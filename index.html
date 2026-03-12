@@ -456,6 +456,43 @@ nav{display:flex;gap:5px;flex-wrap:wrap;}
   </div>
 </div>
 
+<!-- MODAL SPLIT -->
+<div class="modal-overlay" id="split-modal">
+  <div class="modal" style="max-width:560px;width:95%;">
+    <div class="modal-title">✂️ Quebrar <span>OS</span></div>
+    <div style="font-family:var(--fm);font-size:11px;color:var(--muted);margin-bottom:16px;" id="split-card-info"></div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+      <label style="font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;">Técnico</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;" id="split-tecnico-grid">
+        <button class="tecnico-btn" onclick="pickSplitTecnico('Lucas')">Lucas</button>
+        <button class="tecnico-btn" onclick="pickSplitTecnico('Diego')">Diego</button>
+        <button class="tecnico-btn" onclick="pickSplitTecnico('Kassio')">Kassio</button>
+        <button class="tecnico-btn" onclick="pickSplitTecnico('Roberto')">Roberto</button>
+        <button class="tecnico-btn" onclick="pickSplitTecnico('Carlos')">Carlos</button>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
+      <label style="font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Qtd. equipamentos</label>
+      <div style="display:flex;gap:5px;">
+        <button class="split-qty-btn selected" data-qty="2" onclick="setSplitQty(2)">2</button>
+        <button class="split-qty-btn" data-qty="3" onclick="setSplitQty(3)">3</button>
+        <button class="split-qty-btn" data-qty="4" onclick="setSplitQty(4)">4</button>
+        <button class="split-qty-btn" data-qty="5" onclick="setSplitQty(5)">5</button>
+        <button class="split-qty-btn" data-qty="6" onclick="setSplitQty(6)">6</button>
+      </div>
+    </div>
+
+    <div id="split-rows" style="display:flex;flex-direction:column;gap:10px;max-height:320px;overflow-y:auto;margin-bottom:18px;"></div>
+
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeSplitModal()">Cancelar</button>
+      <button class="modal-confirm" id="split-confirm-btn" onclick="submitSplit()">✂️ Quebrar OS</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL FIM DO DIA -->
 <div class="modal-overlay" id="eod-modal">
   <div class="modal">
@@ -600,6 +637,7 @@ function cardHTML(c, color) {
         <div class="card-age">🕐 ${c.age != null ? c.age+'d' : '—'}</div>
         <div class="card-by">${c.tecnico || c.movedBy || '—'}</div>
       </div>
+      <button onclick="openSplitModal('${c.pipefyId}')" style="margin-top:7px;width:100%;font-family:var(--fm);font-size:10px;padding:5px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all 0.15s;" onmouseover="this.style.borderColor='rgba(245,200,0,0.4)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">✂️ Quebrar</button>
     </div>`;
 }
 
@@ -1128,6 +1166,155 @@ function playClienteLoja() {
 
 // Desbloqueia AudioContext no primeiro toque do usuário
 document.addEventListener('click', () => { try { getAudioCtx(); } catch(e) {} }, { once: true });
+
+// ── SPLIT CARD ─────────────────────────────────────────────────
+let splitCardId   = null;
+let splitQty      = 2;
+let splitTecnico  = null;
+
+const EQUIPAMENTOS = ['Microondas', 'Purificador', 'Adega', 'Forno', 'Outro'];
+
+function openSplitModal(pipefyId) {
+  const card = (board?.cards || []).find(c => c.pipefyId === pipefyId);
+  if (!card) return;
+  splitCardId = pipefyId;
+  splitQty    = 2;
+  splitTecnico = null;
+
+  document.getElementById('split-card-info').textContent =
+    `#${card.osCode || pipefyId} — ${card.title}${card.nomeContato ? ' | ' + card.nomeContato : ''}`;
+
+  // Reset qty buttons
+  document.querySelectorAll('.split-qty-btn').forEach(b => {
+    b.classList.toggle('selected', parseInt(b.dataset.qty) === 2);
+  });
+  // Reset tecnico
+  document.querySelectorAll('#split-tecnico-grid .tecnico-btn').forEach(b => b.classList.remove('selected'));
+
+  renderSplitRows();
+  document.getElementById('split-modal').classList.add('open');
+}
+
+function closeSplitModal() {
+  document.getElementById('split-modal').classList.remove('open');
+}
+
+function pickSplitTecnico(name) {
+  splitTecnico = name;
+  document.querySelectorAll('#split-tecnico-grid .tecnico-btn').forEach(b => {
+    b.classList.toggle('selected', b.textContent === name);
+  });
+}
+
+function setSplitQty(qty) {
+  splitQty = qty;
+  document.querySelectorAll('.split-qty-btn').forEach(b => {
+    b.classList.toggle('selected', parseInt(b.dataset.qty) === qty);
+  });
+  renderSplitRows();
+}
+
+function renderSplitRows() {
+  const container = document.getElementById('split-rows');
+  const phases = board?.phases || [];
+  // Destaque para fases de conclusão e produção
+  const keyPhases = phases.filter(p =>
+    ['loja_feito','delivery_feito','aprovado','producao','cliente_loja','urgencia'].includes(p.id)
+  );
+
+  container.innerHTML = Array.from({length: splitQty}, (_, i) => `
+    <div class="split-row" id="split-row-${i}">
+      <div class="split-row-num">Equipamento ${i + 1}</div>
+      <div class="split-equip-grid">
+        ${EQUIPAMENTOS.map(eq => `
+          <button class="split-equip-btn ${i===0&&eq==='Microondas'?'selected':''}"
+            data-row="${i}" data-equip="${eq}"
+            onclick="pickSplitEquip(${i},'${eq}')">
+            ${eq}
+          </button>`).join('')}
+        <input class="split-equip-other" id="split-other-${i}" type="text"
+          placeholder="outro..." oninput="pickSplitEquipOther(${i}, this.value)"
+          style="display:${i===0?'none':'inline'}"/>
+      </div>
+      <div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:4px;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.08em;">Fase de destino</div>
+      <div class="split-phase-grid">
+        ${keyPhases.map((ph, pi) => {
+          const color = COLORS[phases.findIndex(p=>p.id===ph.id) % COLORS.length];
+          const defPhase = i === 0 ? 'loja_feito' : 'producao';
+          return `<button class="split-phase-btn ${ph.id===defPhase?'selected':''}"
+            data-row="${i}" data-phase="${ph.id}"
+            style="${ph.id===defPhase?'background:'+color+';':''}"
+            onclick="pickSplitPhase(${i},'${ph.id}','${color}')">
+            <span style="width:6px;height:6px;border-radius:50%;background:${color};display:inline-block"></span>
+            ${ph.name}
+          </button>`;
+        }).join('')}
+      </div>
+    </div>`).join('');
+
+  // Set default equip for row 0
+  const firstEquip = document.querySelector('[data-row="0"][data-equip="Microondas"]');
+  if (firstEquip) firstEquip.classList.add('selected');
+}
+
+function pickSplitEquip(rowIdx, equip) {
+  document.querySelectorAll(`[data-row="${rowIdx}"].split-equip-btn`).forEach(b => b.classList.remove('selected'));
+  const btn = document.querySelector(`[data-row="${rowIdx}"][data-equip="${equip}"]`);
+  if (btn) btn.classList.add('selected');
+  const other = document.getElementById(`split-other-${rowIdx}`);
+  if (equip === 'Outro') { other.style.display = 'inline'; other.focus(); }
+  else other.style.display = 'none';
+}
+
+function pickSplitEquipOther(rowIdx, val) {
+  // Clear preset selections
+  document.querySelectorAll(`[data-row="${rowIdx}"].split-equip-btn`).forEach(b => {
+    b.classList.toggle('selected', b.dataset.equip === 'Outro');
+  });
+}
+
+function pickSplitPhase(rowIdx, phaseId, color) {
+  document.querySelectorAll(`[data-row="${rowIdx}"].split-phase-btn`).forEach(b => {
+    b.classList.remove('selected'); b.style.background = '';  b.style.color = '';
+  });
+  const btn = document.querySelector(`[data-row="${rowIdx}"][data-phase="${phaseId}"]`);
+  if (btn) { btn.classList.add('selected'); btn.style.background = color; btn.style.color = '#000'; }
+}
+
+function getSplitData() {
+  return Array.from({length: splitQty}, (_, i) => {
+    // Equipamento
+    const selEquipBtn = document.querySelector(`[data-row="${i}"].split-equip-btn.selected`);
+    let equip = selEquipBtn?.dataset.equip || '';
+    if (equip === 'Outro') equip = document.getElementById(`split-other-${i}`)?.value?.trim() || 'Outro';
+
+    // Fase
+    const selPhaseBtn = document.querySelector(`[data-row="${i}"].split-phase-btn.selected`);
+    const phaseId = selPhaseBtn?.dataset.phase || (i === 0 ? 'loja_feito' : 'producao');
+
+    return { equipamento: equip, phaseId };
+  });
+}
+
+async function submitSplit() {
+  const btn = document.getElementById('split-confirm-btn');
+  btn.disabled = true; btn.textContent = '⏳ Quebrando...';
+
+  const splits = getSplitData();
+  try {
+    const res = await api('POST', 'split-card', {
+      pipefyId: splitCardId, splits, tecnico: splitTecnico
+    });
+    if (!res.ok) throw new Error(res.error);
+    board = (await (await fetch('/api/board?action=load')).json()).board || board;
+    renderBoard(); renderStageGrids();
+    document.getElementById('stat-total').textContent = board.cards.length;
+    closeSplitModal();
+    showToast('✂️', 'OS quebrada!', `${res.created} fichas criadas`);
+  } catch(e) { showToast('❌','Erro',e.message); }
+
+  btn.disabled = false; btn.textContent = '✂️ Quebrar OS';
+}
 
 // ── INIT ───────────────────────────────────────────────────────
 // Renderiza fases imediatamente com board padrão — não espera API
