@@ -116,7 +116,7 @@ async function fetchApprovedCards() {
   const all = [];
   let cursor = null, hasNext = true;
 
-  // Início do dia em BRT
+  // Início do dia BRT
   const nowBRT = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
   nowBRT.setHours(0, 0, 0, 0);
   const todayStartUTC = new Date(nowBRT.getTime() + 3 * 60 * 60 * 1000);
@@ -131,9 +131,9 @@ async function fetchApprovedCards() {
             pageInfo { hasNextPage endCursor }
             edges {
               node {
-                id title age created_at
+                id title age
+                updated_at
                 fields { name value }
-                phases_history { phase { name } lastTimeIn }
               }
             }
           }
@@ -147,16 +147,10 @@ async function fetchApprovedCards() {
     if (!phase) throw new Error('Fase "Aprovado" não encontrada');
 
     for (const { node } of phase.cards.edges) {
-      // Quando o card entrou na fase Aprovado pela última vez
-      const aprovadoHistory = (node.phases_history || []).find(h =>
-        h.phase?.name?.toLowerCase().includes("aprovad")
-      );
-      const approvedAt = aprovadoHistory?.lastTimeIn
-        ? new Date(aprovadoHistory.lastTimeIn)
-        : new Date(node.created_at || 0);
-
-      // Só importa se foi aprovado hoje
-      if (approvedAt < todayStartUTC) continue;
+      // updated_at = quando o card foi modificado pela última vez (inclui mover de fase)
+      const updatedAt = node.updated_at ? new Date(node.updated_at) : null;
+      const isToday = updatedAt && updatedAt >= todayStartUTC;
+      if (!isToday) continue;
 
       const fields = node.fields || [];
       const nomeField = fields.find(f =>
@@ -169,14 +163,14 @@ async function fetchApprovedCards() {
       const digitsMatch = nomeVal.match(/(\d{4})\D*$/);
 
       all.push({
-        pipefyId:      String(node.id),
-        title:         node.title || "Sem título",
-        nomeContato:   nomeVal || null,
-        osCode:        digitsMatch ? digitsMatch[1] : null,
-        descricao:     descField?.value || null,
-        age:           node.age ?? null,
-        addedAt:       new Date().toISOString(),
-        approvedAt:    approvedAt.toISOString(),
+        pipefyId:    String(node.id),
+        title:       node.title || "Sem título",
+        nomeContato: nomeVal || null,
+        osCode:      digitsMatch ? digitsMatch[1] : null,
+        descricao:   descField?.value || null,
+        age:         node.age ?? null,
+        addedAt:     new Date().toISOString(),
+        approvedAt:  updatedAt ? updatedAt.toISOString() : new Date().toISOString(),
       });
     }
 
