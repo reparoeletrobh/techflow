@@ -1,10 +1,11 @@
 const PIPEFY_API = "https://api.pipefy.com/graphql";
 const PIPE_ID    = "305832912";
-const BOARD_KEY  = "reparoeletro:board";
+const BOARD_KEY  = "reparoeletro_board";   // sem ":" para evitar conflito de encoding
 
 const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g, "").trim();
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g, "").trim();
 
+// Usa /pipeline para GET e SET — chave sempre em JSON, nunca na URL
 async function dbGet(key) {
   try {
     const r = await fetch(`${UPSTASH_URL}/pipeline`, {
@@ -26,26 +27,28 @@ async function dbSet(key, value) {
       body: JSON.stringify([["SET", key, JSON.stringify(value)]]),
     });
     const j = await r.json();
-    return j[0]?.result === "OK";
+    const ok = j[0]?.result === "OK";
+    if (!ok) console.error("dbSet NOT OK:", JSON.stringify(j));
+    return ok;
   } catch (e) { console.error("dbSet:", e.message); return false; }
 }
 
 function defaultBoard() {
   return {
     phases: [
-      { id: "aprovado",          name: "Aprovado"           },
-      { id: "producao",          name: "Produção"           },
-      { id: "cliente_loja",      name: "Cliente Loja"       },
-      { id: "urgencia",          name: "Urgência"           },
-      { id: "comprar_peca",      name: "Comprar Peça"       },
-      { id: "aguardando_peca",   name: "Aguardando Peça"    },
-      { id: "peca_disponivel",   name: "Peça Disponível"    },
-      { id: "loja_feito",        name: "Loja Feito"         },
-      { id: "delivery_feito",    name: "Delivery Feito"     },
-      { id: "aguardando_ret",    name: "Aguardando Retirada"},
+      { id: "aprovado",        name: "Aprovado"           },
+      { id: "producao",        name: "Produção"           },
+      { id: "cliente_loja",    name: "Cliente Loja"       },
+      { id: "urgencia",        name: "Urgência"           },
+      { id: "comprar_peca",    name: "Comprar Peça"       },
+      { id: "aguardando_peca", name: "Aguardando Peça"    },
+      { id: "peca_disponivel", name: "Peça Disponível"    },
+      { id: "loja_feito",      name: "Loja Feito"         },
+      { id: "delivery_feito",  name: "Delivery Feito"     },
+      { id: "aguardando_ret",  name: "Aguardando Retirada"},
     ],
     cards: [],
-    syncedIds: [],
+    syncedIds: [],   // IDs que já estão no dashboard (não reimportar)
   };
 }
 
@@ -128,9 +131,11 @@ module.exports = async function handler(req, res) {
     if (req.method === "GET" && action === "load") {
       let board = sanitizeBoard(await dbGet(BOARD_KEY));
       let newCount = 0, pipefyError = null;
+
       try {
         const approved = await fetchApprovedCards();
         for (const c of approved) {
+          // Só importa se o ID ainda não está no dashboard
           if (!board.syncedIds.includes(c.pipefyId)) {
             board.cards.unshift({ ...c, phaseId: board.phases[0].id, movedBy: "Pipefy" });
             board.syncedIds.push(c.pipefyId);
@@ -139,20 +144,30 @@ module.exports = async function handler(req, res) {
         }
         if (newCount > 0) await dbSet(BOARD_KEY, board);
       } catch (e) { pipefyError = e.message; }
+
       return res.status(200).json({ ok: true, board, newCount, pipefyError });
     }
 
-    // ── POST/GET reset ────────────────────────────────────────
+    // ── POST reset ────────────────────────────────────────────
+    // Zera o board E marca as OS atuais como "já vistas" para não voltarem
     if (action === "reset") {
       const fresh = defaultBoard();
       try {
         const approved = await fetchApprovedCards();
+        // Marca como vistas MAS NÃO importa — board fica vazio
         fresh.syncedIds = approved.map(c => c.pipefyId);
-      } catch (e) { console.error("Reset fetch error:", e.message); }
+      } catch (e) { console.error("Reset Pipefy error:", e.message); }
+
       const saved = await dbSet(BOARD_KEY, fresh);
+      // Lê de volta para confirmar
       const verify = await dbGet(BOARD_KEY);
-      const verifyOk = verify && Array.isArray(verify.syncedIds) && verify.syncedIds.length === fresh.syncedIds.length;
-      return res.status(200).json({ ok: saved, board: fresh, verified: verifyOk, markedAsSeen: fresh.syncedIds.length });
+      const ok = verify && Array.isArray(verify.syncedIds) && verify.cards.length === 0;
+
+      return res.status(200).json({
+        ok: saved && ok,
+        board: fresh,
+        markedAsSeen: fresh.syncedIds.length,
+      });
     }
 
     // ── POST move ─────────────────────────────────────────────
@@ -171,19 +186,18 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, card });
     }
 
-    // ── POST move-batch (fim do dia: Loja Feito + Delivery Feito → Aguardando Retirada) ──
+    // ── POST move-batch (fim do dia) ──────────────────────────
     if (req.method === "POST" && action === "move-batch") {
-      const { movedBy } = req.body || {};
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
-      const FROM_PHASES = ["loja_feito", "delivery_feito"];
-      const TO_PHASE    = "aguardando_ret";
-      let count = 0;
-      const now = new Date().toISOString();
+      const FROM  = ["loja_feito", "delivery_feito"];
+      const TO    = "aguardando_ret";
+      let count   = 0;
+      const now   = new Date().toISOString();
       for (const card of board.cards) {
-        if (FROM_PHASES.includes(card.phaseId)) {
-          card.phaseId = TO_PHASE;
+        if (FROM.includes(card.phaseId)) {
+          card.phaseId = TO;
           card.movedAt = now;
-          card.movedBy = movedBy || "Sistema";
+          card.movedBy = "Sistema";
           count++;
         }
       }
@@ -193,16 +207,18 @@ module.exports = async function handler(req, res) {
 
     // ── POST create ───────────────────────────────────────────
     if (req.method === "POST" && action === "create") {
-      const { title, phaseId, createdBy } = req.body || {};
+      const { title, phaseId, createdBy, nomeContato, descricao } = req.body || {};
       if (!title)
         return res.status(400).json({ ok: false, error: "title é obrigatório" });
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
       const newId = "local-" + Date.now();
       board.cards.unshift({
-        pipefyId: newId, title, nomeContato: null, descricao: null,
-        age: 0, addedAt: new Date().toISOString(),
+        pipefyId: newId, title, nomeContato: nomeContato || null,
+        descricao: descricao || null, age: 0,
+        addedAt: new Date().toISOString(),
         phaseId: phaseId || board.phases[0].id,
-        movedAt: new Date().toISOString(), movedBy: createdBy || "—", localOnly: true,
+        movedAt: new Date().toISOString(),
+        movedBy: createdBy || "—", localOnly: true,
       });
       board.syncedIds.push(newId);
       await dbSet(BOARD_KEY, board);
@@ -210,6 +226,7 @@ module.exports = async function handler(req, res) {
     }
 
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+
   } catch (err) {
     console.error("Handler error:", err);
     return res.status(500).json({ ok: false, error: err.message });
