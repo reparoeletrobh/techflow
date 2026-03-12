@@ -218,73 +218,100 @@
 
 
   /* METAS */
-  #page-metas { align-items: center; justify-content: flex-start; padding: 32px 28px; }
-  .metas-wrap { width: 100%; max-width: 720px; margin: 0 auto; }
-  .metas-title { font-family: var(--font-head); font-size: 28px; font-weight: 800; letter-spacing: -1px; margin-bottom: 4px; }
+  #page-metas { align-items: flex-start; justify-content: flex-start; padding: 28px 28px 48px; overflow-y: auto; }
+  .metas-wrap { width: 100%; max-width: 900px; margin: 0 auto; }
+  .metas-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 12px; }
+  .metas-title { font-family: var(--font-head); font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
   .metas-title span { color: var(--accent); }
-  .metas-sub { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-bottom: 32px; }
-
-  .metas-section { margin-bottom: 36px; }
-  .metas-section-title {
-    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
-    text-transform: uppercase; letter-spacing: 0.15em; color: var(--muted);
-    margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
-  }
-  .metas-section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-
-  .meta-card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 12px; padding: 20px 22px; margin-bottom: 12px;
-    border-left: 3px solid var(--accent);
-    transition: border-color 0.2s;
-  }
-  .meta-card.delivery { border-left-color: #3b9eff; }
-  .meta-card.exceeded { border-left-color: #22c55e; }
-
-  .meta-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 12px; }
-  .meta-label { font-family: var(--font-head); font-size: 15px; font-weight: 700; }
-  .meta-numbers { font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
-  .meta-numbers strong { font-size: 28px; font-weight: 700; line-height: 1; }
-  .meta-numbers strong.loja { color: var(--accent); }
-  .meta-numbers strong.delivery { color: #3b9eff; }
-  .meta-numbers strong.exceeded { color: #22c55e; }
-
-  .progress-track {
-    height: 10px; background: var(--surface2);
-    border-radius: 99px; overflow: visible; position: relative;
-  }
-  .progress-bar {
-    height: 100%; border-radius: 99px;
-    transition: width 0.8s cubic-bezier(0.34,1.2,0.64,1);
-    position: relative; max-width: none;
-  }
-  .progress-bar.loja    { background: var(--accent); box-shadow: 0 0 12px rgba(245,200,0,0.4); }
-  .progress-bar.delivery{ background: #3b9eff;        box-shadow: 0 0 12px rgba(59,158,255,0.4); }
-  .progress-bar.exceeded{ background: #22c55e;        box-shadow: 0 0 12px rgba(34,197,94,0.5); }
-
-  .progress-100-mark {
-    position: absolute; right: 0; top: -4px; bottom: -4px;
-    width: 2px; background: rgba(255,255,255,0.15); border-radius: 2px;
-  }
-  .meta-pct {
-    font-family: var(--font-mono); font-size: 11px; color: var(--muted);
-    margin-top: 7px; display: flex; justify-content: space-between;
-  }
-  .meta-pct strong { font-size: 13px; }
-  .meta-pct strong.loja { color: var(--accent); }
-  .meta-pct strong.delivery { color: #3b9eff; }
-  .meta-pct strong.exceeded { color: #22c55e; }
-
+  .metas-sub { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-top: 3px; }
   .meta-refresh-btn {
     font-family: var(--font-mono); font-size: 11px; padding: 6px 14px; border-radius: 6px;
     border: 1px solid var(--border); background: transparent; color: var(--muted);
-    cursor: pointer; transition: all 0.15s; margin-bottom: 24px;
+    cursor: pointer; transition: all 0.15s;
   }
   .meta-refresh-btn:hover { color: var(--accent); border-color: var(--accent); }
 
-  .meta-loading { font-family: var(--font-mono); font-size: 12px; color: var(--muted); padding: 40px 0; text-align: center; }
+  /* ROW */
+  .metas-row-label {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted);
+    margin-bottom: 14px; display: flex; align-items: center; gap: 10px;
+  }
+  .metas-row-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .metas-row-label .row-date {
+    font-size: 11px; color: var(--text); background: var(--surface2);
+    border: 1px solid var(--border); padding: 2px 10px; border-radius: 20px;
+    font-family: var(--font-mono);
+  }
 
-  /* TOAST */
+  .metas-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 32px; }
+
+  /* DONUT CARD */
+  .donut-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px 16px 16px;
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    transition: border-color 0.2s; position: relative; overflow: hidden;
+  }
+  .donut-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  }
+  .donut-card.aprovado::before { background: var(--accent); }
+  .donut-card.loja::before     { background: #ff9800; }
+  .donut-card.delivery::before { background: #3b9eff; }
+  .donut-card.prevweek { opacity: 0.75; }
+
+  .donut-card-label { font-family: var(--font-head); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+
+  /* SVG DONUT */
+  .donut-svg-wrap { position: relative; width: 110px; height: 110px; flex-shrink: 0; }
+  .donut-svg { transform: rotate(-90deg); }
+  .donut-track { fill: none; stroke: var(--surface2); stroke-width: 10; }
+  .donut-fill  { fill: none; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 1s cubic-bezier(0.34,1.2,0.64,1); }
+  .donut-fill.aprovado { stroke: var(--accent); filter: drop-shadow(0 0 6px rgba(245,200,0,0.5)); }
+  .donut-fill.loja     { stroke: #ff9800;        filter: drop-shadow(0 0 6px rgba(255,152,0,0.5)); }
+  .donut-fill.delivery { stroke: #3b9eff;        filter: drop-shadow(0 0 6px rgba(59,158,255,0.5)); }
+  .donut-fill.exceeded { stroke: #22c55e;        filter: drop-shadow(0 0 6px rgba(34,197,94,0.6)); }
+  .donut-fill.prevweek { filter: none; }
+
+  .donut-center {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; pointer-events: none;
+  }
+  .donut-pct  { font-family: var(--font-head); font-size: 20px; font-weight: 800; line-height: 1; }
+  .donut-pct.aprovado { color: var(--accent); }
+  .donut-pct.loja     { color: #ff9800; }
+  .donut-pct.delivery { color: #3b9eff; }
+  .donut-pct.exceeded { color: #22c55e; }
+  .donut-pct.prevweek { color: var(--muted); }
+  .donut-pct-sub { font-family: var(--font-mono); font-size: 9px; color: var(--muted); margin-top: 2px; }
+
+  .donut-stats { width: 100%; display: flex; flex-direction: column; gap: 5px; }
+  .donut-stat-row { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 11px; }
+  .donut-stat-row .s-label { color: var(--muted); }
+  .donut-stat-row .s-val   { color: var(--text); font-weight: 500; }
+  .donut-stat-row .s-val.aprovado { color: var(--accent); }
+  .donut-stat-row .s-val.loja     { color: #ff9800; }
+  .donut-stat-row .s-val.delivery { color: #3b9eff; }
+  .donut-stat-row .s-val.exceeded { color: #22c55e; }
+
+  .donut-badge {
+    font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+    padding: 2px 8px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .donut-badge.ok       { background: rgba(245,200,0,0.12); color: var(--accent); }
+  .donut-badge.ok.loja  { background: rgba(255,152,0,0.12); color: #ff9800; }
+  .donut-badge.ok.del   { background: rgba(59,158,255,0.12); color: #3b9eff; }
+  .donut-badge.exceeded { background: rgba(34,197,94,0.15); color: #22c55e; }
+  .donut-badge.low      { background: rgba(239,68,68,0.1); color: #ef4444; }
+
+  .meta-loading { font-family: var(--font-mono); font-size: 12px; color: var(--muted); padding: 60px 0; text-align: center; }
+
+  @media (max-width: 640px) {
+    .metas-row { grid-template-columns: 1fr 1fr; }
+  }
+
+    /* TOAST */
   .toast{
     position:fixed;bottom:24px;right:24px;background:var(--surface);
     border:1px solid var(--border);border-top:2px solid var(--accent);
@@ -434,9 +461,13 @@
 <!-- METAS -->
 <div id="page-metas" class="page">
   <div class="metas-wrap">
-    <div class="metas-title">Metas da <span>Equipe</span></div>
-    <div class="metas-sub">// progresso atualizado a cada movimentação</div>
-    <button class="meta-refresh-btn" onclick="loadGoals()">↻ Atualizar</button>
+    <div class="metas-header">
+      <div>
+        <div class="metas-title">Metas da <span>Equipe</span></div>
+        <div class="metas-sub">// atualiza a cada 30 segundos</div>
+      </div>
+      <button class="meta-refresh-btn" onclick="loadGoals()">↻ Atualizar</button>
+    </div>
     <div id="metas-content"><div class="meta-loading">Carregando metas...</div></div>
   </div>
 </div>
@@ -736,7 +767,6 @@ function showToast(icon, title, msg) {
 
 // ── METAS ──────────────────────────────────────────────────────
 async function loadGoals() {
-  document.getElementById('metas-content').innerHTML = '<div class="meta-loading">Carregando...</div>';
   try {
     const r = await fetch('/api/board?action=goals');
     const data = await r.json();
@@ -748,50 +778,98 @@ async function loadGoals() {
   }
 }
 
+function donutSVG(count, goal, colorClass) {
+  const R = 46;
+  const C = 2 * Math.PI * R;
+  const rawPct = goal > 0 ? count / goal : 0;
+  const pct = Math.round(rawPct * 100);
+  const isExceeded = rawPct >= 1;
+  const cc = isExceeded ? 'exceeded' : colorClass;
+  // Cap at 100% visually but show real number in center
+  const fillPct = Math.min(rawPct, 1);
+  const offset = C - fillPct * C;
+
+  return `
+    <div class="donut-svg-wrap">
+      <svg class="donut-svg" width="110" height="110" viewBox="0 0 110 110">
+        <circle class="donut-track" cx="55" cy="55" r="${R}"/>
+        <circle class="donut-fill ${cc}" cx="55" cy="55" r="${R}"
+          stroke-dasharray="${C}"
+          stroke-dashoffset="${offset}"
+        />
+      </svg>
+      <div class="donut-center">
+        <div class="donut-pct ${cc}">${pct}%</div>
+        <div class="donut-pct-sub">${count}/${goal}</div>
+      </div>
+    </div>`;
+}
+
+function donutCard(label, count, goal, colorClass, isPrevWeek) {
+  const rawPct = goal > 0 ? count / goal : 0;
+  const isExceeded = rawPct >= 1;
+  const cc = isExceeded ? 'exceeded' : colorClass;
+  const remaining = Math.max(goal - count, 0);
+  const extra = count > goal ? count - goal : 0;
+
+  const badgeClass = isExceeded ? 'exceeded' : `ok${colorClass === 'loja' ? ' loja' : colorClass === 'delivery' ? ' del' : ''}`;
+  const badgeText  = isExceeded ? `+${extra} além` : remaining === 0 ? 'Meta!' : `faltam ${remaining}`;
+
+  return `
+    <div class="donut-card ${colorClass} ${isPrevWeek ? 'prevweek' : ''}">
+      <div class="donut-card-label">${label}</div>
+      ${donutSVG(count, goal, isPrevWeek ? 'prevweek' : colorClass)}
+      <div class="donut-stats">
+        <div class="donut-stat-row">
+          <span class="s-label">Realizados</span>
+          <span class="s-val ${isPrevWeek ? '' : cc}">${count}</span>
+        </div>
+        <div class="donut-stat-row">
+          <span class="s-label">Meta</span>
+          <span class="s-val">${goal}</span>
+        </div>
+        ${!isPrevWeek ? `<div class="donut-stat-row" style="margin-top:4px">
+          <span class="donut-badge ${badgeClass}">${badgeText}</span>
+        </div>` : ''}
+      </div>
+    </div>`;
+}
+
 function renderGoals(data) {
-  const { today, week } = data;
-
-  function metaCardHTML(label, count, goal, colorClass, period) {
-    const raw = goal > 0 ? (count / goal) * 100 : 0;
-    const pct = Math.round(raw);
-    const barWidth = Math.min(raw, 100); // barra até 100% visualmente
-    const isExceeded = raw >= 100;
-    const cc = isExceeded ? 'exceeded' : colorClass;
-    const remaining = Math.max(goal - count, 0);
-    const extra = count > goal ? count - goal : 0;
-
-    return `
-      <div class="meta-card ${colorClass} ${isExceeded ? 'exceeded' : ''}">
-        <div class="meta-header">
-          <div class="meta-label">${label} <span style="font-size:11px;color:var(--muted);font-family:var(--font-mono);font-weight:400">/ meta ${goal}</span></div>
-          <div class="meta-numbers">
-            <strong class="${cc}">${count}</strong>
-            <span style="font-size:11px;margin-left:4px;">${period}</span>
-          </div>
-        </div>
-        <div class="progress-track">
-          <div class="progress-bar ${cc}" style="width:${barWidth}%"></div>
-        </div>
-        <div class="meta-pct">
-          <strong class="${cc}">${pct}%</strong>
-          <span>${isExceeded
-            ? `✅ Meta batida! +${extra} além da meta`
-            : `faltam ${remaining} para a meta`
-          }</span>
-        </div>
-      </div>`;
-  }
+  const { today, week, prevWeek, todayLabel, weekLabel, prevWeekLabel } = data;
 
   const html = `
-    <div class="metas-section">
-      <div class="metas-section-title">☀️ Hoje</div>
-      ${metaCardHTML('Loja Feito',     today.loja.count,     today.loja.goal,     'loja',     'hoje')}
-      ${metaCardHTML('Delivery Feito', today.delivery.count, today.delivery.goal, 'delivery', 'hoje')}
+    <!-- HOJE -->
+    <div class="metas-row-label">
+      ☀️ Hoje
+      <span class="row-date">${todayLabel}</span>
     </div>
-    <div class="metas-section">
-      <div class="metas-section-title">📅 Esta Semana</div>
-      ${metaCardHTML('Loja Feito',     week.loja.count,     week.loja.goal,     'loja',     'semana')}
-      ${metaCardHTML('Delivery Feito', week.delivery.count, week.delivery.goal, 'delivery', 'semana')}
+    <div class="metas-row">
+      ${donutCard('Aprovados',     today.aprovado.count, today.aprovado.goal, 'aprovado', false)}
+      ${donutCard('Loja Feito',    today.loja.count,     today.loja.goal,     'loja',     false)}
+      ${donutCard('Delivery Feito',today.delivery.count, today.delivery.goal, 'delivery', false)}
+    </div>
+
+    <!-- SEMANA -->
+    <div class="metas-row-label">
+      📅 Esta Semana
+      <span class="row-date">${weekLabel}</span>
+    </div>
+    <div class="metas-row">
+      ${donutCard('Aprovados',     week.aprovado.count, week.aprovado.goal, 'aprovado', false)}
+      ${donutCard('Loja Feito',    week.loja.count,     week.loja.goal,     'loja',     false)}
+      ${donutCard('Delivery Feito',week.delivery.count, week.delivery.goal, 'delivery', false)}
+    </div>
+
+    <!-- SEMANA ANTERIOR -->
+    <div class="metas-row-label" style="opacity:0.6">
+      📦 Semana Anterior
+      <span class="row-date" style="opacity:0.7">${prevWeekLabel}</span>
+    </div>
+    <div class="metas-row">
+      ${donutCard('Aprovados',     prevWeek.aprovado.count, prevWeek.aprovado.goal, 'aprovado', true)}
+      ${donutCard('Loja Feito',    prevWeek.loja.count,     prevWeek.loja.goal,     'loja',     true)}
+      ${donutCard('Delivery Feito',prevWeek.delivery.count, prevWeek.delivery.goal, 'delivery', true)}
     </div>`;
 
   document.getElementById('metas-content').innerHTML = html;
@@ -799,7 +877,10 @@ function renderGoals(data) {
 
 // ── INIT ───────────────────────────────────────────────────────
 loadBoard();
-setInterval(loadBoard, 30000);
+setInterval(() => {
+  loadBoard();
+  if (document.getElementById('page-metas').classList.contains('active')) loadGoals();
+}, 30000);
 </script>
 </body>
 </html>
