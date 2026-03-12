@@ -161,7 +161,8 @@ module.exports = async function handler(req, res) {
         console.error("Reset fetch error:", e.message);
       }
       await dbSet(BOARD_KEY, fresh);
-      return res.status(200).json({ ok: true, cleared: true, markedAsSeen: fresh.syncedIds.length, message: "Board zerado com sucesso!" });
+      await new Promise(r => setTimeout(r, 300));
+      return res.status(200).json({ ok: true, board: fresh, cleared: true, markedAsSeen: fresh.syncedIds.length, message: "Board zerado com sucesso!" });
     }
 
     // ── POST reset ────────────────────────────────────────────
@@ -179,7 +180,9 @@ module.exports = async function handler(req, res) {
       }
 
       await dbSet(BOARD_KEY, fresh);
-      return res.status(200).json({ ok: true, message: "Board resetado. Somente novas OS aprovadas aparecerão." });
+      // Aguarda 300ms para garantir que Upstash confirmou a gravação
+      await new Promise(r => setTimeout(r, 300));
+      return res.status(200).json({ ok: true, board: fresh, message: "Board resetado." });
     }
 
     // ── POST move ─────────────────────────────────────────────
