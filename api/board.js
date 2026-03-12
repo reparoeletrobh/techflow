@@ -192,11 +192,17 @@ module.exports = async function handler(req, res) {
       // 1. Importa novos aprovados (isolado — falha aqui não afeta o resto)
       try {
         const approved = await fetchApprovedCards();
+        // IDs que estão ativamente no board agora
+        const activeIds = new Set(board.cards.map(c => c.pipefyId));
         for (const c of approved) {
-          if (board.syncedIds.includes(c.pipefyId)) continue;
+          // Só pula se o card já está visível no board
+          // Se estava em syncedIds mas foi removido (ERP, reset parcial), reimporta
+          if (activeIds.has(c.pipefyId)) continue;
           board.cards.unshift({ ...c, phaseId: board.phases[0].id, movedBy: "Pipefy" });
-          board.syncedIds.push(c.pipefyId);
-          board.movesLog.push({ phaseId: "aprovado_entrada", timestamp: new Date().toISOString() });
+          if (!board.syncedIds.includes(c.pipefyId)) {
+            board.syncedIds.push(c.pipefyId);
+            board.movesLog.push({ phaseId: "aprovado_entrada", timestamp: new Date().toISOString() });
+          }
           newCount++;
         }
         board.movesLog = trimLog(board.movesLog);
