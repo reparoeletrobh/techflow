@@ -49,6 +49,7 @@ function defaultBoard() {
     ],
     cards: [],
     syncedIds: [],   // IDs que já estão no dashboard (não reimportar)
+    movesLog: [],    // { phaseId, timestamp } — histórico para cálculo de metas
   };
 }
 
@@ -197,6 +198,17 @@ module.exports = async function handler(req, res) {
       card.phaseId = phaseId;
       card.movedAt = new Date().toISOString();
       card.movedBy = movedBy || "—";
+
+      // Registra no log de metas se for fase relevante
+      if (["loja_feito", "delivery_feito"].includes(phaseId)) {
+        if (!Array.isArray(board.movesLog)) board.movesLog = [];
+        board.movesLog.push({ phaseId, timestamp: card.movedAt });
+        // Mantém apenas últimos 60 dias de log
+        const cutoff60 = new Date();
+        cutoff60.setDate(cutoff60.getDate() - 60);
+        board.movesLog = board.movesLog.filter(m => new Date(m.timestamp) > cutoff60);
+      }
+
       await dbSet(BOARD_KEY, board);
       return res.status(200).json({ ok: true, card });
     }
@@ -279,6 +291,43 @@ module.exports = async function handler(req, res) {
       result.board_key = BOARD_KEY;
 
       return res.status(200).json(result);
+    }
+
+    // ── GET goals ─────────────────────────────────────────────
+    if (req.method === "GET" && action === "goals") {
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const log = Array.isArray(board.movesLog) ? board.movesLog : [];
+
+      const now = new Date();
+
+      // Início do dia (meia-noite, horário de Brasília UTC-3)
+      const todayBRT = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+      todayBRT.setHours(0, 0, 0, 0);
+      const todayStart = new Date(todayBRT.getTime() + 3 * 60 * 60 * 1000); // converte de volta pra UTC
+
+      // Início da semana (segunda-feira)
+      const dayOfWeek = todayBRT.getDay(); // 0=dom,1=seg...
+      const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const weekStartBRT = new Date(todayBRT);
+      weekStartBRT.setDate(weekStartBRT.getDate() + diffToMonday);
+      weekStartBRT.setHours(0, 0, 0, 0);
+      const weekStart = new Date(weekStartBRT.getTime() + 3 * 60 * 60 * 1000);
+
+      const count = (phaseId, since) =>
+        log.filter(m => m.phaseId === phaseId && new Date(m.timestamp) >= since).length;
+
+      return res.status(200).json({
+        ok: true,
+        today: {
+          loja:     { count: count("loja_feito",     todayStart), goal: 15 },
+          delivery: { count: count("delivery_feito", todayStart), goal: 20 },
+        },
+        week: {
+          loja:     { count: count("loja_feito",     weekStart), goal: 90 },
+          delivery: { count: count("delivery_feito", weekStart), goal: 120 },
+        },
+        logSize: log.length,
+      });
     }
 
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
