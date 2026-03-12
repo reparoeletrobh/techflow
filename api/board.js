@@ -377,3 +377,8 @@ module.exports = async function handler(req, res) {
     }
 
         return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+  } catch (err) {
+    console.error("Handler error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+};
