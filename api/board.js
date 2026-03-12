@@ -148,25 +148,16 @@ module.exports = async function handler(req, res) {
       let board = sanitizeBoard(await dbGet(BOARD_KEY));
       let newCount = 0, pipefyError = null;
 
-      // cutoffDate: só importa OS aprovadas APÓS o último reset
-      const cutoff = board.cutoffDate ? new Date(board.cutoffDate) : null;
-
       try {
         const approved = await fetchApprovedCards();
         for (const c of approved) {
-          // Ignora se já está no dashboard (syncedIds)
+          // Só importa se o ID não está em syncedIds — simples e confiável
           if (board.syncedIds.includes(c.pipefyId)) continue;
-          // Ignora se é mais antiga que o cutoff (proteção dupla)
-          if (cutoff && c.addedAtPipefy && new Date(c.addedAtPipefy) < cutoff) {
-            // Marca como vista sem importar
-            board.syncedIds.push(c.pipefyId);
-            continue;
-          }
           board.cards.unshift({ ...c, phaseId: board.phases[0].id, movedBy: "Pipefy" });
           board.syncedIds.push(c.pipefyId);
           newCount++;
         }
-        if (newCount > 0 || approved.length > 0) await dbSet(BOARD_KEY, board);
+        if (newCount > 0) await dbSet(BOARD_KEY, board);
       } catch (e) { pipefyError = e.message; }
 
       return res.status(200).json({ ok: true, board, newCount, pipefyError });
