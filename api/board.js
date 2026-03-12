@@ -1,19 +1,26 @@
-const PIPEFY_API  = "https://api.pipefy.com/graphql";
-const PIPE_ID     = "305832912";
-const BOARD_KEY   = "techflow:board";
+const PIPEFY_API = "https://api.pipefy.com/graphql";
+const PIPE_ID    = "305832912";
+const BOARD_KEY  = "techflow:board";
 
 const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g, "").trim();
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g, "").trim();
 
-// ── Upstash helpers ───────────────────────────────────────────
+// ── Upstash: usa o formato de pipeline REST (o mais confiável) ─
 async function dbGet(key) {
   try {
-    const r = await fetch(`${UPSTASH_URL}/get/${encodeURIComponent(key)}`, {
-      headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
+    const r = await fetch(`${UPSTASH_URL}/pipeline`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${UPSTASH_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify([["GET", key]]),
     });
     const j = await r.json();
-    return j.result ? JSON.parse(j.result) : null;
-  } catch(e) {
+    const result = j[0]?.result;
+    if (!result) return null;
+    return JSON.parse(result);
+  } catch (e) {
     console.error("dbGet error:", e.message);
     return null;
   }
@@ -21,20 +28,25 @@ async function dbGet(key) {
 
 async function dbSet(key, value) {
   try {
-    await fetch(`${UPSTASH_URL}/set/${encodeURIComponent(key)}`, {
+    const r = await fetch(`${UPSTASH_URL}/pipeline`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${UPSTASH_TOKEN}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(JSON.stringify(value)),
+      body: JSON.stringify([["SET", key, JSON.stringify(value)]]),
     });
-  } catch(e) {
+    const j = await r.json();
+    const ok = j[0]?.result === "OK";
+    if (!ok) console.error("dbSet: Upstash não confirmou OK", j);
+    return ok;
+  } catch (e) {
     console.error("dbSet error:", e.message);
+    return false;
   }
 }
 
-// ── Board padrão ──────────────────────────────────────────────
+// ── Board padrão ───────────────────────────────────────────────
 function defaultBoard() {
   return {
     phases: [
@@ -110,7 +122,7 @@ async function fetchApprovedCards() {
   }));
 }
 
-// ── Handler ───────────────────────────────────────────────────
+// ── Handler ────────────────────────────────────────────────────
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
@@ -120,7 +132,7 @@ module.exports = async function handler(req, res) {
   try {
     const { action } = req.query;
 
-    // ── GET load ──────────────────────────────────────────────
+    // ── GET load ───────────────────────────────────────────────
     if (req.method === "GET" && action === "load") {
       let board = sanitizeBoard(await dbGet(BOARD_KEY));
 
@@ -129,7 +141,6 @@ module.exports = async function handler(req, res) {
       try {
         const approved = await fetchApprovedCards();
         for (const c of approved) {
-          // Só importa OS que ainda não foram vistas (não estão em syncedIds)
           if (!board.syncedIds.includes(c.pipefyId)) {
             board.cards.unshift({
               ...c,
@@ -142,7 +153,10 @@ module.exports = async function handler(req, res) {
             newCount++;
           }
         }
-        if (newCount > 0) await dbSet(BOARD_KEY, board);
+        if (newCount > 0) {
+          const saved = await dbSet(BOARD_KEY, board);
+          if (!saved) console.error("load: falha ao salvar board com novos cards");
+        }
       } catch (e) {
         pipefyError = e.message;
         console.error("Pipefy sync error:", e.message);
@@ -151,8 +165,9 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, board, newCount, pipefyError });
     }
 
-    // ── GET reset (acesse /api/board?action=reset no navegador)
-    if (req.method === "GET" && action === "reset") {
+    // ── POST reset ─────────────────────────────────────────────
+    // Zera o board e marca todas as OS atuais do Pipefy como já vistas
+    if ((req.method === "POST" || req.method === "GET") && action === "reset") {
       const fresh = defaultBoard();
       try {
         const approved = await fetchApprovedCards();
@@ -160,32 +175,26 @@ module.exports = async function handler(req, res) {
       } catch (e) {
         console.error("Reset fetch error:", e.message);
       }
-      await dbSet(BOARD_KEY, fresh);
-      await new Promise(r => setTimeout(r, 300));
-      return res.status(200).json({ ok: true, board: fresh, cleared: true, markedAsSeen: fresh.syncedIds.length, message: "Board zerado com sucesso!" });
+
+      const saved = await dbSet(BOARD_KEY, fresh);
+
+      // Verifica se salvou mesmo lendo de volta
+      const verify = await dbGet(BOARD_KEY);
+      const verifyOk = verify && Array.isArray(verify.syncedIds) && verify.syncedIds.length === fresh.syncedIds.length;
+
+      return res.status(200).json({
+        ok: saved,
+        board: fresh,
+        saved,
+        verified: verifyOk,
+        markedAsSeen: fresh.syncedIds.length,
+        message: verifyOk
+          ? `Board zerado. ${fresh.syncedIds.length} OS marcadas como já vistas.`
+          : "AVISO: reset pode não ter sido salvo corretamente.",
+      });
     }
 
-    // ── POST reset ────────────────────────────────────────────
-    // Limpa o board E marca todas as OS atuais do Pipefy como "já vistas"
-    // Assim o board fica vazio e só OS NOVAS (aprovadas depois disso) vão aparecer
-    if (req.method === "POST" && action === "reset") {
-      const fresh = defaultBoard();
-
-      try {
-        const approved = await fetchApprovedCards();
-        // Marca todos os IDs atuais como já vistos — mas NÃO importa para o board
-        fresh.syncedIds = approved.map(c => c.pipefyId);
-      } catch (e) {
-        console.error("Reset fetch error:", e.message);
-      }
-
-      await dbSet(BOARD_KEY, fresh);
-      // Aguarda 300ms para garantir que Upstash confirmou a gravação
-      await new Promise(r => setTimeout(r, 300));
-      return res.status(200).json({ ok: true, board: fresh, message: "Board resetado." });
-    }
-
-    // ── POST move ─────────────────────────────────────────────
+    // ── POST move ──────────────────────────────────────────────
     if (req.method === "POST" && action === "move") {
       const { pipefyId, phaseId, movedBy } = req.body || {};
       if (!pipefyId || !phaseId)
@@ -196,16 +205,15 @@ module.exports = async function handler(req, res) {
       if (!card)
         return res.status(404).json({ ok: false, error: "OS não encontrada no dashboard" });
 
-      const oldPhase = card.phaseId;
       card.phaseId = phaseId;
       card.movedAt = new Date().toISOString();
       card.movedBy = movedBy || "—";
       await dbSet(BOARD_KEY, board);
 
-      return res.status(200).json({ ok: true, card, oldPhase });
+      return res.status(200).json({ ok: true, card });
     }
 
-    // ── POST create ───────────────────────────────────────────
+    // ── POST create ────────────────────────────────────────────
     if (req.method === "POST" && action === "create") {
       const { title, phaseId, createdBy } = req.body || {};
       if (!title)
