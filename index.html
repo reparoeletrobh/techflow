@@ -497,25 +497,61 @@ async function api(method, action, body) {
 async function loadBoard() {
   document.getElementById('refresh-btn').textContent = '↻';
   document.getElementById('error-banner').style.display = 'none';
+
+  // Timeout de 15s para não ficar carregando infinito
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
   try {
-    const res = await api('GET', 'load');
-    if (!res.ok) throw new Error(res.pipefyError || res.error || 'Erro');
+    const r = await fetch('/api/board?action=load', { signal: controller.signal });
+    clearTimeout(timeout);
+    const res = await r.json();
+
+    if (!res.ok && !res.board) throw new Error(res.pipefyError || res.error || 'Erro na API');
+
     board = res.board;
     renderBoard(); renderStageGrids();
     document.getElementById('stat-total').textContent = board.cards.length;
+
+    // Aviso não-bloqueante se Pipefy falhou mas board carregou do banco
+    if (res.pipefyError) {
+      document.getElementById('error-banner').style.display = 'block';
+      document.getElementById('error-banner').textContent = '⚠️ Pipefy indisponível — exibindo dados salvos. ' + res.pipefyError;
+    }
+
     if (res.newCount > 0) {
       const b = document.getElementById('new-badge');
       b.textContent = `+${res.newCount} nova${res.newCount>1?'s':''} OS`;
       b.style.display = 'inline';
       setTimeout(() => b.style.display = 'none', 6000);
     }
-    // Atualiza RS se estiver aberto
+
     if (document.getElementById('page-rs').classList.contains('active'))     renderRsBoard('rs');
     if (document.getElementById('page-rs-rua').classList.contains('active')) renderRsBoard('rs_rua');
+
   } catch(e) {
+    clearTimeout(timeout);
+    const msg = e.name === 'AbortError' ? 'Tempo esgotado (15s) — verifique sua conexão' : e.message;
     document.getElementById('error-banner').style.display = 'block';
-    document.getElementById('error-banner').textContent = '⚠️ ' + e.message;
+    document.getElementById('error-banner').textContent = '⚠️ ' + msg;
+
+    // Se já tinha board em memória, renderiza o que tem em vez de ficar no spinner
+    if (board) {
+      renderBoard(); renderStageGrids();
+    } else {
+      document.getElementById('kanban-wrapper').innerHTML =
+        `<div class="loading-board" style="flex-direction:column;gap:16px">
+          <div style="font-size:32px">⚠️</div>
+          <div style="font-family:var(--fm);font-size:13px;color:var(--muted);text-align:center">
+            Erro ao carregar<br><span style="color:#ef4444;font-size:11px">${msg}</span>
+          </div>
+          <button onclick="loadBoard()" style="font-family:var(--fm);font-size:11px;padding:8px 18px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--accent);cursor:pointer;">
+            ↻ Tentar novamente
+          </button>
+        </div>`;
+    }
   }
+
   document.getElementById('refresh-btn').textContent = '↻ Atualizar';
 }
 
