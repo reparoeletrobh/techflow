@@ -1,12 +1,13 @@
 {
   "version": 2,
-  "functions": {
-    "api/pipefy.js": {
-      "runtime": "edge"
-    }
-  },
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/pipefy.js" },
-    { "src": "/(.*)", "dest": "/index.html" }
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/pipefy.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
   ]
 }
