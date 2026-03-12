@@ -152,10 +152,12 @@ module.exports = async function handler(req, res) {
       try {
         const approved = await fetchApprovedCards();
         for (const c of approved) {
-          // Só importa se o ID não está em syncedIds — simples e confiável
           if (board.syncedIds.includes(c.pipefyId)) continue;
           board.cards.unshift({ ...c, phaseId: board.phases[0].id, movedBy: "Pipefy" });
           board.syncedIds.push(c.pipefyId);
+          // Registra no log de metas como aprovado
+          if (!Array.isArray(board.movesLog)) board.movesLog = [];
+          board.movesLog.push({ phaseId: "aprovado_entrada", timestamp: new Date().toISOString() });
           newCount++;
         }
         if (newCount > 0) await dbSet(BOARD_KEY, board);
@@ -298,42 +300,80 @@ module.exports = async function handler(req, res) {
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
       const log = Array.isArray(board.movesLog) ? board.movesLog : [];
 
-      const now = new Date();
+      // Helpers de data em BRT (UTC-3)
+      function toBRT(date) {
+        return new Date(new Date(date).toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+      }
+      function startOfDayBRT(d) {
+        const b = new Date(toBRT(d)); b.setHours(0,0,0,0);
+        // volta pra UTC
+        return new Date(b.getTime() + 3*60*60*1000);
+      }
+      function startOfWeekBRT(d) {
+        const b = toBRT(d);
+        const day = b.getDay();
+        const diff = day === 0 ? -6 : 1 - day;
+        b.setDate(b.getDate() + diff); b.setHours(0,0,0,0);
+        return new Date(b.getTime() + 3*60*60*1000);
+      }
 
-      // Início do dia (meia-noite, horário de Brasília UTC-3)
-      const todayBRT = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
-      todayBRT.setHours(0, 0, 0, 0);
-      const todayStart = new Date(todayBRT.getTime() + 3 * 60 * 60 * 1000); // converte de volta pra UTC
+      const now     = new Date();
+      const todayUTC  = startOfDayBRT(now);
+      const weekUTC   = startOfWeekBRT(now);
+      // semana anterior: 7 dias antes do início desta semana
+      const prevWeekStart = new Date(weekUTC.getTime() - 7*24*60*60*1000);
+      const prevWeekEnd   = new Date(weekUTC.getTime() - 1);
 
-      // Início da semana (segunda-feira)
-      const dayOfWeek = todayBRT.getDay(); // 0=dom,1=seg...
-      const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-      const weekStartBRT = new Date(todayBRT);
-      weekStartBRT.setDate(weekStartBRT.getDate() + diffToMonday);
-      weekStartBRT.setHours(0, 0, 0, 0);
-      const weekStart = new Date(weekStartBRT.getTime() + 3 * 60 * 60 * 1000);
+      const count = (phaseId, since, until) =>
+        log.filter(m =>
+          m.phaseId === phaseId &&
+          new Date(m.timestamp) >= since &&
+          (!until || new Date(m.timestamp) <= until)
+        ).length;
 
-      const count = (phaseId, since) =>
-        log.filter(m => m.phaseId === phaseId && new Date(m.timestamp) >= since).length;
+      // Datas formatadas
+      const nowBRT = toBRT(now);
+      const days   = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
+      const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+      const fmtDate = (d) => {
+        const b = toBRT(d);
+        return `${String(b.getDate()).padStart(2,"0")}/${String(b.getMonth()+1).padStart(2,"0")}`;
+      };
+
+      // Datas seg a sab da semana atual
+      const weekDates = Array.from({length:6}, (_,i) => {
+        const d = new Date(weekUTC.getTime() + i*24*60*60*1000);
+        return fmtDate(d);
+      });
+      // Datas seg a sab da semana anterior
+      const prevWeekDates = Array.from({length:6}, (_,i) => {
+        const d = new Date(prevWeekStart.getTime() + i*24*60*60*1000);
+        return fmtDate(d);
+      });
 
       return res.status(200).json({
         ok: true,
+        todayLabel: `${days[nowBRT.getDay()]}, ${String(nowBRT.getDate()).padStart(2,"0")} ${months[nowBRT.getMonth()]}`,
+        weekLabel:  `${weekDates[0]} – ${weekDates[5]}`,
+        prevWeekLabel: `${prevWeekDates[0]} – ${prevWeekDates[5]}`,
+        weekDates,
+        prevWeekDates,
         today: {
-          loja:     { count: count("loja_feito",     todayStart), goal: 15 },
-          delivery: { count: count("delivery_feito", todayStart), goal: 20 },
+          aprovado: { count: count("aprovado_entrada", todayUTC), goal: 35 },
+          loja:     { count: count("loja_feito",       todayUTC), goal: 15 },
+          delivery: { count: count("delivery_feito",   todayUTC), goal: 20 },
         },
         week: {
-          loja:     { count: count("loja_feito",     weekStart), goal: 90 },
-          delivery: { count: count("delivery_feito", weekStart), goal: 120 },
+          aprovado: { count: count("aprovado_entrada", weekUTC), goal: 210 },
+          loja:     { count: count("loja_feito",       weekUTC), goal: 90 },
+          delivery: { count: count("delivery_feito",   weekUTC), goal: 120 },
         },
-        logSize: log.length,
+        prevWeek: {
+          aprovado: { count: count("aprovado_entrada", prevWeekStart, prevWeekEnd), goal: 210 },
+          loja:     { count: count("loja_feito",       prevWeekStart, prevWeekEnd), goal: 90 },
+          delivery: { count: count("delivery_feito",   prevWeekStart, prevWeekEnd), goal: 120 },
+        },
       });
     }
 
-    return res.status(404).json({ ok: false, error: "Ação não encontrada" });
-
-  } catch (err) {
-    console.error("Handler error:", err);
-    return res.status(500).json({ ok: false, error: err.message });
-  }
-};
+        return res.status(404).json({ ok: false, error: "Ação não encontrada" });
