@@ -84,6 +84,15 @@ function sanitizeBoard(b) {
   b.cards      = b.cards.map(c => ({ ...c, phaseId: validMain.includes(c.phaseId)   ? c.phaseId : b.phases[0].id }));
   b.rsCards    = b.rsCards.map(c => ({ ...c, phaseId: validRs.includes(c.phaseId)   ? c.phaseId : b.rsPhases[0].id }));
   b.rsRuaCards = b.rsRuaCards.map(c => ({ ...c, phaseId: validRsRua.includes(c.phaseId) ? c.phaseId : b.rsRuaPhases[0].id }));
+
+  // Deduplica por pipefyId — garante que não haja cards repetidos
+  const seenIds = new Set();
+  b.cards = b.cards.filter(c => {
+    if (seenIds.has(c.pipefyId)) return false;
+    seenIds.add(c.pipefyId);
+    return true;
+  });
+
   return b;
 }
 
@@ -230,6 +239,7 @@ module.exports = async function handler(req, res) {
         for (const c of approved) {
           if (activeIds.has(c.pipefyId)) continue; // já está no board
           board.cards.unshift({ ...c, phaseId: board.phases[0].id, movedBy: "Pipefy" });
+          activeIds.add(c.pipefyId); // evita duplicata se o mesmo ID aparecer duas vezes
           if (!board.syncedIds.includes(c.pipefyId)) {
             board.syncedIds.push(c.pipefyId);
             board.movesLog.push({ phaseId: "aprovado_entrada", timestamp: new Date().toISOString() });
