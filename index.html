@@ -479,7 +479,24 @@ const COLORS = ['#f5c800','#ff9800','#ef4444','#a855f7','#3b9eff','#00c896','#22
 const PAGES  = ['dashboard','mover','criar','rs','rs-rua','metas'];
 
 // ── ESTADO ─────────────────────────────────────────────────────
-let board = null;
+const DEFAULT_BOARD = {
+  phases: [
+    { id: "aprovado",        name: "Aprovado"           },
+    { id: "producao",        name: "Produção"           },
+    { id: "cliente_loja",    name: "Cliente Loja"       },
+    { id: "urgencia",        name: "Urgência"           },
+    { id: "comprar_peca",    name: "Comprar Peça"       },
+    { id: "aguardando_peca", name: "Aguardando Peça"    },
+    { id: "peca_disponivel", name: "Peça Disponível"    },
+    { id: "loja_feito",      name: "Loja Feito"         },
+    { id: "delivery_feito",  name: "Delivery Feito"     },
+    { id: "aguardando_ret",  name: "Aguardando Retirada"},
+  ],
+  rsPhases:    [{ id: "rs_loja",  name: "RS na Loja" }, { id: "rs_feito",     name: "RS Feito"      }],
+  rsRuaPhases: [{ id: "rs_rua",   name: "RS Rua"     }, { id: "rs_rua_feito", name: "RS Rua Feito"  }],
+  cards: [], rsCards: [], rsRuaCards: [], syncedIds: [], movesLog: [],
+};
+let board = JSON.parse(JSON.stringify(DEFAULT_BOARD)); // começa com fases visíveis imediatamente
 let selCardId = null, selMovePhase = null, selCreatePhase = null;
 let selTecnico = null, selBoardType = 'os';
 
@@ -495,35 +512,28 @@ async function api(method, action, body) {
 async function loadBoard() {
   document.getElementById('refresh-btn').textContent = '↻';
   document.getElementById('error-banner').style.display = 'none';
-
-  // Timeout curto — só lê o banco, deve ser < 1s
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 8000);
-
   try {
-    const r = await fetch('/api/board?action=load', { signal: ctrl.signal });
-    clearTimeout(t);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const r   = await fetch('/api/board?action=load');
     const res = await r.json();
-    board = res.board || board;
+    if (res.board) {
+      board = res.board;
+      // Garante arrays existem
+      if (!Array.isArray(board.rsCards))    board.rsCards    = [];
+      if (!Array.isArray(board.rsRuaCards)) board.rsRuaCards = [];
+      if (!Array.isArray(board.movesLog))   board.movesLog   = [];
+      if (!board.rsPhases?.length)    board.rsPhases    = DEFAULT_BOARD.rsPhases;
+      if (!board.rsRuaPhases?.length) board.rsRuaPhases = DEFAULT_BOARD.rsRuaPhases;
+    }
   } catch(e) {
-    clearTimeout(t);
-    const msg = e.name === 'AbortError' ? 'Sem resposta do servidor (8s)' : e.message;
     document.getElementById('error-banner').style.display = 'block';
-    document.getElementById('error-banner').textContent = '⚠️ ' + msg + ' — clique em Atualizar para tentar novamente.';
+    document.getElementById('error-banner').textContent = '⚠️ Erro ao conectar: ' + e.message;
   }
-
-  // Sempre renderiza — mesmo que seja board vazio ou do ciclo anterior
-  if (!board) board = { phases: [], cards: [], rsCards: [], rsRuaCards: [], rsPhases: [], rsRuaPhases: [], syncedIds: [], movesLog: [] };
   renderBoard();
   renderStageGrids();
   document.getElementById('stat-total').textContent = board.cards.length;
   document.getElementById('refresh-btn').textContent = '↻ Atualizar';
-
   if (document.getElementById('page-rs').classList.contains('active'))     renderRsBoard('rs');
   if (document.getElementById('page-rs-rua').classList.contains('active')) renderRsBoard('rs_rua');
-
-  // Sync Pipefy em background (não bloqueia nada)
   syncPipefy();
 }
 
@@ -556,10 +566,7 @@ async function syncPipefy() {
 // ── RENDER BOARD ───────────────────────────────────────────────
 function renderBoard() {
   const wrapper = document.getElementById('kanban-wrapper');
-  if (!board || !Array.isArray(board.phases) || board.phases.length === 0) {
-    wrapper.innerHTML = '<div style="padding:40px;font-family:var(--fm);font-size:12px;color:var(--muted);">Nenhum dado carregado ainda — aguarde o sync...</div>';
-    return;
-  }
+  if (!board || !Array.isArray(board.phases)) return;
   const b = document.createElement('div'); b.className = 'kanban-board';
   board.phases.forEach((ph, i) => {
     const color = COLORS[i % COLORS.length];
@@ -1074,6 +1081,10 @@ function showToast(icon, title, msg) {
 }
 
 // ── INIT ───────────────────────────────────────────────────────
+// Renderiza fases imediatamente com board padrão — não espera API
+renderBoard();
+renderStageGrids();
+// Busca dados reais do banco em seguida
 loadBoard();
 // Banco: atualiza tela a cada 10s
 setInterval(() => {
