@@ -616,6 +616,62 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, removedEntries: before - after, totalLog: after });
     }
 
+        // ── POST split-card ────────────────────────────────────────
+    // Quebra uma OS em múltiplos cards (cliente com vários equipamentos)
+    if (req.method === "POST" && action === "split-card") {
+      const { pipefyId, splits, tecnico } = req.body || {};
+      // splits = [{ equipamento, phaseId }, ...]
+      if (!pipefyId || !Array.isArray(splits) || splits.length < 2)
+        return res.status(400).json({ ok: false, error: "pipefyId e ao menos 2 splits obrigatórios" });
+
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const original = board.cards.find(c => c.pipefyId === String(pipefyId));
+      if (!original) return res.status(404).json({ ok: false, error: "OS não encontrada" });
+
+      const now = new Date().toISOString();
+      const newCards = [];
+
+      splits.forEach((s, i) => {
+        const suffix = i === 0 ? "" : `-${i + 1}`;
+        const newId = `${pipefyId}-split-${i + 1}`;
+        const equipLabel = s.equipamento ? ` [${s.equipamento}]` : "";
+        const card = {
+          ...original,
+          pipefyId:   newId,
+          title:      original.title + equipLabel,
+          equipamento: s.equipamento || null,
+          phaseId:    s.phaseId || original.phaseId,
+          movedAt:    now,
+          movedBy:    tecnico || original.movedBy,
+          tecnico:    tecnico || original.tecnico || null,
+          splitFrom:  String(pipefyId),
+          localOnly:  true,
+        };
+        newCards.push(card);
+
+        // Log se foi para fase de conclusão
+        if (["loja_feito", "delivery_feito"].includes(s.phaseId)) {
+          board.movesLog.push({
+            phaseId:   s.phaseId,
+            timestamp: now,
+            tecnico:   tecnico || null,
+            pipefyId:  newId,
+            equipamento: s.equipamento || null,
+          });
+        }
+      });
+
+      // Remove o card original e insere os splits no lugar
+      board.cards = board.cards.filter(c => c.pipefyId !== String(pipefyId));
+      // Adiciona IDs dos splits ao syncedIds
+      newCards.forEach(c => { if (!board.syncedIds.includes(c.pipefyId)) board.syncedIds.push(c.pipefyId); });
+      board.cards.unshift(...newCards);
+      board.movesLog = trimLog(board.movesLog);
+      await dbSet(BOARD_KEY, board);
+
+      return res.status(200).json({ ok: true, created: newCards.length, cards: newCards });
+    }
+
         return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch (err) {
