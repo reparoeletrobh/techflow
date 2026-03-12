@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/pipefy.js" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
+}
