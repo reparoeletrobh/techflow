@@ -219,21 +219,24 @@ module.exports = async function handler(req, res) {
   try {
     const { action } = req.query;
 
-    // ── GET load ───────────────────────────────────────────────
+    // ── GET load — retorna banco imediatamente, sem chamar Pipefy ──
     if (req.method === "GET" && action === "load") {
-      let board = sanitizeBoard(await dbGet(BOARD_KEY));
-      let newCount = 0, pipefyError = null;
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      return res.status(200).json({ ok: true, board, newCount: 0, pipefyError: null });
+    }
 
-      // 1. Importa novos aprovados (isolado — falha aqui não afeta o resto)
+    // ── GET sync — chama Pipefy e atualiza banco (chamada separada) ──
+    if (req.method === "GET" && action === "sync") {
+      let board = sanitizeBoard(await dbGet(BOARD_KEY));
+      let newCount = 0, pipefyError = null, erpRemoved = 0;
+
       try {
-        // fetchApprovedCards já filtra apenas os aprovados HOJE
         const approved = await fetchApprovedCards();
         const activeIds = new Set(board.cards.map(c => c.pipefyId));
-
         for (const c of approved) {
-          if (activeIds.has(c.pipefyId)) continue; // já está no board
+          if (activeIds.has(c.pipefyId)) continue;
           board.cards.unshift({ ...c, phaseId: board.phases[0].id, movedBy: "Pipefy" });
-          activeIds.add(c.pipefyId); // evita duplicata se o mesmo ID aparecer duas vezes
+          activeIds.add(c.pipefyId);
           if (!board.syncedIds.includes(c.pipefyId)) {
             board.syncedIds.push(c.pipefyId);
             board.movesLog.push({ phaseId: "aprovado_entrada", timestamp: new Date().toISOString() });
@@ -244,21 +247,17 @@ module.exports = async function handler(req, res) {
         if (newCount > 0) await dbSet(BOARD_KEY, board);
       } catch (e) { pipefyError = e.message; }
 
-      // 2. Remove cards que foram para ERP (isolado — falha aqui não perde os aprovados)
       try {
         const erpIds = await fetchErpCardIds();
         if (erpIds.length > 0) {
           const before = board.cards.length;
           board.cards = board.cards.filter(c => !erpIds.includes(c.pipefyId));
-          const removed = before - board.cards.length;
-          if (removed > 0) {
-            console.log(`Removed ${removed} cards moved to ERP`);
-            await dbSet(BOARD_KEY, board);
-          }
+          erpRemoved = before - board.cards.length;
+          if (erpRemoved > 0) await dbSet(BOARD_KEY, board);
         }
-      } catch (e) { console.error("ERP check error:", e.message); }
+      } catch (e) { console.error("ERP check:", e.message); }
 
-      return res.status(200).json({ ok: true, board, newCount, pipefyError });
+      return res.status(200).json({ ok: true, board, newCount, erpRemoved, pipefyError });
     }
 
     // ── POST reset ─────────────────────────────────────────────
