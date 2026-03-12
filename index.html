@@ -401,12 +401,12 @@
     <div class="form-card">
 
       <div class="field-group">
-        <label class="field-label">Número da OS (4 dígitos)</label>
+        <label class="field-label">Código OS ou Nome do Contato</label>
         <input
           class="os-num-input" id="os-num-input" type="text"
-          inputmode="numeric" maxlength="4" pattern="[0-9]{4}"
-          placeholder="0000" autocomplete="off"
-          oninput="this.value=this.value.replace(/\D/g,''); onOsNumInput()"
+          placeholder="0000 ou nome do cliente" autocomplete="off"
+          style="font-size:18px;letter-spacing:0.05em;"
+          oninput="onOsNumInput()"
         />
         <div id="os-found-info" style="display:none;background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:10px 12px;">
           <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-bottom:3px;">OS ENCONTRADA</div>
@@ -622,32 +622,83 @@ function pickPhase(id, mode) {
 
 // ── MOVER OS: busca por 4 dígitos ─────────────────────────────
 function onOsNumInput() {
-  const val = document.getElementById('os-num-input').value;
+  const val = document.getElementById('os-num-input').value.trim();
   selCardId = null;
   document.getElementById('os-found-info').style.display = 'none';
   document.getElementById('os-found-info').style.borderLeftColor = '';
+
+  // Limpa sugestões antigas
+  let sugEl = document.getElementById('os-move-suggestions');
+  if (sugEl) sugEl.remove();
+
   checkMove();
+  if (!val || val.length < 2) return;
 
-  if (val.length !== 4) return;
+  const q = val.toLowerCase();
+  const cards = board?.cards || [];
 
-  // Busca pelo osCode (4 últimos dígitos do nome do contato no Pipefy)
-  const found = (board?.cards || []).find(c => c.osCode === val);
+  // Busca por osCode exato (4 dígitos), ou qualquer parte do nome/título/descrição
+  const matches = cards.filter(c =>
+    (c.osCode && c.osCode.includes(q)) ||
+    (c.nomeContato && c.nomeContato.toLowerCase().includes(q)) ||
+    (c.title && c.title.toLowerCase().includes(q)) ||
+    (c.descricao && c.descricao.toLowerCase().includes(q))
+  );
 
-  if (found) {
-    selCardId = found.pipefyId;
-    const ph = board.phases.find(p => p.id === found.phaseId);
-    document.getElementById('os-found-title').textContent = found.title;
-    document.getElementById('os-found-phase').textContent =
-      (found.nomeContato ? '👤 ' + found.nomeContato + '  •  ' : '') +
-      '📍 ' + (ph?.name || '—');
-    document.getElementById('os-found-info').style.display = 'block';
-  } else {
-    // Não encontrado
-    document.getElementById('os-found-title').textContent = 'OS não encontrada para o código ' + val;
-    document.getElementById('os-found-phase').textContent = 'Verifique se a OS foi aprovada no Pipefy';
+  if (matches.length === 1) {
+    // Só um resultado — seleciona direto
+    pickMoveCard(matches[0].pipefyId);
+    return;
+  }
+
+  if (matches.length === 0) {
+    document.getElementById('os-found-title').textContent = 'Nenhuma OS encontrada para "' + val + '"';
+    document.getElementById('os-found-phase').textContent = 'Tente o código, nome ou parte da descrição';
     document.getElementById('os-found-info').style.display = 'block';
     document.getElementById('os-found-info').style.borderLeftColor = '#ef4444';
+    return;
   }
+
+  // Múltiplos resultados — mostra lista
+  const wrap = document.querySelector('.os-search-wrap');
+  sugEl = document.createElement('div');
+  sugEl.id = 'os-move-suggestions';
+  sugEl.style.cssText = 'position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;z-index:50;max-height:240px;overflow-y:auto;';
+
+  matches.slice(0, 8).forEach(c => {
+    const ph = board.phases.find(p => p.id === c.phaseId);
+    const row = document.createElement('div');
+    row.style.cssText = 'padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);transition:background 0.15s;';
+    row.onmouseenter = () => row.style.background = 'var(--surface2)';
+    row.onmouseleave = () => row.style.background = '';
+    row.innerHTML = `
+      <div>
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent)">${c.osCode || '—'}</span>
+        <span style="font-size:12px;color:var(--text);margin-left:8px;">${c.nomeContato || c.title}</span>
+      </div>
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted);flex-shrink:0;margin-left:8px;">${ph?.name || '—'}</span>`;
+    row.onclick = () => { pickMoveCard(c.pipefyId); sugEl.remove(); };
+    sugEl.appendChild(row);
+  });
+
+  wrap.style.position = 'relative';
+  wrap.appendChild(sugEl);
+}
+
+function pickMoveCard(pipefyId) {
+  const c = (board?.cards || []).find(x => x.pipefyId === pipefyId);
+  if (!c) return;
+  selCardId = c.pipefyId;
+  const ph = board.phases.find(p => p.id === c.phaseId);
+  document.getElementById('os-num-input').value = c.osCode || c.nomeContato || c.pipefyId;
+  document.getElementById('os-found-title').textContent = c.title;
+  document.getElementById('os-found-phase').textContent =
+    (c.nomeContato ? '👤 ' + c.nomeContato + '  •  ' : '') + '📍 ' + (ph?.name || '—');
+  document.getElementById('os-found-info').style.borderLeftColor = '';
+  document.getElementById('os-found-info').style.display = 'block';
+  // Remove sugestões se existirem
+  const s = document.getElementById('os-move-suggestions');
+  if (s) s.remove();
   checkMove();
 }
 
@@ -669,6 +720,7 @@ async function submitMove() {
     showToast('✅', 'OS movida!', `→ ${ph?.name}`);
     document.getElementById('os-num-input').value = '';
     document.getElementById('os-found-info').style.display = 'none';
+    const s = document.getElementById('os-move-suggestions'); if(s) s.remove();
     selCardId = null; selMovePhase = null;
     document.querySelectorAll('#move-stages .stage-btn').forEach(b => { b.classList.remove('selected'); b.style.background=''; b.style.color=''; });
     await loadBoard();
