@@ -558,6 +558,7 @@ async function syncPipefy() {
         b.textContent = `+${res.newCount} nova${res.newCount>1?'s':''} OS`;
         b.style.display = 'inline';
         setTimeout(() => b.style.display = 'none', 6000);
+        playNewCard();
       }
     }
   } catch(e) { console.warn('Sync Pipefy:', e.message); }
@@ -832,6 +833,7 @@ async function submitMove() {
     if (!res.ok) throw new Error(res.error);
     const ph = board.phases.find(p => p.id === selMovePhase);
     showToast('✅','OS movida!', (selTecnico ? selTecnico + ' → ' : '') + ph?.name);
+    if (selMovePhase === 'cliente_loja') playClienteLoja();
     document.getElementById('os-num-input').value = '';
     document.getElementById('os-found-info').style.display = 'none';
     const s = document.getElementById('os-move-suggestions'); if(s) s.remove();
@@ -1075,6 +1077,57 @@ function showToast(icon, title, msg) {
   const t = document.getElementById('toast');
   t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 4000);
 }
+
+// ── SONS ───────────────────────────────────────────────────────
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new AudioCtx();
+  return audioCtx;
+}
+
+// Som de nova OS entrando no dash — 3 notas ascendentes suaves
+function playNewCard() {
+  try {
+    const ctx = getAudioCtx();
+    const notes = [523, 659, 784]; // C5, E5, G5
+    notes.forEach((freq, i) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.13);
+      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.13);
+      gain.gain.linearRampToValueAtTime(0.18, ctx.currentTime + i * 0.13 + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.13 + 0.28);
+      osc.start(ctx.currentTime + i * 0.13);
+      osc.stop(ctx.currentTime + i * 0.13 + 0.3);
+    });
+  } catch(e) {}
+}
+
+// Som de Cliente Loja — pulso duplo marcante (dois beeps com timbre diferente)
+function playClienteLoja() {
+  try {
+    const ctx = getAudioCtx();
+    [0, 0.18].forEach(delay => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(880, ctx.currentTime + delay);
+      osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + delay + 0.12);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.14);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.15);
+    });
+  } catch(e) {}
+}
+
+// Desbloqueia AudioContext no primeiro toque do usuário
+document.addEventListener('click', () => { try { getAudioCtx(); } catch(e) {} }, { once: true });
 
 // ── INIT ───────────────────────────────────────────────────────
 // Renderiza fases imediatamente com board padrão — não espera API
