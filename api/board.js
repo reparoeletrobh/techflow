@@ -424,6 +424,8 @@ module.exports = async function handler(req, res) {
     // ── GET debug ──────────────────────────────────────────────
     if (action === "debug") {
       const result = {};
+
+      // Upstash ping
       try {
         const r = await fetch(`${UPSTASH_URL}/pipeline`, {
           method: "POST", headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, "Content-Type": "application/json" },
@@ -431,6 +433,8 @@ module.exports = async function handler(req, res) {
         });
         result.upstash_ping = (await r.json())[0]?.result;
       } catch(e) { result.upstash_ping = "ERRO: " + e.message; }
+
+      // Board state
       try {
         const board = await dbGet(BOARD_KEY);
         result.board_found = !!board;
@@ -439,13 +443,37 @@ module.exports = async function handler(req, res) {
         result.board_rs_rua = board?.rsRuaCards?.length ?? 0;
         result.board_synced = board?.syncedIds?.length ?? 0;
         result.board_log = board?.movesLog?.length ?? 0;
+        result.board_synced_sample = board?.syncedIds?.slice(-5) ?? [];
       } catch(e) { result.board_error = e.message; }
+
+      // Pipefy approved
       try {
         const approved = await fetchApprovedCards();
         result.pipefy_approved_count = approved.length;
+        result.pipefy_sample = approved.slice(-3).map(c => ({ id: c.pipefyId, title: c.title }));
       } catch(e) { result.pipefy_error = e.message; }
+
+      // Simulate load: check which cards would be NEW
+      try {
+        const board = await dbGet(BOARD_KEY);
+        const approved = await fetchApprovedCards();
+        const newOnes = approved.filter(c => !(board?.syncedIds || []).includes(c.pipefyId));
+        result.would_import = newOnes.length;
+        result.new_cards_sample = newOnes.slice(0, 5).map(c => ({ id: c.pipefyId, title: c.title }));
+      } catch(e) { result.simulate_error = e.message; }
+
+      // Test dbSet
+      try {
+        const testKey = BOARD_KEY + "_test";
+        const setOk = await dbSet(testKey, { test: true, ts: Date.now() });
+        const getBack = await dbGet(testKey);
+        result.dbset_works = setOk && getBack?.test === true;
+      } catch(e) { result.dbset_error = e.message; }
+
       result.env_pipefy = !!process.env.PIPEFY_TOKEN;
       result.env_upstash = !!UPSTASH_URL;
+      result.board_key = BOARD_KEY;
+
       return res.status(200).json(result);
     }
 
