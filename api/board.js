@@ -225,6 +225,47 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
+
+    // ── GET debug ─────────────────────────────────────────────
+    if (action === "debug") {
+      const result = {};
+
+      // 1. Testa conexão Upstash
+      try {
+        const r = await fetch(`${UPSTASH_URL}/pipeline`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, "Content-Type": "application/json" },
+          body: JSON.stringify([["PING"]]),
+        });
+        const j = await r.json();
+        result.upstash_ping = j[0]?.result;
+      } catch(e) { result.upstash_ping = "ERRO: " + e.message; }
+
+      // 2. Lê o board atual do Upstash
+      try {
+        const board = await dbGet(BOARD_KEY);
+        result.board_found = !!board;
+        result.board_cards  = board?.cards?.length ?? 0;
+        result.board_synced = board?.syncedIds?.length ?? 0;
+        result.board_synced_ids_sample = board?.syncedIds?.slice(0, 5) ?? [];
+      } catch(e) { result.board_read_error = e.message; }
+
+      // 3. Busca OS aprovadas no Pipefy
+      try {
+        const approved = await fetchApprovedCards();
+        result.pipefy_approved_count = approved.length;
+        result.pipefy_approved_sample = approved.slice(0, 3).map(c => ({ id: c.pipefyId, title: c.title }));
+      } catch(e) { result.pipefy_error = e.message; }
+
+      // 4. Variáveis de ambiente presentes?
+      result.env_pipefy_token_set  = !!(process.env.PIPEFY_TOKEN);
+      result.env_upstash_url_set   = !!UPSTASH_URL;
+      result.env_upstash_token_set = !!UPSTASH_TOKEN;
+      result.board_key = BOARD_KEY;
+
+      return res.status(200).json(result);
+    }
+
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch (err) {
