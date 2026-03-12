@@ -12,9 +12,7 @@ async function dbGet(key) {
       headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
     });
     const j = await r.json();
-    if (!j.result) return null;
-    const parsed = JSON.parse(j.result);
-    return parsed;
+    return j.result ? JSON.parse(j.result) : null;
   } catch(e) {
     console.error("dbGet error:", e.message);
     return null;
@@ -58,7 +56,6 @@ function sanitizeBoard(board) {
   if (!Array.isArray(board.phases) || board.phases.length === 0) board.phases = defaultBoard().phases;
   if (!Array.isArray(board.cards))     board.cards     = [];
   if (!Array.isArray(board.syncedIds)) board.syncedIds = [];
-  // garante que todo card tem phaseId válido
   const validIds = board.phases.map(p => p.id);
   board.cards = board.cards.map(c => ({
     ...c,
@@ -132,12 +129,13 @@ module.exports = async function handler(req, res) {
       try {
         const approved = await fetchApprovedCards();
         for (const c of approved) {
+          // Só importa OS que ainda não foram vistas (não estão em syncedIds)
           if (!board.syncedIds.includes(c.pipefyId)) {
             board.cards.unshift({
               ...c,
-              phaseId:  board.phases[0].id,
-              movedAt:  c.addedAt,
-              movedBy:  "Pipefy",
+              phaseId:   board.phases[0].id,
+              movedAt:   c.addedAt,
+              movedBy:   "Pipefy",
               localOnly: false,
             });
             board.syncedIds.push(c.pipefyId);
@@ -151,6 +149,24 @@ module.exports = async function handler(req, res) {
       }
 
       return res.status(200).json({ ok: true, board, newCount, pipefyError });
+    }
+
+    // ── POST reset ────────────────────────────────────────────
+    // Limpa o board E marca todas as OS atuais do Pipefy como "já vistas"
+    // Assim o board fica vazio e só OS NOVAS (aprovadas depois disso) vão aparecer
+    if (req.method === "POST" && action === "reset") {
+      const fresh = defaultBoard();
+
+      try {
+        const approved = await fetchApprovedCards();
+        // Marca todos os IDs atuais como já vistos — mas NÃO importa para o board
+        fresh.syncedIds = approved.map(c => c.pipefyId);
+      } catch (e) {
+        console.error("Reset fetch error:", e.message);
+      }
+
+      await dbSet(BOARD_KEY, fresh);
+      return res.status(200).json({ ok: true, message: "Board resetado. Somente novas OS aprovadas aparecerão." });
     }
 
     // ── POST move ─────────────────────────────────────────────
