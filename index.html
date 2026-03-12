@@ -337,9 +337,7 @@ nav{display:flex;gap:5px;flex-wrap:wrap;}
     </div>
   </div>
   <div class="error-banner" id="error-banner"></div>
-  <div class="kanban-wrapper" id="kanban-wrapper">
-    <div class="loading-board"><div class="spinner"></div><div class="loading-text">Carregando...</div></div>
-  </div>
+  <div class="kanban-wrapper" id="kanban-wrapper"></div>
 </div>
 
 <!-- MOVER OS -->
@@ -498,31 +496,34 @@ async function loadBoard() {
   document.getElementById('refresh-btn').textContent = '↻';
   document.getElementById('error-banner').style.display = 'none';
 
-  // 1. Carrega do banco instantaneamente
+  // Timeout curto — só lê o banco, deve ser < 1s
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 8000);
+
   try {
-    const r = await fetch('/api/board?action=load');
+    const r = await fetch('/api/board?action=load', { signal: ctrl.signal });
+    clearTimeout(t);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     const res = await r.json();
-    if (!res.ok && !res.board) throw new Error(res.error || 'Erro na API');
-    board = res.board;
-    renderBoard(); renderStageGrids();
-    document.getElementById('stat-total').textContent = board.cards.length;
-    if (document.getElementById('page-rs').classList.contains('active'))     renderRsBoard('rs');
-    if (document.getElementById('page-rs-rua').classList.contains('active')) renderRsBoard('rs_rua');
+    board = res.board || board;
   } catch(e) {
+    clearTimeout(t);
+    const msg = e.name === 'AbortError' ? 'Sem resposta do servidor (8s)' : e.message;
     document.getElementById('error-banner').style.display = 'block';
-    document.getElementById('error-banner').textContent = '⚠️ Erro ao carregar: ' + e.message;
-    document.getElementById('kanban-wrapper').innerHTML =
-      `<div class="loading-board">
-        <div style="font-size:28px">⚠️</div>
-        <div style="font-family:var(--fm);font-size:12px;color:#ef4444">${e.message}</div>
-        <button onclick="loadBoard()" style="font-family:var(--fm);font-size:11px;padding:8px 18px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--accent);cursor:pointer;">↻ Tentar novamente</button>
-      </div>`;
-    document.getElementById('refresh-btn').textContent = '↻ Atualizar';
-    return;
+    document.getElementById('error-banner').textContent = '⚠️ ' + msg + ' — clique em Atualizar para tentar novamente.';
   }
+
+  // Sempre renderiza — mesmo que seja board vazio ou do ciclo anterior
+  if (!board) board = { phases: [], cards: [], rsCards: [], rsRuaCards: [], rsPhases: [], rsRuaPhases: [], syncedIds: [], movesLog: [] };
+  renderBoard();
+  renderStageGrids();
+  document.getElementById('stat-total').textContent = board.cards.length;
   document.getElementById('refresh-btn').textContent = '↻ Atualizar';
 
-  // 2. Sync com Pipefy em background (não bloqueia a tela)
+  if (document.getElementById('page-rs').classList.contains('active'))     renderRsBoard('rs');
+  if (document.getElementById('page-rs-rua').classList.contains('active')) renderRsBoard('rs_rua');
+
+  // Sync Pipefy em background (não bloqueia nada)
   syncPipefy();
 }
 
@@ -555,6 +556,10 @@ async function syncPipefy() {
 // ── RENDER BOARD ───────────────────────────────────────────────
 function renderBoard() {
   const wrapper = document.getElementById('kanban-wrapper');
+  if (!board || !Array.isArray(board.phases) || board.phases.length === 0) {
+    wrapper.innerHTML = '<div style="padding:40px;font-family:var(--fm);font-size:12px;color:var(--muted);">Nenhum dado carregado ainda — aguarde o sync...</div>';
+    return;
+  }
   const b = document.createElement('div'); b.className = 'kanban-board';
   board.phases.forEach((ph, i) => {
     const color = COLORS[i % COLORS.length];
