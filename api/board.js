@@ -66,56 +66,72 @@ function sanitizeBoard(board) {
 }
 
 async function fetchApprovedCards() {
-  const res = await fetch(PIPEFY_API, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${(process.env.PIPEFY_TOKEN || "").trim()}`,
-    },
-    body: JSON.stringify({
-      query: `query {
-        pipe(id: "${PIPE_ID}") {
-          phases {
-            name
-            cards {
-              edges {
-                node {
-                  id
-                  title
-                  fields { name value }
-                  age
-                }
+  const allCards = [];
+  let cursor = null;
+  let hasNextPage = true;
+
+  while (hasNextPage) {
+    const afterClause = cursor ? `, after: "${cursor}"` : "";
+    const query = `query {
+      pipe(id: "${PIPE_ID}") {
+        phases {
+          name
+          cards(first: 50${afterClause}) {
+            pageInfo { hasNextPage endCursor }
+            edges {
+              node {
+                id title
+                fields { name value }
+                age
+                created_at
               }
             }
           }
         }
-      }`,
-    }),
-  });
-  const json = await res.json();
-  if (json.errors) throw new Error(json.errors[0].message);
-  const phases = json.data?.pipe?.phases;
-  if (!Array.isArray(phases)) throw new Error("Resposta inesperada do Pipefy");
-  const approvedPhase = phases.find(p => p.name.toLowerCase().includes("aprovad"));
-  if (!approvedPhase) throw new Error('Fase "Aprovado" não encontrada no Pipe');
+      }
+    }`;
 
-  return approvedPhase.cards.edges.map(e => {
-    const fields = e.node.fields || [];
-    const nomeField = fields.find(f =>
-      f.name.toLowerCase().includes("nome") || f.name.toLowerCase().includes("contato")
-    );
-    const descField = fields.find(f =>
-      f.name.toLowerCase().includes("descri") || f.name.toLowerCase().includes("problema") || f.name.toLowerCase().includes("servi")
-    );
-    return {
-      pipefyId:    String(e.node.id),
-      title:       e.node.title || "Sem título",
-      nomeContato: nomeField?.value || null,
-      descricao:   descField?.value || null,
-      age:         e.node.age ?? null,
-      addedAt:     new Date().toISOString(),
-    };
-  });
+    const res = await fetch(PIPEFY_API, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${(process.env.PIPEFY_TOKEN || "").trim()}`,
+      },
+      body: JSON.stringify({ query }),
+    });
+    const json = await res.json();
+    if (json.errors) throw new Error(json.errors[0].message);
+
+    const phases = json.data?.pipe?.phases;
+    if (!Array.isArray(phases)) throw new Error("Resposta inesperada do Pipefy");
+    const approvedPhase = phases.find(p => p.name.toLowerCase().includes("aprovad"));
+    if (!approvedPhase) throw new Error('Fase "Aprovado" não encontrada no Pipe');
+
+    const cards = approvedPhase.cards;
+    for (const edge of cards.edges) {
+      const fields = edge.node.fields || [];
+      const nomeField = fields.find(f =>
+        f.name.toLowerCase().includes("nome") || f.name.toLowerCase().includes("contato")
+      );
+      const descField = fields.find(f =>
+        f.name.toLowerCase().includes("descri") || f.name.toLowerCase().includes("problema") || f.name.toLowerCase().includes("servi")
+      );
+      allCards.push({
+        pipefyId:      String(edge.node.id),
+        title:         edge.node.title || "Sem título",
+        nomeContato:   nomeField?.value || null,
+        descricao:     descField?.value || null,
+        age:           edge.node.age ?? null,
+        addedAt:       new Date().toISOString(),
+        addedAtPipefy: edge.node.created_at || null,
+      });
+    }
+
+    hasNextPage = cards.pageInfo?.hasNextPage ?? false;
+    cursor      = cards.pageInfo?.endCursor ?? null;
+  }
+
+  return allCards;
 }
 
 module.exports = async function handler(req, res) {
@@ -132,41 +148,49 @@ module.exports = async function handler(req, res) {
       let board = sanitizeBoard(await dbGet(BOARD_KEY));
       let newCount = 0, pipefyError = null;
 
+      // cutoffDate: só importa OS aprovadas APÓS o último reset
+      const cutoff = board.cutoffDate ? new Date(board.cutoffDate) : null;
+
       try {
         const approved = await fetchApprovedCards();
         for (const c of approved) {
-          // Só importa se o ID ainda não está no dashboard
-          if (!board.syncedIds.includes(c.pipefyId)) {
-            board.cards.unshift({ ...c, phaseId: board.phases[0].id, movedBy: "Pipefy" });
+          // Ignora se já está no dashboard (syncedIds)
+          if (board.syncedIds.includes(c.pipefyId)) continue;
+          // Ignora se é mais antiga que o cutoff (proteção dupla)
+          if (cutoff && c.addedAtPipefy && new Date(c.addedAtPipefy) < cutoff) {
+            // Marca como vista sem importar
             board.syncedIds.push(c.pipefyId);
-            newCount++;
+            continue;
           }
+          board.cards.unshift({ ...c, phaseId: board.phases[0].id, movedBy: "Pipefy" });
+          board.syncedIds.push(c.pipefyId);
+          newCount++;
         }
-        if (newCount > 0) await dbSet(BOARD_KEY, board);
+        if (newCount > 0 || approved.length > 0) await dbSet(BOARD_KEY, board);
       } catch (e) { pipefyError = e.message; }
 
       return res.status(200).json({ ok: true, board, newCount, pipefyError });
     }
 
     // ── POST reset ────────────────────────────────────────────
-    // Zera o board E marca as OS atuais como "já vistas" para não voltarem
     if (action === "reset") {
       const fresh = defaultBoard();
+      fresh.cutoffDate = new Date().toISOString(); // só OS aprovadas APÓS esta data entram
       try {
         const approved = await fetchApprovedCards();
-        // Marca como vistas MAS NÃO importa — board fica vazio
+        // Marca TODOS os IDs atuais como já vistos (sem importar nenhum)
         fresh.syncedIds = approved.map(c => c.pipefyId);
       } catch (e) { console.error("Reset Pipefy error:", e.message); }
 
       const saved = await dbSet(BOARD_KEY, fresh);
-      // Lê de volta para confirmar
       const verify = await dbGet(BOARD_KEY);
-      const ok = verify && Array.isArray(verify.syncedIds) && verify.cards.length === 0;
+      const ok = verify && Array.isArray(verify.syncedIds);
 
       return res.status(200).json({
         ok: saved && ok,
         board: fresh,
         markedAsSeen: fresh.syncedIds.length,
+        cutoffDate: fresh.cutoffDate,
       });
     }
 
