@@ -151,6 +151,19 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, board, newCount, pipefyError });
     }
 
+    // ── GET reset (acesse /api/board?action=reset no navegador)
+    if (req.method === "GET" && action === "reset") {
+      const fresh = defaultBoard();
+      try {
+        const approved = await fetchApprovedCards();
+        fresh.syncedIds = approved.map(c => c.pipefyId);
+      } catch (e) {
+        console.error("Reset fetch error:", e.message);
+      }
+      await dbSet(BOARD_KEY, fresh);
+      return res.status(200).json({ ok: true, cleared: true, markedAsSeen: fresh.syncedIds.length, message: "Board zerado com sucesso!" });
+    }
+
     // ── POST reset ────────────────────────────────────────────
     // Limpa o board E marca todas as OS atuais do Pipefy como "já vistas"
     // Assim o board fica vazio e só OS NOVAS (aprovadas depois disso) vão aparecer
