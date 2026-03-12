@@ -570,7 +570,7 @@ module.exports = async function handler(req, res) {
 
         // ── POST fix-log ───────────────────────────────────────────
     // Remove entradas duplicadas do log de hoje (sem pipefyId) e reconstrói
-    if (action === "fix-log") {
+    if (action === "fix-log") { // aceita GET e POST
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
 
       const nowBRT = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
