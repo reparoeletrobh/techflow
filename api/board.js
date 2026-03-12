@@ -117,10 +117,16 @@ async function fetchApprovedCards() {
       const descField = fields.find(f =>
         f.name.toLowerCase().includes("descri") || f.name.toLowerCase().includes("problema") || f.name.toLowerCase().includes("servi")
       );
+      // Extrai os 4 últimos dígitos do nome do contato como código da OS
+      const nomeVal = nomeField?.value || "";
+      const digitsMatch = nomeVal.match(/(\d{4})\D*$/);
+      const osCode = digitsMatch ? digitsMatch[1] : null;
+
       allCards.push({
         pipefyId:      String(edge.node.id),
         title:         edge.node.title || "Sem título",
-        nomeContato:   nomeField?.value || null,
+        nomeContato:   nomeVal || null,
+        osCode,                          // 4 dígitos do nome do contato
         descricao:     descField?.value || null,
         age:           edge.node.age ?? null,
         addedAt:       new Date().toISOString(),
