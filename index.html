@@ -886,11 +886,7 @@ async function submitEod() {
 
 // ── LIMPAR APROVADO ────────────────────────────────────────────
 async function confirmCleanAprovado() {
-  if (!confirm('🧹 Limpar fase Aprovado?
-
-Remove apenas os cards ANTIGOS de Aprovado.
-Cards nas outras fases (Produção, Loja Feito, etc.) são preservados.
-Cards aprovados HOJE permanecem em Aprovado.')) return;
+  if (!confirm('🧹 Limpar fase Aprovado?\n\nRemove apenas os cards ANTIGOS de Aprovado.\nCards nas outras fases são preservados.\nCards aprovados HOJE permanecem em Aprovado.')) return;
   const btn = document.querySelector('.board-actions .action-btn');
   btn.textContent = '⏳'; btn.style.pointerEvents = 'none';
   try {
