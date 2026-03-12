@@ -332,7 +332,8 @@ nav{display:flex;gap:5px;flex-wrap:wrap;}
       <span id="new-badge" class="new-badge" style="display:none"></span>
       <button class="eod-btn" onclick="openEodModal()">🌙 Aguardando Retirada</button>
       <button class="action-btn" id="refresh-btn" onclick="loadBoard()">↻ Atualizar</button>
-      <button class="reset-btn" onclick="confirmReset()">⚠ Zerar</button>
+      <button class="action-btn" onclick="confirmCleanAprovado()" style="border-color:rgba(245,200,0,0.3);color:var(--accent)">🧹 Limpar Aprovado</button>
+      <button class="reset-btn" onclick="confirmReset()">⚠ Zerar Tudo</button>
     </div>
   </div>
   <div class="error-banner" id="error-banner"></div>
@@ -836,6 +837,26 @@ async function submitEod() {
   const res = await api('POST', 'move-batch', {});
   if (res.ok) { board = res.board; renderBoard(); showToast('🌙','Fim do dia!',res.moved+' OS movidas'); }
   closeEodModal(); btn.disabled = false; btn.textContent = 'Confirmar';
+}
+
+// ── LIMPAR APROVADO ────────────────────────────────────────────
+async function confirmCleanAprovado() {
+  if (!confirm('🧹 Limpar fase Aprovado?
+
+Remove apenas os cards ANTIGOS de Aprovado.
+Cards nas outras fases (Produção, Loja Feito, etc.) são preservados.
+Cards aprovados HOJE permanecem em Aprovado.')) return;
+  const btn = document.querySelector('.board-actions .action-btn');
+  btn.textContent = '⏳'; btn.style.pointerEvents = 'none';
+  try {
+    const res = await api('POST', 'clean-aprovado', {});
+    if (!res.ok) throw new Error(res.error);
+    board = res.board;
+    renderBoard();
+    document.getElementById('stat-total').textContent = board.cards.length;
+    showToast('🧹', 'Aprovado limpo!', `${res.removed} cards antigos removidos`);
+  } catch(e) { showToast('❌','Erro',e.message); }
+  btn.textContent = '🧹 Limpar Aprovado'; btn.style.pointerEvents = '';
 }
 
 // ── RESET ──────────────────────────────────────────────────────
