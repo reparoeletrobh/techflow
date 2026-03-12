@@ -189,8 +189,8 @@ module.exports = async function handler(req, res) {
       let board = sanitizeBoard(await dbGet(BOARD_KEY));
       let newCount = 0, pipefyError = null;
 
+      // 1. Importa novos aprovados (isolado — falha aqui não afeta o resto)
       try {
-        // 1. Importa novos aprovados
         const approved = await fetchApprovedCards();
         for (const c of approved) {
           if (board.syncedIds.includes(c.pipefyId)) continue;
@@ -199,17 +199,23 @@ module.exports = async function handler(req, res) {
           board.movesLog.push({ phaseId: "aprovado_entrada", timestamp: new Date().toISOString() });
           newCount++;
         }
-        // 2. Remove cards que foram para ERP no Pipefy
+        board.movesLog = trimLog(board.movesLog);
+        if (newCount > 0) await dbSet(BOARD_KEY, board);
+      } catch (e) { pipefyError = e.message; }
+
+      // 2. Remove cards que foram para ERP (isolado — falha aqui não perde os aprovados)
+      try {
         const erpIds = await fetchErpCardIds();
         if (erpIds.length > 0) {
           const before = board.cards.length;
           board.cards = board.cards.filter(c => !erpIds.includes(c.pipefyId));
           const removed = before - board.cards.length;
-          if (removed > 0) console.log(`Removed ${removed} cards moved to ERP`);
+          if (removed > 0) {
+            console.log(`Removed ${removed} cards moved to ERP`);
+            await dbSet(BOARD_KEY, board);
+          }
         }
-        board.movesLog = trimLog(board.movesLog);
-        if (newCount > 0 || erpIds.length > 0) await dbSet(BOARD_KEY, board);
-      } catch (e) { pipefyError = e.message; }
+      } catch (e) { console.error("ERP check error:", e.message); }
 
       return res.status(200).json({ ok: true, board, newCount, pipefyError });
     }
