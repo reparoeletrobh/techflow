@@ -281,7 +281,7 @@ module.exports = async function handler(req, res) {
       card.phaseId = phaseId; card.movedAt = new Date().toISOString();
       card.movedBy = movedBy || "—"; card.tecnico = tecnico || null;
       if (["loja_feito", "delivery_feito"].includes(phaseId)) {
-        board.movesLog.push({ phaseId, timestamp: card.movedAt, tecnico: tecnico || null });
+        board.movesLog.push({ phaseId, timestamp: card.movedAt, tecnico: tecnico || null, pipefyId: String(pipefyId) });
         board.movesLog = trimLog(board.movesLog);
       }
       await dbSet(BOARD_KEY, board);
@@ -384,15 +384,40 @@ module.exports = async function handler(req, res) {
       const prevWeekEnd = new Date(weekUTC.getTime() - 1);
       const prevWeekStart = new Date(weekUTC.getTime() - 7*24*60*60*1000);
 
-      const cnt = (phaseId, since, until) => log.filter(m =>
-        m.phaseId === phaseId && new Date(m.timestamp) >= since && (!until || new Date(m.timestamp) <= until)
-      ).length;
+      // Conta entradas únicas por card (pipefyId) — evita contar re-movimentações
+      const cnt = (phaseId, since, until) => {
+        const entries = log.filter(m =>
+          m.phaseId === phaseId &&
+          new Date(m.timestamp) >= since &&
+          (!until || new Date(m.timestamp) <= until)
+        );
+        // Se tem pipefyId, deduplica — conta só a última entrada por card
+        const withId    = entries.filter(m => m.pipefyId);
+        const withoutId = entries.filter(m => !m.pipefyId);
+        const uniqueIds = new Set(withId.map(m => m.pipefyId));
+        return uniqueIds.size + withoutId.length;
+      };
 
       const cntByTecnico = (phaseId, since) => {
         const map = {};
         TECNICOS.forEach(t => map[t] = 0);
-        log.filter(m => m.phaseId === phaseId && new Date(m.timestamp) >= since && m.tecnico)
-           .forEach(m => { if (map[m.tecnico] !== undefined) map[m.tecnico]++; else map[m.tecnico] = 1; });
+        const entries = log.filter(m => m.phaseId === phaseId && new Date(m.timestamp) >= since && m.tecnico);
+        // Deduplica por pipefyId — pega a entrada mais recente por card
+        const latest = new Map();
+        for (const m of entries) {
+          if (m.pipefyId) {
+            const prev = latest.get(m.pipefyId);
+            if (!prev || new Date(m.timestamp) > new Date(prev.timestamp)) latest.set(m.pipefyId, m);
+          } else {
+            // sem pipefyId: conta normalmente
+            const key = "noid_" + m.timestamp;
+            latest.set(key, m);
+          }
+        }
+        for (const m of latest.values()) {
+          if (map[m.tecnico] !== undefined) map[m.tecnico]++;
+          else map[m.tecnico] = 1;
+        }
         return map;
       };
 
@@ -541,6 +566,54 @@ module.exports = async function handler(req, res) {
       await dbSet(BOARD_KEY, board);
 
       return res.status(200).json({ ok: true, removed, remaining: board.cards.length, board });
+    }
+
+        // ── POST fix-log ───────────────────────────────────────────
+    // Remove entradas duplicadas do log de hoje (sem pipefyId) e reconstrói
+    if (action === "fix-log") {
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+
+      const nowBRT = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+      nowBRT.setHours(0, 0, 0, 0);
+      const todayStartUTC = new Date(nowBRT.getTime() + 3 * 60 * 60 * 1000);
+
+      const before = board.movesLog.length;
+
+      // Remove entradas de hoje sem pipefyId para loja_feito e delivery_feito
+      board.movesLog = board.movesLog.filter(m => {
+        const isToday = new Date(m.timestamp) >= todayStartUTC;
+        const isTarget = ["loja_feito", "delivery_feito"].includes(m.phaseId);
+        if (isToday && isTarget && !m.pipefyId) return false; // remove
+        return true;
+      });
+
+      // Reconstrói entradas de hoje a partir do estado atual dos cards
+      const now = new Date().toISOString();
+      for (const card of board.cards) {
+        if (!["loja_feito", "delivery_feito"].includes(card.phaseId)) continue;
+        const movedAt = card.movedAt ? new Date(card.movedAt) : null;
+        if (!movedAt || movedAt < todayStartUTC) continue;
+        // Verifica se já existe entrada com pipefyId para este card hoje
+        const alreadyLogged = board.movesLog.some(m =>
+          m.pipefyId === card.pipefyId &&
+          m.phaseId === card.phaseId &&
+          new Date(m.timestamp) >= todayStartUTC
+        );
+        if (!alreadyLogged) {
+          board.movesLog.push({
+            phaseId:  card.phaseId,
+            timestamp: card.movedAt,
+            tecnico:  card.tecnico || null,
+            pipefyId: card.pipefyId,
+          });
+        }
+      }
+
+      board.movesLog = trimLog(board.movesLog);
+      await dbSet(BOARD_KEY, board);
+
+      const after = board.movesLog.length;
+      return res.status(200).json({ ok: true, removedEntries: before - after, totalLog: after });
     }
 
         return res.status(404).json({ ok: false, error: "Ação não encontrada" });
