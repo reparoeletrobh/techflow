@@ -106,6 +106,12 @@ async function pipefyQuery(query) {
 async function fetchApprovedCards() {
   const all = [];
   let cursor = null, hasNext = true;
+
+  // Início do dia em BRT
+  const nowBRT = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  nowBRT.setHours(0, 0, 0, 0);
+  const todayStartUTC = new Date(nowBRT.getTime() + 3 * 60 * 60 * 1000);
+
   while (hasNext) {
     const after = cursor ? `, after: "${cursor}"` : "";
     const data = await pipefyQuery(`query {
@@ -114,31 +120,57 @@ async function fetchApprovedCards() {
           name
           cards(first: 50${after}) {
             pageInfo { hasNextPage endCursor }
-            edges { node { id title fields { name value } age created_at } }
+            edges {
+              node {
+                id title age created_at
+                fields { name value }
+                phases_history { phase { name } lastTimeIn }
+              }
+            }
           }
         }
       }
     }`);
+
     const phases = data?.pipe?.phases;
     if (!Array.isArray(phases)) throw new Error("Resposta inesperada do Pipefy");
     const phase = phases.find(p => p.name.toLowerCase().includes("aprovad"));
     if (!phase) throw new Error('Fase "Aprovado" não encontrada');
+
     for (const { node } of phase.cards.edges) {
+      // Quando o card entrou na fase Aprovado pela última vez
+      const aprovadoHistory = (node.phases_history || []).find(h =>
+        h.phase?.name?.toLowerCase().includes("aprovad")
+      );
+      const approvedAt = aprovadoHistory?.lastTimeIn
+        ? new Date(aprovadoHistory.lastTimeIn)
+        : new Date(node.created_at || 0);
+
+      // Só importa se foi aprovado hoje
+      if (approvedAt < todayStartUTC) continue;
+
       const fields = node.fields || [];
-      const nomeField = fields.find(f => f.name.toLowerCase().includes("nome") || f.name.toLowerCase().includes("contato"));
-      const descField = fields.find(f => f.name.toLowerCase().includes("descri") || f.name.toLowerCase().includes("problema") || f.name.toLowerCase().includes("servi"));
+      const nomeField = fields.find(f =>
+        f.name.toLowerCase().includes("nome") || f.name.toLowerCase().includes("contato")
+      );
+      const descField = fields.find(f =>
+        f.name.toLowerCase().includes("descri") || f.name.toLowerCase().includes("problema") || f.name.toLowerCase().includes("servi")
+      );
       const nomeVal = nomeField?.value || "";
       const digitsMatch = nomeVal.match(/(\d{4})\D*$/);
+
       all.push({
-        pipefyId:    String(node.id),
-        title:       node.title || "Sem título",
-        nomeContato: nomeVal || null,
-        osCode:      digitsMatch ? digitsMatch[1] : null,
-        descricao:   descField?.value || null,
-        age:         node.age ?? null,
-        addedAt:     new Date().toISOString(),
+        pipefyId:      String(node.id),
+        title:         node.title || "Sem título",
+        nomeContato:   nomeVal || null,
+        osCode:        digitsMatch ? digitsMatch[1] : null,
+        descricao:     descField?.value || null,
+        age:           node.age ?? null,
+        addedAt:       new Date().toISOString(),
+        approvedAt:    approvedAt.toISOString(),
       });
     }
+
     hasNext = phase.cards.pageInfo?.hasNextPage ?? false;
     cursor  = phase.cards.pageInfo?.endCursor ?? null;
   }
@@ -191,13 +223,12 @@ module.exports = async function handler(req, res) {
 
       // 1. Importa novos aprovados (isolado — falha aqui não afeta o resto)
       try {
+        // fetchApprovedCards já filtra apenas os aprovados HOJE
         const approved = await fetchApprovedCards();
-        // IDs que estão ativamente no board agora
         const activeIds = new Set(board.cards.map(c => c.pipefyId));
+
         for (const c of approved) {
-          // Só pula se o card já está visível no board
-          // Se estava em syncedIds mas foi removido (ERP, reset parcial), reimporta
-          if (activeIds.has(c.pipefyId)) continue;
+          if (activeIds.has(c.pipefyId)) continue; // já está no board
           board.cards.unshift({ ...c, phaseId: board.phases[0].id, movedBy: "Pipefy" });
           if (!board.syncedIds.includes(c.pipefyId)) {
             board.syncedIds.push(c.pipefyId);
@@ -483,7 +514,33 @@ module.exports = async function handler(req, res) {
       return res.status(200).json(result);
     }
 
-    return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+    // ── POST clean-aprovado ───────────────────────────────────
+    // Remove apenas cards antigos da fase Aprovado — preserva todas as outras fases
+    if (action === "clean-aprovado") {
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+
+      // Início do dia em BRT
+      const nowBRT = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+      nowBRT.setHours(0, 0, 0, 0);
+      const todayStartUTC = new Date(nowBRT.getTime() + 3 * 60 * 60 * 1000);
+
+      const before = board.cards.length;
+
+      board.cards = board.cards.filter(c => {
+        // Mantém cards que NÃO estão em Aprovado
+        if (c.phaseId !== "aprovado") return true;
+        // Em Aprovado: mantém só os de hoje
+        const approvedAt = c.approvedAt ? new Date(c.approvedAt) : null;
+        return approvedAt && approvedAt >= todayStartUTC;
+      });
+
+      const removed = before - board.cards.length;
+      await dbSet(BOARD_KEY, board);
+
+      return res.status(200).json({ ok: true, removed, remaining: board.cards.length, board });
+    }
+
+        return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch (err) {
     console.error("Handler error:", err);
