@@ -625,21 +625,28 @@ function onOsNumInput() {
   const val = document.getElementById('os-num-input').value;
   selCardId = null;
   document.getElementById('os-found-info').style.display = 'none';
+  document.getElementById('os-found-info').style.borderLeftColor = '';
   checkMove();
 
   if (val.length !== 4) return;
 
-  // Busca card cujo title ou pipefyId contém esses 4 dígitos
-  const found = (board?.cards || []).find(c =>
-    c.title.includes(val) || String(c.pipefyId).includes(val)
-  );
+  // Busca pelo osCode (4 últimos dígitos do nome do contato no Pipefy)
+  const found = (board?.cards || []).find(c => c.osCode === val);
 
   if (found) {
     selCardId = found.pipefyId;
     const ph = board.phases.find(p => p.id === found.phaseId);
     document.getElementById('os-found-title').textContent = found.title;
-    document.getElementById('os-found-phase').textContent = '📍 Etapa atual: ' + (ph?.name || '—');
+    document.getElementById('os-found-phase').textContent =
+      (found.nomeContato ? '👤 ' + found.nomeContato + '  •  ' : '') +
+      '📍 ' + (ph?.name || '—');
     document.getElementById('os-found-info').style.display = 'block';
+  } else {
+    // Não encontrado
+    document.getElementById('os-found-title').textContent = 'OS não encontrada para o código ' + val;
+    document.getElementById('os-found-phase').textContent = 'Verifique se a OS foi aprovada no Pipefy';
+    document.getElementById('os-found-info').style.display = 'block';
+    document.getElementById('os-found-info').style.borderLeftColor = '#ef4444';
   }
   checkMove();
 }
