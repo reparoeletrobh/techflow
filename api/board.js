@@ -1,39 +1,79 @@
-// ── Variáveis de ambiente necessárias na Vercel:
-// PIPEFY_TOKEN   → token da API do Pipefy
-// UPSTASH_URL    → URL do banco Upstash (ex: https://xxx.upstash.io)
-// UPSTASH_TOKEN  → token do Upstash
-
 const PIPEFY_API  = "https://api.pipefy.com/graphql";
 const PIPE_ID     = "305832912";
 const BOARD_KEY   = "techflow:board";
 
-// ── Upstash REST helpers ──────────────────────────────────────
+const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g, "").trim();
+const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g, "").trim();
+
+// ── Upstash helpers ───────────────────────────────────────────
 async function dbGet(key) {
-  const r = await fetch(`${process.env.UPSTASH_URL}/get/${key}`, {
-    headers: { Authorization: `Bearer ${process.env.UPSTASH_TOKEN}` },
-  });
-  const j = await r.json();
-  return j.result ? JSON.parse(j.result) : null;
+  try {
+    const r = await fetch(`${UPSTASH_URL}/get/${encodeURIComponent(key)}`, {
+      headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
+    });
+    const j = await r.json();
+    if (!j.result) return null;
+    const parsed = JSON.parse(j.result);
+    return parsed;
+  } catch(e) {
+    console.error("dbGet error:", e.message);
+    return null;
+  }
 }
 
 async function dbSet(key, value) {
-  await fetch(`${process.env.UPSTASH_URL}/set/${key}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.UPSTASH_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(JSON.stringify(value)),
-  });
+  try {
+    await fetch(`${UPSTASH_URL}/set/${encodeURIComponent(key)}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${UPSTASH_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(JSON.stringify(value)),
+    });
+  } catch(e) {
+    console.error("dbSet error:", e.message);
+  }
 }
 
-// ── Pipefy: busca cards da fase "Aprovado" ────────────────────
+// ── Board padrão ──────────────────────────────────────────────
+function defaultBoard() {
+  return {
+    phases: [
+      { id: "entrada",     name: "Entrada"           },
+      { id: "diagnostico", name: "Diagnóstico"        },
+      { id: "aguardando",  name: "Aguard. Peças"      },
+      { id: "manutencao",  name: "Manutenção"         },
+      { id: "teste",       name: "Teste / QA"         },
+      { id: "pronto",      name: "Pronto p/ Retirada" },
+      { id: "entregue",    name: "Entregue"           },
+    ],
+    cards: [],
+    syncedIds: [],
+  };
+}
+
+function sanitizeBoard(board) {
+  if (!board || typeof board !== "object") return defaultBoard();
+  if (!Array.isArray(board.phases) || board.phases.length === 0) board.phases = defaultBoard().phases;
+  if (!Array.isArray(board.cards))     board.cards     = [];
+  if (!Array.isArray(board.syncedIds)) board.syncedIds = [];
+  // garante que todo card tem phaseId válido
+  const validIds = board.phases.map(p => p.id);
+  board.cards = board.cards.map(c => ({
+    ...c,
+    phaseId: validIds.includes(c.phaseId) ? c.phaseId : board.phases[0].id,
+  }));
+  return board;
+}
+
+// ── Pipefy: busca OS da fase Aprovado ─────────────────────────
 async function fetchApprovedCards() {
   const res = await fetch(PIPEFY_API, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.PIPEFY_TOKEN}`,
+      Authorization: `Bearer ${(process.env.PIPEFY_TOKEN || "").trim()}`,
     },
     body: JSON.stringify({
       query: `query {
@@ -46,7 +86,6 @@ async function fetchApprovedCards() {
                   id
                   title
                   fields { name value }
-                  created_at
                   age
                 }
               }
@@ -59,38 +98,22 @@ async function fetchApprovedCards() {
   const json = await res.json();
   if (json.errors) throw new Error(json.errors[0].message);
 
-  const approvedPhase = json.data.pipe.phases.find(
-    (p) => p.name.toLowerCase().includes("aprovad")
-  );
-  if (!approvedPhase) throw new Error('Fase "Aprovado" não encontrada no Pipe.');
+  const phases = json.data?.pipe?.phases;
+  if (!Array.isArray(phases)) throw new Error("Resposta inesperada do Pipefy");
 
-  return approvedPhase.cards.edges.map((e) => ({
+  const approvedPhase = phases.find(p => p.name.toLowerCase().includes("aprovad"));
+  if (!approvedPhase) throw new Error('Fase "Aprovado" não encontrada no Pipe');
+
+  return approvedPhase.cards.edges.map(e => ({
     pipefyId: String(e.node.id),
-    title:    e.node.title,
+    title:    e.node.title || "Sem título",
     fields:   e.node.fields || [],
-    age:      e.node.age,
+    age:      e.node.age ?? null,
     addedAt:  new Date().toISOString(),
   }));
 }
 
-// ── Board padrão ──────────────────────────────────────────────
-function defaultBoard() {
-  return {
-    phases: [
-      { id: "entrada",     name: "Entrada"             },
-      { id: "diagnostico", name: "Diagnóstico"          },
-      { id: "aguardando",  name: "Aguard. Peças"        },
-      { id: "manutencao",  name: "Manutenção"           },
-      { id: "teste",       name: "Teste / QA"           },
-      { id: "pronto",      name: "Pronto p/ Retirada"   },
-      { id: "entregue",    name: "Entregue"             },
-    ],
-    cards: [],          // { pipefyId, title, fields, age, addedAt, phaseId, movedAt, movedBy }
-    syncedIds: [],      // ids já importados do Pipefy
-  };
-}
-
-// ── Handler principal ─────────────────────────────────────────
+// ── Handler ───────────────────────────────────────────────────
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
@@ -100,61 +123,63 @@ module.exports = async function handler(req, res) {
   try {
     const { action } = req.query;
 
-    // ── GET /api/board?action=load ─────────────────────────────
-    // Carrega board + importa novos aprovados do Pipefy
+    // ── GET load ──────────────────────────────────────────────
     if (req.method === "GET" && action === "load") {
-      let board = await dbGet(BOARD_KEY);
-      if (!board) board = defaultBoard();
+      let board = sanitizeBoard(await dbGet(BOARD_KEY));
 
-      // Importa novos cards aprovados do Pipefy
       let newCount = 0;
+      let pipefyError = null;
       try {
         const approved = await fetchApprovedCards();
         for (const c of approved) {
           if (!board.syncedIds.includes(c.pipefyId)) {
-            board.cards.unshift({ ...c, phaseId: "entrada", movedAt: c.addedAt, movedBy: "Pipefy" });
+            board.cards.unshift({
+              ...c,
+              phaseId:  board.phases[0].id,
+              movedAt:  c.addedAt,
+              movedBy:  "Pipefy",
+              localOnly: false,
+            });
             board.syncedIds.push(c.pipefyId);
             newCount++;
           }
         }
         if (newCount > 0) await dbSet(BOARD_KEY, board);
       } catch (e) {
-        // Pipefy offline não derruba o board
+        pipefyError = e.message;
         console.error("Pipefy sync error:", e.message);
       }
 
-      return res.status(200).json({ ok: true, board, newCount });
+      return res.status(200).json({ ok: true, board, newCount, pipefyError });
     }
 
-    // ── POST /api/board?action=move ────────────────────────────
-    // Move card para outra fase (só no board, não toca o Pipefy)
+    // ── POST move ─────────────────────────────────────────────
     if (req.method === "POST" && action === "move") {
-      const { pipefyId, phaseId, movedBy } = req.body;
+      const { pipefyId, phaseId, movedBy } = req.body || {};
       if (!pipefyId || !phaseId)
         return res.status(400).json({ ok: false, error: "pipefyId e phaseId são obrigatórios" });
 
-      const board = await dbGet(BOARD_KEY) || defaultBoard();
-      const card = board.cards.find((c) => c.pipefyId === String(pipefyId));
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const card = board.cards.find(c => c.pipefyId === String(pipefyId));
       if (!card)
         return res.status(404).json({ ok: false, error: "OS não encontrada no dashboard" });
 
       const oldPhase = card.phaseId;
-      card.phaseId  = phaseId;
-      card.movedAt  = new Date().toISOString();
-      card.movedBy  = movedBy || "—";
+      card.phaseId = phaseId;
+      card.movedAt = new Date().toISOString();
+      card.movedBy = movedBy || "—";
       await dbSet(BOARD_KEY, board);
 
       return res.status(200).json({ ok: true, card, oldPhase });
     }
 
-    // ── POST /api/board?action=create ──────────────────────────
-    // Cria card APENAS no dashboard (não cria no Pipefy)
+    // ── POST create ───────────────────────────────────────────
     if (req.method === "POST" && action === "create") {
-      const { title, phaseId, createdBy } = req.body;
+      const { title, phaseId, createdBy } = req.body || {};
       if (!title)
         return res.status(400).json({ ok: false, error: "title é obrigatório" });
 
-      const board = await dbGet(BOARD_KEY) || defaultBoard();
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
       const newId = "local-" + Date.now();
       const card = {
         pipefyId:  newId,
@@ -162,7 +187,7 @@ module.exports = async function handler(req, res) {
         fields:    [],
         age:       0,
         addedAt:   new Date().toISOString(),
-        phaseId:   phaseId || "entrada",
+        phaseId:   phaseId || board.phases[0].id,
         movedAt:   new Date().toISOString(),
         movedBy:   createdBy || "—",
         localOnly: true,
@@ -177,7 +202,7 @@ module.exports = async function handler(req, res) {
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch (err) {
-    console.error(err);
+    console.error("Handler error:", err);
     return res.status(500).json({ ok: false, error: err.message });
   }
 };
