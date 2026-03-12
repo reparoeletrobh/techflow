@@ -7,8 +7,8 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg:#0d0d0d; --surface:#161616; --surface2:#1f1f1f; --border:#2a2a2a;
-  --accent:#f5c800; --accent2:#ffde59; --text:#f0f0f0; --muted:#666;
+  --bg:#0d0d0d; --surface:#161616; --surface2:#1f1f1f; --border:#333;
+  --accent:#f5c800; --accent2:#ffde59; --text:#ffffff; --muted:#aaa;
   --fh:'Syne',sans-serif; --fm:'DM Mono',monospace; --fb:'Inter',sans-serif;
   --c-apr:#f5c800; --c-loja:#ff9800; --c-del:#3b9eff;
   --c-rs:#a855f7; --c-rsrua:#00c896;
@@ -97,12 +97,12 @@ nav{display:flex;gap:5px;flex-wrap:wrap;}
 .card-num{font-family:var(--fm);font-size:11px;font-weight:500;color:var(--accent);}
 .card-title{font-size:11px;font-weight:500;color:var(--text);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .card-nome{font-size:10px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.card-desc{font-size:10px;color:#555;margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.card-desc{font-size:10px;color:#999;margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .card-footer{display:flex;align-items:center;justify-content:space-between;margin-top:7px;padding-top:6px;border-top:1px solid var(--border);}
 .card-age{font-family:var(--fm);font-size:10px;color:var(--muted);}
-.card-by{font-size:10px;color:#444;font-family:var(--fm);max-width:90px;overflow:hidden;text-overflow:ellipsis;}
+.card-by{font-size:10px;color:#aaa;font-family:var(--fm);max-width:90px;overflow:hidden;text-overflow:ellipsis;}
 .card-local{position:absolute;top:5px;right:5px;font-size:9px;font-family:var(--fm);background:rgba(245,200,0,0.1);color:var(--accent);border-radius:3px;padding:1px 5px;}
-.empty-col{flex:1;display:flex;align-items:center;justify-content:center;border:1px dashed var(--border);border-radius:6px;color:#333;font-size:10px;font-family:var(--fm);margin:2px;padding:14px;text-align:center;line-height:1.7;}
+.empty-col{flex:1;display:flex;align-items:center;justify-content:center;border:1px dashed var(--border);border-radius:6px;color:#666;font-size:10px;font-family:var(--fm);margin:2px;padding:14px;text-align:center;line-height:1.7;}
 
 /* ── RS PANEL ── */
 #page-rs, #page-rs-rua { flex-direction: column; }
@@ -144,7 +144,7 @@ nav{display:flex;gap:5px;flex-wrap:wrap;}
   width:100%;outline:none;transition:all 0.15s;
 }
 .f-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(245,200,0,0.1);}
-.f-input::placeholder{color:#333;}
+.f-input::placeholder{color:#666;}
 
 /* OS num big */
 .os-num-input{
@@ -154,7 +154,7 @@ nav{display:flex;gap:5px;flex-wrap:wrap;}
   width:100%;outline:none;transition:all 0.15s;
 }
 .os-num-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(245,200,0,0.12);}
-.os-num-input::placeholder{color:#333;font-size:14px;letter-spacing:0;}
+.os-num-input::placeholder{color:#666;font-size:14px;letter-spacing:0;}
 
 /* OS search wrap */
 .os-search-wrap{position:relative;}
