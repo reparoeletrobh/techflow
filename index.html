@@ -216,6 +216,74 @@
   .submit-btn:hover:not(:disabled){background:var(--accent2);transform:translateY(-1px);box-shadow:0 6px 20px rgba(245,200,0,0.25);}
   .submit-btn:disabled{opacity:0.3;cursor:not-allowed;}
 
+
+  /* METAS */
+  #page-metas { align-items: center; justify-content: flex-start; padding: 32px 28px; }
+  .metas-wrap { width: 100%; max-width: 720px; margin: 0 auto; }
+  .metas-title { font-family: var(--font-head); font-size: 28px; font-weight: 800; letter-spacing: -1px; margin-bottom: 4px; }
+  .metas-title span { color: var(--accent); }
+  .metas-sub { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-bottom: 32px; }
+
+  .metas-section { margin-bottom: 36px; }
+  .metas-section-title {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.15em; color: var(--muted);
+    margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .metas-section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .meta-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 12px;
+    border-left: 3px solid var(--accent);
+    transition: border-color 0.2s;
+  }
+  .meta-card.delivery { border-left-color: #3b9eff; }
+  .meta-card.exceeded { border-left-color: #22c55e; }
+
+  .meta-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 12px; }
+  .meta-label { font-family: var(--font-head); font-size: 15px; font-weight: 700; }
+  .meta-numbers { font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
+  .meta-numbers strong { font-size: 28px; font-weight: 700; line-height: 1; }
+  .meta-numbers strong.loja { color: var(--accent); }
+  .meta-numbers strong.delivery { color: #3b9eff; }
+  .meta-numbers strong.exceeded { color: #22c55e; }
+
+  .progress-track {
+    height: 10px; background: var(--surface2);
+    border-radius: 99px; overflow: visible; position: relative;
+  }
+  .progress-bar {
+    height: 100%; border-radius: 99px;
+    transition: width 0.8s cubic-bezier(0.34,1.2,0.64,1);
+    position: relative; max-width: none;
+  }
+  .progress-bar.loja    { background: var(--accent); box-shadow: 0 0 12px rgba(245,200,0,0.4); }
+  .progress-bar.delivery{ background: #3b9eff;        box-shadow: 0 0 12px rgba(59,158,255,0.4); }
+  .progress-bar.exceeded{ background: #22c55e;        box-shadow: 0 0 12px rgba(34,197,94,0.5); }
+
+  .progress-100-mark {
+    position: absolute; right: 0; top: -4px; bottom: -4px;
+    width: 2px; background: rgba(255,255,255,0.15); border-radius: 2px;
+  }
+  .meta-pct {
+    font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+    margin-top: 7px; display: flex; justify-content: space-between;
+  }
+  .meta-pct strong { font-size: 13px; }
+  .meta-pct strong.loja { color: var(--accent); }
+  .meta-pct strong.delivery { color: #3b9eff; }
+  .meta-pct strong.exceeded { color: #22c55e; }
+
+  .meta-refresh-btn {
+    font-family: var(--font-mono); font-size: 11px; padding: 6px 14px; border-radius: 6px;
+    border: 1px solid var(--border); background: transparent; color: var(--muted);
+    cursor: pointer; transition: all 0.15s; margin-bottom: 24px;
+  }
+  .meta-refresh-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  .meta-loading { font-family: var(--font-mono); font-size: 12px; color: var(--muted); padding: 40px 0; text-align: center; }
+
   /* TOAST */
   .toast{
     position:fixed;bottom:24px;right:24px;background:var(--surface);
@@ -271,6 +339,7 @@
     <button class="nav-btn active" onclick="showPage('dashboard')">Dashboard</button>
     <button class="nav-btn" onclick="showPage('mover')">Mover OS</button>
     <button class="nav-btn" onclick="showPage('criar')">Nova OS</button>
+    <button class="nav-btn" onclick="showPage('metas')">Metas</button>
   </nav>
   <div class="header-right">
     <div class="stat-pill"><strong id="stat-total">—</strong>&nbsp;OS</div>
@@ -358,6 +427,17 @@
 
       <button class="submit-btn" id="btn-create" onclick="submitCreate()" disabled>+ Criar OS</button>
     </div>
+  </div>
+</div>
+
+
+<!-- METAS -->
+<div id="page-metas" class="page">
+  <div class="metas-wrap">
+    <div class="metas-title">Metas da <span>Equipe</span></div>
+    <div class="metas-sub">// progresso atualizado a cada movimentação</div>
+    <button class="meta-refresh-btn" onclick="loadGoals()">↻ Atualizar</button>
+    <div id="metas-content"><div class="meta-loading">Carregando metas...</div></div>
   </div>
 </div>
 
@@ -637,9 +717,10 @@ function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
-  ['dashboard','mover','criar'].forEach((n,i) => {
+  ['dashboard','mover','criar','metas'].forEach((n,i) => {
     if (n === name) document.querySelectorAll('.nav-btn')[i].classList.add('active');
   });
+  if (name === 'metas') loadGoals();
 }
 
 // ── TOAST ──────────────────────────────────────────────────────
@@ -652,9 +733,73 @@ function showToast(icon, title, msg) {
   setTimeout(() => t.classList.remove('show'), 4000);
 }
 
+
+// ── METAS ──────────────────────────────────────────────────────
+async function loadGoals() {
+  document.getElementById('metas-content').innerHTML = '<div class="meta-loading">Carregando...</div>';
+  try {
+    const r = await fetch('/api/board?action=goals');
+    const data = await r.json();
+    if (!data.ok) throw new Error(data.error);
+    renderGoals(data);
+  } catch(e) {
+    document.getElementById('metas-content').innerHTML =
+      `<div class="meta-loading" style="color:#ef4444">Erro: ${e.message}</div>`;
+  }
+}
+
+function renderGoals(data) {
+  const { today, week } = data;
+
+  function metaCardHTML(label, count, goal, colorClass, period) {
+    const raw = goal > 0 ? (count / goal) * 100 : 0;
+    const pct = Math.round(raw);
+    const barWidth = Math.min(raw, 100); // barra até 100% visualmente
+    const isExceeded = raw >= 100;
+    const cc = isExceeded ? 'exceeded' : colorClass;
+    const remaining = Math.max(goal - count, 0);
+    const extra = count > goal ? count - goal : 0;
+
+    return `
+      <div class="meta-card ${colorClass} ${isExceeded ? 'exceeded' : ''}">
+        <div class="meta-header">
+          <div class="meta-label">${label} <span style="font-size:11px;color:var(--muted);font-family:var(--font-mono);font-weight:400">/ meta ${goal}</span></div>
+          <div class="meta-numbers">
+            <strong class="${cc}">${count}</strong>
+            <span style="font-size:11px;margin-left:4px;">${period}</span>
+          </div>
+        </div>
+        <div class="progress-track">
+          <div class="progress-bar ${cc}" style="width:${barWidth}%"></div>
+        </div>
+        <div class="meta-pct">
+          <strong class="${cc}">${pct}%</strong>
+          <span>${isExceeded
+            ? `✅ Meta batida! +${extra} além da meta`
+            : `faltam ${remaining} para a meta`
+          }</span>
+        </div>
+      </div>`;
+  }
+
+  const html = `
+    <div class="metas-section">
+      <div class="metas-section-title">☀️ Hoje</div>
+      ${metaCardHTML('Loja Feito',     today.loja.count,     today.loja.goal,     'loja',     'hoje')}
+      ${metaCardHTML('Delivery Feito', today.delivery.count, today.delivery.goal, 'delivery', 'hoje')}
+    </div>
+    <div class="metas-section">
+      <div class="metas-section-title">📅 Esta Semana</div>
+      ${metaCardHTML('Loja Feito',     week.loja.count,     week.loja.goal,     'loja',     'semana')}
+      ${metaCardHTML('Delivery Feito', week.delivery.count, week.delivery.goal, 'delivery', 'semana')}
+    </div>`;
+
+  document.getElementById('metas-content').innerHTML = html;
+}
+
 // ── INIT ───────────────────────────────────────────────────────
 loadBoard();
-setInterval(loadBoard, 90000);
+setInterval(loadBoard, 30000);
 </script>
 </body>
 </html>
