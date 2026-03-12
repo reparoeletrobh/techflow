@@ -1,11 +1,13 @@
 const PIPEFY_API = "https://api.pipefy.com/graphql";
 const PIPE_ID    = "305832912";
-const BOARD_KEY  = "reparoeletro_board";   // sem ":" para evitar conflito de encoding
+const BOARD_KEY  = "reparoeletro_board";
 
 const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g, "").trim();
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g, "").trim();
 
-// Usa /pipeline para GET e SET — chave sempre em JSON, nunca na URL
+const TECNICOS = ["Lucas", "Diego", "Kassio", "Roberto", "Carlos"];
+
+// ── Upstash ────────────────────────────────────────────────────
 async function dbGet(key) {
   try {
     const r = await fetch(`${UPSTASH_URL}/pipeline`, {
@@ -14,8 +16,7 @@ async function dbGet(key) {
       body: JSON.stringify([["GET", key]]),
     });
     const j = await r.json();
-    const result = j[0]?.result;
-    return result ? JSON.parse(result) : null;
+    return j[0]?.result ? JSON.parse(j[0].result) : null;
   } catch (e) { console.error("dbGet:", e.message); return null; }
 }
 
@@ -27,14 +28,14 @@ async function dbSet(key, value) {
       body: JSON.stringify([["SET", key, JSON.stringify(value)]]),
     });
     const j = await r.json();
-    const ok = j[0]?.result === "OK";
-    if (!ok) console.error("dbSet NOT OK:", JSON.stringify(j));
-    return ok;
+    return j[0]?.result === "OK";
   } catch (e) { console.error("dbSet:", e.message); return false; }
 }
 
+// ── Board padrão ───────────────────────────────────────────────
 function defaultBoard() {
   return {
+    // Fases OS principal
     phases: [
       { id: "aprovado",        name: "Aprovado"           },
       { id: "producao",        name: "Produção"           },
@@ -47,100 +48,133 @@ function defaultBoard() {
       { id: "delivery_feito",  name: "Delivery Feito"     },
       { id: "aguardando_ret",  name: "Aguardando Retirada"},
     ],
-    cards: [],
-    syncedIds: [],   // IDs que já estão no dashboard (não reimportar)
-    movesLog: [],    // { phaseId, timestamp } — histórico para cálculo de metas
+    // Fases RS
+    rsPhases: [
+      { id: "rs_loja",  name: "RS na Loja" },
+      { id: "rs_feito", name: "RS Feito"   },
+    ],
+    // Fases RS Rua
+    rsRuaPhases: [
+      { id: "rs_rua",       name: "RS Rua"      },
+      { id: "rs_rua_feito", name: "RS Rua Feito"},
+    ],
+    cards:      [],  // OS principais
+    rsCards:    [],  // RS
+    rsRuaCards: [],  // RS Rua
+    syncedIds:  [],  // IDs Pipefy já importados
+    movesLog:   [],  // { phaseId, timestamp, tecnico }
   };
 }
 
-function sanitizeBoard(board) {
-  if (!board || typeof board !== "object") return defaultBoard();
-  if (!Array.isArray(board.phases) || board.phases.length === 0) board.phases = defaultBoard().phases;
-  if (!Array.isArray(board.cards))     board.cards     = [];
-  if (!Array.isArray(board.syncedIds)) board.syncedIds = [];
-  const validIds = board.phases.map(p => p.id);
-  board.cards = board.cards.map(c => ({
-    ...c,
-    phaseId: validIds.includes(c.phaseId) ? c.phaseId : board.phases[0].id,
-  }));
-  return board;
+function sanitizeBoard(b) {
+  if (!b || typeof b !== "object") return defaultBoard();
+  const def = defaultBoard();
+  if (!Array.isArray(b.phases)      || !b.phases.length)      b.phases      = def.phases;
+  if (!Array.isArray(b.rsPhases)    || !b.rsPhases.length)    b.rsPhases    = def.rsPhases;
+  if (!Array.isArray(b.rsRuaPhases) || !b.rsRuaPhases.length) b.rsRuaPhases = def.rsRuaPhases;
+  if (!Array.isArray(b.cards))      b.cards      = [];
+  if (!Array.isArray(b.rsCards))    b.rsCards    = [];
+  if (!Array.isArray(b.rsRuaCards)) b.rsRuaCards = [];
+  if (!Array.isArray(b.syncedIds))  b.syncedIds  = [];
+  if (!Array.isArray(b.movesLog))   b.movesLog   = [];
+  // Garante phaseId válido
+  const validMain   = b.phases.map(p => p.id);
+  const validRs     = b.rsPhases.map(p => p.id);
+  const validRsRua  = b.rsRuaPhases.map(p => p.id);
+  b.cards      = b.cards.map(c => ({ ...c, phaseId: validMain.includes(c.phaseId)   ? c.phaseId : b.phases[0].id }));
+  b.rsCards    = b.rsCards.map(c => ({ ...c, phaseId: validRs.includes(c.phaseId)   ? c.phaseId : b.rsPhases[0].id }));
+  b.rsRuaCards = b.rsRuaCards.map(c => ({ ...c, phaseId: validRsRua.includes(c.phaseId) ? c.phaseId : b.rsRuaPhases[0].id }));
+  return b;
 }
 
-async function fetchApprovedCards() {
-  const allCards = [];
-  let cursor = null;
-  let hasNextPage = true;
+// ── Pipefy helpers ─────────────────────────────────────────────
+async function pipefyQuery(query) {
+  const res = await fetch(PIPEFY_API, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${(process.env.PIPEFY_TOKEN || "").trim()}`,
+    },
+    body: JSON.stringify({ query }),
+  });
+  const json = await res.json();
+  if (json.errors) throw new Error(json.errors[0].message);
+  return json.data;
+}
 
-  while (hasNextPage) {
-    const afterClause = cursor ? `, after: "${cursor}"` : "";
-    const query = `query {
+// Busca OS aprovadas com paginação
+async function fetchApprovedCards() {
+  const all = [];
+  let cursor = null, hasNext = true;
+  while (hasNext) {
+    const after = cursor ? `, after: "${cursor}"` : "";
+    const data = await pipefyQuery(`query {
       pipe(id: "${PIPE_ID}") {
         phases {
           name
-          cards(first: 50${afterClause}) {
+          cards(first: 50${after}) {
             pageInfo { hasNextPage endCursor }
-            edges {
-              node {
-                id title
-                fields { name value }
-                age
-                created_at
-              }
-            }
+            edges { node { id title fields { name value } age created_at } }
           }
         }
       }
-    }`;
-
-    const res = await fetch(PIPEFY_API, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${(process.env.PIPEFY_TOKEN || "").trim()}`,
-      },
-      body: JSON.stringify({ query }),
-    });
-    const json = await res.json();
-    if (json.errors) throw new Error(json.errors[0].message);
-
-    const phases = json.data?.pipe?.phases;
+    }`);
+    const phases = data?.pipe?.phases;
     if (!Array.isArray(phases)) throw new Error("Resposta inesperada do Pipefy");
-    const approvedPhase = phases.find(p => p.name.toLowerCase().includes("aprovad"));
-    if (!approvedPhase) throw new Error('Fase "Aprovado" não encontrada no Pipe');
-
-    const cards = approvedPhase.cards;
-    for (const edge of cards.edges) {
-      const fields = edge.node.fields || [];
-      const nomeField = fields.find(f =>
-        f.name.toLowerCase().includes("nome") || f.name.toLowerCase().includes("contato")
-      );
-      const descField = fields.find(f =>
-        f.name.toLowerCase().includes("descri") || f.name.toLowerCase().includes("problema") || f.name.toLowerCase().includes("servi")
-      );
-      // Extrai os 4 últimos dígitos do nome do contato como código da OS
+    const phase = phases.find(p => p.name.toLowerCase().includes("aprovad"));
+    if (!phase) throw new Error('Fase "Aprovado" não encontrada');
+    for (const { node } of phase.cards.edges) {
+      const fields = node.fields || [];
+      const nomeField = fields.find(f => f.name.toLowerCase().includes("nome") || f.name.toLowerCase().includes("contato"));
+      const descField = fields.find(f => f.name.toLowerCase().includes("descri") || f.name.toLowerCase().includes("problema") || f.name.toLowerCase().includes("servi"));
       const nomeVal = nomeField?.value || "";
       const digitsMatch = nomeVal.match(/(\d{4})\D*$/);
-      const osCode = digitsMatch ? digitsMatch[1] : null;
-
-      allCards.push({
-        pipefyId:      String(edge.node.id),
-        title:         edge.node.title || "Sem título",
-        nomeContato:   nomeVal || null,
-        osCode,                          // 4 dígitos do nome do contato
-        descricao:     descField?.value || null,
-        age:           edge.node.age ?? null,
-        addedAt:       new Date().toISOString(),
-        addedAtPipefy: edge.node.created_at || null,
+      all.push({
+        pipefyId:    String(node.id),
+        title:       node.title || "Sem título",
+        nomeContato: nomeVal || null,
+        osCode:      digitsMatch ? digitsMatch[1] : null,
+        descricao:   descField?.value || null,
+        age:         node.age ?? null,
+        addedAt:     new Date().toISOString(),
       });
     }
-
-    hasNextPage = cards.pageInfo?.hasNextPage ?? false;
-    cursor      = cards.pageInfo?.endCursor ?? null;
+    hasNext = phase.cards.pageInfo?.hasNextPage ?? false;
+    cursor  = phase.cards.pageInfo?.endCursor ?? null;
   }
-
-  return allCards;
+  return all;
 }
 
+// Busca IDs de cards que estão na fase ERP (para remover do dash)
+async function fetchErpCardIds() {
+  try {
+    const data = await pipefyQuery(`query {
+      pipe(id: "${PIPE_ID}") {
+        phases {
+          name
+          cards(first: 50) {
+            edges { node { id } }
+          }
+        }
+      }
+    }`);
+    const phases = data?.pipe?.phases || [];
+    const erp = phases.find(p => p.name.toLowerCase().includes("erp"));
+    if (!erp) return [];
+    return erp.cards.edges.map(e => String(e.node.id));
+  } catch (e) {
+    console.error("fetchErpCardIds:", e.message);
+    return [];
+  }
+}
+
+// ── Log helpers ────────────────────────────────────────────────
+function trimLog(log) {
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
+  return log.filter(m => new Date(m.timestamp) > cutoff);
+}
+
+// ── Handler ────────────────────────────────────────────────────
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
@@ -150,239 +184,267 @@ module.exports = async function handler(req, res) {
   try {
     const { action } = req.query;
 
-    // ── GET load ──────────────────────────────────────────────
+    // ── GET load ───────────────────────────────────────────────
     if (req.method === "GET" && action === "load") {
       let board = sanitizeBoard(await dbGet(BOARD_KEY));
       let newCount = 0, pipefyError = null;
 
       try {
+        // 1. Importa novos aprovados
         const approved = await fetchApprovedCards();
         for (const c of approved) {
           if (board.syncedIds.includes(c.pipefyId)) continue;
           board.cards.unshift({ ...c, phaseId: board.phases[0].id, movedBy: "Pipefy" });
           board.syncedIds.push(c.pipefyId);
-          // Registra no log de metas como aprovado
-          if (!Array.isArray(board.movesLog)) board.movesLog = [];
           board.movesLog.push({ phaseId: "aprovado_entrada", timestamp: new Date().toISOString() });
           newCount++;
         }
-        if (newCount > 0) await dbSet(BOARD_KEY, board);
+        // 2. Remove cards que foram para ERP no Pipefy
+        const erpIds = await fetchErpCardIds();
+        if (erpIds.length > 0) {
+          const before = board.cards.length;
+          board.cards = board.cards.filter(c => !erpIds.includes(c.pipefyId));
+          const removed = before - board.cards.length;
+          if (removed > 0) console.log(`Removed ${removed} cards moved to ERP`);
+        }
+        board.movesLog = trimLog(board.movesLog);
+        if (newCount > 0 || erpIds.length > 0) await dbSet(BOARD_KEY, board);
       } catch (e) { pipefyError = e.message; }
 
       return res.status(200).json({ ok: true, board, newCount, pipefyError });
     }
 
-    // ── POST reset ────────────────────────────────────────────
+    // ── POST reset ─────────────────────────────────────────────
     if (action === "reset") {
       const fresh = defaultBoard();
-      fresh.cutoffDate = new Date().toISOString(); // só OS aprovadas APÓS esta data entram
       try {
         const approved = await fetchApprovedCards();
-        // Marca TODOS os IDs atuais como já vistos (sem importar nenhum)
         fresh.syncedIds = approved.map(c => c.pipefyId);
-      } catch (e) { console.error("Reset Pipefy error:", e.message); }
-
+      } catch (e) { console.error("Reset:", e.message); }
       const saved = await dbSet(BOARD_KEY, fresh);
-      const verify = await dbGet(BOARD_KEY);
-      const ok = verify && Array.isArray(verify.syncedIds);
-
-      return res.status(200).json({
-        ok: saved && ok,
-        board: fresh,
-        markedAsSeen: fresh.syncedIds.length,
-        cutoffDate: fresh.cutoffDate,
-      });
+      return res.status(200).json({ ok: saved, board: fresh, markedAsSeen: fresh.syncedIds.length });
     }
 
-    // ── POST move ─────────────────────────────────────────────
+    // ── POST move (OS principal) ───────────────────────────────
     if (req.method === "POST" && action === "move") {
-      const { pipefyId, phaseId, movedBy } = req.body || {};
-      if (!pipefyId || !phaseId)
-        return res.status(400).json({ ok: false, error: "pipefyId e phaseId são obrigatórios" });
+      const { pipefyId, phaseId, movedBy, tecnico } = req.body || {};
+      if (!pipefyId || !phaseId) return res.status(400).json({ ok: false, error: "pipefyId e phaseId são obrigatórios" });
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
       const card = board.cards.find(c => c.pipefyId === String(pipefyId));
-      if (!card)
-        return res.status(404).json({ ok: false, error: "OS não encontrada" });
-      card.phaseId = phaseId;
-      card.movedAt = new Date().toISOString();
-      card.movedBy = movedBy || "—";
-
-      // Registra no log de metas se for fase relevante
+      if (!card) return res.status(404).json({ ok: false, error: "OS não encontrada" });
+      card.phaseId = phaseId; card.movedAt = new Date().toISOString();
+      card.movedBy = movedBy || "—"; card.tecnico = tecnico || null;
       if (["loja_feito", "delivery_feito"].includes(phaseId)) {
-        if (!Array.isArray(board.movesLog)) board.movesLog = [];
-        board.movesLog.push({ phaseId, timestamp: card.movedAt });
-        // Mantém apenas últimos 60 dias de log
-        const cutoff60 = new Date();
-        cutoff60.setDate(cutoff60.getDate() - 60);
-        board.movesLog = board.movesLog.filter(m => new Date(m.timestamp) > cutoff60);
+        board.movesLog.push({ phaseId, timestamp: card.movedAt, tecnico: tecnico || null });
+        board.movesLog = trimLog(board.movesLog);
       }
-
       await dbSet(BOARD_KEY, board);
       return res.status(200).json({ ok: true, card });
     }
 
-    // ── POST move-batch (fim do dia) ──────────────────────────
+    // ── POST move-rs ───────────────────────────────────────────
+    if (req.method === "POST" && action === "move-rs") {
+      const { cardId, phaseId, boardType } = req.body || {};
+      if (!cardId || !phaseId || !boardType) return res.status(400).json({ ok: false, error: "Campos obrigatórios" });
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const arr = boardType === "rs" ? board.rsCards : board.rsRuaCards;
+      const card = arr.find(c => c.id === cardId);
+      if (!card) return res.status(404).json({ ok: false, error: "RS não encontrado" });
+      const prevPhase = card.phaseId;
+      card.phaseId = phaseId; card.movedAt = new Date().toISOString();
+      // Log quando vai para feito
+      const feitoPhase = boardType === "rs" ? "rs_feito" : "rs_rua_feito";
+      if (phaseId === feitoPhase) {
+        board.movesLog.push({ phaseId: boardType === "rs" ? "rs_feito" : "rs_rua_feito", timestamp: card.movedAt });
+        board.movesLog = trimLog(board.movesLog);
+      }
+      await dbSet(BOARD_KEY, board);
+      return res.status(200).json({ ok: true, card, prevPhase });
+    }
+
+    // ── POST move-batch (fim do dia) ───────────────────────────
     if (req.method === "POST" && action === "move-batch") {
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
-      const FROM  = ["loja_feito", "delivery_feito"];
-      const TO    = "aguardando_ret";
-      let count   = 0;
-      const now   = new Date().toISOString();
+      const FROM = ["loja_feito", "delivery_feito"], TO = "aguardando_ret";
+      let count = 0; const now = new Date().toISOString();
       for (const card of board.cards) {
-        if (FROM.includes(card.phaseId)) {
-          card.phaseId = TO;
-          card.movedAt = now;
-          card.movedBy = "Sistema";
-          count++;
-        }
+        if (FROM.includes(card.phaseId)) { card.phaseId = TO; card.movedAt = now; card.movedBy = "Sistema"; count++; }
       }
       await dbSet(BOARD_KEY, board);
       return res.status(200).json({ ok: true, moved: count, board });
     }
 
-    // ── POST create ───────────────────────────────────────────
+    // ── POST create ────────────────────────────────────────────
     if (req.method === "POST" && action === "create") {
-      const { title, phaseId, createdBy, nomeContato, descricao } = req.body || {};
-      if (!title)
-        return res.status(400).json({ ok: false, error: "title é obrigatório" });
+      const { codigo, nome, descricao, boardType, phaseId } = req.body || {};
+      if (!nome && !codigo) return res.status(400).json({ ok: false, error: "Código ou nome obrigatório" });
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
       const newId = "local-" + Date.now();
-      board.cards.unshift({
-        pipefyId: newId, title, nomeContato: nomeContato || null,
-        descricao: descricao || null, age: 0,
-        addedAt: new Date().toISOString(),
-        phaseId: phaseId || board.phases[0].id,
-        movedAt: new Date().toISOString(),
-        movedBy: createdBy || "—", localOnly: true,
-      });
-      board.syncedIds.push(newId);
+      const card = {
+        id: newId, pipefyId: newId,
+        osCode: codigo || null, nomeContato: nome || null,
+        title: (codigo ? "#" + codigo + " " : "") + (nome || ""),
+        descricao: descricao || null,
+        age: 0, addedAt: new Date().toISOString(),
+        movedAt: new Date().toISOString(), movedBy: "Manual", localOnly: true,
+      };
+
+      if (boardType === "rs") {
+        card.phaseId = phaseId || board.rsPhases[0].id;
+        board.rsCards.unshift(card);
+        board.movesLog.push({ phaseId: "rs_criado", timestamp: card.addedAt });
+      } else if (boardType === "rs_rua") {
+        card.phaseId = phaseId || board.rsRuaPhases[0].id;
+        board.rsRuaCards.unshift(card);
+        board.movesLog.push({ phaseId: "rs_rua_criado", timestamp: card.addedAt });
+      } else {
+        card.phaseId = phaseId || board.phases[0].id;
+        board.cards.unshift(card);
+        board.syncedIds.push(newId);
+      }
+      board.movesLog = trimLog(board.movesLog);
+      await dbSet(BOARD_KEY, board);
+      return res.status(200).json({ ok: true, card });
+    }
+
+    // ── POST delete-rs ─────────────────────────────────────────
+    if (req.method === "POST" && action === "delete-rs") {
+      const { cardId, boardType } = req.body || {};
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      if (boardType === "rs")     board.rsCards    = board.rsCards.filter(c => c.id !== cardId);
+      if (boardType === "rs_rua") board.rsRuaCards = board.rsRuaCards.filter(c => c.id !== cardId);
       await dbSet(BOARD_KEY, board);
       return res.status(200).json({ ok: true });
     }
 
-
-    // ── GET debug ─────────────────────────────────────────────
-    if (action === "debug") {
-      const result = {};
-
-      // 1. Testa conexão Upstash
-      try {
-        const r = await fetch(`${UPSTASH_URL}/pipeline`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, "Content-Type": "application/json" },
-          body: JSON.stringify([["PING"]]),
-        });
-        const j = await r.json();
-        result.upstash_ping = j[0]?.result;
-      } catch(e) { result.upstash_ping = "ERRO: " + e.message; }
-
-      // 2. Lê o board atual do Upstash
-      try {
-        const board = await dbGet(BOARD_KEY);
-        result.board_found = !!board;
-        result.board_cards  = board?.cards?.length ?? 0;
-        result.board_synced = board?.syncedIds?.length ?? 0;
-        result.board_synced_ids_sample = board?.syncedIds?.slice(0, 5) ?? [];
-      } catch(e) { result.board_read_error = e.message; }
-
-      // 3. Busca OS aprovadas no Pipefy
-      try {
-        const approved = await fetchApprovedCards();
-        result.pipefy_approved_count = approved.length;
-        result.pipefy_approved_sample = approved.slice(0, 3).map(c => ({ id: c.pipefyId, title: c.title }));
-      } catch(e) { result.pipefy_error = e.message; }
-
-      // 4. Variáveis de ambiente presentes?
-      result.env_pipefy_token_set  = !!(process.env.PIPEFY_TOKEN);
-      result.env_upstash_url_set   = !!UPSTASH_URL;
-      result.env_upstash_token_set = !!UPSTASH_TOKEN;
-      result.board_key = BOARD_KEY;
-
-      return res.status(200).json(result);
-    }
-
-    // ── GET goals ─────────────────────────────────────────────
+    // ── GET goals ──────────────────────────────────────────────
     if (req.method === "GET" && action === "goals") {
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
-      const log = Array.isArray(board.movesLog) ? board.movesLog : [];
+      const log = board.movesLog;
 
-      // Helpers de data em BRT (UTC-3)
-      function toBRT(date) {
-        return new Date(new Date(date).toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
-      }
-      function startOfDayBRT(d) {
-        const b = new Date(toBRT(d)); b.setHours(0,0,0,0);
-        // volta pra UTC
+      function toBRT(d) { return new Date(new Date(d).toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })); }
+      function startOfDayUTC(d) { const b = toBRT(d); b.setHours(0,0,0,0); return new Date(b.getTime() + 3*60*60*1000); }
+      function startOfWeekUTC(d) {
+        const b = toBRT(d); const day = b.getDay();
+        b.setDate(b.getDate() + (day === 0 ? -6 : 1 - day)); b.setHours(0,0,0,0);
         return new Date(b.getTime() + 3*60*60*1000);
       }
-      function startOfWeekBRT(d) {
-        const b = toBRT(d);
-        const day = b.getDay();
-        const diff = day === 0 ? -6 : 1 - day;
-        b.setDate(b.getDate() + diff); b.setHours(0,0,0,0);
-        return new Date(b.getTime() + 3*60*60*1000);
-      }
+      function startOfMonthUTC(d) { const b = toBRT(d); b.setDate(1); b.setHours(0,0,0,0); return new Date(b.getTime() + 3*60*60*1000); }
 
-      const now     = new Date();
-      const todayUTC  = startOfDayBRT(now);
-      const weekUTC   = startOfWeekBRT(now);
-      // semana anterior: 7 dias antes do início desta semana
+      const now = new Date();
+      const todayUTC    = startOfDayUTC(now);
+      const weekUTC     = startOfWeekUTC(now);
+      const monthUTC    = startOfMonthUTC(now);
+      const prevWeekEnd = new Date(weekUTC.getTime() - 1);
       const prevWeekStart = new Date(weekUTC.getTime() - 7*24*60*60*1000);
-      const prevWeekEnd   = new Date(weekUTC.getTime() - 1);
 
-      const count = (phaseId, since, until) =>
-        log.filter(m =>
-          m.phaseId === phaseId &&
-          new Date(m.timestamp) >= since &&
-          (!until || new Date(m.timestamp) <= until)
-        ).length;
+      const cnt = (phaseId, since, until) => log.filter(m =>
+        m.phaseId === phaseId && new Date(m.timestamp) >= since && (!until || new Date(m.timestamp) <= until)
+      ).length;
 
-      // Datas formatadas
-      const nowBRT = toBRT(now);
-      const days   = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
-      const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-      const fmtDate = (d) => {
-        const b = toBRT(d);
-        return `${String(b.getDate()).padStart(2,"0")}/${String(b.getMonth()+1).padStart(2,"0")}`;
+      const cntByTecnico = (phaseId, since) => {
+        const map = {};
+        TECNICOS.forEach(t => map[t] = 0);
+        log.filter(m => m.phaseId === phaseId && new Date(m.timestamp) >= since && m.tecnico)
+           .forEach(m => { if (map[m.tecnico] !== undefined) map[m.tecnico]++; else map[m.tecnico] = 1; });
+        return map;
       };
 
-      // Datas seg a sab da semana atual
-      const weekDates = Array.from({length:6}, (_,i) => {
-        const d = new Date(weekUTC.getTime() + i*24*60*60*1000);
-        return fmtDate(d);
-      });
-      // Datas seg a sab da semana anterior
-      const prevWeekDates = Array.from({length:6}, (_,i) => {
-        const d = new Date(prevWeekStart.getTime() + i*24*60*60*1000);
-        return fmtDate(d);
-      });
+      // Histórico mensal (últimos 6 meses)
+      const monthHistory = [];
+      const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now); d.setMonth(d.getMonth() - i);
+        const ms = startOfMonthUTC(d);
+        const me = new Date(ms); me.setMonth(me.getMonth() + 1); me.setTime(me.getTime() - 1);
+        const brt = toBRT(ms);
+        monthHistory.push({
+          label: monthNames[brt.getMonth()] + "/" + String(brt.getFullYear()).slice(2),
+          rs:     cnt("rs_feito",     ms, me),
+          rsRua:  cnt("rs_rua_feito", ms, me),
+          loja:   cnt("loja_feito",   ms, me),
+          delivery: cnt("delivery_feito", ms, me),
+        });
+      }
+
+      const nowBRT = toBRT(now);
+      const days = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
+      const fmt = d => { const b = toBRT(d); return `${String(b.getDate()).padStart(2,"0")}/${String(b.getMonth()+1).padStart(2,"0")}`; };
+      const weekDates = Array.from({length:6}, (_,i) => fmt(new Date(weekUTC.getTime() + i*24*60*60*1000)));
+      const prevWeekDates = Array.from({length:6}, (_,i) => fmt(new Date(prevWeekStart.getTime() + i*24*60*60*1000)));
 
       return res.status(200).json({
         ok: true,
-        todayLabel: `${days[nowBRT.getDay()]}, ${String(nowBRT.getDate()).padStart(2,"0")} ${months[nowBRT.getMonth()]}`,
-        weekLabel:  `${weekDates[0]} – ${weekDates[5]}`,
+        todayLabel: `${days[nowBRT.getDay()]}, ${String(nowBRT.getDate()).padStart(2,"0")} ${["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"][nowBRT.getMonth()]}`,
+        weekLabel: `${weekDates[0]} – ${weekDates[5]}`,
         prevWeekLabel: `${prevWeekDates[0]} – ${prevWeekDates[5]}`,
-        weekDates,
-        prevWeekDates,
         today: {
-          aprovado: { count: count("aprovado_entrada", todayUTC), goal: 35 },
-          loja:     { count: count("loja_feito",       todayUTC), goal: 15 },
-          delivery: { count: count("delivery_feito",   todayUTC), goal: 20 },
+          aprovado: { count: cnt("aprovado_entrada", todayUTC), goal: 35 },
+          loja:     { count: cnt("loja_feito",       todayUTC), goal: 15 },
+          delivery: { count: cnt("delivery_feito",   todayUTC), goal: 20 },
+          rsCriado: cnt("rs_criado",    todayUTC),
+          rsFeito:  cnt("rs_feito",     todayUTC),
+          rsRuaCriado: cnt("rs_rua_criado",  todayUTC),
+          rsRuaFeito:  cnt("rs_rua_feito",   todayUTC),
         },
         week: {
-          aprovado: { count: count("aprovado_entrada", weekUTC), goal: 210 },
-          loja:     { count: count("loja_feito",       weekUTC), goal: 90 },
-          delivery: { count: count("delivery_feito",   weekUTC), goal: 120 },
+          aprovado: { count: cnt("aprovado_entrada", weekUTC), goal: 210 },
+          loja:     { count: cnt("loja_feito",       weekUTC), goal: 90 },
+          delivery: { count: cnt("delivery_feito",   weekUTC), goal: 120 },
+          rsFeito:  cnt("rs_feito",    weekUTC),
+          rsRuaFeito: cnt("rs_rua_feito", weekUTC),
+        },
+        month: {
+          rsFeito:    cnt("rs_feito",    monthUTC),
+          rsRuaFeito: cnt("rs_rua_feito", monthUTC),
         },
         prevWeek: {
-          aprovado: { count: count("aprovado_entrada", prevWeekStart, prevWeekEnd), goal: 210 },
-          loja:     { count: count("loja_feito",       prevWeekStart, prevWeekEnd), goal: 90 },
-          delivery: { count: count("delivery_feito",   prevWeekStart, prevWeekEnd), goal: 120 },
+          aprovado: { count: cnt("aprovado_entrada", prevWeekStart, prevWeekEnd), goal: 210 },
+          loja:     { count: cnt("loja_feito",       prevWeekStart, prevWeekEnd), goal: 90 },
+          delivery: { count: cnt("delivery_feito",   prevWeekStart, prevWeekEnd), goal: 120 },
         },
+        tecnicoHoje: {
+          loja:     cntByTecnico("loja_feito",     todayUTC),
+          delivery: cntByTecnico("delivery_feito", todayUTC),
+        },
+        tecnicoSemana: {
+          loja:     cntByTecnico("loja_feito",     weekUTC),
+          delivery: cntByTecnico("delivery_feito", weekUTC),
+        },
+        monthHistory,
       });
     }
 
-        return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+    // ── GET debug ──────────────────────────────────────────────
+    if (action === "debug") {
+      const result = {};
+      try {
+        const r = await fetch(`${UPSTASH_URL}/pipeline`, {
+          method: "POST", headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, "Content-Type": "application/json" },
+          body: JSON.stringify([["PING"]]),
+        });
+        result.upstash_ping = (await r.json())[0]?.result;
+      } catch(e) { result.upstash_ping = "ERRO: " + e.message; }
+      try {
+        const board = await dbGet(BOARD_KEY);
+        result.board_found = !!board;
+        result.board_cards = board?.cards?.length ?? 0;
+        result.board_rs = board?.rsCards?.length ?? 0;
+        result.board_rs_rua = board?.rsRuaCards?.length ?? 0;
+        result.board_synced = board?.syncedIds?.length ?? 0;
+        result.board_log = board?.movesLog?.length ?? 0;
+      } catch(e) { result.board_error = e.message; }
+      try {
+        const approved = await fetchApprovedCards();
+        result.pipefy_approved_count = approved.length;
+      } catch(e) { result.pipefy_error = e.message; }
+      result.env_pipefy = !!process.env.PIPEFY_TOKEN;
+      result.env_upstash = !!UPSTASH_URL;
+      return res.status(200).json(result);
+    }
+
+    return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+
   } catch (err) {
     console.error("Handler error:", err);
     return res.status(500).json({ ok: false, error: err.message });
