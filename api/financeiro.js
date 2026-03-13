@@ -80,8 +80,10 @@ async function fetchVideoEnviado() {
       }
     }`);
     const phases = data?.pipe?.phases || [];
-    const phase  = phases.find(p => p.name.toLowerCase().replace(/\s/g,"").includes("videoenviado") ||
-                                     p.name.toLowerCase().includes("video"));
+    const phase  = phases.find(p => {
+      const n = p.name.toLowerCase().trim();
+      return n.includes("video enviado") || n.includes("vídeo enviado") || n === "video enviado";
+    });
     if (!phase) break;
     for (const { node } of phase.cards.edges) {
       const fields = node.fields || [];
@@ -273,5 +275,28 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+  // ── GET debug ─────────────────────────────────────────────
+  if (action === "debug") {
+    const result = {};
+    try {
+      const data = await pipefyQuery(`query {
+        pipe(id: "${PIPE_ID}") {
+          phases { name cards(first: 3) { edges { node { id title } } } }
+        }
+      }`);
+      result.phases = (data?.pipe?.phases || []).map(p => ({
+        name: p.name,
+        cards: p.cards.edges.length,
+        sample: p.cards.edges.map(e => e.node.title).slice(0,2),
+      }));
+    } catch(e) { result.pipefy_error = e.message; }
+    try {
+      const fin = await dbGet(FIN_KEY) || defaultFin();
+      result.fin_records = fin.records.length;
+      result.fin_synced  = fin.syncedIds.length;
+    } catch(e) { result.fin_error = e.message; }
+    return res.status(200).json(result);
+  }
+
+    return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 };
