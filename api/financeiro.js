@@ -11,6 +11,7 @@ const FIN_PHASES = [
   { id: "aguardando_dados",    name: "Aguardando Dados"    },
   { id: "emitir_nf",          name: "Emitir Nota Fiscal"  },
   { id: "faturamento",        name: "Faturamento"         },
+  { id: "pagamento_agendado", name: "Pagamento Agendado"  },
   { id: "entrega_agendada",   name: "Entrega Agendada"    },
   { id: "entrega_liberada",   name: "Entrega Liberada"    },
   { id: "rota_criada",        name: "Rota Criada"         },
@@ -152,7 +153,62 @@ module.exports = async function handler(req, res) {
   if (action === "load") {
     const fin = await dbGet(FIN_KEY) || defaultFin();
     if (!Array.isArray(fin.syncedIds)) fin.syncedIds = [];
-    return res.status(200).json({ ok: true, records: fin.records, phases: FIN_PHASES });
+    if (!Array.isArray(fin.history))   fin.history   = [];
+
+    const records = fin.records || [];
+
+    // ── Calcular metas ─────────────────────────────────────
+    function toBRT(d) { return new Date(new Date(d).toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })); }
+    const nowBRT = toBRT(new Date()); nowBRT.setHours(0,0,0,0);
+    const todayUTC = new Date(nowBRT.getTime() + 3*60*60*1000);
+    // Início da semana (segunda-feira)
+    const weekBRT = toBRT(new Date()); const wd = weekBRT.getDay();
+    weekBRT.setDate(weekBRT.getDate() + (wd===0?-6:1-wd)); weekBRT.setHours(0,0,0,0);
+    const weekUTC = new Date(weekBRT.getTime() + 3*60*60*1000);
+
+    // Log de movimentações (histórico de fases)
+    const allHistory = [];
+    for (const r of records) {
+      for (const h of (r.history || [])) {
+        allHistory.push({ ...h, pipefyId: r.id });
+      }
+    }
+
+    const cntPhase = (phaseId, since) => {
+      const seen = new Set();
+      return allHistory.filter(h => {
+        if (h.phaseId !== phaseId) return false;
+        if (new Date(h.ts) < since) return false;
+        if (seen.has(h.pipefyId)) return false;
+        seen.add(h.pipefyId); return true;
+      }).length;
+    };
+
+    const goals = {
+      today: {
+        faturamento: { count: cntPhase("faturamento", todayUTC), goal: 20 },
+        rota:        { count: cntPhase("rota_criada",  todayUTC), goal: 20 },
+      },
+      week: {
+        faturamento: { count: cntPhase("faturamento", weekUTC), goal: 120 },
+        rota:        { count: cntPhase("rota_criada",  weekUTC), goal: 120 },
+      },
+    };
+
+    // Contagem por fase atual
+    const phaseCounts = {};
+    FIN_PHASES.forEach(p => { phaseCounts[p.id] = 0; });
+    records.forEach(r => { if (phaseCounts[r.phaseId] !== undefined) phaseCounts[r.phaseId]++; });
+
+    const days = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
+    const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+    const nb = toBRT(new Date());
+    const todayLabel = `${days[nb.getDay()]}, ${String(nb.getDate()).padStart(2,"0")} ${months[nb.getMonth()]}`;
+    const wStart = toBRT(weekUTC); const wEnd = new Date(weekUTC.getTime()+5*24*60*60*1000);
+    const fmt = d => { const b = toBRT(d); return `${String(b.getDate()).padStart(2,"0")}/${String(b.getMonth()+1).padStart(2,"0")}`; };
+    const weekLabel = `${fmt(weekUTC)} – ${fmt(wEnd)}`;
+
+    return res.status(200).json({ ok: true, records, phases: FIN_PHASES, goals, phaseCounts, todayLabel, weekLabel });
   }
 
   // ── GET sync — varre Pipefy em background ──────────────────
@@ -245,7 +301,8 @@ module.exports = async function handler(req, res) {
 
     // Valida transições permitidas
     const allowed = {
-      faturamento:      ["entrega_agendada", "entrega_liberada"],
+      faturamento:      ["pagamento_agendado", "entrega_agendada", "entrega_liberada"],
+      pagamento_agendado: ["entrega_agendada", "entrega_liberada"],
       entrega_agendada: ["entrega_liberada"],
       entrega_liberada: ["rota_criada"],
       rota_criada:      ["item_coletado"],
@@ -262,6 +319,10 @@ module.exports = async function handler(req, res) {
     rec.movedAt = new Date().toISOString();
     rec.history = [...(rec.history || []), { phaseId, ts: rec.movedAt }];
     if (phaseId === "entrega_agendada" || phaseId === "entrega_liberada") rec.paidAt = rec.movedAt;
+    if ((phaseId === "entrega_agendada" || phaseId === "pagamento_agendado") && req.body.dataAgendada) {
+      rec.dataAgendada        = req.body.dataAgendada;
+      rec.dataAgendadaDisplay = req.body.dataAgendadaDisplay || req.body.dataAgendada;
+    }
     await dbSet(FIN_KEY, fin);
     return res.status(200).json({ ok: true, record: rec });
   }
