@@ -1,6 +1,0 @@
-{
-  "rewrites": [
-    { "source": "/financeiro", "destination": "/financeiro.html" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
-  ]
-}
