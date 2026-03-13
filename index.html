@@ -1316,12 +1316,51 @@ async function submitSplit() {
   btn.disabled = false; btn.textContent = '✂️ Quebrar OS';
 }
 
+// ── CLEANUP AGUARDANDO RETIRADA ────────────────────────────────
+async function cleanupRet() {
+  try {
+    const r   = await fetch('/api/board?action=cleanup-ret');
+    const res = await r.json();
+    if (res.removed > 0) {
+      // Recarrega o board para refletir remoções
+      await loadBoard();
+      const b = document.getElementById('new-badge');
+      b.textContent = `−${res.removed} retirada${res.removed>1?'s':''} finalizada${res.removed>1?'s':''}`;
+      b.style.background = 'rgba(239,68,68,0.15)';
+      b.style.color = '#ef4444';
+      b.style.display = 'inline';
+      setTimeout(() => { b.style.display='none'; b.style.background=''; b.style.color=''; }, 8000);
+    }
+  } catch(e) { console.warn('cleanup-ret:', e.message); }
+}
+
+function scheduleCleanupRet() {
+  // Roda nas próximas ocorrências de 08:00 e 18:00 BRT
+  const targets = [8, 18];
+  function msUntilNext() {
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone:'America/Sao_Paulo' }));
+    const h = now.getHours(), m = now.getMinutes(), s = now.getSeconds();
+    const nowMin = h*60+m;
+    const targetMins = targets.map(t=>t*60);
+    let diff = targetMins.find(t=>t>nowMin);
+    if (diff === undefined) diff = targetMins[0]+24*60;
+    return (diff - nowMin)*60*1000 - s*1000;
+  }
+  setTimeout(function tick() {
+    cleanupRet();
+    setTimeout(tick, msUntilNext());
+  }, msUntilNext());
+}
+
 // ── INIT ───────────────────────────────────────────────────────
 // Renderiza fases imediatamente com board padrão — não espera API
 renderBoard();
 renderStageGrids();
 // Busca dados reais do banco em seguida
 loadBoard();
+// Cleanup de Aguardando Retirada ao abrir + agendado 2x/dia
+cleanupRet();
+scheduleCleanupRet();
 // Banco: atualiza tela a cada 10s
 setInterval(() => {
   loadBoard();
