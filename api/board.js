@@ -180,7 +180,7 @@ async function fetchApprovedCards() {
   return all;
 }
 
-// Busca IDs de cards que estão na fase ERP (para remover do dash)
+// Busca IDs de cards que estão em ERP ou Finalizado no Pipefy
 async function fetchErpCardIds() {
   try {
     const data = await pipefyQuery(`query {
@@ -194,13 +194,34 @@ async function fetchErpCardIds() {
       }
     }`);
     const phases = data?.pipe?.phases || [];
-    const erp = phases.find(p => p.name.toLowerCase().includes("erp"));
-    if (!erp) return [];
-    return erp.cards.edges.map(e => String(e.node.id));
+    const ids = [];
+    for (const ph of phases) {
+      const n = ph.name.toLowerCase();
+      if (n.includes("erp") || n.includes("finaliz") || n.includes("conclu")) {
+        ph.cards.edges.forEach(e => ids.push(String(e.node.id)));
+      }
+    }
+    return ids;
   } catch (e) {
     console.error("fetchErpCardIds:", e.message);
     return [];
   }
+}
+
+// Remove do aguardando_ret os cards que foram para ERP/Finalizado no Pipefy
+async function cleanupAguardandoRet(board) {
+  const erpIds = await fetchErpCardIds();
+  if (!erpIds.length) return { removed: 0, ids: [] };
+  const before = board.cards.length;
+  const removedIds = [];
+  board.cards = board.cards.filter(c => {
+    if (c.phaseId === "aguardando_ret" && erpIds.includes(c.pipefyId)) {
+      removedIds.push(c.pipefyId);
+      return false;
+    }
+    return true;
+  });
+  return { removed: before - board.cards.length, ids: removedIds };
 }
 
 // ── Log helpers ────────────────────────────────────────────────
@@ -248,6 +269,7 @@ module.exports = async function handler(req, res) {
       } catch (e) { pipefyError = e.message; }
 
       try {
+        // Remove qualquer card (qualquer fase) que está em ERP/Finalizado
         const erpIds = await fetchErpCardIds();
         if (erpIds.length > 0) {
           const before = board.cards.length;
@@ -535,6 +557,19 @@ module.exports = async function handler(req, res) {
         result.dbset_works = setOk && getBack?.test === true;
       } catch(e) { result.dbset_error = e.message; }
 
+      // Lista todas as fases do Pipefy
+      try {
+        const data = await pipefyQuery(`query {
+          pipe(id: "${PIPE_ID}") {
+            phases { name cards(first: 1) { edges { node { id } } } }
+          }
+        }`);
+        result.all_phases = (data?.pipe?.phases || []).map(p => ({
+          name: p.name,
+          cards: p.cards.edges.length
+        }));
+      } catch(e) { result.phases_error = e.message; }
+
       result.env_pipefy = !!process.env.PIPEFY_TOKEN;
       result.env_upstash = !!UPSTASH_URL;
       result.board_key = BOARD_KEY;
@@ -672,7 +707,30 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, created: newCards.length, cards: newCards });
     }
 
-        return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+        // ── GET cleanup-ret — remove aguardando_ret que foram ERP/Finalizado ──
+    // Pode ser chamado por cron externo 2x/dia
+    if (req.method === "GET" && action === "cleanup-ret") {
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      let removed = 0, removedIds = [], pipefyError = null;
+      try {
+        const result = await cleanupAguardandoRet(board);
+        removed    = result.removed;
+        removedIds = result.ids;
+        if (removed > 0) {
+          board.movesLog.push({
+            phaseId:   "cleanup_ret",
+            timestamp: new Date().toISOString(),
+            removed,
+            pipefyIds: removedIds,
+          });
+          board.movesLog = trimLog(board.movesLog);
+          await dbSet(BOARD_KEY, board);
+        }
+      } catch(e) { pipefyError = e.message; }
+      return res.status(200).json({ ok: true, removed, removedIds, pipefyError });
+    }
+
+    return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch (err) {
     console.error("Handler error:", err);
