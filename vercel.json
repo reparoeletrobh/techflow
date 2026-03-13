@@ -1,8 +1,6 @@
 {
   "rewrites": [
-    { "source": "/api/board",      "destination": "/api/board.js"      },
-    { "source": "/api/financeiro", "destination": "/api/financeiro.js" },
-    { "source": "/financeiro",     "destination": "/financeiro.html"   },
-    { "source": "/(.*)",           "destination": "/index.html"        }
+    { "source": "/financeiro", "destination": "/financeiro.html" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
