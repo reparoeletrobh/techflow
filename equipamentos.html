@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reparo Eletro — Equipamentos à Venda</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--border:#252525;
+  --text:#fff;--muted:#888;
+  --accent:#f5c800;--green:#22c55e;--wa:#25d366;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);}
+
+/* HEADER */
+header{
+  text-align:center;padding:32px 20px 24px;border-bottom:1px solid var(--border);
+  position:relative;
+}
+.brand{font-family:var(--fh);font-size:28px;font-weight:800;letter-spacing:-1px;}
+.brand span{color:var(--accent);}
+.brand-sub{font-family:var(--fm);font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:0.08em;}
+.header-stripe{position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);}
+
+/* GRID */
+.grid-wrap{max-width:1200px;margin:0 auto;padding:32px 20px 60px;}
+.grid-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:10px;}
+.grid-title{font-family:var(--fh);font-size:20px;font-weight:800;}
+.grid-title span{color:var(--accent);}
+.grid-count{font-family:var(--fm);font-size:11px;color:var(--muted);}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;}
+
+/* PRODUCT CARD */
+.prod-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:16px;
+  overflow:hidden;transition:transform 0.2s,border-color 0.2s;
+  display:flex;flex-direction:column;
+}
+.prod-card:hover{transform:translateY(-4px);border-color:#333;}
+
+/* CAROUSEL */
+.carousel{position:relative;aspect-ratio:4/3;background:var(--surface2);overflow:hidden;}
+.carousel-imgs{display:flex;height:100%;transition:transform 0.35s cubic-bezier(0.4,0,0.2,1);}
+.carousel-img{width:100%;height:100%;flex-shrink:0;object-fit:cover;}
+.carousel-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;color:var(--border);}
+.carousel-btn{
+  position:absolute;top:50%;transform:translateY(-50%);
+  width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,0.6);
+  color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:14px;transition:all 0.15s;backdrop-filter:blur(4px);
+}
+.carousel-btn:hover{background:rgba(0,0,0,0.85);}
+.carousel-btn.prev{left:8px;}
+.carousel-btn.next{right:8px;}
+.carousel-dots{position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:center;gap:5px;}
+.dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.35);transition:all 0.2s;cursor:pointer;}
+.dot.active{background:#fff;width:14px;border-radius:3px;}
+.foto-count{
+  position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.6);
+  color:#fff;font-family:var(--fm);font-size:10px;padding:3px 8px;border-radius:20px;
+  backdrop-filter:blur(4px);
+}
+
+/* CARD BODY */
+.card-body{padding:16px;flex:1;display:flex;flex-direction:column;gap:10px;}
+.card-code{font-family:var(--fm);font-size:11px;color:var(--accent);font-weight:500;}
+.card-desc{font-size:13px;line-height:1.55;color:var(--text);flex:1;}
+.card-cap{font-family:var(--fm);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px;}
+.card-cap::before{content:'⚡';font-size:11px;}
+.card-footer{display:flex;align-items:center;justify-content:space-between;margin-top:4px;gap:10px;}
+.card-price{font-family:var(--fh);font-size:22px;font-weight:800;color:var(--green);}
+.card-price-sub{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:1px;}
+
+/* WHATSAPP BUTTON */
+.btn-wa{
+  display:flex;align-items:center;gap:7px;padding:10px 16px;border-radius:9px;
+  background:var(--wa);color:#fff;border:none;cursor:pointer;
+  font-family:var(--fb);font-size:12px;font-weight:600;
+  transition:all 0.2s;white-space:nowrap;text-decoration:none;
+}
+.btn-wa:hover{filter:brightness(1.1);transform:scale(1.03);}
+.btn-wa svg{width:18px;height:18px;flex-shrink:0;}
+
+/* EMPTY */
+.empty{text-align:center;padding:80px 20px;font-family:var(--fm);font-size:13px;color:var(--muted);}
+.empty-icon{font-size:48px;margin-bottom:16px;display:block;}
+
+/* LOADING */
+.loading{display:flex;align-items:center;justify-content:center;height:200px;gap:12px;flex-direction:column;}
+.spinner{width:28px;height:28px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+@media(max-width:480px){
+  .grid{grid-template-columns:1fr;}
+  .card-footer{flex-direction:column;align-items:flex-start;}
+  .btn-wa{width:100%;justify-content:center;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">Reparo<span>Eletro</span></div>
+  <div class="brand-sub">// equipamentos revisados à venda</div>
+  <div class="header-stripe"></div>
+</header>
+
+<div class="grid-wrap">
+  <div class="grid-header">
+    <div class="grid-title">Equipamentos <span>Disponíveis</span></div>
+    <div class="grid-count" id="grid-count"></div>
+  </div>
+  <div id="grid-content">
+    <div class="loading">
+      <div class="spinner"></div>
+      <div style="font-family:var(--fm);font-size:11px;color:var(--muted);">Carregando...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const WA_NUMBER = "5531997856023";
+
+async function load() {
+  try {
+    const r   = await fetch('/api/vendas?action=load');
+    const res = await r.json();
+    if (!res.ok) throw new Error(res.error);
+    render(res.produtos || []);
+  } catch(e) {
+    document.getElementById('grid-content').innerHTML =
+      `<div class="empty"><span class="empty-icon">⚠️</span>Erro ao carregar: ${e.message}</div>`;
+  }
+}
+
+function render(produtos) {
+  const count = document.getElementById('grid-count');
+  count.textContent = `${produtos.length} equipamento${produtos.length!==1?'s':''}`;
+
+  if (!produtos.length) {
+    document.getElementById('grid-content').innerHTML =
+      `<div class="empty"><span class="empty-icon">📦</span>Nenhum equipamento disponível no momento.<br>Volte em breve!</div>`;
+    return;
+  }
+
+  const cards = produtos.map(p => cardHTML(p)).join('');
+  document.getElementById('grid-content').innerHTML = `<div class="grid">${cards}</div>`;
+}
+
+function cardHTML(p) {
+  const fotos  = p.fotos || [];
+  const hasFotos = fotos.length > 0;
+  const precoFmt = parseFloat(p.preco).toLocaleString('pt-BR',{minimumFractionDigits:2,style:'currency',currency:'BRL'});
+
+  const carouselInner = hasFotos
+    ? fotos.map(f => `<img class="carousel-img" src="${f}" loading="lazy"/>`).join('')
+    : `<div class="carousel-placeholder">📷</div>`;
+
+  const dots = fotos.length > 1
+    ? `<div class="carousel-dots">${fotos.map((_,i) =>
+        `<div class="dot ${i===0?'active':''}" onclick="goTo('${p.id}',${i})"></div>`
+      ).join('')}</div>` : '';
+
+  const prevBtn = fotos.length > 1 ? `<button class="carousel-btn prev" onclick="slide('${p.id}',-1)">‹</button>` : '';
+  const nextBtn = fotos.length > 1 ? `<button class="carousel-btn next" onclick="slide('${p.id}',1)">›</button>` : '';
+  const fotoCount = fotos.length > 1 ? `<div class="foto-count">📷 ${fotos.length}</div>` : '';
+
+  const msgWA = encodeURIComponent(
+    `Olá! Tenho interesse no equipamento:\n\n📦 Código: ${p.codigo}\n📝 ${p.descricao}${p.capacidade?'\n⚡ '+p.capacidade:''}\n💰 Valor: ${precoFmt}\n\nPoderia me passar mais informações?`
+  );
+
+  return `
+    <div class="prod-card" id="card-${p.id}" data-idx="0" data-total="${fotos.length}">
+      <div class="carousel">
+        <div class="carousel-imgs" id="imgs-${p.id}">${carouselInner}</div>
+        ${prevBtn}${nextBtn}${dots}${fotoCount}
+      </div>
+      <div class="card-body">
+        <div class="card-code">${p.codigo}</div>
+        <div class="card-desc">${p.descricao}</div>
+        ${p.capacidade ? `<div class="card-cap">${p.capacidade}</div>` : ''}
+        <div class="card-footer">
+          <div>
+            <div class="card-price">${precoFmt}</div>
+            <div class="card-price-sub">à vista</div>
+          </div>
+          <a class="btn-wa" href="https://wa.me/${WA_NUMBER}?text=${msgWA}" target="_blank">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+            </svg>
+            WhatsApp
+          </a>
+        </div>
+      </div>
+    </div>`;
+}
+
+function slide(id, dir) {
+  const card  = document.getElementById(`card-${id}`);
+  const total = parseInt(card.dataset.total);
+  if (total <= 1) return;
+  let idx = parseInt(card.dataset.idx) + dir;
+  if (idx < 0) idx = total - 1;
+  if (idx >= total) idx = 0;
+  goTo(id, idx);
+}
+
+function goTo(id, idx) {
+  const card = document.getElementById(`card-${id}`);
+  const imgs = document.getElementById(`imgs-${id}`);
+  card.dataset.idx = idx;
+  imgs.style.transform = `translateX(-${idx * 100}%)`;
+  card.querySelectorAll('.dot').forEach((d,i) => d.classList.toggle('active', i===idx));
+}
+
+load();
+</script>
+</body>
+</html>
