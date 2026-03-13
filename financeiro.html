@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reparo Eletro — Financeiro</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--border:#252525;
+  --text:#fff;--muted:#888;--dim:#3a3a3a;
+  --accent:#f5c800;
+  --c1:#6366f1;--c2:#3b9eff;--c3:#f59e0b;--c4:#22c55e;--c5:#10b981;--c6:#8b5cf6;--c7:#ec4899;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;overflow-x:hidden;}
+
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;height:50px;border-bottom:2px solid var(--accent);
+  background:var(--bg);position:sticky;top:0;z-index:100;
+}
+.logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.logo-icon{width:24px;height:24px;background:var(--accent);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;}
+.logo span{color:var(--accent);}
+.hdr-right{display:flex;align-items:center;gap:10px;}
+.sync-btn{font-family:var(--fm);font-size:10px;padding:5px 11px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all 0.15s;}
+.sync-btn:hover{color:var(--accent);border-color:var(--accent);}
+.live-dot{width:5px;height:5px;background:var(--accent);border-radius:50%;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+/* KANBAN */
+.kanban{display:flex;gap:10px;padding:14px 20px 24px;overflow-x:auto;min-height:calc(100vh - 50px);}
+.col{
+  width:240px;flex-shrink:0;display:flex;flex-direction:column;
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;
+}
+.col-head{padding:10px 12px 8px;border-bottom:1px solid var(--border);position:relative;}
+.col-stripe{position:absolute;top:0;left:0;right:0;height:2px;}
+.col-name{font-family:var(--fh);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;}
+.col-count{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px;}
+.col-body{flex:1;padding:8px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;}
+.col-body::-webkit-scrollbar{width:2px;}
+.col-body::-webkit-scrollbar-thumb{background:var(--border);}
+
+/* FIN CARD */
+.fin-card{
+  background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+  padding:10px;animation:cardIn 0.25s ease;position:relative;overflow:hidden;
+}
+@keyframes cardIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.fin-card:hover{border-color:#333;}
+.fc-bar{position:absolute;left:0;top:0;bottom:0;width:3px;}
+.fc-num{font-family:var(--fm);font-size:11px;color:var(--accent);font-weight:500;}
+.fc-nome{font-size:11px;font-weight:500;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.fc-desc{font-size:10px;color:var(--muted);margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.fc-cpf{font-family:var(--fm);font-size:10px;color:var(--c4);margin-top:4px;}
+.fc-age{font-family:var(--fm);font-size:9px;color:var(--dim);margin-top:4px;}
+.fc-actions{margin-top:8px;display:flex;flex-direction:column;gap:5px;}
+
+/* Buttons inside cards */
+.btn-primary{
+  width:100%;padding:7px 10px;border-radius:6px;border:none;cursor:pointer;
+  font-family:var(--fm);font-size:10px;font-weight:600;transition:all 0.15s;
+}
+.btn-secondary{
+  width:100%;padding:6px 10px;border-radius:6px;cursor:pointer;
+  font-family:var(--fm);font-size:10px;transition:all 0.15s;
+  background:transparent;border:1px solid var(--border);color:var(--muted);
+}
+.btn-secondary:hover{border-color:#444;color:var(--text);}
+.btn-danger{border-color:rgba(239,68,68,0.2);color:#ef444466;}
+.btn-danger:hover{border-color:#ef4444;color:#ef4444;}
+
+/* CPF input inline */
+.cpf-wrap{display:flex;gap:4px;margin-top:4px;}
+.cpf-input{
+  flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;
+  padding:6px 8px;font-family:var(--fm);font-size:11px;color:var(--text);outline:none;min-width:0;
+}
+.cpf-input:focus{border-color:var(--accent);}
+.cpf-save{padding:6px 10px;border-radius:6px;border:none;background:var(--accent);color:#000;font-family:var(--fm);font-size:10px;font-weight:600;cursor:pointer;white-space:nowrap;}
+
+/* Empty col */
+.empty-col{flex:1;display:flex;align-items:center;justify-content:center;color:#2a2a2a;font-family:var(--fm);font-size:10px;text-align:center;padding:12px;}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:400;opacity:0;pointer-events:none;transition:opacity 0.2s;backdrop-filter:blur(3px);}
+.modal-overlay.open{opacity:1;pointer-events:all;}
+.modal{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--accent);border-radius:14px;padding:24px;max-width:380px;width:92%;transform:scale(0.95);transition:transform 0.2s;}
+.modal-overlay.open .modal{transform:scale(1);}
+.modal-title{font-family:var(--fh);font-size:17px;font-weight:800;margin-bottom:4px;}
+.modal-title span{color:var(--accent);}
+.modal-info{font-family:var(--fm);font-size:11px;color:var(--muted);margin-bottom:18px;padding:8px 11px;background:var(--surface2);border-radius:7px;border-left:3px solid var(--accent);}
+.modal-info strong{color:var(--text);}
+.field-group{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.field-label{font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;}
+.f-input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:var(--fb);font-size:14px;color:var(--text);width:100%;outline:none;transition:all 0.15s;}
+.f-input:focus{border-color:var(--accent);}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+.modal-cancel{font-family:var(--fm);font-size:11px;padding:8px 15px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;}
+.modal-cancel:hover{color:var(--text);}
+.modal-confirm{font-family:var(--fm);font-size:11px;font-weight:600;padding:8px 16px;border-radius:7px;background:var(--accent);color:#000;border:none;cursor:pointer;}
+.modal-confirm:hover{filter:brightness(1.1);}
+
+/* TOAST */
+.toast{position:fixed;bottom:18px;right:18px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:11px 14px;font-family:var(--fm);font-size:11px;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.5);}
+.toast.show{transform:translateY(0);opacity:1;}
+
+.spinner-inline{display:inline-block;width:10px;height:10px;border:1px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:middle;}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="logo-icon">💼</div>Reparo<span>Eletro</span> — Financeiro</div>
+  <div class="hdr-right">
+    <span id="sync-status" style="font-family:var(--fm);font-size:10px;color:var(--muted);"></span>
+    <button class="sync-btn" onclick="syncPipefy()">↻ Sync Pipefy</button>
+    <div class="live-dot" title="Atualiza a cada 30s"></div>
+  </div>
+</header>
+
+<div class="kanban" id="kanban">
+  <div style="display:flex;align-items:center;justify-content:center;width:100%;gap:12px;flex-direction:column;padding:60px;">
+    <div class="spinner-inline" style="width:28px;height:28px;border-width:2px;"></div>
+    <div style="font-family:var(--fm);font-size:11px;color:var(--muted);">Carregando...</div>
+  </div>
+</div>
+
+<!-- MODAL CPF/CNPJ -->
+<div class="modal-overlay" id="cpf-modal">
+  <div class="modal">
+    <div class="modal-title">📋 Cadastrar <span>CPF / CNPJ</span></div>
+    <div class="modal-info" id="cpf-modal-info"></div>
+    <div class="field-group">
+      <label class="field-label">CPF ou CNPJ do cliente</label>
+      <input class="f-input" id="cpf-input" type="text" placeholder="000.000.000-00 ou 00.000.000/0001-00"
+        onkeydown="if(event.key==='Enter')submitCpf()" oninput="maskCpfCnpj(this)"/>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeModal('cpf-modal')">Cancelar</button>
+      <button class="modal-confirm" onclick="submitCpf()">Salvar e Avançar →</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MOVER (pagamento) -->
+<div class="modal-overlay" id="mover-modal">
+  <div class="modal">
+    <div class="modal-title" id="mover-title">Mover <span>Ficha</span></div>
+    <div class="modal-info" id="mover-modal-info"></div>
+    <div id="mover-options" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="modal-cancel" onclick="closeModal('mover-modal')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <span id="t-icon">✅</span>
+  <div><strong id="t-title"></strong><br><span id="t-body" style="color:var(--muted);font-size:10px;"></span></div>
+</div>
+
+<script>
+const PHASES = [
+  { id:"aguardando_dados",  name:"Aguardando Dados",   color:"#6366f1" },
+  { id:"emitir_nf",         name:"Emitir Nota Fiscal", color:"#3b9eff" },
+  { id:"faturamento",       name:"Faturamento",        color:"#f59e0b" },
+  { id:"entrega_agendada",  name:"Entrega Agendada",   color:"#f97316" },
+  { id:"entrega_liberada",  name:"Entrega Liberada",   color:"#22c55e" },
+  { id:"rota_criada",       name:"Rota Criada",        color:"#8b5cf6" },
+  { id:"item_coletado",     name:"Item Coletado",      color:"#ec4899" },
+];
+
+const TRANSITIONS = {
+  faturamento:      ["entrega_agendada","entrega_liberada"],
+  entrega_agendada: ["entrega_liberada"],
+  entrega_liberada: ["rota_criada"],
+  rota_criada:      ["item_coletado"],
+};
+
+let records = [];
+let selId   = null;
+
+// ── API ──────────────────────────────────────────────────────
+async function api(action, body) {
+  const r = await fetch(`/api/financeiro?action=${action}`, body ? {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+  } : {});
+  return r.json();
+}
+
+// ── LOAD ─────────────────────────────────────────────────────
+async function load() {
+  try {
+    const res = await api('load');
+    if (!res.ok) throw new Error(res.error);
+    records = res.records || [];
+    render();
+  } catch(e) {
+    document.getElementById('kanban').innerHTML =
+      `<div style="padding:40px;font-family:var(--fm);font-size:12px;color:#ef4444;">Erro: ${e.message}</div>`;
+  }
+}
+
+async function syncPipefy() {
+  const btn = document.querySelector('.sync-btn');
+  const status = document.getElementById('sync-status');
+  btn.textContent = '⏳'; btn.style.pointerEvents = 'none';
+  status.textContent = 'sincronizando...';
+  try {
+    const res = await api('sync');
+    if (res.newCount > 0 || res.removedCount > 0) {
+      await load();
+      showToast('🔄','Sync concluído',`+${res.newCount} novas, ${res.removedCount} finalizadas`);
+    } else {
+      status.textContent = 'sem novidades';
+      setTimeout(() => status.textContent = '', 3000);
+    }
+    if (res.pipefyError) { status.textContent = '⚠️ Pipefy: ' + res.pipefyError; }
+  } catch(e) { status.textContent = '⚠️ ' + e.message; }
+  btn.textContent = '↻ Sync Pipefy'; btn.style.pointerEvents = '';
+}
+
+// ── RENDER ───────────────────────────────────────────────────
+function render() {
+  const kb = document.getElementById('kanban');
+  kb.innerHTML = '';
+  PHASES.forEach(ph => {
+    const cards = records.filter(r => r.phaseId === ph.id);
+    const col   = document.createElement('div'); col.className = 'col';
+    col.innerHTML = `
+      <div class="col-head">
+        <div class="col-stripe" style="background:${ph.color}"></div>
+        <div class="col-name">${ph.name}</div>
+        <div class="col-count">${cards.length} ficha${cards.length!==1?'s':''}</div>
+      </div>
+      <div class="col-body" id="col-${ph.id}">
+        ${cards.length ? cards.map(r => cardHTML(r, ph.color)).join('') : '<div class="empty-col">— vazio —</div>'}
+      </div>`;
+    kb.appendChild(col);
+  });
+}
+
+function cardHTML(r, color) {
+  const actions = buildActions(r);
+  return `
+    <div class="fin-card" id="fc-${r.id}">
+      <div class="fc-bar" style="background:${color}"></div>
+      <div class="fc-num">#${r.osCode || r.pipefyId?.slice(-4) || '—'}</div>
+      <div class="fc-nome">${r.nomeContato || r.title || '—'}</div>
+      ${r.descricao ? `<div class="fc-desc">${r.descricao}</div>` : ''}
+      ${r.cpfCnpj   ? `<div class="fc-cpf">📄 ${r.cpfCnpj}</div>` : ''}
+      ${r.age != null ? `<div class="fc-age">🕐 ${r.age}d</div>` : ''}
+      <div class="fc-actions">${actions}</div>
+    </div>`;
+}
+
+function buildActions(r) {
+  let html = '';
+
+  if (r.phaseId === 'aguardando_dados') {
+    html += `<button class="btn-primary" style="background:var(--accent);color:#000;"
+      onclick="openCpfModal('${r.id}')">📋 Informar CPF / CNPJ</button>`;
+  }
+
+  if (r.phaseId === 'emitir_nf') {
+    html += `<button class="btn-primary" style="background:#3b9eff;color:#fff;"
+      onclick="emitirNF('${r.id}')">🧾 Nota Fiscal Emitida</button>`;
+  }
+
+  if (r.phaseId === 'faturamento') {
+    html += `<button class="btn-primary" style="background:#22c55e;color:#000;"
+      onclick="openMoverModal('${r.id}')">💰 Registrar Pagamento</button>`;
+  }
+
+  if (r.phaseId === 'entrega_agendada') {
+    html += `<button class="btn-primary" style="background:#22c55e;color:#000;"
+      onclick="mover('${r.id}','entrega_liberada')">✅ Liberar Entrega</button>`;
+  }
+
+  if (r.phaseId === 'entrega_liberada') {
+    html += `<button class="btn-primary" style="background:#8b5cf6;color:#fff;"
+      onclick="mover('${r.id}','rota_criada')">🗺️ Rota Criada</button>`;
+  }
+
+  if (r.phaseId === 'rota_criada') {
+    html += `<button class="btn-primary" style="background:#ec4899;color:#fff;"
+      onclick="mover('${r.id}','item_coletado')">📦 Item Coletado</button>`;
+  }
+
+  // Excluir sempre disponível
+  html += `<button class="btn-secondary btn-danger" onclick="excluir('${r.id}')">✕ Excluir</button>`;
+  return html;
+}
+
+// ── CPF MODAL ────────────────────────────────────────────────
+function openCpfModal(id) {
+  selId = id;
+  const r = records.find(x => x.id === id);
+  document.getElementById('cpf-modal-info').innerHTML =
+    `<strong>#${r.osCode||'—'} ${r.nomeContato||r.title||'—'}</strong>`;
+  document.getElementById('cpf-input').value = r.cpfCnpj || '';
+  document.getElementById('cpf-modal').classList.add('open');
+  setTimeout(() => document.getElementById('cpf-input').focus(), 200);
+}
+
+function maskCpfCnpj(input) {
+  let v = input.value.replace(/\D/g,'');
+  if (v.length <= 11) {
+    v = v.replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  } else {
+    v = v.replace(/^(\d{2})(\d)/,'$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/,'$1.$2.$3')
+         .replace(/\.(\d{3})(\d)/,'.$1/$2').replace(/(\d{4})(\d)/,'$1-$2');
+  }
+  input.value = v;
+}
+
+async function submitCpf() {
+  const cpf = document.getElementById('cpf-input').value.trim();
+  if (!cpf) return;
+  const res = await api('set-cpf', { id: selId, cpfCnpj: cpf });
+  if (res.ok) {
+    updateRecord(res.record);
+    closeModal('cpf-modal');
+    showToast('📋','CPF cadastrado!','Ficha avançou para Emitir NF');
+  } else showToast('❌','Erro',res.error);
+}
+
+// ── EMITIR NF ────────────────────────────────────────────────
+async function emitirNF(id) {
+  if (!confirm('Confirmar emissão da Nota Fiscal?')) return;
+  const res = await api('emitir-nf', { id });
+  if (res.ok) {
+    updateRecord(res.record);
+    showToast('🧾','NF Emitida!','Ficha avançou para Faturamento');
+  } else showToast('❌','Erro',res.error);
+}
+
+// ── MOVER MODAL (pagamento) ───────────────────────────────────
+function openMoverModal(id) {
+  selId = id;
+  const r = records.find(x => x.id === id);
+  document.getElementById('mover-title').innerHTML = `💰 Registrar <span>Pagamento</span>`;
+  document.getElementById('mover-modal-info').innerHTML =
+    `<strong>#${r.osCode||'—'} ${r.nomeContato||''}</strong><br>Selecione o destino após pagamento:`;
+  const opts = document.getElementById('mover-options');
+  opts.innerHTML = `
+    <button class="btn-primary" style="background:#f97316;color:#fff;padding:11px;"
+      onclick="mover('${id}','entrega_agendada');closeModal('mover-modal')">
+      📅 Entrega Agendada
+    </button>
+    <button class="btn-primary" style="background:#22c55e;color:#000;padding:11px;"
+      onclick="mover('${id}','entrega_liberada');closeModal('mover-modal')">
+      ✅ Entrega Liberada (imediata)
+    </button>`;
+  document.getElementById('mover-modal').classList.add('open');
+}
+
+// ── MOVER ────────────────────────────────────────────────────
+async function mover(id, phaseId) {
+  const res = await api('mover', { id, phaseId });
+  if (res.ok) {
+    updateRecord(res.record);
+    const ph = PHASES.find(p => p.id === phaseId);
+    showToast('✅','Movido!', ph?.name || phaseId);
+  } else showToast('❌','Erro',res.error);
+}
+
+// ── EXCLUIR ───────────────────────────────────────────────────
+async function excluir(id) {
+  const r = records.find(x => x.id === id);
+  if (!confirm(`Excluir ficha #${r?.osCode||''} — ${r?.nomeContato||''}?`)) return;
+  const res = await api('excluir', { id });
+  if (res.ok) {
+    records = records.filter(x => x.id !== id);
+    render();
+    showToast('🗑️','Ficha excluída','');
+  }
+}
+
+// ── HELPERS ──────────────────────────────────────────────────
+function updateRecord(rec) {
+  const idx = records.findIndex(r => r.id === rec.id);
+  if (idx >= 0) records[idx] = rec; else records.unshift(rec);
+  render();
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function showToast(icon, title, msg) {
+  document.getElementById('t-icon').textContent  = icon;
+  document.getElementById('t-title').textContent = title;
+  document.getElementById('t-body').textContent  = msg;
+  const t = document.getElementById('toast');
+  t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+load();
+// Sync Pipefy ao abrir + a cada 30s
+syncPipefy();
+setInterval(() => { load(); syncPipefy(); }, 30000);
+</script>
+</body>
+</html>
