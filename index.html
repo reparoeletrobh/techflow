@@ -71,7 +71,25 @@ nav{display:flex;gap:5px;flex-wrap:wrap;}
 }
 
 /* ── KANBAN ── */
-.kanban-wrapper{flex:1;padding:14px 24px 24px;overflow-x:auto;}
+.kanban-wrapper{flex:1;padding:14px 24px 0;overflow-x:auto;overflow-y:visible;scrollbar-width:none;}
+.kanban-wrapper::-webkit-scrollbar{display:none;}
+/* Barra de scroll horizontal customizada */
+.hscroll-bar-wrap{
+  position:sticky;bottom:0;left:0;right:0;
+  background:var(--bg);border-top:1px solid var(--border);
+  padding:6px 24px 8px;z-index:50;
+}
+.hscroll-track{
+  height:6px;background:var(--surface2);border-radius:99px;
+  cursor:pointer;position:relative;overflow:hidden;
+}
+.hscroll-thumb{
+  position:absolute;top:0;left:0;height:100%;
+  background:var(--accent);border-radius:99px;
+  transition:opacity 0.2s;opacity:0.7;cursor:grab;min-width:40px;
+}
+.hscroll-thumb:hover,.hscroll-thumb:active{opacity:1;}
+.hscroll-thumb:active{cursor:grabbing;}
 .kanban-board{display:flex;gap:11px;min-width:max-content;min-height:calc(100vh - 190px);}
 .kanban-col{
   width:215px;display:flex;flex-direction:column;border-radius:10px;
@@ -332,12 +350,16 @@ nav{display:flex;gap:5px;flex-wrap:wrap;}
       <span id="new-badge" class="new-badge" style="display:none"></span>
       <button class="eod-btn" onclick="openEodModal()">🌙 Aguardando Retirada</button>
       <button class="action-btn" id="refresh-btn" onclick="loadBoard()">↻ Atualizar</button>
-      <button class="action-btn" onclick="confirmCleanAprovado()" style="border-color:rgba(245,200,0,0.3);color:var(--accent)">🧹 Limpar Aprovado</button>
       <button class="reset-btn" onclick="confirmReset()">⚠ Zerar Tudo</button>
     </div>
   </div>
   <div class="error-banner" id="error-banner"></div>
   <div class="kanban-wrapper" id="kanban-wrapper"></div>
+  <div class="hscroll-bar-wrap" id="hscroll-wrap">
+    <div class="hscroll-track" id="hscroll-track">
+      <div class="hscroll-thumb" id="hscroll-thumb"></div>
+    </div>
+  </div>
 </div>
 
 <!-- MOVER OS -->
@@ -622,6 +644,8 @@ function renderBoard() {
     b.appendChild(col);
   });
   wrapper.innerHTML = ''; wrapper.appendChild(b);
+  // Atualiza barra de scroll
+  setTimeout(() => { const t=document.getElementById('hscroll-thumb'); if(t) t.dispatchEvent(new Event('update')); const w=document.getElementById('kanban-wrapper'); if(w) w.dispatchEvent(new Event('scroll')); }, 50);
 }
 
 function cardHTML(c, color) {
@@ -1352,10 +1376,87 @@ function scheduleCleanupRet() {
   }, msUntilNext());
 }
 
+// ── SCROLL BAR HORIZONTAL ──────────────────────────────────────
+function initHScroll() {
+  const wrapper = document.getElementById('kanban-wrapper');
+  const thumb   = document.getElementById('hscroll-thumb');
+  const track   = document.getElementById('hscroll-track');
+  if (!wrapper || !thumb || !track) return;
+
+  function updateThumb() {
+    const scrollW = wrapper.scrollWidth;
+    const clientW = wrapper.clientWidth;
+    if (scrollW <= clientW) { thumb.style.width = '100%'; return; }
+    const ratio     = clientW / scrollW;
+    const thumbW    = Math.max(ratio * track.clientWidth, 40);
+    const maxScroll = scrollW - clientW;
+    const maxLeft   = track.clientWidth - thumbW;
+    const left      = (wrapper.scrollLeft / maxScroll) * maxLeft;
+    thumb.style.width = thumbW + 'px';
+    thumb.style.left  = left + 'px';
+  }
+
+  wrapper.addEventListener('scroll', updateThumb);
+  window.addEventListener('resize', updateThumb);
+
+  // Drag thumb
+  let dragging = false, startX = 0, startScroll = 0;
+  thumb.addEventListener('mousedown', e => {
+    dragging = true; startX = e.clientX;
+    startScroll = wrapper.scrollLeft;
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const scrollW  = wrapper.scrollWidth;
+    const clientW  = wrapper.clientWidth;
+    const maxScroll = scrollW - clientW;
+    const thumbW   = thumb.offsetWidth;
+    const maxLeft  = track.clientWidth - thumbW;
+    const dx       = e.clientX - startX;
+    const ratio    = maxScroll / maxLeft;
+    wrapper.scrollLeft = Math.max(0, Math.min(startScroll + dx * ratio, maxScroll));
+  });
+  document.addEventListener('mouseup', () => { dragging = false; });
+
+  // Click on track to jump
+  track.addEventListener('click', e => {
+    if (e.target === thumb) return;
+    const rect     = track.getBoundingClientRect();
+    const clickX   = e.clientX - rect.left;
+    const scrollW  = wrapper.scrollWidth;
+    const clientW  = wrapper.clientWidth;
+    const ratio    = (clickX / track.clientWidth);
+    wrapper.scrollLeft = ratio * (scrollW - clientW);
+  });
+
+  // Touch support
+  let tStartX = 0, tStartScroll = 0;
+  thumb.addEventListener('touchstart', e => {
+    tStartX = e.touches[0].clientX;
+    tStartScroll = wrapper.scrollLeft;
+  }, { passive: true });
+  thumb.addEventListener('touchmove', e => {
+    const scrollW  = wrapper.scrollWidth;
+    const clientW  = wrapper.clientWidth;
+    const maxScroll = scrollW - clientW;
+    const thumbW   = thumb.offsetWidth;
+    const maxLeft  = track.clientWidth - thumbW;
+    const dx       = e.touches[0].clientX - tStartX;
+    const ratio    = maxScroll / maxLeft;
+    wrapper.scrollLeft = Math.max(0, Math.min(tStartScroll + dx * ratio, maxScroll));
+  }, { passive: true });
+
+  updateThumb();
+  // Re-update after board renders
+  setTimeout(updateThumb, 500);
+}
+
 // ── INIT ───────────────────────────────────────────────────────
 // Renderiza fases imediatamente com board padrão — não espera API
 renderBoard();
 renderStageGrids();
+initHScroll();
 // Busca dados reais do banco em seguida
 loadBoard();
 // Cleanup de Aguardando Retirada ao abrir + agendado 2x/dia
