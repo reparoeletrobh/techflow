@@ -49,6 +49,12 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
 .tipo-btn.selected.bebe{border-color:#3b9eff;background:rgba(59,158,255,0.08);color:#3b9eff;}
 .tipo-icon{font-size:22px;display:block;margin-bottom:4px;}
 
+/* VENDEDOR */
+.vend-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.vend-btn{padding:10px;border-radius:9px;border:2px solid var(--border);background:var(--surface2);color:var(--muted);font-family:var(--fb);font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;text-align:center;}
+.vend-btn:hover{border-color:#444;color:var(--text);}
+.vend-btn.selected{border-color:#a855f7;background:rgba(168,85,247,0.08);color:#a855f7;}
+
 /* CODIGO row */
 .codigo-row{display:flex;gap:8px;align-items:flex-end;}
 .codigo-row .f-input{flex:1;}
@@ -229,6 +235,13 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
       <label class="field-label">CPF ou CNPJ</label>
       <input class="f-input" id="v-cpf" type="text" placeholder="000.000.000-00" oninput="maskCpfCnpj(this)"/>
     </div>
+    <div class="field">
+      <label class="field-label">Vendedor *</label>
+      <div class="vend-grid">
+        <button class="vend-btn" id="vend-nathan" onclick="setVendedor('Nathan')">Nathan</button>
+        <button class="vend-btn" id="vend-ricardo" onclick="setVendedor('Ricardo')">Ricardo</button>
+      </div>
+    </div>
     <div class="modal-actions">
       <button class="modal-cancel" onclick="closeModal()">Cancelar</button>
       <button class="modal-confirm" id="v-confirm" onclick="confirmarVenda()">✅ Confirmar Venda</button>
@@ -244,7 +257,7 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
 <script>
 let produtos = [], editId = null, selVenderId = null;
 let fotos    = [null,null,null,null,null,null];
-let tipoSel  = null;
+let tipoSel  = null, vendedorSel = null;
 
 const PREFIXOS = { Microondas: 'MI', Bebedouro: 'BE' };
 
@@ -272,27 +285,76 @@ function gerarCodigo() {
 
 // ── FOTOS ─────────────────────────────────────────────────────
 function renderFotoGrid() {
-  document.getElementById('foto-grid').innerHTML = fotos.map((f,i) => `
+  const slots = fotos.map((f,i) => `
     <div class="foto-slot ${f?'has-img':''}" onclick="triggerFile(${i})" id="slot-${i}">
       ${f ? `<img src="${f}"/><button class="remove-btn" onclick="event.stopPropagation();removeFoto(${i})">✕</button>` : `<span class="add-icon">+</span>`}
       <span class="foto-num">${i+1}</span>
       <input type="file" id="file-${i}" accept="image/*" onchange="loadFoto(${i},event)"/>
     </div>`).join('');
+
+  const hasEmpty = fotos.some(f => f === null);
+  const multiBtnHTML = hasEmpty ? `
+    <div style="grid-column:1/-1;margin-top:4px;">
+      <button onclick="triggerFile('multi')"
+        style="width:100%;padding:8px;border-radius:8px;border:1px dashed var(--border);
+               background:transparent;color:var(--muted);font-family:var(--fm);font-size:10px;
+               cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:6px;"
+        onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--text)'"
+        onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+        📂 Selecionar várias fotos de uma vez
+      </button>
+      <input type="file" id="file-multi" accept="image/*" multiple onchange="loadMultiFotos(event)" style="display:none"/>
+    </div>` : '';
+
+  document.getElementById('foto-grid').innerHTML = slots + multiBtnHTML;
 }
-function triggerFile(i){ document.getElementById(`file-${i}`).click(); }
+function triggerFile(i){
+  if (i === 'multi') {
+    document.getElementById('file-multi').click();
+  } else {
+    document.getElementById(`file-${i}`).click();
+  }
+}
 function removeFoto(i){ fotos[i]=null; renderFotoGrid(); }
-function loadFoto(i,e){
-  const file=e.target.files[0]; if(!file) return;
-  const reader=new FileReader();
-  reader.onload=ev=>{
-    const img=new Image(); img.onload=()=>{
-      const canvas=document.createElement('canvas'); const MAX=800;
-      let w=img.width,h=img.height;
-      if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
-      canvas.width=w;canvas.height=h;canvas.getContext('2d').drawImage(img,0,0,w,h);
-      fotos[i]=canvas.toDataURL('image/jpeg',0.82); renderFotoGrid();
-    }; img.src=ev.target.result;
-  }; reader.readAsDataURL(file);
+
+function compressImage(file) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas'); const MAX=800;
+        let w=img.width, h=img.height;
+        if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
+        canvas.width=w; canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        resolve(canvas.toDataURL('image/jpeg',0.82));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadFoto(i, e){
+  const file = e.target.files[0]; if(!file) return;
+  compressImage(file).then(b64 => { fotos[i]=b64; renderFotoGrid(); });
+}
+
+async function loadMultiFotos(e) {
+  const files = Array.from(e.target.files).slice(0, 6);
+  const results = await Promise.all(files.map(f => compressImage(f)));
+  // Preenche os slots vazios primeiro, depois substitui do início
+  let slot = 0;
+  for (const b64 of results) {
+    // Acha o próximo slot vazio
+    while (slot < 6 && fotos[slot] !== null) slot++;
+    if (slot >= 6) break;
+    fotos[slot] = b64;
+    slot++;
+  }
+  renderFotoGrid();
+  e.target.value = ''; // reset para permitir re-seleção
 }
 
 // ── SALVAR ────────────────────────────────────────────────────
@@ -359,6 +421,9 @@ function abrirVender(id) {
   document.getElementById('v-nome').value='';
   document.getElementById('v-tel').value='';
   document.getElementById('v-cpf').value='';
+  vendedorSel=null;
+  document.getElementById('vend-nathan').classList.remove('selected');
+  document.getElementById('vend-ricardo').classList.remove('selected');
   document.getElementById('vender-modal').classList.add('open');
   setTimeout(()=>document.getElementById('v-nome').focus(),200);
 }
@@ -369,12 +434,19 @@ function maskCpfCnpj(input){
   else v=v.replace(/^(\d{2})(\d)/,'$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/,'$1.$2.$3').replace(/\.(\d{3})(\d)/,'.$1/$2').replace(/(\d{4})(\d)/,'$1-$2');
   input.value=v;
 }
+function setVendedor(v) {
+  vendedorSel = v;
+  document.getElementById('vend-nathan').classList.toggle('selected',  v==='Nathan');
+  document.getElementById('vend-ricardo').classList.toggle('selected', v==='Ricardo');
+}
+
 async function confirmarVenda(){
   const nome=document.getElementById('v-nome').value.trim();
   if(!nome) return showToast('⚠️','Nome obrigatório','');
+  if(!vendedorSel) return showToast('⚠️','Selecione o vendedor','Nathan ou Ricardo');
   const btn=document.getElementById('v-confirm');
   btn.disabled=true; btn.textContent='⏳';
-  const res=await api('vender',{produtoId:selVenderId,nomeCliente:nome,telefone:document.getElementById('v-tel').value.trim(),cpfCnpj:document.getElementById('v-cpf').value.trim()});
+  const res=await api('vender',{produtoId:selVenderId,nomeCliente:nome,telefone:document.getElementById('v-tel').value.trim(),cpfCnpj:document.getElementById('v-cpf').value.trim(),vendedor:vendedorSel});
   if(res.ok){
     produtos=produtos.map(p=>p.id===selVenderId?res.produto:p);
     renderTable(); closeModal();
@@ -430,12 +502,14 @@ function renderTable(){
 
     if (curTab === 'vendidos') {
       const dataVenda = p.soldAt ? new Date(p.soldAt).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}) : '—';
+      const vendBadge = p.vendedor ? `<span style="font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:4px;background:rgba(168,85,247,0.12);color:#a855f7">${p.vendedor}</span>` : '—';
       return `<tr class="vendido-row">
         <td><div class="prod-fotos">${thumbs}${extra}</div></td>
         <td class="td-code">${p.codigo}</td>
         <td>${tipoBadge}</td>
         <td class="td-desc" title="${p.descricao}">${p.descricao}</td>
         <td class="td-comprador">${p.compradorNome||'—'}</td>
+        <td>${vendBadge}</td>
         <td class="td-price">${pFmt}</td>
         <td class="td-data">${dataVenda}</td>
         <td style="white-space:nowrap;">
@@ -461,7 +535,7 @@ function renderTable(){
 
   const thead = curTab === 'estoque'
     ? '<tr><th>Fotos</th><th>Código</th><th>Tipo</th><th>Descrição</th><th>Capacidade</th><th>Preço</th><th>Ações</th></tr>'
-    : '<tr><th>Fotos</th><th>Código</th><th>Tipo</th><th>Descrição</th><th>Comprador</th><th>Preço</th><th>Data</th><th></th></tr>';
+    : '<tr><th>Fotos</th><th>Código</th><th>Tipo</th><th>Descrição</th><th>Comprador</th><th>Vendedor</th><th>Preço</th><th>Data</th><th></th></tr>';
 
   document.getElementById('table-wrap').innerHTML=`
     <table class="prod-table">
