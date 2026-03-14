@@ -180,53 +180,54 @@ async function fetchApprovedCards() {
   return all;
 }
 
-// Busca todos os IDs de uma fase com paginação
-async function fetchAllIdsInPhase(phaseName) {
-  const ids = [];
-  let cursor = null, hasNext = true;
-  while (hasNext) {
-    const after = cursor ? `, after: "${cursor}"` : "";
-    const data = await pipefyQuery(`query {
-      pipe(id: "${PIPE_ID}") {
-        phases {
-          name
-          cards(first: 50${after}) {
-            pageInfo { hasNextPage endCursor }
-            edges { node { id } }
+// Busca todas as fases com seus cards em uma única query (até 50 cards por fase)
+async function fetchAllPhaseCards() {
+  const data = await pipefyQuery(`query {
+    pipe(id: "${PIPE_ID}") {
+      phases {
+        name
+        cards(first: 50) {
+          pageInfo { hasNextPage endCursor }
+          edges { node { id } }
+        }
+      }
+    }
+  }`);
+  return data?.pipe?.phases || [];
+}
+
+// Busca IDs de cards que estão em ERP ou Finalizado no Pipefy
+async function fetchErpCardIds() {
+  try {
+    const phases = await fetchAllPhaseCards();
+    const ids = [], targetPhases = [];
+    for (const ph of phases) {
+      const l = ph.name.toLowerCase();
+      if (l.includes("erp") || l.includes("finaliz") || l.includes("conclu") || l.includes("descar")) {
+        targetPhases.push(ph.name);
+        ph.cards.edges.forEach(e => ids.push(String(e.node.id)));
+        // Paginação se houver mais de 50
+        if (ph.cards.pageInfo?.hasNextPage) {
+          let cursor = ph.cards.pageInfo.endCursor;
+          while (cursor) {
+            const data2 = await pipefyQuery(`query {
+              pipe(id: "${PIPE_ID}") {
+                phases {
+                  name
+                  cards(first: 50, after: "${cursor}") {
+                    pageInfo { hasNextPage endCursor }
+                    edges { node { id } }
+                  }
+                }
+              }
+            }`);
+            const ph2 = (data2?.pipe?.phases || []).find(p => p.name === ph.name);
+            if (!ph2) break;
+            ph2.cards.edges.forEach(e => ids.push(String(e.node.id)));
+            cursor = ph2.cards.pageInfo?.hasNextPage ? ph2.cards.pageInfo.endCursor : null;
           }
         }
       }
-    }`);
-    const phases = data?.pipe?.phases || [];
-    const ph = phases.find(p => p.name === phaseName);
-    if (!ph) break;
-    ph.cards.edges.forEach(e => ids.push(String(e.node.id)));
-    hasNext = ph.cards.pageInfo?.hasNextPage ?? false;
-    cursor  = ph.cards.pageInfo?.endCursor ?? null;
-  }
-  return ids;
-}
-
-// Busca nomes de todas as fases do pipe (sem cards)
-async function fetchPhaseNames() {
-  const data = await pipefyQuery(`query {
-    pipe(id: "${PIPE_ID}") { phases { name } }
-  }`);
-  return (data?.pipe?.phases || []).map(p => p.name);
-}
-
-// Busca IDs de cards que estão em ERP ou Finalizado no Pipefy (com paginação)
-async function fetchErpCardIds() {
-  try {
-    const phaseNames = await fetchPhaseNames();
-    const targetPhases = phaseNames.filter(n => {
-      const l = n.toLowerCase();
-      return l.includes("erp") || l.includes("finaliz") || l.includes("conclu");
-    });
-    const ids = [];
-    for (const name of targetPhases) {
-      const phIds = await fetchAllIdsInPhase(name);
-      ids.push(...phIds);
     }
     return { ids, targetPhases };
   } catch (e) {
@@ -235,24 +236,17 @@ async function fetchErpCardIds() {
   }
 }
 
-// Busca IDs de cards em "Aguardando Aprovação" e "ERP" para tracking de metas (com paginação)
+// Busca IDs de cards em "Aguardando Aprovação" e "ERP" para tracking de metas
 async function fetchMetaPhaseIds() {
   try {
-    const phaseNames = await fetchPhaseNames();
-    const aguardandoNames = phaseNames.filter(n => {
-      const l = n.toLowerCase();
-      return l.includes("aguardando") && (l.includes("aprov") || l.includes("aprovação"));
-    });
-    const erpNames = phaseNames.filter(n => n.toLowerCase().includes("erp"));
-
+    const phases = await fetchAllPhaseCards();
     const aguardandoIds = [], erpIds = [];
-    for (const name of aguardandoNames) {
-      const ids = await fetchAllIdsInPhase(name);
-      aguardandoIds.push(...ids);
-    }
-    for (const name of erpNames) {
-      const ids = await fetchAllIdsInPhase(name);
-      erpIds.push(...ids);
+    for (const ph of phases) {
+      const l = ph.name.toLowerCase();
+      if (l.includes("aguardando") && (l.includes("aprov") || l.includes("aprovação")))
+        ph.cards.edges.forEach(e => aguardandoIds.push(String(e.node.id)));
+      if (l.includes("erp"))
+        ph.cards.edges.forEach(e => erpIds.push(String(e.node.id)));
     }
     return { aguardandoIds, erpIds };
   } catch(e) { return { aguardandoIds: [], erpIds: [] }; }
