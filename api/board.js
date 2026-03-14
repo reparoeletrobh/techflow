@@ -180,50 +180,79 @@ async function fetchApprovedCards() {
   return all;
 }
 
-// Busca IDs de cards que estão em ERP ou Finalizado no Pipefy
-async function fetchErpCardIds() {
-  try {
+// Busca todos os IDs de uma fase com paginação
+async function fetchAllIdsInPhase(phaseName) {
+  const ids = [];
+  let cursor = null, hasNext = true;
+  while (hasNext) {
+    const after = cursor ? `, after: "${cursor}"` : "";
     const data = await pipefyQuery(`query {
       pipe(id: "${PIPE_ID}") {
         phases {
           name
-          cards(first: 50) {
+          cards(first: 50${after}) {
+            pageInfo { hasNextPage endCursor }
             edges { node { id } }
           }
         }
       }
     }`);
     const phases = data?.pipe?.phases || [];
+    const ph = phases.find(p => p.name === phaseName);
+    if (!ph) break;
+    ph.cards.edges.forEach(e => ids.push(String(e.node.id)));
+    hasNext = ph.cards.pageInfo?.hasNextPage ?? false;
+    cursor  = ph.cards.pageInfo?.endCursor ?? null;
+  }
+  return ids;
+}
+
+// Busca nomes de todas as fases do pipe (sem cards)
+async function fetchPhaseNames() {
+  const data = await pipefyQuery(`query {
+    pipe(id: "${PIPE_ID}") { phases { name } }
+  }`);
+  return (data?.pipe?.phases || []).map(p => p.name);
+}
+
+// Busca IDs de cards que estão em ERP ou Finalizado no Pipefy (com paginação)
+async function fetchErpCardIds() {
+  try {
+    const phaseNames = await fetchPhaseNames();
+    const targetPhases = phaseNames.filter(n => {
+      const l = n.toLowerCase();
+      return l.includes("erp") || l.includes("finaliz") || l.includes("conclu");
+    });
     const ids = [];
-    for (const ph of phases) {
-      const n = ph.name.toLowerCase();
-      if (n.includes("erp") || n.includes("finaliz") || n.includes("conclu")) {
-        ph.cards.edges.forEach(e => ids.push(String(e.node.id)));
-      }
+    for (const name of targetPhases) {
+      const phIds = await fetchAllIdsInPhase(name);
+      ids.push(...phIds);
     }
-    return ids;
+    return { ids, targetPhases };
   } catch (e) {
     console.error("fetchErpCardIds:", e.message);
-    return [];
+    return { ids: [], targetPhases: [] };
   }
 }
 
-// Busca IDs de cards em "Aguardando Aprovação" e "ERP" para tracking de metas
+// Busca IDs de cards em "Aguardando Aprovação" e "ERP" para tracking de metas (com paginação)
 async function fetchMetaPhaseIds() {
   try {
-    const data = await pipefyQuery(`query {
-      pipe(id: "${PIPE_ID}") {
-        phases { name cards(first: 50) { edges { node { id } } } }
-      }
-    }`);
-    const phases = data?.pipe?.phases || [];
+    const phaseNames = await fetchPhaseNames();
+    const aguardandoNames = phaseNames.filter(n => {
+      const l = n.toLowerCase();
+      return l.includes("aguardando") && (l.includes("aprov") || l.includes("aprovação"));
+    });
+    const erpNames = phaseNames.filter(n => n.toLowerCase().includes("erp"));
+
     const aguardandoIds = [], erpIds = [];
-    for (const ph of phases) {
-      const n = ph.name.toLowerCase();
-      if (n.includes("aguardando") && (n.includes("aprov") || n.includes("aprovação")))
-        ph.cards.edges.forEach(e => aguardandoIds.push(String(e.node.id)));
-      if (n.includes("erp"))
-        ph.cards.edges.forEach(e => erpIds.push(String(e.node.id)));
+    for (const name of aguardandoNames) {
+      const ids = await fetchAllIdsInPhase(name);
+      aguardandoIds.push(...ids);
+    }
+    for (const name of erpNames) {
+      const ids = await fetchAllIdsInPhase(name);
+      erpIds.push(...ids);
     }
     return { aguardandoIds, erpIds };
   } catch(e) { return { aguardandoIds: [], erpIds: [] }; }
@@ -231,9 +260,8 @@ async function fetchMetaPhaseIds() {
 
 // Remove do aguardando_ret os cards que foram para ERP/Finalizado no Pipefy
 async function cleanupAguardandoRet(board) {
-  const erpIds = await fetchErpCardIds();
-  if (!erpIds.length) return { removed: 0, ids: [] };
-  const before = board.cards.length;
+  const { ids: erpIds, targetPhases } = await fetchErpCardIds();
+  const retCards = board.cards.filter(c => c.phaseId === "aguardando_ret");
   const removedIds = [];
   board.cards = board.cards.filter(c => {
     if (c.phaseId === "aguardando_ret" && erpIds.includes(c.pipefyId)) {
@@ -242,7 +270,7 @@ async function cleanupAguardandoRet(board) {
     }
     return true;
   });
-  return { removed: before - board.cards.length, ids: removedIds };
+  return { removed: removedIds.length, ids: removedIds, targetPhases, retTotal: retCards.length, erpTotal: erpIds.length };
 }
 
 // ── Log helpers ────────────────────────────────────────────────
@@ -291,7 +319,7 @@ module.exports = async function handler(req, res) {
 
       try {
         // Remove qualquer card (qualquer fase) que está em ERP/Finalizado
-        const erpIds = await fetchErpCardIds();
+        const { ids: erpIds } = await fetchErpCardIds();
         if (erpIds.length > 0) {
           const before = board.cards.length;
           board.cards = board.cards.filter(c => !erpIds.includes(c.pipefyId));
@@ -756,14 +784,17 @@ module.exports = async function handler(req, res) {
     }
 
         // ── GET cleanup-ret — remove aguardando_ret que foram ERP/Finalizado ──
-    // Pode ser chamado por cron externo 2x/dia
     if (req.method === "GET" && action === "cleanup-ret") {
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
       let removed = 0, removedIds = [], pipefyError = null;
+      let targetPhases = [], retTotal = 0, erpTotal = 0;
       try {
         const result = await cleanupAguardandoRet(board);
-        removed    = result.removed;
-        removedIds = result.ids;
+        removed      = result.removed;
+        removedIds   = result.ids;
+        targetPhases = result.targetPhases || [];
+        retTotal     = result.retTotal     || 0;
+        erpTotal     = result.erpTotal     || 0;
         if (removed > 0) {
           board.movesLog.push({
             phaseId:   "cleanup_ret",
@@ -775,7 +806,10 @@ module.exports = async function handler(req, res) {
           await dbSet(BOARD_KEY, board);
         }
       } catch(e) { pipefyError = e.message; }
-      return res.status(200).json({ ok: true, removed, removedIds, pipefyError });
+      return res.status(200).json({
+        ok: true, removed, removedIds, pipefyError,
+        debug: { targetPhases, retTotal, erpTotal }
+      });
     }
 
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
