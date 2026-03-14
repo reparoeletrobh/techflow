@@ -69,6 +69,7 @@ header{
 .ext-btn:hover.vendas    {box-shadow:0 8px 32px rgba(249,115,22,0.08);}
 .ext-btn:hover.equip     {box-shadow:0 8px 32px rgba(59,158,255,0.08);}
 .ext-btn:hover.metas     {box-shadow:0 8px 32px rgba(168,85,247,0.08);}
+.ext-btn:hover.orc       {box-shadow:0 8px 32px rgba(37,211,102,0.08);}
 
 .ext-icon{
   width:48px;height:48px;border-radius:12px;
@@ -79,6 +80,7 @@ header{
 .vendas     .ext-icon{background:rgba(249,115,22,0.1);}
 .equip      .ext-icon{background:rgba(59,158,255,0.1);}
 .metas      .ext-icon{background:rgba(168,85,247,0.1);}
+.orc        .ext-icon{background:rgba(37,211,102,0.1);}
 
 .ext-name{
   font-family:var(--fh);font-size:13px;font-weight:800;
@@ -89,6 +91,7 @@ header{
 .vendas     .ext-name{color:#f97316;}
 .equip      .ext-name{color:#3b9eff;}
 .metas      .ext-name{color:#a855f7;}
+.orc        .ext-name{color:#25d366;}
 
 .ext-desc{
   font-family:var(--fm);font-size:9px;color:var(--muted);
@@ -129,7 +132,7 @@ footer{
 
   <div class="grid">
 
-    <a class="ext-btn tecnico" href="/">
+    <a class="ext-btn tecnico" href="/tecnico">
       <div class="ext-icon">🔧</div>
       <div class="ext-name">Técnico</div>
       <div class="ext-desc">Kanban de ordens<br>de serviço</div>
@@ -161,6 +164,20 @@ footer{
       <div class="ext-icon">📊</div>
       <div class="ext-name">Metas</div>
       <div class="ext-desc">Painel unificado<br>de indicadores</div>
+      <div class="ext-arrow">→</div>
+    </a>
+
+    <a class="ext-btn" href="/orcamentos-adm" style="--c:#22c55e;">
+      <div class="ext-icon" style="background:rgba(34,197,94,0.1);">📋</div>
+      <div class="ext-name" style="color:#22c55e;">Orçamentos</div>
+      <div class="ext-desc">Leads do chat<br>de atendimento</div>
+      <div class="ext-arrow">→</div>
+    </a>
+
+    <a class="ext-btn orc" href="/orcamento">
+      <div class="ext-icon">💬</div>
+      <div class="ext-name">Orçamento</div>
+      <div class="ext-desc">Chat para coleta<br>de orçamentos</div>
       <div class="ext-arrow">→</div>
     </a>
 
