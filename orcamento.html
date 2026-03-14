@@ -89,7 +89,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 </div>
 <script>
 var phases = [], solicitarColetaId = null;
-var botando = false, aguardandoFicha = true, aguardandoConf = false;
+var botando = false, aguardandoFicha = true;
 var dados = {};
 
 async function init() {
@@ -193,18 +193,6 @@ async function sendMsg(txt) {
   input.value=''; input.style.height='auto';
   addUser(msg);
 
-  if (aguardandoConf) {
-    if (msg==='Confirmar') {
-      aguardandoConf=false;
-      await criarCard();
-    } else {
-      aguardandoConf=false; aguardandoFicha=true; dados={};
-      showTyping(); await delay(500); hideTyping();
-      addBot('Tudo bem! Cole a ficha corrigida.');
-    }
-    return;
-  }
-
   if (aguardandoFicha) {
     botando=true; document.getElementById('send-btn').disabled=true;
     showTyping(); await delay(700); hideTyping();
@@ -219,18 +207,9 @@ async function sendMsg(txt) {
       botando=false; document.getElementById('send-btn').disabled=false;
       return;
     }
-    aguardandoFicha=false; aguardandoConf=true;
-    var end=dados.endereco||'(nao informado)';
-    addBot(
-      'Dados identificados, confirma?\n\n'+
-      'Nome: '+dados.nome+'\n'+
-      'Telefone: '+dados.telefone+'\n'+
-      'Aparelho: '+dados.aparelho+'\n'+
-      'Defeito: '+dados.defeito+'\n'+
-      'Endereco: '+end,
-      ['Confirmar','Corrigir']
-    );
+    aguardandoFicha=false;
     botando=false; document.getElementById('send-btn').disabled=false;
+    await criarCard();
   }
 }
 
