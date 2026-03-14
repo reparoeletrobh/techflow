@@ -143,7 +143,7 @@ async function load() {
     const r   = await fetch('/api/vendas?action=load');
     const res = await r.json();
     if (!res.ok) throw new Error(res.error);
-    allProdutos = res.produtos || [];
+    allProdutos = (res.produtos || []).filter(p => !p.vendido);
     setFilter(activeFilter);
   } catch(e) {
     document.getElementById('grid-content').innerHTML =
