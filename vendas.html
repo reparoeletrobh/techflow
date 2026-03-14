@@ -143,6 +143,20 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
 .toast.show{transform:translateY(0);opacity:1;}
 
 @media(max-width:900px){main{grid-template-columns:1fr;}.form-panel{border-right:none;border-bottom:1px solid var(--border);}}
+
+/* LIGHTBOX */
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;z-index:9999;opacity:0;pointer-events:none;transition:opacity 0.2s;backdrop-filter:blur(6px);}
+.lightbox.open{opacity:1;pointer-events:all;}
+.lightbox img{max-width:90vw;max-height:88vh;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,0.8);object-fit:contain;transition:transform 0.2s;}
+.lb-close{position:fixed;top:18px;right:22px;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;}
+.lb-close:hover{background:rgba(255,255,255,0.25);}
+.lb-nav{position:fixed;top:50%;transform:translateY(-50%);width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;}
+.lb-nav:hover{background:rgba(255,255,255,0.25);}
+.lb-prev{left:16px;}
+.lb-next{right:16px;}
+.lb-counter{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);font-family:var(--fm);font-size:11px;color:rgba(255,255,255,0.6);background:rgba(0,0,0,0.4);padding:4px 12px;border-radius:20px;}
+.prod-foto-thumb{cursor:zoom-in;transition:opacity 0.15s;}
+.prod-foto-thumb:hover{opacity:0.8;}
 </style>
 </head>
 <body>
@@ -499,15 +513,17 @@ function renderTable(){
   }
 
   const rows = lista.map(p => {
-    const thumbs=(p.fotos||[]).slice(0,3).map(f=>`<img class="prod-foto-thumb" src="${f}"/>`).join('');
-    const extra=(p.fotos||[]).length>3?`<div class="prod-foto-more">+${p.fotos.length-3}</div>`:'';
+    const allFotos = p.fotos||[];
+    const fotosJson = JSON.stringify(allFotos).replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    const thumbs=allFotos.slice(0,3).map((f,fi)=>`<img class="prod-foto-thumb" src="${f}" onclick="openLightbox(JSON.parse(this.closest('tr').dataset.fotos),${fi})" style="cursor:zoom-in"/>`).join('');
+    const extra=allFotos.length>3?`<div class="prod-foto-more" onclick="openLightbox(JSON.parse(this.closest('tr').dataset.fotos),3)" style="cursor:zoom-in">+${allFotos.length-3}</div>`:'';;
     const pFmt=parseFloat(p.preco).toLocaleString('pt-BR',{minimumFractionDigits:2,style:'currency',currency:'BRL'});
     const tipoBadge=p.tipo?`<span class="tipo-badge ${p.tipo==='Microondas'?'micro':'bebe'}">${p.tipo}</span>`:'—';
 
     if (curTab === 'vendidos') {
       const dataVenda = p.soldAt ? new Date(p.soldAt).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}) : '—';
       const vendBadge = p.vendedor ? `<span style="font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:4px;background:rgba(168,85,247,0.12);color:#a855f7">${p.vendedor}</span>` : '—';
-      return `<tr class="vendido-row">
+      return `<tr class="vendido-row" data-fotos="${fotosJson}">
         <td><div class="prod-fotos">${thumbs}${extra}</div></td>
         <td class="td-code">${p.codigo}</td>
         <td>${tipoBadge}</td>
@@ -522,7 +538,7 @@ function renderTable(){
       </tr>`;
     }
 
-    return `<tr>
+    return `<tr data-fotos="${fotosJson}">
       <td><div class="prod-fotos">${thumbs}${extra}</div></td>
       <td class="td-code">${p.codigo}</td>
       <td>${tipoBadge}</td>
@@ -558,9 +574,49 @@ function showToast(icon,title,msg){
 
 async function load(){ const res=await api('load'); if(res.ok){ produtos=res.produtos||[]; renderTable(); } }
 
+// ── LIGHTBOX ──────────────────────────────────────────────────
+let lbImages = [], lbIndex = 0;
+
+function openLightbox(imgs, idx) {
+  lbImages = imgs; lbIndex = idx;
+  document.getElementById('lb-img').src = lbImages[lbIndex];
+  document.getElementById('lb-counter').textContent = `${lbIndex+1} / ${lbImages.length}`;
+  document.getElementById('lb-nav-prev') && (document.querySelector('.lb-prev').style.display = lbImages.length > 1 ? 'flex' : 'none');
+  document.querySelector('.lb-prev').style.display = lbImages.length > 1 ? 'flex' : 'none';
+  document.querySelector('.lb-next').style.display = lbImages.length > 1 ? 'flex' : 'none';
+  document.getElementById('lightbox').classList.add('open');
+  document.addEventListener('keydown', lbKeyHandler);
+}
+
+function closeLightbox(e) {
+  if (e.target === document.getElementById('lightbox')) closeLightboxBtn();
+}
+function closeLightboxBtn() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.removeEventListener('keydown', lbKeyHandler);
+}
+function lbNav(dir) {
+  lbIndex = (lbIndex + dir + lbImages.length) % lbImages.length;
+  document.getElementById('lb-img').src = lbImages[lbIndex];
+  document.getElementById('lb-counter').textContent = `${lbIndex+1} / ${lbImages.length}`;
+}
+function lbKeyHandler(e) {
+  if (e.key === 'ArrowRight') lbNav(1);
+  if (e.key === 'ArrowLeft')  lbNav(-1);
+  if (e.key === 'Escape')     closeLightboxBtn();
+}
+
 renderFotoGrid();
 gerarCodigo();
 load();
 </script>
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+  <button class="lb-close" onclick="closeLightboxBtn()">✕</button>
+  <button class="lb-nav lb-prev" onclick="event.stopPropagation();lbNav(-1)">‹</button>
+  <img id="lb-img" src="" alt=""/>
+  <button class="lb-nav lb-next" onclick="event.stopPropagation();lbNav(1)">›</button>
+  <div class="lb-counter" id="lb-counter"></div>
+</div>
 </body>
 </html>
