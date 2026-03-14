@@ -104,6 +104,21 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
 .act-btn.del:hover{border-color:var(--red);background:rgba(239,68,68,0.08);}
 .empty-table{padding:48px;text-align:center;font-family:var(--fm);font-size:12px;color:var(--dim);}
 
+/* TABS */
+.tabs-bar{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:20px;}
+.tab-btn{font-family:var(--fm);font-size:11px;font-weight:600;padding:10px 18px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.15s;display:flex;align-items:center;gap:7px;}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-btn.active.vendidos-tab{color:var(--green);border-bottom-color:var(--green);}
+.tab-badge{font-family:var(--fm);font-size:9px;font-weight:700;padding:1px 6px;border-radius:99px;background:var(--surface2);}
+.tab-btn.active .tab-badge{background:rgba(245,200,0,0.15);color:var(--accent);}
+.tab-btn.active.vendidos-tab .tab-badge{background:rgba(34,197,94,0.15);color:var(--green);}
+
+/* VENDIDO ROW */
+.vendido-row td{opacity:0.7;}
+.td-comprador{font-size:11px;color:var(--muted);}
+.td-data{font-family:var(--fm);font-size:10px;color:var(--muted);}
+
 /* MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:400;opacity:0;pointer-events:none;transition:opacity 0.2s;backdrop-filter:blur(3px);}
 .modal-overlay.open{opacity:1;pointer-events:all;}
@@ -184,7 +199,14 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
   <div class="table-panel">
     <div class="table-header">
       <div class="table-title">Equipamentos <span>Cadastrados</span></div>
-      <div class="table-count" id="table-count">—</div>
+    </div>
+    <div class="tabs-bar">
+      <button class="tab-btn active" id="tab-estoque" onclick="setTab('estoque')">
+        📦 Em Estoque <span class="tab-badge" id="badge-estoque">0</span>
+      </button>
+      <button class="tab-btn vendidos-tab" id="tab-vendidos" onclick="setTab('vendidos')">
+        💚 Vendidos <span class="tab-badge" id="badge-vendidos">0</span>
+      </button>
     </div>
     <div id="table-wrap"><div class="empty-table">Carregando...</div></div>
   </div>
@@ -356,6 +378,8 @@ async function confirmarVenda(){
   if(res.ok){
     produtos=produtos.map(p=>p.id===selVenderId?res.produto:p);
     renderTable(); closeModal();
+    // Switch to vendidos tab briefly to show the sold item
+    setTab('vendidos');
     showToast('💚','Venda registrada!','Ficha criada em Emitir NF no Financeiro');
   } else showToast('❌','Erro',res.error);
   btn.disabled=false; btn.textContent='✅ Confirmar Venda';
@@ -370,33 +394,78 @@ async function excluir(id){
   else showToast('❌','Erro',res.error);
 }
 
+// ── TABS ─────────────────────────────────────────────────────
+let curTab = 'estoque';
+
+function setTab(tab) {
+  curTab = tab;
+  document.getElementById('tab-estoque').classList.toggle('active', tab==='estoque');
+  document.getElementById('tab-vendidos').classList.toggle('active', tab==='vendidos');
+  document.getElementById('tab-estoque').classList.remove('vendidos-tab');
+  document.getElementById('tab-vendidos').classList.toggle('vendidos-tab', tab==='vendidos');
+  renderTable();
+}
+
 // ── TABLE ─────────────────────────────────────────────────────
 function renderTable(){
-  document.getElementById('table-count').textContent=`${produtos.length} produto${produtos.length!==1?'s':''}`;
-  if(!produtos.length){ document.getElementById('table-wrap').innerHTML='<div class="empty-table">📦 Nenhum equipamento ainda.</div>'; return; }
-  const rows=produtos.map(p=>{
+  const estoque  = produtos.filter(p => !p.vendido);
+  const vendidos = produtos.filter(p =>  p.vendido);
+
+  document.getElementById('badge-estoque').textContent  = estoque.length;
+  document.getElementById('badge-vendidos').textContent = vendidos.length;
+
+  const lista = curTab === 'estoque' ? estoque : vendidos;
+
+  if(!lista.length){
+    const msg = curTab==='estoque' ? '📦 Nenhum equipamento em estoque.' : '💚 Nenhuma venda registrada ainda.';
+    document.getElementById('table-wrap').innerHTML=`<div class="empty-table">${msg}</div>`;
+    return;
+  }
+
+  const rows = lista.map(p => {
     const thumbs=(p.fotos||[]).slice(0,3).map(f=>`<img class="prod-foto-thumb" src="${f}"/>`).join('');
     const extra=(p.fotos||[]).length>3?`<div class="prod-foto-more">+${p.fotos.length-3}</div>`:'';
     const pFmt=parseFloat(p.preco).toLocaleString('pt-BR',{minimumFractionDigits:2,style:'currency',currency:'BRL'});
     const tipoBadge=p.tipo?`<span class="tipo-badge ${p.tipo==='Microondas'?'micro':'bebe'}">${p.tipo}</span>`:'—';
-    const vendidoBadge=p.vendido?`<span class="vendido-badge">vendido</span>`:'';
+
+    if (curTab === 'vendidos') {
+      const dataVenda = p.soldAt ? new Date(p.soldAt).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}) : '—';
+      return `<tr class="vendido-row">
+        <td><div class="prod-fotos">${thumbs}${extra}</div></td>
+        <td class="td-code">${p.codigo}</td>
+        <td>${tipoBadge}</td>
+        <td class="td-desc" title="${p.descricao}">${p.descricao}</td>
+        <td class="td-comprador">${p.compradorNome||'—'}</td>
+        <td class="td-price">${pFmt}</td>
+        <td class="td-data">${dataVenda}</td>
+        <td style="white-space:nowrap;">
+          <button class="act-btn del" onclick="excluir('${p.id}')">🗑️</button>
+        </td>
+      </tr>`;
+    }
+
     return `<tr>
       <td><div class="prod-fotos">${thumbs}${extra}</div></td>
       <td class="td-code">${p.codigo}</td>
-      <td>${tipoBadge} ${vendidoBadge}</td>
+      <td>${tipoBadge}</td>
       <td class="td-desc" title="${p.descricao}">${p.descricao}</td>
       <td class="td-cap">${p.capacidade||'—'}</td>
       <td class="td-price">${pFmt}</td>
       <td style="white-space:nowrap;">
-        ${!p.vendido?`<button class="act-btn vender" onclick="abrirVender('${p.id}')">💚 Vender</button>`:''}
+        <button class="act-btn vender" onclick="abrirVender('${p.id}')">💚 Vender</button>
         <button class="act-btn edit" onclick="editarProduto('${p.id}')">✏️</button>
         <button class="act-btn del"  onclick="excluir('${p.id}')">🗑️</button>
       </td>
     </tr>`;
   }).join('');
+
+  const thead = curTab === 'estoque'
+    ? '<tr><th>Fotos</th><th>Código</th><th>Tipo</th><th>Descrição</th><th>Capacidade</th><th>Preço</th><th>Ações</th></tr>'
+    : '<tr><th>Fotos</th><th>Código</th><th>Tipo</th><th>Descrição</th><th>Comprador</th><th>Preço</th><th>Data</th><th></th></tr>';
+
   document.getElementById('table-wrap').innerHTML=`
     <table class="prod-table">
-      <thead><tr><th>Fotos</th><th>Código</th><th>Tipo</th><th>Descrição</th><th>Capacidade</th><th>Preço</th><th>Ações</th></tr></thead>
+      <thead>${thead}</thead>
       <tbody>${rows}</tbody>
     </table>`;
 }
