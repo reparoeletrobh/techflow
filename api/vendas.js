@@ -93,7 +93,7 @@ module.exports = async function handler(req, res) {
   // ── POST vender ────────────────────────────────────────────
   // Cria ficha no financeiro em "emitir_nf" e marca produto como vendido
   if (req.method === "POST" && action === "vender") {
-    const { produtoId, nomeCliente, telefone, cpfCnpj } = req.body || {};
+    const { produtoId, nomeCliente, telefone, cpfCnpj, vendedor } = req.body || {};
     if (!produtoId || !nomeCliente)
       return res.status(400).json({ ok: false, error: "produtoId e nomeCliente obrigatórios" });
 
@@ -133,7 +133,7 @@ module.exports = async function handler(req, res) {
     fin.records.unshift(ficha);
 
     // Marca produto como vendido
-    db.produtos[idx] = { ...p, vendido: true, soldAt: now, compradorNome: nomeCliente, updatedAt: now };
+    db.produtos[idx] = { ...p, vendido: true, soldAt: now, compradorNome: nomeCliente, vendedor: vendedor||null, updatedAt: now };
 
     await Promise.all([dbSet(VENDAS_KEY, db), dbSet(FIN_KEY, fin)]);
     return res.status(200).json({ ok: true, ficha, produto: db.produtos[idx] });
