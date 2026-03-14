@@ -10,98 +10,66 @@
 :root{
   --bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--border:#252525;
   --text:#fff;--muted:#888;--dim:#333;
-  --accent:#f5c800;--green:#22c55e;--red:#ef4444;
+  --accent:#f5c800;--green:#22c55e;
   --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;}
-
-/* HEADER */
 header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;border-bottom:2px solid var(--accent);background:var(--bg);position:sticky;top:0;z-index:100;}
 .logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
 .logo-icon{width:26px;height:26px;background:var(--accent);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;}
 .logo span{color:var(--accent);}
-
-/* TABS */
 .tabs{display:flex;border-bottom:1px solid var(--border);background:var(--bg);padding:0 24px;}
-.tab{font-family:var(--fm);font-size:12px;font-weight:600;padding:12px 20px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.15s;display:flex;align-items:center;gap:7px;}
+.tab{font-family:var(--fm);font-size:12px;font-weight:600;padding:12px 20px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.15s;}
 .tab:hover{color:var(--text);}
 .tab.active{color:var(--accent);border-bottom-color:var(--accent);}
-
-/* PAGES */
 .page{display:none;flex:1;}
 .page.active{display:flex;flex-direction:column;}
-
-/* ── CADASTRO PAGE ── */
 #page-cadastro{align-items:center;justify-content:center;padding:32px 20px;}
-
-/* CHAT CONTAINER */
-.chat-wrap{width:100%;max-width:560px;display:flex;flex-direction:column;gap:0;height:min(640px,80vh);background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
-
-/* CHAT MESSAGES */
+.chat-wrap{width:100%;max-width:560px;display:flex;flex-direction:column;gap:0;height:min(620px,80vh);background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
 .chat-msgs{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;}
 .chat-msgs::-webkit-scrollbar{width:3px;}
 .chat-msgs::-webkit-scrollbar-thumb{background:var(--border);}
-
 .msg{display:flex;flex-direction:column;max-width:85%;}
 .msg.bot{align-self:flex-start;}
 .msg.user{align-self:flex-end;}
-.bubble{padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.55;}
+.bubble{padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.6;}
 .msg.bot  .bubble{background:var(--surface2);border:1px solid var(--border);border-bottom-left-radius:3px;}
 .msg.user .bubble{background:var(--accent);color:#000;font-weight:500;border-bottom-right-radius:3px;}
-
-/* TYPING */
 .typing-wrap{align-self:flex-start;}
 .typing{display:flex;gap:4px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:14px;border-bottom-left-radius:3px;width:fit-content;}
 .td{width:7px;height:7px;background:var(--muted);border-radius:50%;animation:bounce 1.2s infinite;}
 .td:nth-child(2){animation-delay:0.2s;}
 .td:nth-child(3){animation-delay:0.4s;}
 @keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
-
-/* INPUT AREA */
 .chat-input-area{border-top:1px solid var(--border);padding:12px 16px;display:flex;gap:8px;align-items:flex-end;background:var(--surface);}
-.chat-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-family:var(--fb);font-size:13px;color:var(--text);outline:none;resize:none;max-height:100px;line-height:1.4;transition:border 0.15s;}
+.chat-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-family:var(--fb);font-size:13px;color:var(--text);outline:none;resize:none;max-height:160px;line-height:1.4;transition:border 0.15s;}
 .chat-input:focus{border-color:var(--accent);}
 .send-btn{width:40px;height:40px;border-radius:9px;background:var(--accent);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.15s;}
 .send-btn:hover{filter:brightness(1.1);}
 .send-btn:disabled{background:var(--dim);cursor:not-allowed;}
 .send-btn svg{width:16px;height:16px;fill:#000;}
-
-/* QUICK REPLIES */
-.qr-wrap{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
-.qr-btn{font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--accent);background:rgba(245,200,0,0.08);color:var(--accent);cursor:pointer;font-family:var(--fb);transition:all 0.15s;}
+.qr-wrap{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.qr-btn{font-size:12px;padding:5px 13px;border-radius:20px;border:1px solid var(--accent);background:rgba(245,200,0,0.08);color:var(--accent);cursor:pointer;font-family:var(--fb);transition:all 0.15s;}
 .qr-btn:hover{background:var(--accent);color:#000;}
-
-/* SUCCESS */
-.success-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:40px;text-align:center;}
-.success-icon{font-size:48px;}
-.success-title{font-family:var(--fh);font-size:20px;font-weight:800;color:var(--green);}
-.success-sub{font-family:var(--fm);font-size:11px;color:var(--muted);line-height:1.6;}
-.btn-new{font-family:var(--fm);font-size:11px;font-weight:600;padding:10px 20px;border-radius:8px;background:var(--accent);color:#000;border:none;cursor:pointer;margin-top:8px;}
-
-/* TOAST */
 .toast{position:fixed;bottom:18px;right:18px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:11px 14px;font-family:var(--fm);font-size:11px;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);z-index:9999;}
 .toast.show{transform:translateY(0);opacity:1;}
 </style>
 </head>
 <body>
-
 <header>
   <div class="logo"><div class="logo-icon">📋</div>Reparo<span>Eletro</span> — Orçamento</div>
 </header>
-
 <div class="tabs">
-  <button class="tab active" onclick="showPage('cadastro')">📝 Cadastro</button>
-  <button class="tab" onclick="showPage('orcamento')">💬 Orçamento</button>
+  <button class="tab active" id="tab-cadastro" onclick="showPage('cadastro')">📝 Cadastro</button>
+  <button class="tab" id="tab-orcamento" onclick="showPage('orcamento')">💬 Orçamento</button>
 </div>
-
-<!-- ── CADASTRO ── -->
 <div class="page active" id="page-cadastro">
   <div style="display:flex;align-items:center;justify-content:center;flex:1;padding:32px 20px;">
-    <div class="chat-wrap" id="chat-wrap">
+    <div class="chat-wrap">
       <div class="chat-msgs" id="chat-msgs"></div>
       <div class="chat-input-area" id="input-area">
-        <textarea class="chat-input" id="chat-input" placeholder="Digite aqui..." rows="1"
+        <textarea class="chat-input" id="chat-input" placeholder="Cole a ficha aqui..." rows="1"
           onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
         <button class="send-btn" id="send-btn" onclick="sendMsg()">
           <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
@@ -110,218 +78,200 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
     </div>
   </div>
 </div>
-
-<!-- ── ORÇAMENTO ── -->
 <div class="page" id="page-orcamento">
   <div style="display:flex;align-items:center;justify-content:center;flex:1;padding:40px 20px;">
-    <div style="font-family:var(--fm);font-size:12px;color:var(--muted);text-align:center;">
-      Em breve...
-    </div>
+    <div style="font-family:var(--fm);font-size:12px;color:var(--muted);text-align:center;">Em breve...</div>
   </div>
 </div>
-
 <div class="toast" id="toast">
   <span id="t-icon">✅</span>
   <div><strong id="t-title"></strong><br><span id="t-body" style="color:var(--muted);font-size:10px;"></span></div>
 </div>
-
 <script>
-// ── ESTADO ────────────────────────────────────────────────────
-const STEPS = ['nome','telefone','aparelho','defeito','endereco','confirmar'];
-let stepIdx  = 0;
-let dados    = { nome:'', telefone:'', aparelho:'', defeito:'', endereco:'' };
-let phases   = [], solicitarColetaId = null;
-let botando  = false, concluido = false;
+var phases = [], solicitarColetaId = null;
+var botando = false, aguardandoFicha = true, aguardandoConf = false;
+var dados = {};
 
-const PERGUNTAS = {
-  nome:      'Qual o **nome** do cliente?',
-  telefone:  'Qual o **telefone** com DDD?',
-  aparelho:  'Qual o **aparelho**? (ex: Purificador Consul, Microondas Electrolux...)',
-  defeito:   'Qual o **defeito** relatado?',
-  endereco:  'Qual o **CEP ou endereço** para coleta? (pode pular com "pular")',
-  confirmar: null,
-};
-
-// ── INIT ──────────────────────────────────────────────────────
 async function init() {
-  // Carrega fases do Pipefy
   try {
-    const res = await fetch('/api/orcamento?action=estrutura');
-    const data = await res.json();
-    if (data.ok) {
-      phases = data.phases || [];
-      const fase = phases.find(p => p.name.toLowerCase().includes('solicitar coleta'));
-      if (fase) solicitarColetaId = fase.id;
+    var r = await fetch('/api/orcamento?action=estrutura');
+    var d = await r.json();
+    if (d.ok) {
+      phases = d.phases || [];
+      var f = phases.find(function(p){ return p.name.toLowerCase().indexOf('solicitar coleta') >= 0; });
+      if (f) solicitarColetaId = f.id;
     }
   } catch(e) {}
-
-  addBotMsg('Olá! 👋 Vou te ajudar a cadastrar um novo orçamento no Pipefy.\n\nQual o **nome** do cliente?');
+  addBot('Ola! Cole a ficha do cliente abaixo para cadastrar no Pipefy.');
 }
 
-// ── PAGES ─────────────────────────────────────────────────────
 function showPage(name) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  document.getElementById('tab-cadastro').classList.toggle('active', name==='cadastro');
+  document.getElementById('tab-orcamento').classList.toggle('active', name==='orcamento');
   document.getElementById('page-'+name).classList.add('active');
-  document.querySelectorAll('.tab')[name==='cadastro'?0:1].classList.add('active');
 }
 
-// ── CHAT ──────────────────────────────────────────────────────
-function now(){ return new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
-function autoResize(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,100)+'px'; }
-function scrollDown(){ const m=document.getElementById('chat-msgs'); setTimeout(()=>m.scrollTop=m.scrollHeight,60); }
+function autoResize(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,160)+'px'; }
+function scrollDown(){ var m=document.getElementById('chat-msgs'); setTimeout(function(){ m.scrollTop=m.scrollHeight; },60); }
 
-function fmtBold(txt){ return txt.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>'); }
+function fmt(txt){
+  return txt
+    .replace(/Nome:/g,'<strong>Nome:</strong>')
+    .replace(/Telefone:/g,'<strong>Telefone:</strong>')
+    .replace(/Aparelho:/g,'<strong>Aparelho:</strong>')
+    .replace(/Defeito:/g,'<strong>Defeito:</strong>')
+    .replace(/Endereco:/g,'<strong>Endereco:</strong>')
+    .replace(/\n/g,'<br>');
+}
 
-function addBotMsg(txt, qrs) {
-  const m = document.getElementById('chat-msgs');
-  const div = document.createElement('div'); div.className='msg bot';
-  div.innerHTML = `<div class="bubble">${fmtBold(txt)}</div>`;
-  if (qrs?.length) {
-    const qrDiv = document.createElement('div'); qrDiv.className='qr-wrap';
-    qrs.forEach(q => {
-      const btn=document.createElement('button'); btn.className='qr-btn';
-      btn.textContent=q; btn.onclick=()=>sendMsg(q); qrDiv.appendChild(btn);
+function addBot(txt, qrs) {
+  var m=document.getElementById('chat-msgs');
+  var div=document.createElement('div'); div.className='msg bot';
+  div.innerHTML='<div class="bubble">'+fmt(txt)+'</div>';
+  if (qrs && qrs.length) {
+    var qrDiv=document.createElement('div'); qrDiv.className='qr-wrap';
+    qrs.forEach(function(q){
+      var btn=document.createElement('button'); btn.className='qr-btn';
+      btn.textContent=q;
+      btn.onclick=function(){ sendMsg(q); };
+      qrDiv.appendChild(btn);
     });
     div.appendChild(qrDiv);
   }
   m.appendChild(div); scrollDown();
 }
 
-function addUserMsg(txt) {
-  const m=document.getElementById('chat-msgs');
-  const div=document.createElement('div'); div.className='msg user';
-  div.innerHTML=`<div class="bubble">${txt.replace(/\n/g,'<br>')}</div>`;
+function addUser(txt) {
+  var m=document.getElementById('chat-msgs');
+  var div=document.createElement('div'); div.className='msg user';
+  div.innerHTML='<div class="bubble">'+txt.replace(/\n/g,'<br>')+'</div>';
   m.appendChild(div); scrollDown();
 }
 
-function showTyping() {
-  const m=document.getElementById('chat-msgs');
-  const div=document.createElement('div'); div.className='typing-wrap'; div.id='typing';
+function showTyping(){
+  var m=document.getElementById('chat-msgs');
+  var div=document.createElement('div'); div.className='typing-wrap'; div.id='typing';
   div.innerHTML='<div class="typing"><div class="td"></div><div class="td"></div><div class="td"></div></div>';
   m.appendChild(div); scrollDown();
 }
-function hideTyping(){ document.getElementById('typing')?.remove(); }
-
+function hideTyping(){ var t=document.getElementById('typing'); if(t) t.remove(); }
 function handleKey(e){ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();} }
 
-async function sendMsg(txt) {
-  if (botando || concluido) return;
-  const input = document.getElementById('chat-input');
-  const msg = (txt||input.value).trim();
-  if (!msg) return;
-
-  input.value=''; input.style.height='auto';
-  addUserMsg(msg);
-
-  const step = STEPS[stepIdx];
-
-  // Pular endereço
-  if (step === 'endereco' && msg.toLowerCase() === 'pular') {
-    dados.endereco = '';
-    stepIdx++;
-    await botDelay(); mostrarConfirmacao(); return;
-  }
-
-  // Salva valor do passo atual
-  if (step !== 'confirmar') {
-    dados[step] = msg;
-    stepIdx++;
-  }
-
-  const proximo = STEPS[stepIdx];
-
-  botando=true; document.getElementById('send-btn').disabled=true;
-  showTyping(); await new Promise(r=>setTimeout(r,600)); hideTyping();
-
-  if (proximo === 'confirmar') {
-    mostrarConfirmacao();
-  } else if (step === 'confirmar') {
-    if (msg.toLowerCase().includes('sim') || msg.toLowerCase().includes('confirm') || msg === '✅ Confirmar') {
-      await criarCard();
-    } else {
-      stepIdx = 0; dados = {nome:'',telefone:'',aparelho:'',defeito:'',endereco:''};
-      addBotMsg('Tudo bem! Vamos começar de novo. Qual o **nome** do cliente?');
+function parseFicha(txt) {
+  var lines = txt.split(/[\r\n]+/);
+  function get(keys) {
+    for (var i=0; i<keys.length; i++) {
+      for (var j=0; j<lines.length; j++) {
+        var line = lines[j];
+        var col  = line.indexOf(':');
+        if (col < 0) continue;
+        var label = line.slice(0, col).toLowerCase().trim().replace(/[^a-z]/g,'');
+        var key   = keys[i].toLowerCase().replace(/[^a-z]/g,'');
+        if (label.indexOf(key) >= 0 || key.indexOf(label) >= 0) {
+          var val = line.slice(col+1).trim();
+          if (val) return val;
+        }
+      }
     }
-  } else {
-    addBotMsg(PERGUNTAS[proximo], proximo==='endereco'?['Pular']:null);
+    return '';
   }
-
-  botando=false; document.getElementById('send-btn').disabled=false;
-  document.getElementById('chat-input').focus();
+  return {
+    nome:     get(['nome']),
+    telefone: get(['telefone','fone','cel','whatsapp','tel']),
+    aparelho: get(['aparelho','equipamento','produto']),
+    defeito:  get(['defeito','problema','defeit','falha']),
+    endereco: get(['cep','endereco','endereço','end','rua','logradouro']),
+  };
 }
 
-function mostrarConfirmacao() {
-  const end = dados.endereco || '(não informado)';
-  addBotMsg(
-    `Perfeito! Confirma os dados abaixo?\n\n` +
-    `👤 **Nome:** ${dados.nome}\n` +
-    `📱 **Telefone:** ${dados.telefone}\n` +
-    `🔧 **Aparelho:** ${dados.aparelho}\n` +
-    `❗ **Defeito:** ${dados.defeito}\n` +
-    `📍 **Endereço:** ${end}`,
-    ['✅ Confirmar','❌ Recomeçar']
-  );
-  stepIdx = STEPS.indexOf('confirmar');
-  botando=false; document.getElementById('send-btn').disabled=false;
+async function sendMsg(txt) {
+  if (botando) return;
+  var input=document.getElementById('chat-input');
+  var msg=(txt||input.value).trim();
+  if (!msg) return;
+  input.value=''; input.style.height='auto';
+  addUser(msg);
+
+  if (aguardandoConf) {
+    if (msg==='Confirmar') {
+      aguardandoConf=false;
+      await criarCard();
+    } else {
+      aguardandoConf=false; aguardandoFicha=true; dados={};
+      showTyping(); await delay(500); hideTyping();
+      addBot('Tudo bem! Cole a ficha corrigida.');
+    }
+    return;
+  }
+
+  if (aguardandoFicha) {
+    botando=true; document.getElementById('send-btn').disabled=true;
+    showTyping(); await delay(700); hideTyping();
+    dados = parseFicha(msg);
+    var faltando=[];
+    if (!dados.nome)     faltando.push('Nome');
+    if (!dados.telefone) faltando.push('Telefone');
+    if (!dados.aparelho) faltando.push('Aparelho');
+    if (!dados.defeito)  faltando.push('Defeito');
+    if (faltando.length) {
+      addBot('Nao consegui identificar: ' + faltando.join(', ') + '.\n\nVerifique o formato e cole novamente.');
+      botando=false; document.getElementById('send-btn').disabled=false;
+      return;
+    }
+    aguardandoFicha=false; aguardandoConf=true;
+    var end=dados.endereco||'(nao informado)';
+    addBot(
+      'Dados identificados, confirma?\n\n'+
+      'Nome: '+dados.nome+'\n'+
+      'Telefone: '+dados.telefone+'\n'+
+      'Aparelho: '+dados.aparelho+'\n'+
+      'Defeito: '+dados.defeito+'\n'+
+      'Endereco: '+end,
+      ['Confirmar','Corrigir']
+    );
+    botando=false; document.getElementById('send-btn').disabled=false;
+  }
 }
 
 async function criarCard() {
-  showTyping();
+  botando=true; document.getElementById('send-btn').disabled=true;
   document.getElementById('input-area').style.display='none';
-
+  showTyping();
   try {
-    const res = await fetch('/api/orcamento?action=criar-card', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        nome:     dados.nome,
-        telefone: dados.telefone,
-        aparelho: dados.aparelho,
-        defeito:  dados.defeito,
-        endereco: dados.endereco,
-        phaseId:  solicitarColetaId,
-      }),
+    var r=await fetch('/api/orcamento?action=criar-card',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({nome:dados.nome,telefone:dados.telefone,aparelho:dados.aparelho,defeito:dados.defeito,endereco:dados.endereco,phaseId:solicitarColetaId})
     });
-    const data = await res.json();
+    var d=await r.json();
     hideTyping();
-
-    if (data.ok) {
-      concluido = true;
-      addBotMsg(`✅ **Card criado no Pipefy!**\n\nO cliente **${dados.nome}** foi cadastrado na fase **Solicitar Coleta**.\n\nDeseja cadastrar outro?`,['📝 Novo cadastro']);
+    if (d.ok) {
+      addBot('Card criado no Pipefy!\n\n'+dados.nome+' cadastrado em Solicitar Coleta.',['Novo cadastro']);
     } else {
-      addBotMsg(`❌ Erro ao criar card no Pipefy: ${data.error}\n\nTente novamente.`);
+      addBot('Erro: '+d.error);
       document.getElementById('input-area').style.display='flex';
+      aguardandoFicha=true;
     }
   } catch(e) {
     hideTyping();
-    addBotMsg('❌ Sem conexão com o Pipefy. Verifique e tente novamente.');
+    addBot('Sem conexao com o Pipefy. Tente novamente.');
     document.getElementById('input-area').style.display='flex';
+    aguardandoFicha=true;
   }
+  botando=false; document.getElementById('send-btn').disabled=false;
 }
 
-// Botão "Novo cadastro"
-document.addEventListener('click', e => {
-  if (e.target.classList.contains('qr-btn') && e.target.textContent === '📝 Novo cadastro') {
-    reiniciar();
+document.addEventListener('click', function(e) {
+  if (e.target.classList.contains('qr-btn') && e.target.textContent==='Novo cadastro') {
+    dados={}; aguardandoFicha=true; aguardandoConf=false;
+    document.getElementById('chat-msgs').innerHTML='';
+    document.getElementById('input-area').style.display='flex';
+    addBot('Pronto! Cole a proxima ficha.');
+    document.getElementById('chat-input').focus();
   }
 });
 
-function reiniciar() {
-  stepIdx=0; dados={nome:'',telefone:'',aparelho:'',defeito:'',endereco:''}; concluido=false;
-  document.getElementById('chat-msgs').innerHTML='';
-  document.getElementById('input-area').style.display='flex';
-  addBotMsg('Ótimo! Vamos cadastrar mais um. Qual o **nome** do cliente?');
-}
-
-function showToast(icon,title,msg){
-  document.getElementById('t-icon').textContent=icon;
-  document.getElementById('t-title').textContent=title;
-  document.getElementById('t-body').textContent=msg;
-  const t=document.getElementById('toast');
-  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),4000);
-}
-
-function botDelay(){ return new Promise(r=>setTimeout(r,400)); }
+function delay(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
 
 init();
 </script>
