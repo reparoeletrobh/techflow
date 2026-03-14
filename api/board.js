@@ -252,19 +252,68 @@ async function fetchMetaPhaseIds() {
   } catch(e) { return { aguardandoIds: [], erpIds: [] }; }
 }
 
-// Remove do aguardando_ret os cards que foram para ERP/Finalizado no Pipefy
-async function cleanupAguardandoRet(board) {
-  const { ids: erpIds, targetPhases } = await fetchErpCardIds();
-  const retCards = board.cards.filter(c => c.phaseId === "aguardando_ret");
-  const removedIds = [];
-  board.cards = board.cards.filter(c => {
-    if (c.phaseId === "aguardando_ret" && erpIds.includes(c.pipefyId)) {
-      removedIds.push(c.pipefyId);
-      return false;
+// Consulta a fase atual de um card no Pipefy diretamente
+async function fetchCardPhase(pipefyId) {
+  try {
+    const data = await pipefyQuery(`query {
+      card(id: "${pipefyId}") {
+        id
+        current_phase { name }
+      }
+    }`);
+    return data?.card?.current_phase?.name || null;
+  } catch(e) {
+    // Card não encontrado ou erro — tratar como finalizado
+    if (e.message && (e.message.includes("not found") || e.message.includes("Couldn't find") || e.message.includes("null"))) {
+      return "NOT_FOUND";
     }
-    return true;
+    return null;
+  }
+}
+
+// Remove do aguardando_ret os cards cujo pipefyId está em fase de conclusão no Pipefy
+async function cleanupAguardandoRet(board) {
+  const retCards = board.cards.filter(c =>
+    c.phaseId === "aguardando_ret" && !c.localOnly && !c.pipefyId.includes("-split-")
+  );
+
+  const DONE_PHASES = ["erp","finaliz","conclu","descar","reprova"];
+  const isDone = (name) => {
+    if (!name || name === "NOT_FOUND") return true;
+    const l = name.toLowerCase();
+    return DONE_PHASES.some(kw => l.includes(kw));
+  };
+
+  const removedIds = new Set();
+
+  // Consulta em paralelo (até 5 por vez para não sobrecarregar)
+  const BATCH = 5;
+  for (let i = 0; i < retCards.length; i += BATCH) {
+    const batch = retCards.slice(i, i + BATCH);
+    const results = await Promise.all(batch.map(c => fetchCardPhase(c.pipefyId)));
+    batch.forEach((card, idx) => {
+      const phase = results[idx];
+      if (isDone(phase)) removedIds.add(card.pipefyId);
+    });
+  }
+
+  // Remove também split cards cujo pai foi removido
+  const removedPipefyIds = new Set(removedIds);
+  board.cards.forEach(c => {
+    if (c.phaseId === "aguardando_ret" && c.splitFrom && removedPipefyIds.has(c.splitFrom)) {
+      removedIds.add(c.pipefyId);
+    }
   });
-  return { removed: removedIds.length, ids: removedIds, targetPhases, retTotal: retCards.length, erpTotal: erpIds.length };
+
+  const before = board.cards.length;
+  const removedList = [...removedIds];
+  board.cards = board.cards.filter(c => !(c.phaseId === "aguardando_ret" && removedIds.has(c.pipefyId)));
+
+  return {
+    removed: before - board.cards.length,
+    ids: removedList,
+    retTotal: retCards.length,
+  };
 }
 
 // ── Log helpers ────────────────────────────────────────────────
@@ -781,14 +830,12 @@ module.exports = async function handler(req, res) {
     if (req.method === "GET" && action === "cleanup-ret") {
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
       let removed = 0, removedIds = [], pipefyError = null;
-      let targetPhases = [], retTotal = 0, erpTotal = 0;
+      let retTotal = 0;
       try {
         const result = await cleanupAguardandoRet(board);
-        removed      = result.removed;
-        removedIds   = result.ids;
-        targetPhases = result.targetPhases || [];
-        retTotal     = result.retTotal     || 0;
-        erpTotal     = result.erpTotal     || 0;
+        removed    = result.removed;
+        removedIds = result.ids;
+        retTotal   = result.retTotal || 0;
         if (removed > 0) {
           board.movesLog.push({
             phaseId:   "cleanup_ret",
@@ -802,7 +849,7 @@ module.exports = async function handler(req, res) {
       } catch(e) { pipefyError = e.message; }
       return res.status(200).json({
         ok: true, removed, removedIds, pipefyError,
-        debug: { targetPhases, retTotal, erpTotal }
+        debug: { retTotal }
       });
     }
 
