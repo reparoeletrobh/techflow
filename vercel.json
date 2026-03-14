@@ -1,6 +1,6 @@
 {
   "rewrites": [
-    { "source": "/tecnico",      "destination": "/index.html"        },
+    { "source": "/tecnico",      "destination": "/tecnico.html"      },
     { "source": "/financeiro",   "destination": "/financeiro.html"   },
     { "source": "/vendas",       "destination": "/vendas.html"       },
     { "source": "/equipamentos", "destination": "/equipamentos.html" },
