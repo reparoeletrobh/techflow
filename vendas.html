@@ -53,7 +53,8 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
 .vend-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .vend-btn{padding:10px;border-radius:9px;border:2px solid var(--border);background:var(--surface2);color:var(--muted);font-family:var(--fb);font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;text-align:center;}
 .vend-btn:hover{border-color:#444;color:var(--text);}
-.vend-btn.selected{border-color:#a855f7;background:rgba(168,85,247,0.08);color:#a855f7;}
+.vend-btn.selected.online{border-color:#3b9eff;background:rgba(59,158,255,0.08);color:#3b9eff;}
+.vend-btn.selected.loja{border-color:#f59e0b;background:rgba(245,158,11,0.08);color:#f59e0b;}
 
 /* CODIGO row */
 .codigo-row{display:flex;gap:8px;align-items:flex-end;}
@@ -250,10 +251,10 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
       <input class="f-input" id="v-cpf" type="text" placeholder="000.000.000-00" oninput="maskCpfCnpj(this)"/>
     </div>
     <div class="field">
-      <label class="field-label">Vendedor *</label>
+      <label class="field-label">Canal de Venda *</label>
       <div class="vend-grid">
-        <button class="vend-btn" id="vend-nathan" onclick="setVendedor('Nathan')">Nathan</button>
-        <button class="vend-btn" id="vend-ricardo" onclick="setVendedor('Ricardo')">Ricardo</button>
+        <button class="vend-btn online" id="vend-online" onclick="setVendedor('Online')">🌐 Online</button>
+        <button class="vend-btn loja"   id="vend-loja"   onclick="setVendedor('Loja')">🏪 Loja</button>
       </div>
     </div>
     <div class="modal-actions">
@@ -440,8 +441,8 @@ function abrirVender(id) {
   document.getElementById('v-tel').value='';
   document.getElementById('v-cpf').value='';
   vendedorSel=null;
-  document.getElementById('vend-nathan').classList.remove('selected');
-  document.getElementById('vend-ricardo').classList.remove('selected');
+  document.getElementById('vend-online').classList.remove('selected');
+  document.getElementById('vend-loja').classList.remove('selected');
   document.getElementById('vender-modal').classList.add('open');
   setTimeout(()=>document.getElementById('v-nome').focus(),200);
 }
@@ -454,14 +455,14 @@ function maskCpfCnpj(input){
 }
 function setVendedor(v) {
   vendedorSel = v;
-  document.getElementById('vend-nathan').classList.toggle('selected',  v==='Nathan');
-  document.getElementById('vend-ricardo').classList.toggle('selected', v==='Ricardo');
+  document.getElementById('vend-online').className = 'vend-btn online' + (v==='Online'?' selected':'');
+  document.getElementById('vend-loja').className   = 'vend-btn loja'   + (v==='Loja'  ?' selected':'');
 }
 
 async function confirmarVenda(){
   const nome=document.getElementById('v-nome').value.trim();
   if(!nome) return showToast('⚠️','Nome obrigatório','');
-  if(!vendedorSel) return showToast('⚠️','Selecione o vendedor','Nathan ou Ricardo');
+  if(!vendedorSel) return showToast('⚠️','Selecione o canal de venda','Online ou Loja');
   const btn=document.getElementById('v-confirm');
   btn.disabled=true; btn.textContent='⏳';
   const res=await api('vender',{produtoId:selVenderId,nomeCliente:nome,telefone:document.getElementById('v-tel').value.trim(),cpfCnpj:document.getElementById('v-cpf').value.trim(),vendedor:vendedorSel});
@@ -522,7 +523,9 @@ function renderTable(){
 
     if (curTab === 'vendidos') {
       const dataVenda = p.soldAt ? new Date(p.soldAt).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}) : '—';
-      const vendBadge = p.vendedor ? `<span style="font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:4px;background:rgba(168,85,247,0.12);color:#a855f7">${p.vendedor}</span>` : '—';
+      const canalColor = p.vendedor==='Online' ? '#3b9eff' : '#f59e0b';
+      const canalBg    = p.vendedor==='Online' ? 'rgba(59,158,255,0.12)' : 'rgba(245,158,11,0.12)';
+      const vendBadge = p.vendedor ? `<span style="font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:4px;background:${canalBg};color:${canalColor}">${p.vendedor}</span>` : '—';
       return `<tr class="vendido-row" data-fotos="${fotosJson}">
         <td><div class="prod-fotos">${thumbs}${extra}</div></td>
         <td class="td-code">${p.codigo}</td>
@@ -555,7 +558,7 @@ function renderTable(){
 
   const thead = curTab === 'estoque'
     ? '<tr><th>Fotos</th><th>Código</th><th>Tipo</th><th>Descrição</th><th>Capacidade</th><th>Preço</th><th>Ações</th></tr>'
-    : '<tr><th>Fotos</th><th>Código</th><th>Tipo</th><th>Descrição</th><th>Comprador</th><th>Vendedor</th><th>Preço</th><th>Data</th><th></th></tr>';
+    : '<tr><th>Fotos</th><th>Código</th><th>Tipo</th><th>Descrição</th><th>Comprador</th><th>Canal</th><th>Preço</th><th>Data</th><th></th></tr>';
 
   document.getElementById('table-wrap').innerHTML=`
     <table class="prod-table">
