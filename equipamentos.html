@@ -25,6 +25,14 @@ header{
 .brand-sub{font-family:var(--fm);font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:0.08em;}
 .header-stripe{position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);}
 
+/* FILTER TABS */
+.filter-bar{display:flex;gap:8px;margin-bottom:20px;}
+.filter-btn{font-family:var(--fm);font-size:11px;font-weight:600;padding:8px 20px;border-radius:8px;border:2px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all 0.18s;display:flex;align-items:center;gap:6px;}
+.filter-btn:hover{border-color:#444;color:var(--text);}
+.filter-btn.active-all{border-color:var(--accent);color:var(--accent);background:rgba(245,200,0,0.07);}
+.filter-btn.active-micro{border-color:#f59e0b;color:#f59e0b;background:rgba(245,158,11,0.08);}
+.filter-btn.active-bebe{border-color:#3b9eff;color:#3b9eff;background:rgba(59,158,255,0.08);}
+
 /* GRID */
 .grid-wrap{max-width:1200px;margin:0 auto;padding:32px 20px 60px;}
 .grid-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:10px;}
@@ -109,6 +117,11 @@ header{
 </header>
 
 <div class="grid-wrap">
+  <div class="filter-bar">
+    <button class="filter-btn active-all" id="f-all"   onclick="setFilter(null)">🔍 Todos</button>
+    <button class="filter-btn" id="f-micro" onclick="setFilter('Microondas')">📡 Microondas</button>
+    <button class="filter-btn" id="f-bebe"  onclick="setFilter('Bebedouro')">💧 Bebedouro</button>
+  </div>
   <div class="grid-header">
     <div class="grid-title">Equipamentos <span>Disponíveis</span></div>
     <div class="grid-count" id="grid-count"></div>
@@ -129,11 +142,23 @@ async function load() {
     const r   = await fetch('/api/vendas?action=load');
     const res = await r.json();
     if (!res.ok) throw new Error(res.error);
-    render(res.produtos || []);
+    allProdutos = res.produtos || [];
+    setFilter(activeFilter);
   } catch(e) {
     document.getElementById('grid-content').innerHTML =
       `<div class="empty"><span class="empty-icon">⚠️</span>Erro ao carregar: ${e.message}</div>`;
   }
+}
+
+let allProdutos = [], activeFilter = null;
+
+function setFilter(tipo) {
+  activeFilter = tipo;
+  document.getElementById('f-all').className   = 'filter-btn' + (tipo===null?  ' active-all':'');
+  document.getElementById('f-micro').className = 'filter-btn' + (tipo==='Microondas'?' active-micro':'');
+  document.getElementById('f-bebe').className  = 'filter-btn' + (tipo==='Bebedouro'?  ' active-bebe':'');
+  const filtered = tipo ? allProdutos.filter(p => p.tipo === tipo) : allProdutos;
+  render(filtered);
 }
 
 function render(produtos) {
