@@ -261,13 +261,12 @@ async function fetchCardPhase(pipefyId) {
         current_phase { name }
       }
     }`);
-    return data?.card?.current_phase?.name || null;
+    // card: null = arquivado ou não existe mais
+    if (!data?.card) return "NOT_FOUND";
+    return data.card.current_phase?.name || "NOT_FOUND";
   } catch(e) {
-    // Card não encontrado ou erro — tratar como finalizado
-    if (e.message && (e.message.includes("not found") || e.message.includes("Couldn't find") || e.message.includes("null"))) {
-      return "NOT_FOUND";
-    }
-    return null;
+    // Qualquer erro de acesso = tratar como finalizado
+    return "NOT_FOUND";
   }
 }
 
@@ -826,7 +825,29 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, created: newCards.length, cards: newCards });
     }
 
-        // ── GET cleanup-ret — remove aguardando_ret que foram ERP/Finalizado ──
+        // ── GET check-card — diagnóstico de fase de um card específico ──
+    if (req.method === "GET" && action === "check-card") {
+      const { id } = req.query;
+      if (!id) return res.status(400).json({ ok: false, error: "id obrigatório" });
+      const phase = await fetchCardPhase(id);
+      return res.status(200).json({ ok: true, id, phase });
+    }
+
+    // ── GET check-ret — mostra fase atual de todos os cards em aguardando_ret ──
+    if (req.method === "GET" && action === "check-ret") {
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const retCards = board.cards.filter(c =>
+        c.phaseId === "aguardando_ret" && !c.localOnly && !c.pipefyId.includes("-split-")
+      ).slice(0, 10); // primeiros 10 para diagnóstico
+      const results = await Promise.all(retCards.map(async c => ({
+        pipefyId: c.pipefyId,
+        osCode:   c.osCode,
+        phase:    await fetchCardPhase(c.pipefyId),
+      })));
+      return res.status(200).json({ ok: true, total: retCards.length, results });
+    }
+
+    // ── GET cleanup-ret — remove aguardando_ret que foram ERP/Finalizado ──
     if (req.method === "GET" && action === "cleanup-ret") {
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
       let removed = 0, removedIds = [], pipefyError = null;
