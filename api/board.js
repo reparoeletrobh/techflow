@@ -97,18 +97,36 @@ function sanitizeBoard(b) {
 }
 
 // ── Pipefy helpers ─────────────────────────────────────────────
-async function pipefyQuery(query) {
-  const res = await fetch(PIPEFY_API, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${(process.env.PIPEFY_TOKEN || "").trim()}`,
-    },
-    body: JSON.stringify({ query }),
-  });
-  const json = await res.json();
-  if (json.errors) throw new Error(json.errors[0].message);
-  return json.data;
+async function pipefyQuery(query, attempt = 1) {
+  const TIMEOUT_MS = 15000;
+  const MAX_RETRIES = 3;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(PIPEFY_API, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${(process.env.PIPEFY_TOKEN || "").trim()}`,
+      },
+      body: JSON.stringify({ query }),
+      signal: controller.signal,
+    });
+    const text = await res.text();
+    let json;
+    try { json = JSON.parse(text); }
+    catch(e) { throw new Error("INVALID_RESPONSE"); }
+    if (json.errors) throw new Error(json.errors[0].message);
+    return json.data;
+  } catch(e) {
+    if (attempt < MAX_RETRIES && (e.name === "AbortError" || e.message === "INVALID_RESPONSE")) {
+      await new Promise(r => setTimeout(r, 2000 * attempt));
+      return pipefyQuery(query, attempt + 1);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // Busca OS aprovadas com paginação
