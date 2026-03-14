@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='18,2 8,18 15,18 14,30 24,14 17,14' fill='%23fff' stroke='%23fff' stroke-linejoin='round'/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Adm</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050508;--surface:#0d0d14;--surface2:#13131e;--border:#1e1e2e;
+  --text:#e8e8f0;--muted:#5a5a7a;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:var(--fb);display:flex;flex-direction:column;}
+body::before{content:'';position:fixed;inset:0;background:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0;opacity:0.4;}
+
+header{
+  display:flex;align-items:center;justify-content:center;
+  padding:0 28px;height:56px;border-bottom:1px solid var(--border);
+  background:rgba(5,5,8,0.9);backdrop-filter:blur(12px);
+  position:sticky;top:0;z-index:100;
+}
+.logo{font-family:var(--fh);font-size:17px;font-weight:900;display:flex;align-items:center;gap:10px;letter-spacing:-0.5px;}
+.logo-dot{width:8px;height:8px;background:#fff;border-radius:50%;box-shadow:0 0 10px #fff;}
+.logo span{color:#fff;opacity:0.4;}
+
+.wrap{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:40px 24px;position:relative;z-index:1;gap:32px;
+}
+
+.page-title{
+  font-family:var(--fh);font-size:13px;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.18em;color:var(--muted);
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:14px;
+  width:100%;
+  max-width:760px;
+}
+
+.ext-btn{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  padding:28px 20px;border-radius:16px;text-decoration:none;
+  border:1px solid var(--border);background:var(--surface);
+  transition:all 0.2s;cursor:pointer;position:relative;overflow:hidden;
+}
+.ext-btn::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  transition:opacity 0.2s;
+}
+.ext-btn:hover{transform:translateY(-3px);border-color:#2e2e40;}
+.ext-btn:hover::before{opacity:1;}
+.ext-btn::before{opacity:0.7;}
+
+.ext-btn.tecnico::before   {background:#f5c800;}
+.ext-btn.financeiro::before{background:#22c55e;}
+.ext-btn.vendas::before    {background:#f97316;}
+.ext-btn.equip::before     {background:#3b9eff;}
+.ext-btn.metas::before     {background:#a855f7;}
+
+.ext-btn:hover.tecnico   {box-shadow:0 8px 32px rgba(245,200,0,0.08);}
+.ext-btn:hover.financeiro{box-shadow:0 8px 32px rgba(34,197,94,0.08);}
+.ext-btn:hover.vendas    {box-shadow:0 8px 32px rgba(249,115,22,0.08);}
+.ext-btn:hover.equip     {box-shadow:0 8px 32px rgba(59,158,255,0.08);}
+.ext-btn:hover.metas     {box-shadow:0 8px 32px rgba(168,85,247,0.08);}
+
+.ext-icon{
+  width:48px;height:48px;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;font-size:22px;
+}
+.tecnico    .ext-icon{background:rgba(245,200,0,0.1);}
+.financeiro .ext-icon{background:rgba(34,197,94,0.1);}
+.vendas     .ext-icon{background:rgba(249,115,22,0.1);}
+.equip      .ext-icon{background:rgba(59,158,255,0.1);}
+.metas      .ext-icon{background:rgba(168,85,247,0.1);}
+
+.ext-name{
+  font-family:var(--fh);font-size:13px;font-weight:800;
+  text-transform:uppercase;letter-spacing:0.04em;
+}
+.tecnico    .ext-name{color:#f5c800;}
+.financeiro .ext-name{color:#22c55e;}
+.vendas     .ext-name{color:#f97316;}
+.equip      .ext-name{color:#3b9eff;}
+.metas      .ext-name{color:#a855f7;}
+
+.ext-desc{
+  font-family:var(--fm);font-size:9px;color:var(--muted);
+  text-align:center;line-height:1.5;
+}
+
+.ext-arrow{
+  font-size:12px;color:var(--muted);margin-top:2px;
+  transition:transform 0.2s;
+}
+.ext-btn:hover .ext-arrow{transform:translateX(3px);}
+
+footer{
+  text-align:center;padding:20px;
+  font-family:var(--fm);font-size:10px;color:var(--muted);
+  border-top:1px solid var(--border);position:relative;z-index:1;
+}
+
+@media(max-width:600px){
+  .grid{grid-template-columns:repeat(2,1fr);}
+}
+@media(max-width:380px){
+  .grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    Reparo<span>Eletro</span>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="page-title">// painel de navegação</div>
+
+  <div class="grid">
+
+    <a class="ext-btn tecnico" href="/">
+      <div class="ext-icon">🔧</div>
+      <div class="ext-name">Técnico</div>
+      <div class="ext-desc">Kanban de ordens<br>de serviço</div>
+      <div class="ext-arrow">→</div>
+    </a>
+
+    <a class="ext-btn financeiro" href="/financeiro">
+      <div class="ext-icon">💼</div>
+      <div class="ext-name">Financeiro</div>
+      <div class="ext-desc">Fichas, NF e<br>faturamento</div>
+      <div class="ext-arrow">→</div>
+    </a>
+
+    <a class="ext-btn vendas" href="/vendas">
+      <div class="ext-icon">🏪</div>
+      <div class="ext-name">Vendas</div>
+      <div class="ext-desc">Cadastro de<br>equipamentos</div>
+      <div class="ext-arrow">→</div>
+    </a>
+
+    <a class="ext-btn equip" href="/equipamentos">
+      <div class="ext-icon">📦</div>
+      <div class="ext-name">Equipamentos</div>
+      <div class="ext-desc">Vitrine pública<br>de venda</div>
+      <div class="ext-arrow">→</div>
+    </a>
+
+    <a class="ext-btn metas" href="/metas">
+      <div class="ext-icon">📊</div>
+      <div class="ext-name">Metas</div>
+      <div class="ext-desc">Painel unificado<br>de indicadores</div>
+      <div class="ext-arrow">→</div>
+    </a>
+
+  </div>
+</div>
+
+<footer>Reparo Eletro — Sistema interno</footer>
+
+</body>
+</html>
