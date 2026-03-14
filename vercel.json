@@ -3,6 +3,7 @@
     { "source": "/financeiro",   "destination": "/financeiro.html"   },
     { "source": "/vendas",       "destination": "/vendas.html"       },
     { "source": "/equipamentos", "destination": "/equipamentos.html" },
+    { "source": "/metas",        "destination": "/metas.html"        },
     { "source": "/((?!api/).*)", "destination": "/index.html"        }
   ]
 }
