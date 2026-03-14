@@ -22,42 +22,44 @@ module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  // ── Timezone helpers ────────────────────────────────────────
   function toBRT(d) {
     return new Date(new Date(d).toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
   }
   const nowBRT = toBRT(new Date());
 
-  // Today start UTC
+  // Hoje
   const todayBRT = toBRT(new Date()); todayBRT.setHours(0,0,0,0);
   const todayUTC = new Date(todayBRT.getTime() + 3*60*60*1000);
 
-  // Week start (Monday) UTC
+  // Semana (segunda-feira)
   const weekBRT = toBRT(new Date()); const wd = weekBRT.getDay();
   weekBRT.setDate(weekBRT.getDate() + (wd===0?-6:1-wd)); weekBRT.setHours(0,0,0,0);
   const weekUTC = new Date(weekBRT.getTime() + 3*60*60*1000);
 
+  // Mês (dia 1)
+  const monthBRT = toBRT(new Date()); monthBRT.setDate(1); monthBRT.setHours(0,0,0,0);
+  const monthUTC = new Date(monthBRT.getTime() + 3*60*60*1000);
+
   // Labels
   const days   = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
   const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-  const fmt    = d => { const b = toBRT(d); return `${String(b.getDate()).padStart(2,"0")}/${String(b.getMonth()+1).padStart(2,"0")}`; };
+  const fmt    = d => { const b=toBRT(d); return `${String(b.getDate()).padStart(2,"0")}/${String(b.getMonth()+1).padStart(2,"0")}`; };
   const todayLabel = `${days[nowBRT.getDay()]}, ${String(nowBRT.getDate()).padStart(2,"0")} ${months[nowBRT.getMonth()]}`;
   const weekEnd    = new Date(weekUTC.getTime() + 5*24*60*60*1000);
   const weekLabel  = `${fmt(weekUTC)} – ${fmt(weekEnd)}`;
+  const monthLabel = `${months[nowBRT.getMonth()]} ${nowBRT.getFullYear()}`;
 
-  // ── Load all stores in parallel ─────────────────────────────
+  // Carrega tudo em paralelo
   const [board, fin, vendas] = await Promise.all([
-    dbGet(BOARD_KEY),
-    dbGet(FIN_KEY),
-    dbGet(VENDAS_KEY),
+    dbGet(BOARD_KEY), dbGet(FIN_KEY), dbGet(VENDAS_KEY),
   ]);
 
-  const movesLog  = board?.movesLog  || [];
-  const metaLog   = board?.metaLog   || [];
-  const finRecs   = fin?.records     || [];
-  const produtos  = vendas?.produtos || [];
+  const movesLog = board?.movesLog  || [];
+  const metaLog  = board?.metaLog   || [];
+  const finRecs  = fin?.records     || [];
+  const produtos = vendas?.produtos || [];
 
-  // ── Counter helpers ─────────────────────────────────────────
+  // Contador com deduplicação por pipefyId
   function cntLog(log, phaseId, since, until) {
     const seen = new Set();
     return log.filter(h => {
@@ -85,24 +87,20 @@ module.exports = async function handler(req, res) {
     return count;
   }
 
-  // ── BOARD METAS ─────────────────────────────────────────────
-  const board_hoje = {
-    aprovados:   { count: cntLog(movesLog,"aprovado_entrada",    todayUTC), goal: 35  },
-    loja:        { count: cntLog(movesLog,"loja_feito",          todayUTC), goal: 15  },
-    delivery:    { count: cntLog(movesLog,"delivery_feito",      todayUTC), goal: 20  },
-    orcamentos:  { count: cntLog(metaLog, "aguardando_aprovacao",todayUTC), goal: 30  },
-    vendas_erp:  { count: cntLog(metaLog, "erp_entrada",         todayUTC), goal: 25  },
-  };
-  const board_semana = {
-    aprovados:   { count: cntLog(movesLog,"aprovado_entrada",    weekUTC), goal: 210 },
-    loja:        { count: cntLog(movesLog,"loja_feito",          weekUTC), goal: 90  },
-    delivery:    { count: cntLog(movesLog,"delivery_feito",      weekUTC), goal: 120 },
-    orcamentos:  { count: cntLog(metaLog, "aguardando_aprovacao",weekUTC), goal: 150 },
-    vendas_erp:  { count: cntLog(metaLog, "erp_entrada",         weekUTC), goal: 150 },
+  // ── DESTAQUES DO TOPO ────────────────────────────────────────
+  const top = {
+    erp_hoje:    { count: cntLog(metaLog,"erp_entrada",         todayUTC), goal: 25  },
+    erp_semana:  { count: cntLog(metaLog,"erp_entrada",         weekUTC),  goal: 150 },
+    orc_hoje:    { count: cntLog(metaLog,"aguardando_aprovacao",todayUTC), goal: 30  },
+    orc_semana:  { count: cntLog(metaLog,"aguardando_aprovacao",weekUTC),  goal: 150 },
+    eq_vend_sem: { count: produtos.filter(p=>p.soldAt    && new Date(p.soldAt)   >=weekUTC).length,  goal: 25  },
+    eq_vend_mes: { count: produtos.filter(p=>p.soldAt    && new Date(p.soldAt)   >=monthUTC).length, goal: 100 },
+    eq_cad_sem:  { count: produtos.filter(p=>p.createdAt && new Date(p.createdAt)>=weekUTC).length,  goal: 25  },
+    eq_cad_mes:  { count: produtos.filter(p=>p.createdAt && new Date(p.createdAt)>=monthUTC).length, goal: 100 },
   };
 
-  // ── FINANCEIRO METAS ────────────────────────────────────────
-  const fin_hoje = {
+  // ── FINANCEIRO ───────────────────────────────────────────────
+  const fin_hoje   = {
     faturamento: { count: cntFinPhase("faturamento", todayUTC), goal: 20 },
     rota:        { count: cntFinPhase("rota_criada", todayUTC), goal: 20 },
   };
@@ -110,27 +108,30 @@ module.exports = async function handler(req, res) {
     faturamento: { count: cntFinPhase("faturamento", weekUTC), goal: 120 },
     rota:        { count: cntFinPhase("rota_criada", weekUTC), goal: 120 },
   };
-
-  // ── VENDAS METAS ────────────────────────────────────────────
-  const eq_semana = {
-    cadastrados: { count: produtos.filter(p => p.createdAt && new Date(p.createdAt) >= weekUTC).length, goal: 25 },
-    vendidos:    { count: produtos.filter(p => p.soldAt    && new Date(p.soldAt)    >= weekUTC).length, goal: 25 },
-  };
-
-  // ── BOARD CARDS SNAPSHOT ────────────────────────────────────
-  const cardsByPhase = {};
-  (board?.phases||[]).forEach(ph => { cardsByPhase[ph.id] = 0; });
-  (board?.cards||[]).forEach(c => { if (cardsByPhase[c.phaseId]!==undefined) cardsByPhase[c.phaseId]++; });
-
-  // ── FIN FICHAS SNAPSHOT ─────────────────────────────────────
   const fichasByPhase = {};
   finRecs.forEach(r => { fichasByPhase[r.phaseId] = (fichasByPhase[r.phaseId]||0)+1; });
 
+  // ── DASH PRINCIPAL ───────────────────────────────────────────
+  const board_hoje   = {
+    aprovados: { count: cntLog(movesLog,"aprovado_entrada",todayUTC), goal: 35 },
+    loja:      { count: cntLog(movesLog,"loja_feito",      todayUTC), goal: 15 },
+    delivery:  { count: cntLog(movesLog,"delivery_feito",  todayUTC), goal: 20 },
+  };
+  const board_semana = {
+    aprovados: { count: cntLog(movesLog,"aprovado_entrada",weekUTC), goal: 210 },
+    loja:      { count: cntLog(movesLog,"loja_feito",      weekUTC), goal: 90  },
+    delivery:  { count: cntLog(movesLog,"delivery_feito",  weekUTC), goal: 120 },
+  };
+  const cardsByPhase = {};
+  (board?.phases||[]).forEach(ph => { cardsByPhase[ph.id] = 0; });
+  (board?.cards||[]).forEach(c  => { if (cardsByPhase[c.phaseId]!==undefined) cardsByPhase[c.phaseId]++; });
+
   return res.status(200).json({
     ok: true,
-    todayLabel, weekLabel,
-    board:    { hoje: board_hoje,  semana: board_semana,  cardsByPhase },
-    fin:      { hoje: fin_hoje,    semana: fin_semana,    fichasByPhase },
-    eq:       { semana: eq_semana, total: produtos.length, vendidos: produtos.filter(p=>p.vendido).length },
+    todayLabel, weekLabel, monthLabel,
+    top,
+    fin:   { hoje: fin_hoje,   semana: fin_semana,   fichasByPhase },
+    board: { hoje: board_hoje, semana: board_semana, cardsByPhase  },
+    eq:    { total: produtos.length, vendidos: produtos.filter(p=>p.vendido).length },
   });
 };
