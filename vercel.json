@@ -1,10 +1,12 @@
 {
   "rewrites": [
+    { "source": "/tecnico",      "destination": "/index.html"        },
     { "source": "/financeiro",   "destination": "/financeiro.html"   },
     { "source": "/vendas",       "destination": "/vendas.html"       },
     { "source": "/equipamentos", "destination": "/equipamentos.html" },
     { "source": "/metas",        "destination": "/metas.html"        },
     { "source": "/adm",          "destination": "/adm.html"          },
-    { "source": "/((?!api/).*)", "destination": "/index.html"        }
+    { "source": "/orcamento",    "destination": "/orcamento.html"    },
+    { "source": "/",             "destination": "/home.html"         }
   ]
 }
