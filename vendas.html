@@ -285,28 +285,32 @@ function gerarCodigo() {
 
 // ── FOTOS ─────────────────────────────────────────────────────
 function renderFotoGrid() {
-  const slots = fotos.map((f,i) => `
-    <div class="foto-slot ${f?'has-img':''}" onclick="triggerFile(${i})" id="slot-${i}">
-      ${f ? `<img src="${f}"/><button class="remove-btn" onclick="event.stopPropagation();removeFoto(${i})">✕</button>` : `<span class="add-icon">+</span>`}
-      <span class="foto-num">${i+1}</span>
-      <input type="file" id="file-${i}" accept="image/*" onchange="loadFoto(${i},event)"/>
-    </div>`).join('');
+  const thumbs = fotos.map((f,i) => f ? `
+    <div style="position:relative;width:72px;height:72px;flex-shrink:0;">
+      <img src="${f}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--border);"/>
+      <button onclick="removeFoto(${i})"
+        style="position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;
+               background:rgba(239,68,68,0.9);color:#fff;border:none;cursor:pointer;
+               font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;">✕</button>
+      <span style="position:absolute;bottom:3px;left:5px;font-family:var(--fm);font-size:9px;color:rgba(255,255,255,0.7);">${i+1}</span>
+    </div>` : '').filter(Boolean).join('');
 
-  const hasEmpty = fotos.some(f => f === null);
-  const multiBtnHTML = hasEmpty ? `
-    <div style="grid-column:1/-1;margin-top:4px;">
-      <button onclick="triggerFile('multi')"
-        style="width:100%;padding:8px;border-radius:8px;border:1px dashed var(--border);
-               background:transparent;color:var(--muted);font-family:var(--fm);font-size:10px;
-               cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:6px;"
+  const count = fotos.filter(Boolean).length;
+  const hasEmpty = count < 6;
+
+  document.getElementById('foto-grid').innerHTML = `
+    ${thumbs ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:${hasEmpty?'10px':'0'}">${thumbs}</div>` : ''}
+    ${hasEmpty ? `
+      <button onclick="document.getElementById('file-multi').click()"
+        style="width:100%;padding:12px;border-radius:8px;border:1px dashed var(--border);
+               background:transparent;color:var(--muted);font-family:var(--fm);font-size:11px;
+               cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:8px;"
         onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--text)'"
         onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
-        📂 Selecionar várias fotos de uma vez
+        📂 ${count === 0 ? 'Selecionar fotos (até 6)' : `Adicionar mais (${6-count} disponíve${6-count===1?'l':'is'})`}
       </button>
       <input type="file" id="file-multi" accept="image/*" multiple onchange="loadMultiFotos(event)" style="display:none"/>
-    </div>` : '';
-
-  document.getElementById('foto-grid').innerHTML = slots + multiBtnHTML;
+    ` : ''}`;
 }
 function triggerFile(i){
   if (i === 'multi') {
