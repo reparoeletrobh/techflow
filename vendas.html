@@ -9,131 +9,127 @@
 :root{
   --bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--border:#252525;
   --text:#fff;--muted:#888;--dim:#333;
-  --accent:#f5c800;--green:#22c55e;--red:#ef4444;--blue:#3b9eff;
+  --accent:#f5c800;--green:#22c55e;--red:#ef4444;--blue:#3b9eff;--purple:#8b5cf6;
   --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;}
 
-header{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:0 24px;height:52px;border-bottom:2px solid var(--accent);
-  background:var(--bg);position:sticky;top:0;z-index:100;
-}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;border-bottom:2px solid var(--accent);background:var(--bg);position:sticky;top:0;z-index:100;}
 .logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
 .logo-icon{width:26px;height:26px;background:var(--accent);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;}
 .logo span{color:var(--accent);}
+.hdr-links{display:flex;gap:8px;}
 .hdr-link{font-family:var(--fm);font-size:10px;color:var(--muted);text-decoration:none;padding:5px 10px;border:1px solid var(--border);border-radius:6px;transition:all 0.15s;}
 .hdr-link:hover{color:var(--accent);border-color:var(--accent);}
 
 main{display:grid;grid-template-columns:400px 1fr;gap:0;min-height:calc(100vh - 52px);}
 
-/* FORM PANEL */
 .form-panel{border-right:1px solid var(--border);padding:24px;overflow-y:auto;}
-.form-title{font-family:var(--fh);font-size:18px;font-weight:800;margin-bottom:6px;}
+.form-title{font-family:var(--fh);font-size:18px;font-weight:800;margin-bottom:4px;}
 .form-title span{color:var(--accent);}
-.form-sub{font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:24px;}
+.form-sub{font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:22px;}
+.editing-badge{display:none;font-family:var(--fm);font-size:10px;background:rgba(59,158,255,0.12);color:var(--blue);border:1px solid rgba(59,158,255,0.2);border-radius:20px;padding:3px 10px;margin-bottom:14px;}
+.editing-badge.show{display:inline-flex;align-items:center;gap:6px;}
 
 .field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
 .field-label{font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;}
 .f-input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:var(--fb);font-size:13px;color:var(--text);outline:none;transition:border 0.15s;width:100%;}
 .f-input:focus{border-color:var(--accent);}
 .f-input.price{font-family:var(--fm);font-size:16px;color:var(--green);}
+.f-input[readonly]{color:var(--muted);cursor:default;}
 textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
 
+/* TIPO selector */
+.tipo-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.tipo-btn{padding:12px;border-radius:9px;border:2px solid var(--border);background:var(--surface2);color:var(--muted);font-family:var(--fb);font-size:13px;cursor:pointer;transition:all 0.15s;text-align:center;}
+.tipo-btn:hover{border-color:#444;color:var(--text);}
+.tipo-btn.selected.micro{border-color:#f59e0b;background:rgba(245,158,11,0.08);color:#f59e0b;}
+.tipo-btn.selected.bebe{border-color:#3b9eff;background:rgba(59,158,255,0.08);color:#3b9eff;}
+.tipo-icon{font-size:22px;display:block;margin-bottom:4px;}
+
+/* CODIGO row */
+.codigo-row{display:flex;gap:8px;align-items:flex-end;}
+.codigo-row .f-input{flex:1;}
+.btn-regen{padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;font-size:14px;transition:all 0.15s;flex-shrink:0;}
+.btn-regen:hover{color:var(--accent);border-color:var(--accent);}
+
 /* FOTO GRID */
-.foto-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:2px;}
-.foto-slot{
-  aspect-ratio:1;border:2px dashed var(--border);border-radius:10px;
-  display:flex;align-items:center;justify-content:center;
-  cursor:pointer;position:relative;overflow:hidden;transition:all 0.15s;background:var(--surface2);
-}
+.foto-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.foto-slot{aspect-ratio:1;border:2px dashed var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;overflow:hidden;transition:all 0.15s;background:var(--surface2);}
 .foto-slot:hover{border-color:var(--accent);}
 .foto-slot.has-img{border-style:solid;border-color:#333;}
 .foto-slot img{width:100%;height:100%;object-fit:cover;}
 .foto-slot .add-icon{font-size:20px;color:var(--dim);}
-.foto-slot .remove-btn{
-  position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;
-  background:rgba(239,68,68,0.85);color:#fff;border:none;cursor:pointer;
-  display:none;align-items:center;justify-content:center;font-size:11px;font-weight:700;
-}
+.foto-slot .remove-btn{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:rgba(239,68,68,0.85);color:#fff;border:none;cursor:pointer;display:none;align-items:center;justify-content:center;font-size:11px;font-weight:700;}
 .foto-slot:hover .remove-btn{display:flex;}
 .foto-slot input[type=file]{display:none;}
 .foto-num{position:absolute;bottom:4px;left:6px;font-family:var(--fm);font-size:9px;color:var(--muted);}
 
-.btn-submit{
-  width:100%;padding:12px;border-radius:9px;border:none;cursor:pointer;
-  font-family:var(--fh);font-size:14px;font-weight:700;
-  background:var(--accent);color:#000;transition:all 0.15s;margin-top:6px;
-}
+.btn-submit{width:100%;padding:12px;border-radius:9px;border:none;cursor:pointer;font-family:var(--fh);font-size:14px;font-weight:700;background:var(--accent);color:#000;transition:all 0.15s;margin-top:6px;}
 .btn-submit:hover{filter:brightness(1.1);}
 .btn-submit:disabled{opacity:0.5;cursor:not-allowed;}
-.btn-cancel{
-  width:100%;padding:10px;border-radius:9px;border:1px solid var(--border);cursor:pointer;
-  font-family:var(--fm);font-size:12px;background:transparent;color:var(--muted);
-  transition:all 0.15s;margin-top:6px;
-}
+.btn-cancel{width:100%;padding:10px;border-radius:9px;border:1px solid var(--border);cursor:pointer;font-family:var(--fm);font-size:12px;background:transparent;color:var(--muted);transition:all 0.15s;margin-top:6px;}
 .btn-cancel:hover{color:var(--text);border-color:#444;}
 
-/* TABLE PANEL */
+/* TABLE */
 .table-panel{padding:24px;overflow-y:auto;}
 .table-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
 .table-title{font-family:var(--fh);font-size:18px;font-weight:800;}
 .table-title span{color:var(--accent);}
 .table-count{font-family:var(--fm);font-size:11px;color:var(--muted);}
-
 .prod-table{width:100%;border-collapse:collapse;}
-.prod-table th{
-  font-family:var(--fm);font-size:10px;text-transform:uppercase;letter-spacing:0.1em;
-  color:var(--muted);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);
-}
+.prod-table th{font-family:var(--fm);font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);}
 .prod-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
 .prod-table tr:hover td{background:var(--surface);}
-
 .prod-fotos{display:flex;gap:4px;}
 .prod-foto-thumb{width:36px;height:36px;border-radius:5px;object-fit:cover;border:1px solid var(--border);}
 .prod-foto-more{width:36px;height:36px;border-radius:5px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--fm);font-size:9px;color:var(--muted);}
-
 .td-code{font-family:var(--fm);font-size:12px;color:var(--accent);white-space:nowrap;}
-.td-desc{font-size:12px;max-width:200px;}
-.td-desc p{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;}
+.td-tipo{font-size:11px;white-space:nowrap;}
+.td-desc{font-size:12px;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .td-cap{font-family:var(--fm);font-size:11px;color:var(--muted);}
-.td-price{font-family:var(--fm);font-size:13px;color:var(--green);white-space:nowrap;font-weight:500;}
-
-.act-btn{
-  padding:5px 10px;border-radius:6px;border:1px solid var(--border);
-  background:transparent;font-family:var(--fm);font-size:10px;cursor:pointer;transition:all 0.15s;
-}
+.td-price{font-family:var(--fm);font-size:13px;color:var(--green);white-space:nowrap;}
+.tipo-badge{font-family:var(--fm);font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;text-transform:uppercase;}
+.tipo-badge.micro{background:rgba(245,158,11,0.12);color:#f59e0b;}
+.tipo-badge.bebe{background:rgba(59,158,255,0.12);color:#3b9eff;}
+.vendido-badge{font-family:var(--fm);font-size:9px;background:rgba(139,92,246,0.12);color:#8b5cf6;padding:2px 8px;border-radius:4px;}
+.act-btn{padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;font-family:var(--fm);font-size:10px;cursor:pointer;transition:all 0.15s;margin-left:3px;}
 .act-btn.edit{color:var(--blue);}
 .act-btn.edit:hover{border-color:var(--blue);background:rgba(59,158,255,0.08);}
+.act-btn.vender{color:var(--green);}
+.act-btn.vender:hover{border-color:var(--green);background:rgba(34,197,94,0.08);}
 .act-btn.del{color:var(--red);}
 .act-btn.del:hover{border-color:var(--red);background:rgba(239,68,68,0.08);}
-
 .empty-table{padding:48px;text-align:center;font-family:var(--fm);font-size:12px;color:var(--dim);}
-.empty-icon{font-size:32px;margin-bottom:10px;}
 
-/* TOAST */
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:400;opacity:0;pointer-events:none;transition:opacity 0.2s;backdrop-filter:blur(3px);}
+.modal-overlay.open{opacity:1;pointer-events:all;}
+.modal{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--green);border-radius:14px;padding:24px;max-width:400px;width:92%;transform:scale(0.95);transition:transform 0.2s;}
+.modal-overlay.open .modal{transform:scale(1);}
+.modal-title{font-family:var(--fh);font-size:17px;font-weight:800;margin-bottom:4px;}
+.modal-title span{color:var(--green);}
+.modal-info{font-family:var(--fm);font-size:11px;color:var(--muted);margin-bottom:18px;padding:8px 11px;background:var(--surface2);border-radius:7px;border-left:3px solid var(--accent);}
+.modal-info strong{color:var(--text);}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+.modal-cancel{font-family:var(--fm);font-size:11px;padding:8px 15px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;}
+.modal-confirm{font-family:var(--fm);font-size:11px;font-weight:600;padding:8px 16px;border-radius:7px;background:var(--green);color:#000;border:none;cursor:pointer;}
+.modal-confirm:hover{filter:brightness(1.1);}
+
 .toast{position:fixed;bottom:18px;right:18px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:11px 14px;font-family:var(--fm);font-size:11px;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);z-index:9999;}
 .toast.show{transform:translateY(0);opacity:1;}
 
-/* EDITING badge */
-.editing-badge{display:none;font-family:var(--fm);font-size:10px;background:rgba(59,158,255,0.12);color:var(--blue);border:1px solid rgba(59,158,255,0.2);border-radius:20px;padding:3px 10px;margin-bottom:14px;}
-.editing-badge.show{display:inline-flex;align-items:center;gap:6px;}
-
-@media(max-width:900px){
-  main{grid-template-columns:1fr;}
-  .form-panel{border-right:none;border-bottom:1px solid var(--border);}
-}
+@media(max-width:900px){main{grid-template-columns:1fr;}.form-panel{border-right:none;border-bottom:1px solid var(--border);}}
 </style>
 </head>
 <body>
-
 <header>
-  <div class="logo">
-    <div class="logo-icon">🏪</div>
-    Reparo<span>Eletro</span> — Cadastro
+  <div class="logo"><div class="logo-icon">🏪</div>Reparo<span>Eletro</span> — Cadastro</div>
+  <div class="hdr-links">
+    <a class="hdr-link" href="/equipamentos" target="_blank">🔗 Ver Vitrine</a>
+    <a class="hdr-link" href="/metas" target="_blank">📊 Metas</a>
   </div>
-  <a class="hdr-link" href="/equipamentos" target="_blank">🔗 Ver Vitrine →</a>
 </header>
 
 <main>
@@ -141,16 +137,30 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
   <div class="form-panel">
     <div class="form-title">Cadastrar <span>Equipamento</span></div>
     <div class="form-sub">// preencha os dados e clique em salvar</div>
-
     <div class="editing-badge" id="editing-badge">✏️ Editando produto</div>
 
     <div class="field">
-      <label class="field-label">Código *</label>
-      <input class="f-input" id="f-codigo" type="text" placeholder="EQ-001"/>
+      <label class="field-label">Tipo *</label>
+      <div class="tipo-grid">
+        <button class="tipo-btn micro" id="tipo-micro" onclick="setTipo('Microondas')">
+          <span class="tipo-icon">📡</span>Microondas
+        </button>
+        <button class="tipo-btn bebe" id="tipo-bebe" onclick="setTipo('Bebedouro')">
+          <span class="tipo-icon">💧</span>Bebedouro
+        </button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Código (gerado automaticamente)</label>
+      <div class="codigo-row">
+        <input class="f-input" id="f-codigo" type="text" readonly/>
+        <button class="btn-regen" onclick="gerarCodigo()" title="Gerar novo código">↻</button>
+      </div>
     </div>
     <div class="field">
       <label class="field-label">Descrição *</label>
-      <textarea class="f-input" id="f-descricao" placeholder="Descreva o equipamento, marca, modelo, estado..."></textarea>
+      <textarea class="f-input" id="f-descricao" placeholder="Marca, modelo, estado, defeito corrigido..."></textarea>
     </div>
     <div class="field">
       <label class="field-label">Capacidade / Especificação</label>
@@ -162,9 +172,7 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
     </div>
     <div class="field">
       <label class="field-label">Fotos (até 6)</label>
-      <div class="foto-grid" id="foto-grid">
-        <!-- slots gerados por JS -->
-      </div>
+      <div class="foto-grid" id="foto-grid"></div>
     </div>
 
     <button class="btn-submit" id="btn-salvar" onclick="salvar()">💾 Salvar Equipamento</button>
@@ -174,16 +182,36 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
   <!-- TABLE -->
   <div class="table-panel">
     <div class="table-header">
-      <div>
-        <div class="table-title">Equipamentos <span>Cadastrados</span></div>
-      </div>
+      <div class="table-title">Equipamentos <span>Cadastrados</span></div>
       <div class="table-count" id="table-count">—</div>
     </div>
-    <div id="table-wrap">
-      <div class="empty-table"><div class="empty-icon">📦</div>Carregando...</div>
-    </div>
+    <div id="table-wrap"><div class="empty-table">Carregando...</div></div>
   </div>
 </main>
+
+<!-- MODAL VENDER -->
+<div class="modal-overlay" id="vender-modal">
+  <div class="modal">
+    <div class="modal-title">💚 Registrar <span>Venda</span></div>
+    <div class="modal-info" id="vender-info"></div>
+    <div class="field">
+      <label class="field-label">Nome do cliente *</label>
+      <input class="f-input" id="v-nome" type="text" placeholder="Nome completo"/>
+    </div>
+    <div class="field">
+      <label class="field-label">Telefone</label>
+      <input class="f-input" id="v-tel" type="text" placeholder="(31) 99999-9999"/>
+    </div>
+    <div class="field">
+      <label class="field-label">CPF ou CNPJ</label>
+      <input class="f-input" id="v-cpf" type="text" placeholder="000.000.000-00" oninput="maskCpfCnpj(this)"/>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="modal-confirm" id="v-confirm" onclick="confirmarVenda()">✅ Confirmar Venda</button>
+    </div>
+  </div>
+</div>
 
 <div class="toast" id="toast">
   <span id="t-icon">✅</span>
@@ -191,9 +219,11 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
 </div>
 
 <script>
-let produtos  = [];
-let editId    = null;
-let fotos     = [null,null,null,null,null,null]; // base64 strings
+let produtos = [], editId = null, selVenderId = null;
+let fotos    = [null,null,null,null,null,null];
+let tipoSel  = null;
+
+const PREFIXOS = { Microondas: 'MI', Bebedouro: 'BE' };
 
 // ── API ──────────────────────────────────────────────────────
 async function api(action, body) {
@@ -203,51 +233,43 @@ async function api(action, body) {
   return r.json();
 }
 
+// ── TIPO ─────────────────────────────────────────────────────
+function setTipo(t) {
+  tipoSel = t;
+  document.getElementById('tipo-micro').classList.toggle('selected', t==='Microondas');
+  document.getElementById('tipo-bebe').classList.toggle('selected',  t==='Bebedouro');
+  if (!editId) gerarCodigo();
+}
+
+function gerarCodigo() {
+  const prefix = tipoSel ? PREFIXOS[tipoSel] : 'EQ';
+  const num    = Math.floor(1000 + Math.random()*9000);
+  document.getElementById('f-codigo').value = `${prefix}-${num}`;
+}
+
 // ── FOTOS ─────────────────────────────────────────────────────
 function renderFotoGrid() {
-  const grid = document.getElementById('foto-grid');
-  grid.innerHTML = fotos.map((f, i) => `
+  document.getElementById('foto-grid').innerHTML = fotos.map((f,i) => `
     <div class="foto-slot ${f?'has-img':''}" onclick="triggerFile(${i})" id="slot-${i}">
-      ${f ? `<img src="${f}" alt="foto ${i+1}"/>
-             <button class="remove-btn" onclick="event.stopPropagation();removeFoto(${i})">✕</button>` 
-          : `<span class="add-icon">+</span>`}
+      ${f ? `<img src="${f}"/><button class="remove-btn" onclick="event.stopPropagation();removeFoto(${i})">✕</button>` : `<span class="add-icon">+</span>`}
       <span class="foto-num">${i+1}</span>
-      <input type="file" id="file-${i}" accept="image/*" onchange="loadFoto(${i}, event)"/>
+      <input type="file" id="file-${i}" accept="image/*" onchange="loadFoto(${i},event)"/>
     </div>`).join('');
 }
-
-function triggerFile(i) {
-  document.getElementById(`file-${i}`).click();
-}
-
-function loadFoto(i, e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  // Limit: resize to max 800px and compress
-  const reader = new FileReader();
-  reader.onload = ev => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const MAX = 800;
-      let w = img.width, h = img.height;
-      if (w > MAX || h > MAX) {
-        if (w > h) { h = Math.round(h*MAX/w); w = MAX; }
-        else       { w = Math.round(w*MAX/h); h = MAX; }
-      }
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      fotos[i] = canvas.toDataURL('image/jpeg', 0.82);
-      renderFotoGrid();
-    };
-    img.src = ev.target.result;
-  };
-  reader.readAsDataURL(file);
-}
-
-function removeFoto(i) {
-  fotos[i] = null;
-  renderFotoGrid();
+function triggerFile(i){ document.getElementById(`file-${i}`).click(); }
+function removeFoto(i){ fotos[i]=null; renderFotoGrid(); }
+function loadFoto(i,e){
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const img=new Image(); img.onload=()=>{
+      const canvas=document.createElement('canvas'); const MAX=800;
+      let w=img.width,h=img.height;
+      if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
+      canvas.width=w;canvas.height=h;canvas.getContext('2d').drawImage(img,0,0,w,h);
+      fotos[i]=canvas.toDataURL('image/jpeg',0.82); renderFotoGrid();
+    }; img.src=ev.target.result;
+  }; reader.readAsDataURL(file);
 }
 
 // ── SALVAR ────────────────────────────────────────────────────
@@ -256,133 +278,140 @@ async function salvar() {
   const descricao = document.getElementById('f-descricao').value.trim();
   const capacidade= document.getElementById('f-capacidade').value.trim();
   const preco     = parseFloat(document.getElementById('f-preco').value);
-
-  if (!codigo)             return showToast('⚠️','Código obrigatório','');
-  if (!descricao)          return showToast('⚠️','Descrição obrigatória','');
+  if (!tipoSel)              return showToast('⚠️','Selecione o tipo','Microondas ou Bebedouro');
+  if (!codigo)               return showToast('⚠️','Código obrigatório','');
+  if (!descricao)            return showToast('⚠️','Descrição obrigatória','');
   if (isNaN(preco)||preco<0) return showToast('⚠️','Preço inválido','');
-
-  const btn = document.getElementById('btn-salvar');
-  btn.disabled = true; btn.textContent = '⏳ Salvando...';
-
-  const fotosValidas = fotos.filter(Boolean);
-  const res = await api('salvar', { id: editId||undefined, codigo, descricao, capacidade, preco, fotos: fotosValidas });
-
-  if (res.ok) {
-    if (editId) {
-      produtos = produtos.map(p => p.id === editId ? res.produto : p);
-      showToast('✅','Produto atualizado!', codigo);
-    } else {
-      produtos.unshift(res.produto);
-      showToast('✅','Produto cadastrado!', codigo);
-    }
-    renderTable();
-    resetForm();
-  } else showToast('❌','Erro', res.error);
-
-  btn.disabled = false; btn.textContent = '💾 Salvar Equipamento';
+  const btn=document.getElementById('btn-salvar');
+  btn.disabled=true; btn.textContent='⏳ Salvando...';
+  const res=await api('salvar',{id:editId||undefined,codigo,tipo:tipoSel,descricao,capacidade,preco,fotos:fotos.filter(Boolean)});
+  if(res.ok){
+    if(editId) produtos=produtos.map(p=>p.id===editId?res.produto:p);
+    else produtos.unshift(res.produto);
+    renderTable(); resetForm();
+    showToast('✅',editId?'Atualizado!':'Cadastrado!',codigo);
+  } else showToast('❌','Erro',res.error);
+  btn.disabled=false; btn.textContent='💾 Salvar Equipamento';
 }
 
 // ── EDITAR ────────────────────────────────────────────────────
 function editarProduto(id) {
-  const p = produtos.find(x => x.id === id);
-  if (!p) return;
-  editId = id;
-  document.getElementById('f-codigo').value    = p.codigo;
-  document.getElementById('f-descricao').value = p.descricao;
-  document.getElementById('f-capacidade').value= p.capacidade || '';
-  document.getElementById('f-preco').value     = p.preco;
-  fotos = [...(p.fotos || []), null,null,null,null,null,null].slice(0,6);
+  const p=produtos.find(x=>x.id===id); if(!p) return;
+  editId=id;
+  tipoSel=p.tipo||null;
+  document.getElementById('tipo-micro').classList.toggle('selected', p.tipo==='Microondas');
+  document.getElementById('tipo-bebe').classList.toggle('selected',  p.tipo==='Bebedouro');
+  document.getElementById('f-codigo').value    =p.codigo;
+  document.getElementById('f-descricao').value =p.descricao;
+  document.getElementById('f-capacidade').value=p.capacidade||'';
+  document.getElementById('f-preco').value     =p.preco;
+  fotos=[...(p.fotos||[]),null,null,null,null,null,null].slice(0,6);
   renderFotoGrid();
   document.getElementById('editing-badge').classList.add('show');
-  document.getElementById('btn-cancel').style.display = 'block';
-  document.getElementById('btn-salvar').textContent = '💾 Atualizar Equipamento';
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  document.getElementById('btn-cancel').style.display='block';
+  document.getElementById('btn-salvar').textContent='💾 Atualizar Equipamento';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function cancelEdit(){ editId=null; resetForm(); }
+function resetForm(){
+  editId=null; tipoSel=null;
+  ['tipo-micro','tipo-bebe'].forEach(id=>document.getElementById(id).classList.remove('selected'));
+  document.getElementById('f-codigo').value='';
+  document.getElementById('f-descricao').value='';
+  document.getElementById('f-capacidade').value='';
+  document.getElementById('f-preco').value='';
+  fotos=[null,null,null,null,null,null]; renderFotoGrid();
+  document.getElementById('editing-badge').classList.remove('show');
+  document.getElementById('btn-cancel').style.display='none';
+  document.getElementById('btn-salvar').textContent='💾 Salvar Equipamento';
+  gerarCodigo();
 }
 
-function cancelEdit() { editId = null; resetForm(); }
-
-function resetForm() {
-  editId = null;
-  document.getElementById('f-codigo').value    = '';
-  document.getElementById('f-descricao').value = '';
-  document.getElementById('f-capacidade').value= '';
-  document.getElementById('f-preco').value     = '';
-  fotos = [null,null,null,null,null,null];
-  renderFotoGrid();
-  document.getElementById('editing-badge').classList.remove('show');
-  document.getElementById('btn-cancel').style.display = 'none';
-  document.getElementById('btn-salvar').textContent = '💾 Salvar Equipamento';
+// ── VENDER ────────────────────────────────────────────────────
+function abrirVender(id) {
+  const p=produtos.find(x=>x.id===id); if(!p) return;
+  selVenderId=id;
+  const pFmt=parseFloat(p.preco).toLocaleString('pt-BR',{minimumFractionDigits:2,style:'currency',currency:'BRL'});
+  document.getElementById('vender-info').innerHTML=`<strong>${p.tipo||''} — ${p.codigo}</strong><br>${p.descricao.substring(0,60)}... | ${pFmt}`;
+  document.getElementById('v-nome').value='';
+  document.getElementById('v-tel').value='';
+  document.getElementById('v-cpf').value='';
+  document.getElementById('vender-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('v-nome').focus(),200);
+}
+function closeModal(){ document.getElementById('vender-modal').classList.remove('open'); }
+function maskCpfCnpj(input){
+  let v=input.value.replace(/\D/g,'');
+  if(v.length<=11) v=v.replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  else v=v.replace(/^(\d{2})(\d)/,'$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/,'$1.$2.$3').replace(/\.(\d{3})(\d)/,'.$1/$2').replace(/(\d{4})(\d)/,'$1-$2');
+  input.value=v;
+}
+async function confirmarVenda(){
+  const nome=document.getElementById('v-nome').value.trim();
+  if(!nome) return showToast('⚠️','Nome obrigatório','');
+  const btn=document.getElementById('v-confirm');
+  btn.disabled=true; btn.textContent='⏳';
+  const res=await api('vender',{produtoId:selVenderId,nomeCliente:nome,telefone:document.getElementById('v-tel').value.trim(),cpfCnpj:document.getElementById('v-cpf').value.trim()});
+  if(res.ok){
+    produtos=produtos.map(p=>p.id===selVenderId?res.produto:p);
+    renderTable(); closeModal();
+    showToast('💚','Venda registrada!','Ficha criada em Emitir NF no Financeiro');
+  } else showToast('❌','Erro',res.error);
+  btn.disabled=false; btn.textContent='✅ Confirmar Venda';
 }
 
 // ── EXCLUIR ───────────────────────────────────────────────────
-async function excluir(id) {
-  const p = produtos.find(x => x.id === id);
-  if (!confirm(`Excluir "${p?.codigo} — ${p?.descricao?.substring(0,40)}..."?`)) return;
-  const res = await api('excluir', { id });
-  if (res.ok) {
-    produtos = produtos.filter(x => x.id !== id);
-    renderTable();
-    showToast('🗑️','Produto excluído','');
-    if (editId === id) cancelEdit();
-  } else showToast('❌','Erro', res.error);
+async function excluir(id){
+  const p=produtos.find(x=>x.id===id);
+  if(!confirm(`Excluir "${p?.codigo}"?`)) return;
+  const res=await api('excluir',{id});
+  if(res.ok){ produtos=produtos.filter(x=>x.id!==id); renderTable(); showToast('🗑️','Excluído',''); }
+  else showToast('❌','Erro',res.error);
 }
 
 // ── TABLE ─────────────────────────────────────────────────────
-function renderTable() {
-  document.getElementById('table-count').textContent = `${produtos.length} produto${produtos.length!==1?'s':''}`;
-  if (!produtos.length) {
-    document.getElementById('table-wrap').innerHTML = '<div class="empty-table"><div class="empty-icon">📦</div>Nenhum equipamento cadastrado ainda.</div>';
-    return;
-  }
-  const rows = produtos.map(p => {
-    const thumbs = (p.fotos||[]).slice(0,3).map(f =>
-      `<img class="prod-foto-thumb" src="${f}"/>`
-    ).join('');
-    const extra = (p.fotos||[]).length > 3
-      ? `<div class="prod-foto-more">+${p.fotos.length-3}</div>` : '';
-    const precoFmt = parseFloat(p.preco).toLocaleString('pt-BR',{minimumFractionDigits:2,style:'currency',currency:'BRL'});
-    return `
-      <tr>
-        <td><div class="prod-fotos">${thumbs}${extra}</div></td>
-        <td class="td-code">${p.codigo}</td>
-        <td class="td-desc"><p title="${p.descricao}">${p.descricao}</p></td>
-        <td class="td-cap">${p.capacidade||'—'}</td>
-        <td class="td-price">${precoFmt}</td>
-        <td style="white-space:nowrap;">
-          <button class="act-btn edit" onclick="editarProduto('${p.id}')">✏️ Editar</button>
-          <button class="act-btn del"  onclick="excluir('${p.id}')" style="margin-left:4px;">🗑️ Excluir</button>
-        </td>
-      </tr>`;
+function renderTable(){
+  document.getElementById('table-count').textContent=`${produtos.length} produto${produtos.length!==1?'s':''}`;
+  if(!produtos.length){ document.getElementById('table-wrap').innerHTML='<div class="empty-table">📦 Nenhum equipamento ainda.</div>'; return; }
+  const rows=produtos.map(p=>{
+    const thumbs=(p.fotos||[]).slice(0,3).map(f=>`<img class="prod-foto-thumb" src="${f}"/>`).join('');
+    const extra=(p.fotos||[]).length>3?`<div class="prod-foto-more">+${p.fotos.length-3}</div>`:'';
+    const pFmt=parseFloat(p.preco).toLocaleString('pt-BR',{minimumFractionDigits:2,style:'currency',currency:'BRL'});
+    const tipoBadge=p.tipo?`<span class="tipo-badge ${p.tipo==='Microondas'?'micro':'bebe'}">${p.tipo}</span>`:'—';
+    const vendidoBadge=p.vendido?`<span class="vendido-badge">vendido</span>`:'';
+    return `<tr>
+      <td><div class="prod-fotos">${thumbs}${extra}</div></td>
+      <td class="td-code">${p.codigo}</td>
+      <td>${tipoBadge} ${vendidoBadge}</td>
+      <td class="td-desc" title="${p.descricao}">${p.descricao}</td>
+      <td class="td-cap">${p.capacidade||'—'}</td>
+      <td class="td-price">${pFmt}</td>
+      <td style="white-space:nowrap;">
+        ${!p.vendido?`<button class="act-btn vender" onclick="abrirVender('${p.id}')">💚 Vender</button>`:''}
+        <button class="act-btn edit" onclick="editarProduto('${p.id}')">✏️</button>
+        <button class="act-btn del"  onclick="excluir('${p.id}')">🗑️</button>
+      </td>
+    </tr>`;
   }).join('');
-
-  document.getElementById('table-wrap').innerHTML = `
+  document.getElementById('table-wrap').innerHTML=`
     <table class="prod-table">
-      <thead>
-        <tr>
-          <th>Fotos</th><th>Código</th><th>Descrição</th>
-          <th>Capacidade</th><th>Preço</th><th>Ações</th>
-        </tr>
-      </thead>
+      <thead><tr><th>Fotos</th><th>Código</th><th>Tipo</th><th>Descrição</th><th>Capacidade</th><th>Preço</th><th>Ações</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
 }
 
-// ── TOAST ─────────────────────────────────────────────────────
-function showToast(icon, title, msg) {
-  document.getElementById('t-icon').textContent  = icon;
-  document.getElementById('t-title').textContent = title;
-  document.getElementById('t-body').textContent  = msg;
-  const t = document.getElementById('toast');
+function showToast(icon,title,msg){
+  document.getElementById('t-icon').textContent=icon;
+  document.getElementById('t-title').textContent=title;
+  document.getElementById('t-body').textContent=msg;
+  const t=document.getElementById('toast');
   t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),4000);
 }
 
-// ── INIT ──────────────────────────────────────────────────────
-async function load() {
-  const res = await api('load');
-  if (res.ok) { produtos = res.produtos || []; renderTable(); }
-}
+async function load(){ const res=await api('load'); if(res.ok){ produtos=res.produtos||[]; renderTable(); } }
 
 renderFotoGrid();
+gerarCodigo();
 load();
 </script>
 </body>
