@@ -208,6 +208,27 @@ async function fetchErpCardIds() {
   }
 }
 
+// Busca IDs de cards em "Aguardando Aprovação" e "ERP" para tracking de metas
+async function fetchMetaPhaseIds() {
+  try {
+    const data = await pipefyQuery(`query {
+      pipe(id: "${PIPE_ID}") {
+        phases { name cards(first: 50) { edges { node { id } } } }
+      }
+    }`);
+    const phases = data?.pipe?.phases || [];
+    const aguardandoIds = [], erpIds = [];
+    for (const ph of phases) {
+      const n = ph.name.toLowerCase();
+      if (n.includes("aguardando") && (n.includes("aprov") || n.includes("aprovação")))
+        ph.cards.edges.forEach(e => aguardandoIds.push(String(e.node.id)));
+      if (n.includes("erp"))
+        ph.cards.edges.forEach(e => erpIds.push(String(e.node.id)));
+    }
+    return { aguardandoIds, erpIds };
+  } catch(e) { return { aguardandoIds: [], erpIds: [] }; }
+}
+
 // Remove do aguardando_ret os cards que foram para ERP/Finalizado no Pipefy
 async function cleanupAguardandoRet(board) {
   const erpIds = await fetchErpCardIds();
@@ -278,6 +299,33 @@ module.exports = async function handler(req, res) {
           if (erpRemoved > 0) await dbSet(BOARD_KEY, board);
         }
       } catch (e) { console.error("ERP check:", e.message); }
+
+      // Tracking de metas: Aguardando Aprovação e ERP
+      try {
+        const { aguardandoIds, erpIds } = await fetchMetaPhaseIds();
+        let metaChanged = false;
+        if (!Array.isArray(board.metaLog)) board.metaLog = [];
+
+        const seenAg  = new Set(board.metaLog.filter(m=>m.phaseId==="aguardando_aprovacao").map(m=>m.pipefyId));
+        const seenErp = new Set(board.metaLog.filter(m=>m.phaseId==="erp_entrada").map(m=>m.pipefyId));
+
+        for (const id of aguardandoIds) {
+          if (!seenAg.has(id)) {
+            board.metaLog.push({ phaseId: "aguardando_aprovacao", pipefyId: id, timestamp: new Date().toISOString() });
+            metaChanged = true;
+          }
+        }
+        for (const id of erpIds) {
+          if (!seenErp.has(id)) {
+            board.metaLog.push({ phaseId: "erp_entrada", pipefyId: id, timestamp: new Date().toISOString() });
+            metaChanged = true;
+          }
+        }
+        // Trim metaLog to 180 days
+        const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 180);
+        board.metaLog = board.metaLog.filter(m => new Date(m.timestamp) > cutoff);
+        if (metaChanged) await dbSet(BOARD_KEY, board);
+      } catch(e) { console.error("meta tracking:", e.message); }
 
       return res.status(200).json({ ok: true, board, newCount, erpRemoved, pipefyError });
     }
