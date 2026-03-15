@@ -231,6 +231,17 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── POST orc-forcar ───────────────────────────────────────
+  // Remove um pipefyId do syncedIds para forçar reimportação
+  if (req.method === "POST" && action === "orc-forcar") {
+    const { pipefyId } = req.body || {};
+    if (!pipefyId) return res.status(400).json({ ok: false, error: "pipefyId obrigatório" });
+    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
+    db.syncedIds = (db.syncedIds || []).filter(id => id !== String(pipefyId));
+    await dbSet(ORC_KEY, db);
+    return res.status(200).json({ ok: true, msg: "ID removido. Próximo sync vai importar este card." });
+  }
+
   // ── GET orc-debug ─────────────────────────────────────────
   if (action === "orc-debug") {
     const result = {};
