@@ -47,6 +47,27 @@ module.exports = async function handler(req, res) {
     });
   }
 
+  // ── POST update-dados — atualiza fotos e descrição de um card em comprar_peca
+  if (req.method === "POST" && action === "update-dados") {
+    const { pipefyId, fotosCompra, descricaoCompra } = req.body || {};
+    if (!pipefyId) return res.status(400).json({ ok: false, error: "pipefyId obrigatório" });
+
+    const board = await dbGet(BOARD_KEY);
+    if (!board) return res.status(404).json({ ok: false, error: "Board não encontrado" });
+
+    const card = board.cards.find(c => c.pipefyId === String(pipefyId));
+    if (!card) return res.status(404).json({ ok: false, error: "Card não encontrado" });
+
+    // Adiciona novas fotos às existentes (sem duplicar)
+    if (fotosCompra && fotosCompra.length) {
+      card.fotosCompra = [...(card.fotosCompra || []), ...fotosCompra].slice(0, 12);
+    }
+    if (descricaoCompra !== undefined) card.descricaoCompra = descricaoCompra;
+
+    await dbSet(BOARD_KEY, board);
+    return res.status(200).json({ ok: true, card });
+  }
+
   // ── POST atualizar — move card para aguardando_peca com tipo de compra
   if (req.method === "POST" && action === "atualizar") {
     const { pipefyId, tipoCompra, previsao } = req.body || {};
