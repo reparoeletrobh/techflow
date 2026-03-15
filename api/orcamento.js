@@ -37,11 +37,13 @@ async function fetchPipeStructure() {
 
 // Atualiza o campo Valor total no card do Pipefy
 async function updateCardValue(pipefyId, valor) {
+  // Campo currency no Pipefy espera número puro ex: "350.00"
+  const numerico = String(parseFloat(String(valor).replace(",", ".")) || 0);
   const mutation = `mutation {
     updateCardField(input: {
       card_id: "${pipefyId}"
       field_id: "valor_de_contrato"
-      new_value: "${String(valor).replace(/"/g, "")}"
+      new_value: "${numerico}"
     }) { success }
   }`;
   return await pipefyQuery(mutation);
@@ -161,7 +163,7 @@ module.exports = async function handler(req, res) {
         if (cardId <= db.maxIdSeen) continue;        // card antigo
         if (db.syncedIds.includes(card.pipefyId)) continue; // já processado
         let textoOrc = "";
-        try { textoOrc = await gerarTextoOrcamento(card.desc, card.comentarios, card.nome); } catch(e) {}
+        try { textoOrc = await gerarTextoOrcamento(card.desc, card.comentarios, card.nome); } catch(e) { textoOrc = templatePadrao(card.desc, card.nome); }
         db.fichas.unshift({
           id:          card.pipefyId,
           pipefyId:    card.pipefyId,
@@ -223,11 +225,18 @@ module.exports = async function handler(req, res) {
     ficha.preco     = preco || null;
     ficha.enviadoAt = new Date().toISOString();
     await dbSet(ORC_KEY, db);
-    // Atualiza valor no Pipefy em background (não bloqueia)
-    if (preco && ficha.pipefyId && !ficha.pipefyId.startsWith("local")) {
-      updateCardValue(ficha.pipefyId, preco).catch(e => console.error("updateCardValue:", e.message));
+    // Atualiza valor no Pipefy — aguarda e retorna erro se falhar
+    let pipefyUpdateOk = true, pipefyUpdateError = null;
+    if (preco && ficha.pipefyId) {
+      try {
+        await updateCardValue(ficha.pipefyId, preco);
+      } catch(e) {
+        pipefyUpdateOk = false;
+        pipefyUpdateError = e.message;
+        console.error("updateCardValue:", e.message);
+      }
     }
-    return res.status(200).json({ ok: true, ficha });
+    return res.status(200).json({ ok: true, ficha, pipefyUpdateOk, pipefyUpdateError });
   }
 
   // ── POST orc-status ────────────────────────────────────────
@@ -475,25 +484,28 @@ async function gerarTextoOrcamento(desc, comentarios, nome) {
   if (regra) return substituirNome(regra, nome);
 
   var primeiro = primeiroNome(nome) || "cliente";
-  var comStr = (comentarios || []).join("; ");
-  var userMsg = "Nome: " + primeiro + "\nDefeito: " + (desc || "nao informado") + (comStr ? "\nAtividades: " + comStr : "");
+  var comStr   = (comentarios || []).join("; ");
+  var userMsg  = "Nome: " + primeiro + "\r\nDefeito: " + (desc || "nao informado") + (comStr ? "\r\nAtividades: " + comStr : "");
+  var sysMsg   = "Voce e Pedro da Reparo Eletro. Gere orcamento: Ola, NOME bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento: [diagnostico]. Este conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto. Use o primeiro nome real, deixe [VALOR] literal.";
 
   try {
-    var res = await fetch("https://api.anthropic.com/v1/messages", {
+    var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    var timer = controller ? setTimeout(function() { controller.abort(); }, 8000) : null;
+    var fetchOpts = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 400,
-        system: "Voce e Pedro, tecnico da Reparo Eletro em BH. Gere um texto de orcamento para WhatsApp no formato:\n\nOla, {PRIMEIRO NOME} bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n{1-2 frases sobre diagnostico e pecas baseadas no defeito e atividades registradas}\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.\n\nRegras: use o primeiro nome; deixe [VALOR] literal; sem emojis.",
-        messages: [{ role: "user", content: userMsg }],
-      }),
-    });
+      body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 400, system: sysMsg, messages: [{ role: "user", content: userMsg }] }),
+    };
+    if (controller) fetchOpts.signal = controller.signal;
+    var res  = await fetch("https://api.anthropic.com/v1/messages", fetchOpts);
+    if (timer) clearTimeout(timer);
     var data = await res.json();
     var texto = (data.content && data.content[0] && data.content[0].text) ? data.content[0].text : "";
     if (texto && texto.indexOf("[VALOR]") >= 0) return texto;
-    if (texto) return texto + "\n\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.";
-  } catch(e) {}
+    if (texto && texto.length > 20) return texto + "\r\n\r\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.";
+  } catch(e) {
+    console.error("gerarTextoOrcamento:", String(e.message || e));
+  }
 
   return templatePadrao(desc, nome);
 }
@@ -501,41 +513,45 @@ async function gerarTextoOrcamento(desc, comentarios, nome) {
 
 // Busca cards em Aguardando Aprovação direto pelo ID da fase (mais rápido e completo)
 
-async function fetchAguardandoAprovacao() {
-  const all = [];
-  let cursor = null, hasNext = true;
-  while (hasNext) {
-    const after = cursor ? `, after: "${cursor}"` : "";
-    const data = await pipefyQuery(`query {
-      phase(id: "${AGUARDANDO_APROVACAO_PHASE_ID}") {
-        cards(first: 50${after}) {
-          pageInfo { hasNextPage endCursor }
-          edges {
-            node {
-              id title age
-              fields { name value }
-              comments { text author { name } created_at }
-            }
-          }
-        }
-      }
-    }`);
-    const phase = data?.phase;
-    if (!phase) break;
-    for (const { node } of phase.cards.edges) {
-      const fields = node.fields || [];
-      const nome   = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
-      const tel    = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
-      const desc   = fields.find(f => f.name.toLowerCase().includes("descri") || f.name.toLowerCase().includes("empresa"))?.value || "";
-      const end    = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
-      const comentarios = (node.comments || []).map(c => c.text).filter(Boolean);
-      all.push({ pipefyId: String(node.id), title: node.title, nome, tel, desc, end, age: node.age, comentarios });
-    }
-    hasNext = phase.cards.pageInfo?.hasNextPage ?? false;
-    cursor  = phase.cards.pageInfo?.endCursor ?? null;
-  }
-  return all;
+// Gera texto de orçamento com Claude
+// ── NORMALIZA TEXTO (remove acentos, minúsculo) ──────────────
+function norm(s) {
+  return String(s || "").toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9 ]/g, " ");
 }
+
+function hasAny(texto, words) {
+  return words.some(function(w) { return texto.indexOf(norm(w)) >= 0; });
+}
+
+function detectarRegra(desc, comentarios) {
+  var textoNorm = norm([desc || ""].concat(comentarios || []).join(" "));
+  for (var i = 0; i < ORCAMENTO_REGRAS.length; i++) {
+    var regra = ORCAMENTO_REGRAS[i];
+    if (!hasAny(textoNorm, regra.keywords)) continue;
+    if (regra.templateBase) {
+      var comExtra = regra.extraKeys && hasAny(textoNorm, regra.extraKeys);
+      return regra.templateBase.replace("[PRECO]", comExtra ? regra.precoExtra : regra.precoBase);
+    }
+    return regra.template;
+  }
+  return null;
+}
+
+
+function substituirNome(template, nome) {
+  var p = primeiroNome(nome);
+  return template.replace(/\[NOME\]/g, p);
+}
+
+function templatePadrao(desc, nome) {
+  var p = primeiroNome(nome);
+  var saud = p ? "Ola, " + p + " bom dia" : "Ola, bom dia";
+  return saud + ", sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nRealizamos todos os testes e identificamos o problema. Faremos o reparo completo com substituicao das pecas necessarias.\n\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.";
+}
+
+// Busca cards em Aguardando Aprovação direto pelo ID da fase (mais rápido e completo)
 
 // Gera texto de orçamento com Claude
 // ── REGRAS DE ORÇAMENTO ──────────────────────────────────────
