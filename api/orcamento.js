@@ -264,7 +264,10 @@ module.exports = async function handler(req, res) {
       }`);
       const phases = data?.pipe?.phases || [];
       // Mostra todas as fases mas destaca Aguardando Aprovação com IDs
-      const aguPhase = phases.find(p => p.name.toLowerCase().includes("aguardando aprovação") || p.name.toLowerCase().includes("aguardando aprovacao"));
+      const aguPhase = phases.find(p => {
+        const n = p.name.toLowerCase().replace(/[^a-z0-9 ]/g,"");
+        return n.includes("aguardando aprova");
+      });
       result.aguardando_aprovacao = aguPhase ? {
         count: aguPhase.cards.edges.length,
         cards: aguPhase.cards.edges.map(e => ({ id: e.node.id, title: e.node.title })),
@@ -351,7 +354,10 @@ async function fetchAguardandoAprovacao() {
     }
   }`);
   const phases = data?.pipe?.phases || [];
-  const phase  = phases.find(p => p.name.toLowerCase().includes("aguardando aprovação") || p.name.toLowerCase().includes("aguardando aprovacao"));
+  const phase  = phases.find(p => {
+    const n = p.name.toLowerCase().replace(/[^a-z0-9 ]/g,"");
+    return n.includes("aguardando aprova");
+  });
   if (!phase) return [];
   return phase.cards.edges.map(e => {
     const node = e.node;
