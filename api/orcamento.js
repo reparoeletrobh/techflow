@@ -139,6 +139,10 @@ module.exports = async function handler(req, res) {
     let newCount = 0, pipefyError = null;
     try {
       const cards = await fetchAguardandoAprovacao();
+      // DEBUG temporário
+      if (req.query.debug === "1") {
+        return res.status(200).json({ ok: true, debug: true, cards_found: cards.length, card_ids: cards.map(c => c.pipefyId), maxIdSeen: db.maxIdSeen });
+      }
       // Primeira vez: guarda o maior ID atual como referência — não importa nada
       if (!db.initialized) {
         const maxId = cards.reduce((max, c) => Math.max(max, parseInt(c.pipefyId)||0), 0);
