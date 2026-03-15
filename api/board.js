@@ -431,13 +431,18 @@ module.exports = async function handler(req, res) {
 
     // ── POST move (OS principal) ───────────────────────────────
     if (req.method === "POST" && action === "move") {
-      const { pipefyId, phaseId, movedBy, tecnico } = req.body || {};
+      const { pipefyId, phaseId, movedBy, tecnico, fotosCompra, descricaoCompra } = req.body || {};
       if (!pipefyId || !phaseId) return res.status(400).json({ ok: false, error: "pipefyId e phaseId são obrigatórios" });
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
       const card = board.cards.find(c => c.pipefyId === String(pipefyId));
       if (!card) return res.status(404).json({ ok: false, error: "OS não encontrada" });
       card.phaseId = phaseId; card.movedAt = new Date().toISOString();
       card.movedBy = movedBy || "—"; card.tecnico = tecnico || null;
+      // Salva fotos e descrição quando move para comprar_peca
+      if (phaseId === "comprar_peca") {
+        if (fotosCompra)    card.fotosCompra    = fotosCompra;
+        if (descricaoCompra) card.descricaoCompra = descricaoCompra;
+      }
       if (["loja_feito", "delivery_feito"].includes(phaseId)) {
         board.movesLog.push({ phaseId, timestamp: card.movedAt, tecnico: tecnico || null, pipefyId: String(pipefyId) });
         board.movesLog = trimLog(board.movesLog);
