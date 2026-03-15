@@ -232,13 +232,13 @@ module.exports = async function handler(req, res) {
   }
 
   // ── GET orc-reset-init ────────────────────────────────────
-  // Reseta o flag de inicialização para reimportar tudo
   if (action === "orc-reset-init") {
     const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
     db.initialized = false;
     db.syncedIds   = [];
+    db.fichas      = [];  // limpa fichas também
     await dbSet(ORC_KEY, db);
-    return res.status(200).json({ ok: true, msg: "Reset feito. Próximo sync vai marcar cards atuais como vistos sem importar." });
+    return res.status(200).json({ ok: true, msg: "Reset completo. Fichas e IDs limpos." });
   }
 
   // ── POST orc-excluir ───────────────────────────────────────
