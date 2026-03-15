@@ -250,22 +250,25 @@ module.exports = async function handler(req, res) {
         pipe(id: "${PIPE_ID}") {
           phases {
             name
-            cards(first: 10) {
+            cards(first: 50) {
               edges { node { id title } }
             }
           }
         }
       }`);
-      result.phases = (data?.pipe?.phases || []).map(p => ({
-        name: p.name,
-        cards: p.cards.edges.length,
-        sample: p.cards.edges.slice(0,2).map(e => e.node.title),
-      }));
+      const phases = data?.pipe?.phases || [];
+      // Mostra todas as fases mas destaca Aguardando Aprovação com IDs
+      const aguPhase = phases.find(p => p.name.toLowerCase().includes("aguardando aprovação") || p.name.toLowerCase().includes("aguardando aprovacao"));
+      result.aguardando_aprovacao = aguPhase ? {
+        count: aguPhase.cards.edges.length,
+        cards: aguPhase.cards.edges.map(e => ({ id: e.node.id, title: e.node.title })),
+      } : null;
+      result.all_phases_count = phases.map(p => ({ name: p.name, count: p.cards.edges.length }));
     } catch(e) { result.pipefy_error = e.message; }
     const db = await dbGet(ORC_KEY) || {};
-    result.initialized = db.initialized;
-    result.syncedIds_count = (db.syncedIds || []).length;
-    result.fichas_count = (db.fichas || []).length;
+    result.initialized    = db.initialized;
+    result.syncedIds      = db.syncedIds || [];
+    result.fichas_count   = (db.fichas || []).length;
     return res.status(200).json(result);
   }
 
