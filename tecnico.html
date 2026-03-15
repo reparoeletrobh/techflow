@@ -323,6 +323,29 @@ nav{display:flex;gap:5px;flex-wrap:wrap;}
 .t-msg span{color:var(--muted);font-size:10px;}
 
 @media(max-width:640px){.metas-row{grid-template-columns:1fr 1fr;} .rs-mini-row{grid-template-columns:1fr 1fr;} .month-hist{grid-template-columns:repeat(3,1fr);}}
+/* MODAL COMPRA PEÇA */
+.compra-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:500;opacity:0;pointer-events:none;transition:opacity .2s;backdrop-filter:blur(3px);}
+.compra-modal-overlay.open{opacity:1;pointer-events:all;}
+.compra-modal{background:var(--surface);border:1px solid var(--border);border-top:3px solid #f97316;border-radius:14px;padding:22px;max-width:400px;width:92%;transform:scale(.95);transition:transform .2s;max-height:90vh;overflow-y:auto;}
+.compra-modal-overlay.open .compra-modal{transform:scale(1);}
+.compra-modal-title{font-family:var(--fh);font-size:16px;font-weight:800;margin-bottom:4px;color:#f97316;}
+.compra-modal-info{font-family:var(--fm);font-size:11px;color:var(--muted);margin-bottom:14px;padding:7px 10px;background:var(--surface2);border-radius:7px;border-left:3px solid #f97316;}
+.compra-modal-info strong{color:var(--text);}
+.c-field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;}
+.c-field-label{font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;}
+.c-textarea{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-family:var(--fb);font-size:13px;color:var(--text);resize:vertical;min-height:70px;outline:none;width:100%;transition:border .15s;}
+.c-textarea:focus{border-color:#f97316;}
+.c-foto-btn{width:100%;padding:10px;border-radius:8px;border:1px dashed var(--border);background:transparent;color:var(--muted);font-family:var(--fm);font-size:11px;cursor:pointer;transition:all .15s;text-align:center;}
+.c-foto-btn:hover{border-color:#f97316;color:var(--text);}
+.c-thumbs{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+.c-thumb{position:relative;width:64px;height:64px;}
+.c-thumb img{width:64px;height:64px;border-radius:7px;object-fit:cover;border:1px solid var(--border);}
+.c-thumb-rm{position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(239,68,68,.9);color:#fff;border:none;cursor:pointer;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.compra-modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}
+.compra-cancel{font-family:var(--fm);font-size:11px;padding:8px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;}
+.compra-cancel:hover{color:var(--text);}
+.compra-confirm{font-family:var(--fm);font-size:11px;font-weight:600;padding:8px 16px;border-radius:7px;background:#f97316;color:#000;border:none;cursor:pointer;}
+.compra-confirm:hover{filter:brightness(1.1);}
 </style>
 </head>
 <body>
@@ -887,8 +910,79 @@ function checkCreate() {
   document.getElementById('btn-create').disabled = !(nome || codigo);
 }
 
+// ── COMPRA MODAL ───────────────────────────────────────────────
+let compraFotos = [];
+
+function compraModalOpen(pipefyId, nome) {
+  compraFotos = [];
+  document.getElementById('compra-modal-info').innerHTML = '<strong>' + (nome||pipefyId) + '</strong>';
+  document.getElementById('compra-desc').value = '';
+  document.getElementById('compra-thumbs').innerHTML = '';
+  document.getElementById('compra-modal-overlay').classList.add('open');
+}
+function compraModalClose() {
+  document.getElementById('compra-modal-overlay').classList.remove('open');
+}
+function compraLoadFotos(e) {
+  const files = Array.from(e.target.files).slice(0, 6 - compraFotos.length);
+  files.forEach(function(file) {
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      const img = new Image(); img.onload = function() {
+        const canvas = document.createElement('canvas'); const MAX = 800;
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) { if (w > h) { h = Math.round(h*MAX/w); w = MAX; } else { w = Math.round(w*MAX/h); h = MAX; } }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        compraFotos.push(canvas.toDataURL('image/jpeg', 0.82));
+        renderCompraThumbs();
+      }; img.src = ev.target.result;
+    }; reader.readAsDataURL(file);
+  });
+  e.target.value = '';
+}
+function renderCompraThumbs() {
+  const wrap = document.getElementById('compra-thumbs'); wrap.innerHTML = '';
+  compraFotos.forEach(function(f, i) {
+    const div = document.createElement('div'); div.className = 'c-thumb';
+    const img = document.createElement('img'); img.src = f;
+    const rm  = document.createElement('button'); rm.className = 'c-thumb-rm'; rm.textContent = '✕';
+    rm.onclick = function() { compraFotos.splice(i, 1); renderCompraThumbs(); };
+    div.appendChild(img); div.appendChild(rm); wrap.appendChild(div);
+  });
+}
+async function compraModalConfirm() {
+  const desc = document.getElementById('compra-desc').value.trim();
+  compraModalClose();
+  const btn = document.getElementById('btn-move');
+  btn.disabled = true; btn.textContent = '⏳ Movendo...';
+  try {
+    const res = await api('POST', 'move', {
+      pipefyId: selCardId, phaseId: selMovePhase, tecnico: selTecnico,
+      fotosCompra: compraFotos.length ? compraFotos : undefined,
+      descricaoCompra: desc || undefined,
+    });
+    if (!res.ok) throw new Error(res.error);
+    showToast('🛒','Movido para Comprar Peça!', desc ? desc.substring(0,40) : 'Sem descrição');
+    document.getElementById('os-num-input').value = '';
+    document.getElementById('os-found-info').style.display = 'none';
+    const s = document.getElementById('os-move-suggestions'); if(s) s.remove();
+    selCardId = null; selMovePhase = null; compraFotos = [];
+    document.querySelectorAll('#move-stages .stage-btn').forEach(b=>{b.classList.remove('selected');b.style.background='';b.style.color='';});
+    await loadBoard();
+  } catch(e) { showToast('❌','Erro',e.message); }
+  btn.innerHTML = '→ Mover OS'; checkMove();
+}
+
 // ── SUBMIT MOVE ────────────────────────────────────────────────
 async function submitMove() {
+  // Intercepta comprar_peca para abrir modal de fotos/descrição
+  if (selMovePhase === 'comprar_peca') {
+    const card = board.cards.find(c => c.pipefyId === selCardId);
+    const nome = card ? (card.nomeContato || card.title || selCardId) : selCardId;
+    compraModalOpen(selCardId, nome);
+    return;
+  }
   const btn = document.getElementById('btn-move');
   btn.disabled = true; btn.textContent = '⏳ Movendo...';
   try {
@@ -1473,5 +1567,26 @@ setInterval(() => {
   if (document.getElementById('page-metas').classList.contains('active')) loadGoals();
 }, 30000);
 </script>
+<!-- MODAL COMPRA PEÇA -->
+<div class="compra-modal-overlay" id="compra-modal-overlay">
+  <div class="compra-modal">
+    <div class="compra-modal-title">🛒 Comprar Peça</div>
+    <div class="compra-modal-info" id="compra-modal-info"></div>
+    <div class="c-field">
+      <label class="c-field-label">Descrição da peça necessária</label>
+      <textarea class="c-textarea" id="compra-desc" placeholder="Descreva a peça, modelo, especificações..."></textarea>
+    </div>
+    <div class="c-field">
+      <label class="c-field-label">Fotos (opcional)</label>
+      <button class="c-foto-btn" onclick="document.getElementById('compra-file').click()">📷 Selecionar fotos</button>
+      <input type="file" id="compra-file" accept="image/*" multiple style="display:none" onchange="compraLoadFotos(event)"/>
+      <div class="c-thumbs" id="compra-thumbs"></div>
+    </div>
+    <div class="compra-modal-actions">
+      <button class="compra-cancel" onclick="compraModalClose()">Cancelar</button>
+      <button class="compra-confirm" onclick="compraModalConfirm()">→ Mover para Comprar Peça</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
