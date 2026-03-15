@@ -90,6 +90,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .modal-confirm{font-family:var(--fm);font-size:11px;font-weight:600;padding:8px 16px;border-radius:7px;background:var(--accent);color:#000;border:none;cursor:pointer;}
 .modal-confirm:hover{filter:brightness(1.1);}
 
+/* DADOS MODAL */
+.cbtn-dados{background:var(--surface2);border:1px solid var(--border);color:var(--muted);}
+.cbtn-dados:hover{border-color:#f59e0b;color:#f59e0b;}
+
 /* LIGHTBOX */
 .lightbox{position:fixed;inset:0;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;z-index:9998;opacity:0;pointer-events:none;transition:opacity .2s;backdrop-filter:blur(6px);}
 .lightbox.open{opacity:1;pointer-events:all;}
@@ -154,6 +158,28 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
     <div class="modal-actions">
       <button class="modal-cancel" onclick="closeModal()">Cancelar</button>
       <button class="modal-confirm" onclick="confirmarCompra()">Confirmar →</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DADOS DE COMPRA -->
+<div class="modal-overlay" id="modal-dados">
+  <div class="modal">
+    <div class="modal-title">📝 Dados de <span>Compra</span></div>
+    <div class="modal-info" id="dados-modal-info"></div>
+    <div class="f-group">
+      <label class="f-label">Descrição da peça</label>
+      <textarea class="f-input" id="dados-desc" style="resize:vertical;min-height:70px;line-height:1.5;" placeholder="Peça necessária, especificações, modelo..."></textarea>
+    </div>
+    <div class="f-group">
+      <label class="f-label">Adicionar fotos</label>
+      <button class="cbtn cbtn-atualizar" style="width:100%;" onclick="document.getElementById('dados-file').click()">📷 Selecionar fotos</button>
+      <input type="file" id="dados-file" accept="image/*" multiple style="display:none" onchange="dadosLoadFotos(event)"/>
+      <div id="dados-thumbs" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeDadosModal()">Cancelar</button>
+      <button class="modal-confirm" onclick="confirmarDados()">💾 Salvar</button>
     </div>
   </div>
 </div>
@@ -268,6 +294,14 @@ function buildCard(c, tipo) {
 
   // Actions
   var acts = document.createElement("div"); acts.className = "c-actions";
+  // Botão Dados de Compra — disponível em todas as abas
+  var dadosBtn = document.createElement("button"); dadosBtn.className = "cbtn cbtn-dados";
+  dadosBtn.textContent = "📝 Dados de Compra";
+  dadosBtn.setAttribute("data-id", c.pipefyId); dadosBtn.setAttribute("data-nome", c.nomeContato || c.title || "");
+  dadosBtn.setAttribute("data-desc", c.descricaoCompra || "");
+  dadosBtn.onclick = function() { openDadosModal(this.getAttribute("data-id"), this.getAttribute("data-nome"), this.getAttribute("data-desc")); };
+  acts.appendChild(dadosBtn);
+
   if (tipo === "comprar") {
     var btn = document.createElement("button"); btn.className = "cbtn cbtn-atualizar";
     btn.textContent = "🛒 Atualizar Compra";
@@ -343,6 +377,61 @@ function showToast(icon, title, msg) {
   document.getElementById("t-body").textContent  = msg;
   var t = document.getElementById("toast");
   t.classList.add("show"); setTimeout(function() { t.classList.remove("show"); }, 5000);
+}
+
+// ── DADOS MODAL ───────────────────────────────────────────────
+var dadosSelId = null, dadosNovasFotos = [];
+
+function openDadosModal(pipefyId, nome, descAtual) {
+  dadosSelId = pipefyId; dadosNovasFotos = [];
+  document.getElementById("dados-modal-info").innerHTML = "<strong>" + nome + "</strong>";
+  document.getElementById("dados-desc").value = descAtual || "";
+  document.getElementById("dados-thumbs").innerHTML = "";
+  document.getElementById("modal-dados").classList.add("open");
+}
+function closeDadosModal() { document.getElementById("modal-dados").classList.remove("open"); }
+
+function dadosLoadFotos(e) {
+  var files = Array.from(e.target.files).slice(0, 12 - dadosNovasFotos.length);
+  files.forEach(function(file) {
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      var img = new Image(); img.onload = function() {
+        var canvas = document.createElement("canvas"); var MAX = 800;
+        var w = img.width, h = img.height;
+        if (w > MAX || h > MAX) { if (w > h) { h = Math.round(h*MAX/w); w = MAX; } else { w = Math.round(w*MAX/h); h = MAX; } }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        dadosNovasFotos.push(canvas.toDataURL("image/jpeg", 0.82));
+        renderDadosThumbs();
+      }; img.src = ev.target.result;
+    }; reader.readAsDataURL(file);
+  });
+  e.target.value = "";
+}
+
+function renderDadosThumbs() {
+  var wrap = document.getElementById("dados-thumbs"); wrap.innerHTML = "";
+  dadosNovasFotos.forEach(function(f, i) {
+    var div = document.createElement("div"); div.style.cssText = "position:relative;width:60px;height:60px;";
+    var img = document.createElement("img"); img.src = f; img.style.cssText = "width:60px;height:60px;border-radius:7px;object-fit:cover;border:1px solid var(--border);";
+    var rm  = document.createElement("button"); rm.textContent = "✕"; rm.style.cssText = "position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(239,68,68,.9);color:#fff;border:none;cursor:pointer;font-size:10px;font-weight:700;";
+    rm.onclick = function() { dadosNovasFotos.splice(i, 1); renderDadosThumbs(); };
+    div.appendChild(img); div.appendChild(rm); wrap.appendChild(div);
+  });
+}
+
+async function confirmarDados() {
+  var desc = document.getElementById("dados-desc").value.trim();
+  var r = await api("update-dados", {
+    pipefyId: dadosSelId,
+    descricaoCompra: desc,
+    fotosCompra: dadosNovasFotos.length ? dadosNovasFotos : undefined,
+  });
+  if (r.ok) {
+    closeDadosModal(); await load();
+    showToast("💾", "Dados salvos!", desc ? desc.substring(0,40) : "Fotos atualizadas");
+  } else showToast("❌", "Erro", r.error);
 }
 
 load();
