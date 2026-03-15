@@ -133,15 +133,24 @@ module.exports = async function handler(req, res) {
 
   // ── GET orc-sync ───────────────────────────────────────────
   if (action === "orc-sync") {
-    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
+    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [], initialized: false };
     if (!Array.isArray(db.fichas))    db.fichas    = [];
     if (!Array.isArray(db.syncedIds)) db.syncedIds = [];
     let newCount = 0, pipefyError = null;
     try {
       const cards = await fetchAguardandoAprovacao();
+      // Primeira vez: apenas registra os IDs existentes sem criar fichas
+      if (!db.initialized) {
+        cards.forEach(card => {
+          if (!db.syncedIds.includes(card.pipefyId)) db.syncedIds.push(card.pipefyId);
+        });
+        db.initialized = true;
+        await dbSet(ORC_KEY, db);
+        return res.status(200).json({ ok: true, newCount: 0, initialized: true, pipefyError: null });
+      }
+      // Próximas vezes: importa apenas cards novos
       for (const card of cards) {
         if (db.syncedIds.includes(card.pipefyId)) continue;
-        // Gera texto de orçamento com IA
         let textoOrc = "";
         try { textoOrc = await gerarTextoOrcamento(card.desc, card.comentarios); } catch(e) {}
         db.fichas.unshift({
@@ -155,6 +164,7 @@ module.exports = async function handler(req, res) {
           comentarios: card.comentarios,
           textoOrc,
           status:      "pendente",
+          preco:       null,
           createdAt:   new Date().toISOString(),
         });
         db.syncedIds.push(card.pipefyId);
@@ -219,6 +229,16 @@ module.exports = async function handler(req, res) {
     ficha.status = status;
     await dbSet(ORC_KEY, db);
     return res.status(200).json({ ok: true });
+  }
+
+  // ── GET orc-reset-init ────────────────────────────────────
+  // Reseta o flag de inicialização para reimportar tudo
+  if (action === "orc-reset-init") {
+    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
+    db.initialized = false;
+    db.syncedIds   = [];
+    await dbSet(ORC_KEY, db);
+    return res.status(200).json({ ok: true, msg: "Reset feito. Próximo sync vai marcar cards atuais como vistos sem importar." });
   }
 
   // ── POST orc-excluir ───────────────────────────────────────
@@ -299,25 +319,31 @@ async function fetchAguardandoAprovacao() {
 
 // Gera texto de orçamento com Claude
 async function gerarTextoOrcamento(desc, comentarios) {
-  const contexto = `Defeito/Descrição: ${desc}\nAtividades/Comentários: ${comentarios.join("; ")}`;
+  const comStr = comentarios && comentarios.length ? comentarios.join("; ") : "";
+  const userMsg = `Defeito/Descrição: ${desc}${comStr ? "\nAtividades registradas no card: " + comStr : ""}`;
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
       max_tokens: 400,
-      system: `Você é Pedro, técnico da Reparo Eletro em BH. Gera textos de orçamento para clientes no WhatsApp.
-Tom: cordial, direto, informal mas profissional. Sem preço (será preenchido depois). Sem emojis excessivos.
+      system: `Você é Pedro, técnico da Reparo Eletro em BH. Gera textos de orçamento para enviar no WhatsApp.
 
-Estrutura obrigatória:
-1. Saudação: "Olá, bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:"
-2. Diagnóstico e peças: descreva o que foi identificado e o que será feito/trocado (baseado no defeito e nas atividades)
-3. Finalização: "Este conserto completo fica em [VALOR] apenas. Aprovando já iniciamos o conserto."
+REGRAS ABSOLUTAS:
+- Siga EXATAMENTE esta estrutura, sem desviar:
 
-Deixe [VALOR] como placeholder literal para o atendente preencher.
-Seja específico com as peças/procedimentos mencionados nas atividades.
-Máximo 5 linhas no corpo.`,
-      messages: [{ role: "user", content: contexto }],
+Olá, bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:
+
+[1 a 2 frases descrevendo o diagnóstico e o que será feito/trocado, baseado no defeito e nas atividades]
+
+Este conserto completo fica em [VALOR] apenas. Aprovando já iniciamos o conserto.
+
+- Deixe [VALOR] literalmente assim — será substituído pelo atendente
+- Use os termos técnicos das atividades registradas (kit termoelétrico, cooler, peltier, placa, etc.)
+- Se não houver atividades, descreva com base no defeito de forma genérica
+- Sem emojis
+- Máximo 3 parágrafos curtos no total`,
+      messages: [{ role: "user", content: userMsg }],
     }),
   });
   const data = await res.json();
