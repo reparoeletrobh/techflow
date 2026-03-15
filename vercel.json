@@ -7,6 +7,7 @@
     { "source": "/metas",        "destination": "/metas.html"        },
     { "source": "/adm",          "destination": "/adm.html"          },
     { "source": "/orcamento",    "destination": "/orcamento.html"    },
+    { "source": "/compras",      "destination": "/compras.html"      },
     { "source": "/((?!api/).*)", "destination": "/home.html"         }
   ]
 }
