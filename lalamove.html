@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='18,2 8,18 15,18 14,30 24,14 17,14' fill='%238b5cf6' stroke='%238b5cf6' stroke-linejoin='round'/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lalamove</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--border:#252525;
+  --text:#fff;--muted:#888;--dim:#333;
+  --accent:#8b5cf6;--green:#22c55e;--orange:#f97316;--red:#ef4444;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;border-bottom:2px solid var(--accent);background:var(--bg);position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.logo-icon{width:26px;height:26px;background:var(--accent);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;}
+.logo span{color:var(--accent);}
+.tabs{display:flex;border-bottom:1px solid var(--border);padding:0 24px;}
+.tab{font-family:var(--fm);font-size:11px;font-weight:600;padding:11px 18px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;display:flex;align-items:center;gap:6px;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-badge{font-family:var(--fm);font-size:9px;padding:1px 6px;border-radius:20px;background:var(--surface2);}
+.tab.active .tab-badge{background:rgba(139,92,246,.15);color:var(--accent);}
+.page{display:none;flex:1;flex-direction:column;overflow-y:auto;}
+.page.active{display:flex;}
+
+/* TOOLBAR */
+.toolbar{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px;}
+.toolbar-left{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.loja-badge{font-family:var(--fm);font-size:10px;background:rgba(139,92,246,.1);color:var(--accent);padding:4px 10px;border-radius:6px;border:1px solid rgba(139,92,246,.2);}
+.api-badge{font-family:var(--fm);font-size:10px;padding:4px 10px;border-radius:6px;}
+.api-badge.ok{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2);}
+.api-badge.nok{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2);}
+
+/* SEND BUTTON */
+.btn-send{font-family:var(--fh);font-size:12px;font-weight:700;padding:9px 18px;border-radius:8px;border:none;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:6px;}
+.btn-send:disabled{background:var(--dim);cursor:not-allowed;color:var(--muted);}
+.btn-send.coleta{background:var(--orange);color:#000;}
+.btn-send.coleta:hover:not(:disabled){filter:brightness(1.1);}
+.btn-send.entrega{background:var(--accent);color:#fff;}
+.btn-send.entrega:hover:not(:disabled){filter:brightness(1.1);}
+
+/* CARDS */
+.card-list{padding:16px 24px;display:flex;flex-direction:column;gap:10px;}
+.l-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;position:relative;overflow:hidden;}
+.l-card::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;}
+.l-card.coleta::before{background:var(--orange);}
+.l-card.entrega::before{background:var(--accent);}
+.l-card.enviado{opacity:.5;}
+.l-card.enviado::before{background:var(--green);}
+.lc-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px;}
+.lc-code{font-family:var(--fm);font-size:11px;color:var(--orange);font-weight:500;}
+.lc-name{font-size:13px;font-weight:600;margin-top:1px;}
+.lc-desc{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5;}
+.lc-end{font-family:var(--fm);font-size:11px;color:var(--text);margin-top:6px;padding:6px 10px;background:var(--surface2);border-radius:6px;border-left:2px solid var(--accent);}
+.lc-end.missing{color:var(--red);border-left-color:var(--red);background:rgba(239,68,68,.05);}
+.lc-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+.lbtn{font-family:var(--fm);font-size:10px;font-weight:600;padding:5px 12px;border-radius:6px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.lbtn-edit{background:var(--surface2);border:1px solid var(--border);color:var(--muted);}
+.lbtn-edit:hover{border-color:var(--accent);color:var(--accent);}
+.lbtn-del{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.lbtn-del:hover{border-color:var(--red);color:var(--red);}
+.sbadge{font-family:var(--fm);font-size:9px;font-weight:600;padding:2px 8px;border-radius:20px;text-transform:uppercase;}
+.sbadge.pendente{background:rgba(245,200,0,.1);color:#f5c800;}
+.sbadge.sem-end{background:rgba(239,68,68,.1);color:var(--red);}
+.sbadge.enviado{background:rgba(34,197,94,.12);color:var(--green);}
+
+/* EMPTY */
+.empty{padding:48px;text-align:center;font-family:var(--fm);font-size:11px;color:var(--dim);}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:400;opacity:0;pointer-events:none;transition:opacity .2s;backdrop-filter:blur(3px);}
+.modal-overlay.open{opacity:1;pointer-events:all;}
+.modal{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--accent);border-radius:14px;padding:22px;max-width:400px;width:92%;transform:scale(.95);transition:transform .2s;}
+.modal-overlay.open .modal{transform:scale(1);}
+.modal-title{font-family:var(--fh);font-size:16px;font-weight:800;margin-bottom:4px;}
+.modal-title span{color:var(--accent);}
+.f-group{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
+.f-label{font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;}
+.f-input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:var(--fb);font-size:13px;color:var(--text);outline:none;width:100%;transition:border .15s;}
+.f-input:focus{border-color:var(--accent);}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}
+.modal-cancel{font-family:var(--fm);font-size:11px;padding:8px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;}
+.modal-cancel:hover{color:var(--text);}
+.modal-confirm{font-family:var(--fm);font-size:11px;font-weight:600;padding:8px 16px;border-radius:7px;background:var(--accent);color:#fff;border:none;cursor:pointer;}
+.modal-confirm:hover{filter:brightness(1.1);}
+
+/* TOAST */
+.toast{position:fixed;bottom:18px;right:18px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:11px 14px;font-family:var(--fm);font-size:11px;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;}
+.toast.show{transform:translateY(0);opacity:1;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="logo-icon">🚗</div>Reparo<span>Eletro</span> — Lalamove</div>
+  <button onclick="load()" style="font-family:var(--fm);font-size:10px;padding:5px 11px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">↻ Atualizar</button>
+</header>
+
+<div class="tabs">
+  <button class="tab active" id="tab-coleta" onclick="showTab('coleta')">
+    📥 Coletas <span class="tab-badge" id="badge-coleta">0</span>
+  </button>
+  <button class="tab" id="tab-entrega" onclick="showTab('entrega')">
+    📤 Entregas <span class="tab-badge" id="badge-entrega">0</span>
+  </button>
+</div>
+
+<!-- COLETAS -->
+<div class="page active" id="page-coleta">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <span class="loja-badge">🏠 Destino: Rua Ouro Preto 663, Barro Preto</span>
+      <span class="api-badge nok" id="api-status-coleta">API não configurada</span>
+    </div>
+    <button class="btn-send coleta" id="btn-send-coleta" onclick="enviarLalamove('coleta')" disabled>
+      🚗 Enviar Coletas ao Lalamove
+    </button>
+  </div>
+  <div class="card-list" id="list-coleta"><div class="empty">Carregando...</div></div>
+</div>
+
+<!-- ENTREGAS -->
+<div class="page" id="page-entrega">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <span class="loja-badge">🏠 Origem: Rua Ouro Preto 663, Barro Preto</span>
+      <span class="api-badge nok" id="api-status-entrega">API não configurada</span>
+    </div>
+    <button class="btn-send entrega" id="btn-send-entrega" onclick="enviarLalamove('entrega')" disabled>
+      🚗 Enviar Entregas ao Lalamove
+    </button>
+  </div>
+  <div class="card-list" id="list-entrega"><div class="empty">Carregando...</div></div>
+</div>
+
+<!-- MODAL ENDEREÇO -->
+<div class="modal-overlay" id="modal-end">
+  <div class="modal">
+    <div class="modal-title">📍 Editar <span>Endereço</span></div>
+    <div class="f-group">
+      <label class="f-label">Endereço completo</label>
+      <input class="f-input" id="end-input" type="text" placeholder="Rua, número, bairro, cidade..."/>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeEndModal()">Cancelar</button>
+      <button class="modal-confirm" onclick="salvarEndereco()">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <span id="t-icon">✅</span>
+  <div><strong id="t-title"></strong><br><span id="t-body" style="color:var(--muted);font-size:10px;"></span></div>
+</div>
+
+<script>
+var fichas = [], temApiKey = false;
+var selEndId = null, selEndTipo = null;
+var curTab = "coleta";
+
+async function api(action, body) {
+  var r = await fetch("/api/lalamove?action=" + action, body ? {
+    method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body),
+  } : {});
+  return r.json();
+}
+
+function showTab(tab) {
+  curTab = tab;
+  ["coleta","entrega"].forEach(function(t) {
+    document.getElementById("page-"+t).classList.toggle("active", t === tab);
+    document.getElementById("tab-"+t).classList.toggle("active", t === tab);
+  });
+}
+
+async function load() {
+  var d = await api("load");
+  if (!d.ok) return;
+  fichas    = d.fichas    || [];
+  temApiKey = d.temApiKey || false;
+
+  var apiLabel = temApiKey ? "✅ API configurada" : "⚠️ API não configurada";
+  var apiClass = temApiKey ? "ok" : "nok";
+  ["coleta","entrega"].forEach(function(t) {
+    var el = document.getElementById("api-status-"+t);
+    if (el) { el.textContent = apiLabel; el.className = "api-badge " + apiClass; }
+    var btn = document.getElementById("btn-send-"+t);
+    if (btn) btn.disabled = !temApiKey;
+  });
+
+  updateBadges();
+  renderList("coleta");
+  renderList("entrega");
+}
+
+function updateBadges() {
+  ["coleta","entrega"].forEach(function(tipo) {
+    var cnt = fichas.filter(function(f) { return f.tipo === tipo && f.status === "pendente"; }).length;
+    var el  = document.getElementById("badge-"+tipo);
+    if (el) el.textContent = cnt;
+  });
+}
+
+function renderList(tipo) {
+  var el   = document.getElementById("list-"+tipo);
+  var list = fichas.filter(function(f) { return f.tipo === tipo; });
+  if (!list.length) { el.innerHTML = '<div class="empty">Nenhuma ficha de ' + tipo + ' na fila.<br>Mova cards para <strong>' + (tipo === "coleta" ? "Coleta Solicitada" : "Entrega Solicitada") + '</strong> no dash técnico.</div>'; return; }
+  el.innerHTML = "";
+  list.forEach(function(f) { el.appendChild(buildCard(f)); });
+}
+
+function buildCard(f) {
+  var div = document.createElement("div");
+  div.className = "l-card " + f.tipo + (f.status === "enviado" ? " enviado" : "");
+  div.id = "lcard-" + f.pipefyId;
+
+  var head = document.createElement("div"); head.className = "lc-head";
+  var info = document.createElement("div");
+  var code = document.createElement("div"); code.className = "lc-code"; code.textContent = "#" + (f.osCode || f.pipefyId.slice(-4));
+  var name = document.createElement("div"); name.className = "lc-name"; name.textContent = f.nomeContato || "—";
+  info.appendChild(code); info.appendChild(name);
+  var badge = document.createElement("span");
+  badge.className = "sbadge " + (f.status === "enviado" ? "enviado" : (f.endereco ? "pendente" : "sem-end"));
+  badge.textContent = f.status === "enviado" ? "enviado" : (f.endereco ? "pendente" : "sem endereço");
+  head.appendChild(info); head.appendChild(badge);
+  div.appendChild(head);
+
+  if (f.descricao) {
+    var desc = document.createElement("div"); desc.className = "lc-desc"; desc.textContent = f.descricao;
+    div.appendChild(desc);
+  }
+
+  var endEl = document.createElement("div");
+  endEl.className = "lc-end" + (f.endereco ? "" : " missing");
+  endEl.textContent = f.endereco ? "📍 " + f.endereco : "⚠️ Endereço não encontrado — clique em Editar";
+  div.appendChild(endEl);
+
+  if (f.status !== "enviado") {
+    var acts = document.createElement("div"); acts.className = "lc-actions";
+    var editBtn = document.createElement("button"); editBtn.className = "lbtn lbtn-edit"; editBtn.textContent = "✏️ Editar endereço";
+    editBtn.setAttribute("data-id", f.pipefyId); editBtn.setAttribute("data-tipo", f.tipo); editBtn.setAttribute("data-end", f.endereco || "");
+    editBtn.onclick = function() { openEndModal(this.getAttribute("data-id"), this.getAttribute("data-tipo"), this.getAttribute("data-end")); };
+    var delBtn = document.createElement("button"); delBtn.className = "lbtn lbtn-del"; delBtn.textContent = "✕ Remover";
+    delBtn.setAttribute("data-id", f.pipefyId); delBtn.setAttribute("data-tipo", f.tipo);
+    delBtn.onclick = function() { remover(this.getAttribute("data-id"), this.getAttribute("data-tipo")); };
+    acts.appendChild(editBtn); acts.appendChild(delBtn);
+    div.appendChild(acts);
+  }
+  return div;
+}
+
+// ── MODAL ENDEREÇO ─────────────────────────────────────────────
+function openEndModal(pipefyId, tipo, endAtual) {
+  selEndId = pipefyId; selEndTipo = tipo;
+  document.getElementById("end-input").value = endAtual || "";
+  document.getElementById("modal-end").classList.add("open");
+  setTimeout(function() { document.getElementById("end-input").focus(); }, 200);
+}
+function closeEndModal() { document.getElementById("modal-end").classList.remove("open"); }
+async function salvarEndereco() {
+  var end = document.getElementById("end-input").value.trim();
+  if (!end) return;
+  var d = await api("update-endereco", { pipefyId: selEndId, tipo: selEndTipo, endereco: end });
+  if (d.ok) {
+    var f = fichas.find(function(x) { return x.pipefyId === selEndId && x.tipo === selEndTipo; });
+    if (f) f.endereco = end;
+    closeEndModal(); renderList(selEndTipo);
+    showToast("📍", "Endereço salvo!", end.substring(0, 50));
+  } else showToast("❌", "Erro", d.error);
+}
+
+// ── REMOVER ────────────────────────────────────────────────────
+async function remover(pipefyId, tipo) {
+  if (!confirm("Remover da fila?")) return;
+  var d = await api("remover", { pipefyId, tipo });
+  if (d.ok) {
+    fichas = fichas.filter(function(f) { return !(f.pipefyId === pipefyId && f.tipo === tipo); });
+    updateBadges(); renderList(tipo);
+    showToast("🗑️", "Removido", "");
+  }
+}
+
+// ── ENVIAR AO LALAMOVE ──────────────────────────────────────────
+async function enviarLalamove(tipo) {
+  var pendentes = fichas.filter(function(f) { return f.tipo === tipo && f.status === "pendente"; });
+  var semEnd    = pendentes.filter(function(f) { return !f.endereco; });
+  if (semEnd.length) {
+    showToast("⚠️", "Endereços faltando", semEnd.length + " ficha(s) sem endereço preenchido");
+    return;
+  }
+  var btn = document.getElementById("btn-send-"+tipo);
+  btn.disabled = true; btn.textContent = "⏳ Enviando...";
+  var d = await api("enviar-lalamove", { tipo });
+  if (d.ok) {
+    showToast("🚗", "Enviado ao Lalamove!", d.count + " parada(s) criada(s)");
+    await load();
+  } else {
+    showToast("❌", "Erro", d.error);
+  }
+  btn.disabled = !temApiKey;
+  btn.textContent = tipo === "coleta" ? "🚗 Enviar Coletas ao Lalamove" : "🚗 Enviar Entregas ao Lalamove";
+}
+
+// ── TOAST ──────────────────────────────────────────────────────
+function showToast(icon, title, msg) {
+  document.getElementById("t-icon").textContent  = icon;
+  document.getElementById("t-title").textContent = title;
+  document.getElementById("t-body").textContent  = msg;
+  var t = document.getElementById("toast");
+  t.classList.add("show"); setTimeout(function() { t.classList.remove("show"); }, 5000);
+}
+
+load();
+setInterval(load, 30000);
+</script>
+</body>
+</html>
