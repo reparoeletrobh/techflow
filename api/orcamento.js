@@ -296,6 +296,17 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, msg: "Reset completo. Chame orc-sync para inicializar." });
   }
 
+  // ── GET orc-limpar-enviados ───────────────────────────────
+  // Remove fichas com status "enviado" — chamado automaticamente no fim do dia
+  if (action === "orc-limpar-enviados") {
+    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
+    const before = db.fichas.length;
+    db.fichas = db.fichas.filter(f => f.status !== "enviado");
+    const removed = before - db.fichas.length;
+    if (removed > 0) await dbSet(ORC_KEY, db);
+    return res.status(200).json({ ok: true, removed });
+  }
+
   // ── POST orc-excluir ───────────────────────────────────────
   if (req.method === "POST" && action === "orc-excluir") {
     const { id } = req.body || {};
@@ -382,37 +393,71 @@ async function fetchAguardandoAprovacao() {
 // ── NORMALIZA TEXTO (remove acentos, minúsculo) ──────────────
 function norm(s) {
   return String(s || "").toLowerCase()
-    .normalize("NFD").replace(/̀-ͯ/g, " ")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9 ]/g, " ");
 }
 
-// ── REGRAS DE ORÇAMENTO ──────────────────────────────────────
+function hasAny(texto, words) {
+  return words.some(function(w) { return texto.indexOf(norm(w)) >= 0; });
+}
+
 const ORCAMENTO_REGRAS = [
   {
-    keywords: [
-      "termoeletrico","termeletrico","termoeltrico","thermoeletrico",
-      "cooler","culer","coler","colder",
-      "placa de resfriamento","placa resfriamento","placa fria",
-      "peltier","peltyer","peltir",
-      "pasta termica","pasta terminca","pasta termika",
-      "kit frio","kit termoeletrico","kit termico","conjunto termoeletrico",
-    ],
+    keywords: ["termoeletrico","termeletrico","thermoeletrico","termoeltrico",
+               "cooler","culer","coler","colder",
+               "placa de resfriamento","placa resfriamento","placa fria",
+               "peltier","peltyer","peltir",
+               "pasta termica","pasta terminca","pasta termika","pasta termca",
+               "kit frio","kit termoeletrico","kit termico","conjunto termoeletrico"],
     template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do cooler, placa de resfriamento e pasta termica, as pecas serao trocadas tambem. Este conserto completo fica em 350 reais apenas. Aprovando ja iniciamos o conserto.",
+  },
+  {
+    keywords: ["magnetron","magnetrao","magneton","magentron","magnetrom"],
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do magnetron, as pecas serao trocadas tambem. Este conserto completo fica em 370 reais apenas. Aprovando ja iniciamos o conserto.",
+  },
+  {
+    keywords: ["fusivel","fusirel","fuzivel","fusiveil","queimou fusivel","fusivel de alta"],
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e fusivel de alta, as pecas serao trocadas tambem. Este conserto completo fica em 320 reais apenas. Aprovando ja iniciamos o conserto.",
+  },
+  {
+    keywords: ["microchave","micro chave","micro-chave","chave micro"],
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e microchave de acionamento, as pecas serao trocadas tambem. Este conserto completo fica em 320 reais apenas. Aprovando ja iniciamos o conserto.",
+  },
+  {
+    keywords: ["placa micra","placa microondas","placa do microondas","placa micro"],
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e placa micra, as pecas serao trocadas tambem. Este conserto completo fica em 320 reais apenas. Aprovando ja iniciamos o conserto.",
+  },
+  {
+    keywords: ["valvula de gas","valvula gas","recarga de gas","recarga gas","gas refrigerante","carga de gas"],
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca da valvula de gas, solda e recarga de gas refrigerante. Este conserto completo fica em 450 reais apenas. Aprovando ja iniciamos o conserto.",
+  },
+  {
+    keywords: ["mangueira","conexao","conexoes","duto","dutos","hidraulica","hidraulico","vazando","vazamento"],
+    extraKeys: ["motor","gas","compressor"],
+    templateBase: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca dos dutos e conexoes hidraulicas. Este conserto completo fica em [PRECO] reais apenas. Aprovando ja iniciamos o conserto.",
+    precoBase:  "350",
+    precoExtra: "450",
+  },
+  {
+    keywords: ["placa principal","placa de potencia","placa potencia","placa de controle","placa controle"],
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da placa principal, sera feito a reoperacao da placa tambem. Este conserto completo fica em 350 reais apenas. Aprovando ja iniciamos o conserto.",
   },
 ];
 
 function detectarRegra(desc, comentarios) {
-  const textoNorm = norm([desc, ...(comentarios || [])].join(" "));
-  for (const regra of ORCAMENTO_REGRAS) {
-    const match = regra.keywords.some(function(kw) { return textoNorm.includes(norm(kw)); });
-    if (match) return regra.template;
+  var textoNorm = norm([desc || ""].concat(comentarios || []).join(" "));
+  for (var i = 0; i < ORCAMENTO_REGRAS.length; i++) {
+    var regra = ORCAMENTO_REGRAS[i];
+    if (!hasAny(textoNorm, regra.keywords)) continue;
+    if (regra.templateBase) {
+      var comExtra = regra.extraKeys && hasAny(textoNorm, regra.extraKeys);
+      return regra.templateBase.replace("[PRECO]", comExtra ? regra.precoExtra : regra.precoBase);
+    }
+    return regra.template;
   }
   return null;
 }
 
-function primeiroNome(nome) {
-  return nome ? nome.trim().split(/[ ]+/)[0] : "";
-}
 
 function substituirNome(template, nome) {
   var p = primeiroNome(nome);
