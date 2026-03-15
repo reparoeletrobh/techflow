@@ -448,6 +448,31 @@ module.exports = async function handler(req, res) {
         board.movesLog = trimLog(board.movesLog);
       }
       await dbSet(BOARD_KEY, board);
+
+      // Auto-adiciona à fila do Lalamove quando move para coleta/entrega solicitada
+      if (["coleta_solicitada", "entrega_solicitada"].includes(phaseId)) {
+        const LALA_KEY = "reparoeletro_lalamove";
+        try {
+          const lalaDb = await dbGet(LALA_KEY) || { fichas: [] };
+          if (!Array.isArray(lalaDb.fichas)) lalaDb.fichas = [];
+          const tipo = phaseId === "coleta_solicitada" ? "coleta" : "entrega";
+          const jaExiste = lalaDb.fichas.find(f => f.pipefyId === String(pipefyId) && f.tipo === tipo);
+          if (!jaExiste) {
+            lalaDb.fichas.push({
+              pipefyId:    String(pipefyId),
+              tipo,
+              osCode:      card.osCode      || null,
+              nomeContato: card.nomeContato || card.title || null,
+              descricao:   card.descricao   || null,
+              endereco:    null, // será preenchido na tela do Lalamove ou buscado do Pipefy
+              addedAt:     new Date().toISOString(),
+              status:      "pendente",
+            });
+            await dbSet(LALA_KEY, lalaDb);
+          }
+        } catch(e) { console.error("lalamove queue:", e.message); }
+      }
+
       return res.status(200).json({ ok: true, card });
     }
 
@@ -895,6 +920,22 @@ module.exports = async function handler(req, res) {
         ok: true, removed, removedIds, pipefyError,
         debug: { retTotal }
       });
+    }
+
+    // ── POST clear-compra — limpa dados de compra de um card específico ──
+    if (req.method === "POST" && action === "clear-compra") {
+      const { pipefyId } = req.body || {};
+      if (!pipefyId) return res.status(400).json({ ok: false, error: "pipefyId obrigatório" });
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const card  = board.cards.find(c => c.pipefyId === String(pipefyId));
+      if (!card) return res.status(404).json({ ok: false, error: "Card não encontrado" });
+      delete card.descricaoCompra;
+      delete card.fotosCompra;
+      delete card.alertaCompra;
+      delete card.tipoCompra;
+      delete card.previsao;
+      await dbSet(BOARD_KEY, board);
+      return res.status(200).json({ ok: true, pipefyId, msg: "Dados de compra removidos." });
     }
 
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
