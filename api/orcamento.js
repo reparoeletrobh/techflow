@@ -339,13 +339,18 @@ async function dbSet(key, value) {
   } catch(e) { return false; }
 }
 
-// Busca cards em Aguardando Aprovação com campos e comentários
+// Busca cards em Aguardando Aprovação direto pelo ID da fase (mais rápido e completo)
+const AGUARDANDO_APROVACAO_PHASE_ID = "334875152";
+
 async function fetchAguardandoAprovacao() {
-  const data = await pipefyQuery(`query {
-    pipe(id: "${PIPE_ID}") {
-      phases {
-        name
-        cards(first: 50) {
+  const all = [];
+  let cursor = null, hasNext = true;
+  while (hasNext) {
+    const after = cursor ? `, after: "${cursor}"` : "";
+    const data = await pipefyQuery(`query {
+      phase(id: "${AGUARDANDO_APROVACAO_PHASE_ID}") {
+        cards(first: 50${after}) {
+          pageInfo { hasNextPage endCursor }
           edges {
             node {
               id title age
@@ -355,24 +360,22 @@ async function fetchAguardandoAprovacao() {
           }
         }
       }
+    }`);
+    const phase = data?.phase;
+    if (!phase) break;
+    for (const { node } of phase.cards.edges) {
+      const fields = node.fields || [];
+      const nome   = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
+      const tel    = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
+      const desc   = fields.find(f => f.name.toLowerCase().includes("descri") || f.name.toLowerCase().includes("empresa"))?.value || "";
+      const end    = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
+      const comentarios = (node.comments || []).map(c => c.text).filter(Boolean);
+      all.push({ pipefyId: String(node.id), title: node.title, nome, tel, desc, end, age: node.age, comentarios });
     }
-  }`);
-  const phases = data?.pipe?.phases || [];
-  const phase  = phases.find(p => {
-    const n = p.name.toLowerCase().replace(/[^a-z0-9 ]/g,"");
-    return n.includes("aguardando aprova");
-  });
-  if (!phase) return [];
-  return phase.cards.edges.map(e => {
-    const node = e.node;
-    const fields = node.fields || [];
-    const nome    = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
-    const tel     = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
-    const desc    = fields.find(f => f.name.toLowerCase().includes("descri") || f.name.toLowerCase().includes("empresa"))?.value || "";
-    const end     = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
-    const comentarios = (node.comments || []).map(c => c.text).filter(Boolean);
-    return { pipefyId: String(node.id), title: node.title, nome, tel, desc, end, age: node.age, comentarios };
-  });
+    hasNext = phase.cards.pageInfo?.hasNextPage ?? false;
+    cursor  = phase.cards.pageInfo?.endCursor ?? null;
+  }
+  return all;
 }
 
 // Gera texto de orçamento com Claude
