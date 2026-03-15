@@ -8,6 +8,7 @@
     { "source": "/adm",          "destination": "/adm.html"          },
     { "source": "/orcamento",    "destination": "/orcamento.html"    },
     { "source": "/compras",      "destination": "/compras.html"      },
+    { "source": "/lalamove",     "destination": "/lalamove.html"     },
     { "source": "/((?!api/).*)", "destination": "/home.html"         }
   ]
 }
