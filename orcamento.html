@@ -10,23 +10,25 @@
 :root{
   --bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--border:#252525;
   --text:#fff;--muted:#888;--dim:#333;
-  --accent:#f5c800;--green:#22c55e;
+  --accent:#f5c800;--green:#22c55e;--red:#ef4444;
   --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;}
-header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;border-bottom:2px solid var(--accent);background:var(--bg);position:sticky;top:0;z-index:100;}
+header{display:flex;align-items:center;padding:0 24px;height:52px;border-bottom:2px solid var(--accent);background:var(--bg);position:sticky;top:0;z-index:100;}
 .logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
 .logo-icon{width:26px;height:26px;background:var(--accent);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;}
 .logo span{color:var(--accent);}
-.tabs{display:flex;border-bottom:1px solid var(--border);background:var(--bg);padding:0 24px;}
+.tabs{display:flex;border-bottom:1px solid var(--border);padding:0 24px;}
 .tab{font-family:var(--fm);font-size:12px;font-weight:600;padding:12px 20px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.15s;}
 .tab:hover{color:var(--text);}
 .tab.active{color:var(--accent);border-bottom-color:var(--accent);}
 .page{display:none;flex:1;}
 .page.active{display:flex;flex-direction:column;}
+
+/* CADASTRO */
 #page-cadastro{align-items:center;justify-content:center;padding:32px 20px;}
-.chat-wrap{width:100%;max-width:560px;display:flex;flex-direction:column;gap:0;height:min(620px,80vh);background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
+.chat-wrap{width:100%;max-width:560px;display:flex;flex-direction:column;height:min(620px,80vh);background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
 .chat-msgs{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;}
 .chat-msgs::-webkit-scrollbar{width:3px;}
 .chat-msgs::-webkit-scrollbar-thumb{background:var(--border);}
@@ -34,36 +36,80 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .msg.bot{align-self:flex-start;}
 .msg.user{align-self:flex-end;}
 .bubble{padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.6;}
-.msg.bot  .bubble{background:var(--surface2);border:1px solid var(--border);border-bottom-left-radius:3px;}
+.msg.bot .bubble{background:var(--surface2);border:1px solid var(--border);border-bottom-left-radius:3px;}
 .msg.user .bubble{background:var(--accent);color:#000;font-weight:500;border-bottom-right-radius:3px;}
 .typing-wrap{align-self:flex-start;}
-.typing{display:flex;gap:4px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:14px;border-bottom-left-radius:3px;width:fit-content;}
+.typing{display:flex;gap:4px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:14px;border-bottom-left-radius:3px;}
 .td{width:7px;height:7px;background:var(--muted);border-radius:50%;animation:bounce 1.2s infinite;}
-.td:nth-child(2){animation-delay:0.2s;}
-.td:nth-child(3){animation-delay:0.4s;}
+.td:nth-child(2){animation-delay:.2s;}
+.td:nth-child(3){animation-delay:.4s;}
 @keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
 .chat-input-area{border-top:1px solid var(--border);padding:12px 16px;display:flex;gap:8px;align-items:flex-end;background:var(--surface);}
-.chat-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-family:var(--fb);font-size:13px;color:var(--text);outline:none;resize:none;max-height:160px;line-height:1.4;transition:border 0.15s;}
+.chat-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-family:var(--fb);font-size:13px;color:var(--text);outline:none;resize:none;max-height:160px;line-height:1.4;transition:border .15s;}
 .chat-input:focus{border-color:var(--accent);}
-.send-btn{width:40px;height:40px;border-radius:9px;background:var(--accent);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.15s;}
-.send-btn:hover{filter:brightness(1.1);}
+.send-btn{width:40px;height:40px;border-radius:9px;background:var(--accent);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .send-btn:disabled{background:var(--dim);cursor:not-allowed;}
 .send-btn svg{width:16px;height:16px;fill:#000;}
 .qr-wrap{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
-.qr-btn{font-size:12px;padding:5px 13px;border-radius:20px;border:1px solid var(--accent);background:rgba(245,200,0,0.08);color:var(--accent);cursor:pointer;font-family:var(--fb);transition:all 0.15s;}
+.qr-btn{font-size:12px;padding:5px 13px;border-radius:20px;border:1px solid var(--accent);background:rgba(245,200,0,.08);color:var(--accent);cursor:pointer;font-family:var(--fb);transition:all .15s;}
 .qr-btn:hover{background:var(--accent);color:#000;}
-.toast{position:fixed;bottom:18px;right:18px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:11px 14px;font-family:var(--fm);font-size:11px;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);z-index:9999;}
+
+/* ORCAMENTO PANEL */
+.orc-toolbar{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px;}
+.orc-list{flex:1;overflow-y:auto;padding:16px 24px;}
+.orc-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px;position:relative;overflow:hidden;}
+.orc-card::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--accent);}
+.orc-nome{font-size:14px;font-weight:600;}
+.orc-tel{font-family:var(--fm);font-size:11px;color:var(--muted);margin-top:2px;}
+.orc-desc{font-size:12px;color:var(--muted);margin:8px 0;line-height:1.5;}
+.orc-comments{font-family:var(--fm);font-size:10px;color:#666;margin-bottom:10px;padding:8px 10px;background:var(--surface2);border-radius:6px;border-left:2px solid var(--dim);}
+.orc-lbl{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:6px;margin-top:12px;}
+.orc-textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:var(--fb);font-size:12px;color:var(--text);resize:vertical;min-height:90px;line-height:1.6;outline:none;transition:border .15s;}
+.orc-textarea:focus{border-color:var(--accent);}
+.orc-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+.obtn{font-family:var(--fm);font-size:10px;font-weight:600;padding:6px 13px;border-radius:7px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.obtn-copy{background:var(--surface2);border:1px solid var(--border);color:var(--text);}
+.obtn-copy:hover{border-color:var(--accent);color:var(--accent);}
+.obtn-save{background:var(--surface2);border:1px solid var(--border);color:var(--muted);}
+.obtn-save:hover{border-color:var(--green);color:var(--green);}
+.obtn-regen{background:var(--surface2);border:1px solid var(--border);color:var(--muted);}
+.obtn-regen:hover{border-color:#555;color:var(--text);}
+.obtn-del{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.obtn-del:hover{border-color:var(--red);color:var(--red);}
+.sbadge{font-family:var(--fm);font-size:9px;font-weight:600;padding:3px 9px;border-radius:20px;text-transform:uppercase;background:rgba(245,200,0,.1);color:var(--accent);}
+
+/* PRICE + SEND */
+.price-row{display:flex;gap:8px;align-items:center;margin-top:10px;}
+.price-input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-family:var(--fm);font-size:14px;color:var(--green);outline:none;width:140px;transition:border .15s;}
+.price-input:focus{border-color:var(--green);}
+.price-input::placeholder{color:var(--dim);}
+.obtn-send{background:var(--green);color:#000;border:none;font-weight:700;}
+.obtn-send:hover{filter:brightness(1.1);}
+.obtn-send:disabled{background:var(--dim);cursor:not-allowed;color:var(--muted);}
+.orc-card.enviado::before{background:var(--green);}
+.sbadge.enviado{background:rgba(34,197,94,.12);color:var(--green);}
+.sbadge.pendente{background:rgba(245,200,0,.1);color:var(--accent);}
+
+/* TOAST */
+.toast{position:fixed;bottom:18px;right:18px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:11px 14px;font-family:var(--fm);font-size:11px;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;}
 .toast.show{transform:translateY(0);opacity:1;}
 </style>
 </head>
 <body>
+
 <header>
-  <div class="logo"><div class="logo-icon">📋</div>Reparo<span>Eletro</span> — Orçamento</div>
+  <div class="logo">
+    <div class="logo-icon">📋</div>
+    Reparo<span>Eletro</span> — Orçamento
+  </div>
 </header>
+
 <div class="tabs">
-  <button class="tab active" id="tab-cadastro" onclick="showPage('cadastro')">📝 Cadastro</button>
-  <button class="tab" id="tab-orcamento" onclick="showPage('orcamento')">💬 Orçamento</button>
+  <button class="tab active" id="tab-cad" onclick="showPage('cadastro')">📝 Cadastro</button>
+  <button class="tab" id="tab-orc" onclick="showPage('orcamento')">💬 Orçamento</button>
 </div>
+
+<!-- CADASTRO -->
 <div class="page active" id="page-cadastro">
   <div style="display:flex;align-items:center;justify-content:center;flex:1;padding:32px 20px;">
     <div class="chat-wrap">
@@ -78,181 +124,433 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
     </div>
   </div>
 </div>
+
+<!-- ORCAMENTO -->
 <div class="page" id="page-orcamento">
-  <div style="display:flex;align-items:center;justify-content:center;flex:1;padding:40px 20px;">
-    <div style="font-family:var(--fm);font-size:12px;color:var(--muted);text-align:center;">Em breve...</div>
+  <div class="orc-toolbar">
+    <div style="display:flex;gap:10px;align-items:center;">
+      <span id="orc-count" style="font-family:var(--fm);font-size:11px;color:var(--muted);">— fichas</span>
+      <span id="orc-st" style="font-family:var(--fm);font-size:10px;color:var(--muted);"></span>
+    </div>
+    <button id="sync-btn" onclick="orcSync()"
+      style="font-family:var(--fm);font-size:10px;padding:6px 13px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;"
+      onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'"
+      onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">
+      ↻ Sync Pipefy
+    </button>
+  </div>
+  <div class="orc-list" id="orc-list">
+    <div style="padding:48px;text-align:center;font-family:var(--fm);font-size:11px;color:var(--muted);">Carregando...</div>
   </div>
 </div>
+
 <div class="toast" id="toast">
   <span id="t-icon">✅</span>
   <div><strong id="t-title"></strong><br><span id="t-body" style="color:var(--muted);font-size:10px;"></span></div>
 </div>
+
 <script>
+// ── CADASTRO STATE ────────────────────────────────────────────
 var phases = [], solicitarColetaId = null;
 var botando = false, aguardandoFicha = true;
 var dados = {};
 
-async function init() {
-  try {
-    var r = await fetch('/api/orcamento?action=estrutura');
-    var d = await r.json();
-    if (d.ok) {
-      phases = d.phases || [];
-      var f = phases.find(function(p){ return p.name.toLowerCase().indexOf('solicitar coleta') >= 0; });
-      if (f) solicitarColetaId = f.id;
-    }
-  } catch(e) {}
-  addBot('Ola! Cole a ficha do cliente abaixo para cadastrar no Pipefy.');
+// ── HELPERS ───────────────────────────────────────────────────
+function autoResize(el) {
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 160) + "px";
+}
+
+function scrollDown() {
+  var m = document.getElementById("chat-msgs");
+  if (m) setTimeout(function() { m.scrollTop = m.scrollHeight; }, 60);
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function showPage(name) {
-  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
-  document.getElementById('tab-cadastro').classList.toggle('active', name==='cadastro');
-  document.getElementById('tab-orcamento').classList.toggle('active', name==='orcamento');
-  document.getElementById('page-'+name).classList.add('active');
+  document.getElementById("page-cadastro").classList.toggle("active", name === "cadastro");
+  document.getElementById("page-orcamento").classList.toggle("active", name === "orcamento");
+  document.getElementById("tab-cad").classList.toggle("active", name === "cadastro");
+  document.getElementById("tab-orc").classList.toggle("active", name === "orcamento");
+  if (name === "orcamento") orcLoad();
 }
 
-function autoResize(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,160)+'px'; }
-function scrollDown(){ var m=document.getElementById('chat-msgs'); setTimeout(function(){ m.scrollTop=m.scrollHeight; },60); }
-
-function fmt(txt){
-  return txt
-    .replace(/Nome:/g,'<strong>Nome:</strong>')
-    .replace(/Telefone:/g,'<strong>Telefone:</strong>')
-    .replace(/Aparelho:/g,'<strong>Aparelho:</strong>')
-    .replace(/Defeito:/g,'<strong>Defeito:</strong>')
-    .replace(/Endereco:/g,'<strong>Endereco:</strong>')
-    .replace(/\n/g,'<br>');
+function showToast(icon, title, msg) {
+  document.getElementById("t-icon").textContent  = icon;
+  document.getElementById("t-title").textContent = title;
+  document.getElementById("t-body").textContent  = msg;
+  var t = document.getElementById("toast");
+  t.classList.add("show");
+  setTimeout(function() { t.classList.remove("show"); }, 4000);
 }
 
+// ── CHAT ──────────────────────────────────────────────────────
 function addBot(txt, qrs) {
-  var m=document.getElementById('chat-msgs');
-  var div=document.createElement('div'); div.className='msg bot';
-  div.innerHTML='<div class="bubble">'+fmt(txt)+'</div>';
+  var m   = document.getElementById("chat-msgs");
+  var div = document.createElement("div");
+  div.className = "msg bot";
+  var bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.innerHTML = txt.split("\n").join("<br>");
+  div.appendChild(bubble);
   if (qrs && qrs.length) {
-    var qrDiv=document.createElement('div'); qrDiv.className='qr-wrap';
-    qrs.forEach(function(q){
-      var btn=document.createElement('button'); btn.className='qr-btn';
-      btn.textContent=q;
-      btn.onclick=function(){ sendMsg(q); };
+    var qrDiv = document.createElement("div");
+    qrDiv.className = "qr-wrap";
+    qrs.forEach(function(q) {
+      var btn = document.createElement("button");
+      btn.className = "qr-btn";
+      btn.textContent = q;
+      btn.onclick = function() { sendMsg(q); };
       qrDiv.appendChild(btn);
     });
     div.appendChild(qrDiv);
   }
-  m.appendChild(div); scrollDown();
+  m.appendChild(div);
+  scrollDown();
 }
 
 function addUser(txt) {
-  var m=document.getElementById('chat-msgs');
-  var div=document.createElement('div'); div.className='msg user';
-  div.innerHTML='<div class="bubble">'+txt.replace(/\n/g,'<br>')+'</div>';
-  m.appendChild(div); scrollDown();
+  var m   = document.getElementById("chat-msgs");
+  var div = document.createElement("div");
+  div.className = "msg user";
+  var bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.innerHTML = txt.split("\n").join("<br>");
+  div.appendChild(bubble);
+  m.appendChild(div);
+  scrollDown();
 }
 
-function showTyping(){
-  var m=document.getElementById('chat-msgs');
-  var div=document.createElement('div'); div.className='typing-wrap'; div.id='typing';
-  div.innerHTML='<div class="typing"><div class="td"></div><div class="td"></div><div class="td"></div></div>';
-  m.appendChild(div); scrollDown();
+function showTyping() {
+  var m   = document.getElementById("chat-msgs");
+  var div = document.createElement("div");
+  div.className = "typing-wrap";
+  div.id = "typing-ind";
+  div.innerHTML = '<div class="typing"><div class="td"></div><div class="td"></div><div class="td"></div></div>';
+  m.appendChild(div);
+  scrollDown();
 }
-function hideTyping(){ var t=document.getElementById('typing'); if(t) t.remove(); }
-function handleKey(e){ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();} }
+
+function hideTyping() {
+  var t = document.getElementById("typing-ind");
+  if (t) t.remove();
+}
+
+function handleKey(e) {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); }
+}
 
 function parseFicha(txt) {
   var lines = txt.split(/[\r\n]+/);
   function get(keys) {
-    for (var i=0; i<keys.length; i++) {
-      for (var j=0; j<lines.length; j++) {
-        var line = lines[j];
-        var col  = line.indexOf(':');
-        if (col < 0) continue;
-        var label = line.slice(0, col).toLowerCase().trim().replace(/[^a-z]/g,'');
-        var key   = keys[i].toLowerCase().replace(/[^a-z]/g,'');
+    for (var i = 0; i < keys.length; i++) {
+      for (var j = 0; j < lines.length; j++) {
+        var line  = lines[j];
+        var colon = line.indexOf(":");
+        if (colon < 0) continue;
+        var label = line.slice(0, colon).toLowerCase().replace(/[^a-z]/g, "");
+        var key   = keys[i].toLowerCase().replace(/[^a-z]/g, "");
         if (label.indexOf(key) >= 0 || key.indexOf(label) >= 0) {
-          var val = line.slice(col+1).trim();
+          var val = line.slice(colon + 1).trim();
           if (val) return val;
         }
       }
     }
-    return '';
+    return "";
   }
   return {
-    nome:     get(['nome']),
-    telefone: get(['telefone','fone','cel','whatsapp','tel']),
-    aparelho: get(['aparelho','equipamento','produto']),
-    defeito:  get(['defeito','problema','defeit','falha']),
-    endereco: get(['cep','endereco','endereço','end','rua','logradouro']),
+    nome:     get(["nome"]),
+    telefone: get(["telefone","fone","cel","whatsapp","tel"]),
+    aparelho: get(["aparelho","equipamento","produto"]),
+    defeito:  get(["defeito","problema","defeit","falha"]),
+    endereco: get(["cep","endereco","endereço","end","rua","logradouro"]),
   };
 }
 
 async function sendMsg(txt) {
   if (botando) return;
-  var input=document.getElementById('chat-input');
-  var msg=(txt||input.value).trim();
+  var input = document.getElementById("chat-input");
+  var msg   = (txt || input.value).trim();
   if (!msg) return;
-  input.value=''; input.style.height='auto';
+  input.value = ""; input.style.height = "auto";
   addUser(msg);
 
-  if (aguardandoFicha) {
-    botando=true; document.getElementById('send-btn').disabled=true;
-    showTyping(); await delay(700); hideTyping();
-    dados = parseFicha(msg);
-    var faltando=[];
-    if (!dados.nome)     faltando.push('Nome');
-    if (!dados.telefone) faltando.push('Telefone');
-    if (!dados.aparelho) faltando.push('Aparelho');
-    if (!dados.defeito)  faltando.push('Defeito');
-    if (faltando.length) {
-      addBot('Nao consegui identificar: ' + faltando.join(', ') + '.\n\nVerifique o formato e cole novamente.');
-      botando=false; document.getElementById('send-btn').disabled=false;
-      return;
+  if (!aguardandoFicha) {
+    if (msg === "Novo cadastro") {
+      dados = {}; aguardandoFicha = true;
+      document.getElementById("chat-msgs").innerHTML = "";
+      document.getElementById("input-area").style.display = "flex";
+      addBot("Pronto! Cole a próxima ficha.");
     }
-    aguardandoFicha=false;
-    botando=false; document.getElementById('send-btn').disabled=false;
-    await criarCard();
+    return;
   }
+
+  botando = true;
+  document.getElementById("send-btn").disabled = true;
+  showTyping();
+  await delay(700);
+  hideTyping();
+
+  dados = parseFicha(msg);
+  var faltando = [];
+  if (!dados.nome)     faltando.push("Nome");
+  if (!dados.telefone) faltando.push("Telefone");
+  if (!dados.aparelho) faltando.push("Aparelho");
+  if (!dados.defeito)  faltando.push("Defeito");
+
+  if (faltando.length) {
+    addBot("Não consegui identificar: " + faltando.join(", ") + ".\n\nVerifique o formato e cole novamente.");
+    botando = false;
+    document.getElementById("send-btn").disabled = false;
+    return;
+  }
+
+  aguardandoFicha = false;
+  await criarCard();
+  botando = false;
+  document.getElementById("send-btn").disabled = false;
 }
 
 async function criarCard() {
-  botando=true; document.getElementById('send-btn').disabled=true;
-  document.getElementById('input-area').style.display='none';
+  document.getElementById("input-area").style.display = "none";
   showTyping();
   try {
-    var r=await fetch('/api/orcamento?action=criar-card',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({nome:dados.nome,telefone:dados.telefone,aparelho:dados.aparelho,defeito:dados.defeito,endereco:dados.endereco,phaseId:solicitarColetaId})
+    var r = await fetch("/api/orcamento?action=criar-card", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nome:     dados.nome,
+        telefone: dados.telefone,
+        aparelho: dados.aparelho,
+        defeito:  dados.defeito,
+        endereco: dados.endereco || "",
+        phaseId:  solicitarColetaId,
+      }),
     });
-    var d=await r.json();
+    var d = await r.json();
     hideTyping();
     if (d.ok) {
-      addBot('Card criado no Pipefy!\n\n'+dados.nome+' cadastrado em Solicitar Coleta.',['Novo cadastro']);
+      addBot("✅ Card criado no Pipefy!\n\n" + dados.nome + " cadastrado em Solicitar Coleta.", ["Novo cadastro"]);
     } else {
-      addBot('Erro: '+d.error);
-      document.getElementById('input-area').style.display='flex';
-      aguardandoFicha=true;
+      addBot("❌ Erro: " + d.error);
+      document.getElementById("input-area").style.display = "flex";
+      aguardandoFicha = true;
     }
   } catch(e) {
     hideTyping();
-    addBot('Sem conexao com o Pipefy. Tente novamente.');
-    document.getElementById('input-area').style.display='flex';
-    aguardandoFicha=true;
+    addBot("❌ Sem conexão com o Pipefy. Tente novamente.");
+    document.getElementById("input-area").style.display = "flex";
+    aguardandoFicha = true;
   }
-  botando=false; document.getElementById('send-btn').disabled=false;
 }
 
-document.addEventListener('click', function(e) {
-  if (e.target.classList.contains('qr-btn') && e.target.textContent==='Novo cadastro') {
-    dados={}; aguardandoFicha=true; aguardandoConf=false;
-    document.getElementById('chat-msgs').innerHTML='';
-    document.getElementById('input-area').style.display='flex';
-    addBot('Pronto! Cole a proxima ficha.');
-    document.getElementById('chat-input').focus();
-  }
-});
+// ── ORÇAMENTO PANEL ───────────────────────────────────────────
+var orcFichas = [];
 
-function delay(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+async function orcLoad() {
+  try {
+    var r = await fetch("/api/orcamento?action=orc-load");
+    var d = await r.json();
+    if (d.ok) { orcFichas = d.fichas || []; orcRender(); }
+  } catch(e) {}
+}
+
+async function orcSync() {
+  var btn = document.getElementById("sync-btn");
+  var st  = document.getElementById("orc-st");
+  btn.textContent = "⏳";
+  btn.style.pointerEvents = "none";
+  st.textContent = "sincronizando...";
+  try {
+    var r = await fetch("/api/orcamento?action=orc-sync");
+    var d = await r.json();
+    if (d.newCount > 0) {
+      await orcLoad();
+      st.textContent = "+" + d.newCount + " nova" + (d.newCount > 1 ? "s" : "");
+      setTimeout(function() { st.textContent = ""; }, 4000);
+    } else {
+      st.textContent = "sem novidades";
+      setTimeout(function() { st.textContent = ""; }, 3000);
+    }
+    if (d.pipefyError) st.textContent = "Pipefy: " + d.pipefyError;
+  } catch(e) { st.textContent = "Erro: " + e.message; }
+  btn.textContent = "↻ Sync Pipefy";
+  btn.style.pointerEvents = "";
+}
+
+function orcRender() {
+  var countEl = document.getElementById("orc-count");
+  var listEl  = document.getElementById("orc-list");
+  if (!countEl || !listEl) return;
+  countEl.textContent = orcFichas.length + " ficha" + (orcFichas.length !== 1 ? "s" : "");
+  if (!orcFichas.length) {
+    listEl.innerHTML = '<div style="padding:48px;text-align:center;font-family:var(--fm);font-size:11px;color:var(--muted);">Nenhum orçamento pendente.<br>Clique em Sync Pipefy para buscar fichas em Aguardando Aprovação.</div>';
+    return;
+  }
+  listEl.innerHTML = "";
+  orcFichas.forEach(function(f) {
+    var card = document.createElement("div");
+    card.className = "orc-card";
+    card.id = "orc-" + f.id;
+
+    var comms = "";
+    if (f.comentarios && f.comentarios.length) {
+      comms = '<div class="orc-comments">💬 ' + escHtml(f.comentarios.slice(0, 3).join(" | ")) + "</div>";
+    }
+
+    var isSent = f.status === "enviado";
+    card.innerHTML =
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px;">' +
+        '<div>' +
+          '<div class="orc-nome">' + escHtml(f.nome || "—") + "</div>" +
+          '<div class="orc-tel">' + escHtml(f.tel || "") + "</div>" +
+        "</div>" +
+        '<span class="sbadge">' + (f.status || "pendente") + "</span>" +
+      "</div>" +
+      (f.desc ? '<div class="orc-desc">' + escHtml(f.desc) + "</div>" : "") +
+      comms +
+      '<div class="orc-lbl">📄 Texto do Orçamento <span style="color:var(--dim);font-size:9px;float:right">editável</span></div>' +
+      '<textarea class="orc-textarea" id="texto-' + f.id + '" rows="4">' + escHtml(f.textoOrc || "") + "</textarea>" +
+      '<div class="price-row">' +
+        '<span style="font-family:var(--fm);font-size:11px;color:var(--muted)">R$</span>' +
+        '<input class="price-input" id="preco-' + f.id + '" type="number" step="0.01" min="0" placeholder="0,00" value="' + escHtml(f.preco || '') + '"/>' +
+        '<button class="obtn obtn-send" id="sendbtn-' + f.id + '" onclick="orcEnviar(\'' + f.id + '\')">' +
+          (isSent ? "✅ Enviado" : "📤 Enviar Orçamento") +
+        '</button>' +
+      '</div>' +
+      '<div class="orc-actions">' +
+        '<button class="obtn obtn-copy" onclick="orcCopiar(\'' + f.id + '\')">📋 Copiar texto</button>' +
+        '<button class="obtn obtn-save" onclick="orcSalvar(\'' + f.id + '\')">💾 Salvar</button>' +
+        '<button class="obtn obtn-regen" onclick="orcRegerar(\'' + f.id + '\')">✨ IA</button>' +
+        '<button class="obtn obtn-del" onclick="orcExcluir(\'' + f.id + '\')">✕</button>' +
+      '</div>';
+
+    listEl.appendChild(card);
+  });
+}
+
+async function orcCopiar(id) {
+  var ta = document.getElementById("texto-" + id);
+  if (!ta) return;
+  try { await navigator.clipboard.writeText(ta.value); }
+  catch(e) { ta.select(); document.execCommand("copy"); }
+  showToast("📋", "Copiado!", "Texto pronto para o WhatsApp");
+}
+
+async function orcSalvar(id) {
+  var ta = document.getElementById("texto-" + id);
+  if (!ta) return;
+  var r  = await fetch("/api/orcamento?action=orc-update-texto", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: id, textoOrc: ta.value }),
+  });
+  var d = await r.json();
+  if (d.ok) {
+    var f = orcFichas.find(function(x) { return x.id === id; });
+    if (f) f.textoOrc = ta.value;
+    showToast("💾", "Salvo!", "");
+  } else showToast("❌", "Erro", d.error);
+}
+
+async function orcRegerar(id) {
+  var f   = orcFichas.find(function(x) { return x.id === id; });
+  var btn = document.querySelector("#orc-" + id + " .obtn-regen");
+  if (btn) { btn.textContent = "⏳"; btn.disabled = true; }
+  var r = await fetch("/api/orcamento?action=orc-regenerar", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: id }),
+  });
+  var d = await r.json();
+  if (btn) { btn.textContent = "✨ IA"; btn.disabled = false; }
+  if (d.ok) {
+    var ta = document.getElementById("texto-" + id);
+    if (ta) ta.value = d.textoOrc;
+    if (f) f.textoOrc = d.textoOrc;
+    showToast("✨", "Texto gerado!", "Revise e copie para o WhatsApp");
+  } else showToast("❌", "Erro", d.error);
+}
+
+async function orcExcluir(id) {
+  if (!confirm("Excluir esta ficha?")) return;
+  var r = await fetch("/api/orcamento?action=orc-excluir", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: id }),
+  });
+  var d = await r.json();
+  if (d.ok) {
+    orcFichas = orcFichas.filter(function(f) { return f.id !== id; });
+    orcRender();
+    showToast("🗑️", "Excluído", "");
+  }
+}
+
+async function orcEnviar(id) {
+  var f    = orcFichas.find(function(x) { return x.id === id; });
+  if (!f) return;
+  var ta   = document.getElementById("texto-" + id);
+  var prInput = document.getElementById("preco-" + id);
+  if (!ta || !prInput) return;
+  var preco = prInput.value.trim();
+  if (!preco) { showToast("⚠️", "Informe o preço", ""); prInput.focus(); return; }
+  var texto = ta.value;
+  // Monta número limpo para wa.me
+  var telLimpo = (f.tel || "").replace(/\D/g, "");
+  if (!telLimpo.startsWith("55")) telLimpo = "55" + telLimpo;
+  // Adiciona preço ao texto se tiver placeholder [VALOR]
+  var textoFinal = texto.replace("[VALOR]", "R$ " + parseFloat(preco).toLocaleString("pt-BR", {minimumFractionDigits:2}));
+  var waUrl = "https://wa.me/" + telLimpo + "?text=" + encodeURIComponent(textoFinal);
+  // Abre WhatsApp
+  window.open(waUrl, "_blank");
+  // Marca como enviado no banco + atualiza preço no Pipefy
+  var r = await fetch("/api/orcamento?action=orc-enviar", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: id, preco: preco }),
+  });
+  var d = await r.json();
+  if (d.ok) {
+    f.status = "enviado"; f.preco = preco;
+    // Atualiza badge e botão sem re-renderizar tudo
+    var card = document.getElementById("orc-" + id);
+    if (card) {
+      card.classList.add("enviado");
+      var badge = card.querySelector(".sbadge");
+      if (badge) { badge.textContent = "enviado"; badge.className = "sbadge enviado"; }
+      var sendBtn = document.getElementById("send-orc-" + id);
+      if (sendBtn) { sendBtn.textContent = "✅ Enviado"; sendBtn.style.background = "var(--dim)"; sendBtn.style.cursor = "default"; }
+    }
+    showToast("📤", "Orçamento enviado!", "Abrindo WhatsApp...");
+  } else showToast("❌", "Erro", d.error);
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+function delay(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+async function init() {
+  try {
+    var r = await fetch("/api/orcamento?action=estrutura");
+    var d = await r.json();
+    if (d.ok) {
+      phases = d.phases || [];
+      var fase = phases.find(function(p) {
+        return p.name.toLowerCase().indexOf("solicitar coleta") >= 0;
+      });
+      if (fase) solicitarColetaId = fase.id;
+    }
+  } catch(e) {}
+  addBot("Olá! Cole a ficha do cliente abaixo para cadastrar no Pipefy.");
+}
 
 init();
+setInterval(function() {
+  if (document.getElementById("page-orcamento").classList.contains("active")) orcSync();
+}, 60000);
 </script>
 </body>
 </html>
