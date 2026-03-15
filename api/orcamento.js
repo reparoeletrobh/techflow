@@ -133,24 +133,29 @@ module.exports = async function handler(req, res) {
 
   // ── GET orc-sync ───────────────────────────────────────────
   if (action === "orc-sync") {
-    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [], initialized: false };
+    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [], initialized: false, maxIdSeen: 0 };
     if (!Array.isArray(db.fichas))    db.fichas    = [];
     if (!Array.isArray(db.syncedIds)) db.syncedIds = [];
     let newCount = 0, pipefyError = null;
     try {
       const cards = await fetchAguardandoAprovacao();
-      // Primeira vez: apenas registra os IDs existentes sem criar fichas
+      // Primeira vez: guarda o maior ID atual como referência — não importa nada
       if (!db.initialized) {
+        const maxId = cards.reduce((max, c) => Math.max(max, parseInt(c.pipefyId)||0), 0);
+        db.maxIdSeen  = maxId;
+        db.initialized = true;
+        // Também marca todos como vistos para não importar se alguém chamar orc-forcar
         cards.forEach(card => {
           if (!db.syncedIds.includes(card.pipefyId)) db.syncedIds.push(card.pipefyId);
         });
-        db.initialized = true;
         await dbSet(ORC_KEY, db);
-        return res.status(200).json({ ok: true, newCount: 0, initialized: true, pipefyError: null });
+        return res.status(200).json({ ok: true, newCount: 0, initialized: true, maxIdSeen: maxId, pipefyError: null });
       }
-      // Próximas vezes: importa apenas cards novos
+      // Importa apenas cards com ID maior que o máximo visto na inicialização
       for (const card of cards) {
-        if (db.syncedIds.includes(card.pipefyId)) continue;
+        const cardId = parseInt(card.pipefyId) || 0;
+        if (cardId <= db.maxIdSeen) continue;        // card antigo
+        if (db.syncedIds.includes(card.pipefyId)) continue; // já processado
         let textoOrc = "";
         try { textoOrc = await gerarTextoOrcamento(card.desc, card.comentarios); } catch(e) {}
         db.fichas.unshift({
@@ -168,11 +173,12 @@ module.exports = async function handler(req, res) {
           createdAt:   new Date().toISOString(),
         });
         db.syncedIds.push(card.pipefyId);
+        if (cardId > db.maxIdSeen) db.maxIdSeen = cardId;
         newCount++;
       }
       if (newCount > 0) await dbSet(ORC_KEY, db);
     } catch(e) { pipefyError = e.message; }
-    return res.status(200).json({ ok: true, newCount, pipefyError });
+    return res.status(200).json({ ok: true, newCount, pipefyError, maxIdSeen: db.maxIdSeen });
   }
 
   // ── POST orc-update-texto ──────────────────────────────────
@@ -277,9 +283,10 @@ module.exports = async function handler(req, res) {
     const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
     db.initialized = false;
     db.syncedIds   = [];
-    db.fichas      = [];  // limpa fichas também
+    db.fichas      = [];
+    db.maxIdSeen   = 0;
     await dbSet(ORC_KEY, db);
-    return res.status(200).json({ ok: true, msg: "Reset completo. Fichas e IDs limpos." });
+    return res.status(200).json({ ok: true, msg: "Reset completo. Chame orc-sync para inicializar." });
   }
 
   // ── POST orc-excluir ───────────────────────────────────────
