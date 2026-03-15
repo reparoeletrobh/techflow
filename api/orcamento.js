@@ -231,6 +231,33 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── GET orc-debug ─────────────────────────────────────────
+  if (action === "orc-debug") {
+    const result = {};
+    try {
+      const data = await pipefyQuery(`query {
+        pipe(id: "${PIPE_ID}") {
+          phases {
+            name
+            cards(first: 10) {
+              edges { node { id title } }
+            }
+          }
+        }
+      }`);
+      result.phases = (data?.pipe?.phases || []).map(p => ({
+        name: p.name,
+        cards: p.cards.edges.length,
+        sample: p.cards.edges.slice(0,2).map(e => e.node.title),
+      }));
+    } catch(e) { result.pipefy_error = e.message; }
+    const db = await dbGet(ORC_KEY) || {};
+    result.initialized = db.initialized;
+    result.syncedIds_count = (db.syncedIds || []).length;
+    result.fichas_count = (db.fichas || []).length;
+    return res.status(200).json(result);
+  }
+
   // ── GET orc-reset-init ────────────────────────────────────
   if (action === "orc-reset-init") {
     const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
