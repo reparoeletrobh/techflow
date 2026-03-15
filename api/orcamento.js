@@ -468,6 +468,10 @@ function detectarRegra(desc, comentarios) {
 }
 
 
+function primeiroNome(nome) {
+  return nome ? nome.trim().split(/\s+/)[0] : "";
+}
+
 function substituirNome(template, nome) {
   var p = primeiroNome(nome);
   return template.replace(/\[NOME\]/g, p);
