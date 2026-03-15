@@ -379,86 +379,121 @@ async function fetchAguardandoAprovacao() {
 }
 
 // Gera texto de orçamento com Claude
+// ── NORMALIZA TEXTO (remove acentos, minúsculo) ──────────────
+function norm(s) {
+  return String(s || "").toLowerCase()
+    .normalize("NFD").replace(/̀-ͯ/g, " ")
+    .replace(/[^a-z0-9 ]/g, " ");
+}
+
 // ── REGRAS DE ORÇAMENTO ──────────────────────────────────────
-// Cada regra: { keywords, template }
-// keywords: palavras-chave buscadas em QUALQUER campo do card (desc + comentarios)
-// template: texto final com [NOME] como placeholder do nome do cliente
 const ORCAMENTO_REGRAS = [
   {
-    keywords: ["termoeletrico", "termeletrico", "termoelétrico", "cooler", "placa de resfriamento", "peltier", "pasta termica", "pasta térmica", "kit frio", "kit termoeletrico"],
-    template: `Olá, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:
-Foram feitos todos os testes e identificamos que será necessário refazer a parte elétrica que causou danos no conjunto do cooler, placa de resfriamento e pasta térmica, as peças serão trocadas também. Este conserto completo fica em 350 reais apenas. Aprovando já iniciamos o conserto.`,
+    keywords: [
+      "termoeletrico","termeletrico","termoeltrico","thermoeletrico",
+      "cooler","culer","coler","colder",
+      "placa de resfriamento","placa resfriamento","placa fria",
+      "peltier","peltyer","peltir",
+      "pasta termica","pasta terminca","pasta termika",
+      "kit frio","kit termoeletrico","kit termico","conjunto termoeletrico",
+    ],
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do cooler, placa de resfriamento e pasta termica, as pecas serao trocadas tambem. Este conserto completo fica em 350 reais apenas. Aprovando ja iniciamos o conserto.",
   },
-  // ── Adicionar novos casos aqui ──
-  // { keywords: ["fusível", "fusivel", "queimou"], template: `Olá, [NOME]...` },
 ];
 
 function detectarRegra(desc, comentarios) {
-  const texto = [desc, ...(comentarios || [])].join(" ").toLowerCase()
-    .normalize("NFD").replace(/[̀-ͯ]/g, ""); // remove acentos
+  const textoNorm = norm([desc, ...(comentarios || [])].join(" "));
   for (const regra of ORCAMENTO_REGRAS) {
-    const match = regra.keywords.some(kw =>
-      texto.includes(kw.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""))
-    );
+    const match = regra.keywords.some(function(kw) { return textoNorm.includes(norm(kw)); });
     if (match) return regra.template;
   }
   return null;
 }
 
-function templatePadrao(desc) {
-  return `Olá, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:
+function primeiroNome(nome) {
+  return nome ? nome.trim().split(/[ ]+/)[0] : "";
+}
 
-Realizamos todos os testes e identificamos o problema: ${desc || "defeito identificado após análise"}. Faremos o reparo completo com substituição das peças necessárias.
+function substituirNome(template, nome) {
+  var p = primeiroNome(nome);
+  return template.replace(/\[NOME\]/g, p);
+}
 
-Este conserto completo fica em [VALOR] apenas. Aprovando já iniciamos o conserto.`;
+function templatePadrao(desc, nome) {
+  var p = primeiroNome(nome);
+  var saud = p ? "Ola, " + p + " bom dia" : "Ola, bom dia";
+  return saud + ", sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nRealizamos todos os testes e identificamos o problema. Faremos o reparo completo com substituicao das pecas necessarias.\n\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.";
 }
 
 async function gerarTextoOrcamento(desc, comentarios, nome) {
-  // 1. Verifica se bate com alguma regra conhecida
-  const regra = detectarRegra(desc, comentarios);
-  if (regra) {
-    return regra.replace(/\[NOME\]/g, nome ? nome.split(" ")[0] : "");
-  }
+  var regra = detectarRegra(desc, comentarios);
+  if (regra) return substituirNome(regra, nome);
 
-  // 2. Sem regra — usa IA para gerar com base no defeito e comentários
-  if (!desc && (!comentarios || !comentarios.length)) return templatePadrao(desc);
-
-  const nomeFirst = nome ? nome.split(" ")[0] : "";
-  const comStr = comentarios && comentarios.length ? comentarios.join("; ") : "";
-  const userMsg = `Nome do cliente: ${nomeFirst || "cliente"}
-Defeito/Descrição: ${desc || "não informado"}${comStr ? "\nAtividades registradas: " + comStr : ""}`;
+  var primeiro = primeiroNome(nome) || "cliente";
+  var comStr = (comentarios || []).join("; ");
+  var userMsg = "Nome: " + primeiro + "\nDefeito: " + (desc || "nao informado") + (comStr ? "\nAtividades: " + comStr : "");
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    var res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 400,
-        system: `Você é Pedro, técnico da Reparo Eletro em BH. Gera textos de orçamento para WhatsApp.
-
-Siga EXATAMENTE esta estrutura:
-
-Olá, [primeiro nome do cliente] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:
-
-[1 a 2 frases: diagnóstico e o que será feito/trocado com base no defeito e atividades]
-
-Este conserto completo fica em [VALOR] apenas. Aprovando já iniciamos o conserto.
-
-REGRAS:
-- Use o primeiro nome do cliente na saudação
-- Deixe [VALOR] literalmente assim
-- Use termos técnicos das atividades se houver
-- Sem emojis, máximo 3 parágrafos`,
+        system: "Voce e Pedro, tecnico da Reparo Eletro em BH. Gere um texto de orcamento para WhatsApp no formato:\n\nOla, {PRIMEIRO NOME} bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n{1-2 frases sobre diagnostico e pecas baseadas no defeito e atividades registradas}\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.\n\nRegras: use o primeiro nome; deixe [VALOR] literal; sem emojis.",
         messages: [{ role: "user", content: userMsg }],
       }),
     });
-    const data = await res.json();
-    const texto = data.content?.[0]?.text || "";
-    if (texto && texto.includes("[VALOR]")) return texto;
-    if (texto) return texto + "\n\nEste conserto completo fica em [VALOR] apenas. Aprovando já iniciamos o conserto.";
-    return templatePadrao(desc);
-  } catch(e) {
-    return templatePadrao(desc);
-  }
+    var data = await res.json();
+    var texto = (data.content && data.content[0] && data.content[0].text) ? data.content[0].text : "";
+    if (texto && texto.indexOf("[VALOR]") >= 0) return texto;
+    if (texto) return texto + "\n\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.";
+  } catch(e) {}
+
+  return templatePadrao(desc, nome);
 }
+
+
+// Busca cards em Aguardando Aprovação direto pelo ID da fase (mais rápido e completo)
+
+async function fetchAguardandoAprovacao() {
+  const all = [];
+  let cursor = null, hasNext = true;
+  while (hasNext) {
+    const after = cursor ? `, after: "${cursor}"` : "";
+    const data = await pipefyQuery(`query {
+      phase(id: "${AGUARDANDO_APROVACAO_PHASE_ID}") {
+        cards(first: 50${after}) {
+          pageInfo { hasNextPage endCursor }
+          edges {
+            node {
+              id title age
+              fields { name value }
+              comments { text author { name } created_at }
+            }
+          }
+        }
+      }
+    }`);
+    const phase = data?.phase;
+    if (!phase) break;
+    for (const { node } of phase.cards.edges) {
+      const fields = node.fields || [];
+      const nome   = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
+      const tel    = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
+      const desc   = fields.find(f => f.name.toLowerCase().includes("descri") || f.name.toLowerCase().includes("empresa"))?.value || "";
+      const end    = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
+      const comentarios = (node.comments || []).map(c => c.text).filter(Boolean);
+      all.push({ pipefyId: String(node.id), title: node.title, nome, tel, desc, end, age: node.age, comentarios });
+    }
+    hasNext = phase.cards.pageInfo?.hasNextPage ?? false;
+    cursor  = phase.cards.pageInfo?.endCursor ?? null;
+  }
+  return all;
+}
+
+// Gera texto de orçamento com Claude
+// ── REGRAS DE ORÇAMENTO ──────────────────────────────────────
+// Cada regra: { keywords, template }
+// keywords: palavras-chave buscadas em QUALQUER campo do card (desc + comentarios)
+// template: texto final com [NOME] como placeholder do nome do cliente
