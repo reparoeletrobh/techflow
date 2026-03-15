@@ -35,6 +35,18 @@ async function fetchPipeStructure() {
   };
 }
 
+// Atualiza o campo Valor total no card do Pipefy
+async function updateCardValue(pipefyId, valor) {
+  const mutation = `mutation {
+    updateCardField(input: {
+      card_id: "${pipefyId}"
+      field_id: "valor_de_contrato"
+      new_value: "${String(valor).replace(/"/g, "")}"
+    }) { success }
+  }`;
+  return await pipefyQuery(mutation);
+}
+
 async function createPipefyCard({ phaseId, nome, telefone, aparelho, defeito, endereco }) {
   const descricao   = `${aparelho} — ${defeito}`;
   const ultimos4    = telefone.replace(/\D/g, "").slice(-4);
@@ -113,5 +125,201 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // ── GET orc-load ──────────────────────────────────────────
+  if (action === "orc-load") {
+    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
+    return res.status(200).json({ ok: true, fichas: db.fichas || [] });
+  }
+
+  // ── GET orc-sync ───────────────────────────────────────────
+  if (action === "orc-sync") {
+    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
+    if (!Array.isArray(db.fichas))    db.fichas    = [];
+    if (!Array.isArray(db.syncedIds)) db.syncedIds = [];
+    let newCount = 0, pipefyError = null;
+    try {
+      const cards = await fetchAguardandoAprovacao();
+      for (const card of cards) {
+        if (db.syncedIds.includes(card.pipefyId)) continue;
+        // Gera texto de orçamento com IA
+        let textoOrc = "";
+        try { textoOrc = await gerarTextoOrcamento(card.desc, card.comentarios); } catch(e) {}
+        db.fichas.unshift({
+          id:          card.pipefyId,
+          pipefyId:    card.pipefyId,
+          nome:        card.nome,
+          tel:         card.tel,
+          desc:        card.desc,
+          end:         card.end,
+          age:         card.age,
+          comentarios: card.comentarios,
+          textoOrc,
+          status:      "pendente",
+          createdAt:   new Date().toISOString(),
+        });
+        db.syncedIds.push(card.pipefyId);
+        newCount++;
+      }
+      if (newCount > 0) await dbSet(ORC_KEY, db);
+    } catch(e) { pipefyError = e.message; }
+    return res.status(200).json({ ok: true, newCount, pipefyError });
+  }
+
+  // ── POST orc-update-texto ──────────────────────────────────
+  // Regenera ou edita o texto de orçamento de uma ficha
+  if (req.method === "POST" && action === "orc-update-texto") {
+    const { id, textoOrc } = req.body || {};
+    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
+    const ficha = db.fichas.find(f => f.id === id);
+    if (!ficha) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
+    ficha.textoOrc = textoOrc;
+    await dbSet(ORC_KEY, db);
+    return res.status(200).json({ ok: true, ficha });
+  }
+
+  // ── POST orc-regenerar ─────────────────────────────────────
+  if (req.method === "POST" && action === "orc-regenerar") {
+    const { id } = req.body || {};
+    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
+    const ficha = db.fichas.find(f => f.id === id);
+    if (!ficha) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
+    try {
+      ficha.textoOrc = await gerarTextoOrcamento(ficha.desc, ficha.comentarios);
+      await dbSet(ORC_KEY, db);
+      return res.status(200).json({ ok: true, textoOrc: ficha.textoOrc });
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: e.message });
+    }
+  }
+
+  // ── POST orc-enviar ───────────────────────────────────────
+  if (req.method === "POST" && action === "orc-enviar") {
+    const { id, preco } = req.body || {};
+    if (!id) return res.status(400).json({ ok: false, error: "id obrigatório" });
+    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
+    const ficha = db.fichas.find(f => f.id === id);
+    if (!ficha) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
+    ficha.status    = "enviado";
+    ficha.preco     = preco || null;
+    ficha.enviadoAt = new Date().toISOString();
+    await dbSet(ORC_KEY, db);
+    // Atualiza valor no Pipefy em background (não bloqueia)
+    if (preco && ficha.pipefyId && !ficha.pipefyId.startsWith("local")) {
+      updateCardValue(ficha.pipefyId, preco).catch(e => console.error("updateCardValue:", e.message));
+    }
+    return res.status(200).json({ ok: true, ficha });
+  }
+
+  // ── POST orc-status ────────────────────────────────────────
+  if (req.method === "POST" && action === "orc-status") {
+    const { id, status } = req.body || {};
+    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
+    const ficha = db.fichas.find(f => f.id === id);
+    if (!ficha) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
+    ficha.status = status;
+    await dbSet(ORC_KEY, db);
+    return res.status(200).json({ ok: true });
+  }
+
+  // ── POST orc-excluir ───────────────────────────────────────
+  if (req.method === "POST" && action === "orc-excluir") {
+    const { id } = req.body || {};
+    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
+    db.fichas    = db.fichas.filter(f => f.id !== id);
+    db.syncedIds = db.syncedIds.filter(s => s !== id);
+    await dbSet(ORC_KEY, db);
+    return res.status(200).json({ ok: true });
+  }
+
   return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 };
+
+// ── ORÇAMENTOS ────────────────────────────────────────────────
+
+const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g, "").trim();
+const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g, "").trim();
+const ORC_KEY = "reparoeletro_orcamentos";
+
+async function dbGet(key) {
+  try {
+    const r = await fetch(`${UPSTASH_URL}/pipeline`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify([["GET", key]]),
+    });
+    const j = await r.json();
+    return j[0]?.result ? JSON.parse(j[0].result) : null;
+  } catch(e) { return null; }
+}
+
+async function dbSet(key, value) {
+  try {
+    const r = await fetch(`${UPSTASH_URL}/pipeline`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify([["SET", key, JSON.stringify(value)]]),
+    });
+    const j = await r.json();
+    return j[0]?.result === "OK";
+  } catch(e) { return false; }
+}
+
+// Busca cards em Aguardando Aprovação com campos e comentários
+async function fetchAguardandoAprovacao() {
+  const data = await pipefyQuery(`query {
+    pipe(id: "${PIPE_ID}") {
+      phases {
+        name
+        cards(first: 50) {
+          edges {
+            node {
+              id title age
+              fields { name value }
+              comments { text author { name } created_at }
+            }
+          }
+        }
+      }
+    }
+  }`);
+  const phases = data?.pipe?.phases || [];
+  const phase  = phases.find(p => p.name.toLowerCase().includes("aguardando aprovação") || p.name.toLowerCase().includes("aguardando aprovacao"));
+  if (!phase) return [];
+  return phase.cards.edges.map(e => {
+    const node = e.node;
+    const fields = node.fields || [];
+    const nome    = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
+    const tel     = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
+    const desc    = fields.find(f => f.name.toLowerCase().includes("descri") || f.name.toLowerCase().includes("empresa"))?.value || "";
+    const end     = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
+    const comentarios = (node.comments || []).map(c => c.text).filter(Boolean);
+    return { pipefyId: String(node.id), title: node.title, nome, tel, desc, end, age: node.age, comentarios };
+  });
+}
+
+// Gera texto de orçamento com Claude
+async function gerarTextoOrcamento(desc, comentarios) {
+  const contexto = `Defeito/Descrição: ${desc}\nAtividades/Comentários: ${comentarios.join("; ")}`;
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 400,
+      system: `Você é Pedro, técnico da Reparo Eletro em BH. Gera textos de orçamento para clientes no WhatsApp.
+Tom: cordial, direto, informal mas profissional. Sem preço (será preenchido depois). Sem emojis excessivos.
+
+Estrutura obrigatória:
+1. Saudação: "Olá, bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:"
+2. Diagnóstico e peças: descreva o que foi identificado e o que será feito/trocado (baseado no defeito e nas atividades)
+3. Finalização: "Este conserto completo fica em [VALOR] apenas. Aprovando já iniciamos o conserto."
+
+Deixe [VALOR] como placeholder literal para o atendente preencher.
+Seja específico com as peças/procedimentos mencionados nas atividades.
+Máximo 5 linhas no corpo.`,
+      messages: [{ role: "user", content: contexto }],
+    }),
+  });
+  const data = await res.json();
+  return data.content?.[0]?.text || "";
+}
