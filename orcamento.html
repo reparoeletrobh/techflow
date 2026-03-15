@@ -415,14 +415,19 @@ async function orcEnviar(id) {
   if (!ta || !prInput) return;
   var preco = prInput.value.trim();
   if (!preco) { showToast("⚠️", "Informe o preço", ""); prInput.focus(); return; }
-  // Substitui [VALOR] pelo preço e copia
+  // Substitui [VALOR] pelo preço
   var textoFinal = ta.value.replace("[VALOR]", "R$ " + parseFloat(preco).toLocaleString("pt-BR", {minimumFractionDigits: 2}));
-  try { await navigator.clipboard.writeText(textoFinal); }
-  catch(e) { var tmp = document.createElement("textarea"); tmp.value = textoFinal; document.body.appendChild(tmp); tmp.select(); document.execCommand("copy"); document.body.removeChild(tmp); }
+  // Monta link wa.me
+  var telLimpo = (f.tel || "").replace(/\D/g, "");
+  if (telLimpo && !telLimpo.startsWith("55")) telLimpo = "55" + telLimpo;
+  var waUrl = telLimpo ? "https://wa.me/" + telLimpo + "?text=" + encodeURIComponent(textoFinal) : textoFinal;
+  // Copia o link para área de transferência
+  try { await navigator.clipboard.writeText(waUrl); }
+  catch(e) { var tmp = document.createElement("textarea"); tmp.value = waUrl; document.body.appendChild(tmp); tmp.select(); document.execCommand("copy"); document.body.removeChild(tmp); }
   // Marca como enviado
   var r = await fetch("/api/orcamento?action=orc-enviar", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({id: id, preco: preco}) });
   var d = await r.json();
-  if (d.ok) { f.status = "enviado"; f.preco = preco; orcRender(); showToast("📋", "Texto copiado!", "Cole no WhatsApp. Ficha movida para Enviados."); }
+  if (d.ok) { f.status = "enviado"; f.preco = preco; orcRender(); showToast("📋", "Link copiado!", "Cole no navegador ou WhatsApp Web para abrir a conversa."); }
   else showToast("❌", "Erro", d.error);
 }
 
