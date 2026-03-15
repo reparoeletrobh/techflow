@@ -161,7 +161,7 @@ module.exports = async function handler(req, res) {
         if (cardId <= db.maxIdSeen) continue;        // card antigo
         if (db.syncedIds.includes(card.pipefyId)) continue; // já processado
         let textoOrc = "";
-        try { textoOrc = await gerarTextoOrcamento(card.desc, card.comentarios); } catch(e) {}
+        try { textoOrc = await gerarTextoOrcamento(card.desc, card.comentarios, card.nome); } catch(e) {}
         db.fichas.unshift({
           id:          card.pipefyId,
           pipefyId:    card.pipefyId,
@@ -204,7 +204,7 @@ module.exports = async function handler(req, res) {
     const ficha = db.fichas.find(f => f.id === id);
     if (!ficha) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
     try {
-      ficha.textoOrc = await gerarTextoOrcamento(ficha.desc, ficha.comentarios);
+      ficha.textoOrc = await gerarTextoOrcamento(ficha.desc, ficha.comentarios, ficha.nome);
       await dbSet(ORC_KEY, db);
       return res.status(200).json({ ok: true, textoOrc: ficha.textoOrc });
     } catch(e) {
@@ -379,34 +379,86 @@ async function fetchAguardandoAprovacao() {
 }
 
 // Gera texto de orçamento com Claude
-async function gerarTextoOrcamento(desc, comentarios) {
+// ── REGRAS DE ORÇAMENTO ──────────────────────────────────────
+// Cada regra: { keywords, template }
+// keywords: palavras-chave buscadas em QUALQUER campo do card (desc + comentarios)
+// template: texto final com [NOME] como placeholder do nome do cliente
+const ORCAMENTO_REGRAS = [
+  {
+    keywords: ["termoeletrico", "termeletrico", "termoelétrico", "cooler", "placa de resfriamento", "peltier", "pasta termica", "pasta térmica", "kit frio", "kit termoeletrico"],
+    template: `Olá, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:
+Foram feitos todos os testes e identificamos que será necessário refazer a parte elétrica que causou danos no conjunto do cooler, placa de resfriamento e pasta térmica, as peças serão trocadas também. Este conserto completo fica em 350 reais apenas. Aprovando já iniciamos o conserto.`,
+  },
+  // ── Adicionar novos casos aqui ──
+  // { keywords: ["fusível", "fusivel", "queimou"], template: `Olá, [NOME]...` },
+];
+
+function detectarRegra(desc, comentarios) {
+  const texto = [desc, ...(comentarios || [])].join(" ").toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, ""); // remove acentos
+  for (const regra of ORCAMENTO_REGRAS) {
+    const match = regra.keywords.some(kw =>
+      texto.includes(kw.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""))
+    );
+    if (match) return regra.template;
+  }
+  return null;
+}
+
+function templatePadrao(desc) {
+  return `Olá, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:
+
+Realizamos todos os testes e identificamos o problema: ${desc || "defeito identificado após análise"}. Faremos o reparo completo com substituição das peças necessárias.
+
+Este conserto completo fica em [VALOR] apenas. Aprovando já iniciamos o conserto.`;
+}
+
+async function gerarTextoOrcamento(desc, comentarios, nome) {
+  // 1. Verifica se bate com alguma regra conhecida
+  const regra = detectarRegra(desc, comentarios);
+  if (regra) {
+    return regra.replace(/\[NOME\]/g, nome ? nome.split(" ")[0] : "");
+  }
+
+  // 2. Sem regra — usa IA para gerar com base no defeito e comentários
+  if (!desc && (!comentarios || !comentarios.length)) return templatePadrao(desc);
+
+  const nomeFirst = nome ? nome.split(" ")[0] : "";
   const comStr = comentarios && comentarios.length ? comentarios.join("; ") : "";
-  const userMsg = `Defeito/Descrição: ${desc}${comStr ? "\nAtividades registradas no card: " + comStr : ""}`;
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 400,
-      system: `Você é Pedro, técnico da Reparo Eletro em BH. Gera textos de orçamento para enviar no WhatsApp.
+  const userMsg = `Nome do cliente: ${nomeFirst || "cliente"}
+Defeito/Descrição: ${desc || "não informado"}${comStr ? "\nAtividades registradas: " + comStr : ""}`;
 
-REGRAS ABSOLUTAS:
-- Siga EXATAMENTE esta estrutura, sem desviar:
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 400,
+        system: `Você é Pedro, técnico da Reparo Eletro em BH. Gera textos de orçamento para WhatsApp.
 
-Olá, bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:
+Siga EXATAMENTE esta estrutura:
 
-[1 a 2 frases descrevendo o diagnóstico e o que será feito/trocado, baseado no defeito e nas atividades]
+Olá, [primeiro nome do cliente] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:
+
+[1 a 2 frases: diagnóstico e o que será feito/trocado com base no defeito e atividades]
 
 Este conserto completo fica em [VALOR] apenas. Aprovando já iniciamos o conserto.
 
-- Deixe [VALOR] literalmente assim — será substituído pelo atendente
-- Use os termos técnicos das atividades registradas (kit termoelétrico, cooler, peltier, placa, etc.)
-- Se não houver atividades, descreva com base no defeito de forma genérica
-- Sem emojis
-- Máximo 3 parágrafos curtos no total`,
-      messages: [{ role: "user", content: userMsg }],
-    }),
-  });
-  const data = await res.json();
-  return data.content?.[0]?.text || "";
+REGRAS:
+- Use o primeiro nome do cliente na saudação
+- Deixe [VALOR] literalmente assim
+- Use termos técnicos das atividades se houver
+- Sem emojis, máximo 3 parágrafos`,
+        messages: [{ role: "user", content: userMsg }],
+      }),
+    });
+    const data = await res.json();
+    const texto = data.content?.[0]?.text || "";
+    if (texto && texto.includes("[VALOR]")) return texto;
+    if (texto) return texto + "\n\nEste conserto completo fica em [VALOR] apenas. Aprovando já iniciamos o conserto.";
+    return templatePadrao(desc);
+  } catch(e) {
+    return templatePadrao(desc);
+  }
 }
