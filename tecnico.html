@@ -681,6 +681,9 @@ function cardHTML(c, color) {
       <div class="card-title">${c.title}</div>
       ${c.nomeContato ? `<div class="card-nome">👤 ${c.nomeContato}</div>` : ''}
       ${c.descricao   ? `<div class="card-desc">${c.descricao}</div>` : ''}
+      ${c.descricaoCompra ? `<div class="card-desc" style="color:#f59e0b;border-left:2px solid #f59e0b;padding-left:5px;margin-top:3px;">🔩 ${c.descricaoCompra}</div>` : ''}
+      ${c.previsao ? `<div class="card-desc" style="color:#3b9eff;margin-top:2px;">📅 Previsão: ${c.previsao.split('-').reverse().join('/')}</div>` : ''}
+      ${c.alertaCompra && !c.previsao ? `<div class="card-desc" style="color:#22c55e;margin-top:2px;">${c.alertaCompra}</div>` : ''}
       <div class="card-footer">
         <div class="card-age">🕐 ${c.age != null ? c.age+'d' : '—'}</div>
         <div class="card-by">${c.tecnico || c.movedBy || '—'}</div>
