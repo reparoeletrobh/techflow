@@ -408,6 +408,45 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── GET nf-pending — retorna NF pendente para o bookmarklet
+  if (action === "nf-pending") {
+    const fin = await dbGet(FIN_KEY) || defaultFin();
+    const pending = (fin.nfPending || []).slice(-1)[0] || null;
+    return res.status(200).json({ ok: true, nf: pending });
+  }
+
+  // ── POST nf-salvar — salva dados da NF pendente
+  if (req.method === "POST" && action === "nf-salvar") {
+    const nfData = req.body || {};
+    const fin = await dbGet(FIN_KEY) || defaultFin();
+    if (!Array.isArray(fin.nfPending)) fin.nfPending = [];
+    fin.nfPending.push({ ...nfData, savedAt: new Date().toISOString() });
+    // Mantém só as últimas 5
+    fin.nfPending = fin.nfPending.slice(-5);
+    await dbSet(FIN_KEY, fin);
+    return res.status(200).json({ ok: true });
+  }
+
+  // ── POST nf-emitida — marca NF como emitida
+  if (req.method === "POST" && action === "nf-emitida") {
+    const { nfId } = req.body || {};
+    const fin = await dbGet(FIN_KEY) || defaultFin();
+    if (nfId && Array.isArray(fin.nfPending)) {
+      fin.nfPending = fin.nfPending.filter(n => n.nfId !== nfId);
+    }
+    // Move ficha para Emitir NF se ainda estiver em aguardando_dados
+    if (nfId) {
+      const rec = (fin.records || []).find(r => r.id === nfId || r.pipefyId === nfId);
+      if (rec && rec.phaseId === "aguardando_dados") {
+        rec.phaseId = "emitir_nf";
+        rec.movedAt = new Date().toISOString();
+        rec.history = [...(rec.history || []), { phaseId: "emitir_nf", ts: rec.movedAt }];
+      }
+    }
+    await dbSet(FIN_KEY, fin);
+    return res.status(200).json({ ok: true });
+  }
+
   // ── POST fin-forcar — remove pipefyId do syncedIds para reimportar
   if (req.method === "POST" && action === "fin-forcar") {
     const { pipefyId } = req.body || {};
