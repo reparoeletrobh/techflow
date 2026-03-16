@@ -175,15 +175,18 @@ async function chamarAPINFSe(xmlAssinado, certOpts) {
 
 // ── Extrai dados da resposta XML ─────────────────────────────
 function parseResposta(xml) {
-  const getTag = (tag) => {
-    const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
+  function getTag(tag) {
+    var rx = new RegExp("<" + tag + "[^>]*>([\s\S]*?)<\/" + tag + ">");
+    var m = xml.match(rx);
     return m ? m[1].trim() : null;
-  };
-  const chaveAcesso = getTag("chNFSe") || getTag("chaveAcesso");
-  const numero      = getTag("nNFSe")  || getTag("numero");
-  const codigoVerif = getTag("cVerifCod");
-  const erro        = getTag("xMotivo") || getTag("descricaoErro");
-  const sucesso     = xml.includes("nNFSe") || xml.includes("chNFSe");
+  }
+  var chaveAcesso = getTag("chNFSe") || getTag("chaveAcesso");
+  var numero      = getTag("nNFSe")  || getTag("numero");
+  var codigoVerif = getTag("cVerifCod");
+  var sucesso     = xml.includes("nNFSe") || xml.includes("chNFSe");
+  var erro = getTag("xMotivo") || getTag("descricaoErro") || getTag("xMsg")
+           || getTag("mensagem") || getTag("Mensagem") || getTag("faultstring")
+           || (sucesso ? null : xml.slice(0, 300));
   return { sucesso, chaveAcesso, numero, codigoVerif, erro };
 }
 
@@ -228,7 +231,7 @@ module.exports = async function handler(req, res) {
       } else {
         return res.status(200).json({
           ok:    false,
-          error: parsed.erro || "Erro desconhecido na emissão",
+          error: parsed.erro || body.slice(0,400) || "Erro desconhecido",
           status,
           body:  body.slice(0, 500),
         });
