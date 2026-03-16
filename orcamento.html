@@ -390,7 +390,7 @@ function buildCard(f) {
   // Price row
   var priceRow = document.createElement("div"); priceRow.className = "price-row";
   var rLabel = document.createElement("span"); rLabel.style.cssText = "font-family:var(--fm);font-size:11px;color:var(--muted)"; rLabel.textContent = "R$";
-  var prInput = document.createElement("input"); prInput.className = "price-input"; prInput.id = "preco-" + f.id; prInput.type = "number"; prInput.step = "0.01"; prInput.min = "0"; prInput.placeholder = "0,00"; prInput.value = f.preco || "";
+  var prInput = document.createElement("input"); prInput.className = "price-input"; prInput.id = "preco-" + f.id; prInput.type = "number"; prInput.step = "0.01"; prInput.min = "0"; prInput.placeholder = "0,00"; prInput.value = f.preco || f.precoSugerido || "";
   var sendBtn = document.createElement("button"); sendBtn.className = "obtn obtn-send"; sendBtn.id = "sendbtn-" + f.id;
   sendBtn.textContent = isSent ? "✅ Enviado" : "📤 Copiar e Enviar";
   sendBtn.setAttribute("data-id", f.id);
