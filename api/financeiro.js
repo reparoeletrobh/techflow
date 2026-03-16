@@ -18,6 +18,18 @@ const FIN_PHASES = [
   { id: "item_coletado",      name: "Item Coletado"       },
 ];
 
+// Move card no Pipefy para uma fase
+async function pipefyMoveCard(cardId, destPhaseId) {
+  return await pipefyQuery(`mutation {
+    moveCardToPhase(input: { card_id: "${cardId}", destination_phase_id: "${destPhaseId}" }) {
+      card { id current_phase { name } }
+    }
+  }`);
+}
+
+// Fase "Solicitar Entrega" no Pipefy
+const SOLICITAR_ENTREGA_PHASE_ID = "334875186";
+
 // ── Upstash ────────────────────────────────────────────────────
 async function dbGet(key) {
   try {
@@ -106,8 +118,13 @@ async function fetchVideoEnviado() {
     if (!phase) break;
     for (const { node } of phase.cards.edges) {
       const fields = node.fields || [];
-      const nomeField = fields.find(f => f.name.toLowerCase().includes("nome") || f.name.toLowerCase().includes("contato"));
-      const descField = fields.find(f => f.name.toLowerCase().includes("descri") || f.name.toLowerCase().includes("problema") || f.name.toLowerCase().includes("servi"));
+      const nomeField   = fields.find(f => f.name.toLowerCase().includes("nome") || f.name.toLowerCase().includes("contato"));
+      const descField   = fields.find(f => f.name.toLowerCase().includes("empresa") || (f.name.toLowerCase().includes("descri") && !f.name.toLowerCase().includes("servi")));
+      const servicoField= fields.find(f => f.name.toLowerCase().includes("servi"));
+      const valorField  = fields.find(f => f.name.toLowerCase().includes("valor") || f.name.toLowerCase().includes("contrato"));
+      const telField    = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"));
+      const endField    = fields.find(f => f.name.toLowerCase().includes("endere"));
+      const notasField  = fields.find(f => f.name.toLowerCase().includes("nota") || f.name.toLowerCase().includes("treina"));
       const nomeVal = nomeField?.value || "";
       const digitsMatch = nomeVal.match(/(\d{4})\D*$/);
       all.push({
@@ -116,6 +133,10 @@ async function fetchVideoEnviado() {
         nomeContato: nomeVal || null,
         osCode:      digitsMatch ? digitsMatch[1] : null,
         descricao:   descField?.value || null,
+        servicos:    servicoField?.value || notasField?.value || null,
+        valor:       valorField?.value || null,
+        telefone:    telField?.value || null,
+        endereco:    endField?.value || null,
         age:         node.age ?? null,
         updatedAt:   node.updated_at || null,
       });
@@ -251,6 +272,10 @@ module.exports = async function handler(req, res) {
           descricao:   c.descricao,
           age:         c.age,
           cpfCnpj:     null,
+          valor:       card.valor || null,
+          servicos:    card.servicos || null,
+          telefone:    card.telefone || null,
+          endereco:    card.endereco || null,
           phaseId:     "aguardando_dados",
           createdAt:   new Date().toISOString(),
           movedAt:     new Date().toISOString(),
@@ -342,7 +367,13 @@ module.exports = async function handler(req, res) {
       rec.dataAgendadaDisplay = req.body.dataAgendadaDisplay || req.body.dataAgendada;
     }
     await dbSet(FIN_KEY, fin);
-    return res.status(200).json({ ok: true, record: rec });
+    // Move no Pipefy quando vai para Entrega Liberada
+    let pipefyMoveOk = null;
+    if (phaseId === "entrega_liberada" && rec.pipefyId) {
+      try { await pipefyMoveCard(rec.pipefyId, SOLICITAR_ENTREGA_PHASE_ID); pipefyMoveOk = true; }
+      catch(e) { pipefyMoveOk = false; console.error("pipefyMove:", e.message); }
+    }
+    return res.status(200).json({ ok: true, record: rec, pipefyMoveOk });
   }
 
   // ── POST excluir ───────────────────────────────────────────
