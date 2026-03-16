@@ -261,8 +261,20 @@ module.exports = async function handler(req, res) {
     // 1. Importa cards de "Video Enviado"
     try {
       const videoCards = await fetchVideoEnviado();
+      // Remove do syncedIds cards que saíram da fase (permite reimportar)
+      const videoIds = new Set(videoCards.map(c => c.pipefyId));
+      fin.syncedIds = fin.syncedIds.filter(id => {
+        // Mantém no syncedIds se já tem ficha ativa no painel
+        return fin.records.some(r => r.pipefyId === id);
+      });
+
       for (const c of videoCards) {
         if (fin.syncedIds.includes(c.pipefyId)) continue;
+        // Também pula se já tem ficha no painel
+        if (fin.records.some(r => r.pipefyId === c.pipefyId)) {
+          if (!fin.syncedIds.includes(c.pipefyId)) fin.syncedIds.push(c.pipefyId);
+          continue;
+        }
         fin.records.unshift({
           id:          c.pipefyId,
           pipefyId:    c.pipefyId,
@@ -272,10 +284,10 @@ module.exports = async function handler(req, res) {
           descricao:   c.descricao,
           age:         c.age,
           cpfCnpj:     null,
-          valor:       card.valor || null,
-          servicos:    card.servicos || null,
-          telefone:    card.telefone || null,
-          endereco:    card.endereco || null,
+          valor:       c.valor || null,
+          servicos:    c.servicos || null,
+          telefone:    c.telefone || null,
+          endereco:    c.endereco || null,
           phaseId:     "aguardando_dados",
           createdAt:   new Date().toISOString(),
           movedAt:     new Date().toISOString(),
@@ -394,6 +406,16 @@ module.exports = async function handler(req, res) {
     fin.records = fin.records.filter(r => r.id !== id);
     await dbSet(FIN_KEY, fin);
     return res.status(200).json({ ok: true });
+  }
+
+  // ── POST fin-forcar — remove pipefyId do syncedIds para reimportar
+  if (req.method === "POST" && action === "fin-forcar") {
+    const { pipefyId } = req.body || {};
+    if (!pipefyId) return res.status(400).json({ ok: false, error: "pipefyId obrigatório" });
+    const fin = await dbGet(FIN_KEY) || defaultFin();
+    fin.syncedIds = (fin.syncedIds || []).filter(id => id !== String(pipefyId));
+    await dbSet(FIN_KEY, fin);
+    return res.status(200).json({ ok: true, msg: "Removido do syncedIds. Próximo sync importa este card." });
   }
 
   // ── GET debug ─────────────────────────────────────────────
