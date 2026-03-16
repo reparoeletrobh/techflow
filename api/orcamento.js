@@ -214,7 +214,13 @@ module.exports = async function handler(req, res) {
           ficha.desc        = fresh.desc  || ficha.desc;
           ficha.nome        = fresh.nome  || ficha.nome;
         }
-        ficha.textoOrc = await gerarTextoOrcamento(ficha.desc, ficha.comentarios, ficha.nome);
+        var orcResult = await gerarTextoOrcamento(ficha.desc, ficha.comentarios, ficha.nome);
+        if (orcResult && typeof orcResult === "object") {
+          ficha.textoOrc = orcResult.texto;
+          if (orcResult.preco) ficha.precoSugerido = orcResult.preco;
+        } else {
+          ficha.textoOrc = orcResult || "";
+        }
         count++;
       } catch(e) { console.error("regenerar", ficha.pipefyId, e.message); }
     }
@@ -237,9 +243,15 @@ module.exports = async function handler(req, res) {
           ficha.desc = fresh.desc || ficha.desc;
         }
       } catch(e) {}
-      ficha.textoOrc = await gerarTextoOrcamento(ficha.desc, ficha.comentarios, ficha.nome);
+      var orcResult = await gerarTextoOrcamento(ficha.desc, ficha.comentarios, ficha.nome);
+      if (orcResult && typeof orcResult === "object") {
+        ficha.textoOrc = orcResult.texto;
+        if (orcResult.preco) ficha.precoSugerido = orcResult.preco;
+      } else {
+        ficha.textoOrc = orcResult || "";
+      }
       await dbSet(ORC_KEY, db);
-      return res.status(200).json({ ok: true, textoOrc: ficha.textoOrc });
+      return res.status(200).json({ ok: true, textoOrc: ficha.textoOrc, precoSugerido: ficha.precoSugerido });
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });
     }
@@ -545,38 +557,39 @@ const ORCAMENTO_REGRAS = [
                "peltier","peltyer","peltir",
                "pasta termica","pasta terminca","pasta termika","pasta termca",
                "kit frio","kit termico","conjunto termoeletrico"],
-    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do cooler, placa de resfriamento e pasta termica, as pecas serao trocadas tambem. Este conserto completo fica em 350 reais apenas. Aprovando ja iniciamos o conserto.",
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do cooler, placa de resfriamento e pasta termica, as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
   },
   // 3. Magnetron → R$ 370
   {
     keywords: ["magnetron","magnetrao","magneton","magentron","magnetrom","magnetron","magnetico","magnet"],
-    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do magnetron, as pecas serao trocadas tambem. Este conserto completo fica em 370 reais apenas. Aprovando ja iniciamos o conserto.",
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do magnetron, as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
   },
   // 4. Fusível/capacitor → R$ 320
   {
     keywords: ["fusivel","fusível","fusirel","fuzivel","fusiveil","queimou fusivel","fusivel de alta",
                "capacitor e fusivel","troca do fusivel","troca de fusivel"],
-    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e fusivel de alta, as pecas serao trocadas tambem. Este conserto completo fica em 320 reais apenas. Aprovando ja iniciamos o conserto.",
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e fusivel de alta, as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
   },
   // 5. Microchave → R$ 320
   {
     keywords: ["microchave","micro chave","micro-chave","chave micro"],
-    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e microchave de acionamento, as pecas serao trocadas tambem. Este conserto completo fica em 320 reais apenas. Aprovando ja iniciamos o conserto.",
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e microchave de acionamento, as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
   },
   // 6. Membrana → R$ 320
   {
     keywords: ["membrana","membrane","menbrana"],
-    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da membrana, as pecas serao trocadas tambem. Este conserto completo fica em 320 reais apenas. Aprovando ja iniciamos o conserto.",
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da membrana, as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
   },
   // 7. Placa micra → R$ 320
   {
     keywords: ["placa micra","placa microondas","placa do microondas","placa micro"],
-    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e placa micra, as pecas serao trocadas tambem. Este conserto completo fica em 320 reais apenas. Aprovando ja iniciamos o conserto.",
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e placa micra, as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
   },
   // 8. Gás → R$ 450
   {
     keywords: ["valvula de gas","valvula gas","recarga de gas","recarga gas","gas refrigerante","carga de gas"],
-    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca da valvula de gas, solda e recarga de gas refrigerante. Este conserto completo fica em 450 reais apenas. Aprovando ja iniciamos o conserto.",
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca da valvula de gas, solda e recarga de gas refrigerante. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
+    preco: "450",
   },
   // 9. Hidráulica → R$ 350 ou R$ 450 se tiver motor/gas
   {
@@ -591,7 +604,7 @@ const ORCAMENTO_REGRAS = [
     keywords: ["parte eletrica","parte elétrica","reoperacao eletrica","reoperação eletrica"],
     // Só aplica se NÃO tiver peça específica (timer, resistencia etc.)
     excludeKeys: ["timer","resistencia","resistência","termostato","termóstato"],
-    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que esta sobrecarregando o equipamento, sera feito a reoperacao eletrica. Este conserto completo fica em 450 reais apenas. Aprovando ja iniciamos o conserto.",
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que esta sobrecarregando o equipamento, sera feito a reoperacao eletrica. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
   },
   // 11. Forno — timer → R$ 450
   {
@@ -615,23 +628,26 @@ const ORCAMENTO_REGRAS = [
   {
     keywords: ["placa principal","placa de potencia","placa potencia","placa de controle","placa controle",
                "recuperacao da placa","recuperação da placa","recupera da placa","recuperar placa","reoperacao","reoperação"],
-    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da placa principal, sera feito a reoperacao da placa tambem. Este conserto completo fica em 350 reais apenas. Aprovando ja iniciamos o conserto.",
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da placa principal, sera feito a reoperacao da placa tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
   },
 ];
 
+
+// Preços sugeridos por índice de regra (mesma ordem de ORCAMENTO_REGRAS)
+var PRECOS_REGRAS = ["390","350","370","320","320","320","320","450","350","450","450","450","450","350"];
 
 function detectarRegra(desc, comentarios) {
   var textoNorm = norm([desc || ""].concat(comentarios || []).join(" "));
   for (var i = 0; i < ORCAMENTO_REGRAS.length; i++) {
     var regra = ORCAMENTO_REGRAS[i];
     if (!hasAny(textoNorm, regra.keywords)) continue;
-    // Pula se tiver palavras excluídas (ex: parte elétrica + timer = usa regra do timer, não a genérica)
     if (regra.excludeKeys && hasAny(textoNorm, regra.excludeKeys)) continue;
     if (regra.templateBase) {
       var comExtra = regra.extraKeys && hasAny(textoNorm, regra.extraKeys);
-      return regra.templateBase.replace("[PRECO]", comExtra ? regra.precoExtra : regra.precoBase);
+      var preco = comExtra ? regra.precoExtra : regra.precoBase;
+      return { texto: regra.templateBase, preco: preco };
     }
-    return regra.template;
+    return { texto: regra.template, preco: PRECOS_REGRAS[i] || null };
   }
   return null;
 }
@@ -654,7 +670,7 @@ function templatePadrao(desc, nome) {
 
 async function gerarTextoOrcamento(desc, comentarios, nome) {
   var regra = detectarRegra(desc, comentarios);
-  if (regra) return substituirNome(regra, nome);
+  if (regra) return { texto: substituirNome(regra.texto, nome), preco: regra.preco };
 
   var primeiro = primeiroNome(nome) || "cliente";
   var comStr   = (comentarios || []).join("; ");
@@ -674,13 +690,13 @@ async function gerarTextoOrcamento(desc, comentarios, nome) {
     if (timer) clearTimeout(timer);
     var data = await res.json();
     var texto = (data.content && data.content[0] && data.content[0].text) ? data.content[0].text : "";
-    if (texto && texto.indexOf("[VALOR]") >= 0) return texto;
-    if (texto && texto.length > 20) return texto + "\r\n\r\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.";
+    if (texto && texto.indexOf("[VALOR]") >= 0) return { texto: texto, preco: null };
+    if (texto && texto.length > 20) return { texto: texto + "\r\n\r\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.", preco: null };
   } catch(e) {
     console.error("gerarTextoOrcamento:", String(e.message || e));
   }
 
-  return templatePadrao(desc, nome);
+  return { texto: templatePadrao(desc, nome), preco: null };
 }
 
 
