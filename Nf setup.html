@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Configurar NF Auto</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--border:#252525;--text:#fff;--muted:#888;--accent:#3b9eff;--green:#22c55e;--fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px 20px;}
+.card{max-width:560px;width:100%;background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--accent);border-radius:16px;padding:32px;}
+h1{font-family:var(--fh);font-size:22px;font-weight:800;margin-bottom:6px;}
+h1 span{color:var(--accent);}
+.sub{font-size:13px;color:var(--muted);margin-bottom:28px;line-height:1.6;}
+.step{display:flex;gap:14px;margin-bottom:20px;align-items:flex-start;}
+.step-num{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#000;font-family:var(--fm);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.step-body{flex:1;}
+.step-title{font-weight:600;font-size:14px;margin-bottom:4px;}
+.step-desc{font-size:12px;color:var(--muted);line-height:1.6;}
+.bm-link{display:inline-block;margin-top:16px;padding:12px 20px;background:rgba(59,158,255,.12);border:1px dashed var(--accent);border-radius:10px;font-family:var(--fm);font-size:13px;font-weight:700;color:var(--accent);cursor:grab;text-decoration:none;transition:all .2s;}
+.bm-link:hover{background:rgba(59,158,255,.2);}
+.drag-hint{font-size:11px;color:var(--muted);margin-top:8px;font-family:var(--fm);}
+.divider{border:none;border-top:1px solid var(--border);margin:24px 0;}
+.usage-title{font-family:var(--fm);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:12px;}
+.flow{display:flex;flex-direction:column;gap:8px;}
+.flow-item{display:flex;align-items:center;gap:10px;font-size:13px;}
+.flow-icon{width:28px;height:28px;border-radius:7px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.arrow{color:var(--muted);margin:0 4px;font-size:10px;}
+.badge{font-family:var(--fm);font-size:10px;background:rgba(34,197,94,.1);color:var(--green);padding:3px 8px;border-radius:20px;margin-left:auto;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Configurar <span>NF Auto</span></h1>
+  <p class="sub">Configure uma vez e a emissão da nota fica com apenas 1 clique após o site abrir.</p>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <div class="step-title">Mostrar a barra de bookmarks</div>
+      <div class="step-desc">Pressione <strong>Ctrl+Shift+B</strong> no Chrome para exibir a barra de favoritos.</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <div class="step-title">Arraste o botão abaixo para a barra</div>
+      <div class="step-desc">Clique e arraste o botão abaixo direto para a barra de favoritos do Chrome.</div>
+      <a class="bm-link" href="javascript:(async%20function()%7B%20const%20API%20%3D%20'https%3A%20function%20wait(ms)%7B%20return%20new%20Promise(r%3D%3EsetTimeout(r%2Cms))%3B%20%7D%20function%20waitFor(sel%2Ct%3D12000)%7B%20return%20new%20Promise((res%2Crej)%3D%3E%7B%20const%20s%3DDate.now()%3B%20(function%20check()%7B%20const%20el%3Ddocument.querySelector(sel)%3B%20if(el)%20return%20res(el)%3B%20if(Date.now()-s%3Et)%20return%20rej('Timeout%3A'%2Bsel)%3B%20setTimeout(check%2C400)%3B%20%7D)()%3B%20%7D)%3B%20%7D%20function%20fill(id%2Cval)%7B%20const%20el%3Ddocument.getElementById(id)%7C%7Cdocument.querySelector('%5Bname%3D%22'%2Bid%2B'%22%5D')%3B%20if(!el)%20return%3B%20el.focus()%3B%20const%20s%3DObject.getOwnPropertyDescriptor(window.HTMLInputElement.prototype%2C'value')%3F.set%7C%7C%20Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype%2C'value')%3F.set%3B%20if(s)%20s.call(el%2Cval)%3B%20else%20el.value%3Dval%3B%20%5B'input'%2C'change'%2C'keyup'%2C'blur'%5D.forEach(e%3D%3Eel.dispatchEvent(new%20Event(e%2C%7Bbubbles%3Atrue%7D)))%3B%20%7D%20function%20setRadio(name%2Cval)%7B%20const%20r%3Ddocument.querySelector('input%5Bname%3D%22'%2Bname%2B'%22%5D%5Bvalue%3D%22'%2Bval%2B'%22%5D')%3B%20if(r)%20r.click()%3B%20%7D%20function%20today()%7B%20const%20d%3Dnew%20Date()%3B%20return%20String(d.getDate()).padStart(2%2C'0')%2B'%2F'%2BString(d.getMonth()%2B1).padStart(2%2C'0')%2B'%2F'%2Bd.getFullYear()%3B%20%7D%20let%20nf%20%3D%20JSON.parse(sessionStorage.getItem('_nf_pending')%7C%7C'null')%3B%20if(!nf)%7B%20try%7B%20const%20r%3Dawait%20fetch(API%2B'%3Faction%3Dnf-pending')%3B%20const%20d%3Dawait%20r.json()%3B%20if(d.ok%20%26%26%20d.nf)%20nf%3Dd.nf%3B%20%7Dcatch(e)%7B%7D%20%7D%20if(!nf)%7B%20alert('Nenhuma%20NF%20pendente.%5CnClique%20em%20Emitir%20NF%20no%20financeiro%20primeiro.')%3B%20return%3B%20%7D%20const%20%7BcpfCnpj%2Cdesc%2Cvalor%2CnomeCliente%2CosCode%2CnfId%7D%3Dnf%3B%20const%20cpfLimpo%3DcpfCnpj.replace(%2F%5CD%2Fg%2C'')%3B%20sessionStorage.setItem('_nf_pending'%2CJSON.stringify(nf))%3B%20const%20url%3Dlocation.href%3B%20if(url.includes('%2FDPS%2FPessoas')%7C%7Curl.includes('%2FDashboard'))%7B%20if(!url.includes('%2FDPS%2FPessoas'))%20location.href%3D'%2FEmissorNacional%2FDPS%2FPessoas'%3B%20await%20waitFor('%23DataCompetencia')%3B%20await%20wait(600)%3B%20fill('DataCompetencia'%2Ctoday())%3B%20setRadio('Tomador.LocalDomicilio'%2C'1')%3B%20await%20wait(500)%3B%20await%20waitFor('%23Tomador_Inscricao')%3B%20fill('Tomador_Inscricao'%2CcpfLimpo)%3B%20await%20wait(300)%3B%20const%20pesqBtn%3Ddocument.getElementById('btn_Tomador_Inscricao_pesquisar')%3B%20if(pesqBtn)%20pesqBtn.click()%3B%20await%20wait(2000)%3B%20document.getElementById('btnAvancar')%3F.click()%3B%20%7D%20else%20if(url.includes('%2FDPS%2FServico')%7C%7Curl.includes('%2FServico'))%7B%20await%20wait(800)%3B%20const%20ta%3Ddocument.getElementById('Servico_Discriminacao')%20%7C%7Cdocument.querySelector('textarea%5Bname*%3D%22Discriminacao%22%5D')%20%7C%7Cdocument.querySelector('textarea')%3B%20if(ta)%7B%20const%20s%3DObject.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype%2C'value')%3F.set%3B%20if(s)%20s.call(ta%2Cdesc)%3B%20else%20ta.value%3Ddesc%3B%20ta.dispatchEvent(new%20Event('input'%2C%7Bbubbles%3Atrue%7D))%3B%20ta.dispatchEvent(new%20Event('change'%2C%7Bbubbles%3Atrue%7D))%3B%20%7D%20const%20cod%3Ddocument.getElementById('Servico_CodigoServico')%7C%7Cdocument.querySelector('%5Bname*%3D%22CodigoServico%22%5D')%3B%20if(cod)%20fill(cod.id%2C'14.01')%3B%20await%20wait(500)%3B%20document.getElementById('btnAvancar')%3F.click()%3B%20%7D%20else%20if(url.includes('%2FDPS%2FValores')%7C%7Curl.includes('%2FValores'))%7B%20await%20waitFor('%23Valores_ValorServicos')%3B%20await%20wait(500)%3B%20const%20vStr%3DparseFloat(valor).toFixed(2).replace('.'%2C'%2C')%3B%20fill('Valores_ValorServicos'%2CvStr)%3B%20const%20vEl%3Ddocument.getElementById('Valores_ValorServicos')%3B%20if(vEl)%20vEl.dispatchEvent(new%20Event('blur'%2C%7Bbubbles%3Atrue%7D))%3B%20await%20wait(800)%3B%20document.getElementById('btnAvancar')%3F.click()%3B%20%7D%20else%20if(url.includes('%2FDPS%2FEmitir')%7C%7Curl.includes('%2FEmitir'))%7B%20await%20wait(1000)%3B%20const%20emitBtn%3Ddocument.getElementById('btnEmitir')%20%7C%7Cdocument.querySelector('button%5Bid*%3D%22Emitir%22%5D')%20%7C%7Cdocument.querySelector('input%5Bvalue*%3D%22Emitir%22%5D')%3B%20if(emitBtn)%7B%20emitBtn.click()%3B%20await%20wait(4000)%3B%20try%7B%20await%20fetch(API%2B'%3Faction%3Dnf-emitida'%2C%7Bmethod%3A'POST'%2Cheaders%3A%7B'Content-Type'%3A'application%2Fjson'%7D%2Cbody%3AJSON.stringify(%7BnfId%7D)%7D)%3B%20%7Dcatch(e)%7B%7D%20sessionStorage.removeItem('_nf_pending')%3B%20const%20pdf%3Ddocument.querySelector('a%5Bhref*%3D%22.pdf%22%5D%2Ca%5Bhref*%3D%22Download%22%5D%2Ca%5Bhref*%3D%22download%22%5D')%3B%20if(pdf)%20pdf.click()%3B%20alert('NF%20emitida%20com%20sucesso!%20Cliente%3A%20'%2BnomeCliente)%3B%20%7D%20else%20%7B%20alert('Clique%20em%20Emitir%20NFS-e%20para%20concluir.%5CnCliente%3A%20'%2BnomeCliente%2B'%5CnValor%3A%20R%24%20'%2BparseFloat(valor).toFixed(2))%3B%20%7D%20%7D%20else%20%7B%20sessionStorage.setItem('_nf_pending'%2CJSON.stringify(nf))%3B%20location.href%3D'%2FEmissorNacional%2FDPS%2FPessoas'%3B%20%7D%20%7D)()%3B">✦ NF Auto</a>
+      <div class="drag-hint">↑ Arraste este botão para a barra de favoritos do Chrome</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <div class="step-title">Pronto! Faça o teste</div>
+      <div class="step-desc">Vá para <strong>/financeiro</strong>, clique em <strong>📋 Informar CPF/CNPJ</strong>, preencha e clique em <strong>🧾 Emitir</strong>.</div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="usage-title">Fluxo de uso após configuração</div>
+  <div class="flow">
+    <div class="flow-item"><div class="flow-icon">📋</div> Clique em Informar CPF/CNPJ no financeiro</div>
+    <div class="flow-item"><div class="flow-icon">🧾</div> Clique em Emitir — nfse.gov.br abre automaticamente</div>
+    <div class="flow-item"><div class="flow-icon">✦</div> Clique em <strong>✦ NF Auto</strong> na barra do Chrome <span class="badge">1 clique</span></div>
+    <div class="flow-item"><div class="flow-icon">✅</div> Formulário preenchido e NF emitida automaticamente</div>
+  </div>
+</div>
+</body>
+</html>
