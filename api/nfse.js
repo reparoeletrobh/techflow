@@ -90,11 +90,7 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 `      <IM>${IM_EMPRESA}</IM>\n` +
 `      <end>\n` +
 `        <endNac>\n` +
-`          <xLgr>Rua Ouro Preto</xLgr>\n` +
-`          <nro>663</nro>\n` +
-`          <xBairro>Barro Preto</xBairro>\n` +
 `          <cMun>${COD_MUN_BH}</cMun>\n` +
-`          <UF>MG</UF>\n` +
 `          <CEP>30190130</CEP>\n` +
 `        </endNac>\n` +
 `      </end>\n` +
