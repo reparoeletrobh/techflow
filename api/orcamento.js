@@ -200,29 +200,23 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, ficha });
   }
 
-  // ── POST orc-regenerar-todos — rebusca dados do Pipefy e regenera todos
+  // ── POST orc-regenerar-todos — busca dados frescos do Pipefy por card e regenera
   if (action === "orc-regenerar-todos") {
     const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
     const pendentes = (db.fichas || []).filter(f => f.status === "pendente");
     let count = 0;
-    // Rebusca todos os cards da fase para pegar comentários atualizados
-    let cardsAtuais = [];
-    try { cardsAtuais = await fetchAguardandoAprovacao(); } catch(e) {}
-    const cardMap = {};
-    cardsAtuais.forEach(card => { cardMap[card.pipefyId] = card; });
-
     for (const ficha of pendentes) {
       try {
-        // Atualiza comentarios do Pipefy se disponível
-        if (cardMap[ficha.pipefyId]) {
-          const fresh = cardMap[ficha.pipefyId];
-          ficha.comentarios = fresh.comentarios || ficha.comentarios || [];
-          ficha.desc        = fresh.desc        || ficha.desc;
-          ficha.nome        = fresh.nome        || ficha.nome;
+        // Busca dados frescos direto do card no Pipefy
+        const fresh = await fetchCardData(ficha.pipefyId);
+        if (fresh) {
+          ficha.comentarios = fresh.comentarios.length ? fresh.comentarios : (ficha.comentarios || []);
+          ficha.desc        = fresh.desc  || ficha.desc;
+          ficha.nome        = fresh.nome  || ficha.nome;
         }
         ficha.textoOrc = await gerarTextoOrcamento(ficha.desc, ficha.comentarios, ficha.nome);
         count++;
-      } catch(e) { console.error("regenerar", ficha.id, e.message); }
+      } catch(e) { console.error("regenerar", ficha.pipefyId, e.message); }
     }
     await dbSet(ORC_KEY, db);
     return res.status(200).json({ ok: true, regenerados: count });
@@ -235,6 +229,14 @@ module.exports = async function handler(req, res) {
     const ficha = db.fichas.find(f => f.id === id);
     if (!ficha) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
     try {
+      // Busca dados frescos do Pipefy antes de regenerar
+      try {
+        const fresh = await fetchCardData(ficha.pipefyId);
+        if (fresh && fresh.comentarios.length) {
+          ficha.comentarios = fresh.comentarios;
+          ficha.desc = fresh.desc || ficha.desc;
+        }
+      } catch(e) {}
       ficha.textoOrc = await gerarTextoOrcamento(ficha.desc, ficha.comentarios, ficha.nome);
       await dbSet(ORC_KEY, db);
       return res.status(200).json({ ok: true, textoOrc: ficha.textoOrc });
@@ -420,6 +422,32 @@ async function dbSet(key, value) {
     const j = await r.json();
     return j[0]?.result === "OK";
   } catch(e) { return false; }
+}
+
+// Busca campos e atividades de um card específico pelo ID
+async function fetchCardData(pipefyId) {
+  const data = await pipefyQuery(`query {
+    card(id: "${pipefyId}") {
+      id title
+      fields { name value }
+      comments { text }
+    }
+  }`);
+  const node   = data?.card;
+  if (!node) return null;
+  const fields = node.fields || [];
+  const nome     = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
+  const tel      = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
+  const desc     = fields.find(f => f.name.toLowerCase().includes("empresa") || (f.name.toLowerCase().includes("descri") && !f.name.toLowerCase().includes("servi")))?.value || "";
+  const end      = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
+  const servicos = fields.find(f => f.name.toLowerCase().includes("servi"))?.value || "";
+  const infoCliente = fields.find(f => f.name.toLowerCase().includes("informa"))?.value || "";
+  const comentarios = [
+    ...(node.comments || []).map(c => c.text).filter(Boolean),
+    ...(servicos ? [servicos] : []),
+    ...(infoCliente ? [infoCliente] : []),
+  ];
+  return { pipefyId: String(node.id), title: node.title, nome, tel, desc, end, comentarios, servicos };
 }
 
 // Busca cards em Aguardando Aprovação direto pelo ID da fase (mais rápido e completo)
@@ -611,10 +639,62 @@ async function gerarTextoOrcamento(desc, comentarios, nome) {
 }
 
 
+// Busca campos e atividades de um card específico pelo ID
+async function fetchCardData(pipefyId) {
+  const data = await pipefyQuery(`query {
+    card(id: "${pipefyId}") {
+      id title
+      fields { name value }
+      comments { text }
+    }
+  }`);
+  const node   = data?.card;
+  if (!node) return null;
+  const fields = node.fields || [];
+  const nome     = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
+  const tel      = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
+  const desc     = fields.find(f => f.name.toLowerCase().includes("empresa") || (f.name.toLowerCase().includes("descri") && !f.name.toLowerCase().includes("servi")))?.value || "";
+  const end      = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
+  const servicos = fields.find(f => f.name.toLowerCase().includes("servi"))?.value || "";
+  const infoCliente = fields.find(f => f.name.toLowerCase().includes("informa"))?.value || "";
+  const comentarios = [
+    ...(node.comments || []).map(c => c.text).filter(Boolean),
+    ...(servicos ? [servicos] : []),
+    ...(infoCliente ? [infoCliente] : []),
+  ];
+  return { pipefyId: String(node.id), title: node.title, nome, tel, desc, end, comentarios, servicos };
+}
+
 // Busca cards em Aguardando Aprovação direto pelo ID da fase (mais rápido e completo)
 
 // Gera texto de orçamento com Claude
 // ── NORMALIZA TEXTO (remove acentos, minúsculo) ──────────────
+// Busca campos e atividades de um card específico pelo ID
+async function fetchCardData(pipefyId) {
+  const data = await pipefyQuery(`query {
+    card(id: "${pipefyId}") {
+      id title
+      fields { name value }
+      comments { text }
+    }
+  }`);
+  const node   = data?.card;
+  if (!node) return null;
+  const fields = node.fields || [];
+  const nome     = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
+  const tel      = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
+  const desc     = fields.find(f => f.name.toLowerCase().includes("empresa") || (f.name.toLowerCase().includes("descri") && !f.name.toLowerCase().includes("servi")))?.value || "";
+  const end      = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
+  const servicos = fields.find(f => f.name.toLowerCase().includes("servi"))?.value || "";
+  const infoCliente = fields.find(f => f.name.toLowerCase().includes("informa"))?.value || "";
+  const comentarios = [
+    ...(node.comments || []).map(c => c.text).filter(Boolean),
+    ...(servicos ? [servicos] : []),
+    ...(infoCliente ? [infoCliente] : []),
+  ];
+  return { pipefyId: String(node.id), title: node.title, nome, tel, desc, end, comentarios, servicos };
+}
+
 // Busca cards em Aguardando Aprovação direto pelo ID da fase (mais rápido e completo)
 
 // Gera texto de orçamento com Claude
