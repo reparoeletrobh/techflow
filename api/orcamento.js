@@ -164,21 +164,33 @@ module.exports = async function handler(req, res) {
       // Importa apenas cards nunca vistos (não estão no syncedIds)
       for (const card of cards) {
         if (db.syncedIds.includes(card.pipefyId)) continue;
-        let textoOrc = "";
-        try { textoOrc = await gerarTextoOrcamento(card.desc, card.comentarios, card.nome); } catch(e) { textoOrc = templatePadrao(card.desc, card.nome); }
+        let textoOrc = "", precoSugerido = null;
+        try {
+          const orcRes = await gerarTextoOrcamento(card.desc, card.comentarios, card.nome);
+          if (orcRes && typeof orcRes === "object") {
+            textoOrc = orcRes.texto || "";
+            precoSugerido = orcRes.preco || null;
+          } else {
+            textoOrc = String(orcRes || "");
+          }
+        } catch(e) {
+          const tp = templatePadrao(card.desc, card.nome);
+          textoOrc = typeof tp === "object" ? (tp.texto || "") : String(tp || "");
+        }
         db.fichas.unshift({
-          id:          card.pipefyId,
-          pipefyId:    card.pipefyId,
-          nome:        card.nome,
-          tel:         card.tel,
-          desc:        card.desc,
-          end:         card.end,
-          age:         card.age,
-          comentarios: card.comentarios,
+          id:           card.pipefyId,
+          pipefyId:     card.pipefyId,
+          nome:         card.nome,
+          tel:          card.tel,
+          desc:         card.desc,
+          end:          card.end,
+          age:          card.age,
+          comentarios:  card.comentarios,
           textoOrc,
-          status:      "pendente",
-          preco:       null,
-          createdAt:   new Date().toISOString(),
+          precoSugerido,
+          status:       "pendente",
+          preco:        null,
+          createdAt:    new Date().toISOString(),
         });
         db.syncedIds.push(card.pipefyId);
         newCount++;
@@ -214,12 +226,17 @@ module.exports = async function handler(req, res) {
           ficha.desc        = fresh.desc  || ficha.desc;
           ficha.nome        = fresh.nome  || ficha.nome;
         }
-        var orcResult = await gerarTextoOrcamento(ficha.desc, ficha.comentarios, ficha.nome);
-        if (orcResult && typeof orcResult === "object") {
-          ficha.textoOrc = orcResult.texto;
-          if (orcResult.preco) ficha.precoSugerido = orcResult.preco;
-        } else {
-          ficha.textoOrc = orcResult || "";
+        try {
+          const orcResult = await gerarTextoOrcamento(ficha.desc, ficha.comentarios, ficha.nome);
+          if (orcResult && typeof orcResult === "object") {
+            ficha.textoOrc = orcResult.texto || "";
+            if (orcResult.preco) ficha.precoSugerido = orcResult.preco;
+          } else {
+            ficha.textoOrc = String(orcResult || "");
+          }
+        } catch(e) {
+          const tp = templatePadrao(ficha.desc, ficha.nome);
+          ficha.textoOrc = typeof tp === "object" ? (tp.texto || "") : String(tp || "");
         }
         count++;
       } catch(e) { console.error("regenerar", ficha.pipefyId, e.message); }
