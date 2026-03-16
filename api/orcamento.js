@@ -157,10 +157,9 @@ module.exports = async function handler(req, res) {
         await dbSet(ORC_KEY, db);
         return res.status(200).json({ ok: true, newCount: 0, initialized: true, maxIdSeen: maxId, pipefyError: null });
       }
-      // Importa cards que não têm ficha ativa (pendente) no painel
-      const fichasAtivas = new Set((db.fichas || []).filter(f => f.status !== "enviado").map(f => f.pipefyId));
+      // Importa apenas cards nunca vistos (não estão no syncedIds)
       for (const card of cards) {
-        if (fichasAtivas.has(card.pipefyId)) continue; // já tem ficha ativa no painel
+        if ((db.syncedIds || []).includes(card.pipefyId)) continue;
         let textoOrc = "";
         try { textoOrc = await gerarTextoOrcamento(card.desc, card.comentarios, card.nome); } catch(e) { textoOrc = templatePadrao(card.desc, card.nome); }
         db.fichas.unshift({
@@ -309,6 +308,21 @@ module.exports = async function handler(req, res) {
     db.fichas = (db.fichas || []).filter(f => !idsNaFase.has(f.pipefyId));
     await dbSet(ORC_KEY, db);
     return res.status(200).json({ ok: true, removidos: antes - db.syncedIds.length, total_na_fase: cards.length, msg: "Chame orc-sync agora para importar." });
+  }
+
+  // ── GET orc-sync-fichas — sincroniza syncedIds com fichas existentes
+  if (action === "orc-sync-fichas") {
+    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
+    if (!Array.isArray(db.syncedIds)) db.syncedIds = [];
+    let added = 0;
+    (db.fichas || []).forEach(f => {
+      if (!db.syncedIds.includes(f.pipefyId)) {
+        db.syncedIds.push(f.pipefyId);
+        added++;
+      }
+    });
+    await dbSet(ORC_KEY, db);
+    return res.status(200).json({ ok: true, added, total: db.syncedIds.length });
   }
 
   // ── GET orc-reset-init ────────────────────────────────────
