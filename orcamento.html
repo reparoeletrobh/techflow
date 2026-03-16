@@ -167,8 +167,8 @@ header{display:flex;align-items:center;padding:0 24px;height:52px;border-bottom:
 <script>
 // ── CADASTRO ──────────────────────────────────────────────────
 var phases = [], solicitarColetaId = null;
-var botando = false, aguardandoFicha = true;
-var dados = {};
+var botando = false, aguardandoFicha = true, aguardandoColeta = false, aguardandoDataHora = false;
+var dados = {}, coletaInfo = null;
 
 function autoResize(el) { el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 160) + "px"; }
 function scrollDown() { var m = document.getElementById("chat-msgs"); if (m) setTimeout(function() { m.scrollTop = m.scrollHeight; }, 60); }
@@ -260,9 +260,36 @@ async function sendMsg(txt) {
   input.value = ""; input.style.height = "auto";
   addUser(msg);
 
+  // Aguardando escolha de coleta
+  if (aguardandoColeta) {
+    aguardandoColeta = false;
+    if (msg === "🚚 Coletar Agora") {
+      coletaInfo = { tipo: "agora" };
+      botando = true; document.getElementById("send-btn").disabled = true;
+      showTyping(); await delay(600); hideTyping();
+      await criarCard();
+      botando = false; document.getElementById("send-btn").disabled = false;
+    } else if (msg === "📅 Agendar Coleta") {
+      aguardandoDataHora = true;
+      addBot("Informe a data e horario da coleta (ex: 18/03 as 14:00)");
+    }
+    return;
+  }
+
+  // Aguardando data/hora da coleta agendada
+  if (aguardandoDataHora) {
+    aguardandoDataHora = false;
+    coletaInfo = { tipo: "agendar", dataHora: msg };
+    botando = true; document.getElementById("send-btn").disabled = true;
+    showTyping(); await delay(600); hideTyping();
+    await criarCard();
+    botando = false; document.getElementById("send-btn").disabled = false;
+    return;
+  }
+
   if (!aguardandoFicha) {
     if (msg === "Novo cadastro") {
-      dados = {}; aguardandoFicha = true;
+      dados = {}; coletaInfo = null; aguardandoFicha = true;
       document.getElementById("chat-msgs").innerHTML = "";
       document.getElementById("input-area").style.display = "flex";
       addBot("Pronto! Cole a próxima ficha.");
@@ -283,17 +310,26 @@ async function sendMsg(txt) {
     botando = false; document.getElementById("send-btn").disabled = false; return;
   }
   aguardandoFicha = false;
-  await criarCard();
   botando = false; document.getElementById("send-btn").disabled = false;
+  // Pergunta sobre coleta
+  aguardandoColeta = true;
+  addBot("Como será a coleta do equipamento?", ["🚚 Coletar Agora", "📅 Agendar Coleta"]);
 }
 
 async function criarCard() {
   document.getElementById("input-area").style.display = "none";
   showTyping();
   try {
+    // Monta informação de coleta para incluir na descrição
+    var coletaTexto = "";
+    if (coletaInfo) {
+      coletaTexto = coletaInfo.tipo === "agora"
+        ? " | Coleta: IMEDIATA"
+        : " | Coleta agendada: " + coletaInfo.dataHora;
+    }
     var r = await fetch("/api/orcamento?action=criar-card", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nome: dados.nome, telefone: dados.telefone, aparelho: dados.aparelho, defeito: dados.defeito, endereco: dados.endereco || "", phaseId: solicitarColetaId }),
+      body: JSON.stringify({ nome: dados.nome, telefone: dados.telefone, aparelho: dados.aparelho, defeito: dados.defeito + coletaTexto, endereco: dados.endereco || "", phaseId: solicitarColetaId }),
     });
     var d = await r.json(); hideTyping();
     if (d.ok) { addBot("✅ Card criado no Pipefy!\n\n" + dados.nome + " cadastrado em Solicitar Coleta.", ["Novo cadastro"]); }
