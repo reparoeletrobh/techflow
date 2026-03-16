@@ -586,7 +586,32 @@ const ORCAMENTO_REGRAS = [
     precoBase:  "350",
     precoExtra: "450",
   },
-  // 10. Placa principal / recuperação de placa → R$ 350
+  // 10. Forno — parte elétrica genérica → R$ 450
+  {
+    keywords: ["parte eletrica","parte elétrica","reoperacao eletrica","reoperação eletrica"],
+    // Só aplica se NÃO tiver peça específica (timer, resistencia etc.)
+    excludeKeys: ["timer","resistencia","resistência","termostato","termóstato"],
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que esta sobrecarregando o equipamento, sera feito a reoperacao eletrica. Este conserto completo fica em 450 reais apenas. Aprovando ja iniciamos o conserto.",
+  },
+  // 11. Forno — timer → R$ 450
+  {
+    keywords: ["timer","timmer","tmer"],
+    templateBase: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do timer que esta sobrecarregando o equipamento, as pecas serao trocadas tambem. Este conserto completo fica em [PRECO] reais apenas. Aprovando ja iniciamos o conserto.",
+    precoBase: "450", precoExtra: "450",
+  },
+  // 12. Forno — resistência → R$ 450
+  {
+    keywords: ["resistencia","resistência","rezistencia","rezistência"],
+    templateBase: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da resistencia que esta sobrecarregando o equipamento, as pecas serao trocadas tambem. Este conserto completo fica em [PRECO] reais apenas. Aprovando ja iniciamos o conserto.",
+    precoBase: "450", precoExtra: "450",
+  },
+  // 13. Forno — termostato → R$ 450
+  {
+    keywords: ["termostato","termóstato","termostat","termostast"],
+    templateBase: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do termostato que esta sobrecarregando o equipamento, as pecas serao trocadas tambem. Este conserto completo fica em [PRECO] reais apenas. Aprovando ja iniciamos o conserto.",
+    precoBase: "450", precoExtra: "450",
+  },
+  // 14. Placa principal / recuperação de placa → R$ 350
   {
     keywords: ["placa principal","placa de potencia","placa potencia","placa de controle","placa controle",
                "recuperacao da placa","recuperação da placa","recupera da placa","recuperar placa","reoperacao","reoperação"],
@@ -600,6 +625,8 @@ function detectarRegra(desc, comentarios) {
   for (var i = 0; i < ORCAMENTO_REGRAS.length; i++) {
     var regra = ORCAMENTO_REGRAS[i];
     if (!hasAny(textoNorm, regra.keywords)) continue;
+    // Pula se tiver palavras excluídas (ex: parte elétrica + timer = usa regra do timer, não a genérica)
+    if (regra.excludeKeys && hasAny(textoNorm, regra.excludeKeys)) continue;
     if (regra.templateBase) {
       var comExtra = regra.extraKeys && hasAny(textoNorm, regra.extraKeys);
       return regra.templateBase.replace("[PRECO]", comExtra ? regra.precoExtra : regra.precoBase);
