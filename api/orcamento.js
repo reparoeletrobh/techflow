@@ -165,17 +165,19 @@ module.exports = async function handler(req, res) {
       for (const card of cards) {
         if (db.syncedIds.includes(card.pipefyId)) continue;
         let textoOrc = "", precoSugerido = null;
+        // Usa regras fixas primeiro (rápido, sem timeout)
+        // IA só é chamada pelo botão ✨ Regenerar individualmente
         try {
-          const orcRes = await gerarTextoOrcamento(card.desc, card.comentarios, card.nome);
-          if (orcRes && typeof orcRes === "object") {
-            textoOrc = orcRes.texto || "";
-            precoSugerido = orcRes.preco || null;
+          const regra = detectarRegra(card.desc, card.comentarios);
+          if (regra) {
+            textoOrc = substituirNome(regra.texto, card.nome);
+            precoSugerido = regra.preco || null;
           } else {
-            textoOrc = String(orcRes || "");
+            const tp = templatePadrao(card.desc, card.nome);
+            textoOrc = typeof tp === "object" ? (tp.texto || "") : String(tp || "");
           }
         } catch(e) {
-          const tp = templatePadrao(card.desc, card.nome);
-          textoOrc = typeof tp === "object" ? (tp.texto || "") : String(tp || "");
+          textoOrc = "Ola, bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.";
         }
         db.fichas.unshift({
           id:           card.pipefyId,
