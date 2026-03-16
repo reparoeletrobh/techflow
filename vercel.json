@@ -12,6 +12,7 @@
     { "source": "/orcamento",    "destination": "/orcamento.html"    },
     { "source": "/compras",      "destination": "/compras.html"      },
     { "source": "/lalamove",     "destination": "/lalamove.html"     },
+    { "source": "/nf-setup",      "destination": "/nf-setup.html"      },
     { "source": "/((?!api/).*)", "destination": "/home.html"         }
   ]
 }
