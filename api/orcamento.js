@@ -200,16 +200,29 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, ficha });
   }
 
-  // ── POST orc-regenerar-todos — regenera texto de todas as fichas pendentes
+  // ── POST orc-regenerar-todos — rebusca dados do Pipefy e regenera todos
   if (action === "orc-regenerar-todos") {
     const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
     const pendentes = (db.fichas || []).filter(f => f.status === "pendente");
     let count = 0;
+    // Rebusca todos os cards da fase para pegar comentários atualizados
+    let cardsAtuais = [];
+    try { cardsAtuais = await fetchAguardandoAprovacao(); } catch(e) {}
+    const cardMap = {};
+    cardsAtuais.forEach(card => { cardMap[card.pipefyId] = card; });
+
     for (const ficha of pendentes) {
       try {
+        // Atualiza comentarios do Pipefy se disponível
+        if (cardMap[ficha.pipefyId]) {
+          const fresh = cardMap[ficha.pipefyId];
+          ficha.comentarios = fresh.comentarios || ficha.comentarios || [];
+          ficha.desc        = fresh.desc        || ficha.desc;
+          ficha.nome        = fresh.nome        || ficha.nome;
+        }
         ficha.textoOrc = await gerarTextoOrcamento(ficha.desc, ficha.comentarios, ficha.nome);
         count++;
-      } catch(e) {}
+      } catch(e) { console.error("regenerar", ficha.id, e.message); }
     }
     await dbSet(ORC_KEY, db);
     return res.status(200).json({ ok: true, regenerados: count });
@@ -595,42 +608,6 @@ async function gerarTextoOrcamento(desc, comentarios, nome) {
 
 // Gera texto de orçamento com Claude
 // ── NORMALIZA TEXTO (remove acentos, minúsculo) ──────────────
-function norm(s) {
-  return String(s || "").toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9 ]/g, " ");
-}
-
-function hasAny(texto, words) {
-  return words.some(function(w) { return texto.indexOf(norm(w)) >= 0; });
-}
-
-function detectarRegra(desc, comentarios) {
-  var textoNorm = norm([desc || ""].concat(comentarios || []).join(" "));
-  for (var i = 0; i < ORCAMENTO_REGRAS.length; i++) {
-    var regra = ORCAMENTO_REGRAS[i];
-    if (!hasAny(textoNorm, regra.keywords)) continue;
-    if (regra.templateBase) {
-      var comExtra = regra.extraKeys && hasAny(textoNorm, regra.extraKeys);
-      return regra.templateBase.replace("[PRECO]", comExtra ? regra.precoExtra : regra.precoBase);
-    }
-    return regra.template;
-  }
-  return null;
-}
-
-
-function substituirNome(template, nome) {
-  var p = primeiroNome(nome);
-  return template.replace(/\[NOME\]/g, p);
-}
-
-function templatePadrao(desc, nome) {
-  var p = primeiroNome(nome);
-  var saud = p ? "Ola, " + p + " bom dia" : "Ola, bom dia";
-  return saud + ", sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nRealizamos todos os testes e identificamos o problema. Faremos o reparo completo com substituicao das pecas necessarias.\n\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.";
-}
-
 // Busca cards em Aguardando Aprovação direto pelo ID da fase (mais rápido e completo)
 
 // Gera texto de orçamento com Claude
