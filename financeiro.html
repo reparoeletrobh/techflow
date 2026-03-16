@@ -409,6 +409,8 @@ function cardHTML(r, color) {
       <div class="fc-num">#${r.osCode || r.pipefyId?.slice(-4) || '—'}</div>
       <div class="fc-nome">${r.nomeContato || r.title || '—'}</div>
       ${r.descricao ? `<div class="fc-desc">${r.descricao}</div>` : ''}
+      ${r.valor     ? `<div style="font-family:var(--fm);font-size:11px;color:#22c55e;margin-top:3px;">💰 R$ ${r.valor}</div>` : ''}
+      ${r.servicos  ? `<div style="font-family:var(--fm);font-size:10px;color:#888;margin-top:3px;padding:5px 8px;background:var(--surface2);border-radius:5px;border-left:2px solid #333;">🔧 ${r.servicos}</div>` : ''}
       ${r.cpfCnpj   ? `<div class="fc-cpf">📄 ${r.cpfCnpj}</div>` : ''}
       ${r.phaseId==='pagamento_agendado' && r.dataAgendadaDisplay ? `<div style="font-family:var(--fm);font-size:10px;color:#e879f9;margin-top:4px;">⏰ Cobrança: ${r.dataAgendadaDisplay}</div>` : ''}
       ${r.phaseId==='entrega_agendada' && r.dataAgendadaDisplay ? `<div style="font-family:var(--fm);font-size:10px;color:#f97316;margin-top:4px;">📅 ${r.dataAgendadaDisplay}</div>` : ''}
@@ -425,8 +427,10 @@ function buildActions(r) {
     h += `<button class="btn-primary" style="background:#3b9eff;color:#fff;" onclick="emitirNF('${r.id}')">🧾 Nota Fiscal Emitida</button>`;
   if (r.phaseId==='faturamento')
     h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="openMoverModal('${r.id}')">💰 Registrar Pagamento</button>`;
-  if (r.phaseId==='pagamento_agendado')
+  if (r.phaseId==='pagamento_agendado') {
     h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="openMoverPagAgendado('${r.id}')">💰 Recebido — Mover</button>`;
+    h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="mover('${r.id}','entrega_liberada')">✅ Entrega Liberada</button>`;
+  }
   if (r.phaseId==='entrega_agendada')
     h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="mover('${r.id}','entrega_liberada')">✅ Liberar Entrega</button>`;
   if (r.phaseId==='entrega_liberada')
