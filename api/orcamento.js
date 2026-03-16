@@ -157,10 +157,8 @@ module.exports = async function handler(req, res) {
         await dbSet(ORC_KEY, db);
         return res.status(200).json({ ok: true, newCount: 0, initialized: true, maxIdSeen: maxId, pipefyError: null });
       }
-      // Importa apenas cards com ID maior que o máximo visto na inicialização
+      // Importa qualquer card que não esteja no syncedIds
       for (const card of cards) {
-        const cardId = parseInt(card.pipefyId) || 0;
-        if (cardId <= db.maxIdSeen) continue;        // card antigo
         if (db.syncedIds.includes(card.pipefyId)) continue; // já processado
         let textoOrc = "";
         try { textoOrc = await gerarTextoOrcamento(card.desc, card.comentarios, card.nome); } catch(e) { textoOrc = templatePadrao(card.desc, card.nome); }
@@ -179,7 +177,6 @@ module.exports = async function handler(req, res) {
           createdAt:   new Date().toISOString(),
         });
         db.syncedIds.push(card.pipefyId);
-        if (cardId > db.maxIdSeen) db.maxIdSeen = cardId;
         newCount++;
       }
       if (newCount > 0) await dbSet(ORC_KEY, db);
