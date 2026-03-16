@@ -2,6 +2,34 @@ const https  = require("https");
 const crypto = require("crypto");
 const zlib   = require("zlib");
 
+const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/[\'"]/g,"").trim();
+const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/[\'"]/g,"").trim();
+
+async function dbGet(key) {
+  try {
+    const r = await fetch(UPSTASH_URL + "/pipeline", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify([["GET", key]]),
+    });
+    const j = await r.json();
+    const v = j[0]?.result;
+    return v ? JSON.parse(v) : null;
+  } catch(e) { return null; }
+}
+
+async function dbSet(key, value) {
+  try {
+    const r = await fetch(UPSTASH_URL + "/pipeline", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify([["SET", key, JSON.stringify(value)]]),
+    });
+    const j = await r.json();
+    return j[0]?.result === "OK";
+  } catch(e) { return false; }
+}
+
 const NFSE_HOST      = "sefin.nfse.gov.br";
 const NFSE_PATH      = "/SefinNacional/nfse";
 const CNPJ_EMPRESA   = (process.env.NFSE_CNPJ || "59485378000175").replace(/\D/g,"");
@@ -27,11 +55,13 @@ function agora() {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}-03:00`;
 }
 
-function genId() {
-  // TSIdDPS: DPS + CNPJ(14) + Serie(5) + Numero(15)
-  var num = String(Date.now()).slice(-15).padStart(15,"0");
-  var serie = "00001"; // 5 dígitos numéricos (obrigatório a partir 01/2026)
-  return "DPS" + CNPJ_EMPRESA + serie + num;
+function genId(seq) {
+  // TSIdDPS: DPS + CNPJ(14) + Serie(5) + Numero(15) = 37 chars total
+  // Numero deve ser sequencial, não timestamp
+  var num   = String(seq || 1).padStart(15, "0");
+  var serie = "00001"; // 5 dígitos numéricos
+  var id    = "DPS" + CNPJ_EMPRESA + serie + num;
+  return id; // deve ter 37 chars: 3+14+5+15
 }
 
 // Monta XML da DPS conforme schema do governo
@@ -42,7 +72,7 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
     ? `<CNPJ>${cpfLimpo}</CNPJ>`
     : `<CPF>${cpfLimpo}</CPF>`;
   const vlr = parseFloat(valor).toFixed(2);
-  const id  = numDPS; // já é o ID completo no formato TSIdDPS
+  const id  = numDPS; // ID completo TSIdDPS: DPS+CNPJ(14)+Serie(5)+Numero(15) = 37 chars
 
   return `<?xml version="1.0" encoding="UTF-8"?>\n` +
 `<DPS xmlns="http://www.sped.fazenda.gov.br/nfse" versao="1.00">\n` +
@@ -217,7 +247,15 @@ module.exports = async function handler(req, res) {
     try { certOpts = loadCert(); } catch(e) { return res.status(400).json({ ok: false, error: e.message }); }
 
     try {
-      const numDPS = genId();
+      // Busca próximo número sequencial do Redis para garantir unicidade
+      let seq = 1;
+      try {
+        const seqRes = await dbGet("reparoeletro_nfse_seq");
+        seq = (seqRes || 0) + 1;
+        await dbSet("reparoeletro_nfse_seq", seq);
+      } catch(e) { seq = Date.now() % 999999999999999 || 1; }
+      const numDPS = genId(seq);
+      console.log("ID gerado:", numDPS, "len:", numDPS.length);
       const xml    = montarDPS({ cpfcnpj: tomadorCpfCnpj, nome: tomadorNome, discriminacao, valor, numDPS });
       const xmlAss = assinarXML(xml, certOpts.pfx, certOpts.passphrase);
       const b64gz  = await gzipBase64(xmlAss);
@@ -227,7 +265,7 @@ module.exports = async function handler(req, res) {
       if (parsed.ok) {
         return res.status(200).json({ ok: true, chaveAcesso: parsed.chaveAcesso, idDps: parsed.idDps, alertas: parsed.alertas });
       } else {
-        return res.status(200).json({ ok: false, error: parsed.erro, httpStatus: status });
+        return res.status(200).json({ ok: false, error: parsed.erro, httpStatus: status, idDPS: numDPS, idLen: numDPS.length });
       }
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });
