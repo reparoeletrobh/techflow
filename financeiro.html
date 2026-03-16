@@ -491,24 +491,40 @@ async function nfEmitir() {
   await api('set-cpf',   { id: nfSelId, cpfCnpj: cpfcnpj });
   await api('set-valor', { id: nfSelId, valor: valor });
 
-  // 2. Salva dados da NF no servidor para o bookmarklet ler
-  const nfData = {
-    nfId:        nfSelId,
-    cpfCnpj,
-    desc,
-    valor,
-    nomeCliente: r ? (r.nomeContato || r.title || '') : '',
-    osCode:      r ? (r.osCode || '') : '',
-  };
-  await api('nf-salvar', nfData);
+  // 2. Chama API para emissão automática com certificado A1
+  nfStatus('Emitindo nota fiscal...', '#3b9eff');
+  try {
+    const nfRes = await fetch('/api/nfse?action=emitir', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tomadorCpfCnpj: cpfcnpj,
+        tomadorNome:    r ? (r.nomeContato || '') : '',
+        discriminacao:  desc,
+        valor:          valor,
+      }),
+    });
+    const nfData = await nfRes.json();
 
-  // 3. Abre o emissor nacional — bookmarklet vai preencher automaticamente
-  window.open('https://www.nfse.gov.br/EmissorNacional/DPS/Pessoas', '_blank');
-
-  // 4. Recarrega painel
-  await load();
-  nfModalClose();
-  showToast('🧾','Emissor NF aberto!','Clique no bookmark "✦ NF Auto" na barra do Chrome');
+    if (nfData.ok) {
+      // Salva número e chave de acesso na ficha
+      await api('emitir-nf', { id: nfSelId, chaveAcesso: nfData.chaveAcesso, numeroNF: nfData.numero });
+      await load();
+      nfModalClose();
+      showToast('✅', 'NF emitida! NF nº ' + (nfData.numero || ''), 'Chave: ' + (nfData.chaveAcesso || '').slice(0,20) + '...');
+    } else {
+      // Certificado não configurado ou erro — abre emissor manual como fallback
+      if (nfData.error && nfData.error.includes('não configurado')) {
+        nfStatus('⚠️ Certificado não configurado. <a href="/nf-setup" target="_blank" style="color:var(--accent)">Configure aqui</a> ou use o emissor manual.', '#f59e0b');
+        await api('nf-salvar', { nfId: nfSelId, cpfCnpj, desc, valor, nomeCliente: r?.nomeContato||'', osCode: r?.osCode||'' });
+        window.open('https://www.nfse.gov.br/EmissorNacional/DPS/Pessoas', '_blank');
+      } else {
+        nfStatus('❌ ' + nfData.error, '#ef4444');
+      }
+    }
+  } catch(e) {
+    nfStatus('❌ Erro: ' + e.message, '#ef4444');
+  }
 
   btn.disabled = false; btn.textContent = '🧾 Emitir Nota Fiscal';
 }
