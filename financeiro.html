@@ -422,7 +422,7 @@ function cardHTML(r, color) {
 function buildActions(r) {
   let h = '';
   if (r.phaseId==='aguardando_dados')
-    h += `<button class="btn-primary" style="background:var(--accent);color:#000;" onclick="openCpfModal('${r.id}')">📋 Informar CPF / CNPJ</button>`;
+    h += `<button class="btn-primary" style="background:var(--accent);color:#000;" onclick="openNfModal('${r.id}')">📋 Informar CPF / CNPJ</button>`;
   if (r.phaseId==='emitir_nf')
     h += `<button class="btn-primary" style="background:#3b9eff;color:#fff;" onclick="emitirNF('${r.id}')">🧾 Nota Fiscal Emitida</button>`;
   if (r.phaseId==='faturamento')
@@ -439,6 +439,80 @@ function buildActions(r) {
     h += `<button class="btn-primary" style="background:#ec4899;color:#fff;" onclick="mover('${r.id}','item_coletado')">📦 Item Coletado</button>`;
   h += `<button class="btn-secondary btn-danger" onclick="excluir('${r.id}')">✕ Excluir</button>`;
   return h;
+}
+
+// ── NOTA FISCAL ──────────────────────────────────────────────
+var nfSelId = null;
+
+function openNfModal(id) {
+  nfSelId = id;
+  const r = records.find(x => x.id === id);
+  if (!r) return;
+  // Preenche modal com dados da ficha
+  document.getElementById('nf-modal-info').innerHTML =
+    '<strong>#' + (r.osCode||'—') + ' — ' + (r.nomeContato||r.title||'—') + '</strong>';
+  document.getElementById('nf-cpfcnpj').value = r.cpfCnpj || '';
+  document.getElementById('nf-valor').value   = r.valor   || '';
+  // Monta descrição padrão com serviço e garantia
+  const servDesc = r.servicos ? r.servicos + '. ' : '';
+  document.getElementById('nf-desc').value    =
+    servDesc + 'Serviço de conserto e manutenção de eletrodoméstico. Garantia de 90 dias.';
+  document.getElementById('nf-status').style.display = 'none';
+  document.getElementById('nf-modal').style.display  = 'flex';
+  setTimeout(() => document.getElementById('nf-cpfcnpj').focus(), 200);
+}
+
+function nfModalClose() {
+  document.getElementById('nf-modal').style.display = 'none';
+}
+
+function nfStatus(msg, color) {
+  const el = document.getElementById('nf-status');
+  el.textContent = msg;
+  el.style.background = color + '22';
+  el.style.color = color;
+  el.style.border = '1px solid ' + color + '44';
+  el.style.display = 'block';
+}
+
+async function nfEmitir() {
+  const cpfcnpj = document.getElementById('nf-cpfcnpj').value.trim();
+  const desc    = document.getElementById('nf-desc').value.trim();
+  const valor   = document.getElementById('nf-valor').value.trim();
+  if (!cpfcnpj) { nfStatus('Informe o CPF ou CNPJ do tomador.','#ef4444'); return; }
+  if (!valor)   { nfStatus('Informe o valor do serviço.','#ef4444'); return; }
+
+  const r = records.find(x => x.id === nfSelId);
+  const btn = document.getElementById('nf-btn-emitir');
+  btn.disabled = true; btn.textContent = '⏳ Processando...';
+  nfStatus('Salvando dados e abrindo emissor...','#3b9eff');
+
+  // 1. Salva CPF/CNPJ na ficha
+  await api('set-cpf', { id: nfSelId, cpfCnpj: cpfcnpj });
+
+  // 2. Salva valor na ficha
+  await api('set-valor', { id: nfSelId, valor: valor });
+
+  // 3. Abre o emissor de NF em nova aba e injeta os dados via postMessage/localStorage
+  const nfData = {
+    cpfCnpj, desc, valor,
+    nomeCliente: r?.nomeContato || '',
+    osCode:      r?.osCode || '',
+  };
+  localStorage.setItem('reparoeletro_nf_pending', JSON.stringify(nfData));
+
+  // Abre o emissor nacional
+  window.open('https://www.nfse.gov.br/EmissorNacional', '_blank');
+
+  // 4. Move ficha para Emitir NF
+  await api('emitir-nf', { id: nfSelId });
+
+  // 5. Recarrega painel
+  await load();
+  nfModalClose();
+  showToast('🧾','NF em andamento','Complete a emissão no Emissor Nacional');
+
+  btn.disabled = false; btn.textContent = '🧾 Emitir Nota Fiscal';
 }
 
 // ── ACTIONS ──────────────────────────────────────────────────
@@ -617,5 +691,34 @@ load();
 syncPipefy();
 setInterval(()=>{ load(); syncPipefy(); }, 30000);
 </script>
+<!-- MODAL EMITIR NF -->
+<div class="modal" id="nf-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+  <div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid #3b9eff;border-radius:14px;padding:24px;max-width:440px;width:92%;max-height:90vh;overflow-y:auto;">
+    <div style="font-family:var(--fh);font-size:17px;font-weight:800;margin-bottom:4px;">🧾 Emitir <span style="color:#3b9eff">Nota Fiscal</span></div>
+    <div id="nf-modal-info" style="font-family:var(--fm);font-size:11px;color:var(--muted);margin-bottom:14px;padding:8px 10px;background:var(--surface2);border-radius:7px;border-left:3px solid #3b9eff;"></div>
+    <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px;">
+      <label style="font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;">CPF / CNPJ do Tomador *</label>
+      <input id="nf-cpfcnpj" type="text" oninput="maskCpfCnpj(this)"
+        style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:var(--fm);font-size:13px;color:var(--text);outline:none;width:100%;"
+        placeholder="000.000.000-00"/>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
+      <label style="font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;">Descrição do Serviço</label>
+      <textarea id="nf-desc" rows="3"
+        style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:var(--fb);font-size:12px;color:var(--text);outline:none;width:100%;resize:vertical;line-height:1.5;"></textarea>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
+      <label style="font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;">Valor (R$)</label>
+      <input id="nf-valor" type="number" step="0.01"
+        style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:var(--fm);font-size:14px;color:#22c55e;outline:none;width:160px;"
+        placeholder="0,00"/>
+    </div>
+    <div id="nf-status" style="display:none;font-family:var(--fm);font-size:11px;padding:8px 12px;border-radius:7px;margin-bottom:12px;"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="nfModalClose()" style="font-family:var(--fm);font-size:11px;padding:8px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">Cancelar</button>
+      <button onclick="nfEmitir()" id="nf-btn-emitir" style="font-family:var(--fm);font-size:11px;font-weight:600;padding:8px 16px;border-radius:7px;background:#3b9eff;color:#fff;border:none;cursor:pointer;">🧾 Emitir Nota Fiscal</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
