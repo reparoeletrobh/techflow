@@ -30,7 +30,7 @@ function agora() {
 function genId() {
   // TSIdDPS: DPS + CNPJ(14) + Serie(5) + Numero(15)
   var num = String(Date.now()).slice(-15).padStart(15,"0");
-  var serie = "A    "; // 5 chars
+  var serie = "A0001"; // 5 chars alfanuméricos, sem espaços
   return "DPS" + CNPJ_EMPRESA + serie + num;
 }
 
