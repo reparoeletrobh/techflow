@@ -10,7 +10,9 @@ const https   = require("https");
 const crypto  = require("crypto");
 const zlib    = require("zlib");
 
-const NFSE_API = "https://www.nfse.gov.br/SefinNacional/nfse";
+const NFSE_API      = "https://sefin.nfse.gov.br/SefinNacional/nfse";
+const NFSE_HOSTNAME = "sefin.nfse.gov.br";
+const NFSE_PATH     = "/SefinNacional/nfse";
 const CNPJ_EMPRESA = (process.env.NFSE_CNPJ  || "59485378000175").replace(/\D/g,"");
 const IM_EMPRESA   =  process.env.NFSE_IM     || "16391680010";
 const COD_MUNICIPIO_BH = "3106200"; // Código IBGE Belo Horizonte
@@ -143,9 +145,9 @@ async function chamarAPINFSe(xmlAssinado, certOpts) {
       if (err) return reject(err);
 
       const options = {
-        hostname: "www.nfse.gov.br",
+        hostname: NFSE_HOSTNAME,
         port:     443,
-        path:     "/SefinNacional/nfse",
+        path:     NFSE_PATH,
         method:   "POST",
         headers:  {
           "Content-Type":     "application/xml",
