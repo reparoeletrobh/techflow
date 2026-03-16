@@ -56,12 +56,12 @@ function agora() {
 }
 
 function genId(seq) {
-  // TSIdDPS: DPS + CNPJ(14) + Serie(5) + Numero(15) = 37 chars total
-  // Numero deve ser sequencial, não timestamp
+  // TSIdDPS = DPS(3) + cMunEmissor(7) + tpInsc(1) + CNPJ(14) + Serie(5) + Numero(15) = 45 chars
+  // tpInsc: 1=CPF, 2=CNPJ
   var num   = String(seq || 1).padStart(15, "0");
   var serie = "00001"; // 5 dígitos numéricos
-  var id    = "DPS" + CNPJ_EMPRESA + serie + num;
-  return id; // deve ter 37 chars: 3+14+5+15
+  var id    = "DPS" + COD_MUN_BH + "2" + CNPJ_EMPRESA + serie + num;
+  return id; // 3+7+1+14+5+15 = 45 chars
 }
 
 // Monta XML da DPS conforme schema do governo
