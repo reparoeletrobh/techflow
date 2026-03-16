@@ -1,261 +1,232 @@
-// ── NFS-e Nacional — Emissão via API com Certificado A1 ──────
-// Endpoint: POST /api/nfse?action=emitir
-// Requer variáveis de ambiente no Vercel:
-//   NFSE_CERT_PFX    — certificado A1 em base64
-//   NFSE_CERT_SENHA  — senha do certificado
-//   NFSE_IM          — inscrição municipal
-//   NFSE_CNPJ        — CNPJ da empresa (sem pontuação)
+const https  = require("https");
+const crypto = require("crypto");
+const zlib   = require("zlib");
 
-const https   = require("https");
-const crypto  = require("crypto");
-const zlib    = require("zlib");
+const NFSE_HOST      = "sefin.nfse.gov.br";
+const NFSE_PATH      = "/SefinNacional/nfse";
+const CNPJ_EMPRESA   = (process.env.NFSE_CNPJ || "59485378000175").replace(/\D/g,"");
+const IM_EMPRESA     =  process.env.NFSE_IM   || "16391680010";
+const COD_MUN_BH     = "3106200";
 
-const NFSE_API      = "https://sefin.nfse.gov.br/SefinNacional/nfse";
-const NFSE_HOSTNAME = "sefin.nfse.gov.br";
-const NFSE_PATH     = "/SefinNacional/nfse";
-const CNPJ_EMPRESA = (process.env.NFSE_CNPJ  || "59485378000175").replace(/\D/g,"");
-const IM_EMPRESA   =  process.env.NFSE_IM     || "16391680010";
-const COD_MUNICIPIO_BH = "3106200"; // Código IBGE Belo Horizonte
-const COD_PAIS         = "1058";    // Brasil
-const COD_SERVICO      = "14.01";   // Reparação e manutenção de máquinas e equipamentos
-
-// ── Carrega certificado PFX ──────────────────────────────────
 function loadCert() {
-  const b64  = (process.env.NFSE_CERT_PFX || "").trim();
-  const pass = (process.env.NFSE_CERT_SENHA || "").trim();
-  if (!b64) throw new Error("NFSE_CERT_PFX não configurado");
-  if (!pass) throw new Error("NFSE_CERT_SENHA não configurado");
+  const b64  = (process.env.NFSE_CERT_PFX   || "").trim();
+  const pass = (process.env.NFSE_CERT_SENHA  || "").trim();
+  if (!b64)  throw new Error("NFSE_CERT_PFX não configurado no Vercel");
+  if (!pass) throw new Error("NFSE_CERT_SENHA não configurado no Vercel");
   return { pfx: Buffer.from(b64, "base64"), passphrase: pass };
 }
 
-// ── Gera número sequencial da DPS ────────────────────────────
-function genNumDPS() {
-  return String(Date.now()).slice(-15).padStart(15, "0");
+function escXml(s) {
+  return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
-// ── Monta XML da DPS ─────────────────────────────────────────
-function montarDPS({ tomadorCpfCnpj, tomadorNome, discriminacao, valor, dataCompetencia, numDPS }) {
-  const data = dataCompetencia || new Date().toISOString().slice(0,10);
-  const cpfcnpjLimpo = tomadorCpfCnpj.replace(/\D/g,"");
-  const isCnpj = cpfcnpjLimpo.length === 14;
-  const valorFmt = parseFloat(valor).toFixed(2);
-  const hoje = new Date().toISOString().slice(0,10);
-
-  const tomadorTag = isCnpj
-    ? `<CNPJ>${cpfcnpjLimpo}</CNPJ>`
-    : `<CPF>${cpfcnpjLimpo}</CPF>`;
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<DPS xmlns="http://www.sped.fazenda.gov.br/nfse" versao="1.00">
-  <infDPS Id="DPS${numDPS}">
-    <tpAmb>1</tpAmb>
-    <dhEmi>${hoje}T${new Date().toTimeString().slice(0,8)}-03:00</dhEmi>
-    <verAplic>1.0.0</verAplic>
-    <serie>A</serie>
-    <nDPS>${numDPS}</nDPS>
-    <dCompet>${data}</dCompet>
-    <tpEmit>1</tpEmit>
-    <cLocEmi>${COD_MUNICIPIO_BH}</cLocEmi>
-    <prest>
-      <CNPJ>${CNPJ_EMPRESA}</CNPJ>
-      <IM>${IM_EMPRESA}</IM>
-      <end>
-        <endNac>
-          <cMun>${COD_MUNICIPIO_BH}</cMun>
-          <CEP>30190130</CEP>
-        </endNac>
-      </end>
-    </prest>
-    <toma>
-      ${tomadorTag}
-      <xNome>${escapeXml(tomadorNome || "Consumidor Final")}</xNome>
-    </toma>
-    <serv>
-      <locPrest>
-        <cLocPrestacao>${COD_MUNICIPIO_BH}</cLocPrestacao>
-      </locPrest>
-      <cServ>
-        <cTribNac>${COD_SERVICO}</cTribNac>
-        <xDescServ>${escapeXml(discriminacao)}</xDescServ>
-      </cServ>
-    </serv>
-    <valores>
-      <vServPrest>
-        <vReceb>${valorFmt}</vReceb>
-      </vServPrest>
-      <trib>
-        <tribMun>
-          <tribISSQN>1</tribISSQN>
-          <cLocIncid>${COD_MUNICIPIO_BH}</cLocIncid>
-          <pAliq>2.00</pAliq>
-        </tribMun>
-        <totTrib>
-          <pTotTribSN>6.00</pTotTribSN>
-        </totTrib>
-      </trib>
-    </valores>
-  </infDPS>
-</DPS>`;
+function hoje() { return new Date().toISOString().slice(0,10); }
+function agora() {
+  const d = new Date(new Date().toLocaleString("en-US",{timeZone:"America/Sao_Paulo"}));
+  const pad = n => String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}-03:00`;
 }
 
-function escapeXml(s) {
-  return String(s||"")
-    .replace(/&/g,"&amp;")
-    .replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;")
-    .replace(/"/g,"&quot;")
-    .replace(/'/g,"&apos;");
+function genId() { return String(Date.now()).padStart(15,"0"); }
+
+// Monta XML da DPS conforme schema do governo
+function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
+  const cpfLimpo = cpfcnpj.replace(/\D/g,"");
+  const isCnpj   = cpfLimpo.length === 14;
+  const toma      = isCnpj
+    ? `<CNPJ>${cpfLimpo}</CNPJ>`
+    : `<CPF>${cpfLimpo}</CPF>`;
+  const vlr = parseFloat(valor).toFixed(2);
+  const id  = `DPS${numDPS}`;
+
+  return `<?xml version="1.0" encoding="UTF-8"?>\n` +
+`<DPS xmlns="http://www.sped.fazenda.gov.br/nfse" versao="1.00">\n` +
+`  <infDPS Id="${id}">\n` +
+`    <tpAmb>1</tpAmb>\n` +
+`    <dhEmi>${agora()}</dhEmi>\n` +
+`    <verAplic>reparoeletro-1.0</verAplic>\n` +
+`    <serie>A</serie>\n` +
+`    <nDPS>${numDPS}</nDPS>\n` +
+`    <dCompet>${hoje()}</dCompet>\n` +
+`    <tpEmit>1</tpEmit>\n` +
+`    <cLocEmi>${COD_MUN_BH}</cLocEmi>\n` +
+`    <prest>\n` +
+`      <CNPJ>${CNPJ_EMPRESA}</CNPJ>\n` +
+`      <IM>${IM_EMPRESA}</IM>\n` +
+`      <end>\n` +
+`        <endNac>\n` +
+`          <cMun>${COD_MUN_BH}</cMun>\n` +
+`          <CEP>30190130</CEP>\n` +
+`        </endNac>\n` +
+`      </end>\n` +
+`    </prest>\n` +
+`    <toma>\n` +
+`      ${toma}\n` +
+`      <xNome>${escXml(nome||"Consumidor Final")}</xNome>\n` +
+`    </toma>\n` +
+`    <serv>\n` +
+`      <locPrest>\n` +
+`        <cLocPrestacao>${COD_MUN_BH}</cLocPrestacao>\n` +
+`      </locPrest>\n` +
+`      <cServ>\n` +
+`        <cTribNac>14.01</cTribNac>\n` +
+`        <xDescServ>${escXml(discriminacao)}</xDescServ>\n` +
+`      </cServ>\n` +
+`    </serv>\n` +
+`    <valores>\n` +
+`      <vServPrest>\n` +
+`        <vReceb>${vlr}</vReceb>\n` +
+`      </vServPrest>\n` +
+`      <trib>\n` +
+`        <tribMun>\n` +
+`          <tribISSQN>1</tribISSQN>\n` +
+`          <cLocIncid>${COD_MUN_BH}</cLocIncid>\n` +
+`          <pAliq>2.00</pAliq>\n` +
+`        </tribMun>\n` +
+`        <totTrib>\n` +
+`          <pTotTribSN>6.00</pTotTribSN>\n` +
+`        </totTrib>\n` +
+`      </trib>\n` +
+`    </valores>\n` +
+`  </infDPS>\n` +
+`</DPS>`;
 }
 
-// ── Assina XML com certificado A1 ────────────────────────────
-async function assinarXML(xml, pfxBuffer, passphrase) {
-  // Usa crypto nativo do Node.js para assinar
-  // A assinatura segue o padrão XML-DSig exigido pelo governo
-  const sign = crypto.createSign("sha256WithRSAEncryption");
-  sign.update(xml);
-
-  // Extrai chave privada do PFX
-  // Node.js 15+ suporta importação direta de PFX
-  let privateKey;
+// Assina o XML com XMLDSig usando a chave privada do certificado PFX
+function assinarXML(xml, pfxBuf, passphrase) {
   try {
-    const p12 = crypto.createPrivateKey({ key: pfxBuffer, format: "pkcs12", passphrase });
-    privateKey = p12;
+    // Extrai chave privada do PFX (suportado Node.js 15+)
+    const p12 = crypto.createPrivateKey({ key: pfxBuf, format: "pkcs12", passphrase });
+    
+    // Calcula digest do conteúdo de infDPS
+    const infMatch = xml.match(/<infDPS[\s\S]*?<\/infDPS>/);
+    if (!infMatch) throw new Error("infDPS não encontrado no XML");
+    const digest = crypto.createHash("sha256").update(infMatch[0]).digest("base64");
+    
+    // Cria SignedInfo canônico
+    const signedInfo = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">` +
+      `<CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>` +
+      `<SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>` +
+      `<Reference URI="#${xml.match(/Id="([^"]+)"/)?.[1]||''}">` +
+        `<Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/></Transforms>` +
+        `<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>` +
+        `<DigestValue>${digest}</DigestValue>` +
+      `</Reference>` +
+    `</SignedInfo>`;
+    
+    // Assina
+    const sign = crypto.createSign("sha256");
+    sign.update(signedInfo);
+    const sigValue = sign.sign(p12, "base64");
+    
+    // Monta Signature completo
+    const signature = `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">` +
+      signedInfo +
+      `<SignatureValue>${sigValue}</SignatureValue>` +
+    `</Signature>`;
+    
+    return xml.replace("</DPS>", signature + "\n</DPS>");
   } catch(e) {
-    // Fallback: usa o PFX diretamente como agentOptions
-    privateKey = null;
+    console.error("Assinatura falhou:", e.message);
+    // Retorna sem assinatura — a autenticação mTLS pode ser suficiente
+    return xml;
   }
-
-  if (privateKey) {
-    sign.update(xml);
-    const signature = sign.sign(privateKey, "base64");
-    // Injeta assinatura no XML
-    return xml.replace("</DPS>", `<Signature>${signature}</Signature></DPS>`);
-  }
-
-  // Se não conseguiu extrair a chave, retorna XML sem assinatura
-  // (a API pode aceitar mTLS como autenticação suficiente)
-  return xml;
 }
 
-// ── Chama API do governo ─────────────────────────────────────
-async function chamarAPINFSe(xmlAssinado, certOpts) {
-  return new Promise((resolve, reject) => {
-    // Comprime o XML em GZIP conforme exigido pela API
-    zlib.gzip(Buffer.from(xmlAssinado, "utf8"), (err, gzipped) => {
-      if (err) return reject(err);
-
-      const options = {
-        hostname: NFSE_HOSTNAME,
-        port:     443,
-        path:     NFSE_PATH,
-        method:   "POST",
-        headers:  {
-          "Content-Type":     "application/xml",
-          "Content-Encoding": "gzip",
-          "Content-Length":   gzipped.length,
-          "Accept":           "application/xml",
-        },
-        pfx:        certOpts.pfx,
-        passphrase: certOpts.passphrase,
-        rejectUnauthorized: true,
-      };
-
-      const req = https.request(options, (res) => {
-        const chunks = [];
-        res.on("data", chunk => chunks.push(chunk));
-        res.on("end", () => {
-          const body = Buffer.concat(chunks).toString("utf8");
-          resolve({ status: res.statusCode, body });
-        });
-      });
-      req.on("error", reject);
-      req.write(gzipped);
-      req.end();
+// Comprime XML em GZip e converte para base64
+function gzipBase64(xml) {
+  return new Promise((res, rej) => {
+    zlib.gzip(Buffer.from(xml, "utf8"), (err, buf) => {
+      if (err) return rej(err);
+      res(buf.toString("base64"));
     });
   });
 }
 
-// ── Extrai dados da resposta XML ─────────────────────────────
-function parseResposta(xml) {
-  function getTag(tag) {
-    var rx = new RegExp("<" + tag + "[^>]*>([\s\S]*?)<\/" + tag + ">");
-    var m = xml.match(rx);
-    return m ? m[1].trim() : null;
-  }
-  var chaveAcesso = getTag("chNFSe") || getTag("chaveAcesso");
-  var numero      = getTag("nNFSe")  || getTag("numero");
-  var codigoVerif = getTag("cVerifCod");
-  var sucesso     = xml.includes("nNFSe") || xml.includes("chNFSe");
-  var erro = getTag("xMotivo") || getTag("descricaoErro") || getTag("xMsg")
-           || getTag("mensagem") || getTag("Mensagem") || getTag("faultstring")
-           || (sucesso ? null : xml.slice(0, 300));
-  return { sucesso, chaveAcesso, numero, codigoVerif, erro };
+// Chama a API do governo com mTLS
+function chamarAPI(dpsXmlGZipB64, certOpts) {
+  return new Promise((res, rej) => {
+    const body = Buffer.from(JSON.stringify({ dpsXmlGZipB64 }), "utf8");
+    const opts = {
+      hostname:           NFSE_HOST,
+      port:               443,
+      path:               NFSE_PATH,
+      method:             "POST",
+      headers: {
+        "Content-Type":   "application/json",
+        "Content-Length": body.length,
+        "Accept":         "application/json",
+      },
+      pfx:                certOpts.pfx,
+      passphrase:         certOpts.passphrase,
+      rejectUnauthorized: true,
+    };
+    const req = https.request(opts, r => {
+      const chunks = [];
+      r.on("data", c => chunks.push(c));
+      r.on("end", () => res({ status: r.statusCode, body: Buffer.concat(chunks).toString("utf8") }));
+    });
+    req.on("error", rej);
+    req.write(body);
+    req.end();
+  });
 }
 
-// ── HANDLER ──────────────────────────────────────────────────
+function parseResp(body) {
+  try {
+    const j = JSON.parse(body);
+    if (j.chaveAcesso) return { ok: true, chaveAcesso: j.chaveAcesso, idDps: j.idDps, nfseXml: j.nfseXmlGZipB64, alertas: j.alertas };
+    // Erro
+    const msgs = (j.mensagens||j.erros||[]).map(m => m.mensagem||m.descricao||JSON.stringify(m)).join("; ");
+    return { ok: false, erro: msgs || j.mensagem || body.slice(0,400) };
+  } catch(e) {
+    return { ok: false, erro: body.slice(0,400) };
+  }
+}
+
 module.exports = async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Origin","*");
+  res.setHeader("Access-Control-Allow-Methods","GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers","Content-Type");
   if (req.method === "OPTIONS") return res.status(200).end();
 
   const { action } = req.query;
 
-  // ── POST emitir ─────────────────────────────────────────────
+  if (action === "status") {
+    return res.status(200).json({
+      ok: !!(process.env.NFSE_CERT_PFX && process.env.NFSE_CERT_SENHA),
+      temCert:  !!(process.env.NFSE_CERT_PFX),
+      temSenha: !!(process.env.NFSE_CERT_SENHA),
+      temIM:    !!(IM_EMPRESA),
+      cnpj:     CNPJ_EMPRESA,
+      im:       IM_EMPRESA,
+    });
+  }
+
   if (req.method === "POST" && action === "emitir") {
-    const { tomadorCpfCnpj, tomadorNome, discriminacao, valor, dataCompetencia } = req.body || {};
+    const { tomadorCpfCnpj, tomadorNome, discriminacao, valor } = req.body || {};
     if (!tomadorCpfCnpj || !valor)
       return res.status(400).json({ ok: false, error: "tomadorCpfCnpj e valor obrigatórios" });
 
-    if (!IM_EMPRESA)
-      return res.status(400).json({ ok: false, error: "Inscrição Municipal não configurada (NFSE_IM)" });
-
     let certOpts;
-    try { certOpts = loadCert(); }
-    catch(e) { return res.status(400).json({ ok: false, error: e.message }); }
-
-    const numDPS = genNumDPS();
+    try { certOpts = loadCert(); } catch(e) { return res.status(400).json({ ok: false, error: e.message }); }
 
     try {
-      const xml = montarDPS({ tomadorCpfCnpj, tomadorNome, discriminacao, valor, dataCompetencia, numDPS });
-      const xmlAssinado = await assinarXML(xml, certOpts.pfx, certOpts.passphrase);
-      const { status, body } = await chamarAPINFSe(xmlAssinado, certOpts);
-      const parsed = parseResposta(body);
+      const numDPS = genId();
+      const xml    = montarDPS({ cpfcnpj: tomadorCpfCnpj, nome: tomadorNome, discriminacao, valor, numDPS });
+      const xmlAss = assinarXML(xml, certOpts.pfx, certOpts.passphrase);
+      const b64gz  = await gzipBase64(xmlAss);
+      const { status, body } = await chamarAPI(b64gz, certOpts);
+      const parsed = parseResp(body);
 
-      if (parsed.sucesso) {
-        return res.status(200).json({
-          ok:          true,
-          chaveAcesso: parsed.chaveAcesso,
-          numero:      parsed.numero,
-          codigoVerif: parsed.codigoVerif,
-          xmlResposta: body,
-        });
+      if (parsed.ok) {
+        return res.status(200).json({ ok: true, chaveAcesso: parsed.chaveAcesso, idDps: parsed.idDps, alertas: parsed.alertas });
       } else {
-        return res.status(200).json({
-          ok:    false,
-          error: parsed.erro || body.slice(0,400) || "Erro desconhecido",
-          status,
-          body:  body.slice(0, 500),
-        });
+        return res.status(200).json({ ok: false, error: parsed.erro, httpStatus: status });
       }
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });
     }
-  }
-
-  // ── GET status — verifica configuração ────────────────────
-  if (action === "status") {
-    const temCert = !!(process.env.NFSE_CERT_PFX);
-    const temIM   = !!(process.env.NFSE_IM);
-    const temCNPJ = !!(process.env.NFSE_CNPJ);
-    return res.status(200).json({
-      ok:     temCert && temIM && temCNPJ,
-      temCert,
-      temIM,
-      temCNPJ,
-      cnpj:   CNPJ_EMPRESA,
-      im:     IM_EMPRESA || "(não configurado)",
-    });
   }
 
   return res.status(404).json({ ok: false, error: "Ação não encontrada" });
