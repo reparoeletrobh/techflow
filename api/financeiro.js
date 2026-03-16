@@ -319,6 +319,17 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, record: rec });
   }
 
+  // ── POST set-valor ────────────────────────────────────────
+  if (req.method === "POST" && action === "set-valor") {
+    const { id, valor } = req.body || {};
+    const fin = await dbGet(FIN_KEY) || defaultFin();
+    const rec = fin.records.find(r => r.id === id);
+    if (!rec) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
+    rec.valor = valor;
+    await dbSet(FIN_KEY, fin);
+    return res.status(200).json({ ok: true });
+  }
+
   // ── POST emitir-nf ─────────────────────────────────────────
   // Marca NF como emitida e move para Faturamento
   if (req.method === "POST" && action === "emitir-nf") {
