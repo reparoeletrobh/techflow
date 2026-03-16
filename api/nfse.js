@@ -27,7 +27,12 @@ function agora() {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}-03:00`;
 }
 
-function genId() { return String(Date.now()).padStart(15,"0"); }
+function genId() {
+  // TSIdDPS: DPS + CNPJ(14) + Serie(5) + Numero(15)
+  var num = String(Date.now()).slice(-15).padStart(15,"0");
+  var serie = "A    "; // 5 chars
+  return "DPS" + CNPJ_EMPRESA + serie + num;
+}
 
 // Monta XML da DPS conforme schema do governo
 function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
@@ -37,7 +42,7 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
     ? `<CNPJ>${cpfLimpo}</CNPJ>`
     : `<CPF>${cpfLimpo}</CPF>`;
   const vlr = parseFloat(valor).toFixed(2);
-  const id  = `DPS${numDPS}`;
+  const id  = numDPS; // já é o ID completo no formato TSIdDPS
 
   return `<?xml version="1.0" encoding="UTF-8"?>\n` +
 `<DPS xmlns="http://www.sped.fazenda.gov.br/nfse" versao="1.00">\n` +
@@ -46,7 +51,7 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 `    <dhEmi>${agora()}</dhEmi>\n` +
 `    <verAplic>reparoeletro-1.0</verAplic>\n` +
 `    <serie>A</serie>\n` +
-`    <nDPS>${numDPS}</nDPS>\n` +
+`    <nDPS>${numDPS.slice(-15).replace(/^0+/,"") || "1"}</nDPS>\n` +
 `    <dCompet>${hoje()}</dCompet>\n` +
 `    <tpEmit>1</tpEmit>\n` +
 `    <cLocEmi>${COD_MUN_BH}</cLocEmi>\n` +
