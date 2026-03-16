@@ -80,7 +80,7 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 `    <tpAmb>1</tpAmb>\n` +
 `    <dhEmi>${agora()}</dhEmi>\n` +
 `    <verAplic>reparoeletro-1.0</verAplic>\n` +
-`    <serie>A</serie>\n` +
+`    <serie>00001</serie>\n` +
 `    <nDPS>${numDPS.slice(-15).replace(/^0+/,"") || "1"}</nDPS>\n` +
 `    <dCompet>${hoje()}</dCompet>\n` +
 `    <tpEmit>1</tpEmit>\n` +
