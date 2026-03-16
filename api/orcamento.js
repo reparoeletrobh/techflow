@@ -157,9 +157,13 @@ module.exports = async function handler(req, res) {
         await dbSet(ORC_KEY, db);
         return res.status(200).json({ ok: true, newCount: 0, initialized: true, maxIdSeen: maxId, pipefyError: null });
       }
+      // Remove do syncedIds cards que saíram da fase (permite reimportar se voltarem)
+      const idsNaFase = new Set(cards.map(card => card.pipefyId));
+      db.syncedIds = (db.syncedIds || []).filter(id => idsNaFase.has(id));
+
       // Importa apenas cards nunca vistos (não estão no syncedIds)
       for (const card of cards) {
-        if ((db.syncedIds || []).includes(card.pipefyId)) continue;
+        if (db.syncedIds.includes(card.pipefyId)) continue;
         let textoOrc = "";
         try { textoOrc = await gerarTextoOrcamento(card.desc, card.comentarios, card.nome); } catch(e) { textoOrc = templatePadrao(card.desc, card.nome); }
         db.fichas.unshift({
