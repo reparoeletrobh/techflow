@@ -487,30 +487,28 @@ async function nfEmitir() {
   btn.disabled = true; btn.textContent = '⏳ Processando...';
   nfStatus('Salvando dados e abrindo emissor...','#3b9eff');
 
-  // 1. Salva CPF/CNPJ na ficha
-  await api('set-cpf', { id: nfSelId, cpfCnpj: cpfcnpj });
-
-  // 2. Salva valor na ficha
+  // 1. Salva CPF/CNPJ e valor na ficha
+  await api('set-cpf',   { id: nfSelId, cpfCnpj: cpfcnpj });
   await api('set-valor', { id: nfSelId, valor: valor });
 
-  // 3. Abre o emissor de NF em nova aba e injeta os dados via postMessage/localStorage
+  // 2. Salva dados da NF no servidor para o bookmarklet ler
   const nfData = {
-    cpfCnpj, desc, valor,
-    nomeCliente: r?.nomeContato || '',
-    osCode:      r?.osCode || '',
+    nfId:        nfSelId,
+    cpfCnpj,
+    desc,
+    valor,
+    nomeCliente: r ? (r.nomeContato || r.title || '') : '',
+    osCode:      r ? (r.osCode || '') : '',
   };
-  localStorage.setItem('reparoeletro_nf_pending', JSON.stringify(nfData));
+  await api('nf-salvar', nfData);
 
-  // Abre o emissor nacional
-  window.open('https://www.nfse.gov.br/EmissorNacional', '_blank');
+  // 3. Abre o emissor nacional — bookmarklet vai preencher automaticamente
+  window.open('https://www.nfse.gov.br/EmissorNacional/DPS/Pessoas', '_blank');
 
-  // 4. Move ficha para Emitir NF
-  await api('emitir-nf', { id: nfSelId });
-
-  // 5. Recarrega painel
+  // 4. Recarrega painel
   await load();
   nfModalClose();
-  showToast('🧾','NF em andamento','Complete a emissão no Emissor Nacional');
+  showToast('🧾','Emissor NF aberto!','Clique no bookmark "✦ NF Auto" na barra do Chrome');
 
   btn.disabled = false; btn.textContent = '🧾 Emitir Nota Fiscal';
 }
@@ -714,6 +712,9 @@ setInterval(()=>{ load(); syncPipefy(); }, 30000);
         placeholder="0,00"/>
     </div>
     <div id="nf-status" style="display:none;font-family:var(--fm);font-size:11px;padding:8px 12px;border-radius:7px;margin-bottom:12px;"></div>
+    <div style="font-family:var(--fm);font-size:10px;color:var(--muted);padding:8px 10px;background:var(--surface2);border-radius:7px;margin-bottom:12px;border-left:2px solid var(--accent);">
+      ✦ Primeira vez? <a href="/nf-setup" target="_blank" style="color:var(--accent);">Configure o NF Auto</a> para preencher o formulário automaticamente com 1 clique.
+    </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;">
       <button onclick="nfModalClose()" style="font-family:var(--fm);font-size:11px;padding:8px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">Cancelar</button>
       <button onclick="nfEmitir()" id="nf-btn-emitir" style="font-family:var(--fm);font-size:11px;font-weight:600;padding:8px 16px;border-radius:7px;background:#3b9eff;color:#fff;border:none;cursor:pointer;">🧾 Emitir Nota Fiscal</button>
