@@ -447,7 +447,7 @@ function hasAny(texto, words) {
 
 const ORCAMENTO_REGRAS = [
   {
-    keywords: ["termoeletrico","termeletrico","thermoeletrico","termoeltrico",
+    keywords: ["termoeletrico","termeletrico","thermoeletrico","termoeltrico","termo eletrico","termo-eletrico","termoelectric",
                "cooler","culer","coler","colder",
                "placa de resfriamento","placa resfriamento","placa fria",
                "peltier","peltyer","peltir",
