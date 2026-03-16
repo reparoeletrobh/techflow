@@ -200,6 +200,21 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, ficha });
   }
 
+  // ── POST orc-regenerar-todos — regenera texto de todas as fichas pendentes
+  if (action === "orc-regenerar-todos") {
+    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
+    const pendentes = (db.fichas || []).filter(f => f.status === "pendente");
+    let count = 0;
+    for (const ficha of pendentes) {
+      try {
+        ficha.textoOrc = await gerarTextoOrcamento(ficha.desc, ficha.comentarios, ficha.nome);
+        count++;
+      } catch(e) {}
+    }
+    await dbSet(ORC_KEY, db);
+    return res.status(200).json({ ok: true, regenerados: count });
+  }
+
   // ── POST orc-regenerar ─────────────────────────────────────
   if (req.method === "POST" && action === "orc-regenerar") {
     const { id } = req.body || {};
@@ -446,35 +461,58 @@ function hasAny(texto, words) {
 }
 
 const ORCAMENTO_REGRAS = [
+  // 1. Termoelétrico + vela → R$ 390 (verificar ANTES do termoelétrico puro)
   {
-    keywords: ["termoeletrico","termeletrico","thermoeletrico","termoeltrico","termo eletrico","termo-eletrico","termoelectric",
+    keywords: ["vela","velas"],
+    extraKeys: ["termoeletrico","termeletrico","termo eletrico","termo-eletrico","thermoeletrico",
+                "cooler","culer","coler","colder","peltier","pasta termica","kit frio","kit termoeletrico"],
+    templateBase: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do cooler, placa de resfriamento e pasta termica, alem da troca da vela, as pecas serao trocadas tambem. Este conserto completo fica em [PRECO] reais apenas. Aprovando ja iniciamos o conserto.",
+    precoBase:  "390",
+    precoExtra: "390",
+  },
+  // 2. Termoelétrico puro → R$ 350
+  {
+    keywords: ["termoeletrico","termeletrico","termo eletrico","termo-eletrico","thermoeletrico","termoeltrico",
+               "termoelectric","kit termoeletrico","kit termo eletrico","kit termo-eletrico",
                "cooler","culer","coler","colder",
                "placa de resfriamento","placa resfriamento","placa fria",
                "peltier","peltyer","peltir",
                "pasta termica","pasta terminca","pasta termika","pasta termca",
-               "kit frio","kit termoeletrico","kit termico","conjunto termoeletrico"],
+               "kit frio","kit termico","conjunto termoeletrico"],
     template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do cooler, placa de resfriamento e pasta termica, as pecas serao trocadas tambem. Este conserto completo fica em 350 reais apenas. Aprovando ja iniciamos o conserto.",
   },
+  // 3. Magnetron → R$ 370
   {
-    keywords: ["magnetron","magnetrao","magneton","magentron","magnetrom"],
+    keywords: ["magnetron","magnetrao","magneton","magentron","magnetrom","magnetron","magnetico","magnet"],
     template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do magnetron, as pecas serao trocadas tambem. Este conserto completo fica em 370 reais apenas. Aprovando ja iniciamos o conserto.",
   },
+  // 4. Fusível/capacitor → R$ 320
   {
-    keywords: ["fusivel","fusirel","fuzivel","fusiveil","queimou fusivel","fusivel de alta"],
+    keywords: ["fusivel","fusível","fusirel","fuzivel","fusiveil","queimou fusivel","fusivel de alta",
+               "capacitor e fusivel","troca do fusivel","troca de fusivel"],
     template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e fusivel de alta, as pecas serao trocadas tambem. Este conserto completo fica em 320 reais apenas. Aprovando ja iniciamos o conserto.",
   },
+  // 5. Microchave → R$ 320
   {
     keywords: ["microchave","micro chave","micro-chave","chave micro"],
     template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e microchave de acionamento, as pecas serao trocadas tambem. Este conserto completo fica em 320 reais apenas. Aprovando ja iniciamos o conserto.",
   },
+  // 6. Membrana → R$ 320
+  {
+    keywords: ["membrana","membrane","menbrana"],
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da membrana, as pecas serao trocadas tambem. Este conserto completo fica em 320 reais apenas. Aprovando ja iniciamos o conserto.",
+  },
+  // 7. Placa micra → R$ 320
   {
     keywords: ["placa micra","placa microondas","placa do microondas","placa micro"],
     template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e placa micra, as pecas serao trocadas tambem. Este conserto completo fica em 320 reais apenas. Aprovando ja iniciamos o conserto.",
   },
+  // 8. Gás → R$ 450
   {
     keywords: ["valvula de gas","valvula gas","recarga de gas","recarga gas","gas refrigerante","carga de gas"],
     template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca da valvula de gas, solda e recarga de gas refrigerante. Este conserto completo fica em 450 reais apenas. Aprovando ja iniciamos o conserto.",
   },
+  // 9. Hidráulica → R$ 350 ou R$ 450 se tiver motor/gas
   {
     keywords: ["mangueira","conexao","conexoes","duto","dutos","hidraulica","hidraulico","vazando","vazamento"],
     extraKeys: ["motor","gas","compressor"],
@@ -482,11 +520,14 @@ const ORCAMENTO_REGRAS = [
     precoBase:  "350",
     precoExtra: "450",
   },
+  // 10. Placa principal / recuperação de placa → R$ 350
   {
-    keywords: ["placa principal","placa de potencia","placa potencia","placa de controle","placa controle"],
+    keywords: ["placa principal","placa de potencia","placa potencia","placa de controle","placa controle",
+               "recuperacao da placa","recuperação da placa","recupera da placa","recuperar placa","reoperacao","reoperação"],
     template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da placa principal, sera feito a reoperacao da placa tambem. Este conserto completo fica em 350 reais apenas. Aprovando ja iniciamos o conserto.",
   },
 ];
+
 
 function detectarRegra(desc, comentarios) {
   var textoNorm = norm([desc || ""].concat(comentarios || []).join(" "));
