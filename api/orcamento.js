@@ -300,7 +300,7 @@ module.exports = async function handler(req, res) {
       const data = await pipefyQuery(`query {
         card(id: "${id}") {
           id title
-          fields { name value field_id: id }
+          fields { name value }
           comments { text author { name } }
         }
       }`);
