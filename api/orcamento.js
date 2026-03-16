@@ -157,9 +157,10 @@ module.exports = async function handler(req, res) {
         await dbSet(ORC_KEY, db);
         return res.status(200).json({ ok: true, newCount: 0, initialized: true, maxIdSeen: maxId, pipefyError: null });
       }
-      // Importa qualquer card que não esteja no syncedIds
+      // Importa cards que não têm ficha ativa (pendente) no painel
+      const fichasAtivas = new Set((db.fichas || []).filter(f => f.status !== "enviado").map(f => f.pipefyId));
       for (const card of cards) {
-        if (db.syncedIds.includes(card.pipefyId)) continue; // já processado
+        if (fichasAtivas.has(card.pipefyId)) continue; // já tem ficha ativa no painel
         let textoOrc = "";
         try { textoOrc = await gerarTextoOrcamento(card.desc, card.comentarios, card.nome); } catch(e) { textoOrc = templatePadrao(card.desc, card.nome); }
         db.fichas.unshift({
@@ -289,6 +290,25 @@ module.exports = async function handler(req, res) {
     result.syncedIds      = db.syncedIds || [];
     result.fichas_count   = (db.fichas || []).length;
     return res.status(200).json(result);
+  }
+
+  // ── GET orc-sync-forcar-todos ─────────────────────────────
+  // Remove do syncedIds todos os cards que estão AGORA em Aguardando Aprovação
+  // Permite reimportar fichas que já estiveram na fase antes
+  if (action === "orc-sync-forcar-todos") {
+    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
+    let cards = [];
+    try { cards = await fetchAguardandoAprovacao(); } catch(e) {
+      return res.status(200).json({ ok: false, error: e.message });
+    }
+    // Remove do syncedIds apenas os que ainda estão na fase (não os que já foram processados e saíram)
+    const idsNaFase = new Set(cards.map(c => c.pipefyId));
+    const antes = db.syncedIds.length;
+    db.syncedIds = (db.syncedIds || []).filter(id => !idsNaFase.has(id));
+    // Também remove fichas já existentes desses IDs para não duplicar
+    db.fichas = (db.fichas || []).filter(f => !idsNaFase.has(f.pipefyId));
+    await dbSet(ORC_KEY, db);
+    return res.status(200).json({ ok: true, removidos: antes - db.syncedIds.length, total_na_fase: cards.length, msg: "Chame orc-sync agora para importar." });
   }
 
   // ── GET orc-reset-init ────────────────────────────────────
