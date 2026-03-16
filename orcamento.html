@@ -312,8 +312,9 @@ async function orcSync() {
   try {
     var r = await fetch("/api/orcamento?action=orc-sync");
     var d = await r.json();
-    if (d.newCount > 0) { await orcLoad(); st.textContent = "+" + d.newCount + " nova" + (d.newCount > 1 ? "s" : ""); setTimeout(function() { st.textContent = ""; }, 4000); }
-    else { st.textContent = "sem novidades"; setTimeout(function() { st.textContent = ""; }, 3000); }
+    await orcLoad(); // sempre atualiza painel
+    if (d.newCount > 0) { st.textContent = "+" + d.newCount + " nova" + (d.newCount > 1 ? "s" : ""); setTimeout(function() { st.textContent = ""; }, 4000); }
+    else { st.textContent = "atualizado"; setTimeout(function() { st.textContent = ""; }, 2000); }
     if (d.pipefyError) st.textContent = "Pipefy: " + d.pipefyError;
   } catch(e) { st.textContent = "Erro: " + e.message; }
   btn.textContent = "↻ Sync Pipefy"; btn.style.pointerEvents = "";
@@ -479,9 +480,29 @@ async function init() {
 }
 
 init();
+orcLoad(); // carrega fichas na inicialização
 setInterval(function() {
   if (document.getElementById("page-orcamento").classList.contains("active")) orcSync();
 }, 60000);
+
+// Limpa enviados automaticamente às 23:00 BRT
+function agendarLimpeza() {
+  var now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  var target = new Date(now);
+  target.setHours(23, 0, 0, 0);
+  if (now >= target) target.setDate(target.getDate() + 1);
+  var ms = target - now;
+  setTimeout(function() {
+    fetch("/api/orcamento?action=orc-limpar-enviados")
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.removed > 0) { orcFichas = orcFichas.filter(function(f) { return f.status !== "enviado"; }); orcRender(); }
+      })
+      .catch(function() {});
+    agendarLimpeza(); // reagenda para o próximo dia
+  }, ms);
+}
+agendarLimpeza();
 </script>
 </body>
 </html>
