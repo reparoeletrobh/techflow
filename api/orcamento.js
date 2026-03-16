@@ -454,18 +454,18 @@ async function fetchCardData(pipefyId) {
   const node   = data?.card;
   if (!node) return null;
   const fields = node.fields || [];
-  const nome     = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
-  const tel      = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
-  const desc     = fields.find(f => f.name.toLowerCase().includes("empresa") || (f.name.toLowerCase().includes("descri") && !f.name.toLowerCase().includes("servi")))?.value || "";
-  const end      = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
-  const servicos = fields.find(f => f.name.toLowerCase().includes("servi"))?.value || "";
-  const infoCliente = fields.find(f => f.name.toLowerCase().includes("informa"))?.value || "";
+  const nome  = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
+  const tel   = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
+  const desc  = fields.find(f => f.name.toLowerCase().includes("descri"))?.value || "";
+  const end   = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
+  const extras = fields
+    .filter(f => !["telefone","fone","nome","endere","valor"].some(k => f.name.toLowerCase().includes(k)))
+    .map(f => f.value).filter(Boolean);
   const comentarios = [
     ...(node.comments || []).map(c => c.text).filter(Boolean),
-    ...(servicos ? [servicos] : []),
-    ...(infoCliente ? [infoCliente] : []),
+    ...extras,
   ];
-  return { pipefyId: String(node.id), title: node.title, nome, tel, desc, end, comentarios, servicos };
+  return { pipefyId: String(node.id), title: node.title, nome, tel, desc, end, comentarios };
 }
 
 // Busca cards em Aguardando Aprovação direto pelo ID da fase (mais rápido e completo)
@@ -496,17 +496,17 @@ async function fetchAguardandoAprovacao() {
       const fields = node.fields || [];
       const nome     = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
       const tel      = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
-      const desc     = fields.find(f => f.name.toLowerCase().includes("empresa") || (f.name.toLowerCase().includes("descri") && !f.name.toLowerCase().includes("servi")))?.value || "";
+      const desc     = fields.find(f => f.name.toLowerCase().includes("descri"))?.value || "";
       const end      = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
-      const servicos = fields.find(f => f.name.toLowerCase().includes("servi"))?.value || "";
-      const infoCliente = fields.find(f => f.name.toLowerCase().includes("informa"))?.value || "";
-      // Agrega comentários + campo de serviços + informações do cliente como fontes de keywords
+      // Agrega TODOS os campos de texto como fonte de keywords para detecção
+      const extras = fields
+        .filter(f => !["telefone","fone","nome","endere","valor"].some(k => f.name.toLowerCase().includes(k)))
+        .map(f => f.value).filter(Boolean);
       const comentarios = [
         ...(node.comments || []).map(c => c.text).filter(Boolean),
-        ...(servicos ? [servicos] : []),
-        ...(infoCliente ? [infoCliente] : []),
+        ...extras,
       ];
-      all.push({ pipefyId: String(node.id), title: node.title, nome, tel, desc, end, age: node.age, comentarios, servicos });
+      all.push({ pipefyId: String(node.id), title: node.title, nome, tel, desc, end, age: node.age, comentarios });
     }
     hasNext = phase.cards.pageInfo?.hasNextPage ?? false;
     cursor  = phase.cards.pageInfo?.endCursor ?? null;
@@ -669,18 +669,18 @@ async function fetchCardData(pipefyId) {
   const node   = data?.card;
   if (!node) return null;
   const fields = node.fields || [];
-  const nome     = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
-  const tel      = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
-  const desc     = fields.find(f => f.name.toLowerCase().includes("empresa") || (f.name.toLowerCase().includes("descri") && !f.name.toLowerCase().includes("servi")))?.value || "";
-  const end      = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
-  const servicos = fields.find(f => f.name.toLowerCase().includes("servi"))?.value || "";
-  const infoCliente = fields.find(f => f.name.toLowerCase().includes("informa"))?.value || "";
+  const nome  = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
+  const tel   = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
+  const desc  = fields.find(f => f.name.toLowerCase().includes("descri"))?.value || "";
+  const end   = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
+  const extras = fields
+    .filter(f => !["telefone","fone","nome","endere","valor"].some(k => f.name.toLowerCase().includes(k)))
+    .map(f => f.value).filter(Boolean);
   const comentarios = [
     ...(node.comments || []).map(c => c.text).filter(Boolean),
-    ...(servicos ? [servicos] : []),
-    ...(infoCliente ? [infoCliente] : []),
+    ...extras,
   ];
-  return { pipefyId: String(node.id), title: node.title, nome, tel, desc, end, comentarios, servicos };
+  return { pipefyId: String(node.id), title: node.title, nome, tel, desc, end, comentarios };
 }
 
 // Busca cards em Aguardando Aprovação direto pelo ID da fase (mais rápido e completo)
@@ -699,18 +699,18 @@ async function fetchCardData(pipefyId) {
   const node   = data?.card;
   if (!node) return null;
   const fields = node.fields || [];
-  const nome     = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
-  const tel      = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
-  const desc     = fields.find(f => f.name.toLowerCase().includes("empresa") || (f.name.toLowerCase().includes("descri") && !f.name.toLowerCase().includes("servi")))?.value || "";
-  const end      = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
-  const servicos = fields.find(f => f.name.toLowerCase().includes("servi"))?.value || "";
-  const infoCliente = fields.find(f => f.name.toLowerCase().includes("informa"))?.value || "";
+  const nome  = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
+  const tel   = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
+  const desc  = fields.find(f => f.name.toLowerCase().includes("descri"))?.value || "";
+  const end   = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
+  const extras = fields
+    .filter(f => !["telefone","fone","nome","endere","valor"].some(k => f.name.toLowerCase().includes(k)))
+    .map(f => f.value).filter(Boolean);
   const comentarios = [
     ...(node.comments || []).map(c => c.text).filter(Boolean),
-    ...(servicos ? [servicos] : []),
-    ...(infoCliente ? [infoCliente] : []),
+    ...extras,
   ];
-  return { pipefyId: String(node.id), title: node.title, nome, tel, desc, end, comentarios, servicos };
+  return { pipefyId: String(node.id), title: node.title, nome, tel, desc, end, comentarios };
 }
 
 // Busca cards em Aguardando Aprovação direto pelo ID da fase (mais rápido e completo)
