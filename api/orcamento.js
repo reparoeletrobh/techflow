@@ -170,11 +170,15 @@ module.exports = async function handler(req, res) {
         try {
           const regra = detectarRegra(card.desc, card.comentarios);
           if (regra) {
-            textoOrc = substituirNome(regra.texto, card.nome);
+            let texto = substituirNome(regra.texto, card.nome);
             precoSugerido = regra.preco || null;
+            // Substitui [VALOR] pelo preço da regra se disponível
+            if (precoSugerido) texto = texto.replace("[VALOR]", precoSugerido + " reais");
+            textoOrc = texto;
           } else {
             const tp = templatePadrao(card.desc, card.nome);
             textoOrc = typeof tp === "object" ? (tp.texto || "") : String(tp || "");
+            // Template genérico mantém [VALOR] para preenchimento manual
           }
         } catch(e) {
           textoOrc = "Ola, bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.";
@@ -231,8 +235,10 @@ module.exports = async function handler(req, res) {
         try {
           const orcResult = await gerarTextoOrcamento(ficha.desc, ficha.comentarios, ficha.nome);
           if (orcResult && typeof orcResult === "object") {
-            ficha.textoOrc = orcResult.texto || "";
-            if (orcResult.preco) ficha.precoSugerido = orcResult.preco;
+            let texto = orcResult.texto || "";
+            const preco = orcResult.preco || null;
+            if (preco) { texto = texto.replace("[VALOR]", preco + " reais"); ficha.precoSugerido = preco; }
+            ficha.textoOrc = texto;
           } else {
             ficha.textoOrc = String(orcResult || "");
           }
