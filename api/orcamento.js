@@ -448,12 +448,19 @@ async function fetchAguardandoAprovacao() {
     if (!phase) break;
     for (const { node } of phase.cards.edges) {
       const fields = node.fields || [];
-      const nome   = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
-      const tel    = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
-      const desc   = fields.find(f => f.name.toLowerCase().includes("descri") || f.name.toLowerCase().includes("empresa"))?.value || "";
-      const end    = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
-      const comentarios = (node.comments || []).map(c => c.text).filter(Boolean);
-      all.push({ pipefyId: String(node.id), title: node.title, nome, tel, desc, end, age: node.age, comentarios });
+      const nome     = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
+      const tel      = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
+      const desc     = fields.find(f => f.name.toLowerCase().includes("empresa") || (f.name.toLowerCase().includes("descri") && !f.name.toLowerCase().includes("servi")))?.value || "";
+      const end      = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
+      const servicos = fields.find(f => f.name.toLowerCase().includes("servi"))?.value || "";
+      const infoCliente = fields.find(f => f.name.toLowerCase().includes("informa"))?.value || "";
+      // Agrega comentários + campo de serviços + informações do cliente como fontes de keywords
+      const comentarios = [
+        ...(node.comments || []).map(c => c.text).filter(Boolean),
+        ...(servicos ? [servicos] : []),
+        ...(infoCliente ? [infoCliente] : []),
+      ];
+      all.push({ pipefyId: String(node.id), title: node.title, nome, tel, desc, end, age: node.age, comentarios, servicos });
     }
     hasNext = phase.cards.pageInfo?.hasNextPage ?? false;
     cursor  = phase.cards.pageInfo?.endCursor ?? null;
