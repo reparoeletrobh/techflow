@@ -292,6 +292,24 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, msg: "ID removido. Próximo sync vai importar este card." });
   }
 
+  // ── GET orc-card-debug — mostra todos os campos de um card específico
+  if (action === "orc-card-debug") {
+    const { id } = req.query;
+    if (!id) return res.status(400).json({ ok: false, error: "id obrigatório" });
+    try {
+      const data = await pipefyQuery(`query {
+        card(id: "${id}") {
+          id title
+          fields { name value field_id: id }
+          comments { text author { name } }
+        }
+      }`);
+      return res.status(200).json({ ok: true, card: data?.card });
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: e.message });
+    }
+  }
+
   // ── GET orc-debug ─────────────────────────────────────────
   if (action === "orc-debug") {
     const result = {};
