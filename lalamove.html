@@ -117,6 +117,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
       <span class="loja-badge">🏠 Destino: Rua Ouro Preto 663, Barro Preto</span>
       <span class="api-badge nok" id="api-status-coleta">API não configurada</span>
     </div>
+    <button class="btn-send" style="background:#ef4444;color:#fff;" onclick="limparFila()">
+      🗑️ Limpar Fila
+    </button>
     <button class="btn-send coleta" id="btn-send-coleta" onclick="enviarLalamove('coleta')" disabled>
       🚗 Enviar Coletas ao Lalamove
     </button>
@@ -131,6 +134,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
       <span class="loja-badge">🏠 Origem: Rua Ouro Preto 663, Barro Preto</span>
       <span class="api-badge nok" id="api-status-entrega">API não configurada</span>
     </div>
+    <button class="btn-send" style="background:#ef4444;color:#fff;" onclick="limparFila()">
+      🗑️ Limpar Fila
+    </button>
     <button class="btn-send entrega" id="btn-send-entrega" onclick="enviarLalamove('entrega')" disabled>
       🚗 Enviar Entregas ao Lalamove
     </button>
@@ -282,6 +288,19 @@ async function remover(pipefyId, tipo) {
     fichas = fichas.filter(function(f) { return !(f.pipefyId === pipefyId && f.tipo === tipo); });
     updateBadges(); renderList(tipo);
     showToast("🗑️", "Removido", "");
+  }
+}
+
+// ── LIMPAR FILA ────────────────────────────────────────────────
+async function limparFila() {
+  if (!confirm("Limpar toda a fila? Esta ação não pode ser desfeita.")) return;
+  var d = await fetch('/api/lalamove?action=limpar-tudo').then(r=>r.json());
+  if (d.ok) {
+    fichas = [];
+    updateBadges();
+    renderList("coleta");
+    renderList("entrega");
+    showToast("🗑️","Fila limpa!","");
   }
 }
 
