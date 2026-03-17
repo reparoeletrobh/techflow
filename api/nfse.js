@@ -35,7 +35,7 @@ async function dbSet(key, value) {
 
 // Homologação: sefin.producaorestrita.nfse.gov.br
 // Produção:    sefin.nfse.gov.br
-const NFSE_HOMOLOG   = (process.env.NFSE_HOMOLOG || "true") === "true";
+const NFSE_HOMOLOG   = (process.env.NFSE_HOMOLOG || "false") === "true"; // default: PRODUÇÃO
 const NFSE_HOST      = NFSE_HOMOLOG ? "sefin.producaorestrita.nfse.gov.br" : "sefin.nfse.gov.br";
 const NFSE_PATH      = "/SefinNacional/nfse";
 const CNPJ_EMPRESA   = (process.env.NFSE_CNPJ || "59485378000175").replace(/\D/g,"");
@@ -97,6 +97,7 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 `    <cLocEmi>${COD_MUN_BH}</cLocEmi>\n` +
 `    <prest>\n` +
 `      <CNPJ>${CNPJ_EMPRESA}</CNPJ>\n` +
+`      <IM>${IM_EMPRESA}</IM>\n` +
 `      <regTrib>\n` +
 `        <opSimpNac>3</opSimpNac>\n` +
 `        <regApTribSN>1</regApTribSN>\n` +
