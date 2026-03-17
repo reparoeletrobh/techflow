@@ -89,11 +89,12 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 `      <CNPJ>${CNPJ_EMPRESA}</CNPJ>\n` +
 `      <IM>${IM_EMPRESA}</IM>\n` +
 `      <end>\n` +
-`        <xLgr>Rua Ouro Preto</xLgr>\n` +
-`        <nro>663</nro>\n` +
-`        <xBairro>Barro Preto</xBairro>\n` +
 `        <endNac>\n` +
+`          <xLgr>Rua Ouro Preto</xLgr>\n` +
+`          <nro>663</nro>\n` +
+`          <xBairro>Barro Preto</xBairro>\n` +
 `          <cMun>${COD_MUN_BH}</cMun>\n` +
+`          <UF>MG</UF>\n` +
 `          <CEP>30190130</CEP>\n` +
 `        </endNac>\n` +
 `      </end>\n` +
@@ -229,6 +230,23 @@ module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
 
   const { action } = req.query;
+
+  // ── GET debug-xml — retorna XML gerado sem enviar ao governo
+  if (action === "debug-xml") {
+    try {
+      const xml = montarDPS({
+        cpfcnpj: "12345678901",
+        nome:    "Cliente Teste",
+        discriminacao: "Servico de manutencao. Garantia 90 dias.",
+        valor:   "350.00",
+        numDPS:  genId(1),
+      });
+      res.setHeader("Content-Type","text/xml");
+      return res.status(200).send(xml);
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: e.message });
+    }
+  }
 
   if (action === "status") {
     return res.status(200).json({
