@@ -137,7 +137,7 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 }
 
 
-// Assina DPS com XMLDSig: implementação manual com xmldom + node-forge
+// Assina DPS com XMLDSig usando node-forge para tudo
 async function assinarXML(xml, pfxBuf, passphrase) {
   try {
     // 1. Extrai chave privada e cert do PFX via node-forge
@@ -148,7 +148,7 @@ async function assinarXML(xml, pfxBuf, passphrase) {
     const plain    = (p12.getBags({ bagType: forge.pki.oids.keyBag })[forge.pki.oids.keyBag] || []);
     const keyBag   = [...shrouded, ...plain][0];
     if (!keyBag) throw new Error("Chave privada não encontrada no PFX");
-    const privateKeyPem = forge.pki.privateKeyToPem(keyBag.key);
+    const privateKey = keyBag.key; // forge private key object
 
     const certBags   = (p12.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag] || []);
     const certBase64 = certBags[0]
@@ -163,24 +163,22 @@ async function assinarXML(xml, pfxBuf, passphrase) {
     if (!idMatch) throw new Error("Id do infDPS não encontrado");
     const refId = idMatch[1];
 
-    // 3. Canonicaliza infDPS para digest (C14N exc com namespace do elemento pai)
-    // Injeta o xmlns no infDPS para C14N correto
+    // 3. Extrai e canonicaliza infDPS (injeta xmlns herdado do DPS)
     const infDpsRaw = xml.match(/<infDPS[\s\S]*?<\/infDPS>/)?.[0];
     if (!infDpsRaw) throw new Error("infDPS não encontrado");
+    const infDpsC14n = infDpsRaw.replace(
+      /^<infDPS /,
+      '<infDPS xmlns="http://www.sped.fazenda.gov.br/nfse" '
+    );
 
-    const infDpsC14n = infDpsRaw.startsWith('<infDPS xmlns=')
-      ? infDpsRaw
-      : infDpsRaw.replace('<infDPS ', '<infDPS xmlns="http://www.sped.fazenda.gov.br/nfse" ');
+    // 4. DigestValue = SHA256(infDpsC14n)
+    const md = forge.md.sha256.create();
+    md.update(infDpsC14n, "utf8");
+    const digest = forge.util.encode64(md.digest().bytes());
 
-    // 4. DigestValue
-    const digest = crypto.createHash("sha256").update(infDpsC14n, "utf8").digest("base64");
-
-    // 5. SignedInfo
-    // IMPORTANTE: Para C14N exclusivo, o elemento assinado é o SignedInfo
-    // em seu contexto dentro de <Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
-    // Portanto o xmlns NÃO é redeclarado no SignedInfo (é herdado do pai)
-    // A string que de fato é assinada pelo verificador é sem o xmlns no SignedInfo
-    const signedInfoBody =
+    // 5. SignedInfo canônico (standalone com xmlns para assinar)
+    const signedInfoForSign =
+      `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">` +
       `<CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"/>` +
       `<SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>` +
       `<Reference URI="#${refId}">` +
@@ -190,20 +188,20 @@ async function assinarXML(xml, pfxBuf, passphrase) {
         `</Transforms>` +
         `<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>` +
         `<DigestValue>${digest}</DigestValue>` +
-      `</Reference>`;
+      `</Reference>` +
+      `</SignedInfo>`;
 
-    // String para assinar: SignedInfo com xmlns (contexto standalone para assinatura)
-    const signedInfoFull = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">${signedInfoBody}</SignedInfo>`;
-    // String no XML: SignedInfo SEM xmlns (herdado de Signature)
-    const signedInfoInXml = `<SignedInfo>${signedInfoBody}</SignedInfo>`;
+    // 6. Assina SignedInfo com node-forge RSA-SHA256
+    const mdSig = forge.md.sha256.create();
+    mdSig.update(signedInfoForSign, "utf8");
+    const sigBytes  = privateKey.sign(mdSig);
+    const sigValue  = forge.util.encode64(sigBytes);
 
-    // 6. Assina o SignedInfo com xmlns declarado (canonical standalone)
-    const privateKey = crypto.createPrivateKey({ key: privateKeyPem, format: "pem" });
-    const signer = crypto.createSign("sha256WithRSAEncryption");
-    signer.update(signedInfoFull, "utf8");
-    const sigValue = signer.sign(privateKey, "base64");
-
-    // 7. Bloco Signature — SignedInfo sem xmlns (herdado)
+    // 7. Bloco Signature — SignedInfo no XML não redeclara xmlns (herdado de Signature)
+    const signedInfoInXml = signedInfoForSign.replace(
+      '<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">',
+      "<SignedInfo>"
+    );
     const signature =
       `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">` +
         signedInfoInXml +
@@ -211,7 +209,7 @@ async function assinarXML(xml, pfxBuf, passphrase) {
         (certBase64 ? `<KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo>` : "") +
       `</Signature>`;
 
-    // 8. Injeta após </infDPS> dentro do <DPS>
+    // 8. Injeta após </infDPS>
     const signed = xml.replace("</infDPS>", "</infDPS>" + signature);
     console.log("Signature present:", signed.includes("<Signature"));
     return signed;
