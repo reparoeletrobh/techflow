@@ -171,7 +171,7 @@ async function assinarXML(xml, pfxBuf, passphrase) {
       signatureAlgorithm: "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
     });
 
-    const xpathRef = `//*[@Id='${refId}']`;
+    const xpathRef = "//*[local-name(.)='infDPS']";
     sig.addReference({
       xpath: xpathRef,
       transforms: [
@@ -370,7 +370,7 @@ module.exports = async function handler(req, res) {
       });
 
       sig.addReference({
-        xpath: "//*[@Id='DPS123']",
+        xpath: "//*[local-name(.)='infDPS']",
         transforms: ["http://www.w3.org/2000/09/xmldsig#enveloped-signature","http://www.w3.org/2001/10/xml-exc-c14n#WithComments"],
         digestAlgorithm: "http://www.w3.org/2001/04/xmlenc#sha256",
       });
@@ -379,7 +379,7 @@ module.exports = async function handler(req, res) {
       const testXml = `<DPS xmlns="http://www.sped.fazenda.gov.br/nfse"><infDPS Id="DPS123"><test>x</test></infDPS></DPS>`;
 
       try {
-        await sig.computeSignature(testXml, { location: { reference: "//*[@Id='DPS123']", action: "after" } });
+        await sig.computeSignature(testXml, { location: { reference: "//*[local-name(.)='DPS']", action: "append" } });
         steps.push("computeSignature OK");
       } catch(e2) {
         steps.push("computeSignature ERROR: " + e2.message);
