@@ -345,13 +345,52 @@ module.exports = async function handler(req, res) {
   }
 
   if (action === "test-xmlcrypto") {
+    const steps = [];
     try {
       const certOpts = loadCert();
-      const _txml = `<DPS xmlns="http://www.sped.fazenda.gov.br/nfse"><infDPS Id="DPS123"><test>x</test></infDPS></DPS>`;
-      const signed = await assinarXML(_txml, certOpts.pfx, certOpts.passphrase);
-      return res.status(200).json({ ok: true, hasSig: signed.includes("<Signature"), preview: signed.slice(0,500) });
+      steps.push("cert OK");
+      const p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(certOpts.pfx));
+      const p12     = forge.pkcs12.pkcs12FromAsn1(p12Asn1, certOpts.passphrase);
+      const shrouded = (p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag] || []);
+      const plain    = (p12.getBags({ bagType: forge.pki.oids.keyBag })[forge.pki.oids.keyBag] || []);
+      const keyBag   = [...shrouded, ...plain][0];
+      if (!keyBag) throw new Error("No key bag");
+      const privateKeyPem = forge.pki.privateKeyToPem(keyBag.key);
+      steps.push("key extracted");
+
+      const { SignedXml } = xmlCrypto;
+      steps.push("SignedXml type: " + typeof SignedXml);
+
+      const sig = new SignedXml({
+        privateKey: privateKeyPem,
+        canonicalizationAlgorithm: "http://www.w3.org/2001/10/xml-exc-c14n#WithComments",
+        signatureAlgorithm: "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+      });
+
+      sig.addReference({
+        xpath: '//*[@Id="DPS123"]',
+        transforms: ["http://www.w3.org/2000/09/xmldsig#enveloped-signature","http://www.w3.org/2001/10/xml-exc-c14n#WithComments"],
+        digestAlgorithm: "http://www.w3.org/2001/04/xmlenc#sha256",
+      });
+      steps.push("reference added");
+
+      const testXml = `<DPS xmlns="http://www.sped.fazenda.gov.br/nfse"><infDPS Id="DPS123"><test>x</test></infDPS></DPS>`;
+
+      try {
+        await sig.computeSignature(testXml, { location: { reference: '//*[@Id="DPS123"]', action: "after" } });
+        steps.push("computeSignature OK");
+      } catch(e2) {
+        steps.push("computeSignature ERROR: " + e2.message);
+        return res.status(200).json({ ok: false, steps });
+      }
+
+      const signed = sig.getSignedXml();
+      steps.push("getSignedXml len: " + signed.length);
+      steps.push("hasSig: " + signed.includes("<Signature"));
+
+      return res.status(200).json({ ok: true, steps, preview: signed.slice(0,300) });
     } catch(e) {
-      return res.status(200).json({ ok: false, error: e.message, stack: e.stack ? e.stack.slice(0,400) : "" });
+      return res.status(200).json({ ok: false, error: e.message, steps });
     }
   }
 
