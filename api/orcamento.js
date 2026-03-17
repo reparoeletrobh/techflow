@@ -68,8 +68,20 @@ async function createPipefyCard({ phaseId, nome, telefone, aparelho, defeito, en
   const endField  = findField(["endereço", "endereco", "endere"]);
 
   const fieldsAttr = [];
+  // Formata telefone: (xx)9 xxxx-xxxx
+  function formatarTelefone(tel) {
+    const digits = tel.replace(/\D/g, "");
+    if (digits.length === 11) {
+      return `(${digits.slice(0,2)})${digits[2]} ${digits.slice(3,7)}-${digits.slice(7)}`;
+    } else if (digits.length === 10) {
+      return `(${digits.slice(0,2)})${digits.slice(2,6)}-${digits.slice(6)}`;
+    }
+    return tel;
+  }
+  const telefoneFmt = formatarTelefone(telefone);
+
   if (nomeField) fieldsAttr.push(`{ field_id: "${nomeField.id}", field_value: ${JSON.stringify(nomeContato)} }`);
-  if (telField)  fieldsAttr.push(`{ field_id: "${telField.id}",  field_value: ${JSON.stringify(telefone)} }`);
+  if (telField)  fieldsAttr.push(`{ field_id: "${telField.id}",  field_value: ${JSON.stringify(telefoneFmt)} }`);
   if (descField) fieldsAttr.push(`{ field_id: "${descField.id}", field_value: ${JSON.stringify(descricao)} }`);
   if (endField && endereco) fieldsAttr.push(`{ field_id: "${endField.id}", field_value: ${JSON.stringify(endereco)} }`);
 
