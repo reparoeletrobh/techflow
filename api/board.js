@@ -938,6 +938,63 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, pipefyId, msg: "Dados de compra removidos." });
     }
 
+    // ── GET sync-lalamove ─────────────────────────────────────
+    if (action === "sync-lalamove") {
+      try {
+        const LALA_KEY = "reparoeletro_lalamove";
+        // Busca todas as fases com cards do Pipefy
+        const data = await pipefyQuery(`query {
+          pipe(id: "${PIPE_ID}") {
+            phases {
+              name
+              cards(first: 50) {
+                edges { node { id title fields { name value } } }
+              }
+            }
+          }
+        }`);
+        const phases = data?.pipe?.phases || [];
+        const lalaDb = (await dbGet(LALA_KEY)) || { fichas: [] };
+        if (!Array.isArray(lalaDb.fichas)) lalaDb.fichas = [];
+        let added = 0;
+
+        for (const ph of phases) {
+          const l = ph.name.toLowerCase();
+          const isColeta  = l.includes("coleta")  && l.includes("solicit");
+          const isEntrega = l.includes("entrega") && l.includes("solicit");
+          if (!isColeta && !isEntrega) continue;
+          const tipo = isColeta ? "coleta" : "entrega";
+
+          for (const { node } of (ph.cards?.edges || [])) {
+            const pipefyId = String(node.id);
+            if (lalaDb.fichas.find(f => f.pipefyId === pipefyId && f.tipo === tipo)) continue;
+            const fields     = node.fields || [];
+            const endField   = fields.find(f => f.name.toLowerCase().includes("endere"));
+            const telField   = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"));
+            const title      = node.title || "";
+            const m          = title.match(/^(.*?)\s+(\d{3,6})$/);
+            lalaDb.fichas.push({
+              pipefyId, tipo,
+              osCode:      m ? m[2] : null,
+              nomeContato: m ? m[1].trim() : title,
+              descricao:   null,
+              endereco:    endField?.value || null,
+              telefone:    telField?.value || null,
+              lat: null, lng: null,
+              addedAt: new Date().toISOString(),
+              status:  "pendente",
+            });
+            added++;
+          }
+        }
+
+        if (added > 0) await dbSet(LALA_KEY, lalaDb);
+        return res.status(200).json({ ok: true, added, total: lalaDb.fichas.filter(f=>f.status==="pendente").length, fasesLidas: phases.map(p=>p.name) });
+      } catch(e) {
+        return res.status(200).json({ ok: false, error: e.message });
+      }
+    }
+
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch (err) {
