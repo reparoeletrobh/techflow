@@ -165,6 +165,7 @@ function assinarXML(xml, pfxBuf, passphrase) {
     const refId = idMatch[1];
 
     // 3. Usa xml-crypto para assinar com C14N correto
+    if (!xmlCrypto || !xmlCrypto.SignedXml) throw new Error("xml-crypto não carregado: " + typeof xmlCrypto);
     const { SignedXml } = xmlCrypto;
     const sig = new SignedXml({
       privateKey: privateKeyPem,
@@ -330,6 +331,17 @@ module.exports = async function handler(req, res) {
       result.ok = false;
     }
     return res.status(200).json(result);
+  }
+
+  if (action === "test-xmlcrypto") {
+    try {
+      const certOpts = loadCert();
+      const _txml = `<DPS xmlns="http://www.sped.fazenda.gov.br/nfse"><infDPS Id="DPS123"><test>x</test></infDPS></DPS>`;
+      const signed = assinarXML(_txml, certOpts.pfx, certOpts.passphrase);
+      return res.status(200).json({ ok: true, hasSig: signed.includes("<Signature"), preview: signed.slice(0,500) });
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: e.message, stack: e.stack ? e.stack.slice(0,400) : "" });
+    }
   }
 
   if (action === "status") {
