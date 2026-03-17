@@ -170,8 +170,9 @@ async function assinarXML(xml, pfxBuf, passphrase) {
       signatureAlgorithm: "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
     });
 
+    const xpathRef = `//*[@Id='${refId}']`;
     sig.addReference({
-      xpath: `//*[@Id="${refId}"]`,
+      xpath: xpathRef,
       transforms: [
         "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
         "http://www.w3.org/2001/10/xml-exc-c14n#WithComments",
@@ -181,7 +182,7 @@ async function assinarXML(xml, pfxBuf, passphrase) {
 
     // v3: computeSignature é Promise
     await sig.computeSignature(xml, {
-      location: { reference: `//*[@Id="${refId}"]`, action: "after" },
+      location: { reference: xpathRef, action: "after" },
     });
 
     let signed = sig.getSignedXml();
@@ -368,7 +369,7 @@ module.exports = async function handler(req, res) {
       });
 
       sig.addReference({
-        xpath: '//*[@Id="DPS123"]',
+        xpath: "//*[@Id='DPS123']",
         transforms: ["http://www.w3.org/2000/09/xmldsig#enveloped-signature","http://www.w3.org/2001/10/xml-exc-c14n#WithComments"],
         digestAlgorithm: "http://www.w3.org/2001/04/xmlenc#sha256",
       });
@@ -377,7 +378,7 @@ module.exports = async function handler(req, res) {
       const testXml = `<DPS xmlns="http://www.sped.fazenda.gov.br/nfse"><infDPS Id="DPS123"><test>x</test></infDPS></DPS>`;
 
       try {
-        await sig.computeSignature(testXml, { location: { reference: '//*[@Id="DPS123"]', action: "after" } });
+        await sig.computeSignature(testXml, { location: { reference: "//*[@Id='DPS123']", action: "after" } });
         steps.push("computeSignature OK");
       } catch(e2) {
         steps.push("computeSignature ERROR: " + e2.message);
