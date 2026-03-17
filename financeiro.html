@@ -510,7 +510,7 @@ async function nfEmitir() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         tomadorCpfCnpj: cpfcnpj,
-        tomadorNome:    r ? (r.nomeContato || '') : '',
+        tomadorNome:    r ? (r.nomeContato || '').replace(/\s+\d+$/, '').trim() || 'Consumidor Final' : 'Consumidor Final',
         discriminacao:  desc,
         valor:          valor,
       }),
