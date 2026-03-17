@@ -137,7 +137,7 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 }
 
 
-// Assina DPS com XMLDSig: node-forge extrai chave, xml-crypto v3 async
+// Assina DPS com XMLDSig: implementação manual com xmldom + node-forge
 async function assinarXML(xml, pfxBuf, passphrase) {
   try {
     // 1. Extrai chave privada e cert do PFX via node-forge
@@ -150,7 +150,7 @@ async function assinarXML(xml, pfxBuf, passphrase) {
     if (!keyBag) throw new Error("Chave privada não encontrada no PFX");
     const privateKeyPem = forge.pki.privateKeyToPem(keyBag.key);
 
-    const certBags  = (p12.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag] || []);
+    const certBags   = (p12.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag] || []);
     const certBase64 = certBags[0]
       ? forge.pki.certificateToPem(certBags[0].cert)
           .replace(/-----BEGIN CERTIFICATE-----/, "")
@@ -163,43 +163,51 @@ async function assinarXML(xml, pfxBuf, passphrase) {
     if (!idMatch) throw new Error("Id do infDPS não encontrado");
     const refId = idMatch[1];
 
-    // 3. xml-crypto v3 — computeSignature é assíncrono
-    const { SignedXml } = xmlCrypto;
-    const sig = new SignedXml({
-      privateKey: privateKeyPem,
-      canonicalizationAlgorithm: "http://www.w3.org/2001/10/xml-exc-c14n#WithComments",
-      signatureAlgorithm: "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
-    });
+    // 3. Canonicaliza infDPS para digest (C14N exc com namespace do elemento pai)
+    // Injeta o xmlns no infDPS para C14N correto
+    const infDpsRaw = xml.match(/<infDPS[\s\S]*?<\/infDPS>/)?.[0];
+    if (!infDpsRaw) throw new Error("infDPS não encontrado");
 
-    const xpathRef = "//*[local-name(.)='infDPS']";
-    sig.addReference({
-      xpath: xpathRef,
-      transforms: [
-        "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
-        "http://www.w3.org/2001/10/xml-exc-c14n#WithComments",
-      ],
-      digestAlgorithm: "http://www.w3.org/2001/04/xmlenc#sha256",
-    });
+    const infDpsC14n = infDpsRaw.startsWith('<infDPS xmlns=')
+      ? infDpsRaw
+      : infDpsRaw.replace('<infDPS ', '<infDPS xmlns="http://www.sped.fazenda.gov.br/nfse" ');
 
-    // v3: computeSignature é Promise
-    await sig.computeSignature(xml, {
-      location: { reference: xpathRef, action: "after" },
-    });
+    // 4. DigestValue
+    const digest = crypto.createHash("sha256").update(infDpsC14n, "utf8").digest("base64");
 
-    let signed = sig.getSignedXml();
+    // 5. SignedInfo — também precisa ser canonicalizado antes de assinar
+    // Para C14N exc, o SignedInfo com o xmlns da xmldsig já declarado é suficiente
+    const signedInfo =
+      `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">` +
+      `<CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"/>` +
+      `<SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>` +
+      `<Reference URI="#${refId}">` +
+        `<Transforms>` +
+          `<Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>` +
+          `<Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"/>` +
+        `</Transforms>` +
+        `<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>` +
+        `<DigestValue>${digest}</DigestValue>` +
+      `</Reference>` +
+      `</SignedInfo>`;
 
-    if (!signed || !signed.includes("<Signature")) {
-      throw new Error("xml-crypto não gerou assinatura");
-    }
+    // 6. Assina SignedInfo
+    const privateKey = crypto.createPrivateKey({ key: privateKeyPem, format: "pem" });
+    const signer = crypto.createSign("sha256WithRSAEncryption");
+    signer.update(signedInfo, "utf8");
+    const sigValue = signer.sign(privateKey, "base64");
 
-    // Injeta X509Certificate se disponível e não incluído
-    if (certBase64 && !signed.includes("X509Certificate")) {
-      signed = signed.replace(
-        "</Signature>",
-        `<KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo></Signature>`
-      );
-    }
+    // 7. Bloco Signature
+    const signature =
+      `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">` +
+        signedInfo +
+        `<SignatureValue>${sigValue}</SignatureValue>` +
+        (certBase64 ? `<KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo>` : "") +
+      `</Signature>`;
 
+    // 8. Injeta após </infDPS> dentro do <DPS>
+    const signed = xml.replace("</infDPS>", "</infDPS>" + signature);
+    console.log("Signature present:", signed.includes("<Signature"));
     return signed;
 
   } catch(e) {
