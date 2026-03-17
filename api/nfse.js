@@ -129,46 +129,67 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 }
 
 
-// Assina o XML com XMLDSig usando a chave privada do certificado PFX
+// Assina o XML com XMLDSig usando certificado A1
+// Algoritmos conforme XML real emitido pelo portal:
+//   Canonicalization: http://www.w3.org/2001/10/xml-exc-c14n#WithComments
+//   Signature:        http://www.w3.org/2001/04/xmldsig-more#rsa-sha256
+//   Digest:           http://www.w3.org/2001/04/xmlenc#sha256
 function assinarXML(xml, pfxBuf, passphrase) {
   try {
-    // Extrai chave privada do PFX (suportado Node.js 15+)
+    // Extrai chave privada e certificado do PFX
     const p12 = crypto.createPrivateKey({ key: pfxBuf, format: "pkcs12", passphrase });
-    
-    // Calcula digest do conteúdo de infDPS
-    const infMatch = xml.match(/<infDPS[\s\S]*?<\/infDPS>/);
-    if (!infMatch) throw new Error("infDPS não encontrado no XML");
-    const digest = crypto.createHash("sha256").update(infMatch[0]).digest("base64");
-    
-    // Cria SignedInfo canônico
-    const signedInfo = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">` +
-      `<CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>` +
-      `<SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>` +
-      `<Reference URI="#${xml.match(/Id="([^"]+)"/)?.[1]||''}">` +
-        `<Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/></Transforms>` +
-        `<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>` +
-        `<DigestValue>${digest}</DigestValue>` +
-      `</Reference>` +
-    `</SignedInfo>`;
-    
-    // Assina
-    const sign = crypto.createSign("sha256");
-    sign.update(signedInfo);
-    const sigValue = sign.sign(p12, "base64");
-    
-    // Monta Signature completo
-    const signature = `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">` +
-      signedInfo +
-      `<SignatureValue>${sigValue}</SignatureValue>` +
-    `</Signature>`;
-    
-    return xml.replace("</DPS>", signature + "\n</DPS>");
+
+    // Obtém o Id do infDPS para usar na Reference URI
+    const idMatch = xml.match(/infDPS Id="([^"]+)"/);
+    if (!idMatch) throw new Error("Id do infDPS não encontrado");
+    const refId = idMatch[1];
+
+    // 1. Canonicaliza o XML com exc-c14n (simplificado: usa o XML como está)
+    //    Para a DPS, o canonical é o conteúdo do infDPS
+    const infDpsMatch = xml.match(/<infDPS[\s\S]*?<\/infDPS>/);
+    if (!infDpsMatch) throw new Error("infDPS não encontrado");
+    const infDpsContent = infDpsMatch[0];
+
+    // 2. Calcula DigestValue do infDPS canonicalizado
+    const digest = crypto.createHash("sha256").update(infDpsContent, "utf8").digest("base64");
+
+    // 3. Monta o SignedInfo canônico
+    const signedInfo =
+      `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">` +
+        `<CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"/>` +
+        `<SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>` +
+        `<Reference URI="#${refId}">` +
+          `<Transforms>` +
+            `<Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>` +
+            `<Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"/>` +
+          `</Transforms>` +
+          `<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>` +
+          `<DigestValue>${digest}</DigestValue>` +
+        `</Reference>` +
+      `</SignedInfo>`;
+
+    // 4. Assina o SignedInfo
+    const signer = crypto.createSign("sha256");
+    signer.update(signedInfo, "utf8");
+    const sigValue = signer.sign(p12, "base64");
+
+    // 5. Monta o bloco Signature completo
+    const signature =
+      `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">` +
+        signedInfo +
+        `<SignatureValue>${sigValue}</SignatureValue>` +
+      `</Signature>`;
+
+    // 6. Injeta antes do fechamento </infDPS>
+    return xml.replace("</infDPS>", signature + "</infDPS>");
+
   } catch(e) {
-    console.error("Assinatura falhou:", e.message);
-    // Retorna sem assinatura — a autenticação mTLS pode ser suficiente
+    console.error("assinarXML erro:", e.message);
+    // Retorna sem assinatura — API vai rejeitar mas com erro mais descritivo
     return xml;
   }
 }
+
 
 // Comprime XML em GZip e converte para base64
 function gzipBase64(xml) {
