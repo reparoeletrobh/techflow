@@ -348,6 +348,65 @@ module.exports = async function handler(req, res) {
     return res.status(200).json(result);
   }
 
+  if (action === "diag-sign") {
+    // Retorna exatamente o que está sendo assinado para debug
+    try {
+      const certOpts = loadCert();
+      const p12Asn1  = forge.asn1.fromDer(forge.util.createBuffer(certOpts.pfx));
+      const p12      = forge.pkcs12.pkcs12FromAsn1(p12Asn1, certOpts.passphrase);
+      const bags     = [...(p12.getBags({bagType:forge.pki.oids.pkcs8ShroudedKeyBag})[forge.pki.oids.pkcs8ShroudedKeyBag]||[]),
+                        ...(p12.getBags({bagType:forge.pki.oids.keyBag})[forge.pki.oids.keyBag]||[])];
+      const privKey  = bags[0].key;
+      const privPem  = forge.pki.privateKeyToPem(privKey);
+
+      // Gera XML de teste e assina
+      const seq = 9999;
+      const xml  = montarDPS({ cpfcnpj:"12345678901", nome:"Teste", discriminacao:"Teste diag", valor:"100.00", numDPS: genId(seq) });
+      
+      // Extrai o que vai ser assinado
+      const idMatch = xml.match(/infDPS Id="([^"]+)"/);
+      const refId   = idMatch[1];
+      const infDpsRaw = xml.match(/<infDPS[\s\S]*?<\/infDPS>/)[0];
+      const infDpsC14n = infDpsRaw.replace(/^<infDPS /, '<infDPS xmlns="http://www.sped.fazenda.gov.br/nfse" ');
+      const digestBuf  = crypto.createHash("sha256").update(infDpsC14n,"utf8").digest();
+      const digest     = digestBuf.toString("base64");
+
+      const signedInfoStr =
+        `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">` +
+        `<CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"/>` +
+        `<SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>` +
+        `<Reference URI="#${refId}">` +
+        `<Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>` +
+        `<Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"/></Transforms>` +
+        `<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>` +
+        `<DigestValue>${digest}</DigestValue></Reference></SignedInfo>`;
+
+      // Assina com Node.js crypto usando PEM extraído pelo forge
+      const nodeKey = crypto.createPrivateKey({ key: privPem, format: "pem" });
+      const signer  = crypto.createSign("RSA-SHA256");
+      signer.update(signedInfoStr, "utf8");
+      const sigNode = signer.sign(nodeKey, "base64");
+
+      // Assina com forge directamente
+      const md = forge.md.sha256.create();
+      md.update(signedInfoStr, "utf8");
+      const sigForge = Buffer.from(privKey.sign(md), "binary").toString("base64");
+
+      return res.status(200).json({
+        ok: true,
+        refId,
+        digest: digest.slice(0,20)+"...",
+        signedInfoLen: signedInfoStr.length,
+        signedInfoPreview: signedInfoStr.slice(0,100),
+        sigNodeLen: sigNode.length,
+        sigForgeLen: sigForge.length,
+        sigsMatch: sigNode === sigForge,
+      });
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: e.message, stack: (e.stack||"").slice(0,300) });
+    }
+  }
+
   if (action === "xtest2") {
     const steps = [];
     try {
