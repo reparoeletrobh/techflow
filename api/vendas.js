@@ -56,10 +56,24 @@ module.exports = async function handler(req, res) {
     weekBRT.setDate(weekBRT.getDate() + (wd===0?-6:1-wd)); weekBRT.setHours(0,0,0,0);
     const weekUTC = new Date(weekBRT.getTime() + 3*60*60*1000);
 
+    const cadastradosHoje   = produtos.filter(p => p.createdAt && new Date(p.createdAt) >= todayUTC).length;
     const cadastradosSemana = produtos.filter(p => p.createdAt && new Date(p.createdAt) >= weekUTC).length;
-    const vendidosSemana    = produtos.filter(p => p.soldAt    && new Date(p.soldAt)    >= weekUTC).length;
 
-    return res.status(200).json({ ok: true, cadastradosSemana, vendidosSemana });
+    const vendidosHoje      = produtos.filter(p => p.soldAt && new Date(p.soldAt) >= todayUTC).length;
+    const vendidosSemana    = produtos.filter(p => p.soldAt && new Date(p.soldAt) >= weekUTC).length;
+
+    const vendaLojaHoje     = produtos.filter(p => p.soldAt && new Date(p.soldAt) >= todayUTC   && p.vendedor === "Loja").length;
+    const vendaLojaSemana   = produtos.filter(p => p.soldAt && new Date(p.soldAt) >= weekUTC    && p.vendedor === "Loja").length;
+    const vendaOnlineHoje   = produtos.filter(p => p.soldAt && new Date(p.soldAt) >= todayUTC   && p.vendedor === "Online").length;
+    const vendaOnlineSemana = produtos.filter(p => p.soldAt && new Date(p.soldAt) >= weekUTC    && p.vendedor === "Online").length;
+
+    return res.status(200).json({
+      ok: true,
+      cadastradosHoje, cadastradosSemana,
+      vendidosHoje, vendidosSemana,
+      vendaLojaHoje, vendaLojaSemana,
+      vendaOnlineHoje, vendaOnlineSemana,
+    });
   }
 
   // ── POST salvar (criar ou editar) ──────────────────────────
