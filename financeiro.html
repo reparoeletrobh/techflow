@@ -437,8 +437,8 @@ function buildActions(r) {
     if (r.phaseId==='faturamento')
     h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="openMoverModal('${r.id}')">💰 Registrar Pagamento</button>`;
   if (r.phaseId==='pagamento_agendado') {
+    h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="openMoverModal('${r.id}')">💰 Registrar Pagamento</button>`;
     h += `<button class="btn-primary" style="background:#0ea5e9;color:#fff;" onclick="moverSimples('${r.id}','analise_pagamento','🔍','Enviado para Análise!')">🔍 Analisar Pagamento</button>`;
-    h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="mover('${r.id}','entrega_liberada')">✅ Entrega Liberada</button>`;
   }
   if (r.phaseId==='analise_pagamento')
     h += `<button class="btn-primary" style="background:#22c55e;color:#000;font-weight:bold;" onclick="moverSimples('${r.id}','pagamento_confirmado','✅','Pagamento Confirmado!')">✅ Pagamento Confirmado</button>`;
@@ -627,13 +627,12 @@ async function nfEnviada(id) {
 function openMoverModal(id) {
   selId = id;
   const r = records.find(x=>x.id===id);
-  // Default date = today in BRT
   const todayStr = new Date().toLocaleDateString('en-CA', { timeZone:'America/Sao_Paulo' });
   document.getElementById('mover-title').innerHTML = `💰 Registrar <span>Pagamento</span>`;
-  document.getElementById('mover-modal-info').innerHTML = `<strong>#${r.osCode||'—'} ${r.nomeContato||''}</strong><br>Destino após pagamento:`;
+  document.getElementById('mover-modal-info').innerHTML = `<strong>#${r.osCode||'—'} ${r.nomeContato||''}</strong><br>O que deseja fazer?`;
   document.getElementById('mover-options').innerHTML = `
     <div style="background:var(--surface2);border:1px solid rgba(232,121,249,0.2);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;">
-      <div style="font-family:var(--fm);font-size:10px;color:#e879f9;text-transform:uppercase;letter-spacing:0.1em;">⏰ Pagamento Agendado</div>
+      <div style="font-family:var(--fm);font-size:10px;color:#e879f9;text-transform:uppercase;letter-spacing:0.1em;">⏰ Agendar Pagamento</div>
       <div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:2px;">Cliente pagará em outra data</div>
       <div style="display:flex;gap:8px;align-items:center;">
         <input type="date" id="pagamento-agendado-date" value="${todayStr}"
@@ -642,17 +641,8 @@ function openMoverModal(id) {
           onclick="moverPagamentoAgendado('${id}')">Confirmar</button>
       </div>
     </div>
-    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;">
-      <div style="font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;">📅 Entrega Agendada</div>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <input type="date" id="agendada-date" value="${todayStr}"
-          style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:8px 10px;font-family:var(--fm);font-size:12px;color:var(--text);outline:none;"/>
-        <button class="btn-primary" style="background:#f97316;color:#fff;padding:9px 14px;width:auto;white-space:nowrap;"
-          onclick="moverAgendada('${id}')">Confirmar</button>
-      </div>
-    </div>
-    <button class="btn-primary" style="background:#22c55e;color:#000;padding:11px;"
-      onclick="mover('${id}','entrega_liberada');closeModal('mover-modal')">✅ Entrega Liberada (imediata)</button>`;
+    <button class="btn-primary" style="background:#0ea5e9;color:#fff;padding:11px;font-weight:bold;"
+      onclick="moverSimples('${id}','analise_pagamento','🔍','Enviado para An\u00e1lise!');closeModal('mover-modal')">🔍 Analisar Pagamento</button>`;
   document.getElementById('mover-modal').classList.add('open');
 }
 
