@@ -213,84 +213,54 @@ async function assinarXML(xml, pfxBuf, passphrase) {
 // Baixa DANFE via API REST NFS-e (aceita certificado mTLS) e salva no Redis
 async function buscarESalvarDanfe(chaveAcesso, certOpts) {
   try {
-    // API REST NFS-e: GET /SefinNacional/nfse/{chaveAcesso} retorna JSON com nfseXmlGZipB64
-    // O DANFE PDF é obtido via endpoint dedicado da API, não do portal web
     const host = NFSE_HOMOLOG ? "sefin.producaorestrita.nfse.gov.br" : "sefin.nfse.gov.br";
 
+    // Busca JSON da NFS-e via API REST (aceita mTLS)
     const resp = await new Promise((resolve, reject) => {
       const opts = {
-        hostname: host,
-        port:     443,
-        path:     `/SefinNacional/nfse/${chaveAcesso}/danfe`,
-        method:   "GET",
-        pfx:        certOpts.pfx,
-        passphrase: certOpts.passphrase,
-        rejectUnauthorized: true,
-        headers: { "Accept": "application/pdf,application/json,*/*" },
-      };
-      const req = https.request(opts, r => {
-        const chunks = [];
-        r.on("data", c => chunks.push(c));
-        r.on("end", () => resolve({ status: r.statusCode, buf: Buffer.concat(chunks), ct: r.headers["content-type"] || "" }));
-      });
-      req.on("error", reject);
-      req.end();
-    });
-
-    console.log("DANFE API status:", resp.status, "ct:", resp.ct);
-
-    if (resp.status === 200 && resp.ct.includes("pdf")) {
-      const b64 = resp.buf.toString("base64");
-      await fetch(UPSTASH_URL + "/pipeline", {
-        method: "POST",
-        headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
-        body: JSON.stringify([
-          ["SET",    "danfe:" + chaveAcesso, b64],
-          ["EXPIRE", "danfe:" + chaveAcesso, 31536000],
-        ]),
-      });
-      console.log("DANFE salvo no Redis:", chaveAcesso.slice(-10));
-      return true;
-    }
-
-    // Fallback: tenta endpoint alternativo sem /danfe
-    const resp2 = await new Promise((resolve, reject) => {
-      const opts = {
-        hostname: host,
-        port:     443,
+        hostname: host, port: 443,
         path:     `/SefinNacional/nfse/${chaveAcesso}`,
         method:   "GET",
-        pfx:        certOpts.pfx,
-        passphrase: certOpts.passphrase,
+        pfx: certOpts.pfx, passphrase: certOpts.passphrase,
         rejectUnauthorized: true,
-        headers: { "Accept": "application/pdf,*/*" },
+        headers: { "Accept": "application/json" },
       };
       const req = https.request(opts, r => {
         const chunks = [];
         r.on("data", c => chunks.push(c));
-        r.on("end", () => resolve({ status: r.statusCode, buf: Buffer.concat(chunks), ct: r.headers["content-type"] || "" }));
+        r.on("end", () => resolve({ status: r.statusCode, buf: Buffer.concat(chunks) }));
       });
       req.on("error", reject);
       req.end();
     });
 
-    console.log("DANFE fallback status:", resp2.status, "ct:", resp2.ct);
-
-    if (resp2.status === 200 && resp2.ct.includes("pdf")) {
-      const b64 = resp2.buf.toString("base64");
-      await fetch(UPSTASH_URL + "/pipeline", {
-        method: "POST",
-        headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
-        body: JSON.stringify([
-          ["SET",    "danfe:" + chaveAcesso, b64],
-          ["EXPIRE", "danfe:" + chaveAcesso, 31536000],
-        ]),
-      });
-      return true;
+    if (resp.status !== 200) {
+      console.log("NFS-e API status:", resp.status);
+      return false;
     }
 
-    console.log("DANFE não disponível via API, body:", resp2.buf.slice(0,100).toString());
-    return false;
+    // Descomprime XML GZip
+    const json   = JSON.parse(resp.buf.toString("utf8"));
+    const xmlBuf = zlib.gunzipSync(Buffer.from(json.nfseXmlGZipB64, "base64"));
+    const xml    = xmlBuf.toString("utf8");
+
+    // Extrai dados e gera DANFE HTML
+    const dados   = extrairDadosXml(xml);
+    dados.chaveAcesso = chaveAcesso;
+    const danfeHtml = gerarDanfeHtml(dados, chaveAcesso);
+
+    // Salva no Redis (como HTML string)
+    await fetch(UPSTASH_URL + "/pipeline", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify([
+        ["SET",    "danfe:" + chaveAcesso, Buffer.from(danfeHtml).toString("base64")],
+        ["EXPIRE", "danfe:" + chaveAcesso, 31536000],
+      ]),
+    });
+    console.log("DANFE HTML salvo no Redis:", chaveAcesso.slice(-10));
+    return true;
+
   } catch(e) {
     console.error("buscarESalvarDanfe erro:", e.message);
     return false;
@@ -627,41 +597,33 @@ module.exports = async function handler(req, res) {
     if (!chave) return res.status(400).json({ ok: false, error: "chave obrigatória" });
 
     // 1. Tenta servir do Redis
-    try {
+    const getRedisDanfe = async () => {
       const r = await fetch(UPSTASH_URL + "/get/danfe:" + chave, {
         headers: { Authorization: "Bearer " + UPSTASH_TOKEN },
       });
       const j = await r.json();
-      if (j.result) {
-        const buf = Buffer.from(j.result, "base64");
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `attachment; filename="${nome}.pdf"`);
-        return res.status(200).send(buf);
-      }
-    } catch(e) { console.log("Redis miss:", e.message); }
+      return j.result ? Buffer.from(j.result, "base64").toString("utf8") : null;
+    };
 
-    // 2. Não tem no Redis — tenta baixar do gov com certificado e salva
     let certOpts;
     try { certOpts = loadCert(); } catch(e) { return res.status(400).json({ ok: false, error: e.message }); }
-    try {
-      const saved = await buscarESalvarDanfe(chave, certOpts);
-      if (saved) {
-        // Serve do Redis agora
-        const r = await fetch(UPSTASH_URL + "/get/danfe:" + chave, {
-          headers: { Authorization: "Bearer " + UPSTASH_TOKEN },
-        });
-        const j = await r.json();
-        if (j.result) {
-          const buf = Buffer.from(j.result, "base64");
-          res.setHeader("Content-Type", "application/pdf");
-          res.setHeader("Content-Disposition", `attachment; filename="${nome}.pdf"`);
-          return res.status(200).send(buf);
-        }
-      }
-      return res.status(503).json({ ok: false, error: "DANFE não disponível. Tente em alguns instantes." });
-    } catch(e) {
-      return res.status(500).json({ ok: false, error: e.message });
+
+    let html = null;
+    try { html = await getRedisDanfe(); } catch(e) {}
+
+    // 2. Não tem no Redis — busca da API do governo
+    if (!html) {
+      try { await buscarESalvarDanfe(chave, certOpts); } catch(e) {}
+      try { html = await getRedisDanfe(); } catch(e) {}
     }
+
+    if (html && html.startsWith("<!DOCTYPE")) {
+      // Serve HTML diretamente
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(html);
+    }
+
+    return res.status(503).json({ ok: false, error: "DANFE não disponível. Tente em alguns instantes." });
   }
 
   // ── GET danfe-html?chave=XXX — gera DANFE em HTML para impressão/download como PDF
