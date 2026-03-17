@@ -960,8 +960,8 @@ module.exports = async function handler(req, res) {
 
         for (const ph of phases) {
           const l = ph.name.toLowerCase();
-          const isColeta  = l.includes("coleta")  && l.includes("solicit");
-          const isEntrega = l.includes("entrega") && l.includes("solicit");
+          const isColeta  = l === "coleta solicitada";
+          const isEntrega = l === "entrega solicitada";
           if (!isColeta && !isEntrega) continue;
           const tipo = isColeta ? "coleta" : "entrega";
 
