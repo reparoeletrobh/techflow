@@ -336,6 +336,35 @@ module.exports = async function handler(req, res) {
     return res.status(200).json(result);
   }
 
+  if (action === "xtest2") {
+    const steps = [];
+    try {
+      // Check xmldom availability
+      let xmldom;
+      try { xmldom = require("xmldom"); steps.push("xmldom: OK"); }
+      catch(e) { steps.push("xmldom: " + e.message); }
+
+      // Try xpath module
+      let xpathMod;
+      try { xpathMod = require("xpath"); steps.push("xpath module: OK"); }
+      catch(e) { steps.push("xpath module: " + e.message); }
+
+      if (xmldom && xpathMod) {
+        const doc = new xmldom.DOMParser().parseFromString(
+          `<DPS xmlns="http://www.sped.fazenda.gov.br/nfse"><infDPS Id="X1"><v>1</v></infDPS></DPS>`
+        );
+        const nodes1 = xpathMod.select("//*[local-name()='infDPS']", doc);
+        steps.push("xpath select infDPS: " + nodes1.length + " nodes");
+        const nodes2 = xpathMod.select("/*", doc);
+        steps.push("xpath select /*: " + nodes2.length + " nodes");
+      }
+
+      return res.status(200).json({ ok: true, steps });
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: e.message, steps });
+    }
+  }
+
   if (action === "xtest") {
     const steps = [];
     try {
