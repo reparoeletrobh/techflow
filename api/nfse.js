@@ -882,7 +882,8 @@ module.exports = async function handler(req, res) {
   }
 
   if (action === "danfe-xml-raw") {
-    const chave = (req.query.chave || "31062002259485378000175000000000016126034193872720").trim();
+    const chave = (req.query.chave || "").trim();
+    if (!chave) return res.status(400).json({ error: "chave obrigatória" });
     let certOpts;
     try { certOpts = loadCert(); } catch(e) { return res.status(200).json({ error: e.message }); }
     const host = NFSE_HOMOLOG ? "sefin.producaorestrita.nfse.gov.br" : "sefin.nfse.gov.br";
@@ -892,23 +893,23 @@ module.exports = async function handler(req, res) {
         headers: { "Accept": "application/json" },
       };
       const req2 = https.request(opts, r => {
-        const chunks = []; r.on("data", c => chunks.push(c));
-        r.on("end", () => resolve(Buffer.concat(chunks)));
+        const chunks = []; r.on("data", c=>chunks.push(c));
+        r.on("end", ()=>resolve(Buffer.concat(chunks)));
       });
       req2.on("error", reject); req2.end();
     });
-    const json   = JSON.parse(resp.toString("utf8"));
-    const xmlBuf = zlib.gunzipSync(Buffer.from(json.nfseXmlGZipB64, "base64"));
-    const xml    = xmlBuf.toString("utf8");
-    // Extract key tags for debugging
-    const tags = ["nNFSe","xNome","CPF","CNPJ","vServ","vReceb","xDescServ","dCompet","dhEmi","dhProc","xNomeTomador","toma","prest","emit"];
-    const result = {};
-    for (const t of tags) {
-      const m = xml.match(new RegExp("<" + t + "[^>]*>([\s\S]*?)<\/" + t + ">"));
-      result[t] = m ? m[1].trim().slice(0,100) : null;
+    try {
+      const json   = JSON.parse(resp.toString("utf8"));
+      const xmlBuf = zlib.gunzipSync(Buffer.from(json.nfseXmlGZipB64, "base64"));
+      const xml    = xmlBuf.toString("utf8");
+      // Show full XML for inspection
+      res.setHeader("Content-Type","text/plain");
+      return res.status(200).send(xml.slice(0,3000));
+    } catch(e) {
+      return res.status(200).json({ error: e.message, raw: resp.slice(0,200).toString() });
     }
-    return res.status(200).json({ ok: true, tags: result });
   }
+
 
   if (action === "danfe-nfse-json") {
     // Retorna o JSON completo da NFS-e da API do governo
