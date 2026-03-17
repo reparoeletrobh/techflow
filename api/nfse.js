@@ -1,4 +1,5 @@
-const https  = require("https");
+const https     = require("https");
+const xmlCrypto = require("xml-crypto");
 const crypto = require("crypto");
 const zlib   = require("zlib");
 
@@ -129,64 +130,44 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 }
 
 
-// Assina o XML com XMLDSig usando certificado A1
-// Algoritmos conforme XML real emitido pelo portal:
-//   Canonicalization: http://www.w3.org/2001/10/xml-exc-c14n#WithComments
-//   Signature:        http://www.w3.org/2001/04/xmldsig-more#rsa-sha256
-//   Digest:           http://www.w3.org/2001/04/xmlenc#sha256
+// Assina DPS com XMLDSig usando xml-crypto
 function assinarXML(xml, pfxBuf, passphrase) {
   try {
     // Extrai chave privada e certificado do PFX
-    const p12 = crypto.createPrivateKey({ key: pfxBuf, format: "pkcs12", passphrase });
+    const privateKey = crypto.createPrivateKey({ key: pfxBuf, format: "pkcs12", passphrase });
+    const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" });
 
-    // Obtém o Id do infDPS para usar na Reference URI
+    // Extrai certificado público do PFX para incluir na assinatura
+    // Node.js 15+ permite extrair via X509Certificate
+    let certPem = "";
+    try {
+      const certs = crypto.X509Certificate ? null : null; // placeholder
+      // Usa openssl via execSync para extrair cert — alternativa: incluir sem cert
+    } catch(e) {}
+
+    // Id do elemento a assinar
     const idMatch = xml.match(/infDPS Id="([^"]+)"/);
     if (!idMatch) throw new Error("Id do infDPS não encontrado");
     const refId = idMatch[1];
 
-    // 1. Canonicaliza o XML com exc-c14n (simplificado: usa o XML como está)
-    //    Para a DPS, o canonical é o conteúdo do infDPS
-    const infDpsMatch = xml.match(/<infDPS[\s\S]*?<\/infDPS>/);
-    if (!infDpsMatch) throw new Error("infDPS não encontrado");
-    const infDpsContent = infDpsMatch[0];
-
-    // 2. Calcula DigestValue do infDPS canonicalizado
-    const digest = crypto.createHash("sha256").update(infDpsContent, "utf8").digest("base64");
-
-    // 3. Monta o SignedInfo canônico
-    const signedInfo =
-      `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">` +
-        `<CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"/>` +
-        `<SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>` +
-        `<Reference URI="#${refId}">` +
-          `<Transforms>` +
-            `<Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>` +
-            `<Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"/>` +
-          `</Transforms>` +
-          `<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>` +
-          `<DigestValue>${digest}</DigestValue>` +
-        `</Reference>` +
-      `</SignedInfo>`;
-
-    // 4. Assina o SignedInfo
-    const signer = crypto.createSign("sha256");
-    signer.update(signedInfo, "utf8");
-    const sigValue = signer.sign(p12, "base64");
-
-    // 5. Monta o bloco Signature completo
-    const signature =
-      `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">` +
-        signedInfo +
-        `<SignatureValue>${sigValue}</SignatureValue>` +
-      `</Signature>`;
-
-    // 6. Injeta antes do fechamento </infDPS>
-    return xml.replace("</infDPS>", signature + "</infDPS>");
-
+    const sig = new xmlCrypto.SignedXml({ privateKey: privateKeyPem });
+    sig.canonicalizationAlgorithm = "http://www.w3.org/2001/10/xml-exc-c14n#WithComments";
+    sig.signatureAlgorithm = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256";
+    sig.addReference({
+      xpath: `//*[@Id="${refId}"]`,
+      transforms: [
+        "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
+        "http://www.w3.org/2001/10/xml-exc-c14n#WithComments",
+      ],
+      digestAlgorithm: "http://www.w3.org/2001/04/xmlenc#sha256",
+    });
+    sig.computeSignature(xml, {
+      location: { reference: `//*[@Id="${refId}"]`, action: "append" },
+    });
+    return sig.getSignedXml();
   } catch(e) {
     console.error("assinarXML erro:", e.message);
-    // Retorna sem assinatura — API vai rejeitar mas com erro mais descritivo
-    return xml;
+    return xml; // sem assinatura — API vai rejeitar com E0717
   }
 }
 
