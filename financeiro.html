@@ -242,7 +242,9 @@ const PHASES = [
   { id:"aguardando_dados",  name:"Aguardando Dados",   color:"#6366f1" },
   { id:"nf_emitida",        name:"NF Emitida",          color:"#3b9eff" },
   { id:"faturamento",       name:"Faturamento",        color:"#f59e0b" },
-  { id:"pagamento_agendado",name:"Pagamento Agendado", color:"#e879f9" },
+  { id:"pagamento_agendado",  name:"Pagamento Agendado",    color:"#e879f9" },
+  { id:"analise_pagamento",  name:"Análise de Pagamento",  color:"#0ea5e9" },
+  { id:"pagamento_confirmado",name:"Pagamento Confirmado", color:"#22c55e" },
   { id:"entrega_agendada",  name:"Entrega Agendada",   color:"#f97316" },
   { id:"entrega_liberada",  name:"Entrega Liberada",   color:"#22c55e" },
   { id:"rota_criada",       name:"Rota Criada",        color:"#8b5cf6" },
@@ -413,6 +415,8 @@ function cardHTML(r, color) {
       ${r.servicos  ? `<div style="font-family:var(--fm);font-size:10px;color:#888;margin-top:3px;padding:5px 8px;background:var(--surface2);border-radius:5px;border-left:2px solid #333;">🔧 ${r.servicos}</div>` : ''}
       ${r.cpfCnpj   ? `<div class="fc-cpf">📄 ${r.cpfCnpj}</div>` : ''}
       ${r.phaseId==='pagamento_agendado' && r.dataAgendadaDisplay ? `<div style="font-family:var(--fm);font-size:10px;color:#e879f9;margin-top:4px;">⏰ Cobrança: ${r.dataAgendadaDisplay}</div>` : ''}
+      ${r.phaseId==='analise_pagamento' ? `<div style="font-family:var(--fm);font-size:10px;color:#0ea5e9;margin-top:4px;">🔍 Aguardando análise</div>` : ''}
+      ${r.phaseId==='pagamento_confirmado' ? `<div style="font-family:var(--fm);font-size:10px;color:#22c55e;margin-top:4px;">✅ Pagamento confirmado</div>` : ''}
       ${r.phaseId==='entrega_agendada' && r.dataAgendadaDisplay ? `<div style="font-family:var(--fm);font-size:10px;color:#f97316;margin-top:4px;">📅 ${r.dataAgendadaDisplay}</div>` : ''}
       ${r.age != null ? `<div class="fc-age">🕐 ${r.age}d</div>` : ''}
       <div class="fc-actions">${buildActions(r)}</div>
@@ -433,9 +437,13 @@ function buildActions(r) {
     if (r.phaseId==='faturamento')
     h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="openMoverModal('${r.id}')">💰 Registrar Pagamento</button>`;
   if (r.phaseId==='pagamento_agendado') {
-    h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="openMoverPagAgendado('${r.id}')">💰 Recebido — Mover</button>`;
+    h += `<button class="btn-primary" style="background:#0ea5e9;color:#fff;" onclick="moverSimples('${r.id}','analise_pagamento','🔍','Enviado para Análise!')">🔍 Analisar Pagamento</button>`;
     h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="mover('${r.id}','entrega_liberada')">✅ Entrega Liberada</button>`;
   }
+  if (r.phaseId==='analise_pagamento')
+    h += `<button class="btn-primary" style="background:#22c55e;color:#000;font-weight:bold;" onclick="moverSimples('${r.id}','pagamento_confirmado','✅','Pagamento Confirmado!')">✅ Pagamento Confirmado</button>`;
+  if (r.phaseId==='pagamento_confirmado')
+    h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="openMoverPagConfirmado('${r.id}')">🚚 Liberar / Agendar Entrega</button>`;
   if (r.phaseId==='entrega_agendada')
     h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="mover('${r.id}','entrega_liberada')">✅ Liberar Entrega</button>`;
   if (r.phaseId==='entrega_liberada')
@@ -678,14 +686,20 @@ async function moverPagamentoAgendado(id) {
 }
 
 function openMoverPagAgendado(id) {
+  // Mantido para compatibilidade — agora vai direto para analise_pagamento
+  moverSimples(id,'analise_pagamento','🔍','Enviado para Análise!');
+}
+
+function openMoverPagConfirmado(id) {
   selId = id;
   const r = records.find(x=>x.id===id);
   const todayStr = new Date().toLocaleDateString('en-CA', { timeZone:'America/Sao_Paulo' });
-  document.getElementById('mover-title').innerHTML = `💰 Pagamento <span>Recebido</span>`;
-  document.getElementById('mover-modal-info').innerHTML = `<strong>#${r.osCode||'—'} ${r.nomeContato||''}</strong><br>Pagamento confirmado — escolha o destino:`;
+  document.getElementById('mover-title').innerHTML = `🚚 Liberar <span>Entrega</span>`;
+  document.getElementById('mover-modal-info').innerHTML = `<strong>#${r.osCode||'—'} ${r.nomeContato||''}</strong><br>Escolha o destino da entrega:`;
   document.getElementById('mover-options').innerHTML = `
-    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;">
-      <div style="font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;">📅 Entrega Agendada</div>
+    <div style="background:var(--surface2);border:1px solid rgba(249,115,22,0.2);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;">
+      <div style="font-family:var(--fm);font-size:10px;color:#f97316;text-transform:uppercase;letter-spacing:0.1em;">📅 Agendar Entrega</div>
+      <div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:2px;">Entrega em data específica</div>
       <div style="display:flex;gap:8px;align-items:center;">
         <input type="date" id="agendada-date2" value="${todayStr}"
           style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:8px 10px;font-family:var(--fm);font-size:12px;color:var(--text);outline:none;"/>
@@ -707,6 +721,15 @@ async function moverPagAgendadoParaEntrega(id, phaseId, dateInputId) {
     updateRecord(res.record);
     closeModal('mover-modal');
     showToast('📅','Entrega Agendada!', dateDisplay);
+    if (curPage==='painel') await load();
+  } else showToast('❌','Erro',res.error);
+}
+
+async function moverSimples(id, phaseId, icon, msg) {
+  const res = await api('mover',{id,phaseId});
+  if (res.ok) {
+    updateRecord(res.record);
+    showToast(icon||'✅', msg||'Movido!','');
     if (curPage==='painel') await load();
   } else showToast('❌','Erro',res.error);
 }
