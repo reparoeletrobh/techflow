@@ -574,30 +574,10 @@ async function emitirNF(id) {
   else showToast('❌','Erro',res.error);
 }
 
-async function baixarDanfe(chave, nomeArquivo) {
-  try {
-    // Download direto do portal gov com cookies do browser (precisa estar logado)
-    const url = `https://www.nfse.gov.br/EmissorNacional/Notas/Download/DANFSe/${chave}`;
-    const r = await fetch(url, { credentials: 'include' });
-    if (r.status === 302 || r.url.includes('Login')) {
-      // Não está logado — abre portal em nova aba
-      window.open(url, '_blank');
-      showToast('⚠️','Faça login no portal','A nota abrirá após o login');
-      return;
-    }
-    if (!r.ok) { showToast('❌','Erro ao baixar DANFE', 'Status: '+r.status); return; }
-    const blob = await r.blob();
-    const filename = nomeArquivo ? decodeURIComponent(nomeArquivo) + '.pdf' : `danfe-${chave.slice(-10)}.pdf`;
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(a.href);
-  } catch(e) {
-    showToast('❌','Erro DANFE', e.message);
-  }
+function baixarDanfe(chave, nomeArquivo) {
+  // Abre direto no portal — browser faz download com a sessão ativa
+  const url = 'https://www.nfse.gov.br/EmissorNacional/Notas/Download/DANFSe/' + chave;
+  window.open(url, '_blank');
 }
 
 async function nfEnviada(id) {
