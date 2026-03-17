@@ -94,6 +94,7 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 `      <regTrib>\n` +
 `        <opSimpNac>1</opSimpNac>\n` +
 `        <regApTribSN>1</regApTribSN>\n` +
+`        <regEspTrib>0</regEspTrib>\n` +
 `      </regTrib>\n` +
 // end omitido — governo busca pelo CNPJ cadastrado
 
