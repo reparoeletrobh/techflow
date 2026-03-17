@@ -174,9 +174,15 @@ function assinarXML(xml, pfxBuf, passphrase) {
     const refId = idMatch[1];
 
     // 4. Extrai conteúdo do infDPS para digest
+    // C14N exclusivo: namespace do elemento pai (DPS) deve ser declarado no infDPS
     const infDpsMatch = xml.match(/<infDPS[\s\S]*?<\/infDPS>/);
     if (!infDpsMatch) throw new Error("infDPS não encontrado");
-    const digest = crypto.createHash("sha256").update(infDpsMatch[0], "utf8").digest("base64");
+    // Injeta o namespace xmlns no infDPS para C14N correto
+    const infDpsC14n = infDpsMatch[0].replace(
+      /^<infDPS /,
+      '<infDPS xmlns="http://www.sped.fazenda.gov.br/nfse" '
+    );
+    const digest = crypto.createHash("sha256").update(infDpsC14n, "utf8").digest("base64");
 
     // 5. Monta SignedInfo
     const signedInfo =
