@@ -108,7 +108,7 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 `        <cLocPrestacao>${COD_MUN_BH}</cLocPrestacao>\n` +
 `      </locPrest>\n` +
 `      <cServ>\n` +
-`        <cTribNac>14.01</cTribNac>\n` +
+`        <cTribNac>1401</cTribNac>\n` +
 `        <xDescServ>${escXml(discriminacao)}</xDescServ>\n` +
 `      </cServ>\n` +
 `    </serv>\n` +
