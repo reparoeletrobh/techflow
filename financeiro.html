@@ -409,7 +409,7 @@ function cardHTML(r, color) {
       <div class="fc-num">#${r.osCode || r.pipefyId?.slice(-4) || '—'}</div>
       <div class="fc-nome">${r.nomeContato || r.title || '—'}</div>
       ${r.descricao ? `<div class="fc-desc">${r.descricao}</div>` : ''}
-      ${r.valor     ? `<div style="font-family:var(--fm);font-size:11px;color:#22c55e;margin-top:3px;">💰 R$ ${r.valor}</div>` : ''}
+      ${r.valor     ? `<div style="font-family:var(--fm);font-size:11px;color:#22c55e;margin-top:3px;">💰 R$ ${parseFloat((r.valor||"0").replace(",",".").replace(/[^0-9.]/g,""))||r.valor}</div>` : ''}
       ${r.servicos  ? `<div style="font-family:var(--fm);font-size:10px;color:#888;margin-top:3px;padding:5px 8px;background:var(--surface2);border-radius:5px;border-left:2px solid #333;">🔧 ${r.servicos}</div>` : ''}
       ${r.cpfCnpj   ? `<div class="fc-cpf">📄 ${r.cpfCnpj}</div>` : ''}
       ${r.phaseId==='pagamento_agendado' && r.dataAgendadaDisplay ? `<div style="font-family:var(--fm);font-size:10px;color:#e879f9;margin-top:4px;">⏰ Cobrança: ${r.dataAgendadaDisplay}</div>` : ''}
@@ -457,23 +457,11 @@ function openNfModal(id) {
   document.getElementById('nf-modal-info').innerHTML =
     '<strong>#' + (r.osCode||'—') + ' — ' + (r.nomeContato||r.title||'—') + '</strong>';
   document.getElementById('nf-cpfcnpj').value = r.cpfCnpj || '';
-  // Valor puxado automaticamente da ficha (vindo do Pipefy)
-  // Normaliza: "R$ 290,00" → "290.00", "290" → "290", "290,00" → "290.00"
-  const valorRaw   = r.valor || r.valorContrato || '';
-  const valorLimpo = valorRaw.replace(/[^0-9,.]/g,'').replace(',','.').trim();
-  const valorFloat = parseFloat(valorLimpo) || 0;
-  const valorFicha = valorFloat > 0 ? valorFloat.toFixed(2) : '';
-  const nfValorEl  = document.getElementById('nf-valor');
-  nfValorEl.value  = valorFicha;
-  if (valorFicha) {
-    nfValorEl.setAttribute('readonly', true);
-    nfValorEl.style.opacity = '0.75';
-    nfValorEl.style.cursor  = 'default';
-  } else {
-    nfValorEl.removeAttribute('readonly');
-    nfValorEl.style.opacity = '1';
-    nfValorEl.style.cursor  = 'text';
-  }
+  // Valor puxado da ficha e normalizado (vírgula → ponto para input[type=number])
+  const _vRaw = String(r.valor || r.valorContrato || '');
+  const _vNum = parseFloat(_vRaw.replace(/[^0-9,.]/g,'').replace(',','.')) || 0;
+  document.getElementById('nf-valor').value = _vNum > 0 ? _vNum.toFixed(2) : '';
+  document.getElementById('nf-valor').removeAttribute('readonly');
   const valorRow = document.getElementById('nf-valor-row');
   if (valorRow) valorRow.style.display = '';
   // Monta descrição padrão com serviço e garantia
