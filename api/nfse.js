@@ -306,15 +306,34 @@ module.exports = async function handler(req, res) {
       const certOpts = loadCert();
       result.steps.push("cert loaded: " + certOpts.pfx.length + " bytes");
       try {
-        const pk = crypto.createPrivateKey({ key: certOpts.pfx, format: "pkcs12", passphrase: certOpts.passphrase });
-        result.steps.push("privateKey created: " + pk.asymmetricKeyType);
-        const pem = pk.export({ type: "pkcs8", format: "pem" }).toString();
-        result.steps.push("pem exported: " + pem.slice(0,40));
-        const signer = crypto.createSign("sha256WithRSAEncryption");
-        signer.update("test");
-        const sig = signer.sign(pk, "base64");
-        result.steps.push("signature: " + sig.slice(0,30) + "...");
-        result.ok = true;
+        // Parse PFX com node-forge
+        const p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(certOpts.pfx));
+        result.steps.push("pfx parsed");
+        const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, certOpts.passphrase);
+        result.steps.push("pkcs12 loaded");
+
+        // Extrai chave privada
+        let privateKeyPem = "";
+        const shroudedBags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag] || [];
+        const keyBags      = p12.getBags({ bagType: forge.pki.oids.keyBag })[forge.pki.oids.keyBag] || [];
+        const allKeyBags   = [...shroudedBags, ...keyBags];
+        if (allKeyBags.length > 0) {
+          privateKeyPem = forge.pki.privateKeyToPem(allKeyBags[0].key);
+          result.steps.push("privateKey extracted: " + privateKeyPem.slice(0,40));
+        } else {
+          result.steps.push("no key bags found");
+        }
+
+        if (privateKeyPem) {
+          const pk = crypto.createPrivateKey({ key: privateKeyPem, format: "pem" });
+          const signer = crypto.createSign("sha256WithRSAEncryption");
+          signer.update("test");
+          const sig = signer.sign(pk, "base64");
+          result.steps.push("signature OK: " + sig.slice(0,30) + "...");
+          result.ok = true;
+        } else {
+          result.ok = false;
+        }
       } catch(e) {
         result.steps.push("sign error: " + e.message);
         result.ok = false;
