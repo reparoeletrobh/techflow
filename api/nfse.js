@@ -137,25 +137,21 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 }
 
 
-// Assina DPS com XMLDSig usando node-forge para tudo
+// Assina DPS com XMLDSig usando node-forge
 async function assinarXML(xml, pfxBuf, passphrase) {
   try {
-    // 1. Extrai chave privada e cert do PFX via node-forge
+    // 1. Extrai chave e cert do PFX
     const p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(pfxBuf));
     const p12     = forge.pkcs12.pkcs12FromAsn1(p12Asn1, passphrase);
-
-    const shrouded = (p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag] || []);
-    const plain    = (p12.getBags({ bagType: forge.pki.oids.keyBag })[forge.pki.oids.keyBag] || []);
-    const keyBag   = [...shrouded, ...plain][0];
-    if (!keyBag) throw new Error("Chave privada não encontrada no PFX");
-    const privateKey = keyBag.key; // forge private key object
-
-    const certBags   = (p12.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag] || []);
+    const shrouded = (p12.getBags({bagType:forge.pki.oids.pkcs8ShroudedKeyBag})[forge.pki.oids.pkcs8ShroudedKeyBag]||[]);
+    const plain    = (p12.getBags({bagType:forge.pki.oids.keyBag})[forge.pki.oids.keyBag]||[]);
+    const keyBag   = [...shrouded,...plain][0];
+    if (!keyBag) throw new Error("Chave privada não encontrada");
+    const privateKey = keyBag.key;
+    const certBags   = (p12.getBags({bagType:forge.pki.oids.certBag})[forge.pki.oids.certBag]||[]);
     const certBase64 = certBags[0]
       ? forge.pki.certificateToPem(certBags[0].cert)
-          .replace(/-----BEGIN CERTIFICATE-----/, "")
-          .replace(/-----END CERTIFICATE-----/, "")
-          .replace(/\s/g, "")
+          .replace(/-----BEGIN CERTIFICATE-----/,"").replace(/-----END CERTIFICATE-----/,"").replace(/\s/g,"")
       : "";
 
     // 2. Id do infDPS
@@ -163,45 +159,41 @@ async function assinarXML(xml, pfxBuf, passphrase) {
     if (!idMatch) throw new Error("Id do infDPS não encontrado");
     const refId = idMatch[1];
 
-    // 3. Extrai e canonicaliza infDPS (injeta xmlns herdado do DPS)
+    // 3. C14N do infDPS — injeta xmlns herdado e expande self-closing tags
     const infDpsRaw = xml.match(/<infDPS[\s\S]*?<\/infDPS>/)?.[0];
     if (!infDpsRaw) throw new Error("infDPS não encontrado");
-    const infDpsC14n = infDpsRaw.replace(
-      /^<infDPS /,
-      '<infDPS xmlns="http://www.sped.fazenda.gov.br/nfse" '
-    );
+    let infDpsC14n = infDpsRaw.replace(/^<infDPS /, '<infDPS xmlns="http://www.sped.fazenda.gov.br/nfse" ');
+    // C14N: expande self-closing tags (/<tag attr/> → <tag attr></tag>)
+    infDpsC14n = infDpsC14n.replace(/<([a-zA-Z][^>]*?)\/>/g, (m, inner) => `<${inner.trimEnd()}></${inner.trim().split(/[\s>]/)[0]}>`);
 
     // 4. DigestValue = SHA256(infDpsC14n)
     const md = forge.md.sha256.create();
     md.update(infDpsC14n, "utf8");
     const digest = forge.util.encode64(md.digest().bytes());
 
-    // 5. SignedInfo canônico (standalone com xmlns para assinar)
-    const signedInfoForSign =
+    // 5. SignedInfo em C14N (sem self-closing, com xmlns standalone para assinar)
+    // Elementos filhos: sem self-closing (C14N expande tudo)
+    const signedInfoC14n =
       `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">` +
-      `<CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"/>` +
-      `<SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>` +
+      `<CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"></CanonicalizationMethod>` +
+      `<SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"></SignatureMethod>` +
       `<Reference URI="#${refId}">` +
         `<Transforms>` +
-          `<Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>` +
-          `<Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"/>` +
+          `<Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform>` +
+          `<Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"></Transform>` +
         `</Transforms>` +
-        `<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>` +
+        `<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"></DigestMethod>` +
         `<DigestValue>${digest}</DigestValue>` +
       `</Reference>` +
       `</SignedInfo>`;
 
-    // 6. Assina SignedInfo com node-forge RSA-SHA256
+    // 6. Assina SignedInfo C14N com RSA-SHA256
     const mdSig = forge.md.sha256.create();
-    mdSig.update(signedInfoForSign, "utf8");
-    const sigBytes  = privateKey.sign(mdSig);
-    const sigValue  = forge.util.encode64(sigBytes);
+    mdSig.update(signedInfoC14n, "utf8");
+    const sigValue = forge.util.encode64(privateKey.sign(mdSig));
 
-    // 7. Bloco Signature — SignedInfo no XML não redeclara xmlns (herdado de Signature)
-    const signedInfoInXml = signedInfoForSign.replace(
-      '<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">',
-      "<SignedInfo>"
-    );
+    // 7. Bloco Signature no XML (SignedInfo sem xmlns — herdado de Signature)
+    const signedInfoInXml = signedInfoC14n.replace('<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">', "<SignedInfo>");
     const signature =
       `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">` +
         signedInfoInXml +
@@ -209,10 +201,7 @@ async function assinarXML(xml, pfxBuf, passphrase) {
         (certBase64 ? `<KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo>` : "") +
       `</Signature>`;
 
-    // 8. Injeta após </infDPS>
-    const signed = xml.replace("</infDPS>", "</infDPS>" + signature);
-    console.log("Signature present:", signed.includes("<Signature"));
-    return signed;
+    return xml.replace("</infDPS>", "</infDPS>" + signature);
 
   } catch(e) {
     console.error("assinarXML erro:", e.message);
