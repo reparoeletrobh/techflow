@@ -210,6 +210,62 @@ async function assinarXML(xml, pfxBuf, passphrase) {
 }
 
 
+// Baixa o DANFE do portal e salva no Redis
+async function buscarESalvarDanfe(chaveAcesso, certOpts) {
+  try {
+    const pdf = await new Promise((resolve, reject) => {
+      const opts = {
+        hostname: "www.nfse.gov.br",
+        port: 443,
+        path: `/EmissorNacional/Notas/Download/DANFSe/${chaveAcesso}`,
+        method: "GET",
+        pfx:        certOpts.pfx,
+        passphrase: certOpts.passphrase,
+        rejectUnauthorized: true,
+        headers: { "Accept": "application/pdf,*/*", "User-Agent": "Mozilla/5.0" },
+      };
+      const req = https.request(opts, r => {
+        // Segue redirecionamento manualmente se necessário
+        if (r.statusCode >= 300 && r.statusCode < 400 && r.headers.location) {
+          const loc = r.headers.location;
+          const url2 = new URL(loc, "https://www.nfse.gov.br");
+          const opts2 = { ...opts, hostname: url2.hostname, path: url2.pathname + url2.search };
+          const req2 = https.request(opts2, r2 => {
+            const chunks = [];
+            r2.on("data", c => chunks.push(c));
+            r2.on("end", () => resolve({ status: r2.statusCode, buf: Buffer.concat(chunks), ct: r2.headers["content-type"] || "" }));
+          });
+          req2.on("error", reject);
+          req2.end();
+          return;
+        }
+        const chunks = [];
+        r.on("data", c => chunks.push(c));
+        r.on("end", () => resolve({ status: r.statusCode, buf: Buffer.concat(chunks), ct: r.headers["content-type"] || "" }));
+      });
+      req.on("error", reject);
+      req.end();
+    });
+
+    if (pdf.status === 200 && pdf.ct.includes("pdf")) {
+      const b64 = pdf.buf.toString("base64");
+      // Salva no Redis com TTL de 1 ano (365 dias)
+      await fetch(UPSTASH_URL + "/pipeline", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
+        body: JSON.stringify([["SET", "danfe:" + chaveAcesso, b64], ["EXPIRE", "danfe:" + chaveAcesso, 31536000]]),
+      });
+      console.log("DANFE salvo no Redis para chave:", chaveAcesso.slice(-10));
+      return true;
+    }
+    console.log("DANFE não disponível ainda, status:", pdf.status);
+    return false;
+  } catch(e) {
+    console.error("buscarESalvarDanfe erro:", e.message);
+    return false;
+  }
+}
+
 // Comprime XML em GZip e converte para base64
 function gzipBase64(xml) {
   return new Promise((res, rej) => {
@@ -533,38 +589,45 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // ── GET danfe?chave=XXX — proxy do DANFE PDF autenticado com certificado
+  // ── GET danfe?chave=XXX&nome=YYY — serve DANFE do Redis (ou tenta baixar do gov)
   if (action === "danfe") {
     const chave = (req.query.chave || "").trim();
+    const nome  = (req.query.nome  || "danfe-" + chave.slice(-10)).trim();
     if (!chave) return res.status(400).json({ ok: false, error: "chave obrigatória" });
+
+    // 1. Tenta servir do Redis
+    try {
+      const r = await fetch(UPSTASH_URL + "/get/danfe:" + chave, {
+        headers: { Authorization: "Bearer " + UPSTASH_TOKEN },
+      });
+      const j = await r.json();
+      if (j.result) {
+        const buf = Buffer.from(j.result, "base64");
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="${nome}.pdf"`);
+        return res.status(200).send(buf);
+      }
+    } catch(e) { console.log("Redis miss:", e.message); }
+
+    // 2. Não tem no Redis — tenta baixar do gov com certificado e salva
     let certOpts;
     try { certOpts = loadCert(); } catch(e) { return res.status(400).json({ ok: false, error: e.message }); }
     try {
-      const pdf = await new Promise((resolve, reject) => {
-        const opts = {
-          hostname: "www.nfse.gov.br",
-          port: 443,
-          path: `/EmissorNacional/Notas/Download/DANFSe/${chave}`,
-          method: "GET",
-          pfx:        certOpts.pfx,
-          passphrase: certOpts.passphrase,
-          rejectUnauthorized: true,
-          headers: { "Accept": "application/pdf,*/*" },
-        };
-        const req2 = https.request(opts, r => {
-          const chunks = [];
-          r.on("data", c => chunks.push(c));
-          r.on("end", () => resolve({ status: r.statusCode, buf: Buffer.concat(chunks), ct: r.headers["content-type"] || "" }));
+      const saved = await buscarESalvarDanfe(chave, certOpts);
+      if (saved) {
+        // Serve do Redis agora
+        const r = await fetch(UPSTASH_URL + "/get/danfe:" + chave, {
+          headers: { Authorization: "Bearer " + UPSTASH_TOKEN },
         });
-        req2.on("error", reject);
-        req2.end();
-      });
-      if (pdf.status !== 200) {
-        return res.status(pdf.status).json({ ok: false, error: "Governo retornou " + pdf.status });
+        const j = await r.json();
+        if (j.result) {
+          const buf = Buffer.from(j.result, "base64");
+          res.setHeader("Content-Type", "application/pdf");
+          res.setHeader("Content-Disposition", `attachment; filename="${nome}.pdf"`);
+          return res.status(200).send(buf);
+        }
       }
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="danfe-${chave.slice(-10)}.pdf"`);
-      return res.status(200).send(pdf.buf);
+      return res.status(503).json({ ok: false, error: "DANFE não disponível. Tente em alguns instantes." });
     } catch(e) {
       return res.status(500).json({ ok: false, error: e.message });
     }
@@ -606,6 +669,8 @@ module.exports = async function handler(req, res) {
       const parsed = parseResp(body);
 
       if (parsed.ok) {
+        // Tenta salvar DANFE no Redis imediatamente (aguarda 2s para o gov processar)
+        setTimeout(() => buscarESalvarDanfe(parsed.chaveAcesso, certOpts).catch(()=>{}), 2000);
         return res.status(200).json({ ok: true, chaveAcesso: parsed.chaveAcesso, idDps: parsed.idDps, alertas: parsed.alertas });
       } else {
         return res.status(200).json({ ok: false, error: parsed.erro, httpStatus: status, idDPS: numDPS, idLen: numDPS.length });
