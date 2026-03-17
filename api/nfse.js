@@ -291,3 +291,194 @@ function gerarDanfeHtml(dados, chave) {
     "<button class='pbtn' onclick='window.print()'>Imprimir / Salvar como PDF</button>" +
     "</body></html>";
 }
+
+
+
+module.exports = async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin","*");
+  res.setHeader("Access-Control-Allow-Methods","GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers","Content-Type");
+  if (req.method === "OPTIONS") return res.status(200).end();
+
+  const { action } = req.query;
+
+  // ── GET danfe-html — gera DANFE em HTML
+  if (action === "danfe-html") {
+    const chave = (req.query.chave || "").trim();
+    const nome  = (req.query.nome  || "danfe").trim();
+    if (!chave) return res.status(400).json({ ok: false, error: "chave obrigatória" });
+    let certOpts;
+    try { certOpts = loadCert(); } catch(e) { return res.status(400).json({ ok: false, error: e.message }); }
+    const saved = await buscarESalvarDanfe(chave, certOpts).catch(()=>false);
+    const getRedisDanfe = async () => {
+      const r = await fetch(UPSTASH_URL + "/get/danfe:" + chave, { headers: { Authorization: "Bearer " + UPSTASH_TOKEN } });
+      const j = await r.json();
+      return j.result ? Buffer.from(j.result, "base64").toString("utf8") : null;
+    };
+    const html = await getRedisDanfe().catch(()=>null);
+    if (html) { res.setHeader("Content-Type","text/html; charset=utf-8"); return res.status(200).send(html); }
+    return res.status(503).json({ ok: false, error: "DANFE não disponível." });
+  }
+
+  // ── GET danfe — serve DANFE (HTML ou PDF) do Redis
+  if (action === "danfe") {
+    const chave = (req.query.chave || "").trim();
+    const nome  = (req.query.nome  || "danfe-" + (chave.slice(-10))).trim();
+    if (!chave) return res.status(400).json({ ok: false, error: "chave obrigatória" });
+
+    const getRedisDanfe = async () => {
+      const r = await fetch(UPSTASH_URL + "/get/danfe:" + chave, { headers: { Authorization: "Bearer " + UPSTASH_TOKEN } });
+      const j = await r.json();
+      return j.result ? Buffer.from(j.result, "base64") : null;
+    };
+
+    let certOpts;
+    try { certOpts = loadCert(); } catch(e) { return res.status(400).json({ ok: false, error: e.message }); }
+
+    let buf = null;
+    try { buf = await getRedisDanfe(); } catch(e) {}
+
+    if (!buf) {
+      try { await buscarESalvarDanfe(chave, certOpts); } catch(e) {}
+      try { buf = await getRedisDanfe(); } catch(e) {}
+    }
+
+    if (buf) {
+      const str = buf.toString("utf8");
+      if (str.startsWith("<!DOCTYPE")) {
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        return res.status(200).send(str);
+      }
+      // PDF
+      if (buf[0] === 0x25 && buf[1] === 0x50) {
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `inline; filename="${nome}.pdf"`);
+        return res.status(200).send(buf);
+      }
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(str);
+    }
+    return res.status(503).json({ ok: false, error: "DANFE não disponível. Tente em alguns instantes." });
+  }
+
+  // ── POST danfe-store — recebe PDF do browser e salva no Redis
+  if (req.method === "POST" && action === "danfe-store") {
+    const { chave, pdfBase64 } = req.body || {};
+    if (!chave || !pdfBase64) return res.status(400).json({ ok: false, error: "chave e pdfBase64 obrigatórios" });
+    try {
+      await fetch(UPSTASH_URL + "/pipeline", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
+        body: JSON.stringify([["SET", "danfe:" + chave, pdfBase64], ["EXPIRE", "danfe:" + chave, 31536000]]),
+      });
+      return res.status(200).json({ ok: true });
+    } catch(e) { return res.status(500).json({ ok: false, error: e.message }); }
+  }
+
+  // ── GET danfe-force — força regeneração do DANFE
+  if (action === "danfe-force") {
+    const chave = (req.query.chave || "").trim();
+    if (!chave) return res.status(400).json({ ok: false, error: "chave obrigatória" });
+    let certOpts;
+    try { certOpts = loadCert(); } catch(e) { return res.status(200).json({ step: "cert", error: e.message }); }
+    try {
+      const host = NFSE_HOMOLOG ? "sefin.producaorestrita.nfse.gov.br" : "sefin.nfse.gov.br";
+      const resp = await new Promise((resolve, reject) => {
+        const opts = { hostname: host, port: 443, path: `/SefinNacional/nfse/${chave}`, method: "GET",
+          pfx: certOpts.pfx, passphrase: certOpts.passphrase, rejectUnauthorized: false,
+          headers: { "Accept": "application/json" },
+        };
+        const req2 = https.request(opts, r => { const chunks = []; r.on("data", c=>chunks.push(c)); r.on("end",()=>resolve({status:r.statusCode,buf:Buffer.concat(chunks)})); });
+        req2.on("error", reject); req2.end();
+      });
+      if (resp.status !== 200) return res.status(200).json({ step: "api", status: resp.status, body: resp.buf.slice(0,200).toString() });
+      const json   = JSON.parse(resp.buf.toString("utf8"));
+      const xmlBuf = zlib.gunzipSync(Buffer.from(json.nfseXmlGZipB64, "base64"));
+      const xml    = xmlBuf.toString("utf8");
+      const dados  = extrairDadosXml(xml);
+      dados.chaveAcesso = chave;
+      const danfeHtml = gerarDanfeHtml(dados, chave);
+      await fetch(UPSTASH_URL + "/pipeline", {
+        method: "POST", headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
+        body: JSON.stringify([["SET", "danfe:" + chave, Buffer.from(danfeHtml).toString("base64")], ["EXPIRE", "danfe:" + chave, 31536000]]),
+      });
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(danfeHtml);
+    } catch(e) { return res.status(200).json({ step: "error", error: e.message }); }
+  }
+
+  // ── GET status
+  if (action === "status") {
+    return res.status(200).json({
+      ok: !!(process.env.NFSE_CERT_PFX && process.env.NFSE_CERT_SENHA),
+      temCert:  !!(process.env.NFSE_CERT_PFX),
+      temSenha: !!(process.env.NFSE_CERT_SENHA),
+      temIM:    !!(IM_EMPRESA),
+      cnpj:     CNPJ_EMPRESA,
+      im:       IM_EMPRESA,
+      homolog:  NFSE_HOMOLOG,
+    });
+  }
+
+  // ── GET test-sign
+  if (action === "test-sign") {
+    const result = { steps: [] };
+    try {
+      const certOpts = loadCert();
+      result.steps.push("cert loaded: " + certOpts.pfx.length + " bytes");
+      const p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(certOpts.pfx));
+      const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, certOpts.passphrase);
+      result.steps.push("pkcs12 loaded");
+      const allBags = [...(p12.getBags({bagType:forge.pki.oids.pkcs8ShroudedKeyBag})[forge.pki.oids.pkcs8ShroudedKeyBag]||[]), ...(p12.getBags({bagType:forge.pki.oids.keyBag})[forge.pki.oids.keyBag]||[])];
+      if (!allBags.length) { result.steps.push("no key bags"); result.ok = false; return res.status(200).json(result); }
+      const pem = forge.pki.privateKeyToPem(allBags[0].key);
+      result.steps.push("privateKey extracted: " + pem.slice(0,40));
+      const pk = crypto.createPrivateKey({ key: pem, format: "pem" });
+      const signer = crypto.createSign("sha256WithRSAEncryption");
+      signer.update("test");
+      const sig = signer.sign(pk, "base64");
+      result.steps.push("signature OK: " + sig.slice(0,30) + "...");
+      result.ok = true;
+    } catch(e) { result.steps.push("error: " + e.message); result.ok = false; }
+    return res.status(200).json(result);
+  }
+
+  // ── GET debug-xml
+  if (action === "debug-xml") {
+    try {
+      let certOpts; try { certOpts = loadCert(); } catch(e) { certOpts = null; }
+      const xml = montarDPS({ cpfcnpj:"12345678901", nome:"Cliente Teste", discriminacao:"Servico de manutencao. Garantia 90 dias.", valor:"350.00", numDPS: genId(1) });
+      const signed = certOpts ? await assinarXML(xml, certOpts.pfx, certOpts.passphrase) : xml;
+      res.setHeader("Content-Type","text/xml");
+      return res.status(200).send(signed);
+    } catch(e) { return res.status(200).json({ ok: false, error: e.message }); }
+  }
+
+  // ── POST emitir
+  if (req.method === "POST" && action === "emitir") {
+    const { tomadorCpfCnpj, tomadorNome, discriminacao, valor } = req.body || {};
+    if (!tomadorCpfCnpj || !valor) return res.status(400).json({ ok: false, error: "tomadorCpfCnpj e valor obrigatórios" });
+    let certOpts;
+    try { certOpts = loadCert(); } catch(e) { return res.status(400).json({ ok: false, error: e.message }); }
+    try {
+      let seq = 1;
+      try { const seqRes = await dbGet("reparoeletro_nfse_seq"); seq = (seqRes || 0) + 1; await dbSet("reparoeletro_nfse_seq", seq); } catch(e) { seq = Date.now() % 999999999999999 || 1; }
+      const numDPS = genId(seq);
+      console.log("ID gerado:", numDPS, "len:", numDPS.length);
+      const xml    = montarDPS({ cpfcnpj: tomadorCpfCnpj, nome: tomadorNome, discriminacao, valor, numDPS });
+      const xmlAss = await assinarXML(xml, certOpts.pfx, certOpts.passphrase);
+      const b64gz  = await gzipBase64(xmlAss);
+      const { status, body } = await chamarAPI(b64gz, certOpts);
+      const parsed = parseResp(body);
+      if (parsed.ok) {
+        // Gera DANFE sincronamente com dados reais do XML do governo
+        await buscarESalvarDanfe(parsed.chaveAcesso, certOpts).catch(e => console.error("DANFE:", e.message));
+        return res.status(200).json({ ok: true, chaveAcesso: parsed.chaveAcesso, idDps: parsed.idDps, alertas: parsed.alertas });
+      } else {
+        return res.status(200).json({ ok: false, error: parsed.erro, httpStatus: status, idDPS: numDPS, idLen: numDPS.length });
+      }
+    } catch(e) { return res.status(200).json({ ok: false, error: e.message }); }
+  }
+
+  return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+};
