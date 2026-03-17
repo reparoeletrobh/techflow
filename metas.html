@@ -2,370 +2,599 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cpolygon%20points%3D%2218%2C2%208%2C18%2015%2C18%2014%2C30%2024%2C14%2017%2C14%22%20fill%3D%22%23a855f7%22%20stroke%3D%22%23a855f7%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Metas</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500;600&family=Syne:wght@700;800;900&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<title>Mission Control — Reparo Eletro</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
-:root{
-  --bg:#050508;--surface:#0d0d14;--surface2:#13131e;--border:#1e1e2e;--dim:#252535;
-  --text:#e8e8f0;--muted:#5a5a7a;
-  --accent:#f5c800;
-  --c-aprov:#6366f1;--c-loja:#f59e0b;--c-del:#3b9eff;
-  --c-orc:#22c55e;--c-erp:#ec4899;--c-fat:#8b5cf6;--c-rota:#06b6d4;
-  --c-eq:#f97316;--c-eqv:#a855f7;
-  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+:root {
+  --bg:     #000000;
+  --bg2:    #080808;
+  --bg3:    #0f0f0f;
+  --border: #1a1a1a;
+  --yellow: #f5c400;
+  --yellow2:#ffd740;
+  --green:  #00e676;
+  --green2: #00ff88;
+  --muted:  #444;
+  --text:   #cccccc;
+  --dim:    #222;
+  --fh: 'Orbitron', monospace;
+  --fb: 'Rajdhani', sans-serif;
+  --fm: 'Share Tech Mono', monospace;
 }
-*{margin:0;padding:0;box-sizing:border-box;}
-html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:var(--fb);}
-body::before{content:'';position:fixed;inset:0;background:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0;opacity:0.4;}
+* { margin:0; padding:0; box-sizing:border-box; }
 
-header{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:0 28px;height:54px;border-bottom:1px solid var(--border);
-  background:rgba(5,5,8,0.9);backdrop-filter:blur(12px);
-  position:sticky;top:0;z-index:100;
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--fb);
+  min-height: 100vh;
+  overflow-x: hidden;
 }
-.logo{font-family:var(--fh);font-size:16px;font-weight:900;display:flex;align-items:center;gap:10px;letter-spacing:-0.5px;}
-.logo-dot{width:8px;height:8px;background:var(--accent);border-radius:50%;box-shadow:0 0 10px var(--accent);}
-.logo span{color:var(--accent);}
-.hdr-right{display:flex;align-items:center;gap:12px;}
-.live-dot{width:6px;height:6px;background:#22c55e;border-radius:50%;box-shadow:0 0 8px #22c55e;animation:pulse-dot 2s infinite;}
-@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:0.3}}
-.hdr-date{font-family:var(--fm);font-size:10px;color:var(--muted);}
-.refresh-btn{font-family:var(--fm);font-size:10px;padding:5px 11px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all 0.15s;}
-.refresh-btn:hover{color:var(--accent);border-color:var(--accent);}
 
-.wrap{max-width:1400px;margin:0 auto;padding:28px 28px 60px;position:relative;z-index:1;}
-
-/* SECTION HEADER */
-.sec{display:flex;align-items:center;gap:12px;margin-bottom:18px;margin-top:36px;}
-.sec:first-child{margin-top:0;}
-.sec-line{flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent);}
-.sec-label{font-family:var(--fm);font-size:10px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted);white-space:nowrap;}
-.sec-date{font-family:var(--fm);font-size:10px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:2px 10px;border-radius:20px;white-space:nowrap;}
-
-/* GRID */
-.g2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:14px;}
-.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px;}
-.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px;}
-
-/* MEGA CARD — destaque do topo */
-.mega-card{
-  background:var(--surface);border:1px solid var(--border);border-radius:18px;
-  padding:22px 20px 18px;position:relative;overflow:hidden;
-  transition:border-color 0.2s;
+/* Scanline overlay */
+body::before {
+  content:'';
+  position:fixed;
+  inset:0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,.012) 2px, rgba(255,255,255,.012) 4px);
+  pointer-events:none;
+  z-index:999;
 }
-.mega-card:hover{border-color:var(--dim);}
-.mega-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
-.mega-card.c-erp::before{background:var(--c-erp);}
-.mega-card.c-eqv::before{background:var(--c-eqv);}
-.mega-card.c-eq::before{background:var(--c-eq);}
-.mega-card.c-orc::before{background:var(--c-orc);}
-/* Ambient glow */
-.mega-card::after{content:'';position:absolute;top:0;left:0;right:0;height:80px;border-radius:18px 18px 0 0;opacity:0.05;pointer-events:none;}
-.mega-card.c-erp::after{background:var(--c-erp);}
-.mega-card.c-eqv::after{background:var(--c-eqv);}
-.mega-card.c-eq::after{background:var(--c-eq);}
-.mega-card.c-orc::after{background:var(--c-orc);}
 
-.mc-title{font-family:var(--fm);font-size:10px;text-transform:uppercase;letter-spacing:0.14em;color:var(--muted);margin-bottom:14px;}
-.mc-rows{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.mc-block{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
-.mc-period{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:6px;}
-.mc-num{font-family:var(--fh);font-size:30px;font-weight:900;line-height:1;letter-spacing:-1px;}
-.mc-goal{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:3px;}
-/* Progress bar inside mega */
-.mc-bar-wrap{height:4px;background:var(--dim);border-radius:99px;margin-top:8px;overflow:hidden;}
-.mc-bar{height:100%;border-radius:99px;transition:width 1.2s cubic-bezier(0.34,1.1,0.64,1);}
-.mc-badge{font-family:var(--fm);font-size:9px;font-weight:600;margin-top:6px;text-transform:uppercase;}
-.mc-badge.ok{color:#22c55e;}
-.mc-badge.nd{color:var(--muted);}
-
-/* DONUT CARD */
-.dc{
-  background:var(--surface);border:1px solid var(--border);border-radius:16px;
-  padding:20px 16px 14px;display:flex;flex-direction:column;align-items:center;gap:10px;
-  position:relative;overflow:hidden;transition:border-color 0.2s;
+/* Grid background */
+.grid-bg {
+  position:fixed;
+  inset:0;
+  background-image:
+    linear-gradient(rgba(245,196,0,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(245,196,0,.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events:none;
+  z-index:0;
 }
-.dc:hover{border-color:var(--dim);}
-.dc::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;}
-.dc.c-aprov::before{background:var(--c-aprov);}
-.dc.c-loja::before{background:var(--c-loja);}
-.dc.c-del::before{background:var(--c-del);}
-.dc.c-fat::before{background:var(--c-fat);}
-.dc.c-rota::before{background:var(--c-rota);}
-.dc.exceeded{border-color:rgba(34,197,94,0.25);}
-.dc.exceeded::before{background:#22c55e!important;}
 
-.dc-label{font-family:var(--fh);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);text-align:center;}
-.dw{position:relative;width:96px;height:96px;}
-.ds{transform:rotate(-90deg);}
-.d-track{fill:none;stroke:var(--surface2);stroke-width:8;}
-.d-fill{fill:none;stroke-width:8;stroke-linecap:round;transition:stroke-dashoffset 1.3s cubic-bezier(0.34,1.1,0.64,1);}
-.dc.c-aprov .d-fill{stroke:var(--c-aprov);filter:drop-shadow(0 0 5px rgba(99,102,241,0.5));}
-.dc.c-loja  .d-fill{stroke:var(--c-loja); filter:drop-shadow(0 0 5px rgba(245,158,11,0.5));}
-.dc.c-del   .d-fill{stroke:var(--c-del);  filter:drop-shadow(0 0 5px rgba(59,158,255,0.5));}
-.dc.c-fat   .d-fill{stroke:var(--c-fat);  filter:drop-shadow(0 0 5px rgba(139,92,246,0.5));}
-.dc.c-rota  .d-fill{stroke:var(--c-rota); filter:drop-shadow(0 0 5px rgba(6,182,212,0.5));}
-.exceeded .d-fill{stroke:#22c55e!important;filter:drop-shadow(0 0 6px rgba(34,197,94,0.7))!important;}
+/* HEADER */
+header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(0,0,0,.92);
+  border-bottom: 1px solid var(--yellow);
+  padding: 0 24px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  backdrop-filter: blur(10px);
+}
+.logo {
+  font-family: var(--fh);
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--yellow);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo-dot {
+  width: 8px; height: 8px;
+  background: var(--yellow);
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+  box-shadow: 0 0 8px var(--yellow);
+}
+@keyframes pulse {
+  0%,100% { opacity:1; transform:scale(1); }
+  50% { opacity:.4; transform:scale(.7); }
+}
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.date-badge {
+  font-family: var(--fm);
+  font-size: 10px;
+  color: var(--yellow);
+  letter-spacing: .08em;
+}
+.week-badge {
+  font-family: var(--fm);
+  font-size: 9px;
+  color: var(--muted);
+}
+.sync-btn {
+  font-family: var(--fh);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  background: transparent;
+  border: 1px solid var(--yellow);
+  color: var(--yellow);
+  padding: 6px 12px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all .2s;
+  text-transform: uppercase;
+}
+.sync-btn:hover { background: var(--yellow); color: #000; }
 
-.dc-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
-.dc-pct{font-family:var(--fh);font-size:19px;font-weight:800;line-height:1;}
-.dc-sub{font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:1px;}
-.dc-stats{width:100%;}
-.dr{display:flex;justify-content:space-between;font-family:var(--fm);font-size:10px;padding:3px 0;border-bottom:1px solid var(--border);}
-.dr:last-child{border:none;}
-.dl{color:var(--muted);}
-.dbadge{font-family:var(--fm);font-size:9px;font-weight:600;padding:3px 9px;border-radius:20px;text-transform:uppercase;width:100%;text-align:center;margin-top:4px;}
-.dc.c-aprov .dbadge{background:rgba(99,102,241,0.1);color:var(--c-aprov);}
-.dc.c-loja  .dbadge{background:rgba(245,158,11,0.1);color:var(--c-loja);}
-.dc.c-del   .dbadge{background:rgba(59,158,255,0.1);color:var(--c-del);}
-.dc.c-fat   .dbadge{background:rgba(139,92,246,0.1);color:var(--c-fat);}
-.dc.c-rota  .dbadge{background:rgba(6,182,212,0.1); color:var(--c-rota);}
-.exceeded .dbadge{background:rgba(34,197,94,0.15)!important;color:#22c55e!important;}
+/* NAV BACK */
+.nav-back {
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nav-back a {
+  font-family: var(--fm);
+  font-size: 10px;
+  color: var(--muted);
+  text-decoration: none;
+  letter-spacing: .08em;
+  transition: color .2s;
+}
+.nav-back a:hover { color: var(--yellow); }
 
-/* SNAPSHOT */
-.snapshot{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;margin-bottom:14px;}
-.snap-title{font-family:var(--fh);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:14px;}
-.snap-flow{display:flex;gap:0;overflow-x:auto;padding-bottom:4px;}
-.snap-step{flex-shrink:0;text-align:center;padding:10px 12px;min-width:80px;}
-.snap-count{font-family:var(--fh);font-size:24px;font-weight:800;}
-.snap-name{font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:0.05em;}
-.snap-arrow{font-family:var(--fm);font-size:12px;color:var(--border);flex-shrink:0;align-self:center;}
+/* MAIN */
+main {
+  position: relative;
+  z-index: 10;
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
 
-/* TOTALS BAR */
-.totals-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
-.total-pill{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;flex:1;min-width:140px;}
-.tp-label{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:5px;}
-.tp-val{font-family:var(--fh);font-size:28px;font-weight:800;line-height:1;}
+/* TITLE ROW */
+.title-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.title-row h1 {
+  font-family: var(--fh);
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--yellow);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.title-row p {
+  font-family: var(--fm);
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 6px;
+  letter-spacing: .06em;
+}
+.last-update {
+  font-family: var(--fm);
+  font-size: 9px;
+  color: var(--muted);
+  text-align: right;
+}
 
-@media(max-width:900px){.g4{grid-template-columns:repeat(2,1fr);}.g3{grid-template-columns:repeat(2,1fr);}}
-@media(max-width:520px){.g4,.g3,.g2{grid-template-columns:1fr;}.wrap{padding:18px 14px 48px;}.mc-rows{grid-template-columns:1fr;}}
+/* METRICS GRID */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+/* METRIC CARD */
+.mcard {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .3s;
+}
+.mcard::before {
+  content:'';
+  position:absolute;
+  top:0; left:0; right:0;
+  height: 2px;
+  background: var(--yellow);
+  opacity: .6;
+  transition: opacity .3s;
+}
+.mcard.achieved::before {
+  background: var(--green);
+  opacity: 1;
+  box-shadow: 0 0 12px var(--green);
+}
+.mcard.achieved { border-color: rgba(0,230,118,.2); }
+.mcard:hover { border-color: rgba(245,196,0,.3); }
+
+.mcard-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.mcard-label {
+  font-family: var(--fm);
+  font-size: 9px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  margin-bottom: 4px;
+}
+.mcard-title {
+  font-family: var(--fh);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--yellow);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+.mcard.achieved .mcard-title { color: var(--green); }
+.mcard-icon {
+  font-size: 20px;
+  opacity: .7;
+}
+
+/* TWIN METRICS */
+.twin {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.metric-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.metric-period {
+  font-family: var(--fm);
+  font-size: 8px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+
+/* ARC SVG */
+.arc-wrap {
+  position: relative;
+  width: 110px;
+  height: 65px;
+  margin: 0 auto;
+}
+.arc-wrap svg {
+  width: 110px;
+  height: 65px;
+  overflow: visible;
+}
+.arc-bg {
+  fill: none;
+  stroke: var(--dim);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+.arc-fg {
+  fill: none;
+  stroke: var(--yellow);
+  stroke-width: 5;
+  stroke-linecap: round;
+  transition: stroke-dashoffset .8s cubic-bezier(.4,0,.2,1), stroke .3s;
+}
+.arc-fg.achieved { stroke: var(--green); }
+.arc-center {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  line-height: 1;
+}
+.arc-count {
+  font-family: var(--fh);
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--yellow);
+  letter-spacing: -.02em;
+  display: block;
+  transition: color .3s;
+}
+.arc-count.achieved { color: var(--green); text-shadow: 0 0 16px var(--green2); }
+.arc-goal {
+  font-family: var(--fm);
+  font-size: 8px;
+  color: var(--muted);
+  display: block;
+  margin-top: 2px;
+}
+
+/* PCT bar */
+.pct-bar-wrap {
+  margin-top: 6px;
+  height: 3px;
+  background: var(--dim);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.pct-bar {
+  height: 100%;
+  background: var(--yellow);
+  border-radius: 2px;
+  transition: width .8s cubic-bezier(.4,0,.2,1), background .3s;
+}
+.pct-bar.achieved { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.pct-label {
+  font-family: var(--fm);
+  font-size: 8px;
+  color: var(--muted);
+  margin-top: 4px;
+  text-align: right;
+}
+
+/* ACHIEVED GLOW */
+@keyframes glow-pulse {
+  0%,100% { box-shadow: 0 0 0 rgba(0,230,118,0); }
+  50% { box-shadow: 0 0 20px rgba(0,230,118,.15); }
+}
+.mcard.achieved { animation: glow-pulse 2s ease-in-out infinite; }
+
+/* ACHIEVED BADGE */
+.achieved-badge {
+  display: none;
+  font-family: var(--fm);
+  font-size: 8px;
+  color: var(--green);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  border: 1px solid rgba(0,230,118,.3);
+  padding: 2px 6px;
+  border-radius: 2px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.achieved .achieved-badge { display: inline; }
+
+/* LOADING */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  flex-direction: column;
+  gap: 16px;
+}
+.loading-ring {
+  width: 48px; height: 48px;
+  border: 3px solid var(--dim);
+  border-top-color: var(--yellow);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+.loading-text {
+  font-family: var(--fm);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: .08em;
+}
+
+/* ERROR */
+.error-box {
+  background: rgba(239,68,68,.08);
+  border: 1px solid rgba(239,68,68,.3);
+  border-radius: 4px;
+  padding: 20px;
+  text-align: center;
+  font-family: var(--fm);
+  font-size: 11px;
+  color: #ef4444;
+  margin: 40px 0;
+}
 </style>
 </head>
 <body>
+<div class="grid-bg"></div>
 
 <header>
-  <div class="logo"><div class="logo-dot"></div>Reparo<span>Eletro</span> — Metas</div>
-  <div class="hdr-right">
-    <div class="live-dot"></div>
-    <span class="hdr-date" id="hdr-date">—</span>
-    <button class="refresh-btn" onclick="load()">↻ Atualizar</button>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    Reparo Eletro
+  </div>
+  <div class="header-right">
+    <div>
+      <div class="date-badge" id="h-date">—</div>
+      <div class="week-badge" id="h-week">—</div>
+    </div>
+    <button class="sync-btn" onclick="load()">↻ Sync</button>
   </div>
 </header>
 
-<div class="wrap" id="wrap">
-  <div style="padding:60px;text-align:center;font-family:var(--fm);font-size:11px;color:var(--muted);">Carregando...</div>
+<div class="nav-back">
+  <a href="/">← Home</a>
+  <span style="color:var(--border)">|</span>
+  <a href="/adm">ADM</a>
 </div>
 
+<main>
+  <div class="title-row">
+    <div>
+      <h1>Mission Control <span class="achieved-badge" style="display:none"></span></h1>
+      <p>Painel de Metas — Reparo Eletro Conserto de Eletrodomésticos</p>
+    </div>
+    <div class="last-update" id="last-update">—</div>
+  </div>
+
+  <div id="content">
+    <div class="loading">
+      <div class="loading-ring"></div>
+      <div class="loading-text">Carregando dados...</div>
+    </div>
+  </div>
+</main>
+
 <script>
-let data = null;
+var METRICS = [
+  { key: "coletaSolicitada", title: "Coletas Solicitadas", icon: "📦", goalDay: 40,  goalWeek: 200, src: "board" },
+  { key: "orcEnviado",       title: "Orçamentos Enviados", icon: "📋", goalDay: 40,  goalWeek: 200, src: "board" },
+  { key: "aprovadoLoja",     title: "Aprovados Loja",       icon: "🏪", goalDay: 15,  goalWeek: 90,  src: "board" },
+  { key: "aprovadoTotal",    title: "Aprovados Total",       icon: "✅", goalDay: 35,  goalWeek: 200, src: "board" },
+  { key: "erp",              title: "ERP",                   icon: "💾", goalDay: 35,  goalWeek: 200, src: "board" },
+  { key: "equipCadastrado",  title: "Equip. Cadastrados",    icon: "🔧", goalDay: 0,   goalWeek: 0,   src: "vendas", noMeta: true },
+  { key: "vendaLoja",        title: "Vendas Loja",           icon: "🏪", goalDay: 0,   goalWeek: 0,   src: "vendas", noMeta: true },
+  { key: "vendaOnline",      title: "Vendas Online",         icon: "🌐", goalDay: 0,   goalWeek: 0,   src: "vendas", noMeta: true },
+];
+
+// Semicircle arc path: cx=55, cy=55, r=45, 180deg sweep
+var CX = 55, CY = 55, R = 45;
+var ARC_LEN = Math.PI * R; // half circle circumference
+
+function arcPath(pct) {
+  // Clamp
+  pct = Math.max(0, Math.min(1, pct));
+  var dashLen = pct * ARC_LEN;
+  return dashLen;
+}
+
+function buildArc(count, goal, id) {
+  var pct = goal > 0 ? Math.min(count / goal, 1) : 0;
+  var dash = arcPath(pct);
+  var done = count >= goal;
+  var fgClass = done ? "arc-fg achieved" : "arc-fg";
+  var countClass = done ? "arc-count achieved" : "arc-count";
+  var total = ARC_LEN;
+  // arc from left to right, bottom half omitted
+  var startX = CX - R, startY = CY;
+  var endX   = CX + R, endY   = CY;
+  return '<div class="arc-wrap">' +
+    '<svg viewBox="0 0 110 65" preserveAspectRatio="xMidYMid meet">' +
+      '<path class="arc-bg" ' +
+        'd="M '+(CX-R)+' '+CY+' A '+R+' '+R+' 0 0 1 '+(CX+R)+' '+CY+'" ' +
+        'stroke-dasharray="'+total+'" stroke-dashoffset="0"/>' +
+      '<path class="'+fgClass+'" id="arc-'+id+'" ' +
+        'd="M '+(CX-R)+' '+CY+' A '+R+' '+R+' 0 0 1 '+(CX+R)+' '+CY+'" ' +
+        'stroke-dasharray="'+total+' '+total+'" stroke-dashoffset="'+total+'"/>' +
+    '</svg>' +
+    '<div class="arc-center">' +
+      '<span class="'+countClass+'" id="cnt-'+id+'">'+ count +'</span>' +
+      '<span class="arc-goal">/ '+goal+'</span>' +
+    '</div>' +
+  '</div>';
+}
+
+function buildMetricHalf(count, goal, id, noMeta) {
+  if (noMeta || goal <= 0) {
+    // Counter only — no arc, no bar
+    return '<div style="text-align:center;padding:12px 0;">' +
+      '<span style="font-family:var(--fh);font-size:28px;font-weight:900;color:var(--yellow);" id="cnt-'+id+'">'+count+'</span>' +
+      '<span style="display:block;font-family:var(--fm);font-size:8px;color:var(--muted);margin-top:4px;">registros</span>' +
+    '</div>';
+  }
+  var pct = goal > 0 ? Math.min(count / goal, 1) : 0;
+  var done = count >= goal;
+  return buildArc(count, goal, id) +
+    '<div class="pct-bar-wrap">' +
+      '<div class="pct-bar'+(done?" achieved":"")+ '" id="bar-'+id+'" style="width:0%"></div>' +
+    '</div>' +
+    '<div class="pct-label" id="pct-'+id+'">0%</div>';
+}
+
+function buildCard(m, today, week, vendas) {
+  var dayCount, weekCount;
+  if (m.src === "vendas") {
+    if (m.key === "equipCadastrado") { dayCount = (vendas||{}).cadastradosHoje||0;   weekCount = (vendas||{}).cadastradosSemana||0; }
+    if (m.key === "vendaLoja")       { dayCount = (vendas||{}).vendaLojaHoje||0;     weekCount = (vendas||{}).vendaLojaSemana||0; }
+    if (m.key === "vendaOnline")     { dayCount = (vendas||{}).vendaOnlineHoje||0;   weekCount = (vendas||{}).vendaOnlineSemana||0; }
+  } else {
+    dayCount  = (today[m.key] && today[m.key].count != null) ? today[m.key].count : 0;
+    weekCount = (week[m.key]  && week[m.key].count  != null) ? week[m.key].count  : 0;
+  }
+  var dayDone   = !m.noMeta && dayCount  >= m.goalDay;
+  var weekDone  = !m.noMeta && weekCount >= m.goalWeek;
+  var anyDone   = dayDone || weekDone;
+  var cardClass = "mcard" + (anyDone ? " achieved" : "");
+  return '<div class="'+cardClass+'" id="card-'+m.key+'">' +
+    '<div class="mcard-header">' +
+      '<div>' +
+        '<div class="mcard-label">Indicador</div>' +
+        '<div class="mcard-title">'+m.title+'<span class="achieved-badge">ATINGIDO</span></div>' +
+      '</div>' +
+      '<div class="mcard-icon">'+m.icon+'</div>' +
+    '</div>' +
+    '<div class="twin">' +
+      '<div class="metric-block">' +
+        '<div class="metric-period">Hoje</div>' +
+        buildMetricHalf(dayCount, m.goalDay, m.key+"_d", m.noMeta) +
+      '</div>' +
+      '<div class="metric-block">' +
+        '<div class="metric-period">Semana</div>' +
+        buildMetricHalf(weekCount, m.goalWeek, m.key+"_w", m.noMeta) +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function animateArcs(today, week) {
+  METRICS.forEach(function(m) {
+    if (m.noMeta) return; // counter-only cards don't animate arcs
+    var dayCount  = (today[m.key] && today[m.key].count != null) ? today[m.key].count : 0;
+    var weekCount = (week[m.key]  && week[m.key].count  != null) ? week[m.key].count  : 0;
+    [[dayCount, m.goalDay, m.key+"_d"], [weekCount, m.goalWeek, m.key+"_w"]].forEach(function(x) {
+      var count = x[0], goal = x[1], id = x[2];
+      var pct = goal > 0 ? Math.min(count/goal, 1) : 0;
+      var dashLen = pct * ARC_LEN;
+      var total   = ARC_LEN;
+      var arcEl = document.getElementById("arc-"+id);
+      var barEl = document.getElementById("bar-"+id);
+      var pctEl = document.getElementById("pct-"+id);
+      if (arcEl) {
+        arcEl.style.strokeDashoffset = (total - dashLen).toString();
+      }
+      if (barEl) {
+        barEl.style.width = Math.round(pct*100)+"%";
+        if (count >= goal) barEl.classList.add("achieved");
+      }
+      if (pctEl) pctEl.textContent = Math.round(pct*100)+"%";
+    });
+  });
+}
 
 async function load() {
-  document.querySelector('.refresh-btn').textContent = '↻';
   try {
-    const res = await (await fetch('/api/metas')).json();
-    if (!res.ok) throw new Error(res.error || 'Erro');
-    data = res;
-    document.getElementById('hdr-date').textContent = res.todayLabel || '';
-    render();
+    var r = await fetch("/api/board?action=metas");
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.error || "Erro");
+
+    document.getElementById("h-date").textContent = d.todayLabel || "—";
+    document.getElementById("h-week").textContent = d.weekLabel  || "—";
+    document.getElementById("last-update").textContent = "Atualizado: " + new Date().toLocaleTimeString("pt-BR", {timeZone:"America/Sao_Paulo"});
+
+    var today = d.today || {};
+    var week  = d.week  || {};
+
+    var vendas = d.vendas || {};
+    var html = '<div class="metrics-grid">';
+    METRICS.forEach(function(m) {
+      html += buildCard(m, today, week, vendas);
+    });
+    html += '</div>';
+    document.getElementById("content").innerHTML = html;
+
+    // Animate arcs after DOM ready
+    setTimeout(function() { animateArcs(today, week); }, 80);
   } catch(e) {
-    document.getElementById('wrap').innerHTML =
-      `<div style="padding:60px;text-align:center;font-family:var(--fm);font-size:12px;color:#ef4444;">Erro: ${e.message}</div>`;
+    document.getElementById("content").innerHTML =
+      '<div class="error-box">❌ Erro ao carregar dados: ' + e.message + '</div>';
   }
-  document.querySelector('.refresh-btn').textContent = '↻ Atualizar';
-}
-
-// ── MEGA CARD (2 períodos lado a lado) ────────────────────────
-function megaCard(title, cls, colorVar, rows) {
-  // rows = [{label, count, goal}]
-  const blocks = rows.map(r => {
-    const raw  = r.goal > 0 ? r.count / r.goal : 0;
-    const pct  = Math.min(raw, 1) * 100;
-    const isEx = raw >= 1;
-    const badge = isEx
-      ? `<div class="mc-badge ok">✓ Meta batida +${r.count - r.goal}</div>`
-      : `<div class="mc-badge nd">faltam ${r.goal - r.count}</div>`;
-    return `
-      <div class="mc-block">
-        <div class="mc-period">${r.label}</div>
-        <div class="mc-num" style="color:${isEx?'#22c55e':colorVar}">${r.count}</div>
-        <div class="mc-goal">meta: ${r.goal}</div>
-        <div class="mc-bar-wrap">
-          <div class="mc-bar" style="width:${pct.toFixed(1)}%;background:${isEx?'#22c55e':colorVar};"></div>
-        </div>
-        ${badge}
-      </div>`;
-  }).join('');
-  return `
-    <div class="mega-card ${cls}">
-      <div class="mc-title">${title}</div>
-      <div class="mc-rows">${blocks}</div>
-    </div>`;
-}
-
-// ── DONUT ─────────────────────────────────────────────────────
-function donut(label, count, goal, cls) {
-  const R = 40, C = 2 * Math.PI * R;
-  const raw    = goal > 0 ? count / goal : 0;
-  const pct    = Math.round(raw * 100);
-  const isEx   = raw >= 1;
-  const offset = C - Math.min(raw, 1) * C;
-  const rem    = Math.max(goal - count, 0);
-  const badge  = isEx ? `+${count-goal} além ✓` : `faltam ${rem}`;
-  return `
-    <div class="dc ${cls}${isEx?' exceeded':''}">
-      <div class="dc-label">${label}</div>
-      <div class="dw">
-        <svg class="ds" width="96" height="96" viewBox="0 0 96 96">
-          <circle class="d-track" cx="48" cy="48" r="${R}"/>
-          <circle class="d-fill"  cx="48" cy="48" r="${R}"
-            stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
-        </svg>
-        <div class="dc-center">
-          <div class="dc-pct" style="color:${isEx?'#22c55e':'inherit'}">${pct}%</div>
-          <div class="dc-sub">${count}/${goal}</div>
-        </div>
-      </div>
-      <div class="dc-stats">
-        <div class="dr"><span class="dl">Realizados</span><span>${count}</span></div>
-        <div class="dr"><span class="dl">Meta</span><span>${goal}</span></div>
-      </div>
-      <div class="dbadge">${badge}</div>
-    </div>`;
-}
-
-// ── RENDER ────────────────────────────────────────────────────
-function render() {
-  const { top, fin, board, eq, todayLabel, weekLabel, monthLabel } = data;
-
-  // ── SNAPSHOTS ─────────────────────────────────────────────
-  const BOARD_PHASES = [
-    {id:'aprovado',       name:'Aprovado',   c:'#6366f1'},
-    {id:'producao',       name:'Produção',   c:'#3b9eff'},
-    {id:'cliente_loja',   name:'Cli. Loja',  c:'#f59e0b'},
-    {id:'urgencia',       name:'Urgência',   c:'#ef4444'},
-    {id:'loja_feito',     name:'Loja Feito', c:'#22c55e'},
-    {id:'delivery_feito', name:'Delivery',   c:'#06b6d4'},
-    {id:'aguardando_ret', name:'Ag. Ret.',   c:'#8b5cf6'},
-  ];
-  const FIN_PHASES = [
-    {id:'aguardando_dados',  name:'Ag. Dados',  c:'#6366f1'},
-    {id:'emitir_nf',         name:'Emitir NF',  c:'#3b9eff'},
-    {id:'faturamento',       name:'Faturamento',c:'#f59e0b'},
-    {id:'pagamento_agendado',name:'Pg. Agendado',c:'#e879f9'},
-    {id:'entrega_agendada',  name:'Ag. Entrega',c:'#f97316'},
-    {id:'entrega_liberada',  name:'Liberada',   c:'#22c55e'},
-    {id:'rota_criada',       name:'Rota',       c:'#8b5cf6'},
-    {id:'item_coletado',     name:'Coletado',   c:'#ec4899'},
-  ];
-
-  const snapBoard = BOARD_PHASES.map((ph,i) => {
-    const cnt = board.cardsByPhase[ph.id] || 0;
-    const arr = i < BOARD_PHASES.length-1 ? `<div class="snap-arrow">→</div>` : '';
-    return `<div class="snap-step"><div class="snap-count" style="color:${ph.c}">${cnt}</div><div class="snap-name">${ph.name}</div></div>${arr}`;
-  }).join('');
-
-  const snapFin = FIN_PHASES.map((ph,i) => {
-    const cnt = fin.fichasByPhase[ph.id] || 0;
-    const arr = i < FIN_PHASES.length-1 ? `<div class="snap-arrow">→</div>` : '';
-    return `<div class="snap-step"><div class="snap-count" style="color:${ph.c}">${cnt}</div><div class="snap-name">${ph.name}</div></div>${arr}`;
-  }).join('');
-
-  document.getElementById('wrap').innerHTML = `
-
-    <!-- ── TOPO: DESTAQUES ── -->
-    <div class="sec"><span class="sec-label">⚡ Destaques</span><div class="sec-line"></div></div>
-    <div class="g2">
-      ${megaCard('Vendas ERP (Pipefy)','c-erp','var(--c-erp)',[
-          {label:'Hoje',   count:top.erp_hoje.count,   goal:top.erp_hoje.goal},
-          {label:'Semana', count:top.erp_semana.count, goal:top.erp_semana.goal},
-        ])}
-      ${megaCard('Orçamentos Enviados (Pipefy)','c-orc','var(--c-orc)',[
-          {label:'Hoje',   count:top.orc_hoje.count,   goal:top.orc_hoje.goal},
-          {label:'Semana', count:top.orc_semana.count, goal:top.orc_semana.goal},
-        ])}
-    </div>
-    <div class="g2">
-      ${megaCard('Equipamentos Vendidos','c-eqv','var(--c-eqv)',[
-          {label:'Semana', count:top.eq_vend_sem.count, goal:top.eq_vend_sem.goal},
-          {label:monthLabel, count:top.eq_vend_mes.count, goal:top.eq_vend_mes.goal},
-        ])}
-      ${megaCard('Equipamentos Cadastrados','c-eq','var(--c-eq)',[
-          {label:'Semana', count:top.eq_cad_sem.count, goal:top.eq_cad_sem.goal},
-          {label:monthLabel, count:top.eq_cad_mes.count, goal:top.eq_cad_mes.goal},
-        ])}
-    </div>
-
-    <!-- ── FINANCEIRO: SITUAÇÃO ── -->
-    <div class="sec"><span class="sec-label">💼 Financeiro — fichas ativas</span><div class="sec-line"></div></div>
-    <div class="snapshot">
-      <div class="snap-title">Etapas do financeiro</div>
-      <div class="snap-flow">${snapFin}</div>
-    </div>
-
-    <!-- ── FINANCEIRO: METAS HOJE ── -->
-    <div class="sec">
-      <span class="sec-label">💼 Financeiro — hoje</span>
-      <span class="sec-date">${todayLabel}</span>
-      <div class="sec-line"></div>
-    </div>
-    <div class="g2">
-      ${donut('Faturamentos',  fin.hoje.faturamento.count, fin.hoje.faturamento.goal, 'c-fat')}
-      ${donut('Rotas Criadas', fin.hoje.rota.count,        fin.hoje.rota.goal,        'c-rota')}
-    </div>
-
-    <!-- ── FINANCEIRO: METAS SEMANA ── -->
-    <div class="sec">
-      <span class="sec-label">💼 Financeiro — semana</span>
-      <span class="sec-date">${weekLabel}</span>
-      <div class="sec-line"></div>
-    </div>
-    <div class="g2">
-      ${donut('Faturamentos',  fin.semana.faturamento.count, fin.semana.faturamento.goal, 'c-fat')}
-      ${donut('Rotas Criadas', fin.semana.rota.count,        fin.semana.rota.goal,        'c-rota')}
-    </div>
-
-    <!-- ── DASH PRINCIPAL: SITUAÇÃO ── -->
-    <div class="sec"><span class="sec-label">🔧 Dash técnico — OS ativas</span><div class="sec-line"></div></div>
-    <div class="snapshot">
-      <div class="snap-title">Fichas por fase</div>
-      <div class="snap-flow">${snapBoard}</div>
-    </div>
-
-    <!-- ── DASH PRINCIPAL: METAS HOJE ── -->
-    <div class="sec">
-      <span class="sec-label">🔧 Dash técnico — hoje</span>
-      <span class="sec-date">${todayLabel}</span>
-      <div class="sec-line"></div>
-    </div>
-    <div class="g3">
-      ${donut('OS Aprovadas',   board.hoje.aprovados.count, board.hoje.aprovados.goal, 'c-aprov')}
-      ${donut('Loja Feito',     board.hoje.loja.count,      board.hoje.loja.goal,      'c-loja')}
-      ${donut('Delivery Feito', board.hoje.delivery.count,  board.hoje.delivery.goal,  'c-del')}
-    </div>
-
-    <!-- ── DASH PRINCIPAL: METAS SEMANA ── -->
-    <div class="sec">
-      <span class="sec-label">🔧 Dash técnico — semana</span>
-      <span class="sec-date">${weekLabel}</span>
-      <div class="sec-line"></div>
-    </div>
-    <div class="g3">
-      ${donut('OS Aprovadas',   board.semana.aprovados.count, board.semana.aprovados.goal, 'c-aprov')}
-      ${donut('Loja Feito',     board.semana.loja.count,      board.semana.loja.goal,      'c-loja')}
-      ${donut('Delivery Feito', board.semana.delivery.count,  board.semana.delivery.goal,  'c-del')}
-    </div>
-
-    <!-- ── EQUIPAMENTOS: TOTAIS ── -->
-    <div class="sec"><span class="sec-label">📦 Equipamentos — estoque</span><div class="sec-line"></div></div>
-    <div class="totals-bar">
-      <div class="total-pill"><div class="tp-label">Total cadastrado</div><div class="tp-val" style="color:var(--c-eq)">${eq.total}</div></div>
-      <div class="total-pill"><div class="tp-label">Total vendido</div><div class="tp-val" style="color:var(--c-eqv)">${eq.vendidos}</div></div>
-      <div class="total-pill"><div class="tp-label">Em estoque</div><div class="tp-val" style="color:#22c55e">${eq.total - eq.vendidos}</div></div>
-    </div>
-  `;
 }
 
 load();
