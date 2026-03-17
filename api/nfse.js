@@ -71,20 +71,19 @@ function genId(seq) {
 function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
   const cpfLimpo = cpfcnpj.replace(/\D/g,"");
   const isCnpj   = cpfLimpo.length === 14;
-  const toma      = isCnpj
-    ? `<CNPJ>${cpfLimpo}</CNPJ>`
-    : `<CPF>${cpfLimpo}</CPF>`;
-  const vlr = parseFloat(valor).toFixed(2);
-  const id  = numDPS; // ID completo TSIdDPS: DPS+CNPJ(14)+Serie(5)+Numero(15) = 37 chars
+  const toma     = isCnpj ? `<CNPJ>${cpfLimpo}</CNPJ>` : `<CPF>${cpfLimpo}</CPF>`;
+  const vlr      = parseFloat(valor).toFixed(2);
+  const id       = numDPS; // DPS(3)+cMun(7)+tpInsc(1)+CNPJ(14)+serie(5)+nDPS(15) = 45
+  const nDPS     = String(numDPS).slice(-15).replace(/^0+/,"") || "1";
 
   return `<?xml version="1.0" encoding="UTF-8"?>\n` +
-`<DPS xmlns="http://www.sped.fazenda.gov.br/nfse" versao="1.00">\n` +
+`<DPS versao="1.01" xmlns="http://www.sped.fazenda.gov.br/nfse">\n` +
 `  <infDPS Id="${id}">\n` +
 `    <tpAmb>${NFSE_HOMOLOG ? 2 : 1}</tpAmb>\n` +
 `    <dhEmi>${agora()}</dhEmi>\n` +
 `    <verAplic>reparoeletro-1.0</verAplic>\n` +
 `    <serie>00001</serie>\n` +
-`    <nDPS>${numDPS.slice(-15).replace(/^0+/,"") || "1"}</nDPS>\n` +
+`    <nDPS>${nDPS}</nDPS>\n` +
 `    <dCompet>${hoje()}</dCompet>\n` +
 `    <tpEmit>1</tpEmit>\n` +
 `    <cLocEmi>${COD_MUN_BH}</cLocEmi>\n` +
@@ -92,23 +91,22 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 `      <CNPJ>${CNPJ_EMPRESA}</CNPJ>\n` +
 `      <IM>${IM_EMPRESA}</IM>\n` +
 `      <regTrib>\n` +
-`        <opSimpNac>1</opSimpNac>\n` +
+`        <opSimpNac>3</opSimpNac>\n` +
 `        <regApTribSN>1</regApTribSN>\n` +
 `        <regEspTrib>0</regEspTrib>\n` +
 `      </regTrib>\n` +
-// end omitido — governo busca pelo CNPJ cadastrado
-
 `    </prest>\n` +
 `    <toma>\n` +
 `      ${toma}\n` +
-`      <xNome>${escXml(nome||"Consumidor Final")}</xNome>\n` +
+`      <xNome>${escXml(nome || "Consumidor Final")}</xNome>\n` +
 `    </toma>\n` +
 `    <serv>\n` +
 `      <locPrest>\n` +
 `        <cLocPrestacao>${COD_MUN_BH}</cLocPrestacao>\n` +
 `      </locPrest>\n` +
 `      <cServ>\n` +
-`        <cTribNac>140100</cTribNac>\n` +
+`        <cTribNac>140201</cTribNac>\n` +
+`        <cTribMun>001</cTribMun>\n` +
 `        <xDescServ>${escXml(discriminacao)}</xDescServ>\n` +
 `      </cServ>\n` +
 `    </serv>\n` +
@@ -119,11 +117,7 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 `      <trib>\n` +
 `        <tribMun>\n` +
 `          <tribISSQN>1</tribISSQN>\n` +
-`          <BM>\n` +
-`            <nBM>0</nBM>\n` +
-`            <cLocIncid>${COD_MUN_BH}</cLocIncid>\n` +
-`            <pAliq>2.00</pAliq>\n` +
-`          </BM>\n` +
+`          <tpRetISSQN>1</tpRetISSQN>\n` +
 `        </tribMun>\n` +
 `        <totTrib>\n` +
 `          <pTotTribSN>6.00</pTotTribSN>\n` +
@@ -133,6 +127,7 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 `  </infDPS>\n` +
 `</DPS>`;
 }
+
 
 // Assina o XML com XMLDSig usando a chave privada do certificado PFX
 function assinarXML(xml, pfxBuf, passphrase) {
