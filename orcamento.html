@@ -419,6 +419,17 @@ function buildCard(f) {
   if (isGenerico) lbl.style.color = "#f59e0b";
   card.appendChild(lbl);
 
+  // Badge desconto por quantidade (mesmo telefone)
+  var fichasDoCliente = orcFichas.filter(function(x) { return x.tel === f.tel && x.status !== "enviado"; });
+  var qtd = fichasDoCliente.length;
+  var descPct = qtd >= 4 ? 20 : qtd === 3 ? 15 : qtd === 2 ? 10 : 0;
+  if (descPct > 0) {
+    var descBadge = document.createElement("div");
+    descBadge.style.cssText = "font-family:var(--fm);font-size:10px;background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3);border-radius:6px;padding:3px 8px;margin-bottom:6px;display:inline-block;";
+    descBadge.textContent = "🏷️ Desconto " + descPct + "% aplicado ("+qtd+" equip.)";
+    card.appendChild(descBadge);
+  }
+
   // Textarea
   var ta = document.createElement("textarea"); ta.className = "orc-textarea"; ta.id = "texto-" + f.id; ta.rows = 4; ta.value = f.textoOrc || "";
   card.appendChild(ta);
@@ -426,7 +437,15 @@ function buildCard(f) {
   // Price row
   var priceRow = document.createElement("div"); priceRow.className = "price-row";
   var rLabel = document.createElement("span"); rLabel.style.cssText = "font-family:var(--fm);font-size:11px;color:var(--muted)"; rLabel.textContent = "R$";
-  var prInput = document.createElement("input"); prInput.className = "price-input"; prInput.id = "preco-" + f.id; prInput.type = "number"; prInput.step = "0.01"; prInput.min = "0"; prInput.placeholder = "0,00"; prInput.value = f.preco || f.precoSugerido || "";
+  var prInput = document.createElement("input"); prInput.className = "price-input"; prInput.id = "preco-" + f.id; prInput.type = "number"; prInput.step = "0.01"; prInput.min = "0"; prInput.placeholder = "0,00";
+  // Se não tem preço salvo, sugere já com desconto
+  if (f.preco) {
+    prInput.value = f.preco;
+  } else if (f.precoSugerido && descPct > 0) {
+    prInput.value = (parseFloat(f.precoSugerido) * (1 - descPct/100)).toFixed(2);
+  } else {
+    prInput.value = f.precoSugerido || "";
+  }
   var sendBtn = document.createElement("button"); sendBtn.className = "obtn obtn-send"; sendBtn.id = "sendbtn-" + f.id;
   sendBtn.textContent = isSent ? "✅ Enviado" : "📤 Copiar e Enviar";
   sendBtn.setAttribute("data-id", f.id);
@@ -461,8 +480,15 @@ async function orcEnviar(id) {
   if (!ta || !prInput) return;
   var preco = prInput.value.trim();
   if (!preco) { showToast("⚠️", "Informe o preço", ""); prInput.focus(); return; }
-  // Substitui [VALOR] pelo preço
-  var textoFinal = ta.value.replace("[VALOR]", "R$ " + parseFloat(preco).toLocaleString("pt-BR", {minimumFractionDigits: 2}));
+  // Aplica desconto por quantidade de equipamentos do mesmo cliente
+  var fichasDoCliente = orcFichas.filter(function(x) { return x.tel === f.tel && x.status !== "enviado"; });
+  var qtd = fichasDoCliente.length;
+  var descPct = qtd >= 4 ? 20 : qtd === 3 ? 15 : qtd === 2 ? 10 : 0;
+  var precoNum = parseFloat(preco);
+  if (descPct > 0) precoNum = precoNum * (1 - descPct / 100);
+  var precoFmt = precoNum.toLocaleString("pt-BR", {minimumFractionDigits: 2});
+  // Substitui [VALOR] pelo preço com desconto
+  var textoFinal = ta.value.replace("[VALOR]", "R$ " + precoFmt);
   // Monta link wa.me
   var telLimpo = (f.tel || "").replace(/\D/g, "");
   if (telLimpo && !telLimpo.startsWith("55")) telLimpo = "55" + telLimpo;
