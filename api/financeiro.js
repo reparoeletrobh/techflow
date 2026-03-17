@@ -383,8 +383,10 @@ module.exports = async function handler(req, res) {
     // Valida transições permitidas
     const allowed = {
       nf_emitida:      ["faturamento"],
-      faturamento:      ["pagamento_agendado", "entrega_agendada", "entrega_liberada"],
-      pagamento_agendado: ["entrega_agendada", "entrega_liberada"],
+      faturamento:      ["pagamento_agendado", "analise_pagamento", "entrega_agendada", "entrega_liberada"],
+      pagamento_agendado: ["analise_pagamento", "entrega_agendada", "entrega_liberada"],
+      analise_pagamento:  ["pagamento_confirmado"],
+      pagamento_confirmado: ["entrega_agendada", "entrega_liberada"],
       entrega_agendada: ["entrega_liberada"],
       entrega_liberada: ["rota_criada"],
       rota_criada:      ["item_coletado"],
@@ -412,6 +414,7 @@ module.exports = async function handler(req, res) {
       try { await pipefyMoveCard(rec.pipefyId, SOLICITAR_ENTREGA_PHASE_ID); pipefyMoveOk = true; }
       catch(e) { pipefyMoveOk = false; console.error("pipefyMove:", e.message); }
     }
+
     return res.status(200).json({ ok: true, record: rec, pipefyMoveOk });
   }
 
