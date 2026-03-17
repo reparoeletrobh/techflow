@@ -106,7 +106,6 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 `    </prest>\n` +
 `    <toma>\n` +
 `      ${toma}\n` +
-`      <xNome>${escXml(nome || "Consumidor Final")}</xNome>\n` +
 `    </toma>\n` +
 `    <serv>\n` +
 `      <locPrest>\n` +
