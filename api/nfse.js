@@ -207,7 +207,7 @@ function assinarXML(xml, pfxBuf, passphrase) {
         (certBase64 ? `<KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo>` : "") +
       `</Signature>`;
 
-    const signed = xml.replace("</infDPS>", signature + "</infDPS>");
+    const signed = xml.replace("</infDPS>", "</infDPS>" + signature);
     console.log("Signature present:", signed.includes("<Signature"));
     return signed;
 
