@@ -97,7 +97,6 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 `    <cLocEmi>${COD_MUN_BH}</cLocEmi>\n` +
 `    <prest>\n` +
 `      <CNPJ>${CNPJ_EMPRESA}</CNPJ>\n` +
-`      <IM>${IM_EMPRESA}</IM>\n` +
 `      <regTrib>\n` +
 `        <opSimpNac>3</opSimpNac>\n` +
 `        <regApTribSN>1</regApTribSN>\n` +
