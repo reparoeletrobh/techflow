@@ -284,6 +284,33 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // ── GET test-sign — diagnose signing
+  if (action === "test-sign") {
+    const result = { steps: [] };
+    try {
+      const certOpts = loadCert();
+      result.steps.push("cert loaded: " + certOpts.pfx.length + " bytes");
+      try {
+        const pk = crypto.createPrivateKey({ key: certOpts.pfx, format: "pkcs12", passphrase: certOpts.passphrase });
+        result.steps.push("privateKey created: " + pk.asymmetricKeyType);
+        const pem = pk.export({ type: "pkcs8", format: "pem" }).toString();
+        result.steps.push("pem exported: " + pem.slice(0,40));
+        const signer = crypto.createSign("sha256WithRSAEncryption");
+        signer.update("test");
+        const sig = signer.sign(pk, "base64");
+        result.steps.push("signature: " + sig.slice(0,30) + "...");
+        result.ok = true;
+      } catch(e) {
+        result.steps.push("sign error: " + e.message);
+        result.ok = false;
+      }
+    } catch(e) {
+      result.steps.push("cert error: " + e.message);
+      result.ok = false;
+    }
+    return res.status(200).json(result);
+  }
+
   if (action === "status") {
     return res.status(200).json({
       ok: !!(process.env.NFSE_CERT_PFX && process.env.NFSE_CERT_SENHA),
