@@ -1,5 +1,6 @@
 const https     = require("https");
 const forge     = require("node-forge");
+const xmlCrypto = require("xml-crypto");
 const crypto = require("crypto");
 const zlib   = require("zlib");
 
@@ -135,95 +136,70 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 }
 
 
-// Assina DPS com XMLDSig usando node-forge para extrair chave do PFX
+// Assina DPS com XMLDSig: node-forge extrai chave, xml-crypto faz C14N correto
 function assinarXML(xml, pfxBuf, passphrase) {
   try {
-    // 1. Parse PFX com node-forge para extrair chave privada e certificado
+    // 1. Extrai chave privada do PFX via node-forge
     const p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(pfxBuf));
     const p12     = forge.pkcs12.pkcs12FromAsn1(p12Asn1, passphrase);
 
     let privateKeyPem = "";
-    let certPem       = "";
+    const shrouded = (p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag] || []);
+    const plain    = (p12.getBags({ bagType: forge.pki.oids.keyBag })[forge.pki.oids.keyBag] || []);
+    const keyBag   = [...shrouded, ...plain][0];
+    if (!keyBag) throw new Error("Chave privada não encontrada no PFX");
+    privateKeyPem  = forge.pki.privateKeyToPem(keyBag.key);
 
-    // Extrai chave privada
-    for (const bag of p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag] || []) {
-      privateKeyPem = forge.pki.privateKeyToPem(bag.key);
-      break;
-    }
-    if (!privateKeyPem) {
-      for (const bag of p12.getBags({ bagType: forge.pki.oids.keyBag })[forge.pki.oids.keyBag] || []) {
-        privateKeyPem = forge.pki.privateKeyToPem(bag.key);
-        break;
-      }
-    }
-
-    // Extrai certificado
-    for (const bag of p12.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag] || []) {
-      certPem = forge.pki.certificateToPem(bag.cert);
-      break;
+    let certBase64 = "";
+    const certBags = (p12.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag] || []);
+    if (certBags[0]) {
+      certBase64 = forge.pki.certificateToPem(certBags[0].cert)
+        .replace(/-----BEGIN CERTIFICATE-----/, "")
+        .replace(/-----END CERTIFICATE-----/, "")
+        .replace(/\s/g, "");
     }
 
-    if (!privateKeyPem) throw new Error("Chave privada não encontrada no PFX");
-
-    // 2. Converte para Node.js crypto key
-    const privateKey = crypto.createPrivateKey({ key: privateKeyPem, format: "pem" });
-
-    // 3. Id do infDPS
+    // 2. Id do infDPS
     const idMatch = xml.match(/infDPS Id="([^"]+)"/);
     if (!idMatch) throw new Error("Id do infDPS não encontrado");
     const refId = idMatch[1];
 
-    // 4. Extrai conteúdo do infDPS para digest
-    // C14N exclusivo: namespace do elemento pai (DPS) deve ser declarado no infDPS
-    const infDpsMatch = xml.match(/<infDPS[\s\S]*?<\/infDPS>/);
-    if (!infDpsMatch) throw new Error("infDPS não encontrado");
-    // Injeta o namespace xmlns no infDPS para C14N correto
-    const infDpsC14n = infDpsMatch[0].replace(
-      /^<infDPS /,
-      '<infDPS xmlns="http://www.sped.fazenda.gov.br/nfse" '
-    );
-    const digest = crypto.createHash("sha256").update(infDpsC14n, "utf8").digest("base64");
+    // 3. Usa xml-crypto para assinar com C14N correto
+    const { SignedXml } = xmlCrypto;
+    const sig = new SignedXml({
+      privateKey: privateKeyPem,
+      canonicalizationAlgorithm: "http://www.w3.org/2001/10/xml-exc-c14n#WithComments",
+      signatureAlgorithm: "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+    });
 
-    // 5. Monta SignedInfo
-    const signedInfo =
-      `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">` +
-      `<CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"/>` +
-      `<SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>` +
-      `<Reference URI="#${refId}">` +
-        `<Transforms>` +
-          `<Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>` +
-          `<Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"/>` +
-        `</Transforms>` +
-        `<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>` +
-        `<DigestValue>${digest}</DigestValue>` +
-      `</Reference>` +
-      `</SignedInfo>`;
+    sig.addReference({
+      xpath: `//*[@Id="${refId}"]`,
+      transforms: [
+        "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
+        "http://www.w3.org/2001/10/xml-exc-c14n#WithComments",
+      ],
+      digestAlgorithm: "http://www.w3.org/2001/04/xmlenc#sha256",
+    });
 
-    // 6. Assina SignedInfo com RSA-SHA256
-    const signer = crypto.createSign("sha256WithRSAEncryption");
-    signer.update(signedInfo, "utf8");
-    const sigValue = signer.sign(privateKey, "base64");
+    sig.computeSignature(xml, {
+      location: { reference: `//*[@Id="${refId}"]`, action: "after" },
+    });
 
-    // 7. Extrai cert base64 para KeyInfo
-    const certBase64 = certPem
-      .replace(/-----BEGIN CERTIFICATE-----/, "")
-      .replace(/-----END CERTIFICATE-----/, "")
-      .replace(/\s/g, "");
+    let signed = sig.getSignedXml();
 
-    // 8. Bloco Signature completo
-    const signature =
-      `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">` +
-        signedInfo +
-        `<SignatureValue>${sigValue}</SignatureValue>` +
-        (certBase64 ? `<KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo>` : "") +
-      `</Signature>`;
+    // 4. Injeta X509Certificate no KeyInfo se disponível
+    if (certBase64 && !signed.includes("X509Certificate")) {
+      signed = signed.replace(
+        "</Signature>",
+        `<KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo></Signature>`
+      );
+    }
 
-    const signed = xml.replace("</infDPS>", "</infDPS>" + signature);
     console.log("Signature present:", signed.includes("<Signature"));
     return signed;
 
   } catch(e) {
-    console.error("assinarXML erro:", e.message);
+    console.error("assinarXML erro:", e.message, e.stack ? e.stack.slice(0,300) : "");
     return xml;
   }
 }
