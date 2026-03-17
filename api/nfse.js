@@ -175,10 +175,12 @@ async function assinarXML(xml, pfxBuf, passphrase) {
     // 4. DigestValue
     const digest = crypto.createHash("sha256").update(infDpsC14n, "utf8").digest("base64");
 
-    // 5. SignedInfo — também precisa ser canonicalizado antes de assinar
-    // Para C14N exc, o SignedInfo com o xmlns da xmldsig já declarado é suficiente
-    const signedInfo =
-      `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">` +
+    // 5. SignedInfo
+    // IMPORTANTE: Para C14N exclusivo, o elemento assinado é o SignedInfo
+    // em seu contexto dentro de <Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+    // Portanto o xmlns NÃO é redeclarado no SignedInfo (é herdado do pai)
+    // A string que de fato é assinada pelo verificador é sem o xmlns no SignedInfo
+    const signedInfoBody =
       `<CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"/>` +
       `<SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>` +
       `<Reference URI="#${refId}">` +
@@ -188,19 +190,23 @@ async function assinarXML(xml, pfxBuf, passphrase) {
         `</Transforms>` +
         `<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>` +
         `<DigestValue>${digest}</DigestValue>` +
-      `</Reference>` +
-      `</SignedInfo>`;
+      `</Reference>`;
 
-    // 6. Assina SignedInfo
+    // String para assinar: SignedInfo com xmlns (contexto standalone para assinatura)
+    const signedInfoFull = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">${signedInfoBody}</SignedInfo>`;
+    // String no XML: SignedInfo SEM xmlns (herdado de Signature)
+    const signedInfoInXml = `<SignedInfo>${signedInfoBody}</SignedInfo>`;
+
+    // 6. Assina o SignedInfo com xmlns declarado (canonical standalone)
     const privateKey = crypto.createPrivateKey({ key: privateKeyPem, format: "pem" });
     const signer = crypto.createSign("sha256WithRSAEncryption");
-    signer.update(signedInfo, "utf8");
+    signer.update(signedInfoFull, "utf8");
     const sigValue = signer.sign(privateKey, "base64");
 
-    // 7. Bloco Signature
+    // 7. Bloco Signature — SignedInfo sem xmlns (herdado)
     const signature =
       `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">` +
-        signedInfo +
+        signedInfoInXml +
         `<SignatureValue>${sigValue}</SignatureValue>` +
         (certBase64 ? `<KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo>` : "") +
       `</Signature>`;
