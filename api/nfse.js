@@ -288,7 +288,7 @@ module.exports = async function handler(req, res) {
         valor:   "350.00",
         numDPS:  genId(1),
       });
-      const signed = certOpts ? assinarXML(xml, certOpts.pfx, certOpts.passphrase) : xml;
+      const signed = certOpts ? await assinarXML(xml, certOpts.pfx, certOpts.passphrase) : xml;
       const hasSignature = signed.includes("<Signature");
       res.setHeader("Content-Type","text/xml");
       res.setHeader("X-Has-Signature", String(hasSignature));
