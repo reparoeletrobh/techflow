@@ -323,6 +323,12 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // ── POST ou GET limpar-tudo — limpa TODA a fila ─────────────
+  if (action === "limpar-tudo") {
+    await dbSet(LALA_KEY, { fichas: [] });
+    return res.status(200).json({ ok: true, msg: "Fila limpa" });
+  }
+
   // ── POST limpar-enviados ──────────────────────────────────────
   if (req.method === "POST" && action === "limpar-enviados") {
     const db = await dbGet(LALA_KEY) || { fichas: [] };
