@@ -210,35 +210,25 @@ async function assinarXML(xml, pfxBuf, passphrase) {
 }
 
 
-// Baixa o DANFE do portal e salva no Redis
+// Baixa DANFE via API REST NFS-e (aceita certificado mTLS) e salva no Redis
 async function buscarESalvarDanfe(chaveAcesso, certOpts) {
   try {
-    const pdf = await new Promise((resolve, reject) => {
+    // API REST NFS-e: GET /SefinNacional/nfse/{chaveAcesso} retorna JSON com nfseXmlGZipB64
+    // O DANFE PDF é obtido via endpoint dedicado da API, não do portal web
+    const host = NFSE_HOMOLOG ? "sefin.producaorestrita.nfse.gov.br" : "sefin.nfse.gov.br";
+
+    const resp = await new Promise((resolve, reject) => {
       const opts = {
-        hostname: "www.nfse.gov.br",
-        port: 443,
-        path: `/EmissorNacional/Notas/Download/DANFSe/${chaveAcesso}`,
-        method: "GET",
+        hostname: host,
+        port:     443,
+        path:     `/SefinNacional/nfse/${chaveAcesso}/danfe`,
+        method:   "GET",
         pfx:        certOpts.pfx,
         passphrase: certOpts.passphrase,
         rejectUnauthorized: true,
-        headers: { "Accept": "application/pdf,*/*", "User-Agent": "Mozilla/5.0" },
+        headers: { "Accept": "application/pdf,application/json,*/*" },
       };
       const req = https.request(opts, r => {
-        // Segue redirecionamento manualmente se necessário
-        if (r.statusCode >= 300 && r.statusCode < 400 && r.headers.location) {
-          const loc = r.headers.location;
-          const url2 = new URL(loc, "https://www.nfse.gov.br");
-          const opts2 = { ...opts, hostname: url2.hostname, path: url2.pathname + url2.search };
-          const req2 = https.request(opts2, r2 => {
-            const chunks = [];
-            r2.on("data", c => chunks.push(c));
-            r2.on("end", () => resolve({ status: r2.statusCode, buf: Buffer.concat(chunks), ct: r2.headers["content-type"] || "" }));
-          });
-          req2.on("error", reject);
-          req2.end();
-          return;
-        }
         const chunks = [];
         r.on("data", c => chunks.push(c));
         r.on("end", () => resolve({ status: r.statusCode, buf: Buffer.concat(chunks), ct: r.headers["content-type"] || "" }));
@@ -247,18 +237,59 @@ async function buscarESalvarDanfe(chaveAcesso, certOpts) {
       req.end();
     });
 
-    if (pdf.status === 200 && pdf.ct.includes("pdf")) {
-      const b64 = pdf.buf.toString("base64");
-      // Salva no Redis com TTL de 1 ano (365 dias)
+    console.log("DANFE API status:", resp.status, "ct:", resp.ct);
+
+    if (resp.status === 200 && resp.ct.includes("pdf")) {
+      const b64 = resp.buf.toString("base64");
       await fetch(UPSTASH_URL + "/pipeline", {
         method: "POST",
         headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
-        body: JSON.stringify([["SET", "danfe:" + chaveAcesso, b64], ["EXPIRE", "danfe:" + chaveAcesso, 31536000]]),
+        body: JSON.stringify([
+          ["SET",    "danfe:" + chaveAcesso, b64],
+          ["EXPIRE", "danfe:" + chaveAcesso, 31536000],
+        ]),
       });
-      console.log("DANFE salvo no Redis para chave:", chaveAcesso.slice(-10));
+      console.log("DANFE salvo no Redis:", chaveAcesso.slice(-10));
       return true;
     }
-    console.log("DANFE não disponível ainda, status:", pdf.status);
+
+    // Fallback: tenta endpoint alternativo sem /danfe
+    const resp2 = await new Promise((resolve, reject) => {
+      const opts = {
+        hostname: host,
+        port:     443,
+        path:     `/SefinNacional/nfse/${chaveAcesso}`,
+        method:   "GET",
+        pfx:        certOpts.pfx,
+        passphrase: certOpts.passphrase,
+        rejectUnauthorized: true,
+        headers: { "Accept": "application/pdf,*/*" },
+      };
+      const req = https.request(opts, r => {
+        const chunks = [];
+        r.on("data", c => chunks.push(c));
+        r.on("end", () => resolve({ status: r.statusCode, buf: Buffer.concat(chunks), ct: r.headers["content-type"] || "" }));
+      });
+      req.on("error", reject);
+      req.end();
+    });
+
+    console.log("DANFE fallback status:", resp2.status, "ct:", resp2.ct);
+
+    if (resp2.status === 200 && resp2.ct.includes("pdf")) {
+      const b64 = resp2.buf.toString("base64");
+      await fetch(UPSTASH_URL + "/pipeline", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
+        body: JSON.stringify([
+          ["SET",    "danfe:" + chaveAcesso, b64],
+          ["EXPIRE", "danfe:" + chaveAcesso, 31536000],
+        ]),
+      });
+      return true;
+    }
+
+    console.log("DANFE não disponível via API, body:", resp2.buf.slice(0,100).toString());
     return false;
   } catch(e) {
     console.error("buscarESalvarDanfe erro:", e.message);
@@ -633,6 +664,142 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // ── GET danfe-html?chave=XXX — gera DANFE em HTML para impressão/download como PDF
+  if (action === "danfe-html") {
+    const chave = (req.query.chave || "").trim();
+    const nome  = (req.query.nome  || "Cliente").trim();
+    if (!chave) return res.status(400).json({ ok: false, error: "chave obrigatória" });
+
+    // Busca dados salvos no Redis junto com o DANFE (salvos na emissão)
+    let dadosNF = null;
+    try {
+      const r = await fetch(UPSTASH_URL + "/get/nfdata:" + chave, {
+        headers: { Authorization: "Bearer " + UPSTASH_TOKEN },
+      });
+      const j = await r.json();
+      if (j.result) dadosNF = JSON.parse(j.result);
+    } catch(e) {}
+
+    const d = dadosNF || {};
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>NFS-e - ${nome}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #000; background: #fff; padding: 20px; }
+  .header { text-align: center; border: 2px solid #000; padding: 10px; margin-bottom: 8px; }
+  .header h1 { font-size: 16px; font-weight: bold; }
+  .header h2 { font-size: 13px; }
+  .header p  { font-size: 10px; margin-top: 4px; }
+  .section { border: 1px solid #000; margin-bottom: 6px; }
+  .section-title { background: #e0e0e0; font-weight: bold; padding: 4px 8px; font-size: 10px; text-transform: uppercase; border-bottom: 1px solid #000; }
+  .row { display: flex; border-bottom: 1px solid #ccc; }
+  .row:last-child { border-bottom: none; }
+  .field { padding: 4px 8px; flex: 1; }
+  .field label { display: block; font-size: 9px; color: #555; text-transform: uppercase; }
+  .field span  { font-size: 11px; font-weight: bold; }
+  .field.w2 { flex: 2; }
+  .field.w3 { flex: 3; }
+  .chave { font-size: 9px; word-break: break-all; padding: 6px 8px; background: #f5f5f5; border-top: 1px solid #ccc; }
+  .valor-box { text-align: center; padding: 10px; }
+  .valor-box .v { font-size: 22px; font-weight: bold; color: #000; }
+  .footer { text-align: center; font-size: 9px; color: #666; margin-top: 10px; }
+  @media print { body { padding: 0; } button { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>NOTA FISCAL DE SERVIÇO ELETRÔNICA — NFS-e</h1>
+  <h2>REPARO ELETRO - CONSERTO DE ELETRODOMESTICOS LTDA</h2>
+  <p>CNPJ: 59.485.378/0001-75 &nbsp;|&nbsp; IM: 16391680010 &nbsp;|&nbsp; Belo Horizonte - MG</p>
+  <p>Rua Ouro Preto, 663 - Barro Preto - CEP 30170-044</p>
+</div>
+
+<div class="section">
+  <div class="section-title">Dados da Nota</div>
+  <div class="row">
+    <div class="field"><label>Chave de Acesso</label><span style="font-size:9px;font-weight:normal">${chave}</span></div>
+  </div>
+  <div class="row">
+    <div class="field"><label>Data de Emissão</label><span>${d.dhEmi || new Date().toLocaleDateString("pt-BR")}</span></div>
+    <div class="field"><label>Competência</label><span>${d.dCompet || new Date().toLocaleDateString("pt-BR")}</span></div>
+    <div class="field"><label>Código do Serviço</label><span>14.02.01 — Manutenção e reparação de eletrodomésticos</span></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Tomador do Serviço</div>
+  <div class="row">
+    <div class="field w3"><label>Nome / Razão Social</label><span>${d.tomadorNome || nome.replace(/_/g,' ')}</span></div>
+    <div class="field"><label>CPF / CNPJ</label><span>${d.tomadorDoc || ""}</span></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Discriminação do Serviço</div>
+  <div class="row">
+    <div class="field" style="white-space:pre-wrap"><label>Descrição</label><span>${d.discriminacao || ""}</span></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Valores</div>
+  <div class="row">
+    <div class="field"><label>Valor do Serviço</label><span class="v">R$ ${Number(d.valor||0).toLocaleString("pt-BR",{minimumFractionDigits:2})}</span></div>
+    <div class="field"><label>Tributação ISSQN</label><span>Operação Tributável — Simples Nacional</span></div>
+    <div class="field"><label>Município de Incidência</label><span>Belo Horizonte / MG</span></div>
+  </div>
+</div>
+
+<div class="footer">
+  <p>Documento emitido eletronicamente conforme LC 116/2003 — NFS-e Padrão Nacional</p>
+  <p style="margin-top:4px">Consulte sua nota em: <strong>https://www.nfse.gov.br/ConsultaNacional</strong></p>
+</div>
+
+<br>
+<div style="text-align:center">
+  <button onclick="window.print()" style="padding:10px 30px;font-size:14px;background:#3b9eff;color:#fff;border:none;border-radius:8px;cursor:pointer;">🖨️ Imprimir / Salvar como PDF</button>
+</div>
+
+</body>
+</html>`;
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    return res.status(200).send(html);
+  }
+
+  if (action === "danfe-api-test") {
+    const chave = (req.query.chave || "31062002259485378000175000000000016126034193872720").trim();
+    let certOpts;
+    try { certOpts = loadCert(); } catch(e) { return res.status(200).json({ error: e.message }); }
+    const host = NFSE_HOMOLOG ? "sefin.producaorestrita.nfse.gov.br" : "sefin.nfse.gov.br";
+    const paths = [
+      `/SefinNacional/nfse/${chave}/danfe`,
+      `/SefinNacional/nfse/${chave}`,
+    ];
+    const results = [];
+    for (const path of paths) {
+      const r = await new Promise((resolve) => {
+        const opts = { hostname: host, port: 443, path, method: "GET",
+          pfx: certOpts.pfx, passphrase: certOpts.passphrase, rejectUnauthorized: false,
+          headers: { "Accept": "application/pdf,application/json,*/*" },
+        };
+        const req2 = https.request(opts, r => {
+          const chunks = [];
+          r.on("data", c => chunks.push(c));
+          r.on("end", () => resolve({ status: r.statusCode, ct: r.headers["content-type"], len: Buffer.concat(chunks).length, preview: Buffer.concat(chunks).slice(0,150).toString() }));
+        });
+        req2.on("error", e => resolve({ error: e.message }));
+        req2.end();
+      });
+      results.push({ path, ...r });
+    }
+    return res.status(200).json({ ok: true, host, results });
+  }
+
   if (action === "danfe-debug") {
     const chave = (req.query.chave || "").trim() || "31062002259485378000175000000000016126034193872720";
     let certOpts;
@@ -708,7 +875,25 @@ module.exports = async function handler(req, res) {
       const parsed = parseResp(body);
 
       if (parsed.ok) {
-        // Tenta salvar DANFE no Redis imediatamente (aguarda 2s para o gov processar)
+        // Salva dados da NF no Redis para geração do DANFE offline
+        const nfData = {
+          dhEmi:         agora(),
+          dCompet:       hoje(),
+          tomadorNome:   tomadorNome || "",
+          tomadorDoc:    tomadorCpfCnpj || "",
+          discriminacao: discriminacao  || "",
+          valor:         parseFloat(valor).toFixed(2),
+          chaveAcesso:   parsed.chaveAcesso,
+        };
+        fetch(UPSTASH_URL + "/pipeline", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
+          body: JSON.stringify([
+            ["SET", "nfdata:" + parsed.chaveAcesso, JSON.stringify(nfData)],
+            ["EXPIRE", "nfdata:" + parsed.chaveAcesso, 31536000],
+          ]),
+        }).catch(()=>{});
+        // Tenta salvar DANFE do portal no Redis (pode falhar sem sessão)
         setTimeout(() => buscarESalvarDanfe(parsed.chaveAcesso, certOpts).catch(()=>{}), 2000);
         return res.status(200).json({ ok: true, chaveAcesso: parsed.chaveAcesso, idDps: parsed.idDps, alertas: parsed.alertas });
       } else {
