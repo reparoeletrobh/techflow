@@ -942,13 +942,13 @@ module.exports = async function handler(req, res) {
     if (action === "sync-lalamove") {
       try {
         const LALA_KEY = "reparoeletro_lalamove";
-        // Busca todas as fases com cards do Pipefy
+        // Etapa 1: busca IDs das fases Coleta/Entrega Solicitada (sem fields)
         const data = await pipefyQuery(`query {
           pipe(id: "${PIPE_ID}") {
             phases {
               name
               cards(first: 50) {
-                edges { node { id title fields { name value } } }
+                edges { node { id title } }
               }
             }
           }
@@ -958,38 +958,54 @@ module.exports = async function handler(req, res) {
         if (!Array.isArray(lalaDb.fichas)) lalaDb.fichas = [];
         let added = 0;
 
+        // Coleta cards das fases exatas
+        const novos = []; // { pipefyId, tipo, title }
         for (const ph of phases) {
           const l = ph.name.toLowerCase();
           const isColeta  = l === "coleta solicitada";
           const isEntrega = l === "entrega solicitada";
           if (!isColeta && !isEntrega) continue;
           const tipo = isColeta ? "coleta" : "entrega";
-
           for (const { node } of (ph.cards?.edges || [])) {
             const pipefyId = String(node.id);
             if (lalaDb.fichas.find(f => f.pipefyId === pipefyId && f.tipo === tipo)) continue;
-            const fields     = node.fields || [];
-            const endField   = fields.find(f => f.name.toLowerCase().includes("endere"));
-            const telField   = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"));
-            const title      = node.title || "";
-            const m          = title.match(/^(.*?)\s+(\d{3,6})$/);
-            lalaDb.fichas.push({
-              pipefyId, tipo,
-              osCode:      m ? m[2] : null,
-              nomeContato: m ? m[1].trim() : title,
-              descricao:   null,
-              endereco:    endField?.value || null,
-              telefone:    telField?.value || null,
-              lat: null, lng: null,
-              addedAt: new Date().toISOString(),
-              status:  "pendente",
-            });
-            added++;
+            novos.push({ pipefyId, tipo, title: node.title || "" });
           }
         }
 
+        // Etapa 2: busca fields de cada card novo individualmente
+        for (const item of novos) {
+          let endereco = null, telefone = null;
+          try {
+            const cd = await pipefyQuery(`query {
+              card(id: "${item.pipefyId}") {
+                fields { name value }
+              }
+            }`);
+            const fields = cd?.card?.fields || [];
+            const endField = fields.find(f => f.name.toLowerCase().includes("endere"));
+            const telField = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"));
+            endereco = endField?.value || null;
+            telefone = telField?.value || null;
+          } catch(e) {}
+
+          const m = item.title.match(/^(.*?)\s+(\d{3,6})$/);
+          lalaDb.fichas.push({
+            pipefyId:    item.pipefyId,
+            tipo:        item.tipo,
+            osCode:      m ? m[2] : null,
+            nomeContato: m ? m[1].trim() : item.title,
+            descricao:   null,
+            endereco, telefone,
+            lat: null, lng: null,
+            addedAt: new Date().toISOString(),
+            status:  "pendente",
+          });
+          added++;
+        }
+
         if (added > 0) await dbSet(LALA_KEY, lalaDb);
-        return res.status(200).json({ ok: true, added, total: lalaDb.fichas.filter(f=>f.status==="pendente").length, fasesLidas: phases.map(p=>p.name) });
+        return res.status(200).json({ ok: true, added, total: lalaDb.fichas.filter(f=>f.status==="pendente").length });
       } catch(e) {
         return res.status(200).json({ ok: false, error: e.message });
       }
