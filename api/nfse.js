@@ -691,8 +691,19 @@ module.exports = async function handler(req, res) {
       try { html = await getRedisDanfe(); } catch(e) {}
     }
 
-    if (html && html.startsWith("<!DOCTYPE")) {
-      // Serve HTML diretamente
+    if (html) {
+      if (html.startsWith("<!DOCTYPE")) {
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        return res.status(200).send(html);
+      }
+      // PDF em base64
+      const buf = Buffer.from(html, "base64");
+      if (buf[0] === 0x25 && buf[1] === 0x50) { // %PDF
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `inline; filename="${nome}.pdf"`);
+        return res.status(200).send(buf);
+      }
+      // Fallback HTML
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.status(200).send(html);
     }
@@ -988,6 +999,25 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, result });
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });
+    }
+  }
+
+  // ── POST danfe-store — recebe PDF do browser e salva no Redis
+  if (req.method === "POST" && action === "danfe-store") {
+    const { chave, pdfBase64 } = req.body || {};
+    if (!chave || !pdfBase64) return res.status(400).json({ ok: false, error: "chave e pdfBase64 obrigatórios" });
+    try {
+      await fetch(UPSTASH_URL + "/pipeline", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
+        body: JSON.stringify([
+          ["SET",    "danfe:" + chave, pdfBase64],
+          ["EXPIRE", "danfe:" + chave, 31536000],
+        ]),
+      });
+      return res.status(200).json({ ok: true });
+    } catch(e) {
+      return res.status(500).json({ ok: false, error: e.message });
     }
   }
 
