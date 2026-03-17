@@ -458,13 +458,16 @@ function openNfModal(id) {
     '<strong>#' + (r.osCode||'—') + ' — ' + (r.nomeContato||r.title||'—') + '</strong>';
   document.getElementById('nf-cpfcnpj').value = r.cpfCnpj || '';
   // Valor puxado automaticamente da ficha (vindo do Pipefy)
-  const valorFicha = r.valor || r.valorContrato || '';
+  // Normaliza: "R$ 290,00" → "290.00", "290" → "290", "290,00" → "290.00"
+  const valorRaw   = r.valor || r.valorContrato || '';
+  const valorLimpo = valorRaw.replace(/[^0-9,.]/g,'').replace(',','.').trim();
+  const valorFloat = parseFloat(valorLimpo) || 0;
+  const valorFicha = valorFloat > 0 ? valorFloat.toFixed(2) : '';
   const nfValorEl  = document.getElementById('nf-valor');
   nfValorEl.value  = valorFicha;
-  // Se já tem valor do Pipefy: readonly com fundo verde; se não tem: editável
   if (valorFicha) {
     nfValorEl.setAttribute('readonly', true);
-    nfValorEl.style.opacity = '0.8';
+    nfValorEl.style.opacity = '0.75';
     nfValorEl.style.cursor  = 'default';
   } else {
     nfValorEl.removeAttribute('readonly');
