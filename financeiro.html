@@ -575,8 +575,15 @@ async function emitirNF(id) {
 
 async function baixarDanfe(chave, nomeArquivo) {
   try {
-    const url = `/api/nfse?action=danfe&chave=${encodeURIComponent(chave)}`;
-    const r = await fetch(url);
+    // Download direto do portal gov com cookies do browser (precisa estar logado)
+    const url = `https://www.nfse.gov.br/EmissorNacional/Notas/Download/DANFSe/${chave}`;
+    const r = await fetch(url, { credentials: 'include' });
+    if (r.status === 302 || r.url.includes('Login')) {
+      // Não está logado — abre portal em nova aba
+      window.open(url, '_blank');
+      showToast('⚠️','Faça login no portal','A nota abrirá após o login');
+      return;
+    }
     if (!r.ok) { showToast('❌','Erro ao baixar DANFE', 'Status: '+r.status); return; }
     const blob = await r.blob();
     const filename = nomeArquivo ? decodeURIComponent(nomeArquivo) + '.pdf' : `danfe-${chave.slice(-10)}.pdf`;
