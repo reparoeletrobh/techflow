@@ -285,22 +285,21 @@ async function remover(pipefyId, tipo) {
   }
 }
 
-// ── ENVIAR AO LALAMOVE ──────────────────────────────────────────
+// ── ENVIAR AO LALAMOVE ─────────────────────────────────────────
 async function enviarLalamove(tipo) {
   var pendentes = fichas.filter(function(f) { return f.tipo === tipo && f.status === "pendente"; });
-  var semEnd    = pendentes.filter(function(f) { return !f.endereco; });
-  if (semEnd.length) {
-    showToast("⚠️", "Endereços faltando", semEnd.length + " ficha(s) sem endereço preenchido");
-    return;
-  }
+  if (!pendentes.length) { showToast("⚠️","Fila vazia","Não há fichas pendentes"); return; }
+  var semEnd = pendentes.filter(function(f) { return !f.endereco; });
+  if (semEnd.length) { showToast("⚠️","Endereços faltando", semEnd.length + " ficha(s) sem endereço"); return; }
   var btn = document.getElementById("btn-send-"+tipo);
-  btn.disabled = true; btn.textContent = "⏳ Enviando...";
+  btn.disabled = true;
+  btn.textContent = "⏳ Enviando...";
   var d = await api("enviar-lalamove", { tipo });
   if (d.ok) {
-    showToast("🚗", "Enviado ao Lalamove!", d.count + " parada(s) criada(s)");
+    showToast("🚗","Enviado ao Lalamove!", d.count + " parada(s) — Pedido: " + d.orderId);
     await load();
   } else {
-    showToast("❌", "Erro", d.error);
+    showToast("❌","Erro", d.error || "Verifique os endereços e tente novamente");
   }
   btn.disabled = !temApiKey;
   btn.textContent = tipo === "coleta" ? "🚗 Enviar Coletas ao Lalamove" : "🚗 Enviar Entregas ao Lalamove";
