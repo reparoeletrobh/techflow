@@ -52,7 +52,12 @@ function escXml(s) {
   return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
-function hoje() { return new Date().toISOString().slice(0,10); }
+function hoje() {
+  // Data no fuso BRT (UTC-3) para evitar dCompet > dhEmi
+  const d = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const pad = n => String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
 function agora() {
   const d = new Date(new Date().toLocaleString("en-US",{timeZone:"America/Sao_Paulo"}));
   const pad = n => String(n).padStart(2,"0");
