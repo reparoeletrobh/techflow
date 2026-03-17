@@ -633,6 +633,45 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  if (action === "danfe-debug") {
+    const chave = (req.query.chave || "").trim() || "31062002259485378000175000000000016126034193872720";
+    let certOpts;
+    try { certOpts = loadCert(); } catch(e) { return res.status(200).json({ step: "cert", error: e.message }); }
+    try {
+      const result = await new Promise((resolve) => {
+        const opts = {
+          hostname: "www.nfse.gov.br",
+          port: 443,
+          path: `/EmissorNacional/Notas/Download/DANFSe/${chave}`,
+          method: "GET",
+          pfx:        certOpts.pfx,
+          passphrase: certOpts.passphrase,
+          rejectUnauthorized: false,
+          headers: { "Accept": "application/pdf,*/*", "User-Agent": "Mozilla/5.0" },
+        };
+        const req2 = https.request(opts, r => {
+          const chunks = [];
+          r.on("data", c => chunks.push(c));
+          r.on("end", () => {
+            const body = Buffer.concat(chunks);
+            resolve({
+              status: r.statusCode,
+              ct: r.headers["content-type"],
+              location: r.headers["location"],
+              bodyPreview: body.slice(0,200).toString("utf8"),
+              bodyLen: body.length,
+            });
+          });
+        });
+        req2.on("error", e => resolve({ error: e.message }));
+        req2.end();
+      });
+      return res.status(200).json({ ok: true, result });
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: e.message });
+    }
+  }
+
   if (action === "status") {
     return res.status(200).json({
       ok: !!(process.env.NFSE_CERT_PFX && process.env.NFSE_CERT_SENHA),
