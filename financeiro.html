@@ -575,29 +575,31 @@ async function emitirNF(id) {
 }
 
 async function salvarDanfeDoPortal(chave) {
+  // Aguarda 2s para o governo processar a nota antes de tentar baixar
+  await new Promise(r => setTimeout(r, 2000));
   try {
-    // Browser já está logado — baixa DANFE com cookies da sessão
     const url = 'https://www.nfse.gov.br/EmissorNacional/Notas/Download/DANFSe/' + chave;
     const r = await fetch(url, { credentials: 'include' });
-    if (!r.ok || r.url.includes('Login')) {
-      console.log('DANFE: sessão expirada, usando fallback HTML');
+    if (!r.ok || !r.headers.get('content-type')?.includes('pdf')) {
+      console.log('DANFE portal: não disponível ainda, status', r.status);
       return;
     }
     const blob = await r.blob();
-    // Converte para base64 e envia para o servidor salvar no Redis
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const b64 = reader.result.split(',')[1];
-      await fetch('/api/nfse?action=danfe-store', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chave, pdfBase64: b64 }),
-      });
-      console.log('DANFE PDF salvo no Redis:', chave.slice(-10));
-    };
-    reader.readAsDataURL(blob);
+    const b64  = await new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload  = () => res(reader.result.split(',')[1]);
+      reader.onerror = rej;
+      reader.readAsDataURL(blob);
+    });
+    const resp = await fetch('/api/nfse?action=danfe-store', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chave, pdfBase64: b64 }),
+    });
+    const j = await resp.json();
+    if (j.ok) console.log('✅ DANFE PDF original salvo:', chave.slice(-10));
   } catch(e) {
-    console.log('DANFE salvar erro:', e.message);
+    console.log('DANFE portal erro:', e.message);
   }
 }
 
