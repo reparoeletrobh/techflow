@@ -443,7 +443,7 @@ module.exports = async function handler(req, res) {
         if (fotosCompra)    card.fotosCompra    = fotosCompra;
         if (descricaoCompra) card.descricaoCompra = descricaoCompra;
       }
-      if (["loja_feito", "delivery_feito"].includes(phaseId)) {
+      if (["loja_feito", "delivery_feito", "cliente_loja"].includes(phaseId)) {
         board.movesLog.push({ phaseId, timestamp: card.movedAt, tecnico: tecnico || null, pipefyId: String(pipefyId) });
         board.movesLog = trimLog(board.movesLog);
       }
@@ -632,12 +632,43 @@ module.exports = async function handler(req, res) {
       const weekDates = Array.from({length:6}, (_,i) => fmt(new Date(weekUTC.getTime() + i*24*60*60*1000)));
       const prevWeekDates = Array.from({length:6}, (_,i) => fmt(new Date(prevWeekStart.getTime() + i*24*60*60*1000)));
 
+      // Busca stats de vendas
+      let vendasStats = {};
+      try {
+        const vr = await fetch(`${UPSTASH_URL}/pipeline`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, "Content-Type": "application/json" },
+          body: JSON.stringify([["GET", "reparoeletro_vendas"]]),
+        });
+        const vj = await vr.json();
+        const produtos = vj[0]?.result ? JSON.parse(vj[0].result).produtos || [] : [];
+        function toBRTv(d) { return new Date(new Date(d).toLocaleString("en-US",{timeZone:"America/Sao_Paulo"})); }
+        const nBRT = toBRTv(new Date()); nBRT.setHours(0,0,0,0);
+        const tUTC = new Date(nBRT.getTime() + 3*60*60*1000);
+        const wBRT = toBRTv(new Date()); const wdv = wBRT.getDay();
+        wBRT.setDate(wBRT.getDate() + (wdv===0?-6:1-wdv)); wBRT.setHours(0,0,0,0);
+        const wUTC = new Date(wBRT.getTime() + 3*60*60*1000);
+        vendasStats = {
+          cadastradosHoje:   produtos.filter(p => p.createdAt && new Date(p.createdAt) >= tUTC).length,
+          cadastradosSemana: produtos.filter(p => p.createdAt && new Date(p.createdAt) >= wUTC).length,
+          vendaLojaHoje:     produtos.filter(p => p.soldAt && new Date(p.soldAt) >= tUTC && p.vendedor === "Loja").length,
+          vendaLojaSemana:   produtos.filter(p => p.soldAt && new Date(p.soldAt) >= wUTC && p.vendedor === "Loja").length,
+          vendaOnlineHoje:   produtos.filter(p => p.soldAt && new Date(p.soldAt) >= tUTC && p.vendedor === "Online").length,
+          vendaOnlineSemana: produtos.filter(p => p.soldAt && new Date(p.soldAt) >= wUTC && p.vendedor === "Online").length,
+        };
+      } catch(e) { console.error("vendas stats:", e.message); }
+
       return res.status(200).json({
         ok: true,
         todayLabel: `${days[nowBRT.getDay()]}, ${String(nowBRT.getDate()).padStart(2,"0")} ${["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"][nowBRT.getMonth()]}`,
         weekLabel: `${weekDates[0]} – ${weekDates[5]}`,
         prevWeekLabel: `${prevWeekDates[0]} – ${prevWeekDates[5]}`,
         today: {
+          coletaSolicitada: { count: cnt("coleta_solicitada",    todayUTC), goal: 40 },
+          orcEnviado:       { count: cnt("aguardando_aprovacao", todayUTC), goal: 40 },
+          aprovadoLoja:     { count: cnt("cliente_loja",         todayUTC), goal: 15 },
+          aprovadoTotal:    { count: cnt("aprovado_entrada",     todayUTC), goal: 35 },
+          erp:              { count: cnt("erp_entrada",          todayUTC), goal: 35 },
           aprovado: { count: cnt("aprovado_entrada", todayUTC), goal: 35 },
           loja:     { count: cnt("loja_feito",       todayUTC), goal: 15 },
           delivery: { count: cnt("delivery_feito",   todayUTC), goal: 20 },
@@ -647,6 +678,11 @@ module.exports = async function handler(req, res) {
           rsRuaFeito:  cnt("rs_rua_feito",   todayUTC),
         },
         week: {
+          coletaSolicitada: { count: cnt("coleta_solicitada",    weekUTC), goal: 200 },
+          orcEnviado:       { count: cnt("aguardando_aprovacao", weekUTC), goal: 200 },
+          aprovadoLoja:     { count: cnt("cliente_loja",         weekUTC), goal: 90  },
+          aprovadoTotal:    { count: cnt("aprovado_entrada",     weekUTC), goal: 200 },
+          erp:              { count: cnt("erp_entrada",          weekUTC), goal: 200 },
           aprovado: { count: cnt("aprovado_entrada", weekUTC), goal: 210 },
           loja:     { count: cnt("loja_feito",       weekUTC), goal: 90 },
           delivery: { count: cnt("delivery_feito",   weekUTC), goal: 120 },
@@ -671,6 +707,7 @@ module.exports = async function handler(req, res) {
           delivery: cntByTecnico("delivery_feito", weekUTC),
         },
         monthHistory,
+        vendas: vendasStats,
       });
     }
 
@@ -998,6 +1035,22 @@ module.exports = async function handler(req, res) {
         }
 
         if (added > 0) await dbSet(LALA_KEY, lalaDb);
+
+        // Registra coletas solicitadas no metaLog para metas
+        if (added > 0) {
+          const board = await dbGet(BOARD_KEY) || { metaLog: [] };
+          if (!Array.isArray(board.metaLog)) board.metaLog = [];
+          const seenColeta = new Set(board.metaLog.filter(m=>m.phaseId==="coleta_solicitada").map(m=>m.pipefyId));
+          let metaChanged = false;
+          lalaDb.fichas.filter(f=>f.tipo==="coleta" && f.status==="pendente").forEach(f => {
+            if (!seenColeta.has(f.pipefyId)) {
+              board.metaLog.push({ phaseId: "coleta_solicitada", pipefyId: f.pipefyId, timestamp: f.addedAt || new Date().toISOString() });
+              metaChanged = true;
+            }
+          });
+          if (metaChanged) await dbSet(BOARD_KEY, board);
+        }
+
         return res.status(200).json({ ok: true, added, total: lalaDb.fichas.filter(f => f.status === "pendente").length });
       } catch(e) {
         return res.status(200).json({ ok: false, error: e.message });
