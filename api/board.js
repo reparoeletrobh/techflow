@@ -270,71 +270,6 @@ async function fetchMetaPhaseIds() {
   } catch(e) { return { aguardandoIds: [], erpIds: [] }; }
 }
 
-// Busca cards em fases de Coleta/Entrega Solicitada no Pipefy para fila Lalamove
-async function syncLalamoveQueue() {
-  try {
-    const phases = await fetchAllPhaseCards();
-    const LALA_KEY = "reparoeletro_lalamove";
-    const lalaDb   = (await dbGet(LALA_KEY)) || { fichas: [] };
-    if (!Array.isArray(lalaDb.fichas)) lalaDb.fichas = [];
-
-    let changed = false;
-
-    for (const ph of phases) {
-      const l = ph.name.toLowerCase();
-      const isColeta  = l.includes("coleta")  && (l.includes("solicit") || l.includes("aguard"));
-      const isEntrega = l.includes("entrega") && (l.includes("solicit") || l.includes("aguard"));
-      if (!isColeta && !isEntrega) continue;
-
-      const tipo = isColeta ? "coleta" : "entrega";
-
-      for (const { node } of (ph.cards?.edges || [])) {
-        const pipefyId = String(node.id);
-        const jaExiste = lalaDb.fichas.find(f => f.pipefyId === pipefyId && f.tipo === tipo);
-        if (jaExiste) continue;
-
-        // Busca dados do card no Pipefy
-        let osCode = null, nomeContato = null, endereco = null, telefone = null, descricao = null;
-        try {
-          const cardData = await pipefyQuery(`query {
-            card(id: "${pipefyId}") {
-              id title
-              fields { name value }
-            }
-          }`);
-          const fields = cardData?.card?.fields || [];
-          const title  = cardData?.card?.title || "";
-          const endField = fields.find(f => f.name.toLowerCase().includes("endere"));
-          const telField = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"));
-          const descField = fields.find(f => f.name.toLowerCase().includes("descri") || f.name.toLowerCase().includes("aparelho") || f.name.toLowerCase().includes("defeito"));
-          endereco   = endField?.value  || null;
-          telefone   = telField?.value  || null;
-          descricao  = descField?.value || null;
-          // Extrai código OS e nome do título (ex: "João Silva 1234")
-          const m = title.match(/^(.*?)\s+(\d+)$/);
-          nomeContato = m ? m[1].trim() : title;
-          osCode      = m ? m[2] : null;
-        } catch(e) { nomeContato = pipefyId; }
-
-        lalaDb.fichas.push({
-          pipefyId, tipo,
-          osCode, nomeContato, descricao, endereco, telefone,
-          lat: null, lng: null,
-          addedAt: new Date().toISOString(),
-          status:  "pendente",
-        });
-        changed = true;
-      }
-    }
-
-    if (changed) await dbSet(LALA_KEY, lalaDb);
-    return { changed, total: lalaDb.fichas.filter(f => f.status === "pendente").length };
-  } catch(e) {
-    console.error("syncLalamoveQueue:", e.message);
-    return { changed: false, error: e.message };
-  }
-}
-
 // Consulta a fase atual de um card no Pipefy diretamente
 async function fetchCardPhase(pipefyId) {
   try {
@@ -481,12 +416,6 @@ module.exports = async function handler(req, res) {
       } catch(e) { console.error("meta tracking:", e.message); }
 
       return res.status(200).json({ ok: true, board, newCount, erpRemoved, pipefyError });
-    }
-
-    // ── GET sync-lalamove — popula fila Lalamove via Pipefy ──────
-    if (action === "sync-lalamove") {
-      const result = await syncLalamoveQueue();
-      return res.status(200).json({ ok: true, ...result });
     }
 
     // ── POST reset ─────────────────────────────────────────────
