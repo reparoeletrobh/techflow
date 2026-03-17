@@ -118,9 +118,11 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 `      </vServPrest>\n` +
 `      <trib>\n` +
 `        <tribMun>\n` +
-`          <tribISSQN>1</tribISSQN>\n` +
-`          <cLocIncid>${COD_MUN_BH}</cLocIncid>\n` +
-`          <pAliq>2.00</pAliq>\n` +
+`          <BM>\n` +
+`            <tribISSQN>1</tribISSQN>\n` +
+`            <cLocIncid>${COD_MUN_BH}</cLocIncid>\n` +
+`            <pAliq>2.00</pAliq>\n` +
+`          </BM>\n` +
 `        </tribMun>\n` +
 `        <totTrib>\n` +
 `          <pTotTribSN>6.00</pTotTribSN>\n` +
