@@ -425,7 +425,11 @@ function buildActions(r) {
     h += `<button class="btn-primary" style="background:var(--accent);color:#000;" onclick="openNfModal('${r.id}')">📋 Informar CPF / CNPJ</button>`;
   if (r.phaseId==='nf_emitida') {
     if (r.chaveAcesso)
-      h += `<button class="btn-primary" style="background:#3b9eff;color:#fff;" onclick="baixarDanfe('${r.chaveAcesso}')">📄 Baixar DANFE</button>`;
+      const nomeClean = (r.nomeContato||'Cliente').replace(/[^a-zA-Z0-9\u00C0-\u017F ]/g,'').trim();
+      const telClean  = (r.telefone||'').replace(/\D/g,'');
+      const telSuffix = telClean.slice(-4) || '0000';
+      const danfeName = encodeURIComponent('Nota Fiscal ' + nomeClean + ' ' + telSuffix);
+      h += `<button class="btn-primary" style="background:#3b9eff;color:#fff;" onclick="baixarDanfe('${r.chaveAcesso}','${danfeName}')">📄 Baixar DANFE</button>`;
     h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="nfEnviada('${r.id}')">✅ NF Enviada → Faturamento</button>`;
   }
   if (r.phaseId==='faturamento')
@@ -569,15 +573,16 @@ async function emitirNF(id) {
   else showToast('❌','Erro',res.error);
 }
 
-async function baixarDanfe(chave) {
+async function baixarDanfe(chave, nomeArquivo) {
   try {
     const url = `/api/nfse?action=danfe&chave=${encodeURIComponent(chave)}`;
     const r = await fetch(url);
     if (!r.ok) { showToast('❌','Erro ao baixar DANFE', 'Status: '+r.status); return; }
     const blob = await r.blob();
+    const filename = nomeArquivo ? decodeURIComponent(nomeArquivo) + '.pdf' : `danfe-${chave.slice(-10)}.pdf`;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `danfe-${chave.slice(-10)}.pdf`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
