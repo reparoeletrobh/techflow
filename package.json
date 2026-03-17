@@ -1,0 +1,7 @@
+{
+  "name": "reparoeletro",
+  "version": "1.0.0",
+  "dependencies": {
+    "xml-crypto": "^3.2.0"
+  }
+}
