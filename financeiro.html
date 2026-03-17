@@ -574,10 +574,28 @@ async function emitirNF(id) {
   else showToast('❌','Erro',res.error);
 }
 
-function baixarDanfe(chave, nomeArquivo) {
-  // Abre direto no portal — browser faz download com a sessão ativa
-  const url = 'https://www.nfse.gov.br/EmissorNacional/Notas/Download/DANFSe/' + chave;
-  window.open(url, '_blank');
+async function baixarDanfe(chave, nomeArquivo) {
+  try {
+    const nome = nomeArquivo ? decodeURIComponent(nomeArquivo) : ('danfe-' + chave.slice(-10));
+    const url  = '/api/nfse?action=danfe&chave=' + encodeURIComponent(chave) + '&nome=' + encodeURIComponent(nome);
+    showToast('⏳','Preparando DANFE...','Aguarde');
+    const r = await fetch(url);
+    if (!r.ok) {
+      const err = await r.json().catch(()=>({error:'Erro '+r.status}));
+      showToast('❌','Erro DANFE', err.error || 'Erro '+r.status);
+      return;
+    }
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = nome + '.pdf';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+  } catch(e) {
+    showToast('❌','Erro DANFE', e.message);
+  }
 }
 
 async function nfEnviada(id) {
