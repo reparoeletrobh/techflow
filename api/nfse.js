@@ -1065,29 +1065,8 @@ module.exports = async function handler(req, res) {
       const parsed = parseResp(body);
 
       if (parsed.ok) {
-        // Gera e salva DANFE HTML diretamente com os dados da emissão
-        try {
-          const dadosNF = {
-            nNFSe:        "",   // preenchido pelo governo — não temos ainda
-            dhEmi:        agora(),
-            dCompet:      hoje(),
-            xDescServ:    discriminacao || "",
-            vServ:        parseFloat(valor).toFixed(2),
-            cpfTomador:   (tomadorCpfCnpj || "").replace(/\D/g,""),
-            xNomeTomador: tomadorNome || "Consumidor Final",
-          };
-          const danfeHtml = gerarDanfeHtml(dadosNF, parsed.chaveAcesso);
-          fetch(UPSTASH_URL + "/pipeline", {
-            method: "POST",
-            headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
-            body: JSON.stringify([
-              ["SET",    "danfe:" + parsed.chaveAcesso, Buffer.from(danfeHtml).toString("base64")],
-              ["EXPIRE", "danfe:" + parsed.chaveAcesso, 31536000],
-            ]),
-          }).catch(()=>{});
-        } catch(e) { console.error("DANFE save error:", e.message); }
-        // Após salvar DANFE com dados do form, tenta sobrescrever com dados reais do XML
-        setTimeout(() => buscarESalvarDanfe(parsed.chaveAcesso, certOpts).catch(()=>{}), 3000);
+        // Busca XML real do governo e salva DANFE com dados corretos (síncrono)
+        await buscarESalvarDanfe(parsed.chaveAcesso, certOpts).catch(e => console.error("DANFE:", e.message));
         return res.status(200).json({ ok: true, chaveAcesso: parsed.chaveAcesso, idDps: parsed.idDps, alertas: parsed.alertas });
       } else {
         return res.status(200).json({ ok: false, error: parsed.erro, httpStatus: status, idDPS: numDPS, idLen: numDPS.length });
