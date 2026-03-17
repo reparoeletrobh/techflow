@@ -572,31 +572,11 @@ async function emitirNF(id) {
   else showToast('❌','Erro',res.error);
 }
 
-async function baixarDanfe(btnOrChave, nomeArquivo) {
-  try {
-    // Aceita elemento button (com data-chave/data-nome) ou string chave
-    const btn  = (btnOrChave instanceof HTMLElement) ? btnOrChave : null;
-    const chave = btn ? btn.dataset.chave : btnOrChave;
-    const nome  = btn ? btn.dataset.nome : (nomeArquivo || 'danfe-' + chave.slice(-10));
-    const url  = '/api/nfse?action=danfe&chave=' + encodeURIComponent(chave) + '&nome=' + encodeURIComponent(nome);
-    showToast('⏳','Preparando DANFE...','Aguarde');
-    const r = await fetch(url);
-    if (!r.ok) {
-      const err = await r.json().catch(()=>({error:'Erro '+r.status}));
-      showToast('❌','Erro DANFE', err.error || 'Erro '+r.status);
-      return;
-    }
-    const blob = await r.blob();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = nome + '.pdf';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(a.href);
-  } catch(e) {
-    showToast('❌','Erro DANFE', e.message);
-  }
+function baixarDanfe(btn) {
+  const chave = btn.dataset.chave;
+  const nome  = btn.dataset.nome || 'danfe';
+  const url = '/api/nfse?action=danfe&chave=' + encodeURIComponent(chave) + '&nome=' + encodeURIComponent(nome);
+  window.open(url, '_blank');
 }
 
 async function nfEnviada(id) {
