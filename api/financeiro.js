@@ -9,7 +9,7 @@ const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g, "").tri
 // Fases do sistema financeiro
 const FIN_PHASES = [
   { id: "aguardando_dados",    name: "Aguardando Dados"    },
-  { id: "emitir_nf",          name: "Emitir Nota Fiscal"  },
+  { id: "nf_emitida",          name: "NF Emitida"          },
   { id: "faturamento",        name: "Faturamento"         },
   { id: "pagamento_agendado", name: "Pagamento Agendado"  },
   { id: "entrega_agendada",   name: "Entrega Agendada"    },
@@ -324,9 +324,9 @@ module.exports = async function handler(req, res) {
     const rec = fin.records.find(r => r.id === id);
     if (!rec) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
     rec.cpfCnpj = cpfCnpj.trim();
-    rec.phaseId = "emitir_nf";
+    rec.phaseId = "nf_emitida";
     rec.movedAt = new Date().toISOString();
-    rec.history = [...(rec.history || []), { phaseId: "emitir_nf", ts: rec.movedAt }];
+    rec.history = [...(rec.history || []), { phaseId: "nf_emitida", ts: rec.movedAt }];
     await dbSet(FIN_KEY, fin);
     return res.status(200).json({ ok: true, record: rec });
   }
@@ -345,16 +345,31 @@ module.exports = async function handler(req, res) {
   // ── POST emitir-nf ─────────────────────────────────────────
   // Marca NF como emitida e move para Faturamento
   if (req.method === "POST" && action === "emitir-nf") {
+    const { id, chaveAcesso, numeroNF } = req.body || {};
+    if (!id) return res.status(400).json({ ok: false, error: "id obrigatório" });
+    const fin = await dbGet(FIN_KEY) || defaultFin();
+    const rec = fin.records.find(r => r.id === id);
+    if (!rec) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
+    rec.nfEmitidaAt  = new Date().toISOString();
+    rec.chaveAcesso  = chaveAcesso || rec.chaveAcesso || "";
+    rec.numeroNF     = numeroNF   || rec.numeroNF    || "";
+    rec.phaseId      = "nf_emitida";
+    rec.movedAt      = rec.nfEmitidaAt;
+    rec.history      = [...(rec.history || []), { phaseId: "nf_emitida", ts: rec.movedAt }];
+    await dbSet(FIN_KEY, fin);
+    return res.status(200).json({ ok: true, record: rec });
+  }
+
+  // ── POST nf-enviada — move NF Emitida → Faturamento
+  if (req.method === "POST" && action === "nf-enviada") {
     const { id } = req.body || {};
     if (!id) return res.status(400).json({ ok: false, error: "id obrigatório" });
     const fin = await dbGet(FIN_KEY) || defaultFin();
     const rec = fin.records.find(r => r.id === id);
     if (!rec) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
-    if (rec.phaseId !== "emitir_nf") return res.status(400).json({ ok: false, error: "Ficha não está em Emitir NF" });
-    rec.nfEmitidaAt = new Date().toISOString();
-    rec.phaseId     = "faturamento";
-    rec.movedAt     = rec.nfEmitidaAt;
-    rec.history     = [...(rec.history || []), { phaseId: "faturamento", ts: rec.movedAt }];
+    rec.movedAt = new Date().toISOString();
+    rec.phaseId = "faturamento";
+    rec.history = [...(rec.history || []), { phaseId: "faturamento", ts: rec.movedAt }];
     await dbSet(FIN_KEY, fin);
     return res.status(200).json({ ok: true, record: rec });
   }
@@ -367,6 +382,7 @@ module.exports = async function handler(req, res) {
 
     // Valida transições permitidas
     const allowed = {
+      nf_emitida:      ["faturamento"],
       faturamento:      ["pagamento_agendado", "entrega_agendada", "entrega_liberada"],
       pagamento_agendado: ["entrega_agendada", "entrega_liberada"],
       entrega_agendada: ["entrega_liberada"],
@@ -438,9 +454,9 @@ module.exports = async function handler(req, res) {
     if (nfId) {
       const rec = (fin.records || []).find(r => r.id === nfId || r.pipefyId === nfId);
       if (rec && rec.phaseId === "aguardando_dados") {
-        rec.phaseId = "emitir_nf";
+        rec.phaseId = "nf_emitida";
         rec.movedAt = new Date().toISOString();
-        rec.history = [...(rec.history || []), { phaseId: "emitir_nf", ts: rec.movedAt }];
+        rec.history = [...(rec.history || []), { phaseId: "nf_emitida", ts: rec.movedAt }];
       }
     }
     await dbSet(FIN_KEY, fin);
