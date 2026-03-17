@@ -424,15 +424,16 @@ function buildActions(r) {
   if (r.phaseId==='aguardando_dados')
     h += `<button class="btn-primary" style="background:var(--accent);color:#000;" onclick="openNfModal('${r.id}')">📋 Informar CPF / CNPJ</button>`;
   if (r.phaseId==='nf_emitida') {
-    if (r.chaveAcesso)
-      const nomeClean = (r.nomeContato||'Cliente').replace(/[^a-zA-Z0-9\u00C0-\u017F ]/g,'').trim();
+    if (r.chaveAcesso) {
+      const nomeClean = (r.nomeContato||'Cliente').replace(/[^a-zA-Z0-9À-ſ ]/g,'').trim();
       const telClean  = (r.telefone||'').replace(/\D/g,'');
       const telSuffix = telClean.slice(-4) || '0000';
       const danfeName = encodeURIComponent('Nota Fiscal ' + nomeClean + ' ' + telSuffix);
-      h += `<button class="btn-primary" style="background:#3b9eff;color:#fff;" onclick="baixarDanfe('${r.chaveAcesso}','${danfeName}')">📄 Baixar DANFE</button>`;
-    h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="nfEnviada('${r.id}')">✅ NF Enviada → Faturamento</button>`;
+      h += '<button class="btn-primary" style="background:#3b9eff;color:#fff;" onclick="baixarDanfe(\'' + r.chaveAcesso + '\',\'' + danfeName + '\')">📄 Baixar DANFE</button>';
+    }
+    h += '<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="nfEnviada(\'' + r.id + '\')">✅ NF Enviada → Faturamento</button>';
   }
-  if (r.phaseId==='faturamento')
+    if (r.phaseId==='faturamento')
     h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="openMoverModal('${r.id}')">💰 Registrar Pagamento</button>`;
   if (r.phaseId==='pagamento_agendado') {
     h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="openMoverPagAgendado('${r.id}')">💰 Recebido — Mover</button>`;
