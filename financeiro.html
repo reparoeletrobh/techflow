@@ -520,6 +520,8 @@ async function nfEmitir() {
     if (nfData.ok) {
       // Salva número e chave de acesso na ficha
       await api('emitir-nf', { id: nfSelId, chaveAcesso: nfData.chaveAcesso || '', numeroNF: nfData.nNFSe || nfData.numero || '' });
+      // Aproveita sessão ativa do browser para baixar DANFE do portal e salvar no servidor
+      salvarDanfeDoPortal(nfData.chaveAcesso).catch(()=>{});
       await load();
       nfModalClose();
       showToast('✅', 'NF emitida!', 'Chave: ' + (nfData.chaveAcesso || '').slice(0,20) + '...');
@@ -570,6 +572,33 @@ async function emitirNF(id) {
   const res = await api('emitir-nf',{id});
   if (res.ok) { updateRecord(res.record); showToast('🧾','NF Emitida!','Card movido para NF Emitida'); }
   else showToast('❌','Erro',res.error);
+}
+
+async function salvarDanfeDoPortal(chave) {
+  try {
+    // Browser já está logado — baixa DANFE com cookies da sessão
+    const url = 'https://www.nfse.gov.br/EmissorNacional/Notas/Download/DANFSe/' + chave;
+    const r = await fetch(url, { credentials: 'include' });
+    if (!r.ok || r.url.includes('Login')) {
+      console.log('DANFE: sessão expirada, usando fallback HTML');
+      return;
+    }
+    const blob = await r.blob();
+    // Converte para base64 e envia para o servidor salvar no Redis
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const b64 = reader.result.split(',')[1];
+      await fetch('/api/nfse?action=danfe-store', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chave, pdfBase64: b64 }),
+      });
+      console.log('DANFE PDF salvo no Redis:', chave.slice(-10));
+    };
+    reader.readAsDataURL(blob);
+  } catch(e) {
+    console.log('DANFE salvar erro:', e.message);
+  }
 }
 
 function baixarDanfe(btn) {
