@@ -216,15 +216,23 @@ function extrairDadosXml(xml) {
     const m = xml.match(new RegExp("<" + tag + "[^>]*>([\\s\\S]*?)<\\/" + tag + ">"));
     return m ? m[1].trim() : "";
   };
+  const getIn = (parent, tag) => {
+    const pMatch = xml.match(new RegExp("<" + parent + "[^>]*>([\\s\\S]*?)<\\/" + parent + ">"));
+    if (!pMatch) return "";
+    const m = pMatch[1].match(new RegExp("<" + tag + "[^>]*>([\\s\\S]*?)<\\/" + tag + ">"));
+    return m ? m[1].trim() : "";
+  };
   return {
     nNFSe:        get("nNFSe"),
     dhProc:       get("dhProc"),
     dCompet:      get("dCompet"),
     dhEmi:        get("dhEmi"),
     xDescServ:    get("xDescServ"),
-    vServ:        get("vServ"),
-    cpfTomador:   get("CPF") || get("CNPJ"),
-    xNomeTomador: get("xNome"),
+    // vServ dentro de vServPrest
+    vServ:        getIn("vServPrest", "vServ") || get("vServ"),
+    // Tomador: CPF/CNPJ e xNome dentro de <toma>
+    cpfTomador:   getIn("toma", "CPF") || getIn("toma", "CNPJ"),
+    xNomeTomador: getIn("toma", "xNome"),
   };
 }
 
@@ -1078,6 +1086,8 @@ module.exports = async function handler(req, res) {
             ]),
           }).catch(()=>{});
         } catch(e) { console.error("DANFE save error:", e.message); }
+        // Após salvar DANFE com dados do form, tenta sobrescrever com dados reais do XML
+        setTimeout(() => buscarESalvarDanfe(parsed.chaveAcesso, certOpts).catch(()=>{}), 3000);
         return res.status(200).json({ ok: true, chaveAcesso: parsed.chaveAcesso, idDps: parsed.idDps, alertas: parsed.alertas });
       } else {
         return res.status(200).json({ ok: false, error: parsed.erro, httpStatus: status, idDPS: numDPS, idLen: numDPS.length });
