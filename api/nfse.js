@@ -244,135 +244,50 @@ function gerarDanfeHtml(dados, chave) {
   const docFmt= doc.length===11 ? doc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4")
                                  : doc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,"$1.$2.$3/$4-$5");
   const S = (s) => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  const nomeCliente = S(dados.xNomeTomador || "Consumidor Final");
-  const nNFSe  = S(dados.nNFSe || "\u2014");
-  const vServ  = fmtV(dados.vServ);
-  const dhEmi  = fmtDT(dados.dhEmi||dados.dhProc);
-  const dComp  = fmtD(dados.dCompet);
-  const desc   = S(dados.xDescServ||"");
-
-  return `<!DOCTYPE html>
-<html lang='pt-BR'>
-<head>
-<meta charset='UTF-8'>
-<title>NFS-e ${nNFSe} \u2014 ${nomeCliente}</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:Arial,Helvetica,sans-serif;font-size:11px;background:#fff;color:#333;padding:20px;max-width:820px;margin:0 auto}
-/* HEADER */
-.hdr{display:flex;align-items:stretch;border:2px solid #1a7a3c;margin-bottom:8px;border-radius:4px;overflow:hidden}
-.hdr-logo{background:#1a7a3c;color:#fff;padding:12px 16px;display:flex;flex-direction:column;justify-content:center;min-width:200px}
-.hdr-logo h1{font-size:11px;font-weight:bold;text-transform:uppercase;line-height:1.4}
-.hdr-logo p{font-size:8px;margin-top:3px;opacity:.9;line-height:1.5}
-.hdr-middle{flex:1;background:#fff;padding:10px 16px;display:flex;flex-direction:column;justify-content:center;border-left:1px solid #ccc;border-right:1px solid #ccc}
-.hdr-middle .title{font-size:13px;font-weight:bold;color:#1a7a3c;text-transform:uppercase}
-.hdr-middle .sub{font-size:8px;color:#666;margin-top:3px}
-.hdr-nf{background:#1a4fa0;color:#fff;padding:10px 16px;text-align:center;min-width:120px;display:flex;flex-direction:column;justify-content:center;align-items:center}
-.hdr-nf .label{font-size:8px;text-transform:uppercase;opacity:.8}
-.hdr-nf .num{font-size:28px;font-weight:bold;line-height:1}
-.hdr-nf .nfse-tag{font-size:9px;margin-top:4px;background:rgba(255,255,255,.2);padding:2px 6px;border-radius:10px}
-/* SECTION */
-.sec{margin-bottom:6px;border:1px solid #ddd;border-radius:3px;overflow:hidden}
-.sec-t{background:#1a7a3c;color:#fff;font-size:8.5px;font-weight:bold;text-transform:uppercase;padding:4px 10px;letter-spacing:.5px}
-.row{display:flex;flex-wrap:wrap;background:#f9f9f9}
-.f{padding:5px 10px;flex:1;min-width:100px;border-right:1px solid #eee;border-bottom:1px solid #eee}
-.f:last-child{border-right:none}
-.f label{display:block;font-size:7.5px;color:#888;text-transform:uppercase;margin-bottom:1px}
-.f span{font-size:10.5px;font-weight:bold;color:#222}
-.f.w2{flex:2}.f.w3{flex:3}
-.desc-box{background:#f9f9f9;padding:8px 10px;border-top:1px solid #eee;font-size:10px;line-height:1.6;white-space:pre-wrap}
-/* VALOR */
-.valor-box{display:flex;align-items:center;background:#f9f9f9}
-.valor-left{flex:1;padding:8px 10px}
-.valor-right{background:#e8f5ee;border-left:2px solid #1a7a3c;padding:10px 20px;text-align:center;min-width:180px}
-.valor-right .vlabel{font-size:8px;color:#555;text-transform:uppercase}
-.valor-right .vmoney{font-size:22px;font-weight:bold;color:#1a7a3c}
-/* GARANTIA */
-.garantia{background:#fff8e8;border:1px solid #e0a000;border-radius:3px;padding:10px 12px;margin-bottom:6px;font-size:9px;line-height:1.6;color:#5a3e00}
-.garantia strong{color:#7a5000}
-/* CHAVE */
-.chave-box{background:#f5f5f5;border:1px solid #ddd;border-radius:3px;padding:6px 10px;font-family:Courier,monospace;font-size:8px;word-break:break-all;color:#444;text-align:center;margin-bottom:6px}
-/* FOOTER */
-.footer{background:#1a7a3c;color:#fff;text-align:center;padding:5px;font-size:7.5px;border-radius:3px}
-.pbtn{display:block;margin:14px auto 0;padding:10px 36px;font-size:13px;background:#1a4fa0;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:bold}
-@media print{.pbtn{display:none}body{padding:0}}
-</style>
-</head>
-<body>
-
-<div class='hdr'>
-  <div class='hdr-logo'>
-    <h1>Reparo Eletro</h1>
-    <h1>Conserto de Eletrodom\xe9sticos</h1>
-    <p>CNPJ: 59.485.378/0001-75</p>
-    <p>IM: 16391680010</p>
-    <p>Rua Ouro Preto, 663 \u2014 Barro Preto</p>
-    <p>Belo Horizonte/MG \u2014 (31) 9785-6023</p>
-  </div>
-  <div class='hdr-middle'>
-    <div class='title'>Nota Fiscal de Servi\xe7o Eletr\xf4nica</div>
-    <div class='sub'>Emiss\xe3o: ${dhEmi}</div>
-    <div class='sub'>Compet\xeancia: ${dComp}</div>
-  </div>
-  <div class='hdr-nf'>
-    <div class='label'>NFS-e N\xba</div>
-    <div class='num'>${nNFSe}</div>
-    <div class='nfse-tag'>NFS-e Nacional</div>
-  </div>
-</div>
-
-<div class='sec'>
-  <div class='sec-t'>Tomador do Servi\xe7o</div>
-  <div class='row'>
-    <div class='f w3'><label>Nome / Raz\xe3o Social</label><span>${nomeCliente}</span></div>
-    <div class='f'><label>CPF / CNPJ</label><span>${docFmt||"\u2014"}</span></div>
-  </div>
-</div>
-
-<div class='sec'>
-  <div class='sec-t'>Dados do Servi\xe7o</div>
-  <div class='row'>
-    <div class='f'><label>Compet\xeancia</label><span>${dComp}</span></div>
-    <div class='f w2'><label>C\xf3digo do Servi\xe7o (LC 116/2003)</label><span>14.02 \u2014 Manuten\xe7\xe3o e repara\xe7\xe3o de eletrodom\xe9sticos</span></div>
-    <div class='f'><label>Munic\xedpio de Incid\xeancia</label><span>Belo Horizonte / MG</span></div>
-  </div>
-  <div class='desc-box'><strong>Discrimina\xe7\xe3o:</strong><br>${desc}</div>
-</div>
-
-<div class='sec'>
-  <div class='sec-t'>Valores</div>
-  <div class='valor-box'>
-    <div class='valor-left'>
-      <div class='row' style='background:transparent'>
-        <div class='f'><label>Tributa\xe7\xe3o ISSQN</label><span>Simples Nacional \u2014 Tribut\xe1vel</span></div>
-        <div class='f'><label>Al\xedquota ISS</label><span>2,00%</span></div>
-        <div class='f'><label>Regime Tribut\xe1rio</label><span>Simples Nacional</span></div>
-      </div>
-    </div>
-    <div class='valor-right'>
-      <div class='vlabel'>Valor Total do Servi\xe7o</div>
-      <div class='vmoney'>R$ ${vServ}</div>
-    </div>
-  </div>
-</div>
-
-<div class='garantia'>
-  <strong>Termo de Garantia \u2014 CDC Art. 26 e 27 (Lei 8.078/90)</strong><br>
-  O servi\xe7o prestado possui garantia contratual de <strong>90 (noventa) dias</strong> a partir da data de emiss\xe3o desta nota fiscal,
-  conforme disposto no Art. 26, II do C\xf3digo de Defesa do Consumidor. Aplica-se tamb\xe9m a garantia legal de 90 dias para servi\xe7os dur\xe1veis (Art. 26, I do CDC).<br>
-  A garantia cobre exclusivamente o defeito objeto do reparo realizado, n\xe3o abrangendo novos defeitos decorrentes de mau uso, quedas,
-  infiltra\xe7\xe3o de l\xedquidos, tens\xe3o el\xe9trica inadequada ou interven\xe7\xe3o de terceiros.
-  Para acionar a garantia, apresente esta nota fiscal e entre em contato: <strong>(31) 9785-6023</strong>.
-</div>
-
-<div class='chave-box'>
-  <strong>Chave de Acesso:</strong> ${chave}
-</div>
-
-<div class='footer'>
-  Documento emitido eletronicamente conforme LC 116/2003 \u2014 NFS-e Padr\xe3o Nacional &nbsp;|&nbsp; Consulte: <strong>nfse.gov.br/ConsultaNacional</strong>
-</div>
-
-<button class='pbtn' onclick='window.print()'>Imprimir / Salvar como PDF</button>
-</body></html>`;
+  return "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'>" +
+    "<title>NFS-e " + S(dados.nNFSe) + "</title>" +
+    "<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:11px;padding:16px;max-width:800px;margin:0 auto}" +
+    ".hdr{border:2px solid #000;padding:10px;margin-bottom:6px;overflow:hidden}" +
+    ".nfnum{float:right;text-align:right}.nfnum .n{font-size:24px;font-weight:bold}.nfnum .l{font-size:9px;text-transform:uppercase;color:#666}" +
+    ".sec{border:1px solid #999;margin-bottom:5px}.sec-t{background:#ddd;font-weight:bold;padding:3px 8px;font-size:9px;text-transform:uppercase;border-bottom:1px solid #999}" +
+    ".row{display:flex;flex-wrap:wrap}.f{padding:4px 8px;border-right:1px solid #ddd;border-bottom:1px solid #ddd;flex:1;min-width:100px}" +
+    ".f:last-child{border-right:none}.f label{display:block;font-size:8px;color:#666;text-transform:uppercase}.f span{font-size:11px;font-weight:600}" +
+    ".f.w2{flex:2}.f.w3{flex:3}.desc{padding:6px 8px;white-space:pre-wrap;line-height:1.5}" +
+    ".chave{font-size:8px;word-break:break-all;padding:5px 8px;background:#f9f9f9;border-top:1px solid #ddd}" +
+    ".vv{font-size:16px;font-weight:bold;color:#1a6e1a}" +
+    ".footer{text-align:center;font-size:9px;color:#666;margin-top:10px;padding-top:8px;border-top:1px dashed #ccc}" +
+    ".pbtn{display:block;margin:16px auto;padding:10px 32px;font-size:14px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:bold}" +
+    "@media print{.pbtn{display:none}body{padding:0}}</style></head><body>" +
+    "<div class='hdr'>" +
+      "<div class='nfnum'><div class='l'>NFS-e N\xba</div><div class='n'>" + S(dados.nNFSe||"\u2014") + "</div>" +
+        "<div class='l' style='margin-top:4px'>Emiss\xe3o</div><div style='font-size:10px;font-weight:600'>" + fmtDT(dados.dhEmi||dados.dhProc) + "</div></div>" +
+      "<h1 style='font-size:13px;font-weight:bold;text-transform:uppercase'>Nota Fiscal de Servi\xe7o Eletr\xf4nica \u2014 NFS-e</h1>" +
+      "<h2 style='font-size:11px;margin-top:2px'>REPARO ELETRO - CONSERTO DE ELETRODOMESTICOS LTDA</h2>" +
+      "<p style='font-size:9px;color:#444;margin-top:2px'>CNPJ: 59.485.378/0001-75 &nbsp;|&nbsp; IM: 16391680010 &nbsp;|&nbsp; Belo Horizonte - MG</p>" +
+      "<p style='font-size:9px;color:#444'>Rua Ouro Preto, 663 \u2014 Barro Preto \u2014 CEP 30170-044 &nbsp;|&nbsp; (31) 9785-6023</p>" +
+    "</div>" +
+    "<div class='sec'><div class='sec-t'>Tomador do Servi\xe7o</div><div class='row'>" +
+      "<div class='f w3'><label>Nome / Raz\xe3o Social</label><span>" + S(dados.xNomeTomador||"Consumidor Final") + "</span></div>" +
+      "<div class='f'><label>CPF / CNPJ</label><span>" + S(docFmt||"\u2014") + "</span></div>" +
+    "</div></div>" +
+    "<div class='sec'><div class='sec-t'>Dados do Servi\xe7o</div>" +
+      "<div class='row'>" +
+        "<div class='f'><label>Compet\xeancia</label><span>" + fmtD(dados.dCompet) + "</span></div>" +
+        "<div class='f w2'><label>C\xf3digo do Servi\xe7o</label><span>14.02 \u2014 Manuten\xe7\xe3o de eletrodom\xe9sticos</span></div>" +
+        "<div class='f'><label>Munic\xedpio</label><span>Belo Horizonte / MG</span></div>" +
+      "</div>" +
+      "<div class='desc'><strong>Discrimina\xe7\xe3o:</strong><br>" + S(dados.xDescServ||"") + "</div>" +
+    "</div>" +
+    "<div class='sec'><div class='sec-t'>Valores</div><div class='row'>" +
+      "<div class='f'><label>Valor do Servi\xe7o</label><span class='vv'>R$ " + fmtV(dados.vServ) + "</span></div>" +
+      "<div class='f'><label>Tributa\xe7\xe3o ISSQN</label><span>Simples Nacional \u2014 Tribut\xe1vel</span></div>" +
+      "<div class='f'><label>Valor L\xedquido</label><span class='vv'>R$ " + fmtV(dados.vServ) + "</span></div>" +
+    "</div></div>" +
+    "<div class='sec'><div class='sec-t'>Chave de Acesso</div><div class='chave'>" + chave + "</div></div>" +
+    "<div class='footer'>" +
+      "<p>Documento emitido eletronicamente conforme LC 116/2003 \u2014 NFS-e Padr\xe3o Nacional</p>" +
+      "<p style='margin-top:3px'>Consulte: <strong>https://www.nfse.gov.br/ConsultaNacional</strong></p>" +
+    "</div>" +
+    "<button class='pbtn' onclick='window.print()'>Imprimir / Salvar como PDF</button>" +
+    "</body></html>";
 }
