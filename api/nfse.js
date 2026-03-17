@@ -136,36 +136,33 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 }
 
 
-// Assina DPS com XMLDSig: node-forge extrai chave, xml-crypto faz C14N correto
-function assinarXML(xml, pfxBuf, passphrase) {
+// Assina DPS com XMLDSig: node-forge extrai chave, xml-crypto v3 async
+async function assinarXML(xml, pfxBuf, passphrase) {
   try {
-    // 1. Extrai chave privada do PFX via node-forge
+    // 1. Extrai chave privada e cert do PFX via node-forge
     const p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(pfxBuf));
     const p12     = forge.pkcs12.pkcs12FromAsn1(p12Asn1, passphrase);
 
-    let privateKeyPem = "";
     const shrouded = (p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag] || []);
     const plain    = (p12.getBags({ bagType: forge.pki.oids.keyBag })[forge.pki.oids.keyBag] || []);
     const keyBag   = [...shrouded, ...plain][0];
     if (!keyBag) throw new Error("Chave privada não encontrada no PFX");
-    privateKeyPem  = forge.pki.privateKeyToPem(keyBag.key);
+    const privateKeyPem = forge.pki.privateKeyToPem(keyBag.key);
 
-    let certBase64 = "";
-    const certBags = (p12.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag] || []);
-    if (certBags[0]) {
-      certBase64 = forge.pki.certificateToPem(certBags[0].cert)
-        .replace(/-----BEGIN CERTIFICATE-----/, "")
-        .replace(/-----END CERTIFICATE-----/, "")
-        .replace(/\s/g, "");
-    }
+    const certBags  = (p12.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag] || []);
+    const certBase64 = certBags[0]
+      ? forge.pki.certificateToPem(certBags[0].cert)
+          .replace(/-----BEGIN CERTIFICATE-----/, "")
+          .replace(/-----END CERTIFICATE-----/, "")
+          .replace(/\s/g, "")
+      : "";
 
     // 2. Id do infDPS
     const idMatch = xml.match(/infDPS Id="([^"]+)"/);
     if (!idMatch) throw new Error("Id do infDPS não encontrado");
     const refId = idMatch[1];
 
-    // 3. Usa xml-crypto para assinar com C14N correto
-    if (!xmlCrypto || !xmlCrypto.SignedXml) throw new Error("xml-crypto não carregado: " + typeof xmlCrypto);
+    // 3. xml-crypto v3 — computeSignature é assíncrono
     const { SignedXml } = xmlCrypto;
     const sig = new SignedXml({
       privateKey: privateKeyPem,
@@ -182,13 +179,18 @@ function assinarXML(xml, pfxBuf, passphrase) {
       digestAlgorithm: "http://www.w3.org/2001/04/xmlenc#sha256",
     });
 
-    sig.computeSignature(xml, {
+    // v3: computeSignature é Promise
+    await sig.computeSignature(xml, {
       location: { reference: `//*[@Id="${refId}"]`, action: "after" },
     });
 
     let signed = sig.getSignedXml();
 
-    // 4. Injeta X509Certificate no KeyInfo se disponível
+    if (!signed || !signed.includes("<Signature")) {
+      throw new Error("xml-crypto não gerou assinatura");
+    }
+
+    // Injeta X509Certificate se disponível e não incluído
     if (certBase64 && !signed.includes("X509Certificate")) {
       signed = signed.replace(
         "</Signature>",
@@ -196,11 +198,10 @@ function assinarXML(xml, pfxBuf, passphrase) {
       );
     }
 
-    console.log("Signature present:", signed.includes("<Signature"));
     return signed;
 
   } catch(e) {
-    console.error("assinarXML erro:", e.message, e.stack ? e.stack.slice(0,300) : "");
+    console.error("assinarXML erro:", e.message);
     return xml;
   }
 }
@@ -347,7 +348,7 @@ module.exports = async function handler(req, res) {
     try {
       const certOpts = loadCert();
       const _txml = `<DPS xmlns="http://www.sped.fazenda.gov.br/nfse"><infDPS Id="DPS123"><test>x</test></infDPS></DPS>`;
-      const signed = assinarXML(_txml, certOpts.pfx, certOpts.passphrase);
+      const signed = await assinarXML(_txml, certOpts.pfx, certOpts.passphrase);
       return res.status(200).json({ ok: true, hasSig: signed.includes("<Signature"), preview: signed.slice(0,500) });
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message, stack: e.stack ? e.stack.slice(0,400) : "" });
@@ -384,7 +385,7 @@ module.exports = async function handler(req, res) {
       const numDPS = genId(seq);
       console.log("ID gerado:", numDPS, "len:", numDPS.length);
       const xml    = montarDPS({ cpfcnpj: tomadorCpfCnpj, nome: tomadorNome, discriminacao, valor, numDPS });
-      const xmlAss = assinarXML(xml, certOpts.pfx, certOpts.passphrase);
+      const xmlAss = await assinarXML(xml, certOpts.pfx, certOpts.passphrase);
       const b64gz  = await gzipBase64(xmlAss);
       const { status, body } = await chamarAPI(b64gz, certOpts);
       const parsed = parseResp(body);
