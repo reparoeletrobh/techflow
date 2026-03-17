@@ -424,11 +424,8 @@ function buildActions(r) {
   if (r.phaseId==='aguardando_dados')
     h += `<button class="btn-primary" style="background:var(--accent);color:#000;" onclick="openNfModal('${r.id}')">📋 Informar CPF / CNPJ</button>`;
   if (r.phaseId==='nf_emitida') {
-    const danfeUrl = r.chaveAcesso
-      ? `https://www.nfse.gov.br/EmissorNacional/Notas/Download/DANFSe/${r.chaveAcesso}`
-      : null;
-    if (danfeUrl)
-      h += `<a href="${danfeUrl}" target="_blank" class="btn-primary" style="background:#3b9eff;color:#fff;text-decoration:none;display:inline-block;">📄 Baixar DANFE</a>`;
+    if (r.chaveAcesso)
+      h += `<button class="btn-primary" style="background:#3b9eff;color:#fff;" onclick="baixarDanfe('${r.chaveAcesso}')">📄 Baixar DANFE</button>`;
     h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="nfEnviada('${r.id}')">✅ NF Enviada → Faturamento</button>`;
   }
   if (r.phaseId==='faturamento')
@@ -458,7 +455,12 @@ function openNfModal(id) {
   document.getElementById('nf-modal-info').innerHTML =
     '<strong>#' + (r.osCode||'—') + ' — ' + (r.nomeContato||r.title||'—') + '</strong>';
   document.getElementById('nf-cpfcnpj').value = r.cpfCnpj || '';
-  document.getElementById('nf-valor').value   = r.valor   || '';
+  // Valor puxado automaticamente da ficha (vindo do Pipefy)
+  const valorFicha = r.valor || r.valorContrato || '';
+  document.getElementById('nf-valor').value = valorFicha;
+  // Se já tem valor, esconde o campo para não precisar preencher
+  const valorRow = document.getElementById('nf-valor-row');
+  if (valorRow) valorRow.style.display = valorFicha ? 'none' : '';
   // Monta descrição padrão com serviço e garantia
   const servDesc = r.servicos ? r.servicos + '. ' : '';
   document.getElementById('nf-desc').value    =
@@ -565,6 +567,24 @@ async function emitirNF(id) {
   const res = await api('emitir-nf',{id});
   if (res.ok) { updateRecord(res.record); showToast('🧾','NF Emitida!','Card movido para NF Emitida'); }
   else showToast('❌','Erro',res.error);
+}
+
+async function baixarDanfe(chave) {
+  try {
+    const url = `/api/nfse?action=danfe&chave=${encodeURIComponent(chave)}`;
+    const r = await fetch(url);
+    if (!r.ok) { showToast('❌','Erro ao baixar DANFE', 'Status: '+r.status); return; }
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `danfe-${chave.slice(-10)}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+  } catch(e) {
+    showToast('❌','Erro DANFE', e.message);
+  }
 }
 
 async function nfEnviada(id) {
