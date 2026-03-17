@@ -338,5 +338,11 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── POST reset-fila — apaga todas as fichas
+  if (req.method === "POST" && action === "reset-fila") {
+    await dbSet(LALA_KEY, { fichas: [] });
+    return res.status(200).json({ ok: true });
+  }
+
   return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 };
