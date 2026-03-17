@@ -130,29 +130,24 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 }
 
 
-// Assina DPS com XMLDSig usando xml-crypto
+// Assina DPS com XMLDSig usando xml-crypto v3
 function assinarXML(xml, pfxBuf, passphrase) {
   try {
-    // Extrai chave privada e certificado do PFX
     const privateKey = crypto.createPrivateKey({ key: pfxBuf, format: "pkcs12", passphrase });
-    const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" });
+    const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
 
-    // Extrai certificado público do PFX para incluir na assinatura
-    // Node.js 15+ permite extrair via X509Certificate
-    let certPem = "";
-    try {
-      const certs = crypto.X509Certificate ? null : null; // placeholder
-      // Usa openssl via execSync para extrair cert — alternativa: incluir sem cert
-    } catch(e) {}
-
-    // Id do elemento a assinar
     const idMatch = xml.match(/infDPS Id="([^"]+)"/);
     if (!idMatch) throw new Error("Id do infDPS não encontrado");
     const refId = idMatch[1];
 
-    const sig = new xmlCrypto.SignedXml({ privateKey: privateKeyPem });
-    sig.canonicalizationAlgorithm = "http://www.w3.org/2001/10/xml-exc-c14n#WithComments";
-    sig.signatureAlgorithm = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256";
+    // xml-crypto v3 API
+    const SignedXml = xmlCrypto.SignedXml;
+    const sig = new SignedXml({
+      privateKey: privateKeyPem,
+      canonicalizationAlgorithm: "http://www.w3.org/2001/10/xml-exc-c14n#WithComments",
+      signatureAlgorithm: "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+    });
+
     sig.addReference({
       xpath: `//*[@Id="${refId}"]`,
       transforms: [
@@ -161,13 +156,17 @@ function assinarXML(xml, pfxBuf, passphrase) {
       ],
       digestAlgorithm: "http://www.w3.org/2001/04/xmlenc#sha256",
     });
+
     sig.computeSignature(xml, {
       location: { reference: `//*[@Id="${refId}"]`, action: "append" },
     });
-    return sig.getSignedXml();
+
+    const signed = sig.getSignedXml();
+    console.log("Signature present:", signed.includes("<Signature"));
+    return signed;
   } catch(e) {
-    console.error("assinarXML erro:", e.message);
-    return xml; // sem assinatura — API vai rejeitar com E0717
+    console.error("assinarXML erro:", e.message, e.stack);
+    return xml;
   }
 }
 
@@ -234,6 +233,8 @@ module.exports = async function handler(req, res) {
   // ── GET debug-xml — retorna XML gerado sem enviar ao governo
   if (action === "debug-xml") {
     try {
+      let certOpts;
+      try { certOpts = loadCert(); } catch(e) { certOpts = null; }
       const xml = montarDPS({
         cpfcnpj: "12345678901",
         nome:    "Cliente Teste",
@@ -241,8 +242,11 @@ module.exports = async function handler(req, res) {
         valor:   "350.00",
         numDPS:  genId(1),
       });
+      const signed = certOpts ? assinarXML(xml, certOpts.pfx, certOpts.passphrase) : xml;
+      const hasSignature = signed.includes("<Signature");
       res.setHeader("Content-Type","text/xml");
-      return res.status(200).send(xml);
+      res.setHeader("X-Has-Signature", String(hasSignature));
+      return res.status(200).send(signed);
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });
     }
