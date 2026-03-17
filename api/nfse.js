@@ -333,6 +333,16 @@ module.exports = async function handler(req, res) {
     return res.status(200).json(result);
   }
 
+  if (action === "test-xmlcrypto-v") {
+    try {
+      const ver = require("/var/task/node_modules/xml-crypto/package.json").version;
+      const SignedXml = require("xml-crypto").SignedXml;
+      return res.status(200).json({ ok: true, version: ver, SignedXmlType: typeof SignedXml });
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: e.message });
+    }
+  }
+
   if (action === "test-xmlcrypto") {
     try {
       const certOpts = loadCert();
