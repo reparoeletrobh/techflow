@@ -210,6 +210,80 @@ async function assinarXML(xml, pfxBuf, passphrase) {
 }
 
 
+// Extrai campos do XML da NFS-e
+function extrairDadosXml(xml) {
+  const get = (tag) => {
+    const m = xml.match(new RegExp("<" + tag + "[^>]*>([\\s\\S]*?)<\\/" + tag + ">"));
+    return m ? m[1].trim() : "";
+  };
+  return {
+    nNFSe:        get("nNFSe"),
+    dhProc:       get("dhProc"),
+    dCompet:      get("dCompet"),
+    dhEmi:        get("dhEmi"),
+    xDescServ:    get("xDescServ"),
+    vServ:        get("vServ"),
+    cpfTomador:   get("CPF") || get("CNPJ"),
+    xNomeTomador: get("xNome"),
+  };
+}
+
+function gerarDanfeHtml(dados, chave) {
+  const fmtDT = (v) => { try { return new Date(v).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo"}); } catch(e){ return v||""; }};
+  const fmtD  = (v) => v ? v.split("-").reverse().join("/") : "";
+  const fmtV  = (v) => v ? Number(v).toLocaleString("pt-BR",{minimumFractionDigits:2}) : "0,00";
+  const doc   = dados.cpfTomador||"";
+  const docFmt= doc.length===11 ? doc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4")
+                                 : doc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,"$1.$2.$3/$4-$5");
+  const S = (s) => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  return "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'>" +
+    "<title>NFS-e " + S(dados.nNFSe) + "</title>" +
+    "<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:11px;padding:16px;max-width:800px;margin:0 auto}" +
+    ".hdr{border:2px solid #000;padding:10px;margin-bottom:6px;overflow:hidden}" +
+    ".nfnum{float:right;text-align:right}.nfnum .n{font-size:24px;font-weight:bold}.nfnum .l{font-size:9px;text-transform:uppercase;color:#666}" +
+    ".sec{border:1px solid #999;margin-bottom:5px}.sec-t{background:#ddd;font-weight:bold;padding:3px 8px;font-size:9px;text-transform:uppercase;border-bottom:1px solid #999}" +
+    ".row{display:flex;flex-wrap:wrap}.f{padding:4px 8px;border-right:1px solid #ddd;border-bottom:1px solid #ddd;flex:1;min-width:100px}" +
+    ".f:last-child{border-right:none}.f label{display:block;font-size:8px;color:#666;text-transform:uppercase}.f span{font-size:11px;font-weight:600}" +
+    ".f.w2{flex:2}.f.w3{flex:3}.desc{padding:6px 8px;white-space:pre-wrap;line-height:1.5}" +
+    ".chave{font-size:8px;word-break:break-all;padding:5px 8px;background:#f9f9f9;border-top:1px solid #ddd}" +
+    ".vv{font-size:16px;font-weight:bold;color:#1a6e1a}" +
+    ".footer{text-align:center;font-size:9px;color:#666;margin-top:10px;padding-top:8px;border-top:1px dashed #ccc}" +
+    ".pbtn{display:block;margin:16px auto;padding:10px 32px;font-size:14px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:bold}" +
+    "@media print{.pbtn{display:none}body{padding:0}}</style></head><body>" +
+    "<div class='hdr'>" +
+      "<div class='nfnum'><div class='l'>NFS-e N\xba</div><div class='n'>" + S(dados.nNFSe||"\u2014") + "</div>" +
+        "<div class='l' style='margin-top:4px'>Emiss\xe3o</div><div style='font-size:10px;font-weight:600'>" + fmtDT(dados.dhEmi||dados.dhProc) + "</div></div>" +
+      "<h1 style='font-size:13px;font-weight:bold;text-transform:uppercase'>Nota Fiscal de Servi\xe7o Eletr\xf4nica \u2014 NFS-e</h1>" +
+      "<h2 style='font-size:11px;margin-top:2px'>REPARO ELETRO - CONSERTO DE ELETRODOMESTICOS LTDA</h2>" +
+      "<p style='font-size:9px;color:#444;margin-top:2px'>CNPJ: 59.485.378/0001-75 &nbsp;|&nbsp; IM: 16391680010 &nbsp;|&nbsp; Belo Horizonte - MG</p>" +
+      "<p style='font-size:9px;color:#444'>Rua Ouro Preto, 663 \u2014 Barro Preto \u2014 CEP 30170-044 &nbsp;|&nbsp; (31) 9785-6023</p>" +
+    "</div>" +
+    "<div class='sec'><div class='sec-t'>Tomador do Servi\xe7o</div><div class='row'>" +
+      "<div class='f w3'><label>Nome / Raz\xe3o Social</label><span>" + S(dados.xNomeTomador||"Consumidor Final") + "</span></div>" +
+      "<div class='f'><label>CPF / CNPJ</label><span>" + S(docFmt||"\u2014") + "</span></div>" +
+    "</div></div>" +
+    "<div class='sec'><div class='sec-t'>Dados do Servi\xe7o</div>" +
+      "<div class='row'>" +
+        "<div class='f'><label>Compet\xeancia</label><span>" + fmtD(dados.dCompet) + "</span></div>" +
+        "<div class='f w2'><label>C\xf3digo do Servi\xe7o</label><span>14.02 \u2014 Manuten\xe7\xe3o de eletrodom\xe9sticos</span></div>" +
+        "<div class='f'><label>Munic\xedpio</label><span>Belo Horizonte / MG</span></div>" +
+      "</div>" +
+      "<div class='desc'><strong>Discrimina\xe7\xe3o:</strong><br>" + S(dados.xDescServ||"") + "</div>" +
+    "</div>" +
+    "<div class='sec'><div class='sec-t'>Valores</div><div class='row'>" +
+      "<div class='f'><label>Valor do Servi\xe7o</label><span class='vv'>R$ " + fmtV(dados.vServ) + "</span></div>" +
+      "<div class='f'><label>Tributa\xe7\xe3o ISSQN</label><span>Simples Nacional \u2014 Tribut\xe1vel</span></div>" +
+      "<div class='f'><label>Valor L\xedquido</label><span class='vv'>R$ " + fmtV(dados.vServ) + "</span></div>" +
+    "</div></div>" +
+    "<div class='sec'><div class='sec-t'>Chave de Acesso</div><div class='chave'>" + chave + "</div></div>" +
+    "<div class='footer'>" +
+      "<p>Documento emitido eletronicamente conforme LC 116/2003 \u2014 NFS-e Padr\xe3o Nacional</p>" +
+      "<p style='margin-top:3px'>Consulte: <strong>https://www.nfse.gov.br/ConsultaNacional</strong></p>" +
+    "</div>" +
+    "<button class='pbtn' onclick='window.print()'>Imprimir / Salvar como PDF</button>" +
+    "</body></html>";
+}
+
 // Baixa DANFE via API REST NFS-e (aceita certificado mTLS) e salva no Redis
 async function buscarESalvarDanfe(chaveAcesso, certOpts) {
   try {
@@ -731,6 +805,61 @@ module.exports = async function handler(req, res) {
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     return res.status(200).send(html);
+  }
+
+  if (action === "danfe-force") {
+    // Força busca da NFS-e via API e gera DANFE — sem cache Redis
+    const chave = (req.query.chave || "").trim();
+    if (!chave) return res.status(400).json({ ok: false, error: "chave obrigatória" });
+    let certOpts;
+    try { certOpts = loadCert(); } catch(e) { return res.status(200).json({ step: "cert", error: e.message }); }
+    try {
+      const host = NFSE_HOMOLOG ? "sefin.producaorestrita.nfse.gov.br" : "sefin.nfse.gov.br";
+      const resp = await new Promise((resolve, reject) => {
+        const opts = {
+          hostname: host, port: 443,
+          path: `/SefinNacional/nfse/${chave}`,
+          method: "GET",
+          pfx: certOpts.pfx, passphrase: certOpts.passphrase,
+          rejectUnauthorized: false,
+          headers: { "Accept": "application/json" },
+        };
+        const req2 = https.request(opts, r => {
+          const chunks = [];
+          r.on("data", c => chunks.push(c));
+          r.on("end", () => resolve({ status: r.statusCode, buf: Buffer.concat(chunks) }));
+        });
+        req2.on("error", reject);
+        req2.end();
+      });
+
+      if (resp.status !== 200) {
+        return res.status(200).json({ step: "api", status: resp.status, body: resp.buf.slice(0,200).toString() });
+      }
+
+      const json   = JSON.parse(resp.buf.toString("utf8"));
+      const xmlBuf = zlib.gunzipSync(Buffer.from(json.nfseXmlGZipB64, "base64"));
+      const xml    = xmlBuf.toString("utf8");
+      const dados  = extrairDadosXml(xml);
+      dados.chaveAcesso = chave;
+      const danfeHtml = gerarDanfeHtml(dados, chave);
+
+      // Salva no Redis
+      await fetch(UPSTASH_URL + "/pipeline", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
+        body: JSON.stringify([
+          ["SET",    "danfe:" + chave, Buffer.from(danfeHtml).toString("base64")],
+          ["EXPIRE", "danfe:" + chave, 31536000],
+        ]),
+      });
+
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(danfeHtml);
+
+    } catch(e) {
+      return res.status(200).json({ step: "error", error: e.message, stack: (e.stack||"").slice(0,300) });
+    }
   }
 
   if (action === "danfe-nfse-json") {
