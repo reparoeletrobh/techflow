@@ -533,6 +533,43 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // ── GET danfe?chave=XXX — proxy do DANFE PDF autenticado com certificado
+  if (action === "danfe") {
+    const chave = (req.query.chave || "").trim();
+    if (!chave) return res.status(400).json({ ok: false, error: "chave obrigatória" });
+    let certOpts;
+    try { certOpts = loadCert(); } catch(e) { return res.status(400).json({ ok: false, error: e.message }); }
+    try {
+      const pdf = await new Promise((resolve, reject) => {
+        const opts = {
+          hostname: "www.nfse.gov.br",
+          port: 443,
+          path: `/EmissorNacional/Notas/Download/DANFSe/${chave}`,
+          method: "GET",
+          pfx:        certOpts.pfx,
+          passphrase: certOpts.passphrase,
+          rejectUnauthorized: true,
+          headers: { "Accept": "application/pdf,*/*" },
+        };
+        const req2 = https.request(opts, r => {
+          const chunks = [];
+          r.on("data", c => chunks.push(c));
+          r.on("end", () => resolve({ status: r.statusCode, buf: Buffer.concat(chunks), ct: r.headers["content-type"] || "" }));
+        });
+        req2.on("error", reject);
+        req2.end();
+      });
+      if (pdf.status !== 200) {
+        return res.status(pdf.status).json({ ok: false, error: "Governo retornou " + pdf.status });
+      }
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="danfe-${chave.slice(-10)}.pdf"`);
+      return res.status(200).send(pdf.buf);
+    } catch(e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
   if (action === "status") {
     return res.status(200).json({
       ok: !!(process.env.NFSE_CERT_PFX && process.env.NFSE_CERT_SENHA),
