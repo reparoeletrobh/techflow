@@ -862,6 +862,35 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  if (action === "danfe-xml-raw") {
+    const chave = (req.query.chave || "31062002259485378000175000000000016126034193872720").trim();
+    let certOpts;
+    try { certOpts = loadCert(); } catch(e) { return res.status(200).json({ error: e.message }); }
+    const host = NFSE_HOMOLOG ? "sefin.producaorestrita.nfse.gov.br" : "sefin.nfse.gov.br";
+    const resp = await new Promise((resolve, reject) => {
+      const opts = { hostname: host, port: 443, path: `/SefinNacional/nfse/${chave}`, method: "GET",
+        pfx: certOpts.pfx, passphrase: certOpts.passphrase, rejectUnauthorized: false,
+        headers: { "Accept": "application/json" },
+      };
+      const req2 = https.request(opts, r => {
+        const chunks = []; r.on("data", c => chunks.push(c));
+        r.on("end", () => resolve(Buffer.concat(chunks)));
+      });
+      req2.on("error", reject); req2.end();
+    });
+    const json   = JSON.parse(resp.toString("utf8"));
+    const xmlBuf = zlib.gunzipSync(Buffer.from(json.nfseXmlGZipB64, "base64"));
+    const xml    = xmlBuf.toString("utf8");
+    // Extract key tags for debugging
+    const tags = ["nNFSe","xNome","CPF","CNPJ","vServ","vReceb","xDescServ","dCompet","dhEmi","dhProc","xNomeTomador","toma","prest","emit"];
+    const result = {};
+    for (const t of tags) {
+      const m = xml.match(new RegExp("<" + t + "[^>]*>([\s\S]*?)<\/" + t + ">"));
+      result[t] = m ? m[1].trim().slice(0,100) : null;
+    }
+    return res.status(200).json({ ok: true, tags: result });
+  }
+
   if (action === "danfe-nfse-json") {
     // Retorna o JSON completo da NFS-e da API do governo
     const chave = (req.query.chave || "31062002259485378000175000000000016126034193872720").trim();
@@ -998,26 +1027,27 @@ module.exports = async function handler(req, res) {
       const parsed = parseResp(body);
 
       if (parsed.ok) {
-        // Salva dados da NF no Redis para geração do DANFE offline
-        const nfData = {
-          dhEmi:         agora(),
-          dCompet:       hoje(),
-          tomadorNome:   tomadorNome || "",
-          tomadorDoc:    tomadorCpfCnpj || "",
-          discriminacao: discriminacao  || "",
-          valor:         parseFloat(valor).toFixed(2),
-          chaveAcesso:   parsed.chaveAcesso,
-        };
-        fetch(UPSTASH_URL + "/pipeline", {
-          method: "POST",
-          headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
-          body: JSON.stringify([
-            ["SET", "nfdata:" + parsed.chaveAcesso, JSON.stringify(nfData)],
-            ["EXPIRE", "nfdata:" + parsed.chaveAcesso, 31536000],
-          ]),
-        }).catch(()=>{});
-        // Tenta salvar DANFE do portal no Redis (pode falhar sem sessão)
-        setTimeout(() => buscarESalvarDanfe(parsed.chaveAcesso, certOpts).catch(()=>{}), 2000);
+        // Gera e salva DANFE HTML diretamente com os dados da emissão
+        try {
+          const dadosNF = {
+            nNFSe:        "",   // preenchido pelo governo — não temos ainda
+            dhEmi:        agora(),
+            dCompet:      hoje(),
+            xDescServ:    discriminacao || "",
+            vServ:        parseFloat(valor).toFixed(2),
+            cpfTomador:   (tomadorCpfCnpj || "").replace(/\D/g,""),
+            xNomeTomador: tomadorNome || "Consumidor Final",
+          };
+          const danfeHtml = gerarDanfeHtml(dadosNF, parsed.chaveAcesso);
+          fetch(UPSTASH_URL + "/pipeline", {
+            method: "POST",
+            headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
+            body: JSON.stringify([
+              ["SET",    "danfe:" + parsed.chaveAcesso, Buffer.from(danfeHtml).toString("base64")],
+              ["EXPIRE", "danfe:" + parsed.chaveAcesso, 31536000],
+            ]),
+          }).catch(()=>{});
+        } catch(e) { console.error("DANFE save error:", e.message); }
         return res.status(200).json({ ok: true, chaveAcesso: parsed.chaveAcesso, idDps: parsed.idDps, alertas: parsed.alertas });
       } else {
         return res.status(200).json({ ok: false, error: parsed.erro, httpStatus: status, idDPS: numDPS, idLen: numDPS.length });
