@@ -30,7 +30,10 @@ async function dbSet(key, value) {
   } catch(e) { return false; }
 }
 
-const NFSE_HOST      = "sefin.nfse.gov.br";
+// Homologação: sefin.producaorestrita.nfse.gov.br
+// Produção:    sefin.nfse.gov.br
+const NFSE_HOMOLOG   = (process.env.NFSE_HOMOLOG || "true") === "true";
+const NFSE_HOST      = NFSE_HOMOLOG ? "sefin.producaorestrita.nfse.gov.br" : "sefin.nfse.gov.br";
 const NFSE_PATH      = "/SefinNacional/nfse";
 const CNPJ_EMPRESA   = (process.env.NFSE_CNPJ || "59485378000175").replace(/\D/g,"");
 const IM_EMPRESA     =  process.env.NFSE_IM   || "16391680010";
@@ -77,7 +80,7 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n` +
 `<DPS xmlns="http://www.sped.fazenda.gov.br/nfse" versao="1.00">\n` +
 `  <infDPS Id="${id}">\n` +
-`    <tpAmb>1</tpAmb>\n` +
+`    <tpAmb>${NFSE_HOMOLOG ? 2 : 1}</tpAmb>\n` +
 `    <dhEmi>${agora()}</dhEmi>\n` +
 `    <verAplic>reparoeletro-1.0</verAplic>\n` +
 `    <serie>00001</serie>\n` +
@@ -88,6 +91,10 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 `    <prest>\n` +
 `      <CNPJ>${CNPJ_EMPRESA}</CNPJ>\n` +
 `      <IM>${IM_EMPRESA}</IM>\n` +
+`      <regTrib>\n` +
+`        <opSimpNac>1</opSimpNac>\n` +
+`        <regApTribSN>1</regApTribSN>\n` +
+`      </regTrib>\n` +
 // end omitido — governo busca pelo CNPJ cadastrado
 
 `    </prest>\n` +
