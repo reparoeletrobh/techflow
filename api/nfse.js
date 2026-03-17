@@ -278,6 +278,118 @@ function gerarDanfeHtml(dados, chave) {
   var docFmt= doc.length===11 ? doc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4")
                                : doc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,"$1.$2.$3/$4-$5");
   var S = function(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); };
+  var css =
+    "*{margin:0;padding:0;box-sizing:border-box}" +
+    "body{font-family:Arial,Helvetica,sans-serif;font-size:11px;background:#fff;color:#222;padding:18px;max-width:820px;margin:0 auto}" +
+    ".hdr{display:flex;border:2px solid #1a7a3c;border-radius:4px;overflow:hidden;margin-bottom:8px}" +
+    ".hdr-left{background:#1a7a3c;color:#fff;padding:12px 14px;min-width:195px;display:flex;flex-direction:column;justify-content:center}" +
+    ".hdr-left h1{font-size:12px;font-weight:bold;text-transform:uppercase;line-height:1.4}" +
+    ".hdr-left p{font-size:8px;margin-top:2px;opacity:.9;line-height:1.5}" +
+    ".hdr-mid{flex:1;padding:10px 14px;display:flex;flex-direction:column;justify-content:center;border-left:1px solid #ccc;border-right:1px solid #ccc}" +
+    ".hdr-mid .t{font-size:12px;font-weight:bold;color:#1a7a3c;text-transform:uppercase}" +
+    ".hdr-mid .s{font-size:8px;color:#666;margin-top:3px}" +
+    ".hdr-right{background:#1a4fa0;color:#fff;padding:10px 14px;min-width:110px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}" +
+    ".hdr-right .lbl{font-size:8px;text-transform:uppercase;opacity:.8}" +
+    ".hdr-right .num{font-size:26px;font-weight:bold;line-height:1.1}" +
+    ".hdr-right .tag{font-size:8px;margin-top:3px;background:rgba(255,255,255,.2);padding:2px 6px;border-radius:8px}" +
+    ".sec{border:1px solid #ddd;border-radius:3px;margin-bottom:6px;overflow:hidden}" +
+    ".sec-t{background:#1a7a3c;color:#fff;font-size:8px;font-weight:bold;text-transform:uppercase;padding:4px 10px;letter-spacing:.4px}" +
+    ".row{display:flex;flex-wrap:wrap;background:#f9f9f9}" +
+    ".f{padding:5px 10px;flex:1;min-width:100px;border-right:1px solid #eee;border-bottom:1px solid #eee}" +
+    ".f:last-child{border-right:none}" +
+    ".f label{display:block;font-size:7.5px;color:#888;text-transform:uppercase;margin-bottom:1px}" +
+    ".f span{font-size:10.5px;font-weight:bold;color:#222}" +
+    ".f.w2{flex:2}.f.w3{flex:3}" +
+    ".desc{padding:7px 10px;white-space:pre-wrap;line-height:1.6;font-size:10.5px;background:#f9f9f9;border-top:1px solid #eee}" +
+    ".val-box{display:flex;align-items:stretch;background:#f9f9f9}" +
+    ".val-left{flex:1;padding:8px 10px}" +
+    ".val-right{background:#e8f5ee;border-left:2px solid #1a7a3c;padding:10px 18px;text-align:center;min-width:170px;display:flex;flex-direction:column;justify-content:center}" +
+    ".val-right .vl{font-size:8px;color:#555;text-transform:uppercase}" +
+    ".val-right .vm{font-size:22px;font-weight:bold;color:#1a7a3c}" +
+    ".gar{background:#fff8e8;border:1px solid #e0a000;border-radius:3px;padding:9px 12px;margin-bottom:6px;font-size:9px;line-height:1.6;color:#5a3e00}" +
+    ".gar strong{color:#7a5000}" +
+    ".chv{background:#f5f5f5;border:1px solid #ddd;border-radius:3px;padding:6px 10px;font-family:Courier,monospace;font-size:7.5px;word-break:break-all;color:#444;text-align:center;margin-bottom:6px}" +
+    ".foot{background:#1a7a3c;color:#fff;text-align:center;padding:5px;font-size:7.5px;border-radius:3px}" +
+    ".pbtn{display:block;margin:14px auto 0;padding:10px 36px;font-size:13px;background:#1a4fa0;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:bold}" +
+    "@media print{.pbtn{display:none}body{padding:0}}";
+  return "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'>" +
+    "<title>NFS-e " + S(dados.nNFSe||"") + "</title>" +
+    "<style>" + css + "</style></head><body>" +
+
+    "<div class='hdr'>" +
+      "<div class='hdr-left'>" +
+        "<h1>Reparo Eletro</h1>" +
+        "<h1>Conserto de Eletrodom\xe9sticos</h1>" +
+        "<p>CNPJ: 59.485.378/0001-75</p>" +
+        "<p>IM: 16391680010</p>" +
+        "<p>Rua Ouro Preto, 663 \u2014 Barro Preto</p>" +
+        "<p>Belo Horizonte/MG \u2014 (31) 9785-6023</p>" +
+      "</div>" +
+      "<div class='hdr-mid'>" +
+        "<div class='t'>Nota Fiscal de Servi\xe7o Eletr\xf4nica</div>" +
+        "<div class='s'>Emiss\xe3o: " + fmtDT(dados.dhEmi||dados.dhProc) + "</div>" +
+        "<div class='s'>Compet\xeancia: " + fmtD(dados.dCompet) + "</div>" +
+      "</div>" +
+      "<div class='hdr-right'>" +
+        "<div class='lbl'>NFS-e N\xba</div>" +
+        "<div class='num'>" + S(dados.nNFSe||"\u2014") + "</div>" +
+        "<div class='tag'>NFS-e Nacional</div>" +
+      "</div>" +
+    "</div>" +
+
+    "<div class='sec'>" +
+      "<div class='sec-t'>Tomador do Servi\xe7o</div>" +
+      "<div class='row'>" +
+        "<div class='f w3'><label>Nome / Raz\xe3o Social</label><span>" + S(dados.xNomeTomador||"Consumidor Final") + "</span></div>" +
+        "<div class='f'><label>CPF / CNPJ</label><span>" + S(docFmt||"\u2014") + "</span></div>" +
+      "</div>" +
+    "</div>" +
+
+    "<div class='sec'>" +
+      "<div class='sec-t'>Dados do Servi\xe7o</div>" +
+      "<div class='row'>" +
+        "<div class='f'><label>Compet\xeancia</label><span>" + fmtD(dados.dCompet) + "</span></div>" +
+        "<div class='f w2'><label>C\xf3digo do Servi\xe7o (LC 116/2003)</label><span>14.02 \u2014 Manuten\xe7\xe3o de eletrodom\xe9sticos</span></div>" +
+        "<div class='f'><label>Munic\xedpio de Incid\xeancia</label><span>Belo Horizonte / MG</span></div>" +
+      "</div>" +
+      "<div class='desc'><strong>Discrimina\xe7\xe3o:</strong><br>" + S(dados.xDescServ||"") + "</div>" +
+    "</div>" +
+
+    "<div class='sec'>" +
+      "<div class='sec-t'>Valores</div>" +
+      "<div class='val-box'>" +
+        "<div class='val-left'>" +
+          "<div class='row' style='background:transparent'>" +
+            "<div class='f'><label>Tributa\xe7\xe3o ISSQN</label><span>Simples Nacional \u2014 Tribut\xe1vel</span></div>" +
+            "<div class='f'><label>Al\xedquota ISS</label><span>2,00%</span></div>" +
+            "<div class='f'><label>Regime Tribut\xe1rio</label><span>Simples Nacional</span></div>" +
+          "</div>" +
+        "</div>" +
+        "<div class='val-right'>" +
+          "<div class='vl'>Valor Total do Servi\xe7o</div>" +
+          "<div class='vm'>R$ " + fmtV(dados.vServ) + "</div>" +
+        "</div>" +
+      "</div>" +
+    "</div>" +
+
+    "<div class='gar'>" +
+      "<strong>Termo de Garantia \u2014 CDC Art. 26 e 27 (Lei 8.078/90)</strong><br>" +
+      "O servi\xe7o prestado possui garantia contratual de <strong>90 (noventa) dias</strong> a partir da data de emiss\xe3o desta nota fiscal, " +
+      "conforme disposto no Art. 26, II do C\xf3digo de Defesa do Consumidor. Aplica-se tamb\xe9m a garantia legal de 90 dias para servi\xe7os dur\xe1veis (Art. 26, I do CDC).<br>" +
+      "A garantia cobre exclusivamente o defeito objeto do reparo realizado, n\xe3o abrangendo novos defeitos decorrentes de mau uso, quedas, " +
+      "infiltra\xe7\xe3o de l\xedquidos, tens\xe3o el\xe9trica inadequada ou interven\xe7\xe3o de terceiros. " +
+      "Para acionar a garantia, apresente esta nota fiscal e entre em contato: <strong>(31) 9785-6023</strong>." +
+    "</div>" +
+
+    "<div class='chv'><strong>Chave de Acesso:</strong> " + chave + "</div>" +
+
+    "<div class='foot'>" +
+      "Documento emitido eletronicamente conforme LC 116/2003 \u2014 NFS-e Padr\xe3o Nacional &nbsp;|&nbsp; " +
+      "Consulte: <strong>nfse.gov.br/ConsultaNacional</strong>" +
+    "</div>" +
+
+    "<button class='pbtn' onclick='window.print()'>Imprimir / Salvar como PDF</button>" +
+    "</body></html>";
   return "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'>" +
     "<title>NFS-e " + S(dados.nNFSe) + "</title>" +
     "<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:11px;padding:16px;max-width:800px;margin:0 auto}" +
