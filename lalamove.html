@@ -314,8 +314,18 @@ function showToast(icon, title, msg) {
   t.classList.add("show"); setTimeout(function() { t.classList.remove("show"); }, 5000);
 }
 
+// Sincroniza fila do Pipefy (Coleta/Entrega Solicitada)
+async function syncPipefy() {
+  try {
+    var d = await fetch('/api/board?action=sync-lalamove').then(r=>r.json());
+    if (d.changed) await load(); // Recarrega se houve mudanças
+  } catch(e) {}
+}
+
 load();
+syncPipefy(); // Sync imediato ao abrir
 setInterval(load, 30000);
+setInterval(syncPipefy, 60000); // Verifica Pipefy a cada 1 min
 </script>
 </body>
 </html>
