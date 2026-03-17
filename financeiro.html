@@ -459,10 +459,20 @@ function openNfModal(id) {
   document.getElementById('nf-cpfcnpj').value = r.cpfCnpj || '';
   // Valor puxado automaticamente da ficha (vindo do Pipefy)
   const valorFicha = r.valor || r.valorContrato || '';
-  document.getElementById('nf-valor').value = valorFicha;
-  // Se já tem valor, esconde o campo para não precisar preencher
+  const nfValorEl  = document.getElementById('nf-valor');
+  nfValorEl.value  = valorFicha;
+  // Se já tem valor do Pipefy: readonly com fundo verde; se não tem: editável
+  if (valorFicha) {
+    nfValorEl.setAttribute('readonly', true);
+    nfValorEl.style.opacity = '0.8';
+    nfValorEl.style.cursor  = 'default';
+  } else {
+    nfValorEl.removeAttribute('readonly');
+    nfValorEl.style.opacity = '1';
+    nfValorEl.style.cursor  = 'text';
+  }
   const valorRow = document.getElementById('nf-valor-row');
-  if (valorRow) valorRow.style.display = valorFicha ? 'none' : '';
+  if (valorRow) valorRow.style.display = '';
   // Monta descrição padrão com serviço e garantia
   const servDesc = r.servicos ? r.servicos + '. ' : '';
   document.getElementById('nf-desc').value    =
@@ -768,9 +778,9 @@ setInterval(()=>{ load(); syncPipefy(); }, 30000);
       <label style="font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;">Valor (R$)</label>
       <div id="nf-valor-row">
       <input id="nf-valor" type="number" step="0.01"
-      </div>
         style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:var(--fm);font-size:14px;color:#22c55e;outline:none;width:160px;"
         placeholder="0,00"/>
+      </div>
     </div>
     <div id="nf-status" style="display:none;font-family:var(--fm);font-size:11px;padding:8px 12px;border-radius:7px;margin-bottom:12px;"></div>
     <div style="font-family:var(--fm);font-size:10px;color:var(--muted);padding:8px 10px;background:var(--surface2);border-radius:7px;margin-bottom:12px;border-left:2px solid var(--accent);">
