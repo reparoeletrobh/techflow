@@ -115,8 +115,8 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 `    <valores>\n` +
 `      <vServPrest>\n` +
 `        <vServ>${vlr}</vServ>\n` +
-`        <vReceb>${vlr}</vReceb>\n` +
 `      </vServPrest>\n` +
+`      <vReceb>${vlr}</vReceb>\n` +
 `      <trib>\n` +
 `        <tribMun>\n` +
 `          <tribISSQN>1</tribISSQN>\n` +
