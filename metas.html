@@ -3,569 +3,295 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mission Control — Reparo Eletro</title>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<title>Metas — Reparo Eletro</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg:     #000000;
-  --bg2:    #080808;
-  --bg3:    #0f0f0f;
-  --border: #1a1a1a;
-  --yellow: #f5c400;
-  --yellow2:#ffd740;
-  --green:  #00e676;
-  --green2: #00ff88;
-  --muted:  #444;
-  --text:   #cccccc;
-  --dim:    #222;
-  --fh: 'Orbitron', monospace;
-  --fb: 'Rajdhani', sans-serif;
-  --fm: 'Share Tech Mono', monospace;
+  --bg:#0d0d0d; --surface:#161616; --surface2:#1f1f1f; --border:#333;
+  --accent:#f5c800; --accent2:#ffde59; --text:#ffffff; --muted:#aaa;
+  --green:#22c55e; --green2:#16a34a;
+  --fh:'Syne',sans-serif; --fm:'DM Mono',monospace; --fb:'Inter',sans-serif;
 }
-* { margin:0; padding:0; box-sizing:border-box; }
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;overflow-x:hidden;}
 
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--fb);
-  min-height: 100vh;
-  overflow-x: hidden;
+/* HEADER — idêntico ao técnico */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;height:54px;border-bottom:2px solid var(--accent);
+  background:#0d0d0d;position:sticky;top:0;z-index:100;
 }
+.logo{font-family:var(--fh);font-size:18px;font-weight:800;display:flex;align-items:center;gap:9px;}
+.logo-icon{width:28px;height:28px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;}
+.logo-text span{color:var(--accent);}
+.nav-btn{
+  font-family:var(--fm);font-size:10px;padding:6px 13px;border-radius:6px;
+  border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all 0.15s;
+  text-decoration:none;display:inline-flex;align-items:center;
+}
+.nav-btn:hover{color:var(--text);border-color:var(--accent);}
+.nav-btn.active{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600;}
+.stat-pill{font-family:var(--fm);font-size:10px;color:var(--muted);display:flex;align-items:center;gap:4px;}
+.stat-pill strong{color:var(--accent);font-size:13px;}
+.live-dot{width:5px;height:5px;background:var(--accent);border-radius:50%;animation:blink 2s infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.15);opacity:.6;}}
 
-/* Scanline overlay */
-body::before {
-  content:'';
-  position:fixed;
-  inset:0;
-  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,.012) 2px, rgba(255,255,255,.012) 4px);
-  pointer-events:none;
-  z-index:999;
+/* TOOLBAR */
+.toolbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 24px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px;
 }
+.board-title{font-family:var(--fh);font-size:20px;font-weight:800;letter-spacing:-0.5px;}
+.board-title span{color:var(--accent);}
+.toolbar-right{display:flex;align-items:center;gap:8px;}
+.action-btn{
+  font-family:var(--fm);font-size:10px;padding:6px 12px;border-radius:6px;
+  border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all 0.15s;
+}
+.action-btn:hover{color:var(--text);border-color:rgba(245,200,0,.4);}
+.date-label{font-family:var(--fm);font-size:10px;color:var(--muted);}
 
-/* Grid background */
-.grid-bg {
-  position:fixed;
-  inset:0;
-  background-image:
-    linear-gradient(rgba(245,196,0,.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(245,196,0,.04) 1px, transparent 1px);
-  background-size: 40px 40px;
-  pointer-events:none;
-  z-index:0;
+/* PROGRESS BAR */
+.progress-wrap{
+  background:var(--bg);border-top:1px solid var(--border);
+  padding:10px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
 }
+.progress-item{display:flex;align-items:center;gap:8px;flex:1;min-width:160px;}
+.progress-label{font-family:var(--fm);font-size:9px;color:var(--muted);white-space:nowrap;}
+.progress-bar-bg{flex:1;height:5px;background:var(--surface2);border-radius:99px;overflow:hidden;}
+.progress-bar-fg{height:100%;background:var(--accent);border-radius:99px;transition:width .6s cubic-bezier(.4,0,.2,1);}
+.progress-bar-fg.done{background:var(--green);}
+.progress-pct{font-family:var(--fm);font-size:9px;color:var(--muted);min-width:28px;text-align:right;}
 
-/* HEADER */
-header {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background: rgba(0,0,0,.92);
-  border-bottom: 1px solid var(--yellow);
-  padding: 0 24px;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  backdrop-filter: blur(10px);
-}
-.logo {
-  font-family: var(--fh);
-  font-size: 13px;
-  font-weight: 900;
-  color: var(--yellow);
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.logo-dot {
-  width: 8px; height: 8px;
-  background: var(--yellow);
-  border-radius: 50%;
-  animation: pulse 1.5s ease-in-out infinite;
-  box-shadow: 0 0 8px var(--yellow);
-}
-@keyframes pulse {
-  0%,100% { opacity:1; transform:scale(1); }
-  50% { opacity:.4; transform:scale(.7); }
-}
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.date-badge {
-  font-family: var(--fm);
-  font-size: 10px;
-  color: var(--yellow);
-  letter-spacing: .08em;
-}
-.week-badge {
-  font-family: var(--fm);
-  font-size: 9px;
-  color: var(--muted);
-}
-.sync-btn {
-  font-family: var(--fh);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: .1em;
-  background: transparent;
-  border: 1px solid var(--yellow);
-  color: var(--yellow);
-  padding: 6px 12px;
-  cursor: pointer;
-  border-radius: 2px;
-  transition: all .2s;
-  text-transform: uppercase;
-}
-.sync-btn:hover { background: var(--yellow); color: #000; }
-
-/* NAV BACK */
-.nav-back {
-  padding: 12px 24px;
-  border-bottom: 1px solid var(--border);
-  position: relative;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.nav-back a {
-  font-family: var(--fm);
-  font-size: 10px;
-  color: var(--muted);
-  text-decoration: none;
-  letter-spacing: .08em;
-  transition: color .2s;
-}
-.nav-back a:hover { color: var(--yellow); }
-
-/* MAIN */
-main {
-  position: relative;
-  z-index: 10;
-  padding: 24px;
-  max-width: 1200px;
-  margin: 0 auto;
+/* GRID */
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+  gap:16px;
+  padding:20px 24px;
 }
 
-/* TITLE ROW */
-.title-row {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: 32px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border);
+/* METRIC CARD — no estilo dos cards do técnico */
+.mcard{
+  border:1px solid var(--border);background:var(--surface);overflow:hidden;border-radius:8px;
+  display:flex;flex-direction:column;
+  transition:border-color .2s;
 }
-.title-row h1 {
-  font-family: var(--fh);
-  font-size: 22px;
-  font-weight: 900;
-  color: var(--yellow);
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  line-height: 1;
-}
-.title-row p {
-  font-family: var(--fm);
-  font-size: 10px;
-  color: var(--muted);
-  margin-top: 6px;
-  letter-spacing: .06em;
-}
-.last-update {
-  font-family: var(--fm);
-  font-size: 9px;
-  color: var(--muted);
-  text-align: right;
-}
+.mcard:hover{border-color:rgba(245,200,0,.3);}
+.mcard.done{border-color:rgba(34,197,94,.35);}
 
-/* METRICS GRID */
-.metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
+/* Card header — igual col-header do técnico */
+.mcard-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;border-bottom:1px solid var(--border);position:relative;
 }
+.mcard-head::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:var(--accent);
+}
+.mcard.done .mcard-head::before{background:var(--green);}
+.mcard-title{font-family:var(--fh);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+.mcard-icon{font-size:14px;opacity:.8;}
 
-/* METRIC CARD */
-.mcard {
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 20px;
-  position: relative;
-  overflow: hidden;
-  transition: border-color .3s;
-}
-.mcard::before {
-  content:'';
-  position:absolute;
-  top:0; left:0; right:0;
-  height: 2px;
-  background: var(--yellow);
-  opacity: .6;
-  transition: opacity .3s;
-}
-.mcard.achieved::before {
-  background: var(--green);
-  opacity: 1;
-  box-shadow: 0 0 12px var(--green);
-}
-.mcard.achieved { border-color: rgba(0,230,118,.2); }
-.mcard:hover { border-color: rgba(245,196,0,.3); }
+/* Card body */
+.mcard-body{padding:14px;display:flex;flex-direction:column;gap:12px;}
 
-.mcard-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 20px;
+/* Twin row: Hoje | Semana */
+.twin{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.metric-half{
+  background:var(--surface2);border:1px solid var(--border);border-radius:6px;
+  padding:10px;display:flex;flex-direction:column;gap:6px;
 }
-.mcard-label {
-  font-family: var(--fm);
-  font-size: 9px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: .12em;
-  margin-bottom: 4px;
+.metric-half-label{font-family:var(--fm);font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
+.metric-half-count{
+  font-family:var(--fh);font-size:26px;font-weight:800;line-height:1;color:var(--accent);
+  transition:color .3s;
 }
-.mcard-title {
-  font-family: var(--fh);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--yellow);
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  line-height: 1.2;
-}
-.mcard.achieved .mcard-title { color: var(--green); }
-.mcard-icon {
-  font-size: 20px;
-  opacity: .7;
-}
+.metric-half-count.done{color:var(--green);}
+.metric-half-goal{font-family:var(--fm);font-size:8px;color:var(--muted);}
+.metric-half-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:2px;}
+.metric-half-bar-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .6s cubic-bezier(.4,0,.2,1);width:0%;}
+.metric-half-bar-fill.done{background:var(--green);}
 
-/* TWIN METRICS */
-.twin {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+/* Done badge */
+.done-badge{
+  display:none;
+  font-family:var(--fm);font-size:8px;font-weight:600;
+  background:rgba(34,197,94,.12);color:var(--green);
+  border:1px solid rgba(34,197,94,.25);padding:2px 8px;border-radius:20px;
+  letter-spacing:.06em;
 }
+.mcard.done .done-badge{display:inline-block;}
 
-.metric-block {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+/* Vendas card — sem meta, só contador */
+.counter-only{
+  display:flex;align-items:center;justify-content:center;flex-direction:column;
+  gap:2px;padding:6px 0;
 }
-.metric-period {
-  font-family: var(--fm);
-  font-size: 8px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: .1em;
-}
+.counter-only .big{font-family:var(--fh);font-size:32px;font-weight:800;color:var(--accent);line-height:1;}
+.counter-only .sub{font-family:var(--fm);font-size:8px;color:var(--muted);}
 
-/* ARC SVG */
-.arc-wrap {
-  position: relative;
-  width: 110px;
-  height: 65px;
-  margin: 0 auto;
-}
-.arc-wrap svg {
-  width: 110px;
-  height: 65px;
-  overflow: visible;
-}
-.arc-bg {
-  fill: none;
-  stroke: var(--dim);
-  stroke-width: 5;
-  stroke-linecap: round;
-}
-.arc-fg {
-  fill: none;
-  stroke: var(--yellow);
-  stroke-width: 5;
-  stroke-linecap: round;
-  transition: stroke-dashoffset .8s cubic-bezier(.4,0,.2,1), stroke .3s;
-}
-.arc-fg.achieved { stroke: var(--green); }
-.arc-center {
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  text-align: center;
-  line-height: 1;
-}
-.arc-count {
-  font-family: var(--fh);
-  font-size: 20px;
-  font-weight: 900;
-  color: var(--yellow);
-  letter-spacing: -.02em;
-  display: block;
-  transition: color .3s;
-}
-.arc-count.achieved { color: var(--green); text-shadow: 0 0 16px var(--green2); }
-.arc-goal {
-  font-family: var(--fm);
-  font-size: 8px;
-  color: var(--muted);
-  display: block;
-  margin-top: 2px;
-}
-
-/* PCT bar */
-.pct-bar-wrap {
-  margin-top: 6px;
-  height: 3px;
-  background: var(--dim);
-  border-radius: 2px;
-  overflow: hidden;
-}
-.pct-bar {
-  height: 100%;
-  background: var(--yellow);
-  border-radius: 2px;
-  transition: width .8s cubic-bezier(.4,0,.2,1), background .3s;
-}
-.pct-bar.achieved { background: var(--green); box-shadow: 0 0 6px var(--green); }
-.pct-label {
-  font-family: var(--fm);
-  font-size: 8px;
-  color: var(--muted);
-  margin-top: 4px;
-  text-align: right;
-}
-
-/* ACHIEVED GLOW */
-@keyframes glow-pulse {
-  0%,100% { box-shadow: 0 0 0 rgba(0,230,118,0); }
-  50% { box-shadow: 0 0 20px rgba(0,230,118,.15); }
-}
-.mcard.achieved { animation: glow-pulse 2s ease-in-out infinite; }
-
-/* ACHIEVED BADGE */
-.achieved-badge {
-  display: none;
-  font-family: var(--fm);
-  font-size: 8px;
-  color: var(--green);
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  border: 1px solid rgba(0,230,118,.3);
-  padding: 2px 6px;
-  border-radius: 2px;
-  margin-left: 8px;
-  vertical-align: middle;
-}
-.achieved .achieved-badge { display: inline; }
-
-/* LOADING */
-.loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 300px;
-  flex-direction: column;
-  gap: 16px;
-}
-.loading-ring {
-  width: 48px; height: 48px;
-  border: 3px solid var(--dim);
-  border-top-color: var(--yellow);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-@keyframes spin { to { transform:rotate(360deg); } }
-.loading-text {
-  font-family: var(--fm);
-  font-size: 11px;
-  color: var(--muted);
-  letter-spacing: .08em;
-}
-
-/* ERROR */
-.error-box {
-  background: rgba(239,68,68,.08);
-  border: 1px solid rgba(239,68,68,.3);
-  border-radius: 4px;
-  padding: 20px;
-  text-align: center;
-  font-family: var(--fm);
-  font-size: 11px;
-  color: #ef4444;
-  margin: 40px 0;
-}
+/* LOADING / ERROR */
+.loading-wrap{display:flex;align-items:center;justify-content:center;min-height:300px;flex-direction:column;gap:12px;}
+.spinner{width:36px;height:36px;border:3px solid var(--surface2);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{font-family:var(--fm);font-size:10px;color:var(--muted);}
+.error-box{margin:40px 24px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:20px;font-family:var(--fm);font-size:11px;color:#ef4444;text-align:center;}
 </style>
 </head>
 <body>
-<div class="grid-bg"></div>
 
+<!-- HEADER -->
 <header>
   <div class="logo">
-    <div class="logo-dot"></div>
-    Reparo Eletro
+    <div class="logo-icon">⚡</div>
+    <div class="logo-text">Reparo<span>Eletro</span></div>
   </div>
-  <div class="header-right">
-    <div>
-      <div class="date-badge" id="h-date">—</div>
-      <div class="week-badge" id="h-week">—</div>
-    </div>
-    <button class="sync-btn" onclick="load()">↻ Sync</button>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <a class="nav-btn" href="/">Home</a>
+    <a class="nav-btn" href="/tecnico">Técnico</a>
+    <a class="nav-btn" href="/financeiro">Financeiro</a>
+    <a class="nav-btn active" href="/metas">Metas</a>
+  </div>
+  <div class="stat-pill">
+    <div class="live-dot"></div>
+    <span id="h-date">—</span>
   </div>
 </header>
 
-<div class="nav-back">
-  <a href="/">← Home</a>
-  <span style="color:var(--border)">|</span>
-  <a href="/adm">ADM</a>
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <div>
+    <div class="board-title">Painel de <span>Metas</span></div>
+    <div class="date-label" id="h-week" style="margin-top:3px;">—</div>
+  </div>
+  <div class="toolbar-right">
+    <button class="action-btn" onclick="load()">↻ Atualizar</button>
+  </div>
 </div>
 
-<main>
-  <div class="title-row">
-    <div>
-      <h1>Mission Control <span class="achieved-badge" style="display:none"></span></h1>
-      <p>Painel de Metas — Reparo Eletro Conserto de Eletrodomésticos</p>
-    </div>
-    <div class="last-update" id="last-update">—</div>
-  </div>
+<!-- BARRA DE PROGRESSO GERAL -->
+<div class="progress-wrap" id="progress-wrap" style="display:none;">
+</div>
 
-  <div id="content">
-    <div class="loading">
-      <div class="loading-ring"></div>
-      <div class="loading-text">Carregando dados...</div>
-    </div>
+<!-- CONTEÚDO -->
+<div id="content">
+  <div class="loading-wrap">
+    <div class="spinner"></div>
+    <div class="loading-text">Carregando metas...</div>
   </div>
-</main>
+</div>
 
 <script>
 var METRICS = [
-  { key: "coletaSolicitada", title: "Coletas Solicitadas", icon: "📦", goalDay: 40,  goalWeek: 200, src: "board" },
-  { key: "orcEnviado",       title: "Orçamentos Enviados", icon: "📋", goalDay: 40,  goalWeek: 200, src: "board" },
-  { key: "aprovadoLoja",     title: "Aprovados Loja",       icon: "🏪", goalDay: 15,  goalWeek: 90,  src: "board" },
-  { key: "aprovadoTotal",    title: "Aprovados Total",       icon: "✅", goalDay: 35,  goalWeek: 200, src: "board" },
-  { key: "erp",              title: "ERP",                   icon: "💾", goalDay: 35,  goalWeek: 200, src: "board" },
-  { key: "equipCadastrado",  title: "Equip. Cadastrados",    icon: "🔧", goalDay: 0,   goalWeek: 0,   src: "vendas", noMeta: true },
-  { key: "vendaLoja",        title: "Vendas Loja",           icon: "🏪", goalDay: 0,   goalWeek: 0,   src: "vendas", noMeta: true },
-  { key: "vendaOnline",      title: "Vendas Online",         icon: "🌐", goalDay: 0,   goalWeek: 0,   src: "vendas", noMeta: true },
+  { key:"coletaSolicitada", title:"Coletas Solicitadas", icon:"📦", goalDay:40,  goalWeek:200, src:"board" },
+  { key:"orcEnviado",       title:"Orçamentos Enviados", icon:"📋", goalDay:40,  goalWeek:200, src:"board" },
+  { key:"aprovadoLoja",     title:"Aprovados Loja",       icon:"🏪", goalDay:15,  goalWeek:90,  src:"board" },
+  { key:"aprovadoTotal",    title:"Aprovados Total",       icon:"✅", goalDay:35,  goalWeek:200, src:"board" },
+  { key:"erp",              title:"ERP",                   icon:"💾", goalDay:35,  goalWeek:200, src:"board" },
 ];
 
-// Semicircle arc path: cx=55, cy=55, r=45, 180deg sweep
-var CX = 55, CY = 55, R = 45;
-var ARC_LEN = Math.PI * R; // half circle circumference
+var VENDAS_METRICS = [
+  { key:"equipCadastrado", title:"Equip. Cadastrados", icon:"🔧", dayKey:"cadastradosHoje",   weekKey:"cadastradosSemana"  },
+  { key:"vendaLoja",       title:"Vendas Loja",         icon:"🏪", dayKey:"vendaLojaHoje",     weekKey:"vendaLojaSemana"    },
+  { key:"vendaOnline",     title:"Vendas Online",        icon:"🌐", dayKey:"vendaOnlineHoje",   weekKey:"vendaOnlineSemana"  },
+];
 
-function arcPath(pct) {
-  // Clamp
-  pct = Math.max(0, Math.min(1, pct));
-  var dashLen = pct * ARC_LEN;
-  return dashLen;
-}
-
-function buildArc(count, goal, id) {
-  var pct = goal > 0 ? Math.min(count / goal, 1) : 0;
-  var dash = arcPath(pct);
-  var done = count >= goal;
-  var fgClass = done ? "arc-fg achieved" : "arc-fg";
-  var countClass = done ? "arc-count achieved" : "arc-count";
-  var total = ARC_LEN;
-  // arc from left to right, bottom half omitted
-  var startX = CX - R, startY = CY;
-  var endX   = CX + R, endY   = CY;
-  return '<div class="arc-wrap">' +
-    '<svg viewBox="0 0 110 65" preserveAspectRatio="xMidYMid meet">' +
-      '<path class="arc-bg" ' +
-        'd="M '+(CX-R)+' '+CY+' A '+R+' '+R+' 0 0 1 '+(CX+R)+' '+CY+'" ' +
-        'stroke-dasharray="'+total+'" stroke-dashoffset="0"/>' +
-      '<path class="'+fgClass+'" id="arc-'+id+'" ' +
-        'd="M '+(CX-R)+' '+CY+' A '+R+' '+R+' 0 0 1 '+(CX+R)+' '+CY+'" ' +
-        'stroke-dasharray="'+total+' '+total+'" stroke-dashoffset="'+total+'"/>' +
-    '</svg>' +
-    '<div class="arc-center">' +
-      '<span class="'+countClass+'" id="cnt-'+id+'">'+ count +'</span>' +
-      '<span class="arc-goal">/ '+goal+'</span>' +
-    '</div>' +
-  '</div>';
-}
-
-function buildMetricHalf(count, goal, id, noMeta) {
-  if (noMeta || goal <= 0) {
-    // Counter only — no arc, no bar
-    return '<div style="text-align:center;padding:12px 0;">' +
-      '<span style="font-family:var(--fh);font-size:28px;font-weight:900;color:var(--yellow);" id="cnt-'+id+'">'+count+'</span>' +
-      '<span style="display:block;font-family:var(--fm);font-size:8px;color:var(--muted);margin-top:4px;">registros</span>' +
-    '</div>';
+function buildHalf(count, goal, id, noMeta) {
+  var done = !noMeta && goal > 0 && count >= goal;
+  var pct  = (noMeta || goal <= 0) ? 0 : Math.min(count / goal, 1);
+  var countClass = "metric-half-count" + (done ? " done" : "");
+  var fillClass  = "metric-half-bar-fill" + (done ? " done" : "");
+  var html = '<div class="metric-half">' +
+    '<div class="metric-half-label" id="lbl-'+id+'"></div>' +
+    '<div class="'+countClass+'" id="cnt-'+id+'">'+count+'</div>';
+  if (!noMeta && goal > 0) {
+    html += '<div class="metric-half-goal">meta: '+goal+'</div>' +
+      '<div class="metric-half-bar"><div class="'+fillClass+'" id="bar-'+id+'" style="width:0%"></div></div>';
   }
-  var pct = goal > 0 ? Math.min(count / goal, 1) : 0;
-  var done = count >= goal;
-  return buildArc(count, goal, id) +
-    '<div class="pct-bar-wrap">' +
-      '<div class="pct-bar'+(done?" achieved":"")+ '" id="bar-'+id+'" style="width:0%"></div>' +
-    '</div>' +
-    '<div class="pct-label" id="pct-'+id+'">0%</div>';
+  html += '</div>';
+  return html;
 }
 
-function buildCard(m, today, week, vendas) {
-  var dayCount, weekCount;
-  if (m.src === "vendas") {
-    if (m.key === "equipCadastrado") { dayCount = (vendas||{}).cadastradosHoje||0;   weekCount = (vendas||{}).cadastradosSemana||0; }
-    if (m.key === "vendaLoja")       { dayCount = (vendas||{}).vendaLojaHoje||0;     weekCount = (vendas||{}).vendaLojaSemana||0; }
-    if (m.key === "vendaOnline")     { dayCount = (vendas||{}).vendaOnlineHoje||0;   weekCount = (vendas||{}).vendaOnlineSemana||0; }
-  } else {
-    dayCount  = (today[m.key] && today[m.key].count != null) ? today[m.key].count : 0;
-    weekCount = (week[m.key]  && week[m.key].count  != null) ? week[m.key].count  : 0;
-  }
-  var dayDone   = !m.noMeta && dayCount  >= m.goalDay;
-  var weekDone  = !m.noMeta && weekCount >= m.goalWeek;
-  var anyDone   = dayDone || weekDone;
-  var cardClass = "mcard" + (anyDone ? " achieved" : "");
+function buildCard(m, dayCount, weekCount) {
+  var dayDone  = m.goalDay  > 0 && dayCount  >= m.goalDay;
+  var weekDone = m.goalWeek > 0 && weekCount >= m.goalWeek;
+  var anyDone  = dayDone || weekDone;
+  var cardClass = "mcard" + (anyDone ? " done" : "");
   return '<div class="'+cardClass+'" id="card-'+m.key+'">' +
-    '<div class="mcard-header">' +
-      '<div>' +
-        '<div class="mcard-label">Indicador</div>' +
-        '<div class="mcard-title">'+m.title+'<span class="achieved-badge">ATINGIDO</span></div>' +
+    '<div class="mcard-head">' +
+      '<div style="display:flex;align-items:center;gap:8px;">' +
+        '<span class="mcard-title">'+m.title+'</span>' +
+        '<span class="done-badge">META ✓</span>' +
       '</div>' +
-      '<div class="mcard-icon">'+m.icon+'</div>' +
+      '<span class="mcard-icon">'+m.icon+'</span>' +
     '</div>' +
-    '<div class="twin">' +
-      '<div class="metric-block">' +
-        '<div class="metric-period">Hoje</div>' +
-        buildMetricHalf(dayCount, m.goalDay, m.key+"_d", m.noMeta) +
-      '</div>' +
-      '<div class="metric-block">' +
-        '<div class="metric-period">Semana</div>' +
-        buildMetricHalf(weekCount, m.goalWeek, m.key+"_w", m.noMeta) +
+    '<div class="mcard-body">' +
+      '<div class="twin">' +
+        buildHalf(dayCount,  m.goalDay,  m.key+"_d", !m.goalDay) +
+        buildHalf(weekCount, m.goalWeek, m.key+"_w", !m.goalWeek) +
       '</div>' +
     '</div>' +
   '</div>';
 }
 
-function animateArcs(today, week) {
+function buildVendasCard(m, dayCount, weekCount) {
+  return '<div class="mcard">' +
+    '<div class="mcard-head">' +
+      '<span class="mcard-title">'+m.title+'</span>' +
+      '<span class="mcard-icon">'+m.icon+'</span>' +
+    '</div>' +
+    '<div class="mcard-body">' +
+      '<div class="twin">' +
+        '<div class="metric-half">' +
+          '<div class="metric-half-label">Hoje</div>' +
+          '<div class="metric-half-count" id="cnt-'+m.key+'_d">'+dayCount+'</div>' +
+        '</div>' +
+        '<div class="metric-half">' +
+          '<div class="metric-half-label">Semana</div>' +
+          '<div class="metric-half-count" id="cnt-'+m.key+'_w">'+weekCount+'</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function animateBars(today, week) {
   METRICS.forEach(function(m) {
-    if (m.noMeta) return; // counter-only cards don't animate arcs
-    var dayCount  = (today[m.key] && today[m.key].count != null) ? today[m.key].count : 0;
-    var weekCount = (week[m.key]  && week[m.key].count  != null) ? week[m.key].count  : 0;
-    [[dayCount, m.goalDay, m.key+"_d"], [weekCount, m.goalWeek, m.key+"_w"]].forEach(function(x) {
-      var count = x[0], goal = x[1], id = x[2];
-      var pct = goal > 0 ? Math.min(count/goal, 1) : 0;
-      var dashLen = pct * ARC_LEN;
-      var total   = ARC_LEN;
-      var arcEl = document.getElementById("arc-"+id);
+    var dayCount  = today[m.key] ? today[m.key].count : 0;
+    var weekCount = week[m.key]  ? week[m.key].count  : 0;
+    [[dayCount, m.goalDay, m.key+"_d", "Hoje"], [weekCount, m.goalWeek, m.key+"_w", "Semana"]].forEach(function(x) {
+      var count = x[0], goal = x[1], id = x[2], lbl = x[3];
+      var lblEl = document.getElementById("lbl-"+id);
       var barEl = document.getElementById("bar-"+id);
-      var pctEl = document.getElementById("pct-"+id);
-      if (arcEl) {
-        arcEl.style.strokeDashoffset = (total - dashLen).toString();
-      }
-      if (barEl) {
+      if (lblEl) lblEl.textContent = lbl;
+      if (barEl && goal > 0) {
+        var pct = Math.min(count/goal, 1);
         barEl.style.width = Math.round(pct*100)+"%";
-        if (count >= goal) barEl.classList.add("achieved");
+        if (count >= goal) barEl.classList.add("done");
       }
-      if (pctEl) pctEl.textContent = Math.round(pct*100)+"%";
     });
   });
+}
+
+function buildProgressWrap(today, week) {
+  var wrap = document.getElementById("progress-wrap");
+  wrap.style.display = "flex";
+  var html = "";
+  METRICS.forEach(function(m) {
+    var total = (today[m.key]?.count||0) + (week[m.key]?.count||0);
+    var totalGoal = m.goalDay + m.goalWeek;
+    var pct = totalGoal > 0 ? Math.min(total/totalGoal,1) : 0;
+    var done = pct >= 1;
+    var fillClass = "progress-bar-fg" + (done?" done":"");
+    html += '<div class="progress-item">' +
+      '<span class="progress-label">'+m.icon+' '+m.title+'</span>' +
+      '<div class="progress-bar-bg"><div class="'+fillClass+'" style="width:'+Math.round(pct*100)+'%"></div></div>' +
+      '<span class="progress-pct">'+Math.round(pct*100)+'%</span>' +
+    '</div>';
+  });
+  wrap.innerHTML = html;
 }
 
 async function load() {
@@ -575,25 +301,38 @@ async function load() {
     if (!d.ok) throw new Error(d.error || "Erro");
 
     document.getElementById("h-date").textContent = d.todayLabel || "—";
-    document.getElementById("h-week").textContent = d.weekLabel  || "—";
-    document.getElementById("last-update").textContent = "Atualizado: " + new Date().toLocaleTimeString("pt-BR", {timeZone:"America/Sao_Paulo"});
+    document.getElementById("h-week").textContent = "Semana: " + (d.weekLabel || "—");
 
     var today = d.today || {};
     var week  = d.week  || {};
+    var vend  = d.vendas || {};
 
-    var vendas = d.vendas || {};
-    var html = '<div class="metrics-grid">';
+    // Build grid
+    var html = '<div class="grid">';
     METRICS.forEach(function(m) {
-      html += buildCard(m, today, week, vendas);
+      var dc = today[m.key] ? today[m.key].count : 0;
+      var wc = week[m.key]  ? week[m.key].count  : 0;
+      html += buildCard(m, dc, wc);
+    });
+    // Linha divisória
+    html += '<div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:4px;font-family:var(--fh);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;">Vendas &amp; Equipamentos</div>';
+    VENDAS_METRICS.forEach(function(m) {
+      var dc = vend[m.dayKey]  || 0;
+      var wc = vend[m.weekKey] || 0;
+      html += buildVendasCard(m, dc, wc);
     });
     html += '</div>';
     document.getElementById("content").innerHTML = html;
 
-    // Animate arcs after DOM ready
-    setTimeout(function() { animateArcs(today, week); }, 80);
+    // Animate after DOM
+    setTimeout(function() {
+      animateBars(today, week);
+      buildProgressWrap(today, week);
+    }, 60);
+
   } catch(e) {
     document.getElementById("content").innerHTML =
-      '<div class="error-box">❌ Erro ao carregar dados: ' + e.message + '</div>';
+      '<div class="error-box">❌ Erro ao carregar dados: '+e.message+'</div>';
   }
 }
 
