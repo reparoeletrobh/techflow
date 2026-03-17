@@ -1,13 +1,29 @@
-// v2026-03-16-fix-xpath
-const https     = require("https");
-const forge     = require("node-forge");
-const xmlCrypto = require("xml-crypto");
+// nfse.js — NFS-e Nacional com Certificado A1
+// Dependências: node-forge (package.json)
+const https  = require("https");
 const crypto = require("crypto");
 const zlib   = require("zlib");
+const forge  = require("node-forge");
 
-const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/[\'"]/g,"").trim();
-const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/[\'"]/g,"").trim();
+const NFSE_HOMOLOG  = (process.env.NFSE_HOMOLOG || "false") === "true";
+const NFSE_HOST     = NFSE_HOMOLOG ? "sefin.producaorestrita.nfse.gov.br" : "sefin.nfse.gov.br";
+const NFSE_PATH     = "/SefinNacional/nfse";
+const CNPJ_EMPRESA  = (process.env.NFSE_CNPJ || "59485378000175").replace(/\D/g,"");
+const IM_EMPRESA    =  process.env.NFSE_IM   || "16391680010";
+const COD_MUN_BH    = "3106200";
+const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g,"").trim();
+const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g,"").trim();
 
+// ── Cert ─────────────────────────────────────────────────────
+function loadCert() {
+  const b64  = (process.env.NFSE_CERT_PFX   || "").trim();
+  const pass = (process.env.NFSE_CERT_SENHA  || "").trim();
+  if (!b64)  throw new Error("NFSE_CERT_PFX nao configurado no Vercel");
+  if (!pass) throw new Error("NFSE_CERT_SENHA nao configurado no Vercel");
+  return { pfx: Buffer.from(b64, "base64"), passphrase: pass };
+}
+
+// ── Redis ────────────────────────────────────────────────────
 async function dbGet(key) {
   try {
     const r = await fetch(UPSTASH_URL + "/pipeline", {
@@ -33,217 +49,235 @@ async function dbSet(key, value) {
   } catch(e) { return false; }
 }
 
-// Homologação: sefin.producaorestrita.nfse.gov.br
-// Produção:    sefin.nfse.gov.br
-const NFSE_HOMOLOG   = (process.env.NFSE_HOMOLOG || "false") === "true"; // default: PRODUÇÃO
-const NFSE_HOST      = NFSE_HOMOLOG ? "sefin.producaorestrita.nfse.gov.br" : "sefin.nfse.gov.br";
-const NFSE_PATH      = "/SefinNacional/nfse";
-const CNPJ_EMPRESA   = (process.env.NFSE_CNPJ || "59485378000175").replace(/\D/g,"");
-const IM_EMPRESA     =  process.env.NFSE_IM   || "16391680010";
-const COD_MUN_BH     = "3106200";
-
-function loadCert() {
-  const b64  = (process.env.NFSE_CERT_PFX   || "").trim();
-  const pass = (process.env.NFSE_CERT_SENHA  || "").trim();
-  if (!b64)  throw new Error("NFSE_CERT_PFX não configurado no Vercel");
-  if (!pass) throw new Error("NFSE_CERT_SENHA não configurado no Vercel");
-  return { pfx: Buffer.from(b64, "base64"), passphrase: pass };
-}
-
+// ── Helpers ──────────────────────────────────────────────────
 function escXml(s) {
   return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
-function hoje() {
-  // Data no fuso BRT (UTC-3) para evitar dCompet > dhEmi
-  const d = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
-  const pad = n => String(n).padStart(2,"0");
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-}
 function agora() {
   const d = new Date(new Date().toLocaleString("en-US",{timeZone:"America/Sao_Paulo"}));
-  const pad = n => String(n).padStart(2,"0");
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}-03:00`;
+  const p = n => String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}-03:00`;
+}
+
+function hoje() {
+  const d = new Date(new Date().toLocaleString("en-US",{timeZone:"America/Sao_Paulo"}));
+  const p = n => String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
 }
 
 function genId(seq) {
-  // TSIdDPS = DPS(3) + cMunEmissor(7) + tpInsc(1) + CNPJ(14) + Serie(5) + Numero(15) = 45 chars
-  // tpInsc: 1=CPF, 2=CNPJ
-  var num   = String(seq || 1).padStart(15, "0");
-  var serie = "00001"; // 5 dígitos numéricos
-  var id    = "DPS" + COD_MUN_BH + "2" + CNPJ_EMPRESA + serie + num;
-  return id; // 3+7+1+14+5+15 = 45 chars
+  // TSIdDPS = DPS(3)+cMun(7)+tpInsc(1)+CNPJ(14)+Serie(5)+Numero(15) = 45 chars
+  const num   = String(seq || 1).padStart(15,"0");
+  const serie = "00001";
+  return "DPS" + COD_MUN_BH + "2" + CNPJ_EMPRESA + serie + num;
 }
 
-// Monta XML da DPS conforme schema do governo
+// ── Monta DPS ────────────────────────────────────────────────
 function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
   const cpfLimpo = cpfcnpj.replace(/\D/g,"");
   const isCnpj   = cpfLimpo.length === 14;
-  const toma     = isCnpj ? `<CNPJ>${cpfLimpo}</CNPJ>` : `<CPF>${cpfLimpo}</CPF>`;
+  const toma     = isCnpj ? "<CNPJ>" + cpfLimpo + "</CNPJ>" : "<CPF>" + cpfLimpo + "</CPF>";
   const vlr      = parseFloat(valor).toFixed(2);
-  const id       = numDPS; // DPS(3)+cMun(7)+tpInsc(1)+CNPJ(14)+serie(5)+nDPS(15) = 45
-  const nDPS     = String(numDPS).slice(-15).replace(/^0+/,"") || "1";
+  const id       = numDPS;
+  const nDPS     = String(seq_num_only(numDPS));
 
-  return `<?xml version="1.0" encoding="UTF-8"?>\n` +
-`<DPS versao="1.01" xmlns="http://www.sped.fazenda.gov.br/nfse">\n` +
-`  <infDPS Id="${id}">\n` +
-`    <tpAmb>${NFSE_HOMOLOG ? 2 : 1}</tpAmb>\n` +
-`    <dhEmi>${agora()}</dhEmi>\n` +
-`    <verAplic>reparoeletro-1.0</verAplic>\n` +
-`    <serie>00001</serie>\n` +
-`    <nDPS>${nDPS}</nDPS>\n` +
-`    <dCompet>${hoje()}</dCompet>\n` +
-`    <tpEmit>1</tpEmit>\n` +
-`    <cLocEmi>${COD_MUN_BH}</cLocEmi>\n` +
-`    <prest>\n` +
-`      <CNPJ>${CNPJ_EMPRESA}</CNPJ>\n` +
-`      <IM>${IM_EMPRESA}</IM>\n` +
-`      <regTrib>\n` +
-`        <opSimpNac>3</opSimpNac>\n` +
-`        <regApTribSN>1</regApTribSN>\n` +
-`        <regEspTrib>0</regEspTrib>\n` +
-`      </regTrib>\n` +
-`    </prest>\n` +
-`    <toma>\n` +
-`      ${toma}\n` +
-`      <xNome>${escXml(nome || "Consumidor Final")}</xNome>\n` +
-`    </toma>\n` +
-`    <serv>\n` +
-`      <locPrest>\n` +
-`        <cLocPrestacao>${COD_MUN_BH}</cLocPrestacao>\n` +
-`      </locPrest>\n` +
-`      <cServ>\n` +
-`        <cTribNac>140201</cTribNac>\n` +
-`        <cTribMun>001</cTribMun>\n` +
-`        <xDescServ>${escXml(discriminacao)}</xDescServ>\n` +
-`      </cServ>\n` +
-`    </serv>\n` +
-`    <valores>\n` +
-`      <vServPrest>\n` +
-`        <vServ>${vlr}</vServ>\n` +
-`      </vServPrest>\n` +
-`      <trib>\n` +
-`        <tribMun>\n` +
-`          <tribISSQN>1</tribISSQN>\n` +
-`          <tpRetISSQN>1</tpRetISSQN>\n` +
-`        </tribMun>\n` +
-`        <totTrib>\n` +
-`          <pTotTribSN>6.00</pTotTribSN>\n` +
-`        </totTrib>\n` +
-`      </trib>\n` +
-`    </valores>\n` +
-`  </infDPS>\n` +
-`</DPS>`;
+  return '<?xml version="1.0" encoding="UTF-8"?>\n' +
+'<DPS versao="1.01" xmlns="http://www.sped.fazenda.gov.br/nfse">\n' +
+'  <infDPS Id="' + id + '">\n' +
+'    <tpAmb>' + (NFSE_HOMOLOG ? 2 : 1) + '</tpAmb>\n' +
+'    <dhEmi>' + agora() + '</dhEmi>\n' +
+'    <verAplic>reparoeletro-1.0</verAplic>\n' +
+'    <serie>00001</serie>\n' +
+'    <nDPS>' + nDPS + '</nDPS>\n' +
+'    <dCompet>' + hoje() + '</dCompet>\n' +
+'    <tpEmit>1</tpEmit>\n' +
+'    <cLocEmi>' + COD_MUN_BH + '</cLocEmi>\n' +
+'    <prest>\n' +
+'      <CNPJ>' + CNPJ_EMPRESA + '</CNPJ>\n' +
+'      <IM>' + IM_EMPRESA + '</IM>\n' +
+'      <regTrib>\n' +
+'        <opSimpNac>3</opSimpNac>\n' +
+'        <regApTribSN>1</regApTribSN>\n' +
+'        <regEspTrib>0</regEspTrib>\n' +
+'      </regTrib>\n' +
+'    </prest>\n' +
+'    <toma>\n' +
+'      ' + toma + '\n' +
+'      <xNome>' + escXml(nome || "Consumidor Final") + '</xNome>\n' +
+'    </toma>\n' +
+'    <serv>\n' +
+'      <locPrest>\n' +
+'        <cLocPrestacao>' + COD_MUN_BH + '</cLocPrestacao>\n' +
+'      </locPrest>\n' +
+'      <cServ>\n' +
+'        <cTribNac>140201</cTribNac>\n' +
+'        <cTribMun>001</cTribMun>\n' +
+'        <xDescServ>' + escXml(discriminacao) + '</xDescServ>\n' +
+'      </cServ>\n' +
+'    </serv>\n' +
+'    <valores>\n' +
+'      <vServPrest>\n' +
+'        <vServ>' + vlr + '</vServ>\n' +
+'      </vServPrest>\n' +
+'      <trib>\n' +
+'        <tribMun>\n' +
+'          <tribISSQN>1</tribISSQN>\n' +
+'          <tpRetISSQN>1</tpRetISSQN>\n' +
+'        </tribMun>\n' +
+'        <totTrib>\n' +
+'          <pTotTribSN>6.00</pTotTribSN>\n' +
+'        </totTrib>\n' +
+'      </trib>\n' +
+'    </valores>\n' +
+'  </infDPS>\n' +
+'</DPS>';
 }
 
+// Extrai apenas o numero sequencial do TSIdDPS
+function seq_num_only(id) {
+  // id = DPS(3)+cMun(7)+tpInsc(1)+CNPJ(14)+Serie(5)+Numero(15)
+  const n = String(id).slice(-15).replace(/^0+/,"");
+  return n || "1";
+}
 
-// Assina DPS com XMLDSig usando node-forge
+// ── Assinatura XMLDSig com node-forge ────────────────────────
 async function assinarXML(xml, pfxBuf, passphrase) {
   try {
-    // 1. Extrai chave e cert do PFX
     const p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(pfxBuf));
     const p12     = forge.pkcs12.pkcs12FromAsn1(p12Asn1, passphrase);
     const shrouded = (p12.getBags({bagType:forge.pki.oids.pkcs8ShroudedKeyBag})[forge.pki.oids.pkcs8ShroudedKeyBag]||[]);
     const plain    = (p12.getBags({bagType:forge.pki.oids.keyBag})[forge.pki.oids.keyBag]||[]);
     const keyBag   = [...shrouded,...plain][0];
-    if (!keyBag) throw new Error("Chave privada não encontrada");
+    if (!keyBag) throw new Error("Chave privada nao encontrada no PFX");
     const privateKey = keyBag.key;
+
     const certBags   = (p12.getBags({bagType:forge.pki.oids.certBag})[forge.pki.oids.certBag]||[]);
     const certBase64 = certBags[0]
       ? forge.pki.certificateToPem(certBags[0].cert)
           .replace(/-----BEGIN CERTIFICATE-----/,"").replace(/-----END CERTIFICATE-----/,"").replace(/\s/g,"")
       : "";
 
-    // 2. Id do infDPS
     const idMatch = xml.match(/infDPS Id="([^"]+)"/);
-    if (!idMatch) throw new Error("Id do infDPS não encontrado");
+    if (!idMatch) throw new Error("Id do infDPS nao encontrado");
     const refId = idMatch[1];
 
-    // 3. C14N do infDPS — injeta xmlns herdado e expande self-closing tags
+    // C14N do infDPS — injeta xmlns e expande self-closing tags
     const infDpsRaw = xml.match(/<infDPS[\s\S]*?<\/infDPS>/)?.[0];
-    if (!infDpsRaw) throw new Error("infDPS não encontrado");
+    if (!infDpsRaw) throw new Error("infDPS nao encontrado");
     let infDpsC14n = infDpsRaw.replace(/^<infDPS /, '<infDPS xmlns="http://www.sped.fazenda.gov.br/nfse" ');
-    // C14N: expande self-closing tags (/<tag attr/> → <tag attr></tag>)
-    infDpsC14n = infDpsC14n.replace(/<([a-zA-Z][^>]*?)\/>/g, (m, inner) => `<${inner.trimEnd()}></${inner.trim().split(/[\s>]/)[0]}>`);
+    infDpsC14n = infDpsC14n.replace(/<([a-zA-Z][^>]*?)\/>/g, (m, inner) => "<" + inner.trimEnd() + "></" + inner.trim().split(/[\s>]/)[0] + ">");
 
-    // 4. DigestValue = SHA256(infDpsC14n)
     const md = forge.md.sha256.create();
     md.update(infDpsC14n, "utf8");
     const digest = forge.util.encode64(md.digest().bytes());
 
-    // 5. SignedInfo em C14N (sem self-closing, com xmlns standalone para assinar)
-    // Elementos filhos: sem self-closing (C14N expande tudo)
     const signedInfoC14n =
-      `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">` +
-      `<CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"></CanonicalizationMethod>` +
-      `<SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"></SignatureMethod>` +
-      `<Reference URI="#${refId}">` +
-        `<Transforms>` +
-          `<Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform>` +
-          `<Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"></Transform>` +
-        `</Transforms>` +
-        `<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"></DigestMethod>` +
-        `<DigestValue>${digest}</DigestValue>` +
-      `</Reference>` +
-      `</SignedInfo>`;
+      '<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">' +
+      '<CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"></CanonicalizationMethod>' +
+      '<SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"></SignatureMethod>' +
+      '<Reference URI="#' + refId + '">' +
+        '<Transforms>' +
+          '<Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform>' +
+          '<Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"></Transform>' +
+        '</Transforms>' +
+        '<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"></DigestMethod>' +
+        '<DigestValue>' + digest + '</DigestValue>' +
+      '</Reference>' +
+      '</SignedInfo>';
 
-    // 6. Assina SignedInfo C14N com RSA-SHA256
     const mdSig = forge.md.sha256.create();
     mdSig.update(signedInfoC14n, "utf8");
     const sigValue = forge.util.encode64(privateKey.sign(mdSig));
 
-    // 7. Bloco Signature no XML (SignedInfo sem xmlns — herdado de Signature)
     const signedInfoInXml = signedInfoC14n.replace('<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">', "<SignedInfo>");
     const signature =
-      `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">` +
+      '<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">' +
         signedInfoInXml +
-        `<SignatureValue>${sigValue}</SignatureValue>` +
-        (certBase64 ? `<KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo>` : "") +
-      `</Signature>`;
+        '<SignatureValue>' + sigValue + '</SignatureValue>' +
+        (certBase64 ? '<KeyInfo><X509Data><X509Certificate>' + certBase64 + '</X509Certificate></X509Data></KeyInfo>' : "") +
+      '</Signature>';
 
     return xml.replace("</infDPS>", "</infDPS>" + signature);
-
   } catch(e) {
     console.error("assinarXML erro:", e.message);
     return xml;
   }
 }
 
+// ── GZip + Base64 ────────────────────────────────────────────
+function gzipBase64(xml) {
+  return new Promise((res, rej) => {
+    zlib.gzip(Buffer.from(xml, "utf8"), (err, buf) => {
+      if (err) return rej(err);
+      res(buf.toString("base64"));
+    });
+  });
+}
 
-// Extrai campos do XML da NFS-e
+// ── Chama API do governo ─────────────────────────────────────
+function chamarAPI(dpsXmlGZipB64, certOpts) {
+  return new Promise((res, rej) => {
+    const body = Buffer.from(JSON.stringify({ dpsXmlGZipB64 }), "utf8");
+    const opts = {
+      hostname: NFSE_HOST, port: 443, path: NFSE_PATH, method: "POST",
+      headers: { "Content-Type": "application/json", "Content-Length": body.length, "Accept": "application/json" },
+      pfx: certOpts.pfx, passphrase: certOpts.passphrase, rejectUnauthorized: true,
+    };
+    const req = https.request(opts, r => {
+      const chunks = [];
+      r.on("data", c => chunks.push(c));
+      r.on("end", () => res({ status: r.statusCode, body: Buffer.concat(chunks).toString("utf8") }));
+    });
+    req.on("error", rej);
+    req.write(body);
+    req.end();
+  });
+}
+
+function parseResp(body) {
+  try {
+    const j = JSON.parse(body);
+    if (j.chaveAcesso) return { ok: true, chaveAcesso: j.chaveAcesso, idDps: j.idDps, alertas: j.alertas };
+    const msgs = (j.mensagens||j.erros||[]).map(m => m.mensagem||m.descricao||JSON.stringify(m)).join("; ");
+    return { ok: false, erro: msgs || j.mensagem || body.slice(0,400) };
+  } catch(e) {
+    return { ok: false, erro: body.slice(0,400) };
+  }
+}
+
+// ── DANFE ────────────────────────────────────────────────────
 function extrairDadosXml(xml) {
-  const get = (tag) => {
-    const m = xml.match(new RegExp("<" + tag + "[^>]*>([\\s\\S]*?)<\\/" + tag + ">"));
+  function get(tag) {
+    var m = xml.match(new RegExp("<" + tag + "[^>]*>([\\s\\S]*?)<\\/" + tag + ">"));
     return m ? m[1].trim() : "";
-  };
-  const getIn = (parent, tag) => {
-    const pMatch = xml.match(new RegExp("<" + parent + "[^>]*>([\\s\\S]*?)<\\/" + parent + ">"));
-    if (!pMatch) return "";
-    const m = pMatch[1].match(new RegExp("<" + tag + "[^>]*>([\\s\\S]*?)<\\/" + tag + ">"));
+  }
+  function getIn(parent, tag) {
+    var pm = xml.match(new RegExp("<" + parent + "[^>]*>([\\s\\S]*?)<\\/" + parent + ">"));
+    if (!pm) return "";
+    var m = pm[1].match(new RegExp("<" + tag + "[^>]*>([\\s\\S]*?)<\\/" + tag + ">"));
     return m ? m[1].trim() : "";
-  };
+  }
   return {
     nNFSe:        get("nNFSe"),
     dhProc:       get("dhProc"),
     dCompet:      get("dCompet"),
     dhEmi:        get("dhEmi"),
     xDescServ:    get("xDescServ"),
-    // vServ dentro de vServPrest
-    vServ:        getIn("vServPrest", "vServ") || get("vServ"),
-    // Tomador: CPF/CNPJ e xNome dentro de <toma>
-    cpfTomador:   getIn("toma", "CPF") || getIn("toma", "CNPJ"),
-    xNomeTomador: getIn("toma", "xNome"),
+    vServ:        getIn("vServPrest","vServ") || get("vServ"),
+    cpfTomador:   getIn("toma","CPF") || getIn("toma","CNPJ"),
+    xNomeTomador: getIn("toma","xNome"),
   };
 }
 
 function gerarDanfeHtml(dados, chave) {
-  const fmtDT = (v) => { try { return new Date(v).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo"}); } catch(e){ return v||""; }};
-  const fmtD  = (v) => v ? v.split("-").reverse().join("/") : "";
-  const fmtV  = (v) => v ? Number(v).toLocaleString("pt-BR",{minimumFractionDigits:2}) : "0,00";
-  const doc   = dados.cpfTomador||"";
-  const docFmt= doc.length===11 ? doc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4")
-                                 : doc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,"$1.$2.$3/$4-$5");
-  const S = (s) => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  var fmtDT = function(v) { try { return new Date(v).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo"}); } catch(e){ return v||""; }};
+  var fmtD  = function(v) { return v ? v.split("-").reverse().join("/") : ""; };
+  var fmtV  = function(v) { return v ? Number(v).toLocaleString("pt-BR",{minimumFractionDigits:2}) : "0,00"; };
+  var doc   = dados.cpfTomador||"";
+  var docFmt= doc.length===11 ? doc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,"$1.$2.$3-$4")
+                               : doc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,"$1.$2.$3/$4-$5");
+  var S = function(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); };
   return "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'>" +
     "<title>NFS-e " + S(dados.nNFSe) + "</title>" +
     "<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:11px;padding:16px;max-width:800px;margin:0 auto}" +
@@ -292,177 +326,179 @@ function gerarDanfeHtml(dados, chave) {
     "</body></html>";
 }
 
+async function buscarESalvarDanfe(chaveAcesso, certOpts) {
+  try {
+    const resp = await new Promise((resolve, reject) => {
+      const opts = {
+        hostname: NFSE_HOST, port: 443,
+        path: "/SefinNacional/nfse/" + chaveAcesso, method: "GET",
+        pfx: certOpts.pfx, passphrase: certOpts.passphrase, rejectUnauthorized: true,
+        headers: { "Accept": "application/json" },
+      };
+      const req = https.request(opts, r => {
+        const chunks = []; r.on("data",c=>chunks.push(c));
+        r.on("end",()=>resolve({ status: r.statusCode, buf: Buffer.concat(chunks) }));
+      });
+      req.on("error", reject); req.end();
+    });
+    if (resp.status !== 200) return false;
+    const json   = JSON.parse(resp.buf.toString("utf8"));
+    const xmlBuf = zlib.gunzipSync(Buffer.from(json.nfseXmlGZipB64, "base64"));
+    const xml    = xmlBuf.toString("utf8");
+    const dados  = extrairDadosXml(xml);
+    const danfeHtml = gerarDanfeHtml(dados, chaveAcesso);
+    await fetch(UPSTASH_URL + "/pipeline", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify([
+        ["SET",    "danfe:" + chaveAcesso, Buffer.from(danfeHtml).toString("base64")],
+        ["EXPIRE", "danfe:" + chaveAcesso, 31536000],
+      ]),
+    });
+    return true;
+  } catch(e) {
+    console.error("buscarESalvarDanfe:", e.message);
+    return false;
+  }
+}
 
-
+// ── HANDLER ──────────────────────────────────────────────────
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin","*");
   res.setHeader("Access-Control-Allow-Methods","GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers","Content-Type");
   if (req.method === "OPTIONS") return res.status(200).end();
-
   const { action } = req.query;
 
-  // ── GET danfe-html — gera DANFE em HTML
-  if (action === "danfe-html") {
-    const chave = (req.query.chave || "").trim();
-    const nome  = (req.query.nome  || "danfe").trim();
-    if (!chave) return res.status(400).json({ ok: false, error: "chave obrigatória" });
-    let certOpts;
-    try { certOpts = loadCert(); } catch(e) { return res.status(400).json({ ok: false, error: e.message }); }
-    const saved = await buscarESalvarDanfe(chave, certOpts).catch(()=>false);
-    const getRedisDanfe = async () => {
-      const r = await fetch(UPSTASH_URL + "/get/danfe:" + chave, { headers: { Authorization: "Bearer " + UPSTASH_TOKEN } });
-      const j = await r.json();
-      return j.result ? Buffer.from(j.result, "base64").toString("utf8") : null;
-    };
-    const html = await getRedisDanfe().catch(()=>null);
-    if (html) { res.setHeader("Content-Type","text/html; charset=utf-8"); return res.status(200).send(html); }
-    return res.status(503).json({ ok: false, error: "DANFE não disponível." });
+  // GET status
+  if (action === "status") {
+    return res.status(200).json({
+      ok: !!(process.env.NFSE_CERT_PFX && process.env.NFSE_CERT_SENHA),
+      temCert: !!(process.env.NFSE_CERT_PFX),
+      temSenha: !!(process.env.NFSE_CERT_SENHA),
+      temIM: !!(IM_EMPRESA),
+      cnpj: CNPJ_EMPRESA, im: IM_EMPRESA, homolog: NFSE_HOMOLOG,
+    });
   }
 
-  // ── GET danfe — serve DANFE (HTML ou PDF) do Redis
+  // GET danfe — serve DANFE do Redis
   if (action === "danfe") {
     const chave = (req.query.chave || "").trim();
-    const nome  = (req.query.nome  || "danfe-" + (chave.slice(-10))).trim();
-    if (!chave) return res.status(400).json({ ok: false, error: "chave obrigatória" });
-
-    const getRedisDanfe = async () => {
+    const nome  = (req.query.nome  || "danfe-" + chave.slice(-10)).trim();
+    if (!chave) return res.status(400).json({ ok: false, error: "chave obrigatoria" });
+    let certOpts;
+    try { certOpts = loadCert(); } catch(e) { return res.status(400).json({ ok: false, error: e.message }); }
+    async function getRedisDanfe() {
       const r = await fetch(UPSTASH_URL + "/get/danfe:" + chave, { headers: { Authorization: "Bearer " + UPSTASH_TOKEN } });
       const j = await r.json();
       return j.result ? Buffer.from(j.result, "base64") : null;
-    };
-
-    let certOpts;
-    try { certOpts = loadCert(); } catch(e) { return res.status(400).json({ ok: false, error: e.message }); }
-
+    }
     let buf = null;
     try { buf = await getRedisDanfe(); } catch(e) {}
-
     if (!buf) {
       try { await buscarESalvarDanfe(chave, certOpts); } catch(e) {}
       try { buf = await getRedisDanfe(); } catch(e) {}
     }
-
     if (buf) {
       const str = buf.toString("utf8");
-      if (str.startsWith("<!DOCTYPE")) {
-        res.setHeader("Content-Type", "text/html; charset=utf-8");
-        return res.status(200).send(str);
-      }
-      // PDF
+      if (str.startsWith("<!DOCTYPE")) { res.setHeader("Content-Type","text/html; charset=utf-8"); return res.status(200).send(str); }
       if (buf[0] === 0x25 && buf[1] === 0x50) {
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `inline; filename="${nome}.pdf"`);
+        res.setHeader("Content-Type","application/pdf");
+        res.setHeader("Content-Disposition","inline; filename=\"" + nome + ".pdf\"");
         return res.status(200).send(buf);
       }
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Content-Type","text/html; charset=utf-8");
       return res.status(200).send(str);
     }
-    return res.status(503).json({ ok: false, error: "DANFE não disponível. Tente em alguns instantes." });
+    return res.status(503).json({ ok: false, error: "DANFE nao disponivel." });
   }
 
-  // ── POST danfe-store — recebe PDF do browser e salva no Redis
-  if (req.method === "POST" && action === "danfe-store") {
-    const { chave, pdfBase64 } = req.body || {};
-    if (!chave || !pdfBase64) return res.status(400).json({ ok: false, error: "chave e pdfBase64 obrigatórios" });
-    try {
-      await fetch(UPSTASH_URL + "/pipeline", {
-        method: "POST",
-        headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
-        body: JSON.stringify([["SET", "danfe:" + chave, pdfBase64], ["EXPIRE", "danfe:" + chave, 31536000]]),
-      });
-      return res.status(200).json({ ok: true });
-    } catch(e) { return res.status(500).json({ ok: false, error: e.message }); }
-  }
-
-  // ── GET danfe-force — força regeneração do DANFE
+  // GET danfe-force — regenera DANFE do XML do governo
   if (action === "danfe-force") {
     const chave = (req.query.chave || "").trim();
-    if (!chave) return res.status(400).json({ ok: false, error: "chave obrigatória" });
+    if (!chave) return res.status(400).json({ ok: false, error: "chave obrigatoria" });
     let certOpts;
-    try { certOpts = loadCert(); } catch(e) { return res.status(200).json({ step: "cert", error: e.message }); }
+    try { certOpts = loadCert(); } catch(e) { return res.status(200).json({ step:"cert", error:e.message }); }
     try {
-      const host = NFSE_HOMOLOG ? "sefin.producaorestrita.nfse.gov.br" : "sefin.nfse.gov.br";
       const resp = await new Promise((resolve, reject) => {
-        const opts = { hostname: host, port: 443, path: `/SefinNacional/nfse/${chave}`, method: "GET",
+        const opts = { hostname: NFSE_HOST, port: 443, path: "/SefinNacional/nfse/" + chave, method: "GET",
           pfx: certOpts.pfx, passphrase: certOpts.passphrase, rejectUnauthorized: false,
           headers: { "Accept": "application/json" },
         };
-        const req2 = https.request(opts, r => { const chunks = []; r.on("data", c=>chunks.push(c)); r.on("end",()=>resolve({status:r.statusCode,buf:Buffer.concat(chunks)})); });
+        const req2 = https.request(opts, r => { const chunks = []; r.on("data",c=>chunks.push(c)); r.on("end",()=>resolve({status:r.statusCode,buf:Buffer.concat(chunks)})); });
         req2.on("error", reject); req2.end();
       });
-      if (resp.status !== 200) return res.status(200).json({ step: "api", status: resp.status, body: resp.buf.slice(0,200).toString() });
+      if (resp.status !== 200) return res.status(200).json({ step:"api", status:resp.status, body:resp.buf.slice(0,200).toString() });
       const json   = JSON.parse(resp.buf.toString("utf8"));
       const xmlBuf = zlib.gunzipSync(Buffer.from(json.nfseXmlGZipB64, "base64"));
       const xml    = xmlBuf.toString("utf8");
       const dados  = extrairDadosXml(xml);
-      dados.chaveAcesso = chave;
       const danfeHtml = gerarDanfeHtml(dados, chave);
       await fetch(UPSTASH_URL + "/pipeline", {
-        method: "POST", headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
-        body: JSON.stringify([["SET", "danfe:" + chave, Buffer.from(danfeHtml).toString("base64")], ["EXPIRE", "danfe:" + chave, 31536000]]),
+        method:"POST", headers:{Authorization:"Bearer "+UPSTASH_TOKEN,"Content-Type":"application/json"},
+        body: JSON.stringify([["SET","danfe:"+chave,Buffer.from(danfeHtml).toString("base64")],["EXPIRE","danfe:"+chave,31536000]]),
       });
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Content-Type","text/html; charset=utf-8");
       return res.status(200).send(danfeHtml);
-    } catch(e) { return res.status(200).json({ step: "error", error: e.message }); }
+    } catch(e) { return res.status(200).json({ step:"error", error:e.message }); }
   }
 
-  // ── GET status
-  if (action === "status") {
-    return res.status(200).json({
-      ok: !!(process.env.NFSE_CERT_PFX && process.env.NFSE_CERT_SENHA),
-      temCert:  !!(process.env.NFSE_CERT_PFX),
-      temSenha: !!(process.env.NFSE_CERT_SENHA),
-      temIM:    !!(IM_EMPRESA),
-      cnpj:     CNPJ_EMPRESA,
-      im:       IM_EMPRESA,
-      homolog:  NFSE_HOMOLOG,
-    });
+  // POST danfe-store
+  if (req.method === "POST" && action === "danfe-store") {
+    const { chave, pdfBase64 } = req.body || {};
+    if (!chave || !pdfBase64) return res.status(400).json({ ok: false, error: "chave e pdfBase64 obrigatorios" });
+    try {
+      await fetch(UPSTASH_URL + "/pipeline", {
+        method:"POST", headers:{Authorization:"Bearer "+UPSTASH_TOKEN,"Content-Type":"application/json"},
+        body: JSON.stringify([["SET","danfe:"+chave,pdfBase64],["EXPIRE","danfe:"+chave,31536000]]),
+      });
+      return res.status(200).json({ ok: true });
+    } catch(e) { return res.status(500).json({ ok:false, error:e.message }); }
   }
 
-  // ── GET test-sign
+  // GET test-sign
   if (action === "test-sign") {
     const result = { steps: [] };
     try {
       const certOpts = loadCert();
       result.steps.push("cert loaded: " + certOpts.pfx.length + " bytes");
       const p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(certOpts.pfx));
-      const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, certOpts.passphrase);
+      const p12     = forge.pkcs12.pkcs12FromAsn1(p12Asn1, certOpts.passphrase);
       result.steps.push("pkcs12 loaded");
-      const allBags = [...(p12.getBags({bagType:forge.pki.oids.pkcs8ShroudedKeyBag})[forge.pki.oids.pkcs8ShroudedKeyBag]||[]), ...(p12.getBags({bagType:forge.pki.oids.keyBag})[forge.pki.oids.keyBag]||[])];
+      const allBags = [...(p12.getBags({bagType:forge.pki.oids.pkcs8ShroudedKeyBag})[forge.pki.oids.pkcs8ShroudedKeyBag]||[]),
+                       ...(p12.getBags({bagType:forge.pki.oids.keyBag})[forge.pki.oids.keyBag]||[])];
       if (!allBags.length) { result.steps.push("no key bags"); result.ok = false; return res.status(200).json(result); }
       const pem = forge.pki.privateKeyToPem(allBags[0].key);
-      result.steps.push("privateKey extracted: " + pem.slice(0,40));
-      const pk = crypto.createPrivateKey({ key: pem, format: "pem" });
-      const signer = crypto.createSign("sha256WithRSAEncryption");
-      signer.update("test");
-      const sig = signer.sign(pk, "base64");
-      result.steps.push("signature OK: " + sig.slice(0,30) + "...");
+      result.steps.push("privateKey: " + pem.slice(0,40));
       result.ok = true;
     } catch(e) { result.steps.push("error: " + e.message); result.ok = false; }
     return res.status(200).json(result);
   }
 
-  // ── GET debug-xml
+  // GET debug-xml
   if (action === "debug-xml") {
     try {
       let certOpts; try { certOpts = loadCert(); } catch(e) { certOpts = null; }
-      const xml = montarDPS({ cpfcnpj:"12345678901", nome:"Cliente Teste", discriminacao:"Servico de manutencao. Garantia 90 dias.", valor:"350.00", numDPS: genId(1) });
+      const xml = montarDPS({ cpfcnpj:"12345678901", nome:"Cliente Teste", discriminacao:"Manutencao. Garantia 90 dias.", valor:"350.00", numDPS: genId(1) });
       const signed = certOpts ? await assinarXML(xml, certOpts.pfx, certOpts.passphrase) : xml;
       res.setHeader("Content-Type","text/xml");
       return res.status(200).send(signed);
-    } catch(e) { return res.status(200).json({ ok: false, error: e.message }); }
+    } catch(e) { return res.status(200).json({ ok:false, error:e.message }); }
   }
 
-  // ── POST emitir
+  // POST emitir
   if (req.method === "POST" && action === "emitir") {
     const { tomadorCpfCnpj, tomadorNome, discriminacao, valor } = req.body || {};
-    if (!tomadorCpfCnpj || !valor) return res.status(400).json({ ok: false, error: "tomadorCpfCnpj e valor obrigatórios" });
+    if (!tomadorCpfCnpj || !valor) return res.status(400).json({ ok:false, error:"tomadorCpfCnpj e valor obrigatorios" });
     let certOpts;
-    try { certOpts = loadCert(); } catch(e) { return res.status(400).json({ ok: false, error: e.message }); }
+    try { certOpts = loadCert(); } catch(e) { return res.status(400).json({ ok:false, error:e.message }); }
     try {
       let seq = 1;
-      try { const seqRes = await dbGet("reparoeletro_nfse_seq"); seq = (seqRes || 0) + 1; await dbSet("reparoeletro_nfse_seq", seq); } catch(e) { seq = Date.now() % 999999999999999 || 1; }
+      try {
+        const seqRes = await dbGet("reparoeletro_nfse_seq");
+        seq = (seqRes || 0) + 1;
+        await dbSet("reparoeletro_nfse_seq", seq);
+      } catch(e) { seq = Date.now() % 999999999999999 || 1; }
       const numDPS = genId(seq);
       console.log("ID gerado:", numDPS, "len:", numDPS.length);
       const xml    = montarDPS({ cpfcnpj: tomadorCpfCnpj, nome: tomadorNome, discriminacao, valor, numDPS });
@@ -471,14 +507,13 @@ module.exports = async function handler(req, res) {
       const { status, body } = await chamarAPI(b64gz, certOpts);
       const parsed = parseResp(body);
       if (parsed.ok) {
-        // Gera DANFE sincronamente com dados reais do XML do governo
         await buscarESalvarDanfe(parsed.chaveAcesso, certOpts).catch(e => console.error("DANFE:", e.message));
-        return res.status(200).json({ ok: true, chaveAcesso: parsed.chaveAcesso, idDps: parsed.idDps, alertas: parsed.alertas });
+        return res.status(200).json({ ok:true, chaveAcesso:parsed.chaveAcesso, idDps:parsed.idDps, alertas:parsed.alertas });
       } else {
-        return res.status(200).json({ ok: false, error: parsed.erro, httpStatus: status, idDPS: numDPS, idLen: numDPS.length });
+        return res.status(200).json({ ok:false, error:parsed.erro, httpStatus:status, idDPS:numDPS, idLen:numDPS.length });
       }
-    } catch(e) { return res.status(200).json({ ok: false, error: e.message }); }
+    } catch(e) { return res.status(200).json({ ok:false, error:e.message }); }
   }
 
-  return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+  return res.status(404).json({ ok:false, error:"Acao nao encontrada" });
 };
