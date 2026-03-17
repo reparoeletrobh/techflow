@@ -570,7 +570,7 @@ function animateArcs(today, week) {
 
 async function load() {
   try {
-    var r = await fetch("/api/board?action=metas");
+    var r = await fetch("/api/metas");
     var d = await r.json();
     if (!d.ok) throw new Error(d.error || "Erro");
 
