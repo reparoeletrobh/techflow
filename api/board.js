@@ -480,11 +480,13 @@ module.exports = async function handler(req, res) {
         if (metaChanged) await dbSet(BOARD_KEY, board);
       } catch(e) { console.error("meta tracking:", e.message); }
 
-      // Sync fila Lalamove (Coleta/Entrega Solicitada no Pipefy)
-      let lalamoveSync = null;
-      try { lalamoveSync = await syncLalamoveQueue(); } catch(e) {}
+      return res.status(200).json({ ok: true, board, newCount, erpRemoved, pipefyError });
+    }
 
-      return res.status(200).json({ ok: true, board, newCount, erpRemoved, pipefyError, lalamoveSync });
+    // ── GET sync-lalamove — popula fila Lalamove via Pipefy ──────
+    if (action === "sync-lalamove") {
+      const result = await syncLalamoveQueue();
+      return res.status(200).json({ ok: true, ...result });
     }
 
     // ── POST reset ─────────────────────────────────────────────
