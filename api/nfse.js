@@ -336,6 +336,54 @@ module.exports = async function handler(req, res) {
     return res.status(200).json(result);
   }
 
+  if (action === "xtest") {
+    const steps = [];
+    try {
+      const certOpts = loadCert();
+      const p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(certOpts.pfx));
+      const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, certOpts.passphrase);
+      const allBags = [
+        ...(p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag] || []),
+        ...(p12.getBags({ bagType: forge.pki.oids.keyBag })[forge.pki.oids.keyBag] || []),
+      ];
+      const pem = forge.pki.privateKeyToPem(allBags[0].key);
+      steps.push("key: OK");
+
+      const { SignedXml } = xmlCrypto;
+      const sig = new SignedXml({ privateKey: pem });
+
+      // Try simplest possible xpath
+      const xpaths = [
+        "//*[local-name(.)='infDPS']",
+        "/*",
+        "/DPS",
+        "//infDPS",
+      ];
+
+      const xml = `<DPS xmlns="http://www.sped.fazenda.gov.br/nfse"><infDPS Id="X1"><v>1</v></infDPS></DPS>`;
+
+      for (const xp of xpaths) {
+        try {
+          const s2 = new SignedXml({ privateKey: pem });
+          s2.addReference({
+            xpath: xp,
+            transforms: ["http://www.w3.org/2000/09/xmldsig#enveloped-signature"],
+            digestAlgorithm: "http://www.w3.org/2001/04/xmlenc#sha256",
+          });
+          await s2.computeSignature(xml);
+          const out = s2.getSignedXml();
+          steps.push("xpath '" + xp + "': " + (out.includes("<Signature") ? "OK" : "no sig"));
+          if (out.includes("<Signature")) break;
+        } catch(e) {
+          steps.push("xpath '" + xp + "': ERR " + e.message.slice(0,50));
+        }
+      }
+      return res.status(200).json({ ok: true, steps });
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: e.message, steps });
+    }
+  }
+
   if (action === "test-xmlcrypto-v") {
     try {
       const ver = require("/var/task/node_modules/xml-crypto/package.json").version;
