@@ -240,7 +240,7 @@ header{
 <script>
 const PHASES = [
   { id:"aguardando_dados",  name:"Aguardando Dados",   color:"#6366f1" },
-  { id:"emitir_nf",         name:"Emitir NF",          color:"#3b9eff" },
+  { id:"nf_emitida",        name:"NF Emitida",          color:"#3b9eff" },
   { id:"faturamento",       name:"Faturamento",        color:"#f59e0b" },
   { id:"pagamento_agendado",name:"Pagamento Agendado", color:"#e879f9" },
   { id:"entrega_agendada",  name:"Entrega Agendada",   color:"#f97316" },
@@ -423,8 +423,14 @@ function buildActions(r) {
   let h = '';
   if (r.phaseId==='aguardando_dados')
     h += `<button class="btn-primary" style="background:var(--accent);color:#000;" onclick="openNfModal('${r.id}')">📋 Informar CPF / CNPJ</button>`;
-  if (r.phaseId==='emitir_nf')
-    h += `<button class="btn-primary" style="background:#3b9eff;color:#fff;" onclick="emitirNF('${r.id}')">🧾 Nota Fiscal Emitida</button>`;
+  if (r.phaseId==='nf_emitida') {
+    const danfeUrl = r.chaveAcesso
+      ? `https://www.nfse.gov.br/EmissorNacional/Notas/Download/DANFSe/${r.chaveAcesso}`
+      : null;
+    if (danfeUrl)
+      h += `<a href="${danfeUrl}" target="_blank" class="btn-primary" style="background:#3b9eff;color:#fff;text-decoration:none;display:inline-block;">📄 Baixar DANFE</a>`;
+    h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="nfEnviada('${r.id}')">✅ NF Enviada → Faturamento</button>`;
+  }
   if (r.phaseId==='faturamento')
     h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="openMoverModal('${r.id}')">💰 Registrar Pagamento</button>`;
   if (r.phaseId==='pagamento_agendado') {
@@ -508,10 +514,10 @@ async function nfEmitir() {
 
     if (nfData.ok) {
       // Salva número e chave de acesso na ficha
-      await api('emitir-nf', { id: nfSelId, chaveAcesso: nfData.chaveAcesso, numeroNF: nfData.numero });
+      await api('emitir-nf', { id: nfSelId, chaveAcesso: nfData.chaveAcesso || '', numeroNF: nfData.nNFSe || nfData.numero || '' });
       await load();
       nfModalClose();
-      showToast('✅', 'NF emitida! NF nº ' + (nfData.numero || ''), 'Chave: ' + (nfData.chaveAcesso || '').slice(0,20) + '...');
+      showToast('✅', 'NF emitida!', 'Chave: ' + (nfData.chaveAcesso || '').slice(0,20) + '...');
     } else {
       // Certificado não configurado ou erro — abre emissor manual como fallback
       if (nfData.error && nfData.error.includes('não configurado')) {
@@ -550,14 +556,20 @@ async function submitCpf() {
   const cpf = document.getElementById('cpf-input').value.trim();
   if (!cpf) return;
   const res = await api('set-cpf',{id:selId,cpfCnpj:cpf});
-  if (res.ok) { updateRecord(res.record); closeModal('cpf-modal'); showToast('📋','CPF cadastrado!','Avançou para Emitir NF'); }
+  if (res.ok) { updateRecord(res.record); closeModal('cpf-modal'); showToast('📋','NF Emitida!','Card movido para NF Emitida'); }
   else showToast('❌','Erro',res.error);
 }
 
 async function emitirNF(id) {
   if (!confirm('Confirmar emissão da Nota Fiscal?')) return;
   const res = await api('emitir-nf',{id});
-  if (res.ok) { updateRecord(res.record); showToast('🧾','NF Emitida!','Avançou para Faturamento'); }
+  if (res.ok) { updateRecord(res.record); showToast('🧾','NF Emitida!','Card movido para NF Emitida'); }
+  else showToast('❌','Erro',res.error);
+}
+
+async function nfEnviada(id) {
+  const res = await api('nf-enviada',{id});
+  if (res.ok) { updateRecord(res.record); showToast('✅','NF Enviada!','Avançou para Faturamento'); }
   else showToast('❌','Erro',res.error);
 }
 
