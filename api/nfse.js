@@ -771,6 +771,38 @@ module.exports = async function handler(req, res) {
     return res.status(200).send(html);
   }
 
+  if (action === "danfe-nfse-json") {
+    // Retorna o JSON completo da NFS-e da API do governo
+    const chave = (req.query.chave || "31062002259485378000175000000000016126034193872720").trim();
+    let certOpts;
+    try { certOpts = loadCert(); } catch(e) { return res.status(200).json({ error: e.message }); }
+    const host = NFSE_HOMOLOG ? "sefin.producaorestrita.nfse.gov.br" : "sefin.nfse.gov.br";
+    const r = await new Promise((resolve) => {
+      const opts = { hostname: host, port: 443, path: `/SefinNacional/nfse/${chave}`, method: "GET",
+        pfx: certOpts.pfx, passphrase: certOpts.passphrase, rejectUnauthorized: false,
+        headers: { "Accept": "application/json" },
+      };
+      const req2 = https.request(opts, r => {
+        const chunks = [];
+        r.on("data", c => chunks.push(c));
+        r.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+      });
+      req2.on("error", e => resolve(JSON.stringify({ error: e.message })));
+      req2.end();
+    });
+    try {
+      const j = JSON.parse(r);
+      // Mostra só as chaves de primeiro nível e tamanhos
+      const summary = {};
+      for (const [k,v] of Object.entries(j)) {
+        summary[k] = typeof v === "string" ? v.slice(0,80) + (v.length>80?"...":"") : v;
+      }
+      return res.status(200).json({ ok: true, keys: Object.keys(j), summary });
+    } catch(e) {
+      return res.status(200).json({ ok: false, raw: r.slice(0,500) });
+    }
+  }
+
   if (action === "danfe-api-test") {
     const chave = (req.query.chave || "31062002259485378000175000000000016126034193872720").trim();
     let certOpts;
