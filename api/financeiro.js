@@ -298,14 +298,15 @@ module.exports = async function handler(req, res) {
       }
     } catch (e) { pipefyError = e.message; }
 
-    // 2. Remove fichas em "Item Coletado" cujo card foi para ERP/Finalizado
+    // 2. Remove fichas cujo card foi para ERP ou Finalizado no Pipefy (qualquer fase)
     try {
       const finIds = await fetchFinalizadoIds();
       if (finIds.length > 0) {
         const before = fin.records.length;
         fin.records = fin.records.filter(r => {
-          if (r.phaseId !== "item_coletado") return true;
-          return !finIds.includes(r.pipefyId);
+          if (!r.pipefyId) return true;               // sem pipefyId: mantém
+          if (r.pipefyId.startsWith("venda-")) return true; // venda interna: mantém
+          return !finIds.includes(r.pipefyId);         // remove se está em ERP/Finalizado
         });
         removedCount = before - fin.records.length;
       }
