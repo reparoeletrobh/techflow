@@ -72,8 +72,10 @@ async function createPipefyCard({ phaseId, nome, telefone, aparelho, defeito, en
   // Campo type=phone do Pipefy aceita formato livre mas precisa ser consistente
   function formatarTelefone(tel) {
     const digits = tel.replace(/\D/g, "");
-    // Remove prefixo 55 (Brasil) se presente com 13 dígitos
-    const d = digits.length === 13 && digits.startsWith("55") ? digits.slice(2) : digits;
+    // Remove prefixo 55 (Brasil) se presente com 12 ou 13 dígitos
+    const d = (digits.length === 13 && digits.startsWith("55")) ? digits.slice(2)
+            : (digits.length === 12 && digits.startsWith("55")) ? digits.slice(2)
+            : digits;
     if (d.length === 11) {
       return "(" + d.slice(0,2) + ")" + d[2] + " " + d.slice(3,7) + "-" + d.slice(7);
     }
