@@ -1,9 +1,107 @@
 const PIPEFY_API = "https://api.pipefy.com/graphql";
 const PIPE_ID    = "305832912";
+const BOARD_KEY  = "reparoeletro_board";
 
-async function pipefyQuery(query) {
+const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g, "").trim();
+const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g, "").trim();
+
+const TECNICOS = ["Lucas", "Diego", "Kassio", "Roberto", "Carlos"];
+
+// ── Upstash ────────────────────────────────────────────────────
+async function dbGet(key) {
+  try {
+    const r = await fetch(`${UPSTASH_URL}/pipeline`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify([["GET", key]]),
+    });
+    const j = await r.json();
+    return j[0]?.result ? JSON.parse(j[0].result) : null;
+  } catch (e) { console.error("dbGet:", e.message); return null; }
+}
+
+async function dbSet(key, value) {
+  try {
+    const r = await fetch(`${UPSTASH_URL}/pipeline`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify([["SET", key, JSON.stringify(value)]]),
+    });
+    const j = await r.json();
+    return j[0]?.result === "OK";
+  } catch (e) { console.error("dbSet:", e.message); return false; }
+}
+
+// ── Board padrão ───────────────────────────────────────────────
+function defaultBoard() {
+  return {
+    // Fases OS principal
+    phases: [
+      { id: "aprovado",        name: "Aprovado"           },
+      { id: "producao",        name: "Produção"           },
+      { id: "cliente_loja",    name: "Cliente Loja"       },
+      { id: "urgencia",        name: "Urgência"           },
+      { id: "comprar_peca",    name: "Comprar Peça"       },
+      { id: "aguardando_peca", name: "Aguardando Peça"    },
+      { id: "peca_disponivel", name: "Peça Disponível"    },
+      { id: "loja_feito",      name: "Loja Feito"         },
+      { id: "delivery_feito",  name: "Delivery Feito"     },
+      { id: "aguardando_ret",  name: "Aguardando Retirada"},
+    ],
+    // Fases RS
+    rsPhases: [
+      { id: "rs_loja",  name: "RS na Loja" },
+      { id: "rs_feito", name: "RS Feito"   },
+    ],
+    // Fases RS Rua
+    rsRuaPhases: [
+      { id: "rs_rua",       name: "RS Rua"      },
+      { id: "rs_rua_feito", name: "RS Rua Feito"},
+    ],
+    cards:      [],  // OS principais
+    rsCards:    [],  // RS
+    rsRuaCards: [],  // RS Rua
+    syncedIds:  [],  // IDs Pipefy já importados
+    movesLog:   [],  // { phaseId, timestamp, tecnico }
+  };
+}
+
+function sanitizeBoard(b) {
+  if (!b || typeof b !== "object") return defaultBoard();
+  const def = defaultBoard();
+  if (!Array.isArray(b.phases)      || !b.phases.length)      b.phases      = def.phases;
+  if (!Array.isArray(b.rsPhases)    || !b.rsPhases.length)    b.rsPhases    = def.rsPhases;
+  if (!Array.isArray(b.rsRuaPhases) || !b.rsRuaPhases.length) b.rsRuaPhases = def.rsRuaPhases;
+  if (!Array.isArray(b.cards))      b.cards      = [];
+  if (!Array.isArray(b.rsCards))    b.rsCards    = [];
+  if (!Array.isArray(b.rsRuaCards)) b.rsRuaCards = [];
+  if (!Array.isArray(b.syncedIds))  b.syncedIds  = [];
+  if (!Array.isArray(b.movesLog))   b.movesLog   = [];
+  // Garante phaseId válido
+  const validMain   = b.phases.map(p => p.id);
+  const validRs     = b.rsPhases.map(p => p.id);
+  const validRsRua  = b.rsRuaPhases.map(p => p.id);
+  b.cards      = b.cards.map(c => ({ ...c, phaseId: validMain.includes(c.phaseId)   ? c.phaseId : b.phases[0].id }));
+  b.rsCards    = b.rsCards.map(c => ({ ...c, phaseId: validRs.includes(c.phaseId)   ? c.phaseId : b.rsPhases[0].id }));
+  b.rsRuaCards = b.rsRuaCards.map(c => ({ ...c, phaseId: validRsRua.includes(c.phaseId) ? c.phaseId : b.rsRuaPhases[0].id }));
+
+  // Deduplica por pipefyId — garante que não haja cards repetidos
+  const seenIds = new Set();
+  b.cards = b.cards.filter(c => {
+    if (seenIds.has(c.pipefyId)) return false;
+    seenIds.add(c.pipefyId);
+    return true;
+  });
+
+  return b;
+}
+
+// ── Pipefy helpers ─────────────────────────────────────────────
+async function pipefyQuery(query, attempt = 1) {
+  const TIMEOUT_MS = 15000;
+  const MAX_RETRIES = 3;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     const res = await fetch(PIPEFY_API, {
       method: "POST",
@@ -16,882 +114,969 @@ async function pipefyQuery(query) {
     });
     const text = await res.text();
     let json;
-    try { json = JSON.parse(text); } catch(e) { throw new Error("Pipefy retornou resposta inválida"); }
-    if (json.errors) throw new Error(json.errors.map(e => e.message).join("; "));
+    try { json = JSON.parse(text); }
+    catch(e) { throw new Error("INVALID_RESPONSE"); }
+    if (json.errors) throw new Error(json.errors[0].message);
     return json.data;
-  } finally { clearTimeout(timer); }
-}
-
-async function fetchPipeStructure() {
-  const data = await pipefyQuery(`query {
-    pipe(id: "${PIPE_ID}") {
-      phases { id name }
-      start_form_fields { id label type }
-    }
-  }`);
-  return {
-    phases: data?.pipe?.phases || [],
-    fields: data?.pipe?.start_form_fields || [],
-  };
-}
-
-// Atualiza o campo Valor total no card do Pipefy
-async function updateCardValue(pipefyId, valor) {
-  // Campo currency no Pipefy espera número puro ex: "350.00"
-  const numerico = String(parseFloat(String(valor).replace(",", ".")) || 0);
-  const mutation = `mutation {
-    updateCardField(input: {
-      card_id: "${pipefyId}"
-      field_id: "valor_de_contrato"
-      new_value: "${numerico}"
-    }) { success }
-  }`;
-  return await pipefyQuery(mutation);
-}
-
-async function createPipefyCard({ phaseId, nome, telefone, aparelho, defeito, endereco }) {
-  const descricao   = `${aparelho} — ${defeito}`;
-  const ultimos4    = telefone.replace(/\D/g, "").slice(-4);
-  const nomeContato = `${nome} ${ultimos4}`;
-
-  const { fields } = await fetchPipeStructure();
-
-  function findField(keywords) {
-    return fields.find(f =>
-      keywords.some(kw => f.label.toLowerCase().includes(kw))
-    );
-  }
-
-  const nomeField = findField(["nome"]);
-  const telField  = findField(["telefone", "fone", "celular"]);
-  const descField = findField(["descrição", "descricao", "empresa", "descri"]);
-  const endField  = findField(["endereço", "endereco", "endere"]);
-
-  const fieldsAttr = [];
-  // Formata telefone: (xx)9 xxxx-xxxx
-  function formatarTelefone(tel) {
-    const digits = tel.replace(/\D/g, "");
-    if (digits.length === 11) {
-      return "(" + digits.slice(0,2) + ")" + digits[2] + " " + digits.slice(3,7) + "-" + digits.slice(7);
-    } else if (digits.length === 10) {
-      return "(" + digits.slice(0,2) + ")" + digits.slice(2,6) + "-" + digits.slice(6);
-    }
-    return tel;
-  }
-  const telefoneFmt = formatarTelefone(telefone);
-
-  if (nomeField) fieldsAttr.push(`{ field_id: "${nomeField.id}", field_value: ${JSON.stringify(nomeContato)} }`);
-  if (telField)  fieldsAttr.push(`{ field_id: "${telField.id}",  field_value: ${JSON.stringify(telefoneFmt)} }`);
-  if (descField) fieldsAttr.push(`{ field_id: "${descField.id}", field_value: ${JSON.stringify(descricao)} }`);
-  if (endField && endereco) fieldsAttr.push(`{ field_id: "${endField.id}", field_value: ${JSON.stringify(endereco)} }`);
-
-  // Tenta criar com phase_id primeiro, se falhar cria sem (vai para fase inicial)
-  const tryCreate = async (usePhaseId) => {
-    const phaseArg = usePhaseId && phaseId ? `\n      phase_id: "${phaseId}"` : "";
-    const mutation = `mutation {
-      createCard(input: {
-        pipe_id: "${PIPE_ID}"${phaseArg}
-        fields_attributes: [${fieldsAttr.join(", ")}]
-      }) {
-        card { id title url current_phase { name } }
-      }
-    }`;
-    return await pipefyQuery(mutation);
-  };
-
-  let data;
-  try {
-    data = await tryCreate(true);
   } catch(e) {
-    // Se falhar com phase_id, tenta sem
-    data = await tryCreate(false);
+    if (attempt < MAX_RETRIES && (e.name === "AbortError" || e.message === "INVALID_RESPONSE")) {
+      await new Promise(r => setTimeout(r, 2000 * attempt));
+      return pipefyQuery(query, attempt + 1);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
   }
-
-  return data?.createCard?.card;
 }
 
-module.exports = async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  if (req.method === "OPTIONS") return res.status(200).end();
-
-  const { action } = req.query;
-
-  if (action === "estrutura") {
-    try {
-      const estrutura = await fetchPipeStructure();
-      return res.status(200).json({ ok: true, ...estrutura });
-    } catch(e) {
-      return res.status(200).json({ ok: false, error: e.message });
-    }
-  }
-
-  if (req.method === "POST" && action === "criar-card") {
-    const { nome, telefone, aparelho, defeito, endereco, phaseId } = req.body || {};
-    if (!nome || !telefone || !aparelho || !defeito)
-      return res.status(400).json({ ok: false, error: "nome, telefone, aparelho e defeito são obrigatórios" });
-    try {
-      const card = await createPipefyCard({ phaseId, nome, telefone, aparelho, defeito, endereco: endereco || "" });
-      return res.status(200).json({ ok: true, card });
-    } catch(e) {
-      return res.status(200).json({ ok: false, error: e.message });
-    }
-  }
-
-  // ── GET orc-load ──────────────────────────────────────────
-  if (action === "orc-load") {
-    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
-    return res.status(200).json({ ok: true, fichas: db.fichas || [] });
-  }
-
-  // ── GET orc-sync ───────────────────────────────────────────
-  if (action === "orc-sync") {
-    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [], initialized: false, maxIdSeen: 0 };
-    if (!Array.isArray(db.fichas))    db.fichas    = [];
-    if (!Array.isArray(db.syncedIds)) db.syncedIds = [];
-    let newCount = 0, pipefyError = null;
-    try {
-      const cards = await fetchAguardandoAprovacao();
-      // DEBUG temporário
-      if (req.query.debug === "1") {
-        return res.status(200).json({ ok: true, debug: true, cards_found: cards.length, card_ids: cards.map(c => c.pipefyId), maxIdSeen: db.maxIdSeen });
-      }
-      // Primeira vez: guarda o maior ID atual como referência — não importa nada
-      if (!db.initialized) {
-        const maxId = cards.reduce((max, c) => Math.max(max, parseInt(c.pipefyId)||0), 0);
-        db.maxIdSeen  = maxId;
-        db.initialized = true;
-        // Também marca todos como vistos para não importar se alguém chamar orc-forcar
-        cards.forEach(card => {
-          if (!db.syncedIds.includes(card.pipefyId)) db.syncedIds.push(card.pipefyId);
-        });
-        await dbSet(ORC_KEY, db);
-        return res.status(200).json({ ok: true, newCount: 0, initialized: true, maxIdSeen: maxId, pipefyError: null });
-      }
-      // Remove do syncedIds cards que saíram da fase (permite reimportar se voltarem)
-      const idsNaFase = new Set(cards.map(card => card.pipefyId));
-      db.syncedIds = (db.syncedIds || []).filter(id => idsNaFase.has(id));
-
-      // Importa apenas cards nunca vistos (não estão no syncedIds)
-      for (const card of cards) {
-        if (db.syncedIds.includes(card.pipefyId)) continue;
-        let textoOrc = "", precoSugerido = null;
-        // Usa regras fixas primeiro (rápido, sem timeout)
-        // IA só é chamada pelo botão ✨ Regenerar individualmente
-        try {
-          const regra = detectarRegra(card.desc, card.comentarios);
-          if (regra) {
-            let texto = substituirNome(regra.texto, card.nome);
-            precoSugerido = regra.preco || null;
-            // Substitui [VALOR] pelo preço da regra se disponível
-            if (precoSugerido) texto = texto.replace("[VALOR]", precoSugerido + " reais");
-            textoOrc = texto;
-          } else {
-            const tp = templatePadrao(card.desc, card.nome);
-            textoOrc = typeof tp === "object" ? (tp.texto || "") : String(tp || "");
-            // Template genérico mantém [VALOR] para preenchimento manual
-          }
-        } catch(e) {
-          textoOrc = "Ola, bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.";
-        }
-        db.fichas.unshift({
-          id:           card.pipefyId,
-          pipefyId:     card.pipefyId,
-          nome:         card.nome,
-          tel:          card.tel,
-          desc:         card.desc,
-          end:          card.end,
-          age:          card.age,
-          comentarios:  card.comentarios,
-          textoOrc,
-          precoSugerido,
-          status:       "pendente",
-          preco:        null,
-          createdAt:    new Date().toISOString(),
-        });
-        db.syncedIds.push(card.pipefyId);
-        newCount++;
-      }
-      if (newCount > 0) await dbSet(ORC_KEY, db);
-    } catch(e) { pipefyError = e.message; }
-    return res.status(200).json({ ok: true, newCount, pipefyError, maxIdSeen: db.maxIdSeen });
-  }
-
-  // ── POST orc-update-texto ──────────────────────────────────
-  // Regenera ou edita o texto de orçamento de uma ficha
-  if (req.method === "POST" && action === "orc-update-texto") {
-    const { id, textoOrc } = req.body || {};
-    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
-    const ficha = db.fichas.find(f => f.id === id);
-    if (!ficha) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
-    ficha.textoOrc = textoOrc;
-    await dbSet(ORC_KEY, db);
-    return res.status(200).json({ ok: true, ficha });
-  }
-
-  // ── POST orc-regenerar-todos — busca dados frescos do Pipefy por card e regenera
-  if (action === "orc-regenerar-todos") {
-    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
-    const pendentes = (db.fichas || []).filter(f => f.status === "pendente");
-    let count = 0;
-    for (const ficha of pendentes) {
-      try {
-        // Busca dados frescos direto do card no Pipefy
-        const fresh = await fetchCardData(ficha.pipefyId);
-        if (fresh) {
-          ficha.comentarios = fresh.comentarios.length ? fresh.comentarios : (ficha.comentarios || []);
-          ficha.desc        = fresh.desc  || ficha.desc;
-          ficha.nome        = fresh.nome  || ficha.nome;
-        }
-        try {
-          const orcResult = await gerarTextoOrcamento(ficha.desc, ficha.comentarios, ficha.nome);
-          if (orcResult && typeof orcResult === "object") {
-            let texto = orcResult.texto || "";
-            const preco = orcResult.preco || null;
-            if (preco) { texto = texto.replace("[VALOR]", preco + " reais"); ficha.precoSugerido = preco; }
-            ficha.textoOrc = texto;
-          } else {
-            ficha.textoOrc = String(orcResult || "");
-          }
-        } catch(e) {
-          const tp = templatePadrao(ficha.desc, ficha.nome);
-          ficha.textoOrc = typeof tp === "object" ? (tp.texto || "") : String(tp || "");
-        }
-        count++;
-      } catch(e) { console.error("regenerar", ficha.pipefyId, e.message); }
-    }
-    await dbSet(ORC_KEY, db);
-    return res.status(200).json({ ok: true, regenerados: count });
-  }
-
-  // ── POST orc-regenerar ─────────────────────────────────────
-  if (req.method === "POST" && action === "orc-regenerar") {
-    const { id } = req.body || {};
-    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
-    const ficha = db.fichas.find(f => f.id === id);
-    if (!ficha) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
-    try {
-      // Busca dados frescos do Pipefy antes de regenerar
-      try {
-        const fresh = await fetchCardData(ficha.pipefyId);
-        if (fresh && fresh.comentarios.length) {
-          ficha.comentarios = fresh.comentarios;
-          ficha.desc = fresh.desc || ficha.desc;
-        }
-      } catch(e) {}
-      var orcResult = await gerarTextoOrcamento(ficha.desc, ficha.comentarios, ficha.nome);
-      if (orcResult && typeof orcResult === "object") {
-        ficha.textoOrc = orcResult.texto;
-        if (orcResult.preco) ficha.precoSugerido = orcResult.preco;
-      } else {
-        ficha.textoOrc = orcResult || "";
-      }
-      await dbSet(ORC_KEY, db);
-      return res.status(200).json({ ok: true, textoOrc: ficha.textoOrc, precoSugerido: ficha.precoSugerido });
-    } catch(e) {
-      return res.status(200).json({ ok: false, error: e.message });
-    }
-  }
-
-  // ── POST orc-enviar ───────────────────────────────────────
-  if (req.method === "POST" && action === "orc-enviar") {
-    const { id, preco } = req.body || {};
-    if (!id) return res.status(400).json({ ok: false, error: "id obrigatório" });
-    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
-    const ficha = db.fichas.find(f => f.id === id);
-    if (!ficha) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
-    ficha.status    = "enviado";
-    ficha.preco     = preco || null;
-    ficha.enviadoAt = new Date().toISOString();
-    await dbSet(ORC_KEY, db);
-    // Atualiza valor no Pipefy — aguarda e retorna erro se falhar
-    let pipefyUpdateOk = true, pipefyUpdateError = null;
-    if (preco && ficha.pipefyId) {
-      try {
-        await updateCardValue(ficha.pipefyId, preco);
-      } catch(e) {
-        pipefyUpdateOk = false;
-        pipefyUpdateError = e.message;
-        console.error("updateCardValue:", e.message);
-      }
-    }
-    return res.status(200).json({ ok: true, ficha, pipefyUpdateOk, pipefyUpdateError });
-  }
-
-  // ── POST orc-status ────────────────────────────────────────
-  if (req.method === "POST" && action === "orc-status") {
-    const { id, status } = req.body || {};
-    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
-    const ficha = db.fichas.find(f => f.id === id);
-    if (!ficha) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
-    ficha.status = status;
-    await dbSet(ORC_KEY, db);
-    return res.status(200).json({ ok: true });
-  }
-
-  // ── POST orc-forcar ───────────────────────────────────────
-  // Remove um pipefyId do syncedIds para forçar reimportação
-  if (req.method === "POST" && action === "orc-forcar") {
-    const { pipefyId } = req.body || {};
-    if (!pipefyId) return res.status(400).json({ ok: false, error: "pipefyId obrigatório" });
-    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
-    db.syncedIds = (db.syncedIds || []).filter(id => id !== String(pipefyId));
-    await dbSet(ORC_KEY, db);
-    return res.status(200).json({ ok: true, msg: "ID removido. Próximo sync vai importar este card." });
-  }
-
-  // ── GET orc-card-debug — mostra todos os campos de um card específico
-  if (action === "orc-card-debug") {
-    const { id } = req.query;
-    if (!id) return res.status(400).json({ ok: false, error: "id obrigatório" });
-    try {
-      const data = await pipefyQuery(`query {
-        card(id: "${id}") {
-          id title
-          fields { name value }
-          comments { text author { name } }
-        }
-      }`);
-      return res.status(200).json({ ok: true, card: data?.card });
-    } catch(e) {
-      return res.status(200).json({ ok: false, error: e.message });
-    }
-  }
-
-  // ── GET orc-debug ─────────────────────────────────────────
-  if (action === "orc-debug") {
-    const result = {};
-    try {
-      const data = await pipefyQuery(`query {
-        pipe(id: "${PIPE_ID}") {
-          phases {
-            name
-            cards(first: 50) {
-              edges { node { id title } }
-            }
-          }
-        }
-      }`);
-      const phases = data?.pipe?.phases || [];
-      // Mostra todas as fases mas destaca Aguardando Aprovação com IDs
-      const aguPhase = phases.find(p => {
-        const n = p.name.toLowerCase().replace(/[^a-z0-9 ]/g,"");
-        return n.includes("aguardando aprova");
-      });
-      result.aguardando_aprovacao = aguPhase ? {
-        count: aguPhase.cards.edges.length,
-        cards: aguPhase.cards.edges.map(e => ({ id: e.node.id, title: e.node.title })),
-      } : null;
-      result.all_phases_count = phases.map(p => ({ name: p.name, count: p.cards.edges.length }));
-    } catch(e) { result.pipefy_error = e.message; }
-    const db = await dbGet(ORC_KEY) || {};
-    result.initialized    = db.initialized;
-    result.syncedIds      = db.syncedIds || [];
-    result.fichas_count   = (db.fichas || []).length;
-    return res.status(200).json(result);
-  }
-
-  // ── GET orc-sync-forcar-todos ─────────────────────────────
-  // Remove do syncedIds todos os cards que estão AGORA em Aguardando Aprovação
-  // Permite reimportar fichas que já estiveram na fase antes
-  if (action === "orc-sync-forcar-todos") {
-    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
-    let cards = [];
-    try { cards = await fetchAguardandoAprovacao(); } catch(e) {
-      return res.status(200).json({ ok: false, error: e.message });
-    }
-    // Remove do syncedIds apenas os que ainda estão na fase (não os que já foram processados e saíram)
-    const idsNaFase = new Set(cards.map(c => c.pipefyId));
-    const antes = db.syncedIds.length;
-    db.syncedIds = (db.syncedIds || []).filter(id => !idsNaFase.has(id));
-    // Também remove fichas já existentes desses IDs para não duplicar
-    db.fichas = (db.fichas || []).filter(f => !idsNaFase.has(f.pipefyId));
-    await dbSet(ORC_KEY, db);
-    return res.status(200).json({ ok: true, removidos: antes - db.syncedIds.length, total_na_fase: cards.length, msg: "Chame orc-sync agora para importar." });
-  }
-
-  // ── GET orc-sync-fichas — sincroniza syncedIds com fichas existentes
-  if (action === "orc-sync-fichas") {
-    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
-    if (!Array.isArray(db.syncedIds)) db.syncedIds = [];
-    let added = 0;
-    (db.fichas || []).forEach(f => {
-      if (!db.syncedIds.includes(f.pipefyId)) {
-        db.syncedIds.push(f.pipefyId);
-        added++;
-      }
-    });
-    await dbSet(ORC_KEY, db);
-    return res.status(200).json({ ok: true, added, total: db.syncedIds.length });
-  }
-
-  // ── GET orc-reset-init ────────────────────────────────────
-  if (action === "orc-reset-init") {
-    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
-    db.initialized = false;
-    db.syncedIds   = [];
-    db.fichas      = [];
-    db.maxIdSeen   = 0;
-    await dbSet(ORC_KEY, db);
-    return res.status(200).json({ ok: true, msg: "Reset completo. Chame orc-sync para inicializar." });
-  }
-
-  // ── GET orc-limpar-enviados ───────────────────────────────
-  // Remove fichas com status "enviado" — chamado automaticamente no fim do dia
-  if (action === "orc-limpar-enviados") {
-    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
-    const before = db.fichas.length;
-    db.fichas = db.fichas.filter(f => f.status !== "enviado");
-    const removed = before - db.fichas.length;
-    if (removed > 0) await dbSet(ORC_KEY, db);
-    return res.status(200).json({ ok: true, removed });
-  }
-
-  // ── POST orc-excluir ───────────────────────────────────────
-  if (req.method === "POST" && action === "orc-excluir") {
-    const { id } = req.body || {};
-    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
-    db.fichas    = db.fichas.filter(f => f.id !== id);
-    db.syncedIds = db.syncedIds.filter(s => s !== id);
-    await dbSet(ORC_KEY, db);
-    return res.status(200).json({ ok: true });
-  }
-
-  return res.status(404).json({ ok: false, error: "Ação não encontrada" });
-};
-
-// ── ORÇAMENTOS ────────────────────────────────────────────────
-
-const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g, "").trim();
-const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g, "").trim();
-const ORC_KEY = "reparoeletro_orcamentos";
-
-async function dbGet(key) {
-  try {
-    const r = await fetch(`${UPSTASH_URL}/pipeline`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, "Content-Type": "application/json" },
-      body: JSON.stringify([["GET", key]]),
-    });
-    const j = await r.json();
-    return j[0]?.result ? JSON.parse(j[0].result) : null;
-  } catch(e) { return null; }
-}
-
-async function dbSet(key, value) {
-  try {
-    const r = await fetch(`${UPSTASH_URL}/pipeline`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, "Content-Type": "application/json" },
-      body: JSON.stringify([["SET", key, JSON.stringify(value)]]),
-    });
-    const j = await r.json();
-    return j[0]?.result === "OK";
-  } catch(e) { return false; }
-}
-
-// Busca campos e atividades de um card específico pelo ID
-async function fetchCardData(pipefyId) {
-  const data = await pipefyQuery(`query {
-    card(id: "${pipefyId}") {
-      id title
-      fields { name value }
-      comments { text }
-    }
-  }`);
-  const node   = data?.card;
-  if (!node) return null;
-  const fields = node.fields || [];
-  const nome  = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
-  const tel   = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
-  const desc  = fields.find(f => f.name.toLowerCase().includes("descri"))?.value || "";
-  const end   = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
-  const extras = fields
-    .filter(f => !["telefone","fone","nome","endere","valor"].some(k => f.name.toLowerCase().includes(k)))
-    .map(f => f.value).filter(Boolean);
-  const comentarios = [
-    ...(node.comments || []).map(c => c.text).filter(Boolean),
-    ...extras,
-  ];
-  return { pipefyId: String(node.id), title: node.title, nome, tel, desc, end, comentarios };
-}
-
-// Busca cards em Aguardando Aprovação direto pelo ID da fase (mais rápido e completo)
-const AGUARDANDO_APROVACAO_PHASE_ID = "334875152";
-
-async function fetchAguardandoAprovacao() {
+// Busca OS aprovadas com paginação
+async function fetchApprovedCards() {
   const all = [];
   let cursor = null, hasNext = true;
+
+  // Início do dia BRT
+  const nowBRT = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  nowBRT.setHours(0, 0, 0, 0);
+  const todayStartUTC = new Date(nowBRT.getTime() + 3 * 60 * 60 * 1000);
+
   while (hasNext) {
     const after = cursor ? `, after: "${cursor}"` : "";
     const data = await pipefyQuery(`query {
-      phase(id: "${AGUARDANDO_APROVACAO_PHASE_ID}") {
-        cards(first: 50${after}) {
-          pageInfo { hasNextPage endCursor }
-          edges {
-            node {
-              id title age
-              fields { name value }
-              comments { text author { name } created_at }
+      pipe(id: "${PIPE_ID}") {
+        phases {
+          name
+          cards(first: 50${after}) {
+            pageInfo { hasNextPage endCursor }
+            edges {
+              node {
+                id title age
+                updated_at
+                fields { name value }
+              }
             }
           }
         }
       }
     }`);
-    const phase = data?.phase;
-    if (!phase) break;
+
+    const phases = data?.pipe?.phases;
+    if (!Array.isArray(phases)) throw new Error("Resposta inesperada do Pipefy");
+    const phase = phases.find(p => p.name.toLowerCase().includes("aprovad"));
+    if (!phase) throw new Error('Fase "Aprovado" não encontrada');
+
     for (const { node } of phase.cards.edges) {
+      // updated_at = quando o card foi modificado pela última vez (inclui mover de fase)
+      const updatedAt = node.updated_at ? new Date(node.updated_at) : null;
+      const isToday = updatedAt && updatedAt >= todayStartUTC;
+      if (!isToday) continue;
+
       const fields = node.fields || [];
-      const nome     = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
-      const tel      = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
-      const desc     = fields.find(f => f.name.toLowerCase().includes("descri"))?.value || "";
-      const end      = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
-      // Agrega TODOS os campos de texto como fonte de keywords para detecção
-      const extras = fields
-        .filter(f => !["telefone","fone","nome","endere","valor"].some(k => f.name.toLowerCase().includes(k)))
-        .map(f => f.value).filter(Boolean);
-      const comentarios = [
-        ...(node.comments || []).map(c => c.text).filter(Boolean),
-        ...extras,
-      ];
-      all.push({ pipefyId: String(node.id), title: node.title, nome, tel, desc, end, age: node.age, comentarios });
+      const nomeField = fields.find(f =>
+        f.name.toLowerCase().includes("nome") || f.name.toLowerCase().includes("contato")
+      );
+      const descField = fields.find(f =>
+        f.name.toLowerCase().includes("descri") || f.name.toLowerCase().includes("problema") || f.name.toLowerCase().includes("servi")
+      );
+      const nomeVal = nomeField?.value || "";
+      const digitsMatch = nomeVal.match(/(\d{4})\D*$/);
+
+      all.push({
+        pipefyId:    String(node.id),
+        title:       node.title || "Sem título",
+        nomeContato: nomeVal || null,
+        osCode:      digitsMatch ? digitsMatch[1] : null,
+        descricao:   descField?.value || null,
+        age:         node.age ?? null,
+        addedAt:     new Date().toISOString(),
+        approvedAt:  updatedAt ? updatedAt.toISOString() : new Date().toISOString(),
+      });
     }
+
     hasNext = phase.cards.pageInfo?.hasNextPage ?? false;
     cursor  = phase.cards.pageInfo?.endCursor ?? null;
   }
   return all;
 }
 
-// Gera texto de orçamento com Claude
-// ── NORMALIZA TEXTO (remove acentos, minúsculo) ──────────────
-function norm(s) {
-  return String(s || "").toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9 ]/g, " ");
-}
-
-function hasAny(texto, words) {
-  return words.some(function(w) { return texto.indexOf(norm(w)) >= 0; });
-}
-
-const ORCAMENTO_REGRAS = [
-  // 1. Termoelétrico + vela → R$ 390 (verificar ANTES do termoelétrico puro)
-  {
-    keywords: ["vela","velas"],
-    extraKeys: ["termoeletrico","termeletrico","termo eletrico","termo-eletrico","thermoeletrico",
-                "cooler","culer","coler","colder","peltier","pasta termica","kit frio","kit termoeletrico"],
-    templateBase: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do cooler, placa de resfriamento e pasta termica, alem da troca da vela, as pecas serao trocadas tambem. Este conserto completo fica em [PRECO] reais apenas. Aprovando ja iniciamos o conserto.",
-    precoBase:  "390",
-    precoExtra: "390",
-  },
-  // 2. Termoelétrico puro → R$ 350
-  {
-    keywords: ["termoeletrico","termeletrico","termo eletrico","termo-eletrico","thermoeletrico","termoeltrico",
-               "termoelectric","kit termoeletrico","kit termo eletrico","kit termo-eletrico",
-               "cooler","culer","coler","colder",
-               "placa de resfriamento","placa resfriamento","placa fria",
-               "peltier","peltyer","peltir",
-               "pasta termica","pasta terminca","pasta termika","pasta termca",
-               "kit frio","kit termico","conjunto termoeletrico"],
-    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do cooler, placa de resfriamento e pasta termica, as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
-  },
-  // 3. Magnetron → R$ 370
-  {
-    keywords: ["magnetron","magnetrao","magneton","magentron","magnetrom","magnetron","magnetico","magnet"],
-    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do magnetron, as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
-  },
-  // 4. Fusível/capacitor → R$ 320
-  {
-    keywords: ["fusivel","fusível","fusirel","fuzivel","fusiveil","queimou fusivel","fusivel de alta",
-               "capacitor e fusivel","troca do fusivel","troca de fusivel"],
-    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e fusivel de alta, as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
-  },
-  // 5. Microchave → R$ 320
-  {
-    keywords: ["microchave","micro chave","micro-chave","chave micro"],
-    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e microchave de acionamento, as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
-  },
-  // 6. Membrana → R$ 320
-  {
-    keywords: ["membrana","membrane","menbrana"],
-    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da membrana, as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
-  },
-  // 7. Placa micra → R$ 320
-  {
-    keywords: ["placa micra","placa microondas","placa do microondas","placa micro"],
-    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e placa micra, as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
-  },
-  // 8. Gás → R$ 450
-  {
-    keywords: ["valvula de gas","valvula gas","recarga de gas","recarga gas","gas refrigerante","carga de gas"],
-    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca da valvula de gas, solda e recarga de gas refrigerante. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
-    preco: "450",
-  },
-  // 9. Hidráulica → R$ 350 ou R$ 450 se tiver motor/gas
-  {
-    keywords: ["mangueira","conexao","conexoes","duto","dutos","hidraulica","hidraulico","vazando","vazamento"],
-    extraKeys: ["motor","gas","compressor"],
-    templateBase: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca dos dutos e conexoes hidraulicas. Este conserto completo fica em [PRECO] reais apenas. Aprovando ja iniciamos o conserto.",
-    precoBase:  "350",
-    precoExtra: "450",
-  },
-  // 10. Forno — parte elétrica genérica → R$ 450
-  {
-    keywords: ["parte eletrica","parte elétrica","reoperacao eletrica","reoperação eletrica"],
-    // Só aplica se NÃO tiver peça específica (timer, resistencia etc.)
-    excludeKeys: ["timer","resistencia","resistência","termostato","termóstato"],
-    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que esta sobrecarregando o equipamento, sera feito a reoperacao eletrica. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
-  },
-  // 11. Forno — timer → R$ 450
-  {
-    keywords: ["timer","timmer","tmer"],
-    templateBase: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do timer que esta sobrecarregando o equipamento, as pecas serao trocadas tambem. Este conserto completo fica em [PRECO] reais apenas. Aprovando ja iniciamos o conserto.",
-    precoBase: "450", precoExtra: "450",
-  },
-  // 12. Forno — resistência → R$ 450
-  {
-    keywords: ["resistencia","resistência","rezistencia","rezistência"],
-    templateBase: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da resistencia que esta sobrecarregando o equipamento, as pecas serao trocadas tambem. Este conserto completo fica em [PRECO] reais apenas. Aprovando ja iniciamos o conserto.",
-    precoBase: "450", precoExtra: "450",
-  },
-  // 13. Forno — termostato → R$ 450
-  {
-    keywords: ["termostato","termóstato","termostat","termostast"],
-    templateBase: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do termostato que esta sobrecarregando o equipamento, as pecas serao trocadas tambem. Este conserto completo fica em [PRECO] reais apenas. Aprovando ja iniciamos o conserto.",
-    precoBase: "450", precoExtra: "450",
-  },
-  // 14. Placa principal / recuperação de placa → R$ 350
-  {
-    keywords: ["placa principal","placa de potencia","placa potencia","placa de controle","placa controle",
-               "recuperacao da placa","recuperação da placa","recupera da placa","recuperar placa","reoperacao","reoperação"],
-    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da placa principal, sera feito a reoperacao da placa tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
-  },
-];
-
-
-// Preços sugeridos por índice de regra (mesma ordem de ORCAMENTO_REGRAS)
-var PRECOS_REGRAS = ["390","350","370","320","320","320","320","450","350","450","450","450","450","350"];
-
-function detectarRegra(desc, comentarios) {
-  var textoNorm = norm([desc || ""].concat(comentarios || []).join(" "));
-  for (var i = 0; i < ORCAMENTO_REGRAS.length; i++) {
-    var regra = ORCAMENTO_REGRAS[i];
-    if (!hasAny(textoNorm, regra.keywords)) continue;
-    if (regra.excludeKeys && hasAny(textoNorm, regra.excludeKeys)) continue;
-    if (regra.templateBase) {
-      var comExtra = regra.extraKeys && hasAny(textoNorm, regra.extraKeys);
-      var preco = comExtra ? regra.precoExtra : regra.precoBase;
-      return { texto: regra.templateBase, preco: preco };
+// Busca todas as fases com seus cards em uma única query (até 50 cards por fase)
+async function fetchAllPhaseCards() {
+  const data = await pipefyQuery(`query {
+    pipe(id: "${PIPE_ID}") {
+      phases {
+        name
+        cards(first: 50) {
+          pageInfo { hasNextPage endCursor }
+          edges { node { id } }
+        }
+      }
     }
-    return { texto: regra.template, preco: PRECOS_REGRAS[i] || null };
-  }
-  return null;
+  }`);
+  return data?.pipe?.phases || [];
 }
 
-
-function primeiroNome(nome) {
-  return nome ? nome.trim().split(/\s+/)[0] : "";
+// Busca IDs de cards que estão em ERP ou Finalizado no Pipefy
+async function fetchErpCardIds() {
+  try {
+    const phases = await fetchAllPhaseCards();
+    const ids = [], targetPhases = [];
+    for (const ph of phases) {
+      const l = ph.name.toLowerCase();
+      if (l.includes("erp") || l.includes("finaliz") || l.includes("conclu") || l.includes("descar")) {
+        targetPhases.push(ph.name);
+        ph.cards.edges.forEach(e => ids.push(String(e.node.id)));
+        // Paginação se houver mais de 50
+        if (ph.cards.pageInfo?.hasNextPage) {
+          let cursor = ph.cards.pageInfo.endCursor;
+          while (cursor) {
+            const data2 = await pipefyQuery(`query {
+              pipe(id: "${PIPE_ID}") {
+                phases {
+                  name
+                  cards(first: 50, after: "${cursor}") {
+                    pageInfo { hasNextPage endCursor }
+                    edges { node { id } }
+                  }
+                }
+              }
+            }`);
+            const ph2 = (data2?.pipe?.phases || []).find(p => p.name === ph.name);
+            if (!ph2) break;
+            ph2.cards.edges.forEach(e => ids.push(String(e.node.id)));
+            cursor = ph2.cards.pageInfo?.hasNextPage ? ph2.cards.pageInfo.endCursor : null;
+          }
+        }
+      }
+    }
+    return { ids, targetPhases };
+  } catch (e) {
+    console.error("fetchErpCardIds:", e.message);
+    return { ids: [], targetPhases: [] };
+  }
 }
 
-function substituirNome(template, nome) {
-  var p = primeiroNome(nome);
-  return template.replace(/\[NOME\]/g, p);
+// Busca IDs de cards em "Aguardando Aprovação" e "ERP" para tracking de metas
+async function fetchMetaPhaseIds() {
+  try {
+    const phases = await fetchAllPhaseCards();
+    const aguardandoIds = [], erpIds = [];
+    for (const ph of phases) {
+      const l = ph.name.toLowerCase();
+      if (l.includes("aguardando") && (l.includes("aprov") || l.includes("aprovação")))
+        ph.cards.edges.forEach(e => aguardandoIds.push(String(e.node.id)));
+      if (l.includes("erp"))
+        ph.cards.edges.forEach(e => erpIds.push(String(e.node.id)));
+    }
+    return { aguardandoIds, erpIds };
+  } catch(e) { return { aguardandoIds: [], erpIds: [] }; }
 }
 
-function templatePadrao(desc, nome) {
-  var p = primeiroNome(nome);
-  var saud = p ? "Ola, " + p + " bom dia" : "Ola, bom dia";
-  return saud + ", sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nRealizamos todos os testes e identificamos o problema. Faremos o reparo completo com substituicao das pecas necessarias.\n\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.";
+// Consulta a fase atual de um card no Pipefy diretamente
+async function fetchCardPhase(pipefyId) {
+  try {
+    const data = await pipefyQuery(`query {
+      card(id: "${pipefyId}") {
+        id
+        current_phase { name }
+      }
+    }`);
+    // card: null = arquivado ou não existe mais
+    if (!data?.card) return "NOT_FOUND";
+    return data.card.current_phase?.name || "NOT_FOUND";
+  } catch(e) {
+    // Qualquer erro de acesso = tratar como finalizado
+    return "NOT_FOUND";
+  }
 }
 
-// ── DETECTA MÚLTIPLOS EQUIPAMENTOS ────────────────────────────
-// Formato do Pipefy: "m:troca do fusível e capacitor peca 40 mtroca do magnétron peca 110"
-// Cada equipamento começa com "m:" ou "m" no meio do texto
-function detectarMultiplosEquipamentos(comentarios) {
-  const texto = (comentarios || []).join(" ");
-  const raw = texto.trim();
+// Remove do aguardando_ret os cards cujo pipefyId está em fase de conclusão no Pipefy
+async function cleanupAguardandoRet(board) {
+  const retCards = board.cards.filter(c =>
+    c.phaseId === "aguardando_ret" && !c.localOnly && !c.pipefyId.includes("-split-")
+  );
 
-  // Divide onde termina "peca NUMERO" seguido de novo equipamento com "m"
-  // Ex: "m:troca do fusível e capacitor peca 40 mtroca do magnétron peca 110"
-  const blocos = raw.split(/(?<=pe[cç]a\s+\d+)\s+m/i).filter(s => s.trim());
-  if (blocos.length >= 2) return parseBlocos(blocos);
+  const DONE_PHASES = ["erp","finaliz","conclu","descar","reprova"];
+  const isDone = (name) => {
+    if (!name || name === "NOT_FOUND") return true;
+    const l = name.toLowerCase();
+    return DONE_PHASES.some(kw => l.includes(kw));
+  };
 
-  // Fallback: split por "m:" no início de cada bloco
-  const blocos2 = raw.split(/(?:^|\s+)m:/i).filter(s => s.trim());
-  if (blocos2.length >= 2) return parseBlocos(blocos2);
+  const removedIds = new Set();
 
-  return null;
+  // Consulta em paralelo (até 5 por vez para não sobrecarregar)
+  const BATCH = 5;
+  for (let i = 0; i < retCards.length; i += BATCH) {
+    const batch = retCards.slice(i, i + BATCH);
+    const results = await Promise.all(batch.map(c => fetchCardPhase(c.pipefyId)));
+    batch.forEach((card, idx) => {
+      const phase = results[idx];
+      if (isDone(phase)) removedIds.add(card.pipefyId);
+    });
+  }
+
+  // Remove também split cards cujo pai foi removido
+  const removedPipefyIds = new Set(removedIds);
+  board.cards.forEach(c => {
+    if (c.phaseId === "aguardando_ret" && c.splitFrom && removedPipefyIds.has(c.splitFrom)) {
+      removedIds.add(c.pipefyId);
+    }
+  });
+
+  const before = board.cards.length;
+  const removedList = [...removedIds];
+  board.cards = board.cards.filter(c => !(c.phaseId === "aguardando_ret" && removedIds.has(c.pipefyId)));
+
+  return {
+    removed: before - board.cards.length,
+    ids: removedList,
+    retTotal: retCards.length,
+  };
 }
 
-function parseBlocos(blocos) {
-  const partes = [];
-  for (const bloco of blocos) {
-    // Remove prefixos m: ou m do início
-    const trimmed = bloco.trim().replace(/^m[:.\s]*/i, "").trim();
-    if (trimmed.length < 3) continue;
-    // Remove trecho "peca NUMERO" — é custo de peça, não preço do orçamento
-    const descBloco = trimmed.replace(/\s*pe[cç]a\s+\d+\s*/gi, " ").trim();
-    if (descBloco) partes.push({ desc: descBloco });
-  }
-  return partes.length >= 2 ? partes : null;
+// ── Log helpers ────────────────────────────────────────────────
+function trimLog(log) {
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
+  return log.filter(m => new Date(m.timestamp) > cutoff);
 }
 
-function gerarTextoMultiplos(partes, nome) {
-  const primeiro = nome ? nome.trim().split(/\s+/)[0] : "";
-  const saud = primeiro || "cliente";
-  let total = 0;
-  let linhas = [];
-
-  for (let i = 0; i < partes.length; i++) {
-    const p = partes[i];
-    const n = i + 1;
-    // Detecta preço pela regra de cada equipamento individual
-    const regra = detectarRegra(p.desc, []);
-    const preco = regra ? parseInt(regra.preco || "0") : 0;
-    if (preco) total += preco;
-
-    const textoEquip = gerarDescricaoEquip(p.desc);
-    linhas.push("Em relacao ao microondas " + n + " " + textoEquip + " Este conserto individual fica em " + (preco ? preco + " reais" : "[VALOR]") + ".");
-  }
-
-  // Desconto combo: ~10% arredondado para dezena
-  const desconto = total > 0 ? Math.round(total * 0.9 / 10) * 10 : null;
-
-  let msg = "Ola, " + saud + ", foram feitos todos os testes:\n\n";
-  msg += linhas.join("\n\n");
-
-  if (desconto && total > desconto) {
-    msg += "\n\nConsertando os " + partes.length + " juntos eu consigo um desconto para voce de " + total + " reais por " + desconto + " apenas. Aprovando ja iniciamos o conserto.";
-  } else {
-    msg += "\n\nAprovando ja iniciamos o conserto.";
-  }
-
-  return { texto: msg, preco: desconto ? String(desconto) : String(total || "") };
-}
-
-function gerarDescricaoEquip(desc) {
-  const n = norm(desc);
-  if (hasAny(n, ["magnetron","magnetrao","magneton","magentron"])) {
-    return "sera necessario fazer a troca do conjunto do magnetron, sera feito a reoperacao eletrica tambem.";
-  }
-  if (hasAny(n, ["fusivel","fusível","fusirel","capacitor"])) {
-    return "sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e fusivel de alta que estao sobrecarregando o sistema, as pecas serao trocadas tambem.";
-  }
-  if (hasAny(n, ["microchave","micro chave"])) {
-    return "sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e microchave de acionamento, as pecas serao trocadas tambem.";
-  }
-  if (hasAny(n, ["membrana"])) {
-    return "sera necessario refazer a parte eletrica que causou danos no conjunto da membrana, as pecas serao trocadas tambem.";
-  }
-  if (hasAny(n, ["placa micra","placa micro"])) {
-    return "sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e placa micra, as pecas serao trocadas tambem.";
-  }
-  if (hasAny(n, ["termoeletrico","cooler","peltier","pasta termica"])) {
-    return "sera necessario refazer a parte eletrica que causou danos no conjunto do cooler, placa de resfriamento e pasta termica, as pecas serao trocadas tambem.";
-  }
-  if (hasAny(n, ["placa principal","reoperacao","recuperacao"])) {
-    return "sera necessario refazer a parte eletrica que causou danos no conjunto da placa principal, sera feito a reoperacao da placa tambem.";
-  }
-  return "sera necessario realizar o reparo identificado nos testes, as pecas necessarias serao trocadas.";
-}
-
-async function gerarTextoOrcamento(desc, comentarios, nome) {
-  // Verifica múltiplos equipamentos primeiro
-  const multiplos = detectarMultiplosEquipamentos(comentarios);
-  if (multiplos) return gerarTextoMultiplos(multiplos, nome);
-
-  var regra = detectarRegra(desc, comentarios);
-  if (regra) return { texto: substituirNome(regra.texto, nome), preco: regra.preco };
-
-  var primeiro = primeiroNome(nome) || "cliente";
-  var comStr   = (comentarios || []).join("; ");
-  var userMsg  = "Nome: " + primeiro + "\r\nDefeito: " + (desc || "nao informado") + (comStr ? "\r\nAtividades: " + comStr : "");
-  var sysMsg   = "Voce e Pedro da Reparo Eletro. Gere orcamento: Ola, NOME bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento: [diagnostico]. Este conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto. Use o primeiro nome real, deixe [VALOR] literal.";
+// ── Handler ────────────────────────────────────────────────────
+module.exports = async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
-    var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-    var timer = controller ? setTimeout(function() { controller.abort(); }, 8000) : null;
-    var fetchOpts = {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 400, system: sysMsg, messages: [{ role: "user", content: userMsg }] }),
-    };
-    if (controller) fetchOpts.signal = controller.signal;
-    var res  = await fetch("https://api.anthropic.com/v1/messages", fetchOpts);
-    if (timer) clearTimeout(timer);
-    var data = await res.json();
-    var texto = (data.content && data.content[0] && data.content[0].text) ? data.content[0].text : "";
-    if (texto && texto.indexOf("[VALOR]") >= 0) return { texto: texto, preco: null };
-    if (texto && texto.length > 20) return { texto: texto + "\r\n\r\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.", preco: null };
-  } catch(e) {
-    console.error("gerarTextoOrcamento:", String(e.message || e));
+    const { action } = req.query;
+
+    // ── GET load — retorna banco imediatamente, sem chamar Pipefy ──
+    if (req.method === "GET" && action === "load") {
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      return res.status(200).json({ ok: true, board, newCount: 0, pipefyError: null });
+    }
+
+    // ── GET sync — chama Pipefy e atualiza banco (chamada separada) ──
+    if (req.method === "GET" && action === "sync") {
+      let board = sanitizeBoard(await dbGet(BOARD_KEY));
+      let newCount = 0, pipefyError = null, erpRemoved = 0;
+
+      try {
+        const approved = await fetchApprovedCards();
+        const activeIds = new Set(board.cards.map(c => c.pipefyId));
+        for (const c of approved) {
+          if (activeIds.has(c.pipefyId)) continue;
+          board.cards.unshift({ ...c, phaseId: board.phases[0].id, movedBy: "Pipefy" });
+          activeIds.add(c.pipefyId);
+          if (!board.syncedIds.includes(c.pipefyId)) {
+            board.syncedIds.push(c.pipefyId);
+            board.movesLog.push({ phaseId: "aprovado_entrada", timestamp: new Date().toISOString() });
+          }
+          newCount++;
+        }
+        board.movesLog = trimLog(board.movesLog);
+        if (newCount > 0) await dbSet(BOARD_KEY, board);
+      } catch (e) { pipefyError = e.message; }
+
+      try {
+        // Remove qualquer card (qualquer fase) que está em ERP/Finalizado
+        const { ids: erpIds } = await fetchErpCardIds();
+        if (erpIds.length > 0) {
+          const before = board.cards.length;
+          board.cards = board.cards.filter(c => !erpIds.includes(c.pipefyId));
+          erpRemoved = before - board.cards.length;
+          if (erpRemoved > 0) await dbSet(BOARD_KEY, board);
+        }
+      } catch (e) { console.error("ERP check:", e.message); }
+
+      // Tracking de metas: Aguardando Aprovação e ERP
+      try {
+        const { aguardandoIds, erpIds } = await fetchMetaPhaseIds();
+        let metaChanged = false;
+        if (!Array.isArray(board.metaLog)) board.metaLog = [];
+
+        const seenAg     = new Set(board.metaLog.filter(m=>m.phaseId==="aguardando_aprovacao").map(m=>m.pipefyId));
+        const seenErp    = new Set(board.metaLog.filter(m=>m.phaseId==="erp_entrada").map(m=>m.pipefyId));
+        const seenColeta = new Set(board.metaLog.filter(m=>m.phaseId==="coleta_solicitada").map(m=>m.pipefyId));
+
+        for (const id of aguardandoIds) {
+          if (!seenAg.has(id)) {
+            board.metaLog.push({ phaseId: "aguardando_aprovacao", pipefyId: id, timestamp: new Date().toISOString() });
+            metaChanged = true;
+          }
+        }
+        for (const id of erpIds) {
+          if (!seenErp.has(id)) {
+            board.metaLog.push({ phaseId: "erp_entrada", pipefyId: id, timestamp: new Date().toISOString() });
+            metaChanged = true;
+          }
+        }
+        // Tracking coleta_solicitada via Pipefy phases
+        try {
+          const allPhases = await fetchAllPhaseCards();
+          const coletaIds = [];
+          for (const ph of allPhases) {
+            if (ph.name.toLowerCase().trim() === "coleta solicitada")
+              ph.cards.edges.forEach(e => coletaIds.push(String(e.node.id)));
+          }
+          for (const id of coletaIds) {
+            if (!seenColeta.has(id)) {
+              board.metaLog.push({ phaseId: "coleta_solicitada", pipefyId: id, timestamp: new Date().toISOString() });
+              metaChanged = true;
+            }
+          }
+        } catch(e) { console.error("coleta_solicitada tracking:", e.message); }
+        // Trim metaLog to 180 days
+        const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 180);
+        board.metaLog = board.metaLog.filter(m => new Date(m.timestamp) > cutoff);
+        if (metaChanged) await dbSet(BOARD_KEY, board);
+      } catch(e) { console.error("meta tracking:", e.message); }
+
+      return res.status(200).json({ ok: true, board, newCount, erpRemoved, pipefyError });
+    }
+
+    // ── POST reset ─────────────────────────────────────────────
+    if (action === "reset") {
+      const fresh = defaultBoard();
+      try {
+        const approved = await fetchApprovedCards();
+        fresh.syncedIds = approved.map(c => c.pipefyId);
+      } catch (e) { console.error("Reset:", e.message); }
+      const saved = await dbSet(BOARD_KEY, fresh);
+      return res.status(200).json({ ok: saved, board: fresh, markedAsSeen: fresh.syncedIds.length });
+    }
+
+    // ── POST move (OS principal) ───────────────────────────────
+    if (req.method === "POST" && action === "move") {
+      const { pipefyId, phaseId, movedBy, tecnico, fotosCompra, descricaoCompra } = req.body || {};
+      if (!pipefyId || !phaseId) return res.status(400).json({ ok: false, error: "pipefyId e phaseId são obrigatórios" });
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const card = board.cards.find(c => c.pipefyId === String(pipefyId));
+      if (!card) return res.status(404).json({ ok: false, error: "OS não encontrada" });
+      card.phaseId = phaseId; card.movedAt = new Date().toISOString();
+      card.movedBy = movedBy || "—"; card.tecnico = tecnico || null;
+      // Salva fotos e descrição quando move para comprar_peca
+      if (phaseId === "comprar_peca") {
+        if (fotosCompra)    card.fotosCompra    = fotosCompra;
+        if (descricaoCompra) card.descricaoCompra = descricaoCompra;
+      }
+      if (["loja_feito", "delivery_feito", "cliente_loja"].includes(phaseId)) {
+        board.movesLog.push({ phaseId, timestamp: card.movedAt, tecnico: tecnico || null, pipefyId: String(pipefyId) });
+        board.movesLog = trimLog(board.movesLog);
+      }
+      await dbSet(BOARD_KEY, board);
+
+      // Auto-adiciona à fila do Lalamove quando move para coleta/entrega solicitada
+      if (["coleta_solicitada", "entrega_solicitada"].includes(phaseId)) {
+        const LALA_KEY = "reparoeletro_lalamove";
+        try {
+          const lalaDb = await dbGet(LALA_KEY) || { fichas: [] };
+          if (!Array.isArray(lalaDb.fichas)) lalaDb.fichas = [];
+          const tipo = phaseId === "coleta_solicitada" ? "coleta" : "entrega";
+          const jaExiste = lalaDb.fichas.find(f => f.pipefyId === String(pipefyId) && f.tipo === tipo);
+          if (!jaExiste) {
+            lalaDb.fichas.push({
+              pipefyId:    String(pipefyId),
+              tipo,
+              osCode:      card.osCode      || null,
+              nomeContato: card.nomeContato || card.title || null,
+              descricao:   card.descricao   || null,
+              endereco:    null, // será preenchido na tela do Lalamove ou buscado do Pipefy
+              addedAt:     new Date().toISOString(),
+              status:      "pendente",
+            });
+            await dbSet(LALA_KEY, lalaDb);
+          }
+        } catch(e) { console.error("lalamove queue:", e.message); }
+      }
+
+      return res.status(200).json({ ok: true, card });
+    }
+
+    // ── POST move-rs ───────────────────────────────────────────
+    if (req.method === "POST" && action === "move-rs") {
+      const { cardId, phaseId, boardType } = req.body || {};
+      if (!cardId || !phaseId || !boardType) return res.status(400).json({ ok: false, error: "Campos obrigatórios" });
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const arr = boardType === "rs" ? board.rsCards : board.rsRuaCards;
+      const card = arr.find(c => c.id === cardId);
+      if (!card) return res.status(404).json({ ok: false, error: "RS não encontrado" });
+      const prevPhase = card.phaseId;
+      card.phaseId = phaseId; card.movedAt = new Date().toISOString();
+      // Log quando vai para feito
+      const feitoPhase = boardType === "rs" ? "rs_feito" : "rs_rua_feito";
+      if (phaseId === feitoPhase) {
+        board.movesLog.push({ phaseId: boardType === "rs" ? "rs_feito" : "rs_rua_feito", timestamp: card.movedAt });
+        board.movesLog = trimLog(board.movesLog);
+      }
+      await dbSet(BOARD_KEY, board);
+      return res.status(200).json({ ok: true, card, prevPhase });
+    }
+
+    // ── POST move-batch (fim do dia) ───────────────────────────
+    if (req.method === "POST" && action === "move-batch") {
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const FROM = ["loja_feito", "delivery_feito"], TO = "aguardando_ret";
+      let count = 0; const now = new Date().toISOString();
+      for (const card of board.cards) {
+        if (FROM.includes(card.phaseId)) { card.phaseId = TO; card.movedAt = now; card.movedBy = "Sistema"; count++; }
+      }
+      await dbSet(BOARD_KEY, board);
+      return res.status(200).json({ ok: true, moved: count, board });
+    }
+
+    // ── POST create ────────────────────────────────────────────
+    if (req.method === "POST" && action === "create") {
+      const { codigo, nome, descricao, boardType, phaseId } = req.body || {};
+      if (!nome && !codigo) return res.status(400).json({ ok: false, error: "Código ou nome obrigatório" });
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const newId = "local-" + Date.now();
+      const card = {
+        id: newId, pipefyId: newId,
+        osCode: codigo || null, nomeContato: nome || null,
+        title: (codigo ? "#" + codigo + " " : "") + (nome || ""),
+        descricao: descricao || null,
+        age: 0, addedAt: new Date().toISOString(),
+        movedAt: new Date().toISOString(), movedBy: "Manual", localOnly: true,
+      };
+
+      if (boardType === "rs") {
+        card.phaseId = phaseId || board.rsPhases[0].id;
+        board.rsCards.unshift(card);
+        board.movesLog.push({ phaseId: "rs_criado", timestamp: card.addedAt });
+      } else if (boardType === "rs_rua") {
+        card.phaseId = phaseId || board.rsRuaPhases[0].id;
+        board.rsRuaCards.unshift(card);
+        board.movesLog.push({ phaseId: "rs_rua_criado", timestamp: card.addedAt });
+      } else {
+        card.phaseId = phaseId || board.phases[0].id;
+        board.cards.unshift(card);
+        board.syncedIds.push(newId);
+      }
+      board.movesLog = trimLog(board.movesLog);
+      await dbSet(BOARD_KEY, board);
+      return res.status(200).json({ ok: true, card });
+    }
+
+    // ── POST delete-rs ─────────────────────────────────────────
+    if (req.method === "POST" && action === "delete-rs") {
+      const { cardId, boardType } = req.body || {};
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      if (boardType === "rs")     board.rsCards    = board.rsCards.filter(c => c.id !== cardId);
+      if (boardType === "rs_rua") board.rsRuaCards = board.rsRuaCards.filter(c => c.id !== cardId);
+      await dbSet(BOARD_KEY, board);
+      return res.status(200).json({ ok: true });
+    }
+
+    // ── GET goals ──────────────────────────────────────────────
+    if (req.method === "GET" && action === "goals") {
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const log = board.movesLog;
+
+      function toBRT(d) { return new Date(new Date(d).toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })); }
+      function startOfDayUTC(d) { const b = toBRT(d); b.setHours(0,0,0,0); return new Date(b.getTime() + 3*60*60*1000); }
+      function startOfWeekUTC(d) {
+        const b = toBRT(d); const day = b.getDay();
+        b.setDate(b.getDate() + (day === 0 ? -6 : 1 - day)); b.setHours(0,0,0,0);
+        return new Date(b.getTime() + 3*60*60*1000);
+      }
+      function startOfMonthUTC(d) { const b = toBRT(d); b.setDate(1); b.setHours(0,0,0,0); return new Date(b.getTime() + 3*60*60*1000); }
+
+      const now = new Date();
+      const todayUTC    = startOfDayUTC(now);
+      const weekUTC     = startOfWeekUTC(now);
+      const monthUTC    = startOfMonthUTC(now);
+      const prevWeekEnd = new Date(weekUTC.getTime() - 1);
+      const prevWeekStart = new Date(weekUTC.getTime() - 7*24*60*60*1000);
+
+      // Conta entradas únicas por card (pipefyId) — evita contar re-movimentações
+      const cnt = (phaseId, since, until) => {
+        const entries = log.filter(m =>
+          m.phaseId === phaseId &&
+          new Date(m.timestamp) >= since &&
+          (!until || new Date(m.timestamp) <= until)
+        );
+        // Se tem pipefyId, deduplica — conta só a última entrada por card
+        const withId    = entries.filter(m => m.pipefyId);
+        const withoutId = entries.filter(m => !m.pipefyId);
+        const uniqueIds = new Set(withId.map(m => m.pipefyId));
+        return uniqueIds.size + withoutId.length;
+      };
+
+      const cntByTecnico = (phaseId, since) => {
+        const map = {};
+        TECNICOS.forEach(t => map[t] = 0);
+        const entries = log.filter(m => m.phaseId === phaseId && new Date(m.timestamp) >= since && m.tecnico);
+        // Deduplica por pipefyId — pega a entrada mais recente por card
+        const latest = new Map();
+        for (const m of entries) {
+          if (m.pipefyId) {
+            const prev = latest.get(m.pipefyId);
+            if (!prev || new Date(m.timestamp) > new Date(prev.timestamp)) latest.set(m.pipefyId, m);
+          } else {
+            // sem pipefyId: conta normalmente
+            const key = "noid_" + m.timestamp;
+            latest.set(key, m);
+          }
+        }
+        for (const m of latest.values()) {
+          if (map[m.tecnico] !== undefined) map[m.tecnico]++;
+          else map[m.tecnico] = 1;
+        }
+        return map;
+      };
+
+      // Histórico mensal (últimos 6 meses)
+      const monthHistory = [];
+      const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now); d.setMonth(d.getMonth() - i);
+        const ms = startOfMonthUTC(d);
+        const me = new Date(ms); me.setMonth(me.getMonth() + 1); me.setTime(me.getTime() - 1);
+        const brt = toBRT(ms);
+        monthHistory.push({
+          label: monthNames[brt.getMonth()] + "/" + String(brt.getFullYear()).slice(2),
+          rs:     cnt("rs_feito",     ms, me),
+          rsRua:  cnt("rs_rua_feito", ms, me),
+          loja:   cnt("loja_feito",   ms, me),
+          delivery: cnt("delivery_feito", ms, me),
+        });
+      }
+
+      const nowBRT = toBRT(now);
+      const days = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
+      const fmt = d => { const b = toBRT(d); return `${String(b.getDate()).padStart(2,"0")}/${String(b.getMonth()+1).padStart(2,"0")}`; };
+      const weekDates = Array.from({length:6}, (_,i) => fmt(new Date(weekUTC.getTime() + i*24*60*60*1000)));
+      const prevWeekDates = Array.from({length:6}, (_,i) => fmt(new Date(prevWeekStart.getTime() + i*24*60*60*1000)));
+
+      // Busca stats de vendas
+      let vendasStats = {};
+      try {
+        const vr = await fetch(`${UPSTASH_URL}/pipeline`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, "Content-Type": "application/json" },
+          body: JSON.stringify([["GET", "reparoeletro_vendas"]]),
+        });
+        const vj = await vr.json();
+        const produtos = vj[0]?.result ? JSON.parse(vj[0].result).produtos || [] : [];
+        function toBRTv(d) { return new Date(new Date(d).toLocaleString("en-US",{timeZone:"America/Sao_Paulo"})); }
+        const nBRT = toBRTv(new Date()); nBRT.setHours(0,0,0,0);
+        const tUTC = new Date(nBRT.getTime() + 3*60*60*1000);
+        const wBRT = toBRTv(new Date()); const wdv = wBRT.getDay();
+        wBRT.setDate(wBRT.getDate() + (wdv===0?-6:1-wdv)); wBRT.setHours(0,0,0,0);
+        const wUTC = new Date(wBRT.getTime() + 3*60*60*1000);
+        vendasStats = {
+          cadastradosHoje:   produtos.filter(p => p.createdAt && new Date(p.createdAt) >= tUTC).length,
+          cadastradosSemana: produtos.filter(p => p.createdAt && new Date(p.createdAt) >= wUTC).length,
+          vendaLojaHoje:     produtos.filter(p => p.soldAt && new Date(p.soldAt) >= tUTC && p.vendedor === "Loja").length,
+          vendaLojaSemana:   produtos.filter(p => p.soldAt && new Date(p.soldAt) >= wUTC && p.vendedor === "Loja").length,
+          vendaOnlineHoje:   produtos.filter(p => p.soldAt && new Date(p.soldAt) >= tUTC && p.vendedor === "Online").length,
+          vendaOnlineSemana: produtos.filter(p => p.soldAt && new Date(p.soldAt) >= wUTC && p.vendedor === "Online").length,
+        };
+      } catch(e) { console.error("vendas stats:", e.message); }
+
+      return res.status(200).json({
+        ok: true,
+        todayLabel: `${days[nowBRT.getDay()]}, ${String(nowBRT.getDate()).padStart(2,"0")} ${["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"][nowBRT.getMonth()]}`,
+        weekLabel: `${weekDates[0]} – ${weekDates[5]}`,
+        prevWeekLabel: `${prevWeekDates[0]} – ${prevWeekDates[5]}`,
+        today: {
+          coletaSolicitada: { count: cnt("coleta_solicitada",    todayUTC), goal: 40 },
+          orcEnviado:       { count: cnt("aguardando_aprovacao", todayUTC), goal: 40 },
+          aprovadoLoja:     { count: cnt("cliente_loja",         todayUTC), goal: 15 },
+          aprovadoTotal:    { count: cnt("aprovado_entrada",     todayUTC), goal: 35 },
+          erp:              { count: cnt("erp_entrada",          todayUTC), goal: 35 },
+          aprovado: { count: cnt("aprovado_entrada", todayUTC), goal: 35 },
+          loja:     { count: cnt("loja_feito",       todayUTC), goal: 15 },
+          delivery: { count: cnt("delivery_feito",   todayUTC), goal: 20 },
+          rsCriado: cnt("rs_criado",    todayUTC),
+          rsFeito:  cnt("rs_feito",     todayUTC),
+          rsRuaCriado: cnt("rs_rua_criado",  todayUTC),
+          rsRuaFeito:  cnt("rs_rua_feito",   todayUTC),
+        },
+        week: {
+          coletaSolicitada: { count: cnt("coleta_solicitada",    weekUTC), goal: 200 },
+          orcEnviado:       { count: cnt("aguardando_aprovacao", weekUTC), goal: 200 },
+          aprovadoLoja:     { count: cnt("cliente_loja",         weekUTC), goal: 90  },
+          aprovadoTotal:    { count: cnt("aprovado_entrada",     weekUTC), goal: 200 },
+          erp:              { count: cnt("erp_entrada",          weekUTC), goal: 200 },
+          aprovado: { count: cnt("aprovado_entrada", weekUTC), goal: 210 },
+          loja:     { count: cnt("loja_feito",       weekUTC), goal: 90 },
+          delivery: { count: cnt("delivery_feito",   weekUTC), goal: 120 },
+          rsFeito:  cnt("rs_feito",    weekUTC),
+          rsRuaFeito: cnt("rs_rua_feito", weekUTC),
+        },
+        month: {
+          rsFeito:    cnt("rs_feito",    monthUTC),
+          rsRuaFeito: cnt("rs_rua_feito", monthUTC),
+        },
+        prevWeek: {
+          aprovado: { count: cnt("aprovado_entrada", prevWeekStart, prevWeekEnd), goal: 210 },
+          loja:     { count: cnt("loja_feito",       prevWeekStart, prevWeekEnd), goal: 90 },
+          delivery: { count: cnt("delivery_feito",   prevWeekStart, prevWeekEnd), goal: 120 },
+        },
+        tecnicoHoje: {
+          loja:     cntByTecnico("loja_feito",     todayUTC),
+          delivery: cntByTecnico("delivery_feito", todayUTC),
+        },
+        tecnicoSemana: {
+          loja:     cntByTecnico("loja_feito",     weekUTC),
+          delivery: cntByTecnico("delivery_feito", weekUTC),
+        },
+        monthHistory,
+        vendas: vendasStats,
+      });
+    }
+
+    // ── GET debug ──────────────────────────────────────────────
+    if (action === "debug") {
+      const result = {};
+
+      // Upstash ping
+      try {
+        const r = await fetch(`${UPSTASH_URL}/pipeline`, {
+          method: "POST", headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, "Content-Type": "application/json" },
+          body: JSON.stringify([["PING"]]),
+        });
+        result.upstash_ping = (await r.json())[0]?.result;
+      } catch(e) { result.upstash_ping = "ERRO: " + e.message; }
+
+      // Board state
+      try {
+        const board = await dbGet(BOARD_KEY);
+        result.board_found = !!board;
+        result.board_cards = board?.cards?.length ?? 0;
+        result.board_rs = board?.rsCards?.length ?? 0;
+        result.board_rs_rua = board?.rsRuaCards?.length ?? 0;
+        result.board_synced = board?.syncedIds?.length ?? 0;
+        result.board_log = board?.movesLog?.length ?? 0;
+        result.board_synced_sample = board?.syncedIds?.slice(-5) ?? [];
+      } catch(e) { result.board_error = e.message; }
+
+      // Pipefy approved
+      try {
+        const approved = await fetchApprovedCards();
+        result.pipefy_approved_count = approved.length;
+        result.pipefy_sample = approved.slice(-3).map(c => ({ id: c.pipefyId, title: c.title }));
+      } catch(e) { result.pipefy_error = e.message; }
+
+      // Simulate load: check which cards would be NEW
+      try {
+        const board = await dbGet(BOARD_KEY);
+        const approved = await fetchApprovedCards();
+        const newOnes = approved.filter(c => !(board?.syncedIds || []).includes(c.pipefyId));
+        result.would_import = newOnes.length;
+        result.new_cards_sample = newOnes.slice(0, 5).map(c => ({ id: c.pipefyId, title: c.title }));
+      } catch(e) { result.simulate_error = e.message; }
+
+      // Test dbSet
+      try {
+        const testKey = BOARD_KEY + "_test";
+        const setOk = await dbSet(testKey, { test: true, ts: Date.now() });
+        const getBack = await dbGet(testKey);
+        result.dbset_works = setOk && getBack?.test === true;
+      } catch(e) { result.dbset_error = e.message; }
+
+      // Lista todas as fases do Pipefy
+      try {
+        const data = await pipefyQuery(`query {
+          pipe(id: "${PIPE_ID}") {
+            phases { name cards(first: 1) { edges { node { id } } } }
+          }
+        }`);
+        result.all_phases = (data?.pipe?.phases || []).map(p => ({
+          name: p.name,
+          cards: p.cards.edges.length
+        }));
+      } catch(e) { result.phases_error = e.message; }
+
+      result.env_pipefy = !!process.env.PIPEFY_TOKEN;
+      result.env_upstash = !!UPSTASH_URL;
+      result.board_key = BOARD_KEY;
+
+      return res.status(200).json(result);
+    }
+
+    // ── POST clean-aprovado ───────────────────────────────────
+    // Remove apenas cards antigos da fase Aprovado — preserva todas as outras fases
+    if (action === "clean-aprovado") {
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+
+      // Início do dia em BRT
+      const nowBRT = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+      nowBRT.setHours(0, 0, 0, 0);
+      const todayStartUTC = new Date(nowBRT.getTime() + 3 * 60 * 60 * 1000);
+
+      const before = board.cards.length;
+
+      board.cards = board.cards.filter(c => {
+        // Mantém cards que NÃO estão em Aprovado
+        if (c.phaseId !== "aprovado") return true;
+        // Em Aprovado: mantém só os de hoje
+        const approvedAt = c.approvedAt ? new Date(c.approvedAt) : null;
+        return approvedAt && approvedAt >= todayStartUTC;
+      });
+
+      const removed = before - board.cards.length;
+      await dbSet(BOARD_KEY, board);
+
+      return res.status(200).json({ ok: true, removed, remaining: board.cards.length, board });
+    }
+
+        // ── POST fix-log ───────────────────────────────────────────
+    // Remove entradas duplicadas do log de hoje (sem pipefyId) e reconstrói
+    if (action === "fix-log") { // aceita GET e POST
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+
+      const nowBRT = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+      nowBRT.setHours(0, 0, 0, 0);
+      const todayStartUTC = new Date(nowBRT.getTime() + 3 * 60 * 60 * 1000);
+
+      const before = board.movesLog.length;
+
+      // Remove entradas de hoje sem pipefyId para loja_feito e delivery_feito
+      board.movesLog = board.movesLog.filter(m => {
+        const isToday = new Date(m.timestamp) >= todayStartUTC;
+        const isTarget = ["loja_feito", "delivery_feito"].includes(m.phaseId);
+        if (isToday && isTarget && !m.pipefyId) return false; // remove
+        return true;
+      });
+
+      // Reconstrói entradas de hoje a partir do estado atual dos cards
+      const now = new Date().toISOString();
+      for (const card of board.cards) {
+        if (!["loja_feito", "delivery_feito"].includes(card.phaseId)) continue;
+        const movedAt = card.movedAt ? new Date(card.movedAt) : null;
+        if (!movedAt || movedAt < todayStartUTC) continue;
+        // Verifica se já existe entrada com pipefyId para este card hoje
+        const alreadyLogged = board.movesLog.some(m =>
+          m.pipefyId === card.pipefyId &&
+          m.phaseId === card.phaseId &&
+          new Date(m.timestamp) >= todayStartUTC
+        );
+        if (!alreadyLogged) {
+          board.movesLog.push({
+            phaseId:  card.phaseId,
+            timestamp: card.movedAt,
+            tecnico:  card.tecnico || null,
+            pipefyId: card.pipefyId,
+          });
+        }
+      }
+
+      board.movesLog = trimLog(board.movesLog);
+      await dbSet(BOARD_KEY, board);
+
+      const after = board.movesLog.length;
+      return res.status(200).json({ ok: true, removedEntries: before - after, totalLog: after });
+    }
+
+        // ── POST split-card ────────────────────────────────────────
+    // Quebra uma OS em múltiplos cards (cliente com vários equipamentos)
+    if (req.method === "POST" && action === "split-card") {
+      const { pipefyId, splits, tecnico } = req.body || {};
+      // splits = [{ equipamento, phaseId }, ...]
+      if (!pipefyId || !Array.isArray(splits) || splits.length < 2)
+        return res.status(400).json({ ok: false, error: "pipefyId e ao menos 2 splits obrigatórios" });
+
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const original = board.cards.find(c => c.pipefyId === String(pipefyId));
+      if (!original) return res.status(404).json({ ok: false, error: "OS não encontrada" });
+
+      const now = new Date().toISOString();
+      const newCards = [];
+
+      splits.forEach((s, i) => {
+        const suffix = i === 0 ? "" : `-${i + 1}`;
+        const newId = `${pipefyId}-split-${i + 1}`;
+        const equipLabel = s.equipamento ? ` [${s.equipamento}]` : "";
+        const card = {
+          ...original,
+          pipefyId:   newId,
+          title:      original.title + equipLabel,
+          equipamento: s.equipamento || null,
+          phaseId:    s.phaseId || original.phaseId,
+          movedAt:    now,
+          movedBy:    tecnico || original.movedBy,
+          tecnico:    tecnico || original.tecnico || null,
+          splitFrom:  String(pipefyId),
+          localOnly:  true,
+        };
+        newCards.push(card);
+
+        // Log se foi para fase de conclusão
+        if (["loja_feito", "delivery_feito"].includes(s.phaseId)) {
+          board.movesLog.push({
+            phaseId:   s.phaseId,
+            timestamp: now,
+            tecnico:   tecnico || null,
+            pipefyId:  newId,
+            equipamento: s.equipamento || null,
+          });
+        }
+      });
+
+      // Remove o card original e insere os splits no lugar
+      board.cards = board.cards.filter(c => c.pipefyId !== String(pipefyId));
+      // Adiciona IDs dos splits ao syncedIds
+      newCards.forEach(c => { if (!board.syncedIds.includes(c.pipefyId)) board.syncedIds.push(c.pipefyId); });
+      board.cards.unshift(...newCards);
+      board.movesLog = trimLog(board.movesLog);
+      await dbSet(BOARD_KEY, board);
+
+      return res.status(200).json({ ok: true, created: newCards.length, cards: newCards });
+    }
+
+        // ── GET check-card — diagnóstico de fase de um card específico ──
+    if (req.method === "GET" && action === "check-card") {
+      const { id } = req.query;
+      if (!id) return res.status(400).json({ ok: false, error: "id obrigatório" });
+      const phase = await fetchCardPhase(id);
+      return res.status(200).json({ ok: true, id, phase });
+    }
+
+    // ── GET check-ret — mostra fase atual de todos os cards em aguardando_ret ──
+    if (req.method === "GET" && action === "check-ret") {
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const retCards = board.cards.filter(c =>
+        c.phaseId === "aguardando_ret" && !c.localOnly && !c.pipefyId.includes("-split-")
+      ).slice(0, 10); // primeiros 10 para diagnóstico
+      const results = await Promise.all(retCards.map(async c => ({
+        pipefyId: c.pipefyId,
+        osCode:   c.osCode,
+        phase:    await fetchCardPhase(c.pipefyId),
+      })));
+      return res.status(200).json({ ok: true, total: retCards.length, results });
+    }
+
+    // ── GET cleanup-ret — remove aguardando_ret que foram ERP/Finalizado ──
+    if (req.method === "GET" && action === "cleanup-ret") {
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      let removed = 0, removedIds = [], pipefyError = null;
+      let retTotal = 0;
+      try {
+        const result = await cleanupAguardandoRet(board);
+        removed    = result.removed;
+        removedIds = result.ids;
+        retTotal   = result.retTotal || 0;
+        if (removed > 0) {
+          board.movesLog.push({
+            phaseId:   "cleanup_ret",
+            timestamp: new Date().toISOString(),
+            removed,
+            pipefyIds: removedIds,
+          });
+          board.movesLog = trimLog(board.movesLog);
+          await dbSet(BOARD_KEY, board);
+        }
+      } catch(e) { pipefyError = e.message; }
+      return res.status(200).json({
+        ok: true, removed, removedIds, pipefyError,
+        debug: { retTotal }
+      });
+    }
+
+    // ── POST clear-compra — limpa dados de compra de um card específico ──
+    if (req.method === "POST" && action === "clear-compra") {
+      const { pipefyId } = req.body || {};
+      if (!pipefyId) return res.status(400).json({ ok: false, error: "pipefyId obrigatório" });
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const card  = board.cards.find(c => c.pipefyId === String(pipefyId));
+      if (!card) return res.status(404).json({ ok: false, error: "Card não encontrado" });
+      delete card.descricaoCompra;
+      delete card.fotosCompra;
+      delete card.alertaCompra;
+      delete card.tipoCompra;
+      delete card.previsao;
+      await dbSet(BOARD_KEY, board);
+      return res.status(200).json({ ok: true, pipefyId, msg: "Dados de compra removidos." });
+    }
+
+    // ── GET sync-lalamove ─────────────────────────────────────
+    if (action === "sync-lalamove") {
+      try {
+        const LALA_KEY = "reparoeletro_lalamove";
+        const lalaDb = (await dbGet(LALA_KEY)) || { fichas: [] };
+        if (!Array.isArray(lalaDb.fichas)) lalaDb.fichas = [];
+
+        // Mesma query que fetchApprovedCards — unica que funciona com Pipefy
+        const data = await pipefyQuery(`query {
+          pipe(id: "${PIPE_ID}") {
+            phases {
+              name
+              cards(first: 50) {
+                edges {
+                  node {
+                    id title
+                    fields { name value }
+                  }
+                }
+              }
+            }
+          }
+        }`);
+
+        const phases = data?.pipe?.phases || [];
+        let added = 0;
+
+        for (const ph of phases) {
+          const l    = ph.name.toLowerCase().trim();
+          const tipo = l === "coleta solicitada" ? "coleta"
+                     : l === "entrega solicitada" ? "entrega"
+                     : null;
+          if (!tipo) continue;
+
+          for (const { node } of (ph.cards?.edges || [])) {
+            const pipefyId = String(node.id);
+            if (lalaDb.fichas.find(f => f.pipefyId === pipefyId && f.tipo === tipo)) continue;
+
+            const fields   = node.fields || [];
+            const endField = fields.find(f => f.name.toLowerCase().includes("endere"));
+            const telField = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"));
+            const title    = node.title || "";
+            const m        = title.match(/^(.*?)\s+(\d{3,6})$/);
+
+            lalaDb.fichas.push({
+              pipefyId, tipo,
+              osCode:      m ? m[2] : null,
+              nomeContato: m ? m[1].trim() : title,
+              descricao:   null,
+              endereco:    endField?.value || null,
+              telefone:    telField?.value || null,
+              lat: null, lng: null,
+              addedAt: new Date().toISOString(),
+              status:  "pendente",
+            });
+            added++;
+          }
+        }
+
+        if (added > 0) await dbSet(LALA_KEY, lalaDb);
+
+        // Registra coletas solicitadas no metaLog para metas
+        if (added > 0) {
+          const board = await dbGet(BOARD_KEY) || { metaLog: [] };
+          if (!Array.isArray(board.metaLog)) board.metaLog = [];
+          const seenColeta = new Set(board.metaLog.filter(m=>m.phaseId==="coleta_solicitada").map(m=>m.pipefyId));
+          let metaChanged = false;
+          lalaDb.fichas.filter(f=>f.tipo==="coleta" && f.status==="pendente").forEach(f => {
+            if (!seenColeta.has(f.pipefyId)) {
+              board.metaLog.push({ phaseId: "coleta_solicitada", pipefyId: f.pipefyId, timestamp: f.addedAt || new Date().toISOString() });
+              metaChanged = true;
+            }
+          });
+          if (metaChanged) await dbSet(BOARD_KEY, board);
+        }
+
+        return res.status(200).json({ ok: true, added, total: lalaDb.fichas.filter(f => f.status === "pendente").length });
+      } catch(e) {
+        return res.status(200).json({ ok: false, error: e.message });
+      }
+    }
+
+    return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+
+  } catch (err) {
+    console.error("Handler error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
   }
-
-  return { texto: templatePadrao(desc, nome), preco: null };
-}
-
-
-// Busca campos e atividades de um card específico pelo ID
-async function fetchCardData(pipefyId) {
-  const data = await pipefyQuery(`query {
-    card(id: "${pipefyId}") {
-      id title
-      fields { name value }
-      comments { text }
-    }
-  }`);
-  const node   = data?.card;
-  if (!node) return null;
-  const fields = node.fields || [];
-  const nome  = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
-  const tel   = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
-  const desc  = fields.find(f => f.name.toLowerCase().includes("descri"))?.value || "";
-  const end   = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
-  const extras = fields
-    .filter(f => !["telefone","fone","nome","endere","valor"].some(k => f.name.toLowerCase().includes(k)))
-    .map(f => f.value).filter(Boolean);
-  const comentarios = [
-    ...(node.comments || []).map(c => c.text).filter(Boolean),
-    ...extras,
-  ];
-  return { pipefyId: String(node.id), title: node.title, nome, tel, desc, end, comentarios };
-}
-
-// Busca cards em Aguardando Aprovação direto pelo ID da fase (mais rápido e completo)
-
-// Gera texto de orçamento com Claude
-// ── NORMALIZA TEXTO (remove acentos, minúsculo) ──────────────
-// Busca campos e atividades de um card específico pelo ID
-async function fetchCardData(pipefyId) {
-  const data = await pipefyQuery(`query {
-    card(id: "${pipefyId}") {
-      id title
-      fields { name value }
-      comments { text }
-    }
-  }`);
-  const node   = data?.card;
-  if (!node) return null;
-  const fields = node.fields || [];
-  const nome  = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
-  const tel   = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
-  const desc  = fields.find(f => f.name.toLowerCase().includes("descri"))?.value || "";
-  const end   = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
-  const extras = fields
-    .filter(f => !["telefone","fone","nome","endere","valor"].some(k => f.name.toLowerCase().includes(k)))
-    .map(f => f.value).filter(Boolean);
-  const comentarios = [
-    ...(node.comments || []).map(c => c.text).filter(Boolean),
-    ...extras,
-  ];
-  return { pipefyId: String(node.id), title: node.title, nome, tel, desc, end, comentarios };
-}
-
-// Busca cards em Aguardando Aprovação direto pelo ID da fase (mais rápido e completo)
-
-// Gera texto de orçamento com Claude
-// ── REGRAS DE ORÇAMENTO ──────────────────────────────────────
-// Cada regra: { keywords, template }
-// keywords: palavras-chave buscadas em QUALQUER campo do card (desc + comentarios)
-// template: texto final com [NOME] como placeholder do nome do cliente
+};
