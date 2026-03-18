@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Garantia — Reparo Eletro</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0d0d0d;--surface:#161616;--surface2:#1f1f1f;--border:#2a2a2a;
+  --text:#fff;--muted:#888;--dim:#333;
+  --c1:#f59e0b; /* Garantia Acionada */
+  --c2:#3b9eff; /* Em Análise */
+  --c3:#22c55e; /* Serviço Finalizado */
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+/* HEADER */
+header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;border-bottom:2px solid var(--c1);background:var(--bg);flex-shrink:0;}
+.logo{font-family:var(--fh);font-size:16px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.logo-icon{width:26px;height:26px;background:var(--c1);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;}
+.logo span{color:var(--c1);}
+.header-right{display:flex;align-items:center;gap:8px;}
+.hbtn{font-family:var(--fm);font-size:10px;padding:5px 11px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;text-decoration:none;display:inline-flex;align-items:center;}
+.hbtn:hover{color:var(--text);border-color:var(--c1);}
+.hbtn.accent{background:var(--c1);color:#000;border-color:var(--c1);font-weight:600;}
+.hbtn.accent:hover{background:#fbbf24;}
+.live-dot{width:5px;height:5px;background:var(--c1);border-radius:50%;animation:blink 2s infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+/* TOOLBAR */
+.toolbar{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.board-title{font-family:var(--fh);font-size:18px;font-weight:800;}
+.board-title span{color:var(--c1);}
+.toolbar-right{display:flex;gap:8px;align-items:center;}
+
+/* KANBAN */
+.kanban{flex:1;display:flex;gap:14px;padding:14px 20px;overflow-x:auto;overflow-y:hidden;}
+.kanban::-webkit-scrollbar{height:4px;}
+.kanban::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+
+/* COLUMN */
+.col{
+  flex:0 0 320px;
+  display:flex;flex-direction:column;
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  overflow:hidden;
+}
+.col-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;border-bottom:1px solid var(--border);
+  position:relative;flex-shrink:0;
+}
+.col-header::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--col-color,#fff);}
+.col-title{font-family:var(--fh);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+.col-count{font-family:var(--fm);font-size:10px;background:var(--surface2);border:1px solid var(--border);padding:1px 7px;border-radius:20px;color:var(--muted);}
+.col-body{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:8px;}
+.col-body::-webkit-scrollbar{width:3px;}
+.col-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+
+/* CARD */
+.gcard{
+  background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+  overflow:hidden;transition:border-color .15s;
+}
+.gcard:hover{border-color:rgba(255,255,255,.12);}
+
+.gcard-head{padding:10px 12px;border-bottom:1px solid var(--border);}
+.gcard-os{font-family:var(--fm);font-size:10px;font-weight:600;margin-bottom:2px;}
+.gcard-nome{font-size:13px;font-weight:600;line-height:1.3;}
+.gcard-tel{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px;}
+
+.gcard-desc{padding:8px 12px;font-size:11px;color:var(--muted);line-height:1.5;border-bottom:1px solid var(--border);}
+
+.gcard-actions{padding:8px 12px;display:flex;flex-wrap:wrap;gap:5px;}
+.gact{font-family:var(--fm);font-size:9px;padding:4px 9px;border-radius:5px;border:1px solid var(--border);background:transparent;cursor:pointer;color:var(--muted);transition:all .15s;white-space:nowrap;}
+.gact:hover{color:var(--text);border-color:rgba(255,255,255,.2);}
+.gact.next:hover{color:var(--col-color,#fff);border-color:var(--col-color,#fff);}
+.gact.del:hover{color:#ef4444;border-color:rgba(239,68,68,.3);}
+
+/* EMPTY */
+.col-empty{padding:32px 12px;text-align:center;font-family:var(--fm);font-size:10px;color:var(--dim);}
+
+/* LOADING */
+.loading-wrap{flex:1;display:flex;align-items:center;justify-content:center;gap:10px;font-family:var(--fm);font-size:11px;color:var(--muted);}
+.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--c1);border-radius:50%;animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* TOAST */
+#toast{position:fixed;bottom:18px;right:18px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:11px 15px;font-family:var(--fm);font-size:11px;color:#fff;z-index:9999;max-width:280px;opacity:0;transition:opacity .2s;display:flex;gap:10px;align-items:flex-start;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🛡️</div>
+    <div>Reparo<span>Eletro</span></div>
+  </div>
+  <div class="header-right">
+    <div class="live-dot"></div>
+    <a class="hbtn" href="/">Home</a>
+    <button class="hbtn" onclick="syncNow()">↻ Sync Pipefy</button>
+    <button class="hbtn" onclick="limparFinalizados()">🗑 Limpar Finalizados</button>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div>
+    <div class="board-title">Dash <span>Garantia</span></div>
+  </div>
+  <div class="toolbar-right">
+    <span id="status-txt" style="font-family:var(--fm);font-size:10px;color:var(--muted);"></span>
+  </div>
+</div>
+
+<div class="kanban" id="kanban">
+  <div class="loading-wrap"><div class="spinner"></div> Carregando...</div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+var FASES = [
+  { id: "garantia_acionada",  name: "Garantia Acionada",  color: "#f59e0b" },
+  { id: "em_analise",         name: "Em Análise",          color: "#3b9eff" },
+  { id: "servico_finalizado", name: "Serviço Finalizado",  color: "#22c55e" },
+];
+
+var fichas = [];
+
+async function api(action, body) {
+  var opts = { method: body !== undefined ? "POST" : "GET", headers: { "Content-Type": "application/json" } };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  var r = await fetch("/api/garantia?action=" + action, opts);
+  return r.json();
+}
+
+async function load() {
+  var d = await api("load");
+  if (!d.ok) return;
+  fichas = d.fichas || [];
+  render();
+}
+
+async function syncNow() {
+  document.getElementById("status-txt").textContent = "Sincronizando...";
+  var d = await api("sync", {});
+  document.getElementById("status-txt").textContent = "";
+  if (d.ok) {
+    if (d.added > 0 || d.removed > 0)
+      showToast("✅", d.added + " nova(s), " + d.removed + " removida(s)", d.pipefyError || "");
+    else
+      showToast("ℹ️", "Nenhuma alteração", "");
+    await load();
+  } else {
+    showToast("❌", "Erro no sync", d.pipefyError || d.error || "");
+  }
+}
+
+async function limparFinalizados() {
+  if (!confirm("Remover todas as fichas de Serviço Finalizado?")) return;
+  var d = await api("limpar-finalizados", {});
+  if (d.ok) { showToast("🗑", d.removed + " ficha(s) removida(s)", ""); await load(); }
+}
+
+async function mover(id, phaseId) {
+  var d = await api("mover", { id, phaseId });
+  if (d.ok) {
+    var f = fichas.find(function(x) { return x.id === id; });
+    if (f) { f.phaseId = phaseId; f.movedAt = new Date().toISOString(); render(); }
+  } else showToast("❌", "Erro", d.error);
+}
+
+async function excluir(id, nome) {
+  if (!confirm("Remover ficha de \"" + nome + "\"?")) return;
+  var d = await api("excluir", { id });
+  if (d.ok) { fichas = fichas.filter(function(f) { return f.id !== id; }); render(); }
+}
+
+function render() {
+  var kanban = document.getElementById("kanban");
+  kanban.innerHTML = "";
+
+  FASES.forEach(function(fase, fi) {
+    var cards = fichas.filter(function(f) { return f.phaseId === fase.id; });
+    var nextFase = FASES[fi + 1] || null;
+
+    var col = document.createElement("div");
+    col.className = "col";
+    col.style.setProperty("--col-color", fase.color);
+
+    var head = "<div class=\"col-header\" style=\"--col-color:" + fase.color + "\">" +
+      "<span class=\"col-title\" style=\"color:" + fase.color + "\">" + fase.name + "</span>" +
+      "<span class=\"col-count\">" + cards.length + "</span>" +
+    "</div>";
+
+    var body = "<div class=\"col-body\">";
+    if (!cards.length) {
+      body += "<div class=\"col-empty\">Nenhuma ficha</div>";
+    } else {
+      cards.forEach(function(f) {
+        var os = f.osCode ? "<span style=\"color:" + fase.color + "\">#" + f.osCode + "</span>" : "";
+        var actionBtns = "";
+        if (nextFase) {
+          actionBtns += "<button class=\"gact next\" style=\"--col-color:" + nextFase.color + "\" onclick=\"mover('" + f.id + "','" + nextFase.id + "')\">→ " + nextFase.name + "</button>";
+        }
+        actionBtns += "<button class=\"gact del\" onclick=\"excluir('" + f.id + "','" + (f.nomeContato||"").replace(/'/g,"") + "')\">🗑 Remover</button>";
+
+        body += "<div class=\"gcard\">" +
+          "<div class=\"gcard-head\">" +
+            (os ? "<div class=\"gcard-os\">" + os + "</div>" : "") +
+            "<div class=\"gcard-nome\">" + (f.nomeContato || "—") + "</div>" +
+            (f.telefone ? "<div class=\"gcard-tel\">" + f.telefone + "</div>" : "") +
+          "</div>" +
+          (f.descricao ? "<div class=\"gcard-desc\">" + f.descricao + "</div>" : "") +
+          "<div class=\"gcard-actions\">" + actionBtns + "</div>" +
+        "</div>";
+      });
+    }
+    body += "</div>";
+
+    col.innerHTML = head + body;
+    kanban.appendChild(col);
+  });
+}
+
+var toastTimer;
+function showToast(icon, title, msg) {
+  var t = document.getElementById("toast");
+  t.innerHTML = "<span style=\"font-size:16px\">" + icon + "</span><div><div style=\"font-weight:600\">" + title + "</div>" + (msg ? "<div style=\"color:#888;margin-top:2px;font-size:10px\">" + msg + "</div>" : "") + "</div>";
+  t.style.opacity = "1";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function() { t.style.opacity = "0"; }, 4000);
+}
+
+// Auto sync ao abrir + a cada 60s
+load().then(function() { syncNow(); });
+setInterval(function() { load().then(function() { syncNow(); }); }, 60000);
+</script>
+</body>
+</html>
