@@ -141,7 +141,7 @@ module.exports = async function handler(req, res) {
           descricao:   card.descricao,
           phaseId:     FASES[0].id, // Garantia Acionada
           createdAt:   new Date().toISOString(),
-          movedAt:     new Date().toISOString(),
+          movedAt:     null, // só recebe valor quando usuario mover entre fases
         });
         db.syncedIds.push(card.pipefyId);
         added++;
@@ -157,6 +157,12 @@ module.exports = async function handler(req, res) {
           removed = before + added - db.fichas.length;
         }
       }
+
+      // Auto-remove fichas em Serviço Finalizado
+      const beforeFin = db.fichas.length;
+      db.fichas = db.fichas.filter(f => f.phaseId !== "servico_finalizado");
+      const removedFin = beforeFin - db.fichas.length;
+      if (removedFin > 0) removed += removedFin;
 
       if (added > 0 || removed > 0) await dbSet(GARANTIA_KEY, db);
     } catch(e) { pipefyError = e.message; }
@@ -208,11 +214,10 @@ module.exports = async function handler(req, res) {
     const todayUTC = new Date(nowBRT.getTime() + 3*60*60*1000);
 
     const before = db.fichas.length;
-    // Mantém fichas movidas hoje (movedAt) ou criadas hoje (createdAt) se nunca movidas
+    // Mantém apenas fichas que foram explicitamente movidas entre fases hoje
     db.fichas = db.fichas.filter(f => {
-      const ref = f.movedAt || f.createdAt;
-      if (!ref) return false;
-      return new Date(ref) >= todayUTC;
+      if (!f.movedAt) return false; // nunca foi movida: remove
+      return new Date(f.movedAt) >= todayUTC;
     });
     const removed = before - db.fichas.length;
     // Atualiza syncedIds
