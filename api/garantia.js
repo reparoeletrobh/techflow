@@ -204,6 +204,21 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, removed });
   }
 
+  // ── POST reset-moveat — zera movedAt de fichas nunca movidas pelo usuário
+  if (req.method === "POST" && action === "reset-moveat") {
+    const db = await dbGet(GARANTIA_KEY) || defaultDB();
+    let count = 0;
+    db.fichas.forEach(f => {
+      // Se está na fase inicial, nunca foi movida pelo usuário
+      if (f.phaseId === FASES[0].id) {
+        f.movedAt = null;
+        count++;
+      }
+    });
+    await dbSet(GARANTIA_KEY, db);
+    return res.status(200).json({ ok: true, reset: count });
+  }
+
   // ── POST limpar-nao-movidas-hoje ─────────────────────────────
   if (req.method === "POST" && action === "limpar-nao-movidas-hoje") {
     const db = await dbGet(GARANTIA_KEY) || defaultDB();
@@ -214,10 +229,10 @@ module.exports = async function handler(req, res) {
     const todayUTC = new Date(nowBRT.getTime() + 3*60*60*1000);
 
     const before = db.fichas.length;
-    // Mantém apenas fichas que foram explicitamente movidas entre fases hoje
+    // Remove: fichas nunca movidas (movedAt null) + fichas movidas antes de hoje
     db.fichas = db.fichas.filter(f => {
-      if (!f.movedAt) return false; // nunca foi movida: remove
-      return new Date(f.movedAt) >= todayUTC;
+      if (!f.movedAt) return false;                    // nunca movida: remove
+      return new Date(f.movedAt) >= todayUTC;           // mantém só as de hoje
     });
     const removed = before - db.fichas.length;
     // Atualiza syncedIds
