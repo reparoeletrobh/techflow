@@ -92,47 +92,51 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 16px;
-  height: 46px;
+  gap: 10px;
+  padding: 0 10px;
+  height: 42px;
+  margin: 2px 8px;
+  border-radius: 8px;
   cursor: pointer;
-  border-left: 2px solid transparent;
+  border-left: none;
   transition: background .15s, border-color .15s;
   white-space: nowrap;
   overflow: hidden;
   position: relative;
   user-select: none;
+  background: color-mix(in srgb, var(--item-color, #888) 38%, #0d0d14);
+  border: 1px solid color-mix(in srgb, var(--item-color, #888) 55%, transparent);
 }
 .nav-item:hover {
-  background: var(--surface2);
+  background: color-mix(in srgb, var(--item-color, #888) 50%, #0d0d14);
+  border-color: color-mix(in srgb, var(--item-color, #888) 70%, transparent);
 }
 .nav-item.active {
-  border-left-color: var(--item-color, #fff);
-  background: var(--surface2);
+  background: color-mix(in srgb, var(--item-color, #888) 55%, #0d0d14);
+  border-color: color-mix(in srgb, var(--item-color, #888) 80%, transparent);
 }
-.nav-item.active .nav-label,
-.nav-item:hover  .nav-label { color: var(--item-color, var(--text)); }
+.nav-item.active .nav-label { color: #fff; font-weight: 600; }
+.nav-item:hover  .nav-label { color: #fff; }
 
 .nav-icon {
-  font-size: 16px;
+  font-size: 17px;
   flex-shrink: 0;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
+  width: 26px;
+  text-align: center;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity .15s;
 }
 .nav-label {
   font-family: var(--fm);
   font-size: 11px;
   font-weight: 500;
-  color: var(--muted);
+  color: rgba(255,255,255,.9);
   transition: opacity .2s, color .15s;
   letter-spacing: .03em;
 }
 .sidebar.collapsed .nav-label { opacity: 0; }
+.sidebar.collapsed .nav-item { margin: 2px 6px; justify-content: center; padding: 0; }
 
 /* Tooltip quando collapsed */
 .sidebar.collapsed .nav-item:hover::after {
