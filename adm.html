@@ -2,203 +2,403 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='18,2 8,18 15,18 14,30 24,14 17,14' fill='%23fff' stroke='%23fff' stroke-linejoin='round'/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Adm</title>
+<title>Reparo Eletro — ADM</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='18,2 8,18 15,18 14,30 24,14 17,14' fill='%23fff' stroke='%23fff' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Inter:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{
-  --bg:#050508;--surface:#0d0d14;--surface2:#13131e;--border:#1e1e2e;
-  --text:#e8e8f0;--muted:#5a5a7a;
-  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
-}
-*{margin:0;padding:0;box-sizing:border-box;}
-html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:var(--fb);display:flex;flex-direction:column;}
-body::before{content:'';position:fixed;inset:0;background:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0;opacity:0.4;}
-
-header{
-  display:flex;align-items:center;justify-content:center;
-  padding:0 28px;height:56px;border-bottom:1px solid var(--border);
-  background:rgba(5,5,8,0.9);backdrop-filter:blur(12px);
-  position:sticky;top:0;z-index:100;
-}
-.logo{font-family:var(--fh);font-size:17px;font-weight:900;display:flex;align-items:center;gap:10px;letter-spacing:-0.5px;}
-.logo-dot{width:8px;height:8px;background:#fff;border-radius:50%;box-shadow:0 0 10px #fff;}
-.logo span{color:#fff;opacity:0.4;}
-
-.wrap{
-  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  padding:40px 24px;position:relative;z-index:1;gap:32px;
+:root {
+  --bg:       #050508;
+  --surface:  #0d0d14;
+  --surface2: #13131e;
+  --border:   #1e1e2e;
+  --text:     #e8e8f0;
+  --muted:    #5a5a7a;
+  --sidebar-w: 220px;
+  --sidebar-collapsed: 60px;
+  --fh: 'Syne', sans-serif;
+  --fm: 'DM Mono', monospace;
+  --fb: 'Inter', sans-serif;
 }
 
-.page-title{
-  font-family:var(--fh);font-size:13px;font-weight:700;
-  text-transform:uppercase;letter-spacing:0.18em;color:var(--muted);
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--fb); }
+
+/* ── LAYOUT ──────────────────────────────────────────────── */
+.shell {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
 }
 
-.grid{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:14px;
-  width:100%;
-  max-width:760px;
+/* ── SIDEBAR ─────────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: width .25s cubic-bezier(.4,0,.2,1), min-width .25s cubic-bezier(.4,0,.2,1);
+  overflow: hidden;
+  z-index: 10;
+  position: relative;
+}
+.sidebar.collapsed {
+  width: var(--sidebar-collapsed);
+  min-width: var(--sidebar-collapsed);
 }
 
-.ext-btn{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
-  padding:28px 20px;border-radius:16px;text-decoration:none;
-  border:1px solid var(--border);background:var(--surface);
-  transition:all 0.2s;cursor:pointer;position:relative;overflow:hidden;
+/* Logo */
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  height: 56px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  overflow: hidden;
+  white-space: nowrap;
 }
-.ext-btn::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:2px;
-  transition:opacity 0.2s;
+.logo-dot {
+  width: 8px; height: 8px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #fff;
+  flex-shrink: 0;
 }
-.ext-btn:hover{transform:translateY(-3px);border-color:#2e2e40;}
-.ext-btn:hover::before{opacity:1;}
-.ext-btn::before{opacity:0.7;}
+.logo-text {
+  font-family: var(--fh);
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: -.5px;
+  opacity: 1;
+  transition: opacity .2s;
+}
+.logo-text span { color: #ffffff; opacity: .4; }
+.sidebar.collapsed .logo-text { opacity: 0; pointer-events: none; }
 
-.ext-btn.tecnico::before   {background:#f5c800;}
-.ext-btn.financeiro::before{background:#22c55e;}
-.ext-btn.vendas::before    {background:#f97316;}
-.ext-btn.equip::before     {background:#3b9eff;}
-.ext-btn.metas::before     {background:#a855f7;}
-
-.ext-btn:hover.tecnico   {box-shadow:0 8px 32px rgba(245,200,0,0.08);}
-.ext-btn:hover.financeiro{box-shadow:0 8px 32px rgba(34,197,94,0.08);}
-.ext-btn:hover.vendas    {box-shadow:0 8px 32px rgba(249,115,22,0.08);}
-.ext-btn:hover.equip     {box-shadow:0 8px 32px rgba(59,158,255,0.08);}
-.ext-btn:hover.metas     {box-shadow:0 8px 32px rgba(168,85,247,0.08);}
-.ext-btn:hover.orc       {box-shadow:0 8px 32px rgba(37,211,102,0.08);}
-
-.ext-icon{
-  width:48px;height:48px;border-radius:12px;
-  display:flex;align-items:center;justify-content:center;font-size:22px;
+/* Nav items */
+.nav-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px 0;
 }
-.tecnico    .ext-icon{background:rgba(245,200,0,0.1);}
-.financeiro .ext-icon{background:rgba(34,197,94,0.1);}
-.vendas     .ext-icon{background:rgba(249,115,22,0.1);}
-.equip      .ext-icon{background:rgba(59,158,255,0.1);}
-.metas      .ext-icon{background:rgba(168,85,247,0.1);}
-.orc        .ext-icon{background:rgba(37,211,102,0.1);}
+.nav-list::-webkit-scrollbar { width: 3px; }
+.nav-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-.ext-name{
-  font-family:var(--fh);font-size:13px;font-weight:800;
-  text-transform:uppercase;letter-spacing:0.04em;
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  height: 46px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: background .15s, border-color .15s;
+  white-space: nowrap;
+  overflow: hidden;
+  position: relative;
+  user-select: none;
 }
-.tecnico    .ext-name{color:#f5c800;}
-.financeiro .ext-name{color:#22c55e;}
-.vendas     .ext-name{color:#f97316;}
-.equip      .ext-name{color:#3b9eff;}
-.metas      .ext-name{color:#a855f7;}
-.orc        .ext-name{color:#25d366;}
+.nav-item:hover {
+  background: var(--surface2);
+}
+.nav-item.active {
+  border-left-color: var(--item-color, #fff);
+  background: var(--surface2);
+}
+.nav-item.active .nav-label { color: var(--item-color, #fff); }
 
-.ext-desc{
-  font-family:var(--fm);font-size:9px;color:var(--muted);
-  text-align:center;line-height:1.5;
+.nav-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  width: 26px;
+  text-align: center;
+}
+.nav-label {
+  font-family: var(--fm);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  transition: opacity .2s, color .15s;
+  letter-spacing: .03em;
+}
+.sidebar.collapsed .nav-label { opacity: 0; }
+
+/* Tooltip quando collapsed */
+.sidebar.collapsed .nav-item:hover::after {
+  content: attr(data-label);
+  position: absolute;
+  left: calc(var(--sidebar-collapsed) + 8px);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--fm);
+  font-size: 11px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  z-index: 999;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
 }
 
-.ext-arrow{
-  font-size:12px;color:var(--muted);margin-top:2px;
-  transition:transform 0.2s;
-}
-.ext-btn:hover .ext-arrow{transform:translateX(3px);}
-
-footer{
-  text-align:center;padding:20px;
-  font-family:var(--fm);font-size:10px;color:var(--muted);
-  border-top:1px solid var(--border);position:relative;z-index:1;
+/* Separator */
+.nav-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 6px 12px;
 }
 
-@media(max-width:600px){
-  .grid{grid-template-columns:repeat(2,1fr);}
+/* Toggle button */
+.toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  border-top: 1px solid var(--border);
+  cursor: pointer;
+  color: var(--muted);
+  transition: background .15s, color .15s;
+  flex-shrink: 0;
+  font-size: 14px;
+  gap: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  padding: 0 16px;
 }
-@media(max-width:380px){
-  .grid{grid-template-columns:1fr;}
+.toggle-btn:hover { background: var(--surface2); color: var(--text); }
+.toggle-btn .toggle-icon {
+  flex-shrink: 0;
+  transition: transform .25s;
 }
+.sidebar.collapsed .toggle-icon { transform: scaleX(-1); }
+.toggle-label {
+  font-family: var(--fm);
+  font-size: 10px;
+  transition: opacity .2s;
+}
+.sidebar.collapsed .toggle-label { opacity: 0; }
+
+/* ── CONTENT AREA ────────────────────────────────────────── */
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* Welcome screen */
+.welcome {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  opacity: 1;
+  transition: opacity .2s;
+}
+.welcome.hidden { display: none; }
+.welcome-icon { font-size: 40px; opacity: .3; }
+.welcome-text {
+  font-family: var(--fm);
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.8;
+}
+.welcome-arrow {
+  font-family: var(--fm);
+  font-size: 11px;
+  color: var(--muted);
+  opacity: .5;
+}
+
+/* iFrame */
+.frame-wrap {
+  flex: 1;
+  display: none;
+  overflow: hidden;
+}
+.frame-wrap.visible { display: flex; }
+.frame-wrap iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: var(--bg);
+}
+
+/* Loading bar */
+.load-bar {
+  height: 2px;
+  background: transparent;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.load-bar.loading {
+  background: var(--border);
+}
+.load-bar.loading::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -40%;
+  width: 40%;
+  height: 100%;
+  background: currentColor;
+  animation: slide 1s linear infinite;
+}
+@keyframes slide { to { left: 100%; } }
 </style>
 </head>
 <body>
+<div class="shell">
 
-<header>
-  <div class="logo">
-    <div class="logo-dot"></div>
-    Reparo<span>Eletro</span>
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+
+    <div class="sidebar-logo">
+      <div class="logo-dot"></div>
+      <div class="logo-text">Reparo<span>Eletro</span></div>
+    </div>
+
+    <div class="nav-list">
+
+      <div class="nav-item" data-url="/tecnico" data-label="Técnico"
+           style="--item-color:#f5c800" onclick="openPage(this)">
+        <span class="nav-icon">🔧</span>
+        <span class="nav-label">Técnico</span>
+      </div>
+
+      <div class="nav-item" data-url="/financeiro" data-label="Financeiro"
+           style="--item-color:#22c55e" onclick="openPage(this)">
+        <span class="nav-icon">💼</span>
+        <span class="nav-label">Financeiro</span>
+      </div>
+
+      <div class="nav-item" data-url="/orcamento" data-label="Orçamento"
+           style="--item-color:#25d366" onclick="openPage(this)">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">Orçamento</span>
+      </div>
+
+      <div class="nav-item" data-url="/vendas" data-label="Vendas"
+           style="--item-color:#f97316" onclick="openPage(this)">
+        <span class="nav-icon">🏪</span>
+        <span class="nav-label">Vendas</span>
+      </div>
+
+      <div class="nav-sep"></div>
+
+      <div class="nav-item" data-url="/equipamentos" data-label="Equipamentos"
+           style="--item-color:#3b9eff" onclick="openPage(this)">
+        <span class="nav-icon">📦</span>
+        <span class="nav-label">Equipamentos</span>
+      </div>
+
+      <div class="nav-item" data-url="/compra-equip" data-label="Compra Equip."
+           style="--item-color:#f59e0b" onclick="openPage(this)">
+        <span class="nav-icon">🛒</span>
+        <span class="nav-label">Compra Equip.</span>
+      </div>
+
+      <div class="nav-item" data-url="/compras" data-label="Compras"
+           style="--item-color:#3b9eff" onclick="openPage(this)">
+        <span class="nav-icon">🔩</span>
+        <span class="nav-label">Compras</span>
+      </div>
+
+      <div class="nav-sep"></div>
+
+      <div class="nav-item" data-url="/lalamove" data-label="Lalamove"
+           style="--item-color:#8b5cf6" onclick="openPage(this)">
+        <span class="nav-icon">🚗</span>
+        <span class="nav-label">Lalamove</span>
+      </div>
+
+      <div class="nav-item" data-url="/metas" data-label="Metas"
+           style="--item-color:#a855f7" onclick="openPage(this)">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Metas</span>
+      </div>
+
+    </div>
+
+    <div class="toggle-btn" onclick="toggleSidebar()">
+      <span class="toggle-icon">◀</span>
+      <span class="toggle-label">Recolher</span>
+    </div>
+
   </div>
-</header>
 
-<div class="wrap">
-  <div class="page-title">// painel de navegação</div>
+  <!-- CONTENT -->
+  <div class="content">
+    <div class="load-bar" id="load-bar"></div>
 
-  <div class="grid">
+    <div class="welcome" id="welcome">
+      <div class="welcome-icon">⚡</div>
+      <div class="welcome-text">
+        Reparo Eletro — Sistema de Gestão<br>
+        Selecione um painel na barra lateral
+      </div>
+      <div class="welcome-arrow">← escolha um módulo</div>
+    </div>
 
-    <a class="ext-btn tecnico" href="/tecnico">
-      <div class="ext-icon">🔧</div>
-      <div class="ext-name">Técnico</div>
-      <div class="ext-desc">Kanban de ordens<br>de serviço</div>
-      <div class="ext-arrow">→</div>
-    </a>
-
-    <a class="ext-btn financeiro" href="/financeiro">
-      <div class="ext-icon">💼</div>
-      <div class="ext-name">Financeiro</div>
-      <div class="ext-desc">Fichas, NF e<br>faturamento</div>
-      <div class="ext-arrow">→</div>
-    </a>
-
-    <a class="ext-btn vendas" href="/vendas">
-      <div class="ext-icon">🏪</div>
-      <div class="ext-name">Vendas</div>
-      <div class="ext-desc">Cadastro de<br>equipamentos</div>
-      <div class="ext-arrow">→</div>
-    </a>
-
-    <a class="ext-btn equip" href="/equipamentos">
-      <div class="ext-icon">📦</div>
-      <div class="ext-name">Equipamentos</div>
-      <div class="ext-desc">Vitrine pública<br>de venda</div>
-      <div class="ext-arrow">→</div>
-    </a>
-
-    <a class="ext-btn metas" href="/metas">
-      <div class="ext-icon">📊</div>
-      <div class="ext-name">Metas</div>
-      <div class="ext-desc">Painel unificado<br>de indicadores</div>
-      <div class="ext-arrow">→</div>
-    </a>
-
-    <a class="ext-btn" href="/compras" style="border-color:rgba(59,158,255,.2);">
-      <div class="ext-icon" style="background:rgba(59,158,255,.1);">🛒</div>
-      <div class="ext-name" style="color:#3b9eff;">Compras</div>
-      <div class="ext-desc">Gestão de<br>peças e compras</div>
-      <div class="ext-arrow">→</div>
-    </a>
-
-    <a class="ext-btn" href="/lalamove" style="border-color:rgba(139,92,246,.2);">
-      <div class="ext-icon" style="background:rgba(139,92,246,.1);">🚗</div>
-      <div class="ext-name" style="color:#8b5cf6;">Lalamove</div>
-      <div class="ext-desc">Coletas e entregas<br>via Lalamove</div>
-      <div class="ext-arrow">→</div>
-    </a>
-
-    <a class="ext-btn" href="/compra-equip" style="border-color:rgba(245,158,11,.2);">
-      <div class="ext-icon" style="background:rgba(245,158,11,.1);">🛒</div>
-      <div class="ext-name" style="color:#f59e0b;">Compra Equip.</div>
-      <div class="ext-desc">Análise de compra<br>de equipamentos</div>
-      <div class="ext-arrow">→</div>
-    </a>
-
-    <a class="ext-btn" href="/orcamento" style="border-color:rgba(34,197,94,.2);">
-      <div class="ext-icon" style="background:rgba(34,197,94,.1);">📋</div>
-      <div class="ext-name" style="color:#22c55e;">Orçamento</div>
-      <div class="ext-desc">Cadastro e envio<br>de orçamentos</div>
-      <div class="ext-arrow">→</div>
-    </a>
-
+    <div class="frame-wrap" id="frame-wrap">
+      <iframe id="main-frame" src="" title="Painel"></iframe>
+    </div>
   </div>
+
 </div>
 
-<footer>Reparo Eletro — Sistema interno</footer>
+<script>
+var sidebar  = document.getElementById('sidebar');
+var welcome  = document.getElementById('welcome');
+var frameWrap = document.getElementById('frame-wrap');
+var frame    = document.getElementById('main-frame');
+var loadBar  = document.getElementById('load-bar');
+var collapsed = false;
 
+function toggleSidebar() {
+  collapsed = !collapsed;
+  sidebar.classList.toggle('collapsed', collapsed);
+  var lbl = sidebar.querySelector('.toggle-label');
+  if (lbl) lbl.textContent = collapsed ? 'Expandir' : 'Recolher';
+}
+
+function openPage(el) {
+  var url = el.getAttribute('data-url');
+  if (!url) return;
+
+  // Active state
+  document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
+  el.classList.add('active');
+
+  // Show frame, hide welcome
+  welcome.classList.add('hidden');
+  frameWrap.classList.add('visible');
+
+  // Loading bar
+  loadBar.classList.add('loading');
+  loadBar.style.color = getComputedStyle(el).getPropertyValue('--item-color') || '#fff';
+
+  // Load iframe
+  frame.onload = function() {
+    loadBar.classList.remove('loading');
+  };
+  frame.src = url;
+}
+
+// Support browser back/forward via keyboard
+document.addEventListener('keydown', function(e) {
+  if (e.altKey && e.key === 'ArrowLeft')  { frame.contentWindow?.history.back();    }
+  if (e.altKey && e.key === 'ArrowRight') { frame.contentWindow?.history.forward();  }
+});
+</script>
 </body>
 </html>
