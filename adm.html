@@ -110,13 +110,24 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
   border-left-color: var(--item-color, #fff);
   background: var(--surface2);
 }
-.nav-item.active .nav-label { color: var(--item-color, #fff); }
+.nav-item.active .nav-label,
+.nav-item:hover  .nav-label { color: var(--item-color, var(--text)); }
 
 .nav-icon {
-  font-size: 18px;
+  font-size: 16px;
   flex-shrink: 0;
-  width: 26px;
-  text-align: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,.06);
+  transition: background .15s;
+}
+.nav-item.active .nav-icon,
+.nav-item:hover .nav-icon {
+  background: color-mix(in srgb, var(--item-color, #fff) 15%, transparent);
 }
 .nav-label {
   font-family: var(--fm);
