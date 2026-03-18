@@ -394,8 +394,9 @@ module.exports = async function handler(req, res) {
         let metaChanged = false;
         if (!Array.isArray(board.metaLog)) board.metaLog = [];
 
-        const seenAg  = new Set(board.metaLog.filter(m=>m.phaseId==="aguardando_aprovacao").map(m=>m.pipefyId));
-        const seenErp = new Set(board.metaLog.filter(m=>m.phaseId==="erp_entrada").map(m=>m.pipefyId));
+        const seenAg     = new Set(board.metaLog.filter(m=>m.phaseId==="aguardando_aprovacao").map(m=>m.pipefyId));
+        const seenErp    = new Set(board.metaLog.filter(m=>m.phaseId==="erp_entrada").map(m=>m.pipefyId));
+        const seenColeta = new Set(board.metaLog.filter(m=>m.phaseId==="coleta_solicitada").map(m=>m.pipefyId));
 
         for (const id of aguardandoIds) {
           if (!seenAg.has(id)) {
@@ -409,6 +410,21 @@ module.exports = async function handler(req, res) {
             metaChanged = true;
           }
         }
+        // Tracking coleta_solicitada via Pipefy phases
+        try {
+          const allPhases = await fetchAllPhaseCards();
+          const coletaIds = [];
+          for (const ph of allPhases) {
+            if (ph.name.toLowerCase().trim() === "coleta solicitada")
+              ph.cards.edges.forEach(e => coletaIds.push(String(e.node.id)));
+          }
+          for (const id of coletaIds) {
+            if (!seenColeta.has(id)) {
+              board.metaLog.push({ phaseId: "coleta_solicitada", pipefyId: id, timestamp: new Date().toISOString() });
+              metaChanged = true;
+            }
+          }
+        } catch(e) { console.error("coleta_solicitada tracking:", e.message); }
         // Trim metaLog to 180 days
         const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 180);
         board.metaLog = board.metaLog.filter(m => new Date(m.timestamp) > cutoff);
