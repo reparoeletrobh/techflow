@@ -88,6 +88,32 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--c1);border-radius:50%;animation:spin 1s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
 
+/* MOVER OS PAGE */
+#page-mover { align-items: center; justify-content: center; }
+.form-wrap { width: 100%; max-width: 520px; padding: 28px 20px; }
+.form-title { font-family: var(--fh); font-size: 26px; font-weight: 800; letter-spacing: -1px; margin-bottom: 4px; }
+.form-title span { color: var(--c1); }
+.form-sub { font-family: var(--fm); font-size: 10px; color: var(--muted); margin-bottom: 6px; }
+.form-card { background: var(--surface); border: 1px solid var(--border); border-top: 2px solid var(--c1); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; gap: 18px; }
+.field-group { display: flex; flex-direction: column; gap: 7px; }
+.field-label { font-family: var(--fm); font-size: 10px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; display: flex; align-items: center; gap: 6px; }
+.field-label::before { content: ''; width: 8px; height: 1px; background: var(--c1); }
+.os-num-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; color: var(--text); font-family: var(--fm); font-size: 20px; letter-spacing: .04em; outline: none; transition: border-color .15s, box-shadow .15s; }
+.os-num-input:focus { border-color: var(--c1); box-shadow: 0 0 0 3px rgba(245,158,11,.12); }
+.os-num-input::placeholder { color: #666; font-size: 14px; }
+.os-found-info { display: none; background: var(--surface2); border: 1px solid var(--border); border-left: 3px solid var(--c1); border-radius: 8px; padding: 10px 12px; }
+.tecnico-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; }
+.tecnico-btn { padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); font-family: var(--fb); font-size: 13px; cursor: pointer; transition: all .15s; text-align: center; }
+.tecnico-btn:hover { border-color: rgba(245,158,11,.3); color: var(--text); }
+.tecnico-btn.selected { background: var(--c1); color: #000; border-color: var(--c1); font-weight: 600; }
+.stages-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.stage-btn { padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); font-family: var(--fb); font-size: 12px; cursor: pointer; transition: all .15s; text-align: left; display: flex; align-items: center; gap: 8px; }
+.stage-btn:hover { border-color: rgba(245,158,11,.3); color: var(--text); }
+.stage-btn.selected { color: #000; border-color: transparent; font-weight: 600; }
+.submit-btn { width: 100%; padding: 14px; border-radius: 10px; border: none; background: var(--c1); color: #000; font-family: var(--fh); font-size: 14px; font-weight: 800; cursor: pointer; transition: all .15s; letter-spacing: .02em; }
+.submit-btn:hover:not(:disabled) { background: #fbbf24; transform: translateY(-1px); }
+.submit-btn:disabled { opacity: .3; cursor: not-allowed; }
+
 /* TOAST */
 #toast{position:fixed;bottom:18px;right:18px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:11px 15px;font-family:var(--fm);font-size:11px;color:#fff;z-index:9999;max-width:280px;opacity:0;transition:opacity .2s;display:flex;gap:10px;align-items:flex-start;}
 </style>
@@ -101,7 +127,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   </div>
   <div class="header-right">
     <div class="live-dot"></div>
-    <a class="hbtn" href="/">Home</a>
+    <button class="hbtn" id="nav-kanban" onclick="showPage('kanban')" style="background:var(--c1);color:#000;font-weight:600;">📋 Garantias</button>
+    <button class="hbtn" id="nav-mover"  onclick="showPage('mover')">🔀 Mover OS</button>
     <button class="hbtn" onclick="syncNow()">↻ Sync Pipefy</button>
     <button class="hbtn" onclick="limparFinalizados()">🗑 Limpar Finalizados</button>
   </div>
@@ -116,8 +143,43 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   </div>
 </div>
 
+<div id="page-kanban" class="g-page active" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
 <div class="kanban" id="kanban">
   <div class="loading-wrap"><div class="spinner"></div> Carregando...</div>
+</div>
+</div>
+
+<div id="page-mover" class="g-page" style="flex:1;display:flex;align-items:center;justify-content:center;overflow-y:auto;">
+  <div class="form-wrap">
+    <div class="form-title">Mover <span>OS</span></div>
+    <div class="form-sub">// código, nome ou descrição da OS</div>
+    <div class="form-card">
+      <div class="field-group">
+        <label class="field-label">Buscar OS</label>
+        <input class="os-num-input" id="os-num-input" type="text" placeholder="0000 ou nome..." autocomplete="off" oninput="onOsNumInput()">
+        <div class="os-found-info" id="os-found-info">
+          <div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:3px;">OS ENCONTRADA</div>
+          <div id="os-found-title" style="font-size:13px;font-weight:500;"></div>
+          <div id="os-found-phase" style="font-size:11px;color:var(--muted);margin-top:2px;font-family:var(--fm);"></div>
+        </div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Técnico</label>
+        <div class="tecnico-grid">
+          <button class="tecnico-btn" onclick="gPickTecnico('Lucas')">Lucas</button>
+          <button class="tecnico-btn" onclick="gPickTecnico('Diego')">Diego</button>
+          <button class="tecnico-btn" onclick="gPickTecnico('Kassio')">Kassio</button>
+          <button class="tecnico-btn" onclick="gPickTecnico('Roberto')">Roberto</button>
+          <button class="tecnico-btn" onclick="gPickTecnico('Carlos')">Carlos</button>
+        </div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Mover para</label>
+        <div class="stages-grid" id="g-move-stages"></div>
+      </div>
+      <button class="submit-btn" id="g-btn-move" onclick="gSubmitMove()" disabled>→ Mover OS</button>
+    </div>
+  </div>
 </div>
 
 <div id="toast"></div>
@@ -236,8 +298,138 @@ function showToast(icon, title, msg) {
   toastTimer = setTimeout(function() { t.style.opacity = "0"; }, 4000);
 }
 
+// ── FASES DO BOARD (para Mover OS) ───────────────────────────
+var BOARD_PHASES = [
+  { id: "aprovado",        name: "Aprovado"           },
+  { id: "producao",        name: "Produção"            },
+  { id: "cliente_loja",    name: "Cliente Loja"        },
+  { id: "urgencia",        name: "Urgência"            },
+  { id: "comprar_peca",    name: "Comprar Peça"        },
+  { id: "aguardando_peca", name: "Aguardando Peça"     },
+  { id: "peca_disponivel", name: "Peça Disponível"     },
+  { id: "loja_feito",      name: "Loja Feito"          },
+  { id: "delivery_feito",  name: "Delivery Feito"      },
+  { id: "aguardando_ret",  name: "Aguardando Retirada" },
+];
+var COLORS = ["#f5c800","#ff9800","#ef4444","#a855f7","#3b9eff","#00c896","#22c55e","#10b981","#f59e0b","#e879f9"];
+var gBoard = null;
+var gSelCardId = null, gSelPhase = null, gSelTecnico = null;
+
+// ── NAVEGAÇÃO ─────────────────────────────────────────────────
+function showPage(page) {
+  document.querySelectorAll(".g-page").forEach(function(p) { p.style.display = "none"; });
+  var el = document.getElementById("page-" + page);
+  if (el) el.style.display = page === "kanban" ? "flex" : "flex";
+  document.getElementById("nav-kanban").style.background = page === "kanban" ? "var(--c1)" : "";
+  document.getElementById("nav-kanban").style.color      = page === "kanban" ? "#000" : "";
+  document.getElementById("nav-kanban").style.fontWeight = page === "kanban" ? "600" : "";
+  document.getElementById("nav-mover").style.background  = page === "mover"  ? "var(--c1)" : "";
+  document.getElementById("nav-mover").style.color       = page === "mover"  ? "#000" : "";
+  document.getElementById("nav-mover").style.fontWeight  = page === "mover"  ? "600" : "";
+  if (page === "mover") buildStagesGrid();
+}
+
+// ── MOVER OS ─────────────────────────────────────────────────
+function buildStagesGrid() {
+  var grid = document.getElementById("g-move-stages");
+  if (!grid) return;
+  var phases = (gBoard && gBoard.phases && gBoard.phases.length) ? gBoard.phases : BOARD_PHASES;
+  grid.innerHTML = phases.map(function(ph, i) {
+    return '<button class="stage-btn" data-id="' + ph.id + '" onclick="gPickPhase(\'' + ph.id + '\')"><span style="width:8px;height:8px;border-radius:50%;background:' + COLORS[i % COLORS.length] + ';flex-shrink:0;"></span>' + ph.name + '</button>';
+  }).join("");
+}
+
+function gPickPhase(id) {
+  gSelPhase = id;
+  var phases = (gBoard && gBoard.phases && gBoard.phases.length) ? gBoard.phases : BOARD_PHASES;
+  document.querySelectorAll("#g-move-stages .stage-btn").forEach(function(b, i) {
+    var active = b.getAttribute("data-id") === id;
+    b.classList.toggle("selected", active);
+    b.style.background = active ? COLORS[i % COLORS.length] : "";
+    b.style.color      = active ? "#000" : "";
+  });
+  gCheckMove();
+}
+
+function gPickTecnico(name) {
+  gSelTecnico = name;
+  document.querySelectorAll(".tecnico-btn").forEach(function(b) {
+    b.classList.toggle("selected", b.textContent.trim() === name);
+  });
+  gCheckMove();
+}
+
+function gCheckMove() {
+  var btn = document.getElementById("g-btn-move");
+  if (btn) btn.disabled = !(gSelCardId && gSelPhase);
+}
+
+function onOsNumInput() {
+  var val = document.getElementById("os-num-input").value.trim().toLowerCase();
+  gSelCardId = null;
+  document.getElementById("os-found-info").style.display = "none";
+  gCheckMove();
+  if (!val || !gBoard) return;
+  var cards = gBoard.cards || [];
+  var found = cards.find(function(card) {
+    return (card.osCode && card.osCode.toLowerCase().includes(val)) ||
+           (card.nomeContato && card.nomeContato.toLowerCase().includes(val)) ||
+           (card.title && card.title.toLowerCase().includes(val));
+  });
+  if (found) {
+    gSelCardId = found.pipefyId;
+    var phase = BOARD_PHASES.find(function(p) { return p.id === found.phaseId; });
+    document.getElementById("os-found-title").textContent = found.title || (found.nomeContato || "") + " #" + (found.osCode || "");
+    document.getElementById("os-found-phase").textContent = phase ? phase.name : found.phaseId;
+    document.getElementById("os-found-info").style.display = "block";
+    gCheckMove();
+  }
+}
+
+async function gSubmitMove() {
+  if (!gSelCardId || !gSelPhase) return;
+  var btn = document.getElementById("g-btn-move");
+  btn.disabled = true; btn.textContent = "Movendo...";
+  try {
+    var r = await fetch("/api/board?action=move", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pipefyId: gSelCardId, phaseId: gSelPhase, tecnico: gSelTecnico })
+    });
+    var d = await r.json();
+    if (d.ok) {
+      var phase = BOARD_PHASES.find(function(p) { return p.id === gSelPhase; });
+      showToast("✅", "OS movida!", (gSelTecnico ? gSelTecnico + " → " : "") + (phase ? phase.name : gSelPhase));
+      // Reset
+      gSelCardId = null; gSelPhase = null;
+      document.getElementById("os-num-input").value = "";
+      document.getElementById("os-found-info").style.display = "none";
+      document.querySelectorAll("#g-move-stages .stage-btn").forEach(function(b) { b.classList.remove("selected"); b.style.background = ""; b.style.color = ""; });
+      if (gBoard) {
+        var r2 = await fetch("/api/board?action=load");
+        var d2 = await r2.json();
+        if (d2.board) gBoard = d2.board;
+      }
+    } else {
+      showToast("❌", "Erro", d.error || "");
+    }
+  } catch(e) { showToast("❌", "Erro", e.message); }
+  btn.disabled = false; btn.textContent = "→ Mover OS";
+  gCheckMove();
+}
+
+// Carrega board para Mover OS
+async function loadBoard() {
+  try {
+    var r = await fetch("/api/board?action=load");
+    var d = await r.json();
+    if (d.board) gBoard = d.board;
+    buildStagesGrid();
+  } catch(e) {}
+}
+
 // Auto sync ao abrir + a cada 60s
-load().then(function() { syncNow(); });
+load().then(function() { syncNow(); loadBoard(); });
 setInterval(function() { load().then(function() { syncNow(); }); }, 60000);
 </script>
 </body>
