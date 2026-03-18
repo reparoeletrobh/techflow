@@ -68,17 +68,25 @@ async function createPipefyCard({ phaseId, nome, telefone, aparelho, defeito, en
   const endField  = findField(["endereço", "endereco", "endere"]);
 
   const fieldsAttr = [];
-  // Formata telefone: (xx)9 xxxx-xxxx
+  // Formata telefone para campo phone do Pipefy: (xx)9 xxxx-xxxx
+  // Campo type=phone do Pipefy aceita formato livre mas precisa ser consistente
   function formatarTelefone(tel) {
     const digits = tel.replace(/\D/g, "");
-    if (digits.length === 11) {
-      return `(${digits.slice(0,2)})${digits[2]} ${digits.slice(3,7)}-${digits.slice(7)}`;
-    } else if (digits.length === 10) {
-      return `(${digits.slice(0,2)})${digits.slice(2,6)}-${digits.slice(6)}`;
+    // Remove prefixo 55 (Brasil) se presente com 13 dígitos
+    const d = digits.length === 13 && digits.startsWith("55") ? digits.slice(2) : digits;
+    if (d.length === 11) {
+      return "(" + d.slice(0,2) + ")" + d[2] + " " + d.slice(3,7) + "-" + d.slice(7);
+    }
+    if (d.length === 10) {
+      return "(" + d.slice(0,2) + ")" + d.slice(2,6) + "-" + d.slice(6);
+    }
+    if (d.length === 9) {
+      return d[0] + " " + d.slice(1,5) + "-" + d.slice(5);
     }
     return tel;
   }
   const telefoneFmt = formatarTelefone(telefone);
+  console.log("telefone original:", telefone, "formatado:", telefoneFmt);
 
   if (nomeField) fieldsAttr.push(`{ field_id: "${nomeField.id}", field_value: ${JSON.stringify(nomeContato)} }`);
   if (telField)  fieldsAttr.push(`{ field_id: "${telField.id}",  field_value: ${JSON.stringify(telefoneFmt)} }`);
@@ -705,7 +713,102 @@ function templatePadrao(desc, nome) {
   return saud + ", sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nRealizamos todos os testes e identificamos o problema. Faremos o reparo completo com substituicao das pecas necessarias.\n\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.";
 }
 
+// ── DETECTA MÚLTIPLOS EQUIPAMENTOS ────────────────────────────
+// Formato do Pipefy: "m:troca do fusível e capacitor peca 40 mtroca do magnétron peca 110"
+// Cada equipamento começa com "m:" ou "m" no meio do texto
+function detectarMultiplosEquipamentos(comentarios) {
+  const texto = (comentarios || []).join(" ");
+  const raw = texto.trim();
+
+  // Divide onde termina "peca NUMERO" seguido de novo equipamento com "m"
+  // Ex: "m:troca do fusível e capacitor peca 40 mtroca do magnétron peca 110"
+  const blocos = raw.split(/(?<=pe[cç]a\s+\d+)\s+m/i).filter(s => s.trim());
+  if (blocos.length >= 2) return parseBlocos(blocos);
+
+  // Fallback: split por "m:" no início de cada bloco
+  const blocos2 = raw.split(/(?:^|\s+)m:/i).filter(s => s.trim());
+  if (blocos2.length >= 2) return parseBlocos(blocos2);
+
+  return null;
+}
+
+function parseBlocos(blocos) {
+  const partes = [];
+  for (const bloco of blocos) {
+    // Remove prefixos m: ou m do início
+    const trimmed = bloco.trim().replace(/^m[:.\s]*/i, "").trim();
+    if (trimmed.length < 3) continue;
+    // Remove trecho "peca NUMERO" — é custo de peça, não preço do orçamento
+    const descBloco = trimmed.replace(/\s*pe[cç]a\s+\d+\s*/gi, " ").trim();
+    if (descBloco) partes.push({ desc: descBloco });
+  }
+  return partes.length >= 2 ? partes : null;
+}
+
+function gerarTextoMultiplos(partes, nome) {
+  const primeiro = nome ? nome.trim().split(/\s+/)[0] : "";
+  const saud = primeiro || "cliente";
+  let total = 0;
+  let linhas = [];
+
+  for (let i = 0; i < partes.length; i++) {
+    const p = partes[i];
+    const n = i + 1;
+    // Detecta preço pela regra de cada equipamento individual
+    const regra = detectarRegra(p.desc, []);
+    const preco = regra ? parseInt(regra.preco || "0") : 0;
+    if (preco) total += preco;
+
+    const textoEquip = gerarDescricaoEquip(p.desc);
+    linhas.push("Em relacao ao microondas " + n + " " + textoEquip + " Este conserto individual fica em " + (preco ? preco + " reais" : "[VALOR]") + ".");
+  }
+
+  // Desconto combo: ~10% arredondado para dezena
+  const desconto = total > 0 ? Math.round(total * 0.9 / 10) * 10 : null;
+
+  let msg = "Ola, " + saud + ", foram feitos todos os testes:\n\n";
+  msg += linhas.join("\n\n");
+
+  if (desconto && total > desconto) {
+    msg += "\n\nConsertando os " + partes.length + " juntos eu consigo um desconto para voce de " + total + " reais por " + desconto + " apenas. Aprovando ja iniciamos o conserto.";
+  } else {
+    msg += "\n\nAprovando ja iniciamos o conserto.";
+  }
+
+  return { texto: msg, preco: desconto ? String(desconto) : String(total || "") };
+}
+
+function gerarDescricaoEquip(desc) {
+  const n = norm(desc);
+  if (hasAny(n, ["magnetron","magnetrao","magneton","magentron"])) {
+    return "sera necessario fazer a troca do conjunto do magnetron, sera feito a reoperacao eletrica tambem.";
+  }
+  if (hasAny(n, ["fusivel","fusível","fusirel","capacitor"])) {
+    return "sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e fusivel de alta que estao sobrecarregando o sistema, as pecas serao trocadas tambem.";
+  }
+  if (hasAny(n, ["microchave","micro chave"])) {
+    return "sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e microchave de acionamento, as pecas serao trocadas tambem.";
+  }
+  if (hasAny(n, ["membrana"])) {
+    return "sera necessario refazer a parte eletrica que causou danos no conjunto da membrana, as pecas serao trocadas tambem.";
+  }
+  if (hasAny(n, ["placa micra","placa micro"])) {
+    return "sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e placa micra, as pecas serao trocadas tambem.";
+  }
+  if (hasAny(n, ["termoeletrico","cooler","peltier","pasta termica"])) {
+    return "sera necessario refazer a parte eletrica que causou danos no conjunto do cooler, placa de resfriamento e pasta termica, as pecas serao trocadas tambem.";
+  }
+  if (hasAny(n, ["placa principal","reoperacao","recuperacao"])) {
+    return "sera necessario refazer a parte eletrica que causou danos no conjunto da placa principal, sera feito a reoperacao da placa tambem.";
+  }
+  return "sera necessario realizar o reparo identificado nos testes, as pecas necessarias serao trocadas.";
+}
+
 async function gerarTextoOrcamento(desc, comentarios, nome) {
+  // Verifica múltiplos equipamentos primeiro
+  const multiplos = detectarMultiplosEquipamentos(comentarios);
+  if (multiplos) return gerarTextoMultiplos(multiplos, nome);
+
   var regra = detectarRegra(desc, comentarios);
   if (regra) return { texto: substituirNome(regra.texto, nome), preco: regra.preco };
 
