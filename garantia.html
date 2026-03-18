@@ -64,6 +64,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .gcard{
   background:var(--surface2);border:1px solid var(--border);border-radius:8px;
   overflow:hidden;transition:border-color .15s;
+  flex-shrink:0;
 }
 .gcard:hover{border-color:rgba(255,255,255,.12);}
 
@@ -150,7 +151,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 </div>
 </div>
 
-<div id="page-mover" class="g-page" style="flex:1;display:flex;align-items:center;justify-content:center;overflow-y:auto;">
+<div id="page-mover" class="g-page" style="flex:1;display:none;align-items:center;justify-content:center;overflow-y:auto;">
   <div class="form-wrap">
     <div class="form-title">Mover <span>OS</span></div>
     <div class="form-sub">// código, nome ou descrição da OS</div>
