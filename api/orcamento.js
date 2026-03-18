@@ -632,7 +632,15 @@ const ORCAMENTO_REGRAS = [
     keywords: ["placa micra","placa microondas","placa do microondas","placa micro"],
     template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e placa micra, as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
   },
-  // 8. Gás → R$ 450
+  // 8. Válvula de água / acionamento → R$ 370
+  {
+    keywords: ["valvula","válvula","valvula de agua","valvula de acionamento","troca da valvula","troca de valvula","valvula solenoide","solenoide"],
+    excludeKeys: ["gas","gás","recarga","refrigerante"],
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto da valvula de acionamento de agua. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
+    preco: "370",
+  },
+
+  // 9. Gás → R$ 450
   {
     keywords: ["valvula de gas","valvula gas","recarga de gas","recarga gas","gas refrigerante","carga de gas"],
     template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca da valvula de gas, solda e recarga de gas refrigerante. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
@@ -681,7 +689,7 @@ const ORCAMENTO_REGRAS = [
 
 
 // Preços sugeridos por índice de regra (mesma ordem de ORCAMENTO_REGRAS)
-var PRECOS_REGRAS = ["390","350","370","320","320","320","320","450","350","450","450","450","450","350"];
+var PRECOS_REGRAS = ["390","350","370","320","320","320","320","370","450","350","450","450","450","450","350"];
 
 function detectarRegra(desc, comentarios) {
   var textoNorm = norm([desc || ""].concat(comentarios || []).join(" "));
