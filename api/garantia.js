@@ -188,8 +188,8 @@ module.exports = async function handler(req, res) {
   if (req.method === "POST" && action === "excluir") {
     const { id } = req.body || {};
     const db = await dbGet(GARANTIA_KEY) || defaultDB();
-    db.fichas    = db.fichas.filter(f => f.id !== id);
-    db.syncedIds = db.syncedIds.filter(s => s !== id);
+    db.fichas = db.fichas.filter(f => f.id !== id);
+    // Mantém syncedId — impede reimportação no próximo sync
     await dbSet(GARANTIA_KEY, db);
     return res.status(200).json({ ok: true });
   }
@@ -235,9 +235,8 @@ module.exports = async function handler(req, res) {
       return new Date(f.movedAt) >= todayUTC;           // mantém só as de hoje
     });
     const removed = before - db.fichas.length;
-    // Atualiza syncedIds
-    const ids = new Set(db.fichas.map(f => f.pipefyId));
-    db.syncedIds = db.syncedIds.filter(id => ids.has(id));
+    // IMPORTANTE: manter syncedIds para o sync não reimportar as fichas removidas
+    // syncedIds só é limpo quando uma ficha vai para Finalizado/ERP no Pipefy
 
     if (removed > 0) await dbSet(GARANTIA_KEY, db);
     return res.status(200).json({ ok: true, removed, remaining: db.fichas.length });
