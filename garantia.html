@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Garantia — Reparo Eletro</title>
+<title>Setor de Garantia — Reparo Eletro</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -131,12 +131,13 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
     <button class="hbtn" id="nav-mover"  onclick="showPage('mover')">🔀 Mover OS</button>
     <button class="hbtn" onclick="syncNow()">↻ Sync Pipefy</button>
     <button class="hbtn" onclick="limparFinalizados()">🗑 Limpar Finalizados</button>
+    <button class="hbtn" onclick="confirmarLimparNaoMovidas()" style="border-color:rgba(59,158,255,.3);color:#93c5fd;">🧹 Limpar Não Movidas Hoje</button>
   </div>
 </header>
 
 <div class="toolbar">
   <div>
-    <div class="board-title">Dash <span>Garantia</span></div>
+    <div class="board-title">Setor de <span>Garantia</span></div>
   </div>
   <div class="toolbar-right">
     <span id="status-txt" style="font-family:var(--fm);font-size:10px;color:var(--muted);"></span>
@@ -431,6 +432,18 @@ async function loadBoard() {
 // Auto sync ao abrir + a cada 60s
 load().then(function() { syncNow(); loadBoard(); });
 setInterval(function() { load().then(function() { syncNow(); }); }, 60000);
+
+async function confirmarLimparNaoMovidas() {
+  var hoje = new Date().toLocaleDateString("pt-BR", {timeZone:"America/Sao_Paulo"});
+  if (!confirm("Remover fichas que NÃO foram movidas hoje (" + hoje + ")?\n\nSerão mantidas apenas as fichas com movimentação de hoje.")) return;
+  var d = await api("limpar-nao-movidas-hoje", {});
+  if (d.ok) {
+    showToast("🧹", d.removed + " ficha(s) removida(s)", d.remaining + " mantida(s) (movidas hoje)");
+    await load();
+  } else {
+    showToast("❌", "Erro", d.error || "");
+  }
+}
 </script>
 </body>
 </html>
