@@ -122,12 +122,7 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255,255,255,.06);
-  transition: background .15s;
-}
-.nav-item.active .nav-icon,
-.nav-item:hover .nav-icon {
-  background: color-mix(in srgb, var(--item-color, #fff) 15%, transparent);
+  transition: opacity .15s;
 }
 .nav-label {
   font-family: var(--fm);
@@ -282,25 +277,25 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
 
       <div class="nav-item" data-url="/tecnico" data-label="Técnico"
            style="--item-color:#f5c800" onclick="openPage(this)">
-        <span class="nav-icon">🔧</span>
+        <span class="nav-icon" style="background:rgba(245,200,0,.15);">🔧</span>
         <span class="nav-label">Técnico</span>
       </div>
 
       <div class="nav-item" data-url="/financeiro" data-label="Financeiro"
            style="--item-color:#22c55e" onclick="openPage(this)">
-        <span class="nav-icon">💼</span>
+        <span class="nav-icon" style="background:rgba(34,197,94,.15);">💼</span>
         <span class="nav-label">Financeiro</span>
       </div>
 
       <div class="nav-item" data-url="/orcamento" data-label="Orçamento"
            style="--item-color:#25d366" onclick="openPage(this)">
-        <span class="nav-icon">📋</span>
+        <span class="nav-icon" style="background:rgba(37,211,102,.15);">📋</span>
         <span class="nav-label">Orçamento</span>
       </div>
 
       <div class="nav-item" data-url="/vendas" data-label="Vendas"
            style="--item-color:#f97316" onclick="openPage(this)">
-        <span class="nav-icon">🏪</span>
+        <span class="nav-icon" style="background:rgba(249,115,22,.15);">🏪</span>
         <span class="nav-label">Vendas</span>
       </div>
 
@@ -308,19 +303,19 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
 
       <div class="nav-item" data-url="/equipamentos" data-label="Equipamentos"
            style="--item-color:#3b9eff" onclick="openPage(this)">
-        <span class="nav-icon">📦</span>
+        <span class="nav-icon" style="background:rgba(59,158,255,.15);">📦</span>
         <span class="nav-label">Equipamentos</span>
       </div>
 
       <div class="nav-item" data-url="/compra-equip" data-label="Compra Equip."
            style="--item-color:#f59e0b" onclick="openPage(this)">
-        <span class="nav-icon">🛒</span>
+        <span class="nav-icon" style="background:rgba(245,158,11,.15);">🛒</span>
         <span class="nav-label">Compra Equip.</span>
       </div>
 
       <div class="nav-item" data-url="/compras" data-label="Compras"
            style="--item-color:#3b9eff" onclick="openPage(this)">
-        <span class="nav-icon">🔩</span>
+        <span class="nav-icon" style="background:rgba(59,158,255,.15);">🔩</span>
         <span class="nav-label">Compras</span>
       </div>
 
@@ -328,13 +323,13 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
 
       <div class="nav-item" data-url="/lalamove" data-label="Lalamove"
            style="--item-color:#8b5cf6" onclick="openPage(this)">
-        <span class="nav-icon">🚗</span>
+        <span class="nav-icon" style="background:rgba(139,92,246,.15);">🚗</span>
         <span class="nav-label">Lalamove</span>
       </div>
 
       <div class="nav-item" data-url="/metas" data-label="Metas"
            style="--item-color:#a855f7" onclick="openPage(this)">
-        <span class="nav-icon">📊</span>
+        <span class="nav-icon" style="background:rgba(168,85,247,.15);">📊</span>
         <span class="nav-label">Metas</span>
       </div>
 
