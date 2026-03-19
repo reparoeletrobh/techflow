@@ -1,6 +1,7 @@
 const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g, "").trim();
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g, "").trim();
 const BOARD_KEY     = "reparoeletro_board";
+const LOGS_KEY      = "reparoeletro_logs";
 const VENDAS_KEY    = "reparoeletro_vendas";
 
 async function dbGet(key) {
@@ -44,9 +45,15 @@ module.exports = async function handler(req, res) {
   const weekLabel  = `${fmt(weekUTC)} – ${fmt(weekEnd)}`;
 
   // Carrega dados
-  const [board, vendasDb] = await Promise.all([
-    dbGet(BOARD_KEY), dbGet(VENDAS_KEY),
+  // Lê logs da chave separada (pequena) e vendas — evita carregar o board inteiro (710KB)
+  const [logsData, vendasDb] = await Promise.all([
+    dbGet(LOGS_KEY), dbGet(VENDAS_KEY),
   ]);
+  // Fallback: se LOGS_KEY ainda não existe, lê do board
+  let board = logsData;
+  if (!board || (!board.movesLog && !board.metaLog)) {
+    board = await dbGet(BOARD_KEY);
+  }
 
   const movesLog = board?.movesLog || [];
   const metaLog  = board?.metaLog  || [];
