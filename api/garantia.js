@@ -118,6 +118,15 @@ module.exports = async function handler(req, res) {
     if (!Array.isArray(db.syncedIds)) db.syncedIds = [];
     let added = 0, removed = 0, pipefyError = null;
 
+    // Se não há fichas ativas, limpa syncedIds para permitir reimportação
+    if (db.fichas.length === 0) {
+      db.syncedIds = [];
+    } else {
+      // Mantém syncedIds só dos que ainda têm ficha ativa
+      const idsAtivos = new Set(db.fichas.map(f => f.pipefyId));
+      db.syncedIds = db.syncedIds.filter(id => idsAtivos.has(id));
+    }
+
     try {
       // 1. Busca novos cards em RS
       const cards = await fetchRSCards();
@@ -241,6 +250,17 @@ module.exports = async function handler(req, res) {
 
     if (removed > 0) await dbSet(GARANTIA_KEY, db);
     return res.status(200).json({ ok: true, removed, remaining: db.fichas.length });
+  }
+
+  // ── POST clear-synced — limpa syncedIds para forçar reimportação total ──
+  if (req.method === "POST" && action === "clear-synced") {
+    const db = await dbGet(GARANTIA_KEY) || defaultDB();
+    const antes = db.syncedIds.length;
+    // Mantém apenas IDs que ainda têm ficha ativa
+    const idsAtivos = new Set(db.fichas.map(f => f.pipefyId));
+    db.syncedIds = db.syncedIds.filter(id => idsAtivos.has(id));
+    await dbSet(GARANTIA_KEY, db);
+    return res.status(200).json({ ok: true, removidos: antes - db.syncedIds.length, restantes: db.syncedIds.length });
   }
 
   // ── GET sync-debug — mostra fases do Pipefy e cards em RS ──────
