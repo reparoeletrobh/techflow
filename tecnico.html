@@ -615,7 +615,6 @@ async function loadBoard() {
   document.getElementById('refresh-btn').textContent = '↻ Atualizar';
   if (document.getElementById('page-rs').classList.contains('active'))     renderRsBoard('rs');
   if (document.getElementById('page-rs-rua').classList.contains('active')) renderRsBoard('rs_rua');
-  syncPipefy();
 }
 
 async function syncPipefy() {
@@ -1610,14 +1609,14 @@ loadBoard();
 cleanupRet();
 scheduleCleanupRet();
 // Banco: atualiza tela a cada 10s
+// Board reload a cada 30s (era 10s — reduzido para aliviar o servidor)
 setInterval(() => {
   loadBoard();
-}, 10000);
-// Pipefy: sync a cada 30s separado
+}, 30000);
+// Pipefy sync a cada 60s — separado do reload
 setInterval(() => {
   syncPipefy();
-  if (document.getElementById('page-metas').classList.contains('active')) loadGoals();
-}, 30000);
+}, 60000);
 </script>
 <!-- MODAL COMPRA PEÇA -->
 <div class="compra-modal-overlay" id="compra-modal-overlay">
