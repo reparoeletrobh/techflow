@@ -156,17 +156,6 @@ module.exports = async function handler(req, res) {
         added++;
       }
 
-      // 3. Remove fichas cujo card foi para Finalizado/ERP no Pipefy
-      const pipefyIds = db.fichas.filter(f => f.pipefyId && !f.pipefyId.startsWith("local-")).map(f => f.pipefyId);
-      if (pipefyIds.length > 0) {
-        const finalizados = await fetchFinalizadoIds(pipefyIds);
-        if (finalizados.size > 0) {
-          db.fichas    = db.fichas.filter(f => !finalizados.has(f.pipefyId));
-          db.syncedIds = db.syncedIds.filter(id => !finalizados.has(id));
-          removed = before + added - db.fichas.length;
-        }
-      }
-
       // Auto-remove fichas em Serviço Finalizado
       const beforeFin = db.fichas.length;
       db.fichas = db.fichas.filter(f => f.phaseId !== "servico_finalizado");
