@@ -1089,7 +1089,7 @@ function computeGoalsFromBoard(board) {
     return new Set(withId.map(m=>m.pipefyId)).size + withoutId.length;
   }
   function cntByTecnico(phaseId, since) {
-    const map={}; TECNICOS.forEach(t=>map[t]=0);
+    const map={}; ['Lucas','Diego','Kassio','Roberto','Carlos'].forEach(t=>map[t]=0);
     const entries=log.filter(m=>m.phaseId===phaseId&&new Date(m.timestamp||m.ts)>=since&&m.tecnico);
     const latest=new Map();
     for(const m of entries){ if(m.pipefyId){const p=latest.get(m.pipefyId); if(!p||new Date(m.timestamp)>new Date(p.timestamp))latest.set(m.pipefyId,m);}else latest.set('noid_'+m.timestamp,m); }
