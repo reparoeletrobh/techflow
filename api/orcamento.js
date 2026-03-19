@@ -73,17 +73,20 @@ async function createPipefyCard({ phaseId, nome, telefone, aparelho, defeito, en
   function formatarTelefone(tel) {
     const digits = tel.replace(/\D/g, "");
     // Remove prefixo 55 (Brasil) se presente com 12 ou 13 dígitos
-    const d = (digits.length === 13 && digits.startsWith("55")) ? digits.slice(2)
-            : (digits.length === 12 && digits.startsWith("55")) ? digits.slice(2)
-            : digits;
+    var d = (digits.length === 13 && digits.startsWith("55")) ? digits.slice(2)
+          : (digits.length === 12 && digits.startsWith("55")) ? digits.slice(2)
+          : digits;
+    // Celular com 10 dígitos (sem o 9): adiciona o 9 após o DDD
+    if (d.length === 10) {
+      d = d.slice(0,2) + "9" + d.slice(2);
+    }
+    // Celular com 9 dígitos (sem DDD): adiciona o 9 na frente
+    if (d.length === 9 && d[0] !== "9") {
+      d = "9" + d;
+    }
+    // Agora formata: 11 dígitos = (DD)9 XXXX-XXXX
     if (d.length === 11) {
       return "(" + d.slice(0,2) + ")" + d[2] + " " + d.slice(3,7) + "-" + d.slice(7);
-    }
-    if (d.length === 10) {
-      return "(" + d.slice(0,2) + ")" + d.slice(2,6) + "-" + d.slice(6);
-    }
-    if (d.length === 9) {
-      return d[0] + " " + d.slice(1,5) + "-" + d.slice(5);
     }
     return tel;
   }
