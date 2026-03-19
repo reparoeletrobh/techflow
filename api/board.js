@@ -1,6 +1,7 @@
 const PIPEFY_API = "https://api.pipefy.com/graphql";
 const PIPE_ID    = "305832912";
 const BOARD_KEY  = "reparoeletro_board";
+const LOGS_KEY   = "reparoeletro_logs";
 
 const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g, "").trim();
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g, "").trim();
@@ -335,8 +336,17 @@ async function cleanupAguardandoRet(board) {
 
 // ── Log helpers ────────────────────────────────────────────────
 function trimLog(log) {
+  // Mantém 90 dias no log completo
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
   return log.filter(m => new Date(m.timestamp) > cutoff);
+}
+
+// Salva logs em chave separada (mais leve para o /api/metas ler)
+async function saveLogs(board) {
+  try {
+    const logs = { movesLog: board.movesLog || [], metaLog: board.metaLog || [] };
+    await dbSet(LOGS_KEY, logs);
+  } catch(e) {}
 }
 
 // ── Handler ────────────────────────────────────────────────────
@@ -375,6 +385,7 @@ module.exports = async function handler(req, res) {
         }
         board.movesLog = trimLog(board.movesLog);
         if (newCount > 0) await dbSet(BOARD_KEY, board);
+      await saveLogs(board);
       } catch (e) { pipefyError = e.message; }
 
       try {
@@ -385,6 +396,7 @@ module.exports = async function handler(req, res) {
           board.cards = board.cards.filter(c => !erpIds.includes(c.pipefyId));
           erpRemoved = before - board.cards.length;
           if (erpRemoved > 0) await dbSet(BOARD_KEY, board);
+      await saveLogs(board);
         }
       } catch (e) { console.error("ERP check:", e.message); }
 
@@ -429,6 +441,7 @@ module.exports = async function handler(req, res) {
         const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 180);
         board.metaLog = board.metaLog.filter(m => new Date(m.timestamp) > cutoff);
         if (metaChanged) await dbSet(BOARD_KEY, board);
+      await saveLogs(board);
       } catch(e) { console.error("meta tracking:", e.message); }
 
       return res.status(200).json({ ok: true, board, newCount, erpRemoved, pipefyError });
@@ -464,6 +477,7 @@ module.exports = async function handler(req, res) {
         board.movesLog = trimLog(board.movesLog);
       }
       await dbSet(BOARD_KEY, board);
+      await saveLogs(board);
 
       // Auto-adiciona à fila do Lalamove quando move para coleta/entrega solicitada
       if (["coleta_solicitada", "entrega_solicitada"].includes(phaseId)) {
@@ -509,6 +523,7 @@ module.exports = async function handler(req, res) {
         board.movesLog = trimLog(board.movesLog);
       }
       await dbSet(BOARD_KEY, board);
+      await saveLogs(board);
       return res.status(200).json({ ok: true, card, prevPhase });
     }
 
@@ -521,6 +536,7 @@ module.exports = async function handler(req, res) {
         if (FROM.includes(card.phaseId)) { card.phaseId = TO; card.movedAt = now; card.movedBy = "Sistema"; count++; }
       }
       await dbSet(BOARD_KEY, board);
+      await saveLogs(board);
       return res.status(200).json({ ok: true, moved: count, board });
     }
 
@@ -554,6 +570,7 @@ module.exports = async function handler(req, res) {
       }
       board.movesLog = trimLog(board.movesLog);
       await dbSet(BOARD_KEY, board);
+      await saveLogs(board);
       return res.status(200).json({ ok: true, card });
     }
 
@@ -564,6 +581,7 @@ module.exports = async function handler(req, res) {
       if (boardType === "rs")     board.rsCards    = board.rsCards.filter(c => c.id !== cardId);
       if (boardType === "rs_rua") board.rsRuaCards = board.rsRuaCards.filter(c => c.id !== cardId);
       await dbSet(BOARD_KEY, board);
+      await saveLogs(board);
       return res.status(200).json({ ok: true });
     }
 
@@ -818,6 +836,7 @@ module.exports = async function handler(req, res) {
 
       const removed = before - board.cards.length;
       await dbSet(BOARD_KEY, board);
+      await saveLogs(board);
 
       return res.status(200).json({ ok: true, removed, remaining: board.cards.length, board });
     }
@@ -865,6 +884,7 @@ module.exports = async function handler(req, res) {
 
       board.movesLog = trimLog(board.movesLog);
       await dbSet(BOARD_KEY, board);
+      await saveLogs(board);
 
       const after = board.movesLog.length;
       return res.status(200).json({ ok: true, removedEntries: before - after, totalLog: after });
@@ -922,6 +942,7 @@ module.exports = async function handler(req, res) {
       board.cards.unshift(...newCards);
       board.movesLog = trimLog(board.movesLog);
       await dbSet(BOARD_KEY, board);
+      await saveLogs(board);
 
       return res.status(200).json({ ok: true, created: newCards.length, cards: newCards });
     }
@@ -967,6 +988,7 @@ module.exports = async function handler(req, res) {
           });
           board.movesLog = trimLog(board.movesLog);
           await dbSet(BOARD_KEY, board);
+      await saveLogs(board);
         }
       } catch(e) { pipefyError = e.message; }
       return res.status(200).json({
@@ -988,6 +1010,7 @@ module.exports = async function handler(req, res) {
       delete card.tipoCompra;
       delete card.previsao;
       await dbSet(BOARD_KEY, board);
+      await saveLogs(board);
       return res.status(200).json({ ok: true, pipefyId, msg: "Dados de compra removidos." });
     }
 
@@ -1065,12 +1088,34 @@ module.exports = async function handler(req, res) {
             }
           });
           if (metaChanged) await dbSet(BOARD_KEY, board);
+      await saveLogs(board);
         }
 
         return res.status(200).json({ ok: true, added, total: lalaDb.fichas.filter(f => f.status === "pendente").length });
       } catch(e) {
         return res.status(200).json({ ok: false, error: e.message });
       }
+    }
+
+    // ── POST limpar-nao-movidas-hoje ─────────────────────────
+    if (req.method === "POST" && action === "limpar-nao-movidas-hoje") {
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+
+      // Meia-noite BRT de hoje em UTC
+      function toBRT(d) { return new Date(new Date(d).toLocaleString("en-US",{timeZone:"America/Sao_Paulo"})); }
+      const nowBRT = toBRT(new Date()); nowBRT.setHours(0,0,0,0);
+      const todayUTC = new Date(nowBRT.getTime() + 3*60*60*1000);
+
+      const before = board.cards.length;
+      board.cards = board.cards.filter(card => {
+        if (!card.movedAt) return false;           // sem data: remove
+        return new Date(card.movedAt) >= todayUTC; // mantém só as movidas hoje
+      });
+      const removed = before - board.cards.length;
+
+      if (removed > 0) await dbSet(BOARD_KEY, board);
+      await saveLogs(board);
+      return res.status(200).json({ ok: true, removed, remaining: board.cards.length, board });
     }
 
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
