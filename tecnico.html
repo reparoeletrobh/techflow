@@ -1072,11 +1072,62 @@ async function confirmReset() {
 }
 
 // ── METAS ──────────────────────────────────────────────────────
+function computeGoalsFromBoard(board) {
+  const log = board?.movesLog || [];
+  const metaLog = board?.metaLog || [];
+  function toBRT(d) { return new Date(new Date(d).toLocaleString('en-US',{timeZone:'America/Sao_Paulo'})); }
+  function startOfDayUTC(d)  { const b=toBRT(d); b.setHours(0,0,0,0); return new Date(b.getTime()+3*60*60*1000); }
+  function startOfWeekUTC(d) { const b=toBRT(d); const dy=b.getDay(); b.setDate(b.getDate()+(dy===0?-6:1-dy)); b.setHours(0,0,0,0); return new Date(b.getTime()+3*60*60*1000); }
+  function startOfMonthUTC(d){ const b=toBRT(d); b.setDate(1); b.setHours(0,0,0,0); return new Date(b.getTime()+3*60*60*1000); }
+  const now=new Date();
+  const todayUTC=startOfDayUTC(now), weekUTC=startOfWeekUTC(now), monthUTC=startOfMonthUTC(now);
+  const prevWeekEnd=new Date(weekUTC.getTime()-1), prevWeekStart=new Date(weekUTC.getTime()-7*24*60*60*1000);
+
+  function cnt(phaseId, since, until) {
+    const entries = log.filter(m => m.phaseId===phaseId && new Date(m.timestamp||m.ts)>=since && (!until||new Date(m.timestamp||m.ts)<=until));
+    const withId=entries.filter(m=>m.pipefyId), withoutId=entries.filter(m=>!m.pipefyId);
+    return new Set(withId.map(m=>m.pipefyId)).size + withoutId.length;
+  }
+  function cntByTecnico(phaseId, since) {
+    const map={}; TECNICOS.forEach(t=>map[t]=0);
+    const entries=log.filter(m=>m.phaseId===phaseId&&new Date(m.timestamp||m.ts)>=since&&m.tecnico);
+    const latest=new Map();
+    for(const m of entries){ if(m.pipefyId){const p=latest.get(m.pipefyId); if(!p||new Date(m.timestamp)>new Date(p.timestamp))latest.set(m.pipefyId,m);}else latest.set('noid_'+m.timestamp,m); }
+    for(const m of latest.values()){if(map[m.tecnico]!==undefined)map[m.tecnico]++;else map[m.tecnico]=1;}
+    return map;
+  }
+  const monthNames=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const monthHistory=[];
+  for(let i=5;i>=0;i--){
+    const d=new Date(now); d.setMonth(d.getMonth()-i);
+    const ms=startOfMonthUTC(d), me=new Date(ms); me.setMonth(me.getMonth()+1); me.setTime(me.getTime()-1);
+    const brt=toBRT(ms);
+    monthHistory.push({label:monthNames[brt.getMonth()]+'/'+String(brt.getFullYear()).slice(2),rs:cnt('rs_feito',ms,me),rsRua:cnt('rs_rua_feito',ms,me),loja:cnt('loja_feito',ms,me),delivery:cnt('delivery_feito',ms,me)});
+  }
+  const nowBRT=toBRT(now);
+  const days=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+  const fmt=d=>{const b=toBRT(d);return String(b.getDate()).padStart(2,'0')+'/'+String(b.getMonth()+1).padStart(2,'0');};
+  const weekDates=Array.from({length:6},(_,i)=>fmt(new Date(weekUTC.getTime()+i*24*60*60*1000)));
+  const prevWeekDates=Array.from({length:6},(_,i)=>fmt(new Date(prevWeekStart.getTime()+i*24*60*60*1000)));
+  return {
+    ok: true,
+    todayLabel: days[nowBRT.getDay()]+', '+String(nowBRT.getDate()).padStart(2,'0')+' '+monthNames[nowBRT.getMonth()],
+    weekLabel:  weekDates[0]+' – '+weekDates[5],
+    prevWeekLabel: prevWeekDates[0]+' – '+prevWeekDates[5],
+    today:    { aprovado:{count:cnt('aprovado_entrada',todayUTC),goal:35}, loja:{count:cnt('loja_feito',todayUTC),goal:15}, delivery:{count:cnt('delivery_feito',todayUTC),goal:20}, rsCriado:cnt('rs_criado',todayUTC), rsFeito:cnt('rs_feito',todayUTC), rsRuaCriado:cnt('rs_rua_criado',todayUTC), rsRuaFeito:cnt('rs_rua_feito',todayUTC) },
+    week:     { aprovado:{count:cnt('aprovado_entrada',weekUTC),goal:210}, loja:{count:cnt('loja_feito',weekUTC),goal:90}, delivery:{count:cnt('delivery_feito',weekUTC),goal:120}, rsFeito:cnt('rs_feito',weekUTC), rsRuaFeito:cnt('rs_rua_feito',weekUTC) },
+    month:    { rsFeito:cnt('rs_feito',monthUTC), rsRuaFeito:cnt('rs_rua_feito',monthUTC) },
+    prevWeek: { aprovado:{count:cnt('aprovado_entrada',prevWeekStart,prevWeekEnd),goal:210}, loja:{count:cnt('loja_feito',prevWeekStart,prevWeekEnd),goal:90}, delivery:{count:cnt('delivery_feito',prevWeekStart,prevWeekEnd),goal:120} },
+    tecnicoHoje:   { loja:cntByTecnico('loja_feito',todayUTC), delivery:cntByTecnico('delivery_feito',todayUTC) },
+    tecnicoSemana: { loja:cntByTecnico('loja_feito',weekUTC),  delivery:cntByTecnico('delivery_feito',weekUTC) },
+    monthHistory,
+  };
+}
+
 async function loadGoals() {
   try {
-    const r = await fetch('/api/board?action=goals');
-    const d = await r.json();
-    if (!d.ok) throw new Error(d.error);
+    // Usa o board já carregado em memória — evita chamada extra ao Redis
+    const d = computeGoalsFromBoard(board);
     renderGoals(d);
   } catch(e) {
     document.getElementById('metas-content').innerHTML = `<div class="meta-loading" style="color:#ef4444">Erro: ${e.message}</div>`;
