@@ -243,6 +243,23 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, removed, remaining: db.fichas.length });
   }
 
+  // ── GET sync-debug — mostra fases do Pipefy e cards em RS ──────
+  if (action === "sync-debug") {
+    try {
+      const data = await pipefyQuery(
+        "query { pipe(id: \"" + PIPE_ID + "\") { phases { name cards(first: 5) { edges { node { id title } } } } } }"
+      );
+      const phases = data?.pipe?.phases || [];
+      return res.status(200).json({
+        ok: true,
+        phases: phases.map(p => ({ name: p.name, cards: p.cards?.edges?.length || 0 })),
+        rsFound: phases.filter(p => p.name.toLowerCase().includes("rs")).map(p => p.name),
+      });
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: e.message });
+    }
+  }
+
   // ── GET debug — mostra syncedIds e fichas ────────────────────
   if (action === "debug") {
     const db = await dbGet(GARANTIA_KEY) || defaultDB();
