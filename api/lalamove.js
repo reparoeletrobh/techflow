@@ -395,6 +395,29 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, lat: f.lat, lng: f.lng });
   }
 
+  // ── GET check-services — verifica market info e serviços disponíveis
+  if (action === "check-services") {
+    if (!LALA_KEY_ENV || !LALA_SECRET_ENV)
+      return res.status(200).json({ ok: false, error: "API key não configurada" });
+    try {
+      // Tenta GET /v3/cities para ver se a chave é válida
+      const path = "/v3/cities?country=BR";
+      const hdrs = lalamoveHeaders(LALA_KEY_ENV, LALA_SECRET_ENV, "GET", path, "");
+      const { status, body } = await lalaFetch(LALA_HOST, path, "GET", hdrs, null);
+      let parsed = null; try { parsed = JSON.parse(body); } catch(e) {}
+      return res.status(200).json({
+        ok: status === 200,
+        httpStatus: status,
+        response: parsed || body,
+        host: LALA_HOST,
+        keyPrefix: LALA_KEY_ENV.slice(0,8) + "...",
+        sandbox: SANDBOX,
+      });
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: e.message });
+    }
+  }
+
   // ── POST debug-cotacao — testa cotação com 1 ficha e retorna detalhes completos
   if (req.method === "POST" && action === "debug-cotacao") {
     if (!LALA_KEY_ENV || !LALA_SECRET_ENV)
