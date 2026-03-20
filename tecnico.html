@@ -1123,19 +1123,20 @@ function computeGoalsFromBoard(board) {
   };
 }
 
+// Controla se os logs já foram carregados nesta sessão
+let logsCarregados = false;
+
 async function loadGoals() {
   try {
-    // Se board já tem logs em memória, usa direto (instantâneo)
-    if (board.movesLog && board.movesLog.length > 0) {
-      renderGoals(computeGoalsFromBoard(board));
-      return;
-    }
-    // Busca logs separados (leves, ~50KB) — só na primeira vez ou após reload
-    const r = await fetch('/api/board?action=load-logs');
-    const d = await r.json();
-    if (d.ok) {
-      board.movesLog = d.movesLog || [];
-      board.metaLog  = d.metaLog  || [];
+    if (!logsCarregados) {
+      document.getElementById('metas-content').innerHTML = '<div class="meta-loading">Carregando metas...</div>';
+      const r = await fetch('/api/board?action=load-logs');
+      const d = await r.json();
+      if (d.ok) {
+        board.movesLog = d.movesLog || [];
+        board.metaLog  = d.metaLog  || [];
+        logsCarregados = true;
+      }
     }
     renderGoals(computeGoalsFromBoard(board));
   } catch(e) {
