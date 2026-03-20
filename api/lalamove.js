@@ -244,13 +244,13 @@ module.exports = async function handler(req, res) {
     if (tipo === "coleta") {
       const fmtCoord = v => parseFloat(v).toFixed(6);
       stops = [
-        ...pendentes.map(f => ({ location: { lat: fmtCoord(f.lat), lng: fmtCoord(f.lng) }, addresses: { pt_BR: { displayString: f.endereco, country: "BR" } } })),
-        { location: { lat: fmtCoord(LOJA.lat), lng: fmtCoord(LOJA.lng) }, addresses: { pt_BR: { displayString: LOJA.endereco, country: "BR" } } },
+        ...pendentes.map(f => ({ coordinates: { lat: fmtCoord(f.lat), lng: fmtCoord(f.lng) }, address: f.endereco || "Belo Horizonte, MG" })),
+        { coordinates: { lat: fmtCoord(LOJA.lat), lng: fmtCoord(LOJA.lng) }, address: LOJA.endereco },
       ];
     } else {
       stops = [
-        { location: { lat: fmtCoord(LOJA.lat), lng: fmtCoord(LOJA.lng) }, addresses: { pt_BR: { displayString: LOJA.endereco, country: "BR" } } },
-        ...pendentes.map(f => ({ location: { lat: fmtCoord(f.lat), lng: fmtCoord(f.lng) }, addresses: { pt_BR: { displayString: f.endereco, country: "BR" } } })),
+        { coordinates: { lat: fmtCoord(LOJA.lat), lng: fmtCoord(LOJA.lng) }, address: LOJA.endereco },
+        ...pendentes.map(f => ({ coordinates: { lat: fmtCoord(f.lat), lng: fmtCoord(f.lng) }, address: f.endereco || "Belo Horizonte, MG" })),
       ];
     }
 
@@ -401,8 +401,8 @@ module.exports = async function handler(req, res) {
 
     // Stop mínimo válido (BH)
     const stops = [
-      { location: { lat: "-19.924500", lng: "-43.935200" }, addresses: { pt_BR: { displayString: "Rua Ouro Preto 663, Barro Preto, BH", country: "BR" } } },
-      { location: { lat: "-19.920000", lng: "-43.940000" }, addresses: { pt_BR: { displayString: "Rua Sapucai, Floresta, BH", country: "BR" } } },
+      { coordinates: { lat: "-19.924500", lng: "-43.935200" }, address: "Rua Ouro Preto 663, Barro Preto, BH" },
+      { coordinates: { lat: "-19.920000", lng: "-43.940000" }, address: "Rua Sapucai, Floresta, BH" },
     ];
 
     const quotePath = "/v3/quotations";
