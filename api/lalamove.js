@@ -256,7 +256,7 @@ module.exports = async function handler(req, res) {
 
     // ETAPA 1: Cotação
     const quotePath = "/v3/quotations";
-    const quoteBody = JSON.stringify({ data: { serviceType: "CAR", language: "pt_BR", stops, requesterContact: { name: LOJA.nome, phone: LOJA.telefone } } });
+    const quoteBody = JSON.stringify({ data: { serviceType: "CAR", language: "pt_BR", stops } });
     const quoteHdrs = lalamoveHeaders(LALA_KEY_ENV, LALA_SECRET_ENV, "POST", quotePath, quoteBody);
 
     let quotationId, lalaStops;
@@ -457,7 +457,7 @@ module.exports = async function handler(req, res) {
     ];
 
     const quotePath = "/v3/quotations";
-    const quoteBody = JSON.stringify({ data: { serviceType: "CAR", language: "pt_BR", stops, requesterContact: { name: LOJA.nome, phone: LOJA.telefone } } });
+    const quoteBody = JSON.stringify({ data: { serviceType: "CAR", language: "pt_BR", stops } });
     const quoteHdrs = lalamoveHeaders(LALA_KEY_ENV, LALA_SECRET_ENV, "POST", quotePath, quoteBody);
 
     try {
