@@ -344,6 +344,18 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── POST set-coords — salva lat/lng de uma ficha (geocoding feito no frontend)
+  if (req.method === "POST" && action === "set-coords") {
+    const { id, lat, lng } = req.body || {};
+    if (!id || !lat || !lng) return res.status(400).json({ ok: false, error: "id, lat e lng obrigatorios" });
+    const db = await dbGet(LALA_KEY) || { fichas: [] };
+    const f = (db.fichas || []).find(x => x.pipefyId === id || x.id === id);
+    if (!f) return res.status(404).json({ ok: false, error: "Ficha nao encontrada" });
+    f.lat = lat; f.lng = lng;
+    await dbSet(LALA_KEY, db);
+    return res.status(200).json({ ok: true });
+  }
+
   // ── POST geocodificar-tudo — geocodifica todas as fichas sem coords ──
   if (req.method === "POST" && action === "geocodificar-tudo") {
     const db = await dbGet(LALA_KEY) || { fichas: [] };
