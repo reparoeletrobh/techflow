@@ -517,8 +517,10 @@ module.exports = async function handler(req, res) {
           const lalaDb = await dbGet(LALA_KEY) || { fichas: [] };
           if (!Array.isArray(lalaDb.fichas)) lalaDb.fichas = [];
           const tipo = phaseId === "coleta_solicitada" ? "coleta" : "entrega";
+          if (!Array.isArray(lalaDb.removedIds)) lalaDb.removedIds = [];
           const jaExiste = lalaDb.fichas.find(f => f.pipefyId === String(pipefyId) && f.tipo === tipo);
-          if (!jaExiste) {
+          const jaRemovida = lalaDb.removedIds.includes(String(pipefyId) + ":" + tipo);
+          if (!jaExiste && !jaRemovida) {
             lalaDb.fichas.push({
               pipefyId:    String(pipefyId),
               tipo,
@@ -1081,7 +1083,10 @@ module.exports = async function handler(req, res) {
 
           for (const { node } of (ph.cards?.edges || [])) {
             const pipefyId = String(node.id);
+            if (!Array.isArray(lalaDb.removedIds)) lalaDb.removedIds = [];
+            const removedKey = pipefyId + ":" + tipo;
             if (lalaDb.fichas.find(f => f.pipefyId === pipefyId && f.tipo === tipo)) continue;
+            if (lalaDb.removedIds.includes(removedKey)) continue; // já foi removida, não reimporta
 
             const fields   = node.fields || [];
             const endField = fields.find(f => f.name.toLowerCase().includes("endere"));
