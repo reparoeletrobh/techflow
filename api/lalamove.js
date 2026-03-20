@@ -246,14 +246,15 @@ module.exports = async function handler(req, res) {
     // Monta stops
     let stops;
     if (tipo === "coleta") {
+      const fmtCoord = v => parseFloat(v).toFixed(6);
       stops = [
-        ...pendentes.map(f => ({ location: { lat: String(f.lat), lng: String(f.lng) }, addresses: { pt_BR: { displayString: f.endereco, country: "BR" } } })),
-        { location: { lat: LOJA.lat, lng: LOJA.lng }, addresses: { pt_BR: { displayString: LOJA.endereco, country: "BR" } } },
+        ...pendentes.map(f => ({ location: { lat: fmtCoord(f.lat), lng: fmtCoord(f.lng) }, addresses: { pt_BR: { displayString: f.endereco, country: "BR" } } })),
+        { location: { lat: fmtCoord(LOJA.lat), lng: fmtCoord(LOJA.lng) }, addresses: { pt_BR: { displayString: LOJA.endereco, country: "BR" } } },
       ];
     } else {
       stops = [
-        { location: { lat: LOJA.lat, lng: LOJA.lng }, addresses: { pt_BR: { displayString: LOJA.endereco, country: "BR" } } },
-        ...pendentes.map(f => ({ location: { lat: String(f.lat), lng: String(f.lng) }, addresses: { pt_BR: { displayString: f.endereco, country: "BR" } } })),
+        { location: { lat: fmtCoord(LOJA.lat), lng: fmtCoord(LOJA.lng) }, addresses: { pt_BR: { displayString: LOJA.endereco, country: "BR" } } },
+        ...pendentes.map(f => ({ location: { lat: fmtCoord(f.lat), lng: fmtCoord(f.lng) }, addresses: { pt_BR: { displayString: f.endereco, country: "BR" } } })),
       ];
     }
 
