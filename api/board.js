@@ -82,7 +82,8 @@ function sanitizeBoard(b) {
   const validMain   = b.phases.map(p => p.id);
   const validRs     = b.rsPhases.map(p => p.id);
   const validRsRua  = b.rsRuaPhases.map(p => p.id);
-  b.cards      = b.cards.map(c => ({ ...c, phaseId: validMain.includes(c.phaseId)   ? c.phaseId : b.phases[0].id }));
+  // Só reseta phaseId se for null/undefined — mantém fases desconhecidas para não perder posição
+  b.cards      = b.cards.map(c => ({ ...c, phaseId: (c.phaseId && validMain.includes(c.phaseId)) ? c.phaseId : (c.phaseId || b.phases[0].id) }));
   b.rsCards    = b.rsCards.map(c => ({ ...c, phaseId: validRs.includes(c.phaseId)   ? c.phaseId : b.rsPhases[0].id }));
   b.rsRuaCards = b.rsRuaCards.map(c => ({ ...c, phaseId: validRsRua.includes(c.phaseId) ? c.phaseId : b.rsRuaPhases[0].id }));
 
@@ -372,9 +373,11 @@ module.exports = async function handler(req, res) {
 
       try {
         const approved = await fetchApprovedCards();
-        const activeIds = new Set(board.cards.map(c => c.pipefyId));
+        const activeIds  = new Set(board.cards.map(c => c.pipefyId));
+        const syncedSet  = new Set(board.syncedIds);
         for (const c of approved) {
-          if (activeIds.has(c.pipefyId)) continue;
+          // Nunca re-importa card já conhecido — mesmo que saiu de board.cards por qualquer motivo
+          if (activeIds.has(c.pipefyId) || syncedSet.has(c.pipefyId)) continue;
           board.cards.unshift({ ...c, phaseId: board.phases[0].id, movedBy: "Pipefy" });
           activeIds.add(c.pipefyId);
           if (!board.syncedIds.includes(c.pipefyId)) {
