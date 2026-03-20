@@ -90,6 +90,30 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .modal-confirm{font-family:var(--fm);font-size:11px;font-weight:600;padding:8px 16px;border-radius:7px;background:var(--accent);color:#fff;border:none;cursor:pointer;}
 .modal-confirm:hover{filter:brightness(1.1);}
 
+/* PREVIEW MODAL */
+#preview-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:500;backdrop-filter:blur(4px);}
+#preview-overlay.open{display:flex;}
+.preview-modal{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--orange);border-radius:14px;padding:22px;width:92%;max-width:560px;max-height:88vh;display:flex;flex-direction:column;gap:14px;}
+.preview-title{font-family:var(--fh);font-size:16px;font-weight:800;}
+.preview-title span{color:var(--orange);}
+.preview-batches{overflow-y:auto;display:flex;flex-direction:column;gap:12px;flex:1;}
+.batch-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.batch-header{padding:8px 12px;background:rgba(249,115,22,.12);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.batch-num{font-family:var(--fh);font-size:12px;font-weight:700;color:var(--orange);}
+.batch-tag{font-family:var(--fm);font-size:9px;color:var(--muted);background:var(--surface);padding:2px 7px;border-radius:10px;border:1px solid var(--border);}
+.batch-stops{padding:8px 12px;display:flex;flex-direction:column;gap:6px;}
+.batch-stop{display:flex;align-items:flex-start;gap:8px;font-size:11px;}
+.stop-dot{width:16px;height:16px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;margin-top:1px;}
+.stop-dot.loja{background:#22c55e;color:#000;}
+.stop-dot.cliente{background:var(--orange);color:#000;}
+.stop-info{flex:1;}
+.stop-nome{font-weight:600;color:var(--text);}
+.stop-end{color:var(--muted);font-family:var(--fm);font-size:9px;margin-top:1px;}
+.preview-footer{display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;}
+.prev-cancel{font-family:var(--fm);font-size:11px;padding:8px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;}
+.prev-confirm{font-family:var(--fm);font-size:11px;font-weight:600;padding:8px 16px;border-radius:7px;background:var(--orange);color:#000;border:none;cursor:pointer;}
+.prev-confirm:hover{filter:brightness(1.1);}
+
 /* TOAST */
 .toast{position:fixed;bottom:18px;right:18px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:11px 14px;font-family:var(--fm);font-size:11px;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;}
 .toast.show{transform:translateY(0);opacity:1;}
@@ -319,24 +343,88 @@ async function limparFila() {
   }
 }
 
-// ── ENVIAR AO LALAMOVE ─────────────────────────────────────────
-async function enviarLalamove(tipo) {
+// ── PREVIEW + ENVIAR AO LALAMOVE ──────────────────────────────
+var previewTipo = null;
+var previewBatches = [];
+
+function enviarLalamove(tipo) {
   var pendentes = fichas.filter(function(f) { return f.tipo === tipo && f.status === "pendente"; });
   if (!pendentes.length) { showToast("⚠️","Fila vazia","Não há fichas pendentes"); return; }
   var semEnd = pendentes.filter(function(f) { return !f.endereco; });
   if (semEnd.length) { showToast("⚠️","Endereços faltando", semEnd.length + " ficha(s) sem endereço"); return; }
-  var btn = document.getElementById("btn-send-"+tipo);
-  btn.disabled = true;
-  btn.textContent = "⏳ Enviando...";
-  var d = await api("enviar-lalamove", { tipo });
-  if (d.ok) {
-    showToast("🚗","Enviado ao Lalamove!", d.count + " parada(s) — Pedido: " + d.orderId);
-    await load();
-  } else {
-    showToast("❌","Erro", d.error || "Verifique os endereços e tente novamente");
+  var semCoords = pendentes.filter(function(f) { return !f.lat || !f.lng; });
+  if (semCoords.length) { showToast("❌","Coordenadas faltando", semCoords.length + " ficha(s) sem GPS — geocodifique primeiro"); return; }
+
+  // Divide em lotes de 3 paradas
+  previewTipo = tipo;
+  previewBatches = [];
+  for (var i = 0; i < pendentes.length; i += 3) {
+    previewBatches.push(pendentes.slice(i, i + 3));
   }
-  btn.disabled = !temApiKey;
-  btn.textContent = tipo === "coleta" ? "🚗 Enviar Coletas ao Lalamove" : "🚗 Enviar Entregas ao Lalamove";
+
+  // Renderiza preview
+  document.getElementById("preview-tipo-label").textContent = tipo === "coleta" ? "Coletas" : "Entregas";
+  var total = pendentes.length;
+  var lotes = previewBatches.length;
+  document.getElementById("preview-summary").textContent =
+    total + " parada(s) → " + lotes + " corrida(s) de até 3 paradas cada · Rota otimizada ativada";
+
+  var container = document.getElementById("preview-batches");
+  container.innerHTML = "";
+  previewBatches.forEach(function(batch, bi) {
+    var card = document.createElement("div");
+    card.className = "batch-card";
+    var isColeta = tipo === "coleta";
+    var stops = isColeta
+      ? batch.concat([{nomeContato: "Reparo Eletro (loja)", endereco: "Rua Ouro Preto, 663, Barro Preto, BH", isLoja: true}])
+      : [{nomeContato: "Reparo Eletro (loja)", endereco: "Rua Ouro Preto, 663, Barro Preto, BH", isLoja: true}].concat(batch);
+
+    var stopsHtml = stops.map(function(s, si) {
+      var dotClass = s.isLoja ? "loja" : "cliente";
+      var dotLabel = s.isLoja ? "L" : (si + 1);
+      return "<div class='batch-stop'>" +
+        "<div class='stop-dot " + dotClass + "'>" + dotLabel + "</div>" +
+        "<div class='stop-info'><div class='stop-nome'>" + (s.nomeContato || "Cliente") + "</div>" +
+        "<div class='stop-end'>" + (s.endereco || "Sem endereço") + "</div></div>" +
+        "</div>";
+    }).join("");
+
+    card.innerHTML =
+      "<div class='batch-header'>" +
+        "<span class='batch-num'>Corrida " + (bi+1) + " de " + lotes + "</span>" +
+        "<span class='batch-tag'>" + batch.length + " cliente(s) · Rota otimizada</span>" +
+      "</div>" +
+      "<div class='batch-stops'>" + stopsHtml + "</div>";
+    container.appendChild(card);
+  });
+
+  document.getElementById("preview-overlay").classList.add("open");
+}
+
+function fecharPreview() {
+  document.getElementById("preview-overlay").classList.remove("open");
+}
+
+async function confirmarEnvio() {
+  var btn = document.getElementById("btn-confirmar-envio");
+  btn.disabled = true; btn.textContent = "⏳ Enviando...";
+  var sucessos = 0, erros = [];
+
+  for (var i = 0; i < previewBatches.length; i++) {
+    var loteIds = previewBatches[i].map(function(f) { return f.pipefyId; });
+    var d = await api("enviar-lote", { tipo: previewTipo, loteIds: loteIds });
+    if (d.ok) { sucessos++; }
+    else { erros.push("Lote " + (i+1) + ": " + (d.error||"erro")); }
+  }
+
+  btn.disabled = false; btn.textContent = "🚗 Confirmar e Enviar";
+  fecharPreview();
+  if (erros.length === 0) {
+    showToast("🚗", previewBatches.length + " corrida(s) enviada(s)!", sucessos + " pedido(s) criados");
+  } else {
+    showToast("⚠️", sucessos + " enviado(s), " + erros.length + " erro(s)", erros[0]);
+  }
+  await load();
 }
 
 // ── TOAST ──────────────────────────────────────────────────────
@@ -451,5 +539,18 @@ syncPipefy(); // Sync imediato ao abrir
 setInterval(load, 30000);
 setInterval(syncPipefy, 60000); // Verifica Pipefy a cada 1 min
 </script>
+<!-- PREVIEW MODAL -->
+<div id="preview-overlay">
+  <div class="preview-modal">
+    <div class="preview-title">Pré-visualização — <span id="preview-tipo-label">Coletas</span></div>
+    <div id="preview-summary" style="font-family:var(--fm);font-size:10px;color:var(--muted);"></div>
+    <div class="preview-batches" id="preview-batches"></div>
+    <div class="preview-footer">
+      <button class="prev-cancel" onclick="fecharPreview()">Cancelar</button>
+      <button class="prev-confirm" id="btn-confirmar-envio" onclick="confirmarEnvio()">🚗 Confirmar e Enviar</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
