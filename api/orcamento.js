@@ -195,6 +195,13 @@ module.exports = async function handler(req, res) {
         try {
           const regra = detectarRegra(card.desc, card.comentarios);
           if (regra) {
+            let precoRegra = parseFloat(regra.preco || "0");
+            // Regra "grande": +R$300 para forno grande ou adega grande
+            const equipImp = detectarEquipamento(card.desc || "", "");
+            if (isGrande(card.desc || "", "") && (equipImp === "forno" || equipImp === "adega") && precoRegra > 0) {
+              precoRegra += 300;
+              regra = Object.assign({}, regra, { preco: String(precoRegra) });
+            }
             let texto = substituirNome(regra.texto, card.nome);
             precoSugerido = regra.preco || null;
             // Substitui [VALOR] pelo preço da regra se disponível
@@ -694,6 +701,37 @@ const ORCAMENTO_REGRAS = [
 // Preços sugeridos por índice de regra (mesma ordem de ORCAMENTO_REGRAS)
 var PRECOS_REGRAS = ["390","350","370","320","320","320","320","370","450","350","450","450","450","450","350"];
 
+// ── DETECTA TIPO DE EQUIPAMENTO ──────────────────────────────────
+function detectarEquipamento(desc, titulo) {
+  var texto = norm([desc||"", titulo||""].join(" "));
+  if (texto.includes("microondas") || texto.includes("micro ondas") || texto.includes("forno micro")) return "microondas";
+  if (texto.includes("purificador") || texto.includes("purif")) return "purificador";
+  if (texto.includes("adega"))  return "adega";
+  if (texto.includes("forno"))  return "forno";
+  if (texto.includes("geladeira") || texto.includes("refrigerador")) return "geladeira";
+  if (texto.includes("lavadora") || texto.includes("maquina de lavar") || texto.includes("lava")) return "lavadora";
+  if (texto.includes("secadora") || texto.includes("centrifuga")) return "secadora";
+  if (texto.includes("lava loucas") || texto.includes("lava-loucas") || texto.includes("lava louça")) return "lava-loucas";
+  return null;
+}
+
+// Verifica se o equipamento é "grande" (ex: forno grande, adega grande)
+function isGrande(desc, titulo) {
+  var texto = norm([desc||"", titulo||""].join(" "));
+  return texto.includes("grande");
+}
+
+// Gera linha de equipamento para orçamento multi
+function linhaEquipamento(equip, descDiagnostico) {
+  if (!equip) return descDiagnostico;
+  var nomes = {
+    "microondas": "Microondas", "purificador": "Purificador",
+    "adega": "Adega", "forno": "Forno", "geladeira": "Geladeira",
+    "lavadora": "Lavadora", "secadora": "Secadora", "lava-loucas": "Lava-Louças"
+  };
+  return (nomes[equip] || equip) + ":\n" + descDiagnostico;
+}
+
 function detectarRegra(desc, comentarios) {
   var textoNorm = norm([desc || ""].concat(comentarios || []).join(" "));
   for (var i = 0; i < ORCAMENTO_REGRAS.length; i++) {
@@ -823,7 +861,16 @@ async function gerarTextoOrcamento(desc, comentarios, nome) {
   if (multiplos) return gerarTextoMultiplos(multiplos, nome);
 
   var regra = detectarRegra(desc, comentarios);
-  if (regra) return { texto: substituirNome(regra.texto, nome), preco: regra.preco };
+  if (regra) {
+    var precoBase = parseFloat(regra.preco || "0");
+    // Regra "grande": adiciona R$300 se o equipamento for grande (forno grande, adega grande)
+    var equip = detectarEquipamento(desc, "");
+    if (isGrande(desc, "") && (equip === "forno" || equip === "adega") && precoBase > 0) {
+      precoBase += 300;
+      regra = Object.assign({}, regra, { preco: String(precoBase) });
+    }
+    return { texto: substituirNome(regra.texto, nome), preco: regra.preco };
+  }
 
   var primeiro = primeiroNome(nome) || "cliente";
   var comStr   = (comentarios || []).join("; ");
