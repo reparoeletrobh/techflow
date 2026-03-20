@@ -85,10 +85,12 @@ function lalamoveSign(secret, timestamp, method, path, body) {
 function lalamoveHeaders(key, secret, method, path, body) {
   const ts  = Date.now().toString();
   const sig = lalamoveSign(secret, ts, method, path, body);
+  const token = key + ":" + ts + ":" + sig;
   return {
-    "Content-Type":  "application/json; charset=utf8",
-    "Authorization": `hmac id="${key}", nonce="${ts}", signature="${sig}"`,
+    "Content-Type":  "application/json",
+    "Authorization": "hmac " + token,
     "Market":        "BR",
+    "Request-ID":    ts + "-" + Math.random().toString(36).slice(2,8),
     "Accept":        "application/json",
   };
 }
