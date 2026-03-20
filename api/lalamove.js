@@ -344,5 +344,43 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── POST geocodificar-tudo — geocodifica todas as fichas sem coords ──
+  if (req.method === "POST" && action === "geocodificar-tudo") {
+    const db = await dbGet(LALA_KEY) || { fichas: [] };
+    const semCoords = (db.fichas || []).filter(f => f.status === "pendente" && f.endereco && (!f.lat || !f.lng));
+    let ok_count = 0, fail_count = 0;
+
+    for (const f of semCoords) {
+      const coords = await geocodificar(f.endereco);
+      if (coords) {
+        f.lat = coords.lat;
+        f.lng = coords.lng;
+        ok_count++;
+      } else {
+        fail_count++;
+      }
+      // Respeita rate limit do Nominatim: 1 req/segundo
+      await new Promise(r => setTimeout(r, 1100));
+    }
+
+    if (ok_count > 0) await dbSet(LALA_KEY, db);
+    return res.status(200).json({ ok: true, ok_count, fail_count, total: semCoords.length });
+  }
+
+  // ── POST geocodificar-ficha — geocodifica uma ficha específica ──
+  if (req.method === "POST" && action === "geocodificar-ficha") {
+    const { id } = req.body || {};
+    const db = await dbGet(LALA_KEY) || { fichas: [] };
+    const f = (db.fichas || []).find(x => x.pipefyId === id || x.id === id);
+    if (!f) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
+    if (!f.endereco) return res.status(400).json({ ok: false, error: "Ficha sem endereço" });
+    const coords = await geocodificar(f.endereco);
+    if (!coords) return res.status(200).json({ ok: false, error: "Endereço não encontrado no mapa" });
+    f.lat = coords.lat;
+    f.lng = coords.lng;
+    await dbSet(LALA_KEY, db);
+    return res.status(200).json({ ok: true, lat: f.lat, lng: f.lng });
+  }
+
   return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 };
