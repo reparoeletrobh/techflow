@@ -349,17 +349,54 @@ function showToast(icon, title, msg) {
 }
 
 // Sincroniza fila do Pipefy (Coleta/Entrega Solicitada)
-// Geocoding via Nominatim rodando no FRONTEND (sem timeout de servidor)
+// Geocoding inteligente — tenta múltiplas estratégias
 async function nominatimGeocode(endereco) {
-  try {
-    var q = encodeURIComponent(endereco + ", Belo Horizonte, MG, Brasil");
-    var r = await fetch("https://nominatim.openstreetmap.org/search?q=" + q + "&format=json&limit=1&countrycodes=br", {
-      headers: {"Accept-Language": "pt-BR"}
-    });
-    var j = await r.json();
-    if (j && j[0]) return { lat: parseFloat(j[0].lat), lng: parseFloat(j[0].lon) };
-    return null;
-  } catch(e) { return null; }
+  // Estratégias em ordem de tolerância
+  var tentativas = buildTentativas(endereco);
+  for (var i = 0; i < tentativas.length; i++) {
+    try {
+      var q = encodeURIComponent(tentativas[i]);
+      var r = await fetch("https://nominatim.openstreetmap.org/search?q=" + q + "&format=json&limit=1&countrycodes=br", {
+        headers: {"Accept-Language": "pt-BR"}
+      });
+      var j = await r.json();
+      if (j && j[0]) return { lat: parseFloat(j[0].lat), lng: parseFloat(j[0].lon) };
+      if (i < tentativas.length - 1) await new Promise(function(r){ setTimeout(r, 1100); });
+    } catch(e) {}
+  }
+  return null;
+}
+
+function buildTentativas(end) {
+  // Limpa o endereço
+  var limpo = end
+    .replace(/apto?\s*[:\-]?\s*\d+/gi, '')
+    .replace(/ap\s*[:\-]?\s*\d+/gi, '')
+    .replace(/bloco?\s*[:\-]?\s*[\w]+/gi, '')
+    .replace(/blc?\s*[:\-]?\s*[\w]+/gi, '')
+    .replace(/complemento[^,]*/gi, '')
+    .replace(/,\s*,/g, ',').trim();
+
+  // Extrai CEP se houver
+  var cep = end.match(/\b(\d{5}[-\s]?\d{3})\b/);
+  
+  var tentativas = [];
+  
+  // 1. Endereço limpo + BH
+  tentativas.push(limpo + ", Belo Horizonte, MG, Brasil");
+  
+  // 2. CEP direto (mais preciso)
+  if (cep) tentativas.push(cep[1].replace(/\s/g,'') + ", Brasil");
+  
+  // 3. Só rua + número + BH (remove bairro e complementos)
+  var ruaNum = end.match(/^([^,]+,\s*\d+)/);
+  if (ruaNum) tentativas.push(ruaNum[1] + ", Belo Horizonte, MG, Brasil");
+  
+  // 4. Original + BH
+  if (end !== limpo) tentativas.push(end + ", Belo Horizonte, MG, Brasil");
+  
+  // Remove duplicatas
+  return tentativas.filter(function(t, i, a) { return a.indexOf(t) === i; });
 }
 
 async function geocodificarTudo() {
