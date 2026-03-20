@@ -395,5 +395,42 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, lat: f.lat, lng: f.lng });
   }
 
+  // ── POST debug-cotacao — testa cotação com 1 ficha e retorna detalhes completos
+  if (req.method === "POST" && action === "debug-cotacao") {
+    if (!LALA_KEY_ENV || !LALA_SECRET_ENV)
+      return res.status(200).json({ ok: false, error: "API key não configurada" });
+
+    const db = await dbGet(LALA_KEY) || { fichas: [] };
+    const pendente = (db.fichas || []).find(f => f.status === "pendente" && f.lat && f.lng);
+    if (!pendente) return res.status(200).json({ ok: false, error: "Nenhuma ficha com coordenadas" });
+
+    const fmtCoord = v => parseFloat(v).toFixed(6);
+    const stops = [
+      { location: { lat: fmtCoord(pendente.lat), lng: fmtCoord(pendente.lng) }, addresses: { pt_BR: { displayString: pendente.endereco || "BH", country: "BR" } } },
+      { location: { lat: fmtCoord(LOJA.lat), lng: fmtCoord(LOJA.lng) }, addresses: { pt_BR: { displayString: LOJA.endereco, country: "BR" } } },
+    ];
+
+    const quotePath = "/v3/quotations";
+    const quoteBody = JSON.stringify({ data: { serviceType: "MOTORCYCLE", language: "pt_BR", stops, requesterContact: { name: LOJA.nome, phone: LOJA.telefone } } });
+    const quoteHdrs = lalamoveHeaders(LALA_KEY_ENV, LALA_SECRET_ENV, "POST", quotePath, quoteBody);
+
+    try {
+      const { status, body } = await lalaFetch(LALA_HOST, quotePath, "POST", quoteHdrs, quoteBody);
+      let parsed = null;
+      try { parsed = JSON.parse(body); } catch(e) {}
+      return res.status(200).json({
+        ok: status === 201,
+        httpStatus: status,
+        response: parsed || body,
+        sentBody: JSON.parse(quoteBody),
+        headers: { Authorization: quoteHdrs.Authorization?.slice(0,50) + "...", Market: quoteHdrs.Market },
+        host: LALA_HOST,
+        keyPrefix: LALA_KEY_ENV.slice(0,8) + "...",
+      });
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: e.message });
+    }
+  }
+
   return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 };
