@@ -155,6 +155,9 @@ module.exports = async function handler(req, res) {
   // ── GET orc-load ──────────────────────────────────────────
   if (action === "orc-load") {
     const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
+    // Deduplica por id
+    const seen = new Set();
+    db.fichas = (db.fichas || []).filter(f => { if (seen.has(f.id)) return false; seen.add(f.id); return true; });
     return res.status(200).json({ ok: true, fichas: db.fichas || [] });
   }
 
