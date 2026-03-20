@@ -1,6 +1,5 @@
 // lalamove.js — Integração Lalamove v3 API (Brazil)
 // Fluxo: Adicionar fichas → Cotar → Confirmar Pedido
-const https  = require("https");
 const crypto = require("crypto");
 
 const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g,"").trim();
@@ -94,23 +93,14 @@ function lalamoveHeaders(key, secret, method, path, body) {
   };
 }
 
-// ── Chamada HTTPS para Lalamove ───────────────────────────────
-function lalaFetch(host, path, method, headers, body) {
-  return new Promise((resolve, reject) => {
-    const buf = body ? Buffer.from(body, "utf8") : null;
-    const opts = {
-      hostname: host, port: 443, path, method,
-      headers: { ...headers, ...(buf ? { "Content-Length": buf.length } : {}) },
-    };
-    const req = https.request(opts, r => {
-      const chunks = [];
-      r.on("data", c => chunks.push(c));
-      r.on("end", () => resolve({ status: r.statusCode, body: Buffer.concat(chunks).toString("utf8") }));
-    });
-    req.on("error", reject);
-    if (buf) req.write(buf);
-    req.end();
-  });
+// ── Chamada para Lalamove via fetch nativo ────────────────────
+async function lalaFetch(host, path, method, headers, body) {
+  const url = "https://" + host + path;
+  const opts = { method, headers };
+  if (body) opts.body = body;
+  const r = await fetch(url, opts);
+  const text = await r.text();
+  return { status: r.status, body: text };
 }
 
 // Formata telefone para padrão internacional +55
