@@ -1125,9 +1125,19 @@ function computeGoalsFromBoard(board) {
 
 async function loadGoals() {
   try {
-    // Usa o board já carregado em memória — evita chamada extra ao Redis
-    const d = computeGoalsFromBoard(board);
-    renderGoals(d);
+    // Se board já tem logs em memória, usa direto (instantâneo)
+    if (board.movesLog && board.movesLog.length > 0) {
+      renderGoals(computeGoalsFromBoard(board));
+      return;
+    }
+    // Busca logs separados (leves, ~50KB) — só na primeira vez ou após reload
+    const r = await fetch('/api/board?action=load-logs');
+    const d = await r.json();
+    if (d.ok) {
+      board.movesLog = d.movesLog || [];
+      board.metaLog  = d.metaLog  || [];
+    }
+    renderGoals(computeGoalsFromBoard(board));
   } catch(e) {
     document.getElementById('metas-content').innerHTML = `<div class="meta-loading" style="color:#ef4444">Erro: ${e.message}</div>`;
   }
