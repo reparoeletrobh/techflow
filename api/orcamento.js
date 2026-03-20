@@ -695,11 +695,18 @@ const ORCAMENTO_REGRAS = [
                "recuperacao da placa","recuperação da placa","recupera da placa","recuperar placa","reoperacao","reoperação"],
     template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da placa principal, sera feito a reoperacao da placa tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
   },
+
+  // 15. Display → R$ 370
+  {
+    keywords: ["display","teclado display","painel display","troca do display","troca de display","display microondas"],
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do display e na membrana interface, as pecas serao trocadas tambem. Este conserto individual fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
+    preco: "370",
+  },
 ];
 
 
 // Preços sugeridos por índice de regra (mesma ordem de ORCAMENTO_REGRAS)
-var PRECOS_REGRAS = ["390","350","370","320","320","320","320","370","450","350","450","450","450","450","350"];
+var PRECOS_REGRAS = ["390","350","370","320","320","320","320","370","450","350","450","450","450","450","370","350"];
 
 // ── DETECTA TIPO DE EQUIPAMENTO ──────────────────────────────────
 function detectarEquipamento(desc, titulo) {
