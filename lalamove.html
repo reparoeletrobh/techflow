@@ -349,27 +349,57 @@ function showToast(icon, title, msg) {
 }
 
 // Sincroniza fila do Pipefy (Coleta/Entrega Solicitada)
+// Geocoding via Nominatim rodando no FRONTEND (sem timeout de servidor)
+async function nominatimGeocode(endereco) {
+  try {
+    var q = encodeURIComponent(endereco + ", Belo Horizonte, MG, Brasil");
+    var r = await fetch("https://nominatim.openstreetmap.org/search?q=" + q + "&format=json&limit=1&countrycodes=br", {
+      headers: {"Accept-Language": "pt-BR"}
+    });
+    var j = await r.json();
+    if (j && j[0]) return { lat: parseFloat(j[0].lat), lng: parseFloat(j[0].lon) };
+    return null;
+  } catch(e) { return null; }
+}
+
 async function geocodificarTudo() {
   var semCoords = fichas.filter(function(f) { return f.status === "pendente" && f.endereco && (!f.lat || !f.lng); });
   if (!semCoords.length) { showToast("✅","Tudo geocodificado","Todas as fichas já têm coordenadas"); return; }
   var btn = document.getElementById("btn-geocod");
   btn.disabled = true;
-  btn.textContent = "⏳ Geocodificando 0/" + semCoords.length + "...";
-  var d = await api("geocodificar-tudo", {});
+  var ok_count = 0, fail_count = 0;
+
+  for (var i = 0; i < semCoords.length; i++) {
+    btn.textContent = "⏳ " + (i+1) + "/" + semCoords.length + "...";
+    var f = semCoords[i];
+    var coords = await nominatimGeocode(f.endereco);
+    if (coords) {
+      // Salva coords no servidor
+      await api("set-coords", { id: f.pipefyId || f.id, lat: coords.lat, lng: coords.lng });
+      f.lat = coords.lat; f.lng = coords.lng;
+      ok_count++;
+    } else {
+      fail_count++;
+    }
+    // Respeita rate limit Nominatim: 1 req/s
+    await new Promise(function(r) { setTimeout(r, 1100); });
+  }
+
   btn.disabled = false;
   btn.textContent = "📍 Geocodificar Endereços";
-  if (d.ok) {
-    showToast("📍", d.ok_count + " geocodificado(s)", d.fail_count + " falhou");
-    await load();
-  } else {
-    showToast("❌","Erro",d.error||"");
-  }
+  showToast("📍", ok_count + " geocodificado(s)", fail_count > 0 ? fail_count + " endereço(s) não encontrado(s)" : "");
+  render();
 }
 
 async function geocodificarFicha(id) {
-  var d = await api("geocodificar-ficha", {id: id});
-  if (d.ok) { showToast("📍","Geocodificado!",""); await load(); }
-  else showToast("❌","Erro geocoding",d.error||"");
+  var f = fichas.find(function(x) { return (x.pipefyId||x.id) === id; });
+  if (!f || !f.endereco) { showToast("❌","Sem endereço",""); return; }
+  var coords = await nominatimGeocode(f.endereco);
+  if (!coords) { showToast("❌","Não encontrado","Tente editar o endereço com CEP ou bairro"); return; }
+  await api("set-coords", { id: id, lat: coords.lat, lng: coords.lng });
+  f.lat = coords.lat; f.lng = coords.lng;
+  showToast("📍","Geocodificado!","");
+  render();
 }
 
 async function syncPipefy() {
