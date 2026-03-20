@@ -480,15 +480,45 @@ async function orcEnviar(id) {
   if (!ta || !prInput) return;
   var preco = prInput.value.trim();
   if (!preco) { showToast("⚠️", "Informe o preço", ""); prInput.focus(); return; }
-  // Aplica desconto por quantidade de equipamentos do mesmo cliente
+
+  // Fichas do mesmo cliente (mesmo tel, não enviadas)
   var fichasDoCliente = orcFichas.filter(function(x) { return x.tel === f.tel && x.status !== "enviado"; });
   var qtd = fichasDoCliente.length;
   var descPct = qtd >= 4 ? 20 : qtd === 3 ? 15 : qtd === 2 ? 10 : 0;
   var precoNum = parseFloat(preco);
   if (descPct > 0) precoNum = precoNum * (1 - descPct / 100);
   var precoFmt = precoNum.toLocaleString("pt-BR", {minimumFractionDigits: 2});
-  // Substitui [VALOR] pelo preço com desconto
-  var textoFinal = ta.value.replace("[VALOR]", "R$ " + precoFmt);
+
+  // Monta texto final — se múltiplos equipamentos, adiciona cabeçalho com total e nome do equip
+  var textoBase = ta.value.replace("[VALOR]", "R$ " + precoFmt);
+
+  if (qtd > 1) {
+    // Detecta tipo do equipamento desta ficha
+    var descTexto = (f.desc || "").toLowerCase();
+    var equipNome = null;
+    if (descTexto.includes("microondas") || descTexto.includes("micro ondas")) equipNome = "Microondas";
+    else if (descTexto.includes("purificador")) equipNome = "Purificador";
+    else if (descTexto.includes("adega"))  equipNome = "Adega";
+    else if (descTexto.includes("forno"))  equipNome = "Forno";
+    else if (descTexto.includes("geladeira") || descTexto.includes("refrigerador")) equipNome = "Geladeira";
+    else if (descTexto.includes("lavadora") || descTexto.includes("maquina de lavar")) equipNome = "Lavadora";
+
+    // Monta prefixo: "2 equipamentos\n\nMicroondas:\n[texto]"
+    var prefixo = qtd + " equipamentos\n\n";
+    if (equipNome) {
+      prefixo += equipNome + ":\n";
+    }
+    textoBase = textoBase.replace(
+      "Foram feitos todos os testes",
+      prefixo + "Foram feitos todos os testes"
+    );
+    // Fallback se não achou a frase padrão
+    if (textoBase.indexOf(prefixo) === -1 && equipNome) {
+      textoBase = "Ola, " + (f.nome ? f.nome.split(" ")[0] : "cliente") + " bom dia, sou o Pedro da Reparo Eletro:\n\n" + qtd + " equipamentos\n\n" + equipNome + ":\n" + textoBase;
+    }
+  }
+
+  var textoFinal = textoBase;
   // Monta link wa.me
   var telLimpo = (f.tel || "").replace(/\D/g, "");
   if (telLimpo && !telLimpo.startsWith("55")) telLimpo = "55" + telLimpo;
