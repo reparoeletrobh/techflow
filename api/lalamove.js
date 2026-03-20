@@ -203,8 +203,12 @@ module.exports = async function handler(req, res) {
   // ── POST remover ──────────────────────────────────────────────
   if (req.method === "POST" && action === "remover") {
     const { pipefyId, tipo } = req.body || {};
-    const db = await dbGet(LALA_KEY) || { fichas: [] };
+    const db = await dbGet(LALA_KEY) || { fichas: [], removedIds: [] };
+    if (!Array.isArray(db.removedIds)) db.removedIds = [];
     db.fichas = db.fichas.filter(f => !(f.pipefyId === pipefyId && f.tipo === tipo));
+    // Guarda ID removido para impedir reimportação
+    const key = pipefyId + ":" + tipo;
+    if (!db.removedIds.includes(key)) db.removedIds.push(key);
     await dbSet(LALA_KEY, db);
     return res.status(200).json({ ok: true });
   }
