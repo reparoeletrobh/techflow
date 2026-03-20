@@ -345,7 +345,12 @@ function trimLog(log) {
 // Salva logs em chave separada (mais leve para o /api/metas ler)
 async function saveLogs(board) {
   try {
-    const logs = { movesLog: board.movesLog || [], metaLog: board.metaLog || [] };
+    // Trim antes de salvar — mantém só 90 dias
+    const cutoff90 = new Date(); cutoff90.setDate(cutoff90.getDate() - 90);
+    const logs = {
+      movesLog: (board.movesLog || []).filter(m => new Date(m.timestamp) > cutoff90),
+      metaLog:  (board.metaLog  || []).filter(m => new Date(m.timestamp) > cutoff90),
+    };
     await dbSet(LOGS_KEY, logs);
   } catch(e) {}
 }
@@ -363,7 +368,21 @@ module.exports = async function handler(req, res) {
     // ── GET load — retorna banco imediatamente, sem chamar Pipefy ──
     if (req.method === "GET" && action === "load") {
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
-      return res.status(200).json({ ok: true, board, newCount: 0, pipefyError: null });
+      // Envia logs separados — reduz payload de 720KB para ~100KB
+      const logs = await dbGet(LOGS_KEY);
+      const boardLeve = {
+        phases:      board.phases,
+        rsPhases:    board.rsPhases,
+        rsRuaPhases: board.rsRuaPhases,
+        cards:       board.cards,
+        rsCards:     board.rsCards,
+        rsRuaCards:  board.rsRuaCards,
+        syncedIds:   board.syncedIds,
+        // Logs leves para Metas — usa LOGS_KEY se disponível, senão do board
+        movesLog:    (logs?.movesLog || board.movesLog || []),
+        metaLog:     (logs?.metaLog  || board.metaLog  || []),
+      };
+      return res.status(200).json({ ok: true, board: boardLeve, newCount: 0, pipefyError: null });
     }
 
     // ── GET sync — chama Pipefy e atualiza banco (chamada separada) ──
