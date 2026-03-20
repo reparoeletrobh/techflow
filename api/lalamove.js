@@ -214,6 +214,101 @@ module.exports = async function handler(req, res) {
   }
 
   // ── POST enviar-lalamove — cotar + pedir em sequência automática
+  // ── POST enviar-lote — envia um lote específico de fichas (max 3) com rota otimizada
+  if (req.method === "POST" && action === "enviar-lote") {
+    if (!LALA_KEY_ENV || !LALA_SECRET_ENV)
+      return res.status(400).json({ ok: false, error: "API keys não configuradas" });
+
+    const { tipo, loteIds } = req.body || {};
+    if (!tipo || !Array.isArray(loteIds) || !loteIds.length)
+      return res.status(400).json({ ok: false, error: "tipo e loteIds obrigatorios" });
+
+    const db = await dbGet(LALA_KEY) || { fichas: [] };
+    const pendentes = (db.fichas || []).filter(f =>
+      f.tipo === tipo && f.status === "pendente" && loteIds.includes(f.pipefyId) && f.lat && f.lng
+    );
+
+    if (!pendentes.length)
+      return res.status(400).json({ ok: false, error: "Nenhuma ficha válida no lote" });
+
+    const fmtCoord = v => parseFloat(v).toFixed(6);
+
+    // Monta stops com rota otimizada
+    let stops;
+    if (tipo === "coleta") {
+      stops = [
+        ...pendentes.map(f => ({ coordinates: { lat: fmtCoord(f.lat), lng: fmtCoord(f.lng) }, address: f.endereco || "Belo Horizonte, MG" })),
+        { coordinates: { lat: fmtCoord(LOJA.lat), lng: fmtCoord(LOJA.lng) }, address: LOJA.endereco },
+      ];
+    } else {
+      stops = [
+        { coordinates: { lat: fmtCoord(LOJA.lat), lng: fmtCoord(LOJA.lng) }, address: LOJA.endereco },
+        ...pendentes.map(f => ({ coordinates: { lat: fmtCoord(f.lat), lng: fmtCoord(f.lng) }, address: f.endereco || "Belo Horizonte, MG" })),
+      ];
+    }
+
+    // ETAPA 1: Cotação com rota otimizada
+    const quotePath = "/v3/quotations";
+    const quoteBody = JSON.stringify({ data: { serviceType: "CAR", language: "pt_BR", stops, isRouteOptimized: true } });
+    const quoteHdrs = lalamoveHeaders(LALA_KEY_ENV, LALA_SECRET_ENV, "POST", quotePath, quoteBody);
+
+    let quotationId, lalaStops;
+    try {
+      const { status: qs, body: qb } = await lalaFetch(LALA_HOST, quotePath, "POST", quoteHdrs, quoteBody);
+      const qj = JSON.parse(qb);
+      if (qs !== 201 || !qj.data?.quotationId)
+        return res.status(200).json({ ok: false, error: "Erro na cotação: " + JSON.stringify(qj.errors || qj).slice(0,300) });
+      quotationId = qj.data.quotationId;
+      lalaStops   = qj.data.stops || [];
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: "Cotação falhou: " + e.message });
+    }
+
+    // ETAPA 2: Pedido
+    let senderStopId, recipientStops;
+    if (tipo === "coleta") {
+      senderStopId   = lalaStops[lalaStops.length - 1]?.stopId;
+      recipientStops = lalaStops.slice(0, -1).map((s, i) => ({
+        stopId: s.stopId,
+        name:   pendentes[i]?.nomeContato || "Cliente",
+        phone:  formatTelIntl(pendentes[i]?.telefone),
+      }));
+    } else {
+      senderStopId   = lalaStops[0]?.stopId;
+      recipientStops = lalaStops.slice(1).map((s, i) => ({
+        stopId: s.stopId,
+        name:   pendentes[i]?.nomeContato || "Cliente",
+        phone:  formatTelIntl(pendentes[i]?.telefone),
+      }));
+    }
+
+    const orderPath = "/v3/orders";
+    const orderBody = JSON.stringify({ data: {
+      quotationId,
+      sender:     { stopId: senderStopId, name: LOJA.nome, phone: LOJA.telefone },
+      recipients: recipientStops,
+    }});
+    const orderHdrs = lalamoveHeaders(LALA_KEY_ENV, LALA_SECRET_ENV, "POST", orderPath, orderBody);
+
+    try {
+      const { status: os, body: ob } = await lalaFetch(LALA_HOST, orderPath, "POST", orderHdrs, orderBody);
+      const oj = JSON.parse(ob);
+      if (os !== 201 || !oj.data?.orderId)
+        return res.status(200).json({ ok: false, error: "Erro no pedido: " + JSON.stringify(oj.errors || oj).slice(0,300) });
+
+      // Marca fichas do lote como enviadas
+      const agora = new Date().toISOString();
+      pendentes.forEach(f => {
+        const dbF = db.fichas.find(x => x.pipefyId === f.pipefyId);
+        if (dbF) { dbF.status = "enviado"; dbF.orderId = oj.data.orderId; dbF.enviadoAt = agora; }
+      });
+      await dbSet(LALA_KEY, db);
+      return res.status(200).json({ ok: true, orderId: oj.data.orderId, count: pendentes.length });
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: "Pedido falhou: " + e.message });
+    }
+  }
+
   if (req.method === "POST" && action === "enviar-lalamove") {
     if (!LALA_KEY_ENV || !LALA_SECRET_ENV)
       return res.status(400).json({ ok: false, error: "LALAMOVE_API_KEY e LALAMOVE_API_SECRET não configurados no Vercel" });
