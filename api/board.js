@@ -368,8 +368,8 @@ module.exports = async function handler(req, res) {
     // ── GET load — retorna banco imediatamente, sem chamar Pipefy ──
     if (req.method === "GET" && action === "load") {
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
-      // Envia logs separados — reduz payload de 720KB para ~100KB
-      const logs = await dbGet(LOGS_KEY);
+      // Retorna apenas o essencial para renderizar — SEM logs pesados
+      // Logs são buscados separadamente por /api/metas
       const boardLeve = {
         phases:      board.phases,
         rsPhases:    board.rsPhases,
@@ -378,11 +378,20 @@ module.exports = async function handler(req, res) {
         rsCards:     board.rsCards,
         rsRuaCards:  board.rsRuaCards,
         syncedIds:   board.syncedIds,
-        // Logs leves para Metas — usa LOGS_KEY se disponível, senão do board
-        movesLog:    (logs?.movesLog || board.movesLog || []),
-        metaLog:     (logs?.metaLog  || board.metaLog  || []),
+        movesLog:    [],
+        metaLog:     [],
       };
       return res.status(200).json({ ok: true, board: boardLeve, newCount: 0, pipefyError: null });
+    }
+
+    // ── GET load-logs — retorna apenas os logs (para o painel Metas)
+    if (req.method === "GET" && action === "load-logs") {
+      const logs = await dbGet(LOGS_KEY);
+      if (logs) return res.status(200).json({ ok: true, movesLog: logs.movesLog || [], metaLog: logs.metaLog || [] });
+      // Fallback: lê do board
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      await saveLogs(board); // popula LOGS_KEY para próximas chamadas
+      return res.status(200).json({ ok: true, movesLog: board.movesLog || [], metaLog: board.metaLog || [] });
     }
 
     // ── GET sync — chama Pipefy e atualiza banco (chamada separada) ──
