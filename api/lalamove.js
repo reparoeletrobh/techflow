@@ -250,7 +250,7 @@ module.exports = async function handler(req, res) {
 
     // ETAPA 1: Cotação
     const quotePath = "/v3/quotations";
-    const quoteBody = JSON.stringify({ data: { serviceType: "MOTORCYCLE", language: "pt_BR", stops, requesterContact: { name: LOJA.nome, phone: LOJA.telefone } } });
+    const quoteBody = JSON.stringify({ data: { serviceType: "CAR", language: "pt_BR", stops, requesterContact: { name: LOJA.nome, phone: LOJA.telefone } } });
     const quoteHdrs = lalamoveHeaders(LALA_KEY_ENV, LALA_SECRET_ENV, "POST", quotePath, quoteBody);
 
     let quotationId, lalaStops;
@@ -385,6 +385,33 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, lat: f.lat, lng: f.lng });
   }
 
+  // ── POST test-cotacao-raw — testa cotação com serviceType variável
+  if (req.method === "POST" && action === "test-cotacao-raw") {
+    if (!LALA_KEY_ENV || !LALA_SECRET_ENV)
+      return res.status(200).json({ ok: false, error: "API key não configurada" });
+
+    const { serviceType = "MOTORCYCLE", useSandbox = false } = req.body || {};
+    const host = useSandbox ? LALA_HOST_SANDBOX : LALA_HOST_PROD;
+
+    // Stop mínimo válido (BH)
+    const stops = [
+      { location: { lat: "-19.924500", lng: "-43.935200" }, addresses: { pt_BR: { displayString: "Rua Ouro Preto 663, Barro Preto, BH", country: "BR" } } },
+      { location: { lat: "-19.920000", lng: "-43.940000" }, addresses: { pt_BR: { displayString: "Rua Sapucai, Floresta, BH", country: "BR" } } },
+    ];
+
+    const quotePath = "/v3/quotations";
+    const quoteBody = JSON.stringify({ data: { serviceType, language: "pt_BR", stops, requesterContact: { name: "Reparo Eletro", phone: "+5531997856023" } } });
+    const quoteHdrs = lalamoveHeaders(LALA_KEY_ENV, LALA_SECRET_ENV, "POST", quotePath, quoteBody);
+
+    try {
+      const { status, body } = await lalaFetch(host, quotePath, "POST", quoteHdrs, quoteBody);
+      let parsed = null; try { parsed = JSON.parse(body); } catch(e) {}
+      return res.status(200).json({ ok: status === 201, httpStatus: status, response: parsed || body, serviceType, host });
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: e.message });
+    }
+  }
+
   // ── GET check-services — verifica market info e serviços disponíveis
   if (action === "check-services") {
     if (!LALA_KEY_ENV || !LALA_SECRET_ENV)
@@ -424,7 +451,7 @@ module.exports = async function handler(req, res) {
     ];
 
     const quotePath = "/v3/quotations";
-    const quoteBody = JSON.stringify({ data: { serviceType: "MOTORCYCLE", language: "pt_BR", stops, requesterContact: { name: LOJA.nome, phone: LOJA.telefone } } });
+    const quoteBody = JSON.stringify({ data: { serviceType: "CAR", language: "pt_BR", stops, requesterContact: { name: LOJA.nome, phone: LOJA.telefone } } });
     const quoteHdrs = lalamoveHeaders(LALA_KEY_ENV, LALA_SECRET_ENV, "POST", quotePath, quoteBody);
 
     try {
