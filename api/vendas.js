@@ -2,6 +2,43 @@ const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g, "").tri
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g, "").trim();
 const VENDAS_KEY    = "reparoeletro_vendas";
 const FIN_KEY       = "reparoeletro_financeiro";
+const PIPE_ID       = "305832912";
+const PIPEFY_API    = "https://api.pipefy.com/graphql";
+
+async function pipefyQuery(query) {
+  const r = await fetch(PIPEFY_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + (process.env.PIPEFY_TOKEN||"").trim() },
+    body: JSON.stringify({ query }),
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+async function getProntoParaVendaPhaseId() {
+  const data = await pipefyQuery(
+    "query { pipe(id: \"" + PIPE_ID + "\") { phases { id name } } }"
+  );
+  const phases = data?.pipe?.phases || [];
+  const phase = phases.find(p => p.name.toLowerCase().includes("pronto para venda"));
+  return phase?.id || null;
+}
+
+async function criarCardPipefy(phaseId, produto, nomeCliente, telefone) {
+  try {
+    const titulo = (produto.tipo ? produto.tipo + " — " : "") + (produto.codigo || produto.descricao.substring(0,40));
+    const descCompleta = produto.descricao + (produto.capacidade ? " — " + produto.capacidade : "");
+    const precoFmt = parseFloat(produto.preco).toLocaleString("pt-BR",{minimumFractionDigits:2,style:"currency",currency:"BRL"});
+    const data = await pipefyQuery(
+      "mutation { createCard(input: { pipe_id: \"" + PIPE_ID + "\" phase_id: \"" + phaseId + "\" title: \"" + titulo.replace(/"/g,"'") + "\" fields_attributes: [ { field_id: \"nome_do_contato\" field_value: \"" + nomeCliente.replace(/"/g,"'") + "\" }, { field_id: \"telefone\" field_value: \"" + (telefone||"").replace(/"/g,"'") + "\" }, { field_id: \"descri_o\" field_value: \"" + descCompleta.replace(/"/g,"'") + " | Valor: " + precoFmt + "\" } ] }) { card { id title } } }"
+    );
+    return data?.createCard?.card?.id || null;
+  } catch(e) {
+    console.error("Pipefy createCard:", e.message);
+    return null;
+  }
+}
 
 async function dbGet(key) {
   try {
@@ -150,7 +187,24 @@ module.exports = async function handler(req, res) {
     db.produtos[idx] = { ...p, vendido: true, soldAt: now, compradorNome: nomeCliente, vendedor: vendedor||null, updatedAt: now };
 
     await Promise.all([dbSet(VENDAS_KEY, db), dbSet(FIN_KEY, fin)]);
-    return res.status(200).json({ ok: true, ficha, produto: db.produtos[idx] });
+
+    // Cria card no Pipefy na fase "Pronto para Venda" (async, não bloqueia resposta)
+    let pipefyCardId = null;
+    try {
+      const phaseId = await getProntoParaVendaPhaseId();
+      if (phaseId) {
+        pipefyCardId = await criarCardPipefy(phaseId, p, nomeCliente, telefone);
+        // Atualiza ficha financeiro com o pipefyId real
+        if (pipefyCardId) {
+          ficha.pipefyId = String(pipefyCardId);
+          const fichaIdx = fin.records.findIndex(r => r.id === ficha.id);
+          if (fichaIdx >= 0) fin.records[fichaIdx].pipefyId = String(pipefyCardId);
+          await dbSet(FIN_KEY, fin);
+        }
+      }
+    } catch(e) { console.error("Pipefy card creation:", e.message); }
+
+    return res.status(200).json({ ok: true, ficha, produto: db.produtos[idx], pipefyCardId });
   }
 
   // ── POST excluir ───────────────────────────────────────────
