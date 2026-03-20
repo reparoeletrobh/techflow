@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='18,2 8,18 15,18 14,30 24,14 17,14' fill='%238b5cf6' stroke='%238b5cf6' stroke-linejoin='round'/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lalamove</title>
@@ -119,6 +120,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
     </div>
     <button class="btn-send" style="background:#ef4444;color:#fff;" onclick="limparFila()">
       🗑️ Limpar Fila
+    </button>
+    <button class="btn-send" id="btn-geocod" onclick="geocodificarTudo()" style="background:var(--surface2);border:1px solid var(--border);color:var(--muted);">
+      📍 Geocodificar Endereços
     </button>
     <button class="btn-send coleta" id="btn-send-coleta" onclick="enviarLalamove('coleta')" disabled>
       🚗 Enviar Coletas ao Lalamove
@@ -243,8 +247,19 @@ function buildCard(f) {
 
   var endEl = document.createElement("div");
   endEl.className = "lc-end" + (f.endereco ? "" : " missing");
-  endEl.textContent = f.endereco ? "📍 " + f.endereco : "⚠️ Endereço não encontrado — clique em Editar";
+  var coordIcon = f.lat && f.lng ? "✅ " : "❌ ";
+  endEl.textContent = f.endereco ? (coordIcon + f.endereco) : "⚠️ Endereço não encontrado — clique em Editar";
   div.appendChild(endEl);
+
+  // Botão geocodificar individual (só se tem endereço mas sem coords)
+  if (f.endereco && (!f.lat || !f.lng) && f.status !== "enviado") {
+    var geocBtn = document.createElement("button");
+    geocBtn.className = "lbtn"; geocBtn.style.cssText = "color:#f59e0b;border-color:rgba(245,158,11,.3);margin-top:4px;";
+    geocBtn.textContent = "📍 Geocodificar endereço";
+    var fid = f.pipefyId || f.id;
+    geocBtn.onclick = (function(id){ return function(){ geocodificarFicha(id); }; })(fid);
+    div.appendChild(geocBtn);
+  }
 
   if (f.status !== "enviado") {
     var acts = document.createElement("div"); acts.className = "lc-actions";
@@ -334,6 +349,29 @@ function showToast(icon, title, msg) {
 }
 
 // Sincroniza fila do Pipefy (Coleta/Entrega Solicitada)
+async function geocodificarTudo() {
+  var semCoords = fichas.filter(function(f) { return f.status === "pendente" && f.endereco && (!f.lat || !f.lng); });
+  if (!semCoords.length) { showToast("✅","Tudo geocodificado","Todas as fichas já têm coordenadas"); return; }
+  var btn = document.getElementById("btn-geocod");
+  btn.disabled = true;
+  btn.textContent = "⏳ Geocodificando 0/" + semCoords.length + "...";
+  var d = await api("geocodificar-tudo", {});
+  btn.disabled = false;
+  btn.textContent = "📍 Geocodificar Endereços";
+  if (d.ok) {
+    showToast("📍", d.ok_count + " geocodificado(s)", d.fail_count + " falhou");
+    await load();
+  } else {
+    showToast("❌","Erro",d.error||"");
+  }
+}
+
+async function geocodificarFicha(id) {
+  var d = await api("geocodificar-ficha", {id: id});
+  if (d.ok) { showToast("📍","Geocodificado!",""); await load(); }
+  else showToast("❌","Erro geocoding",d.error||"");
+}
+
 async function syncPipefy() {
   try {
     var d = await fetch('/api/board?action=sync-lalamove').then(r=>r.json());
