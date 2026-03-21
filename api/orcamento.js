@@ -192,47 +192,64 @@ module.exports = async function handler(req, res) {
       // Importa apenas cards nunca vistos (não estão no syncedIds)
       for (const card of cards) {
         if (db.syncedIds.includes(card.pipefyId)) continue;
-        let textoOrc = "", precoSugerido = null;
-        // Usa regras fixas primeiro (rápido, sem timeout)
-        // IA só é chamada pelo botão ✨ Regenerar individualmente
-        try {
-          const regra = detectarRegra(card.desc, card.comentarios);
-          if (regra) {
-            let precoRegra = parseFloat(regra.preco || "0");
-            // Regra "grande": +R$300 para forno grande ou adega grande
-            const equipImp = detectarEquipamento(card.desc || "", "");
-            if (isGrande(card.desc || "", "") && (equipImp === "forno" || equipImp === "adega") && precoRegra > 0) {
-              precoRegra += 300;
-              regra = Object.assign({}, regra, { preco: String(precoRegra) });
+
+        // Verifica se as notas têm múltiplos equipamentos (ex: "purificador: ... bebedouro: ...")
+        const notasField = card.comentarios ? card.comentarios.join("\n") : "";
+        const multiEquip = splitEquipamentos(notasField);
+
+        // Função auxiliar para gerar texto de orçamento para 1 equipamento
+        function gerarFicha(descEquip, comentariosEquip, sufixoId) {
+          let textoOrc = "", precoSugerido = null;
+          try {
+            let regra = detectarRegra(descEquip, comentariosEquip);
+            if (regra) {
+              let precoRegra = parseFloat(regra.preco || "0");
+              const equipImp = detectarEquipamento(descEquip, "");
+              if (isGrande(descEquip, "") && (equipImp === "forno" || equipImp === "adega") && precoRegra > 0) {
+                precoRegra += 300;
+                regra = Object.assign({}, regra, { preco: String(precoRegra) });
+              }
+              let texto = substituirNome(regra.texto, card.nome);
+              precoSugerido = regra.preco || null;
+              if (precoSugerido) texto = texto.replace("[VALOR]", precoSugerido + " reais");
+              textoOrc = texto;
+            } else {
+              const tp = templatePadrao(descEquip, card.nome);
+              textoOrc = typeof tp === "object" ? (tp.texto || "") : String(tp || "");
             }
-            let texto = substituirNome(regra.texto, card.nome);
-            precoSugerido = regra.preco || null;
-            // Substitui [VALOR] pelo preço da regra se disponível
-            if (precoSugerido) texto = texto.replace("[VALOR]", precoSugerido + " reais");
-            textoOrc = texto;
-          } else {
-            const tp = templatePadrao(card.desc, card.nome);
-            textoOrc = typeof tp === "object" ? (tp.texto || "") : String(tp || "");
-            // Template genérico mantém [VALOR] para preenchimento manual
+          } catch(e) {
+            textoOrc = "Ola, bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.";
           }
-        } catch(e) {
-          textoOrc = "Ola, bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.";
+          return {
+            id:          card.pipefyId + (sufixoId || ""),
+            pipefyId:    card.pipefyId,
+            nome:        card.nome,
+            tel:         card.tel,
+            desc:        descEquip,
+            end:         card.end,
+            age:         card.age,
+            comentarios: comentariosEquip,
+            textoOrc,
+            precoSugerido,
+            status:      "pendente",
+            preco:       null,
+            createdAt:   new Date().toISOString(),
+          };
         }
-        db.fichas.unshift({
-          id:           card.pipefyId,
-          pipefyId:     card.pipefyId,
-          nome:         card.nome,
-          tel:          card.tel,
-          desc:         card.desc,
-          end:          card.end,
-          age:          card.age,
-          comentarios:  card.comentarios,
-          textoOrc,
-          precoSugerido,
-          status:       "pendente",
-          preco:        null,
-          createdAt:    new Date().toISOString(),
-        });
+
+        if (multiEquip && multiEquip.length >= 2) {
+          // Cria 1 ficha por equipamento
+          multiEquip.forEach((equip, i) => {
+            const descEquip = equip.nomeEquip + ": " + equip.descProblema;
+            const ficha = gerarFicha(descEquip, [equip.descProblema], i === 0 ? "" : "-eq" + (i+1));
+            db.fichas.unshift(ficha);
+          });
+        } else {
+          // 1 equipamento normal
+          const ficha = gerarFicha(card.desc, card.comentarios, "");
+          db.fichas.unshift(ficha);
+        }
+
         db.syncedIds.push(card.pipefyId);
         newCount++;
       }
@@ -702,7 +719,7 @@ const ORCAMENTO_REGRAS = [
   // 15. Display → R$ 370
   {
     keywords: ["display","teclado display","painel display","troca do display","troca de display","display microondas"],
-    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do display e na membrana interface, as pecas serao trocadas tambem. Este conserto individual fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do display, as pecas serao trocadas tambem. Este conserto individual fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
     preco: "370",
   },
 ];
@@ -712,6 +729,25 @@ const ORCAMENTO_REGRAS = [
 var PRECOS_REGRAS = ["390","350","370","320","320","320","320","370","450","350","450","450","450","450","370","350"];
 
 // ── DETECTA TIPO DE EQUIPAMENTO ──────────────────────────────────
+// ── DETECTA MÚLTIPLOS EQUIPAMENTOS NAS NOTAS ────────────────────
+// Formato: "equipamento: descricao do problema // equipamento2: descricao"
+function splitEquipamentos(notas) {
+  if (!notas) return null;
+  // Detecta padrão "palavra: texto" separados por linha em branco ou nova linha
+  // Ex: "purificador: troca do kit // bebedouro: troca das conexoes"
+  const partes = notas.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+  if (partes.length < 2) return null;
+  
+  const equipamentos = [];
+  for (const parte of partes) {
+    const match = parte.match(/^([^:]+):\s*(.+)/s);
+    if (match) {
+      equipamentos.push({ nomeEquip: match[1].trim(), descProblema: match[2].trim() });
+    }
+  }
+  return equipamentos.length >= 2 ? equipamentos : null;
+}
+
 function detectarEquipamento(desc, titulo) {
   var texto = norm([desc||"", titulo||""].join(" "));
   if (texto.includes("microondas") || texto.includes("micro ondas") || texto.includes("forno micro")) return "microondas";
