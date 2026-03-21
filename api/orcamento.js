@@ -239,12 +239,34 @@ module.exports = async function handler(req, res) {
         }
 
         if (multiEquip && multiEquip.length >= 2) {
-          // Cria 1 ficha por equipamento
-          multiEquip.forEach((equip, i) => {
-            const descEquip = equip.nomeEquip + ": " + equip.descProblema;
-            const ficha = gerarFicha(descEquip, [equip.descProblema], i === 0 ? "" : "-eq" + (i+1));
-            db.fichas.unshift(ficha);
-          });
+          // 1 ficha com texto combinando todos os equipamentos no padrão multi
+          var qtd = multiEquip.length;
+          var primeiroNome = card.nome ? card.nome.split(" ")[0] : "cliente";
+          var totalPreco = 0;
+          var partesTexto = [];
+
+          for (var ei = 0; ei < multiEquip.length; ei++) {
+            var equip = multiEquip[ei];
+            var descEquip = equip.nomeEquip + ": " + equip.descProblema;
+            var fichaTemp = gerarFicha(descEquip, [equip.descProblema], "-tmp");
+            // Extrai o corpo (remove cabeçalho "Ola, ...")
+            var corpo = fichaTemp.textoOrc || "";
+            var dblN = corpo.indexOf("\n\n");
+            if (dblN > 0) corpo = corpo.slice(dblN + 2).trim();
+            // Capitaliza nome do equipamento
+            var nomeCapital = equip.nomeEquip.charAt(0).toUpperCase() + equip.nomeEquip.slice(1);
+            partesTexto.push(nomeCapital + ":\n" + corpo);
+            totalPreco += parseFloat(fichaTemp.precoSugerido || "0");
+          }
+
+          var cabecalho = "Ola, " + primeiroNome + " bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\n" + qtd + " equipamentos\n\n";
+          var textoFinal = cabecalho + partesTexto.join("\n\n");
+
+          var fichaCombinada = gerarFicha(card.desc, card.comentarios, "");
+          fichaCombinada.textoOrc = textoFinal;
+          fichaCombinada.precoSugerido = totalPreco > 0 ? String(totalPreco) : null;
+          fichaCombinada.multiEquip = true;
+          db.fichas.unshift(fichaCombinada);
         } else {
           // 1 equipamento normal
           const ficha = gerarFicha(card.desc, card.comentarios, "");
