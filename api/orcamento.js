@@ -378,8 +378,12 @@ module.exports = async function handler(req, res) {
     if (!pipefyId) return res.status(400).json({ ok: false, error: "pipefyId obrigatório" });
     const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
     db.syncedIds = (db.syncedIds || []).filter(id => id !== String(pipefyId));
+    // Remove todas as fichas existentes com esse pipefyId (inclui variantes -eq2, -eq3, etc.)
+    const before = (db.fichas || []).length;
+    db.fichas = (db.fichas || []).filter(f => f.pipefyId !== String(pipefyId));
+    const removed = before - db.fichas.length;
     await dbSet(ORC_KEY, db);
-    return res.status(200).json({ ok: true, msg: "ID removido. Próximo sync vai importar este card." });
+    return res.status(200).json({ ok: true, msg: "ID e fichas removidos. Próximo sync vai reimportar.", fichasRemovidas: removed });
   }
 
   // ── GET orc-card-debug — mostra todos os campos de um card específico
