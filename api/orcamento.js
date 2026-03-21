@@ -194,7 +194,8 @@ module.exports = async function handler(req, res) {
         if (db.syncedIds.includes(card.pipefyId)) continue;
 
         // Verifica se as notas têm múltiplos equipamentos (ex: "purificador: ... bebedouro: ...")
-        const notasField = card.comentarios ? card.comentarios.join("\n") : "";
+        // Usa o campo "Notas do treinamento" diretamente (preserva quebras de parágrafo)
+        const notasField = card.notas || (card.comentarios ? card.comentarios.join("\n\n") : "");
         const multiEquip = splitEquipamentos(notasField);
 
         // Função auxiliar para gerar texto de orçamento para 1 equipamento
@@ -587,6 +588,7 @@ async function fetchAguardandoAprovacao() {
       const tel      = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
       const desc     = fields.find(f => f.name.toLowerCase().includes("descri"))?.value || "";
       const end      = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
+      const notas    = fields.find(f => f.name.toLowerCase().includes("nota") || f.name.toLowerCase().includes("treina"))?.value || "";
       // Agrega TODOS os campos de texto como fonte de keywords para detecção
       const extras = fields
         .filter(f => !["telefone","fone","nome","endere","valor"].some(k => f.name.toLowerCase().includes(k)))
@@ -595,7 +597,7 @@ async function fetchAguardandoAprovacao() {
         ...(node.comments || []).map(c => c.text).filter(Boolean),
         ...extras,
       ];
-      all.push({ pipefyId: String(node.id), title: node.title, nome, tel, desc, end, age: node.age, comentarios });
+      all.push({ pipefyId: String(node.id), title: node.title, nome, tel, desc, end, age: node.age, comentarios, notas });
     }
     hasNext = phase.cards.pageInfo?.hasNextPage ?? false;
     cursor  = phase.cards.pageInfo?.endCursor ?? null;
