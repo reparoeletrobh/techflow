@@ -239,7 +239,7 @@ module.exports = async function handler(req, res) {
         }
 
         if (multiEquip && multiEquip.length >= 2) {
-          // 1 ficha com texto combinando todos os equipamentos no padrão multi
+          // 1 ficha combinando todos os equipamentos no padrão correto
           var qtd = multiEquip.length;
           var primeiroNome = card.nome ? card.nome.split(" ")[0] : "cliente";
           var totalPreco = 0;
@@ -249,22 +249,29 @@ module.exports = async function handler(req, res) {
             var equip = multiEquip[ei];
             var descEquip = equip.nomeEquip + ": " + equip.descProblema;
             var fichaTemp = gerarFicha(descEquip, [equip.descProblema], "-tmp");
-            // Extrai o corpo (remove cabeçalho "Ola, ...")
+            // Extrai só o corpo diagnóstico (remove "Foram feitos...identificamos que" mas mantém o resto)
             var corpo = fichaTemp.textoOrc || "";
+            // Remove o cabecalho "Ola, ... orcamento:\n\n"
             var dblN = corpo.indexOf("\n\n");
             if (dblN > 0) corpo = corpo.slice(dblN + 2).trim();
-            // Capitaliza nome do equipamento
+            // Remove "Aprovando ja iniciamos o conserto." do final — vai na linha final combinada
+            corpo = corpo.replace(/\.? Aprovando ja iniciamos o conserto\.?$/, "").trim();
             var nomeCapital = equip.nomeEquip.charAt(0).toUpperCase() + equip.nomeEquip.slice(1);
-            partesTexto.push(nomeCapital + ":\n" + corpo);
+            partesTexto.push("Em relacao ao " + nomeCapital + ":\n" + corpo);
             totalPreco += parseFloat(fichaTemp.precoSugerido || "0");
           }
 
-          var cabecalho = "Ola, " + primeiroNome + " bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\n" + qtd + " equipamentos\n\n";
-          var textoFinal = cabecalho + partesTexto.join("\n\n");
+          // Calcula desconto: 2 equip=10%, 3=15%, 4+=20%
+          var descPct = qtd >= 4 ? 20 : qtd === 3 ? 15 : 10;
+          var precoComDesconto = Math.round(totalPreco * (1 - descPct / 100));
+          var linhaFinal = "Consertando os " + qtd + " juntos eu consigo um desconto para voce de " + totalPreco + " reais por " + precoComDesconto + " apenas. Aprovando ja iniciamos o conserto.";
+
+          var cabecalho = "Ola, " + primeiroNome + " bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\n";
+          var textoFinal = cabecalho + partesTexto.join("\n\n") + "\n\n" + linhaFinal;
 
           var fichaCombinada = gerarFicha(card.desc, card.comentarios, "");
           fichaCombinada.textoOrc = textoFinal;
-          fichaCombinada.precoSugerido = totalPreco > 0 ? String(totalPreco) : null;
+          fichaCombinada.precoSugerido = String(precoComDesconto);
           fichaCombinada.multiEquip = true;
           db.fichas.unshift(fichaCombinada);
         } else {
