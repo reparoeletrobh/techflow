@@ -561,8 +561,9 @@ module.exports = async function handler(req, res) {
           cards(first: 50) {
             edges {
               node {
-                id title created_at updated_at age
+                id title
                 fields { name value }
+                phases_history { phase { id } firstTimeIn }
               }
             }
           }
@@ -575,24 +576,14 @@ module.exports = async function handler(req, res) {
         const nome = fields.find(f=>f.name.toLowerCase().includes("nome"))?.value || node.title;
         const tel  = fields.find(f=>f.name.toLowerCase().includes("telefone")||f.name.toLowerCase().includes("fone"))?.value || "";
         const desc = fields.find(f=>f.name.toLowerCase().includes("descri"))?.value || "";
-        // Pipefy: created_at e updated_at são Unix timestamps em segundos
-        // Usamos updated_at pois é quando o card foi movido para esta fase
-        // Se updated_at for 0 ou inválido, usamos created_at como fallback
-        const ts = node.updated_at || node.created_at || 0;
-        const entradaFaseMs = ts * 1000;
-        const diffMs = agora - entradaFaseMs;
+        // Usa phases_history para pegar exatamente quando entrou em Aguardando Aprovação
+        const hist = (node.phases_history || []).find(h => h.phase?.id === String(AGUARDANDO_APROVACAO_PHASE_ID));
+        const entradaFaseMs = hist?.firstTimeIn ? new Date(hist.firstTimeIn).getTime() : 0;
+        const diffMs = entradaFaseMs ? (agora - entradaFaseMs) : 0;
         const ageDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-        // Debug: retorna todos os campos de tempo raw
-        return { pipefyId: String(node.id), title: node.title, nome, tel, desc, age: ageDias,
-                 _raw: { updated_at: node.updated_at, created_at: node.created_at, age_pipefy: node.age, diffH: Math.floor(diffMs/3600000) } };
-      });
-      // Retorna TODOS para debug, sem filtro
-      if (action === "sem-resposta-debug") {
-        return res.status(200).json({ ok: true, cards, debug: true });
-      }
-      // Filtro normal: só cards com 2+ dias (48h+) na fase
-      const filtrados = cards.filter(c => c.age >= 2).map(({_raw, ...c}) => c);
-      return res.status(200).json({ ok: true, cards: filtrados });
+        return { pipefyId: String(node.id), title: node.title, nome, tel, desc, age: ageDias };
+      }).filter(c => c.age >= 2); // 2+ dias na fase Aguardando Aprovação
+      return res.status(200).json({ ok: true, cards });
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });
     }
