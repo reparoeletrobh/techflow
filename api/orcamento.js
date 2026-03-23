@@ -433,6 +433,27 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // ── GET phase-ids — retorna IDs das fases do Pipefy
+  if (action === "phase-ids") {
+    const data = await pipefyQuery(`query {
+      pipe(id: "${PIPE_ID}") {
+        phases {
+          id name
+          fields { id label type }
+        }
+      }
+    }`);
+    const phases = data?.pipe?.phases || [];
+    return res.status(200).json({
+      ok: true,
+      phases: phases.map(p => ({
+        id: p.id,
+        name: p.name,
+        fields: p.fields?.map(f => ({id:f.id, label:f.label, type:f.type}))
+      }))
+    });
+  }
+
   // ── GET orc-debug ─────────────────────────────────────────
   if (action === "orc-debug") {
     const result = {};
@@ -532,6 +553,97 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── GET sem-resposta — cards em Aguardando Aprovação há mais de 48h
+  if (action === "sem-resposta") {
+    try {
+      const data = await pipefyQuery(`query {
+        phase(id: "${AGUARDANDO_APROVACAO_PHASE_ID}") {
+          cards(first: 50) {
+            edges {
+              node {
+                id title age
+                fields { name value }
+              }
+            }
+          }
+        }
+      }`);
+      const cards = (data?.phase?.cards?.edges || []).map(({node}) => {
+        const fields = node.fields || [];
+        const nome = fields.find(f=>f.name.toLowerCase().includes("nome"))?.value || node.title;
+        const tel  = fields.find(f=>f.name.toLowerCase().includes("telefone")||f.name.toLowerCase().includes("fone"))?.value || "";
+        const desc = fields.find(f=>f.name.toLowerCase().includes("descri"))?.value || "";
+        return { pipefyId: String(node.id), title: node.title, nome, tel, desc, age: node.age || 0 };
+      }).filter(c => (c.age || 0) >= 2); // mais de 48h = 2+ dias
+      return res.status(200).json({ ok: true, cards });
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: e.message });
+    }
+  }
+
+  // ── GET ultima-chamada — espelho da fase Ultima Chamada do Pipefy
+  if (action === "ultima-chamada") {
+    try {
+      const phaseId = await getPhaseIdByName("Ultima Chamada");
+      if (!phaseId) return res.status(200).json({ ok: false, error: "Fase Ultima Chamada não encontrada" });
+      const data = await pipefyQuery(`query {
+        phase(id: "${phaseId}") {
+          cards(first: 50) {
+            edges {
+              node {
+                id title age
+                fields { name value }
+              }
+            }
+          }
+        }
+      }`);
+      const cards = (data?.phase?.cards?.edges || []).map(({node}) => {
+        const fields = node.fields || [];
+        const nome = fields.find(f=>f.name.toLowerCase().includes("nome"))?.value || node.title;
+        const tel  = fields.find(f=>f.name.toLowerCase().includes("telefone")||f.name.toLowerCase().includes("fone"))?.value || "";
+        const desc = fields.find(f=>f.name.toLowerCase().includes("descri"))?.value || "";
+        const dataEnc = fields.find(f=>f.name.toLowerCase().includes("encerr")||f.name.toLowerCase().includes("prazo")||f.name.toLowerCase().includes("esperada"))?.value || "";
+        return { pipefyId: String(node.id), title: node.title, nome, tel, desc, age: node.age || 0, dataEncerramento: dataEnc };
+      });
+      return res.status(200).json({ ok: true, cards });
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: e.message });
+    }
+  }
+
+  // ── POST alertar — move card para Ultima Chamada + preenche data +7 dias úteis
+  if (req.method === "POST" && action === "alertar") {
+    const { pipefyId } = req.body || {};
+    if (!pipefyId) return res.status(400).json({ ok: false, error: "pipefyId obrigatorio" });
+    try {
+      const phaseId   = await getPhaseIdByName("Ultima Chamada");
+      if (!phaseId) return res.status(200).json({ ok: false, error: "Fase Ultima Chamada não encontrada" });
+      const dateFieldId = await getDateFieldId();
+      const dataLimite  = addDiasUteis(7);
+
+      // Move para Ultima Chamada
+      await pipefyQuery(`mutation {
+        moveCardToPhase(input: { card_id: "${pipefyId}", destination_phase_id: "${phaseId}" }) {
+          card { id }
+        }
+      }`);
+
+      // Preenche campo de data se encontrado
+      if (dateFieldId) {
+        await pipefyQuery(`mutation {
+          updateCardField(input: { card_id: "${pipefyId}", field_id: "${dateFieldId}", new_value: "${dataLimite}" }) {
+            card { id }
+          }
+        }`);
+      }
+
+      return res.status(200).json({ ok: true, pipefyId, phaseId, dataLimite, dateFieldId });
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: e.message });
+    }
+  }
+
   return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 };
 
@@ -593,6 +705,37 @@ async function fetchCardData(pipefyId) {
 
 // Busca cards em Aguardando Aprovação direto pelo ID da fase (mais rápido e completo)
 const AGUARDANDO_APROVACAO_PHASE_ID = "334875152";
+
+// Busca ID de uma fase pelo nome
+async function getPhaseIdByName(name) {
+  const data = await pipefyQuery(`query { pipe(id: "${PIPE_ID}") { phases { id name } } }`);
+  const phase = (data?.pipe?.phases || []).find(p => p.name.toLowerCase().includes(name.toLowerCase()));
+  return phase?.id || null;
+}
+
+// Busca ID do campo de data de encerramento
+async function getDateFieldId() {
+  const data = await pipefyQuery(`query { pipe(id: "${PIPE_ID}") { phases { name fields { id label type } } } }`);
+  const phases = data?.pipe?.phases || [];
+  for (const ph of phases) {
+    const f = (ph.fields || []).find(f => f.type === "date" && (f.label.toLowerCase().includes("encerr") || f.label.toLowerCase().includes("prazo") || f.label.toLowerCase().includes("data")));
+    if (f) return f.id;
+  }
+  return null;
+}
+
+// Calcula data + N dias úteis (pula sábado e domingo)
+function addDiasUteis(dias) {
+  const d = new Date();
+  let count = 0;
+  while (count < dias) {
+    d.setDate(d.getDate() + 1);
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) count++;
+  }
+  // Formato ISO YYYY-MM-DD
+  return d.toISOString().split("T")[0];
+}
 
 async function fetchAguardandoAprovacao() {
   const all = [];
