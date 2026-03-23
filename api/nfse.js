@@ -598,6 +598,29 @@ module.exports = async function handler(req, res) {
     } catch(e) { return res.status(200).json({ ok:false, error:e.message }); }
   }
 
+  // GET debug-emitir-get — diagnóstico via URL (sem precisar de console)
+  if (action === "debug-emitir-get") {
+    let certOpts;
+    try { certOpts = loadCert(); } catch(e) { return res.status(200).send("<pre>CERT ERROR: "+e.message+"</pre>"); }
+    try {
+      const numDPS = genId(1);
+      const xml    = montarDPS({ cpfcnpj:"12345678901", nome:"Cliente Teste", discriminacao:"Manutencao de eletrodomestico. Garantia 90 dias.", valor:"100.00", numDPS });
+      const xmlAss = await assinarXML(xml, certOpts.pfx, certOpts.passphrase);
+      const b64gz  = await gzipBase64(xmlAss);
+      const { status, body } = await chamarAPI(b64gz, certOpts);
+      res.setHeader("Content-Type","text/html; charset=utf-8");
+      return res.status(200).send(
+        "<pre style='font-family:monospace;font-size:13px;padding:20px;'>"+
+        "HTTP STATUS: "+status+"\n\n"+
+        "RESPONSE BODY:\n"+body+"\n\n"+
+        "XML ID: "+numDPS+"\n"+
+        "ID LEN: "+numDPS.length+"\n"+
+        "AMBIENTE: "+(NFSE_HOMOLOG?"HOMOLOGACAO":"PRODUCAO")+"\n"+
+        "</pre>"
+      );
+    } catch(e) { return res.status(200).send("<pre>ERROR: "+e.message+"</pre>"); }
+  }
+
   // POST debug-emitir — emite e retorna resposta raw do governo
   if (req.method === "POST" && action === "debug-emitir") {
     const { tomadorCpfCnpj, tomadorNome, discriminacao, valor } = req.body || {};
