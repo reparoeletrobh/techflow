@@ -561,22 +561,26 @@ module.exports = async function handler(req, res) {
           cards(first: 50) {
             edges {
               node {
-                id title age
+                id title updated_at
                 fields { name value }
               }
             }
           }
         }
       }`);
+      const agora = Date.now();
+      const QUARENTA_OITO_HORAS = 48 * 60 * 60 * 1000;
       const cards = (data?.phase?.cards?.edges || []).map(({node}) => {
         const fields = node.fields || [];
         const nome = fields.find(f=>f.name.toLowerCase().includes("nome"))?.value || node.title;
         const tel  = fields.find(f=>f.name.toLowerCase().includes("telefone")||f.name.toLowerCase().includes("fone"))?.value || "";
         const desc = fields.find(f=>f.name.toLowerCase().includes("descri"))?.value || "";
-        // age do Pipefy é em MINUTOS (tempo na fase atual) — converter para dias
-        const ageDias = Math.floor((node.age || 0) / 1440);
+        // updated_at = última vez que o card foi movido de fase (timestamp Unix em segundos)
+        const movidoEm = (node.updated_at || 0) * 1000;
+        const diffMs   = agora - movidoEm;
+        const ageDias  = Math.floor(diffMs / (1000 * 60 * 60 * 24));
         return { pipefyId: String(node.id), title: node.title, nome, tel, desc, age: ageDias };
-      }).filter(c => c.age >= 2); // 2+ dias na fase = mais de 48h em Aguardando Aprovação
+      }).filter(c => c.age >= 2); // 2+ dias desde updated_at = mais de 48h na fase
       return res.status(200).json({ ok: true, cards });
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });
