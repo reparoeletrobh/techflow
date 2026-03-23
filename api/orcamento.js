@@ -573,8 +573,8 @@ module.exports = async function handler(req, res) {
         const nome = fields.find(f=>f.name.toLowerCase().includes("nome"))?.value || node.title;
         const tel  = fields.find(f=>f.name.toLowerCase().includes("telefone")||f.name.toLowerCase().includes("fone"))?.value || "";
         const desc = fields.find(f=>f.name.toLowerCase().includes("descri"))?.value || "";
-        // age do Pipefy já é em dias (tempo na fase atual)
-        const ageDias = node.age || 0;
+        // age do Pipefy é em MINUTOS (tempo na fase atual) — converter para dias
+        const ageDias = Math.floor((node.age || 0) / 1440);
         return { pipefyId: String(node.id), title: node.title, nome, tel, desc, age: ageDias };
       }).filter(c => c.age >= 2); // 2+ dias na fase = mais de 48h em Aguardando Aprovação
       return res.status(200).json({ ok: true, cards });
