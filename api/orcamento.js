@@ -658,6 +658,19 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // ── GET debug-card-time — retorna campos de tempo brutos de um card
+  if (action === "debug-card-time") {
+    const cardId = req.query.id || "1322520742";
+    const data = await pipefyQuery(`query {
+      card(id: "${cardId}") {
+        id title age created_at updated_at
+        current_phase { id name }
+        phases_history { phase { id name } firstTimeIn lastTimeOut }
+      }
+    }`);
+    return res.status(200).json({ ok: true, card: data?.card });
+  }
+
   return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 };
 
