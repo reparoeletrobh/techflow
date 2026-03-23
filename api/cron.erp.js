@@ -47,17 +47,13 @@ async function moveToFinalizado(cardId) {
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
 
-  // Verifica se é domingo 23h BRT (UTC-3)
-  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
-  const isDomingo = now.getDay() === 0;
-  const hora      = now.getHours();
-
-  // Permite chamada manual via ?force=1 ou automática quando domingo 23h
-  const isAuto    = isDomingo && hora === 23;
-  const isForced  = req.query.force === "1";
-
-  if (!isAuto && !isForced) {
-    return res.status(200).json({ ok: true, skipped: true, msg: `Agendado para domingo 23h BRT. Hoje: ${["Dom","Seg","Ter","Qua","Qui","Sex","Sab"][now.getDay()]} ${hora}h` });
+  // Vercel cron já garante execução no horário correto (domingo 23h BRT = segunda 02:00 UTC)
+  // Permite também chamada manual via ?force=1
+  const isForced = req.query.force === "1";
+  const isCron   = req.headers["x-vercel-cron"] === "1" || req.method === "GET";
+  
+  if (!isForced && !isCron) {
+    return res.status(200).json({ ok: true, skipped: true, msg: "Use ?force=1 para executar manualmente" });
   }
 
   try {
