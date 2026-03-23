@@ -1,654 +1,3 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='18,2 8,18 15,18 14,30 24,14 17,14' fill='%2322c55e' stroke='%2322c55e' stroke-linejoin='round'/%3E%3C/svg%3E">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Orçamento</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-<style>
-:root{
-  --bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--border:#252525;
-  --text:#fff;--muted:#888;--dim:#333;
-  --accent:#f5c800;--green:#22c55e;--red:#ef4444;
-  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
-}
-*{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;}
-header{display:flex;align-items:center;padding:0 24px;height:52px;border-bottom:2px solid var(--accent);background:var(--bg);position:sticky;top:0;z-index:100;}
-.logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
-.logo-icon{width:26px;height:26px;background:var(--accent);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;}
-.logo span{color:var(--accent);}
-.tabs{display:flex;border-bottom:1px solid var(--border);padding:0 24px;}
-.tab{font-family:var(--fm);font-size:12px;font-weight:600;padding:12px 18px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;display:flex;align-items:center;gap:6px;}
-.tab:hover{color:var(--text);}
-.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
-.page{display:none;flex:1;flex-direction:column;}
-.page.active{display:flex;}
-
-/* CADASTRO */
-#page-cadastro{align-items:center;justify-content:center;padding:32px 20px;}
-.chat-wrap{width:100%;max-width:560px;display:flex;flex-direction:column;height:min(620px,80vh);background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
-.chat-msgs{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;}
-.chat-msgs::-webkit-scrollbar{width:3px;}
-.chat-msgs::-webkit-scrollbar-thumb{background:var(--border);}
-.msg{display:flex;flex-direction:column;max-width:85%;}
-.msg.bot{align-self:flex-start;}
-.msg.user{align-self:flex-end;}
-.bubble{padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.6;}
-.msg.bot .bubble{background:var(--surface2);border:1px solid var(--border);border-bottom-left-radius:3px;}
-.msg.user .bubble{background:var(--accent);color:#000;font-weight:500;border-bottom-right-radius:3px;}
-.typing-wrap{align-self:flex-start;}
-.typing{display:flex;gap:4px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:14px;border-bottom-left-radius:3px;}
-.td{width:7px;height:7px;background:var(--muted);border-radius:50%;animation:bounce 1.2s infinite;}
-.td:nth-child(2){animation-delay:.2s;}.td:nth-child(3){animation-delay:.4s;}
-@keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
-.chat-input-area{border-top:1px solid var(--border);padding:12px 16px;display:flex;gap:8px;align-items:flex-end;background:var(--surface);}
-.chat-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-family:var(--fb);font-size:13px;color:var(--text);outline:none;resize:none;max-height:160px;line-height:1.4;transition:border .15s;}
-.chat-input:focus{border-color:var(--accent);}
-.send-btn{width:40px;height:40px;border-radius:9px;background:var(--accent);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.send-btn:disabled{background:var(--dim);cursor:not-allowed;}
-.send-btn svg{width:16px;height:16px;fill:#000;}
-.qr-wrap{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
-.qr-btn{font-size:12px;padding:5px 13px;border-radius:20px;border:1px solid var(--accent);background:rgba(245,200,0,.08);color:var(--accent);cursor:pointer;font-family:var(--fb);transition:all .15s;}
-.qr-btn:hover{background:var(--accent);color:#000;}
-
-/* ORC PANEL */
-.orc-toolbar{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px;}
-.orc-list{flex:1;overflow-y:auto;padding:16px 24px;}
-.orc-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px;position:relative;overflow:hidden;}
-.orc-card::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--accent);}
-.orc-card.enviado::before{background:var(--green);}
-.orc-nome{font-size:14px;font-weight:600;}
-.orc-tel{font-family:var(--fm);font-size:11px;color:var(--muted);margin-top:2px;}
-.orc-desc{font-size:12px;color:var(--muted);margin:8px 0;line-height:1.5;}
-.orc-comments{font-family:var(--fm);font-size:10px;color:#666;margin-bottom:10px;padding:8px 10px;background:var(--surface2);border-radius:6px;border-left:2px solid var(--dim);}
-.orc-lbl{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:6px;margin-top:12px;}
-.orc-textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:var(--fb);font-size:12px;color:var(--text);resize:vertical;min-height:90px;line-height:1.6;outline:none;transition:border .15s;}
-.orc-textarea:focus{border-color:var(--accent);}
-.price-row{display:flex;gap:8px;align-items:center;margin-top:10px;}
-.price-input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-family:var(--fm);font-size:14px;color:var(--green);outline:none;width:130px;transition:border .15s;}
-.price-input:focus{border-color:var(--green);}
-.price-input::placeholder{color:var(--dim);}
-.orc-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
-.obtn{font-family:var(--fm);font-size:10px;font-weight:600;padding:6px 13px;border-radius:7px;cursor:pointer;transition:all .15s;white-space:nowrap;}
-.obtn-send{background:var(--green);color:#000;border:none;}
-.obtn-send:hover{filter:brightness(1.1);}
-.obtn-copy{background:var(--surface2);border:1px solid var(--border);color:var(--text);}
-.obtn-copy:hover{border-color:var(--accent);color:var(--accent);}
-.obtn-save{background:var(--surface2);border:1px solid var(--border);color:var(--muted);}
-.obtn-save:hover{border-color:var(--green);color:var(--green);}
-.obtn-regen{background:var(--surface2);border:1px solid var(--border);color:var(--muted);}
-.obtn-regen:hover{border-color:#555;color:var(--text);}
-.obtn-del{background:transparent;border:1px solid var(--border);color:var(--muted);}
-.obtn-del:hover{border-color:var(--red);color:var(--red);}
-.sbadge{font-family:var(--fm);font-size:9px;font-weight:600;padding:3px 9px;border-radius:20px;text-transform:uppercase;}
-.sbadge.pendente{background:rgba(245,200,0,.1);color:var(--accent);}
-.sbadge.enviado{background:rgba(34,197,94,.12);color:var(--green);}
-.tab-badge{font-family:var(--fm);font-size:9px;background:rgba(34,197,94,.15);color:var(--green);padding:1px 6px;border-radius:20px;}
-
-.toast{position:fixed;bottom:18px;right:18px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:11px 14px;font-family:var(--fm);font-size:11px;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;}
-.toast.show{transform:translateY(0);opacity:1;}
-.sr-card{background:var(--surface);border:1px solid var(--border);border-left:3px solid #f59e0b;border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;}
-.uc-card{background:var(--surface);border:1px solid var(--border);border-left:3px solid #ef4444;border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;}
-.sr-nome{font-size:13px;font-weight:600;}
-.sr-desc{font-size:11px;color:var(--muted);font-family:var(--fm);}
-.sr-age{font-family:var(--fm);font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(245,158,11,.12);color:#f59e0b;width:fit-content;}
-.uc-age{font-family:var(--fm);font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(239,68,68,.12);color:#ef4444;width:fit-content;}
-.sr-btn{font-family:var(--fm);font-size:10px;font-weight:600;padding:7px 14px;border-radius:7px;border:none;cursor:pointer;background:#f59e0b;color:#000;transition:all .15s;}
-.sr-btn:hover{filter:brightness(1.1);}
-</style>
-</head>
-<body>
-
-<header>
-  <div class="logo">
-    <div class="logo-icon">📋</div>
-    Reparo<span>Eletro</span> — Orçamento
-  </div>
-</header>
-
-<div class="tabs">
-  <button class="tab active" id="tab-cad" onclick="showPage('cadastro')">📝 Cadastro</button>
-  <button class="tab" id="tab-orc" onclick="showPage('orcamento')">💬 Orçamento</button>
-  <button class="tab" id="tab-env" onclick="showPage('enviado')">
-    ✅ Enviados <span class="tab-badge" id="badge-env">0</span>
-  </button>
-  <button class="tab" id="tab-sem" onclick="showPage('sem-resposta')" style="color:#f59e0b;">
-    🔕 Sem Resposta <span class="tab-badge" id="badge-sem" style="background:rgba(245,158,11,.15);color:#f59e0b;">0</span>
-  </button>
-  <button class="tab" id="tab-ult" onclick="showPage('ultima-chamada')" style="color:#ef4444;">
-    🚨 Última Chamada <span class="tab-badge" id="badge-ult" style="background:rgba(239,68,68,.15);color:#ef4444;">0</span>
-  </button>
-</div>
-
-<!-- CADASTRO -->
-<div class="page active" id="page-cadastro">
-  <div style="display:flex;align-items:center;justify-content:center;flex:1;padding:32px 20px;">
-    <div class="chat-wrap">
-      <div class="chat-msgs" id="chat-msgs"></div>
-      <div class="chat-input-area" id="input-area">
-        <textarea class="chat-input" id="chat-input" placeholder="Cole a ficha aqui..." rows="1"
-          onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
-        <button class="send-btn" id="send-btn" onclick="sendMsg()">
-          <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ORCAMENTO PENDENTE -->
-<div class="page" id="page-orcamento">
-  <div class="orc-toolbar">
-    <div style="display:flex;gap:10px;align-items:center;">
-      <span id="orc-count" style="font-family:var(--fm);font-size:11px;color:var(--muted);">— fichas</span>
-      <span id="orc-st" style="font-family:var(--fm);font-size:10px;color:var(--muted);"></span>
-    </div>
-    <button onclick="orcRegerarTodos()" id="regen-todos-btn"
-      style="font-family:var(--fm);font-size:10px;padding:6px 13px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;"
-      onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'"
-      onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">
-      ✨ Regenerar Todos
-    </button>
-    <button id="sync-btn" onclick="orcSync()"
-      style="font-family:var(--fm);font-size:10px;padding:6px 13px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;"
-      onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'"
-      onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">
-      ↻ Sync Pipefy
-    </button>
-  </div>
-  <div class="orc-list" id="orc-list">
-    <div style="padding:48px;text-align:center;font-family:var(--fm);font-size:11px;color:var(--muted);">Carregando...</div>
-  </div>
-</div>
-
-<!-- ENVIADOS -->
-<div class="page" id="page-enviado">
-  <div class="orc-toolbar">
-    <span id="env-count" style="font-family:var(--fm);font-size:11px;color:var(--muted);">— fichas enviadas</span>
-  </div>
-  <div class="orc-list" id="env-list">
-    <div style="padding:48px;text-align:center;font-family:var(--fm);font-size:11px;color:var(--muted);">Nenhum orçamento enviado ainda.</div>
-  </div>
-</div>
-
-<div class="toast" id="toast">
-  <span id="t-icon">✅</span>
-  <div><strong id="t-title"></strong><br><span id="t-body" style="color:var(--muted);font-size:10px;"></span></div>
-</div>
-
-<!-- SEM RESPOSTA -->
-<div class="page" id="page-sem-resposta">
-  <div id="list-sem" style="padding:16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;">
-    <div class="empty" style="font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;">Carregando...</div>
-  </div>
-</div>
-
-<!-- ULTIMA CHAMADA -->
-<div class="page" id="page-ultima-chamada">
-  <div id="list-ult" style="padding:16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;">
-    <div class="empty" style="font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;">Carregando...</div>
-  </div>
-</div>
-
-<script>
-// ── CADASTRO ──────────────────────────────────────────────────
-var phases = [], solicitarColetaId = null;
-var botando = false, aguardandoFicha = true, aguardandoColeta = false, aguardandoDataHora = false;
-var dados = {}, coletaInfo = null;
-
-function autoResize(el) { el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 160) + "px"; }
-function scrollDown() { var m = document.getElementById("chat-msgs"); if (m) setTimeout(function() { m.scrollTop = m.scrollHeight; }, 60); }
-function escHtml(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
-
-function showToast(icon, title, msg) {
-  document.getElementById("t-icon").textContent  = icon;
-  document.getElementById("t-title").textContent = title;
-  document.getElementById("t-body").textContent  = msg;
-  var t = document.getElementById("toast");
-  t.classList.add("show");
-  setTimeout(function() { t.classList.remove("show"); }, 4000);
-}
-
-function showPage(name) {
-  var pages = ["cadastro","orcamento","enviado","sem-resposta","ultima-chamada"];
-  pages.forEach(function(p) { document.getElementById("page-"+p).classList.toggle("active", p === name); });
-  document.getElementById("tab-cad").classList.toggle("active", name === "cadastro");
-  document.getElementById("tab-orc").classList.toggle("active", name === "orcamento");
-  document.getElementById("tab-env").classList.toggle("active", name === "enviado");
-  document.getElementById("tab-sem").classList.toggle("active", name === "sem-resposta");
-  document.getElementById("tab-ult").classList.toggle("active", name === "ultima-chamada");
-  if (name === "orcamento" || name === "enviado") orcLoad();
-  if (name === "sem-resposta") loadSemResposta();
-  if (name === "ultima-chamada") loadUltimaChamada();
-}
-
-function addBot(txt, qrs) {
-  var m = document.getElementById("chat-msgs");
-  var div = document.createElement("div"); div.className = "msg bot";
-  var bub = document.createElement("div"); bub.className = "bubble";
-  bub.innerHTML = txt.split("\n").join("<br>");
-  div.appendChild(bub);
-  if (qrs && qrs.length) {
-    var qrDiv = document.createElement("div"); qrDiv.className = "qr-wrap";
-    qrs.forEach(function(q) {
-      var btn = document.createElement("button"); btn.className = "qr-btn";
-      btn.textContent = q; btn.onclick = function() { sendMsg(q); };
-      qrDiv.appendChild(btn);
-    });
-    div.appendChild(qrDiv);
-  }
-  m.appendChild(div); scrollDown();
-}
-
-function addUser(txt) {
-  var m = document.getElementById("chat-msgs");
-  var div = document.createElement("div"); div.className = "msg user";
-  var bub = document.createElement("div"); bub.className = "bubble";
-  bub.innerHTML = txt.split("\n").join("<br>");
-  div.appendChild(bub); m.appendChild(div); scrollDown();
-}
-
-function showTyping() {
-  var m = document.getElementById("chat-msgs");
-  var div = document.createElement("div"); div.className = "typing-wrap"; div.id = "typing-ind";
-  div.innerHTML = '<div class="typing"><div class="td"></div><div class="td"></div><div class="td"></div></div>';
-  m.appendChild(div); scrollDown();
-}
-function hideTyping() { var t = document.getElementById("typing-ind"); if (t) t.remove(); }
-function handleKey(e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); } }
-function delay(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
-
-function parseFicha(txt) {
-  var lines = txt.split(/[\r\n]+/);
-  function get(keys) {
-    for (var i = 0; i < keys.length; i++) {
-      for (var j = 0; j < lines.length; j++) {
-        var line = lines[j], colon = line.indexOf(":");
-        if (colon < 0) continue;
-        var label = line.slice(0, colon).toLowerCase().replace(/[^a-z]/g, "");
-        var key   = keys[i].toLowerCase().replace(/[^a-z]/g, "");
-        if (label.indexOf(key) >= 0 || key.indexOf(label) >= 0) {
-          var val = line.slice(colon + 1).trim(); if (val) return val;
-        }
-      }
-    }
-    return "";
-  }
-  return {
-    nome:     get(["nome"]),
-    telefone: get(["telefone","fone","cel","whatsapp","tel"]),
-    aparelho: get(["aparelho","equipamento","produto"]),
-    defeito:  get(["defeito","problema","defeit","falha"]),
-    endereco: get(["cep","endereco","end","rua","logradouro"]),
-  };
-}
-
-async function sendMsg(txt) {
-  if (botando) return;
-  var input = document.getElementById("chat-input");
-  var msg = (txt || input.value).trim(); if (!msg) return;
-  input.value = ""; input.style.height = "auto";
-  addUser(msg);
-
-  // Aguardando escolha de coleta
-  if (aguardandoColeta) {
-    aguardandoColeta = false;
-    if (msg === "🚚 Coletar Agora") {
-      coletaInfo = { tipo: "agora" };
-      botando = true; document.getElementById("send-btn").disabled = true;
-      showTyping(); await delay(600); hideTyping();
-      await criarCard();
-      botando = false; document.getElementById("send-btn").disabled = false;
-    } else if (msg === "📅 Agendar Coleta") {
-      aguardandoDataHora = true;
-      addBot("Informe a data e horario da coleta (ex: 18/03 as 14:00)");
-    }
-    return;
-  }
-
-  // Aguardando data/hora da coleta agendada
-  if (aguardandoDataHora) {
-    aguardandoDataHora = false;
-    coletaInfo = { tipo: "agendar", dataHora: msg };
-    botando = true; document.getElementById("send-btn").disabled = true;
-    showTyping(); await delay(600); hideTyping();
-    await criarCard();
-    botando = false; document.getElementById("send-btn").disabled = false;
-    return;
-  }
-
-  if (!aguardandoFicha) {
-    if (msg === "Novo cadastro") {
-      dados = {}; coletaInfo = null; aguardandoFicha = true;
-      document.getElementById("chat-msgs").innerHTML = "";
-      document.getElementById("input-area").style.display = "flex";
-      addBot("Pronto! Cole a próxima ficha.");
-    }
-    return;
-  }
-
-  botando = true; document.getElementById("send-btn").disabled = true;
-  showTyping(); await delay(700); hideTyping();
-  dados = parseFicha(msg);
-  var faltando = [];
-  if (!dados.nome)     faltando.push("Nome");
-  if (!dados.telefone) faltando.push("Telefone");
-  if (!dados.aparelho) faltando.push("Aparelho");
-  if (!dados.defeito)  faltando.push("Defeito");
-  if (faltando.length) {
-    addBot("Não consegui identificar: " + faltando.join(", ") + ".\n\nVerifique o formato e cole novamente.");
-    botando = false; document.getElementById("send-btn").disabled = false; return;
-  }
-  aguardandoFicha = false;
-  botando = false; document.getElementById("send-btn").disabled = false;
-  // Pergunta sobre coleta
-  aguardandoColeta = true;
-  addBot("Como será a coleta do equipamento?", ["🚚 Coletar Agora", "📅 Agendar Coleta"]);
-}
-
-async function criarCard() {
-  document.getElementById("input-area").style.display = "none";
-  showTyping();
-  try {
-    // Monta informação de coleta para incluir na descrição
-    var coletaTexto = "";
-    if (coletaInfo) {
-      coletaTexto = coletaInfo.tipo === "agora"
-        ? " | Coleta: IMEDIATA"
-        : " | Coleta agendada: " + coletaInfo.dataHora;
-    }
-    var r = await fetch("/api/orcamento?action=criar-card", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nome: dados.nome, telefone: dados.telefone, aparelho: dados.aparelho, defeito: dados.defeito + coletaTexto, endereco: dados.endereco || "", phaseId: solicitarColetaId }),
-    });
-    var d = await r.json(); hideTyping();
-    if (d.ok) { addBot("✅ Card criado no Pipefy!\n\n" + dados.nome + " cadastrado em Solicitar Coleta.", ["Novo cadastro"]); }
-    else { addBot("❌ Erro: " + d.error); document.getElementById("input-area").style.display = "flex"; aguardandoFicha = true; }
-  } catch(e) { hideTyping(); addBot("❌ Sem conexão. Tente novamente."); document.getElementById("input-area").style.display = "flex"; aguardandoFicha = true; }
-}
-
-// ── ORÇAMENTO PANEL ───────────────────────────────────────────
-var orcFichas = [];
-
-async function orcLoad() {
-  try {
-    var r = await fetch("/api/orcamento?action=orc-load");
-    var d = await r.json();
-    if (d.ok) { orcFichas = d.fichas || []; orcRender(); }
-  } catch(e) {}
-}
-
-async function orcSync() {
-  var btn = document.getElementById("sync-btn"), st = document.getElementById("orc-st");
-  btn.textContent = "⏳"; btn.style.pointerEvents = "none"; st.textContent = "sincronizando...";
-  try {
-    var r = await fetch("/api/orcamento?action=orc-sync");
-    var d = await r.json();
-    await orcLoad(); // sempre atualiza painel
-    if (d.newCount > 0) { st.textContent = "+" + d.newCount + " nova" + (d.newCount > 1 ? "s" : ""); setTimeout(function() { st.textContent = ""; }, 4000); }
-    else { st.textContent = "atualizado"; setTimeout(function() { st.textContent = ""; }, 2000); }
-    if (d.pipefyError) st.textContent = "Pipefy: " + d.pipefyError;
-  } catch(e) { st.textContent = "Erro: " + e.message; }
-  btn.textContent = "↻ Sync Pipefy"; btn.style.pointerEvents = "";
-}
-
-function orcRender() {
-  var pendentes = orcFichas.filter(function(f) { return f.status !== "enviado"; });
-  var enviados  = orcFichas.filter(function(f) { return f.status === "enviado"; });
-
-  var countEl = document.getElementById("orc-count");
-  if (countEl) countEl.textContent = pendentes.length + " ficha" + (pendentes.length !== 1 ? "s" : "");
-  var envCount = document.getElementById("env-count");
-  if (envCount) envCount.textContent = enviados.length + " ficha" + (enviados.length !== 1 ? "s enviadas" : " enviada");
-  var badgeEnv = document.getElementById("badge-env");
-  if (badgeEnv) badgeEnv.textContent = enviados.length;
-
-  var listEl = document.getElementById("orc-list");
-  if (listEl) {
-    if (!pendentes.length) { listEl.innerHTML = '<div style="padding:48px;text-align:center;font-family:var(--fm);font-size:11px;color:var(--muted);">Nenhum orçamento pendente.<br>Clique em Sync Pipefy para buscar fichas em Aguardando Aprovação.</div>'; }
-    else { listEl.innerHTML = ""; pendentes.forEach(function(f) { listEl.appendChild(buildCard(f)); }); }
-  }
-
-  var envEl = document.getElementById("env-list");
-  if (envEl) {
-    if (!enviados.length) { envEl.innerHTML = '<div style="padding:48px;text-align:center;font-family:var(--fm);font-size:11px;color:var(--muted);">Nenhum orçamento enviado ainda.</div>'; }
-    else { envEl.innerHTML = ""; enviados.forEach(function(f) { envEl.appendChild(buildCard(f)); }); }
-  }
-}
-
-function buildCard(f) {
-  var card = document.createElement("div");
-  card.className = "orc-card" + (f.status === "enviado" ? " enviado" : "");
-  card.id = "orc-" + f.id;
-  var isSent = f.status === "enviado";
-
-  // Header
-  var head = document.createElement("div");
-  head.style.cssText = "display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px;";
-  var info = document.createElement("div");
-  var nomEl = document.createElement("div"); nomEl.className = "orc-nome"; nomEl.textContent = f.nome || "—";
-  var telEl = document.createElement("div"); telEl.className = "orc-tel"; telEl.textContent = f.tel || "";
-  info.appendChild(nomEl); info.appendChild(telEl);
-  var badge = document.createElement("span"); badge.className = "sbadge " + (f.status || "pendente"); badge.textContent = f.status || "pendente";
-  head.appendChild(info); head.appendChild(badge);
-  card.appendChild(head);
-
-  // Desc
-  if (f.desc) { var descEl = document.createElement("div"); descEl.className = "orc-desc"; descEl.textContent = f.desc; card.appendChild(descEl); }
-
-  // Comments
-  if (f.comentarios && f.comentarios.length) {
-    var comEl = document.createElement("div"); comEl.className = "orc-comments";
-    comEl.textContent = "💬 " + f.comentarios.slice(0, 3).join(" | "); card.appendChild(comEl);
-  }
-
-  // Texto label
-  var isGenerico = (f.textoOrc || "").indexOf("Realizamos todos os testes") >= 0 || !(f.textoOrc || "").trim();
-  var lbl = document.createElement("div"); lbl.className = "orc-lbl";
-  lbl.textContent = "📄 Texto do Orçamento" + (isGenerico ? " ⚠️ padrão" : "");
-  if (isGenerico) lbl.style.color = "#f59e0b";
-  card.appendChild(lbl);
-
-  // Badge desconto por quantidade (mesmo telefone)
-  var fichasDoCliente = orcFichas.filter(function(x) { return x.tel === f.tel && x.status !== "enviado"; });
-  var qtd = fichasDoCliente.length;
-  var descPct = qtd >= 4 ? 20 : qtd === 3 ? 15 : qtd === 2 ? 10 : 0;
-  if (descPct > 0) {
-    var descBadge = document.createElement("div");
-    descBadge.style.cssText = "font-family:var(--fm);font-size:10px;background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3);border-radius:6px;padding:3px 8px;margin-bottom:6px;display:inline-block;";
-    descBadge.textContent = "🏷️ Desconto " + descPct + "% aplicado ("+qtd+" equip.)";
-    card.appendChild(descBadge);
-  }
-
-  // Textarea
-  var ta = document.createElement("textarea"); ta.className = "orc-textarea"; ta.id = "texto-" + f.id; ta.rows = 4; ta.value = f.textoOrc || "";
-  card.appendChild(ta);
-
-  // Price row
-  var priceRow = document.createElement("div"); priceRow.className = "price-row";
-  var rLabel = document.createElement("span"); rLabel.style.cssText = "font-family:var(--fm);font-size:11px;color:var(--muted)"; rLabel.textContent = "R$";
-  var prInput = document.createElement("input"); prInput.className = "price-input"; prInput.id = "preco-" + f.id; prInput.type = "number"; prInput.step = "0.01"; prInput.min = "0"; prInput.placeholder = "0,00";
-  // Se não tem preço salvo, sugere já com desconto
-  if (f.preco) {
-    prInput.value = f.preco;
-  } else if (f.precoSugerido && descPct > 0) {
-    prInput.value = (parseFloat(f.precoSugerido) * (1 - descPct/100)).toFixed(2);
-  } else {
-    prInput.value = f.precoSugerido || "";
-  }
-  var sendBtn = document.createElement("button"); sendBtn.className = "obtn obtn-send"; sendBtn.id = "sendbtn-" + f.id;
-  sendBtn.textContent = isSent ? "✅ Enviado" : "📤 Copiar e Enviar";
-  sendBtn.setAttribute("data-id", f.id);
-  sendBtn.onclick = function() { orcEnviar(this.getAttribute("data-id")); };
-  priceRow.appendChild(rLabel); priceRow.appendChild(prInput); priceRow.appendChild(sendBtn);
-  card.appendChild(priceRow);
-
-  // Actions
-  var actions = document.createElement("div"); actions.className = "orc-actions";
-
-  var copyBtn = document.createElement("button"); copyBtn.className = "obtn obtn-copy"; copyBtn.textContent = "📋 Copiar texto";
-  copyBtn.setAttribute("data-id", f.id); copyBtn.onclick = function() { orcCopiar(this.getAttribute("data-id")); };
-
-  var saveBtn = document.createElement("button"); saveBtn.className = "obtn obtn-save"; saveBtn.textContent = "💾 Salvar";
-  saveBtn.setAttribute("data-id", f.id); saveBtn.onclick = function() { orcSalvar(this.getAttribute("data-id")); };
-
-  var regenBtn = document.createElement("button"); regenBtn.className = "obtn obtn-regen"; regenBtn.textContent = "✨ IA";
-  regenBtn.setAttribute("data-id", f.id); regenBtn.onclick = function() { orcRegerar(this.getAttribute("data-id")); };
-
-  var delBtn = document.createElement("button"); delBtn.className = "obtn obtn-del"; delBtn.textContent = "✕";
-  delBtn.setAttribute("data-id", f.id); delBtn.onclick = function() { orcExcluir(this.getAttribute("data-id")); };
-
-  actions.appendChild(copyBtn); actions.appendChild(saveBtn); actions.appendChild(regenBtn); actions.appendChild(delBtn);
-  card.appendChild(actions);
-  return card;
-}
-
-async function orcEnviar(id) {
-  var f = orcFichas.find(function(x) { return x.id === id; }); if (!f) return;
-  var ta      = document.getElementById("texto-" + id);
-  var prInput = document.getElementById("preco-" + id);
-  if (!ta || !prInput) return;
-  var preco = prInput.value.trim();
-  if (!preco) { showToast("⚠️", "Informe o preço", ""); prInput.focus(); return; }
-
-  // Fichas do mesmo cliente (mesmo tel, não enviadas)
-  var fichasDoCliente = orcFichas.filter(function(x) { return x.tel === f.tel && x.status !== "enviado"; });
-  var qtd = fichasDoCliente.length;
-  var descPct = qtd >= 4 ? 20 : qtd === 3 ? 15 : qtd === 2 ? 10 : 0;
-  var precoNum = parseFloat(preco);
-  if (descPct > 0) precoNum = precoNum * (1 - descPct / 100);
-  var precoFmt = precoNum.toLocaleString("pt-BR", {minimumFractionDigits: 2});
-
-  // Monta texto final — se múltiplos equipamentos, adiciona cabeçalho com total e nome do equip
-  var textoBase = ta.value.replace("[VALOR]", "R$ " + precoFmt);
-
-  if (qtd > 1) {
-    // Detecta tipo do equipamento desta ficha
-    var descTexto = (f.desc || "").toLowerCase();
-    var equipNome = null;
-    if (descTexto.includes("microondas") || descTexto.includes("micro ondas")) equipNome = "Microondas";
-    else if (descTexto.includes("purificador")) equipNome = "Purificador";
-    else if (descTexto.includes("adega"))  equipNome = "Adega";
-    else if (descTexto.includes("forno"))  equipNome = "Forno";
-    else if (descTexto.includes("geladeira") || descTexto.includes("refrigerador")) equipNome = "Geladeira";
-    else if (descTexto.includes("lavadora") || descTexto.includes("maquina de lavar")) equipNome = "Lavadora";
-
-    // Monta prefixo: "2 equipamentos\n\nMicroondas:\n[texto]"
-    var prefixo = qtd + " equipamentos\n\n";
-    if (equipNome) {
-      prefixo += equipNome + ":\n";
-    }
-    textoBase = textoBase.replace(
-      "Foram feitos todos os testes",
-      prefixo + "Foram feitos todos os testes"
-    );
-    // Fallback se não achou a frase padrão
-    if (textoBase.indexOf(prefixo) === -1 && equipNome) {
-      textoBase = "Ola, " + (f.nome ? f.nome.split(" ")[0] : "cliente") + " bom dia, sou o Pedro da Reparo Eletro:\n\n" + qtd + " equipamentos\n\n" + equipNome + ":\n" + textoBase;
-    }
-  }
-
-  var textoFinal = textoBase;
-  // Monta link wa.me
-  var telLimpo = (f.tel || "").replace(/\D/g, "");
-  if (telLimpo && !telLimpo.startsWith("55")) telLimpo = "55" + telLimpo;
-  var waUrl = telLimpo ? "https://wa.me/" + telLimpo + "?text=" + encodeURIComponent(textoFinal) : textoFinal;
-  // Copia o link para área de transferência
-  try { await navigator.clipboard.writeText(waUrl); }
-  catch(e) { var tmp = document.createElement("textarea"); tmp.value = waUrl; document.body.appendChild(tmp); tmp.select(); document.execCommand("copy"); document.body.removeChild(tmp); }
-  // Marca como enviado
-  var r = await fetch("/api/orcamento?action=orc-enviar", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({id: id, preco: preco}) });
-  var d = await r.json();
-  if (d.ok) { f.status = "enviado"; f.preco = preco; orcRender(); showToast("📋", "Link copiado!", "Cole no navegador ou WhatsApp Web para abrir a conversa."); }
-  else showToast("❌", "Erro", d.error);
-}
-
-async function orcCopiar(id) {
-  var ta = document.getElementById("texto-" + id); if (!ta) return;
-  try { await navigator.clipboard.writeText(ta.value); }
-  catch(e) { ta.select(); document.execCommand("copy"); }
-  showToast("📋", "Copiado!", "Texto pronto para o WhatsApp");
-}
-
-async function orcSalvar(id) {
-  var ta = document.getElementById("texto-" + id); if (!ta) return;
-  var r = await fetch("/api/orcamento?action=orc-update-texto", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({id: id, textoOrc: ta.value}) });
-  var d = await r.json();
-  if (d.ok) { var f = orcFichas.find(function(x) { return x.id === id; }); if (f) f.textoOrc = ta.value; showToast("💾", "Salvo!", ""); }
-  else showToast("❌", "Erro", d.error);
-}
-
-async function orcRegerar(id) {
-  var f = orcFichas.find(function(x) { return x.id === id; });
-  var btn = document.querySelector("#orc-" + id + " .obtn-regen");
-  if (btn) { btn.textContent = "⏳"; btn.disabled = true; }
-  var r = await fetch("/api/orcamento?action=orc-regenerar", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({id: id}) });
-  var d = await r.json();
-  if (btn) { btn.textContent = "✨ IA"; btn.disabled = false; }
-  if (d.ok) { var ta = document.getElementById("texto-" + id); if (ta) ta.value = d.textoOrc; if (f) f.textoOrc = d.textoOrc; showToast("✨", "Texto gerado!", "Revise e copie para o WhatsApp"); }
-  else showToast("❌", "Erro", d.error);
-}
-
-async function orcExcluir(id) {
-  if (!confirm("Excluir esta ficha?")) return;
-  var r = await fetch("/api/orcamento?action=orc-excluir", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({id: id}) });
-  var d = await r.json();
-  if (d.ok) { orcFichas = orcFichas.filter(function(f) { return f.id !== id; }); orcRender(); showToast("🗑️", "Excluído", ""); }
-}
-
-// ── INIT ──────────────────────────────────────────────────────
-async function orcRegerarTodos() {
-  var btn = document.getElementById("regen-todos-btn");
-  btn.textContent = "⏳"; btn.style.pointerEvents = "none";
-  try {
-    var r = await fetch("/api/orcamento?action=orc-regenerar-todos", { method: "POST" });
-    var d = await r.json();
-    if (d.ok) { await orcLoad(); showToast("✨", d.regenerados + " fichas atualizadas!", ""); }
-    else showToast("❌", "Erro", d.error);
-  } catch(e) { showToast("❌", "Erro", e.message); }
-  btn.textContent = "✨ Regenerar Todos"; btn.style.pointerEvents = "";
-}
-
-async function init() {
-  try {
-    var r = await fetch("/api/orcamento?action=estrutura");
-    var d = await r.json();
-    if (d.ok) {
-      phases = d.phases || [];
-      var fase = phases.find(function(p) { return p.name.toLowerCase().indexOf("solicitar coleta") >= 0; });
-      if (fase) solicitarColetaId = fase.id;
-    }
-  } catch(e) {}
-  addBot("Olá! Cole a ficha do cliente abaixo para cadastrar no Pipefy.");
-}
-
-init();
-orcLoad(); // carrega fichas na inicialização
-setInterval(function() {
-  if (document.getElementById("page-orcamento").classList.contains("active")) orcSync();
-}, 60000);
-
-// Limpa enviados automaticamente às 23:00 BRT
-function agendarLimpeza() {
-  var now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
-  var target = new Date(now);
-  target.setHours(23, 0, 0, 0);
-  if (now >= target) target.setDate(target.getDate() + 1);
-  var ms = target - now;
-  setTimeout(function() {
-    fetch("/api/orcamento?action=orc-limpar-enviados")
-      .then(function(r) { return r.json(); })
-      .then(function(d) {
-        if (d.removed > 0) { orcFichas = orcFichas.filter(function(f) { return f.status !== "enviado"; }); orcRender(); }
-      })
-      .catch(function() {});
-    agendarLimpeza(); // reagenda para o próximo dia
-  }, ms);
-}
-agendarLimpeza();
-</script>
 <script>
 var MSG_PARTES = [
   "*ATENCAO* comunicado importante da Reparo Eletro.",
@@ -657,85 +6,121 @@ var MSG_PARTES = [
 ];
 var MSG_UC = MSG_PARTES.join("\n");
 
+function srCard(card) {
+  var tel = (card.tel || "").replace(/[^0-9]/g, "");
+  if (tel.slice(0,2) === "55" && tel.length >= 12) tel = tel.slice(2);
+  if (tel.length === 10) tel = tel.slice(0,2) + "9" + tel.slice(2);
+  var waLink = tel ? "https://wa.me/55" + tel + "?text=" + encodeURIComponent(MSG_UC) : null;
+  var id = card.pipefyId;
+
+  var wrap = document.createElement("div"); wrap.className = "sr-card";
+
+  var nome = document.createElement("div"); nome.className = "sr-nome";
+  nome.textContent = card.nome || card.title || ""; wrap.appendChild(nome);
+
+  if (card.desc) {
+    var desc = document.createElement("div"); desc.className = "sr-desc";
+    desc.textContent = card.desc.substring(0, 80) + "..."; wrap.appendChild(desc);
+  }
+
+  var age = document.createElement("div"); age.className = "sr-age";
+  age.textContent = card.age + " dia(s) sem resposta"; wrap.appendChild(age);
+
+  var btns = document.createElement("div");
+  btns.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;";
+
+  if (waLink) {
+    var a = document.createElement("a"); a.href = waLink; a.target = "_blank";
+    a.style.textDecoration = "none";
+    var bc = document.createElement("button"); bc.className = "sr-btn";
+    bc.textContent = "Copiar e Enviar";
+    bc.onclick = (function(i) { return function() { alertarCliente(i); }; })(id);
+    a.appendChild(bc); btns.appendChild(a);
+  }
+
+  var bm = document.createElement("button"); bm.className = "sr-btn";
+  bm.id = "btn-al-" + id;
+  bm.style.cssText = "background:transparent;border:1px solid var(--border);color:var(--muted);";
+  bm.textContent = "Mover p/ Ultima Chamada";
+  bm.onclick = (function(i) { return function() { alertarCliente(i); }; })(id);
+  btns.appendChild(bm); wrap.appendChild(btns);
+  return wrap;
+}
+
+function ucCard(card) {
+  var wrap = document.createElement("div"); wrap.className = "uc-card";
+  var nome = document.createElement("div"); nome.className = "sr-nome";
+  nome.textContent = card.nome || card.title || ""; wrap.appendChild(nome);
+  if (card.desc) {
+    var desc = document.createElement("div"); desc.className = "sr-desc";
+    desc.textContent = card.desc.substring(0, 80) + "..."; wrap.appendChild(desc);
+  }
+  var age = document.createElement("div"); age.className = "uc-age";
+  age.textContent = card.age + " dia(s) - " + (card.dataEncerramento ? "Prazo: " + card.dataEncerramento : "Sem data limite");
+  wrap.appendChild(age);
+  return wrap;
+}
+
+function loadMsg(elId, msg) {
+  var el = document.getElementById(elId); if (!el) return;
+  el.innerHTML = "";
+  var d = document.createElement("div");
+  d.style.cssText = "font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;";
+  d.textContent = msg; el.appendChild(d);
+}
+
 async function loadSemResposta() {
-  var list = document.getElementById("list-sem");
-  list.innerHTML = "<div style='font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;'>Carregando...</div>";
+  loadMsg("list-sem", "Carregando...");
   try {
-    var d = await fetch("/api/orcamento?action=sem-resposta").then(function(r){return r.json();});
+    var r = await fetch("/api/orcamento?action=sem-resposta");
+    var d = await r.json();
     var badge = document.getElementById("badge-sem");
     if (badge) badge.textContent = d.cards ? d.cards.length : 0;
     if (!d.ok || !d.cards || !d.cards.length) {
-      list.innerHTML = "<div style='font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;'>" + (d.error || "Nenhum cliente sem resposta ha mais de 48h") + "</div>";
+      loadMsg("list-sem", d.error || "Nenhum cliente sem resposta ha mais de 48h");
       return;
     }
-    var html = "";
-    d.cards.forEach(function(card) {
-      var tel = (card.tel || "").replace(/\D/g, "");
-      if (tel.indexOf("55") === 0 && tel.length >= 12) tel = tel.slice(2);
-      if (tel.length === 10) tel = tel.slice(0,2) + "9" + tel.slice(2);
-      var waLink = tel ? "https://wa.me/55" + tel + "?text=" + encodeURIComponent(MSG_UC) : null;
-      var id = card.pipefyId;
-      html += "<div class='sr-card'>";
-      html += "<div class='sr-nome'>" + (card.nome || card.title) + "</div>";
-      if (card.desc) html += "<div class='sr-desc'>" + card.desc.substring(0, 80) + "...</div>";
-      html += "<div class='sr-age'>&#9200; " + card.age + " dia(s) sem resposta</div>";
-      html += "<div style='display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;'>";
-      if (waLink) html += "<a href='" + waLink + "' target='_blank' style='text-decoration:none;'><button class='sr-btn'>&#128203; Copiar e Enviar</button></a>";
-      html += "<button class='sr-btn' style='background:transparent;border:1px solid var(--border);color:var(--muted);' id='btn-al-" + id + "' onclick='alertarCliente("" + id + "")'>&#9989; Mover p/ Ultima Chamada</button>";
-      html += "</div></div>";
-    });
-    list.innerHTML = html;
-  } catch(e) {
-    list.innerHTML = "<div style='font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;'>Erro: " + e.message + "</div>";
-  }
+    var list = document.getElementById("list-sem"); list.innerHTML = "";
+    d.cards.forEach(function(card) { list.appendChild(srCard(card)); });
+  } catch(e) { loadMsg("list-sem", "Erro: " + e.message); }
 }
 
 async function alertarCliente(pipefyId) {
   var btn = document.getElementById("btn-al-" + pipefyId);
   if (btn) { btn.disabled = true; btn.textContent = "..."; }
   try {
-    var d = await fetch("/api/orcamento?action=alertar", {
+    var r = await fetch("/api/orcamento?action=alertar", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({pipefyId: pipefyId})
-    }).then(function(r){return r.json();});
+    });
+    var d = await r.json();
     if (d.ok) {
       showToast("OK", "Movido para Ultima Chamada!", "Prazo: " + (d.dataLimite || ""));
       loadSemResposta();
     } else {
-      showToast("Erro", d.error || "Erro desconhecido", "");
-      if (btn) { btn.disabled = false; btn.textContent = "&#9989; Mover p/ Ultima Chamada"; }
+      showToast("Erro", d.error || "", "");
+      if (btn) { btn.disabled = false; btn.textContent = "Mover p/ Ultima Chamada"; }
     }
   } catch(e) {
     showToast("Erro", e.message, "");
-    if (btn) { btn.disabled = false; btn.textContent = "&#9989; Mover p/ Ultima Chamada"; }
+    if (btn) { btn.disabled = false; btn.textContent = "Mover p/ Ultima Chamada"; }
   }
 }
 
 async function loadUltimaChamada() {
-  var list = document.getElementById("list-ult");
-  list.innerHTML = "<div style='font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;'>Carregando...</div>";
+  loadMsg("list-ult", "Carregando...");
   try {
-    var d = await fetch("/api/orcamento?action=ultima-chamada").then(function(r){return r.json();});
+    var r = await fetch("/api/orcamento?action=ultima-chamada");
+    var d = await r.json();
     var badge = document.getElementById("badge-ult");
     if (badge) badge.textContent = d.cards ? d.cards.length : 0;
     if (!d.ok || !d.cards || !d.cards.length) {
-      list.innerHTML = "<div style='font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;'>" + (d.error || "Nenhuma ficha em Ultima Chamada") + "</div>";
+      loadMsg("list-ult", d.error || "Nenhuma ficha em Ultima Chamada");
       return;
     }
-    var html = "";
-    d.cards.forEach(function(card) {
-      html += "<div class='uc-card'>";
-      html += "<div class='sr-nome'>" + (card.nome || card.title) + "</div>";
-      if (card.desc) html += "<div class='sr-desc'>" + card.desc.substring(0, 80) + "...</div>";
-      html += "<div class='uc-age'>&#128680; " + card.age + " dia(s) - " + (card.dataEncerramento ? "Prazo: " + card.dataEncerramento : "Sem data limite") + "</div>";
-      html += "</div>";
-    });
-    list.innerHTML = html;
-  } catch(e) {
-    list.innerHTML = "<div style='font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;'>Erro: " + e.message + "</div>";
-  }
+    var list = document.getElementById("list-ult"); list.innerHTML = "";
+    d.cards.forEach(function(card) { list.appendChild(ucCard(card)); });
+  } catch(e) { loadMsg("list-ult", "Erro: " + e.message); }
 }
 </script>
-</body>
-</html>
