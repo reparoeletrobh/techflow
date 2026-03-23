@@ -1,6 +1,6 @@
 {
   "crons": [
-    { "path": "/api/cron-erp", "schedule": "0 2 * * 1" }
+    { "path": "/api/board?action=erp-to-finalizado", "schedule": "0 2 * * 1" }
   ],
   "rewrites": [
     { "source": "/tecnico",      "destination": "/tecnico.html"      },
