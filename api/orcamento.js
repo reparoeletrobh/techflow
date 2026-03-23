@@ -573,8 +573,11 @@ module.exports = async function handler(req, res) {
         const nome = fields.find(f=>f.name.toLowerCase().includes("nome"))?.value || node.title;
         const tel  = fields.find(f=>f.name.toLowerCase().includes("telefone")||f.name.toLowerCase().includes("fone"))?.value || "";
         const desc = fields.find(f=>f.name.toLowerCase().includes("descri"))?.value || "";
-        return { pipefyId: String(node.id), title: node.title, nome, tel, desc, age: node.age || 0 };
-      }).filter(c => (c.age || 0) >= 2); // mais de 48h = 2+ dias
+        // age do Pipefy é em minutos — converter para dias
+        const ageMinutes = node.age || 0;
+        const ageDias = Math.floor(ageMinutes / 1440);
+        return { pipefyId: String(node.id), title: node.title, nome, tel, desc, age: ageDias };
+      }).filter(c => c.age >= 2); // mais de 48h = 2+ dias
       return res.status(200).json({ ok: true, cards });
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });
