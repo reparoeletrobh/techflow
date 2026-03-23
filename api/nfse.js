@@ -97,7 +97,7 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 '      <CNPJ>' + CNPJ_EMPRESA + '</CNPJ>\n' +
 '      <IM>' + IM_EMPRESA + '</IM>\n' +
 '      <regTrib>\n' +
-'        <opSimpNac>1</opSimpNac>\n' +
+'        <opSimpNac>3</opSimpNac>\n' +
 '        <regApTribSN>1</regApTribSN>\n' +
 '        <regEspTrib>0</regEspTrib>\n' +
 '      </regTrib>\n' +
@@ -123,7 +123,7 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 '      <trib>\n' +
 '        <tribMun>\n' +
 '          <tribISSQN>1</tribISSQN>\n' +
-'          <tpRetISSQN>2</tpRetISSQN>\n' +
+'          <tpRetISSQN>1</tpRetISSQN>\n' +
 '        </tribMun>\n' +
 '        <totTrib>\n' +
 '          <pTotTribSN>6.00</pTotTribSN>\n' +
@@ -144,20 +144,18 @@ function seq_num_only(id) {
 // ── Assinatura XMLDSig com node-forge ────────────────────────
 async function assinarXML(xml, pfxBuf, passphrase) {
   try {
-    // Extrai chave privada e certificado do PFX usando forge
     const p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(pfxBuf));
     const p12     = forge.pkcs12.pkcs12FromAsn1(p12Asn1, passphrase);
     const shrouded = (p12.getBags({bagType:forge.pki.oids.pkcs8ShroudedKeyBag})[forge.pki.oids.pkcs8ShroudedKeyBag]||[]);
     const plain    = (p12.getBags({bagType:forge.pki.oids.keyBag})[forge.pki.oids.keyBag]||[]);
     const keyBag   = [...shrouded,...plain][0];
     if (!keyBag) throw new Error("Chave privada nao encontrada no PFX");
+    const privateKey = keyBag.key;
 
-    // Converte chave para PEM e usa crypto nativo (mais preciso para XMLDSig)
-    const privKeyPem = forge.pki.privateKeyToPem(keyBag.key);
     const certBags   = (p12.getBags({bagType:forge.pki.oids.certBag})[forge.pki.oids.certBag]||[]);
     const certBase64 = certBags[0]
       ? forge.pki.certificateToPem(certBags[0].cert)
-          .replace(/-----BEGIN CERTIFICATE-----/,"").replace(/-----END CERTIFICATE-----/,"").replace(/[\s]/g,"")
+          .replace(/-----BEGIN CERTIFICATE-----/,"").replace(/-----END CERTIFICATE-----/,"").replace(/\s/g,"")
       : "";
 
     const idMatch = xml.match(/infDPS Id="([^"]+)"/);
@@ -170,9 +168,9 @@ async function assinarXML(xml, pfxBuf, passphrase) {
     let infDpsC14n = infDpsRaw.replace(/^<infDPS /, '<infDPS xmlns="http://www.sped.fazenda.gov.br/nfse" ');
     infDpsC14n = infDpsC14n.replace(/<([a-zA-Z][^>]*?)\/>/g, (m, inner) => "<" + inner.trimEnd() + "></" + inner.trim().split(/[\s>]/)[0] + ">");
 
-    // Digest usando crypto nativo (Buffer, não string)
-    const digestBuf = crypto.createHash("sha256").update(Buffer.from(infDpsC14n, "utf8")).digest();
-    const digest    = digestBuf.toString("base64");
+    const md = forge.md.sha256.create();
+    md.update(infDpsC14n, "utf8");
+    const digest = forge.util.encode64(md.digest().bytes());
 
     const signedInfoC14n =
       '<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">' +
@@ -188,10 +186,9 @@ async function assinarXML(xml, pfxBuf, passphrase) {
       '</Reference>' +
       '</SignedInfo>';
 
-    // Assina SignedInfo usando crypto nativo com Buffer
-    const signer   = crypto.createSign("RSA-SHA256");
-    signer.update(Buffer.from(signedInfoC14n, "utf8"));
-    const sigValue = signer.sign(privKeyPem, "base64");
+    const mdSig = forge.md.sha256.create();
+    mdSig.update(signedInfoC14n, "utf8");
+    const sigValue = forge.util.encode64(privateKey.sign(mdSig));
 
     const signedInfoInXml = signedInfoC14n.replace('<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">', "<SignedInfo>");
     const signature =
@@ -598,53 +595,6 @@ module.exports = async function handler(req, res) {
       const signed = certOpts ? await assinarXML(xml, certOpts.pfx, certOpts.passphrase) : xml;
       res.setHeader("Content-Type","text/xml");
       return res.status(200).send(signed);
-    } catch(e) { return res.status(200).json({ ok:false, error:e.message }); }
-  }
-
-  // GET debug-emitir-get — diagnóstico via URL (sem precisar de console)
-  if (action === "debug-emitir-get") {
-    let certOpts;
-    try { certOpts = loadCert(); } catch(e) { return res.status(200).send("<pre>CERT ERROR: "+e.message+"</pre>"); }
-    try {
-      const numDPS = genId(1);
-      const xml    = montarDPS({ cpfcnpj:"12345678901", nome:"Cliente Teste", discriminacao:"Manutencao de eletrodomestico. Garantia 90 dias.", valor:"100.00", numDPS });
-      const xmlAss = await assinarXML(xml, certOpts.pfx, certOpts.passphrase);
-      const b64gz  = await gzipBase64(xmlAss);
-      const { status, body } = await chamarAPI(b64gz, certOpts);
-      res.setHeader("Content-Type","text/html; charset=utf-8");
-      return res.status(200).send(
-        "<pre style='font-family:monospace;font-size:13px;padding:20px;'>"+
-        "HTTP STATUS: "+status+"\n\n"+
-        "RESPONSE BODY:\n"+body+"\n\n"+
-        "XML ID: "+numDPS+"\n"+
-        "ID LEN: "+numDPS.length+"\n"+
-        "AMBIENTE: "+(NFSE_HOMOLOG?"HOMOLOGACAO":"PRODUCAO")+"\n"+
-        "</pre>"
-      );
-    } catch(e) { return res.status(200).send("<pre>ERROR: "+e.message+"</pre>"); }
-  }
-
-  // POST debug-emitir — emite e retorna resposta raw do governo
-  if (req.method === "POST" && action === "debug-emitir") {
-    const { tomadorCpfCnpj, tomadorNome, discriminacao, valor } = req.body || {};
-    if (!tomadorCpfCnpj || !valor) return res.status(400).json({ ok:false, error:"tomadorCpfCnpj e valor obrigatorios" });
-    let certOpts;
-    try { certOpts = loadCert(); } catch(e) { return res.status(400).json({ ok:false, error:e.message }); }
-    try {
-      const numDPS = genId(1);
-      const xml    = montarDPS({ cpfcnpj: tomadorCpfCnpj, nome: tomadorNome, discriminacao, valor, numDPS });
-      const xmlAss = await assinarXML(xml, certOpts.pfx, certOpts.passphrase);
-      const b64gz  = await gzipBase64(xmlAss);
-      const { status, body } = await chamarAPI(b64gz, certOpts);
-      // Retorna tudo raw para diagnóstico
-      return res.status(200).json({ 
-        ok: false, 
-        httpStatus: status, 
-        rawBody: body,
-        xmlPreview: xml.slice(0, 500),
-        idLen: numDPS.length,
-        id: numDPS
-      });
     } catch(e) { return res.status(200).json({ ok:false, error:e.message }); }
   }
 
