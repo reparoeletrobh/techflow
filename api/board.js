@@ -1154,6 +1154,51 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, removed, remaining: board.cards.length, board });
     }
 
+    // ── GET erp-to-finalizado — move todos os cards de ERP para Finalizado no Pipefy
+    if (action === "erp-to-finalizado") {
+      const ERP_PHASE_ID        = "339008925";
+      const FINALIZADO_PHASE_ID = "334875153";
+      try {
+        // Busca cards em ERP
+        const all = [];
+        let cursor = null, hasNext = true;
+        while (hasNext) {
+          const after = cursor ? `, after: "${cursor}"` : "";
+          const data = await pipefyQuery(`query {
+            phase(id: "${ERP_PHASE_ID}") {
+              cards(first: 50${after}) {
+                pageInfo { hasNextPage endCursor }
+                edges { node { id title } }
+              }
+            }
+          }`);
+          if (!data?.phase) break;
+          data.phase.cards.edges.forEach(({ node }) => all.push(node));
+          hasNext = data.phase.cards.pageInfo?.hasNextPage ?? false;
+          cursor  = data.phase.cards.pageInfo?.endCursor ?? null;
+        }
+        if (!all.length) return res.status(200).json({ ok: true, moved: 0, msg: "Nenhum card em ERP" });
+
+        const results = [];
+        for (const card of all) {
+          try {
+            await pipefyQuery(`mutation {
+              moveCardToPhase(input: { card_id: "${card.id}", destination_phase_id: "${FINALIZADO_PHASE_ID}" }) {
+                card { id }
+              }
+            }`);
+            results.push({ id: card.id, title: card.title, ok: true });
+          } catch(e) {
+            results.push({ id: card.id, title: card.title, ok: false, error: e.message });
+          }
+        }
+        const moved = results.filter(r => r.ok).length;
+        return res.status(200).json({ ok: true, moved, total: all.length, results });
+      } catch(e) {
+        return res.status(200).json({ ok: false, error: e.message });
+      }
+    }
+
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch (err) {
