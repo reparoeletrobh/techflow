@@ -1199,6 +1199,26 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    // ── GET/POST html-store — armazena/retorna HTML no Redis (uso temporário)
+    if (action === "html-store") {
+      if (req.method === "POST") {
+        const { key, html } = req.body || {};
+        if (!key || !html) return res.status(400).json({ ok:false, error:"key e html obrigatorios" });
+        const buf = Buffer.from(html, "utf8").toString("base64");
+        await dbSet("html_store_" + key, buf);
+        return res.status(200).json({ ok: true, size: html.length });
+      }
+      if (req.method === "GET") {
+        const { key } = req.query;
+        if (!key) return res.status(400).json({ ok:false, error:"key obrigatoria" });
+        const b64 = await dbGet("html_store_" + key);
+        if (!b64) return res.status(404).json({ ok:false, error:"nao encontrado" });
+        const html = Buffer.from(b64, "base64").toString("utf8");
+        res.setHeader("Content-Type","text/html; charset=utf-8");
+        return res.status(200).send(html);
+      }
+    }
+
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch (err) {
