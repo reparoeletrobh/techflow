@@ -97,7 +97,7 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 '      <CNPJ>' + CNPJ_EMPRESA + '</CNPJ>\n' +
 '      <IM>' + IM_EMPRESA + '</IM>\n' +
 '      <regTrib>\n' +
-'        <opSimpNac>3</opSimpNac>\n' +
+'        <opSimpNac>1</opSimpNac>\n' +
 '        <regApTribSN>1</regApTribSN>\n' +
 '        <regEspTrib>0</regEspTrib>\n' +
 '      </regTrib>\n' +
@@ -123,7 +123,7 @@ function montarDPS({ cpfcnpj, nome, discriminacao, valor, numDPS }) {
 '      <trib>\n' +
 '        <tribMun>\n' +
 '          <tribISSQN>1</tribISSQN>\n' +
-'          <tpRetISSQN>1</tpRetISSQN>\n' +
+'          <tpRetISSQN>2</tpRetISSQN>\n' +
 '        </tribMun>\n' +
 '        <totTrib>\n' +
 '          <pTotTribSN>6.00</pTotTribSN>\n' +
@@ -144,18 +144,20 @@ function seq_num_only(id) {
 // ── Assinatura XMLDSig com node-forge ────────────────────────
 async function assinarXML(xml, pfxBuf, passphrase) {
   try {
+    // Extrai chave privada e certificado do PFX usando forge
     const p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(pfxBuf));
     const p12     = forge.pkcs12.pkcs12FromAsn1(p12Asn1, passphrase);
     const shrouded = (p12.getBags({bagType:forge.pki.oids.pkcs8ShroudedKeyBag})[forge.pki.oids.pkcs8ShroudedKeyBag]||[]);
     const plain    = (p12.getBags({bagType:forge.pki.oids.keyBag})[forge.pki.oids.keyBag]||[]);
     const keyBag   = [...shrouded,...plain][0];
     if (!keyBag) throw new Error("Chave privada nao encontrada no PFX");
-    const privateKey = keyBag.key;
 
+    // Converte chave para PEM e usa crypto nativo (mais preciso para XMLDSig)
+    const privKeyPem = forge.pki.privateKeyToPem(keyBag.key);
     const certBags   = (p12.getBags({bagType:forge.pki.oids.certBag})[forge.pki.oids.certBag]||[]);
     const certBase64 = certBags[0]
       ? forge.pki.certificateToPem(certBags[0].cert)
-          .replace(/-----BEGIN CERTIFICATE-----/,"").replace(/-----END CERTIFICATE-----/,"").replace(/\s/g,"")
+          .replace(/-----BEGIN CERTIFICATE-----/,"").replace(/-----END CERTIFICATE-----/,"").replace(/[\s]/g,"")
       : "";
 
     const idMatch = xml.match(/infDPS Id="([^"]+)"/);
@@ -168,9 +170,9 @@ async function assinarXML(xml, pfxBuf, passphrase) {
     let infDpsC14n = infDpsRaw.replace(/^<infDPS /, '<infDPS xmlns="http://www.sped.fazenda.gov.br/nfse" ');
     infDpsC14n = infDpsC14n.replace(/<([a-zA-Z][^>]*?)\/>/g, (m, inner) => "<" + inner.trimEnd() + "></" + inner.trim().split(/[\s>]/)[0] + ">");
 
-    const md = forge.md.sha256.create();
-    md.update(infDpsC14n, "utf8");
-    const digest = forge.util.encode64(md.digest().bytes());
+    // Digest usando crypto nativo (Buffer, não string)
+    const digestBuf = crypto.createHash("sha256").update(Buffer.from(infDpsC14n, "utf8")).digest();
+    const digest    = digestBuf.toString("base64");
 
     const signedInfoC14n =
       '<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">' +
@@ -186,9 +188,10 @@ async function assinarXML(xml, pfxBuf, passphrase) {
       '</Reference>' +
       '</SignedInfo>';
 
-    const mdSig = forge.md.sha256.create();
-    mdSig.update(signedInfoC14n, "utf8");
-    const sigValue = forge.util.encode64(privateKey.sign(mdSig));
+    // Assina SignedInfo usando crypto nativo com Buffer
+    const signer   = crypto.createSign("RSA-SHA256");
+    signer.update(Buffer.from(signedInfoC14n, "utf8"));
+    const sigValue = signer.sign(privKeyPem, "base64");
 
     const signedInfoInXml = signedInfoC14n.replace('<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">', "<SignedInfo>");
     const signature =
