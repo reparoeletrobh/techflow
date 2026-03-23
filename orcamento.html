@@ -89,6 +89,14 @@ header{display:flex;align-items:center;padding:0 24px;height:52px;border-bottom:
 
 .toast{position:fixed;bottom:18px;right:18px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:11px 14px;font-family:var(--fm);font-size:11px;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;}
 .toast.show{transform:translateY(0);opacity:1;}
+.sr-card{background:var(--surface);border:1px solid var(--border);border-left:3px solid #f59e0b;border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;}
+.uc-card{background:var(--surface);border:1px solid var(--border);border-left:3px solid #ef4444;border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;}
+.sr-nome{font-size:13px;font-weight:600;}
+.sr-desc{font-size:11px;color:var(--muted);font-family:var(--fm);}
+.sr-age{font-family:var(--fm);font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(245,158,11,.12);color:#f59e0b;width:fit-content;}
+.uc-age{font-family:var(--fm);font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(239,68,68,.12);color:#ef4444;width:fit-content;}
+.sr-btn{font-family:var(--fm);font-size:10px;font-weight:600;padding:7px 14px;border-radius:7px;border:none;cursor:pointer;background:#f59e0b;color:#000;transition:all .15s;}
+.sr-btn:hover{filter:brightness(1.1);}
 </style>
 </head>
 <body>
@@ -105,6 +113,12 @@ header{display:flex;align-items:center;padding:0 24px;height:52px;border-bottom:
   <button class="tab" id="tab-orc" onclick="showPage('orcamento')">💬 Orçamento</button>
   <button class="tab" id="tab-env" onclick="showPage('enviado')">
     ✅ Enviados <span class="tab-badge" id="badge-env">0</span>
+  </button>
+  <button class="tab" id="tab-sem" onclick="showPage('sem-resposta')" style="color:#f59e0b;">
+    🔕 Sem Resposta <span class="tab-badge" id="badge-sem" style="background:rgba(245,158,11,.15);color:#f59e0b;">0</span>
+  </button>
+  <button class="tab" id="tab-ult" onclick="showPage('ultima-chamada')" style="color:#ef4444;">
+    🚨 Última Chamada <span class="tab-badge" id="badge-ult" style="background:rgba(239,68,68,.15);color:#ef4444;">0</span>
   </button>
 </div>
 
@@ -164,6 +178,20 @@ header{display:flex;align-items:center;padding:0 24px;height:52px;border-bottom:
   <div><strong id="t-title"></strong><br><span id="t-body" style="color:var(--muted);font-size:10px;"></span></div>
 </div>
 
+<!-- SEM RESPOSTA -->
+<div class="page" id="page-sem-resposta">
+  <div id="list-sem" style="padding:16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;">
+    <div class="empty" style="font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;">Carregando...</div>
+  </div>
+</div>
+
+<!-- ULTIMA CHAMADA -->
+<div class="page" id="page-ultima-chamada">
+  <div id="list-ult" style="padding:16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;">
+    <div class="empty" style="font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;">Carregando...</div>
+  </div>
+</div>
+
 <script>
 // ── CADASTRO ──────────────────────────────────────────────────
 var phases = [], solicitarColetaId = null;
@@ -184,12 +212,16 @@ function showToast(icon, title, msg) {
 }
 
 function showPage(name) {
-  var pages = ["cadastro","orcamento","enviado"];
+  var pages = ["cadastro","orcamento","enviado","sem-resposta","ultima-chamada"];
   pages.forEach(function(p) { document.getElementById("page-"+p).classList.toggle("active", p === name); });
   document.getElementById("tab-cad").classList.toggle("active", name === "cadastro");
   document.getElementById("tab-orc").classList.toggle("active", name === "orcamento");
   document.getElementById("tab-env").classList.toggle("active", name === "enviado");
+  document.getElementById("tab-sem").classList.toggle("active", name === "sem-resposta");
+  document.getElementById("tab-ult").classList.toggle("active", name === "ultima-chamada");
   if (name === "orcamento" || name === "enviado") orcLoad();
+  if (name === "sem-resposta") loadSemResposta();
+  if (name === "ultima-chamada") loadUltimaChamada();
 }
 
 function addBot(txt, qrs) {
@@ -616,6 +648,70 @@ function agendarLimpeza() {
   }, ms);
 }
 agendarLimpeza();
+</script>
+<script>
+var MSG_UC = "*ATENCAO* comunicado importante da Reparo Eletro.\nEstamos com mais de 150 equipamentos sem resposta na loja e ficamos sem espaco para trabalhar. Esta prejudicando muito a gente.\nPor este motivo conto com a sua colaboracao. Nao tendo resposta, retirada do equipamento ou solicitacao de entrega nos proximos 7 dias. Infelizmente teremos que fazer o descarte do mesmo. Conto com a sua colaboracao.";
+
+async function loadSemResposta() {
+  var list = document.getElementById("list-sem");
+  list.innerHTML = '<div style="font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;">Carregando...</div>';
+  var d = await fetch("/api/orcamento?action=sem-resposta").then(function(r){return r.json();});
+  document.getElementById("badge-sem").textContent = d.cards ? d.cards.length : 0;
+  if (!d.ok || !d.cards || !d.cards.length) {
+    list.innerHTML = '<div style="font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;">' + (d.error || "Nenhum cliente sem resposta ha mais de 48h") + '</div>';
+    return;
+  }
+  list.innerHTML = d.cards.map(function(card) {
+    var tel = (card.tel || "").replace(/\D/g, "");
+    if (tel.startsWith("55") && tel.length >= 12) tel = tel.slice(2);
+    if (tel.length === 10) tel = tel.slice(0,2) + "9" + tel.slice(2);
+    var waLink = tel ? "https://wa.me/55" + tel + "?text=" + encodeURIComponent(MSG_UC) : null;
+    var id = card.pipefyId;
+    return '<div class="sr-card">' +
+      '<div class="sr-nome">' + (card.nome || card.title) + '</div>' +
+      (card.desc ? '<div class="sr-desc">' + card.desc.substring(0, 80) + '...</div>' : '') +
+      '<div class="sr-age">&#x23F0; ' + card.age + ' dia(s) sem resposta</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">' +
+      (waLink ? '<a href="' + waLink + '" target="_blank" style="text-decoration:none;"><button class="sr-btn">&#x1F4CB; Copiar e Enviar</button></a>' : '') +
+      '<button class="sr-btn" style="background:transparent;border:1px solid var(--border);color:var(--muted);" id="btn-al-' + id + '" onclick="alertarCliente('' + id + '')">&#x2705; Mover para Ultima Chamada</button>' +
+      '</div></div>';
+  }).join("");
+}
+
+async function alertarCliente(pipefyId) {
+  var btn = document.getElementById("btn-al-" + pipefyId);
+  if (btn) { btn.disabled = true; btn.textContent = "..."; }
+  var d = await fetch("/api/orcamento?action=alertar", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({pipefyId: pipefyId})
+  }).then(function(r) { return r.json(); });
+  if (d.ok) {
+    showToast("&#x2705;", "Movido para Ultima Chamada!", "Prazo: " + (d.dataLimite || ""));
+    loadSemResposta();
+  } else {
+    showToast("&#x274C;", "Erro", d.error || "");
+    if (btn) { btn.disabled = false; btn.textContent = "&#x2705; Mover para Ultima Chamada"; }
+  }
+}
+
+async function loadUltimaChamada() {
+  var list = document.getElementById("list-ult");
+  list.innerHTML = '<div style="font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;">Carregando...</div>';
+  var d = await fetch("/api/orcamento?action=ultima-chamada").then(function(r) { return r.json(); });
+  document.getElementById("badge-ult").textContent = d.cards ? d.cards.length : 0;
+  if (!d.ok || !d.cards || !d.cards.length) {
+    list.innerHTML = '<div style="font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;">' + (d.error || "Nenhuma ficha em Ultima Chamada") + '</div>';
+    return;
+  }
+  list.innerHTML = d.cards.map(function(card) {
+    return '<div class="uc-card">' +
+      '<div class="sr-nome">' + (card.nome || card.title) + '</div>' +
+      (card.desc ? '<div class="sr-desc">' + card.desc.substring(0, 80) + '...</div>' : '') +
+      '<div class="uc-age">&#x1F6A8; ' + card.age + ' dia(s) &middot; ' + (card.dataEncerramento ? "Prazo: " + card.dataEncerramento : "Sem data limite") + '</div>' +
+      '</div>';
+  }).join("");
+}
 </script>
 </body>
 </html>
