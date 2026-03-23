@@ -619,28 +619,26 @@ module.exports = async function handler(req, res) {
     const { pipefyId } = req.body || {};
     if (!pipefyId) return res.status(400).json({ ok: false, error: "pipefyId obrigatorio" });
     try {
-      const phaseId   = await getPhaseIdByName("Ultima Chamada");
-      if (!phaseId) return res.status(200).json({ ok: false, error: "Fase Ultima Chamada não encontrada" });
-      const dateFieldId = await getDateFieldId();
-      const dataLimite  = addDiasUteis(7);
+      const phaseId    = "338413470"; // Ultima Chamada
+      const dataLimite = addDiasUteis(7);
 
-      // Move para Ultima Chamada
-      await pipefyQuery(`mutation {
-        moveCardToPhase(input: { card_id: "${pipefyId}", destination_phase_id: "${phaseId}" }) {
-          card { id }
-        }
-      }`);
-
-      // Preenche campo de data se encontrado
-      if (dateFieldId) {
+      // Move para Ultima Chamada (ignora erro se já estiver lá)
+      try {
         await pipefyQuery(`mutation {
-          updateCardField(input: { card_id: "${pipefyId}", field_id: "${dateFieldId}", new_value: "${dataLimite}" }) {
+          moveCardToPhase(input: { card_id: "${pipefyId}", destination_phase_id: "${phaseId}" }) {
             card { id }
           }
         }`);
-      }
+      } catch(moveErr) { /* ignora "already in phase" */ }
 
-      return res.status(200).json({ ok: true, pipefyId, phaseId, dataLimite, dateFieldId });
+      // Seta due_date nativa do card (+7 dias úteis)
+      await pipefyQuery(`mutation {
+        updateCard(input: { id: "${pipefyId}", due_date: "${dataLimite}T23:59:00-03:00" }) {
+          card { id due_date }
+        }
+      }`);
+
+      return res.status(200).json({ ok: true, pipefyId, phaseId, dataLimite });
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });
     }
