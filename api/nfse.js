@@ -598,6 +598,30 @@ module.exports = async function handler(req, res) {
     } catch(e) { return res.status(200).json({ ok:false, error:e.message }); }
   }
 
+  // POST debug-emitir — emite e retorna resposta raw do governo
+  if (req.method === "POST" && action === "debug-emitir") {
+    const { tomadorCpfCnpj, tomadorNome, discriminacao, valor } = req.body || {};
+    if (!tomadorCpfCnpj || !valor) return res.status(400).json({ ok:false, error:"tomadorCpfCnpj e valor obrigatorios" });
+    let certOpts;
+    try { certOpts = loadCert(); } catch(e) { return res.status(400).json({ ok:false, error:e.message }); }
+    try {
+      const numDPS = genId(1);
+      const xml    = montarDPS({ cpfcnpj: tomadorCpfCnpj, nome: tomadorNome, discriminacao, valor, numDPS });
+      const xmlAss = await assinarXML(xml, certOpts.pfx, certOpts.passphrase);
+      const b64gz  = await gzipBase64(xmlAss);
+      const { status, body } = await chamarAPI(b64gz, certOpts);
+      // Retorna tudo raw para diagnóstico
+      return res.status(200).json({ 
+        ok: false, 
+        httpStatus: status, 
+        rawBody: body,
+        xmlPreview: xml.slice(0, 500),
+        idLen: numDPS.length,
+        id: numDPS
+      });
+    } catch(e) { return res.status(200).json({ ok:false, error:e.message }); }
+  }
+
   // POST emitir
   if (req.method === "POST" && action === "emitir") {
     const { tomadorCpfCnpj, tomadorNome, discriminacao, valor } = req.body || {};
