@@ -587,8 +587,7 @@ module.exports = async function handler(req, res) {
   // ── GET ultima-chamada — espelho da fase Ultima Chamada do Pipefy
   if (action === "ultima-chamada") {
     try {
-      const phaseId = await getPhaseIdByName("Ultima Chamada");
-      if (!phaseId) return res.status(200).json({ ok: false, error: "Fase Ultima Chamada não encontrada" });
+      const phaseId = "338413470"; // Ultima Chamada
       const data = await pipefyQuery(`query {
         phase(id: "${phaseId}") {
           cards(first: 50) {
@@ -718,10 +717,15 @@ async function getPhaseIdByName(name) {
 
 // Busca ID do campo de data de encerramento
 async function getDateFieldId() {
-  const data = await pipefyQuery(`query { pipe(id: "${PIPE_ID}") { phases { name fields { id label type } } } }`);
-  const phases = data?.pipe?.phases || [];
-  for (const ph of phases) {
-    const f = (ph.fields || []).find(f => f.type === "date" && (f.label.toLowerCase().includes("encerr") || f.label.toLowerCase().includes("prazo") || f.label.toLowerCase().includes("data")));
+  const data = await pipefyQuery(`query { pipe(id: "${PIPE_ID}") { start_form_fields { id label type } phases { name fields { id label type } } } }`);
+  const allFields = [
+    ...(data?.pipe?.start_form_fields || []),
+    ...(data?.pipe?.phases || []).flatMap(ph => ph.fields || [])
+  ];
+  // Procura campo de data por prioridade: vencimento > encerr > prazo > data
+  const keywords = ["vencimento", "encerr", "prazo", "data", "date"];
+  for (const kw of keywords) {
+    const f = allFields.find(f => f.type === "date" && f.label.toLowerCase().includes(kw));
     if (f) return f.id;
   }
   return null;
