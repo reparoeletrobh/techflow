@@ -89,6 +89,14 @@ header{display:flex;align-items:center;padding:0 24px;height:52px;border-bottom:
 
 .toast{position:fixed;bottom:18px;right:18px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:11px 14px;font-family:var(--fm);font-size:11px;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;}
 .toast.show{transform:translateY(0);opacity:1;}
+.sr-card{background:var(--surface);border:1px solid var(--border);border-left:3px solid #f59e0b;border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;}
+.uc-card{background:var(--surface);border:1px solid var(--border);border-left:3px solid #ef4444;border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;}
+.sr-nome{font-size:13px;font-weight:600;}
+.sr-desc{font-size:11px;color:var(--muted);font-family:var(--fm);}
+.sr-age{font-family:var(--fm);font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(245,158,11,.12);color:#f59e0b;width:fit-content;}
+.uc-age{font-family:var(--fm);font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(239,68,68,.12);color:#ef4444;width:fit-content;}
+.sr-btn{font-family:var(--fm);font-size:10px;font-weight:600;padding:7px 14px;border-radius:7px;border:none;cursor:pointer;background:#f59e0b;color:#000;transition:all .15s;}
+.sr-btn:hover{filter:brightness(1.1);}
 </style>
 </head>
 <body>
@@ -105,6 +113,12 @@ header{display:flex;align-items:center;padding:0 24px;height:52px;border-bottom:
   <button class="tab" id="tab-orc" onclick="showPage('orcamento')">💬 Orçamento</button>
   <button class="tab" id="tab-env" onclick="showPage('enviado')">
     ✅ Enviados <span class="tab-badge" id="badge-env">0</span>
+  </button>
+  <button class="tab" id="tab-sem" onclick="showPage('sem-resposta')" style="color:#f59e0b;">
+    🔕 Sem Resposta <span class="tab-badge" id="badge-sem" style="background:rgba(245,158,11,.15);color:#f59e0b;">0</span>
+  </button>
+  <button class="tab" id="tab-ult" onclick="showPage('ultima-chamada')" style="color:#ef4444;">
+    🚨 Última Chamada <span class="tab-badge" id="badge-ult" style="background:rgba(239,68,68,.15);color:#ef4444;">0</span>
   </button>
 </div>
 
@@ -184,12 +198,13 @@ function showToast(icon, title, msg) {
 }
 
 function showPage(name) {
-  var pages = ["cadastro","orcamento","enviado"];
-  pages.forEach(function(p) { document.getElementById("page-"+p).classList.toggle("active", p === name); });
-  document.getElementById("tab-cad").classList.toggle("active", name === "cadastro");
-  document.getElementById("tab-orc").classList.toggle("active", name === "orcamento");
-  document.getElementById("tab-env").classList.toggle("active", name === "enviado");
-  if (name === "orcamento" || name === "enviado") orcLoad();
+  var pages=["cadastro","orcamento","enviado","sem-resposta","ultima-chamada"];
+  pages.forEach(function(p){document.getElementById("page-"+p).classList.toggle("active",p===name);});
+  var tabs={cad:"cadastro",orc:"orcamento",env:"enviado",sem:"sem-resposta",ult:"ultima-chamada"};
+  Object.keys(tabs).forEach(function(t){document.getElementById("tab-"+t).classList.toggle("active",name===tabs[t]);});
+  if(name==="orcamento"||name==="enviado") orcLoad();
+  if(name==="sem-resposta") loadSemResposta();
+  if(name==="ultima-chamada") loadUltimaChamada();
 }
 
 function addBot(txt, qrs) {
@@ -616,6 +631,18 @@ function agendarLimpeza() {
   }, ms);
 }
 agendarLimpeza();
+</script>
+<div class="page" id="page-sem-resposta"><div style="padding:10px 16px 0;display:flex;justify-content:space-between;align-items:center;"><span style="font-family:var(--fm);font-size:10px;color:var(--muted);">+48h sem resposta</span><button onclick="loadSemResposta()" style="font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">&#8635; Atualizar</button></div><div id="list-sem" style="padding:16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;"></div></div>
+<div class="page" id="page-ultima-chamada"><div style="padding:10px 16px 0;display:flex;justify-content:space-between;align-items:center;"><span style="font-family:var(--fm);font-size:10px;color:var(--muted);">Espelho Ultima Chamada</span><button onclick="loadUltimaChamada()" style="font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">&#8635; Atualizar</button></div><div id="list-ult" style="padding:16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;"></div></div>
+<script>
+var MSG_PARTES=["*ATENCAO* comunicado importante da Reparo Eletro.","Estamos com mais de 150 equipamentos sem resposta na loja e ficamos sem espaco para trabalhar. Esta prejudicando muito a gente.","Por este motivo conto com a sua colaboracao. Nao tendo resposta, retirada do equipamento ou solicitacao de entrega nos proximos 7 dias. Infelizmente teremos que fazer o descarte do mesmo. Conto com a sua colaboracao."];
+var MSG_UC=MSG_PARTES.join("\n");
+function srCard(c){var tel=(c.tel||'').replace(/[^0-9]/g,'');if(tel.slice(0,2)==='55'&&tel.length>=12)tel=tel.slice(2);if(tel.length===10)tel=tel.slice(0,2)+'9'+tel.slice(2);var wl=tel?'https://wa.me/55'+tel+'?text='+encodeURIComponent(MSG_UC):null;var id=c.pipefyId;var w=document.createElement('div');w.className='sr-card';var n=document.createElement('div');n.className='sr-nome';n.textContent=c.nome||c.title||'';w.appendChild(n);if(c.desc){var d=document.createElement('div');d.className='sr-desc';d.textContent=c.desc.substring(0,80)+'...';w.appendChild(d);}var a=document.createElement('div');a.className='sr-age';a.textContent=c.age+' dia(s) sem resposta';w.appendChild(a);var b=document.createElement('div');b.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;';if(wl){var lk=document.createElement('a');lk.href=wl;lk.target='_blank';lk.style.textDecoration='none';var bc=document.createElement('button');bc.className='sr-btn';bc.textContent='Copiar e Enviar';bc.onclick=(function(i){return function(){alertarCliente(i);};})(id);lk.appendChild(bc);b.appendChild(lk);}var bm=document.createElement('button');bm.className='sr-btn';bm.id='btn-al-'+id;bm.style.cssText='background:transparent;border:1px solid var(--border);color:var(--muted);';bm.textContent='Mover p/ Ultima Chamada';bm.onclick=(function(i){return function(){alertarCliente(i);};})(id);b.appendChild(bm);w.appendChild(b);return w;}
+function ucCard(c){var w=document.createElement('div');w.className='uc-card';var n=document.createElement('div');n.className='sr-nome';n.textContent=c.nome||c.title||'';w.appendChild(n);if(c.desc){var d=document.createElement('div');d.className='sr-desc';d.textContent=c.desc.substring(0,80)+'...';w.appendChild(d);}var a=document.createElement('div');a.className='uc-age';a.textContent=c.age+' dia(s) - '+(c.dataEncerramento?'Prazo: '+c.dataEncerramento:'Sem data limite');w.appendChild(a);return w;}
+function loadMsg(id,msg){var el=document.getElementById(id);if(!el)return;el.innerHTML='';var d=document.createElement('div');d.style.cssText='font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;';d.textContent=msg;el.appendChild(d);}
+async function loadSemResposta(){loadMsg('list-sem','Carregando...');try{var d=await fetch('/api/orcamento?action=sem-resposta').then(function(r){return r.json();});var bg=document.getElementById('badge-sem');if(bg)bg.textContent=d.cards?d.cards.length:0;if(!d.ok||!d.cards||!d.cards.length){loadMsg('list-sem',d.error||'Nenhum cliente sem resposta ha mais de 48h');return;}var list=document.getElementById('list-sem');list.innerHTML='';d.cards.forEach(function(card){list.appendChild(srCard(card));});}catch(e){loadMsg('list-sem','Erro: '+e.message);}}
+async function alertarCliente(pipefyId){var btn=document.getElementById('btn-al-'+pipefyId);if(btn){btn.disabled=true;btn.textContent='...';}try{var d=await fetch('/api/orcamento?action=alertar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pipefyId:pipefyId})}).then(function(r){return r.json();});if(d.ok){showToast('OK','Movido para Ultima Chamada!','Prazo: '+(d.dataLimite||''));loadSemResposta();}else{showToast('Erro',d.error||'','');if(btn){btn.disabled=false;btn.textContent='Mover p/ Ultima Chamada';}}}catch(e){showToast('Erro',e.message,'');if(btn){btn.disabled=false;btn.textContent='Mover p/ Ultima Chamada';}}}
+async function loadUltimaChamada(){loadMsg('list-ult','Carregando...');try{var d=await fetch('/api/orcamento?action=ultima-chamada').then(function(r){return r.json();});var bg=document.getElementById('badge-ult');if(bg)bg.textContent=d.cards?d.cards.length:0;if(!d.ok||!d.cards||!d.cards.length){loadMsg('list-ult',d.error||'Nenhuma ficha em Ultima Chamada');return;}var list=document.getElementById('list-ult');list.innerHTML='';d.cards.forEach(function(card){list.appendChild(ucCard(card));});}catch(e){loadMsg('list-ult','Erro: '+e.message);}}
 </script>
 </body>
 </html>
