@@ -650,67 +650,91 @@ function agendarLimpeza() {
 agendarLimpeza();
 </script>
 <script>
-var MSG_UC = "*ATENCAO* comunicado importante da Reparo Eletro.\nEstamos com mais de 150 equipamentos sem resposta na loja e ficamos sem espaco para trabalhar. Esta prejudicando muito a gente.\nPor este motivo conto com a sua colaboracao. Nao tendo resposta, retirada do equipamento ou solicitacao de entrega nos proximos 7 dias. Infelizmente teremos que fazer o descarte do mesmo. Conto com a sua colaboracao.";
+var MSG_PARTES = [
+  "*ATENCAO* comunicado importante da Reparo Eletro.",
+  "Estamos com mais de 150 equipamentos sem resposta na loja e ficamos sem espaco para trabalhar. Esta prejudicando muito a gente.",
+  "Por este motivo conto com a sua colaboracao. Nao tendo resposta, retirada do equipamento ou solicitacao de entrega nos proximos 7 dias. Infelizmente teremos que fazer o descarte do mesmo. Conto com a sua colaboracao."
+];
+var MSG_UC = MSG_PARTES.join("\n");
 
 async function loadSemResposta() {
   var list = document.getElementById("list-sem");
-  list.innerHTML = '<div style="font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;">Carregando...</div>';
-  var d = await fetch("/api/orcamento?action=sem-resposta").then(function(r){return r.json();});
-  document.getElementById("badge-sem").textContent = d.cards ? d.cards.length : 0;
-  if (!d.ok || !d.cards || !d.cards.length) {
-    list.innerHTML = '<div style="font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;">' + (d.error || "Nenhum cliente sem resposta ha mais de 48h") + '</div>';
-    return;
+  list.innerHTML = "<div style='font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;'>Carregando...</div>";
+  try {
+    var d = await fetch("/api/orcamento?action=sem-resposta").then(function(r){return r.json();});
+    var badge = document.getElementById("badge-sem");
+    if (badge) badge.textContent = d.cards ? d.cards.length : 0;
+    if (!d.ok || !d.cards || !d.cards.length) {
+      list.innerHTML = "<div style='font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;'>" + (d.error || "Nenhum cliente sem resposta ha mais de 48h") + "</div>";
+      return;
+    }
+    var html = "";
+    d.cards.forEach(function(card) {
+      var tel = (card.tel || "").replace(/\D/g, "");
+      if (tel.indexOf("55") === 0 && tel.length >= 12) tel = tel.slice(2);
+      if (tel.length === 10) tel = tel.slice(0,2) + "9" + tel.slice(2);
+      var waLink = tel ? "https://wa.me/55" + tel + "?text=" + encodeURIComponent(MSG_UC) : null;
+      var id = card.pipefyId;
+      html += "<div class='sr-card'>";
+      html += "<div class='sr-nome'>" + (card.nome || card.title) + "</div>";
+      if (card.desc) html += "<div class='sr-desc'>" + card.desc.substring(0, 80) + "...</div>";
+      html += "<div class='sr-age'>&#9200; " + card.age + " dia(s) sem resposta</div>";
+      html += "<div style='display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;'>";
+      if (waLink) html += "<a href='" + waLink + "' target='_blank' style='text-decoration:none;'><button class='sr-btn'>&#128203; Copiar e Enviar</button></a>";
+      html += "<button class='sr-btn' style='background:transparent;border:1px solid var(--border);color:var(--muted);' id='btn-al-" + id + "' onclick='alertarCliente("" + id + "")'>&#9989; Mover p/ Ultima Chamada</button>";
+      html += "</div></div>";
+    });
+    list.innerHTML = html;
+  } catch(e) {
+    list.innerHTML = "<div style='font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;'>Erro: " + e.message + "</div>";
   }
-  list.innerHTML = d.cards.map(function(card) {
-    var tel = (card.tel || "").replace(/\D/g, "");
-    if (tel.startsWith("55") && tel.length >= 12) tel = tel.slice(2);
-    if (tel.length === 10) tel = tel.slice(0,2) + "9" + tel.slice(2);
-    var waLink = tel ? "https://wa.me/55" + tel + "?text=" + encodeURIComponent(MSG_UC) : null;
-    var id = card.pipefyId;
-    return '<div class="sr-card">' +
-      '<div class="sr-nome">' + (card.nome || card.title) + '</div>' +
-      (card.desc ? '<div class="sr-desc">' + card.desc.substring(0, 80) + '...</div>' : '') +
-      '<div class="sr-age">&#x23F0; ' + card.age + ' dia(s) sem resposta</div>' +
-      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">' +
-      (waLink ? '<a href="' + waLink + '" target="_blank" style="text-decoration:none;"><button class="sr-btn">&#x1F4CB; Copiar e Enviar</button></a>' : '') +
-      '<button class="sr-btn" style="background:transparent;border:1px solid var(--border);color:var(--muted);" id="btn-al-' + id + '" onclick="alertarCliente('' + id + '')">&#x2705; Mover para Ultima Chamada</button>' +
-      '</div></div>';
-  }).join("");
 }
 
 async function alertarCliente(pipefyId) {
   var btn = document.getElementById("btn-al-" + pipefyId);
   if (btn) { btn.disabled = true; btn.textContent = "..."; }
-  var d = await fetch("/api/orcamento?action=alertar", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({pipefyId: pipefyId})
-  }).then(function(r) { return r.json(); });
-  if (d.ok) {
-    showToast("&#x2705;", "Movido para Ultima Chamada!", "Prazo: " + (d.dataLimite || ""));
-    loadSemResposta();
-  } else {
-    showToast("&#x274C;", "Erro", d.error || "");
-    if (btn) { btn.disabled = false; btn.textContent = "&#x2705; Mover para Ultima Chamada"; }
+  try {
+    var d = await fetch("/api/orcamento?action=alertar", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({pipefyId: pipefyId})
+    }).then(function(r){return r.json();});
+    if (d.ok) {
+      showToast("OK", "Movido para Ultima Chamada!", "Prazo: " + (d.dataLimite || ""));
+      loadSemResposta();
+    } else {
+      showToast("Erro", d.error || "Erro desconhecido", "");
+      if (btn) { btn.disabled = false; btn.textContent = "&#9989; Mover p/ Ultima Chamada"; }
+    }
+  } catch(e) {
+    showToast("Erro", e.message, "");
+    if (btn) { btn.disabled = false; btn.textContent = "&#9989; Mover p/ Ultima Chamada"; }
   }
 }
 
 async function loadUltimaChamada() {
   var list = document.getElementById("list-ult");
-  list.innerHTML = '<div style="font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;">Carregando...</div>';
-  var d = await fetch("/api/orcamento?action=ultima-chamada").then(function(r) { return r.json(); });
-  document.getElementById("badge-ult").textContent = d.cards ? d.cards.length : 0;
-  if (!d.ok || !d.cards || !d.cards.length) {
-    list.innerHTML = '<div style="font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;">' + (d.error || "Nenhuma ficha em Ultima Chamada") + '</div>';
-    return;
+  list.innerHTML = "<div style='font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;'>Carregando...</div>";
+  try {
+    var d = await fetch("/api/orcamento?action=ultima-chamada").then(function(r){return r.json();});
+    var badge = document.getElementById("badge-ult");
+    if (badge) badge.textContent = d.cards ? d.cards.length : 0;
+    if (!d.ok || !d.cards || !d.cards.length) {
+      list.innerHTML = "<div style='font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;'>" + (d.error || "Nenhuma ficha em Ultima Chamada") + "</div>";
+      return;
+    }
+    var html = "";
+    d.cards.forEach(function(card) {
+      html += "<div class='uc-card'>";
+      html += "<div class='sr-nome'>" + (card.nome || card.title) + "</div>";
+      if (card.desc) html += "<div class='sr-desc'>" + card.desc.substring(0, 80) + "...</div>";
+      html += "<div class='uc-age'>&#128680; " + card.age + " dia(s) - " + (card.dataEncerramento ? "Prazo: " + card.dataEncerramento : "Sem data limite") + "</div>";
+      html += "</div>";
+    });
+    list.innerHTML = html;
+  } catch(e) {
+    list.innerHTML = "<div style='font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;'>Erro: " + e.message + "</div>";
   }
-  list.innerHTML = d.cards.map(function(card) {
-    return '<div class="uc-card">' +
-      '<div class="sr-nome">' + (card.nome || card.title) + '</div>' +
-      (card.desc ? '<div class="sr-desc">' + card.desc.substring(0, 80) + '...</div>' : '') +
-      '<div class="uc-age">&#x1F6A8; ' + card.age + ' dia(s) &middot; ' + (card.dataEncerramento ? "Prazo: " + card.dataEncerramento : "Sem data limite") + '</div>' +
-      '</div>';
-  }).join("");
 }
 </script>
 </body>
