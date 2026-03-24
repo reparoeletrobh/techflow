@@ -1052,9 +1052,13 @@ module.exports = async function handler(req, res) {
       try {
         const LALA_KEY = "reparoeletro_lalamove";
         const lalaDb = (await dbGet(LALA_KEY)) || { fichas: [] };
-        if (!Array.isArray(lalaDb.fichas)) lalaDb.fichas = [];
+        if (!Array.isArray(lalaDb.fichas))    lalaDb.fichas    = [];
+        if (!Array.isArray(lalaDb.removedIds)) lalaDb.removedIds = [];
 
-        // Mesma query que fetchApprovedCards — unica que funciona com Pipefy
+        // clearTimestamp: só importa fichas que entraram na fase APÓS a última limpeza
+        const clearTs = lalaDb.clearTimestamp ? new Date(lalaDb.clearTimestamp).getTime() : 0;
+
+        // Busca com phases_history para detectar a ÚLTIMA entrada na fase
         const data = await pipefyQuery(`query {
           pipe(id: "${PIPE_ID}") {
             phases {
@@ -1064,6 +1068,7 @@ module.exports = async function handler(req, res) {
                   node {
                     id title
                     fields { name value }
+                    phases_history { phase { name } firstTimeIn lastTimeOut }
                   }
                 }
               }
@@ -1082,11 +1087,30 @@ module.exports = async function handler(req, res) {
           if (!tipo) continue;
 
           for (const { node } of (ph.cards?.edges || [])) {
-            const pipefyId = String(node.id);
-            if (!Array.isArray(lalaDb.removedIds)) lalaDb.removedIds = [];
+            const pipefyId  = String(node.id);
             const removedKey = pipefyId + ":" + tipo;
+
+            // Regra 1: já está na fila ativa
             if (lalaDb.fichas.find(f => f.pipefyId === pipefyId && f.tipo === tipo)) continue;
-            if (lalaDb.removedIds.includes(removedKey)) continue; // já foi removida, não reimporta
+            // Regra 2: foi removida manualmente → não volta NUNCA
+            if (lalaDb.removedIds.includes(removedKey)) continue;
+
+            // Regra 3: pega a entrada mais recente na fase usando phases_history
+            // O card pode ter entrado múltiplas vezes (saiu e voltou) — pega a última
+            const histEntradas = (node.phases_history || []).filter(h =>
+              h.phase?.name?.toLowerCase().trim() === l
+            );
+            // Ordena por firstTimeIn desc para pegar a mais recente
+            histEntradas.sort((a, b) =>
+              new Date(b.firstTimeIn).getTime() - new Date(a.firstTimeIn).getTime()
+            );
+            const ultimaEntrada = histEntradas[0];
+            const entradaMs = ultimaEntrada?.firstTimeIn
+              ? new Date(ultimaEntrada.firstTimeIn).getTime()
+              : 0;
+
+            // Regra 4: só importa se a ÚLTIMA entrada na fase foi APÓS o clearTimestamp
+            if (clearTs > 0 && entradaMs <= clearTs) continue;
 
             const fields   = node.fields || [];
             const endField = fields.find(f => f.name.toLowerCase().includes("endere"));
