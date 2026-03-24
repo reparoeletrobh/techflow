@@ -340,12 +340,12 @@ async function criarCard() {
     var coletaTexto = "";
     if (coletaInfo) {
       coletaTexto = coletaInfo.tipo === "agora"
-        ? " | Coleta: IMEDIATA"
-        : " | Coleta agendada: " + coletaInfo.dataHora;
+        ? "Coleta: IMEDIATA | "
+        : "Coleta agendada: " + coletaInfo.dataHora + " | ";
     }
     var r = await fetch("/api/orcamento?action=criar-card", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nome: dados.nome, telefone: dados.telefone, aparelho: dados.aparelho, defeito: dados.defeito + coletaTexto, endereco: dados.endereco || "", phaseId: solicitarColetaId }),
+      body: JSON.stringify({ nome: dados.nome, telefone: dados.telefone, aparelho: dados.aparelho, defeito: coletaTexto + dados.defeito, endereco: dados.endereco || "", phaseId: solicitarColetaId }),
     });
     var d = await r.json(); hideTyping();
     if (d.ok) { addBot("✅ Card criado no Pipefy!\n\n" + dados.nome + " cadastrado em Solicitar Coleta.", ["Novo cadastro"]); }
