@@ -144,7 +144,7 @@ module.exports = async function handler(req, res) {
   // ── POST vender ────────────────────────────────────────────
   // Cria ficha no financeiro em "emitir_nf" e marca produto como vendido
   if (req.method === "POST" && action === "vender") {
-    const { produtoId, nomeCliente, telefone, cpfCnpj, vendedor } = req.body || {};
+    const { produtoId, nomeCliente, telefone, cpfCnpj, vendedor, modalidade } = req.body || {};
     if (!produtoId || !nomeCliente)
       return res.status(400).json({ ok: false, error: "produtoId e nomeCliente obrigatórios" });
 
@@ -183,8 +183,12 @@ module.exports = async function handler(req, res) {
     if (!Array.isArray(fin.syncedIds)) fin.syncedIds = [];
     fin.records.unshift(ficha);
 
-    // Marca produto como vendido
-    db.produtos[idx] = { ...p, vendido: true, soldAt: now, compradorNome: nomeCliente, vendedor: vendedor||null, updatedAt: now };
+    // Marca produto como vendido — salva vendedor (pessoa) e modalidade (canal) separados
+    db.produtos[idx] = { ...p, vendido: true, soldAt: now, compradorNome: nomeCliente,
+      nomeVendedor: vendedor||null, modalidade: modalidade||null,
+      // retrocompatibilidade: vendedor mantém a modalidade para código legado
+      vendedor: modalidade||vendedor||null,
+      updatedAt: now };
 
     await Promise.all([dbSet(VENDAS_KEY, db), dbSet(FIN_KEY, fin)]);
 
