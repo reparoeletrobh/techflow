@@ -1252,6 +1252,15 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    // ── POST reset-lala-timestamp — zera clearTimestamp para forçar sync completo
+    if (action === "reset-lala-timestamp") {
+      const LALA_KEY = "reparoeletro_lalamove";
+      const lalaDb = (await dbGet(LALA_KEY)) || {};
+      delete lalaDb.clearTimestamp;
+      await dbSet(LALA_KEY, lalaDb);
+      return res.status(200).json({ ok: true, msg: "clearTimestamp removido — próximo sync importa tudo" });
+    }
+
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch (err) {
