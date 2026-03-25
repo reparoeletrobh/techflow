@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cpolygon%20points%3D%2218%2C2%208%2C18%2015%2C18%2014%2C30%2024%2C14%2017%2C14%22%20fill%3D%22%23f97316%22%20stroke%3D%22%23f97316%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vendas</title>
@@ -145,6 +146,48 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
 
 @media(max-width:900px){main{grid-template-columns:1fr;}.form-panel{border-right:none;border-bottom:1px solid var(--border);}}
 
+/* SEARCH BAR */
+.search-wrap{position:relative;margin-bottom:16px;}
+.search-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px 9px 34px;font-family:var(--fb);font-size:13px;color:var(--text);outline:none;transition:border 0.15s;}
+.search-input:focus{border-color:var(--accent);}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none;}
+
+/* VEND-GRID 3 cols */
+.vend-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.vend-btn{padding:10px;border-radius:9px;border:2px solid var(--border);background:var(--surface2);color:var(--muted);font-family:var(--fb);font-size:12px;font-weight:500;cursor:pointer;transition:all 0.15s;text-align:center;}
+.vend-btn:hover{border-color:#444;color:var(--text);}
+.vend-btn.selected{border-color:var(--green);background:rgba(34,197,94,0.08);color:var(--green);}
+
+/* MODAL-GRID 3 cols */
+.modal-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;}
+.modal-tipo-btn{padding:10px 6px;border-radius:9px;border:2px solid var(--border);background:var(--surface2);color:var(--muted);font-family:var(--fb);font-size:11px;font-weight:500;cursor:pointer;transition:all 0.15s;text-align:center;}
+.modal-tipo-btn:hover{border-color:#444;color:var(--text);}
+.modal-tipo-btn.selected.online{border-color:#3b9eff;background:rgba(59,158,255,0.08);color:#3b9eff;}
+.modal-tipo-btn.selected.loja{border-color:#f59e0b;background:rgba(245,158,11,0.08);color:#f59e0b;}
+.modal-tipo-btn.selected.troca{border-color:#8b5cf6;background:rgba(139,92,246,0.08);color:#8b5cf6;}
+
+/* RELATÓRIO */
+.rel-filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;}
+.rel-filter-label{font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
+.rel-input{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-family:var(--fm);font-size:11px;color:var(--text);outline:none;}
+.rel-input:focus{border-color:var(--accent);}
+.rel-btn{font-family:var(--fm);font-size:11px;font-weight:600;padding:7px 14px;border-radius:7px;background:var(--accent);color:#000;border:none;cursor:pointer;}
+.rel-btn:hover{filter:brightness(1.1);}
+
+.rel-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:22px;}
+.rel-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.rel-card-label{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:6px;}
+.rel-card-val{font-family:var(--fh);font-size:24px;font-weight:800;}
+.rel-card-sub{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px;}
+
+.rel-section{margin-bottom:20px;}
+.rel-section-title{font-family:var(--fm);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+.rel-table{width:100%;border-collapse:collapse;}
+.rel-table th{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);}
+.rel-table td{padding:9px 10px;border-bottom:1px solid var(--border);font-size:12px;}
+.rel-table tr:hover td{background:var(--surface);}
+.rel-bar{height:6px;border-radius:3px;background:var(--accent);display:inline-block;margin-right:8px;vertical-align:middle;}
+
 /* LIGHTBOX */
 .lightbox{position:fixed;inset:0;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;z-index:9999;opacity:0;pointer-events:none;transition:opacity 0.2s;backdrop-filter:blur(6px);}
 .lightbox.open{opacity:1;pointer-events:all;}
@@ -228,8 +271,45 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
       <button class="tab-btn vendidos-tab" id="tab-vendidos" onclick="setTab('vendidos')">
         💚 Vendidos <span class="tab-badge" id="badge-vendidos">0</span>
       </button>
+      <button class="tab-btn" id="tab-relatorio" onclick="setTab('relatorio')" style="color:#8b5cf6;">
+        📊 Relatório
+      </button>
     </div>
+    <!-- BUSCA (visível em estoque e vendidos) -->
+    <div class="search-wrap" id="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input class="search-input" id="search-input" type="text" placeholder="Buscar por código, tipo, descrição, comprador..." oninput="renderTable()"/>
+    </div>
+    <!-- TABELA ESTOQUE/VENDIDOS -->
     <div id="table-wrap"><div class="empty-table">Carregando...</div></div>
+    <!-- PAINEL RELATÓRIO -->
+    <div id="rel-panel" style="display:none;">
+      <div class="rel-filters">
+        <div>
+          <div class="rel-filter-label">De</div>
+          <input class="rel-input" type="date" id="rel-de"/>
+        </div>
+        <div>
+          <div class="rel-filter-label">Até</div>
+          <input class="rel-input" type="date" id="rel-ate"/>
+        </div>
+        <button class="rel-btn" onclick="renderRelatorio()">Filtrar</button>
+        <button class="rel-btn" style="background:var(--surface2);color:var(--muted);border:1px solid var(--border);" onclick="relClearFilter()">Tudo</button>
+      </div>
+      <div class="rel-cards" id="rel-cards"></div>
+      <div class="rel-section">
+        <div class="rel-section-title">Por Modalidade</div>
+        <table class="rel-table" id="rel-modalidade"></table>
+      </div>
+      <div class="rel-section">
+        <div class="rel-section-title">Por Vendedor</div>
+        <table class="rel-table" id="rel-vendedor"></table>
+      </div>
+      <div class="rel-section">
+        <div class="rel-section-title">Vendedor × Modalidade</div>
+        <table class="rel-table" id="rel-cruzado"></table>
+      </div>
+    </div>
   </div>
 </main>
 
@@ -251,10 +331,19 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
       <input class="f-input" id="v-cpf" type="text" placeholder="000.000.000-00" oninput="maskCpfCnpj(this)"/>
     </div>
     <div class="field">
-      <label class="field-label">Canal de Venda *</label>
+      <label class="field-label">Vendedor *</label>
       <div class="vend-grid">
-        <button class="vend-btn online" id="vend-online" onclick="setVendedor('Online')">🌐 Online</button>
-        <button class="vend-btn loja"   id="vend-loja"   onclick="setVendedor('Loja')">🏪 Loja</button>
+        <button class="vend-btn" id="vend-ricardo" onclick="setVendedor('Ricardo')">Ricardo</button>
+        <button class="vend-btn" id="vend-nathan"  onclick="setVendedor('Nathan')">Nathan</button>
+        <button class="vend-btn" id="vend-pedro"   onclick="setVendedor('Pedro')">Pedro</button>
+      </div>
+    </div>
+    <div class="field">
+      <label class="field-label">Modalidade *</label>
+      <div class="modal-grid">
+        <button class="modal-tipo-btn online" id="mod-online" onclick="setModalidade('Online')">🌐 Online</button>
+        <button class="modal-tipo-btn loja"   id="mod-loja"   onclick="setModalidade('Loja')">🏪 Loja</button>
+        <button class="modal-tipo-btn troca"  id="mod-troca"  onclick="setModalidade('Troca')">🔄 Troca</button>
       </div>
     </div>
     <div class="modal-actions">
@@ -272,7 +361,7 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
 <script>
 let produtos = [], editId = null, selVenderId = null;
 let fotos    = [null,null,null,null,null,null];
-let tipoSel  = null, vendedorSel = null;
+let tipoSel  = null, vendedorSel = null, modalidadeSel = null;
 
 const PREFIXOS = { Microondas: 'MI', Bebedouro: 'BE' };
 
@@ -440,9 +529,9 @@ function abrirVender(id) {
   document.getElementById('v-nome').value='';
   document.getElementById('v-tel').value='';
   document.getElementById('v-cpf').value='';
-  vendedorSel=null;
-  document.getElementById('vend-online').classList.remove('selected');
-  document.getElementById('vend-loja').classList.remove('selected');
+  vendedorSel=null; modalidadeSel=null;
+  ['vend-ricardo','vend-nathan','vend-pedro'].forEach(id=>document.getElementById(id).classList.remove('selected'));
+  ['mod-online','mod-loja','mod-troca'].forEach(id=>document.getElementById(id).classList.remove('selected'));
   document.getElementById('vender-modal').classList.add('open');
   setTimeout(()=>document.getElementById('v-nome').focus(),200);
 }
@@ -455,17 +544,27 @@ function maskCpfCnpj(input){
 }
 function setVendedor(v) {
   vendedorSel = v;
-  document.getElementById('vend-online').className = 'vend-btn online' + (v==='Online'?' selected':'');
-  document.getElementById('vend-loja').className   = 'vend-btn loja'   + (v==='Loja'  ?' selected':'');
+  ['Ricardo','Nathan','Pedro'].forEach(n => {
+    const el = document.getElementById('vend-'+n.toLowerCase());
+    el.className = 'vend-btn' + (v===n ? ' selected' : '');
+  });
+}
+function setModalidade(m) {
+  modalidadeSel = m;
+  ['online','loja','troca'].forEach(k => {
+    const el = document.getElementById('mod-'+k);
+    el.className = 'modal-tipo-btn ' + k + (m.toLowerCase()===k ? ' selected' : '');
+  });
 }
 
 async function confirmarVenda(){
   const nome=document.getElementById('v-nome').value.trim();
   if(!nome) return showToast('⚠️','Nome obrigatório','');
-  if(!vendedorSel) return showToast('⚠️','Selecione o canal de venda','Online ou Loja');
+  if(!vendedorSel) return showToast('⚠️','Selecione o vendedor','Ricardo, Nathan ou Pedro');
+  if(!modalidadeSel) return showToast('⚠️','Selecione a modalidade','Online, Loja ou Troca');
   const btn=document.getElementById('v-confirm');
   btn.disabled=true; btn.textContent='⏳';
-  const res=await api('vender',{produtoId:selVenderId,nomeCliente:nome,telefone:document.getElementById('v-tel').value.trim(),cpfCnpj:document.getElementById('v-cpf').value.trim(),vendedor:vendedorSel});
+  const res=await api('vender',{produtoId:selVenderId,nomeCliente:nome,telefone:document.getElementById('v-tel').value.trim(),cpfCnpj:document.getElementById('v-cpf').value.trim(),vendedor:vendedorSel,modalidade:modalidadeSel});
   if(res.ok){
     produtos=produtos.map(p=>p.id===selVenderId?res.produto:p);
     renderTable(); closeModal();
@@ -492,23 +591,42 @@ function setTab(tab) {
   curTab = tab;
   document.getElementById('tab-estoque').classList.toggle('active', tab==='estoque');
   document.getElementById('tab-vendidos').classList.toggle('active', tab==='vendidos');
+  document.getElementById('tab-relatorio').classList.toggle('active', tab==='relatorio');
   document.getElementById('tab-estoque').classList.remove('vendidos-tab');
   document.getElementById('tab-vendidos').classList.toggle('vendidos-tab', tab==='vendidos');
-  renderTable();
+  // show/hide panels
+  document.getElementById('table-wrap').style.display = tab==='relatorio' ? 'none' : '';
+  document.getElementById('search-wrap').style.display = tab==='relatorio' ? 'none' : '';
+  document.getElementById('rel-panel').style.display   = tab==='relatorio' ? '' : 'none';
+  if (tab==='relatorio') { initRelDates(); renderRelatorio(); }
+  else renderTable();
 }
 
 // ── TABLE ─────────────────────────────────────────────────────
 function renderTable(){
+  const q = (document.getElementById('search-input')?.value||'').toLowerCase().trim();
   const estoque  = produtos.filter(p => !p.vendido);
   const vendidos = produtos.filter(p =>  p.vendido);
 
   document.getElementById('badge-estoque').textContent  = estoque.length;
   document.getElementById('badge-vendidos').textContent = vendidos.length;
 
-  const lista = curTab === 'estoque' ? estoque : vendidos;
+  let lista = curTab === 'estoque' ? estoque : vendidos;
+
+  // Filtro de busca
+  if (q) {
+    lista = lista.filter(p =>
+      (p.codigo||'').toLowerCase().includes(q) ||
+      (p.tipo||'').toLowerCase().includes(q) ||
+      (p.descricao||'').toLowerCase().includes(q) ||
+      (p.compradorNome||'').toLowerCase().includes(q) ||
+      (p.vendedor||'').toLowerCase().includes(q) ||
+      (p.modalidade||'').toLowerCase().includes(q)
+    );
+  }
 
   if(!lista.length){
-    const msg = curTab==='estoque' ? '📦 Nenhum equipamento em estoque.' : '💚 Nenhuma venda registrada ainda.';
+    const msg = q ? '🔍 Nenhum resultado para "'+q+'".' : curTab==='estoque' ? '📦 Nenhum equipamento em estoque.' : '💚 Nenhuma venda registrada ainda.';
     document.getElementById('table-wrap').innerHTML=`<div class="empty-table">${msg}</div>`;
     return;
   }
@@ -523,16 +641,18 @@ function renderTable(){
 
     if (curTab === 'vendidos') {
       const dataVenda = p.soldAt ? new Date(p.soldAt).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}) : '—';
-      const canalColor = p.vendedor==='Online' ? '#3b9eff' : '#f59e0b';
-      const canalBg    = p.vendedor==='Online' ? 'rgba(59,158,255,0.12)' : 'rgba(245,158,11,0.12)';
-      const vendBadge = p.vendedor ? `<span style="font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:4px;background:${canalBg};color:${canalColor}">${p.vendedor}</span>` : '—';
+      const modColor = p.modalidade==='Online' ? '#3b9eff' : p.modalidade==='Troca' ? '#8b5cf6' : '#f59e0b';
+      const modBg    = p.modalidade==='Online' ? 'rgba(59,158,255,0.12)' : p.modalidade==='Troca' ? 'rgba(139,92,246,0.12)' : 'rgba(245,158,11,0.12)';
+      const modBadge = (p.modalidade||p.vendedor) ? `<span style="font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:4px;background:${modBg};color:${modColor}">${p.modalidade||p.vendedor}</span>` : '—';
+      const vendPessoa = p.vendedor && !['Online','Loja','Troca'].includes(p.vendedor) ? p.vendedor : (p.nomeVendedor||'—');
       return `<tr class="vendido-row" data-fotos="${fotosJson}">
         <td><div class="prod-fotos">${thumbs}${extra}</div></td>
         <td class="td-code">${p.codigo}</td>
         <td>${tipoBadge}</td>
         <td class="td-desc" title="${p.descricao}">${p.descricao}</td>
         <td class="td-comprador">${p.compradorNome||'—'}</td>
-        <td>${vendBadge}</td>
+        <td style="font-size:11px;color:var(--muted);">${vendPessoa}</td>
+        <td>${modBadge}</td>
         <td class="td-price">${pFmt}</td>
         <td class="td-data">${dataVenda}</td>
         <td style="white-space:nowrap;">
@@ -558,7 +678,7 @@ function renderTable(){
 
   const thead = curTab === 'estoque'
     ? '<tr><th>Fotos</th><th>Código</th><th>Tipo</th><th>Descrição</th><th>Capacidade</th><th>Preço</th><th>Ações</th></tr>'
-    : '<tr><th>Fotos</th><th>Código</th><th>Tipo</th><th>Descrição</th><th>Comprador</th><th>Canal</th><th>Preço</th><th>Data</th><th></th></tr>';
+    : '<tr><th>Fotos</th><th>Código</th><th>Tipo</th><th>Descrição</th><th>Comprador</th><th>Vendedor</th><th>Modalidade</th><th>Preço</th><th>Data</th><th></th></tr>';
 
   document.getElementById('table-wrap').innerHTML=`
     <table class="prod-table">
@@ -612,6 +732,110 @@ function lbKeyHandler(e) {
 renderFotoGrid();
 gerarCodigo();
 load();
+
+// ── RELATÓRIO ─────────────────────────────────────────────────
+function initRelDates() {
+  const ate = new Date();
+  const de  = new Date(); de.setDate(de.getDate() - 30);
+  const fmt = d => d.toISOString().slice(0,10);
+  if (!document.getElementById('rel-de').value)  document.getElementById('rel-de').value  = fmt(de);
+  if (!document.getElementById('rel-ate').value) document.getElementById('rel-ate').value = fmt(ate);
+}
+
+function relClearFilter() {
+  document.getElementById('rel-de').value  = '';
+  document.getElementById('rel-ate').value = '';
+  renderRelatorio();
+}
+
+function renderRelatorio() {
+  const deVal  = document.getElementById('rel-de').value;
+  const ateVal = document.getElementById('rel-ate').value;
+  const deMs   = deVal  ? new Date(deVal  + 'T00:00:00').getTime() : 0;
+  const ateMs  = ateVal ? new Date(ateVal + 'T23:59:59').getTime() : Infinity;
+
+  const vendidos = produtos.filter(p => {
+    if (!p.vendido) return false;
+    const ts = p.soldAt ? new Date(p.soldAt).getTime() : 0;
+    return ts >= deMs && ts <= ateMs;
+  });
+
+  const total   = vendidos.length;
+  const receita = vendidos.reduce((s,p) => s + (parseFloat(p.preco)||0), 0);
+  const ticketM = total ? receita / total : 0;
+  const fmt     = v => v.toLocaleString('pt-BR',{style:'currency',currency:'BRL',minimumFractionDigits:2});
+
+  // Cards resumo
+  document.getElementById('rel-cards').innerHTML = `
+    <div class="rel-card">
+      <div class="rel-card-label">Total Vendas</div>
+      <div class="rel-card-val">${total}</div>
+      <div class="rel-card-sub">equipamentos</div>
+    </div>
+    <div class="rel-card">
+      <div class="rel-card-label">Receita</div>
+      <div class="rel-card-val" style="font-size:18px;color:var(--green)">${fmt(receita)}</div>
+    </div>
+    <div class="rel-card">
+      <div class="rel-card-label">Ticket Médio</div>
+      <div class="rel-card-val" style="font-size:18px;color:var(--accent)">${fmt(ticketM)}</div>
+    </div>`;
+
+  // Helper: agrupa e renderiza tabela
+  function buildTable(elId, groupFn, label) {
+    const map = {};
+    vendidos.forEach(p => {
+      const k = groupFn(p) || 'Indefinido';
+      if (!map[k]) map[k] = {qtd:0, rec:0};
+      map[k].qtd++;
+      map[k].rec += parseFloat(p.preco)||0;
+    });
+    const sorted = Object.entries(map).sort((a,b) => b[1].qtd - a[1].qtd);
+    const maxQtd = sorted[0]?.[1]?.qtd || 1;
+    const rows = sorted.map(([k,v]) => {
+      const barW = Math.round((v.qtd/maxQtd)*80);
+      return `<tr>
+        <td style="font-weight:500">${k}</td>
+        <td><span class="rel-bar" style="width:${barW}px"></span>${v.qtd}</td>
+        <td style="color:var(--green);font-family:var(--fm);font-size:11px">${fmt(v.rec)}</td>
+        <td style="color:var(--muted);font-family:var(--fm);font-size:10px">${fmt(v.rec/v.qtd)}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById(elId).innerHTML = `
+      <thead><tr><th>${label}</th><th>Qtd</th><th>Receita</th><th>Ticket Médio</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:20px">Sem dados</td></tr>'}</tbody>`;
+  }
+
+  buildTable('rel-modalidade', p => p.modalidade || p.vendedor, 'Modalidade');
+  buildTable('rel-vendedor',   p => {
+    // Vendedor = pessoa (não Online/Loja/Troca)
+    if (p.nomeVendedor) return p.nomeVendedor;
+    if (p.vendedor && !['Online','Loja','Troca'].includes(p.vendedor)) return p.vendedor;
+    return 'Indefinido';
+  }, 'Vendedor');
+
+  // Tabela cruzada vendedor × modalidade
+  const vendedores = [...new Set(vendidos.map(p => {
+    if (p.nomeVendedor) return p.nomeVendedor;
+    if (p.vendedor && !['Online','Loja','Troca'].includes(p.vendedor)) return p.vendedor;
+    return 'Indefinido';
+  }))].sort();
+  const modalidades = [...new Set(vendidos.map(p => p.modalidade || p.vendedor || 'Indefinido'))].sort();
+
+  let cruzHead = '<thead><tr><th>Vendedor</th>' + modalidades.map(m=>`<th>${m}</th>`).join('') + '<th>Total</th></tr></thead>';
+  let cruzBody = '<tbody>' + vendedores.map(v => {
+    const rowVendas = vendidos.filter(p => {
+      const pv = p.nomeVendedor || (!['Online','Loja','Troca'].includes(p.vendedor||'') ? p.vendedor : null) || 'Indefinido';
+      return pv === v;
+    });
+    const cols = modalidades.map(m => {
+      const n = rowVendas.filter(p => (p.modalidade||p.vendedor||'Indefinido') === m).length;
+      return `<td style="text-align:center;font-family:var(--fm);font-size:11px">${n||'—'}</td>`;
+    }).join('');
+    return `<tr><td style="font-weight:500">${v}</td>${cols}<td style="font-family:var(--fm);font-size:11px;font-weight:600;color:var(--accent)">${rowVendas.length}</td></tr>`;
+  }).join('') + '</tbody>';
+  document.getElementById('rel-cruzado').innerHTML = cruzHead + cruzBody;
+}
 </script>
 <!-- LIGHTBOX -->
 <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
