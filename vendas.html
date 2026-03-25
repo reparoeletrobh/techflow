@@ -309,6 +309,13 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
         <div class="rel-section-title">Vendedor × Modalidade</div>
         <table class="rel-table" id="rel-cruzado"></table>
       </div>
+      <div class="rel-section">
+        <div class="rel-section-title">Equipamentos Vendidos</div>
+        <table class="rel-table" id="rel-lista">
+          <thead><tr><th>Data</th><th>Código</th><th>Tipo</th><th>Descrição</th><th>Comprador</th><th>Vendedor</th><th>Modalidade</th><th>Preço</th></tr></thead>
+          <tbody id="rel-lista-body"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 </main>
@@ -835,6 +842,30 @@ function renderRelatorio() {
     return `<tr><td style="font-weight:500">${v}</td>${cols}<td style="font-family:var(--fm);font-size:11px;font-weight:600;color:var(--accent)">${rowVendas.length}</td></tr>`;
   }).join('') + '</tbody>';
   document.getElementById('rel-cruzado').innerHTML = cruzHead + cruzBody;
+
+  // Lista detalhada de equipamentos vendidos no período
+  const listaRows = vendidos
+    .sort((a,b) => new Date(b.soldAt).getTime() - new Date(a.soldAt).getTime())
+    .map(p => {
+      const data = p.soldAt ? new Date(p.soldAt).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}) : '—';
+      const preco = parseFloat(p.preco).toLocaleString('pt-BR',{style:'currency',currency:'BRL',minimumFractionDigits:2});
+      const modColor = p.modalidade==='Online'||p.vendedor==='Online' ? '#3b9eff'
+                     : p.modalidade==='Troca'||p.vendedor==='Troca'   ? '#8b5cf6' : '#f59e0b';
+      const mod = p.modalidade||p.vendedor||'—';
+      const vend = p.nomeVendedor || (!['Online','Loja','Troca'].includes(p.vendedor||'') ? p.vendedor : null) || '—';
+      return `<tr>
+        <td style="font-family:var(--fm);font-size:10px;color:var(--muted);white-space:nowrap">${data}</td>
+        <td style="font-family:var(--fm);font-size:11px;color:var(--accent)">${p.codigo}</td>
+        <td style="font-size:11px">${p.tipo||'—'}</td>
+        <td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.descricao}">${p.descricao}</td>
+        <td style="font-size:11px;color:var(--muted)">${p.compradorNome||'—'}</td>
+        <td style="font-size:11px">${vend}</td>
+        <td><span style="font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:4px;background:${modColor}22;color:${modColor}">${mod}</span></td>
+        <td style="font-family:var(--fm);font-size:11px;color:var(--green);white-space:nowrap">${preco}</td>
+      </tr>`;
+    }).join('');
+  document.getElementById('rel-lista-body').innerHTML =
+    listaRows || '<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:20px">Sem vendas no período</td></tr>';
 }
 </script>
 <!-- LIGHTBOX -->
