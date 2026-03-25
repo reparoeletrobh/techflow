@@ -1059,6 +1059,7 @@ module.exports = async function handler(req, res) {
         const clearTs = lalaDb.clearTimestamp ? new Date(lalaDb.clearTimestamp).getTime() : 0;
 
         // Busca com phases_history para detectar a ÚLTIMA entrada na fase
+        // updated_at = quando o card foi movido pela última vez (incluindo para fase atual)
         const data = await pipefyQuery(`query {
           pipe(id: "${PIPE_ID}") {
             phases {
@@ -1066,7 +1067,7 @@ module.exports = async function handler(req, res) {
               cards(first: 50) {
                 edges {
                   node {
-                    id title
+                    id title updated_at
                     fields { name value }
                     phases_history { phase { name } firstTimeIn lastTimeOut }
                   }
@@ -1095,21 +1096,29 @@ module.exports = async function handler(req, res) {
             // Regra 2: foi removida manualmente → não volta NUNCA
             if (lalaDb.removedIds.includes(removedKey)) continue;
 
-            // Regra 3: pega a entrada mais recente na fase usando phases_history
-            // O card pode ter entrado múltiplas vezes (saiu e voltou) — pega a última
+            // Regra 3: determina quando o card entrou na fase atual
+            // Tenta phases_history primeiro, fallback para updated_at
             const histEntradas = (node.phases_history || []).filter(h =>
               h.phase?.name?.toLowerCase().trim() === l
             );
-            // Ordena por firstTimeIn desc para pegar a mais recente
             histEntradas.sort((a, b) =>
               new Date(b.firstTimeIn).getTime() - new Date(a.firstTimeIn).getTime()
             );
             const ultimaEntrada = histEntradas[0];
-            const entradaMs = ultimaEntrada?.firstTimeIn
-              ? new Date(ultimaEntrada.firstTimeIn).getTime()
-              : 0;
 
-            // Regra 4: só importa se a ÚLTIMA entrada na fase foi APÓS o clearTimestamp
+            let entradaMs = 0;
+            if (ultimaEntrada?.firstTimeIn) {
+              // Tem histórico — usa firstTimeIn da última entrada
+              entradaMs = new Date(ultimaEntrada.firstTimeIn).getTime();
+            } else if (node.updated_at) {
+              // Sem histórico (card novo ou fase inicial) — usa updated_at como proxy
+              entradaMs = node.updated_at * 1000;
+            }
+            // Se não temos nenhuma referência de tempo, deixa passar (entradaMs=0 com clearTs>0 bloquearia)
+            // Nesse caso assumimos que é recente
+            if (entradaMs === 0) entradaMs = Date.now();
+
+            // Regra 4: só importa se a entrada na fase foi APÓS o clearTimestamp
             if (clearTs > 0 && entradaMs <= clearTs) continue;
 
             const fields   = node.fields || [];
