@@ -185,12 +185,13 @@ module.exports = async function handler(req, res) {
   }
 
   if (req.method === "POST" && action === "marcar-cadastrado-vendas") {
-    const { id } = req.body || {};
+    const { id, dadosVendas } = req.body || {};
     if (!id) return res.status(400).json({ ok: false, error: "id obrigatorio" });
     const db = await dbGet(COMPRA_KEY) || defaultDB();
     const f  = db.fichas.find(f => f.id === id);
     if (!f) return res.status(404).json({ ok: false, error: "Ficha nao encontrada" });
     f.cadastradoVendas = true;
+    if (dadosVendas) f.dadosVendas = dadosVendas;
     await dbSet(COMPRA_KEY, db);
     return res.status(200).json({ ok: true });
   }
