@@ -575,11 +575,24 @@ async function confirmarVenda(){
   if(res.ok){
     produtos=produtos.map(p=>p.id===selVenderId?res.produto:p);
     renderTable(); closeModal();
-    // Switch to vendidos tab briefly to show the sold item
     setTab('vendidos');
-    showToast('💚','Venda registrada!','Ficha criada em Emitir NF no Financeiro');
+    showToast('💚','Venda registrada!','Ficha criada no Financeiro e card no Pipefy');
+    // Exibe modal com texto para almoxarifado
+    if(res.textoAlmox){
+      document.getElementById('almox-texto').value = res.textoAlmox;
+      document.getElementById('almox-modal').classList.add('open');
+    }
   } else showToast('❌','Erro',res.error);
   btn.disabled=false; btn.textContent='✅ Confirmar Venda';
+}
+
+function copiarAlmox(){
+  const ta = document.getElementById('almox-texto');
+  ta.select(); ta.setSelectionRange(0,99999);
+  try {
+    navigator.clipboard.writeText(ta.value).catch(()=>{ document.execCommand('copy'); });
+  } catch(e) { document.execCommand('copy'); }
+  showToast('📋','Copiado!','Texto pronto para enviar no WhatsApp');
 }
 
 // ── EXCLUIR ───────────────────────────────────────────────────
@@ -742,11 +755,14 @@ load();
 
 // ── RELATÓRIO ─────────────────────────────────────────────────
 function initRelDates() {
-  const ate = new Date();
-  const de  = new Date(); de.setDate(de.getDate() - 30);
   const fmt = d => d.toISOString().slice(0,10);
-  if (!document.getElementById('rel-de').value)  document.getElementById('rel-de').value  = fmt(de);
-  if (!document.getElementById('rel-ate').value) document.getElementById('rel-ate').value = fmt(ate);
+  // Semana atual: segunda a domingo
+  const hoje = new Date();
+  const dia  = hoje.getDay(); // 0=dom,1=seg...
+  const seg  = new Date(hoje); seg.setDate(hoje.getDate() - (dia === 0 ? 6 : dia - 1));
+  const dom  = new Date(seg);  dom.setDate(seg.getDate() + 6);
+  if (!document.getElementById('rel-de').value)  document.getElementById('rel-de').value  = fmt(seg);
+  if (!document.getElementById('rel-ate').value) document.getElementById('rel-ate').value = fmt(dom);
 }
 
 function relClearFilter() {
@@ -868,6 +884,19 @@ function renderRelatorio() {
     listaRows || '<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:20px">Sem vendas no período</td></tr>';
 }
 </script>
+<!-- MODAL WHATSAPP ALMOXARIFADO -->
+<div class="modal-overlay" id="almox-modal" style="z-index:450;">
+  <div class="modal" style="border-top-color:var(--green);max-width:460px;">
+    <div class="modal-title">📦 <span>Almoxarifado</span></div>
+    <div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:10px;">Copie o texto e envie no WhatsApp para separação:</div>
+    <textarea id="almox-texto" readonly style="width:100%;min-height:180px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:var(--fm);font-size:11px;color:var(--text);resize:none;line-height:1.6;outline:none;"></textarea>
+    <div class="modal-actions" style="margin-top:12px;">
+      <button class="modal-cancel" onclick="document.getElementById('almox-modal').classList.remove('open')">Fechar</button>
+      <button class="modal-confirm" style="background:var(--green);" onclick="copiarAlmox()">📋 Copiar Texto</button>
+    </div>
+  </div>
+</div>
+
 <!-- LIGHTBOX -->
 <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
   <button class="lb-close" onclick="closeLightboxBtn()">✕</button>
