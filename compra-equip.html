@@ -239,6 +239,9 @@ tr:hover td{background:rgba(255,255,255,.02);}
             <th style="font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;">Recomendação</th>
             <th style="font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;">Fotos</th>
             <th style="font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;">No Vendas</th>
+            <th style="font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;">Tipo</th>
+            <th style="font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;">Código</th>
+            <th style="font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;">Preço</th>
           </tr>
         </thead>
         <tbody id="tbody-comprados"></tbody>
@@ -586,7 +589,10 @@ function renderComprados() {
       '<td style="font-size:11px;color:var(--muted);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:10px 12px;border-bottom:1px solid var(--border);" title="' + (f.descricao||'') + '">' + (f.descricao || '—') + '</td>' +
       '<td style="padding:10px 12px;border-bottom:1px solid var(--border);">' + recHtml + '</td>' +
       '<td style="font-family:var(--fm);font-size:10px;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--border);">' + (nFotos ? '📸 ' + nFotos : '—') + '</td>' +
-      '<td style="padding:10px 12px;border-bottom:1px solid var(--border);">' + vendas + '</td>';
+      '<td style="padding:10px 12px;border-bottom:1px solid var(--border);">' + vendas + '</td>' +
+      '<td style="font-family:var(--fm);font-size:10px;color:var(--accent);padding:10px 12px;border-bottom:1px solid var(--border);">' + (f.dadosVendas ? f.dadosVendas.tipo||'—' : '—') + '</td>' +
+      '<td style="font-family:var(--fm);font-size:10px;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--border);">' + (f.dadosVendas ? f.dadosVendas.codigo||'—' : '—') + '</td>' +
+      '<td style="font-family:var(--fm);font-size:11px;color:var(--green);padding:10px 12px;border-bottom:1px solid var(--border);white-space:nowrap">' + (f.dadosVendas && f.dadosVendas.preco ? 'R$ ' + parseFloat(f.dadosVendas.preco).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '—') + '</td>';
     tbody.appendChild(tr);
   });
 }
@@ -736,10 +742,11 @@ async function cvConfirmar() {
   btn.disabled = false; btn.textContent = '✅ Cadastrar no Vendas';
 
   if (r.ok) {
-    // Marca a ficha como cadastrada no vendas
-    await api('marcar-cadastrado-vendas', { id: cvFichaId });
+    var dadosVendas = { tipo: cvTipoSel, codigo: cod, descricao: desc, preco: preco };
+    // Salva dados do cadastro em vendas na ficha
+    await api('marcar-cadastrado-vendas', { id: cvFichaId, dadosVendas: dadosVendas });
     var f = fichas.find(function(x) { return x.id === cvFichaId; });
-    if (f) f.cadastradoVendas = true;
+    if (f) { f.cadastradoVendas = true; f.dadosVendas = dadosVendas; }
     cvCloseModal();
     render();
     showToast('💚','Cadastrado no Vendas!','Produto disponível no painel de vendas');
