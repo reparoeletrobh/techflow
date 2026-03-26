@@ -25,6 +25,15 @@ async function getProntoParaVendaPhaseId() {
   return phase?.id || null;
 }
 
+async function getReceberPhaseId() {
+  const data = await pipefyQuery(
+    "query { pipe(id: \"" + PIPE_ID + "\") { phases { id name } } }"
+  );
+  const phases = data?.pipe?.phases || [];
+  const phase = phases.find(p => p.name.toLowerCase().includes("receber"));
+  return phase?.id || null;
+}
+
 async function criarCardPipefy(phaseId, produto, nomeCliente, telefone) {
   try {
     const titulo = (produto.tipo ? produto.tipo + " — " : "") + (produto.codigo || produto.descricao.substring(0,40));
@@ -159,11 +168,13 @@ module.exports = async function handler(req, res) {
 
     const now = new Date().toISOString();
     const precoFmt = parseFloat(p.preco).toLocaleString("pt-BR",{minimumFractionDigits:2,style:"currency",currency:"BRL"});
+    const dataVenda = new Date().toLocaleDateString("pt-BR",{timeZone:"America/Sao_Paulo"});
 
-    // Cria ficha no financeiro
+    // ── Ficha no Financeiro (emitir NF) ──────────────────────────────────
+    const fichaId = `venda-${Date.now()}`;
     const ficha = {
-      id:          `venda-${Date.now()}`,
-      pipefyId:    `venda-${Date.now()}`,
+      id:          fichaId,
+      pipefyId:    fichaId,
       osCode:      p.codigo,
       nomeContato: nomeCliente,
       telefone:    telefone || null,
@@ -175,40 +186,74 @@ module.exports = async function handler(req, res) {
       origem:      "venda_equipamento",
       phaseId:     "emitir_nf",
       createdAt:   now, movedAt: now,
-      history:     [
-        { phaseId: "emitir_nf", ts: now },
-      ],
+      history:     [{ phaseId: "emitir_nf", ts: now }],
     };
-    if (!Array.isArray(fin.records))  fin.records  = [];
+    if (!Array.isArray(fin.records))   fin.records   = [];
     if (!Array.isArray(fin.syncedIds)) fin.syncedIds = [];
     fin.records.unshift(ficha);
 
-    // Marca produto como vendido — salva vendedor (pessoa) e modalidade (canal) separados
+    // ── Marca produto como vendido ────────────────────────────────────────
     db.produtos[idx] = { ...p, vendido: true, soldAt: now, compradorNome: nomeCliente,
       nomeVendedor: vendedor||null, modalidade: modalidade||null,
-      // retrocompatibilidade: vendedor mantém a modalidade para código legado
       vendedor: modalidade||vendedor||null,
       updatedAt: now };
 
     await Promise.all([dbSet(VENDAS_KEY, db), dbSet(FIN_KEY, fin)]);
 
-    // Cria card no Pipefy na fase "Pronto para Venda" (async, não bloqueia resposta)
+    // ── Texto WhatsApp para almoxarifado ──────────────────────────────────
+    const textoAlmox = [
+      "📦 *SEPARAÇÃO — ALMOXARIFADO*",
+      "",
+      `📅 Data: ${dataVenda}`,
+      `🏷️ Código: ${p.codigo || "—"}`,
+      `📦 Tipo: ${p.tipo || "—"}`,
+      `📝 Descrição: ${p.descricao}`,
+      `💰 Valor: ${precoFmt}`,
+      "",
+      `👤 Comprador: ${nomeCliente}`,
+      telefone ? `📱 Telefone: ${telefone}` : null,
+      "",
+      `🛒 Vendedor: ${vendedor || "—"}`,
+      `🔖 Modalidade: ${modalidade || "—"}`,
+    ].filter(l => l !== null).join("\n");
+
+    // ── Pipefy: card em Pronto para Venda (comprador) e Receber (almox) ──
     let pipefyCardId = null;
+    let pipefyReceberCardId = null;
     try {
-      const phaseId = await getProntoParaVendaPhaseId();
-      if (phaseId) {
-        pipefyCardId = await criarCardPipefy(phaseId, p, nomeCliente, telefone);
-        // Atualiza ficha financeiro com o pipefyId real
+      const [phaseVenda, phaseReceber] = await Promise.all([
+        getProntoParaVendaPhaseId(),
+        getReceberPhaseId(),
+      ]);
+
+      if (phaseVenda) {
+        pipefyCardId = await criarCardPipefy(phaseVenda, p, nomeCliente, telefone);
         if (pipefyCardId) {
           ficha.pipefyId = String(pipefyCardId);
-          const fichaIdx = fin.records.findIndex(r => r.id === ficha.id);
-          if (fichaIdx >= 0) fin.records[fichaIdx].pipefyId = String(pipefyCardId);
+          const fi = fin.records.findIndex(r => r.id === ficha.id);
+          if (fi >= 0) fin.records[fi].pipefyId = String(pipefyCardId);
           await dbSet(FIN_KEY, fin);
         }
       }
+
+      if (phaseReceber) {
+        // Card no Receber: título é "VENDA — {codigo} | {tipo}" para almoxarifado
+        const tituloReceber = `VENDA — ${p.codigo || p.tipo || "Equipamento"} | ${nomeCliente}`;
+        const descReceber   = `${p.descricao} | Valor: ${precoFmt} | Vendedor: ${vendedor||"—"} | Modalidade: ${modalidade||"—"}`;
+        const dataAlmox = await pipefyQuery(
+          "mutation { createCard(input: { pipe_id: \"" + PIPE_ID + "\" phase_id: \"" + phaseReceber + "\" title: \"" + tituloReceber.replace(/"/g,"'") + "\" fields_attributes: [ { field_id: \"descri_o\" field_value: \"" + descReceber.replace(/"/g,"'") + "\" } ] }) { card { id } } }"
+        );
+        pipefyReceberCardId = dataAlmox?.createCard?.card?.id || null;
+      }
     } catch(e) { console.error("Pipefy card creation:", e.message); }
 
-    return res.status(200).json({ ok: true, ficha, produto: db.produtos[idx], pipefyCardId });
+    return res.status(200).json({
+      ok: true, ficha,
+      produto: db.produtos[idx],
+      pipefyCardId,
+      pipefyReceberCardId,
+      textoAlmox,
+    });
   }
 
   // ── POST excluir ───────────────────────────────────────────
