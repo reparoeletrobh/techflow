@@ -223,6 +223,28 @@ tr:hover td{background:rgba(255,255,255,.02);}
   <div id="grid-comprados" class="grid">
     <div class="empty">Nenhum equipamento comprado ainda.</div>
   </div>
+  <!-- RELATÓRIO COMPRADOS -->
+  <div id="rel-comprados" style="display:none;padding:0 24px 32px;">
+    <div style="font-family:var(--fm);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:10px;padding-top:4px;border-top:1px solid var(--border);">
+      📋 Equipamentos Comprados — Registro
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr>
+            <th style="font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;">OS</th>
+            <th style="font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;">Nome</th>
+            <th style="font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;">Telefone</th>
+            <th style="font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;">Descrição</th>
+            <th style="font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;">Recomendação</th>
+            <th style="font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;">Fotos</th>
+            <th style="font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;">No Vendas</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-comprados"></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- PÁGINA: Painel Geral -->
@@ -529,12 +551,44 @@ function closeFotoModal() {
 function renderComprados() {
   var el   = document.getElementById('grid-comprados');
   var list = fichas.filter(function(f) { return f.status === 'comprado'; });
+
   if (!list.length) {
     el.innerHTML = '<div class="empty">Nenhum equipamento comprado ainda.<br>Clique em <strong>🛒 Equipamento Comprado</strong> em qualquer ficha.</div>';
+    document.getElementById('rel-comprados').style.display = 'none';
     return;
   }
+
   el.innerHTML = '';
   list.forEach(function(f) { el.appendChild(buildCompradoCard(f)); });
+
+  // Tabela relatório abaixo dos cards
+  document.getElementById('rel-comprados').style.display = '';
+  var tbody = document.getElementById('tbody-comprados');
+  tbody.innerHTML = '';
+  list.forEach(function(f) {
+    var titleParts = (f.title || f.nomeContato || '').match(/^(.*?)\s+(\d{3,6})$/);
+    var nome = titleParts ? titleParts[1] : (f.nomeContato || f.title || '—');
+    var os   = titleParts ? '#' + titleParts[2] : '—';
+    var recHtml = f.recomendacao === 'sim'
+      ? '<span style="font-family:var(--fm);font-size:9px;color:var(--green);">✅ Recomenda</span>'
+      : f.recomendacao === 'nao'
+      ? '<span style="font-family:var(--fm);font-size:9px;color:var(--red);">❌ Não Recomenda</span>'
+      : '<span style="font-family:var(--fm);font-size:9px;color:var(--muted);">—</span>';
+    var nFotos = (f.fotos || []).length;
+    var vendas = f.cadastradoVendas
+      ? '<span style="font-family:var(--fm);font-size:9px;background:rgba(34,197,94,.12);color:var(--green);padding:2px 8px;border-radius:4px;">✅ Sim</span>'
+      : '<span style="font-family:var(--fm);font-size:9px;color:var(--muted);">—</span>';
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td style="font-family:var(--fm);font-size:10px;color:var(--accent);padding:10px 12px;border-bottom:1px solid var(--border);white-space:nowrap">' + os + '</td>' +
+      '<td style="font-size:12px;font-weight:500;padding:10px 12px;border-bottom:1px solid var(--border);">' + nome + '</td>' +
+      '<td style="font-family:var(--fm);font-size:10px;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--border);white-space:nowrap">' + (f.telefone || '—') + '</td>' +
+      '<td style="font-size:11px;color:var(--muted);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:10px 12px;border-bottom:1px solid var(--border);" title="' + (f.descricao||'') + '">' + (f.descricao || '—') + '</td>' +
+      '<td style="padding:10px 12px;border-bottom:1px solid var(--border);">' + recHtml + '</td>' +
+      '<td style="font-family:var(--fm);font-size:10px;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--border);">' + (nFotos ? '📸 ' + nFotos : '—') + '</td>' +
+      '<td style="padding:10px 12px;border-bottom:1px solid var(--border);">' + vendas + '</td>';
+    tbody.appendChild(tr);
+  });
 }
 
 function buildCompradoCard(f) {
