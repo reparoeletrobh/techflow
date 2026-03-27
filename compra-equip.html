@@ -562,7 +562,12 @@ function renderComprados() {
   }
 
   el.innerHTML = '';
-  list.forEach(function(f) { el.appendChild(buildCompradoCard(f)); });
+  list.forEach(function(f) {
+    // Só mostra o card se ainda NÃO foi cadastrado no vendas
+    if (!f.cadastradoVendas) {
+      el.appendChild(buildCompradoCard(f));
+    }
+  });
 
   // Tabela relatório abaixo dos cards
   document.getElementById('rel-comprados').style.display = '';
