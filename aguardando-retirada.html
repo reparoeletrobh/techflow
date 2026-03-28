@@ -114,7 +114,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 <div class="page" id="page-aviso">
   <div class="page-title">⚠️ Parados <span>+24 horas</span></div>
   <div class="page-sub">// fichas em Aguardando Retirada há mais de 24h — clique em Copiar e Enviar para avisar o cliente</div>
-  <div id="grid-aviso" class="ret-grid">
+  <div id="grid-aviso" style="display:flex;flex-direction:column;gap:8px;max-width:700px;">
     <div class="loading"><div class="spinner"></div>Carregando...</div>
   </div>
 </div>
@@ -129,11 +129,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 var curTab = 'painel';
 var cards  = [];
 
-var MSG_RETIRADA = [
-  "Bom dia, Pedro aqui da Reparo Eletro.",
-  "Estamos com pouco espaço na loja e esta muito dificil de trabalhar, precisamos que o equipamento seja retirado ou entregue.",
-  "Conto com a sua colaboração pois esta nos prejudicando muito ficar sem espaço."
-].join("\n");
+var MSG_RETIRADA = "Bom dia, Pedro aqui da Reparo Eletro.\nEstamos com pouco espaço na loja e esta muito dificil de trabalhar, precisamos que o equipamento seja retirado ou entregue.\nConto com a sua colaboração pois esta nos prejudicando muito ficar sem espaço.";
 
 // ── TABS ─────────────────────────────────────────────────────
 function setTab(t) {
@@ -230,19 +226,20 @@ function renderAviso() {
     var div = document.createElement('div');
     div.className = 'av-card';
     div.innerHTML =
-      '<div>' +
-        (os ? '<div style="font-family:var(--fm);font-size:10px;color:var(--accent);margin-bottom:2px">' + os + '</div>' : '') +
-        '<div class="av-nome">' + nome + '</div>' +
-        (c.telefone ? '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px">' + c.telefone + '</div>' : '') +
-      '</div>' +
-      '<div class="av-age">⏱ ' + ageText + '</div>' +
-      (c.title ? '<div class="av-desc">' + c.title.substring(0,100) + '</div>' : '') +
-      '<div class="av-msg-preview">' + MSG_RETIRADA + '</div>' +
-      '<div class="av-btns">' +
-        (waLink
-          ? '<button class="av-btn copiar" onclick="copiarEnviar(\'' + (waLink).replace(/'/g,"\\'") + '\')">📋 Copiar e Enviar</button>'
-          : '<span style="font-family:var(--fm);font-size:10px;color:var(--red);">Sem telefone cadastrado</span>'
-        ) +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">' +
+        '<div>' +
+          (os ? '<div style="font-family:var(--fm);font-size:10px;color:var(--accent);margin-bottom:2px">' + os + '</div>' : '') +
+          '<div class="av-nome">' + nome + '</div>' +
+          (c.telefone ? '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px">' + c.telefone + '</div>' : '') +
+          '<div class="av-age" style="margin-top:4px">⏱ ' + ageText + '</div>' +
+          (c.title ? '<div class="av-desc">' + c.title.substring(0,80) + '</div>' : '') +
+        '</div>' +
+        '<div style="flex-shrink:0">' +
+          (waLink
+            ? '<button class="av-btn copiar" onclick="copiarEnviar(\'' + (waLink).replace(/'/g,"\\'") + '\')">📋 Copiar e Enviar</button>'
+            : '<span style="font-family:var(--fm);font-size:10px;color:var(--red);">Sem telefone</span>'
+          ) +
+        '</div>' +
       '</div>';
     el.appendChild(div);
   });
