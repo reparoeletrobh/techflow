@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aguardando Retirada</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--border:#252525;
+  --text:#fff;--muted:#888;--dim:#333;
+  --accent:#f97316;--green:#22c55e;--red:#ef4444;--blue:#3b9eff;--yellow:#f5c800;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;}
+
+header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;border-bottom:2px solid var(--accent);background:var(--bg);position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.logo-icon{width:26px;height:26px;background:var(--accent);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;}
+.logo span{color:var(--accent);}
+.hdr-right{display:flex;gap:8px;align-items:center;}
+.hbtn{font-family:var(--fm);font-size:10px;padding:5px 11px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;text-decoration:none;display:inline-flex;align-items:center;}
+.hbtn:hover{color:var(--text);border-color:var(--accent);}
+.hbtn.refresh{color:var(--accent);border-color:rgba(249,115,22,.3);}
+
+/* TABS */
+.tabs-bar{display:flex;border-bottom:1px solid var(--border);padding:0 24px;background:var(--bg);position:sticky;top:52px;z-index:90;}
+.tab-btn{font-family:var(--fm);font-size:11px;font-weight:600;padding:12px 18px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;display:flex;align-items:center;gap:7px;}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-btn.active.aviso-tab{color:var(--yellow);border-bottom-color:var(--yellow);}
+.tab-badge{font-family:var(--fm);font-size:9px;font-weight:700;padding:1px 6px;border-radius:99px;background:var(--surface2);}
+.tab-btn.active .tab-badge{background:rgba(249,115,22,.15);color:var(--accent);}
+.tab-btn.active.aviso-tab .tab-badge{background:rgba(245,200,0,.15);color:var(--yellow);}
+
+/* PAGE */
+.page{display:none;flex:1;flex-direction:column;padding:20px 24px;}
+.page.active{display:flex;}
+
+/* PAINEL — lista de cards */
+.ret-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
+.ret-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:border-color .2s;}
+.ret-card:hover{border-color:rgba(249,115,22,.25);}
+.ret-card-head{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+.ret-os{font-family:var(--fm);font-size:10px;color:var(--accent);font-weight:600;}
+.ret-nome{font-size:13px;font-weight:600;margin-top:2px;}
+.ret-tel{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px;}
+.ret-age-badge{font-family:var(--fm);font-size:9px;padding:3px 8px;border-radius:20px;white-space:nowrap;flex-shrink:0;}
+.ret-age-badge.normal{background:rgba(249,115,22,.1);color:var(--accent);border:1px solid rgba(249,115,22,.2);}
+.ret-age-badge.alert{background:rgba(245,200,0,.1);color:var(--yellow);border:1px solid rgba(245,200,0,.2);}
+.ret-desc{padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.5;}
+
+.empty-state{padding:60px 24px;text-align:center;font-family:var(--fm);font-size:11px;color:var(--dim);display:flex;flex-direction:column;align-items:center;gap:8px;}
+.empty-icon{font-size:32px;opacity:.4;}
+
+/* AVISO cards (parados >24h) */
+.page-title{font-family:var(--fh);font-size:17px;font-weight:800;margin-bottom:16px;}
+.page-title span{color:var(--yellow);}
+.page-sub{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:4px;margin-bottom:20px;}
+.av-card{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--yellow);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;}
+.av-nome{font-size:13px;font-weight:600;}
+.av-desc{font-size:11px;color:var(--muted);line-height:1.5;}
+.av-age{font-family:var(--fm);font-size:10px;color:var(--yellow);}
+.av-btns{display:flex;gap:8px;flex-wrap:wrap;}
+.av-btn{font-family:var(--fm);font-size:10px;font-weight:600;padding:8px 14px;border-radius:7px;border:none;cursor:pointer;transition:all .15s;}
+.av-btn.copiar{background:var(--yellow);color:#000;}
+.av-btn.copiar:hover{filter:brightness(1.1);}
+.av-msg-preview{font-family:var(--fm);font-size:10px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:10px 12px;line-height:1.6;white-space:pre-wrap;}
+
+/* LOADING */
+.loading{display:flex;align-items:center;justify-content:center;min-height:200px;gap:10px;font-family:var(--fm);font-size:11px;color:var(--muted);}
+.spinner{width:18px;height:18px;border:2px solid var(--dim);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* TOAST */
+.toast{position:fixed;bottom:18px;right:18px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:11px 14px;font-family:var(--fm);font-size:11px;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;}
+.toast.show{transform:translateY(0);opacity:1;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">📦</div>
+    Reparo<span>Eletro</span> — Aguardando Retirada
+  </div>
+  <div class="hdr-right">
+    <button class="hbtn refresh" onclick="load()">↻ Atualizar</button>
+    <a class="hbtn" href="/tecnico">Técnico</a>
+    <a class="hbtn" href="/financeiro">Financeiro</a>
+    <a class="hbtn" href="/">Home</a>
+  </div>
+</header>
+
+<!-- TABS -->
+<div class="tabs-bar">
+  <button class="tab-btn active" id="tab-painel" onclick="setTab('painel')">
+    📦 Aguardando Retirada <span class="tab-badge" id="badge-painel">0</span>
+  </button>
+  <button class="tab-btn aviso-tab" id="tab-aviso" onclick="setTab('aviso')">
+    ⚠️ Parados +24h <span class="tab-badge" id="badge-aviso">0</span>
+  </button>
+</div>
+
+<!-- PAINEL -->
+<div class="page active" id="page-painel">
+  <div id="grid-painel" class="ret-grid">
+    <div class="loading"><div class="spinner"></div>Carregando...</div>
+  </div>
+</div>
+
+<!-- AVISOS -->
+<div class="page" id="page-aviso">
+  <div class="page-title">⚠️ Parados <span>+24 horas</span></div>
+  <div class="page-sub">// fichas em Aguardando Retirada há mais de 24h — clique em Copiar e Enviar para avisar o cliente</div>
+  <div id="grid-aviso" class="ret-grid">
+    <div class="loading"><div class="spinner"></div>Carregando...</div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <span id="t-icon">✅</span>
+  <div><strong id="t-title"></strong><br><span id="t-body" style="color:var(--muted);font-size:10px;"></span></div>
+</div>
+
+<script>
+var curTab = 'painel';
+var cards  = [];
+
+var MSG_RETIRADA = [
+  "Bom dia, Pedro aqui da Reparo Eletro.",
+  "Estamos com pouco espaço na loja e esta muito dificil de trabalhar, precisamos que o equipamento seja retirado ou entregue.",
+  "Conto com a sua colaboração pois esta nos prejudicando muito ficar sem espaço."
+].join("\n");
+
+// ── TABS ─────────────────────────────────────────────────────
+function setTab(t) {
+  curTab = t;
+  ['painel','aviso'].forEach(function(id) {
+    document.getElementById('tab-'  + id).classList.toggle('active', id === t);
+    document.getElementById('page-' + id).classList.toggle('active', id === t);
+  });
+  document.getElementById('tab-aviso').classList.toggle('aviso-tab', true);
+  if (t === 'painel') renderPainel();
+  else renderAviso();
+}
+
+// ── LOAD ─────────────────────────────────────────────────────
+async function load() {
+  var r = await fetch('/api/board?action=load').then(function(r){return r.json();}).catch(function(){return null;});
+  if (!r || !r.board) { showToast('❌','Erro','Não foi possível carregar o board'); return; }
+  var board = r.board;
+  // Pega cards em aguardando_ret com dados de entrada na fase
+  var allCards = (board.cards || []).filter(function(c){ return c.phaseId === 'aguardando_ret'; });
+  cards = allCards;
+  updateBadges();
+  if (curTab === 'painel') renderPainel();
+  else renderAviso();
+}
+
+// ── BADGESS ───────────────────────────────────────────────────
+function updateBadges() {
+  var agora = Date.now();
+  var vinte4h = 24 * 60 * 60 * 1000;
+  var atrasados = cards.filter(function(c) {
+    var ts = c.movedAt ? new Date(c.movedAt).getTime() : 0;
+    return ts && (agora - ts) >= vinte4h;
+  });
+  document.getElementById('badge-painel').textContent = cards.length;
+  document.getElementById('badge-aviso').textContent  = atrasados.length;
+}
+
+// ── PAINEL ────────────────────────────────────────────────────
+function renderPainel() {
+  var el = document.getElementById('grid-painel');
+  if (!cards.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div>Nenhum equipamento aguardando retirada.</div>';
+    return;
+  }
+  el.innerHTML = '';
+  var agora = Date.now();
+  var vinte4h = 24 * 60 * 60 * 1000;
+  cards.forEach(function(c) {
+    var ts    = c.movedAt ? new Date(c.movedAt).getTime() : 0;
+    var diffH = ts ? Math.floor((agora - ts) / (1000 * 60 * 60)) : 0;
+    var diffD = Math.floor(diffH / 24);
+    var atrasado = ts && (agora - ts) >= vinte4h;
+    var ageText = diffH < 24 ? diffH + 'h na fase' : diffD + ' dia(s) na fase';
+    var ageClass = atrasado ? 'alert' : 'normal';
+
+    var m = (c.title || c.nomeContato || '').match(/^(.*?)\s+(\d{3,6})$/);
+    var nome = m ? m[1] : (c.nomeContato || c.title || '—');
+    var os   = m ? '#' + m[2] : (c.osCode ? '#'+c.osCode : '');
+
+    var div = document.createElement('div');
+    div.className = 'ret-card';
+    div.innerHTML =
+      '<div class="ret-card-head">' +
+        '<div>' +
+          (os ? '<div class="ret-os">' + os + '</div>' : '') +
+          '<div class="ret-nome">' + nome + '</div>' +
+          (c.telefone ? '<div class="ret-tel">' + c.telefone + '</div>' : '') +
+        '</div>' +
+        '<span class="ret-age-badge ' + ageClass + '">' + ageText + '</span>' +
+      '</div>' +
+      (c.title ? '<div class="ret-desc">' + (c.title).substring(0,100) + '</div>' : '');
+    el.appendChild(div);
+  });
+}
+
+// ── AVISO +24H ────────────────────────────────────────────────
+function renderAviso() {
+  var el = document.getElementById('grid-aviso');
+  var agora = Date.now();
+  var vinte4h = 24 * 60 * 60 * 1000;
+
+  var atrasados = cards.filter(function(c) {
+    var ts = c.movedAt ? new Date(c.movedAt).getTime() : 0;
+    return ts && (agora - ts) >= vinte4h;
+  });
+
+  if (!atrasados.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div>Nenhuma ficha parada há mais de 24h.</div>';
+    return;
+  }
+
+  el.innerHTML = '';
+  atrasados.forEach(function(c) {
+    var ts   = c.movedAt ? new Date(c.movedAt).getTime() : 0;
+    var diffH = Math.floor((agora - ts) / (1000 * 60 * 60));
+    var diffD = Math.floor(diffH / 24);
+    var ageText = diffD > 0 ? diffD + ' dia(s) e ' + (diffH % 24) + 'h parado' : diffH + 'h parado';
+
+    var m = (c.title || c.nomeContato || '').match(/^(.*?)\s+(\d{3,6})$/);
+    var nome = m ? m[1] : (c.nomeContato || c.title || '—');
+    var os   = m ? '#' + m[2] : (c.osCode ? '#'+c.osCode : '');
+
+    // Monta link WhatsApp
+    var tel = (c.telefone || '').replace(/\D/g, '');
+    if (tel.slice(0,2) === '55' && tel.length >= 12) tel = tel.slice(2);
+    if (tel.length === 10) tel = tel.slice(0,2) + '9' + tel.slice(2);
+    var waLink = tel ? 'https://wa.me/55' + tel + '?text=' + encodeURIComponent(MSG_RETIRADA) : null;
+
+    var div = document.createElement('div');
+    div.className = 'av-card';
+    div.innerHTML =
+      '<div>' +
+        (os ? '<div style="font-family:var(--fm);font-size:10px;color:var(--accent);margin-bottom:2px">' + os + '</div>' : '') +
+        '<div class="av-nome">' + nome + '</div>' +
+        (c.telefone ? '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px">' + c.telefone + '</div>' : '') +
+      '</div>' +
+      '<div class="av-age">⏱ ' + ageText + '</div>' +
+      (c.title ? '<div class="av-desc">' + c.title.substring(0,100) + '</div>' : '') +
+      '<div class="av-msg-preview">' + MSG_RETIRADA + '</div>' +
+      '<div class="av-btns">' +
+        (waLink
+          ? '<button class="av-btn copiar" onclick="copiarEnviar(\'' + (waLink).replace(/'/g,"\\'") + '\')">📋 Copiar e Enviar</button>'
+          : '<span style="font-family:var(--fm);font-size:10px;color:var(--red);">Sem telefone cadastrado</span>'
+        ) +
+      '</div>';
+    el.appendChild(div);
+  });
+}
+
+// ── COPIAR E ENVIAR ───────────────────────────────────────────
+function copiarEnviar(waLink) {
+  // Copia o texto para o clipboard
+  navigator.clipboard.writeText(MSG_RETIRADA).catch(function() {
+    var ta = document.createElement('textarea');
+    ta.value = MSG_RETIRADA;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+  showToast('📋', 'Copiado!', 'Abrindo WhatsApp...');
+  setTimeout(function() { window.open(waLink, '_blank'); }, 800);
+}
+
+// ── TOAST ─────────────────────────────────────────────────────
+var toastTimer;
+function showToast(icon, title, msg) {
+  var t = document.getElementById('toast');
+  document.getElementById('t-icon').textContent  = icon;
+  document.getElementById('t-title').textContent = title;
+  document.getElementById('t-body').textContent  = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function() { t.classList.remove('show'); }, 4000);
+}
+
+// ── INIT ─────────────────────────────────────────────────────
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>
