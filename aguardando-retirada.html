@@ -198,9 +198,17 @@ function renderPainel() {
 }
 
 // ── AVISO +24H ────────────────────────────────────────────────
-function renderAviso() {
+async function renderAviso() {
   var el = document.getElementById('grid-aviso');
-  var atrasados = cards.filter(function(c){ return c.atrasado; });
+  el.innerHTML = '<div class="loading"><div class="spinner"></div>Buscando dados do Pipefy...</div>';
+
+  var r = await fetch('/api/aguardando-retirada?action=parados').then(function(r){return r.json();}).catch(function(){return null;});
+  if (!r || !r.ok) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Erro ao buscar dados.</div>';
+    return;
+  }
+
+  var atrasados = r.cards || [];
 
   if (!atrasados.length) {
     el.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div>Nenhuma ficha parada há mais de 24h.</div>';
@@ -212,10 +220,8 @@ function renderAviso() {
     var diffH   = c.diffH || 0;
     var diffD   = c.diffD || 0;
     var ageText = diffD > 0 ? diffD + ' dia(s) e ' + (diffH % 24) + 'h parado' : diffH + 'h parado';
-
-    var m = (c.title || c.nomeContato || '').match(/^(.*?)\s+(\d{3,6})$/);
-    var nome = m ? m[1] : (c.nomeContato || c.title || '—');
-    var os   = m ? '#' + m[2] : (c.osCode ? '#'+c.osCode : '');
+    var os      = c.osCode || '';
+    var nome    = c.nome   || c.title || '—';
 
     // Monta link WhatsApp
     var tel = (c.telefone || '').replace(/\D/g, '');
@@ -230,14 +236,13 @@ function renderAviso() {
         '<div>' +
           (os ? '<div style="font-family:var(--fm);font-size:10px;color:var(--accent);margin-bottom:2px">' + os + '</div>' : '') +
           '<div class="av-nome">' + nome + '</div>' +
-          (c.telefone ? '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px">' + c.telefone + '</div>' : '') +
+          (c.telefone ? '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px">' + c.telefone + '</div>' : '<div style="font-family:var(--fm);font-size:10px;color:var(--red);margin-top:2px">Sem telefone no Pipefy</div>') +
           '<div class="av-age" style="margin-top:4px">⏱ ' + ageText + '</div>' +
-          (c.title ? '<div class="av-desc">' + c.title.substring(0,80) + '</div>' : '') +
         '</div>' +
         '<div style="flex-shrink:0">' +
           (waLink
             ? '<button class="av-btn copiar" onclick="copiarEnviar(\'' + (waLink).replace(/'/g,"\\'") + '\')">📋 Copiar e Enviar</button>'
-            : '<span style="font-family:var(--fm);font-size:10px;color:var(--red);">Sem telefone</span>'
+            : '<button class="av-btn" style="background:var(--surface2);color:var(--muted);border:1px solid var(--border);cursor:not-allowed">Sem telefone</button>'
           ) +
         '</div>' +
       '</div>';
