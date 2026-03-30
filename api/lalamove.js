@@ -86,19 +86,39 @@ async function geocodificar(endereco) {
   const dentoBH  = (lat, lng) => lat > -20.3 && lat < -19.4 && lng > -44.5 && lng < -43.3;
 
   // ── 1. Nominatim (OSM) — melhor cobertura do Brasil ──────────
-  try {
+  const nomQuery = async (q) => {
     const url = "https://nominatim.openstreetmap.org/search?q="
-      + encodeURIComponent(endBH)
+      + encodeURIComponent(q)
       + "&format=json&limit=5&countrycodes=br&viewbox=-44.5,-20.3,-43.3,-19.4&bounded=0";
     const r = await fetch(url, { headers: { "User-Agent": "ReparoEletro/1.0 (reparoeletroadm.com)" } });
     const j = await r.json();
-    if (j?.length) {
-      // Prefere resultado dentro da bbox de BH, aceita MG se não tiver
-      const emBH = j.find(x => dentoBH(parseFloat(x.lat), parseFloat(x.lon)));
-      const emMG = j.find(x => dentroMG(parseFloat(x.lat), parseFloat(x.lon)));
-      const best = emBH || emMG;
-      if (best) return { lat: String(best.lat), lng: String(best.lon) };
+    const emBH = j?.find(x => dentoBH(parseFloat(x.lat), parseFloat(x.lon)));
+    const emMG = j?.find(x => dentroMG(parseFloat(x.lat), parseFloat(x.lon)));
+    return emBH || emMG || null;
+  };
+
+  try {
+    // Tentativa 1: endereço completo
+    let best = await nomQuery(endBH);
+
+    // Tentativa 2: sem número (só rua + bairro + cidade)
+    if (!best) {
+      const semNum = endBH.replace(/,?\s*\d+[-\w]*/g, "").replace(/\s+/g, " ").trim();
+      if (semNum !== endBH) best = await nomQuery(semNum);
     }
+
+    // Tentativa 3: só bairro + cidade (fallback de proximidade)
+    if (!best) {
+      const partes = endNorm.split(",").map(p => p.trim());
+      // Tenta pegar o bairro (geralmente 2º ou 3º elemento)
+      for (let i = partes.length - 1; i >= 1; i--) {
+        const bairro = partes[i] + ", Belo Horizonte, MG, Brasil";
+        best = await nomQuery(bairro);
+        if (best) break;
+      }
+    }
+
+    if (best) return { lat: String(best.lat), lng: String(best.lon) };
   } catch(e) { console.error("Nominatim:", e.message); }
 
   // ── 2. Google Maps (se configurado) ──────────────────────────
@@ -658,22 +678,38 @@ module.exports = async function handler(req, res) {
       testes: {}
     };
 
-    // Teste 1: Nominatim
+    // Teste 1: Nominatim — tenta 3 variações
     try {
-      const url = "https://nominatim.openstreetmap.org/search?q="
-        + encodeURIComponent(endBH)
-        + "&format=json&limit=5&countrycodes=br&viewbox=-44.5,-20.3,-43.3,-19.4&bounded=0";
-      const r = await fetch(url, { headers: { "User-Agent": "ReparoEletro/1.0" } });
-      const j = await r.json();
-      const emBH = j?.find(x => dentoBH(parseFloat(x.lat), parseFloat(x.lon)));
-      const emMG = j?.find(x => dentroMG(parseFloat(x.lat), parseFloat(x.lon)));
-      const best = emBH || emMG;
+      const nomQ = async (q) => {
+        const u = "https://nominatim.openstreetmap.org/search?q=" + encodeURIComponent(q)
+          + "&format=json&limit=5&countrycodes=br&viewbox=-44.5,-20.3,-43.3,-19.4&bounded=0";
+        const r = await fetch(u, { headers: { "User-Agent": "ReparoEletro/1.0" } });
+        return r.json();
+      };
+      const semNum = endBH.replace(/,?\s*\d+[-\w]*/g, "").replace(/\s+/g, " ").trim();
+      const partes = endBH.split(",").map(p => p.trim());
+      const bairro = partes.length > 1 ? partes[partes.length-2] + ", Belo Horizonte, MG" : null;
+
+      const t1 = await nomQ(endBH);
+      const t2 = semNum !== endBH ? await nomQ(semNum) : [];
+      const t3 = bairro ? await nomQ(bairro) : [];
+
+      const findBest = (j) => {
+        const emBH = j?.find(x => dentoBH(parseFloat(x.lat), parseFloat(x.lon)));
+        const emMG = j?.find(x => dentroMG(parseFloat(x.lat), parseFloat(x.lon)));
+        return emBH || emMG || null;
+      };
+      const best = findBest(t1) || findBest(t2) || findBest(t3);
+
       resultado.testes.nominatim = {
-        status: best ? "OK" : "sem resultado em BH/MG",
+        status: best ? "OK" : "sem resultado",
         coords: best ? { lat: parseFloat(best.lat), lng: parseFloat(best.lon) } : null,
         display_name: best?.display_name || null,
-        dentoBH: best ? dentoBH(parseFloat(best.lat), parseFloat(best.lon)) : false,
-        totalResultados: j?.length || 0,
+        tentativas: {
+          completo:    { query: endBH, resultados: t1?.length || 0, achou: !!findBest(t1) },
+          semNumero:   { query: semNum, resultados: t2?.length || 0, achou: !!findBest(t2) },
+          bairro:      { query: bairro, resultados: t3?.length || 0, achou: !!findBest(t3) },
+        }
       };
     } catch(e) { resultado.testes.nominatim = { status: "erro: " + e.message }; }
 
