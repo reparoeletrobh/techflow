@@ -495,18 +495,21 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // ── POST ou GET limpar-tudo — limpa fila e salva timestamp de limpeza ───────
+  // ── POST ou GET limpar-tudo — limpa fila, move fichas atuais para removedIds ──
   if (action === "limpar-tudo") {
     const db = await dbGet(LALA_KEY) || {};
-    // Preserva syncedIds para não reimportar fichas antigas
-    // Salva clearTimestamp: só fichas que entraram em Coleta Solicitada APÓS este momento serão importadas
-    await dbSet(LALA_KEY, {
-      fichas:         [],
-      removedIds:     [],
-      syncedIds:      db.syncedIds || [],
-      clearTimestamp: new Date().toISOString(),
+    const fichasAtuais = db.fichas || [];
+    // Adiciona todas as fichas atuais ao removedIds para não reimportá-las
+    const removedIds = db.removedIds || [];
+    fichasAtuais.forEach(f => {
+      const key = f.pipefyId + ":" + f.tipo;
+      if (!removedIds.includes(key)) removedIds.push(key);
     });
-    return res.status(200).json({ ok: true, msg: "Fila limpa", clearTimestamp: new Date().toISOString() });
+    await dbSet(LALA_KEY, {
+      fichas:     [],
+      removedIds: removedIds,
+    });
+    return res.status(200).json({ ok: true, msg: "Fila limpa. " + fichasAtuais.length + " ficha(s) arquivadas." });
   }
 
   // ── POST limpar-enviados ──────────────────────────────────────
