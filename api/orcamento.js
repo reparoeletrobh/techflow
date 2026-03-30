@@ -848,6 +848,13 @@ const ORCAMENTO_REGRAS = [
                "capacitor e fusivel","troca do fusivel","troca de fusivel"],
     template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e fusivel de alta, as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
   },
+  // 4b. Sensor de temperatura + capacitor → R$ 320
+  {
+    keywords: ["sensor de temperatura","sensor temperatura","sensor termico","sensor termico","sensore temperatura",
+               "troca do sensor","troca sensor","sensor e capacitor","capacitor e sensor"],
+    template: "Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do sensor de temperatura e capacitor, as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.",
+    valor: "320",
+  },
   // 5. Microchave → R$ 320
   {
     keywords: ["microchave","micro chave","micro-chave","chave micro"],
@@ -927,7 +934,7 @@ const ORCAMENTO_REGRAS = [
 
 
 // Preços sugeridos por índice de regra (mesma ordem de ORCAMENTO_REGRAS)
-var PRECOS_REGRAS = ["390","350","370","320","320","320","320","370","450","350","450","450","450","450","370","350"];
+var PRECOS_REGRAS = ["390","350","370","320","320","320","320","320","370","450","350","450","450","450","450","370","350"];
 
 // ── DETECTA TIPO DE EQUIPAMENTO ──────────────────────────────────
 // ── DETECTA MÚLTIPLOS EQUIPAMENTOS NAS NOTAS ────────────────────
