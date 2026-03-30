@@ -618,5 +618,59 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // ── GET debug-geocode — testa o geocodificador e mostra qual API foi usada ──
+  if (action === "debug-geocode") {
+    const GMAPS_KEY = (process.env.GOOGLE_MAPS_KEY || "").trim();
+    const endereco  = req.query.endereco || "Rua Ouro Preto, 663, Barro Preto, Belo Horizonte, MG";
+    const resultado = { endereco, googleKeyPresente: !!GMAPS_KEY, apiUsada: null, coords: null, erro: null };
+
+    try {
+      const endBH = endereco.toLowerCase().includes("belo horizonte") || endereco.toLowerCase().includes(", bh")
+        ? endereco
+        : endereco + ", Belo Horizonte, MG, Brasil";
+
+      if (GMAPS_KEY) {
+        const url = "https://maps.googleapis.com/maps/api/geocode/json?address="
+          + encodeURIComponent(endBH) + "&region=br&key=" + GMAPS_KEY;
+        const r = await fetch(url);
+        const j = await r.json();
+        resultado.googleRawStatus = j.status;
+        if (j.status === "OK" && j.results?.[0]) {
+          const loc = j.results[0].geometry.location;
+          const valido = loc.lat > -23 && loc.lat < -14 && loc.lng > -52 && loc.lng < -39;
+          resultado.apiUsada    = "Google Maps";
+          resultado.coords      = { lat: loc.lat, lng: loc.lng };
+          resultado.enderecoFormatado = j.results[0].formatted_address;
+          resultado.dentroMG    = valido;
+          if (!valido) resultado.aviso = "Coords fora de MG — verifique o endereço";
+        } else {
+          resultado.apiUsada = "Google Maps (falhou)";
+          resultado.googleErro = j.status + (j.error_message ? ": " + j.error_message : "");
+        }
+      }
+
+      // Se Google não funcionou, testa Nominatim
+      if (!resultado.coords) {
+        const q = encodeURIComponent(endBH);
+        const url2 = "https://nominatim.openstreetmap.org/search?q=" + q
+          + "&format=json&limit=3&countrycodes=br&viewbox=-44.5,-20.1,-43.5,-19.5&bounded=1";
+        const r2 = await fetch(url2, { headers: { "User-Agent": "ReparoEletro/1.0" } });
+        const j2 = await r2.json();
+        if (j2?.[0]) {
+          resultado.apiUsada = "Nominatim (fallback)";
+          resultado.coords   = { lat: parseFloat(j2[0].lat), lng: parseFloat(j2[0].lon) };
+          resultado.nominatimDisplay = j2[0].display_name;
+        } else {
+          resultado.apiUsada = "Nenhuma (falhou)";
+          resultado.erro     = "Nenhuma API retornou resultado";
+        }
+      }
+    } catch(e) {
+      resultado.erro = e.message;
+    }
+
+    return res.status(200).json(resultado);
+  }
+
   return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 };
