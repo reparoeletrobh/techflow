@@ -264,12 +264,93 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
   animation: slide 1s linear infinite;
 }
 @keyframes slide { to { left: 100%; } }
+
+/* ── MOBILE ─────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0;
+    height: 100dvh;
+    z-index: 300;
+    transform: translateX(-100%);
+    transition: transform .25s cubic-bezier(.4,0,.2,1), width .25s;
+    box-shadow: 4px 0 24px rgba(0,0,0,.5);
+    width: var(--sidebar-w) !important;
+    min-width: var(--sidebar-w) !important;
+  }
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+  .sidebar.collapsed {
+    width: var(--sidebar-w) !important;
+    min-width: var(--sidebar-w) !important;
+  }
+  .sidebar.collapsed .logo-text,
+  .sidebar.collapsed .nav-label,
+  .sidebar.collapsed .toggle-label { opacity: 1 !important; pointer-events: auto !important; }
+  .sidebar.collapsed .nav-item { margin: 2px 8px; justify-content: flex-start !important; padding: 0 12px !important; }
+  .sidebar.collapsed .nav-item:hover::after { display: none; }
+  .toggle-btn { display: none; }
+  .mobile-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.55);
+    z-index: 299;
+    backdrop-filter: blur(2px);
+  }
+  .mobile-overlay.active { display: block; }
+  .hamburger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px; height: 36px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    cursor: pointer;
+    flex-shrink: 0;
+    z-index: 200;
+  }
+  .hamburger span {
+    display: block;
+    width: 16px; height: 2px;
+    background: var(--text);
+    border-radius: 2px;
+    position: relative;
+  }
+  .hamburger span::before,
+  .hamburger span::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: 16px; height: 2px;
+    background: var(--text);
+    border-radius: 2px;
+  }
+  .hamburger span::before { top: -5px; }
+  .hamburger span::after  { top:  5px; }
+  .main-area { margin-left: 0 !important; }
+  .content { padding-top: 52px !important; }
+  .hamburger {
+    position: fixed;
+    top: 12px; left: 12px;
+    z-index: 298;
+  }
+}
+@media (min-width: 769px) {
+  .hamburger { display: none !important; }
+  .mobile-overlay { display: none !important; }
+}
 </style>
 </head>
 <body>
 <div class="shell">
 
   <!-- SIDEBAR -->
+  <!-- Mobile overlay -->
+  <div class="mobile-overlay" id="mobile-overlay" onclick="closeMobileSidebar()"></div>
+
   <div class="sidebar" id="sidebar">
 
     <div class="sidebar-logo">
@@ -358,6 +439,11 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
 
   </div>
 
+  <!-- Hamburger (mobile only) -->
+  <button class="hamburger" id="hamburger-btn" onclick="toggleMobileSidebar()" aria-label="Menu">
+    <span></span>
+  </button>
+
   <!-- CONTENT -->
   <div class="content">
     <div class="load-bar" id="load-bar"></div>
@@ -393,9 +479,27 @@ function toggleSidebar() {
   if (lbl) lbl.textContent = collapsed ? 'Expandir' : 'Recolher';
 }
 
+// Mobile sidebar
+var mobileOpen = false;
+var mobileOverlay = document.getElementById('mobile-overlay');
+
+function toggleMobileSidebar() {
+  mobileOpen = !mobileOpen;
+  sidebar.classList.toggle('mobile-open', mobileOpen);
+  mobileOverlay.classList.toggle('active', mobileOpen);
+}
+
+function closeMobileSidebar() {
+  mobileOpen = false;
+  sidebar.classList.remove('mobile-open');
+  mobileOverlay.classList.remove('active');
+}
+
 function openPage(el) {
   var url = el.getAttribute('data-url');
   if (!url) return;
+  // Close mobile sidebar when navigating
+  closeMobileSidebar();
 
   // Active state
   document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
