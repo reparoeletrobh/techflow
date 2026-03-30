@@ -66,48 +66,64 @@ async function fetchCardDados(pipefyId) {
 
 // ── Geocoding via Nominatim (OpenStreetMap) ───────────────────
 async function geocodificar(endereco) {
-  const GMAPS_KEY = (process.env.GOOGLE_MAPS_KEY || "").trim();
-  try {
-    // Garante que o endereço inclua BH para evitar matches em outras cidades
-    const endBH = endereco.toLowerCase().includes("belo horizonte") || endereco.toLowerCase().includes(", bh")
-      ? endereco
-      : endereco + ", Belo Horizonte, MG, Brasil";
+  const GMAPS_KEY    = (process.env.GOOGLE_MAPS_KEY || "").trim();
+  const OPENCAGE_KEY = (process.env.OPENCAGE_KEY    || "").trim();
 
-    if (GMAPS_KEY) {
-      // Google Maps Geocoding API — muito mais preciso que Nominatim
+  // Garante "Belo Horizonte, MG" no endereço para evitar matches em outras cidades
+  const endBH = endereco.toLowerCase().includes("belo horizonte") || endereco.toLowerCase().includes(", bh")
+    ? endereco
+    : endereco + ", Belo Horizonte, MG, Brasil";
+
+  // Validação de bounding box de MG
+  const dentroMG = (lat, lng) => lat > -23 && lat < -14 && lng > -52 && lng < -39;
+
+  // ── 1. Google Maps (se configurado) ──────────────────────────
+  if (GMAPS_KEY) {
+    try {
       const url = "https://maps.googleapis.com/maps/api/geocode/json?address="
-        + encodeURIComponent(endBH)
-        + "&region=br&key=" + GMAPS_KEY;
+        + encodeURIComponent(endBH) + "&region=br&key=" + GMAPS_KEY;
       const r = await fetch(url);
       const j = await r.json();
       if (j.status === "OK" && j.results?.[0]) {
         const loc = j.results[0].geometry.location;
-        // Valida que o resultado é em Minas Gerais (lat entre -23 e -14, lng entre -52 e -39)
-        if (loc.lat > -23 && loc.lat < -14 && loc.lng > -52 && loc.lng < -39) {
+        if (dentroMG(loc.lat, loc.lng))
           return { lat: String(loc.lat), lng: String(loc.lng) };
-        }
       }
-    }
+    } catch(e) { console.error("Google Maps geocode:", e.message); }
+  }
 
-    // Fallback: Nominatim com âncora em BH
+  // ── 2. OpenCage (se configurado) ─────────────────────────────
+  if (OPENCAGE_KEY) {
+    try {
+      const url = "https://api.opencagedata.com/geocode/v1/json?q="
+        + encodeURIComponent(endBH)
+        + "&key=" + OPENCAGE_KEY
+        + "&countrycode=br&limit=1&language=pt&no_annotations=1"
+        + "&bounds=-44.5,-20.1,-43.5,-19.5";  // bounding box BH
+      const r = await fetch(url);
+      const j = await r.json();
+      if (j.results?.[0]) {
+        const { lat, lng } = j.results[0].geometry;
+        if (dentroMG(lat, lng))
+          return { lat: String(lat), lng: String(lng) };
+      }
+    } catch(e) { console.error("OpenCage geocode:", e.message); }
+  }
+
+  // ── 3. Nominatim (fallback gratuito com bounding box BH) ─────
+  try {
     const q = encodeURIComponent(endBH);
-    const url2 = "https://nominatim.openstreetmap.org/search?q=" + q
+    const url = "https://nominatim.openstreetmap.org/search?q=" + q
       + "&format=json&limit=3&countrycodes=br&viewbox=-44.5,-20.1,-43.5,-19.5&bounded=1";
-    const r2 = await fetch(url2, { headers: { "User-Agent": "ReparoEletro/1.0 (reparoeletroadm.com)" } });
-    const j2 = await r2.json();
-    if (j2 && j2[0]) {
-      const lat = parseFloat(j2[0].lat), lng = parseFloat(j2[0].lon);
-      // Valida bounding box de BH
-      if (lat > -20.1 && lat < -19.5 && lng > -44.5 && lng < -43.5) {
-        return { lat: String(lat), lng: String(lng) };
-      }
-      // Aceita qualquer resultado MG se não houver resultado em BH
-      if (lat > -23 && lat < -14 && lng > -52 && lng < -39) {
-        return { lat: String(lat), lng: String(lng) };
-      }
+    const r = await fetch(url, { headers: { "User-Agent": "ReparoEletro/1.0 (reparoeletroadm.com)" } });
+    const j = await r.json();
+    if (j?.[0]) {
+      const lat = parseFloat(j[0].lat), lng = parseFloat(j[0].lon);
+      if (dentroMG(lat, lng)) return { lat: String(lat), lng: String(lng) };
     }
-    return null;
-  } catch(e) { console.error("geocodificar:", e.message); return null; }
+  } catch(e) { console.error("Nominatim geocode:", e.message); }
+
+  return null;
 }
 
 // ── HMAC signature para Lalamove ──────────────────────────────
@@ -620,9 +636,10 @@ module.exports = async function handler(req, res) {
 
   // ── GET debug-geocode — testa o geocodificador e mostra qual API foi usada ──
   if (action === "debug-geocode") {
-    const GMAPS_KEY = (process.env.GOOGLE_MAPS_KEY || "").trim();
-    const endereco  = req.query.endereco || "Rua Ouro Preto, 663, Barro Preto, Belo Horizonte, MG";
-    const resultado = { endereco, googleKeyPresente: !!GMAPS_KEY, apiUsada: null, coords: null, erro: null };
+    const GMAPS_KEY    = (process.env.GOOGLE_MAPS_KEY || "").trim();
+    const OPENCAGE_KEY = (process.env.OPENCAGE_KEY    || "").trim();
+    const endereco     = req.query.endereco || "Rua Ouro Preto, 663, Barro Preto, Belo Horizonte, MG";
+    const resultado    = { endereco, googleKeyPresente: !!GMAPS_KEY, opencageKeyPresente: !!OPENCAGE_KEY, apiUsada: null, coords: null, erro: null };
 
     try {
       const endBH = endereco.toLowerCase().includes("belo horizonte") || endereco.toLowerCase().includes(", bh")
@@ -649,7 +666,28 @@ module.exports = async function handler(req, res) {
         }
       }
 
-      // Se Google não funcionou, testa Nominatim
+      // Se Google não funcionou, testa OpenCage
+      if (!resultado.coords && OPENCAGE_KEY) {
+        try {
+          const endBH = endereco.toLowerCase().includes("belo horizonte") ? endereco : endereco + ", Belo Horizonte, MG, Brasil";
+          const url = "https://api.opencagedata.com/geocode/v1/json?q="
+            + encodeURIComponent(endBH)
+            + "&key=" + OPENCAGE_KEY
+            + "&countrycode=br&limit=1&language=pt&no_annotations=1&bounds=-44.5,-20.1,-43.5,-19.5";
+          const r = await fetch(url);
+          const j = await r.json();
+          if (j.results?.[0]) {
+            const { lat, lng } = j.results[0].geometry;
+            resultado.apiUsada = "OpenCage";
+            resultado.coords   = { lat, lng };
+            resultado.opencageFormatted = j.results[0].formatted;
+          } else {
+            resultado.opencageErro = j.status?.message || "Sem resultado";
+          }
+        } catch(e) { resultado.opencageErro = e.message; }
+      }
+
+      // Se nenhuma funcionou, testa Nominatim
       if (!resultado.coords) {
         const q = encodeURIComponent(endBH);
         const url2 = "https://nominatim.openstreetmap.org/search?q=" + q
