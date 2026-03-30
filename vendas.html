@@ -595,6 +595,19 @@ function copiarAlmox(){
   showToast('📋','Copiado!','Texto pronto para enviar no WhatsApp');
 }
 
+// ── CANCELAR VENDA ────────────────────────────────────────────
+async function cancelarVenda(id){
+  const p = produtos.find(x=>x.id===id);
+  if(!confirm(`Cancelar venda de "${p?.codigo}"?\nO produto voltará ao estoque disponível.`)) return;
+  const res = await api('cancelar-venda',{id});
+  if(res.ok){
+    produtos = produtos.map(x => x.id===id ? res.produto : x);
+    renderTable();
+    setTab('estoque');
+    showToast('↩','Venda cancelada!','Produto devolvido ao estoque');
+  } else showToast('❌','Erro',res.error);
+}
+
 // ── EXCLUIR ───────────────────────────────────────────────────
 async function excluir(id){
   const p=produtos.find(x=>x.id===id);
@@ -604,17 +617,7 @@ async function excluir(id){
   else showToast('❌','Erro',res.error);
 }
 
-async function cancelarVenda(id){
-  const p=produtos.find(x=>x.id===id);
-  if(!confirm(`Cancelar venda de "${p?.codigo}"?\n\nO equipamento voltará ao estoque disponível.`)) return;
-  const res=await api('cancelar-venda',{id});
-  if(res.ok){
-    produtos=produtos.map(x=>x.id===id?res.produto:x);
-    renderTable();
-    setTab('estoque');
-    showToast('↩','Venda cancelada!','Equipamento disponível no estoque');
-  } else showToast('❌','Erro',res.error);
-}
+
 
 // ── TABS ─────────────────────────────────────────────────────
 let curTab = 'estoque';
@@ -688,11 +691,10 @@ function renderTable(){
         <td class="td-price">${pFmt}</td>
         <td class="td-data">${dataVenda}</td>
         <td style="white-space:nowrap;">
-          <button class="act-btn" style="color:#f59e0b;border-color:rgba(245,158,11,.2);" onclick="cancelarVenda('${p.id}')" title="Cancelar venda — devolve ao estoque">↩ Cancelar</button>
+          <button class="act-btn" style="color:#f59e0b;border-color:rgba(245,158,11,.2);" onclick="cancelarVenda('${p.id}')">↩ Cancelar</button>
           <button class="act-btn del" onclick="excluir('${p.id}')">🗑️</button>
         </td>
       </tr>`;
-    }
 
     return `<tr data-fotos="${fotosJson}">
       <td><div class="prod-fotos">${thumbs}${extra}</div></td>
