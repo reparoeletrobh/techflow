@@ -1096,27 +1096,32 @@ module.exports = async function handler(req, res) {
             // Regra 2: foi removida manualmente → não volta NUNCA
             if (lalaDb.removedIds.includes(removedKey)) continue;
 
-            // Regra 3: determina quando o card entrou na fase atual
-            // Tenta phases_history primeiro, fallback para updated_at
-            const histEntradas = (node.phases_history || []).filter(h =>
-              h.phase?.name?.toLowerCase().trim() === l
-            );
-            histEntradas.sort((a, b) =>
-              new Date(b.firstTimeIn).getTime() - new Date(a.firstTimeIn).getTime()
-            );
-            const ultimaEntrada = histEntradas[0];
-
+            // Regra 3: determina quando o card entrou na fase ATUAL
+            // Para cards na fase agora, updated_at é o momento mais confiável
+            // pois phases_history.firstTimeIn pode ser de uma entrada ANTERIOR
             let entradaMs = 0;
-            if (ultimaEntrada?.firstTimeIn) {
-              // Tem histórico — usa firstTimeIn da última entrada
-              entradaMs = new Date(ultimaEntrada.firstTimeIn).getTime();
-            } else if (node.updated_at) {
-              // Sem histórico (card novo ou fase inicial) — usa updated_at como proxy
+
+            if (node.updated_at) {
+              // updated_at = quando o card foi movido por último (= entrou na fase atual)
               entradaMs = node.updated_at * 1000;
             }
-            // Se não temos nenhuma referência de tempo, deixa passar (entradaMs=0 com clearTs>0 bloquearia)
-            // Nesse caso assumimos que é recente
-            if (entradaMs === 0) entradaMs = Date.now();
+
+            // Fallback: tenta phases_history se não tiver updated_at
+            if (!entradaMs) {
+              const histEntradas = (node.phases_history || []).filter(h =>
+                h.phase?.name?.toLowerCase().trim() === l
+              );
+              histEntradas.sort((a, b) =>
+                new Date(b.firstTimeIn).getTime() - new Date(a.firstTimeIn).getTime()
+              );
+              const ultimaEntrada = histEntradas[0];
+              if (ultimaEntrada?.firstTimeIn) {
+                entradaMs = new Date(ultimaEntrada.firstTimeIn).getTime();
+              }
+            }
+
+            // Último recurso: assume que é agora
+            if (!entradaMs) entradaMs = Date.now();
 
             // Regra 4: só importa se a entrada na fase foi APÓS o clearTimestamp
             if (clearTs > 0 && entradaMs <= clearTs) continue;
