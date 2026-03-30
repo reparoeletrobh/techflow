@@ -249,5 +249,28 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── POST cancelar-venda — devolve produto ao estoque ───────────────────
+  if (req.method === "POST" && action === "cancelar-venda") {
+    const { id } = req.body || {};
+    if (!id) return res.status(400).json({ ok: false, error: "id obrigatório" });
+    const db = await dbGet(VENDAS_KEY) || defaultDB();
+    const idx = db.produtos.findIndex(p => p.id === id);
+    if (idx < 0) return res.status(404).json({ ok: false, error: "Produto não encontrado" });
+    // Limpa todos os dados de venda, volta ao estado de estoque
+    const p = db.produtos[idx];
+    db.produtos[idx] = {
+      ...p,
+      vendido:      false,
+      soldAt:       null,
+      compradorNome: null,
+      nomeVendedor: null,
+      modalidade:   null,
+      vendedor:     null,
+      updatedAt:    new Date().toISOString(),
+    };
+    await dbSet(VENDAS_KEY, db);
+    return res.status(200).json({ ok: true, produto: db.produtos[idx] });
+  }
+
   return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 };
