@@ -15,6 +15,7 @@
     { "source": "/garantia",     "destination": "/garantia.html"     },
     { "source": "/lalamove",     "destination": "/lalamove.html"     },
     { "source": "/aguardando-retirada", "destination": "/aguardando-retirada.html" },
+    { "source": "/metricas", "destination": "/metricas.html" },
     { "source": "/nf-setup",      "destination": "/nf-setup.html"      },
     { "source": "/((?!api/).*)", "destination": "/home.html"         }
   ]
