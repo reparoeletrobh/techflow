@@ -167,6 +167,40 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .painel-act.nao-comprar:hover{color:var(--red);border-color:rgba(239,68,68,.2);}
 .painel-act.active-comprado{background:rgba(34,197,94,.1);color:var(--green);border-color:rgba(34,197,94,.25);}
 .painel-act.active-nao{background:rgba(239,68,68,.08);color:var(--red);border-color:rgba(239,68,68,.2);}
+
+/* ── MOBILE ────────────────────────────────────────────────── */
+@media(max-width:768px){
+  header{padding:0 12px;height:48px;}
+  .logo{font-size:13px;}
+  .hdr-right{gap:4px;}
+  .hbtn{padding:4px 8px;font-size:9px;}
+
+  .tabs-bar{padding:0 8px;overflow-x:auto;white-space:nowrap;}
+  .tab-btn{padding:10px 12px;font-size:10px;flex-shrink:0;}
+
+  .page{padding:14px 12px;}
+
+  /* Cards grid: 1 col */
+  .cards-grid{grid-template-columns:1fr !important;}
+  .equip-card{padding:14px;}
+  .card-fotos{grid-template-columns:repeat(3,1fr);}
+
+  /* Table responsive */
+  table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;font-size:11px;}
+  th,td{padding:7px 6px;white-space:nowrap;}
+
+  /* Modal */
+  .modal{max-width:calc(100vw - 20px);margin:10px;max-height:calc(100dvh - 20px);overflow-y:auto;}
+  .modal-actions{flex-direction:column;gap:8px;}
+  .modal-confirm,.modal-cancel{width:100%;}
+  .modal-grid{grid-template-columns:1fr !important;}
+
+  .card-actions{flex-wrap:wrap;gap:6px;}
+  .card-actions button{flex:1;min-width:100px;font-size:10px;}
+}
+@media(max-width:480px){
+  .tab-badge{display:none;}
+}
 </style>
 </head>
 <body>
