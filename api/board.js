@@ -216,14 +216,15 @@ async function fetchAllPhaseCards() {
   return data?.pipe?.phases || [];
 }
 
-// Busca IDs de cards que estão em ERP ou Finalizado no Pipefy
+// Busca IDs de cards que estão em ERP, Finalizado ou Reprovado no Pipefy
 async function fetchErpCardIds() {
   try {
     const phases = await fetchAllPhaseCards();
     const ids = [], targetPhases = [];
     for (const ph of phases) {
       const l = ph.name.toLowerCase();
-      if (l.includes("erp") || l.includes("finaliz") || l.includes("conclu") || l.includes("descar")) {
+      if (l.includes("erp") || l.includes("finaliz") || l.includes("conclu") ||
+          l.includes("descar") || l.includes("reprov")) {
         targetPhases.push(ph.name);
         ph.cards.edges.forEach(e => ids.push(String(e.node.id)));
         // Paginação se houver mais de 50
@@ -420,16 +421,18 @@ module.exports = async function handler(req, res) {
       } catch (e) { pipefyError = e.message; }
 
       try {
-        // Remove qualquer card (qualquer fase) que está em ERP/Finalizado
+        // Remove qualquer card que está em ERP, Finalizado ou Reprovado no Pipefy
         const { ids: erpIds } = await fetchErpCardIds();
         if (erpIds.length > 0) {
           const before = board.cards.length;
-          board.cards = board.cards.filter(c => !erpIds.includes(c.pipefyId));
+          board.cards       = board.cards.filter(c => !erpIds.includes(c.pipefyId));
+          board.rsCards     = (board.rsCards     || []).filter(c => !erpIds.includes(c.pipefyId));
+          board.rsRuaCards  = (board.rsRuaCards  || []).filter(c => !erpIds.includes(c.pipefyId));
           erpRemoved = before - board.cards.length;
           if (erpRemoved > 0) await dbSet(BOARD_KEY, board);
-      await saveLogs(board);
+          await saveLogs(board);
         }
-      } catch (e) { console.error("ERP check:", e.message); }
+      } catch (e) { console.error("ERP/Reprovado check:", e.message); }
 
       // Tracking de metas: Aguardando Aprovação e ERP
       try {
