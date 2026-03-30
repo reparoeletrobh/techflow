@@ -1055,11 +1055,9 @@ module.exports = async function handler(req, res) {
         if (!Array.isArray(lalaDb.fichas))    lalaDb.fichas    = [];
         if (!Array.isArray(lalaDb.removedIds)) lalaDb.removedIds = [];
 
-        // clearTimestamp: só importa fichas que entraram na fase APÓS a última limpeza
-        const clearTs = lalaDb.clearTimestamp ? new Date(lalaDb.clearTimestamp).getTime() : 0;
-
-        // Busca com phases_history para detectar a ÚLTIMA entrada na fase
-        // updated_at = quando o card foi movido pela última vez (incluindo para fase atual)
+        // Importa tudo que não está em removedIds e não está na fila
+        // O "limpar-tudo" move as fichas atuais para removedIds, então elas não voltam
+        // Novas fichas movidas para a fase SEMPRE entram (sem filtro de tempo)
         const data = await pipefyQuery(`query {
           pipe(id: "${PIPE_ID}") {
             phases {
@@ -1067,9 +1065,8 @@ module.exports = async function handler(req, res) {
               cards(first: 50) {
                 edges {
                   node {
-                    id title updated_at
+                    id title
                     fields { name value }
-                    phases_history { phase { name } firstTimeIn lastTimeOut }
                   }
                 }
               }
@@ -1088,43 +1085,13 @@ module.exports = async function handler(req, res) {
           if (!tipo) continue;
 
           for (const { node } of (ph.cards?.edges || [])) {
-            const pipefyId  = String(node.id);
+            const pipefyId   = String(node.id);
             const removedKey = pipefyId + ":" + tipo;
 
             // Regra 1: já está na fila ativa
             if (lalaDb.fichas.find(f => f.pipefyId === pipefyId && f.tipo === tipo)) continue;
-            // Regra 2: foi removida manualmente → não volta NUNCA
+            // Regra 2: foi removida (limpar-tudo ou remoção manual) → não volta
             if (lalaDb.removedIds.includes(removedKey)) continue;
-
-            // Regra 3: determina quando o card entrou na fase ATUAL
-            // Para cards na fase agora, updated_at é o momento mais confiável
-            // pois phases_history.firstTimeIn pode ser de uma entrada ANTERIOR
-            let entradaMs = 0;
-
-            if (node.updated_at) {
-              // updated_at = quando o card foi movido por último (= entrou na fase atual)
-              entradaMs = node.updated_at * 1000;
-            }
-
-            // Fallback: tenta phases_history se não tiver updated_at
-            if (!entradaMs) {
-              const histEntradas = (node.phases_history || []).filter(h =>
-                h.phase?.name?.toLowerCase().trim() === l
-              );
-              histEntradas.sort((a, b) =>
-                new Date(b.firstTimeIn).getTime() - new Date(a.firstTimeIn).getTime()
-              );
-              const ultimaEntrada = histEntradas[0];
-              if (ultimaEntrada?.firstTimeIn) {
-                entradaMs = new Date(ultimaEntrada.firstTimeIn).getTime();
-              }
-            }
-
-            // Último recurso: assume que é agora
-            if (!entradaMs) entradaMs = Date.now();
-
-            // Regra 4: só importa se a entrada na fase foi APÓS o clearTimestamp
-            if (clearTs > 0 && entradaMs <= clearTs) continue;
 
             const fields   = node.fields || [];
             const endField = fields.find(f => f.name.toLowerCase().includes("endere"));
