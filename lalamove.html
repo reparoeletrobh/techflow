@@ -345,7 +345,7 @@ async function limparFila() {
 
 // ── PREVIEW + ENVIAR AO LALAMOVE ──────────────────────────────
 var previewTipo = null;
-var previewBatches = [];
+var previewPendentes = [];
 
 function enviarLalamove(tipo) {
   var pendentes = fichas.filter(function(f) { return f.tipo === tipo && f.status === "pendente"; });
@@ -355,48 +355,43 @@ function enviarLalamove(tipo) {
   var semCoords = pendentes.filter(function(f) { return !f.lat || !f.lng; });
   if (semCoords.length) { showToast("❌","Coordenadas faltando", semCoords.length + " ficha(s) sem GPS — geocodifique primeiro"); return; }
 
-  // Divide em lotes de 3 paradas
+  // Uma única corrida com todas as paradas
   previewTipo = tipo;
-  previewBatches = [];
-  for (var i = 0; i < pendentes.length; i += 3) {
-    previewBatches.push(pendentes.slice(i, i + 3));
-  }
+  previewPendentes = pendentes;
 
-  // Renderiza preview
-  document.getElementById("preview-tipo-label").textContent = tipo === "coleta" ? "Coletas" : "Entregas";
-  var total = pendentes.length;
-  var lotes = previewBatches.length;
+  var total    = pendentes.length;
+  var isColeta = tipo === "coleta";
+
+  document.getElementById("preview-tipo-label").textContent = isColeta ? "Coletas" : "Entregas";
   document.getElementById("preview-summary").textContent =
-    total + " parada(s) → " + lotes + " corrida(s) de até 3 paradas cada · Rota otimizada ativada";
+    total + " parada(s) → 1 corrida · Rota otimizada ativada";
+
+  // Monta preview da única corrida
+  var stops = isColeta
+    ? pendentes.concat([{nomeContato: "Reparo Eletro (loja)", endereco: "Rua Ouro Preto, 663, Barro Preto, BH", isLoja: true}])
+    : [{nomeContato: "Reparo Eletro (loja)", endereco: "Rua Ouro Preto, 663, Barro Preto, BH", isLoja: true}].concat(pendentes);
+
+  var stopsHtml = stops.map(function(s, si) {
+    var dotClass = s.isLoja ? "loja" : "cliente";
+    var dotLabel = s.isLoja ? "L" : si + (isColeta ? 1 : 0);
+    return "<div class='batch-stop'>" +
+      "<div class='stop-dot " + dotClass + "'>" + dotLabel + "</div>" +
+      "<div class='stop-info'><div class='stop-nome'>" + (s.nomeContato || "Cliente") + "</div>" +
+      "<div class='stop-end'>" + (s.endereco || "Sem endereço") + "</div></div>" +
+      "</div>";
+  }).join("");
 
   var container = document.getElementById("preview-batches");
   container.innerHTML = "";
-  previewBatches.forEach(function(batch, bi) {
-    var card = document.createElement("div");
-    card.className = "batch-card";
-    var isColeta = tipo === "coleta";
-    var stops = isColeta
-      ? batch.concat([{nomeContato: "Reparo Eletro (loja)", endereco: "Rua Ouro Preto, 663, Barro Preto, BH", isLoja: true}])
-      : [{nomeContato: "Reparo Eletro (loja)", endereco: "Rua Ouro Preto, 663, Barro Preto, BH", isLoja: true}].concat(batch);
-
-    var stopsHtml = stops.map(function(s, si) {
-      var dotClass = s.isLoja ? "loja" : "cliente";
-      var dotLabel = s.isLoja ? "L" : (si + 1);
-      return "<div class='batch-stop'>" +
-        "<div class='stop-dot " + dotClass + "'>" + dotLabel + "</div>" +
-        "<div class='stop-info'><div class='stop-nome'>" + (s.nomeContato || "Cliente") + "</div>" +
-        "<div class='stop-end'>" + (s.endereco || "Sem endereço") + "</div></div>" +
-        "</div>";
-    }).join("");
-
-    card.innerHTML =
-      "<div class='batch-header'>" +
-        "<span class='batch-num'>Corrida " + (bi+1) + " de " + lotes + "</span>" +
-        "<span class='batch-tag'>" + batch.length + " cliente(s) · Rota otimizada</span>" +
-      "</div>" +
-      "<div class='batch-stops'>" + stopsHtml + "</div>";
-    container.appendChild(card);
-  });
+  var card = document.createElement("div");
+  card.className = "batch-card";
+  card.innerHTML =
+    "<div class='batch-header'>" +
+      "<span class='batch-num'>1 Corrida</span>" +
+      "<span class='batch-tag'>" + total + " parada(s) · Rota otimizada</span>" +
+    "</div>" +
+    "<div class='batch-stops'>" + stopsHtml + "</div>";
+  container.appendChild(card);
 
   document.getElementById("preview-overlay").classList.add("open");
 }
@@ -408,21 +403,18 @@ function fecharPreview() {
 async function confirmarEnvio() {
   var btn = document.getElementById("btn-confirmar-envio");
   btn.disabled = true; btn.textContent = "⏳ Enviando...";
-  var sucessos = 0, erros = [];
 
-  for (var i = 0; i < previewBatches.length; i++) {
-    var loteIds = previewBatches[i].map(function(f) { return f.pipefyId; });
-    var d = await api("enviar-lote", { tipo: previewTipo, loteIds: loteIds });
-    if (d.ok) { sucessos++; }
-    else { erros.push("Lote " + (i+1) + ": " + (d.error||"erro")); }
-  }
+  // Envia todas as fichas em uma única chamada
+  var loteIds = previewPendentes.map(function(f) { return f.pipefyId; });
+  var d = await api("enviar-lote", { tipo: previewTipo, loteIds: loteIds });
 
   btn.disabled = false; btn.textContent = "🚗 Confirmar e Enviar";
   fecharPreview();
-  if (erros.length === 0) {
-    showToast("🚗", previewBatches.length + " corrida(s) enviada(s)!", sucessos + " pedido(s) criados");
+
+  if (d.ok) {
+    showToast("🚗", "Corrida enviada!", d.count + " parada(s) — Pedido: " + d.orderId);
   } else {
-    showToast("⚠️", sucessos + " enviado(s), " + erros.length + " erro(s)", erros[0]);
+    showToast("❌", "Erro", d.error || "Verifique os endereços e tente novamente");
   }
   await load();
 }
