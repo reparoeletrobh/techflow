@@ -76,6 +76,36 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 /* TOAST */
 .toast{position:fixed;bottom:18px;right:18px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:11px 14px;font-family:var(--fm);font-size:11px;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;}
 .toast.show{transform:translateY(0);opacity:1;}
+
+/* ── MOBILE ────────────────────────────────────────────────── */
+@media(max-width:768px){
+  header{padding:0 12px;height:48px;}
+  .logo{font-size:13px;}
+  .hdr-right{gap:4px;}
+  .hbtn{padding:4px 8px;font-size:9px;}
+
+  .tabs-bar{padding:0 8px;overflow-x:auto;white-space:nowrap;}
+  .tab-btn{padding:10px 12px;font-size:10px;flex-shrink:0;}
+
+  .page{padding:14px 12px;}
+
+  /* Cards: 1 col */
+  .ret-grid{grid-template-columns:1fr;}
+  .ret-card-head{flex-direction:column;gap:6px;align-items:flex-start;}
+  .ret-age-badge{align-self:flex-start;}
+
+  /* Aviso list */
+  .av-card{padding:12px;}
+  .av-btn.copiar{width:100%;margin-top:4px;}
+
+  /* Inner flex of aviso card */
+  .av-card > div:first-child{flex-direction:column !important;gap:10px;}
+  .av-card > div:first-child > div:last-child{flex-shrink:1 !important;width:100%;}
+}
+@media(max-width:480px){
+  .tab-badge{display:none;}
+  .page-title{font-size:15px;}
+}
 </style>
 </head>
 <body>
