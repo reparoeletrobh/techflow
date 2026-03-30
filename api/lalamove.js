@@ -98,14 +98,17 @@ async function geocodificar(endereco) {
       const url = "https://api.opencagedata.com/geocode/v1/json?q="
         + encodeURIComponent(endBH)
         + "&key=" + OPENCAGE_KEY
-        + "&countrycode=br&limit=1&language=pt&no_annotations=1"
-        + "&bounds=-44.5,-20.1,-43.5,-19.5";  // bounding box BH
+        + "&countrycode=br&limit=5&language=pt&no_annotations=1"
+        + "&proximity=-19.9245,-43.9352";  // âncora: loja Reparo Eletro BH
       const r = await fetch(url);
       const j = await r.json();
-      if (j.results?.[0]) {
-        const { lat, lng } = j.results[0].geometry;
-        if (dentroMG(lat, lng))
-          return { lat: String(lat), lng: String(lng) };
+      if (j.results?.length) {
+        // Escolhe o resultado mais próximo da loja (centro de BH)
+        const lojaLat = -19.9245, lojaLng = -43.9352;
+        const dist = (lat, lng) => Math.pow(lat-lojaLat,2)+Math.pow(lng-lojaLng,2);
+        const validos = j.results.filter(r => dentroMG(r.geometry.lat, r.geometry.lng));
+        const melhor  = validos.sort((a,b) => dist(a.geometry.lat,a.geometry.lng) - dist(b.geometry.lat,b.geometry.lng))[0];
+        if (melhor) return { lat: String(melhor.geometry.lat), lng: String(melhor.geometry.lng) };
       }
     } catch(e) { console.error("OpenCage geocode:", e.message); }
   }
@@ -673,7 +676,7 @@ module.exports = async function handler(req, res) {
           const url = "https://api.opencagedata.com/geocode/v1/json?q="
             + encodeURIComponent(endBH)
             + "&key=" + OPENCAGE_KEY
-            + "&countrycode=br&limit=1&language=pt&no_annotations=1&bounds=-44.5,-20.1,-43.5,-19.5";
+            + "&countrycode=br&limit=5&language=pt&no_annotations=1&proximity=-19.9245,-43.9352";
           const r = await fetch(url);
           const j = await r.json();
           if (j.results?.[0]) {
