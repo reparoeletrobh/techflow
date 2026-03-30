@@ -117,6 +117,45 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 /* TOAST */
 .toast{position:fixed;bottom:18px;right:18px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:11px 14px;font-family:var(--fm);font-size:11px;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;}
 .toast.show{transform:translateY(0);opacity:1;}
+
+/* ── MOBILE ────────────────────────────────────────────────── */
+@media(max-width:768px){
+  header{padding:0 12px;height:48px;}
+  .logo{font-size:13px;}
+  .hdr-right{gap:4px;}
+  .hbtn{padding:4px 8px;font-size:9px;}
+
+  .tabs-bar{padding:0 8px;overflow-x:auto;white-space:nowrap;}
+  .tab-btn{padding:10px 12px;font-size:10px;flex-shrink:0;}
+
+  .page{padding:14px 12px;}
+
+  /* Queue cards stack */
+  .queue-grid{grid-template-columns:1fr !important;}
+  .ficha-card{padding:12px;}
+
+  /* Action buttons wrap */
+  .ficha-actions{flex-wrap:wrap;gap:6px;}
+  .ficha-actions button{flex:1;min-width:80px;font-size:9px;padding:6px 8px;}
+
+  .btn-send{width:100%;margin-bottom:8px;}
+
+  /* Preview modal */
+  .preview-modal .modal{max-width:calc(100vw - 20px);margin:10px;max-height:calc(100dvh - 20px);overflow-y:auto;}
+  .prev-confirm,.prev-cancel{width:100%;}
+  .modal-actions{flex-direction:column;gap:8px;}
+
+  .batch-card{padding:12px;}
+  .batch-stop{gap:8px;}
+  .stop-nome{font-size:11px;}
+  .stop-end{font-size:10px;}
+
+  .status-bar{flex-wrap:wrap;gap:6px;}
+}
+@media(max-width:480px){
+  .tab-badge{display:none;}
+  .send-section{flex-direction:column;gap:8px;}
+}
 </style>
 </head>
 <body>
