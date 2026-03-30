@@ -171,6 +171,64 @@ header{
   .goals-grid{grid-template-columns:1fr;}
   .phase-strip{gap:6px;}
 }
+
+/* ── MOBILE ────────────────────────────────────────────────── */
+@media(max-width:768px){
+  header{padding:0 12px;height:48px;}
+  .logo{font-size:13px;}
+  .hdr-right{gap:4px;}
+  .hbtn{padding:4px 8px;font-size:9px;}
+
+  .tabs-bar{padding:0 8px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;}
+  .tab-btn{padding:10px 12px;font-size:10px;flex-shrink:0;}
+  .tab-badge{font-size:8px;}
+
+  .page{padding:12px;}
+
+  /* Fichas - full width */
+  .painel-header{flex-direction:column;align-items:flex-start;gap:8px;}
+
+  /* Phase pills - horizontal scroll */
+  .phase-strip{gap:6px;padding-bottom:6px;}
+  .phase-pill{padding:10px 12px;min-width:80px;}
+  .phase-pill-count{font-size:20px;}
+
+  /* Kanban - horizontal scroll (keep it, make columns narrower) */
+  .kanban{padding:10px 12px 20px;gap:8px;}
+  .col{width:220px;}
+  .col-header{padding:10px 12px;}
+  .card{padding:10px 12px;margin:0 8px 8px;}
+  .card-title{font-size:12px;}
+  .card-meta{font-size:10px;}
+  .card-actions{flex-wrap:wrap;gap:4px;}
+  .card-actions button{font-size:9px;padding:4px 8px;}
+
+  /* Goals grid 1 col */
+  .goals-grid{grid-template-columns:1fr;}
+
+  /* Flow wrap scroll */
+  .flow-wrap{gap:0;padding-bottom:6px;}
+  .flow-stage{min-width:100px;padding:10px 8px;}
+  .flow-num{font-size:20px;}
+
+  /* Tables scroll */
+  table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;font-size:11px;}
+  th,td{padding:7px 6px;white-space:nowrap;}
+
+  /* Modal */
+  .modal,.modal-overlay .modal{max-width:calc(100vw - 16px) !important;margin:8px !important;max-height:calc(100dvh - 16px) !important;overflow-y:auto !important;}
+  .modal-actions{flex-direction:column;gap:8px;}
+  .modal-confirm,.modal-cancel,.modal-btn{width:100%;}
+  .modal-grid,.modal-body{grid-template-columns:1fr !important;}
+
+  .filter-row{flex-wrap:wrap;gap:8px;}
+  .filter-row input,.filter-row select{flex:1;min-width:140px;}
+}
+@media(max-width:480px){
+  .col{width:200px;}
+  .tab-badge{display:none;}
+}
+
 </style>
 </head>
 <body>
