@@ -66,14 +66,48 @@ async function fetchCardDados(pipefyId) {
 
 // ── Geocoding via Nominatim (OpenStreetMap) ───────────────────
 async function geocodificar(endereco) {
+  const GMAPS_KEY = (process.env.GOOGLE_MAPS_KEY || "").trim();
   try {
-    const q = encodeURIComponent(endereco + ", Belo Horizonte, MG, Brasil");
-    const url = "https://nominatim.openstreetmap.org/search?q=" + q + "&format=json&limit=1&countrycodes=br";
-    const r = await fetch(url, { headers: { "User-Agent": "ReparoEletro/1.0 (reparoeletroadm.com)" } });
-    const j = await r.json();
-    if (j && j[0]) return { lat: j[0].lat, lng: j[0].lon };
+    // Garante que o endereço inclua BH para evitar matches em outras cidades
+    const endBH = endereco.toLowerCase().includes("belo horizonte") || endereco.toLowerCase().includes(", bh")
+      ? endereco
+      : endereco + ", Belo Horizonte, MG, Brasil";
+
+    if (GMAPS_KEY) {
+      // Google Maps Geocoding API — muito mais preciso que Nominatim
+      const url = "https://maps.googleapis.com/maps/api/geocode/json?address="
+        + encodeURIComponent(endBH)
+        + "&region=br&key=" + GMAPS_KEY;
+      const r = await fetch(url);
+      const j = await r.json();
+      if (j.status === "OK" && j.results?.[0]) {
+        const loc = j.results[0].geometry.location;
+        // Valida que o resultado é em Minas Gerais (lat entre -23 e -14, lng entre -52 e -39)
+        if (loc.lat > -23 && loc.lat < -14 && loc.lng > -52 && loc.lng < -39) {
+          return { lat: String(loc.lat), lng: String(loc.lng) };
+        }
+      }
+    }
+
+    // Fallback: Nominatim com âncora em BH
+    const q = encodeURIComponent(endBH);
+    const url2 = "https://nominatim.openstreetmap.org/search?q=" + q
+      + "&format=json&limit=3&countrycodes=br&viewbox=-44.5,-20.1,-43.5,-19.5&bounded=1";
+    const r2 = await fetch(url2, { headers: { "User-Agent": "ReparoEletro/1.0 (reparoeletroadm.com)" } });
+    const j2 = await r2.json();
+    if (j2 && j2[0]) {
+      const lat = parseFloat(j2[0].lat), lng = parseFloat(j2[0].lon);
+      // Valida bounding box de BH
+      if (lat > -20.1 && lat < -19.5 && lng > -44.5 && lng < -43.5) {
+        return { lat: String(lat), lng: String(lng) };
+      }
+      // Aceita qualquer resultado MG se não houver resultado em BH
+      if (lat > -23 && lat < -14 && lng > -52 && lng < -39) {
+        return { lat: String(lat), lng: String(lng) };
+      }
+    }
     return null;
-  } catch(e) { return null; }
+  } catch(e) { console.error("geocodificar:", e.message); return null; }
 }
 
 // ── HMAC signature para Lalamove ──────────────────────────────
@@ -213,23 +247,26 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  // ── POST enviar-lalamove — cotar + pedir em sequência automática
-  // ── POST enviar-lote — envia um lote específico de fichas (max 3) com rota otimizada
+  // ── POST enviar-lote — envia TODAS as fichas em uma única corrida ─────────
   if (req.method === "POST" && action === "enviar-lote") {
     if (!LALA_KEY_ENV || !LALA_SECRET_ENV)
       return res.status(400).json({ ok: false, error: "API keys não configuradas" });
 
     const { tipo, loteIds } = req.body || {};
-    if (!tipo || !Array.isArray(loteIds) || !loteIds.length)
-      return res.status(400).json({ ok: false, error: "tipo e loteIds obrigatorios" });
+    if (!tipo)
+      return res.status(400).json({ ok: false, error: "tipo obrigatorio" });
 
     const db = await dbGet(LALA_KEY) || { fichas: [] };
+    // Se loteIds enviado, usa apenas esses — senão usa TODAS as pendentes do tipo
     const pendentes = (db.fichas || []).filter(f =>
-      f.tipo === tipo && f.status === "pendente" && loteIds.includes(f.pipefyId) && f.lat && f.lng
+      f.tipo === tipo &&
+      f.status === "pendente" &&
+      f.lat && f.lng &&
+      (Array.isArray(loteIds) ? loteIds.includes(f.pipefyId) : true)
     );
 
     if (!pendentes.length)
-      return res.status(400).json({ ok: false, error: "Nenhuma ficha válida no lote" });
+      return res.status(400).json({ ok: false, error: "Nenhuma ficha válida com coordenadas" });
 
     const fmtCoord = v => parseFloat(v).toFixed(6);
 
