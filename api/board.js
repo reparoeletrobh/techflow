@@ -1252,13 +1252,147 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // ── POST reset-lala-timestamp — zera clearTimestamp para forçar sync completo
+    // ── GET/POST reset-lala-timestamp — zera clearTimestamp e faz sync inline (acessível via link)
     if (action === "reset-lala-timestamp") {
       const LALA_KEY = "reparoeletro_lalamove";
-      const lalaDb = (await dbGet(LALA_KEY)) || {};
+      const lalaDb = (await dbGet(LALA_KEY)) || { fichas: [], removedIds: [] };
+      if (!Array.isArray(lalaDb.fichas))    lalaDb.fichas    = [];
+      if (!Array.isArray(lalaDb.removedIds)) lalaDb.removedIds = [];
       delete lalaDb.clearTimestamp;
+      // Sync inline: importa todos os cards de Coleta/Entrega Solicitada sem filtro de tempo
+      let added = 0;
+      try {
+        const data = await pipefyQuery(`query {
+          pipe(id: "${PIPE_ID}") {
+            phases {
+              name
+              cards(first: 50) {
+                edges {
+                  node {
+                    id title
+                    fields { name value }
+                  }
+                }
+              }
+            }
+          }
+        }`);
+        for (const ph of (data?.pipe?.phases || [])) {
+          const l = ph.name.toLowerCase().trim();
+          const tipo = l === "coleta solicitada" ? "coleta" : l === "entrega solicitada" ? "entrega" : null;
+          if (!tipo) continue;
+          for (const { node } of (ph.cards?.edges || [])) {
+            const pipefyId = String(node.id);
+            if (lalaDb.fichas.find(f => f.pipefyId === pipefyId && f.tipo === tipo)) continue;
+            if (lalaDb.removedIds.includes(pipefyId + ":" + tipo)) continue;
+            const fields = node.fields || [];
+            const endField = fields.find(f => f.name.toLowerCase().includes("endere"));
+            const telField = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"));
+            const m = (node.title || "").match(/^(.*?)\s+(\d{3,6})$/);
+            lalaDb.fichas.push({
+              pipefyId, tipo,
+              osCode:      m ? m[2] : null,
+              nomeContato: m ? m[1].trim() : (node.title || ""),
+              descricao: null,
+              endereco:  endField?.value || null,
+              telefone:  telField?.value || null,
+              lat: null, lng: null,
+              addedAt: new Date().toISOString(),
+              status: "pendente",
+            });
+            added++;
+          }
+        }
+      } catch(e) { console.error("reset-lala sync:", e.message); }
       await dbSet(LALA_KEY, lalaDb);
-      return res.status(200).json({ ok: true, msg: "clearTimestamp removido — próximo sync importa tudo" });
+      return res.status(200).json({ ok: true, msg: `Reset feito! ${added} ficha(s) importada(s). Recarregue o painel Lalamove.`, added, total: lalaDb.fichas.filter(f=>f.status==="pendente").length });
+    }
+
+    // ── GET debug-lalamove — diagnóstico completo do sync ────────────────
+    if (action === "debug-lalamove") {
+      const LALA_KEY = "reparoeletro_lalamove";
+      const lalaDb   = (await dbGet(LALA_KEY)) || { fichas: [] };
+      const result   = {
+        clearTimestamp:    lalaDb.clearTimestamp || null,
+        clearTimestampMs:  lalaDb.clearTimestamp ? new Date(lalaDb.clearTimestamp).getTime() : 0,
+        agoraMs:           Date.now(),
+        fichasNoRedis:     (lalaDb.fichas || []).length,
+        fichasPendentes:   (lalaDb.fichas || []).filter(f => f.status === "pendente").length,
+        removedIds:        lalaDb.removedIds || [],
+        pipefyFases:       [],
+        cardsColeta:       [],
+        bloqueados:        [],
+        motivos:           [],
+      };
+
+      try {
+        const data = await pipefyQuery(`query {
+          pipe(id: "${PIPE_ID}") {
+            phases {
+              name
+              cards(first: 50) {
+                edges {
+                  node {
+                    id title updated_at
+                    phases_history { phase { name } firstTimeIn }
+                  }
+                }
+              }
+            }
+          }
+        }`);
+
+        const phases = data?.pipe?.phases || [];
+        result.pipefyFases = phases.map(p => ({ nome: p.name, cards: p.cards?.edges?.length || 0 }));
+
+        for (const ph of phases) {
+          const l    = ph.name.toLowerCase().trim();
+          const tipo = l === "coleta solicitada" ? "coleta" : l === "entrega solicitada" ? "entrega" : null;
+          if (!tipo) continue;
+
+          for (const { node } of (ph.cards?.edges || [])) {
+            const pipefyId   = String(node.id);
+            const removedKey = pipefyId + ":" + tipo;
+
+            // Calcula entradaMs
+            const histEntradas = (node.phases_history || []).filter(h => h.phase?.name?.toLowerCase().trim() === l);
+            histEntradas.sort((a, b) => new Date(b.firstTimeIn).getTime() - new Date(a.firstTimeIn).getTime());
+            const ultimaEntrada = histEntradas[0];
+            let entradaMs = 0;
+            if (ultimaEntrada?.firstTimeIn) entradaMs = new Date(ultimaEntrada.firstTimeIn).getTime();
+            else if (node.updated_at)       entradaMs = node.updated_at * 1000;
+            if (entradaMs === 0)            entradaMs = Date.now();
+
+            // Verifica cada regra
+            const jaExiste  = !!(lalaDb.fichas || []).find(f => f.pipefyId === pipefyId && f.tipo === tipo);
+            const removido  = (lalaDb.removedIds || []).includes(removedKey);
+            const bloqueado = result.clearTimestampMs > 0 && entradaMs <= result.clearTimestampMs;
+
+            const card = {
+              pipefyId, tipo, titulo: node.title,
+              entradaMs, entradaData: entradaMs ? new Date(entradaMs).toISOString() : null,
+              clearTimestamp: result.clearTimestamp,
+              jaExisteNaFila: jaExiste,
+              removido,
+              bloqueadoPorClearTs: bloqueado,
+              temHistorico: histEntradas.length > 0,
+              updated_at: node.updated_at,
+              resultado: jaExiste ? "JÁ NA FILA" : removido ? "REMOVIDO" : bloqueado ? "BLOQUEADO (clearTimestamp)" : "SERIA IMPORTADO",
+            };
+            result.cardsColeta.push(card);
+            if (bloqueado || removido) result.bloqueados.push({ pipefyId, titulo: node.title, motivo: removido ? "removido manualmente" : `entrada ${new Date(entradaMs).toISOString()} <= clearTs ${result.clearTimestamp}` });
+          }
+        }
+        result.resumo = {
+          totalNaPipefy: result.cardsColeta.length,
+          seriaImportado: result.cardsColeta.filter(c => c.resultado === "SERIA IMPORTADO").length,
+          jaExistem: result.cardsColeta.filter(c => c.resultado === "JÁ NA FILA").length,
+          bloqueados: result.cardsColeta.filter(c => c.resultado.includes("BLOQUEADO")).length,
+          removidos: result.cardsColeta.filter(c => c.resultado === "REMOVIDO").length,
+        };
+      } catch(e) { result.erroQuery = e.message; }
+
+      return res.status(200).json(result);
     }
 
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
