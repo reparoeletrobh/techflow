@@ -83,13 +83,13 @@ async function geocodificar(endereco) {
   // Validação: coords devem ser de MG
   const dentroMG = (lat, lng) => lat > -23 && lat < -14 && lng > -52 && lng < -39;
   // Validação mais estrita: bbox de BH e região metropolitana
-  const dentoBH  = (lat, lng) => lat > -20.3 && lat < -19.4 && lng > -44.5 && lng < -43.3;
+  const dentoBH  = (lat, lng) => lat > -20.5 && lat < -19.3 && lng > -44.8 && lng < -43.0;
 
   // ── 1. Nominatim (OSM) — melhor cobertura do Brasil ──────────
   const nomQuery = async (q) => {
     const url = "https://nominatim.openstreetmap.org/search?q="
       + encodeURIComponent(q)
-      + "&format=json&limit=5&countrycodes=br&viewbox=-44.5,-20.3,-43.3,-19.4&bounded=0";
+      + "&format=json&limit=5&countrycodes=br&viewbox=-44.8,-20.5,-43.0,-19.3&bounded=0";
     const r = await fetch(url, { headers: { "User-Agent": "ReparoEletro/1.0 (reparoeletroadm.com)" } });
     const j = await r.json();
     const emBH = j?.find(x => dentoBH(parseFloat(x.lat), parseFloat(x.lon)));
@@ -672,7 +672,7 @@ module.exports = async function handler(req, res) {
 
     const endBH = endereco.toLowerCase().includes("belo horizonte") ? endereco : endereco + ", Belo Horizonte, MG, Brasil";
     const dentroMG = (lat, lng) => lat > -23 && lat < -14 && lng > -52 && lng < -39;
-    const dentoBH  = (lat, lng) => lat > -20.3 && lat < -19.4 && lng > -44.5 && lng < -43.3;
+    const dentoBH  = (lat, lng) => lat > -20.5 && lat < -19.3 && lng > -44.8 && lng < -43.0;
 
     const resultado = {
       endereco, endBH,
@@ -685,7 +685,7 @@ module.exports = async function handler(req, res) {
     try {
       const nomQ = async (q) => {
         const u = "https://nominatim.openstreetmap.org/search?q=" + encodeURIComponent(q)
-          + "&format=json&limit=5&countrycodes=br&viewbox=-44.5,-20.3,-43.3,-19.4&bounded=0";
+          + "&format=json&limit=5&countrycodes=br&viewbox=-44.8,-20.5,-43.0,-19.3&bounded=0";
         const r = await fetch(u, { headers: { "User-Agent": "ReparoEletro/1.0" } });
         return r.json();
       };
