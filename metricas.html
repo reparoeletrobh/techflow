@@ -63,7 +63,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .live-strip{display:flex;flex-direction:column;gap:12px;}
 .strip-row{display:grid;gap:12px;}
 .strip-row.erp{grid-template-columns:1fr 1fr 1fr;}
-.strip-row.periodo{grid-template-columns:repeat(5,1fr);}
+.strip-row.periodo{grid-template-columns:repeat(6,1fr);}
 .strip-row-label{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);padding:2px 0;}
 .live-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
   padding:18px 20px;position:relative;overflow:hidden;transition:border-color .2s;}
@@ -168,7 +168,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
   .tab-btn{padding:10px 14px;font-size:10px;flex-shrink:0;}
   .page{padding:14px 12px;gap:16px;}
   .strip-row.erp{grid-template-columns:1fr 1fr 1fr;}
-  .strip-row.periodo{grid-template-columns:1fr 1fr;}
+  .strip-row.periodo{grid-template-columns:1fr 1fr 1fr;}
   .input-grid{grid-template-columns:1fr 1fr;grid-template-rows:auto auto auto;}
   .input-grid > *:last-child{grid-column:1/-1;}
   .btn-salvar{width:100%;}
@@ -528,10 +528,10 @@ function renderFiltrado() {
 }
 
 function calcMetricasJS(dias) {
-  var fichas=0, invest=0, erp=0, valorErp=0, coletas=0;
-  dias.forEach(d => { fichas+=d.fichas||0; invest+=d.investimento||0; erp+=d.erpCount||0; valorErp+=d.valorErp||0; coletas+=d.coletasSolic||0; });
+  var fichas=0, invest=0, erp=0, valorErp=0, coletas=0, orc=0;
+  dias.forEach(d => { fichas+=d.fichas||0; invest+=d.investimento||0; erp+=d.erpCount||0; valorErp+=d.valorErp||0; coletas+=d.coletasSolic||0; orc+=d.orcEnviado||0; });
   return {
-    fichas, investimento: invest, erpCount: erp, valorErp, coletasSolic: coletas,
+    fichas, investimento: invest, erpCount: erp, valorErp, coletasSolic: coletas, orcEnviado: orc,
     cac:           erp   > 0 ? +(invest/erp).toFixed(2)    : null,
     ticketMedio:   erp   > 0 ? +(valorErp/erp).toFixed(2)  : null,
     custoPorFicha: fichas> 0 ? +(invest/fichas).toFixed(2) : null,
@@ -565,6 +565,7 @@ var METAS = {
   custoPorFicha:   { valor: 21,    maior: false },
   fichas:          { valor: 60,    maior: true  },
   coletasSolic:    { valor: 50,    maior: true  },
+  orcEnviado:      { valor: 50,    maior: true  },
 };
 
 function metaBar(atual, meta) {
@@ -645,6 +646,12 @@ function renderStrip(m) {
         '<div class="lc-value" style="color:#a855f7">' + NUM(m.coletasSolic || 0) + '</div>' +
         '<div class="lc-sub">fichas em Coleta Solicitada</div>' +
       metaBar(m.coletasSolic || 0, METAS.coletasSolic) +
+      '</div>' +
+      '<div class="live-card" style="border-top:3px solid #22c55e;">' +
+        '<div class="lc-label">Orçamentos Enviados</div>' +
+        '<div class="lc-value" style="color:#22c55e">' + NUM(m.orcEnviado || 0) + '</div>' +
+        '<div class="lc-sub">entraram em Aguardando Aprovação</div>' +
+      metaBar(m.orcEnviado || 0, METAS.orcEnviado) +
       '</div>' +
     '</div>';
 
