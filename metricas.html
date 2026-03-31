@@ -178,6 +178,13 @@ tr:hover td{background:rgba(255,255,255,.02);}
 @media(max-width:480px){
   .live-strip{grid-template-columns:1fr;}
 }
+
+/* METAS */
+.meta-bar-wrap{margin-top:10px;display:flex;flex-direction:column;gap:3px;}
+.meta-bar-track{height:3px;background:var(--dim);border-radius:2px;overflow:hidden;}
+.meta-bar-fill{height:100%;border-radius:2px;transition:width .6s ease;}
+.meta-label{font-family:var(--fm);font-size:8px;color:var(--muted);display:flex;justify-content:space-between;}
+.meta-label.hit{color:var(--green);}
 </style>
 </head>
 <body>
@@ -545,6 +552,33 @@ function agruparSemanas(dias) {
     .map(([semana, ds]) => ({ semana, ...calcMetricasJS(ds) }));
 }
 
+// Metas diárias
+var METAS = {
+  erp:           { label: 'Meta ERP',        valor: 30,    maior: true  },
+  valorErp:      { label: 'Meta Valor',       valor: 10000, maior: true  },
+  roas:          { label: 'Meta ROAS',        valor: 6.6,   maior: true  },
+  cac:           { label: 'Meta CAC',         valor: 48,    maior: false },
+  ticketMedio:   { label: 'Meta Ticket',      valor: 334,   maior: true  },
+  custoPorFicha: { label: 'Meta C/Ficha',     valor: 21,    maior: false },
+};
+
+function metaBar(atual, meta) {
+  if (atual == null || !meta) return '';
+  // Para métricas onde menor é melhor (CAC, custo/ficha), inverte o cálculo
+  var pct = meta.maior
+    ? Math.min(100, Math.round(atual / meta.valor * 100))
+    : Math.min(100, Math.round(meta.valor / atual * 100));
+  var hit   = pct >= 100;
+  var color = hit ? 'var(--green)' : pct >= 70 ? 'var(--yellow)' : 'var(--red)';
+  var pctDisplay = meta.maior
+    ? Math.round(atual / meta.valor * 100)
+    : Math.round(meta.valor / atual * 100);
+  return '<div class="meta-bar-wrap">' +
+    '<div class="meta-bar-track"><div class="meta-bar-fill" style="width:' + Math.min(100,pct) + '%;background:' + color + '"></div></div>' +
+    '<div class="meta-label' + (hit ? ' hit' : '') + '"><span>' + meta.label + '</span><span>' + pctDisplay + '%' + (hit ? ' ✓' : '') + '</span></div>' +
+  '</div>';
+}
+
 function renderStrip(m) {
   // m = métricas do período (ou resumo geral se sem filtro)
   var e = data.erpAtual;
@@ -559,18 +593,21 @@ function renderStrip(m) {
         '<div class="lc-label">ERPs em Aberto</div>' +
         '<div class="lc-value green">' + e.count + '</div>' +
         '<div class="lc-sub">cards na fase ERP</div>' +
+      metaBar(e.count, METAS.erp) +
       '</div>' +
       '<div class="live-card blue">' +
         '<div class="live-badge">AO VIVO</div>' +
         '<div class="lc-label">Valor Total ERP</div>' +
         '<div class="lc-value blue">' + BRL(e.valor) + '</div>' +
         '<div class="lc-sub">soma dos contratos</div>' +
+      metaBar(e.valor, METAS.valorErp) +
       '</div>' +
       '<div class="live-card" style="border-top:3px solid var(--cyan);">' +
         '<div class="live-badge" style="background:rgba(6,182,212,.12);color:var(--cyan);border-color:rgba(6,182,212,.2);">AO VIVO</div>' +
         '<div class="lc-label">ROAS</div>' +
         '<div class="lc-value" style="color:var(--cyan)">' + (m.investimento > 0 ? (e.valor / m.investimento).toFixed(2) + 'x' : '—') + '</div>' +
         '<div class="lc-sub">valor ERP / investido (' + BRL(m.investimento) + ')</div>' +
+      metaBar(m.investimento > 0 ? e.valor/m.investimento : null, METAS.roas) +
       '</div>' +
     '</div>' +
     // LINHA 2 — Métricas do período
@@ -580,16 +617,19 @@ function renderStrip(m) {
         '<div class="lc-label">CAC ' + periodoLabel + '</div>' +
         '<div class="lc-value orange">' + BRL(m.cac) + '</div>' +
         '<div class="lc-sub">investimento / ERPs (' + NUM(m.erpCount) + ')</div>' +
+      metaBar(m.cac, METAS.cac) +
       '</div>' +
       '<div class="live-card purple">' +
         '<div class="lc-label">Ticket Médio</div>' +
         '<div class="lc-value purple">' + BRL(m.ticketMedio) + '</div>' +
         '<div class="lc-sub">valor ERP / ERPs</div>' +
+      metaBar(m.ticketMedio, METAS.ticketMedio) +
       '</div>' +
       '<div class="live-card" style="--c:var(--yellow);border-top:3px solid var(--yellow);">' +
         '<div class="lc-label">Custo por Ficha</div>' +
         '<div class="lc-value" style="color:var(--yellow)">' + BRL(m.custoPorFicha) + '</div>' +
         '<div class="lc-sub">investimento / fichas (' + NUM(m.fichas) + ')</div>' +
+      metaBar(m.custoPorFicha, METAS.custoPorFicha) +
       '</div>' +
     '</div>';
 
