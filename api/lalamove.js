@@ -794,38 +794,45 @@ module.exports = async function handler(req, res) {
     const pendentes = (db.fichas || []).filter(f => f.status === "pendente" && f.pipefyId);
     if (!pendentes.length) return res.status(200).json({ ok: true, updated: 0 });
 
-    // Busca dados dos cards do Pipefy em batch
-    const aliases = pendentes.map((f, i) =>
-      `c${i}: card(id: "${f.pipefyId}") { id title fields { name value } }`
-    ).join("\n");
+    const PIPEFY_TOKEN = (process.env.PIPEFY_TOKEN || "").trim();
+    let updated = 0;
 
-    try {
-      const data = await pipefyQuery(`query { ${aliases} }`);
-      let updated = 0;
-      pendentes.forEach((f, i) => {
-        const card = data[`c${i}`];
-        if (!card) return;
-        const fields    = card.fields || [];
-        const nomeField = fields.find(fl => fl.name.toLowerCase().includes("nome"));
-        const telField  = fields.find(fl => fl.name.toLowerCase().includes("telefone") || fl.name.toLowerCase().includes("fone"));
-        const endField  = fields.find(fl => fl.name.toLowerCase().includes("endere"));
-
-        const nome = nomeField?.value?.trim() || null;
-        if (nome) {
-          const idx = db.fichas.findIndex(x => x.pipefyId === f.pipefyId);
-          if (idx >= 0) {
-            db.fichas[idx].nomeContato = nome;
-            if (telField?.value) db.fichas[idx].telefone = telField.value;
-            if (endField?.value && !db.fichas[idx].endereco) db.fichas[idx].endereco = endField.value;
-            updated++;
+    // Busca em lotes de 5 para não sobrecarregar
+    for (let i = 0; i < pendentes.length; i += 5) {
+      const lote = pendentes.slice(i, i + 5);
+      const aliases = lote.map((f, j) =>
+        `c${j}: card(id: "${f.pipefyId}") { id fields { name value } }`
+      ).join("\n");
+      try {
+        const r = await fetch(PIPEFY_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${PIPEFY_TOKEN}` },
+          body: JSON.stringify({ query: `query { ${aliases} }` }),
+        });
+        const data = (await r.json()).data || {};
+        lote.forEach((f, j) => {
+          const card   = data[`c${j}`];
+          if (!card) return;
+          const fields    = card.fields || [];
+          const nomeField = fields.find(fl => fl.name.toLowerCase().includes("nome"));
+          const telField  = fields.find(fl => fl.name.toLowerCase().includes("telefone") || fl.name.toLowerCase().includes("fone"));
+          const endField  = fields.find(fl => fl.name.toLowerCase().includes("endere"));
+          const nome = nomeField?.value?.trim();
+          if (nome) {
+            const idx = db.fichas.findIndex(x => x.pipefyId === f.pipefyId);
+            if (idx >= 0) {
+              db.fichas[idx].nomeContato = nome;
+              if (telField?.value) db.fichas[idx].telefone = telField.value;
+              if (endField?.value && !db.fichas[idx].endereco) db.fichas[idx].endereco = endField.value;
+              updated++;
+            }
           }
-        }
-      });
-      if (updated > 0) await dbSet(LALA_KEY, db);
-      return res.status(200).json({ ok: true, updated, total: pendentes.length });
-    } catch(e) {
-      return res.status(200).json({ ok: false, error: e.message });
+        });
+      } catch(e) { console.error("atualizar-nomes lote:", e.message); }
     }
+
+    if (updated > 0) await dbSet(LALA_KEY, db);
+    return res.status(200).json({ ok: true, updated, total: pendentes.length });
   }
 
   return res.status(404).json({ ok: false, error: "Ação não encontrada" });
