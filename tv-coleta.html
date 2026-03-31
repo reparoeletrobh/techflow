@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TV — Coleta</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#07080a;--surface:#0f1114;--surface2:#181b1f;--border:#1e2228;
+  --text:#f0f2f5;--muted:#5a6270;--dim:#2a2f38;
+  --accent:#f97316;--green:#22c55e;--red:#ef4444;--blue:#3b9eff;--yellow:#f5c800;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;}
+
+header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;
+  border-bottom:2px solid var(--accent);background:var(--bg);position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.logo-icon{width:26px;height:26px;background:var(--accent);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;}
+.logo span{color:var(--accent);}
+.hdr-right{display:flex;gap:8px;}
+.hbtn{font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;text-decoration:none;display:inline-flex;align-items:center;gap:5px;}
+.hbtn:hover{color:var(--text);border-color:var(--accent);}
+.hbtn.primary{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700;}
+.hbtn.green{background:var(--green);color:#000;border-color:var(--green);font-weight:700;}
+
+.tabs-bar{display:flex;border-bottom:1px solid var(--border);padding:0 24px;background:var(--bg);position:sticky;top:52px;z-index:90;}
+.tab-btn{font-family:var(--fm);font-size:11px;font-weight:600;padding:12px 20px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-badge{font-family:var(--fm);font-size:9px;padding:1px 6px;border-radius:99px;background:var(--surface2);margin-left:4px;}
+.tab-btn.active .tab-badge{background:rgba(249,115,22,.15);color:var(--accent);}
+
+.page{display:none;flex:1;flex-direction:column;padding:20px 24px;gap:16px;}
+.page.active{display:flex;}
+
+/* Link do motorista */
+.driver-link-card{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--green);border-radius:12px;padding:18px 20px;}
+.driver-link-title{font-family:var(--fh);font-size:14px;font-weight:800;margin-bottom:8px;}
+.driver-link-title span{color:var(--green);}
+.driver-link-url{font-family:var(--fm);font-size:12px;background:var(--surface2);padding:10px 14px;border-radius:8px;border:1px solid var(--border);color:var(--blue);word-break:break-all;margin-bottom:10px;}
+.driver-link-actions{display:flex;gap:8px;flex-wrap:wrap;}
+
+/* Cards de ficha */
+.fichas-grid{display:flex;flex-direction:column;gap:8px;max-width:700px;}
+.ficha-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;transition:border-color .2s;}
+.ficha-card:hover{border-color:rgba(249,115,22,.2);}
+.ficha-card.coletada{opacity:.5;border-left:3px solid var(--green);}
+.ficha-info{flex:1;}
+.ficha-nome{font-size:13px;font-weight:600;}
+.ficha-end{font-size:11px;color:var(--muted);margin-top:3px;}
+.ficha-tel{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px;}
+.ficha-status{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:20px;}
+.ficha-status.pendente{background:rgba(249,115,22,.1);color:var(--accent);border:1px solid rgba(249,115,22,.2);}
+.ficha-status.coletada{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2);}
+.ficha-actions{display:flex;gap:6px;flex-shrink:0;}
+.fbtn{font-family:var(--fm);font-size:9px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
+.fbtn:hover{color:var(--text);border-color:var(--accent);}
+.fbtn.del{border-color:rgba(239,68,68,.2);color:var(--red);}
+.fbtn.del:hover{background:rgba(239,68,68,.1);}
+
+.empty-state{padding:60px;text-align:center;font-family:var(--fm);font-size:11px;color:var(--dim);}
+.spinner-wrap{display:flex;align-items:center;justify-content:center;gap:10px;padding:40px;font-family:var(--fm);font-size:11px;color:var(--muted);}
+.spinner{width:16px;height:16px;border:2px solid var(--dim);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.toast{position:fixed;bottom:18px;right:18px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:11px 14px;font-family:var(--fm);font-size:11px;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;}
+.toast.show{transform:translateY(0);opacity:1;}
+
+@media(max-width:768px){
+  header{padding:0 12px;height:48px;}
+  .page{padding:14px 12px;}
+  .driver-link-actions{flex-direction:column;}
+  .hbtn{font-size:9px;padding:4px 8px;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🚚</div>
+    TV<span>Assistência</span> — Coleta
+  </div>
+  <div class="hdr-right">
+    <button class="hbtn" onclick="sincronizar()">↻ Sync</button>
+    <button class="hbtn" onclick="limparFila()" style="color:var(--red);border-color:rgba(239,68,68,.3);">🗑 Limpar Fila</button>
+  </div>
+</header>
+
+<div class="tabs-bar">
+  <button class="tab-btn active" id="tab-fila" onclick="setTab('fila')">
+    🚚 Fila de Coleta <span class="tab-badge" id="badge-fila">0</span>
+  </button>
+  <button class="tab-btn" id="tab-link" onclick="setTab('link')">
+    🔗 Link do Motorista
+  </button>
+</div>
+
+<!-- FILA -->
+<div class="page active" id="page-fila">
+  <div id="fichas-list">
+    <div class="spinner-wrap"><div class="spinner"></div>Carregando...</div>
+  </div>
+</div>
+
+<!-- LINK MOTORISTA -->
+<div class="page" id="page-link">
+  <div class="driver-link-card">
+    <div class="driver-link-title">🔗 Link do <span>Motorista</span></div>
+    <div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:12px;">
+      Envie este link para o motorista. Ele pode acessar a rota e marcar cada coleta como concluída.
+    </div>
+    <div class="driver-link-url" id="driver-url">https://reparoeletroadm.com/tv/motorista</div>
+    <div class="driver-link-actions">
+      <button class="hbtn green" onclick="copiarLink()">📋 Copiar Link</button>
+      <a class="hbtn" id="btn-wa-link" href="#" target="_blank">💬 Enviar WhatsApp</a>
+      <a class="hbtn" href="/tv/motorista" target="_blank">👁 Visualizar Rota</a>
+    </div>
+  </div>
+
+  <div class="driver-link-card" style="border-top-color:var(--blue);">
+    <div class="driver-link-title" style="font-size:12px;">ℹ️ Como funciona</div>
+    <div style="font-family:var(--fm);font-size:10px;color:var(--muted);line-height:1.8;margin-top:8px;">
+      1. Clique em <strong style="color:var(--text)">↻ Sync</strong> para importar fichas em Coleta Solicitada do painel técnico<br>
+      2. Envie o link para o motorista<br>
+      3. O motorista acessa, vê a rota e marca cada coleta como ✅ Concluída<br>
+      4. As fichas marcadas aparecem com status <strong style="color:var(--green)">Coletada</strong> aqui
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <span id="t-icon">✅</span>
+  <div><strong id="t-title"></strong><br><span id="t-body" style="color:var(--muted);font-size:10px;"></span></div>
+</div>
+
+<script>
+var curTab = 'fila';
+var fichas = [];
+
+function setTab(t) {
+  curTab = t;
+  ['fila','link'].forEach(function(id) {
+    document.getElementById('tab-'+id).classList.toggle('active', id===t);
+    document.getElementById('page-'+id).classList.toggle('active', id===t);
+  });
+  if (t === 'link') setupDriverLink();
+}
+
+function setupDriverLink() {
+  var url = window.location.origin + '/tv/motorista';
+  document.getElementById('driver-url').textContent = url;
+  var tel = '5531997856023'; // número da loja
+  var msg = encodeURIComponent('Olá! Segue o link com as coletas de hoje 🚚\n' + url);
+  document.getElementById('btn-wa-link').href = 'https://wa.me/' + tel + '?text=' + msg;
+}
+
+async function load() {
+  try {
+    var r = await fetch('/api/tv-coleta?action=load').then(function(r){return r.json();});
+    if (!r.ok) { showToast('❌','Erro',r.error); return; }
+    fichas = r.fichas || [];
+    renderFila();
+  } catch(e) { showToast('❌','Erro',e.message); }
+}
+
+function renderFila() {
+  var el = document.getElementById('fichas-list');
+  var pendentes = fichas.filter(function(f){return f.status==='pendente';});
+  var coletadas = fichas.filter(function(f){return f.status==='coletado';});
+  document.getElementById('badge-fila').textContent = pendentes.length;
+
+  if (!fichas.length) {
+    el.innerHTML = '<div class="empty-state">Nenhuma ficha na fila.<br>Clique em ↻ Sync para importar do painel técnico.</div>';
+    return;
+  }
+
+  el.innerHTML = '<div class="fichas-grid" id="fichas-grid"></div>';
+  var grid = document.getElementById('fichas-grid');
+  fichas.forEach(function(f) {
+    var card = document.createElement('div');
+    card.className = 'ficha-card' + (f.status==='coletado' ? ' coletada' : '');
+    var statusTxt = f.status === 'coletado' ? '✅ Coletada' : '⏳ Pendente';
+    var statusCls = f.status === 'coletado' ? 'coletada' : 'pendente';
+    card.innerHTML =
+      '<div class="ficha-info">' +
+        '<div class="ficha-nome">' + (f.nomeContato||'—') + '</div>' +
+        '<div class="ficha-end">📍 ' + (f.endereco||'Sem endereço') + '</div>' +
+        (f.telefone ? '<div class="ficha-tel">📱 '+f.telefone+'</div>' : '') +
+        (f.coletadoEm ? '<div class="ficha-tel" style="color:var(--green)">Coletado: '+new Date(f.coletadoEm).toLocaleTimeString('pt-BR')+'</div>' : '') +
+      '</div>' +
+      '<div class="ficha-actions">' +
+        '<span class="ficha-status '+statusCls+'">'+statusTxt+'</span>' +
+        '<button class="fbtn del" onclick="removerFicha(\''+f.pipefyId+'\')">✕</button>' +
+      '</div>';
+    grid.appendChild(card);
+  });
+}
+
+async function sincronizar() {
+  showToast('↻','Sincronizando...','Importando do painel técnico');
+  try {
+    var r = await fetch('/api/tv-coleta?action=sync').then(function(r){return r.json();});
+    if (r.ok) {
+      showToast('✅', r.added + ' ficha(s) importada(s)', r.total + ' pendente(s) no total');
+      await load();
+    } else showToast('❌','Erro',r.error);
+  } catch(e) { showToast('❌','Erro',e.message); }
+}
+
+async function removerFicha(pipefyId) {
+  if (!confirm('Remover da fila?')) return;
+  var r = await fetch('/api/tv-coleta?action=remover', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({pipefyId})
+  }).then(function(r){return r.json();});
+  if (r.ok) { await load(); showToast('🗑','Removida',''); }
+  else showToast('❌','Erro',r.error);
+}
+
+async function limparFila() {
+  if (!confirm('Limpar toda a fila? As fichas coletadas serão arquivadas.')) return;
+  var r = await fetch('/api/tv-coleta?action=limpar', {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json();});
+  if (r.ok) { showToast('🗑','Fila limpa',''); await load(); }
+  else showToast('❌','Erro',r.error);
+}
+
+function copiarLink() {
+  var url = window.location.origin + '/tv/motorista';
+  navigator.clipboard.writeText(url).catch(function(){
+    var ta=document.createElement('textarea'); ta.value=url;
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+  });
+  showToast('📋','Link copiado!','');
+}
+
+var toastTimer;
+function showToast(icon, title, msg) {
+  var t=document.getElementById('toast');
+  document.getElementById('t-icon').textContent=icon;
+  document.getElementById('t-title').textContent=title;
+  document.getElementById('t-body').textContent=msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){t.classList.remove('show');},4000);
+}
+
+load();
+</script>
+</body>
+</html>
