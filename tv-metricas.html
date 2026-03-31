@@ -508,8 +508,9 @@ function renderFiltrado() {
 
   // Filtra dias no período
   var diasFiltrados = (data.diario || []).filter(d => {
-    if (de  && d.data < de)  return false;
-    if (ate && d.data > ate) return false;
+    var dData = d.data ? d.data.slice(0,10) : '';
+    if (de  && dData < de)  return false;
+    if (ate && dData > ate) return false;
     return true;
   });
 
@@ -588,6 +589,7 @@ function metaBar(atual, meta) {
 
 function renderStrip(m) {
   // m = métricas do período (ou resumo geral se sem filtro)
+  if (!data || !data.erpAtual) return;
   var e = data.erpAtual;
   var periodoLabel = filtroAtivo ? 'Período' : 'Acumulado';
 
@@ -678,8 +680,8 @@ function renderStrip(m) {
     '</div>';
 
   // Atualiza ERP na aba lançar (sempre ao vivo)
-  document.getElementById('erp-live-count').textContent = e.count + ' ERPs';
-  document.getElementById('erp-live-valor').textContent = BRL(e.valor);
+  var elc = document.getElementById('erp-live-count'); if(elc) elc.textContent = e.count + ' ERPs';
+  var elv = document.getElementById('erp-live-valor'); if(elv) elv.textContent = BRL(e.valor);
 }
 
 function renderLiveStrip() {
