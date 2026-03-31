@@ -295,7 +295,43 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-    return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+  // ── GET valor-erp-periodo
+  if (action === "valor-erp-periodo") {
+    const { de, ate } = req.query;
+    if (!de || !ate) return res.status(400).json({ ok: false, error: "de e ate obrigatórios" });
+    try {
+      const logsData = await dbGet(LOGS_KEY);
+      const metaLog  = logsData?.metaLog || [];
+      const ids = metaLog
+        .filter(m => {
+          if (m.phaseId !== "erp_entrada") return false;
+          const d = toDateStr(new Date(m.timestamp).getTime());
+          return d >= de && d <= ate;
+        })
+        .map(m => m.pipefyId)
+        .filter((v, i, a) => a.indexOf(v) === i);
+      if (!ids.length) return res.status(200).json({ ok: true, valor: 0, count: 0 });
+      let totalValor = 0;
+      for (let i = 0; i < ids.length; i += 10) {
+        const lote = ids.slice(i, i + 10);
+        const aliases = lote.map((id, j) => `c${j}: card(id: "${id}") { id fields { name value } }`).join(" ");
+        try {
+          const data = await pipefyQuery(`query { ${aliases} }`);
+          for (let j = 0; j < lote.length; j++) {
+            const card = data[`c${j}`];
+            if (!card) continue;
+            const vf = (card.fields||[]).find(f=>f.name.toLowerCase().includes("valor"));
+            totalValor += parseFloat(String(vf?.value||"0").replace(/[^\d.,]/g,"").replace(",",".")) || 0;
+          }
+        } catch(e) {}
+      }
+      return res.status(200).json({ ok: true, valor: totalValor, count: ids.length });
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: e.message });
+    }
+  }
+
+  return res.status(404).json({ ok: false, error: "Ação não encontrada" });
   } catch(e) {
     console.error("metricas handler error:", e.message, e.stack);
     return res.status(200).json({ ok: false, error: "Erro interno: " + e.message });
