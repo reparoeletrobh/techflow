@@ -1099,13 +1099,13 @@ module.exports = async function handler(req, res) {
             const fields   = node.fields || [];
             const endField  = fields.find(f => f.name.toLowerCase().includes("endere"));
             const telField  = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"));
-            const nomeField = fields.find(f => f.name.toLowerCase() === "nome" || f.name.toLowerCase().includes("nome do cliente") || f.name.toLowerCase().includes("nome contato"));
+            const nomeField = fields.find(f => f.name.toLowerCase().includes("nome"));
             const title     = node.title || "";
             const m         = title.match(/^(.*?)\s+(\d{3,6})$/);
-            // Nome: campo Nome do Pipefy, ou extrai do título antes do " — " ou "| "
-            let nomeContato = nomeField?.value || null;
+            // Nome: campo Nome do Pipefy (mais confiável)
+            // Fallback: extrai do título apenas a parte antes de " — " ou " | "
+            let nomeContato = nomeField?.value?.trim() || null;
             if (!nomeContato) {
-              // tenta extrair só o nome do título: "Ana Silva 1234" ou "Ana Silva — Bebedouro"
               const tClean = title.split(/\s*[—–|]\s*/)[0].trim();
               const mNome  = tClean.match(/^(.*?)\s+(\d{3,6})$/);
               nomeContato  = mNome ? mNome[1].trim() : tClean;
@@ -1114,7 +1114,7 @@ module.exports = async function handler(req, res) {
             lalaDb.fichas.push({
               pipefyId, tipo,
               osCode:      m ? m[2] : null,
-              nomeContato: nomeContato,
+              nomeContato,
               descricao:   null,
               endereco:    endField?.value || null,
               telefone:    telField?.value || null,
