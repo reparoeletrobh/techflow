@@ -183,6 +183,23 @@ async function lalaFetch(host, path, method, headers, body) {
 }
 
 // Formata telefone para padrão internacional +55
+// Extrai complemento do endereço (ap, apto, bloco, sala, etc.)
+function extractComplemento(endereco) {
+  if (!endereco) return "";
+  const m = endereco.match(/,?\s*[-–]?\s*((ap(to)?\.?\s*\d+[\w]*|apartamento\s*\d+[\w]*|bloco\s*[\w]+|bl\.?\s*[\w]+|sala\s*[\w]+|loja\s*[\w]+|andar\s*[\w]+|conjunto\s*[\w]+|cj\.?\s*[\w]+))/i);
+  return m ? m[1].trim() : "";
+}
+
+// Formata nome para Lalamove: "Nome Telefone"
+function formatNomeLala(nomeContato, telefone) {
+  var tel = (telefone || "").replace(/\D/g, "").slice(-11); // últimos 11 dígitos
+  if (!tel) return nomeContato || "Cliente";
+  var telFmt = tel.length === 11
+    ? "(" + tel.slice(0,2) + ") " + tel.slice(2,7) + "-" + tel.slice(7)
+    : tel;
+  return (nomeContato || "Cliente") + " " + telFmt;
+}
+
 function formatTelIntl(tel) {
   if (!tel) return "+5531997856023"; // fallback loja
   const digits = tel.replace(/\D/g, "");
@@ -349,16 +366,18 @@ module.exports = async function handler(req, res) {
     if (tipo === "coleta") {
       senderStopId   = lalaStops[lalaStops.length - 1]?.stopId;
       recipientStops = lalaStops.slice(0, -1).map((s, i) => ({
-        stopId: s.stopId,
-        name:   pendentes[i]?.nomeContato || "Cliente",
-        phone:  formatTelIntl(pendentes[i]?.telefone),
+        stopId:  s.stopId,
+        name:    formatNomeLala(pendentes[i]?.nomeContato, pendentes[i]?.telefone),
+        phone:   formatTelIntl(pendentes[i]?.telefone),
+        remarks: extractComplemento(pendentes[i]?.endereco),
       }));
     } else {
       senderStopId   = lalaStops[0]?.stopId;
       recipientStops = lalaStops.slice(1).map((s, i) => ({
-        stopId: s.stopId,
-        name:   pendentes[i]?.nomeContato || "Cliente",
-        phone:  formatTelIntl(pendentes[i]?.telefone),
+        stopId:  s.stopId,
+        name:    formatNomeLala(pendentes[i]?.nomeContato, pendentes[i]?.telefone),
+        phone:   formatTelIntl(pendentes[i]?.telefone),
+        remarks: extractComplemento(pendentes[i]?.endereco),
       }));
     }
 
@@ -450,10 +469,10 @@ module.exports = async function handler(req, res) {
     let senderStopId, recipientStops;
     if (tipo === "coleta") {
       senderStopId   = lalaStops[lalaStops.length - 1]?.stopId;
-      recipientStops = lalaStops.slice(0, -1).map((s, i) => ({ stopId: s.stopId, name: pendentes[i]?.nomeContato || "Cliente", phone: formatTelIntl(pendentes[i]?.telefone) }));
+      recipientStops = lalaStops.slice(0, -1).map((s, i) => ({ stopId: s.stopId, name: formatNomeLala(pendentes[i]?.nomeContato, pendentes[i]?.telefone), phone: formatTelIntl(pendentes[i]?.telefone), remarks: extractComplemento(pendentes[i]?.endereco) }));
     } else {
       senderStopId   = lalaStops[0]?.stopId;
-      recipientStops = lalaStops.slice(1).map((s, i) => ({ stopId: s.stopId, name: pendentes[i]?.nomeContato || "Cliente", phone: formatTelIntl(pendentes[i]?.telefone) }));
+      recipientStops = lalaStops.slice(1).map((s, i) => ({ stopId: s.stopId, name: formatNomeLala(pendentes[i]?.nomeContato, pendentes[i]?.telefone), phone: formatTelIntl(pendentes[i]?.telefone), remarks: extractComplemento(pendentes[i]?.endereco) }));
     }
 
     const orderPath = "/v3/orders";
