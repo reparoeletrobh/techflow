@@ -40,7 +40,12 @@ async function pipefyQuery(query) {
     body: JSON.stringify({ query }),
   });
   const j = await r.json();
-  if (j.errors) throw new Error(j.errors.map(e => e.message).join("; "));
+  if (j.errors) {
+    const msg = Array.isArray(j.errors)
+      ? j.errors.map(e => e.message || String(e)).join("; ")
+      : String(j.errors);
+    throw new Error(msg);
+  }
   return j.data;
 }
 
