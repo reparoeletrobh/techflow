@@ -154,9 +154,11 @@ module.exports = async function handler(req, res) {
     const erpPorDia    = {};
     const coletaPorDia = {};
     const orcPorDia    = {};
+    const valorErpPorDia = {};
     for (const e of erpLog) {
       const d = toDateStr(new Date(e.timestamp).getTime());
-      erpPorDia[d] = (erpPorDia[d] || 0) + 1;
+      erpPorDia[d]     = (erpPorDia[d]     || 0) + 1;
+      valorErpPorDia[d] = (valorErpPorDia[d] || 0) + (e.valor || 0);
     }
     for (const e of coletaLog) {
       const d = toDateStr(new Date(e.timestamp).getTime());
@@ -168,13 +170,14 @@ module.exports = async function handler(req, res) {
     }
 
     // Constrói array de dias enriquecido
-    // fichas/investimento/valorErp = lançamento manual (fonte: usuário)
-    // erpCount/coletasSolic/orcEnviado = SEMPRE metaLog Pipefy (fonte confiável)
+    // fichas/investimento = lançamento manual (fonte: usuário)
+    // erpCount/valorErp/coletasSolic/orcEnviado = SEMPRE metaLog Pipefy (fonte confiável)
     const diasEnriq = db.dias.map(d => ({
       ...d,
-      erpCount:     erpPorDia[d.data]    || 0,
-      coletasSolic: coletaPorDia[d.data] || 0,
-      orcEnviado:   orcPorDia[d.data]    || 0,
+      erpCount:     erpPorDia[d.data]      || 0,
+      valorErp:     valorErpPorDia[d.data] || 0,
+      coletasSolic: coletaPorDia[d.data]   || 0,
+      orcEnviado:   orcPorDia[d.data]      || 0,
     }));
 
     // Adiciona dias que aparecem no metaLog mas não têm lançamento manual
@@ -189,7 +192,7 @@ module.exports = async function handler(req, res) {
           fichas:       0,
           investimento: 0,
           erpCount:     erpPorDia[data]    || 0,
-          valorErp:     0,
+          valorErp:     valorErpPorDia[data] || 0,
           coletasSolic: coletaPorDia[data] || 0,
           orcEnviado:   orcPorDia[data]    || 0,
         });
