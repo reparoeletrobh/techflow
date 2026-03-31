@@ -79,7 +79,9 @@ async function fetchErpCards() {
 
 // Helpers de data
 function toDateStr(ts) {
-  return new Date(ts).toISOString().slice(0, 10);
+  // Usa timezone de Brasília (UTC-3) para garantir que a data bata com o dia local
+  return new Date(ts).toLocaleDateString('pt-BR', {timeZone:'America/Sao_Paulo'})
+    .split('/').reverse().join('-'); // DD/MM/YYYY → YYYY-MM-DD
 }
 function weekStart(d) {
   const dt = new Date(d);
@@ -89,7 +91,8 @@ function weekStart(d) {
   return dt.toISOString().slice(0,10);
 }
 function monthKey(ts) {
-  return new Date(ts).toISOString().slice(0, 7); // "2025-03"
+  var d = new Date(ts).toLocaleDateString('pt-BR', {timeZone:'America/Sao_Paulo'}).split('/');
+  return d[2] + '-' + d[1]; // YYYY-MM
 }
 
 // Calcula métricas agregadas para um conjunto de dias
