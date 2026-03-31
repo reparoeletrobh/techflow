@@ -63,14 +63,16 @@ async function fetchErpCards() {
 }
 
 function toDateStr(ts) {
-  // BH = UTC-3 fixo (sem horario de verao desde 2019)
   var d = new Date(ts - 3 * 60 * 60 * 1000);
   return d.toISOString().slice(0, 10);
 }
-function weekStart(d) {
-  const dt = new Date(d); const day = dt.getDay();
-  dt.setDate(dt.getDate() - (day === 0 ? 6 : day - 1)); dt.setHours(0,0,0,0);
-  return (new Date(dt.getTime() - 3*60*60*1000)).toISOString().slice(0,10);
+function weekStart(dateStr) {
+  const [y,m,d] = dateStr.split("-").map(Number);
+  const dt = new Date(y, m-1, d);
+  const day = dt.getDay();
+  dt.setDate(dt.getDate() - (day === 0 ? 6 : day - 1));
+  const yr = dt.getFullYear(), mo = String(dt.getMonth()+1).padStart(2,"0"), dy = String(dt.getDate()).padStart(2,"0");
+  return yr+"-"+mo+"-"+dy;
 }
 function monthKey(ts) {
   var d = new Date(ts - 3 * 60 * 60 * 1000);
@@ -150,7 +152,7 @@ module.exports = async function handler(req, res) {
 
       const semanas = {};
       for (const d of diasEnriq) {
-        const sk = weekStart(d.data + "T12:00:00");
+        const [_y,_m,_d] = (d.data||"").split("-").map(Number); const sk = weekStart(new Date(_y,_m-1,_d).toISOString().slice(0,10));
         if (!semanas[sk]) semanas[sk] = [];
         semanas[sk].push(d);
       }
