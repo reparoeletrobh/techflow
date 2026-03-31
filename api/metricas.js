@@ -94,15 +94,16 @@ function monthKey(ts) {
 
 // Calcula métricas agregadas para um conjunto de dias
 function calcMetricas(dias) {
-  let fichas = 0, investimento = 0, erpCount = 0, valorErp = 0;
+  let fichas = 0, investimento = 0, erpCount = 0, valorErp = 0, coletasSolic = 0;
   for (const d of dias) {
-    fichas      += d.fichas      || 0;
-    investimento += d.investimento || 0;
-    erpCount    += d.erpCount    || 0;
-    valorErp    += d.valorErp    || 0;
+    fichas        += d.fichas        || 0;
+    investimento  += d.investimento  || 0;
+    erpCount      += d.erpCount      || 0;
+    valorErp      += d.valorErp      || 0;
+    coletasSolic  += d.coletasSolic  || 0;
   }
   return {
-    fichas, investimento, erpCount, valorErp,
+    fichas, investimento, erpCount, valorErp, coletasSolic,
     cac:          erpCount   > 0 ? +(investimento / erpCount).toFixed(2)   : null,
     ticketMedio:  erpCount   > 0 ? +(valorErp     / erpCount).toFixed(2)   : null,
     custoPorFicha: fichas    > 0 ? +(investimento / fichas).toFixed(2)     : null,
@@ -206,7 +207,7 @@ module.exports = async function handler(req, res) {
 
   // ── POST salvar-dia — salva ou atualiza dados de um dia ──────────────────
   if (req.method === "POST" && action === "salvar-dia") {
-    const { data, fichas, investimento, erpCount, valorErp, obs } = req.body || {};
+    const { data, fichas, investimento, erpCount, valorErp, coletasSolic, obs } = req.body || {};
     if (!data) return res.status(400).json({ ok: false, error: "data obrigatória (YYYY-MM-DD)" });
 
     const db = await dbGet(METRICAS_KEY) || { dias: [] };
@@ -215,11 +216,12 @@ module.exports = async function handler(req, res) {
     const idx = db.dias.findIndex(d => d.data === data);
     const entry = {
       data,
-      fichas:      parseInt(fichas)      || 0,
+      fichas:       parseInt(fichas)       || 0,
       investimento: parseFloat(investimento) || 0,
-      erpCount:    parseInt(erpCount)    || 0,
-      valorErp:    parseFloat(valorErp)  || 0,
-      obs:         obs || "",
+      erpCount:     parseInt(erpCount)     || 0,
+      valorErp:     parseFloat(valorErp)   || 0,
+      coletasSolic: parseInt(coletasSolic) || 0,
+      obs:          obs || "",
       updatedAt:   new Date().toISOString(),
     };
 
