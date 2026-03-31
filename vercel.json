@@ -1,137 +1,29 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron-erp",
-      "schedule": "0 */2 * * *"
-    }
-  ],
+  "crons": [{"path":"/api/cron-erp","schedule":"0 */2 * * *"}],
   "rewrites": [
-    {
-      "source": "/tecnico",
-      "destination": "/tecnico.html"
-    },
-    {
-      "source": "/financeiro",
-      "destination": "/financeiro.html"
-    },
-    {
-      "source": "/vendas",
-      "destination": "/vendas.html"
-    },
-    {
-      "source": "/equipamentos",
-      "destination": "/equipamentos.html"
-    },
-    {
-      "source": "/metas",
-      "destination": "/metas.html"
-    },
-    {
-      "source": "/adm",
-      "destination": "/adm.html"
-    },
-    {
-      "source": "/orcamento",
-      "destination": "/orcamento.html"
-    },
-    {
-      "source": "/compras",
-      "destination": "/compras.html"
-    },
-    {
-      "source": "/compra-equip",
-      "destination": "/compra-equip.html"
-    },
-    {
-      "source": "/garantia",
-      "destination": "/garantia.html"
-    },
-    {
-      "source": "/lalamove",
-      "destination": "/lalamove.html"
-    },
-    {
-      "source": "/aguardando-retirada",
-      "destination": "/aguardando-retirada.html"
-    },
-    {
-      "source": "/metricas",
-      "destination": "/metricas.html"
-    },
-    {
-      "source": "/nf-setup",
-      "destination": "/nf-setup.html"
-    },
-    {
-      "source": "/tv",
-      "destination": "/tv-adm.html"
-    },
-    {
-      "source": "/tv/adm",
-      "destination": "/tv-adm.html"
-    },
-    {
-      "source": "/tv/tecnico",
-      "destination": "/tv-tecnico.html"
-    },
-    {
-      "source": "/tv/orcamento",
-      "destination": "/tv-orcamento.html"
-    },
-    {
-      "source": "/tv/financeiro",
-      "destination": "/tv-financeiro.html"
-    },
-    {
-      "source": "/tv/metricas",
-      "destination": "/tv-metricas.html"
-    },
-    {
-      "source": "/tv/coleta",
-      "destination": "/tv-coleta.html"
-    },
-    {
-      "source": "/tv/motorista",
-      "destination": "/tv-motorista.html"
-    },
-    {
-      "source": "/tv/aguardando-retirada",
-      "destination": "/tv-aguardando-retirada.html"
-    },
-    {
-      "source": "/((?!api/).*)",
-      "destination": "/home.html"
-    }
-  ]
-}{
-  "crons": [
-    { "path": "/api/board?action=erp-to-finalizado", "schedule": "0 2 * * 1" }
-  ],
-  "rewrites": [
-    { "source": "/tecnico",      "destination": "/tecnico.html"      },
-    { "source": "/financeiro",   "destination": "/financeiro.html"   },
-    { "source": "/vendas",       "destination": "/vendas.html"       },
-    { "source": "/equipamentos", "destination": "/equipamentos.html" },
-    { "source": "/metas",        "destination": "/metas.html"        },
-    { "source": "/adm",          "destination": "/adm.html"          },
-    { "source": "/orcamento",    "destination": "/orcamento.html"    },
-    { "source": "/compras",      "destination": "/compras.html"      },
-    { "source": "/compra-equip", "destination": "/compra-equip.html" },
-    { "source": "/garantia",     "destination": "/garantia.html"     },
-    { "source": "/lalamove",     "destination": "/lalamove.html"     },
-    { "source": "/aguardando-retirada", "destination": "/aguardando-retirada.html" },
-    { "source": "/metricas", "destination": "/metricas.html" },
-    { "source": "/nf-setup",      "destination": "/nf-setup.html"      },
-    { "source": "/((?!api/).*)", "destination": "/home.html"         }
-  ,
-    { "source": "/tv",                    "destination": "/tv-adm.html" },
-    { "source": "/tv/adm",                "destination": "/tv-adm.html" },
-    { "source": "/tv/tecnico",            "destination": "/tv-tecnico.html" },
-    { "source": "/tv/orcamento",          "destination": "/tv-orcamento.html" },
-    { "source": "/tv/financeiro",         "destination": "/tv-financeiro.html" },
-    { "source": "/tv/metricas",           "destination": "/tv-metricas.html" },
-    { "source": "/tv/coleta",             "destination": "/tv-coleta.html" },
-    { "source": "/tv/motorista",          "destination": "/tv-motorista.html" },
-    { "source": "/tv/aguardando-retirada","destination": "/tv-aguardando-retirada.html" }
+    {"source":"/tecnico","destination":"/tecnico.html"},
+    {"source":"/financeiro","destination":"/financeiro.html"},
+    {"source":"/vendas","destination":"/vendas.html"},
+    {"source":"/equipamentos","destination":"/equipamentos.html"},
+    {"source":"/metas","destination":"/metas.html"},
+    {"source":"/adm","destination":"/adm.html"},
+    {"source":"/orcamento","destination":"/orcamento.html"},
+    {"source":"/compras","destination":"/compras.html"},
+    {"source":"/compra-equip","destination":"/compra-equip.html"},
+    {"source":"/garantia","destination":"/garantia.html"},
+    {"source":"/lalamove","destination":"/lalamove.html"},
+    {"source":"/aguardando-retirada","destination":"/aguardando-retirada.html"},
+    {"source":"/metricas","destination":"/metricas.html"},
+    {"source":"/nf-setup","destination":"/nf-setup.html"},
+    {"source":"/tv","destination":"/tv-adm.html"},
+    {"source":"/tv/adm","destination":"/tv-adm.html"},
+    {"source":"/tv/tecnico","destination":"/tv-tecnico.html"},
+    {"source":"/tv/orcamento","destination":"/tv-orcamento.html"},
+    {"source":"/tv/financeiro","destination":"/tv-financeiro.html"},
+    {"source":"/tv/metricas","destination":"/tv-metricas.html"},
+    {"source":"/tv/coleta","destination":"/tv-coleta.html"},
+    {"source":"/tv/motorista","destination":"/tv-motorista.html"},
+    {"source":"/tv/aguardando-retirada","destination":"/tv-aguardando-retirada.html"},
+    {"source":"/((?!api/).*)", "destination":"/home.html"}
   ]
 }
