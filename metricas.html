@@ -890,20 +890,15 @@ function showToast(icon, title, msg) {
   // Lançar dados: data padrão = hoje
   document.getElementById('inp-data').value = df(new Date());
 
-  // Filtro de período: padrão = hoje
+  // Filtro de período: padrão = hoje — seta ANTES do load()
   var hoje = df(new Date());
   document.getElementById('filtro-de').value  = hoje;
   document.getElementById('filtro-ate').value = hoje;
+  filtroAtivo = { de: hoje, ate: hoje };
+  document.querySelectorAll('.pshort')[0]?.classList.add('active');
 
-  // Carrega dados e aplica filtro de hoje automaticamente
-  load().then(() => {
-    filtroAtivo = { de: hoje, ate: hoje };
-    renderFiltrado();
-    // Marca atalho "Hoje" como ativo
-    document.querySelectorAll('.pshort').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.pshort')[0]?.classList.add('active');
-  });
-
+  // Carrega dados — filtroAtivo já está setado, load() usará o filtro correto
+  load();
   setInterval(load, 120000);
 })();
 </script>
