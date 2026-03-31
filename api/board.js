@@ -208,12 +208,19 @@ async function fetchAllPhaseCards() {
         name
         cards(first: 50) {
           pageInfo { hasNextPage endCursor }
-          edges { node { id } }
+          edges { node { id fields { name value } } }
         }
       }
     }
   }`);
   return data?.pipe?.phases || [];
+}
+
+function extractCardValor(node) {
+  const fields = node?.fields || [];
+  const f = fields.find(f => f.name.toLowerCase().includes("valor"));
+  if (!f?.value) return 0;
+  return parseFloat(String(f.value).replace(/[^\d.,]/g,"").replace(",",".")) || 0;
 }
 
 // Busca IDs de cards que estão em ERP, Finalizado ou Reprovado no Pipefy
@@ -261,16 +268,16 @@ async function fetchErpCardIds() {
 async function fetchMetaPhaseIds() {
   try {
     const phases = await fetchAllPhaseCards();
-    const aguardandoIds = [], erpIds = [];
+    const aguardandoIds = [], erpCards = [];
     for (const ph of phases) {
       const l = ph.name.toLowerCase();
       if (l.includes("aguardando") && (l.includes("aprov") || l.includes("aprovação")))
         ph.cards.edges.forEach(e => aguardandoIds.push(String(e.node.id)));
       if (l.includes("erp"))
-        ph.cards.edges.forEach(e => erpIds.push(String(e.node.id)));
+        ph.cards.edges.forEach(e => erpCards.push({ id: String(e.node.id), node: e.node }));
     }
-    return { aguardandoIds, erpIds };
-  } catch(e) { return { aguardandoIds: [], erpIds: [] }; }
+    return { aguardandoIds, erpCards, erpIds: erpCards.map(c => c.id) };
+  } catch(e) { return { aguardandoIds: [], erpCards: [], erpIds: [] }; }
 }
 
 // Consulta a fase atual de um card no Pipefy diretamente
@@ -436,7 +443,7 @@ module.exports = async function handler(req, res) {
 
       // Tracking de metas: Aguardando Aprovação e ERP
       try {
-        const { aguardandoIds, erpIds } = await fetchMetaPhaseIds();
+        const { aguardandoIds, erpCards } = await fetchMetaPhaseIds();
         let metaChanged = false;
         if (!Array.isArray(board.metaLog)) board.metaLog = [];
 
@@ -450,9 +457,9 @@ module.exports = async function handler(req, res) {
             metaChanged = true;
           }
         }
-        for (const id of erpIds) {
+        for (const { id, node } of erpCards) {
           if (!seenErp.has(id)) {
-            board.metaLog.push({ phaseId: "erp_entrada", pipefyId: id, timestamp: new Date().toISOString() });
+            board.metaLog.push({ phaseId: "erp_entrada", pipefyId: id, valor: extractCardValor(node), timestamp: new Date().toISOString() });
             metaChanged = true;
           }
         }
