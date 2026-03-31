@@ -192,6 +192,21 @@ function extractComplemento(endereco) {
   return m ? m[1].trim() : "";
 }
 
+// Encontra o stop da loja por coordenadas (não por índice — a otimização pode mover ela)
+function findLojaStop(lalaStops) {
+  const lojaLat = parseFloat(LOJA.lat);
+  const lojaLng = parseFloat(LOJA.lng);
+  let best = null, bestDist = Infinity;
+  for (const s of lalaStops) {
+    const lat = parseFloat(s.coordinates?.lat);
+    const lng = parseFloat(s.coordinates?.lng);
+    if (isNaN(lat) || isNaN(lng)) continue;
+    const dist = Math.pow(lat - lojaLat, 2) + Math.pow(lng - lojaLng, 2);
+    if (dist < bestDist) { bestDist = dist; best = s; }
+  }
+  return best;
+}
+
 // Encontra a ficha que melhor corresponde a um stop pelo par de coordenadas
 // usedIds: Set de pipefyIds já usados para evitar duplicatas
 function matchFichaByCoords(fichas, coords, usedIds) {
@@ -385,17 +400,20 @@ module.exports = async function handler(req, res) {
 
     // ETAPA 2: Pedido
     let senderStopId, recipientStops;
+    // Identifica o stop da loja pelas coordenadas (ignora posição — a otimização pode mover)
+    const lojaStop = findLojaStop(lalaStops);
+    const clientStops = lalaStops.filter(s => s.stopId !== lojaStop?.stopId);
     if (tipo === "coleta") {
-      senderStopId   = lalaStops[lalaStops.length - 1]?.stopId;
+      senderStopId   = lojaStop?.stopId;
       { const _used = new Set();
-      recipientStops = lalaStops.slice(0, -1).map((s) => {
+      recipientStops = clientStops.map((s) => {
         const f = matchFichaByCoords(pendentes, s.coordinates, _used);
         return { stopId: s.stopId, name: formatNomeLala(f?.nomeContato, f?.telefone), phone: formatTelIntl(f?.telefone), remarks: extractComplemento(f?.endereco) };
       }); }
     } else {
-      senderStopId   = lalaStops[0]?.stopId;
+      senderStopId   = lojaStop?.stopId;
       { const _used = new Set();
-      recipientStops = lalaStops.slice(1).map((s) => {
+      recipientStops = clientStops.map((s) => {
         const f = matchFichaByCoords(pendentes, s.coordinates, _used);
         return { stopId: s.stopId, name: formatNomeLala(f?.nomeContato, f?.telefone), phone: formatTelIntl(f?.telefone), remarks: extractComplemento(f?.endereco) };
       }); }
@@ -487,12 +505,14 @@ module.exports = async function handler(req, res) {
 
     // ETAPA 2: Pedido
     let senderStopId, recipientStops;
+    const lojaStop2 = findLojaStop(lalaStops);
+    const clientStops2 = lalaStops.filter(s => s.stopId !== lojaStop2?.stopId);
     if (tipo === "coleta") {
-      senderStopId   = lalaStops[lalaStops.length - 1]?.stopId;
-      { const _u=new Set(); recipientStops = lalaStops.slice(0, -1).map((s) => { const f = matchFichaByCoords(pendentes, s.coordinates, _u); return { stopId: s.stopId, name: formatNomeLala(f?.nomeContato, f?.telefone), phone: formatTelIntl(f?.telefone), remarks: extractComplemento(f?.endereco) }; }); }
+      senderStopId   = lojaStop2?.stopId;
+      { const _u=new Set(); const _cs=findLojaStop(lalaStops); const _cl=lalaStops.filter(s=>s.stopId!==_cs?.stopId); recipientStops = _cl.map((s) => { const f = matchFichaByCoords(pendentes, s.coordinates, _u); return { stopId: s.stopId, name: formatNomeLala(f?.nomeContato, f?.telefone), phone: formatTelIntl(f?.telefone), remarks: extractComplemento(f?.endereco) }; }); }
     } else {
-      senderStopId   = lalaStops[0]?.stopId;
-      { const _u=new Set(); recipientStops = lalaStops.slice(1).map((s) => { const f = matchFichaByCoords(pendentes, s.coordinates, _u); return { stopId: s.stopId, name: formatNomeLala(f?.nomeContato, f?.telefone), phone: formatTelIntl(f?.telefone), remarks: extractComplemento(f?.endereco) }; }); }
+      senderStopId   = lojaStop?.stopId;
+      { const _u=new Set(); const _cs2=findLojaStop(lalaStops); const _cl2=lalaStops.filter(s=>s.stopId!==_cs2?.stopId); recipientStops = _cl2.map((s) => { const f = matchFichaByCoords(pendentes, s.coordinates, _u); return { stopId: s.stopId, name: formatNomeLala(f?.nomeContato, f?.telefone), phone: formatTelIntl(f?.telefone), remarks: extractComplemento(f?.endereco) }; }); }
     }
 
     const orderPath = "/v3/orders";
