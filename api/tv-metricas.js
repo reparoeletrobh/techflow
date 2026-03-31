@@ -1,911 +1,225 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TV — Métricas</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-<style>
-:root{
-  --bg:#07080a;--surface:#0f1114;--surface2:#181b1f;--border:#1e2228;
-  --text:#f0f2f5;--muted:#5a6270;--dim:#2a2f38;
-  --accent:#f97316;--green:#22c55e;--red:#ef4444;--blue:#3b9eff;
-  --yellow:#f5c800;--purple:#a855f7;--cyan:#06b6d4;
-  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
-}
-*{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;}
+// api/tv-metricas.js — Métricas TV (independente do Reparo Eletro)
+const PIPEFY_API     = "https://api.pipefy.com/graphql";
+const PIPE_ID        = "306904889";
+const UPSTASH_URL    = (process.env.UPSTASH_URL    || "").replace(/['"]/g,"").trim();
+const UPSTASH_TOKEN  = (process.env.UPSTASH_TOKEN  || "").replace(/['"]/g,"").trim();
+const METRICAS_KEY   = "tv_metricas";
+const LOGS_KEY       = "tv_logs";
+const ERP_PHASE_ID   = null; // será descoberto dinamicamente
 
-/* HEADER */
-header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;
-  border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:100;}
-.logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
-.logo-icon{width:28px;height:28px;background:linear-gradient(135deg,var(--accent),var(--yellow));
-  border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;}
-.hdr-right{display:flex;gap:8px;}
-.hbtn{font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;
-  border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;
-  text-decoration:none;display:inline-flex;align-items:center;transition:all .15s;}
-.hbtn:hover,.hbtn.active{color:var(--text);border-color:var(--accent);background:rgba(249,115,22,.08);}
-.hbtn.refresh{color:var(--accent);border-color:rgba(249,115,22,.3);}
-
-/* TABS */
-.tabs-bar{display:flex;border-bottom:1px solid var(--border);padding:0 24px;
-  background:var(--bg);position:sticky;top:52px;z-index:90;}
-.tab-btn{font-family:var(--fm);font-size:11px;font-weight:600;padding:12px 20px;
-  border:none;background:transparent;color:var(--muted);cursor:pointer;
-  border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;}
-.tab-btn:hover{color:var(--text);}
-.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
-
-/* PAGE */
-.page{display:none;flex-direction:column;padding:24px;gap:24px;}
-.page.active{display:flex;}
-
-/* FILTRO PERÍODO */
-.periodo-bar{display:flex;align-items:center;gap:12px;padding:16px 0 4px;flex-wrap:wrap;}
-.periodo-label{font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;flex-shrink:0;}
-.periodo-input{background:var(--surface2);border:1px solid var(--border);border-radius:7px;
-  padding:7px 12px;font-family:var(--fm);font-size:12px;color:var(--text);outline:none;
-  transition:border .15s;color-scheme:dark;}
-.periodo-input:focus{border-color:var(--accent);}
-.btn-periodo{background:var(--accent);border:none;border-radius:7px;padding:7px 16px;
-  font-family:var(--fm);font-size:11px;font-weight:600;color:#000;cursor:pointer;transition:all .15s;}
-.btn-periodo:hover{filter:brightness(1.1);}
-.btn-periodo.secondary{background:var(--surface2);color:var(--muted);border:1px solid var(--border);}
-.btn-periodo.secondary:hover{color:var(--text);border-color:var(--accent);}
-.periodo-shortcuts{display:flex;gap:6px;flex-wrap:wrap;}
-.pshort{font-family:var(--fm);font-size:9px;padding:4px 10px;border-radius:20px;border:1px solid var(--border);
-  background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
-.pshort:hover,.pshort.active{border-color:var(--accent);color:var(--accent);background:rgba(249,115,22,.08);}
-
-/* LIVE STRIP */
-.live-strip{display:flex;flex-direction:column;gap:12px;}
-.strip-row{display:grid;gap:12px;}
-.strip-row.erp{grid-template-columns:1fr 1fr 1fr;}
-.strip-row.periodo{grid-template-columns:repeat(6,1fr);}
-.strip-row-label{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);padding:2px 0;}
-.live-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
-  padding:18px 20px;position:relative;overflow:hidden;transition:border-color .2s;}
-.live-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
-.live-card.orange::before{background:linear-gradient(90deg,var(--accent),var(--yellow));}
-.live-card.green::before{background:linear-gradient(90deg,var(--green),var(--cyan));}
-.live-card.blue::before{background:linear-gradient(90deg,var(--blue),var(--purple));}
-.live-card.purple::before{background:linear-gradient(90deg,var(--purple),var(--red));}
-.live-card:hover{border-color:rgba(249,115,22,.2);}
-.lc-label{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;}
-.lc-value{font-family:var(--fh);font-size:26px;font-weight:800;line-height:1;}
-.lc-value.green{color:var(--green);}
-.lc-value.blue{color:var(--blue);}
-.lc-value.orange{color:var(--accent);}
-.lc-value.purple{color:var(--purple);}
-.lc-sub{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:6px;}
-.live-badge{position:absolute;top:14px;right:14px;font-family:var(--fm);font-size:8px;
-  padding:2px 7px;border-radius:20px;background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.2);}
-
-/* SECTION HEADER */
-.sec-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
-.sec-title{font-family:var(--fh);font-size:14px;font-weight:800;}
-.sec-title span{color:var(--accent);}
-.sec-sub{font-family:var(--fm);font-size:10px;color:var(--muted);}
-
-/* DATA INPUT SECTION */
-.input-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 24px;}
-.input-grid{display:grid;grid-template-columns:repeat(3,1fr) repeat(3,1fr) auto;gap:12px;align-items:end;margin-top:16px;}
-.field{display:flex;flex-direction:column;gap:6px;}
-.field label{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
-.f-input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;
-  padding:9px 12px;font-family:var(--fm);font-size:13px;color:var(--text);outline:none;
-  transition:border .15s;width:100%;}
-.f-input:focus{border-color:var(--accent);}
-.f-input[type="date"]{color-scheme:dark;}
-.btn-salvar{background:linear-gradient(135deg,var(--accent),var(--yellow));border:none;
-  border-radius:8px;padding:10px 20px;font-family:var(--fm);font-size:11px;font-weight:600;
-  color:#000;cursor:pointer;transition:all .2s;white-space:nowrap;}
-.btn-salvar:hover{filter:brightness(1.1);transform:translateY(-1px);}
-.erp-live-row{display:flex;align-items:center;gap:10px;margin-top:14px;padding:10px 14px;
-  background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.15);border-radius:8px;}
-.erp-live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 2s infinite;}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.erp-live-txt{font-family:var(--fm);font-size:11px;color:var(--green);}
-.erp-live-val{font-family:var(--fh);font-size:14px;font-weight:800;color:var(--green);margin-left:auto;}
-
-/* CHART BARS */
-.chart-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 24px;}
-.chart-title{font-family:var(--fh);font-size:13px;font-weight:800;margin-bottom:16px;}
-.chart-title span{color:var(--cyan);}
-.bars-area{display:flex;align-items:flex-end;gap:6px;height:160px;overflow-x:auto;padding-bottom:80px;position:relative;}
-.bar-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;min-width:36px;}
-.bar{width:28px;border-radius:5px 5px 0 0;transition:height .4s cubic-bezier(.34,1.56,.64,1);cursor:pointer;position:relative;}
-.bar:hover{filter:brightness(1.2);}
-.bar-label{font-family:var(--fm);font-size:8px;color:var(--muted);white-space:nowrap;
-  writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);
-  margin-top:6px;max-height:60px;overflow:hidden;text-overflow:ellipsis;}
-.bar-val{font-family:var(--fm);font-size:8px;color:var(--muted);position:absolute;top:-16px;width:100%;text-align:center;white-space:nowrap;}
-
-/* TABLE */
-.table-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
-.tbl-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
-.tbl-title{font-family:var(--fh);font-size:13px;font-weight:800;}
-table{width:100%;border-collapse:collapse;}
-th{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);
-  padding:10px 16px;text-align:left;border-bottom:1px solid var(--border);background:var(--surface2);}
-td{font-family:var(--fm);font-size:11px;padding:10px 16px;border-bottom:1px solid rgba(30,34,40,.6);vertical-align:middle;}
-tr:last-child td{border-bottom:none;}
-tr:hover td{background:rgba(255,255,255,.02);}
-.td-date{color:var(--muted);}
-.td-money{color:var(--green);font-weight:600;}
-.td-cac{color:var(--accent);font-weight:600;}
-.td-ticket{color:var(--blue);font-weight:600;}
-.td-cpf{color:var(--yellow);font-weight:600;}
-.td-roi.positive{color:var(--green);}
-.td-roi.negative{color:var(--red);}
-.td-del{cursor:pointer;color:var(--muted);background:none;border:none;font-size:12px;padding:2px 6px;border-radius:4px;}
-.td-del:hover{color:var(--red);}
-.badge{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:20px;display:inline-block;}
-.badge.green{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2);}
-.badge.red{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2);}
-.empty-state{padding:40px;text-align:center;font-family:var(--fm);font-size:11px;color:var(--dim);}
-
-/* TOAST */
-.toast{position:fixed;bottom:20px;right:20px;background:var(--surface);border:1px solid var(--border);
-  border-top:2px solid var(--accent);border-radius:10px;padding:12px 16px;font-family:var(--fm);
-  font-size:11px;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;
-  transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;}
-.toast.show{transform:translateY(0);opacity:1;}
-
-/* LOADING */
-.loading-row{display:flex;align-items:center;justify-content:center;gap:10px;padding:40px;
-  font-family:var(--fm);font-size:11px;color:var(--muted);}
-.spinner{width:16px;height:16px;border:2px solid var(--dim);border-top-color:var(--accent);
-  border-radius:50%;animation:spin 1s linear infinite;}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-/* MOBILE */
-@media(max-width:768px){
-  header{padding:0 14px;height:48px;}
-  .tabs-bar{padding:0 8px;overflow-x:auto;white-space:nowrap;}
-  .tab-btn{padding:10px 14px;font-size:10px;flex-shrink:0;}
-  .page{padding:14px 12px;gap:16px;}
-  .strip-row.erp{grid-template-columns:1fr 1fr 1fr;}
-  .strip-row.periodo{grid-template-columns:1fr 1fr 1fr;}
-  .input-grid{grid-template-columns:1fr 1fr;grid-template-rows:auto auto auto;}
-  .input-grid > *:last-child{grid-column:1/-1;}
-  .btn-salvar{width:100%;}
-  table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;}
-  .lc-value{font-size:20px;}
-}
-@media(max-width:480px){
-  .live-strip{grid-template-columns:1fr;}
-}
-
-/* METAS — badge discreto canto superior direito */
-.meta-badge{position:absolute;top:10px;right:10px;display:flex;align-items:center;gap:4px;}
-.meta-pct{font-family:var(--fm);font-size:8px;font-weight:600;opacity:.7;}
-.meta-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
-.live-card{position:relative;overflow:visible;}
-</style>
-</head>
-<body>
-
-<header>
-  <div class="logo">
-    <div class="logo-icon">📊</div>
-    Reparo<span style="color:var(--accent)">Eletro</span> — <span style="color:var(--yellow)">Métricas</span>
-  </div>
-  <div class="hdr-right">
-    <button class="hbtn refresh" onclick="load()">↻ Atualizar</button>
-    <a class="hbtn" href="/financeiro">Financeiro</a>
-    <a class="hbtn" href="/tv">Home</a>
-  </div>
-</header>
-
-<div class="tabs-bar">
-  <button class="tab-btn active" id="tab-geral"   onclick="setTab('geral')">📈 Visão Geral</button>
-  <button class="tab-btn"        id="tab-diario"  onclick="setTab('diario')">📅 Diário</button>
-  <button class="tab-btn"        id="tab-semanal" onclick="setTab('semanal')">📆 Semanal</button>
-  <button class="tab-btn"        id="tab-mensal"  onclick="setTab('mensal')">🗓️ Mensal</button>
-  <button class="tab-btn"        id="tab-lancar"  onclick="setTab('lancar')">✏️ Lançar Dados</button>
-</div>
-
-<!-- VISÃO GERAL -->
-<div class="page active" id="page-geral">
-  <!-- Filtro de período -->
-  <div>
-    <div class="periodo-bar">
-      <span class="periodo-label">Período:</span>
-      <input class="periodo-input" type="date" id="filtro-de" title="De">
-      <span style="color:var(--muted);font-family:var(--fm);font-size:11px;">até</span>
-      <input class="periodo-input" type="date" id="filtro-ate" title="Até">
-      <button class="btn-periodo" onclick="aplicarFiltro()">🔍 Aplicar</button>
-      <button class="btn-periodo secondary" onclick="limparFiltro()">✕ Limpar</button>
-      <div class="periodo-shortcuts">
-        <button class="pshort" onclick="atalhoHoje()">Hoje</button>
-        <button class="pshort" onclick="atalhoSemana()">Esta semana</button>
-        <button class="pshort" onclick="atalhoMes()">Este mês</button>
-        <button class="pshort" onclick="atalho7d()">7 dias</button>
-        <button class="pshort" onclick="atalho30d()">30 dias</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Live ERP + métricas do período -->
-  <div>
-    <div class="sec-header">
-      <div>
-        <div class="sec-title" id="live-title">ERP TV ao Vivo <span>// Pipefy</span></div>
-        <div class="sec-sub" id="live-sub">Dados em tempo real — TV Assistência</div>
-      </div>
-    </div>
-    <div class="live-strip" id="live-strip" style="margin-top:12px;">
-      <div class="loading-row"><div class="spinner"></div>Carregando...</div>
-    </div>
-  </div>
-
-  <!-- Chart CAC -->
-  <div class="chart-wrap">
-    <div class="chart-title">CAC por Semana <span>// Custo de Aquisição</span></div>
-    <div class="bars-area" id="chart-cac"></div>
-  </div>
-
-  <!-- Chart Ticket -->
-  <div class="chart-wrap">
-    <div class="chart-title" style="--cyan:#a855f7">Ticket Médio por Semana <span style="color:var(--purple)">// Valor ERP</span></div>
-    <div class="bars-area" id="chart-ticket"></div>
-  </div>
-
-  <!-- Resumo geral -->
-  <div class="table-card">
-    <div class="tbl-head"><div class="tbl-title">Resumo Geral Acumulado</div></div>
-    <table>
-      <thead><tr>
-        <th>Fichas</th><th>Investido</th><th>ERP</th><th>Valor ERP</th>
-        <th>CAC</th><th>Ticket Médio</th><th>Custo/Ficha</th><th>ROI</th>
-      </tr></thead>
-      <tbody id="resumo-body"><tr><td colspan="8" class="empty-state">Carregando...</td></tr></tbody>
-    </table>
-  </div>
-</div>
-
-<!-- DIÁRIO -->
-<div class="page" id="page-diario">
-  <div class="table-card">
-    <div class="tbl-head">
-      <div class="tbl-title">Relatório Diário <span style="font-size:10px;color:var(--muted);font-family:var(--fm)">// últimos 30 dias</span></div>
-    </div>
-    <table>
-      <thead><tr>
-        <th>Data</th><th>Fichas</th><th>Investido</th><th>ERP</th>
-        <th>Valor ERP</th><th>CAC</th><th>Ticket Médio</th><th>Custo/Ficha</th><th>ROI</th>
-      </tr></thead>
-      <tbody id="diario-body"><tr><td colspan="9" class="empty-state"><div class="loading-row"><div class="spinner"></div>Carregando...</div></td></tr></tbody>
-    </table>
-  </div>
-</div>
-
-<!-- SEMANAL -->
-<div class="page" id="page-semanal">
-  <div class="table-card">
-    <div class="tbl-head"><div class="tbl-title">Relatório Semanal</div></div>
-    <table>
-      <thead><tr>
-        <th>Semana</th><th>Fichas</th><th>Investido</th><th>ERP</th>
-        <th>Valor ERP</th><th>CAC</th><th>Ticket Médio</th><th>Custo/Ficha</th><th>ROI</th>
-      </tr></thead>
-      <tbody id="semanal-body"><tr><td colspan="9" class="empty-state"><div class="loading-row"><div class="spinner"></div>Carregando...</div></td></tr></tbody>
-    </table>
-  </div>
-</div>
-
-<!-- MENSAL -->
-<div class="page" id="page-mensal">
-  <div class="table-card">
-    <div class="tbl-head"><div class="tbl-title">Relatório Mensal</div></div>
-    <table>
-      <thead><tr>
-        <th>Mês</th><th>Fichas</th><th>Investido</th><th>ERP</th>
-        <th>Valor ERP</th><th>CAC</th><th>Ticket Médio</th><th>Custo/Ficha</th><th>ROI</th>
-      </tr></thead>
-      <tbody id="mensal-body"><tr><td colspan="9" class="empty-state"><div class="loading-row"><div class="spinner"></div>Carregando...</div></td></tr></tbody>
-    </table>
-  </div>
-</div>
-
-<!-- LANÇAR DADOS -->
-<div class="page" id="page-lancar">
-  <div class="input-card">
-    <div class="sec-header">
-      <div>
-        <div class="sec-title">Lançar Dados do Dia</div>
-        <div class="sec-sub">// preencha os dados diários de investimento e fichas</div>
-      </div>
-    </div>
-
-    <!-- ERP ao vivo -->
-    <div class="erp-live-row" id="erp-live-row">
-      <div class="erp-live-dot"></div>
-      <span class="erp-live-txt">ERP ao vivo (Pipefy):</span>
-      <span id="erp-live-count" class="erp-live-val">—</span>
-      <span id="erp-live-valor" class="erp-live-val" style="color:var(--cyan);margin-left:8px;">—</span>
-    </div>
-
-    <div class="input-grid" style="margin-top:16px;">
-      <div class="field">
-        <label>Data</label>
-        <input class="f-input" type="date" id="inp-data">
-      </div>
-      <div class="field">
-        <label>Fichas recebidas</label>
-        <input class="f-input" type="number" id="inp-fichas" placeholder="0" min="0">
-      </div>
-      <div class="field">
-        <label>Investimento em tráfego (R$)</label>
-        <input class="f-input" type="number" id="inp-invest" placeholder="0,00" min="0" step="0.01">
-      </div>
-      <div class="field">
-        <label>Qtd ERP aprovados</label>
-        <input class="f-input" type="number" id="inp-erp" placeholder="0" min="0">
-      </div>
-      <div class="field">
-        <label>Valor total ERP (R$)</label>
-        <input class="f-input" type="number" id="inp-valor-erp" placeholder="0,00" min="0" step="0.01">
-      </div>
-      <div class="field">
-        <label>Coletas Solicitadas</label>
-        <input class="f-input" type="number" id="inp-coletas" placeholder="0" min="0">
-      </div>
-      <button class="btn-salvar" onclick="salvarDia()">💾 Salvar</button>
-    </div>
-
-    <!-- Preview em tempo real -->
-    <div id="preview-calc" style="display:none;margin-top:16px;padding:14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;">
-      <div style="font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:10px;">Preview dos indicadores</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;" id="preview-grid"></div>
-    </div>
-
-    <div style="margin-top:6px;font-family:var(--fm);font-size:10px;color:var(--muted);">
-      💡 Se deixar ERP em branco, será usado o valor ao vivo do Pipefy automaticamente.
-    </div>
-  </div>
-
-  <!-- Histórico de lançamentos -->
-  <div class="table-card">
-    <div class="tbl-head"><div class="tbl-title">Histórico de Lançamentos</div></div>
-    <table>
-      <thead><tr>
-        <th>Data</th><th>Fichas</th><th>Investido</th><th>ERP</th>
-        <th>Valor ERP</th><th>CAC</th><th>Ticket</th><th>Custo/F</th><th></th>
-      </tr></thead>
-      <tbody id="historico-body"><tr><td colspan="9" class="empty-state"><div class="loading-row"><div class="spinner"></div>Carregando...</div></td></tr></tbody>
-    </table>
-  </div>
-</div>
-
-<div class="toast" id="toast">
-  <span id="t-icon">✅</span>
-  <div><strong id="t-title"></strong><br><span id="t-body" style="color:var(--muted);font-size:10px;"></span></div>
-</div>
-
-<script>
-var curTab = 'geral';
-var data   = null;
-
-// ── UTILS ────────────────────────────────────────────────────
-var BRL = v => v == null ? '—' : 'R$ ' + parseFloat(v).toLocaleString('pt-BR', {minimumFractionDigits:2,maximumFractionDigits:2});
-var NUM = v => v == null ? '—' : Number(v).toLocaleString('pt-BR');
-var PCT = v => v == null ? '—' : (v > 0 ? '+' : '') + v.toFixed(1) + '%';
-var fmtSemana = s => {
-  if (!s) return '—';
-  var parts = s.split('-');
-  if (parts.length < 3) return s;
-  var d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
-  var fim = new Date(d); fim.setDate(d.getDate() + 6);
-  var p = x => String(x.getDate()).padStart(2,'0') + '/' + String(x.getMonth()+1).padStart(2,'0');
-  return p(d) + '–' + p(fim);
-};
-var fmtMes = m => {
-  if (!m) return '—';
-  var [y,mo] = m.split('-');
-  var nomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  return nomes[parseInt(mo)-1] + '/' + y.slice(2);
-};
-var fmtData = d => {
-  if (!d) return '—';
-  var p = d.split('-');
-  return (p[2]||'')+'/'+(p[1]||'')+'/'+(p[0]||'');
-};
-
-// ── TABS ─────────────────────────────────────────────────────
-function setTab(t) {
-  curTab = t;
-  ['geral','diario','semanal','mensal','lancar'].forEach(id => {
-    document.getElementById('tab-'+id).classList.toggle('active', id === t);
-    document.getElementById('page-'+id).classList.toggle('active', id === t);
-  });
-  if (data) render();
-}
-
-// ── LOAD ─────────────────────────────────────────────────────
-async function load() {
+async function dbGet(key) {
   try {
-    var r = await fetch('/api/tv-metricas?action=load').then(r => r.json());
-    if (!r.ok) { showToast('❌','Erro',r.error); return; }
-    data = r;
-    // Se há filtro ativo, aplica em cima dos novos dados
-    if (filtroAtivo) renderFiltrado();
-    else render();
-  } catch(e) { showToast('❌','Erro',e.message); }
+    const r = await fetch(`${UPSTASH_URL}/pipeline`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify([["GET", key]]),
+    });
+    const j = await r.json();
+    return j[0]?.result ? JSON.parse(j[0].result) : null;
+  } catch(e) { return null; }
 }
 
-// ── RENDER ───────────────────────────────────────────────────
-function render() {
-  renderLiveStrip();
-  renderCharts();
-  renderResumo();
-  if (curTab === 'diario')  renderDiario();
-  if (curTab === 'semanal') renderSemanal();
-  if (curTab === 'mensal')  renderMensal();
-  if (curTab === 'lancar')  renderHistorico();
-}
-
-function metricaRow(m, labelPrimeiro) {
-  var roiClass = m.roi == null ? '' : (m.roi >= 0 ? 'positive' : 'negative');
-  return `
-    <td>${labelPrimeiro}</td>
-    <td>${NUM(m.fichas)}</td>
-    <td class="td-money">${BRL(m.investimento)}</td>
-    <td>${NUM(m.erpCount)}</td>
-    <td class="td-money">${BRL(m.valorErp)}</td>
-    <td class="td-cac">${BRL(m.cac)}</td>
-    <td class="td-ticket">${BRL(m.ticketMedio)}</td>
-    <td class="td-cpf">${BRL(m.custoPorFicha)}</td>
-    <td class="td-roi ${roiClass}">${PCT(m.roi)}</td>`;
-}
-
-// Filtro de período
-var filtroAtivo = null; // { de, ate } ou null
-
-function markShortcut(idx) {
-  document.querySelectorAll('.pshort').forEach((b,i) => b.classList.toggle('active', i===idx));
-}
-function atalhoHoje()    { var h = hj(); setFiltro(h, h); markShortcut(0); }
-function atalhoSemana()  { var h = new Date(); var d = h.getDay(); var s = new Date(h); s.setDate(h.getDate()-(d===0?6:d-1)); setFiltro(df(s), hj()); markShortcut(1); }
-function atalhoMes()     { var h = new Date(); setFiltro(h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-01', hj()); markShortcut(2); }
-function atalho7d()      { var s = new Date(); s.setDate(s.getDate()-6); setFiltro(df(s), hj()); markShortcut(3); }
-function atalho30d()     { var s = new Date(); s.setDate(s.getDate()-29); setFiltro(df(s), hj()); markShortcut(4); }
-function hj()            { return df(new Date()); }
-function df(d) {
-  var y=d.getFullYear(), mo=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
-  return y+'-'+mo+'-'+dd;
-}
-
-function setFiltro(de, ate) {
-  document.getElementById('filtro-de').value  = de;
-  document.getElementById('filtro-ate').value = ate;
-  aplicarFiltro();
-}
-
-function aplicarFiltro() {
-  var de  = document.getElementById('filtro-de').value;
-  var ate = document.getElementById('filtro-ate').value;
-  if (!de && !ate) { limparFiltro(); return; }
-  filtroAtivo = { de, ate };
-  renderFiltrado();
-}
-
-function limparFiltro() {
-  document.getElementById('filtro-de').value  = '';
-  document.getElementById('filtro-ate').value = '';
-  filtroAtivo = null;
-  document.querySelectorAll('.pshort').forEach(b => b.classList.remove('active'));
-  renderLiveStrip();
-  renderCharts();
-}
-
-function renderFiltrado() {
-  if (!data || !filtroAtivo || !data.diario) return;
-  var { de, ate } = filtroAtivo;
-
-  // Filtra dias no período
-  var diasFiltrados = (data.diario || []).filter(d => {
-    var dData = d.data ? d.data.slice(0,10) : '';
-    if (de  && dData < de)  return false;
-    if (ate && dData > ate) return false;
+async function dbSet(key, val) {
+  try {
+    await fetch(`${UPSTASH_URL}/pipeline`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify([["SET", key, JSON.stringify(val)]]),
+    });
     return true;
-  });
-
-  // Calcula métricas do período
-  var m = calcMetricasJS(diasFiltrados);
-
-  // Atualiza título
-  var fmtD = d => { var p=d.split('-'); return (p[2]||'')+'/'+(p[1]||''); };
-  var label = (de && ate) ? fmtD(de)+' – '+fmtD(ate) : (de ? 'A partir de '+fmtD(de) : 'Até '+fmtD(ate));
-  document.getElementById('live-title').innerHTML = 'Período <span>// ' + label + '</span>';
-  document.getElementById('live-sub').textContent = diasFiltrados.length + ' dia(s) com dados lançados';
-
-  renderStrip(m);
-
-  // Gráficos filtrados
-  var semanasFiltradas = agruparSemanas(diasFiltrados);
-  renderBarChart('chart-cac',    semanasFiltradas, s => s.cac,        fmtSemana, '#f97316', BRL);
-  renderBarChart('chart-ticket', semanasFiltradas, s => s.ticketMedio, fmtSemana, '#a855f7', BRL);
+  } catch(e) { return false; }
 }
 
-function calcMetricasJS(dias) {
-  var fichas=0, invest=0, erp=0, valorErp=0, coletas=0, orc=0;
-  dias.forEach(d => { fichas+=d.fichas||0; invest+=d.investimento||0; erp+=d.erpCount||0; valorErp+=d.valorErp||0; coletas+=d.coletasSolic||0; orc+=d.orcEnviado||0; });
+// Busca cards em ERP da TV com valor
+async function fetchErpCards() {
+  try {
+    const data = await fetch(PIPEFY_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${(process.env.PIPEFY_TOKEN||"").trim()}` },
+      body: JSON.stringify({ query: `query {
+        pipe(id: "${PIPE_ID}") {
+          phases {
+            name
+            cards(first: 50) {
+              edges { node { id title fields { name value } } }
+            }
+          }
+        }
+      }` }),
+    }).then(r => r.json());
+    const phases = data?.data?.pipe?.phases || [];
+    const cards  = [];
+    for (const ph of phases) {
+      if (!ph.name.toLowerCase().includes("erp")) continue;
+      for (const { node } of (ph.cards?.edges || [])) {
+        const fields = node.fields || [];
+        const valor  = fields.find(f => f.name.toLowerCase().includes("valor"))?.value || "0";
+        const num    = parseFloat(String(valor).replace(/[^\d.,]/g,"").replace(",",".")) || 0;
+        cards.push({ id: String(node.id), title: node.title, valor: num });
+      }
+    }
+    return cards;
+  } catch(e) { return []; }
+}
+
+function toDateStr(ts) {
+  var d = new Date(ts - 3 * 60 * 60 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+function weekStart(dateStr) {
+  const [y,m,d] = dateStr.split("-").map(Number);
+  const dt = new Date(y, m-1, d);
+  const day = dt.getDay();
+  dt.setDate(dt.getDate() - (day === 0 ? 6 : day - 1));
+  const yr = dt.getFullYear(), mo = String(dt.getMonth()+1).padStart(2,"0"), dy = String(dt.getDate()).padStart(2,"0");
+  return yr+"-"+mo+"-"+dy;
+}
+function monthKey(ts) {
+  var d = new Date(ts - 3 * 60 * 60 * 1000);
+  return d.toISOString().slice(0, 7);
+}
+
+function calcMetricas(dias) {
+  let fichas = 0, investimento = 0, erpCount = 0, valorErp = 0, coletasSolic = 0, orcEnviado = 0;
+  for (const d of dias) {
+    fichas        += d.fichas        || 0;
+    investimento  += d.investimento  || 0;
+    erpCount      += d.erpCount      || 0;
+    valorErp      += d.valorErp      || 0;
+    coletasSolic  += d.coletasSolic  || 0;
+    orcEnviado    += d.orcEnviado    || 0;
+  }
   return {
-    fichas, investimento: invest, erpCount: erp, valorErp, coletasSolic: coletas, orcEnviado: orc,
-    cac:           erp   > 0 ? +(invest/erp).toFixed(2)    : null,
-    ticketMedio:   erp   > 0 ? +(valorErp/erp).toFixed(2)  : null,
-    custoPorFicha: fichas> 0 ? +(invest/fichas).toFixed(2) : null,
-    roi: invest>0 ? +((valorErp-invest)/invest*100).toFixed(1) : null,
+    fichas, investimento, erpCount, valorErp, coletasSolic, orcEnviado,
+    cac:           erpCount   > 0 ? +(investimento / erpCount).toFixed(2)   : null,
+    ticketMedio:   erpCount   > 0 ? +(valorErp     / erpCount).toFixed(2)   : null,
+    custoPorFicha: fichas     > 0 ? +(investimento / fichas).toFixed(2)     : null,
+    roi:           investimento > 0 ? +((valorErp - investimento) / investimento * 100).toFixed(1) : null,
   };
 }
 
-function agruparSemanas(dias) {
-  var semanas = {};
-  dias.forEach(d => {
-    var parts = d.data.split('-');
-    var dt = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
-    var day = dt.getDay();
-    dt.setDate(dt.getDate() - (day===0?6:day-1));
-    var sk = df(dt);
-    if (!semanas[sk]) semanas[sk] = [];
-    semanas[sk].push(d);
-  });
-  return Object.entries(semanas)
-    .sort(([a],[b]) => a.localeCompare(b))
-    .map(([semana, ds]) => ({ semana, ...calcMetricasJS(ds) }));
-}
+module.exports = async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.status(200).end();
 
-// Metas diárias
-var METAS = {
-  erp:             { valor: 5,     maior: true  },
-  valorErp:        { valor: 3500,  maior: true  },
-  roas:            { valor: 10,    maior: true  },
-  cac:             { valor: 70,    maior: false },
-  ticketMedio:     { valor: 750,   maior: true  },
-  custoPorFicha:   { valor: 5,     maior: false },
-  fichas:          { valor: 70,    maior: true  },
-  coletasSolic:    { valor: 8,     maior: true  },
-  orcEnviado:      { valor: 8,     maior: true  },
-};
+  const action = req.query.action || "";
 
-function metaBar(atual, meta) {
-  if (atual == null || !meta) return '';
-  var raw = meta.maior
-    ? Math.round(atual / meta.valor * 100)
-    : Math.round(meta.valor / atual * 100);
-  var pct   = Math.min(100, raw);
-  var hit   = raw >= 100;
-  var color = hit ? 'var(--green)' : pct >= 70 ? 'var(--yellow)' : '#ef4444';
-  var txt   = hit ? '✓ ' + raw + '%' : raw + '%';
-  return '<div class="meta-badge">' +
-    '<span class="meta-pct" style="color:' + color + '">' + txt + '</span>' +
-    '<div class="meta-dot" style="background:' + color + ';box-shadow:0 0 4px ' + color + '40"></div>' +
-  '</div>';
-}
+  try {
+    // ── GET load ──────────────────────────────────────────────
+    if (action === "load") {
+      const [rawDb, logsData] = await Promise.all([dbGet(METRICAS_KEY), dbGet(LOGS_KEY)]);
+      const db = rawDb || { dias: [] };
+      if (!Array.isArray(db.dias)) db.dias = [];
 
-function renderStrip(m) {
-  // m = métricas do período (ou resumo geral se sem filtro)
-  if (!data || !data.erpAtual) return;
-  var e = data.erpAtual;
-  var periodoLabel = filtroAtivo ? 'Período' : 'Acumulado';
+      let erpCards = [];
+      try { erpCards = await fetchErpCards(); } catch(e) {}
+      const erpAtual = { count: erpCards.length, valor: erpCards.reduce((s,c) => s+c.valor, 0), cards: erpCards };
 
-  // Quando há filtro: usa dados do período para ERP/Valor
-  // Sem filtro: usa ao vivo do Pipefy
-  var erpCount  = filtroAtivo ? (m.erpCount  || 0) : e.count;
-  // Valor ERP: se filtro = hoje, usa ao vivo (Pipefy). Se período histórico, usa lançado.
-  var hoje      = df(new Date());
-  var filtroEHoje = filtroAtivo && filtroAtivo.de === hoje && filtroAtivo.ate === hoje;
-  var erpValor  = !filtroAtivo ? e.valor : (filtroEHoje ? e.valor : (m.valorErp || 0));
-  var erpBadge  = filtroAtivo
-    ? '<div class="live-badge" style="background:rgba(34,197,94,.12);color:var(--green);border-color:rgba(34,197,94,.2);">PERÍODO</div>'
-    : '<div class="live-badge">AO VIVO</div>';
-  var valBadge  = filtroAtivo
-    ? '<div class="live-badge" style="background:rgba(59,158,255,.12);color:var(--blue);border-color:rgba(59,158,255,.2);">PERÍODO</div>'
-    : '<div class="live-badge">AO VIVO</div>';
-  var roasBadge = filtroAtivo
-    ? '<div class="live-badge" style="background:rgba(6,182,212,.12);color:var(--cyan);border-color:rgba(6,182,212,.2);">PERÍODO</div>'
-    : '<div class="live-badge" style="background:rgba(6,182,212,.12);color:var(--cyan);border-color:rgba(6,182,212,.2);">AO VIVO</div>';
-  var roasVal = m.investimento > 0 ? (erpValor / m.investimento).toFixed(2) + 'x' : '—';
-  var erpLabel  = filtroAtivo ? 'ERPs no Período' : 'ERPs em Aberto';
-  var valLabel  = filtroAtivo ? 'Valor ERP no Período' : 'Valor Total ERP';
-  var erpSub    = filtroAtivo ? 'entraram em ERP no período' : 'cards na fase ERP';
-  var valSub    = filtroAtivo ? 'soma dos contratos do período' : 'soma dos contratos';
-  var rowLabel  = filtroAtivo ? '📊 ERP do Período' : '📡 ERP ao vivo — Pipefy';
+      const metaLog    = logsData?.metaLog || [];
+      const erpLog     = metaLog.filter(m => m.phaseId === "erp_entrada");
+      const coletaLog  = metaLog.filter(m => m.phaseId === "coleta_solicitada");
+      const orcLog     = metaLog.filter(m => m.phaseId === "aguardando_aprovacao");
 
-  document.getElementById('live-strip').innerHTML =
-    '<div class="strip-row-label">' + rowLabel + '</div>' +
-    '<div class="strip-row erp">' +
-      '<div class="live-card green">' +
-        erpBadge +
-        '<div class="lc-label">' + erpLabel + '</div>' +
-        '<div class="lc-value green">' + NUM(erpCount) + '</div>' +
-        '<div class="lc-sub">' + erpSub + '</div>' +
-      metaBar(erpCount, METAS.erp) +
-      '</div>' +
-      '<div class="live-card blue">' +
-        valBadge +
-        '<div class="lc-label">' + valLabel + '</div>' +
-        '<div class="lc-value blue">' + BRL(erpValor) + '</div>' +
-        '<div class="lc-sub">' + valSub + '</div>' +
-      metaBar(erpValor, METAS.valorErp) +
-      '</div>' +
-      '<div class="live-card" style="border-top:3px solid var(--cyan);">' +
-        roasBadge +
-        '<div class="lc-label">ROAS</div>' +
-        '<div class="lc-value" style="color:var(--cyan)">' + roasVal + '</div>' +
-        '<div class="lc-sub">valor ERP / investido (' + BRL(m.investimento) + ')</div>' +
-      metaBar(m.investimento > 0 ? erpValor/m.investimento : null, METAS.roas) +
-      '</div>' +
-    '</div>' +
-    // LINHA 2 — Métricas do período
-    '<div class="strip-row-label">📊 Métricas do ' + periodoLabel + '</div>' +
-    '<div class="strip-row periodo">' +
-      '<div class="live-card orange">' +
-        '<div class="lc-label">CAC ' + periodoLabel + '</div>' +
-        '<div class="lc-value orange">' + BRL(m.cac) + '</div>' +
-        '<div class="lc-sub">investimento / ERPs (' + NUM(m.erpCount) + ')</div>' +
-      metaBar(m.cac, METAS.cac) +
-      '</div>' +
-      '<div class="live-card purple">' +
-        '<div class="lc-label">Ticket Médio</div>' +
-        '<div class="lc-value purple">' + BRL(m.ticketMedio) + '</div>' +
-        '<div class="lc-sub">valor ERP / ERPs</div>' +
-      metaBar(m.ticketMedio, METAS.ticketMedio) +
-      '</div>' +
-      '<div class="live-card" style="--c:var(--yellow);border-top:3px solid var(--yellow);">' +
-        '<div class="lc-label">Custo por Ficha</div>' +
-        '<div class="lc-value" style="color:var(--yellow)">' + BRL(m.custoPorFicha) + '</div>' +
-        '<div class="lc-sub">investimento / fichas (' + NUM(m.fichas) + ')</div>' +
-      metaBar(m.custoPorFicha, METAS.custoPorFicha) +
-      '</div>' +
-      '<div class="live-card" style="border-top:3px solid #06b6d4;">' +
-        '<div class="lc-label">Fichas no Período</div>' +
-        '<div class="lc-value" style="color:#06b6d4">' + NUM(m.fichas) + '</div>' +
-        '<div class="lc-sub">fichas recebidas</div>' +
-      metaBar(m.fichas, METAS.fichas) +
-      '</div>' +
-      '<div class="live-card" style="border-top:3px solid #a855f7;">' +
-        '<div class="lc-label">Coletas Solicitadas</div>' +
-        '<div class="lc-value" style="color:#a855f7">' + NUM(m.coletasSolic || 0) + '</div>' +
-        '<div class="lc-sub">fichas em Coleta Solicitada</div>' +
-      metaBar(m.coletasSolic || 0, METAS.coletasSolic) +
-      '</div>' +
-      '<div class="live-card" style="border-top:3px solid #22c55e;">' +
-        '<div class="lc-label">Orçamentos Enviados</div>' +
-        '<div class="lc-value" style="color:#22c55e">' + NUM(m.orcEnviado || 0) + '</div>' +
-        '<div class="lc-sub">entraram em Aguardando Aprovação</div>' +
-      metaBar(m.orcEnviado || 0, METAS.orcEnviado) +
-      '</div>' +
-    '</div>';
+      const erpPorDia = {}, coletaPorDia = {}, orcPorDia = {};
+      for (const e of erpLog)    { const d=toDateStr(new Date(e.timestamp).getTime()); erpPorDia[d]=(erpPorDia[d]||0)+1; }
+      for (const e of coletaLog) { const d=toDateStr(new Date(e.timestamp).getTime()); coletaPorDia[d]=(coletaPorDia[d]||0)+1; }
+      for (const e of orcLog)    { const d=toDateStr(new Date(e.timestamp).getTime()); orcPorDia[d]=(orcPorDia[d]||0)+1; }
 
-  // Atualiza ERP na aba lançar (sempre ao vivo)
-  var elc = document.getElementById('erp-live-count'); if(elc) elc.textContent = e.count + ' ERPs';
-  var elv = document.getElementById('erp-live-valor'); if(elv) elv.textContent = BRL(e.valor);
-}
+      const diasEnriq = db.dias.map(d => ({
+        ...d,
+        erpCount:     d.erpCount     != null ? d.erpCount     : (erpPorDia[d.data]    || 0),
+        coletasSolic: d.coletasSolic != null ? d.coletasSolic : (coletaPorDia[d.data] || 0),
+        orcEnviado:   d.orcEnviado   != null ? d.orcEnviado   : (orcPorDia[d.data]    || 0),
+      }));
 
-function renderLiveStrip() {
-  renderStrip(data.resumo || {});
-}
+      const diasSet = new Set(diasEnriq.map(d => d.data));
+      const todosDias = { ...erpPorDia };
+      for (const d of Object.keys(coletaPorDia)) todosDias[d] = todosDias[d] || 0;
+      for (const d of Object.keys(orcPorDia))    todosDias[d] = todosDias[d] || 0;
+      for (const data of Object.keys(todosDias)) {
+        if (!diasSet.has(data)) {
+          diasEnriq.push({ data, fichas: 0, investimento: 0, erpCount: erpPorDia[data]||0, valorErp: 0, coletasSolic: coletaPorDia[data]||0, orcEnviado: orcPorDia[data]||0 });
+        }
+      }
+      diasEnriq.sort((a,b) => a.data.localeCompare(b.data));
 
-function renderCharts() {
-  if (filtroAtivo) return; // handled by renderFiltrado
-  var semanas = data.semanal || [];
-  renderBarChart('chart-cac', semanas, s => s.cac, fmtSemana, '#f97316', BRL);
-  renderBarChart('chart-ticket', semanas, s => s.ticketMedio, fmtSemana, '#a855f7', BRL);
-}
+      const hoje30 = Date.now() - 30*24*60*60*1000;
+      const diario = diasEnriq.filter(d => new Date(d.data).getTime() >= hoje30)
+        .sort((a,b) => a.data.localeCompare(b.data))
+        .map(d => ({ ...d, ...calcMetricas([d]) }));
 
-function renderBarChart(elId, items, getValue, getLabel, color, fmt) {
-  var el = document.getElementById(elId);
-  if (!items.length) { el.innerHTML = '<div class="empty-state">Sem dados suficientes</div>'; return; }
-  var vals = items.map(getValue).filter(v => v != null);
-  var maxV = Math.max(...vals, 1);
-  el.innerHTML = items.map(item => {
-    var v = getValue(item);
-    var h = v == null ? 0 : Math.max(4, Math.round((v / maxV) * 120));
-    return `<div class="bar-wrap">
-      <div class="bar" style="height:${h}px;background:linear-gradient(180deg,${color}cc,${color}44);" title="${fmt(v)}">
-        <div class="bar-val">${v == null ? '' : fmt(v)}</div>
-      </div>
-      <div class="bar-label">${getLabel(item)}</div>
-    </div>`;
-  }).join('');
-}
+      const semanas = {};
+      for (const d of diasEnriq) {
+        const [_y,_m,_d] = (d.data||"").split("-").map(Number); const sk = weekStart(new Date(_y,_m-1,_d).toISOString().slice(0,10));
+        if (!semanas[sk]) semanas[sk] = [];
+        semanas[sk].push(d);
+      }
+      const semanal = Object.entries(semanas).sort(([a],[b]) => a.localeCompare(b)).slice(-12)
+        .map(([semana, dias]) => ({ semana, ...calcMetricas(dias) }));
 
-function renderResumo() {
-  var m = data.resumo || {};
-  var roiClass = m.roi == null ? '' : (m.roi >= 0 ? 'positive' : 'negative');
-  document.getElementById('resumo-body').innerHTML = `<tr>
-    <td>${NUM(m.fichas)}</td>
-    <td class="td-money">${BRL(m.investimento)}</td>
-    <td>${NUM(m.erpCount)}</td>
-    <td class="td-money">${BRL(m.valorErp)}</td>
-    <td class="td-cac">${BRL(m.cac)}</td>
-    <td class="td-ticket">${BRL(m.ticketMedio)}</td>
-    <td class="td-cpf">${BRL(m.custoPorFicha)}</td>
-    <td class="td-roi ${roiClass}">${PCT(m.roi)}</td>
-  </tr>`;
-}
+      const meses = {};
+      for (const d of diasEnriq) {
+        const mk = (d.data ? d.data.slice(0,7) : "");
+        if (!meses[mk]) meses[mk] = [];
+        meses[mk].push(d);
+      }
+      const mensal = Object.entries(meses).sort(([a],[b]) => a.localeCompare(b))
+        .map(([mes, dias]) => ({ mes, ...calcMetricas(dias) }));
 
-function renderDiario() {
-  var rows = (data.diario || []).slice().reverse();
-  document.getElementById('diario-body').innerHTML = rows.length ? rows.map(m => {
-    var roiClass = m.roi == null ? '' : (m.roi >= 0 ? 'positive' : 'negative');
-    return `<tr>
-      <td class="td-date">${fmtData(m.data)}</td>
-      <td>${NUM(m.fichas)}</td>
-      <td class="td-money">${BRL(m.investimento)}</td>
-      <td>${NUM(m.erpCount)}</td>
-      <td class="td-money">${BRL(m.valorErp)}</td>
-      <td class="td-cac">${BRL(m.cac)}</td>
-      <td class="td-ticket">${BRL(m.ticketMedio)}</td>
-      <td class="td-cpf">${BRL(m.custoPorFicha)}</td>
-      <td class="td-roi ${roiClass}">${PCT(m.roi)}</td>
-    </tr>`;
-  }).join('') : '<tr><td colspan="9" class="empty-state">Nenhum dado registrado nos últimos 30 dias.</td></tr>';
-}
+      return res.status(200).json({ ok: true, erpAtual, diario, semanal, mensal, resumo: calcMetricas(diasEnriq), totalDias: diasEnriq.length });
+    }
 
-function renderSemanal() {
-  var rows = (data.semanal || []).slice().reverse();
-  document.getElementById('semanal-body').innerHTML = rows.length ? rows.map(m => {
-    var roiClass = m.roi == null ? '' : (m.roi >= 0 ? 'positive' : 'negative');
-    return `<tr>
-      <td class="td-date">${fmtSemana(m.semana)}</td>
-      <td>${NUM(m.fichas)}</td>
-      <td class="td-money">${BRL(m.investimento)}</td>
-      <td>${NUM(m.erpCount)}</td>
-      <td class="td-money">${BRL(m.valorErp)}</td>
-      <td class="td-cac">${BRL(m.cac)}</td>
-      <td class="td-ticket">${BRL(m.ticketMedio)}</td>
-      <td class="td-cpf">${BRL(m.custoPorFicha)}</td>
-      <td class="td-roi ${roiClass}">${PCT(m.roi)}</td>
-    </tr>`;
-  }).join('') : '<tr><td colspan="9" class="empty-state">Sem dados semanais.</td></tr>';
-}
+    // ── POST salvar-dia ───────────────────────────────────────
+    if (req.method === "POST" && action === "salvar-dia") {
+      const { data, fichas, investimento, erpCount, valorErp, coletasSolic, orcEnviado, obs } = req.body || {};
+      if (!data) return res.status(400).json({ ok: false, error: "data obrigatória" });
+      const db = await dbGet(METRICAS_KEY) || { dias: [] };
+      if (!Array.isArray(db.dias)) db.dias = [];
+      const entry = {
+        data,
+        fichas:       parseInt(fichas)       || 0,
+        investimento: parseFloat(investimento) || 0,
+        erpCount:     parseInt(erpCount)     || 0,
+        valorErp:     parseFloat(valorErp)   || 0,
+        coletasSolic: parseInt(coletasSolic) || 0,
+        orcEnviado:   parseInt(orcEnviado)   || 0,
+        obs:          obs || "",
+        updatedAt:    new Date().toISOString(),
+      };
+      const idx = db.dias.findIndex(d => d.data === data);
+      if (idx >= 0) db.dias[idx] = entry; else db.dias.push(entry);
+      await dbSet(METRICAS_KEY, db);
+      return res.status(200).json({ ok: true, entry, ...calcMetricas([entry]) });
+    }
 
-function renderMensal() {
-  var rows = (data.mensal || []).slice().reverse();
-  document.getElementById('mensal-body').innerHTML = rows.length ? rows.map(m => {
-    var roiClass = m.roi == null ? '' : (m.roi >= 0 ? 'positive' : 'negative');
-    return `<tr>
-      <td class="td-date">${fmtMes(m.mes)}</td>
-      <td>${NUM(m.fichas)}</td>
-      <td class="td-money">${BRL(m.investimento)}</td>
-      <td>${NUM(m.erpCount)}</td>
-      <td class="td-money">${BRL(m.valorErp)}</td>
-      <td class="td-cac">${BRL(m.cac)}</td>
-      <td class="td-ticket">${BRL(m.ticketMedio)}</td>
-      <td class="td-cpf">${BRL(m.custoPorFicha)}</td>
-      <td class="td-roi ${roiClass}">${PCT(m.roi)}</td>
-    </tr>`;
-  }).join('') : '<tr><td colspan="9" class="empty-state">Sem dados mensais.</td></tr>';
-}
+    // ── GET erp-ao-vivo ───────────────────────────────────────
+    if (action === "erp-ao-vivo") {
+      const cards = await fetchErpCards();
+      return res.status(200).json({ ok: true, count: cards.length, valorTotal: cards.reduce((s,c)=>s+c.valor,0), cards });
+    }
 
-function renderHistorico() {
-  var rows = (data.diario || []).slice().reverse().slice(0, 60);
-  document.getElementById('historico-body').innerHTML = rows.length ? rows.map(m => `<tr>
-    <td class="td-date">${fmtData(m.data)}</td>
-    <td>${NUM(m.fichas)}</td>
-    <td class="td-money">${BRL(m.investimento)}</td>
-    <td>${NUM(m.erpCount)}</td>
-    <td class="td-money">${BRL(m.valorErp)}</td>
-    <td class="td-cac">${BRL(m.cac)}</td>
-    <td class="td-ticket">${BRL(m.ticketMedio)}</td>
-    <td class="td-cpf">${BRL(m.custoPorFicha)}</td>
-    <td><button class="td-del" onclick="deletarDia('${m.data}')" title="Remover">🗑️</button></td>
-  </tr>`).join('') : '<tr><td colspan="9" class="empty-state">Nenhum lançamento ainda.</td></tr>';
-}
+    // ── POST deletar-dia ──────────────────────────────────────
+    if (req.method === "POST" && action === "deletar-dia") {
+      const { data } = req.body || {};
+      if (!data) return res.status(400).json({ ok: false, error: "data obrigatória" });
+      const db = await dbGet(METRICAS_KEY) || { dias: [] };
+      db.dias = (db.dias || []).filter(d => d.data !== data);
+      await dbSet(METRICAS_KEY, db);
+      return res.status(200).json({ ok: true });
+    }
 
-// ── PREVIEW CALC ─────────────────────────────────────────────
-function calcPreview() {
-  var fichas    = parseFloat(document.getElementById('inp-fichas').value)  || 0;
-  var invest    = parseFloat(document.getElementById('inp-invest').value)  || 0;
-  var erpCount  = parseFloat(document.getElementById('inp-erp').value)     || (data?.erpAtual?.count || 0);
-  var valorErp  = parseFloat(document.getElementById('inp-valor-erp').value) || (data?.erpAtual?.valor || 0);
-
-  var cac           = erpCount   > 0 ? invest / erpCount   : null;
-  var ticketMedio   = erpCount   > 0 ? valorErp / erpCount : null;
-  var custoPorFicha = fichas     > 0 ? invest / fichas     : null;
-
-  var show = fichas > 0 || invest > 0;
-  document.getElementById('preview-calc').style.display = show ? 'block' : 'none';
-  if (!show) return;
-
-  document.getElementById('preview-grid').innerHTML = [
-    {label:'CAC',        val:BRL(cac),           color:'var(--accent)'},
-    {label:'Ticket Médio', val:BRL(ticketMedio),  color:'var(--blue)'},
-    {label:'Custo/Ficha', val:BRL(custoPorFicha), color:'var(--yellow)'},
-  ].map(c => `<div style="text-align:center;">
-    <div style="font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">${c.label}</div>
-    <div style="font-family:var(--fh);font-size:18px;font-weight:800;color:${c.color}">${c.val}</div>
-  </div>`).join('');
-}
-
-['inp-fichas','inp-invest','inp-erp','inp-valor-erp'].forEach(id => {
-  document.getElementById(id)?.addEventListener('input', calcPreview);
-});
-
-// ── SALVAR DIA ────────────────────────────────────────────────
-async function salvarDia() {
-  var dataVal   = document.getElementById('inp-data').value;
-  var fichas    = document.getElementById('inp-fichas').value;
-  var invest    = document.getElementById('inp-invest').value;
-  var erpCount  = document.getElementById('inp-erp').value    || (data?.erpAtual?.count || 0);
-  var valorErp  = document.getElementById('inp-valor-erp').value || (data?.erpAtual?.valor || 0);
-
-  if (!dataVal) { showToast('⚠️','Data obrigatória','Preencha a data'); return; }
-
-  var coletas = document.getElementById('inp-coletas').value || 0;
-  var r = await fetch('/api/tv-metricas?action=salvar-dia', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({
-      data: dataVal, fichas: +fichas, investimento: +invest,
-      erpCount: +erpCount, valorErp: +valorErp, coletasSolic: +coletas,
-    }),
-  }).then(r=>r.json()).catch(e=>({ok:false,error:e.message}));
-
-  if (r.ok) {
-    showToast('✅','Salvo!','CAC: '+BRL(r.cac)+'  Ticket: '+BRL(r.ticketMedio));
-    document.getElementById('inp-fichas').value    = '';
-    document.getElementById('inp-invest').value    = '';
-    document.getElementById('inp-erp').value       = '';
-    document.getElementById('inp-valor-erp').value = '';
-    document.getElementById('inp-coletas').value   = '';
-    document.getElementById('preview-calc').style.display = 'none';
-    await load();
-  } else {
-    showToast('❌','Erro',r.error);
+    return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+  } catch(e) {
+    return res.status(200).json({ ok: false, error: "Erro interno: " + e.message });
   }
-}
-
-// ── DELETAR DIA ───────────────────────────────────────────────
-async function deletarDia(dataVal) {
-  if (!confirm('Remover lançamento de ' + fmtData(dataVal) + '?')) return;
-  var r = await fetch('/api/tv-metricas?action=deletar-dia', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({data: dataVal}),
-  }).then(r=>r.json()).catch(()=>({ok:false}));
-  if (r.ok) { showToast('🗑️','Removido',''); await load(); }
-  else showToast('❌','Erro','');
-}
-
-// ── TOAST ─────────────────────────────────────────────────────
-var toastTimer;
-function showToast(icon, title, msg) {
-  var t = document.getElementById('toast');
-  document.getElementById('t-icon').textContent  = icon;
-  document.getElementById('t-title').textContent = title;
-  document.getElementById('t-body').textContent  = msg;
-  t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 4000);
-}
-
-// ── INIT ─────────────────────────────────────────────────────
-(function init() {
-  // Lançar dados: data padrão = hoje
-  document.getElementById('inp-data').value = df(new Date());
-
-  // Filtro de período: padrão = hoje
-  var hoje = df(new Date());
-  document.getElementById('filtro-de').value  = hoje;
-  document.getElementById('filtro-ate').value = hoje;
-
-  // Carrega dados e aplica filtro de hoje automaticamente
-  load().then(() => {
-    filtroAtivo = { de: hoje, ate: hoje };
-    renderFiltrado();
-    // Marca atalho "Hoje" como ativo
-    document.querySelectorAll('.pshort').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.pshort')[0]?.classList.add('active');
-  });
-
-  setInterval(load, 120000);
-})();
-</script>
-</body>
-</html>
+};    // Constrói array de dias enriquecido
+    // fichas/investimento/valorErp = lançamento manual (fonte: usuário)
+    // erpCount/coletasSolic/orcEnviado = SEMPRE metaLog Pipefy (fonte confiável)
+    const diasEnriq = db.dias.map(d => ({
+      ...d,
+      erpCount:     erpPorDia[d.data]    || 0,
+      coletasSolic: coletaPorDia[d.data] || 0,
+      orcEnviado:   orcPorDia[d.data]    || 0,
+    }));
