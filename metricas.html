@@ -503,7 +503,7 @@ function limparFiltro() {
 }
 
 function renderFiltrado() {
-  if (!data || !filtroAtivo) return;
+  if (!data || !filtroAtivo || !data.diario) return;
   var { de, ate } = filtroAtivo;
 
   // Filtra dias no período
@@ -596,7 +596,10 @@ function renderStrip(m) {
   // Quando há filtro: usa dados do período para ERP/Valor
   // Sem filtro: usa ao vivo do Pipefy
   var erpCount  = filtroAtivo ? (m.erpCount  || 0) : e.count;
-  var erpValor  = filtroAtivo ? (m.valorErp  || 0) : e.valor;
+  // Valor ERP: se filtro = hoje, usa ao vivo (Pipefy). Se período histórico, usa lançado.
+  var hoje      = df(new Date());
+  var filtroEHoje = filtroAtivo && filtroAtivo.de === hoje && filtroAtivo.ate === hoje;
+  var erpValor  = !filtroAtivo ? e.valor : (filtroEHoje ? e.valor : (m.valorErp || 0));
   var erpBadge  = filtroAtivo
     ? '<div class="live-badge" style="background:rgba(34,197,94,.12);color:var(--green);border-color:rgba(34,197,94,.2);">PERÍODO</div>'
     : '<div class="live-badge">AO VIVO</div>';
