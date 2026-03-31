@@ -66,9 +66,12 @@ function toDateStr(ts) { return new Date(ts).toISOString().slice(0, 10); }
 function weekStart(d) {
   const dt = new Date(d); const day = dt.getDay();
   dt.setDate(dt.getDate() - (day === 0 ? 6 : day - 1)); dt.setHours(0,0,0,0);
-  return dt.toISOString().slice(0,10);
+  return toDateStr(dt.getTime());
 }
-function monthKey(ts) { return new Date(ts).toISOString().slice(0, 7); }
+function monthKey(ts) {
+  var d = new Date(ts).toLocaleDateString('pt-BR', {timeZone:'America/Sao_Paulo'}).split('/');
+  return d[2] + '-' + d[1]; // YYYY-MM
+}
 
 function calcMetricas(dias) {
   let fichas = 0, investimento = 0, erpCount = 0, valorErp = 0, coletasSolic = 0, orcEnviado = 0;
