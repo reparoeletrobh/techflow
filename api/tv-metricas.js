@@ -161,7 +161,7 @@ module.exports = async function handler(req, res) {
 
       const meses = {};
       for (const d of diasEnriq) {
-        const mk = monthKey(d.data + "T12:00:00");
+        const mk = (d.data ? d.data.slice(0,7) : "");
         if (!meses[mk]) meses[mk] = [];
         meses[mk].push(d);
       }
