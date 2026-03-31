@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📺 Rota de Coleta — TV Assistência</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#07080a;--surface:#0f1114;--surface2:#181b1f;--border:#1e2228;
+  --text:#f0f2f5;--muted:#5a6270;
+  --accent:#f97316;--green:#22c55e;--red:#ef4444;--blue:#3b9eff;
+  --fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;padding-bottom:40px;}
+
+.header{background:var(--surface);border-bottom:2px solid var(--accent);padding:14px 20px;
+  display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50;}
+.header-icon{font-size:22px;}
+.header-title{font-size:16px;font-weight:700;}
+.header-sub{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:1px;}
+.header-date{font-family:var(--fm);font-size:10px;color:var(--accent);margin-left:auto;}
+
+.stats{display:flex;gap:10px;padding:14px 16px;overflow-x:auto;}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:10px 16px;min-width:100px;text-align:center;flex-shrink:0;}
+.stat-num{font-family:var(--fm);font-size:22px;font-weight:700;line-height:1;}
+.stat-lbl{font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:3px;text-transform:uppercase;}
+
+.list{padding:10px 16px;display:flex;flex-direction:column;gap:10px;}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .2s;}
+.card.coletada{opacity:.6;border-left:4px solid var(--green);}
+.card-header{padding:14px 16px;display:flex;align-items:center;gap:12px;}
+.card-num{width:30px;height:30px;border-radius:50%;background:var(--accent);
+  color:#000;font-family:var(--fm);font-size:12px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.card.coletada .card-num{background:var(--green);}
+.card-info{flex:1;}
+.card-nome{font-size:14px;font-weight:600;}
+.card-end{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.4;}
+.card-tel{font-family:var(--fm);font-size:11px;color:var(--muted);margin-top:4px;}
+.card-status{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:20px;flex-shrink:0;}
+.card-status.pendente{background:rgba(249,115,22,.1);color:var(--accent);border:1px solid rgba(249,115,22,.2);}
+.card-status.coletada{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2);}
+
+.card-actions{padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:8px;}
+.btn{font-family:var(--fm);font-size:11px;font-weight:600;padding:10px 16px;border-radius:8px;
+  border:none;cursor:pointer;transition:all .15s;flex:1;text-align:center;text-decoration:none;display:inline-block;}
+.btn.confirmar{background:var(--green);color:#000;}
+.btn.confirmar:hover:not(:disabled){filter:brightness(1.1);}
+.btn.confirmar:disabled{background:var(--surface2);color:var(--muted);cursor:not-allowed;}
+.btn.maps{background:var(--blue);color:#fff;}
+.btn.maps:hover{filter:brightness(1.1);}
+.btn.wapp{background:#25d366;color:#fff;}
+
+.coletado-badge{padding:8px 16px;border-top:1px solid var(--border);
+  font-family:var(--fm);font-size:11px;color:var(--green);text-align:center;}
+
+.loading{display:flex;align-items:center;justify-content:center;min-height:200px;
+  gap:10px;font-family:var(--fm);font-size:11px;color:var(--muted);}
+.spinner{width:18px;height:18px;border:2px solid #2a2f38;border-top-color:var(--accent);
+  border-radius:50%;animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.empty{text-align:center;padding:60px 20px;font-family:var(--fm);font-size:11px;color:var(--muted);}
+.empty-icon{font-size:40px;margin-bottom:12px;opacity:.4;}
+
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(80px);
+  background:var(--green);color:#000;border-radius:30px;padding:10px 20px;
+  font-family:var(--fm);font-size:12px;font-weight:700;opacity:0;
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;white-space:nowrap;}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">🚚</div>
+  <div>
+    <div class="header-title">Rota de Coleta</div>
+    <div class="header-sub">TV Assistência — confirme cada coleta</div>
+  </div>
+  <div class="header-date" id="header-date">—</div>
+</div>
+
+<div class="stats" id="stats">
+  <div class="stat"><div class="stat-num" id="stat-total">—</div><div class="stat-lbl">Total</div></div>
+  <div class="stat"><div class="stat-num" style="color:var(--accent)" id="stat-pend">—</div><div class="stat-lbl">Pendentes</div></div>
+  <div class="stat"><div class="stat-num" style="color:var(--green)" id="stat-done">—</div><div class="stat-lbl">Coletadas</div></div>
+</div>
+
+<div id="list-container" class="list">
+  <div class="loading"><div class="spinner"></div>Carregando rota...</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var rota = [];
+
+async function load() {
+  try {
+    var r = await fetch('/api/tv-coleta?action=motorista').then(function(r){return r.json();});
+    if (!r.ok) { showError(r.error); return; }
+    rota = r.rota || [];
+    document.getElementById('header-date').textContent = r.data || '';
+    render();
+  } catch(e) { showError(e.message); }
+}
+
+// Carrega status coletados do localStorage (persiste no aparelho do motorista)
+function getColetados() {
+  try { return JSON.parse(localStorage.getItem('tv_coletados') || '{}'); } catch(e) { return {}; }
+}
+function saveColetado(id) {
+  var c = getColetados(); c[id] = new Date().toISOString();
+  try { localStorage.setItem('tv_coletados', JSON.stringify(c)); } catch(e) {}
+}
+
+function render() {
+  var coletados = getColetados();
+  var total = rota.length;
+  var done  = rota.filter(function(f){ return coletados[f.pipefyId]; }).length;
+  var pend  = total - done;
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-pend').textContent  = pend;
+  document.getElementById('stat-done').textContent  = done;
+
+  var el = document.getElementById('list-container');
+  if (!total) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">✅</div>Nenhuma coleta na fila hoje!</div>';
+    return;
+  }
+
+  el.innerHTML = '';
+  rota.forEach(function(f, i) {
+    var isColetada = !!coletados[f.pipefyId];
+    var card = document.createElement('div');
+    card.className = 'card' + (isColetada ? ' coletada' : '');
+    card.id = 'card-'+f.pipefyId;
+
+    // Monta link Google Maps
+    var mapsUrl = f.endereco
+      ? 'https://maps.google.com/?q=' + encodeURIComponent(f.endereco)
+      : null;
+
+    // WhatsApp
+    var waUrl = null;
+    if (f.telefone) {
+      var tel = f.telefone.replace(/\D/g,'');
+      if (tel.slice(0,2)==='55' && tel.length>=12) tel=tel.slice(2);
+      if (tel.length===10) tel=tel.slice(0,2)+'9'+tel.slice(2);
+      if (tel) waUrl = 'https://wa.me/55'+tel;
+    }
+
+    var hora = coletados[f.pipefyId] ? ' às '+new Date(coletados[f.pipefyId]).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
+
+    card.innerHTML =
+      '<div class="card-header">' +
+        '<div class="card-num">' + (isColetada ? '✓' : (i+1)) + '</div>' +
+        '<div class="card-info">' +
+          '<div class="card-nome">' + (f.nomeContato||'—') + '</div>' +
+          '<div class="card-end">' + (f.endereco||'Sem endereço') + '</div>' +
+          (f.telefone ? '<div class="card-tel">📱 '+f.telefone+'</div>' : '') +
+        '</div>' +
+        '<span class="card-status '+(isColetada?'coletada':'pendente')+'">'+(isColetada?'✅ Coletada':'⏳ Pendente')+'</span>' +
+      '</div>' +
+      (isColetada
+        ? '<div class="coletado-badge">✅ Coletado'+hora+'</div>'
+        : '<div class="card-actions">' +
+            '<button class="btn confirmar" onclick="confirmar(\''+f.pipefyId+'\')">✅ Confirmar Coleta</button>' +
+            (mapsUrl ? '<a class="btn maps" href="'+mapsUrl+'" target="_blank">🗺 Maps</a>' : '') +
+            (waUrl   ? '<a class="btn wapp" href="'+waUrl+'" target="_blank">💬</a>'        : '') +
+          '</div>'
+      );
+
+    el.appendChild(card);
+  });
+}
+
+async function confirmar(pipefyId) {
+  var btn = document.querySelector('#card-'+pipefyId+' .btn.confirmar');
+  if (btn) { btn.disabled=true; btn.textContent='...'; }
+
+  // Salva localmente imediatamente (UX offline)
+  saveColetado(pipefyId);
+  render();
+  showToast('✅ Coleta confirmada!');
+
+  // Atualiza no servidor em background
+  try {
+    await fetch('/api/tv-coleta?action=marcar-coletado', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({pipefyId})
+    });
+  } catch(e) { console.error('sync error:', e); }
+}
+
+function showError(msg) {
+  document.getElementById('list-container').innerHTML =
+    '<div class="empty"><div class="empty-icon">❌</div>' + msg + '</div>';
+}
+
+var toastTimer;
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3000);
+}
+
+load();
+// Atualiza a cada 2 min
+setInterval(load, 120000);
+</script>
+</body>
+</html>
