@@ -519,7 +519,7 @@ async function renderFiltrado() {
 
   // Busca valor real dos ERPs do período diretamente no Pipefy
   try {
-    var vr = await fetch('/api/tv-metricas?action=valor-erp-periodo&de=' + de + '&ate=' + ate).then(function(r){return r.json();});
+    var vr = await fetch('/api/metricas?action=valor-erp-periodo&de=' + de + '&ate=' + ate).then(function(r){return r.json();});
     if (vr.ok && vr.valor > 0) m.valorErp = vr.valor;
   } catch(e) {}
 
@@ -845,7 +845,7 @@ async function salvarDia() {
   if (!dataVal) { showToast('⚠️','Data obrigatória','Preencha a data'); return; }
 
   var coletas = document.getElementById('inp-coletas').value || 0;
-  var r = await fetch('/api/tv-metricas?action=salvar-dia', {
+  var r = await fetch('/api/metricas?action=salvar-dia', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({
@@ -871,7 +871,7 @@ async function salvarDia() {
 // ── DELETAR DIA ───────────────────────────────────────────────
 async function deletarDia(dataVal) {
   if (!confirm('Remover lançamento de ' + fmtData(dataVal) + '?')) return;
-  var r = await fetch('/api/tv-metricas?action=deletar-dia', {
+  var r = await fetch('/api/metricas?action=deletar-dia', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({data: dataVal}),
   }).then(r=>r.json()).catch(()=>({ok:false}));
