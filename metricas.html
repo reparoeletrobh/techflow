@@ -474,7 +474,11 @@ function atalhoMes()     { var h = new Date(); setFiltro(h.getFullYear()+'-'+Str
 function atalho7d()      { var s = new Date(); s.setDate(s.getDate()-6); setFiltro(df(s), hj()); markShortcut(3); }
 function atalho30d()     { var s = new Date(); s.setDate(s.getDate()-29); setFiltro(df(s), hj()); markShortcut(4); }
 function hj()            { return df(new Date()); }
-function df(d)           { return d.toISOString().slice(0,10); }
+function df(d) {
+  // Data no fuso de Brasília para os inputs de filtro
+  return d.toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'})
+    .split('/').reverse().join('-');
+}
 
 function setFiltro(de, ate) {
   document.getElementById('filtro-de').value  = de;
