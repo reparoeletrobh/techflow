@@ -76,6 +76,8 @@ async function geocodificar(endereco) {
     .replace(/Av\.\s+/g, "Avenida ")
     .replace(/Al\.\s+/g, "Alameda ")
     .replace(/,?\s*[-]?\s*(ap(to)?\.?|apartamento|bloco|bl\.?|sala|lote)\s*[\w\d]+/gi, "")
+    // Separa texto colado: "BairroMunicípio" → "Bairro, Município"
+    .replace(/([a-záéíóúãõâêîôûç])([A-ZÁÉÍÓÚÃÕÂÊÎÔÛÇ])/g, "$1, $2")
     .replace(/\s+/g, " ").trim();
 
   const endBH = (endNorm.toLowerCase().includes("belo horizonte") ? endNorm : endNorm + ", Belo Horizonte, MG, Brasil");
@@ -188,6 +190,22 @@ function extractComplemento(endereco) {
   if (!endereco) return "";
   const m = endereco.match(/,?\s*[-–]?\s*((ap(to)?\.?\s*\d+[\w]*|apartamento\s*\d+[\w]*|bloco\s*[\w]+|bl\.?\s*[\w]+|sala\s*[\w]+|loja\s*[\w]+|andar\s*[\w]+|conjunto\s*[\w]+|cj\.?\s*[\w]+))/i);
   return m ? m[1].trim() : "";
+}
+
+// Encontra a ficha que melhor corresponde a um stop pelo par de coordenadas
+function matchFichaByCoords(fichas, coords) {
+  if (!coords) return fichas[0];
+  const lat = parseFloat(coords.lat);
+  const lng = parseFloat(coords.lng);
+  let best = fichas[0], bestDist = Infinity;
+  for (const f of fichas) {
+    const fLat = parseFloat(f.lat);
+    const fLng = parseFloat(f.lng);
+    if (isNaN(fLat) || isNaN(fLng)) continue;
+    const dist = Math.pow(fLat - lat, 2) + Math.pow(fLng - lng, 2);
+    if (dist < bestDist) { bestDist = dist; best = f; }
+  }
+  return best;
 }
 
 // Formata nome para Lalamove: "Nome Telefone"
@@ -365,20 +383,27 @@ module.exports = async function handler(req, res) {
     let senderStopId, recipientStops;
     if (tipo === "coleta") {
       senderStopId   = lalaStops[lalaStops.length - 1]?.stopId;
-      recipientStops = lalaStops.slice(0, -1).map((s, i) => ({
-        stopId:  s.stopId,
-        name:    formatNomeLala(pendentes[i]?.nomeContato, pendentes[i]?.telefone),
-        phone:   formatTelIntl(pendentes[i]?.telefone),
-        remarks: extractComplemento(pendentes[i]?.endereco),
-      }));
+      recipientStops = lalaStops.slice(0, -1).map((s) => {
+        // Encontra a ficha correta pela proximidade de coordenadas (após otimização de rota)
+        const f = matchFichaByCoords(pendentes, s.coordinates);
+        return {
+          stopId:  s.stopId,
+          name:    formatNomeLala(f?.nomeContato, f?.telefone),
+          phone:   formatTelIntl(f?.telefone),
+          remarks: extractComplemento(f?.endereco),
+        };
+      });
     } else {
       senderStopId   = lalaStops[0]?.stopId;
-      recipientStops = lalaStops.slice(1).map((s, i) => ({
-        stopId:  s.stopId,
-        name:    formatNomeLala(pendentes[i]?.nomeContato, pendentes[i]?.telefone),
-        phone:   formatTelIntl(pendentes[i]?.telefone),
-        remarks: extractComplemento(pendentes[i]?.endereco),
-      }));
+      recipientStops = lalaStops.slice(1).map((s) => {
+        const f = matchFichaByCoords(pendentes, s.coordinates);
+        return {
+          stopId:  s.stopId,
+          name:    formatNomeLala(f?.nomeContato, f?.telefone),
+          phone:   formatTelIntl(f?.telefone),
+          remarks: extractComplemento(f?.endereco),
+        };
+      });
     }
 
     const orderPath = "/v3/orders";
@@ -469,10 +494,10 @@ module.exports = async function handler(req, res) {
     let senderStopId, recipientStops;
     if (tipo === "coleta") {
       senderStopId   = lalaStops[lalaStops.length - 1]?.stopId;
-      recipientStops = lalaStops.slice(0, -1).map((s, i) => ({ stopId: s.stopId, name: formatNomeLala(pendentes[i]?.nomeContato, pendentes[i]?.telefone), phone: formatTelIntl(pendentes[i]?.telefone), remarks: extractComplemento(pendentes[i]?.endereco) }));
+      recipientStops = lalaStops.slice(0, -1).map((s) => { const f = matchFichaByCoords(pendentes, s.coordinates); return { stopId: s.stopId, name: formatNomeLala(f?.nomeContato, f?.telefone), phone: formatTelIntl(f?.telefone), remarks: extractComplemento(f?.endereco) }; });
     } else {
       senderStopId   = lalaStops[0]?.stopId;
-      recipientStops = lalaStops.slice(1).map((s, i) => ({ stopId: s.stopId, name: formatNomeLala(pendentes[i]?.nomeContato, pendentes[i]?.telefone), phone: formatTelIntl(pendentes[i]?.telefone), remarks: extractComplemento(pendentes[i]?.endereco) }));
+      recipientStops = lalaStops.slice(1).map((s) => { const f = matchFichaByCoords(pendentes, s.coordinates); return { stopId: s.stopId, name: formatNomeLala(f?.nomeContato, f?.telefone), phone: formatTelIntl(f?.telefone), remarks: extractComplemento(f?.endereco) }; });
     }
 
     const orderPath = "/v3/orders";
