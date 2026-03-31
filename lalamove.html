@@ -413,10 +413,12 @@ function enviarLalamove(tipo) {
   var stopsHtml = stops.map(function(s, si) {
     var dotClass = s.isLoja ? "loja" : "cliente";
     var dotLabel = s.isLoja ? "L" : si + (isColeta ? 1 : 0);
+    // Nome limpo: remove descrição do título se vier com ela
+    var nomeClean = s.isLoja ? s.nomeContato : (s.nomeContato || "Cliente").split(/\s*[—–|]\s*/)[0].trim();
     // Nome + telefone no padrão Lalamove
     var nomeLala = s.isLoja
-      ? s.nomeContato
-      : (s.nomeContato || "Cliente") + (s.telefone ? " " + s.telefone : "");
+      ? nomeClean
+      : nomeClean + (s.telefone ? " " + s.telefone : "");
     // Extrai complemento do endereço
     var comp = "";
     if (!s.isLoja && s.endereco) {
