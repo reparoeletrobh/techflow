@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TV — Orçamento</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--border:#252525;
+  --text:#fff;--muted:#888;--dim:#333;
+  --accent:#f97316;--green:#22c55e;--red:#ef4444;--blue:#3b9eff;--yellow:#f5c800;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;}
+
+header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;
+  border-bottom:2px solid var(--accent);background:var(--bg);position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.logo-icon{width:26px;height:26px;background:var(--accent);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;}
+.logo span{color:var(--accent);}
+.hdr-right{display:flex;gap:8px;align-items:center;}
+.hbtn{font-family:var(--fm);font-size:10px;padding:5px 11px;border-radius:6px;border:1px solid var(--border);
+  background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;text-decoration:none;display:inline-flex;align-items:center;}
+.hbtn:hover{color:var(--text);border-color:var(--accent);}
+.hbtn.primary{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700;}
+
+/* TABS */
+.tabs-bar{display:flex;border-bottom:1px solid var(--border);padding:0 24px;background:var(--bg);
+  position:sticky;top:52px;z-index:90;}
+.tab-btn{font-family:var(--fm);font-size:11px;font-weight:600;padding:12px 18px;border:none;
+  background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;
+  margin-bottom:-1px;transition:all .15s;display:flex;align-items:center;gap:7px;}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-badge{font-family:var(--fm);font-size:9px;font-weight:700;padding:1px 6px;border-radius:99px;
+  background:var(--surface2);color:var(--muted);}
+.tab-btn.active .tab-badge{background:rgba(249,115,22,.15);color:var(--accent);}
+
+/* PAGE */
+.page{display:none;flex:1;flex-direction:column;padding:20px 24px;}
+.page.active{display:flex;}
+.page-title{font-family:var(--fh);font-size:17px;font-weight:800;margin-bottom:4px;}
+.page-title span{color:var(--accent);}
+.page-sub{font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:20px;}
+
+/* ORC CARDS LIST */
+.orc-list{display:flex;flex-direction:column;gap:12px;max-width:800px;}
+
+/* SR card — Sem Resposta */
+.sr-card{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--yellow);
+  border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;}
+.sr-nome{font-size:13px;font-weight:600;}
+.sr-desc{font-size:11px;color:var(--muted);line-height:1.5;}
+.sr-age{font-family:var(--fm);font-size:10px;color:var(--yellow);}
+.sr-btn{font-family:var(--fm);font-size:10px;font-weight:600;padding:7px 14px;border-radius:7px;
+  border:none;cursor:pointer;transition:all .15s;background:var(--yellow);color:#000;}
+.sr-btn:hover:not(:disabled){filter:brightness(1.1);}
+.sr-btn:disabled{opacity:.5;cursor:not-allowed;}
+
+/* UC card — Ultima Chamada */
+.uc-card{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--red);
+  border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;}
+.uc-age{font-family:var(--fm);font-size:10px;color:var(--red);}
+
+/* ORC fichas */
+.orc-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:14px 16px;display:flex;flex-direction:column;gap:8px;}
+.orc-card:hover{border-color:rgba(249,115,22,.25);}
+.orc-nome{font-size:13px;font-weight:600;}
+.orc-desc{font-size:11px;color:var(--muted);line-height:1.5;}
+.orc-val{font-family:var(--fm);font-size:13px;color:var(--green);font-weight:700;}
+.orc-meta{font-family:var(--fm);font-size:10px;color:var(--muted);}
+.orc-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
+.orc-btn{font-family:var(--fm);font-size:10px;font-weight:600;padding:7px 14px;border-radius:7px;
+  border:1px solid var(--border);cursor:pointer;transition:all .15s;background:transparent;color:var(--muted);}
+.orc-btn:hover:not(:disabled){color:var(--text);border-color:var(--accent);}
+.orc-btn.confirm{background:var(--green);color:#000;border-color:var(--green);}
+.orc-btn.confirm:hover{filter:brightness(1.1);}
+.orc-btn.send{background:var(--accent);color:#000;border-color:var(--accent);}
+.orc-btn.send:hover{filter:brightness(1.1);}
+.orc-btn:disabled{opacity:.5;cursor:not-allowed;}
+
+/* Price input */
+.price-row{display:flex;align-items:center;gap:8px;}
+.price-input{background:var(--surface2);border:1px solid var(--border);border-radius:7px;
+  padding:7px 12px;font-family:var(--fm);font-size:13px;color:var(--green);
+  outline:none;width:120px;transition:border .15s;}
+.price-input:focus{border-color:var(--accent);}
+
+/* Loading / empty */
+.loading-msg{font-family:var(--fm);font-size:11px;color:var(--muted);padding:40px;text-align:center;}
+.spinner-wrap{display:flex;align-items:center;justify-content:center;gap:10px;padding:40px;}
+.spinner{width:18px;height:18px;border:2px solid var(--dim);border-top-color:var(--accent);
+  border-radius:50%;animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* TOAST */
+.toast{position:fixed;bottom:18px;right:18px;background:var(--surface);border:1px solid var(--border);
+  border-top:2px solid var(--accent);border-radius:10px;padding:11px 14px;font-family:var(--fm);
+  font-size:11px;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;}
+.toast.show{transform:translateY(0);opacity:1;}
+
+/* MOBILE */
+@media(max-width:768px){
+  header{padding:0 12px;height:48px;}
+  .tabs-bar{padding:0 8px;overflow-x:auto;white-space:nowrap;}
+  .tab-btn{padding:10px 12px;font-size:10px;flex-shrink:0;}
+  .page{padding:14px 12px;}
+  .orc-card,.sr-card,.uc-card{padding:12px;}
+  .orc-actions{flex-wrap:wrap;}
+  .orc-btn{flex:1;min-width:100px;text-align:center;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">📋</div>
+    Reparo<span>Eletro</span> — Orçamento
+  </div>
+  <div class="hdr-right">
+    <button class="hbtn" onclick="loadAll()">↻ Atualizar</button>
+    <a class="hbtn" href="/tv/tecnico">Técnico</a>
+    <a class="hbtn" href="/tv">Home</a>
+  </div>
+</header>
+
+<div class="tabs-bar">
+  <button class="tab-btn active" id="tab-fichas"  onclick="setTab('fichas')">
+    📋 Fichas <span class="tab-badge" id="badge-fichas">0</span>
+  </button>
+  <button class="tab-btn" id="tab-sem" onclick="setTab('sem')">
+    ⚠️ Sem Resposta <span class="tab-badge" id="badge-sem">0</span>
+  </button>
+  <button class="tab-btn" id="tab-ult" onclick="setTab('ult')">
+    🔴 Última Chamada <span class="tab-badge" id="badge-ult">0</span>
+  </button>
+</div>
+
+<!-- FICHAS -->
+<div class="page active" id="page-fichas">
+  <div class="page-title">Fichas <span>// Aguardando Orçamento</span></div>
+  <div class="page-sub">// fichas em Aguardando Aprovação no Pipefy</div>
+  <div class="orc-list" id="list-fichas">
+    <div class="spinner-wrap"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<!-- SEM RESPOSTA -->
+<div class="page" id="page-sem">
+  <div class="page-title">Sem Resposta <span>// +48h</span></div>
+  <div class="page-sub">// clientes em Aguardando Aprovação há mais de 48h sem retorno</div>
+  <div class="orc-list" id="list-sem">
+    <div class="spinner-wrap"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<!-- ULTIMA CHAMADA -->
+<div class="page" id="page-ult">
+  <div class="page-title">Última Chamada <span>// Prazo Final</span></div>
+  <div class="page-sub">// fichas movidas para Ultima Chamada com prazo de encerramento</div>
+  <div class="orc-list" id="list-ult">
+    <div class="spinner-wrap"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <span id="t-icon">✅</span>
+  <div><strong id="t-title"></strong><br><span id="t-body" style="color:var(--muted);font-size:10px;"></span></div>
+</div>
+
+<script>
+var curTab = 'fichas';
+
+var MSG_PARTES = [
+  "*ATENCAO* comunicado importante da TV Assistência.",
+  "Estamos com mais de 150 equipamentos sem resposta na loja e ficamos sem espaco para trabalhar. Esta prejudicando muito a gente.",
+  "Por este motivo conto com a sua colaboracao. Nao tendo resposta, retirada do equipamento ou solicitacao de entrega nos proximos 7 dias. Infelizmente teremos que fazer o descarte do mesmo. Conto com a sua colaboracao."
+];
+var MSG_UC = MSG_PARTES.join("\n");
+
+// ── TABS ─────────────────────────────────────────────────────
+function setTab(t) {
+  curTab = t;
+  ['fichas','sem','ult'].forEach(function(id) {
+    document.getElementById('tab-'+id).classList.toggle('active', id===t);
+    document.getElementById('page-'+id).classList.toggle('active', id===t);
+  });
+  if (t==='fichas') loadFichas();
+  if (t==='sem')    loadSemResposta();
+  if (t==='ult')    loadUltimaChamada();
+}
+
+// ── LOADING MSG ───────────────────────────────────────────────
+function loadMsg(elId, msg) {
+  var el = document.getElementById(elId); if (!el) return;
+  el.innerHTML = '<div class="loading-msg">' + msg + '</div>';
+}
+function spinner(elId) {
+  var el = document.getElementById(elId); if (!el) return;
+  el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div></div>';
+}
+
+// ── FICHAS ────────────────────────────────────────────────────
+async function loadFichas() {
+  spinner('list-fichas');
+  try {
+    var d = await fetch('/api/tv-orcamento?action=orc-load').then(function(r){return r.json();});
+    var badge = document.getElementById('badge-fichas');
+    if (badge) badge.textContent = d.fichas ? d.fichas.length : 0;
+    if (!d.ok || !d.fichas || !d.fichas.length) {
+      loadMsg('list-fichas', d.error || 'Nenhuma ficha aguardando orçamento'); return;
+    }
+    var list = document.getElementById('list-fichas'); list.innerHTML = '';
+    d.fichas.forEach(function(f) { list.appendChild(orcCard(f)); });
+  } catch(e) { loadMsg('list-fichas', 'Erro: ' + e.message); }
+}
+
+function orcCard(f) {
+  var wrap = document.createElement('div'); wrap.className = 'orc-card'; wrap.id = 'orc-'+f.id;
+  var nome = document.createElement('div'); nome.className = 'orc-nome';
+  nome.textContent = f.nome || f.title || '—'; wrap.appendChild(nome);
+  if (f.desc) {
+    var desc = document.createElement('div'); desc.className = 'orc-desc';
+    desc.textContent = f.desc.substring(0,120) + (f.desc.length>120?'...':''); wrap.appendChild(desc);
+  }
+  if (f.end) {
+    var end = document.createElement('div'); end.className = 'orc-meta';
+    end.textContent = '📍 ' + f.end; wrap.appendChild(end);
+  }
+
+  // Valor
+  var priceRow = document.createElement('div'); priceRow.className = 'price-row';
+  var lbl = document.createElement('span'); lbl.style.cssText = 'font-family:var(--fm);font-size:10px;color:var(--muted);';
+  lbl.textContent = 'Valor: R$';
+  var inp = document.createElement('input'); inp.className = 'price-input'; inp.type = 'number';
+  inp.placeholder = '0,00'; inp.step = '0.01'; inp.min = '0';
+  if (f.preco) inp.value = f.preco;
+  inp.id = 'price-'+f.id;
+  priceRow.appendChild(lbl); priceRow.appendChild(inp); wrap.appendChild(priceRow);
+
+  // Botões
+  var btns = document.createElement('div'); btns.className = 'orc-actions';
+
+  // Enviar orçamento
+  var bSend = document.createElement('button'); bSend.className = 'orc-btn send';
+  bSend.textContent = '📨 Enviar Orçamento';
+  bSend.onclick = (function(fid, nome) { return function() { enviarOrcamento(fid, nome); }; })(f.id, f.nome);
+  btns.appendChild(bSend);
+
+  // Confirmar aprovação
+  var bConf = document.createElement('button'); bConf.className = 'orc-btn confirm';
+  bConf.textContent = '✅ Confirmar Aprovação';
+  bConf.onclick = (function(fid) { return function() { confirmarAprovacao(fid); }; })(f.id);
+  btns.appendChild(bConf);
+
+  // WhatsApp direto
+  if (f.tel) {
+    var tel = f.tel.replace(/\D/g,'');
+    if (tel.slice(0,2)==='55' && tel.length>=12) tel=tel.slice(2);
+    if (tel.length===10) tel=tel.slice(0,2)+'9'+tel.slice(2);
+    if (tel) {
+      var bWa = document.createElement('a'); bWa.className = 'orc-btn';
+      bWa.style.textDecoration='none';bWa.style.textAlign='center';
+      bWa.textContent = '💬 WhatsApp';
+      bWa.href = 'https://wa.me/55'+tel; bWa.target = '_blank';
+      btns.appendChild(bWa);
+    }
+  }
+
+  wrap.appendChild(btns);
+  return wrap;
+}
+
+async function enviarOrcamento(fichaId, nome) {
+  var inp = document.getElementById('price-'+fichaId);
+  var preco = inp ? inp.value : '';
+  if (!preco) { showToast('⚠️','Preencha o valor',''); return; }
+  var btn = document.querySelector('#orc-'+fichaId+' .orc-btn.send');
+  if (btn) { btn.disabled=true; btn.textContent='⏳ Enviando...'; }
+  try {
+    var d = await fetch('/api/tv-orcamento?action=enviar-orcamento', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({fichaId, preco})
+    }).then(function(r){return r.json();});
+    if (d.ok) {
+      showToast('📨','Orçamento enviado!', nome || '');
+      loadFichas();
+    } else {
+      showToast('❌','Erro',d.error||'');
+      if (btn) { btn.disabled=false; btn.textContent='📨 Enviar Orçamento'; }
+    }
+  } catch(e) {
+    showToast('❌','Erro',e.message);
+    if (btn) { btn.disabled=false; btn.textContent='📨 Enviar Orçamento'; }
+  }
+}
+
+async function confirmarAprovacao(fichaId) {
+  if (!confirm('Confirmar aprovação desta ficha?')) return;
+  try {
+    var d = await fetch('/api/tv-orcamento?action=confirmar-aprovacao', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({fichaId})
+    }).then(function(r){return r.json();});
+    if (d.ok) { showToast('✅','Aprovado!',''); loadFichas(); }
+    else showToast('❌','Erro',d.error||'');
+  } catch(e) { showToast('❌','Erro',e.message); }
+}
+
+// ── SEM RESPOSTA ──────────────────────────────────────────────
+function srCard(card) {
+  var tel = (card.tel || '').replace(/[^0-9]/g, '');
+  if (tel.slice(0,2)==='55' && tel.length>=12) tel=tel.slice(2);
+  if (tel.length===10) tel=tel.slice(0,2)+'9'+tel.slice(2);
+  var waLink = tel ? 'https://wa.me/55'+tel+'?text='+encodeURIComponent(MSG_UC) : null;
+  var id = card.pipefyId;
+  var wrap = document.createElement('div'); wrap.className = 'sr-card';
+  var nome = document.createElement('div'); nome.className = 'sr-nome';
+  nome.textContent = card.nome || card.title || ''; wrap.appendChild(nome);
+  if (card.desc) {
+    var desc = document.createElement('div'); desc.className = 'sr-desc';
+    desc.textContent = card.desc.substring(0,100)+'...'; wrap.appendChild(desc);
+  }
+  var age = document.createElement('div'); age.className = 'sr-age';
+  age.textContent = '⏱ ' + card.age + ' dia(s) sem resposta'; wrap.appendChild(age);
+  var btns = document.createElement('div'); btns.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;';
+  if (waLink) {
+    var bc = document.createElement('button'); bc.className = 'sr-btn'; bc.textContent = '📋 Copiar e Enviar';
+    bc.onclick = (function(i, link){ return function(){
+      navigator.clipboard.writeText(link).catch(function(){
+        var ta=document.createElement('textarea'); ta.value=link;
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+      });
+      alertarCliente(i);
+    }; })(id, waLink);
+    btns.appendChild(bc);
+  }
+  var bm = document.createElement('button'); bm.className = 'sr-btn'; bm.id = 'btn-al-'+id;
+  bm.style.cssText = 'background:transparent;border:1px solid var(--border);color:var(--muted);';
+  bm.textContent = 'Mover p/ Última Chamada';
+  bm.onclick = (function(i){ return function(){ alertarCliente(i); }; })(id);
+  btns.appendChild(bm); wrap.appendChild(btns);
+  return wrap;
+}
+
+async function loadSemResposta() {
+  spinner('list-sem');
+  try {
+    var d = await fetch('/api/tv-orcamento?action=sem-resposta').then(function(r){return r.json();});
+    var badge = document.getElementById('badge-sem');
+    if (badge) badge.textContent = d.cards ? d.cards.length : 0;
+    if (!d.ok || !d.cards || !d.cards.length) {
+      loadMsg('list-sem', d.error || 'Nenhum cliente sem resposta há mais de 48h'); return;
+    }
+    var list = document.getElementById('list-sem'); list.innerHTML = '';
+    d.cards.forEach(function(card) { list.appendChild(srCard(card)); });
+  } catch(e) { loadMsg('list-sem', 'Erro: '+e.message); }
+}
+
+async function alertarCliente(pipefyId) {
+  var btn = document.getElementById('btn-al-'+pipefyId);
+  if (btn) { btn.disabled=true; btn.textContent='...'; }
+  try {
+    var d = await fetch('/api/tv-orcamento?action=alertar', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({pipefyId})
+    }).then(function(r){return r.json();});
+    if (d.ok) {
+      showToast('✅','Movido para Última Chamada!','Prazo: '+(d.dataLimite||''));
+      loadSemResposta();
+    } else {
+      showToast('❌','Erro',d.error||'');
+      if (btn){btn.disabled=false;btn.textContent='Mover p/ Última Chamada';}
+    }
+  } catch(e) {
+    showToast('❌','Erro',e.message);
+    if (btn){btn.disabled=false;btn.textContent='Mover p/ Última Chamada';}
+  }
+}
+
+// ── ULTIMA CHAMADA ────────────────────────────────────────────
+function ucCard(card) {
+  var wrap = document.createElement('div'); wrap.className = 'uc-card';
+  var nome = document.createElement('div'); nome.className = 'sr-nome';
+  nome.textContent = card.nome || card.title || ''; wrap.appendChild(nome);
+  if (card.desc) {
+    var desc = document.createElement('div'); desc.className = 'sr-desc';
+    desc.textContent = card.desc.substring(0,100)+'...'; wrap.appendChild(desc);
+  }
+  var age = document.createElement('div'); age.className = 'uc-age';
+  age.textContent = '🔴 '+card.age+' dia(s) — '+(card.dataEncerramento?'Prazo: '+card.dataEncerramento:'Sem data limite');
+  wrap.appendChild(age);
+  return wrap;
+}
+
+async function loadUltimaChamada() {
+  spinner('list-ult');
+  try {
+    var d = await fetch('/api/tv-orcamento?action=ultima-chamada').then(function(r){return r.json();});
+    var badge = document.getElementById('badge-ult');
+    if (badge) badge.textContent = d.cards ? d.cards.length : 0;
+    if (!d.ok || !d.cards || !d.cards.length) {
+      loadMsg('list-ult', d.error || 'Nenhuma ficha em Última Chamada'); return;
+    }
+    var list = document.getElementById('list-ult'); list.innerHTML = '';
+    d.cards.forEach(function(card) { list.appendChild(ucCard(card)); });
+  } catch(e) { loadMsg('list-ult', 'Erro: '+e.message); }
+}
+
+// ── TOAST ─────────────────────────────────────────────────────
+var toastTimer;
+function showToast(icon, title, msg) {
+  var t = document.getElementById('toast');
+  document.getElementById('t-icon').textContent  = icon;
+  document.getElementById('t-title').textContent = title;
+  document.getElementById('t-body').textContent  = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 4000);
+}
+
+// ── LOAD ALL ──────────────────────────────────────────────────
+function loadAll() {
+  loadFichas();
+  // Pré-carrega badges das outras abas
+  fetch('/api/tv-orcamento?action=sem-resposta').then(function(r){return r.json();}).then(function(d){
+    var b=document.getElementById('badge-sem'); if(b) b.textContent=d.cards?d.cards.length:0;
+  }).catch(function(){});
+  fetch('/api/tv-orcamento?action=ultima-chamada').then(function(r){return r.json();}).then(function(d){
+    var b=document.getElementById('badge-ult'); if(b) b.textContent=d.cards?d.cards.length:0;
+  }).catch(function(){});
+}
+
+// ── INIT ─────────────────────────────────────────────────────
+loadAll();
+setInterval(loadAll, 60000);
+</script>
+</body>
+</html>
