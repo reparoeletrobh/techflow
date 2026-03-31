@@ -63,7 +63,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .live-strip{display:flex;flex-direction:column;gap:12px;}
 .strip-row{display:grid;gap:12px;}
 .strip-row.erp{grid-template-columns:1fr 1fr 1fr;}
-.strip-row.periodo{grid-template-columns:repeat(3,1fr);}
+.strip-row.periodo{grid-template-columns:repeat(5,1fr);}
 .strip-row-label{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);padding:2px 0;}
 .live-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
   padding:18px 20px;position:relative;overflow:hidden;transition:border-color .2s;}
@@ -91,7 +91,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 
 /* DATA INPUT SECTION */
 .input-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 24px;}
-.input-grid{display:grid;grid-template-columns:repeat(5,1fr) auto;gap:12px;align-items:end;margin-top:16px;}
+.input-grid{display:grid;grid-template-columns:repeat(3,1fr) repeat(3,1fr) auto;gap:12px;align-items:end;margin-top:16px;}
 .field{display:flex;flex-direction:column;gap:6px;}
 .field label{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
 .f-input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;
@@ -168,7 +168,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
   .tab-btn{padding:10px 14px;font-size:10px;flex-shrink:0;}
   .page{padding:14px 12px;gap:16px;}
   .strip-row.erp{grid-template-columns:1fr 1fr 1fr;}
-  .strip-row.periodo{grid-template-columns:1fr;}
+  .strip-row.periodo{grid-template-columns:1fr 1fr;}
   .input-grid{grid-template-columns:1fr 1fr;grid-template-rows:auto auto auto;}
   .input-grid > *:last-child{grid-column:1/-1;}
   .btn-salvar{width:100%;}
@@ -179,12 +179,11 @@ tr:hover td{background:rgba(255,255,255,.02);}
   .live-strip{grid-template-columns:1fr;}
 }
 
-/* METAS */
-.meta-bar-wrap{margin-top:10px;display:flex;flex-direction:column;gap:3px;}
-.meta-bar-track{height:3px;background:var(--dim);border-radius:2px;overflow:hidden;}
-.meta-bar-fill{height:100%;border-radius:2px;transition:width .6s ease;}
-.meta-label{font-family:var(--fm);font-size:8px;color:var(--muted);display:flex;justify-content:space-between;}
-.meta-label.hit{color:var(--green);}
+/* METAS — badge discreto canto superior direito */
+.meta-badge{position:absolute;top:10px;right:10px;display:flex;align-items:center;gap:4px;}
+.meta-pct{font-family:var(--fm);font-size:8px;font-weight:600;opacity:.7;}
+.meta-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.live-card{position:relative;overflow:visible;}
 </style>
 </head>
 <body>
@@ -350,6 +349,10 @@ tr:hover td{background:rgba(255,255,255,.02);}
       <div class="field">
         <label>Valor total ERP (R$)</label>
         <input class="f-input" type="number" id="inp-valor-erp" placeholder="0,00" min="0" step="0.01">
+      </div>
+      <div class="field">
+        <label>Coletas Solicitadas</label>
+        <input class="f-input" type="number" id="inp-coletas" placeholder="0" min="0">
       </div>
       <button class="btn-salvar" onclick="salvarDia()">💾 Salvar</button>
     </div>
@@ -525,10 +528,10 @@ function renderFiltrado() {
 }
 
 function calcMetricasJS(dias) {
-  var fichas=0, invest=0, erp=0, valorErp=0;
-  dias.forEach(d => { fichas+=d.fichas||0; invest+=d.investimento||0; erp+=d.erpCount||0; valorErp+=d.valorErp||0; });
+  var fichas=0, invest=0, erp=0, valorErp=0, coletas=0;
+  dias.forEach(d => { fichas+=d.fichas||0; invest+=d.investimento||0; erp+=d.erpCount||0; valorErp+=d.valorErp||0; coletas+=d.coletasSolic||0; });
   return {
-    fichas, investimento: invest, erpCount: erp, valorErp,
+    fichas, investimento: invest, erpCount: erp, valorErp, coletasSolic: coletas,
     cac:           erp   > 0 ? +(invest/erp).toFixed(2)    : null,
     ticketMedio:   erp   > 0 ? +(valorErp/erp).toFixed(2)  : null,
     custoPorFicha: fichas> 0 ? +(invest/fichas).toFixed(2) : null,
@@ -554,28 +557,28 @@ function agruparSemanas(dias) {
 
 // Metas diárias
 var METAS = {
-  erp:           { label: 'Meta ERP',        valor: 30,    maior: true  },
-  valorErp:      { label: 'Meta Valor',       valor: 10000, maior: true  },
-  roas:          { label: 'Meta ROAS',        valor: 6.6,   maior: true  },
-  cac:           { label: 'Meta CAC',         valor: 48,    maior: false },
-  ticketMedio:   { label: 'Meta Ticket',      valor: 334,   maior: true  },
-  custoPorFicha: { label: 'Meta C/Ficha',     valor: 21,    maior: false },
+  erp:             { valor: 30,    maior: true  },
+  valorErp:        { valor: 10000, maior: true  },
+  roas:            { valor: 6.6,   maior: true  },
+  cac:             { valor: 48,    maior: false },
+  ticketMedio:     { valor: 334,   maior: true  },
+  custoPorFicha:   { valor: 21,    maior: false },
+  fichas:          { valor: 60,    maior: true  },
+  coletasSolic:    { valor: 50,    maior: true  },
 };
 
 function metaBar(atual, meta) {
   if (atual == null || !meta) return '';
-  // Para métricas onde menor é melhor (CAC, custo/ficha), inverte o cálculo
-  var pct = meta.maior
-    ? Math.min(100, Math.round(atual / meta.valor * 100))
-    : Math.min(100, Math.round(meta.valor / atual * 100));
-  var hit   = pct >= 100;
-  var color = hit ? 'var(--green)' : pct >= 70 ? 'var(--yellow)' : 'var(--red)';
-  var pctDisplay = meta.maior
+  var raw = meta.maior
     ? Math.round(atual / meta.valor * 100)
     : Math.round(meta.valor / atual * 100);
-  return '<div class="meta-bar-wrap">' +
-    '<div class="meta-bar-track"><div class="meta-bar-fill" style="width:' + Math.min(100,pct) + '%;background:' + color + '"></div></div>' +
-    '<div class="meta-label' + (hit ? ' hit' : '') + '"><span>' + meta.label + '</span><span>' + pctDisplay + '%' + (hit ? ' ✓' : '') + '</span></div>' +
+  var pct   = Math.min(100, raw);
+  var hit   = raw >= 100;
+  var color = hit ? 'var(--green)' : pct >= 70 ? 'var(--yellow)' : '#ef4444';
+  var txt   = hit ? '✓ ' + raw + '%' : raw + '%';
+  return '<div class="meta-badge">' +
+    '<span class="meta-pct" style="color:' + color + '">' + txt + '</span>' +
+    '<div class="meta-dot" style="background:' + color + ';box-shadow:0 0 4px ' + color + '40"></div>' +
   '</div>';
 }
 
@@ -630,6 +633,18 @@ function renderStrip(m) {
         '<div class="lc-value" style="color:var(--yellow)">' + BRL(m.custoPorFicha) + '</div>' +
         '<div class="lc-sub">investimento / fichas (' + NUM(m.fichas) + ')</div>' +
       metaBar(m.custoPorFicha, METAS.custoPorFicha) +
+      '</div>' +
+      '<div class="live-card" style="border-top:3px solid #06b6d4;">' +
+        '<div class="lc-label">Fichas no Período</div>' +
+        '<div class="lc-value" style="color:#06b6d4">' + NUM(m.fichas) + '</div>' +
+        '<div class="lc-sub">fichas recebidas</div>' +
+      metaBar(m.fichas, METAS.fichas) +
+      '</div>' +
+      '<div class="live-card" style="border-top:3px solid #a855f7;">' +
+        '<div class="lc-label">Coletas Solicitadas</div>' +
+        '<div class="lc-value" style="color:#a855f7">' + NUM(m.coletasSolic || 0) + '</div>' +
+        '<div class="lc-sub">fichas em Coleta Solicitada</div>' +
+      metaBar(m.coletasSolic || 0, METAS.coletasSolic) +
       '</div>' +
     '</div>';
 
@@ -789,21 +804,23 @@ async function salvarDia() {
 
   if (!dataVal) { showToast('⚠️','Data obrigatória','Preencha a data'); return; }
 
+  var coletas = document.getElementById('inp-coletas').value || 0;
   var r = await fetch('/api/metricas?action=salvar-dia', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({
       data: dataVal, fichas: +fichas, investimento: +invest,
-      erpCount: +erpCount, valorErp: +valorErp,
+      erpCount: +erpCount, valorErp: +valorErp, coletasSolic: +coletas,
     }),
   }).then(r=>r.json()).catch(e=>({ok:false,error:e.message}));
 
   if (r.ok) {
     showToast('✅','Salvo!','CAC: '+BRL(r.cac)+'  Ticket: '+BRL(r.ticketMedio));
-    document.getElementById('inp-fichas').value = '';
-    document.getElementById('inp-invest').value = '';
-    document.getElementById('inp-erp').value    = '';
+    document.getElementById('inp-fichas').value    = '';
+    document.getElementById('inp-invest').value    = '';
+    document.getElementById('inp-erp').value       = '';
     document.getElementById('inp-valor-erp').value = '';
+    document.getElementById('inp-coletas').value   = '';
     document.getElementById('preview-calc').style.display = 'none';
     await load();
   } else {
