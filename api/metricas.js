@@ -113,12 +113,15 @@ module.exports = async function handler(req, res) {
 
   const action = req.query.action || "";
 
+  try {
+
   // ── GET load — carrega todos os dados de métricas ─────────────────────────
   if (action === "load") {
-    const [db, logsData] = await Promise.all([
-      dbGet(METRICAS_KEY) || { dias: [] },
+    const [rawDb, logsData] = await Promise.all([
+      dbGet(METRICAS_KEY),
       dbGet(LOGS_KEY),
     ]);
+    const db = rawDb || { dias: [] };
     if (!Array.isArray(db.dias)) db.dias = [];
 
     // ERP ao vivo do Pipefy
@@ -243,5 +246,9 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+    return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+  } catch(e) {
+    console.error("metricas handler error:", e.message, e.stack);
+    return res.status(200).json({ ok: false, error: "Erro interno: " + e.message });
+  }
 };
