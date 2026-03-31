@@ -1,5 +1,6 @@
 const PIPEFY_API = "https://api.pipefy.com/graphql";
 const PIPE_ID    = "306904889";
+const ORC_KEY    = "tv_orcamentos";
 
 async function pipefyQuery(query) {
   const controller = new AbortController();
@@ -290,6 +291,18 @@ module.exports = async function handler(req, res) {
 
   // ── POST orc-update-texto ──────────────────────────────────
   // Regenera ou edita o texto de orçamento de uma ficha
+  // ── POST orc-update-preco — atualiza preco sem mudar status ─
+  if (req.method === "POST" && action === "orc-update-preco") {
+    const { id, preco, precoSugerido } = req.body || {};
+    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
+    const ficha = db.fichas.find(f => f.id === id);
+    if (!ficha) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
+    if (preco !== undefined) ficha.preco = preco;
+    if (precoSugerido !== undefined) ficha.precoSugerido = precoSugerido;
+    await dbSet(ORC_KEY, db);
+    return res.status(200).json({ ok: true, ficha });
+  }
+
   if (req.method === "POST" && action === "orc-update-texto") {
     const { id, textoOrc } = req.body || {};
     const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
@@ -669,7 +682,6 @@ module.exports = async function handler(req, res) {
 
 const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g, "").trim();
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g, "").trim();
-const ORC_KEY = "tv_orcamentos";
 
 async function dbGet(key) {
   try {
