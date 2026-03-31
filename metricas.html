@@ -597,10 +597,11 @@ function renderStrip(m) {
   // Sem filtro: usa ao vivo do Pipefy
   // ERP count: metaLog do período (ou ao vivo sem filtro)
   var erpCount  = filtroAtivo ? (m.erpCount || 0) : e.count;
-  // Valor ERP: metaLog do período (valor dos contratos que entraram em ERP no período)
-  // Sem filtro: ao vivo do Pipefy (todos os abertos agora)
-  var erpValor  = filtroAtivo ? (m.valorErp || 0) : e.valor;
-  // Ticket Médio: valorErp / erpCount do período
+  // Valor ERP: se hoje → ao vivo (Pipefy). Se histórico → metaLog (tem valor após novo sync)
+  var hoje      = df(new Date());
+  var filtroHoje = filtroAtivo && filtroAtivo.de === hoje && filtroAtivo.ate === hoje;
+  var erpValor  = !filtroAtivo ? e.valor : (filtroHoje ? e.valor : (m.valorErp || 0));
+  // Ticket Médio: valorErp / erpCount
   var ticketLive = erpCount > 0 ? (erpValor / erpCount).toFixed(2) : null;
   // Todos os 3 cards do topo sempre usam dados ao vivo do Pipefy
   var erpBadge  = '<div class="live-badge">AO VIVO</div>';
