@@ -94,17 +94,17 @@ function monthKey(ts) {
 
 // Calcula métricas agregadas para um conjunto de dias
 function calcMetricas(dias) {
-  let fichas = 0, investimento = 0, erpCount = 0, valorErp = 0, coletasSolic = 0, orcamentos = 0;
+  let fichas = 0, investimento = 0, erpCount = 0, valorErp = 0, coletasSolic = 0, orcEnviado = 0;
   for (const d of dias) {
     fichas        += d.fichas        || 0;
     investimento  += d.investimento  || 0;
     erpCount      += d.erpCount      || 0;
     valorErp      += d.valorErp      || 0;
     coletasSolic  += d.coletasSolic  || 0;
-    orcamentos    += d.orcamentos    || 0;
+    orcEnviado    += d.orcEnviado    || 0;
   }
   return {
-    fichas, investimento, erpCount, valorErp, coletasSolic, orcEnviado, orcamentos,
+    fichas, investimento, erpCount, valorErp, coletasSolic, orcEnviado,
     cac:          erpCount   > 0 ? +(investimento / erpCount).toFixed(2)   : null,
     ticketMedio:  erpCount   > 0 ? +(valorErp     / erpCount).toFixed(2)   : null,
     custoPorFicha: fichas    > 0 ? +(investimento / fichas).toFixed(2)     : null,
@@ -186,7 +186,7 @@ module.exports = async function handler(req, res) {
           erpCount:     erpPorDia[data]    || 0,
           valorErp:     0,
           coletasSolic: coletaPorDia[data] || 0,
-          orcamentos:   orcPorDia[data]    || 0,
+          orcEnviado:   orcPorDia[data]    || 0,
         });
       }
     }
