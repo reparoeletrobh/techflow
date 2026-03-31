@@ -169,14 +169,15 @@ module.exports = async function handler(req, res) {
     }
 
     // Constrói array de dias enriquecido
-    // fichas/investimento = lançamento manual (fonte: usuário)
-    // erpCount/valorErp/coletasSolic/orcEnviado = SEMPRE metaLog Pipefy (fonte confiável)
+    // fichas/investimento/valorErp = lançamento manual (prioridade)
+    // erpCount/coletasSolic/orcEnviado = SEMPRE metaLog (automático)
+    // valorErp fallback: metaLog (quando board.js começar a gravar valor)
     const diasEnriq = db.dias.map(d => ({
       ...d,
-      erpCount:     erpPorDia[d.data]      || 0,
-      valorErp:     valorErpPorDia[d.data] || 0,
-      coletasSolic: coletaPorDia[d.data]   || 0,
-      orcEnviado:   orcPorDia[d.data]      || 0,
+      erpCount:     erpPorDia[d.data]    || 0,
+      valorErp:     (d.valorErp != null && d.valorErp > 0) ? d.valorErp : (valorErpPorDia[d.data] || 0),
+      coletasSolic: coletaPorDia[d.data] || 0,
+      orcEnviado:   orcPorDia[d.data]    || 0,
     }));
 
     // Adiciona dias que aparecem no metaLog mas não têm lançamento manual
