@@ -416,7 +416,9 @@ async function load() {
     var r = await fetch('/api/metricas?action=load').then(r => r.json());
     if (!r.ok) { showToast('❌','Erro',r.error); return; }
     data = r;
-    render();
+    // Se há filtro ativo, aplica em cima dos novos dados
+    if (filtroAtivo) renderFiltrado();
+    else render();
   } catch(e) { showToast('❌','Erro',e.message); }
 }
 
@@ -448,11 +450,14 @@ function metricaRow(m, labelPrimeiro) {
 // Filtro de período
 var filtroAtivo = null; // { de, ate } ou null
 
-function atalhoHoje()    { var h = hj(); setFiltro(h, h); }
-function atalhoSemana()  { var h = new Date(); var d = h.getDay(); var s = new Date(h); s.setDate(h.getDate()-(d===0?6:d-1)); setFiltro(df(s), hj()); }
-function atalhoMes()     { var h = new Date(); setFiltro(h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-01', hj()); }
-function atalho7d()      { var s = new Date(); s.setDate(s.getDate()-6); setFiltro(df(s), hj()); }
-function atalho30d()     { var s = new Date(); s.setDate(s.getDate()-29); setFiltro(df(s), hj()); }
+function markShortcut(idx) {
+  document.querySelectorAll('.pshort').forEach((b,i) => b.classList.toggle('active', i===idx));
+}
+function atalhoHoje()    { var h = hj(); setFiltro(h, h); markShortcut(0); }
+function atalhoSemana()  { var h = new Date(); var d = h.getDay(); var s = new Date(h); s.setDate(h.getDate()-(d===0?6:d-1)); setFiltro(df(s), hj()); markShortcut(1); }
+function atalhoMes()     { var h = new Date(); setFiltro(h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-01', hj()); markShortcut(2); }
+function atalho7d()      { var s = new Date(); s.setDate(s.getDate()-6); setFiltro(df(s), hj()); markShortcut(3); }
+function atalho30d()     { var s = new Date(); s.setDate(s.getDate()-29); setFiltro(df(s), hj()); markShortcut(4); }
 function hj()            { return df(new Date()); }
 function df(d)           { return d.toISOString().slice(0,10); }
 
@@ -474,6 +479,7 @@ function limparFiltro() {
   document.getElementById('filtro-de').value  = '';
   document.getElementById('filtro-ate').value = '';
   filtroAtivo = null;
+  document.querySelectorAll('.pshort').forEach(b => b.classList.remove('active'));
   renderLiveStrip();
   renderCharts();
 }
@@ -498,21 +504,23 @@ function renderFiltrado() {
   document.getElementById('live-title').innerHTML = 'Período <span>// ' + label + '</span>';
   document.getElementById('live-sub').textContent = diasFiltrados.length + ' dia(s) com dados lançados';
 
+  var e = data.erpAtual;
   document.getElementById('live-strip').innerHTML = `
     <div class="live-card green">
-      <div class="lc-label">Fichas no Período</div>
-      <div class="lc-value green">${NUM(m.fichas)}</div>
-      <div class="lc-sub">fichas recebidas</div>
+      <div class="live-badge">AO VIVO</div>
+      <div class="lc-label">ERPs em Aberto</div>
+      <div class="lc-value green">${e.count}</div>
+      <div class="lc-sub">${BRL(e.valor)} na fase ERP</div>
     </div>
     <div class="live-card blue">
-      <div class="lc-label">Investimento</div>
-      <div class="lc-value blue">${BRL(m.investimento)}</div>
-      <div class="lc-sub">tráfego pago</div>
+      <div class="lc-label">Fichas no Período</div>
+      <div class="lc-value blue">${NUM(m.fichas)}</div>
+      <div class="lc-sub">${BRL(m.investimento)} investido</div>
     </div>
     <div class="live-card orange">
       <div class="lc-label">CAC do Período</div>
       <div class="lc-value orange">${BRL(m.cac)}</div>
-      <div class="lc-sub">${NUM(m.erpCount)} ERPs · investimento/ERP</div>
+      <div class="lc-sub">${NUM(m.erpCount)} ERPs lançados</div>
     </div>
     <div class="live-card purple">
       <div class="lc-label">Ticket Médio</div>
@@ -784,10 +792,24 @@ function showToast(icon, title, msg) {
 
 // ── INIT ─────────────────────────────────────────────────────
 (function init() {
-  // Set today as default date
-  document.getElementById('inp-data').value = new Date().toISOString().slice(0, 10);
-  load();
-  setInterval(load, 120000); // refresh 2min
+  // Lançar dados: data padrão = hoje
+  document.getElementById('inp-data').value = df(new Date());
+
+  // Filtro de período: padrão = hoje
+  var hoje = df(new Date());
+  document.getElementById('filtro-de').value  = hoje;
+  document.getElementById('filtro-ate').value = hoje;
+
+  // Carrega dados e aplica filtro de hoje automaticamente
+  load().then(() => {
+    filtroAtivo = { de: hoje, ate: hoje };
+    renderFiltrado();
+    // Marca atalho "Hoje" como ativo
+    document.querySelectorAll('.pshort').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.pshort')[0]?.classList.add('active');
+  });
+
+  setInterval(load, 120000);
 })();
 </script>
 </body>
