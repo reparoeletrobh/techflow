@@ -595,12 +595,13 @@ function renderStrip(m) {
 
   // Quando há filtro: usa dados do período para ERP/Valor
   // Sem filtro: usa ao vivo do Pipefy
-  // ERP count: metaLog quando filtrado, ao vivo quando sem filtro
-  var erpCount  = filtroAtivo ? (m.erpCount  || 0) : e.count;
-  // Valor ERP: sempre ao vivo do Pipefy (Pipefy tem o dado em tempo real)
-  var erpValor  = e.valor;
-  // Ticket Médio: valor ao vivo / count ao vivo (mais preciso)
-  var ticketLive = e.count > 0 ? (e.valor / e.count).toFixed(2) : null;
+  // ERP count: metaLog do período (ou ao vivo sem filtro)
+  var erpCount  = filtroAtivo ? (m.erpCount || 0) : e.count;
+  // Valor ERP: metaLog do período (valor dos contratos que entraram em ERP no período)
+  // Sem filtro: ao vivo do Pipefy (todos os abertos agora)
+  var erpValor  = filtroAtivo ? (m.valorErp || 0) : e.valor;
+  // Ticket Médio: valorErp / erpCount do período
+  var ticketLive = erpCount > 0 ? (erpValor / erpCount).toFixed(2) : null;
   // Todos os 3 cards do topo sempre usam dados ao vivo do Pipefy
   var erpBadge  = '<div class="live-badge">AO VIVO</div>';
   var valBadge  = '<div class="live-badge">AO VIVO</div>';
@@ -609,7 +610,7 @@ function renderStrip(m) {
   var erpLabel  = filtroAtivo ? 'ERPs no Período' : 'ERPs em Aberto';
   var valLabel  = 'Valor Total ERP';
   var erpSub    = filtroAtivo ? 'entraram em ERP no período' : 'cards na fase ERP';
-  var valSub    = 'soma dos contratos (ao vivo)';
+  var valSub    = filtroAtivo ? 'soma dos contratos do período' : 'soma dos contratos ao vivo';
   var rowLabel  = '📡 ERP ao vivo — Pipefy';
 
   document.getElementById('live-strip').innerHTML =
@@ -649,7 +650,7 @@ function renderStrip(m) {
       '<div class="live-card purple">' +
         '<div class="lc-label">Ticket Médio</div>' +
         '<div class="lc-value purple">' + BRL(ticketLive) + '</div>' +
-        '<div class="lc-sub">valor ERP / ERPs (ao vivo)</div>' +
+        '<div class="lc-sub">valor ERP / ERPs no período</div>' +
       metaBar(ticketLive, METAS.ticketMedio) +
       '</div>' +
       '<div class="live-card" style="--c:var(--yellow);border-top:3px solid var(--yellow);">' +
