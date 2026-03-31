@@ -214,4 +214,12 @@ module.exports = async function handler(req, res) {
   } catch(e) {
     return res.status(200).json({ ok: false, error: "Erro interno: " + e.message });
   }
-};
+};    // Constrói array de dias enriquecido
+    // fichas/investimento/valorErp = lançamento manual (fonte: usuário)
+    // erpCount/coletasSolic/orcEnviado = SEMPRE metaLog Pipefy (fonte confiável)
+    const diasEnriq = db.dias.map(d => ({
+      ...d,
+      erpCount:     erpPorDia[d.data]    || 0,
+      coletasSolic: coletaPorDia[d.data] || 0,
+      orcEnviado:   orcPorDia[d.data]    || 0,
+    }));
