@@ -163,6 +163,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 <header>
   <div class="logo"><div class="logo-icon">🚗</div>Reparo<span>Eletro</span> — Lalamove</div>
   <button onclick="load()" style="font-family:var(--fm);font-size:10px;padding:5px 11px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">↻ Atualizar</button>
+  <button onclick="atualizarNomes()" style="font-family:var(--fm);font-size:10px;padding:5px 11px;border-radius:6px;border:1px solid rgba(34,197,94,.3);background:transparent;color:var(--green);cursor:pointer;" title="Busca nome do cliente no Pipefy para todas as fichas">👤 Corrigir Nomes</button>
 </header>
 
 <div class="tabs">
@@ -474,6 +475,16 @@ async function confirmarEnvio() {
 }
 
 // ── TOAST ──────────────────────────────────────────────────────
+async function atualizarNomes() {
+  showToast("👤", "Buscando nomes...", "Consultando Pipefy");
+  var r = await fetch("/api/lalamove?action=atualizar-nomes").then(r=>r.json()).catch(()=>({ok:false}));
+  if (r.ok) {
+    showToast("✅", r.updated + " nome(s) corrigido(s)", "de " + r.total + " ficha(s)");
+    await load();
+  } else {
+    showToast("❌", "Erro", r.error || "Falha ao buscar nomes");
+  }
+}
 function showToast(icon, title, msg) {
   document.getElementById("t-icon").textContent  = icon;
   document.getElementById("t-title").textContent = title;
