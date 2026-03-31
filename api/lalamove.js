@@ -788,5 +788,45 @@ module.exports = async function handler(req, res) {
     return res.status(200).json(resultado);
   }
 
+  // ── GET atualizar-nomes — busca nome correto do Pipefy para fichas existentes ──
+  if (action === "atualizar-nomes") {
+    const db = await dbGet(LALA_KEY) || { fichas: [] };
+    const pendentes = (db.fichas || []).filter(f => f.status === "pendente" && f.pipefyId);
+    if (!pendentes.length) return res.status(200).json({ ok: true, updated: 0 });
+
+    // Busca dados dos cards do Pipefy em batch
+    const aliases = pendentes.map((f, i) =>
+      `c${i}: card(id: "${f.pipefyId}") { id title fields { name value } }`
+    ).join("\n");
+
+    try {
+      const data = await pipefyQuery(`query { ${aliases} }`);
+      let updated = 0;
+      pendentes.forEach((f, i) => {
+        const card = data[`c${i}`];
+        if (!card) return;
+        const fields    = card.fields || [];
+        const nomeField = fields.find(fl => fl.name.toLowerCase().includes("nome"));
+        const telField  = fields.find(fl => fl.name.toLowerCase().includes("telefone") || fl.name.toLowerCase().includes("fone"));
+        const endField  = fields.find(fl => fl.name.toLowerCase().includes("endere"));
+
+        const nome = nomeField?.value?.trim() || null;
+        if (nome) {
+          const idx = db.fichas.findIndex(x => x.pipefyId === f.pipefyId);
+          if (idx >= 0) {
+            db.fichas[idx].nomeContato = nome;
+            if (telField?.value) db.fichas[idx].telefone = telField.value;
+            if (endField?.value && !db.fichas[idx].endereco) db.fichas[idx].endereco = endField.value;
+            updated++;
+          }
+        }
+      });
+      if (updated > 0) await dbSet(LALA_KEY, db);
+      return res.status(200).json({ ok: true, updated, total: pendentes.length });
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: e.message });
+    }
+  }
+
   return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 };
