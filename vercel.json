@@ -18,5 +18,15 @@
     { "source": "/metricas", "destination": "/metricas.html" },
     { "source": "/nf-setup",      "destination": "/nf-setup.html"      },
     { "source": "/((?!api/).*)", "destination": "/home.html"         }
+  ,
+    { "source": "/tv",                    "destination": "/tv-adm.html" },
+    { "source": "/tv/adm",                "destination": "/tv-adm.html" },
+    { "source": "/tv/tecnico",            "destination": "/tv-tecnico.html" },
+    { "source": "/tv/orcamento",          "destination": "/tv-orcamento.html" },
+    { "source": "/tv/financeiro",         "destination": "/tv-financeiro.html" },
+    { "source": "/tv/metricas",           "destination": "/tv-metricas.html" },
+    { "source": "/tv/coleta",             "destination": "/tv-coleta.html" },
+    { "source": "/tv/motorista",          "destination": "/tv-motorista.html" },
+    { "source": "/tv/aguardando-retirada","destination": "/tv-aguardando-retirada.html" }
   ]
 }
