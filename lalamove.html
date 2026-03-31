@@ -413,11 +413,24 @@ function enviarLalamove(tipo) {
   var stopsHtml = stops.map(function(s, si) {
     var dotClass = s.isLoja ? "loja" : "cliente";
     var dotLabel = s.isLoja ? "L" : si + (isColeta ? 1 : 0);
+    // Nome + telefone no padrão Lalamove
+    var nomeLala = s.isLoja
+      ? s.nomeContato
+      : (s.nomeContato || "Cliente") + (s.telefone ? " " + s.telefone : "");
+    // Extrai complemento do endereço
+    var comp = "";
+    if (!s.isLoja && s.endereco) {
+      var cm = s.endereco.match(/,?\s*[-–]?\s*((ap(to)?\.?\s*\d+[\w]*|apartamento\s*\d+[\w]*|bloco\s*[\w]+|sala\s*[\w]+|loja\s*[\w]+|andar\s*[\w]+))/i);
+      if (cm) comp = cm[1].trim();
+    }
     return "<div class='batch-stop'>" +
       "<div class='stop-dot " + dotClass + "'>" + dotLabel + "</div>" +
-      "<div class='stop-info'><div class='stop-nome'>" + (s.nomeContato || "Cliente") + "</div>" +
-      "<div class='stop-end'>" + (s.endereco || "Sem endereço") + "</div></div>" +
-      "</div>";
+      "<div class='stop-info'>" +
+        "<div class='stop-nome'>" + nomeLala + "</div>" +
+        "<div class='stop-end'>" + (s.endereco || "Sem endereço") + "</div>" +
+        (comp ? "<div style='font-family:var(--fm);font-size:9px;color:var(--accent);margin-top:2px'>📍 " + comp + "</div>" : "") +
+      "</div>" +
+    "</div>";
   }).join("");
 
   var container = document.getElementById("preview-batches");
