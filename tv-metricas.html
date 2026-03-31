@@ -595,26 +595,22 @@ function renderStrip(m) {
 
   // Quando há filtro: usa dados do período para ERP/Valor
   // Sem filtro: usa ao vivo do Pipefy
+  // ERP count: metaLog quando filtrado, ao vivo quando sem filtro
   var erpCount  = filtroAtivo ? (m.erpCount  || 0) : e.count;
-  // Valor ERP: se filtro = hoje, usa ao vivo (Pipefy). Se período histórico, usa lançado.
-  var hoje      = df(new Date());
-  var filtroEHoje = filtroAtivo && filtroAtivo.de === hoje && filtroAtivo.ate === hoje;
-  var erpValor  = !filtroAtivo ? e.valor : (filtroEHoje ? e.valor : (m.valorErp || 0));
-  var erpBadge  = filtroAtivo
-    ? '<div class="live-badge" style="background:rgba(34,197,94,.12);color:var(--green);border-color:rgba(34,197,94,.2);">PERÍODO</div>'
-    : '<div class="live-badge">AO VIVO</div>';
-  var valBadge  = filtroAtivo
-    ? '<div class="live-badge" style="background:rgba(59,158,255,.12);color:var(--blue);border-color:rgba(59,158,255,.2);">PERÍODO</div>'
-    : '<div class="live-badge">AO VIVO</div>';
-  var roasBadge = filtroAtivo
-    ? '<div class="live-badge" style="background:rgba(6,182,212,.12);color:var(--cyan);border-color:rgba(6,182,212,.2);">PERÍODO</div>'
-    : '<div class="live-badge" style="background:rgba(6,182,212,.12);color:var(--cyan);border-color:rgba(6,182,212,.2);">AO VIVO</div>';
+  // Valor ERP: sempre ao vivo do Pipefy (Pipefy tem o dado em tempo real)
+  var erpValor  = e.valor;
+  // Ticket Médio: valor ao vivo / count ao vivo (mais preciso)
+  var ticketLive = e.count > 0 ? (e.valor / e.count).toFixed(2) : null;
+  // Todos os 3 cards do topo sempre usam dados ao vivo do Pipefy
+  var erpBadge  = '<div class="live-badge">AO VIVO</div>';
+  var valBadge  = '<div class="live-badge">AO VIVO</div>';
+  var roasBadge = '<div class="live-badge" style="background:rgba(6,182,212,.12);color:var(--cyan);border-color:rgba(6,182,212,.2);">AO VIVO</div>';
   var roasVal = m.investimento > 0 ? (erpValor / m.investimento).toFixed(2) + 'x' : '—';
   var erpLabel  = filtroAtivo ? 'ERPs no Período' : 'ERPs em Aberto';
-  var valLabel  = filtroAtivo ? 'Valor ERP no Período' : 'Valor Total ERP';
+  var valLabel  = 'Valor Total ERP';
   var erpSub    = filtroAtivo ? 'entraram em ERP no período' : 'cards na fase ERP';
-  var valSub    = filtroAtivo ? 'soma dos contratos do período' : 'soma dos contratos';
-  var rowLabel  = filtroAtivo ? '📊 ERP do Período' : '📡 ERP ao vivo — Pipefy';
+  var valSub    = 'soma dos contratos (ao vivo)';
+  var rowLabel  = '📡 ERP ao vivo — Pipefy';
 
   document.getElementById('live-strip').innerHTML =
     '<div class="strip-row-label">' + rowLabel + '</div>' +
@@ -652,9 +648,9 @@ function renderStrip(m) {
       '</div>' +
       '<div class="live-card purple">' +
         '<div class="lc-label">Ticket Médio</div>' +
-        '<div class="lc-value purple">' + BRL(m.ticketMedio) + '</div>' +
-        '<div class="lc-sub">valor ERP / ERPs</div>' +
-      metaBar(m.ticketMedio, METAS.ticketMedio) +
+        '<div class="lc-value purple">' + BRL(ticketLive) + '</div>' +
+        '<div class="lc-sub">valor ERP / ERPs (ao vivo)</div>' +
+      metaBar(ticketLive, METAS.ticketMedio) +
       '</div>' +
       '<div class="live-card" style="--c:var(--yellow);border-top:3px solid var(--yellow);">' +
         '<div class="lc-label">Custo por Ficha</div>' +
