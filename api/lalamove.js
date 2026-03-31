@@ -193,18 +193,22 @@ function extractComplemento(endereco) {
 }
 
 // Encontra a ficha que melhor corresponde a um stop pelo par de coordenadas
-function matchFichaByCoords(fichas, coords) {
-  if (!coords) return fichas[0];
+// usedIds: Set de pipefyIds já usados para evitar duplicatas
+function matchFichaByCoords(fichas, coords, usedIds) {
+  const candidates = usedIds ? fichas.filter(f => !usedIds.has(f.pipefyId)) : fichas;
+  if (!candidates.length) return fichas[0]; // fallback
+  if (!coords) { const f = candidates[0]; if (usedIds) usedIds.add(f.pipefyId); return f; }
   const lat = parseFloat(coords.lat);
   const lng = parseFloat(coords.lng);
-  let best = fichas[0], bestDist = Infinity;
-  for (const f of fichas) {
+  let best = candidates[0], bestDist = Infinity;
+  for (const f of candidates) {
     const fLat = parseFloat(f.lat);
     const fLng = parseFloat(f.lng);
     if (isNaN(fLat) || isNaN(fLng)) continue;
     const dist = Math.pow(fLat - lat, 2) + Math.pow(fLng - lng, 2);
     if (dist < bestDist) { bestDist = dist; best = f; }
   }
+  if (usedIds) usedIds.add(best.pipefyId);
   return best;
 }
 
@@ -383,27 +387,18 @@ module.exports = async function handler(req, res) {
     let senderStopId, recipientStops;
     if (tipo === "coleta") {
       senderStopId   = lalaStops[lalaStops.length - 1]?.stopId;
+      { const _used = new Set();
       recipientStops = lalaStops.slice(0, -1).map((s) => {
-        // Encontra a ficha correta pela proximidade de coordenadas (após otimização de rota)
-        const f = matchFichaByCoords(pendentes, s.coordinates);
-        return {
-          stopId:  s.stopId,
-          name:    formatNomeLala(f?.nomeContato, f?.telefone),
-          phone:   formatTelIntl(f?.telefone),
-          remarks: extractComplemento(f?.endereco),
-        };
-      });
+        const f = matchFichaByCoords(pendentes, s.coordinates, _used);
+        return { stopId: s.stopId, name: formatNomeLala(f?.nomeContato, f?.telefone), phone: formatTelIntl(f?.telefone), remarks: extractComplemento(f?.endereco) };
+      }); }
     } else {
       senderStopId   = lalaStops[0]?.stopId;
+      { const _used = new Set();
       recipientStops = lalaStops.slice(1).map((s) => {
-        const f = matchFichaByCoords(pendentes, s.coordinates);
-        return {
-          stopId:  s.stopId,
-          name:    formatNomeLala(f?.nomeContato, f?.telefone),
-          phone:   formatTelIntl(f?.telefone),
-          remarks: extractComplemento(f?.endereco),
-        };
-      });
+        const f = matchFichaByCoords(pendentes, s.coordinates, _used);
+        return { stopId: s.stopId, name: formatNomeLala(f?.nomeContato, f?.telefone), phone: formatTelIntl(f?.telefone), remarks: extractComplemento(f?.endereco) };
+      }); }
     }
 
     const orderPath = "/v3/orders";
@@ -494,10 +489,10 @@ module.exports = async function handler(req, res) {
     let senderStopId, recipientStops;
     if (tipo === "coleta") {
       senderStopId   = lalaStops[lalaStops.length - 1]?.stopId;
-      recipientStops = lalaStops.slice(0, -1).map((s) => { const f = matchFichaByCoords(pendentes, s.coordinates); return { stopId: s.stopId, name: formatNomeLala(f?.nomeContato, f?.telefone), phone: formatTelIntl(f?.telefone), remarks: extractComplemento(f?.endereco) }; });
+      { const _u=new Set(); recipientStops = lalaStops.slice(0, -1).map((s) => { const f = matchFichaByCoords(pendentes, s.coordinates, _u); return { stopId: s.stopId, name: formatNomeLala(f?.nomeContato, f?.telefone), phone: formatTelIntl(f?.telefone), remarks: extractComplemento(f?.endereco) }; }); }
     } else {
       senderStopId   = lalaStops[0]?.stopId;
-      recipientStops = lalaStops.slice(1).map((s) => { const f = matchFichaByCoords(pendentes, s.coordinates); return { stopId: s.stopId, name: formatNomeLala(f?.nomeContato, f?.telefone), phone: formatTelIntl(f?.telefone), remarks: extractComplemento(f?.endereco) }; });
+      { const _u=new Set(); recipientStops = lalaStops.slice(1).map((s) => { const f = matchFichaByCoords(pendentes, s.coordinates, _u); return { stopId: s.stopId, name: formatNomeLala(f?.nomeContato, f?.telefone), phone: formatTelIntl(f?.telefone), remarks: extractComplemento(f?.endereco) }; }); }
     }
 
     const orderPath = "/v3/orders";
