@@ -475,9 +475,8 @@ function atalho7d()      { var s = new Date(); s.setDate(s.getDate()-6); setFilt
 function atalho30d()     { var s = new Date(); s.setDate(s.getDate()-29); setFiltro(df(s), hj()); markShortcut(4); }
 function hj()            { return df(new Date()); }
 function df(d) {
-  // Data no fuso de Brasília para os inputs de filtro
-  return d.toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'})
-    .split('/').reverse().join('-');
+  var y=d.getFullYear(), mo=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+  return y+'-'+mo+'-'+dd;
 }
 
 function setFiltro(de, ate) {
