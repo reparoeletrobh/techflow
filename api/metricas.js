@@ -94,16 +94,17 @@ function monthKey(ts) {
 
 // Calcula métricas agregadas para um conjunto de dias
 function calcMetricas(dias) {
-  let fichas = 0, investimento = 0, erpCount = 0, valorErp = 0, coletasSolic = 0;
+  let fichas = 0, investimento = 0, erpCount = 0, valorErp = 0, coletasSolic = 0, orcamentos = 0;
   for (const d of dias) {
     fichas        += d.fichas        || 0;
     investimento  += d.investimento  || 0;
     erpCount      += d.erpCount      || 0;
     valorErp      += d.valorErp      || 0;
     coletasSolic  += d.coletasSolic  || 0;
+    orcamentos    += d.orcamentos    || 0;
   }
   return {
-    fichas, investimento, erpCount, valorErp, coletasSolic,
+    fichas, investimento, erpCount, valorErp, coletasSolic, orcEnviado, orcamentos,
     cac:          erpCount   > 0 ? +(investimento / erpCount).toFixed(2)   : null,
     ticketMedio:  erpCount   > 0 ? +(valorErp     / erpCount).toFixed(2)   : null,
     custoPorFicha: fichas    > 0 ? +(investimento / fichas).toFixed(2)     : null,
@@ -144,10 +145,12 @@ module.exports = async function handler(req, res) {
     const metaLog    = logsData?.metaLog || [];
     const erpLog     = metaLog.filter(m => m.phaseId === "erp_entrada");
     const coletaLog  = metaLog.filter(m => m.phaseId === "coleta_solicitada");
+    const orcLog     = metaLog.filter(m => m.phaseId === "aguardando_aprovacao");
 
     // Agrupa por dia
     const erpPorDia    = {};
     const coletaPorDia = {};
+    const orcPorDia    = {};
     for (const e of erpLog) {
       const d = toDateStr(new Date(e.timestamp).getTime());
       erpPorDia[d] = (erpPorDia[d] || 0) + 1;
@@ -156,18 +159,24 @@ module.exports = async function handler(req, res) {
       const d = toDateStr(new Date(e.timestamp).getTime());
       coletaPorDia[d] = (coletaPorDia[d] || 0) + 1;
     }
+    for (const e of orcLog) {
+      const d = toDateStr(new Date(e.timestamp).getTime());
+      orcPorDia[d] = (orcPorDia[d] || 0) + 1;
+    }
 
     // Constrói array de dias enriquecido — prioriza valor manual, usa metaLog como fallback
     const diasEnriq = db.dias.map(d => ({
       ...d,
       erpCount:     d.erpCount     != null ? d.erpCount     : (erpPorDia[d.data]    || 0),
       coletasSolic: d.coletasSolic != null ? d.coletasSolic : (coletaPorDia[d.data] || 0),
+      orcEnviado:   d.orcEnviado   != null ? d.orcEnviado   : (orcPorDia[d.data]    || 0),
     }));
 
     // Adiciona dias que aparecem no metaLog mas não têm lançamento manual
     const diasSet = new Set(diasEnriq.map(d => d.data));
     const todosDias = { ...erpPorDia };
     for (const d of Object.keys(coletaPorDia)) todosDias[d] = todosDias[d] || 0;
+    for (const d of Object.keys(orcPorDia))    todosDias[d] = todosDias[d] || 0;
     for (const data of Object.keys(todosDias)) {
       if (!diasSet.has(data)) {
         diasEnriq.push({
@@ -177,6 +186,7 @@ module.exports = async function handler(req, res) {
           erpCount:     erpPorDia[data]    || 0,
           valorErp:     0,
           coletasSolic: coletaPorDia[data] || 0,
+          orcamentos:   orcPorDia[data]    || 0,
         });
       }
     }
