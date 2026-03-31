@@ -735,7 +735,7 @@ module.exports = async function handler(req, res) {
         prevWeekLabel: `${prevWeekDates[0]} – ${prevWeekDates[5]}`,
         today: {
           coletaSolicitada: { count: cnt("coleta_solicitada",    todayUTC), goal: 40 },
-          orcEnviado:       { count: cnt("aguardando_aprovacao", todayUTC), goal: 40 },
+          orcEnviado:       { count: cnt("aguardando_aprovacao", todayUTC), goal: 50 },
           aprovadoLoja:     { count: cnt("cliente_loja",         todayUTC), goal: 15 },
           aprovadoTotal:    { count: cnt("aprovado_entrada",     todayUTC), goal: 35 },
           erp:              { count: cnt("erp_entrada",          todayUTC), goal: 35 },
