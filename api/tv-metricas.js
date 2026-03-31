@@ -62,15 +62,19 @@ async function fetchErpCards() {
   } catch(e) { return []; }
 }
 
-function toDateStr(ts) { return new Date(ts).toISOString().slice(0, 10); }
+function toDateStr(ts) {
+  // BH = UTC-3 fixo (sem horario de verao desde 2019)
+  var d = new Date(ts - 3 * 60 * 60 * 1000);
+  return d.toISOString().slice(0, 10);
+}
 function weekStart(d) {
   const dt = new Date(d); const day = dt.getDay();
   dt.setDate(dt.getDate() - (day === 0 ? 6 : day - 1)); dt.setHours(0,0,0,0);
-  return toDateStr(dt.getTime());
+  return (new Date(dt.getTime() - 3*60*60*1000)).toISOString().slice(0,10);
 }
 function monthKey(ts) {
-  var d = new Date(ts).toLocaleDateString('pt-BR', {timeZone:'America/Sao_Paulo'}).split('/');
-  return d[2] + '-' + d[1]; // YYYY-MM
+  var d = new Date(ts - 3 * 60 * 60 * 1000);
+  return d.toISOString().slice(0, 7);
 }
 
 function calcMetricas(dias) {
