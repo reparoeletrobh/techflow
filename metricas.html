@@ -60,7 +60,11 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .pshort:hover,.pshort.active{border-color:var(--accent);color:var(--accent);background:rgba(249,115,22,.08);}
 
 /* LIVE STRIP */
-.live-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.live-strip{display:flex;flex-direction:column;gap:12px;}
+.strip-row{display:grid;gap:12px;}
+.strip-row.erp{grid-template-columns:1fr 1fr;}
+.strip-row.periodo{grid-template-columns:repeat(3,1fr);}
+.strip-row-label{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);padding:2px 0;}
 .live-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
   padding:18px 20px;position:relative;overflow:hidden;transition:border-color .2s;}
 .live-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
@@ -163,7 +167,8 @@ tr:hover td{background:rgba(255,255,255,.02);}
   .tabs-bar{padding:0 8px;overflow-x:auto;white-space:nowrap;}
   .tab-btn{padding:10px 14px;font-size:10px;flex-shrink:0;}
   .page{padding:14px 12px;gap:16px;}
-  .live-strip{grid-template-columns:1fr 1fr;}
+  .strip-row.erp{grid-template-columns:1fr 1fr;}
+  .strip-row.periodo{grid-template-columns:1fr;}
   .input-grid{grid-template-columns:1fr 1fr;grid-template-rows:auto auto auto;}
   .input-grid > *:last-child{grid-column:1/-1;}
   .btn-salvar{width:100%;}
@@ -504,29 +509,7 @@ function renderFiltrado() {
   document.getElementById('live-title').innerHTML = 'Período <span>// ' + label + '</span>';
   document.getElementById('live-sub').textContent = diasFiltrados.length + ' dia(s) com dados lançados';
 
-  var e = data.erpAtual;
-  document.getElementById('live-strip').innerHTML = `
-    <div class="live-card green">
-      <div class="live-badge">AO VIVO</div>
-      <div class="lc-label">ERPs em Aberto</div>
-      <div class="lc-value green">${e.count}</div>
-      <div class="lc-sub">${BRL(e.valor)} na fase ERP</div>
-    </div>
-    <div class="live-card blue">
-      <div class="lc-label">Fichas no Período</div>
-      <div class="lc-value blue">${NUM(m.fichas)}</div>
-      <div class="lc-sub">${BRL(m.investimento)} investido</div>
-    </div>
-    <div class="live-card orange">
-      <div class="lc-label">CAC do Período</div>
-      <div class="lc-value orange">${BRL(m.cac)}</div>
-      <div class="lc-sub">${NUM(m.erpCount)} ERPs lançados</div>
-    </div>
-    <div class="live-card purple">
-      <div class="lc-label">Ticket Médio</div>
-      <div class="lc-value purple">${BRL(m.ticketMedio)}</div>
-      <div class="lc-sub">valor ERP / ERPs</div>
-    </div>`;
+  renderStrip(m);
 
   // Gráficos filtrados
   var semanasFiltradas = agruparSemanas(diasFiltrados);
@@ -562,40 +545,55 @@ function agruparSemanas(dias) {
     .map(([semana, ds]) => ({ semana, ...calcMetricasJS(ds) }));
 }
 
-function renderLiveStrip() {
+function renderStrip(m) {
+  // m = métricas do período (ou resumo geral se sem filtro)
   var e = data.erpAtual;
-  if (filtroAtivo) { renderFiltrado(); return; }
+  var periodoLabel = filtroAtivo ? 'Período' : 'Acumulado';
 
-  document.getElementById('live-title').innerHTML = 'ERP ao Vivo <span>// Pipefy</span>';
-  document.getElementById('live-sub').textContent = 'Dados em tempo real da fase ERP';
-
-  document.getElementById('live-strip').innerHTML = `
-    <div class="live-card green">
-      <div class="live-badge">AO VIVO</div>
-      <div class="lc-label">ERPs em Aberto</div>
-      <div class="lc-value green">${e.count}</div>
-      <div class="lc-sub">cards na fase ERP</div>
-    </div>
-    <div class="live-card blue">
-      <div class="live-badge">AO VIVO</div>
-      <div class="lc-label">Valor Total ERP</div>
-      <div class="lc-value blue">${BRL(e.valor)}</div>
-      <div class="lc-sub">soma dos contratos</div>
-    </div>
-    <div class="live-card orange">
-      <div class="lc-label">CAC Acumulado</div>
-      <div class="lc-value orange">${BRL(data.resumo?.cac)}</div>
-      <div class="lc-sub">investimento / ERPs</div>
-    </div>
-    <div class="live-card purple">
-      <div class="lc-label">Ticket Médio</div>
-      <div class="lc-value purple">${BRL(data.resumo?.ticketMedio)}</div>
-      <div class="lc-sub">valor ERP / ERPs</div>
-    </div>`;
+  document.getElementById('live-strip').innerHTML =
+    // LINHA 1 — ERP ao vivo (sempre fixo)
+    '<div class="strip-row-label">📡 ERP ao vivo — Pipefy</div>' +
+    '<div class="strip-row erp">' +
+      '<div class="live-card green">' +
+        '<div class="live-badge">AO VIVO</div>' +
+        '<div class="lc-label">ERPs em Aberto</div>' +
+        '<div class="lc-value green">' + e.count + '</div>' +
+        '<div class="lc-sub">cards na fase ERP</div>' +
+      '</div>' +
+      '<div class="live-card blue">' +
+        '<div class="live-badge">AO VIVO</div>' +
+        '<div class="lc-label">Valor Total ERP</div>' +
+        '<div class="lc-value blue">' + BRL(e.valor) + '</div>' +
+        '<div class="lc-sub">soma dos contratos</div>' +
+      '</div>' +
+    '</div>' +
+    // LINHA 2 — Métricas do período
+    '<div class="strip-row-label">📊 Métricas do ' + periodoLabel + '</div>' +
+    '<div class="strip-row periodo">' +
+      '<div class="live-card orange">' +
+        '<div class="lc-label">CAC ' + periodoLabel + '</div>' +
+        '<div class="lc-value orange">' + BRL(m.cac) + '</div>' +
+        '<div class="lc-sub">investimento / ERPs (' + NUM(m.erpCount) + ')</div>' +
+      '</div>' +
+      '<div class="live-card purple">' +
+        '<div class="lc-label">Ticket Médio</div>' +
+        '<div class="lc-value purple">' + BRL(m.ticketMedio) + '</div>' +
+        '<div class="lc-sub">valor ERP / ERPs</div>' +
+      '</div>' +
+      '<div class="live-card" style="--c:var(--yellow);border-top:3px solid var(--yellow);">' +
+        '<div class="lc-label">Custo por Ficha</div>' +
+        '<div class="lc-value" style="color:var(--yellow)">' + BRL(m.custoPorFicha) + '</div>' +
+        '<div class="lc-sub">investimento / fichas (' + NUM(m.fichas) + ')</div>' +
+      '</div>' +
+    '</div>';
 
   // Atualiza ERP na aba lançar
   document.getElementById('erp-live-count').textContent = e.count + ' ERPs';
   document.getElementById('erp-live-valor').textContent = BRL(e.valor);
+}
+
+function renderLiveStrip() {
+  renderStrip(data.resumo || {});
 }
 
 function renderCharts() {
