@@ -140,26 +140,47 @@ module.exports = async function handler(req, res) {
       cards:  erpCards,
     };
 
-    // metaLog para distribuição temporal dos ERPs
-    const metaLog = logsData?.metaLog || [];
-    const erpLog  = metaLog.filter(m => m.phaseId === "erp_entrada");
+    // metaLog para distribuição temporal dos ERPs e Coletas
+    const metaLog    = logsData?.metaLog || [];
+    const erpLog     = metaLog.filter(m => m.phaseId === "erp_entrada");
+    const coletaLog  = metaLog.filter(m => m.phaseId === "coleta_solicitada");
 
-    // Enriquece dias com erpCount/valorErp do metaLog (melhor estimativa por dia)
-    // O dia "hoje" usa o dado ao vivo do Pipefy para erpCount
-    const hoje = toDateStr(Date.now());
-
-    // Agrupa erpLog por dia
-    const erpPorDia = {};
+    // Agrupa por dia
+    const erpPorDia    = {};
+    const coletaPorDia = {};
     for (const e of erpLog) {
       const d = toDateStr(new Date(e.timestamp).getTime());
       erpPorDia[d] = (erpPorDia[d] || 0) + 1;
     }
+    for (const e of coletaLog) {
+      const d = toDateStr(new Date(e.timestamp).getTime());
+      coletaPorDia[d] = (coletaPorDia[d] || 0) + 1;
+    }
 
-    // Constrói array de dias enriquecido
+    // Constrói array de dias enriquecido — prioriza valor manual, usa metaLog como fallback
     const diasEnriq = db.dias.map(d => ({
       ...d,
-      erpCount: d.erpCount != null ? d.erpCount : (erpPorDia[d.data] || 0),
+      erpCount:     d.erpCount     != null ? d.erpCount     : (erpPorDia[d.data]    || 0),
+      coletasSolic: d.coletasSolic != null ? d.coletasSolic : (coletaPorDia[d.data] || 0),
     }));
+
+    // Adiciona dias que aparecem no metaLog mas não têm lançamento manual
+    const diasSet = new Set(diasEnriq.map(d => d.data));
+    const todosDias = { ...erpPorDia };
+    for (const d of Object.keys(coletaPorDia)) todosDias[d] = todosDias[d] || 0;
+    for (const data of Object.keys(todosDias)) {
+      if (!diasSet.has(data)) {
+        diasEnriq.push({
+          data,
+          fichas:       0,
+          investimento: 0,
+          erpCount:     erpPorDia[data]    || 0,
+          valorErp:     0,
+          coletasSolic: coletaPorDia[data] || 0,
+        });
+      }
+    }
+    diasEnriq.sort((a, b) => a.data.localeCompare(b.data));
 
     // --- RELATÓRIO DIÁRIO (últimos 30 dias) ---
     const hoje30 = Date.now() - 30*24*60*60*1000;
