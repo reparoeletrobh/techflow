@@ -42,6 +42,23 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .page{display:none;flex-direction:column;padding:24px;gap:24px;}
 .page.active{display:flex;}
 
+/* FILTRO PERÍODO */
+.periodo-bar{display:flex;align-items:center;gap:12px;padding:16px 0 4px;flex-wrap:wrap;}
+.periodo-label{font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;flex-shrink:0;}
+.periodo-input{background:var(--surface2);border:1px solid var(--border);border-radius:7px;
+  padding:7px 12px;font-family:var(--fm);font-size:12px;color:var(--text);outline:none;
+  transition:border .15s;color-scheme:dark;}
+.periodo-input:focus{border-color:var(--accent);}
+.btn-periodo{background:var(--accent);border:none;border-radius:7px;padding:7px 16px;
+  font-family:var(--fm);font-size:11px;font-weight:600;color:#000;cursor:pointer;transition:all .15s;}
+.btn-periodo:hover{filter:brightness(1.1);}
+.btn-periodo.secondary{background:var(--surface2);color:var(--muted);border:1px solid var(--border);}
+.btn-periodo.secondary:hover{color:var(--text);border-color:var(--accent);}
+.periodo-shortcuts{display:flex;gap:6px;flex-wrap:wrap;}
+.pshort{font-family:var(--fm);font-size:9px;padding:4px 10px;border-radius:20px;border:1px solid var(--border);
+  background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
+.pshort:hover,.pshort.active{border-color:var(--accent);color:var(--accent);background:rgba(249,115,22,.08);}
+
 /* LIVE STRIP */
 .live-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
 .live-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
@@ -93,11 +110,13 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .chart-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 24px;}
 .chart-title{font-family:var(--fh);font-size:13px;font-weight:800;margin-bottom:16px;}
 .chart-title span{color:var(--cyan);}
-.bars-area{display:flex;align-items:flex-end;gap:6px;height:140px;overflow-x:auto;padding-bottom:24px;position:relative;}
+.bars-area{display:flex;align-items:flex-end;gap:6px;height:160px;overflow-x:auto;padding-bottom:80px;position:relative;}
 .bar-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;min-width:36px;}
 .bar{width:28px;border-radius:5px 5px 0 0;transition:height .4s cubic-bezier(.34,1.56,.64,1);cursor:pointer;position:relative;}
 .bar:hover{filter:brightness(1.2);}
-.bar-label{font-family:var(--fm);font-size:8px;color:var(--muted);white-space:nowrap;transform:rotate(-35deg);transform-origin:top left;margin-top:6px;}
+.bar-label{font-family:var(--fm);font-size:8px;color:var(--muted);white-space:nowrap;
+  writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);
+  margin-top:6px;max-height:60px;overflow:hidden;text-overflow:ellipsis;}
 .bar-val{font-family:var(--fm);font-size:8px;color:var(--muted);position:absolute;top:-16px;width:100%;text-align:center;white-space:nowrap;}
 
 /* TABLE */
@@ -180,12 +199,31 @@ tr:hover td{background:rgba(255,255,255,.02);}
 
 <!-- VISÃO GERAL -->
 <div class="page active" id="page-geral">
-  <!-- Live ERP -->
+  <!-- Filtro de período -->
+  <div>
+    <div class="periodo-bar">
+      <span class="periodo-label">Período:</span>
+      <input class="periodo-input" type="date" id="filtro-de" title="De">
+      <span style="color:var(--muted);font-family:var(--fm);font-size:11px;">até</span>
+      <input class="periodo-input" type="date" id="filtro-ate" title="Até">
+      <button class="btn-periodo" onclick="aplicarFiltro()">🔍 Aplicar</button>
+      <button class="btn-periodo secondary" onclick="limparFiltro()">✕ Limpar</button>
+      <div class="periodo-shortcuts">
+        <button class="pshort" onclick="atalhoHoje()">Hoje</button>
+        <button class="pshort" onclick="atalhoSemana()">Esta semana</button>
+        <button class="pshort" onclick="atalhoMes()">Este mês</button>
+        <button class="pshort" onclick="atalho7d()">7 dias</button>
+        <button class="pshort" onclick="atalho30d()">30 dias</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live ERP + métricas do período -->
   <div>
     <div class="sec-header">
       <div>
-        <div class="sec-title">ERP ao Vivo <span>// Pipefy</span></div>
-        <div class="sec-sub">Dados em tempo real da fase ERP</div>
+        <div class="sec-title" id="live-title">ERP ao Vivo <span>// Pipefy</span></div>
+        <div class="sec-sub" id="live-sub">Dados em tempo real da fase ERP</div>
       </div>
     </div>
     <div class="live-strip" id="live-strip" style="margin-top:12px;">
@@ -343,9 +381,12 @@ var NUM = v => v == null ? '—' : Number(v).toLocaleString('pt-BR');
 var PCT = v => v == null ? '—' : (v > 0 ? '+' : '') + v.toFixed(1) + '%';
 var fmtSemana = s => {
   if (!s) return '—';
-  var d = new Date(s + 'T12:00:00');
+  var parts = s.split('-');
+  if (parts.length < 3) return s;
+  var d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
   var fim = new Date(d); fim.setDate(d.getDate() + 6);
-  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) + '–' + fim.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+  var p = x => String(x.getDate()).padStart(2,'0') + '/' + String(x.getMonth()+1).padStart(2,'0');
+  return p(d) + '–' + p(fim);
 };
 var fmtMes = m => {
   if (!m) return '—';
@@ -355,8 +396,8 @@ var fmtMes = m => {
 };
 var fmtData = d => {
   if (!d) return '—';
-  var [y,m,dd] = d.split('-');
-  return dd+'/'+m+'/'+y;
+  var p = d.split('-');
+  return (p[2]||'')+'/'+(p[1]||'')+'/'+(p[0]||'');
 };
 
 // ── TABS ─────────────────────────────────────────────────────
@@ -404,8 +445,122 @@ function metricaRow(m, labelPrimeiro) {
     <td class="td-roi ${roiClass}">${PCT(m.roi)}</td>`;
 }
 
+// Filtro de período
+var filtroAtivo = null; // { de, ate } ou null
+
+function atalhoHoje()    { var h = hj(); setFiltro(h, h); }
+function atalhoSemana()  { var h = new Date(); var d = h.getDay(); var s = new Date(h); s.setDate(h.getDate()-(d===0?6:d-1)); setFiltro(df(s), hj()); }
+function atalhoMes()     { var h = new Date(); setFiltro(h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-01', hj()); }
+function atalho7d()      { var s = new Date(); s.setDate(s.getDate()-6); setFiltro(df(s), hj()); }
+function atalho30d()     { var s = new Date(); s.setDate(s.getDate()-29); setFiltro(df(s), hj()); }
+function hj()            { return df(new Date()); }
+function df(d)           { return d.toISOString().slice(0,10); }
+
+function setFiltro(de, ate) {
+  document.getElementById('filtro-de').value  = de;
+  document.getElementById('filtro-ate').value = ate;
+  aplicarFiltro();
+}
+
+function aplicarFiltro() {
+  var de  = document.getElementById('filtro-de').value;
+  var ate = document.getElementById('filtro-ate').value;
+  if (!de && !ate) { limparFiltro(); return; }
+  filtroAtivo = { de, ate };
+  renderFiltrado();
+}
+
+function limparFiltro() {
+  document.getElementById('filtro-de').value  = '';
+  document.getElementById('filtro-ate').value = '';
+  filtroAtivo = null;
+  renderLiveStrip();
+  renderCharts();
+}
+
+function renderFiltrado() {
+  if (!data || !filtroAtivo) return;
+  var { de, ate } = filtroAtivo;
+
+  // Filtra dias no período
+  var diasFiltrados = (data.diario || []).filter(d => {
+    if (de  && d.data < de)  return false;
+    if (ate && d.data > ate) return false;
+    return true;
+  });
+
+  // Calcula métricas do período
+  var m = calcMetricasJS(diasFiltrados);
+
+  // Atualiza título
+  var fmtD = d => { var p=d.split('-'); return (p[2]||'')+'/'+(p[1]||''); };
+  var label = (de && ate) ? fmtD(de)+' – '+fmtD(ate) : (de ? 'A partir de '+fmtD(de) : 'Até '+fmtD(ate));
+  document.getElementById('live-title').innerHTML = 'Período <span>// ' + label + '</span>';
+  document.getElementById('live-sub').textContent = diasFiltrados.length + ' dia(s) com dados lançados';
+
+  document.getElementById('live-strip').innerHTML = `
+    <div class="live-card green">
+      <div class="lc-label">Fichas no Período</div>
+      <div class="lc-value green">${NUM(m.fichas)}</div>
+      <div class="lc-sub">fichas recebidas</div>
+    </div>
+    <div class="live-card blue">
+      <div class="lc-label">Investimento</div>
+      <div class="lc-value blue">${BRL(m.investimento)}</div>
+      <div class="lc-sub">tráfego pago</div>
+    </div>
+    <div class="live-card orange">
+      <div class="lc-label">CAC do Período</div>
+      <div class="lc-value orange">${BRL(m.cac)}</div>
+      <div class="lc-sub">${NUM(m.erpCount)} ERPs · investimento/ERP</div>
+    </div>
+    <div class="live-card purple">
+      <div class="lc-label">Ticket Médio</div>
+      <div class="lc-value purple">${BRL(m.ticketMedio)}</div>
+      <div class="lc-sub">valor ERP / ERPs</div>
+    </div>`;
+
+  // Gráficos filtrados
+  var semanasFiltradas = agruparSemanas(diasFiltrados);
+  renderBarChart('chart-cac',    semanasFiltradas, s => s.cac,        fmtSemana, '#f97316', BRL);
+  renderBarChart('chart-ticket', semanasFiltradas, s => s.ticketMedio, fmtSemana, '#a855f7', BRL);
+}
+
+function calcMetricasJS(dias) {
+  var fichas=0, invest=0, erp=0, valorErp=0;
+  dias.forEach(d => { fichas+=d.fichas||0; invest+=d.investimento||0; erp+=d.erpCount||0; valorErp+=d.valorErp||0; });
+  return {
+    fichas, investimento: invest, erpCount: erp, valorErp,
+    cac:           erp   > 0 ? +(invest/erp).toFixed(2)    : null,
+    ticketMedio:   erp   > 0 ? +(valorErp/erp).toFixed(2)  : null,
+    custoPorFicha: fichas> 0 ? +(invest/fichas).toFixed(2) : null,
+    roi: invest>0 ? +((valorErp-invest)/invest*100).toFixed(1) : null,
+  };
+}
+
+function agruparSemanas(dias) {
+  var semanas = {};
+  dias.forEach(d => {
+    var parts = d.data.split('-');
+    var dt = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+    var day = dt.getDay();
+    dt.setDate(dt.getDate() - (day===0?6:day-1));
+    var sk = df(dt);
+    if (!semanas[sk]) semanas[sk] = [];
+    semanas[sk].push(d);
+  });
+  return Object.entries(semanas)
+    .sort(([a],[b]) => a.localeCompare(b))
+    .map(([semana, ds]) => ({ semana, ...calcMetricasJS(ds) }));
+}
+
 function renderLiveStrip() {
   var e = data.erpAtual;
+  if (filtroAtivo) { renderFiltrado(); return; }
+
+  document.getElementById('live-title').innerHTML = 'ERP ao Vivo <span>// Pipefy</span>';
+  document.getElementById('live-sub').textContent = 'Dados em tempo real da fase ERP';
+
   document.getElementById('live-strip').innerHTML = `
     <div class="live-card green">
       <div class="live-badge">AO VIVO</div>
@@ -436,6 +591,7 @@ function renderLiveStrip() {
 }
 
 function renderCharts() {
+  if (filtroAtivo) return; // handled by renderFiltrado
   var semanas = data.semanal || [];
   renderBarChart('chart-cac', semanas, s => s.cac, fmtSemana, '#f97316', BRL);
   renderBarChart('chart-ticket', semanas, s => s.ticketMedio, fmtSemana, '#a855f7', BRL);
