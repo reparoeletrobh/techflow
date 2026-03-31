@@ -208,7 +208,7 @@ module.exports = async function handler(req, res) {
     // --- RELATÓRIO SEMANAL (últimas 12 semanas) ---
     const semanas = {};
     for (const d of diasEnriq) {
-      const [_y,_m,_d] = (d.data||"").split("-").map(Number); const sk = weekStart(new Date(_y,_m-1,_d).toISOString().slice(0,10));
+      const sk = weekStart(d.data || "");
       if (!semanas[sk]) semanas[sk] = [];
       semanas[sk].push(d);
     }
@@ -220,7 +220,7 @@ module.exports = async function handler(req, res) {
     // --- RELATÓRIO MENSAL ---
     const meses = {};
     for (const d of diasEnriq) {
-      const mk = monthKey(d.data + "T12:00:00");
+      const mk = d.data ? d.data.slice(0,7) : ""; // YYYY-MM
       if (!meses[mk]) meses[mk] = [];
       meses[mk].push(d);
     }
