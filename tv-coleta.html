@@ -7,16 +7,16 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#07080a;--surface:#0f1114;--surface2:#181b1f;--border:#1e2228;
-  --text:#f0f2f5;--muted:#5a6270;--dim:#2a2f38;
-  --accent:#f97316;--green:#22c55e;--red:#ef4444;--blue:#3b9eff;--yellow:#f5c800;
+  --bg:#03060e;--surface:#080d18;--surface2:#0d1425;--border:#1a2540;--border2:#243050;
+  --text:#dce8f8;--muted:#4a607a;--dim:#060c18;
+  --accent:#3b9eff;--green:#10d982;--red:#f04060;--yellow:#f5c800;--cyan:#06d6d6;
   --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;}
 
 header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;
-  border-bottom:2px solid var(--accent);background:var(--bg);position:sticky;top:0;z-index:100;}
+  border-bottom:1px solid var(--border);box-shadow:0 1px 0 rgba(59,158,255,.1),0 4px 30px rgba(0,0,0,.7);background:var(--bg);position:sticky;top:0;z-index:100;}
 .logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
 .logo-icon{width:26px;height:26px;background:var(--accent);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;}
 .logo span{color:var(--accent);}
@@ -26,7 +26,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .hbtn.primary{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700;}
 .hbtn.green{background:var(--green);color:#000;border-color:var(--green);font-weight:700;}
 
-.tabs-bar{display:flex;border-bottom:1px solid var(--border);padding:0 24px;background:var(--bg);position:sticky;top:52px;z-index:90;}
+.tabs-bar{display:flex;border-bottom:1px solid var(--border);padding:0 24px;background:var(--bg);position:sticky;top:56px;z-index:90;}
 .tab-btn{font-family:var(--fm);font-size:11px;font-weight:600;padding:12px 20px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;}
 .tab-btn:hover{color:var(--text);}
 .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
