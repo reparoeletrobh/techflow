@@ -174,17 +174,9 @@ module.exports = async function handler(req, res) {
       if (req.query.debug === "1") {
         return res.status(200).json({ ok: true, debug: true, cards_found: cards.length, card_ids: cards.map(c => c.pipefyId), maxIdSeen: db.maxIdSeen });
       }
-      // Primeira vez: guarda o maior ID atual como referência — não importa nada
+      // Marca como inicializado (sem pular cards)
       if (!db.initialized) {
-        const maxId = cards.reduce((max, c) => Math.max(max, parseInt(c.pipefyId)||0), 0);
-        db.maxIdSeen  = maxId;
         db.initialized = true;
-        // Também marca todos como vistos para não importar se alguém chamar orc-forcar
-        cards.forEach(card => {
-          if (!db.syncedIds.includes(card.pipefyId)) db.syncedIds.push(card.pipefyId);
-        });
-        await dbSet(ORC_KEY, db);
-        return res.status(200).json({ ok: true, newCount: 0, initialized: true, maxIdSeen: maxId, pipefyError: null });
       }
       // Remove do syncedIds cards que saíram da fase (permite reimportar se voltarem)
       const idsNaFase = new Set(cards.map(card => card.pipefyId));
