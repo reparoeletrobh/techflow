@@ -144,6 +144,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   <div class="logo">📺 TV <span>Assistência</span> — Orçamento</div>
   <div class="hdr-right">
     <button class="hbtn" onclick="loadAll()">↻ Atualizar</button>
+    <button class="hbtn" id="sync-btn" onclick="syncFichas()" style="border-color:rgba(59,158,255,.4);color:#3b9eff;">⟳ Sync Pipefy</button>
     <a class="hbtn" href="/tv/tecnico">Técnico</a>
     <a class="hbtn" href="/tv">Home</a>
   </div>
@@ -492,6 +493,25 @@ function showToast(icon,title,msg) {
 }
 
 // ── INIT ─────────────────────────────────────────────────────
+async function syncFichas() {
+  var btn = document.getElementById('sync-btn');
+  btn.textContent = '⏳ Sincronizando...';
+  btn.disabled = true;
+  try {
+    var r = await fetch('/api/tv-orcamento?action=orc-sync').then(function(r){return r.json();});
+    if (r.ok) {
+      showToast('✅', r.newCount > 0 ? r.newCount + ' ficha(s) nova(s)!' : 'Nenhuma ficha nova', 'Sync concluído');
+      if (r.newCount > 0) loadAll();
+    } else {
+      showToast('❌', 'Erro no sync', r.error || '');
+    }
+  } catch(e) {
+    showToast('❌', 'Erro', e.message);
+  }
+  btn.textContent = '⟳ Sync Pipefy';
+  btn.disabled = false;
+}
+
 function loadAll() {
   // Pre-load badges
   fetch('/api/tv-orcamento?action=orc-load').then(function(r){return r.json();}).then(function(d){
