@@ -193,22 +193,41 @@ module.exports = async function handler(req, res) {
 
         // Função auxiliar para gerar texto de orçamento para 1 equipamento
         function gerarFicha(descEquip, comentariosEquip, sufixoId) {
-          // TV: detecta polegadas e peça para gerar orçamento com tabela de precos TV
+          // TV: detecta polegadas inline para evitar problemas de escopo
           let textoOrc = "", precoSugerido = null;
           try {
-            const pol   = detectarPolegadas(descEquip, comentariosEquip);
-            const peca  = detectarPecaTV(comentariosEquip) || "conjunto eletronico";
-            const preco = pol ? getPrecoPorPolegadas(pol) : null;
-            const primeiro = primeiroNome(card.nome) || "cliente";
-            const saud = "Ola, " + primeiro + " bom dia, aqui e o Pedro da TV Assistencia.";
-            const diag = "\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da " + peca + ". As pecas serao trocadas tambem e sera feito a reoperacao eletrica.";
-            const valor = preco
-              ? " Este conserto completo fica em " + preco + " reais apenas. Aprovando ja iniciamos o servico."
-              : " Este conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o servico.";
-            textoOrc = saud + diag + valor;
-            if (preco) precoSugerido = preco.replace(".","").replace(",",".");
+            // Detectar polegadas inline
+            var _texto = (descEquip || "") + " " + (comentariosEquip || []).join(" ");
+            var _mPol = _texto.match(/(\d{2})\s*(?:pol(?:egadas?)?|\"|'')/i);
+            var _pol = null;
+            if (_mPol) { _pol = parseInt(_mPol[1]); }
+            else {
+              var _nums = _texto.match(/\b([3-7]\d)\b/g);
+              if (_nums) { for (var _n of _nums) { var _v=parseInt(_n); if(_v>=30&&_v<=79){_pol=_v;break;} } }
+            }
+            // Detectar peca inline
+            var _tl = _texto.toLowerCase();
+            var _peca = "conjunto eletronico";
+            if (_tl.includes("barramento")) _peca = "barramento";
+            else if (_tl.includes("placa t-con")||_tl.includes("t-com")||_tl.includes("tcon")) _peca = "placa T-CON";
+            else if (_tl.includes("placa main")||_tl.includes("placa principal")) _peca = "placa principal";
+            else if (_tl.includes("placa")) _peca = "placa";
+            else if (_tl.includes("flat")) _peca = "flat cable";
+            else if (_tl.includes("mem")) _peca = "memoria";
+            else if (_tl.includes("solda")) _peca = "solda";
+            else if (_tl.includes("fonte")) _peca = "fonte";
+            else if (_tl.includes("backlight")||_tl.includes("led")) _peca = "backlight LED";
+            // Tabela de precos
+            var _preco = null;
+            if (_pol) {
+              var _tb = [{min:30,max:39,p:"490,00"},{min:40,max:49,p:"690,00"},{min:50,max:59,p:"890,00"},{min:60,max:69,p:"1.490,00"},{min:70,max:79,p:"1.990,00"}];
+              for (var _f of _tb) { if (_pol>=_f.min&&_pol<=_f.max){_preco=_f.p;break;} }
+            }
+            var _primeiro = (card.nome||"").split(" ")[0] || "cliente";
+            textoOrc = "Ola, " + _primeiro + " bom dia, aqui e o Pedro da TV Assistencia.\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da " + _peca + ". As pecas serao trocadas tambem e sera feito a reoperacao eletrica. Este conserto completo fica em " + (_preco || "[VALOR]") + " reais apenas. Aprovando ja iniciamos o servico.";
+            if (_preco) precoSugerido = _preco.replace(".","").replace(",",".");
           } catch(e) {
-            textoOrc = templatePadrao(descEquip, card.nome);
+            textoOrc = "Ola, " + ((card.nome||"").split(" ")[0]||"cliente") + " bom dia, aqui e o Pedro da TV Assistencia.\n\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o servico.";
           }
           return {
             id:          card.pipefyId + (sufixoId || ""),
