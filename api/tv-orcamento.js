@@ -201,26 +201,22 @@ module.exports = async function handler(req, res) {
 
         // Função auxiliar para gerar texto de orçamento para 1 equipamento
         function gerarFicha(descEquip, comentariosEquip, sufixoId) {
+          // TV: detecta polegadas e peça para gerar orçamento com tabela de precos TV
           let textoOrc = "", precoSugerido = null;
           try {
-            let regra = detectarRegra(descEquip, comentariosEquip);
-            if (regra) {
-              let precoRegra = parseFloat(regra.preco || "0");
-              const equipImp = detectarEquipamento(descEquip, "");
-              if (isGrande(descEquip, "") && (equipImp === "forno" || equipImp === "adega") && precoRegra > 0) {
-                precoRegra += 300;
-                regra = Object.assign({}, regra, { preco: String(precoRegra) });
-              }
-              let texto = substituirNome(regra.texto, card.nome);
-              precoSugerido = regra.preco || null;
-              if (precoSugerido) texto = texto.replace("[VALOR]", precoSugerido + " reais");
-              textoOrc = texto;
-            } else {
-              const tp = templatePadrao(descEquip, card.nome);
-              textoOrc = typeof tp === "object" ? (tp.texto || "") : String(tp || "");
-            }
+            const pol   = detectarPolegadas(descEquip, comentariosEquip);
+            const peca  = detectarPecaTV(comentariosEquip) || "conjunto eletronico";
+            const preco = pol ? getPrecoPorPolegadas(pol) : null;
+            const primeiro = primeiroNome(card.nome) || "cliente";
+            const saud = "Ola, " + primeiro + " bom dia, aqui e o Pedro da TV Assistencia.";
+            const diag = "\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da " + peca + ". As pecas serao trocadas tambem e sera feito a reoperacao eletrica.";
+            const valor = preco
+              ? " Este conserto completo fica em " + preco + " reais apenas. Aprovando ja iniciamos o servico."
+              : " Este conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o servico.";
+            textoOrc = saud + diag + valor;
+            if (preco) precoSugerido = preco.replace(".","").replace(",",".");
           } catch(e) {
-            textoOrc = "Ola, bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.";
+            textoOrc = templatePadrao(descEquip, card.nome);
           }
           return {
             id:          card.pipefyId + (sufixoId || ""),
@@ -605,7 +601,7 @@ module.exports = async function handler(req, res) {
   // ── GET ultima-chamada — espelho da fase Ultima Chamada do Pipefy
   if (action === "ultima-chamada") {
     try {
-      const phaseId = "338413470"; // Ultima Chamada
+      const phaseId = "341638208"; // TV: Ultima Chamada
       const data = await pipefyQuery(`query {
         phase(id: "${phaseId}") {
           cards(first: 50) {
@@ -734,7 +730,8 @@ async function fetchCardData(pipefyId) {
 }
 
 // Busca cards em Aguardando Aprovação direto pelo ID da fase (mais rápido e completo)
-const AGUARDANDO_APROVACAO_PHASE_ID = "334875152";
+const AGUARDANDO_APROVACAO_PHASE_ID = "341638194"; // TV: Aguardando Aprovacao (Enviados)
+const AGUARDANDO_ORCAMENTO_PHASE_ID  = "341638197"; // TV: Aguardando Orcamento (pendentes/novos)
 
 // Busca ID de uma fase pelo nome
 async function getPhaseIdByName(name) {
@@ -778,7 +775,7 @@ async function fetchAguardandoAprovacao() {
   while (hasNext) {
     const after = cursor ? `, after: "${cursor}"` : "";
     const data = await pipefyQuery(`query {
-      phase(id: "${AGUARDANDO_APROVACAO_PHASE_ID}") {
+      phase(id: "${AGUARDANDO_ORCAMENTO_PHASE_ID}") {
         cards(first: 50${after}) {
           pageInfo { hasNextPage endCursor }
           edges {
