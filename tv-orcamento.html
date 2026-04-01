@@ -311,19 +311,23 @@ function orcCard(f) {
   textoDiv.id = 'texto-'+f.id;
   textoDiv.contentEditable = true;
   textoDiv.textContent = f.textoOrc || '...';
+  // Guarda tel no elemento para usar no copiarEnviar
+  wrap.setAttribute('data-tel', f.tel || '');
   wrap.appendChild(textoDiv);
 
   // Valor
   var pr = document.createElement('div'); pr.className = 'price-row';
   var lbl = document.createElement('span'); lbl.style.cssText='font-family:var(--fm);font-size:10px;color:var(--muted);'; lbl.textContent='Valor: R$';
   var inp = document.createElement('input'); inp.className='price-input'; inp.type='number'; inp.placeholder='0,00'; inp.step='0.01'; inp.min='0'; inp.id='price-'+f.id;
+  // Preenche com precoSugerido (gerado automaticamente) ou preco (manual)
   if (f.preco) inp.value = f.preco;
+  else if (f.precoSugerido) inp.value = f.precoSugerido;
   pr.appendChild(lbl); pr.appendChild(inp); wrap.appendChild(pr);
 
   // Botões
   var btns = document.createElement('div'); btns.className = 'orc-actions';
-  var bSend = document.createElement('button'); bSend.className = 'orc-btn primary'; bSend.textContent = '📨 Copiar e Enviar';
-  bSend.onclick = (function(fid){return function(){copiarEnviar(fid);};})(f.id);
+  var bSend = document.createElement('button'); bSend.className = 'orc-btn primary'; bSend.textContent = '📲 Enviar WhatsApp';
+  bSend.onclick = (function(fid, ftel){return function(){copiarEnviar(fid, ftel);};})(f.id, f.tel||'');
 
   var bConf = document.createElement('button'); bConf.className = 'orc-btn green'; bConf.textContent = '✅ Aprovado';
   bConf.onclick = (function(fid){return function(){confirmarAprovado(fid);};})(f.id);
@@ -331,27 +335,34 @@ function orcCard(f) {
   btns.appendChild(bSend);
   btns.appendChild(bConf);
 
-  if (f.tel) {
-    var tel = f.tel.replace(/\D/g,'');
-    if (tel.slice(0,2)==='55'&&tel.length>=12) tel=tel.slice(2);
-    if (tel.length===10) tel=tel.slice(0,2)+'9'+tel.slice(2);
-    if (tel) {
-      var bWa = document.createElement('a'); bWa.className='orc-btn'; bWa.href='https://wa.me/55'+tel; bWa.target='_blank';
-      bWa.style.textDecoration='none'; bWa.textContent='💬 WhatsApp'; btns.appendChild(bWa);
-    }
-  }
+
   wrap.appendChild(btns);
   return wrap;
 }
 
-async function copiarEnviar(fid) {
+async function copiarEnviar(fid, tel) {
   var preco = document.getElementById('price-'+fid)?.value;
   var texto = document.getElementById('texto-'+fid)?.innerText;
   if (!preco) { showToast('⚠️','Preencha o valor',''); return; }
-  if (texto) {
-    texto = texto.replace(/\[VALOR\]/g, preco+' reais');
-    try { await navigator.clipboard.writeText(texto); } catch(e) {}
+
+  // Substitui [VALOR] pelo preço no texto
+  if (texto) texto = texto.replace(/\[VALOR\]/g, preco + ' reais');
+
+  // Formata número para WhatsApp
+  var num = (tel||'').replace(/\D/g,'');
+  if (num.slice(0,2)==='55' && num.length>=12) num = num.slice(2);
+  if (num.length===10) num = num.slice(0,2)+'9'+num.slice(2);
+
+  // Abre WhatsApp com o texto pronto
+  if (num) {
+    var waUrl = 'https://wa.me/55'+num+'?text='+encodeURIComponent(texto||'');
+    window.open(waUrl, '_blank');
+  } else {
+    // Sem número: copia para clipboard
+    try { await navigator.clipboard.writeText(texto||''); } catch(e) {}
+    showToast('📋','Texto copiado!','Número não encontrado');
   }
+
   await marcarEnviado(fid, preco);
 }
 
