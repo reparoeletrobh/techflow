@@ -1027,174 +1027,93 @@ function substituirNome(template, nome) {
 function templatePadrao(desc, nome) {
   var p = primeiroNome(nome);
   var saud = p ? "Ola, " + p + " bom dia" : "Ola, bom dia";
-  return saud + ", sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nRealizamos todos os testes e identificamos o problema. Faremos o reparo completo com substituicao das pecas necessarias.\n\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.";
+  return saud + ", aqui e o Pedro da TV Assistencia.\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da [peca]. As pecas serao trocadas tambem e sera feito a reoperacao eletrica. Este conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o servico.";
 }
 
-// ── DETECTA MÚLTIPLOS EQUIPAMENTOS ────────────────────────────
-// Formato do Pipefy: "m:troca do fusível e capacitor peca 40 mtroca do magnétron peca 110"
-// Cada equipamento começa com "m:" ou "m" no meio do texto
-function detectarMultiplosEquipamentos(comentarios) {
-  const texto = (comentarios || []).join(" ");
-  const raw = texto.trim();
+// Tabela de precos TV por polegadas
+var PRECOS_TV = [
+  { min: 30, max: 39, preco: "490,00" },
+  { min: 40, max: 49, preco: "690,00" },
+  { min: 50, max: 59, preco: "890,00" },
+  { min: 60, max: 69, preco: "1.490,00" },
+  { min: 70, max: 79, preco: "1.990,00" },
+];
 
-  // Divide onde termina "peca NUMERO" seguido de novo equipamento com "m"
-  // Ex: "m:troca do fusível e capacitor peca 40 mtroca do magnétron peca 110"
-  const blocos = raw.split(/(?<=pe[cç]a\s+\d+)\s+m/i).filter(s => s.trim());
-  if (blocos.length >= 2) return parseBlocos(blocos);
-
-  // Fallback: split por "m:" no início de cada bloco
-  const blocos2 = raw.split(/(?:^|\s+)m:/i).filter(s => s.trim());
-  if (blocos2.length >= 2) return parseBlocos(blocos2);
-
+function detectarPolegadas(desc, comentarios) {
+  var texto = (desc || "") + " " + (comentarios || []).join(" ");
+  // Busca padroes como "55 pol", "55\"", "55 polegadas", "55pol"
+  var m = texto.match(/(\d{2})\s*(?:pol(?:egadas?)?|\"|'')/i);
+  if (m) return parseInt(m[1]);
+  // Busca numeros isolados entre 30 e 79
+  var nums = texto.match(/\b([3-7]\d)\b/g);
+  if (nums) {
+    for (var n of nums) {
+      var v = parseInt(n);
+      if (v >= 30 && v <= 79) return v;
+    }
+  }
   return null;
 }
 
-function parseBlocos(blocos) {
-  const partes = [];
-  for (const bloco of blocos) {
-    // Remove prefixos m: ou m do início
-    const trimmed = bloco.trim().replace(/^m[:.\s]*/i, "").trim();
-    if (trimmed.length < 3) continue;
-    // Remove trecho "peca NUMERO" — é custo de peça, não preço do orçamento
-    const descBloco = trimmed.replace(/\s*pe[cç]a\s+\d+\s*/gi, " ").trim();
-    if (descBloco) partes.push({ desc: descBloco });
-  }
-  return partes.length >= 2 ? partes : null;
+function detectarPecaTV(comentarios) {
+  var texto = (comentarios || []).join(" ").toLowerCase();
+  if (texto.includes("barramento"))     return "barramento";
+  if (texto.includes("placa t-con") || texto.includes("t-com") || texto.includes("tcon")) return "placa T-CON";
+  if (texto.includes("placa main") || texto.includes("placa principal")) return "placa principal";
+  if (texto.includes("placa"))          return "placa";
+  if (texto.includes("flat"))           return "flat cable";
+  if (texto.includes("memória") || texto.includes("memoria")) return "memoria";
+  if (texto.includes("solda"))          return "solda";
+  if (texto.includes("fonte"))          return "fonte";
+  if (texto.includes("backlight") || texto.includes("led")) return "backlight LED";
+  return null;
 }
 
-function gerarTextoMultiplos(partes, nome) {
-  const primeiro = nome ? nome.trim().split(/\s+/)[0] : "";
-  const saud = primeiro || "cliente";
-  let total = 0;
-  let linhas = [];
-
-  for (let i = 0; i < partes.length; i++) {
-    const p = partes[i];
-    const n = i + 1;
-    // Detecta preço pela regra de cada equipamento individual
-    const regra = detectarRegra(p.desc, []);
-    const preco = regra ? parseInt(regra.preco || "0") : 0;
-    if (preco) total += preco;
-
-    const textoEquip = gerarDescricaoEquip(p.desc);
-    linhas.push("Em relacao ao microondas " + n + " " + textoEquip + " Este conserto individual fica em " + (preco ? preco + " reais" : "[VALOR]") + ".");
+function getPrecoPorPolegadas(pol) {
+  if (!pol) return null;
+  for (var faixa of PRECOS_TV) {
+    if (pol >= faixa.min && pol <= faixa.max) return faixa.preco;
   }
-
-  // Desconto combo: ~10% arredondado para dezena
-  const desconto = total > 0 ? Math.round(total * 0.9 / 10) * 10 : null;
-
-  let msg = "Ola, " + saud + ", foram feitos todos os testes:\n\n";
-  msg += linhas.join("\n\n");
-
-  if (desconto && total > desconto) {
-    msg += "\n\nConsertando os " + partes.length + " juntos eu consigo um desconto para voce de " + total + " reais por " + desconto + " apenas. Aprovando ja iniciamos o conserto.";
-  } else {
-    msg += "\n\nAprovando ja iniciamos o conserto.";
-  }
-
-  return { texto: msg, preco: desconto ? String(desconto) : String(total || "") };
-}
-
-function gerarDescricaoEquip(desc) {
-  const n = norm(desc);
-  if (hasAny(n, ["magnetron","magnetrao","magneton","magentron"])) {
-    return "sera necessario fazer a troca do conjunto do magnetron, sera feito a reoperacao eletrica tambem.";
-  }
-  if (hasAny(n, ["fusivel","fusível","fusirel","capacitor"])) {
-    return "sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e fusivel de alta que estao sobrecarregando o sistema, as pecas serao trocadas tambem.";
-  }
-  if (hasAny(n, ["microchave","micro chave"])) {
-    return "sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e microchave de acionamento, as pecas serao trocadas tambem.";
-  }
-  if (hasAny(n, ["membrana"])) {
-    return "sera necessario refazer a parte eletrica que causou danos no conjunto da membrana, as pecas serao trocadas tambem.";
-  }
-  if (hasAny(n, ["placa micra","placa micro"])) {
-    return "sera necessario refazer a parte eletrica que causou danos no conjunto do capacitor e placa micra, as pecas serao trocadas tambem.";
-  }
-  if (hasAny(n, ["termoeletrico","cooler","peltier","pasta termica"])) {
-    return "sera necessario refazer a parte eletrica que causou danos no conjunto do cooler, placa de resfriamento e pasta termica, as pecas serao trocadas tambem.";
-  }
-  if (hasAny(n, ["placa principal","reoperacao","recuperacao"])) {
-    return "sera necessario refazer a parte eletrica que causou danos no conjunto da placa principal, sera feito a reoperacao da placa tambem.";
-  }
-  return "sera necessario realizar o reparo identificado nos testes, as pecas necessarias serao trocadas.";
+  return null;
 }
 
 async function gerarTextoOrcamento(desc, comentarios, nome) {
-  // Verifica múltiplos equipamentos primeiro
-  const multiplos = detectarMultiplosEquipamentos(comentarios);
-  if (multiplos) return gerarTextoMultiplos(multiplos, nome);
-
-  var regra = detectarRegra(desc, comentarios);
-  if (regra) {
-    var precoBase = parseFloat(regra.preco || "0");
-    // Regra "grande": adiciona R$300 se o equipamento for grande (forno grande, adega grande)
-    var equip = detectarEquipamento(desc, "");
-    if (isGrande(desc, "") && (equip === "forno" || equip === "adega") && precoBase > 0) {
-      precoBase += 300;
-      regra = Object.assign({}, regra, { preco: String(precoBase) });
-    }
-    return { texto: substituirNome(regra.texto, nome), preco: regra.preco };
-  }
-
   var primeiro = primeiroNome(nome) || "cliente";
-  var comStr   = (comentarios || []).join("; ");
-  var userMsg  = "Nome: " + primeiro + "\r\nDefeito: " + (desc || "nao informado") + (comStr ? "\r\nAtividades: " + comStr : "");
-  var sysMsg   = "Voce e Pedro da Reparo Eletro. Gere orcamento: Ola, NOME bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento: [diagnostico]. Este conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto. Use o primeiro nome real, deixe [VALOR] literal.";
+  var pol      = detectarPolegadas(desc, comentarios);
+  var peca     = detectarPecaTV(comentarios) || "conjunto eletronico";
+  var preco    = pol ? getPrecoPorPolegadas(pol) : null;
 
-  try {
-    var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-    var timer = controller ? setTimeout(function() { controller.abort(); }, 8000) : null;
-    var fetchOpts = {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 400, system: sysMsg, messages: [{ role: "user", content: userMsg }] }),
-    };
-    if (controller) fetchOpts.signal = controller.signal;
-    var res  = await fetch("https://api.anthropic.com/v1/messages", fetchOpts);
-    if (timer) clearTimeout(timer);
-    var data = await res.json();
-    var texto = (data.content && data.content[0] && data.content[0].text) ? data.content[0].text : "";
-    if (texto && texto.indexOf("[VALOR]") >= 0) return { texto: texto, preco: null };
-    if (texto && texto.length > 20) return { texto: texto + "\r\n\r\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.", preco: null };
-  } catch(e) {
-    console.error("gerarTextoOrcamento:", String(e.message || e));
+  // Monta texto com o modelo padrao TV
+  var saud  = "Ola, " + primeiro + " bom dia, aqui e o Pedro da TV Assistencia.";
+  var diag  = "\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da " + peca + ". As pecas serao trocadas tambem e sera feito a reoperacao eletrica.";
+  var valor = preco
+    ? " Este conserto completo fica em " + preco + " reais apenas. Aprovando ja iniciamos o servico."
+    : " Este conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o servico.";
+
+  var texto = saud + diag + valor;
+
+  // Se nao detectou polegadas, tenta com Claude para extrair
+  if (!pol) {
+    try {
+      var comStr  = (comentarios || []).join("; ");
+      var userMsg = "Ficha TV:\nDefeito: " + (desc||"nao informado") + (comStr ? "\nInfos: "+comStr : "");
+      var sysMsg  = "Voce e Pedro da TV Assistencia. Gere orcamento de TV seguindo EXATAMENTE este modelo:\n\nOla, NOME bom dia, aqui e o Pedro da TV Assistencia.\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da [PECA]. As pecas serao trocadas tambem e sera feito a reoperacao eletrica. Este conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o servico.\n\nSubstitua NOME pelo primeiro nome real. Mantenha [VALOR] literal. [PECA] = peca mais provavel (barramento, placa, placa T-CON, flat, memoria, solda, fonte). Responda so com o texto do orcamento.";
+      var res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 300, system: sysMsg, messages: [{ role: "user", content: userMsg }] }),
+      });
+      var data  = await res.json();
+      var textoAI = (data.content && data.content[0] && data.content[0].text) || "";
+      if (textoAI && textoAI.length > 30) return { texto: textoAI, preco: null };
+    } catch(e) {
+      console.error("gerarTextoOrcamento TV:", e.message);
+    }
   }
 
-  return { texto: templatePadrao(desc, nome), preco: null };
+  return { texto, preco: preco ? preco.replace(".","").replace(",",".") : null };
 }
 
-
-// Busca campos e atividades de um card específico pelo ID
-async function fetchCardData(pipefyId) {
-  const data = await pipefyQuery(`query {
-    card(id: "${pipefyId}") {
-      id title
-      fields { name value }
-      comments { text }
-    }
-  }`);
-  const node   = data?.card;
-  if (!node) return null;
-  const fields = node.fields || [];
-  const nome  = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
-  const tel   = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
-  const desc  = fields.find(f => f.name.toLowerCase().includes("descri"))?.value || "";
-  const end   = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
-  const extras = fields
-    .filter(f => !["telefone","fone","nome","endere","valor"].some(k => f.name.toLowerCase().includes(k)))
-    .map(f => f.value).filter(Boolean);
-  const comentarios = [
-    ...(node.comments || []).map(c => c.text).filter(Boolean),
-    ...extras,
-  ];
-  return { pipefyId: String(node.id), title: node.title, nome, tel, desc, end, comentarios };
-}
-
-// Busca cards em Aguardando Aprovação direto pelo ID da fase (mais rápido e completo)
-
-// Gera texto de orçamento com Claude
 // ── NORMALIZA TEXTO (remove acentos, minúsculo) ──────────────
 // Busca campos e atividades de um card específico pelo ID
 async function fetchCardData(pipefyId) {
