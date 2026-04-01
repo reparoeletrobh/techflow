@@ -819,7 +819,10 @@ function showPage(name) {
   document.querySelectorAll('.tab-btn')[tabIdx]?.classList.add('active');
   if (name==='painel') renderPainel();
   else if (name==='kanban') renderKanban();
-  else if (name==='mover') renderMover();
+  else if (name==='mover') {
+    if (records && records.length) renderMover();
+    else load().then(function(){ renderMover(); });
+  }
 }
 
 function showToast(icon,title,msg) {
@@ -832,8 +835,8 @@ function showToast(icon,title,msg) {
 
 // -- MOVER OS -------------------------------------------------
 function renderMover() {
-  if (!records || !records.length) { load().then(renderMover); return; }
-  var recs = records;
+  var recs = records || [];
+  if (!recs.length) { return; } // dados ainda nao carregados, showPage vai chamar apos load
 
   // Populate select
   var select = document.getElementById('mover-select');
