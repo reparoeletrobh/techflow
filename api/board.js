@@ -1401,6 +1401,84 @@ module.exports = async function handler(req, res) {
       return res.status(200).json(result);
     }
 
+    // ── GET recover-all — reimporta TODOS os cards de todas as fases ativas ──
+    if (action === "recover-all") {
+      try {
+        const data = await pipefyQuery(`query {
+          pipe(id: "${PIPE_ID}") {
+            phases {
+              name
+              cards(first: 50) {
+                edges {
+                  node {
+                    id title age
+                    fields { name value }
+                  }
+                }
+              }
+            }
+          }
+        }`);
+
+        const board = sanitizeBoard(await dbGet(BOARD_KEY));
+        const phases = data?.pipe?.phases || [];
+        const activeIds = new Set(board.cards.map(c => c.pipefyId));
+
+        // Fases que NÃO devem ser importadas (já saíram do fluxo)
+        const skipPhases = ["erp","finaliz","conclu","descar","reprov","entregue","concluíd"];
+
+        let added = 0, skipped = 0;
+
+        for (const ph of phases) {
+          const l = ph.name.toLowerCase();
+          if (skipPhases.some(s => l.includes(s))) { skipped++; continue; }
+
+          // Mapeia nome da fase Pipefy → phaseId interno do board
+          let phaseId = "aprovado";
+          if (l.includes("produção") || l.includes("producao")) phaseId = "producao";
+          else if (l.includes("urgência") || l.includes("urgencia")) phaseId = "urgencia";
+          else if (l.includes("comprar") && l.includes("peça")) phaseId = "comprar_peca";
+          else if (l.includes("aguardando") && l.includes("peça")) phaseId = "aguardando_peca";
+          else if (l.includes("peça disponível") || l.includes("peca disponivel")) phaseId = "peca_disponivel";
+          else if (l.includes("loja feito") || (l.includes("loja") && l.includes("feito"))) phaseId = "loja_feito";
+          else if (l.includes("delivery") && l.includes("feito")) phaseId = "delivery_feito";
+          else if (l.includes("aguardando") && l.includes("ret")) phaseId = "aguardando_ret";
+          else if (l.includes("cliente") && l.includes("loja")) phaseId = "cliente_loja";
+
+          for (const { node } of (ph.cards?.edges || [])) {
+            const id = String(node.id);
+            if (activeIds.has(id)) continue; // já está no board
+
+            const fields = node.fields || [];
+            const nomeField = fields.find(f => f.name.toLowerCase().includes("nome") || f.name.toLowerCase().includes("contato"));
+            const descField = fields.find(f => f.name.toLowerCase().includes("descri") || f.name.toLowerCase().includes("problem") || f.name.toLowerCase().includes("servi"));
+            const nomeVal = nomeField?.value || "";
+            const digitsMatch = nomeVal.match(/(\d{4})\D*$/);
+
+            board.cards.push({
+              pipefyId:    id,
+              title:       node.title || "",
+              nomeContato: nomeVal || null,
+              osCode:      digitsMatch ? digitsMatch[1] : null,
+              descricao:   descField?.value || null,
+              age:         node.age ?? null,
+              phaseId,
+              addedAt:     new Date().toISOString(),
+              recoveredAt: new Date().toISOString(),
+            });
+            if (!board.syncedIds.includes(id)) board.syncedIds.push(id);
+            activeIds.add(id);
+            added++;
+          }
+        }
+
+        await dbSet(BOARD_KEY, board);
+        return res.status(200).json({ ok: true, added, skippedPhases: skipped, total: board.cards.length });
+      } catch(e) {
+        return res.status(200).json({ ok: false, error: "Erro recover-all: " + e.message });
+      }
+    }
+
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch (err) {
