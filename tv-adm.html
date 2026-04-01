@@ -4,99 +4,235 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TV Assistência — ADM</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{
-  --bg:#03060e;--surface:#080d18;--surface2:#0d1425;--border:#1a2540;--border2:#243050;
-  --text:#dce8f8;--muted:#4a607a;--dim:#060c18;
-  --accent:#3b9eff;--green:#10d982;--red:#f04060;--yellow:#f5c800;--cyan:#06d6d6;
-  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+:root {
+  --bg:       #050508;
+  --surface:  #0d0d14;
+  --surface2: #13131e;
+  --border:   #1e1e2e;
+  --text:     #e8e8f0;
+  --muted:    #5a5a7a;
+  --sidebar-w: 220px;
+  --sidebar-collapsed: 60px;
+  --fh: 'Syne', sans-serif;
+  --fm: 'DM Mono', monospace;
+  --fb: 'Inter', sans-serif;
 }
-*{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;
-  display:flex;height:100vh;overflow:hidden;}
 
-.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);height:100vh;
-  background:var(--surface);border-right:1px solid var(--border);
-  display:flex;flex-direction:column;transition:width .25s,min-width .25s;overflow:hidden;}
-.sidebar.collapsed{width:var(--sidebar-collapsed);min-width:var(--sidebar-collapsed);}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--fb); }
 
-.sidebar-logo{display:flex;align-items:center;gap:10px;padding:14px 16px;
-  border-bottom:1px solid var(--border);height:52px;flex-shrink:0;}
-.logo-icon{width:28px;height:28px;background:var(--accent);border-radius:7px;
-  display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
-.logo-text{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;white-space:nowrap;
-  overflow:hidden;transition:opacity .2s;}
-.logo-text span{color:var(--accent);}
-.sidebar.collapsed .logo-text{opacity:0;pointer-events:none;}
+.shell { display: flex; height: 100vh; width: 100vw; }
 
-.nav-section{padding:10px 8px 4px;font-family:'DM Mono',monospace;font-size:9px;
-  text-transform:uppercase;letter-spacing:.1em;color:var(--muted);white-space:nowrap;
-  overflow:hidden;transition:opacity .2s;}
-.sidebar.collapsed .nav-section{opacity:0;}
+/* ── SIDEBAR ─────────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: width .25s cubic-bezier(.4,0,.2,1), min-width .25s cubic-bezier(.4,0,.2,1);
+  overflow: hidden;
+  z-index: 10;
+  position: relative;
+}
+.sidebar.collapsed {
+  width: var(--sidebar-collapsed);
+  min-width: var(--sidebar-collapsed);
+}
 
-.nav-items{flex:1;overflow-y:auto;padding:4px 0;}
-.nav-item{display:flex;align-items:center;gap:10px;padding:0 12px;height:40px;
-  border-radius:8px;margin:2px 8px;cursor:pointer;transition:all .15s;
-  color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;
-  text-decoration:none;}
-.nav-item:hover{background:var(--surface2);color:var(--text);}
-.nav-item.active{background:rgba(59,158,255,.1);color:var(--accent);}
-.nav-icon{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;
-  justify-content:center;font-size:13px;flex-shrink:0;background:var(--surface2);}
-.nav-item.active .nav-icon{background:rgba(59,158,255,.15);}
-.nav-label{white-space:nowrap;overflow:hidden;transition:opacity .2s;}
-.sidebar.collapsed .nav-label{opacity:0;}
-.sidebar.collapsed .nav-item{margin:2px 6px;justify-content:center;padding:0;}
-.sidebar.collapsed .nav-section{display:none;}
+/* Logo */
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  height: 56px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.logo-dot {
+  width: 8px; height: 8px;
+  background: #3b9eff;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #3b9eff;
+  flex-shrink: 0;
+}
+.logo-text {
+  font-family: var(--fh);
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: -.5px;
+  opacity: 1;
+  transition: opacity .2s;
+}
+.logo-text span { color: #ffffff; opacity: .4; }
+.sidebar.collapsed .logo-text { opacity: 0; pointer-events: none; }
 
-.toggle-btn{display:flex;align-items:center;gap:8px;padding:12px 16px;
-  border-top:1px solid var(--border);cursor:pointer;color:var(--muted);
-  font-family:'DM Mono',monospace;font-size:10px;transition:color .15s;flex-shrink:0;}
-.toggle-btn:hover{color:var(--text);}
-.toggle-icon{transition:transform .25s;}
-.toggle-label{white-space:nowrap;overflow:hidden;transition:opacity .2s;}
-.sidebar.collapsed .toggle-label{opacity:0;}
-.sidebar.collapsed .toggle-icon{transform:scaleX(-1);}
+/* Nav */
+.nav-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px 0;
+}
+.nav-list::-webkit-scrollbar { width: 3px; }
+.nav-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-/* CONTENT */
-.content{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;}
-.load-bar{height:2px;background:transparent;transition:background .3s;position:absolute;top:0;left:0;right:0;z-index:10;}
-.load-bar.loading{background:linear-gradient(90deg,transparent,var(--accent),transparent);
-  background-size:200% 100%;animation:loadAnim 1s infinite;}
-@keyframes loadAnim{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.nav-section {
+  padding: 10px 8px 4px 18px;
+  font-family: var(--fm);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity .2s;
+}
+.sidebar.collapsed .nav-section { opacity: 0; }
 
-.welcome{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
-  color:var(--muted);font-family:'DM Mono',monospace;font-size:12px;}
-.welcome-icon{font-size:40px;opacity:.3;}
-.welcome-text{text-align:center;line-height:1.8;opacity:.5;}
-.welcome-arrow{color:var(--accent);opacity:.4;font-size:11px;}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  height: 42px;
+  margin: 2px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+  white-space: nowrap;
+  overflow: hidden;
+  position: relative;
+  user-select: none;
+  background: color-mix(in srgb, var(--item-color, #888) 38%, #0d0d14);
+  border: 1px solid color-mix(in srgb, var(--item-color, #888) 55%, transparent);
+  text-decoration: none;
+}
+.nav-item:hover {
+  background: color-mix(in srgb, var(--item-color, #888) 50%, #0d0d14);
+  border-color: color-mix(in srgb, var(--item-color, #888) 70%, transparent);
+}
+.nav-item.active {
+  background: color-mix(in srgb, var(--item-color, #888) 55%, #0d0d14);
+  border-color: color-mix(in srgb, var(--item-color, #888) 80%, transparent);
+}
+.nav-item.active .nav-label { color: #fff; font-weight: 600; }
+.nav-item:hover  .nav-label { color: #fff; }
 
-.frame-wrap{flex:1;display:none;}
-.frame-wrap.visible{display:flex;}
-.frame-wrap iframe{width:100%;height:100%;border:none;background:var(--bg);}
+.nav-icon {
+  font-size: 17px;
+  flex-shrink: 0;
+  width: 26px;
+  text-align: center;
+  display: flex; align-items: center; justify-content: center;
+}
+.nav-label {
+  font-family: var(--fm);
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255,255,255,.9);
+  transition: opacity .2s, color .15s;
+  letter-spacing: .03em;
+}
+.sidebar.collapsed .nav-label { opacity: 0; }
+.sidebar.collapsed .nav-item { margin: 2px 6px; justify-content: center; padding: 0; }
 
-/* MOBILE */
-.hamburger{display:none;}
-.mobile-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:299;backdrop-filter:blur(2px);}
-.mobile-overlay.active{display:block;}
-@media(max-width:768px){
-  .sidebar{position:fixed;top:0;left:0;height:100dvh;z-index:300;
-    transform:translateX(-100%);transition:transform .25s;box-shadow:4px 0 24px rgba(0,0,0,.5);
-    width:var(--sidebar-w)!important;min-width:var(--sidebar-w)!important;}
-  .sidebar.mobile-open{transform:translateX(0);}
-  .sidebar.collapsed .logo-text,.sidebar.collapsed .nav-label,.sidebar.collapsed .toggle-label{opacity:1!important;pointer-events:auto!important;}
-  .sidebar.collapsed .nav-item{margin:2px 8px!important;justify-content:flex-start!important;padding:0 12px!important;}
-  .toggle-btn{display:none;}
-  .hamburger{display:flex;align-items:center;justify-content:center;
-    width:36px;height:36px;border:1px solid var(--border);border-radius:8px;
-    background:var(--surface);cursor:pointer;position:fixed;top:12px;left:12px;z-index:298;}
-  .hamburger span{display:block;width:16px;height:2px;background:var(--text);border-radius:2px;position:relative;}
-  .hamburger span::before,.hamburger span::after{content:'';position:absolute;left:0;
-    width:16px;height:2px;background:var(--text);border-radius:2px;}
-  .hamburger span::before{top:-5px;}
-  .hamburger span::after{top:5px;}
-  .content{padding-top:52px;}
+/* Tooltip collapsed */
+.sidebar.collapsed .nav-item:hover::after {
+  content: attr(data-label);
+  position: absolute;
+  left: calc(var(--sidebar-collapsed) + 8px);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--fm);
+  font-size: 11px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  z-index: 999;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+}
+
+.nav-sep { height: 1px; background: var(--border); margin: 6px 12px; }
+
+/* Toggle */
+.toggle-btn {
+  display: flex; align-items: center; justify-content: center;
+  height: 48px;
+  border-top: 1px solid var(--border);
+  cursor: pointer;
+  color: var(--muted);
+  transition: background .15s, color .15s;
+  flex-shrink: 0;
+  font-size: 14px;
+  gap: 8px;
+  white-space: nowrap; overflow: hidden;
+  padding: 0 16px;
+}
+.toggle-btn:hover { background: var(--surface2); color: var(--text); }
+.toggle-icon { flex-shrink: 0; transition: transform .25s; }
+.sidebar.collapsed .toggle-icon { transform: scaleX(-1); }
+.toggle-label { font-family: var(--fm); font-size: 10px; transition: opacity .2s; }
+.sidebar.collapsed .toggle-label { opacity: 0; }
+
+/* ── CONTENT ─────────────────────────────────────────────── */
+.content { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+.load-bar { height: 2px; background: transparent; transition: background .3s; position: absolute; top: 0; left: 0; right: 0; z-index: 10; }
+.load-bar.loading {
+  background: linear-gradient(90deg, transparent, #3b9eff, transparent);
+  background-size: 200% 100%;
+  animation: loadAnim 1s infinite;
+}
+@keyframes loadAnim { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+.welcome {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 12px;
+  color: var(--muted); font-family: var(--fm); font-size: 12px;
+}
+.welcome-icon { font-size: 48px; opacity: .3; }
+.welcome-text { text-align: center; line-height: 2; opacity: .5; }
+.welcome-arrow { color: #3b9eff; opacity: .4; font-size: 11px; }
+
+.frame-wrap { flex: 1; display: none; }
+.frame-wrap.visible { display: flex; }
+.frame-wrap iframe { width: 100%; height: 100%; border: none; background: var(--bg); }
+
+/* ── MOBILE ──────────────────────────────────────────────── */
+.hamburger { display: none; }
+.mobile-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 299; backdrop-filter: blur(3px); }
+.mobile-overlay.active { display: block; }
+
+@media(max-width:768px) {
+  .sidebar {
+    position: fixed; top: 0; left: 0; height: 100dvh; z-index: 300;
+    transform: translateX(-100%); transition: transform .25s;
+    box-shadow: 4px 0 24px rgba(0,0,0,.6);
+    width: var(--sidebar-w) !important; min-width: var(--sidebar-w) !important;
+  }
+  .sidebar.mobile-open { transform: translateX(0); }
+  .sidebar.collapsed .logo-text, .sidebar.collapsed .nav-label, .sidebar.collapsed .toggle-label { opacity: 1 !important; pointer-events: auto !important; }
+  .sidebar.collapsed .nav-item { margin: 2px 8px !important; justify-content: flex-start !important; padding: 0 12px !important; }
+  .toggle-btn { display: none; }
+  .hamburger {
+    display: flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--surface); cursor: pointer;
+    position: fixed; top: 12px; left: 12px; z-index: 298;
+  }
+  .hamburger span { display: block; width: 16px; height: 2px; background: var(--text); border-radius: 2px; position: relative; }
+  .hamburger span::before, .hamburger span::after { content:''; position: absolute; left: 0; width: 16px; height: 2px; background: var(--text); border-radius: 2px; }
+  .hamburger span::before { top: -5px; }
+  .hamburger span::after  { top:  5px; }
+  .content { padding-top: 52px; }
 }
 </style>
 </head>
@@ -105,72 +241,76 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;
 <div class="mobile-overlay" id="mobile-overlay" onclick="closeMobile()"></div>
 <button class="hamburger" onclick="toggleMobile()"><span></span></button>
 
-<div class="sidebar" id="sidebar">
-  <div class="sidebar-logo">
-    <div class="logo-icon">📺</div>
-    <div class="logo-text">TV <span>Assistência</span></div>
+<div class="shell">
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-dot"></div>
+      <div class="logo-text">TV <span>Assistência</span></div>
+    </div>
+
+    <div class="nav-list">
+      <div class="nav-section">Principal</div>
+
+      <div class="nav-item" data-url="/tv/tecnico" data-label="Técnico"
+           style="--item-color:#3b9eff" onclick="openPage(this)">
+        <span class="nav-icon">🔧</span>
+        <span class="nav-label">Técnico</span>
+      </div>
+
+      <div class="nav-item" data-url="/tv/orcamento" data-label="Orçamento"
+           style="--item-color:#f5c800" onclick="openPage(this)">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">Orçamento</span>
+      </div>
+
+      <div class="nav-item" data-url="/tv/financeiro" data-label="Financeiro"
+           style="--item-color:#22c55e" onclick="openPage(this)">
+        <span class="nav-icon">💰</span>
+        <span class="nav-label">Financeiro</span>
+      </div>
+
+      <div class="nav-sep"></div>
+      <div class="nav-section">Operação</div>
+
+      <div class="nav-item" data-url="/tv/coleta" data-label="Coleta"
+           style="--item-color:#f97316" onclick="openPage(this)">
+        <span class="nav-icon">🚚</span>
+        <span class="nav-label">Coleta</span>
+      </div>
+
+      <div class="nav-item" data-url="/tv/aguardando-retirada" data-label="Ag. Retirada"
+           style="--item-color:#f97316" onclick="openPage(this)">
+        <span class="nav-icon">📦</span>
+        <span class="nav-label">Ag. Retirada</span>
+      </div>
+
+      <div class="nav-sep"></div>
+      <div class="nav-section">Análise</div>
+
+      <div class="nav-item" data-url="/tv/metricas" data-label="Métricas"
+           style="--item-color:#a855f7" onclick="openPage(this)">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Métricas</span>
+      </div>
+
+    </div>
+
+    <div class="toggle-btn" onclick="toggleSidebar()">
+      <span class="toggle-icon">◀</span>
+      <span class="toggle-label">Recolher</span>
+    </div>
   </div>
 
-  <div class="nav-items">
-    <div class="nav-section">Principal</div>
-
-    <div class="nav-item" data-url="/tv/tecnico" data-label="Técnico"
-         style="--item-color:#3b9eff" onclick="openPage(this)">
-      <span class="nav-icon">🔧</span>
-      <span class="nav-label">Técnico</span>
+  <div class="content">
+    <div class="load-bar" id="load-bar"></div>
+    <div class="welcome" id="welcome">
+      <div class="welcome-icon">📺</div>
+      <div class="welcome-text">TV Assistência — Sistema de Gestão<br>Selecione um painel na barra lateral</div>
+      <div class="welcome-arrow">← escolha um módulo</div>
     </div>
-
-    <div class="nav-item" data-url="/tv/orcamento" data-label="Orçamento"
-         style="--item-color:#f5c800" onclick="openPage(this)">
-      <span class="nav-icon">📋</span>
-      <span class="nav-label">Orçamento</span>
+    <div class="frame-wrap" id="frame-wrap">
+      <iframe id="main-frame" src="" title="Painel TV"></iframe>
     </div>
-
-    <div class="nav-item" data-url="/tv/financeiro" data-label="Financeiro"
-         style="--item-color:#22c55e" onclick="openPage(this)">
-      <span class="nav-icon">💰</span>
-      <span class="nav-label">Financeiro</span>
-    </div>
-
-    <div class="nav-section">Operação</div>
-
-    <div class="nav-item" data-url="/tv/coleta" data-label="Coleta"
-         style="--item-color:#f97316" onclick="openPage(this)">
-      <span class="nav-icon">🚚</span>
-      <span class="nav-label">Coleta</span>
-    </div>
-
-    <div class="nav-item" data-url="/tv/aguardando-retirada" data-label="Ag. Retirada"
-         style="--item-color:#f97316" onclick="openPage(this)">
-      <span class="nav-icon">📦</span>
-      <span class="nav-label">Ag. Retirada</span>
-    </div>
-
-    <div class="nav-section">Análise</div>
-
-    <div class="nav-item" data-url="/tv/metricas" data-label="Métricas"
-         style="--item-color:#a855f7" onclick="openPage(this)">
-      <span class="nav-icon">📊</span>
-      <span class="nav-label">Métricas</span>
-    </div>
-
-  </div>
-
-  <div class="toggle-btn" onclick="toggleSidebar()">
-    <span class="toggle-icon">◀</span>
-    <span class="toggle-label">Recolher</span>
-  </div>
-</div>
-
-<div class="content">
-  <div class="load-bar" id="load-bar"></div>
-  <div class="welcome" id="welcome">
-    <div class="welcome-icon">📺</div>
-    <div class="welcome-text">TV Assistência — Sistema de Gestão<br>Selecione um painel na barra lateral</div>
-    <div class="welcome-arrow">← escolha um módulo</div>
-  </div>
-  <div class="frame-wrap" id="frame-wrap">
-    <iframe id="main-frame" src="" title="Painel TV"></iframe>
   </div>
 </div>
 
