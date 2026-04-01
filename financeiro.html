@@ -834,6 +834,20 @@ function showToast(icon,title,msg) {
 }
 
 // -- MOVER OS -------------------------------------------------
+function getFaseName(id) {
+  var map = {
+    aguardando_dados: 'Aguardando Dados',
+    nf_emitida: 'NF Emitida',
+    faturamento: 'Faturamento',
+    pagamento_agendado: 'Pag. Agendado',
+    entrega_agendada: 'Entrega Agendada',
+    entrega_liberada: 'Entrega Liberada',
+    rota_criada: 'Rota Criada',
+    item_coletado: 'Item Coletado'
+  };
+  return map[id] || id || '-';
+}
+
 function renderMover() {
   var recs = records || [];
   if (!recs.length) { return; } // dados ainda nao carregados, showPage vai chamar apos load
