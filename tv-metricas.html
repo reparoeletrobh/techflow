@@ -193,7 +193,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
     Reparo<span style="color:var(--accent)">Eletro</span> — <span style="color:var(--yellow)">Métricas</span>
   </div>
   <div class="hdr-right">
-    <button class="hbtn refresh" onclick="load()">↻ Atualizar</button>
+    <button class="hbtn refresh" id="sync-btn" onclick="syncBoard()" style="border-color:rgba(59,158,255,.4);color:#3b9eff;">⟳ Sync</button>
     <a class="hbtn" href="/financeiro">Financeiro</a>
     <a class="hbtn" href="/tv">Home</a>
   </div>
@@ -891,6 +891,21 @@ function showToast(icon, title, msg) {
 }
 
 // ── INIT ─────────────────────────────────────────────────────
+async function syncBoard() {
+  var btn = document.getElementById('sync-btn');
+  btn.textContent = '⏳ Sincronizando...';
+  btn.disabled = true;
+  try {
+    await fetch('/api/tv-board?action=sync');
+    await load();
+    showToast('✅','Sync concluído','Métricas atualizadas');
+  } catch(e) {
+    showToast('❌','Erro no sync', e.message);
+  }
+  btn.textContent = '⟳ Sync';
+  btn.disabled = false;
+}
+
 (function init() {
   // Lançar dados: data padrão = hoje
   document.getElementById('inp-data').value = df(new Date());
