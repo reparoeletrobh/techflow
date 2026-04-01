@@ -223,7 +223,14 @@ module.exports = async function handler(req, res) {
       const phaseReceber = await getReceberPhaseId();
       if (phaseReceber) {
         const tituloReceber = `VENDA — ${p.codigo || p.tipo || "Equipamento"} | ${nomeCliente}`;
-        const descReceber   = `${p.descricao} | Valor: ${precoFmt} | Vendedor: ${vendedor||"—"} | Modalidade: ${modalidade||"—"}`;
+        const descReceber   = [
+          p.descricao,
+          `Valor: ${precoFmt}`,
+          `Vendedor: ${vendedor||"—"}`,
+          `Modalidade: ${modalidade||"—"}`,
+          "",
+          textoAlmox
+        ].join("\n");
         const dataAlmox = await pipefyQuery(
           "mutation { createCard(input: { pipe_id: \"" + PIPE_ID + "\" phase_id: \"" + phaseReceber + "\" title: \"" + tituloReceber.replace(/"/g,"'") + "\" fields_attributes: [ { field_id: \"descri_o\" field_value: \"" + descReceber.replace(/"/g,"'") + "\" } ] }) { card { id } } }"
         );
