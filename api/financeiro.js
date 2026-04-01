@@ -2,6 +2,7 @@ const PIPEFY_API    = "https://api.pipefy.com/graphql";
 const PIPE_ID       = "305832912";
 const BOARD_KEY     = "reparoeletro_board";
 const FIN_KEY       = "reparoeletro_financeiro";
+const FIN_BACKUP_KEY = "reparoeletro_financeiro_backup";
 
 const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g, "").trim();
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g, "").trim();
@@ -313,6 +314,7 @@ module.exports = async function handler(req, res) {
     } catch (e) { console.error("finalizado check:", e.message); }
 
     if (newCount > 0 || removedCount > 0) await dbSet(FIN_KEY, fin);
+    try { await dbSet(FIN_BACKUP_KEY, { ...fin, backedUpAt: new Date().toISOString() }); } catch(e) {}
     return res.status(200).json({ ok: true, newCount, removedCount, pipefyError });
   }
 
@@ -329,6 +331,7 @@ module.exports = async function handler(req, res) {
     rec.movedAt = new Date().toISOString();
     rec.history = [...(rec.history || []), { phaseId: "nf_emitida", ts: rec.movedAt }];
     await dbSet(FIN_KEY, fin);
+    try { await dbSet(FIN_BACKUP_KEY, { ...fin, backedUpAt: new Date().toISOString() }); } catch(e) {}
     return res.status(200).json({ ok: true, record: rec });
   }
 
@@ -340,6 +343,7 @@ module.exports = async function handler(req, res) {
     if (!rec) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
     rec.valor = valor;
     await dbSet(FIN_KEY, fin);
+    try { await dbSet(FIN_BACKUP_KEY, { ...fin, backedUpAt: new Date().toISOString() }); } catch(e) {}
     return res.status(200).json({ ok: true });
   }
 
@@ -358,6 +362,7 @@ module.exports = async function handler(req, res) {
     rec.movedAt      = rec.nfEmitidaAt;
     rec.history      = [...(rec.history || []), { phaseId: "nf_emitida", ts: rec.movedAt }];
     await dbSet(FIN_KEY, fin);
+    try { await dbSet(FIN_BACKUP_KEY, { ...fin, backedUpAt: new Date().toISOString() }); } catch(e) {}
     return res.status(200).json({ ok: true, record: rec });
   }
 
@@ -372,6 +377,7 @@ module.exports = async function handler(req, res) {
     rec.phaseId = "faturamento";
     rec.history = [...(rec.history || []), { phaseId: "faturamento", ts: rec.movedAt }];
     await dbSet(FIN_KEY, fin);
+    try { await dbSet(FIN_BACKUP_KEY, { ...fin, backedUpAt: new Date().toISOString() }); } catch(e) {}
     return res.status(200).json({ ok: true, record: rec });
   }
 
@@ -409,6 +415,7 @@ module.exports = async function handler(req, res) {
       rec.dataAgendadaDisplay = req.body.dataAgendadaDisplay || req.body.dataAgendada;
     }
     await dbSet(FIN_KEY, fin);
+    try { await dbSet(FIN_BACKUP_KEY, { ...fin, backedUpAt: new Date().toISOString() }); } catch(e) {}
     // Move no Pipefy quando vai para Entrega Liberada
     let pipefyMoveOk = null;
     if (phaseId === "entrega_liberada" && rec.pipefyId) {
@@ -425,6 +432,7 @@ module.exports = async function handler(req, res) {
     const fin = await dbGet(FIN_KEY) || defaultFin();
     fin.records = fin.records.filter(r => r.id !== id);
     await dbSet(FIN_KEY, fin);
+    try { await dbSet(FIN_BACKUP_KEY, { ...fin, backedUpAt: new Date().toISOString() }); } catch(e) {}
     return res.status(200).json({ ok: true });
   }
 
@@ -444,6 +452,7 @@ module.exports = async function handler(req, res) {
     // Mantém só as últimas 5
     fin.nfPending = fin.nfPending.slice(-5);
     await dbSet(FIN_KEY, fin);
+    try { await dbSet(FIN_BACKUP_KEY, { ...fin, backedUpAt: new Date().toISOString() }); } catch(e) {}
     return res.status(200).json({ ok: true });
   }
 
@@ -464,6 +473,7 @@ module.exports = async function handler(req, res) {
       }
     }
     await dbSet(FIN_KEY, fin);
+    try { await dbSet(FIN_BACKUP_KEY, { ...fin, backedUpAt: new Date().toISOString() }); } catch(e) {}
     return res.status(200).json({ ok: true });
   }
 
@@ -474,6 +484,7 @@ module.exports = async function handler(req, res) {
     const fin = await dbGet(FIN_KEY) || defaultFin();
     fin.syncedIds = (fin.syncedIds || []).filter(id => id !== String(pipefyId));
     await dbSet(FIN_KEY, fin);
+    try { await dbSet(FIN_BACKUP_KEY, { ...fin, backedUpAt: new Date().toISOString() }); } catch(e) {}
     return res.status(200).json({ ok: true, msg: "Removido do syncedIds. Próximo sync importa este card." });
   }
 
@@ -500,5 +511,15 @@ module.exports = async function handler(req, res) {
     return res.status(200).json(result);
   }
 
-    return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+    // ── GET restore-backup ───────────────────────────────────────
+  if (action === "restore-backup") {
+    try {
+      const backup = await dbGet(FIN_BACKUP_KEY);
+      if (!backup) return res.status(200).json({ ok: false, error: "Nenhum backup encontrado" });
+      await dbSet(FIN_KEY, backup);
+      return res.status(200).json({ ok: true, backedUpAt: backup.backedUpAt, records: backup.records?.length });
+    } catch(e) { return res.status(200).json({ ok: false, error: e.message }); }
+  }
+
+  return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 };
