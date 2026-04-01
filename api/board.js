@@ -208,12 +208,20 @@ async function fetchAllPhaseCards() {
         name
         cards(first: 50) {
           pageInfo { hasNextPage endCursor }
-          edges { node { id fields { name value } } }
+          edges { node { id } }
         }
       }
     }
   }`);
   return data?.pipe?.phases || [];
+}
+
+// Busca campos (incluindo valor) de um card específico
+async function fetchCardFields(pipefyId) {
+  try {
+    const data = await pipefyQuery(`query { card(id: "${pipefyId}") { id fields { name value } } }`);
+    return data?.card?.fields || [];
+  } catch(e) { return []; }
 }
 
 function extractCardValor(node) {
@@ -274,7 +282,7 @@ async function fetchMetaPhaseIds() {
       if (l.includes("aguardando") && (l.includes("aprov") || l.includes("aprovação")))
         ph.cards.edges.forEach(e => aguardandoIds.push(String(e.node.id)));
       if (l.includes("erp"))
-        ph.cards.edges.forEach(e => erpCards.push({ id: String(e.node.id), node: e.node }));
+        ph.cards.edges.forEach(e => erpCards.push({ id: String(e.node.id) }));
     }
     return { aguardandoIds, erpCards, erpIds: erpCards.map(c => c.id) };
   } catch(e) { return { aguardandoIds: [], erpCards: [], erpIds: [] }; }
@@ -459,7 +467,14 @@ module.exports = async function handler(req, res) {
         }
         for (const { id, node } of erpCards) {
           if (!seenErp.has(id)) {
-            board.metaLog.push({ phaseId: "erp_entrada", pipefyId: id, valor: extractCardValor(node), timestamp: new Date().toISOString() });
+            // Busca valor do card separadamente para não sobrecarregar fetchAllPhaseCards
+            let valor = 0;
+            try {
+              const fields = await fetchCardFields(id);
+              const f = fields.find(f => f.name.toLowerCase().includes("valor"));
+              if (f?.value) valor = parseFloat(String(f.value).replace(/[^\d.,]/g,"").replace(",",".")) || 0;
+            } catch(e) {}
+            board.metaLog.push({ phaseId: "erp_entrada", pipefyId: id, valor, timestamp: new Date().toISOString() });
             metaChanged = true;
           }
         }
