@@ -224,10 +224,10 @@ module.exports = async function handler(req, res) {
               for (var _f of _tb) { if (_pol>=_f.min&&_pol<=_f.max){_preco=_f.p;break;} }
             }
             var _primeiro = (card.nome||"").split(" ")[0] || "cliente";
-            textoOrc = "Ola, " + _primeiro + " bom dia, aqui e o Pedro da TV Assistencia.\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da " + _peca + ". As pecas serao trocadas tambem e sera feito a reoperacao eletrica. Este conserto completo fica em " + (_preco || "[VALOR]") + " reais apenas. Aprovando ja iniciamos o servico.";
+            textoOrc = _primeiro + " bom dia, sou o Pedro da Reparo Eletro e vou passar seu orcamento:\n\nForam feito os testes, identificamos que sera necessario fazer a troca da " + _peca + " da TV, sera feito a reoperacao eletrica tambem. Este conserto completo fica em " + (_preco || "[VALOR]") + " reais apenas. Aprovando ja iniciamos o conserto.";
             if (_preco) precoSugerido = _preco.replace(".","").replace(",",".");
           } catch(e) {
-            textoOrc = "Ola, " + ((card.nome||"").split(" ")[0]||"cliente") + " bom dia, aqui e o Pedro da TV Assistencia.\n\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o servico.";
+            textoOrc = ((card.nome||"").split(" ")[0]||"cliente") + " bom dia, sou o Pedro da Reparo Eletro e vou passar seu orcamento:\n\nEste conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.";
           }
           return {
             id:          card.pipefyId + (sufixoId || ""),
@@ -274,7 +274,7 @@ module.exports = async function handler(req, res) {
           var precoComDesconto = Math.round(totalPreco * (1 - descPct / 100));
           var linhaFinal = "Consertando os " + qtd + " juntos eu consigo um desconto para voce de " + totalPreco + " reais por " + precoComDesconto + " apenas. Aprovando ja iniciamos o conserto.";
 
-          var cabecalho = "Ola, " + primeiroNome + " bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\n";
+          var cabecalho = primeiroNome + " bom dia, sou o Pedro da Reparo Eletro e vou passar seu orcamento:\n\n";
           var textoFinal = cabecalho + partesTexto.join("\n\n") + "\n\n" + linhaFinal;
 
           var fichaCombinada = gerarFicha(card.desc, card.comentarios, "");
@@ -1036,9 +1036,8 @@ function substituirNome(template, nome) {
 }
 
 function templatePadrao(desc, nome) {
-  var p = primeiroNome(nome);
-  var saud = p ? "Ola, " + p + " bom dia" : "Ola, bom dia";
-  return saud + ", aqui e o Pedro da TV Assistencia.\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da [peca]. As pecas serao trocadas tambem e sera feito a reoperacao eletrica. Este conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o servico.";
+  var p = primeiroNome(nome) || "cliente";
+  return p + " bom dia, sou o Pedro da Reparo Eletro e vou passar seu orcamento:\n\nForam feito os testes, identificamos que sera necessario fazer a troca da [peca] da TV, sera feito a reoperacao eletrica tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.";
 }
 
 // Tabela de precos TV por polegadas
@@ -1094,21 +1093,15 @@ async function gerarTextoOrcamento(desc, comentarios, nome) {
   var peca     = detectarPecaTV(comentarios) || "conjunto eletronico";
   var preco    = pol ? getPrecoPorPolegadas(pol) : null;
 
-  // Monta texto com o modelo padrao TV
-  var saud  = "Ola, " + primeiro + " bom dia, aqui e o Pedro da TV Assistencia.";
-  var diag  = "\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da " + peca + ". As pecas serao trocadas tambem e sera feito a reoperacao eletrica.";
-  var valor = preco
-    ? " Este conserto completo fica em " + preco + " reais apenas. Aprovando ja iniciamos o servico."
-    : " Este conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o servico.";
-
-  var texto = saud + diag + valor;
+  // Monta texto com modelo padrao TV Assistencia
+  var texto = primeiro + " bom dia, sou o Pedro da Reparo Eletro e vou passar seu orcamento:\n\nForam feito os testes, identificamos que sera necessario fazer a troca da " + peca + " da TV, sera feito a reoperacao eletrica tambem. Este conserto completo fica em " + (preco || "[VALOR]") + " reais apenas. Aprovando ja iniciamos o conserto.";
 
   // Se nao detectou polegadas, tenta com Claude para extrair
   if (!pol) {
     try {
       var comStr  = (comentarios || []).join("; ");
       var userMsg = "Ficha TV:\nDefeito: " + (desc||"nao informado") + (comStr ? "\nInfos: "+comStr : "");
-      var sysMsg  = "Voce e Pedro da TV Assistencia. Gere orcamento de TV seguindo EXATAMENTE este modelo:\n\nOla, NOME bom dia, aqui e o Pedro da TV Assistencia.\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da [PECA]. As pecas serao trocadas tambem e sera feito a reoperacao eletrica. Este conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o servico.\n\nSubstitua NOME pelo primeiro nome real. Mantenha [VALOR] literal. [PECA] = peca mais provavel (barramento, placa, placa T-CON, flat, memoria, solda, fonte). Responda so com o texto do orcamento.";
+      var sysMsg  = "Voce e Pedro da Reparo Eletro. Gere orcamento de TV seguindo EXATAMENTE este modelo:\n\nNOME bom dia, sou o Pedro da Reparo Eletro e vou passar seu orcamento:\n\nForam feito os testes, identificamos que sera necessario fazer a troca da [PECA] da TV, sera feito a reoperacao eletrica tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.\n\nSubstitua NOME pelo primeiro nome real (so o nome, sem Ola ou virgula antes). Mantenha [VALOR] literal. [PECA] = peca mais provavel (placa fonte, placa principal, placa T-CON, barramento, flat, memoria, solda). Responda so com o texto do orcamento.";
       var res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
