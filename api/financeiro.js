@@ -511,7 +511,23 @@ module.exports = async function handler(req, res) {
     return res.status(200).json(result);
   }
 
-    // ── GET restore-backup ───────────────────────────────────────
+    // ── POST mover-fase — move uma ficha para qualquer fase
+  if (req.method === "POST" && action === "mover-fase") {
+    const { id, phaseId } = req.body || {};
+    if (!id || !phaseId) return res.status(400).json({ ok: false, error: "id e phaseId obrigatórios" });
+    const fin = await dbGet(FIN_KEY) || { records: [], syncedIds: [] };
+    const rec = (fin.records || []).find(r => r.id === id || r.pipefyId === id);
+    if (!rec) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
+    const prev = rec.phaseId;
+    rec.phaseId = phaseId;
+    rec.movedAt = new Date().toISOString();
+    rec.history = [...(rec.history || []), { phaseId, ts: rec.movedAt }];
+    await dbSet(FIN_KEY, fin);
+    try { await dbSet(FIN_BACKUP_KEY, { ...fin, backedUpAt: new Date().toISOString() }); } catch(e) {}
+    return res.status(200).json({ ok: true, record: rec, prev });
+  }
+
+  // ── GET restore-backup ───────────────────────────────────────
   if (action === "restore-backup") {
     try {
       const backup = await dbGet(FIN_BACKUP_KEY);
