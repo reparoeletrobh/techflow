@@ -832,13 +832,13 @@ function showToast(icon,title,msg) {
 
 // -- MOVER OS -------------------------------------------------
 function renderMover() {
-  if (!allData) { loadData().then(renderMover); return; }
-  var records = allData.records || [];
+  if (!records || !records.length) { load().then(renderMover); return; }
+  var recs = records;
 
   // Populate select
   var select = document.getElementById('mover-select');
   select.innerHTML = '<option value="">-- Selecionar ficha --</option>';
-  records.forEach(function(r) {
+  recs.forEach(function(r) {
     var opt = document.createElement('option');
     opt.value = r.id;
     opt.textContent = (r.osCode ? '#'+r.osCode+' -- ' : '') + (r.nomeContato||r.title||r.id) + ' ['+getFaseName(r.phaseId)+']';
@@ -852,7 +852,7 @@ function renderMover() {
     pagamento_agendado:'#22c55e',entrega_agendada:'#f5c800',entrega_liberada:'#22c55e',
     rota_criada:'#06b6d4',item_coletado:'#22c55e'};
 
-  records.forEach(function(r) {
+  recs.forEach(function(r) {
     var cor = cores[r.phaseId] || '#888';
     var row = document.createElement('div');
     row.style.cssText = 'display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;flex-wrap:wrap;';
@@ -916,7 +916,7 @@ async function moverFicha(id, fase) {
     }).then(function(r){return r.json();});
     if (r.ok) {
       showToast('✅','Ficha movida!', getFaseName(fase));
-      await loadData();
+      await load();
       renderMover();
     } else {
       showToast('❌','Erro',r.error||'');
