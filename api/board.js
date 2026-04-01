@@ -1,7 +1,8 @@
 const PIPEFY_API = "https://api.pipefy.com/graphql";
 const PIPE_ID    = "305832912";
-const BOARD_KEY  = "reparoeletro_board";
-const LOGS_KEY   = "reparoeletro_logs";
+const BOARD_KEY   = "reparoeletro_board";
+const LOGS_KEY    = "reparoeletro_logs";
+const BACKUP_KEY  = "reparoeletro_board_backup";
 
 const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g, "").trim();
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g, "").trim();
@@ -431,7 +432,10 @@ module.exports = async function handler(req, res) {
           newCount++;
         }
         board.movesLog = trimLog(board.movesLog);
-        if (newCount > 0) await dbSet(BOARD_KEY, board);
+        if (newCount > 0) {
+          await dbSet(BOARD_KEY, board);
+          try { await dbSet(BACKUP_KEY, { ...board, backedUpAt: new Date().toISOString() }); } catch(e) {}
+        }
       await saveLogs(board);
       } catch (e) { pipefyError = e.message; }
 
@@ -511,6 +515,8 @@ module.exports = async function handler(req, res) {
         fresh.syncedIds = approved.map(c => c.pipefyId);
       } catch (e) { console.error("Reset:", e.message); }
       const saved = await dbSet(BOARD_KEY, fresh);
+      // Backup automático
+      try { await dbSet(BACKUP_KEY, { ...fresh, backedUpAt: new Date().toISOString() }); } catch(e) {}
       return res.status(200).json({ ok: saved, board: fresh, markedAsSeen: fresh.syncedIds.length });
     }
 
@@ -1399,6 +1405,80 @@ module.exports = async function handler(req, res) {
       } catch(e) { result.erroQuery = e.message; }
 
       return res.status(200).json(result);
+    }
+
+    // ── GET fix-recovered — move cards recuperados para aguardando_ret, remove ERP/Finalizado
+    if (action === "fix-recovered") {
+      try {
+        const board = sanitizeBoard(await dbGet(BOARD_KEY));
+        const recovered = board.cards.filter(c => c.recoveredAt);
+        if (!recovered.length) return res.status(200).json({ ok: true, msg: "Nenhum card recuperado", moved: 0 });
+
+        // Busca quais estão em ERP ou Finalizado no Pipefy
+        const ids = recovered.map(c => c.pipefyId);
+        const aliases = ids.slice(0, 50).map((id, j) => `c${j}: card(id: "${id}") { id current_phase { name } }`).join(" ");
+        let erpIds = new Set();
+        try {
+          const data = await pipefyQuery(`query { ${aliases} }`);
+          for (let j = 0; j < ids.length; j++) {
+            const card = data[`c${j}`];
+            const fase = card?.current_phase?.name?.toLowerCase() || "";
+            if (fase.includes("erp") || fase.includes("finaliz") || fase.includes("conclu") || fase.includes("descar") || fase.includes("reprov")) {
+              erpIds.add(ids[j]);
+            }
+          }
+        } catch(e) { console.error("fix-recovered pipefy check:", e.message); }
+
+        let moved = 0, removed = 0;
+        board.cards = board.cards.filter(c => {
+          if (!c.recoveredAt) return true; // não mexe em cards normais
+          if (erpIds.has(c.pipefyId)) { removed++; return false; } // remove ERP/Finalizado
+          c.phaseId = "aguardando_ret"; // move para aguardando retirada
+          delete c.recoveredAt; // limpa flag
+          moved++;
+          return true;
+        });
+
+        await dbSet(BOARD_KEY, board);
+        await dbSet(BACKUP_KEY, { ...board, backedUpAt: new Date().toISOString() });
+        return res.status(200).json({ ok: true, moved, removed, total: board.cards.length });
+      } catch(e) {
+        return res.status(200).json({ ok: false, error: "fix-recovered: " + e.message });
+      }
+    }
+
+    // ── GET restore-backup — restaura board do último backup
+    if (action === "restore-backup") {
+      try {
+        const backup = await dbGet(BACKUP_KEY);
+        if (!backup) return res.status(200).json({ ok: false, error: "Nenhum backup encontrado" });
+        await dbSet(BOARD_KEY, backup);
+        return res.status(200).json({ ok: true, backedUpAt: backup.backedUpAt, cards: backup.cards?.length });
+      } catch(e) {
+        return res.status(200).json({ ok: false, error: e.message });
+      }
+    }
+
+    // ── GET get-pipefy-phases — mostra fases reais do Pipefy ──
+    if (action === "get-pipefy-phases") {
+      try {
+        const data = await pipefyQuery(`query {
+          pipe(id: "${PIPE_ID}") {
+            phases {
+              name
+              cards_count
+            }
+          }
+        }`);
+        const phases = (data?.pipe?.phases || []).map(p => ({
+          name: p.name,
+          count: p.cards_count || 0,
+          lower: p.name.toLowerCase()
+        }));
+        return res.status(200).json({ ok: true, phases });
+      } catch(e) {
+        return res.status(200).json({ ok: false, error: e.message });
+      }
     }
 
     // ── GET recover-all — reimporta TODOS os cards de todas as fases ativas ──
