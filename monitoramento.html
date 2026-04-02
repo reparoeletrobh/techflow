@@ -166,11 +166,11 @@ async function loadAll() {
   document.getElementById('sections').innerHTML = '<div class="spinner"><div class="spin"></div>Buscando dados...</div>';
 
   try {
-    var [boardRes, orcRes, compraRes, ultimaChamadaRes, finRes] = await Promise.all([
+    var [boardRes, orcRes, compraRes, semRespostaRes, finRes] = await Promise.all([
       fetch('/api/board?action=load').then(function(r){return r.json();}),
       fetch('/api/orcamento?action=orc-load').then(function(r){return r.json();}),
       fetch('/api/compra-equip?action=load').then(function(r){return r.json();}).catch(function(){return {items:[]};}),
-      fetch('/api/orcamento?action=ultima-chamada').then(function(r){return r.json();}).catch(function(){return {cards:[]};}),
+      fetch('/api/orcamento?action=sem-resposta').then(function(r){return r.json();}).catch(function(){return {cards:[]};}),
       fetch('/api/financeiro?action=load').then(function(r){return r.json();}).catch(function(){return {records:[]};}),
     ]);
 
@@ -184,7 +184,7 @@ async function loadAll() {
       pecaDisponivel: cards.filter(function(c){return c.phaseId==='peca_disponivel';}),
       urgencia:       cards.filter(function(c){return c.phaseId==='urgencia';}),
       equipComprado:  (compraRes.items||[]).filter(function(i){return i.status==='comprado' && !i.cadastradoVendas;}),
-      ultimaChamada:  ultimaChamadaRes.cards || [],
+      semResposta:    semRespostaRes.cards || [],
       analisePagamento: (finRes.records||[]).filter(function(r){return r.phaseId==='analise_pagamento';}),
     };
 
@@ -203,7 +203,7 @@ function renderSummary() {
     {label:'Peça Disponível',count: data.pecaDisponivel.length, c:'#3b9eff'},
     {label:'Equip. p/ Cadastrar',count:data.equipComprado.length,c:'#a855f7'},
     {label:'Em Urgência',   count: data.urgencia.length,        c:'#ef4444'},
-    {label:'Última Chamada', count: data.ultimaChamada.length,   c:'#f97316'},
+    {label:'Sem Resposta',   count: data.semResposta.length,     c:'#f97316'},
     {label:'Análise Pgto',   count: data.analisePagamento.length, c:'#9b72ff'},
   ];
   var total = items.reduce(function(a,i){return a+i.count;},0);
@@ -275,16 +275,15 @@ function renderSections() {
     '</div>';
   });
 
-  // 5. Última Chamada
-  html += renderSection('Última Chamada — orçamento prestes a expirar', data.ultimaChamada, '#f97316', function(item){
-    var ms = item.age ? item.age * 1000 : null;
-    var hot = ms && ms > 86400000 * 5;
+  // 5. Sem Resposta
+  html += renderSection('Sem Resposta — orçamento sem retorno há 2+ dias', data.semResposta, '#f97316', function(item){
+    var hot = item.age >= 5;
     return '<div class="item-card" style="--c:#f97316">' +
       '<div class="item-nome">'+escH(item.nome||item.title||'—')+'</div>' +
       '<div class="item-desc">'+escH((item.desc||'').slice(0,80))+'</div>' +
-      (hot
-        ? '<div class="item-age hot" style="--c:#ef4444">⚠️ '+fmtSince(null, ms)+'</div>'
-        : '<div class="item-age" style="--c:#f97316">'+(item.age ? Math.floor(item.age/86400)+'d' : '—')+'</div>') +
+      '<div class="item-age'+(hot?' hot':'')+'" style="--c:'+(hot?'#ef4444':'#f97316')+'">'+
+        (hot?'🔥 ':'')+item.age+'d sem resposta'+
+      '</div>' +
     '</div>';
   });
 
