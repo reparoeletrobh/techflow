@@ -783,7 +783,7 @@ function addDiasUteis(dias) {
 async function fetchAguardandoAprovacao() {
   // Busca das 2 fases: Aguardando Orçamento E Aguardando Aprovação
   const all = [];
-  for (const phaseId of [AGUARDANDO_ORCAMENTO_PHASE_ID, AGUARDANDO_APROVACAO_PHASE_ID]) {
+  for (const phaseId of [AGUARDANDO_APROVACAO_PHASE_ID]) { // apenas Aguardando Aprovacao
   let cursor = null, hasNext = true;
   while (hasNext) {
     const after = cursor ? `, after: "${cursor}"` : "";
