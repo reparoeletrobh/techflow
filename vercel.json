@@ -5,7 +5,7 @@
       "schedule": "0 2 * * 1"
     },
     {
-      "path": "/api/board?action=reprocess-erp-timestamps",
+      "path": "/api/board?action=scan-erp-full",
       "schedule": "0 3 * * *"
     }
   ],
