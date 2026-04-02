@@ -107,6 +107,10 @@
       "destination": "/nf-setup.html"
     },
     {
+      "source": "/compras-pecas",
+      "destination": "/compras-pecas.html"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/home.html"
     }
