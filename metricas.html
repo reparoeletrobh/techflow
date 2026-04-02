@@ -897,25 +897,17 @@ async function syncBoard() {
   var btn = document.getElementById('sync-btn');
   btn.textContent = '⏳ Sync...';
   btn.disabled = true;
-  // Timeout de 25s para não travar
   var timeout = setTimeout(function() {
     btn.textContent = '⟳ Sync';
     btn.disabled = false;
-    showToast('⚠️','Sync demorou','Tente novamente');
-  }, 25000);
+    showToast('⚠️','Timeout','Dados parcialmente atualizados');
+  }, 20000);
   try {
-    var hoje = df(new Date());
-    await Promise.all([
-      fetch('/api/board?action=sync'),
-      fetch('/api/board?action=scan-erp-day&date=' + hoje)
-    ]);
+    await fetch('/api/board?action=sync');
     await load();
-    if (filtroAtivo) {
-      try { await renderFiltrado(); } catch(e2) {}
-    }
-    showToast('✅','Sync concluído','ERPs do dia atualizados');
+    showToast('✅','Sync concluído','');
   } catch(e) {
-    showToast('❌','Erro no sync', e.message);
+    showToast('❌','Erro', e.message);
   }
   clearTimeout(timeout);
   btn.textContent = '⟳ Sync';
