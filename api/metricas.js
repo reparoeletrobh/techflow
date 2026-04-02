@@ -149,32 +149,32 @@ module.exports = async function handler(req, res) {
     const db = rawDb || { dias: [] };
     if (!Array.isArray(db.dias)) db.dias = [];
 
-    // ERP ao vivo do Pipefy
+    // ERP ao vivo do Pipefy — com paginação completa e agrupamento por data de entrada
     let erpCards = [];
     try { erpCards = await fetchErpCards(); } catch(e) {}
 
+    // Agrupa ERPs por data de entrada (phases_history) — fonte primária
+    const erpPorDia    = {};
+    const valorErpPorDia = {};
+    for (const card of erpCards) {
+      if (!card.entradaDate) continue;
+      erpPorDia[card.entradaDate]     = (erpPorDia[card.entradaDate]     || 0) + 1;
+      valorErpPorDia[card.entradaDate] = (valorErpPorDia[card.entradaDate] || 0) + (card.valor || 0);
+    }
+
     const erpAtual = {
-      count:  erpCards.length,
-      valor:  erpCards.reduce((s, c) => s + c.valor, 0),
-      cards:  erpCards,
+      count: erpCards.length,
+      valor: erpCards.reduce((s, c) => s + c.valor, 0),
+      cards: erpCards,
     };
 
-    // metaLog para distribuição temporal dos ERPs e Coletas
-    const metaLog    = logsData?.metaLog || [];
-    const erpLog     = metaLog.filter(m => m.phaseId === "erp_entrada");
-    const coletaLog  = metaLog.filter(m => m.phaseId === "coleta_solicitada");
-    const orcLog     = metaLog.filter(m => m.phaseId === "aguardando_aprovacao");
+    // metaLog para Coletas e Orçamentos (esses permanecem do log local)
+    const metaLog   = logsData?.metaLog || [];
+    const coletaLog = metaLog.filter(m => m.phaseId === "coleta_solicitada");
+    const orcLog    = metaLog.filter(m => m.phaseId === "aguardando_aprovacao");
 
-    // Agrupa por dia
-    const erpPorDia    = {};
     const coletaPorDia = {};
     const orcPorDia    = {};
-    const valorErpPorDia = {};
-    for (const e of erpLog) {
-      const d = toDateStr(new Date(e.timestamp).getTime());
-      erpPorDia[d]     = (erpPorDia[d]     || 0) + 1;
-      valorErpPorDia[d] = (valorErpPorDia[d] || 0) + (e.valor || 0);
-    }
     for (const e of coletaLog) {
       const d = toDateStr(new Date(e.timestamp).getTime());
       coletaPorDia[d] = (coletaPorDia[d] || 0) + 1;
