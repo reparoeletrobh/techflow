@@ -327,7 +327,7 @@ function orcCard(f) {
 
   // Botões
   var btns = document.createElement('div'); btns.className = 'orc-actions';
-  var bSend = document.createElement('button'); bSend.className = 'orc-btn primary'; bSend.textContent = '📲 Copiar e Enviar';
+  var bSend = document.createElement('button'); bSend.className = 'orc-btn primary'; bSend.textContent = '📋 Copiar e Enviar';
   bSend.onclick = (function(fid, ftel){return function(){copiarEnviar(fid, ftel);};})(f.id, f.tel||'');
 
   var bConf = document.createElement('button'); bConf.className = 'orc-btn green'; bConf.textContent = '✅ Aprovado';
@@ -354,15 +354,21 @@ async function copiarEnviar(fid, tel) {
   if (num.startsWith('55') && num.length >= 12) num = num.slice(2);
   if (num.length === 10) num = num.slice(0,2) + '9' + num.slice(2);
 
-  if (num && num.length >= 11) {
-    // Abre WhatsApp com o texto pronto
-    var url = 'https://wa.me/55' + num + '?text=' + encodeURIComponent(texto || '');
-    window.open(url, '_blank');
-  } else {
-    // Sem número: copia para clipboard
-    try { await navigator.clipboard.writeText(texto || ''); } catch(e) {}
-    showToast('📋','Texto copiado!','Número não encontrado');
+  // Monta o conteúdo: link wa.me + texto
+  var conteudo = num && num.length >= 11
+    ? 'https://wa.me/55' + num + '?text=' + encodeURIComponent(texto || '') + '\n\n' + (texto || '')
+    : (texto || '');
+
+  // Copia para área de transferência (sem abrir aba)
+  try {
+    await navigator.clipboard.writeText(conteudo);
+  } catch(e) {
+    var ta = document.createElement('textarea');
+    ta.value = conteudo;
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
   }
+  showToast('📋','Copiado!', num ? 'Link wa.me + texto prontos' : 'Texto copiado');
 
   await marcarEnviado(fid, preco);
 }
