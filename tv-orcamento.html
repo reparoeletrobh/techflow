@@ -354,9 +354,9 @@ async function copiarEnviar(fid, tel) {
   if (num.startsWith('55') && num.length >= 12) num = num.slice(2);
   if (num.length === 10) num = num.slice(0,2) + '9' + num.slice(2);
 
-  // Monta o conteúdo: link wa.me + texto
+  // Só o link wa.me com texto embutido
   var conteudo = num && num.length >= 11
-    ? 'https://wa.me/55' + num + '?text=' + encodeURIComponent(texto || '') + '\n\n' + (texto || '')
+    ? 'https://wa.me/55' + num + '?text=' + encodeURIComponent(texto || '')
     : (texto || '');
 
   // Copia para área de transferência (sem abrir aba)
