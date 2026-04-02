@@ -469,16 +469,29 @@ module.exports = async function handler(req, res) {
             metaChanged = true;
           }
         }
-        for (const { id, node } of erpCards) {
+        for (const { id } of erpCards) {
           if (!seenErp.has(id)) {
-            // Busca valor do card separadamente para não sobrecarregar fetchAllPhaseCards
+            // Busca valor E timestamp real de entrada em ERP via phases_history
             let valor = 0;
+            let erpTimestamp = new Date().toISOString();
             try {
-              const fields = await fetchCardFields(id);
-              const f = fields.find(f => f.name.toLowerCase().includes("valor"));
-              if (f?.value) valor = parseFloat(String(f.value).replace(/[^\d.,]/g,"").replace(",",".")) || 0;
-            } catch(e) {}
-            board.metaLog.push({ phaseId: "erp_entrada", pipefyId: id, valor, timestamp: new Date().toISOString() });
+              const cardData = await pipefyQuery(`query {
+                card(id: "${id}") {
+                  fields { name value }
+                  phases_history { phase { name } firstTimeIn lastTimeOut }
+                }
+              }`);
+              // Valor do contrato
+              const fields = cardData?.card?.fields || [];
+              const vf = fields.find(f => f.name.toLowerCase().includes("valor"));
+              if (vf?.value) valor = parseFloat(String(vf.value).replace(/[^\d.,]/g,"").replace(",",".")) || 0;
+              // Timestamp real de entrada em ERP
+              const hist = (cardData?.card?.phases_history || []).find(h =>
+                h.phase?.name?.toLowerCase().includes("erp")
+              );
+              if (hist?.firstTimeIn) erpTimestamp = hist.firstTimeIn;
+            } catch(e) { console.error("ERP card fetch:", e.message); }
+            board.metaLog.push({ phaseId: "erp_entrada", pipefyId: id, valor, timestamp: erpTimestamp });
             metaChanged = true;
           }
         }
@@ -1405,6 +1418,31 @@ module.exports = async function handler(req, res) {
       } catch(e) { result.erroQuery = e.message; }
 
       return res.status(200).json(result);
+    }
+
+    // ── POST reset-erp-batch — remove entradas ERP de um intervalo e força re-sync com phases_history
+    if (req.method === "POST" && action === "reset-erp-batch") {
+      const { after, before } = req.body || {};
+      if (!after || !before) return res.status(400).json({ ok: false, error: "after e before obrigatórios" });
+      try {
+        const board = sanitizeBoard(await dbGet(BOARD_KEY));
+        if (!Array.isArray(board.metaLog)) board.metaLog = [];
+        const afterMs  = new Date(after).getTime();
+        const beforeMs = new Date(before).getTime();
+        // Coleta pipefyIds das entradas ruins
+        const badIds = new Set();
+        board.metaLog = board.metaLog.filter(m => {
+          if (m.phaseId !== "erp_entrada") return true;
+          const ts = new Date(m.timestamp).getTime();
+          if (ts >= afterMs && ts <= beforeMs) { badIds.add(m.pipefyId); return false; }
+          return true;
+        });
+        // Remove esses IDs do seenErp implicitamente (já removemos do metaLog)
+        // O próximo sync vai re-detectá-los e buscar phases_history
+        await dbSet(BOARD_KEY, board);
+        await saveLogs(board);
+        return res.status(200).json({ ok: true, removed: badIds.size, ids: [...badIds].slice(0,5) });
+      } catch(e) { return res.status(200).json({ ok: false, error: e.message }); }
     }
 
     // ── GET fix-recovered — move cards recuperados para aguardando_ret, remove ERP/Finalizado
