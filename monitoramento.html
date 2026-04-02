@@ -150,8 +150,8 @@ function timeSince(iso) {
   return Date.now() - new Date(iso).getTime();
 }
 
-function fmtSince(iso) {
-  var ms = timeSince(iso);
+function fmtSince(iso, msOverride) {
+  var ms = msOverride || timeSince(iso);
   if (!ms) return '—';
   var mins = Math.floor(ms/60000);
   if (mins < 60) return mins + ' min';
@@ -166,10 +166,12 @@ async function loadAll() {
   document.getElementById('sections').innerHTML = '<div class="spinner"><div class="spin"></div>Buscando dados...</div>';
 
   try {
-    var [boardRes, orcRes, compraRes] = await Promise.all([
+    var [boardRes, orcRes, compraRes, ultimaChamadaRes, finRes] = await Promise.all([
       fetch('/api/board?action=load').then(function(r){return r.json();}),
       fetch('/api/orcamento?action=orc-load').then(function(r){return r.json();}),
-      fetch('/api/compra-equip?action=load').then(function(r){return r.json();}).catch(function(){return {items:[]};})
+      fetch('/api/compra-equip?action=load').then(function(r){return r.json();}).catch(function(){return {items:[]};}),
+      fetch('/api/orcamento?action=ultima-chamada').then(function(r){return r.json();}).catch(function(){return {cards:[]};}),
+      fetch('/api/financeiro?action=load').then(function(r){return r.json();}).catch(function(){return {records:[]};}),
     ]);
 
     var cards = boardRes.board?.cards || [];
@@ -182,6 +184,8 @@ async function loadAll() {
       pecaDisponivel: cards.filter(function(c){return c.phaseId==='peca_disponivel';}),
       urgencia:       cards.filter(function(c){return c.phaseId==='urgencia';}),
       equipComprado:  (compraRes.items||[]).filter(function(i){return i.status==='comprado' && !i.cadastradoVendas;}),
+      ultimaChamada:  ultimaChamadaRes.cards || [],
+      analisePagamento: (finRes.records||[]).filter(function(r){return r.phaseId==='analise_pagamento';}),
     };
 
     renderSummary();
@@ -199,6 +203,8 @@ function renderSummary() {
     {label:'Peça Disponível',count: data.pecaDisponivel.length, c:'#3b9eff'},
     {label:'Equip. p/ Cadastrar',count:data.equipComprado.length,c:'#a855f7'},
     {label:'Em Urgência',   count: data.urgencia.length,        c:'#ef4444'},
+    {label:'Última Chamada', count: data.ultimaChamada.length,   c:'#f97316'},
+    {label:'Análise Pgto',   count: data.analisePagamento.length, c:'#9b72ff'},
   ];
   var total = items.reduce(function(a,i){return a+i.count;},0);
   var html = items.map(function(i){
@@ -266,6 +272,28 @@ function renderSections() {
       '<div class="item-nome">'+escH(c.nomeContato||'—')+'</div>' +
       '<div class="item-desc">'+escH((c.descricao||'').slice(0,80))+'</div>' +
       (hot ? '<div class="item-age hot" style="--c:#ef4444">' : '<div class="item-age" style="--c:#ef4444">') + '⚡ ' + fmtSince(c.addedAt) + '</div>' +
+    '</div>';
+  });
+
+  // 5. Última Chamada
+  html += renderSection('Última Chamada — orçamento prestes a expirar', data.ultimaChamada, '#f97316', function(item){
+    var ms = item.age ? item.age * 1000 : null;
+    var hot = ms && ms > 86400000 * 5;
+    return '<div class="item-card" style="--c:#f97316">' +
+      '<div class="item-nome">'+escH(item.nome||item.title||'—')+'</div>' +
+      '<div class="item-desc">'+escH((item.desc||'').slice(0,80))+'</div>' +
+      (hot
+        ? '<div class="item-age hot" style="--c:#ef4444">⚠️ '+fmtSince(null, ms)+'</div>'
+        : '<div class="item-age" style="--c:#f97316">'+(item.age ? Math.floor(item.age/86400)+'d' : '—')+'</div>') +
+    '</div>';
+  });
+
+  // 6. Análise de Pagamento
+  html += renderSection('Análise de Pagamento — aguardando confirmação', data.analisePagamento, '#9b72ff', function(r){
+    return '<div class="item-card" style="--c:#9b72ff">' +
+      '<div class="item-nome">'+escH(r.nomeContato||r.title||'—')+'</div>' +
+      '<div class="item-desc">'+escH((r.descricao||r.title||'').slice(0,80))+'</div>' +
+      '<div class="item-age" style="--c:#9b72ff">'+fmtSince(r.movedAt)+'</div>' +
     '</div>';
   });
 
