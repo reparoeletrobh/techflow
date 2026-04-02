@@ -224,7 +224,16 @@ function renderSummary() {
 function renderSections() {
   var html = '';
 
-  // 1. Orçamentos pendentes
+  // 1. Análise de Pagamento — PRIMEIRO
+  html += renderSection('Análise de Pagamento — aguardando confirmação', data.analisePagamento, '#9b72ff', function(r){
+    return '<div class="item-card" style="--c:#9b72ff">' +
+      '<div class="item-nome">'+escH(r.nomeContato||r.title||'—')+'</div>' +
+      '<div class="item-desc">'+escH((r.descricao||r.title||'').slice(0,80))+'</div>' +
+      '<div class="item-age" style="--c:#9b72ff">'+fmtSince(r.movedAt)+'</div>' +
+    '</div>';
+  });
+
+  // 2. Orçamentos pendentes
   html += renderSection('Orçamentos não enviados', data.orcPendentes, '#f5c800', function(f){
     var semValor = (!f.preco && !f.precoSugerido) || (f.textoOrc||'').includes('[VALOR]');
     return '<div class="item-card" style="--c:#f5c800">' +
@@ -284,15 +293,6 @@ function renderSections() {
       '<div class="item-age'+(hot?' hot':'')+'" style="--c:'+(hot?'#ef4444':'#f97316')+'">'+
         (hot?'🔥 ':'')+item.age+'d sem resposta'+
       '</div>' +
-    '</div>';
-  });
-
-  // 6. Análise de Pagamento
-  html += renderSection('Análise de Pagamento — aguardando confirmação', data.analisePagamento, '#9b72ff', function(r){
-    return '<div class="item-card" style="--c:#9b72ff">' +
-      '<div class="item-nome">'+escH(r.nomeContato||r.title||'—')+'</div>' +
-      '<div class="item-desc">'+escH((r.descricao||r.title||'').slice(0,80))+'</div>' +
-      '<div class="item-age" style="--c:#9b72ff">'+fmtSince(r.movedAt)+'</div>' +
     '</div>';
   });
 
