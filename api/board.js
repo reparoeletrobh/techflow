@@ -1458,89 +1458,80 @@ module.exports = async function handler(req, res) {
       return res.status(200).json(result);
     }
 
-    // ── GET scan-erp-day — varre TODAS as fases buscando cards que entraram em ERP num dia
-    // Necessário para capturar cards que já saíram do ERP (Finalizado, Descarte, etc.)
-    if (action === "scan-erp-day") {
-      const targetDate = req.query.date || new Date(Date.now() - 3*60*60*1000).toISOString().slice(0,10);
+    // ── GET scan-erp-full — varre TODAS as fases com paginação completa buscando cards que
+    // entraram em ERP em qualquer data, usando phases_history real do Pipefy
+    if (action === "scan-erp-full") {
+      const targetDate = req.query.date || null; // null = todas as datas
       try {
         const board = sanitizeBoard(await dbGet(BOARD_KEY));
         if (!Array.isArray(board.metaLog)) board.metaLog = [];
         const seenErp = new Set(board.metaLog.filter(m=>m.phaseId==="erp_entrada").map(m=>m.pipefyId));
 
-        // Busca todas as fases do pipe incluindo downstream (ERP, Finalizado, Descarte, RS, etc.)
-        const scanPhases = ["erp","finaliz","conclu","descar","reprov","rs","fechamento","entregue"];
+        // ID real da fase ERP no Pipefy
+        const ERP_PHASE_ID = "339008925";
 
-        const phasesData = await pipefyQuery(`query {
-          pipe(id: "${PIPE_ID}") {
-            phases {
-              name
-              cards(first: 50) {
-                edges {
-                  node {
-                    id
-                    fields { name value }
-                    phases_history { phase { name } firstTimeIn }
+        // Fases downstream do ERP para varrer (com paginação completa)
+        const phasesRes = await pipefyQuery(`query { pipe(id:"${PIPE_ID}") { phases { id name } } }`);
+        const allPhases = phasesRes?.pipe?.phases || [];
+
+        // Fases que podem ter cards que passaram pelo ERP
+        const scanKeywords = ["erp","finaliz","descart","reprovado","rs urgente","^rs$","fechamento","entregue","conclu"];
+        const targetPhases = allPhases.filter(ph => {
+          const l = ph.name.toLowerCase().trim();
+          return scanKeywords.some(k => {
+            if (k.startsWith("^") && k.endsWith("$")) return l === k.slice(1,-1);
+            return l.includes(k);
+          });
+        });
+
+        let added = 0, scanned = 0;
+
+        for (const phase of targetPhases) {
+          let cursor = null, hasNext = true;
+          while (hasNext) {
+            const after = cursor ? `, after: "${cursor}"` : "";
+            const res = await pipefyQuery(`query {
+              phase(id: "${phase.id}") {
+                cards(first: 50${after}) {
+                  pageInfo { hasNextPage endCursor }
+                  edges {
+                    node {
+                      id
+                      fields { name value }
+                      phases_history { phase { id name } firstTimeIn }
+                    }
                   }
                 }
               }
+            }`);
+
+            const cards = res?.phase?.cards;
+            hasNext = cards?.pageInfo?.hasNextPage ?? false;
+            cursor  = cards?.pageInfo?.endCursor ?? null;
+
+            for (const { node } of (cards?.edges || [])) {
+              scanned++;
+              const id = String(node.id);
+              if (seenErp.has(id)) continue;
+
+              // Verifica se passou pela fase ERP
+              const erpHist = (node.phases_history || []).find(h =>
+                h.phase?.id === ERP_PHASE_ID || h.phase?.name?.toLowerCase().includes("erp")
+              );
+              if (!erpHist?.firstTimeIn) continue;
+
+              // Se targetDate especificado, filtra pela data (BH = UTC-3)
+              const erpDateBH = new Date(new Date(erpHist.firstTimeIn).getTime() - 3*60*60*1000).toISOString().slice(0,10);
+              if (targetDate && erpDateBH !== targetDate) continue;
+
+              // Busca valor
+              const vf = (node.fields||[]).find(f=>f.name.toLowerCase().includes("valor"));
+              const valor = vf?.value ? parseFloat(String(vf.value).replace(/[^\d.,]/g,"").replace(",",".")) || 0 : 0;
+
+              board.metaLog.push({ phaseId:"erp_entrada", pipefyId:id, valor, timestamp:erpHist.firstTimeIn });
+              seenErp.add(id);
+              added++;
             }
-          }
-        }`);
-
-        const allPhases = phasesData?.pipe?.phases || [];
-        let added = 0, scanned = 0;
-
-        for (const ph of allPhases) {
-          const l = ph.name.toLowerCase();
-          // Só varre fases que fazem sentido (downstream do ERP)
-          if (!scanPhases.some(s => l.includes(s))) continue;
-
-          for (const { node } of (ph.cards?.edges || [])) {
-            scanned++;
-            const id = String(node.id);
-            if (seenErp.has(id)) continue;
-
-            // Verifica se entrou em ERP no dia alvo via phases_history
-            const erpHist = (node.phases_history || []).find(h =>
-              h.phase?.name?.toLowerCase().includes("erp") && h.firstTimeIn
-            );
-            if (!erpHist) continue;
-
-            // Converte timestamp para BH e compara com targetDate
-            const erpTs = erpHist.firstTimeIn;
-            const erpDateBH = new Date(new Date(erpTs).getTime() - 3*60*60*1000).toISOString().slice(0,10);
-            if (erpDateBH !== targetDate) continue;
-
-            // Busca valor
-            const fields = node.fields || [];
-            const vf = fields.find(f => f.name.toLowerCase().includes("valor"));
-            const valor = vf?.value ? parseFloat(String(vf.value).replace(/[^\d.,]/g,"").replace(",",".")) || 0 : 0;
-
-            board.metaLog.push({ phaseId: "erp_entrada", pipefyId: id, valor, timestamp: erpTs });
-            seenErp.add(id);
-            added++;
-          }
-        }
-
-        // Também varre a fase ERP atual
-        const erpPhase = allPhases.find(ph => ph.name.toLowerCase().includes("erp") && !ph.name.toLowerCase().includes("finaliz"));
-        if (erpPhase) {
-          for (const { node } of (erpPhase.cards?.edges || [])) {
-            scanned++;
-            const id = String(node.id);
-            if (seenErp.has(id)) continue;
-            const erpHist = (node.phases_history || []).find(h =>
-              h.phase?.name?.toLowerCase().includes("erp") && h.firstTimeIn
-            );
-            const erpTs = erpHist?.firstTimeIn || new Date().toISOString();
-            const erpDateBH = new Date(new Date(erpTs).getTime() - 3*60*60*1000).toISOString().slice(0,10);
-            if (erpDateBH !== targetDate) continue;
-            const fields = node.fields || [];
-            const vf = fields.find(f => f.name.toLowerCase().includes("valor"));
-            const valor = vf?.value ? parseFloat(String(vf.value).replace(/[^\d.,]/g,"").replace(",",".")) || 0 : 0;
-            board.metaLog.push({ phaseId: "erp_entrada", pipefyId: id, valor, timestamp: erpTs });
-            seenErp.add(id);
-            added++;
           }
         }
 
@@ -1549,60 +1540,20 @@ module.exports = async function handler(req, res) {
           await saveLogs(board);
         }
 
-        return res.status(200).json({ ok: true, targetDate, scanned, added, totalErpMetalog: board.metaLog.filter(m=>m.phaseId==="erp_entrada").length });
+        // Summary por data
+        const erpAll = board.metaLog.filter(m=>m.phaseId==="erp_entrada");
+        const byDay = erpAll.reduce((a,e)=>{
+          const dt = new Date(new Date(e.timestamp).getTime()-3*60*60*1000).toISOString().slice(0,10);
+          a[dt]=(a[dt]||0)+1; return a;
+        },{});
+
+        return res.status(200).json({ ok:true, scanned, added, targetDate, byDay, totalMetalog:erpAll.length });
       } catch(e) {
-        return res.status(200).json({ ok: false, error: "scan-erp-day: " + e.message });
+        return res.status(200).json({ ok:false, error:"scan-erp-full: "+e.message });
       }
     }
 
-    // ── GET reprocess-erp-timestamps — corrige timestamps do metaLog usando phases_history real
-    if (action === "reprocess-erp-timestamps") {
-      try {
-        const board = sanitizeBoard(await dbGet(BOARD_KEY));
-        if (!Array.isArray(board.metaLog)) board.metaLog = [];
-        
-        // Pega todos os erp_entrada únicos
-        const erpEntries = board.metaLog.filter(m => m.phaseId === "erp_entrada");
-        const uniqueIds = [...new Set(erpEntries.map(m => m.pipefyId))].filter(id => !id.startsWith("manual-"));
-        
-        let fixed = 0, errors = 0;
-        // Processa em lotes de 10
-        for (let i = 0; i < uniqueIds.length; i += 10) {
-          const lote = uniqueIds.slice(i, i + 10);
-          const aliases = lote.map((id, j) => `c${j}: card(id: "${id}") { id fields { name value } phases_history { phase { name } firstTimeIn } }`).join(" ");
-          try {
-            const data = await pipefyQuery(`query { ${aliases} }`);
-            for (let j = 0; j < lote.length; j++) {
-              const id = lote[j];
-              const card = data[`c${j}`];
-              if (!card) continue;
-              const hist = (card.phases_history || []).find(h =>
-                h.phase?.name?.toLowerCase().includes("erp") && h.firstTimeIn
-              );
-              if (!hist?.firstTimeIn) continue;
-              const realTs = hist.firstTimeIn;
-              const vf = (card.fields || []).find(f => f.name.toLowerCase().includes("valor"));
-              const valor = vf?.value ? parseFloat(String(vf.value).replace(/[^\d.,]/g,"").replace(",",".")) || 0 : 0;
-              // Atualiza a entrada no metaLog
-              const entry = board.metaLog.find(m => m.phaseId === "erp_entrada" && m.pipefyId === id);
-              if (entry) {
-                entry.timestamp = realTs;
-                entry.valor = valor;
-                fixed++;
-              }
-            }
-          } catch(e) { errors++; }
-        }
-        
-        await dbSet(BOARD_KEY, board);
-        await saveLogs(board);
-        return res.status(200).json({ ok: true, fixed, errors, total: uniqueIds.length });
-      } catch(e) {
-        return res.status(200).json({ ok: false, error: e.message });
-      }
-    }
-
-    // ── POST reset-erp-batch — remove entradas ERP de um intervalo e força re-sync com phases_history
+    // ── POST reset-erp-batch    // ── POST reset-erp-batch — remove entradas ERP de um intervalo e força re-sync com phases_history
     if (req.method === "POST" && action === "reset-erp-batch") {
       const { after, before } = req.body || {};
       if (!after || !before) return res.status(400).json({ ok: false, error: "after e before obrigatórios" });
