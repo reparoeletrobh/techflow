@@ -605,6 +605,12 @@ async function loadBoard() {
       if (!Array.isArray(board.movesLog))   board.movesLog   = [];
       if (!board.rsPhases?.length)    board.rsPhases    = DEFAULT_BOARD.rsPhases;
       if (!board.rsRuaPhases?.length) board.rsRuaPhases = DEFAULT_BOARD.rsRuaPhases;
+      // Garante fase virtual "OS em Atraso" entre cliente_loja e urgencia
+      if (!board.phases.find(p => p.id === 'atrasados')) {
+        const idxLoja = board.phases.findIndex(p => p.id === 'cliente_loja');
+        const insertAt = idxLoja >= 0 ? idxLoja + 1 : board.phases.length;
+        board.phases.splice(insertAt, 0, { id: 'atrasados', name: 'OS em Atraso' });
+      }
     }
   } catch(e) {
     document.getElementById('error-banner').style.display = 'block';
