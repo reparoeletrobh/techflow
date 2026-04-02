@@ -444,6 +444,36 @@ module.exports = async function handler(req, res) {
         const { ids: erpIds } = await fetchErpCardIds();
         if (erpIds.length > 0) {
           const before = board.cards.length;
+
+          // Antes de remover: registra no metaLog cards que ainda não foram registrados
+          // Isso captura cards que saíram do ERP (Finalizado, RS, etc.) antes do sync
+          if (!Array.isArray(board.metaLog)) board.metaLog = [];
+          const seenErpSet = new Set(board.metaLog.filter(m=>m.phaseId==="erp_entrada").map(m=>m.pipefyId));
+          for (const id of erpIds) {
+            if (!seenErpSet.has(id)) {
+              // Busca phases_history para timestamp e valor reais
+              let erpTs = new Date().toISOString();
+              let valor = 0;
+              try {
+                const cardData = await pipefyQuery(`query {
+                  card(id: "${id}") {
+                    fields { name value }
+                    phases_history { phase { name } firstTimeIn }
+                  }
+                }`);
+                const fields = cardData?.card?.fields || [];
+                const vf = fields.find(f => f.name.toLowerCase().includes("valor"));
+                if (vf?.value) valor = parseFloat(String(vf.value).replace(/[^\d.,]/g,"").replace(",",".")) || 0;
+                const hist = (cardData?.card?.phases_history || []).find(h =>
+                  h.phase?.name?.toLowerCase().includes("erp") && h.firstTimeIn
+                );
+                if (hist?.firstTimeIn) erpTs = hist.firstTimeIn;
+              } catch(e) {}
+              board.metaLog.push({ phaseId: "erp_entrada", pipefyId: id, valor, timestamp: erpTs });
+              seenErpSet.add(id);
+            }
+          }
+
           board.cards       = board.cards.filter(c => !erpIds.includes(c.pipefyId));
           board.rsCards     = (board.rsCards     || []).filter(c => !erpIds.includes(c.pipefyId));
           board.rsRuaCards  = (board.rsRuaCards  || []).filter(c => !erpIds.includes(c.pipefyId));
@@ -823,6 +853,31 @@ module.exports = async function handler(req, res) {
     }
 
     // ── GET debug ──────────────────────────────────────────────
+    // ── GET card-phases-debug — mostra phases_history de um card específico
+    if (action === "card-phases-debug") {
+      const { pipefyId } = req.query;
+      if (!pipefyId) return res.status(400).json({ ok: false, error: "pipefyId obrigatório" });
+      try {
+        const data = await pipefyQuery(`query {
+          card(id: "${pipefyId}") {
+            id title
+            current_phase { name id }
+            fields { name value }
+            phases_history { phase { id name } firstTimeIn lastTimeOut }
+          }
+        }`);
+        const card = data?.card;
+        return res.status(200).json({
+          ok: true,
+          id: card?.id,
+          title: card?.title,
+          currentPhase: card?.current_phase,
+          valor: (card?.fields||[]).find(f=>f.name.toLowerCase().includes("valor"))?.value,
+          phasesHistory: card?.phases_history || [],
+        });
+      } catch(e) { return res.status(200).json({ ok: false, error: e.message }); }
+    }
+
     if (action === "debug") {
       const result = {};
 
