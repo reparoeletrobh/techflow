@@ -897,19 +897,27 @@ async function syncBoard() {
   var btn = document.getElementById('sync-btn');
   btn.textContent = '⏳ Sync...';
   btn.disabled = true;
+  // Timeout de 25s para não travar
+  var timeout = setTimeout(function() {
+    btn.textContent = '⟳ Sync';
+    btn.disabled = false;
+    showToast('⚠️','Sync demorou','Tente novamente');
+  }, 25000);
   try {
-    // 1. Sync normal (cards ativos)
-    await fetch('/api/board?action=sync');
-    // 2. Scan ERP do dia — captura cards que já saíram do ERP (Finalizado etc.)
     var hoje = df(new Date());
-    await fetch('/api/board?action=scan-erp-day&date=' + hoje);
-    // 3. Recarrega métricas
+    await Promise.all([
+      fetch('/api/board?action=sync'),
+      fetch('/api/board?action=scan-erp-day&date=' + hoje)
+    ]);
     await load();
-    if (filtroAtivo) await renderFiltrado();
+    if (filtroAtivo) {
+      try { await renderFiltrado(); } catch(e2) {}
+    }
     showToast('✅','Sync concluído','ERPs do dia atualizados');
   } catch(e) {
     showToast('❌','Erro no sync', e.message);
   }
+  clearTimeout(timeout);
   btn.textContent = '⟳ Sync';
   btn.disabled = false;
 }
