@@ -565,6 +565,7 @@ const DEFAULT_BOARD = {
     { id: "aprovado",        name: "Aprovado"           },
     { id: "producao",        name: "Produção"           },
     { id: "cliente_loja",    name: "Cliente Loja"       },
+    { id: "atrasados",       name: "OS em Atraso"       },
     { id: "urgencia",        name: "Urgência"           },
     { id: "comprar_peca",    name: "Comprar Peça"       },
     { id: "aguardando_peca", name: "Aguardando Peça"    },
@@ -649,18 +650,40 @@ function renderBoard() {
   const wrapper = document.getElementById('kanban-wrapper');
   if (!board || !Array.isArray(board.phases)) return;
   const b = document.createElement('div'); b.className = 'kanban-board';
+  const VINTE_QUATRO_H = 86400000; // ms
+  const agora = Date.now();
+
+  // Cards "atrasados": em aprovado/producao/cliente_loja há +24h
+  const atrasadosCards = board.cards.filter(c => {
+    if (!['aprovado','producao','cliente_loja'].includes(c.phaseId)) return false;
+    const ref = c.movedAt || c.addedAt;
+    if (!ref) return false;
+    return (agora - new Date(ref).getTime()) > VINTE_QUATRO_H;
+  });
+  const atrasadosIds = new Set(atrasadosCards.map(c => c.pipefyId));
+
   board.phases.forEach((ph, i) => {
     const color = COLORS[i % COLORS.length];
-    const cards = board.cards.filter(c => c.phaseId === ph.id);
+    let cards;
+    if (ph.id === 'atrasados') {
+      // Fase virtual: mostra cards de aprovado/producao/cliente_loja com +24h
+      cards = atrasadosCards.sort((a,b) => new Date(a.movedAt||a.addedAt) - new Date(b.movedAt||b.addedAt));
+    } else if (['aprovado','producao','cliente_loja'].includes(ph.id)) {
+      // Exclui os que já aparecem em atrasados
+      cards = board.cards.filter(c => c.phaseId === ph.id && !atrasadosIds.has(c.pipefyId));
+    } else {
+      cards = board.cards.filter(c => c.phaseId === ph.id);
+    }
     const col = document.createElement('div'); col.className = 'kanban-col';
+    const headerStyle = ph.id === 'atrasados' ? ' style="background:rgba(239,68,68,.08);border-radius:8px 8px 0 0;"' : '';
     col.innerHTML = `
-      <div class="col-header">
+      <div class="col-header"${headerStyle}>
         <div class="col-stripe" style="background:${color}"></div>
         <div class="col-title">${ph.name}</div>
-        <div class="col-count">${cards.length}</div>
+        <div class="col-count" style="${ph.id==='atrasados'&&cards.length>0?'background:rgba(239,68,68,.3);color:#ef4444;':''}">${cards.length}</div>
       </div>
       <div class="col-body">
-        ${cards.length === 0 ? '<div class="empty-col">— vazio —</div>' : cards.map(c => cardHTML(c, color)).join('')}
+        ${cards.length === 0 ? '<div class="empty-col">— vazio —</div>' : cards.map(c => cardHTML(c, color, ph.id === 'atrasados')).join('')}
       </div>`;
     b.appendChild(col);
   });
@@ -669,10 +692,17 @@ function renderBoard() {
   setTimeout(() => { const t=document.getElementById('hscroll-thumb'); if(t) t.dispatchEvent(new Event('update')); const w=document.getElementById('kanban-wrapper'); if(w) w.dispatchEvent(new Event('scroll')); }, 50);
 }
 
-function cardHTML(c, color) {
+function cardHTML(c, color, isAtrasado) {
+  // Calcula tempo na fase atual
+  const refTs = c.movedAt || c.addedAt;
+  const diffH = refTs ? Math.floor((Date.now() - new Date(refTs).getTime()) / 3600000) : null;
+  const atrasadoBadge = isAtrasado && diffH != null
+    ? `<div style="font-family:var(--fm);font-size:9px;color:#ef4444;padding:2px 6px;background:rgba(239,68,68,.12);border-radius:4px;margin-bottom:4px;">⏱ ${diffH}h em ${c.phaseId === 'aprovado' ? 'Aprovado' : c.phaseId === 'producao' ? 'Produção' : 'Loja'}</div>`
+    : '';
   return `
-    <div class="os-card">
-      <div class="card-bar" style="background:${color}"></div>
+    <div class="os-card" style="${isAtrasado ? 'border-color:rgba(239,68,68,.3);' : ''}">
+      <div class="card-bar" style="background:${isAtrasado ? '#ef4444' : color}"></div>
+      ${atrasadoBadge}
       ${c.localOnly ? '<span class="card-local">local</span>' : ''}
       <div class="card-num">#${c.osCode || c.pipefyId}</div>
       <div class="card-title">${c.title}</div>
