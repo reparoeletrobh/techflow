@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compra de Peças</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050508;--surface:#0d0d14;--surface2:#13131e;--border:#1e1e2e;
+  --text:#e8e8f0;--muted:#5a5a7a;
+  --accent:#3b9eff;--green:#22c55e;--red:#ef4444;--yellow:#f5c800;--orange:#f97316;--purple:#a855f7;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;
+  background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--fh);font-size:14px;font-weight:900;display:flex;align-items:center;gap:8px;}
+.logo-dot{width:8px;height:8px;background:var(--accent);border-radius:50%;box-shadow:0 0 8px var(--accent);}
+.hbtn{font-family:var(--fm);font-size:10px;padding:5px 11px;border-radius:6px;border:1px solid var(--border);
+  background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;text-decoration:none;display:inline-flex;align-items:center;}
+.hbtn:hover{color:var(--text);border-color:var(--accent);}
+
+/* TABS */
+.tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);padding:0 20px;position:sticky;top:52px;z-index:90;}
+.tab{font-family:var(--fm);font-size:10px;padding:10px 16px;cursor:pointer;color:var(--muted);
+  border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;display:flex;align-items:center;gap:6px;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-badge{font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:99px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);}
+.tab.active .tab-badge{background:rgba(59,158,255,.15);color:var(--accent);border-color:rgba(59,158,255,.3);}
+
+/* LAYOUT 2 colunas */
+.page{display:none;flex:1;}
+.page.active{display:flex;}
+.left-col{width:340px;min-width:340px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 97px);position:sticky;top:97px;}
+.right-col{flex:1;overflow-y:auto;padding:20px;height:calc(100vh - 97px);}
+
+/* FORM */
+.form-header{padding:16px 20px 10px;border-bottom:1px solid var(--border);}
+.form-title{font-family:var(--fh);font-size:13px;font-weight:800;}
+.form-body{padding:14px 20px;display:flex;flex-direction:column;gap:10px;}
+.fl{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;}
+.fi{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px 11px;
+  font-family:var(--fb);font-size:13px;color:var(--text);outline:none;width:100%;transition:border .15s;}
+.fi:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(59,158,255,.1);}
+.fi-row{display:flex;gap:8px;}
+.fi-row .fi{width:auto;flex:1;}
+.btn{font-family:var(--fm);font-size:10px;font-weight:700;padding:9px 16px;border-radius:8px;
+  border:none;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px;}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#1a7ad4);color:#fff;width:100%;}
+.btn-primary:hover{filter:brightness(1.1);}
+.btn-sm{font-size:9px;padding:5px 10px;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:6px;}
+.btn-sm:hover{color:var(--text);border-color:var(--accent);}
+.btn-green{background:linear-gradient(135deg,var(--green),#16a34a);color:#000;}
+.btn-orange{background:linear-gradient(135deg,var(--orange),#ea6e0a);color:#fff;}
+.urgente-toggle{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--muted);}
+.urgente-toggle input{accent-color:var(--red);}
+
+/* LISTA */
+.list-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.list-title{font-family:var(--fh);font-size:13px;font-weight:800;}
+.list-actions{display:flex;gap:6px;align-items:center;}
+.empty{font-family:var(--fm);font-size:11px;color:var(--muted);padding:30px;text-align:center;
+  border:1px dashed var(--border);border-radius:8px;}
+
+/* CARD PEÇA */
+.peca-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px;
+  transition:border-color .15s;position:relative;}
+.peca-card:hover{border-color:rgba(59,158,255,.25);}
+.peca-card.selected{border-color:var(--accent);background:rgba(59,158,255,.05);}
+.peca-card.urgente{border-left:3px solid var(--red);}
+.peca-check{margin-top:2px;accent-color:var(--accent);width:15px;height:15px;cursor:pointer;flex-shrink:0;}
+.peca-body{flex:1;}
+.peca-desc{font-size:13px;font-weight:600;}
+.peca-meta{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;}
+.peca-status{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;border:1px solid;}
+.s-pendente{color:var(--yellow);border-color:rgba(245,200,0,.3);background:rgba(245,200,0,.08);}
+.s-aguardando{color:var(--orange);border-color:rgba(249,115,22,.3);background:rgba(249,115,22,.08);}
+.s-pago{color:var(--green);border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.08);}
+.peca-actions{display:flex;gap:5px;margin-top:8px;}
+.previsao-badge{font-family:var(--fm);font-size:9px;color:var(--accent);padding:2px 7px;
+  background:rgba(59,158,255,.1);border:1px solid rgba(59,158,255,.2);border-radius:4px;}
+.previsao-badge.vencida{color:var(--red);background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.2);}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;
+  align-items:center;justify-content:center;backdrop-filter:blur(3px);}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:24px;width:440px;max-width:95vw;display:flex;flex-direction:column;gap:14px;}
+.modal-title{font-family:var(--fh);font-size:15px;font-weight:800;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;}
+.tipo-toggle{display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.tipo-btn{flex:1;padding:8px;font-family:var(--fm);font-size:10px;text-align:center;cursor:pointer;
+  background:transparent;border:none;color:var(--muted);transition:all .15s;}
+.tipo-btn.active{background:var(--accent);color:#fff;}
+
+/* PAINEL ONLINE */
+.online-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}
+.online-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;}
+.online-card.chegou{border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.05);}
+.online-card.atrasada{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.04);}
+.online-eta{font-family:var(--fh);font-size:18px;font-weight:900;margin:6px 0;}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--surface);border:1px solid var(--border);
+  border-top:2px solid var(--accent);border-radius:10px;padding:10px 14px;font-family:var(--fm);
+  font-size:11px;transform:translateY(60px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;}
+.toast.show{transform:translateY(0);opacity:1;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="logo-dot"></div>Reparo<b>Eletro</b> — <span style="color:var(--accent)">Compra de Peças</span></div>
+  <div style="display:flex;gap:8px;">
+    <button class="hbtn" onclick="copiarSelecionadas()" id="btn-copiar" style="display:none;border-color:rgba(59,158,255,.3);color:var(--accent);">📋 Copiar</button>
+    <button class="hbtn" onclick="abrirModalCompra()" id="btn-comprar" style="display:none;border-color:rgba(34,197,94,.3);color:var(--green);">🛒 Comprar selecionadas</button>
+    <a class="hbtn" href="/adm">Home</a>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="trocarTab('pendentes')" id="tab-pendentes">📋 Pendentes <span class="tab-badge" id="badge-pendentes">0</span></div>
+  <div class="tab" onclick="trocarTab('aguardando')" id="tab-aguardando">⏳ Ag. Pagamento <span class="tab-badge" id="badge-aguardando">0</span></div>
+  <div class="tab" onclick="trocarTab('pago')" id="tab-pago">✅ Pagamento Realizado <span class="tab-badge" id="badge-pago">0</span></div>
+  <div class="tab" onclick="trocarTab('online')" id="tab-online">📦 Online c/ Previsão <span class="tab-badge" id="badge-online">0</span></div>
+</div>
+
+<!-- ABA PENDENTES -->
+<div class="page active" id="page-pendentes">
+  <div class="left-col">
+    <div class="form-header">
+      <div class="form-title">➕ Cadastrar Peça</div>
+    </div>
+    <div class="form-body">
+      <div>
+        <div class="fl">Descrição da peça *</div>
+        <input class="fi" id="f-desc" placeholder="Ex: Placa de potência, Capacitor 450V..." />
+      </div>
+      <div>
+        <div class="fl">OS / Referência</div>
+        <input class="fi" id="f-os" placeholder="Número da OS ou cliente" />
+      </div>
+      <div class="fi-row">
+        <div style="flex:1;">
+          <div class="fl">Qtd</div>
+          <input class="fi" id="f-qtd" type="number" min="1" value="1" />
+        </div>
+        <div style="flex:2;">
+          <div class="fl">Observação</div>
+          <input class="fi" id="f-obs" placeholder="Opcional" />
+        </div>
+      </div>
+      <label class="urgente-toggle">
+        <input type="checkbox" id="f-urgente" />
+        🔴 Urgente
+      </label>
+      <button class="btn btn-primary" onclick="cadastrar()">➕ Cadastrar Peça</button>
+    </div>
+  </div>
+  <div class="right-col">
+    <div class="list-header">
+      <div class="list-title">Peças para comprar</div>
+      <div class="list-actions">
+        <button class="btn-sm" onclick="selecionarTodas()">Sel. todas</button>
+        <button class="btn-sm" onclick="deselecionarTodas()">Limpar sel.</button>
+      </div>
+    </div>
+    <div id="lista-pendentes"></div>
+  </div>
+</div>
+
+<!-- ABA AGUARDANDO PAGAMENTO -->
+<div class="page" id="page-aguardando">
+  <div class="right-col" style="max-width:800px;">
+    <div class="list-header">
+      <div class="list-title">⏳ Aguardando Pagamento</div>
+      <div class="list-actions">
+        <button class="btn-sm" onclick="selecionarTodasAba('aguardando')">Sel. todas</button>
+        <button class="btn-sm" style="color:var(--green);border-color:rgba(34,197,94,.3);" onclick="confirmarPagamentoSelecionadas()">✅ Confirmar pagamento</button>
+      </div>
+    </div>
+    <div id="lista-aguardando"></div>
+  </div>
+</div>
+
+<!-- ABA PAGAMENTO REALIZADO -->
+<div class="page" id="page-pago">
+  <div class="right-col" style="max-width:800px;">
+    <div class="list-header">
+      <div class="list-title">✅ Pagamento Realizado</div>
+    </div>
+    <div id="lista-pago"></div>
+  </div>
+</div>
+
+<!-- ABA ONLINE / PREVISÃO -->
+<div class="page" id="page-online">
+  <div class="right-col">
+    <div class="list-header">
+      <div class="list-title">📦 Compras Online — Previsão de Chegada</div>
+    </div>
+    <div class="online-grid" id="lista-online"></div>
+  </div>
+</div>
+
+<!-- MODAL COMPRA -->
+<div class="modal-overlay" id="modal-compra">
+  <div class="modal">
+    <div class="modal-title">🛒 Finalizar Compra</div>
+    <div id="modal-resumo" style="font-family:var(--fm);font-size:10px;color:var(--muted);"></div>
+    <div>
+      <div class="fl">Tipo de Compra</div>
+      <div class="tipo-toggle">
+        <button class="tipo-btn active" id="tipo-loja" onclick="setTipo('loja')">🏪 Loja Física</button>
+        <button class="tipo-btn" id="tipo-online" onclick="setTipo('online')">🌐 Online</button>
+      </div>
+    </div>
+    <div>
+      <div class="fl">Fornecedor</div>
+      <input class="fi" id="m-fornecedor" placeholder="Nome da loja ou site" />
+    </div>
+    <div>
+      <div class="fl">Dados para Pagamento</div>
+      <input class="fi" id="m-pagamento" placeholder="PIX, boleto, cartão..." />
+    </div>
+    <div id="previsoes-wrapper" style="display:none;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-sm" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-green" onclick="finalizarCompra()">✅ Confirmar Compra</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var pecas = [];
+var tabAtual = 'pendentes';
+var tipoCompra = 'loja';
+var selecionadasAguardando = new Set();
+var toastTimer;
+
+function toast(msg, cor) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.borderTopColor = cor || 'var(--accent)';
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3000);
+}
+
+async function api(action, body) {
+  var opts = { headers:{'Content-Type':'application/json'} };
+  if (body) { opts.method='POST'; opts.body=JSON.stringify(body); }
+  var r = await fetch('/api/compras-pecas?action='+action, opts);
+  return r.json();
+}
+
+async function load() {
+  var d = await api('load');
+  pecas = d.pecas || [];
+  render();
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('pt-BR');
+}
+function diasAte(iso) {
+  if (!iso) return null;
+  return Math.ceil((new Date(iso) - new Date()) / 86400000);
+}
+
+function render() {
+  var pendentes  = pecas.filter(p => p.status === 'pendente');
+  var aguardando = pecas.filter(p => p.status === 'aguardando_pagamento');
+  var pagas      = pecas.filter(p => p.status === 'pago');
+  var online     = pecas.filter(p => p.status !== 'pendente' && p.tipoCompra === 'online' && p.previsaoChegada);
+
+  document.getElementById('badge-pendentes').textContent  = pendentes.length;
+  document.getElementById('badge-aguardando').textContent = aguardando.length;
+  document.getElementById('badge-pago').textContent       = pagas.length;
+  document.getElementById('badge-online').textContent     = online.length;
+
+  renderLista('lista-pendentes', pendentes, 'pendentes');
+  renderLista('lista-aguardando', aguardando, 'aguardando');
+  renderLista('lista-pago', pagas, 'pago');
+  renderOnline(online);
+  atualizarBotoesHeader();
+}
+
+function renderLista(elId, lista, tipo) {
+  var el = document.getElementById(elId);
+  if (!lista.length) {
+    el.innerHTML = '<div class="empty">— Nenhuma peça aqui —</div>';
+    return;
+  }
+  el.innerHTML = lista.map(function(p) {
+    var checked = isSelecionada(p.id) ? 'checked' : '';
+    var urgClass = p.urgente ? ' urgente' : '';
+    var selClass = isSelecionada(p.id) ? ' selected' : '';
+    var prevBadge = '';
+    if (p.previsaoChegada) {
+      var dias = diasAte(p.previsaoChegada);
+      var cls = dias < 0 ? 'previsao-badge vencida' : 'previsao-badge';
+      var txt = dias < 0 ? 'Atrasada '+Math.abs(dias)+'d' : 'Chega em '+dias+'d';
+      prevBadge = '<span class="'+cls+'">📦 '+txt+' ('+fmtDate(p.previsaoChegada)+')</span>';
+    }
+    var statusCls = {pendente:'s-pendente',aguardando_pagamento:'s-aguardando',pago:'s-pago'}[p.status]||'s-pendente';
+    var extra = '';
+    if (p.fornecedor) extra += '<span>🏪 '+escH(p.fornecedor)+'</span>';
+    if (p.dadosPagamento) extra += '<span>💳 '+escH(p.dadosPagamento)+'</span>';
+    if (p.compradoEm) extra += '<span>🛒 '+fmtDate(p.compradoEm)+'</span>';
+    if (p.pagoEm) extra += '<span>✅ '+fmtDate(p.pagoEm)+'</span>';
+    var acoes = '';
+    if (tipo === 'pendentes') {
+      acoes = '<div class="peca-actions">'+
+        '<button class="btn-sm" onclick="comprarUma(\''+p.id+'\')">🛒 Comprar</button>'+
+        '<button class="btn-sm" onclick="deletar(\''+p.id+'\')">🗑</button>'+
+        '</div>';
+    } else if (tipo === 'aguardando') {
+      acoes = '<div class="peca-actions">'+
+        '<button class="btn-sm" style="color:var(--green);" onclick="confirmarPagamento([\''+p.id+'\'])">✅ Pago</button>'+
+        (p.tipoCompra==='online'?'<button class="btn-sm" style="color:var(--accent);" onclick="editarPrevisao(\''+p.id+'\',\''+(p.previsaoChegada||'')+'\')">📅 Previsão</button>':'')+
+        '</div>';
+    }
+    return '<div class="peca-card'+urgClass+selClass+'" id="card-'+p.id+'">'
+      +'<input type="checkbox" class="peca-check" '+checked+' onchange="toggleSel(\''+p.id+'\',this.checked)">'
+      +'<div class="peca-body">'
+        +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+          +'<div class="peca-desc">'+escH(p.descricao)+'</div>'
+          +'<span class="peca-status '+statusCls+'">'+statusLabel(p.status)+'</span>'
+          +(p.urgente?'<span style="font-family:var(--fm);font-size:9px;color:var(--red);">🔴 URGENTE</span>':'')+
+        '</div>'
+        +'<div class="peca-meta">'
+          +(p.os?'<span>OS: '+escH(p.os)+'</span>':'')
+          +(p.quantidade>1?'<span>Qtd: '+p.quantidade+'</span>':'')
+          +(p.obs?'<span>📝 '+escH(p.obs)+'</span>':'')
+          +extra+
+        '</div>'
+        +(prevBadge?'<div style="margin-top:6px;">'+prevBadge+'</div>':'')
+        +acoes+
+      '</div>'
+      +'</div>';
+  }).join('');
+}
+
+function renderOnline(lista) {
+  var el = document.getElementById('lista-online');
+  if (!lista.length) {
+    el.innerHTML = '<div class="empty">— Nenhuma compra online com previsão —</div>';
+    return;
+  }
+  var hoje = new Date().toISOString().slice(0,10);
+  el.innerHTML = lista.map(function(p) {
+    var dias = diasAte(p.previsaoChegada);
+    var cls = dias < 0 ? 'online-card atrasada' : (dias === 0 ? 'online-card chegou' : 'online-card');
+    var eta = dias < 0 ? '⚠️ Atrasada '+Math.abs(dias)+'d' : (dias === 0 ? '✅ Chega hoje!' : '📦 '+dias+'d');
+    return '<div class="'+cls+'">'
+      +'<div style="font-family:var(--fm);font-size:9px;color:var(--muted);">'+escH(p.fornecedor||'—')+'</div>'
+      +'<div class="peca-desc" style="margin-top:4px;">'+escH(p.descricao)+'</div>'
+      +(p.os?'<div style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:2px;">OS: '+escH(p.os)+'</div>':'')
+      +'<div class="online-eta" style="color:'+(dias<0?'var(--red)':dias===0?'var(--green)':'var(--accent)')+'">'+eta+'</div>'
+      +'<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">Previsão: '+fmtDate(p.previsaoChegada)+'</div>'
+      +'<div style="margin-top:8px;">'
+        +'<button class="btn-sm" style="color:var(--accent);" onclick="editarPrevisao(\''+p.id+'\',\''+(p.previsaoChegada||'')+'\')">📅 Editar data</button>'
+      +'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function statusLabel(s) {
+  return {pendente:'Pendente',aguardando_pagamento:'Ag. Pagamento',pago:'Pago'}[s]||s;
+}
+function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// SELEÇÃO
+var selecionadas = new Set();
+function isSelecionada(id) { return selecionadas.has(id); }
+function toggleSel(id, checked) {
+  if (checked) selecionadas.add(id);
+  else selecionadas.delete(id);
+  var card = document.getElementById('card-'+id);
+  if (card) card.classList.toggle('selected', checked);
+  atualizarBotoesHeader();
+}
+function selecionarTodas() {
+  pecas.filter(p=>p.status==='pendente').forEach(p=>{ selecionadas.add(p.id); });
+  render();
+}
+function deselecionarTodas() { selecionadas.clear(); render(); }
+function selecionarTodasAba(aba) {
+  pecas.filter(p=>p.status==='aguardando_pagamento').forEach(p=>{ selecionadasAguardando.add(p.id); });
+  render();
+}
+function atualizarBotoesHeader() {
+  var n = [...selecionadas].filter(id => pecas.find(p=>p.id===id&&p.status==='pendente')).length;
+  document.getElementById('btn-copiar').style.display  = n>0 ? 'inline-flex' : 'none';
+  document.getElementById('btn-comprar').style.display = n>0 ? 'inline-flex' : 'none';
+}
+
+// CADASTRAR
+async function cadastrar() {
+  var desc = document.getElementById('f-desc').value.trim();
+  if (!desc) { toast('Preencha a descrição','var(--red)'); return; }
+  var d = await api('cadastrar', {
+    descricao: desc,
+    os:        document.getElementById('f-os').value.trim(),
+    quantidade:document.getElementById('f-qtd').value,
+    obs:       document.getElementById('f-obs').value.trim(),
+    urgente:   document.getElementById('f-urgente').checked
+  });
+  if (d.ok) {
+    document.getElementById('f-desc').value='';
+    document.getElementById('f-os').value='';
+    document.getElementById('f-qtd').value='1';
+    document.getElementById('f-obs').value='';
+    document.getElementById('f-urgente').checked=false;
+    await load();
+    toast('✅ Peça cadastrada!');
+  } else { toast('Erro: '+d.error,'var(--red)'); }
+}
+
+// DELETAR
+async function deletar(id) {
+  if (!confirm('Remover esta peça?')) return;
+  await api('deletar',{id});
+  selecionadas.delete(id);
+  await load();
+}
+
+// MODAL COMPRA
+var idsParaComprar = [];
+function comprarUma(id) {
+  idsParaComprar = [id];
+  abrirModalCompra();
+}
+function abrirModalCompra() {
+  var ids = tabAtual==='pendentes'
+    ? [...selecionadas].filter(id=>pecas.find(p=>p.id===id&&p.status==='pendente'))
+    : idsParaComprar;
+  if (!ids.length) { toast('Selecione peças primeiro','var(--yellow)'); return; }
+  idsParaComprar = ids;
+  var resumo = ids.map(id=>{ var p=pecas.find(x=>x.id===id); return p?'• '+p.descricao+(p.os?' (OS:'+p.os+')':''):''; }).join('<br>');
+  document.getElementById('modal-resumo').innerHTML = resumo;
+  document.getElementById('m-fornecedor').value='';
+  document.getElementById('m-pagamento').value='';
+  setTipo('loja');
+  document.getElementById('modal-compra').classList.add('open');
+}
+function fecharModal() { document.getElementById('modal-compra').classList.remove('open'); idsParaComprar=[]; }
+function setTipo(tipo) {
+  tipoCompra = tipo;
+  document.getElementById('tipo-loja').classList.toggle('active', tipo==='loja');
+  document.getElementById('tipo-online').classList.toggle('active', tipo==='online');
+  var wrap = document.getElementById('previsoes-wrapper');
+  if (tipo==='online') {
+    var html = '<div class="fl" style="margin-bottom:8px;">Previsão de chegada por peça</div>';
+    idsParaComprar.forEach(function(id) {
+      var p = pecas.find(x=>x.id===id);
+      if (!p) return;
+      html += '<div style="margin-bottom:8px;">'
+        +'<div style="font-size:11px;color:var(--muted);margin-bottom:4px;">'+escH(p.descricao)+'</div>'
+        +'<input class="fi" type="date" id="prev-'+id+'" />'
+        +'</div>';
+    });
+    wrap.innerHTML = html;
+    wrap.style.display = 'block';
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+async function finalizarCompra() {
+  var fornecedor = document.getElementById('m-fornecedor').value.trim();
+  var pagamento  = document.getElementById('m-pagamento').value.trim();
+  var previsoes  = {};
+  if (tipoCompra==='online') {
+    idsParaComprar.forEach(function(id){
+      var el = document.getElementById('prev-'+id);
+      if (el && el.value) previsoes[id] = el.value;
+    });
+  }
+  var d = await api('comprar',{ ids:idsParaComprar, fornecedor, tipoCompra, dadosPagamento:pagamento, previsoes });
+  if (d.ok) {
+    fecharModal();
+    selecionadas.clear();
+    await load();
+    toast('✅ Movido para Ag. Pagamento!','var(--green)');
+  } else { toast('Erro: '+d.error,'var(--red)'); }
+}
+
+// CONFIRMAR PAGAMENTO
+async function confirmarPagamento(ids) {
+  if (!ids.length) return;
+  var d = await api('confirmar-pagamento',{ids});
+  if (d.ok) { selecionadasAguardando.clear(); await load(); toast('✅ Pagamento confirmado!','var(--green)'); }
+  else toast('Erro: '+d.error,'var(--red)');
+}
+async function confirmarPagamentoSelecionadas() {
+  var ids = pecas.filter(p=>p.status==='aguardando_pagamento'&&isSelecionada(p.id)).map(p=>p.id);
+  if (!ids.length) { toast('Selecione peças primeiro','var(--yellow)'); return; }
+  await confirmarPagamento(ids);
+}
+
+// EDITAR PREVISÃO
+function editarPrevisao(id, atual) {
+  var nova = prompt('Previsão de chegada (AAAA-MM-DD):', atual||'');
+  if (nova !== null) salvarPrevisao(id, nova);
+}
+async function salvarPrevisao(id, data) {
+  var d = await api('previsao',{id, previsaoChegada: data});
+  if (d.ok) { await load(); toast('📅 Previsão atualizada!'); }
+}
+
+// COPIAR
+function copiarSelecionadas() {
+  var ids = [...selecionadas].filter(id=>pecas.find(p=>p.id===id&&p.status==='pendente'));
+  if (!ids.length) return;
+  var texto = ids.map(function(id,i){
+    var p = pecas.find(x=>x.id===id);
+    return (i+1)+'. '+p.descricao+(p.os?' — OS: '+p.os:'')+(p.quantidade>1?' (x'+p.quantidade+')':'')+(p.urgente?' 🔴 URGENTE':'');
+  }).join('\n');
+  navigator.clipboard.writeText(texto).catch(function(){
+    var ta=document.createElement('textarea');ta.value=texto;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+  });
+  toast('📋 '+ids.length+' peça(s) copiadas!');
+}
+
+// TABS
+function trocarTab(aba) {
+  tabAtual = aba;
+  ['pendentes','aguardando','pago','online'].forEach(function(t){
+    document.getElementById('tab-'+t).classList.toggle('active', t===aba);
+    document.getElementById('page-'+t).classList.toggle('active', t===aba);
+  });
+  atualizarBotoesHeader();
+}
+
+// INIT
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>
