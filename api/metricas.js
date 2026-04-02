@@ -49,28 +49,43 @@ async function pipefyQuery(query) {
   return j.data;
 }
 
-// Busca cards em ERP com valor_de_contrato
+// Busca cards em ERP com valor + data de entrada (phases_history) — paginação completa
 async function fetchErpCards() {
   try {
     const ERP_PHASE_ID = "339008925";
-    const data = await pipefyQuery(`query {
-      phase(id: "${ERP_PHASE_ID}") {
-        cards(first: 50) {
-          edges {
-            node {
-              id title
-              fields { name value }
+    const all = [];
+    let cursor = null, hasNext = true;
+    while (hasNext) {
+      const after = cursor ? `, after: "${cursor}"` : "";
+      const data = await pipefyQuery(`query {
+        phase(id: "${ERP_PHASE_ID}") {
+          cards(first: 50${after}) {
+            pageInfo { hasNextPage endCursor }
+            edges {
+              node {
+                id title
+                fields { name value }
+                phases_history { phase { id } firstTimeIn }
+              }
             }
           }
         }
+      }`);
+      const page = data?.phase?.cards;
+      hasNext = page?.pageInfo?.hasNextPage ?? false;
+      cursor  = page?.pageInfo?.endCursor ?? null;
+      for (const { node } of (page?.edges || [])) {
+        const fields = node.fields || [];
+        const valor  = fields.find(f => f.name.toLowerCase().includes("valor"))?.value || "0";
+        const num    = parseFloat(String(valor).replace(/[^\d.,]/g,"").replace(",",".")) || 0;
+        // Data de entrada em ERP via phases_history
+        const hist = (node.phases_history || []).find(h => h.phase?.id === ERP_PHASE_ID && h.firstTimeIn);
+        const entradaTs = hist?.firstTimeIn || null;
+        const entradaDate = entradaTs ? new Date(new Date(entradaTs).getTime() - 3*60*60*1000).toISOString().slice(0,10) : null;
+        all.push({ id: String(node.id), title: node.title, valor: num, entradaTs, entradaDate });
       }
-    }`);
-    return (data?.phase?.cards?.edges || []).map(({ node }) => {
-      const fields = node.fields || [];
-      const valor  = fields.find(f => f.name.toLowerCase().includes("valor"))?.value || "0";
-      const num    = parseFloat(String(valor).replace(/[^\d.,]/g,"").replace(",",".")) || 0;
-      return { id: String(node.id), title: node.title, valor: num };
-    });
+    }
+    return all;
   } catch(e) {
     console.error("fetchErpCards:", e.message);
     return [];
@@ -286,6 +301,23 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // ── GET erp-por-data — ERP agrupado por data de entrada (Pipefy ao vivo)
+  if (action === "erp-por-data") {
+    try {
+      const cards = await fetchErpCards();
+      const byDate = {};
+      for (const c of cards) {
+        const dt = c.entradaDate || "sem-data";
+        if (!byDate[dt]) byDate[dt] = { count: 0, valor: 0 };
+        byDate[dt].count++;
+        byDate[dt].valor += c.valor;
+      }
+      return res.status(200).json({ ok: true, total: cards.length, byDate });
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: e.message });
+    }
+  }
+
   // ── DELETE deletar-dia — remove um dia ───────────────────────────────────
   if (req.method === "POST" && action === "deletar-dia") {
     const { data } = req.body || {};
@@ -335,6 +367,39 @@ module.exports = async function handler(req, res) {
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });
     }
+  }
+
+  // ── POST fix-metalog — corrige entradas ERP do metaLog
+  if (req.method === "POST" && action === "fix-metalog") {
+    const { removeAfter, removeBefore, addErps } = req.body || {};
+    try {
+      const logsData = await dbGet(LOGS_KEY) || {};
+      let metaLog = logsData.metaLog || [];
+      let removed = 0;
+      if (removeAfter || removeBefore) {
+        const before = removeBefore ? new Date(removeBefore).getTime() : Infinity;
+        const after  = removeAfter  ? new Date(removeAfter).getTime()  : 0;
+        metaLog = metaLog.filter(m => {
+          if (m.phaseId !== "erp_entrada") return true;
+          const ts = new Date(m.timestamp).getTime();
+          if (ts >= after && ts <= before) { removed++; return false; }
+          return true;
+        });
+      }
+      let added = 0;
+      if (Array.isArray(addErps)) {
+        for (const entry of addErps) {
+          const baseTs = new Date(entry.data + "T12:00:00-03:00").getTime();
+          for (let i = 0; i < entry.count; i++) {
+            metaLog.push({ phaseId: "erp_entrada", pipefyId: "manual-" + entry.data + "-" + i, valor: 0, timestamp: new Date(baseTs + i * 1000).toISOString(), manual: true });
+            added++;
+          }
+        }
+      }
+      logsData.metaLog = metaLog;
+      await dbSet(LOGS_KEY, logsData);
+      return res.status(200).json({ ok: true, removed, added, total: metaLog.length });
+    } catch(e) { return res.status(200).json({ ok: false, error: e.message }); }
   }
 
   return res.status(404).json({ ok: false, error: "Ação não encontrada" });
