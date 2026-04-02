@@ -449,38 +449,12 @@ module.exports = async function handler(req, res) {
           if (!Array.isArray(board.metaLog)) board.metaLog = [];
           const seenErpSet = new Set(board.metaLog.filter(m=>m.phaseId==="erp_entrada").map(m=>m.pipefyId));
           
-          // Busca phases_history e valor em lotes de 10 para eficiência
+          // Registra novos cards em ERP com timestamp atual (rápido)
+          // Use reprocess-erp-timestamps para corrigir timestamps via phases_history
           const newErpIds = erpIds.filter(id => !seenErpSet.has(id));
-          for (let i = 0; i < newErpIds.length; i += 10) {
-            const lote = newErpIds.slice(i, i + 10);
-            const aliases = lote.map((id, j) => `c${j}: card(id: "${id}") { id fields { name value } phases_history { phase { name } firstTimeIn } }`).join(" ");
-            try {
-              const loteData = await pipefyQuery(`query { ${aliases} }`);
-              for (let j = 0; j < lote.length; j++) {
-                const id = lote[j];
-                const card = loteData[`c${j}`];
-                if (!card) continue;
-                // Valor do contrato
-                const fields = card.fields || [];
-                const vf = fields.find(f => f.name.toLowerCase().includes("valor"));
-                const valor = vf?.value ? parseFloat(String(vf.value).replace(/[^\d.,]/g,"").replace(",",".")) || 0 : 0;
-                // Timestamp real de entrada em ERP via phases_history
-                const hist = (card.phases_history || []).find(h =>
-                  h.phase?.name?.toLowerCase().includes("erp") && h.firstTimeIn
-                );
-                const erpTs = hist?.firstTimeIn || new Date().toISOString();
-                board.metaLog.push({ phaseId: "erp_entrada", pipefyId: id, valor, timestamp: erpTs });
-                seenErpSet.add(id);
-              }
-            } catch(e) {
-              // Fallback: log com timestamp atual
-              for (const id of lote) {
-                if (!seenErpSet.has(id)) {
-                  board.metaLog.push({ phaseId: "erp_entrada", pipefyId: id, valor: 0, timestamp: new Date().toISOString() });
-                  seenErpSet.add(id);
-                }
-              }
-            }
+          for (const id of newErpIds) {
+            board.metaLog.push({ phaseId: "erp_entrada", pipefyId: id, valor: 0, timestamp: new Date().toISOString(), needsReprocess: true });
+            seenErpSet.add(id);
           }
 
           board.cards       = board.cards.filter(c => !erpIds.includes(c.pipefyId));
