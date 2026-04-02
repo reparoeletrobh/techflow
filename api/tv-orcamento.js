@@ -507,6 +507,14 @@ module.exports = async function handler(req, res) {
     return res.status(200).json(result);
   }
 
+  // ── GET orc-reset-completo — limpa tudo e reimporta só Aguardando Aprovação
+  if (action === "orc-reset-completo") {
+    try {
+      await dbSet(ORC_KEY, { fichas: [], syncedIds: [], initialized: false });
+      return res.status(200).json({ ok: true, msg: "DB limpo. Chame orc-sync para importar." });
+    } catch(e) { return res.status(200).json({ ok: false, error: e.message }); }
+  }
+
   // ── GET orc-sync-forcar-todos ─────────────────────────────
   // Remove do syncedIds todos os cards que estão AGORA em Aguardando Aprovação
   // Permite reimportar fichas que já estiveram na fase antes
