@@ -3,6 +3,10 @@
     {
       "path": "/api/board?action=erp-to-finalizado",
       "schedule": "0 2 * * 1"
+    },
+    {
+      "path": "/api/board?action=reprocess-erp-timestamps",
+      "schedule": "0 3 * * *"
     }
   ],
   "rewrites": [
