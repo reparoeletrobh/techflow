@@ -446,31 +446,40 @@ module.exports = async function handler(req, res) {
           const before = board.cards.length;
 
           // Antes de remover: registra no metaLog cards que ainda não foram registrados
-          // Isso captura cards que saíram do ERP (Finalizado, RS, etc.) antes do sync
           if (!Array.isArray(board.metaLog)) board.metaLog = [];
           const seenErpSet = new Set(board.metaLog.filter(m=>m.phaseId==="erp_entrada").map(m=>m.pipefyId));
-          for (const id of erpIds) {
-            if (!seenErpSet.has(id)) {
-              // Busca phases_history para timestamp e valor reais
-              let erpTs = new Date().toISOString();
-              let valor = 0;
-              try {
-                const cardData = await pipefyQuery(`query {
-                  card(id: "${id}") {
-                    fields { name value }
-                    phases_history { phase { name } firstTimeIn }
-                  }
-                }`);
-                const fields = cardData?.card?.fields || [];
+          
+          // Busca phases_history e valor em lotes de 10 para eficiência
+          const newErpIds = erpIds.filter(id => !seenErpSet.has(id));
+          for (let i = 0; i < newErpIds.length; i += 10) {
+            const lote = newErpIds.slice(i, i + 10);
+            const aliases = lote.map((id, j) => `c${j}: card(id: "${id}") { id fields { name value } phases_history { phase { name } firstTimeIn } }`).join(" ");
+            try {
+              const loteData = await pipefyQuery(`query { ${aliases} }`);
+              for (let j = 0; j < lote.length; j++) {
+                const id = lote[j];
+                const card = loteData[`c${j}`];
+                if (!card) continue;
+                // Valor do contrato
+                const fields = card.fields || [];
                 const vf = fields.find(f => f.name.toLowerCase().includes("valor"));
-                if (vf?.value) valor = parseFloat(String(vf.value).replace(/[^\d.,]/g,"").replace(",",".")) || 0;
-                const hist = (cardData?.card?.phases_history || []).find(h =>
+                const valor = vf?.value ? parseFloat(String(vf.value).replace(/[^\d.,]/g,"").replace(",",".")) || 0 : 0;
+                // Timestamp real de entrada em ERP via phases_history
+                const hist = (card.phases_history || []).find(h =>
                   h.phase?.name?.toLowerCase().includes("erp") && h.firstTimeIn
                 );
-                if (hist?.firstTimeIn) erpTs = hist.firstTimeIn;
-              } catch(e) {}
-              board.metaLog.push({ phaseId: "erp_entrada", pipefyId: id, valor, timestamp: erpTs });
-              seenErpSet.add(id);
+                const erpTs = hist?.firstTimeIn || new Date().toISOString();
+                board.metaLog.push({ phaseId: "erp_entrada", pipefyId: id, valor, timestamp: erpTs });
+                seenErpSet.add(id);
+              }
+            } catch(e) {
+              // Fallback: log com timestamp atual
+              for (const id of lote) {
+                if (!seenErpSet.has(id)) {
+                  board.metaLog.push({ phaseId: "erp_entrada", pipefyId: id, valor: 0, timestamp: new Date().toISOString() });
+                  seenErpSet.add(id);
+                }
+              }
             }
           }
 
@@ -1569,6 +1578,53 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, targetDate, scanned, added, totalErpMetalog: board.metaLog.filter(m=>m.phaseId==="erp_entrada").length });
       } catch(e) {
         return res.status(200).json({ ok: false, error: "scan-erp-day: " + e.message });
+      }
+    }
+
+    // ── GET reprocess-erp-timestamps — corrige timestamps do metaLog usando phases_history real
+    if (action === "reprocess-erp-timestamps") {
+      try {
+        const board = sanitizeBoard(await dbGet(BOARD_KEY));
+        if (!Array.isArray(board.metaLog)) board.metaLog = [];
+        
+        // Pega todos os erp_entrada únicos
+        const erpEntries = board.metaLog.filter(m => m.phaseId === "erp_entrada");
+        const uniqueIds = [...new Set(erpEntries.map(m => m.pipefyId))].filter(id => !id.startsWith("manual-"));
+        
+        let fixed = 0, errors = 0;
+        // Processa em lotes de 10
+        for (let i = 0; i < uniqueIds.length; i += 10) {
+          const lote = uniqueIds.slice(i, i + 10);
+          const aliases = lote.map((id, j) => `c${j}: card(id: "${id}") { id fields { name value } phases_history { phase { name } firstTimeIn } }`).join(" ");
+          try {
+            const data = await pipefyQuery(`query { ${aliases} }`);
+            for (let j = 0; j < lote.length; j++) {
+              const id = lote[j];
+              const card = data[`c${j}`];
+              if (!card) continue;
+              const hist = (card.phases_history || []).find(h =>
+                h.phase?.name?.toLowerCase().includes("erp") && h.firstTimeIn
+              );
+              if (!hist?.firstTimeIn) continue;
+              const realTs = hist.firstTimeIn;
+              const vf = (card.fields || []).find(f => f.name.toLowerCase().includes("valor"));
+              const valor = vf?.value ? parseFloat(String(vf.value).replace(/[^\d.,]/g,"").replace(",",".")) || 0 : 0;
+              // Atualiza a entrada no metaLog
+              const entry = board.metaLog.find(m => m.phaseId === "erp_entrada" && m.pipefyId === id);
+              if (entry) {
+                entry.timestamp = realTs;
+                entry.valor = valor;
+                fixed++;
+              }
+            }
+          } catch(e) { errors++; }
+        }
+        
+        await dbSet(BOARD_KEY, board);
+        await saveLogs(board);
+        return res.status(200).json({ ok: true, fixed, errors, total: uniqueIds.length });
+      } catch(e) {
+        return res.status(200).json({ ok: false, error: e.message });
       }
     }
 
