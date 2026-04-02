@@ -171,6 +171,7 @@ async function loadAll() {
       fetch('/api/orcamento?action=orc-load').then(function(r){return r.json();}),
       fetch('/api/compra-equip?action=load').then(function(r){return r.json();}).catch(function(){return {items:[]};}),
       fetch('/api/orcamento?action=sem-resposta').then(function(r){return r.json();}).catch(function(){return {cards:[]};}),
+      fetch('/api/compras-pecas?action=load').then(function(r){return r.json();}).catch(function(){return {pecas:[]};}),,
       fetch('/api/financeiro?action=load').then(function(r){return r.json();}).catch(function(){return {records:[]};}),
     ]);
 
@@ -185,7 +186,10 @@ async function loadAll() {
       urgencia:       cards.filter(function(c){return c.phaseId==='urgencia';}),
       equipComprado:  (compraRes.items||[]).filter(function(i){return i.status==='comprado' && !i.cadastradoVendas;}),
       semResposta:    semRespostaRes.cards || [],
-      analisePagamento: (finRes.records||[]).filter(function(r){return r.phaseId==='analise_pagamento';}),
+      analisePagamento:  (finRes.records||[]).filter(function(r){return r.phaseId==='analise_pagamento';}),
+      pecasPendentes:    (compPecasRes.pecas||[]).filter(function(p){return p.status==='pendente';}),
+      pecasAgPagamento:  (compPecasRes.pecas||[]).filter(function(p){return p.status==='aguardando_pagamento';}),
+      pecasOnline:       (compPecasRes.pecas||[]).filter(function(p){return p.tipoCompra==='online'&&p.previsaoChegada&&p.status!=='pago';}),
     };
 
     renderSummary();
@@ -205,6 +209,9 @@ function renderSummary() {
     {label:'Em Urgência',   count: data.urgencia.length,        c:'#ef4444'},
     {label:'Sem Resposta',   count: data.semResposta.length,     c:'#f97316'},
     {label:'Análise Pgto',   count: data.analisePagamento.length, c:'#9b72ff'},
+    {label:'Compras Pendentes',count: data.pecasPendentes.length,  c:'#f97316'},
+    {label:'Ag. Pgto Peças',   count: data.pecasAgPagamento.length,c:'#f5c800'},
+    {label:'Online c/ Previsão',count:data.pecasOnline.length,     c:'#3b9eff'},
   ];
   var total = items.reduce(function(a,i){return a+i.count;},0);
   var html = items.map(function(i){
@@ -296,7 +303,38 @@ function renderSections() {
     '</div>';
   });
 
-  document.getElementById('sections').innerHTML = html || '<div class="empty">✅ Nenhuma pendência encontrada!</div>';
+  // Peças Pendentes de Compra
+  html += renderSection('Peças para Comprar — cadastradas aguardando compra', data.pecasPendentes, '#f97316', function(p){
+    return '<div class="item-card" style="--c:#f97316">'
+      +'<div class="item-nome">'+escH(p.descricao)+'</div>'
+      +'<div class="item-desc">'+(p.os?'OS: '+escH(p.os):'')+''+(p.urgente?' 🔴 URGENTE':'')+'</div>'
+      +'<div class="item-age" style="--c:#f97316">'+fmtSince(p.createdAt)+'</div>'
+      +'</div>';
+  });
+
+  // Aguardando Pagamento de Peças
+  html += renderSection('Peças — Aguardando Pagamento', data.pecasAgPagamento, '#f5c800', function(p){
+    return '<div class="item-card" style="--c:#f5c800">'
+      +'<div class="item-nome">'+escH(p.descricao)+'</div>'
+      +'<div class="item-desc">'+(p.fornecedor?escH(p.fornecedor):'')+(p.dadosPagamento?' — '+escH(p.dadosPagamento):'')+'</div>'
+      +'<div class="item-age" style="--c:#f5c800">'+fmtSince(p.compradoEm)+'</div>'
+      +'</div>';
+  });
+
+  // Peças Online com Previsão
+  html += renderSection('Compras Online — Previsão de Chegada', data.pecasOnline, '#3b9eff', function(p){
+    var ms = timeSince(p.previsaoChegada) * -1;
+    var dias = Math.ceil((new Date(p.previsaoChegada)-new Date())/86400000);
+    var hot = dias < 0;
+    return '<div class="item-card" style="--c:#3b9eff">'
+      +'<div class="item-nome">'+escH(p.descricao)+'</div>'
+      +'<div class="item-desc">'+(p.fornecedor?escH(p.fornecedor):'')+'</div>'
+      +'<div class="item-age'+(hot?' hot':'')+'" style="--c:'+(hot?'var(--red)':'#3b9eff')+'">'
+        +(hot?'⚠️ Atrasada':'📦 ')+(hot?Math.abs(dias)+'d':dias+'d')+'</div>'
+      +'</div>';
+  });
+
+    document.getElementById('sections').innerHTML = html || '<div class="empty">✅ Nenhuma pendência encontrada!</div>';
 }
 
 function renderSection(title, items, color, renderItem) {
