@@ -203,26 +203,25 @@ async function loadAll() {
 
 function renderSummary() {
   var items = [
-    {label:'Orç. Pendentes', count: data.orcPendentes.length,   c:'#f5c800'},
-    {label:'Comprar Peça',   count: data.comprarPeca.length,    c:'#f97316'},
-    {label:'Peça Disponível',count: data.pecaDisponivel.length, c:'#3b9eff'},
-    {label:'Equip. p/ Cadastrar',count:data.equipComprado.length,c:'#a855f7'},
-    {label:'Em Urgência',   count: data.urgencia.length,        c:'#ef4444'},
-    {label:'Sem Resposta',   count: data.semResposta.length,     c:'#f97316'},
-    {label:'Análise Pgto',   count: data.analisePagamento.length, c:'#9b72ff'},
-    {label:'Compras Pendentes',count: data.pecasPendentes.length,  c:'#f97316'},
-    {label:'Ag. Pgto Peças',   count: data.pecasAgPagamento.length,c:'#f5c800'},
-    {label:'Online c/ Previsão',count:data.pecasOnline.length,     c:'#3b9eff'},
+    {label:'Análise Pgto',      count: data.analisePagamento.length,  c:'#9b72ff', anchor:'analisePagamento'},
+    {label:'Orç. Pendentes',    count: data.orcPendentes.length,      c:'#f5c800', anchor:'orcPendentes'},
+    {label:'Comprar Peça',      count: data.comprarPeca.length,       c:'#f97316', anchor:'comprarPeca'},
+    {label:'Peça Disponível',   count: data.pecaDisponivel.length,    c:'#3b9eff', anchor:'pecaDisponivel'},
+    {label:'Equip. Comprados',  count: data.equipComprado.length,     c:'#a855f7', anchor:'equipComprado'},
+    {label:'Em Urgência',       count: data.urgencia.length,          c:'#ef4444', anchor:'urgencia'},
+    {label:'Sem Resposta',      count: data.semResposta.length,       c:'#f97316', anchor:'semResposta'},
+    {label:'Compras Pendentes', count: data.pecasPendentes.length,    c:'#f97316', anchor:'pecasPendentes'},
+    {label:'Ag. Pgto Peças',    count: data.pecasAgPagamento.length,  c:'#f5c800', anchor:'pecasAgPagamento'},
+    {label:'Online c/ Previsão',count: data.pecasOnline.length,       c:'#3b9eff', anchor:'pecasOnline'},
   ];
   var total = items.reduce(function(a,i){return a+i.count;},0);
   var html = items.map(function(i){
-    return '<div class="sum-card" style="--c:'+i.c+'">' +
+    return '<div class="sum-card" style="--c:'+i.c+';cursor:pointer;" onclick="scrollToSection(this.dataset.anchor)" data-anchor="'+i.anchor+'">' +
       '<div class="sum-count">'+i.count+'</div>' +
       '<div class="sum-label">'+i.label+'</div>' +
     '</div>';
   }).join('');
-  // Total card
-  html = '<div class="sum-card" style="--c:#ef4444">' +
+  html = '<div class="sum-card" style="--c:#ef4444;">' +
     '<div class="sum-count">'+total+'</div>' +
     '<div class="sum-label">Total Pendências</div>' +
   '</div>' + html;
@@ -234,57 +233,57 @@ function renderSections() {
     analisePagamento: function() {
       return renderSection('Análise de Pagamento — aguardando confirmação', data.analisePagamento, '#9b72ff', function(r){
         return '<div class="item-card" style="--c:#9b72ff"><div class="item-nome">'+escH(r.nomeContato||r.title||'—')+'</div><div class="item-desc">'+escH((r.descricao||r.title||'').slice(0,80))+'</div><div class="item-age" style="--c:#9b72ff">'+fmtSince(r.movedAt)+'</div></div>';
-      });
+      }, 'analisePagamento');
     },
     orcPendentes: function() {
       return renderSection('Orçamentos não enviados', data.orcPendentes, '#f5c800', function(f){
         var semValor=(!f.preco&&!f.precoSugerido)||(f.textoOrc||'').includes('[VALOR]');
         return '<div class="item-card" style="--c:#f5c800"><div class="item-nome">'+escH(f.nome||'—')+'</div><div class="item-desc">'+escH((f.desc||'').slice(0,80))+'</div>'+(semValor?'<div class="item-age" style="--c:#ef4444">⚠️ Sem valor</div>':'<div class="item-age" style="--c:#f5c800">R$ '+(f.precoSugerido||f.preco||'—')+'</div>')+'</div>';
-      });
+      }, 'orcPendentes');
     },
     comprarPeca: function() {
       return renderSection('Comprar Peça — aguardando compra', data.comprarPeca, '#f97316', function(c){
         var ms=timeSince(c.addedAt),hot=ms&&ms>86400000*2;
         return '<div class="item-card" style="--c:#f97316"><div class="item-nome">'+escH(c.nomeContato||'—')+'</div><div class="item-desc">'+escH((c.descricao||'').slice(0,80))+'</div><div class="item-age'+(hot?' hot':'')+'" style="--c:#f97316">'+fmtSince(c.addedAt)+'</div></div>';
-      });
+      }, 'comprarPeca');
     },
     pecaDisponivel: function() {
       return renderSection('Peça Disponível — aguardando ação', data.pecaDisponivel, '#3b9eff', function(c){
         return '<div class="item-card" style="--c:#3b9eff"><div class="item-nome">'+escH(c.nomeContato||'—')+'</div><div class="item-desc">'+escH((c.descricao||'').slice(0,80))+'</div><div class="item-age" style="--c:#3b9eff">'+fmtSince(c.addedAt)+'</div></div>';
-      });
+      }, 'pecaDisponivel');
     },
     equipComprado: function() {
       return renderSection('Equipamentos Comprados — não cadastrados no Vendas', data.equipComprado, '#a855f7', function(i){
         return '<div class="item-card" style="--c:#a855f7"><div class="item-nome">'+escH(i.tipo||i.descricao||'—')+'</div><div class="item-desc">'+escH((i.descricao||'').slice(0,80))+'</div><div class="item-age" style="--c:#a855f7">'+fmtSince(i.createdAt||i.addedAt)+'</div></div>';
-      });
+      }, 'equipComprado');
     },
     urgencia: function() {
       return renderSection('Em Urgência', data.urgencia, '#ef4444', function(c){
         var ms=timeSince(c.addedAt),hot=ms&&ms>3600000*4;
         return '<div class="item-card" style="--c:#ef4444"><div class="item-nome">'+escH(c.nomeContato||'—')+'</div><div class="item-desc">'+escH((c.descricao||'').slice(0,80))+'</div><div class="item-age'+(hot?' hot':'')+'" style="--c:#ef4444">⚡ '+fmtSince(c.addedAt)+'</div></div>';
-      });
+      }, 'urgencia');
     },
     semResposta: function() {
       return renderSection('Sem Resposta — orçamento sem retorno há 2+ dias', data.semResposta, '#f97316', function(item){
         var hot=item.age>=5;
         return '<div class="item-card" style="--c:#f97316"><div class="item-nome">'+escH(item.nome||item.title||'—')+'</div><div class="item-desc">'+escH((item.desc||'').slice(0,80))+'</div><div class="item-age'+(hot?' hot':'')+'" style="--c:'+(hot?'#ef4444':'#f97316')+'">'+(hot?'🔥 ':'')+item.age+'d sem resposta</div></div>';
-      });
+      }, 'semResposta');
     },
     pecasPendentes: function() {
       return renderSection('Peças para Comprar', data.pecasPendentes, '#f97316', function(p){
-        return '<div class="item-card" style="--c:#f97316"><div class="item-nome">'+escH(p.descricao)+'</div><div class="item-desc">'+(p.os?'OS: '+escH(p.os):'')+' '+(p.urgente?'🔴 URGENTE':'')+'</div><div class="item-age" style="--c:#f97316">'+fmtSince(p.createdAt)+'</div></div>';
-      });
+        return '<div class="item-card" style="--c:#f97316"><div class="item-nome">'+escH(p.descricao)+'</div><div class="item-desc">'+(p.os?'OS: '+escH(p.os)+' ':'')+(p.urgente?'🔴 URGENTE':'')+'</div><div class="item-age" style="--c:#f97316">'+fmtSince(p.createdAt)+'</div></div>';
+      }, 'pecasPendentes');
     },
     pecasAgPagamento: function() {
       return renderSection('Peças — Aguardando Pagamento', data.pecasAgPagamento, '#f5c800', function(p){
         return '<div class="item-card" style="--c:#f5c800"><div class="item-nome">'+escH(p.descricao)+'</div><div class="item-desc">'+(p.fornecedor?escH(p.fornecedor):'')+(p.dadosPagamento?' — '+escH(p.dadosPagamento):'')+'</div><div class="item-age" style="--c:#f5c800">'+fmtSince(p.compradoEm)+'</div></div>';
-      });
+      }, 'pecasAgPagamento');
     },
     pecasOnline: function() {
       return renderSection('Compras Online — Previsão de Chegada', data.pecasOnline, '#3b9eff', function(p){
         var dias=Math.ceil((new Date(p.previsaoChegada)-new Date())/86400000),hot=dias<0;
         return '<div class="item-card" style="--c:#3b9eff"><div class="item-nome">'+escH(p.descricao)+'</div><div class="item-desc">'+(p.fornecedor?escH(p.fornecedor):'')+'</div><div class="item-age'+(hot?' hot':'')+'" style="--c:'+(hot?'var(--red)':'#3b9eff')+'">'+(hot?'⚠️ Atrasada '+Math.abs(dias)+'d':'📦 '+dias+'d')+'</div></div>';
-      });
+      }, 'pecasOnline');
     },
   };
   var html = '';
@@ -295,8 +294,9 @@ function renderSections() {
   document.getElementById('sections').innerHTML = html || '<div class="empty">✅ Nenhuma pendência encontrada!</div>';
 }
 
-function renderSection(title, items, color, renderItem) {
-  var html = '<div class="section">' +
+function renderSection(title, items, color, renderItem, sectionId) {
+  var idAttr = sectionId ? ' id="sec-'+sectionId+'"' : '';
+  var html = '<div class="section"'+idAttr+'>' +
     '<div class="section-header">' +
       '<div class="section-dot" style="--c:'+color+'"></div>' +
       '<div class="section-title">'+escH(title)+'</div>' +
@@ -491,6 +491,11 @@ function toggleVisOrdem(btn) {
   btn.textContent = vis ? '🚫' : '👁';
   var item = btn.closest('.ordem-item');
   item.style.opacity = vis ? '0.4' : '1';
+}
+
+function scrollToSection(id) {
+  var el = document.getElementById('sec-'+id);
+  if (el) el.scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
 // Auto-refresh a cada 2 minutos
