@@ -166,13 +166,13 @@ async function loadAll() {
   document.getElementById('sections').innerHTML = '<div class="spinner"><div class="spin"></div>Buscando dados...</div>';
 
   try {
-    var [boardRes, orcRes, compraRes, semRespostaRes, finRes] = await Promise.all([
+    var [finRes, boardRes, orcRes, compraRes, semRespostaRes, compPecasRes] = await Promise.all([
+      fetch('/api/financeiro?action=load').then(function(r){return r.json();}).catch(function(){return {records:[]};}),
       fetch('/api/board?action=load').then(function(r){return r.json();}),
       fetch('/api/orcamento?action=orc-load').then(function(r){return r.json();}),
       fetch('/api/compra-equip?action=load').then(function(r){return r.json();}).catch(function(){return {items:[]};}),
       fetch('/api/orcamento?action=sem-resposta').then(function(r){return r.json();}).catch(function(){return {cards:[]};}),
-      fetch('/api/compras-pecas?action=load').then(function(r){return r.json();}).catch(function(){return {pecas:[]};}),,
-      fetch('/api/financeiro?action=load').then(function(r){return r.json();}).catch(function(){return {records:[]};}),
+      fetch('/api/compras-pecas?action=load').then(function(r){return r.json();}).catch(function(){return {pecas:[]};})
     ]);
 
     var cards = boardRes.board?.cards || [];
