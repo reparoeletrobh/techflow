@@ -17,12 +17,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
 header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;
   background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
 .logo{font-family:var(--fh);font-size:14px;font-weight:900;display:flex;align-items:center;gap:8px;}
-.logo-dot{width:8px;height:8px;background:var(--accent);border-radius:50%;box-shadow:0 0 8px var(--accent);}
+.logo-dot{width:8px;height:8px;background:var(--orange);border-radius:50%;box-shadow:0 0 8px var(--orange);}
 .hbtn{font-family:var(--fm);font-size:10px;padding:5px 11px;border-radius:6px;border:1px solid var(--border);
   background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;text-decoration:none;display:inline-flex;align-items:center;}
 .hbtn:hover{color:var(--text);border-color:var(--accent);}
-
-/* TABS */
 .tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);padding:0 20px;position:sticky;top:52px;z-index:90;}
 .tab{font-family:var(--fm);font-size:10px;padding:10px 16px;cursor:pointer;color:var(--muted);
   border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;display:flex;align-items:center;gap:6px;}
@@ -30,14 +28,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .tab.active{color:var(--accent);border-bottom-color:var(--accent);}
 .tab-badge{font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:99px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);}
 .tab.active .tab-badge{background:rgba(59,158,255,.15);color:var(--accent);border-color:rgba(59,158,255,.3);}
-
-/* LAYOUT 2 colunas */
 .page{display:none;flex:1;}
 .page.active{display:flex;}
 .left-col{width:340px;min-width:340px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 97px);position:sticky;top:97px;}
 .right-col{flex:1;overflow-y:auto;padding:20px;height:calc(100vh - 97px);}
-
-/* FORM */
 .form-header{padding:16px 20px 10px;border-bottom:1px solid var(--border);}
 .form-title{font-family:var(--fh);font-size:13px;font-weight:800;}
 .form-body{padding:14px 20px;display:flex;flex-direction:column;gap:10px;}
@@ -48,24 +42,19 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .fi-row{display:flex;gap:8px;}
 .fi-row .fi{width:auto;flex:1;}
 .btn{font-family:var(--fm);font-size:10px;font-weight:700;padding:9px 16px;border-radius:8px;
-  border:none;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px;}
+  border:none;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px;justify-content:center;}
 .btn-primary{background:linear-gradient(135deg,var(--accent),#1a7ad4);color:#fff;width:100%;}
 .btn-primary:hover{filter:brightness(1.1);}
-.btn-sm{font-size:9px;padding:5px 10px;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:6px;}
+.btn-sm{font-size:9px;padding:5px 10px;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:6px;cursor:pointer;}
 .btn-sm:hover{color:var(--text);border-color:var(--accent);}
-.btn-green{background:linear-gradient(135deg,var(--green),#16a34a);color:#000;}
-.btn-orange{background:linear-gradient(135deg,var(--orange),#ea6e0a);color:#fff;}
+.btn-green{background:linear-gradient(135deg,var(--green),#16a34a);color:#000;border:none;border-radius:6px;font-family:var(--fm);font-size:9px;font-weight:700;padding:5px 10px;cursor:pointer;}
 .urgente-toggle{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--muted);}
 .urgente-toggle input{accent-color:var(--red);}
-
-/* LISTA */
 .list-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
-.list-title{font-family:var(--fh);font-size:13px;font-weight:800;}
+.list-title{font-family:var(--fh);font-size:13px;font-weight:800;color:#fff;}
 .list-actions{display:flex;gap:6px;align-items:center;}
 .empty{font-family:var(--fm);font-size:11px;color:var(--muted);padding:30px;text-align:center;
   border:1px dashed var(--border);border-radius:8px;}
-
-/* CARD PEÇA */
 .peca-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;
   padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px;
   transition:border-color .15s;position:relative;}
@@ -74,48 +63,61 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .peca-card.urgente{border-left:3px solid var(--red);}
 .peca-check{margin-top:2px;accent-color:var(--accent);width:15px;height:15px;cursor:pointer;flex-shrink:0;}
 .peca-body{flex:1;}
-.peca-desc{font-size:13px;font-weight:600;}
+.peca-desc{font-size:13px;font-weight:600;color:#fff;}
 .peca-meta{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;}
 .peca-status{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;border:1px solid;}
 .s-pendente{color:var(--yellow);border-color:rgba(245,200,0,.3);background:rgba(245,200,0,.08);}
 .s-aguardando{color:var(--orange);border-color:rgba(249,115,22,.3);background:rgba(249,115,22,.08);}
 .s-pago{color:var(--green);border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.08);}
-.peca-actions{display:flex;gap:5px;margin-top:8px;}
+.peca-actions{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap;}
 .previsao-badge{font-family:var(--fm);font-size:9px;color:var(--accent);padding:2px 7px;
   background:rgba(59,158,255,.1);border:1px solid rgba(59,158,255,.2);border-radius:4px;}
 .previsao-badge.vencida{color:var(--red);background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.2);}
-
-/* MODAL */
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;
+/* GRUPOS */
+.grupo-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden;}
+.grupo-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;
+  background:linear-gradient(90deg,rgba(249,115,22,.1),rgba(249,115,22,.03));border-bottom:1px solid var(--border);}
+.grupo-label{font-family:var(--fm);font-size:10px;font-weight:700;color:var(--orange);display:flex;align-items:center;gap:6px;}
+.grupo-qtd{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;
+  background:rgba(249,115,22,.15);color:var(--orange);border:1px solid rgba(249,115,22,.3);}
+.grupo-actions{display:flex;gap:6px;}
+.grupo-body{padding:8px;}
+.grupo-body .peca-card{border-left:3px solid var(--orange);margin-bottom:6px;}
+.grupo-body .peca-card:last-child{margin-bottom:0;}
+/* MODAIS */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;
   align-items:center;justify-content:center;backdrop-filter:blur(3px);}
-.modal-overlay.open{display:flex;}
+.overlay.open{display:flex;}
 .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;
   padding:24px;width:440px;max-width:95vw;display:flex;flex-direction:column;gap:14px;}
-.modal-title{font-family:var(--fh);font-size:15px;font-weight:800;}
-.modal-actions{display:flex;gap:8px;justify-content:flex-end;}
-.tipo-toggle{display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.modal-title{font-family:var(--fh);font-size:15px;font-weight:900;color:#fff;}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;}
+.tipo-toggle{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
 .tipo-btn{flex:1;padding:8px;font-family:var(--fm);font-size:10px;text-align:center;cursor:pointer;
   background:transparent;border:none;color:var(--muted);transition:all .15s;}
 .tipo-btn.active{background:var(--accent);color:#fff;}
-
-/* PAINEL ONLINE */
+/* MODAL PAGAMENTO */
+.pgto-row{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);}
+.pgto-row:last-child{border-bottom:none;}
+.pgto-label{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;min-width:90px;padding-top:2px;}
+.pgto-value{font-size:13px;color:#fff;font-weight:500;word-break:break-word;flex:1;}
+/* ONLINE GRID */
 .online-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}
 .online-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;}
 .online-card.chegou{border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.05);}
 .online-card.atrasada{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.04);}
-.online-eta{font-family:var(--fh);font-size:18px;font-weight:900;margin:6px 0;}
-
+.online-eta{font-family:var(--fh);font-size:20px;font-weight:900;margin:6px 0;}
 /* TOAST */
 .toast{position:fixed;bottom:20px;right:20px;background:var(--surface);border:1px solid var(--border);
   border-top:2px solid var(--accent);border-radius:10px;padding:10px 14px;font-family:var(--fm);
-  font-size:11px;transform:translateY(60px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;}
+  font-size:11px;transform:translateY(60px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;color:var(--text);}
 .toast.show{transform:translateY(0);opacity:1;}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="logo"><div class="logo-dot"></div>Reparo<b>Eletro</b> — <span style="color:var(--accent)">Compra de Peças</span></div>
+  <div class="logo"><div class="logo-dot"></div>Reparo<b>Eletro</b> — <span style="color:var(--orange)">Compra de Peças</span></div>
   <div style="display:flex;gap:8px;">
     <button class="hbtn" onclick="copiarSelecionadas()" id="btn-copiar" style="display:none;border-color:rgba(59,158,255,.3);color:var(--accent);">📋 Copiar</button>
     <button class="hbtn" onclick="abrirModalCompra()" id="btn-comprar" style="display:none;border-color:rgba(34,197,94,.3);color:var(--green);">🛒 Comprar selecionadas</button>
@@ -126,39 +128,22 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 <div class="tabs">
   <div class="tab active" onclick="trocarTab('pendentes')" id="tab-pendentes">📋 Pendentes <span class="tab-badge" id="badge-pendentes">0</span></div>
   <div class="tab" onclick="trocarTab('aguardando')" id="tab-aguardando">⏳ Ag. Pagamento <span class="tab-badge" id="badge-aguardando">0</span></div>
-  <div class="tab" onclick="trocarTab('pago')" id="tab-pago">✅ Pagamento Realizado <span class="tab-badge" id="badge-pago">0</span></div>
-  <div class="tab" onclick="trocarTab('online')" id="tab-online">📦 Online c/ Previsão <span class="tab-badge" id="badge-online">0</span></div>
+  <div class="tab" onclick="trocarTab('pago')" id="tab-pago">✅ Pago <span class="tab-badge" id="badge-pago">0</span></div>
+  <div class="tab" onclick="trocarTab('online')" id="tab-online">📦 Online <span class="tab-badge" id="badge-online">0</span></div>
 </div>
 
 <!-- ABA PENDENTES -->
 <div class="page active" id="page-pendentes">
   <div class="left-col">
-    <div class="form-header">
-      <div class="form-title">➕ Cadastrar Peça</div>
-    </div>
+    <div class="form-header"><div class="form-title">➕ Cadastrar Peça</div></div>
     <div class="form-body">
-      <div>
-        <div class="fl">Descrição da peça *</div>
-        <input class="fi" id="f-desc" placeholder="Ex: Placa de potência, Capacitor 450V..." />
-      </div>
-      <div>
-        <div class="fl">OS / Referência</div>
-        <input class="fi" id="f-os" placeholder="Número da OS ou cliente" />
-      </div>
+      <div><div class="fl">Descrição da peça *</div><input class="fi" id="f-desc" placeholder="Ex: Placa de potência, Capacitor..."/></div>
+      <div><div class="fl">OS / Referência</div><input class="fi" id="f-os" placeholder="Número da OS ou cliente"/></div>
       <div class="fi-row">
-        <div style="flex:1;">
-          <div class="fl">Qtd</div>
-          <input class="fi" id="f-qtd" type="number" min="1" value="1" />
-        </div>
-        <div style="flex:2;">
-          <div class="fl">Observação</div>
-          <input class="fi" id="f-obs" placeholder="Opcional" />
-        </div>
+        <div style="flex:1;"><div class="fl">Qtd</div><input class="fi" id="f-qtd" type="number" min="1" value="1"/></div>
+        <div style="flex:2;"><div class="fl">Observação</div><input class="fi" id="f-obs" placeholder="Opcional"/></div>
       </div>
-      <label class="urgente-toggle">
-        <input type="checkbox" id="f-urgente" />
-        🔴 Urgente
-      </label>
+      <label class="urgente-toggle"><input type="checkbox" id="f-urgente"/> 🔴 Urgente</label>
       <button class="btn btn-primary" onclick="cadastrar()">➕ Cadastrar Peça</button>
     </div>
   </div>
@@ -167,52 +152,44 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
       <div class="list-title">Peças para comprar</div>
       <div class="list-actions">
         <button class="btn-sm" onclick="selecionarTodas()">Sel. todas</button>
-        <button class="btn-sm" onclick="deselecionarTodas()">Limpar sel.</button>
+        <button class="btn-sm" onclick="deselecionarTodas()">Limpar</button>
       </div>
     </div>
     <div id="lista-pendentes"></div>
   </div>
 </div>
 
-<!-- ABA AGUARDANDO PAGAMENTO -->
+<!-- ABA AGUARDANDO -->
 <div class="page" id="page-aguardando">
-  <div class="right-col" style="max-width:800px;">
+  <div class="right-col" style="max-width:860px;">
     <div class="list-header">
       <div class="list-title">⏳ Aguardando Pagamento</div>
-      <div class="list-actions">
-        <button class="btn-sm" onclick="selecionarTodasAba('aguardando')">Sel. todas</button>
-        <button class="btn-sm" style="color:var(--green);border-color:rgba(34,197,94,.3);" onclick="confirmarPagamentoSelecionadas()">✅ Confirmar pagamento</button>
-      </div>
     </div>
     <div id="lista-aguardando"></div>
   </div>
 </div>
 
-<!-- ABA PAGAMENTO REALIZADO -->
+<!-- ABA PAGO -->
 <div class="page" id="page-pago">
-  <div class="right-col" style="max-width:800px;">
-    <div class="list-header">
-      <div class="list-title">✅ Pagamento Realizado</div>
-    </div>
+  <div class="right-col" style="max-width:860px;">
+    <div class="list-header"><div class="list-title">✅ Pagamento Realizado</div></div>
     <div id="lista-pago"></div>
   </div>
 </div>
 
-<!-- ABA ONLINE / PREVISÃO -->
+<!-- ABA ONLINE -->
 <div class="page" id="page-online">
   <div class="right-col">
-    <div class="list-header">
-      <div class="list-title">📦 Compras Online — Previsão de Chegada</div>
-    </div>
+    <div class="list-header"><div class="list-title">📦 Compras Online — Previsão</div></div>
     <div class="online-grid" id="lista-online"></div>
   </div>
 </div>
 
 <!-- MODAL COMPRA -->
-<div class="modal-overlay" id="modal-compra">
+<div class="overlay" id="modal-compra">
   <div class="modal">
     <div class="modal-title">🛒 Finalizar Compra</div>
-    <div id="modal-resumo" style="font-family:var(--fm);font-size:10px;color:var(--muted);"></div>
+    <div id="modal-resumo" style="font-family:var(--fm);font-size:10px;color:var(--muted);max-height:120px;overflow-y:auto;"></div>
     <div>
       <div class="fl">Tipo de Compra</div>
       <div class="tipo-toggle">
@@ -220,18 +197,23 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
         <button class="tipo-btn" id="tipo-online" onclick="setTipo('online')">🌐 Online</button>
       </div>
     </div>
-    <div>
-      <div class="fl">Fornecedor</div>
-      <input class="fi" id="m-fornecedor" placeholder="Nome da loja ou site" />
-    </div>
-    <div>
-      <div class="fl">Dados para Pagamento</div>
-      <input class="fi" id="m-pagamento" placeholder="PIX, boleto, cartão..." />
-    </div>
+    <div><div class="fl">Fornecedor</div><input class="fi" id="m-fornecedor" placeholder="Nome da loja ou site"/></div>
+    <div><div class="fl">Dados para Pagamento</div><input class="fi" id="m-pagamento" placeholder="PIX, boleto, cartão..."/></div>
     <div id="previsoes-wrapper" style="display:none;"></div>
-    <div class="modal-actions">
-      <button class="btn btn-sm" onclick="fecharModal()">Cancelar</button>
-      <button class="btn btn-green" onclick="finalizarCompra()">✅ Confirmar Compra</button>
+    <div class="modal-footer">
+      <button class="btn-sm" onclick="fecharModalCompra()">Cancelar</button>
+      <button class="btn-green" style="padding:7px 16px;" onclick="finalizarCompra()">✅ Confirmar Compra</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DADOS PAGAMENTO -->
+<div class="overlay" id="modal-pgto">
+  <div class="modal" style="width:400px;">
+    <div class="modal-title">💳 Dados de Pagamento</div>
+    <div id="pgto-content"></div>
+    <div class="modal-footer">
+      <button class="btn-sm" onclick="document.getElementById('modal-pgto').classList.remove('open')">Fechar</button>
     </div>
   </div>
 </div>
@@ -242,7 +224,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 var pecas = [];
 var tabAtual = 'pendentes';
 var tipoCompra = 'loja';
-var selecionadasAguardando = new Set();
+var selecionadas = new Set();
+var idsParaComprar = [];
 var toastTimer;
 
 function toast(msg, cor) {
@@ -255,9 +238,9 @@ function toast(msg, cor) {
 }
 
 async function api(action, body) {
-  var opts = { headers:{'Content-Type':'application/json'} };
-  if (body) { opts.method='POST'; opts.body=JSON.stringify(body); }
-  var r = await fetch('/api/compras-pecas?action='+action, opts);
+  var opts = { headers: {'Content-Type':'application/json'} };
+  if (body) { opts.method = 'POST'; opts.body = JSON.stringify(body); }
+  var r = await fetch('/api/compras-pecas?action=' + action, opts);
   return r.json();
 }
 
@@ -275,199 +258,231 @@ function diasAte(iso) {
   if (!iso) return null;
   return Math.ceil((new Date(iso) - new Date()) / 86400000);
 }
+function escH(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function statusLabel(s) {
+  return {pendente:'Pendente', aguardando_pagamento:'Ag. Pagamento', pago:'Pago'}[s] || s;
+}
 
 function render() {
-  var pendentes  = pecas.filter(p => p.status === 'pendente');
-  var aguardando = pecas.filter(p => p.status === 'aguardando_pagamento');
-  var pagas      = pecas.filter(p => p.status === 'pago');
-  var online     = pecas.filter(p => p.status !== 'pendente' && p.tipoCompra === 'online' && p.previsaoChegada);
+  var pendentes  = pecas.filter(function(p){ return p.status === 'pendente'; });
+  var aguardando = pecas.filter(function(p){ return p.status === 'aguardando_pagamento'; });
+  var pagas      = pecas.filter(function(p){ return p.status === 'pago'; });
+  var online     = pecas.filter(function(p){ return p.tipoCompra === 'online' && p.previsaoChegada && p.status !== 'pago'; });
 
   document.getElementById('badge-pendentes').textContent  = pendentes.length;
   document.getElementById('badge-aguardando').textContent = aguardando.length;
   document.getElementById('badge-pago').textContent       = pagas.length;
   document.getElementById('badge-online').textContent     = online.length;
 
-  renderLista('lista-pendentes', pendentes, 'pendentes');
-  renderLista('lista-aguardando', aguardando, 'aguardando');
-  renderLista('lista-pago', pagas, 'pago');
+  renderPendentes(pendentes);
+  renderAguardando(aguardando);
+  renderPagas(pagas);
   renderOnline(online);
   atualizarBotoesHeader();
 }
 
-function renderLista(elId, lista, tipo) {
-  var el = document.getElementById(elId);
-  if (!lista.length) {
-    el.innerHTML = '<div class="empty">— Nenhuma peça aqui —</div>';
-    return;
+// ── CARD SIMPLES ──────────────────────────────────────────
+function cardHTML(p, tipo) {
+  var sel = selecionadas.has(p.id);
+  var prevBadge = '';
+  if (p.previsaoChegada) {
+    var dias = diasAte(p.previsaoChegada);
+    var vc = dias < 0 ? 'previsao-badge vencida' : 'previsao-badge';
+    prevBadge = '<span class="' + vc + '">📦 ' + (dias < 0 ? 'Atrasada ' + Math.abs(dias) + 'd' : 'Chega em ' + dias + 'd') + ' (' + fmtDate(p.previsaoChegada) + ')</span>';
   }
-  el.innerHTML = lista.map(function(p) {
-    var checked = isSelecionada(p.id) ? 'checked' : '';
-    var urgClass = p.urgente ? ' urgente' : '';
-    var selClass = isSelecionada(p.id) ? ' selected' : '';
-    var prevBadge = '';
-    if (p.previsaoChegada) {
-      var dias = diasAte(p.previsaoChegada);
-      var cls = dias < 0 ? 'previsao-badge vencida' : 'previsao-badge';
-      var txt = dias < 0 ? 'Atrasada '+Math.abs(dias)+'d' : 'Chega em '+dias+'d';
-      prevBadge = '<span class="'+cls+'">📦 '+txt+' ('+fmtDate(p.previsaoChegada)+')</span>';
-    }
-    var statusCls = {pendente:'s-pendente',aguardando_pagamento:'s-aguardando',pago:'s-pago'}[p.status]||'s-pendente';
-    var extra = '';
-    if (p.fornecedor) extra += '<span>🏪 '+escH(p.fornecedor)+'</span>';
-    if (p.dadosPagamento) extra += '<span>💳 '+escH(p.dadosPagamento)+'</span>';
-    if (p.compradoEm) extra += '<span>🛒 '+fmtDate(p.compradoEm)+'</span>';
-    if (p.pagoEm) extra += '<span>✅ '+fmtDate(p.pagoEm)+'</span>';
-    var acoes = '';
-    if (tipo === 'pendentes') {
-      acoes = '<div class="peca-actions">'+
-        '<button class="btn-sm" onclick="comprarUma(\''+p.id+'\')">🛒 Comprar</button>'+
-        '<button class="btn-sm" onclick="deletar(\''+p.id+'\')">🗑</button>'+
-        '</div>';
-    } else if (tipo === 'aguardando') {
-      acoes = '<div class="peca-actions">'+
-        '<button class="btn-sm" style="color:var(--green);" onclick="confirmarPagamento([\''+p.id+'\'])">✅ Pago</button>'+
-        (p.tipoCompra==='online'?'<button class="btn-sm" style="color:var(--accent);" onclick="editarPrevisao(\''+p.id+'\',\''+(p.previsaoChegada||'')+'\')">📅 Previsão</button>':'')+
-        '</div>';
-    }
-    return '<div class="peca-card'+urgClass+selClass+'" id="card-'+p.id+'">'
-      +'<input type="checkbox" class="peca-check" '+checked+' onchange="toggleSel(\''+p.id+'\',this.checked)">'
-      +'<div class="peca-body">'
-        +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-          +'<div class="peca-desc">'+escH(p.descricao)+'</div>'
-          +'<span class="peca-status '+statusCls+'">'+statusLabel(p.status)+'</span>'
-          +(p.urgente?'<span style="font-family:var(--fm);font-size:9px;color:var(--red);">🔴 URGENTE</span>':'')+
-        '</div>'
-        +'<div class="peca-meta">'
-          +(p.os?'<span>OS: '+escH(p.os)+'</span>':'')
-          +(p.quantidade>1?'<span>Qtd: '+p.quantidade+'</span>':'')
-          +(p.obs?'<span>📝 '+escH(p.obs)+'</span>':'')
-          +extra+
-        '</div>'
-        +(prevBadge?'<div style="margin-top:6px;">'+prevBadge+'</div>':'')
-        +acoes+
-      '</div>'
-      +'</div>';
-  }).join('');
+  var sc = {pendente:'s-pendente', aguardando_pagamento:'s-aguardando', pago:'s-pago'}[p.status] || 's-pendente';
+  var acoes = '';
+
+  if (tipo === 'pendentes') {
+    acoes = '<div class="peca-actions">'
+      + '<button class="btn-sm" onclick="comprarUma(\'' + p.id + '\')">🛒 Comprar</button>'
+      + '<button class="btn-sm" onclick="deletar(\'' + p.id + '\')">🗑</button>'
+      + '</div>';
+  } else if (tipo === 'aguardando') {
+    acoes = '<div class="peca-actions">'
+      + '<button class="btn-sm" style="color:var(--green);" onclick="confirmarPagamento([\'' + p.id + '\'])">✅ Pago</button>'
+      + '<button class="btn-sm" style="color:var(--accent);" onclick="verPagamento(\'' + p.id + '\')">💳 Ver Pgto</button>'
+      + (p.tipoCompra === 'online' ? '<button class="btn-sm" onclick="editarPrevisao(\'' + p.id + '\')">📅 Previsão</button>' : '')
+      + '</div>';
+  } else if (tipo === 'pago') {
+    acoes = '<div class="peca-actions">'
+      + '<button class="btn-sm" style="color:var(--accent);" onclick="verPagamento(\'' + p.id + '\')">💳 Ver Pgto</button>'
+      + '</div>';
+  }
+
+  return '<div class="peca-card' + (p.urgente ? ' urgente' : '') + (sel ? ' selected' : '') + '" id="card-' + p.id + '">'
+    + '<input type="checkbox" class="peca-check"' + (sel ? ' checked' : '') + ' onchange="toggleSel(\'' + p.id + '\', this.checked)">'
+    + '<div class="peca-body">'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+        + '<div class="peca-desc">' + escH(p.descricao) + '</div>'
+        + '<span class="peca-status ' + sc + '">' + statusLabel(p.status) + '</span>'
+        + (p.urgente ? '<span style="font-family:var(--fm);font-size:9px;color:var(--red);">🔴 URGENTE</span>' : '')
+      + '</div>'
+      + '<div class="peca-meta">'
+        + (p.os ? '<span>OS: ' + escH(p.os) + '</span>' : '')
+        + (p.quantidade > 1 ? '<span>Qtd: ' + p.quantidade + '</span>' : '')
+        + (p.obs ? '<span>📝 ' + escH(p.obs) + '</span>' : '')
+      + '</div>'
+      + (prevBadge ? '<div style="margin-top:6px;">' + prevBadge + '</div>' : '')
+      + acoes
+    + '</div>'
+    + '</div>';
 }
 
+// ── RENDER PENDENTES ──────────────────────────────────────
+function renderPendentes(lista) {
+  var el = document.getElementById('lista-pendentes');
+  if (!lista.length) { el.innerHTML = '<div class="empty">— Nenhuma peça pendente —</div>'; return; }
+  el.innerHTML = lista.map(function(p){ return cardHTML(p, 'pendentes'); }).join('');
+}
+
+// ── RENDER AGUARDANDO — com agrupamento visual ────────────
+function renderAguardando(lista) {
+  var el = document.getElementById('lista-aguardando');
+  if (!lista.length) { el.innerHTML = '<div class="empty">— Nenhuma peça aguardando pagamento —</div>'; return; }
+
+  var grupos = {};
+  var individuais = [];
+  lista.forEach(function(p) {
+    if (p.grupoId) {
+      if (!grupos[p.grupoId]) grupos[p.grupoId] = [];
+      grupos[p.grupoId].push(p);
+    } else {
+      individuais.push(p);
+    }
+  });
+
+  var html = '';
+
+  // Grupos visuais
+  Object.keys(grupos).forEach(function(gid) {
+    var gps = grupos[gid];
+    var ids = gps.map(function(x){ return x.id; });
+    var idsJson = JSON.stringify(ids).replace(/"/g, '&quot;');
+    var fornec = escH(gps[0].fornecedor || '—');
+    var tcomp = gps[0].tipoCompra === 'online' ? '🌐 Online' : '🏪 Loja';
+    html += '<div class="grupo-wrap">'
+      + '<div class="grupo-header">'
+        + '<div class="grupo-label">📦 ' + fornec + ' · ' + tcomp + ' <span class="grupo-qtd">' + gps.length + ' peças</span></div>'
+        + '<div class="grupo-actions">'
+          + '<button class="btn-sm" style="color:var(--accent);" onclick="verPagamentoGrupo(\'' + gid + '\')">💳 Dados Pgto</button>'
+          + '<button class="btn-sm" style="color:var(--green);" onclick="confirmarGrupo(\'' + gid + '\')">✅ Pagar grupo</button>'
+        + '</div>'
+      + '</div>'
+      + '<div class="grupo-body">' + gps.map(function(p){ return cardHTML(p, 'aguardando'); }).join('') + '</div>'
+      + '</div>';
+  });
+
+  // Individuais
+  individuais.forEach(function(p){ html += cardHTML(p, 'aguardando'); });
+  el.innerHTML = html;
+}
+
+// ── RENDER PAGAS ──────────────────────────────────────────
+function renderPagas(lista) {
+  var el = document.getElementById('lista-pago');
+  if (!lista.length) { el.innerHTML = '<div class="empty">— Nenhuma peça paga —</div>'; return; }
+  el.innerHTML = lista.map(function(p){ return cardHTML(p, 'pago'); }).join('');
+}
+
+// ── RENDER ONLINE ─────────────────────────────────────────
 function renderOnline(lista) {
   var el = document.getElementById('lista-online');
-  if (!lista.length) {
-    el.innerHTML = '<div class="empty">— Nenhuma compra online com previsão —</div>';
-    return;
-  }
-  var hoje = new Date().toISOString().slice(0,10);
+  if (!lista.length) { el.innerHTML = '<div class="empty">— Nenhuma compra online com previsão —</div>'; return; }
   el.innerHTML = lista.map(function(p) {
     var dias = diasAte(p.previsaoChegada);
     var cls = dias < 0 ? 'online-card atrasada' : (dias === 0 ? 'online-card chegou' : 'online-card');
-    var eta = dias < 0 ? '⚠️ Atrasada '+Math.abs(dias)+'d' : (dias === 0 ? '✅ Chega hoje!' : '📦 '+dias+'d');
-    return '<div class="'+cls+'">'
-      +'<div style="font-family:var(--fm);font-size:9px;color:var(--muted);">'+escH(p.fornecedor||'—')+'</div>'
-      +'<div class="peca-desc" style="margin-top:4px;">'+escH(p.descricao)+'</div>'
-      +(p.os?'<div style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:2px;">OS: '+escH(p.os)+'</div>':'')
-      +'<div class="online-eta" style="color:'+(dias<0?'var(--red)':dias===0?'var(--green)':'var(--accent)')+'">'+eta+'</div>'
-      +'<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">Previsão: '+fmtDate(p.previsaoChegada)+'</div>'
-      +'<div style="margin-top:8px;">'
-        +'<button class="btn-sm" style="color:var(--accent);" onclick="editarPrevisao(\''+p.id+'\',\''+(p.previsaoChegada||'')+'\')">📅 Editar data</button>'
-      +'</div>'
-      +'</div>';
+    var eta = dias < 0 ? '⚠️ Atrasada ' + Math.abs(dias) + 'd' : (dias === 0 ? '✅ Chega hoje!' : '📦 ' + dias + 'd');
+    var cor = dias < 0 ? 'var(--red)' : (dias === 0 ? 'var(--green)' : 'var(--accent)');
+    return '<div class="' + cls + '">'
+      + '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);">' + escH(p.fornecedor || '—') + '</div>'
+      + '<div class="peca-desc" style="margin-top:4px;">' + escH(p.descricao) + '</div>'
+      + (p.os ? '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:2px;">OS: ' + escH(p.os) + '</div>' : '')
+      + '<div class="online-eta" style="color:' + cor + ';">' + eta + '</div>'
+      + '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">Previsão: ' + fmtDate(p.previsaoChegada) + '</div>'
+      + '<div style="margin-top:8px;"><button class="btn-sm" style="color:var(--accent);" onclick="editarPrevisao(\'' + p.id + '\')">📅 Editar data</button></div>'
+      + '</div>';
   }).join('');
 }
 
-function statusLabel(s) {
-  return {pendente:'Pendente',aguardando_pagamento:'Ag. Pagamento',pago:'Pago'}[s]||s;
-}
-function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-// SELEÇÃO
-var selecionadas = new Set();
-function isSelecionada(id) { return selecionadas.has(id); }
+// ── SELEÇÃO ───────────────────────────────────────────────
 function toggleSel(id, checked) {
   if (checked) selecionadas.add(id);
   else selecionadas.delete(id);
-  var card = document.getElementById('card-'+id);
+  var card = document.getElementById('card-' + id);
   if (card) card.classList.toggle('selected', checked);
   atualizarBotoesHeader();
 }
 function selecionarTodas() {
-  pecas.filter(p=>p.status==='pendente').forEach(p=>{ selecionadas.add(p.id); });
+  pecas.filter(function(p){ return p.status === 'pendente'; }).forEach(function(p){ selecionadas.add(p.id); });
   render();
 }
 function deselecionarTodas() { selecionadas.clear(); render(); }
-function selecionarTodasAba(aba) {
-  pecas.filter(p=>p.status==='aguardando_pagamento').forEach(p=>{ selecionadasAguardando.add(p.id); });
-  render();
-}
 function atualizarBotoesHeader() {
-  var n = [...selecionadas].filter(id => pecas.find(p=>p.id===id&&p.status==='pendente')).length;
-  document.getElementById('btn-copiar').style.display  = n>0 ? 'inline-flex' : 'none';
-  document.getElementById('btn-comprar').style.display = n>0 ? 'inline-flex' : 'none';
+  var n = [...selecionadas].filter(function(id){ return pecas.find(function(p){ return p.id === id && p.status === 'pendente'; }); }).length;
+  document.getElementById('btn-copiar').style.display  = n > 0 ? 'inline-flex' : 'none';
+  document.getElementById('btn-comprar').style.display = n > 0 ? 'inline-flex' : 'none';
 }
 
-// CADASTRAR
+// ── CADASTRAR ─────────────────────────────────────────────
 async function cadastrar() {
   var desc = document.getElementById('f-desc').value.trim();
-  if (!desc) { toast('Preencha a descrição','var(--red)'); return; }
+  if (!desc) { toast('Preencha a descrição', 'var(--red)'); return; }
   var d = await api('cadastrar', {
     descricao: desc,
-    os:        document.getElementById('f-os').value.trim(),
-    quantidade:document.getElementById('f-qtd').value,
-    obs:       document.getElementById('f-obs').value.trim(),
-    urgente:   document.getElementById('f-urgente').checked
+    os: document.getElementById('f-os').value.trim(),
+    quantidade: document.getElementById('f-qtd').value,
+    obs: document.getElementById('f-obs').value.trim(),
+    urgente: document.getElementById('f-urgente').checked
   });
   if (d.ok) {
-    document.getElementById('f-desc').value='';
-    document.getElementById('f-os').value='';
-    document.getElementById('f-qtd').value='1';
-    document.getElementById('f-obs').value='';
-    document.getElementById('f-urgente').checked=false;
+    ['f-desc','f-os','f-obs'].forEach(function(id){ document.getElementById(id).value=''; });
+    document.getElementById('f-qtd').value = '1';
+    document.getElementById('f-urgente').checked = false;
     await load();
     toast('✅ Peça cadastrada!');
-  } else { toast('Erro: '+d.error,'var(--red)'); }
+  } else { toast('Erro: ' + d.error, 'var(--red)'); }
 }
 
-// DELETAR
+// ── DELETAR ───────────────────────────────────────────────
 async function deletar(id) {
   if (!confirm('Remover esta peça?')) return;
-  await api('deletar',{id});
+  await api('deletar', {id});
   selecionadas.delete(id);
   await load();
 }
 
-// MODAL COMPRA
-var idsParaComprar = [];
-function comprarUma(id) {
-  idsParaComprar = [id];
-  abrirModalCompra();
-}
+// ── MODAL COMPRA ──────────────────────────────────────────
+function comprarUma(id) { idsParaComprar = [id]; abrirModalCompra(); }
 function abrirModalCompra() {
-  var ids = tabAtual==='pendentes'
-    ? [...selecionadas].filter(id=>pecas.find(p=>p.id===id&&p.status==='pendente'))
+  var ids = tabAtual === 'pendentes'
+    ? [...selecionadas].filter(function(id){ return pecas.find(function(p){ return p.id === id && p.status === 'pendente'; }); })
     : idsParaComprar;
-  if (!ids.length) { toast('Selecione peças primeiro','var(--yellow)'); return; }
+  if (!ids.length) { toast('Selecione peças primeiro', 'var(--yellow)'); return; }
   idsParaComprar = ids;
-  var resumo = ids.map(id=>{ var p=pecas.find(x=>x.id===id); return p?'• '+p.descricao+(p.os?' (OS:'+p.os+')':''):''; }).join('<br>');
-  document.getElementById('modal-resumo').innerHTML = resumo;
-  document.getElementById('m-fornecedor').value='';
-  document.getElementById('m-pagamento').value='';
+  document.getElementById('modal-resumo').innerHTML = ids.map(function(id) {
+    var p = pecas.find(function(x){ return x.id === id; });
+    return p ? '• ' + escH(p.descricao) + (p.os ? ' (OS: ' + p.os + ')' : '') : '';
+  }).join('<br>');
+  document.getElementById('m-fornecedor').value = '';
+  document.getElementById('m-pagamento').value = '';
   setTipo('loja');
   document.getElementById('modal-compra').classList.add('open');
 }
-function fecharModal() { document.getElementById('modal-compra').classList.remove('open'); idsParaComprar=[]; }
-function setTipo(tipo) {
-  tipoCompra = tipo;
-  document.getElementById('tipo-loja').classList.toggle('active', tipo==='loja');
-  document.getElementById('tipo-online').classList.toggle('active', tipo==='online');
+function fecharModalCompra() { document.getElementById('modal-compra').classList.remove('open'); idsParaComprar = []; }
+function setTipo(t) {
+  tipoCompra = t;
+  document.getElementById('tipo-loja').classList.toggle('active', t === 'loja');
+  document.getElementById('tipo-online').classList.toggle('active', t === 'online');
   var wrap = document.getElementById('previsoes-wrapper');
-  if (tipo==='online') {
+  if (t === 'online') {
     var html = '<div class="fl" style="margin-bottom:8px;">Previsão de chegada por peça</div>';
     idsParaComprar.forEach(function(id) {
-      var p = pecas.find(x=>x.id===id);
+      var p = pecas.find(function(x){ return x.id === id; });
       if (!p) return;
-      html += '<div style="margin-bottom:8px;">'
-        +'<div style="font-size:11px;color:var(--muted);margin-bottom:4px;">'+escH(p.descricao)+'</div>'
-        +'<input class="fi" type="date" id="prev-'+id+'" />'
-        +'</div>';
+      html += '<div style="margin-bottom:8px;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">' + escH(p.descricao) + '</div><input class="fi" type="date" id="prev-' + id + '"/></div>';
     });
     wrap.innerHTML = html;
     wrap.style.display = 'block';
@@ -479,64 +494,89 @@ async function finalizarCompra() {
   var fornecedor = document.getElementById('m-fornecedor').value.trim();
   var pagamento  = document.getElementById('m-pagamento').value.trim();
   var previsoes  = {};
-  if (tipoCompra==='online') {
-    idsParaComprar.forEach(function(id){
-      var el = document.getElementById('prev-'+id);
+  if (tipoCompra === 'online') {
+    idsParaComprar.forEach(function(id) {
+      var el = document.getElementById('prev-' + id);
       if (el && el.value) previsoes[id] = el.value;
     });
   }
-  var d = await api('comprar',{ ids:idsParaComprar, fornecedor, tipoCompra, dadosPagamento:pagamento, previsoes });
+  var d = await api('comprar', {ids: idsParaComprar, fornecedor, tipoCompra, dadosPagamento: pagamento, previsoes});
   if (d.ok) {
-    fecharModal();
+    fecharModalCompra();
     selecionadas.clear();
     await load();
-    toast('✅ Movido para Ag. Pagamento!','var(--green)');
-  } else { toast('Erro: '+d.error,'var(--red)'); }
+    toast('✅ Movido para Ag. Pagamento!', 'var(--green)');
+  } else { toast('Erro: ' + d.error, 'var(--red)'); }
 }
 
-// CONFIRMAR PAGAMENTO
-async function confirmarPagamento(ids) {
-  if (!ids.length) return;
-  var d = await api('confirmar-pagamento',{ids});
-  if (d.ok) { selecionadasAguardando.clear(); await load(); toast('✅ Pagamento confirmado!','var(--green)'); }
-  else toast('Erro: '+d.error,'var(--red)');
+// ── VER PAGAMENTO ─────────────────────────────────────────
+function verPagamento(id) {
+  var p = pecas.find(function(x){ return x.id === id; });
+  if (!p) return;
+  mostrarModalPgto([p]);
 }
-async function confirmarPagamentoSelecionadas() {
-  var ids = pecas.filter(p=>p.status==='aguardando_pagamento'&&isSelecionada(p.id)).map(p=>p.id);
-  if (!ids.length) { toast('Selecione peças primeiro','var(--yellow)'); return; }
+function verPagamentoGrupo(grupoId) {
+  var gps = pecas.filter(function(p){ return p.grupoId === grupoId; });
+  if (!gps.length) return;
+  mostrarModalPgto(gps);
+}
+function mostrarModalPgto(gps) {
+  var p = gps[0];
+  var html = '<div class="pgto-row"><div class="pgto-label">Fornecedor</div><div class="pgto-value">' + escH(p.fornecedor || '—') + '</div></div>'
+    + '<div class="pgto-row"><div class="pgto-label">Tipo</div><div class="pgto-value">' + (p.tipoCompra === 'online' ? '🌐 Online' : '🏪 Loja Física') + '</div></div>'
+    + '<div class="pgto-row"><div class="pgto-label">Pagamento</div><div class="pgto-value">' + escH(p.dadosPagamento || '—') + '</div></div>'
+    + '<div class="pgto-row"><div class="pgto-label">Comprado em</div><div class="pgto-value">' + fmtDate(p.compradoEm) + '</div></div>'
+    + (gps.length > 1 ? '<div class="pgto-row"><div class="pgto-label">Peças (' + gps.length + ')</div><div class="pgto-value">' + gps.map(function(x){ return escH(x.descricao + (x.os ? ' — OS:'+x.os : '')); }).join('<br>') + '</div></div>' : '');
+  document.getElementById('pgto-content').innerHTML = html;
+  document.getElementById('modal-pgto').classList.add('open');
+}
+
+// ── CONFIRMAR PAGAMENTO ───────────────────────────────────
+async function confirmarPagamento(ids) {
+  var d = await api('confirmar-pagamento', {ids});
+  if (d.ok) { await load(); toast('✅ Pagamento confirmado!', 'var(--green)'); }
+  else toast('Erro: ' + d.error, 'var(--red)');
+}
+async function confirmarGrupo(grupoId) {
+  var ids = pecas.filter(function(p){ return p.grupoId === grupoId; }).map(function(p){ return p.id; });
+  if (!ids.length) return;
   await confirmarPagamento(ids);
 }
 
-// EDITAR PREVISÃO
-function editarPrevisao(id, atual) {
-  var nova = prompt('Previsão de chegada (AAAA-MM-DD):', atual||'');
+// ── PREVISÃO ──────────────────────────────────────────────
+function editarPrevisao(id) {
+  var p = pecas.find(function(x){ return x.id === id; });
+  var atual = p ? (p.previsaoChegada || '') : '';
+  var nova = prompt('Previsão de chegada (AAAA-MM-DD):', atual);
   if (nova !== null) salvarPrevisao(id, nova);
 }
 async function salvarPrevisao(id, data) {
-  var d = await api('previsao',{id, previsaoChegada: data});
+  var d = await api('previsao', {id, previsaoChegada: data});
   if (d.ok) { await load(); toast('📅 Previsão atualizada!'); }
 }
 
-// COPIAR
+// ── COPIAR ────────────────────────────────────────────────
 function copiarSelecionadas() {
-  var ids = [...selecionadas].filter(id=>pecas.find(p=>p.id===id&&p.status==='pendente'));
+  var ids = [...selecionadas].filter(function(id){ return pecas.find(function(p){ return p.id === id && p.status === 'pendente'; }); });
   if (!ids.length) return;
-  var texto = ids.map(function(id,i){
-    var p = pecas.find(x=>x.id===id);
-    return (i+1)+'. '+p.descricao+(p.os?' — OS: '+p.os:'')+(p.quantidade>1?' (x'+p.quantidade+')':'')+(p.urgente?' 🔴 URGENTE':'');
+  var texto = ids.map(function(id, i) {
+    var p = pecas.find(function(x){ return x.id === id; });
+    return (i+1) + '. ' + p.descricao + (p.os ? ' — OS: ' + p.os : '') + (p.quantidade > 1 ? ' (x' + p.quantidade + ')' : '') + (p.urgente ? ' 🔴 URGENTE' : '');
   }).join('\n');
   navigator.clipboard.writeText(texto).catch(function(){
-    var ta=document.createElement('textarea');ta.value=texto;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+    var ta = document.createElement('textarea');
+    ta.value = texto; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
   });
-  toast('📋 '+ids.length+' peça(s) copiadas!');
+  toast('📋 ' + ids.length + ' peça(s) copiadas!');
 }
 
-// TABS
+// ── TABS ──────────────────────────────────────────────────
 function trocarTab(aba) {
   tabAtual = aba;
-  ['pendentes','aguardando','pago','online'].forEach(function(t){
-    document.getElementById('tab-'+t).classList.toggle('active', t===aba);
-    document.getElementById('page-'+t).classList.toggle('active', t===aba);
+  ['pendentes','aguardando','pago','online'].forEach(function(t) {
+    document.getElementById('tab-' + t).classList.toggle('active', t === aba);
+    document.getElementById('page-' + t).classList.toggle('active', t === aba);
   });
   atualizarBotoesHeader();
 }
