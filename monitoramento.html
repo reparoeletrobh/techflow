@@ -171,7 +171,7 @@ async function loadAll() {
       fetch('/api/financeiro?action=load').then(function(r){return r.json();}).catch(function(){return {records:[]};}),
       fetch('/api/board?action=load').then(function(r){return r.json();}),
       fetch('/api/orcamento?action=orc-load').then(function(r){return r.json();}),
-      fetch('/api/compra-equip?action=load').then(function(r){return r.json();}).catch(function(){return {items:[]};}),
+      fetch('/api/compra-equip?action=load').then(function(r){return r.json();}).catch(function(){return {fichas:[]};}),
       fetch('/api/orcamento?action=sem-resposta').then(function(r){return r.json();}).catch(function(){return {cards:[]};}),
       fetch('/api/compras-pecas?action=load').then(function(r){return r.json();}).catch(function(){return {pecas:[]};})
     ]);
@@ -185,7 +185,7 @@ async function loadAll() {
       comprarPeca:    cards.filter(function(c){return c.phaseId==='comprar_peca';}),
       pecaDisponivel: cards.filter(function(c){return c.phaseId==='peca_disponivel';}),
       urgencia:       cards.filter(function(c){return c.phaseId==='urgencia';}),
-      equipComprado:  (compraRes.items||[]).filter(function(i){return i.status==='comprado' && !i.cadastradoVendas;}),
+      equipComprado:  (compraRes.fichas||[]).filter(function(i){return i.status==='comprado' && !i.cadastradoVendas;}),
       semResposta:    semRespostaRes.cards || [],
       analisePagamento:  (finRes.records||[]).filter(function(r){return r.phaseId==='analise_pagamento';}),
       pecasPendentes:    (compPecasRes.pecas||[]).filter(function(p){return p.status==='pendente';}),
@@ -254,7 +254,14 @@ function renderSections() {
     },
     equipComprado: function() {
       return renderSection('Equipamentos Comprados — não cadastrados no Vendas', data.equipComprado, '#a855f7', function(i){
-        return '<div class="item-card" style="--c:#a855f7"><div class="item-nome">'+escH(i.tipo||i.descricao||'—')+'</div><div class="item-desc">'+escH((i.descricao||'').slice(0,80))+'</div><div class="item-age" style="--c:#a855f7">'+fmtSince(i.createdAt||i.addedAt)+'</div></div>';
+        var nome = escH(i.nomeContato||i.title||'—');
+        var desc = escH((i.descricao||'').slice(0,80));
+        var ref  = i.pipefyId||'';
+        return '<div class="item-card" style="--c:#a855f7">'
+          +'<div class="item-nome">'+nome+(ref?' <span style="font-family:var(--fm);font-size:10px;color:var(--muted);">#'+escH(ref)+'</span>':'')+'</div>'
+          +'<div class="item-desc">'+desc+'</div>'
+          +'<div class="item-age" style="--c:#a855f7">'+fmtSince(i.createdAt||i.addedAt)+'</div>'
+          +'</div>';
       }, 'equipComprado');
     },
     urgencia: function() {
