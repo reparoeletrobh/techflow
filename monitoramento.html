@@ -301,7 +301,24 @@ function renderSections() {
   document.getElementById('sections').innerHTML = html || '<div class="empty">✅ Nenhuma pendência encontrada!</div>';
 }
 
+var _SECTION_TITLE_MAP = {
+  'Análise de Pagamento': 'analisePagamento',
+  'Orçamentos não enviados': 'orcPendentes',
+  'Comprar Peça': 'comprarPeca',
+  'Peça Disponível': 'pecaDisponivel',
+  'Equipamentos Comprados': 'equipComprado',
+  'Em Urgência': 'urgencia',
+  'Sem Resposta': 'semResposta',
+  'Peças para Comprar': 'pecasPendentes',
+  'Peças — Aguardando Pagamento': 'pecasAgPagamento',
+  'Compras Online': 'pecasOnline',
+};
 function renderSection(title, items, color, renderItem, sectionId) {
+  if (!sectionId) {
+    for (var _k in _SECTION_TITLE_MAP) {
+      if (title.startsWith(_k)) { sectionId = _SECTION_TITLE_MAP[_k]; break; }
+    }
+  }
   var idAttr = sectionId ? ' id="sec-'+sectionId+'"' : '';
   var html = '<div class="section"'+idAttr+'>' +
     '<div class="section-header">' +
