@@ -711,6 +711,8 @@ function openMoverModal(id) {
         <button onclick="document.getElementById('anexo-upload').click();event.preventDefault();"
           style="font-family:var(--fm);font-size:10px;padding:7px 12px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;">📎 Selecionar</button>
         <span id="anexo-nome" style="font-family:var(--fm);font-size:10px;color:var(--muted);">Nenhum arquivo</span>
+      </label>
+      <div style="font-family:var(--fm);font-size:9px;color:var(--muted);padding:3px 0;">💡 Ou cole com <kbd style="background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:1px 5px;">Ctrl+V</kbd> com a imagem copiada</div
       </div>
       <div id="anexo-preview" style="display:none;margin-top:2px;"></div>
       <button class="btn-primary" style="background:#0ea5e9;color:#fff;padding:11px;font-weight:bold;"
@@ -788,12 +790,17 @@ async function moverPagAgendadoParaEntrega(id, phaseId, dateInputId) {
   } else showToast('❌','Erro',res.error);
 }
 
-function previewAnexo(input) {
-  const file = input.files[0];
+// Armazena o arquivo atual para envio
+var _anexoFile = null;
+
+function processAnexo(file) {
   if (!file) return;
+  _anexoFile = file;
   const nome = file.name.length > 30 ? file.name.slice(0,28)+'...' : file.name;
-  document.getElementById('anexo-nome').textContent = nome;
+  const nomeEl = document.getElementById('anexo-nome');
+  if (nomeEl) nomeEl.textContent = nome;
   const prev = document.getElementById('anexo-preview');
+  if (!prev) return;
   const reader = new FileReader();
   reader.onload = function(e) {
     if (file.type.startsWith('image/')) {
@@ -806,9 +813,33 @@ function previewAnexo(input) {
   reader.readAsDataURL(file);
 }
 
+function previewAnexo(input) {
+  processAnexo(input.files[0]);
+}
+
+// Ctrl+V global — captura imagem da área de transferência quando modal está aberto
+document.addEventListener('paste', function(e) {
+  const modal = document.getElementById('mover-modal');
+  if (!modal || !modal.classList.contains('open')) return;
+  const items = e.clipboardData?.items || [];
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type.startsWith('image/')) {
+      const file = items[i].getAsFile();
+      if (file) {
+        // Nomeia o arquivo com timestamp
+        Object.defineProperty(file, 'name', { value: 'comprovante-' + Date.now() + '.png', writable: false });
+        processAnexo(file);
+        showToast('📋','Imagem colada!','Ctrl+V capturado');
+      }
+      break;
+    }
+  }
+});
+
 async function moverAnalisePagamento(id) {
+  // Usa o arquivo do input OU o colado via Ctrl+V
   const input = document.getElementById('anexo-upload');
-  const file = input?.files[0];
+  const file = (input?.files[0]) || _anexoFile;
   let anexo = null;
   if (file) {
     const b64 = await new Promise(res => {
@@ -823,9 +854,12 @@ async function moverAnalisePagamento(id) {
     updateRecord(res.record);
     closeModal('mover-modal');
     // Reset upload fields
-    if (input) { input.value=''; }
-    document.getElementById('anexo-nome').textContent = 'Nenhum arquivo';
-    document.getElementById('anexo-preview').style.display = 'none';
+    _anexoFile = null;
+    if (input) { input.value = ''; }
+    const nomeEl = document.getElementById('anexo-nome');
+    const prevEl = document.getElementById('anexo-preview');
+    if (nomeEl) nomeEl.textContent = 'Nenhum arquivo';
+    if (prevEl) prevEl.style.display = 'none';
     showToast('🔍','Enviado para Análise!', anexo ? 'Com comprovante' : 'Sem comprovante');
     if (curPage==='painel') await load();
   } else showToast('❌','Erro',res.error);
