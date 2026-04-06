@@ -50,6 +50,29 @@ async function updateCardValue(pipefyId, valor) {
   return await pipefyQuery(mutation);
 }
 
+function parseFichaTexto(txt) {
+  const result = { nome:"", telefone:"", aparelho:"", defeito:"", endereco:"" };
+  if (!txt) return result;
+  const linhas = txt.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  let bairro = "";
+  for (const linha of linhas) {
+    const sep = linha.indexOf(":");
+    if (sep < 0) continue;
+    const chave = linha.slice(0, sep).trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const valor = linha.slice(sep + 1).trim();
+    if (!valor) continue;
+    if (chave.includes("nome"))                                             result.nome     = valor;
+    else if (chave.includes("aparelho") || chave.includes("equip"))        result.aparelho = valor;
+    else if (chave.includes("defeito") || chave.includes("problema"))      result.defeito  = valor;
+    else if (chave.includes("telefone") || chave.includes("fone") || chave.includes("cel") || chave.includes("whatsapp")) result.telefone = valor;
+    else if (chave.includes("cep") || chave.includes("endere") || chave.includes("rua") || chave.includes("av") || chave.includes("logra")) result.endereco = valor;
+    else if (chave.includes("bairro") || chave.includes("cidade") || chave.includes("local")) bairro = valor;
+  }
+  if (bairro && result.endereco) result.endereco += ", " + bairro;
+  else if (bairro) result.endereco = bairro;
+  return result;
+}
+
 async function createPipefyCard({ phaseId, nome, telefone, aparelho, defeito, endereco }) {
   const descricao   = `${aparelho} — ${defeito}`;
   const ultimos4    = telefone.replace(/\D/g, "").slice(-4);
@@ -142,7 +165,13 @@ module.exports = async function handler(req, res) {
   }
 
   if (req.method === "POST" && action === "criar-card") {
-    const { nome, telefone, aparelho, defeito, endereco, phaseId } = req.body || {};
+    let { nome, telefone, aparelho, defeito, endereco, phaseId, texto } = req.body || {};
+    if (texto && !nome) {
+      const parsed = parseFichaTexto(texto);
+      nome = parsed.nome||nome; telefone = parsed.telefone||telefone;
+      aparelho = parsed.aparelho||aparelho; defeito = parsed.defeito||defeito;
+      endereco = parsed.endereco||endereco;
+    }
     if (!nome || !telefone || !aparelho || !defeito)
       return res.status(400).json({ ok: false, error: "nome, telefone, aparelho e defeito são obrigatórios" });
     try {
