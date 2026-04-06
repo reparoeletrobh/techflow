@@ -470,7 +470,7 @@ function markShortcut(idx) {
   document.querySelectorAll('.pshort').forEach((b,i) => b.classList.toggle('active', i===idx));
 }
 function atalhoHoje()    { var h = hj(); setFiltro(h, h); markShortcut(0); }
-function atalhoSemana()  { var h = new Date(); var d = h.getDay(); var s = new Date(h); s.setDate(h.getDate()-(d===0?6:d-1)); setFiltro(df(s), hj()); markShortcut(1); }
+function atalhoSemana()  { var h = new Date(); var d = h.getDay(); var s = new Date(h); s.setDate(h.getDate()-d); var e = new Date(s); e.setDate(s.getDate()+6); setFiltro(df(s), df(e)); markShortcut(1); }
 function atalhoMes()     { var h = new Date(); setFiltro(h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-01', hj()); markShortcut(2); }
 function atalho7d()      { var s = new Date(); s.setDate(s.getDate()-6); setFiltro(df(s), hj()); markShortcut(3); }
 function atalho30d()     { var s = new Date(); s.setDate(s.getDate()-29); setFiltro(df(s), hj()); markShortcut(4); }
@@ -918,11 +918,15 @@ async function syncBoard() {
   // Lançar dados: data padrão = hoje
   document.getElementById('inp-data').value = df(new Date());
 
-  // Filtro de período: padrão = hoje — seta ANTES do load()
-  var hoje = df(new Date());
-  document.getElementById('filtro-de').value  = hoje;
-  document.getElementById('filtro-ate').value = hoje;
-  filtroAtivo = { de: hoje, ate: hoje };
+  // Filtro padrão = semana vigente (domingo a sábado)
+  var _now = new Date(); var _d = _now.getDay();
+  var _sun = new Date(_now); _sun.setDate(_now.getDate() - _d);
+  var _sat = new Date(_sun); _sat.setDate(_sun.getDate() + 6);
+  var semDe  = df(_sun);
+  var semAte = df(_sat);
+  document.getElementById('filtro-de').value  = semDe;
+  document.getElementById('filtro-ate').value = semAte;
+  filtroAtivo = { de: semDe, ate: semAte };
   document.querySelectorAll('.pshort')[0]?.classList.add('active');
 
   // Carrega dados — filtroAtivo já está setado, load() usará o filtro correto
