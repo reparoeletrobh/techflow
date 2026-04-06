@@ -49,6 +49,45 @@ async function updateCardValue(pipefyId, valor) {
   return await pipefyQuery(mutation);
 }
 
+// ── PARSER DE FICHA ─────────────────────────────────────────
+// Suporta o formato:
+//   Nome: Marcelo
+//   Aparelho: Microondas
+//   Defeito: Liga mas não esquenta
+//   Cep/Endereço: Rua Geórgia 155, Condomínio Pinheiro, ap 504
+//   Telefone: +5511979960998
+//   Bairro: Estrela Dalva, Belo Horizonte
+// A linha Bairro é sempre anexada ao endereço
+function parseFichaTexto(txt) {
+  const result = { nome:"", telefone:"", aparelho:"", defeito:"", endereco:"" };
+  if (!txt) return result;
+
+  const linhas = txt.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  let bairro = "";
+
+  for (const linha of linhas) {
+    const sep = linha.indexOf(":");
+    if (sep < 0) continue;
+    const chave = linha.slice(0, sep).trim().toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // remove acentos
+    const valor = linha.slice(sep + 1).trim();
+    if (!valor) continue;
+
+    if (chave.includes("nome"))                                result.nome     = valor;
+    else if (chave.includes("aparelho") || chave.includes("equip")) result.aparelho = valor;
+    else if (chave.includes("defeito") || chave.includes("problema")) result.defeito  = valor;
+    else if (chave.includes("telefone") || chave.includes("fone") || chave.includes("cel") || chave.includes("whatsapp")) result.telefone = valor;
+    else if (chave.includes("cep") || chave.includes("endere") || chave.includes("rua") || chave.includes("av") || chave.includes("logra")) result.endereco = valor;
+    else if (chave.includes("bairro") || chave.includes("cidade") || chave.includes("local")) bairro = valor;
+  }
+
+  // Anexa bairro ao endereço
+  if (bairro && result.endereco) result.endereco += ", " + bairro;
+  else if (bairro)               result.endereco = bairro;
+
+  return result;
+}
+
 async function createPipefyCard({ phaseId, nome, telefone, aparelho, defeito, endereco }) {
   const descricao   = `${aparelho} — ${defeito}`;
   const ultimos4    = telefone.replace(/\D/g, "").slice(-4);
@@ -141,12 +180,23 @@ module.exports = async function handler(req, res) {
   }
 
   if (req.method === "POST" && action === "criar-card") {
-    const { nome, telefone, aparelho, defeito, endereco, phaseId } = req.body || {};
+    let { nome, telefone, aparelho, defeito, endereco, phaseId, texto } = req.body || {};
+
+    // Se veio texto bruto, faz o parse
+    if (texto && !nome) {
+      const parsed = parseFichaTexto(texto);
+      nome     = parsed.nome     || nome;
+      telefone = parsed.telefone || telefone;
+      aparelho = parsed.aparelho || aparelho;
+      defeito  = parsed.defeito  || defeito;
+      endereco = parsed.endereco || endereco;
+    }
+
     if (!nome || !telefone || !aparelho || !defeito)
       return res.status(400).json({ ok: false, error: "nome, telefone, aparelho e defeito são obrigatórios" });
     try {
       const card = await createPipefyCard({ phaseId, nome, telefone, aparelho, defeito, endereco: endereco || "" });
-      return res.status(200).json({ ok: true, card });
+      return res.status(200).json({ ok: true, cardId: card?.id, card });
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });
     }
@@ -290,6 +340,18 @@ module.exports = async function handler(req, res) {
 
   // ── POST orc-update-texto ──────────────────────────────────
   // Regenera ou edita o texto de orçamento de uma ficha
+  // ── POST orc-update-preco — atualiza preco sem mudar status ─
+  if (req.method === "POST" && action === "orc-update-preco") {
+    const { id, preco, precoSugerido } = req.body || {};
+    const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
+    const ficha = db.fichas.find(f => f.id === id);
+    if (!ficha) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
+    if (preco !== undefined) ficha.preco = preco;
+    if (precoSugerido !== undefined) ficha.precoSugerido = precoSugerido;
+    await dbSet(ORC_KEY, db);
+    return res.status(200).json({ ok: true, ficha });
+  }
+
   if (req.method === "POST" && action === "orc-update-texto") {
     const { id, textoOrc } = req.body || {};
     const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
