@@ -354,40 +354,38 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  // ── GET valor-erp-periodo — busca valor real dos ERPs do período direto no Pipefy
+  // ── GET valor-erp-periodo — usa valor do metaLog (gravado na entrada do ERP)
   if (action === "valor-erp-periodo") {
     const { de, ate } = req.query;
     if (!de || !ate) return res.status(400).json({ ok: false, error: "de e ate obrigatórios" });
     try {
       const logsData = await dbGet(LOGS_KEY);
       const metaLog  = logsData?.metaLog || [];
-      // Filtra pipefyIds que entraram em ERP no período (BH timezone)
-      const ids = metaLog
-        .filter(m => {
-          if (m.phaseId !== "erp_entrada") return false;
-          const d = toDateStr(new Date(m.timestamp).getTime());
-          return d >= de && d <= ate;
-        })
-        .map(m => m.pipefyId)
-        .filter((v, i, a) => a.indexOf(v) === i); // unique
+
+      // Usa o valor JÁ gravado no metaLog na hora em que o card entrou no ERP
+      // Evita consultar Pipefy novamente (valores podem ter mudado)
+      const entradas = metaLog.filter(m => {
+        if (m.phaseId !== "erp_entrada") return false;
+        const d = toDateStr(new Date(m.timestamp).getTime());
+        return d >= de && d <= ate;
+      });
+
+      // Deduplica por pipefyId (mantém a entrada mais recente)
+      const seen = new Set();
+      const unicas = entradas.filter(m => {
+        if (seen.has(m.pipefyId)) return false;
+        seen.add(m.pipefyId); return true;
+      });
+
+      const totalValor = unicas.reduce((s, m) => s + (m.valor || 0), 0);
+      const ids = unicas.map(m => m.pipefyId);
 
       if (!ids.length) return res.status(200).json({ ok: true, valor: 0, count: 0, ids: [] });
 
-      // Busca valores no Pipefy em lotes de 10
-      let totalValor = 0;
-      for (let i = 0; i < ids.length; i += 10) {
-        const lote   = ids.slice(i, i + 10);
-        const aliases = lote.map((id, j) => `c${j}: card(id: "${id}") { id fields { name value } }`).join(" ");
-        try {
-          const data = await pipefyQuery(`query { ${aliases} }`);
-          for (let j = 0; j < lote.length; j++) {
-            const card   = data[`c${j}`];
-            if (!card) continue;
-            const valField = (card.fields || []).find(f => f.name.toLowerCase().includes("valor"));
-            const num = parseFloat(String(valField?.value || "0").replace(/[^\d.,]/g,"").replace(",",".")) || 0;
-            totalValor += num;
-          }
-        } catch(e) { console.error("valor-erp lote:", e.message); }
+      // Dummy loop para manter compatibilidade com o bloco try/catch abaixo
+      let _unused = 0;
+      for (let i = 0; i < 0; i++) {
+        _unused++;
       }
       return res.status(200).json({ ok: true, valor: totalValor, count: ids.length, ids });
     } catch(e) {
