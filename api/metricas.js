@@ -170,11 +170,15 @@ module.exports = async function handler(req, res) {
 
     // metaLog para Coletas e Orçamentos (esses permanecem do log local)
     const metaLog   = logsData?.metaLog || [];
+    const movesLog  = logsData?.movesLog || [];
     const coletaLog = metaLog.filter(m => m.phaseId === "coleta_solicitada");
     const orcLog    = metaLog.filter(m => m.phaseId === "aguardando_aprovacao");
+    // Fichas automáticas: cada card aprovado = 1 ficha
+    const fichasLog = movesLog.filter(m => m.phaseId === "aprovado_entrada");
 
     const coletaPorDia = {};
     const orcPorDia    = {};
+    const fichasLogPorDia = {};
     for (const e of coletaLog) {
       const d = toDateStr(new Date(e.timestamp).getTime());
       coletaPorDia[d] = (coletaPorDia[d] || 0) + 1;
@@ -183,13 +187,20 @@ module.exports = async function handler(req, res) {
       const d = toDateStr(new Date(e.timestamp).getTime());
       orcPorDia[d] = (orcPorDia[d] || 0) + 1;
     }
+    for (const e of fichasLog) {
+      const d = toDateStr(new Date(e.timestamp).getTime());
+      fichasLogPorDia[d] = (fichasLogPorDia[d] || 0) + 1;
+    }
 
     // Constrói array de dias enriquecido
     // fichas/investimento/valorErp = lançamento manual (prioridade)
     // erpCount/coletasSolic/orcEnviado = SEMPRE metaLog (automático)
     // valorErp fallback: metaLog (quando board.js começar a gravar valor)
+    const INVEST_PADRAO = 1400; // R$1.400/dia padrão
     const diasEnriq = db.dias.map(d => ({
       ...d,
+      fichas:       (d.fichas > 0) ? d.fichas : (fichasLogPorDia[d.data] || 0),
+      investimento: (d.investimento > 0) ? d.investimento : INVEST_PADRAO,
       erpCount:     erpPorDia[d.data]    || 0,
       valorErp:     (d.valorErp != null && d.valorErp > 0) ? d.valorErp : (valorErpPorDia[d.data] || 0),
       coletasSolic: coletaPorDia[d.data] || 0,
@@ -205,8 +216,8 @@ module.exports = async function handler(req, res) {
       if (!diasSet.has(data)) {
         diasEnriq.push({
           data,
-          fichas:       0,
-          investimento: 0,
+          fichas:       fichasLogPorDia[data] || 0,
+          investimento: INVEST_PADRAO,
           erpCount:     erpPorDia[data]    || 0,
           valorErp:     valorErpPorDia[data] || 0,
           coletasSolic: coletaPorDia[data] || 0,
