@@ -153,30 +153,6 @@ module.exports = async function handler(req, res) {
     let erpCards = [];
     try { erpCards = await fetchErpCards(); } catch(e) {}
 
-    // Agrupa ERPs por data — HÍBRIDO:
-    // 1) metaLog (erp_entrada) para histórico de dias passados
-    // 2) fetchErpCards() ao vivo substitui/complementa o dia de hoje
-    const erpPorDia      = {};
-    const valorErpPorDia = {};
-
-    // Passo 1: preenche com metaLog (histórico persistido)
-    const erpLog = metaLog.filter(m => m.phaseId === "erp_entrada");
-    for (const e of erpLog) {
-      const d = toDateStr(new Date(e.timestamp).getTime());
-      erpPorDia[d]      = (erpPorDia[d]      || 0) + 1;
-      valorErpPorDia[d] = (valorErpPorDia[d] || 0) + (e.valor || 0);
-    }
-
-    // Passo 2: substitui o dia de hoje com dados ao vivo do Pipefy (mais preciso)
-    const hojeStr = toDateStr(Date.now());
-    erpPorDia[hojeStr]      = 0;
-    valorErpPorDia[hojeStr] = 0;
-    for (const card of erpCards) {
-      if (!card.entradaDate) continue;
-      erpPorDia[card.entradaDate]      = (erpPorDia[card.entradaDate]      || 0) + 1;
-      valorErpPorDia[card.entradaDate] = (valorErpPorDia[card.entradaDate] || 0) + (card.valor || 0);
-    }
-
     const erpAtual = {
       count: erpCards.length,
       valor: erpCards.reduce((s, c) => s + c.valor, 0),
@@ -205,6 +181,30 @@ module.exports = async function handler(req, res) {
     for (const e of fichasLog) {
       const d = toDateStr(new Date(e.timestamp).getTime());
       fichasLogPorDia[d] = (fichasLogPorDia[d] || 0) + 1;
+    }
+
+    // Agrupa ERPs por data — HÍBRIDO:
+    // 1) metaLog (erp_entrada) para histórico de dias passados
+    // 2) fetchErpCards() ao vivo substitui/complementa o dia de hoje
+    const erpPorDia      = {};
+    const valorErpPorDia = {};
+
+    // Passo 1: preenche com metaLog (histórico persistido)
+    const erpLog = metaLog.filter(m => m.phaseId === "erp_entrada");
+    for (const e of erpLog) {
+      const d = toDateStr(new Date(e.timestamp).getTime());
+      erpPorDia[d]      = (erpPorDia[d]      || 0) + 1;
+      valorErpPorDia[d] = (valorErpPorDia[d] || 0) + (e.valor || 0);
+    }
+
+    // Passo 2: substitui o dia de hoje com dados ao vivo do Pipefy (mais preciso)
+    const hojeStr = toDateStr(Date.now());
+    erpPorDia[hojeStr]      = 0;
+    valorErpPorDia[hojeStr] = 0;
+    for (const card of erpCards) {
+      if (!card.entradaDate) continue;
+      erpPorDia[card.entradaDate]      = (erpPorDia[card.entradaDate]      || 0) + 1;
+      valorErpPorDia[card.entradaDate] = (valorErpPorDia[card.entradaDate] || 0) + (card.valor || 0);
     }
 
     // Constrói array de dias enriquecido
