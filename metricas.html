@@ -518,12 +518,6 @@ async function renderFiltrado() {
   // Calcula métricas do período
   var m = calcMetricasJS(diasFiltrados);
 
-  // Busca valor real dos ERPs do período diretamente no Pipefy
-  try {
-    var vr = await fetch('/api/metricas?action=valor-erp-periodo&de=' + de + '&ate=' + ate).then(function(r){return r.json();});
-    if (vr.ok && vr.valor > 0) m.valorErp = vr.valor;
-  } catch(e) {}
-
   // Atualiza título
   var fmtD = d => { var p=d.split('-'); return (p[2]||'')+'/'+(p[1]||''); };
   var label = (de && ate) ? fmtD(de)+' – '+fmtD(ate) : (de ? 'A partir de '+fmtD(de) : 'Até '+fmtD(ate));
