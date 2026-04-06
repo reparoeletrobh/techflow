@@ -107,5 +107,33 @@ module.exports = async (req, res) => {
     return res.status(200).json({ ok:true });
   }
 
+  // ── POST marcar-caminho — marca peças como "a caminho" ────────
+  if (req.method === "POST" && action === "marcar-caminho") {
+    const { ids, previsoes } = req.body || {};
+    if (!ids?.length) return res.status(400).json({ ok:false, error:"ids obrigatórios" });
+    const now = new Date().toISOString();
+    for (const id of ids) {
+      const p = db.pecas.find(x => x.id === id);
+      if (!p) continue;
+      p.status = "a_caminho";
+      p.aCaminhoEm = now;
+      if (previsoes && previsoes[id]) p.previsaoChegada = previsoes[id];
+    }
+    await dbSet(KEY, db);
+    return res.status(200).json({ ok:true });
+  }
+
+  // ── POST marcar-recebido — marca peças como recebidas ─────────
+  if (req.method === "POST" && action === "marcar-recebido") {
+    const { ids } = req.body || {};
+    if (!ids?.length) return res.status(400).json({ ok:false, error:"ids obrigatórios" });
+    for (const id of ids) {
+      const p = db.pecas.find(x => x.id === id);
+      if (p) { p.status = "recebido"; p.recebidoEm = new Date().toISOString(); }
+    }
+    await dbSet(KEY, db);
+    return res.status(200).json({ ok:true });
+  }
+
   return res.status(404).json({ ok:false, error:"Ação não encontrada" });
 };
