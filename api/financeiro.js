@@ -384,7 +384,7 @@ module.exports = async function handler(req, res) {
   // ── POST mover ─────────────────────────────────────────────
   // Move entre fases manualmente (faturamento → entrega_agendada/liberada, etc.)
   if (req.method === "POST" && action === "mover") {
-    const { id, phaseId } = req.body || {};
+    const { id, phaseId, anexo } = req.body || {};
     if (!id || !phaseId) return res.status(400).json({ ok: false, error: "id e phaseId obrigatórios" });
 
     // Valida transições permitidas
@@ -410,6 +410,9 @@ module.exports = async function handler(req, res) {
     rec.movedAt = new Date().toISOString();
     rec.history = [...(rec.history || []), { phaseId, ts: rec.movedAt }];
     if (phaseId === "entrega_agendada" || phaseId === "entrega_liberada") rec.paidAt = rec.movedAt;
+    if (phaseId === "analise_pagamento" && anexo) {
+      rec.anexo = anexo; // { data: base64, type: 'image/jpeg'|'application/pdf', name: '...' }
+    }
     if ((phaseId === "entrega_agendada" || phaseId === "pagamento_agendado") && req.body.dataAgendada) {
       rec.dataAgendada        = req.body.dataAgendada;
       rec.dataAgendadaDisplay = req.body.dataAgendadaDisplay || req.body.dataAgendada;
@@ -513,7 +516,7 @@ module.exports = async function handler(req, res) {
 
     // ── POST mover-fase — move uma ficha para qualquer fase
   if (req.method === "POST" && action === "mover-fase") {
-    const { id, phaseId } = req.body || {};
+    const { id, phaseId, anexo } = req.body || {};
     if (!id || !phaseId) return res.status(400).json({ ok: false, error: "id e phaseId obrigatórios" });
     const fin = await dbGet(FIN_KEY) || { records: [], syncedIds: [] };
     const rec = (fin.records || []).find(r => r.id === id || r.pipefyId === id);
