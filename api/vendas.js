@@ -278,13 +278,15 @@ module.exports = async function handler(req, res) {
     try {
       const phaseReceber = await getReceberPhaseId();
       if (!phaseReceber) return res.status(500).json({ ok:false, error:"Fase Receber não encontrada no Pipefy" });
-      const titulo = `VENDA — ${p.codigo || p.tipo || "Equipamento"} | ${nomeCliente}`;
-      const desc   = [p.descricao, `Valor: ${precoFmt}`, `Vendedor: ${vendedor}`, `Modalidade: ${modalidade}`, "", textoAlmox].join("\n");
-      const data   = await pipefyQuery(
-        "mutation { createCard(input: { pipe_id: \"" + PIPE_ID + "\" phase_id: \"" + phaseReceber + "\" title: \"" + titulo.replace(/"/g,"'") + "\" fields_attributes: [ { field_id: \"descri_o\" field_value: \"" + desc.replace(/"/g,"'").replace(/\n/g,"\\n") + "\" } ] }) { card { id } } }"
-      );
+      // Título com todas as infos (fallback caso campos não existam)
+      const tituloCompleto = `VENDA — ${p.codigo || "—"} | ${p.tipo || "—"} ${p.descricao} | ${nomeCliente} | ${precoFmt} | ${vendedor} | ${modalidade}`;
+      const titulo = tituloCompleto.replace(/"/g,"'").slice(0, 255);
+
+      // Tenta criar o card — primeiro sem campos (garante criação)
+      const mutation = `mutation { createCard(input: { pipe_id: "${PIPE_ID}" phase_id: "${phaseReceber}" title: "${titulo}" }) { card { id } } }`;
+      const data = await pipefyQuery(mutation);
       const cardId = data?.createCard?.card?.id;
-      if (!cardId) return res.status(500).json({ ok:false, error:"Pipefy não retornou ID do card", data });
+      if (!cardId) return res.status(500).json({ ok:false, error:"Pipefy não retornou ID do card", raw: JSON.stringify(data).slice(0,300) });
       return res.status(200).json({ ok:true, pipefyCardId:cardId, textoAlmox });
     } catch(e) {
       return res.status(500).json({ ok:false, error:e.message });
