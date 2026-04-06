@@ -246,6 +246,51 @@ module.exports = async function handler(req, res) {
     });
   }
 
+  // ── POST retentar-pipefy — recria card no Pipefy para venda já feita ──────
+  if (req.method === "POST" && action === "retentar-pipefy") {
+    const { produtoId } = req.body || {};
+    if (!produtoId) return res.status(400).json({ ok:false, error:"produtoId obrigatório" });
+    const db = await dbGet(VENDAS_KEY) || defaultDB();
+    const p  = db.produtos.find(x => x.id === produtoId);
+    if (!p)  return res.status(404).json({ ok:false, error:"Produto não encontrado" });
+    if (!p.vendido) return res.status(400).json({ ok:false, error:"Produto não foi vendido" });
+
+    const precoFmt = parseFloat(p.preco).toLocaleString("pt-BR",{minimumFractionDigits:2,style:"currency",currency:"BRL"});
+    const dataVenda = p.soldAt ? new Date(p.soldAt).toLocaleDateString("pt-BR",{timeZone:"America/Sao_Paulo"}) : new Date().toLocaleDateString("pt-BR",{timeZone:"America/Sao_Paulo"});
+    const nomeCliente = p.compradorNome || "—";
+    const telefone    = p.compradorTel  || "";
+    const vendedor    = p.nomeVendedor  || p.vendedor || "—";
+    const modalidade  = p.modalidade    || "—";
+
+    const textoAlmox = [
+      "📦 *SEPARAÇÃO — ALMOXARIFADO*","",
+      `📅 Data: ${dataVenda}`,
+      `🏷️ Código: ${p.codigo || "—"}`,
+      `📦 Tipo: ${p.tipo || "—"}`,
+      `📝 Descrição: ${p.descricao}`,
+      `💰 Valor: ${precoFmt}`,"",
+      `👤 Comprador: ${nomeCliente}`,
+      telefone ? `📱 Telefone: ${telefone}` : null,"",
+      `🛒 Vendedor: ${vendedor}`,
+      `🔖 Modalidade: ${modalidade}`,
+    ].filter(l => l !== null).join("\n");
+
+    try {
+      const phaseReceber = await getReceberPhaseId();
+      if (!phaseReceber) return res.status(500).json({ ok:false, error:"Fase Receber não encontrada no Pipefy" });
+      const titulo = `VENDA — ${p.codigo || p.tipo || "Equipamento"} | ${nomeCliente}`;
+      const desc   = [p.descricao, `Valor: ${precoFmt}`, `Vendedor: ${vendedor}`, `Modalidade: ${modalidade}`, "", textoAlmox].join("\n");
+      const data   = await pipefyQuery(
+        "mutation { createCard(input: { pipe_id: \"" + PIPE_ID + "\" phase_id: \"" + phaseReceber + "\" title: \"" + titulo.replace(/"/g,"'") + "\" fields_attributes: [ { field_id: \"descri_o\" field_value: \"" + desc.replace(/"/g,"'").replace(/\n/g,"\\n") + "\" } ] }) { card { id } } }"
+      );
+      const cardId = data?.createCard?.card?.id;
+      if (!cardId) return res.status(500).json({ ok:false, error:"Pipefy não retornou ID do card", data });
+      return res.status(200).json({ ok:true, pipefyCardId:cardId, textoAlmox });
+    } catch(e) {
+      return res.status(500).json({ ok:false, error:e.message });
+    }
+  }
+
   // ── POST excluir ───────────────────────────────────────────
   if (req.method === "POST" && action === "excluir") {
     const { id } = req.body || {};
