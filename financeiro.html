@@ -475,7 +475,7 @@ function cardHTML(r, color) {
       ${r.servicos  ? `<div style="font-family:var(--fm);font-size:10px;color:#888;margin-top:3px;padding:5px 8px;background:var(--surface2);border-radius:5px;border-left:2px solid #333;">🔧 ${r.servicos}</div>` : ''}
       ${r.cpfCnpj   ? `<div class="fc-cpf">📄 ${r.cpfCnpj}</div>` : ''}
       ${r.phaseId==='pagamento_agendado' && r.dataAgendadaDisplay ? `<div style="font-family:var(--fm);font-size:10px;color:#e879f9;margin-top:4px;">⏰ Cobrança: ${r.dataAgendadaDisplay}</div>` : ''}
-      ${r.phaseId==='analise_pagamento' ? `<div style="font-family:var(--fm);font-size:10px;color:#0ea5e9;margin-top:4px;">🔍 Aguardando análise</div>` : ''}
+      ${r.phaseId==='analise_pagamento' ? `<div style="font-family:var(--fm);font-size:10px;color:#0ea5e9;margin-top:4px;">🔍 Aguardando análise${r.anexo ? ' · 📎 com comprovante' : ''}</div>` : ''}
       ${r.phaseId==='pagamento_confirmado' ? `<div style="font-family:var(--fm);font-size:10px;color:#22c55e;margin-top:4px;">✅ Pagamento confirmado</div>` : ''}
       ${r.phaseId==='entrega_agendada' && r.dataAgendadaDisplay ? `<div style="font-family:var(--fm);font-size:10px;color:#f97316;margin-top:4px;">📅 ${r.dataAgendadaDisplay}</div>` : ''}
       ${r.age != null ? `<div class="fc-age">🕐 ${r.age}d</div>` : ''}
@@ -500,8 +500,10 @@ function buildActions(r) {
     h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="openMoverModal('${r.id}')">💰 Registrar Pagamento</button>`;
     h += `<button class="btn-primary" style="background:#0ea5e9;color:#fff;" onclick="moverSimples('${r.id}','analise_pagamento','🔍','Enviado para Análise!')">🔍 Analisar Pagamento</button>`;
   }
-  if (r.phaseId==='analise_pagamento')
+  if (r.phaseId==='analise_pagamento') {
+    if (r.anexo) h += `<button class="btn-primary" style="background:rgba(59,158,255,.12);color:#3b9eff;border:1px solid rgba(59,158,255,.3);margin-bottom:4px;" onclick="verAnexo('${r.id}')">📎 Ver Comprovante</button>`;
     h += `<button class="btn-primary" style="background:#22c55e;color:#000;font-weight:bold;" onclick="moverSimples('${r.id}','pagamento_confirmado','✅','Pagamento Confirmado!')">✅ Pagamento Confirmado</button>`;
+  }
   if (r.phaseId==='pagamento_confirmado')
     h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="openMoverPagConfirmado('${r.id}')">🚚 Liberar / Agendar Entrega</button>`;
   if (r.phaseId==='entrega_agendada')
@@ -701,8 +703,19 @@ function openMoverModal(id) {
           onclick="moverPagamentoAgendado('${id}')">Confirmar</button>
       </div>
     </div>
-    <button class="btn-primary" style="background:#0ea5e9;color:#fff;padding:11px;font-weight:bold;"
-      onclick="moverSimples('${id}','analise_pagamento','🔍','Enviado para An\u00e1lise!');closeModal('mover-modal')">🔍 Analisar Pagamento</button>`;
+    <div style="background:var(--surface2);border:1px solid rgba(14,165,233,0.25);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;">
+      <div style="font-family:var(--fm);font-size:10px;color:#0ea5e9;text-transform:uppercase;letter-spacing:0.1em;">🔍 Análise de Pagamento</div>
+      <div style="font-family:var(--fm);font-size:10px;color:var(--muted);">Anexe o comprovante (imagem ou PDF)</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input type="file" id="anexo-upload" accept="image/*,application/pdf" style="display:none;" onchange="previewAnexo(this)"/>
+        <button onclick="document.getElementById('anexo-upload').click();event.preventDefault();"
+          style="font-family:var(--fm);font-size:10px;padding:7px 12px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;">📎 Selecionar</button>
+        <span id="anexo-nome" style="font-family:var(--fm);font-size:10px;color:var(--muted);">Nenhum arquivo</span>
+      </div>
+      <div id="anexo-preview" style="display:none;margin-top:2px;"></div>
+      <button class="btn-primary" style="background:#0ea5e9;color:#fff;padding:11px;font-weight:bold;"
+        onclick="moverAnalisePagamento('${id}')">🔍 Enviar para Análise</button>
+    </div>`;
   document.getElementById('mover-modal').classList.add('open');
 }
 
@@ -773,6 +786,75 @@ async function moverPagAgendadoParaEntrega(id, phaseId, dateInputId) {
     showToast('📅','Entrega Agendada!', dateDisplay);
     if (curPage==='painel') await load();
   } else showToast('❌','Erro',res.error);
+}
+
+function previewAnexo(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const nome = file.name.length > 30 ? file.name.slice(0,28)+'...' : file.name;
+  document.getElementById('anexo-nome').textContent = nome;
+  const prev = document.getElementById('anexo-preview');
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    if (file.type.startsWith('image/')) {
+      prev.innerHTML = `<img src="${e.target.result}" style="max-width:100%;max-height:120px;border-radius:6px;border:1px solid var(--border);"/>`;
+    } else {
+      prev.innerHTML = `<div style="font-family:var(--fm);font-size:10px;color:var(--accent);padding:6px;background:rgba(59,158,255,.1);border-radius:6px;">📄 ${nome}</div>`;
+    }
+    prev.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function moverAnalisePagamento(id) {
+  const input = document.getElementById('anexo-upload');
+  const file = input?.files[0];
+  let anexo = null;
+  if (file) {
+    const b64 = await new Promise(res => {
+      const r = new FileReader();
+      r.onload = e => res(e.target.result);
+      r.readAsDataURL(file);
+    });
+    anexo = { data: b64, type: file.type, name: file.name };
+  }
+  const res = await api('mover', { id, phaseId: 'analise_pagamento', anexo });
+  if (res.ok) {
+    updateRecord(res.record);
+    closeModal('mover-modal');
+    // Reset upload fields
+    if (input) { input.value=''; }
+    document.getElementById('anexo-nome').textContent = 'Nenhum arquivo';
+    document.getElementById('anexo-preview').style.display = 'none';
+    showToast('🔍','Enviado para Análise!', anexo ? 'Com comprovante' : 'Sem comprovante');
+    if (curPage==='painel') await load();
+  } else showToast('❌','Erro',res.error);
+}
+
+function verAnexo(id) {
+  const r = records.find(x=>x.id===id);
+  if (!r?.anexo) return;
+  const { data, type, name } = r.anexo;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
+  overlay.onclick = () => overlay.remove();
+  let inner = '';
+  if (type?.startsWith('image/')) {
+    inner = `<div style="max-width:90vw;max-height:90vh;position:relative;">
+      <img src="${data}" style="max-width:90vw;max-height:85vh;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.8);display:block;"/>
+      <div style="text-align:center;margin-top:8px;font-family:var(--fm);font-size:10px;color:rgba(255,255,255,.5);">${name} · clique para fechar</div>
+    </div>`;
+  } else {
+    inner = `<div style="background:var(--surface);border-radius:12px;padding:24px;text-align:center;max-width:500px;">
+      <div style="font-size:48px;margin-bottom:16px;">📄</div>
+      <div style="font-family:var(--fh);font-size:16px;font-weight:800;margin-bottom:12px;">${name}</div>
+      <a href="${data}" download="${name}" onclick="event.stopPropagation()"
+        style="font-family:var(--fm);font-size:11px;padding:10px 20px;border-radius:8px;background:var(--accent);color:#fff;text-decoration:none;display:inline-block;">⬇ Baixar PDF</a>
+      <div style="margin-top:12px;font-family:var(--fm);font-size:10px;color:var(--muted);">clique fora para fechar</div>
+    </div>`;
+  }
+  overlay.innerHTML = inner;
+  document.body.appendChild(overlay);
 }
 
 async function moverSimples(id, phaseId, icon, msg) {
