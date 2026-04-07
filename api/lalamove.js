@@ -344,6 +344,45 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── Testa cada ficha individualmente contra a API Lalamove para achar coordenadas ruins
+async function testarFichasIndividualmente(pendentes, tipo, key, secret) {
+  const erros = [];
+  const fmtCoord = v => parseFloat(v).toFixed(6);
+  for (const f of pendentes) {
+    const clientStop = { coordinates: { lat: fmtCoord(f.lat), lng: fmtCoord(f.lng) }, address: f.endereco || "Belo Horizonte, MG" };
+    const lojaStop   = { coordinates: { lat: fmtCoord(LOJA.lat), lng: fmtCoord(LOJA.lng) }, address: LOJA.endereco };
+    const stops = tipo === "coleta" ? [clientStop, lojaStop] : [lojaStop, clientStop];
+    const body  = JSON.stringify({ data: { serviceType: "CAR", language: "pt_BR", stops, isRouteOptimized: false } });
+    const hdrs  = lalamoveHeaders(key, secret, "POST", "/v3/quotations", body);
+    try {
+      const { status, body: rb } = await lalaFetch(LALA_HOST, "/v3/quotations", "POST", hdrs, body);
+      const rj = JSON.parse(rb);
+      if (status !== 201 || !rj.data?.quotationId) {
+        const errCode = (rj.errors || [])[0]?.id || "ERRO_DESCONHECIDO";
+        const errMsg  = (rj.errors || [])[0]?.message || JSON.stringify(rj).slice(0, 150);
+        erros.push({ pipefyId: f.pipefyId, nomeContato: f.nomeContato, endereco: f.endereco, erroMsg: errCode + ": " + errMsg });
+      }
+    } catch(e) {
+      erros.push({ pipefyId: f.pipefyId, nomeContato: f.nomeContato, endereco: f.endereco, erroMsg: "Falha na requisição: " + e.message });
+    }
+  }
+  return erros;
+}
+
+// ── POST reset-erro — reseta ficha com erro de volta para pendente
+  if (req.method === "POST" && action === "reset-erro") {
+    const { pipefyId, tipo } = req.body || {};
+    if (!pipefyId) return res.status(400).json({ ok:false, error:"pipefyId obrigatório" });
+    const db = await dbGet(LALA_KEY) || { fichas: [] };
+    const f  = db.fichas.find(x => x.pipefyId === pipefyId && (!tipo || x.tipo === tipo));
+    if (!f) return res.status(404).json({ ok:false, error:"Ficha não encontrada" });
+    f.status  = "pendente";
+    f.erroMsg = null;
+    f.erroAt  = null;
+    await dbSet(LALA_KEY, db);
+    return res.status(200).json({ ok:true });
+  }
+
   // ── POST enviar-lote — envia TODAS as fichas em uma única corrida ─────────
   if (req.method === "POST" && action === "enviar-lote") {
     if (!LALA_KEY_ENV || !LALA_SECRET_ENV)
@@ -390,8 +429,24 @@ module.exports = async function handler(req, res) {
     try {
       const { status: qs, body: qb } = await lalaFetch(LALA_HOST, quotePath, "POST", quoteHdrs, quoteBody);
       const qj = JSON.parse(qb);
-      if (qs !== 201 || !qj.data?.quotationId)
+      if (qs !== 201 || !qj.data?.quotationId) {
+        // Tenta identificar fichas com problema testando individualmente
+        const erros = await testarFichasIndividualmente(pendentes, tipo, LALA_KEY_ENV, LALA_SECRET_ENV);
+        if (erros.length) {
+          // Marca fichas com erro no DB
+          erros.forEach(({ pipefyId, erroMsg }) => {
+            const dbF = db.fichas.find(x => x.pipefyId === pipefyId);
+            if (dbF) { dbF.status = "erro"; dbF.erroMsg = erroMsg; dbF.erroAt = new Date().toISOString(); }
+          });
+          await dbSet(LALA_KEY, db);
+          return res.status(200).json({
+            ok: false,
+            erros,
+            error: `${erros.length} ficha(s) com endereço inválido marcadas — corrija e tente novamente`,
+          });
+        }
         return res.status(200).json({ ok: false, error: "Erro na cotação: " + JSON.stringify(qj.errors || qj).slice(0,300) });
+      }
       quotationId = qj.data.quotationId;
       lalaStops   = qj.data.stops || [];
     } catch(e) {
