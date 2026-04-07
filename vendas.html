@@ -484,12 +484,19 @@ function compressImage(file) {
     reader.onload = ev => {
       const img = new Image();
       img.onload = () => {
-        const canvas = document.createElement('canvas'); const MAX=800;
+        const canvas = document.createElement('canvas'); const MAX=600;
         let w=img.width, h=img.height;
         if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
         canvas.width=w; canvas.height=h;
         canvas.getContext('2d').drawImage(img,0,0,w,h);
-        resolve(canvas.toDataURL('image/jpeg',0.82));
+        var b64 = canvas.toDataURL('image/jpeg',0.65);
+        // Se ainda > 80KB, comprime mais
+        if(b64.length > 80000) {
+          canvas.width=Math.round(w*0.7); canvas.height=Math.round(h*0.7);
+          canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+          b64 = canvas.toDataURL('image/jpeg',0.55);
+        }
+        resolve(b64);
       };
       img.src = ev.target.result;
     };
