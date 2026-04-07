@@ -69,6 +69,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .sbadge.pendente{background:rgba(245,200,0,.1);color:#f5c800;}
 .sbadge.sem-end{background:rgba(239,68,68,.1);color:var(--red);}
 .sbadge.enviado{background:rgba(34,197,94,.12);color:var(--green);}
+.sbadge.erro{background:rgba(239,68,68,.12);color:var(--red);}
+.l-card.erro-lala{border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.03);}
+.erro-msg{font-family:var(--fm);font-size:10px;color:var(--red);margin-top:5px;padding:6px 10px;background:rgba(239,68,68,.08);border-radius:6px;border-left:2px solid var(--red);}
 
 /* EMPTY */
 .empty{padding:48px;text-align:center;font-family:var(--fm);font-size:11px;color:var(--dim);}
@@ -290,7 +293,7 @@ function renderList(tipo) {
 
 function buildCard(f) {
   var div = document.createElement("div");
-  div.className = "l-card " + f.tipo + (f.status === "enviado" ? " enviado" : "");
+  div.className = "l-card " + f.tipo + (f.status === "enviado" ? " enviado" : "") + (f.status === "erro" ? " erro-lala" : "");
   div.id = "lcard-" + f.pipefyId;
 
   var head = document.createElement("div"); head.className = "lc-head";
@@ -299,8 +302,9 @@ function buildCard(f) {
   var name = document.createElement("div"); name.className = "lc-name"; name.textContent = f.nomeContato || "—";
   info.appendChild(code); info.appendChild(name);
   var badge = document.createElement("span");
-  badge.className = "sbadge " + (f.status === "enviado" ? "enviado" : (f.endereco ? "pendente" : "sem-end"));
-  badge.textContent = f.status === "enviado" ? "enviado" : (f.endereco ? "pendente" : "sem endereço");
+  var badgeCls = f.status === "enviado" ? "enviado" : f.status === "erro" ? "erro" : (f.endereco ? "pendente" : "sem-end");
+  badge.className = "sbadge " + badgeCls;
+  badge.textContent = f.status === "enviado" ? "enviado" : f.status === "erro" ? "⚠️ endereço inválido" : (f.endereco ? "pendente" : "sem endereço");
   head.appendChild(info); head.appendChild(badge);
   div.appendChild(head);
 
@@ -314,6 +318,19 @@ function buildCard(f) {
   var coordIcon = f.lat && f.lng ? "✅ " : "❌ ";
   endEl.textContent = f.endereco ? (coordIcon + f.endereco) : "⚠️ Endereço não encontrado — clique em Editar";
   div.appendChild(endEl);
+
+  // Mensagem de erro do Lalamove
+  if (f.status === "erro" && f.erroMsg) {
+    var erroEl = document.createElement("div"); erroEl.className = "erro-msg";
+    erroEl.textContent = "❌ " + f.erroMsg;
+    div.appendChild(erroEl);
+    // Botão retentar após corrigir endereço
+    var retryBtn = document.createElement("button");
+    retryBtn.className = "lbtn"; retryBtn.style.cssText = "color:var(--red);border-color:rgba(239,68,68,.3);margin-top:4px;font-weight:700;";
+    retryBtn.textContent = "🔄 Retentar após corrigir";
+    retryBtn.onclick = (function(id, tp) { return function() { retentarFicha(id, tp); }; })(f.pipefyId, f.tipo);
+    div.appendChild(retryBtn);
+  }
 
   // Botão geocodificar individual (só se tem endereço mas sem coords)
   if (f.endereco && (!f.lat || !f.lng) && f.status !== "enviado") {
@@ -347,6 +364,17 @@ function openEndModal(pipefyId, tipo, endAtual) {
   setTimeout(function() { document.getElementById("end-input").focus(); }, 200);
 }
 function closeEndModal() { document.getElementById("modal-end").classList.remove("open"); }
+async function retentarFicha(pipefyId, tipo) {
+  // Reseta status para pendente para poder reenviar após corrigir
+  var d = await api("reset-erro", { pipefyId, tipo });
+  if (d.ok) {
+    var f = fichas.find(function(x) { return x.pipefyId === pipefyId && x.tipo === tipo; });
+    if (f) { f.status = "pendente"; f.erroMsg = null; }
+    renderList(tipo);
+    showToast("🔄", "Ficha reativada", "Corrija o endereço e tente enviar novamente");
+  } else showToast("❌", "Erro", d.error);
+}
+
 async function salvarEndereco() {
   var end = document.getElementById("end-input").value.trim();
   if (!end) return;
@@ -468,6 +496,8 @@ async function confirmarEnvio() {
 
   if (d.ok) {
     showToast("🚗", "Corrida enviada!", d.count + " parada(s) — Pedido: " + d.orderId);
+  } else if (d.erros && d.erros.length) {
+    showToast("⚠️", d.erros.length + " ficha(s) com erro marcadas", "Corrija os endereços e tente novamente");
   } else {
     showToast("❌", "Erro", d.error || "Verifique os endereços e tente novamente");
   }
