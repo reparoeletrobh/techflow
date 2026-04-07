@@ -87,7 +87,11 @@ module.exports = async function handler(req, res) {
   // ── GET load ───────────────────────────────────────────────
   if (action === "load") {
     const db = await dbGet(VENDAS_KEY) || defaultDB();
-    return res.status(200).json({ ok: true, produtos: db.produtos || [] });
+    // Para produtos vendidos, não retorna fotos (economiza payload)
+    const produtos = (db.produtos || []).map(p =>
+      p.vendido ? { ...p, fotos: [] } : p
+    );
+    return res.status(200).json({ ok: true, produtos });
   }
 
   // ── GET stats (para metas) ─────────────────────────────────
@@ -129,7 +133,9 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "codigo, descricao e preco são obrigatórios" });
 
     const db = await dbGet(VENDAS_KEY) || defaultDB();
-    const fotosArr = Array.isArray(fotos) ? fotos.slice(0, 6) : [];
+    // Limita a 3 fotos por produto e verifica tamanho total
+    const fotosRaw = Array.isArray(fotos) ? fotos.filter(Boolean).slice(0, 3) : [];
+    const fotosArr = fotosRaw;
 
     if (id) {
       const idx = db.produtos.findIndex(p => p.id === id);
@@ -145,7 +151,17 @@ module.exports = async function handler(req, res) {
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       };
       db.produtos.unshift(produto);
-      await dbSet(VENDAS_KEY, db);
+      // Verifica tamanho antes de salvar
+      const payload = JSON.stringify(db);
+      if(payload.length > 900000) {
+        // Remove fotos de produtos vendidos para liberar espaço
+        db.produtos = db.produtos.map(p => p.vendido ? {...p, fotos:[]} : p);
+      }
+      try {
+        await dbSet(VENDAS_KEY, db);
+      } catch(e) {
+        return res.status(500).json({ ok: false, error: "Erro ao salvar: banco de dados cheio. Contate o suporte." });
+      }
       return res.status(200).json({ ok: true, produto });
     }
   }
