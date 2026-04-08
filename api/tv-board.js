@@ -173,48 +173,102 @@ async function moveCardPipefy(cardId, phaseId) {
   return data?.moveCardToPhase?.card;
 }
 
-// ── GEOCODIFICAÇÃO (mesmo sistema do Lalamove) ────────────────
+// ── GEOCODIFICAÇÃO — cobre RMBH (Região Metropolitana de BH) ──
+// Cidades: BH, Contagem, Betim, Ribeirão das Neves, Santa Luzia,
+//          Nova Lima, Vespasiano, Lagoa Santa, Ibirité, Sabará, etc.
+const RMBH_CIDADES = [
+  "belo horizonte","contagem","betim","ribeirão das neves","ribeiro das neves",
+  "santa luzia","nova lima","vespasiano","lagoa santa","ibirité","ibirite",
+  "sabará","sabara","pedro leopoldo","esmeraldas","brumadinho","sarzedo",
+  "mario campos","mario campos","mateus leme","confins","taquaraçu de minas",
+  "jaboticatubas","capim branco","matozinhos","funilândia","funilândia",
+  "paraopeba","baldim","jequitibá","prudente de morais","caetanópolis"
+];
+
 async function geocodificar(endereco) {
   const GMAPS_KEY    = (process.env.GOOGLE_MAPS_KEY || "").trim();
   const OPENCAGE_KEY = (process.env.OPENCAGE_KEY    || "").trim();
+
+  // Normaliza: remove complementos, expande abreviações, substitui "BH"
   const endNorm = endereco
-    .replace(/,?\s*\bBH\b/gi, "")
+    .replace(/,?\s*\bBH\b/gi, ", Belo Horizonte")
     .replace(/\bR\.\s+/g, "Rua ")
     .replace(/\bAv\.\s+/g, "Avenida ")
-    .replace(/,?\s*[-]?\s*(ap(to)?\.?|apartamento|bloco|bl\.?|sala)\s*[\w\d]+/gi, "")
+    .replace(/\bAl\.\s+/g, "Alameda ")
+    .replace(/,?\s*[-]?\s*(ap(to)?\.?|apartamento|bloco|bl\.?|sala|lote)\s*[\w\d]+/gi, "")
     .replace(/\s+/g, " ").trim();
-  const endBH = endNorm.toLowerCase().includes("belo horizonte") ? endNorm : endNorm + ", Belo Horizonte, MG, Brasil";
-  const dentoBH = (lat, lng) => lat > -20.5 && lat < -19.3 && lng > -44.8 && lng < -43.0;
-  const nomQuery = async (q) => {
+
+  // Verifica se já menciona alguma cidade da RMBH
+  const endLow = endNorm.toLowerCase();
+  const temCidade = RMBH_CIDADES.some(function(ct) { return endLow.includes(ct); });
+
+  // Se não mencionar cidade, adiciona "Região Metropolitana de Belo Horizonte, MG, Brasil"
+  const endFull = temCidade
+    ? endNorm + ", MG, Brasil"
+    : endNorm + ", Região Metropolitana de Belo Horizonte, MG, Brasil";
+
+  // Bbox RMBH (maior que só BH): lat -20.8 a -18.8, lng -45.2 a -43.0
+  const dentoRMBH = function(lat, lng) {
+    return lat > -20.8 && lat < -18.8 && lng > -45.2 && lng < -43.0;
+  };
+
+  const nomQuery = async function(q) {
+    // viewbox cobre toda a RMBH, bounded=0 para não limitar demais
     const url = "https://nominatim.openstreetmap.org/search?q=" + encodeURIComponent(q)
-      + "&format=json&limit=5&countrycodes=br&viewbox=-44.8,-20.5,-43.0,-19.3&bounded=0";
+      + "&format=json&limit=5&countrycodes=br"
+      + "&viewbox=-45.2,-20.8,-43.0,-18.8&bounded=0";
     const r = await fetch(url, { headers: { "User-Agent": "TVAssistencia/1.0 (reparoeletroadm.com)" } });
     const j = await r.json();
-    return (j || []).find(x => dentoBH(parseFloat(x.lat), parseFloat(x.lon))) || null;
+    return (j || []).find(function(x) { return dentoRMBH(parseFloat(x.lat), parseFloat(x.lon)); }) || null;
   };
+
   try {
-    let best = await nomQuery(endBH);
-    if (!best) { const s = endBH.replace(/,?\s*\d+[-\w]*/g,"").replace(/\s+/g," ").trim(); if(s!==endBH) best=await nomQuery(s); }
+    // Tentativa 1: endereço completo
+    let best = await nomQuery(endFull);
+    // Tentativa 2: sem número
+    if (!best) {
+      const semNum = endFull.replace(/,?\s*\d+[-\w]*/g, "").replace(/\s+/g, " ").trim();
+      if (semNum !== endFull) best = await nomQuery(semNum);
+    }
+    // Tentativa 3: só bairro/cidade + RMBH
+    if (!best) {
+      const partes = endNorm.split(",").map(function(p){ return p.trim(); }).filter(Boolean);
+      for (let i = partes.length - 1; i >= 1; i--) {
+        best = await nomQuery(partes[i] + ", Região Metropolitana de Belo Horizonte, MG, Brasil");
+        if (best) break;
+      }
+    }
     if (best) return { lat: parseFloat(best.lat), lng: parseFloat(best.lon) };
   } catch(e) { console.error("Nominatim:", e.message); }
+
+  // Fallback Google Maps
   if (GMAPS_KEY) {
     try {
-      const r = await fetch("https://maps.googleapis.com/maps/api/geocode/json?address=" + encodeURIComponent(endBH) + "&region=br&key=" + GMAPS_KEY);
+      const r = await fetch("https://maps.googleapis.com/maps/api/geocode/json?address="
+        + encodeURIComponent(endFull) + "&region=br&key=" + GMAPS_KEY);
       const j = await r.json();
       if (j.status === "OK" && j.results && j.results[0]) {
         const loc = j.results[0].geometry.location;
-        if (dentoBH(loc.lat, loc.lng)) return { lat: loc.lat, lng: loc.lng };
+        if (dentoRMBH(loc.lat, loc.lng)) return { lat: loc.lat, lng: loc.lng };
       }
     } catch(e) { console.error("GMaps:", e.message); }
   }
+
+  // Fallback OpenCage
   if (OPENCAGE_KEY) {
     try {
-      const r = await fetch("https://api.opencagedata.com/geocode/v1/json?q=" + encodeURIComponent(endBH) + "&key=" + OPENCAGE_KEY + "&countrycode=br&limit=3&no_annotations=1&proximity=-19.9245,-43.9352");
+      const r = await fetch("https://api.opencagedata.com/geocode/v1/json?q="
+        + encodeURIComponent(endFull)
+        + "&key=" + OPENCAGE_KEY
+        + "&countrycode=br&limit=5&no_annotations=1&proximity=-19.9245,-43.9352");
       const j = await r.json();
-      const ok = (j.results||[]).filter(x => (x.confidence||0)>=6 && dentoBH(x.geometry.lat,x.geometry.lng));
+      const ok = (j.results || []).filter(function(x) {
+        return (x.confidence || 0) >= 5 && dentoRMBH(x.geometry.lat, x.geometry.lng);
+      });
       if (ok.length) return { lat: ok[0].geometry.lat, lng: ok[0].geometry.lng };
     } catch(e) { console.error("OpenCage:", e.message); }
   }
+
   return null;
 }
 
