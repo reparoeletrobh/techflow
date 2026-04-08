@@ -524,7 +524,12 @@ async function syncFichas() {
 }
 
 function loadAll() {
-  // Pre-load badges
+  // Recarrega conteúdo da aba ativa
+  var tabAtual = document.querySelector('.tab-btn.active')?.id;
+  if (!tabAtual || tabAtual === 'tab-orc' || tabAtual === 'tab-env') loadOrc();
+  else if (tabAtual === 'tab-sem') loadSem();
+  else if (tabAtual === 'tab-ult') loadUlt();
+  // Atualiza badges de todas as abas
   fetch('/api/tv-orcamento?action=orc-load').then(function(r){return r.json();}).then(function(d){
     var fichas=d.fichas||[];
     document.getElementById('badge-orc').textContent=fichas.filter(function(f){return f.status==='pendente';}).length;
