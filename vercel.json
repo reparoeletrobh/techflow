@@ -165,6 +165,10 @@
     {
       "source": "/api/tv-vendas",
       "destination": "/api/tv-vendas.js"
+    },
+    {
+      "source": "/api/tv-rotas",
+      "destination": "/api/tv-rotas.js"
     }
   ]
 }
