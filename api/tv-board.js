@@ -433,31 +433,27 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
-    // ── GET sync-coleta — busca cards na fase "Liberado para Rota" no Pipefy ──
+    // ── GET sync-coleta — busca cards na fase "Liberado para Rota" pelo ID exato ──
     if (req.method === "GET" && action === "sync-coleta") {
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
       try {
-        // Busca todas as fases do pipe e encontra "Liberado para Rota"
+        // Busca diretamente pelo ID da fase (341638193) — sem buscar todas as fases
         const data = await pipefyQuery(`query {
-          pipe(id: "${PIPE_ID}") {
-            phases {
-              id name
-              cards(first: 50) {
-                edges {
-                  node {
-                    id title
-                    fields { name value }
-                  }
+          phase(id: "${LIBERADO_ROTA_PHASE_ID}") {
+            id name
+            cards(first: 50) {
+              edges {
+                node {
+                  id title
+                  fields { name value }
                 }
               }
             }
           }
         }`);
-        const phases = data?.pipe?.phases || [];
-        // Busca fase pelo ID exato 341638193 ("Liberado para Rota")
-        const liberadoPhase = phases.find(ph => ph.id === LIBERADO_ROTA_PHASE_ID);
+        const liberadoPhase = data?.phase;
         if (!liberadoPhase) {
-          return res.status(200).json({ ok: true, found: 0, msg: "Fase Liberado para Rota (" + LIBERADO_ROTA_PHASE_ID + ") nao encontrada" });
+          return res.status(200).json({ ok: true, found: 0, msg: "Fase " + LIBERADO_ROTA_PHASE_ID + " nao encontrada" });
         }
         let moved = 0;
         for (const { node } of (liberadoPhase.cards?.edges || [])) {
