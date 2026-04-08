@@ -54,10 +54,12 @@ module.exports = async function handler(req, res) {
     const { cardIds } = req.body || {};
     if (!Array.isArray(cardIds) || !cardIds.length)
       return res.status(400).json({ ok: false, error: "cardIds obrigatório" });
-    const [db, board] = await Promise.all([
-      dbGet(ROTAS_KEY) || defaultRotas(),
-      dbGet(BOARD_KEY) || { cards: [] },
+    const [dbRaw2, boardRaw2] = await Promise.all([
+      dbGet(ROTAS_KEY),
+      dbGet(BOARD_KEY),
     ]);
+    const db    = dbRaw2    || defaultRotas();
+    const board = boardRaw2 || { cards: [] };
     db.contador = (db.contador || 0) + 1;
     const numero = db.contador;
     const cards = cardIds.map(id => {
