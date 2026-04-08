@@ -297,13 +297,35 @@ function toggleSelAll() {
   renderFila();
 }
 
-function otimizarRota() {
+async function otimizarRota() {
   if (!fila.length) { toast('Nenhum card na fila', 'var(--yellow)'); return; }
-  // Ordena por endereço (simplesmente aplica uma ordem fixa — em produção seria chamada de API de otimização)
-  // Por ora, mantém a ordem atual e apenas marca como otimizada
-  otimizado = true;
-  document.getElementById('otimizado-badge').style.display = 'inline';
-  toast('✅ Rota otimizada! Último ponto: Oficina TV Assistência.', 'var(--green)');
+  var btn = document.querySelector('.btn-otimizar');
+  btn.textContent = '⏳ Geocodificando...'; btn.disabled = true;
+  try {
+    var ids = fila.map(function(c) { return c.pipefyId; });
+    var r = await fetch('/api/tv-board?action=otimizar-rota', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cardIds: ids })
+    }).then(function(r) { return r.json(); });
+
+    if (!r.ok) { toast('❌ Erro: ' + (r.error || 'Falha na otimização'), 'var(--red)'); return; }
+
+    // Reordena o array fila local conforme resultado
+    var mapa = {};
+    fila.forEach(function(c) { mapa[c.pipefyId] = c; });
+    fila = r.ordenados.map(function(o) { return mapa[o.pipefyId] || mapa[o.pipefyId]; }).filter(Boolean);
+
+    otimizado = true;
+    document.getElementById('otimizado-badge').style.display = 'inline';
+    renderFila();
+
+    var msg = '✅ Rota otimizada — ' + fila.length + ' paradas';
+    if (r.semCoord > 0) msg += ' (' + r.semCoord + ' sem endereço, ao final)';
+    toast(msg, 'var(--green)');
+  } catch(e) {
+    toast('❌ ' + e.message, 'var(--red)');
+  }
+  btn.textContent = '🗺️ Otimizar Rota'; btn.disabled = false;
 }
 
 async function criarRota() {
