@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='18,2 8,18 15,18 14,30 24,14 17,14' fill='%233b9eff' stroke='%233b9eff' stroke-linejoin='round'/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TV — Compras</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--border:#252525;
+  --text:#fff;--muted:#888;--dim:#333;
+  --accent:#3b9eff;--green:#22c55e;--orange:#f97316;--red:#ef4444;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;border-bottom:2px solid var(--accent);background:var(--bg);position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.logo-icon{width:26px;height:26px;background:var(--accent);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;}
+.logo span{color:var(--accent);}
+.live-dot{width:5px;height:5px;background:var(--accent);border-radius:50%;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.tabs{display:flex;border-bottom:1px solid var(--border);padding:0 24px;}
+.tab{font-family:var(--fm);font-size:11px;font-weight:600;padding:11px 16px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;display:flex;align-items:center;gap:6px;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-badge{font-family:var(--fm);font-size:9px;padding:1px 6px;border-radius:20px;background:var(--surface2);}
+.tab.active .tab-badge{background:rgba(59,158,255,.15);color:var(--accent);}
+.page{display:none;flex:1;flex-direction:column;overflow-y:auto;}
+.page.active{display:flex;}
+
+/* CARD LIST */
+.card-list{padding:20px 24px;display:flex;flex-direction:column;gap:12px;}
+.c-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;position:relative;overflow:hidden;}
+.c-card::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;}
+.c-card.comprar::before{background:var(--orange);}
+.c-card.aguardando::before{background:var(--accent);}
+.c-card.disponivel::before{background:var(--green);}
+.c-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px;}
+.c-code{font-family:var(--fm);font-size:12px;color:var(--orange);font-weight:500;}
+.c-name{font-size:14px;font-weight:600;margin-top:1px;}
+.c-desc{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px;}
+.c-alerta{font-family:var(--fm);font-size:11px;padding:5px 10px;border-radius:6px;margin-bottom:10px;display:inline-block;}
+.c-alerta.local{background:rgba(34,197,94,.1);color:var(--green);}
+.c-alerta.online{background:rgba(59,158,255,.1);color:var(--accent);}
+.c-alerta.disponivel{background:rgba(34,197,94,.15);color:var(--green);}
+
+/* FOTOS */
+.c-fotos{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+.c-foto{width:72px;height:72px;border-radius:8px;object-fit:cover;border:1px solid var(--border);cursor:zoom-in;transition:opacity .15s;}
+.c-foto:hover{opacity:.8;}
+
+/* DESC COMPRA */
+.c-desc-compra{font-family:var(--fm);font-size:11px;color:var(--muted);padding:8px 10px;background:var(--surface2);border-radius:6px;border-left:2px solid var(--dim);margin-bottom:10px;}
+
+/* ACTIONS */
+.c-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.cbtn{font-family:var(--fm);font-size:11px;font-weight:600;padding:8px 14px;border-radius:8px;border:none;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.cbtn-atualizar{background:var(--surface2);border:1px solid var(--border);color:var(--text);}
+.cbtn-atualizar:hover{border-color:var(--accent);color:var(--accent);}
+.cbtn-disponivel{background:var(--green);color:#000;}
+.cbtn-disponivel:hover{filter:brightness(1.1);}
+
+/* EMPTY */
+.empty{padding:48px;text-align:center;font-family:var(--fm);font-size:11px;color:var(--dim);}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:400;opacity:0;pointer-events:none;transition:opacity .2s;backdrop-filter:blur(3px);}
+.modal-overlay.open{opacity:1;pointer-events:all;}
+.modal{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--accent);border-radius:14px;padding:24px;max-width:420px;width:92%;transform:scale(.95);transition:transform .2s;max-height:90vh;overflow-y:auto;}
+.modal-overlay.open .modal{transform:scale(1);}
+.modal-title{font-family:var(--fh);font-size:17px;font-weight:800;margin-bottom:4px;}
+.modal-title span{color:var(--accent);}
+.modal-info{font-family:var(--fm);font-size:11px;color:var(--muted);margin-bottom:16px;padding:8px 10px;background:var(--surface2);border-radius:7px;border-left:3px solid var(--accent);}
+.modal-info strong{color:var(--text);}
+.opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.opt-btn{padding:14px;border-radius:10px;border:2px solid var(--border);background:var(--surface2);color:var(--muted);font-family:var(--fb);font-size:13px;cursor:pointer;transition:all .15s;text-align:center;}
+.opt-btn:hover{border-color:#444;color:var(--text);}
+.opt-btn.selected.local{border-color:var(--green);background:rgba(34,197,94,.08);color:var(--green);}
+.opt-btn.selected.online{border-color:var(--accent);background:rgba(59,158,255,.08);color:var(--accent);}
+.opt-icon{font-size:22px;display:block;margin-bottom:4px;}
+.f-group{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.f-label{font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;}
+.f-input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:var(--fb);font-size:13px;color:var(--text);outline:none;width:100%;transition:border .15s;}
+.f-input:focus{border-color:var(--accent);}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}
+.modal-cancel{font-family:var(--fm);font-size:11px;padding:8px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;}
+.modal-cancel:hover{color:var(--text);}
+.modal-confirm{font-family:var(--fm);font-size:11px;font-weight:600;padding:8px 16px;border-radius:7px;background:var(--accent);color:#000;border:none;cursor:pointer;}
+.modal-confirm:hover{filter:brightness(1.1);}
+
+/* DADOS MODAL */
+.cbtn-dados{background:var(--surface2);border:1px solid var(--border);color:var(--muted);}
+.cbtn-dados:hover{border-color:#f59e0b;color:#f59e0b;}
+
+/* LIGHTBOX */
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;z-index:9998;opacity:0;pointer-events:none;transition:opacity .2s;backdrop-filter:blur(6px);}
+.lightbox.open{opacity:1;pointer-events:all;}
+.lightbox img{max-width:90vw;max-height:88vh;border-radius:10px;object-fit:contain;}
+.lb-close{position:fixed;top:16px;right:20px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.lb-close:hover{background:rgba(255,255,255,.25);}
+
+/* TOAST */
+.toast{position:fixed;bottom:18px;right:18px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:11px 14px;font-family:var(--fm);font-size:11px;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;}
+.toast.show{transform:translateY(0);opacity:1;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="logo-icon">🛒</div>Reparo<span>Eletro</span> — Compras</div>
+  <div style="display:flex;gap:10px;align-items:center;">
+    <button onclick="load()" style="font-family:var(--fm);font-size:10px;padding:5px 11px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">↻ Atualizar</button>
+    <div class="live-dot"></div>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" id="tab-comprar" onclick="showTab('comprar')">
+    🛒 Comprar Peça <span class="tab-badge" id="badge-comprar">0</span>
+  </button>
+  <button class="tab" id="tab-aguardando" onclick="showTab('aguardando')">
+    📦 Aguardando Peça <span class="tab-badge" id="badge-aguardando">0</span>
+  </button>
+  <button class="tab" id="tab-disponivel" onclick="showTab('disponivel')">
+    ✅ Peça Disponível <span class="tab-badge" id="badge-disponivel">0</span>
+  </button>
+</div>
+
+<div class="page active" id="page-comprar">
+  <div class="card-list" id="list-comprar"><div class="empty">Carregando...</div></div>
+</div>
+<div class="page" id="page-aguardando">
+  <div class="card-list" id="list-aguardando"><div class="empty">Carregando...</div></div>
+</div>
+<div class="page" id="page-disponivel">
+  <div class="card-list" id="list-disponivel"><div class="empty">Carregando...</div></div>
+</div>
+
+<!-- MODAL ATUALIZAR -->
+<div class="modal-overlay" id="modal-atualizar">
+  <div class="modal">
+    <div class="modal-title">🛒 Atualizar <span>Compra</span></div>
+    <div class="modal-info" id="modal-info"></div>
+    <div class="opt-grid">
+      <button class="opt-btn local" id="opt-local" onclick="setTipoCompra('local')">
+        <span class="opt-icon">🏪</span>Compra Local
+      </button>
+      <button class="opt-btn online" id="opt-online" onclick="setTipoCompra('online')">
+        <span class="opt-icon">📦</span>Compra Online
+      </button>
+    </div>
+    <div class="f-group" id="previsao-group" style="display:none;">
+      <label class="f-label">Previsão de chegada</label>
+      <input class="f-input" id="previsao-input" type="date"/>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="modal-confirm" onclick="confirmarCompra()">Confirmar →</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DADOS DE COMPRA -->
+<div class="modal-overlay" id="modal-dados">
+  <div class="modal">
+    <div class="modal-title">📝 Dados de <span>Compra</span></div>
+    <div class="modal-info" id="dados-modal-info"></div>
+    <div class="f-group">
+      <label class="f-label">Descrição da peça</label>
+      <textarea class="f-input" id="dados-desc" style="resize:vertical;min-height:70px;line-height:1.5;" placeholder="Peça necessária, especificações, modelo..."></textarea>
+    </div>
+    <div class="f-group">
+      <label class="f-label">Adicionar fotos</label>
+      <button class="cbtn cbtn-atualizar" style="width:100%;" onclick="document.getElementById('dados-file').click()">📷 Selecionar fotos</button>
+      <input type="file" id="dados-file" accept="image/*" multiple style="display:none" onchange="dadosLoadFotos(event)"/>
+      <div id="dados-thumbs" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeDadosModal()">Cancelar</button>
+      <button class="modal-confirm" onclick="confirmarDados()">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lb-close" onclick="event.stopPropagation();closeLightbox()">✕</button>
+  <img id="lb-img" src="" alt=""/>
+</div>
+
+<div class="toast" id="toast">
+  <span id="t-icon">✅</span>
+  <div><strong id="t-title"></strong><br><span id="t-body" style="color:var(--muted);font-size:10px;"></span></div>
+</div>
+
+<script>
+var cards = { comprar: [], aguardando: [], disponivel: [] };
+var selPipefyId = null, tipoComprasel = null;
+
+// ── API ──────────────────────────────────────────────────────
+async function api(action, body) {
+  var r = await fetch("/api/tv-compras?action=" + action, body ? {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  } : {});
+  return r.json();
+}
+
+// ── TABS ──────────────────────────────────────────────────────
+function showTab(name) {
+  ["comprar","aguardando","disponivel"].forEach(function(t) {
+    document.getElementById("page-"+t).classList.toggle("active", t === name);
+    document.getElementById("tab-"+t).classList.toggle("active", t === name);
+  });
+}
+
+// ── LOAD ──────────────────────────────────────────────────────
+async function load() {
+  var d = await api("load");
+  if (!d.ok) return;
+  cards.comprar    = d.comprar    || [];
+  cards.aguardando = d.aguardando || [];
+  cards.disponivel = d.disponivel || [];
+  updateBadges();
+  renderList("comprar");
+  renderList("aguardando");
+  renderList("disponivel");
+}
+
+function updateBadges() {
+  document.getElementById("badge-comprar").textContent    = cards.comprar.length;
+  document.getElementById("badge-aguardando").textContent = cards.aguardando.length;
+  document.getElementById("badge-disponivel").textContent = cards.disponivel.length;
+}
+
+// ── RENDER ────────────────────────────────────────────────────
+function renderList(tipo) {
+  var el   = document.getElementById("list-"+tipo);
+  var list = cards[tipo];
+  if (!list.length) {
+    el.innerHTML = '<div class="empty">Nenhuma ficha aqui.</div>';
+    return;
+  }
+  el.innerHTML = "";
+  list.forEach(function(c) { el.appendChild(buildCard(c, tipo)); });
+}
+
+function buildCard(c, tipo) {
+  var div = document.createElement("div");
+  div.className = "c-card " + tipo;
+  div.id = "card-" + c.pipefyId;
+
+  // Header
+  var head = document.createElement("div"); head.className = "c-head";
+  var info = document.createElement("div");
+  var codeEl = document.createElement("div"); codeEl.className = "c-code"; codeEl.textContent = "#" + (c.osCode || c.pipefyId.slice(-4));
+  var nameEl = document.createElement("div"); nameEl.className = "c-name"; nameEl.textContent = c.nomeContato || c.title || "—";
+  info.appendChild(codeEl); info.appendChild(nameEl);
+  head.appendChild(info);
+  div.appendChild(head);
+
+  // Descrição do card
+  if (c.descricao) {
+    var descEl = document.createElement("div"); descEl.className = "c-desc"; descEl.textContent = c.descricao;
+    div.appendChild(descEl);
+  }
+
+  // Descrição da compra
+  if (c.descricaoCompra) {
+    var dcEl = document.createElement("div"); dcEl.className = "c-desc-compra";
+    dcEl.textContent = "📝 " + c.descricaoCompra;
+    div.appendChild(dcEl);
+  }
+
+  // Alerta
+  if (c.alertaCompra) {
+    var alertEl = document.createElement("div");
+    alertEl.className = "c-alerta " + (tipo === "disponivel" ? "disponivel" : (c.tipoCompra === "local" ? "local" : "online"));
+    alertEl.textContent = c.alertaCompra;
+    div.appendChild(alertEl);
+  }
+
+  // Fotos
+  if (c.fotosCompra && c.fotosCompra.length) {
+    var fotosEl = document.createElement("div"); fotosEl.className = "c-fotos";
+    c.fotosCompra.forEach(function(f, i) {
+      var img = document.createElement("img"); img.className = "c-foto"; img.src = f;
+      img.onclick = function() { openLightbox(f); };
+      fotosEl.appendChild(img);
+    });
+    div.appendChild(fotosEl);
+  }
+
+  // Actions
+  var acts = document.createElement("div"); acts.className = "c-actions";
+  // Botão Dados de Compra — disponível em todas as abas
+  var dadosBtn = document.createElement("button"); dadosBtn.className = "cbtn cbtn-dados";
+  dadosBtn.textContent = "📝 Dados de Compra";
+  dadosBtn.setAttribute("data-id", c.pipefyId); dadosBtn.setAttribute("data-nome", c.nomeContato || c.title || "");
+  dadosBtn.setAttribute("data-desc", c.descricaoCompra || "");
+  dadosBtn.onclick = function() { openDadosModal(this.getAttribute("data-id"), this.getAttribute("data-nome"), this.getAttribute("data-desc")); };
+  acts.appendChild(dadosBtn);
+
+  if (tipo === "comprar") {
+    var btn = document.createElement("button"); btn.className = "cbtn cbtn-atualizar";
+    btn.textContent = "🛒 Atualizar Compra";
+    btn.setAttribute("data-id", c.pipefyId); btn.setAttribute("data-nome", c.nomeContato || c.title || "");
+    btn.onclick = function() { openModal(this.getAttribute("data-id"), this.getAttribute("data-nome")); };
+    acts.appendChild(btn);
+  }
+  if (tipo === "aguardando") {
+    var btn2 = document.createElement("button"); btn2.className = "cbtn cbtn-disponivel";
+    btn2.textContent = "✅ Peça Disponível";
+    btn2.setAttribute("data-id", c.pipefyId);
+    btn2.onclick = function() { marcarDisponivel(this.getAttribute("data-id")); };
+    acts.appendChild(btn2);
+  }
+  div.appendChild(acts);
+  return div;
+}
+
+// ── MODAL ATUALIZAR ───────────────────────────────────────────
+function openModal(pipefyId, nome) {
+  selPipefyId = pipefyId; tipoComprasel = null;
+  document.getElementById("modal-info").innerHTML = "<strong>#" + pipefyId.slice(-4) + " — " + nome + "</strong>";
+  document.getElementById("opt-local").classList.remove("selected");
+  document.getElementById("opt-online").classList.remove("selected");
+  document.getElementById("previsao-group").style.display = "none";
+  document.getElementById("previsao-input").value = "";
+  document.getElementById("modal-atualizar").classList.add("open");
+}
+
+function closeModal() { document.getElementById("modal-atualizar").classList.remove("open"); }
+
+function setTipoCompra(tipo) {
+  tipoComprasel = tipo;
+  document.getElementById("opt-local").classList.toggle("selected", tipo === "local");
+  document.getElementById("opt-online").classList.toggle("selected", tipo === "online");
+  document.getElementById("previsao-group").style.display = tipo === "online" ? "flex" : "none";
+}
+
+async function confirmarCompra() {
+  if (!tipoComprasel) { showToast("⚠️","Selecione o tipo de compra",""); return; }
+  var previsao = document.getElementById("previsao-input").value;
+  if (tipoComprasel === "online" && !previsao) { showToast("⚠️","Informe a previsão de chegada",""); return; }
+  var d = await api("atualizar", { pipefyId: selPipefyId, tipoCompra: tipoComprasel, previsao: previsao });
+  if (d.ok) {
+    closeModal(); await load();
+    var msg = tipoComprasel === "local" ? "🏪 Peça a caminho — compra local" : "📦 Previsão: " + formatDate(previsao);
+    showToast("✅", "Movido para Aguardando Peça", msg);
+  } else showToast("❌","Erro",d.error);
+}
+
+async function marcarDisponivel(pipefyId) {
+  var d = await api("peca-disponivel", { pipefyId: pipefyId });
+  if (d.ok) { await load(); showToast("✅","Peça Disponível!","Card movido no dash técnico"); }
+  else showToast("❌","Erro",d.error);
+}
+
+function formatDate(iso) {
+  if (!iso) return ""; var p = iso.split("-");
+  return p[2]+"/"+p[1]+"/"+p[0];
+}
+
+// ── LIGHTBOX ──────────────────────────────────────────────────
+function openLightbox(src) {
+  document.getElementById("lb-img").src = src;
+  document.getElementById("lightbox").classList.add("open");
+}
+function closeLightbox() { document.getElementById("lightbox").classList.remove("open"); }
+
+// ── TOAST ─────────────────────────────────────────────────────
+function showToast(icon, title, msg) {
+  document.getElementById("t-icon").textContent  = icon;
+  document.getElementById("t-title").textContent = title;
+  document.getElementById("t-body").textContent  = msg;
+  var t = document.getElementById("toast");
+  t.classList.add("show"); setTimeout(function() { t.classList.remove("show"); }, 5000);
+}
+
+// ── DADOS MODAL ───────────────────────────────────────────────
+var dadosSelId = null, dadosNovasFotos = [];
+
+function openDadosModal(pipefyId, nome, descAtual) {
+  dadosSelId = pipefyId; dadosNovasFotos = [];
+  document.getElementById("dados-modal-info").innerHTML = "<strong>" + nome + "</strong>";
+  document.getElementById("dados-desc").value = descAtual || "";
+  document.getElementById("dados-thumbs").innerHTML = "";
+  document.getElementById("modal-dados").classList.add("open");
+}
+function closeDadosModal() { document.getElementById("modal-dados").classList.remove("open"); }
+
+function dadosLoadFotos(e) {
+  var files = Array.from(e.target.files).slice(0, 12 - dadosNovasFotos.length);
+  files.forEach(function(file) {
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      var img = new Image(); img.onload = function() {
+        var canvas = document.createElement("canvas"); var MAX = 800;
+        var w = img.width, h = img.height;
+        if (w > MAX || h > MAX) { if (w > h) { h = Math.round(h*MAX/w); w = MAX; } else { w = Math.round(w*MAX/h); h = MAX; } }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        dadosNovasFotos.push(canvas.toDataURL("image/jpeg", 0.82));
+        renderDadosThumbs();
+      }; img.src = ev.target.result;
+    }; reader.readAsDataURL(file);
+  });
+  e.target.value = "";
+}
+
+function renderDadosThumbs() {
+  var wrap = document.getElementById("dados-thumbs"); wrap.innerHTML = "";
+  dadosNovasFotos.forEach(function(f, i) {
+    var div = document.createElement("div"); div.style.cssText = "position:relative;width:60px;height:60px;";
+    var img = document.createElement("img"); img.src = f; img.style.cssText = "width:60px;height:60px;border-radius:7px;object-fit:cover;border:1px solid var(--border);";
+    var rm  = document.createElement("button"); rm.textContent = "✕"; rm.style.cssText = "position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(239,68,68,.9);color:#fff;border:none;cursor:pointer;font-size:10px;font-weight:700;";
+    rm.onclick = function() { dadosNovasFotos.splice(i, 1); renderDadosThumbs(); };
+    div.appendChild(img); div.appendChild(rm); wrap.appendChild(div);
+  });
+}
+
+async function confirmarDados() {
+  var desc = document.getElementById("dados-desc").value.trim();
+  var r = await api("update-dados", {
+    pipefyId: dadosSelId,
+    descricaoCompra: desc,
+    fotosCompra: dadosNovasFotos.length ? dadosNovasFotos : undefined,
+  });
+  if (r.ok) {
+    closeDadosModal(); await load();
+    showToast("💾", "Dados salvos!", desc ? desc.substring(0,40) : "Fotos atualizadas");
+  } else showToast("❌", "Erro", r.error);
+}
+
+load();
+setInterval(load, 30000);
+</script>
+</body>
+</html>
