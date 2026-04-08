@@ -47,6 +47,34 @@
       "destination": "/tv-aguardando-retirada.html"
     },
     {
+      "source": "/tv/monitoramento",
+      "destination": "/tv-monitoramento.html"
+    },
+    {
+      "source": "/tv/vendas",
+      "destination": "/tv-vendas.html"
+    },
+    {
+      "source": "/tv/compra-equip",
+      "destination": "/tv-compra-equip.html"
+    },
+    {
+      "source": "/tv/compras-pecas",
+      "destination": "/tv-compras-pecas.html"
+    },
+    {
+      "source": "/tv/compras",
+      "destination": "/tv-compras.html"
+    },
+    {
+      "source": "/tv/lalamove",
+      "destination": "/tv-lalamove.html"
+    },
+    {
+      "source": "/tv/garantia",
+      "destination": "/tv-garantia.html"
+    },
+    {
       "source": "/tecnico",
       "destination": "/tecnico.html"
     },
@@ -113,6 +141,30 @@
     {
       "source": "/((?!api/).*)",
       "destination": "/home.html"
+    },
+    {
+      "source": "/api/tv-compras-pecas",
+      "destination": "/api/tv-compras-pecas.js"
+    },
+    {
+      "source": "/api/tv-compra-equip",
+      "destination": "/api/tv-compra-equip.js"
+    },
+    {
+      "source": "/api/tv-compras",
+      "destination": "/api/tv-compras.js"
+    },
+    {
+      "source": "/api/tv-lalamove",
+      "destination": "/api/tv-lalamove.js"
+    },
+    {
+      "source": "/api/tv-garantia",
+      "destination": "/api/tv-garantia.js"
+    },
+    {
+      "source": "/api/tv-vendas",
+      "destination": "/api/tv-vendas.js"
     }
   ]
 }
