@@ -233,7 +233,7 @@ function buildCard(rotaId, c) {
       + '</div>';
   }
   var tel = (c.telefone || '').replace(/\D/g,'');
-  var wppLink = tel ? 'https://wa.me/' + tel + '?text=' + encodeURIComponent('Olá, bom dia! Sou o motorista da TV Assistência e estou a caminho do seu endereço.') : '#';
+  var wppLink = tel ? 'https://wa.me/' + tel + '?text=' + encodeURIComponent('Olá, bom dia sou o motorista da Reparo Eletro TV e estou a caminho do seu endereço.') : '#';
   var mapsLink = 'https://maps.google.com/?q=' + encodeURIComponent(c.endereco || '');
 
   return '<div class="m-card" id="mc-' + rotaId + '-' + c.pipefyId + '">'
