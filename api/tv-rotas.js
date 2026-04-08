@@ -1,19 +1,29 @@
-const { createClient } = require("@upstash/redis");
-
-const redis = createClient({
-  url:   process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN,
-});
+const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g,"").trim();
+const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g,"").trim();
 
 const ROTAS_KEY  = "tv_rotas";
 const BOARD_KEY  = "tv_board";
 
-async function dbGet(k) {
-  try { const v = await redis.get(k); return v ? (typeof v === "string" ? JSON.parse(v) : v) : null; }
-  catch(e) { return null; }
+async function dbGet(key) {
+  try {
+    const r = await fetch(UPSTASH_URL + "/pipeline", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify([["GET", key]]),
+    });
+    const j = await r.json();
+    return j[0] && j[0].result ? JSON.parse(j[0].result) : null;
+  } catch(e) { return null; }
 }
-async function dbSet(k, v) {
-  try { await redis.set(k, JSON.stringify(v)); return true; } catch(e) { return false; }
+async function dbSet(key, val) {
+  try {
+    await fetch(UPSTASH_URL + "/pipeline", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + UPSTASH_TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify([["SET", key, JSON.stringify(val)]]),
+    });
+    return true;
+  } catch(e) { return false; }
 }
 
 function defaultRotas() { return { rotas: [], contador: 0 }; }
