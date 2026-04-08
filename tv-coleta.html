@@ -341,7 +341,12 @@ async function criarRota() {
     otimizado = false;
     document.getElementById('otimizado-badge').style.display = 'none';
     await loadAll();
-    toast('🗺️ ' + d.rota.label + ' criada com sucesso!', 'var(--green)');
+    var msg = '🗺️ ' + d.rota.label + ' criada!';
+    if (d.pipefy) {
+      if (d.pipefy.erros === 0) msg += ' · ' + d.pipefy.movidos + ' card(s) → Rota em Andamento';
+      else msg += ' · ' + d.pipefy.movidos + ' movidos, ' + d.pipefy.erros + ' erro(s) Pipefy';
+    }
+    toast(msg, 'var(--green)');
     setTab('rotas');
   } else {
     btn.disabled = false;
