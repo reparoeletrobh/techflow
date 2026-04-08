@@ -165,12 +165,18 @@ module.exports = async function handler(req, res) {
   }
 
   if (req.method === "POST" && action === "criar-card") {
-    let { nome, telefone, aparelho, defeito, endereco, phaseId, texto } = req.body || {};
+    let { nome, telefone, aparelho, defeito, endereco, phaseId, texto, coleta } = req.body || {};
     if (texto && !nome) {
       const parsed = parseFichaTexto(texto);
       nome = parsed.nome||nome; telefone = parsed.telefone||telefone;
       aparelho = parsed.aparelho||aparelho; defeito = parsed.defeito||defeito;
       endereco = parsed.endereco||endereco;
+    }
+    // Injeta coleta no defeito: "Defeito | Coleta: IMEDIATA" ou "Coleta agendada: 01/04 | Defeito"
+    if (coleta && defeito) {
+      defeito = coleta + " | " + defeito;
+    } else if (coleta) {
+      defeito = coleta;
     }
     if (!nome || !telefone || !aparelho || !defeito)
       return res.status(400).json({ ok: false, error: "nome, telefone, aparelho e defeito são obrigatórios" });
