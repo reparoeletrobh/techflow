@@ -433,6 +433,19 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
+    // ── POST update-card — atualiza campos de um card no board local ──
+    if (req.method === "POST" && action === "update-card") {
+      const { pipefyId, fields } = req.body || {};
+      if (!pipefyId || !fields) return res.status(400).json({ ok: false, error: "pipefyId e fields são obrigatórios" });
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const card  = board.cards.find(function(c) { return c.pipefyId === String(pipefyId); });
+      if (!card) return res.status(404).json({ ok: false, error: "Card não encontrado" });
+      const allowed = ["endereco", "nomeContato", "telefone", "descricao"];
+      allowed.forEach(function(f) { if (fields[f] !== undefined) card[f] = fields[f]; });
+      await dbSet(BOARD_KEY, board);
+      return res.status(200).json({ ok: true, card });
+    }
+
     // ── GET sync-coleta — busca cards na fase 341638193 (Liberado para Rota) ──
     if (req.method === "GET" && action === "sync-coleta") {
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
