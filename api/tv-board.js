@@ -433,68 +433,60 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
-    // ── GET sync-coleta — busca cards na fase "Liberado para Rota" pelo ID exato ──
+    // ── GET sync-coleta — busca cards na fase 341638193 (Liberado para Rota) ──
     if (req.method === "GET" && action === "sync-coleta") {
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      let edges = [];
       try {
-        // Busca diretamente pelo ID da fase (341638193) — sem buscar todas as fases
-        const data = await pipefyQuery(`query {
-          phase(id: "${LIBERADO_ROTA_PHASE_ID}") {
-            id name
-            cards(first: 50) {
-              edges {
-                node {
-                  id title
-                  fields { name value }
-                }
-              }
-            }
-          }
-        }`);
-        const liberadoPhase = data?.phase;
-        if (!liberadoPhase) {
-          return res.status(200).json({ ok: true, found: 0, msg: "Fase " + LIBERADO_ROTA_PHASE_ID + " nao encontrada" });
-        }
-        let moved = 0;
-        for (const { node } of (liberadoPhase.cards?.edges || [])) {
-          const id = String(node.id);
-          const existing = board.cards.find(c => c.pipefyId === id);
-          if (existing) {
-            if (existing.phaseId !== "liberado_rota") {
-              existing.phaseId = "liberado_rota";
-              existing.movedAt = new Date().toISOString();
-              moved++;
-            }
-          } else {
-            // Card existe no Pipefy mas não no board local — adiciona
-            const fields = node.fields || [];
-            const nome = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
-            const tel  = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
-            const end  = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
-            const desc = fields.find(f => f.name.toLowerCase().includes("descri"))?.value || "";
-            const ultimos4 = tel.replace(/\D/g,"").slice(-4);
-            board.cards.unshift({
-              pipefyId:    id,
-              title:       node.title,
-              nomeContato: nome + (ultimos4 ? " " + ultimos4 : ""),
-              telefone:    tel,
-              endereco:    end,
-              descricao:   desc,
-              phaseId:     "liberado_rota",
-              movedAt:     new Date().toISOString(),
-              movedBy:     "Pipefy",
-              addedAt:     new Date().toISOString(),
-            });
-            if (!board.syncedIds.includes(id)) board.syncedIds.push(id);
+        const data = await pipefyQuery(
+          "query { phase(id: \"" + LIBERADO_ROTA_PHASE_ID + "\") { cards(first: 50) { edges { node { id title fields { name value } } } } } }"
+        );
+        edges = data && data.phase && data.phase.cards ? data.phase.cards.edges : [];
+      } catch(e) {
+        return res.status(200).json({ ok: false, error: "Pipefy: " + e.message });
+      }
+      let moved = 0;
+      for (const edge of edges) {
+        const node = edge.node;
+        const id   = String(node.id);
+        const existing = board.cards.find(function(c) { return c.pipefyId === id; });
+        if (existing) {
+          if (existing.phaseId !== "liberado_rota") {
+            existing.phaseId = "liberado_rota";
+            existing.movedAt = new Date().toISOString();
             moved++;
           }
+        } else {
+          const fields = node.fields || [];
+          const nomeF  = fields.find(function(f) { return f.name.toLowerCase().includes("nome"); });
+          const telF   = fields.find(function(f) { return f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"); });
+          const endF   = fields.find(function(f) { return f.name.toLowerCase().includes("endere"); });
+          const descF  = fields.find(function(f) { return f.name.toLowerCase().includes("descri"); });
+          const tel    = (telF && telF.value) ? telF.value : "";
+          const digits = tel.replace(/[^0-9]/g, "");
+          const ultimos4 = digits.slice(-4);
+          const nome   = (nomeF && nomeF.value) ? nomeF.value : node.title;
+          board.cards.unshift({
+            pipefyId:    id,
+            title:       node.title,
+            nomeContato: nome + (ultimos4 ? " " + ultimos4 : ""),
+            telefone:    tel,
+            endereco:    (endF  && endF.value)  ? endF.value  : "",
+            descricao:   (descF && descF.value) ? descF.value : "",
+            phaseId:     "liberado_rota",
+            movedAt:     new Date().toISOString(),
+            movedBy:     "Pipefy",
+            addedAt:     new Date().toISOString(),
+          });
+          if (board.syncedIds.indexOf(id) === -1) board.syncedIds.push(id);
+          moved++;
         }
-        if (moved > 0) await dbSet(BOARD_KEY, board);
-        const filaAtual = board.cards.filter(c => c.phaseId === "liberado_rota");
-        return res.status(200).json({ ok: true, found: liberadoPhase.cards.edges.length, moved, filaCount: filaAtual.length });
-      } catch(e) {
-        return res.status(200).json({ ok: false, error: "sync-coleta: " + e.message });
       }
+      if (moved > 0) {
+        try { await dbSet(BOARD_KEY, board); } catch(e) { /* ignore */ }
+      }
+      const filaAtual = board.cards.filter(function(c) { return c.phaseId === "liberado_rota"; });
+      return res.status(200).json({ ok: true, found: edges.length, moved: moved, filaCount: filaAtual.length });
     }
 
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
