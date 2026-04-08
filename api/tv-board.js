@@ -58,6 +58,7 @@ function defaultBoard() {
       { id: "loja_feito",      name: "Loja Feito"         },
       { id: "delivery_feito",  name: "Delivery Feito"     },
       { id: "aguardando_ret",  name: "Aguardando Retirada"},
+      { id: "liberado_rota",   name: "Liberado para Rota" },
     ],
     cards:     [],
     syncedIds: [],
