@@ -341,6 +341,85 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    // ── POST move ─────────────────────────────────────────────
+    if (req.method === "POST" && action === "move") {
+      const { pipefyId, phaseId, movedBy, tecnico, fotosCompra, descricaoCompra } = req.body || {};
+      if (!pipefyId || !phaseId) return res.status(400).json({ ok: false, error: "pipefyId e phaseId são obrigatórios" });
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const card = board.cards.find(c => c.pipefyId === String(pipefyId));
+      if (!card) return res.status(404).json({ ok: false, error: "OS não encontrada" });
+      card.phaseId = phaseId; card.movedAt = new Date().toISOString();
+      card.movedBy = movedBy || "—"; card.tecnico = tecnico || null;
+      if (phaseId === "comprar_peca") {
+        if (fotosCompra)     card.fotosCompra     = fotosCompra;
+        if (descricaoCompra) card.descricaoCompra = descricaoCompra;
+      }
+      if (["loja_feito", "delivery_feito", "cliente_loja"].includes(phaseId)) {
+        board.movesLog.push({ phaseId, timestamp: card.movedAt, tecnico: tecnico || null, pipefyId: String(pipefyId) });
+        board.movesLog = trimLog(board.movesLog);
+      }
+      await dbSet(BOARD_KEY, board);
+      await saveLogs(board);
+
+      // Auto-adiciona à fila Lalamove TV quando move para coleta/entrega solicitada
+      if (["coleta_solicitada", "entrega_solicitada"].includes(phaseId)) {
+        const LALA_KEY = "tv_lalamove";
+        try {
+          const lalaDb = await dbGet(LALA_KEY) || { fichas: [] };
+          if (!Array.isArray(lalaDb.fichas)) lalaDb.fichas = [];
+          const tipo = phaseId === "coleta_solicitada" ? "coleta" : "entrega";
+          if (!Array.isArray(lalaDb.removedIds)) lalaDb.removedIds = [];
+          const jaExiste  = lalaDb.fichas.find(f => f.pipefyId === String(pipefyId) && f.tipo === tipo);
+          const jaRemovida = lalaDb.removedIds.includes(String(pipefyId) + ":" + tipo);
+          if (!jaExiste && !jaRemovida) {
+            lalaDb.fichas.push({
+              pipefyId: String(pipefyId), tipo,
+              osCode: card.osCode || null,
+              nomeContato: card.nomeContato || card.title || null,
+              descricao: card.descricao || null,
+              endereco: null, addedAt: new Date().toISOString(), status: "pendente",
+            });
+            await dbSet(LALA_KEY, lalaDb);
+          }
+        } catch(e) { console.error("tv lalamove queue:", e.message); }
+      }
+
+      return res.status(200).json({ ok: true, card });
+    }
+
+    // ── POST move-rs ───────────────────────────────────────────
+    if (req.method === "POST" && action === "move-rs") {
+      const { cardId, phaseId, boardType } = req.body || {};
+      if (!cardId || !phaseId || !boardType) return res.status(400).json({ ok: false, error: "Campos obrigatórios" });
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const arr = boardType === "rs" ? board.rsCards : board.rsRuaCards;
+      const card = (arr || []).find(c => c.id === cardId);
+      if (!card) return res.status(404).json({ ok: false, error: "RS não encontrado" });
+      card.phaseId = phaseId; card.movedAt = new Date().toISOString();
+      await dbSet(BOARD_KEY, board);
+      await saveLogs(board);
+      return res.status(200).json({ ok: true, card });
+    }
+
+    // ── POST move-batch (fim do dia) ───────────────────────────
+    if (req.method === "POST" && action === "move-batch") {
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const FROM = ["loja_feito", "delivery_feito"], TO = "aguardando_ret";
+      let count = 0; const now = new Date().toISOString();
+      for (const card of board.cards) {
+        if (FROM.includes(card.phaseId)) { card.phaseId = TO; card.movedAt = now; card.movedBy = "Sistema"; count++; }
+      }
+      await dbSet(BOARD_KEY, board);
+      await saveLogs(board);
+      return res.status(200).json({ ok: true, moved: count });
+    }
+
+    // ── POST cleanup-ret ───────────────────────────────────────
+    if (req.method === "GET" && action === "cleanup-ret") {
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      return res.status(200).json({ ok: true });
+    }
+
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch(e) {
