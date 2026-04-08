@@ -421,6 +421,77 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
+    // ── GET sync-coleta — busca cards na fase "Liberado para Rota" no Pipefy ──
+    if (req.method === "GET" && action === "sync-coleta") {
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      try {
+        // Busca todas as fases do pipe e encontra "Liberado para Rota"
+        const data = await pipefyQuery(`query {
+          pipe(id: "${PIPE_ID}") {
+            phases {
+              id name
+              cards(first: 50) {
+                edges {
+                  node {
+                    id title
+                    fields { name value }
+                  }
+                }
+              }
+            }
+          }
+        }`);
+        const phases = data?.pipe?.phases || [];
+        // Encontra fase Liberado para Rota (nome contém "liberado" ou "rota")
+        const liberadoPhase = phases.find(ph => {
+          const l = ph.name.toLowerCase();
+          return l.includes("liberado") || (l.includes("rota") && !l.includes("coleta"));
+        });
+        if (!liberadoPhase) {
+          return res.status(200).json({ ok: true, found: 0, msg: "Fase 'Liberado para Rota' não encontrada no Pipefy" });
+        }
+        let moved = 0;
+        for (const { node } of (liberadoPhase.cards?.edges || [])) {
+          const id = String(node.id);
+          const existing = board.cards.find(c => c.pipefyId === id);
+          if (existing) {
+            if (existing.phaseId !== "liberado_rota") {
+              existing.phaseId = "liberado_rota";
+              existing.movedAt = new Date().toISOString();
+              moved++;
+            }
+          } else {
+            // Card existe no Pipefy mas não no board local — adiciona
+            const fields = node.fields || [];
+            const nome = fields.find(f => f.name.toLowerCase().includes("nome"))?.value || node.title;
+            const tel  = fields.find(f => f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"))?.value || "";
+            const end  = fields.find(f => f.name.toLowerCase().includes("endere"))?.value || "";
+            const desc = fields.find(f => f.name.toLowerCase().includes("descri"))?.value || "";
+            const ultimos4 = tel.replace(/\D/g,"").slice(-4);
+            board.cards.unshift({
+              pipefyId:    id,
+              title:       node.title,
+              nomeContato: nome + (ultimos4 ? " " + ultimos4 : ""),
+              telefone:    tel,
+              endereco:    end,
+              descricao:   desc,
+              phaseId:     "liberado_rota",
+              movedAt:     new Date().toISOString(),
+              movedBy:     "Pipefy",
+              addedAt:     new Date().toISOString(),
+            });
+            if (!board.syncedIds.includes(id)) board.syncedIds.push(id);
+            moved++;
+          }
+        }
+        if (moved > 0) await dbSet(BOARD_KEY, board);
+        const filaAtual = board.cards.filter(c => c.phaseId === "liberado_rota");
+        return res.status(200).json({ ok: true, found: liberadoPhase.cards.edges.length, moved, filaCount: filaAtual.length });
+      } catch(e) {
+        return res.status(200).json({ ok: false, error: "sync-coleta: " + e.message });
+      }
+    }
+
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch(e) {
