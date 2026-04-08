@@ -1,8 +1,28 @@
 const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g,"").trim();
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g,"").trim();
+const PIPEFY_API    = "https://api.pipefy.com/graphql";
+const ROTA_ANDAMENTO_PHASE_ID = "342805685"; // "Rota em Andamento"
 
 const ROTAS_KEY  = "tv_rotas";
 const BOARD_KEY  = "tv_board";
+
+async function moverParaRotaAndamento(pipefyId) {
+  const token = (process.env.PIPEFY_TOKEN || "").trim();
+  if (!token) return { ok: false, error: "PIPEFY_TOKEN ausente" };
+  try {
+    const query = "mutation { moveCardToPhase(input: { card_id: \"" + pipefyId + "\", destination_phase_id: \"" + ROTA_ANDAMENTO_PHASE_ID + "\" }) { card { id current_phase { name } } } }";
+    const r = await fetch(PIPEFY_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+      body: JSON.stringify({ query }),
+    });
+    const j = await r.json();
+    if (j.errors) return { ok: false, error: j.errors[0].message };
+    return { ok: true };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+}
 
 async function dbGet(key) {
   try {
@@ -93,7 +113,21 @@ module.exports = async function handler(req, res) {
     };
     db.rotas.unshift(rota);
     await dbSet(ROTAS_KEY, db);
-    return res.status(200).json({ ok: true, rota });
+
+    // Move cada card para fase "Rota em Andamento" no Pipefy
+    const pipefyResults = [];
+    for (const card of cards) {
+      if (card.pipefyId === "oficina") continue;
+      const res = await moverParaRotaAndamento(card.pipefyId);
+      pipefyResults.push({ pipefyId: card.pipefyId, ...res });
+    }
+    const pipefyErros = pipefyResults.filter(function(r) { return !r.ok; });
+
+    return res.status(200).json({
+      ok: true,
+      rota,
+      pipefy: { movidos: pipefyResults.length - pipefyErros.length, erros: pipefyErros.length },
+    });
   }
 
   // ── POST marcar-coletado ──────────────────────────────────────
