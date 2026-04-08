@@ -320,7 +320,8 @@ async function otimizarRota() {
     renderFila();
 
     var msg = '✅ Rota otimizada — ' + fila.length + ' paradas';
-    if (r.semCoord > 0) msg += ' (' + r.semCoord + ' sem endereço, ao final)';
+    if (r.semCoord > 0) msg += ' · ' + r.semCoord + ' sem endereço (ao final)';
+    if (r.melhoria2opt > 0) msg += ' · 2-opt: -' + r.melhoria2opt + '%';
     toast(msg, 'var(--green)');
   } catch(e) {
     toast('❌ ' + e.message, 'var(--red)');
