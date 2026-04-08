@@ -35,16 +35,18 @@ module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
 
   const { action } = req.query;
+  try {
 
   // ── GET load ──────────────────────────────────────────────────
   if (action === "load") {
-    const [db, board] = await Promise.all([
-      dbGet(ROTAS_KEY) || defaultRotas(),
-      dbGet(BOARD_KEY) || { cards: [] },
+    const [dbRaw, boardRaw] = await Promise.all([
+      dbGet(ROTAS_KEY),
+      dbGet(BOARD_KEY),
     ]);
-    // Fila: cards na fase liberado_rota
-    const fila = (board.cards || []).filter(c => c.phaseId === "liberado_rota");
-    return res.status(200).json({ ok: true, rotas: db.rotas || [], fila, contador: db.contador || 0 });
+    const db    = dbRaw    || defaultRotas();
+    const board = boardRaw || { cards: [] };
+    const fila  = (board.cards || []).filter(function(c) { return c.phaseId === "liberado_rota"; });
+    return res.status(200).json({ ok: true, rotas: db.rotas || [], fila: fila, contador: db.contador || 0 });
   }
 
   // ── POST criar-rota ───────────────────────────────────────────
@@ -134,5 +136,8 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, rota });
   }
 
-  return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+    return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+  } catch(e) {
+    return res.status(200).json({ ok: false, error: "Erro interno: " + e.message });
+  }
 };
