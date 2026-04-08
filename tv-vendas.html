@@ -386,8 +386,7 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
     <div class="field">
       <label class="field-label">Vendedor *</label>
       <div class="vend-grid">
-        <button class="vend-btn" id="vend-ricardo" onclick="setVendedor('Ricardo')">Ricardo</button>
-        <button class="vend-btn" id="vend-nathan"  onclick="setVendedor('Nathan')">Nathan</button>
+        <button class="vend-btn" id="vend-rangel" onclick="setVendedor('Rangel')">Rangel</button>
         <button class="vend-btn" id="vend-pedro"   onclick="setVendedor('Pedro')">Pedro</button>
       </div>
     </div>
@@ -604,7 +603,7 @@ function maskCpfCnpj(input){
 }
 function setVendedor(v) {
   vendedorSel = v;
-  ['Ricardo','Nathan','Pedro'].forEach(n => {
+  ['Rangel','Pedro'].forEach(n => {
     const el = document.getElementById('vend-'+n.toLowerCase());
     el.className = 'vend-btn' + (v===n ? ' selected' : '');
   });
@@ -620,7 +619,7 @@ function setModalidade(m) {
 async function confirmarVenda(){
   const nome=document.getElementById('v-nome').value.trim();
   if(!nome) return showToast('⚠️','Nome obrigatório','');
-  if(!vendedorSel) return showToast('⚠️','Selecione o vendedor','Ricardo, Nathan ou Pedro');
+  if(!vendedorSel) return showToast('⚠️','Selecione o vendedor','Rangel ou Pedro');
   if(!modalidadeSel) return showToast('⚠️','Selecione a modalidade','Online, Loja ou Troca');
   const btn=document.getElementById('v-confirm');
   btn.disabled=true; btn.textContent='⏳';
