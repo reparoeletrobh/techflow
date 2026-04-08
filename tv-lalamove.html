@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='18,2 8,18 15,18 14,30 24,14 17,14' fill='%238b5cf6' stroke='%238b5cf6' stroke-linejoin='round'/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TV — Lalamove</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--border:#252525;
+  --text:#fff;--muted:#888;--dim:#333;
+  --accent:#8b5cf6;--green:#22c55e;--orange:#f97316;--red:#ef4444;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;border-bottom:2px solid var(--accent);background:var(--bg);position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.logo-icon{width:26px;height:26px;background:var(--accent);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;}
+.logo span{color:var(--accent);}
+.tabs{display:flex;border-bottom:1px solid var(--border);padding:0 24px;}
+.tab{font-family:var(--fm);font-size:11px;font-weight:600;padding:11px 18px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;display:flex;align-items:center;gap:6px;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-badge{font-family:var(--fm);font-size:9px;padding:1px 6px;border-radius:20px;background:var(--surface2);}
+.tab.active .tab-badge{background:rgba(139,92,246,.15);color:var(--accent);}
+.page{display:none;flex:1;flex-direction:column;overflow-y:auto;}
+.page.active{display:flex;}
+
+/* TOOLBAR */
+.toolbar{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px;}
+.toolbar-left{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.loja-badge{font-family:var(--fm);font-size:10px;background:rgba(139,92,246,.1);color:var(--accent);padding:4px 10px;border-radius:6px;border:1px solid rgba(139,92,246,.2);}
+.api-badge{font-family:var(--fm);font-size:10px;padding:4px 10px;border-radius:6px;}
+.api-badge.ok{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2);}
+.api-badge.nok{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2);}
+
+/* SEND BUTTON */
+.btn-send{font-family:var(--fh);font-size:12px;font-weight:700;padding:9px 18px;border-radius:8px;border:none;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:6px;}
+.btn-send:disabled{background:var(--dim);cursor:not-allowed;color:var(--muted);}
+.btn-send.coleta{background:var(--orange);color:#000;}
+.btn-send.coleta:hover:not(:disabled){filter:brightness(1.1);}
+.btn-send.entrega{background:var(--accent);color:#fff;}
+.btn-send.entrega:hover:not(:disabled){filter:brightness(1.1);}
+
+/* CARDS */
+.card-list{padding:16px 24px;display:flex;flex-direction:column;gap:10px;}
+.l-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;position:relative;overflow:hidden;}
+.l-card::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;}
+.l-card.coleta::before{background:var(--orange);}
+.l-card.entrega::before{background:var(--accent);}
+.l-card.enviado{opacity:.5;}
+.l-card.enviado::before{background:var(--green);}
+.lc-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px;}
+.lc-code{font-family:var(--fm);font-size:11px;color:var(--orange);font-weight:500;}
+.lc-name{font-size:13px;font-weight:600;margin-top:1px;}
+.lc-desc{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5;}
+.lc-end{font-family:var(--fm);font-size:11px;color:var(--text);margin-top:6px;padding:6px 10px;background:var(--surface2);border-radius:6px;border-left:2px solid var(--accent);}
+.lc-end.missing{color:var(--red);border-left-color:var(--red);background:rgba(239,68,68,.05);}
+.lc-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+.lbtn{font-family:var(--fm);font-size:10px;font-weight:600;padding:5px 12px;border-radius:6px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.lbtn-edit{background:var(--surface2);border:1px solid var(--border);color:var(--muted);}
+.lbtn-edit:hover{border-color:var(--accent);color:var(--accent);}
+.lbtn-del{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.lbtn-del:hover{border-color:var(--red);color:var(--red);}
+.sbadge{font-family:var(--fm);font-size:9px;font-weight:600;padding:2px 8px;border-radius:20px;text-transform:uppercase;}
+.sbadge.pendente{background:rgba(245,200,0,.1);color:#f5c800;}
+.sbadge.sem-end{background:rgba(239,68,68,.1);color:var(--red);}
+.sbadge.enviado{background:rgba(34,197,94,.12);color:var(--green);}
+.sbadge.erro{background:rgba(239,68,68,.12);color:var(--red);}
+.l-card.erro-lala{border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.03);}
+.erro-msg{font-family:var(--fm);font-size:10px;color:var(--red);margin-top:5px;padding:6px 10px;background:rgba(239,68,68,.08);border-radius:6px;border-left:2px solid var(--red);}
+
+/* EMPTY */
+.empty{padding:48px;text-align:center;font-family:var(--fm);font-size:11px;color:var(--dim);}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:400;opacity:0;pointer-events:none;transition:opacity .2s;backdrop-filter:blur(3px);}
+.modal-overlay.open{opacity:1;pointer-events:all;}
+.modal{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--accent);border-radius:14px;padding:22px;max-width:400px;width:92%;transform:scale(.95);transition:transform .2s;}
+.modal-overlay.open .modal{transform:scale(1);}
+.modal-title{font-family:var(--fh);font-size:16px;font-weight:800;margin-bottom:4px;}
+.modal-title span{color:var(--accent);}
+.f-group{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
+.f-label{font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;}
+.f-input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:var(--fb);font-size:13px;color:var(--text);outline:none;width:100%;transition:border .15s;}
+.f-input:focus{border-color:var(--accent);}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}
+.modal-cancel{font-family:var(--fm);font-size:11px;padding:8px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;}
+.modal-cancel:hover{color:var(--text);}
+.modal-confirm{font-family:var(--fm);font-size:11px;font-weight:600;padding:8px 16px;border-radius:7px;background:var(--accent);color:#fff;border:none;cursor:pointer;}
+.modal-confirm:hover{filter:brightness(1.1);}
+
+/* PREVIEW MODAL */
+#preview-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:500;backdrop-filter:blur(4px);}
+#preview-overlay.open{display:flex;}
+.preview-modal{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--orange);border-radius:14px;padding:22px;width:92%;max-width:560px;max-height:88vh;display:flex;flex-direction:column;gap:14px;}
+.preview-title{font-family:var(--fh);font-size:16px;font-weight:800;}
+.preview-title span{color:var(--orange);}
+.preview-batches{overflow-y:auto;display:flex;flex-direction:column;gap:12px;flex:1;}
+.batch-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.batch-header{padding:8px 12px;background:rgba(249,115,22,.12);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.batch-num{font-family:var(--fh);font-size:12px;font-weight:700;color:var(--orange);}
+.batch-tag{font-family:var(--fm);font-size:9px;color:var(--muted);background:var(--surface);padding:2px 7px;border-radius:10px;border:1px solid var(--border);}
+.batch-stops{padding:8px 12px;display:flex;flex-direction:column;gap:6px;}
+.batch-stop{display:flex;align-items:flex-start;gap:8px;font-size:11px;}
+.stop-dot{width:16px;height:16px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;margin-top:1px;}
+.stop-dot.loja{background:#22c55e;color:#000;}
+.stop-dot.cliente{background:var(--orange);color:#000;}
+.stop-info{flex:1;}
+.stop-nome{font-weight:600;color:var(--text);}
+.stop-end{color:var(--muted);font-family:var(--fm);font-size:9px;margin-top:1px;}
+.preview-footer{display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;}
+.prev-cancel{font-family:var(--fm);font-size:11px;padding:8px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;}
+.prev-confirm{font-family:var(--fm);font-size:11px;font-weight:600;padding:8px 16px;border-radius:7px;background:var(--orange);color:#000;border:none;cursor:pointer;}
+.prev-confirm:hover{filter:brightness(1.1);}
+
+/* TOAST */
+.toast{position:fixed;bottom:18px;right:18px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:11px 14px;font-family:var(--fm);font-size:11px;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;}
+.toast.show{transform:translateY(0);opacity:1;}
+
+/* ── MOBILE ────────────────────────────────────────────────── */
+@media(max-width:768px){
+  header{padding:0 12px;height:48px;}
+  .logo{font-size:13px;}
+  .hdr-right{gap:4px;}
+  .hbtn{padding:4px 8px;font-size:9px;}
+
+  .tabs-bar{padding:0 8px;overflow-x:auto;white-space:nowrap;}
+  .tab-btn{padding:10px 12px;font-size:10px;flex-shrink:0;}
+
+  .page{padding:14px 12px;}
+
+  /* Queue cards stack */
+  .queue-grid{grid-template-columns:1fr !important;}
+  .ficha-card{padding:12px;}
+
+  /* Action buttons wrap */
+  .ficha-actions{flex-wrap:wrap;gap:6px;}
+  .ficha-actions button{flex:1;min-width:80px;font-size:9px;padding:6px 8px;}
+
+  .btn-send{width:100%;margin-bottom:8px;}
+
+  /* Preview modal */
+  .preview-modal .modal{max-width:calc(100vw - 20px);margin:10px;max-height:calc(100dvh - 20px);overflow-y:auto;}
+  .prev-confirm,.prev-cancel{width:100%;}
+  .modal-actions{flex-direction:column;gap:8px;}
+
+  .batch-card{padding:12px;}
+  .batch-stop{gap:8px;}
+  .stop-nome{font-size:11px;}
+  .stop-end{font-size:10px;}
+
+  .status-bar{flex-wrap:wrap;gap:6px;}
+}
+@media(max-width:480px){
+  .tab-badge{display:none;}
+  .send-section{flex-direction:column;gap:8px;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="logo-icon">🚗</div>Reparo<span>Eletro</span> — Lalamove</div>
+  <button onclick="load()" style="font-family:var(--fm);font-size:10px;padding:5px 11px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">↻ Atualizar</button>
+  <button onclick="atualizarNomes()" style="font-family:var(--fm);font-size:10px;padding:5px 11px;border-radius:6px;border:1px solid rgba(34,197,94,.3);background:transparent;color:var(--green);cursor:pointer;" title="Busca nome do cliente no Pipefy para todas as fichas">👤 Corrigir Nomes</button>
+</header>
+
+<div class="tabs">
+  <button class="tab active" id="tab-coleta" onclick="showTab('coleta')">
+    📥 Coletas <span class="tab-badge" id="badge-coleta">0</span>
+  </button>
+  <button class="tab" id="tab-entrega" onclick="showTab('entrega')">
+    📤 Entregas <span class="tab-badge" id="badge-entrega">0</span>
+  </button>
+</div>
+
+<!-- COLETAS -->
+<div class="page active" id="page-coleta">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <span class="loja-badge">🏠 Destino: Rua Ouro Preto 663, Barro Preto</span>
+      <span class="api-badge nok" id="api-status-coleta">API não configurada</span>
+    </div>
+    <button class="btn-send" style="background:#ef4444;color:#fff;" onclick="limparFila()">
+      🗑️ Limpar Fila
+    </button>
+    <button class="btn-send" id="btn-geocod" onclick="geocodificarTudo()" style="background:var(--surface2);border:1px solid var(--border);color:var(--muted);">
+      📍 Geocodificar Endereços
+    </button>
+    <button class="btn-send coleta" id="btn-send-coleta" onclick="enviarLalamove('coleta')" disabled>
+      🚗 Enviar Coletas ao Lalamove
+    </button>
+  </div>
+  <div class="card-list" id="list-coleta"><div class="empty">Carregando...</div></div>
+</div>
+
+<!-- ENTREGAS -->
+<div class="page" id="page-entrega">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <span class="loja-badge">🏠 Origem: Rua Ouro Preto 663, Barro Preto</span>
+      <span class="api-badge nok" id="api-status-entrega">API não configurada</span>
+    </div>
+    <button class="btn-send" style="background:#ef4444;color:#fff;" onclick="limparFila()">
+      🗑️ Limpar Fila
+    </button>
+    <button class="btn-send entrega" id="btn-send-entrega" onclick="enviarLalamove('entrega')" disabled>
+      🚗 Enviar Entregas ao Lalamove
+    </button>
+  </div>
+  <div class="card-list" id="list-entrega"><div class="empty">Carregando...</div></div>
+</div>
+
+<!-- MODAL ENDEREÇO -->
+<div class="modal-overlay" id="modal-end">
+  <div class="modal">
+    <div class="modal-title">📍 Editar <span>Endereço</span></div>
+    <div class="f-group">
+      <label class="f-label">Endereço completo</label>
+      <input class="f-input" id="end-input" type="text" placeholder="Rua, número, bairro, cidade..."/>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeEndModal()">Cancelar</button>
+      <button class="modal-confirm" onclick="salvarEndereco()">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <span id="t-icon">✅</span>
+  <div><strong id="t-title"></strong><br><span id="t-body" style="color:var(--muted);font-size:10px;"></span></div>
+</div>
+
+<script>
+var fichas = [], temApiKey = false;
+var selEndId = null, selEndTipo = null;
+var curTab = "coleta";
+
+async function api(action, body) {
+  var r = await fetch("/api/tv-lalamove?action=" + action, body ? {
+    method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body),
+  } : {});
+  return r.json();
+}
+
+function showTab(tab) {
+  curTab = tab;
+  ["coleta","entrega"].forEach(function(t) {
+    document.getElementById("page-"+t).classList.toggle("active", t === tab);
+    document.getElementById("tab-"+t).classList.toggle("active", t === tab);
+  });
+}
+
+async function load() {
+  var d = await api("load");
+  if (!d.ok) return;
+  fichas    = d.fichas    || [];
+  temApiKey = d.temApiKey || false;
+
+  var apiLabel = temApiKey ? "✅ API configurada" : "⚠️ API não configurada";
+  var apiClass = temApiKey ? "ok" : "nok";
+  ["coleta","entrega"].forEach(function(t) {
+    var el = document.getElementById("api-status-"+t);
+    if (el) { el.textContent = apiLabel; el.className = "api-badge " + apiClass; }
+    var btn = document.getElementById("btn-send-"+t);
+    if (btn) btn.disabled = !temApiKey;
+  });
+
+  updateBadges();
+  renderList("coleta");
+  renderList("entrega");
+}
+
+function updateBadges() {
+  ["coleta","entrega"].forEach(function(tipo) {
+    var cnt = fichas.filter(function(f) { return f.tipo === tipo && f.status === "pendente"; }).length;
+    var el  = document.getElementById("badge-"+tipo);
+    if (el) el.textContent = cnt;
+  });
+}
+
+function renderList(tipo) {
+  var el   = document.getElementById("list-"+tipo);
+  var list = fichas.filter(function(f) { return f.tipo === tipo; });
+  if (!list.length) { el.innerHTML = '<div class="empty">Nenhuma ficha de ' + tipo + ' na fila.<br>Mova cards para <strong>' + (tipo === "coleta" ? "Coleta Solicitada" : "Entrega Solicitada") + '</strong> no dash técnico.</div>'; return; }
+  el.innerHTML = "";
+  list.forEach(function(f) { el.appendChild(buildCard(f)); });
+}
+
+function buildCard(f) {
+  var div = document.createElement("div");
+  div.className = "l-card " + f.tipo + (f.status === "enviado" ? " enviado" : "") + (f.status === "erro" ? " erro-lala" : "");
+  div.id = "lcard-" + f.pipefyId;
+
+  var head = document.createElement("div"); head.className = "lc-head";
+  var info = document.createElement("div");
+  var code = document.createElement("div"); code.className = "lc-code"; code.textContent = "#" + (f.osCode || f.pipefyId.slice(-4));
+  var name = document.createElement("div"); name.className = "lc-name"; name.textContent = f.nomeContato || "—";
+  info.appendChild(code); info.appendChild(name);
+  var badge = document.createElement("span");
+  var badgeCls = f.status === "enviado" ? "enviado" : f.status === "erro" ? "erro" : (f.endereco ? "pendente" : "sem-end");
+  badge.className = "sbadge " + badgeCls;
+  badge.textContent = f.status === "enviado" ? "enviado" : f.status === "erro" ? "⚠️ endereço inválido" : (f.endereco ? "pendente" : "sem endereço");
+  head.appendChild(info); head.appendChild(badge);
+  div.appendChild(head);
+
+  if (f.descricao) {
+    var desc = document.createElement("div"); desc.className = "lc-desc"; desc.textContent = f.descricao;
+    div.appendChild(desc);
+  }
+
+  var endEl = document.createElement("div");
+  endEl.className = "lc-end" + (f.endereco ? "" : " missing");
+  var coordIcon = f.lat && f.lng ? "✅ " : "❌ ";
+  endEl.textContent = f.endereco ? (coordIcon + f.endereco) : "⚠️ Endereço não encontrado — clique em Editar";
+  div.appendChild(endEl);
+
+  // Mensagem de erro do Lalamove
+  if (f.status === "erro" && f.erroMsg) {
+    var erroEl = document.createElement("div"); erroEl.className = "erro-msg";
+    erroEl.textContent = "❌ " + f.erroMsg;
+    div.appendChild(erroEl);
+    // Botão retentar após corrigir endereço
+    var retryBtn = document.createElement("button");
+    retryBtn.className = "lbtn"; retryBtn.style.cssText = "color:var(--red);border-color:rgba(239,68,68,.3);margin-top:4px;font-weight:700;";
+    retryBtn.textContent = "🔄 Retentar após corrigir";
+    retryBtn.onclick = (function(id, tp) { return function() { retentarFicha(id, tp); }; })(f.pipefyId, f.tipo);
+    div.appendChild(retryBtn);
+  }
+
+  // Botão geocodificar individual (só se tem endereço mas sem coords)
+  if (f.endereco && (!f.lat || !f.lng) && f.status !== "enviado") {
+    var geocBtn = document.createElement("button");
+    geocBtn.className = "lbtn"; geocBtn.style.cssText = "color:#f59e0b;border-color:rgba(245,158,11,.3);margin-top:4px;";
+    geocBtn.textContent = "📍 Geocodificar endereço";
+    var fid = f.pipefyId || f.id;
+    geocBtn.onclick = (function(id){ return function(){ geocodificarFicha(id); }; })(fid);
+    div.appendChild(geocBtn);
+  }
+
+  if (f.status !== "enviado") {
+    var acts = document.createElement("div"); acts.className = "lc-actions";
+    var editBtn = document.createElement("button"); editBtn.className = "lbtn lbtn-edit"; editBtn.textContent = "✏️ Editar endereço";
+    editBtn.setAttribute("data-id", f.pipefyId); editBtn.setAttribute("data-tipo", f.tipo); editBtn.setAttribute("data-end", f.endereco || "");
+    editBtn.onclick = function() { openEndModal(this.getAttribute("data-id"), this.getAttribute("data-tipo"), this.getAttribute("data-end")); };
+    var delBtn = document.createElement("button"); delBtn.className = "lbtn lbtn-del"; delBtn.textContent = "✕ Remover";
+    delBtn.setAttribute("data-id", f.pipefyId); delBtn.setAttribute("data-tipo", f.tipo);
+    delBtn.onclick = function() { remover(this.getAttribute("data-id"), this.getAttribute("data-tipo")); };
+    acts.appendChild(editBtn); acts.appendChild(delBtn);
+    div.appendChild(acts);
+  }
+  return div;
+}
+
+// ── MODAL ENDEREÇO ─────────────────────────────────────────────
+function openEndModal(pipefyId, tipo, endAtual) {
+  selEndId = pipefyId; selEndTipo = tipo;
+  document.getElementById("end-input").value = endAtual || "";
+  document.getElementById("modal-end").classList.add("open");
+  setTimeout(function() { document.getElementById("end-input").focus(); }, 200);
+}
+function closeEndModal() { document.getElementById("modal-end").classList.remove("open"); }
+async function retentarFicha(pipefyId, tipo) {
+  // Reseta status para pendente para poder reenviar após corrigir
+  var d = await api("reset-erro", { pipefyId, tipo });
+  if (d.ok) {
+    var f = fichas.find(function(x) { return x.pipefyId === pipefyId && x.tipo === tipo; });
+    if (f) { f.status = "pendente"; f.erroMsg = null; }
+    renderList(tipo);
+    showToast("🔄", "Ficha reativada", "Corrija o endereço e tente enviar novamente");
+  } else showToast("❌", "Erro", d.error);
+}
+
+async function salvarEndereco() {
+  var end = document.getElementById("end-input").value.trim();
+  if (!end) return;
+  var d = await api("update-endereco", { pipefyId: selEndId, tipo: selEndTipo, endereco: end });
+  if (d.ok) {
+    var f = fichas.find(function(x) { return x.pipefyId === selEndId && x.tipo === selEndTipo; });
+    if (f) f.endereco = end;
+    closeEndModal(); renderList(selEndTipo);
+    showToast("📍", "Endereço salvo!", end.substring(0, 50));
+  } else showToast("❌", "Erro", d.error);
+}
+
+// ── REMOVER ────────────────────────────────────────────────────
+async function remover(pipefyId, tipo) {
+  if (!confirm("Remover da fila?")) return;
+  var d = await api("remover", { pipefyId, tipo });
+  if (d.ok) {
+    fichas = fichas.filter(function(f) { return !(f.pipefyId === pipefyId && f.tipo === tipo); });
+    updateBadges(); renderList(tipo);
+    showToast("🗑️", "Removido", "");
+  }
+}
+
+// ── LIMPAR FILA ────────────────────────────────────────────────
+async function limparFila() {
+  if (!confirm("Limpar toda a fila? Esta ação não pode ser desfeita.")) return;
+  var d = await fetch('/api/tv-lalamove?action=limpar-tudo').then(r=>r.json());
+  if (d.ok) {
+    fichas = [];
+    updateBadges();
+    renderList("coleta");
+    renderList("entrega");
+    showToast("🗑️","Fila limpa!","");
+  }
+}
+
+// ── PREVIEW + ENVIAR AO LALAMOVE ──────────────────────────────
+var previewTipo = null;
+var previewPendentes = [];
+
+function enviarLalamove(tipo) {
+  var pendentes = fichas.filter(function(f) { return f.tipo === tipo && f.status === "pendente"; });
+  if (!pendentes.length) { showToast("⚠️","Fila vazia","Não há fichas pendentes"); return; }
+  var semEnd = pendentes.filter(function(f) { return !f.endereco; });
+  if (semEnd.length) { showToast("⚠️","Endereços faltando", semEnd.length + " ficha(s) sem endereço"); return; }
+  var semCoords = pendentes.filter(function(f) { return !f.lat || !f.lng; });
+  if (semCoords.length) { showToast("❌","Coordenadas faltando", semCoords.length + " ficha(s) sem GPS — geocodifique primeiro"); return; }
+
+  // Uma única corrida com todas as paradas
+  previewTipo = tipo;
+  previewPendentes = pendentes;
+
+  var total    = pendentes.length;
+  var isColeta = tipo === "coleta";
+
+  document.getElementById("preview-tipo-label").textContent = isColeta ? "Coletas" : "Entregas";
+  document.getElementById("preview-summary").textContent =
+    total + " parada(s) → 1 corrida · Rota otimizada ativada";
+
+  // Monta preview da única corrida
+  var stops = isColeta
+    ? pendentes.concat([{nomeContato: "Reparo Eletro (loja)", endereco: "Rua Ouro Preto, 663, Barro Preto, BH", isLoja: true}])
+    : [{nomeContato: "Reparo Eletro (loja)", endereco: "Rua Ouro Preto, 663, Barro Preto, BH", isLoja: true}].concat(pendentes);
+
+  var stopsHtml = stops.map(function(s, si) {
+    var dotClass = s.isLoja ? "loja" : "cliente";
+    var dotLabel = s.isLoja ? "L" : si + (isColeta ? 1 : 0);
+    // Nome limpo: remove descrição do título se vier com ela
+    var nomeClean = s.isLoja ? s.nomeContato : (s.nomeContato || "Cliente").split(/\s*[—–|]\s*/)[0].trim();
+    // Nome + telefone no padrão Lalamove
+    var nomeLala = s.isLoja
+      ? nomeClean
+      : nomeClean + (s.telefone ? " " + s.telefone : "");
+    // Extrai complemento do endereço
+    var comp = "";
+    if (!s.isLoja && s.endereco) {
+      var cm = s.endereco.match(/,?\s*[-–]?\s*((ap(to)?\.?\s*\d+[\w]*|apartamento\s*\d+[\w]*|bloco\s*[\w]+|sala\s*[\w]+|loja\s*[\w]+|andar\s*[\w]+))/i);
+      if (cm) comp = cm[1].trim();
+    }
+    return "<div class='batch-stop'>" +
+      "<div class='stop-dot " + dotClass + "'>" + dotLabel + "</div>" +
+      "<div class='stop-info'>" +
+        "<div class='stop-nome'>" + nomeLala + "</div>" +
+        "<div class='stop-end'>" + (s.endereco || "Sem endereço") + "</div>" +
+        (comp ? "<div style='font-family:var(--fm);font-size:9px;color:var(--accent);margin-top:2px'>📍 " + comp + "</div>" : "") +
+      "</div>" +
+    "</div>";
+  }).join("");
+
+  var container = document.getElementById("preview-batches");
+  container.innerHTML = "";
+  var card = document.createElement("div");
+  card.className = "batch-card";
+  card.innerHTML =
+    "<div class='batch-header'>" +
+      "<span class='batch-num'>1 Corrida</span>" +
+      "<span class='batch-tag'>" + total + " parada(s) · Rota otimizada</span>" +
+    "</div>" +
+    "<div class='batch-stops'>" + stopsHtml + "</div>";
+  container.appendChild(card);
+
+  document.getElementById("preview-overlay").classList.add("open");
+}
+
+function fecharPreview() {
+  document.getElementById("preview-overlay").classList.remove("open");
+}
+
+async function confirmarEnvio() {
+  var btn = document.getElementById("btn-confirmar-envio");
+  btn.disabled = true; btn.textContent = "⏳ Enviando...";
+
+  // Envia todas as fichas em uma única chamada
+  var loteIds = previewPendentes.map(function(f) { return f.pipefyId; });
+  var d = await api("enviar-lote", { tipo: previewTipo, loteIds: loteIds });
+
+  btn.disabled = false; btn.textContent = "🚗 Confirmar e Enviar";
+  fecharPreview();
+
+  if (d.ok) {
+    showToast("🚗", "Corrida enviada!", d.count + " parada(s) — Pedido: " + d.orderId);
+  } else if (d.erros && d.erros.length) {
+    showToast("⚠️", d.erros.length + " ficha(s) com erro marcadas", "Corrija os endereços e tente novamente");
+  } else {
+    showToast("❌", "Erro", d.error || "Verifique os endereços e tente novamente");
+  }
+  await load();
+}
+
+// ── TOAST ──────────────────────────────────────────────────────
+async function atualizarNomes() {
+  showToast("👤", "Buscando nomes...", "Consultando Pipefy");
+  var r = await fetch("/api/tv-lalamove?action=atualizar-nomes").then(r=>r.json()).catch(()=>({ok:false}));
+  if (r.ok) {
+    showToast("✅", r.updated + " nome(s) corrigido(s)", "de " + r.total + " ficha(s)");
+    await load();
+  } else {
+    showToast("❌", "Erro", r.error || "Falha ao buscar nomes");
+  }
+}
+function showToast(icon, title, msg) {
+  document.getElementById("t-icon").textContent  = icon;
+  document.getElementById("t-title").textContent = title;
+  document.getElementById("t-body").textContent  = msg;
+  var t = document.getElementById("toast");
+  t.classList.add("show"); setTimeout(function() { t.classList.remove("show"); }, 5000);
+}
+
+// Sincroniza fila do Pipefy (Coleta/Entrega Solicitada)
+// Geocoding inteligente — tenta múltiplas estratégias
+async function nominatimGeocode(endereco) {
+  // Estratégias em ordem de tolerância
+  var tentativas = buildTentativas(endereco);
+  for (var i = 0; i < tentativas.length; i++) {
+    try {
+      var q = encodeURIComponent(tentativas[i]);
+      var r = await fetch("https://nominatim.openstreetmap.org/search?q=" + q + "&format=json&limit=1&countrycodes=br", {
+        headers: {"Accept-Language": "pt-BR"}
+      });
+      var j = await r.json();
+      if (j && j[0]) return { lat: parseFloat(j[0].lat), lng: parseFloat(j[0].lon) };
+      if (i < tentativas.length - 1) await new Promise(function(r){ setTimeout(r, 1100); });
+    } catch(e) {}
+  }
+  return null;
+}
+
+function buildTentativas(end) {
+  // Limpa o endereço
+  var limpo = end
+    .replace(/apto?\s*[:\-]?\s*\d+/gi, '')
+    .replace(/ap\s*[:\-]?\s*\d+/gi, '')
+    .replace(/bloco?\s*[:\-]?\s*[\w]+/gi, '')
+    .replace(/blc?\s*[:\-]?\s*[\w]+/gi, '')
+    .replace(/complemento[^,]*/gi, '')
+    .replace(/,\s*,/g, ',').trim();
+
+  // Extrai CEP se houver
+  var cep = end.match(/\b(\d{5}[-\s]?\d{3})\b/);
+  
+  var tentativas = [];
+  
+  // 1. Endereço limpo + BH
+  tentativas.push(limpo + ", Belo Horizonte, MG, Brasil");
+  
+  // 2. CEP direto (mais preciso)
+  if (cep) tentativas.push(cep[1].replace(/\s/g,'') + ", Brasil");
+  
+  // 3. Só rua + número + BH (remove bairro e complementos)
+  var ruaNum = end.match(/^([^,]+,\s*\d+)/);
+  if (ruaNum) tentativas.push(ruaNum[1] + ", Belo Horizonte, MG, Brasil");
+  
+  // 4. Original + BH
+  if (end !== limpo) tentativas.push(end + ", Belo Horizonte, MG, Brasil");
+  
+  // Remove duplicatas
+  return tentativas.filter(function(t, i, a) { return a.indexOf(t) === i; });
+}
+
+async function geocodificarTudo() {
+  var semCoords = fichas.filter(function(f) { return f.status === "pendente" && f.endereco && (!f.lat || !f.lng); });
+  if (!semCoords.length) { showToast("✅","Tudo geocodificado","Todas as fichas já têm coordenadas"); return; }
+  var btn = document.getElementById("btn-geocod");
+  btn.disabled = true;
+  var ok_count = 0, fail_count = 0;
+
+  for (var i = 0; i < semCoords.length; i++) {
+    btn.textContent = "⏳ " + (i+1) + "/" + semCoords.length + "...";
+    var f = semCoords[i];
+    var coords = await nominatimGeocode(f.endereco);
+    if (coords) {
+      // Salva coords no servidor
+      await api("set-coords", { id: f.pipefyId || f.id, lat: coords.lat, lng: coords.lng });
+      f.lat = coords.lat; f.lng = coords.lng;
+      ok_count++;
+    } else {
+      fail_count++;
+    }
+    // Respeita rate limit Nominatim: 1 req/s
+    await new Promise(function(r) { setTimeout(r, 1100); });
+  }
+
+  btn.disabled = false;
+  btn.textContent = "📍 Geocodificar Endereços";
+  showToast("📍", ok_count + " geocodificado(s)", fail_count > 0 ? fail_count + " endereço(s) não encontrado(s)" : "");
+  render();
+}
+
+async function geocodificarFicha(id) {
+  var f = fichas.find(function(x) { return (x.pipefyId||x.id) === id; });
+  if (!f || !f.endereco) { showToast("❌","Sem endereço",""); return; }
+  var coords = await nominatimGeocode(f.endereco);
+  if (!coords) { showToast("❌","Não encontrado","Tente editar o endereço com CEP ou bairro"); return; }
+  await api("set-coords", { id: id, lat: coords.lat, lng: coords.lng });
+  f.lat = coords.lat; f.lng = coords.lng;
+  showToast("📍","Geocodificado!","");
+  render();
+}
+
+async function syncPipefy() {
+  try {
+    var d = await fetch('/api/board?action=sync-lalamove').then(r=>r.json());
+    if (d.changed) await load(); // Recarrega se houve mudanças
+  } catch(e) {}
+}
+
+load();
+syncPipefy(); // Sync imediato ao abrir
+setInterval(load, 30000);
+setInterval(syncPipefy, 60000); // Verifica Pipefy a cada 1 min
+</script>
+<!-- PREVIEW MODAL -->
+<div id="preview-overlay">
+  <div class="preview-modal">
+    <div class="preview-title">Pré-visualização — <span id="preview-tipo-label">Coletas</span></div>
+    <div id="preview-summary" style="font-family:var(--fm);font-size:10px;color:var(--muted);"></div>
+    <div class="preview-batches" id="preview-batches"></div>
+    <div class="preview-footer">
+      <button class="prev-cancel" onclick="fecharPreview()">Cancelar</button>
+      <button class="prev-confirm" id="btn-confirmar-envio" onclick="confirmarEnvio()">🚗 Confirmar e Enviar</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
