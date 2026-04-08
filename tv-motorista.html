@@ -2,219 +2,353 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>📺 Rota de Coleta — TV Assistência</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>TV — Motorista</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#07080a;--surface:#0f1114;--surface2:#181b1f;--border:#1e2228;
-  --text:#f0f2f5;--muted:#5a6270;
-  --accent:#f97316;--green:#22c55e;--red:#ef4444;--blue:#3b9eff;
-  --fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+  --bg:#03060e;--surface:#080d18;--surface2:#0d1425;--border:#1a2540;
+  --text:#dce8f8;--muted:#4a607a;
+  --accent:#3b9eff;--green:#10d982;--red:#f04060;--yellow:#f5c800;--orange:#f97316;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
 }
-*{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;padding-bottom:40px;}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:52px;
+  border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--fh);font-size:14px;font-weight:900;display:flex;align-items:center;gap:8px;}
+.logo-dot{width:8px;height:8px;background:var(--green);border-radius:50%;box-shadow:0 0 8px var(--green);}
+.logo span{color:var(--green);}
+.sync-btn{font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;}
+.sync-btn:hover{color:var(--text);border-color:var(--accent);}
 
-.header{background:var(--surface);border-bottom:2px solid var(--accent);padding:14px 20px;
-  display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50;}
-.header-icon{font-size:22px;}
-.header-title{font-size:16px;font-weight:700;}
-.header-sub{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:1px;}
-.header-date{font-family:var(--fm);font-size:10px;color:var(--accent);margin-left:auto;}
+.main{padding:16px;}
+.page-title{font-family:var(--fh);font-size:18px;font-weight:900;margin-bottom:4px;}
+.page-title span{color:var(--green);}
+.page-sub{font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:20px;}
 
-.stats{display:flex;gap:10px;padding:14px 16px;overflow-x:auto;}
-.stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;
-  padding:10px 16px;min-width:100px;text-align:center;flex-shrink:0;}
-.stat-num{font-family:var(--fm);font-size:22px;font-weight:700;line-height:1;}
-.stat-lbl{font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:3px;text-transform:uppercase;}
+/* ROTA CARD */
+.rota-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px;}
+.rota-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;transition:background .15s;}
+.rota-head:active{background:rgba(59,158,255,.05);}
+.rota-head-info{display:flex;align-items:center;gap:10px;}
+.rota-num{font-family:var(--fh);font-size:20px;font-weight:900;color:var(--accent);}
+.rota-meta{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px;}
+.rota-prog{font-family:var(--fm);font-size:10px;padding:3px 10px;border-radius:99px;}
+.prog-and{background:rgba(249,115,22,.1);color:var(--orange);border:1px solid rgba(249,115,22,.3);}
+.prog-ok{background:rgba(16,217,130,.1);color:var(--green);border:1px solid rgba(16,217,130,.3);}
+.rota-chev{font-size:14px;color:var(--muted);transition:transform .2s;}
+.rota-chev.open{transform:rotate(90deg);}
+.rota-body{display:none;border-top:1px solid var(--border);}
+.rota-body.open{display:block;}
 
-.list{padding:10px 16px;display:flex;flex-direction:column;gap:10px;}
+/* CARDS DA ROTA */
+.cards-list{}
+.m-card{border-bottom:1px solid var(--border);padding:14px 16px;}
+.m-card:last-child{border-bottom:none;}
+.m-card.coletado{opacity:.45;}
+.m-card.destino{background:rgba(59,158,255,.04);opacity:.6;}
+.m-card-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;}
+.m-card-info{flex:1;}
+.m-nome{font-size:14px;font-weight:600;color:#fff;margin-bottom:3px;}
+.m-end{font-size:12px;color:var(--muted);margin-bottom:2px;}
+.m-os{font-family:var(--fm);font-size:10px;color:var(--muted);}
+.m-status{font-family:var(--fm);font-size:9px;padding:3px 10px;border-radius:99px;}
+.ms-pend{background:rgba(249,115,22,.1);color:var(--orange);border:1px solid rgba(249,115,22,.3);}
+.ms-col{background:rgba(16,217,130,.1);color:var(--green);border:1px solid rgba(16,217,130,.3);}
+.ms-dest{background:rgba(59,158,255,.1);color:var(--accent);border:1px solid rgba(59,158,255,.2);}
 
-.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .2s;}
-.card.coletada{opacity:.6;border-left:4px solid var(--green);}
-.card-header{padding:14px 16px;display:flex;align-items:center;gap:12px;}
-.card-num{width:30px;height:30px;border-radius:50%;background:var(--accent);
-  color:#000;font-family:var(--fm);font-size:12px;font-weight:700;
-  display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.card.coletada .card-num{background:var(--green);}
-.card-info{flex:1;}
-.card-nome{font-size:14px;font-weight:600;}
-.card-end{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.4;}
-.card-tel{font-family:var(--fm);font-size:11px;color:var(--muted);margin-top:4px;}
-.card-status{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:20px;flex-shrink:0;}
-.card-status.pendente{background:rgba(249,115,22,.1);color:var(--accent);border:1px solid rgba(249,115,22,.2);}
-.card-status.coletada{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2);}
+.m-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
+.m-btn{font-family:var(--fb);font-size:12px;font-weight:600;padding:12px 10px;border-radius:10px;border:none;cursor:pointer;transition:all .2s;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:6px;}
+.m-btn.wpp{background:rgba(37,211,102,.15);color:#25d366;border:1px solid rgba(37,211,102,.3);}
+.m-btn.maps{background:rgba(59,158,255,.15);color:var(--accent);border:1px solid rgba(59,158,255,.3);}
+.m-btn.rel{background:rgba(245,200,0,.15);color:var(--yellow);border:1px solid rgba(245,200,0,.3);}
+.m-btn.coletado{background:var(--green);color:#000;font-weight:800;grid-column:1/-1;}
+.m-btn:active{filter:brightness(0.85);}
 
-.card-actions{padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:8px;}
-.btn{font-family:var(--fm);font-size:11px;font-weight:600;padding:10px 16px;border-radius:8px;
-  border:none;cursor:pointer;transition:all .15s;flex:1;text-align:center;text-decoration:none;display:inline-block;}
-.btn.confirmar{background:var(--green);color:#000;}
-.btn.confirmar:hover:not(:disabled){filter:brightness(1.1);}
-.btn.confirmar:disabled{background:var(--surface2);color:var(--muted);cursor:not-allowed;}
-.btn.maps{background:var(--blue);color:#fff;}
-.btn.maps:hover{filter:brightness(1.1);}
-.btn.wapp{background:#25d366;color:#fff;}
+/* SEÇÃO COLETADOS */
+.coletados-sec{background:rgba(16,217,130,.04);border-top:1px solid rgba(16,217,130,.1);padding:12px 16px;}
+.coletados-title{font-family:var(--fm);font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;}
 
-.coletado-badge{padding:8px 16px;border-top:1px solid var(--border);
-  font-family:var(--fm);font-size:11px;color:var(--green);text-align:center;}
+/* MODAL RELATÓRIO */
+.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;flex-direction:column;overflow-y:auto;}
+.ov.open{display:flex;}
+.modal{background:var(--surface);margin:auto;width:100%;max-width:480px;border-radius:14px 14px 0 0;padding:20px;margin-top:auto;max-height:90vh;overflow-y:auto;}
+.modal-title{font-family:var(--fh);font-size:16px;font-weight:800;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;}
+.modal-close{background:transparent;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px;}
+.modal-section{margin-bottom:16px;}
+.modal-label{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;}
+.modal-textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-family:var(--fb);font-size:13px;color:var(--text);resize:none;outline:none;min-height:80px;}
+.modal-textarea:focus{border-color:var(--accent);}
+.photo-area{background:var(--surface2);border:1px dashed var(--border);border-radius:8px;padding:20px;text-align:center;cursor:pointer;font-family:var(--fm);font-size:11px;color:var(--muted);}
+.photo-preview{max-width:100%;border-radius:8px;margin-top:8px;}
+.sig-canvas{width:100%;height:160px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;cursor:crosshair;touch-action:none;}
+.modal-actions{display:flex;gap:8px;margin-top:16px;}
+.modal-btn{flex:1;font-family:var(--fm);font-size:11px;font-weight:700;padding:10px;border-radius:8px;border:none;cursor:pointer;}
+.modal-btn.cancel{background:var(--surface2);color:var(--muted);}
+.modal-btn.save{background:var(--green);color:#000;}
+.file-input{display:none;}
 
-.loading{display:flex;align-items:center;justify-content:center;min-height:200px;
-  gap:10px;font-family:var(--fm);font-size:11px;color:var(--muted);}
-.spinner{width:18px;height:18px;border:2px solid #2a2f38;border-top-color:var(--accent);
-  border-radius:50%;animation:spin 1s linear infinite;}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-.empty{text-align:center;padding:60px 20px;font-family:var(--fm);font-size:11px;color:var(--muted);}
-.empty-icon{font-size:40px;margin-bottom:12px;opacity:.4;}
-
-.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(80px);
-  background:var(--green);color:#000;border-radius:30px;padding:10px 20px;
-  font-family:var(--fm);font-size:12px;font-weight:700;opacity:0;
-  transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;white-space:nowrap;}
+.empty-rotas{font-family:var(--fm);font-size:11px;color:var(--muted);padding:30px;text-align:center;border:1px dashed var(--border);border-radius:10px;}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--green);border-radius:10px;padding:10px 20px;font-family:var(--fm);font-size:11px;opacity:0;transition:all .3s;z-index:9999;white-space:nowrap;}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
 </style>
 </head>
 <body>
+<header>
+  <div class="logo"><div class="logo-dot"></div>TV <span>Motorista</span></div>
+  <button class="sync-btn" onclick="loadRotas()">↻ Sync</button>
+</header>
 
-<div class="header">
-  <div class="header-icon">🚚</div>
-  <div>
-    <div class="header-title">Rota de Coleta</div>
-    <div class="header-sub">TV Assistência — confirme cada coleta</div>
+<div class="main">
+  <div class="page-title">Painel do <span>Motorista</span></div>
+  <div class="page-sub">// Suas rotas de coleta ativas</div>
+  <div id="rotas-container"></div>
+</div>
+
+<!-- MODAL RELATÓRIO -->
+<div class="ov" id="modal-rel">
+  <div class="modal">
+    <div class="modal-title">
+      📋 Relatório de Coleta
+      <button class="modal-close" onclick="fecharRel()">✕</button>
+    </div>
+    <div class="modal-section">
+      <div class="modal-label">Foto do equipamento</div>
+      <div class="photo-area" onclick="document.getElementById('photo-input').click()">
+        📷 Toque para tirar foto ou selecionar
+      </div>
+      <input type="file" id="photo-input" accept="image/*" capture="environment" class="file-input" onchange="previewPhoto(this)"/>
+      <img id="photo-preview" class="photo-preview" style="display:none"/>
+    </div>
+    <div class="modal-section">
+      <div class="modal-label">Descrição / Observação</div>
+      <textarea class="modal-textarea" id="rel-desc" placeholder="Descreva o estado do equipamento, condições da coleta..."></textarea>
+    </div>
+    <div class="modal-section">
+      <div class="modal-label">Assinatura do cliente</div>
+      <canvas class="sig-canvas" id="sig-canvas"></canvas>
+      <div style="margin-top:6px;display:flex;gap:8px;">
+        <button onclick="limparAssinatura()" style="font-family:var(--fm);font-size:9px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">Limpar</button>
+        <span style="font-family:var(--fm);font-size:9px;color:var(--muted);">Peça ao cliente que assine acima</span>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="fecharRel()">Cancelar</button>
+      <button class="modal-btn save" onclick="salvarRel()">✅ Salvar Relatório</button>
+    </div>
   </div>
-  <div class="header-date" id="header-date">—</div>
-</div>
-
-<div class="stats" id="stats">
-  <div class="stat"><div class="stat-num" id="stat-total">—</div><div class="stat-lbl">Total</div></div>
-  <div class="stat"><div class="stat-num" style="color:var(--accent)" id="stat-pend">—</div><div class="stat-lbl">Pendentes</div></div>
-  <div class="stat"><div class="stat-num" style="color:var(--green)" id="stat-done">—</div><div class="stat-lbl">Coletadas</div></div>
-</div>
-
-<div id="list-container" class="list">
-  <div class="loading"><div class="spinner"></div>Carregando rota...</div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-var rota = [];
-
-async function load() {
-  try {
-    var r = await fetch('/api/tv-coleta?action=motorista').then(function(r){return r.json();});
-    if (!r.ok) { showError(r.error); return; }
-    rota = r.rota || [];
-    document.getElementById('header-date').textContent = r.data || '';
-    render();
-  } catch(e) { showError(e.message); }
-}
-
-// Carrega status coletados do localStorage (persiste no aparelho do motorista)
-function getColetados() {
-  try { return JSON.parse(localStorage.getItem('tv_coletados') || '{}'); } catch(e) { return {}; }
-}
-function saveColetado(id) {
-  var c = getColetados(); c[id] = new Date().toISOString();
-  try { localStorage.setItem('tv_coletados', JSON.stringify(c)); } catch(e) {}
-}
-
-function render() {
-  var coletados = getColetados();
-  var total = rota.length;
-  var done  = rota.filter(function(f){ return coletados[f.pipefyId]; }).length;
-  var pend  = total - done;
-  document.getElementById('stat-total').textContent = total;
-  document.getElementById('stat-pend').textContent  = pend;
-  document.getElementById('stat-done').textContent  = done;
-
-  var el = document.getElementById('list-container');
-  if (!total) {
-    el.innerHTML = '<div class="empty"><div class="empty-icon">✅</div>Nenhuma coleta na fila hoje!</div>';
-    return;
-  }
-
-  el.innerHTML = '';
-  rota.forEach(function(f, i) {
-    var isColetada = !!coletados[f.pipefyId];
-    var card = document.createElement('div');
-    card.className = 'card' + (isColetada ? ' coletada' : '');
-    card.id = 'card-'+f.pipefyId;
-
-    // Monta link Google Maps
-    var mapsUrl = f.endereco
-      ? 'https://maps.google.com/?q=' + encodeURIComponent(f.endereco)
-      : null;
-
-    // WhatsApp
-    var waUrl = null;
-    if (f.telefone) {
-      var tel = f.telefone.replace(/\D/g,'');
-      if (tel.slice(0,2)==='55' && tel.length>=12) tel=tel.slice(2);
-      if (tel.length===10) tel=tel.slice(0,2)+'9'+tel.slice(2);
-      if (tel) waUrl = 'https://wa.me/55'+tel;
-    }
-
-    var hora = coletados[f.pipefyId] ? ' às '+new Date(coletados[f.pipefyId]).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
-
-    card.innerHTML =
-      '<div class="card-header">' +
-        '<div class="card-num">' + (isColetada ? '✓' : (i+1)) + '</div>' +
-        '<div class="card-info">' +
-          '<div class="card-nome">' + (f.nomeContato||'—') + '</div>' +
-          '<div class="card-end">' + (f.endereco||'Sem endereço') + '</div>' +
-          (f.telefone ? '<div class="card-tel">📱 '+f.telefone+'</div>' : '') +
-        '</div>' +
-        '<span class="card-status '+(isColetada?'coletada':'pendente')+'">'+(isColetada?'✅ Coletada':'⏳ Pendente')+'</span>' +
-      '</div>' +
-      (isColetada
-        ? '<div class="coletado-badge">✅ Coletado'+hora+'</div>'
-        : '<div class="card-actions">' +
-            '<button class="btn confirmar" onclick="confirmar(\''+f.pipefyId+'\')">✅ Confirmar Coleta</button>' +
-            (mapsUrl ? '<a class="btn maps" href="'+mapsUrl+'" target="_blank">🗺 Maps</a>' : '') +
-            (waUrl   ? '<a class="btn wapp" href="'+waUrl+'" target="_blank">💬</a>'        : '') +
-          '</div>'
-      );
-
-    el.appendChild(card);
-  });
-}
-
-async function confirmar(pipefyId) {
-  var btn = document.querySelector('#card-'+pipefyId+' .btn.confirmar');
-  if (btn) { btn.disabled=true; btn.textContent='...'; }
-
-  // Salva localmente imediatamente (UX offline)
-  saveColetado(pipefyId);
-  render();
-  showToast('✅ Coleta confirmada!');
-
-  // Atualiza no servidor em background
-  try {
-    await fetch('/api/tv-coleta?action=marcar-coletado', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({pipefyId})
-    });
-  } catch(e) { console.error('sync error:', e); }
-}
-
-function showError(msg) {
-  document.getElementById('list-container').innerHTML =
-    '<div class="empty"><div class="empty-icon">❌</div>' + msg + '</div>';
-}
-
+var rotas = [];
+var relRotaId = null, relPipefyId = null;
+var sigDrawing = false, sigCtx = null, sigLastX = 0, sigLastY = 0;
+var photoB64 = null;
 var toastTimer;
-function showToast(msg) {
+
+function toast(msg, cor) {
   var t = document.getElementById('toast');
-  t.textContent = msg;
+  t.textContent = msg; t.style.borderTopColor = cor || 'var(--green)';
   t.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3000);
 }
 
-load();
-// Atualiza a cada 2 min
-setInterval(load, 120000);
+function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+async function api(action, body) {
+  var opts = { headers: { 'Content-Type': 'application/json' } };
+  if (body) { opts.method = 'POST'; opts.body = JSON.stringify(body); }
+  var r = await fetch('/api/tv-rotas?action=' + action, opts);
+  return r.json();
+}
+
+async function loadRotas() {
+  var d = await api('load');
+  rotas = (d.rotas || []).filter(function(r) { return r.status === 'andamento'; });
+  render();
+}
+
+function render() {
+  var el = document.getElementById('rotas-container');
+  if (!rotas.length) {
+    el.innerHTML = '<div class="empty-rotas">Nenhuma rota ativa no momento.<br>Aguarde a equipe criar uma rota de coleta.</div>';
+    return;
+  }
+  el.innerHTML = rotas.map(function(rota) {
+    var pendentes = rota.cards.filter(function(c) { return c.status === 'pendente'; });
+    var coletados = rota.cards.filter(function(c) { return c.status === 'coletado'; });
+    var total     = rota.cards.filter(function(c) { return c.status !== 'destino_final'; });
+    var progLabel = coletados.length + '/' + total.length + ' coletados';
+    var progCls   = coletados.length === total.length ? 'prog-ok' : 'prog-and';
+
+    var cardsHTML = '';
+    // Pendentes primeiro
+    pendentes.forEach(function(c) {
+      cardsHTML += buildCard(rota.id, c);
+    });
+    // Coletados em seção separada
+    if (coletados.length) {
+      cardsHTML += '<div class="coletados-sec"><div class="coletados-title">✅ Coletados (' + coletados.length + ')</div>'
+        + coletados.map(function(c) { return buildCard(rota.id, c); }).join('') + '</div>';
+    }
+    // Destino final
+    var dest = rota.cards.find(function(c) { return c.status === 'destino_final'; });
+    if (dest) {
+      cardsHTML += '<div class="m-card destino"><div class="m-card-head">'
+        + '<div class="m-card-info"><div class="m-nome">🏁 ' + escH(dest.nomeContato) + '</div><div class="m-end">📍 ' + escH(dest.endereco) + '</div></div>'
+        + '<div class="m-status ms-dest">Destino Final</div></div>'
+        + '<div class="m-actions"><a class="m-btn maps" href="https://maps.google.com/?q=' + encodeURIComponent(dest.endereco) + '" target="_blank">🗺️ Ver no Mapa</a></div>'
+        + '</div>';
+    }
+
+    return '<div class="rota-wrap" id="mwr-' + rota.id + '">'
+      + '<div class="rota-head" onclick="toggleRota(\'' + rota.id + '\')">'
+        + '<div class="rota-head-info">'
+          + '<div class="rota-num">' + escH(rota.label) + '</div>'
+          + '<div class="rota-meta">' + progLabel + ' · ' + new Date(rota.criadaEm).toLocaleDateString('pt-BR') + '</div>'
+        + '</div>'
+        + '<div style="display:flex;align-items:center;gap:10px;">'
+          + '<div class="rota-prog ' + progCls + '">' + progLabel + '</div>'
+          + '<span class="rota-chev" id="mchev-' + rota.id + '">▶</span>'
+        + '</div>'
+      + '</div>'
+      + '<div class="rota-body" id="mbody-' + rota.id + '">'
+        + '<div class="cards-list">' + cardsHTML + '</div>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function buildCard(rotaId, c) {
+  if (c.status === 'coletado') {
+    return '<div class="m-card coletado">'
+      + '<div class="m-card-head"><div class="m-card-info">'
+        + '<div class="m-nome">' + escH(c.nomeContato) + '</div>'
+        + '<div class="m-end">📍 ' + escH(c.endereco) + '</div>'
+      + '</div><div class="m-status ms-col">✅ Coletado</div></div>'
+      + '</div>';
+  }
+  var tel = (c.telefone || '').replace(/\D/g,'');
+  var wppLink = tel ? 'https://wa.me/' + tel + '?text=' + encodeURIComponent('Olá, bom dia! Sou o motorista da TV Assistência e estou a caminho do seu endereço.') : '#';
+  var mapsLink = 'https://maps.google.com/?q=' + encodeURIComponent(c.endereco || '');
+
+  return '<div class="m-card" id="mc-' + rotaId + '-' + c.pipefyId + '">'
+    + '<div class="m-card-head">'
+      + '<div class="m-card-info">'
+        + '<div class="m-nome">' + escH(c.nomeContato) + '</div>'
+        + '<div class="m-end">📍 ' + escH(c.endereco) + '</div>'
+        + (c.osCode ? '<div class="m-os">OS #' + escH(c.osCode) + '</div>' : '')
+      + '</div>'
+      + '<div class="m-status ms-pend">⏳ Pendente</div>'
+    + '</div>'
+    + '<div class="m-actions">'
+      + '<a class="m-btn wpp" href="' + wppLink + '" target="_blank">💬 Avisar Cliente</a>'
+      + '<a class="m-btn maps" href="' + mapsLink + '" target="_blank">🗺️ Ir ao Endereço</a>'
+      + '<button class="m-btn rel" onclick="abrirRel(\'' + rotaId + '\',\'' + c.pipefyId + '\')">📋 Iniciar Relatório</button>'
+      + '<button class="m-btn coletado" onclick="marcarColetado(\'' + rotaId + '\',\'' + c.pipefyId + '\')">✅ Equipamento Coletado</button>'
+    + '</div>'
+    + '</div>';
+}
+
+function toggleRota(id) {
+  var body = document.getElementById('mbody-' + id);
+  var chev = document.getElementById('mchev-' + id);
+  if (body) body.classList.toggle('open');
+  if (chev) chev.classList.toggle('open');
+}
+
+async function marcarColetado(rotaId, pipefyId) {
+  var d = await api('marcar-coletado', { rotaId, pipefyId });
+  if (d.ok) {
+    // Atualiza local
+    var rota = rotas.find(function(r) { return r.id === rotaId; });
+    if (rota) {
+      var card = rota.cards.find(function(c) { return c.pipefyId === pipefyId; });
+      if (card) { card.status = 'coletado'; card.coletadoEm = new Date().toISOString(); }
+      if (d.rota.status === 'concluida') {
+        rotas = rotas.filter(function(r) { return r.id !== rotaId; });
+        toast('🏁 Todos coletados! Rota concluída!', 'var(--green)');
+      } else {
+        toast('✅ Equipamento coletado!', 'var(--green)');
+      }
+    }
+    render();
+    // Re-open the rota
+    setTimeout(function() {
+      var body = document.getElementById('mbody-' + rotaId);
+      var chev = document.getElementById('mchev-' + rotaId);
+      if (body) body.classList.add('open');
+      if (chev) chev.classList.add('open');
+    }, 50);
+  } else { toast('Erro: ' + d.error, 'var(--red)'); }
+}
+
+// ── RELATÓRIO ──────────────────────────────────────────────────
+function abrirRel(rotaId, pipefyId) {
+  relRotaId = rotaId; relPipefyId = pipefyId;
+  photoB64 = null;
+  document.getElementById('rel-desc').value = '';
+  document.getElementById('photo-input').value = '';
+  document.getElementById('photo-preview').style.display = 'none';
+  document.getElementById('modal-rel').classList.add('open');
+  initSigCanvas();
+}
+function fecharRel() {
+  document.getElementById('modal-rel').classList.remove('open');
+  relRotaId = null; relPipefyId = null;
+}
+
+function previewPhoto(input) {
+  var file = input.files[0]; if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    photoB64 = e.target.result;
+    var prev = document.getElementById('photo-preview');
+    prev.src = photoB64; prev.style.display = 'block';
+    document.querySelector('.photo-area').textContent = '✅ Foto selecionada';
+  };
+  reader.readAsDataURL(file);
+}
+
+function initSigCanvas() {
+  var canvas = document.getElementById('sig-canvas');
+  canvas.width = canvas.offsetWidth || 400;
+  canvas.height = 160;
+  sigCtx = canvas.getContext('2d');
+  sigCtx.fillStyle = 'var(--surface2)'; sigCtx.fillRect(0,0,canvas.width,canvas.height);
+  sigCtx.strokeStyle = '#dce8f8'; sigCtx.lineWidth = 2; sigCtx.lineCap = 'round';
+  canvas.addEventListener('mousedown',  sigStart); canvas.addEventListener('mousemove', sigMove); canvas.addEventListener('mouseup', sigEnd);
+  canvas.addEventListener('touchstart', sigStart, {passive:false}); canvas.addEventListener('touchmove', sigMove, {passive:false}); canvas.addEventListener('touchend', sigEnd);
+}
+function sigPos(e, canvas) {
+  var r = canvas.getBoundingClientRect();
+  var t = e.touches ? e.touches[0] : e;
+  return { x: t.clientX - r.left, y: t.clientY - r.top };
+}
+function sigStart(e) { e.preventDefault(); sigDrawing = true; var p = sigPos(e, this); sigLastX = p.x; sigLastY = p.y; }
+function sigMove(e) {
+  if (!sigDrawing) return; e.preventDefault();
+  var p = sigPos(e, this);
+  sigCtx.beginPath(); sigCtx.moveTo(sigLastX, sigLastY); sigCtx.lineTo(p.x, p.y); sigCtx.stroke();
+  sigLastX = p.x; sigLastY = p.y;
+}
+function sigEnd(e) { sigDrawing = false; }
+function limparAssinatura() { if (sigCtx) { var c = document.getElementById('sig-canvas'); sigCtx.fillStyle='var(--surface2)'; sigCtx.fillRect(0,0,c.width,c.height); } }
+
+async function salvarRel() {
+  var desc = document.getElementById('rel-desc').value.trim();
+  var sig  = document.getElementById('sig-canvas').toDataURL('image/png');
+  var d = await api('salvar-relatorio', { rotaId: relRotaId, pipefyId: relPipefyId, foto: photoB64, descricao: desc, assinatura: sig });
+  if (d.ok) { fecharRel(); toast('📋 Relatório salvo!', 'var(--green)'); }
+  else toast('Erro: ' + d.error, 'var(--red)');
+}
+
+loadRotas();
+setInterval(loadRotas, 30000);
 </script>
 </body>
 </html>
