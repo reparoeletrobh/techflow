@@ -2,6 +2,7 @@
 const PIPE_ID   = "306904889";
 const BOARD_KEY = "tv_board";
 const LOGS_KEY  = "tv_logs";
+const LIBERADO_ROTA_PHASE_ID = "341638193"; // "Liberado para Rota"
 const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g,"").trim();
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g,"").trim();
 const PIPEFY_API    = "https://api.pipefy.com/graphql";
@@ -453,13 +454,10 @@ module.exports = async function handler(req, res) {
           }
         }`);
         const phases = data?.pipe?.phases || [];
-        // Busca fase por ID exato se configurado, senão por nome exato "Liberado para Rota"
-        const liberadoPhase = phases.find(ph => {
-          if (LIBERADO_ROTA_PHASE_ID) return ph.id === LIBERADO_ROTA_PHASE_ID;
-          return ph.name === "Liberado para Rota";
-        });
+        // Busca fase pelo ID exato 341638193 ("Liberado para Rota")
+        const liberadoPhase = phases.find(ph => ph.id === LIBERADO_ROTA_PHASE_ID);
         if (!liberadoPhase) {
-          return res.status(200).json({ ok: true, found: 0, msg: "Fase 'Liberado para Rota' não encontrada no Pipefy" });
+          return res.status(200).json({ ok: true, found: 0, msg: "Fase Liberado para Rota (" + LIBERADO_ROTA_PHASE_ID + ") nao encontrada" });
         }
         let moved = 0;
         for (const { node } of (liberadoPhase.cards?.edges || [])) {
