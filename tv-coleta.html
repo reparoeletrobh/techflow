@@ -57,6 +57,14 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .fila-os{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px;}
 .sel-badge{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;background:rgba(59,158,255,.15);color:var(--accent);border:1px solid rgba(59,158,255,.3);}
 .otimizado-badge{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;background:rgba(16,217,130,.1);color:var(--green);border:1px solid rgba(16,217,130,.2);margin-left:8px;}
+.edit-end-btn{font-family:var(--fm);font-size:9px;padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;flex-shrink:0;transition:all .15s;}
+.edit-end-btn:hover{color:var(--accent);border-color:var(--accent);}
+.end-edit-row{display:flex;gap:6px;align-items:center;margin-top:4px;}
+.end-input{flex:1;background:var(--surface2);border:1px solid var(--accent);border-radius:6px;padding:5px 8px;font-family:var(--fb);font-size:11px;color:var(--text);outline:none;}
+.end-save-btn{font-family:var(--fm);font-size:9px;padding:4px 10px;border-radius:5px;border:none;background:var(--green);color:#000;cursor:pointer;font-weight:700;}
+.end-cancel-btn{font-family:var(--fm);font-size:9px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;}
+.btn-selall{font-family:var(--fm);font-size:10px;font-weight:700;padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .2s;}
+.btn-selall:hover{color:var(--text);border-color:var(--accent);}
 
 /* ROTAS */
 .section-title{font-family:var(--fh);font-size:14px;font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
@@ -118,8 +126,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   <div class="fila-header">
     <div class="fila-title">Fila de Coleta <span id="otimizado-badge" style="display:none" class="otimizado-badge">✅ Rota otimizada</span></div>
     <div class="fila-actions">
+      <button class="btn-selall" id="btn-selall" onclick="toggleSelAll()">☑ Selecionar Todos</button>
       <button class="btn btn-otimizar" onclick="otimizarRota()">🗺️ Otimizar Rota</button>
-      <button class="btn btn-criar" id="btn-criar" onclick="criarRota()" disabled>📋 Criar Rota de Coleta</button>
+      <button class="btn btn-criar" id="btn-criar" onclick="criarRota()">📋 Criar Rota de Coleta</button>
     </div>
   </div>
   <div style="font-family:var(--fm);font-size:10px;color:var(--muted);">Clique nos cards para selecionar quais farão parte da rota. Último ponto fixo: Oficina TV Assistência.</div>
@@ -198,19 +207,60 @@ function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;
 function renderFila() {
   var el = document.getElementById('fila-list');
   if (!fila.length) { el.innerHTML = '<div class="empty">Nenhum equipamento aguardando coleta.<br>Mova cards para <strong>Liberado para Rota</strong> no painel Técnico.</div>'; return; }
-  el.innerHTML = fila.map(function(c, i) {
-    var sel = selecionados.has(c.pipefyId);
-    return '<div class="fila-card' + (sel ? ' selected' : '') + '" onclick="toggleSel(\'' + c.pipefyId + '\')" id="fc-' + c.pipefyId + '">'
-      + '<div class="fila-num">' + (i + 1) + '</div>'
-      + '<div class="fila-info">'
-        + '<div class="fila-nome">' + escH(c.nomeContato || c.title || '—') + '</div>'
-        + '<div class="fila-end">📍 ' + escH(c.endereco || 'Sem endereço') + '</div>'
-        + (c.osCode ? '<div class="fila-os">OS #' + escH(c.osCode) + '</div>' : '')
+  el.innerHTML = fila.map(function(card, i) {
+    var sel = selecionados.has(card.pipefyId);
+    var pid = card.pipefyId;
+    return '<div class="fila-card' + (sel ? ' selected' : '') + '" id="fc-' + pid + '">'
+      + '<div class="fila-num" onclick="toggleSel(\'' + pid + '\')">' + (i + 1) + '</div>'
+      + '<div class="fila-info" onclick="toggleSel(\'' + pid + '\')" style="cursor:pointer">'
+        + '<div class="fila-nome">' + escH(card.nomeContato || card.title || '—') + '</div>'
+        + '<div class="fila-end" id="end-txt-' + pid + '">📍 ' + escH(card.endereco || 'Sem endereço') + '</div>'
+        + (card.osCode ? '<div class="fila-os">OS #' + escH(card.osCode) + '</div>' : '')
       + '</div>'
-      + (sel ? '<div class="sel-badge">✓ Selecionado</div>' : '')
+      + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">'
+        + (sel ? '<div class="sel-badge">✓</div>' : '')
+        + '<button class="edit-end-btn" onclick="editEnd(event,\'' + pid + '\')" title="Editar endereço">✏️ Endereço</button>'
+      + '</div>'
+      + '</div>'
+      + '<div id="end-edit-' + pid + '" style="display:none;padding:4px 12px 10px 12px;background:var(--surface);border:1px solid var(--accent);border-top:none;border-radius:0 0 10px 10px;margin-top:-6px;">'
+        + '<div class="end-edit-row">'
+          + '<input class="end-input" id="end-inp-' + pid + '" value="' + escH(card.endereco || '') + '" placeholder="Digite o endereço completo"/>'
+          + '<button class="end-save-btn" onclick="saveEnd(\'' + pid + '\')">✓ Salvar</button>'
+          + '<button class="end-cancel-btn" onclick="cancelEnd(\'' + pid + '\')">✕</button>'
+        + '</div>'
       + '</div>';
   }).join('');
   updCriarBtn();
+}
+
+function editEnd(e, pid) {
+  e.stopPropagation();
+  document.getElementById('end-edit-' + pid).style.display = 'block';
+  var inp = document.getElementById('end-inp-' + pid);
+  if (inp) { inp.focus(); inp.select(); }
+}
+
+function cancelEnd(pid) {
+  document.getElementById('end-edit-' + pid).style.display = 'none';
+}
+
+function saveEnd(pid) {
+  var inp = document.getElementById('end-inp-' + pid);
+  if (!inp) return;
+  var newEnd = inp.value.trim();
+  // Atualiza no array local
+  var card = fila.find(function(c) { return c.pipefyId === pid; });
+  if (card) card.endereco = newEnd;
+  // Atualiza texto visível
+  var txt = document.getElementById('end-txt-' + pid);
+  if (txt) txt.textContent = '📍 ' + (newEnd || 'Sem endereço');
+  cancelEnd(pid);
+  // Persiste no board Redis
+  fetch('/api/tv-board?action=update-card', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ pipefyId: pid, fields: { endereco: newEnd } })
+  }).catch(function(){});
+  toast('📍 Endereço atualizado', 'var(--green)');
 }
 
 function toggleSel(id) {
@@ -227,7 +277,24 @@ function toggleSel(id) {
 }
 
 function updCriarBtn() {
-  document.getElementById('btn-criar').disabled = selecionados.size === 0;
+  var btn = document.getElementById('btn-criar');
+  var selBtn = document.getElementById('btn-selall');
+  btn.disabled = false;
+  // Update selecionar todos label
+  if (selBtn) {
+    var allSel = fila.length > 0 && fila.every(function(c) { return selecionados.has(c.pipefyId); });
+    selBtn.textContent = allSel ? '☐ Desmarcar Todos' : '☑ Selecionar Todos';
+  }
+}
+
+function toggleSelAll() {
+  var allSel = fila.length > 0 && fila.every(function(c) { return selecionados.has(c.pipefyId); });
+  if (allSel) {
+    selecionados.clear();
+  } else {
+    fila.forEach(function(c) { selecionados.add(c.pipefyId); });
+  }
+  renderFila();
 }
 
 function otimizarRota() {
@@ -240,10 +307,10 @@ function otimizarRota() {
 }
 
 async function criarRota() {
-  if (!selecionados.size) { toast('Selecione os cards da rota', 'var(--yellow)'); return; }
+  var ids = selecionados.size > 0 ? Array.from(selecionados) : fila.map(function(c){ return c.pipefyId; });
+  if (!ids.length) { toast('Fila vazia — faça o Sync Pipefy primeiro', 'var(--yellow)'); return; }
   var btn = document.getElementById('btn-criar');
   btn.textContent = '⏳ Criando...'; btn.disabled = true;
-  var ids = Array.from(selecionados);
   var d = await api('criar-rota', { cardIds: ids });
   btn.textContent = '📋 Criar Rota de Coleta';
   if (d.ok) {
