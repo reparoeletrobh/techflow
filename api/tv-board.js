@@ -182,6 +182,17 @@ module.exports = async function handler(req, res) {
 
   try {
     // ── GET load ──────────────────────────────────────────────
+    // ── GET listar-fases — lista todas as fases do pipe TV com IDs reais ────
+    if (action === "listar-fases") {
+      try {
+        const data = await pipefyQuery(`query { pipe(id: "${PIPE_ID}") { phases { id name } } }`);
+        const phases = data?.pipe?.phases || [];
+        return res.status(200).json({ ok: true, pipe: PIPE_ID, phases });
+      } catch(e) {
+        return res.status(200).json({ ok: false, error: e.message });
+      }
+    }
+
     if (req.method === "GET" && action === "load") {
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
       return res.status(200).json({ ok: true, board, newCount: 0 });
@@ -442,10 +453,10 @@ module.exports = async function handler(req, res) {
           }
         }`);
         const phases = data?.pipe?.phases || [];
-        // Encontra fase Liberado para Rota (nome contém "liberado" ou "rota")
+        // Busca fase por ID exato se configurado, senão por nome exato "Liberado para Rota"
         const liberadoPhase = phases.find(ph => {
-          const l = ph.name.toLowerCase();
-          return l.includes("liberado") || (l.includes("rota") && !l.includes("coleta"));
+          if (LIBERADO_ROTA_PHASE_ID) return ph.id === LIBERADO_ROTA_PHASE_ID;
+          return ph.name === "Liberado para Rota";
         });
         if (!liberadoPhase) {
           return res.status(200).json({ ok: true, found: 0, msg: "Fase 'Liberado para Rota' não encontrada no Pipefy" });
