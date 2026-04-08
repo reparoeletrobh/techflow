@@ -406,11 +406,7 @@ nav{display:flex;gap:5px;flex-wrap:wrap;}
       <div class="field-group">
         <label class="field-label">Técnico</label>
         <div class="tecnico-grid" id="tecnico-grid">
-          <button class="tecnico-btn" onclick="pickTecnico('Lucas')">Lucas</button>
-          <button class="tecnico-btn" onclick="pickTecnico('Diego')">Diego</button>
-          <button class="tecnico-btn" onclick="pickTecnico('Kassio')">Kassio</button>
-          <button class="tecnico-btn" onclick="pickTecnico('Roberto')">Roberto</button>
-          <button class="tecnico-btn" onclick="pickTecnico('Carlos')">Carlos</button>
+          <button class="tecnico-btn" onclick="pickTecnico('Jose')">Jose</button>
         </div>
       </div>
 
@@ -508,11 +504,7 @@ nav{display:flex;gap:5px;flex-wrap:wrap;}
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
       <label style="font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;">Técnico</label>
       <div style="display:flex;gap:6px;flex-wrap:wrap;" id="split-tecnico-grid">
-        <button class="tecnico-btn" onclick="pickSplitTecnico('Lucas')">Lucas</button>
-        <button class="tecnico-btn" onclick="pickSplitTecnico('Diego')">Diego</button>
-        <button class="tecnico-btn" onclick="pickSplitTecnico('Kassio')">Kassio</button>
-        <button class="tecnico-btn" onclick="pickSplitTecnico('Roberto')">Roberto</button>
-        <button class="tecnico-btn" onclick="pickSplitTecnico('Carlos')">Carlos</button>
+        <button class="tecnico-btn" onclick="pickSplitTecnico('Jose')">Jose</button>
       </div>
     </div>
 
@@ -1087,7 +1079,7 @@ function computeGoalsFromBoard(board) {
     return new Set(withId.map(m=>m.pipefyId)).size + withoutId.length;
   }
   function cntByTecnico(phaseId, since) {
-    const map={}; ['Lucas','Diego','Kassio','Roberto','Carlos'].forEach(t=>map[t]=0);
+    const map={}; ['Jose'].forEach(t=>map[t]=0);
     const entries=log.filter(m=>m.phaseId===phaseId&&new Date(m.timestamp||m.ts)>=since&&m.tecnico);
     const latest=new Map();
     for(const m of entries){ if(m.pipefyId){const p=latest.get(m.pipefyId); if(!p||new Date(m.timestamp)>new Date(p.timestamp))latest.set(m.pipefyId,m);}else latest.set('noid_'+m.timestamp,m); }
@@ -1184,7 +1176,7 @@ function donutCard(label, count, goal, colorClass, isPrev) {
 }
 
 function tecnicoTableHTML(tecHoje, tecSemana) {
-  const tecnicos = ['Lucas','Diego','Kassio','Roberto','Carlos'];
+  const tecnicos = ['Jose'];
   const maxH = Math.max(...tecnicos.map(t => (tecHoje.loja[t]||0)+(tecHoje.delivery[t]||0)), 1);
   const maxS = Math.max(...tecnicos.map(t => (tecSemana.loja[t]||0)+(tecSemana.delivery[t]||0)), 1);
   const rows = tecnicos.map(t => {
