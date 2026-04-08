@@ -71,6 +71,14 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   box-shadow:0 2px 12px rgba(59,158,255,.25);}
 .chat-send:hover:not(:disabled){filter:brightness(1.15);box-shadow:0 4px 20px rgba(59,158,255,.4);}
 .chat-send:disabled{opacity:.5;cursor:not-allowed;}
+.coleta-row{display:flex;gap:8px;padding:8px 16px 0;flex-wrap:wrap;align-items:center;}
+.coleta-lbl{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;}
+.coleta-btn{font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
+.coleta-btn:hover{border-color:var(--accent);color:var(--text);}
+.coleta-btn.active-imediata{background:rgba(239,68,68,.15);color:#ef4444;border-color:rgba(239,68,68,.4);font-weight:700;}
+.coleta-btn.active-agendada{background:rgba(245,200,0,.15);color:#f5c800;border-color:rgba(245,200,0,.4);font-weight:700;}
+.coleta-date{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 9px;font-family:var(--fm);font-size:10px;color:var(--text);outline:none;display:none;}
+.coleta-date.show{display:inline-block;}
 
 /* ORC CARDS */
 .orc-list{display:flex;flex-direction:column;gap:10px;}
@@ -176,6 +184,12 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
     <div class="chat-msgs" id="chat-msgs">
       <div class="chat-bubble">Olá! Cole a ficha do cliente abaixo para cadastrar no Pipefy.</div>
     </div>
+    <div class="coleta-row">
+      <span class="coleta-lbl">Coleta:</span>
+      <button class="coleta-btn" id="btn-imediata" onclick="setColeta('imediata')">⚡ Imediata</button>
+      <button class="coleta-btn" id="btn-agendada" onclick="setColeta('agendada')">📅 Agendada</button>
+      <input type="date" class="coleta-date" id="coleta-data"/>
+    </div>
     <div class="chat-input-row">
       <textarea class="chat-input" id="chat-input" placeholder="Cole a ficha aqui..." rows="2"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarFicha();}"></textarea>
@@ -243,19 +257,49 @@ function setTab(t) {
 }
 
 // ── CADASTRO ──────────────────────────────────────────────────
+var tipoColetaSel = null;
+
+function setColeta(tipo) {
+  tipoColetaSel = tipo;
+  document.getElementById('btn-imediata').className = 'coleta-btn' + (tipo==='imediata' ? ' active-imediata' : '');
+  document.getElementById('btn-agendada').className  = 'coleta-btn' + (tipo==='agendada'  ? ' active-agendada'  : '');
+  var dataEl = document.getElementById('coleta-data');
+  if (tipo === 'agendada') {
+    dataEl.classList.add('show');
+    // Default = hoje
+    if (!dataEl.value) dataEl.value = new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});
+  } else {
+    dataEl.classList.remove('show');
+  }
+}
+
+function buildColetaStr() {
+  if (!tipoColetaSel) return null;
+  if (tipoColetaSel === 'imediata') return 'Coleta: IMEDIATA';
+  var d = document.getElementById('coleta-data').value;
+  if (!d) return 'Coleta: IMEDIATA';
+  var parts = d.split('-'); // YYYY-MM-DD
+  return 'Coleta agendada: ' + parts[2] + '/' + parts[1];
+}
+
 async function enviarFicha() {
   var inp = document.getElementById('chat-input');
   var txt = inp.value.trim();
   if (!txt) return;
+  if (!tipoColetaSel) {
+    addBubble('⚠️ Selecione o tipo de coleta (Imediata ou Agendada) antes de enviar.', false);
+    return;
+  }
   addBubble(txt, true);
   inp.value = '';
   inp.style.height = 'auto';
   document.querySelector('.chat-send').disabled = true;
   addBubble('⏳ Cadastrando no Pipefy...', false, 'msg-loading');
+  var coletaStr = buildColetaStr();
   try {
     var r = await fetch('/api/tv-orcamento?action=criar-card', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({texto: txt})
+      body: JSON.stringify({texto: txt, coleta: coletaStr})
     }).then(function(r){return r.json();});
     removeById('msg-loading');
     if (r.ok) {
