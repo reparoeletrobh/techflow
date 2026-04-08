@@ -299,6 +299,60 @@ function nearestNeighbor(pontos, inicio) {
   return ordem;
 }
 
+// 2-opt — refinamento pós Nearest Neighbor
+// Recebe array de pontos JÁ na ordem do NN (inclui ponto inicial como [0])
+// O ponto inicial (oficina) é fixo — só otimiza os intermediários
+// Retorna nova ordem de índices (sem o ponto inicial duplicado)
+function doisOpt(pontos, ordemNN, pontoInicio) {
+  // Constrói rota completa: inicio → p[0] → p[1] → ... → p[n-1] → inicio
+  // Trabalha com os índices dos pontos intermediários
+  let rota = ordemNN.slice(); // cópia
+  const n = rota.length;
+
+  // Distância total da rota completa (com retorno à origem)
+  function distTotal(r) {
+    let d = distGraus(pontoInicio, pontos[r[0]]);
+    for (let i = 0; i < r.length - 1; i++) d += distGraus(pontos[r[i]], pontos[r[i+1]]);
+    d += distGraus(pontos[r[r.length-1]], pontoInicio);
+    return d;
+  }
+
+  let melhorou = true;
+  let iteracoes = 0;
+  const MAX_ITER = 100; // segurança
+
+  while (melhorou && iteracoes < MAX_ITER) {
+    melhorou = false;
+    iteracoes++;
+    for (let i = 0; i < n - 1; i++) {
+      for (let j = i + 1; j < n; j++) {
+        // Pontos envolvidos na troca
+        const A = i === 0 ? pontoInicio : pontos[rota[i-1]];
+        const B = pontos[rota[i]];
+        const C = pontos[rota[j]];
+        const D = j === n-1 ? pontoInicio : pontos[rota[j+1]];
+
+        // Custo atual: A→B + C→D
+        const custoAtual = distGraus(A, B) + distGraus(C, D);
+        // Custo após troca 2-opt: A→C + B→D
+        const custoTroca  = distGraus(A, C) + distGraus(B, D);
+
+        if (custoTroca < custoAtual - 1e-10) {
+          // Inverte o segmento entre i e j
+          let esq = i, dir = j;
+          while (esq < dir) {
+            const tmp = rota[esq]; rota[esq] = rota[dir]; rota[dir] = tmp;
+            esq++; dir--;
+          }
+          melhorou = true;
+        }
+      }
+    }
+  }
+
+  return rota;
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
@@ -600,8 +654,25 @@ module.exports = async function handler(req, res) {
       // Ponto de partida = Oficina TV Assistência
       const oficina = { lat: -19.9679, lng: -44.0078 };
       // Nearest-Neighbor a partir da oficina
-      const ordemIdx = nearestNeighbor(coordsValidas, oficina);
-      const ordenados = ordemIdx.map(function(i) { return comCoord[i]; }).concat(semCoord);
+      // Passo 1: Nearest Neighbor
+      const ordemNN = nearestNeighbor(coordsValidas, oficina);
+
+      // Passo 2: 2-opt refinement
+      let ordemOtimizada = ordemNN;
+      let melhoria2opt = 0;
+      if (coordsValidas.length >= 3) {
+        function distTotalRota(r) {
+          let d = distGraus(oficina, coordsValidas[r[0]]);
+          for (let i = 0; i < r.length-1; i++) d += distGraus(coordsValidas[r[i]], coordsValidas[r[i+1]]);
+          d += distGraus(coordsValidas[r[r.length-1]], oficina);
+          return d;
+        }
+        const distAntes = distTotalRota(ordemNN);
+        ordemOtimizada = doisOpt(coordsValidas, ordemNN, oficina);
+        const distDepois = distTotalRota(ordemOtimizada);
+        melhoria2opt = Math.round((1 - distDepois / distAntes) * 100);
+      }
+      const ordenados = ordemOtimizada.map(function(i) { return comCoord[i]; }).concat(semCoord);
       // Retorna pipefyIds na ordem otimizada + coords para debug
       const resultado = ordenados.map(function(card, i) {
         const idx = comCoord.indexOf(card);
@@ -613,7 +684,7 @@ module.exports = async function handler(req, res) {
           geocoded:  idx >= 0,
         };
       });
-      return res.status(200).json({ ok: true, ordenados: resultado, semCoord: semCoord.length });
+      return res.status(200).json({ ok: true, ordenados: resultado, semCoord: semCoord.length, melhoria2opt: melhoria2opt });
     }
 
     // ── GET sync-coleta — busca cards na fase 341638193 (Liberado para Rota) ──
