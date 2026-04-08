@@ -98,6 +98,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   <div class="logo"><div class="logo-dot"></div>TV <span>Assistência</span> — Coleta</div>
   <div class="hdr-right">
     <a class="hbtn green" href="/tv-motorista" target="_blank">🚗 Painel Motorista</a>
+    <button class="hbtn" id="btn-sync" onclick="syncColeta()" style="border-color:rgba(59,158,255,.3);color:var(--accent);">⟳ Sync Pipefy</button>
     <button class="hbtn" onclick="loadAll()">↻ Atualizar</button>
     <a class="hbtn" href="/tv">Home</a>
   </div>
@@ -156,6 +157,29 @@ async function api(action, body) {
   if (body) { opts.method = 'POST'; opts.body = JSON.stringify(body); }
   var r = await fetch('/api/tv-rotas?action=' + action, opts);
   return r.json();
+}
+
+async function syncColeta() {
+  var btn = document.getElementById('btn-sync');
+  btn.textContent = '⏳ Sincronizando...'; btn.disabled = true;
+  try {
+    var r = await fetch('/api/tv-board?action=sync-coleta').then(function(r){ return r.json(); });
+    if (r.ok) {
+      await loadAll();
+      if (r.moved > 0) {
+        toast('✅ ' + r.moved + ' ficha(s) adicionada(s) à fila!', 'var(--green)');
+      } else if (r.found === 0) {
+        toast('ℹ️ ' + (r.msg || 'Nenhuma ficha na fase Liberado para Rota'), 'var(--accent)');
+      } else {
+        toast('✅ Fila atualizada — ' + r.filaCount + ' ficha(s)', 'var(--accent)');
+      }
+    } else {
+      toast('❌ Erro: ' + (r.error || 'Falha no sync'), 'var(--red)');
+    }
+  } catch(e) {
+    toast('❌ ' + e.message, 'var(--red)');
+  }
+  btn.textContent = '⟳ Sync Pipefy'; btn.disabled = false;
 }
 
 async function loadAll() {
