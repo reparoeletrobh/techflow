@@ -173,6 +173,78 @@ async function moveCardPipefy(cardId, phaseId) {
   return data?.moveCardToPhase?.card;
 }
 
+// ── GEOCODIFICAÇÃO (mesmo sistema do Lalamove) ────────────────
+async function geocodificar(endereco) {
+  const GMAPS_KEY    = (process.env.GOOGLE_MAPS_KEY || "").trim();
+  const OPENCAGE_KEY = (process.env.OPENCAGE_KEY    || "").trim();
+  const endNorm = endereco
+    .replace(/,?\s*\bBH\b/gi, "")
+    .replace(/\bR\.\s+/g, "Rua ")
+    .replace(/\bAv\.\s+/g, "Avenida ")
+    .replace(/,?\s*[-]?\s*(ap(to)?\.?|apartamento|bloco|bl\.?|sala)\s*[\w\d]+/gi, "")
+    .replace(/\s+/g, " ").trim();
+  const endBH = endNorm.toLowerCase().includes("belo horizonte") ? endNorm : endNorm + ", Belo Horizonte, MG, Brasil";
+  const dentoBH = (lat, lng) => lat > -20.5 && lat < -19.3 && lng > -44.8 && lng < -43.0;
+  const nomQuery = async (q) => {
+    const url = "https://nominatim.openstreetmap.org/search?q=" + encodeURIComponent(q)
+      + "&format=json&limit=5&countrycodes=br&viewbox=-44.8,-20.5,-43.0,-19.3&bounded=0";
+    const r = await fetch(url, { headers: { "User-Agent": "TVAssistencia/1.0 (reparoeletroadm.com)" } });
+    const j = await r.json();
+    return (j || []).find(x => dentoBH(parseFloat(x.lat), parseFloat(x.lon))) || null;
+  };
+  try {
+    let best = await nomQuery(endBH);
+    if (!best) { const s = endBH.replace(/,?\s*\d+[-\w]*/g,"").replace(/\s+/g," ").trim(); if(s!==endBH) best=await nomQuery(s); }
+    if (best) return { lat: parseFloat(best.lat), lng: parseFloat(best.lon) };
+  } catch(e) { console.error("Nominatim:", e.message); }
+  if (GMAPS_KEY) {
+    try {
+      const r = await fetch("https://maps.googleapis.com/maps/api/geocode/json?address=" + encodeURIComponent(endBH) + "&region=br&key=" + GMAPS_KEY);
+      const j = await r.json();
+      if (j.status === "OK" && j.results && j.results[0]) {
+        const loc = j.results[0].geometry.location;
+        if (dentoBH(loc.lat, loc.lng)) return { lat: loc.lat, lng: loc.lng };
+      }
+    } catch(e) { console.error("GMaps:", e.message); }
+  }
+  if (OPENCAGE_KEY) {
+    try {
+      const r = await fetch("https://api.opencagedata.com/geocode/v1/json?q=" + encodeURIComponent(endBH) + "&key=" + OPENCAGE_KEY + "&countrycode=br&limit=3&no_annotations=1&proximity=-19.9245,-43.9352");
+      const j = await r.json();
+      const ok = (j.results||[]).filter(x => (x.confidence||0)>=6 && dentoBH(x.geometry.lat,x.geometry.lng));
+      if (ok.length) return { lat: ok[0].geometry.lat, lng: ok[0].geometry.lng };
+    } catch(e) { console.error("OpenCage:", e.message); }
+  }
+  return null;
+}
+
+// Distância euclidiana (graus) entre dois pontos — suficiente para BH
+function distGraus(a, b) {
+  const dlat = a.lat - b.lat, dlng = (a.lng - b.lng) * Math.cos(a.lat * Math.PI / 180);
+  return Math.sqrt(dlat*dlat + dlng*dlng);
+}
+
+// Nearest-Neighbor TSP — retorna índices ordenados de `pontos`
+// pontos: [{lat,lng}], inicio: {lat,lng}
+function nearestNeighbor(pontos, inicio) {
+  const visitado = new Array(pontos.length).fill(false);
+  const ordem = [];
+  let atual = inicio;
+  for (let step = 0; step < pontos.length; step++) {
+    let melhorIdx = -1, melhorDist = Infinity;
+    for (let i = 0; i < pontos.length; i++) {
+      if (visitado[i]) continue;
+      const d = distGraus(atual, pontos[i]);
+      if (d < melhorDist) { melhorDist = d; melhorIdx = i; }
+    }
+    if (melhorIdx < 0) break;
+    visitado[melhorIdx] = true;
+    ordem.push(melhorIdx);
+    atual = pontos[melhorIdx];
+  }
+  return ordem;
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
@@ -444,6 +516,50 @@ module.exports = async function handler(req, res) {
       allowed.forEach(function(f) { if (fields[f] !== undefined) card[f] = fields[f]; });
       await dbSet(BOARD_KEY, board);
       return res.status(200).json({ ok: true, card });
+    }
+
+    // ── POST otimizar-rota — geocodifica e reordena por nearest-neighbor ──
+    if (req.method === "POST" && action === "otimizar-rota") {
+      const { cardIds } = req.body || {};
+      if (!Array.isArray(cardIds) || !cardIds.length)
+        return res.status(400).json({ ok: false, error: "cardIds obrigatório" });
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      // Monta lista de cards com endereço
+      const cards = cardIds.map(function(id) {
+        return board.cards.find(function(c) { return c.pipefyId === String(id); }) || { pipefyId: String(id), endereco: "" };
+      });
+      // Geocodifica cada endereço (com delay para não bater limite do Nominatim)
+      const coords = [];
+      for (let i = 0; i < cards.length; i++) {
+        const end = cards[i].endereco || "";
+        if (!end) { coords.push(null); continue; }
+        try {
+          const c = await geocodificar(end);
+          coords.push(c);
+        } catch(e) { coords.push(null); }
+        if (i < cards.length - 1) await new Promise(function(r) { setTimeout(r, 350); });
+      }
+      // Cards sem coordenadas vão para o final da lista
+      const comCoord   = cards.filter(function(_, i) { return coords[i] !== null; });
+      const semCoord   = cards.filter(function(_, i) { return coords[i] === null; });
+      const coordsValidas = coords.filter(function(c) { return c !== null; });
+      // Ponto de partida = Oficina TV Assistência
+      const oficina = { lat: -19.9679, lng: -44.0078 };
+      // Nearest-Neighbor a partir da oficina
+      const ordemIdx = nearestNeighbor(coordsValidas, oficina);
+      const ordenados = ordemIdx.map(function(i) { return comCoord[i]; }).concat(semCoord);
+      // Retorna pipefyIds na ordem otimizada + coords para debug
+      const resultado = ordenados.map(function(card, i) {
+        const idx = comCoord.indexOf(card);
+        return {
+          pipefyId:  card.pipefyId,
+          nomeContato: card.nomeContato || "",
+          endereco:  card.endereco || "",
+          coords:    idx >= 0 ? coordsValidas[idx] : null,
+          geocoded:  idx >= 0,
+        };
+      });
+      return res.status(200).json({ ok: true, ordenados: resultado, semCoord: semCoord.length });
     }
 
     // ── GET sync-coleta — busca cards na fase 341638193 (Liberado para Rota) ──
