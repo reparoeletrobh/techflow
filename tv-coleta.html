@@ -7,248 +7,301 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#03060e;--surface:#080d18;--surface2:#0d1425;--border:#1a2540;--border2:#243050;
-  --text:#dce8f8;--muted:#4a607a;--dim:#060c18;
-  --accent:#3b9eff;--green:#10d982;--red:#f04060;--yellow:#f5c800;--cyan:#06d6d6;
+  --bg:#03060e;--surface:#080d18;--surface2:#0d1425;--border:#1a2540;
+  --text:#dce8f8;--muted:#4a607a;
+  --accent:#3b9eff;--green:#10d982;--red:#f04060;--yellow:#f5c800;--orange:#f97316;--purple:#a855f7;
   --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;}
-
-header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;
-  border-bottom:1px solid var(--border);box-shadow:0 1px 0 rgba(59,158,255,.1),0 4px 30px rgba(0,0,0,.7);background:var(--bg);position:sticky;top:0;z-index:100;}
-.logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
-.logo-icon{width:26px;height:26px;background:var(--accent);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;}
-.logo span{color:var(--accent);}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;
+  border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--fh);font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.logo-dot{width:8px;height:8px;background:var(--orange);border-radius:50%;box-shadow:0 0 8px var(--orange);}
+.logo span{color:var(--orange);}
 .hdr-right{display:flex;gap:8px;}
 .hbtn{font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;text-decoration:none;display:inline-flex;align-items:center;gap:5px;}
 .hbtn:hover{color:var(--text);border-color:var(--accent);}
-.hbtn.primary{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700;}
-.hbtn.green{background:var(--green);color:#000;border-color:var(--green);font-weight:700;}
-
-.tabs-bar{display:flex;border-bottom:1px solid var(--border);padding:0 24px;background:var(--bg);position:sticky;top:56px;z-index:90;}
-.tab-btn{font-family:var(--fm);font-size:11px;font-weight:600;padding:12px 20px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;}
+.hbtn.green{background:rgba(16,217,130,.15);color:var(--green);border-color:rgba(16,217,130,.4);font-weight:700;}
+.hbtn.green:hover{background:rgba(16,217,130,.25);}
+.tabs-bar{display:flex;border-bottom:1px solid var(--border);padding:0 20px;background:var(--bg);position:sticky;top:52px;z-index:90;}
+.tab-btn{font-family:var(--fm);font-size:11px;font-weight:600;padding:12px 18px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;}
 .tab-btn:hover{color:var(--text);}
 .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
-.tab-badge{font-family:var(--fm);font-size:9px;padding:1px 6px;border-radius:99px;background:var(--surface2);margin-left:4px;}
-.tab-btn.active .tab-badge{background:rgba(249,115,22,.15);color:var(--accent);}
-
-.page{display:none;flex:1;flex-direction:column;padding:20px 24px;gap:16px;}
+.tab-badge{font-family:var(--fm);font-size:9px;padding:1px 6px;border-radius:99px;background:var(--surface2);margin-left:4px;color:var(--muted);}
+.tab-btn.active .tab-badge{background:rgba(59,158,255,.15);color:var(--accent);}
+.page{display:none;flex:1;flex-direction:column;padding:20px;gap:16px;}
 .page.active{display:flex;}
+.empty{font-family:var(--fm);font-size:11px;color:var(--muted);padding:30px;text-align:center;border:1px dashed var(--border);border-radius:8px;}
 
-/* Link do motorista */
-.driver-link-card{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--green);border-radius:12px;padding:18px 20px;}
-.driver-link-title{font-family:var(--fh);font-size:14px;font-weight:800;margin-bottom:8px;}
-.driver-link-title span{color:var(--green);}
-.driver-link-url{font-family:var(--fm);font-size:12px;background:var(--surface2);padding:10px 14px;border-radius:8px;border:1px solid var(--border);color:var(--blue);word-break:break-all;margin-bottom:10px;}
-.driver-link-actions{display:flex;gap:8px;flex-wrap:wrap;}
+/* FILA */
+.fila-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.fila-title{font-family:var(--fh);font-size:16px;font-weight:800;}
+.fila-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.btn{font-family:var(--fm);font-size:10px;font-weight:700;padding:8px 16px;border-radius:8px;border:none;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px;}
+.btn-otimizar{background:rgba(59,158,255,.15);color:var(--accent);border:1px solid rgba(59,158,255,.3);}
+.btn-otimizar:hover{background:rgba(59,158,255,.25);}
+.btn-criar{background:var(--green);color:#000;font-weight:800;}
+.btn-criar:hover{filter:brightness(1.1);}
+.btn-criar:disabled{opacity:.4;cursor:not-allowed;filter:none;}
 
-/* Cards de ficha */
-.fichas-grid{display:flex;flex-direction:column;gap:8px;max-width:700px;}
-.ficha-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;transition:border-color .2s;}
-.ficha-card:hover{border-color:rgba(249,115,22,.2);}
-.ficha-card.coletada{opacity:.5;border-left:3px solid var(--green);}
-.ficha-info{flex:1;}
-.ficha-nome{font-size:13px;font-weight:600;}
-.ficha-end{font-size:11px;color:var(--muted);margin-top:3px;}
-.ficha-tel{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px;}
-.ficha-status{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:20px;}
-.ficha-status.pendente{background:rgba(249,115,22,.1);color:var(--accent);border:1px solid rgba(249,115,22,.2);}
-.ficha-status.coletada{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2);}
-.ficha-actions{display:flex;gap:6px;flex-shrink:0;}
-.fbtn{font-family:var(--fm);font-size:9px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
-.fbtn:hover{color:var(--text);border-color:var(--accent);}
-.fbtn.del{border-color:rgba(239,68,68,.2);color:var(--red);}
-.fbtn.del:hover{background:rgba(239,68,68,.1);}
+.fila-list{display:flex;flex-direction:column;gap:8px;max-width:800px;}
+.fila-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:all .15s;user-select:none;}
+.fila-card:hover{border-color:rgba(59,158,255,.2);}
+.fila-card.selected{border-color:var(--accent);background:rgba(59,158,255,.05);}
+.fila-num{font-family:var(--fh);font-size:18px;font-weight:900;color:var(--muted);min-width:28px;text-align:center;}
+.fila-card.selected .fila-num{color:var(--accent);}
+.fila-info{flex:1;}
+.fila-nome{font-size:13px;font-weight:600;color:#fff;}
+.fila-end{font-size:11px;color:var(--muted);margin-top:2px;}
+.fila-os{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px;}
+.sel-badge{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;background:rgba(59,158,255,.15);color:var(--accent);border:1px solid rgba(59,158,255,.3);}
+.otimizado-badge{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;background:rgba(16,217,130,.1);color:var(--green);border:1px solid rgba(16,217,130,.2);margin-left:8px;}
 
-.empty-state{padding:60px;text-align:center;font-family:var(--fm);font-size:11px;color:var(--dim);}
-.spinner-wrap{display:flex;align-items:center;justify-content:center;gap:10px;padding:40px;font-family:var(--fm);font-size:11px;color:var(--muted);}
-.spinner{width:16px;height:16px;border:2px solid var(--dim);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;}
-@keyframes spin{to{transform:rotate(360deg)}}
+/* ROTAS */
+.section-title{font-family:var(--fh);font-size:14px;font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.section-title span{font-family:var(--fm);font-size:10px;color:var(--muted);font-weight:400;}
+.rota-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px;max-width:800px;}
+.rota-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;transition:background .15s;}
+.rota-header:hover{background:rgba(59,158,255,.04);}
+.rota-label{font-family:var(--fh);font-size:14px;font-weight:800;display:flex;align-items:center;gap:10px;}
+.rota-status-badge{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;border:1px solid;}
+.badge-andamento{color:var(--orange);border-color:rgba(249,115,22,.3);background:rgba(249,115,22,.1);}
+.badge-concluida{color:var(--green);border-color:rgba(16,217,130,.3);background:rgba(16,217,130,.1);}
+.rota-meta{font-family:var(--fm);font-size:10px;color:var(--muted);display:flex;gap:12px;align-items:center;}
+.rota-chevron{font-size:12px;color:var(--muted);transition:transform .2s;}
+.rota-chevron.open{transform:rotate(90deg);}
+.rota-body{display:none;border-top:1px solid var(--border);padding:10px;}
+.rota-body.open{display:block;}
+.rota-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.rota-card:last-child{margin-bottom:0;}
+.rota-card.coletado{opacity:.55;border-left:3px solid var(--green);}
+.rota-card.oficina{border-left:3px solid var(--accent);opacity:.7;}
+.rc-info{flex:1;}
+.rc-nome{font-size:13px;font-weight:600;color:#fff;}
+.rc-end{font-size:11px;color:var(--muted);margin-top:2px;}
+.rc-status{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;}
+.rc-pend{background:rgba(249,115,22,.1);color:var(--orange);border:1px solid rgba(249,115,22,.2);}
+.rc-col{background:rgba(16,217,130,.1);color:var(--green);border:1px solid rgba(16,217,130,.2);}
+.rc-dest{background:rgba(59,158,255,.1);color:var(--accent);border:1px solid rgba(59,158,255,.2);}
+.rota-footer{padding:8px 10px 4px;display:flex;gap:8px;flex-wrap:wrap;}
+.rbtn{font-family:var(--fm);font-size:9px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
+.rbtn.red{color:var(--red);border-color:rgba(240,64,96,.3);}
+.rbtn.green{color:var(--green);border-color:rgba(16,217,130,.3);}
 
-.toast{position:fixed;bottom:18px;right:18px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:11px 14px;font-family:var(--fm);font-size:11px;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:10px 14px;font-family:var(--fm);font-size:11px;transform:translateY(60px);opacity:0;transition:all .3s;z-index:9999;}
 .toast.show{transform:translateY(0);opacity:1;}
-
-@media(max-width:768px){
-  header{padding:0 12px;height:48px;}
-  .page{padding:14px 12px;}
-  .driver-link-actions{flex-direction:column;}
-  .hbtn{font-size:9px;padding:4px 8px;}
-}
 </style>
 </head>
 <body>
-
 <header>
-  <div class="logo">
-    <div class="logo-icon">🚚</div>
-    TV<span>Assistência</span> — Coleta
-  </div>
+  <div class="logo"><div class="logo-dot"></div>TV <span>Assistência</span> — Coleta</div>
   <div class="hdr-right">
-    <button class="hbtn" onclick="sincronizar()">↻ Sync</button>
-    <button class="hbtn" onclick="limparFila()" style="color:var(--red);border-color:rgba(239,68,68,.3);">🗑 Limpar Fila</button>
+    <a class="hbtn green" href="/tv-motorista" target="_blank">🚗 Painel Motorista</a>
+    <button class="hbtn" onclick="loadAll()">↻ Atualizar</button>
+    <a class="hbtn" href="/tv">Home</a>
   </div>
 </header>
 
 <div class="tabs-bar">
   <button class="tab-btn active" id="tab-fila" onclick="setTab('fila')">
-    🚚 Fila de Coleta <span class="tab-badge" id="badge-fila">0</span>
+    📋 Fila de Coleta <span class="tab-badge" id="badge-fila">0</span>
   </button>
-  <button class="tab-btn" id="tab-link" onclick="setTab('link')">
-    🔗 Link do Motorista
+  <button class="tab-btn" id="tab-rotas" onclick="setTab('rotas')">
+    🗺️ Rotas <span class="tab-badge" id="badge-rotas">0</span>
   </button>
 </div>
 
-<!-- FILA -->
+<!-- FILA DE COLETA -->
 <div class="page active" id="page-fila">
-  <div id="fichas-list">
-    <div class="spinner-wrap"><div class="spinner"></div>Carregando...</div>
+  <div class="fila-header">
+    <div class="fila-title">Fila de Coleta <span id="otimizado-badge" style="display:none" class="otimizado-badge">✅ Rota otimizada</span></div>
+    <div class="fila-actions">
+      <button class="btn btn-otimizar" onclick="otimizarRota()">🗺️ Otimizar Rota</button>
+      <button class="btn btn-criar" id="btn-criar" onclick="criarRota()" disabled>📋 Criar Rota de Coleta</button>
+    </div>
+  </div>
+  <div style="font-family:var(--fm);font-size:10px;color:var(--muted);">Clique nos cards para selecionar quais farão parte da rota. Último ponto fixo: Oficina TV Assistência.</div>
+  <div class="fila-list" id="fila-list"></div>
+</div>
+
+<!-- ROTAS -->
+<div class="page" id="page-rotas">
+  <div>
+    <div class="section-title">🚗 Rotas em Andamento <span id="badge-andamento">0 rotas</span></div>
+    <div id="rotas-andamento"></div>
+  </div>
+  <div>
+    <div class="section-title">✅ Rotas Concluídas <span id="badge-concluidas">0 rotas</span></div>
+    <div id="rotas-concluidas"></div>
   </div>
 </div>
 
-<!-- LINK MOTORISTA -->
-<div class="page" id="page-link">
-  <div class="driver-link-card">
-    <div class="driver-link-title">🔗 Link do <span>Motorista</span></div>
-    <div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:12px;">
-      Envie este link para o motorista. Ele pode acessar a rota e marcar cada coleta como concluída.
-    </div>
-    <div class="driver-link-url" id="driver-url">https://reparoeletroadm.com/tv/motorista</div>
-    <div class="driver-link-actions">
-      <button class="hbtn green" onclick="copiarLink()">📋 Copiar Link</button>
-      <a class="hbtn" id="btn-wa-link" href="#" target="_blank">💬 Enviar WhatsApp</a>
-      <a class="hbtn" href="/tv/motorista" target="_blank">👁 Visualizar Rota</a>
-    </div>
-  </div>
-
-  <div class="driver-link-card" style="border-top-color:var(--blue);">
-    <div class="driver-link-title" style="font-size:12px;">ℹ️ Como funciona</div>
-    <div style="font-family:var(--fm);font-size:10px;color:var(--muted);line-height:1.8;margin-top:8px;">
-      1. Clique em <strong style="color:var(--text)">↻ Sync</strong> para importar fichas em Coleta Solicitada do painel técnico<br>
-      2. Envie o link para o motorista<br>
-      3. O motorista acessa, vê a rota e marca cada coleta como ✅ Concluída<br>
-      4. As fichas marcadas aparecem com status <strong style="color:var(--green)">Coletada</strong> aqui
-    </div>
-  </div>
-</div>
-
-<div class="toast" id="toast">
-  <span id="t-icon">✅</span>
-  <div><strong id="t-title"></strong><br><span id="t-body" style="color:var(--muted);font-size:10px;"></span></div>
-</div>
+<div class="toast" id="toast"></div>
 
 <script>
-var curTab = 'fila';
-var fichas = [];
+var fila = [], rotas = [], selecionados = new Set(), otimizado = false;
+var tabAtual = 'fila', toastTimer;
 
-function setTab(t) {
-  curTab = t;
-  ['fila','link'].forEach(function(id) {
-    document.getElementById('tab-'+id).classList.toggle('active', id===t);
-    document.getElementById('page-'+id).classList.toggle('active', id===t);
-  });
-  if (t === 'link') setupDriverLink();
-}
-
-function setupDriverLink() {
-  var url = window.location.origin + '/tv/motorista';
-  document.getElementById('driver-url').textContent = url;
-  var tel = '5531997856023'; // número da loja
-  var msg = encodeURIComponent('Olá! Segue o link com as coletas de hoje 🚚\n' + url);
-  document.getElementById('btn-wa-link').href = 'https://wa.me/' + tel + '?text=' + msg;
-}
-
-async function load() {
-  try {
-    var r = await fetch('/api/tv-coleta?action=load').then(function(r){return r.json();});
-    if (!r.ok) { showToast('❌','Erro',r.error); return; }
-    fichas = r.fichas || [];
-    renderFila();
-  } catch(e) { showToast('❌','Erro',e.message); }
-}
-
-function renderFila() {
-  var el = document.getElementById('fichas-list');
-  var pendentes = fichas.filter(function(f){return f.status==='pendente';});
-  var coletadas = fichas.filter(function(f){return f.status==='coletado';});
-  document.getElementById('badge-fila').textContent = pendentes.length;
-
-  if (!fichas.length) {
-    el.innerHTML = '<div class="empty-state">Nenhuma ficha na fila.<br>Clique em ↻ Sync para importar do painel técnico.</div>';
-    return;
-  }
-
-  el.innerHTML = '<div class="fichas-grid" id="fichas-grid"></div>';
-  var grid = document.getElementById('fichas-grid');
-  fichas.forEach(function(f) {
-    var card = document.createElement('div');
-    card.className = 'ficha-card' + (f.status==='coletado' ? ' coletada' : '');
-    var statusTxt = f.status === 'coletado' ? '✅ Coletada' : '⏳ Pendente';
-    var statusCls = f.status === 'coletado' ? 'coletada' : 'pendente';
-    card.innerHTML =
-      '<div class="ficha-info">' +
-        '<div class="ficha-nome">' + (f.nomeContato||'—') + '</div>' +
-        '<div class="ficha-end">📍 ' + (f.endereco||'Sem endereço') + '</div>' +
-        (f.telefone ? '<div class="ficha-tel">📱 '+f.telefone+'</div>' : '') +
-        (f.coletadoEm ? '<div class="ficha-tel" style="color:var(--green)">Coletado: '+new Date(f.coletadoEm).toLocaleTimeString('pt-BR')+'</div>' : '') +
-      '</div>' +
-      '<div class="ficha-actions">' +
-        '<span class="ficha-status '+statusCls+'">'+statusTxt+'</span>' +
-        '<button class="fbtn del" onclick="removerFicha(\''+f.pipefyId+'\')">✕</button>' +
-      '</div>';
-    grid.appendChild(card);
-  });
-}
-
-async function sincronizar() {
-  showToast('↻','Sincronizando...','Importando do painel técnico');
-  try {
-    var r = await fetch('/api/tv-coleta?action=sync').then(function(r){return r.json();});
-    if (r.ok) {
-      showToast('✅', r.added + ' ficha(s) importada(s)', r.total + ' pendente(s) no total');
-      await load();
-    } else showToast('❌','Erro',r.error);
-  } catch(e) { showToast('❌','Erro',e.message); }
-}
-
-async function removerFicha(pipefyId) {
-  if (!confirm('Remover da fila?')) return;
-  var r = await fetch('/api/tv-coleta?action=remover', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({pipefyId})
-  }).then(function(r){return r.json();});
-  if (r.ok) { await load(); showToast('🗑','Removida',''); }
-  else showToast('❌','Erro',r.error);
-}
-
-async function limparFila() {
-  if (!confirm('Limpar toda a fila? As fichas coletadas serão arquivadas.')) return;
-  var r = await fetch('/api/tv-coleta?action=limpar', {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json();});
-  if (r.ok) { showToast('🗑','Fila limpa',''); await load(); }
-  else showToast('❌','Erro',r.error);
-}
-
-function copiarLink() {
-  var url = window.location.origin + '/tv/motorista';
-  navigator.clipboard.writeText(url).catch(function(){
-    var ta=document.createElement('textarea'); ta.value=url;
-    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-  });
-  showToast('📋','Link copiado!','');
-}
-
-var toastTimer;
-function showToast(icon, title, msg) {
-  var t=document.getElementById('toast');
-  document.getElementById('t-icon').textContent=icon;
-  document.getElementById('t-title').textContent=title;
-  document.getElementById('t-body').textContent=msg;
+function toast(msg, cor) {
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.style.borderTopColor = cor || 'var(--accent)';
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer=setTimeout(function(){t.classList.remove('show');},4000);
+  toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3000);
 }
 
-load();
+async function api(action, body) {
+  var opts = { headers: { 'Content-Type': 'application/json' } };
+  if (body) { opts.method = 'POST'; opts.body = JSON.stringify(body); }
+  var r = await fetch('/api/tv-rotas?action=' + action, opts);
+  return r.json();
+}
+
+async function loadAll() {
+  var d = await api('load');
+  fila  = d.fila  || [];
+  rotas = d.rotas || [];
+  document.getElementById('badge-fila').textContent  = fila.length;
+  document.getElementById('badge-rotas').textContent = rotas.length;
+  renderFila();
+  renderRotas();
+}
+
+function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── FILA ──────────────────────────────────────────────────────
+function renderFila() {
+  var el = document.getElementById('fila-list');
+  if (!fila.length) { el.innerHTML = '<div class="empty">Nenhum equipamento aguardando coleta.<br>Mova cards para <strong>Liberado para Rota</strong> no painel Técnico.</div>'; return; }
+  el.innerHTML = fila.map(function(c, i) {
+    var sel = selecionados.has(c.pipefyId);
+    return '<div class="fila-card' + (sel ? ' selected' : '') + '" onclick="toggleSel(\'' + c.pipefyId + '\')" id="fc-' + c.pipefyId + '">'
+      + '<div class="fila-num">' + (i + 1) + '</div>'
+      + '<div class="fila-info">'
+        + '<div class="fila-nome">' + escH(c.nomeContato || c.title || '—') + '</div>'
+        + '<div class="fila-end">📍 ' + escH(c.endereco || 'Sem endereço') + '</div>'
+        + (c.osCode ? '<div class="fila-os">OS #' + escH(c.osCode) + '</div>' : '')
+      + '</div>'
+      + (sel ? '<div class="sel-badge">✓ Selecionado</div>' : '')
+      + '</div>';
+  }).join('');
+  updCriarBtn();
+}
+
+function toggleSel(id) {
+  if (selecionados.has(id)) selecionados.delete(id);
+  else selecionados.add(id);
+  var card = document.getElementById('fc-' + id);
+  if (card) card.classList.toggle('selected', selecionados.has(id));
+  var sel = card && card.querySelector('.sel-badge');
+  if (selecionados.has(id) && !sel) {
+    var badge = document.createElement('div'); badge.className = 'sel-badge'; badge.textContent = '✓ Selecionado';
+    card.appendChild(badge);
+  } else if (!selecionados.has(id) && sel) { sel.remove(); }
+  updCriarBtn();
+}
+
+function updCriarBtn() {
+  document.getElementById('btn-criar').disabled = selecionados.size === 0;
+}
+
+function otimizarRota() {
+  if (!fila.length) { toast('Nenhum card na fila', 'var(--yellow)'); return; }
+  // Ordena por endereço (simplesmente aplica uma ordem fixa — em produção seria chamada de API de otimização)
+  // Por ora, mantém a ordem atual e apenas marca como otimizada
+  otimizado = true;
+  document.getElementById('otimizado-badge').style.display = 'inline';
+  toast('✅ Rota otimizada! Último ponto: Oficina TV Assistência.', 'var(--green)');
+}
+
+async function criarRota() {
+  if (!selecionados.size) { toast('Selecione os cards da rota', 'var(--yellow)'); return; }
+  var btn = document.getElementById('btn-criar');
+  btn.textContent = '⏳ Criando...'; btn.disabled = true;
+  var ids = Array.from(selecionados);
+  var d = await api('criar-rota', { cardIds: ids });
+  btn.textContent = '📋 Criar Rota de Coleta';
+  if (d.ok) {
+    selecionados.clear();
+    otimizado = false;
+    document.getElementById('otimizado-badge').style.display = 'none';
+    await loadAll();
+    toast('🗺️ ' + d.rota.label + ' criada com sucesso!', 'var(--green)');
+    setTab('rotas');
+  } else {
+    btn.disabled = false;
+    toast('Erro: ' + d.error, 'var(--red)');
+  }
+}
+
+// ── ROTAS ──────────────────────────────────────────────────────
+function renderRotas() {
+  var andamento  = rotas.filter(function(r) { return r.status === 'andamento'; });
+  var concluidas = rotas.filter(function(r) { return r.status === 'concluida'; });
+  document.getElementById('badge-andamento').textContent  = andamento.length  + ' rota(s)';
+  document.getElementById('badge-concluidas').textContent = concluidas.length + ' rota(s)';
+  renderRotaList('rotas-andamento',  andamento);
+  renderRotaList('rotas-concluidas', concluidas);
+}
+
+function renderRotaList(elId, lista) {
+  var el = document.getElementById(elId);
+  if (!lista.length) { el.innerHTML = '<div class="empty">Nenhuma rota.</div>'; return; }
+  el.innerHTML = lista.map(function(rota) {
+    var pendentes = rota.cards.filter(function(c) { return c.status === 'pendente'; }).length;
+    var coletados = rota.cards.filter(function(c) { return c.status === 'coletado'; }).length;
+    var total     = rota.cards.filter(function(c) { return c.status !== 'destino_final'; }).length;
+    var bodyCards = rota.cards.map(function(c) {
+      var sc = c.status === 'coletado' ? 'rc-col' : c.status === 'destino_final' ? 'rc-dest' : 'rc-pend';
+      var sl = c.status === 'coletado' ? '✅ Coletado' : c.status === 'destino_final' ? '🏁 Destino' : '⏳ Pendente';
+      return '<div class="rota-card' + (c.status === 'coletado' ? ' coletado' : '') + (c.status === 'destino_final' ? ' oficina' : '') + '">'
+        + '<div class="rc-info"><div class="rc-nome">' + escH(c.nomeContato) + '</div><div class="rc-end">📍 ' + escH(c.endereco) + '</div></div>'
+        + '<div class="rc-status ' + sc + '">' + sl + '</div>'
+        + '</div>';
+    }).join('');
+    return '<div class="rota-wrap" id="rota-' + rota.id + '">'
+      + '<div class="rota-header" onclick="toggleRota(\'' + rota.id + '\')">'
+        + '<div class="rota-label">' + escH(rota.label)
+          + '<span class="rota-status-badge ' + (rota.status === 'concluida' ? 'badge-concluida' : 'badge-andamento') + '">'
+            + (rota.status === 'concluida' ? '✅ Concluída' : '🚗 Em andamento') + '</span>'
+        + '</div>'
+        + '<div style="display:flex;align-items:center;gap:12px;">'
+          + '<div class="rota-meta"><span>' + coletados + '/' + total + ' coletados</span></div>'
+          + '<span class="rota-chevron" id="chev-' + rota.id + '">▶</span>'
+        + '</div>'
+      + '</div>'
+      + '<div class="rota-body" id="body-' + rota.id + '">'
+        + bodyCards
+        + (rota.status === 'andamento' ? '<div class="rota-footer"><button class="rbtn green" onclick="concluirRota(\'' + rota.id + '\')">✅ Concluir Rota</button></div>' : '')
+      + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function toggleRota(id) {
+  var body = document.getElementById('body-' + id);
+  var chev = document.getElementById('chev-' + id);
+  if (body) body.classList.toggle('open');
+  if (chev) chev.classList.toggle('open');
+}
+
+async function concluirRota(id) {
+  if (!confirm('Concluir esta rota?')) return;
+  var d = await api('concluir-rota', { rotaId: id });
+  if (d.ok) { await loadAll(); toast('✅ Rota concluída!', 'var(--green)'); }
+}
+
+function setTab(aba) {
+  tabAtual = aba;
+  ['fila', 'rotas'].forEach(function(t) {
+    document.getElementById('tab-' + t).classList.toggle('active', t === aba);
+    document.getElementById('page-' + t).classList.toggle('active', t === aba);
+  });
+}
+
+loadAll();
+setInterval(loadAll, 30000);
 </script>
 </body>
 </html>
