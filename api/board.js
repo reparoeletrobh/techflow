@@ -8,6 +8,7 @@ const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g, "").tri
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g, "").trim();
 
 const TECNICOS = ["Lucas", "Diego", "Kassio", "Roberto", "Carlos"];
+const EQUIP_GRAVADO_PHASE_ID = "342818728"; // "Equipamento Gravado"
 
 // ── Upstash ────────────────────────────────────────────────────
 async function dbGet(key) {
@@ -1727,6 +1728,41 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, added, skippedPhases: skipped, total: board.cards.length });
       } catch(e) {
         return res.status(200).json({ ok: false, error: "Erro recover-all: " + e.message });
+      }
+    }
+
+    // ── GET equip-gravado — busca cards na fase "Equipamento Gravado" no Pipefy ──
+    if (action === "equip-gravado") {
+      try {
+        const query = "query { phase(id: \"" + EQUIP_GRAVADO_PHASE_ID + "\") { cards(first: 50) { edges { node { id title fields { name value } } } } } }";
+        const r = await fetch(PIPEFY_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (process.env.PIPEFY_TOKEN || "").trim() },
+          body: JSON.stringify({ query }),
+        });
+        const j = await r.json();
+        if (j.errors) return res.status(200).json({ ok: false, error: j.errors[0].message });
+        const edges = (j.data && j.data.phase && j.data.phase.cards) ? j.data.phase.cards.edges : [];
+        const cards = edges.map(function(e) {
+          const node   = e.node;
+          const fields = node.fields || [];
+          const nomeF  = fields.find(function(f){ return f.name.toLowerCase().includes("nome"); });
+          const telF   = fields.find(function(f){ return f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"); });
+          const descF  = fields.find(function(f){ return f.name.toLowerCase().includes("descri"); });
+          const title  = node.title || "";
+          const m      = title.match(/^(.*?)\s+(\d{3,6})$/);
+          return {
+            pipefyId:    String(node.id),
+            osCode:      m ? m[2] : null,
+            nomeContato: (nomeF && nomeF.value) ? nomeF.value.trim() : (m ? m[1].trim() : title),
+            telefone:    (telF  && telF.value)  ? telF.value  : null,
+            descricao:   (descF && descF.value) ? descF.value : null,
+            title,
+          };
+        });
+        return res.status(200).json({ ok: true, cards, count: cards.length });
+      } catch(e) {
+        return res.status(200).json({ ok: false, error: "equip-gravado: " + e.message });
       }
     }
 
