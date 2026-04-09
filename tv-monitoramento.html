@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TV — Monitoramento</title>
+<title>Monitoramento</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -84,13 +84,13 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 <header>
   <div class="logo">
     <div class="logo-dot"></div>
-    <span>TV <b>Assistência</b> — <span style="color:#ef4444">Monitoramento</span></span>
+    <span>Reparo<b>Eletro</b> — <span style="color:#ef4444">Monitoramento</span></span>
   </div>
   <div class="hdr-right">
     <span class="last-update" id="last-update">—</span>
     <button class="hbtn refresh" onclick="loadAll()">⟳ Atualizar</button>
     <button class="hbtn" onclick="abrirOrdem()" style="border-color:rgba(59,158,255,.3);color:var(--blue,#3b9eff);">⚙️ Ordenar</button>
-    <a class="hbtn" href="/tv">Home</a>
+    <a class="hbtn" href="/adm">Home</a>
   </div>
 </header>
 
@@ -167,13 +167,14 @@ async function loadAll() {
   document.getElementById('sections').innerHTML = '<div class="spinner"><div class="spin"></div>Buscando dados...</div>';
 
   try {
-    var [finRes, boardRes, orcRes, compraRes, semRespostaRes, compPecasRes] = await Promise.all([
-      fetch('/api/tv-financeiro?action=load').then(function(r){return r.json();}).catch(function(){return {records:[]};}),
-      fetch('/api/tv-board?action=load').then(function(r){return r.json();}),
-      fetch('/api/tv-orcamento?action=orc-load').then(function(r){return r.json();}),
-      fetch('/api/tv-compra-equip?action=load').then(function(r){return r.json();}).catch(function(){return {fichas:[]};}),
-      fetch('/api/tv-orcamento?action=sem-resposta').then(function(r){return r.json();}).catch(function(){return {cards:[]};}),
-      fetch('/api/tv-compras-pecas?action=load').then(function(r){return r.json();}).catch(function(){return {pecas:[]};})
+    var [finRes, boardRes, orcRes, compraRes, semRespostaRes, compPecasRes, equipGravadoRes] = await Promise.all([
+      fetch('/api/financeiro?action=load').then(function(r){return r.json();}).catch(function(){return {records:[]};}),
+      fetch('/api/board?action=load').then(function(r){return r.json();}),
+      fetch('/api/orcamento?action=orc-load').then(function(r){return r.json();}),
+      fetch('/api/compra-equip?action=load').then(function(r){return r.json();}).catch(function(){return {fichas:[]};}),
+      fetch('/api/orcamento?action=sem-resposta').then(function(r){return r.json();}).catch(function(){return {cards:[]};}),
+      fetch('/api/compras-pecas?action=load').then(function(r){return r.json();}).catch(function(){return {pecas:[]};}).catch(function(){return {pecas:[]}}),
+      fetch('/api/board?action=equip-gravado').then(function(r){return r.json();}).catch(function(){return {cards:[]};})
     ]);
 
     var cards = boardRes.board?.cards || [];
@@ -191,6 +192,7 @@ async function loadAll() {
       pecasPendentes:    (compPecasRes.pecas||[]).filter(function(p){return p.status==='pendente';}),
       pecasAgPagamento:  (compPecasRes.pecas||[]).filter(function(p){return p.status==='aguardando_pagamento';}),
       pecasOnline:       (compPecasRes.pecas||[]).filter(function(p){return p.tipoCompra==='online'&&p.previsaoChegada&&p.status!=='pago';}),
+      equipGravado:      equipGravadoRes.cards || [],
     };
 
     renderSummary();
@@ -265,7 +267,13 @@ function renderSections() {
       }, 'equipComprado');
     },
     urgencia: function() {
-      return renderSection('Em Urgência', data.urgencia, '#ef4444', function(c){
+      return renderSection('Equipamento Gravado — aguardando envio de vídeo', data.equipGravado, '#22c55e', function(c){
+        return '<div style="font-size:13px;font-weight:600">' + escH(c.nomeContato || c.title || '—') + '</div>'
+          + (c.osCode ? '<div style="font-family:var(--fm);font-size:10px;color:var(--muted)">OS #' + escH(c.osCode) + '</div>' : '')
+          + (c.descricao ? '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + escH(c.descricao.substring(0,80)) + '</div>' : '');
+      }, 'equip-gravado') +
+
+      renderSection('Em Urgência', data.urgencia, '#ef4444', function(c){
         var ms=timeSince(c.addedAt),hot=ms&&ms>3600000*4;
         return '<div class="item-card" style="--c:#ef4444"><div class="item-nome">'+escH(c.nomeContato||'—')+'</div><div class="item-desc">'+escH((c.descricao||'').slice(0,80))+'</div><div class="item-age'+(hot?' hot':'')+'" style="--c:#ef4444">⚡ '+fmtSince(c.addedAt)+'</div></div>';
       }, 'urgencia');
@@ -408,7 +416,13 @@ renderSections = function() {
       });
     },
     urgencia: function() {
-      return renderSection('Em Urgência', data.urgencia, '#ef4444', function(c){
+      return renderSection('Equipamento Gravado — aguardando envio de vídeo', data.equipGravado, '#22c55e', function(c){
+        return '<div style="font-size:13px;font-weight:600">' + escH(c.nomeContato || c.title || '—') + '</div>'
+          + (c.osCode ? '<div style="font-family:var(--fm);font-size:10px;color:var(--muted)">OS #' + escH(c.osCode) + '</div>' : '')
+          + (c.descricao ? '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + escH(c.descricao.substring(0,80)) + '</div>' : '');
+      }, 'equip-gravado') +
+
+      renderSection('Em Urgência', data.urgencia, '#ef4444', function(c){
         var ms=timeSince(c.addedAt);var hot=ms&&ms>3600000*4;
         return '<div class="item-card" style="--c:#ef4444"><div class="item-nome">'+escH(c.nomeContato||'—')+'</div><div class="item-desc">'+escH((c.descricao||'').slice(0,80))+'</div><div class="item-age'+(hot?' hot':'')+'" style="--c:#ef4444">⚡ '+fmtSince(c.addedAt)+'</div></div>';
       });
