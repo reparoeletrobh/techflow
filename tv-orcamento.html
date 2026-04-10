@@ -587,8 +587,20 @@ function loadAll() {
   }).catch(function(){});
 }
 
+// Auto-sync: busca novos cards no Pipefy a cada 3 minutos
+async function autoSync() {
+  try {
+    var r = await fetch('/api/tv-orcamento?action=orc-sync').then(function(r){return r.json();});
+    if (r.ok && r.newCount > 0) {
+      loadAll();
+    }
+  } catch(e) { /* silencioso */ }
+}
+
 loadAll();
+autoSync(); // sync imediato ao abrir
 setInterval(loadAll, 60000);
+setInterval(autoSync, 180000);
 </script>
 </body>
 </html>
