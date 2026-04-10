@@ -499,7 +499,15 @@ function limparFiltro() {
   document.getElementById('filtro-ate').value = '';
   filtroAtivo = null;
   document.querySelectorAll('.pshort').forEach(b => b.classList.remove('active'));
-  renderLiveStrip();
+  // Recalcula acumulado real a partir de data.diario (todos os dias)
+  if (data && data.diario && data.diario.length) {
+    var mAcum = calcMetricasJS(data.diario);
+    document.getElementById('live-title').innerHTML = 'Acumulado <span>// todos os dados</span>';
+    document.getElementById('live-sub').textContent = data.diario.length + ' dia(s) no histórico';
+    renderStrip(mAcum);
+  } else {
+    renderLiveStrip();
+  }
   renderCharts();
 }
 
@@ -508,7 +516,7 @@ async function renderFiltrado() {
   var { de, ate } = filtroAtivo;
 
   // Filtra dias no período
-  var diasFiltrados = (data.diario || []).filter(d => {
+  var diasFiltrados = (data.diario || []).filter(function(d) {
     var dData = d.data ? d.data.slice(0,10) : '';
     if (de  && dData < de)  return false;
     if (ate && dData > ate) return false;
@@ -519,7 +527,7 @@ async function renderFiltrado() {
   var m = calcMetricasJS(diasFiltrados);
 
   // Atualiza título
-  var fmtD = d => { var p=d.split('-'); return (p[2]||'')+'/'+(p[1]||''); };
+  var fmtD = function(d) { var p=d.split('-'); return (p[2]||'')+'/'+(p[1]||''); };
   var label = (de && ate) ? fmtD(de)+' – '+fmtD(ate) : (de ? 'A partir de '+fmtD(de) : 'Até '+fmtD(ate));
   document.getElementById('live-title').innerHTML = 'Período <span>// ' + label + '</span>';
   document.getElementById('live-sub').textContent = diasFiltrados.length + ' dia(s) com dados lançados';
@@ -528,8 +536,58 @@ async function renderFiltrado() {
 
   // Gráficos filtrados
   var semanasFiltradas = agruparSemanas(diasFiltrados);
-  renderBarChart('chart-cac',    semanasFiltradas, s => s.cac,        fmtSemana, '#f97316', BRL);
-  renderBarChart('chart-ticket', semanasFiltradas, s => s.ticketMedio, fmtSemana, '#a855f7', BRL);
+  renderBarChart('chart-cac',    semanasFiltradas, function(s) { return s.cac; },         fmtSemana, '#f97316', BRL);
+  renderBarChart('chart-ticket', semanasFiltradas, function(s) { return s.ticketMedio; }, fmtSemana, '#a855f7', BRL);
+
+  // Atualiza tabelas das abas com dados filtrados
+  if (curTab === 'diario')  renderDiarioFiltrado(diasFiltrados);
+  if (curTab === 'semanal') renderSemanalFiltrado(semanasFiltradas);
+  if (curTab === 'mensal')  renderMensalFiltrado(agruparMeses(diasFiltrados));
+}
+
+// Renderiza tabela diária com dados filtrados
+function renderDiarioFiltrado(dias) {
+  var rows = dias.slice().reverse();
+  var el = document.getElementById('diario-body');
+  if (!el) return;
+  el.innerHTML = rows.length ? rows.map(function(m) {
+    var roiClass = m.roi == null ? '' : (m.roi >= 0 ? 'positive' : 'negative');
+    return '<tr><td class="td-date">' + fmtData(m.data) + '</td><td>' + NUM(m.fichas) + '</td><td class="td-money">' + BRL(m.investimento) + '</td><td>' + NUM(m.erpCount) + '</td><td class="td-money">' + BRL(m.valorErp) + '</td><td class="td-cac">' + BRL(m.cac) + '</td><td class="td-ticket">' + BRL(m.ticketMedio) + '</td><td class="td-cpf">' + BRL(m.custoPorFicha) + '</td><td class="td-roi ' + roiClass + '">' + PCT(m.roi) + '</td></tr>';
+  }).join('') : '<tr><td colspan="9" class="empty-state">Nenhum dado no período selecionado.</td></tr>';
+}
+
+function renderSemanalFiltrado(semanas) {
+  var rows = semanas.slice().reverse();
+  var el = document.getElementById('semanal-body');
+  if (!el) return;
+  el.innerHTML = rows.length ? rows.map(function(m) {
+    var roiClass = m.roi == null ? '' : (m.roi >= 0 ? 'positive' : 'negative');
+    return '<tr><td class="td-date">' + fmtSemana(m.semana) + '</td><td>' + NUM(m.fichas) + '</td><td class="td-money">' + BRL(m.investimento) + '</td><td>' + NUM(m.erpCount) + '</td><td class="td-money">' + BRL(m.valorErp) + '</td><td class="td-cac">' + BRL(m.cac) + '</td><td class="td-ticket">' + BRL(m.ticketMedio) + '</td><td class="td-cpf">' + BRL(m.custoPorFicha) + '</td><td class="td-roi ' + roiClass + '">' + PCT(m.roi) + '</td></tr>';
+  }).join('') : '<tr><td colspan="9" class="empty-state">Sem dados no período.</td></tr>';
+}
+
+function agruparMeses(dias) {
+  var meses = {};
+  dias.forEach(function(d) {
+    var mk = d.data ? d.data.slice(0,7) : '';
+    if (!mk) return;
+    if (!meses[mk]) meses[mk] = [];
+    meses[mk].push(d);
+  });
+  return Object.entries(meses).sort(function(a,b){ return a[0].localeCompare(b[0]); })
+    .map(function(e) { return Object.assign({ mes: e[0] }, calcMetricasJS(e[1])); });
+}
+
+function renderMensalFiltrado(meses) {
+  var rows = meses.slice().reverse();
+  var el = document.getElementById('mensal-body');
+  if (!el) return;
+  el.innerHTML = rows.length ? rows.map(function(m) {
+    var roiClass = m.roi == null ? '' : (m.roi >= 0 ? 'positive' : 'negative');
+    var partes = m.mes.split('-');
+    var label = (partes[1]||'') + '/' + (partes[0]||'');
+    return '<tr><td class="td-date">' + label + '</td><td>' + NUM(m.fichas) + '</td><td class="td-money">' + BRL(m.investimento) + '</td><td>' + NUM(m.erpCount) + '</td><td class="td-money">' + BRL(m.valorErp) + '</td><td class="td-cac">' + BRL(m.cac) + '</td><td class="td-ticket">' + BRL(m.ticketMedio) + '</td><td class="td-cpf">' + BRL(m.custoPorFicha) + '</td><td class="td-roi ' + roiClass + '">' + PCT(m.roi) + '</td></tr>';
+  }).join('') : '<tr><td colspan="9" class="empty-state">Sem dados no período.</td></tr>';
 }
 
 function calcMetricasJS(dias) {
@@ -921,7 +979,7 @@ async function syncBoard() {
   document.getElementById('filtro-de').value  = semDe;
   document.getElementById('filtro-ate').value = semAte;
   filtroAtivo = { de: semDe, ate: semAte };
-  document.querySelectorAll('.pshort')[0]?.classList.add('active');
+  document.querySelectorAll('.pshort')[1]?.classList.add('active'); // 'Esta semana' é o índice 1
 
   // Carrega dados — filtroAtivo já está setado, load() usará o filtro correto
   load();
