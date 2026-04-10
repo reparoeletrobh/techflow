@@ -59,11 +59,19 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .pc-actions{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap;}
 .pb{font-family:var(--fm);font-size:9px;color:var(--accent);padding:2px 7px;background:rgba(59,158,255,.1);border:1px solid rgba(59,158,255,.2);border-radius:4px;}
 .pb.vencida{color:var(--red);background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.2);}
-.grupo{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden;}
-.grupo-head{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:linear-gradient(90deg,rgba(249,115,22,.1),rgba(249,115,22,.03));border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px;}
+.grupo{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--orange);border-radius:12px;margin-bottom:16px;overflow:hidden;}
+.grupo-head{display:flex;align-items:flex-start;justify-content:space-between;padding:14px 16px;background:rgba(249,115,22,.05);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px;}
+.grupo-head-info{flex:1;}
+.grupo-forn{font-family:var(--fh);font-size:14px;font-weight:800;color:#fff;margin-bottom:4px;}
+.grupo-meta-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:4px;}
 .grupo-lbl{font-family:var(--fm);font-size:10px;font-weight:700;color:var(--orange);display:flex;align-items:center;gap:6px;}
+.grupo-valor{font-family:var(--fh);font-size:16px;font-weight:900;color:var(--green);}
+.grupo-tipo{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;background:rgba(59,158,255,.15);color:var(--accent);border:1px solid rgba(59,158,255,.3);}
+.grupo-tipo.online{background:rgba(168,85,247,.15);color:#a855f7;border-color:rgba(168,85,247,.3);}
 .grupo-qtd{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;background:rgba(249,115,22,.15);color:var(--orange);border:1px solid rgba(249,115,22,.3);}
-.grupo-acts{display:flex;gap:6px;flex-wrap:wrap;}
+.grupo-desc{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px;}
+.grupo-pgto{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px;}
+.grupo-acts{display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start;}
 .grupo-body{padding:8px;}
 .grupo-body .pc{border-left:3px solid var(--orange);margin-bottom:6px;}
 .grupo-body .pc:last-child{margin-bottom:0;}
@@ -172,6 +180,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
       </div>
     </div>
     <div><div class="fl">Fornecedor</div><input class="fi" id="m-forn" placeholder="Nome da loja ou site"/></div>
+    <div><div class="fl">Valor Total (R$)</div><input class="fi" id="m-valor" type="number" step="0.01" min="0" placeholder="0,00"/></div>
+    <div><div class="fl">Descrição do Pedido</div><input class="fi" id="m-desc-grupo" placeholder="Ex: Placa T-Con Samsung, capacitores..."/></div>
     <div><div class="fl">Dados Pagamento</div><input class="fi" id="m-pag" placeholder="PIX, boleto, cartao..."/></div>
     <div id="prev-wrap" style="display:none;"></div>
     <div class="mod-foot">
@@ -424,7 +434,15 @@ function setTipo(t) {
 async function finCompra() {
   var prevs = {};
   if (tcAtual === 'online') idsComprar.forEach(function(id) { var e = document.getElementById('prv-' + id); if (e && e.value) prevs[id] = e.value; });
-  var d = await req('comprar', { ids: idsComprar, fornecedor: document.getElementById('m-forn').value.trim(), tipoCompra: tcAtual, dadosPagamento: document.getElementById('m-pag').value.trim(), previsoes: prevs });
+  var d = await req('comprar', {
+    ids: idsComprar,
+    fornecedor: document.getElementById('m-forn').value.trim(),
+    tipoCompra: tcAtual,
+    valor: parseFloat(document.getElementById('m-valor').value) || null,
+    descricaoGrupo: document.getElementById('m-desc-grupo').value.trim(),
+    dadosPagamento: document.getElementById('m-pag').value.trim(),
+    previsoes: prevs
+  });
   if (d.ok) { fechaCompra(); sel.clear(); await load(); toast('Movido para Ag. Pagamento!', 'var(--green)'); }
   else toast('Erro: ' + d.error, 'var(--red)');
 }
