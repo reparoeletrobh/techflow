@@ -705,8 +705,17 @@ function renderStrip(m) {
   //   sem filtro → ao vivo Pipefy
   //   com filtro e m.valorErp > 0 (lançado manual) → usa lançado
   //   com filtro e m.valorErp = 0 → usa ao vivo (melhor estimativa)
-  var erpValorManual = filtroAtivo ? (m.valorErp || 0) : 0;
-  var erpValor  = !filtroAtivo ? e.valor : (erpValorManual > 0 ? erpValorManual : e.valor);
+  // erpValor: consistente com erpCount
+  // - período inclui hoje → usa LIVE e.valor (mesmo conjunto que e.count)
+  // - período passado → usa metaLog m.valorErp (se lançado), senão 0
+  var erpValor;
+  if (!filtroAtivo) {
+    erpValor = e.valor; // sem filtro: live total
+  } else if (periodoIncluiHoje) {
+    erpValor = e.valor; // mesmo conjunto do live count (e.count)
+  } else {
+    erpValor = m.valorErp || 0; // período passado: metaLog
+  }
   // Ticket Médio: valorErp / erpCount
   var ticketLive = erpCount > 0 ? (erpValor / erpCount).toFixed(2) : null;
   // Todos os 3 cards do topo sempre usam dados ao vivo do Pipefy
