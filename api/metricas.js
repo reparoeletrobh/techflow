@@ -211,7 +211,7 @@ module.exports = async function handler(req, res) {
     // fichas/investimento/valorErp = lançamento manual (prioridade)
     // erpCount/coletasSolic/orcEnviado = SEMPRE metaLog (automático)
     // valorErp fallback: metaLog (quando board.js começar a gravar valor)
-    const INVEST_PADRAO = 1400; // R$1.400/dia padrão
+    const INVEST_PADRAO = 1428.57; // R$10.000/semana ÷ 7 dias
     const diasEnriq = db.dias.map(d => ({
       ...d,
       fichas:       (d.fichas > 0) ? d.fichas : (fichasLogPorDia[d.data] || 0),
