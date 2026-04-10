@@ -709,21 +709,37 @@ async function testarFichasIndividualmente(pendentes, tipo, key, secret) {
     }
   }
 
-  // ── POST ou GET limpar-tudo — limpa fila, move fichas atuais para removedIds ──
+  // ── POST ou GET limpar-tudo — limpa fila inteira ─────────────
   if (action === "limpar-tudo") {
     const db = await dbGet(LALA_KEY) || {};
     const fichasAtuais = db.fichas || [];
-    // Adiciona todas as fichas atuais ao removedIds para não reimportá-las
     const removedIds = db.removedIds || [];
     fichasAtuais.forEach(f => {
       const key = f.pipefyId + ":" + f.tipo;
       if (!removedIds.includes(key)) removedIds.push(key);
     });
-    await dbSet(LALA_KEY, {
-      fichas:     [],
-      removedIds: removedIds,
-    });
+    await dbSet(LALA_KEY, { fichas: [], removedIds });
     return res.status(200).json({ ok: true, msg: "Fila limpa. " + fichasAtuais.length + " ficha(s) arquivadas." });
+  }
+
+  // ── POST limpar-tipo — limpa apenas coleta OU apenas entrega ──
+  if (action === "limpar-tipo") {
+    const tipo = (req.body && req.body.tipo) || req.query.tipo;
+    if (!tipo || !["coleta","entrega"].includes(tipo))
+      return res.status(400).json({ ok: false, error: "tipo deve ser 'coleta' ou 'entrega'" });
+    const db = await dbGet(LALA_KEY) || {};
+    const fichasAtuais = db.fichas || [];
+    const removedIds   = db.removedIds || [];
+    // Arquiva apenas as fichas do tipo informado
+    fichasAtuais.filter(f => f.tipo === tipo).forEach(f => {
+      const key = f.pipefyId + ":" + f.tipo;
+      if (!removedIds.includes(key)) removedIds.push(key);
+    });
+    db.fichas     = fichasAtuais.filter(f => f.tipo !== tipo);
+    db.removedIds = removedIds;
+    const removidas = fichasAtuais.length - db.fichas.length;
+    await dbSet(LALA_KEY, db);
+    return res.status(200).json({ ok: true, tipo, removidas, msg: removidas + " ficha(s) de " + tipo + " arquivadas." });
   }
 
   // ── POST limpar-enviados ──────────────────────────────────────
