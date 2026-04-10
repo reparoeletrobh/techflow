@@ -190,12 +190,15 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
     </div>
   </div>
 </div>
-<!-- MODAL PAGAMENTO -->
+<!-- MODAL DADOS DA COMPRA -->
 <div class="ov" id="mod-pgto">
-  <div class="mod" style="width:400px;">
-    <div class="mod-title">Dados de Pagamento</div>
+  <div class="mod" style="width:440px;">
+    <div class="mod-title">📦 Dados da Compra</div>
     <div id="pgto-body"></div>
-    <div class="mod-foot"><button class="btn-sm" onclick="document.getElementById('mod-pgto').classList.remove('open')">Fechar</button></div>
+    <div class="mod-foot" style="gap:8px;">
+      <button class="btn-sm" onclick="fecharModPgto()">Fechar</button>
+      <button class="btn-sm" id="btn-pagar-modal" style="background:var(--green);color:#000;border-color:var(--green);font-weight:700;display:none;" onclick="pagarDoModal()">✅ Confirmar Pagamento</button>
+    </div>
   </div>
 </div>
 <!-- MODAL CAMINHO -->
@@ -279,7 +282,7 @@ function card(p, tipo) {
   if (tipo === 'p') {
     ac = '<div class="pc-actions"><button class="btn-sm" onclick="comprar1(\'' + p.id + '\')">Comprar</button><button class="btn-sm" onclick="del(\'' + p.id + '\')">Remover</button></div>';
   } else if (tipo === 'a') {
-    ac = '<div class="pc-actions"><button class="btn-sm" style="color:var(--green);" onclick="confPag([\'' + p.id + '\'])">Pago</button><button class="btn-sm" style="color:var(--accent);" onclick="vPgto(\'' + p.id + '\')">Ver Pgto</button>' + (p.tipoCompra === 'online' ? '<button class="btn-sm" onclick="editPrev(\'' + p.id + '\')">Previsao</button>' : '') + '</div>';
+    ac = '<div class="pc-actions"><button class="btn-sm" style="color:var(--accent);border-color:rgba(59,158,255,.3);" onclick="vPgto(\'' + p.id + '\')">📦 Ver Dados</button>' + (p.tipoCompra === 'online' ? '<button class="btn-sm" onclick="editPrev(\'' + p.id + '\')">Previsao</button>' : '') + '</div>';
   } else if (tipo === 'g') {
     ac = '<div class="pc-actions"><button class="btn-sm" style="color:var(--accent);border-color:rgba(59,158,255,.3);" onclick="abrirCaminho([\'' + p.id + '\'])">A Caminho</button><button class="btn-sm" onclick="vPgto(\'' + p.id + '\')">Ver Pgto</button></div>';
   }
@@ -317,7 +320,7 @@ function rAgu(lst) {
     var forn = esc(gps[0].fornecedor || '---');
     var tc = gps[0].tipoCompra === 'online' ? 'Online' : 'Loja';
     h += '<div class="grupo"><div class="grupo-head"><div class="grupo-lbl">' + forn + ' - ' + tc + ' <span class="grupo-qtd">' + gps.length + ' pecas</span></div>'
-      + '<div class="grupo-acts"><button class="btn-sm" style="color:var(--accent);" onclick="vGrupo(\'' + gid + '\')">Ver Pgto</button><button class="btn-sm" style="color:var(--green);" onclick="confGrupo(\'' + gid + '\')">Pagar grupo</button></div>'
+      + '<div class="grupo-acts"><button class="btn-sm" style="color:var(--accent);" onclick="vGrupo(\'' + gid + '\')">📦 Ver Dados</button><button class="btn-sm" style="color:var(--green);" onclick="confGrupo(\'' + gid + '\')">✅ Pago</button></div>'
       + '</div><div class="grupo-body">' + gps.map(function(p) { return card(p, 'a'); }).join('') + '</div></div>';
   });
   ind.forEach(function(p) { h += card(p, 'a'); });
@@ -458,10 +461,77 @@ async function confGrupo(gid) {
 }
 function vPgto(id) { var p = itens.find(function(x) { return x.id === id; }); if (p) mostraPgto([p]); }
 function vGrupo(gid) { var gps = itens.filter(function(p) { return p.grupoId === gid; }); if (gps.length) mostraPgto(gps); }
+var _pgtoIds = []; // ids para confirmar pagamento pelo modal
+
+function fecharModPgto() {
+  document.getElementById('mod-pgto').classList.remove('open');
+  _pgtoIds = [];
+}
+
+function pagarDoModal() {
+  if (_pgtoIds.length) { fecharModPgto(); confPag(_pgtoIds); }
+}
+
 function mostraPgto(gps) {
   var p = gps[0];
-  var h = row('Fornecedor', p.fornecedor || '---') + row('Tipo', p.tipoCompra === 'online' ? 'Online' : 'Loja Fisica') + row('Pagamento', p.dadosPagamento || '---') + row('Comprado em', fd(p.compradoEm));
-  if (gps.length > 1) h += row('Pecas (' + gps.length + ')', gps.map(function(x) { return esc(x.descricao + (x.os ? ' - OS:' + x.os : '')); }).join('<br>'));
+  var isGrupo = gps.length > 1;
+  var valor = p.valor ? 'R$ ' + parseFloat(p.valor).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : null;
+  var h = '';
+
+  // Cabeçalho com fornecedor e valor em destaque
+  h += '<div style="background:var(--surface2);border-radius:8px;padding:12px 14px;margin-bottom:12px;">'
+    + '<div style="font-family:var(--fh);font-size:16px;font-weight:800;color:#fff;">' + esc(p.fornecedor || '---') + '</div>'
+    + '<div style="display:flex;gap:10px;align-items:center;margin-top:6px;flex-wrap:wrap;">'
+    + (valor ? '<div style="font-family:var(--fh);font-size:18px;font-weight:900;color:var(--green);">' + valor + '</div>' : '')
+    + '<span style="font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;background:rgba(59,158,255,.15);color:var(--accent);border:1px solid rgba(59,158,255,.3);">' + (p.tipoCompra === 'online' ? 'Online' : 'Loja Física') + '</span>'
+    + '</div>'
+    + '</div>';
+
+  // Descrição do grupo
+  if (p.descricaoGrupo) {
+    h += '<div style="margin-bottom:10px;">'
+      + '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;">Descrição</div>'
+      + '<div style="font-size:13px;color:var(--text);">' + esc(p.descricaoGrupo) + '</div>'
+      + '</div>';
+  }
+
+  // Dados de pagamento
+  if (p.dadosPagamento) {
+    h += '<div style="background:rgba(59,158,255,.06);border:1px solid rgba(59,158,255,.2);border-radius:8px;padding:10px 12px;margin-bottom:10px;">'
+      + '<div style="font-family:var(--fm);font-size:9px;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;">💳 Dados de Pagamento</div>'
+      + '<div style="font-family:var(--fm);font-size:12px;color:var(--text);">' + esc(p.dadosPagamento) + '</div>'
+      + '</div>';
+  }
+
+  // Lista de itens
+  h += '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;">Itens (' + gps.length + ')</div>';
+  h += '<div style="display:flex;flex-direction:column;gap:4px;max-height:180px;overflow-y:auto;">';
+  gps.forEach(function(x) {
+    h += '<div style="background:var(--surface2);border-radius:6px;padding:7px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;">'
+      + '<div>'
+        + '<div style="font-size:12px;font-weight:600;color:#fff;">' + esc(x.descricao) + '</div>'
+        + (x.os ? '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);">OS: ' + esc(x.os) + '</div>' : '')
+        + (x.quantidade > 1 ? '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);">Qtd: ' + x.quantidade + '</div>' : '')
+      + '</div>'
+      + '<span style="font-family:var(--fm);font-size:9px;padding:2px 6px;border-radius:99px;background:rgba(249,115,22,.1);color:var(--orange);white-space:nowrap;">Ag. Pgto</span>'
+      + '</div>';
+  });
+  h += '</div>';
+
+  // Comprado em
+  if (p.compradoEm) {
+    h += '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:8px;">Pedido em: ' + fd(p.compradoEm) + '</div>';
+  }
+
+  // Configura ids para confirmar pelo botão do modal
+  _pgtoIds = gps.map(function(x) { return x.id; });
+  var btnPagar = document.getElementById('btn-pagar-modal');
+  if (btnPagar) {
+    // Só mostra botão pagar se status for aguardando_pagamento
+    var podeConfirmar = gps.every(function(x) { return x.status === 'aguardando_pagamento'; });
+    btnPagar.style.display = podeConfirmar ? 'inline-flex' : 'none';
+  }
+
   document.getElementById('pgto-body').innerHTML = h;
   document.getElementById('mod-pgto').classList.add('open');
 }
