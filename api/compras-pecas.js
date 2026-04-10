@@ -56,7 +56,7 @@ module.exports = async (req, res) => {
 
   // ── POST comprar — marca peças como compradas (um ou mais) ────
   if (req.method === "POST" && action === "comprar") {
-    const { ids, fornecedor, tipoCompra, dadosPagamento, previsoes } = req.body || {};
+    const { ids, fornecedor, tipoCompra, dadosPagamento, previsoes, valor, descricaoGrupo } = req.body || {};
     if (!ids?.length) return res.status(400).json({ ok:false, error:"ids obrigatórios" });
     const grupoId = ids.length > 1 ? uid() : null;
     const now = new Date().toISOString();
@@ -65,6 +65,8 @@ module.exports = async (req, res) => {
       if (!p) continue;
       p.status        = "aguardando_pagamento";
       p.fornecedor    = fornecedor || "";
+      p.valor         = valor || null;
+      p.descricaoGrupo= descricaoGrupo || "";
       p.tipoCompra    = tipoCompra || "loja"; // loja | online
       p.dadosPagamento= dadosPagamento || "";
       p.compradoEm    = now;
