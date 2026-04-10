@@ -469,7 +469,8 @@ function fecharModPgto() {
 }
 
 function pagarDoModal() {
-  if (_pgtoIds.length) { fecharModPgto(); confPag(_pgtoIds); }
+  var ids = _pgtoIds.slice(); // copia antes de fechar (fecharModPgto zera _pgtoIds)
+  if (ids.length) { fecharModPgto(); confPag(ids); }
 }
 
 function mostraPgto(gps) {
