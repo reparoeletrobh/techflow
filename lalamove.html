@@ -400,14 +400,21 @@ async function remover(pipefyId, tipo) {
 
 // ── LIMPAR FILA ────────────────────────────────────────────────
 async function limparFila() {
-  if (!confirm("Limpar toda a fila? Esta ação não pode ser desfeita.")) return;
-  var d = await fetch('/api/lalamove?action=limpar-tudo').then(r=>r.json());
+  var tipo = curTab; // "coleta" ou "entrega"
+  var label = tipo === "coleta" ? "Coletas" : "Entregas";
+  if (!confirm("Limpar a fila de " + label + "? As fichas não serão reimportadas automaticamente.")) return;
+  var d = await fetch('/api/lalamove?action=limpar-tipo', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tipo: tipo })
+  }).then(r => r.json());
   if (d.ok) {
-    fichas = [];
+    fichas = fichas.filter(function(f) { return f.tipo !== tipo; });
     updateBadges();
-    renderList("coleta");
-    renderList("entrega");
-    showToast("🗑️","Fila limpa!","");
+    renderList(tipo);
+    showToast("🗑️", "Fila de " + label + " limpa!", d.removidas + " ficha(s) removida(s)");
+  } else {
+    showToast("❌", "Erro", d.error || "Falha ao limpar");
   }
 }
 
