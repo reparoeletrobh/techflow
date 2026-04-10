@@ -470,7 +470,14 @@ function markShortcut(idx) {
   document.querySelectorAll('.pshort').forEach((b,i) => b.classList.toggle('active', i===idx));
 }
 function atalhoHoje()    { var h = hj(); setFiltro(h, h); markShortcut(0); }
-function atalhoSemana()  { var h = new Date(); var d = h.getDay(); var s = new Date(h); s.setDate(h.getDate()-d); var e = new Date(s); e.setDate(s.getDate()+6); setFiltro(df(s), df(e)); markShortcut(1); }
+function atalhoSemana()  {
+  var h = new Date();
+  var d = h.getDay(); // 0=Dom,1=Seg,...,6=Sab
+  var daysToMon = (d === 0) ? 6 : d - 1; // distância até segunda
+  var seg = new Date(h); seg.setDate(h.getDate() - daysToMon);
+  var dom = new Date(seg); dom.setDate(seg.getDate() + 6);
+  setFiltro(df(seg), df(dom)); markShortcut(1);
+}
 function atalhoMes()     { var h = new Date(); setFiltro(h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-01', hj()); markShortcut(2); }
 function atalho7d()      { var s = new Date(); s.setDate(s.getDate()-6); setFiltro(df(s), hj()); markShortcut(3); }
 function atalho30d()     { var s = new Date(); s.setDate(s.getDate()-29); setFiltro(df(s), hj()); markShortcut(4); }
@@ -497,9 +504,10 @@ function aplicarFiltro() {
 function limparFiltro() {
   // Reseta para semana vigente (padrão da página)
   var _now = new Date(); var _d = _now.getDay();
-  var _sun = new Date(_now); _sun.setDate(_now.getDate() - _d);
-  var _sat = new Date(_sun); _sat.setDate(_sun.getDate() + 6);
-  var semDe  = df(_sun), semAte = df(_sat);
+  var _daysToMon = (_d === 0) ? 6 : _d - 1;
+  var _seg = new Date(_now); _seg.setDate(_now.getDate() - _daysToMon);
+  var _dom = new Date(_seg); _dom.setDate(_seg.getDate() + 6);
+  var semDe  = df(_seg), semAte = df(_dom);
   document.getElementById('filtro-de').value  = semDe;
   document.getElementById('filtro-ate').value = semAte;
   filtroAtivo = { de: semDe, ate: semAte };
@@ -689,7 +697,10 @@ function renderStrip(m) {
   // Quando há filtro: usa dados do período para ERP/Valor
   // Sem filtro: usa ao vivo do Pipefy
   // ERP count: metaLog do período (ou ao vivo sem filtro)
-  var erpCount  = filtroAtivo ? (m.erpCount || 0) : e.count;
+  // Quando o período inclui hoje, usa o count AO VIVO do Pipefy (mais preciso que cache parcial)
+  var hojeFmt = df(new Date());
+  var periodoIncluiHoje = filtroAtivo && filtroAtivo.de <= hojeFmt && hojeFmt <= filtroAtivo.ate;
+  var erpCount = !filtroAtivo ? e.count : (periodoIncluiHoje ? e.count : (m.erpCount || 0));
   // Valor ERP:
   //   sem filtro → ao vivo Pipefy
   //   com filtro e m.valorErp > 0 (lançado manual) → usa lançado
@@ -1015,12 +1026,13 @@ async function syncBoard() {
   // Lançar dados: data padrão = hoje
   document.getElementById('inp-data').value = df(new Date());
 
-  // Filtro padrão = semana vigente (domingo a sábado)
+  // Filtro padrão = semana vigente (segunda a domingo)
   var _now = new Date(); var _d = _now.getDay();
-  var _sun = new Date(_now); _sun.setDate(_now.getDate() - _d);
-  var _sat = new Date(_sun); _sat.setDate(_sun.getDate() + 6);
-  var semDe  = df(_sun);
-  var semAte = df(_sat);
+  var _daysToMon2 = (_d === 0) ? 6 : _d - 1;
+  var _seg2 = new Date(_now); _seg2.setDate(_now.getDate() - _daysToMon2);
+  var _dom2 = new Date(_seg2); _dom2.setDate(_seg2.getDate() + 6);
+  var semDe  = df(_seg2);
+  var semAte = df(_dom2);
   document.getElementById('filtro-de').value  = semDe;
   document.getElementById('filtro-ate').value = semAte;
   filtroAtivo = { de: semDe, ate: semAte };
