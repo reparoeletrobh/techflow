@@ -495,19 +495,18 @@ function aplicarFiltro() {
 }
 
 function limparFiltro() {
-  document.getElementById('filtro-de').value  = '';
-  document.getElementById('filtro-ate').value = '';
-  filtroAtivo = null;
-  document.querySelectorAll('.pshort').forEach(b => b.classList.remove('active'));
-  // Recalcula acumulado real a partir de data.diario (todos os dias)
-  if (data && data.diario && data.diario.length) {
-    var mAcum = calcMetricasJS(data.diario);
-    document.getElementById('live-title').innerHTML = 'Acumulado <span>// todos os dados</span>';
-    document.getElementById('live-sub').textContent = data.diario.length + ' dia(s) no histórico';
-    renderStrip(mAcum);
-  } else {
-    renderLiveStrip();
-  }
+  // Reseta para semana vigente (padrão da página)
+  var _now = new Date(); var _d = _now.getDay();
+  var _sun = new Date(_now); _sun.setDate(_now.getDate() - _d);
+  var _sat = new Date(_sun); _sat.setDate(_sun.getDate() + 6);
+  var semDe  = df(_sun), semAte = df(_sat);
+  document.getElementById('filtro-de').value  = semDe;
+  document.getElementById('filtro-ate').value = semAte;
+  filtroAtivo = { de: semDe, ate: semAte };
+  document.querySelectorAll('.pshort').forEach(function(b, i) {
+    b.classList.toggle('active', i === 1); // 'Esta semana' = índice 1
+  });
+  renderFiltrado();
   renderCharts();
 }
 
@@ -683,8 +682,8 @@ function metaBar(atual, meta) {
 
 function renderStrip(m) {
   // m = métricas do período (ou resumo geral se sem filtro)
-  if (!data || !data.erpAtual) return;
-  var e = data.erpAtual;
+  if (!data) return;
+  var e = data.erpAtual || { count: 0, valor: 0 };
   var periodoLabel = filtroAtivo ? 'Período' : 'Acumulado';
 
   // Quando há filtro: usa dados do período para ERP/Valor
