@@ -524,7 +524,7 @@ async function renderFiltrado() {
   });
 
   // Calcula métricas do período
-  var m = calcMetricasJS(diasFiltrados);
+  var m = calcMetricasJS(diasFiltrados, de, ate);
 
   // Atualiza título
   var fmtD = function(d) { var p=d.split('-'); return (p[2]||'')+'/'+(p[1]||''); };
@@ -590,15 +590,39 @@ function renderMensalFiltrado(meses) {
   }).join('') : '<tr><td colspan="9" class="empty-state">Sem dados no período.</td></tr>';
 }
 
-function calcMetricasJS(dias) {
-  var fichas=0, invest=0, erp=0, valorErp=0, coletas=0, orc=0;
-  dias.forEach(d => { fichas+=d.fichas||0; invest+=d.investimento||0; erp+=d.erpCount||0; valorErp+=d.valorErp||0; coletas+=d.coletasSolic||0; orc+=d.orcEnviado||0; });
+var INVEST_SEMANAL = 10000; // R$10.000 fixo por semana (7 dias corridos)
+
+function investPorPeriodo(de, ate) {
+  // Calcula investimento com base em dias CORRIDOS do calendário ÷ 7 × R$10.000
+  if (!de || !ate) return null;
+  var d1 = new Date(de + 'T00:00:00'), d2 = new Date(ate + 'T00:00:00');
+  var calDays = (d2 - d1) / 86400000 + 1;
+  return +(calDays / 7 * INVEST_SEMANAL).toFixed(2);
+}
+
+function calcMetricasJS(dias, de, ate) {
+  var fichas=0, erp=0, valorErp=0, coletas=0, orc=0;
+  dias.forEach(function(d) {
+    fichas   += d.fichas        || 0;
+    erp      += d.erpCount      || 0;
+    valorErp += d.valorErp      || 0;
+    coletas  += d.coletasSolic  || 0;
+    orc      += d.orcEnviado    || 0;
+  });
+  // Investimento baseado em dias corridos do período (não soma de valores diários)
+  var invest = investPorPeriodo(de, ate);
+  if (invest === null) {
+    // Sem período definido: usa span dos dias disponíveis
+    var datas = dias.map(function(d) { return d.data; }).filter(Boolean).sort();
+    invest = datas.length >= 2 ? investPorPeriodo(datas[0], datas[datas.length-1]) : 0;
+  }
   return {
-    fichas, investimento: invest, erpCount: erp, valorErp, coletasSolic: coletas, orcEnviado: orc,
+    fichas: fichas, investimento: invest, erpCount: erp, valorErp: valorErp,
+    coletasSolic: coletas, orcEnviado: orc,
     cac:           erp   > 0 ? +(invest/erp).toFixed(2)    : null,
     ticketMedio:   erp   > 0 ? +(valorErp/erp).toFixed(2)  : null,
     custoPorFicha: fichas> 0 ? +(invest/fichas).toFixed(2) : null,
-    roi: invest>0 ? +((valorErp-invest)/invest*100).toFixed(1) : null,
+    roi: invest > 0 ? +((valorErp - invest) / invest * 100).toFixed(1) : null,
   };
 }
 
@@ -615,7 +639,18 @@ function agruparSemanas(dias) {
   });
   return Object.entries(semanas)
     .sort(([a],[b]) => a.localeCompare(b))
-    .map(([semana, ds]) => ({ semana, ...calcMetricasJS(ds) }));
+    .map(function(entry) {
+      var semana = entry[0], ds = entry[1];
+      // Semana vai de segunda a domingo — sempre 7 dias corridos = R$10.000
+      var datas = ds.map(function(d){ return d.data; }).sort();
+      var semanaDe = datas[0], semanaAte = datas[datas.length-1];
+      // Garante que a semana seja calculada como 7 dias (seg a dom)
+      var dtSeg = new Date(semana + 'T00:00:00');
+      var dtDom = new Date(dtSeg); dtDom.setDate(dtSeg.getDate() + 6);
+      var deStr  = semana;
+      var ateStr = dtDom.getFullYear() + '-' + String(dtDom.getMonth()+1).padStart(2,'0') + '-' + String(dtDom.getDate()).padStart(2,'0');
+      return Object.assign({ semana: semana }, calcMetricasJS(ds, deStr, ateStr));
+    });
 }
 
 // Metas diárias
@@ -747,7 +782,18 @@ function renderStrip(m) {
 }
 
 function renderLiveStrip() {
-  renderStrip(data.resumo || {});
+  // Recalcula investimento do resumo baseado no span de datas real
+  var resumo = Object.assign({}, data.resumo || {});
+  if (data.diario && data.diario.length) {
+    var datas = data.diario.map(function(d){ return d.data; }).filter(Boolean).sort();
+    resumo.investimento = investPorPeriodo(datas[0], datas[datas.length-1]);
+    if (resumo.investimento > 0) {
+      resumo.cac           = resumo.erpCount   > 0 ? +(resumo.investimento / resumo.erpCount).toFixed(2)   : null;
+      resumo.custoPorFicha = resumo.fichas      > 0 ? +(resumo.investimento / resumo.fichas).toFixed(2)    : null;
+      resumo.roi           = resumo.investimento > 0 ? +((resumo.valorErp - resumo.investimento) / resumo.investimento * 100).toFixed(1) : null;
+    }
+  }
+  renderStrip(resumo);
 }
 
 function renderCharts() {
