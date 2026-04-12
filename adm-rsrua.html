@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>RS Rua — Painel</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#03060e;--surface:#080d18;--surface2:#0d1425;--border:#1a2540;
+  --text:#dce8f8;--muted:#4a607a;
+  --green:#10d982;--red:#f04060;--accent:#3b9eff;--orange:#f97316;--purple:#a855f7;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;padding-bottom:24px;}
+
+header{display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:50px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--fh);font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px;}
+.logo-dot{width:7px;height:7px;background:var(--red);border-radius:50%;box-shadow:0 0 6px var(--red);}
+.logo span{color:var(--red);}
+.hbtn{font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;}
+.hbtn:hover{color:var(--text);}
+
+.page{padding:16px;}
+
+.sec-title{font-family:var(--fh);font-size:16px;font-weight:900;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.sec-title span{color:var(--red);}
+
+.empty{font-family:var(--fm);font-size:11px;color:var(--muted);padding:40px 20px;text-align:center;border:1px dashed var(--border);border-radius:10px;}
+
+/* Card de OS */
+.os-card{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--red);border-radius:12px;padding:16px;margin-bottom:12px;}
+.os-nome{font-family:var(--fh);font-size:16px;font-weight:800;color:#fff;margin-bottom:4px;}
+.os-defeito{font-size:13px;color:var(--muted);margin-bottom:10px;}
+.os-meta{display:flex;flex-direction:column;gap:4px;margin-bottom:14px;}
+.os-meta-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);}
+.os-meta-row strong{color:var(--text);font-weight:500;}
+.os-fase{font-family:var(--fm);font-size:9px;padding:3px 10px;border-radius:99px;background:rgba(240,64,96,.1);color:var(--red);border:1px solid rgba(240,64,96,.3);display:inline-block;margin-bottom:12px;}
+
+.os-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.os-btn{flex:1;min-width:100px;padding:12px 8px;border-radius:10px;border:none;font-family:var(--fm);font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .15s;text-decoration:none;}
+.os-btn:active{filter:brightness(.85);}
+.os-btn.wpp{background:rgba(37,211,102,.12);color:#25d366;border:1px solid rgba(37,211,102,.3);}
+.os-btn.maps{background:rgba(59,158,255,.12);color:var(--accent);border:1px solid rgba(59,158,255,.3);}
+.os-btn.ok{background:rgba(16,217,130,.12);color:var(--green);border:1px solid rgba(16,217,130,.3);}
+.os-btn.ok.done{background:var(--green);color:#000;}
+.os-btn.del{background:rgba(240,64,96,.08);color:var(--red);border:1px solid rgba(240,64,96,.2);}
+
+/* Fases selector */
+.fase-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+.fase-pill{font-family:var(--fm);font-size:9px;padding:4px 10px;border-radius:99px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
+.fase-pill.active{background:rgba(240,64,96,.1);color:var(--red);border-color:rgba(240,64,96,.4);}
+
+/* Summary bar */
+.summary{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+.sum-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;flex:1;min-width:80px;}
+.sum-num{font-family:var(--fh);font-size:20px;font-weight:900;color:var(--red);}
+.sum-label{font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:2px;}
+
+/* Spinner */
+.spinner{display:flex;align-items:center;justify-content:center;padding:40px;gap:10px;font-family:var(--fm);font-size:11px;color:var(--muted);}
+.spin{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--red);border-radius:10px;padding:10px 18px;font-family:var(--fm);font-size:11px;opacity:0;transition:all .3s;z-index:9999;white-space:nowrap;}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-dot"></div>RS <span>Rua</span></div>
+  <a class="hbtn" href="/adm">← ADM</a>
+</header>
+
+<div class="page">
+  <div class="sec-title">🏘️ OS de <span>RS Rua</span></div>
+  <div id="summary" class="summary"></div>
+  <div id="lista"><div class="spinner"><div class="spin"></div>Carregando...</div></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var fichas = [];
+var FASES_RUA = [
+  { id: 'garantia_solicitada', label: 'Garantia Solicitada' },
+  { id: 'equip_recolhido',     label: 'Equip. Recolhido' },
+  { id: 'conserto_realizado',  label: 'Conserto Realizado' },
+];
+
+var toastT;
+function toast(msg, cor) {
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.style.borderTopColor = cor || 'var(--red)';
+  t.classList.add('show'); clearTimeout(toastT);
+  toastT = setTimeout(function() { t.classList.remove('show'); }, 3000);
+}
+
+async function api(action, body) {
+  var opts = { headers: { 'Content-Type': 'application/json' } };
+  if (body) { opts.method = 'POST'; opts.body = JSON.stringify(body); }
+  var r = await fetch('/api/garantia?action=' + action, opts);
+  return r.json();
+}
+
+async function load() {
+  var d = await api('load');
+  if (!d.ok) return;
+  fichas = (d.fichas || []).filter(function(f) { return f.tipo === 'rua'; });
+  render();
+}
+
+function render() {
+  var ativas = fichas.filter(function(f) { return !f.concluida; });
+  var concluidas = fichas.filter(function(f) { return f.concluida; });
+
+  // Summary
+  var counts = {};
+  FASES_RUA.forEach(function(f) { counts[f.id] = 0; });
+  ativas.forEach(function(f) { if (counts[f.faseId] !== undefined) counts[f.faseId]++; });
+  document.getElementById('summary').innerHTML =
+    FASES_RUA.map(function(fase) {
+      return '<div class="sum-item"><div class="sum-num">' + (counts[fase.id] || 0) + '</div><div class="sum-label">' + esc(fase.label) + '</div></div>';
+    }).join('') +
+    '<div class="sum-item"><div class="sum-num" style="color:var(--green)">' + concluidas.length + '</div><div class="sum-label">Concluídas</div></div>';
+
+  var el = document.getElementById('lista');
+  if (!ativas.length) {
+    el.innerHTML = '<div class="empty">✅ Nenhuma OS de RS Rua pendente</div>';
+    return;
+  }
+  el.innerHTML = ativas.map(function(f) { return buildCard(f); }).join('');
+}
+
+function buildCard(f) {
+  var wppTel = (f.telefone || '').replace(/\D/g, '');
+  var faseLabel = (FASES_RUA.find(function(x) { return x.id === f.faseId; }) || {}).label || f.faseId;
+  var mapUrl = f.endereco ? 'https://maps.google.com/?q=' + encodeURIComponent(f.endereco) : '';
+
+  var fases = FASES_RUA.map(function(fase) {
+    return '<button class="fase-pill' + (f.faseId === fase.id ? ' active' : '') + '" onclick="moverFase(\'' + f.id + '\',\'' + fase.id + '\')">' + esc(fase.label) + '</button>';
+  }).join('');
+
+  return '<div class="os-card" id="card-' + f.id + '">' +
+    '<div class="os-nome">' + esc(f.nome) + '</div>' +
+    '<div class="os-defeito">' + esc(f.defeito) + '</div>' +
+    '<div class="os-meta">' +
+      '<div class="os-meta-row">📞 <strong>' + esc(f.telefone) + '</strong></div>' +
+      (f.endereco ? '<div class="os-meta-row">📍 <strong>' + esc(f.endereco) + '</strong></div>' : '') +
+    '</div>' +
+    '<div class="fase-row">' + fases + '</div>' +
+    '<div class="os-actions">' +
+      (wppTel ? '<a class="os-btn wpp" href="https://wa.me/55' + wppTel + '?text=' + encodeURIComponent('Olá ' + f.nome + '! Sou o técnico da Reparo Eletro e estou a caminho.') + '" target="_blank">💬 WhatsApp</a>' : '') +
+      (mapUrl ? '<a class="os-btn maps" href="' + mapUrl + '" target="_blank">🗺️ Endereço</a>' : '') +
+      '<button class="os-btn ok" onclick="concluir(\'' + f.id + '\')">✅ Concluído</button>' +
+    '</div>' +
+    '</div>';
+}
+
+async function moverFase(id, faseId) {
+  var d = await api('mover', { id: id, faseId: faseId });
+  if (d.ok) {
+    var idx = fichas.findIndex(function(f) { return f.id === id; });
+    if (idx >= 0) fichas[idx] = d.ficha;
+    render(); toast('Fase atualizada', 'var(--accent)');
+  } else { toast('Erro: ' + (d.error || 'falha'), 'var(--red)'); }
+}
+
+async function concluir(id) {
+  if (!confirm('Confirmar conclusão desta OS?')) return;
+  var d = await api('concluir', { id: id });
+  if (d.ok) {
+    var idx = fichas.findIndex(function(f) { return f.id === id; });
+    if (idx >= 0) fichas[idx] = d.ficha;
+    render(); toast('✅ OS Concluída!', 'var(--green)');
+  } else { toast('Erro: ' + (d.error || 'falha'), 'var(--red)'); }
+}
+
+function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+load();
+setInterval(load, 45000);
+</script>
+</body>
+</html>
