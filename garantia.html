@@ -3,447 +3,525 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Setor de Garantia — Reparo Eletro</title>
+<title>Reparo Eletro — Garantia</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#0d0d0d;--surface:#161616;--surface2:#1f1f1f;--border:#2a2a2a;
-  --text:#fff;--muted:#888;--dim:#333;
-  --c1:#f59e0b; /* Garantia Acionada */
-  --c2:#3b9eff; /* Em Análise */
-  --c3:#22c55e; /* Serviço Finalizado */
+  --bg:#03060e;--surface:#080d18;--surface2:#0d1425;--border:#1a2540;--border2:#243050;
+  --text:#dce8f8;--muted:#4a607a;--dim:#060c18;
+  --accent:#3b9eff;--green:#10d982;--red:#f04060;--yellow:#f5c800;--orange:#f97316;--purple:#a855f7;--cyan:#06d6d6;
   --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--bg);color:var(--text);font-family:var(--fb);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 22px;height:52px;border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--fh);font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.logo-dot{width:8px;height:8px;background:var(--purple);border-radius:50%;box-shadow:0 0 8px var(--purple);}
+.logo span{color:var(--purple);}
+.hdr-btns{display:flex;gap:8px;}
+.hbtn{font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;text-decoration:none;display:inline-flex;align-items:center;gap:5px;}
+.hbtn:hover{color:var(--text);border-color:var(--accent);}
 
-/* HEADER */
-header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;border-bottom:2px solid var(--c1);background:var(--bg);flex-shrink:0;}
-.logo{font-family:var(--fh);font-size:16px;font-weight:800;display:flex;align-items:center;gap:8px;}
-.logo-icon{width:26px;height:26px;background:var(--c1);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;}
-.logo span{color:var(--c1);}
-.header-right{display:flex;align-items:center;gap:8px;}
-.hbtn{font-family:var(--fm);font-size:10px;padding:5px 11px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;text-decoration:none;display:inline-flex;align-items:center;}
-.hbtn:hover{color:var(--text);border-color:var(--c1);}
-.hbtn.accent{background:var(--c1);color:#000;border-color:var(--c1);font-weight:600;}
-.hbtn.accent:hover{background:#fbbf24;}
-.live-dot{width:5px;height:5px;background:var(--c1);border-radius:50%;animation:blink 2s infinite;}
-@keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+/* ── MAIN TABS ── */
+.main-tabs{display:flex;border-bottom:1px solid var(--border);padding:0 22px;background:var(--bg);position:sticky;top:52px;z-index:90;gap:2px;}
+.mtab{font-family:var(--fm);font-size:11px;font-weight:600;padding:12px 18px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;white-space:nowrap;}
+.mtab:hover{color:var(--text);}
+.mtab.active{color:var(--purple);border-bottom-color:var(--purple);}
+.mtab .badge{font-family:var(--fm);font-size:9px;padding:1px 6px;border-radius:99px;background:var(--surface2);margin-left:4px;color:var(--muted);}
+.mtab.active .badge{background:rgba(168,85,247,.15);color:var(--purple);}
 
-/* TOOLBAR */
-.toolbar{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;border-bottom:1px solid var(--border);flex-shrink:0;}
-.board-title{font-family:var(--fh);font-size:18px;font-weight:800;}
-.board-title span{color:var(--c1);}
-.toolbar-right{display:flex;gap:8px;align-items:center;}
+.view{display:none;padding:20px 22px;}
+.view.active{display:block;}
 
-/* KANBAN */
-.kanban{flex:1;display:flex;gap:14px;padding:14px 20px;overflow-x:auto;overflow-y:hidden;}
-.kanban::-webkit-scrollbar{height:4px;}
-.kanban::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+/* ── CADASTRO + KANBAN (view geral) ── */
+.geral-grid{display:grid;grid-template-columns:320px 1fr;gap:20px;align-items:start;}
+@media(max-width:900px){.geral-grid{grid-template-columns:1fr;}}
 
-/* COLUMN */
-.col{
-  flex:0 0 320px;
-  display:flex;flex-direction:column;
-  background:var(--surface);border:1px solid var(--border);border-radius:10px;
-  overflow:hidden;
-}
-.col-header{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:10px 14px;border-bottom:1px solid var(--border);
-  position:relative;flex-shrink:0;
-}
-.col-header::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--col-color,#fff);}
-.col-title{font-family:var(--fh);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
-.col-count{font-family:var(--fm);font-size:10px;background:var(--surface2);border:1px solid var(--border);padding:1px 7px;border-radius:20px;color:var(--muted);}
-.col-body{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:8px;}
-.col-body::-webkit-scrollbar{width:3px;}
-.col-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+/* Form */
+.form-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;}
+.form-title{font-family:var(--fh);font-size:15px;font-weight:800;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.form-title span{color:var(--purple);}
+.fl{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px;}
+.fi{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-family:var(--fb);font-size:13px;color:var(--text);outline:none;transition:border .15s;margin-bottom:12px;}
+.fi:focus{border-color:var(--purple);}
+.tipo-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.tipo-btn{padding:10px 8px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--fm);font-size:10px;font-weight:700;text-align:center;transition:all .15s;}
+.tipo-btn:hover{border-color:var(--purple);color:var(--text);}
+.tipo-btn.sel-loja_imediata{background:rgba(16,217,130,.1);color:var(--green);border-color:rgba(16,217,130,.4);}
+.tipo-btn.sel-loja_acompanhamento{background:rgba(59,158,255,.1);color:var(--accent);border-color:rgba(59,158,255,.4);}
+.tipo-btn.sel-delivery{background:rgba(249,115,22,.1);color:var(--orange);border-color:rgba(249,115,22,.4);}
+.tipo-btn.sel-rua{background:rgba(240,64,96,.1);color:var(--red);border-color:rgba(240,64,96,.4);}
+.btn-cad{width:100%;padding:11px;border-radius:8px;border:none;background:var(--purple);color:#fff;font-family:var(--fm);font-size:11px;font-weight:700;cursor:pointer;transition:all .2s;margin-top:4px;}
+.btn-cad:hover{filter:brightness(1.1);}
+.btn-cad:disabled{opacity:.5;cursor:not-allowed;}
 
-/* CARD */
-.gcard{
-  background:var(--surface2);border:1px solid var(--border);border-radius:8px;
-  overflow:hidden;transition:border-color .15s;
-  flex-shrink:0;
-}
-.gcard:hover{border-color:rgba(255,255,255,.12);}
+/* Kanban */
+.kanban{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+@media(max-width:1200px){.kanban{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:700px){.kanban{grid-template-columns:1fr;}}
+.kb-col{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.kb-head{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.kb-label{font-family:var(--fh);font-size:12px;font-weight:800;}
+.kb-count{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;}
+.kb-body{padding:8px;display:flex;flex-direction:column;gap:6px;min-height:60px;}
+.kb-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;}
+.kb-nome{font-size:12px;font-weight:600;color:#fff;margin-bottom:2px;}
+.kb-fase{font-family:var(--fm);font-size:9px;color:var(--muted);}
+.kb-empty{font-family:var(--fm);font-size:10px;color:var(--muted);padding:12px;text-align:center;}
 
-.gcard-head{padding:10px 12px;border-bottom:1px solid var(--border);}
-.gcard-os{font-family:var(--fm);font-size:10px;font-weight:600;margin-bottom:2px;}
-.gcard-nome{font-size:13px;font-weight:600;line-height:1.3;}
-.gcard-tel{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px;}
+/* ── POR-TIPO VIEWS (tabs: loja_imediata etc) ── */
+.tipo-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+.tipo-title{font-family:var(--fh);font-size:18px;font-weight:900;}
+.kanban-fases{display:grid;gap:12px;}
+.fase-col{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.fase-head{padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.fase-label{font-family:var(--fm);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;}
+.fase-body{padding:8px;display:flex;flex-direction:column;gap:6px;min-height:50px;}
 
-.gcard-desc{padding:8px 12px;font-size:11px;color:var(--muted);line-height:1.5;border-bottom:1px solid var(--border);}
+/* Ficha card */
+.ficha-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;transition:border-color .15s;}
+.ficha-card:hover{border-color:rgba(168,85,247,.2);}
+.fc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px;}
+.fc-nome{font-size:13px;font-weight:600;color:#fff;}
+.fc-tipo-badge{font-family:var(--fm);font-size:8px;padding:2px 7px;border-radius:99px;white-space:nowrap;}
+.fc-defeito{font-size:11px;color:var(--muted);margin-bottom:6px;}
+.fc-meta{display:flex;gap:8px;flex-wrap:wrap;font-family:var(--fm);font-size:9px;color:var(--muted);margin-bottom:8px;}
+.fc-actions{display:flex;gap:6px;flex-wrap:wrap;}
+.fc-btn{font-family:var(--fm);font-size:9px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
+.fc-btn:hover{color:var(--text);border-color:var(--accent);}
+.fc-btn.green{color:var(--green);border-color:rgba(16,217,130,.3);}
+.fc-btn.red{color:var(--red);border-color:rgba(240,64,96,.3);}
+.fc-btn.orange{color:var(--orange);border-color:rgba(249,115,22,.3);}
+.fase-select{font-family:var(--fm);font-size:9px;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;outline:none;}
+.fase-select:focus{border-color:var(--purple);}
 
-.gcard-actions{padding:8px 12px;display:flex;flex-wrap:wrap;gap:5px;}
-.gact{font-family:var(--fm);font-size:9px;padding:4px 9px;border-radius:5px;border:1px solid var(--border);background:transparent;cursor:pointer;color:var(--muted);transition:all .15s;white-space:nowrap;}
-.gact:hover{color:var(--text);border-color:rgba(255,255,255,.2);}
-.gact.next:hover{color:var(--col-color,#fff);border-color:var(--col-color,#fff);}
-.gact.del:hover{color:#ef4444;border-color:rgba(239,68,68,.3);}
+/* ── MONITORAMENTO TAB ── */
+.mon-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;}
+@media(max-width:800px){.mon-grid{grid-template-columns:1fr;}}
+.mon-sec{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.mon-sec-head{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.mon-sec-title{font-family:var(--fh);font-size:13px;font-weight:800;}
+.mon-count{font-family:var(--fm);font-size:10px;padding:2px 8px;border-radius:99px;}
+.mon-body{padding:8px;display:flex;flex-direction:column;gap:4px;max-height:300px;overflow-y:auto;}
+.mon-item{background:var(--surface2);border-radius:6px;padding:8px 10px;border-left:3px solid transparent;}
+.mon-nome{font-size:12px;font-weight:600;color:#fff;}
+.mon-fase{font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:2px;}
+.mon-empty{font-family:var(--fm);font-size:10px;color:var(--muted);padding:16px;text-align:center;}
 
-/* EMPTY */
-.col-empty{padding:32px 12px;text-align:center;font-family:var(--fm);font-size:10px;color:var(--dim);}
-
-/* LOADING */
-.loading-wrap{flex:1;display:flex;align-items:center;justify-content:center;gap:10px;font-family:var(--fm);font-size:11px;color:var(--muted);}
-.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--c1);border-radius:50%;animation:spin 1s linear infinite;}
-@keyframes spin{to{transform:rotate(360deg);}}
-
-/* MOVER OS PAGE */
-#page-mover { align-items: center; justify-content: center; }
-.form-wrap { width: 100%; max-width: 520px; padding: 28px 20px; }
-.form-title { font-family: var(--fh); font-size: 26px; font-weight: 800; letter-spacing: -1px; margin-bottom: 4px; }
-.form-title span { color: var(--c1); }
-.form-sub { font-family: var(--fm); font-size: 10px; color: var(--muted); margin-bottom: 6px; }
-.form-card { background: var(--surface); border: 1px solid var(--border); border-top: 2px solid var(--c1); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; gap: 18px; }
-.field-group { display: flex; flex-direction: column; gap: 7px; }
-.field-label { font-family: var(--fm); font-size: 10px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; display: flex; align-items: center; gap: 6px; }
-.field-label::before { content: ''; width: 8px; height: 1px; background: var(--c1); }
-.os-num-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; color: var(--text); font-family: var(--fm); font-size: 20px; letter-spacing: .04em; outline: none; transition: border-color .15s, box-shadow .15s; }
-.os-num-input:focus { border-color: var(--c1); box-shadow: 0 0 0 3px rgba(245,158,11,.12); }
-.os-num-input::placeholder { color: #666; font-size: 14px; }
-.os-found-info { display: none; background: var(--surface2); border: 1px solid var(--border); border-left: 3px solid var(--c1); border-radius: 8px; padding: 10px 12px; }
-.tecnico-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; }
-.tecnico-btn { padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); font-family: var(--fb); font-size: 13px; cursor: pointer; transition: all .15s; text-align: center; }
-.tecnico-btn:hover { border-color: rgba(245,158,11,.3); color: var(--text); }
-.tecnico-btn.selected { background: var(--c1); color: #000; border-color: var(--c1); font-weight: 600; }
-.stages-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
-.stage-btn { padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); font-family: var(--fb); font-size: 12px; cursor: pointer; transition: all .15s; text-align: left; display: flex; align-items: center; gap: 8px; }
-.stage-btn:hover { border-color: rgba(245,158,11,.3); color: var(--text); }
-.stage-btn.selected { color: #000; border-color: transparent; font-weight: 600; }
-.submit-btn { width: 100%; padding: 14px; border-radius: 10px; border: none; background: var(--c1); color: #000; font-family: var(--fh); font-size: 14px; font-weight: 800; cursor: pointer; transition: all .15s; letter-spacing: .02em; }
-.submit-btn:hover:not(:disabled) { background: #fbbf24; transform: translateY(-1px); }
-.submit-btn:disabled { opacity: .3; cursor: not-allowed; }
-
-/* TOAST */
-#toast{position:fixed;bottom:18px;right:18px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:11px 15px;font-family:var(--fm);font-size:11px;color:#fff;z-index:9999;max-width:280px;opacity:0;transition:opacity .2s;display:flex;gap:10px;align-items:flex-start;}
+/* ── RELATÓRIO TAB ── */
+.rel-filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
+.rel-input{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-family:var(--fm);font-size:10px;color:var(--text);outline:none;}
+.rel-input:focus{border-color:var(--purple);}
+.qbtn{font-family:var(--fm);font-size:9px;padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
+.qbtn:hover,.qbtn.active{border-color:var(--purple);color:var(--purple);}
+.tipo-filter{display:flex;gap:6px;flex-wrap:wrap;}
+.tqbtn{font-family:var(--fm);font-size:9px;padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
+.tqbtn.active{border-color:var(--purple);color:var(--purple);background:rgba(168,85,247,.08);}
+.rel-table{width:100%;border-collapse:collapse;font-size:12px;}
+.rel-table th{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;background:var(--surface);}
+.rel-table td{padding:10px 12px;border-bottom:1px solid var(--border);}
+.rel-table tr:hover td{background:var(--surface2);}
+.empty{font-family:var(--fm);font-size:11px;color:var(--muted);padding:30px;text-align:center;border:1px dashed var(--border);border-radius:8px;}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--purple);border-radius:10px;padding:10px 16px;font-family:var(--fm);font-size:11px;transform:translateY(60px);opacity:0;transition:all .3s;z-index:9999;}
+.toast.show{transform:translateY(0);opacity:1;}
 </style>
 </head>
 <body>
-
 <header>
-  <div class="logo">
-    <div class="logo-icon">🛡️</div>
-    <div>Reparo<span>Eletro</span></div>
-  </div>
-  <div class="header-right">
-    <div class="live-dot"></div>
-    <button class="hbtn" id="nav-kanban" onclick="showPage('kanban')" style="background:var(--c1);color:#000;font-weight:600;">📋 Garantias</button>
-    <button class="hbtn" id="nav-mover"  onclick="showPage('mover')">🔀 Mover OS</button>
-    <button class="hbtn" onclick="syncNow()">↻ Sync Pipefy</button>
-    <button class="hbtn" onclick="confirmarLimparNaoMovidas()" style="border-color:rgba(59,158,255,.3);color:#93c5fd;">🧹 Limpar Não Movidas Hoje</button>
+  <div class="logo"><div class="logo-dot"></div>Reparo<b>Eletro</b> — <span>Garantia</span></div>
+  <div class="hdr-btns">
+    <button class="hbtn" onclick="load()">↻ Atualizar</button>
+    <a class="hbtn" href="/adm">Home</a>
   </div>
 </header>
 
-<div class="toolbar">
-  <div>
-    <div class="board-title">Setor de <span>Garantia</span></div>
-  </div>
-  <div class="toolbar-right">
-    <span id="status-txt" style="font-family:var(--fm);font-size:10px;color:var(--muted);"></span>
-  </div>
+<div class="main-tabs">
+  <button class="mtab active" id="mtab-geral"            onclick="setView('geral')">📋 Geral<span class="badge" id="b-geral">0</span></button>
+  <button class="mtab"        id="mtab-loja_imediata"    onclick="setView('loja_imediata')">🏪 Loja Imediata<span class="badge" id="b-loja_imediata">0</span></button>
+  <button class="mtab"        id="mtab-loja_acompanhamento" onclick="setView('loja_acompanhamento')">🔍 Loja Acomp.<span class="badge" id="b-loja_acompanhamento">0</span></button>
+  <button class="mtab"        id="mtab-delivery"         onclick="setView('delivery')">🚚 Delivery<span class="badge" id="b-delivery">0</span></button>
+  <button class="mtab"        id="mtab-rua"              onclick="setView('rua')">🏘️ RS Rua<span class="badge" id="b-rua">0</span></button>
+  <button class="mtab"        id="mtab-monitoramento"    onclick="setView('monitoramento')">🔭 Monitoramento</button>
+  <button class="mtab"        id="mtab-relatorio"        onclick="setView('relatorio')">📊 Relatório</button>
 </div>
 
-<div id="page-kanban" class="g-page active" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
-<div class="kanban" id="kanban">
-  <div class="loading-wrap"><div class="spinner"></div> Carregando...</div>
-</div>
-</div>
-
-<div id="page-mover" class="g-page" style="flex:1;display:none;align-items:center;justify-content:center;overflow-y:auto;">
-  <div class="form-wrap">
-    <div class="form-title">Mover <span>OS</span></div>
-    <div class="form-sub">// código, nome ou descrição da OS</div>
+<!-- VIEW GERAL -->
+<div class="view active" id="view-geral">
+  <div class="geral-grid">
+    <!-- Form cadastro -->
     <div class="form-card">
-      <div class="field-group">
-        <label class="field-label">Buscar OS</label>
-        <input class="os-num-input" id="os-num-input" type="text" placeholder="0000 ou nome..." autocomplete="off" oninput="onOsNumInput()">
-        <div class="os-found-info" id="os-found-info">
-          <div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:3px;">OS ENCONTRADA</div>
-          <div id="os-found-title" style="font-size:13px;font-weight:500;"></div>
-          <div id="os-found-phase" style="font-size:11px;color:var(--muted);margin-top:2px;font-family:var(--fm);"></div>
-        </div>
+      <div class="form-title">📝 Cadastrar <span>Garantia</span></div>
+      <div class="fl">Nome *</div>
+      <input class="fi" id="f-nome" placeholder="Nome do cliente"/>
+      <div class="fl">Telefone *</div>
+      <input class="fi" id="f-tel" placeholder="(31) 9 0000-0000"/>
+      <div class="fl">Defeito *</div>
+      <input class="fi" id="f-defeito" placeholder="Descreva o defeito relatado"/>
+      <div class="fl">Endereço (opcional)</div>
+      <input class="fi" id="f-end" placeholder="Rua, número, bairro"/>
+      <div class="fl">Tipo de Garantia *</div>
+      <div class="tipo-grid">
+        <button class="tipo-btn" id="tb-li"  onclick="setTipo('loja_imediata')">🏪 Loja<br>Imediata</button>
+        <button class="tipo-btn" id="tb-la"  onclick="setTipo('loja_acompanhamento')">🔍 Loja<br>Acomp.</button>
+        <button class="tipo-btn" id="tb-del" onclick="setTipo('delivery')">🚚 Delivery</button>
+        <button class="tipo-btn" id="tb-rua" onclick="setTipo('rua')">🏘️ RS Rua</button>
       </div>
-      <div class="field-group">
-        <label class="field-label">Técnico</label>
-        <div class="tecnico-grid">
-          <button class="tecnico-btn" onclick="gPickTecnico('Lucas')">Lucas</button>
-          <button class="tecnico-btn" onclick="gPickTecnico('Diego')">Diego</button>
-          <button class="tecnico-btn" onclick="gPickTecnico('Kassio')">Kassio</button>
-          <button class="tecnico-btn" onclick="gPickTecnico('Roberto')">Roberto</button>
-          <button class="tecnico-btn" onclick="gPickTecnico('Carlos')">Carlos</button>
-        </div>
-      </div>
-      <div class="field-group">
-        <label class="field-label">Mover para</label>
-        <div class="stages-grid" id="g-move-stages"></div>
-      </div>
-      <button class="submit-btn" id="g-btn-move" onclick="gSubmitMove()" disabled>→ Mover OS</button>
+      <button class="btn-cad" id="btn-cad" onclick="cadastrar()">+ Cadastrar Garantia</button>
+    </div>
+    <!-- Kanban resumo -->
+    <div>
+      <div style="font-family:var(--fh);font-size:14px;font-weight:800;margin-bottom:12px;color:var(--purple);">Kanban de Garantias</div>
+      <div class="kanban" id="kanban-geral"></div>
     </div>
   </div>
 </div>
 
-<div id="toast"></div>
+<!-- VIEW LOJA IMEDIATA -->
+<div class="view" id="view-loja_imediata">
+  <div class="tipo-header">
+    <div class="tipo-title" style="color:var(--green)">🏪 Loja Imediata</div>
+  </div>
+  <div class="kanban-fases" id="fases-loja_imediata" style="grid-template-columns:repeat(3,1fr)"></div>
+</div>
+
+<!-- VIEW LOJA ACOMPANHAMENTO -->
+<div class="view" id="view-loja_acompanhamento">
+  <div class="tipo-header">
+    <div class="tipo-title" style="color:var(--accent)">🔍 Loja Acompanhamento</div>
+  </div>
+  <div class="kanban-fases" id="fases-loja_acompanhamento" style="grid-template-columns:repeat(4,1fr)"></div>
+</div>
+
+<!-- VIEW DELIVERY -->
+<div class="view" id="view-delivery">
+  <div class="tipo-header">
+    <div class="tipo-title" style="color:var(--orange)">🚚 Delivery</div>
+  </div>
+  <div class="kanban-fases" id="fases-delivery" style="grid-template-columns:repeat(3,1fr)"></div>
+</div>
+
+<!-- VIEW RS RUA -->
+<div class="view" id="view-rua">
+  <div class="tipo-header">
+    <div class="tipo-title" style="color:var(--red)">🏘️ RS Rua</div>
+    <a class="hbtn" href="/adm-rsrua" target="_blank" style="color:var(--red);border-color:rgba(240,64,96,.3);">📱 Painel Motorista</a>
+  </div>
+  <div class="kanban-fases" id="fases-rua" style="grid-template-columns:repeat(3,1fr)"></div>
+</div>
+
+<!-- VIEW MONITORAMENTO -->
+<div class="view" id="view-monitoramento">
+  <div style="font-family:var(--fh);font-size:16px;font-weight:900;margin-bottom:16px;">🔭 Monitoramento de <span style="color:var(--purple)">Garantias</span></div>
+  <div class="mon-grid" id="mon-garantia"></div>
+</div>
+
+<!-- VIEW RELATÓRIO -->
+<div class="view" id="view-relatorio">
+  <div style="font-family:var(--fh);font-size:16px;font-weight:900;margin-bottom:16px;">📊 Relatório de <span style="color:var(--purple)">Garantias Concluídas</span></div>
+  <div class="rel-filters">
+    <input type="date" class="rel-input" id="rel-de"/>
+    <span style="font-family:var(--fm);font-size:10px;color:var(--muted)">até</span>
+    <input type="date" class="rel-input" id="rel-ate"/>
+    <button class="qbtn" onclick="relPeriodo('hoje')">Hoje</button>
+    <button class="qbtn" onclick="relPeriodo('semana')">Esta semana</button>
+    <button class="qbtn" onclick="relPeriodo('mes')">Este mês</button>
+    <button class="qbtn" onclick="relPeriodo('tudo')">Tudo</button>
+  </div>
+  <div class="tipo-filter" style="margin-bottom:16px;" id="rel-tipo-filter">
+    <button class="tqbtn active" data-tipo="" onclick="setRelTipo(this,'')">Todos</button>
+    <button class="tqbtn" data-tipo="loja_imediata" onclick="setRelTipo(this,'loja_imediata')">🏪 Loja Imediata</button>
+    <button class="tqbtn" data-tipo="loja_acompanhamento" onclick="setRelTipo(this,'loja_acompanhamento')">🔍 Loja Acomp.</button>
+    <button class="tqbtn" data-tipo="delivery" onclick="setRelTipo(this,'delivery')">🚚 Delivery</button>
+    <button class="tqbtn" data-tipo="rua" onclick="setRelTipo(this,'rua')">🏘️ RS Rua</button>
+  </div>
+  <div id="rel-resumo" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;"></div>
+  <div style="overflow-x:auto;">
+    <table class="rel-table"><thead><tr>
+      <th>Data</th><th>Nome</th><th>Telefone</th><th>Defeito</th><th>Tipo</th><th>Duração</th>
+    </tr></thead><tbody id="rel-body"></tbody></table>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
 
 <script>
-var FASES = [
-  { id: "garantia_acionada",  name: "Garantia Acionada",  color: "#f59e0b" },
-  { id: "em_analise",         name: "Em Análise",          color: "#3b9eff" },
-  { id: "servico_finalizado", name: "Serviço Finalizado",  color: "#22c55e" },
-];
+var fichas = [], fases = {}, tipoSel = null, curView = 'geral', relTipoFiltro = '';
 
-var fichas = [];
+var TIPO_COLORS = {
+  loja_imediata:      { c: 'var(--green)',  bg: 'rgba(16,217,130,.1)',  label: '🏪 Loja Imediata' },
+  loja_acompanhamento:{ c: 'var(--accent)', bg: 'rgba(59,158,255,.1)',  label: '🔍 Loja Acomp.' },
+  delivery:           { c: 'var(--orange)', bg: 'rgba(249,115,22,.1)',  label: '🚚 Delivery' },
+  rua:                { c: 'var(--red)',    bg: 'rgba(240,64,96,.1)',   label: '🏘️ RS Rua' },
+};
 
-async function api(action, body) {
-  var opts = { method: body !== undefined ? "POST" : "GET", headers: { "Content-Type": "application/json" } };
-  if (body !== undefined) opts.body = JSON.stringify(body);
-  var r = await fetch("/api/garantia?action=" + action, opts);
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtDate(iso){ if(!iso) return '—'; var d=new Date(iso); return d.toLocaleDateString('pt-BR'); }
+function fmtDur(a,b){ if(!a||!b) return '—'; var ms=new Date(b)-new Date(a); var h=Math.round(ms/3600000); return h<24?h+'h':Math.round(h/24)+'d'; }
+function df(d){ return d.toISOString().slice(0,10); }
+
+var toastT;
+function toast(msg, cor){
+  var t=document.getElementById('toast'); t.textContent=msg; t.style.borderTopColor=cor||'var(--purple)';
+  t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(function(){ t.classList.remove('show'); }, 3000);
+}
+
+async function api(action, body){
+  var opts={headers:{'Content-Type':'application/json'}};
+  if(body){opts.method='POST';opts.body=JSON.stringify(body);}
+  var r=await fetch('/api/garantia?action='+action,opts);
   return r.json();
 }
 
-async function load() {
-  var d = await api("load");
-  if (!d.ok) return;
+async function load(){
+  var d = await api('load');
+  if(!d.ok) return;
   fichas = d.fichas || [];
+  fases  = d.fases  || {};
+  updateBadges();
   render();
 }
 
-async function syncNow() {
-  document.getElementById("status-txt").textContent = "Sincronizando...";
-  var d = await api("sync", {});
-  document.getElementById("status-txt").textContent = "";
-  if (d.ok) {
-    if (d.added > 0 || d.removed > 0)
-      showToast("✅", d.added + " nova(s), " + d.removed + " removida(s)", d.pipefyError || "");
-    else
-      showToast("ℹ️", "Nenhuma alteração", "");
-    await load();
-  } else {
-    showToast("❌", "Erro no sync", d.pipefyError || d.error || "");
+function updateBadges(){
+  var tipos=['loja_imediata','loja_acompanhamento','delivery','rua'];
+  var total=0;
+  tipos.forEach(function(t){
+    var n=fichas.filter(function(f){return f.tipo===t&&!f.concluida;}).length;
+    var el=document.getElementById('b-'+t); if(el) el.textContent=n;
+    total+=n;
+  });
+  var bg=document.getElementById('b-geral'); if(bg) bg.textContent=total;
+}
+
+function setView(v){
+  curView=v;
+  document.querySelectorAll('.view').forEach(function(el){el.classList.remove('active');});
+  document.querySelectorAll('.mtab').forEach(function(el){el.classList.remove('active');});
+  var vEl=document.getElementById('view-'+v); if(vEl) vEl.classList.add('active');
+  var tEl=document.getElementById('mtab-'+v); if(tEl) tEl.classList.add('active');
+  render();
+}
+
+function setTipo(t){
+  tipoSel=t;
+  ['li','la','del','rua'].forEach(function(k){ document.getElementById('tb-'+k).className='tipo-btn'; });
+  var map={loja_imediata:'li',loja_acompanhamento:'la',delivery:'del',rua:'rua'};
+  var btn=document.getElementById('tb-'+map[t]); if(btn) btn.className='tipo-btn sel-'+t;
+}
+
+function render(){
+  if(curView==='geral')             renderGeral();
+  else if(curView==='monitoramento') renderMonitoramento();
+  else if(curView==='relatorio')     renderRelatorio();
+  else                               renderTipo(curView);
+}
+
+// ── GERAL ─────────────────────────────────────────────────────
+function renderGeral(){
+  var tipos=['loja_imediata','loja_acompanhamento','delivery','rua'];
+  var el=document.getElementById('kanban-geral');
+  el.innerHTML = tipos.map(function(t){
+    var tc=TIPO_COLORS[t];
+    var ativas=fichas.filter(function(f){return f.tipo===t&&!f.concluida;});
+    var cards=ativas.slice(0,5).map(function(f){
+      var fase=(fases[t]||[]).find(function(x){return x.id===f.faseId;});
+      return '<div class="kb-card" onclick="setView(\''+t+'\')" style="cursor:pointer;border-left:2px solid '+tc.c+'">'+
+        '<div class="kb-nome">'+esc(f.nome)+'</div>'+
+        '<div class="kb-fase">'+esc(fase?fase.label:f.faseId)+'</div>'+
+        '</div>';
+    }).join('');
+    var extra=ativas.length>5?'<div class="kb-empty">+'+( ativas.length-5)+' mais...</div>':'';
+    return '<div class="kb-col">'+
+      '<div class="kb-head">'+
+        '<div class="kb-label" style="color:'+tc.c+'">'+tc.label+'</div>'+
+        '<span class="kb-count" style="background:'+tc.bg+';color:'+tc.c+'">'+ativas.length+'</span>'+
+      '</div>'+
+      '<div class="kb-body">'+(ativas.length?cards+extra:'<div class="kb-empty">Vazio</div>')+'</div>'+
+      '</div>';
+  }).join('');
+}
+
+// ── POR TIPO ──────────────────────────────────────────────────
+function renderTipo(tipo){
+  var el=document.getElementById('fases-'+tipo); if(!el) return;
+  var fasesT=fases[tipo]||[];
+  var tc=TIPO_COLORS[tipo]||{c:'var(--purple)',bg:'rgba(168,85,247,.1)'};
+  var fichasTipo=fichas.filter(function(f){return f.tipo===tipo&&!f.concluida;});
+  el.innerHTML=fasesT.map(function(fase){
+    var cards=fichasTipo.filter(function(f){return f.faseId===fase.id;});
+    var cardsHtml=cards.length?cards.map(function(f){ return buildFichaCard(f,tipo,fasesT); }).join('')
+      :'<div class="kb-empty">—</div>';
+    return '<div class="fase-col">'+
+      '<div class="fase-head">'+
+        '<div class="fase-label" style="color:'+tc.c+'">'+esc(fase.label)+'</div>'+
+        '<span class="kb-count" style="background:'+tc.bg+';color:'+tc.c+'">'+cards.length+'</span>'+
+      '</div>'+
+      '<div class="fase-body">'+cardsHtml+'</div>'+
+      '</div>';
+  }).join('');
+}
+
+function buildFichaCard(f, tipo, fasesT){
+  var tc=TIPO_COLORS[tipo]||{c:'var(--purple)'};
+  var opts=fasesT.map(function(fs){
+    return '<option value="'+fs.id+'"'+(f.faseId===fs.id?' selected':'')+'>'+esc(fs.label)+'</option>';
+  }).join('');
+  var wppTel=(f.telefone||'').replace(/\D/g,'');
+  return '<div class="ficha-card">'+
+    '<div class="fc-top">'+
+      '<div class="fc-nome">'+esc(f.nome)+'</div>'+
+      '<span class="fc-tipo-badge" style="background:'+tc.bg+';color:'+tc.c+'">'+tc.label+'</span>'+
+    '</div>'+
+    '<div class="fc-defeito">'+esc(f.defeito)+'</div>'+
+    '<div class="fc-meta">'+
+      (f.telefone?'<span>📞 '+esc(f.telefone)+'</span>':'')+
+      (f.endereco?'<span>📍 '+esc(f.endereco)+'</span>':'')+
+      '<span>'+fmtDate(f.criadaEm)+'</span>'+
+    '</div>'+
+    '<div class="fc-actions">'+
+      '<select class="fase-select" onchange="moverFase(\''+f.id+'\',this.value)">'+opts+'</select>'+
+      (wppTel?'<a class="fc-btn" href="https://wa.me/'+wppTel+'" target="_blank">💬 WPP</a>':'')+
+      (f.endereco?'<a class="fc-btn orange" href="https://maps.google.com/?q='+encodeURIComponent(f.endereco)+'" target="_blank">🗺️</a>':'')+
+      '<button class="fc-btn green" onclick="concluir(\''+f.id+'\')">✅ Concluir</button>'+
+      '<button class="fc-btn red" onclick="excluir(\''+f.id+'\')">🗑</button>'+
+    '</div>'+
+    '</div>';
+}
+
+// ── MONITORAMENTO ──────────────────────────────────────────────
+function renderMonitoramento(){
+  var el=document.getElementById('mon-garantia');
+  var tipos=['loja_imediata','loja_acompanhamento','delivery','rua'];
+  el.innerHTML=tipos.map(function(tipo){
+    var tc=TIPO_COLORS[tipo];
+    var fasesT=fases[tipo]||[];
+    var ativas=fichas.filter(function(f){return f.tipo===tipo&&!f.concluida;});
+    var items=ativas.length?ativas.map(function(f){
+      var fase=(fasesT||[]).find(function(x){return x.id===f.faseId;});
+      return '<div class="mon-item" style="border-left-color:'+tc.c+'">'+
+        '<div class="mon-nome">'+esc(f.nome)+' <span style="font-family:var(--fm);font-size:9px;color:var(--muted);">'+esc(f.telefone)+'</span></div>'+
+        '<div class="mon-fase">'+esc(fase?fase.label:f.faseId)+' · '+esc(f.defeito.slice(0,40))+'</div>'+
+        '</div>';
+    }).join(''):'<div class="mon-empty">✅ Nenhuma pendência</div>';
+    return '<div class="mon-sec">'+
+      '<div class="mon-sec-head">'+
+        '<div class="mon-sec-title" style="color:'+tc.c+'">'+tc.label+'</div>'+
+        '<span class="mon-count" style="background:'+TIPO_COLORS[tipo].bg+';color:'+tc.c+'">'+ativas.length+'</span>'+
+      '</div>'+
+      '<div class="mon-body">'+items+'</div>'+
+      '</div>';
+  }).join('');
+}
+
+// ── RELATÓRIO ─────────────────────────────────────────────────
+function relPeriodo(p){
+  document.querySelectorAll('.qbtn').forEach(function(b){b.classList.remove('active');});
+  var h=new Date(), de, ate;
+  if(p==='hoje'){de=df(h);ate=de;}
+  else if(p==='semana'){var d=h.getDay(),dm=(d===0?6:d-1);var s=new Date(h);s.setDate(h.getDate()-dm);de=df(s);ate=df(new Date(s.setDate(s.getDate()+6)));}
+  else if(p==='mes'){de=h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-01';ate=df(h);}
+  else{de='';ate='';}
+  document.getElementById('rel-de').value=de||'';
+  document.getElementById('rel-ate').value=ate||'';
+  event.target.classList.add('active');
+  renderRelatorio();
+}
+
+function setRelTipo(btn, tipo){
+  relTipoFiltro=tipo;
+  document.querySelectorAll('.tqbtn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  renderRelatorio();
+}
+
+function renderRelatorio(){
+  var de=document.getElementById('rel-de').value;
+  var ate=document.getElementById('rel-ate').value;
+  var concluidas=fichas.filter(function(f){
+    if(!f.concluida) return false;
+    if(relTipoFiltro && f.tipo!==relTipoFiltro) return false;
+    if(de&&f.concluidaEm&&f.concluidaEm.slice(0,10)<de) return false;
+    if(ate&&f.concluidaEm&&f.concluidaEm.slice(0,10)>ate) return false;
+    return true;
+  });
+  // Resumo
+  var tipos=['loja_imediata','loja_acompanhamento','delivery','rua'];
+  var res=document.getElementById('rel-resumo');
+  res.innerHTML=tipos.map(function(t){
+    var tc=TIPO_COLORS[t];
+    var n=concluidas.filter(function(f){return f.tipo===t;}).length;
+    return '<div style="background:'+tc.bg+';border:1px solid '+tc.c+'40;border-radius:8px;padding:8px 14px;text-align:center;">'+
+      '<div style="font-family:var(--fh);font-size:20px;font-weight:900;color:'+tc.c+'">'+n+'</div>'+
+      '<div style="font-family:var(--fm);font-size:9px;color:'+tc.c+'">'+tc.label+'</div>'+
+      '</div>';
+  }).join('');
+  // Tabela
+  var tbody=document.getElementById('rel-body');
+  if(!concluidas.length){ tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:20px;font-family:var(--fm);font-size:11px;color:var(--muted);">Nenhuma garantia concluída no período.</td></tr>'; return; }
+  tbody.innerHTML=concluidas.slice().reverse().map(function(f){
+    var tc=TIPO_COLORS[f.tipo]||{c:'var(--muted)',label:f.tipo};
+    return '<tr>'+
+      '<td style="font-family:var(--fm);font-size:10px;color:var(--muted);">'+fmtDate(f.concluidaEm||f.movidaEm)+'</td>'+
+      '<td style="font-weight:600;">'+esc(f.nome)+'</td>'+
+      '<td style="font-family:var(--fm);font-size:10px;color:var(--muted);">'+esc(f.telefone)+'</td>'+
+      '<td style="font-size:11px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(f.defeito)+'</td>'+
+      '<td><span style="font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:99px;background:'+tc.bg+';color:'+tc.c+';">'+tc.label+'</span></td>'+
+      '<td style="font-family:var(--fm);font-size:10px;color:var(--muted);">'+fmtDur(f.criadaEm,f.concluidaEm)+'</td>'+
+      '</tr>';
+  }).join('');
+}
+
+// ── AÇÕES ──────────────────────────────────────────────────────
+async function cadastrar(){
+  var nome=document.getElementById('f-nome').value.trim();
+  var tel=document.getElementById('f-tel').value.trim();
+  var def=document.getElementById('f-defeito').value.trim();
+  var end=document.getElementById('f-end').value.trim();
+  if(!nome||!tel||!def){ toast('Preencha nome, telefone e defeito','var(--red)'); return; }
+  if(!tipoSel){ toast('Selecione o tipo de garantia','var(--yellow)'); return; }
+  var btn=document.getElementById('btn-cad'); btn.disabled=true; btn.textContent='⏳ Cadastrando...';
+  var d=await api('cadastrar',{nome,telefone:tel,defeito:def,endereco:end,tipo:tipoSel});
+  btn.disabled=false; btn.textContent='+ Cadastrar Garantia';
+  if(d.ok){
+    fichas.unshift(d.ficha);
+    ['f-nome','f-tel','f-defeito','f-end'].forEach(function(id){document.getElementById(id).value='';});
+    tipoSel=null;
+    ['li','la','del','rua'].forEach(function(k){document.getElementById('tb-'+k).className='tipo-btn';});
+    updateBadges(); render();
+    toast('✅ Garantia cadastrada!','var(--green)');
+  } else { toast('Erro: '+(d.error||'falha'),'var(--red)'); }
+}
+
+async function moverFase(id, faseId){
+  var d=await api('mover',{id,faseId});
+  if(d.ok){
+    var idx=fichas.findIndex(function(f){return f.id===id;});
+    if(idx>=0) fichas[idx]=d.ficha;
+    updateBadges(); renderTipo(curView);
+  } else { toast('Erro: '+d.error,'var(--red)'); }
+}
+
+async function concluir(id){
+  if(!confirm('Marcar como concluída?')) return;
+  var d=await api('concluir',{id});
+  if(d.ok){
+    var idx=fichas.findIndex(function(f){return f.id===id;});
+    if(idx>=0) fichas[idx]=d.ficha;
+    updateBadges(); render(); toast('✅ Garantia concluída!','var(--green)');
+  } else { toast('Erro: '+d.error,'var(--red)'); }
+}
+
+async function excluir(id){
+  if(!confirm('Excluir esta garantia?')) return;
+  var d=await api('excluir',{id});
+  if(d.ok){
+    fichas=fichas.filter(function(f){return f.id!==id;});
+    updateBadges(); render(); toast('🗑️ Excluída','var(--red)');
   }
 }
 
-async function limparFinalizados() {
-  if (!confirm("Remover todas as fichas de Serviço Finalizado?")) return;
-  var d = await api("limpar-finalizados", {});
-  if (d.ok) { showToast("🗑", d.removed + " ficha(s) removida(s)", ""); await load(); }
-}
-
-async function mover(id, phaseId) {
-  var d = await api("mover", { id, phaseId });
-  if (d.ok) {
-    var f = fichas.find(function(x) { return x.id === id; });
-    if (f) { f.phaseId = phaseId; f.movedAt = new Date().toISOString(); render(); }
-  } else showToast("❌", "Erro", d.error);
-}
-
-async function excluir(id, nome) {
-  if (!confirm("Remover ficha de \"" + nome + "\"?")) return;
-  var d = await api("excluir", { id });
-  if (d.ok) { fichas = fichas.filter(function(f) { return f.id !== id; }); render(); }
-}
-
-function render() {
-  var kanban = document.getElementById("kanban");
-  kanban.innerHTML = "";
-
-  FASES.forEach(function(fase, fi) {
-    var cards = fichas.filter(function(f) { return f.phaseId === fase.id; });
-    var nextFase = FASES[fi + 1] || null;
-
-    var col = document.createElement("div");
-    col.className = "col";
-    col.style.setProperty("--col-color", fase.color);
-
-    var head = "<div class=\"col-header\" style=\"--col-color:" + fase.color + "\">" +
-      "<span class=\"col-title\" style=\"color:" + fase.color + "\">" + fase.name + "</span>" +
-      "<span class=\"col-count\">" + cards.length + "</span>" +
-    "</div>";
-
-    var body = "<div class=\"col-body\">";
-    if (!cards.length) {
-      body += "<div class=\"col-empty\">Nenhuma ficha</div>";
-    } else {
-      cards.forEach(function(f) {
-        var os = f.osCode ? "<span style=\"color:" + fase.color + "\">#" + f.osCode + "</span>" : "";
-        var actionBtns = "";
-        if (nextFase) {
-          actionBtns += "<button class=\"gact next\" style=\"--col-color:" + nextFase.color + "\" onclick=\"mover('" + f.id + "','" + nextFase.id + "')\">→ " + nextFase.name + "</button>";
-        }
-        actionBtns += "<button class=\"gact del\" onclick=\"excluir('" + f.id + "','" + (f.nomeContato||"").replace(/'/g,"") + "')\">🗑 Remover</button>";
-
-        body += "<div class=\"gcard\">" +
-          "<div class=\"gcard-head\">" +
-            (os ? "<div class=\"gcard-os\">" + os + "</div>" : "") +
-            "<div class=\"gcard-nome\">" + (f.nomeContato || "—") + "</div>" +
-            (f.telefone ? "<div class=\"gcard-tel\">" + f.telefone + "</div>" : "") +
-          "</div>" +
-          (f.descricao ? "<div class=\"gcard-desc\">" + f.descricao + "</div>" : "") +
-          "<div class=\"gcard-actions\">" + actionBtns + "</div>" +
-        "</div>";
-      });
-    }
-    body += "</div>";
-
-    col.innerHTML = head + body;
-    kanban.appendChild(col);
-  });
-}
-
-var toastTimer;
-function showToast(icon, title, msg) {
-  var t = document.getElementById("toast");
-  t.innerHTML = "<span style=\"font-size:16px\">" + icon + "</span><div><div style=\"font-weight:600\">" + title + "</div>" + (msg ? "<div style=\"color:#888;margin-top:2px;font-size:10px\">" + msg + "</div>" : "") + "</div>";
-  t.style.opacity = "1";
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(function() { t.style.opacity = "0"; }, 4000);
-}
-
-// ── FASES DO BOARD (para Mover OS) ───────────────────────────
-var BOARD_PHASES = [
-  { id: "aprovado",        name: "Aprovado"           },
-  { id: "producao",        name: "Produção"            },
-  { id: "cliente_loja",    name: "Cliente Loja"        },
-  { id: "urgencia",        name: "Urgência"            },
-  { id: "comprar_peca",    name: "Comprar Peça"        },
-  { id: "aguardando_peca", name: "Aguardando Peça"     },
-  { id: "peca_disponivel", name: "Peça Disponível"     },
-  { id: "loja_feito",      name: "Loja Feito"          },
-  { id: "delivery_feito",  name: "Delivery Feito"      },
-  { id: "aguardando_ret",  name: "Aguardando Retirada" },
-];
-var COLORS = ["#f5c800","#ff9800","#ef4444","#a855f7","#3b9eff","#00c896","#22c55e","#10b981","#f59e0b","#e879f9"];
-var gBoard = null;
-var gSelCardId = null, gSelPhase = null, gSelTecnico = null;
-
-// ── NAVEGAÇÃO ─────────────────────────────────────────────────
-function showPage(page) {
-  document.querySelectorAll(".g-page").forEach(function(p) { p.style.display = "none"; });
-  var el = document.getElementById("page-" + page);
-  if (el) el.style.display = page === "kanban" ? "flex" : "flex";
-  document.getElementById("nav-kanban").style.background = page === "kanban" ? "var(--c1)" : "";
-  document.getElementById("nav-kanban").style.color      = page === "kanban" ? "#000" : "";
-  document.getElementById("nav-kanban").style.fontWeight = page === "kanban" ? "600" : "";
-  document.getElementById("nav-mover").style.background  = page === "mover"  ? "var(--c1)" : "";
-  document.getElementById("nav-mover").style.color       = page === "mover"  ? "#000" : "";
-  document.getElementById("nav-mover").style.fontWeight  = page === "mover"  ? "600" : "";
-  if (page === "mover") buildStagesGrid();
-}
-
-// ── MOVER OS ─────────────────────────────────────────────────
-function buildStagesGrid() {
-  var grid = document.getElementById("g-move-stages");
-  if (!grid) return;
-  var phases = (gBoard && gBoard.phases && gBoard.phases.length) ? gBoard.phases : BOARD_PHASES;
-  grid.innerHTML = phases.map(function(ph, i) {
-    return '<button class="stage-btn" data-id="' + ph.id + '" onclick="gPickPhase(\'' + ph.id + '\')"><span style="width:8px;height:8px;border-radius:50%;background:' + COLORS[i % COLORS.length] + ';flex-shrink:0;"></span>' + ph.name + '</button>';
-  }).join("");
-}
-
-function gPickPhase(id) {
-  gSelPhase = id;
-  var phases = (gBoard && gBoard.phases && gBoard.phases.length) ? gBoard.phases : BOARD_PHASES;
-  document.querySelectorAll("#g-move-stages .stage-btn").forEach(function(b, i) {
-    var active = b.getAttribute("data-id") === id;
-    b.classList.toggle("selected", active);
-    b.style.background = active ? COLORS[i % COLORS.length] : "";
-    b.style.color      = active ? "#000" : "";
-  });
-  gCheckMove();
-}
-
-function gPickTecnico(name) {
-  gSelTecnico = name;
-  document.querySelectorAll(".tecnico-btn").forEach(function(b) {
-    b.classList.toggle("selected", b.textContent.trim() === name);
-  });
-  gCheckMove();
-}
-
-function gCheckMove() {
-  var btn = document.getElementById("g-btn-move");
-  if (btn) btn.disabled = !(gSelCardId && gSelPhase);
-}
-
-function onOsNumInput() {
-  var val = document.getElementById("os-num-input").value.trim().toLowerCase();
-  gSelCardId = null;
-  document.getElementById("os-found-info").style.display = "none";
-  gCheckMove();
-  if (!val || !gBoard) return;
-  var cards = gBoard.cards || [];
-  var found = cards.find(function(card) {
-    return (card.osCode && card.osCode.toLowerCase().includes(val)) ||
-           (card.nomeContato && card.nomeContato.toLowerCase().includes(val)) ||
-           (card.title && card.title.toLowerCase().includes(val));
-  });
-  if (found) {
-    gSelCardId = found.pipefyId;
-    var phase = BOARD_PHASES.find(function(p) { return p.id === found.phaseId; });
-    document.getElementById("os-found-title").textContent = found.title || (found.nomeContato || "") + " #" + (found.osCode || "");
-    document.getElementById("os-found-phase").textContent = phase ? phase.name : found.phaseId;
-    document.getElementById("os-found-info").style.display = "block";
-    gCheckMove();
-  }
-}
-
-async function gSubmitMove() {
-  if (!gSelCardId || !gSelPhase) return;
-  var btn = document.getElementById("g-btn-move");
-  btn.disabled = true; btn.textContent = "Movendo...";
-  try {
-    var r = await fetch("/api/board?action=move", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pipefyId: gSelCardId, phaseId: gSelPhase, tecnico: gSelTecnico })
-    });
-    var d = await r.json();
-    if (d.ok) {
-      var phase = BOARD_PHASES.find(function(p) { return p.id === gSelPhase; });
-      showToast("✅", "OS movida!", (gSelTecnico ? gSelTecnico + " → " : "") + (phase ? phase.name : gSelPhase));
-      // Reset
-      gSelCardId = null; gSelPhase = null;
-      document.getElementById("os-num-input").value = "";
-      document.getElementById("os-found-info").style.display = "none";
-      document.querySelectorAll("#g-move-stages .stage-btn").forEach(function(b) { b.classList.remove("selected"); b.style.background = ""; b.style.color = ""; });
-      if (gBoard) {
-        var r2 = await fetch("/api/board?action=load");
-        var d2 = await r2.json();
-        if (d2.board) gBoard = d2.board;
-      }
-    } else {
-      showToast("❌", "Erro", d.error || "");
-    }
-  } catch(e) { showToast("❌", "Erro", e.message); }
-  btn.disabled = false; btn.textContent = "→ Mover OS";
-  gCheckMove();
-}
-
-// Carrega board para Mover OS
-async function loadBoard() {
-  try {
-    var r = await fetch("/api/board?action=load");
-    var d = await r.json();
-    if (d.board) gBoard = d.board;
-    buildStagesGrid();
-  } catch(e) {}
-}
-
-// Auto sync ao abrir + a cada 60s
-load().then(function() { syncNow(); loadBoard(); });
-setInterval(function() { load().then(function() { syncNow(); }); }, 60000);
-
-async function confirmarLimparNaoMovidas() {
-  var hoje = new Date().toLocaleDateString("pt-BR", {timeZone:"America/Sao_Paulo"});
-  if (!confirm("Remover fichas que NÃO foram movidas hoje (" + hoje + ")?\n\nSerão mantidas apenas as fichas com movimentação de hoje.")) return;
-  var d = await api("limpar-nao-movidas-hoje", {});
-  if (d.ok) {
-    showToast("🧹", d.removed + " ficha(s) removida(s)", d.remaining + " mantida(s) (movidas hoje)");
-    await load();
-  } else {
-    showToast("❌", "Erro", d.error || "");
-  }
-}
+// init
+load();
+setInterval(load, 60000);
 </script>
 </body>
 </html>
