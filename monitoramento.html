@@ -167,14 +167,15 @@ async function loadAll() {
   document.getElementById('sections').innerHTML = '<div class="spinner"><div class="spin"></div>Buscando dados...</div>';
 
   try {
-    var [finRes, boardRes, orcRes, compraRes, semRespostaRes, compPecasRes, equipGravadoRes] = await Promise.all([
+    var [finRes, boardRes, orcRes, compraRes, semRespostaRes, compPecasRes, equipGravadoRes, garantiaRes] = await Promise.all([
       fetch('/api/financeiro?action=load').then(function(r){return r.json();}).catch(function(){return {records:[]};}),
       fetch('/api/board?action=load').then(function(r){return r.json();}),
       fetch('/api/orcamento?action=orc-load').then(function(r){return r.json();}),
       fetch('/api/compra-equip?action=load').then(function(r){return r.json();}).catch(function(){return {fichas:[]};}),
       fetch('/api/orcamento?action=sem-resposta').then(function(r){return r.json();}).catch(function(){return {cards:[]};}),
       fetch('/api/compras-pecas?action=load').then(function(r){return r.json();}).catch(function(){return {pecas:[]};}).catch(function(){return {pecas:[]}}),
-      fetch('/api/board?action=equip-gravado').then(function(r){return r.json();}).catch(function(){return {cards:[]};})
+      fetch('/api/board?action=equip-gravado').then(function(r){return r.json();}).catch(function(){return {cards:[]};}).catch(function(){return {cards:[]}}),
+      fetch('/api/garantia?action=load').then(function(r){return r.json();}).catch(function(){return {fichas:[]};})
     ]);
 
     var cards = boardRes.board?.cards || [];
@@ -193,6 +194,10 @@ async function loadAll() {
       pecasAgPagamento:  (compPecasRes.pecas||[]).filter(function(p){return p.status==='aguardando_pagamento';}),
       pecasOnline:       (compPecasRes.pecas||[]).filter(function(p){return p.tipoCompra==='online'&&p.previsaoChegada&&p.status!=='pago';}),
       equipGravado:      equipGravadoRes.cards || [],
+      garantiaLojaImediata:     (garantiaRes.fichas||[]).filter(function(f){return f.tipo==='loja_imediata'&&!f.concluida;}),
+      garantiaLojaAcomp:        (garantiaRes.fichas||[]).filter(function(f){return f.tipo==='loja_acompanhamento'&&!f.concluida;}),
+      garantiaDelivery:         (garantiaRes.fichas||[]).filter(function(f){return f.tipo==='delivery'&&!f.concluida;}),
+      garantiaRua:              (garantiaRes.fichas||[]).filter(function(f){return f.tipo==='rua'&&!f.concluida;}),
     };
 
     renderSummary();
@@ -211,6 +216,10 @@ function renderSummary() {
     {label:'Peça Disponível',   count: data.pecaDisponivel.length,    c:'#3b9eff', anchor:'pecaDisponivel'},
     {label:'Equip. Comprados',  count: data.equipComprado.length,     c:'#a855f7', anchor:'equipComprado'},
     {label:'Equip. Gravado',    count: data.equipGravado.length,      c:'#22c55e', anchor:'equip-gravado'},
+    {label:'Gar. Loja Imed.',   count: (data.garantiaLojaImediata||[]).length,  c:'#10d982', anchor:'garantia-loja-imediata'},
+    {label:'Gar. Loja Acomp.',  count: (data.garantiaLojaAcomp||[]).length,     c:'#3b9eff', anchor:'garantia-loja-acomp'},
+    {label:'Gar. Delivery',     count: (data.garantiaDelivery||[]).length,      c:'#f97316', anchor:'garantia-delivery'},
+    {label:'Gar. RS Rua',       count: (data.garantiaRua||[]).length,           c:'#f04060', anchor:'garantia-rua'},
     {label:'Em Urgência',       count: data.urgencia.length,          c:'#ef4444', anchor:'urgencia'},
     {label:'Sem Resposta',      count: data.semResposta.length,       c:'#f97316', anchor:'semResposta'},
     {label:'Compras Pendentes', count: data.pecasPendentes.length,    c:'#f97316', anchor:'pecasPendentes'},
@@ -268,7 +277,29 @@ function renderSections() {
       }, 'equipComprado');
     },
     urgencia: function() {
-      return renderSection('Equipamento Gravado — aguardando envio de vídeo', data.equipGravado, '#22c55e', function(c){
+
+      return renderSection('Garantia — Loja Imediata', data.garantiaLojaImediata, '#10d982', function(g){
+        return '<div style="font-size:13px;font-weight:600;color:#fff">' + escH(g.nome) + '</div>'
+          + '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">' + escH(g.defeito.slice(0,60)) + '</div>'
+          + '<div style="font-family:var(--fm);font-size:9px;color:#10d982;margin-top:2px;">' + escH(g.faseId.replace(/_/g,' ')) + '</div>';
+      }, 'garantia-loja-imediata') +
+      renderSection('Garantia — Loja Acompanhamento', data.garantiaLojaAcomp, '#3b9eff', function(g){
+        return '<div style="font-size:13px;font-weight:600;color:#fff">' + escH(g.nome) + '</div>'
+          + '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">' + escH(g.defeito.slice(0,60)) + '</div>'
+          + '<div style="font-family:var(--fm);font-size:9px;color:#3b9eff;margin-top:2px;">' + escH(g.faseId.replace(/_/g,' ')) + '</div>';
+      }, 'garantia-loja-acomp') +
+      renderSection('Garantia — Delivery', data.garantiaDelivery, '#f97316', function(g){
+        return '<div style="font-size:13px;font-weight:600;color:#fff">' + escH(g.nome) + '</div>'
+          + '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">' + escH(g.defeito.slice(0,60)) + '</div>'
+          + (g.endereco ? '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);">📍 ' + escH(g.endereco.slice(0,50)) + '</div>' : '');
+      }, 'garantia-delivery') +
+      renderSection('Garantia — RS Rua', data.garantiaRua, '#f04060', function(g){
+        return '<div style="font-size:13px;font-weight:600;color:#fff">' + escH(g.nome) + '</div>'
+          + '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">' + escH(g.defeito.slice(0,60)) + '</div>'
+          + (g.endereco ? '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);">📍 ' + escH(g.endereco.slice(0,50)) + '</div>' : '');
+      }, 'garantia-rua') +
+
+      renderSection('Equipamento Gravado — aguardando envio de vídeo', data.equipGravado, '#22c55e', function(c){
         return '<div style="font-size:13px;font-weight:600">' + escH(c.nomeContato || c.title || '—') + '</div>'
           + (c.osCode ? '<div style="font-family:var(--fm);font-size:10px;color:var(--muted)">OS #' + escH(c.osCode) + '</div>' : '')
           + (c.descricao ? '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + escH(c.descricao.substring(0,80)) + '</div>' : '');
@@ -317,6 +348,10 @@ var _SECTION_TITLE_MAP = {
   'Peça Disponível': 'pecaDisponivel',
   'Equipamentos Comprados': 'equipComprado',
   'Equipamento Gravado': 'equip-gravado',
+  'Garantia — Loja Imediata': 'garantia-loja-imediata',
+  'Garantia — Loja Acompanhamento': 'garantia-loja-acomp',
+  'Garantia — Delivery': 'garantia-delivery',
+  'Garantia — RS Rua': 'garantia-rua',
   'Em Urgência': 'urgencia',
   'Sem Resposta': 'semResposta',
   'Peças para Comprar': 'pecasPendentes',
@@ -358,6 +393,10 @@ var SECOES_DEFAULT = [
   { id:'pecaDisponivel',    label:'Peça Disponível',               cor:'#3b9eff', visivel:true },
   { id:'equipComprado',     label:'Equipamentos Comprados',        cor:'#a855f7', visivel:true },
   { id:'equip-gravado',    label:'Equipamento Gravado',           cor:'#22c55e', visivel:true },
+  { id:'garantia-loja-imediata', label:'Garantia Loja Imediata',      cor:'#10d982', visivel:true },
+  { id:'garantia-loja-acomp',    label:'Garantia Loja Acomp.',        cor:'#3b9eff', visivel:true },
+  { id:'garantia-delivery',      label:'Garantia Delivery',           cor:'#f97316', visivel:true },
+  { id:'garantia-rua',           label:'Garantia RS Rua',             cor:'#f04060', visivel:true },
   { id:'urgencia',          label:'Em Urgência',                   cor:'#ef4444', visivel:true },
   { id:'semResposta',       label:'Sem Resposta',                  cor:'#f97316', visivel:true },
   { id:'pecasPendentes',    label:'Peças para Comprar',            cor:'#f97316', visivel:true },
@@ -419,7 +458,29 @@ renderSections = function() {
       });
     },
     urgencia: function() {
-      return renderSection('Equipamento Gravado — aguardando envio de vídeo', data.equipGravado, '#22c55e', function(c){
+
+      return renderSection('Garantia — Loja Imediata', data.garantiaLojaImediata, '#10d982', function(g){
+        return '<div style="font-size:13px;font-weight:600;color:#fff">' + escH(g.nome) + '</div>'
+          + '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">' + escH(g.defeito.slice(0,60)) + '</div>'
+          + '<div style="font-family:var(--fm);font-size:9px;color:#10d982;margin-top:2px;">' + escH(g.faseId.replace(/_/g,' ')) + '</div>';
+      }, 'garantia-loja-imediata') +
+      renderSection('Garantia — Loja Acompanhamento', data.garantiaLojaAcomp, '#3b9eff', function(g){
+        return '<div style="font-size:13px;font-weight:600;color:#fff">' + escH(g.nome) + '</div>'
+          + '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">' + escH(g.defeito.slice(0,60)) + '</div>'
+          + '<div style="font-family:var(--fm);font-size:9px;color:#3b9eff;margin-top:2px;">' + escH(g.faseId.replace(/_/g,' ')) + '</div>';
+      }, 'garantia-loja-acomp') +
+      renderSection('Garantia — Delivery', data.garantiaDelivery, '#f97316', function(g){
+        return '<div style="font-size:13px;font-weight:600;color:#fff">' + escH(g.nome) + '</div>'
+          + '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">' + escH(g.defeito.slice(0,60)) + '</div>'
+          + (g.endereco ? '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);">📍 ' + escH(g.endereco.slice(0,50)) + '</div>' : '');
+      }, 'garantia-delivery') +
+      renderSection('Garantia — RS Rua', data.garantiaRua, '#f04060', function(g){
+        return '<div style="font-size:13px;font-weight:600;color:#fff">' + escH(g.nome) + '</div>'
+          + '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">' + escH(g.defeito.slice(0,60)) + '</div>'
+          + (g.endereco ? '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);">📍 ' + escH(g.endereco.slice(0,50)) + '</div>' : '');
+      }, 'garantia-rua') +
+
+      renderSection('Equipamento Gravado — aguardando envio de vídeo', data.equipGravado, '#22c55e', function(c){
         return '<div style="font-size:13px;font-weight:600">' + escH(c.nomeContato || c.title || '—') + '</div>'
           + (c.osCode ? '<div style="font-family:var(--fm);font-size:10px;color:var(--muted)">OS #' + escH(c.osCode) + '</div>' : '')
           + (c.descricao ? '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + escH(c.descricao.substring(0,80)) + '</div>' : '');
