@@ -72,7 +72,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 /* ── POR-TIPO VIEWS (tabs: loja_imediata etc) ── */
 .tipo-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
 .tipo-title{font-family:var(--fh);font-size:18px;font-weight:900;}
-.kanban-fases{display:grid;gap:12px;}
+.kanban-fases{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;}
+.kanban-fases .fase-col{flex:0 0 260px;min-width:260px;}
 .fase-col{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
 .fase-head{padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
 .fase-label{font-family:var(--fm);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;}
@@ -181,7 +182,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   <div class="tipo-header">
     <div class="tipo-title" style="color:var(--green)">🏪 Loja Imediata</div>
   </div>
-  <div class="kanban-fases" id="fases-loja_imediata" style="grid-template-columns:repeat(3,1fr)"></div>
+  <div class="kanban-fases" id="fases-loja_imediata"></div>
 </div>
 
 <!-- VIEW LOJA ACOMPANHAMENTO -->
@@ -189,7 +190,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   <div class="tipo-header">
     <div class="tipo-title" style="color:var(--accent)">🔍 Loja Acompanhamento</div>
   </div>
-  <div class="kanban-fases" id="fases-loja_acompanhamento" style="grid-template-columns:repeat(4,1fr)"></div>
+  <div class="kanban-fases" id="fases-loja_acompanhamento"></div>
 </div>
 
 <!-- VIEW DELIVERY -->
@@ -197,7 +198,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   <div class="tipo-header">
     <div class="tipo-title" style="color:var(--orange)">🚚 Delivery</div>
   </div>
-  <div class="kanban-fases" id="fases-delivery" style="grid-template-columns:repeat(3,1fr)"></div>
+  <div class="kanban-fases" id="fases-delivery"></div>
 </div>
 
 <!-- VIEW RS RUA -->
@@ -206,7 +207,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
     <div class="tipo-title" style="color:var(--red)">🏘️ RS Rua</div>
     <a class="hbtn" href="/adm-rsrua" target="_blank" style="color:var(--red);border-color:rgba(240,64,96,.3);">📱 Painel Motorista</a>
   </div>
-  <div class="kanban-fases" id="fases-rua" style="grid-template-columns:repeat(3,1fr)"></div>
+  <div class="kanban-fases" id="fases-rua"></div>
 </div>
 
 <!-- VIEW MONITORAMENTO -->
@@ -376,6 +377,8 @@ function buildFichaCard(f, tipo, fasesT){
       (f.telefone?'<span>📞 '+esc(f.telefone)+'</span>':'')+
       (f.endereco?'<span>📍 '+esc(f.endereco)+'</span>':'')+
       '<span>'+fmtDate(f.criadaEm)+'</span>'+
+      (f.pipefyId?'<span style="color:var(--green)">🔗 Pipefy #'+esc(f.pipefyId)+'</span>':'')+
+      (f.pipefyErro?'<span style="color:var(--red)" title="'+esc(f.pipefyErro)+'">⚠️ Pipefy erro</span>':'')+
     '</div>'+
     '<div class="fc-actions">'+
       '<select class="fase-select" onchange="moverFase(\''+f.id+'\',this.value)">'+opts+'</select>'+
@@ -519,9 +522,18 @@ async function excluir(id){
   }
 }
 
+// Pipefy sync para delivery — verifica Finalizado no Pipefy a cada 5 min
+async function pipefySync() {
+  try {
+    await api('pipefy-sync');
+    await load();
+  } catch(e) {}
+}
+
 // init
 load();
 setInterval(load, 60000);
+setInterval(pipefySync, 300000); // sync Pipefy a cada 5 min
 </script>
 </body>
 </html>
