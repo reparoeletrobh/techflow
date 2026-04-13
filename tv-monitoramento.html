@@ -167,13 +167,14 @@ async function loadAll() {
   document.getElementById('sections').innerHTML = '<div class="spinner"><div class="spin"></div>Buscando dados...</div>';
 
   try {
-    var [finRes, boardRes, orcRes, compraRes, semRespostaRes, compPecasRes] = await Promise.all([
+    var [finRes, boardRes, orcRes, compraRes, semRespostaRes, compPecasRes, remarcarRes] = await Promise.all([
       fetch('/api/tv-financeiro?action=load').then(function(r){return r.json();}).catch(function(){return {records:[]};}),
       fetch('/api/tv-board?action=load').then(function(r){return r.json();}),
       fetch('/api/tv-orcamento?action=orc-load').then(function(r){return r.json();}),
       fetch('/api/tv-compra-equip?action=load').then(function(r){return r.json();}).catch(function(){return {fichas:[]};}),
       fetch('/api/tv-orcamento?action=sem-resposta').then(function(r){return r.json();}).catch(function(){return {cards:[]};}),
-      fetch('/api/tv-compras-pecas?action=load').then(function(r){return r.json();}).catch(function(){return {pecas:[]};})
+      fetch('/api/tv-compras-pecas?action=load').then(function(r){return r.json();}).catch(function(){return {pecas:[]};}),
+      fetch('/api/tv-board?action=remarcar-fase').then(function(r){return r.json();}).catch(function(){return {cards:[]};})
     ]);
 
     var cards = boardRes.board?.cards || [];
@@ -191,6 +192,7 @@ async function loadAll() {
       pecasPendentes:    (compPecasRes.pecas||[]).filter(function(p){return p.status==='pendente';}),
       pecasAgPagamento:  (compPecasRes.pecas||[]).filter(function(p){return p.status==='aguardando_pagamento';}),
       pecasOnline:       (compPecasRes.pecas||[]).filter(function(p){return p.tipoCompra==='online'&&p.previsaoChegada&&p.status!=='pago';}),
+      remarcar:          remarcarRes.cards || [],
     };
 
     renderSummary();
@@ -203,6 +205,7 @@ async function loadAll() {
 
 function renderSummary() {
   var items = [
+    {label:'Remarcar',          count: (data.remarcar||[]).length,         c:'#f04060', anchor:'remarcar'},
     {label:'Análise Pgto',      count: data.analisePagamento.length,  c:'#9b72ff', anchor:'analisePagamento'},
     {label:'Orç. Pendentes',    count: data.orcPendentes.length,      c:'#f5c800', anchor:'orcPendentes'},
     {label:'Comprar Peça',      count: data.comprarPeca.length,       c:'#f97316', anchor:'comprarPeca'},
@@ -231,7 +234,14 @@ function renderSummary() {
 function renderSections() {
   var RENDER_MAP = {
     analisePagamento: function() {
-      return renderSection('Análise de Pagamento — aguardando confirmação', data.analisePagamento, '#9b72ff', function(r){
+      return renderSection('🔄 Remarcar — aguardando reagendamento', data.remarcar, '#f04060', function(c){
+        return '<div style="font-size:13px;font-weight:600">' + escH(c.nomeContato || c.title || '—') + '</div>'
+          + (c.osCode ? '<div style="font-family:var(--fm);font-size:10px;color:var(--muted)">OS #' + escH(c.osCode) + '</div>' : '')
+          + (c.endereco ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">📍 ' + escH(c.endereco.slice(0,60)) + '</div>' : '')
+          + (c.descricao ? '<div style="font-size:11px;color:var(--muted);">' + escH(c.descricao.slice(0,60)) + '</div>' : '');
+      }, 'remarcar') +
+
+      renderSection('Análise de Pagamento — aguardando confirmação', data.analisePagamento, '#9b72ff', function(r){
         return '<div class="item-card" style="--c:#9b72ff"><div class="item-nome">'+escH(r.nomeContato||r.title||'—')+'</div><div class="item-desc">'+escH((r.descricao||r.title||'').slice(0,80))+'</div><div class="item-age" style="--c:#9b72ff">'+fmtSince(r.movedAt)+'</div></div>';
       }, 'analisePagamento');
     },
@@ -302,6 +312,7 @@ function renderSections() {
 }
 
 var _SECTION_TITLE_MAP = {
+  'Remarcar': 'remarcar',
   'Análise de Pagamento': 'analisePagamento',
   'Orçamentos não enviados': 'orcPendentes',
   'Comprar Peça': 'comprarPeca',
@@ -342,6 +353,7 @@ function escH(s) {
 
 // ── ORDEM DOS PAINÉIS ──────────────────────────────────────
 var SECOES_DEFAULT = [
+  { id:'remarcar',          label:'Remarcar',                      cor:'#f04060', visivel:true },
   { id:'analisePagamento',  label:'Análise de Pagamento',          cor:'#9b72ff', visivel:true },
   { id:'orcPendentes',      label:'Orçamentos não enviados',       cor:'#f5c800', visivel:true },
   { id:'comprarPeca',       label:'Comprar Peça',                  cor:'#f97316', visivel:true },
@@ -381,7 +393,13 @@ var _renderSectionsOrig = renderSections;
 renderSections = function() {
   var RENDER_MAP = {
     analisePagamento: function() {
-      return renderSection('Análise de Pagamento — aguardando confirmação', data.analisePagamento, '#9b72ff', function(r){
+      return renderSection('🔄 Remarcar — aguardando reagendamento', data.remarcar, '#f04060', function(c){
+        return '<div style="font-size:13px;font-weight:600">' + escH(c.nomeContato || c.title || '—') + '</div>'
+          + (c.osCode ? '<div style="font-family:var(--fm);font-size:10px;color:var(--muted)">OS #' + escH(c.osCode) + '</div>' : '')
+          + (c.endereco ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">📍 ' + escH(c.endereco.slice(0,60)) + '</div>' : '')
+          + (c.descricao ? '<div style="font-size:11px;color:var(--muted);">' + escH(c.descricao.slice(0,60)) + '</div>' : '');
+      }, 'remarcar') +
+      renderSection('Análise de Pagamento — aguardando confirmação', data.analisePagamento, '#9b72ff', function(r){
         return '<div class="item-card" style="--c:#9b72ff"><div class="item-nome">'+escH(r.nomeContato||r.title||'—')+'</div><div class="item-desc">'+escH((r.descricao||r.title||'').slice(0,80))+'</div><div class="item-age" style="--c:#9b72ff">'+fmtSince(r.movedAt)+'</div></div>';
       });
     },
