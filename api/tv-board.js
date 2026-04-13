@@ -720,6 +720,43 @@ async function otimizarPontos(pontos, pontoInicio) {
       return res.status(200).json({ ok: true, found: edges.length, moved: moved, filaCount: filaAtual.length });
     }
 
+    // ── GET remarcar-fase — busca cards na fase Remarcar ao vivo no Pipefy ──
+    if (action === "remarcar-fase") {
+      try {
+        const query = "query { phase(id: \"" + "341638217" + "\") { cards(first: 50) { edges { node { id title fields { name value } } } } } }";
+        const r = await fetch(PIPEFY_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + (process.env.PIPEFY_TOKEN || "").trim() },
+          body: JSON.stringify({ query }),
+        });
+        const j = await r.json();
+        if (j.errors) return res.status(200).json({ ok: false, error: j.errors[0].message });
+        const edges = j.data?.phase?.cards?.edges || [];
+        const cards = edges.map(function(e) {
+          const node   = e.node;
+          const fields = node.fields || [];
+          const nomeF  = fields.find(function(f){ return f.name.toLowerCase().includes("nome"); });
+          const telF   = fields.find(function(f){ return f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"); });
+          const endF   = fields.find(function(f){ return f.name.toLowerCase().includes("endere"); });
+          const descF  = fields.find(function(f){ return f.name.toLowerCase().includes("descri"); });
+          const title  = node.title || "";
+          const m      = title.match(/^(.*?)\s+(\d{3,6})$/);
+          return {
+            pipefyId:    String(node.id),
+            osCode:      m ? m[2] : null,
+            nomeContato: (nomeF?.value?.trim()) || (m ? m[1].trim() : title),
+            telefone:    telF?.value || null,
+            endereco:    endF?.value || null,
+            descricao:   descF?.value || null,
+            title,
+          };
+        });
+        return res.status(200).json({ ok: true, cards, count: cards.length });
+      } catch(e) {
+        return res.status(200).json({ ok: false, error: "remarcar-fase: " + e.message });
+      }
+    }
+
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch(e) {
