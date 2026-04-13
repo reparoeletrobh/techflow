@@ -765,7 +765,7 @@ async function testarFichasIndividualmente(pendentes, tipo, key, secret) {
     const f = (db.fichas || []).find(x => x.pipefyId === id || x.id === id);
     if (!f) return res.status(404).json({ ok: false, error: "Ficha nao encontrada" });
     f.lat = lat; f.lng = lng;
-    await dbSet(LALA_KEY, db);
+    if (fonte) f.geocFonte = fonte;
     return res.status(200).json({ ok: true });
   }
 
@@ -780,12 +780,12 @@ async function testarFichasIndividualmente(pendentes, tipo, key, secret) {
       if (coords) {
         f.lat = coords.lat;
         f.lng = coords.lng;
+        if (coords.fonte) f.geocFonte = coords.fonte;
         ok_count++;
       } else {
         fail_count++;
       }
-      // Respeita rate limit do Nominatim: 1 req/segundo
-      await new Promise(r => setTimeout(r, 1100));
+      await new Promise(r => setTimeout(r, 400)); // servidor gerencia rate limits internamente
     }
 
     if (ok_count > 0) await dbSet(LALA_KEY, db);
@@ -803,8 +803,10 @@ async function testarFichasIndividualmente(pendentes, tipo, key, secret) {
     if (!coords) return res.status(200).json({ ok: false, error: "Endereço não encontrado no mapa" });
     f.lat = coords.lat;
     f.lng = coords.lng;
+    if (coords.fonte) f.geocFonte = coords.fonte;
     await dbSet(LALA_KEY, db);
-    return res.status(200).json({ ok: true, lat: f.lat, lng: f.lng });
+    return res.status(200).json({ ok: true, lat: f.lat, lng: f.lng, fonte: coords.fonte || null,
+      googleMapsUrl: 'https://maps.google.com/?q=' + f.lat + ',' + f.lng });
   }
 
   // ── POST test-cotacao-raw — testa cotação com serviceType variável
