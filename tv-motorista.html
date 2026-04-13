@@ -64,6 +64,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 .m-btn.maps{background:rgba(59,158,255,.15);color:var(--accent);border:1px solid rgba(59,158,255,.3);}
 .m-btn.rel{background:rgba(245,200,0,.15);color:var(--yellow);border:1px solid rgba(245,200,0,.3);}
 .m-btn.coletado{background:var(--green);color:#000;font-weight:800;grid-column:1/-1;}
+.m-btn.remarcar{background:rgba(249,115,22,.15);color:var(--orange);border:1px solid rgba(249,115,22,.3);}
 .m-btn:active{filter:brightness(0.85);}
 
 /* SEÇÃO COLETADOS */
@@ -252,6 +253,17 @@ function buildCard(rotaId, c) {
       + '<button class="m-btn coletado" onclick="marcarColetado(\'' + rotaId + '\',\'' + c.pipefyId + '\')">✅ Equipamento Coletado</button>'
     + '</div>'
     + '</div>';
+}
+
+async function remarcarCard(rotaId, pipefyId) {
+  if (!confirm('Mover esta ficha para Remarcar no Pipefy?')) return;
+  var d = await api('remarcar', { rotaId, pipefyId });
+  if (d.ok) {
+    toast('🔄 Ficha movida para Remarcar', 'var(--orange)');
+    await load();
+  } else {
+    toast('❌ ' + (d.error || 'Erro ao remarcar'), '#ef4444');
+  }
 }
 
 function toggleRota(id) {
