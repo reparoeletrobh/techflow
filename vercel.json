@@ -139,6 +139,10 @@
       "destination": "/compras-pecas.html"
     },
     {
+      "source": "/adm-rsrua",
+      "destination": "/adm-rsrua.html"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/home.html"
     },
