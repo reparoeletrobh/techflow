@@ -272,85 +272,11 @@ async function geocodificar(endereco) {
   return null;
 }
 
-// Distância euclidiana (graus) entre dois pontos — suficiente para BH
+// Distância euclidiana (graus) entre dois pontos
 function distGraus(a, b) {
-  const dlat = a.lat - b.lat, dlng = (a.lng - b.lng) * Math.cos(a.lat * Math.PI / 180);
+  const dlat = a.lat - b.lat;
+  const dlng = (a.lng - b.lng) * Math.cos(a.lat * Math.PI / 180);
   return Math.sqrt(dlat*dlat + dlng*dlng);
-}
-
-// Nearest-Neighbor TSP — retorna índices ordenados de `pontos`
-// pontos: [{lat,lng}], inicio: {lat,lng}
-function nearestNeighbor(pontos, inicio) {
-  const visitado = new Array(pontos.length).fill(false);
-  const ordem = [];
-  let atual = inicio;
-  for (let step = 0; step < pontos.length; step++) {
-    let melhorIdx = -1, melhorDist = Infinity;
-    for (let i = 0; i < pontos.length; i++) {
-      if (visitado[i]) continue;
-      const d = distGraus(atual, pontos[i]);
-      if (d < melhorDist) { melhorDist = d; melhorIdx = i; }
-    }
-    if (melhorIdx < 0) break;
-    visitado[melhorIdx] = true;
-    ordem.push(melhorIdx);
-    atual = pontos[melhorIdx];
-  }
-  return ordem;
-}
-
-// 2-opt — refinamento pós Nearest Neighbor
-// Recebe array de pontos JÁ na ordem do NN (inclui ponto inicial como [0])
-// O ponto inicial (oficina) é fixo — só otimiza os intermediários
-// Retorna nova ordem de índices (sem o ponto inicial duplicado)
-function doisOpt(pontos, ordemNN, pontoInicio) {
-  // Constrói rota completa: inicio → p[0] → p[1] → ... → p[n-1] → inicio
-  // Trabalha com os índices dos pontos intermediários
-  let rota = ordemNN.slice(); // cópia
-  const n = rota.length;
-
-  // Distância total da rota completa (com retorno à origem)
-  function distTotal(r) {
-    let d = distGraus(pontoInicio, pontos[r[0]]);
-    for (let i = 0; i < r.length - 1; i++) d += distGraus(pontos[r[i]], pontos[r[i+1]]);
-    d += distGraus(pontos[r[r.length-1]], pontoInicio);
-    return d;
-  }
-
-  let melhorou = true;
-  let iteracoes = 0;
-  const MAX_ITER = 100; // segurança
-
-  while (melhorou && iteracoes < MAX_ITER) {
-    melhorou = false;
-    iteracoes++;
-    for (let i = 0; i < n - 1; i++) {
-      for (let j = i + 1; j < n; j++) {
-        // Pontos envolvidos na troca
-        const A = i === 0 ? pontoInicio : pontos[rota[i-1]];
-        const B = pontos[rota[i]];
-        const C = pontos[rota[j]];
-        const D = j === n-1 ? pontoInicio : pontos[rota[j+1]];
-
-        // Custo atual: A→B + C→D
-        const custoAtual = distGraus(A, B) + distGraus(C, D);
-        // Custo após troca 2-opt: A→C + B→D
-        const custoTroca  = distGraus(A, C) + distGraus(B, D);
-
-        if (custoTroca < custoAtual - 1e-10) {
-          // Inverte o segmento entre i e j
-          let esq = i, dir = j;
-          while (esq < dir) {
-            const tmp = rota[esq]; rota[esq] = rota[dir]; rota[dir] = tmp;
-            esq++; dir--;
-          }
-          melhorou = true;
-        }
-      }
-    }
-  }
-
-  return rota;
 }
 
 module.exports = async function handler(req, res) {
@@ -362,332 +288,383 @@ module.exports = async function handler(req, res) {
   const action = req.query.action || "";
 
   try {
-    // ── GET load ──────────────────────────────────────────────
-    // ── GET listar-fases — lista todas as fases do pipe TV com IDs reais ────
+
+    // ── GET load ────────────────────────────────────────────────
+    if (action === "load") {
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      return res.status(200).json({ ok: true, board });
+    }
+
+    // ── GET listar-fases ─────────────────────────────────────────
     if (action === "listar-fases") {
-      try {
-        const data = await pipefyQuery(`query { pipe(id: "${PIPE_ID}") { phases { id name } } }`);
-        const phases = data?.pipe?.phases || [];
-        return res.status(200).json({ ok: true, pipe: PIPE_ID, phases });
-      } catch(e) {
-        return res.status(200).json({ ok: false, error: e.message });
-      }
+      const data = await pipefyQuery(`query { pipe(id: "${PIPE_ID}") { phases { id name } } }`);
+      const phases = data?.pipe?.phases || [];
+      return res.status(200).json({ ok: true, pipe: PIPE_ID, phases });
     }
 
-    if (req.method === "GET" && action === "load") {
+    // ── GET sync — sincroniza board com Pipefy ───────────────────
+    if (action === "sync") {
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
-      return res.status(200).json({ ok: true, board, newCount: 0 });
-    }
-
-    // ── GET load-logs ─────────────────────────────────────────
-    if (req.method === "GET" && action === "load-logs") {
-      const logs = await dbGet(LOGS_KEY);
-      if (logs) return res.status(200).json({ ok: true, movesLog: logs.movesLog || [], metaLog: logs.metaLog || [] });
-      const board = sanitizeBoard(await dbGet(BOARD_KEY));
-      return res.status(200).json({ ok: true, movesLog: board.movesLog || [], metaLog: board.metaLog || [] });
-    }
-
-    // ── GET sync — importa novos cards do Pipefy ──────────────
-    if (req.method === "GET" && action === "sync") {
-      let board = sanitizeBoard(await dbGet(BOARD_KEY));
-      let newCount = 0, erpRemoved = 0;
-
+      let novos = 0, pipefyError = null;
       try {
-        const approved  = await fetchApprovedCards();
-        const activeIds = new Set(board.cards.map(c => c.pipefyId));
-        const syncedSet = new Set(board.syncedIds);
-        for (const c of approved) {
-          if (activeIds.has(c.pipefyId) || syncedSet.has(c.pipefyId)) continue;
-          board.cards.unshift({ ...c, phaseId: board.phases[0].id, movedBy: "Pipefy", movedAt: new Date().toISOString() });
-          activeIds.add(c.pipefyId);
-          if (!board.syncedIds.includes(c.pipefyId)) board.syncedIds.push(c.pipefyId);
-          newCount++;
-        }
-        board.movesLog = trimLog(board.movesLog);
-        if (newCount > 0) await dbSet(BOARD_KEY, board);
-        await saveLogs(board);
-      } catch(e) { console.error("TV sync:", e.message); }
-
-      // Remove cards em ERP/Finalizado
-      try {
-        const doneIds = await fetchDoneIds();
-        if (doneIds.length) {
-          const before = board.cards.length;
-          board.cards = board.cards.filter(c => !doneIds.includes(c.pipefyId));
-          erpRemoved  = before - board.cards.length;
-          if (erpRemoved > 0) { await dbSet(BOARD_KEY, board); await saveLogs(board); }
-        }
-      } catch(e) { console.error("TV done check:", e.message); }
-
-      // Tracking metaLog: ERP e Aguardando Aprovação
-      try {
-        const data = await pipefyQuery(`query {
-          pipe(id: "${PIPE_ID}") {
-            phases {
-              name
-              cards(first: 50) { edges { node { id } } }
-            }
-          }
-        }`);
-        const phases = data?.pipe?.phases || [];
-        if (!Array.isArray(board.metaLog)) board.metaLog = [];
-        const seenErp = new Set(board.metaLog.filter(m => m.phaseId === "erp_entrada").map(m => m.pipefyId));
-        const seenAg  = new Set(board.metaLog.filter(m => m.phaseId === "aguardando_aprovacao").map(m => m.pipefyId));
-        const seenCol = new Set(board.metaLog.filter(m => m.phaseId === "coleta_solicitada").map(m => m.pipefyId));
-        let metaChanged = false;
-        for (const ph of phases) {
-          const l = ph.name.toLowerCase();
-          for (const { node } of (ph.cards?.edges || [])) {
-            const id = String(node.id);
-            if (l.includes("erp") && !seenErp.has(id)) {
-              board.metaLog.push({ phaseId: "erp_entrada", pipefyId: id, timestamp: new Date().toISOString() });
-              metaChanged = true;
-            }
-            if ((l.includes("aguardando") && l.includes("aprov")) && !seenAg.has(id)) {
-              board.metaLog.push({ phaseId: "aguardando_aprovacao", pipefyId: id, timestamp: new Date().toISOString() });
-              metaChanged = true;
-            }
-            if (l.includes("coleta solicitada") && !seenCol.has(id)) {
-              board.metaLog.push({ phaseId: "coleta_solicitada", pipefyId: id, timestamp: new Date().toISOString() });
-              metaChanged = true;
-            }
+        const aprovados = await fetchApprovedCards();
+        const doneIds   = await fetchDoneIds();
+        // Remove cards finalizados
+        board.cards = board.cards.filter(function(c) { return !doneIds.includes(c.pipefyId); });
+        // Adiciona novos cards
+        for (const c of aprovados) {
+          if (!board.syncedIds.includes(c.pipefyId)) {
+            board.cards.push(Object.assign({ phaseId: "aprovado" }, c));
+            board.syncedIds.push(c.pipefyId);
+            novos++;
           }
         }
-        if (metaChanged) { await dbSet(BOARD_KEY, board); await saveLogs(board); }
-      } catch(e) { console.error("TV metaLog:", e.message); }
-
-      return res.status(200).json({ ok: true, board, newCount, erpRemoved });
+        board.syncedIds = trimLog(board.syncedIds, 2000);
+        if (novos > 0) await dbSet(BOARD_KEY, board);
+      } catch(e) { pipefyError = e.message; }
+      return res.status(200).json({ ok: true, novos, pipefyError });
     }
 
-    // ── POST mover — move card de fase ────────────────────────
-    if (req.method === "POST" && action === "mover") {
-      const { pipefyId, phaseId, tecnico } = req.body || {};
-      if (!pipefyId || !phaseId) return res.status(400).json({ ok: false, error: "pipefyId e phaseId obrigatórios" });
-      const board = sanitizeBoard(await dbGet(BOARD_KEY));
-      const idx   = board.cards.findIndex(c => c.pipefyId === pipefyId);
-      if (idx < 0) return res.status(404).json({ ok: false, error: "Card não encontrado" });
-      board.cards[idx].phaseId = phaseId;
-      board.cards[idx].movedBy = tecnico || "sistema";
-      board.cards[idx].movedAt = new Date().toISOString();
-      board.movesLog.push({ phaseId, pipefyId, tecnico: tecnico || "sistema", timestamp: new Date().toISOString() });
-      board.movesLog = trimLog(board.movesLog);
-      await dbSet(BOARD_KEY, board);
-      await saveLogs(board);
-      return res.status(200).json({ ok: true, card: board.cards[idx] });
-    }
-
-    // ── POST criar — cria card local ──────────────────────────
-    if (req.method === "POST" && action === "criar") {
-      const { nomeContato, telefone, endereco, descricao } = req.body || {};
-      if (!nomeContato) return res.status(400).json({ ok: false, error: "nomeContato obrigatório" });
-      const board = sanitizeBoard(await dbGet(BOARD_KEY));
-      const newCard = {
-        pipefyId:    "local-" + Date.now(),
-        osCode:      null,
-        nomeContato, telefone: telefone || null,
-        endereco:    endereco || null,
-        descricao:   descricao || null,
-        title:       nomeContato,
-        phaseId:     board.phases[0].id,
-        movedBy:     "manual",
-        movedAt:     new Date().toISOString(),
-        localOnly:   true,
-      };
-      board.cards.unshift(newCard);
-      await dbSet(BOARD_KEY, board);
-      return res.status(200).json({ ok: true, card: newCard });
-    }
-
-    // ── POST deletar ──────────────────────────────────────────
-    if (req.method === "POST" && action === "deletar") {
-      const { pipefyId } = req.body || {};
-      if (!pipefyId) return res.status(400).json({ ok: false, error: "pipefyId obrigatório" });
-      const board = sanitizeBoard(await dbGet(BOARD_KEY));
-      board.cards = board.cards.filter(c => c.pipefyId !== pipefyId);
-      await dbSet(BOARD_KEY, board);
-      return res.status(200).json({ ok: true });
-    }
-
-    // ── GET metas — conta por fase para o painel de métricas ──
-    if (req.method === "GET" && action === "metas") {
-      const logs  = await dbGet(LOGS_KEY);
-      const mLog  = logs?.metaLog || [];
-      const today = new Date().toISOString().slice(0, 10);
-      const week  = (() => {
-        const d = new Date(); const day = d.getDay();
-        d.setDate(d.getDate() - (day === 0 ? 6 : day - 1)); d.setHours(0,0,0,0);
-        return d.toISOString().slice(0, 10);
-      })();
-      const cnt = (phase, from) => mLog.filter(m => m.phaseId === phase && m.timestamp >= from).length;
-      return res.status(200).json({
-        ok: true,
-        hoje: {
-          erp:              cnt("erp_entrada",        today),
-          orcEnviado:       cnt("aguardando_aprovacao", today),
-          coletaSolicitada: cnt("coleta_solicitada",  today),
-        },
-        semana: {
-          erp:              cnt("erp_entrada",        week),
-          orcEnviado:       cnt("aguardando_aprovacao", week),
-          coletaSolicitada: cnt("coleta_solicitada",  week),
-        },
-      });
-    }
-
-    // ── POST move ─────────────────────────────────────────────
-    if (req.method === "POST" && action === "move") {
-      const { pipefyId, phaseId, movedBy, tecnico, fotosCompra, descricaoCompra } = req.body || {};
-      if (!pipefyId || !phaseId) return res.status(400).json({ ok: false, error: "pipefyId e phaseId são obrigatórios" });
-      const board = sanitizeBoard(await dbGet(BOARD_KEY));
-      const card = board.cards.find(c => c.pipefyId === String(pipefyId));
-      if (!card) return res.status(404).json({ ok: false, error: "OS não encontrada" });
-      card.phaseId = phaseId; card.movedAt = new Date().toISOString();
-      card.movedBy = movedBy || "—"; card.tecnico = tecnico || null;
-      if (phaseId === "comprar_peca") {
-        if (fotosCompra)     card.fotosCompra     = fotosCompra;
-        if (descricaoCompra) card.descricaoCompra = descricaoCompra;
-      }
-      if (["loja_feito", "delivery_feito", "cliente_loja"].includes(phaseId)) {
-        board.movesLog.push({ phaseId, timestamp: card.movedAt, tecnico: tecnico || null, pipefyId: String(pipefyId) });
-        board.movesLog = trimLog(board.movesLog);
-      }
-      await dbSet(BOARD_KEY, board);
-      await saveLogs(board);
-
-      // Auto-adiciona à fila Lalamove TV quando move para coleta/entrega solicitada
-      if (["coleta_solicitada", "entrega_solicitada"].includes(phaseId)) {
-        const LALA_KEY = "tv_lalamove";
-        try {
-          const lalaDb = await dbGet(LALA_KEY) || { fichas: [] };
-          if (!Array.isArray(lalaDb.fichas)) lalaDb.fichas = [];
-          const tipo = phaseId === "coleta_solicitada" ? "coleta" : "entrega";
-          if (!Array.isArray(lalaDb.removedIds)) lalaDb.removedIds = [];
-          const jaExiste  = lalaDb.fichas.find(f => f.pipefyId === String(pipefyId) && f.tipo === tipo);
-          const jaRemovida = lalaDb.removedIds.includes(String(pipefyId) + ":" + tipo);
-          if (!jaExiste && !jaRemovida) {
-            lalaDb.fichas.push({
-              pipefyId: String(pipefyId), tipo,
-              osCode: card.osCode || null,
-              nomeContato: card.nomeContato || card.title || null,
-              descricao: card.descricao || null,
-              endereco: null, addedAt: new Date().toISOString(), status: "pendente",
-            });
-            await dbSet(LALA_KEY, lalaDb);
-          }
-        } catch(e) { console.error("tv lalamove queue:", e.message); }
-      }
-
-      return res.status(200).json({ ok: true, card });
-    }
-
-    // ── POST move-rs ───────────────────────────────────────────
-    if (req.method === "POST" && action === "move-rs") {
-      const { cardId, phaseId, boardType } = req.body || {};
-      if (!cardId || !phaseId || !boardType) return res.status(400).json({ ok: false, error: "Campos obrigatórios" });
-      const board = sanitizeBoard(await dbGet(BOARD_KEY));
-      const arr = boardType === "rs" ? board.rsCards : board.rsRuaCards;
-      const card = (arr || []).find(c => c.id === cardId);
-      if (!card) return res.status(404).json({ ok: false, error: "RS não encontrado" });
-      card.phaseId = phaseId; card.movedAt = new Date().toISOString();
-      await dbSet(BOARD_KEY, board);
-      await saveLogs(board);
-      return res.status(200).json({ ok: true, card });
-    }
-
-    // ── POST move-batch (fim do dia) ───────────────────────────
-    if (req.method === "POST" && action === "move-batch") {
-      const board = sanitizeBoard(await dbGet(BOARD_KEY));
-      const FROM = ["loja_feito", "delivery_feito"], TO = "aguardando_ret";
-      let count = 0; const now = new Date().toISOString();
-      for (const card of board.cards) {
-        if (FROM.includes(card.phaseId)) { card.phaseId = TO; card.movedAt = now; card.movedBy = "Sistema"; count++; }
-      }
-      await dbSet(BOARD_KEY, board);
-      await saveLogs(board);
-      return res.status(200).json({ ok: true, moved: count });
-    }
-
-    // ── POST cleanup-ret ───────────────────────────────────────
-    if (req.method === "GET" && action === "cleanup-ret") {
-      const board = sanitizeBoard(await dbGet(BOARD_KEY));
-      return res.status(200).json({ ok: true });
-    }
-
-    // ── POST update-card — atualiza campos de um card no board local ──
+    // ── POST update-card ─────────────────────────────────────────
     if (req.method === "POST" && action === "update-card") {
-      const { pipefyId, fields } = req.body || {};
-      if (!pipefyId || !fields) return res.status(400).json({ ok: false, error: "pipefyId e fields são obrigatórios" });
+      const { pipefyId, endereco, nomeContato, telefone, descricao, urgente } = req.body || {};
+      if (!pipefyId) return res.status(400).json({ ok: false, error: "pipefyId obrigatório" });
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
       const card  = board.cards.find(function(c) { return c.pipefyId === String(pipefyId); });
       if (!card) return res.status(404).json({ ok: false, error: "Card não encontrado" });
-      const allowed = ["endereco", "nomeContato", "telefone", "descricao"];
-      allowed.forEach(function(f) { if (fields[f] !== undefined) card[f] = fields[f]; });
+      if (endereco   !== undefined) card.endereco   = endereco;
+      if (nomeContato !== undefined) card.nomeContato = nomeContato;
+      if (telefone   !== undefined) card.telefone   = telefone;
+      if (descricao  !== undefined) card.descricao  = descricao;
+      if (urgente    !== undefined) card.urgente    = urgente;
       await dbSet(BOARD_KEY, board);
       return res.status(200).json({ ok: true, card });
     }
 
-    // ── POST otimizar-rota — geocodifica e reordena por nearest-neighbor ──
+    // ── POST move — move card para fase (local + Pipefy) ─────────
+    if (req.method === "POST" && action === "move") {
+      const { pipefyId, phaseId, pipefyPhaseId, techName } = req.body || {};
+      if (!pipefyId || !phaseId) return res.status(400).json({ ok: false, error: "pipefyId e phaseId obrigatórios" });
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const card  = board.cards.find(function(c) { return c.pipefyId === String(pipefyId); });
+      if (!card) return res.status(404).json({ ok: false, error: "Card não encontrado" });
+      card.phaseId = phaseId;
+      if (techName) card.techName = techName;
+      card.movidoEm = new Date().toISOString();
+      board.movesLog = trimLog([...(board.movesLog || []),
+        { id: pipefyId, phase: phaseId, tech: techName, ts: Date.now() }]);
+      await dbSet(BOARD_KEY, board);
+      // Move no Pipefy se phase ID real foi fornecido
+      let pipefyResult = null;
+      if (pipefyPhaseId) {
+        try { pipefyResult = await moveCardPipefy(pipefyId, pipefyPhaseId); }
+        catch(e) { pipefyResult = { error: e.message }; }
+      }
+      return res.status(200).json({ ok: true, card, pipefy: pipefyResult });
+    }
+
+    // ── POST move-rs — move para RS ──────────────────────────────
+    if (req.method === "POST" && action === "move-rs") {
+      const { pipefyId } = req.body || {};
+      if (!pipefyId) return res.status(400).json({ ok: false, error: "pipefyId obrigatório" });
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const card  = board.cards.find(function(c) { return c.pipefyId === String(pipefyId); });
+      if (!card) return res.status(404).json({ ok: false, error: "Card não encontrado" });
+      card.phaseId  = "rs";
+      card.movidoEm = new Date().toISOString();
+      board.movesLog = trimLog([...(board.movesLog || []),
+        { id: pipefyId, phase: "rs", ts: Date.now() }]);
+      await dbSet(BOARD_KEY, board);
+      return res.status(200).json({ ok: true, card });
+    }
+
+    // ── POST move-batch — move vários cards de uma vez ───────────
+    if (req.method === "POST" && action === "move-batch") {
+      const { cardIds, phaseId, pipefyPhaseId } = req.body || {};
+      if (!Array.isArray(cardIds) || !phaseId)
+        return res.status(400).json({ ok: false, error: "cardIds e phaseId obrigatórios" });
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const movidos = [];
+      for (const id of cardIds) {
+        const card = board.cards.find(function(c) { return c.pipefyId === String(id); });
+        if (card) {
+          card.phaseId  = phaseId;
+          card.movidoEm = new Date().toISOString();
+          movidos.push(card);
+        }
+      }
+      await dbSet(BOARD_KEY, board);
+      // Move no Pipefy em paralelo se fornecido
+      if (pipefyPhaseId) {
+        await Promise.allSettled(movidos.map(function(c) {
+          return moveCardPipefy(c.pipefyId, pipefyPhaseId).catch(function(){});
+        }));
+      }
+      return res.status(200).json({ ok: true, movidos: movidos.length });
+    }
+
+    // ── POST cleanup-ret — remove cards em fases finais ──────────
+    if (req.method === "POST" && action === "cleanup-ret") {
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const antes  = board.cards.length;
+      try {
+        const doneIds = await fetchDoneIds();
+        board.cards = board.cards.filter(function(c) { return !doneIds.includes(c.pipefyId); });
+      } catch(e) {
+        const fasesFinais = ["finalizado","descarte","pronto_venda","erp","rs"];
+        board.cards = board.cards.filter(function(c) { return !fasesFinais.includes(c.phaseId); });
+      }
+      const removidos = antes - board.cards.length;
+      await dbSet(BOARD_KEY, board);
+      return res.status(200).json({ ok: true, removidos });
+    }
+
+    // ── POST otimizar-rota — geocodifica + otimiza com OSRM ──────
     if (req.method === "POST" && action === "otimizar-rota") {
       const { cardIds } = req.body || {};
       if (!Array.isArray(cardIds) || !cardIds.length)
         return res.status(400).json({ ok: false, error: "cardIds obrigatório" });
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
-      // Monta lista de cards com endereço
       const cards = cardIds.map(function(id) {
-        return board.cards.find(function(c) { return c.pipefyId === String(id); }) || { pipefyId: String(id), endereco: "" };
+        return board.cards.find(function(c) { return c.pipefyId === String(id); })
+          || { pipefyId: String(id), endereco: "" };
       });
-      // Geocodifica cada endereço (com delay para não bater limite do Nominatim)
+      // Geocodifica com delay para não saturar Nominatim
       const coords = [];
       for (let i = 0; i < cards.length; i++) {
         const end = cards[i].endereco || "";
         if (!end) { coords.push(null); continue; }
-        try {
-          const c = await geocodificar(end);
-          coords.push(c);
-        } catch(e) { coords.push(null); }
+        try { coords.push(await geocodificar(end)); }
+        catch(e) { coords.push(null); }
         if (i < cards.length - 1) await new Promise(function(r) { setTimeout(r, 350); });
       }
-      // Cards sem coordenadas vão para o final da lista
-      const comCoord   = cards.filter(function(_, i) { return coords[i] !== null; });
-      const semCoord   = cards.filter(function(_, i) { return coords[i] === null; });
-      const coordsValidas = coords.filter(function(c) { return c !== null; });
-      // Ponto de partida = Oficina TV Assistência
-      const oficina = { lat: -19.9679, lng: -44.0078 };
-      // Nearest-Neighbor a partir da oficina
-      // Passo 1: Nearest Neighbor
-      const ordemNN = nearestNeighbor(coordsValidas, oficina);
-
-      // Passo 2: 2-opt refinement
-      let ordemOtimizada = ordemNN;
-      let melhoria2opt = 0;
-      if (coordsValidas.length >= 3) {
-        function distTotalRota(r) {
-          let d = distGraus(oficina, coordsValidas[r[0]]);
-          for (let i = 0; i < r.length-1; i++) d += distGraus(coordsValidas[r[i]], coordsValidas[r[i+1]]);
-          d += distGraus(coordsValidas[r[r.length-1]], oficina);
-          return d;
-        }
-        const distAntes = distTotalRota(ordemNN);
-        ordemOtimizada = doisOpt(coordsValidas, ordemNN, oficina);
-        const distDepois = distTotalRota(ordemOtimizada);
-        melhoria2opt = Math.round((1 - distDepois / distAntes) * 100);
-      }
-      const ordenados = ordemOtimizada.map(function(i) { return comCoord[i]; }).concat(semCoord);
-      // Retorna pipefyIds na ordem otimizada + coords para debug
-      const resultado = ordenados.map(function(card, i) {
+      const comCoord  = cards.filter(function(_, i) { return coords[i] !== null; });
+      const semCoord  = cards.filter(function(_, i) { return coords[i] === null; });
+      const coordsVal = coords.filter(function(c) { return c !== null; });
+      const oficina   = { lat: -19.9679, lng: -44.0078 }; // TV Assistência
+      const { ordem, fonte, melhoria } = await otimizarPontos(coordsVal, oficina);
+      const ordenados = ordem.map(function(i) { return comCoord[i]; }).concat(semCoord);
+      const resultado = ordenados.map(function(card) {
         const idx = comCoord.indexOf(card);
         return {
-          pipefyId:  card.pipefyId,
+          pipefyId:    card.pipefyId,
           nomeContato: card.nomeContato || "",
-          endereco:  card.endereco || "",
-          coords:    idx >= 0 ? coordsValidas[idx] : null,
-          geocoded:  idx >= 0,
+          endereco:    card.endereco || "",
+          coords:      idx >= 0 ? coordsVal[idx] : null,
+          geocoded:    idx >= 0,
         };
       });
-      return res.status(200).json({ ok: true, ordenados: resultado, semCoord: semCoord.length, melhoria2opt: melhoria2opt });
+      return res.status(200).json({
+        ok: true, ordenados: resultado,
+        semCoord: semCoord.length,
+        fonte,                      // "osrm" | "local"
+        melhoria2opt: melhoria,
+      });
     }
 
-    // ── GET sync-coleta — busca cards na fase 341638193 (Liberado para Rota) ──
+// ══════════════════════════════════════════════════════════════
+// OTIMIZAÇÃO DE ROTA — Pipeline:
+//   1. OSRM Trip API (grafo real de estradas BH/RMBH)
+//      - <10 paradas: brute force (ótimo exato)
+//      - ≥10 paradas: farthest-insertion heuristic
+//   2. Fallback: NN + 2-opt + Or-opt (distância euclidiana)
+// ══════════════════════════════════════════════════════════════
+
+// ── 1. OSRM Trip API ─────────────────────────────────────────
+// Chama o endpoint /trip do OSRM com pontos de coleta + oficina como início fixo.
+// Retorna array de índices ordenados (excluindo o 0 = oficina) ou null se falhar.
+async function osrmTrip(pontos, oficina) {
+  // coords: lng,lat separados por ; — oficina PRIMEIRO (source=first)
+  const coords = [oficina, ...pontos]
+    .map(function(p) { return p.lng.toFixed(6) + ',' + p.lat.toFixed(6); })
+    .join(';');
+  const url = 'https://router.project-osrm.org/trip/v1/driving/' + coords
+    + '?source=first&roundtrip=false&destination=any&overview=false&annotations=false';
+  try {
+    const controller = new AbortController();
+    const tID = setTimeout(function() { controller.abort(); }, 8000); // 8s timeout
+    const r   = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'TVAssistencia/2.0' } });
+    clearTimeout(tID);
+    const j = await r.json();
+    if (!j || j.code !== 'Ok' || !j.waypoints) return null;
+    // waypoints[i].waypoint_index = posição na rota otimizada do input[i]
+    // input[0] = oficina (posição 0 garantida por source=first)
+    // input[1..n] = paradas de coleta
+    // Monta: ordemOSRM[posição] = índice original da parada (0-based nos pontos[])
+    const n = pontos.length;
+    const ordem = new Array(n);
+    for (let inputIdx = 1; inputIdx <= n; inputIdx++) { // ignora oficina (input[0])
+      const wp  = j.waypoints[inputIdx];
+      const pos = wp.waypoint_index - 1; // -1 porque posição 0 = oficina
+      if (pos >= 0 && pos < n) ordem[pos] = inputIdx - 1; // índice em pontos[]
+    }
+    // Verifica se todos os índices foram preenchidos
+    if (ordem.some(function(x) { return x === undefined; })) return null;
+    return ordem;
+  } catch(e) {
+    console.log('OSRM Trip falhou:', e.message);
+    return null;
+  }
+}
+
+// ── 2a. Nearest Neighbor ─────────────────────────────────────
+function nearestNeighbor(pontos, inicio) {
+  const vis = new Array(pontos.length).fill(false);
+  const ord = [];
+  let atual = inicio;
+  for (let s = 0; s < pontos.length; s++) {
+    let bIdx = -1, bDist = Infinity;
+    for (let i = 0; i < pontos.length; i++) {
+      if (vis[i]) continue;
+      const d = distGraus(atual, pontos[i]);
+      if (d < bDist) { bDist = d; bIdx = i; }
+    }
+    if (bIdx < 0) break;
+    vis[bIdx] = true; ord.push(bIdx); atual = pontos[bIdx];
+  }
+  return ord;
+}
+
+// ── 2b. 2-opt ────────────────────────────────────────────────
+// Remove cruzamentos de arestas
+function doisOpt(pontos, ordemNN, pontoInicio) {
+  let rota = ordemNN.slice();
+  const n = rota.length;
+
+  function distRota(r) {
+    let d = distGraus(pontoInicio, pontos[r[0]]);
+    for (let i = 0; i < r.length-1; i++) d += distGraus(pontos[r[i]], pontos[r[i+1]]);
+    d += distGraus(pontos[r[r.length-1]], pontoInicio);
+    return d;
+  }
+
+  let melhorou = true, iter = 0;
+  while (melhorou && iter < 100) {
+    melhorou = false; iter++;
+    for (let i = 0; i < n-1; i++) {
+      for (let j = i+1; j < n; j++) {
+        const A = i === 0 ? pontoInicio : pontos[rota[i-1]];
+        const B = pontos[rota[i]];
+        const C = pontos[rota[j]];
+        const D = j === n-1 ? pontoInicio : pontos[rota[j+1]];
+        if (distGraus(A,C) + distGraus(B,D) < distGraus(A,B) + distGraus(C,D) - 1e-10) {
+          let l = i, r2 = j;
+          while (l < r2) { const t = rota[l]; rota[l] = rota[r2]; rota[r2] = t; l++; r2--; }
+          melhorou = true;
+        }
+      }
+    }
+  }
+  return rota;
+}
+
+// ── 2c. Or-opt ───────────────────────────────────────────────
+// Complemento ao 2-opt: tenta *realocar* cada ponto para a melhor posição.
+// Encontra melhorias que 2-opt não descobre (pontos isolados fora de lugar).
+// O(n²) por passagem, converge em 2-3 iterações para rotas de 5-15 paradas.
+function orOpt(pontos, rota, pontoInicio) {
+  const n = rota.length;
+  if (n < 3) return rota;
+
+  // Distância total da rota
+  function dist(r) {
+    let d = distGraus(pontoInicio, pontos[r[0]]);
+    for (let i = 0; i < r.length-1; i++) d += distGraus(pontos[r[i]], pontos[r[i+1]]);
+    d += distGraus(pontos[r[r.length-1]], pontoInicio);
+    return d;
+  }
+
+  let atual = rota.slice();
+  let melhorou = true;
+  let passes  = 0;
+
+  while (melhorou && passes < 50) {
+    melhorou = false; passes++;
+
+    for (let i = 0; i < n; i++) {
+      // Remove o ponto na posição i
+      const removido = atual[i];
+      const semI = atual.filter(function(_, idx) { return idx !== i; });
+
+      // Custo do ponto removido na posição original
+      const antA = i === 0 ? pontoInicio : pontos[atual[i-1]];
+      const antB = pontos[removido];
+      const antC = i === n-1 ? pontoInicio : pontos[atual[i+1]];
+      const custoRemocao = distGraus(antA, antB) + distGraus(antB, antC) - distGraus(antA, antC);
+
+      // Tenta inserir o ponto removido em cada outra posição
+      let melhorGanho = 1e-10; // só aceita se realmente melhorar
+      let melhorPos   = -1;
+
+      for (let j = 0; j <= semI.length; j++) {
+        const prevP = j === 0 ? pontoInicio : pontos[semI[j-1]];
+        const nextP = j === semI.length ? pontoInicio : pontos[semI[j]];
+        // Custo de inserir removido entre prevP e nextP
+        const custoInsercao = distGraus(prevP, pontos[removido])
+                            + distGraus(pontos[removido], nextP)
+                            - distGraus(prevP, nextP);
+        const ganho = custoRemocao - custoInsercao;
+        if (ganho > melhorGanho) {
+          melhorGanho = ganho;
+          melhorPos   = j;
+        }
+      }
+
+      if (melhorPos >= 0) {
+        // Aplica a relocação
+        const nova = semI.slice(0, melhorPos)
+          .concat([removido])
+          .concat(semI.slice(melhorPos));
+        atual   = nova;
+        melhorou = true;
+        break; // reinicia do início após qualquer melhoria
+      }
+    }
+  }
+  return atual;
+}
+
+// ── ORQUESTRADOR ─────────────────────────────────────────────
+// Combina OSRM + fallback local search
+// Retorna { ordem: [...indices], fonte: "osrm"|"local", melhoria }
+async function otimizarPontos(pontos, pontoInicio) {
+  const n = pontos.length;
+  if (n === 0) return { ordem: [], fonte: 'trivial', melhoria: 0 };
+  if (n === 1) return { ordem: [0], fonte: 'trivial', melhoria: 0 };
+
+  // Distância total de uma ordem
+  function distOrd(ord) {
+    let d = distGraus(pontoInicio, pontos[ord[0]]);
+    for (let i = 0; i < ord.length-1; i++) d += distGraus(pontos[ord[i]], pontos[ord[i+1]]);
+    d += distGraus(pontos[ord[ord.length-1]], pontoInicio);
+    return d;
+  }
+
+  // ── Tenta OSRM Trip (grafo real de estradas) ──────────────
+  const osrmOrdem = await osrmTrip(pontos, pontoInicio);
+
+  if (osrmOrdem) {
+    // OSRM retornou uma rota válida — aplica Or-opt adicional na métrica euclidiana
+    // para eventuais refinamentos locais (OSRM otimiza tempo de viagem, nós distância)
+    const osrmMelhorado = orOpt(pontos, osrmOrdem, pontoInicio);
+    console.log('Rota via OSRM Trip API (grafo real de estradas BH)');
+    return { ordem: osrmMelhorado, fonte: 'osrm', melhoria: 0 };
+  }
+
+  // ── Fallback: NN + 2-opt + Or-opt ─────────────────────────
+  console.log('OSRM indisponível — usando NN+2opt+Or-opt (distância euclidiana)');
+  const ordemNN = nearestNeighbor(pontos, pontoInicio);
+  const distNN  = distOrd(ordemNN);
+
+  const ordemOpt = doisOpt(pontos, ordemNN, pontoInicio);
+  const ordemFinal = orOpt(pontos, ordemOpt, pontoInicio);
+  const distFinal = distOrd(ordemFinal);
+
+  const melhoria = Math.round((1 - distFinal / distNN) * 100);
+  return { ordem: ordemFinal, fonte: 'local', melhoria };
+}
+
+// ── GET sync-coleta — busca cards na fase 341638193 (Liberado para Rota) ──
     if (req.method === "GET" && action === "sync-coleta") {
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
       let edges = [];
