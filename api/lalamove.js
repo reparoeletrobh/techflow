@@ -766,6 +766,7 @@ async function testarFichasIndividualmente(pendentes, tipo, key, secret) {
     if (!f) return res.status(404).json({ ok: false, error: "Ficha nao encontrada" });
     f.lat = lat; f.lng = lng;
     if (fonte) f.geocFonte = fonte;
+    await dbSet(LALA_KEY, db); // persiste no Redis
     return res.status(200).json({ ok: true });
   }
 
