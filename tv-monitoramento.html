@@ -283,7 +283,14 @@ function renderSections() {
     semResposta: function() {
       return renderSection('Sem Resposta — orçamento sem retorno há 2+ dias', data.semResposta, '#f97316', function(item){
         var hot=item.age>=5;
-        return '<div class="item-card" style="--c:#f97316"><div class="item-nome">'+escH(item.nome||item.title||'—')+'</div><div class="item-desc">'+escH((item.desc||'').slice(0,80))+'</div><div class="item-age'+(hot?' hot':'')+'" style="--c:'+(hot?'#ef4444':'#f97316')+'">'+(hot?'🔥 ':'')+item.age+'d sem resposta</div></div>';
+        var tel=(item.tel||'').replace(/\D/g,'');
+        var hasTel = tel && tel.length>=10;
+        return '<div class="item-card" style="--c:#f97316">' +
+          '<div class="item-nome">'+escH(item.nome||item.title||'—')+'</div>' +
+          '<div class="item-desc">'+escH((item.desc||'').slice(0,80))+'</div>' +
+          '<div class="item-age'+(hot?' hot':'')+'" style="--c:'+(hot?'#ef4444':'#f97316')+'">'+(hot?'🔥 ':'')+item.age+'d sem resposta</div>' +
+          (hasTel ? '<button id="btn-uc-'+escH(item.pipefyId)+'" onclick="alertarClienteTV(\''+(item.pipefyId||'')+'\',\''+tel+'\')" style="margin-top:6px;font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.3);color:var(--orange);cursor:pointer;font-weight:700;">📋 Copiar e Enviar</button>' : '') +
+          '</div>';
       }, 'semResposta');
     },
     pecasPendentes: function() {
@@ -434,8 +441,15 @@ renderSections = function() {
     semResposta: function() {
       return renderSection('Sem Resposta — orçamento sem retorno há 2+ dias', data.semResposta, '#f97316', function(item){
         var hot=item.age>=5;
-        return '<div class="item-card" style="--c:#f97316"><div class="item-nome">'+escH(item.nome||item.title||'—')+'</div><div class="item-desc">'+escH((item.desc||'').slice(0,80))+'</div><div class="item-age'+(hot?' hot':'')+'" style="--c:'+(hot?'#ef4444':'#f97316')+'">'+(hot?'🔥 ':'')+item.age+'d sem resposta</div></div>';
-      });
+        var tel=(item.tel||'').replace(/\D/g,'');
+        var hasTel = tel && tel.length>=10;
+        return '<div class="item-card" style="--c:#f97316">' +
+          '<div class="item-nome">'+escH(item.nome||item.title||'—')+'</div>' +
+          '<div class="item-desc">'+escH((item.desc||'').slice(0,80))+'</div>' +
+          '<div class="item-age'+(hot?' hot':'')+'" style="--c:'+(hot?'#ef4444':'#f97316')+'">'+(hot?'🔥 ':'')+item.age+'d sem resposta</div>' +
+          (hasTel ? '<button id="btn-uc2-'+escH(item.pipefyId)+'" onclick="alertarClienteTV(\''+(item.pipefyId||'')+'\',\''+tel+'\')" style="margin-top:6px;font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.3);color:var(--orange);cursor:pointer;font-weight:700;">📋 Copiar e Enviar</button>' : '') +
+          '</div>';
+      }, 'semResposta');
     },
     pecasPendentes: function() {
       return renderSection('Peças para Comprar — cadastradas aguardando compra', data.pecasPendentes, '#f97316', function(p){
@@ -543,6 +557,39 @@ function scrollToSection(id) {
 }
 
 // Auto-refresh a cada 2 minutos
+// ── ALERTAR CLIENTE TV (Sem Resposta → Última Chamada) ──────
+async function alertarClienteTV(pipefyId, tel) {
+  var MSG = 'ATENÇÃO: comunicado importante da TV Assistência.\n\nEstamos com equipamentos sem resposta na loja. Não tendo resposta, retirada ou solicitação de entrega nos próximos 7 dias, teremos que fazer o descarte do mesmo. Conto com sua colaboração.';
+  var num = (tel||'').replace(/\D/g,'');
+  if (num.slice(0,2)==='55'&&num.length>=12) num=num.slice(2);
+  if (num.length===10) num=num.slice(0,2)+'9'+num.slice(2);
+  var link = num && num.length>=11
+    ? 'https://wa.me/55'+num+'?text='+encodeURIComponent(MSG) : MSG;
+  try { await navigator.clipboard.writeText(link); } catch(e) {
+    var ta=document.createElement('textarea'); ta.value=link;
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+  }
+  var btn = document.getElementById('btn-uc-'+pipefyId);
+  if (btn) { btn.disabled=true; btn.textContent='...'; }
+  try {
+    var d = await fetch('/api/tv-orcamento?action=alertar', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({pipefyId})
+    }).then(function(r){return r.json();});
+    if (d.ok) {
+      showToast('📋 Copiado! Movido p/ Última Chamada — Prazo: '+(d.dataLimite||''), 'var(--green)');
+      setTimeout(loadAll, 1200);
+    } else {
+      showToast('❌ Erro: '+(d.error||'falha'), 'var(--red)');
+      if (btn) { btn.disabled=false; btn.textContent='📋 Copiar e Enviar'; }
+    }
+  } catch(e) {
+    showToast('❌ '+e.message, 'var(--red)');
+    if (btn) { btn.disabled=false; btn.textContent='📋 Copiar e Enviar'; }
+  }
+}
+
 loadAll();
 setInterval(loadAll, 120000);
 </script>
