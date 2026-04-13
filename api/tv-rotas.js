@@ -172,6 +172,41 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, rota });
   }
 
+    // ── POST remarcar — move card para fase Remarcar no Pipefy ──
+  if (req.method === "POST" && action === "remarcar") {
+    const { rotaId, pipefyId } = req.body || {};
+    if (!rotaId || !pipefyId) return res.status(400).json({ ok: false, error: "rotaId e pipefyId obrigatórios" });
+
+    const token = (process.env.PIPEFY_TOKEN || "").trim();
+    if (!token) return res.status(200).json({ ok: false, error: "PIPEFY_TOKEN ausente" });
+
+    // Move no Pipefy para fase Remarcar
+    const query = "mutation { moveCardToPhase(input: { card_id: \"" + pipefyId + "\", destination_phase_id: \"341638217\" }) { card { id current_phase { name } } } }";
+    try {
+      const r = await fetch("https://api.pipefy.com/graphql", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+        body: JSON.stringify({ query }),
+      });
+      const j = await r.json();
+      if (j.errors) return res.status(200).json({ ok: false, error: j.errors[0].message });
+
+      // Remove o card da rota local (fica no Pipefy como Remarcar)
+      const dbRaw = await dbGet(ROTAS_KEY);
+      const db = dbRaw || defaultRotas();
+      const rota = (db.rotas || []).find(function(r) { return r.id === rotaId; });
+      if (rota) {
+        rota.cards = rota.cards.filter(function(c) { return c.pipefyId !== String(pipefyId); });
+        await dbSet(ROTAS_KEY, db);
+      }
+
+      const faseName = j.data?.moveCardToPhase?.card?.current_phase?.name || "Remarcar";
+      return res.status(200).json({ ok: true, fase: faseName });
+    } catch(e) {
+      return res.status(200).json({ ok: false, error: "Pipefy: " + e.message });
+    }
+  }
+
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
   } catch(e) {
     return res.status(200).json({ ok: false, error: "Erro interno: " + e.message });
