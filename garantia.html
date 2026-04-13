@@ -165,37 +165,39 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 <!-- VIEW GERAL -->
 <div class="view active" id="view-geral">
   <div class="geral-grid">
-    <!-- Form cadastro -->
-    <div class="form-card">
-      <div class="form-title">📝 Cadastrar <span>Garantia</span></div>
-      <div class="fl">Nome *</div>
-      <input class="fi" id="f-nome" placeholder="Nome do cliente"/>
-      <div class="fl">Telefone *</div>
-      <input class="fi" id="f-tel" placeholder="(31) 9 0000-0000"/>
-      <div class="fl">Defeito *</div>
-      <input class="fi" id="f-defeito" placeholder="Descreva o defeito relatado"/>
-      <div class="fl">Endereço (opcional)</div>
-      <input class="fi" id="f-end" placeholder="Rua, número, bairro"/>
-      <div class="fl">Tipo de Garantia *</div>
-      <div class="tipo-grid">
-        <button class="tipo-btn" id="tb-li"  onclick="setTipo('loja_imediata')">🏪 Loja<br>Imediata</button>
-        <button class="tipo-btn" id="tb-la"  onclick="setTipo('loja_acompanhamento')">🔍 Loja<br>Acomp.</button>
-        <button class="tipo-btn" id="tb-del" onclick="setTipo('delivery')">🚚 Delivery</button>
-        <button class="tipo-btn" id="tb-rua" onclick="setTipo('rua')">🏘️ RS Rua</button>
+    <!-- Coluna esquerda: formulário + busca -->
+    <div>
+      <div class="form-card">
+        <div class="form-title">📝 Cadastrar <span>Garantia</span></div>
+        <div class="fl">Nome *</div>
+        <input class="fi" id="f-nome" placeholder="Nome do cliente"/>
+        <div class="fl">Telefone *</div>
+        <input class="fi" id="f-tel" placeholder="(31) 9 0000-0000"/>
+        <div class="fl">Defeito *</div>
+        <input class="fi" id="f-defeito" placeholder="Descreva o defeito relatado"/>
+        <div class="fl">Endereço (opcional)</div>
+        <input class="fi" id="f-end" placeholder="Rua, número, bairro"/>
+        <div class="fl">Tipo de Garantia *</div>
+        <div class="tipo-grid">
+          <button class="tipo-btn" id="tb-li"  onclick="setTipo('loja_imediata')">🏪 Loja<br>Imediata</button>
+          <button class="tipo-btn" id="tb-la"  onclick="setTipo('loja_acompanhamento')">🔍 Loja<br>Acomp.</button>
+          <button class="tipo-btn" id="tb-del" onclick="setTipo('delivery')">🚚 Delivery</button>
+          <button class="tipo-btn" id="tb-rua" onclick="setTipo('rua')">🏘️ RS Rua</button>
+        </div>
+        <button class="btn-cad" id="btn-cad" onclick="cadastrar()">+ Cadastrar Garantia</button>
       </div>
-      <button class="btn-cad" id="btn-cad" onclick="cadastrar()">+ Cadastrar Garantia</button>
-    </div>
 
-    <!-- Busca de OS -->
-    <div class="search-card">
-      <div class="search-title">🔍 Buscar <span>OS</span></div>
-      <div class="search-row">
-        <input class="fi" id="busca-os" placeholder="Nome, telefone ou OS..." onkeydown="if(event.key==='Enter')buscarOS()"/>
-        <button class="btn-search" onclick="buscarOS()">Buscar</button>
+      <!-- Busca de OS -->
+      <div class="search-card">
+        <div class="search-title">🔍 Buscar <span>OS</span></div>
+        <div class="search-row">
+          <input class="fi" id="busca-os" placeholder="Nome, telefone ou defeito..." onkeydown="if(event.key==='Enter')buscarOS()"/>
+          <button class="btn-search" onclick="buscarOS()">Buscar</button>
+        </div>
+        <div id="busca-resultados"></div>
       </div>
-      <div id="busca-resultados"></div>
     </div>
-    <!-- Kanban resumo -->
+    <!-- Coluna direita: Kanban -->
     <div>
       <div style="font-family:var(--fh);font-size:14px;font-weight:800;margin-bottom:12px;color:var(--purple);">Kanban de Garantias</div>
       <div class="kanban" id="kanban-geral"></div>
