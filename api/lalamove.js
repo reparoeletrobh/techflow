@@ -759,7 +759,7 @@ async function testarFichasIndividualmente(pendentes, tipo, key, secret) {
 
   // ── POST set-coords — salva lat/lng de uma ficha (geocoding feito no frontend)
   if (req.method === "POST" && action === "set-coords") {
-    const { id, lat, lng } = req.body || {};
+    const { id, lat, lng, fonte } = req.body || {};
     if (!id || !lat || !lng) return res.status(400).json({ ok: false, error: "id, lat e lng obrigatorios" });
     const db = await dbGet(LALA_KEY) || { fichas: [] };
     const f = (db.fichas || []).find(x => x.pipefyId === id || x.id === id);
