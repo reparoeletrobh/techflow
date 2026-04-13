@@ -221,9 +221,12 @@ module.exports = async function handler(req, res) {
       for (const card of cards) {
         if (db.syncedIds.includes(card.pipefyId)) continue;
 
-        // Verifica se as notas têm múltiplos equipamentos (ex: "purificador: ... bebedouro: ...")
-        // Usa o campo "Notas do treinamento" diretamente (preserva quebras de parágrafo)
-        const notasField = card.notas || (card.comentarios ? card.comentarios.join("\n\n") : "");
+        // Detecta múltiplos equipamentos:
+        // 1. Campo "notas" do Pipefy (campo específico do pipe)
+        // 2. Primeiro comentário (diagnóstico do técnico) — formato "TV X - diagnóstico\nTV Y - diagnóstico"
+        // 3. Todos os comentários juntos como fallback
+        const priComentario = (card.comentarios || [])[0] || "";
+        const notasField = card.notas || priComentario || (card.comentarios ? card.comentarios.join("\n\n") : "");
         const multiEquip = splitEquipamentos(notasField);
 
         // Função auxiliar para gerar texto de orçamento para 1 equipamento
@@ -370,14 +373,35 @@ module.exports = async function handler(req, res) {
           ficha.nome        = fresh.nome  || ficha.nome;
         }
         try {
-          const orcResult = await gerarTextoOrcamento(ficha.desc, ficha.comentarios, ficha.nome);
-          if (orcResult && typeof orcResult === "object") {
-            let texto = orcResult.texto || "";
-            const preco = orcResult.preco || null;
-            if (preco) { texto = texto.replace("[VALOR]", preco + " reais"); ficha.precoSugerido = preco; }
-            ficha.textoOrc = texto;
+          // Tenta multi-equipamento primeiro
+          const priCom = (ficha.comentarios || [])[0] || "";
+          const nField  = ficha.notas || priCom || (ficha.comentarios || []).join("\n\n");
+          const mEq     = splitEquipamentos(nField);
+          if (mEq && mEq.length >= 2) {
+            const pNome = primeiroNome(ficha.nome) || "cliente";
+            let totalP = 0; const partes = [];
+            for (const eq of mEq) {
+              const ft = await gerarTextoOrcamento(eq.nomeEquip+": "+eq.descProblema, [eq.descProblema], ficha.nome);
+              let corpo = (ft && ft.texto) ? ft.texto : "";
+              const dn = corpo.indexOf("\n\n"); if (dn > 0) corpo = corpo.slice(dn+2).trim();
+              corpo = corpo.replace(/\.? Aprovando ja iniciamos o conserto\.?$/, "").trim();
+              partes.push("Em relacao ao "+eq.nomeEquip.charAt(0).toUpperCase()+eq.nomeEquip.slice(1)+":\n"+corpo);
+              totalP += parseFloat((ft && ft.preco) ? ft.preco : "0");
+            }
+            const dp = mEq.length >= 4 ? 20 : mEq.length === 3 ? 15 : 10;
+            const pDesc = Math.round(totalP * (1-dp/100));
+            ficha.textoOrc = pNome+" bom dia, sou o Pedro da Reparo Eletro e vou passar seu orcamento:\n\n"+partes.join("\n\n")+"\n\nConsertando os "+mEq.length+" juntos eu consigo um desconto para voce de "+totalP+" reais por "+pDesc+" apenas. Aprovando ja iniciamos o conserto.";
+            ficha.precoSugerido = String(pDesc); ficha.multiEquip = true;
           } else {
-            ficha.textoOrc = String(orcResult || "");
+            const orcResult = await gerarTextoOrcamento(ficha.desc, ficha.comentarios, ficha.nome);
+            if (orcResult && typeof orcResult === "object") {
+              let texto = orcResult.texto || "";
+              const preco = orcResult.preco || null;
+              if (preco) { texto = texto.replace("[VALOR]", preco + " reais"); ficha.precoSugerido = preco; }
+              ficha.textoOrc = texto;
+            } else {
+              ficha.textoOrc = String(orcResult || "");
+            }
           }
         } catch(e) {
           const tp = templatePadrao(ficha.desc, ficha.nome);
@@ -400,18 +424,52 @@ module.exports = async function handler(req, res) {
       // Busca dados frescos do Pipefy antes de regenerar
       try {
         const fresh = await fetchCardData(ficha.pipefyId);
-        if (fresh && fresh.comentarios.length) {
+        if (fresh && fresh.comentarios && fresh.comentarios.length) {
           ficha.comentarios = fresh.comentarios;
-          ficha.desc = fresh.desc || ficha.desc;
+          ficha.desc        = fresh.desc || ficha.desc;
+          ficha.notas       = fresh.notas || ficha.notas || "";
         }
       } catch(e) {}
-      var orcResult = await gerarTextoOrcamento(ficha.desc, ficha.comentarios, ficha.nome);
-      if (orcResult && typeof orcResult === "object") {
-        ficha.textoOrc = orcResult.texto;
-        if (orcResult.preco) ficha.precoSugerido = orcResult.preco;
+
+      // Tenta detectar múltiplos equipamentos (mesmo fluxo do sync)
+      const priComentario = (ficha.comentarios || [])[0] || "";
+      const notasField    = ficha.notas || priComentario || (ficha.comentarios || []).join("\n\n");
+      const multiEquip    = splitEquipamentos(notasField);
+
+      if (multiEquip && multiEquip.length >= 2) {
+        // Multi-equipamento: monta orçamento combinado
+        const primeiroN = primeiroNome(ficha.nome) || "cliente";
+        let totalPreco = 0;
+        const partesTexto = [];
+        for (const equip of multiEquip) {
+          const descEquip = equip.nomeEquip + ": " + equip.descProblema;
+          const ft = await gerarTextoOrcamento(descEquip, [equip.descProblema], ficha.nome);
+          let corpo = (ft && ft.texto) ? ft.texto : "";
+          const dblN = corpo.indexOf("\n\n");
+          if (dblN > 0) corpo = corpo.slice(dblN + 2).trim();
+          corpo = corpo.replace(/\.? Aprovando ja iniciamos o conserto\.?$/, "").trim();
+          const nomeCapital = equip.nomeEquip.charAt(0).toUpperCase() + equip.nomeEquip.slice(1);
+          partesTexto.push("Em relacao ao " + nomeCapital + ":\n" + corpo);
+          totalPreco += parseFloat((ft && ft.preco) ? ft.preco : "0");
+        }
+        const qtd = multiEquip.length;
+        const descPct = qtd >= 4 ? 20 : qtd === 3 ? 15 : 10;
+        const precoDesc = Math.round(totalPreco * (1 - descPct / 100));
+        const linhaFinal = "Consertando os " + qtd + " juntos eu consigo um desconto para voce de " + totalPreco + " reais por " + precoDesc + " apenas. Aprovando ja iniciamos o conserto.";
+        ficha.textoOrc       = primeiroN + " bom dia, sou o Pedro da Reparo Eletro e vou passar seu orcamento:\n\n" + partesTexto.join("\n\n") + "\n\n" + linhaFinal;
+        ficha.precoSugerido  = String(precoDesc);
+        ficha.multiEquip     = true;
       } else {
-        ficha.textoOrc = orcResult || "";
+        // 1 equipamento
+        const orcResult = await gerarTextoOrcamento(ficha.desc, ficha.comentarios, ficha.nome);
+        if (orcResult && typeof orcResult === "object") {
+          ficha.textoOrc = orcResult.texto;
+          if (orcResult.preco) ficha.precoSugerido = orcResult.preco;
+        } else {
+          ficha.textoOrc = orcResult || "";
+        }
       }
+
       await dbSet(ORC_KEY, db);
       return res.status(200).json({ ok: true, textoOrc: ficha.textoOrc, precoSugerido: ficha.precoSugerido });
     } catch(e) {
@@ -1007,19 +1065,59 @@ var PRECOS_REGRAS = ["390","350","370","320","320","320","320","320","370","450"
 // Formato: "equipamento: descricao do problema // equipamento2: descricao"
 function splitEquipamentos(notas) {
   if (!notas) return null;
-  // Detecta padrão "palavra: texto" separados por linha em branco ou nova linha
-  // Ex: "purificador: troca do kit // bebedouro: troca das conexoes"
-  const partes = notas.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
-  if (partes.length < 2) return null;
-  
-  const equipamentos = [];
-  for (const parte of partes) {
-    const match = parte.match(/^([^:]+):\s*(.+)/s);
-    if (match) {
-      equipamentos.push({ nomeEquip: match[1].trim(), descProblema: match[2].trim() });
+
+  // ── Tenta formato 1: "equip: descricao" separados por linha em branco ──
+  // Ex: "purificador: troca do kit\n\nbebedouro: troca das conexoes"
+  const partesDuplo = notas.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+  if (partesDuplo.length >= 2) {
+    const eqs = [];
+    for (const p of partesDuplo) {
+      const m = p.match(/^([^:\n]+):\s*(.+)/s);
+      if (m) eqs.push({ nomeEquip: m[1].trim(), descProblema: m[2].trim() });
+    }
+    if (eqs.length >= 2) return eqs;
+  }
+
+  // ── Tenta formato 2: cada linha = 1 equipamento ──
+  // Ex: "TV 40 - Reparo de placa + troca dos alto falantes\nTV 50 plasma - troca placa fonte"
+  // Formato: {descrição TV} - {diagnóstico}  ou  {descrição TV}: {diagnóstico}
+  const linhas = notas.split(/\n/).map(l => l.trim()).filter(Boolean);
+  if (linhas.length >= 2) {
+    const TV_LINHA = /^(?:tv|televisao|televisão|tela|monitor)\s+.{2,}/i;
+    const tvLinhas = linhas.filter(l => TV_LINHA.test(l));
+    if (tvLinhas.length >= 2) {
+      return tvLinhas.map(function(l) {
+        // Separa em "nome" e "diagnóstico" pelo primeiro " - " ou ": "
+        const sep = l.match(/^(.+?)\s+[-–:]\s+(.+)$/);
+        if (sep) return { nomeEquip: sep[1].trim(), descProblema: sep[2].trim() };
+        return { nomeEquip: l, descProblema: l };
+      });
+    }
+    // Qualquer 2+ linhas com padrão "X - Y" ou "X: Y"
+    const equipLinhas = linhas.filter(l => /^.{3,}\s+[-–:]\s+.{3,}$/.test(l));
+    if (equipLinhas.length >= 2) {
+      return equipLinhas.map(function(l) {
+        const sep = l.match(/^(.+?)\s+[-–:]\s+(.+)$/);
+        if (sep) return { nomeEquip: sep[1].trim(), descProblema: sep[2].trim() };
+        return { nomeEquip: l, descProblema: l };
+      });
     }
   }
-  return equipamentos.length >= 2 ? equipamentos : null;
+
+  // ── Formato 3: separados por ";" ──
+  // Ex: "TV 32 sem imagem; Tv 32 sem som e sem imagem"
+  if (notas.includes(";")) {
+    const partesSemi = notas.split(";").map(p => p.trim()).filter(p => p.length > 3);
+    if (partesSemi.length >= 2) {
+      return partesSemi.map(function(p) {
+        const sep = p.match(/^(.+?)\s+[-–:]\s+(.+)$/);
+        if (sep) return { nomeEquip: sep[1].trim(), descProblema: sep[2].trim() };
+        return { nomeEquip: p, descProblema: p };
+      });
+    }
+  }
+
+  return null;
 }
 
 function detectarEquipamento(desc, titulo) {
