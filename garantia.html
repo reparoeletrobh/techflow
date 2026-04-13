@@ -123,6 +123,22 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .rel-table td{padding:10px 12px;border-bottom:1px solid var(--border);}
 .rel-table tr:hover td{background:var(--surface2);}
 .empty{font-family:var(--fm);font-size:11px;color:var(--muted);padding:30px;text-align:center;border:1px dashed var(--border);border-radius:8px;}
+.search-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-top:14px;}
+.search-title{font-family:var(--fh);font-size:13px;font-weight:800;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.search-title span{color:var(--purple);}
+.search-row{display:flex;gap:8px;margin-bottom:10px;}
+.search-row .fi{margin-bottom:0;flex:1;}
+.btn-search{padding:9px 16px;border-radius:8px;border:none;background:var(--purple);color:#fff;font-family:var(--fm);font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.btn-search:hover{filter:brightness(1.1);}
+.sr-result{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;}
+.sr-nome{font-size:13px;font-weight:600;color:#fff;margin-bottom:2px;}
+.sr-meta{font-family:var(--fm);font-size:9px;color:var(--muted);margin-bottom:8px;display:flex;gap:10px;flex-wrap:wrap;}
+.sr-mover-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.sr-mover-row select{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-family:var(--fm);font-size:10px;color:var(--text);outline:none;cursor:pointer;}
+.sr-mover-row select:focus{border-color:var(--purple);}
+.btn-mover{padding:7px 16px;border-radius:7px;border:none;background:rgba(168,85,247,.15);color:var(--purple);border:1px solid rgba(168,85,247,.3);font-family:var(--fm);font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.btn-mover:hover{background:rgba(168,85,247,.25);}
+.sr-empty{font-family:var(--fm);font-size:10px;color:var(--muted);text-align:center;padding:12px 0;}
 .toast{position:fixed;bottom:20px;right:20px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--purple);border-radius:10px;padding:10px 16px;font-family:var(--fm);font-size:11px;transform:translateY(60px);opacity:0;transition:all .3s;z-index:9999;}
 .toast.show{transform:translateY(0);opacity:1;}
 </style>
@@ -168,6 +184,16 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
         <button class="tipo-btn" id="tb-rua" onclick="setTipo('rua')">🏘️ RS Rua</button>
       </div>
       <button class="btn-cad" id="btn-cad" onclick="cadastrar()">+ Cadastrar Garantia</button>
+    </div>
+
+    <!-- Busca de OS -->
+    <div class="search-card">
+      <div class="search-title">🔍 Buscar <span>OS</span></div>
+      <div class="search-row">
+        <input class="fi" id="busca-os" placeholder="Nome, telefone ou OS..." onkeydown="if(event.key==='Enter')buscarOS()"/>
+        <button class="btn-search" onclick="buscarOS()">Buscar</button>
+      </div>
+      <div id="busca-resultados"></div>
     </div>
     <!-- Kanban resumo -->
     <div>
@@ -528,6 +554,91 @@ async function pipefySync() {
     await api('pipefy-sync');
     await load();
   } catch(e) {}
+}
+
+// ── BUSCA DE OS ───────────────────────────────────────────────
+function buscarOS() {
+  var q = (document.getElementById('busca-os').value || '').trim().toLowerCase();
+  var el = document.getElementById('busca-resultados');
+  if (!q) { el.innerHTML = '<div class="sr-empty">Digite nome, telefone ou número da OS.</div>'; return; }
+  var resultados = fichas.filter(function(f) {
+    return (f.nome     && f.nome.toLowerCase().includes(q))
+        || (f.telefone && f.telefone.replace(/\D/g,'').includes(q.replace(/\D/g,'')))
+        || (f.defeito  && f.defeito.toLowerCase().includes(q));
+  });
+  if (!resultados.length) {
+    el.innerHTML = '<div class="sr-empty">Nenhuma OS encontrada para &ldquo;' + esc(q) + '&rdquo;.</div>';
+    return;
+  }
+  var rows = resultados.map(function(f) {
+    var tc = TIPO_COLORS[f.tipo] || { c: 'var(--purple)', label: f.tipo };
+    var fasesT = fases[f.tipo] || [];
+    var faseAtual = (fasesT.find(function(x){ return x.id === f.faseId; }) || {}).label || f.faseId;
+    var opts = fasesT.map(function(fase){
+      return '<option value="' + fase.id + '"' + (fase.id === f.faseId ? ' selected' : '') + '>' + esc(fase.label) + '</option>';
+    }).join('');
+    var status = f.concluida
+      ? '<span style="color:var(--green)">✅ Concluída</span>'
+      : '<span style="color:var(--muted)">⏳ Ativa</span>';
+    var row = document.createElement('div');
+    row.className = 'sr-result';
+    row.innerHTML = ''
+      + '<div class="sr-nome">' + esc(f.nome) + '</div>'
+      + '<div class="sr-meta">'
+        + '<span style="color:' + tc.c + '">' + tc.label + '</span>'
+        + '<span>📍 ' + esc(faseAtual) + '</span>'
+        + (f.telefone ? '<span>📞 ' + esc(f.telefone) + '</span>' : '')
+        + status
+      + '</div>'
+      + '<div class="sr-mover-row">'
+        + '<select id="sel-' + f.id + '">' + opts + '</select>'
+        + '<button class="btn-mover" id="mv-' + f.id + '">↪ Mover</button>'
+        + (!f.concluida ? '<button class="btn-mover" id="cl-' + f.id + '" style="background:rgba(16,217,130,.1);color:var(--green);border-color:rgba(16,217,130,.3);">✅ Concluir</button>' : '')
+      + '</div>';
+    // Attach events after DOM is set
+    var fid = f.id;
+    setTimeout(function() {
+      var mv = document.getElementById('mv-' + fid);
+      var cl = document.getElementById('cl-' + fid);
+      if (mv) mv.onclick = function() { moverDaBusca(fid); };
+      if (cl) cl.onclick = function() { concluirDaBusca(fid); };
+    }, 0);
+    return row;
+  });
+  el.innerHTML = '';
+  rows.forEach(function(r) { el.appendChild(r); });
+}
+
+async function moverDaBusca(id) {
+  var sel = document.getElementById('sel-fase-' + id);
+  if (!sel) return;
+  var faseId = sel.value;
+  var f = fichas.find(function(x) { return x.id === id; });
+  if (!f || f.faseId === faseId) { toast('Selecione uma fase diferente', 'var(--yellow)'); return; }
+  var d = await api('mover', { id: id, faseId: faseId });
+  if (d.ok) {
+    var idx = fichas.findIndex(function(x) { return x.id === id; });
+    if (idx >= 0) fichas[idx] = d.ficha;
+    var fasesT = fases[f.tipo] || [];
+    var faseLabel = (fasesT.find(function(x) { return x.id === faseId; }) || {}).label || faseId;
+    toast('✅ ' + (f.nome) + ' → ' + faseLabel, 'var(--green)');
+    updateBadges();
+    buscarOS(); // atualiza resultado da busca
+  } else { toast('Erro: ' + (d.error || 'falha'), 'var(--red)'); }
+}
+
+async function concluirDaBusca(id) {
+  var f = fichas.find(function(x) { return x.id === id; });
+  if (!f) return;
+  if (!confirm('Concluir OS de ' + f.nome + '?')) return;
+  var d = await api('concluir', { id: id });
+  if (d.ok) {
+    var idx = fichas.findIndex(function(x) { return x.id === id; });
+    if (idx >= 0) fichas[idx] = d.ficha;
+    toast('✅ OS concluída!', 'var(--green)');
+    updateBadges();
+    buscarOS();
+  } else { toast('Erro: ' + (d.error || 'falha'), 'var(--red)'); }
 }
 
 // init
