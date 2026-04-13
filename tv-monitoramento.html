@@ -1,40 +1,239 @@
-document.getElementById('sections').innerHTML = '<div class="spinner"><div class="spin"></div>Buscando dados...</div>';
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TV — Monitoramento</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050508;--surface:#0d0d14;--surface2:#13131e;--border:#1e1e2e;
+  --text:#e8e8f0;--muted:#5a5a7a;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+  --red:#ef4444;--yellow:#f5c800;--orange:#f97316;--blue:#3b9eff;--green:#22c55e;--purple:#a855f7;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;}
 
-try {
-    var [finRes, boardRes, orcRes, compraRes, semRespostaRes, compPecasRes] = await Promise.all([
+header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:56px;
+  background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--fh);font-size:15px;font-weight:900;display:flex;align-items:center;gap:10px;}
+.logo-dot{width:8px;height:8px;background:#ef4444;border-radius:50%;box-shadow:0 0 10px #ef4444;}
+.hdr-right{display:flex;gap:8px;align-items:center;}
+.hbtn{font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;
+  border:1px solid var(--border);background:transparent;color:var(--muted);
+  cursor:pointer;transition:all .2s;text-decoration:none;display:inline-flex;align-items:center;}
+.hbtn:hover{color:var(--text);border-color:var(--blue);}
+.hbtn.refresh{border-color:rgba(59,158,255,.3);color:var(--blue);}
+
+.container{max-width:1100px;margin:0 auto;padding:24px;}
+
+.header-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;}
+.page-title{font-family:var(--fh);font-size:22px;font-weight:900;color:#ffffff;}
+.page-title span{color:#ef4444;}
+.page-sub{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:4px;}
+.last-update{font-family:var(--fm);font-size:10px;color:var(--muted);}
+
+/* SUMMARY CARDS */
+.summary{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:28px;}
+.sum-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;
+  position:relative;overflow:hidden;cursor:pointer;transition:all .2s;}
+.sum-card:hover{transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,.4),0 0 0 1px var(--c);}
+.sum-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--c);}
+.sum-count{font-family:var(--fh);font-size:28px;font-weight:900;color:var(--c);line-height:1;text-shadow:0 0 12px var(--c);}
+.sum-label{font-family:var(--fm);font-size:9px;color:rgba(255,255,255,.6);margin-top:4px;text-transform:uppercase;letter-spacing:.05em;}
+
+/* SECTIONS */
+.section{margin-bottom:24px;}
+.section-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.section-dot{width:10px;height:10px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c);flex-shrink:0;}
+.section-title{font-family:var(--fh);font-size:13px;font-weight:800;letter-spacing:.3px;color:#ffffff;}
+.section-count{font-family:var(--fm);font-size:10px;padding:2px 8px;border-radius:99px;
+  background:rgba(255,255,255,.06);color:var(--muted);}
+
+.card-list{display:flex;flex-direction:column;gap:6px;}
+.item-card{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--c);
+  border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:12px;transition:border-color .15s;}
+.item-card:hover{border-color:rgba(255,255,255,.15);}
+.item-nome{font-size:13px;font-weight:700;flex:1;color:#ffffff;letter-spacing:.01em;}
+.item-desc{font-size:11px;color:rgba(255,255,255,.75);flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.item-age{font-family:var(--fm);font-size:10px;padding:3px 9px;border-radius:20px;
+  background:color-mix(in srgb,var(--c) 15%,transparent);
+  color:var(--c);border:1px solid color-mix(in srgb,var(--c) 30%,transparent);white-space:nowrap;flex-shrink:0;}
+.item-age.hot{animation:pulse 2s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+.empty{font-family:var(--fm);font-size:11px;color:var(--muted);padding:20px;text-align:center;
+  background:var(--surface);border:1px dashed var(--border);border-radius:8px;}
+
+.spinner{display:flex;align-items:center;justify-content:center;gap:10px;padding:30px;
+  font-family:var(--fm);font-size:11px;color:var(--muted);}
+.spin{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--blue);
+  border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.toast{position:fixed;bottom:20px;right:20px;background:var(--surface);border:1px solid var(--border);
+  border-top:2px solid var(--blue);border-radius:10px;padding:12px 16px;
+  font-family:var(--fm);font-size:11px;display:flex;align-items:center;gap:8px;
+  transform:translateY(80px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;}
+.toast.show{transform:translateY(0);opacity:1;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    <span>TV <b>Assistência</b> — <span style="color:#ef4444">Monitoramento</span></span>
+  </div>
+  <div class="hdr-right">
+    <span class="last-update" id="last-update">—</span>
+    <button class="hbtn refresh" onclick="loadAll()">⟳ Atualizar</button>
+    <button class="hbtn" onclick="abrirOrdem()" style="border-color:rgba(59,158,255,.3);color:var(--blue,#3b9eff);">⚙️ Ordenar</button>
+    <a class="hbtn" href="/tv">Home</a>
+  </div>
+</header>
+
+<div class="container">
+  <div class="header-row">
+    <div>
+      <div class="page-title">Monitoramento <span>// Pendências</span></div>
+      <div class="page-sub">// tarefas que precisam de ação imediata</div>
+    </div>
+  </div>
+
+  <!-- RESUMO -->
+  <div class="summary" id="summary">
+    <div class="spinner"><div class="spin"></div>Carregando...</div>
+  </div>
+
+  <div id="sections">
+    <div class="spinner"><div class="spin"></div>Buscando dados...</div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <span id="t-icon">✅</span>
+  <div><strong id="t-title"></strong><br><span id="t-body" style="color:var(--muted);font-size:10px;"></span></div>
+</div>
+
+<script>
+var data = {};
+var toastTimer;
+
+function showToast(icon, title, msg) {
+  document.getElementById('t-icon').textContent = icon;
+  document.getElementById('t-title').textContent = title;
+  document.getElementById('t-body').textContent = msg;
+  var t = document.getElementById('toast');
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 4000);
+}
+
+function fmtAge(ms) {
+  if (!ms) return '—';
+  var mins = Math.floor(ms / 60000);
+  if (mins < 60) return mins + 'min';
+  var hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + 'h';
+  return Math.floor(hrs / 24) + 'd';
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  var d = new Date(iso);
+  return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+}
+
+function timeSince(iso) {
+  if (!iso) return null;
+  return Date.now() - new Date(iso).getTime();
+}
+
+function fmtSince(iso, msOverride) {
+  var ms = msOverride || timeSince(iso);
+  if (!ms) return '—';
+  var mins = Math.floor(ms/60000);
+  if (mins < 60) return mins + ' min';
+  var hrs = Math.floor(mins/60);
+  if (hrs < 24) return hrs + 'h ' + (mins%60) + 'min';
+  var dias = Math.floor(hrs/24);
+  return dias + 'd ' + (hrs%24) + 'h';
+}
+
+async function loadAll() {
+  document.getElementById('summary').innerHTML = '<div class="spinner"><div class="spin"></div>Carregando...</div>';
+  document.getElementById('sections').innerHTML = '<div class="spinner"><div class="spin"></div>Buscando dados...</div>';
+
+  try {
     var [finRes, boardRes, orcRes, compraRes, semRespostaRes, compPecasRes, remarcarRes] = await Promise.all([
-fetch('/api/tv-financeiro?action=load').then(function(r){return r.json();}).catch(function(){return {records:[]};}),
-fetch('/api/tv-board?action=load').then(function(r){return r.json();}),
-fetch('/api/tv-orcamento?action=orc-load').then(function(r){return r.json();}),
-fetch('/api/tv-compra-equip?action=load').then(function(r){return r.json();}).catch(function(){return {fichas:[]};}),
-fetch('/api/tv-orcamento?action=sem-resposta').then(function(r){return r.json();}).catch(function(){return {cards:[]};}),
-      fetch('/api/tv-compras-pecas?action=load').then(function(r){return r.json();}).catch(function(){return {pecas:[]};})
+      fetch('/api/tv-financeiro?action=load').then(function(r){return r.json();}).catch(function(){return {records:[]};}),
+      fetch('/api/tv-board?action=load').then(function(r){return r.json();}),
+      fetch('/api/tv-orcamento?action=orc-load').then(function(r){return r.json();}),
+      fetch('/api/tv-compra-equip?action=load').then(function(r){return r.json();}).catch(function(){return {fichas:[]};}),
+      fetch('/api/tv-orcamento?action=sem-resposta').then(function(r){return r.json();}).catch(function(){return {cards:[]};}),
       fetch('/api/tv-compras-pecas?action=load').then(function(r){return r.json();}).catch(function(){return {pecas:[]};}),
       fetch('/api/tv-board?action=remarcar-fase').then(function(r){return r.json();}).catch(function(){return {cards:[]};})
-]);
+    ]);
 
-var cards = boardRes.board?.cards || [];
-@@ -191,6 +192,7 @@
-pecasPendentes:    (compPecasRes.pecas||[]).filter(function(p){return p.status==='pendente';}),
-pecasAgPagamento:  (compPecasRes.pecas||[]).filter(function(p){return p.status==='aguardando_pagamento';}),
-pecasOnline:       (compPecasRes.pecas||[]).filter(function(p){return p.tipoCompra==='online'&&p.previsaoChegada&&p.status!=='pago';}),
+    var cards = boardRes.board?.cards || [];
+    var fichas = orcRes.fichas || [];
+
+    data = {
+      orcPendentes:   fichas.filter(function(f){return f.status==='pendente';}),
+      orcSemAnalise:  fichas.filter(function(f){return f.status==='pendente' && (!f.textoOrc || f.textoOrc.includes('[VALOR]'));}),
+      comprarPeca:    cards.filter(function(c){return c.phaseId==='comprar_peca';}),
+      pecaDisponivel: cards.filter(function(c){return c.phaseId==='peca_disponivel';}),
+      urgencia:       cards.filter(function(c){return c.phaseId==='urgencia';}),
+      equipComprado:  (compraRes.fichas||[]).filter(function(i){return i.status==='comprado' && !i.cadastradoVendas;}),
+      semResposta:    semRespostaRes.cards || [],
+      analisePagamento:  (finRes.records||[]).filter(function(r){return r.phaseId==='analise_pagamento';}),
+      pecasPendentes:    (compPecasRes.pecas||[]).filter(function(p){return p.status==='pendente';}),
+      pecasAgPagamento:  (compPecasRes.pecas||[]).filter(function(p){return p.status==='aguardando_pagamento';}),
+      pecasOnline:       (compPecasRes.pecas||[]).filter(function(p){return p.tipoCompra==='online'&&p.previsaoChegada&&p.status!=='pago';}),
       remarcar:          remarcarRes.cards || [],
-};
+    };
 
-renderSummary();
-@@ -203,6 +205,7 @@
+    renderSummary();
+    renderSections();
+    document.getElementById('last-update').textContent = 'Atualizado: ' + new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  } catch(e) {
+    showToast('❌','Erro ao carregar', e.message);
+  }
+}
 
 function renderSummary() {
-var items = [
+  var items = [
     {label:'Remarcar',          count: (data.remarcar||[]).length,         c:'#f04060', anchor:'remarcar'},
-{label:'Análise Pgto',      count: data.analisePagamento.length,  c:'#9b72ff', anchor:'analisePagamento'},
-{label:'Orç. Pendentes',    count: data.orcPendentes.length,      c:'#f5c800', anchor:'orcPendentes'},
-{label:'Comprar Peça',      count: data.comprarPeca.length,       c:'#f97316', anchor:'comprarPeca'},
-@@ -231,7 +234,14 @@
+    {label:'Análise Pgto',      count: data.analisePagamento.length,  c:'#9b72ff', anchor:'analisePagamento'},
+    {label:'Orç. Pendentes',    count: data.orcPendentes.length,      c:'#f5c800', anchor:'orcPendentes'},
+    {label:'Comprar Peça',      count: data.comprarPeca.length,       c:'#f97316', anchor:'comprarPeca'},
+    {label:'Peça Disponível',   count: data.pecaDisponivel.length,    c:'#3b9eff', anchor:'pecaDisponivel'},
+    {label:'Equip. Comprados',  count: data.equipComprado.length,     c:'#a855f7', anchor:'equipComprado'},
+    {label:'Em Urgência',       count: data.urgencia.length,          c:'#ef4444', anchor:'urgencia'},
+    {label:'Sem Resposta',      count: data.semResposta.length,       c:'#f97316', anchor:'semResposta'},
+    {label:'Compras Pendentes', count: data.pecasPendentes.length,    c:'#f97316', anchor:'pecasPendentes'},
+    {label:'Ag. Pgto Peças',    count: data.pecasAgPagamento.length,  c:'#f5c800', anchor:'pecasAgPagamento'},
+    {label:'Online c/ Previsão',count: data.pecasOnline.length,       c:'#3b9eff', anchor:'pecasOnline'},
+  ];
+  var total = items.reduce(function(a,i){return a+i.count;},0);
+  var html = items.map(function(i){
+    return '<div class="sum-card" style="--c:'+i.c+';cursor:pointer;" onclick="scrollToSection(this.dataset.anchor)" data-anchor="'+i.anchor+'">' +
+      '<div class="sum-count">'+i.count+'</div>' +
+      '<div class="sum-label">'+i.label+'</div>' +
+    '</div>';
+  }).join('');
+  html = '<div class="sum-card" style="--c:#ef4444;">' +
+    '<div class="sum-count">'+total+'</div>' +
+    '<div class="sum-label">Total Pendências</div>' +
+  '</div>' + html;
+  document.getElementById('summary').innerHTML = html;
+}
+
 function renderSections() {
-var RENDER_MAP = {
-analisePagamento: function() {
-      return renderSection('Análise de Pagamento — aguardando confirmação', data.analisePagamento, '#9b72ff', function(r){
+  var RENDER_MAP = {
+    analisePagamento: function() {
       return renderSection('🔄 Remarcar — aguardando reagendamento', data.remarcar, '#f04060', function(c){
         return '<div style="font-size:13px;font-weight:600">' + escH(c.nomeContato || c.title || '—') + '</div>'
           + (c.osCode ? '<div style="font-family:var(--fm);font-size:10px;color:var(--muted)">OS #' + escH(c.osCode) + '</div>' : '')
@@ -43,30 +242,157 @@ analisePagamento: function() {
       }, 'remarcar') +
 
       renderSection('Análise de Pagamento — aguardando confirmação', data.analisePagamento, '#9b72ff', function(r){
-return '<div class="item-card" style="--c:#9b72ff"><div class="item-nome">'+escH(r.nomeContato||r.title||'—')+'</div><div class="item-desc">'+escH((r.descricao||r.title||'').slice(0,80))+'</div><div class="item-age" style="--c:#9b72ff">'+fmtSince(r.movedAt)+'</div></div>';
-}, 'analisePagamento');
-},
-@@ -302,6 +312,7 @@
+        return '<div class="item-card" style="--c:#9b72ff"><div class="item-nome">'+escH(r.nomeContato||r.title||'—')+'</div><div class="item-desc">'+escH((r.descricao||r.title||'').slice(0,80))+'</div><div class="item-age" style="--c:#9b72ff">'+fmtSince(r.movedAt)+'</div></div>';
+      }, 'analisePagamento');
+    },
+    orcPendentes: function() {
+      return renderSection('Orçamentos não enviados', data.orcPendentes, '#f5c800', function(f){
+        var semValor=(!f.preco&&!f.precoSugerido)||(f.textoOrc||'').includes('[VALOR]');
+        return '<div class="item-card" style="--c:#f5c800"><div class="item-nome">'+escH(f.nome||'—')+'</div><div class="item-desc">'+escH((f.desc||'').slice(0,80))+'</div>'+(semValor?'<div class="item-age" style="--c:#ef4444">⚠️ Sem valor</div>':'<div class="item-age" style="--c:#f5c800">R$ '+(f.precoSugerido||f.preco||'—')+'</div>')+'</div>';
+      }, 'orcPendentes');
+    },
+    comprarPeca: function() {
+      return renderSection('Comprar Peça — aguardando compra', data.comprarPeca, '#f97316', function(c){
+        var ms=timeSince(c.addedAt),hot=ms&&ms>86400000*2;
+        return '<div class="item-card" style="--c:#f97316"><div class="item-nome">'+escH(c.nomeContato||'—')+'</div><div class="item-desc">'+escH((c.descricao||'').slice(0,80))+'</div><div class="item-age'+(hot?' hot':'')+'" style="--c:#f97316">'+fmtSince(c.addedAt)+'</div></div>';
+      }, 'comprarPeca');
+    },
+    pecaDisponivel: function() {
+      return renderSection('Peça Disponível — aguardando ação', data.pecaDisponivel, '#3b9eff', function(c){
+        return '<div class="item-card" style="--c:#3b9eff"><div class="item-nome">'+escH(c.nomeContato||'—')+'</div><div class="item-desc">'+escH((c.descricao||'').slice(0,80))+'</div><div class="item-age" style="--c:#3b9eff">'+fmtSince(c.addedAt)+'</div></div>';
+      }, 'pecaDisponivel');
+    },
+    equipComprado: function() {
+      return renderSection('Equipamentos Comprados — não cadastrados no Vendas', data.equipComprado, '#a855f7', function(i){
+        var nome = escH(i.nomeContato||i.title||'—');
+        var desc = escH((i.descricao||'').slice(0,80));
+        var ref  = i.pipefyId||'';
+        return '<div class="item-card" style="--c:#a855f7">'
+          +'<div class="item-nome">'+nome+(ref?' <span style="font-family:var(--fm);font-size:10px;color:var(--muted);">#'+escH(ref)+'</span>':'')+'</div>'
+          +'<div class="item-desc">'+desc+'</div>'
+          +'<div class="item-age" style="--c:#a855f7">'+fmtSince(i.createdAt||i.addedAt)+'</div>'
+          +'</div>';
+      }, 'equipComprado');
+    },
+    urgencia: function() {
+      return renderSection('Em Urgência', data.urgencia, '#ef4444', function(c){
+        var ms=timeSince(c.addedAt),hot=ms&&ms>3600000*4;
+        return '<div class="item-card" style="--c:#ef4444"><div class="item-nome">'+escH(c.nomeContato||'—')+'</div><div class="item-desc">'+escH((c.descricao||'').slice(0,80))+'</div><div class="item-age'+(hot?' hot':'')+'" style="--c:#ef4444">⚡ '+fmtSince(c.addedAt)+'</div></div>';
+      }, 'urgencia');
+    },
+    semResposta: function() {
+      return renderSection('Sem Resposta — orçamento sem retorno há 2+ dias', data.semResposta, '#f97316', function(item){
+        var hot=item.age>=5;
+        return '<div class="item-card" style="--c:#f97316"><div class="item-nome">'+escH(item.nome||item.title||'—')+'</div><div class="item-desc">'+escH((item.desc||'').slice(0,80))+'</div><div class="item-age'+(hot?' hot':'')+'" style="--c:'+(hot?'#ef4444':'#f97316')+'">'+(hot?'🔥 ':'')+item.age+'d sem resposta</div></div>';
+      }, 'semResposta');
+    },
+    pecasPendentes: function() {
+      return renderSection('Peças para Comprar', data.pecasPendentes, '#f97316', function(p){
+        return '<div class="item-card" style="--c:#f97316"><div class="item-nome">'+escH(p.descricao)+'</div><div class="item-desc">'+(p.os?'OS: '+escH(p.os)+' ':'')+(p.urgente?'🔴 URGENTE':'')+'</div><div class="item-age" style="--c:#f97316">'+fmtSince(p.createdAt)+'</div></div>';
+      }, 'pecasPendentes');
+    },
+    pecasAgPagamento: function() {
+      return renderSection('Peças — Aguardando Pagamento', data.pecasAgPagamento, '#f5c800', function(p){
+        return '<div class="item-card" style="--c:#f5c800"><div class="item-nome">'+escH(p.descricao)+'</div><div class="item-desc">'+(p.fornecedor?escH(p.fornecedor):'')+(p.dadosPagamento?' — '+escH(p.dadosPagamento):'')+'</div><div class="item-age" style="--c:#f5c800">'+fmtSince(p.compradoEm)+'</div></div>';
+      }, 'pecasAgPagamento');
+    },
+    pecasOnline: function() {
+      return renderSection('Compras Online — Previsão de Chegada', data.pecasOnline, '#3b9eff', function(p){
+        var dias=Math.ceil((new Date(p.previsaoChegada)-new Date())/86400000),hot=dias<0;
+        return '<div class="item-card" style="--c:#3b9eff"><div class="item-nome">'+escH(p.descricao)+'</div><div class="item-desc">'+(p.fornecedor?escH(p.fornecedor):'')+'</div><div class="item-age'+(hot?' hot':'')+'" style="--c:'+(hot?'var(--red)':'#3b9eff')+'">'+(hot?'⚠️ Atrasada '+Math.abs(dias)+'d':'📦 '+dias+'d')+'</div></div>';
+      }, 'pecasOnline');
+    },
+  };
+  var html = '';
+  secoes.forEach(function(s) {
+    if (!s.visivel) return;
+    if (RENDER_MAP[s.id]) html += RENDER_MAP[s.id]();
+  });
+  document.getElementById('sections').innerHTML = html || '<div class="empty">✅ Nenhuma pendência encontrada!</div>';
 }
 
 var _SECTION_TITLE_MAP = {
   'Remarcar': 'remarcar',
-'Análise de Pagamento': 'analisePagamento',
-'Orçamentos não enviados': 'orcPendentes',
-'Comprar Peça': 'comprarPeca',
-@@ -342,6 +353,7 @@
+  'Análise de Pagamento': 'analisePagamento',
+  'Orçamentos não enviados': 'orcPendentes',
+  'Comprar Peça': 'comprarPeca',
+  'Peça Disponível': 'pecaDisponivel',
+  'Equipamentos Comprados': 'equipComprado',
+  'Em Urgência': 'urgencia',
+  'Sem Resposta': 'semResposta',
+  'Peças para Comprar': 'pecasPendentes',
+  'Peças — Aguardando Pagamento': 'pecasAgPagamento',
+  'Compras Online': 'pecasOnline',
+};
+function renderSection(title, items, color, renderItem, sectionId) {
+  if (!sectionId) {
+    for (var _k in _SECTION_TITLE_MAP) {
+      if (title.startsWith(_k)) { sectionId = _SECTION_TITLE_MAP[_k]; break; }
+    }
+  }
+  var idAttr = sectionId ? ' id="sec-'+sectionId+'"' : '';
+  var html = '<div class="section"'+idAttr+'>' +
+    '<div class="section-header">' +
+      '<div class="section-dot" style="--c:'+color+'"></div>' +
+      '<div class="section-title">'+escH(title)+'</div>' +
+      '<div class="section-count">'+items.length+'</div>' +
+    '</div>' +
+    '<div class="card-list">';
+  if (!items.length) {
+    html += '<div class="empty">✅ Nenhum item pendente</div>';
+  } else {
+    items.forEach(function(i){ html += renderItem(i); });
+  }
+  html += '</div></div>';
+  return html;
+}
+
+function escH(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 
 // ── ORDEM DOS PAINÉIS ──────────────────────────────────────
 var SECOES_DEFAULT = [
   { id:'remarcar',          label:'Remarcar',                      cor:'#f04060', visivel:true },
-{ id:'analisePagamento',  label:'Análise de Pagamento',          cor:'#9b72ff', visivel:true },
-{ id:'orcPendentes',      label:'Orçamentos não enviados',       cor:'#f5c800', visivel:true },
-{ id:'comprarPeca',       label:'Comprar Peça',                  cor:'#f97316', visivel:true },
-@@ -381,7 +393,13 @@
+  { id:'analisePagamento',  label:'Análise de Pagamento',          cor:'#9b72ff', visivel:true },
+  { id:'orcPendentes',      label:'Orçamentos não enviados',       cor:'#f5c800', visivel:true },
+  { id:'comprarPeca',       label:'Comprar Peça',                  cor:'#f97316', visivel:true },
+  { id:'pecaDisponivel',    label:'Peça Disponível',               cor:'#3b9eff', visivel:true },
+  { id:'equipComprado',     label:'Equipamentos Comprados',        cor:'#a855f7', visivel:true },
+  { id:'urgencia',          label:'Em Urgência',                   cor:'#ef4444', visivel:true },
+  { id:'semResposta',       label:'Sem Resposta',                  cor:'#f97316', visivel:true },
+  { id:'pecasPendentes',    label:'Peças para Comprar',            cor:'#f97316', visivel:true },
+  { id:'pecasAgPagamento',  label:'Peças Ag. Pagamento',           cor:'#f5c800', visivel:true },
+  { id:'pecasOnline',       label:'Compras Online c/ Previsão',    cor:'#3b9eff', visivel:true },
+];
+
+function carregarOrdem() {
+  try {
+    var saved = localStorage.getItem('mon_ordem');
+    if (saved) {
+      var parsed = JSON.parse(saved);
+      // Merge: mantém novas seções que podem ter sido adicionadas
+      var ids = parsed.map(function(s){return s.id;});
+      SECOES_DEFAULT.forEach(function(s){
+        if (!ids.includes(s.id)) parsed.push(s);
+      });
+      return parsed.filter(function(s){ return SECOES_DEFAULT.find(function(d){return d.id===s.id;}); });
+    }
+  } catch(e) {}
+  return JSON.parse(JSON.stringify(SECOES_DEFAULT));
+}
+
+var secoes = carregarOrdem();
+
+function salvarOrdemStorage() {
+  localStorage.setItem('mon_ordem', JSON.stringify(secoes));
+}
+
+// Override renderSections to use order
+var _renderSectionsOrig = renderSections;
 renderSections = function() {
-var RENDER_MAP = {
-analisePagamento: function() {
-      return renderSection('Análise de Pagamento — aguardando confirmação', data.analisePagamento, '#9b72ff', function(r){
+  var RENDER_MAP = {
+    analisePagamento: function() {
       return renderSection('🔄 Remarcar — aguardando reagendamento', data.remarcar, '#f04060', function(c){
         return '<div style="font-size:13px;font-weight:600">' + escH(c.nomeContato || c.title || '—') + '</div>'
           + (c.osCode ? '<div style="font-family:var(--fm);font-size:10px;color:var(--muted)">OS #' + escH(c.osCode) + '</div>' : '')
@@ -74,6 +400,165 @@ analisePagamento: function() {
           + (c.descricao ? '<div style="font-size:11px;color:var(--muted);">' + escH(c.descricao.slice(0,60)) + '</div>' : '');
       }, 'remarcar') +
       renderSection('Análise de Pagamento — aguardando confirmação', data.analisePagamento, '#9b72ff', function(r){
-return '<div class="item-card" style="--c:#9b72ff"><div class="item-nome">'+escH(r.nomeContato||r.title||'—')+'</div><div class="item-desc">'+escH((r.descricao||r.title||'').slice(0,80))+'</div><div class="item-age" style="--c:#9b72ff">'+fmtSince(r.movedAt)+'</div></div>';
-});
-},
+        return '<div class="item-card" style="--c:#9b72ff"><div class="item-nome">'+escH(r.nomeContato||r.title||'—')+'</div><div class="item-desc">'+escH((r.descricao||r.title||'').slice(0,80))+'</div><div class="item-age" style="--c:#9b72ff">'+fmtSince(r.movedAt)+'</div></div>';
+      });
+    },
+    orcPendentes: function() {
+      return renderSection('Orçamentos não enviados', data.orcPendentes, '#f5c800', function(f){
+        var semValor = (!f.preco && !f.precoSugerido) || (f.textoOrc||'').includes('[VALOR]');
+        return '<div class="item-card" style="--c:#f5c800"><div class="item-nome">'+escH(f.nome||'—')+'</div><div class="item-desc">'+escH((f.desc||'').slice(0,80))+'</div>'+(semValor?'<div class="item-age" style="--c:#ef4444">⚠️ Sem valor</div>':'<div class="item-age" style="--c:#f5c800">R$ '+(f.precoSugerido||f.preco||'—')+'</div>')+'</div>';
+      });
+    },
+    comprarPeca: function() {
+      return renderSection('Comprar Peça — aguardando compra', data.comprarPeca, '#f97316', function(c){
+        var ms=timeSince(c.addedAt);var hot=ms&&ms>86400000*2;
+        return '<div class="item-card" style="--c:#f97316"><div class="item-nome">'+escH(c.nomeContato||'—')+'</div><div class="item-desc">'+escH((c.descricao||'').slice(0,80))+'</div><div class="item-age'+(hot?' hot':'')+'" style="--c:#f97316">'+fmtSince(c.addedAt)+'</div></div>';
+      });
+    },
+    pecaDisponivel: function() {
+      return renderSection('Peça Disponível — aguardando ação', data.pecaDisponivel, '#3b9eff', function(c){
+        return '<div class="item-card" style="--c:#3b9eff"><div class="item-nome">'+escH(c.nomeContato||'—')+'</div><div class="item-desc">'+escH((c.descricao||'').slice(0,80))+'</div><div class="item-age" style="--c:#3b9eff">'+fmtSince(c.addedAt)+'</div></div>';
+      });
+    },
+    equipComprado: function() {
+      return renderSection('Equipamentos Comprados — não cadastrados no Vendas', data.equipComprado, '#a855f7', function(i){
+        return '<div class="item-card" style="--c:#a855f7"><div class="item-nome">'+escH(i.tipo||i.descricao||'—')+'</div><div class="item-desc">'+escH((i.descricao||'').slice(0,80))+'</div><div class="item-age" style="--c:#a855f7">'+fmtSince(i.createdAt||i.addedAt)+'</div></div>';
+      });
+    },
+    urgencia: function() {
+      return renderSection('Em Urgência', data.urgencia, '#ef4444', function(c){
+        var ms=timeSince(c.addedAt);var hot=ms&&ms>3600000*4;
+        return '<div class="item-card" style="--c:#ef4444"><div class="item-nome">'+escH(c.nomeContato||'—')+'</div><div class="item-desc">'+escH((c.descricao||'').slice(0,80))+'</div><div class="item-age'+(hot?' hot':'')+'" style="--c:#ef4444">⚡ '+fmtSince(c.addedAt)+'</div></div>';
+      });
+    },
+    semResposta: function() {
+      return renderSection('Sem Resposta — orçamento sem retorno há 2+ dias', data.semResposta, '#f97316', function(item){
+        var hot=item.age>=5;
+        return '<div class="item-card" style="--c:#f97316"><div class="item-nome">'+escH(item.nome||item.title||'—')+'</div><div class="item-desc">'+escH((item.desc||'').slice(0,80))+'</div><div class="item-age'+(hot?' hot':'')+'" style="--c:'+(hot?'#ef4444':'#f97316')+'">'+(hot?'🔥 ':'')+item.age+'d sem resposta</div></div>';
+      }, 'semResposta');
+    },
+    pecasPendentes: function() {
+      return renderSection('Peças para Comprar — cadastradas aguardando compra', data.pecasPendentes, '#f97316', function(p){
+        return '<div class="item-card" style="--c:#f97316"><div class="item-nome">'+escH(p.descricao)+'</div><div class="item-desc">'+(p.os?'OS: '+escH(p.os):'')+''+(p.urgente?' 🔴 URGENTE':'')+'</div><div class="item-age" style="--c:#f97316">'+fmtSince(p.createdAt)+'</div></div>';
+      });
+    },
+    pecasAgPagamento: function() {
+      return renderSection('Peças — Aguardando Pagamento', data.pecasAgPagamento, '#f5c800', function(p){
+        return '<div class="item-card" style="--c:#f5c800"><div class="item-nome">'+escH(p.descricao)+'</div><div class="item-desc">'+(p.fornecedor?escH(p.fornecedor):'')+(p.dadosPagamento?' — '+escH(p.dadosPagamento):'')+'</div><div class="item-age" style="--c:#f5c800">'+fmtSince(p.compradoEm)+'</div></div>';
+      });
+    },
+    pecasOnline: function() {
+      return renderSection('Compras Online — Previsão de Chegada', data.pecasOnline, '#3b9eff', function(p){
+        var dias=Math.ceil((new Date(p.previsaoChegada)-new Date())/86400000);var hot=dias<0;
+        return '<div class="item-card" style="--c:#3b9eff"><div class="item-nome">'+escH(p.descricao)+'</div><div class="item-desc">'+(p.fornecedor?escH(p.fornecedor):'')+'</div><div class="item-age'+(hot?' hot':'')+'" style="--c:'+(hot?'var(--red)':'#3b9eff')+'">'+(hot?'⚠️ Atrasada':'📦 ')+(hot?Math.abs(dias)+'d':dias+'d')+'</div></div>';
+      });
+    },
+  };
+
+  var html = '';
+  secoes.forEach(function(s) {
+    if (!s.visivel) return;
+    if (RENDER_MAP[s.id]) html += RENDER_MAP[s.id]();
+  });
+  document.getElementById('sections').innerHTML = html || '<div class="empty">✅ Nenhuma pendência encontrada!</div>';
+};
+
+// ── MODAL ORDEM ──────────────────────────────────────────────
+var dragSrc = null;
+
+function abrirOrdem() {
+  renderOrdemList();
+  var m = document.getElementById('modal-ordem');
+  m.style.display = 'flex';
+}
+function fecharOrdem() {
+  document.getElementById('modal-ordem').style.display = 'none';
+}
+function salvarOrdem() {
+  // Lê a ordem atual do DOM
+  var items = document.querySelectorAll('.ordem-item');
+  var nova = [];
+  items.forEach(function(el) {
+    var id = el.getAttribute('data-id');
+    var sec = secoes.find(function(s){return s.id===id;});
+    if (sec) {
+      sec.visivel = el.querySelector('.olho-btn').getAttribute('data-vis') === '1';
+      nova.push(sec);
+    }
+  });
+  secoes = nova;
+  salvarOrdemStorage();
+  fecharOrdem();
+  renderSections();
+}
+function renderOrdemList() {
+  var el = document.getElementById('ordem-list');
+  el.innerHTML = secoes.map(function(s, i) {
+    var vis = s.visivel !== false;
+    var cnt = data[s.id] ? data[s.id].length : 0;
+    return '<div class="ordem-item" data-id="'+s.id+'" draggable="true" '
+      +'style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;cursor:grab;opacity:'+(vis?1:0.4)+';">'
+      +'<span style="color:var(--muted);font-size:14px;cursor:grab;">⠿</span>'
+      +'<div style="width:8px;height:8px;border-radius:50%;background:'+s.cor+';flex-shrink:0;"></div>'
+      +'<div style="flex:1;font-family:var(--fb);font-size:12px;">'+s.label+'</div>'
+      +'<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">'+cnt+'</div>'
+      +'<button class="olho-btn" data-vis="'+(vis?'1':'0')+'" onclick="toggleVisOrdem(this)" '
+        +'style="font-size:14px;background:none;border:none;cursor:pointer;padding:2px 6px;">'+(vis?'👁':'🚫')+'</button>'
+      +'</div>';
+  }).join('');
+
+  // Drag & drop
+  el.querySelectorAll('.ordem-item').forEach(function(item) {
+    item.addEventListener('dragstart', function(e) {
+      dragSrc = this;
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(function(){dragSrc.style.opacity='0.3';}, 0);
+    });
+    item.addEventListener('dragend', function() { this.style.opacity=''; });
+    item.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      var rect = this.getBoundingClientRect();
+      var after = e.clientY > rect.top + rect.height/2;
+      if (dragSrc && dragSrc !== this) {
+        if (after) this.parentNode.insertBefore(dragSrc, this.nextSibling);
+        else this.parentNode.insertBefore(dragSrc, this);
+      }
+    });
+  });
+}
+function toggleVisOrdem(btn) {
+  var vis = btn.getAttribute('data-vis') === '1';
+  btn.setAttribute('data-vis', vis ? '0' : '1');
+  btn.textContent = vis ? '🚫' : '👁';
+  var item = btn.closest('.ordem-item');
+  item.style.opacity = vis ? '0.4' : '1';
+}
+
+function scrollToSection(id) {
+  var el = document.getElementById('sec-'+id);
+  if (!el) return;
+  var top = el.getBoundingClientRect().top + window.scrollY - 120;
+  window.scrollTo({ top: top, behavior: 'smooth' });
+}
+
+// Auto-refresh a cada 2 minutos
+loadAll();
+setInterval(loadAll, 120000);
+</script>
+
+<!-- MODAL ORDEM -->
+<div id="modal-ordem" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:420px;max-width:95vw;max-height:85vh;overflow-y:auto;">
+    <div style="font-family:var(--fh);font-size:16px;font-weight:900;margin-bottom:6px;">⚙️ Ordenar Painéis</div>
+    <div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:16px;">Arraste para reordenar • clique no olho para ocultar</div>
+    <div id="ordem-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+      <button onclick="fecharOrdem()" style="font-family:var(--fm);font-size:10px;padding:7px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">Cancelar</button>
+      <button onclick="salvarOrdem()" style="font-family:var(--fm);font-size:10px;padding:7px 14px;border-radius:7px;border:none;background:linear-gradient(135deg,var(--accent),#1a7ad4);color:#fff;cursor:pointer;">✅ Salvar</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
