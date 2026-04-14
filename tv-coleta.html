@@ -298,23 +298,57 @@ function cancelEnd(pid) {
   document.getElementById('end-edit-' + pid).style.display = 'none';
 }
 
-function saveEnd(pid) {
+async function saveEnd(pid) {
   var inp = document.getElementById('end-inp-' + pid);
   if (!inp) return;
   var newEnd = inp.value.trim();
-  // Atualiza no array local
+  if (!newEnd) { toast('Digite um endereço', 'var(--yellow)'); return; }
+
   var card = fila.find(function(c) { return c.pipefyId === pid; });
-  if (card) card.endereco = newEnd;
-  // Atualiza texto visível
+  if (card) {
+    card.endereco = newEnd;
+    // Limpa coordenadas antigas — endereço mudou
+    card.lat = null; card.lng = null; card.geocFonte = null;
+  }
+
+  // Atualiza texto visível imediatamente
   var txt = document.getElementById('end-txt-' + pid);
-  if (txt) txt.textContent = '📍 ' + (newEnd || 'Sem endereço');
+  if (txt) txt.textContent = '📍 ' + newEnd;
   cancelEnd(pid);
-  // Persiste no board Redis
-  fetch('/api/tv-board?action=update-card', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ pipefyId: pid, fields: { endereco: newEnd } })
-  }).catch(function(){});
-  toast('📍 Endereço atualizado', 'var(--green)');
+
+  // Persiste endereço no Redis (sem wrapper fields)
+  try {
+    var r = await fetch('/api/tv-board?action=update-card', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ pipefyId: pid, endereco: newEnd, lat: null, lng: null, geocFonte: null })
+    }).then(function(r){ return r.json(); });
+    if (!r.ok) { toast('❌ Erro ao salvar: ' + (r.error||'falha'), 'var(--red)'); return; }
+  } catch(e) {
+    toast('❌ Erro de conexão', 'var(--red)'); return;
+  }
+
+  // Tenta geocodificar automaticamente o novo endereço
+  var badge = document.getElementById('fc-' + pid)?.querySelector('.geo-badge');
+  if (badge) { badge.textContent = '⏳ Geocodificando...'; }
+  try {
+    var gr = await fetch('/api/lalamove?action=debug-geocode&endereco=' + encodeURIComponent(newEnd))
+      .then(function(r){ return r.json(); });
+    if (gr.ok && gr.coords) {
+      if (card) { card.lat = gr.coords.lat; card.lng = gr.coords.lng; card.geocFonte = gr.coords.fonte; }
+      await fetch('/api/tv-board?action=update-card', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ pipefyId: pid, lat: gr.coords.lat, lng: gr.coords.lng, geocFonte: gr.coords.fonte })
+      });
+      renderFila();
+      toast('📍 Endereço salvo e geocodificado! (' + (gr.coords.fonte||'ok') + ')', 'var(--green)');
+    } else {
+      renderFila();
+      toast('📍 Endereço salvo. Geocodificação manual necessária.', 'var(--yellow)');
+    }
+  } catch(ge) {
+    renderFila();
+    toast('📍 Endereço salvo (geocodificação falhou)', 'var(--yellow)');
+  }
 }
 
 function toggleSel(id) {
