@@ -509,7 +509,7 @@ function buildMapsUrl(cards) {
     .filter(function(c){ return c.endereco || (c.lat && c.lng); })
     .map(function(c){
       return c.endereco
-        ? encodeURIComponent(c.endereco + ', Belo Horizonte, MG, Brasil')
+        ? encodeURIComponent(c.endereco + ', Brasil')
         : (c.lat + ',' + c.lng);
     });
   if (!paradas.length) return null;
