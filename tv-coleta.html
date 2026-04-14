@@ -140,7 +140,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 <header>
   <div class="logo"><div class="logo-dot"></div>TV <span>Assistência</span> — Coleta</div>
   <div class="hdr-right">
-    <a class="hbtn green" href="/tv-motorista" target="_blank">🚗 Painel Motorista</a>
+    <a class="hbtn green" href="/tv/motorista" target="_blank">🚗 Painel Motorista</a>
     <button class="hbtn" id="btn-sync" onclick="syncColeta()" style="border-color:rgba(59,158,255,.3);color:var(--accent);">⟳ Sync Pipefy</button>
     <button class="hbtn" onclick="loadAll()">↻ Atualizar</button>
     <a class="hbtn" href="/tv">Home</a>
@@ -496,7 +496,7 @@ function renderGrupos() {
         + 'ondragstart="onDragStart(event)" ondragend="onDragEnd(event)">'
         + '<div><div style="font-weight:600;color:var(--text)">' + escH(nome) + '</div>'
         + '<div style="color:var(--muted);font-size:9px">' + escH(end.slice(0,50)) + '</div></div>'
-        + '<span style="cursor:pointer;color:var(--red);font-size:11px" onclick="moverParaGrupo('' + pid + '',' + gi + ')" title="Mover para outro grupo">⇄</span>'
+        + '<span style="cursor:pointer;color:var(--red);font-size:11px" data-pid="' + pid + '" data-gi="' + gi + '" onclick="moverParaGrupoEl(this)" title="Mover para outro grupo">⇄</span>'
         + '</div>';
     }).join('');
     return '<div class="route-group">'
@@ -535,6 +535,12 @@ function onDrop(e, toGrupo) {
   gruposState[toGrupo].push(dragPid);
   renderGrupos();
 }
+function moverParaGrupoEl(el) {
+  var pid = el.getAttribute('data-pid');
+  var fromGrupo = parseInt(el.getAttribute('data-gi'));
+  moverParaGrupo(pid, fromGrupo);
+}
+
 function moverParaGrupo(pid, fromGrupo) {
   // Mostra prompt para escolher grupo destino
   var outros = gruposState.map(function(g,i){ return i; }).filter(function(i){ return i !== fromGrupo; });
