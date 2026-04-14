@@ -218,6 +218,20 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, ficha });
     }
 
+    // ── POST reabrir ───────────────────────────────────────────
+    if (req.method === "POST" && action === "reabrir") {
+      const { id } = req.body || {};
+      const db = await dbGet(GARANTIA_KEY) || defaultDB();
+      const ficha = db.fichas.find(function(f) { return f.id === id; });
+      if (!ficha) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
+      ficha.concluida   = false;
+      ficha.concluidaEm = null;
+      ficha.faseId      = primeiraFase(ficha.tipo);
+      ficha.movidaEm    = new Date().toISOString();
+      await dbSet(GARANTIA_KEY, db);
+      return res.status(200).json({ ok: true, ficha });
+    }
+
     // ── POST excluir ───────────────────────────────────────────
     if (req.method === "POST" && action === "excluir") {
       const { id } = req.body || {};
