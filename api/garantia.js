@@ -191,7 +191,9 @@ module.exports = async function handler(req, res) {
 
       ficha.faseId   = faseId;
       ficha.movidaEm = new Date().toISOString();
-      ficha.concluida = isConcluida(ficha);
+      // Nunca auto-conclui ao mover — só action=concluir faz isso.
+      // Assim conserto_realizado permanece visível no Kanban.
+      ficha.concluida = false;
 
       // Delivery + solicitar_entrega → move card Pipefy para Solicitar Entrega
       let pipefyResult = null;
