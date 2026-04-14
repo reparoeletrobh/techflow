@@ -354,8 +354,34 @@ function toggleSelAll() {
 async function otimizarRota() {
   if (!fila.length) { toast('Nenhum card na fila', 'var(--yellow)'); return; }
   var btn = document.querySelector('.btn-otimizar');
-  btn.textContent = '⏳ Geocodificando...'; btn.disabled = true;
+  btn.disabled = true;
+
   try {
+    // ── ETAPA 1: Geocodificar cards sem coordenadas (com progresso) ──
+    var semCoord = fila.filter(function(c) { return c.endereco && (!c.lat || !c.lng); });
+    var total = semCoord.length;
+    for (var i = 0; i < semCoord.length; i++) {
+      btn.textContent = '📍 Geocodificando ' + (i+1) + '/' + total + '...';
+      var card = semCoord[i];
+      try {
+        var gr = await fetch('/api/lalamove?action=debug-geocode&endereco=' + encodeURIComponent(card.endereco))
+          .then(function(r) { return r.json(); });
+        if (gr.ok && gr.coords) {
+          card.lat       = gr.coords.lat;
+          card.lng       = gr.coords.lng;
+          card.geocFonte = gr.coords.fonte;
+          // Salva no Redis
+          await fetch('/api/tv-board?action=update-card', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pipefyId: card.pipefyId, lat: card.lat, lng: card.lng, geocFonte: card.geocFonte })
+          });
+        }
+      } catch(ge) { /* continua mesmo se geocodificação falhar */ }
+      await new Promise(function(r) { setTimeout(r, 200); });
+    }
+
+    // ── ETAPA 2: Otimizar ordem via API ──
+    btn.textContent = '🗺️ Otimizando ordem...';
     var ids = fila.map(function(c) { return c.pipefyId; });
     var r = await fetch('/api/tv-board?action=otimizar-rota', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -364,10 +390,16 @@ async function otimizarRota() {
 
     if (!r.ok) { toast('❌ Erro: ' + (r.error || 'Falha na otimização'), 'var(--red)'); return; }
 
-    // Reordena o array fila local conforme resultado
+    // ── ETAPA 3: Reordena fila + atualiza coords das fichas ──
     var mapa = {};
     fila.forEach(function(c) { mapa[c.pipefyId] = c; });
-    fila = r.ordenados.map(function(o) { return mapa[o.pipefyId] || mapa[o.pipefyId]; }).filter(Boolean);
+    fila = r.ordenados.map(function(o) {
+      var card = mapa[o.pipefyId];
+      if (!card) return null;
+      // Aplica coords retornadas pela API (podem ser melhores que as geocodificadas localmente)
+      if (o.coords && o.coords.lat) { card.lat = o.coords.lat; card.lng = o.coords.lng; }
+      return card;
+    }).filter(Boolean);
 
     otimizado = true;
     document.getElementById('otimizado-badge').style.display = 'inline';
@@ -375,7 +407,7 @@ async function otimizarRota() {
 
     var msg = '✅ Rota otimizada — ' + fila.length + ' paradas';
     if (r.semCoord > 0) msg += ' · ' + r.semCoord + ' sem endereço (ao final)';
-    if (r.melhoria2opt > 0) msg += ' · 2-opt: -' + r.melhoria2opt + '%';
+    if (r.fonte) msg += ' · via ' + r.fonte;
     toast(msg, 'var(--green)');
   } catch(e) {
     toast('❌ ' + e.message, 'var(--red)');
