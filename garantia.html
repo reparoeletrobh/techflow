@@ -374,19 +374,50 @@ function renderTipo(tipo){
   var el=document.getElementById('fases-'+tipo); if(!el) return;
   var fasesT=fases[tipo]||[];
   var tc=TIPO_COLORS[tipo]||{c:'var(--purple)',bg:'rgba(168,85,247,.1)'};
-  var fichasTipo=fichas.filter(function(f){return f.tipo===tipo&&!f.concluida;});
+  var ativas=fichas.filter(function(f){return f.tipo===tipo&&!f.concluida;});
+  var concluidasTipo=fichas.filter(function(f){return f.tipo===tipo&&f.concluida;});
+  // Última fase do tipo — concluídas aparecem aqui
+  var ultimaFaseId=fasesT.length?fasesT[fasesT.length-1].id:null;
   el.innerHTML=fasesT.map(function(fase){
-    var cards=fichasTipo.filter(function(f){return f.faseId===fase.id;});
-    var cardsHtml=cards.length?cards.map(function(f){ return buildFichaCard(f,tipo,fasesT); }).join('')
-      :'<div class="kb-empty">—</div>';
+    var cards=ativas.filter(function(f){return f.faseId===fase.id;});
+    // Na última fase, inclui as concluídas (visualmente diferenciadas)
+    var conclCards=(fase.id===ultimaFaseId)?concluidasTipo:[];
+    var totalCards=cards.length+conclCards.length;
+    var cardsHtml=
+      (cards.length?cards.map(function(f){ return buildFichaCard(f,tipo,fasesT); }).join(''):'')+
+      (conclCards.length?conclCards.map(function(f){ return buildFichaCardConcluida(f,tipo); }).join(''):'')+
+      (!totalCards?'<div class="kb-empty">—</div>':'');
     return '<div class="fase-col">'+
       '<div class="fase-head">'+
         '<div class="fase-label" style="color:'+tc.c+'">'+esc(fase.label)+'</div>'+
-        '<span class="kb-count" style="background:'+tc.bg+';color:'+tc.c+'">'+cards.length+'</span>'+
+        '<span class="kb-count" style="background:'+tc.bg+';color:'+tc.c+'">'+totalCards+'</span>'+
       '</div>'+
       '<div class="fase-body">'+cardsHtml+'</div>'+
       '</div>';
   }).join('');
+}
+
+function buildFichaCardConcluida(f, tipo){
+  var tc=TIPO_COLORS[tipo]||{c:'var(--green)',bg:'rgba(16,217,130,.1)'};
+  var wppTel=(f.telefone||'').replace(/\D/g,'');
+  var dt=f.concluidaEm?fmtDate(f.concluidaEm):'';
+  return '<div class="ficha-card" style="opacity:.7;border-left:3px solid #10d982;">'+
+    '<div class="fc-top">'+
+      '<div class="fc-nome">'+esc(f.nome)+'</div>'+
+      '<span class="fc-tipo-badge" style="background:rgba(16,217,130,.15);color:#10d982;">✅ Concluída</span>'+
+    '</div>'+
+    '<div class="fc-defeito">'+esc(f.defeito)+'</div>'+
+    '<div class="fc-meta">'+
+      (f.telefone?'<span>📞 '+esc(f.telefone)+'</span>':'')+
+      (f.endereco?'<span>📍 '+esc(f.endereco)+'</span>':'')+
+      (dt?'<span style="color:#10d982;">✅ '+dt+'</span>':'')+
+    '</div>'+
+    '<div class="fc-actions">'+
+      (wppTel?'<a class="fc-btn" href="https://wa.me/'+wppTel+'" target="_blank">💬 WPP</a>':'')+
+      '<button class="fc-btn" style="border-color:rgba(59,158,255,.3);color:#3b9eff;" onclick="reabrirGarantia(\''+f.id+'\')">↩ Reabrir</button>'+
+      '<button class="fc-btn red" onclick="excluir(\''+f.id+'\')">🗑</button>'+
+    '</div>'+
+    '</div>';
 }
 
 function buildFichaCard(f, tipo, fasesT){
@@ -548,6 +579,16 @@ async function excluir(id){
     fichas=fichas.filter(function(f){return f.id!==id;});
     updateBadges(); render(); toast('🗑️ Excluída','var(--red)');
   }
+}
+
+async function reabrirGarantia(id){
+  if(!confirm('Reabrir esta OS?')) return;
+  var d=await api('reabrir',{id});
+  if(d.ok){
+    var idx=fichas.findIndex(function(f){return f.id===id;});
+    if(idx>=0) fichas[idx]=d.ficha;
+    updateBadges(); render(); toast('↩ OS reaberta','var(--accent)');
+  } else { toast('Erro: '+(d.error||'falha'),'var(--red)'); }
 }
 
 // Pipefy sync para delivery — verifica Finalizado no Pipefy a cada 5 min
