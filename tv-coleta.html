@@ -503,10 +503,17 @@ async function geocodificarCard(el, e) {
 // ── VER NO MAPS ────────────────────────────────────────────────
 function buildMapsUrl(cards) {
   var OFICINA = encodeURIComponent("Rua Alcides Gonçalves, 106, Camargos, Belo Horizonte, MG");
-  var paradas = cards.filter(function(c){ return c.lat && c.lng; });
+  // Usa endereço textual — bate exatamente com o que está no sistema
+  // Fallback para lat,lng se não tiver endereço
+  var paradas = cards
+    .filter(function(c){ return c.endereco || (c.lat && c.lng); })
+    .map(function(c){
+      return c.endereco
+        ? encodeURIComponent(c.endereco + ', Belo Horizonte, MG, Brasil')
+        : (c.lat + ',' + c.lng);
+    });
   if (!paradas.length) return null;
-  var midPoints = paradas.map(function(c){ return c.lat + ',' + c.lng; }).join('/');
-  return 'https://www.google.com/maps/dir/' + OFICINA + '/' + midPoints + '/' + OFICINA;
+  return 'https://www.google.com/maps/dir/' + OFICINA + '/' + paradas.join('/') + '/' + OFICINA;
 }
 
 function verNoMaps() {
