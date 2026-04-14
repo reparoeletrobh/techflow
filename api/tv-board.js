@@ -327,16 +327,19 @@ module.exports = async function handler(req, res) {
 
     // ── POST update-card ─────────────────────────────────────────
     if (req.method === "POST" && action === "update-card") {
-      const { pipefyId, endereco, nomeContato, telefone, descricao, urgente } = req.body || {};
+      const { pipefyId, endereco, nomeContato, telefone, descricao, urgente, lat, lng, geocFonte } = req.body || {};
       if (!pipefyId) return res.status(400).json({ ok: false, error: "pipefyId obrigatório" });
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
       const card  = board.cards.find(function(c) { return c.pipefyId === String(pipefyId); });
       if (!card) return res.status(404).json({ ok: false, error: "Card não encontrado" });
-      if (endereco   !== undefined) card.endereco   = endereco;
+      if (endereco    !== undefined) card.endereco    = endereco;
       if (nomeContato !== undefined) card.nomeContato = nomeContato;
-      if (telefone   !== undefined) card.telefone   = telefone;
-      if (descricao  !== undefined) card.descricao  = descricao;
-      if (urgente    !== undefined) card.urgente    = urgente;
+      if (telefone    !== undefined) card.telefone    = telefone;
+      if (descricao   !== undefined) card.descricao   = descricao;
+      if (urgente     !== undefined) card.urgente     = urgente;
+      if (lat         !== undefined) card.lat         = lat;
+      if (lng         !== undefined) card.lng         = lng;
+      if (geocFonte   !== undefined) card.geocFonte   = geocFonte;
       await dbSet(BOARD_KEY, board);
       return res.status(200).json({ ok: true, card });
     }
