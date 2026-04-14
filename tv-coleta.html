@@ -46,6 +46,41 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .btn-criar:disabled{opacity:.4;cursor:not-allowed;filter:none;}
 
 .fila-list{display:flex;flex-direction:column;gap:8px;max-width:800px;}
+
+/* Geocode badge */
+.geo-badge{font-family:var(--fm);font-size:9px;padding:1px 6px;border-radius:4px;display:inline-flex;align-items:center;gap:3px;cursor:pointer;border:1px solid transparent;}
+.geo-badge.ok-google{background:rgba(16,217,130,.1);color:#10d982;border-color:rgba(16,217,130,.25);}
+.geo-badge.ok-osm{background:rgba(245,200,0,.1);color:#f5c800;border-color:rgba(245,200,0,.25);}
+.geo-badge.ok-approx{background:rgba(249,115,22,.1);color:#f97316;border-color:rgba(249,115,22,.25);}
+.geo-badge.no-coord{background:rgba(240,64,96,.1);color:#f04060;border-color:rgba(240,64,96,.25);}
+.geo-badge.loading{background:rgba(59,158,255,.08);color:var(--accent);border-color:rgba(59,158,255,.2);}
+
+/* Modal múltiplas rotas */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+.modal-bg.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:560px;max-width:96vw;max-height:90vh;overflow-y:auto;}
+.modal-title{font-family:var(--fh);font-size:16px;font-weight:800;margin-bottom:4px;}
+.modal-sub{font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:18px;}
+.route-group{background:var(--surface2);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;}
+.route-group-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;}
+.route-group-label{font-family:var(--fh);font-size:13px;font-weight:700;}
+.route-group-meta{font-family:var(--fm);font-size:10px;color:var(--muted);}
+.route-group-cards{padding:0 14px 12px;}
+.rc-mini{font-family:var(--fm);font-size:10px;padding:4px 0;color:var(--muted);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.rc-mini:last-child{border-bottom:none;}
+.rc-mini span{color:var(--text);}
+.drag-item{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;margin:4px 0;cursor:grab;display:flex;align-items:center;justify-content:space-between;font-family:var(--fm);font-size:10px;color:var(--text);}
+.drag-item:active{cursor:grabbing;opacity:.7;}
+.drag-zone{min-height:32px;border:1px dashed var(--border);border-radius:6px;padding:4px;}
+.drag-zone.drag-over{border-color:var(--accent);background:rgba(59,158,255,.05);}
+.add-group-btn{font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;width:100%;margin-top:6px;transition:all .15s;}
+.add-group-btn:hover{color:var(--text);border-color:var(--accent);}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+.mbtn{font-family:var(--fm);font-size:10px;padding:8px 16px;border-radius:7px;cursor:pointer;transition:all .15s;}
+.mbtn-cancel{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.mbtn-maps{background:rgba(59,158,255,.12);color:var(--accent);border:1px solid rgba(59,158,255,.3);}
+.mbtn-criar{background:var(--green);border:none;color:#000;font-weight:800;}
+.mbtn-criar:hover{filter:brightness(1.1);}
 .fila-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:all .15s;user-select:none;}
 .fila-card:hover{border-color:rgba(59,158,255,.2);}
 .fila-card.selected{border-color:var(--accent);background:rgba(59,158,255,.05);}
@@ -128,7 +163,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
     <div class="fila-actions">
       <button class="btn-selall" id="btn-selall" onclick="toggleSelAll()">☑ Selecionar Todos</button>
       <button class="btn btn-otimizar" onclick="otimizarRota()">🗺️ Otimizar Rota</button>
-      <button class="btn btn-criar" id="btn-criar" onclick="criarRota()">📋 Criar Rota de Coleta</button>
+      <button class="btn" id="btn-maps" onclick="verNoMaps()" style="background:rgba(59,158,255,.1);color:var(--accent);border:1px solid rgba(59,158,255,.3);">📍 Ver no Maps</button>
+      <button class="btn btn-criar" id="btn-criar" onclick="abrirModalRotas()">📋 Criar Rota de Coleta</button>
     </div>
   </div>
   <div style="font-family:var(--fm);font-size:10px;color:var(--muted);">Clique nos cards para selecionar quais farão parte da rota. Último ponto fixo: Oficina TV Assistência.</div>
@@ -193,10 +229,28 @@ async function syncColeta() {
 
 async function loadAll() {
   var d = await api('load');
-  fila  = d.fila  || [];
   rotas = d.rotas || [];
-  document.getElementById('badge-fila').textContent  = fila.length;
   document.getElementById('badge-rotas').textContent = rotas.length;
+  // Só reseta a fila se NÃO estiver otimizada — preserva ordem após otimização
+  if (!otimizado) {
+    fila = d.fila || [];
+    document.getElementById('badge-fila').textContent = fila.length;
+  } else {
+    // Mantém ordem otimizada, mas atualiza dados dos cards (endereço, coords, etc.)
+    var atualizado = d.fila || [];
+    fila = fila.map(function(c) {
+      var fresh = atualizado.find(function(x){ return x.pipefyId === c.pipefyId; });
+      return fresh || c; // mantém posição, atualiza dados
+    }).filter(function(c) {
+      // Remove cards que saíram da fila
+      return atualizado.some(function(x){ return x.pipefyId === c.pipefyId; });
+    });
+    // Adiciona novos cards ao final (chegaram depois da otimização)
+    atualizado.forEach(function(c) {
+      if (!fila.some(function(x){ return x.pipefyId === c.pipefyId; })) fila.push(c);
+    });
+    document.getElementById('badge-fila').textContent = fila.length;
+  }
   renderFila();
   renderRotas();
 }
@@ -214,7 +268,7 @@ function renderFila() {
       + '<div class="fila-num" onclick="toggleSel(\'' + pid + '\')">' + (i + 1) + '</div>'
       + '<div class="fila-info" onclick="toggleSel(\'' + pid + '\')" style="cursor:pointer">'
         + '<div class="fila-nome">' + escH(card.nomeContato || card.title || '—') + '</div>'
-        + '<div class="fila-end" id="end-txt-' + pid + '">📍 ' + escH(card.endereco || 'Sem endereço') + '</div>'
+        + '<div class="fila-end" id="end-txt-' + pid + '">📍 ' + escH(card.endereco || 'Sem endereço') + '</div>'        + '<div style="margin-top:4px;display:flex;align-items:center;gap:5px;">' + geoBadge(card) + '</div>'
         + (card.osCode ? '<div class="fila-os">OS #' + escH(card.osCode) + '</div>' : '')
       + '</div>'
       + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">'
@@ -329,30 +383,196 @@ async function otimizarRota() {
   btn.textContent = '🗺️ Otimizar Rota'; btn.disabled = false;
 }
 
-async function criarRota() {
+
+// ── GEOCODIFICADOR ─────────────────────────────────────────────
+function geoBadge(card) {
+  if (!card.endereco) return '<span class="geo-badge no-coord">📍 Sem endereço</span>';
+  if (!card.lat || !card.lng) {
+    var pid = card.pipefyId;
+    return '<span class="geo-badge no-coord" onclick="geocodificarCard(this,event)" data-pid="' + pid + '" title="Clique para geocodificar">⚠️ Sem coord · Geocodificar</span>';
+  }
+  var fonteMap = {
+    'google':                  {label:'🌐 Google',   cls:'ok-google'},
+    'google_sem_num':          {label:'🌐 Google~',  cls:'ok-osm'},
+    'nominatim_struct':        {label:'📍 OSM',       cls:'ok-google'},
+    'nominatim_struct_semnum': {label:'📍 OSM~',      cls:'ok-osm'},
+    'nominatim_livre':         {label:'📍 OSM±',      cls:'ok-approx'},
+    'nominatim_rua_cidade':    {label:'📍 OSM±',      cls:'ok-approx'},
+    'opencage':                {label:'🔵 OpenCage', cls:'ok-osm'}
+  };
+  var b = fonteMap[card.geocFonte] || {label:'📍 OK', cls:'ok-osm'};
+  var lat = card.lat, lng = card.lng;
+  return '<span class="geo-badge ' + b.cls + '" onclick="verificarPin(this,event)" data-lat="' + lat + '" data-lng="' + lng + '" title="Verificar pin no Maps">' + b.label + '</span>';
+}
+
+function verificarPin(el, e) {
+  if (e) e.stopPropagation();
+  window.open('https://maps.google.com/?q=' + el.dataset.lat + ',' + el.dataset.lng, '_blank');
+}
+
+async function geocodificarCard(el, e) {
+  if (e) e.stopPropagation();
+  var pipefyId = el.dataset.pid;
+  var card = fila.find(function(c){ return c.pipefyId === pipefyId; });
+  if (!card || !card.endereco) return;
+  el.textContent = '⏳ Geocodificando...';
+  try {
+    var r = await fetch('/api/lalamove?action=debug-geocode&endereco=' + encodeURIComponent(card.endereco))
+      .then(function(r){ return r.json(); });
+    if (r.ok && r.coords) {
+      card.lat = r.coords.lat; card.lng = r.coords.lng; card.geocFonte = r.coords.fonte;
+      await fetch('/api/tv-board?action=update-card', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ pipefyId: pipefyId, fields: { lat: card.lat, lng: card.lng, geocFonte: card.geocFonte } })
+      });
+      renderFila();
+      toast('📍 Geocodificado! (' + (r.coords.fonte||'ok') + ')', 'var(--green)');
+    } else {
+      el.textContent = '❌ Não encontrado';
+      toast('❌ Não encontrado — edite o endereço', 'var(--red)');
+    }
+  } catch(ex) { toast('❌ Erro: ' + ex.message, 'var(--red)'); }
+}
+
+// ── VER NO MAPS ────────────────────────────────────────────────
+function buildMapsUrl(cards) {
+  var OFICINA = encodeURIComponent("Rua Alcides Gonçalves, 106, Camargos, Belo Horizonte, MG");
+  var paradas = cards.filter(function(c){ return c.lat && c.lng; });
+  if (!paradas.length) return null;
+  var midPoints = paradas.map(function(c){ return c.lat + ',' + c.lng; }).join('/');
+  return 'https://www.google.com/maps/dir/' + OFICINA + '/' + midPoints + '/' + OFICINA;
+}
+
+function verNoMaps() {
+  var url = buildMapsUrl(fila);
+  if (!url) { toast('Nenhum card com coordenadas na fila', 'var(--yellow)'); return; }
+  window.open(url, '_blank');
+}
+
+function verNoMapsModal() {
+  var todos = [];
+  gruposState.forEach(function(g){ todos = todos.concat(g); });
+  var cards = todos.map(function(pid){ return fila.find(function(c){ return c.pipefyId === pid; }); }).filter(Boolean);
+  var url = buildMapsUrl(cards);
+  if (!url) { toast('Nenhum card com coordenadas', 'var(--yellow)'); return; }
+  window.open(url, '_blank');
+}
+
+// ── MODAL MÚLTIPLAS ROTAS ──────────────────────────────────────
+var gruposState = []; // array de arrays de pipefyIds
+
+function abrirModalRotas() {
   var ids = selecionados.size > 0 ? Array.from(selecionados) : fila.map(function(c){ return c.pipefyId; });
-  if (!ids.length) { toast('Fila vazia — faça o Sync Pipefy primeiro', 'var(--yellow)'); return; }
+  if (!ids.length) { toast('Fila vazia', 'var(--yellow)'); return; }
+  // Inicia com 1 grupo contendo todos os cards
+  gruposState = [ids.slice()];
+  renderGrupos();
+  document.getElementById('modal-rotas').classList.add('open');
+}
+
+function closeModal() { document.getElementById('modal-rotas').classList.remove('open'); }
+function closeModalBg(e) { if (e.target.id === 'modal-rotas') closeModal(); }
+
+function addGrupo() {
+  gruposState.push([]);
+  renderGrupos();
+}
+
+function removeGrupo(idx) {
+  // Move cards do grupo removido para o primeiro grupo
+  var removidos = gruposState.splice(idx, 1)[0];
+  if (removidos.length && gruposState.length) gruposState[0] = gruposState[0].concat(removidos);
+  renderGrupos();
+}
+
+function renderGrupos() {
+  var cont = document.getElementById('grupos-container');
+  cont.innerHTML = gruposState.map(function(grupo, gi) {
+    var cardRows = grupo.map(function(pid) {
+      var card = fila.find(function(c){ return c.pipefyId === pid; });
+      var nome = card ? (card.nomeContato || card.title || pid) : pid;
+      var end  = card ? (card.endereco || 'Sem endereço') : '';
+      return '<div class="drag-item" draggable="true" data-pid="' + pid + '" data-grupo="' + gi + '" '
+        + 'ondragstart="onDragStart(event)" ondragend="onDragEnd(event)">'
+        + '<div><div style="font-weight:600;color:var(--text)">' + escH(nome) + '</div>'
+        + '<div style="color:var(--muted);font-size:9px">' + escH(end.slice(0,50)) + '</div></div>'
+        + '<span style="cursor:pointer;color:var(--red);font-size:11px" onclick="moverParaGrupo('' + pid + '',' + gi + ')" title="Mover para outro grupo">⇄</span>'
+        + '</div>';
+    }).join('');
+    return '<div class="route-group">'
+      + '<div class="route-group-head">'
+        + '<div class="route-group-label">Rota ' + (gi+1) + '</div>'
+        + '<div style="display:flex;align-items:center;gap:8px;">'
+          + '<div class="route-group-meta">' + grupo.length + ' parada(s)</div>'
+          + (gi > 0 ? '<span style="cursor:pointer;color:var(--red);font-size:10px" onclick="removeGrupo(' + gi + ')">✕ Remover</span>' : '')
+        + '</div>'
+      + '</div>'
+      + '<div class="drag-zone" data-grupo="' + gi + '" '
+        + 'ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event,' + gi + ')">'
+        + (cardRows || '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);padding:8px;text-align:center">Arraste cards aqui</div>')
+      + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+// Drag & Drop
+var dragPid = null, dragFromGrupo = -1;
+function onDragStart(e) {
+  dragPid = e.currentTarget.dataset.pid;
+  dragFromGrupo = parseInt(e.currentTarget.dataset.grupo);
+  e.dataTransfer.effectAllowed = 'move';
+}
+function onDragEnd(e) { dragPid = null; dragFromGrupo = -1; }
+function onDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+function onDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+function onDrop(e, toGrupo) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (dragPid === null || dragFromGrupo === toGrupo) return;
+  // Remove do grupo origem
+  gruposState[dragFromGrupo] = gruposState[dragFromGrupo].filter(function(p){ return p !== dragPid; });
+  // Adiciona no grupo destino
+  gruposState[toGrupo].push(dragPid);
+  renderGrupos();
+}
+function moverParaGrupo(pid, fromGrupo) {
+  // Mostra prompt para escolher grupo destino
+  var outros = gruposState.map(function(g,i){ return i; }).filter(function(i){ return i !== fromGrupo; });
+  if (!outros.length) { toast('Crie outro grupo primeiro', 'var(--yellow)'); return; }
+  var destino = outros[0]; // Move para o próximo grupo disponível
+  if (outros.length > 1) {
+    var opts = outros.map(function(i){ return 'Rota ' + (i+1); }).join(' / ');
+    var resp = prompt('Mover para qual rota? (' + opts + ')');
+    var escolha = parseInt(resp) - 1;
+    if (!isNaN(escolha) && gruposState[escolha]) destino = escolha;
+  }
+  gruposState[fromGrupo] = gruposState[fromGrupo].filter(function(p){ return p !== pid; });
+  gruposState[destino].push(pid);
+  renderGrupos();
+}
+
+async function confirmarCriarRotas() {
+  var grupos = gruposState.filter(function(g){ return g.length > 0; });
+  if (!grupos.length) { toast('Nenhum card nas rotas', 'var(--yellow)'); return; }
+  closeModal();
   var btn = document.getElementById('btn-criar');
   btn.textContent = '⏳ Criando...'; btn.disabled = true;
-  var d = await api('criar-rota', { cardIds: ids });
-  btn.textContent = '📋 Criar Rota de Coleta';
-  if (d.ok) {
-    selecionados.clear();
-    otimizado = false;
-    document.getElementById('otimizado-badge').style.display = 'none';
-    await loadAll();
-    var msg = '🗺️ ' + d.rota.label + ' criada!';
-    if (d.pipefy) {
-      if (d.pipefy.erros === 0) msg += ' · ' + d.pipefy.movidos + ' card(s) → Rota em Andamento';
-      else msg += ' · ' + d.pipefy.movidos + ' movidos, ' + d.pipefy.erros + ' erro(s) Pipefy';
-    }
-    toast(msg, 'var(--green)');
-    setTab('rotas');
-  } else {
-    btn.disabled = false;
-    toast('Erro: ' + d.error, 'var(--red)');
+  var msgs = [];
+  for (var i = 0; i < grupos.length; i++) {
+    var d = await api('criar-rota', { cardIds: grupos[i] });
+    if (d.ok) msgs.push('🗺️ ' + d.rota.label + ' (' + grupos[i].length + ' paradas)');
+    else msgs.push('❌ Rota ' + (i+1) + ': ' + (d.error || 'Erro'));
   }
+  selecionados.clear();
+  otimizado = false;
+  document.getElementById('otimizado-badge').style.display = 'none';
+  btn.textContent = '📋 Criar Rota de Coleta'; btn.disabled = false;
+  await loadAll();
+  toast(msgs.join(' · '), 'var(--green)');
+  setTab('rotas');
 }
+
+async function criarRota() { abrirModalRotas(); } // compat alias
 
 // ── ROTAS ──────────────────────────────────────────────────────
 function renderRotas() {
@@ -392,7 +612,7 @@ function renderRotaList(elId, lista) {
       + '</div>'
       + '<div class="rota-body" id="body-' + rota.id + '">'
         + bodyCards
-        + (rota.status === 'andamento' ? '<div class="rota-footer"><button class="rbtn green" onclick="concluirRota(\'' + rota.id + '\')">✅ Concluir Rota</button></div>' : '')
+        + (rota.status === 'andamento' ? '<div class="rota-footer" style="display:flex;gap:8px;"><button class="rbtn" onclick="verRotaNoMaps(\'' + rota.id + '\')">📍 Ver no Maps</button><button class="rbtn green" onclick="concluirRota(\'' + rota.id + '\')">✅ Concluir Rota</button></div>' : '')
       + '</div>'
       + '</div>';
   }).join('');
@@ -403,6 +623,19 @@ function toggleRota(id) {
   var chev = document.getElementById('chev-' + id);
   if (body) body.classList.toggle('open');
   if (chev) chev.classList.toggle('open');
+}
+
+function verRotaNoMaps(rotaId) {
+  var rota = rotas.find(function(r){ return r.id === rotaId; });
+  if (!rota) return;
+  // Busca coords dos cards na fila para construir URL
+  var cards = rota.cards.filter(function(c){ return c.status !== 'destino_final'; });
+  var OFICINA = encodeURIComponent("Rua Alcides Gonçalves, 106, Camargos, Belo Horizonte, MG");
+  // Usa endereço textual dos cards (mais legível no Maps)
+  var paradas = cards.map(function(c){ return encodeURIComponent(c.endereco || ''); }).filter(Boolean);
+  if (!paradas.length) { toast('Cards sem endereço', 'var(--yellow)'); return; }
+  var url = 'https://www.google.com/maps/dir/' + OFICINA + '/' + paradas.join('/') + '/' + OFICINA;
+  window.open(url, '_blank');
 }
 
 async function concluirRota(id) {
@@ -422,5 +655,20 @@ function setTab(aba) {
 loadAll();
 setInterval(loadAll, 30000);
 </script>
+
+<!-- Modal Múltiplas Rotas -->
+<div class="modal-bg" id="modal-rotas" onclick="closeModalBg(event)">
+  <div class="modal">
+    <div class="modal-title">📋 Criar Rota(s) de Coleta</div>
+    <div class="modal-sub" id="modal-sub">// Arraste os cards entre grupos para dividir em múltiplas rotas</div>
+    <div id="grupos-container"></div>
+    <button class="add-group-btn" onclick="addGrupo()">+ Adicionar outra rota</button>
+    <div class="modal-actions">
+      <button class="mbtn mbtn-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="mbtn mbtn-maps" onclick="verNoMapsModal()">📍 Ver no Maps</button>
+      <button class="mbtn mbtn-criar" onclick="confirmarCriarRotas()">✅ Criar Rota(s)</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
