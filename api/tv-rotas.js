@@ -114,6 +114,24 @@ module.exports = async function handler(req, res) {
     db.rotas.unshift(rota);
     await dbSet(ROTAS_KEY, db);
 
+    // Atualiza phaseId dos cards no board Redis para "rota_andamento"
+    // CRÍTICO: sem isso os cards ficam presos como "liberado_rota" no Redis
+    // mesmo depois de virar rota, causando inconsistência com o Pipefy
+    const boardAtualizado = await dbGet(BOARD_KEY) || { cards: [] };
+    let boardAlterado = false;
+    for (const card of cards) {
+      if (card.pipefyId === "oficina") continue;
+      const bc = (boardAtualizado.cards || []).find(function(c) { return c.pipefyId === String(card.pipefyId); });
+      if (bc && bc.phaseId === "liberado_rota") {
+        bc.phaseId  = "rota_andamento";
+        bc.movedAt  = new Date().toISOString();
+        boardAlterado = true;
+      }
+    }
+    if (boardAlterado) {
+      try { await dbSet(BOARD_KEY, boardAtualizado); } catch(e) { /* ignora — não bloqueia a rota */ }
+    }
+
     // Move cada card para fase "Rota em Andamento" no Pipefy
     const pipefyResults = [];
     for (const card of cards) {
