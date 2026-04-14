@@ -717,7 +717,22 @@ async function otimizarPontos(pontos, pontoInicio) {
         try { await dbSet(BOARD_KEY, board); } catch(e) { /* ignore */ }
       }
       const filaAtual = board.cards.filter(function(c) { return c.phaseId === "liberado_rota"; });
-      return res.status(200).json({ ok: true, found: edges.length, moved: moved, filaCount: filaAtual.length });
+
+      // Remove do Redis cards que já não estão mais em "Liberado para Rota" no Pipefy
+      // Isso corrige cards fantasma que ficaram presos na fila após virar rota
+      const idsNoPipefy = new Set(edges.map(function(e) { return String(e.node.id); }));
+      const fantasmas = filaAtual.filter(function(c) { return !idsNoPipefy.has(c.pipefyId); });
+      if (fantasmas.length > 0) {
+        fantasmas.forEach(function(c) {
+          // Muda phaseId para "rota_andamento" em vez de deletar — preserva histórico
+          c.phaseId = "rota_andamento";
+          c.movedAt = new Date().toISOString();
+        });
+        try { await dbSet(BOARD_KEY, board); } catch(e) { /* ignora */ }
+      }
+
+      const filaLimpa = board.cards.filter(function(c) { return c.phaseId === "liberado_rota"; });
+      return res.status(200).json({ ok: true, found: edges.length, moved: moved, filaCount: filaLimpa.length, fantasmasRemovidos: fantasmas.length });
     }
 
     // ── GET remarcar-fase — busca cards na fase Remarcar ao vivo no Pipefy ──
