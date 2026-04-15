@@ -45,7 +45,7 @@ module.exports = async function handler(req, res) {
   }
 
   // ── POST salvar ───────────────────────────────────────────────
-  if (req.method === "POST" && action === "salvar") {
+  if (req.method === "POST" && (action === "salvar" || action === "registrar")) {
     const { motorista, data, km, equipamentos, observacao } = req.body || {};
 
     if (!motorista || !["Wilde", "Paulo"].includes(motorista))
