@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TV — Logística</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050508;--surface:#0d0d14;--surface2:#13131e;--border:#1e1e2e;
+  --text:#e8e8f0;--muted:#5a5a7a;
+  --accent:#f97316;--green:#22c55e;--blue:#3b9eff;--red:#ef4444;--purple:#a855f7;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;}
+
+header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:54px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--fh);font-size:15px;font-weight:900;display:flex;align-items:center;gap:8px;}
+.logo-dot{width:9px;height:9px;background:var(--accent);border-radius:50%;box-shadow:0 0 8px var(--accent);}
+.logo em{color:var(--accent);font-style:normal;}
+.hbtn{font-family:var(--fm);font-size:10px;padding:6px 13px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;text-decoration:none;transition:all .15s;}
+.hbtn:hover{color:var(--text);border-color:var(--accent);}
+.hdr-r{display:flex;align-items:center;gap:10px;}
+
+.tabs-bar{display:flex;border-bottom:1px solid var(--border);padding:0 24px;background:var(--surface);}
+.tab{font-family:var(--fm);font-size:11px;font-weight:600;padding:12px 16px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;display:flex;align-items:center;gap:6px;}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab:hover{color:var(--text);}
+.tab-badge{font-family:var(--fm);font-size:9px;background:rgba(249,115,22,.15);color:var(--accent);padding:1px 6px;border-radius:99px;}
+
+.page{display:none;padding:24px;}
+.page.active{display:block;}
+
+/* FORM */
+.form-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;max-width:560px;}
+.form-title{font-family:var(--fh);font-size:17px;font-weight:800;margin-bottom:4px;}
+.form-sub{font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:20px;}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field.full{grid-column:1/-1;}
+.fl{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
+.fi{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:var(--fm);font-size:13px;color:var(--text);outline:none;transition:border .15s;width:100%;}
+.fi:focus{border-color:var(--accent);}
+.fi::placeholder{color:var(--muted);}
+select.fi{cursor:pointer;}
+.motorista-row{display:flex;gap:10px;margin-bottom:0;}
+.motorista-btn{flex:1;padding:14px 10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:var(--fh);font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;text-align:center;}
+.motorista-btn:hover{border-color:var(--accent);color:var(--text);}
+.motorista-btn.sel-wilde{border-color:#3b9eff;background:rgba(59,158,255,.1);color:#3b9eff;}
+.motorista-btn.sel-paulo{border-color:#a855f7;background:rgba(168,85,247,.1);color:#a855f7;}
+.submit-btn{width:100%;margin-top:16px;padding:13px;border-radius:9px;border:none;background:var(--accent);color:#fff;font-family:var(--fh);font-size:13px;font-weight:800;cursor:pointer;transition:filter .15s;}
+.submit-btn:hover{filter:brightness(1.1);}
+.submit-btn:disabled{opacity:.5;cursor:not-allowed;filter:none;}
+
+/* DASHBOARD */
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:24px;}
+.metric-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;}
+.mc-label{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:6px;}
+.mc-val{font-family:var(--fh);font-size:28px;font-weight:900;}
+.mc-sub{font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:3px;}
+.mc-wilde{border-left:3px solid #3b9eff;}
+.mc-paulo{border-left:3px solid #a855f7;}
+.mc-total{border-left:3px solid var(--accent);}
+
+.chart-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px;}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;}
+.chart-title{font-family:var(--fm);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:14px;}
+
+/* TABELA */
+.table-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.table-head{padding:14px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px;}
+.filters{display:flex;gap:8px;flex-wrap:wrap;}
+.fsel{font-family:var(--fm);font-size:10px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;outline:none;transition:border .15s;}
+.fsel:focus,.fsel:hover{border-color:var(--accent);color:var(--text);}
+table{width:100%;border-collapse:collapse;}
+thead tr{border-bottom:1px solid var(--border);}
+thead th{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding:10px 20px;text-align:left;font-weight:500;}
+tbody tr{border-bottom:1px solid rgba(30,30,46,.6);transition:background .1s;}
+tbody tr:hover{background:var(--surface2);}
+td{font-family:var(--fm);font-size:11px;padding:11px 20px;color:var(--text);}
+.td-muted{color:var(--muted);}
+.badge-wilde{display:inline-flex;align-items:center;gap:4px;font-family:var(--fm);font-size:9px;padding:3px 8px;border-radius:99px;background:rgba(59,158,255,.1);color:#3b9eff;border:1px solid rgba(59,158,255,.25);}
+.badge-paulo{display:inline-flex;align-items:center;gap:4px;font-family:var(--fm);font-size:9px;padding:3px 8px;border-radius:99px;background:rgba(168,85,247,.1);color:#a855f7;border:1px solid rgba(168,85,247,.25);}
+.del-btn{font-family:var(--fm);font-size:9px;padding:3px 8px;border-radius:5px;border:1px solid rgba(239,68,68,.2);background:transparent;color:var(--red);cursor:pointer;transition:all .15s;}
+.del-btn:hover{background:rgba(239,68,68,.1);}
+
+.empty-state{padding:48px;text-align:center;font-family:var(--fm);font-size:11px;color:var(--muted);}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:10px 16px;font-family:var(--fm);font-size:11px;opacity:0;transform:translateY(20px);transition:all .25s;z-index:999;}
+.toast.show{opacity:1;transform:translateY(0);}
+
+/* BAR CHART simples */
+.bar-chart{display:flex;flex-direction:column;gap:8px;}
+.bar-row{display:flex;align-items:center;gap:10px;}
+.bar-label{font-family:var(--fm);font-size:10px;color:var(--muted);width:60px;flex-shrink:0;text-align:right;}
+.bar-track{flex:1;height:20px;background:var(--surface2);border-radius:4px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:4px;transition:width .5s ease;display:flex;align-items:center;padding-left:6px;}
+.bar-val{font-family:var(--fm);font-size:9px;color:#fff;font-weight:600;}
+
+/* MINI STAT comparativo */
+.comp-row{display:flex;gap:10px;align-items:center;margin-bottom:8px;}
+.comp-name{font-family:var(--fm);font-size:10px;width:52px;flex-shrink:0;}
+.comp-bar-track{flex:1;height:14px;background:var(--surface2);border-radius:3px;overflow:hidden;}
+.comp-bar-fill{height:100%;border-radius:3px;transition:width .5s;}
+.comp-num{font-family:var(--fm);font-size:10px;width:44px;text-align:right;flex-shrink:0;}
+
+@media(max-width:640px){
+  .chart-row{grid-template-columns:1fr;}
+  .fields{grid-template-columns:1fr;}
+  .motorista-row{flex-direction:column;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="logo-dot"></div>TV <em>Assistência</em> — Logística</div>
+  <div class="hdr-r">
+    <a class="hbtn" href="/tv">← TV</a>
+    <a class="hbtn" href="/tv/adm">ADM</a>
+  </div>
+</header>
+
+<div class="tabs-bar">
+  <button class="tab active" id="tab-registrar" onclick="setTab('registrar')">📝 Registrar</button>
+  <button class="tab" id="tab-dashboard" onclick="setTab('dashboard')">📊 Dashboard</button>
+  <button class="tab" id="tab-historico" onclick="setTab('historico')">
+    📋 Histórico <span class="tab-badge" id="badge-hist">0</span>
+  </button>
+</div>
+
+<!-- REGISTRAR -->
+<div class="page active" id="page-registrar">
+  <div class="form-card">
+    <div class="form-title">Novo Registro</div>
+    <div class="form-sub">// logística diária</div>
+
+    <div class="field full" style="margin-bottom:14px;">
+      <div class="fl">Motorista</div>
+      <div class="motorista-row">
+        <button class="motorista-btn" id="btn-wilde" onclick="selMotorista('Wilde')">🚗 Wilde</button>
+        <button class="motorista-btn" id="btn-paulo" onclick="selMotorista('Paulo')">🚗 Paulo</button>
+      </div>
+    </div>
+
+    <div class="fields">
+      <div class="field">
+        <div class="fl">Data</div>
+        <input class="fi" type="date" id="f-data">
+      </div>
+      <div class="field">
+        <div class="fl">KMs rodados</div>
+        <input class="fi" type="number" id="f-km" min="0" step="0.1" placeholder="Ex: 87.5">
+      </div>
+      <div class="field">
+        <div class="fl">Equipamentos transportados</div>
+        <input class="fi" type="number" id="f-equip" min="0" step="1" placeholder="Ex: 12">
+      </div>
+      <div class="field">
+        <div class="fl">Tipo de operação</div>
+        <select class="fi" id="f-tipo">
+          <option value="coleta">Coleta</option>
+          <option value="entrega">Entrega</option>
+          <option value="coleta_entrega">Coleta + Entrega</option>
+        </select>
+      </div>
+      <div class="field full">
+        <div class="fl">Observação (opcional)</div>
+        <input class="fi" type="text" id="f-obs" placeholder="Ex: chuva, tráfego, rota alternativa...">
+      </div>
+    </div>
+
+    <button class="submit-btn" id="btn-salvar" onclick="salvar()">✓ Salvar Registro</button>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="page" id="page-dashboard">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <span style="font-family:var(--fh);font-size:17px;font-weight:800;">Análise Logística</span>
+    <div style="display:flex;gap:8px;">
+      <select class="fsel" id="dash-periodo" onchange="renderDash()">
+        <option value="7">Últimos 7 dias</option>
+        <option value="30" selected>Últimos 30 dias</option>
+        <option value="90">Últimos 90 dias</option>
+        <option value="0">Tudo</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="dash-grid" id="dash-metrics"></div>
+
+  <div class="chart-row">
+    <div class="chart-card">
+      <div class="chart-title">KMs por motorista</div>
+      <div id="chart-km"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Equipamentos por motorista</div>
+      <div id="chart-equip"></div>
+    </div>
+  </div>
+
+  <div class="chart-row">
+    <div class="chart-card">
+      <div class="chart-title">KMs por dia (últimos 14 dias)</div>
+      <div id="chart-km-dia" class="bar-chart"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Equipamentos por dia (últimos 14 dias)</div>
+      <div id="chart-equip-dia" class="bar-chart"></div>
+    </div>
+  </div>
+</div>
+
+<!-- HISTÓRICO -->
+<div class="page" id="page-historico">
+  <div class="table-card">
+    <div class="table-head">
+      <div style="font-family:var(--fm);font-size:11px;color:var(--muted);" id="hist-count">— registros</div>
+      <div class="filters">
+        <select class="fsel" id="filt-motorista" onchange="renderHist()">
+          <option value="">Todos os motoristas</option>
+          <option value="Wilde">Wilde</option>
+          <option value="Paulo">Paulo</option>
+        </select>
+        <select class="fsel" id="filt-tipo" onchange="renderHist()">
+          <option value="">Todos os tipos</option>
+          <option value="coleta">Coleta</option>
+          <option value="entrega">Entrega</option>
+          <option value="coleta_entrega">Coleta + Entrega</option>
+        </select>
+        <select class="fsel" id="filt-mes" onchange="renderHist()">
+          <option value="">Todos os meses</option>
+        </select>
+        <input class="fsel" type="date" id="filt-de" onchange="renderHist()" placeholder="De">
+        <input class="fsel" type="date" id="filt-ate" onchange="renderHist()" placeholder="Até">
+      </div>
+    </div>
+    <div id="hist-table"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var motoristaSel = null;
+var registros = [];
+var toastT;
+
+// ── INIT ──────────────────────────────────────────────────────
+(function(){
+  var hoje = new Date().toISOString().slice(0,10);
+  document.getElementById('f-data').value = hoje;
+  load();
+  populaMeses();
+})();
+
+function setTab(t) {
+  ['registrar','dashboard','historico'].forEach(function(x){
+    document.getElementById('page-'+x).classList.toggle('active', x===t);
+    document.getElementById('tab-'+x).classList.toggle('active', x===t);
+  });
+  if (t==='dashboard') renderDash();
+  if (t==='historico') renderHist();
+}
+
+// ── API ───────────────────────────────────────────────────────
+async function api(action, body) {
+  var opts = { credentials:'include', headers:{'Content-Type':'application/json'} };
+  if (body) { opts.method = 'POST'; opts.body = JSON.stringify(body); }
+  var r = await fetch('/api/tv-logistica?action=' + action, opts);
+  return r.json();
+}
+
+async function load() {
+  try {
+    var d = await api('load');
+    registros = d.registros || [];
+    document.getElementById('badge-hist').textContent = registros.length;
+  } catch(e) {}
+}
+
+// ── FORMULÁRIO ────────────────────────────────────────────────
+function selMotorista(nome) {
+  motoristaSel = nome;
+  document.getElementById('btn-wilde').className = 'motorista-btn' + (nome==='Wilde' ? ' sel-wilde' : '');
+  document.getElementById('btn-paulo').className = 'motorista-btn' + (nome==='Paulo' ? ' sel-paulo' : '');
+}
+
+async function salvar() {
+  if (!motoristaSel) { toast('Selecione o motorista', '#f59e0b'); return; }
+  var data  = document.getElementById('f-data').value;
+  var km    = parseFloat(document.getElementById('f-km').value);
+  var equip = parseInt(document.getElementById('f-equip').value);
+  var tipo  = document.getElementById('f-tipo').value;
+  var obs   = document.getElementById('f-obs').value.trim();
+
+  if (!data)  { toast('Informe a data', '#f59e0b'); return; }
+  if (!km || km <= 0)    { toast('Informe os KMs rodados', '#f59e0b'); return; }
+  if (!equip || equip < 0) { toast('Informe os equipamentos', '#f59e0b'); return; }
+
+  var btn = document.getElementById('btn-salvar');
+  btn.disabled = true; btn.textContent = '⏳ Salvando...';
+
+  var d = await api('salvar', { motorista: motoristaSel, data, km, equip, tipo, obs });
+  btn.disabled = false; btn.textContent = '✓ Salvar Registro';
+
+  if (d.ok) {
+    registros = d.registros || registros;
+    document.getElementById('badge-hist').textContent = registros.length;
+    // Reset form
+    document.getElementById('f-km').value = '';
+    document.getElementById('f-equip').value = '';
+    document.getElementById('f-obs').value = '';
+    motoristaSel = null;
+    document.getElementById('btn-wilde').className = 'motorista-btn';
+    document.getElementById('btn-paulo').className = 'motorista-btn';
+    document.getElementById('f-data').value = new Date().toISOString().slice(0,10);
+    populaMeses();
+    toast('✅ Registro salvo!', '#22c55e');
+  } else {
+    toast('❌ Erro: ' + (d.error||'falha'), '#ef4444');
+  }
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────
+function filtrarPorPeriodo(dias) {
+  if (!dias || dias == 0) return registros;
+  var cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - parseInt(dias));
+  var cutStr = cutoff.toISOString().slice(0,10);
+  return registros.filter(function(r){ return r.data >= cutStr; });
+}
+
+function renderDash() {
+  var dias = parseInt(document.getElementById('dash-periodo').value);
+  var dados = filtrarPorPeriodo(dias);
+
+  var wilde = dados.filter(function(r){ return r.motorista==='Wilde'; });
+  var paulo = dados.filter(function(r){ return r.motorista==='Paulo'; });
+
+  var kmW   = wilde.reduce(function(s,r){ return s + (r.km||0); }, 0);
+  var kmP   = paulo.reduce(function(s,r){ return s + (r.km||0); }, 0);
+  var eqW   = wilde.reduce(function(s,r){ return s + (r.equip||0); }, 0);
+  var eqP   = paulo.reduce(function(s,r){ return s + (r.equip||0); }, 0);
+  var kmT   = kmW + kmP;
+  var eqT   = eqW + eqP;
+  var dias_  = dados.length;
+  var km_dia = dias_ > 0 ? (kmT/dias_).toFixed(1) : 0;
+  var eq_dia = dias_ > 0 ? (eqT/dias_).toFixed(1) : 0;
+
+  // Metrics
+  document.getElementById('dash-metrics').innerHTML = [
+    { label:'KMs totais', val: kmT.toFixed(0)+'km', sub: km_dia+'km/registro', cls:'mc-total' },
+    { label:'Equip. transportados', val: eqT, sub: eq_dia+' equip/registro', cls:'mc-total' },
+    { label:'KMs — Wilde', val: kmW.toFixed(0)+'km', sub: wilde.length+' registros', cls:'mc-wilde' },
+    { label:'KMs — Paulo', val: kmP.toFixed(0)+'km', sub: paulo.length+' registros', cls:'mc-paulo' },
+    { label:'Equip. — Wilde', val: eqW, sub: 'total Wilde', cls:'mc-wilde' },
+    { label:'Equip. — Paulo', val: eqP, sub: 'total Paulo', cls:'mc-paulo' },
+  ].map(function(m){
+    return '<div class="metric-card '+m.cls+'">'
+      +'<div class="mc-label">'+m.label+'</div>'
+      +'<div class="mc-val">'+m.val+'</div>'
+      +'<div class="mc-sub">'+m.sub+'</div>'
+      +'</div>';
+  }).join('');
+
+  // Comparativo KMs
+  var maxKm = Math.max(kmW, kmP, 1);
+  document.getElementById('chart-km').innerHTML = '<div class="bar-chart">'
+    + compBar('Wilde', kmW, maxKm, '#3b9eff', 'km')
+    + compBar('Paulo', kmP, maxKm, '#a855f7', 'km')
+    + '</div>';
+
+  var maxEq = Math.max(eqW, eqP, 1);
+  document.getElementById('chart-equip').innerHTML = '<div class="bar-chart">'
+    + compBar('Wilde', eqW, maxEq, '#3b9eff', ' equip.')
+    + compBar('Paulo', eqP, maxEq, '#a855f7', ' equip.')
+    + '</div>';
+
+  // KMs por dia — últimos 14 dias
+  renderBarDia('chart-km-dia', dados, 'km', '#f97316');
+  renderBarDia('chart-equip-dia', dados, 'equip', '#22c55e');
+}
+
+function compBar(nome, val, max, cor, unit) {
+  var pct = max > 0 ? Math.round((val/max)*100) : 0;
+  return '<div class="comp-row">'
+    + '<span class="comp-name" style="color:'+cor+'">'+nome+'</span>'
+    + '<div class="comp-bar-track"><div class="comp-bar-fill" style="width:'+pct+'%;background:'+cor+';"></div></div>'
+    + '<span class="comp-num" style="color:'+cor+'">'+val+unit+'</span>'
+    + '</div>';
+}
+
+function renderBarDia(elId, dados, campo, cor) {
+  // Agrupa por data (últimos 14 dias)
+  var datas = {};
+  var cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 13);
+  for (var i=0; i<14; i++) {
+    var d = new Date(cutoff); d.setDate(cutoff.getDate()+i);
+    var key = d.toISOString().slice(0,10);
+    datas[key] = 0;
+  }
+  dados.forEach(function(r){ if (datas[r.data]!==undefined) datas[r.data] += (r[campo]||0); });
+
+  var keys = Object.keys(datas).sort();
+  var maxVal = Math.max.apply(null, keys.map(function(k){ return datas[k]; }).concat([1]));
+  var el = document.getElementById(elId);
+  el.innerHTML = keys.map(function(k){
+    var pct = Math.round((datas[k]/maxVal)*100);
+    var label = k.slice(5); // MM-DD
+    return '<div class="bar-row">'
+      + '<span class="bar-label">'+label+'</span>'
+      + '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+cor+';">'
+        + (pct>15 ? '<span class="bar-val">'+datas[k]+'</span>' : '')
+      + '</div></div>'
+      + (pct<=15 && datas[k]>0 ? '<span style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-left:4px;">'+datas[k]+'</span>' : '')
+      + '</div>';
+  }).join('');
+}
+
+// ── HISTÓRICO ─────────────────────────────────────────────────
+function populaMeses() {
+  var meses = {};
+  registros.forEach(function(r){ if (r.data) meses[r.data.slice(0,7)] = true; });
+  var sel = document.getElementById('filt-mes');
+  var cur = sel.value;
+  sel.innerHTML = '<option value="">Todos os meses</option>';
+  Object.keys(meses).sort().reverse().forEach(function(m){
+    var opt = document.createElement('option');
+    opt.value = m; opt.textContent = m;
+    if (m===cur) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function renderHist() {
+  var filtM  = document.getElementById('filt-motorista').value;
+  var filtT  = document.getElementById('filt-tipo').value;
+  var filtMes = document.getElementById('filt-mes').value;
+  var filtDe = document.getElementById('filt-de').value;
+  var filtAte = document.getElementById('filt-ate').value;
+
+  var dados = registros.filter(function(r){
+    if (filtM  && r.motorista !== filtM) return false;
+    if (filtT  && r.tipo !== filtT)      return false;
+    if (filtMes && !r.data.startsWith(filtMes)) return false;
+    if (filtDe && r.data < filtDe)       return false;
+    if (filtAte && r.data > filtAte)     return false;
+    return true;
+  }).sort(function(a,b){ return b.data.localeCompare(a.data); });
+
+  document.getElementById('hist-count').textContent = dados.length + ' registro' + (dados.length!==1?'s':'');
+  document.getElementById('badge-hist').textContent = registros.length;
+
+  var el = document.getElementById('hist-table');
+  if (!dados.length) {
+    el.innerHTML = '<div class="empty-state">Nenhum registro encontrado com esses filtros.</div>';
+    return;
+  }
+
+  var tipoLabel = { coleta:'Coleta', entrega:'Entrega', coleta_entrega:'Coleta+Entrega' };
+
+  el.innerHTML = '<table>'
+    + '<thead><tr>'
+    + '<th>Data</th><th>Motorista</th><th>KMs</th><th>Equip.</th><th>Tipo</th><th>Obs.</th><th></th>'
+    + '</tr></thead>'
+    + '<tbody>'
+    + dados.map(function(r){
+      var badge = r.motorista==='Wilde'
+        ? '<span class="badge-wilde">Wilde</span>'
+        : '<span class="badge-paulo">Paulo</span>';
+      return '<tr>'
+        + '<td>'+fmtData(r.data)+'</td>'
+        + '<td>'+badge+'</td>'
+        + '<td><strong>'+r.km+'</strong> km</td>'
+        + '<td><strong>'+r.equip+'</strong></td>'
+        + '<td class="td-muted">'+(tipoLabel[r.tipo]||r.tipo)+'</td>'
+        + '<td class="td-muted">'+(r.obs||'—')+'</td>'
+        + '<td><button class="del-btn" data-id="'+r.id+'" onclick="excluir(this.getAttribute(\'data-id\'))">✕</button></td>'
+        + '</tr>';
+    }).join('')
+    + '</tbody></table>';
+}
+
+function fmtData(d) {
+  if (!d) return '—';
+  var p = d.split('-');
+  return p[2]+'/'+p[1]+'/'+p[0];
+}
+
+async function excluir(id) {
+  if (!confirm('Excluir este registro?')) return;
+  var d = await api('excluir', { id });
+  if (d.ok) {
+    registros = d.registros || registros.filter(function(r){ return r.id !== id; });
+    populaMeses();
+    renderHist();
+    if (document.getElementById('page-dashboard').classList.contains('active')) renderDash();
+    toast('🗑️ Excluído', '#ef4444');
+  }
+}
+
+function toast(msg, cor) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.borderTopColor = cor || 'var(--accent)';
+  t.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(function(){ t.classList.remove('show'); }, 3000);
+}
+</script>
+</body>
+</html>
