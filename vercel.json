@@ -11,6 +11,34 @@
   ],
   "rewrites": [
     {
+      "source": "/tv/logistica",
+      "destination": "/tv-logistica.html"
+    },
+    {
+      "source": "/api/tv-logistica",
+      "destination": "/api/tv-logistica.js"
+    },
+    {
+      "source": "/login",
+      "destination": "/login.html"
+    },
+    {
+      "source": "/api/auth",
+      "destination": "/api/auth.js"
+    },
+    {
+      "source": "/api/admin-auth",
+      "destination": "/api/admin-auth.js"
+    },
+    {
+      "source": "/auth-guard.js",
+      "destination": "/auth-guard.js"
+    },
+    {
+      "source": "/admin-users",
+      "destination": "/admin-users.html"
+    },
+    {
       "source": "/tv",
       "destination": "/tv-adm.html"
     },
@@ -37,6 +65,14 @@
     {
       "source": "/tv/coleta",
       "destination": "/tv-coleta.html"
+    },
+    {
+      "source": "/tv/logistica",
+      "destination": "/tv-logistica.html"
+    },
+    {
+      "source": "/api/tv-logistica",
+      "destination": "/api/tv-logistica.js"
     },
     {
       "source": "/tv/motorista",
