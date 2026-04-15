@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TV — Logística</title>
+<title>TV — Logística v4</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -278,6 +278,7 @@ function selMot(m){
 async function load(){
   try{ var d=await fetch('/api/tv-logistica?action=load').then(r=>r.json()); recs=d.registros||[]; }
   catch(e){ recs=[]; }
+  renderT();
 }
 
 async function registrar(){
@@ -290,13 +291,26 @@ async function registrar(){
   var btn=document.getElementById('btn-reg');
   btn.disabled=true; btn.textContent='⏳ Salvando...';
   try{
-    var d=await fetch('/api/tv-logistica?action=registrar',{
+    var resp=await fetch('/api/tv-logistica?action=registrar',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({motorista:motSel,km:parseFloat(km),equipamentos:parseInt(eq),data:dt,observacao:ob})
-    }).then(r=>r.json());
-    if(d.ok){ recs.unshift(d.registro); document.getElementById('f-km').value=''; document.getElementById('f-eq').value=''; document.getElementById('f-obs').value=''; toast('✅ Registro salvo!','var(--green)'); }
-    else toast('❌ '+(d.error||'Erro'),'var(--red)');
-  }catch(e){ toast('❌ Erro de conexão','var(--red)'); }
+    });
+    var d=await resp.json();
+    if(d && d.ok){
+      if(!Array.isArray(recs)) recs=[];
+      recs.unshift(d.registro);
+      document.getElementById('f-km').value='';
+      document.getElementById('f-eq').value='';
+      document.getElementById('f-obs').value='';
+      motSel='';
+      document.getElementById('btn-wilde').className='moto-btn wilde';
+      document.getElementById('btn-paulo').className='moto-btn paulo';
+      renderT();
+      toast('✅ Registro salvo!','var(--green)');
+    } else {
+      toast('❌ '+(d&&d.error||'Erro ao salvar'),'var(--red)');
+    }
+  }catch(e){ toast('❌ Erro: '+e.message,'var(--red)'); }
   btn.disabled=false; btn.textContent='✅ Registrar';
 }
 
