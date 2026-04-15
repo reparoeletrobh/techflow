@@ -67,14 +67,6 @@
       "destination": "/tv-coleta.html"
     },
     {
-      "source": "/tv/logistica",
-      "destination": "/tv-logistica.html"
-    },
-    {
-      "source": "/api/tv-logistica",
-      "destination": "/api/tv-logistica.js"
-    },
-    {
       "source": "/tv/motorista",
       "destination": "/tv-motorista.html"
     },
