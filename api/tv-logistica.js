@@ -1,5 +1,4 @@
-// api/tv-logistica.js — Controle de logística TV Assistência
-// Registros de rotas: motorista, km, equipamentos, data
+// api/tv-logistica.js — Logística TV Assistência
 
 const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g,"").trim();
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g,"").trim();
@@ -17,21 +16,18 @@ async function dbGet(key) {
 
 async function dbSet(key, val) {
   try {
+    const body = JSON.stringify(val);
     await fetch(`${UPSTASH_URL}/set/${encodeURIComponent(key)}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, "Content-Type": "application/json" },
-      body: JSON.stringify(JSON.stringify(val))
+      body: JSON.stringify(body)
     });
     return true;
   } catch(e) { return false; }
 }
 
 function uid() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-}
-
-function defaultDB() {
-  return { registros: [] };
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
 module.exports = async function handler(req, res) {
@@ -42,60 +38,48 @@ module.exports = async function handler(req, res) {
 
   const action = req.query.action || "";
 
-  // ── GET load ────────────────────────────────────────────────
+  // ── GET load ──────────────────────────────────────────────────
   if (action === "load") {
-    const db = await dbGet(LOG_KEY) || defaultDB();
+    const db = await dbGet(LOG_KEY) || { registros: [] };
     return res.status(200).json({ ok: true, registros: db.registros || [] });
   }
 
-  // ── POST registrar ──────────────────────────────────────────
-  if (req.method === "POST" && action === "registrar") {
-    const { motorista, km, equipamentos, data, observacao } = req.body || {};
-    if (!motorista || !km || !equipamentos || !data)
-      return res.status(400).json({ ok: false, error: "motorista, km, equipamentos e data são obrigatórios" });
+  // ── POST salvar ───────────────────────────────────────────────
+  if (req.method === "POST" && action === "salvar") {
+    const { motorista, data, km, equipamentos, observacao } = req.body || {};
 
-    const db = await dbGet(LOG_KEY) || defaultDB();
+    if (!motorista || !["Wilde", "Paulo"].includes(motorista))
+      return res.status(400).json({ ok: false, error: "Selecione o motorista" });
+    if (!data)
+      return res.status(400).json({ ok: false, error: "Data obrigatória" });
+    if (!km || isNaN(parseFloat(km)) || parseFloat(km) <= 0)
+      return res.status(400).json({ ok: false, error: "Informe os KMs rodados" });
+    if (equipamentos === undefined || isNaN(parseInt(equipamentos)) || parseInt(equipamentos) < 0)
+      return res.status(400).json({ ok: false, error: "Informe os equipamentos" });
+
+    const db = await dbGet(LOG_KEY) || { registros: [] };
     const registro = {
-      id:          uid(),
-      motorista:   motorista.trim(),
-      km:          parseFloat(km),
-      equipamentos: parseInt(equipamentos),
+      id:           uid(),
+      motorista,
       data,
-      observacao:  (observacao || "").trim(),
-      criadoEm:   new Date().toISOString()
+      km:           parseFloat(parseFloat(km).toFixed(1)),
+      equipamentos: parseInt(equipamentos),
+      observacao:   (observacao || "").trim(),
+      criadoEm:     new Date().toISOString(),
     };
     db.registros.unshift(registro);
     await dbSet(LOG_KEY, db);
-    return res.status(200).json({ ok: true, registro });
+    return res.status(200).json({ ok: true, registro, registros: db.registros });
   }
 
-  // ── POST editar ─────────────────────────────────────────────
-  if (req.method === "POST" && action === "editar") {
-    const { id, motorista, km, equipamentos, data, observacao } = req.body || {};
-    if (!id) return res.status(400).json({ ok: false, error: "id obrigatório" });
-
-    const db = await dbGet(LOG_KEY) || defaultDB();
-    const reg = db.registros.find(r => r.id === id);
-    if (!reg) return res.status(404).json({ ok: false, error: "Registro não encontrado" });
-
-    if (motorista)    reg.motorista    = motorista.trim();
-    if (km)           reg.km           = parseFloat(km);
-    if (equipamentos) reg.equipamentos = parseInt(equipamentos);
-    if (data)         reg.data         = data;
-    if (observacao !== undefined) reg.observacao = observacao.trim();
-
-    await dbSet(LOG_KEY, db);
-    return res.status(200).json({ ok: true, registro: reg });
-  }
-
-  // ── POST excluir ─────────────────────────────────────────────
+  // ── POST excluir ──────────────────────────────────────────────
   if (req.method === "POST" && action === "excluir") {
     const { id } = req.body || {};
     if (!id) return res.status(400).json({ ok: false, error: "id obrigatório" });
-    const db = await dbGet(LOG_KEY) || defaultDB();
-    db.registros = db.registros.filter(r => r.id !== id);
+    const db = await dbGet(LOG_KEY) || { registros: [] };
+    db.registros = db.registros.filter(function(r) { return r.id !== id; });
     await dbSet(LOG_KEY, db);
-    return res.status(200).json({ ok: true });
+    return res.status(200).json({ ok: true, registros: db.registros });
   }
 
   return res.status(404).json({ ok: false, error: "Ação não encontrada" });
