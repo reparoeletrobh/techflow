@@ -285,38 +285,58 @@ module.exports = async function handler(req, res) {
         }
 
         if (multiEquip && multiEquip.length >= 2) {
-          // 1 ficha combinando todos os equipamentos no padrão correto
-          var qtd = multiEquip.length;
           var primeiroNome = card.nome ? card.nome.split(" ")[0] : "cliente";
+
+          // Separa condenadas das consertáveis
+          var consertaveis = multiEquip.filter(function(e) { return !isCondenado(e); });
+          var condenadas   = multiEquip.filter(function(e) { return  isCondenado(e); });
+
           var totalPreco = 0;
           var partesTexto = [];
 
-          for (var ei = 0; ei < multiEquip.length; ei++) {
-            var equip = multiEquip[ei];
+          // Gera orçamento apenas para as consertáveis
+          for (var ei = 0; ei < consertaveis.length; ei++) {
+            var equip = consertaveis[ei];
             var descEquip = equip.nomeEquip + ": " + equip.descProblema;
             var fichaTemp = gerarFicha(descEquip, [equip.descProblema], "-tmp");
-            // Extrai só o corpo diagnóstico (remove "Foram feitos...identificamos que" mas mantém o resto)
             var corpo = fichaTemp.textoOrc || "";
-            // Remove o cabecalho "Ola, ... orcamento:\n\n"
             var dblN = corpo.indexOf("\n\n");
             if (dblN > 0) corpo = corpo.slice(dblN + 2).trim();
-            // Remove "Aprovando ja iniciamos o conserto." do final — vai na linha final combinada
             corpo = corpo.replace(/\.? Aprovando ja iniciamos o conserto\.?$/, "").trim();
             var nomeCapital = equip.nomeEquip.charAt(0).toUpperCase() + equip.nomeEquip.slice(1);
             partesTexto.push("Em relacao ao " + nomeCapital + ":\n" + corpo);
             totalPreco += parseFloat(fichaTemp.precoSugerido || "0");
           }
 
-          // Calcula desconto: 2 equip=10%, 3=15%, 4+=20%
-          var descPct = qtd >= 4 ? 20 : qtd === 3 ? 15 : 10;
-          var precoComDesconto = Math.round(totalPreco * (1 - descPct / 100));
-          var linhaFinal = "Consertando os " + qtd + " juntos eu consigo um desconto para voce de " + totalPreco + " reais por " + precoComDesconto + " apenas. Aprovando ja iniciamos o conserto.";
-
           var cabecalho = primeiroNome + " bom dia, sou o Pedro da Reparo Eletro e vou passar seu orcamento:\n\n";
-          var textoFinal = cabecalho + partesTexto.join("\n\n") + "\n\n" + linhaFinal;
+          var textoFinal = "";
+
+          if (consertaveis.length >= 2) {
+            // 2+ consertáveis: desconto normal
+            var descPct = consertaveis.length >= 4 ? 20 : consertaveis.length === 3 ? 15 : 10;
+            var precoComDesconto = Math.round(totalPreco * (1 - descPct / 100));
+            var linhaFinal = "Consertando as " + consertaveis.length + " juntas eu consigo um desconto para voce de " + totalPreco + " reais por " + precoComDesconto + " apenas. Aprovando ja iniciamos o conserto.";
+            textoFinal = cabecalho + partesTexto.join("\n\n") + "\n\n" + linhaFinal;
+          } else if (consertaveis.length === 1) {
+            // 1 consertável: orçamento simples sem desconto
+            var precoComDesconto = totalPreco;
+            textoFinal = cabecalho + partesTexto[0] + ". Aprovando ja iniciamos o conserto.";
+          } else {
+            // Todas condenadas
+            var precoComDesconto = 0;
+            textoFinal = cabecalho.trimEnd();
+          }
+
+          // Adiciona nota para cada condenada
+          if (condenadas.length > 0) {
+            condenadas.forEach(function(e) {
+              var nomeL = nomeEquipLimpo(e.nomeEquip) || "TV";
+              textoFinal += "\n\nA " + nomeL + " infelizmente nao tem conserto.";
+            });
+          }
 
           var fichaCombinada = gerarFicha(card.desc, card.comentarios, "");
-          fichaCombinada.textoOrc = textoFinal;
+          fichaCombinada.textoOrc = textoFinal.trim();
           fichaCombinada.precoSugerido = String(precoComDesconto);
           fichaCombinada.multiEquip = true;
           db.fichas.unshift(fichaCombinada);
@@ -379,8 +399,10 @@ module.exports = async function handler(req, res) {
           const mEq     = splitEquipamentos(nField);
           if (mEq && mEq.length >= 2) {
             const pNome = primeiroNome(ficha.nome) || "cliente";
+            const consertaveisT = mEq.filter(e => !isCondenado(e));
+            const condenadasT   = mEq.filter(e =>  isCondenado(e));
             let totalP = 0; const partes = [];
-            for (const eq of mEq) {
+            for (const eq of consertaveisT) {
               const ft = await gerarTextoOrcamento(eq.nomeEquip+": "+eq.descProblema, [eq.descProblema], ficha.nome);
               let corpo = (ft && ft.texto) ? ft.texto : "";
               const dn = corpo.indexOf("\n\n"); if (dn > 0) corpo = corpo.slice(dn+2).trim();
@@ -388,9 +410,20 @@ module.exports = async function handler(req, res) {
               partes.push("Em relacao ao "+eq.nomeEquip.charAt(0).toUpperCase()+eq.nomeEquip.slice(1)+":\n"+corpo);
               totalP += parseFloat((ft && ft.preco) ? ft.preco : "0");
             }
-            const dp = mEq.length >= 4 ? 20 : mEq.length === 3 ? 15 : 10;
-            const pDesc = Math.round(totalP * (1-dp/100));
-            ficha.textoOrc = pNome+" bom dia, sou o Pedro da Reparo Eletro e vou passar seu orcamento:\n\n"+partes.join("\n\n")+"\n\nConsertando os "+mEq.length+" juntos eu consigo um desconto para voce de "+totalP+" reais por "+pDesc+" apenas. Aprovando ja iniciamos o conserto.";
+            let textoT = pNome+" bom dia, sou o Pedro da Reparo Eletro e vou passar seu orcamento:\n\n";
+            let pDesc = totalP;
+            if (consertaveisT.length >= 2) {
+              const dp = consertaveisT.length >= 4 ? 20 : consertaveisT.length === 3 ? 15 : 10;
+              pDesc = Math.round(totalP * (1-dp/100));
+              textoT += partes.join("\n\n") + "\n\nConsertando as " + consertaveisT.length + " juntas eu consigo um desconto para voce de " + totalP + " reais por " + pDesc + " apenas. Aprovando ja iniciamos o conserto.";
+            } else if (consertaveisT.length === 1) {
+              pDesc = totalP;
+              textoT += partes[0] + ". Aprovando ja iniciamos o conserto.";
+            } else { textoT = textoT.trimEnd(); }
+            if (condenadasT.length > 0) {
+              condenadasT.forEach(e => { textoT += "\n\nA " + nomeEquipLimpo(e.nomeEquip) + " infelizmente nao tem conserto."; });
+            }
+            ficha.textoOrc = textoT.trim();
             ficha.precoSugerido = String(pDesc); ficha.multiEquip = true;
           } else {
             const orcResult = await gerarTextoOrcamento(ficha.desc, ficha.comentarios, ficha.nome);
@@ -437,11 +470,13 @@ module.exports = async function handler(req, res) {
       const multiEquip    = splitEquipamentos(notasField);
 
       if (multiEquip && multiEquip.length >= 2) {
-        // Multi-equipamento: monta orçamento combinado
-        const primeiroN = primeiroNome(ficha.nome) || "cliente";
+        // Multi-equipamento: separa condenadas das consertáveis
+        const primeiroN    = primeiroNome(ficha.nome) || "cliente";
+        const consertaveisR = multiEquip.filter(e => !isCondenado(e));
+        const condenadasR   = multiEquip.filter(e =>  isCondenado(e));
         let totalPreco = 0;
         const partesTexto = [];
-        for (const equip of multiEquip) {
+        for (const equip of consertaveisR) {
           const descEquip = equip.nomeEquip + ": " + equip.descProblema;
           const ft = await gerarTextoOrcamento(descEquip, [equip.descProblema], ficha.nome);
           let corpo = (ft && ft.texto) ? ft.texto : "";
@@ -452,11 +487,20 @@ module.exports = async function handler(req, res) {
           partesTexto.push("Em relacao ao " + nomeCapital + ":\n" + corpo);
           totalPreco += parseFloat((ft && ft.preco) ? ft.preco : "0");
         }
-        const qtd = multiEquip.length;
-        const descPct = qtd >= 4 ? 20 : qtd === 3 ? 15 : 10;
-        const precoDesc = Math.round(totalPreco * (1 - descPct / 100));
-        const linhaFinal = "Consertando os " + qtd + " juntos eu consigo um desconto para voce de " + totalPreco + " reais por " + precoDesc + " apenas. Aprovando ja iniciamos o conserto.";
-        ficha.textoOrc       = primeiroN + " bom dia, sou o Pedro da Reparo Eletro e vou passar seu orcamento:\n\n" + partesTexto.join("\n\n") + "\n\n" + linhaFinal;
+        let textoR = primeiroN + " bom dia, sou o Pedro da Reparo Eletro e vou passar seu orcamento:\n\n";
+        let precoDesc = totalPreco;
+        if (consertaveisR.length >= 2) {
+          const descPct = consertaveisR.length >= 4 ? 20 : consertaveisR.length === 3 ? 15 : 10;
+          precoDesc = Math.round(totalPreco * (1 - descPct / 100));
+          textoR += partesTexto.join("\n\n") + "\n\nConsertando as " + consertaveisR.length + " juntas eu consigo um desconto para voce de " + totalPreco + " reais por " + precoDesc + " apenas. Aprovando ja iniciamos o conserto.";
+        } else if (consertaveisR.length === 1) {
+          precoDesc = totalPreco;
+          textoR += partesTexto[0] + ". Aprovando ja iniciamos o conserto.";
+        } else { textoR = textoR.trimEnd(); }
+        if (condenadasR.length > 0) {
+          condenadasR.forEach(e => { textoR += "\n\nA " + nomeEquipLimpo(e.nomeEquip) + " infelizmente nao tem conserto."; });
+        }
+        ficha.textoOrc       = textoR.trim();
         ficha.precoSugerido  = String(precoDesc);
         ficha.multiEquip     = true;
       } else {
@@ -1063,6 +1107,17 @@ var PRECOS_REGRAS = ["390","350","370","320","320","320","320","320","370","450"
 // ── DETECTA TIPO DE EQUIPAMENTO ──────────────────────────────────
 // ── DETECTA MÚLTIPLOS EQUIPAMENTOS NAS NOTAS ────────────────────
 // Formato: "equipamento: descricao do problema // equipamento2: descricao"
+// Detecta se um equipamento é condenado (sem conserto)
+function isCondenado(equip) {
+  var texto = ((equip.nomeEquip || "") + " " + (equip.descProblema || "")).toUpperCase();
+  return texto.includes("CONDENADA") || texto.includes("CONDENADO") || texto.includes("SEM CONSERTO") || texto.includes("IRREPARAVEL");
+}
+
+// Extrai o nome limpo do equipamento (remove CONDENADA e variantes)
+function nomeEquipLimpo(nomeEquip) {
+  return nomeEquip.replace(/[-\s]*(CONDENADA|CONDENADO|SEM CONSERTO|IRREPARAVEL)\s*/gi, "").trim();
+}
+
 function splitEquipamentos(notas) {
   if (!notas) return null;
 
