@@ -3,64 +3,37 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Compras</title>
+<title>TV — Compras de Peças</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{
-  --bg:#050508;--surface:#0d0d14;--surface2:#13131e;--border:#1e1e2e;
-  --text:#e8e8f0;--muted:#5a5a7a;
-  --accent:#3b9eff;--green:#22c55e;--red:#ef4444;--yellow:#f5c800;--orange:#f97316;--purple:#a855f7;
-  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
-}
+:root{--bg:#050508;--surface:#0d0d14;--surface2:#13131e;--border:#1e1e2e;--text:#e8e8f0;--muted:#5a5a7a;--accent:#3b9eff;--green:#22c55e;--red:#ef4444;--yellow:#f5c800;--orange:#f97316;--purple:#a855f7;--fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;}
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;}
-
-/* HEADER */
 header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
 .logo{font-family:var(--fh);font-size:14px;font-weight:900;display:flex;align-items:center;gap:8px;}
-.logo-dot{width:8px;height:8px;background:var(--orange);border-radius:50%;box-shadow:0 0 8px var(--orange);}
+.logo-dot{width:8px;height:8px;background:var(--accent);border-radius:50%;box-shadow:0 0 8px var(--accent);}
 .hbtn{font-family:var(--fm);font-size:10px;padding:5px 11px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;text-decoration:none;display:inline-flex;align-items:center;}
 .hbtn:hover{color:var(--text);border-color:var(--accent);}
-
-/* MÓDULOS TABS (nível 1) */
-.mod-tabs{display:flex;background:var(--surface);border-bottom:2px solid var(--border);padding:0 20px;position:sticky;top:52px;z-index:95;}
-.mod-tab{font-family:var(--fh);font-size:12px;font-weight:800;padding:12px 20px;cursor:pointer;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s;display:flex;align-items:center;gap:7px;}
-.mod-tab:hover{color:var(--text);}
-.mod-tab.active{color:var(--orange);border-bottom-color:var(--orange);}
-.mod-tab .mb{font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:99px;background:var(--surface2);border:1px solid var(--border);}
-.mod-tab.active .mb{background:rgba(249,115,22,.15);color:var(--orange);border-color:rgba(249,115,22,.3);}
-
-/* MÓDULOS PÁGINAS */
-.mod-page{display:none;flex:1;}
-.mod-page.active{display:flex;flex-direction:column;}
-
-/* SUB-TABS (nível 2 — dentro de cada módulo) */
-.tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);padding:0 20px;position:sticky;top:103px;z-index:90;overflow-x:auto;}
+.tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);padding:0 20px;position:sticky;top:52px;z-index:90;overflow-x:auto;}
 .tab{font-family:var(--fm);font-size:10px;padding:10px 16px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;display:flex;align-items:center;gap:6px;white-space:nowrap;}
 .tab:hover{color:var(--text);}
 .tab.active{color:var(--accent);border-bottom-color:var(--accent);}
 .tab-badge{font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:99px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);}
 .tab.active .tab-badge{background:rgba(59,158,255,.15);color:var(--accent);border-color:rgba(59,158,255,.3);}
-
-/* PÁGINAS */
 .page{display:none;flex:1;}
 .page.active{display:flex;}
-
-/* ──────────────── MÓDULO PEÇAS AVULSAS ──────────────── */
-.left-col{width:340px;min-width:340px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 148px);position:sticky;top:148px;}
-.right-col{flex:1;overflow-y:auto;padding:20px;height:calc(100vh - 148px);}
+.left-col{width:340px;min-width:340px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 97px);position:sticky;top:97px;}
+.right-col{flex:1;overflow-y:auto;padding:20px;height:calc(100vh - 97px);}
 .form-header{padding:16px 20px 10px;border-bottom:1px solid var(--border);}
 .form-title{font-family:var(--fh);font-size:13px;font-weight:800;}
 .form-body{padding:14px 20px;display:flex;flex-direction:column;gap:10px;}
 .fl{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;}
 .fi{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px 11px;font-family:var(--fb);font-size:13px;color:var(--text);outline:none;width:100%;transition:border .15s;}
 .fi:focus{border-color:var(--accent);}
-textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
 .fi-row{display:flex;gap:8px;}
 .fi-row .fi{flex:1;width:auto;}
 .btn-add{font-family:var(--fm);font-size:10px;font-weight:700;padding:9px 16px;border-radius:8px;border:none;cursor:pointer;background:linear-gradient(135deg,var(--accent),#1a7ad4);color:#fff;width:100%;display:flex;align-items:center;justify-content:center;gap:6px;}
 .btn-add:hover{filter:brightness(1.1);}
-.btn-add.orange{background:linear-gradient(135deg,var(--orange),#c45a0a);}
 .btn-sm{font-size:9px;padding:5px 10px;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:6px;cursor:pointer;font-family:var(--fm);}
 .btn-sm:hover{color:var(--text);border-color:var(--accent);}
 .urgente-toggle{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--muted);}
@@ -69,8 +42,6 @@ textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
 .list-title{font-family:var(--fh);font-size:13px;font-weight:800;color:#fff;}
 .list-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
 .empty{font-family:var(--fm);font-size:11px;color:var(--muted);padding:30px;text-align:center;border:1px dashed var(--border);border-radius:8px;}
-
-/* CARDS PEÇAS */
 .pc{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px;}
 .pc:hover{border-color:rgba(59,158,255,.2);}
 .pc.selected{border-color:var(--accent);background:rgba(59,158,255,.05);}
@@ -88,91 +59,20 @@ textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
 .pc-actions{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap;}
 .pb{font-family:var(--fm);font-size:9px;color:var(--accent);padding:2px 7px;background:rgba(59,158,255,.1);border:1px solid rgba(59,158,255,.2);border-radius:4px;}
 .pb.vencida{color:var(--red);background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.2);}
-
-/* GRUPOS */
-.grupo{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--orange);border-radius:12px;margin-bottom:16px;overflow:hidden;}
-.grupo-head{display:flex;align-items:flex-start;justify-content:space-between;padding:14px 16px;background:rgba(249,115,22,.05);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px;}
-.grupo-head-info{flex:1;}
-.grupo-forn{font-family:var(--fh);font-size:14px;font-weight:800;color:#fff;margin-bottom:4px;}
-.grupo-meta-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:4px;}
+.grupo{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden;}
+.grupo-head{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:linear-gradient(90deg,rgba(249,115,22,.1),rgba(249,115,22,.03));border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px;}
 .grupo-lbl{font-family:var(--fm);font-size:10px;font-weight:700;color:var(--orange);display:flex;align-items:center;gap:6px;}
-.grupo-valor{font-family:var(--fh);font-size:16px;font-weight:900;color:var(--green);}
-.grupo-tipo{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;background:rgba(59,158,255,.15);color:var(--accent);border:1px solid rgba(59,158,255,.3);}
-.grupo-tipo.online{background:rgba(168,85,247,.15);color:#a855f7;border-color:rgba(168,85,247,.3);}
 .grupo-qtd{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;background:rgba(249,115,22,.15);color:var(--orange);border:1px solid rgba(249,115,22,.3);}
-.grupo-acts{display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start;}
+.grupo-acts{display:flex;gap:6px;flex-wrap:wrap;}
 .grupo-body{padding:8px;}
 .grupo-body .pc{border-left:3px solid var(--orange);margin-bottom:6px;}
 .grupo-body .pc:last-child{margin-bottom:0;}
-
-/* A CAMINHO */
 .cc{background:var(--surface);border:1px solid rgba(59,158,255,.25);border-left:3px solid var(--accent);border-radius:10px;padding:14px 16px;margin-bottom:10px;}
 .cc-eta{font-family:var(--fh);font-size:22px;font-weight:900;margin:6px 0;}
-
-/* ONLINE GRID */
 .og{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}
 .oc{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;}
 .oc.chegou{border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.05);}
 .oc.atrasada{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.04);}
-
-/* ──────────────── MÓDULO OS/PIPEFY ──────────────── */
-.card-list{padding:20px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;height:calc(100vh - 148px);}
-.c-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;position:relative;overflow:hidden;}
-.c-card::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;}
-.c-card.comprar::before{background:var(--orange);}
-.c-card.aguardando::before{background:var(--accent);}
-.c-card.disponivel::before{background:var(--green);}
-.c-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px;}
-.c-code{font-family:var(--fm);font-size:12px;color:var(--orange);font-weight:500;}
-.c-name{font-size:14px;font-weight:600;margin-top:1px;}
-.c-desc-pf{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px;}
-.c-alerta{font-family:var(--fm);font-size:11px;padding:5px 10px;border-radius:6px;margin-bottom:10px;display:inline-block;}
-.c-alerta.local{background:rgba(34,197,94,.1);color:var(--green);}
-.c-alerta.online{background:rgba(59,158,255,.1);color:var(--accent);}
-.c-alerta.disponivel{background:rgba(34,197,94,.15);color:var(--green);}
-.c-fotos{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
-.c-foto{width:72px;height:72px;border-radius:8px;object-fit:cover;border:1px solid var(--border);cursor:zoom-in;transition:opacity .15s;}
-.c-foto:hover{opacity:.8;}
-.c-desc-compra{font-family:var(--fm);font-size:11px;color:var(--muted);padding:8px 10px;background:var(--surface2);border-radius:6px;border-left:2px solid var(--border);margin-bottom:10px;}
-.c-actions{display:flex;gap:8px;flex-wrap:wrap;}
-.cbtn{font-family:var(--fm);font-size:11px;font-weight:600;padding:8px 14px;border-radius:8px;border:none;cursor:pointer;transition:all .15s;white-space:nowrap;}
-.cbtn-atualizar{background:var(--surface2);border:1px solid var(--border);color:var(--text);}
-.cbtn-atualizar:hover{border-color:var(--accent);color:var(--accent);}
-.cbtn-disponivel{background:var(--green);color:#000;}
-.cbtn-disponivel:hover{filter:brightness(1.1);}
-.cbtn-dados{background:var(--surface2);border:1px solid var(--border);color:var(--muted);}
-.cbtn-dados:hover{border-color:var(--yellow);color:var(--yellow);}
-
-/* ──────────────── RASTREABILIDADE ──────────────── */
-.rastr-section{border-top:2px solid var(--border);padding:16px 20px 20px;}
-.rastr-title{font-family:var(--fh);font-size:12px;font-weight:800;color:var(--purple);display:flex;align-items:center;gap:7px;margin-bottom:12px;}
-.rastr-form{display:flex;flex-direction:column;gap:8px;}
-.rastr-ref-row{display:flex;gap:8px;}
-.rastr-ref-row .fi{flex:1;}
-.rastr-badge{font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:99px;border:1px solid;}
-.rastr-badge.os{color:var(--accent);border-color:rgba(59,158,255,.3);background:rgba(59,158,255,.08);}
-.rastr-badge.peca{color:var(--orange);border-color:rgba(249,115,22,.3);background:rgba(249,115,22,.08);}
-.rastr-badge.compra{color:var(--green);border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.08);}
-.rastr-badge.geral{color:var(--muted);border-color:var(--border);background:var(--surface2);}
-
-/* TIMELINE */
-.timeline{display:flex;flex-direction:column;gap:0;}
-.tl-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);position:relative;}
-.tl-item:last-child{border-bottom:none;}
-.tl-dot{width:28px;height:28px;border-radius:50%;background:var(--surface2);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px;}
-.tl-dot.os{border-color:rgba(59,158,255,.5);background:rgba(59,158,255,.1);}
-.tl-dot.peca{border-color:rgba(249,115,22,.5);background:rgba(249,115,22,.1);}
-.tl-dot.compra{border-color:rgba(34,197,94,.5);background:rgba(34,197,94,.1);}
-.tl-body{flex:1;}
-.tl-header{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:3px;}
-.tl-ref{font-family:var(--fm);font-size:10px;font-weight:700;color:#fff;}
-.tl-note{font-size:12px;color:var(--text);line-height:1.5;}
-.tl-meta{font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:4px;}
-.tl-del{font-family:var(--fm);font-size:9px;color:var(--muted);background:transparent;border:none;cursor:pointer;padding:2px 6px;border-radius:4px;}
-.tl-del:hover{color:var(--red);}
-.rastr-empty{font-family:var(--fm);font-size:10px;color:var(--muted);text-align:center;padding:20px;border:1px dashed var(--border);border-radius:8px;}
-
-/* MODAIS */
 .ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(3px);}
 .ov.open{display:flex;}
 .mod{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:440px;max-width:95vw;display:flex;flex-direction:column;gap:14px;max-height:90vh;overflow-y:auto;}
@@ -181,196 +81,98 @@ textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
 .tt{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
 .tb{flex:1;padding:8px;font-family:var(--fm);font-size:10px;text-align:center;cursor:pointer;background:transparent;border:none;color:var(--muted);transition:all .15s;}
 .tb.active{background:var(--accent);color:#fff;}
-.opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.opt-btn{padding:14px;border-radius:10px;border:2px solid var(--border);background:var(--surface2);color:var(--muted);font-family:var(--fb);font-size:13px;cursor:pointer;transition:all .15s;text-align:center;}
-.opt-btn:hover{border-color:#444;color:var(--text);}
-.opt-btn.selected.local{border-color:var(--green);background:rgba(34,197,94,.08);color:var(--green);}
-.opt-btn.selected.online{border-color:var(--accent);background:rgba(59,158,255,.08);color:var(--accent);}
-.opt-icon{font-size:22px;display:block;margin-bottom:4px;}
-.modal-info{font-family:var(--fm);font-size:11px;color:var(--muted);margin-bottom:4px;padding:8px 10px;background:var(--surface2);border-radius:7px;border-left:3px solid var(--accent);}
-.modal-info strong{color:var(--text);}
 .pr{display:flex;align-items:flex-start;gap:12px;padding:9px 0;border-bottom:1px solid var(--border);}
 .pr:last-child{border-bottom:none;}
 .pl{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;min-width:90px;padding-top:2px;}
 .pv{font-size:13px;color:#fff;font-weight:500;word-break:break-word;flex:1;}
-
-/* LIGHTBOX */
-.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;z-index:9998;opacity:0;pointer-events:none;transition:opacity .2s;backdrop-filter:blur(6px);}
-.lightbox.open{opacity:1;pointer-events:all;}
-.lightbox img{max-width:90vw;max-height:88vh;border-radius:10px;object-fit:contain;}
-.lb-close{position:fixed;top:16px;right:20px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
-.lb-close:hover{background:rgba(255,255,255,.25);}
-
-/* TOAST */
 .toast{position:fixed;bottom:20px;right:20px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:10px 14px;font-family:var(--fm);font-size:11px;transform:translateY(60px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;color:var(--text);}
 .toast.show{transform:translateY(0);opacity:1;}
 </style>
 </head>
 <body>
-
 <header>
-  <div class="logo"><div class="logo-dot"></div>Reparo<b>Eletro</b> &mdash; <span style="color:var(--orange)">Compras</span></div>
+  <div class="logo"><div class="logo-dot"></div>TV <b>Assistência</b> &mdash; <span style="color:var(--orange)">Compra de Pecas</span></div>
   <div style="display:flex;gap:8px;">
     <button class="hbtn" onclick="copiarSel()" id="btn-copiar" style="display:none;border-color:rgba(59,158,255,.3);color:var(--accent);">Copiar</button>
     <button class="hbtn" onclick="abrirCompra()" id="btn-comprar" style="display:none;border-color:rgba(34,197,94,.3);color:var(--green);">Comprar</button>
-    <a class="hbtn" href="/adm">Home</a>
+    <a class="hbtn" href="/tv">Home</a>
   </div>
 </header>
-
-<!-- MÓDULOS: Peças OS | Compra de Peças -->
-<div class="mod-tabs">
-  <div class="mod-tab active" onclick="modTab('os')" id="modtab-os">
-    🔧 Compras OS <span class="mb" id="mb-os">0</span>
+<div class="tabs">
+  <div class="tab active" onclick="tab('pendentes')" id="tab-pendentes">Pendentes <span class="tab-badge" id="bp">0</span></div>
+  <div class="tab" onclick="tab('aguardando')" id="tab-aguardando">Ag. Pagamento <span class="tab-badge" id="ba">0</span></div>
+  <div class="tab" onclick="tab('pago')" id="tab-pago">Pago <span class="tab-badge" id="bg">0</span></div>
+  <div class="tab" onclick="tab('caminho')" id="tab-caminho">A Caminho <span class="tab-badge" id="bc">0</span></div>
+  <div class="tab" onclick="tab('online')" id="tab-online">Online <span class="tab-badge" id="bo">0</span></div>
+</div>
+<div class="page active" id="page-pendentes">
+  <div class="left-col">
+    <div class="form-header"><div class="form-title">Cadastrar Peca</div></div>
+    <div class="form-body">
+      <div><div class="fl">Descricao *</div><input class="fi" id="f-desc" placeholder="Ex: Placa de potencia..."/></div>
+      <div><div class="fl">OS / Referencia</div><input class="fi" id="f-os" placeholder="OS ou cliente"/></div>
+      <div class="fi-row">
+        <div style="flex:1;"><div class="fl">Qtd</div><input class="fi" id="f-qtd" type="number" min="1" value="1"/></div>
+        <div style="flex:2;"><div class="fl">Obs</div><input class="fi" id="f-obs" placeholder="Opcional"/></div>
+      </div>
+      <label class="urgente-toggle"><input type="checkbox" id="f-urg"/> Urgente</label>
+      <button class="btn-add" onclick="cadastrar()">+ Cadastrar</button>
+    </div>
   </div>
-  <div class="mod-tab" onclick="modTab('pecas')" id="modtab-pecas">
-    📦 Peças Avulsas <span class="mb" id="mb-pecas">0</span>
+  <div class="right-col">
+    <div class="list-header">
+      <div class="list-title">Pecas para comprar</div>
+      <div class="list-actions">
+        <button class="btn-sm" onclick="selTodas()">Sel. todas</button>
+        <button class="btn-sm" onclick="deselTodas()">Limpar</button>
+      </div>
+    </div>
+    <div id="lista-p"></div>
   </div>
 </div>
-
-<!-- ═══════════════════════ MÓDULO OS/PIPEFY ═══════════════════════ -->
-<div class="mod-page active" id="modpage-os">
-  <div class="tabs" id="os-tabs">
-    <div class="tab active" onclick="osTab('comprar')" id="ostab-comprar">🛒 Comprar Peça <span class="tab-badge" id="obadge-comprar">0</span></div>
-    <div class="tab" onclick="osTab('aguardando')" id="ostab-aguardando">📦 Aguardando Peça <span class="tab-badge" id="obadge-aguardando">0</span></div>
-    <div class="tab" onclick="osTab('disponivel')" id="ostab-disponivel">✅ Peça Disponível <span class="tab-badge" id="obadge-disponivel">0</span></div>
-  </div>
-
-  <div class="page active" id="ospage-comprar">
-    <div class="card-list" id="oslist-comprar"><div class="empty">Carregando...</div></div>
-  </div>
-  <div class="page" id="ospage-aguardando">
-    <div class="card-list" id="oslist-aguardando"><div class="empty">Carregando...</div></div>
-  </div>
-  <div class="page" id="ospage-disponivel">
-    <div class="card-list" id="oslist-disponivel"><div class="empty">Carregando...</div></div>
+<div class="page" id="page-aguardando">
+  <div class="right-col" style="max-width:860px;">
+    <div class="list-header"><div class="list-title">Aguardando Pagamento</div></div>
+    <div id="lista-a"></div>
   </div>
 </div>
-
-<!-- ═══════════════════════ MÓDULO PEÇAS AVULSAS ═══════════════════════ -->
-<div class="mod-page" id="modpage-pecas">
-  <div class="tabs" id="pecas-tabs">
-    <div class="tab active" onclick="pecTab('pendentes')" id="pectab-pendentes">Pendentes <span class="tab-badge" id="pbp">0</span></div>
-    <div class="tab" onclick="pecTab('aguardando')" id="pectab-aguardando">Ag. Pagamento <span class="tab-badge" id="pba">0</span></div>
-    <div class="tab" onclick="pecTab('pago')" id="pectab-pago">Pago <span class="tab-badge" id="pbg">0</span></div>
-    <div class="tab" onclick="pecTab('caminho')" id="pectab-caminho">A Caminho <span class="tab-badge" id="pbc">0</span></div>
-    <div class="tab" onclick="pecTab('online')" id="pectab-online">Online <span class="tab-badge" id="pbo">0</span></div>
-  </div>
-
-  <!-- ABA PENDENTES — com form cadastro + rastreabilidade na col esquerda -->
-  <div class="page active" id="pecpage-pendentes">
-    <div class="left-col">
-      <!-- FORM CADASTRO PEÇA -->
-      <div class="form-header"><div class="form-title">Cadastrar Peça</div></div>
-      <div class="form-body">
-        <div><div class="fl">Descrição *</div><input class="fi" id="f-desc" placeholder="Ex: Placa de potência..."/></div>
-        <div><div class="fl">OS / Referência</div><input class="fi" id="f-os" placeholder="OS ou cliente"/></div>
-        <div class="fi-row">
-          <div style="flex:1;"><div class="fl">Qtd</div><input class="fi" id="f-qtd" type="number" min="1" value="1"/></div>
-          <div style="flex:2;"><div class="fl">Obs</div><input class="fi" id="f-obs" placeholder="Opcional"/></div>
-        </div>
-        <label class="urgente-toggle"><input type="checkbox" id="f-urg"/> Urgente</label>
-        <button class="btn-add" onclick="cadastrar()">+ Cadastrar Peça</button>
-      </div>
-
-      <!-- FORM RASTREABILIDADE -->
-      <div class="rastr-section">
-        <div class="rastr-title">
-          <span>🔍</span> Rastreabilidade
-        </div>
-        <div class="rastr-form">
-          <div class="rastr-ref-row">
-            <div style="flex:1;">
-              <div class="fl">OS / Peça / Ref</div>
-              <input class="fi" id="r-ref" placeholder="Ex: OS 1042, Placa..."/>
-            </div>
-            <div style="width:90px;">
-              <div class="fl">Tipo</div>
-              <select class="fi" id="r-tipo" style="cursor:pointer;">
-                <option value="os">OS</option>
-                <option value="peca">Peça</option>
-                <option value="compra">Compra</option>
-                <option value="geral">Geral</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <div class="fl">Fase / Anotação *</div>
-            <textarea class="fi" id="r-nota" placeholder="Ex: Aguardando aprovação do cliente. Peça encomendada no fornecedor X..."></textarea>
-          </div>
-          <button class="btn-add orange" onclick="rastrAdd()">+ Registrar</button>
-        </div>
-
-        <!-- TIMELINE -->
-        <div style="margin-top:14px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-            <div style="font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;">Histórico</div>
-            <input class="fi" id="r-busca" style="width:130px;font-size:10px;padding:4px 8px;" placeholder="Filtrar..."/>
-          </div>
-          <div id="rastr-timeline"><div class="rastr-empty">Nenhum registro ainda.</div></div>
-        </div>
+<div class="page" id="page-pago">
+  <div class="right-col" style="max-width:860px;">
+    <div class="list-header">
+      <div class="list-title">Pagamento Realizado</div>
+      <div class="list-actions">
+        <button class="btn-sm" onclick="selTodasPago()">Sel. todas</button>
+        <button class="btn-sm" style="color:var(--accent);border-color:rgba(59,158,255,.3);" onclick="abrirCaminho([])">Marcar a caminho</button>
       </div>
     </div>
-
-    <div class="right-col">
-      <div class="list-header">
-        <div class="list-title">Peças para comprar</div>
-        <div class="list-actions">
-          <button class="btn-sm" onclick="selTodas()">Sel. todas</button>
-          <button class="btn-sm" onclick="deselTodas()">Limpar</button>
-        </div>
-      </div>
-      <div id="lista-p"></div>
-    </div>
-  </div>
-
-  <!-- DEMAIS ABAS PEÇAS -->
-  <div class="page" id="pecpage-aguardando">
-    <div class="right-col" style="max-width:860px;">
-      <div class="list-header"><div class="list-title">Aguardando Pagamento</div></div>
-      <div id="lista-a"></div>
-    </div>
-  </div>
-  <div class="page" id="pecpage-pago">
-    <div class="right-col" style="max-width:860px;">
-      <div class="list-header">
-        <div class="list-title">Pagamento Realizado</div>
-        <div class="list-actions">
-          <button class="btn-sm" onclick="selTodasPago()">Sel. todas</button>
-          <button class="btn-sm" style="color:var(--accent);border-color:rgba(59,158,255,.3);" onclick="abrirCaminho([])">Marcar a caminho</button>
-        </div>
-      </div>
-      <div id="lista-g"></div>
-    </div>
-  </div>
-  <div class="page" id="pecpage-caminho">
-    <div class="right-col" style="max-width:860px;">
-      <div class="list-header"><div class="list-title">Peças a Caminho</div></div>
-      <div id="lista-c"></div>
-    </div>
-  </div>
-  <div class="page" id="pecpage-online">
-    <div class="right-col">
-      <div class="list-header"><div class="list-title">Online — Previsão</div></div>
-      <div class="og" id="lista-o"></div>
-    </div>
+    <div id="lista-g"></div>
   </div>
 </div>
-
-<!-- ════ MODAL COMPRA PEÇA AVULSA ════ -->
+<div class="page" id="page-caminho">
+  <div class="right-col" style="max-width:860px;">
+    <div class="list-header"><div class="list-title">Pecas a Caminho</div></div>
+    <div id="lista-c"></div>
+  </div>
+</div>
+<div class="page" id="page-online">
+  <div class="right-col">
+    <div class="list-header"><div class="list-title">Online - Previsao</div></div>
+    <div class="og" id="lista-o"></div>
+  </div>
+</div>
+<!-- MODAL COMPRA -->
 <div class="ov" id="mod-compra">
   <div class="mod">
     <div class="mod-title">Finalizar Compra</div>
     <div id="mod-resumo" style="font-family:var(--fm);font-size:10px;color:var(--muted);max-height:100px;overflow-y:auto;"></div>
     <div><div class="fl">Tipo</div>
       <div class="tt">
-        <button class="tb active" id="tb-loja" onclick="setTipo('loja')">Loja Física</button>
+        <button class="tb active" id="tb-loja" onclick="setTipo('loja')">Loja Fisica</button>
         <button class="tb" id="tb-online" onclick="setTipo('online')">Online</button>
       </div>
     </div>
     <div><div class="fl">Fornecedor</div><input class="fi" id="m-forn" placeholder="Nome da loja ou site"/></div>
-    <div><div class="fl">Valor Total (R$)</div><input class="fi" id="m-valor" type="number" step="0.01" min="0" placeholder="0,00"/></div>
-    <div><div class="fl">Descrição do Pedido</div><input class="fi" id="m-desc-grupo" placeholder="Ex: Placa T-Con Samsung, capacitores..."/></div>
-    <div><div class="fl">Dados Pagamento</div><input class="fi" id="m-pag" placeholder="PIX, boleto, cartão..."/></div>
+    <div><div class="fl">Dados Pagamento</div><input class="fi" id="m-pag" placeholder="PIX, boleto, cartao..."/></div>
     <div id="prev-wrap" style="display:none;"></div>
     <div class="mod-foot">
       <button class="btn-sm" onclick="fechaCompra()">Cancelar</button>
@@ -378,20 +180,15 @@ textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
     </div>
   </div>
 </div>
-
-<!-- ════ MODAL DADOS DA COMPRA ════ -->
+<!-- MODAL PAGAMENTO -->
 <div class="ov" id="mod-pgto">
-  <div class="mod" style="width:440px;">
-    <div class="mod-title">📦 Dados da Compra</div>
+  <div class="mod" style="width:400px;">
+    <div class="mod-title">Dados de Pagamento</div>
     <div id="pgto-body"></div>
-    <div class="mod-foot" style="gap:8px;">
-      <button class="btn-sm" onclick="fecharModPgto()">Fechar</button>
-      <button class="btn-sm" id="btn-pagar-modal" style="background:var(--green);color:#000;border-color:var(--green);font-weight:700;display:none;" onclick="pagarDoModal()">✅ Confirmar Pagamento</button>
-    </div>
+    <div class="mod-foot"><button class="btn-sm" onclick="document.getElementById('mod-pgto').classList.remove('open')">Fechar</button></div>
   </div>
 </div>
-
-<!-- ════ MODAL CAMINHO ════ -->
+<!-- MODAL CAMINHO -->
 <div class="ov" id="mod-caminho">
   <div class="mod" style="width:420px;">
     <div class="mod-title">Marcar como A Caminho</div>
@@ -403,362 +200,14 @@ textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
     </div>
   </div>
 </div>
-
-<!-- ════ MODAL ATUALIZAR COMPRA OS ════ -->
-<div class="ov" id="modal-atualizar">
-  <div class="mod">
-    <div class="mod-title">🛒 Atualizar Compra</div>
-    <div class="modal-info" id="modal-info"></div>
-    <div class="opt-grid">
-      <button class="opt-btn local" id="opt-local" onclick="setTipoCompra('local')">
-        <span class="opt-icon">🏪</span>Compra Local
-      </button>
-      <button class="opt-btn online" id="opt-online" onclick="setTipoCompra('online')">
-        <span class="opt-icon">📦</span>Compra Online
-      </button>
-    </div>
-    <div id="previsao-group" style="display:none;">
-      <div class="fl">Previsão de chegada</div>
-      <input class="fi" id="previsao-input" type="date"/>
-    </div>
-    <div class="mod-foot">
-      <button class="btn-sm" onclick="closeModalOS()">Cancelar</button>
-      <button class="btn-sm" style="background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700;" onclick="confirmarCompraOS()">Confirmar →</button>
-    </div>
-  </div>
-</div>
-
-<!-- ════ MODAL DADOS DE COMPRA OS ════ -->
-<div class="ov" id="modal-dados">
-  <div class="mod">
-    <div class="mod-title">📝 Dados de Compra</div>
-    <div class="modal-info" id="dados-modal-info"></div>
-    <div>
-      <div class="fl">Descrição da peça</div>
-      <textarea class="fi" id="dados-desc" style="min-height:70px;line-height:1.5;" placeholder="Peça necessária, especificações, modelo..."></textarea>
-    </div>
-    <div>
-      <div class="fl">Adicionar fotos</div>
-      <button class="cbtn cbtn-atualizar" style="width:100%;" onclick="document.getElementById('dados-file').click()">📷 Selecionar fotos</button>
-      <input type="file" id="dados-file" accept="image/*" multiple style="display:none" onchange="dadosLoadFotos(event)"/>
-      <div id="dados-thumbs" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"></div>
-    </div>
-    <div class="mod-foot">
-      <button class="btn-sm" onclick="closeDadosModal()">Cancelar</button>
-      <button class="btn-sm" style="background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700;" onclick="confirmarDados()">💾 Salvar</button>
-    </div>
-  </div>
-</div>
-
-<!-- LIGHTBOX -->
-<div class="lightbox" id="lightbox" onclick="closeLightbox()">
-  <button class="lb-close" onclick="event.stopPropagation();closeLightbox()">✕</button>
-  <img id="lb-img" src="" alt=""/>
-</div>
-
 <div class="toast" id="toast"></div>
-
 <script>
-// ══════════════════════════════════════════════
-//  MÓDULOS
-// ══════════════════════════════════════════════
-var modAtual = 'os';
-
-function modTab(m) {
-  modAtual = m;
-  ['os','pecas'].forEach(function(x) {
-    document.getElementById('modtab-' + x).classList.toggle('active', x === m);
-    document.getElementById('modpage-' + x).classList.toggle('active', x === m);
-  });
-  // header buttons só visíveis no módulo peças
-  updBtns();
-}
-
-// ══════════════════════════════════════════════
-//  RASTREABILIDADE
-// ══════════════════════════════════════════════
-var RASTR_KEY = 'reparoeletro_rastreabilidade';
-var rastrItens = [];
-
-async function rastrLoad() {
-  try {
-    var r = await fetch('/api/rastreabilidade?action=load');
-    var d = await r.json();
-    rastrItens = d.itens || [];
-  } catch(e) { rastrItens = []; }
-  rastrRender();
-}
-
-function rastrRender(filtro) {
-  var el = document.getElementById('rastr-timeline');
-  var lista = rastrItens.slice();
-  if (filtro) {
-    var f = filtro.toLowerCase();
-    lista = lista.filter(function(i) {
-      return (i.ref||'').toLowerCase().includes(f) || (i.nota||'').toLowerCase().includes(f);
-    });
-  }
-  if (!lista.length) {
-    el.innerHTML = '<div class="rastr-empty">' + (filtro ? 'Nenhum resultado.' : 'Nenhum registro ainda.') + '</div>';
-    return;
-  }
-  var tipoIcon = { os:'🔧', peca:'📦', compra:'💳', geral:'📋' };
-  el.innerHTML = lista.map(function(i) {
-    var dt = i.criadoEm ? new Date(i.criadoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
-    return '<div class="tl-item">' +
-      '<div class="tl-dot ' + (i.tipo||'geral') + '">' + (tipoIcon[i.tipo]||'📋') + '</div>' +
-      '<div class="tl-body">' +
-        '<div class="tl-header">' +
-          (i.ref ? '<span class="tl-ref">' + esc(i.ref) + '</span>' : '') +
-          '<span class="rastr-badge ' + (i.tipo||'geral') + '">' + (i.tipo||'geral') + '</span>' +
-        '</div>' +
-        '<div class="tl-note">' + esc(i.nota) + '</div>' +
-        '<div class="tl-meta" style="display:flex;align-items:center;justify-content:space-between;">' +
-          '<span>' + dt + '</span>' +
-          '<button class="tl-del" onclick="rastrDel(\'' + i.id + '\')">✕ remover</button>' +
-        '</div>' +
-      '</div>' +
-    '</div>';
-  }).join('');
-}
-
-async function rastrAdd() {
-  var nota = document.getElementById('r-nota').value.trim();
-  if (!nota) { toast('Escreva uma anotação', 'var(--red)'); return; }
-  var payload = {
-    ref: document.getElementById('r-ref').value.trim(),
-    tipo: document.getElementById('r-tipo').value,
-    nota: nota
-  };
-  try {
-    var r = await fetch('/api/rastreabilidade?action=add', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
-    });
-    var d = await r.json();
-    if (d.ok) {
-      document.getElementById('r-nota').value = '';
-      document.getElementById('r-ref').value = '';
-      await rastrLoad();
-      toast('Registro salvo!', 'var(--purple)');
-    } else toast('Erro: ' + d.error, 'var(--red)');
-  } catch(e) { toast('Erro de conexão', 'var(--red)'); }
-}
-
-async function rastrDel(id) {
-  if (!confirm('Remover este registro?')) return;
-  try {
-    await fetch('/api/rastreabilidade?action=del', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id:id})
-    });
-    await rastrLoad();
-  } catch(e) {}
-}
-
-document.getElementById('r-busca').addEventListener('input', function() {
-  rastrRender(this.value.trim());
-});
-
-// ══════════════════════════════════════════════
-//  MÓDULO OS / PIPEFY
-// ══════════════════════════════════════════════
-var osCards = { comprar:[], aguardando:[], disponivel:[] };
-var osAbaAtual = 'comprar';
-var selPipefyId = null, tipoComprasel = null;
-var dadosSelId = null, dadosNovasFotos = [];
-
-async function osLoad() {
-  var d = await fetch('/api/compras?action=load').then(function(r){return r.json();});
-  if (!d.ok) return;
-  osCards.comprar   = d.comprar   || [];
-  osCards.aguardando= d.aguardando|| [];
-  osCards.disponivel= d.disponivel|| [];
-  document.getElementById('obadge-comprar').textContent   = osCards.comprar.length;
-  document.getElementById('obadge-aguardando').textContent= osCards.aguardando.length;
-  document.getElementById('obadge-disponivel').textContent= osCards.disponivel.length;
-  var tot = osCards.comprar.length + osCards.aguardando.length + osCards.disponivel.length;
-  document.getElementById('mb-os').textContent = tot;
-  osRenderList('comprar');
-  osRenderList('aguardando');
-  osRenderList('disponivel');
-}
-
-function osTab(name) {
-  osAbaAtual = name;
-  ['comprar','aguardando','disponivel'].forEach(function(t) {
-    document.getElementById('ostab-'+t).classList.toggle('active', t===name);
-    document.getElementById('ospage-'+t).classList.toggle('active', t===name);
-  });
-}
-
-function osRenderList(tipo) {
-  var el = document.getElementById('oslist-'+tipo);
-  var list = osCards[tipo];
-  if (!list.length) { el.innerHTML = '<div class="empty">Nenhuma ficha aqui.</div>'; return; }
-  el.innerHTML = '';
-  list.forEach(function(c) { el.appendChild(osBuildCard(c, tipo)); });
-}
-
-function osBuildCard(c, tipo) {
-  var div = document.createElement('div');
-  div.className = 'c-card ' + tipo;
-  div.id = 'oscard-' + c.pipefyId;
-
-  var head = document.createElement('div'); head.className = 'c-head';
-  var info = document.createElement('div');
-  var codeEl = document.createElement('div'); codeEl.className = 'c-code';
-  codeEl.textContent = '#' + (c.osCode || c.pipefyId.slice(-4));
-  var nameEl = document.createElement('div'); nameEl.className = 'c-name';
-  nameEl.textContent = c.nomeContato || c.title || '—';
-  info.appendChild(codeEl); info.appendChild(nameEl); head.appendChild(info); div.appendChild(head);
-
-  if (c.descricao) {
-    var de = document.createElement('div'); de.className = 'c-desc-pf'; de.textContent = c.descricao; div.appendChild(de);
-  }
-  if (c.descricaoCompra) {
-    var dc = document.createElement('div'); dc.className = 'c-desc-compra'; dc.textContent = '📝 ' + c.descricaoCompra; div.appendChild(dc);
-  }
-  if (c.alertaCompra) {
-    var al = document.createElement('div');
-    al.className = 'c-alerta ' + (tipo==='disponivel'?'disponivel':(c.tipoCompra==='local'?'local':'online'));
-    al.textContent = c.alertaCompra; div.appendChild(al);
-  }
-  if (c.fotosCompra && c.fotosCompra.length) {
-    var fo = document.createElement('div'); fo.className = 'c-fotos';
-    c.fotosCompra.forEach(function(f) {
-      var img = document.createElement('img'); img.className = 'c-foto'; img.src = f;
-      img.onclick = function(){ openLightbox(f); }; fo.appendChild(img);
-    });
-    div.appendChild(fo);
-  }
-
-  var acts = document.createElement('div'); acts.className = 'c-actions';
-  var dadosBtn = document.createElement('button');
-  dadosBtn.className = 'cbtn cbtn-dados'; dadosBtn.textContent = '📝 Dados';
-  dadosBtn.onclick = function(){ openDadosModal(c.pipefyId, c.nomeContato||c.title||'', c.descricaoCompra||''); };
-  acts.appendChild(dadosBtn);
-
-  if (tipo === 'comprar') {
-    var btn = document.createElement('button');
-    btn.className = 'cbtn cbtn-atualizar'; btn.textContent = '🛒 Atualizar Compra';
-    btn.onclick = function(){ openModalOS(c.pipefyId, c.nomeContato||c.title||''); };
-    acts.appendChild(btn);
-  }
-  if (tipo === 'aguardando') {
-    var btn2 = document.createElement('button');
-    btn2.className = 'cbtn cbtn-disponivel'; btn2.textContent = '✅ Peça Disponível';
-    btn2.onclick = function(){ osMarcarDisponivel(c.pipefyId); };
-    acts.appendChild(btn2);
-  }
-  div.appendChild(acts);
-  return div;
-}
-
-function openModalOS(pipefyId, nome) {
-  selPipefyId = pipefyId; tipoComprasel = null;
-  document.getElementById('modal-info').innerHTML = '<strong>#' + pipefyId.slice(-4) + ' — ' + nome + '</strong>';
-  document.getElementById('opt-local').classList.remove('selected');
-  document.getElementById('opt-online').classList.remove('selected');
-  document.getElementById('previsao-group').style.display = 'none';
-  document.getElementById('previsao-input').value = '';
-  document.getElementById('modal-atualizar').classList.add('open');
-}
-function closeModalOS() { document.getElementById('modal-atualizar').classList.remove('open'); }
-
-function setTipoCompra(tipo) {
-  tipoComprasel = tipo;
-  document.getElementById('opt-local').classList.toggle('selected', tipo==='local');
-  document.getElementById('opt-online').classList.toggle('selected', tipo==='online');
-  document.getElementById('previsao-group').style.display = tipo==='online'?'flex':'none';
-}
-
-async function confirmarCompraOS() {
-  if (!tipoComprasel) { toast('Selecione o tipo de compra', 'var(--yellow)'); return; }
-  var prev = document.getElementById('previsao-input').value;
-  if (tipoComprasel==='online' && !prev) { toast('Informe a previsão de chegada', 'var(--yellow)'); return; }
-  var d = await fetch('/api/compras?action=atualizar', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({pipefyId:selPipefyId, tipoCompra:tipoComprasel, previsao:prev})
-  }).then(function(r){return r.json();});
-  if (d.ok) {
-    closeModalOS(); await osLoad();
-    toast(tipoComprasel==='local'?'🏪 A caminho — compra local':'📦 Previsão: '+prev, 'var(--green)');
-  } else toast('Erro: '+d.error, 'var(--red)');
-}
-
-async function osMarcarDisponivel(pipefyId) {
-  var d = await fetch('/api/compras?action=peca-disponivel', {
-    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({pipefyId:pipefyId})
-  }).then(function(r){return r.json();});
-  if (d.ok) { await osLoad(); toast('✅ Peça Disponível!', 'var(--green)'); }
-  else toast('Erro: '+d.error, 'var(--red)');
-}
-
-// DADOS COMPRA OS
-function openDadosModal(pipefyId, nome, descAtual) {
-  dadosSelId = pipefyId; dadosNovasFotos = [];
-  document.getElementById('dados-modal-info').innerHTML = '<strong>' + nome + '</strong>';
-  document.getElementById('dados-desc').value = descAtual || '';
-  document.getElementById('dados-thumbs').innerHTML = '';
-  document.getElementById('modal-dados').classList.add('open');
-}
-function closeDadosModal() { document.getElementById('modal-dados').classList.remove('open'); }
-
-function dadosLoadFotos(e) {
-  var files = Array.from(e.target.files).slice(0, 12 - dadosNovasFotos.length);
-  files.forEach(function(file) {
-    var reader = new FileReader();
-    reader.onload = function(ev) {
-      var img2 = new Image();
-      img2.onload = function() {
-        var canvas = document.createElement('canvas');
-        var MAX=800, w=img2.width, h=img2.height;
-        if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
-        canvas.width=w; canvas.height=h;
-        canvas.getContext('2d').drawImage(img2,0,0,w,h);
-        dadosNovasFotos.push(canvas.toDataURL('image/jpeg',0.82));
-        renderDadosThumbs();
-      };
-      img2.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-  e.target.value='';
-}
-function renderDadosThumbs() {
-  var wrap = document.getElementById('dados-thumbs'); wrap.innerHTML='';
-  dadosNovasFotos.forEach(function(f,i) {
-    var div=document.createElement('div'); div.style.cssText='position:relative;width:60px;height:60px;';
-    var img3=document.createElement('img'); img3.src=f; img3.style.cssText='width:60px;height:60px;border-radius:7px;object-fit:cover;border:1px solid var(--border);';
-    var rm=document.createElement('button'); rm.textContent='✕';
-    rm.style.cssText='position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(239,68,68,.9);color:#fff;border:none;cursor:pointer;font-size:10px;font-weight:700;';
-    rm.onclick=function(){dadosNovasFotos.splice(i,1);renderDadosThumbs();};
-    div.appendChild(img3); div.appendChild(rm); wrap.appendChild(div);
-  });
-}
-async function confirmarDados() {
-  var desc = document.getElementById('dados-desc').value.trim();
-  var r = await fetch('/api/compras?action=update-dados', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({pipefyId:dadosSelId, descricaoCompra:desc, fotosCompra:dadosNovasFotos.length?dadosNovasFotos:undefined})
-  }).then(function(x){return x.json();});
-  if(r.ok){closeDadosModal();await osLoad();toast('💾 Dados salvos!','var(--green)');}
-  else toast('Erro: '+r.error,'var(--red)');
-}
-
-// LIGHTBOX
-function openLightbox(src){document.getElementById('lb-img').src=src;document.getElementById('lightbox').classList.add('open');}
-function closeLightbox(){document.getElementById('lightbox').classList.remove('open');}
-
-// ══════════════════════════════════════════════
-//  MÓDULO PEÇAS AVULSAS
-// ══════════════════════════════════════════════
 var itens = [];
-var pecAbaAtual = 'pendentes';
+var abaAtual = 'pendentes';
 var tcAtual = 'loja';
 var sel = new Set();
 var idsComprar = [];
 var idsCam = [];
-var _pgtoIds = [];
 var tt;
 
 function toast(m, c) {
@@ -767,248 +216,287 @@ function toast(m, c) {
   t.style.borderTopColor = c || 'var(--accent)';
   t.classList.add('show');
   clearTimeout(tt);
-  tt = setTimeout(function(){t.classList.remove('show');}, 3000);
+  tt = setTimeout(function() { t.classList.remove('show'); }, 3000);
 }
 
-function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+async function req(action, body) {
+  var o = { headers: { 'Content-Type': 'application/json' } };
+  if (body) { o.method = 'POST'; o.body = JSON.stringify(body); }
+  var r = await fetch('/api/tv-compras-pecas?action=' + action, o);
+  return r.json();
+}
 
-async function pecLoad() {
-  var d = await fetch('/api/compras-pecas?action=load').then(function(r){return r.json();});
+async function load() {
+  var d = await req('load');
   itens = d.pecas || [];
-  var pen = itens.filter(function(p){return p.status==='pendente';}).length;
-  var agu = itens.filter(function(p){return p.status==='aguardando_pagamento';}).length;
-  var pag = itens.filter(function(p){return p.status==='pago';}).length;
-  var cam = itens.filter(function(p){return p.status==='a_caminho';}).length;
-  var tot = pen+agu+pag+cam;
-  document.getElementById('mb-pecas').textContent = tot;
   render();
 }
 
-function fd(iso){ return iso ? new Date(iso).toLocaleDateString('pt-BR') : '---'; }
-function da(iso){ return iso ? Math.ceil((new Date(iso)-new Date())/86400000) : null; }
+function fd(iso) { return iso ? new Date(iso).toLocaleDateString('pt-BR') : '---'; }
+function da(iso) { return iso ? Math.ceil((new Date(iso) - new Date()) / 86400000) : null; }
+function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
-var SL={pendente:'Pendente',aguardando_pagamento:'Ag.Pgto',pago:'Pago',a_caminho:'A Caminho',recebido:'Recebido'};
-var SC={pendente:'sp',aguardando_pagamento:'sa',pago:'sg',a_caminho:'sc',recebido:'sr'};
+var SL = { pendente:'Pendente', aguardando_pagamento:'Ag.Pgto', pago:'Pago', a_caminho:'A Caminho', recebido:'Recebido' };
+var SC = { pendente:'sp', aguardando_pagamento:'sa', pago:'sg', a_caminho:'sc', recebido:'sr' };
 
 function render() {
-  var pen=itens.filter(function(p){return p.status==='pendente';});
-  var agu=itens.filter(function(p){return p.status==='aguardando_pagamento';});
-  var pag=itens.filter(function(p){return p.status==='pago';});
-  var cam=itens.filter(function(p){return p.status==='a_caminho';});
-  var onl=cam.filter(function(p){return p.tipoCompra==='online'&&p.previsaoChegada;});
-  document.getElementById('pbp').textContent=pen.length;
-  document.getElementById('pba').textContent=agu.length;
-  document.getElementById('pbg').textContent=pag.length;
-  document.getElementById('pbc').textContent=cam.length;
-  document.getElementById('pbo').textContent=onl.length;
-  rPen(pen); rAgu(agu); rPag(pag); rCam(cam); rOnl(onl);
+  var pen = itens.filter(function(p) { return p.status === 'pendente'; });
+  var agu = itens.filter(function(p) { return p.status === 'aguardando_pagamento'; });
+  var pag = itens.filter(function(p) { return p.status === 'pago'; });
+  var cam = itens.filter(function(p) { return p.status === 'a_caminho'; });
+  var onl = cam.filter(function(p) { return p.tipoCompra === 'online' && p.previsaoChegada; });
+  document.getElementById('bp').textContent = pen.length;
+  document.getElementById('ba').textContent = agu.length;
+  document.getElementById('bg').textContent = pag.length;
+  document.getElementById('bc').textContent = cam.length;
+  document.getElementById('bo').textContent = onl.length;
+  rPen(pen);
+  rAgu(agu);
+  rPag(pag);
+  rCam(cam);
+  rOnl(onl);
   updBtns();
 }
 
-function pecCard(p, tipo) {
-  var s=sel.has(p.id);
-  var pb='';
-  if(p.previsaoChegada){var d=da(p.previsaoChegada);pb='<span class="pb'+(d<0?' vencida':'')+'>'+(d<0?'Atrasada '+Math.abs(d)+'d':'Chega em '+d+'d')+' ('+fd(p.previsaoChegada)+')</span>';}
-  var ac='';
-  if(tipo==='p') ac='<div class="pc-actions"><button class="btn-sm" onclick="comprar1(\''+p.id+'\')">Comprar</button><button class="btn-sm" onclick="del(\''+p.id+'\')">Remover</button></div>';
-  else if(tipo==='a') ac='<div class="pc-actions"><button class="btn-sm" style="color:var(--accent);border-color:rgba(59,158,255,.3);" onclick="vPgto(\''+p.id+'\')">📦 Ver Dados</button>'+(p.tipoCompra==='online'?'<button class="btn-sm" onclick="editPrev(\''+p.id+'\')">Previsão</button>':'')+'</div>';
-  else if(tipo==='g') ac='<div class="pc-actions"><button class="btn-sm" style="color:var(--accent);border-color:rgba(59,158,255,.3);" onclick="abrirCaminho([\''+p.id+'\'])">A Caminho</button><button class="btn-sm" onclick="vPgto(\''+p.id+'\')">Ver Pgto</button></div>';
-  return '<div class="pc'+(p.urgente?' urgente':'')+(s?' selected':'')+'" id="ci-'+p.id+'">' +
-    '<input type="checkbox" class="pc-check"'+(s?' checked':'')+' onchange="togSel(\''+p.id+'\',this.checked)">' +
-    '<div class="pc-body"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
-    '<div class="pc-desc">'+esc(p.descricao)+'</div>' +
-    '<span class="pc-status '+(SC[p.status]||'sp')+'">'+(SL[p.status]||p.status)+'</span>' +
-    (p.urgente?'<span style="font-family:var(--fm);font-size:9px;color:var(--red);">URGENTE</span>':'') +
-    '</div><div class="pc-meta">' +
-    (p.os?'<span>OS: '+esc(p.os)+'</span>':'') +
-    (p.quantidade>1?'<span>Qtd: '+p.quantidade+'</span>':'') +
-    (p.obs?'<span>'+esc(p.obs)+'</span>':'') +
-    '</div>'+(pb?'<div style="margin-top:6px;">'+pb+'</div>':'')+ac+'</div></div>';
+function card(p, tipo) {
+  var s = sel.has(p.id);
+  var pb = '';
+  if (p.previsaoChegada) {
+    var d = da(p.previsaoChegada);
+    pb = '<span class="pb' + (d < 0 ? ' vencida' : '') + '">' + (d < 0 ? 'Atrasada ' + Math.abs(d) + 'd' : 'Chega em ' + d + 'd') + ' (' + fd(p.previsaoChegada) + ')</span>';
+  }
+  var ac = '';
+  if (tipo === 'p') {
+    ac = '<div class="pc-actions"><button class="btn-sm" onclick="comprar1(\'' + p.id + '\')">Comprar</button><button class="btn-sm" onclick="del(\'' + p.id + '\')">Remover</button></div>';
+  } else if (tipo === 'a') {
+    ac = '<div class="pc-actions"><button class="btn-sm" style="color:var(--green);" onclick="confPag([\'' + p.id + '\'])">Pago</button><button class="btn-sm" style="color:var(--accent);" onclick="vPgto(\'' + p.id + '\')">Ver Pgto</button>' + (p.tipoCompra === 'online' ? '<button class="btn-sm" onclick="editPrev(\'' + p.id + '\')">Previsao</button>' : '') + '</div>';
+  } else if (tipo === 'g') {
+    ac = '<div class="pc-actions"><button class="btn-sm" style="color:var(--accent);border-color:rgba(59,158,255,.3);" onclick="abrirCaminho([\'' + p.id + '\'])">A Caminho</button><button class="btn-sm" onclick="vPgto(\'' + p.id + '\')">Ver Pgto</button></div>';
+  }
+  return '<div class="pc' + (p.urgente ? ' urgente' : '') + (s ? ' selected' : '') + '" id="ci-' + p.id + '">'
+    + '<input type="checkbox" class="pc-check"' + (s ? ' checked' : '') + ' onchange="togSel(\'' + p.id + '\',this.checked)">'
+    + '<div class="pc-body">'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+        + '<div class="pc-desc">' + esc(p.descricao) + '</div>'
+        + '<span class="pc-status ' + (SC[p.status] || 'sp') + '">' + (SL[p.status] || p.status) + '</span>'
+        + (p.urgente ? '<span style="font-family:var(--fm);font-size:9px;color:var(--red);">URGENTE</span>' : '')
+      + '</div>'
+      + '<div class="pc-meta">' + (p.os ? '<span>OS: ' + esc(p.os) + '</span>' : '') + (p.quantidade > 1 ? '<span>Qtd: ' + p.quantidade + '</span>' : '') + (p.obs ? '<span>' + esc(p.obs) + '</span>' : '') + '</div>'
+      + (pb ? '<div style="margin-top:6px;">' + pb + '</div>' : '')
+      + ac
+    + '</div></div>';
 }
 
-function rPen(lst){var el=document.getElementById('lista-p');el.innerHTML=lst.length?lst.map(function(p){return pecCard(p,'p');}).join(''):'<div class="empty">Nenhuma peça pendente</div>';}
-function rAgu(lst){
-  var el=document.getElementById('lista-a');
-  if(!lst.length){el.innerHTML='<div class="empty">Nenhuma peça aguardando</div>';return;}
-  var grupos={},ind=[];
-  lst.forEach(function(p){if(p.grupoId){if(!grupos[p.grupoId])grupos[p.grupoId]=[];grupos[p.grupoId].push(p);}else ind.push(p);});
-  var h='';
-  Object.keys(grupos).forEach(function(gid){
-    var gps=grupos[gid];var forn=esc(gps[0].fornecedor||'---');var tc=gps[0].tipoCompra==='online'?'Online':'Loja';
-    h+='<div class="grupo"><div class="grupo-head"><div class="grupo-lbl">'+forn+' - '+tc+' <span class="grupo-qtd">'+gps.length+' peças</span></div>' +
-      '<div class="grupo-acts"><button class="btn-sm" style="color:var(--accent);" onclick="vGrupo(\''+gid+'\')">📦 Ver Dados</button><button class="btn-sm" style="color:var(--green);" onclick="confGrupo(\''+gid+'\')">✅ Pago</button></div>' +
-      '</div><div class="grupo-body">'+gps.map(function(p){return pecCard(p,'a');}).join('')+'</div></div>';
+function rPen(lst) {
+  var el = document.getElementById('lista-p');
+  el.innerHTML = lst.length ? lst.map(function(p) { return card(p, 'p'); }).join('') : '<div class="empty">Nenhuma peca pendente</div>';
+}
+
+function rAgu(lst) {
+  var el = document.getElementById('lista-a');
+  if (!lst.length) { el.innerHTML = '<div class="empty">Nenhuma peca aguardando</div>'; return; }
+  var grupos = {};
+  var ind = [];
+  lst.forEach(function(p) {
+    if (p.grupoId) { if (!grupos[p.grupoId]) grupos[p.grupoId] = []; grupos[p.grupoId].push(p); }
+    else ind.push(p);
   });
-  ind.forEach(function(p){h+=pecCard(p,'a');});
-  el.innerHTML=h;
+  var h = '';
+  Object.keys(grupos).forEach(function(gid) {
+    var gps = grupos[gid];
+    var forn = esc(gps[0].fornecedor || '---');
+    var tc = gps[0].tipoCompra === 'online' ? 'Online' : 'Loja';
+    h += '<div class="grupo"><div class="grupo-head"><div class="grupo-lbl">' + forn + ' - ' + tc + ' <span class="grupo-qtd">' + gps.length + ' pecas</span></div>'
+      + '<div class="grupo-acts"><button class="btn-sm" style="color:var(--accent);" onclick="vGrupo(\'' + gid + '\')">Ver Pgto</button><button class="btn-sm" style="color:var(--green);" onclick="confGrupo(\'' + gid + '\')">Pagar grupo</button></div>'
+      + '</div><div class="grupo-body">' + gps.map(function(p) { return card(p, 'a'); }).join('') + '</div></div>';
+  });
+  ind.forEach(function(p) { h += card(p, 'a'); });
+  el.innerHTML = h;
 }
-function rPag(lst){var el=document.getElementById('lista-g');el.innerHTML=lst.length?lst.map(function(p){return pecCard(p,'g');}).join(''):'<div class="empty">Nenhuma peça paga</div>';}
-function rCam(lst){
-  var el=document.getElementById('lista-c');
-  if(!lst.length){el.innerHTML='<div class="empty">Nenhuma peça a caminho</div>';return;}
-  el.innerHTML=lst.map(function(p){
-    var isOnl=p.tipoCompra==='online';var d=p.previsaoChegada?da(p.previsaoChegada):null;
-    var eta,cor;
-    if(isOnl){if(d===null){eta='Online';cor='var(--accent)';}else if(d<0){eta='Atrasada '+Math.abs(d)+'d';cor='var(--red)';}else if(d===0){eta='Chega hoje!';cor='var(--green)';}else{eta=d+' dias';cor='var(--accent)';}}else{eta='Compra local';cor='var(--green)';}
-    return '<div class="cc"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">' +
-      '<div class="pc-desc">'+esc(p.descricao)+'</div>' +
-      '<span class="pc-status sc">'+(isOnl?'Online':'Local')+'</span>' +
-      (p.urgente?'<span style="font-family:var(--fm);font-size:9px;color:var(--red);">URGENTE</span>':'') +
-      '</div><div class="cc-eta" style="color:'+cor+';">'+eta+'</div>' +
-      (isOnl&&p.previsaoChegada?'<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">Previsão: '+fd(p.previsaoChegada)+'</div>':'') +
-      (p.fornecedor?'<div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:3px;">'+esc(p.fornecedor)+'</div>':'') +
-      (p.os?'<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">OS: '+esc(p.os)+'</div>':'') +
-      '<div style="display:flex;gap:6px;margin-top:8px;">' +
-      (isOnl?'<button class="btn-sm" style="color:var(--accent);" onclick="editPrev(\''+p.id+'\')">Editar previsão</button>':'') +
-      '<button class="btn-sm" style="color:var(--green);" onclick="recebeu(\''+p.id+'\')">Recebi</button>' +
-      '</div></div>';
+
+function rPag(lst) {
+  var el = document.getElementById('lista-g');
+  el.innerHTML = lst.length ? lst.map(function(p) { return card(p, 'g'); }).join('') : '<div class="empty">Nenhuma peca paga</div>';
+}
+
+function rCam(lst) {
+  var el = document.getElementById('lista-c');
+  if (!lst.length) { el.innerHTML = '<div class="empty">Nenhuma peca a caminho</div>'; return; }
+  el.innerHTML = lst.map(function(p) {
+    var isOnl = p.tipoCompra === 'online';
+    var d = p.previsaoChegada ? da(p.previsaoChegada) : null;
+    var eta, cor;
+    if (isOnl) {
+      if (d === null) { eta = 'Online'; cor = 'var(--accent)'; }
+      else if (d < 0) { eta = 'Atrasada ' + Math.abs(d) + 'd'; cor = 'var(--red)'; }
+      else if (d === 0) { eta = 'Chega hoje!'; cor = 'var(--green)'; }
+      else { eta = d + ' dias'; cor = 'var(--accent)'; }
+    } else { eta = 'Compra local'; cor = 'var(--green)'; }
+    return '<div class="cc"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">'
+      + '<div class="pc-desc">' + esc(p.descricao) + '</div>'
+      + '<span class="pc-status sc">' + (isOnl ? 'Online' : 'Local') + '</span>'
+      + (p.urgente ? '<span style="font-family:var(--fm);font-size:9px;color:var(--red);">URGENTE</span>' : '')
+      + '</div>'
+      + '<div class="cc-eta" style="color:' + cor + ';">' + eta + '</div>'
+      + (isOnl && p.previsaoChegada ? '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">Previsao: ' + fd(p.previsaoChegada) + '</div>' : '')
+      + (p.fornecedor ? '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:3px;">' + esc(p.fornecedor) + '</div>' : '')
+      + (p.os ? '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">OS: ' + esc(p.os) + '</div>' : '')
+      + '<div style="display:flex;gap:6px;margin-top:8px;">'
+        + (isOnl ? '<button class="btn-sm" style="color:var(--accent);" onclick="editPrev(\'' + p.id + '\')">Editar previsao</button>' : '')
+        + '<button class="btn-sm" style="color:var(--green);" onclick="recebeu(\'' + p.id + '\')">Recebi</button>'
+      + '</div></div>';
   }).join('');
 }
-function rOnl(lst){
-  var el=document.getElementById('lista-o');
-  if(!lst.length){el.innerHTML='<div class="empty">Nenhuma compra online</div>';return;}
-  el.innerHTML=lst.map(function(p){
-    var d=da(p.previsaoChegada);
-    var cls=d<0?'oc atrasada':(d===0?'oc chegou':'oc');
-    var eta=d<0?'Atrasada '+Math.abs(d)+'d':(d===0?'Chega hoje!':d+' dias');
-    var cor=d<0?'var(--red)':(d===0?'var(--green)':'var(--accent)');
-    return '<div class="'+cls+'"><div style="font-family:var(--fm);font-size:9px;color:var(--muted);">'+esc(p.fornecedor||'---')+'</div>' +
-      '<div class="pc-desc" style="margin-top:4px;">'+esc(p.descricao)+'</div>' +
-      (p.os?'<div style="font-family:var(--fm);font-size:9px;color:var(--muted);">OS: '+esc(p.os)+'</div>':'') +
-      '<div style="font-family:var(--fh);font-size:20px;font-weight:900;color:'+cor+';margin:6px 0;">'+eta+'</div>' +
-      '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">Previsão: '+fd(p.previsaoChegada)+'</div>' +
-      '<button class="btn-sm" style="color:var(--accent);margin-top:8px;" onclick="editPrev(\''+p.id+'\')">Editar data</button></div>';
+
+function rOnl(lst) {
+  var el = document.getElementById('lista-o');
+  if (!lst.length) { el.innerHTML = '<div class="empty">Nenhuma compra online</div>'; return; }
+  el.innerHTML = lst.map(function(p) {
+    var d = da(p.previsaoChegada);
+    var cls = d < 0 ? 'oc atrasada' : (d === 0 ? 'oc chegou' : 'oc');
+    var eta = d < 0 ? 'Atrasada ' + Math.abs(d) + 'd' : (d === 0 ? 'Chega hoje!' : d + ' dias');
+    var cor = d < 0 ? 'var(--red)' : (d === 0 ? 'var(--green)' : 'var(--accent)');
+    return '<div class="' + cls + '"><div style="font-family:var(--fm);font-size:9px;color:var(--muted);">' + esc(p.fornecedor || '---') + '</div>'
+      + '<div class="pc-desc" style="margin-top:4px;">' + esc(p.descricao) + '</div>'
+      + (p.os ? '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);">OS: ' + esc(p.os) + '</div>' : '')
+      + '<div style="font-family:var(--fh);font-size:20px;font-weight:900;color:' + cor + ';margin:6px 0;">' + eta + '</div>'
+      + '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">Previsao: ' + fd(p.previsaoChegada) + '</div>'
+      + '<button class="btn-sm" style="color:var(--accent);margin-top:8px;" onclick="editPrev(\'' + p.id + '\')">Editar data</button></div>';
   }).join('');
 }
 
-function togSel(id,v){if(v)sel.add(id);else sel.delete(id);var el=document.getElementById('ci-'+id);if(el)el.classList.toggle('selected',v);updBtns();}
-function selTodas(){itens.filter(function(p){return p.status==='pendente';}).forEach(function(p){sel.add(p.id);});render();}
-function selTodasPago(){itens.filter(function(p){return p.status==='pago';}).forEach(function(p){sel.add(p.id);});render();}
-function deselTodas(){sel.clear();render();}
-
-function updBtns(){
-  if(modAtual!=='pecas'){document.getElementById('btn-copiar').style.display='none';document.getElementById('btn-comprar').style.display='none';return;}
-  var n=[...sel].filter(function(id){return itens.find(function(p){return p.id===id&&p.status==='pendente';});}).length;
-  document.getElementById('btn-copiar').style.display=n>0?'inline-flex':'none';
-  document.getElementById('btn-comprar').style.display=n>0?'inline-flex':'none';
+function togSel(id, v) {
+  if (v) sel.add(id); else sel.delete(id);
+  var el = document.getElementById('ci-' + id);
+  if (el) el.classList.toggle('selected', v);
+  updBtns();
+}
+function selTodas() { itens.filter(function(p) { return p.status === 'pendente'; }).forEach(function(p) { sel.add(p.id); }); render(); }
+function selTodasPago() { itens.filter(function(p) { return p.status === 'pago'; }).forEach(function(p) { sel.add(p.id); }); render(); }
+function deselTodas() { sel.clear(); render(); }
+function updBtns() {
+  var n = [...sel].filter(function(id) { return itens.find(function(p) { return p.id === id && p.status === 'pendente'; }); }).length;
+  document.getElementById('btn-copiar').style.display = n > 0 ? 'inline-flex' : 'none';
+  document.getElementById('btn-comprar').style.display = n > 0 ? 'inline-flex' : 'none';
 }
 
-async function cadastrar(){
-  var desc=document.getElementById('f-desc').value.trim();
-  if(!desc){toast('Preencha a descrição','var(--red)');return;}
-  var d=await fetch('/api/compras-pecas?action=cadastrar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({descricao:desc,os:document.getElementById('f-os').value.trim(),quantidade:document.getElementById('f-qtd').value,obs:document.getElementById('f-obs').value.trim(),urgente:document.getElementById('f-urg').checked})}).then(function(r){return r.json();});
-  if(d.ok){['f-desc','f-os','f-obs'].forEach(function(i){document.getElementById(i).value='';});document.getElementById('f-qtd').value='1';document.getElementById('f-urg').checked=false;await pecLoad();toast('Peça cadastrada!');}
-  else toast('Erro: '+d.error,'var(--red)');
+async function cadastrar() {
+  var desc = document.getElementById('f-desc').value.trim();
+  if (!desc) { toast('Preencha a descricao', 'var(--red)'); return; }
+  var d = await req('cadastrar', { descricao: desc, os: document.getElementById('f-os').value.trim(), quantidade: document.getElementById('f-qtd').value, obs: document.getElementById('f-obs').value.trim(), urgente: document.getElementById('f-urg').checked });
+  if (d.ok) {
+    ['f-desc','f-os','f-obs'].forEach(function(i) { document.getElementById(i).value = ''; });
+    document.getElementById('f-qtd').value = '1';
+    document.getElementById('f-urg').checked = false;
+    await load(); toast('Peca cadastrada!');
+  } else toast('Erro: ' + d.error, 'var(--red)');
 }
 
-async function del(id){if(!confirm('Remover?'))return;await fetch('/api/compras-pecas?action=deletar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});sel.delete(id);await pecLoad();}
+async function del(id) {
+  if (!confirm('Remover?')) return;
+  await req('deletar', { id: id });
+  sel.delete(id); await load();
+}
 
-function comprar1(id){idsComprar=[id];abrirCompra();}
-function abrirCompra(){
-  var ids=[...sel].filter(function(id){return itens.find(function(p){return p.id===id&&p.status==='pendente';});});
-  if(idsComprar.length&&idsComprar.length===1)ids=idsComprar;
-  if(!ids.length){toast('Selecione peças','var(--yellow)');return;}
-  idsComprar=ids;
-  document.getElementById('mod-resumo').innerHTML=ids.map(function(id){var p=itens.find(function(x){return x.id===id;});return p?'- '+esc(p.descricao)+(p.os?' (OS:'+p.os+')':''):'';}).join('<br>');
-  document.getElementById('m-forn').value='';document.getElementById('m-pag').value='';
+function comprar1(id) { idsComprar = [id]; abrirCompra(); }
+function abrirCompra() {
+  var ids = abaAtual === 'pendentes' ? [...sel].filter(function(id) { return itens.find(function(p) { return p.id === id && p.status === 'pendente'; }); }) : idsComprar;
+  if (!ids.length) { toast('Selecione pecas', 'var(--yellow)'); return; }
+  idsComprar = ids;
+  document.getElementById('mod-resumo').innerHTML = ids.map(function(id) { var p = itens.find(function(x) { return x.id === id; }); return p ? '- ' + esc(p.descricao) + (p.os ? ' (OS:' + p.os + ')' : '') : ''; }).join('<br>');
+  document.getElementById('m-forn').value = '';
+  document.getElementById('m-pag').value = '';
   setTipo('loja');
   document.getElementById('mod-compra').classList.add('open');
 }
-function fechaCompra(){document.getElementById('mod-compra').classList.remove('open');idsComprar=[];}
-
-function setTipo(t){
-  tcAtual=t;
-  document.getElementById('tb-loja').classList.toggle('active',t==='loja');
-  document.getElementById('tb-online').classList.toggle('active',t==='online');
-  var w=document.getElementById('prev-wrap');
-  if(t==='online'){var h='<div class="fl" style="margin-bottom:8px;">Previsão por peça</div>';idsComprar.forEach(function(id){var p=itens.find(function(x){return x.id===id;});if(p)h+='<div style="margin-bottom:6px;"><div style="font-size:11px;color:var(--muted);margin-bottom:3px;">'+esc(p.descricao)+'</div><input class="fi" type="date" id="prv-'+id+'"/></div>';});w.innerHTML=h;w.style.display='block';}
-  else{w.style.display='none';}
+function fechaCompra() { document.getElementById('mod-compra').classList.remove('open'); idsComprar = []; }
+function setTipo(t) {
+  tcAtual = t;
+  document.getElementById('tb-loja').classList.toggle('active', t === 'loja');
+  document.getElementById('tb-online').classList.toggle('active', t === 'online');
+  var w = document.getElementById('prev-wrap');
+  if (t === 'online') {
+    var h = '<div class="fl" style="margin-bottom:8px;">Previsao por peca</div>';
+    idsComprar.forEach(function(id) { var p = itens.find(function(x) { return x.id === id; }); if (p) h += '<div style="margin-bottom:6px;"><div style="font-size:11px;color:var(--muted);margin-bottom:3px;">' + esc(p.descricao) + '</div><input class="fi" type="date" id="prv-' + id + '"/></div>'; });
+    w.innerHTML = h; w.style.display = 'block';
+  } else { w.style.display = 'none'; }
+}
+async function finCompra() {
+  var prevs = {};
+  if (tcAtual === 'online') idsComprar.forEach(function(id) { var e = document.getElementById('prv-' + id); if (e && e.value) prevs[id] = e.value; });
+  var d = await req('comprar', { ids: idsComprar, fornecedor: document.getElementById('m-forn').value.trim(), tipoCompra: tcAtual, dadosPagamento: document.getElementById('m-pag').value.trim(), previsoes: prevs });
+  if (d.ok) { fechaCompra(); sel.clear(); await load(); toast('Movido para Ag. Pagamento!', 'var(--green)'); }
+  else toast('Erro: ' + d.error, 'var(--red)');
 }
 
-async function finCompra(){
-  var prevs={};if(tcAtual==='online')idsComprar.forEach(function(id){var e=document.getElementById('prv-'+id);if(e&&e.value)prevs[id]=e.value;});
-  var d=await fetch('/api/compras-pecas?action=comprar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:idsComprar,fornecedor:document.getElementById('m-forn').value.trim(),tipoCompra:tcAtual,valor:parseFloat(document.getElementById('m-valor').value)||null,descricaoGrupo:document.getElementById('m-desc-grupo').value.trim(),dadosPagamento:document.getElementById('m-pag').value.trim(),previsoes:prevs})}).then(function(r){return r.json();});
-  if(d.ok){fechaCompra();sel.clear();await pecLoad();toast('Movido para Ag. Pagamento!','var(--green)');}
-  else toast('Erro: '+d.error,'var(--red)');
+async function confPag(ids) {
+  var d = await req('confirmar-pagamento', { ids: ids });
+  if (d.ok) { await load(); toast('Pagamento confirmado!', 'var(--green)'); }
+  else toast('Erro: ' + d.error, 'var(--red)');
 }
-
-async function confPag(ids){var d=await fetch('/api/compras-pecas?action=confirmar-pagamento',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:ids})}).then(function(r){return r.json();});if(d.ok){await pecLoad();toast('Pagamento confirmado!','var(--green)');}else toast('Erro: '+d.error,'var(--red)');}
-async function confGrupo(gid){var ids=itens.filter(function(p){return p.grupoId===gid;}).map(function(p){return p.id;});if(ids.length)await confPag(ids);}
-
-function vPgto(id){var p=itens.find(function(x){return x.id===id;});if(p)mostraPgto([p]);}
-function vGrupo(gid){var gps=itens.filter(function(p){return p.grupoId===gid;});if(gps.length)mostraPgto(gps);}
-
-function fecharModPgto(){document.getElementById('mod-pgto').classList.remove('open');_pgtoIds=[];}
-function pagarDoModal(){var ids=_pgtoIds.slice();if(ids.length){fecharModPgto();confPag(ids);}}
-
-function mostraPgto(gps){
-  var p=gps[0];
-  var valor=p.valor?'R$ '+parseFloat(p.valor).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):null;
-  var h='<div style="background:var(--surface2);border-radius:8px;padding:12px 14px;margin-bottom:12px;">' +
-    '<div style="font-family:var(--fh);font-size:16px;font-weight:800;color:#fff;">'+esc(p.fornecedor||'---')+'</div>' +
-    '<div style="display:flex;gap:10px;align-items:center;margin-top:6px;flex-wrap:wrap;">' +
-    (valor?'<div style="font-family:var(--fh);font-size:18px;font-weight:900;color:var(--green);">'+valor+'</div>':'') +
-    '<span style="font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;background:rgba(59,158,255,.15);color:var(--accent);border:1px solid rgba(59,158,255,.3);">'+(p.tipoCompra==='online'?'Online':'Loja Física')+'</span>' +
-    '</div></div>';
-  if(p.descricaoGrupo)h+='<div style="margin-bottom:10px;"><div style="font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;">Descrição</div><div style="font-size:13px;color:var(--text);">'+esc(p.descricaoGrupo)+'</div></div>';
-  if(p.dadosPagamento)h+='<div style="background:rgba(59,158,255,.06);border:1px solid rgba(59,158,255,.2);border-radius:8px;padding:10px 12px;margin-bottom:10px;"><div style="font-family:var(--fm);font-size:9px;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;">💳 Dados de Pagamento</div><div style="font-family:var(--fm);font-size:12px;color:var(--text);">'+esc(p.dadosPagamento)+'</div></div>';
-  h+='<div style="font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;">Itens ('+gps.length+')</div><div style="display:flex;flex-direction:column;gap:4px;max-height:180px;overflow-y:auto;">';
-  gps.forEach(function(x){h+='<div style="background:var(--surface2);border-radius:6px;padding:7px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;"><div><div style="font-size:12px;font-weight:600;color:#fff;">'+esc(x.descricao)+'</div>'+(x.os?'<div style="font-family:var(--fm);font-size:9px;color:var(--muted);">OS: '+esc(x.os)+'</div>':'')+(x.quantidade>1?'<div style="font-family:var(--fm);font-size:9px;color:var(--muted);">Qtd: '+x.quantidade+'</div>':'')+'</div><span style="font-family:var(--fm);font-size:9px;padding:2px 6px;border-radius:99px;background:rgba(249,115,22,.1);color:var(--orange);white-space:nowrap;">Ag. Pgto</span></div>';});
-  h+='</div>';
-  if(p.compradoEm)h+='<div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:8px;">Pedido em: '+fd(p.compradoEm)+'</div>';
-  _pgtoIds=gps.map(function(x){return x.id;});
-  var btnPagar=document.getElementById('btn-pagar-modal');
-  if(btnPagar){var podeConf=gps.every(function(x){return x.status==='aguardando_pagamento';});btnPagar.style.display=podeConf?'inline-flex':'none';}
-  document.getElementById('pgto-body').innerHTML=h;
+async function confGrupo(gid) {
+  var ids = itens.filter(function(p) { return p.grupoId === gid; }).map(function(p) { return p.id; });
+  if (ids.length) await confPag(ids);
+}
+function vPgto(id) { var p = itens.find(function(x) { return x.id === id; }); if (p) mostraPgto([p]); }
+function vGrupo(gid) { var gps = itens.filter(function(p) { return p.grupoId === gid; }); if (gps.length) mostraPgto(gps); }
+function mostraPgto(gps) {
+  var p = gps[0];
+  var h = row('Fornecedor', p.fornecedor || '---') + row('Tipo', p.tipoCompra === 'online' ? 'Online' : 'Loja Fisica') + row('Pagamento', p.dadosPagamento || '---') + row('Comprado em', fd(p.compradoEm));
+  if (gps.length > 1) h += row('Pecas (' + gps.length + ')', gps.map(function(x) { return esc(x.descricao + (x.os ? ' - OS:' + x.os : '')); }).join('<br>'));
+  document.getElementById('pgto-body').innerHTML = h;
   document.getElementById('mod-pgto').classList.add('open');
 }
+function row(l, v) { return '<div class="pr"><div class="pl">' + esc(l) + '</div><div class="pv">' + v + '</div></div>'; }
 
-function abrirCaminho(force){
-  var ids=(force&&force.length)?force:[...sel].filter(function(id){return itens.find(function(p){return p.id===id&&p.status==='pago';});});
-  if(!ids.length){toast('Selecione peças pagas','var(--yellow)');return;}
-  idsCam=ids;
-  document.getElementById('cam-resumo').innerHTML=ids.map(function(id){var p=itens.find(function(x){return x.id===id;});return p?'- '+esc(p.descricao):'';}).join('<br>');
-  var onlIds=ids.filter(function(id){var p=itens.find(function(x){return x.id===id;});return p&&p.tipoCompra==='online';});
-  var h='';
-  if(onlIds.length){h='<div class="fl" style="margin:8px 0 4px;">Previsão (online)</div>';onlIds.forEach(function(id){var p=itens.find(function(x){return x.id===id;});h+='<div style="margin-bottom:6px;"><div style="font-size:11px;color:var(--muted);margin-bottom:3px;">'+esc(p.descricao)+'</div><input class="fi" type="date" id="cp-'+id+'" value="'+(p.previsaoChegada||'')+'"/></div>';});}
-  else{h='<div style="font-family:var(--fm);font-size:10px;color:var(--muted);padding:4px 0;">Compra local — sem previsão</div>';}
-  document.getElementById('cam-prevs').innerHTML=h;
+function abrirCaminho(force) {
+  var ids = (force && force.length) ? force : [...sel].filter(function(id) { return itens.find(function(p) { return p.id === id && p.status === 'pago'; }); });
+  if (!ids.length) { toast('Selecione pecas pagas', 'var(--yellow)'); return; }
+  idsCam = ids;
+  document.getElementById('cam-resumo').innerHTML = ids.map(function(id) { var p = itens.find(function(x) { return x.id === id; }); return p ? '- ' + esc(p.descricao) : ''; }).join('<br>');
+  var onlIds = ids.filter(function(id) { var p = itens.find(function(x) { return x.id === id; }); return p && p.tipoCompra === 'online'; });
+  var h = '';
+  if (onlIds.length) {
+    h = '<div class="fl" style="margin:8px 0 4px;">Previsao (online)</div>';
+    onlIds.forEach(function(id) { var p = itens.find(function(x) { return x.id === id; }); h += '<div style="margin-bottom:6px;"><div style="font-size:11px;color:var(--muted);margin-bottom:3px;">' + esc(p.descricao) + '</div><input class="fi" type="date" id="cp-' + id + '" value="' + (p.previsaoChegada || '') + '"/></div>'; });
+  } else { h = '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);padding:4px 0;">Compra local - sem previsao</div>'; }
+  document.getElementById('cam-prevs').innerHTML = h;
   document.getElementById('mod-caminho').classList.add('open');
 }
-async function confCaminho(){
-  var prevs={};idsCam.forEach(function(id){var e=document.getElementById('cp-'+id);if(e&&e.value)prevs[id]=e.value;});
-  var d=await fetch('/api/compras-pecas?action=marcar-caminho',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:idsCam,previsoes:prevs})}).then(function(r){return r.json();});
-  if(d.ok){document.getElementById('mod-caminho').classList.remove('open');sel.clear();idsCam=[];await pecLoad();toast('Movido para A Caminho!','var(--accent)');}
-  else toast('Erro: '+d.error,'var(--red)');
+async function confCaminho() {
+  var prevs = {};
+  idsCam.forEach(function(id) { var e = document.getElementById('cp-' + id); if (e && e.value) prevs[id] = e.value; });
+  var d = await req('marcar-caminho', { ids: idsCam, previsoes: prevs });
+  if (d.ok) { document.getElementById('mod-caminho').classList.remove('open'); sel.clear(); idsCam = []; await load(); toast('Movido para A Caminho!', 'var(--accent)'); }
+  else toast('Erro: ' + d.error, 'var(--red)');
 }
-async function recebeu(id){if(!confirm('Confirmar recebimento?'))return;var d=await fetch('/api/compras-pecas?action=marcar-recebido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[id]})}).then(function(r){return r.json();});if(d.ok){await pecLoad();toast('Peça recebida!','var(--green)');};}
-function editPrev(id){var p=itens.find(function(x){return x.id===id;});var nova=prompt('Previsão (AAAA-MM-DD):',p?(p.previsaoChegada||')':''));if(nova!==null)fetch('/api/compras-pecas?action=previsao',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,previsaoChegada:nova})}).then(function(d){return d.json();}).then(function(d){if(d.ok){pecLoad();toast('Previsão atualizada!');}});}
-
-function pecTab(a){
-  pecAbaAtual=a;
-  ['pendentes','aguardando','pago','caminho','online'].forEach(function(t){
-    document.getElementById('pectab-'+t).classList.toggle('active',t===a);
-    document.getElementById('pecpage-'+t).classList.toggle('active',t===a);
+async function recebeu(id) {
+  if (!confirm('Confirmar recebimento?')) return;
+  var d = await req('marcar-recebido', { ids: [id] });
+  if (d.ok) { await load(); toast('Peca recebida!', 'var(--green)'); }
+}
+function editPrev(id) {
+  var p = itens.find(function(x) { return x.id === id; });
+  var nova = prompt('Previsao (AAAA-MM-DD):', p ? (p.previsaoChegada || '') : '');
+  if (nova !== null) req('previsao', { id: id, previsaoChegada: nova }).then(function(d) { if (d.ok) { load(); toast('Previsao atualizada!'); } });
+}
+function copiarSel() {
+  var ids = [...sel].filter(function(id) { return itens.find(function(p) { return p.id === id && p.status === 'pendente'; }); });
+  if (!ids.length) return;
+  var t = ids.map(function(id, i) { var p = itens.find(function(x) { return x.id === id; }); return (i+1) + '. ' + p.descricao + (p.os ? ' - OS:' + p.os : '') + (p.quantidade > 1 ? ' (x' + p.quantidade + ')' : '') + (p.urgente ? ' URGENTE' : ''); }).join('\n');
+  navigator.clipboard.writeText(t).catch(function() { var ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); });
+  toast(ids.length + ' pecas copiadas!');
+}
+function tab(a) {
+  abaAtual = a;
+  ['pendentes','aguardando','pago','caminho','online'].forEach(function(t) {
+    document.getElementById('tab-' + t).classList.toggle('active', t === a);
+    document.getElementById('page-' + t).classList.toggle('active', t === a);
   });
   updBtns();
 }
-
-function copiarSel(){
-  var ids=[...sel].filter(function(id){return itens.find(function(p){return p.id===id&&p.status==='pendente';});});
-  if(!ids.length)return;
-  var t=ids.map(function(id,i){var p=itens.find(function(x){return x.id===id;});return(i+1)+'. '+p.descricao+(p.os?' - OS:'+p.os:'')+(p.quantidade>1?' (x'+p.quantidade+')':'')+(p.urgente?' URGENTE':'');}).join('\n');
-  navigator.clipboard.writeText(t).catch(function(){var ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);});
-  toast(ids.length+' peças copiadas!');
-}
-
-// ══════════════════════════════════════════════
-//  INIT
-// ══════════════════════════════════════════════
-osLoad();
-pecLoad();
-rastrLoad();
-setInterval(osLoad, 30000);
-setInterval(pecLoad, 60000);
+load();
+setInterval(load, 60000);
 </script>
 </body>
 </html>
