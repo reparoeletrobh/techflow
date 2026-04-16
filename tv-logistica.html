@@ -66,7 +66,7 @@ input[type=month].fi-sm::-webkit-calendar-picker-indicator{filter:invert(.5);}
 .fi-search{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-family:var(--fm);font-size:11px;color:var(--text);outline:none;width:170px;}
 .fi-search:focus{border-color:var(--accent);}
 table{width:100%;border-collapse:collapse;}
-thead th{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;position:sticky;top:108px;background:var(--bg);}
+thead th{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;background:var(--surface2);}
 tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
 tbody tr:hover{background:var(--surface);}
 tbody td{font-family:var(--fm);font-size:11px;padding:10px 12px;color:var(--text);}
@@ -76,7 +76,7 @@ tbody td{font-family:var(--fm);font-size:11px;padding:10px 12px;color:var(--text
 .abt{font-family:var(--fm);font-size:9px;padding:3px 8px;border-radius:5px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);transition:all .15s;margin-right:3px;}
 .abt:hover{color:var(--text);border-color:var(--text);}
 .abt.del:hover{color:var(--red);border-color:var(--red);}
-.empty-r{text-align:center;padding:40px;color:var(--muted);font-family:var(--fm);font-size:11px;}
+
 
 /* DASH */
 #page-dash{padding:24px;gap:18px;flex-direction:column;}
@@ -177,7 +177,8 @@ tbody td{font-family:var(--fm);font-size:11px;padding:10px 12px;color:var(--text
     <input type="text" class="fi-search" id="f-busca" placeholder="🔍 Buscar...">
     <span id="t-count" style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-left:auto;"></span>
   </div>
-  <div style="overflow-x:auto;">
+  <div id="empty-r" style="display:none;align-items:center;justify-content:center;padding:48px;font-family:var(--fm);font-size:11px;color:var(--muted);">Nenhum registro encontrado.</div>
+<div style="overflow-x:auto;">
     <table>
       <thead><tr>
         <th onclick="sortBy('data')" style="cursor:pointer">Data ⇅</th>
@@ -341,7 +342,13 @@ function renderT(){
   var list=getFiltered();
   document.getElementById('t-count').textContent=list.length+' registro'+(list.length!==1?'s':'');
   var tb=document.getElementById('tbody');
-  if(!list.length){ tb.innerHTML='<tr><td colspan="7" class="empty-r">Nenhum registro encontrado.</td></tr>'; return; }
+  var emptyDiv=document.getElementById('empty-r');
+  if(!list.length){
+    tb.innerHTML='';
+    if(emptyDiv) emptyDiv.style.display='flex';
+    return;
+  }
+  if(emptyDiv) emptyDiv.style.display='none';
   tb.innerHTML=list.map(function(r){
     var b=r.motorista==='Wilde'?'<span class="bm bw">Wilde</span>':'<span class="bm bp">Paulo</span>';
     var ke=r.equipamentos>0?(r.km/r.equipamentos).toFixed(1)+' km':'—';
