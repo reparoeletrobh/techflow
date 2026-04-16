@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rastrear</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050508;--surface:#0d0d14;--surface2:#13131e;--border:#1e1e2e;
+  --text:#e8e8f0;--muted:#5a5a7a;
+  --accent:#3b9eff;--green:#22c55e;--red:#ef4444;--yellow:#f5c800;--orange:#f97316;--purple:#a855f7;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;}
+
+.top{padding:24px 24px 0;display:flex;flex-direction:column;gap:4px;}
+.page-title{font-family:var(--fh);font-size:22px;font-weight:900;color:#fff;display:flex;align-items:center;gap:10px;}
+.page-sub{font-family:var(--fm);font-size:10px;color:var(--muted);}
+
+.search-wrap{padding:18px 24px 0;}
+.search-box{position:relative;}
+.search-input{
+  width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;
+  padding:13px 16px 13px 42px;font-family:var(--fb);font-size:14px;color:var(--text);
+  outline:none;transition:border .15s;
+}
+.search-input:focus{border-color:var(--purple);}
+.search-input::placeholder{color:var(--muted);}
+.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:16px;pointer-events:none;opacity:.5;}
+.clear-btn{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--muted);font-size:11px;padding:2px 7px;cursor:pointer;display:none;}
+.clear-btn:hover{color:var(--text);}
+
+.results-wrap{flex:1;padding:12px 24px 24px;overflow-y:auto;}
+
+/* Estado vazio / dica */
+.hint{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:60px 20px;text-align:center;}
+.hint-icon{font-size:36px;opacity:.25;}
+.hint-text{font-family:var(--fm);font-size:11px;color:var(--muted);line-height:1.8;}
+
+/* Spinner */
+.spinner{display:flex;align-items:center;justify-content:center;padding:40px;}
+.spin{width:22px;height:22px;border:2px solid var(--border);border-top-color:var(--purple);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* Grupo por tipo */
+.group{margin-bottom:20px;}
+.group-header{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px;display:flex;align-items:center;gap:8px;}
+.group-header::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* Resultado card */
+.result{
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:12px 14px;margin-bottom:6px;cursor:pointer;
+  display:flex;align-items:center;gap:12px;
+  transition:border-color .15s, background .15s;
+  text-decoration:none;
+}
+.result:hover{border-color:var(--purple);background:rgba(168,85,247,.06);}
+.result:active{transform:scale(.99);}
+
+.result-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.result-icon.os     {background:rgba(59,158,255,.12);}
+.result-icon.garantia{background:rgba(245,200,0,.1);}
+.result-icon.peca   {background:rgba(249,115,22,.1);}
+
+.result-body{flex:1;min-width:0;}
+.result-label{font-size:13px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.result-sub{font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+.result-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;}
+.fase-badge{font-family:var(--fm);font-size:9px;font-weight:700;padding:2px 8px;border-radius:99px;border:1px solid;white-space:nowrap;}
+.result-date{font-family:var(--fm);font-size:8px;color:var(--muted);}
+
+.result-arrow{font-size:14px;color:var(--muted);flex-shrink:0;opacity:.5;}
+
+/* Sem resultados */
+.no-results{font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px 20px;}
+.no-results strong{color:var(--text);}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="page-title">🔍 Rastrear</div>
+  <div class="page-sub">Busca em tempo real em todo o sistema</div>
+</div>
+
+<div class="search-wrap">
+  <div class="search-box">
+    <span class="search-icon">🔍</span>
+    <input
+      class="search-input"
+      id="search"
+      placeholder="Nome, OS, peça, telefone, defeito..."
+      autocomplete="off"
+      autofocus
+    />
+    <button class="clear-btn" id="clear-btn" onclick="limpar()">✕ limpar</button>
+  </div>
+</div>
+
+<div class="results-wrap" id="results-wrap">
+  <div class="hint">
+    <div class="hint-icon">🔎</div>
+    <div class="hint-text">
+      Digite qualquer coisa — nome de cliente,<br>
+      número de OS, peça, telefone, defeito...<br><br>
+      Os resultados aparecem enquanto você digita<br>
+      e levam direto à fase atual.
+    </div>
+  </div>
+</div>
+
+<script>
+var searchTimer = null;
+var lastQ = '';
+
+var TIPO_ICON  = { os: '🔧', garantia: '🛡️', peca: '📦' };
+var TIPO_LABEL = { os: 'Ordens de Serviço', garantia: 'Garantia', peca: 'Compra de Peças' };
+
+document.getElementById('search').addEventListener('input', function() {
+  var q = this.value.trim();
+  document.getElementById('clear-btn').style.display = q ? 'block' : 'none';
+  clearTimeout(searchTimer);
+  if (!q) { showHint(); lastQ = ''; return; }
+  if (q === lastQ) return;
+  lastQ = q;
+  if (q.length < 2) return;
+  searchTimer = setTimeout(function() { buscar(q); }, 280);
+});
+
+document.getElementById('search').addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') limpar();
+});
+
+function limpar() {
+  document.getElementById('search').value = '';
+  document.getElementById('clear-btn').style.display = 'none';
+  lastQ = '';
+  showHint();
+  document.getElementById('search').focus();
+}
+
+function showHint() {
+  document.getElementById('results-wrap').innerHTML =
+    '<div class="hint"><div class="hint-icon">🔎</div><div class="hint-text">Digite qualquer coisa — nome de cliente,<br>número de OS, peça, telefone, defeito...<br><br>Os resultados aparecem enquanto você digita<br>e levam direto à fase atual.</div></div>';
+}
+
+function showSpinner() {
+  document.getElementById('results-wrap').innerHTML = '<div class="spinner"><div class="spin"></div></div>';
+}
+
+async function buscar(q) {
+  showSpinner();
+  try {
+    var r = await fetch('/api/rastrear?q=' + encodeURIComponent(q));
+    var d = await r.json();
+    renderResults(q, d.results || []);
+  } catch(e) {
+    document.getElementById('results-wrap').innerHTML =
+      '<div class="no-results">Erro ao buscar. Tente novamente.</div>';
+  }
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  return d.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'});
+}
+
+function renderResults(q, results) {
+  var wrap = document.getElementById('results-wrap');
+
+  if (!results.length) {
+    wrap.innerHTML = '<div class="no-results">Nenhum resultado para <strong>"' + esc(q) + '"</strong></div>';
+    return;
+  }
+
+  // Agrupa por tipo
+  var grupos = {};
+  results.forEach(function(r) {
+    if (!grupos[r.tipo]) grupos[r.tipo] = [];
+    grupos[r.tipo].push(r);
+  });
+
+  var html = '';
+  var ordem = ['os', 'garantia', 'peca'];
+  ordem.forEach(function(tipo) {
+    if (!grupos[tipo] || !grupos[tipo].length) return;
+    var lista = grupos[tipo];
+    html += '<div class="group">';
+    html += '<div class="group-header">' +
+      TIPO_ICON[tipo] + ' ' + TIPO_LABEL[tipo] +
+      ' <span style="color:var(--muted);font-size:8px;margin-left:2px;">(' + lista.length + ')</span>' +
+    '</div>';
+    lista.forEach(function(r) {
+      html += buildCard(r);
+    });
+    html += '</div>';
+  });
+
+  wrap.innerHTML = html;
+}
+
+function buildCard(r) {
+  var cor = r.cor || '#5a5a7a';
+  // Borda e background do badge com opacidade — inline sem CSS vars dinâmicas
+  var badgeStyle = 'color:' + cor + ';border-color:' + cor + '55;background:' + cor + '18;';
+  var iconClass = 'result-icon ' + r.tipo;
+  var dataStr = encodeURIComponent(JSON.stringify(r));
+
+  return '<div class="result" onclick=\'irPara(' + JSON.stringify(r.url) + ',' + JSON.stringify(r.tipo) + ',' + JSON.stringify(r.id) + ')\'>' +
+    '<div class="' + iconClass + '">' + TIPO_ICON[r.tipo] + '</div>' +
+    '<div class="result-body">' +
+      '<div class="result-label">' + esc(r.label) + '</div>' +
+      (r.sublabel ? '<div class="result-sub">' + esc(r.sublabel) + '</div>' : '') +
+    '</div>' +
+    '<div class="result-right">' +
+      '<span class="fase-badge" style="' + badgeStyle + '">' + esc(r.fase) + '</span>' +
+      (r.updatedAt ? '<span class="result-date">' + fmtDate(r.updatedAt) + '</span>' : '') +
+    '</div>' +
+    '<span class="result-arrow">›</span>' +
+  '</div>';
+}
+
+function irPara(url, tipo, id) {
+  // Tenta navegar pelo pai (quando carregado dentro do iframe do adm.html)
+  try {
+    if (window.parent && window.parent !== window && typeof window.parent.navTo === 'function') {
+      window.parent.navTo(url);
+      return;
+    }
+  } catch(e) {}
+  // Fallback: navega a janela atual
+  window.location.href = url;
+}
+</script>
+</body>
+</html>
