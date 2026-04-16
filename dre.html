@@ -327,8 +327,9 @@ body.tv-mode .tv-screen{display:flex;}
         <div class="panel-title">📥 Recebíveis</div>
         <div class="filter-tabs" id="rec-tabs">
           <button class="ftab active" onclick="recFilter('todos',this)">Todos</button>
-          <button class="ftab" onclick="recFilter('urgente',this)">🔴 Urgentes</button>
-          <button class="ftab" onclick="recFilter('andamento',this)">🟡 Em andamento</button>
+          <button class="ftab" onclick="recFilter('aguardando_dados',this)">Ag. Dados</button>
+          <button class="ftab" onclick="recFilter('faturamento',this)">Faturamento</button>
+          <button class="ftab" onclick="recFilter('pagamento_agendado',this)">Pag. Agendado</button>
         </div>
         <div id="rec-sum" class="sum-row"></div>
         <div id="rec-content"></div>
@@ -714,7 +715,7 @@ function updateBadges() {
   var kpis = S.data.kpis;
   var sbRec = document.getElementById('sb-rec-badge');
   var sbPay = document.getElementById('sb-pay-badge');
-  if (kpis.recebiveisTotal > 0) { sbRec.textContent=kpis.recebiveisTotal; sbRec.style.display='inline'; }
+  if (kpis.recebiveisCount > 0) { sbRec.textContent=kpis.recebiveisCount; sbRec.style.display='inline'; }
   else sbRec.style.display='none';
   if (kpis.fixasPendentes > 0) { sbPay.textContent=kpis.fixasPendentes; sbPay.style.display='inline'; }
   else sbPay.style.display='none';
@@ -752,8 +753,8 @@ function renderKPIs() {
     </div>
     <div class="kpi-box blue">
       <div class="kpi-label">Recebíveis em Aberto</div>
-      <div class="kpi-val blue">${k.recebiveisTotal}</div>
-      <div class="kpi-sub">🔴 ${k.recebiveisUrgentes} aguard. pagamento</div>
+      <div class="kpi-val blue">${k.recebiveisCount}</div>
+      <div class="kpi-sub">Total: ${brl(k.recebiveisValor$)}</div>
     </div>
     <div class="kpi-box orange">
       <div class="kpi-label">A Pagar Esta Semana</div>
@@ -764,7 +765,7 @@ function renderKPIs() {
   document.getElementById('kpi-grid').innerHTML = html;
 
   // Recebíveis urgentes no dash
-  var rec = (S.data.recebiveis||[]).filter(x=>x.urgente).slice(0,4);
+  var rec = (S.data.recebiveis||[]).slice(0,4);
   document.getElementById('dash-rec').innerHTML = rec.length
     ? rec.map(r=>`<div class="card-item rec-urgente" style="margin-bottom:6px;">
         <span class="card-icon">🟡</span>
@@ -774,7 +775,7 @@ function renderKPIs() {
         </div>
         <button class="btn-sm" style="color:var(--green);" onclick="abrirConfirmarOS(${JSON.stringify(r).replace(/"/g,'&quot;')})">Confirmar</button>
       </div>`).join('')
-    : '<div class="empty">Nenhum recebível urgente</div>';
+    : '<div class="empty">Nenhum recebível em aberto</div>';
 
   // A pagar semana no dash
   var fp = (S.data.aPagar?.fixas||[]).slice(0,4);
@@ -957,28 +958,26 @@ function recFilter(f, el) {
 function renderRecebiveis() {
   if (!S.data) return;
   var all = S.data.recebiveis||[];
-  var URGENTES_PHASES = new Set(['loja_feito','delivery_feito','aguardando_ret']);
-  var EM_AND_PHASES   = new Set(['producao','cliente_loja','urgencia','aprovado','comprar_peca','aguardando_peca','peca_disponivel']);
 
   var lista = all;
-  if (_recFilter==='urgente')   lista = all.filter(r=>r.urgente);
-  if (_recFilter==='andamento') lista = all.filter(r=>!r.urgente);
+  if (_recFilter !== 'todos') lista = all.filter(r=>r.phaseId === _recFilter);
 
   // Summary
+  const totalValor$ = all.reduce((s,r)=>s+(r.valor||0), 0);
   document.getElementById('rec-sum').innerHTML = `
-    <div class="sum-box"><div class="sum-label">Total Recebíveis</div><div class="sum-val" style="color:var(--blue);">${all.length}</div></div>
-    <div class="sum-box"><div class="sum-label">🔴 Urgentes</div><div class="sum-val" style="color:var(--orange);">${all.filter(r=>r.urgente).length}</div></div>
-    <div class="sum-box"><div class="sum-label">🟡 Em andamento</div><div class="sum-val" style="color:var(--yellow);">${all.filter(r=>!r.urgente).length}</div></div>`;
+    <div class="sum-box"><div class="sum-label">Total Fichas</div><div class="sum-val" style="color:var(--blue);">${all.length}</div></div>
+    <div class="sum-box"><div class="sum-label">Valor Total</div><div class="sum-val" style="color:var(--green);">${brl(totalValor$)}</div></div>
+    <div class="sum-box"><div class="sum-label">Ticket Médio</div><div class="sum-val">${brl(all.length > 0 ? totalValor$/all.length : 0)}</div></div>`;
 
   if (!lista.length) { document.getElementById('rec-content').innerHTML='<div class="empty">Nenhum recebível encontrado</div>'; return; }
 
   // Sort: urgentes first
-  lista = [...lista].sort((a,b) => (b.urgente?1:0)-(a.urgente?1:0));
+  lista = [...lista].sort((a,b) => (a.nomeContato||'').localeCompare(b.nomeContato||''));
 
   document.getElementById('rec-content').innerHTML = '<div class="cards-list">'+lista.map(r=>{
-    var urgClass = r.urgente ? 'rec-urgente' : '';
-    var phaseColors = {aguardando_dados:'badge-muted',nf_emitida:'badge-blue',faturamento:'badge-blue',pagamento_agendado:'badge-yellow',analise_pagamento:'badge-orange',pagamento_confirmado:'badge-green'};
-    var urgBadge = r.urgente ? '<span class="badge badge-orange">'+esc(r.phaseLabel)+'</span>' : '<span class="badge '+(phaseColors[r.phaseId]||'badge-muted')+'">'+esc(r.phaseLabel)+'</span>';
+    var urgClass = '';
+    var phaseColors = {aguardando_dados:'badge-muted',nf_emitida:'badge-blue',faturamento:'badge-blue',pagamento_agendado:'badge-green',analise_pagamento:'badge-green',pagamento_confirmado:'badge-green'};
+    var phBadge = '<span class="badge '+(phaseColors[r.phaseId]||'badge-muted')+'">'+esc(r.phaseLabel)+'</span>';
     var days = r.addedAt ? Math.floor((Date.now()-new Date(r.addedAt).getTime())/86400000) : null;
     var dayStr = days!=null ? `${days}d em aberto` : '';
     return `<div class="card-item ${urgClass}">
@@ -988,7 +987,8 @@ function renderRecebiveis() {
         <div class="card-sub">#${r.osCode||r.pipefyId||'—'} ${dayStr?'· '+dayStr:''}</div>
       </div>
       <div class="card-right">
-        ${urgBadge}
+        ${r.valor > 0 ? '<div class=\"val-green\">'+brl(r.valor)+'</div>' : ''}
+        ${phBadge}
         <button class="btn-sm" style="color:var(--green);border-color:rgba(34,197,94,.3);" onclick='abrirConfirmarOS(${JSON.stringify(r)})'>✅ Confirmar</button>
       </div>
     </div>`;
@@ -1206,13 +1206,13 @@ function renderTV() {
   document.getElementById('tv-meta-sub').textContent= brl(k.receitaMes)+' de '+brl(k.metaMensal);
   document.getElementById('tv-meta-bar').style.width = Math.min(k.metaPct||0,100)+'%';
 
-  var recUr = (S.data.recebiveis||[]).filter(r=>r.urgente).slice(0,5);
+  var recUr = (S.data.recebiveis||[]).slice(0,5);
   document.getElementById('tv-rec-list').innerHTML = recUr.length
     ? recUr.map(r=>`<div class="tv-item">
         <div><div class="tv-item-name">${esc(r.nomeContato||r.title||'—')}</div><div class="tv-item-sub">#${r.osCode||''} · ${esc(r.phaseLabel)}</div></div>
-        <span style="font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;background:rgba(249,115,22,.15);color:var(--orange);border:1px solid rgba(249,115,22,.3);">URGENTE</span>
+        ${r.valor>0?'<div style=\"font-family:var(--fh);font-size:12px;font-weight:800;color:var(--green);">'+brl(r.valor)+'</div>':''}
       </div>`).join('')
-    : '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);padding:20px;text-align:center;">✅ Sem recebíveis urgentes</div>';
+    : '<div style="font-family:var(--fm);font-size:10px;color:var(--muted);padding:20px;text-align:center;">✅ Nenhum recebível em aberto</div>';
 
   document.getElementById('tv-apagar-info').textContent =
     `A pagar esta semana: ${brl(k.apagarSemana)} · ${k.fixasPendentes} conta${k.fixasPendentes!==1?'s':''} fixa pendente`;
