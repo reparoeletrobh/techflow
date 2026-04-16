@@ -8,335 +8,71 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Inter:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg:       #050508;
-  --surface:  #0d0d14;
-  --surface2: #13131e;
-  --border:   #1e1e2e;
-  --text:     #e8e8f0;
-  --muted:    #5a5a7a;
-  --sidebar-w: 220px;
-  --sidebar-collapsed: 60px;
-  --fh: 'Syne', sans-serif;
-  --fm: 'DM Mono', monospace;
-  --fb: 'Inter', sans-serif;
+  --bg: #050508; --surface: #0d0d14; --surface2: #13131e; --border: #1e1e2e;
+  --text: #e8e8f0; --muted: #5a5a7a;
+  --sidebar-w: 220px; --sidebar-collapsed: 60px;
+  --fh: 'Syne', sans-serif; --fm: 'DM Mono', monospace; --fb: 'Inter', sans-serif;
 }
-
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--fb); }
-
-/* ── LAYOUT ──────────────────────────────────────────────── */
-.shell {
-  display: flex;
-  height: 100vh;
-  width: 100vw;
-}
-
-/* ── SIDEBAR ─────────────────────────────────────────────── */
-.sidebar {
-  width: var(--sidebar-w);
-  min-width: var(--sidebar-w);
-  background: var(--surface);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  transition: width .25s cubic-bezier(.4,0,.2,1), min-width .25s cubic-bezier(.4,0,.2,1);
-  overflow: hidden;
-  z-index: 10;
-  position: relative;
-}
-.sidebar.collapsed {
-  width: var(--sidebar-collapsed);
-  min-width: var(--sidebar-collapsed);
-}
-
-/* Logo */
-.sidebar-logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 16px;
-  height: 56px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-  overflow: hidden;
-  white-space: nowrap;
-}
-.logo-dot {
-  width: 8px; height: 8px;
-  background: #fff;
-  border-radius: 50%;
-  box-shadow: 0 0 10px #fff;
-  flex-shrink: 0;
-}
-.logo-text {
-  font-family: var(--fh);
-  font-size: 15px;
-  font-weight: 900;
-  letter-spacing: -.5px;
-  opacity: 1;
-  transition: opacity .2s;
-}
+.shell { display: flex; height: 100vh; width: 100vw; }
+.sidebar { width: var(--sidebar-w); min-width: var(--sidebar-w); background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; transition: width .25s cubic-bezier(.4,0,.2,1), min-width .25s cubic-bezier(.4,0,.2,1); overflow: hidden; z-index: 10; position: relative; }
+.sidebar.collapsed { width: var(--sidebar-collapsed); min-width: var(--sidebar-collapsed); }
+.sidebar-logo { display: flex; align-items: center; gap: 10px; padding: 0 16px; height: 56px; border-bottom: 1px solid var(--border); flex-shrink: 0; overflow: hidden; white-space: nowrap; }
+.logo-dot { width: 8px; height: 8px; background: #fff; border-radius: 50%; box-shadow: 0 0 10px #fff; flex-shrink: 0; }
+.logo-text { font-family: var(--fh); font-size: 15px; font-weight: 900; letter-spacing: -.5px; opacity: 1; transition: opacity .2s; }
 .logo-text span { color: #ffffff; opacity: .4; }
 .sidebar.collapsed .logo-text { opacity: 0; pointer-events: none; }
-
-/* Nav items */
-.nav-list {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 10px 0;
-}
+.nav-list { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 10px 0; }
 .nav-list::-webkit-scrollbar { width: 3px; }
 .nav-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 10px;
-  height: 42px;
-  margin: 2px 8px;
-  border-radius: 8px;
-  cursor: pointer;
-  border-left: none;
-  transition: background .15s, border-color .15s;
-  white-space: nowrap;
-  overflow: hidden;
-  position: relative;
-  user-select: none;
-  background: color-mix(in srgb, var(--item-color, #888) 38%, #0d0d14);
-  border: 1px solid color-mix(in srgb, var(--item-color, #888) 55%, transparent);
-}
-.nav-item:hover {
-  background: color-mix(in srgb, var(--item-color, #888) 50%, #0d0d14);
-  border-color: color-mix(in srgb, var(--item-color, #888) 70%, transparent);
-}
-.nav-item.active {
-  background: color-mix(in srgb, var(--item-color, #888) 55%, #0d0d14);
-  border-color: color-mix(in srgb, var(--item-color, #888) 80%, transparent);
-}
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 0 10px; height: 42px; margin: 2px 8px; border-radius: 8px; cursor: pointer; border-left: none; transition: background .15s, border-color .15s; white-space: nowrap; overflow: hidden; position: relative; user-select: none; background: color-mix(in srgb, var(--item-color, #888) 38%, #0d0d14); border: 1px solid color-mix(in srgb, var(--item-color, #888) 55%, transparent); }
+.nav-item:hover { background: color-mix(in srgb, var(--item-color, #888) 50%, #0d0d14); border-color: color-mix(in srgb, var(--item-color, #888) 70%, transparent); }
+.nav-item.active { background: color-mix(in srgb, var(--item-color, #888) 55%, #0d0d14); border-color: color-mix(in srgb, var(--item-color, #888) 80%, transparent); }
 .nav-item.active .nav-label { color: #fff; font-weight: 600; }
-.nav-item:hover  .nav-label { color: #fff; }
-
-.nav-icon {
-  font-size: 17px;
-  flex-shrink: 0;
-  width: 26px;
-  text-align: center;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.nav-label {
-  font-family: var(--fm);
-  font-size: 11px;
-  font-weight: 500;
-  color: rgba(255,255,255,.9);
-  transition: opacity .2s, color .15s;
-  letter-spacing: .03em;
-}
+.nav-item:hover .nav-label { color: #fff; }
+.nav-icon { font-size: 17px; flex-shrink: 0; width: 26px; text-align: center; display: flex; align-items: center; justify-content: center; }
+.nav-label { font-family: var(--fm); font-size: 11px; font-weight: 500; color: rgba(255,255,255,.9); transition: opacity .2s, color .15s; letter-spacing: .03em; }
 .sidebar.collapsed .nav-label { opacity: 0; }
 .sidebar.collapsed .nav-item { margin: 2px 6px; justify-content: center; padding: 0; }
-
-/* Tooltip quando collapsed */
-.sidebar.collapsed .nav-item:hover::after {
-  content: attr(data-label);
-  position: absolute;
-  left: calc(var(--sidebar-collapsed) + 8px);
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  color: var(--text);
-  font-family: var(--fm);
-  font-size: 11px;
-  padding: 5px 10px;
-  border-radius: 6px;
-  white-space: nowrap;
-  z-index: 999;
-  pointer-events: none;
-  box-shadow: 0 4px 16px rgba(0,0,0,.4);
-}
-
-/* Separator */
-.nav-sep {
-  height: 1px;
-  background: var(--border);
-  margin: 6px 12px;
-}
-
-/* Toggle button */
-.toggle-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 48px;
-  border-top: 1px solid var(--border);
-  cursor: pointer;
-  color: var(--muted);
-  transition: background .15s, color .15s;
-  flex-shrink: 0;
-  font-size: 14px;
-  gap: 8px;
-  white-space: nowrap;
-  overflow: hidden;
-  padding: 0 16px;
-}
+.sidebar.collapsed .nav-item:hover::after { content: attr(data-label); position: absolute; left: calc(var(--sidebar-collapsed) + 8px); background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-family: var(--fm); font-size: 11px; padding: 5px 10px; border-radius: 6px; white-space: nowrap; z-index: 999; pointer-events: none; box-shadow: 0 4px 16px rgba(0,0,0,.4); }
+.nav-sep { height: 1px; background: var(--border); margin: 6px 12px; }
+.toggle-btn { display: flex; align-items: center; justify-content: center; height: 48px; border-top: 1px solid var(--border); cursor: pointer; color: var(--muted); transition: background .15s, color .15s; flex-shrink: 0; font-size: 14px; gap: 8px; white-space: nowrap; overflow: hidden; padding: 0 16px; }
 .toggle-btn:hover { background: var(--surface2); color: var(--text); }
-.toggle-btn .toggle-icon {
-  flex-shrink: 0;
-  transition: transform .25s;
-}
+.toggle-btn .toggle-icon { flex-shrink: 0; transition: transform .25s; }
 .sidebar.collapsed .toggle-icon { transform: scaleX(-1); }
-.toggle-label {
-  font-family: var(--fm);
-  font-size: 10px;
-  transition: opacity .2s;
-}
+.toggle-label { font-family: var(--fm); font-size: 10px; transition: opacity .2s; }
 .sidebar.collapsed .toggle-label { opacity: 0; }
-
-/* ── CONTENT AREA ────────────────────────────────────────── */
-.content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--bg);
-}
-
-/* Welcome screen */
-.welcome {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  opacity: 1;
-  transition: opacity .2s;
-}
+.content { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+.welcome { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; opacity: 1; transition: opacity .2s; }
 .welcome.hidden { display: none; }
 .welcome-icon { font-size: 40px; opacity: .3; }
-.welcome-text {
-  font-family: var(--fm);
-  font-size: 12px;
-  color: var(--muted);
-  text-align: center;
-  line-height: 1.8;
-}
-.welcome-arrow {
-  font-family: var(--fm);
-  font-size: 11px;
-  color: var(--muted);
-  opacity: .5;
-}
-
-/* iFrame */
-.frame-wrap {
-  flex: 1;
-  display: none;
-  overflow: hidden;
-}
+.welcome-text { font-family: var(--fm); font-size: 12px; color: var(--muted); text-align: center; line-height: 1.8; }
+.welcome-arrow { font-family: var(--fm); font-size: 11px; color: var(--muted); opacity: .5; }
+.frame-wrap { flex: 1; display: none; overflow: hidden; }
 .frame-wrap.visible { display: flex; }
-.frame-wrap iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-  background: var(--bg);
-}
-
-/* Loading bar */
-.load-bar {
-  height: 2px;
-  background: transparent;
-  position: relative;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-.load-bar.loading {
-  background: var(--border);
-}
-.load-bar.loading::after {
-  content: '';
-  position: absolute;
-  top: 0; left: -40%;
-  width: 40%;
-  height: 100%;
-  background: currentColor;
-  animation: slide 1s linear infinite;
-}
+.frame-wrap iframe { width: 100%; height: 100%; border: none; background: var(--bg); }
+.load-bar { height: 2px; background: transparent; position: relative; overflow: hidden; flex-shrink: 0; }
+.load-bar.loading { background: var(--border); }
+.load-bar.loading::after { content: ''; position: absolute; top: 0; left: -40%; width: 40%; height: 100%; background: currentColor; animation: slide 1s linear infinite; }
 @keyframes slide { to { left: 100%; } }
-
-/* ── MOBILE ─────────────────────────────────────────────────── */
 @media (max-width: 768px) {
-  .sidebar {
-    position: fixed;
-    top: 0; left: 0;
-    height: 100dvh;
-    z-index: 300;
-    transform: translateX(-100%);
-    transition: transform .25s cubic-bezier(.4,0,.2,1), width .25s;
-    box-shadow: 4px 0 24px rgba(0,0,0,.5);
-    width: var(--sidebar-w) !important;
-    min-width: var(--sidebar-w) !important;
-  }
-  .sidebar.mobile-open {
-    transform: translateX(0);
-  }
-  .sidebar.collapsed {
-    width: var(--sidebar-w) !important;
-    min-width: var(--sidebar-w) !important;
-  }
-  .sidebar.collapsed .logo-text,
-  .sidebar.collapsed .nav-label,
-  .sidebar.collapsed .toggle-label { opacity: 1 !important; pointer-events: auto !important; }
+  .sidebar { position: fixed; top: 0; left: 0; height: 100dvh; z-index: 300; transform: translateX(-100%); transition: transform .25s cubic-bezier(.4,0,.2,1), width .25s; box-shadow: 4px 0 24px rgba(0,0,0,.5); width: var(--sidebar-w) !important; min-width: var(--sidebar-w) !important; }
+  .sidebar.mobile-open { transform: translateX(0); }
+  .sidebar.collapsed { width: var(--sidebar-w) !important; min-width: var(--sidebar-w) !important; }
+  .sidebar.collapsed .logo-text, .sidebar.collapsed .nav-label, .sidebar.collapsed .toggle-label { opacity: 1 !important; pointer-events: auto !important; }
   .sidebar.collapsed .nav-item { margin: 2px 8px; justify-content: flex-start !important; padding: 0 12px !important; }
   .sidebar.collapsed .nav-item:hover::after { display: none; }
   .toggle-btn { display: none; }
-  .mobile-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,.55);
-    z-index: 299;
-    backdrop-filter: blur(2px);
-  }
+  .mobile-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 299; backdrop-filter: blur(2px); }
   .mobile-overlay.active { display: block; }
-  .hamburger {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px; height: 36px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface);
-    cursor: pointer;
-    flex-shrink: 0;
-    z-index: 200;
-  }
-  .hamburger span {
-    display: block;
-    width: 16px; height: 2px;
-    background: var(--text);
-    border-radius: 2px;
-    position: relative;
-  }
-  .hamburger span::before,
-  .hamburger span::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    width: 16px; height: 2px;
-    background: var(--text);
-    border-radius: 2px;
-  }
+  .hamburger { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); cursor: pointer; flex-shrink: 0; z-index: 200; }
+  .hamburger span { display: block; width: 16px; height: 2px; background: var(--text); border-radius: 2px; position: relative; }
+  .hamburger span::before, .hamburger span::after { content: ''; position: absolute; left: 0; width: 16px; height: 2px; background: var(--text); border-radius: 2px; }
   .hamburger span::before { top: -5px; }
-  .hamburger span::after  { top:  5px; }
-  .main-area { margin-left: 0 !important; }
+  .hamburger span::after { top: 5px; }
   .content { padding-top: 52px !important; }
-  .hamburger {
-    position: fixed;
-    top: 12px; left: 12px;
-    z-index: 298;
-  }
+  .hamburger { position: fixed; top: 12px; left: 12px; z-index: 298; }
 }
 @media (min-width: 769px) {
   .hamburger { display: none !important; }
@@ -346,120 +82,84 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
 </head>
 <body>
 <div class="shell">
-
-  <!-- SIDEBAR -->
-  <!-- Mobile overlay -->
   <div class="mobile-overlay" id="mobile-overlay" onclick="closeMobileSidebar()"></div>
-
   <div class="sidebar" id="sidebar">
-
     <div class="sidebar-logo">
       <div class="logo-dot"></div>
       <div class="logo-text">Reparo<span>Eletro</span></div>
     </div>
-
     <div class="nav-list">
 
-      <div class="nav-item" data-url="/tecnico" data-label="Técnico"
-           style="--item-color:#f5c800" onclick="openPage(this)">
+      <!-- RASTREAR — busca global -->
+      <div class="nav-item" data-url="/rastrear" data-label="Rastrear" style="--item-color:#a855f7" onclick="openPage(this)">
+        <span class="nav-icon" style="background:rgba(168,85,247,.15);">🔍</span>
+        <span class="nav-label">Rastrear</span>
+      </div>
+      <div class="nav-sep"></div>
+
+      <div class="nav-item" data-url="/tecnico" data-label="Técnico" style="--item-color:#f5c800" onclick="openPage(this)">
         <span class="nav-icon" style="background:rgba(245,200,0,.15);">🔧</span>
         <span class="nav-label">Técnico</span>
       </div>
-
-      <div class="nav-item" data-url="/financeiro#fichas" data-label="Financeiro"
-           style="--item-color:#22c55e" onclick="openPage(this)">
+      <div class="nav-item" data-url="/financeiro#fichas" data-label="Financeiro" style="--item-color:#22c55e" onclick="openPage(this)">
         <span class="nav-icon" style="background:rgba(34,197,94,.15);">💼</span>
         <span class="nav-label">Financeiro</span>
       </div>
-
-      <div class="nav-item" data-url="/orcamento" data-label="Orçamento"
-           style="--item-color:#25d366" onclick="openPage(this)">
+      <div class="nav-item" data-url="/orcamento" data-label="Orçamento" style="--item-color:#25d366" onclick="openPage(this)">
         <span class="nav-icon" style="background:rgba(37,211,102,.15);">📋</span>
         <span class="nav-label">Orçamento</span>
       </div>
-
-      <div class="nav-item" data-url="/vendas" data-label="Vendas"
-           style="--item-color:#f97316" onclick="openPage(this)">
+      <div class="nav-item" data-url="/vendas" data-label="Vendas" style="--item-color:#f97316" onclick="openPage(this)">
         <span class="nav-icon" style="background:rgba(249,115,22,.15);">🏪</span>
         <span class="nav-label">Vendas</span>
       </div>
-
       <div class="nav-sep"></div>
-
-      <div class="nav-item" data-url="/equipamentos" data-label="Equipamentos"
-           style="--item-color:#3b9eff" onclick="openPage(this)">
+      <div class="nav-item" data-url="/equipamentos" data-label="Equipamentos" style="--item-color:#3b9eff" onclick="openPage(this)">
         <span class="nav-icon" style="background:rgba(59,158,255,.15);">📦</span>
         <span class="nav-label">Equipamentos</span>
       </div>
-
-      <div class="nav-item" data-url="/compra-equip" data-label="Compra Equip."
-           style="--item-color:#f59e0b" onclick="openPage(this)">
+      <div class="nav-item" data-url="/compra-equip" data-label="Compra Equip." style="--item-color:#f59e0b" onclick="openPage(this)">
         <span class="nav-icon" style="background:rgba(245,158,11,.15);">🛒</span>
         <span class="nav-label">Compra Equip.</span>
       </div>
-
-      <div class="nav-item" data-url="/compras-pecas" data-label="Compra de Peças"
-           style="--item-color:#f97316" onclick="openPage(this)">
-        <span class="nav-icon">🔩</span>
-        <span class="nav-label">Compra de Peças</span>
-      </div>
-
-      <div class="nav-item" data-url="/compras" data-label="Compras"
-           style="--item-color:#3b9eff" onclick="openPage(this)">
-        <span class="nav-icon" style="background:rgba(59,158,255,.15);">🔩</span>
+      <div class="nav-item" data-url="/compras-pecas" data-label="Compras" style="--item-color:#f97316" onclick="openPage(this)">
+        <span class="nav-icon" style="background:rgba(249,115,22,.15);">🔩</span>
         <span class="nav-label">Compras</span>
       </div>
-
       <div class="nav-sep"></div>
-
-      <div class="nav-item" data-url="/lalamove" data-label="Lalamove"
-           style="--item-color:#8b5cf6" onclick="openPage(this)">
+      <div class="nav-item" data-url="/lalamove" data-label="Lalamove" style="--item-color:#8b5cf6" onclick="openPage(this)">
         <span class="nav-icon" style="background:rgba(139,92,246,.15);">🚗</span>
         <span class="nav-label">Lalamove</span>
       </div>
-
-      <div class="nav-item" data-url="/garantia" data-label="Garantia"
-           style="--item-color:#f59e0b" onclick="openPage(this)">
+      <div class="nav-item" data-url="/garantia" data-label="Garantia" style="--item-color:#f59e0b" onclick="openPage(this)">
         <span class="nav-icon">🛡️</span>
         <span class="nav-label">Garantia</span>
       </div>
-
-      <div class="nav-item" data-url="/metricas" data-label="Métricas"
-           style="--item-color:#f5c800" onclick="openPage(this)">
+      <div class="nav-item" data-url="/metricas" data-label="Métricas" style="--item-color:#f5c800" onclick="openPage(this)">
         <span class="nav-icon" style="background:rgba(245,200,0,.15);">📊</span>
         <span class="nav-label">Métricas</span>
       </div>
-
-      <div class="nav-item" data-url="/monitoramento" data-label="Monitoramento"
-           style="--item-color:#ef4444" onclick="openPage(this)">
+      <div class="nav-item" data-url="/monitoramento" data-label="Monitoramento" style="--item-color:#ef4444" onclick="openPage(this)">
         <span class="nav-icon">🔴</span>
         <span class="nav-label">Monitoramento</span>
       </div>
-
-      <div class="nav-item" data-url="/aguardando-retirada" data-label="Ag. Retirada"
-           style="--item-color:#f97316" onclick="openPage(this)">
+      <div class="nav-item" data-url="/aguardando-retirada" data-label="Ag. Retirada" style="--item-color:#f97316" onclick="openPage(this)">
         <span class="nav-icon">📦</span>
         <span class="nav-label">Ag. Retirada</span>
       </div>
-
     </div>
-
     <div class="toggle-btn" onclick="toggleSidebar()">
       <span class="toggle-icon">◀</span>
       <span class="toggle-label">Recolher</span>
     </div>
-
   </div>
 
-  <!-- Hamburger (mobile only) -->
   <button class="hamburger" id="hamburger-btn" onclick="toggleMobileSidebar()" aria-label="Menu">
     <span></span>
   </button>
 
-  <!-- CONTENT -->
   <div class="content">
     <div class="load-bar" id="load-bar"></div>
-
     <div class="welcome" id="welcome">
       <div class="welcome-icon">⚡</div>
       <div class="welcome-text">
@@ -468,20 +168,18 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
       </div>
       <div class="welcome-arrow">← escolha um módulo</div>
     </div>
-
     <div class="frame-wrap" id="frame-wrap">
       <iframe id="main-frame" src="" title="Painel"></iframe>
     </div>
   </div>
-
 </div>
 
 <script>
-var sidebar  = document.getElementById('sidebar');
-var welcome  = document.getElementById('welcome');
+var sidebar   = document.getElementById('sidebar');
+var welcome   = document.getElementById('welcome');
 var frameWrap = document.getElementById('frame-wrap');
-var frame    = document.getElementById('main-frame');
-var loadBar  = document.getElementById('load-bar');
+var frame     = document.getElementById('main-frame');
+var loadBar   = document.getElementById('load-bar');
 var collapsed = false;
 
 function toggleSidebar() {
@@ -491,16 +189,13 @@ function toggleSidebar() {
   if (lbl) lbl.textContent = collapsed ? 'Expandir' : 'Recolher';
 }
 
-// Mobile sidebar
 var mobileOpen = false;
 var mobileOverlay = document.getElementById('mobile-overlay');
-
 function toggleMobileSidebar() {
   mobileOpen = !mobileOpen;
   sidebar.classList.toggle('mobile-open', mobileOpen);
   mobileOverlay.classList.toggle('active', mobileOpen);
 }
-
 function closeMobileSidebar() {
   mobileOpen = false;
   sidebar.classList.remove('mobile-open');
@@ -510,32 +205,35 @@ function closeMobileSidebar() {
 function openPage(el) {
   var url = el.getAttribute('data-url');
   if (!url) return;
-  // Close mobile sidebar when navigating
   closeMobileSidebar();
-
-  // Active state
   document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
   el.classList.add('active');
-
-  // Show frame, hide welcome
   welcome.classList.add('hidden');
   frameWrap.classList.add('visible');
-
-  // Loading bar
   loadBar.classList.add('loading');
   loadBar.style.color = getComputedStyle(el).getPropertyValue('--item-color') || '#fff';
-
-  // Load iframe
-  frame.onload = function() {
-    loadBar.classList.remove('loading');
-  };
+  frame.onload = function() { loadBar.classList.remove('loading'); };
   frame.src = url;
 }
 
-// Support browser back/forward via keyboard
+// Chamado de dentro do iframe (rastrear.html) para navegar para outro módulo
+function navTo(url) {
+  var navItem = document.querySelector('.nav-item[data-url="' + url + '"]');
+  if (navItem) {
+    openPage(navItem);
+  } else {
+    // URL não tem nav item direto — carrega no iframe mesmo assim
+    welcome.classList.add('hidden');
+    frameWrap.classList.add('visible');
+    loadBar.classList.add('loading');
+    frame.onload = function() { loadBar.classList.remove('loading'); };
+    frame.src = url;
+  }
+}
+
 document.addEventListener('keydown', function(e) {
-  if (e.altKey && e.key === 'ArrowLeft')  { frame.contentWindow?.history.back();    }
-  if (e.altKey && e.key === 'ArrowRight') { frame.contentWindow?.history.forward();  }
+  if (e.altKey && e.key === 'ArrowLeft')  { frame.contentWindow?.history.back(); }
+  if (e.altKey && e.key === 'ArrowRight') { frame.contentWindow?.history.forward(); }
 });
 </script>
 </body>
