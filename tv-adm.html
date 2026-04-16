@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TV Assistência — ADM</title>
-<script src="/auth-guard.js" data-page="tv"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -246,95 +245,91 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
   <div class="sidebar" id="sidebar">
     <div class="sidebar-logo">
       <div class="logo-dot"></div>
-    <div id="user-badge" style="margin:0 12px 8px;padding:8px 10px;background:rgba(59,158,255,.08);border:1px solid rgba(59,158,255,.15);border-radius:8px;font-size:11px;display:flex;align-items:center;justify-content:space-between;gap:6px;">
-      <span id="user-name" style="font-family:'DM Mono',monospace;color:#7a96b8;"></span>
-      <button onclick="doLogout()" style="font-family:'DM Mono',monospace;font-size:9px;padding:3px 8px;border-radius:5px;border:1px solid rgba(240,64,96,.3);background:rgba(240,64,96,.08);color:#f04060;cursor:pointer;">Sair</button>
-    </div>
-      <div class="logo-text">TV <span>Assistência</span></div>
+    <div class="logo-text">TV <span>Assistência</span></div>
     </div>
 
     <div class="nav-list">
 
-      <div class="nav-item" data-url="/tv/tecnico" data-label="Técnico" data-perm="tv/tecnico"
+      <div class="nav-item" data-url="/tv/tecnico" data-label="Técnico"
            style="--item-color:#3b9eff" onclick="openPage(this)">
         <span class="nav-icon">🔧</span>
         <span class="nav-label">Técnico</span>
       </div>
 
-      <div class="nav-item" data-url="/tv/financeiro" data-label="Financeiro" data-perm="tv/financeiro"
+      <div class="nav-item" data-url="/tv/financeiro" data-label="Financeiro"
            style="--item-color:#22c55e" onclick="openPage(this)">
         <span class="nav-icon">💰</span>
         <span class="nav-label">Financeiro</span>
       </div>
 
-      <div class="nav-item" data-url="/tv/orcamento" data-label="Orçamento" data-perm="tv/orcamento"
+      <div class="nav-item" data-url="/tv/orcamento" data-label="Orçamento"
            style="--item-color:#f5c800" onclick="openPage(this)">
         <span class="nav-icon">📋</span>
         <span class="nav-label">Orçamento</span>
       </div>
 
-      <div class="nav-item" data-url="/tv/vendas" data-label="Vendas" data-perm="tv/vendas"
+      <div class="nav-item" data-url="/tv/vendas" data-label="Vendas"
            style="--item-color:#22c55e" onclick="openPage(this)">
         <span class="nav-icon">🏷️</span>
         <span class="nav-label">Vendas</span>
       </div>
 
-      <div class="nav-item" data-url="/tv/compra-equip" data-label="Compra Equip." data-perm="tv/compra-equip"
+      <div class="nav-item" data-url="/tv/compra-equip" data-label="Compra Equip."
            style="--item-color:#f5c800" onclick="openPage(this)">
         <span class="nav-icon">📦</span>
         <span class="nav-label">Compra Equip.</span>
       </div>
 
-      <div class="nav-item" data-url="/tv/compras-pecas" data-label="Compra de Peças" data-perm="tv/compras-pecas"
+      <div class="nav-item" data-url="/tv/compras-pecas" data-label="Compra de Peças"
            style="--item-color:#f97316" onclick="openPage(this)">
         <span class="nav-icon">🔩</span>
         <span class="nav-label">Compra de Peças</span>
       </div>
 
-      <div class="nav-item" data-url="/tv/compras" data-label="Compras" data-perm="tv/compras"
+      <div class="nav-item" data-url="/tv/compras" data-label="Compras"
            style="--item-color:#06b6d4" onclick="openPage(this)">
         <span class="nav-icon">🛒</span>
         <span class="nav-label">Compras</span>
       </div>
 
 
-      <div class="nav-item" data-url="/tv/garantia" data-label="Garantia" data-perm="tv/garantia"
+      <div class="nav-item" data-url="/tv/garantia" data-label="Garantia"
            style="--item-color:#a855f7" onclick="openPage(this)">
         <span class="nav-icon">🛡️</span>
         <span class="nav-label">Garantia</span>
       </div>
 
-      <div class="nav-item" data-url="/tv/metricas" data-label="Métricas" data-perm="tv/metricas"
+      <div class="nav-item" data-url="/tv/metricas" data-label="Métricas"
            style="--item-color:#a855f7" onclick="openPage(this)">
         <span class="nav-icon">📊</span>
         <span class="nav-label">Métricas</span>
       </div>
 
-      <div class="nav-item" data-url="/tv/monitoramento" data-label="Monitoramento" data-perm="tv/monitoramento"
+      <div class="nav-item" data-url="/tv/monitoramento" data-label="Monitoramento"
            style="--item-color:#f97316" onclick="openPage(this)">
         <span class="nav-icon">🔭</span>
         <span class="nav-label">Monitoramento</span>
       </div>
 
-      <div class="nav-item" data-url="/tv/aguardando-retirada" data-label="Ag. Retirada" data-perm="tv/aguardando-retirada"
+      <div class="nav-item" data-url="/tv/aguardando-retirada" data-label="Ag. Retirada"
            style="--item-color:#f97316" onclick="openPage(this)">
         <span class="nav-icon">📦</span>
         <span class="nav-label">Ag. Retirada</span>
       </div>
 
-      <div class="nav-item" data-url="/tv/coleta" data-label="Coleta" data-perm="tv/coleta"
+      <div class="nav-item" data-url="/tv/coleta" data-label="Coleta"
            style="--item-color:#3b9eff" onclick="openPage(this)">
         <span class="nav-icon">🚚</span>
         <span class="nav-label">Coleta</span>
       </div>
 
-      <div class="nav-item" data-url="/tv/motorista" data-label="Motorista" data-perm="tv/motorista"
+      <div class="nav-item" data-url="/tv/motorista" data-label="Motorista"
            style="--item-color:#22c55e" onclick="openPage(this)">
         <span class="nav-icon">🧑‍✈️</span>
         <span class="nav-label">Motorista</span>
       </div>
 
-      <div class="nav-item" data-url="/tv/logistica" data-label="Logística" data-perm="tv/logistica"
+      <div class="nav-item" data-url="/tv/logistica" data-label="Logística"
            style="--item-color:#f97316" onclick="openPage(this)">
         <span class="nav-icon" style="background:rgba(249,115,22,.15);">📊</span>
         <span class="nav-label">Logística</span>
@@ -402,24 +397,6 @@ function openPage(el) {
   frame.src = url;
 }
 
-// ── AUTH ──────────────────────────────────────────────────────
-function doLogout() {
-  fetch('/api/auth?action=logout',{method:'POST',credentials:'include'})
-    .finally(function(){ window.location.href='/login'; });
-}
-document.addEventListener('auth-ready', function(e) {
-  var auth = e.detail;
-  var nb = document.getElementById('user-name');
-  if (nb) nb.textContent = auth.username;
-  document.querySelectorAll('[data-perm]').forEach(function(el) {
-    if (!auth.can(el.getAttribute('data-perm'))) el.style.display = 'none';
-  });
-  document.querySelectorAll('.nav-sep').forEach(function(sep) {
-    var next = sep.nextElementSibling;
-    while (next && next.classList.contains('nav-sep')) next = next.nextElementSibling;
-    if (!next || next.style.display === 'none') sep.style.display = 'none';
-  });
-});
 </script>
 </body>
 </html>
