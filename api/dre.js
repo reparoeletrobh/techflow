@@ -34,14 +34,26 @@ function today() { return new Date().toISOString().slice(0,10); }
 // ── Config defaults ────────────────────────────────────────────
 const CFG_DEFAULT = { metaMensal: 0, impostoPct: 6, nomeEmpresa: 'Reparo Eletro' };
 
-// ── Board phases ───────────────────────────────────────────────
+// ── Board phases (todas as fases do board) ─────────────────────
 const PHASE_LABEL = {
   aprovado:'Aprovado', producao:'Em Produção', cliente_loja:'Cliente Loja',
   urgencia:'Urgência', comprar_peca:'Comprar Peça', aguardando_peca:'Aguardando Peça',
   peca_disponivel:'Peça Disponível', loja_feito:'Loja Feito',
-  delivery_feito:'Delivery Feito', aguardando_ret:'Ag. Retirada'
+  delivery_feito:'Delivery Feito', aguardando_ret:'Ag. Retirada',
+  // Fases financeiras
+  aguardando_dados:'Aguardando Dados', nf_emitida:'NF Emitida',
+  faturamento:'Faturamento', pagamento_agendado:'Pagamento Agendado',
+  analise_pagamento:'Análise de Pagamento', pagamento_confirmado:'Pagamento Confirmado'
 };
-const URGENTES = new Set(['loja_feito','delivery_feito','aguardando_ret']);
+
+// Apenas fichas nestas fases aparecem como Recebíveis
+const FIN_PHASES = new Set([
+  'aguardando_dados','nf_emitida','faturamento',
+  'pagamento_agendado','analise_pagamento','pagamento_confirmado'
+]);
+
+// Recebíveis urgentes = próximos ao pagamento
+const URGENTES = new Set(['pagamento_agendado','analise_pagamento','pagamento_confirmado']);
 
 // ── Categorias ─────────────────────────────────────────────────
 const CAT_RECEITA = {
@@ -49,6 +61,7 @@ const CAT_RECEITA = {
   delivery:'Coleta/Entrega', outro:'Outros'
 };
 const CAT_DESPESA = {
+  peca_cmv:'Compra de Peças (CMV)',   // ← alimenta CMV diretamente
   aluguel:'Aluguel', energia:'Energia Elétrica', agua:'Água',
   telefone:'Telefone/Internet', salario:'Salário/Pró-labore',
   material:'Material/Suprimentos', marketing:'Marketing',
@@ -69,9 +82,15 @@ function calcDRE(receitas, despesas, partes, config, mes) {
   const impostos     = +(receitaBruta * (cfg.impostoPct/100)).toFixed(2);
   const receitaLiq   = receitaBruta - impostos;
 
-  // CMV = peças recebidas no mês com valor registrado
-  const cmv = (partes||[]).filter(p => p.status==='recebido' && (p.recebidoEm||'').startsWith(mes) && p.valor)
-               .reduce((s,p) => s + (p.valor||0), 0);
+  // CMV = despesas categoria 'peca_cmv' pagas no mês
+  //       + peças recebidas de reparoeletro_compras_pecas (integração automática)
+  const cmvDespesas = (despesas||[])
+    .filter(x => x.categoria==='peca_cmv' && (x.data||x.dataVencimento||'').startsWith(mes) && x.status==='pago')
+    .reduce((s,x) => s + (x.valor||0), 0);
+  const cmvBoard = (partes||[])
+    .filter(p => p.status==='recebido' && (p.recebidoEm||'').startsWith(mes) && p.valor)
+    .reduce((s,p) => s + (p.valor||0), 0);
+  const cmv = +(cmvDespesas + cmvBoard).toFixed(2);
   const lucroBruto = receitaLiq - cmv;
 
   // Despesas pagas no mês
@@ -145,9 +164,9 @@ function calcKPIs(receitas, despesas, fixas, config, cards, mes) {
   const metaPct     = cfg.metaMensal>0 ? +(Math.min(receitaMes/cfg.metaMensal*100,999)).toFixed(1) : 0;
   const ticket      = recs.length>0 ? +(receitaMes/recs.length).toFixed(2) : 0;
 
-  // Receivables = OS cards not confirmed
+  // Receivables = somente OS nas fases financeiras, ainda não confirmadas
   const confirmed = new Set((receitas||[]).filter(x=>x.osRef && x.status==='recebido').map(x=>x.osRef));
-  const recebiveis = (cards||[]).filter(c => !confirmed.has(c.pipefyId));
+  const recebiveis = (cards||[]).filter(c => FIN_PHASES.has(c.phaseId) && !confirmed.has(c.pipefyId));
   const recUrgentes = recebiveis.filter(c => URGENTES.has(c.phaseId));
 
   // A pagar esta semana
@@ -199,9 +218,11 @@ module.exports = async (req, res) => {
       const cards    = bD?.cards    || (Array.isArray(bD)?bD:[]);
       const partes   = pD?.pecas    || (Array.isArray(pD)?pD:[]);
 
-      // Receivables
-      const confirmed = new Set(receitas.filter(x=>x.osRef && x.status==='recebido').map(x=>x.osRef));
-      const recebiveis = cards.filter(c=>!confirmed.has(c.pipefyId)).map(c=>({
+      // Receivables = somente OS nas fases financeiras, ainda não confirmadas
+      const confirmed = new Set((receitas||[]).filter(x=>x.osRef && x.status==='recebido').map(x=>x.osRef));
+      const recebiveis = cards
+        .filter(c => FIN_PHASES.has(c.phaseId) && !confirmed.has(c.pipefyId))
+        .map(c=>({
         pipefyId:c.pipefyId, osCode:c.osCode, nomeContato:c.nomeContato,
         title:c.title, phaseId:c.phaseId,
         phaseLabel: PHASE_LABEL[c.phaseId]||c.phaseId,
