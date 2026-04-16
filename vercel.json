@@ -45,6 +45,8 @@
     { "source": "/nf-setup", "destination": "/nf-setup.html" },
     { "source": "/adm-rsrua", "destination": "/adm-rsrua.html" },
     { "source": "/api/rastreabilidade", "destination": "/api/rastreabilidade.js" },
+    { "source": "/api/rastrear", "destination": "/api/rastrear.js" },
+    { "source": "/rastrear", "destination": "/rastrear.html" },
     { "source": "/api/tv-compras-pecas", "destination": "/api/tv-compras-pecas.js" },
     { "source": "/api/tv-compra-equip", "destination": "/api/tv-compra-equip.js" },
     { "source": "/api/tv-compras", "destination": "/api/tv-compras.js" },
