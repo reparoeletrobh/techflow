@@ -172,7 +172,7 @@ function calcKPIs(receitas, despesas, fixas, config, finRecords, mes) {
   // Receivables = fichas do financeiro nas fases corretas, não confirmadas
   const confirmed  = new Set((receitas||[]).filter(x=>x.osRef && x.status==='recebido').map(x=>x.osRef));
   const recebiveis = (finRecords||[]).filter(c => FIN_PHASES.has(c.phaseId) && !confirmed.has(c.pipefyId||c.id));
-  const recUrgentes = recebiveis.filter(c => URGENTES.has(c.phaseId));
+  const recebiveisValor$ = +recebiveis.reduce((s,c) => s + (parseFloat(c.valor)||0), 0).toFixed(2);
 
   // A pagar esta semana
   const now = Date.now();
@@ -192,7 +192,8 @@ function calcKPIs(receitas, despesas, fixas, config, finRecords, mes) {
     receitaMes, despesasMes, impostos, lucroLiq, margemLiq,
     metaPct, metaMensal: cfg.metaMensal,
     ticket, countReceitas: recs.length,
-    recebiveisTotal: recebiveis.length, recebiveisUrgentes: recUrgentes.length,
+    recebiveisCount: recebiveis.length,
+    recebiveisValor$,
     apagarSemana: +semana.toFixed(2),
     fixasPendentes: fixasPend.length, totalFixasPend, totalFixasMes
   };
@@ -232,14 +233,16 @@ module.exports = async (req, res) => {
           osCode:     c.osCode,
           nomeContato:c.nomeContato,
           title:      c.title || c.descricao,
-          valor:      c.valor,
+          valor:      parseFloat(c.valor)||0,
           telefone:   c.telefone,
           phaseId:    c.phaseId,
           phaseLabel: PHASE_LABEL[c.phaseId] || c.phaseId,
-          urgente:    URGENTES.has(c.phaseId),
           addedAt:    c.createdAt || c.movedAt
         }))
-        .sort((a,b) => (b.urgente?1:0) - (a.urgente?1:0));
+        .sort((a,b) => (a.nomeContato||'').localeCompare(b.nomeContato||''));
+
+      // Soma total dos recebíveis
+      const recebiveisTotal$ = +recebiveis.reduce((s,r) => s + r.valor, 0).toFixed(2);
 
       // A pagar: fixas do mês + despesas pendentes
       const fixasPagas = new Set(despesas.filter(x=>x.fixaRef && (x.data||x.dataVencimento||'').startsWith(mes) && x.status==='pago').map(x=>x.fixaRef));
@@ -253,6 +256,7 @@ module.exports = async (req, res) => {
         receitas: [...receitas].reverse(),
         despesas: [...despesas].reverse(),
         fixas, config, recebiveis,
+        recebiveisTotal$,
         aPagar: { fixas:fixasPend, despesas:despPend },
         dre:   calcDRE(receitas,despesas,config,mes),
         fluxo: calcFluxo(receitas,despesas,mes),
