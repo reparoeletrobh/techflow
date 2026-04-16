@@ -10,7 +10,7 @@
 :root{
   --bg:#050508;--surface:#0d0d14;--surface2:#13131e;--border:#1e1e2e;
   --text:#e8e8f0;--muted:#5a5a7a;--purple:#a855f7;
-  --sidebar-w:220px;--sidebar-collapsed:60px;
+  --sidebar-w:260px;--sidebar-collapsed:60px;
   --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -18,64 +18,90 @@ html,body{height:100vh;overflow:hidden;background:var(--bg);color:var(--text);fo
 .shell{display:flex;height:100vh;width:100vw;}
 
 /* ── SIDEBAR ── */
-.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;transition:width .25s cubic-bezier(.4,0,.2,1),min-width .25s cubic-bezier(.4,0,.2,1);overflow:hidden;z-index:10;position:relative;}
+.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;transition:width .25s cubic-bezier(.4,0,.2,1),min-width .25s cubic-bezier(.4,0,.2,1);overflow:hidden;z-index:10;}
 .sidebar.collapsed{width:var(--sidebar-collapsed);min-width:var(--sidebar-collapsed);}
 .sidebar-logo{display:flex;align-items:center;gap:10px;padding:0 16px;height:56px;border-bottom:1px solid var(--border);flex-shrink:0;overflow:hidden;white-space:nowrap;}
 .logo-dot{width:8px;height:8px;background:#fff;border-radius:50%;box-shadow:0 0 10px #fff;flex-shrink:0;}
 .logo-text{font-family:var(--fh);font-size:15px;font-weight:900;letter-spacing:-.5px;transition:opacity .2s;}
 .logo-text span{opacity:.4;}
 .sidebar.collapsed .logo-text{opacity:0;pointer-events:none;}
+
 .nav-list{flex:1;overflow-y:auto;overflow-x:hidden;padding:10px 0;}
 .nav-list::-webkit-scrollbar{width:3px;}
 .nav-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+
 .nav-item{display:flex;align-items:center;gap:10px;padding:0 10px;height:42px;margin:2px 8px;border-radius:8px;cursor:pointer;transition:background .15s,border-color .15s;white-space:nowrap;overflow:hidden;position:relative;user-select:none;background:color-mix(in srgb,var(--item-color,#888) 38%,#0d0d14);border:1px solid color-mix(in srgb,var(--item-color,#888) 55%,transparent);}
 .nav-item:hover{background:color-mix(in srgb,var(--item-color,#888) 50%,#0d0d14);border-color:color-mix(in srgb,var(--item-color,#888) 70%,transparent);}
 .nav-item.active{background:color-mix(in srgb,var(--item-color,#888) 55%,#0d0d14);border-color:color-mix(in srgb,var(--item-color,#888) 80%,transparent);}
 .nav-item.active .nav-label,.nav-item:hover .nav-label{color:#fff;}
 .nav-item.active .nav-label{font-weight:600;}
 .nav-icon{font-size:17px;flex-shrink:0;width:26px;text-align:center;display:flex;align-items:center;justify-content:center;}
-.nav-label{font-family:var(--fm);font-size:11px;font-weight:500;color:rgba(255,255,255,.9);transition:opacity .2s,color .15s;letter-spacing:.03em;}
+.nav-label{font-family:var(--fm);font-size:11px;font-weight:500;color:rgba(255,255,255,.9);transition:opacity .2s;letter-spacing:.03em;}
 .sidebar.collapsed .nav-label{opacity:0;}
 .sidebar.collapsed .nav-item{margin:2px 6px;justify-content:center;padding:0;}
-.sidebar.collapsed .nav-item:hover::after{content:attr(data-label);position:absolute;left:calc(var(--sidebar-collapsed) + 8px);background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--fm);font-size:11px;padding:5px 10px;border-radius:6px;white-space:nowrap;z-index:999;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.4);}
+.sidebar.collapsed .nav-item:hover::after{content:attr(data-label);position:absolute;left:calc(var(--sidebar-collapsed)+8px);background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--fm);font-size:11px;padding:5px 10px;border-radius:6px;white-space:nowrap;z-index:999;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.4);}
 .nav-sep{height:1px;background:var(--border);margin:6px 12px;}
 
 /* ── RASTREAR inline ── */
-.rastr-wrap{margin:2px 8px;position:relative;}
+.rastr-wrap{margin:2px 8px;}
 .rastr-btn{display:flex;align-items:center;gap:10px;padding:0 10px;height:42px;border-radius:8px;cursor:pointer;white-space:nowrap;overflow:hidden;user-select:none;background:color-mix(in srgb,var(--purple) 38%,#0d0d14);border:1px solid color-mix(in srgb,var(--purple) 55%,transparent);transition:background .15s,border-color .15s;}
 .rastr-btn:hover{background:color-mix(in srgb,var(--purple) 50%,#0d0d14);border-color:color-mix(in srgb,var(--purple) 70%,transparent);}
-.rastr-btn.open{background:color-mix(in srgb,var(--purple) 55%,#0d0d14);border-color:color-mix(in srgb,var(--purple) 80%,transparent);border-bottom-left-radius:0;border-bottom-right-radius:0;}
-.rastr-btn-icon{font-size:17px;width:26px;text-align:center;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.rastr-btn-label{font-family:var(--fm);font-size:11px;font-weight:500;color:rgba(255,255,255,.9);letter-spacing:.03em;flex:1;transition:opacity .2s;}
+.rastr-btn.open{background:color-mix(in srgb,var(--purple) 60%,#0d0d14);border-color:color-mix(in srgb,var(--purple) 85%,transparent);border-radius:8px 8px 0 0;}
+.rastr-btn-icon{font-size:17px;width:26px;text-align:center;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.rastr-btn-label{font-family:var(--fm);font-size:11px;font-weight:600;color:rgba(255,255,255,.95);flex:1;transition:opacity .2s;letter-spacing:.03em;}
 .rastr-btn-arrow{font-family:var(--fm);font-size:9px;color:rgba(168,85,247,.8);transition:transform .2s;flex-shrink:0;}
 .rastr-btn.open .rastr-btn-arrow{transform:rotate(180deg);}
 .sidebar.collapsed .rastr-btn{justify-content:center;padding:0;}
-.sidebar.collapsed .rastr-btn-label,.sidebar.collapsed .rastr-btn-arrow{opacity:0;width:0;overflow:hidden;padding:0;}
-.sidebar.collapsed .rastr-wrap:hover::after{content:'Rastrear';position:absolute;left:calc(var(--sidebar-collapsed) - 2px);background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--fm);font-size:11px;padding:5px 10px;border-radius:6px;white-space:nowrap;z-index:999;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.4);}
+.sidebar.collapsed .rastr-btn-label,.sidebar.collapsed .rastr-btn-arrow{opacity:0;width:0;overflow:hidden;}
+.sidebar.collapsed .rastr-wrap:hover::after{content:'Rastrear';position:absolute;left:calc(var(--sidebar-collapsed)+8px);background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--fm);font-size:11px;padding:5px 10px;border-radius:6px;white-space:nowrap;z-index:999;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.4);}
 
-.rastr-panel{display:none;background:rgba(168,85,247,.03);border:1px solid color-mix(in srgb,var(--purple) 50%,transparent);border-top:none;border-radius:0 0 8px 8px;overflow:hidden;}
+.rastr-panel{display:none;background:rgba(168,85,247,.025);border:1px solid color-mix(in srgb,var(--purple) 45%,transparent);border-top:none;border-radius:0 0 8px 8px;overflow:hidden;}
 .rastr-panel.open{display:block;}
-.rastr-input-wrap{padding:7px 8px;border-bottom:1px solid rgba(168,85,247,.12);}
+
+/* Input */
+.rastr-input-wrap{padding:8px 10px;border-bottom:1px solid rgba(168,85,247,.12);}
 .rastr-input-rel{position:relative;}
-.rastr-input-icon{position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:11px;pointer-events:none;opacity:.4;}
-.rastr-input{width:100%;background:var(--surface2);border:1px solid rgba(168,85,247,.3);border-radius:6px;padding:6px 8px 6px 26px;font-family:var(--fb);font-size:12px;color:var(--text);outline:none;transition:border-color .15s;}
+.rastr-input-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:12px;pointer-events:none;opacity:.35;}
+.rastr-input{width:100%;background:var(--surface2);border:1px solid rgba(168,85,247,.25);border-radius:6px;padding:7px 8px 7px 28px;font-family:var(--fb);font-size:12px;color:var(--text);outline:none;transition:border-color .15s;}
 .rastr-input:focus{border-color:var(--purple);}
 .rastr-input::placeholder{color:var(--muted);font-size:11px;}
-.rastr-results{max-height:300px;overflow-y:auto;}
+
+/* Results list */
+.rastr-results{max-height:380px;overflow-y:auto;}
 .rastr-results::-webkit-scrollbar{width:3px;}
 .rastr-results::-webkit-scrollbar-thumb{background:rgba(168,85,247,.3);border-radius:2px;}
-.rastr-state{font-family:var(--fm);font-size:10px;color:var(--muted);text-align:center;padding:12px 8px;}
-.rastr-spin{width:14px;height:14px;border:2px solid rgba(168,85,247,.2);border-top-color:var(--purple);border-radius:50%;animation:spin .6s linear infinite;margin:12px auto;}
-@keyframes spin{to{transform:rotate(360deg);}}
-.rastr-group-hd{font-family:var(--fm);font-size:8px;color:rgba(168,85,247,.6);text-transform:uppercase;letter-spacing:.1em;padding:5px 10px 2px;background:rgba(168,85,247,.04);}
-.rastr-r{display:flex;align-items:center;gap:7px;padding:6px 10px;cursor:pointer;transition:background .12s;border-bottom:1px solid rgba(168,85,247,.05);}
+
+/* State messages */
+.rastr-state{font-family:var(--fm);font-size:10px;color:var(--muted);text-align:center;padding:14px 10px;}
+.rastr-spin{width:14px;height:14px;border:2px solid rgba(168,85,247,.15);border-top-color:var(--purple);border-radius:50%;animation:rspin .6s linear infinite;margin:14px auto;}
+@keyframes rspin{to{transform:rotate(360deg);}}
+
+/* Group header */
+.rastr-gh{font-family:var(--fm);font-size:8px;color:rgba(168,85,247,.55);text-transform:uppercase;letter-spacing:.1em;padding:6px 10px 3px;background:rgba(168,85,247,.04);}
+
+/* Result card — RICH */
+.rastr-r{
+  display:flex;align-items:flex-start;gap:9px;
+  padding:9px 10px;cursor:pointer;
+  border-bottom:1px solid rgba(168,85,247,.06);
+  transition:background .12s;
+  position:relative;
+}
 .rastr-r:last-child{border-bottom:none;}
-.rastr-r:hover{background:rgba(168,85,247,.1);}
-.rastr-r-icon{font-size:12px;flex-shrink:0;width:18px;text-align:center;}
+.rastr-r:hover{background:rgba(168,85,247,.08);}
+.rastr-r:hover .rastr-r-arrow{opacity:.8;}
+.rastr-r-icon{font-size:14px;flex-shrink:0;width:22px;text-align:center;margin-top:1px;}
 .rastr-r-body{flex:1;min-width:0;}
-.rastr-r-label{font-size:11px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.rastr-r-sub{font-family:var(--fm);font-size:8px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.rastr-r-fase{font-family:var(--fm);font-size:8px;font-weight:700;padding:1px 5px;border-radius:99px;border:1px solid;white-space:nowrap;flex-shrink:0;}
+.rastr-r-top{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:2px;}
+.rastr-r-name{font-size:12px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;}
+.rastr-r-urgente{font-family:var(--fm);font-size:7px;font-weight:700;padding:1px 5px;border-radius:99px;background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);flex-shrink:0;}
+.rastr-r-ref{font-family:var(--fm);font-size:9px;color:var(--muted);}
+.rastr-r-phone{font-family:var(--fm);font-size:9px;color:var(--muted);}
+.rastr-r-desc{font-size:10px;color:rgba(232,232,240,.55);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rastr-r-badges{display:flex;gap:4px;align-items:center;margin-top:4px;flex-wrap:wrap;}
+.rastr-r-fase{font-family:var(--fm);font-size:8px;font-weight:700;padding:1px 6px;border-radius:99px;border:1px solid;white-space:nowrap;}
+.rastr-r-tipo{font-family:var(--fm);font-size:8px;padding:1px 5px;border-radius:99px;border:1px solid;white-space:nowrap;}
+.rastr-r-arrow{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--purple);opacity:.3;transition:opacity .15s;}
 
 /* ── TOGGLE / CONTENT ── */
 .toggle-btn{display:flex;align-items:center;justify-content:center;height:48px;border-top:1px solid var(--border);cursor:pointer;color:var(--muted);transition:background .15s,color .15s;flex-shrink:0;font-size:14px;gap:8px;white-space:nowrap;overflow:hidden;padding:0 16px;}
@@ -95,8 +121,8 @@ html,body{height:100vh;overflow:hidden;background:var(--bg);color:var(--text);fo
 .frame-wrap iframe{width:100%;height:100%;border:none;background:var(--bg);}
 .load-bar{height:2px;background:transparent;position:relative;overflow:hidden;flex-shrink:0;}
 .load-bar.loading{background:var(--border);}
-.load-bar.loading::after{content:'';position:absolute;top:0;left:-40%;width:40%;height:100%;background:currentColor;animation:slide 1s linear infinite;}
-@keyframes slide{to{left:100%;}}
+.load-bar.loading::after{content:'';position:absolute;top:0;left:-40%;width:40%;height:100%;background:currentColor;animation:lslide 1s linear infinite;}
+@keyframes lslide{to{left:100%;}}
 
 /* ── MOBILE ── */
 @media(max-width:768px){
@@ -117,9 +143,7 @@ html,body{height:100vh;overflow:hidden;background:var(--bg);color:var(--text);fo
   .content{padding-top:52px!important;}
   .hamburger{position:fixed;top:12px;left:12px;}
 }
-@media(min-width:769px){
-  .hamburger,.mobile-overlay{display:none!important;}
-}
+@media(min-width:769px){.hamburger,.mobile-overlay{display:none!important;}}
 </style>
 </head>
 <body>
@@ -133,7 +157,6 @@ html,body{height:100vh;overflow:hidden;background:var(--bg);color:var(--text);fo
     </div>
 
     <div class="nav-list">
-
       <!-- RASTREAR -->
       <div class="rastr-wrap" id="rastr-wrap">
         <div class="rastr-btn" id="rastr-btn" onclick="toggleRastrear()">
@@ -260,44 +283,54 @@ function closeMobileSidebar() {
   sidebar.classList.remove('mobile-open');
   document.getElementById('mobile-overlay').classList.remove('active');
 }
+function setNavActive(url) {
+  document.querySelectorAll('.nav-item').forEach(function(n){ n.classList.remove('active'); });
+  var item = document.querySelector('.nav-item[data-url="' + url + '"]');
+  if (item) {
+    item.classList.add('active');
+    return item;
+  }
+  return null;
+}
+function loadFrame(url, color) {
+  welcome.classList.add('hidden');
+  frameWrap.classList.add('visible');
+  loadBar.classList.add('loading');
+  loadBar.style.color = color || 'var(--purple)';
+  frame.src = url;
+}
 function openPage(el) {
-  var url = el.getAttribute('data-url');
-  if (!url) return;
   closeMobileSidebar();
   fecharRastrear();
-  document.querySelectorAll('.nav-item').forEach(function(n){ n.classList.remove('active'); });
-  el.classList.add('active');
-  welcome.classList.add('hidden');
-  frameWrap.classList.add('visible');
-  loadBar.classList.add('loading');
-  loadBar.style.color = getComputedStyle(el).getPropertyValue('--item-color') || '#fff';
+  setNavActive(el.getAttribute('data-url'));
+  var color = getComputedStyle(el).getPropertyValue('--item-color') || '#fff';
   frame.onload = function(){ loadBar.classList.remove('loading'); };
-  frame.src = url;
+  loadFrame(el.getAttribute('data-url'), color);
 }
 function navTo(url) {
-  var navItem = document.querySelector('.nav-item[data-url="' + url + '"]');
-  if (navItem) { openPage(navItem); return; }
-  welcome.classList.add('hidden');
-  frameWrap.classList.add('visible');
-  loadBar.classList.add('loading');
+  var item = setNavActive(url);
+  var color = item ? getComputedStyle(item).getPropertyValue('--item-color') : '#fff';
   frame.onload = function(){ loadBar.classList.remove('loading'); };
-  frame.src = url;
+  loadFrame(url, color);
 }
+
 document.addEventListener('keydown', function(e) {
   if (e.altKey && e.key === 'ArrowLeft')  frame.contentWindow?.history.back();
   if (e.altKey && e.key === 'ArrowRight') frame.contentWindow?.history.forward();
   if (e.key === 'Escape') fecharRastrear();
 });
 
-// ── RASTREAR ──────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+//  RASTREAR
+// ══════════════════════════════════════════════════════════════
 var rastrAberto = false;
 var rastrTimer  = null;
 var rastrUltimo = '';
 var TIPO_ICON   = { os:'🔧', garantia:'🛡️', peca:'📦' };
-var TIPO_HD     = { os:'Ordens de Serviço', garantia:'Garantia', peca:'Peças / Compras' };
+var TIPO_GH     = { os:'Ordens de Serviço', garantia:'Garantia', peca:'Peças / Compras' };
 
 function toggleRastrear() {
-  if (collapsed) {          // expande sidebar antes
+  if (collapsed) {
     collapsed = false;
     sidebar.classList.remove('collapsed');
     sidebar.querySelector('.toggle-label').textContent = 'Recolher';
@@ -319,6 +352,7 @@ function fecharRastrear() {
   document.getElementById('rastr-results').innerHTML =
     '<div class="rastr-state">Digite para buscar em todo o sistema</div>';
 }
+
 function rastrDigitou(q) {
   clearTimeout(rastrTimer);
   var t = q.trim();
@@ -331,6 +365,7 @@ function rastrDigitou(q) {
   if (t === rastrUltimo || t.length < 2) return;
   rastrTimer = setTimeout(function(){ rastrBuscar(t); }, 300);
 }
+
 async function rastrBuscar(q) {
   rastrUltimo = q;
   document.getElementById('rastr-results').innerHTML = '<div class="rastr-spin"></div>';
@@ -342,7 +377,9 @@ async function rastrBuscar(q) {
     document.getElementById('rastr-results').innerHTML = '<div class="rastr-state">Erro ao buscar</div>';
   }
 }
+
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
 function rastrRender(q, results) {
   var el = document.getElementById('rastr-results');
   if (!results.length) {
@@ -352,28 +389,182 @@ function rastrRender(q, results) {
   var grupos = {};
   results.forEach(function(r){ if(!grupos[r.tipo]) grupos[r.tipo]=[]; grupos[r.tipo].push(r); });
   var html = '';
-  ['os','garantia','peca'].forEach(function(tipo) {
+  ['os','garantia','peca'].forEach(function(tipo){
     if (!grupos[tipo] || !grupos[tipo].length) return;
-    html += '<div class="rastr-group-hd">' + TIPO_ICON[tipo] + ' ' + TIPO_HD[tipo] + ' (' + grupos[tipo].length + ')</div>';
-    grupos[tipo].forEach(function(r) {
-      var cor = r.cor || '#5a5a7a';
-      var bs = 'color:' + cor + ';border-color:' + cor + '55;background:' + cor + '18;';
-      html +=
-        '<div class="rastr-r" onclick=\'rastrIr(' + JSON.stringify(r.url) + ')\'>' +
-          '<span class="rastr-r-icon">' + TIPO_ICON[r.tipo] + '</span>' +
-          '<div class="rastr-r-body">' +
-            '<div class="rastr-r-label">' + esc(r.label) + '</div>' +
-            (r.sublabel ? '<div class="rastr-r-sub">' + esc(r.sublabel) + '</div>' : '') +
-          '</div>' +
-          '<span class="rastr-r-fase" style="' + bs + '">' + esc(r.fase) + '</span>' +
-        '</div>';
-    });
+    html += '<div class="rastr-gh">' + TIPO_ICON[tipo] + ' ' + TIPO_GH[tipo] + ' (' + grupos[tipo].length + ')</div>';
+    grupos[tipo].forEach(function(r){ html += buildCard(r); });
   });
   el.innerHTML = html;
 }
-function rastrIr(url) {
+
+function buildCard(r) {
+  var cor = r.cor || '#5a5a7a';
+  var bs  = 'color:' + cor + ';border-color:' + cor + '44;background:' + cor + '15;';
+
+  // Tipo badge (só para garantia)
+  var tipoBadge = '';
+  if (r.tipo === 'garantia' && r.sublabel) {
+    var tc = r.tipoCor || '#5a5a7a';
+    tipoBadge = '<span class="rastr-r-tipo" style="color:' + tc + ';border-color:' + tc + '44;background:' + tc + '15;">' + esc(r.sublabel) + '</span>';
+  }
+
+  // Ref badge (para OS e peças)
+  var refBadge = '';
+  if (r.tipo !== 'garantia' && r.sublabel) {
+    refBadge = '<span class="rastr-r-ref">' + esc(r.sublabel) + '</span>';
+  }
+
+  // Urgente badge
+  var urgBadge = r.urgente ? '<span class="rastr-r-urgente">URGENTE</span>' : '';
+
+  // Phone
+  var phone = r.telefone ? '<span class="rastr-r-phone">📞 ' + esc(r.telefone) + '</span>' : '';
+
+  // Descrição truncada (só se existir)
+  var desc = r.descricao ? '<div class="rastr-r-desc">' + esc(r.descricao.slice(0,60)) + (r.descricao.length > 60 ? '…' : '') + '</div>' : '';
+
+  // Encode result as JSON for onclick (safe since adm.html is own page)
+  var encoded = JSON.stringify(r).replace(/'/g, '&#39;');
+
+  return '<div class="rastr-r" onclick=\'rastrIr(' + encoded + ')\'>' +
+    '<span class="rastr-r-icon">' + TIPO_ICON[r.tipo] + '</span>' +
+    '<div class="rastr-r-body">' +
+      '<div class="rastr-r-top">' +
+        '<span class="rastr-r-name">' + esc(r.label) + '</span>' +
+        urgBadge +
+      '</div>' +
+      (phone || refBadge ? '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' + phone + refBadge + '</div>' : '') +
+      desc +
+      '<div class="rastr-r-badges">' +
+        '<span class="rastr-r-fase" style="' + bs + '">' + esc(r.fase) + '</span>' +
+        tipoBadge +
+      '</div>' +
+    '</div>' +
+    '<span class="rastr-r-arrow">›</span>' +
+  '</div>';
+}
+
+// ══════════════════════════════════════════════════════════════
+//  NAVEGAÇÃO PRECISA — vai exatamente onde o item está
+// ══════════════════════════════════════════════════════════════
+function rastrIr(r) {
   fecharRastrear();
-  navTo(url);
+
+  var item = setNavActive(r.url);
+  var color = item ? getComputedStyle(item).getPropertyValue('--item-color') : 'var(--purple)';
+
+  // Após carregar o iframe, navega para a fase e destaca o item
+  frame.onload = function() {
+    loadBar.classList.remove('loading');
+    setTimeout(function(){
+      try { navigarNaFase(r); } catch(e) {}
+    }, 400);
+  };
+
+  loadFrame(r.url, color);
+}
+
+function navigarNaFase(r) {
+  var fw = frame.contentWindow;
+
+  if (r.tipo === 'peca') {
+    // ── Peça avulsa em compras-pecas ──
+    if (typeof fw.modTab === 'function') fw.modTab('pecas');
+    if (typeof fw.pecTab === 'function') fw.pecTab(r.pecaTab || 'pendentes');
+    setTimeout(function(){
+      try {
+        var el = r.elementId ? fw.document.getElementById(r.elementId) : null;
+        highlight(el);
+      } catch(e) {}
+    }, 200);
+
+  } else if (r.tipo === 'os' && r.osFaseKey) {
+    // ── OS em fase de compras (compras-pecas) ──
+    if (typeof fw.modTab === 'function') fw.modTab('os');
+    if (typeof fw.osTab === 'function') fw.osTab(r.osFaseKey);
+    setTimeout(function(){
+      try {
+        var el = r.elementId ? fw.document.getElementById(r.elementId) : null;
+        highlight(el);
+      } catch(e) {}
+    }, 200);
+
+  } else if (r.tipo === 'os') {
+    // ── OS em tecnico — busca pelo nome no DOM ──
+    // Dá mais tempo para o kanban renderizar (~73 cards)
+    setTimeout(function(){
+      try {
+        var fw2 = frame.contentWindow;
+        var el = null;
+
+        // 1. Tenta por data-pipefy-id (caso tecnico seja atualizado futuramente)
+        el = fw2.document.querySelector('[data-pipefy-id="' + r.id + '"]');
+
+        // 2. Tenta pelo código OS no .card-num (#1148 → label contém "1148")
+        if (!el && r.sublabel) {
+          var osCode = r.sublabel.replace('#','').trim();
+          var nums = fw2.document.querySelectorAll('.card-num');
+          for (var n = 0; n < nums.length; n++) {
+            if (nums[n].textContent.includes(osCode)) {
+              el = nums[n].closest('.os-card') || nums[n].parentElement;
+              break;
+            }
+          }
+        }
+
+        // 3. Fallback: busca pelo nome no .card-nome (tem emoji "👤 Nome" — usa includes)
+        if (!el) {
+          var nomes = fw2.document.querySelectorAll('.card-nome');
+          for (var i = 0; i < nomes.length; i++) {
+            if (nomes[i].textContent.includes(r.label)) {
+              el = nomes[i].closest('.os-card') || nomes[i].parentElement;
+              break;
+            }
+          }
+        }
+
+        highlight(el);
+      } catch(e) {}
+    }, 600);
+
+  } else if (r.tipo === 'garantia') {
+    // ── Garantia — filtra pelo tipo e busca pelo nome ──
+    if (typeof fw.setView === 'function') fw.setView(r.garantiaTipo || 'todos');
+    setTimeout(function(){
+      try {
+        var fw2 = frame.contentWindow;
+        var target = null;
+
+        // Busca por data-ficha-id se existir
+        target = fw2.document.querySelector('[data-ficha-id="' + r.id + '"]');
+
+        // Fallback: busca pelo nome em .fc-nome (sem emoji — match direto)
+        if (!target) {
+          var nomes = fw2.document.querySelectorAll('.fc-nome');
+          for (var i = 0; i < nomes.length; i++) {
+            if (nomes[i].textContent.includes(r.label)) {
+              target = nomes[i].closest('.ficha-card') || nomes[i].parentElement;
+              break;
+            }
+          }
+        }
+
+        highlight(target);
+      } catch(e) {}
+    }, 500);
+  }
+}
+
+function highlight(el) {
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.style.outline = '2px solid #a855f7';
+  el.style.boxShadow = '0 0 16px rgba(168,85,247,.4)';
+  el.style.transition = 'outline .3s, box-shadow .3s';
+  setTimeout(function(){
+    el.style.outline = '';
+    el.style.boxShadow = '';
+  }, 2500);
 }
 </script>
 </body>
