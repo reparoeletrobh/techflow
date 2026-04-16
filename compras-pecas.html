@@ -144,33 +144,17 @@ textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
 .cbtn-dados:hover{border-color:var(--yellow);color:var(--yellow);}
 
 /* ──────────────── RASTREABILIDADE ──────────────── */
-.rastr-section{border-top:2px solid var(--border);padding:16px 20px 20px;}
-.rastr-title{font-family:var(--fh);font-size:12px;font-weight:800;color:var(--purple);display:flex;align-items:center;gap:7px;margin-bottom:12px;}
-.rastr-form{display:flex;flex-direction:column;gap:8px;}
-.rastr-ref-row{display:flex;gap:8px;}
-.rastr-ref-row .fi{flex:1;}
-.rastr-badge{font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:99px;border:1px solid;}
-.rastr-badge.os{color:var(--accent);border-color:rgba(59,158,255,.3);background:rgba(59,158,255,.08);}
-.rastr-badge.peca{color:var(--orange);border-color:rgba(249,115,22,.3);background:rgba(249,115,22,.08);}
-.rastr-badge.compra{color:var(--green);border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.08);}
-.rastr-badge.geral{color:var(--muted);border-color:var(--border);background:var(--surface2);}
-
-/* TIMELINE */
-.timeline{display:flex;flex-direction:column;gap:0;}
-.tl-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);position:relative;}
-.tl-item:last-child{border-bottom:none;}
-.tl-dot{width:28px;height:28px;border-radius:50%;background:var(--surface2);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px;}
-.tl-dot.os{border-color:rgba(59,158,255,.5);background:rgba(59,158,255,.1);}
-.tl-dot.peca{border-color:rgba(249,115,22,.5);background:rgba(249,115,22,.1);}
-.tl-dot.compra{border-color:rgba(34,197,94,.5);background:rgba(34,197,94,.1);}
-.tl-body{flex:1;}
-.tl-header{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:3px;}
-.tl-ref{font-family:var(--fm);font-size:10px;font-weight:700;color:#fff;}
-.tl-note{font-size:12px;color:var(--text);line-height:1.5;}
-.tl-meta{font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:4px;}
-.tl-del{font-family:var(--fm);font-size:9px;color:var(--muted);background:transparent;border:none;cursor:pointer;padding:2px 6px;border-radius:4px;}
-.tl-del:hover{color:var(--red);}
-.rastr-empty{font-family:var(--fm);font-size:10px;color:var(--muted);text-align:center;padding:20px;border:1px dashed var(--border);border-radius:8px;}
+.rastr-section{border-top:2px solid var(--border);padding:14px 20px 20px;}
+.rastr-title{font-family:var(--fh);font-size:12px;font-weight:800;color:var(--purple);display:flex;align-items:center;gap:7px;margin-bottom:10px;}
+.rastr-empty{font-family:var(--fm);font-size:10px;color:var(--muted);text-align:center;padding:16px;border:1px dashed var(--border);border-radius:8px;margin-top:8px;}
+.rastr-results{display:flex;flex-direction:column;gap:4px;margin-top:8px;max-height:280px;overflow-y:auto;}
+.rastr-result{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.rastr-result:hover{border-color:var(--purple);background:rgba(168,85,247,.07);}
+.rastr-r-info{flex:1;min-width:0;}
+.rastr-r-label{font-size:12px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rastr-r-ref{font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:2px;}
+.rastr-r-fase{font-family:var(--fm);font-size:9px;font-weight:700;padding:2px 8px;border-radius:99px;border:1px solid;white-space:nowrap;flex-shrink:0;}
+.rastr-r-arrow{font-size:11px;color:var(--muted);flex-shrink:0;}
 
 /* MODAIS */
 .ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(3px);}
@@ -272,42 +256,11 @@ textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
         <button class="btn-add" onclick="cadastrar()">+ Cadastrar Peça</button>
       </div>
 
-      <!-- FORM RASTREABILIDADE -->
+      <!-- RASTREABILIDADE -->
       <div class="rastr-section">
-        <div class="rastr-title">
-          <span>🔍</span> Rastreabilidade
-        </div>
-        <div class="rastr-form">
-          <div class="rastr-ref-row">
-            <div style="flex:1;">
-              <div class="fl">OS / Peça / Ref</div>
-              <input class="fi" id="r-ref" placeholder="Ex: OS 1042, Placa..."/>
-            </div>
-            <div style="width:90px;">
-              <div class="fl">Tipo</div>
-              <select class="fi" id="r-tipo" style="cursor:pointer;">
-                <option value="os">OS</option>
-                <option value="peca">Peça</option>
-                <option value="compra">Compra</option>
-                <option value="geral">Geral</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <div class="fl">Fase / Anotação *</div>
-            <textarea class="fi" id="r-nota" placeholder="Ex: Aguardando aprovação do cliente. Peça encomendada no fornecedor X..."></textarea>
-          </div>
-          <button class="btn-add orange" onclick="rastrAdd()">+ Registrar</button>
-        </div>
-
-        <!-- TIMELINE -->
-        <div style="margin-top:14px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-            <div style="font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;">Histórico</div>
-            <input class="fi" id="r-busca" style="width:130px;font-size:10px;padding:4px 8px;" placeholder="Filtrar..."/>
-          </div>
-          <div id="rastr-timeline"><div class="rastr-empty">Nenhum registro ainda.</div></div>
-        </div>
+        <div class="rastr-title"><span>🔍</span> Rastreabilidade</div>
+        <input class="fi" id="r-busca" placeholder="Buscar OS, peça, referência..." oninput="rastrSearch(this.value)" autocomplete="off"/>
+        <div class="rastr-results" id="rastr-results"></div>
       </div>
     </div>
 
@@ -475,88 +428,118 @@ function modTab(m) {
 }
 
 // ══════════════════════════════════════════════
-//  RASTREABILIDADE
+//  RASTREABILIDADE — busca em tempo real
 // ══════════════════════════════════════════════
-var RASTR_KEY = 'reparoeletro_rastreabilidade';
-var rastrItens = [];
 
-async function rastrLoad() {
-  try {
-    var r = await fetch('/api/rastreabilidade?action=load');
-    var d = await r.json();
-    rastrItens = d.itens || [];
-  } catch(e) { rastrItens = []; }
-  rastrRender();
+// Mapa de status → label e cor para peças avulsas
+var FASE_LABEL = {
+  pendente:              { label:'Pendente',         cor:'var(--yellow)',  tab:'pendentes' },
+  aguardando_pagamento:  { label:'Ag. Pagamento',    cor:'var(--orange)',  tab:'aguardando' },
+  pago:                  { label:'Pago',             cor:'var(--green)',   tab:'pago' },
+  a_caminho:             { label:'A Caminho',        cor:'var(--accent)',  tab:'caminho' },
+  recebido:              { label:'Recebido',         cor:'var(--purple)',  tab:'caminho' }
+};
+// Mapa de faseKey OS → label e cor
+var OS_FASE = {
+  comprar:    { label:'Comprar Peça',    cor:'var(--orange)' },
+  aguardando: { label:'Aguardando Peça', cor:'var(--accent)' },
+  disponivel: { label:'Peça Disponível', cor:'var(--green)'  }
+};
+
+var rastrTimer = null;
+
+function rastrSearch(q) {
+  clearTimeout(rastrTimer);
+  rastrTimer = setTimeout(function() { rastrExec(q); }, 180);
 }
 
-function rastrRender(filtro) {
-  var el = document.getElementById('rastr-timeline');
-  var lista = rastrItens.slice();
-  if (filtro) {
-    var f = filtro.toLowerCase();
-    lista = lista.filter(function(i) {
-      return (i.ref||'').toLowerCase().includes(f) || (i.nota||'').toLowerCase().includes(f);
+function rastrExec(q) {
+  var el = document.getElementById('rastr-results');
+  var term = (q || '').trim().toLowerCase();
+
+  if (term.length < 2) { el.innerHTML = ''; return; }
+
+  var results = [];
+
+  // ── Busca em peças avulsas (já carregadas em `itens`) ──
+  itens.forEach(function(p) {
+    var haystack = [p.descricao, p.os, p.obs, p.fornecedor].join(' ').toLowerCase();
+    if (haystack.includes(term)) {
+      var f = FASE_LABEL[p.status] || { label: p.status, cor:'var(--muted)', tab:'pendentes' };
+      results.push({
+        tipo: 'peca', id: p.id,
+        label: p.descricao,
+        ref: p.os ? 'OS: ' + p.os : '',
+        fase: f.label, cor: f.cor, tab: f.tab
+      });
+    }
+  });
+
+  // ── Busca em cards OS/Pipefy (já carregados em `osCards`) ──
+  ['comprar','aguardando','disponivel'].forEach(function(faseKey) {
+    (osCards[faseKey] || []).forEach(function(c) {
+      var haystack = [c.nomeContato, c.title, c.osCode, c.descricao, c.descricaoCompra].join(' ').toLowerCase();
+      if (haystack.includes(term)) {
+        var f = OS_FASE[faseKey];
+        results.push({
+          tipo: 'os', pipefyId: c.pipefyId, faseKey: faseKey,
+          label: c.nomeContato || c.title || '—',
+          ref: '#' + (c.osCode || c.pipefyId.slice(-4)),
+          fase: f.label, cor: f.cor
+        });
+      }
     });
-  }
-  if (!lista.length) {
-    el.innerHTML = '<div class="rastr-empty">' + (filtro ? 'Nenhum resultado.' : 'Nenhum registro ainda.') + '</div>';
+  });
+
+  if (!results.length) {
+    el.innerHTML = '<div class="rastr-empty">Nenhum resultado para "' + esc(q.trim()) + '"</div>';
     return;
   }
-  var tipoIcon = { os:'🔧', peca:'📦', compra:'💳', geral:'📋' };
-  el.innerHTML = lista.map(function(i) {
-    var dt = i.criadoEm ? new Date(i.criadoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
-    return '<div class="tl-item">' +
-      '<div class="tl-dot ' + (i.tipo||'geral') + '">' + (tipoIcon[i.tipo]||'📋') + '</div>' +
-      '<div class="tl-body">' +
-        '<div class="tl-header">' +
-          (i.ref ? '<span class="tl-ref">' + esc(i.ref) + '</span>' : '') +
-          '<span class="rastr-badge ' + (i.tipo||'geral') + '">' + (i.tipo||'geral') + '</span>' +
-        '</div>' +
-        '<div class="tl-note">' + esc(i.nota) + '</div>' +
-        '<div class="tl-meta" style="display:flex;align-items:center;justify-content:space-between;">' +
-          '<span>' + dt + '</span>' +
-          '<button class="tl-del" onclick="rastrDel(\'' + i.id + '\')">✕ remover</button>' +
-        '</div>' +
+
+  el.innerHTML = results.map(function(r) {
+    var bordeR = r.cor.replace('var(', '').replace(')', '');
+    return '<div class="rastr-result" onclick=\'rastrIr(' + JSON.stringify(r) + ')\'>' +
+      '<div class="rastr-r-info">' +
+        '<div class="rastr-r-label">' + esc(r.label) + '</div>' +
+        (r.ref ? '<div class="rastr-r-ref">' + esc(r.ref) + '</div>' : '') +
       '</div>' +
+      '<span class="rastr-r-fase" style="color:' + r.cor + ';border-color:' + r.cor.replace(')', ',.35)').replace('var(','rgba(0,0,0,0) var(') + ';background:' + r.cor.replace(')', ',.08)').replace('var(','rgba(0,0,0,0) var(') + ';">' + esc(r.fase) + '</span>' +
+      '<span class="rastr-r-arrow">›</span>' +
     '</div>';
   }).join('');
 }
 
-async function rastrAdd() {
-  var nota = document.getElementById('r-nota').value.trim();
-  if (!nota) { toast('Escreva uma anotação', 'var(--red)'); return; }
-  var payload = {
-    ref: document.getElementById('r-ref').value.trim(),
-    tipo: document.getElementById('r-tipo').value,
-    nota: nota
-  };
-  try {
-    var r = await fetch('/api/rastreabilidade?action=add', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
-    });
-    var d = await r.json();
-    if (d.ok) {
-      document.getElementById('r-nota').value = '';
-      document.getElementById('r-ref').value = '';
-      await rastrLoad();
-      toast('Registro salvo!', 'var(--purple)');
-    } else toast('Erro: ' + d.error, 'var(--red)');
-  } catch(e) { toast('Erro de conexão', 'var(--red)'); }
-}
+function rastrIr(r) {
+  // Limpa busca
+  document.getElementById('r-busca').value = '';
+  document.getElementById('rastr-results').innerHTML = '';
 
-async function rastrDel(id) {
-  if (!confirm('Remover este registro?')) return;
-  try {
-    await fetch('/api/rastreabilidade?action=del', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id:id})
-    });
-    await rastrLoad();
-  } catch(e) {}
+  if (r.tipo === 'peca') {
+    modTab('pecas');
+    pecTab(r.tab || 'pendentes');
+    setTimeout(function() {
+      var el = document.getElementById('ci-' + r.id);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.style.outline = '2px solid var(--purple)';
+        el.style.transition = 'outline .3s';
+        setTimeout(function() { el.style.outline = ''; }, 2200);
+      }
+    }, 120);
+  } else {
+    modTab('os');
+    osTab(r.faseKey);
+    setTimeout(function() {
+      var el = document.getElementById('oscard-' + r.pipefyId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.style.outline = '2px solid var(--purple)';
+        el.style.transition = 'outline .3s';
+        setTimeout(function() { el.style.outline = ''; }, 2200);
+      }
+    }, 120);
+  }
 }
-
-document.getElementById('r-busca').addEventListener('input', function() {
-  rastrRender(this.value.trim());
-});
 
 // ══════════════════════════════════════════════
 //  MÓDULO OS / PIPEFY
@@ -1006,7 +989,6 @@ function copiarSel(){
 // ══════════════════════════════════════════════
 osLoad();
 pecLoad();
-rastrLoad();
 setInterval(osLoad, 30000);
 setInterval(pecLoad, 60000);
 </script>
