@@ -51,9 +51,9 @@ const PHASE_LABEL = {
 };
 
 // Apenas fichas NESTAS fases aparecem como Recebíveis
+// Fases exatas definidas pelo usuário — emitir_nf excluído propositalmente
 const FIN_PHASES = new Set([
   'aguardando_dados',
-  'emitir_nf',          // ← fase legada com 13 fichas ativas
   'nf_emitida',
   'faturamento',
   'pagamento_agendado',
