@@ -982,7 +982,7 @@ async function confCaminho(){
   else toast('Erro: '+d.error,'var(--red)');
 }
 async function recebeu(id){if(!confirm('Confirmar recebimento?'))return;var d=await fetch('/api/compras-pecas?action=marcar-recebido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[id]})}).then(function(r){return r.json();});if(d.ok){await pecLoad();toast('Peça recebida!','var(--green)');};}
-function editPrev(id){var p=itens.find(function(x){return x.id===id;});var nova=prompt('Previsão (AAAA-MM-DD):',p?(p.previsaoChegada||')':''));if(nova!==null)fetch('/api/compras-pecas?action=previsao',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,previsaoChegada:nova})}).then(function(d){return d.json();}).then(function(d){if(d.ok){pecLoad();toast('Previsão atualizada!');}});}
+function editPrev(id){var p=itens.find(function(x){return x.id===id;});var nova=prompt('Previsão (AAAA-MM-DD):',p?(p.previsaoChegada||''):'');if(nova!==null)fetch('/api/compras-pecas?action=previsao',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,previsaoChegada:nova})}).then(function(d){return d.json();}).then(function(d){if(d.ok){pecLoad();toast('Previsão atualizada!');}});}
 
 function pecTab(a){
   pecAbaAtual=a;
