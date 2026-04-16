@@ -196,11 +196,21 @@ tbody td{font-family:var(--fm);font-size:11px;padding:10px 12px;color:var(--text
 
 <!-- DASHBOARD -->
 <div class="page" id="page-dash">
-  <div class="toolbar">
-    <input type="month" class="fi-sm" id="d-mes" oninput="renderDash()">
-    <button class="fbtn active" data-d="todos" onclick="setFD(this,'todos')">Todos</button>
-    <button class="fbtn wf" data-d="Wilde" onclick="setFD(this,'Wilde')">Wilde</button>
-    <button class="fbtn pf" data-d="Paulo" onclick="setFD(this,'Paulo')">Paulo</button>
+  <div class="toolbar" style="gap:6px;flex-wrap:wrap;align-items:center;">
+    <button class="fbtn active" id="dp-sem"  onclick="setPeriodo(this,'semana')">Esta semana</button>
+    <button class="fbtn"        id="dp-7"    onclick="setPeriodo(this,'7dias')">Últimos 7d</button>
+    <button class="fbtn"        id="dp-mes"  onclick="setPeriodo(this,'mes')">Este mês</button>
+    <button class="fbtn"        id="dp-tudo" onclick="setPeriodo(this,'tudo')">Tudo</button>
+    <button class="fbtn"        id="dp-cust" onclick="setPeriodo(this,'custom')">Personalizado</button>
+    <div id="custom-dates" style="display:none;align-items:center;gap:6px;">
+      <input type="date" class="fi-sm" id="d-de"  oninput="renderDash()" placeholder="De">
+      <span style="font-family:var(--fm);font-size:10px;color:var(--muted);">até</span>
+      <input type="date" class="fi-sm" id="d-ate" oninput="renderDash()" placeholder="Até">
+    </div>
+    <div style="width:1px;height:18px;background:var(--border);margin:0 2px;"></div>
+    <button class="fbtn active" id="dm-todos" onclick="setFD(this,'todos')">Todos</button>
+    <button class="fbtn wf"     id="dm-wilde" onclick="setFD(this,'Wilde')">Wilde</button>
+    <button class="fbtn pf"     id="dm-paulo" onclick="setFD(this,'Paulo')">Paulo</button>
   </div>
   <div class="kpi-grid" id="kpi-grid"></div>
   <div class="charts2">
