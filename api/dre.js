@@ -34,25 +34,34 @@ function today() { return new Date().toISOString().slice(0,10); }
 // ── Config defaults ────────────────────────────────────────────
 const CFG_DEFAULT = { metaMensal: 0, impostoPct: 6, nomeEmpresa: 'Reparo Eletro' };
 
-// ── Board phases (todas as fases do board) ─────────────────────
+// ── Fases do painel Financeiro (reparoeletro_financeiro) ────────
 const PHASE_LABEL = {
-  aprovado:'Aprovado', producao:'Em Produção', cliente_loja:'Cliente Loja',
-  urgencia:'Urgência', comprar_peca:'Comprar Peça', aguardando_peca:'Aguardando Peça',
-  peca_disponivel:'Peça Disponível', loja_feito:'Loja Feito',
-  delivery_feito:'Delivery Feito', aguardando_ret:'Ag. Retirada',
-  // Fases financeiras
-  aguardando_dados:'Aguardando Dados', nf_emitida:'NF Emitida',
-  faturamento:'Faturamento', pagamento_agendado:'Pagamento Agendado',
-  analise_pagamento:'Análise de Pagamento', pagamento_confirmado:'Pagamento Confirmado'
+  aguardando_dados:'Aguardando Dados',
+  emitir_nf:'Emitir NF',          // fase legada ativa no sistema
+  nf_emitida:'NF Emitida',
+  faturamento:'Faturamento',
+  pagamento_agendado:'Pagamento Agendado',
+  analise_pagamento:'Análise de Pagamento',
+  pagamento_confirmado:'Pagamento Confirmado',
+  // pós-pagamento (não aparecem como recebíveis)
+  entrega_agendada:'Entrega Agendada',
+  entrega_liberada:'Entrega Liberada',
+  rota_criada:'Rota Criada',
+  item_coletado:'Item Coletado'
 };
 
-// Apenas fichas nestas fases aparecem como Recebíveis
+// Apenas fichas NESTAS fases aparecem como Recebíveis
 const FIN_PHASES = new Set([
-  'aguardando_dados','nf_emitida','faturamento',
-  'pagamento_agendado','analise_pagamento','pagamento_confirmado'
+  'aguardando_dados',
+  'emitir_nf',          // ← fase legada com 13 fichas ativas
+  'nf_emitida',
+  'faturamento',
+  'pagamento_agendado',
+  'analise_pagamento',
+  'pagamento_confirmado'
 ]);
 
-// Recebíveis urgentes = próximos ao pagamento
+// Urgentes = próximos do pagamento
 const URGENTES = new Set(['pagamento_agendado','analise_pagamento','pagamento_confirmado']);
 
 // ── Categorias ─────────────────────────────────────────────────
@@ -146,7 +155,7 @@ function calcFluxo(receitas, despesas, mes) {
   return weeks;
 }
 
-function calcKPIs(receitas, despesas, fixas, config, cards, mes) {
+function calcKPIs(receitas, despesas, fixas, config, finRecords, mes) {
   const cfg = { ...CFG_DEFAULT, ...config };
   const recs  = (receitas||[]).filter(x => x.data?.startsWith(mes) && x.status==='recebido');
   const desps = (despesas||[]).filter(x => (x.data||x.dataVencimento||'').startsWith(mes) && x.status==='pago');
@@ -160,9 +169,9 @@ function calcKPIs(receitas, despesas, fixas, config, cards, mes) {
   const metaPct     = cfg.metaMensal>0 ? +(Math.min(receitaMes/cfg.metaMensal*100,999)).toFixed(1) : 0;
   const ticket      = recs.length>0 ? +(receitaMes/recs.length).toFixed(2) : 0;
 
-  // Receivables = somente OS nas fases financeiras, ainda não confirmadas
-  const confirmed = new Set((receitas||[]).filter(x=>x.osRef && x.status==='recebido').map(x=>x.osRef));
-  const recebiveis = (cards||[]).filter(c => FIN_PHASES.has(c.phaseId) && !confirmed.has(c.pipefyId));
+  // Receivables = fichas do financeiro nas fases corretas, não confirmadas
+  const confirmed  = new Set((receitas||[]).filter(x=>x.osRef && x.status==='recebido').map(x=>x.osRef));
+  const recebiveis = (finRecords||[]).filter(c => FIN_PHASES.has(c.phaseId) && !confirmed.has(c.pipefyId||c.id));
   const recUrgentes = recebiveis.filter(c => URGENTES.has(c.phaseId));
 
   // A pagar esta semana
@@ -203,26 +212,34 @@ module.exports = async (req, res) => {
 
     // ── LOAD (all data + computed metrics) ──────────────────────
     if (action === 'load') {
-      const [rD,dD,fD,cD,bD] = await dbGet(
+      const [rD,dD,fD,cD,finD] = await dbGet(
         'reparo_fin_receitas','reparo_fin_despesas','reparo_fin_fixas',
-        'reparo_fin_config','reparoeletro_board'
+        'reparo_fin_config','reparoeletro_financeiro'
       );
       const receitas = rD?.receitas || (Array.isArray(rD)?rD:[]);
       const despesas = dD?.despesas || (Array.isArray(dD)?dD:[]);
       const fixas    = fD?.fixas    || (Array.isArray(fD)?fD:[]);
       const config   = { ...CFG_DEFAULT, ...(cD||{}) };
-      const cards    = bD?.cards    || (Array.isArray(bD)?bD:[]);
+      // reparoeletro_financeiro pode guardar { records:[...] } ou array direto
+      const finRecords = finD?.records || (Array.isArray(finD)?finD:[]);
 
-      // Receivables = somente OS nas fases financeiras, ainda não confirmadas
+      // Receivables = fichas do painel financeiro nas fases corretas, não confirmadas
       const confirmed = new Set((receitas||[]).filter(x=>x.osRef && x.status==='recebido').map(x=>x.osRef));
-      const recebiveis = cards
+      const recebiveis = finRecords
         .filter(c => FIN_PHASES.has(c.phaseId) && !confirmed.has(c.pipefyId))
         .map(c=>({
-        pipefyId:c.pipefyId, osCode:c.osCode, nomeContato:c.nomeContato,
-        title:c.title, phaseId:c.phaseId,
-        phaseLabel: PHASE_LABEL[c.phaseId]||c.phaseId,
-        urgente: URGENTES.has(c.phaseId), addedAt:c.addedAt
-      }));
+          pipefyId:   c.pipefyId || c.id,
+          osCode:     c.osCode,
+          nomeContato:c.nomeContato,
+          title:      c.title || c.descricao,
+          valor:      c.valor,
+          telefone:   c.telefone,
+          phaseId:    c.phaseId,
+          phaseLabel: PHASE_LABEL[c.phaseId] || c.phaseId,
+          urgente:    URGENTES.has(c.phaseId),
+          addedAt:    c.createdAt || c.movedAt
+        }))
+        .sort((a,b) => (b.urgente?1:0) - (a.urgente?1:0));
 
       // A pagar: fixas do mês + despesas pendentes
       const fixasPagas = new Set(despesas.filter(x=>x.fixaRef && (x.data||x.dataVencimento||'').startsWith(mes) && x.status==='pago').map(x=>x.fixaRef));
@@ -239,7 +256,7 @@ module.exports = async (req, res) => {
         aPagar: { fixas:fixasPend, despesas:despPend },
         dre:   calcDRE(receitas,despesas,config,mes),
         fluxo: calcFluxo(receitas,despesas,mes),
-        kpis:  calcKPIs(receitas,despesas,fixas,config,cards,mes)
+        kpis:  calcKPIs(receitas,despesas,fixas,config,finRecords,mes)
       });
     }
 
