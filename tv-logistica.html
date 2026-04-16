@@ -249,7 +249,7 @@ tbody td{font-family:var(--fm);font-size:11px;padding:10px 12px;color:var(--text
 <div class="toast" id="toast"></div>
 
 <script>
-var recs=[], fmot='todos', fdash='todos', sf='data', sd=true, toastT;
+var recs=[], fmot='todos', fdash='todos', periodo='semana', sf='data', sd=true, toastT;
 
 function setTab(t){
   ['form','tabela','dash'].forEach(function(p){
@@ -316,7 +316,20 @@ async function registrar(){
 }
 
 function setFM(el,m){ document.querySelectorAll('#page-tabela .fbtn').forEach(b=>b.classList.remove('active')); el.classList.add('active'); fmot=m; renderT(); }
-function setFD(el,m){ document.querySelectorAll('#page-dash .fbtn').forEach(b=>b.classList.remove('active')); el.classList.add('active'); fdash=m; renderDash(); }
+function setFD(el,m){
+  document.querySelectorAll('[id^=dm-]').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  fdash=m;
+  renderDash();
+}
+function setPeriodo(el,p){
+  document.querySelectorAll('[id^=dp-]').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  periodo=p;
+  var cd=document.getElementById('custom-dates');
+  if(cd) cd.style.display=p==='custom'?'flex':'none';
+  renderDash();
+}
 function sortBy(f){ if(sf===f) sd=!sd; else{sf=f;sd=true;} renderT(); }
 
 function getFiltered(){
@@ -365,32 +378,92 @@ function renderT(){
   }).join('');
 }
 
+function getPeriodoDates(){
+  var hoje=new Date(), y=hoje.getFullYear(), m=hoje.getMonth(), d=hoje.getDate();
+  if(periodo==='semana'){
+    var dow=hoje.getDay()||7; // 1=Mon..7=Sun
+    var seg=new Date(y,m,d-(dow-1));
+    return {de:seg.toISOString().slice(0,10), ate:hoje.toISOString().slice(0,10)};
+  }
+  if(periodo==='7dias'){
+    var s=new Date(y,m,d-6);
+    return {de:s.toISOString().slice(0,10), ate:hoje.toISOString().slice(0,10)};
+  }
+  if(periodo==='mes'){
+    return {de:y+'-'+(m+1<10?'0':'')+(m+1)+'-01', ate:hoje.toISOString().slice(0,10)};
+  }
+  if(periodo==='custom'){
+    var de=document.getElementById('d-de').value;
+    var ate=document.getElementById('d-ate').value;
+    return {de:de||null, ate:ate||null};
+  }
+  return {de:null, ate:null}; // tudo
+}
+
+// Filtra por período (ignora motorista) — para gráficos comparativos
+function getByPeriod(){
+  var p=getPeriodoDates();
+  return recs.filter(function(r){
+    if(p.de&&r.data<p.de) return false;
+    if(p.ate&&r.data>p.ate) return false;
+    return true;
+  });
+}
+
+// Filtra por período + motorista — para KPIs do motorista selecionado
 function getDash(){
-  var mes=document.getElementById('d-mes').value;
+  var p=getPeriodoDates();
   return recs.filter(function(r){
     if(fdash!=='todos'&&r.motorista!==fdash) return false;
-    if(mes&&!r.data.startsWith(mes)) return false;
+    if(p.de&&r.data<p.de) return false;
+    if(p.ate&&r.data>p.ate) return false;
     return true;
   });
 }
 
 function renderDash(){
+  // Para KPIs: usa filtro de período + motorista (getDash)
   var data=getDash();
-  var W=data.filter(r=>r.motorista==='Wilde'), P=data.filter(r=>r.motorista==='Paulo');
-  var kmT=soma(data,'km'),kmW=soma(W,'km'),kmP=soma(P,'km');
-  var eqT=soma(data,'equipamentos'),eqW=soma(W,'equipamentos'),eqP=soma(P,'equipamentos');
-  var sT=data.length,sW=W.length,sP=P.length;
+  // Para barras comparativas: usa só período, sem filtro de motorista (getByPeriod)
+  var allP=getByPeriod();
+  var W=allP.filter(r=>r.motorista==='Wilde');
+  var P=allP.filter(r=>r.motorista==='Paulo');
+
+  var kmT=soma(data,'km'), eqT=soma(data,'equipamentos'), sT=data.length;
+  var kmW=soma(W,'km'),    eqW=soma(W,'equipamentos'),    sW=W.length;
+  var kmP=soma(P,'km'),    eqP=soma(P,'equipamentos'),    sP=P.length;
   var ke=eqT>0?(kmT/eqT).toFixed(1)+'km':'—';
+  var kmMedia=sT>0?(kmT/sT).toFixed(1):'—';
 
-  document.getElementById('kpi-grid').innerHTML=[
-    {cls:'kt',c:'var(--accent)',n:kmT.toFixed(1)+' km',l:'Total km',s:sT+' saídas · km/eq: '+ke},
-    {cls:'kt',c:'var(--accent)',n:eqT,l:'Total equipamentos',s:''},
-    {cls:'kw',c:'var(--wilde)',n:kmW.toFixed(1)+' km',l:'Km — Wilde',s:sW+' saídas · '+eqW+' equip.'},
-    {cls:'kp',c:'var(--paulo)',n:kmP.toFixed(1)+' km',l:'Km — Paulo',s:sP+' saídas · '+eqP+' equip.'},
-    {cls:'kw',c:'var(--wilde)',n:eqW+' equip.',l:'Equip. Wilde',s:sW>0?(eqW/sW).toFixed(1)+' equip/saída':'—'},
-    {cls:'kp',c:'var(--paulo)',n:eqP+' equip.',l:'Equip. Paulo',s:sP>0?(eqP/sP).toFixed(1)+' equip/saída':'—'},
-  ].map(k=>'<div class="kc '+k.cls+'"><div class="kn" style="color:'+k.c+'">'+k.n+'</div><div class="kl">'+k.l+'</div><div class="ks">'+k.s+'</div></div>').join('');
+  // KPIs — muda conforme filtro de motorista
+  var kpis;
+  if(fdash==='todos'){
+    kpis=[
+      {cls:'kt',c:'var(--accent)',n:soma(allP,'km').toFixed(0)+' km',l:'Total km',s:allP.length+' saídas · km/eq: '+(soma(allP,'equipamentos')>0?(soma(allP,'km')/soma(allP,'equipamentos')).toFixed(1)+'km':'—')},
+      {cls:'kt',c:'var(--accent)',n:soma(allP,'equipamentos'),l:'Total equipamentos',s:''},
+      {cls:'kw',c:'var(--wilde)',n:kmW.toFixed(0)+' km',l:'Km — Wilde',s:sW+' saídas · '+eqW+' equip.'},
+      {cls:'kp',c:'var(--paulo)',n:kmP.toFixed(0)+' km',l:'Km — Paulo',s:sP+' saídas · '+eqP+' equip.'},
+      {cls:'kw',c:'var(--wilde)',n:eqW+' equip.',l:'Equip. Wilde',s:sW>0?(eqW/sW).toFixed(1)+' equip/saída':'—'},
+      {cls:'kp',c:'var(--paulo)',n:eqP+' equip.',l:'Equip. Paulo',s:sP>0?(eqP/sP).toFixed(1)+' equip/saída':'—'},
+    ];
+  } else {
+    var cor=fdash==='Wilde'?'var(--wilde)':'var(--paulo)';
+    var cls=fdash==='Wilde'?'kw':'kp';
+    var melhor=data.length?data.slice().sort((a,b)=>b.km-a.km)[0]:null;
+    kpis=[
+      {cls:cls,c:cor,n:kmT.toFixed(0)+' km',l:'Total km — '+fdash,s:sT+' saídas'},
+      {cls:cls,c:cor,n:eqT+' equip.',l:'Total equipamentos',s:eqT>0&&sT>0?(eqT/sT).toFixed(1)+' equip/saída':'—'},
+      {cls:cls,c:cor,n:kmMedia+' km',l:'Média km/saída',s:''},
+      {cls:cls,c:cor,n:ke,l:'Km por equipamento',s:''},
+      {cls:cls,c:cor,n:melhor?(melhor.km.toFixed(0)+' km'):'—',l:'Melhor saída',s:melhor?fd(melhor.data):''},
+      {cls:'kt',c:'var(--accent)',n:sT,l:'Total saídas',s:''},
+    ];
+  }
+  document.getElementById('kpi-grid').innerHTML=kpis.map(k=>
+    '<div class="kc '+k.cls+'"><div class="kn" style="color:'+k.c+'">'+k.n+'</div><div class="kl">'+k.l+'</div><div class="ks">'+k.s+'</div></div>'
+  ).join('');
 
+  // Barras comparativas — sempre Wilde vs Paulo usando período (sem filtro de motorista)
   var mkm=Math.max(kmW,kmP,1), meq=Math.max(eqW,eqP,1);
   document.getElementById('c-km').innerHTML=[{l:'Wilde',v:kmW,c:'bfw'},{l:'Paulo',v:kmP,c:'bfp'}].map(b=>
     '<div class="bi"><div class="blb">'+b.l+'</div><div class="btr"><div class="bf '+b.c+'" style="width:'+Math.round(b.v/mkm*100)+'%"></div></div><div class="bv">'+b.v.toFixed(0)+'</div></div>'
@@ -399,26 +472,28 @@ function renderDash(){
     '<div class="bi"><div class="blb">'+b.l+'</div><div class="btr"><div class="bf '+b.c+'" style="width:'+Math.round(b.v/meq*100)+'%"></div></div><div class="bv">'+b.v+'</div></div>'
   ).join('');
 
-  renderDonut(sW,sP,sT);
+  renderDonut(W.length, P.length, allP.length);
 
+  // Sparkline — usa dados filtrados por período + motorista
   var spark=data.slice().sort((a,b)=>a.data.localeCompare(b.data)).slice(-15);
   var msp=Math.max(...spark.map(r=>r.km),1);
   document.getElementById('sp-bars').innerHTML=spark.map(r=>{
     var h=Math.max(4,Math.round(r.km/msp*54));
-    var c=r.motorista==='Wilde'?'var(--wilde)':'var(--paulo)';
-    return '<div class="sb" style="height:'+h+'px;background:'+c+';opacity:.65" title="'+r.motorista+' '+fd(r.data)+' '+r.km+' km"></div>';
+    var cor=r.motorista==='Wilde'?'var(--wilde)':'var(--paulo)';
+    return '<div class="sb" style="height:'+h+'px;background:'+cor+';opacity:.65" title="'+r.motorista+' '+fd(r.data)+' '+r.km+' km"></div>';
   }).join('');
   document.getElementById('sp-labels').innerHTML=spark.map(r=>'<div class="sl">'+r.data.slice(5).replace('-','/')+'</div>').join('');
 
+  // Gráfico diário — usa dados do período filtrado (sem motorista)
   var byDay={};
-  data.forEach(function(r){
+  allP.forEach(function(r){
     if(!byDay[r.data]) byDay[r.data]={km:0,eq:0,w:0,p:0};
     byDay[r.data].km+=r.km; byDay[r.data].eq+=r.equipamentos;
     if(r.motorista==='Wilde') byDay[r.data].w+=r.km; else byDay[r.data].p+=r.km;
   });
   var days=Object.keys(byDay).sort().slice(-20);
   var md=Math.max(...days.map(d=>byDay[d].km),1);
-  document.getElementById('c-daily').innerHTML=days.map(function(d){
+  document.getElementById('c-daily').innerHTML=days.length?days.map(function(d){
     var v=byDay[d];
     return '<div class="bi">'
       +'<div class="blb">'+fd(d).slice(0,5)+'</div>'
@@ -429,7 +504,7 @@ function renderDash(){
       +'<div class="bv">'+v.km.toFixed(0)+'</div>'
       +'<div style="font-family:var(--fm);font-size:9px;color:var(--orange);width:38px;text-align:right">'+v.eq+' eq.</div>'
       +'</div>';
-  }).join('');
+  }).join(''):'<div style="font-family:var(--fm);font-size:11px;color:var(--muted);padding:12px">Sem dados no período.</div>';
 }
 
 function renderDonut(sW,sP,sT){
