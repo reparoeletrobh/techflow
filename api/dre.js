@@ -70,7 +70,7 @@ const CAT_DESPESA = {
 };
 
 // ── Financial calculations ─────────────────────────────────────
-function calcDRE(receitas, despesas, partes, config, mes) {
+function calcDRE(receitas, despesas, config, mes) {
   const cfg = { ...CFG_DEFAULT, ...config };
 
   // Receitas recebidas no mês
@@ -82,15 +82,11 @@ function calcDRE(receitas, despesas, partes, config, mes) {
   const impostos     = +(receitaBruta * (cfg.impostoPct/100)).toFixed(2);
   const receitaLiq   = receitaBruta - impostos;
 
-  // CMV = despesas categoria 'peca_cmv' pagas no mês
-  //       + peças recebidas de reparoeletro_compras_pecas (integração automática)
-  const cmvDespesas = (despesas||[])
+  // CMV = despesas categoria 'peca_cmv' pagas no mês (100% manual)
+  const cmv = +(despesas||[])
     .filter(x => x.categoria==='peca_cmv' && (x.data||x.dataVencimento||'').startsWith(mes) && x.status==='pago')
-    .reduce((s,x) => s + (x.valor||0), 0);
-  const cmvBoard = (partes||[])
-    .filter(p => p.status==='recebido' && (p.recebidoEm||'').startsWith(mes) && p.valor)
-    .reduce((s,p) => s + (p.valor||0), 0);
-  const cmv = +(cmvDespesas + cmvBoard).toFixed(2);
+    .reduce((s,x) => s + (x.valor||0), 0)
+    .toFixed(2);
   const lucroBruto = receitaLiq - cmv;
 
   // Despesas pagas no mês
@@ -207,16 +203,15 @@ module.exports = async (req, res) => {
 
     // ── LOAD (all data + computed metrics) ──────────────────────
     if (action === 'load') {
-      const [rD,dD,fD,cD,bD,pD] = await dbGet(
+      const [rD,dD,fD,cD,bD] = await dbGet(
         'reparo_fin_receitas','reparo_fin_despesas','reparo_fin_fixas',
-        'reparo_fin_config','reparoeletro_board','reparoeletro_compras_pecas'
+        'reparo_fin_config','reparoeletro_board'
       );
       const receitas = rD?.receitas || (Array.isArray(rD)?rD:[]);
       const despesas = dD?.despesas || (Array.isArray(dD)?dD:[]);
       const fixas    = fD?.fixas    || (Array.isArray(fD)?fD:[]);
       const config   = { ...CFG_DEFAULT, ...(cD||{}) };
       const cards    = bD?.cards    || (Array.isArray(bD)?bD:[]);
-      const partes   = pD?.pecas    || (Array.isArray(pD)?pD:[]);
 
       // Receivables = somente OS nas fases financeiras, ainda não confirmadas
       const confirmed = new Set((receitas||[]).filter(x=>x.osRef && x.status==='recebido').map(x=>x.osRef));
@@ -242,8 +237,7 @@ module.exports = async (req, res) => {
         despesas: [...despesas].reverse(),
         fixas, config, recebiveis,
         aPagar: { fixas:fixasPend, despesas:despPend },
-        partes: partes.filter(p=>p.status==='recebido'),
-        dre:   calcDRE(receitas,despesas,partes,config,mes),
+        dre:   calcDRE(receitas,despesas,config,mes),
         fluxo: calcFluxo(receitas,despesas,mes),
         kpis:  calcKPIs(receitas,despesas,fixas,config,cards,mes)
       });
