@@ -200,39 +200,38 @@ function calcKPIs(receitas, despesas, fixas, config, finRecords, mes) {
 }
 
 // ── MAIN ──────────────────────────────────────────────────────
-// ── Fallback parser inteligente ─────────────────────────────────────────
+// ── Fallback parser inteligente ────────────────────────────────────────
 function aiParseServer(texto, hoje) {
   const t = texto.toLowerCase();
   const cats = {
-    peca_cmv:['fortec','peça','peca','componente','resistor','capacitor','placa','display','fonte','cabo','chip','sensor','módulo','modulo'],
+    peca_cmv:['fortec','peça','peca','componente','resistor','capacitor','placa','display','fonte','cabo','chip','sensor'],
     aluguel:['aluguel'],energia:['energia','luz','enel','eletricidade'],
     agua:['água','agua','copasa'],telefone:['telefone','internet','vivo','claro','tim'],
     salario:['salário','salario','pro-labore','funcionário'],material:['material','suprimento'],
     marketing:['marketing','publicidade','instagram','google'],contabilidade:['contador','contabilidade'],
-    transporte:['uber','combustível','combustivel','gasolina','frete'],manutencao:['manutenção','manutencao'],
+    transporte:['uber','combustivel','gasolina','frete'],manutencao:['manutencao','conserto'],
   };
   let categoria = 'outros';
   for (const [cat, kws] of Object.entries(cats)) {
     if (kws.some(k => t.includes(k))) { categoria = cat; break; }
   }
-  // Remove separadores de milhar, depois extrai todos os números
-  const norm = texto.replace(/(\d)\.(\d{3})/g,'$1$2');
+  const norm = texto.replace(/(\d)\.(\d{3})/g, '$1$2');
   const nums = [...norm.matchAll(/\d+(?:,\d{1,2})?/g)]
-    .map(m => parseFloat(m[0].replace(',','.'))).filter(n => !isNaN(n) && n > 0);
+    .map(m => parseFloat(m[0].replace(',','.'))). filter(n => !isNaN(n) && n > 0);
   if (!nums.length) return null;
-  // Ignora dias (1-31) e anos (2020-2030), pega o maior restante
-  const vals = nums.filter(n => !(n>=1&&n<=31&&Number.isInteger(n)) && !(n>=2020&&n<=2030&&Number.isInteger(n)));
-  const valor = (vals.length ? Math.max(...vals) : Math.max(...nums));
-  // Extrai descrição — remove stopwords monetárias e números
-  let desc = texto.replace(/(?:do dia|até agora|gastamos|com|reais?|r\$|pago|total|entre|no mês)\/gi,' ')
+  const vals = nums.filter(n => !(n>=1 && n<=31 && Number.isInteger(n)) && !(n>=2020 && n<=2030 && Number.isInteger(n)));
+  const valor = vals.length ? Math.max(...vals) : Math.max(...nums);
+  let desc = texto
+    .replace(/do dia/gi,' ').replace(/até agora/gi,' ').replace(/gastamos/gi,' ')
+    .replace(/\breais?\b/gi,' ').replace(/r\$/gi,' ').replace(/\btotal\b/gi,' ')
     .replace(/\d[\d.,\/]*/g,'').replace(/\s+/g,' ').trim();
-  desc = desc.split(/\s+/).filter(w=>w.length>1).slice(0,3).join(' ');
+  desc = desc.split(/\s+/).filter(w => w.length > 1).slice(0, 3).join(' ');
   const lbl = {peca_cmv:'Compra de Peças',aluguel:'Aluguel',energia:'Energia Elétrica',agua:'Água',
     telefone:'Telefone/Internet',salario:'Salário',material:'Material',marketing:'Marketing',
     contabilidade:'Contabilidade',transporte:'Transporte',manutencao:'Manutenção',outros:'Despesa'};
   if (!desc || desc.length < 2) desc = lbl[categoria];
-  else desc = desc.charAt(0).toUpperCase()+desc.slice(1).toLowerCase();
-  return {descricao:desc.slice(0,40), valor, categoria, status:'pago', data:hoje};
+  else desc = desc.charAt(0).toUpperCase() + desc.slice(1).toLowerCase();
+  return {descricao: desc.slice(0,40), valor, categoria, status:'pago', data:hoje};
 }
 
 module.exports = async (req, res) => {
