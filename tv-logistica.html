@@ -281,7 +281,6 @@ function selMot(m){
   var h=new Date().toISOString().slice(0,10), mes=h.slice(0,7);
   document.getElementById('f-data').value=h;
   document.getElementById('f-mes').value=mes;
-  document.getElementById('d-mes').value=mes;
   document.getElementById('f-busca').addEventListener('input',renderT);
   load();
 })();
