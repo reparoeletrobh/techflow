@@ -229,7 +229,11 @@ function aiParseServer(texto, hoje) {
   const lbl = {peca_cmv:'Compra de Peças',aluguel:'Aluguel',energia:'Energia Elétrica',agua:'Água',
     telefone:'Telefone/Internet',salario:'Salário',material:'Material',marketing:'Marketing',
     contabilidade:'Contabilidade',transporte:'Transporte',manutencao:'Manutenção',outros:'Despesa'};
-  if (!desc || desc.length < 2) desc = lbl[categoria];
+  // Se a descrição ficou com palavras genéricas, usa o label da categoria
+  const genericWords = new Set(['com','peças','peca','de','do','da','no','na','para','que','e']);
+  const descWords = desc.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+  const isGeneric = descWords.length === 0 || descWords.every(w => genericWords.has(w));
+  if (!desc || desc.length < 2 || isGeneric) desc = lbl[categoria];
   else desc = desc.charAt(0).toUpperCase() + desc.slice(1).toLowerCase();
   return {descricao: desc.slice(0,40), valor, categoria, status:'pago', data:hoje};
 }
