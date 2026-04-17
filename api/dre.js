@@ -200,6 +200,41 @@ function calcKPIs(receitas, despesas, fixas, config, finRecords, mes) {
 }
 
 // ── MAIN ──────────────────────────────────────────────────────
+// ── Fallback parser inteligente ─────────────────────────────────────────
+function aiParseServer(texto, hoje) {
+  const t = texto.toLowerCase();
+  const cats = {
+    peca_cmv:['fortec','peça','peca','componente','resistor','capacitor','placa','display','fonte','cabo','chip','sensor','módulo','modulo'],
+    aluguel:['aluguel'],energia:['energia','luz','enel','eletricidade'],
+    agua:['água','agua','copasa'],telefone:['telefone','internet','vivo','claro','tim'],
+    salario:['salário','salario','pro-labore','funcionário'],material:['material','suprimento'],
+    marketing:['marketing','publicidade','instagram','google'],contabilidade:['contador','contabilidade'],
+    transporte:['uber','combustível','combustivel','gasolina','frete'],manutencao:['manutenção','manutencao'],
+  };
+  let categoria = 'outros';
+  for (const [cat, kws] of Object.entries(cats)) {
+    if (kws.some(k => t.includes(k))) { categoria = cat; break; }
+  }
+  // Remove separadores de milhar, depois extrai todos os números
+  const norm = texto.replace(/(\d)\.(\d{3})/g,'$1$2');
+  const nums = [...norm.matchAll(/\d+(?:,\d{1,2})?/g)]
+    .map(m => parseFloat(m[0].replace(',','.'))).filter(n => !isNaN(n) && n > 0);
+  if (!nums.length) return null;
+  // Ignora dias (1-31) e anos (2020-2030), pega o maior restante
+  const vals = nums.filter(n => !(n>=1&&n<=31&&Number.isInteger(n)) && !(n>=2020&&n<=2030&&Number.isInteger(n)));
+  const valor = (vals.length ? Math.max(...vals) : Math.max(...nums));
+  // Extrai descrição — remove stopwords monetárias e números
+  let desc = texto.replace(/(?:do dia|até agora|gastamos|com|reais?|r\$|pago|total|entre|no mês)\/gi,' ')
+    .replace(/\d[\d.,\/]*/g,'').replace(/\s+/g,' ').trim();
+  desc = desc.split(/\s+/).filter(w=>w.length>1).slice(0,3).join(' ');
+  const lbl = {peca_cmv:'Compra de Peças',aluguel:'Aluguel',energia:'Energia Elétrica',agua:'Água',
+    telefone:'Telefone/Internet',salario:'Salário',material:'Material',marketing:'Marketing',
+    contabilidade:'Contabilidade',transporte:'Transporte',manutencao:'Manutenção',outros:'Despesa'};
+  if (!desc || desc.length < 2) desc = lbl[categoria];
+  else desc = desc.charAt(0).toUpperCase()+desc.slice(1).toLowerCase();
+  return {descricao:desc.slice(0,40), valor, categoria, status:'pago', data:hoje};
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin','*');
   res.setHeader('Access-Control-Allow-Methods','GET,POST,OPTIONS');
@@ -432,17 +467,23 @@ module.exports = async (req, res) => {
         '"gastamos 13464 com peças"→{"descricao":"Compra de Peças","valor":13464,"categoria":"peca_cmv","data":"' + hoje + '","status":"pago"} ' +
         '"conta de luz 280"→{"descricao":"Energia Elétrica","valor":280,"categoria":"energia","data":"' + hoje + '","status":"pago"}';
       try {
+        const AKEY = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY || '';
+        const hdrs = {'Content-Type':'application/json','anthropic-version':'2023-06-01'};
+        if (AKEY) hdrs['x-api-key'] = AKEY;
         const r = await fetch('https://api.anthropic.com/v1/messages', {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
+          method:'POST', headers:hdrs,
           body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:200,system:sys,messages:[{role:'user',content:texto}]})
         });
         const d = await r.json();
+        if (d.type === 'error') throw new Error(d.error?.message || 'API error');
         const raw = (d.content?.[0]?.text||'').trim().replace(/```json?\n?/gi,'').replace(/```/g,'').trim();
+        if (!raw) throw new Error('resposta vazia');
         const parsed = JSON.parse(raw);
         if (!parsed.valor || parsed.valor <= 0) throw new Error('valor inválido');
         return res.status(200).json({ok:true, parsed});
       } catch(e) {
+        const fb = aiParseServer(texto, hoje);
+        if (fb) return res.status(200).json({ok:true, parsed:fb, fallback:true});
         return res.status(200).json({ok:false, error:'parse falhou: '+e.message});
       }
     }
