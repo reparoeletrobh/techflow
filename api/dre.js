@@ -98,8 +98,8 @@ function calcDRE(receitas, despesas, config, mes) {
     .toFixed(2);
   const lucroBruto = receitaLiq - cmv;
 
-  // Despesas pagas no mês
-  const desps = (despesas||[]).filter(x => (x.data||x.dataVencimento||'').startsWith(mes) && x.status==='pago');
+  // Despesas operacionais pagas no mês (EXCLUINDO peca_cmv — já conta no CMV)
+  const desps = (despesas||[]).filter(x => (x.data||x.dataVencimento||'').startsWith(mes) && x.status==='pago' && x.categoria !== 'peca_cmv');
   const despGroups = {};
   for (const k of Object.keys(CAT_DESPESA)) despGroups[k] = 0;
   desps.forEach(d => { despGroups[d.categoria||'outros'] = (despGroups[d.categoria||'outros']||0) + (d.valor||0); });
@@ -158,7 +158,7 @@ function calcFluxo(receitas, despesas, mes) {
 function calcKPIs(receitas, despesas, fixas, config, finRecords, mes) {
   const cfg = { ...CFG_DEFAULT, ...config };
   const recs  = (receitas||[]).filter(x => x.data?.startsWith(mes) && x.status==='recebido');
-  const desps = (despesas||[]).filter(x => (x.data||x.dataVencimento||'').startsWith(mes) && x.status==='pago');
+  const desps = (despesas||[]).filter(x => (x.data||x.dataVencimento||'').startsWith(mes) && x.status==='pago' && x.categoria !== 'peca_cmv');
   const pend  = (despesas||[]).filter(x => (x.dataVencimento||x.data||'').startsWith(mes) && x.status==='pendente');
 
   const receitaMes  = +recs.reduce((s,x)=>s+(x.valor||0),0).toFixed(2);
