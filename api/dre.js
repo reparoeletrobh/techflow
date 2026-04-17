@@ -418,6 +418,35 @@ module.exports = async (req, res) => {
       return res.status(200).json({ok:true});
     }
 
+    // ── AI PARSE — interpreta texto de gasto server-side ──────────────────
+    if (action === 'ai-parse') {
+      const { texto } = req.body || {};
+      if (!texto) return res.status(200).json({ok:false,error:'texto obrigatório'});
+      const hoje = new Date().toISOString().slice(0,10);
+      const sys = 'Você é assistente financeiro de uma assistência técnica brasileira. ' +
+        'Analise o texto de gasto/despesa e retorne APENAS JSON válido sem markdown: ' +
+        '{descricao(string capitalize máx 40 chars),valor(número positivo),categoria(peca_cmv|aluguel|energia|agua|telefone|salario|material|marketing|contabilidade|transporte|manutencao|outros),status(pago|pendente),data(YYYY-MM-DD)}. ' +
+        'Hoje:' + hoje + '. Status padrão=pago. peca_cmv=peças/componentes eletrônicos. ' +
+        'Se mencionar valor total gasto em peças num período, use esse valor total. ' +
+        'Exemplos: "Fortec 120"→{"descricao":"Fortec","valor":120,"categoria":"peca_cmv","data":"' + hoje + '","status":"pago"} ' +
+        '"gastamos 13464 com peças"→{"descricao":"Compra de Peças","valor":13464,"categoria":"peca_cmv","data":"' + hoje + '","status":"pago"} ' +
+        '"conta de luz 280"→{"descricao":"Energia Elétrica","valor":280,"categoria":"energia","data":"' + hoje + '","status":"pago"}';
+      try {
+        const r = await fetch('https://api.anthropic.com/v1/messages', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:200,system:sys,messages:[{role:'user',content:texto}]})
+        });
+        const d = await r.json();
+        const raw = (d.content?.[0]?.text||'').trim().replace(/```json?\n?/gi,'').replace(/```/g,'').trim();
+        const parsed = JSON.parse(raw);
+        if (!parsed.valor || parsed.valor <= 0) throw new Error('valor inválido');
+        return res.status(200).json({ok:true, parsed});
+      } catch(e) {
+        return res.status(200).json({ok:false, error:'parse falhou: '+e.message});
+      }
+    }
+
     return res.status(200).json({ok:false,error:'Ação não encontrada'});
 
   } catch(e) {
