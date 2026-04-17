@@ -229,41 +229,6 @@ body.tv-mode .tv-screen{display:flex;}
 .tv-bar-label{font-family:var(--fm);font-size:7px;color:var(--muted);}
 
 
-/* ── AI CHAT ── */
-.sb-chat{border-top:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;max-height:320px;}
-.sb-chat-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;cursor:pointer;user-select:none;}
-.sb-chat-title{font-family:var(--fm);font-size:9px;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:.1em;display:flex;align-items:center;gap:6px;}
-.sb-chat-dot{width:6px;height:6px;border-radius:50%;background:var(--purple);box-shadow:0 0 6px var(--purple);animation:chat-pulse 2s infinite;}
-@keyframes chat-pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
-.sb-chat-toggle{font-size:10px;color:var(--muted);transition:transform .2s;}
-.sb-chat-toggle.open{transform:rotate(180deg);}
-.sb-chat-body{display:none;flex-direction:column;flex:1;min-height:0;}
-.sb-chat-body.open{display:flex;}
-.sb-chat-msgs{flex:1;overflow-y:auto;padding:6px 10px;display:flex;flex-direction:column;gap:6px;min-height:80px;max-height:180px;}
-.sb-chat-msgs::-webkit-scrollbar{width:2px;}
-.sb-chat-msgs::-webkit-scrollbar-thumb{background:rgba(168,85,247,.3);}
-.chat-msg{font-family:var(--fb);font-size:11px;line-height:1.4;padding:6px 9px;border-radius:8px;max-width:100%;word-break:break-word;}
-.chat-msg.user{background:rgba(168,85,247,.15);color:#e0d0ff;border:1px solid rgba(168,85,247,.2);align-self:flex-end;}
-.chat-msg.ai{background:var(--surface2);color:var(--text);border:1px solid var(--border);align-self:flex-start;}
-.chat-msg.ai.loading{color:var(--muted);font-style:italic;}
-.chat-confirm{background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.25);border-radius:9px;padding:8px 10px;margin:2px 0;display:flex;flex-direction:column;gap:6px;}
-.chat-confirm-row{display:flex;justify-content:space-between;align-items:center;}
-.chat-confirm-label{font-family:var(--fm);font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
-.chat-confirm-val{font-family:var(--fh);font-size:12px;font-weight:800;color:#fff;}
-.chat-confirm-val.green{color:var(--green);}
-.chat-confirm-btns{display:flex;gap:5px;margin-top:2px;}
-.chat-btn-ok{flex:1;font-family:var(--fm);font-size:9px;padding:5px;border:none;background:var(--green);color:#000;border-radius:5px;cursor:pointer;font-weight:700;}
-.chat-btn-ok:hover{filter:brightness(1.1);}
-.chat-btn-no{flex:1;font-family:var(--fm);font-size:9px;padding:5px;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:5px;cursor:pointer;}
-.chat-btn-no:hover{color:#fff;}
-.sb-chat-input-wrap{display:flex;gap:4px;padding:6px 8px;border-top:1px solid var(--border);}
-.sb-chat-input{flex:1;background:var(--surface2);border:1px solid rgba(168,85,247,.25);border-radius:7px;padding:6px 9px;font-family:var(--fb);font-size:11px;color:var(--text);outline:none;resize:none;min-height:32px;max-height:80px;}
-.sb-chat-input:focus{border-color:var(--purple);}
-.sb-chat-input::placeholder{color:var(--muted);font-size:10px;}
-.sb-chat-send{background:var(--purple);border:none;border-radius:6px;width:28px;height:28px;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;align-self:flex-end;}
-.sb-chat-send:hover{filter:brightness(1.15);}
-.sb-chat-send:disabled{opacity:.4;cursor:not-allowed;}
-
 /* ── AI CHAT SIDEBAR ── */
 .ai-chat{border-top:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;}
 .ai-chat-hd{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;cursor:pointer;user-select:none;transition:background .12s;}
@@ -346,24 +311,6 @@ body.tv-mode .tv-screen{display:flex;}
       <div class="sb-item" data-panel="config" onclick="nav(this)"><span class="sb-item-icon">⚙️</span>Configurações</div>
     </nav>
     <!-- ─── AI CHAT ─── -->
-    <div class="sb-chat" id="sb-chat">
-      <div class="sb-chat-header" onclick="chatToggle()">
-        <div class="sb-chat-title">
-          <div class="sb-chat-dot"></div>
-          IA — Lançar Despesa
-        </div>
-        <span class="sb-chat-toggle" id="chat-toggle-icon">▾</span>
-      </div>
-      <div class="sb-chat-body" id="chat-body">
-        <div class="sb-chat-msgs" id="chat-msgs">
-          <div class="chat-msg ai">Olá! Digite um gasto e eu lanço automaticamente.<br><span style="color:var(--muted);font-size:10px;">Ex: Fortec 120 reais</span></div>
-        </div>
-        <div class="sb-chat-input-wrap">
-          <textarea class="sb-chat-input" id="chat-input" placeholder="Ex: Fortec: 120 reais" rows="1" onkeydown="chatKeyDown(event)" oninput="chatAutoResize(this)"></textarea>
-          <button class="sb-chat-send" id="chat-send-btn" onclick="chatEnviar()" title="Enviar">↑</button>
-        </div>
-      </div>
-    </div>
     <!-- ── AI CHAT ── -->
     <div class="ai-chat" id="ai-chat">
       <div class="ai-chat-hd" onclick="aiToggle()">
