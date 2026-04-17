@@ -228,6 +228,80 @@ body.tv-mode .tv-screen{display:flex;}
 .tv-bar-s{background:var(--red);border-radius:0 0 3px 3px;min-height:2px;transition:height .4s;}
 .tv-bar-label{font-family:var(--fm);font-size:7px;color:var(--muted);}
 
+
+/* ── AI CHAT ── */
+.sb-chat{border-top:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;max-height:320px;}
+.sb-chat-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;cursor:pointer;user-select:none;}
+.sb-chat-title{font-family:var(--fm);font-size:9px;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:.1em;display:flex;align-items:center;gap:6px;}
+.sb-chat-dot{width:6px;height:6px;border-radius:50%;background:var(--purple);box-shadow:0 0 6px var(--purple);animation:chat-pulse 2s infinite;}
+@keyframes chat-pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+.sb-chat-toggle{font-size:10px;color:var(--muted);transition:transform .2s;}
+.sb-chat-toggle.open{transform:rotate(180deg);}
+.sb-chat-body{display:none;flex-direction:column;flex:1;min-height:0;}
+.sb-chat-body.open{display:flex;}
+.sb-chat-msgs{flex:1;overflow-y:auto;padding:6px 10px;display:flex;flex-direction:column;gap:6px;min-height:80px;max-height:180px;}
+.sb-chat-msgs::-webkit-scrollbar{width:2px;}
+.sb-chat-msgs::-webkit-scrollbar-thumb{background:rgba(168,85,247,.3);}
+.chat-msg{font-family:var(--fb);font-size:11px;line-height:1.4;padding:6px 9px;border-radius:8px;max-width:100%;word-break:break-word;}
+.chat-msg.user{background:rgba(168,85,247,.15);color:#e0d0ff;border:1px solid rgba(168,85,247,.2);align-self:flex-end;}
+.chat-msg.ai{background:var(--surface2);color:var(--text);border:1px solid var(--border);align-self:flex-start;}
+.chat-msg.ai.loading{color:var(--muted);font-style:italic;}
+.chat-confirm{background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.25);border-radius:9px;padding:8px 10px;margin:2px 0;display:flex;flex-direction:column;gap:6px;}
+.chat-confirm-row{display:flex;justify-content:space-between;align-items:center;}
+.chat-confirm-label{font-family:var(--fm);font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
+.chat-confirm-val{font-family:var(--fh);font-size:12px;font-weight:800;color:#fff;}
+.chat-confirm-val.green{color:var(--green);}
+.chat-confirm-btns{display:flex;gap:5px;margin-top:2px;}
+.chat-btn-ok{flex:1;font-family:var(--fm);font-size:9px;padding:5px;border:none;background:var(--green);color:#000;border-radius:5px;cursor:pointer;font-weight:700;}
+.chat-btn-ok:hover{filter:brightness(1.1);}
+.chat-btn-no{flex:1;font-family:var(--fm);font-size:9px;padding:5px;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:5px;cursor:pointer;}
+.chat-btn-no:hover{color:#fff;}
+.sb-chat-input-wrap{display:flex;gap:4px;padding:6px 8px;border-top:1px solid var(--border);}
+.sb-chat-input{flex:1;background:var(--surface2);border:1px solid rgba(168,85,247,.25);border-radius:7px;padding:6px 9px;font-family:var(--fb);font-size:11px;color:var(--text);outline:none;resize:none;min-height:32px;max-height:80px;}
+.sb-chat-input:focus{border-color:var(--purple);}
+.sb-chat-input::placeholder{color:var(--muted);font-size:10px;}
+.sb-chat-send{background:var(--purple);border:none;border-radius:6px;width:28px;height:28px;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;align-self:flex-end;}
+.sb-chat-send:hover{filter:brightness(1.15);}
+.sb-chat-send:disabled{opacity:.4;cursor:not-allowed;}
+
+/* ── AI CHAT SIDEBAR ── */
+.ai-chat{border-top:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;}
+.ai-chat-hd{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;cursor:pointer;user-select:none;transition:background .12s;}
+.ai-chat-hd:hover{background:rgba(168,85,247,.06);}
+.ai-chat-title{font-family:var(--fm);font-size:9px;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:.1em;display:flex;align-items:center;gap:6px;}
+.ai-chat-dot{width:6px;height:6px;border-radius:50%;background:var(--purple);box-shadow:0 0 6px var(--purple);animation:ai-pulse 2s infinite;}
+@keyframes ai-pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+.ai-chat-arr{font-family:var(--fm);font-size:10px;color:var(--muted);transition:transform .2s;}
+.ai-chat-arr.open{transform:rotate(180deg);}
+.ai-chat-body{display:none;flex-direction:column;overflow:hidden;}
+.ai-chat-body.open{display:flex;}
+.ai-chat-msgs{overflow-y:auto;padding:6px 10px;display:flex;flex-direction:column;gap:5px;max-height:160px;min-height:60px;}
+.ai-chat-msgs::-webkit-scrollbar{width:2px;}
+.ai-chat-msgs::-webkit-scrollbar-thumb{background:rgba(168,85,247,.3);}
+.ai-msg{font-family:var(--fb);font-size:11px;line-height:1.4;padding:6px 9px;border-radius:8px;word-break:break-word;}
+.ai-msg.user{background:rgba(168,85,247,.15);color:#ddd0ff;border:1px solid rgba(168,85,247,.2);align-self:flex-end;max-width:90%;}
+.ai-msg.bot{background:var(--surface2);color:var(--text);border:1px solid var(--border);align-self:flex-start;max-width:95%;}
+.ai-msg.bot.loading{color:var(--muted);font-style:italic;}
+.ai-confirm{background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.2);border-radius:9px;padding:9px 10px;display:flex;flex-direction:column;gap:6px;}
+.ai-confirm-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.ai-confirm-lbl{font-family:var(--fm);font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px;}
+.ai-confirm-val{font-family:var(--fh);font-size:12px;font-weight:800;color:#fff;}
+.ai-confirm-val.g{color:var(--green);}
+.ai-confirm-val.s{font-family:var(--fm);font-size:10px;color:var(--orange);}
+.ai-confirm-btns{display:flex;gap:5px;}
+.ai-btn-ok{flex:1;font-family:var(--fm);font-size:9px;padding:5px;border:none;background:var(--green);color:#000;border-radius:5px;cursor:pointer;font-weight:700;}
+.ai-btn-ok:hover{filter:brightness(1.1);}
+.ai-btn-ok:disabled{opacity:.5;cursor:not-allowed;}
+.ai-btn-no{flex:1;font-family:var(--fm);font-size:9px;padding:5px;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:5px;cursor:pointer;}
+.ai-btn-no:hover{color:#fff;}
+.ai-input-wrap{display:flex;gap:4px;padding:6px 8px;border-top:1px solid var(--border);}
+.ai-input{flex:1;background:var(--surface2);border:1px solid rgba(168,85,247,.25);border-radius:7px;padding:6px 9px;font-family:var(--fb);font-size:11px;color:var(--text);outline:none;transition:border .15s;resize:none;height:32px;max-height:80px;overflow:hidden;}
+.ai-input:focus{border-color:var(--purple);}
+.ai-input::placeholder{color:var(--muted);font-size:10px;}
+.ai-send{background:rgba(168,85,247,.8);border:none;border-radius:6px;width:28px;height:28px;color:#fff;cursor:pointer;font-size:14px;transition:background .15s;flex-shrink:0;align-self:flex-end;}
+.ai-send:hover{background:var(--purple);}
+.ai-send:disabled{opacity:.4;cursor:not-allowed;}
+
 /* ── LOADING ── */
 .loading{text-align:center;padding:60px;font-family:var(--fm);font-size:11px;color:var(--muted);}
 .spin{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:sp .6s linear infinite;margin:0 auto 12px;}
@@ -271,6 +345,49 @@ body.tv-mode .tv-screen{display:flex;}
       <div class="sb-sep"></div>
       <div class="sb-item" data-panel="config" onclick="nav(this)"><span class="sb-item-icon">⚙️</span>Configurações</div>
     </nav>
+    <!-- ─── AI CHAT ─── -->
+    <div class="sb-chat" id="sb-chat">
+      <div class="sb-chat-header" onclick="chatToggle()">
+        <div class="sb-chat-title">
+          <div class="sb-chat-dot"></div>
+          IA — Lançar Despesa
+        </div>
+        <span class="sb-chat-toggle" id="chat-toggle-icon">▾</span>
+      </div>
+      <div class="sb-chat-body" id="chat-body">
+        <div class="sb-chat-msgs" id="chat-msgs">
+          <div class="chat-msg ai">Olá! Digite um gasto e eu lanço automaticamente.<br><span style="color:var(--muted);font-size:10px;">Ex: Fortec 120 reais</span></div>
+        </div>
+        <div class="sb-chat-input-wrap">
+          <textarea class="sb-chat-input" id="chat-input" placeholder="Ex: Fortec: 120 reais" rows="1" onkeydown="chatKeyDown(event)" oninput="chatAutoResize(this)"></textarea>
+          <button class="sb-chat-send" id="chat-send-btn" onclick="chatEnviar()" title="Enviar">↑</button>
+        </div>
+      </div>
+    </div>
+    <!-- ── AI CHAT ── -->
+    <div class="ai-chat" id="ai-chat">
+      <div class="ai-chat-hd" onclick="aiToggle()">
+        <div class="ai-chat-title">
+          <span class="ai-chat-dot"></span>
+          IA — Lançar Gasto
+        </div>
+        <span class="ai-chat-arr" id="ai-arr">▾</span>
+      </div>
+      <div class="ai-chat-body" id="ai-body">
+        <div class="ai-chat-msgs" id="ai-msgs">
+          <div class="ai-msg bot">Olá! Digite um gasto e lanço automaticamente.<br><span style="color:var(--muted);font-size:10px">Ex: Fortec 120 reais</span></div>
+        </div>
+        <div class="ai-input-wrap">
+          <textarea class="ai-input" id="ai-input"
+            placeholder="Ex: Fortec: 120 reais"
+            rows="1"
+            onkeydown="aiKeyDown(event)"
+            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,80)+'px'"
+          ></textarea>
+          <button class="ai-send" id="ai-send" onclick="aiEnviar()" title="Enviar">↑</button>
+        </div>
+      </div>
+    </div>
     <div class="sb-footer">
       <button class="sb-footer-btn" onclick="tvMode(true)">📺 Modo TV</button>
     </div>
@@ -1427,6 +1544,22 @@ document.addEventListener('keydown', e => {
 
 // ── Start ──────────────────────────────────────────────
 init();
+// ══════════════════════════════════════════════════════
+//  AI CHAT — Lançar Gasto
+// ══════════════════════════════════════════════════════
+var aiAberto=false, aiOcupado=false;
+var AI_CAT_KW={peca_cmv:['fortec','peça','peca','componente','resistor','capacitor','placa','display','fonte','cabo','conector','módulo','modulo','sensor','chip'],aluguel:['aluguel','alug'],energia:['energia','luz','enel','eletricidade'],agua:['água','agua','copasa','saneamento'],telefone:['telefone','internet','vivo','claro','tim','oi','net','telecom'],salario:['salário','salario','pro-labore','prolabore','funcionário','funcionario'],material:['material','suprimento','escritório','escritorio','limpeza','papel'],marketing:['marketing','publicidade','anúncio','anuncio','instagram','google','propaganda'],contabilidade:['contador','contabilidade','contábil','contabil'],transporte:['uber','99','combustível','combustivel','gasolina','estacionamento','frete'],manutencao:['manutenção','manutencao','reparo','conserto','reforma'],outros:[]};
+var AI_CAT_LBL={peca_cmv:'Compra de Peças',aluguel:'Aluguel',energia:'Energia',agua:'Água',telefone:'Tel/Internet',salario:'Salário',material:'Material',marketing:'Marketing',contabilidade:'Contabilidade',transporte:'Transporte',manutencao:'Manutenção',outros:'Outros'};
+function aiInfereCat(txt){var t=(txt||'').toLowerCase();for(var cat in AI_CAT_KW){var kws=AI_CAT_KW[cat];for(var i=0;i<kws.length;i++){if(t.includes(kws[i]))return cat;}}return 'outros';}
+function aiToggle(){aiAberto=!aiAberto;document.getElementById('ai-body').classList.toggle('open',aiAberto);var arr=document.getElementById('ai-arr');arr.textContent=aiAberto?'▴':'▾';arr.classList.toggle('open',aiAberto);if(aiAberto)setTimeout(function(){document.getElementById('ai-input').focus();},80);}
+function aiKeyDown(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();aiEnviar();}}
+function aiAddMsg(html,tipo){var msgs=document.getElementById('ai-msgs');var d=document.createElement('div');d.className='ai-msg '+tipo;d.innerHTML=html;msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;return d;}
+async function aiEnviar(){if(aiOcupado)return;var input=document.getElementById('ai-input');var txt=input.value.trim();if(!txt)return;aiOcupado=true;document.getElementById('ai-send').disabled=true;input.value='';input.style.height='32px';aiAddMsg(esc(txt),'user');var loadEl=aiAddMsg('⏳ Interpretando...','bot loading');try{var parsed=await aiParseIA(txt);loadEl.remove();if(!parsed||!parsed.valor||parsed.valor<=0){aiAddMsg('Não identifiquei o valor. Tente: <b>Nome: valor</b>','bot');}else{aiMostraConfirm(parsed);}}catch(e){loadEl.remove();var fallback=aiParseLocal(txt);if(fallback&&fallback.valor>0){aiMostraConfirm(fallback);}else{aiAddMsg('Erro ao processar. Tente novamente.','bot');}}aiOcupado=false;document.getElementById('ai-send').disabled=false;document.getElementById('ai-input').focus();}
+async function aiParseIA(txt){var hoje=new Date().toISOString().slice(0,10);var sys='Você é assistente financeiro de uma assistência técnica brasileira. Analise o gasto e retorne APENAS JSON sem markdown: {descricao,valor,categoria(peca_cmv|aluguel|energia|agua|telefone|salario|material|marketing|contabilidade|transporte|manutencao|outros),status(pago|pendente),data(YYYY-MM-DD)}. Hoje:'+hoje+'. Fortec=peca_cmv. Status padrão=pago.';var resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:200,system:sys,messages:[{role:'user',content:txt}]})});var d=await resp.json();var raw=(d.content?.[0]?.text||'').trim().replace(/```json?\n?/gi,'').replace(/```/g,'').trim();return JSON.parse(raw);}
+function aiParseLocal(txt){var hoje=new Date().toISOString().slice(0,10);var vm=txt.match(/(\d{1,6}[.,]?\d{0,2})/);if(!vm)return null;var valor=parseFloat(vm[1].replace(',','.'));var desc=txt.replace(vm[0],'').replace(/[\s:,\-reais]+/gi,' ').trim();desc=desc.split(/\s+/).slice(0,3).join(' ');if(!desc)desc='Despesa';desc=desc.charAt(0).toUpperCase()+desc.slice(1).toLowerCase();return{descricao:desc,valor:valor,categoria:aiInfereCat(txt),status:'pago',data:hoje};}
+function aiMostraConfirm(p){var msgs=document.getElementById('ai-msgs');var d=document.createElement('div');d.className='ai-confirm';d.innerHTML='<div class="ai-confirm-grid"><div><div class="ai-confirm-lbl">Descrição</div><div class="ai-confirm-val">'+esc(p.descricao)+'</div></div><div style="text-align:right"><div class="ai-confirm-lbl">Valor</div><div class="ai-confirm-val g">'+brl(p.valor)+'</div></div><div><div class="ai-confirm-lbl">Categoria</div><div class="ai-confirm-val s">'+(AI_CAT_LBL[p.categoria]||p.categoria)+'</div></div><div style="text-align:right"><div class="ai-confirm-lbl">Data</div><div class="ai-confirm-val s">'+fmtDate(p.data)+'</div></div></div><div class="ai-confirm-btns"><button class="ai-btn-ok">✅ Lançar</button><button class="ai-btn-no">✕ Cancelar</button></div>';var btnOk=d.querySelector('.ai-btn-ok');var btnNo=d.querySelector('.ai-btn-no');btnOk._parsed=p;btnOk.onclick=function(){aiConfirmar(this);};btnNo.onclick=function(){this.closest('.ai-confirm').remove();};msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;}
+async function aiConfirmar(btn){var p=btn._parsed;if(!p)return;btn.disabled=true;btn.textContent='⏳';var card=btn.closest('.ai-confirm');var r=await api('add-despesa',{descricao:p.descricao,valor:p.valor,data:p.data,dataVencimento:p.data,categoria:p.categoria,status:p.status||'pago'});card.remove();if(r.ok){aiAddMsg('✅ <b>'+esc(p.descricao)+'</b> — '+brl(p.valor)+' lançado!','bot');await loadData();}else{aiAddMsg('❌ Erro: '+(r.error||'falha ao salvar'),'bot');}}
+
 </script>
 </body>
 </html>
