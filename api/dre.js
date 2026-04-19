@@ -185,8 +185,8 @@ function calcKPIs(receitas, despesas, fixas, config, finRecords, mes) {
   const desps = (despesas||[]).filter(x => (x.data||x.dataVencimento||'').startsWith(mes) && x.status==='pago' && x.categoria !== 'peca_cmv');
   const pend  = (despesas||[]).filter(x => (x.dataVencimento||x.data||'').startsWith(mes) && x.status==='pendente');
 
-  const receitaMes  = +recs.reduce((s,x)=>s+(x.valor||0),0).toFixed(2);
-  const despesasMes = +desps.reduce((s,x)=>s+(x.valor||0),0).toFixed(2);
+  const receitaMes  = +recs.reduce((s,x)=>s+(parseFloat(x.valor)||0),0).toFixed(2);
+  const despesasMes = +desps.reduce((s,x)=>s+(parseFloat(x.valor)||0),0).toFixed(2);
   const impostos    = +(receitaMes*(cfg.impostoPct/100)).toFixed(2);
   const lucroLiq    = +(receitaMes - despesasMes - impostos).toFixed(2);
   const margemLiq   = receitaMes>0 ? +(lucroLiq/receitaMes*100).toFixed(1) : 0;
@@ -209,8 +209,8 @@ function calcKPIs(receitas, despesas, fixas, config, finRecords, mes) {
   // Fixas não pagas no mês
   const fixasPagas = new Set((despesas||[]).filter(x=>x.fixaRef && (x.data||x.dataVencimento||'').startsWith(mes) && x.status==='pago').map(x=>x.fixaRef));
   const fixasPend  = (fixas||[]).filter(f=>f.ativo && !fixasPagas.has(f.id));
-  const totalFixasPend = +fixasPend.reduce((s,f)=>s+(f.valor||0),0).toFixed(2);
-  const totalFixasMes  = +(fixas||[]).filter(f=>f.ativo).reduce((s,f)=>s+(f.valor||0),0).toFixed(2);
+  const totalFixasPend = +fixasPend.reduce((s,f)=>s+(parseFloat(f.valor)||0),0).toFixed(2);
+  const totalFixasMes  = +(fixas||[]).filter(f=>f.ativo).reduce((s,f)=>s+(parseFloat(f.valor)||0),0).toFixed(2);
 
   return {
     receitaMes, despesasMes, impostos, lucroLiq, margemLiq,
@@ -304,7 +304,7 @@ module.exports = async (req, res) => {
         .sort((a,b) => (a.nomeContato||'').localeCompare(b.nomeContato||''));
 
       // Soma total dos recebíveis
-      const recebiveisTotal$ = +recebiveis.reduce((s,r) => s + r.valor, 0).toFixed(2);
+      const recebiveisTotal$ = +recebiveis.reduce((s,r) => s + (parseFloat(r.valor)||0), 0).toFixed(2);
 
       // A pagar: fixas do mês + despesas pendentes
       const fixasPagas = new Set(despesas.filter(x=>x.fixaRef && (x.data||x.dataVencimento||'').startsWith(mes) && x.status==='pago').map(x=>x.fixaRef));
