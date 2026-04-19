@@ -989,7 +989,7 @@ function abrirCompra(){
   setTipo('loja');
   document.getElementById('mod-compra').classList.add('open');
 }
-function fechaCompra(){document.getElementById('mod-compra').classList.remove('open');idsComprar=[];}
+function fechaCompra(){document.getElementById('mod-compra').classList.remove('open');idsComprar=[];window._kbOsMode=null;}
 
 function setTipo(t){
   tcAtual=t;
@@ -1001,6 +1001,28 @@ function setTipo(t){
 }
 
 async function finCompra(){
+  // ── Modo OS: compra de card do Pipefy ──────────────────────────────
+  if (window._kbOsMode) {
+    var osPipefyId = window._kbOsMode;
+    window._kbOsMode = null;
+    var osTipo = tcAtual === 'online' ? 'online' : 'local';
+    var osPrev = '';
+    if (osTipo === 'online') {
+      var prevEl = document.getElementById('prv-'+osPipefyId);
+      osPrev = prevEl ? prevEl.value : '';
+      if (!osPrev) { toast('Informe a previsão de chegada','var(--yellow)'); window._kbOsMode = osPipefyId; return; }
+    }
+    var d = await fetch('/api/compras?action=atualizar',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({pipefyId:osPipefyId, tipoCompra:osTipo, previsao:osPrev})
+    }).then(function(r){return r.json();});
+    fechaCompra(); idsComprar=[];
+    if (d.ok) {
+      await osLoad(); kbBuild();
+      toast(osTipo==='local'?'🏪 Compra local registrada!':'📦 Previsão: '+osPrev,'var(--green)');
+    } else toast('Erro: '+(d.error||''),'var(--red)');
+    return;
+  }
+  // ── Modo Avulsa: fluxo padrão ──────────────────────────────────────
   var prevs={};if(tcAtual==='online')idsComprar.forEach(function(id){var e=document.getElementById('prv-'+id);if(e&&e.value)prevs[id]=e.value;});
   var d=await fetch('/api/compras-pecas?action=comprar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:idsComprar,fornecedor:document.getElementById('m-forn').value.trim(),tipoCompra:tcAtual,valor:parseFloat(document.getElementById('m-valor').value)||null,descricaoGrupo:document.getElementById('m-desc-grupo').value.trim(),dadosPagamento:document.getElementById('m-pag').value.trim(),previsoes:prevs})}).then(function(r){return r.json();});
   if(d.ok){fechaCompra();sel.clear();await pecLoad();toast('Movido para Ag. Pagamento!','var(--green)');}
@@ -1265,7 +1287,21 @@ async function kbReload() { await Promise.all([osLoad(),pecLoad()]); kbBuild(); 
 
 
 // ── Kanban helpers diretos no card ──────────────────────────────────────
-function kbOsAtualizar(e, pipefyId, nome) { e.stopPropagation(); openModalOS(pipefyId, nome); }
+function kbOsAtualizar(e, pipefyId, nome) {
+  e.stopPropagation();
+  // Abre o mesmo modal "Finalizar Compra" das avulsas, com flag OS
+  window._kbOsMode = pipefyId;
+  selPipefyId = pipefyId;
+  // Usa pipefyId como ID para o input de previsão (setTipo online)
+  idsComprar = [pipefyId];
+  document.getElementById('mod-resumo').innerHTML = '- OS #' + (pipefyId.slice(-4)) + ' — ' + esc(nome);
+  document.getElementById('m-forn').value = '';
+  document.getElementById('m-pag').value = '';
+  document.getElementById('m-valor').value = '';
+  document.getElementById('m-desc-grupo').value = '';
+  setTipo('loja');
+  document.getElementById('mod-compra').classList.add('open');
+}
 async function kbOsDisponivel(e, pipefyId) { e.stopPropagation(); await osMarcarDisponivel(pipefyId); await kbReload(); }
 function kbAvComprar1(e, avId) { e.stopPropagation(); comprar1(avId); }
 async function kbAvDel(e, avId) { e.stopPropagation(); await del(avId); await kbReload(); }
