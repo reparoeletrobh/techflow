@@ -15,6 +15,48 @@
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;}
 
+/* ── KANBAN ── */
+.kanban-wrap{display:flex;flex:1;overflow:hidden;min-height:0;}
+.kanban-sidebar{width:260px;min-width:260px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 103px);position:sticky;top:103px;background:var(--surface);}
+.kanban-board{flex:1;display:flex;gap:0;overflow-x:auto;overflow-y:hidden;padding:0;}
+.kanban-board::-webkit-scrollbar{height:4px;}
+.kanban-board::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.kb-col{min-width:220px;max-width:260px;flex:1;display:flex;flex-direction:column;border-right:1px solid var(--border);height:calc(100vh - 103px);}
+.kb-col:last-child{border-right:none;}
+.kb-col-hd{padding:10px 14px 8px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;background:var(--surface2);}
+.kb-col-title{font-family:var(--fh);font-size:11px;font-weight:800;display:flex;align-items:center;gap:6px;}
+.kb-col-badge{font-family:var(--fm);font-size:9px;padding:1px 7px;border-radius:99px;background:var(--surface);border:1px solid var(--border);color:var(--muted);}
+.kb-col-body{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;}
+.kb-col-body::-webkit-scrollbar{width:2px;}
+.kb-col-body::-webkit-scrollbar-thumb{background:var(--border);}
+.kb-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;cursor:pointer;transition:all .15s;user-select:none;}
+.kb-card:hover{border-color:rgba(255,255,255,.15);background:var(--surface2);}
+.kb-card.selected{border-color:var(--accent);background:rgba(59,158,255,.08);box-shadow:0 0 0 1px rgba(59,158,255,.3);}
+.kb-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:4px;}
+.kb-card-name{font-family:var(--fb);font-size:11px;font-weight:600;line-height:1.3;flex:1;}
+.kb-card-src{font-family:var(--fm);font-size:8px;padding:1px 5px;border-radius:4px;flex-shrink:0;}
+.kb-card-src.os{background:rgba(168,85,247,.15);color:var(--purple);border:1px solid rgba(168,85,247,.3);}
+.kb-card-src.av{background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.25);}
+.kb-card-ref{font-family:var(--fm);font-size:9px;color:var(--muted);margin-bottom:3px;}
+.kb-card-meta{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:5px;}
+.kb-card-tag{font-family:var(--fm);font-size:8px;padding:1px 5px;border-radius:3px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);}
+.kb-card-tag.urg{background:rgba(239,68,68,.1);color:var(--red);border-color:rgba(239,68,68,.25);}
+.kb-card-tag.qtd{background:rgba(59,158,255,.1);color:var(--accent);border-color:rgba(59,158,255,.25);}
+.kb-card-btns{display:flex;gap:4px;margin-top:6px;}
+.kb-btn{font-family:var(--fm);font-size:8px;padding:3px 7px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);transition:all .12s;}
+.kb-btn:hover{color:var(--text);border-color:rgba(255,255,255,.2);}
+.kb-btn.ok{border-color:rgba(34,197,94,.3);color:var(--green);}
+.kb-btn.ok:hover{background:rgba(34,197,94,.1);}
+.kb-btn.arr{border-color:rgba(59,158,255,.3);color:var(--accent);}
+.kb-btn.arr:hover{background:rgba(59,158,255,.1);}
+.kb-empty{font-family:var(--fm);font-size:10px;color:var(--muted);text-align:center;padding:24px 12px;opacity:.6;}
+.kb-sel-bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:8px 16px;display:none;align-items:center;gap:12px;z-index:200;box-shadow:0 4px 24px rgba(0,0,0,.5);}
+.kb-sel-bar.show{display:flex;}
+.kb-sel-txt{font-family:var(--fm);font-size:10px;color:var(--accent);}
+.kb-sel-btn{font-family:var(--fm);font-size:9px;padding:5px 12px;border-radius:6px;cursor:pointer;border:none;font-weight:700;}
+.kb-sel-btn.comprar{background:var(--green);color:#000;}
+.kb-sel-btn.clear{background:transparent;border:1px solid var(--border);color:var(--muted);}
+
 /* HEADER */
 header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
 .logo{font-family:var(--fh);font-size:14px;font-weight:900;display:flex;align-items:center;gap:8px;}
@@ -203,12 +245,61 @@ textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
 
 <!-- MÓDULOS: Peças OS | Compra de Peças -->
 <div class="mod-tabs">
+  <div class="mod-tab" onclick="modTab('kanban')" id="modtab-kanban">
+    📋 Kanban <span class="mb" id="mb-kanban">0</span>
+  </div>
   <div class="mod-tab active" onclick="modTab('os')" id="modtab-os">
     🔧 Compras OS <span class="mb" id="mb-os">0</span>
   </div>
   <div class="mod-tab" onclick="modTab('pecas')" id="modtab-pecas">
     📦 Peças Avulsas <span class="mb" id="mb-pecas">0</span>
   </div>
+</div>
+
+<!-- ═══════════════════════ MÓDULO KANBAN ═══════════════════════ -->
+<div class="mod-page" id="modpage-kanban">
+  <div class="kanban-wrap">
+    <div class="kanban-sidebar">
+      <div style="font-family:var(--fh);font-size:12px;font-weight:800;padding:12px 16px;border-bottom:1px solid var(--border);">Cadastrar Peça</div>
+      <div style="padding:14px;display:flex;flex-direction:column;gap:10px;">
+        <div><div class="fl">Descrição *</div><input class="fi" id="kf-desc" placeholder="Ex: Placa de potência..."/></div>
+        <div><div class="fl">OS / Referência</div><input class="fi" id="kf-os" placeholder="OS ou cliente"/></div>
+        <div class="fi-row">
+          <div style="flex:1;"><div class="fl">Qtd</div><input class="fi" id="kf-qtd" type="number" min="1" value="1"/></div>
+          <div style="flex:2;"><div class="fl">Obs</div><input class="fi" id="kf-obs" placeholder="Opcional"/></div>
+        </div>
+        <label class="urgente-toggle"><input type="checkbox" id="kf-urg"/> Urgente</label>
+        <button class="btn-add" onclick="kbCadastrar()">+ Cadastrar Peça</button>
+      </div>
+    </div>
+    <div class="kanban-board" id="kb-board">
+      <div class="kb-col">
+        <div class="kb-col-hd"><div class="kb-col-title" style="color:var(--yellow)">🛒 Para Comprar</div><span class="kb-col-badge" id="kbc-comprar">0</span></div>
+        <div class="kb-col-body" id="kbl-comprar"></div>
+      </div>
+      <div class="kb-col">
+        <div class="kb-col-hd"><div class="kb-col-title" style="color:var(--orange)">⏳ Ag. Pagamento</div><span class="kb-col-badge" id="kbc-agpag">0</span></div>
+        <div class="kb-col-body" id="kbl-agpag"></div>
+      </div>
+      <div class="kb-col">
+        <div class="kb-col-hd"><div class="kb-col-title" style="color:var(--green)">✅ Pago</div><span class="kb-col-badge" id="kbc-pago">0</span></div>
+        <div class="kb-col-body" id="kbl-pago"></div>
+      </div>
+      <div class="kb-col">
+        <div class="kb-col-hd"><div class="kb-col-title" style="color:var(--accent)">🚚 A Caminho</div><span class="kb-col-badge" id="kbc-caminho">0</span></div>
+        <div class="kb-col-body" id="kbl-caminho"></div>
+      </div>
+      <div class="kb-col">
+        <div class="kb-col-hd"><div class="kb-col-title" style="color:var(--purple)">🌐 Online</div><span class="kb-col-badge" id="kbc-online">0</span></div>
+        <div class="kb-col-body" id="kbl-online"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="kb-sel-bar" id="kb-sel-bar">
+  <span class="kb-sel-txt" id="kb-sel-txt">0 selecionadas</span>
+  <button class="kb-sel-btn comprar" onclick="kbAbrirCompra()">🛒 Comprar</button>
+  <button class="kb-sel-btn clear" onclick="kbClearSel()">✕ Limpar</button>
 </div>
 
 <!-- ═══════════════════════ MÓDULO OS/PIPEFY ═══════════════════════ -->
@@ -419,10 +510,11 @@ var modAtual = 'os';
 
 function modTab(m) {
   modAtual = m;
-  ['os','pecas'].forEach(function(x) {
+  ['kanban','os','pecas'].forEach(function(x) {
     document.getElementById('modtab-' + x).classList.toggle('active', x === m);
     document.getElementById('modpage-' + x).classList.toggle('active', x === m);
   });
+  if (m === 'kanban') kbBuild();
   // header buttons só visíveis no módulo peças
   updBtns();
 }
@@ -991,6 +1083,131 @@ osLoad();
 pecLoad();
 setInterval(osLoad, 30000);
 setInterval(pecLoad, 60000);
+// ══════════════════════════════════════════════
+//  KANBAN — visão unificada
+// ══════════════════════════════════════════════
+var kbSel = new Set();
+var kbItems = [];
+
+function kbBuild() {
+  kbItems = [];
+  // Peças Avulsas
+  itens.forEach(function(p) {
+    var col = 'comprar';
+    if (p.status === 'aguardando_pagamento') col = 'agpag';
+    else if (p.status === 'pago') col = 'pago';
+    else if (p.status === 'a_caminho' || p.status === 'recebido') col = 'caminho';
+    else if (p.status === 'online') col = 'online';
+    kbItems.push({ id:'av_'+p.id, _id:p.id, src:'av', nome:p.descricao||'—', ref:p.os||'', qtd:p.quantidade||1, urg:!!p.urgente, col:col, forn:p.fornecedor||'' });
+  });
+  // OS Cards
+  ['comprar','aguardando'].forEach(function(faseKey) {
+    (osCards[faseKey]||[]).forEach(function(c) {
+      kbItems.push({ id:'os_'+c.pipefyId, _id:c.pipefyId, src:'os', nome:c.nomeContato||c.title||'—', ref:'#'+(c.osCode||(c.pipefyId||'').slice(-4)), qtd:1, urg:false, col:faseKey==='comprar'?'comprar':'caminho', forn:c.descricaoCompra||'' });
+    });
+  });
+  kbRender();
+}
+
+function kbRender() {
+  var cols = { comprar:[], agpag:[], pago:[], caminho:[], online:[] };
+  kbItems.forEach(function(item) { if (cols[item.col]) cols[item.col].push(item); });
+  var mbTotal = 0;
+  Object.keys(cols).forEach(function(col) {
+    var body = document.getElementById('kbl-'+col);
+    var badge = document.getElementById('kbc-'+col);
+    if (!body) return;
+    badge.textContent = cols[col].length;
+    if (col !== 'caminho') mbTotal += cols[col].length;
+    if (!cols[col].length) { body.innerHTML = '<div class="kb-empty">Nenhuma peça</div>'; return; }
+    body.innerHTML = cols[col].map(function(item) {
+      var sel = kbSel.has(item.id);
+      var btns = '';
+      if (item.col==='comprar') btns += '<button class="kb-btn ok" onclick="kbMoveAgPag(event,\''+item.id+'\')">Ag. Pgto →</button>';
+      if (item.col==='agpag' && item.src==='av') btns += '<button class="kb-btn ok" onclick="kbConfPagItem(event,\''+item.id+'\')">✅ Pago</button>';
+      if (item.col==='pago' && item.src==='av') btns += '<button class="kb-btn arr" onclick="kbMarcaCaminho(event,\''+item.id+'\')">🚚 Caminho</button><button class="kb-btn" style="color:var(--purple);border-color:rgba(168,85,247,.3);" onclick="kbMarcaOnline(event,\''+item.id+'\')">🌐 Online</button>';
+      return '<div class="kb-card'+(sel?' selected':'')+'" id="kbcard-'+item.id+'" onclick="kbToggleSel(event,\''+item.id+'\')">' +
+        '<div class="kb-card-top"><div class="kb-card-name">'+esc(item.nome)+'</div>' +
+        '<span class="kb-card-src '+(item.src==='os'?'os':'av')+'">'+(item.src==='os'?'OS':'Avulsa')+'</span></div>' +
+        (item.ref?'<div class="kb-card-ref">'+esc(item.ref)+'</div>':'') +
+        '<div class="kb-card-meta">'+(item.qtd>1?'<span class="kb-card-tag qtd">x'+item.qtd+'</span>':'')+(item.urg?'<span class="kb-card-tag urg">🔴 Urgente</span>':'')+(item.forn?'<span class="kb-card-tag">'+esc(item.forn.slice(0,20))+'</span>':'')+'</div>' +
+        (btns?'<div class="kb-card-btns" onclick="event.stopPropagation()">'+btns+'</div>':'') +
+      '</div>';
+    }).join('');
+  });
+  var mb = document.getElementById('mb-kanban');
+  if (mb) mb.textContent = mbTotal;
+}
+
+function kbToggleSel(e, id) {
+  if (e.target.tagName==='BUTTON') return;
+  kbSel.has(id) ? kbSel.delete(id) : kbSel.add(id);
+  var el = document.getElementById('kbcard-'+id);
+  if (el) el.classList.toggle('selected', kbSel.has(id));
+  kbUpdateSelBar();
+}
+
+function kbClearSel() { kbSel.clear(); kbUpdateSelBar(); kbRender(); }
+
+function kbUpdateSelBar() {
+  var bar = document.getElementById('kb-sel-bar');
+  var n = kbSel.size;
+  bar.classList.toggle('show', n > 0);
+  document.getElementById('kb-sel-txt').textContent = n + ' selecionada' + (n>1?'s':'');
+}
+
+async function kbMoveAgPag(e, id) {
+  e.stopPropagation();
+  var ids = kbSel.size > 0 ? [...kbSel].filter(function(i){ var it=kbItems.find(function(x){return x.id===i;}); return it&&it.col==='comprar'; }) : [id];
+  if (!ids.includes(id)) ids = [id];
+  var avIds = ids.filter(function(i){return i.startsWith('av_');}).map(function(i){return i.replace('av_','');});
+  if (avIds.length) {
+    await fetch('/api/compras-pecas?action=comprar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:avIds,fornecedor:'',tipoCompra:'local',valor:null,descricaoGrupo:'',dadosPagamento:'',previsoes:{}})});
+  }
+  await kbReload(); kbClearSel();
+  toast(ids.length+' → Ag. Pagamento','var(--orange)');
+}
+
+function kbAbrirCompra() {
+  var avIds = [...kbSel].filter(function(i){return i.startsWith('av_');}).map(function(i){return i.replace('av_','');});
+  if (avIds.length) { sel.clear(); avIds.forEach(function(id){sel.add(id);}); abrirCompra(); modTab('pecas'); }
+}
+
+async function kbConfPagItem(e, id) {
+  e.stopPropagation();
+  var avId = id.replace('av_','');
+  await confPag([avId]);
+  await kbReload();
+}
+
+async function kbMarcaCaminho(e, id) {
+  e.stopPropagation();
+  var avId = id.replace('av_','');
+  await fetch('/api/compras-pecas?action=marcar-caminho',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[avId],previsoes:{}})});
+  await kbReload(); toast('A Caminho!','var(--accent)');
+}
+
+async function kbMarcaOnline(e, id) {
+  e.stopPropagation();
+  var avId = id.replace('av_','');
+  await fetch('/api/compras-pecas?action=marcar-caminho',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[avId],previsoes:{},tipoOnline:true})});
+  await kbReload(); toast('Online!','var(--purple)');
+}
+
+async function kbCadastrar() {
+  var desc = document.getElementById('kf-desc').value.trim();
+  if (!desc) { toast('Informe a descrição','var(--yellow)'); return; }
+  var r = await fetch('/api/compras-pecas?action=cadastrar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({descricao:desc,os:document.getElementById('kf-os').value.trim(),quantidade:document.getElementById('kf-qtd').value,obs:document.getElementById('kf-obs').value.trim(),urgente:document.getElementById('kf-urg').checked})}).then(function(r){return r.json();});
+  if (r.ok) {
+    ['kf-desc','kf-os','kf-obs'].forEach(function(id){document.getElementById(id).value='';});
+    document.getElementById('kf-qtd').value='1'; document.getElementById('kf-urg').checked=false;
+    await kbReload(); toast('Peça cadastrada!','var(--green)');
+  } else toast('Erro: '+(r.error||''),'var(--red)');
+}
+
+async function kbReload() { await Promise.all([osLoad(),pecLoad()]); kbBuild(); }
+
+
 </script>
 </body>
 </html>
