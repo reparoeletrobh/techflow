@@ -76,6 +76,41 @@ module.exports = async (req, res) => {
       }
     }
     await dbSet(KEY, db);
+
+    // ── Auto-registro DRE: lança peca_cmv automaticamente ────────
+    if (valor && parseFloat(valor) > 0) {
+      try {
+        const DRE_KEY = 'reparo_fin_despesas';
+        const dreRaw  = await dbGet(DRE_KEY);
+        const dreDesps = Array.isArray(dreRaw) ? dreRaw : [];
+        const hoje = now.slice(0, 10);
+        // Monta descrição: usa descricaoGrupo || fornecedor || nomes das peças
+        const nomePecas = db.pecas
+          .filter(p => ids.includes(p.id))
+          .map(p => p.descricao).slice(0, 3).join(', ');
+        const descDRE = (descricaoGrupo || fornecedor || nomePecas || 'Compra de Peças').slice(0, 40);
+        dreDesps.push({
+          id:             uid(),
+          descricao:      descDRE,
+          valor:          parseFloat(valor),
+          categoria:      'peca_cmv',
+          status:         'pago',
+          data:           hoje,
+          dataVencimento: hoje,
+          fornecedor:     fornecedor || '',
+          autoCompra:     true,       // flag: criado automaticamente
+          comprasIds:     ids,        // referência às peças compradas
+          grupoId:        grupoId,
+          tipoCompra:     tipoCompra || 'loja',
+        });
+        await dbSet(DRE_KEY, dreDesps);
+      } catch (dreErr) {
+        // Não deixa falhar a compra por erro do DRE
+        console.error('[DRE auto-registro] Erro:', dreErr.message);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────
+
     return res.status(200).json({ ok:true, grupoId });
   }
 
