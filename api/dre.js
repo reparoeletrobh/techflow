@@ -109,15 +109,15 @@ function calcDRE(receitas, despesas, config, mes) {
   const recs = (receitas||[]).filter(x => x.data?.startsWith(mes) && x.status === 'recebido');
   const recGroups = {};
   for (const k of Object.keys(CAT_RECEITA)) recGroups[k] = 0;
-  recs.forEach(r => { recGroups[r.categoria||'outro'] = (recGroups[r.categoria||'outro']||0) + (r.valor||0); });
-  const receitaBruta = recs.reduce((s,r) => s + (r.valor||0), 0);
+  recs.forEach(r => { recGroups[r.categoria||'outro'] = (recGroups[r.categoria||'outro']||0) + (parseFloat(r.valor)||0); });
+  const receitaBruta = recs.reduce((s,r) => s + (parseFloat(r.valor)||0), 0);
   const impostos     = +(receitaBruta * (cfg.impostoPct/100)).toFixed(2);
   const receitaLiq   = receitaBruta - impostos;
 
   // CMV = despesas categoria 'peca_cmv' pagas no mês (100% manual)
   const cmv = +(despesas||[])
     .filter(x => x.categoria==='peca_cmv' && (x.data||x.dataVencimento||'').startsWith(mes) && x.status==='pago')
-    .reduce((s,x) => s + (x.valor||0), 0)
+    .reduce((s,x) => s + (parseFloat(x.valor)||0), 0)
     .toFixed(2);
   const lucroBruto = receitaLiq - cmv;
 
@@ -125,11 +125,11 @@ function calcDRE(receitas, despesas, config, mes) {
   const desps = (despesas||[]).filter(x => (x.data||x.dataVencimento||'').startsWith(mes) && x.status==='pago' && x.categoria !== 'peca_cmv');
   const despGroups = {};
   for (const k of Object.keys(CAT_DESPESA)) { if (k !== 'peca_cmv') despGroups[k] = 0; }
-  desps.forEach(d => { if (d.categoria !== 'peca_cmv') despGroups[d.categoria||'outros'] = (despGroups[d.categoria||'outros']||0) + (d.valor||0); });
+  desps.forEach(d => { if (d.categoria !== 'peca_cmv') despGroups[d.categoria||'outros'] = (despGroups[d.categoria||'outros']||0) + (parseFloat(d.valor)||0); });
 
   // Fixas: categorias em DESP_FIXA ou com fixaRef
-  const despFixas = desps.filter(x => x.fixaRef || DESP_FIXA.has(x.categoria)).reduce((s,x) => s+(x.valor||0), 0);
-  const despVar   = desps.filter(x => !x.fixaRef && !DESP_FIXA.has(x.categoria)).reduce((s,x) => s+(x.valor||0), 0);
+  const despFixas = desps.filter(x => x.fixaRef || DESP_FIXA.has(x.categoria)).reduce((s,x) => s+(parseFloat(x.valor)||0), 0);
+  const despVar   = desps.filter(x => !x.fixaRef && !DESP_FIXA.has(x.categoria)).reduce((s,x) => s+(parseFloat(x.valor)||0), 0);
   const totalDesp = despFixas + despVar;
 
   const lucroLiq = lucroBruto - totalDesp;
