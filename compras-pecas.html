@@ -159,8 +159,8 @@ textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
 
 /* ──────────────── MÓDULO OS/PIPEFY ──────────────── */
 .card-list{padding:20px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;height:calc(100vh - 148px);}
-.c-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;position:relative;overflow:hidden;}
-.c-card::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;}
+.c-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;position:relative;}
+.c-card::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;border-radius:14px 0 0 14px;}
 .c-card.comprar::before{background:var(--orange);}
 .c-card.aguardando::before{background:var(--accent);}
 .c-card.disponivel::before{background:var(--green);}
