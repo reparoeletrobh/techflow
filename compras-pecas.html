@@ -1200,8 +1200,32 @@ async function kbMoveAgPag(e, id) {
 }
 
 function kbAbrirCompra() {
-  var avIds = [...kbSel].filter(function(i){return i.startsWith('av_');}).map(function(i){return i.replace('av_','');});
-  if (avIds.length) { sel.clear(); avIds.forEach(function(id){sel.add(id);}); abrirCompra(); modTab('pecas'); }
+  var selectedItems = [...kbSel].map(function(id){
+    return kbItems.find(function(x){ return x.id===id; });
+  }).filter(Boolean);
+
+  if (!selectedItems.length) { toast('Nenhum card selecionado','var(--yellow)'); return; }
+
+  var avItems = selectedItems.filter(function(i){ return i.src==='av'; });
+  var osItems = selectedItems.filter(function(i){ return i.src==='os'; });
+
+  // Avulsas: abre modal de compra sem navegar para outra aba
+  if (avItems.length > 0) {
+    sel.clear();
+    avItems.forEach(function(item){ sel.add(item._id); });
+    abrirCompra();
+  }
+
+  // OS: abre modal OS para o primeiro selecionado (modal é individual)
+  if (osItems.length > 0 && avItems.length === 0) {
+    openModalOS(osItems[0]._id, osItems[0].nome);
+    if (osItems.length > 1) toast('OS: abrindo 1 de '+osItems.length+'. Repita para as demais.','var(--accent)');
+  }
+
+  // Mix avulsa + OS: avisa sobre OS pendentes após abrir modal de avulsa
+  if (avItems.length > 0 && osItems.length > 0) {
+    setTimeout(function(){ toast(osItems.length+' OS não incluída(s) — selecione separado','var(--orange)'); }, 900);
+  }
 }
 
 async function kbConfPagItem(e, id) {
