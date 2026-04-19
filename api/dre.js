@@ -66,17 +66,40 @@ const URGENTES = new Set(['pagamento_agendado','analise_pagamento','pagamento_co
 
 // ── Categorias ─────────────────────────────────────────────────
 const CAT_RECEITA = {
+  servico_reparo:      'Serviço de Reparo',
+  venda_peca:          'Venda de Peças',
+  contrato_manutencao: 'Contrato de Manutenção',
+  visita_tecnica:      'Visita Técnica / Orçamento',
+  garantia:            'Garantia / Recall',
+  outros_receita:      'Outros',
+  // legados
   servico:'Serviço de Reparo', peca:'Venda de Peças',
   delivery:'Coleta/Entrega', outro:'Outros'
 };
 const CAT_DESPESA = {
-  peca_cmv:'Compra de Peças (CMV)',   // ← alimenta CMV diretamente
-  aluguel:'Aluguel', energia:'Energia Elétrica', agua:'Água',
-  telefone:'Telefone/Internet', salario:'Salário/Pró-labore',
-  material:'Material/Suprimentos', marketing:'Marketing',
-  contabilidade:'Contabilidade', transporte:'Transporte',
-  manutencao:'Manutenção', outros:'Outros'
+  // CMV — alimenta custo direto, não entra em despesas operacionais
+  peca_cmv:'Compra de Peças (CMV)',
+  // ── Fixas ──────────────────────────────────────────────────
+  aluguel:'Aluguel',
+  energia:'Energia Elétrica',
+  agua:'Água / Saneamento',
+  telefone:'Telefone / Internet',
+  pro_labore:'Pró-Labore (Sócio)',
+  salario:'Salários / Encargos',
+  contabilidade:'Contabilidade / Contador',
+  software:'Software / Sistemas',
+  // ── Variáveis ──────────────────────────────────────────────
+  marketing:'Marketing / Publicidade',
+  material:'Material de Escritório',
+  transporte:'Transporte / Frete',
+  manutencao:'Manutenção do Local',
+  bancario:'Tarifas Bancárias',
+  impostos:'DAS / Impostos / Taxas',
+  treinamento:'Cursos / Treinamentos',
+  outros:'Outros',
 };
+// Quais despesas são fixas (para separar no DRE)
+const DESP_FIXA = new Set(['aluguel','energia','agua','telefone','pro_labore','salario','contabilidade','software']);
 
 // ── Financial calculations ─────────────────────────────────────
 function calcDRE(receitas, despesas, config, mes) {
@@ -101,11 +124,12 @@ function calcDRE(receitas, despesas, config, mes) {
   // Despesas operacionais pagas no mês (EXCLUINDO peca_cmv — já conta no CMV)
   const desps = (despesas||[]).filter(x => (x.data||x.dataVencimento||'').startsWith(mes) && x.status==='pago' && x.categoria !== 'peca_cmv');
   const despGroups = {};
-  for (const k of Object.keys(CAT_DESPESA)) despGroups[k] = 0;
-  desps.forEach(d => { despGroups[d.categoria||'outros'] = (despGroups[d.categoria||'outros']||0) + (d.valor||0); });
+  for (const k of Object.keys(CAT_DESPESA)) { if (k !== 'peca_cmv') despGroups[k] = 0; }
+  desps.forEach(d => { if (d.categoria !== 'peca_cmv') despGroups[d.categoria||'outros'] = (despGroups[d.categoria||'outros']||0) + (d.valor||0); });
 
-  const despFixas = desps.filter(x=>x.fixaRef).reduce((s,x) => s+(x.valor||0), 0);
-  const despVar   = desps.filter(x=>!x.fixaRef).reduce((s,x) => s+(x.valor||0), 0);
+  // Fixas: categorias em DESP_FIXA ou com fixaRef
+  const despFixas = desps.filter(x => x.fixaRef || DESP_FIXA.has(x.categoria)).reduce((s,x) => s+(x.valor||0), 0);
+  const despVar   = desps.filter(x => !x.fixaRef && !DESP_FIXA.has(x.categoria)).reduce((s,x) => s+(x.valor||0), 0);
   const totalDesp = despFixas + despVar;
 
   const lucroLiq = lucroBruto - totalDesp;
@@ -290,7 +314,7 @@ module.exports = async (req, res) => {
       const despPend = despesas.filter(x=>(x.dataVencimento||x.data||'').startsWith(mes) && x.status==='pendente');
 
       return res.status(200).json({
-        ok:true, mes, catReceita:CAT_RECEITA, catDespesa:CAT_DESPESA,
+        ok:true, mes, catReceita:CAT_RECEITA, catDespesa:CAT_DESPESA, despFixaSet:[...DESP_FIXA],
         receitas: [...receitas].reverse(),
         despesas: [...despesas].reverse(),
         fixas, config, recebiveis,
