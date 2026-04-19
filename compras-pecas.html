@@ -245,10 +245,10 @@ textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
 
 <!-- MÓDULOS: Peças OS | Compra de Peças -->
 <div class="mod-tabs">
-  <div class="mod-tab" onclick="modTab('kanban')" id="modtab-kanban">
+  <div class="mod-tab active" onclick="modTab('kanban')" id="modtab-kanban">
     🗂️ Fila de Compras <span class="mb" id="mb-kanban">0</span>
   </div>
-  <div class="mod-tab active" onclick="modTab('os')" id="modtab-os">
+  <div class="mod-tab" onclick="modTab('os')" id="modtab-os">
     🔧 Compras OS <span class="mb" id="mb-os">0</span>
   </div>
   <div class="mod-tab" onclick="modTab('pecas')" id="modtab-pecas">
@@ -257,7 +257,7 @@ textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
 </div>
 
 <!-- ═══════════════════════ MÓDULO KANBAN ═══════════════════════ -->
-<div class="mod-page" id="modpage-kanban">
+<div class="mod-page active" id="modpage-kanban">
   <div class="kanban-wrap">
     <div class="kanban-sidebar">
       <div style="font-family:var(--fh);font-size:12px;font-weight:800;padding:12px 16px;border-bottom:1px solid var(--border);">Cadastrar Peça</div>
@@ -303,7 +303,7 @@ textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
 </div>
 
 <!-- ═══════════════════════ MÓDULO OS/PIPEFY ═══════════════════════ -->
-<div class="mod-page active" id="modpage-os">
+<div class="mod-page" id="modpage-os">
   <div class="tabs" id="os-tabs">
     <div class="tab active" onclick="osTab('comprar')" id="ostab-comprar">🛒 Comprar Peça <span class="tab-badge" id="obadge-comprar">0</span></div>
     <div class="tab" onclick="osTab('aguardando')" id="ostab-aguardando">📦 Aguardando Peça <span class="tab-badge" id="obadge-aguardando">0</span></div>
