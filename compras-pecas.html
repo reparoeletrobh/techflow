@@ -246,7 +246,7 @@ textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
 <!-- MÓDULOS: Peças OS | Compra de Peças -->
 <div class="mod-tabs">
   <div class="mod-tab" onclick="modTab('kanban')" id="modtab-kanban">
-    📋 Kanban <span class="mb" id="mb-kanban">0</span>
+    🗂️ Fila de Compras <span class="mb" id="mb-kanban">0</span>
   </div>
   <div class="mod-tab active" onclick="modTab('os')" id="modtab-os">
     🔧 Compras OS <span class="mb" id="mb-os">0</span>
@@ -1121,22 +1121,53 @@ function kbRender() {
     if (col !== 'caminho') mbTotal += cols[col].length;
     if (!cols[col].length) { body.innerHTML = '<div class="kb-empty">Nenhuma peça</div>'; return; }
     body.innerHTML = cols[col].map(function(item) {
-      var sel = kbSel.has(item.id);
+      var selCard = kbSel.has(item.id);
+      // Buttons per column/source
       var btns = '';
-      if (item.col==='comprar') btns += '<button class="kb-btn ok" onclick="kbMoveAgPag(event,\''+item.id+'\')">Ag. Pgto →</button>';
-      if (item.col==='agpag' && item.src==='av') btns += '<button class="kb-btn ok" onclick="kbConfPagItem(event,\''+item.id+'\')">✅ Pago</button>';
-      if (item.col==='pago' && item.src==='av') btns += '<button class="kb-btn arr" onclick="kbMarcaCaminho(event,\''+item.id+'\')">🚚 Caminho</button><button class="kb-btn" style="color:var(--purple);border-color:rgba(168,85,247,.3);" onclick="kbMarcaOnline(event,\''+item.id+'\')">🌐 Online</button>';
-      return '<div class="kb-card'+(sel?' selected':'')+'" id="kbcard-'+item.id+'" onclick="kbToggleSel(event,\''+item.id+'\')">' +
+      if (item.col === 'comprar') {
+        if (item.src === 'os') {
+          btns = '<button class="kb-btn ok" onclick="kbOsAtualizar(event,\''+item._id+'\',\''+esc(item.nome)+'\')" >🛒 Atualizar Compra</button>';
+        } else {
+          btns = '<button class="kb-btn ok" onclick="kbAvComprar1(event,\''+item._id+'\')" >🛒 Comprar</button>' +
+                 '<button class="kb-btn" style="color:var(--red);border-color:rgba(239,68,68,.3);" onclick="kbAvDel(event,\''+item._id+'\')" >✕</button>';
+        }
+      } else if (item.col === 'agpag' && item.src === 'av') {
+        btns = '<button class="kb-btn arr" onclick="kbVerDados(event,\''+item._id+'\')" >📦 Ver Dados</button>' +
+               (item.raw && item.raw.tipoCompra === 'online' ? '<button class="kb-btn" onclick="kbEditPrev(event,\''+item._id+'\')" >📅 Previsão</button>' : '');
+      } else if (item.col === 'pago' && item.src === 'av') {
+        btns = '<button class="kb-btn arr" onclick="kbMarcaCaminho(event,\''+item.id+'\')" >🚚 A Caminho</button>' +
+               '<button class="kb-btn" style="color:var(--purple);border-color:rgba(168,85,247,.3);" onclick="kbMarcaOnline(event,\''+item.id+'\')" >🌐 Online</button>' +
+               '<button class="kb-btn" onclick="kbVerDados(event,\''+item._id+'\')" >💳 Ver Pgto</button>';
+      } else if (item.col === 'caminho') {
+        if (item.src === 'os' && item.faseKey === 'aguardando') {
+          btns = '<button class="kb-btn ok" onclick="kbOsDisponivel(event,\''+item._id+'\')" >✅ Peça Disponível</button>';
+        } else if (item.src === 'av') {
+          btns = '<button class="kb-btn ok" onclick="kbRecebeu(event,\''+item._id+'\')" >✅ Recebido</button>' +
+                 '<button class="kb-btn" onclick="kbEditPrev(event,\''+item._id+'\')" >📅 Previsão</button>';
+        }
+      } else if (item.col === 'online' && item.src === 'av') {
+        btns = '<button class="kb-btn ok" onclick="kbRecebeu(event,\''+item._id+'\')" >✅ Recebido</button>' +
+               '<button class="kb-btn" onclick="kbEditPrev(event,\''+item._id+'\')" >📅 Previsão</button>';
+      }
+      // Previsão chip
+      var prevChip = '';
+      if (item.raw && item.raw.previsaoChegada) {
+        var dd = da(item.raw.previsaoChegada);
+        var pt = dd < 0 ? '⚠️ Atrasada '+Math.abs(dd)+'d' : (dd === 0 ? '🟢 Hoje' : '📅 '+dd+'d');
+        var pc = dd < 0 ? 'var(--red)' : (dd === 0 ? 'var(--green)' : 'var(--accent)');
+        prevChip = '<span class="kb-card-tag" style="color:'+pc+';border-color:'+pc+';">'+pt+'</span>';
+      }
+      var fornChip = item.forn ? '<span class="kb-card-tag">'+esc(item.forn.slice(0,22))+'</span>' : '';
+      return '<div class="kb-card'+(selCard?' selected':'')+'" id="kbcard-'+item.id+'" onclick="kbToggleSel(event,\''+item.id+'\')">' +
         '<div class="kb-card-top"><div class="kb-card-name">'+esc(item.nome)+'</div>' +
         '<span class="kb-card-src '+(item.src==='os'?'os':'av')+'">'+(item.src==='os'?'OS':'Avulsa')+'</span></div>' +
-        (item.ref?'<div class="kb-card-ref">'+esc(item.ref)+'</div>':'') +
-        '<div class="kb-card-meta">'+(item.qtd>1?'<span class="kb-card-tag qtd">x'+item.qtd+'</span>':'')+(item.urg?'<span class="kb-card-tag urg">🔴 Urgente</span>':'')+(item.forn?'<span class="kb-card-tag">'+esc(item.forn.slice(0,20))+'</span>':'')+'</div>' +
-        (btns?'<div class="kb-card-btns" onclick="event.stopPropagation()">'+btns+'</div>':'') +
+        (item.ref ? '<div class="kb-card-ref">'+esc(item.ref)+'</div>' : '') +
+        '<div class="kb-card-meta">'+(item.qtd>1?'<span class="kb-card-tag qtd">x'+item.qtd+'</span>':'')+(item.urg?'<span class="kb-card-tag urg">🔴 Urgente</span>':'')+fornChip+prevChip+'</div>' +
+        (btns ? '<div class="kb-card-btns">'+btns+'</div>' : '') +
       '</div>';
     }).join('');
   });
-  var mb = document.getElementById('mb-kanban');
-  if (mb) mb.textContent = mbTotal;
+  var mb = document.getElementById('mb-kanban'); if (mb) mb.textContent = mbTotal;
 }
 
 function kbToggleSel(e, id) {
@@ -1207,6 +1238,21 @@ async function kbCadastrar() {
 
 async function kbReload() { await Promise.all([osLoad(),pecLoad()]); kbBuild(); }
 
+
+
+// ── Kanban helpers diretos no card ──────────────────────────────────────
+function kbOsAtualizar(e, pipefyId, nome) { e.stopPropagation(); openModalOS(pipefyId, nome); }
+async function kbOsDisponivel(e, pipefyId) { e.stopPropagation(); await osMarcarDisponivel(pipefyId); await kbReload(); }
+function kbAvComprar1(e, avId) { e.stopPropagation(); comprar1(avId); }
+async function kbAvDel(e, avId) { e.stopPropagation(); await del(avId); await kbReload(); }
+function kbVerDados(e, avId) { e.stopPropagation(); vPgto(avId); }
+function kbEditPrev(e, avId) { e.stopPropagation(); editPrev(avId); }
+async function kbRecebeu(e, avId) {
+  e.stopPropagation();
+  if (!confirm('Confirmar recebimento?')) return;
+  var d = await fetch('/api/compras-pecas?action=marcar-recebido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[avId]})}).then(function(r){return r.json();});
+  if (d.ok) { await kbReload(); toast('Recebido!','var(--green)'); }
+}
 
 </script>
 </body>
