@@ -989,7 +989,7 @@ function abrirCompra(){
   setTipo('loja');
   document.getElementById('mod-compra').classList.add('open');
 }
-function fechaCompra(){document.getElementById('mod-compra').classList.remove('open');idsComprar=[];window._kbOsMode=null;}
+function fechaCompra(){document.getElementById('mod-compra').classList.remove('open');idsComprar=[];window._kbOsMode=null;window._kbBatchMode=null;}
 
 function setTipo(t){
   tcAtual=t;
@@ -1001,16 +1001,74 @@ function setTipo(t){
 }
 
 async function finCompra(){
-  // ── Modo OS: compra de card do Pipefy ──────────────────────────────
+  var forn = document.getElementById('m-forn').value.trim();
+  var valor = parseFloat(document.getElementById('m-valor').value)||null;
+  var desc = document.getElementById('m-desc-grupo').value.trim();
+  var pag = document.getElementById('m-pag').value.trim();
+  var tipo = tcAtual;
+
+  // Coleta previsões (para itens online)
+  var prevs = {};
+  if (tipo === 'online') {
+    idsComprar.forEach(function(id){
+      var e = document.getElementById('prv-'+id);
+      if (e && e.value) prevs[id] = e.value;
+    });
+  }
+
+  // ── Modo BATCH: processa avulsas + OS juntos ──────────────────────
+  if (window._kbBatchMode) {
+    var batch = window._kbBatchMode;
+    window._kbBatchMode = null;
+
+    // Valida previsão se online
+    if (tipo === 'online') {
+      var faltaPrev = batch.osItems.filter(function(i){ return !prevs[i._id]; });
+      if (faltaPrev.length) {
+        window._kbBatchMode = batch;
+        toast('Informe previsão para todos os itens online','var(--yellow)'); return;
+      }
+    }
+
+    fechaCompra(); idsComprar = [];
+    var erros = [];
+
+    // Avulsas
+    if (batch.avIds.length) {
+      var avPrevs = {};
+      batch.avIds.forEach(function(id){ if(prevs[id]) avPrevs[id]=prevs[id]; });
+      var r = await fetch('/api/compras-pecas?action=comprar',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ids:batch.avIds,fornecedor:forn,tipoCompra:tipo,valor:valor,descricaoGrupo:desc,dadosPagamento:pag,previsoes:avPrevs})
+      }).then(function(r){return r.json();});
+      if (!r.ok) erros.push('Avulsas: '+(r.error||'erro'));
+    }
+
+    // OS cards — um por um via Pipefy
+    for (var i=0; i<batch.osItems.length; i++) {
+      var osItem = batch.osItems[i];
+      var osPrev = prevs[osItem._id] || '';
+      var r2 = await fetch('/api/compras?action=atualizar',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({pipefyId:osItem._id, tipoCompra:tipo==='online'?'online':'local', previsao:osPrev})
+      }).then(function(r){return r.json();});
+      if (!r2.ok) erros.push(osItem.nome+': '+(r2.error||'erro'));
+    }
+
+    sel.clear(); kbClearSel();
+    await osLoad(); await pecLoad(); kbBuild();
+    if (erros.length) toast('Erros: '+erros.join(' | '),'var(--red)');
+    else toast('✅ '+( batch.avIds.length + batch.osItems.length )+' compra(s) registrada(s)!','var(--green)');
+    return;
+  }
+
+  // ── Modo OS individual (botão direto no card) ─────────────────────
   if (window._kbOsMode) {
     var osPipefyId = window._kbOsMode;
     window._kbOsMode = null;
-    var osTipo = tcAtual === 'online' ? 'online' : 'local';
-    var osPrev = '';
-    if (osTipo === 'online') {
-      var prevEl = document.getElementById('prv-'+osPipefyId);
-      osPrev = prevEl ? prevEl.value : '';
-      if (!osPrev) { toast('Informe a previsão de chegada','var(--yellow)'); window._kbOsMode = osPipefyId; return; }
+    var osTipo = tipo === 'online' ? 'online' : 'local';
+    var osPrev = prevs[osPipefyId] || '';
+    if (osTipo === 'online' && !osPrev) {
+      window._kbOsMode = osPipefyId;
+      toast('Informe a previsão de chegada','var(--yellow)'); return;
     }
     var d = await fetch('/api/compras?action=atualizar',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({pipefyId:osPipefyId, tipoCompra:osTipo, previsao:osPrev})
@@ -1022,9 +1080,11 @@ async function finCompra(){
     } else toast('Erro: '+(d.error||''),'var(--red)');
     return;
   }
-  // ── Modo Avulsa: fluxo padrão ──────────────────────────────────────
-  var prevs={};if(tcAtual==='online')idsComprar.forEach(function(id){var e=document.getElementById('prv-'+id);if(e&&e.value)prevs[id]=e.value;});
-  var d=await fetch('/api/compras-pecas?action=comprar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:idsComprar,fornecedor:document.getElementById('m-forn').value.trim(),tipoCompra:tcAtual,valor:parseFloat(document.getElementById('m-valor').value)||null,descricaoGrupo:document.getElementById('m-desc-grupo').value.trim(),dadosPagamento:document.getElementById('m-pag').value.trim(),previsoes:prevs})}).then(function(r){return r.json();});
+
+  // ── Modo Avulsa padrão ────────────────────────────────────────────
+  var d=await fetch('/api/compras-pecas?action=comprar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ids:idsComprar,fornecedor:forn,tipoCompra:tipo,valor:valor,descricaoGrupo:desc,dadosPagamento:pag,previsoes:prevs})
+  }).then(function(r){return r.json();});
   if(d.ok){fechaCompra();sel.clear();await pecLoad();toast('Movido para Ag. Pagamento!','var(--green)');}
   else toast('Erro: '+d.error,'var(--red)');
 }
@@ -1224,30 +1284,32 @@ async function kbMoveAgPag(e, id) {
 function kbAbrirCompra() {
   var selectedItems = [...kbSel].map(function(id){
     return kbItems.find(function(x){ return x.id===id; });
-  }).filter(Boolean);
+  }).filter(Boolean).filter(function(i){ return i && i.col==='comprar'; });
 
-  if (!selectedItems.length) { toast('Nenhum card selecionado','var(--yellow)'); return; }
+  if (!selectedItems.length) { toast('Nenhum card em Para Comprar selecionado','var(--yellow)'); return; }
 
   var avItems = selectedItems.filter(function(i){ return i.src==='av'; });
   var osItems = selectedItems.filter(function(i){ return i.src==='os'; });
 
-  // Avulsas: abre modal de compra sem navegar para outra aba
-  if (avItems.length > 0) {
-    sel.clear();
-    avItems.forEach(function(item){ sel.add(item._id); });
-    abrirCompra();
-  }
+  // Modo BATCH: tudo junto num modal
+  window._kbBatchMode = { avIds: avItems.map(function(i){return i._id;}), osItems: osItems };
 
-  // OS: abre modal OS para o primeiro selecionado (modal é individual)
-  if (osItems.length > 0 && avItems.length === 0) {
-    openModalOS(osItems[0]._id, osItems[0].nome);
-    if (osItems.length > 1) toast('OS: abrindo 1 de '+osItems.length+'. Repita para as demais.','var(--accent)');
-  }
+  // Monta resumo com todos os itens
+  var resumo = '';
+  avItems.forEach(function(i){ resumo += '- '+esc(i.nome)+(i.ref?' ('+esc(i.ref)+')':'')+' <span style="font-size:9px;color:var(--green);">[Avulsa]</span><br>'; });
+  osItems.forEach(function(i){ resumo += '- OS '+esc(i.ref)+' — '+esc(i.nome)+' <span style="font-size:9px;color:var(--purple);">[OS]</span><br>'; });
 
-  // Mix avulsa + OS: avisa sobre OS pendentes após abrir modal de avulsa
-  if (avItems.length > 0 && osItems.length > 0) {
-    setTimeout(function(){ toast(osItems.length+' OS não incluída(s) — selecione separado','var(--orange)'); }, 900);
-  }
+  document.getElementById('mod-resumo').innerHTML = resumo;
+  document.getElementById('m-forn').value = '';
+  document.getElementById('m-pag').value = '';
+  document.getElementById('m-valor').value = '';
+  document.getElementById('m-desc-grupo').value = '';
+
+  // IDs para setTipo (previsão online)
+  idsComprar = avItems.map(function(i){return i._id;}).concat(osItems.map(function(i){return i._id;}));
+
+  setTipo('loja');
+  document.getElementById('mod-compra').classList.add('open');
 }
 
 async function kbConfPagItem(e, id) {
