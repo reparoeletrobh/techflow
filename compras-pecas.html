@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+—<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -1213,8 +1213,13 @@ function kbRender() {
                  '<button class="kb-btn" style="color:var(--red);border-color:rgba(239,68,68,.3);" onclick="kbAvDel(event,\''+item._id+'\')" >✕</button>';
         }
       } else if (item.col === 'agpag' && item.src === 'av') {
-        btns = '<button class="kb-btn arr" onclick="kbVerDados(event,\''+item._id+'\')" >📦 Ver Dados</button>' +
-               (item.raw && item.raw.tipoCompra === 'online' ? '<button class="kb-btn" onclick="kbEditPrev(event,\''+item._id+'\')" >📅 Previsão</button>' : '');
+        btns = '<button class="kb-btn arr" onclick="kbVerDados(event,\''+item._id+'\')" >📦 Ver Dados</button>';
+        if (item.raw && item.raw.grupoId) {
+          btns += '<button class="kb-btn ok" onclick="kbPagarGrupo(event,\''+item.raw.grupoId+'\')" >✅ Pago (grupo)</button>';
+        } else {
+          btns += '<button class="kb-btn ok" onclick="kbConfPagItem(event,\''+item.id+'\')" >✅ Pago</button>';
+        }
+        if (item.raw && item.raw.tipoCompra === 'online') btns += '<button class="kb-btn" onclick="kbEditPrev(event,\''+item._id+'\')" >📅 Previsão</button>';
       } else if (item.col === 'pago' && item.src === 'av') {
         btns = '<button class="kb-btn arr" onclick="kbMarcaCaminho(event,\''+item.id+'\')" >🚚 A Caminho</button>' +
                '<button class="kb-btn" style="color:var(--purple);border-color:rgba(168,85,247,.3);" onclick="kbMarcaOnline(event,\''+item.id+'\')" >🌐 Online</button>' +
@@ -1366,13 +1371,27 @@ function kbOsAtualizar(e, pipefyId, nome) {
 async function kbOsDisponivel(e, pipefyId) { e.stopPropagation(); await osMarcarDisponivel(pipefyId); await kbReload(); }
 function kbAvComprar1(e, avId) { e.stopPropagation(); comprar1(avId); }
 async function kbAvDel(e, avId) { e.stopPropagation(); await del(avId); await kbReload(); }
-function kbVerDados(e, avId) { e.stopPropagation(); vPgto(avId); }
+function kbVerDados(e, avId) {
+  e.stopPropagation();
+  var p = itens.find(function(x){ return x.id === avId; });
+  if (p && p.grupoId) { vGrupo(p.grupoId); }
+  else { vPgto(avId); }
+}
 function kbEditPrev(e, avId) { e.stopPropagation(); editPrev(avId); }
 async function kbRecebeu(e, avId) {
   e.stopPropagation();
   if (!confirm('Confirmar recebimento?')) return;
   var d = await fetch('/api/compras-pecas?action=marcar-recebido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[avId]})}).then(function(r){return r.json();});
   if (d.ok) { await kbReload(); toast('Recebido!','var(--green)'); }
+}
+
+async function kbPagarGrupo(e, grupoId) {
+  e.stopPropagation();
+  var ids = itens.filter(function(p){ return p.grupoId === grupoId && p.status === 'aguardando_pagamento'; }).map(function(p){ return p.id; });
+  if (!ids.length) { toast('Nenhuma peca pendente neste grupo','var(--yellow)'); return; }
+  var d = await fetch('/api/compras-pecas?action=confirmar-pagamento',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:ids})}).then(function(r){return r.json();});
+  if (d.ok) { await kbReload(); toast('Grupo pago! '+ids.length+' peca(s)','var(--green)'); }
+  else toast('Erro: '+(d.error||''),'var(--red)');
 }
 
 </script>
