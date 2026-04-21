@@ -179,10 +179,6 @@
       "destination": "/balcao.html"
     },
     {
-      "source": "/balcao",
-      "destination": "/balcao.html"
-    },
-    {
       "source": "/dre",
       "destination": "/dre.html"
     },
