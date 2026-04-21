@@ -171,10 +171,6 @@
       "destination": "/adm-rsrua.html"
     },
     {
-      "source": "/balcao",
-      "destination": "/balcao.html"
-    },
-    {
       "source": "/dre",
       "destination": "/dre.html"
     },
@@ -222,6 +218,10 @@
       "source": "/api/tv-rotas",
       "destination": "/api/tv-rotas.js"
     },
+    {
+  "source": "/balcao",
+  "destination": "/balcao.html"
+},
     {
       "source": "/((?!api/).*)",
       "destination": "/home.html"
