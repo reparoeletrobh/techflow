@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Balcao — Reparo Eletro</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d0d14;--surface:#13131e;--surface2:#1a1a28;--border:#1e1e2e;--text:#e8e8f0;--muted:#5a5a7a;--green:#22c55e;--orange:#f97316;--yellow:#f5c800;--blue:#3b9eff;--fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;}
+.header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--border);background:var(--surface);flex-wrap:wrap;gap:10px;}
+.header-title{display:flex;align-items:center;gap:12px;}
+.header-dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);}
+.header-label{font-family:var(--fh);font-size:18px;font-weight:800;}
+.header-stats{display:flex;gap:10px;align-items:center;}
+.stat-pill{background:var(--surface2);border:1px solid var(--border);border-radius:99px;padding:5px 14px;font-family:var(--fm);font-size:11px;display:flex;align-items:center;gap:6px;}
+.stat-pill .sv{font-weight:700;font-size:13px;}
+.sv.orange{color:var(--orange);}
+.sv.green{color:var(--green);}
+.btn-refresh{background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 14px;color:var(--muted);font-family:var(--fm);font-size:10px;cursor:pointer;transition:all .15s;}
+.btn-refresh:hover{border-color:var(--green);color:var(--green);}
+.main{flex:1;padding:24px;max-width:1200px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:20px;}
+.section-label{font-family:var(--fh);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.bc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;}
+.bc-empty{font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:48px 0;opacity:.6;}
+.bc-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:border-color .15s;}
+.bc-card:hover{border-color:rgba(255,255,255,.12);}
+.bc-card.pago{opacity:.65;border-color:rgba(34,197,94,.25);}
+.bc-card-head{padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;}
+.bc-name{font-family:var(--fh);font-size:16px;font-weight:800;}
+.bc-refs{display:flex;gap:6px;margin-top:4px;}
+.bc-os{font-family:var(--fm);font-size:10px;color:var(--yellow);}
+.bc-tec{font-family:var(--fm);font-size:10px;color:var(--blue);}
+.bc-badge{font-family:var(--fm);font-size:9px;padding:3px 9px;border-radius:99px;white-space:nowrap;}
+.bc-badge.ag{background:rgba(249,115,22,.15);color:var(--orange);border:1px solid rgba(249,115,22,.3);}
+.bc-badge.pg{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);}
+.bc-body{padding:12px 16px;display:flex;flex-direction:column;gap:8px;}
+.bc-row{display:flex;justify-content:space-between;align-items:center;}
+.bc-lbl{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
+.bc-val{font-family:var(--fb);font-size:12px;text-align:right;max-width:60%;word-break:break-word;}
+.bc-foot{padding:12px 16px;border-top:1px solid var(--border);}
+.btn-pagar{width:100%;font-family:var(--fh);font-size:12px;font-weight:700;padding:11px;border-radius:9px;border:none;background:var(--green);color:#000;cursor:pointer;transition:filter .15s;}
+.btn-pagar:hover{filter:brightness(1.1);}
+.btn-pagar:disabled{opacity:.5;cursor:not-allowed;filter:none;}
+.pago-label{font-family:var(--fm);font-size:10px;color:var(--green);text-align:center;display:block;padding:4px 0;}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle;}
+@keyframes sp{to{transform:rotate(360deg);}}
+.toast-wrap{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
+.toast{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 20px;font-family:var(--fm);font-size:11px;animation:tin .2s ease;white-space:nowrap;}
+.toast.g{border-color:rgba(34,197,94,.4);color:var(--green);}
+.toast.r{border-color:rgba(239,68,68,.4);color:#ef4444;}
+@keyframes tin{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-title">
+    <div class="header-dot"></div>
+    <span class="header-label">Balcao — Clientes na Loja</span>
+  </div>
+  <div class="header-stats">
+    <div class="stat-pill"><span class="sv orange" id="s-ag">—</span> aguardando</div>
+    <div class="stat-pill"><span class="sv green" id="s-pg">—</span> pagos hoje</div>
+    <button class="btn-refresh" onclick="load()">Atualizar</button>
+  </div>
+</div>
+<div class="main">
+  <div>
+    <div class="section-label">Aguardando Pagamento</div>
+    <div class="bc-grid" id="g-ag"><div class="bc-empty"><span class="spin"></span></div></div>
+  </div>
+  <div id="sec-pg" style="display:none">
+    <div class="section-label">Pagos Hoje</div>
+    <div class="bc-grid" id="g-pg"></div>
+  </div>
+</div>
+<div class="toast-wrap" id="toasts"></div>
+<script>
+var cards=[];
+async function load(){
+  try{
+    var r=await fetch('/api/board?action=balcao-load');
+    var d=await r.json();
+    cards=d.cards||[];
+    render();
+  }catch(e){
+    document.getElementById('g-ag').innerHTML='<div class="bc-empty">Erro ao carregar</div>';
+  }
+}
+function fmt(ts){return ts?new Date(ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function render(){
+  var hoje=new Date().toDateString();
+  var ag=cards.filter(c=>c.status!=='pago');
+  var pg=cards.filter(c=>c.status==='pago'&&c.pagoEm&&new Date(c.pagoEm).toDateString()===hoje);
+  document.getElementById('s-ag').textContent=ag.length;
+  document.getElementById('s-pg').textContent=pg.length;
+  var ga=document.getElementById('g-ag');
+  ga.innerHTML=ag.length?ag.map(card).join(''):'<div class="bc-empty">Nenhum cliente aguardando</div>';
+  var sp=document.getElementById('sec-pg'),gp=document.getElementById('g-pg');
+  if(pg.length){sp.style.display='';gp.innerHTML=pg.map(card).join('');}else{sp.style.display='none';}
+}
+function card(c){
+  var p=c.status==='pago';
+  return '<div class="bc-card'+(p?' pago':'')+'" id="bc-'+c.pipefyId+'">'+
+    '<div class="bc-card-head"><div><div class="bc-name">'+esc(c.nomeContato||'Cliente')+'</div>'+
+    '<div class="bc-refs">'+(c.osCode?'<span class="bc-os">OS #'+c.osCode+'</span>':'')+
+    (c.tecnico?'<span class="bc-tec">· '+esc(c.tecnico)+'</span>':'')+'</div></div>'+
+    '<span class="bc-badge '+(p?'pg':'ag')+'">'+(p?'Pago':'Aguardando')+'</span></div>'+
+    '<div class="bc-body">'+
+    (c.descricao?'<div class="bc-row"><span class="bc-lbl">Servico</span><span class="bc-val">'+esc(c.descricao)+'</span></div>':'')+
+    '<div class="bc-row"><span class="bc-lbl">Entrada</span><span class="bc-val">'+fmt(c.entradaEm)+'</span></div>'+
+    (p?'<div class="bc-row"><span class="bc-lbl">Pago em</span><span class="bc-val" style="color:var(--green)">'+fmt(c.pagoEm)+'</span></div>':'')+
+    '</div><div class="bc-foot">'+
+    (!p?'<button class="btn-pagar" id="btn-'+c.pipefyId+'" onclick="pagar(''+c.pipefyId+'')">Confirmar Pagamento</button>':
+    '<span class="pago-label">Ficha enviada para ERP</span>')+
+    '</div></div>';
+}
+async function pagar(id){
+  var btn=document.getElementById('btn-'+id);
+  if(!btn||btn.disabled)return;
+  btn.disabled=true;btn.textContent='Processando...';
+  try{
+    var r=await fetch('/api/board?action=balcao-pagar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pipefyId:id})});
+    var d=await r.json();
+    if(d.ok){
+      var c=cards.find(x=>x.pipefyId===id);
+      if(c){c.status='pago';c.pagoEm=new Date().toISOString();}
+      render();toast('Pagamento confirmado — ficha enviada para ERP!','g');
+    }else{btn.disabled=false;btn.textContent='Confirmar Pagamento';toast('Erro: '+(d.error||'falha'),'r');}
+  }catch(e){btn.disabled=false;btn.textContent='Confirmar Pagamento';toast('Erro de conexao','r');}
+}
+function toast(msg,type){
+  var w=document.getElementById('toasts'),t=document.createElement('div');
+  t.className='toast '+(type||'');t.textContent=msg;w.appendChild(t);
+  setTimeout(()=>t.remove(),3500);
+}
+load();
+setInterval(load,30000);
+</script>
+</body>
+</html>
