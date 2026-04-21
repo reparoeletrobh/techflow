@@ -219,13 +219,12 @@
       "destination": "/api/tv-rotas.js"
     },
     {
-  "source": "/balcao",
-  "destination": "/balcao.html"
-},
+      "source": "/balcao",
+      "destination": "/balcao.html"
+    },
     {
       "source": "/((?!api/).*)",
       "destination": "/home.html"
     }
-  ],
-  "ignoreCommand": "if git diff HEAD~1 --name-only 2>/dev/null | grep -qE '\\.(html|js|json|css)$'; then echo 0; else echo 1; fi"
+  ]
 }
