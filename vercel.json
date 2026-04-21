@@ -1,4 +1,4 @@
-→→{
+{
   "crons": [
     {
       "path": "/api/board?action=erp-to-finalizado",
@@ -169,10 +169,6 @@
     {
       "source": "/adm-rsrua",
       "destination": "/adm-rsrua.html"
-    },
-    {
-      "source": "/balcao",
-      "destination": "/balcao.html"
     },
     {
       "source": "/balcao",
