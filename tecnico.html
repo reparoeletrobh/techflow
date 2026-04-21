@@ -358,7 +358,6 @@ nav{display:flex;gap:5px;flex-wrap:wrap;}
     <button class="nav-btn" onclick="showPage('mover')">Mover OS</button>
     <button class="nav-btn" onclick="showPage('criar')">Nova OS</button>
     <button class="nav-btn" onclick="showPage('metas')">Metas</button>
-    <button class="nav-btn" onclick="showPage('balcao')" id="nav-balcao">🏪 Balcão <span id="balcao-badge" style="display:none;background:var(--orange);color:#000;border-radius:99px;font-size:9px;padding:1px 6px;margin-left:4px;font-weight:700;"></span></button>
   </nav>
   <div class="header-right">
     <div class="stat-pill"><strong id="stat-total">—</strong>&nbsp;OS</div>
@@ -555,55 +554,10 @@ nav{display:flex;gap:5px;flex-wrap:wrap;}
   <div class="t-msg"><strong id="t-title"></strong><span id="t-body"></span></div>
 </div>
 
-<!-- ─── BALCÃO ─────────────────────────────────────────────── -->
-<style>
-#page-balcao{padding:20px;display:flex;flex-direction:column;gap:16px;}
-.balcao-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
-.balcao-title{font-family:var(--fh);font-size:18px;font-weight:900;display:flex;align-items:center;gap:10px;}
-.balcao-dot{width:10px;height:10px;border-radius:50%;background:var(--orange);box-shadow:0 0 8px var(--orange);}
-.balcao-stats{display:flex;gap:10px;}
-.balcao-stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 16px;text-align:center;}
-.balcao-stat .sv{font-family:var(--fh);font-size:20px;font-weight:900;}
-.balcao-stat .sl{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;}
-.balcao-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;}
-.bc-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:border .15s;}
-.bc-card:hover{border-color:rgba(255,255,255,.15);}
-.bc-card.pago{border-color:rgba(34,197,94,.3);opacity:.7;}
-.bc-card-top{padding:12px 14px 10px;border-bottom:1px solid var(--border);}
-.bc-card-name{font-family:var(--fh);font-size:15px;font-weight:800;margin-bottom:2px;}
-.bc-card-ref{font-family:var(--fm);font-size:10px;color:var(--muted);}
-.bc-card-body{padding:10px 14px;display:flex;flex-direction:column;gap:6px;}
-.bc-card-row{display:flex;justify-content:space-between;align-items:center;}
-.bc-card-label{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
-.bc-card-val{font-family:var(--fb);font-size:12px;font-weight:600;}
-.bc-card-footer{padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:8px;}
-.bc-btn-pagar{flex:1;font-family:var(--fm);font-size:10px;font-weight:700;padding:9px;border-radius:8px;border:none;background:var(--green);color:#000;cursor:pointer;transition:filter .15s;}
-.bc-btn-pagar:hover{filter:brightness(1.1);}
-.bc-btn-pagar:disabled{opacity:.5;cursor:not-allowed;}
-.bc-pago-badge{font-family:var(--fm);font-size:9px;padding:3px 10px;border-radius:99px;background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);}
-.balcao-empty{font-family:var(--fm);font-size:12px;color:var(--muted);text-align:center;padding:48px;opacity:.6;}
-</style>
-
-<div id="page-balcao" class="page" style="display:none;">
-  <div class="balcao-header">
-    <div class="balcao-title">
-      <div class="balcao-dot"></div>
-      Balcão — Clientes na Loja
-    </div>
-    <div class="balcao-stats">
-      <div class="balcao-stat"><div class="sv orange" id="bc-stat-aguardando">0</div><div class="sl">Aguardando</div></div>
-      <div class="balcao-stat"><div class="sv green" id="bc-stat-pago">0</div><div class="sl">Pagos Hoje</div></div>
-    </div>
-  </div>
-  <div class="balcao-grid" id="bc-grid">
-    <div class="balcao-empty">Carregando...</div>
-  </div>
-</div>
-
 <script>
 // ── CORES ──────────────────────────────────────────────────────
 const COLORS = ['#f5c800','#ff9800','#ef4444','#a855f7','#3b9eff','#00c896','#22c55e','#10b981','#f59e0b','#e879f9'];
-const PAGES  = ['dashboard','mover','criar','rs','rs-rua','metas','balcao'];
+const PAGES  = ['dashboard','mover','criar','rs','rs-rua','metas'];
 
 // ── ESTADO ─────────────────────────────────────────────────────
 const DEFAULT_BOARD = {
@@ -1368,7 +1322,6 @@ function showPage(name) {
   if (name === 'metas')   loadGoals();
   if (name === 'rs')      renderRsBoard('rs');
   if (name === 'rs-rua')  renderRsBoard('rs_rua');
-  if (name === 'balcao')  bcLoad();
 }
 
 // ── TOAST ──────────────────────────────────────────────────────
@@ -1711,104 +1664,6 @@ setInterval(() => {
 setInterval(() => {
   syncPipefy();
 }, 60000);
-
-// ══════════════════════════════════════════════════════
-//  BALCÃO — Clientes na Loja
-// ══════════════════════════════════════════════════════
-var bcCards = [];
-var bcLoading = false;
-
-async function bcLoad() {
-  if (bcLoading) return;
-  bcLoading = true;
-  try {
-    const r = await fetch('/api/board?action=balcao-load');
-    const d = await r.json();
-    bcCards = d.cards || [];
-    bcRender();
-    bcUpdateBadge();
-  } catch(e) {
-    document.getElementById('bc-grid').innerHTML = '<div class="balcao-empty">Erro ao carregar</div>';
-  }
-  bcLoading = false;
-}
-
-function bcRender() {
-  const grid = document.getElementById('bc-grid');
-  if (!bcCards.length) {
-    grid.innerHTML = '<div class="balcao-empty">Nenhum cliente no balcão no momento.</div>';
-    document.getElementById('bc-stat-aguardando').textContent = '0';
-    document.getElementById('bc-stat-pago').textContent = '0';
-    return;
-  }
-  const hoje = new Date().toDateString();
-  let aguardando = 0, pagos = 0;
-  grid.innerHTML = bcCards.map(function(card) {
-    const isPago = card.status === 'pago';
-    if (isPago && card.pagoEm && new Date(card.pagoEm).toDateString() === hoje) pagos++;
-    if (!isPago) aguardando++;
-    const entradaFmt = card.entradaEm ? new Date(card.entradaEm).toLocaleString('pt-BR',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}) : '—';
-    const pagoFmt = card.pagoEm ? new Date(card.pagoEm).toLocaleString('pt-BR',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}) : null;
-    return '<div class="bc-card'+(isPago?' pago':'')+'" id="bc-'+card.pipefyId+'">' +
-      '<div class="bc-card-top">' +
-        '<div class="bc-card-name">'+(card.nomeContato||'Cliente')+'</div>' +
-        '<div class="bc-card-ref">'+(card.osCode?'OS #'+card.osCode:'')+(card.tecnico?' · '+card.tecnico:'')+'</div>' +
-      '</div>' +
-      '<div class="bc-card-body">' +
-        (card.descricao?'<div class="bc-card-row"><span class="bc-card-label">Serviço</span><span class="bc-card-val" style="font-size:11px;max-width:160px;text-align:right;word-break:break-word;">'+card.descricao+'</span></div>':'') +
-        '<div class="bc-card-row"><span class="bc-card-label">Entrada</span><span class="bc-card-val">'+entradaFmt+'</span></div>' +
-        (isPago&&pagoFmt?'<div class="bc-card-row"><span class="bc-card-label">Pago em</span><span class="bc-card-val" style="color:var(--green);">'+pagoFmt+'</span></div>':'') +
-      '</div>' +
-      '<div class="bc-card-footer">' +
-        (!isPago
-          ? '<button class="bc-btn-pagar" id="bcbtn-'+card.pipefyId+'" onclick="bcPagar(''+card.pipefyId+'')">✅ Confirmar Pagamento</button>'
-          : '<span class="bc-pago-badge">✅ Pago — enviado para ERP</span>') +
-      '</div>' +
-    '</div>';
-  }).join('');
-  document.getElementById('bc-stat-aguardando').textContent = aguardando;
-  document.getElementById('bc-stat-pago').textContent = pagos;
-}
-
-function bcUpdateBadge() {
-  const pending = bcCards.filter(function(c){ return c.status !== 'pago'; }).length;
-  const badge = document.getElementById('balcao-badge');
-  if (!badge) return;
-  badge.textContent = pending;
-  badge.style.display = pending > 0 ? 'inline' : 'none';
-}
-
-async function bcPagar(pipefyId) {
-  const btn = document.getElementById('bcbtn-'+pipefyId);
-  if (!btn) return;
-  btn.disabled = true;
-  btn.textContent = '⏳ Processando...';
-  try {
-    const r = await fetch('/api/board?action=balcao-pagar', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({pipefyId: pipefyId})
-    });
-    const d = await r.json();
-    if (d.ok) {
-      // Atualiza localmente
-      const card = bcCards.find(function(c){ return c.pipefyId === pipefyId; });
-      if (card) { card.status = 'pago'; card.pagoEm = new Date().toISOString(); }
-      bcRender();
-      bcUpdateBadge();
-      showToast && showToast('✅ Pagamento confirmado — card enviado para ERP!', 'green');
-    } else {
-      btn.disabled = false;
-      btn.textContent = '✅ Confirmar Pagamento';
-      alert('Erro: ' + (d.error || 'falha ao processar'));
-    }
-  } catch(e) {
-    btn.disabled = false;
-    btn.textContent = '✅ Confirmar Pagamento';
-    alert('Erro de conexão');
-  }
-}
-
 </script>
 <!-- MODAL COMPRA PEÇA -->
 <div class="compra-modal-overlay" id="compra-modal-overlay">
