@@ -1,4 +1,4 @@
-—const PIPEFY_API = "https://api.pipefy.com/graphql";
+const PIPEFY_API = "https://api.pipefy.com/graphql";
 const PIPE_ID    = "305832912";
 const BOARD_KEY   = "reparoeletro_board";
 const LOGS_KEY    = "reparoeletro_logs";
