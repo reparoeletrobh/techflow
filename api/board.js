@@ -1,4 +1,4 @@
-const PIPEFY_API = "https://api.pipefy.com/graphql";
+—const PIPEFY_API = "https://api.pipefy.com/graphql";
 const PIPE_ID    = "305832912";
 const BOARD_KEY   = "reparoeletro_board";
 const LOGS_KEY    = "reparoeletro_logs";
@@ -567,6 +567,30 @@ module.exports = async function handler(req, res) {
       }
       await dbSet(BOARD_KEY, board);
       await saveLogs(board);
+
+      // ── Auto-registra no Balcão quando entra em Cliente Loja ──
+      if (phaseId === 'cliente_loja') {
+        try {
+          const BALCAO_KEY = 'reparoeletro_balcao';
+          const balcao = (await dbGet(BALCAO_KEY)) || [];
+          // Evita duplicata
+          if (!balcao.find(b => b.pipefyId === String(pipefyId))) {
+            balcao.unshift({
+              pipefyId:    String(pipefyId),
+              nomeContato: card.nomeContato || card.title || '—',
+              osCode:      card.osCode      || null,
+              descricao:   card.descricao   || null,
+              tecnico:     tecnico          || card.tecnico || null,
+              entradaEm:   card.movedAt,
+              status:      'aguardando_pagamento',
+              pagoEm:      null,
+            });
+            await dbSet(BALCAO_KEY, balcao);
+          }
+        } catch(balcaoErr) {
+          console.error('[Balcao] Erro ao registrar:', balcaoErr.message);
+        }
+      }
 
       // Auto-adiciona à fila do Lalamove quando move para coleta/entrega solicitada
       if (["coleta_solicitada", "entrega_solicitada"].includes(phaseId)) {
@@ -1764,6 +1788,34 @@ module.exports = async function handler(req, res) {
       } catch(e) {
         return res.status(200).json({ ok: false, error: "equip-gravado: " + e.message });
       }
+    }
+
+    // ── BALCÃO: carregar cards ─────────────────────────────────────
+    if (action === 'balcao-load') {
+      const balcao = (await dbGet('reparoeletro_balcao')) || [];
+      return res.status(200).json({ ok: true, cards: balcao });
+    }
+
+    // ── BALCÃO: confirmar pagamento → move para ERP no Pipefy ──────
+    if (action === 'balcao-pagar') {
+      const { pipefyId } = req.body || {};
+      if (!pipefyId) return res.status(400).json({ ok: false, error: 'pipefyId obrigatório' });
+      const ERP_PHASE_ID = '339008925';
+      try {
+        const pipRes = await pipefyQuery(`mutation {
+          moveCardToPhase(input: { card_id: "${pipefyId}", destination_phase_id: "${ERP_PHASE_ID}" }) {
+            card { id }
+          }
+        }`);
+        if (pipRes?.errors?.length) throw new Error(pipRes.errors[0].message);
+      } catch(pipErr) {
+        return res.status(200).json({ ok: false, error: 'Pipefy: ' + pipErr.message });
+      }
+      const BALCAO_KEY = 'reparoeletro_balcao';
+      const balcao = (await dbGet(BALCAO_KEY)) || [];
+      const entry = balcao.find(b => b.pipefyId === String(pipefyId));
+      if (entry) { entry.status = 'pago'; entry.pagoEm = new Date().toISOString(); await dbSet(BALCAO_KEY, balcao); }
+      return res.status(200).json({ ok: true });
     }
 
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
