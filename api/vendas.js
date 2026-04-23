@@ -17,7 +17,7 @@ async function pipefyQuery(query) {
 }
 
 async function getProntoParaVendaPhaseId() {
-  const data = await pipefyQuery(h
+  const data = await pipefyQuery(
     "query { pipe(id: \"" + PIPE_ID + "\") { phases { id name } } }"
   );
   const phases = data?.pipe?.phases || [];
