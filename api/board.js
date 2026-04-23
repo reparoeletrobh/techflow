@@ -580,6 +580,7 @@ module.exports = async function handler(req, res) {
               nomeContato: card.nomeContato || card.title || '—',
               osCode:      card.osCode      || null,
               descricao:   card.descricao   || null,
+              telefone:    card.telefone    || null,
               tecnico:     tecnico          || card.tecnico || null,
               entradaEm:   card.movedAt,
               status:      'aguardando_pagamento',
