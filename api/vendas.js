@@ -210,6 +210,7 @@ module.exports = async function handler(req, res) {
 
     // ── Marca produto como vendido ────────────────────────────────────────
     db.produtos[idx] = { ...p, vendido: true, soldAt: now, compradorNome: nomeCliente,
+      compradorTel: telefone||null,
       nomeVendedor: vendedor||null, modalidade: modalidade||null,
       vendedor: modalidade||vendedor||null,
       updatedAt: now };
@@ -247,9 +248,20 @@ module.exports = async function handler(req, res) {
           "",
           textoAlmox
         ].join("\n");
-        const dataAlmox = await pipefyQuery(
-          "mutation { createCard(input: { pipe_id: \"" + PIPE_ID + "\" phase_id: \"" + phaseReceber + "\" title: \"" + tituloReceber.replace(/"/g,"'") + "\" fields_attributes: [ { field_id: \"descri_o\" field_value: \"" + descReceber.replace(/"/g,"'") + "\" } ] }) { card { id } } }"
-        );
+        const safeTitle = tituloReceber.replace(/"/g,"'").slice(0,255);
+        const safeName  = nomeCliente.replace(/"/g,"'").slice(0,255);
+        const safeTel   = (telefone||"").replace(/"/g,"'").slice(0,100);
+        const safeDesc  = descReceber.replace(/"/g,"'").slice(0,3000);
+        let dataAlmox = null;
+        try {
+          dataAlmox = await pipefyQuery(
+            "mutation { createCard(input: { pipe_id: \"" + PIPE_ID + "\" phase_id: \"" + phaseReceber + "\" title: \"" + safeTitle + "\" fields_attributes: [ { field_id: \"nome_do_contato\" field_value: \"" + safeName + "\" }, { field_id: \"telefone\" field_value: \"" + safeTel + "\" }, { field_id: \"descri_o\" field_value: \"" + safeDesc + "\" } ] }) { card { id } } }"
+          );
+        } catch(eF) {
+          dataAlmox = await pipefyQuery(
+            "mutation { createCard(input: { pipe_id: \"" + PIPE_ID + "\" phase_id: \"" + phaseReceber + "\" title: \"" + safeTitle + "\" }) { card { id } } }"
+          );
+        }
         pipefyReceberCardId = dataAlmox?.createCard?.card?.id || null;
       }
     } catch(e) { console.error("Pipefy Receber card:", e.message); }
