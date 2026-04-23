@@ -101,7 +101,7 @@ function render(){
   var _tel = c.telefone ? '55'+c.telefone.replace(/\D/g,'') : '';
   var _msg = encodeURIComponent('Bom dia, Pedro aqui da Reparo Eletro.\n\nEstamos com pouco espaço na loja e esta muito dificil de trabalhar, precisamos que o equipamento seja retirado ou entregue.\n\nConto com a sua colaboração pois esta nos prejudicando muito ficar sem espaço.');
   var _waHref = _tel ? 'https://wa.me/'+_tel+'?text='+_msg : 'https://api.whatsapp.com/send?text='+_msg;
-  var _waBtn = _48h ? '<a class=\"btn-wa48\" href=\"'+_waHref+'\" target=\"_blank\">📱 Solicitar Retirada</a>' : '';
+  var _waBtn = _48h ? '<a class="btn-wa48" href="'+_waHref+'" target="_blank">📱 Solicitar Retirada</a>' : '';
   document.getElementById('s-ag').textContent=ag.length;
   document.getElementById('s-pg').textContent=pg.length;
   var ga=document.getElementById('g-ag');
