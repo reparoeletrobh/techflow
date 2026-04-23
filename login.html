@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — Reparo Eletro ADM</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:#0a0a0a;color:#fff;font-family:'Inter',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;}
+  .card{background:#111;border:1px solid #252525;border-radius:16px;padding:40px 36px;width:100%;max-width:360px;}
+  .logo{text-align:center;margin-bottom:32px;}
+  .logo h1{font-size:22px;font-weight:700;color:#fff;letter-spacing:-0.5px;}
+  .logo h1 span{color:#f5c800;}
+  .logo p{color:#888;font-size:13px;margin-top:6px;}
+  .field{margin-bottom:18px;}
+  .field label{display:block;font-size:12px;color:#888;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;}
+  .field input{width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:12px 14px;color:#fff;font-size:14px;outline:none;transition:border-color .2s;}
+  .field input:focus{border-color:#f5c800;}
+  .btn{width:100%;background:#f5c800;color:#000;border:none;border-radius:8px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;transition:opacity .2s;}
+  .btn:hover{opacity:.9;}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .error{background:#2a1010;border:1px solid #5a1a1a;color:#ff6b6b;border-radius:8px;padding:12px 14px;font-size:13px;margin-bottom:16px;display:none;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <h1>Reparo <span>Eletro</span></h1>
+    <p>Área administrativa</p>
+  </div>
+  <div class="error" id="err"></div>
+  <div class="field">
+    <label>Usuário</label>
+    <input type="text" id="user" placeholder="admin" autocomplete="username">
+  </div>
+  <div class="field">
+    <label>Senha</label>
+    <input type="password" id="pass" placeholder="••••••" autocomplete="current-password">
+  </div>
+  <button class="btn" id="btn" onclick="doLogin()">Entrar</button>
+</div>
+<script>
+  (function(){
+    var d = JSON.parse(localStorage.getItem('adm_auth')||'{}');
+    if(d.token && d.expiry && Date.now() < d.expiry) window.location.replace('/adm');
+  })();
+  document.getElementById('user').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('pass').focus();});
+  document.getElementById('pass').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
+  async function doLogin(){
+    var btn=document.getElementById('btn'),err=document.getElementById('err');
+    var user=document.getElementById('user').value.trim(),pass=document.getElementById('pass').value;
+    err.style.display='none';
+    if(!user||!pass){showErr('Preencha usuário e senha.');return;}
+    btn.disabled=true;btn.textContent='Entrando...';
+    try{
+      var r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user,password:pass})});
+      var d=await r.json();
+      if(d.ok){
+        localStorage.setItem('adm_auth',JSON.stringify({token:d.token,expiry:d.expiry}));
+        window.location.replace('/adm');
+      }else{showErr(d.error||'Usuário ou senha inválidos.');}
+    }catch(e){showErr('Erro de conexão. Tente novamente.');}
+    btn.disabled=false;btn.textContent='Entrar';
+  }
+  function showErr(msg){var el=document.getElementById('err');el.textContent=msg;el.style.display='block';}
+</script>
+</body>
+</html>
