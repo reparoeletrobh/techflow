@@ -354,5 +354,22 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, produto: db.produtos[idx] });
   }
 
+
+  // ── POST update-pipefy-card ────────────────────────────────────────────────
+  if (req.method === "POST" && action === "update-pipefy-card") {
+    const { cardId, nome, telefone } = req.body || {};
+    if (!cardId) return res.status(400).json({ ok:false, error:"cardId obrigatorio" });
+    try {
+      const parts = [];
+      if (nome)     parts.push(`m1: updateCardField(input: { card_id: "${cardId}" field_id: "nome_do_contato" new_value: "${nome.replace(/"/g,"'")}" }) { card { id } }`);
+      if (telefone) parts.push(`m2: updateCardField(input: { card_id: "${cardId}" field_id: "telefone" new_value: "${telefone.replace(/"/g,"'")}" }) { card { id } }`);
+      if (!parts.length) return res.status(400).json({ ok:false, error:"nome ou telefone obrigatorio" });
+      await pipefyQuery("mutation { " + parts.join(" ") + " }");
+      return res.status(200).json({ ok:true, cardId });
+    } catch(e) {
+      return res.status(500).json({ ok:false, error:e.message });
+    }
+  }
+
   return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 };
