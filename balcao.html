@@ -114,7 +114,7 @@ function card(c){
     '<div class="bc-row"><span class="bc-lbl">Entrada</span><span class="bc-val">'+fmt(c.entradaEm)+'</span></div>'+
     (p?'<div class="bc-row"><span class="bc-lbl">Pago em</span><span class="bc-val" style="color:var(--green)">'+fmt(c.pagoEm)+'</span></div>':'')+
     '</div><div class="bc-foot">'+
-    (!p?'<button class="btn-pagar" id="btn-'+c.pipefyId+'" onclick="pagar(''+c.pipefyId+'')">Confirmar Pagamento</button>':
+    (!p?'<button class="btn-pagar" id="btn-'+c.pipefyId+'" onclick="pagar('+c.pipefyId+')">Confirmar Pagamento</button>':
     '<span class="pago-label">Ficha enviada para ERP</span>')+
     '</div></div>';
 }
