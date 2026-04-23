@@ -1,6 +1,15 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+<script>
+(function(){
+  var d = JSON.parse(localStorage.getItem('adm_auth')||'{}');
+  if(!d.token || !d.expiry || Date.now() > d.expiry){
+    localStorage.removeItem('adm_auth');
+    window.location.replace('/login');
+  }
+})();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Reparo Eletro — ADM</title>
