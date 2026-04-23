@@ -1819,7 +1819,33 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
-    return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+  // ── POST balcao-resync — busca telefone do Pipefy e atualiza Redis ─────────
+  if (req.method === 'POST' && action === 'balcao-resync') {
+    try {
+      const balcao = (await dbGet(BALCAO_KEY)) || [];
+      let updated = 0;
+      for (const card of balcao) {
+        if (card.telefone) continue;
+        try {
+          const data = await pipefyQuery(
+            'query { card(id: "' + card.pipefyId + '") { fields { name value } } }'
+          );
+          const fields = data?.card?.fields || [];
+          const telF = fields.find(f => f.name && f.name.toLowerCase().includes('telefone'));
+          if (telF && telF.value) {
+            card.telefone = telF.value;
+            updated++;
+          }
+        } catch(eCard) { /* ignora cards que falharem */ }
+      }
+      await dbSet(BALCAO_KEY, balcao);
+      return res.status(200).json({ ok: true, total: balcao.length, updated });
+    } catch(e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+      return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch (err) {
     console.error("Handler error:", err);
