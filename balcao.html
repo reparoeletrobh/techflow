@@ -25,7 +25,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
 .section-label::after{content:'';flex:1;height:1px;background:var(--border);}
 .bc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;}
 .bc-empty{font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:48px 0;opacity:.6;}
-.bc-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:border-color .15s;}
+.bc-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:border-color .15s;position:relative;}
 .bc-card:hover{border-color:rgba(255,255,255,.12);}
 .bc-card.pago{opacity:.65;border-color:rgba(34,197,94,.25);}
 .bc-card-head{padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;}
@@ -44,6 +44,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
 .btn-pagar{width:100%;font-family:var(--fh);font-size:12px;font-weight:700;padding:11px;border-radius:9px;border:none;background:var(--green);color:#000;cursor:pointer;transition:filter .15s;}
 .btn-wa48{display:block;width:100%;background:#f5c800;color:#000;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;text-align:center;text-decoration:none;transition:opacity .15s;margin-top:8px;}
 .btn-wa48:hover{opacity:.85;}
+.btn-excluir{position:absolute;top:10px;right:10px;background:transparent;border:1px solid #444;border-radius:6px;color:#888;font-size:11px;padding:3px 8px;cursor:pointer;transition:all .15s;}
+.btn-excluir:hover{background:#5a1a1a;border-color:#c0392b;color:#ff6b6b;}
 .btn-pagar:hover{filter:brightness(1.1);}
 .btn-pagar:disabled{opacity:.5;cursor:not-allowed;filter:none;}
 .pago-label{font-family:var(--fm);font-size:10px;color:var(--green);text-align:center;display:block;padding:4px 0;}
@@ -112,6 +114,7 @@ function card(c){
   var _waHref = _tel ? 'https://wa.me/'+_tel+'?text='+_msg : 'https://api.whatsapp.com/send?text='+_msg;
   var _waBtn = _48h ? '<a class="btn-wa48" href="'+_waHref+'" target="_blank">📱 Solicitar Retirada</a>' : '';
   return '<div class="bc-card'+(p?' pago':'')+'" id="bc-'+c.pipefyId+'">'+
+    '<button class="btn-excluir" onclick="excluir(\'' + c.pipefyId + '\')">✕</button>'+
     '<div class="bc-card-head"><div><div class="bc-name">'+esc(c.nomeContato||'Cliente')+'</div>'+
     '<div class="bc-refs">'+(c.osCode?'<span class="bc-os">OS #'+c.osCode+'</span>':'')+
     (c.tecnico?'<span class="bc-tec">· '+esc(c.tecnico)+'</span>':'')+'</div></div>'+
@@ -139,6 +142,15 @@ async function pagar(id){
       render();toast('Pagamento confirmado — ficha enviada para ERP!','g');
     }else{btn.disabled=false;btn.textContent='Confirmar Pagamento';toast('Erro: '+(d.error||'falha'),'r');}
   }catch(e){btn.disabled=false;btn.textContent='Confirmar Pagamento';toast('Erro de conexao','r');}
+}
+async function excluir(id){
+  if(!confirm('Excluir este card do balcão?'))return;
+  try{
+    var r=await fetch('/api/board?action=balcao-excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pipefyId:id})});
+    var d=await r.json();
+    if(d.ok){cards=cards.filter(c=>c.pipefyId!==String(id));render();toast('Card removido do balcão','g');}
+    else{toast('Erro: '+(d.error||'falha'),'r');}
+  }catch(e){toast('Erro de conexao','r');}
 }
 function toast(msg,type){
   var w=document.getElementById('toasts'),t=document.createElement('div');
