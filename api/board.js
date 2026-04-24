@@ -572,7 +572,7 @@ module.exports = async function handler(req, res) {
       if (phaseId === 'cliente_loja') {
         try {
           const BALCAO_KEY = 'reparoeletro_balcao';
-          const balcao = (await dbGet(BALCAO_KEY)) || [];
+          const balcao = (await dbGet('reparoeletro_balcao')) || [];
           // Evita duplicata
           if (!balcao.find(b => b.pipefyId === String(pipefyId))) {
             balcao.unshift({
@@ -586,7 +586,7 @@ module.exports = async function handler(req, res) {
               status:      'aguardando_pagamento',
               pagoEm:      null,
             });
-            await dbSet(BALCAO_KEY, balcao);
+            await dbSet('reparoeletro_balcao', balcao);
           }
         } catch(balcaoErr) {
           console.error('[Balcao] Erro ao registrar:', balcaoErr.message);
