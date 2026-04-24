@@ -97,11 +97,6 @@ function render(){
   var hoje=new Date().toDateString();
   var ag=cards.filter(c=>c.status!=='pago');
   var pg=cards.filter(c=>c.status==='pago'&&c.pagoEm&&new Date(c.pagoEm).toDateString()===hoje);
-  var _48h = (Date.now() - new Date(c.entradaEm).getTime()) > 48*60*60*1000;
-  var _tel = c.telefone ? '55'+c.telefone.replace(/\D/g,'') : '';
-  var _msg = encodeURIComponent('Bom dia, Pedro aqui da Reparo Eletro.\n\nEstamos com pouco espaço na loja e esta muito dificil de trabalhar, precisamos que o equipamento seja retirado ou entregue.\n\nConto com a sua colaboração pois esta nos prejudicando muito ficar sem espaço.');
-  var _waHref = _tel ? 'https://wa.me/'+_tel+'?text='+_msg : 'https://api.whatsapp.com/send?text='+_msg;
-  var _waBtn = _48h ? '<a class="btn-wa48" href="'+_waHref+'" target="_blank">📱 Solicitar Retirada</a>' : '';
   document.getElementById('s-ag').textContent=ag.length;
   document.getElementById('s-pg').textContent=pg.length;
   var ga=document.getElementById('g-ag');
@@ -111,6 +106,11 @@ function render(){
 }
 function card(c){
   var p=c.status==='pago';
+  var _48h = (Date.now() - new Date(c.entradaEm).getTime()) > 48*60*60*1000;
+  var _tel = c.telefone ? '55'+c.telefone.replace(/\D/g,'') : '';
+  var _msg = encodeURIComponent('Bom dia, Pedro aqui da Reparo Eletro.\n\nEstamos com pouco espaço na loja e esta muito dificil de trabalhar, precisamos que o equipamento seja retirado ou entregue.\n\nConto com a sua colaboração pois esta nos prejudicando muito ficar sem espaço.');
+  var _waHref = _tel ? 'https://wa.me/'+_tel+'?text='+_msg : 'https://api.whatsapp.com/send?text='+_msg;
+  var _waBtn = _48h ? '<a class="btn-wa48" href="'+_waHref+'" target="_blank">📱 Solicitar Retirada</a>' : '';
   return '<div class="bc-card'+(p?' pago':'')+'" id="bc-'+c.pipefyId+'">'+
     '<div class="bc-card-head"><div><div class="bc-name">'+esc(c.nomeContato||'Cliente')+'</div>'+
     '<div class="bc-refs">'+(c.osCode?'<span class="bc-os">OS #'+c.osCode+'</span>':'')+
