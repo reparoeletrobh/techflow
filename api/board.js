@@ -1861,6 +1861,62 @@ module.exports = async function handler(req, res) {
     }
   }
 
+    // ── POST balcao-force-sync — busca todos cards da fase Cliente Loja no Pipefy ──
+  if (req.method === 'POST' && action === 'balcao-force-sync') {
+    try {
+      // 1. Descobre o ID numérico da fase "Cliente Loja" no Pipefy
+      const pipeData = await pipefyQuery(
+        'query { pipe(id: "' + PIPE_ID + '") { phases { id name } } }'
+      );
+      const phases = pipeData?.pipe?.phases || [];
+      const lojaPhase = phases.find(p =>
+        p.name.toLowerCase().includes('cliente') && p.name.toLowerCase().includes('loja')
+      ) || phases.find(p => p.name.toLowerCase().includes('loja'));
+      if (!lojaPhase) return res.status(404).json({ ok: false, error: 'Fase Cliente Loja nao encontrada', phases: phases.map(p=>p.name) });
+
+      // 2. Busca todos os cards dessa fase
+      const phaseData = await pipefyQuery(
+        'query { phase(id: "' + lojaPhase.id + '") { cards(first: 50) { edges { node { id title created_at fields { name value } } } } } }'
+      );
+      const edges = phaseData?.phase?.cards?.edges || [];
+
+      // 3. Mapeia para formato balcão
+      const getF = (fields, name) => {
+        const f = fields.find(x => x.name && x.name.toLowerCase().includes(name.toLowerCase()));
+        return f ? f.value : null;
+      };
+      const newCards = edges.map(e => {
+        const c = e.node;
+        const fields = c.fields || [];
+        const titleParts = (c.title || '').split(' ');
+        const osCode = titleParts.find(p => /^\d{4}$/.test(p)) || null;
+        return {
+          pipefyId:    c.id,
+          nomeContato: getF(fields,'nome') || c.title,
+          osCode:      osCode || getF(fields,'os') || getF(fields,'codigo'),
+          descricao:   getF(fields,'descri') || getF(fields,'servi') || null,
+          tecnico:     getF(fields,'tecnico') || getF(fields,'tecn') || null,
+          telefone:    getF(fields,'telefone') || getF(fields,'fone') || null,
+          entradaEm:   c.created_at || new Date().toISOString(),
+          status:      'aguardando',
+          pagoEm:      null,
+        };
+      });
+
+      // 4. Merge: mantém pagoEm de cards já existentes
+      const existing = (await dbGet('reparoeletro_balcao')) || [];
+      const merged = newCards.map(nc => {
+        const old = existing.find(e => String(e.pipefyId) === String(nc.pipefyId));
+        return old ? { ...nc, status: old.status, pagoEm: old.pagoEm } : nc;
+      });
+
+      await dbSet('reparoeletro_balcao', merged);
+      return res.status(200).json({ ok: true, total: merged.length, phase: lojaPhase.name, phaseId: lojaPhase.id });
+    } catch(e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
       return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch (err) {
