@@ -1845,6 +1845,22 @@ module.exports = async function handler(req, res) {
     }
   }
 
+    // ── POST balcao-excluir — remove card do balcão no Redis ─────────────────
+  if (req.method === 'POST' && action === 'balcao-excluir') {
+    const { pipefyId } = req.body || {};
+    if (!pipefyId) return res.status(400).json({ ok: false, error: 'pipefyId obrigatorio' });
+    try {
+      const balcao = (await dbGet('reparoeletro_balcao')) || [];
+      const before = balcao.length;
+      const filtered = balcao.filter(c => String(c.pipefyId) !== String(pipefyId));
+      if (filtered.length === before) return res.status(404).json({ ok: false, error: 'Card nao encontrado' });
+      await dbSet('reparoeletro_balcao', filtered);
+      return res.status(200).json({ ok: true, removed: before - filtered.length });
+    } catch(e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
       return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch (err) {
