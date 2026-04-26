@@ -143,7 +143,26 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, card, pipefyComment, pipefyMove });
   }
 
-  // ── GET fases — lista fases do pipe TV ────────────────────────────────────
+  // ── POST salvar-relatorio — salva relatorio no card e move para coleta_realizada ─
+  if (req.method === "POST" && action === "salvar-relatorio") {
+    const { pipefyId, foto, descricao, assinatura } = req.body || {};
+    if (!pipefyId) return res.status(400).json({ ok: false, error: "pipefyId obrigatorio" });
+    const coleta = (await dbGet(COLETA_KEY)) || { cards: [] };
+    let card = coleta.cards.find(c => String(c.pipefyId) === String(pipefyId));
+    if (!card) {
+      card = { pipefyId: String(pipefyId), coletaPhase: "liberado_coleta", entradaEm: new Date().toISOString() };
+      coleta.cards.unshift(card);
+    }
+    card.relatorio = { descricao: descricao || null, temFoto: !!foto, temAssinatura: !!assinatura, registradoEm: new Date().toISOString() };
+    if (foto) card.relatorio.foto = foto;
+    if (assinatura) card.relatorio.assinatura = assinatura;
+    card.coletaPhase = "coleta_realizada";
+    card.coleta_realizadaEm = new Date().toISOString();
+    await dbSet(COLETA_KEY, coleta);
+    return res.status(200).json({ ok: true, card });
+  }
+
+    // ── GET fases — lista fases do pipe TV ────────────────────────────────────
   if (action === "fases") {
     return res.status(200).json({ ok: true, aguardandoAprovacaoId: await getAguardandoAprovacaoId(), coletaPhases: COLETA_PHASES });
   }
