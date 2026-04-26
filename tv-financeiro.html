@@ -238,6 +238,7 @@ header{
   <div class="hdr-right">
     <button class="tab-btn" onclick="showPage('painel')">📊 Painel</button>
     <button class="tab-btn active" onclick="showPage('kanban')">📋 Fichas</button>
+    <button class="tab-btn" onclick="showPage('mover')" style="border-color:rgba(239,68,68,.4);color:#ef4444;">🔀 Mover OS</button>
     <span id="sync-status" style="font-family:var(--fm);font-size:10px;color:var(--muted);"></span>
     <button class="sync-btn" onclick="syncPipefy()">↻ Sync</button>
     <div class="live-dot"></div>
@@ -296,6 +297,10 @@ header{
   <div><strong id="t-title"></strong><br><span id="t-body" style="color:var(--muted);font-size:10px;"></span></div>
 </div>
 
+<div id="page-mover" style="display:none;padding:20px 22px 32px;overflow-y:auto;min-height:calc(100vh - 50px);">
+<div style="font-family:var(--fh);font-size:20px;font-weight:800;margin-bottom:20px;">🔀 Mover <span style="color:var(--accent)">OS</span></div>
+<div id="mover-content" style="font-family:var(--fm);font-size:12px;color:var(--muted);">Carregando...</div>
+</div>
 <script>
 const PHASES = [
   { id:"aguardando_dados",  name:"Aguardando Dados",   color:"#6366f1" },
@@ -832,6 +837,194 @@ load();
 showPage('kanban'); // abre em Fichas por padrão
 syncPipefy();
 setInterval(()=>{ load(); syncPipefy(); }, 30000);
+
+
+// ── Mover OS ─────────────────────────────
+async function executarMover() {
+  var id   = document.getElementById('mover-select').value;
+  var fase = document.getElementById('mover-fase').value;
+  if (!id || !fase) { showToast('⚠️','Selecione a ficha e a fase',''); return; }
+  await moverFicha(id, fase);
+}
+
+function getFaseName(id) {
+  var map = {
+    aguardando_dados: 'Aguardando Dados',
+    nf_emitida: 'NF Emitida',
+    faturamento: 'Faturamento',
+    pagamento_agendado: 'Pag. Agendado',
+    entrega_agendada: 'Entrega Agendada',
+    entrega_liberada: 'Entrega Liberada',
+    rota_criada: 'Rota Criada',
+    item_coletado: 'Item Coletado'
+  };
+  return map[id] || id || '-';
+}
+
+async function moverAnalisePagamento(id) {
+  // Usa o arquivo do input OU o colado via Ctrl+V
+  const input = document.getElementById('anexo-upload');
+  const file = (input?.files[0]) || _anexoFile;
+  let anexo = null;
+  if (file) {
+    const b64 = await new Promise(res => {
+      const r = new FileReader();
+      r.onload = e => res(e.target.result);
+      r.readAsDataURL(file);
+    });
+    anexo = { data: b64, type: file.type, name: file.name };
+  }
+  const res = await api('mover', { id, phaseId: 'analise_pagamento', anexo });
+  if (res.ok) {
+    updateRecord(res.record);
+    closeModal('mover-modal');
+    // Reset upload fields
+    _anexoFile = null;
+    if (input) { input.value = ''; }
+    const nomeEl = document.getElementById('anexo-nome');
+    const prevEl = document.getElementById('anexo-preview');
+    if (nomeEl) nomeEl.textContent = 'Nenhum arquivo';
+    if (prevEl) prevEl.style.display = 'none';
+    showToast('🔍','Enviado para Análise!', anexo ? 'Com comprovante' : 'Sem comprovante');
+    if (curPage==='painel') await load();
+  } else showToast('❌','Erro',res.error);
+}
+
+async function moverFicha(id, fase) {
+  try {
+    var r = await fetch('/api/financeiro?action=mover-fase', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({id, phaseId: fase})
+    }).then(function(r){return r.json();});
+    if (r.ok) {
+      showToast('✅','Ficha movida!', getFaseName(fase));
+      await load();
+      renderMover();
+    } else {
+      showToast('❌','Erro',r.error||'');
+    }
+  } catch(e) { showToast('❌','Erro',e.message); }
+}
+
+async function moverRapido(id, sel) {
+  var fase = sel.value;
+  if (!fase) return;
+  await moverFicha(id, fase);
+  sel.value = '';
+}
+
+function previewAnexo(input) {
+  processAnexo(input.files[0]);
+}
+
+function processAnexo(file) {
+  if (!file) return;
+  _anexoFile = file;
+  const nome = file.name.length > 30 ? file.name.slice(0,28)+'...' : file.name;
+  const nomeEl = document.getElementById('anexo-nome');
+  if (nomeEl) nomeEl.textContent = nome;
+  const prev = document.getElementById('anexo-preview');
+  if (!prev) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    if (file.type.startsWith('image/')) {
+      prev.innerHTML = `<img src="${e.target.result}" style="max-width:100%;max-height:120px;border-radius:6px;border:1px solid var(--border);"/>`;
+    } else {
+      prev.innerHTML = `<div style="font-family:var(--fm);font-size:10px;color:var(--accent);padding:6px;background:rgba(59,158,255,.1);border-radius:6px;">📄 ${nome}</div>`;
+    }
+    prev.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderMover() {
+  var recs = records || [];
+  if (!recs.length) { return; } // dados ainda nao carregados, showPage vai chamar apos load
+
+  // Populate select
+  var select = document.getElementById('mover-select');
+  select.innerHTML = '<option value="">-- Selecionar ficha --</option>';
+  recs.forEach(function(r) {
+    var opt = document.createElement('option');
+    opt.value = r.id;
+    opt.textContent = (r.osCode ? '#'+r.osCode+' -- ' : '') + (r.nomeContato||r.title||r.id) + ' ['+getFaseName(r.phaseId)+']';
+    select.appendChild(opt);
+  });
+
+  // Build list
+  var lista = document.getElementById('mover-lista');
+  lista.innerHTML = '';
+  var cores = {aguardando_dados:'#f97316',nf_emitida:'#3b9eff',faturamento:'#a855f7',
+    pagamento_agendado:'#22c55e',entrega_agendada:'#f5c800',entrega_liberada:'#22c55e',
+    rota_criada:'#06b6d4',item_coletado:'#22c55e'};
+
+  recs.forEach(function(r) {
+    var cor = cores[r.phaseId] || '#888';
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;flex-wrap:wrap;';
+
+    var pill = document.createElement('div');
+    pill.style.cssText = 'font-family:var(--fm);font-size:10px;color:'+cor+';background:'+cor+'20;border:1px solid '+cor+'40;border-radius:20px;padding:2px 10px;white-space:nowrap;';
+    pill.textContent = getFaseName(r.phaseId) || '-';
+
+    var nome = document.createElement('div');
+    nome.style.cssText = 'flex:1;font-size:12px;font-weight:600;min-width:120px;';
+    nome.textContent = r.nomeContato || r.title || '-';
+
+    var sel = document.createElement('select');
+    sel.style.cssText = 'background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-family:var(--fm);font-size:10px;color:var(--text);cursor:pointer;';
+    sel.innerHTML = '<option value="">Mover para...</option>' +
+      '<option value="aguardando_dados">Aguardando Dados</option>' +
+      '<option value="nf_emitida">NF Emitida</option>' +
+      '<option value="faturamento">Faturamento</option>' +
+      '<option value="pagamento_agendado">Pagamento Agendado</option>' +
+      '<option value="entrega_agendada">Entrega Agendada</option>' +
+      '<option value="entrega_liberada">Entrega Liberada</option>' +
+      '<option value="rota_criada">Rota Criada</option>' +
+      '<option value="item_coletado">Item Coletado</option>';
+    sel.onchange = (function(rid, selEl) {
+      return function() { moverRapido(rid, selEl); };
+    })(r.id, sel);
+
+    row.appendChild(pill);
+    row.appendChild(nome);
+    if (r.valor) {
+      var val = document.createElement('div');
+      val.style.cssText = 'font-family:var(--fm);font-size:11px;color:var(--green);';
+      val.textContent = 'R$ '+parseFloat(r.valor).toLocaleString('pt-BR',{minimumFractionDigits:2});
+      row.appendChild(val);
+    }
+    row.appendChild(sel);
+    lista.appendChild(row);
+  });
+}
+
+function verAnexo(id) {
+  const r = records.find(x=>x.id===id);
+  if (!r?.anexo) return;
+  const { data, type, name } = r.anexo;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
+  overlay.onclick = () => overlay.remove();
+  let inner = '';
+  if (type?.startsWith('image/')) {
+    inner = `<div style="max-width:90vw;max-height:90vh;position:relative;">
+      <img src="${data}" style="max-width:90vw;max-height:85vh;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.8);display:block;"/>
+      <div style="text-align:center;margin-top:8px;font-family:var(--fm);font-size:10px;color:rgba(255,255,255,.5);">${name} · clique para fechar</div>
+    </div>`;
+  } else {
+    inner = `<div style="background:var(--surface);border-radius:12px;padding:24px;text-align:center;max-width:500px;">
+      <div style="font-size:48px;margin-bottom:16px;">📄</div>
+      <div style="font-family:var(--fh);font-size:16px;font-weight:800;margin-bottom:12px;">${name}</div>
+      <a href="${data}" download="${name}" onclick="event.stopPropagation()"
+        style="font-family:var(--fm);font-size:11px;padding:10px 20px;border-radius:8px;background:var(--accent);color:#fff;text-decoration:none;display:inline-block;">⬇ Baixar PDF</a>
+      <div style="margin-top:12px;font-family:var(--fm);font-size:10px;color:var(--muted);">clique fora para fechar</div>
+    </div>`;
+  }
+  overlay.innerHTML = inner;
+  document.body.appendChild(overlay);
+}
+
 </script>
 <!-- MODAL EMITIR NF -->
 <div class="modal" id="nf-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
