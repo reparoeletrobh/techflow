@@ -921,6 +921,86 @@ async function syncBoard() {
   load();
   setInterval(load, 120000);
 })();
+
+
+// ── Filtro por período ─────────────────────────
+function agruparMeses(dias) {
+  var meses = {};
+  dias.forEach(function(d) {
+    var mk = d.data ? d.data.slice(0,7) : '';
+    if (!mk) return;
+    if (!meses[mk]) meses[mk] = [];
+    meses[mk].push(d);
+  });
+  return Object.entries(meses).sort(function(a,b){ return a[0].localeCompare(b[0]); })
+    .map(function(e) { return Object.assign({ mes: e[0] }, calcMetricasJS(e[1])); });
+}
+
+function investPorPeriodo(de, ate) {
+  // Calcula investimento com base em dias CORRIDOS do calendário ÷ 7 × R$10.000
+  if (!de || !ate) return null;
+  var d1 = new Date(de + 'T00:00:00'), d2 = new Date(ate + 'T00:00:00');
+  var calDays = (d2 - d1) / 86400000 + 1;
+  return +(calDays / 7 * INVEST_SEMANAL).toFixed(2);
+}
+
+function renderDiarioFiltrado(dias) {
+  var rows = dias.slice().reverse();
+  var el = document.getElementById('diario-body');
+  if (!el) return;
+  el.innerHTML = rows.length ? rows.map(function(m) {
+    var roiClass = m.roi == null ? '' : (m.roi >= 0 ? 'positive' : 'negative');
+    return '<tr><td class="td-date">' + fmtData(m.data) + '</td><td>' + NUM(m.fichas) + '</td><td class="td-money">' + BRL(m.investimento) + '</td><td>' + NUM(m.erpCount) + '</td><td class="td-money">' + BRL(m.valorErp) + '</td><td class="td-cac">' + BRL(m.cac) + '</td><td class="td-ticket">' + BRL(m.ticketMedio) + '</td><td class="td-cpf">' + BRL(m.custoPorFicha) + '</td><td class="td-roi ' + roiClass + '">' + PCT(m.roi) + '</td></tr>';
+  }).join('') : '<tr><td colspan="9" class="empty-state">Nenhum dado no período selecionado.</td></tr>';
+}
+
+function renderMensalFiltrado(meses) {
+  var rows = meses.slice().reverse();
+  var el = document.getElementById('mensal-body');
+  if (!el) return;
+  el.innerHTML = rows.length ? rows.map(function(m) {
+    var roiClass = m.roi == null ? '' : (m.roi >= 0 ? 'positive' : 'negative');
+    var partes = m.mes.split('-');
+    var label = (partes[1]||'') + '/' + (partes[0]||'');
+    return '<tr><td class="td-date">' + label + '</td><td>' + NUM(m.fichas) + '</td><td class="td-money">' + BRL(m.investimento) + '</td><td>' + NUM(m.erpCount) + '</td><td class="td-money">' + BRL(m.valorErp) + '</td><td class="td-cac">' + BRL(m.cac) + '</td><td class="td-ticket">' + BRL(m.ticketMedio) + '</td><td class="td-cpf">' + BRL(m.custoPorFicha) + '</td><td class="td-roi ' + roiClass + '">' + PCT(m.roi) + '</td></tr>';
+  }).join('') : '<tr><td colspan="9" class="empty-state">Sem dados no período.</td></tr>';
+}
+
+function renderSemanalFiltrado(semanas) {
+  var rows = semanas.slice().reverse();
+  var el = document.getElementById('semanal-body');
+  if (!el) return;
+  el.innerHTML = rows.length ? rows.map(function(m) {
+    var roiClass = m.roi == null ? '' : (m.roi >= 0 ? 'positive' : 'negative');
+    return '<tr><td class="td-date">' + fmtSemana(m.semana) + '</td><td>' + NUM(m.fichas) + '</td><td class="td-money">' + BRL(m.investimento) + '</td><td>' + NUM(m.erpCount) + '</td><td class="td-money">' + BRL(m.valorErp) + '</td><td class="td-cac">' + BRL(m.cac) + '</td><td class="td-ticket">' + BRL(m.ticketMedio) + '</td><td class="td-cpf">' + BRL(m.custoPorFicha) + '</td><td class="td-roi ' + roiClass + '">' + PCT(m.roi) + '</td></tr>';
+  }).join('') : '<tr><td colspan="9" class="empty-state">Sem dados no período.</td></tr>';
+}
+
+function aplicarFiltro() {
+  var de  = document.getElementById('filtro-de').value;
+  var ate = document.getElementById('filtro-ate').value;
+  if (!de && !ate) { limparFiltro(); return; }
+  filtroAtivo = { de, ate };
+  renderFiltrado();
+}
+
+function limparFiltro() {
+  // Reseta para semana vigente (padrão da página)
+  var _now = new Date(); var _d = _now.getDay();
+  var _daysToMon = (_d === 0) ? 6 : _d - 1;
+  var _seg = new Date(_now); _seg.setDate(_now.getDate() - _daysToMon);
+  var _dom = new Date(_seg); _dom.setDate(_seg.getDate() + 6);
+  var semDe  = df(_seg), semAte = df(_dom);
+  document.getElementById('filtro-de').value  = semDe;
+  document.getElementById('filtro-ate').value = semAte;
+  filtroAtivo = { de: semDe, ate: semAte };
+  document.querySelectorAll('.pshort').forEach(function(b, i) {
+    b.classList.toggle('active', i === 1); // 'Esta semana' = índice 1
+  });
+  renderFiltrado();
+  renderCharts();
+}
+
 </script>
 </body>
 </html>
