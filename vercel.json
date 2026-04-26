@@ -47,6 +47,14 @@
       "destination": "/tv-adm.html"
     },
     {
+      "source": "/tv/rastrear",
+      "destination": "/tv-rastrear.html"
+    },
+    {
+      "source": "/tv/equipamentos",
+      "destination": "/tv-equipamentos.html"
+    },
+    {
       "source": "/tv/tecnico",
       "destination": "/tv-tecnico.html"
     },
