@@ -665,7 +665,7 @@ function cardHTML(c, color) {
     <div class="os-card">
       <div class="card-bar" style="background:${color}"></div>
       ${c.localOnly ? '<span class="card-local">local</span>' : ''}
-      <div class="card-num">#${c.osCode || c.pipefyId}</div>
+      <div class="card-num">#${(()=>{if(c.osCode)return c.osCode;var m=String(c.nomeContato||c.title||"").match(/\b\d{4}\b/g);return m?m[m.length-1]:String(c.pipefyId).slice(-4);})()} </div>
       <div class="card-title">${c.title}</div>
       ${c.nomeContato ? `<div class="card-nome">👤 ${c.nomeContato}</div>` : ''}
       ${c.descricao   ? `<div class="card-desc">${c.descricao}</div>` : ''}
@@ -739,7 +739,7 @@ function rsCardHTML(c, color, boardType, currentPhase, feitoId) {
   return `
     <div class="os-card">
       <div class="card-bar" style="background:${color}"></div>
-      <div class="card-num">#${c.osCode || c.id.slice(-4)}</div>
+      <div class="card-num">#${(()=>{if(c.osCode)return c.osCode;var m=String(c.title||c.nomeContato||"").match(/\b\d{4}\b/g);return m?m[m.length-1]:String(c.id).slice(-4);})()} </div>
       <div class="card-title">${c.title || c.nomeContato || '—'}</div>
       ${c.nomeContato ? `<div class="card-nome">👤 ${c.nomeContato}</div>` : ''}
       ${c.descricao   ? `<div class="card-desc">${c.descricao}</div>` : ''}
