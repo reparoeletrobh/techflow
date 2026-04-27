@@ -153,7 +153,7 @@ async function loadCurrent(){
   }catch(e){
     clearTimeout(tid);
     var msg=e.name==='AbortError'?'Timeout — servidor demorou demais':esc(e.message);
-    document.getElementById('kanban').innerHTML='<div style="display:flex;align-items:center;justify-content:center;flex:1;flex-direction:column;gap:12px;font-family:var(--fm);font-size:11px;color:#ef4444;">❌ '+msg+'<button onclick="loadCurrent()" style="font-family:var(--fm);font-size:10px;padding:6px 16px;border-radius:6px;border:1px solid #ef4444;background:rgba(240,64,96,.1);color:#ef4444;cursor:pointer;">↻ Tentar Novamente</button></div>';
+    document.getElementById('kanban').innerHTML='<div style="display:flex;align-items:center;justify-content:center;flex:1;flex-direction:column;gap:12px;font-family:var(--fm);font-size:11px;color:#ef4444;">\u274C '+msg+'<button onclick="loadCurrent()" style="font-family:var(--fm);font-size:10px;padding:6px 16px;border-radius:6px;border:1px solid #ef4444;background:rgba(240,64,96,.1);color:#ef4444;cursor:pointer;">↻ Tentar Novamente</button></div>';
   }
 }
 
@@ -175,10 +175,10 @@ function buildCardColeta(c,phaseId){
   var diagBtns='';
   if(phaseId==='coleta_realizada'){
     diagBtns='<div class="c-actions">'+
-      '<button class="btn-diag" id="diag-btn-'+c.pipefyId+'" onclick="abrirDiag(\''+c.pipefyId+'\')">📋 Diagnóstico</button>'+
+      '<button class="btn-diag" id="diag-btn-'+c.pipefyId+'" onclick="abrirDiag(\''+c.pipefyId+'\')">\uD83D\uDCCB Diagnóstico</button>'+
       '<div class="diag-form" id="diag-form-'+c.pipefyId+'">'+
         '<textarea class="diag-textarea" id="diag-txt-'+c.pipefyId+'" placeholder="Descreva o estado do equipamento..."></textarea>'+
-        '<button class="diag-submit" onclick="enviarDiag(\''+c.pipefyId+'\')">✅ Registrar</button>'+
+        '<button class="diag-submit" onclick="enviarDiag(\''+c.pipefyId+'\')">\u2705 Registrar</button>'+
         '<button class="diag-cancel" onclick="fecharDiag(\''+c.pipefyId+'\')">✕ Cancelar</button>'+
       '</div></div>';
   }
@@ -186,10 +186,10 @@ function buildCardColeta(c,phaseId){
     '<div class="c-num">#'+esc(num)+'</div>'+
     '<div class="c-nome">'+esc(c.nomeContato||'—')+'</div>'+
     (c.descricao?'<div class="c-desc">'+esc(c.descricao)+'</div>':'')+
-    '<div class="c-time">📅 '+fmtDate(c.entradaEm||c.movedAt)+'</div>'+
+    '<div class="c-time">\uD83D\uDCC5 '+fmtDate(c.entradaEm||c.movedAt)+'</div>'+
     diagBtns+
-    (c.diagnostico?'<div class="c-time" style="margin-top:4px;color:#f5c800;">📋 '+esc(c.diagnostico.substring(0,60))+(c.diagnostico.length>60?'…':'')+'</div>':'')+
-    '<button class="btn-del" onclick="excluirFicha(\''+c.pipefyId+'\',\'coleta\')">🗑 Excluir Ficha</button>'+
+    (c.diagnostico?'<div class="c-time" style="margin-top:4px;color:#f5c800;">\uD83D\uDCCB '+esc(c.diagnostico.substring(0,60))+(c.diagnostico.length>60?'…':'')+'</div>':'')+
+    '<button class="btn-del" onclick="excluirFicha(\''+c.pipefyId+'\',\'coleta\')">\uD83D\uDDD1 Excluir Ficha</button>'+
     '</div>';
 }
 
@@ -198,33 +198,33 @@ function buildCardEntrega(c,phaseId){
   var pagBtn='';
   if(phaseId==='entrega_realizada'){
     pagBtn='<div class="c-actions">'+
-      '<button class="btn-pag" id="pag-btn-'+c.pipefyId+'" onclick="confirmarPagamento(\''+c.pipefyId+'\')">💰 Confirmar Pagamento</button>'+
+      '<button class="btn-pag" id="pag-btn-'+c.pipefyId+'" onclick="confirmarPagamento(\''+c.pipefyId+'\')">\uD83D\uDCB0 Confirmar Pagamento</button>'+
     '</div>';
   }
   return '<div class="c-card" id="card-'+c.pipefyId+'">'+
     '<div class="c-num">#'+esc(num)+'</div>'+
     '<div class="c-nome">'+esc(c.nomeContato||'—')+'</div>'+
     (c.descricao?'<div class="c-desc">'+esc(c.descricao)+'</div>':'')+
-    '<div class="c-time">📅 '+fmtDate(c.entradaEm||c.movedAt)+'</div>'+
-    pagBtn+"<button class=\"btn-del\" onclick=\"excluirFicha(\\'"+c.pipefyId+"\\',\\'entrega\\')\">🗑 Excluir Ficha</button>'+
+    '<div class="c-time">\uD83D\uDCC5 '+fmtDate(c.entradaEm||c.movedAt)+'</div>'+
+    pagBtn+"<button class=\"btn-del\" onclick=\"excluirFicha(\\'"+c.pipefyId+"\\',\\'entrega\\')\">\uD83D\uDDD1 Excluir Ficha</button>'+
     '</div>';
 }
 
-function abrirDiag(id){var f=document.getElementById('diag-form-'+id);var b=document.getElementById('diag-btn-'+id);if(f)f.classList.toggle('open');if(b)bm.style.display=f.classList.contains('open')?'none':'flex';}
-function fecharDiag(id){var f=document.getElementById('diag-form-'+id);var b=document.getElementById('diag-btn-'+id);if(f)f.classList.remove('open');if(b)bm.style.display='flex';}
+function abrirDiag(id){var f=document.getElementById('diag-form-'+id);var b=document.getElementById('diag-btn-'+id);if(f)f.classList.toggle('open');if(b)b.style.display=f.classList.contains('open')?'none':'flex';}
+function fecharDiag(id){var f=document.getElementById('diag-form-'+id);var b=document.getElementById('diag-btn-'+id);if(f)f.classList.remove('open');if(b)b.style.display='flex';}
 async function enviarDiag(pid){
   var txt=document.getElementById('diag-txt-'+pid);
   var texto=txt?txt.value.trim():'';
-  if(!texto){toast('⚠️ Digite o diagnóstico antes de registrar','var(--orange)');return;}
+  if(!texto){toast('\u26A0\uFE0F Digite o diagnóstico antes de registrar','var(--orange)');return;}
   var btn=document.querySelector('#diag-form-'+pid+' .diag-submit');
   if(btn){btn.disabled=true;btn.textContent='Enviando...';}
   try{
     var r=await fetch('/api/tv-coleta?action=diagnostico',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pipefyId:pid,texto:texto})});
     var d=await r.json();
     if(!d.ok)throw new Error(d.error||'Falha');
-    toast('✅ Diagnóstico registrado!','var(--green)');
+    toast('\u2705 Diagnóstico registrado!','var(--green)');
     await loadCurrent();
-  }catch(e){toast('❌ '+e.message,'#ef4444');if(btn){btn.disabled=false;btn.textContent='✅ Registrar';}}
+  }catch(e){toast('\u274C '+e.message,'#ef4444');if(btn){btn.disabled=false;btn.textContent='\u2705 Registrar';}}
 }
 
 async function confirmarPagamento(pid){
@@ -235,25 +235,25 @@ async function confirmarPagamento(pid){
     var r=await fetch('/api/tv-coleta?action=confirmar-pagamento',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pipefyId:pid})});
     var d=await r.json();
     if(!d.ok)throw new Error(d.error||'Falha');
-    var msg='✅ Pagamento confirmado!';
-    if(d.pipefyERP?.ok)msg+=' 📂 Movido para ERP';
-    else msg+=' ⚠️ ERP: '+(d.pipefyERP?.error||'não movido');
+    var msg='\u2705 Pagamento confirmado!';
+    if(d.pipefyERP?.ok)msg+=' \uD83D\uDCC2 Movido para ERP';
+    else msg+=' \u26A0\uFE0F ERP: '+(d.pipefyERP?.error||'n\u00E3o movido');
     toast(msg,'var(--yellow)');
     await loadCurrent();
-  }catch(e){toast('❌ '+e.message,'#ef4444');if(btn){btn.disabled=false;btn.textContent='💰 Confirmar Pagamento';}}
+  }catch(e){toast('\u274C '+e.message,'#ef4444');if(btn){btn.disabled=false;btn.textContent='\uD83D\uDCB0 Confirmar Pagamento';}}
 }
 
 async function excluirFicha(pid, type) {
-  if(!confirm('Excluir esta ficha do kanban?\nEla pode reaparecer no próximo sync se ainda estiver no Pipefy.')) return;
+  if(!confirm('Excluir exta ficha do kanban?\nEla pode reaparecer no pr\u00F3ximo sync se ainda estiver no Pipefy.')) return;
   var btn = document.querySelector('#card-'+pid+' .btn-del');
   if(btn){btn.disabled=true;btn.textContent='Removendo...';}
   try {
     var r=await fetch('/api/tv-coleta?action=excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pipefyId:pid,type:type})});
     var d=await r.json();
     if(!d.ok) throw new Error(d.error||'Falha');
-    toast('🗑 Ficha removida','var(--red)');
+    toast('\uD83D\uDDD1 Ficha removida','var(--red)');
     await loadCurrent();
-  } catch(e){toast('❌ '+e.message,'#ef4444');if(btn){btn.disabled=false;btn.textContent='🗑 Excluir Ficha';}}
+  } catch(e){toast('\u274C '+e.message,'#ef4444');if(btn){btn.disabled=false;btn.textContent='\uD83D\uDDD1 Excluir Ficha';}}
 }
 
 loadCurrent();
