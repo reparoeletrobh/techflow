@@ -234,7 +234,7 @@ module.exports = async function handler(req, res) {
         card = { pipefyId: String(pipefyId), coletaPhase: "liberado_coleta", entradaEm: new Date().toISOString() };
         coleta.cards.unshift(card);
       }
-      // Nao armazenar base64 no Redis (muito grande) Ã¢ÂÂ apenas flags
+      // Nao armazenar base64 no Redis (muito grande) â apenas flags
       card.relatorio = {
         descricao:      descricao || null,
         temFoto:        temFoto,
@@ -404,6 +404,38 @@ module.exports = async function handler(req, res) {
         }
       } catch(e) { pipefyERP = { ok: false, error: e.message }; }
       return res.status(200).json({ ok: true, pipefyERP: pipefyERP });
+    }
+
+    // POST excluir — remove ficha da view do motorista (coleta ou entrega)
+    if (req.method === "POST" && action === "excluir") {
+      var body = req.body || {};
+      var pipefyId = String(body.pipefyId || "");
+      var type     = body.type || "coleta"; // 'coleta' ou 'entrega'
+      if (!pipefyId) return res.status(400).json({ ok: false, error: "pipefyId obrigatorio" });
+
+      // 1. Marcar no tv_board para nao reaparecer no proximo sync
+      var board = (await dbGet(BOARD_KEY)) || { cards: [] };
+      var bc = (board.cards || []).find(function(c) { return String(c.pipefyId) === pipefyId; });
+      if (bc) {
+        bc.phaseId = "excluido_motorista";
+        await dbSet(BOARD_KEY, board);
+      }
+
+      // 2. Remover de tv_coleta_cards (se for coleta)
+      if (type === "coleta") {
+        var coleta = (await dbGet(COLETA_KEY)) || { cards: [] };
+        coleta.cards = (coleta.cards || []).filter(function(c) { return String(c.pipefyId) !== pipefyId; });
+        await dbSet(COLETA_KEY, coleta);
+      }
+
+      // 3. Remover de tv_entrega_cards (se for entrega)
+      if (type === "entrega") {
+        var entrega = (await dbGet(ENTREGA_KEY)) || { cards: [] };
+        entrega.cards = (entrega.cards || []).filter(function(c) { return String(c.pipefyId) !== pipefyId; });
+        await dbSet(ENTREGA_KEY, entrega);
+      }
+
+      return res.status(200).json({ ok: true });
     }
 
     return res.status(404).json({ ok: false, error: "Acao nao encontrada: " + action });
