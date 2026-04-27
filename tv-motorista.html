@@ -57,6 +57,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 .m-btn.ok{background:var(--green);color:#000;font-weight:800;grid-column:1/-1;}
 .m-btn.ok-ent{background:var(--yellow);color:#000;font-weight:800;grid-column:1/-1;}
 .m-btn:active{filter:brightness(.85);transform:scale(.98);}
+.m-btn.excluir{background:rgba(240,64,96,.12);color:var(--red);border:1px solid rgba(240,64,96,.25);grid-column:1/-1;margin-top:2px;}
+
 .empty-state{font-family:var(--fm);font-size:11px;color:var(--muted);padding:28px 16px;text-align:center;border:1px dashed var(--border);border-radius:10px;}
 /* MODAL RELATORIO */
 .ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;flex-direction:column;overflow-y:auto;}
@@ -251,6 +253,7 @@ function buildCardColeta(c, phase) {
     '<button class="m-btn rel" onclick="abrirRel(\''+c.pipefyId+'\')">&#128203; Iniciar Relatorio</button>'+
     '<button class="m-btn remarcar" onclick="moverConfirmar(\''+c.pipefyId+'\',\'remarcar\',\'move\',\'Remarcar esta ficha?\')">&#128516; Remarcar</button>'+
     '<button class="m-btn ok" onclick="moverConfirmar(\''+c.pipefyId+'\',\'coleta_realizada\',\'move\',\'Confirmar coleta?\')">&#9989; Equipamento Coletado</button>'+
+    '<button class="m-btn excluir" onclick="excluirFicha(\''+c.pipefyId+'\',\'coleta\')">&#128465; Excluir Ficha</button>'+
     '</div></div>';
 }
 
@@ -276,6 +279,7 @@ function buildCardEntrega(c, phase) {
     '<a class="m-btn maps" href="'+maps+'" target="_blank">&#128506; Ir ao Endereco</a>'+
     '<button class="m-btn remarcar" onclick="moverConfirmar(\''+c.pipefyId+'\',\'remarcar\',\'move-entrega\',\'Remarcar esta ficha?\')">&#128516; Remarcar</button>'+
     '<button class="m-btn ok-ent" onclick="moverConfirmar(\''+c.pipefyId+'\',\'entrega_realizada\',\'move-entrega\',\'Confirmar entrega realizada?\')">&#128230; Entrega Realizada</button>'+
+    '<button class="m-btn excluir" onclick="excluirFicha(\''+c.pipefyId+'\',\'entrega\')">&#128465; Excluir Ficha</button>'+
     '</div></div>';
 }
 
@@ -365,6 +369,16 @@ async function salvarRel() {
     else toast('\u274C '+(d.error||'Erro ao salvar'), '#ef4444');
   } catch(e) { toast('\u274C '+e.message, '#ef4444'); }
   btn.disabled = false; btn.textContent = '\u2705 Salvar Relatorio';
+}
+
+
+async function excluirFicha(pipefyId, type) {
+  if (!confirm('Excluir exta ficha da lista do motorista?\nEla pode reaparecer no proximo sync se ainda estiver no Pipefy.')) return;
+  try {
+    var d = await api('excluir', {pipefyId: pipefyId, type: type});
+    if (d.ok) { toast('&#128465; Ficha removida', 'var(--red)'); await load(); }
+    else toast('&#10060; ' + (d.error || 'Erro'), '#ef4444');
+  } catch(e) { toast('&#10060; ' + e.message, '#ef4444'); }
 }
 
 load();
