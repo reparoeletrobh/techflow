@@ -231,20 +231,35 @@ module.exports = async function handler(req, res) {
 
         // Função auxiliar para gerar texto de orçamento para 1 equipamento
         function gerarFicha(descEquip, comentariosEquip, sufixoId) {
-          // TV: detecta polegadas inline para evitar problemas de escopo
           let textoOrc = "", precoSugerido = null;
           try {
-            // Detectar polegadas inline
-            var _texto = (descEquip || "") + " " + (comentariosEquip || []).join(" ");
-            var _mPol = _texto.match(/(\d{2})\s*(?:pol(?:egadas?)?|\"|'')/i);
+            var _textoFull = (descEquip||"") + " " + (comentariosEquip||[]).join(" ");
+            var _normFull = _textoFull.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9 :]/g," ");
+            var _primeiroNome = (card.nome||"").split(" ")[0] || "cliente";
+
+            // ── REGRA CONDENADA ─────────────────────────────────────
+            var _palavrasCondenada = ["condenada","condenado","sem conserto","irreparavel","inviavel","nao tem conserto","nao tem reparo","sem reparo"];
+            var _isCondenada = _palavrasCondenada.some(function(p){ return _normFull.includes(p); });
+            if (_isCondenada) {
+              textoOrc = "Ola, bom dia " + _primeiroNome + " fizemos todos os testes e identificamos que infelizmente nao tem conserto viavel a TV. Caso queira ela de volta me fala que providencio a entrega.";
+              return {
+                id: card.pipefyId + (sufixoId||""),
+                pipefyId: card.pipefyId, nome: card.nome, tel: card.tel,
+                desc: descEquip, end: card.end, age: card.age,
+                comentarios: comentariosEquip, textoOrc, precoSugerido: null,
+                status: "pendente", preco: null, createdAt: new Date().toISOString(),
+              };
+            }
+
+            // ── GERAÇÃO NORMAL ─────────────────────────────────────
+            var _mPol = _textoFull.match(/(d{2})s*(?:pol(?:egadas?)?|"|'')/i);
             var _pol = null;
             if (_mPol) { _pol = parseInt(_mPol[1]); }
             else {
-              var _nums = _texto.match(/\b([3-7]\d)\b/g);
+              var _nums = _textoFull.match(/([3-7]d)/g);
               if (_nums) { for (var _n of _nums) { var _v=parseInt(_n); if(_v>=30&&_v<=79){_pol=_v;break;} } }
             }
-            // Detectar peca inline
-            var _tl = _texto.toLowerCase();
+            var _tl = _textoFull.toLowerCase();
             var _peca = "conjunto eletronico";
             if (_tl.includes("barramento")) _peca = "barramento";
             else if (_tl.includes("placa t-con")||_tl.includes("t-com")||_tl.includes("tcon")) _peca = "placa T-CON";
@@ -255,32 +270,34 @@ module.exports = async function handler(req, res) {
             else if (_tl.includes("solda")) _peca = "solda";
             else if (_tl.includes("fonte")) _peca = "fonte";
             else if (_tl.includes("backlight")||_tl.includes("led")) _peca = "backlight LED";
-            // Tabela de precos
             var _preco = null;
             if (_pol) {
               var _tb = [{min:30,max:39,p:"490,00"},{min:40,max:49,p:"690,00"},{min:50,max:59,p:"890,00"},{min:60,max:69,p:"1.490,00"},{min:70,max:79,p:"1.990,00"}];
               for (var _f of _tb) { if (_pol>=_f.min&&_pol<=_f.max){_preco=_f.p;break;} }
             }
-            var _primeiro = (card.nome||"").split(" ")[0] || "cliente";
-            textoOrc = _primeiro + " bom dia, sou o Pedro da Reparo Eletro e vou passar seu orcamento:\n\nForam feito os testes, identificamos que sera necessario fazer a troca da " + _peca + " da TV, sera feito a reoperacao eletrica tambem. Este conserto completo fica em " + (_preco || "[VALOR]") + " reais apenas. Aprovando ja iniciamos o conserto.";
+            textoOrc = _primeiroNome + " bom dia, sou o Pedro da Reparo Eletro e vou passar seu orcamento:\n\nForam feito os testes, identificamos que sera necessario fazer a troca da " + _peca + " da TV, sera feito a reoperacao eletrica tambem. Este conserto completo fica em " + (_preco || "[VALOR]") + " reais apenas. Aprovando ja iniciamos o conserto.";
             if (_preco) precoSugerido = _preco.replace(".","").replace(",",".");
+
+            // ── REGRA RISCO ────────────────────────────────────────
+            if (_normFull.includes("risco")) {
+              textoOrc += "\n\nObs.: Devido as condicoes da placa do equipamento preciso comunicar o risco de ao trabalhar nela o curto progredir e infelizmente ela apagar completamente. Sao poucos os casos mas existe esse risco.";
+            }
+
+            // ── REGRA ACRILICO ─────────────────────────────────────
+            var _mAcrilico = _textoFull.match(/acr[ií]licos*:s*([d.,]+)/i);
+            if (_mAcrilico) {
+              textoOrc += "\n\nDevido ao superaquecimento dos barramentos o acrilico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV esta com cores mais claras. Sem trocar o acrilico voce pode considerar uma qualidade de 80 a 90%. Trocando o Acrilico fica 100% e tem um custo adicional de " + _mAcrilico[1] + " reais. Aguardo sua resposta.";
+            }
+
           } catch(e) {
             textoOrc = ((card.nome||"").split(" ")[0]||"cliente") + " bom dia, sou o Pedro da Reparo Eletro e vou passar seu orcamento:\n\nEste conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.";
           }
           return {
-            id:          card.pipefyId + (sufixoId || ""),
-            pipefyId:    card.pipefyId,
-            nome:        card.nome,
-            tel:         card.tel,
-            desc:        descEquip,
-            end:         card.end,
-            age:         card.age,
-            comentarios: comentariosEquip,
-            textoOrc,
-            precoSugerido,
-            status:      "pendente",
-            preco:       null,
-            createdAt:   new Date().toISOString(),
+            id:          card.pipefyId + (sufixoId||""),
+            pipefyId:    card.pipefyId, nome: card.nome, tel: card.tel,
+            desc:        descEquip, end: card.end, age: card.age,
+            comentarios: comentariosEquip, textoOrc, precoSugerido,
+            status:      "pendente", preco: null, createdAt: new Date().toISOString(),
           };
         }
 
