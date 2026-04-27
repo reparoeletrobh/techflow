@@ -88,8 +88,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 </header>
 <!-- TABS -->
 <div class="tabs">
-  <button class="tab coleta active" id="tab-coleta" onclick="switchMode('coleta')">ð Coleta</button>
-  <button class="tab entrega" id="tab-entrega" onclick="switchMode('entrega')">ð¦ Entrega</button>
+  <button class="tab coleta active" id="tab-coleta" onclick="switchMode('coleta')">🚚 Coleta</button>
+  <button class="tab entrega" id="tab-entrega" onclick="switchMode('entrega')">📦 Entrega</button>
 </div>
 <div class="main">
   <div class="page-title" id="page-title">Painel do <span>Motorista</span></div>
@@ -99,10 +99,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 <!-- MODAL RELATORIO COLETA -->
 <div class="ov" id="modal-rel">
   <div class="modal">
-    <div class="modal-title">ð RelatÃ³rio de Coleta<button class="modal-close" onclick="fecharRel()">â</button></div>
+    <div class="modal-title">📋 RelatÃ³rio de Coleta<button class="modal-close" onclick="fecharRel()">â</button></div>
     <div class="modal-section">
       <div class="modal-label">Foto do equipamento</div>
-      <div class="photo-area" id="photo-area-label" onclick="document.getElementById('photo-input').click()">ð· Toque para tirar foto ou selecionar</div>
+      <div class="photo-area" id="photo-area-label" onclick="document.getElementById('photo-input').click()">📷 Toque para tirar foto ou selecionar</div>
       <input type="file" id="photo-input" accept="image/*" capture="environment" class="file-input" onchange="previewPhoto(this)"/>
       <img id="photo-preview" class="photo-preview" style="display:none"/>
     </div>
@@ -160,18 +160,22 @@ function switchMode(m) {
 }
 
 async function load() {
-  document.getElementById('container').innerHTML = '<div class="empty-state">Carregando...</div>';
+  document.getElementById('container').innerHTML = '<div class="empty-state">Sincronizando com Pipefy...</div>';
   try {
+    if (mode === 'coleta') {
+      await fetch('/api/tv-board?action=sync-coleta').catch(function(){});
+    } else {
+      await fetch('/api/tv-coleta?action=sync-entrega').catch(function(){});
+    }
     var action = mode === 'coleta' ? 'load' : 'load-entrega';
     var d = await api(action);
     if (!d.ok) throw new Error(d.error || 'Erro');
     allCards = d.byPhase || {};
     render();
   } catch(e) {
-    document.getElementById('container').innerHTML = '<div class="empty-state">â ' + esc(e.message) + '</div>';
+    document.getElementById('container').innerHTML = '<div class="empty-state">❌ ' + esc(e.message) + '</div>';
   }
 }
-
 function render() {
   if (mode === 'coleta') renderColeta();
   else renderEntrega();
@@ -196,7 +200,7 @@ function renderColeta() {
   }
   if (rem.length) {
     html += sec('#f97316', 'Remarcados', rem.length);
-    rem.forEach(function(c){ html += buildSimples(c, 'ð Remarcado', 'badge-rem', 'dimmed'); });
+    rem.forEach(function(c){ html += buildSimples(c, '🔄 Remarcado', 'badge-rem', 'dimmed'); });
   }
   document.getElementById('container').innerHTML = html;
 }
@@ -221,7 +225,7 @@ function renderEntrega() {
 }
 
 function sec(color, label, count) {
-  return '<div class="sec-header"><div class="sec-dot" style="background:'+color+'"></div>'+label+' ('+count+')</div>';
+  return '<div class="sec-header"><div class="sec-dot" style="background:'+color('"></div>'+label+' ('+count+')</div>';
 }
 
 function buildCardColeta(c, phase) {
@@ -231,21 +235,21 @@ function buildCardColeta(c, phase) {
   var wpp = tel ? 'https://wa.me/55'+tel+'?text='+msg : 'https://api.whatsapp.com/send?text='+msg;
   var maps = 'https://maps.google.com/?q='+encodeURIComponent(c.endereco||c.nomeContato||'');
   var badge = phase==='comunicacao_realizada'
-    ? '<div class="m-badge badge-com">ð¬ Avisado</div>'
+    ? '<div class="m-badge badge-com">💬 Avisado</div>'
     : '<div class="m-badge badge-lib">â³ Aguardando</div>';
   var cls = phase==='comunicacao_realizada' ? 'm-card comunicou' : 'm-card';
   return '<div class="'+cls+'" id="mcard-'+c.pipefyId+'">'+
     '<div class="m-head"><div class="m-info">'+
     '<div class="m-num">#'+esc(num)+'</div>'+
-    '<div class="m-nome">'+esc(c.nomeContato||'â')+'</div>'+
-    (c.endereco?'<div class="m-end">ð '+esc(c.endereco)+'</div>':'')+
+    '<div class="m-nome">'+esc(c.nomeContato||'—')+'</div>'+
+    (c.endereco?'<div class="m-end">📍 '+esc(c.endereco)+'</div>':'')+
     (c.descricao?'<div class="m-desc">'+esc(c.descricao)+'</div>':'')+
     '</div>'+badge+'</div>'+
     '<div class="m-actions">'+
-    '<button class="m-btn wpp" onclick="avisarCliente(\''+c.pipefyId+'\',\''+wpp+'\',\'move\',\'comunicacao_realizada\')">ð¬ Avisar Cliente</button>'+
-    '<a class="m-btn maps" href="'+maps+'" target="_blank">ðºï¸ Ir ao EndereÃ§o</a>'+
-    '<button class="m-btn rel" onclick="abrirRel(\''+c.pipefyId+'\')">ð Iniciar RelatÃ³rio</button>'+
-    '<button class="m-btn remarcar" onclick="mover(\''+c.pipefyId+'\',\'remarcar\',\'move\')">ð Remarcar</button>'+
+    '<button class="m-btn wpp" onclick="avisarCliente(\''+c.pipefyId+'\',\''+wpp+'\',\'move\',\'comunicacao_realizada\')">💬 Avisar Cliente</button>'+
+    '<a class="m-btn maps" href="'+maps+'" target="_blank">🗺️ï¸ Ir ao EndereÃ§o</a>'+
+    '<button class="m-btn rel" onclick="abrirRel(\''+c.pipefyId+'\')">📋 Iniciar RelatÃ³rio</button>'+
+    '<button class="m-btn remarcar" onclick="mover(\''+c.pipefyId+'\',\'remarcar\',\'move\')">🔄 Remarcar</button>'+
     '<button class="m-btn ok" onclick="moverConfirmar(\''+c.pipefyId+'\',\'coleta_realizada\',\'move\',\'Confirmar coleta?\')">â Equipamento Coletado</button>'+
     '</div></div>';
 }
@@ -257,21 +261,21 @@ function buildCardEntrega(c, phase) {
   var wpp = tel ? 'https://wa.me/55'+tel+'?text='+msg : 'https://api.whatsapp.com/send?text='+msg;
   var maps = 'https://maps.google.com/?q='+encodeURIComponent(c.endereco||c.nomeContato||'');
   var badge = phase==='comunicacao_entrega'
-    ? '<div class="m-badge badge-com">ð¬ Avisado</div>'
-    : '<div class="m-badge badge-ent">ð¦ Aguardando</div>';
+    ? '<div class="m-badge badge-com">💬 Avisado</div>'
+    : '<div class="m-badge badge-ent">📦 Aguardando</div>';
   var cls = phase==='comunicacao_entrega' ? 'm-card comunicou' : 'm-card';
   return '<div class="'+cls+'" id="mcard-'+c.pipefyId+'">'+
     '<div class="m-head"><div class="m-info">'+
     '<div class="m-num">#'+esc(num)+'</div>'+
-    '<div class="m-nome">'+esc(c.nomeContato||'â')+'</div>'+
-    (c.endereco?'<div class="m-end">ð '+esc(c.endereco)+'</div>':'')+
+    '<div class="m-nome">'+esc(c.nomeContato||'—')+'</div>'+
+    (c.endereco?'<div class="m-end">📍 '+esc(c.endereco)+'</div>':'')+
     (c.descricao?'<div class="m-desc">'+esc(c.descricao)+'</div>':'')+
     '</div>'+badge+'</div>'+
     '<div class="m-actions">'+
-    '<button class="m-btn wpp" onclick="avisarCliente(\''+c.pipefyId+'\',\''+wpp+'\',\'move-entrega\',\'comunicacao_entrega\')">ð¬ Avisar Cliente</button>'+
-    '<a class="m-btn maps" href="'+maps+'" target="_blank">ðºï¸ Ir ao EndereÃ§o</a>'+
-    '<button class="m-btn remarcar" onclick="mover(\''+c.pipefyId+'\',\'remarcar\',\'move-entrega\')">ð Remarcar</button>'+
-    '<button class="m-btn ok-ent" onclick="moverConfirmar(\''+c.pipefyId+'\',\'entrega_realizada\',\'move-entrega\',\'Confirmar entrega realizada?\')">ð¦ Entrega Realizada</button>'+
+    '<button class="m-btn wpp" onclick="avisarCliente(\''+c.pipefyId+'\',\''+wpp+'\',\'move-entrega\',\'comunicacao_entrega\')">💬 Avisar Cliente</button>'+
+    '<a class="m-btn maps" href="'+maps+'" target="_blank">🗺️ï¸ Ir ao EndereÃ§o</a>'+
+    '<button class="m-btn remarcar" onclick="mover(\''+c.pipefyId+'\',\'remarcar\',\'move-entrega\')">🔄 Remarcar</button>'+
+    '<button class="m-btn ok-ent" onclick="moverConfirmar(\''+c.pipefyId+'\',\'entrega_realizada\',\'move-entrega\',\'Confirmar entrega realizada?\')">📦 Entrega Realizada</button>'+
     '</div></div>';
 }
 
@@ -279,8 +283,8 @@ function buildSimples(c, lbl, badgeCls, cls) {
   var num = osNum(c);
   return '<div class="m-card '+cls+'"><div class="m-head"><div class="m-info">'+
     '<div class="m-num">#'+esc(num)+'</div>'+
-    '<div class="m-nome">'+esc(c.nomeContato||'â')+'</div>'+
-    (c.endereco?'<div class="m-end">ð '+esc(c.endereco)+'</div>':'')+
+    '<div class="m-nome">'+esc(c.nomeContato||'—')+'</div>'+
+    (c.endereco?'<div class="m-end">📍 '+esc(c.endereco)+'</div>':'')+
     '</div><div class="m-badge '+badgeCls+'">'+lbl+'</div></div></div>';
 }
 
@@ -288,7 +292,7 @@ async function avisarCliente(pipefyId, wppLink, action, phase) {
   window.open(wppLink, '_blank');
   try {
     await api(action, {pipefyId: pipefyId, phase: phase});
-    toast('ð¬ Cliente avisado â ComunicaÃ§Ã£o Realizada', 'var(--purple)');
+    toast('💬 Cliente avisado â ComunicaÃ§Ã£o Realizada', 'var(--purple)');
     await load();
   } catch(e) { toast('â ï¸ WPP aberto, falha ao registrar: '+e.message, 'var(--orange)'); }
 }
@@ -297,7 +301,7 @@ async function mover(pipefyId, phase, action) {
   if (!confirm('Mover esta ficha para '+phase+'?')) return;
   try {
     var d = await api(action, {pipefyId: pipefyId, phase: phase});
-    if (d.ok) { toast('ð Movido para '+phase, 'var(--orange)'); await load(); }
+    if (d.ok) { toast('🔄 Movido para '+phase, 'var(--orange)'); await load(); }
     else toast('â '+(d.error||'Erro'), '#ef4444');
   } catch(e) { toast('â '+e.message, '#ef4444'); }
 }
@@ -317,7 +321,7 @@ function abrirRel(pipefyId) {
   document.getElementById('rel-desc').value = '';
   document.getElementById('photo-input').value = '';
   document.getElementById('photo-preview').style.display = 'none';
-  document.getElementById('photo-area-label').textContent = 'ð· Toque para tirar foto ou selecionar';
+  document.getElementById('photo-area-label').textContent = '📷 Toque para tirar foto ou selecionar';
   document.getElementById('modal-rel').classList.add('open');
   initSigCanvas();
 }
@@ -358,7 +362,7 @@ async function salvarRel() {
   btn.disabled = true; btn.textContent = 'Salvando...';
   try {
     var d = await api('salvar-relatorio', {pipefyId:relPipefyId, foto:photoB64, descricao:desc, assinatura:sig});
-    if (d.ok) { fecharRel(); toast('ð RelatÃ³rio salvo!', 'var(--green)'); await load(); }
+    if (d.ok) { fecharRel(); toast('📋 RelatÃ³rio salvo!', 'var(--green)'); await load(); }
     else toast('â '+(d.error||'Erro ao salvar'), '#ef4444');
   } catch(e) { toast('â '+e.message, '#ef4444'); }
   btn.disabled = false; btn.textContent = 'â Salvar RelatÃ³rio';
