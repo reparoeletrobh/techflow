@@ -243,7 +243,7 @@ async function confirmarPagamento(pid){
   }catch(e){toast('❌ '+e.message,'#ef4444');if(btn){btn.disabled=false;btn.textContent='💰 Confirmar Pagamento';}}
 }
 
-ap�nc function excluirFicha(pid, type) {
+async function excluirFicha(pid, type) {
   if(!confirm('Excluir esta ficha do kanban?\nEla pode reaparecer no próximo sync se ainda estiver no Pipefy.')) return;
   var btn = document.querySelector('#card-'+pid+' .btn-del');
   if(btn){btn.disabled=true;btn.textContent='Removendo...';}
