@@ -2,6 +2,7 @@ const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g,"").trim
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN  || "").replace(/['"]/g,"").trim();
 const PIPEFY_API    = "https://api.pipefy.com/graphql";
 const TV_PIPE_ID    = "306904889";
+const SOLICITAR_ENTREGA_PHASE_ID = "341638199"; // "Solicitar Entrega" no Pipefy
 const COLETA_KEY    = "tv_coleta_cards";
 const BOARD_KEY     = "tv_board";
 
@@ -251,7 +252,73 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, coletaPhases: COLETA_PHASES });
     }
 
-    // GET load-entrega
+    // GET sync-entrega — busca cards na fase 341638199 (Solicitar Entrega) e atualiza o board
+    if (action === "sync-entrega") {
+      const board = (await dbGet(BOARD_KEY)) || { cards: [], syncedIds: [] };
+      if (!board.syncedIds) board.syncedIds = [];
+      let edges = [], pipefyErr = null;
+      try {
+        const token = (process.env.PIPEFY_TOKEN || "").trim();
+        const q = `query { phase(id: "${SOLICITAR_ENTREGA_PHASE_ID}") { cards(first: 50) { edges { node { id title fields { name value } } } } } }`;
+        const r = await fetch(PIPEFY_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+          body: JSON.stringify({ query: q }),
+        });
+        const j = await r.json();
+        edges = j?.data?.phase?.cards?.edges || [];
+      } catch(e) { pipefyErr = e.message; }
+
+      let moved = 0;
+      for (const edge of edges) {
+        const node = edge.node;
+        const id   = String(node.id);
+        const fields = node.fields || [];
+        const nomeF  = fields.find(function(f){ return f.name.toLowerCase().includes("nome"); });
+        const telF   = fields.find(function(f){ return f.name.toLowerCase().includes("telefone") || f.name.toLowerCase().includes("fone"); });
+        const endF   = fields.find(function(f){ return f.name.toLowerCase().includes("endere"); });
+        const descF  = fields.find(function(f){ return f.name.toLowerCase().includes("descri"); });
+        const tel    = (telF && telF.value) ? telF.value : "";
+        const nome   = (nomeF && nomeF.value) ? nomeF.value : node.title;
+        const existing = board.cards.find(function(c){ return c.pipefyId === id; });
+        if (existing) {
+          if (existing.phaseId !== "solicitar_entrega") {
+            existing.phaseId = "solicitar_entrega";
+            existing.movedAt = new Date().toISOString();
+            moved++;
+          }
+        } else {
+          board.cards.unshift({
+            pipefyId:    id,
+            title:       node.title,
+            nomeContato: nome,
+            telefone:    tel,
+            endereco:    (endF && endF.value) ? endF.value : "",
+            descricao:   (descF && descF.value) ? descF.value : "",
+            phaseId:     "solicitar_entrega",
+            movedAt:     new Date().toISOString(),
+            addedAt:     new Date().toISOString(),
+          });
+          if (board.syncedIds.indexOf(id) === -1) board.syncedIds.push(id);
+          moved++;
+        }
+      }
+      // Remover fantasmas: cards marcados solicitar_entrega que nao estao mais no Pipefy
+      const idsNoPipefy = new Set(edges.map(function(e){ return String(e.node.id); }));
+      board.cards.forEach(function(c){
+        if (c.phaseId === "solicitar_entrega" && !idsNoPipefy.has(c.pipefyId)) {
+          c.phaseId = "entrega_andamento";
+          c.movedAt = new Date().toISOString();
+        }
+      });
+      if (moved > 0 || edges.length > 0) {
+        try { await dbSet(BOARD_KEY, board); } catch(e) { /* ignore */ }
+      }
+      const filaAtual = board.cards.filter(function(c){ return c.phaseId === "solicitar_entrega"; });
+      return res.status(200).json({ ok: true, found: edges.length, moved, filaCount: filaAtual.length, pipefyErr });
+    }
+
+        // GET load-entrega
     if (action === "load-entrega") {
       var entrega = (await dbGet(ENTREGA_KEY)) || { cards: [] };
       var board   = (await dbGet(BOARD_KEY))   || { cards: [] };
