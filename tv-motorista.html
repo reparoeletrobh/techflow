@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='18,2 8,18 15,18 14,30 24,14 17,14' fill='%233b9eff' stroke='%233b9eff' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>TV â Motorista</title>
+<title>TV — Motorista</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#03060e;--surface:#080d18;--surface2:#0d1425;--border:#1a2540;--text:#dce8f8;--muted:#4a607a;--accent:#3b9eff;--green:#10d982;--red:#f04060;--yellow:#f5c800;--orange:#f97316;--purple:#a855f7;--fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;}
@@ -27,7 +27,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 .page-title{font-family:var(--fh);font-size:18px;font-weight:900;margin-bottom:4px;}
 .page-title span{color:var(--green);}
 .page-sub{font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:16px;}
-/* SEÃÃO */
+/* SEçÃ¡O */
 .sec-header{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;display:flex;align-items:center;gap:8px;margin:16px 0 8px;}
 .sec-header::after{content:'';flex:1;height:1px;background:var(--border);}
 .sec-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
@@ -35,7 +35,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 .m-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:12px;transition:border-color .15s;}
 .m-card.comunicou{border-color:rgba(168,85,247,.25);}
 .m-card.dimmed{opacity:.45;}
-.m-head{padding:14px 16px 10px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+.m-head{padding:14px 16px 10px;display:flex;align-items:flex-start;justify-content:space-between;gp�ap:8px;}
 .m-info{flex:1;min-width:0;}
 .m-num{font-family:var(--fm);font-size:11px;color:var(--accent);margin-bottom:3px;}
 .m-nome{font-size:14px;font-weight:600;color:#fff;line-height:1.35;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -47,7 +47,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 .badge-col{background:rgba(16,217,130,.1);color:var(--green);border:1px solid rgba(16,217,130,.3);}
 .badge-rem{background:rgba(249,115,22,.1);color:var(--orange);border:1px solid rgba(249,115,22,.3);}
 .badge-ent{background:rgba(245,200,0,.1);color:var(--yellow);border:1px solid rgba(245,200,0,.3);}
-/* AÃÃES */
+/* AçÃ£ES MOTORISTA */
+.alertbtn{font-family:var(--fm);font-size:10px;padding:8px 12px;border:1px solid rgba(16,217,130,.2);border-radius:6px;color:var(--green);background:transparent;cursor:pointer;}
 .m-actions{padding:0 12px 12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .m-btn{font-family:var(--fb);font-size:12px;font-weight:600;padding:11px 8px;border-radius:10px;border:none;cursor:pointer;transition:all .15s;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:6px;}
 .m-btn.wpp{background:rgba(37,211,102,.12);color:#25d366;border:1px solid rgba(37,211,102,.25);}
@@ -81,14 +82,14 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
 </style>
 </head>
-<body>
+<BODY>
 <header>
   <div class="logo"><div class="logo-dot"></div>TV <span>Motorista</span></div>
-  <button class="sync-btn" onclick="load()">â» Sync</button>
+  <button class="sync-btn" onclick="load()">↻ Sync</button>
 </header>
-<!-- TABS -->
 <div class="tabs">
-  <button class="tab coleta active" id="tab-coleta" onclick="switchMode('coleta')">🚚 Coleta</button>
+  <button class="tab coleta active" id="tab-coleta" onclick="switchMode('coleta')">🚚
+Coleta</button>
   <button class="tab entrega" id="tab-entrega" onclick="switchMode('entrega')">📦 Entrega</button>
 </div>
 <div class="main">
@@ -96,10 +97,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
   <div class="page-sub" id="page-sub">// Fichas liberadas para coleta</div>
   <div id="container"></div>
 </div>
-<!-- MODAL RELATORIO COLETA -->
 <div class="ov" id="modal-rel">
   <div class="modal">
-    <div class="modal-title">📋 RelatÃ³rio de Coleta<button class="modal-close" onclick="fecharRel()">â</button></div>
+    <div class="modal-title">📋 Relatório de Coleta<button class="modal-close" onclick="fecharRel()">✕</button></div>
     <div class="modal-section">
       <div class="modal-label">Foto do equipamento</div>
       <div class="photo-area" id="photo-area-label" onclick="document.getElementById('photo-input').click()">📷 Toque para tirar foto ou selecionar</div>
@@ -107,7 +107,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
       <img id="photo-preview" class="photo-preview" style="display:none"/>
     </div>
     <div class="modal-section">
-      <div class="modal-label">DescriÃ§Ã£o / ObservaÃ§Ã£o</div>
+      <div class="modal-label">Descrição / Observação</div>
       <textarea class="modal-textarea" id="rel-desc" placeholder="Descreva o estado do equipamento..."></textarea>
     </div>
     <div class="modal-section">
@@ -115,12 +115,12 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
       <canvas class="sig-canvas" id="sig-canvas"></canvas>
       <div style="margin-top:6px;display:flex;gap:8px;">
         <button onclick="limparAssinatura()" style="font-family:var(--fm);font-size:9px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">Limpar</button>
-        <span style="font-family:var(--fm);font-size:9px;color:var(--muted);">PeÃ§a ao cliente que assine acima</span>
+        <span style="font-family:var(--fm);font-size:9px;color:var(--muted);">Peça ao cliente que assine acima</span>
       </div>
     </div>
     <div class="modal-actions">
       <button class="modal-btn cancel" onclick="fecharRel()">Cancelar</button>
-      <button class="modal-btn save" id="btn-salvar-rel" onclick="salvarRel()">â Salvar RelatÃ³rio</button>
+      <button class="modal-btn save" id="btn-salvar-rel" onclick="salvarRel()">✅ Salvar Relatório</button>
     </div>
   </div>
 </div>
@@ -176,6 +176,7 @@ async function load() {
     document.getElementById('container').innerHTML = '<div class="empty-state">❌ ' + esc(e.message) + '</div>';
   }
 }
+
 function render() {
   if (mode === 'coleta') renderColeta();
   else renderEntrega();
@@ -191,12 +192,12 @@ function renderColeta() {
   if (!lib.length) html += '<div class="empty-state">Nenhuma ficha aguardando coleta</div>';
   else lib.forEach(function(c){ html += buildCardColeta(c, 'liberado_coleta'); });
   if (com.length) {
-    html += sec('#a855f7', 'ComunicaÃ§Ã£o Realizada', com.length);
+    html += sec('#a855f7', 'Comunicação Realizada', com.length);
     com.forEach(function(c){ html += buildCardColeta(c, 'comunicacao_realizada'); });
   }
   if (col.length) {
     html += sec('#10d982', 'Coletados', col.length);
-    col.forEach(function(c){ html += buildSimples(c, 'â Coletado', 'badge-col', 'dimmed'); });
+    col.forEach(function(c){ html += buildSimples(c, '✅ Coletado', 'badge-col', 'dimmed'); });
   }
   if (rem.length) {
     html += sec('#f97316', 'Remarcados', rem.length);
@@ -214,29 +215,29 @@ function renderEntrega() {
   if (!lib.length) html += '<div class="empty-state">Nenhuma ficha aguardando entrega</div>';
   else lib.forEach(function(c){ html += buildCardEntrega(c, 'liberado_entrega'); });
   if (com.length) {
-    html += sec('#a855f7', 'ComunicaÃ§Ã£o Realizada', com.length);
+    html += sec('#a855f7', 'Comunicação Realizada', com.length);
     com.forEach(function(c){ html += buildCardEntrega(c, 'comunicacao_entrega'); });
   }
   if (ent.length) {
     html += sec('#10d982', 'Entregues', ent.length);
-    ent.forEach(function(c){ html += buildSimples(c, 'â Entregue', 'badge-col', 'dimmed'); });
+    ent.forEach(function(c){ html += buildSimples(c, '✅ Entregue', 'badge-col', 'dimmed'); });
   }
   document.getElementById('container').innerHTML = html;
 }
 
 function sec(color, label, count) {
-  return '<div class="sec-header"><div class="sec-dot" style="background:'+color('"></div>'+label+' ('+count+')</div>';
+  return '<div class="sec-header"><div class="sec-dot" style="background:'+color+'"></div>'+label+' ('+count+')</div>';
 }
 
 function buildCardColeta(c, phase) {
   var num = osNum(c);
   var tel = (c.telefone||'').replace(/\D/g,'');
-  var msg = encodeURIComponent('OlÃ¡, bom dia! Sou o motorista da Reparo Eletro TV e estou a caminho para coletar o equipamento.');
+  var msg = encodeURIComponent('Olá, bom dia! Sou o motorista da Reparo Eletro TV e estou a caminho para coletar o equipamento.');
   var wpp = tel ? 'https://wa.me/55'+tel+'?text='+msg : 'https://api.whatsapp.com/send?text='+msg;
   var maps = 'https://maps.google.com/?q='+encodeURIComponent(c.endereco||c.nomeContato||'');
   var badge = phase==='comunicacao_realizada'
     ? '<div class="m-badge badge-com">💬 Avisado</div>'
-    : '<div class="m-badge badge-lib">â³ Aguardando</div>';
+    : '<div class="m-badge badge-lib">💳 Aguardando</div>';
   var cls = phase==='comunicacao_realizada' ? 'm-card comunicou' : 'm-card';
   return '<div class="'+cls+'" id="mcard-'+c.pipefyId+'">'+
     '<div class="m-head"><div class="m-info">'+
@@ -247,21 +248,21 @@ function buildCardColeta(c, phase) {
     '</div>'+badge+'</div>'+
     '<div class="m-actions">'+
     '<button class="m-btn wpp" onclick="avisarCliente(\''+c.pipefyId+'\',\''+wpp+'\',\'move\',\'comunicacao_realizada\')">💬 Avisar Cliente</button>'+
-    '<a class="m-btn maps" href="'+maps+'" target="_blank">🗺️ï¸ Ir ao EndereÃ§o</a>'+
-    '<button class="m-btn rel" onclick="abrirRel(\''+c.pipefyId+'\')">📋 Iniciar RelatÃ³rio</button>'+
+    '<a class="m-btn maps" href="'+maps+'" target="_blank">🗺/Ir ao Endereço</a>'+
+    '<button class="m-btn rel" onclick="abrirRel(\''+c.pipefyId+'\')">📋 Iniciar Relatório</button>'+
     '<button class="m-btn remarcar" onclick="mover(\''+c.pipefyId+'\',\'remarcar\',\'move\')">🔄 Remarcar</button>'+
-    '<button class="m-btn ok" onclick="moverConfirmar(\''+c.pipefyId+'\',\'coleta_realizada\',\'move\',\'Confirmar coleta?\')">â Equipamento Coletado</button>'+
+    '<button class="m-btn ok" onclick="moverConfirmar(\''+c.pipefyId+'\',\'coleta_realizada\',\'move\',\'Confirmar coleta?\')">✅ Equipamento Coletado</button>'+
     '</div></div>';
 }
 
 function buildCardEntrega(c, phase) {
   var num = osNum(c);
   var tel = (c.telefone||'').replace(/\D/g,'');
-  var msg = encodeURIComponent('OlÃ¡, bom dia! Sou o motorista da Reparo Eletro TV e estou a caminho para entregar o seu equipamento.');
-  var wpp = tel ? 'https://wa.me/55'+tel+'?text='+msg : 'https://api.whatsapp.com/send?text='+msg;
+  var msg = encodeURIComponent('Olá, bom dia! Sou o motorista da Reparo Eletro TV e estou a caminho para entregar o seu equipamento.');
+  var wpp = tel ? 'https://wa.me/55'+del+''text='+msg : 'https://api.whatsapp.com/send?text='+msg;
   var maps = 'https://maps.google.com/?q='+encodeURIComponent(c.endereco||c.nomeContato||'');
   var badge = phase==='comunicacao_entrega'
-    ? '<div class="m-badge badge-com">💬 Avisado</div>'
+    ? '<div class="m-badge badge-com">💬 Avisado</omt>'
     : '<div class="m-badge badge-ent">📦 Aguardando</div>';
   var cls = phase==='comunicacao_entrega' ? 'm-card comunicou' : 'm-card';
   return '<div class="'+cls+'" id="mcard-'+c.pipefyId+'">'+
@@ -273,7 +274,7 @@ function buildCardEntrega(c, phase) {
     '</div>'+badge+'</div>'+
     '<div class="m-actions">'+
     '<button class="m-btn wpp" onclick="avisarCliente(\''+c.pipefyId+'\',\''+wpp+'\',\'move-entrega\',\'comunicacao_entrega\')">💬 Avisar Cliente</button>'+
-    '<a class="m-btn maps" href="'+maps+'" target="_blank">🗺️ï¸ Ir ao EndereÃ§o</a>'+
+    '<a class="m-btn maps" href="'+maps+'" target="_blank">🗺/Ir ao Endereço</a>'+
     '<button class="m-btn remarcar" onclick="mover(\''+c.pipefyId+'\',\'remarcar\',\'move-entrega\')">🔄 Remarcar</button>'+
     '<button class="m-btn ok-ent" onclick="moverConfirmar(\''+c.pipefyId+'\',\'entrega_realizada\',\'move-entrega\',\'Confirmar entrega realizada?\')">📦 Entrega Realizada</button>'+
     '</div></div>';
@@ -292,30 +293,29 @@ async function avisarCliente(pipefyId, wppLink, action, phase) {
   window.open(wppLink, '_blank');
   try {
     await api(action, {pipefyId: pipefyId, phase: phase});
-    toast('💬 Cliente avisado â ComunicaÃ§Ã£o Realizada', 'var(--purple)');
+    toast('💬 Cliente avisado — Comunicação Realizada', 'var(--purple)');
     await load();
-  } catch(e) { toast('â ï¸ WPP aberto, falha ao registrar: '+e.message, 'var(--orange)'); }
+  } catch(e) { toast('⚠️ WPP aberto, falha ao registrar: '+e.message, 'var(--orange)'); }
 }
 
-async function mover(pipefyId, phase, action) {
+api�nc function mover(pipefyId, phase, action) {
   if (!confirm('Mover esta ficha para '+phase+'?')) return;
   try {
     var d = await api(action, {pipefyId: pipefyId, phase: phase});
-    if (d.ok) { toast('🔄 Movido para '+phase, 'var(--orange)'); await load(); }
-    else toast('â '+(d.error||'Erro'), '#ef4444');
-  } catch(e) { toast('â '+e.message, '#ef4444'); }
+    if (d.ok) { toast('🔄 Sovido para '+phase, 'var(--orange)'); await load(); }
+    else toast('❌ '+(d.error||'Erro'), '#ef4444');
+  } catch(e) { toast('܌ '+e.message, '#ef4444'); }
 }
 
-async function moverConfirmar(pipefyId, phase, action, msg) {
+api�nc function moverConfirmar(pipefyId, phase, action, msg) {
   if (!confirm(msg)) return;
   try {
     var d = await api(action, {pipefyId: pipefyId, phase: phase});
-    if (d.ok) { toast('â Confirmado!', 'var(--green)'); await load(); }
-    else toast('â '+(d.error||'Erro'), '#ef4444');
-  } catch(e) { toast('â '+e.message, '#ef4444'); }
+    if (d.ok) { toast('✅ Confirmado!', 'var(--green)'); await load(); }
+    else toast('❌ '+(d.error||'Erro'), '#ef4444');
+  } catch(e) { toast('❌ '+e.message, '#ef4444'); }
 }
 
-// MODAL RELATÃRIO
 function abrirRel(pipefyId) {
   relPipefyId = pipefyId; photoB64 = null;
   document.getElementById('rel-desc').value = '';
@@ -333,7 +333,7 @@ function previewPhoto(input) {
     photoB64 = e.target.result;
     var prev = document.getElementById('photo-preview');
     prev.src = photoB64; prev.style.display = 'block';
-    document.getElementById('photo-area-label').textContent = 'â Foto selecionada';
+    document.getElementById('photo-area-label').textContent = '✅ Foto selecionada';
   };
   reader.readAsDataURL(file);
 }
@@ -344,7 +344,7 @@ function initSigCanvas() {
   sigCtx.fillStyle = '#0d1425'; sigCtx.fillRect(0,0,c.width,c.height);
   sigCtx.strokeStyle = '#dce8f8'; sigCtx.lineWidth = 2; sigCtx.lineCap = 'round';
   ['mousedown','mousemove','mouseup','touchstart','touchmove','touchend'].forEach(function(ev){
-    c.removeEventListener(ev, ev==='mousedown'||ev==='touchstart'?sigStart:ev==='mousemove'||ev==='touchmove'?sigMove:sigEnd);
+    c.removeEventListener(ev,ev1==='mousedown'||ev==='touchstart'?sigStart:ev==='mousemove'||ev==='touchmove'?sigMove:sigEnd);
   });
   c.addEventListener('mousedown',sigStart); c.addEventListener('mousemove',sigMove); c.addEventListener('mouseup',sigEnd);
   c.addEventListener('touchstart',sigStart,{passive:false}); c.addEventListener('touchmove',sigMove,{passive:false}); c.addEventListener('touchend',sigEnd);
@@ -355,17 +355,17 @@ function sigMove(e){ if(!sigDrawing)return; e.preventDefault(); var p=sigPos(e,t
 function sigEnd(){ sigDrawing=false; }
 function limparAssinatura(){ if(sigCtx){ var c=document.getElementById('sig-canvas'); sigCtx.fillStyle='#0d1425'; sigCtx.fillRect(0,0,c.width,c.height); } }
 
-async function salvarRel() {
+api�nc function salvarRel() {
   var desc = document.getElementById('rel-desc').value.trim();
   var sig  = document.getElementById('sig-canvas').toDataURL('image/png');
   var btn  = document.getElementById('btn-salvar-rel');
   btn.disabled = true; btn.textContent = 'Salvando...';
   try {
     var d = await api('salvar-relatorio', {pipefyId:relPipefyId, foto:photoB64, descricao:desc, assinatura:sig});
-    if (d.ok) { fecharRel(); toast('📋 RelatÃ³rio salvo!', 'var(--green)'); await load(); }
-    else toast('â '+(d.error||'Erro ao salvar'), '#ef4444');
-  } catch(e) { toast('â '+e.message, '#ef4444'); }
-  btn.disabled = false; btn.textContent = 'â Salvar RelatÃ³rio';
+    if (d.ok) { fecharRel(); toast('📋 Relatório salvo!', 'var(--green)'); await load(); }
+    else toast('❌ '+(d.error||'Erro ao salvar'), '#ef4444');
+  } catch(e) { toast('❌ '+e.message, '#ef4444'); }
+  btn.disabled = false; btn.textContent = '✅ Salvar Relatório';
 }
 
 load();
