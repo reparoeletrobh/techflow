@@ -73,6 +73,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .btn-pag{width:100%;font-family:var(--fb);font-size:11px;font-weight:700;padding:8px;border-radius:7px;border:none;cursor:pointer;background:var(--yellow);color:#000;transition:filter .15s;display:flex;align-items:center;justify-content:center;gap:5px;}
 .btn-pag:hover{filter:brightness(1.1);}
 .btn-pag:disabled{opacity:.4;cursor:not-allowed;filter:none;}
+.btn-del{width:100%;font-family:var(--fm);font-size:9px;font-weight:700;padding:5px;border-radius:6px;border:1px solid rgba(240,64,96,.3);cursor:pointer;background:rgba(240,64,96,.08);color:var(--red);transition:all .15s;display:flex;align-items:center;justify-content:center;gap:4px;margin-top:4px;}
+.btn-del:hover{background:rgba(240,64,96,.18);}
 .toast-wrap{position:fixed;bottom:16px;right:16px;display:flex;flex-direction:column;gap:8px;z-index:9999;}
 .toast{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:var(--fm);font-size:11px;transform:translateX(200%);opacity:0;transition:all .3s;max-width:280px;}
 .toast.show{transform:translateX(0);opacity:1;}
@@ -136,13 +138,11 @@ async function loadCurrent(){
   var ctrl=new AbortController();
   var tid=setTimeout(function(){ctrl.abort();},20000);
   try{
-    // 1. Sincronizar com Pipefy primeiro
     if(currentTab==='coleta'){
       await fetch('/api/tv-board?action=sync-coleta',{signal:ctrl.signal}).catch(function(){});
     } else {
       await fetch('/api/tv-coleta?action=sync-entrega',{signal:ctrl.signal}).catch(function(){});
     }
-    // 2. Carregar dados do Redis
     var action=currentTab==='coleta'?'load':'load-entrega';
     var r=await fetch('/api/tv-coleta?action='+action,{signal:ctrl.signal});
     clearTimeout(tid);
@@ -189,6 +189,7 @@ function buildCardColeta(c,phaseId){
     '<div class="c-time">📅 '+fmtDate(c.entradaEm||c.movedAt)+'</div>'+
     diagBtns+
     (c.diagnostico?'<div class="c-time" style="margin-top:4px;color:#f5c800;">📋 '+esc(c.diagnostico.substring(0,60))+(c.diagnostico.length>60?'…':'')+'</div>':'')+
+    '<button class="btn-del" onclick="excluirFicha(\''+c.pipefyId+'\',\'coleta\')">🗑 Excluir Ficha</button>'+
     '</div>';
 }
 
@@ -205,11 +206,12 @@ function buildCardEntrega(c,phaseId){
     '<div class="c-nome">'+esc(c.nomeContato||'—')+'</div>'+
     (c.descricao?'<div class="c-desc">'+esc(c.descricao)+'</div>':'')+
     '<div class="c-time">📅 '+fmtDate(c.entradaEm||c.movedAt)+'</div>'+
-    pagBtn+'</div>';
+    pagBtn+"<button class=\"btn-del\" onclick=\"excluirFicha(\\'"+c.pipefyId+"\\',\\'entrega\\')\">🗑 Excluir Ficha</button>'+
+    '</div>';
 }
 
-function abrirDiag(id){var f=document.getElementById('diag-form-'+id);var b=document.getElementById('diag-btn-'+id);if(f)f.classList.toggle('open');if(b)b.style.display=f.classList.contains('open')?'none':'flex';}
-function fecharDiag(id){var f=document.getElementById('diag-form-'+id);var b=document.getElementById('diag-btn-'+id);if(f)f.classList.remove('open');if(b)b.style.display='flex';}
+function abrirDiag(id){var f=document.getElementById('diag-form-'+id);var b=document.getElementById('diag-btn-'+id);if(f)f.classList.toggle('open');if(b)bm.style.display=f.classList.contains('open')?'none':'flex';}
+function fecharDiag(id){var f=document.getElementById('diag-form-'+id);var b=document.getElementById('diag-btn-'+id);if(f)f.classList.remove('open');if(b)bm.style.display='flex';}
 async function enviarDiag(pid){
   var txt=document.getElementById('diag-txt-'+pid);
   var texto=txt?txt.value.trim():'';
@@ -239,6 +241,19 @@ async function confirmarPagamento(pid){
     toast(msg,'var(--yellow)');
     await loadCurrent();
   }catch(e){toast('❌ '+e.message,'#ef4444');if(btn){btn.disabled=false;btn.textContent='💰 Confirmar Pagamento';}}
+}
+
+ap�nc function excluirFicha(pid, type) {
+  if(!confirm('Excluir esta ficha do kanban?\nEla pode reaparecer no próximo sync se ainda estiver no Pipefy.')) return;
+  var btn = document.querySelector('#card-'+pid+' .btn-del');
+  if(btn){btn.disabled=true;btn.textContent='Removendo...';}
+  try {
+    var r=await fetch('/api/tv-coleta?action=excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pipefyId:pid,type:type})});
+    var d=await r.json();
+    if(!d.ok) throw new Error(d.error||'Falha');
+    toast('🗑 Ficha removida','var(--red)');
+    await loadCurrent();
+  } catch(e){toast('❌ '+e.message,'#ef4444');if(btn){btn.disabled=false;btn.textContent='🗑 Excluir Ficha';}}
 }
 
 loadCurrent();
