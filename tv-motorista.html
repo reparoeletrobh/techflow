@@ -57,9 +57,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 .m-btn.ok{background:var(--green);color:#000;font-weight:800;grid-column:1/-1;}
 .m-btn.ok-ent{background:var(--yellow);color:#000;font-weight:800;grid-column:1/-1;}
 .m-btn:active{filter:brightness(.85);transform:scale(.98);}
-
 .empty-state{font-family:var(--fm);font-size:11px;color:var(--muted);padding:28px 16px;text-align:center;border:1px dashed var(--border);border-radius:10px;}
-/* MODAL RELATORIO */
 .ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;flex-direction:column;overflow-y:auto;}
 .ov.open{display:flex;}
 .modal{background:var(--surface);margin:auto;width:100%;max-width:480px;border-radius:14px 14px 0 0;padding:20px;margin-top:auto;max-height:90vh;overflow-y:auto;}
@@ -77,7 +75,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 .modal-btn.cancel{background:var(--surface2);color:var(--muted);}
 .modal-btn.save{background:var(--green);color:#000;}
 .file-input{display:none;}
-/* TOAST */
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--green);border-radius:10px;padding:10px 20px;font-family:var(--fm);font-size:11px;opacity:0;transition:all .3s;z-index:9999;white-space:nowrap;max-width:90vw;text-align:center;}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
 </style>
@@ -98,7 +95,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 </div>
 <div class="ov" id="modal-rel">
   <div class="modal">
-    <div class="modal-title">&#128203; Relat&oacute;rio de Coleta<button class="modal-close" onclick="fecharRel()">&#10005;</button></div>
+    <div class="modal-title">&#128203; Relat&#743;rio de Coleta<button class="modal-close" onclick="fecharRel()">&#10005;</button></div>
     <div class="modal-section">
       <div class="modal-label">Foto do equipamento</div>
       <div class="photo-area" id="photo-area-label" onclick="document.getElementById('photo-input').click()">&#128247; Toque para tirar foto ou selecionar</div>
@@ -106,7 +103,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
       <img id="photo-preview" class="photo-preview" style="display:none"/>
     </div>
     <div class="modal-section">
-      <div class="modal-label">Descri&ccedil;&atilde;o / Observa&ccedil;&atilde;o</div>
+      <div class="modal-label">Descric&#767;a&#753;o / Observa&#767;a&#753;o</div>
       <textarea class="modal-textarea" id="rel-desc" placeholder="Descreva o estado do equipamento..."></textarea>
     </div>
     <div class="modal-section">
@@ -114,12 +111,12 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
       <canvas class="sig-canvas" id="sig-canvas"></canvas>
       <div style="margin-top:6px;display:flex;gap:8px;">
         <button onclick="limparAssinatura()" style="font-family:var(--fm);font-size:9px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">Limpar</button>
-        <span style="font-family:var(--fm);font-size:9px;color:var(--muted);">Pe&ccedil;a ao cliente que assine acima</span>
+        <span style="font-family:var(--fm);font-size:9px;color:var(--muted);">Pe&#767;a ao cliente que assine acima</span>
       </div>
     </div>
     <div class="modal-actions">
       <button class="modal-btn cancel" onclick="fecharRel()">Cancelar</button>
-      <button class="modal-btn save" id="btn-salvar-rel" onclick="salvarRel()">&#9989; Salvar Relat&oacute;rio</button>
+      <button class="modal-btn save" id="btn-salvar-rel" onclick="salvarRel()">&#9989; Salvar Relatorio</span></button>
     </div>
   </div>
 </div>
@@ -127,7 +124,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 <script>
 var mode = 'coleta';
 var allCards = {};
-var relPipefyId = null;
+ var relPipefyId = null;
 var sigCtx = null, sigDrawing = false, sigLastX = 0, sigLastY = 0;
 var photoB64 = null;
 var toastTimer;
@@ -143,7 +140,7 @@ function toast(msg, cor) {
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function osNum(c){ if(c.osCode)return c.osCode; var m=String(c.nomeContato||'').match(/\b\d{4}\b/g); return m?m[m.length-1]:String(c.pipefyId).slice(-4); }
 
-async function api(action, body) {
+apync function api(action, body) {
   var opts = { headers: {'Content-Type':'application/json'} };
   if (body) { opts.method = 'POST'; opts.body = JSON.stringify(body); }
   var r = await fetch('/api/tv-coleta?action=' + action, opts);
@@ -200,7 +197,7 @@ function renderColeta() {
   }
   if (rem.length) {
     html += sec('#f97316', 'Remarcados', rem.length);
-    rem.forEach(function(c){ html += buildSimples(c, '&#128516; Remarcado', 'badge-rem', 'dimmed'); });
+    rem.forEach(function(c){ html += buildSimples(c, '&#128516; Remarcado',l'badge-rem', 'dimmed'); });
   }
   document.getElementById('container').innerHTML = html;
 }
@@ -288,7 +285,7 @@ function buildSimples(c, lbl, badgeCls, cls) {
     '</div><div class="m-badge '+badgeCls+'">'+lbl+'</div></div></div>';
 }
 
-async function avisarCliente(pipefyId, wppLink, action, phase) {
+apync function avisarCliente(pipefyId, wppLink, action, phase) {
   window.open(wppLink, '_blank');
   try {
     await api(action, {pipefyId: pipefyId, phase: phase});
@@ -342,9 +339,6 @@ function initSigCanvas() {
   sigCtx = c.getContext('2d');
   sigCtx.fillStyle = '#0d1425'; sigCtx.fillRect(0,0,c.width,c.height);
   sigCtx.strokeStyle = '#dce8f8'; sigCtx.lineWidth = 2; sigCtx.lineCap = 'round';
-  ['mousedown','mousemove','mouseup','touchstart','touchmove','touchend'].forEach(function(ev){
-    c.removeEventListener(ev, ev==='mousedown'||ev==='touchstart'?sigStart:ev==='mousemove'||ev==='touchmove'?sigMove:sigEnd);
-  });
   c.addEventListener('mousedown',sigStart); c.addEventListener('mousemove',sigMove); c.addEventListener('mouseup',sigEnd);
   c.addEventListener('touchstart',sigStart,{passive:false}); c.addEventListener('touchmove',sigMove,{passive:false}); c.addEventListener('touchend',sigEnd);
 }
@@ -361,12 +355,11 @@ async function salvarRel() {
   btn.disabled = true; btn.textContent = 'Salvando...';
   try {
     var d = await api('salvar-relatorio', {pipefyId:relPipefyId, foto:photoB64, descricao:desc, assinatura:sig});
-    if (d.ok) { fecharRel(); toast('\uD83D\uDCCB Relatorio salvo!', 'var(--green)'); await load(); }
+    if (d.ok) { fecharRel(); toast('\uD83D\uDCCB Relatorio salvado!', 'var(--green)'); await load(); }
     else toast('\u274C '+(d.error||'Erro ao salvar'), '#ef4444');
   } catch(e) { toast('\u274C '+e.message, '#ef4444'); }
   btn.disabled = false; btn.textContent = '\u2705 Salvar Relatorio';
 }
-
 
 load();
 setInterval(load, 30000);
