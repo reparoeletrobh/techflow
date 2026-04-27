@@ -13,6 +13,16 @@ const COLETA_PHASES = [
   { id: "orcamento_registrado",  name: "Orcamento Registrado" },
 ];
 
+
+const ENTREGA_KEY   = "tv_entrega_cards";
+const SOLICITAR_ENTREGA_BOARD_PHASE = "solicitar_entrega"; // phaseId no tv_board
+
+const ENTREGA_PHASES = [
+  { id: "liberado_entrega",    name: "Liberado para Entrega" },
+  { id: "comunicacao_entrega", name: "Comunicacao Realizada" },
+  { id: "entrega_realizada",   name: "Entrega Realizada" },
+];
+
 async function dbGet(key) {
   try {
     const r = await fetch(UPSTASH_URL + "/pipeline", {
@@ -69,6 +79,24 @@ async function getAguardandoAprovacaoId() {
   } catch(e) { return null; }
 }
 
+async function getERPPhaseId() {
+  const token = (process.env.PIPEFY_TOKEN || "").trim();
+  if (!token) return null;
+  try {
+    const r = await fetch(PIPEFY_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+      body: JSON.stringify({ query: 'query { pipe(id: "' + TV_PIPE_ID + '") { phases { id name } } }' }),
+    });
+    const j = await r.json();
+    const phases = (j.data && j.data.pipe && j.data.pipe.phases) || [];
+    const found = phases.find(function(p) {
+      return p.name.toLowerCase().includes("erp");
+    });
+    return found ? found.id : null;
+  } catch(e) { return null; }
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
@@ -95,7 +123,7 @@ module.exports = async function handler(req, res) {
         if (!exists) {
           coleta.cards.unshift({
             pipefyId:     id,
-            nomeContato:  bc.nomeContato || bc.title || "â",
+            nomeContato:  bc.nomeContato || bc.title || "Ã¢ÂÂ",
             osCode:       bc.osCode  || null,
             endereco:     bc.endereco || null,
             telefone:     bc.telefone || null,
@@ -135,7 +163,7 @@ module.exports = async function handler(req, res) {
         var bc2 = (board.cards || []).find(function(c) { return String(c.pipefyId) === String(pipefyId); });
         card = {
           pipefyId:    String(pipefyId),
-          nomeContato: (bc2 && (bc2.nomeContato || bc2.title)) || "â",
+          nomeContato: (bc2 && (bc2.nomeContato || bc2.title)) || "Ã¢ÂÂ",
           osCode:      (bc2 && bc2.osCode)    || null,
           endereco:    (bc2 && bc2.endereco)  || null,
           telefone:    (bc2 && bc2.telefone)  || null,
@@ -205,7 +233,7 @@ module.exports = async function handler(req, res) {
         card = { pipefyId: String(pipefyId), coletaPhase: "liberado_coleta", entradaEm: new Date().toISOString() };
         coleta.cards.unshift(card);
       }
-      // Nao armazenar base64 no Redis (muito grande) â apenas flags
+      // Nao armazenar base64 no Redis (muito grande) Ã¢ÂÂ apenas flags
       card.relatorio = {
         descricao:      descricao || null,
         temFoto:        temFoto,
@@ -221,6 +249,94 @@ module.exports = async function handler(req, res) {
     // GET fases
     if (action === "fases") {
       return res.status(200).json({ ok: true, coletaPhases: COLETA_PHASES });
+    }
+
+    // GET load-entrega
+    if (action === "load-entrega") {
+      var entrega = (await dbGet(ENTREGA_KEY)) || { cards: [] };
+      var board   = (await dbGet(BOARD_KEY))   || { cards: [] };
+      var changed = false;
+      var boardCards = (board.cards || []).filter(function(c) { return c.phaseId === SOLICITAR_ENTREGA_BOARD_PHASE; });
+      for (var i = 0; i < boardCards.length; i++) {
+        var bc = boardCards[i];
+        var id = String(bc.pipefyId);
+        var exists = entrega.cards.find(function(c) { return c.pipefyId === id; });
+        if (!exists) {
+          entrega.cards.unshift({
+            pipefyId:    id,
+            nomeContato: bc.nomeContato || bc.title || "â",
+            osCode:      bc.osCode   || null,
+            endereco:    bc.endereco || null,
+            telefone:    bc.telefone || null,
+            descricao:   bc.descricao || null,
+            entregaPhase: "liberado_entrega",
+            entradaEm:   bc.movedAt || new Date().toISOString(),
+          });
+          changed = true;
+        }
+      }
+      if (changed) await dbSet(ENTREGA_KEY, entrega);
+      var byPhase = {};
+      ENTREGA_PHASES.forEach(function(p) { byPhase[p.id] = []; });
+      (entrega.cards || []).forEach(function(c) {
+        var ph = c.entregaPhase || "liberado_entrega";
+        if (byPhase[ph]) byPhase[ph].push(c);
+      });
+      return res.status(200).json({ ok: true, phases: ENTREGA_PHASES, byPhase: byPhase, total: (entrega.cards || []).length });
+    }
+
+    // POST move-entrega
+    if (req.method === "POST" && action === "move-entrega") {
+      var body = req.body || {};
+      var pipefyId = String(body.pipefyId || "");
+      var phase    = body.phase;
+      if (!pipefyId || !phase) return res.status(400).json({ ok: false, error: "pipefyId e phase obrigatorios" });
+      if (!ENTREGA_PHASES.find(function(p) { return p.id === phase; }))
+        return res.status(400).json({ ok: false, error: "Fase invalida para entrega" });
+      var entrega = (await dbGet(ENTREGA_KEY)) || { cards: [] };
+      var card = entrega.cards.find(function(c) { return c.pipefyId === pipefyId; });
+      if (!card) {
+        var board2 = (await dbGet(BOARD_KEY)) || { cards: [] };
+        var bc2    = (board2.cards || []).find(function(c) { return String(c.pipefyId) === pipefyId; });
+        card = {
+          pipefyId:     pipefyId,
+          nomeContato:  (bc2 && (bc2.nomeContato || bc2.title)) || "â",
+          osCode:       (bc2 && bc2.osCode)    || null,
+          endereco:     (bc2 && bc2.endereco)  || null,
+          telefone:     (bc2 && bc2.telefone)  || null,
+          descricao:    (bc2 && bc2.descricao) || null,
+          entregaPhase: "liberado_entrega",
+          entradaEm:    new Date().toISOString(),
+        };
+        entrega.cards.unshift(card);
+      }
+      card.entregaPhase   = phase;
+      card[phase + "Em"]  = new Date().toISOString();
+      await dbSet(ENTREGA_KEY, entrega);
+      return res.status(200).json({ ok: true, card: card });
+    }
+
+    // POST confirmar-pagamento â move Pipefy card para ERP e remove da entrega local
+    if (req.method === "POST" && action === "confirmar-pagamento") {
+      var body = req.body || {};
+      var pipefyId = String(body.pipefyId || "");
+      if (!pipefyId) return res.status(400).json({ ok: false, error: "pipefyId obrigatorio" });
+      // Remove do Redis de entrega
+      var entrega = (await dbGet(ENTREGA_KEY)) || { cards: [] };
+      entrega.cards = (entrega.cards || []).filter(function(c) { return c.pipefyId !== pipefyId; });
+      await dbSet(ENTREGA_KEY, entrega);
+      // Move card no Pipefy para ERP
+      var pipefyERP = { ok: false };
+      try {
+        var erpPhaseId = await getERPPhaseId();
+        if (erpPhaseId) {
+          await pipefyMutation('mutation { moveCardToPhase(input: { card_id: "' + pipefyId + '", destination_phase_id: "' + erpPhaseId + '" }) { card { id } } }');
+          pipefyERP = { ok: true, erpPhaseId: erpPhaseId };
+        } else {
+          pipefyERP = { ok: false, error: "Fase ERP nao encontrada no pipe TV" };
+        }
+      } catch(e) { pipefyERP = { ok: false, error: e.message }; }
+      return res.status(200).json({ ok: true, pipefyERP: pipefyERP });
     }
 
     return res.status(404).json({ ok: false, error: "Acao nao encontrada: " + action });
