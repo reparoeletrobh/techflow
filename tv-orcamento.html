@@ -241,7 +241,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 
 <script>
 var curTab = 'cadastro';
-var MSG_UC = '*ATENCAO* comunicado importante da TV Assistência.\n\nEstamos com equipamentos sem resposta na loja. Por este motivo, não tendo resposta, retirada do equipamento ou solicitação de entrega nos próximos 7 dias, teremos que fazer o descarte do mesmo. Conto com sua colaboração.';
+var MSG_UC = '*ATENÇÃO comunicado importante da Reparo Eletro.\n\nEstamos com mais de 150 equipamentos sem resposta na loja e ficamos sem espaço para trabalhar. Esta prejudicando muito a gente.\n\nPor este motivo conto com a sua colaboração. Não tendo resposta, retirada do equipamento ou solicitação de entrega nos proximos 7 dias. Infelizmente teremos que fazer o descarte do mesmo. Conto com a sua colaboração.';
 
 // ── TABS ─────────────────────────────────────────────────────
 function setTab(t) {
@@ -347,41 +347,41 @@ async function loadOrc() {
 
 function orcCard(f) {
   var wrap = document.createElement('div'); wrap.className = 'orc-card'; wrap.id = 'orc-'+f.id;
-  var nome = document.createElement('div'); nome.className = 'orc-nome'; nome.textContent = f.nome||'—'; wrap.appendChild(nome);
-  if (f.desc) { var desc = document.createElement('div'); desc.className = 'orc-desc'; desc.textContent = f.desc.slice(0,120)+(f.desc.length>120?'...':''); wrap.appendChild(desc); }
-  if (f.end)  { var end  = document.createElement('div'); end.className  = 'orc-meta'; end.textContent = '📍 '+f.end; wrap.appendChild(end); }
 
-  // Texto do orçamento
-  var textoDiv = document.createElement('div'); textoDiv.className = 'orc-texto';
-  textoDiv.id = 'texto-'+f.id;
-  textoDiv.contentEditable = true;
-  textoDiv.textContent = f.textoOrc || '...';
-  // Guarda tel no elemento para usar no copiarEnviar
-  wrap.setAttribute('data-tel', f.tel || '');
-  wrap.appendChild(textoDiv);
+  // Cabeçalho: nome + tel + age + badge
+  var head = document.createElement('div'); head.style.cssText='display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px;';
+  var info = document.createElement('div'); info.style.cssText='flex:1;min-width:0;';
+  var nome = document.createElement('div'); nome.className='orc-nome'; nome.textContent=f.nome||'—'; info.appendChild(nome);
+  if (f.tel) { var telEl=document.createElement('div'); telEl.style.cssText='font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px;'; telEl.textContent='📞 '+f.tel; info.appendChild(telEl); }
+  if (f.age) { var ageEl=document.createElement('div'); ageEl.style.cssText='font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:2px;'; ageEl.textContent='⏳ '+f.age+' dia(s) em Aguardando Aprovação'; info.appendChild(ageEl); }
+  var isCondenada = (f.textoOrc||'').toLowerCase().includes('nao tem conserto viavel');
+  var badge = document.createElement('span'); badge.style.cssText='font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;flex-shrink:0;';
+  if (isCondenada) { badge.textContent='❌ Condenada'; badge.style.cssText+=';background:rgba(240,64,96,.15);color:var(--red);border:1px solid rgba(240,64,96,.3);'; }
+  else { badge.textContent='⏳ Pendente'; badge.style.cssText+=';background:rgba(59,158,255,.1);color:var(--accent);border:1px solid rgba(59,158,255,.25);'; }
+  head.appendChild(info); head.appendChild(badge); wrap.appendChild(head);
 
-  // Valor
-  var pr = document.createElement('div'); pr.className = 'price-row';
-  var lbl = document.createElement('span'); lbl.style.cssText='font-family:var(--fm);font-size:10px;color:var(--muted);'; lbl.textContent='Valor: R$';
-  var inp = document.createElement('input'); inp.className='price-input'; inp.type='number'; inp.placeholder='0,00'; inp.step='0.01'; inp.min='0'; inp.id='price-'+f.id;
-  // Preenche com precoSugerido (gerado automaticamente) ou preco (manual)
-  if (f.preco) inp.value = f.preco;
-  else if (f.precoSugerido) inp.value = f.precoSugerido;
+  if (f.desc) { var desc=document.createElement('div'); desc.className='orc-desc'; desc.textContent=f.desc; desc.style.marginBottom='6px'; wrap.appendChild(desc); }
+  if (f.end)  { var end=document.createElement('div'); end.className='orc-meta'; end.textContent='📍 '+f.end; end.style.marginBottom='6px'; wrap.appendChild(end); }
+  if (f.comentarios && f.comentarios.length) {
+    var comEl=document.createElement('div'); comEl.style.cssText='font-family:var(--fm);font-size:9px;color:var(--muted);background:rgba(0,0,0,.2);border-radius:6px;padding:6px 8px;margin-bottom:8px;line-height:1.5;';
+    comEl.textContent='💬 '+f.comentarios.slice(0,3).join(' | ').slice(0,200); wrap.appendChild(comEl);
+  }
+
+  var textoDiv=document.createElement('div'); textoDiv.className='orc-texto'; textoDiv.id='texto-'+f.id; textoDiv.contentEditable=true;
+  textoDiv.textContent=f.textoOrc||'...'; wrap.setAttribute('data-tel',f.tel||''); wrap.appendChild(textoDiv);
+
+  var pr=document.createElement('div'); pr.className='price-row';
+  var lbl=document.createElement('span'); lbl.style.cssText='font-family:var(--fm);font-size:10px;color:var(--muted);'; lbl.textContent='Valor: R$';
+  var inp=document.createElement('input'); inp.className='price-input'; inp.type='number'; inp.placeholder='0,00'; inp.step='0.01'; inp.min='0'; inp.id='price-'+f.id;
+  if (f.preco) inp.value=f.preco; else if (f.precoSugerido) inp.value=f.precoSugerido;
   pr.appendChild(lbl); pr.appendChild(inp); wrap.appendChild(pr);
 
-  // Botões
-  var btns = document.createElement('div'); btns.className = 'orc-actions';
-  var bSend = document.createElement('button'); bSend.className = 'orc-btn primary'; bSend.textContent = '📋 Copiar e Enviar';
-  bSend.onclick = (function(fid, ftel){return function(){copiarEnviar(fid, ftel);};})(f.id, f.tel||'');
-
-  var bConf = document.createElement('button'); bConf.className = 'orc-btn green'; bConf.textContent = '✅ Aprovado';
-  bConf.onclick = (function(fid){return function(){confirmarAprovado(fid);};})(f.id);
-
-  btns.appendChild(bSend);
-  btns.appendChild(bConf);
-
-
-  wrap.appendChild(btns);
+  var btns=document.createElement('div'); btns.className='orc-actions';
+  var bSend=document.createElement('button'); bSend.className='orc-btn primary'; bSend.textContent='📋 Copiar e Enviar';
+  bSend.onclick=(function(fid,ftel){return function(){copiarEnviar(fid,ftel);};})(f.id,f.tel||'');
+  var bConf=document.createElement('button'); bConf.className='orc-btn green'; bConf.textContent='✅ Aprovado';
+  bConf.onclick=(function(fid){return function(){confirmarAprovado(fid);};})(f.id);
+  btns.appendChild(bSend); btns.appendChild(bConf); wrap.appendChild(btns);
   return wrap;
 }
 
