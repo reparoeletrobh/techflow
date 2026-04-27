@@ -103,7 +103,7 @@ function buildCard(c,phaseId){
   var num=osNum(c);
   var diagBtns='';
   if(phaseId==='coleta_realizada'){
-    diagBtns='<div class="c-actions"><button class="btn-diag" id="diag-btn-'+c.pipefyId+'" onclick="abrirDiag(''+c.pipefyId+'')">📋 Diagnóstico</button><div class="diag-form" id="diag-form-'+c.pipefyId+'"><textarea class="diag-textarea" id="diag-txt-'+c.pipefyId+'" placeholder="Descreva o estado do equipamento, problema identificado..."></textarea><button class="diag-submit" onclick="enviarDiag(''+c.pipefyId+'')">✅ Registrar</button><button class="diag-cancel" onclick="fecharDiag(''+c.pipefyId+'')">✕ Cancelar</button></div></div>';
+    diagBtns='<div class="c-actions"><button class="btn-diag" id="diag-btn-'+c.pipefyId+'" onclick="abrirDiag(\''+c.pipefyId+'\')">📋 Diagnóstico</button><div class="diag-form" id="diag-form-'+c.pipefyId+'"><textarea class="diag-textarea" id="diag-txt-'+c.pipefyId+'" placeholder="Descreva o estado do equipamento, problema identificado..."></textarea><button class="diag-submit" onclick="enviarDiag(\''+c.pipefyId+'\')">✅ Registrar</button><button class="diag-cancel" onclick="fecharDiag(\''+c.pipefyId+'\')">✕ Cancelar</button></div></div>';
   }
   return '<div class="c-card" id="card-'+c.pipefyId+'"><div class="c-num">#'+esc(num)+'</div><div class="c-nome">'+esc(c.nomeContato||'—')+'</div>'+(c.descricao?'<div class="c-desc">'+esc(c.descricao)+'</div>':'')+'<div class="c-time">📅 '+fmtDate(c.entradaEm)+'</div>'+diagBtns+(c.diagnostico?'<div class="c-time" style="margin-top:4px;color:#f5c800;">📋 '+esc(c.diagnostico.substring(0,60))+(c.diagnostico.length>60?'…':'')+'</div>':'')+'</div>';
 }
