@@ -206,7 +206,7 @@ function buildCardEntrega(c,phaseId){
     '<div class="c-nome">'+esc(c.nomeContato||'—')+'</div>'+
     (c.descricao?'<div class="c-desc">'+esc(c.descricao)+'</div>':'')+
     '<div class="c-time">\uD83D\uDCC5 '+fmtDate(c.entradaEm||c.movedAt)+'</div>'+
-    pagBtn+"<button class=\"btn-del\" onclick=\"excluirFicha(\\'"+c.pipefyId+"\\',\\'entrega\\')\">\uD83D\uDDD1 Excluir Ficha</button>'+
+    pagBtn+'<button class="btn-del" onclick="excluirFicha(\''+c.pipefyId+'\',\'entrega\')">🗑 Excluir Ficha</button>'+
     '</div>';
 }
 
