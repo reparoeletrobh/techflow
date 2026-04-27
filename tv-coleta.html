@@ -7,9 +7,10 @@
 <title>TV â Coleta</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#03060e;--surface:#080d18;--surface2:#0d1425;--border:#1a2540;--text:#dce8f8;--muted:#4a607a;--accent:#3b9eff;--green:#10d982;--red:#f04060;--yellow:#f5c800;--orange:#f97316;--fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;}
+:root{--bg:#03060e;--surface:#080d18;--surface2:#0d1425;--border:#1a2540;--text:#dce8f8;--muted:#4a607a;--accent:#3b9eff;--green:#10d982;--red:#f04060;--yellow:#f5c800;--orange:#f97316;--purple:#a855f7;--fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;}
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+/* HEADER */
 header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;gap:12px;}
 .hdr-title{font-family:var(--fh);font-size:16px;font-weight:800;display:flex;align-items:center;gap:8px;}
 .hdr-title span{color:var(--green);}
@@ -17,6 +18,14 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .sync-btn:hover{color:var(--text);border-color:var(--green);}
 .hdr-stats{font-family:var(--fm);font-size:10px;color:var(--muted);display:flex;gap:12px;}
 .stat-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;}
+/* TABS */
+.tabs{display:flex;gap:0;padding:10px 20px 0;background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0;}
+.tab{font-family:var(--fm);font-size:11px;font-weight:700;padding:8px 22px;border-radius:8px 8px 0 0;border:1px solid transparent;border-bottom:none;cursor:pointer;color:var(--muted);background:transparent;transition:all .15s;letter-spacing:.05em;}
+.tab.active{background:var(--surface);border-color:var(--border);color:var(--text);}
+.tab.coleta.active{color:var(--accent);}
+.tab.entrega.active{color:var(--orange);}
+.tab:hover:not(.active){color:var(--text);}
+/* KANBAN */
 .kanban{flex:1;display:flex;gap:0;overflow-x:auto;overflow-y:hidden;}
 .kanban::-webkit-scrollbar{height:4px;}
 .kanban::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
@@ -29,11 +38,25 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .col-body::-webkit-scrollbar{width:3px;}
 .col-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
 .col-empty{font-family:var(--fm);font-size:10px;color:var(--muted);text-align:center;padding:24px 8px;opacity:.5;}
-.col[data-phase="liberado_coleta"] .col-name{color:#3b9eff;}.col[data-phase="liberado_coleta"] .col-badge{background:rgba(59,158,255,.15);color:#3b9eff;}
-.col[data-phase="comunicacao_realizada"] .col-name{color:#a855f7;}.col[data-phase="comunicacao_realizada"] .col-badge{background:rgba(168,85,247,.15);color:#a855f7;}
-.col[data-phase="coleta_realizada"] .col-name{color:var(--green);}.col[data-phase="coleta_realizada"] .col-badge{background:rgba(16,217,130,.15);color:var(--green);}
-.col[data-phase="remarcar"] .col-name{color:var(--orange);}.col[data-phase="remarcar"] .col-badge{background:rgba(249,115,22,.15);color:var(--orange);}
-.col[data-phase="orcamento_registrado"] .col-name{color:var(--yellow);}.col[data-phase="orcamento_registrado"] .col-badge{background:rgba(245,200,0,.15);color:var(--yellow);}
+/* COLETA col colors */
+.col[data-phase="liberado_coleta"] .col-name{color:#3b9eff;}
+.col[data-phase="liberado_coleta"] .col-badge{background:rgba(59,158,255,.15);color:#3b9eff;}
+.col[data-phase="comunicacao_realizada"] .col-name{color:#a855f7;}
+.col[data-phase="comunicacao_realizada"] .col-badge{background:rgba(168,85,247,.15);color:#a855f7;}
+.col[data-phase="coleta_realizada"] .col-name{color:var(--green);}
+.col[data-phase="coleta_realizada"] .col-badge{background:rgba(16,217,130,.15);color:var(--green);}
+.col[data-phase="remarcar"] .col-name{color:var(--orange);}
+.col[data-phase="remarcar"] .col-badge{background:rgba(249,115,22,.15);color:var(--orange);}
+.col[data-phase="orcamento_registrado"] .col-name{color:var(--yellow);}
+.col[data-phase="orcamento_registrado"] .col-badge{background:rgba(245,200,0,.15);color:var(--yellow);}
+/* ENTREGA col colors */
+.col[data-phase="liberado_entrega"] .col-name{color:var(--orange);}
+.col[data-phase="liberado_entrega"] .col-badge{background:rgba(249,115,22,.15);color:var(--orange);}
+.col[data-phase="comunicacao_entrega"] .col-name{color:#a855f7;}
+.col[data-phase="comunicacao_entrega"] .col-badge{background:rgba(168,85,247,.15);color:#a855f7;}
+.col[data-phase="entrega_realizada"] .col-name{color:var(--green);}
+.col[data-phase="entrega_realizada"] .col-badge{background:rgba(16,217,130,.15);color:var(--green);}
+/* CARD */
 .c-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;transition:border-color .15s;}
 .c-card:hover{border-color:rgba(59,158,255,.2);}
 .c-num{font-family:var(--fm);font-size:10px;color:var(--accent);margin-bottom:3px;}
@@ -41,6 +64,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .c-desc{font-size:10px;color:var(--muted);margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .c-time{font-family:var(--fm);font-size:9px;color:var(--muted);}
 .c-actions{margin-top:8px;display:flex;flex-direction:column;gap:5px;}
+/* DiagnÃ³stico (coleta) */
 .btn-diag{width:100%;font-family:var(--fb);font-size:11px;font-weight:700;padding:8px;border-radius:7px;border:none;cursor:pointer;background:var(--green);color:#000;transition:filter .15s;display:flex;align-items:center;justify-content:center;gap:5px;}
 .btn-diag:hover{filter:brightness(1.1);}
 .btn-diag:disabled{opacity:.4;cursor:not-allowed;filter:none;}
@@ -53,6 +77,11 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .diag-submit:disabled{opacity:.4;cursor:not-allowed;}
 .diag-cancel{width:100%;margin-top:4px;font-family:var(--fm);font-size:10px;padding:5px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
 .diag-cancel:hover{color:var(--text);border-color:var(--accent);}
+/* Confirmar Pagamento (entrega) */
+.btn-pag{width:100%;font-family:var(--fb);font-size:11px;font-weight:700;padding:8px;border-radius:7px;border:none;cursor:pointer;background:var(--yellow);color:#000;transition:filter .15s;display:flex;align-items:center;justify-content:center;gap:5px;}
+.btn-pag:hover{filter:brightness(1.1);}
+.btn-pag:disabled{opacity:.4;cursor:not-allowed;filter:none;}
+/* TOAST */
 .toast-wrap{position:fixed;bottom:16px;right:16px;display:flex;flex-direction:column;gap:8px;z-index:9999;}
 .toast{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:var(--fm);font-size:11px;transform:translateX(200%);opacity:0;transition:all .3s;max-width:280px;}
 .toast.show{transform:translateX(0);opacity:1;}
@@ -64,56 +93,144 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 <header>
   <div class="hdr-title">ð Coleta <span>Kanban</span></div>
   <div class="hdr-stats" id="hdr-stats"></div>
-  <button class="sync-btn" onclick="load()">â» Sync</button>
+  <button class="sync-btn" onclick="loadCurrent()">â» Sync</button>
 </header>
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab coleta active" id="tab-coleta" onclick="switchTab('coleta')">ð Coleta</button>
+  <button class="tab entrega" id="tab-entrega" onclick="switchTab('entrega')">ð¦ Entrega</button>
+</div>
 <div class="kanban" id="kanban">
   <div style="display:flex;align-items:center;justify-content:center;flex:1;font-family:var(--fm);font-size:11px;color:var(--muted);"><div class="spin"></div>&nbsp;Carregando...</div>
 </div>
 <div class="toast-wrap" id="toasts"></div>
 <script>
-var PHASES=[{id:'liberado_coleta',name:'Liberado para Coleta',color:'#3b9eff'},{id:'comunicacao_realizada',name:'ComunicaÃ§Ã£o Realizada',color:'#a855f7'},{id:'coleta_realizada',name:'Coleta Realizada',color:'#10d982'},{id:'remarcar',name:'Remarcar',color:'#f97316'},{id:'orcamento_registrado',name:'OrÃ§amento Registrado',color:'#f5c800'}];
+var COLETA_PHASES=[
+  {id:'liberado_coleta',name:'Liberado para Coleta',color:'#3b9eff'},
+  {id:'comunicacao_realizada',name:'ComunicaÃ§Ã£o Realizada',color:'#a855f7'},
+  {id:'coleta_realizada',name:'Coleta Realizada',color:'#10d982'},
+  {id:'remarcar',name:'Remarcar',color:'#f97316'},
+  {id:'orcamento_registrado',name:'OrÃ§amento Registrado',color:'#f5c800'}
+];
+var ENTREGA_PHASES=[
+  {id:'liberado_entrega',name:'Liberado para Entrega',color:'#f97316'},
+  {id:'comunicacao_entrega',name:'ComunicaÃ§Ã£o Realizada',color:'#a855f7'},
+  {id:'entrega_realizada',name:'Entrega Realizada',color:'#10d982'}
+];
+
+var currentTab='coleta';
 var byPhase={};
-function toast(msg,color){var wrap=document.getElementById('toasts');var el=document.createElement('div');el.className='toast';el.textContent=msg;el.style.borderTopColor=color||'var(--green)';wrap.appendChild(el);requestAnimationFrame(function(){el.classList.add('show');});setTimeout(function(){el.classList.remove('show');setTimeout(function(){el.remove();},400);},3500);}
+
+function toast(msg,color){
+  var wrap=document.getElementById('toasts');
+  var el=document.createElement('div');
+  el.className='toast';el.textContent=msg;
+  el.style.borderTopColor=color||'var(--green)';
+  wrap.appendChild(el);
+  requestAnimationFrame(function(){el.classList.add('show');});
+  setTimeout(function(){el.classList.remove('show');setTimeout(function(){el.remove();},400);},3500);
+}
 function fmtDate(iso){if(!iso)return '';var d=new Date(iso);return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function osNum(c){if(c.osCode)return c.osCode;var m=String(c.nomeContato||'').match(/\b\d{4}\b/g);return m?m[m.length-1]:String(c.pipefyId).slice(-4);}
-async function load(){
+
+function switchTab(tab){
+  currentTab=tab;
+  document.getElementById('tab-coleta').classList.toggle('active',tab==='coleta');
+  document.getElementById('tab-entrega').classList.toggle('active',tab==='entrega');
+  document.getElementById('hdr-title-span') && (document.getElementById('hdr-title-span').textContent=tab==='coleta'?'Coleta':'Entrega');
+  loadCurrent();
+}
+
+async function loadCurrent(){
+  var action=currentTab==='coleta'?'load':'load-entrega';
+  var phases=currentTab==='coleta'?COLETA_PHASES:ENTREGA_PHASES;
   document.getElementById('kanban').innerHTML='<div style="display:flex;align-items:center;justify-content:center;flex:1;font-family:var(--fm);font-size:11px;color:var(--muted);"><div class="spin"></div>&nbsp;Carregando...</div>';
   var ctrl=new AbortController();
   var tid=setTimeout(function(){ctrl.abort();},12000);
   try{
-    var r=await fetch('/api/tv-coleta?action=load',{signal:ctrl.signal});
+    var r=await fetch('/api/tv-coleta?action='+action,{signal:ctrl.signal});
     clearTimeout(tid);
     var d=await r.json();
     if(!d.ok)throw new Error(d.error||'Erro ao carregar');
     byPhase=d.byPhase||{};
-    render(d);
+    renderKanban(phases);
   }catch(e){
     clearTimeout(tid);
     var msg=e.name==='AbortError'?'Timeout â servidor demorou demais':esc(e.message);
-    document.getElementById('kanban').innerHTML='<div style="display:flex;align-items:center;justify-content:center;flex:1;flex-direction:column;gap:12px;font-family:var(--fm);font-size:11px;color:#ef4444;">â '+msg+'<button onclick="load()" style="font-family:var(--fm);font-size:10px;padding:6px 16px;border-radius:6px;border:1px solid #ef4444;background:rgba(240,64,96,.1);color:#ef4444;cursor:pointer;">â» Tentar Novamente</button></div>';
+    document.getElementById('kanban').innerHTML='<div style="display:flex;align-items:center;justify-content:center;flex:1;flex-direction:column;gap:12px;font-family:var(--fm);font-size:11px;color:#ef4444;">â '+msg+'<button onclick="loadCurrent()" style="font-family:var(--fm);font-size:10px;padding:6px 16px;border-radius:6px;border:1px solid #ef4444;background:rgba(240,64,96,.1);color:#ef4444;cursor:pointer;">â» Tentar Novamente</button></div>';
   }
 }
-function render(d){
-  var stats=PHASES.map(function(p){var n=(byPhase[p.id]||[]).length;return n>0?'<span><span class="stat-dot" style="background:'+p.color+'"></span>'+n+'</span>':'';}).filter(Boolean).join('');
+
+function renderKanban(phases){
+  var stats=phases.map(function(p){var n=(byPhase[p.id]||[]).length;return n>0?'<span><span class="stat-dot" style="background:'+p.color+'"></span>'+n+'</span>':'';}).filter(Boolean).join('');
   document.getElementById('hdr-stats').innerHTML=stats||'<span>Nenhuma ficha</span>';
-  var html=PHASES.map(function(ph){
+
+  var html=phases.map(function(ph){
     var cards=byPhase[ph.id]||[];
-    var cardsHtml=cards.length===0?'<div class="col-empty">â vazio â</div>':cards.map(function(c){return buildCard(c,ph.id);}).join('');
+    var cardsHtml=cards.length===0?'<div class="col-empty">â vazio â</div>':cards.map(function(c){
+      return currentTab==='coleta'?buildCardColeta(c,ph.id):buildCardEntrega(c,ph.id);
+    }).join('');
     return '<div class="col" data-phase="'+ph.id+'"><div class="col-head"><span class="col-name">'+ph.name+'</span><span class="col-badge">'+cards.length+'</span></div><div class="col-body">'+cardsHtml+'</div></div>';
   }).join('');
+
   document.getElementById('kanban').innerHTML=html;
 }
-function buildCard(c,phaseId){
+
+// ââ CARD COLETA ââââââââââââââââââââââââââââââââââââââââââââââ
+function buildCardColeta(c,phaseId){
   var num=osNum(c);
   var diagBtns='';
   if(phaseId==='coleta_realizada'){
-    diagBtns='<div class="c-actions"><button class="btn-diag" id="diag-btn-'+c.pipefyId+'" onclick="abrirDiag(\''+c.pipefyId+'\')">ð DiagnÃ³stico</button><div class="diag-form" id="diag-form-'+c.pipefyId+'"><textarea class="diag-textarea" id="diag-txt-'+c.pipefyId+'" placeholder="Descreva o estado do equipamento, problema identificado..."></textarea><button class="diag-submit" onclick="enviarDiag(\''+c.pipefyId+'\')">â Registrar</button><button class="diag-cancel" onclick="fecharDiag(\''+c.pipefyId+'\')">â Cancelar</button></div></div>';
+    diagBtns='<div class="c-actions">'+
+      '<button class="btn-diag" id="diag-btn-'+c.pipefyId+'" onclick="abrirDiag(\''+c.pipefyId+'\')">ð DiagnÃ³stico</button>'+
+      '<div class="diag-form" id="diag-form-'+c.pipefyId+'">'+
+        '<textarea class="diag-textarea" id="diag-txt-'+c.pipefyId+'" placeholder="Descreva o estado do equipamento, problema identificado..."></textarea>'+
+        '<button class="diag-submit" onclick="enviarDiag(\''+c.pipefyId+'\')">â Registrar</button>'+
+        '<button class="diag-cancel" onclick="fecharDiag(\''+c.pipefyId+'\')">â Cancelar</button>'+
+      '</div></div>';
   }
-  return '<div class="c-card" id="card-'+c.pipefyId+'"><div class="c-num">#'+esc(num)+'</div><div class="c-nome">'+esc(c.nomeContato||'â')+'</div>'+(c.descricao?'<div class="c-desc">'+esc(c.descricao)+'</div>':'')+'<div class="c-time">ð '+fmtDate(c.entradaEm)+'</div>'+diagBtns+(c.diagnostico?'<div class="c-time" style="margin-top:4px;color:#f5c800;">ð '+esc(c.diagnostico.substring(0,60))+(c.diagnostico.length>60?'â¦':'')+'</div>':'')+'</div>';
+  return '<div class="c-card" id="card-'+c.pipefyId+'">'+
+    '<div class="c-num">#'+esc(num)+'</div>'+
+    '<div class="c-nome">'+esc(c.nomeContato||'â')+'</div>'+
+    (c.descricao?'<div class="c-desc">'+esc(c.descricao)+'</div>':'')+
+    '<div class="c-time">ð '+fmtDate(c.entradaEm)+'</div>'+
+    diagBtns+
+    (c.diagnostico?'<div class="c-time" style="margin-top:4px;color:#f5c800;">ð '+esc(c.diagnostico.substring(0,60))+(c.diagnostico.length>60?'â¦':'')+'</div>':'')+
+    '</div>';
 }
-function abrirDiag(pipefyId){var form=document.getElementById('diag-form-'+pipefyId);var btn=document.getElementById('diag-btn-'+pipefyId);if(form){form.classList.toggle('open');}if(btn){btn.style.display=form.classList.contains('open')?'none':'flex';}}
-function fecharDiag(pipefyId){var form=document.getElementById('diag-form-'+pipefyId);var btn=document.getElementById('diag-btn-'+pipefyId);if(form)form.classList.remove('open');if(btn)btn.style.display='flex';}
+
+// ââ CARD ENTREGA âââââââââââââââââââââââââââââââââââââââââââââ
+function buildCardEntrega(c,phaseId){
+  var num=osNum(c);
+  var pagBtn='';
+  if(phaseId==='entrega_realizada'){
+    pagBtn='<div class="c-actions">'+
+      '<button class="btn-pag" id="pag-btn-'+c.pipefyId+'" onclick="confirmarPagamento(\''+c.pipefyId+'\')">ð° Confirmar Pagamento</button>'+
+    '</div>';
+  }
+  return '<div class="c-card" id="card-'+c.pipefyId+'">'+
+    '<div class="c-num">#'+esc(num)+'</div>'+
+    '<div class="c-nome">'+esc(c.nomeContato||'â')+'</div>'+
+    (c.descricao?'<div class="c-desc">'+esc(c.descricao)+'</div>':'')+
+    '<div class="c-time">ð '+fmtDate(c.entradaEm)+'</div>'+
+    pagBtn+
+    '</div>';
+}
+
+// ââ DIAGNÃSTICO ââââââââââââââââââââââââââââââââââââââââââââââ
+function abrirDiag(pipefyId){
+  var form=document.getElementById('diag-form-'+pipefyId);
+  var btn=document.getElementById('diag-btn-'+pipefyId);
+  if(form){form.classList.toggle('open');}
+  if(btn){btn.style.display=form.classList.contains('open')?'none':'flex';}
+}
+function fecharDiag(pipefyId){
+  var form=document.getElementById('diag-form-'+pipefyId);
+  var btn=document.getElementById('diag-btn-'+pipefyId);
+  if(form)form.classList.remove('open');
+  if(btn)btn.style.display='flex';
+}
 async function enviarDiag(pipefyId){
   var txt=document.getElementById('diag-txt-'+pipefyId);
   var texto=txt?txt.value.trim():'';
@@ -130,14 +247,35 @@ async function enviarDiag(pipefyId){
     if(!d.pipefyComment?.ok)msgs.push('â ï¸ ComentÃ¡rio: '+(d.pipefyComment?.error||'falhou'));
     if(!d.pipefyMove?.ok)msgs.push('â ï¸ Move: '+(d.pipefyMove?.error||'falhou'));
     toast(msgs.join(' | '),'var(--green)');
-    await load();
+    await loadCurrent();
   }catch(e){
     toast('â '+e.message,'#ef4444');
     if(btn){btn.disabled=false;btn.textContent='â Registrar';}
   }
 }
-load();
-setInterval(load,30000);
+
+// ââ CONFIRMAR PAGAMENTO ââââââââââââââââââââââââââââââââââââââ
+async function confirmarPagamento(pipefyId){
+  if(!confirm('Confirmar pagamento desta ficha? Ela serÃ¡ movida para ERP no Pipefy.'))return;
+  var btn=document.getElementById('pag-btn-'+pipefyId);
+  if(btn){btn.disabled=true;btn.textContent='Processando...';}
+  try{
+    var r=await fetch('/api/tv-coleta?action=confirmar-pagamento',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pipefyId:pipefyId})});
+    var d=await r.json();
+    if(!d.ok)throw new Error(d.error||'Falha');
+    var msg='â Pagamento confirmado!';
+    if(d.pipefyERP?.ok)msg+=' ð Movido para ERP no Pipefy';
+    else msg+=' â ï¸ ERP: '+(d.pipefyERP?.error||'nÃ£o movido');
+    toast(msg,'var(--yellow)');
+    await loadCurrent();
+  }catch(e){
+    toast('â '+e.message,'#ef4444');
+    if(btn){btn.disabled=false;btn.textContent='ð° Confirmar Pagamento';}
+  }
+}
+
+loadCurrent();
+setInterval(loadCurrent,30000);
 </script>
 </body>
 </html>
