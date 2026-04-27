@@ -259,10 +259,10 @@ function buildCardEntrega(c, phase) {
   var num = osNum(c);
   var tel = (c.telefone||'').replace(/\D/g,'');
   var msg = encodeURIComponent('Olá, bom dia! Sou o motorista da Reparo Eletro TV e estou a caminho para entregar o seu equipamento.');
-  var wpp = tel ? 'https://wa.me/55'+del+''text='+msg : 'https://api.whatsapp.com/send?text='+msg;
+  var wpp = tel ? 'https://wa.me/55'+tel+'?text='+msg : 'https://api.whatsapp.com/send?text='+msg;
   var maps = 'https://maps.google.com/?q='+encodeURIComponent(c.endereco||c.nomeContato||'');
   var badge = phase==='comunicacao_entrega'
-    ? '<div class="m-badge badge-com">💬 Avisado</omt>'
+    ? '<div class="m-badge badge-com">💬 Avisado</div>'
     : '<div class="m-badge badge-ent">📦 Aguardando</div>';
   var cls = phase==='comunicacao_entrega' ? 'm-card comunicou' : 'm-card';
   return '<div class="'+cls+'" id="mcard-'+c.pipefyId+'">'+
