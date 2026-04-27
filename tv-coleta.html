@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='18,2 8,18 15,18 14,30 24,14 17,14' fill='%2322c55e' stroke='%2322c55e' stroke-linejoin='round'/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TV — Coleta</title>
+<title>TV â Coleta</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#03060e;--surface:#080d18;--surface2:#0d1425;--border:#1a2540;--text:#dce8f8;--muted:#4a607a;--accent:#3b9eff;--green:#10d982;--red:#f04060;--yellow:#f5c800;--orange:#f97316;--fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;}
@@ -62,16 +62,16 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 </head>
 <body>
 <header>
-  <div class="hdr-title">🚚 Coleta <span>Kanban</span></div>
+  <div class="hdr-title">ð Coleta <span>Kanban</span></div>
   <div class="hdr-stats" id="hdr-stats"></div>
-  <button class="sync-btn" onclick="load()">↻ Sync</button>
+  <button class="sync-btn" onclick="load()">â» Sync</button>
 </header>
 <div class="kanban" id="kanban">
   <div style="display:flex;align-items:center;justify-content:center;flex:1;font-family:var(--fm);font-size:11px;color:var(--muted);"><div class="spin"></div>&nbsp;Carregando...</div>
 </div>
 <div class="toast-wrap" id="toasts"></div>
 <script>
-var PHASES=[{id:'liberado_coleta',name:'Liberado para Coleta',color:'#3b9eff'},{id:'comunicacao_realizada',name:'Comunicação Realizada',color:'#a855f7'},{id:'coleta_realizada',name:'Coleta Realizada',color:'#10d982'},{id:'remarcar',name:'Remarcar',color:'#f97316'},{id:'orcamento_registrado',name:'Orçamento Registrado',color:'#f5c800'}];
+var PHASES=[{id:'liberado_coleta',name:'Liberado para Coleta',color:'#3b9eff'},{id:'comunicacao_realizada',name:'ComunicaÃ§Ã£o Realizada',color:'#a855f7'},{id:'coleta_realizada',name:'Coleta Realizada',color:'#10d982'},{id:'remarcar',name:'Remarcar',color:'#f97316'},{id:'orcamento_registrado',name:'OrÃ§amento Registrado',color:'#f5c800'}];
 var byPhase={};
 function toast(msg,color){var wrap=document.getElementById('toasts');var el=document.createElement('div');el.className='toast';el.textContent=msg;el.style.borderTopColor=color||'var(--green)';wrap.appendChild(el);requestAnimationFrame(function(){el.classList.add('show');});setTimeout(function(){el.classList.remove('show');setTimeout(function(){el.remove();},400);},3500);}
 function fmtDate(iso){if(!iso)return '';var d=new Date(iso);return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}
@@ -79,14 +79,19 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 function osNum(c){if(c.osCode)return c.osCode;var m=String(c.nomeContato||'').match(/\b\d{4}\b/g);return m?m[m.length-1]:String(c.pipefyId).slice(-4);}
 async function load(){
   document.getElementById('kanban').innerHTML='<div style="display:flex;align-items:center;justify-content:center;flex:1;font-family:var(--fm);font-size:11px;color:var(--muted);"><div class="spin"></div>&nbsp;Carregando...</div>';
+  var ctrl=new AbortController();
+  var tid=setTimeout(function(){ctrl.abort();},12000);
   try{
-    var r=await fetch('/api/tv-coleta?action=load');
+    var r=await fetch('/api/tv-coleta?action=load',{signal:ctrl.signal});
+    clearTimeout(tid);
     var d=await r.json();
     if(!d.ok)throw new Error(d.error||'Erro ao carregar');
     byPhase=d.byPhase||{};
     render(d);
   }catch(e){
-    document.getElementById('kanban').innerHTML='<div style="display:flex;align-items:center;justify-content:center;flex:1;font-family:var(--fm);font-size:11px;color:#ef4444;">❌ '+esc(e.message)+'</div>';
+    clearTimeout(tid);
+    var msg=e.name==='AbortError'?'Timeout â servidor demorou demais':esc(e.message);
+    document.getElementById('kanban').innerHTML='<div style="display:flex;align-items:center;justify-content:center;flex:1;flex-direction:column;gap:12px;font-family:var(--fm);font-size:11px;color:#ef4444;">â '+msg+'<button onclick="load()" style="font-family:var(--fm);font-size:10px;padding:6px 16px;border-radius:6px;border:1px solid #ef4444;background:rgba(240,64,96,.1);color:#ef4444;cursor:pointer;">â» Tentar Novamente</button></div>';
   }
 }
 function render(d){
@@ -94,7 +99,7 @@ function render(d){
   document.getElementById('hdr-stats').innerHTML=stats||'<span>Nenhuma ficha</span>';
   var html=PHASES.map(function(ph){
     var cards=byPhase[ph.id]||[];
-    var cardsHtml=cards.length===0?'<div class="col-empty">— vazio —</div>':cards.map(function(c){return buildCard(c,ph.id);}).join('');
+    var cardsHtml=cards.length===0?'<div class="col-empty">â vazio â</div>':cards.map(function(c){return buildCard(c,ph.id);}).join('');
     return '<div class="col" data-phase="'+ph.id+'"><div class="col-head"><span class="col-name">'+ph.name+'</span><span class="col-badge">'+cards.length+'</span></div><div class="col-body">'+cardsHtml+'</div></div>';
   }).join('');
   document.getElementById('kanban').innerHTML=html;
@@ -103,32 +108,32 @@ function buildCard(c,phaseId){
   var num=osNum(c);
   var diagBtns='';
   if(phaseId==='coleta_realizada'){
-    diagBtns='<div class="c-actions"><button class="btn-diag" id="diag-btn-'+c.pipefyId+'" onclick="abrirDiag(\''+c.pipefyId+'\')">📋 Diagnóstico</button><div class="diag-form" id="diag-form-'+c.pipefyId+'"><textarea class="diag-textarea" id="diag-txt-'+c.pipefyId+'" placeholder="Descreva o estado do equipamento, problema identificado..."></textarea><button class="diag-submit" onclick="enviarDiag(\''+c.pipefyId+'\')">✅ Registrar</button><button class="diag-cancel" onclick="fecharDiag(\''+c.pipefyId+'\')">✕ Cancelar</button></div></div>';
+    diagBtns='<div class="c-actions"><button class="btn-diag" id="diag-btn-'+c.pipefyId+'" onclick="abrirDiag(\''+c.pipefyId+'\')">ð DiagnÃ³stico</button><div class="diag-form" id="diag-form-'+c.pipefyId+'"><textarea class="diag-textarea" id="diag-txt-'+c.pipefyId+'" placeholder="Descreva o estado do equipamento, problema identificado..."></textarea><button class="diag-submit" onclick="enviarDiag(\''+c.pipefyId+'\')">â Registrar</button><button class="diag-cancel" onclick="fecharDiag(\''+c.pipefyId+'\')">â Cancelar</button></div></div>';
   }
-  return '<div class="c-card" id="card-'+c.pipefyId+'"><div class="c-num">#'+esc(num)+'</div><div class="c-nome">'+esc(c.nomeContato||'—')+'</div>'+(c.descricao?'<div class="c-desc">'+esc(c.descricao)+'</div>':'')+'<div class="c-time">📅 '+fmtDate(c.entradaEm)+'</div>'+diagBtns+(c.diagnostico?'<div class="c-time" style="margin-top:4px;color:#f5c800;">📋 '+esc(c.diagnostico.substring(0,60))+(c.diagnostico.length>60?'…':'')+'</div>':'')+'</div>';
+  return '<div class="c-card" id="card-'+c.pipefyId+'"><div class="c-num">#'+esc(num)+'</div><div class="c-nome">'+esc(c.nomeContato||'â')+'</div>'+(c.descricao?'<div class="c-desc">'+esc(c.descricao)+'</div>':'')+'<div class="c-time">ð '+fmtDate(c.entradaEm)+'</div>'+diagBtns+(c.diagnostico?'<div class="c-time" style="margin-top:4px;color:#f5c800;">ð '+esc(c.diagnostico.substring(0,60))+(c.diagnostico.length>60?'â¦':'')+'</div>':'')+'</div>';
 }
 function abrirDiag(pipefyId){var form=document.getElementById('diag-form-'+pipefyId);var btn=document.getElementById('diag-btn-'+pipefyId);if(form){form.classList.toggle('open');}if(btn){btn.style.display=form.classList.contains('open')?'none':'flex';}}
 function fecharDiag(pipefyId){var form=document.getElementById('diag-form-'+pipefyId);var btn=document.getElementById('diag-btn-'+pipefyId);if(form)form.classList.remove('open');if(btn)btn.style.display='flex';}
 async function enviarDiag(pipefyId){
   var txt=document.getElementById('diag-txt-'+pipefyId);
   var texto=txt?txt.value.trim():'';
-  if(!texto){toast('⚠️ Digite o diagnóstico antes de registrar','var(--orange)');return;}
+  if(!texto){toast('â ï¸ Digite o diagnÃ³stico antes de registrar','var(--orange)');return;}
   var btn=document.querySelector('#diag-form-'+pipefyId+' .diag-submit');
   if(btn){btn.disabled=true;btn.textContent='Enviando...';}
   try{
     var r=await fetch('/api/tv-coleta?action=diagnostico',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pipefyId:pipefyId,texto:texto})});
     var d=await r.json();
     if(!d.ok)throw new Error(d.error||'Falha');
-    var msgs=['✅ Diagnóstico registrado!'];
-    if(d.pipefyComment?.ok)msgs.push('💬 Comentado no Pipefy');
-    if(d.pipefyMove?.ok)msgs.push('🔀 Movido p/ Aguardando Aprovação');
-    if(!d.pipefyComment?.ok)msgs.push('⚠️ Comentário: '+(d.pipefyComment?.error||'falhou'));
-    if(!d.pipefyMove?.ok)msgs.push('⚠️ Move: '+(d.pipefyMove?.error||'falhou'));
+    var msgs=['â DiagnÃ³stico registrado!'];
+    if(d.pipefyComment?.ok)msgs.push('ð¬ Comentado no Pipefy');
+    if(d.pipefyMove?.ok)msgs.push('ð Movido p/ Aguardando AprovaÃ§Ã£o');
+    if(!d.pipefyComment?.ok)msgs.push('â ï¸ ComentÃ¡rio: '+(d.pipefyComment?.error||'falhou'));
+    if(!d.pipefyMove?.ok)msgs.push('â ï¸ Move: '+(d.pipefyMove?.error||'falhou'));
     toast(msgs.join(' | '),'var(--green)');
     await load();
   }catch(e){
-    toast('❌ '+e.message,'#ef4444');
-    if(btn){btn.disabled=false;btn.textContent='✅ Registrar';}
+    toast('â '+e.message,'#ef4444');
+    if(btn){btn.disabled=false;btn.textContent='â Registrar';}
   }
 }
 load();
