@@ -9,7 +9,7 @@
 <style>
 :root{--bg:#03060e;--surface:#080d18;--surface2:#0d1425;--border:#1a2540;--text:#dce8f8;--muted:#4a607a;--accent:#3b9eff;--green:#10d982;--red:#f04060;--yellow:#f5c800;--orange:#f97316;--purple:#a855f7;--fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;}
 *{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
 header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;gap:12px;}
 .hdr-title{font-family:var(--fh);font-size:16px;font-weight:800;display:flex;align-items:center;gap:8px;}
 .hdr-title span{color:var(--green);}
@@ -23,7 +23,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .tab.coleta.active{color:var(--accent);}
 .tab.entrega.active{color:var(--orange);}
 .tab:hover:not(.active){color:var(--text);}
-.kanban{flex:1;display:flex;gap:0;overflow-x:auto;overflow-y:hidden;}
+.kanban{flex:1;min-height:0;display:flex;gap:0;overflow-x:auto;overflow-y:hidden;}
 .kanban::-webkit-scrollbar{height:4px;}
 .kanban::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
 .col{flex:0 0 240px;display:flex;flex-direction:column;border-right:1px solid var(--border);min-height:0;}
@@ -31,7 +31,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .col-head{padding:12px 14px 10px;border-bottom:1px solid var(--border);flex-shrink:0;}
 .col-name{font-family:var(--fm);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
 .col-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;border-radius:9px;font-family:var(--fm);font-size:10px;font-weight:700;background:var(--surface2);color:var(--muted);padding:0 5px;margin-left:6px;}
-.col-body{flex:1;overflow-y:auto;padding:10px 8px;display:flex;flex-direction:column;gap:8px;}
+.col-body{flex:1;min-height:0;overflow-y:auto;padding:10px 8px;display:flex;flex-direction:column;gap:8px;}
 .col-body::-webkit-scrollbar{width:3px;}
 .col-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
 .col-empty{font-family:var(--fm);font-size:10px;color:var(--muted);text-align:center;padding:24px 8px;opacity:.5;}
@@ -70,6 +70,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .diag-submit:disabled{opacity:.4;cursor:not-allowed;}
 .diag-cancel{width:100%;margin-top:4px;font-family:var(--fm);font-size:10px;padding:5px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
 .diag-cancel:hover{color:var(--text);border-color:var(--accent);}
+.diag-input{width:100%;margin-bottom:6px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px;font-family:var(--fb);font-size:11px;color:var(--text);outline:none;transition:border-color .15s;}
+.diag-input:focus{border-color:var(--green);}
+.diag-label{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;}
 .btn-pag{width:100%;font-family:var(--fb);font-size:11px;font-weight:700;padding:8px;border-radius:7px;border:none;cursor:pointer;background:var(--yellow);color:#000;transition:filter .15s;display:flex;align-items:center;justify-content:center;gap:5px;}
 .btn-pag:hover{filter:brightness(1.1);}
 .btn-pag:disabled{opacity:.4;cursor:not-allowed;filter:none;}
@@ -177,6 +180,9 @@ function buildCardColeta(c,phaseId){
     diagBtns='<div class="c-actions">'+
       '<button class="btn-diag" id="diag-btn-'+c.pipefyId+'" onclick="abrirDiag(\''+c.pipefyId+'\')">\uD83D\uDCCB Diagnóstico</button>'+
       '<div class="diag-form" id="diag-form-'+c.pipefyId+'">'+
+        '<div class="diag-label">Modelo do Equipamento</div>'+
+        '<input class="diag-input" type="text" id="diag-modelo-'+c.pipefyId+'" placeholder="Ex: Samsung UN55TU7020"/>'+
+        '<div class="diag-label">Diagnóstico</div>'+
         '<textarea class="diag-textarea" id="diag-txt-'+c.pipefyId+'" placeholder="Descreva o estado do equipamento..."></textarea>'+
         '<button class="diag-submit" onclick="enviarDiag(\''+c.pipefyId+'\')">\u2705 Registrar</button>'+
         '<button class="diag-cancel" onclick="fecharDiag(\''+c.pipefyId+'\')">✕ Cancelar</button>'+
@@ -188,7 +194,7 @@ function buildCardColeta(c,phaseId){
     (c.descricao?'<div class="c-desc">'+esc(c.descricao)+'</div>':'')+
     '<div class="c-time">\uD83D\uDCC5 '+fmtDate(c.entradaEm||c.movedAt)+'</div>'+
     diagBtns+
-    (c.diagnostico?'<div class="c-time" style="margin-top:4px;color:#f5c800;">\uD83D\uDCCB '+esc(c.diagnostico.substring(0,60))+(c.diagnostico.length>60?'…':'')+'</div>':'')+
+    (c.modelo?'<div style="font-family:var(--fm);font-size:10px;color:var(--accent);margin-top:3px;">📺 '+esc(c.modelo)+'</div>':'')+(c.diagnostico?'<div class="c-time" style="margin-top:4px;color:#f5c800;">\uD83D\uDCCB '+esc(c.diagnostico.substring(0,60))+(c.diagnostico.length>60?'…':'')+'</div>':'')+
     '<button class="btn-del" onclick="excluirFicha(\''+c.pipefyId+'\',\'coleta\')">\uD83D\uDDD1 Excluir Ficha</button>'+
     '</div>';
 }
@@ -214,12 +220,14 @@ function abrirDiag(id){var f=document.getElementById('diag-form-'+id);var b=docu
 function fecharDiag(id){var f=document.getElementById('diag-form-'+id);var b=document.getElementById('diag-btn-'+id);if(f)f.classList.remove('open');if(b)b.style.display='flex';}
 async function enviarDiag(pid){
   var txt=document.getElementById('diag-txt-'+pid);
+  var modeloEl=document.getElementById('diag-modelo-'+pid);
   var texto=txt?txt.value.trim():'';
+  var modelo=modeloEl?modeloEl.value.trim():'';
   if(!texto){toast('\u26A0\uFE0F Digite o diagnóstico antes de registrar','var(--orange)');return;}
   var btn=document.querySelector('#diag-form-'+pid+' .diag-submit');
   if(btn){btn.disabled=true;btn.textContent='Enviando...';}
   try{
-    var r=await fetch('/api/tv-coleta?action=diagnostico',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pipefyId:pid,texto:texto})});
+    var r=await fetch('/api/tv-coleta?action=diagnostico',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pipefyId:pid,texto:texto,modelo:modelo})});
     var d=await r.json();
     if(!d.ok)throw new Error(d.error||'Falha');
     toast('\u2705 Diagnóstico registrado!','var(--green)');
