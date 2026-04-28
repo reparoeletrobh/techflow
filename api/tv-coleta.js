@@ -191,17 +191,20 @@ module.exports = async function handler(req, res) {
 
       var coleta = (await dbGet(COLETA_KEY)) || { cards: [] };
       var card = coleta.cards.find(function(c) { return String(c.pipefyId) === String(pipefyId); });
+      var modelo = body.modelo;
       if (card) {
         card.coletaPhase  = "orcamento_registrado";
         card.diagnostico  = texto.trim();
         card.diagnosticoEm = new Date().toISOString();
+        if (modelo && modelo.trim()) card.modelo = modelo.trim();
       }
       await dbSet(COLETA_KEY, coleta);
 
       var pipefyComment = { ok: false };
       try {
         var t = texto.trim().replace(/"/g, '\\"').replace(/\n/g, ' ');
-        await pipefyMutation('mutation { createComment(input: { card_id: "' + pipefyId + '", text: "Diagnostico: ' + t + '" }) { comment { id } } }');
+        var m = (modelo && modelo.trim()) ? ('Modelo: ' + modelo.trim().replace(/"/g, '') + ' | ') : '';
+        await pipefyMutation('mutation { createComment(input: { card_id: "' + pipefyId + '", text: "' + m + 'Diagnostico: ' + t + '" }) { comment { id } } }');
         pipefyComment = { ok: true };
       } catch(e) { pipefyComment = { ok: false, error: e.message }; }
 
