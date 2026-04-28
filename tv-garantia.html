@@ -318,6 +318,15 @@ var gBoard = null;
 var gSelCardId = null, gSelPhase = null, gSelTecnico = null;
 
 // ── NAVEGAÇÃO ─────────────────────────────────────────────────
+async function loadGBoard() {
+  if (gBoard) return; // já carregado
+  try {
+    var r = await fetch('/api/board?action=load');
+    var d = await r.json();
+    if (d.board) { gBoard = d.board; buildStagesGrid(); }
+  } catch(e) { console.warn('loadGBoard err:', e); }
+}
+
 function showPage(page) {
   document.querySelectorAll(".g-page").forEach(function(p) { p.style.display = "none"; });
   var el = document.getElementById("page-" + page);
@@ -328,7 +337,7 @@ function showPage(page) {
   document.getElementById("nav-mover").style.background  = page === "mover"  ? "var(--c1)" : "";
   document.getElementById("nav-mover").style.color       = page === "mover"  ? "#000" : "";
   document.getElementById("nav-mover").style.fontWeight  = page === "mover"  ? "600" : "";
-  if (page === "mover") buildStagesGrid();
+  if (page === "mover") { buildStagesGrid(); loadGBoard(); }
 }
 
 // ── MOVER OS ─────────────────────────────────────────────────
@@ -373,16 +382,24 @@ function onOsNumInput() {
   gCheckMove();
   if (!val || !gBoard) return;
   var cards = gBoard.cards || [];
-  var found = cards.find(function(card) {
+  var q = val.toLowerCase().replace(/[\D]/g, function(c, i, s) {
+    // keep letters and digits in original
+    return c;
+  });
+  var results = cards.filter(function(card) {
     return (card.osCode && card.osCode.toLowerCase().includes(val)) ||
            (card.nomeContato && card.nomeContato.toLowerCase().includes(val)) ||
-           (card.title && card.title.toLowerCase().includes(val));
+           (card.title && card.title.toLowerCase().includes(val)) ||
+           (card.descricao && card.descricao.toLowerCase().includes(val));
   });
+  var found = results[0] || null;
+  // If multiple results, still pick first but show count
+  
   if (found) {
     gSelCardId = found.pipefyId;
     var phase = BOARD_PHASES.find(function(p) { return p.id === found.phaseId; });
-    document.getElementById("os-found-title").textContent = found.title || (found.nomeContato || "") + " #" + (found.osCode || "");
-    document.getElementById("os-found-phase").textContent = phase ? phase.name : found.phaseId;
+    document.getElementById("os-found-title").textContent = (found.nomeContato || found.title || "") + (found.osCode ? " — OS #" + found.osCode : "");
+    document.getElementById("os-found-phase").textContent = (phase ? phase.name : found.phaseId) + (results.length > 1 ? " (" + results.length + " resultados, mostrando 1º)" : "");
     document.getElementById("os-found-info").style.display = "block";
     gCheckMove();
   }
