@@ -199,7 +199,9 @@ module.exports = async function handler(req, res) {
   if (action === "tecnico-load") {
     const db = await dbGet(GARANTIA_KEY) || defaultDB();
     const all = db.fichas || [];
-    const garantias = all.filter(f => f.phaseId !== "servico_finalizado");
+    // Só mostra fichas na fase inicial (garantia_acionada)
+    // Ao mover para em_analise ou servico_finalizado, sai da coluna do kanban tecnico
+    const garantias = all.filter(f => f.phaseId === "garantia_acionada");
     return res.status(200).json({ ok: true, garantias, lojaImediata: [] });
   }
   return res.status(404).json({ ok: false, error: "Acao nao encontrada" });
