@@ -219,6 +219,7 @@ function buildCard(r) {
     '<div class="result-body">' +
       '<div class="result-label">' + esc(r.label) + '</div>' +
       (r.sublabel ? '<div class="result-sub">' + esc(r.sublabel) + '</div>' : '') +
+      (r.descricao ? '<div style="font-size:12px;font-weight:600;color:var(--text);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px;">' + esc(r.descricao) + '</div>' : '') +
     '</div>' +
     '<div class="result-right">' +
       '<span class="fase-badge" style="' + badgeStyle + '">' + esc(r.fase) + '</span>' +
