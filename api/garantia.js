@@ -145,13 +145,15 @@ module.exports = async function handler(req, res) {
         return res.status(400).json({ ok: false, error: "tipo inválido: " + tipo });
 
       const db = await dbGet(GARANTIA_KEY) || defaultDB();
-      const ficha = {
+            const tecnico = (req.body.tecnico || "").trim();
+      ficha = {
         id:         uid(),
         nome:       nome.trim(),
         telefone:   telefone.trim(),
         defeito:    defeito.trim(),
         endereco:   (endereco || "").trim(),
         tipo,
+        tecnico:    tecnico || null,
         faseId:     primeiraFase(tipo),
         criadaEm:   new Date().toISOString(),
         movidaEm:   new Date().toISOString(),
@@ -279,6 +281,30 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, sincronizados, pipefyErro: r.error || null });
     }
 
+    if (action === "tecnico-load") {
+    const db = await dbGet(GARANTIA_KEY) || defaultDB();
+    const all = db.fichas || [];
+    return res.status(200).json({ ok: true,
+      garantias:    all.filter(f => (f.tipo === "loja_acompanhamento" || f.tipo === "delivery") && !f.concluida),
+      lojaImediata: all.filter(f => f.tipo === "loja_imediata" && !f.concluida)
+    });
+  }
+  if (action === "relatorio-tecnico") {
+    const db = await dbGet(GARANTIA_KEY) || defaultDB();
+    const all = db.fichas || [];
+    const agora = new Date();
+    const hist = [];
+    for (let m = 0; m < 6; m++) {
+      const d   = new Date(agora.getFullYear(), agora.getMonth() - m, 1);
+      const ym  = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0");
+      const lbl = d.toLocaleDateString("pt-BR", { month:"short", year:"2-digit" });
+      const fichasM = all.filter(f => f.criadaEm && f.criadaEm.slice(0,7) === ym);
+      const porTec  = {};
+      fichasM.forEach(f => { const t = f.tecnico || "N/D"; porTec[t] = (porTec[t]||0)+1; });
+      hist.push({ ym, label: lbl, total: fichasM.length, porTecnico: porTec });
+    }
+    return res.status(200).json({ ok: true, mesAtual: hist[0]||{label:"",total:0,porTecnico:{}}, historico: hist });
+  }
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch(e) {
