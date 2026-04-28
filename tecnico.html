@@ -581,6 +581,14 @@ const DEFAULT_BOARD = {
 let board = JSON.parse(JSON.stringify(DEFAULT_BOARD)); // começa com fases visíveis imediatamente
 let garantiasData = { garantias: [], lojaImediata: [] };
 let selCardId = null, selMovePhase = null, selCreatePhase = null;
+let selGarantiaId = null, selGarantiaFicha = null;
+const GARANTIA_FASES = {
+  loja_imediata:       [{id:'producao',label:'Produção'},{id:'conserto_concluido',label:'Conserto ✅'},{id:'equip_retirado',label:'Equip. Retirado'}],
+  loja_acompanhamento: [{id:'producao',label:'Produção'},{id:'conserto_concluido',label:'Conserto ✅'},{id:'teste_realizado',label:'Testado'},{id:'equip_retirado',label:'Equip. Retirado'}],
+  delivery:            [{id:'coleta_solicitada',label:'Coleta Sol.'},{id:'producao',label:'Produção'},{id:'conserto_concluido',label:'Conserto ✅'},{id:'teste_realizado',label:'Testado'},{id:'solicitar_entrega',label:'Ag. Entrega'},{id:'entrega_realizada',label:'Entregue'}],
+  rua:                 [{id:'garantia_solicitada',label:'Garantia Acionada'},{id:'equip_recolhido',label:'Equip. Recolhido'},{id:'conserto_realizado',label:'Conserto ✅'}],
+};
+
 let selTecnico = null, selBoardType = 'os';
 
 // ── API ────────────────────────────────────────────────────────
@@ -834,7 +842,7 @@ function sanitizeBoardClient(b) {
 // ── STAGE GRIDS ────────────────────────────────────────────────
 function renderStageGrids() {
   if (!board) return;
-  renderGrid('move-stages', board.phases);
+  if (!selGarantiaId) renderGrid('move-stages', board.phases);
   updateCreateStages();
 }
 
@@ -893,44 +901,86 @@ function pickTecnico(name) {
 // ── BUSCA OS ───────────────────────────────────────────────────
 function onOsNumInput() {
   const val = document.getElementById('os-num-input').value.trim();
-  selCardId = null;
+  selCardId = null; selGarantiaId = null; selGarantiaFicha = null;
   document.getElementById('os-found-info').style.display = 'none';
   document.getElementById('os-found-info').style.borderLeftColor = '';
   const s = document.getElementById('os-move-suggestions'); if(s) s.remove();
   checkMove();
   if (!val || val.length < 2) return;
   const q = val.toLowerCase();
-  const matches = (board?.cards || []).filter(c =>
+  const boardMatches = (board?.cards || []).filter(c =>
     (c.osCode && c.osCode.includes(q)) ||
     (c.nomeContato && c.nomeContato.toLowerCase().includes(q)) ||
     (c.title && c.title.toLowerCase().includes(q)) ||
     (c.descricao && c.descricao.toLowerCase().includes(q))
   );
-  if (matches.length === 1) { pickMoveCard(matches[0].pipefyId); return; }
-  if (matches.length === 0) {
-    document.getElementById('os-found-title').textContent = 'Nenhuma OS para "' + val + '"';
-    document.getElementById('os-found-phase').textContent = 'Verifique código, nome ou descrição';
+  const garAll = [...(garantiasData?.garantias||[]), ...(garantiasData?.lojaImediata||[])];
+  const garMatches = garAll.filter(f =>
+    (f.nome && f.nome.toLowerCase().includes(q)) ||
+    (f.telefone && f.telefone.replace(/\D/g,'').includes(q.replace(/\D/g,''))) ||
+    (f.defeito && f.defeito.toLowerCase().includes(q))
+  );
+  if (boardMatches.length===0 && garMatches.length===0) {
+    document.getElementById('os-found-title').textContent = 'Nenhum resultado para "' + val + '"';
+    document.getElementById('os-found-phase').textContent = 'Verifique nome, OS ou defeito';
     document.getElementById('os-found-info').style.display = 'block';
     document.getElementById('os-found-info').style.borderLeftColor = '#ef4444';
     return;
   }
-  // Dropdown
+  if (boardMatches.length===1 && garMatches.length===0) { pickMoveCard(boardMatches[0].pipefyId); return; }
+  if (garMatches.length===1 && boardMatches.length===0) { pickGarantiaCard(garMatches[0]); return; }
   const wrap = document.querySelector('.os-search-wrap');
   const sugEl = document.createElement('div');
   sugEl.id = 'os-move-suggestions';
-  sugEl.style.cssText = 'position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;z-index:50;max-height:220px;overflow-y:auto;';
-  matches.slice(0, 8).forEach(c => {
+  sugEl.style.cssText = 'position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;z-index:50;max-height:260px;overflow-y:auto;';
+  boardMatches.slice(0,5).forEach(c => {
     const ph = board.phases.find(p => p.id === c.phaseId);
     const row = document.createElement('div');
     row.style.cssText = 'padding:9px 13px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);transition:background 0.15s;';
-    row.onmouseenter = () => row.style.background = 'var(--surface2)';
-    row.onmouseleave = () => row.style.background = '';
-    row.innerHTML = `<div><span style="font-family:var(--fm);font-size:11px;color:var(--accent)">${c.osCode||'—'}</span><span style="font-size:11px;color:var(--text);margin-left:8px;">${c.nomeContato||c.title}</span></div><span style="font-family:var(--fm);font-size:10px;color:var(--muted);flex-shrink:0;margin-left:8px;">${ph?.name||'—'}</span>`;
-    row.onclick = () => { pickMoveCard(c.pipefyId); sugEl.remove(); };
+    row.onmouseenter=()=>row.style.background='var(--surface2)'; row.onmouseleave=()=>row.style.background='';
+    row.innerHTML = `<div><span style="font-family:var(--fm);font-size:11px;color:var(--blue)">${c.osCode||'—'}</span><span style="font-size:11px;color:var(--text);margin-left:8px;">${c.nomeContato||c.title}</span></div><span style="font-family:var(--fm);font-size:10px;color:var(--muted);">${ph?.name||'—'}</span>`;
+    row.onclick=()=>{ pickMoveCard(c.pipefyId); sugEl.remove(); };
     sugEl.appendChild(row);
   });
-  wrap.style.position = 'relative'; wrap.appendChild(sugEl);
+  const TLBL={loja_imediata:'🏪',loja_acompanhamento:'🔍',delivery:'🚚',rua:'🏘️'};
+  const FLBL={producao:'Produção',conserto_concluido:'Conserto ✅',teste_realizado:'Testado',equip_retirado:'Retirado',coleta_solicitada:'Coleta Sol.',solicitar_entrega:'Ag. Entrega',entrega_realizada:'Entregue',garantia_solicitada:'Garantia',equip_recolhido:'Recolhido',conserto_realizado:'OK'};
+  garMatches.slice(0,5).forEach(f => {
+    const row = document.createElement('div');
+    row.style.cssText = 'padding:9px 13px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);background:rgba(16,217,130,.04);transition:background 0.15s;';
+    row.onmouseenter=()=>row.style.background='rgba(16,217,130,.1)'; row.onmouseleave=()=>row.style.background='rgba(16,217,130,.04)';
+    row.innerHTML = `<div><span style="font-family:var(--fm);font-size:10px;color:#10d982">${TLBL[f.tipo]||f.tipo} Garantia</span><span style="font-size:11px;color:var(--text);margin-left:8px;">${f.nome}</span></div><span style="font-family:var(--fm);font-size:10px;color:var(--muted);">🛡️ ${FLBL[f.faseId]||f.faseId}</span>`;
+    row.onclick=()=>{ pickGarantiaCard(f); sugEl.remove(); };
+    sugEl.appendChild(row);
+  });
+  wrap.style.position='relative'; wrap.appendChild(sugEl);
 }
+
+function pickGarantiaCard(f) {
+  selGarantiaId=f.id; selGarantiaFicha=f; selCardId=null; selMovePhase=null;
+  const TLBL={loja_imediata:'🏪 Loja Imediata',loja_acompanhamento:'🔍 Loja Acomp.',delivery:'🚚 Delivery',rua:'🏘️ RS Rua'};
+  const FLBL={producao:'Produção',conserto_concluido:'Conserto Concluído',teste_realizado:'Testado',equip_retirado:'Equip. Retirado',coleta_solicitada:'Coleta Solicitada',solicitar_entrega:'Ag. Entrega',entrega_realizada:'Entregue',garantia_solicitada:'Garantia Acionada',equip_recolhido:'Recolhido',conserto_realizado:'Conserto OK'};
+  document.getElementById('os-num-input').value = f.nome;
+  document.getElementById('os-found-title').textContent = '🛡️ ' + (TLBL[f.tipo]||f.tipo) + ' — ' + f.defeito.slice(0,50);
+  document.getElementById('os-found-phase').textContent = '📍 ' + (FLBL[f.faseId]||f.faseId) + (f.tecnico?' • 👨‍🔧 '+f.tecnico:'');
+  document.getElementById('os-found-info').style.borderLeftColor = '#10d982';
+  document.getElementById('os-found-info').style.display = 'block';
+  const s = document.getElementById('os-move-suggestions'); if(s) s.remove();
+  const fases = GARANTIA_FASES[f.tipo]||[];
+  const stagesEl = document.getElementById('move-stages');
+  if (stagesEl) {
+    const colors=['#10d982','#3b9eff','#f5c800','#f97316','#a855f7','#ef4444'];
+    stagesEl.innerHTML = fases.map((ph,i)=>`<button class="stage-btn" data-id="${ph.id}" onclick="pickGarantiaPhase('${ph.id}','${colors[i%colors.length]}',this)"><div class="stage-dot" style="background:${colors[i%colors.length]}"></div>${ph.label}</button>`).join('');
+  }
+  checkMove();
+}
+
+function pickGarantiaPhase(id, color, btn) {
+  selMovePhase=id;
+  document.querySelectorAll('#move-stages .stage-btn').forEach(b=>{b.classList.remove('selected');b.style.background='';b.style.color='';});
+  if(btn){btn.classList.add('selected');btn.style.background=color;btn.style.color='#000';}
+  checkMove();
+}
+
 
 function pickMoveCard(pipefyId) {
   const c = (board?.cards || []).find(x => x.pipefyId === pipefyId);
@@ -947,7 +997,7 @@ function pickMoveCard(pipefyId) {
 }
 
 function checkMove() {
-  document.getElementById('btn-move').disabled = !(selCardId && selMovePhase);
+  document.getElementById('btn-move').disabled = !((selCardId || selGarantiaId) && selMovePhase);
 }
 function checkCreate() {
   const nome = document.getElementById('create-nome').value.trim();
@@ -1021,6 +1071,22 @@ async function compraModalConfirm() {
 
 // ── SUBMIT MOVE ────────────────────────────────────────────────
 async function submitMove() {
+  if (selGarantiaId) {
+    const btn=document.getElementById('btn-move'); btn.disabled=true; btn.textContent='⏳ Movendo...';
+    try {
+      const res=await fetch('/api/garantia?action=mover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:selGarantiaId,faseId:selMovePhase})});
+      const d=await res.json();
+      if(!d.ok) throw new Error(d.error||'Falha');
+      const FLBL={producao:'Produção',conserto_concluido:'Conserto ✅',teste_realizado:'Testado',equip_retirado:'Equip. Retirado',coleta_solicitada:'Coleta Sol.',solicitar_entrega:'Ag. Entrega',entrega_realizada:'Entregue',garantia_solicitada:'Garantia',equip_recolhido:'Recolhido',conserto_realizado:'Conserto OK'};
+      showToast('✅','Garantia movida!', FLBL[selMovePhase]||selMovePhase);
+      document.getElementById('os-num-input').value='';
+      document.getElementById('os-found-info').style.display='none';
+      selGarantiaId=null; selGarantiaFicha=null; selMovePhase=null;
+      renderStageGrids();
+      await loadBoard();
+    } catch(e){showToast('❌','Erro',e.message);}
+    document.getElementById('btn-move').innerHTML='→ Mover OS'; checkMove(); return;
+  }
   // Intercepta comprar_peca para abrir modal de fotos/descrição
   if (selMovePhase === 'comprar_peca') {
     const card = board.cards.find(c => c.pipefyId === selCardId);
