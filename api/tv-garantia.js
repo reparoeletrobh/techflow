@@ -196,5 +196,11 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, removidos: antes - db.syncedIds.length });
   }
 
+  if (action === "tecnico-load") {
+    const db = await dbGet(GARANTIA_KEY) || defaultDB();
+    const all = db.fichas || [];
+    const garantias = all.filter(f => f.phaseId !== "servico_finalizado");
+    return res.status(200).json({ ok: true, garantias, lojaImediata: [] });
+  }
   return res.status(404).json({ ok: false, error: "Acao nao encontrada" });
 };
