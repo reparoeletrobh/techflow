@@ -573,10 +573,13 @@ let garantiasData = { garantias: [], lojaImediata: [] };
 let selCardId = null, selMovePhase = null, selCreatePhase = null;
 let selGarantiaId = null, selGarantiaFicha = null;
 const GARANTIA_FASES = {
-  loja_imediata:       [{id:'producao',label:'Produção'},{id:'conserto_concluido',label:'Conserto ✅'},{id:'equip_retirado',label:'Equip. Retirado'}],
-  loja_acompanhamento: [{id:'producao',label:'Produção'},{id:'conserto_concluido',label:'Conserto ✅'},{id:'teste_realizado',label:'Testado'},{id:'equip_retirado',label:'Equip. Retirado'}],
-  delivery:            [{id:'coleta_solicitada',label:'Coleta Sol.'},{id:'producao',label:'Produção'},{id:'conserto_concluido',label:'Conserto ✅'},{id:'teste_realizado',label:'Testado'},{id:'solicitar_entrega',label:'Ag. Entrega'},{id:'entrega_realizada',label:'Entregue'}],
-  rua:                 [{id:'garantia_solicitada',label:'Garantia Acionada'},{id:'equip_recolhido',label:'Equip. Recolhido'},{id:'conserto_realizado',label:'Conserto ✅'}],
+  // TV usa fases simples: garantia_acionada → em_analise → servico_finalizado
+  tv_garantia: [{id:'garantia_acionada',label:'Garantia Acionada'},{id:'em_analise',label:'Em Análise'},{id:'servico_finalizado',label:'Serviço Finalizado'}],
+  // fallback — não usado no TV
+  loja_imediata: [{id:'garantia_acionada',label:'Garantia Acionada'},{id:'em_analise',label:'Em Análise'},{id:'servico_finalizado',label:'Serviço Finalizado'}],
+  loja_acompanhamento: [{id:'garantia_acionada',label:'Garantia Acionada'},{id:'em_analise',label:'Em Análise'},{id:'servico_finalizado',label:'Serviço Finalizado'}],
+  delivery: [{id:'garantia_acionada',label:'Garantia Acionada'},{id:'em_analise',label:'Em Análise'},{id:'servico_finalizado',label:'Serviço Finalizado'}],
+  rua: [{id:'garantia_acionada',label:'Garantia Acionada'},{id:'em_analise',label:'Em Análise'},{id:'servico_finalizado',label:'Serviço Finalizado'}],
 };
 
 let selTecnico = null, selBoardType = 'os';
@@ -609,7 +612,7 @@ async function loadBoard() {
     document.getElementById('error-banner').style.display = 'block';
     document.getElementById('error-banner').textContent = '⚠️ Erro ao conectar: ' + e.message;
   }
-  try { const gr=await fetch('/api/garantia?action=tecnico-load'); const gd=await gr.json(); if(gd.ok) garantiasData={garantias:gd.garantias||[],lojaImediata:gd.lojaImediata||[]}; } catch(e){}
+  try { const gr=await fetch('/api/tv-garantia?action=tecnico-load'); const gd=await gr.json(); if(gd.ok) garantiasData={garantias:gd.garantias||[],lojaImediata:gd.lojaImediata||[]}; } catch(e){}
   renderBoard();
   renderStageGrids();
   document.getElementById('stat-total').textContent = board.cards.length;
@@ -909,7 +912,7 @@ function onOsNumInput() {
     sugEl.appendChild(row);
   });
   const TLBL={loja_imediata:'🏪',loja_acompanhamento:'🔍',delivery:'🚚',rua:'🏘️'};
-  const FLBL={producao:'Produção',conserto_concluido:'Conserto ✅',teste_realizado:'Testado',equip_retirado:'Retirado',coleta_solicitada:'Coleta Sol.',solicitar_entrega:'Ag. Entrega',entrega_realizada:'Entregue',garantia_solicitada:'Garantia',equip_recolhido:'Recolhido',conserto_realizado:'OK'};
+  const FLBL={garantia_acionada:'Garantia Acionada',em_analise:'Em Análise',servico_finalizado:'Serviço Finalizado'};
   garMatches.slice(0,5).forEach(f => {
     const row = document.createElement('div');
     row.style.cssText = 'padding:9px 13px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);background:rgba(16,217,130,.04);transition:background 0.15s;';
@@ -1040,10 +1043,10 @@ async function submitMove() {
   if (selGarantiaId) {
     const btn=document.getElementById('btn-move'); btn.disabled=true; btn.textContent='⏳ Movendo...';
     try {
-      const res=await fetch('/api/garantia?action=mover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:selGarantiaId,faseId:selMovePhase})});
+      const res=await fetch('/api/tv-garantia?action=mover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:selGarantiaId,faseId:selMovePhase})});
       const d=await res.json();
       if(!d.ok) throw new Error(d.error||'Falha');
-      const FLBL={producao:'Produção',conserto_concluido:'Conserto ✅',teste_realizado:'Testado',equip_retirado:'Equip. Retirado',coleta_solicitada:'Coleta Sol.',solicitar_entrega:'Ag. Entrega',entrega_realizada:'Entregue',garantia_solicitada:'Garantia',equip_recolhido:'Recolhido',conserto_realizado:'Conserto OK'};
+      const FLBL={garantia_acionada:'Garantia Acionada',em_analise:'Em Análise',servico_finalizado:'Serviço Finalizado'};
       showToast('✅','Garantia movida!', FLBL[selMovePhase]||selMovePhase);
       document.getElementById('os-num-input').value='';
       document.getElementById('os-found-info').style.display='none';
