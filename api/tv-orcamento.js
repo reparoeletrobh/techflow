@@ -252,11 +252,11 @@ module.exports = async function handler(req, res) {
             }
 
             // ── GERAÇÃO NORMAL ─────────────────────────────────────
-            var _mPol = _textoFull.match(/(d{2})s*(?:pol(?:egadas?)?|"|'')/i);
+            var _mPol = _textoFull.match(/(\d{2})\s*(?:pol(?:egadas?)?|")/i);
             var _pol = null;
             if (_mPol) { _pol = parseInt(_mPol[1]); }
             else {
-              var _nums = _textoFull.match(/([3-7]d)/g);
+              var _nums = _textoFull.match(/\b([3-7]\d)\b/g);
               if (_nums) { for (var _n of _nums) { var _v=parseInt(_n); if(_v>=30&&_v<=79){_pol=_v;break;} } }
             }
             var _tl = _textoFull.toLowerCase();
@@ -284,7 +284,7 @@ module.exports = async function handler(req, res) {
             }
 
             // ── REGRA ACRILICO ─────────────────────────────────────
-            var _mAcrilico = _textoFull.match(/acr[ií]licos*:s*([d.,]+)/i);
+            var _mAcrilico = _textoFull.match(/acrilico\s*:\s*([\d.,]+)/i);
             if (_mAcrilico) {
               textoOrc += "\n\nDevido ao superaquecimento dos barramentos o acrilico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV esta com cores mais claras. Sem trocar o acrilico voce pode considerar uma qualidade de 80 a 90%. Trocando o Acrilico fica 100% e tem um custo adicional de " + _mAcrilico[1] + " reais. Aguardo sua resposta.";
             }
