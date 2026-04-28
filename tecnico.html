@@ -579,6 +579,7 @@ const DEFAULT_BOARD = {
   cards: [], rsCards: [], rsRuaCards: [], syncedIds: [], movesLog: [],
 };
 let board = JSON.parse(JSON.stringify(DEFAULT_BOARD)); // começa com fases visíveis imediatamente
+let garantiasData = { garantias: [], lojaImediata: [] };
 let selCardId = null, selMovePhase = null, selCreatePhase = null;
 let selTecnico = null, selBoardType = 'os';
 
@@ -616,6 +617,7 @@ async function loadBoard() {
     document.getElementById('error-banner').style.display = 'block';
     document.getElementById('error-banner').textContent = '⚠️ Erro ao conectar: ' + e.message;
   }
+  try { const gr=await fetch('/api/garantia?action=tecnico-load'); const gd=await gr.json(); if(gd.ok) garantiasData={garantias:gd.garantias||[],lojaImediata:gd.lojaImediata||[]}; } catch(e){}
   renderBoard();
   renderStageGrids();
   document.getElementById('stat-total').textContent = board.cards.length;
@@ -668,6 +670,13 @@ function renderBoard() {
   });
   const atrasadosIds = new Set(atrasadosCards.map(c => c.pipefyId));
 
+  // ── Garantia cols ──
+  [{label:'🛡️ Garantias',color:'#3b9eff',cards:garantiasData.garantias||[]},{label:'🏪 RS Loja Imediata',color:'#10d982',cards:garantiasData.lojaImediata||[]}].forEach(function(gc){
+    const c=document.createElement('div');c.className='kanban-col';
+    c.innerHTML='<div class="col-header"><div class="col-stripe" style="background:'+gc.color+'"></div><div class="col-title">'+gc.label+'</div><div class="col-count">'+gc.cards.length+'</div></div><div class="col-body">'+
+      (gc.cards.length===0?'<div class="empty-col">— vazio —</div>':gc.cards.map(function(f){return '<div class="os-card"><div class="card-bar" style="background:'+gc.color+'"></div><div class="card-num" style="color:'+gc.color+'">'+(f.tipo==='loja_imediata'?'🏪':f.tipo==='delivery'?'🚚':'🔍')+'</div><div class="card-title">'+(f.nome||'—')+'</div>'+(f.defeito?'<div class="card-desc">'+f.defeito.slice(0,60)+'</div>':'')+'<div class="card-footer"><div class="card-age">'+( f.criadaEm?new Date(f.criadaEm).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"}):"—")+'</div><div class="card-by" style="color:'+gc.color+';font-weight:700;">'+(f.tecnico||"—")+'</div></div></div>';}).join(''))+'</div>';
+    b.appendChild(c);
+  });
   board.phases.forEach((ph, i) => {
     const color = COLORS[i % COLORS.length];
     let cards;
