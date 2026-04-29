@@ -321,9 +321,12 @@ module.exports = async function handler(req, res) {
     if (changed) await dbSet(GARANTIA_KEY, db);
 
     // Colunas: só fichas ativas (não concluídas)
+    // Coluna do técnico: só fichas em "producao" — equipamento está na loja
+    // coleta_solicitada = ainda na casa do cliente, não aparece aqui
+    const naLoja = f => !f.concluida && f.faseId === "producao";
     return res.status(200).json({ ok: true,
-      garantias:    all.filter(f => (f.tipo === "loja_acompanhamento" || f.tipo === "delivery") && !f.concluida),
-      lojaImediata: all.filter(f => f.tipo === "loja_imediata" && !f.concluida)
+      garantias:    all.filter(f => (f.tipo === "loja_acompanhamento" || f.tipo === "delivery") && naLoja(f)),
+      lojaImediata: all.filter(f => f.tipo === "loja_imediata" && naLoja(f))
     });
   }
   if (action === "relatorio-tecnico") {
