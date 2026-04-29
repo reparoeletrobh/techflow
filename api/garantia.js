@@ -285,29 +285,42 @@ module.exports = async function handler(req, res) {
     const db = await dbGet(GARANTIA_KEY) || defaultDB();
     const all = db.fichas || [];
 
+    // Fases terminais — ao chegar aqui a ficha sai das colunas automaticamente
+    const FASES_TERMINAIS = ["entrega_realizada","equip_retirado","conserto_realizado","servico_finalizado"];
+    let changed = false;
+    for (const f of all) {
+      if (!f.concluida && FASES_TERMINAIS.includes(f.faseId)) {
+        f.concluida = true;
+        f.concluidaEm = f.concluidaEm || new Date().toISOString();
+        f.concluidaMotivo = "fase_terminal_local";
+        changed = true;
+      }
+    }
+
     // Auto-concluir fichas cujo card Pipefy está em Finalizado
     const ativas = all.filter(f => !f.concluida && f.pipefyId);
     if (ativas.length > 0) {
       try {
         const qp = ativas.map(f => 'c' + f.pipefyId + ': card(id: "' + f.pipefyId + '") { id current_phase { id name } }').join("\n");
         const pdata = await pipefyQuery("query {\n" + qp + "\n}");
-        let changed = false;
         for (const ficha of ativas) {
           const card = pdata && pdata["c" + ficha.pipefyId];
           if (!card) continue;
           const pid   = (card.current_phase && card.current_phase.id)   || "";
           const pname = (card.current_phase && card.current_phase.name  || "").toLowerCase();
-          if (pid === PIPEFY_FASE_FINALIZADO || pname.includes("finalizado") || pname.includes("erp") || pname.includes("concluido") || pname.includes("conclu")) {
+          if (pid === PIPEFY_FASE_FINALIZADO || pname.includes("finalizado") || pname.includes("erp")) {
             ficha.concluida = true;
             ficha.concluidaEm = ficha.concluidaEm || new Date().toISOString();
             ficha.concluidaMotivo = "pipefy_finalizado";
             changed = true;
           }
         }
-        if (changed) await dbSet(GARANTIA_KEY, db);
       } catch(e) { /* silencioso */ }
     }
 
+    if (changed) await dbSet(GARANTIA_KEY, db);
+
+    // Colunas: só fichas ativas (não concluídas)
     return res.status(200).json({ ok: true,
       garantias:    all.filter(f => (f.tipo === "loja_acompanhamento" || f.tipo === "delivery") && !f.concluida),
       lojaImediata: all.filter(f => f.tipo === "loja_imediata" && !f.concluida)
@@ -329,7 +342,26 @@ module.exports = async function handler(req, res) {
     }
     return res.status(200).json({ ok: true, mesAtual: hist[0]||{label:"",total:0,porTecnico:{}}, historico: hist });
   }
-    return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+      // ── force-saida-colunas — força saída de fichas em fases terminais ──
+  if (action === "force-saida-colunas") {
+    const db = await dbGet(GARANTIA_KEY) || defaultDB();
+    const FASES_T = ["entrega_realizada","equip_retirado","conserto_realizado","servico_finalizado"];
+    let count = 0;
+    const removidas = [];
+    for (const f of db.fichas || []) {
+      if (!f.concluida && FASES_T.includes(f.faseId)) {
+        f.concluida = true;
+        f.concluidaEm = new Date().toISOString();
+        f.concluidaMotivo = "force_saida";
+        removidas.push({ id: f.id, nome: f.nome, faseId: f.faseId });
+        count++;
+      }
+    }
+    if (count > 0) await dbSet(GARANTIA_KEY, db);
+    return res.status(200).json({ ok: true, removidas, total: count });
+  }
+
+  return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch(e) {
     return res.status(200).json({ ok: false, error: "Erro interno: " + e.message });
