@@ -230,7 +230,11 @@ async function enviarDiag(pid){
     var r=await fetch('/api/tv-coleta?action=diagnostico',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pipefyId:pid,texto:texto,modelo:modelo})});
     var d=await r.json();
     if(!d.ok)throw new Error(d.error||'Falha');
-    toast('\u2705 Diagnóstico registrado!','var(--green)');
+    if(d.moveWarning){
+      toast('\u26A0\uFE0F Diagnóstico salvo, mas falhou mover no Pipefy: '+d.moveWarning,'var(--orange)');
+    } else {
+      toast('\u2705 Diagnóstico registrado e enviado para Aguardando Aprovação!','var(--green)');
+    }
     await loadCurrent();
   }catch(e){toast('\u274C '+e.message,'#ef4444');if(btn){btn.disabled=false;btn.textContent='\u2705 Registrar';}}
 }
