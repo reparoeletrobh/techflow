@@ -475,13 +475,22 @@ module.exports = async function handler(req, res) {
       return c.coletaPhase === "orcamento_registrado" && c.diagnostico && c.pipefyId;
     });
     const results = [];
-    for (const card of pendentes) {
-      try {
-        await pipefyMutation('mutation { moveCardToPhase(input: { card_id: "' + card.pipefyId + '", destination_phase_id: "341638194" }) { card { id } } }');
-        results.push({ pipefyId: card.pipefyId, nome: card.nomeContato || card.osCode || card.pipefyId, ok: true });
-      } catch(e) {
-        results.push({ pipefyId: card.pipefyId, nome: card.nomeContato || card.osCode || card.pipefyId, ok: false, error: e.message });
+    const mover2passos = async function(cid) {
+      const move = function(pid, dest) {
+        return pipefyMutation('mutation { moveCardToPhase(input: { card_id: "' + pid + '", destination_phase_id: "' + dest + '" }) { card { id } } }');
+      };
+      try { await move(cid, "341638194"); return { ok: true, via: "direto" }; }
+      catch(e1) {
+        if (e1.message && e1.message.includes("fase")) {
+          try { await move(cid, "341638197"); await move(cid, "341638194"); return { ok: true, via: "intermediaria" }; }
+          catch(e2) { return { ok: false, error: e2.message }; }
+        }
+        return { ok: false, error: e1.message };
       }
+    };
+    for (const card of pendentes) {
+      const r = await mover2passos(card.pipefyId);
+      results.push({ pipefyId: card.pipefyId, nome: card.nomeContato || card.osCode || card.pipefyId, ...r });
     }
     return res.status(200).json({ ok: true, total: pendentes.length, results: results });
   }
