@@ -197,13 +197,29 @@ module.exports = async function handler(req, res) {
 
       var pipefyMove = { ok: false };
       try {
-        var phaseId = await getAguardandoAprovacaoId();
-        if (phaseId) {
-          await pipefyMutation('mutation { moveCardToPhase(input: { card_id: "' + pipefyId + '", destination_phase_id: "' + phaseId + '" }) { card { id } } }');
-          pipefyMove = { ok: true, phaseId: phaseId };
-        } else {
-          pipefyMove = { ok: false, error: "Fase Aguardando Aprovacao nao encontrada" };
+        // Tenta direto para Aguardando Aprovação (341638194).
+        // Se recusar (fase não válida), passa por Aguardando Orçamento (341638197) primeiro.
+        async function moverParaAprovacao(cid) {
+          const APROVACAO = "341638194";
+          const ORCAMENTO = "341638197";
+          const move = function(pid, dest) {
+            return pipefyMutation('mutation { moveCardToPhase(input: { card_id: "' + pid + '", destination_phase_id: "' + dest + '" }) { card { id } } }');
+          };
+          try {
+            await move(cid, APROVACAO);
+            return { ok: true, via: "direto" };
+          } catch(e1) {
+            if (e1.message && e1.message.includes("fase")) {
+              try {
+                await move(cid, ORCAMENTO);
+                await move(cid, APROVACAO);
+                return { ok: true, via: "intermediaria" };
+              } catch(e2) { return { ok: false, error: e2.message }; }
+            }
+            return { ok: false, error: e1.message };
+          }
         }
+        pipefyMove = await moverParaAprovacao(pipefyId);
       } catch(e) { pipefyMove = { ok: false, error: e.message }; }
 
       // Se o move Pipefy falhou, retorna aviso mas ainda ok:true (diagnostico salvo)
