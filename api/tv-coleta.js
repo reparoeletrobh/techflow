@@ -470,6 +470,67 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, total: pendentes.length, results: results });
   }
 
+    // ── forcar-aguardando — força 6 fichas específicas para Aguardando Aprovação ──
+  if (action === "forcar-aguardando") {
+    // IDs confirmados do resultado anterior
+    const targets = [
+      { os: "7807", pipefyId: "1343132179", nome: "Pedro 7807"    },
+      { os: "4401", pipefyId: "1343239129", nome: "Fabiano 4401"  },
+      { os: "9941", pipefyId: "1342560226", nome: "Sheila 9941"   },
+      { os: "7631", pipefyId: "1342463023", nome: "Edileuza 7631" },
+      { os: "2230", pipefyId: "1342167738", nome: "Roseane 2230"  },
+      { os: "2750", pipefyId: "1340294528", nome: "Luana 2750"    },
+    ];
+
+    // Fases candidatas — tenta em ordem até alguma aceitar
+    const CANDIDATE_PHASES = [
+      "341638194", // Aguardando Aprovação (Enviados)
+      "341638197", // Aguardando Orçamento (novos)
+      "341638196", // possível fase intermediária
+      "341638195", // possível fase intermediária
+      "341638198", // possível fase intermediária
+    ];
+
+    const results = [];
+    for (const target of targets) {
+      // Primeiro: verificar fase atual do card
+      let currentPhase = null;
+      try {
+        const qr = await fetch(PIPEFY_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + (process.env.PIPEFY_TOKEN||"").trim() },
+          body: JSON.stringify({ query: 'query { card(id: "' + target.pipefyId + '") { id current_phase { id name } } }' })
+        });
+        const qj = await qr.json();
+        currentPhase = qj.data?.card?.current_phase;
+      } catch(e) {}
+
+      // Se já está em Aguardando Aprovação, pular
+      if (currentPhase && (currentPhase.id === "341638194" || currentPhase.id === "341638197")) {
+        results.push({ ...target, ok: true, skipped: true, currentPhase: currentPhase.name, msg: "Já está em " + currentPhase.name });
+        continue;
+      }
+
+      // Tenta mover para cada fase candidata
+      let moved = false;
+      let lastErr = "";
+      for (const phaseId of CANDIDATE_PHASES) {
+        try {
+          await pipefyMutation('mutation { moveCardToPhase(input: { card_id: "' + target.pipefyId + '", destination_phase_id: "' + phaseId + '" }) { card { id current_phase { id name } } } }');
+          moved = true;
+          results.push({ ...target, ok: true, movedTo: phaseId, currentPhase: currentPhase?.name || "?" });
+          break;
+        } catch(e) {
+          lastErr = e.message;
+        }
+      }
+      if (!moved) {
+        results.push({ ...target, ok: false, currentPhase: currentPhase?.name || "?", error: lastErr });
+      }
+    }
+    return res.status(200).json({ ok: true, results });
+  }
+
   return res.status(404).json({ ok: false, error: "Acao nao encontrada: " + action });
 
   } catch(e) {
