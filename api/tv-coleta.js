@@ -556,6 +556,60 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, results });
   }
 
+    // ── force-edna-jessica — move forçado com descoberta de fase atual ──
+  if (action === "force-edna-jessica") {
+    const targets = [
+      { nome: "Edna 2829",    pipefyId: "1342193349" },
+      { nome: "Jessica 4704", pipefyId: "1342442208" },
+    ];
+    // Todas as fases do pipe TV em ordem de fluxo (IDs confirmados + intermediários prováveis)
+    // 341638193=Liberado Rota, 194=Ag.Aprovação, 197=Ag.Orçamento, 199=Sol.Entrega, 211=ERP
+    // IDs do 193 ao 211 — tenta cada um como intermediário
+    const ALL_IDS = ["341638193","341638194","341638195","341638196","341638197",
+                     "341638198","341638199","341638200","341638201","341638202",
+                     "341638203","341638204","341638205","341638206","341638207",
+                     "341638208","341638209","341638210","341638211"];
+    const DEST = "341638194";
+    const move = function(cid, dest) {
+      return pipefyMutation('mutation { moveCardToPhase(input: { card_id: "' + cid + '", destination_phase_id: "' + dest + '" }) { card { id current_phase { id name } } } }');
+    };
+    const getPhase = async function(cid) {
+      const r = await fetch("https://api.pipefy.com/graphql", {
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":"Bearer "+process.env.PIPEFY_TOKEN},
+        body:JSON.stringify({query:'query{card(id:"'+cid+'"){current_phase{id name}}}'})
+      });
+      const j = await r.json();
+      return j.data?.card?.current_phase;
+    };
+    const results = [];
+    for (const t of targets) {
+      // Descobre fase atual
+      let currentPhase = null;
+      try { currentPhase = await getPhase(t.pipefyId); } catch(e) {}
+      // Tenta direto primeiro
+      try {
+        const r = await move(t.pipefyId, DEST);
+        const newPhase = r?.data?.moveCardToPhase?.card?.current_phase;
+        results.push({...t, ok:true, via:"direto", currentPhase: currentPhase?.name, newPhase: newPhase?.name});
+        continue;
+      } catch(e0) {}
+      // Tenta cada fase como intermediário
+      let moved = false;
+      for (const mid of ALL_IDS) {
+        if (mid === DEST) continue;
+        try {
+          await move(t.pipefyId, mid);
+          await move(t.pipefyId, DEST);
+          results.push({...t, ok:true, via:"via "+mid, currentPhase: currentPhase?.name});
+          moved = true; break;
+        } catch(e) {}
+      }
+      if (!moved) results.push({...t, ok:false, currentPhase: currentPhase?.name, error:"Nenhuma rota funcionou"});
+    }
+    return res.status(200).json({ok:true, results});
+  }
+
   return res.status(404).json({ ok: false, error: "Acao nao encontrada: " + action });
 
   } catch(e) {
