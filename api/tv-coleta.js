@@ -60,24 +60,11 @@ async function pipefyMutation(query) {
   return j.data;
 }
 
+// Phase ID hardcoded — confirmado em api/tv-orcamento.js linha 906
+const AGUARDANDO_APROVACAO_ID = "341638194";
+
 async function getAguardandoAprovacaoId() {
-  const token = (process.env.PIPEFY_TOKEN || "").trim();
-  if (!token) return null;
-  try {
-    const r = await fetch(PIPEFY_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-      body: JSON.stringify({ query: 'query { pipe(id: "' + TV_PIPE_ID + '") { phases { id name } } }' }),
-    });
-    const j = await r.json();
-    const phases = (j.data && j.data.pipe && j.data.pipe.phases) || [];
-    const found = phases.find(function(p) {
-      return p.name.toLowerCase().includes("aguardando") && p.name.toLowerCase().includes("aprova");
-    }) || phases.find(function(p) {
-      return p.name.toLowerCase().includes("aprovacao") || p.name.toLowerCase().includes("aprovacao");
-    });
-    return found ? found.id : null;
-  } catch(e) { return null; }
+  return AGUARDANDO_APROVACAO_ID;
 }
 
 async function getERPPhaseId() {
@@ -219,7 +206,9 @@ module.exports = async function handler(req, res) {
         }
       } catch(e) { pipefyMove = { ok: false, error: e.message }; }
 
-      return res.status(200).json({ ok: true, card: card, pipefyComment: pipefyComment, pipefyMove: pipefyMove });
+      // Se o move Pipefy falhou, retorna aviso mas ainda ok:true (diagnostico salvo)
+      const moveWarning = (!pipefyMove.ok) ? ("Pipefy move falhou: " + (pipefyMove.error || "nao encontrado")) : null;
+      return res.status(200).json({ ok: true, card: card, pipefyComment: pipefyComment, pipefyMove: pipefyMove, moveWarning: moveWarning });
     }
 
     // POST salvar-relatorio (motorista)
@@ -441,7 +430,29 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
-    return res.status(404).json({ ok: false, error: "Acao nao encontrada: " + action });
+    
+  // ── GET retry-mover-aguardando ─────────────────────────────────────────────
+  if (action === "retry-mover-aguardando") {
+    const coleta = (await dbGet(COLETA_KEY)) || { cards: [] };
+    const pendentes = (coleta.cards || []).filter(function(c) {
+      return c.coletaPhase === "orcamento_registrado" && c.diagnostico && c.pipefyId;
+    });
+    const results = [];
+    for (const card of pendentes) {
+      try {
+        await pipefyMutation(
+          'mutation { moveCardToPhase(input: { card_id: "' + card.pipefyId +
+          '", destination_phase_id: "' + AGUARDANDO_APROVACAO_ID + '" }) { card { id } } }'
+        );
+        results.push({ pipefyId: card.pipefyId, nome: card.nomeContato || card.osCode || card.pipefyId, ok: true });
+      } catch(e) {
+        results.push({ pipefyId: card.pipefyId, nome: card.nomeContato || card.osCode || card.pipefyId, ok: false, error: e.message });
+      }
+    }
+    return res.status(200).json({ ok: true, total: pendentes.length, results: results });
+  }
+
+  return res.status(404).json({ ok: false, error: "Acao nao encontrada: " + action });
 
   } catch(e) {
     return res.status(500).json({ ok: false, error: "Erro interno: " + e.message });
