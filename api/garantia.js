@@ -284,6 +284,30 @@ module.exports = async function handler(req, res) {
     if (action === "tecnico-load") {
     const db = await dbGet(GARANTIA_KEY) || defaultDB();
     const all = db.fichas || [];
+
+    // Auto-concluir fichas cujo card Pipefy está em Finalizado
+    const ativas = all.filter(f => !f.concluida && f.pipefyId);
+    if (ativas.length > 0) {
+      try {
+        const qp = ativas.map(f => 'c' + f.pipefyId + ': card(id: "' + f.pipefyId + '") { id current_phase { id name } }').join("\n");
+        const pdata = await pipefyQuery("query {\n" + qp + "\n}");
+        let changed = false;
+        for (const ficha of ativas) {
+          const card = pdata && pdata["c" + ficha.pipefyId];
+          if (!card) continue;
+          const pid   = (card.current_phase && card.current_phase.id)   || "";
+          const pname = (card.current_phase && card.current_phase.name  || "").toLowerCase();
+          if (pid === PIPEFY_FASE_FINALIZADO || pname.includes("finalizado") || pname.includes("erp") || pname.includes("concluido") || pname.includes("conclu")) {
+            ficha.concluida = true;
+            ficha.concluidaEm = ficha.concluidaEm || new Date().toISOString();
+            ficha.concluidaMotivo = "pipefy_finalizado";
+            changed = true;
+          }
+        }
+        if (changed) await dbSet(GARANTIA_KEY, db);
+      } catch(e) { /* silencioso */ }
+    }
+
     return res.status(200).json({ ok: true,
       garantias:    all.filter(f => (f.tipo === "loja_acompanhamento" || f.tipo === "delivery") && !f.concluida),
       lojaImediata: all.filter(f => f.tipo === "loja_imediata" && !f.concluida)
