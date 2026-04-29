@@ -364,6 +364,28 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, removidas, total: count });
   }
 
+    // ── check-pipefy-phases — consulta fase atual no Pipefy de todas as fichas ativas ──
+  if (action === "check-pipefy-phases") {
+    const db = await dbGet(GARANTIA_KEY) || defaultDB();
+    const all = db.fichas || [];
+    const ativas = all.filter(f => !f.concluida && f.pipefyId);
+    if (!ativas.length) return res.status(200).json({ ok: true, resultados: [] });
+    const qp = ativas.map(f => 'c' + f.pipefyId + ': card(id: "' + f.pipefyId + '") { id title current_phase { id name } }').join("\n");
+    const pdata = await pipefyQuery("query {\n" + qp + "\n}");
+    const resultados = ativas.map(f => {
+      const card = pdata && pdata["c" + f.pipefyId];
+      return {
+        id: f.id, nome: f.nome, tipo: f.tipo,
+        faseLocal: f.faseId,
+        pipefyId: f.pipefyId,
+        pipefyFase: card && card.current_phase ? card.current_phase.name : "NAO_ENCONTRADO",
+        pipefyFaseId: card && card.current_phase ? card.current_phase.id : null,
+        pipefyTitle: card ? card.title : null,
+      };
+    });
+    return res.status(200).json({ ok: true, total: resultados.length, resultados });
+  }
+
   return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch(e) {
