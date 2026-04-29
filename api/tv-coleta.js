@@ -452,6 +452,24 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, total: pendentes.length, results: results });
   }
 
+    // ── retry-mover-aguardando — move retroativamente fichas com diagnostico ──
+  if (action === "retry-mover-aguardando") {
+    const coleta = (await dbGet(COLETA_KEY)) || { cards: [] };
+    const pendentes = (coleta.cards || []).filter(function(c) {
+      return c.coletaPhase === "orcamento_registrado" && c.diagnostico && c.pipefyId;
+    });
+    const results = [];
+    for (const card of pendentes) {
+      try {
+        await pipefyMutation('mutation { moveCardToPhase(input: { card_id: "' + card.pipefyId + '", destination_phase_id: "341638194" }) { card { id } } }');
+        results.push({ pipefyId: card.pipefyId, nome: card.nomeContato || card.osCode || card.pipefyId, ok: true });
+      } catch(e) {
+        results.push({ pipefyId: card.pipefyId, nome: card.nomeContato || card.osCode || card.pipefyId, ok: false, error: e.message });
+      }
+    }
+    return res.status(200).json({ ok: true, total: pendentes.length, results: results });
+  }
+
   return res.status(404).json({ ok: false, error: "Acao nao encontrada: " + action });
 
   } catch(e) {
