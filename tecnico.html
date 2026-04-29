@@ -1078,7 +1078,9 @@ async function submitMove() {
       const d=await res.json();
       if(!d.ok) throw new Error(d.error||'Falha');
       const FLBL={producao:'Produção',conserto_concluido:'Conserto ✅',teste_realizado:'Testado',equip_retirado:'Equip. Retirado',coleta_solicitada:'Coleta Sol.',solicitar_entrega:'Ag. Entrega',entrega_realizada:'Entregue',garantia_solicitada:'Garantia',equip_recolhido:'Recolhido',conserto_realizado:'Conserto OK'};
-      showToast('✅','Garantia movida!', FLBL[selMovePhase]||selMovePhase);
+      showToast('✅','Garantia movida e removida da coluna!', FLBL[selMovePhase]||selMovePhase);
+      // Qualquer move na seção Técnico → remove da coluna (disponível só no rastrear)
+      try { await fetch('/api/garantia?action=concluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:selGarantiaId})}); } catch(e2){}
       document.getElementById('os-num-input').value='';
       document.getElementById('os-found-info').style.display='none';
       selGarantiaId=null; selGarantiaFicha=null; selMovePhase=null;
