@@ -68,6 +68,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
     <div class="stat-pill"><span class="sv orange" id="s-ag">—</span> aguardando</div>
     <div class="stat-pill"><span class="sv green" id="s-pg">—</span> pagos hoje</div>
     <button class="btn-refresh" onclick="load()">Atualizar</button>
+    <div style="margin:12px 0 4px;position:relative;">
+      <input id="balcao-busca" type="text" placeholder="Buscar por nome, OS, descrição..." oninput="filtrar(this.value)"
+        style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px 10px 38px;font-family:var(--fm);font-size:11px;color:var(--text);outline:none;box-sizing:border-box;"
+        onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"/>
+      <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none;">🔍</span>
+    </div>
   </div>
 </div>
 <div class="main">
@@ -82,7 +88,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
 </div>
 <div class="toast-wrap" id="toasts"></div>
 <script>
-var cards=[];
+var cards=[]; var filtroAtivo="";
+function filtrar(q){filtroAtivo=q;render();}
 async function load(){
   try{
     var r=await fetch('/api/board?action=balcao-load');
@@ -97,8 +104,10 @@ function fmt(ts){return ts?new Date(ts).toLocaleString('pt-BR',{day:'2-digit',mo
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function render(){
   var hoje=new Date().toDateString();
-  var ag=cards.filter(c=>c.status!=='pago');
-  var pg=cards.filter(c=>c.status==='pago'&&c.pagoEm&&new Date(c.pagoEm).toDateString()===hoje);
+  var q=filtroAtivo.toLowerCase().trim();
+  var match=function(c){if(!q)return true;return((c.nomeContato||'')+(c.osCode||'')+(c.descricao||'')+(c.telefone||'')).toLowerCase().includes(q);};
+  var ag=cards.filter(c=>c.status!=='pago'&&match(c));
+  var pg=cards.filter(c=>c.status==='pago'&&c.pagoEm&&new Date(c.pagoEm).toDateString()===hoje&&match(c));
   document.getElementById('s-ag').textContent=ag.length;
   document.getElementById('s-pg').textContent=pg.length;
   var ga=document.getElementById('g-ag');
