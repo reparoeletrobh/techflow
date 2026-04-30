@@ -320,7 +320,15 @@ module.exports = async function handler(req, res) {
         const parts = comPipefy.map(f =>
           'c' + f.pipefyId + ': card(id: "' + f.pipefyId + '") { id title current_phase { id name } }'
         ).join("\n");
-        const data = await pipefyQuery("query {\n" + parts + "\n}");
+        // Fetch direto — cards do pipe TV não são acessíveis via pipefyQuery do pipe garantia
+        const _tok = pipefyToken();
+        const _resp = await fetch(PIPEFY_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + _tok },
+          body: JSON.stringify({ query: "query {\n" + parts + "\n}" })
+        });
+        const _json = await _resp.json();
+        const data = _json.data || {};
         for (const ficha of comPipefy) {
           const key  = "c" + ficha.pipefyId;
           const card = data && data[key];
