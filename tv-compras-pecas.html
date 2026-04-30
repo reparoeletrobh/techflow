@@ -56,6 +56,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
 .kb-sel-btn{font-family:var(--fm);font-size:9px;padding:5px 12px;border-radius:6px;cursor:pointer;border:none;font-weight:700;}
 .kb-sel-btn.comprar{background:var(--green);color:#000;}
 .kb-sel-btn.clear{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.tv-card{border-left:3px solid var(--accent) !important;}
 
 /* HEADER */
 header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
@@ -244,14 +245,12 @@ textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
 </header>
 
 <!-- MÓDULOS: Peças OS | Compra de Peças -->
-<div class="mod-tabs">
+<div class="mod-tabs" style="display:none;">
   <div class="mod-tab active" onclick="modTab('kanban')" id="modtab-kanban">
     🗂️ Fila de Compras <span class="mb" id="mb-kanban">0</span>
   </div>
-  <div class="mod-tab" onclick="modTab('tv')" id="modtab-tv">
     📺 TV Aprovadas <span class="mb" id="mb-tv">0</span>
   </div>
-  <div class="mod-tab" onclick="modTab('pecas')" id="modtab-pecas">
     📦 Peças Avulsas <span class="mb" id="mb-pecas">0</span>
   </div>
 </div>
@@ -259,19 +258,7 @@ textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
 <!-- ═══════════════════════ MÓDULO KANBAN ═══════════════════════ -->
 <div class="mod-page active" id="modpage-kanban">
   <div class="kanban-wrap">
-    <div class="kanban-sidebar">
-      <div style="font-family:var(--fh);font-size:12px;font-weight:800;padding:12px 16px;border-bottom:1px solid var(--border);">Cadastrar Peça</div>
-      <div style="padding:14px;display:flex;flex-direction:column;gap:10px;">
-        <div><div class="fl">Descrição *</div><input class="fi" id="kf-desc" placeholder="Ex: Placa de potência..."/></div>
-        <div><div class="fl">OS / Referência</div><input class="fi" id="kf-os" placeholder="OS ou cliente"/></div>
-        <div class="fi-row">
-          <div style="flex:1;"><div class="fl">Qtd</div><input class="fi" id="kf-qtd" type="number" min="1" value="1"/></div>
-          <div style="flex:2;"><div class="fl">Obs</div><input class="fi" id="kf-obs" placeholder="Opcional"/></div>
-        </div>
-        <label class="urgente-toggle"><input type="checkbox" id="kf-urg"/> Urgente</label>
-        <button class="btn-add" onclick="kbCadastrar()">+ Cadastrar Peça</button>
-      </div>
-    </div>
+    
     <div class="kanban-board" id="kb-board">
       <div class="kb-col">
         <div class="kb-col-hd"><div class="kb-col-title" style="color:var(--yellow)">🛒 Para Comprar</div><span class="kb-col-badge" id="kbc-comprar">0</span></div>
@@ -303,96 +290,11 @@ textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
 </div>
 
 <!-- ═══════════════════════ MÓDULO TV APROVADAS ═══════════════════════ -->
-<div class="mod-page" id="modpage-tv">
-  <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-    <div style="font-family:var(--fh);font-size:13px;font-weight:800;color:var(--accent);">📺 TVs Aprovadas — Aguardando Compra de Peça</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="hbtn" id="btn-cp-tv-sel" onclick="tvCopiarSel()" style="display:none;color:var(--accent);border-color:rgba(59,158,255,.3);">📋 Copiar Selecionadas</button>
-      <button class="hbtn" onclick="tvCopiarTodas()" style="color:var(--green);border-color:rgba(34,197,94,.3);">📋 Copiar Todas</button>
-    </div>
-  </div>
-  <div style="padding:14px 20px;flex:1;overflow-y:auto;" id="lista-tv-apr"></div>
-</div>
+
 
 
 <!-- ═══════════════════════ MÓDULO PEÇAS AVULSAS ═══════════════════════ -->
-<div class="mod-page" id="modpage-pecas">
-  <div class="tabs" id="pecas-tabs">
-    <div class="tab active" onclick="pecTab('pendentes')" id="pectab-pendentes">Pendentes <span class="tab-badge" id="pbp">0</span></div>
-    <div class="tab" onclick="pecTab('aguardando')" id="pectab-aguardando">Ag. Pagamento <span class="tab-badge" id="pba">0</span></div>
-    <div class="tab" onclick="pecTab('pago')" id="pectab-pago">Pago <span class="tab-badge" id="pbg">0</span></div>
-    <div class="tab" onclick="pecTab('caminho')" id="pectab-caminho">A Caminho <span class="tab-badge" id="pbc">0</span></div>
-    <div class="tab" onclick="pecTab('online')" id="pectab-online">Online <span class="tab-badge" id="pbo">0</span></div>
-  </div>
 
-  <!-- ABA PENDENTES — com form cadastro + rastreabilidade na col esquerda -->
-  <div class="page active" id="pecpage-pendentes">
-    <div class="left-col">
-      <!-- FORM CADASTRO PEÇA -->
-      <div class="form-header"><div class="form-title">Cadastrar Peça</div></div>
-      <div class="form-body">
-        <div><div class="fl">Descrição *</div><input class="fi" id="f-desc" placeholder="Ex: Placa de potência..."/></div>
-        <div><div class="fl">OS / Referência</div><input class="fi" id="f-os" placeholder="OS ou cliente"/></div>
-        <div class="fi-row">
-          <div style="flex:1;"><div class="fl">Qtd</div><input class="fi" id="f-qtd" type="number" min="1" value="1"/></div>
-          <div style="flex:2;"><div class="fl">Obs</div><input class="fi" id="f-obs" placeholder="Opcional"/></div>
-        </div>
-        <label class="urgente-toggle"><input type="checkbox" id="f-urg"/> Urgente</label>
-        <button class="btn-add" onclick="cadastrar()">+ Cadastrar Peça</button>
-      </div>
-
-      <!-- RASTREABILIDADE -->
-      <div class="rastr-section">
-        <div class="rastr-title"><span>🔍</span> Rastreabilidade</div>
-        <input class="fi" id="r-busca" placeholder="Buscar OS, peça, referência..." oninput="rastrSearch(this.value)" autocomplete="off"/>
-        <div class="rastr-results" id="rastr-results"></div>
-      </div>
-    </div>
-
-    <div class="right-col">
-      <div class="list-header">
-        <div class="list-title">Peças para comprar</div>
-        <div class="list-actions">
-          <button class="btn-sm" onclick="selTodas()">Sel. todas</button>
-          <button class="btn-sm" onclick="deselTodas()">Limpar</button>
-        </div>
-      </div>
-      <div id="lista-p"></div>
-    </div>
-  </div>
-
-  <!-- DEMAIS ABAS PEÇAS -->
-  <div class="page" id="pecpage-aguardando">
-    <div class="right-col" style="max-width:860px;">
-      <div class="list-header"><div class="list-title">Aguardando Pagamento</div></div>
-      <div id="lista-a"></div>
-    </div>
-  </div>
-  <div class="page" id="pecpage-pago">
-    <div class="right-col" style="max-width:860px;">
-      <div class="list-header">
-        <div class="list-title">Pagamento Realizado</div>
-        <div class="list-actions">
-          <button class="btn-sm" onclick="selTodasPago()">Sel. todas</button>
-          <button class="btn-sm" style="color:var(--accent);border-color:rgba(59,158,255,.3);" onclick="abrirCaminho([])">Marcar a caminho</button>
-        </div>
-      </div>
-      <div id="lista-g"></div>
-    </div>
-  </div>
-  <div class="page" id="pecpage-caminho">
-    <div class="right-col" style="max-width:860px;">
-      <div class="list-header"><div class="list-title">Peças a Caminho</div></div>
-      <div id="lista-c"></div>
-    </div>
-  </div>
-  <div class="page" id="pecpage-online">
-    <div class="right-col">
-      <div class="list-header"><div class="list-title">Online — Previsão</div></div>
-      <div class="og" id="lista-o"></div>
-    </div>
-  </div>
-</div>
 
 <!-- ════ MODAL COMPRA PEÇA AVULSA ════ -->
 <div class="ov" id="mod-compra">
@@ -601,7 +503,6 @@ function rastrIr(r) {
   document.getElementById('rastr-results').innerHTML = '';
 
   if (r.tipo === 'peca') {
-    modTab('pecas');
     pecTab(r.tab || 'pendentes');
     setTimeout(function() {
       var el = document.getElementById('ci-' + r.id);
@@ -613,7 +514,6 @@ function rastrIr(r) {
       }
     }, 120);
   } else {
-    modTab('os');
     osTab(r.faseKey);
     setTimeout(function() {
       var el = document.getElementById('oscard-' + r.pipefyId);
@@ -882,10 +782,13 @@ function pecCard(p, tipo) {
   if(tipo==='p') ac='<div class="pc-actions"><button class="btn-sm" onclick="comprar1(\''+p.id+'\')">Comprar</button><button class="btn-sm" onclick="del(\''+p.id+'\')">Remover</button></div>';
   else if(tipo==='a') ac='<div class="pc-actions"><button class="btn-sm" style="color:var(--accent);border-color:rgba(59,158,255,.3);" onclick="vPgto(\''+p.id+'\')">📦 Ver Dados</button>'+(p.tipoCompra==='online'?'<button class="btn-sm" onclick="editPrev(\''+p.id+'\')">Previsão</button>':'')+'</div>';
   else if(tipo==='g') ac='<div class="pc-actions"><button class="btn-sm" style="color:var(--accent);border-color:rgba(59,158,255,.3);" onclick="abrirCaminho([\''+p.id+'\'])">A Caminho</button><button class="btn-sm" onclick="vPgto(\''+p.id+'\')">Ver Pgto</button></div>';
-  return '<div class="pc'+(p.urgente?' urgente':'')+(s?' selected':'')+'" id="ci-'+p.id+'">' +
+  var nomeHtml = p.nomeContato ? '<div style="font-family:var(--fh);font-size:13px;font-weight:800;color:#fff;margin-bottom:4px;">'+esc(p.nomeContato)+'</div>' : '';
+  var modeloHtml = p.modelo ? '<div style="font-family:var(--fm);font-size:10px;color:var(--accent);margin-bottom:3px;">📺 '+esc(p.modelo)+'</div>' : '';
+  var pecaHtml = p.peca ? '<div style="font-family:var(--fm);font-size:10px;color:var(--yellow);margin-bottom:3px;">🔧 '+esc(p.peca)+'</div>' : '';
+  var descHtml = p.descricao ? '<div class="pc-desc">'+esc(p.descricao)+'</div>' : '';
+  return '<div class="pc'+(p.urgente?' urgente':'')+(s?' selected':'')+(p.origem==="tv_aprovado"?' tv-card':'')+'" id="ci-'+p.id+'">' +
     '<input type="checkbox" class="pc-check"'+(s?' checked':'')+' onchange="togSel(\''+p.id+'\',this.checked)">' +
-    '<div class="pc-body"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
-    '<div class="pc-desc">'+esc(p.descricao)+'</div>' +
+    '<div class="pc-body">' + nomeHtml + modeloHtml + pecaHtml + descHtml +
     '<span class="pc-status '+(SC[p.status]||'sp')+'">'+(SL[p.status]||p.status)+'</span>' +
     (p.urgente?'<span style="font-family:var(--fm);font-size:9px;color:var(--red);">URGENTE</span>':'') +
     '</div><div class="pc-meta">' +
