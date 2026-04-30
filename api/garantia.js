@@ -284,49 +284,9 @@ module.exports = async function handler(req, res) {
     if (action === "tecnico-load") {
     const db = await dbGet(GARANTIA_KEY) || defaultDB();
     const all = db.fichas || [];
-
-    // Fases terminais — ao chegar aqui a ficha sai das colunas automaticamente
-    const FASES_TERMINAIS = ["entrega_realizada","equip_retirado","conserto_realizado","servico_finalizado"];
-    let changed = false;
-    for (const f of all) {
-      if (!f.concluida && FASES_TERMINAIS.includes(f.faseId)) {
-        f.concluida = true;
-        f.concluidaEm = f.concluidaEm || new Date().toISOString();
-        f.concluidaMotivo = "fase_terminal_local";
-        changed = true;
-      }
-    }
-
-    // Auto-concluir fichas cujo card Pipefy está em Finalizado
-    const ativas = all.filter(f => !f.concluida && f.pipefyId);
-    if (ativas.length > 0) {
-      try {
-        const qp = ativas.map(f => 'c' + f.pipefyId + ': card(id: "' + f.pipefyId + '") { id current_phase { id name } }').join("\n");
-        const pdata = await pipefyQuery("query {\n" + qp + "\n}");
-        for (const ficha of ativas) {
-          const card = pdata && pdata["c" + ficha.pipefyId];
-          if (!card) continue;
-          const pid   = (card.current_phase && card.current_phase.id)   || "";
-          const pname = (card.current_phase && card.current_phase.name  || "").toLowerCase();
-          if (pid === PIPEFY_FASE_FINALIZADO || pname.includes("finalizado") || pname.includes("erp")) {
-            ficha.concluida = true;
-            ficha.concluidaEm = ficha.concluidaEm || new Date().toISOString();
-            ficha.concluidaMotivo = "pipefy_finalizado";
-            changed = true;
-          }
-        }
-      } catch(e) { /* silencioso */ }
-    }
-
-    if (changed) await dbSet(GARANTIA_KEY, db);
-
-    // Colunas: só fichas ativas (não concluídas)
-    // Coluna do técnico: só fichas em "producao" — equipamento está na loja
-    // coleta_solicitada = ainda na casa do cliente, não aparece aqui
-    const naLoja = f => !f.concluida && f.faseId === "producao";
     return res.status(200).json({ ok: true,
-      garantias:    all.filter(f => (f.tipo === "loja_acompanhamento" || f.tipo === "delivery") && naLoja(f)),
-      lojaImediata: all.filter(f => f.tipo === "loja_imediata" && naLoja(f))
+      garantias:    all.filter(f => (f.tipo === "loja_acompanhamento" || f.tipo === "delivery") && !f.concluida),
+      lojaImediata: all.filter(f => f.tipo === "loja_imediata" && !f.concluida)
     });
   }
   if (action === "relatorio-tecnico") {
@@ -345,45 +305,45 @@ module.exports = async function handler(req, res) {
     }
     return res.status(200).json({ ok: true, mesAtual: hist[0]||{label:"",total:0,porTecnico:{}}, historico: hist });
   }
-      // ── force-saida-colunas — força saída de fichas em fases terminais ──
-  if (action === "force-saida-colunas") {
-    const db = await dbGet(GARANTIA_KEY) || defaultDB();
-    const FASES_T = ["entrega_realizada","equip_retirado","conserto_realizado","servico_finalizado"];
-    let count = 0;
-    const removidas = [];
-    for (const f of db.fichas || []) {
-      if (!f.concluida && FASES_T.includes(f.faseId)) {
-        f.concluida = true;
-        f.concluidaEm = new Date().toISOString();
-        f.concluidaMotivo = "force_saida";
-        removidas.push({ id: f.id, nome: f.nome, faseId: f.faseId });
-        count++;
+      // ── compare-pipefy — compara fichas ativas com fase atual no Pipefy ──
+  if (action === "compare-pipefy") {
+    const db   = await dbGet(GARANTIA_KEY) || defaultDB();
+    const all  = db.fichas || [];
+    const ativas = all.filter(f => !f.concluida);
+    const comPipefy  = ativas.filter(f => f.pipefyId);
+    const semPipefy  = ativas.filter(f => !f.pipefyId);
+
+    // Query em lote — todos os pipefyIds de uma vez
+    let pipefyFases = {};
+    if (comPipefy.length > 0) {
+      try {
+        const parts = comPipefy.map(f =>
+          'c' + f.pipefyId + ': card(id: "' + f.pipefyId + '") { id title current_phase { id name } }'
+        ).join("\n");
+        const data = await pipefyQuery("query {\n" + parts + "\n}");
+        for (const ficha of comPipefy) {
+          const key  = "c" + ficha.pipefyId;
+          const card = data && data[key];
+          pipefyFases[ficha.pipefyId] = card
+            ? { fase: card.current_phase ? card.current_phase.name : "?", faseId: card.current_phase ? card.current_phase.id : "?" }
+            : { fase: "Não encontrado no Pipefy", faseId: null };
+        }
+      } catch(e) {
+        for (const f of comPipefy) pipefyFases[f.pipefyId] = { fase: "Erro: " + e.message, faseId: null };
       }
     }
-    if (count > 0) await dbSet(GARANTIA_KEY, db);
-    return res.status(200).json({ ok: true, removidas, total: count });
-  }
 
-    // ── check-pipefy-phases — consulta fase atual no Pipefy de todas as fichas ativas ──
-  if (action === "check-pipefy-phases") {
-    const db = await dbGet(GARANTIA_KEY) || defaultDB();
-    const all = db.fichas || [];
-    const ativas = all.filter(f => !f.concluida && f.pipefyId);
-    if (!ativas.length) return res.status(200).json({ ok: true, resultados: [] });
-    const qp = ativas.map(f => 'c' + f.pipefyId + ': card(id: "' + f.pipefyId + '") { id title current_phase { id name } }').join("\n");
-    const pdata = await pipefyQuery("query {\n" + qp + "\n}");
-    const resultados = ativas.map(f => {
-      const card = pdata && pdata["c" + f.pipefyId];
-      return {
-        id: f.id, nome: f.nome, tipo: f.tipo,
-        faseLocal: f.faseId,
-        pipefyId: f.pipefyId,
-        pipefyFase: card && card.current_phase ? card.current_phase.name : "NAO_ENCONTRADO",
-        pipefyFaseId: card && card.current_phase ? card.current_phase.id : null,
-        pipefyTitle: card ? card.title : null,
-      };
-    });
-    return res.status(200).json({ ok: true, total: resultados.length, resultados });
+    const result = ativas.map(f => ({
+      nome:       f.nome,
+      tipo:       f.tipo,
+      faseLocal:  f.faseId,
+      pipefyId:   f.pipefyId || null,
+      pipefyFase: f.pipefyId ? (pipefyFases[f.pipefyId] || {}).fase : "Sem ID Pipefy",
+      pipefyFaseId: f.pipefyId ? (pipefyFases[f.pipefyId] || {}).faseId : null,
+      dias:       Math.floor((Date.now() - new Date(f.movidaEm)) / 86400000),
+    }));
+
+    return res.status(200).json({ ok: true, total: result.length, fichas: result });
   }
 
   return res.status(404).json({ ok: false, error: "Ação não encontrada" });
