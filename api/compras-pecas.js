@@ -2,6 +2,7 @@
 const UPSTASH_URL   = process.env.UPSTASH_URL;
 const UPSTASH_TOKEN = process.env.UPSTASH_TOKEN;
 const KEY           = "reparoeletro_compras_pecas";
+const TV_KEY = "reparoeletro_tv_compras";
 
 async function dbGet(key) {
   const r = await fetch(`${UPSTASH_URL}/pipeline`, {
@@ -174,5 +175,20 @@ module.exports = async (req, res) => {
 
     if(action==="limpar-tv-indevidos"){const antes=db.pecas.length;db.pecas=db.pecas.filter(p=>p.origem!=="tv_aprovado");const removidas=antes-db.pecas.length;if(removidas>0)await dbSet(KEY,db);return res.status(200).json({ok:true,removidas,total:db.pecas.length});}
 
-  return res.status(404).json({ ok:false, error:"Ação não encontrada" });
+  // ── TV actions — chave separada, não mistura com ADM ─────────
+  if (action === "tv-load") {
+    const tvDb = (await dbGet(TV_KEY)) || { pecas: [] };
+    return res.status(200).json({ ok: true, pecas: tvDb.pecas || [] });
+  }
+  if (req.method === "POST" && action === "tv-atualizar") {
+    const { id, status } = req.body || {};
+    const tvDb = (await dbGet(TV_KEY)) || { pecas: [] };
+    const p = (tvDb.pecas || []).find(x => x.id === id);
+    if (!p) return res.status(404).json({ ok: false, error: "Não encontrado" });
+    if (status) p.status = status;
+    await dbSet(TV_KEY, tvDb);
+    return res.status(200).json({ ok: true });
+  }
+
+    return res.status(404).json({ ok:false, error:"Ação não encontrada" });
 };
