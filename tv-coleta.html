@@ -70,6 +70,15 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .diag-submit:disabled{opacity:.4;cursor:not-allowed;}
 .diag-cancel{width:100%;margin-top:4px;font-family:var(--fm);font-size:10px;padding:5px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
 .diag-cancel:hover{color:var(--text);border-color:var(--accent);}
+.diag-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
+.chip{font-family:var(--fm);font-size:10px;padding:5px 11px;border-radius:99px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;transition:all .15s;user-select:none;}
+.chip:hover{border-color:var(--accent);color:var(--text);}
+.chip.on{background:rgba(59,158,255,.15);border-color:var(--accent);color:var(--accent);}
+.chip.on.condenada{background:rgba(240,64,96,.15);border-color:var(--red);color:var(--red);}
+.chip.on.risco{background:rgba(245,200,0,.15);border-color:var(--yellow);color:var(--yellow);}
+.chip.on.acrilico{background:rgba(16,217,130,.15);border-color:var(--green);color:var(--green);}
+.chip-acrilico-val{width:100%;margin-top:4px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-family:var(--fb);font-size:12px;color:var(--text);outline:none;display:none;}
+.chip-acrilico-val:focus{border-color:var(--green);}
 .diag-input{width:100%;margin-bottom:6px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px;font-family:var(--fb);font-size:11px;color:var(--text);outline:none;transition:border-color .15s;}
 .diag-input:focus{border-color:var(--green);}
 .diag-label{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;}
@@ -182,8 +191,15 @@ function buildCardColeta(c,phaseId){
       '<div class="diag-form" id="diag-form-'+c.pipefyId+'">'+
         '<div class="diag-label">Modelo do Equipamento</div>'+
         '<input class="diag-input" type="text" id="diag-modelo-'+c.pipefyId+'" placeholder="Ex: Samsung UN55TU7020"/>'+
-        '<div class="diag-label">Diagnóstico</div>'+
-        '<textarea class="diag-textarea" id="diag-txt-'+c.pipefyId+'" placeholder="Descreva o estado do equipamento..."></textarea>'+
+        '<div class="diag-label">Diagnóstico — selecione uma ou mais opções</div>'+
+        '<div class="diag-chips">'+
+          '<button class="chip" id="chip-barramento-'+c.pipefyId+'" onclick="toggleChip(\''+c.pipefyId+'\',\'barramento\')">Barramento</button>'+
+          '<button class="chip" id="chip-placa-'+c.pipefyId+'" onclick="toggleChip(\''+c.pipefyId+'\',\'placa\')">Placa</button>'+
+          '<button class="chip condenada" id="chip-condenada-'+c.pipefyId+'" onclick="toggleChip(\''+c.pipefyId+'\',\'condenada\')">Condenada</button>'+
+          '<button class="chip risco" id="chip-risco-'+c.pipefyId+'" onclick="toggleChip(\''+c.pipefyId+'\',\'risco\')">Risco</button>'+
+          '<button class="chip acrilico" id="chip-acrilico-'+c.pipefyId+'" onclick="toggleChip(\''+c.pipefyId+'\',\'acrilico\')">Acrílico</button>'+
+        '</div>'+
+        '<input class="chip-acrilico-val diag-input" type="number" id="chip-acrilico-val-'+c.pipefyId+'" placeholder="Valor do Acrílico (R$)" min="0" step="0.01"/>'+
         '<button class="diag-submit" onclick="enviarDiag(\''+c.pipefyId+'\')">\u2705 Registrar</button>'+
         '<button class="diag-cancel" onclick="fecharDiag(\''+c.pipefyId+'\')">✕ Cancelar</button>'+
       '</div></div>';
@@ -218,12 +234,13 @@ function buildCardEntrega(c,phaseId){
 
 function abrirDiag(id){var f=document.getElementById('diag-form-'+id);var b=document.getElementById('diag-btn-'+id);if(f)f.classList.toggle('open');if(b)b.style.display=f.classList.contains('open')?'none':'flex';}
 function fecharDiag(id){var f=document.getElementById('diag-form-'+id);var b=document.getElementById('diag-btn-'+id);if(f)f.classList.remove('open');if(b)b.style.display='flex';}
+function toggleChip(pid,nome){var chip=document.getElementById('chip-'+nome+'-'+pid);if(!chip)return;chip.classList.toggle('on');if(nome==='acrilico'){var v=document.getElementById('chip-acrilico-val-'+pid);if(v)v.style.display=chip.classList.contains('on')?'block':'none';}}
+function chipTexto(pid){var chips=['barramento','placa','condenada','risco','acrilico'];var sel=chips.filter(function(c){var el=document.getElementById('chip-'+c+'-'+pid);return el&&el.classList.contains('on');});if(!sel.length)return'';return sel.map(function(c){if(c==='acrilico'){var v=document.getElementById('chip-acrilico-val-'+pid);return'Acrilico'+(v&&v.value?': '+v.value:'');}return c.charAt(0).toUpperCase()+c.slice(1);}).join(' | ');}
 async function enviarDiag(pid){
-  var txt=document.getElementById('diag-txt-'+pid);
   var modeloEl=document.getElementById('diag-modelo-'+pid);
-  var texto=txt?txt.value.trim():'';
   var modelo=modeloEl?modeloEl.value.trim():'';
-  if(!texto){toast('\u26A0\uFE0F Digite o diagnóstico antes de registrar','var(--orange)');return;}
+  var texto=chipTexto(pid);
+  if(!texto){toast('\u26A0\uFE0F Selecione pelo menos uma opção de diagnóstico','var(--orange)');return;}
   var btn=document.querySelector('#diag-form-'+pid+' .diag-submit');
   if(btn){btn.disabled=true;btn.textContent='Enviando...';}
   try{

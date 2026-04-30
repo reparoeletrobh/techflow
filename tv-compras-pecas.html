@@ -100,6 +100,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 </header>
 <div class="tabs">
   <div class="tab active" onclick="tab('pendentes')" id="tab-pendentes">Pendentes <span class="tab-badge" id="bp">0</span></div>
+  <div class="tab" onclick="tab('tv-aprovadas')" id="tab-tv-aprovadas">📺 TV Aprovadas <span class="tab-badge" id="btv">0</span></div>
   <div class="tab" onclick="tab('aguardando')" id="tab-aguardando">Ag. Pagamento <span class="tab-badge" id="ba">0</span></div>
   <div class="tab" onclick="tab('pago')" id="tab-pago">Pago <span class="tab-badge" id="bg">0</span></div>
   <div class="tab" onclick="tab('caminho')" id="tab-caminho">A Caminho <span class="tab-badge" id="bc">0</span></div>
@@ -497,6 +498,28 @@ function tab(a) {
 }
 load();
 setInterval(load, 60000);
+</script>
+<div id="page-tv-aprovadas" class="page" style="flex-direction:column;">
+  <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+    <div style="font-family:var(--fh);font-size:13px;font-weight:800;">📺 TV Aprovadas — Aguardando Compra de Peça</div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-sm" id="btn-cp-tv-sel" onclick="copiarTvSel()" style="display:none;color:var(--accent);border-color:rgba(59,158,255,.3);">📋 Copiar Selecionadas</button>
+      <button class="btn-sm" onclick="copiarTvAll()" style="color:var(--green);border-color:rgba(34,197,94,.3);">📋 Copiar Todas</button>
+    </div>
+  </div>
+  <div style="padding:16px 20px;flex:1;overflow-y:auto;" id="lista-tv"></div>
+</div>
+<script>
+var tvItens=[],tvSel=new Set();
+function renderTv(){var el=document.getElementById('lista-tv');var b=document.getElementById('btv');var p=tvItens.filter(function(p){return p.status==='pendente';});if(b)b.textContent=p.length;if(!p.length){el.innerHTML='<div class="empty">Nenhuma TV aprovada pendente</div>';return;}el.innerHTML=p.map(function(x){var s=tvSel.has(x.id);return '<div class="pc'+(s?' selected':'')+'" id="tv-ci-'+x.id+'"><input type="checkbox" class="pc-check"'+(s?' checked':'')+' onchange="togTvSel(\''+x.id+'\',this.checked)"><div class="pc-body"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;"><span style="font-family:var(--fh);font-size:12px;font-weight:800;color:#fff;">'+esc(x.nomeContato||'—')+'</span><span style="font-family:var(--fm);font-size:9px;padding:1px 6px;border-radius:4px;background:rgba(168,85,247,.15);color:var(--purple);border:1px solid rgba(168,85,247,.3);">OS '+esc(x.os||'—')+'</span></div><div style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5;">'+esc(x.descricao||'—')+'</div><div style="display:flex;gap:6px;"><button class="btn-sm" style="color:var(--accent);" onclick="cpTvCard(\''+x.id+'\')">📋 Copiar</button><button class="btn-sm" style="color:var(--green);" onclick="mkTvComp(\''+x.id+'\')">✅ Comprada</button></div></div></div>';}).join('');}
+function togTvSel(id,v){if(v)tvSel.add(id);else tvSel.delete(id);var el=document.getElementById('tv-ci-'+id);if(el)el.classList.toggle('selected',v);document.getElementById('btn-cp-tv-sel').style.display=tvSel.size>0?'':'none';}
+function tvTxt(x){return 'OS: '+(x.os||'—')+' | Cliente: '+(x.nomeContato||'—')+'\n'+(x.descricao||'—');}
+function cpTvCard(id){var x=tvItens.find(function(p){return p.id===id;});if(!x)return;navigator.clipboard.writeText(tvTxt(x)).then(function(){toast('✅ Copiado!');});}
+function copiarTvSel(){var s=tvItens.filter(function(p){return tvSel.has(p.id);});if(!s.length)return;navigator.clipboard.writeText(s.map(function(p,i){return(i+1)+'. '+tvTxt(p);}).join('\n\n')).then(function(){toast('✅ '+s.length+' copiadas!');});}
+function copiarTvAll(){var p=tvItens.filter(function(x){return x.status==='pendente';});if(!p.length){toast('Nenhuma');return;}navigator.clipboard.writeText(p.map(function(x,i){return(i+1)+'. '+tvTxt(x);}).join('\n\n')).then(function(){toast('✅ '+p.length+' TVs copiadas!');});}
+async function mkTvComp(id){try{await req('atualizar',{id:id,status:'aguardando_pagamento'});await load();toast('✅ Comprada');}catch(e){toast('❌ '+e.message);}}
+var _ol=load;load=async function(){var d=await req('load');if(d.pecas){itens=d.pecas;tvItens=d.pecas.filter(function(p){return p.origem==='tv_aprovado';});}render();renderTv();};
+var _ot=tab;tab=function(t){if(t==='tv-aprovadas'){document.querySelectorAll('.tab').forEach(function(el){el.classList.remove('active');});document.getElementById('tab-tv-aprovadas').classList.add('active');document.querySelectorAll('.page').forEach(function(el){el.classList.remove('active');});var pg=document.getElementById('page-tv-aprovadas');if(pg)pg.classList.add('active');return;}_ot(t);};
 </script>
 </body>
 </html>

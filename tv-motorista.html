@@ -24,6 +24,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 .tab.active.entrega{color:var(--orange);}
 .tab:hover:not(.active){color:var(--text);}
 .main{padding:16px;}
+.busca-wrap{position:relative;margin-bottom:12px;}
+.busca-input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 14px 9px 36px;font-family:var(--fm);font-size:11px;color:var(--text);outline:none;box-sizing:border-box;transition:border-color .15s;}
+.busca-input:focus{border-color:var(--accent);}
+.busca-ico{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none;}
 .page-title{font-family:var(--fh);font-size:18px;font-weight:900;margin-bottom:4px;}
 .page-title span{color:var(--green);}
 .page-sub{font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:16px;}
@@ -94,6 +98,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 <div class="main">
   <div class="page-title" id="page-title">Painel do <span>Motorista</span></div>
   <div class="page-sub" id="page-sub">// Fichas liberadas para coleta</div>
+  <div class="busca-wrap"><span class="busca-ico">&#128269;</span><input class="busca-input" id="motorista-busca" type="text" placeholder="Buscar por nome, OS, endereço..." oninput="filtrarCards(this.value)"/></div>
   <div id="container"></div>
 </div>
 <div class="ov" id="modal-rel">
@@ -127,6 +132,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 <script>
 var mode = 'coleta';
 var allCards = {};
+var filtroMotorista = '';
 var relPipefyId = null;
 var sigCtx = null, sigDrawing = false, sigLastX = 0, sigLastY = 0;
 var photoB64 = null;
@@ -158,6 +164,7 @@ function switchMode(m) {
   load();
 }
 
+function filtrarCards(q){filtroMotorista=q.toLowerCase().trim();render();}
 async function load() {
   document.getElementById('container').innerHTML = '<div class="empty-state">Sincronizando com Pipefy...</div>';
   try {
@@ -182,10 +189,11 @@ function render() {
 }
 
 function renderColeta() {
-  var lib = allCards['liberado_coleta'] || [];
-  var com = allCards['comunicacao_realizada'] || [];
-  var col = allCards['coleta_realizada'] || [];
-  var rem = allCards['remarcar'] || [];
+  var _q=filtroMotorista;var _m=function(c){if(!_q)return true;return((c.nomeContato||'')+(c.osCode||'')+(c.endereco||'')+(c.descricao||'')).toLowerCase().includes(_q);};
+  var lib=(allCards['liberado_coleta']||[]).filter(_m);
+  var com=(allCards['comunicacao_realizada']||[]).filter(_m);
+  var col=(allCards['coleta_realizada']||[]).filter(_m);
+  var rem=(allCards['remarcar']||[]).filter(_m);
   var html = '';
   html += sec('#3b9eff', 'A Coletar', lib.length);
   if (!lib.length) html += '<div class="empty-state">Nenhuma ficha aguardando coleta</div>';
@@ -206,9 +214,10 @@ function renderColeta() {
 }
 
 function renderEntrega() {
-  var lib = allCards['liberado_entrega'] || [];
-  var com = allCards['comunicacao_entrega'] || [];
-  var ent = allCards['entrega_realizada'] || [];
+  var _q=filtroMotorista;var _m=function(c){if(!_q)return true;return((c.nomeContato||'')+(c.osCode||'')+(c.endereco||'')+(c.descricao||'')).toLowerCase().includes(_q);};
+  var lib=(allCards['liberado_entrega']||[]).filter(_m);
+  var com=(allCards['comunicacao_entrega']||[]).filter(_m);
+  var ent=(allCards['entrega_realizada']||[]).filter(_m);
   var html = '';
   html += sec('#f97316', 'A Entregar', lib.length);
   if (!lib.length) html += '<div class="empty-state">Nenhuma ficha aguardando entrega</div>';
