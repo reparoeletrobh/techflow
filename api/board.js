@@ -424,7 +424,10 @@ module.exports = async function handler(req, res) {
         for (const c of approved) {
           // Nunca re-importa card já conhecido — mesmo que saiu de board.cards por qualquer motivo
           if (activeIds.has(c.pipefyId) || syncedSet.has(c.pipefyId)) continue;
-          board.cards.unshift({ ...c, phaseId: board.phases[0].id, movedBy: "Pipefy" });
+          const _txt=((c.nomeContato||'')+' '+(c.descricao||'')+' '+(c.title||'')).toLowerCase();
+          const _isLoja=_txt.includes('loja');
+          board.cards.unshift({ ...c, phaseId: _isLoja?'cliente_loja':board.phases[0].id, movedBy:"Pipefy" });
+          if(_isLoja){try{const _b=(await dbGet('reparoeletro_balcao'))||[];if(!_b.find(b=>b.pipefyId===String(c.pipefyId))){_b.unshift({pipefyId:String(c.pipefyId),nomeContato:c.nomeContato||c.title||'—',osCode:c.osCode||null,descricao:c.descricao||null,telefone:c.telefone||null,tecnico:null,entradaEm:new Date().toISOString(),status:'aguardando_pagamento',pagoEm:null});await dbSet('reparoeletro_balcao',_b);}}catch(_e){}}
           activeIds.add(c.pipefyId);
           if (!board.syncedIds.includes(c.pipefyId)) {
             board.syncedIds.push(c.pipefyId);
