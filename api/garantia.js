@@ -354,6 +354,34 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, total: result.length, fichas: result });
   }
 
+    // ── force-remove-finalizados ─────────────────────────────────
+  if (action === "force-remove-finalizados") {
+    const db = await dbGet(GARANTIA_KEY) || defaultDB();
+    // pipefyIds confirmados como Finalizado no Pipefy
+    const PIPEFY_FINALIZADOS = new Set([
+      "1341050397","1340515029","1339647098","1339437751",
+      "1338487077","1338477821","1338141543","1337253696",
+      "1336559831","1336463675","1336246266","1335982509",
+      "1335887472","1335874019","1335392718","1335154250"
+    ]);
+    // Fases terminais locais
+    const FASES_T = ["entrega_realizada","equip_retirado","equip_recolhido","conserto_realizado","servico_finalizado"];
+    const removidas = [];
+    for (const f of db.fichas || []) {
+      if (f.concluida) continue;
+      const byPipefy = f.pipefyId && PIPEFY_FINALIZADOS.has(f.pipefyId);
+      const byFase   = FASES_T.includes(f.faseId);
+      if (byPipefy || byFase) {
+        f.concluida = true;
+        f.concluidaEm = new Date().toISOString();
+        f.concluidaMotivo = byPipefy ? "pipefy_finalizado_force" : "fase_terminal";
+        removidas.push({ nome: f.nome, pipefyId: f.pipefyId||null, motivo: f.concluidaMotivo });
+      }
+    }
+    if (removidas.length > 0) await dbSet(GARANTIA_KEY, db);
+    return res.status(200).json({ ok: true, total: removidas.length, removidas });
+  }
+
   return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch(e) {
