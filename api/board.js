@@ -430,7 +430,7 @@ module.exports = async function handler(req, res) {
           if(_isLoja){try{const _b=(await dbGet('reparoeletro_balcao'))||[];if(!_b.find(b=>b.pipefyId===String(c.pipefyId))){_b.unshift({pipefyId:String(c.pipefyId),nomeContato:c.nomeContato||c.title||'—',osCode:c.osCode||null,descricao:c.descricao||null,telefone:c.telefone||null,tecnico:null,entradaEm:new Date().toISOString(),status:'aguardando_pagamento',pagoEm:null});await dbSet('reparoeletro_balcao',_b);}}catch(_e){}}
           // Auto-cria compra de peça para card TV aprovado
           try {
-            const _cpKey="reparoeletro_compras_pecas";
+            const _cpKey="tv_compras_pecas";
             const _cpDb=(await dbGet(_cpKey))||{pecas:[]};
             if(!Array.isArray(_cpDb.pecas))_cpDb.pecas=[];
             if(!_cpDb.pecas.some(p=>p.pipefyId===String(c.pipefyId)&&p.origem==="tv_aprovado")){
