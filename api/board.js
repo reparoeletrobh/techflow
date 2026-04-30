@@ -428,17 +428,7 @@ module.exports = async function handler(req, res) {
           const _isLoja=_txt.includes('loja');
           board.cards.unshift({ ...c, phaseId: _isLoja?'cliente_loja':board.phases[0].id, movedBy:"Pipefy" });
           if(_isLoja){try{const _b=(await dbGet('reparoeletro_balcao'))||[];if(!_b.find(b=>b.pipefyId===String(c.pipefyId))){_b.unshift({pipefyId:String(c.pipefyId),nomeContato:c.nomeContato||c.title||'—',osCode:c.osCode||null,descricao:c.descricao||null,telefone:c.telefone||null,tecnico:null,entradaEm:new Date().toISOString(),status:'aguardando_pagamento',pagoEm:null});await dbSet('reparoeletro_balcao',_b);}}catch(_e){}}
-          // Auto-cria compra de peça para card TV aprovado
-          try {
-            const _cpKey="tv_compras_pecas";
-            const _cpDb=(await dbGet(_cpKey))||{pecas:[]};
-            if(!Array.isArray(_cpDb.pecas))_cpDb.pecas=[];
-            if(!_cpDb.pecas.some(p=>p.pipefyId===String(c.pipefyId)&&p.origem==="tv_aprovado")){
-              _cpDb.pecas.unshift({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),origem:"tv_aprovado",pipefyId:String(c.pipefyId),os:c.osCode||String(c.pipefyId).slice(-4),nomeContato:c.nomeContato||c.title||"—",descricao:c.descricao||c.title||"TV aprovada",status:"pendente",createdAt:new Date().toISOString(),urgente:false,obs:"",quantidade:1});
-              await dbSet(_cpKey,_cpDb);
-            }
-          } catch(_cpErr){console.error("[CompraAuto]",_cpErr.message);}
-          activeIds.add(c.pipefyId);
+          activeIds.add(c.pipefyId); // compra TV via tv-board.js
           if (!board.syncedIds.includes(c.pipefyId)) {
             board.syncedIds.push(c.pipefyId);
             board.movesLog.push({ phaseId: "aprovado_entrada", timestamp: new Date().toISOString() });

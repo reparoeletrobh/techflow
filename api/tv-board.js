@@ -317,6 +317,14 @@ module.exports = async function handler(req, res) {
             board.cards.push(Object.assign({ phaseId: "aprovado" }, c));
             board.syncedIds.push(c.pipefyId);
             novos++;
+            try {
+              const _cpDb=(await dbGet("tv_compras_pecas"))||{pecas:[]};
+              if(!Array.isArray(_cpDb.pecas))_cpDb.pecas=[];
+              if(!_cpDb.pecas.some(function(p){return p.pipefyId===String(c.pipefyId);})){
+                _cpDb.pecas.unshift({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),origem:"tv_aprovado",pipefyId:String(c.pipefyId),os:c.osCode||String(c.pipefyId).slice(-4),nomeContato:c.nomeContato||c.title||"—",descricao:c.descricao||c.title||"TV aprovada",status:"pendente",createdAt:new Date().toISOString(),urgente:false,obs:"",quantidade:1});
+                await dbSet("tv_compras_pecas",_cpDb);
+              }
+            } catch(_e){console.error("[TVCompraAuto]",_e.message);}
           }
         }
         board.syncedIds = trimLog(board.syncedIds, 2000);
