@@ -517,8 +517,8 @@ function tvTxt(x){return 'OS: '+(x.os||'—')+' | Cliente: '+(x.nomeContato||'�
 function cpTvCard(id){var x=tvItens.find(function(p){return p.id===id;});if(!x)return;navigator.clipboard.writeText(tvTxt(x)).then(function(){toast('✅ Copiado!');});}
 function copiarTvSel(){var s=tvItens.filter(function(p){return tvSel.has(p.id);});if(!s.length)return;navigator.clipboard.writeText(s.map(function(p,i){return(i+1)+'. '+tvTxt(p);}).join('\n\n')).then(function(){toast('✅ '+s.length+' copiadas!');});}
 function copiarTvAll(){var p=tvItens.filter(function(x){return x.status==='pendente';});if(!p.length){toast('Nenhuma');return;}navigator.clipboard.writeText(p.map(function(x,i){return(i+1)+'. '+tvTxt(x);}).join('\n\n')).then(function(){toast('✅ '+p.length+' TVs copiadas!');});}
-async function mkTvComp(id){try{await req('atualizar',{id:id,status:'aguardando_pagamento'});await load();toast('✅ Comprada');}catch(e){toast('❌ '+e.message);}}
-var _ol=load;load=async function(){var d=await req('load');if(d.pecas){itens=d.pecas;tvItens=d.pecas.filter(function(p){return p.origem==='tv_aprovado';});}render();renderTv();};
+async function mkTvComp(id){try{await req('tv-atualizar',{id:id,status:'aguardando_pagamento'});await load();toast('✅ Comprada');}catch(e){toast('❌ '+e.message);}}
+var _ol=load;load=async function(){var d=await req('tv-load');if(d.pecas){itens=d.pecas;tvItens=d.pecas.filter(function(p){return p.origem==='tv_aprovado';});}render();renderTv();};
 var _ot=tab;tab=function(t){if(t==='tv-aprovadas'){document.querySelectorAll('.tab').forEach(function(el){el.classList.remove('active');});document.getElementById('tab-tv-aprovadas').classList.add('active');document.querySelectorAll('.page').forEach(function(el){el.classList.remove('active');});var pg=document.getElementById('page-tv-aprovadas');if(pg)pg.classList.add('active');return;}_ot(t);};
 </script>
 </body>
