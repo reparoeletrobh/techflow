@@ -193,8 +193,7 @@ module.exports = async function handler(req, res) {
 
       ficha.faseId   = faseId;
       ficha.movidaEm = new Date().toISOString();
-      // Nunca auto-conclui ao mover — só action=concluir faz isso.
-      // Assim conserto_realizado permanece visível no Kanban.
+      // Ao mover via Técnico, auto-conclui (sai da coluna)
       ficha.concluida = false;
 
       // Delivery + solicitar_entrega → move card Pipefy para Solicitar Entrega
@@ -218,6 +217,9 @@ module.exports = async function handler(req, res) {
       ficha.faseId      = ultimas[ficha.tipo] || ficha.faseId;
       ficha.concluida   = true;
       ficha.concluidaEm = new Date().toISOString();
+      ficha.concluida = true;
+      ficha.concluidaEm = new Date().toISOString();
+      ficha.concluidaMotivo = "movida_tecnico";
       await dbSet(GARANTIA_KEY, db);
       return res.status(200).json({ ok: true, ficha });
     }
@@ -380,6 +382,16 @@ module.exports = async function handler(req, res) {
     }
     if (removidas.length > 0) await dbSet(GARANTIA_KEY, db);
     return res.status(200).json({ ok: true, total: removidas.length, removidas });
+  }
+
+    if (action === "limpar-coluna") {
+    const db = await dbGet(GARANTIA_KEY) || defaultDB();
+    let count = 0;
+    for (const f of db.fichas || []) {
+      if (!f.concluida) { f.concluida=true; f.concluidaEm=new Date().toISOString(); f.concluidaMotivo="reset_manual"; count++; }
+    }
+    if (count > 0) await dbSet(GARANTIA_KEY, db);
+    return res.status(200).json({ ok: true, removidas: count });
   }
 
   return res.status(404).json({ ok: false, error: "Ação não encontrada" });
