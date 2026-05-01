@@ -459,6 +459,15 @@ module.exports = async function handler(req, res) {
     if (!ficha) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
     ficha.status = status;
     await dbSet(ORC_KEY, db);
+    // Se aprovado: tira da Ultima Chamada no Pipefy e volta para Aguardando Aprovacao
+    if (status === "aprovado" && ficha.pipefyId) {
+      try {
+        const cd = await pipefyQuery(`query { card(id: "${ficha.pipefyId}") { current_phase { id } } }`);
+        if (cd?.card?.current_phase?.id === "338413470") {
+          await pipefyQuery(`mutation { moveCardToPhase(input: { card_id: "${ficha.pipefyId}", destination_phase_id: "334875152" }) { card { id } } }`);
+        }
+      } catch(e) { /* silencioso */ }
+    }
     return res.status(200).json({ ok: true });
   }
 
