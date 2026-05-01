@@ -87,23 +87,23 @@ async function api(action,body){var opts=body?{method:'POST',headers:{'Content-T
 function fd(s){if(!s)return '—';var d=new Date(s);return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});}
 function da(s){if(!s)return 0;return Math.ceil((new Date(s)-new Date())/(1000*60*60*24));}
 function buildCard(p){
-  var s=sel.has(p.id),isP=p.status==='pendente',isA=p.status==='aguardando_pagamento',isG=p.status==='a_caminho';
-  var prev='';if(p.previsaoChegada){var d=da(p.previsaoChegada);prev='<div style="font-family:var(--fm);font-size:9px;color:'+(d<0?'var(--red)':'var(--muted)')+';">'+(d<0?'Atrasada '+Math.abs(d)+'d':'Chega em '+d+'d')+' ('+fd(p.previsaoChegada)+')</div>';}
-  var acts='';
-  if(isP)acts='<button class="btn-sm" style="color:var(--accent);" onclick="comprar1(''+p.id+'')">Comprar</button><button class="btn-sm" style="color:var(--red);" onclick="del(''+p.id+'')">Remover</button>';
-  else if(isA)acts='<button class="btn-sm" style="color:var(--green);" onclick="pagarItem(''+p.id+'')">✅ Pago</button><button class="btn-sm" onclick="vDados(''+p.id+'')">Ver Dados</button>';
-  else if(p.status==='pago')acts='<button class="btn-sm" style="color:var(--accent);" onclick="aCaminho([''+p.id+''])">🚚 A Caminho</button>';
-  else if(isG)acts='<button class="btn-sm" style="color:var(--green);" onclick="recebido([''+p.id+''])">📦 Recebido</button>';
-  return '<div class="pc'+(p.urgente?' urgente':'')+(p.origem==='tv_aprovado'?' tv-card':'')+'" id="ci-'+p.id+'">'
-    +(isP?'<input type="checkbox" style="margin-bottom:4px;accent-color:var(--accent);"'+(s?' checked':'')+' onchange="togSel(''+p.id+'',this.checked)"><br>':'')
-    +(p.nomeContato?'<div class="pc-nome">'+esc(p.nomeContato)+'</div>':'')
-    +(p.modelo?'<div class="pc-modelo">📺 '+esc(p.modelo)+'</div>':'')
-    +(p.peca?'<div class="pc-peca">🔧 '+esc(p.peca)+'</div>':'')
-    +(p.descricao&&p.descricao!==p.nomeContato?'<div class="pc-desc">'+esc(p.descricao)+'</div>':'')
-    +'<div class="pc-meta">'+(p.os?'<span>OS: '+esc(p.os)+'</span>':'')+(p.quantidade>1?'<span>Qtd: '+p.quantidade+'</span>':'')+(p.obs?'<span>'+esc(p.obs)+'</span>':'')+'</div>'
-    +(prev?'<div style="margin-top:4px;">'+prev+'</div>':'')
-    +(acts?'<div class="pc-acts">'+acts+'</div>':'')
-    +'</div>';
+  var s=sel.has(p.id),isP=p.status==="pendente",isA=p.status==="aguardando_pagamento",isG=p.status==="a_caminho";
+  var prev="";if(p.previsaoChegada){var d=da(p.previsaoChegada);prev="<div style='font-size:9px;color:"+(d<0?"var(--red)":"var(--muted)")+"'>"+(d<0?"Atrasada "+Math.abs(d)+"d":"Chega em "+d+"d")+" ("+fd(p.previsaoChegada)+")</div>";}
+  var acts="";
+  if(isP) acts="<div class='pc-acts'><button class='btn-sm' style='color:var(--accent)' onclick='comprar1(""+p.id+"")'>Comprar</button><button class='btn-sm' style='color:var(--red)' onclick='del(""+p.id+"")'>Remover</button></div>";
+  else if(isA) acts="<div class='pc-acts'><button class='btn-sm' style='color:var(--green)' onclick='pagarItem(""+p.id+"")'>✅ Pago</button><button class='btn-sm' onclick='vDados(""+p.id+"")'>Ver Dados</button></div>";
+  else if(p.status==="pago") acts="<div class='pc-acts'><button class='btn-sm' style='color:var(--accent)' onclick='aCaminho([""+p.id+""])'>🚚 A Caminho</button></div>";
+  else if(isG) acts="<div class='pc-acts'><button class='btn-sm' style='color:var(--green)' onclick='recebido([""+p.id+""])'>📦 Recebido</button></div>";
+  var chk=isP?"<input type='checkbox' style='accent-color:var(--accent);'"+(s?" checked":"")+" onchange='togSel(""+p.id+"",this.checked)'>":"";
+  return "<div class='pc"+(p.urgente?" urgente":"")+(p.origem==="tv_aprovado"?" tv-card":"")+"' id='ci-"+p.id+"'>"
+    +chk
+    +(p.nomeContato?"<div class='pc-nome'>"+esc(p.nomeContato)+"</div>":"")
+    +(p.modelo?"<div class='pc-modelo'>📺 "+esc(p.modelo)+"</div>":"")
+    +(p.peca?"<div class='pc-peca'>🔧 "+esc(p.peca)+"</div>":"")
+    +(p.descricao&&p.descricao!==p.nomeContato?"<div class='pc-desc'>"+esc(p.descricao)+"</div>":"")
+    +"<div class='pc-meta'>"+(p.os?"<span>OS: "+esc(p.os)+"</span>":"")+(p.quantidade>1?"<span>Qtd: "+p.quantidade+"</span>":"")+(p.obs?"<span>"+esc(p.obs)+"</span>":"")+"</div>"
+    +(prev?"<div>"+prev+"</div>":"")
+    +acts+"</div>";
 }
 function render(){
   var cols={'pendente':{b:'kbl-p',c:'kbc-p'},'aguardando_pagamento':{b:'kbl-a',c:'kbc-a'},'pago':{b:'kbl-pg',c:'kbc-pg'},'a_caminho':{b:'kbl-c',c:'kbc-c'},'online':{b:'kbl-o',c:'kbc-o'},'recebido':{b:'kbl-o',c:'kbc-o'}};
