@@ -311,22 +311,35 @@ module.exports = async function handler(req, res) {
         const doneIds   = await fetchDoneIds();
         // Remove cards finalizados
         board.cards = board.cards.filter(function(c) { return !doneIds.includes(c.pipefyId); });
-        // Adiciona novos cards
+        // Carrega coleta (modelo + peca do diagnostico) e compras de uma vez
+        let _cpDb=null,_cpChanged=false,_coletaCards=[];
+        try{_cpDb=(await dbGet("tv_compras_pecas"))||{pecas:[]};if(!Array.isArray(_cpDb.pecas))_cpDb.pecas=[];}catch(_e){}
+        try{const _cr=await dbGet("tv_coleta_cards");_coletaCards=(_cr&&_cr.cards)?_cr.cards:[];}catch(_e){}
         for (const c of aprovados) {
-          if (!board.syncedIds.includes(c.pipefyId)) {
-            board.cards.push(Object.assign({ phaseId: "aprovado" }, c));
+          // Cria compra independente de syncedIds — recria se foi limpo
+          if(_cpDb&&!_cpDb.pecas.some(function(p){return p.pipefyId===String(c.pipefyId);})){
+            const _cc=_coletaCards.find(function(cc){return String(cc.pipefyId)===String(c.pipefyId);});
+            _cpDb.pecas.unshift({
+              id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+              origem:"tv_aprovado",pipefyId:String(c.pipefyId),
+              os:c.osCode||String(c.pipefyId).slice(-4),
+              nomeContato:c.nomeContato||c.title||"—",
+              descricao:c.descricao||c.title||"TV aprovada",
+              modelo:_cc?(_cc.modelo||null):null,
+              peca:_cc?(_cc.diagnostico||null):null,
+              status:"pendente",createdAt:new Date().toISOString(),
+              urgente:false,obs:"",quantidade:1
+            });
+            _cpChanged=true;
+          }
+          // Adiciona ao board somente se for novo
+          if(!board.syncedIds.includes(c.pipefyId)){
+            board.cards.push(Object.assign({phaseId:"aprovado"},c));
             board.syncedIds.push(c.pipefyId);
             novos++;
-            try {
-              const _cpDb=(await dbGet("tv_compras_pecas"))||{pecas:[]};
-              if(!Array.isArray(_cpDb.pecas))_cpDb.pecas=[];
-              if(!_cpDb.pecas.some(function(p){return p.pipefyId===String(c.pipefyId);})){
-                _cpDb.pecas.unshift({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),origem:"tv_aprovado",pipefyId:String(c.pipefyId),os:c.osCode||String(c.pipefyId).slice(-4),nomeContato:c.nomeContato||c.title||"—",descricao:c.descricao||c.title||"TV aprovada",status:"pendente",createdAt:new Date().toISOString(),urgente:false,obs:"",quantidade:1});
-                await dbSet("tv_compras_pecas",_cpDb);
-              }
-            } catch(_e){console.error("[TVCompraAuto]",_e.message);}
           }
         }
+        if(_cpDb&&_cpChanged){try{await dbSet("tv_compras_pecas",_cpDb);}catch(_e){console.error("[TVCompraAuto]",_e.message);}}
         board.syncedIds = trimLog(board.syncedIds, 2000);
         if (novos > 0) await dbSet(BOARD_KEY, board);
       } catch(e) { pipefyError = e.message; }
