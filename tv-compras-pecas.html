@@ -1147,7 +1147,7 @@ function copiarSel(){
 // ══════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════
-Promise.all([osLoad(), pecLoad()]).then(function(){ kbBuild(); });
+pecLoad().then(function(){ kbBuild(); });
 setInterval(osLoad, 30000);
 setInterval(pecLoad, 60000);
 // ══════════════════════════════════════════════
