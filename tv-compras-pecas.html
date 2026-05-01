@@ -1158,14 +1158,26 @@ var kbItems = [];
 
 function kbBuild() {
   kbItems = [];
-  // Peças Avulsas
+  var hoje = new Date(); hoje.setHours(0,0,0,0);
+  var ontem = new Date(hoje); ontem.setDate(ontem.getDate()-1);
   itens.forEach(function(p) {
+    if (p.origem === 'tv_aprovado') {
+      var dt = p.createdAt ? new Date(p.createdAt) : null;
+      if (!dt || dt < ontem) return;
+    }
     var col = 'comprar';
     if (p.status === 'aguardando_pagamento') col = 'agpag';
     else if (p.status === 'pago') col = 'pago';
     else if (p.status === 'a_caminho' || p.status === 'recebido') col = 'caminho';
     else if (p.status === 'online') col = 'online';
-    kbItems.push({ id:'av_'+p.id, _id:p.id, src:'av', nome:p.descricao||'—', ref:p.os||'', qtd:p.quantidade||1, urg:!!p.urgente, col:col, forn:p.fornecedor||'' });
+    kbItems.push({ id:'av_'+p.id, _id:p.id, src:'av',
+      nome: p.peca || p.descricao || '—',
+      modelo: p.modelo || null,
+      descricao: p.descricao || null,
+      nomeContato: p.nomeContato || null,
+      ref:p.os||'', qtd:p.quantidade||1, urg:!!p.urgente,
+      col:col, forn:p.fornecedor||'', raw:p, origem:p.origem||'avulsa'
+    });
   });
   // OS Cards
   ['comprar','aguardando'].forEach(function(faseKey) {
@@ -1230,12 +1242,18 @@ function kbRender() {
         prevChip = '<span class="kb-card-tag" style="color:'+pc+';border-color:'+pc+';">'+pt+'</span>';
       }
       var fornChip = item.forn ? '<span class="kb-card-tag">'+esc(item.forn.slice(0,22))+'</span>' : '';
-      return '<div class="kb-card'+(selCard?' selected':'')+'" id="kbcard-'+item.id+'" onclick="kbToggleSel(event,\''+item.id+'\')">' +
-        '<div class="kb-card-top"><div class="kb-card-name">'+esc(item.nome)+'</div>' +
-        '<span class="kb-card-src '+(item.src==='os'?'os':'av')+'">'+(item.src==='os'?'OS':'Avulsa')+'</span></div>' +
-        (item.ref ? '<div class="kb-card-ref">'+esc(item.ref)+'</div>' : '') +
+      var tvCard = item.origem === 'tv_aprovado';
+      return '<div class="kb-card'+(selCard?' selected':'')+(tvCard?' tv-card':'')+'" id="kbcard-'+item.id+'" onclick="kbToggleSel(event,\''+item.id+'\')">' +
+        '<div class="kb-card-top">' +
+          '<div class="kb-card-name" style="font-size:13px;font-weight:800;color:#fff;">'+esc(item.nome)+'</div>' +
+          (tvCard?'':'<span class="kb-card-src av">Avulsa</span>') +
+        '</div>' +
+        (item.modelo?'<div style="font-family:var(--fm);font-size:10px;color:var(--accent);margin:2px 0;">📺 '+esc(item.modelo)+'</div>':'') +
+        (item.descricao&&item.descricao!==item.nome?'<div style="font-size:11px;color:var(--muted);margin:3px 0;line-height:1.4;">'+esc(item.descricao.slice(0,80))+'</div>':'') +
+        (item.nomeContato?'<div style="font-family:var(--fm);font-size:10px;color:var(--text);margin:2px 0;">👤 '+esc(item.nomeContato)+'</div>':'') +
+        (item.ref?'<div class="kb-card-ref">'+esc(item.ref)+'</div>':'') +
         '<div class="kb-card-meta">'+(item.qtd>1?'<span class="kb-card-tag qtd">x'+item.qtd+'</span>':'')+(item.urg?'<span class="kb-card-tag urg">🔴 Urgente</span>':'')+fornChip+prevChip+'</div>' +
-        (btns ? '<div class="kb-card-btns">'+btns+'</div>' : '') +
+        (btns?'<div class="kb-card-btns">'+btns+'</div>':'') +
       '</div>';
     }).join('');
   });
