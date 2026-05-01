@@ -258,7 +258,17 @@ textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
 <!-- ═══════════════════════ MÓDULO KANBAN ═══════════════════════ -->
 <div class="mod-page active" id="modpage-kanban">
   <div class="kanban-wrap">
-    
+    <div class="kanban-sidebar">
+      <div class="form-header"><div class="form-title">➕ Cadastrar Peça</div></div>
+      <div class="form-body">
+        <div><div class="fl">Descrição *</div><input class="fi" id="f-desc" placeholder="Ex: Placa principal Samsung 50"/></div>
+        <div><div class="fl">OS / Cliente</div><input class="fi" id="f-os" placeholder="Ex: 6987"/></div>
+        <div><div class="fl">Quantidade</div><input class="fi" id="f-qtd" type="number" value="1" min="1"/></div>
+        <div><div class="fl">Observação</div><input class="fi" id="f-obs" placeholder="Opcional"/></div>
+        <div style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="f-urg" style="accent-color:var(--red)"/><label for="f-urg" style="font-family:var(--fm);font-size:11px;color:var(--muted);cursor:pointer;">Urgente</label></div>
+        <button class="hbtn" onclick="cadastrar()" style="color:var(--green);border-color:rgba(34,197,94,.3);">+ Adicionar à Fila</button>
+      </div>
+    </div>
     <div class="kanban-board" id="kb-board">
       <div class="kb-col">
         <div class="kb-col-hd"><div class="kb-col-title" style="color:var(--yellow)">🛒 Para Comprar</div><span class="kb-col-badge" id="kbc-comprar">0</span></div>
