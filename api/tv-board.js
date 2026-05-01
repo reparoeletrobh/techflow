@@ -796,6 +796,37 @@ async function otimizarPontos(pontos, pontoInicio) {
       }
     }
 
+        // ── backfill-compras — recria entradas para todos os cards do board ──
+    if (action === "backfill-compras") {
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const cards = (board.cards || []).filter(c => c.pipefyId);
+      let cpDb = (await dbGet("tv_compras_pecas")) || { pecas: [] };
+      if (!Array.isArray(cpDb.pecas)) cpDb.pecas = [];
+      let coletaCards = [];
+      try { const cr = await dbGet("tv_coleta_cards"); coletaCards = (cr && cr.cards) ? cr.cards : []; } catch(_e) {}
+      let adicionados = 0;
+      const now = new Date().toISOString();
+      for (const c of cards) {
+        if (!cpDb.pecas.some(p => p.pipefyId === String(c.pipefyId))) {
+          const cc = coletaCards.find(x => String(x.pipefyId) === String(c.pipefyId));
+          cpDb.pecas.unshift({
+            id: Date.now().toString(36) + Math.random().toString(36).slice(2,5),
+            origem: "tv_aprovado", pipefyId: String(c.pipefyId),
+            os: c.osCode || String(c.pipefyId).slice(-4),
+            nomeContato: c.nomeContato || c.title || "—",
+            descricao: c.descricao || c.title || "TV aprovada",
+            modelo: cc ? (cc.modelo || null) : null,
+            peca:   cc ? (cc.diagnostico || null) : null,
+            status: "pendente", createdAt: now,
+            urgente: false, obs: "", quantidade: 1
+          });
+          adicionados++;
+        }
+      }
+      if (adicionados > 0) await dbSet("tv_compras_pecas", cpDb);
+      return res.status(200).json({ ok: true, adicionados, total: cpDb.pecas.length });
+    }
+
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch(e) {
