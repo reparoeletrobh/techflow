@@ -67,6 +67,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100
   <div class="header-stats">
     <div class="stat-pill"><span class="sv orange" id="s-ag">—</span> aguardando</div>
     <div class="stat-pill"><span class="sv green" id="s-pg">—</span> pagos hoje</div>
+    <div class="stat-pill" style="border-color:rgba(59,158,255,.3);">📥 <span class="sv" style="color:var(--blue)" id="s-hoje">—</span> entraram hoje</div>
+    <div class="stat-pill" style="border-color:rgba(168,85,247,.3);">📅 <span class="sv" style="color:#a855f7" id="s-semana">—</span> esta semana</div>
     <button class="btn-refresh" onclick="load()">Atualizar</button>
     <div style="margin:12px 0 4px;position:relative;">
       <input id="balcao-busca" type="text" placeholder="Buscar por nome, OS, descrição..." oninput="filtrar(this.value)"
@@ -108,8 +110,16 @@ function render(){
   var match=function(c){if(!q)return true;return((c.nomeContato||'')+(c.osCode||'')+(c.descricao||'')+(c.telefone||'')).toLowerCase().includes(q);};
   var ag=cards.filter(c=>c.status!=='pago'&&match(c));
   var pg=cards.filter(c=>c.status==='pago'&&c.pagoEm&&new Date(c.pagoEm).toDateString()===hoje&&match(c));
+  // Entraram hoje
+  var inicioHoje = new Date(); inicioHoje.setHours(0,0,0,0);
+  var entrHoje = cards.filter(c => c.entradaEm && new Date(c.entradaEm) >= inicioHoje).length;
+  // Entraram esta semana (últimos 7 dias)
+  var inicioSemana = new Date(); inicioSemana.setDate(inicioSemana.getDate() - inicioSemana.getDay()); inicioSemana.setHours(0,0,0,0);
+  var entrSemana = cards.filter(c => c.entradaEm && new Date(c.entradaEm) >= inicioSemana).length;
   document.getElementById('s-ag').textContent=ag.length;
   document.getElementById('s-pg').textContent=pg.length;
+  document.getElementById('s-hoje').textContent=entrHoje;
+  document.getElementById('s-semana').textContent=entrSemana;
   var ga=document.getElementById('g-ag');
   ga.innerHTML=ag.length?ag.map(card).join(''):'<div class="bc-empty">Nenhum cliente aguardando</div>';
   var sp=document.getElementById('sec-pg'),gp=document.getElementById('g-pg');
