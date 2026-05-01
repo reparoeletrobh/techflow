@@ -624,7 +624,7 @@ var osAbaAtual = 'comprar';
 var selPipefyId = null, tipoComprasel = null;
 var dadosSelId = null, dadosNovasFotos = [];
 
-async function osLoad() {
+async function osLoad() { if(!document.getElementById("mb-os")) return;
   var d = await fetch('/api/compras?action=load').then(function(r){return r.json();});
   if (!d.ok) return;
   osCards.comprar   = d.comprar   || [];
