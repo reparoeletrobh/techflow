@@ -404,7 +404,7 @@ textarea.fi{resize:vertical;min-height:60px;line-height:1.5;}
 // ══════════════════════════════════════════════
 //  MÓDULOS
 // ══════════════════════════════════════════════
-var modAtual = 'kanban';
+var modAtual = 'os';
 
 function modTab(m) {
   modAtual = m;
@@ -1334,5 +1334,9 @@ async function tvMoverFila(id){
   if(r.ok){await fetch('/api/tv-compras-pecas?action=deletar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});pecLoad();tvLoad();toast('✅ Movido para Fila!','var(--green)');}
 }
 </script>
+<!-- stubs para elementos do ADM referenciados pelo JS mas sem HTML no TV -->
+<span id="mb-total" style="display:none"></span>
+<div id="kbc-hist" style="display:none"></div>
+<div id="kbl-hist" style="display:none"></div>
 </body>
 </html>
