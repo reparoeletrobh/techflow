@@ -1811,9 +1811,16 @@ module.exports = async function handler(req, res) {
             card { id }
           }
         }`);
-        if (pipRes?.errors?.length) throw new Error(pipRes.errors[0].message);
+        const pipErrMsg = pipRes?.errors?.[0]?.message || '';
+        // Se já está na fase de destino, trata como sucesso e continua
+        if (pipRes?.errors?.length && !pipErrMsg.toLowerCase().includes('already')) {
+          throw new Error(pipErrMsg);
+        }
       } catch(pipErr) {
-        return res.status(200).json({ ok: false, error: 'Pipefy: ' + pipErr.message });
+        // "already in destination phase" = card ja esta em ERP -> prossegue normalmente
+        if (!pipErr.message.toLowerCase().includes('already')) {
+          return res.status(200).json({ ok: false, error: 'Pipefy: ' + pipErr.message });
+        }
       }
       const BALCAO_KEY = 'reparoeletro_balcao';
       const balcao = (await dbGet(BALCAO_KEY)) || [];
