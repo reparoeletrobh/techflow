@@ -209,7 +209,7 @@ function renderCatalog(){
     return '<div class="prod-card fade-in">'+
       '<div class="prod-card-img">'+
         '<img src="'+p.fotos[0]+'" alt="'+p.nome+'" loading="lazy">'+
-        '<button class="prod-expand-btn" onclick="openLightbox(''+p.id+'',0);event.stopPropagation()"><svg viewBox="0 0 24 24"><path d="M21 11V3h-8l3.29 3.29-10 10L3 13v8h8l-3.29-3.29 10-10z"/></svg></button>'+
+        '<button class="prod-expand-btn" onclick="openLightbox('+p.id+',0);event.stopPropagation()"><svg viewBox="0 0 24 24"><path d="M21 11V3h-8l3.29 3.29-10 10L3 13v8h8l-3.29-3.29 10-10z"/></svg></button>'+
         '<span class="badge-status badge-'+p.status+'">'+(ok?'Disponível':'Vendido')+'</span>'+
       '</div>'+
       '<div class="prod-card-body">'+
@@ -223,11 +223,11 @@ function renderCatalog(){
   observeFadeIn();
 }
 var lbP=null,lbI=0;
-function openLightbox(id,i){lbP=produtos.find(function(x){return x.id===id;});lbI=i||0;updLB();document.getElementById('lightbox').classList.add('open');document.body.style.overflow='hidden';}
+function openLightbox(id,i){lbP=produtos.find(function(x){return String(x.id)===String(id);});lbI=i||0;updLB();document.getElementById('lightbox').classList.add('open');document.body.style.overflow='hidden';}
 function updLB(){document.getElementById('lightbox-img').src=lbP.fotos[lbI];document.getElementById('lightbox-caption').textContent=lbP.nome;document.getElementById('lightbox-thumbs').innerHTML=lbP.fotos.map(function(f,i){return '<div class="lightbox-thumb'+(i===lbI?' active':'')+'" onclick="lbGoTo('+i+')"><img src="'+f+'"></div>';}).join('');}
 function lbGoTo(i){lbI=i;updLB();}
 function closeLightbox(e){if(e&&e.target!==document.getElementById('lightbox'))return;document.getElementById('lightbox').classList.remove('open');document.body.style.overflow='';}
-function openCheckout(id){var p=produtos.find(function(x){return x.id===id;});if(!p)return;document.getElementById('co-imgs').innerHTML='<img class="main-img" src="'+p.fotos[0]+'" alt="'+p.nome+'" onclick="openLightbox(''+p.id+'',0)"><img src="'+p.fotos[0]+'" onclick="openLightbox(''+p.id+'',0)"><img src="'+p.fotos[1]+'" onclick="openLightbox(''+p.id+'',1)">';document.getElementById('co-name').textContent=p.nome;document.getElementById('co-desc').textContent=p.descricao;document.getElementById('co-price').textContent='R$ '+p.preco;document.getElementById('co-total').textContent='R$ '+p.preco;document.getElementById('checkout-overlay').classList.add('open');document.body.style.overflow='hidden';}
+function openCheckout(id){var p=produtos.find(function(x){return String(x.id)===String(id);});if(!p)return;document.getElementById('co-imgs').innerHTML='<img class="main-img" src="'+p.fotos[0]+'" alt="'+p.nome+'" onclick="openLightbox('+p.id+',0)"><img src="'+p.fotos[0]+'" onclick="openLightbox('+p.id+',0)"><img src="'+p.fotos[1]+'" onclick="openLightbox('+p.id+',1)">';document.getElementById('co-name').textContent=p.nome;document.getElementById('co-desc').textContent=p.descricao;document.getElementById('co-price').textContent='R$ '+p.preco;document.getElementById('co-total').textContent='R$ '+p.preco;document.getElementById('checkout-overlay').classList.add('open');document.body.style.overflow='hidden';}
 function closeCheckout(e){if(e&&e.target!==document.getElementById('checkout-overlay'))return;document.getElementById('checkout-overlay').classList.remove('open');document.body.style.overflow='';}
 function submitCheckout(){var n=document.getElementById('co-form-nome').value,t=document.getElementById('co-form-tel').value,pr=document.getElementById('co-name').textContent,vl=document.getElementById('co-price').textContent;if(!n||!t){alert('Preencha nome e WhatsApp!');return;}window.open('https://wa.me/'+WPP+'?text='+encodeURIComponent('Pedido:\nProduto: '+pr+'\nValor: '+vl+'\nNome: '+n+'\nTel: '+t),'_blank');closeCheckout();}
 function observeFadeIn(){var obs=new IntersectionObserver(function(entries){entries.forEach(function(e){if(e.isIntersecting){e.target.classList.add('visible');obs.unobserve(e.target);}});},{threshold:.1});document.querySelectorAll('.fade-in:not(.visible)').forEach(function(el){obs.observe(el);});}
