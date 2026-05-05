@@ -194,7 +194,8 @@ async function loadProdutos(){
     var el=document.getElementById('estoque-count');
     if(el)el.textContent=produtos.length;
   }catch(e){console.error('Catálogo erro:',e);}
-  loadProdutos();
+  renderCatalog();
+  observeFadeIn();
 }function toggleAB(){abVersion=abVersion==='a'?'b':'a';params.set('v',abVersion);history.replaceState(null,'','?'+params.toString());updateABUI();renderCatalog();}
 function updateABUI(){document.getElementById('ab-dot').className='ab-dot ab-dot-'+abVersion;document.getElementById('ab-label').textContent=abVersion==='a'?'Versão A: WhatsApp':'Versão B: Checkout';}
 updateABUI();
