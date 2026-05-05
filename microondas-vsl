@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nunca Compre um Microondas Sem Ver Este Vídeo — Reparo Eletro</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700;1,900&family=Inter:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a0a;--bg2:#111;--bg3:#161616;--text:#f0f0e8;--muted:#5a5a50;--muted2:#919180;--gold:#c9b298;--green:#10b981;--red:#ef4444;--blue:#3b82f6;--fh:'Playfair Display',serif;--fb:'Inter',sans-serif;--fm:'DM Mono',monospace}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:16px;line-height:1.6;overflow-x:hidden}
+/* NAV */
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:18px 40px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(to bottom,rgba(10,10,10,.95) 0%,transparent 100%)}
+.nav-logo{font-family:var(--fh);font-size:18px;font-weight:900;color:var(--text)}
+.nav-logo span{color:var(--gold)}
+.nav-badge{font-family:var(--fm);font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);border:1px solid rgba(201,178,152,.3);padding:6px 14px;border-radius:99px;display:flex;align-items:center;gap:7px}
+.nav-dot{width:6px;height:6px;background:var(--green);border-radius:50%;animation:pdot 2s ease-in-out infinite}
+@keyframes pdot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.4)}}
+/* HERO */
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:120px 24px 80px;text-align:center;position:relative;overflow:hidden}
+.hero-glow{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:700px;height:500px;background:radial-gradient(ellipse,rgba(201,178,152,.05) 0%,transparent 70%);pointer-events:none}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:var(--fm);font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);border:1px solid rgba(201,178,152,.25);padding:8px 18px;border-radius:99px;margin-bottom:40px;position:relative;z-index:1}
+.hero-title{font-family:var(--fh);font-size:clamp(36px,5.5vw,70px);font-weight:900;line-height:1.08;letter-spacing:-1px;max-width:860px;position:relative;z-index:1;margin-bottom:24px}
+.hero-title em{font-style:italic;color:var(--gold)}
+.hero-title .hl{color:var(--green)}
+.hero-sub{font-size:18px;color:var(--muted2);max-width:540px;margin-bottom:52px;position:relative;z-index:1;line-height:1.7}
+/* VIDEO */
+.vwrap{position:relative;z-index:1;width:100%;max-width:800px;margin-bottom:44px}
+.vbox{position:relative;padding-bottom:56.25%;background:var(--bg3);border-radius:16px;overflow:hidden;border:1px solid rgba(201,178,152,.12);box-shadow:0 40px 80px rgba(0,0,0,.6)}
+.vplaceholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:radial-gradient(ellipse at center,#1a1a16 0%,#0a0a0a 100%)}
+.vplay{width:76px;height:76px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;animation:ppulse 2.5s ease-in-out infinite}
+@keyframes ppulse{0%,100%{box-shadow:0 0 0 0 rgba(201,178,152,.4)}50%{box-shadow:0 0 0 20px rgba(201,178,152,0)}}
+.vplay svg{fill:#0a0a0a;margin-left:5px}
+.vlabel{font-family:var(--fm);font-size:11px;letter-spacing:2px;color:var(--muted2);text-transform:uppercase}
+/* BUTTONS */
+.btn-primary{display:inline-flex;align-items:center;gap:10px;background:var(--text);color:var(--bg);font-family:var(--fb);font-size:15px;font-weight:600;padding:17px 42px;border-radius:99px;border:none;cursor:pointer;text-decoration:none;transition:all .2s;position:relative;z-index:1}
+.btn-primary:hover{background:var(--gold);transform:translateY(-2px);box-shadow:0 20px 40px rgba(201,178,152,.25)}
+.urgency{background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);border-radius:12px;padding:13px 22px;display:flex;align-items:center;gap:10px;font-size:13px;color:#fca5a5;max-width:520px;margin:20px auto 0;position:relative;z-index:1}
+.urgency-dot{width:7px;height:7px;background:var(--red);border-radius:50%;flex-shrink:0;animation:pdot 1.5s ease-in-out infinite}
+/* DIVIDER */
+hr{border:none;height:1px;background:linear-gradient(to right,transparent,rgba(201,178,152,.2),transparent);margin:0 40px}
+/* CATALOG */
+.catalog{padding:90px 24px;max-width:1200px;margin:0 auto}
+.sec-tag{font-family:var(--fm);font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.sec-tag::before{content:'';height:1px;width:28px;background:var(--gold);opacity:.5}
+.sec-title{font-family:var(--fh);font-size:clamp(30px,4vw,50px);font-weight:900;line-height:1.1;margin-bottom:10px}
+.sec-title em{font-style:italic;color:var(--gold)}
+.sec-sub{color:var(--muted2);font-size:15px;margin-bottom:52px;max-width:500px}
+.filters{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:44px}
+.fpill{font-family:var(--fm);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;padding:8px 18px;border-radius:99px;border:1px solid rgba(201,178,152,.2);color:var(--muted2);cursor:pointer;transition:all .2s;background:transparent}
+.fpill.active,.fpill:hover{border-color:var(--gold);color:var(--gold);background:rgba(201,178,152,.06)}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:22px}
+/* CARD */
+.pcard{background:var(--bg2);border:1px solid rgba(201,178,152,.1);border-radius:16px;overflow:hidden;transition:transform .3s,border-color .3s,box-shadow .3s;cursor:default}
+.pcard:hover{transform:translateY(-4px);border-color:rgba(201,178,152,.28);box-shadow:0 24px 48px rgba(0,0,0,.4)}
+.cphoto{position:relative;aspect-ratio:4/3;overflow:hidden;background:var(--bg3)}
+.cphoto img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:opacity .35s;opacity:0}
+.cphoto img.on{opacity:1}
+.cphoto-nav{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-between;padding:0 10px;opacity:0;transition:opacity .2s}
+.cphoto:hover .cphoto-nav{opacity:1}
+.cnav{width:30px;height:30px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.15);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .2s}
+.cnav:hover{background:rgba(201,178,152,.3)}
+.cnav svg{width:13px;height:13px;fill:white}
+.cdots{position:absolute;bottom:9px;left:50%;transform:translateX(-50%);display:flex;gap:4px}
+.cdot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.3);transition:all .2s}
+.cdot.on{background:var(--gold);width:14px;border-radius:3px}
+.cexpand{position:absolute;top:9px;right:9px;width:28px;height:28px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.13);border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity .2s,background .2s}
+.cphoto:hover .cexpand{opacity:1}
+.cexpand:hover{background:rgba(201,178,152,.35)}
+.cexpand svg{width:13px;height:13px;fill:white}
+.cbadge{position:absolute;top:9px;left:9px;font-family:var(--fm);font-size:9px;letter-spacing:1.5px;text-transform:uppercase;padding:4px 9px;border-radius:6px;background:rgba(16,185,129,.14);color:var(--green);border:1px solid rgba(16,185,129,.28)}
+.cbody{padding:18px 18px 22px}
+.cos{font-family:var(--fm);font-size:10px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:5px}
+.cname{font-family:var(--fh);font-size:19px;font-weight:700;margin-bottom:6px}
+.cspecs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+.cspec{font-size:11px;color:var(--muted2);background:var(--bg3);padding:4px 9px;border-radius:6px}
+.cdesc{font-size:13px;color:var(--muted2);line-height:1.5;margin-bottom:18px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cfooter{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.cprice{display:flex;flex-direction:column}
+.cold{font-size:12px;color:var(--muted);text-decoration:line-through}
+.cnow{font-family:var(--fh);font-size:23px;font-weight:700;color:var(--green);line-height:1}
+.clab{font-size:11px;color:var(--muted2)}
+.ccta{display:flex;align-items:center;gap:7px;padding:11px 16px;border-radius:99px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all .2s;text-decoration:none;white-space:nowrap}
+.cwa{background:#25D366;color:#fff}
+.cwa:hover{background:#20bd5a;transform:scale(1.03)}
+.cck{background:var(--gold);color:var(--bg)}
+.cck:hover{background:#d4bc8a;transform:scale(1.03)}
+/* LIGHTBOX */
+.lb{display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.95);align-items:center;justify-content:center}
+.lb.open{display:flex}
+.lbimg{max-width:90vw;max-height:85vh;object-fit:contain;border-radius:8px}
+.lbclose{position:fixed;top:18px;right:22px;width:42px;height:42px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:19px;color:white;transition:background .2s}
+.lbclose:hover{background:rgba(255,255,255,.14)}
+.lbarrow{position:fixed;top:50%;transform:translateY(-50%);width:46px;height:46px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .2s}
+.lbarrow:hover{background:rgba(201,178,152,.2)}
+.lbarrow svg{width:19px;height:19px;fill:white}
+#lb-prev{left:18px} #lb-next{right:18px}
+.lbcount{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);font-family:var(--fm);font-size:12px;color:rgba(255,255,255,.4)}
+/* CHECKOUT */
+.ckoverlay{display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.88);align-items:center;justify-content:center;padding:18px}
+.ckoverlay.open{display:flex}
+.ckmodal{background:var(--bg2);border:1px solid rgba(201,178,152,.14);border-radius:20px;width:100%;max-width:840px;max-height:90vh;overflow-y:auto;position:relative}
+.ckhead{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:18px 26px;background:var(--bg2);border-bottom:1px solid rgba(201,178,152,.1)}
+.ckhead-title{font-family:var(--fh);font-size:17px;font-weight:700}
+.ckxbtn{width:34px;height:34px;background:var(--bg3);border:1px solid rgba(255,255,255,.08);border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--muted2);transition:background .2s}
+.ckxbtn:hover{background:rgba(255,255,255,.1)}
+.ckbody{display:grid;grid-template-columns:1fr 1fr;gap:0}
+@media(max-width:620px){.ckbody{grid-template-columns:1fr}}
+.ckphotos{position:relative;aspect-ratio:1;background:var(--bg3);overflow:hidden}
+.ckphotos img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .3s}
+.ckphotos img.on{opacity:1}
+.ckthumbs{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:5px}
+.ckthumb{width:42px;height:42px;border-radius:6px;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:border-color .2s;flex-shrink:0}
+.ckthumb.on{border-color:var(--gold)}
+.ckthumb img{width:100%;height:100%;object-fit:cover}
+.ckexpand{position:absolute;top:9px;right:9px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.14);border-radius:7px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.ckexpand svg{width:15px;height:15px;fill:white}
+.ckinfo{padding:28px 26px;display:flex;flex-direction:column}
+.ckos{font-family:var(--fm);font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:6px}
+.ckname{font-family:var(--fh);font-size:24px;font-weight:900;margin-bottom:4px}
+.ckspecs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px}
+.ckspec{font-size:12px;background:var(--bg3);color:var(--muted2);padding:4px 11px;border-radius:7px}
+.ckdlbl{font-family:var(--fm);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:7px}
+.ckdesc{font-size:13px;color:var(--muted2);line-height:1.7;margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid rgba(201,178,152,.08)}
+.ckprow{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+.ckold{font-size:13px;color:var(--muted);text-decoration:line-through}
+.ckprice{font-family:var(--fh);font-size:34px;font-weight:900;color:var(--green);line-height:1}
+.ckpsub{font-size:12px;color:var(--muted2);margin-bottom:24px}
+.ckinput{width:100%;background:var(--bg3);border:1px solid rgba(201,178,152,.12);border-radius:10px;padding:12px 15px;font-family:var(--fb);font-size:14px;color:var(--text);margin-bottom:10px;outline:none;transition:border-color .2s}
+.ckinput::placeholder{color:var(--muted)}
+.ckinput:focus{border-color:rgba(201,178,152,.38)}
+.cksubmit{width:100%;padding:15px;background:var(--gold);color:var(--bg);font-family:var(--fb);font-size:15px;font-weight:700;border:none;border-radius:12px;cursor:pointer;transition:all .2s;margin-top:2px}
+.cksubmit:hover{background:#d4bc8a;transform:translateY(-1px);box-shadow:0 12px 28px rgba(201,178,152,.24)}
+.cksec{text-align:center;font-size:11px;color:var(--muted);margin-top:10px;display:flex;align-items:center;justify-content:center;gap:5px}
+/* FOOTER */
+.footer{padding:56px 40px 36px;text-align:center;border-top:1px solid rgba(201,178,152,.08)}
+.flogo{font-family:var(--fh);font-size:21px;font-weight:900;margin-bottom:7px}
+.flogo span{color:var(--gold)}
+.fsub{font-size:13px;color:var(--muted)}
+/* AB BADGE */
+.abbadge{position:fixed;bottom:18px;left:18px;font-family:var(--fm);font-size:9px;letter-spacing:2px;text-transform:uppercase;padding:5px 11px;border-radius:6px;z-index:200;opacity:.55}
+.ab-a{background:rgba(59,130,246,.13);color:#93c5fd;border:1px solid rgba(59,130,246,.28)}
+.ab-b{background:rgba(201,178,152,.09);color:var(--gold);border:1px solid rgba(201,178,152,.28)}
+/* SCROLL FADE */
+.fi{opacity:0;transform:translateY(22px);transition:opacity .7s,transform .7s}
+.fi.vis{opacity:1;transform:none}
+#catalogo{scroll-margin-top:80px}
+@media(max-width:768px){.nav{padding:14px 18px}.hero{padding:96px 18px 56px}.catalog{padding:56px 16px}.pgrid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="abbadge" id="abbadge"></div>
+
+<nav class="nav">
+  <div class="nav-logo">Reparo<span>Eletro</span></div>
+  <div class="nav-badge"><div class="nav-dot"></div>Equipamentos Revisados</div>
+</nav>
+
+<!-- ═══ SEÇÃO 1: HERO + VSL ═══ -->
+<section class="hero" id="hero">
+  <div class="hero-glow"></div>
+  <div class="eyebrow">⚡ Alerta ao Consumidor</div>
+  <h1 class="hero-title">
+    Nunca compre um microondas<br>
+    <em>sem ver este vídeo</em> antes.<br>
+    <span class="hl">Economize até 70% agora mesmo!</span>
+  </h1>
+  <p class="hero-sub">Descubra o que as lojas não querem que você saiba — e como ter um microondas de qualidade pagando muito menos.</p>
+
+  <!-- VIDEO: substituir o bloco .vplaceholder pelo código VTurb -->
+  <div class="vwrap fi">
+    <div class="vbox">
+      <div class="vplaceholder" id="vplaceholder">
+        <div class="vplay" onclick="alert('Insira aqui o código VTurb')">
+          <svg viewBox="0 0 24 24" width="30" height="30"><polygon points="5,3 19,12 5,21"/></svg>
+        </div>
+        <div class="vlabel">▶&nbsp;&nbsp;Assistir vídeo</div>
+        <div style="font-family:var(--fm);font-size:10px;color:rgba(201,178,152,.4);letter-spacing:1px;">[ ESPAÇO RESERVADO VTURB ]</div>
+      </div>
+    </div>
+  </div>
+
+  <a href="#catalogo" class="btn-primary fi">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+    Ver Catálogo
+  </a>
+
+  <div class="urgency fi">
+    <div class="urgency-dot"></div>
+    <span><strong>Estoque limitado</strong> — 28 equipamentos disponíveis agora</span>
+  </div>
+</section>
+
+<hr>
+
+<!-- ═══ SEÇÃO 2: CATÁLOGO ═══ -->
+<section class="catalog" id="catalogo">
+  <div class="sec-tag">Catálogo</div>
+  <h2 class="sec-title">Microondas <em>Revisados</em></h2>
+  <p class="sec-sub">Todos os equipamentos passam por revisão técnica completa com garantia de funcionamento.</p>
+  <div class="filters">
+    <button class="fpill active" data-f="all">Todos</button>
+    <button class="fpill" data-f="microondas">Microondas</button>
+    <button class="fpill" data-f="bebedouro">Bebedouros</button>
+  </div>
+  <div class="pgrid" id="pgrid"></div>
+</section>
+
+<footer class="footer">
+  <div class="flogo">Reparo<span>Eletro</span></div>
+  <div class="fsub">Equipamentos revisados com qualidade · Belo Horizonte, MG</div>
+</footer>
+
+<!-- LIGHTBOX -->
+<div class="lb" id="lb">
+  <div class="lbclose" onclick="lbClose()">✕</div>
+  <div class="lbarrow" id="lb-prev" onclick="lbPrev()"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></div>
+  <img class="lbimg" id="lb-img" src="" alt="">
+  <div class="lbarrow" id="lb-next" onclick="lbNext()"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+  <div class="lbcount" id="lb-count"></div>
+</div>
+
+<!-- CHECKOUT -->
+<div class="ckoverlay" id="ckoverlay">
+  <div class="ckmodal">
+    <div class="ckhead">
+      <div class="ckhead-title" id="ck-title">Finalizar Compra</div>
+      <div class="ckxbtn" onclick="ckClose()">✕</div>
+    </div>
+    <div class="ckbody">
+      <div class="ckphotos" id="ck-photos">
+        <div class="ckexpand" onclick="ckExpandPhoto()"><svg viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></div>
+        <div class="ckthumbs" id="ck-thumbs"></div>
+      </div>
+      <div class="ckinfo">
+        <div class="ckos" id="ck-os"></div>
+        <div class="ckname" id="ck-name"></div>
+        <div class="ckspecs" id="ck-specs"></div>
+        <div class="ckdlbl">Descrição</div>
+        <div class="ckdesc" id="ck-desc"></div>
+        <div class="ckprow">
+          <span class="ckold" id="ck-old"></span>
+          <span class="ckprice" id="ck-price"></span>
+        </div>
+        <div class="ckpsub">à vista · Retirada em BH</div>
+        <input class="ckinput" type="text" placeholder="Seu nome completo" id="ck-nome">
+        <input class="ckinput" type="tel" placeholder="WhatsApp (31) 99999-9999" id="ck-tel">
+        <input class="ckinput" type="text" placeholder="Bairro / Cidade" id="ck-bairro">
+        <button class="cksubmit" onclick="ckSubmit()">Confirmar Pedido →</button>
+        <div class="cksec">🔒 Pagamento confirmado na retirada · Sem taxa</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── A/B TEST ──────────────────────────────────────────────────────────────
+const AB = (Math.random() < 0.5) ? 'A' : 'B';
+// Forçar versão: AB = 'A' (WhatsApp) | AB = 'B' (Checkout)
+const badge = document.getElementById('abbadge');
+badge.textContent = 'A/B — Versão ' + AB;
+badge.className = 'abbadge ' + (AB==='A'?'ab-a':'ab-b');
+
+const WA = '5531999999999'; // ← NÚMERO REAL AQUI
+const waMsg = (n,id,p) => encodeURIComponent('Olá! Tenho interesse no *'+n+'* ('+id+') por '+p+'. Ainda disponível?');
+const R = n => 'R$ ' + Number(n).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+
+// ── PRODUTOS ──────────────────────────────────────────────────────────────
+// Conectar à API real: fetch('/api/tv-equipamentos?action=load').then(r=>r.json()).then(d=>{...})
+const PROD = [
+  {id:'MI-7991',nome:'ELECTROLUX mt30s',cat:'microondas',lit:'20 litros',ten:'127v',p:270,po:650,
+   desc:'Microondas Electrolux mt30s revisado, 20 litros. Funcionamento perfeito, prato giratório íntegro. Revisado pelo técnico com garantia.',
+   fotos:['https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=600&q=80','https://images.unsplash.com/photo-1574269909862-7e1d70bb8078?w=600&q=80','https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80']},
+  {id:'MI-2499',nome:'ELECTROLUX mt30s',cat:'microondas',lit:'20 litros',ten:'127v',p:270,po:650,
+   desc:'Microondas Electrolux mt30s revisado. Teclado e display 100% funcionais. Ótima condição.',
+   fotos:['https://images.unsplash.com/photo-1574269909862-7e1d70bb8078?w=600&q=80','https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=600&q=80']},
+  {id:'MI-3845',nome:'PANASONIC NN-ST67',cat:'microondas',lit:'32 litros',ten:'220v',p:380,po:900,
+   desc:'Panasonic 32 litros revisado, 220v. Funções de descongelamento e cozimento rápido perfeitas.',
+   fotos:['https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80','https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=600&q=80']},
+  {id:'MI-4201',nome:'BRASTEMP BMS45',cat:'microondas',lit:'45 litros',ten:'220v',p:490,po:1100,
+   desc:'Brastemp 45 litros revisado. Maior linha doméstica, ideal para famílias grandes. Garantia de funcionamento.',
+   fotos:['https://images.unsplash.com/photo-1576867757603-05b134ebc379?w=600&q=80','https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80']},
+  {id:'MI-5560',nome:'PHILCO PMO33',cat:'microondas',lit:'30 litros',ten:'110v',p:220,po:580,
+   desc:'Philco 30 litros revisado. Todos os modos funcionando. Excelente custo-benefício.',
+   fotos:['https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=600&q=80','https://images.unsplash.com/photo-1574269909862-7e1d70bb8078?w=600&q=80']},
+  {id:'BE-7182',nome:'ELECTROLUX pe12v',cat:'bebedouro',lit:'Passagem',ten:'Bivolt',p:330,po:750,
+   desc:'Bebedouro Electrolux pe12v bivolt revisado. Água gelada e natural funcionando. Compressor revisado.',
+   fotos:['https://images.unsplash.com/photo-1563861826100-9cb868fdbe1c?w=600&q=80','https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=600&q=80']},
+];
+
+// ── RENDER ────────────────────────────────────────────────────────────────
+const pIdx = {};
+function render(f){
+  const g = document.getElementById('pgrid');
+  const list = f==='all'?PROD:PROD.filter(p=>p.cat===f);
+  g.innerHTML = list.map((p,i)=>`
+    <div class="pcard fi" style="transition-delay:${i*.06}s">
+      <div class="cphoto" id="cp-${p.id}">
+        ${p.fotos.map((f,j)=>`<img src="${f}" alt="${p.nome}" class="${j===0?'on':''}" loading="lazy">`).join('')}
+        <div class="cphoto-nav">
+          <div class="cnav" onclick="slide('${p.id}',-1,event)"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></div>
+          <div class="cnav" onclick="slide('${p.id}',1,event)"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+        </div>
+        <div class="cexpand" onclick="lbOpen('${p.id}',event)"><svg viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></div>
+        <div class="cbadge">✓ Revisado</div>
+        <div class="cdots" id="dots-${p.id}">
+          ${p.fotos.map((_,j)=>`<div class="cdot ${j===0?'on':''}" onclick="gp('${p.id}',${j},event)"></div>`).join('')}
+        </div>
+      </div>
+      <div class="cbody">
+        <div class="cos">${p.id}</div>
+        <div class="cname">${p.nome}</div>
+        <div class="cspecs"><span class="cspec">⚡ ${p.ten}</span><span class="cspec">📐 ${p.lit}</span></div>
+        <div class="cdesc">${p.desc}</div>
+        <div class="cfooter">
+          <div class="cprice">
+            <div class="cold">${R(p.po)}</div>
+            <div class="cnow">${R(p.p)}</div>
+            <div class="clab">à vista</div>
+          </div>
+          ${AB==='A'
+            ?`<a href="https://wa.me/${WA}?text=${waMsg(p.nome,p.id,R(p.p))}" class="ccta cwa" target="_blank" onclick="track('wa','${p.id}')">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+                WhatsApp
+              </a>`
+            :`<button class="ccta cck" onclick="ckOpen('${p.id}');track('ck','${p.id}')">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                Comprar
+              </button>`
+          }
+        </div>
+      </div>
+    </div>`).join('');
+  observe();
+}
+
+// SLIDER
+function getIdx(id){return pIdx[id]||0}
+function setIdx(id,i){
+  const w=document.getElementById('cp-'+id); if(!w)return;
+  const imgs=w.querySelectorAll('img'), dots=document.getElementById('dots-'+id)?.querySelectorAll('.cdot');
+  const n=imgs.length; i=((i%n)+n)%n; pIdx[id]=i;
+  imgs.forEach((el,j)=>el.classList.toggle('on',j===i));
+  dots&&dots.forEach((d,j)=>d.classList.toggle('on',j===i));
+}
+function slide(id,d,e){e?.stopPropagation();setIdx(id,getIdx(id)+d)}
+function gp(id,i,e){e?.stopPropagation();setIdx(id,i)}
+
+// LIGHTBOX
+let lbImgs=[],lbI=0;
+function lbOpen(id,e){e?.stopPropagation();const p=PROD.find(x=>x.id===id);if(!p)return;lbImgs=p.fotos;lbI=getIdx(id);lbShow();document.getElementById('lb').classList.add('open')}
+function lbShow(){document.getElementById('lb-img').src=lbImgs[lbI];document.getElementById('lb-count').textContent=(lbI+1)+' / '+lbImgs.length}
+function lbPrev(){lbI=((lbI-1)+lbImgs.length)%lbImgs.length;lbShow()}
+function lbNext(){lbI=(lbI+1)%lbImgs.length;lbShow()}
+function lbClose(){document.getElementById('lb').classList.remove('open')}
+document.getElementById('lb').addEventListener('click',function(e){if(e.target===this)lbClose()})
+
+// CHECKOUT
+let ckP=null, ckPI=0;
+function ckOpen(id){
+  const p=PROD.find(x=>x.id===id); if(!p)return; ckP=p; ckPI=0;
+  document.getElementById('ck-title').textContent='Finalizar — '+p.nome;
+  document.getElementById('ck-os').textContent=p.id;
+  document.getElementById('ck-name').textContent=p.nome;
+  document.getElementById('ck-desc').textContent=p.desc;
+  document.getElementById('ck-price').textContent=R(p.p);
+  document.getElementById('ck-old').textContent=R(p.po);
+  document.getElementById('ck-specs').innerHTML=`<span class="ckspec">⚡ ${p.ten}</span><span class="ckspec">📐 ${p.lit}</span><span class="ckspec">✓ Revisado</span>`;
+  const ph=document.getElementById('ck-photos');
+  ph.querySelectorAll('img').forEach(el=>el.remove());
+  p.fotos.forEach((f,j)=>{const img=document.createElement('img');img.src=f;img.alt=p.nome;if(j===0)img.classList.add('on');ph.insertBefore(img,ph.firstChild)});
+  document.getElementById('ck-thumbs').innerHTML=p.fotos.map((f,j)=>`<div class="ckthumb ${j===0?'on':''}" onclick="ckGP(${j})"><img src="${f}" alt=""></div>`).join('');
+  document.getElementById('ckoverlay').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function ckGP(i){if(!ckP)return;ckPI=i;const ph=document.getElementById('ck-photos');ph.querySelectorAll('img').forEach((el,j)=>el.classList.toggle('on',j===i));document.getElementById('ck-thumbs').querySelectorAll('.ckthumb').forEach((t,j)=>t.classList.toggle('on',j===i))}
+function ckExpandPhoto(){if(!ckP)return;lbImgs=ckP.fotos;lbI=ckPI;lbShow();document.getElementById('lb').classList.add('open')}
+function ckClose(){document.getElementById('ckoverlay').classList.remove('open');document.body.style.overflow=''}
+document.getElementById('ckoverlay').addEventListener('click',function(e){if(e.target===this)ckClose()})
+function ckSubmit(){
+  const nome=document.getElementById('ck-nome').value.trim(), tel=document.getElementById('ck-tel').value.trim();
+  if(!nome||!tel){alert('Preencha seu nome e WhatsApp.');return}
+  const msg='Olá! Quero confirmar o pedido:\n\n*'+ckP.nome+'* ('+ckP.id+')\nPreço: '+R(ckP.p)+'\n\nNome: '+nome+'\nTelefone: '+tel;
+  window.open('https://wa.me/'+WA+'?text='+encodeURIComponent(msg),'_blank');
+  ckClose();
+}
+
+// FILTERS
+document.querySelectorAll('.fpill').forEach(el=>{
+  el.addEventListener('click',function(){
+    document.querySelectorAll('.fpill').forEach(p=>p.classList.remove('active'));
+    this.classList.add('active');
+    render(this.dataset.f);
+  });
+});
+
+// KEYBOARD
+document.addEventListener('keydown',e=>{
+  if(document.getElementById('lb').classList.contains('open')){
+    if(e.key==='ArrowLeft')lbPrev();
+    if(e.key==='ArrowRight')lbNext();
+    if(e.key==='Escape')lbClose();
+  }
+  if(document.getElementById('ckoverlay').classList.contains('open')&&e.key==='Escape')ckClose();
+});
+
+// FADE IN OBSERVER
+function observe(){
+  const io=new IntersectionObserver(entries=>{
+    entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('vis');io.unobserve(e.target)}})
+  },{threshold:.08});
+  document.querySelectorAll('.fi:not(.vis)').forEach(el=>io.observe(el));
+}
+
+// ANALYTICS
+function track(type,id){console.log('[A/B]',AB,type,id);/* integrar GTM/Meta Pixel aqui */}
+
+// INIT
+render('all');
+observe();
+</script>
+</body>
+</html>
