@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Microondas Seminovos — Reparo Eletro</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a0a0a'/%3E%3Crect x='4' y='9' width='24' height='14' rx='2' fill='none' stroke='%23c9b298' stroke-width='1.5'/%3E%3Crect x='20' y='11' width='6' height='10' rx='1' fill='%23c9b298' opacity='.4'/%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,400;1,700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a0a;--bg2:#111;--bg3:#171717;--text:#f0f0e8;--muted:#5a5a50;--muted2:#919180;--gold:#c9b298;--gold2:rgba(201,178,152,0.12);--green:#10b981;--blue:#3b82f6;--fh:'Playfair Display',serif;--fb:'Inter',sans-serif}
+html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-family:var(--fb);overflow-x:hidden}
+.vsl-section{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px 80px;position:relative;overflow:hidden}
+.vsl-section::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:.4}
+.logo-bar{display:flex;align-items:center;gap:10px;margin-bottom:40px}
+.logo-bar span{font-family:var(--fh);font-size:22px;font-weight:700}
+.logo-bar span b{color:var(--gold)}
+.badge-pill{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(201,178,152,0.35);border-radius:999px;padding:7px 16px;font-size:10px;font-weight:600;letter-spacing:2.5px;color:var(--gold);text-transform:uppercase;margin-bottom:28px}
+.vsl-headline{font-family:var(--fh);font-size:clamp(32px,5vw,62px);font-weight:900;line-height:1.1;text-align:center;max-width:820px;margin-bottom:14px}
+.vsl-headline em{font-style:italic;color:var(--gold);display:block}
+.vsl-sub{font-size:16px;color:var(--muted2);text-align:center;max-width:560px;line-height:1.65;margin-bottom:36px}
+.vsl-sub strong{color:var(--green);font-weight:600}
+.video-wrap{width:100%;max-width:780px;aspect-ratio:16/9;background:var(--bg3);border:1px solid rgba(201,178,152,0.15);border-radius:14px;position:relative;overflow:hidden;margin-bottom:36px}
+.video-wrap::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,rgba(201,178,152,0.06) 0%,transparent 70%)}
+.video-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+.video-play-btn{width:72px;height:72px;border-radius:50%;background:rgba(201,178,152,0.15);border:2px solid rgba(201,178,152,0.4);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s}
+.video-play-btn:hover{background:rgba(201,178,152,0.25);transform:scale(1.05)}
+.video-play-btn svg{width:26px;height:26px;fill:var(--gold);margin-left:4px}
+.video-label{font-size:12px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase}
+.vturb-placeholder{font-size:11px;color:var(--muted);position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(10,10,10,0.8);padding:4px 10px;border-radius:4px;white-space:nowrap}
+.btn-cta-primary{display:inline-flex;align-items:center;gap:10px;background:var(--gold);color:#0a0a0a;font-family:var(--fh);font-weight:700;font-size:18px;padding:16px 44px;border-radius:6px;border:none;cursor:pointer;text-decoration:none;letter-spacing:-0.3px;transition:all .2s}
+.btn-cta-primary:hover{background:#d4be9e;transform:translateY(-2px)}
+.scroll-hint{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--muted);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;animation:bounce 2s infinite}
+@keyframes bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(6px)}}
+.catalog-section{min-height:100vh;padding:80px 20px;position:relative}
+.catalog-section::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:1px;height:80px;background:linear-gradient(var(--gold),transparent);opacity:.3}
+.section-label{text-align:center;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:14px}
+.section-title{font-family:var(--fh);font-size:clamp(26px,3.5vw,46px);font-weight:700;text-align:center;margin-bottom:10px}
+.section-sub{font-size:14px;color:var(--muted2);text-align:center;margin-bottom:52px}
+.catalog-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:20px;max-width:1100px;margin:0 auto}
+.prod-card{background:var(--bg3);border:1px solid rgba(201,178,152,0.1);border-radius:14px;overflow:hidden;transition:all .25s}
+.prod-card:hover{border-color:rgba(201,178,152,0.3);transform:translateY(-4px);box-shadow:0 16px 40px rgba(0,0,0,0.4)}
+.prod-card-img{width:100%;aspect-ratio:4/3;overflow:hidden;position:relative;background:var(--bg2)}
+.prod-card-img img{width:100%;height:100%;object-fit:cover;transition:transform .4s}
+.prod-card:hover .prod-card-img img{transform:scale(1.06)}
+.prod-expand-btn{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:6px;background:rgba(10,10,10,0.7);border:1px solid rgba(201,178,152,0.2);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s;cursor:pointer;z-index:2}
+.prod-card:hover .prod-expand-btn{opacity:1}
+.prod-expand-btn svg{width:14px;height:14px;fill:var(--gold)}
+.badge-status{position:absolute;top:10px;left:10px;font-size:9px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;padding:4px 10px;border-radius:4px}
+.badge-disponivel{background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3)}
+.badge-vendido{background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.2)}
+.prod-card-body{padding:18px 18px 20px}
+.prod-card-body h3{font-family:var(--fh);font-size:17px;font-weight:700;margin-bottom:6px;line-height:1.3}
+.prod-desc{font-size:12px;color:var(--muted2);line-height:1.55;margin-bottom:14px}
+.prod-price-row{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:14px}
+.prod-price{font-family:var(--fh);font-size:24px;font-weight:700;color:var(--gold);line-height:1}
+.prod-price-old{font-size:13px;color:var(--muted);text-decoration:line-through}
+.prod-economy{font-size:10px;font-weight:600;color:var(--green);background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);padding:3px 8px;border-radius:4px}
+.prod-specs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.spec-pill{font-size:10px;color:var(--muted2);background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);padding:3px 8px;border-radius:4px}
+.btn-buy{width:100%;padding:11px;border-radius:8px;border:none;font-family:var(--fb);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-buy-a{background:var(--green);color:#fff}
+.btn-buy-a:hover{background:#0da871;transform:translateY(-1px)}
+.btn-buy-b{background:var(--blue);color:#fff}
+.btn-buy-b:hover{background:#2563eb;transform:translateY(-1px)}
+.btn-buy svg{width:14px;height:14px;fill:#fff}
+.lightbox{display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.92);align-items:center;justify-content:center}
+.lightbox.open{display:flex}
+.lightbox-inner{position:relative;max-width:90vw;max-height:90vh;display:flex;flex-direction:column;gap:12px;align-items:center}
+.lightbox-img{max-width:90vw;max-height:75vh;border-radius:12px;border:1px solid rgba(201,178,152,0.2);object-fit:contain}
+.lightbox-close{position:absolute;top:-16px;right:-16px;width:36px;height:36px;border-radius:50%;background:var(--bg3);border:1px solid rgba(201,178,152,0.2);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);font-size:18px;transition:all .2s}
+.lightbox-close:hover{background:var(--gold);color:#000}
+.lightbox-thumbs{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.lightbox-thumb{width:56px;height:42px;border-radius:6px;overflow:hidden;border:1.5px solid transparent;cursor:pointer;transition:.15s}
+.lightbox-thumb.active{border-color:var(--gold)}
+.lightbox-thumb img{width:100%;height:100%;object-fit:cover}
+.lightbox-caption{font-family:var(--fh);font-size:18px;font-weight:700;color:var(--text);text-align:center}
+.checkout-overlay{display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.88);align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px}
+.checkout-overlay.open{display:flex}
+.checkout-modal{background:var(--bg3);border:1px solid rgba(201,178,152,0.15);border-radius:18px;width:100%;max-width:860px;overflow:hidden;display:grid;grid-template-columns:1fr 1fr}
+@media(max-width:680px){.checkout-modal{grid-template-columns:1fr}}
+.checkout-product{padding:32px;border-right:1px solid rgba(201,178,152,0.1)}
+@media(max-width:680px){.checkout-product{border-right:none;border-bottom:1px solid rgba(201,178,152,.1)}}
+.checkout-product-imgs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.checkout-product-imgs img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px;cursor:zoom-in;border:1px solid rgba(201,178,152,0.1);transition:transform .2s}
+.checkout-product-imgs img:hover{transform:scale(1.03)}
+.checkout-product-imgs img.main-img{grid-column:span 2;aspect-ratio:16/9}
+.checkout-prod-name{font-family:var(--fh);font-size:20px;font-weight:700;margin-bottom:8px}
+.checkout-prod-desc{font-size:12px;color:var(--muted2);line-height:1.6;margin-bottom:14px}
+.checkout-price-big{font-family:var(--fh);font-size:32px;font-weight:900;color:var(--gold)}
+.checkout-price-pix{font-size:11px;color:var(--green);margin-top:2px}
+.checkout-form-side{padding:32px}
+.checkout-form-side h2{font-family:var(--fh);font-size:20px;font-weight:700;margin-bottom:24px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin-bottom:6px}
+.form-group input,.form-group select{width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(201,178,152,0.15);border-radius:8px;padding:11px 14px;font-family:var(--fb);font-size:13px;color:var(--text);outline:none;transition:border-color .15s}
+.form-group input:focus,.form-group select:focus{border-color:var(--gold)}
+.form-group select option{background:var(--bg3)}
+.checkout-divider{border:none;border-top:1px solid rgba(201,178,152,0.08);margin:20px 0}
+.checkout-total-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.checkout-total-label{font-size:12px;color:var(--muted2)}
+.checkout-total-value{font-family:var(--fh);font-size:22px;font-weight:700;color:var(--gold)}
+.btn-checkout-submit{width:100%;padding:14px;border-radius:10px;border:none;background:var(--gold);color:#0a0a0a;font-family:var(--fh);font-size:16px;font-weight:700;cursor:pointer;transition:all .2s}
+.btn-checkout-submit:hover{background:#d4be9e;transform:translateY(-1px)}
+.checkout-close-btn{position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;background:var(--bg2);border:1px solid rgba(201,178,152,0.15);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;color:var(--text);transition:.2s}
+.checkout-close-btn:hover{background:var(--gold);color:#000}
+.ab-toggle{position:fixed;bottom:20px;right:20px;z-index:100;background:var(--bg3);border:1px solid rgba(201,178,152,0.2);border-radius:10px;padding:10px 14px;font-size:10px;font-weight:600;letter-spacing:1px;color:var(--gold);text-transform:uppercase;cursor:pointer;transition:.2s;display:flex;align-items:center;gap:8px}
+.ab-toggle:hover{border-color:var(--gold)}
+.ab-dot{width:8px;height:8px;border-radius:50%}
+.ab-dot-a{background:var(--green)}
+.ab-dot-b{background:var(--blue)}
+.footer{text-align:center;padding:40px 20px;border-top:1px solid rgba(201,178,152,0.07);font-size:12px;color:var(--muted)}
+.fade-in{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease}
+.fade-in.visible{opacity:1;transform:translateY(0)}
+</style>
+</head>
+<body>
+<section class="vsl-section" id="vsl">
+  <div class="logo-bar fade-in"><span>Reparo<b>Eletro</b></span></div>
+  <div class="badge-pill fade-in">⭐ MICROONDAS SEMINOVOS REVISADOS</div>
+  <h1 class="vsl-headline fade-in">Nunca compre um microondas<em>sem ver este vídeo antes.</em></h1>
+  <p class="vsl-sub fade-in">Você pode economizar até <strong>70% agora mesmo!</strong> — Microondas revisados, garantidos e prontos para uso.</p>
+  <div class="video-wrap fade-in" id="vturb-container">
+    <div class="video-placeholder">
+      <div class="video-play-btn"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
+      <span class="video-label">Assistir ao vídeo</span>
+    </div>
+    <span class="vturb-placeholder">[ Insira aqui o código HTML do Vturb ]</span>
+  </div>
+  <a href="#catalogo" class="btn-cta-primary fade-in">▼ Ver Catálogo de Microondas</a>
+  <div class="scroll-hint">▼ role para baixo</div>
+</section>
+<section class="catalog-section" id="catalogo">
+  <p class="section-label fade-in">Catálogo Exclusivo</p>
+  <h2 class="section-title fade-in">Microondas Revisados & Garantidos</h2>
+  <p class="section-sub fade-in">Todos com garantia de 3 meses • Entrega em BH e região</p>
+  <div class="catalog-grid" id="catalog-grid"></div>
+</section>
+<footer class="footer">© 2025 Reparo Eletro — Todos os microondas passam por revisão técnica completa</footer>
+<div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+  <div class="lightbox-inner">
+    <button class="lightbox-close" onclick="closeLightbox()">×</button>
+    <img class="lightbox-img" id="lightbox-img" src="" alt="">
+    <p class="lightbox-caption" id="lightbox-caption"></p>
+    <div class="lightbox-thumbs" id="lightbox-thumbs"></div>
+  </div>
+</div>
+<div class="checkout-overlay" id="checkout-overlay" onclick="closeCheckout(event)">
+  <div class="checkout-modal" style="position:relative">
+    <button class="checkout-close-btn" onclick="closeCheckout()">×</button>
+    <div class="checkout-product">
+      <div class="checkout-product-imgs" id="co-imgs"></div>
+      <h3 class="checkout-prod-name" id="co-name"></h3>
+      <p class="checkout-prod-desc" id="co-desc"></p>
+      <div class="checkout-price-big" id="co-price"></div>
+      <p class="checkout-price-pix">💚 À vista no PIX</p>
+    </div>
+    <div class="checkout-form-side">
+      <h2>Finalizar Pedido</h2>
+      <div class="form-group"><label>Nome completo</label><input type="text" placeholder="Seu nome" id="co-form-nome"></div>
+      <div class="form-group"><label>WhatsApp</label><input type="tel" placeholder="(31) 9 9999-9999" id="co-form-tel"></div>
+      <div class="form-group"><label>Bairro / Cidade</label><input type="text" placeholder="Ex: Santa Efigênia, BH" id="co-form-local"></div>
+      <div class="form-group"><label>Forma de pagamento</label><select id="co-form-pgto"><option value="pix">PIX (desconto especial)</option><option value="dinheiro">Dinheiro</option><option value="credito">Cartão (2x sem juros)</option></select></div>
+      <hr class="checkout-divider">
+      <div class="checkout-total-row"><span class="checkout-total-label">Total</span><span class="checkout-total-value" id="co-total"></span></div>
+      <button class="btn-checkout-submit" onclick="submitCheckout()">Confirmar Pedido →</button>
+      <p style="font-size:11px;color:var(--muted);text-align:center;margin-top:12px">Entraremos em contato em até 5 minutos</p>
+    </div>
+  </div>
+</div>
+<div class="ab-toggle" onclick="toggleAB()" id="ab-btn"><span class="ab-dot ab-dot-a" id="ab-dot"></span><span id="ab-label">Versão A: WhatsApp</span></div>
+<script>
+var params=new URLSearchParams(location.search);
+var abVersion=params.get('v')==='b'?'b':'a';
+var WPP='5531999999999';
+function mSVG(c1,c2,lb){var s='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="'+c1+'"/><rect x="30" y="50" width="340" height="200" rx="12" fill="'+c2+'" opacity=".4"/><rect x="50" y="70" width="220" height="160" rx="8" fill="rgba(0,0,0,.5)"/><rect x="60" y="80" width="200" height="140" rx="6" fill="rgba(0,0,0,.7)"/><circle cx="160" cy="150" r="50" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="2"/><rect x="282" y="72" width="88" height="156" rx="4" fill="rgba(0,0,0,.5)"/><rect x="292" y="92" width="68" height="28" rx="4" fill="rgba(255,255,255,.07)"/><circle cx="326" cy="170" r="18" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.1)" stroke-width="1"/><text x="200" y="268" text-anchor="middle" fill="rgba(255,255,255,.35)" font-size="10" font-family="Inter,sans-serif">'+lb+'</text></svg>';return 'data:image/svg+xml,'+encodeURIComponent(s);}
+var produtos=[
+  {id:'mo-001',nome:'Samsung MO25SA 25L Prata',preco:349,precoOld:749,descricao:'Microondas Samsung revisado, capacidade 25L, 10 níveis de potência, teclado touch. Revisado e higienizado. Garantia 3 meses.',specs:['25 Litros','10 Potências','Digital','Prata'],fotos:[mSVG('#1a1a24','#3b5bdb','Samsung 25L • Prata'),mSVG('#1e2030','#364fc7','Samsung 25L • Interior')],status:'disponivel'},
+  {id:'mo-002',nome:'Brastemp BAO20 20L Branco',preco:279,precoOld:599,descricao:'Brastemp 20L, design compacto, 10 programas automáticos, timer 99 minutos. Perfeito para apartamentos.',specs:['20 Litros','10 Programas','Mecânico','Branco'],fotos:[mSVG('#1f1f1f','#888','Brastemp 20L • Branco'),mSVG('#252525','#aaa','Brastemp 20L • Detalhe')],status:'disponivel'},
+  {id:'mo-003',nome:'Electrolux MEF41 31L Preto',preco:429,precoOld:899,descricao:'Electrolux 31L, capacidade família, função grill, descongelamento automático, 8 menus pré-programados.',specs:['31 Litros','Função Grill','8 Menus','Preto'],fotos:[mSVG('#111','#222','Electrolux 31L • Preto'),mSVG('#131313','#2a2a2a','Electrolux 31L • Grill')],status:'disponivel'},
+  {id:'mo-004',nome:'Panasonic NN-ST35L 32L',preco:399,precoOld:849,descricao:'Panasonic 32L, tecnologia inverter, cozimento uniforme, painel espelhado. Poucas unidades!',specs:['32 Litros','Inverter','Espelhado','220V'],fotos:[mSVG('#16162a','#7048e8','Panasonic 32L • Inverter'),mSVG('#1a1a30','#6741d9','Panasonic 32L • Painel')],status:'disponivel'},
+  {id:'mo-005',nome:'Consul CMW20 20L Branco',preco:259,precoOld:499,descricao:'Consul 20L, modelo popular e confiável, fácil de usar. Ideal para o dia a dia.',specs:['20 Litros','7 Potências','Mecânico','Branco'],fotos:[mSVG('#1e1e1e','#c9a227','Consul 20L • Branco'),mSVG('#252520','#b8941f','Consul 20L • Interior')],status:'disponivel'},
+  {id:'mo-006',nome:'Midea MM-4CP 30L Prata',preco:319,precoOld:649,descricao:'Midea 30L prata, espelho interno Rotoflat, distribuição uniforme, 11 menus automáticos.',specs:['30 Litros','Rotoflat','11 Menus','Prata'],fotos:[mSVG('#1a201e','#0d9488','Midea 30L • Prata'),mSVG('#1e2422','#0f766e','Midea 30L • Detalhe')],status:'disponivel'}
+];
+function toggleAB(){abVersion=abVersion==='a'?'b':'a';params.set('v',abVersion);history.replaceState(null,'','?'+params.toString());updateABUI();renderCatalog();}
+function updateABUI(){document.getElementById('ab-dot').className='ab-dot ab-dot-'+abVersion;document.getElementById('ab-label').textContent=abVersion==='a'?'Versão A: WhatsApp':'Versão B: Checkout';}
+updateABUI();
+function renderCatalog(){
+  var grid=document.getElementById('catalog-grid');
+  grid.innerHTML=produtos.map(function(p){
+    var ok=p.status==='disponivel';
+    var ec=Math.round((1-p.preco/p.precoOld)*100);
+    var btn='';
+    if(ok){if(abVersion==='a'){var msg=encodeURIComponent('Olá! Interesse no '+p.nome+' por R$'+p.preco+'. Disponível?');btn='<a href="https://wa.me/'+WPP+'?text='+msg+'" target="_blank" class="btn-buy btn-buy-a"><svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg>Comprar via WhatsApp</a>';}else{btn='<button class="btn-buy btn-buy-b" onclick="openCheckout(''+p.id+'')">💳 Comprar Agora</button>';}}else{btn='<button class="btn-buy" style="background:rgba(239,68,68,.1);color:#ef4444;cursor:not-allowed" disabled>Vendido</button>';}
+    return '<div class="prod-card fade-in">'+
+      '<div class="prod-card-img">'+
+        '<img src="'+p.fotos[0]+'" alt="'+p.nome+'" loading="lazy">'+
+        '<button class="prod-expand-btn" onclick="openLightbox(''+p.id+'',0);event.stopPropagation()"><svg viewBox="0 0 24 24"><path d="M21 11V3h-8l3.29 3.29-10 10L3 13v8h8l-3.29-3.29 10-10z"/></svg></button>'+
+        '<span class="badge-status badge-'+p.status+'">'+(ok?'Disponível':'Vendido')+'</span>'+
+      '</div>'+
+      '<div class="prod-card-body">'+
+        '<h3>'+p.nome+'</h3>'+
+        '<p class="prod-desc">'+p.descricao+'</p>'+
+        '<div class="prod-price-row"><div><div class="prod-price">R$ '+p.preco+'</div><div class="prod-price-old">De R$ '+p.precoOld+'</div></div><span class="prod-economy">-'+ec+'%</span></div>'+
+        '<div class="prod-specs">'+p.specs.map(function(s){return '<span class="spec-pill">'+s+'</span>';}).join('')+'</div>'+
+        btn+
+      '</div></div>';
+  }).join('');
+  observeFadeIn();
+}
+var lbP=null,lbI=0;
+function openLightbox(id,i){lbP=produtos.find(function(x){return x.id===id;});lbI=i||0;updLB();document.getElementById('lightbox').classList.add('open');document.body.style.overflow='hidden';}
+function updLB(){document.getElementById('lightbox-img').src=lbP.fotos[lbI];document.getElementById('lightbox-caption').textContent=lbP.nome;document.getElementById('lightbox-thumbs').innerHTML=lbP.fotos.map(function(f,i){return '<div class="lightbox-thumb'+(i===lbI?' active':'')+'" onclick="lbGoTo('+i+')"><img src="'+f+'"></div>';}).join('');}
+function lbGoTo(i){lbI=i;updLB();}
+function closeLightbox(e){if(e&&e.target!==document.getElementById('lightbox'))return;document.getElementById('lightbox').classList.remove('open');document.body.style.overflow='';}
+function openCheckout(id){var p=produtos.find(function(x){return x.id===id;});if(!p)return;document.getElementById('co-imgs').innerHTML='<img class="main-img" src="'+p.fotos[0]+'" alt="'+p.nome+'" onclick="openLightbox(''+p.id+'',0)"><img src="'+p.fotos[0]+'" onclick="openLightbox(''+p.id+'',0)"><img src="'+p.fotos[1]+'" onclick="openLightbox(''+p.id+'',1)">';document.getElementById('co-name').textContent=p.nome;document.getElementById('co-desc').textContent=p.descricao;document.getElementById('co-price').textContent='R$ '+p.preco;document.getElementById('co-total').textContent='R$ '+p.preco;document.getElementById('checkout-overlay').classList.add('open');document.body.style.overflow='hidden';}
+function closeCheckout(e){if(e&&e.target!==document.getElementById('checkout-overlay'))return;document.getElementById('checkout-overlay').classList.remove('open');document.body.style.overflow='';}
+function submitCheckout(){var n=document.getElementById('co-form-nome').value,t=document.getElementById('co-form-tel').value,pr=document.getElementById('co-name').textContent,vl=document.getElementById('co-price').textContent;if(!n||!t){alert('Preencha nome e WhatsApp!');return;}window.open('https://wa.me/'+WPP+'?text='+encodeURIComponent('Pedido:\nProduto: '+pr+'\nValor: '+vl+'\nNome: '+n+'\nTel: '+t),'_blank');closeCheckout();}
+function observeFadeIn(){var obs=new IntersectionObserver(function(entries){entries.forEach(function(e){if(e.isIntersecting){e.target.classList.add('visible');obs.unobserve(e.target);}});},{threshold:.1});document.querySelectorAll('.fade-in:not(.visible)').forEach(function(el){obs.observe(el);});}
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeLightbox();closeCheckout();}});
+renderCatalog();observeFadeIn();
+</script>
+</body>
+</html>
