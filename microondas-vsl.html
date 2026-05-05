@@ -232,7 +232,7 @@ function closeCheckout(e){if(e&&e.target!==document.getElementById('checkout-ove
 function submitCheckout(){var n=document.getElementById('co-form-nome').value,t=document.getElementById('co-form-tel').value,pr=document.getElementById('co-name').textContent,vl=document.getElementById('co-price').textContent;if(!n||!t){alert('Preencha nome e WhatsApp!');return;}window.open('https://wa.me/'+WPP+'?text='+encodeURIComponent('Pedido:\nProduto: '+pr+'\nValor: '+vl+'\nNome: '+n+'\nTel: '+t),'_blank');closeCheckout();}
 function observeFadeIn(){var obs=new IntersectionObserver(function(entries){entries.forEach(function(e){if(e.isIntersecting){e.target.classList.add('visible');obs.unobserve(e.target);}});},{threshold:.1});document.querySelectorAll('.fade-in:not(.visible)').forEach(function(el){obs.observe(el);});}
 document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeLightbox();closeCheckout();}});
-renderCatalog();observeFadeIn();
+loadProdutos();
 </script>
 </body>
 </html>
