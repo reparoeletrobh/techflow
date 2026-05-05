@@ -231,6 +231,10 @@
       "destination": "/balcao.html"
     },
     {
+      "source": "/microondas-vsl",
+      "destination": "/microondas-vsl.html"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/home.html"
     }

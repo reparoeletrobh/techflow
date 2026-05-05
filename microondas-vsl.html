@@ -174,15 +174,28 @@ var params=new URLSearchParams(location.search);
 var abVersion=params.get('v')==='b'?'b':'a';
 var WPP='5531999999999';
 function mSVG(c1,c2,lb){var s='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="'+c1+'"/><rect x="30" y="50" width="340" height="200" rx="12" fill="'+c2+'" opacity=".4"/><rect x="50" y="70" width="220" height="160" rx="8" fill="rgba(0,0,0,.5)"/><rect x="60" y="80" width="200" height="140" rx="6" fill="rgba(0,0,0,.7)"/><circle cx="160" cy="150" r="50" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="2"/><rect x="282" y="72" width="88" height="156" rx="4" fill="rgba(0,0,0,.5)"/><rect x="292" y="92" width="68" height="28" rx="4" fill="rgba(255,255,255,.07)"/><circle cx="326" cy="170" r="18" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.1)" stroke-width="1"/><text x="200" y="268" text-anchor="middle" fill="rgba(255,255,255,.35)" font-size="10" font-family="Inter,sans-serif">'+lb+'</text></svg>';return 'data:image/svg+xml,'+encodeURIComponent(s);}
-var produtos=[
-  {id:'mo-001',nome:'Samsung MO25SA 25L Prata',preco:349,precoOld:749,descricao:'Microondas Samsung revisado, capacidade 25L, 10 níveis de potência, teclado touch. Revisado e higienizado. Garantia 3 meses.',specs:['25 Litros','10 Potências','Digital','Prata'],fotos:[mSVG('#1a1a24','#3b5bdb','Samsung 25L • Prata'),mSVG('#1e2030','#364fc7','Samsung 25L • Interior')],status:'disponivel'},
-  {id:'mo-002',nome:'Brastemp BAO20 20L Branco',preco:279,precoOld:599,descricao:'Brastemp 20L, design compacto, 10 programas automáticos, timer 99 minutos. Perfeito para apartamentos.',specs:['20 Litros','10 Programas','Mecânico','Branco'],fotos:[mSVG('#1f1f1f','#888','Brastemp 20L • Branco'),mSVG('#252525','#aaa','Brastemp 20L • Detalhe')],status:'disponivel'},
-  {id:'mo-003',nome:'Electrolux MEF41 31L Preto',preco:429,precoOld:899,descricao:'Electrolux 31L, capacidade família, função grill, descongelamento automático, 8 menus pré-programados.',specs:['31 Litros','Função Grill','8 Menus','Preto'],fotos:[mSVG('#111','#222','Electrolux 31L • Preto'),mSVG('#131313','#2a2a2a','Electrolux 31L • Grill')],status:'disponivel'},
-  {id:'mo-004',nome:'Panasonic NN-ST35L 32L',preco:399,precoOld:849,descricao:'Panasonic 32L, tecnologia inverter, cozimento uniforme, painel espelhado. Poucas unidades!',specs:['32 Litros','Inverter','Espelhado','220V'],fotos:[mSVG('#16162a','#7048e8','Panasonic 32L • Inverter'),mSVG('#1a1a30','#6741d9','Panasonic 32L • Painel')],status:'disponivel'},
-  {id:'mo-005',nome:'Consul CMW20 20L Branco',preco:259,precoOld:499,descricao:'Consul 20L, modelo popular e confiável, fácil de usar. Ideal para o dia a dia.',specs:['20 Litros','7 Potências','Mecânico','Branco'],fotos:[mSVG('#1e1e1e','#c9a227','Consul 20L • Branco'),mSVG('#252520','#b8941f','Consul 20L • Interior')],status:'disponivel'},
-  {id:'mo-006',nome:'Midea MM-4CP 30L Prata',preco:319,precoOld:649,descricao:'Midea 30L prata, espelho interno Rotoflat, distribuição uniforme, 11 menus automáticos.',specs:['30 Litros','Rotoflat','11 Menus','Prata'],fotos:[mSVG('#1a201e','#0d9488','Midea 30L • Prata'),mSVG('#1e2422','#0f766e','Midea 30L • Detalhe')],status:'disponivel'}
-];
-function toggleAB(){abVersion=abVersion==='a'?'b':'a';params.set('v',abVersion);history.replaceState(null,'','?'+params.toString());updateABUI();renderCatalog();}
+var produtos=[];
+async function loadProdutos(){
+  try{
+    var d=await fetch('/api/tv-vendas?action=load').then(function(r){return r.json();});
+    produtos=(d.produtos||[])
+      .filter(function(p){return !p.vendido;})
+      .map(function(p){
+        var nome=(p.tipo?p.tipo+' ':'')+p.codigo;
+        var fotos=Array.isArray(p.fotos)&&p.fotos.length?p.fotos:[mSVG('#1a1a24','#c9b298',p.codigo||'?')];
+        var precoOld=p.precoOriginal||Math.round(parseFloat(p.preco)*2.3);
+        var specs=[];
+        if(p.capacidade)specs.push(p.capacidade);
+        if(p.tipo)specs.push(p.tipo);
+        return {id:p.id,nome:nome,preco:parseFloat(p.preco),precoOld:precoOld,
+          descricao:p.descricao+(p.capacidade?' — '+p.capacidade:''),
+          specs:specs,fotos:fotos,status:'disponivel'};
+      });
+    var el=document.getElementById('estoque-count');
+    if(el)el.textContent=produtos.length;
+  }catch(e){console.error('Catálogo erro:',e);}
+  loadProdutos();
+}function toggleAB(){abVersion=abVersion==='a'?'b':'a';params.set('v',abVersion);history.replaceState(null,'','?'+params.toString());updateABUI();renderCatalog();}
 function updateABUI(){document.getElementById('ab-dot').className='ab-dot ab-dot-'+abVersion;document.getElementById('ab-label').textContent=abVersion==='a'?'Versão A: WhatsApp':'Versão B: Checkout';}
 updateABUI();
 function renderCatalog(){
