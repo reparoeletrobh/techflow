@@ -177,7 +177,7 @@ function mSVG(c1,c2,lb){var s='<svg xmlns="http://www.w3.org/2000/svg" viewBox="
 var produtos=[];
 async function loadProdutos(){
   try{
-    var d=await fetch('/api/tv-vendas?action=load').then(function(r){return r.json();});
+    var d=await fetch('/api/vendas?action=load').then(function(r){return r.json();});
     produtos=(d.produtos||[])
       .filter(function(p){return !p.vendido;})
       .map(function(p){
