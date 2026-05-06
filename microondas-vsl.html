@@ -170,8 +170,11 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
 </div>
 <div class="ab-toggle" onclick="toggleAB()" id="ab-btn"><span class="ab-dot ab-dot-a" id="ab-dot"></span><span id="ab-label">Versão A: WhatsApp</span></div>
 <script>
-var params=new URLSearchParams(location.search);
-var abVersion=params.get('v')==='b'?'b':'a';
+// 4 versões: microondas-wa | microondas-ck | purificador-wa | purificador-ck
+var rawV=(new URLSearchParams(location.search)).get('v')||'microondas-wa';
+var IS_MICRO=rawV.indexOf('purificador')<0;
+var USE_WA=rawV.indexOf('-ck')<0;
+var abVersion=USE_WA?'a':'b';
 var WPP='5531999999999';
 // Textos dinâmicos por versão
 (function(){
