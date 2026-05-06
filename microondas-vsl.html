@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Microondas Seminovos — Reparo Eletro</title>
+<title>Microondas Seminovos — Reparo Eletro BH</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a0a0a'/%3E%3Crect x='4' y='9' width='24' height='14' rx='2' fill='none' stroke='%23c9b298' stroke-width='1.5'/%3E%3Crect x='20' y='11' width='6' height='10' rx='1' fill='%23c9b298' opacity='.4'/%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -116,10 +116,10 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
 </head>
 <body>
 <section class="vsl-section" id="vsl">
-  <div class="logo-bar fade-in"><span>Reparo<b>Eletro</b></span></div>
+  <div class="logo-bar fade-in"><span>Reparo<b>Eletro BH</b></span></div>
   <div class="badge-pill fade-in">⭐ MICROONDAS SEMINOVOS REVISADOS</div>
-  <h1 class="vsl-headline fade-in">Nunca compre um microondas<em>sem ver este vídeo antes.</em></h1>
-  <p class="vsl-sub fade-in">Você pode economizar até <strong>70% agora mesmo!</strong> — Microondas revisados, garantidos e prontos para uso.</p>
+  <h1 class="vsl-headline fade-in" id="vsl-headline"></h1>
+  <p class="vsl-sub fade-in" id="vsl-sub"></p>
   <div class="video-wrap fade-in" id="vturb-container">
     <div class="video-placeholder">
       <div class="video-play-btn"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
@@ -132,11 +132,11 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
 </section>
 <section class="catalog-section" id="catalogo">
   <p class="section-label fade-in">Catálogo Exclusivo</p>
-  <h2 class="section-title fade-in">Microondas Revisados & Garantidos</h2>
+  <h2 class="section-title fade-in" id="catalog-title"></h2>
   <p class="section-sub fade-in">Todos com garantia de 3 meses • Entrega em BH e região</p>
   <div class="catalog-grid" id="catalog-grid"></div>
 </section>
-<footer class="footer">© 2025 Reparo Eletro — Todos os microondas passam por revisão técnica completa</footer>
+<footer class="footer">© 2025 Reparo Eletro BH — Todos os microondas passam por revisão técnica completa</footer>
 <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
   <div class="lightbox-inner">
     <button class="lightbox-close" onclick="closeLightbox()">×</button>
@@ -173,6 +173,22 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
 var params=new URLSearchParams(location.search);
 var abVersion=params.get('v')==='b'?'b':'a';
 var WPP='5531999999999';
+// Textos dinâmicos por versão
+(function(){
+  var hl=document.getElementById('vsl-headline');
+  var sb=document.getElementById('vsl-sub');
+  var ct=document.getElementById('catalog-title');
+  var sub='Economize até <strong>70% agora mesmo!</strong> Garantia de 90 Dias, 3x Sem Juros no Cartão, Entrega Rápida!';
+  if(IS_MICRO){
+    if(hl)hl.innerHTML='Não compre seu <em>MICROONDAS,</em><br>sem ver este vídeo antes.';
+    if(sb)sb.innerHTML=sub;
+    if(ct)ct.textContent='Microondas Semi-novos com Garantia';
+  }else{
+    if(hl)hl.innerHTML='Não compre seu <em>PURIFICADOR,</em><br>sem ver este vídeo antes.';
+    if(sb)sb.innerHTML=sub;
+    if(ct)ct.textContent='Purificadores Semi-novos com Garantia';
+  }
+})();
 function mSVG(c1,c2,lb){var s='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="'+c1+'"/><rect x="30" y="50" width="340" height="200" rx="12" fill="'+c2+'" opacity=".4"/><rect x="50" y="70" width="220" height="160" rx="8" fill="rgba(0,0,0,.5)"/><rect x="60" y="80" width="200" height="140" rx="6" fill="rgba(0,0,0,.7)"/><circle cx="160" cy="150" r="50" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="2"/><rect x="282" y="72" width="88" height="156" rx="4" fill="rgba(0,0,0,.5)"/><rect x="292" y="92" width="68" height="28" rx="4" fill="rgba(255,255,255,.07)"/><circle cx="326" cy="170" r="18" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.1)" stroke-width="1"/><text x="200" y="268" text-anchor="middle" fill="rgba(255,255,255,.35)" font-size="10" font-family="Inter,sans-serif">'+lb+'</text></svg>';return 'data:image/svg+xml,'+encodeURIComponent(s);}
 var produtos=[];
 async function loadProdutos(){
@@ -201,7 +217,8 @@ function updateABUI(){document.getElementById('ab-dot').className='ab-dot ab-dot
 updateABUI();
 function renderCatalog(){
   var grid=document.getElementById('catalog-grid');
-  grid.innerHTML=produtos.map(function(p){
+  var lista=IS_MICRO?produtos.filter(function(p){return p.cat==='microondas';}):produtos.filter(function(p){return p.cat!=='microondas';});
+  grid.innerHTML=lista.map(function(p){
     var ok=p.status==='disponivel';
     var ec=Math.round((1-p.preco/p.precoOld)*100);
     var btn='';
@@ -221,6 +238,7 @@ function renderCatalog(){
       '</div></div>';
   }).join('');
   observeFadeIn();
+
 }
 var lbP=null,lbI=0;
 function openLightbox(id,i){lbP=produtos.find(function(x){return String(x.id)===String(id);});lbI=i||0;updLB();document.getElementById('lightbox').classList.add('open');document.body.style.overflow='hidden';}
