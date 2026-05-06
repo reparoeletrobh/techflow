@@ -170,89 +170,216 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
 </div>
 
 <script>
-// 4 versões: microondas-wa | microondas-ck | purificador-wa | purificador-ck
-var rawV=(new URLSearchParams(location.search)).get('v')||'microondas-wa';
-var IS_MICRO=rawV.indexOf('purificador')<0;
-var USE_WA=rawV.indexOf('-ck')<0;
-var abVersion=USE_WA?'wa':'ck';
-var WPP='5531999999999';
-// Textos dinâmicos por versão
-(function(){
-  var hl=document.getElementById('vsl-headline');
-  var sb=document.getElementById('vsl-sub');
-  var ct=document.getElementById('catalog-title');
-  var sub='Economize até <strong>70% agora mesmo!</strong> Garantia de 90 Dias, 3x Sem Juros no Cartão, Entrega Rápida!';
-  if(IS_MICRO){
-    if(hl)hl.innerHTML='Não compre seu <em>MICROONDAS,</em><br>sem ver este vídeo antes.';
-    if(sb)sb.innerHTML=sub;
-    if(ct)ct.textContent='Microondas Semi-novos com Garantia';
-  }else{
-    if(hl)hl.innerHTML='Não compre seu <em>PURIFICADOR,</em><br>sem ver este vídeo antes.';
-    if(sb)sb.innerHTML=sub;
-    if(ct)ct.textContent='Purificadores Semi-novos com Garantia';
+// ── 4 VERSÕES POR URL ────────────────────────────────────────────────────
+// Links:
+//   ?produto=microondas&cta=wa  → Microondas + WhatsApp
+//   ?produto=microondas&cta=ck  → Microondas + Checkout
+//   ?produto=purificador&cta=wa → Purificador + WhatsApp
+//   ?produto=purificador&cta=ck → Purificador + Checkout
+var params  = new URLSearchParams(location.search);
+var PRODUTO = (params.get('produto') || 'microondas').toLowerCase();
+var CTA     = (params.get('cta')     || 'wa').toLowerCase();
+var IS_PURI = PRODUTO === 'purificador';
+
+var WA = '5531999999999'; // ← NÚMERO REAL AQUI
+var R  = function(n){ return 'R$ ' + parseFloat(n).toFixed(2).replace('.',','); };
+
+// ── TEXTOS DINÂMICOS POR PRODUTO ─────────────────────────────────────────
+var TEXTOS = {
+  microondas: {
+    headline1: 'Não compre seu',
+    headline2: 'MICROONDAS,',
+    headline3: 'sem ver este vídeo antes.',
+    sub:       'Economize até 70% agora mesmo! Garantia de 90 Dias, 3x Sem Juros no Cartão, Entrega Rápida!',
+    secTitle:  'Microondas Semi-novos com Garantia',
+    ctaBtn:    'Ver Catálogo de Microondas',
+    urgency:   '<span id="urgency-label">microondas disponíveis</span>',
+    filtro:    function(p){ return (p.tipo||'').toLowerCase().includes('microondas') || (p.tipo||'').toLowerCase().includes('micro'); }
+  },
+  purificador: {
+    headline1: 'Não compre seu',
+    headline2: 'PURIFICADOR,',
+    headline3: 'sem ver este vídeo antes.',
+    sub:       'Economize até 70% agora mesmo! Garantia de 90 Dias, 3x Sem Juros no Cartão, Entrega Rápida!',
+    secTitle:  'Purificadores Semi-novos com Garantia',
+    ctaBtn:    'Ver Catálogo de Purificadores',
+    urgency:   'purificadores disponíveis',
+    filtro:    function(p){ var t=(p.tipo||'').toLowerCase(); return t.includes('purificador') || t.includes('bebedouro') || t.includes('filtro'); }
   }
-})();
-function mSVG(c1,c2,lb){var s='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="'+c1+'"/><rect x="30" y="50" width="340" height="200" rx="12" fill="'+c2+'" opacity=".4"/><rect x="50" y="70" width="220" height="160" rx="8" fill="rgba(0,0,0,.5)"/><rect x="60" y="80" width="200" height="140" rx="6" fill="rgba(0,0,0,.7)"/><circle cx="160" cy="150" r="50" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="2"/><rect x="282" y="72" width="88" height="156" rx="4" fill="rgba(0,0,0,.5)"/><rect x="292" y="92" width="68" height="28" rx="4" fill="rgba(255,255,255,.07)"/><circle cx="326" cy="170" r="18" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.1)" stroke-width="1"/><text x="200" y="268" text-anchor="middle" fill="rgba(255,255,255,.35)" font-size="10" font-family="Inter,sans-serif">'+lb+'</text></svg>';return 'data:image/svg+xml,'+encodeURIComponent(s);}
-var produtos=[];
+};
+var TX = TEXTOS[PRODUTO] || TEXTOS.microondas;
+
+// ── APLICAR TEXTOS NO DOM ────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  // Headline
+  var h1 = document.querySelector('.vsl-headline');
+  if (h1) h1.innerHTML = TX.headline1 + ' <em>' + TX.headline2 + '</em><br>' + TX.headline3;
+  // Sub
+  var sub = document.querySelector('.vsl-sub');
+  if (sub) sub.textContent = TX.sub;
+  // Section title
+  var secT = document.querySelector('.catalog-title');
+  if (secT) secT.textContent = TX.secTitle;
+  // CTA button
+  var ctaBtn = document.querySelector('.cta-catalog');
+  if (ctaBtn) ctaBtn.textContent = '▼ ' + TX.ctaBtn;
+  // Urgency count label
+  var urgEl = document.querySelector('#urgency-label');
+  if (urgEl) urgEl.textContent = TX.urgency;
+});
+
+// ── PRODUTOS ─────────────────────────────────────────────────────────────
+var PROD = [];
+function mSVG(label){
+  var s='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="#141414"/><text x="200" y="155" text-anchor="middle" fill="rgba(240,180,41,.3)" font-size="13" font-family="DM Mono,monospace">'+label+'</text></svg>';
+  return 'data:image/svg+xml,'+encodeURIComponent(s);
+}
 async function loadProdutos(){
   try{
-    var d=await fetch('/api/vendas?action=load').then(function(r){return r.json();});
-    produtos=(d.produtos||[])
-      .filter(function(p){return !p.vendido;})
-      .map(function(p){
-        var nome=(p.tipo?p.tipo+' ':'')+p.codigo;
-        var fotos=Array.isArray(p.fotos)&&p.fotos.length?p.fotos:[mSVG('#1a1a24','#f0b429',p.codigo||'?')];
-        var precoOld=p.precoOriginal||Math.round(parseFloat(p.preco)*2.3);
-        var specs=[];
-        if(p.capacidade)specs.push(p.capacidade);
-        if(p.tipo)specs.push(p.tipo);
-        return {id:p.id,nome:nome,preco:parseFloat(p.preco),precoOld:precoOld,
-          descricao:p.descricao+(p.capacidade?' — '+p.capacidade:''),
-          specs:specs,fotos:fotos,status:'disponivel'};
-      });
-    var el=document.getElementById('estoque-count');
-    if(el)el.textContent=produtos.length;
-  }catch(e){console.error('Catálogo erro:',e);}
+    var d = await fetch('/api/tv-vendas?action=load').then(function(r){return r.json();});
+    var todos = (d.produtos||[]).filter(function(p){return !p.vendido;});
+    // Filtrar pelo tipo de produto da URL
+    PROD = todos.filter(TX.filtro).map(function(p){
+      var fotos = Array.isArray(p.fotos)&&p.fotos.length ? p.fotos : [mSVG(p.codigo||'sem foto')];
+      var precoOld = Math.round(parseFloat(p.preco)*2.3);
+      return {
+        id: p.id, os: p.codigo||'—',
+        nome: (p.tipo?p.tipo+' ':'')+p.codigo,
+        desc: p.descricao||'Equipamento revisado com garantia de funcionamento.',
+        specs: [p.capacidade, p.tipo].filter(Boolean),
+        fotos: fotos, preco: parseFloat(p.preco), precoOld: precoOld
+      };
+    });
+    var el = document.getElementById('estq');
+    if(el) el.textContent = PROD.length;
+  }catch(e){ console.error('loadProdutos:', e); }
   renderCatalog();
   observeFadeIn();
 }
-function updateABUI(){document.getElementById('ab-dot').className='ab-dot ab-dot-'+abVersion;document.getElementById('ab-label').textContent=abVersion==='wa'?'Versão A: WhatsApp':'Versão B: Checkout';}
-updateABUI();
+
+// ── FOTO STATE ────────────────────────────────────────────────────────────
+var pIdx = {};
+function pi(id){ return pIdx[id]||0; }
+function setPi(id,i,ev){
+  if(ev) ev.stopPropagation();
+  var w=document.getElementById('ph-'+id); if(!w) return;
+  var imgs=w.querySelectorAll('img.cph'), dots=w.querySelectorAll('.ph-dot');
+  var n=imgs.length; i=((i%n)+n)%n; pIdx[id]=i;
+  imgs.forEach(function(el,j){el.classList.toggle('on',j===i);});
+  dots.forEach(function(d,j){d.classList.toggle('on',j===i);});
+}
+function slideP(id,dir,ev){ ev.stopPropagation(); setPi(id,pi(id)+dir,null); }
+
+// ── LIGHTBOX ──────────────────────────────────────────────────────────────
+var lbP=null, lbI=0;
+function openLightbox(productId, startIdx){
+  lbP = PROD.find(function(x){return String(x.id)===String(productId);});
+  if(!lbP) return;
+  lbI = startIdx||0;
+  updLB();
+  document.getElementById('lightbox').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function updLB(){
+  document.getElementById('lightbox-img').src = lbP.fotos[lbI];
+  document.getElementById('lightbox-caption').textContent = lbP.nome;
+  document.getElementById('lightbox-count').textContent = (lbI+1)+' / '+lbP.fotos.length;
+}
+function lbGoto(i){ lbI=((i%lbP.fotos.length)+lbP.fotos.length)%lbP.fotos.length; updLB(); }
+function closeLightbox(){ document.getElementById('lightbox').classList.remove('open'); document.body.style.overflow=''; }
+document.addEventListener('DOMContentLoaded', function(){
+  var lb = document.getElementById('lightbox');
+  if(lb) lb.addEventListener('click', function(e){ if(e.target===this) closeLightbox(); });
+});
+
+// ── CHECKOUT ──────────────────────────────────────────────────────────────
+var ckP = null;
+function openCheckout(productId){
+  ckP = PROD.find(function(x){return String(x.id)===String(productId);}); if(!ckP) return;
+  document.getElementById('co-imgs').innerHTML = '<img class="main-img" src="'+ckP.fotos[0]+'" alt="'+ckP.nome+'" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" onclick="openLightbox(''+ckP.id+'',0)">';
+  document.getElementById('co-name').textContent = ckP.nome;
+  document.getElementById('co-price').textContent = R(ckP.preco);
+  document.getElementById('co-old').textContent = R(ckP.precoOld);
+  document.getElementById('co-desc').textContent = ckP.desc;
+  document.getElementById('co-os').textContent = ckP.os;
+  document.getElementById('checkout-overlay').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeCheckout(){ document.getElementById('checkout-overlay').classList.remove('open'); document.body.style.overflow=''; }
+document.addEventListener('DOMContentLoaded', function(){
+  var co = document.getElementById('checkout-overlay');
+  if(co) co.addEventListener('click', function(e){ if(e.target===this) closeCheckout(); });
+});
+function submitCheckout(){
+  var nome=document.getElementById('co-form-tel').value.trim(), tel=document.getElementById('co-form-tel').value.trim();
+  if(!ckP||!nome){alert('Preencha seus dados.');return;}
+  var msg='Olá! Quero confirmar:\n\n*'+ckP.nome+'* ('+ckP.os+')\nValor: '+R(ckP.preco)+'\n\nNome: '+nome;
+  window.open('https://wa.me/'+WA+'?text='+encodeURIComponent(msg),'_blank');
+  closeCheckout();
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────
 function renderCatalog(){
-  var grid=document.getElementById('catalog-grid');
-  var lista=IS_MICRO?produtos.filter(function(p){return p.cat==='microondas';}):produtos.filter(function(p){return p.cat!=='microondas';});
-  grid.innerHTML=lista.map(function(p){
-    var ok=p.status==='disponivel';
-    var ec=Math.round((1-p.preco/p.precoOld)*100);
-    var btn='';
-    if(ok){if(abVersion==='wa'){var msg=encodeURIComponent('Olá! Interesse no '+p.nome+' por R$'+p.preco+'. Disponível?');btn='<a href="https://wa.me/'+WPP+'?text='+msg+'" target="_blank" class="btn-buy btn-buy-a"><svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg>Comprar via WhatsApp</a>';}else{btn='<button class="btn-buy btn-buy-b" onclick="openCheckout('+p.id+')">💳 Comprar Agora</button>';}}else{btn='<button class="btn-buy" style="background:rgba(239,68,68,.1);color:#ef4444;cursor:not-allowed" disabled>Vendido</button>';}
-    return '<div class="prod-card fade-in">'+
-      '<div class="prod-card-img">'+
-        '<img src="'+p.fotos[0]+'" alt="'+p.nome+'" loading="lazy">'+
-        '<button class="prod-expand-btn" onclick="openLightbox('+p.id+',0);event.stopPropagation()"><svg viewBox="0 0 24 24"><path d="M21 11V3h-8l3.29 3.29-10 10L3 13v8h8l-3.29-3.29 10-10z"/></svg></button>'+
-        '<span class="badge-status badge-'+p.status+'">'+(ok?'Disponível':'Vendido')+'</span>'+
+  var g = document.getElementById('catalog-grid');
+  if(!g) return;
+  if(!PROD.length){
+    g.innerHTML = '<div style="color:var(--muted);font-family:var(--fm);font-size:12px;padding:40px 0;text-align:center;">Nenhum equipamento disponível no momento</div>';
+    return;
+  }
+  g.innerHTML = PROD.map(function(p,i){
+    var ec = Math.round((1-(p.preco/p.precoOld))*100);
+    var waMsg = encodeURIComponent('Olá! Tenho interesse no *'+p.nome+'* ('+p.os+') por '+R(p.preco)+'. Disponível?');
+    // CTA baseado na versão da URL
+    var ctaBtn = CTA==='wa'
+      ? '<a href="https://wa.me/'+WA+'?text='+waMsg+'" class="prod-btn btn-wa" target="_blank"><svg viewBox="0 0 24 24" width="14" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg> WhatsApp</a>'
+      : '<button class="prod-btn btn-ck" onclick="openCheckout(''+p.id+'')">🛒 Comprar</button>';
+    return '<div class="prod-card fade-in" style="transition-delay:'+i*.05+'s">'+
+      '<div class="prod-img" id="ph-'+p.id+'" onclick="openLightbox(''+p.id+'',pi(''+p.id+''))" style="cursor:zoom-in">'+
+        p.fotos.map(function(f,j){return '<img class="cph'+(j===0?' on':'')+'" src="'+f+'" alt="'+p.nome+'" loading="'+(i<3?'eager':'lazy')+'">'; }).join('')+
+        (p.fotos.length>1?
+          '<div class="ph-nav">'+
+            '<div class="ph-btn" onclick="slideP(''+p.id+'',-1,event)"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></div>'+
+            '<div class="ph-btn" onclick="slideP(''+p.id+'',1,event)"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>'+
+          '</div>'+
+          '<div class="ph-dots">'+p.fotos.map(function(_,j){return '<div class="ph-dot'+(j===0?' on':'')+'"></div>';}).join('')+'</div>':'')+
+        '<span class="prod-badge">✓ Revisado</span>'+
       '</div>'+
-      '<div class="prod-card-body">'+
+      '<div class="prod-body">'+
+        '<div class="prod-os">'+p.os+'</div>'+
         '<h3>'+p.nome+'</h3>'+
-        '<p class="prod-desc">'+p.descricao+'</p>'+
-        '<div class="prod-price-row"><div><div class="prod-price">R$ '+p.preco+'</div><div class="prod-price-old">De R$ '+p.precoOld+'</div></div><span class="prod-economy">-'+ec+'%</span></div>'+
-        '<div class="prod-specs">'+p.specs.map(function(s){return '<span class="spec-pill">'+s+'</span>';}).join('')+'</div>'+
-        btn+
-      '</div></div>';
+        '<p class="prod-desc">'+p.desc+'</p>'+
+        '<div class="prod-price-row">'+
+          '<div><div class="prod-price-old">'+R(p.precoOld)+'</div><div class="prod-price">'+R(p.preco)+'</div></div>'+
+          '<span class="prod-economy">-'+ec+'% OFF</span>'+
+        '</div>'+
+        ctaBtn+
+      '</div>'+
+    '</div>';
   }).join('');
   observeFadeIn();
-
 }
-var lbP=null,lbI=0;
-function openLightbox(id,i){lbP=produtos.find(function(x){return String(x.id)===String(id);});lbI=i||0;updLB();document.getElementById('lightbox').classList.add('open');document.body.style.overflow='hidden';}
-function updLB(){document.getElementById('lightbox-img').src=lbP.fotos[lbI];document.getElementById('lightbox-caption').textContent=lbP.nome;document.getElementById('lightbox-thumbs').innerHTML=lbP.fotos.map(function(f,i){return '<div class="lightbox-thumb'+(i===lbI?' active':'')+'" onclick="lbGoTo('+i+')"><img src="'+f+'"></div>';}).join('');}
-function lbGoTo(i){lbI=i;updLB();}
-function closeLightbox(e){if(e&&e.target!==document.getElementById('lightbox'))return;document.getElementById('lightbox').classList.remove('open');document.body.style.overflow='';}
-function openCheckout(id){var p=produtos.find(function(x){return String(x.id)===String(id);});if(!p)return;document.getElementById('co-imgs').innerHTML='<img class="main-img" src="'+p.fotos[0]+'" alt="'+p.nome+'" onclick="openLightbox('+p.id+',0)"><img src="'+p.fotos[0]+'" onclick="openLightbox('+p.id+',0)"><img src="'+p.fotos[1]+'" onclick="openLightbox('+p.id+',1)">';document.getElementById('co-name').textContent=p.nome;document.getElementById('co-desc').textContent=p.descricao;document.getElementById('co-price').textContent='R$ '+p.preco;document.getElementById('co-total').textContent='R$ '+p.preco;document.getElementById('checkout-overlay').classList.add('open');document.body.style.overflow='hidden';}
-function closeCheckout(e){if(e&&e.target!==document.getElementById('checkout-overlay'))return;document.getElementById('checkout-overlay').classList.remove('open');document.body.style.overflow='';}
-function submitCheckout(){var n=document.getElementById('co-form-nome').value,t=document.getElementById('co-form-tel').value,pr=document.getElementById('co-name').textContent,vl=document.getElementById('co-price').textContent;if(!n||!t){alert('Preencha nome e WhatsApp!');return;}window.open('https://wa.me/'+WPP+'?text='+encodeURIComponent('Pedido:\nProduto: '+pr+'\nValor: '+vl+'\nNome: '+n+'\nTel: '+t),'_blank');closeCheckout();}
-function observeFadeIn(){var obs=new IntersectionObserver(function(entries){entries.forEach(function(e){if(e.isIntersecting){e.target.classList.add('visible');obs.unobserve(e.target);}});},{threshold:.1});document.querySelectorAll('.fade-in:not(.visible)').forEach(function(el){obs.observe(el);});}
-document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeLightbox();closeCheckout();}});
+
+// ── FADE IN ───────────────────────────────────────────────────────────────
+function observeFadeIn(){
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('visible'); io.unobserve(e.target); }});
+  },{threshold:.08});
+  document.querySelectorAll('.fade-in:not(.visible)').forEach(function(el){io.observe(el);});
+}
+
+// ── KEYBOARD ──────────────────────────────────────────────────────────────
+document.addEventListener('keydown',function(e){
+  var lb=document.getElementById('lightbox');
+  if(lb&&lb.classList.contains('open')){
+    if(e.key==='ArrowLeft') lbGoto(lbI-1);
+    if(e.key==='ArrowRight') lbGoto(lbI+1);
+    if(e.key==='Escape') closeLightbox();
+  }
+  var co=document.getElementById('checkout-overlay');
+  if(co&&co.classList.contains('open')&&e.key==='Escape') closeCheckout();
+});
+
+// ── INIT ──────────────────────────────────────────────────────────────────
 loadProdutos();
 </script>
 </body>
