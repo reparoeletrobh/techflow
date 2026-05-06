@@ -117,7 +117,7 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
 <body>
 <section class="vsl-section" id="vsl">
   <div class="logo-bar fade-in"><span>Reparo<b>Eletro BH</b></span></div>
-  <div class="badge-pill fade-in">⭐ MICROONDAS SEMINOVOS REVISADOS</div>
+  <div class="badge-pill fade-in" id="vsl-badge">⭐ MICROONDAS SEMI-NOVOS REVISADOS</div>
   <h1 class="vsl-headline fade-in" id="vsl-headline"></h1>
   <p class="vsl-sub fade-in" id="vsl-sub"></p>
   <div class="video-wrap fade-in" id="vturb-container">
@@ -127,16 +127,16 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
     </div>
     <span class="vturb-placeholder">[ Insira aqui o código HTML do Vturb ]</span>
   </div>
-  <a href="#catalogo" class="btn-cta-primary fade-in">▼ Ver Catálogo de Microondas</a>
+  <a href="#catalogo" class="btn-cta-primary cta-catalog fade-in" id="vsl-cta-btn">▼ Ver Catálogo</a>
   <div class="scroll-hint">▼ role para baixo</div>
 </section>
 <section class="catalog-section" id="catalogo">
   <p class="section-label fade-in">Catálogo Exclusivo</p>
-  <h2 class="section-title fade-in" id="catalog-title"></h2>
-  <p class="section-sub fade-in">Todos com garantia de 3 meses • Entrega em BH e região</p>
+  <h2 class="section-title catalog-title fade-in" id="catalog-title"></h2>
+  <p class="section-sub fade-in">Todos com garantia de 90 dias • Entrega em BH e região</p>
   <div class="catalog-grid" id="catalog-grid"></div>
 </section>
-<footer class="footer">© 2025 Reparo Eletro BH — Todos os microondas passam por revisão técnica completa</footer>
+<footer class="footer" id="vsl-footer">© 2025 Reparo Eletro BH — Todos os equipamentos passam por revisão técnica completa</footer>
 <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
   <div class="lightbox-inner">
     <button class="lightbox-close" onclick="closeLightbox()">×</button>
@@ -152,6 +152,7 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
       <div class="checkout-product-imgs" id="co-imgs"></div>
       <h3 class="checkout-prod-name" id="co-name"></h3>
       <p class="checkout-prod-desc" id="co-desc"></p>
+      <div style="font-size:13px;color:var(--muted);text-decoration:line-through;margin-bottom:4px" id="co-old"></div>
       <div class="checkout-price-big" id="co-price"></div>
       <p class="checkout-price-pix">💚 À vista no PIX</p>
     </div>
@@ -171,11 +172,15 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
 
 <script>
 // ── 4 VERSÕES POR URL ────────────────────────────────────────────────────
-// Links:
-//   ?produto=microondas&cta=wa  → Microondas + WhatsApp
-//   ?produto=microondas&cta=ck  → Microondas + Checkout
-//   ?produto=purificador&cta=wa → Purificador + WhatsApp
-//   ?produto=purificador&cta=ck → Purificador + Checkout
+// ─── OS 4 LINKS DO PROJETO ────────────────────────────────────────────────
+// Versão 1 — Microondas + WhatsApp:
+//   reparoeletroadm.com/microondas-vsl?produto=microondas&cta=wa
+// Versão 2 — Microondas + Checkout:
+//   reparoeletroadm.com/microondas-vsl?produto=microondas&cta=ck
+// Versão 3 — Purificador + WhatsApp:
+//   reparoeletroadm.com/microondas-vsl?produto=purificador&cta=wa
+// Versão 4 — Purificador + Checkout:
+//   reparoeletroadm.com/microondas-vsl?produto=purificador&cta=ck
 var params  = new URLSearchParams(location.search);
 var PRODUTO = (params.get('produto') || 'microondas').toLowerCase();
 var CTA     = (params.get('cta')     || 'wa').toLowerCase();
@@ -193,8 +198,9 @@ var TEXTOS = {
     sub:       'Economize até 70% agora mesmo! Garantia de 90 Dias, 3x Sem Juros no Cartão, Entrega Rápida!',
     secTitle:  'Microondas Semi-novos com Garantia',
     ctaBtn:    'Ver Catálogo de Microondas',
-    urgency:   '<span id="urgency-label">microondas disponíveis</span>',
-    filtro:    function(p){ return (p.tipo||'').toLowerCase().includes('microondas') || (p.tipo||'').toLowerCase().includes('micro'); }
+    badge:     '⭐ MICROONDAS SEMI-NOVOS REVISADOS',
+    footer:    '© 2025 Reparo Eletro BH — Todos os microondas passam por revisão técnica completa',
+    filtro:    function(p){ var t=(p.tipo||'').toLowerCase(); return t.includes('microondas') || t.includes('micro'); }
   },
   purificador: {
     headline1: 'Não compre seu',
@@ -203,7 +209,8 @@ var TEXTOS = {
     sub:       'Economize até 70% agora mesmo! Garantia de 90 Dias, 3x Sem Juros no Cartão, Entrega Rápida!',
     secTitle:  'Purificadores Semi-novos com Garantia',
     ctaBtn:    'Ver Catálogo de Purificadores',
-    urgency:   'purificadores disponíveis',
+    badge:     '⭐ PURIFICADORES SEMI-NOVOS REVISADOS',
+    footer:    '© 2025 Reparo Eletro BH — Todos os purificadores passam por revisão técnica completa',
     filtro:    function(p){ var t=(p.tipo||'').toLowerCase(); return t.includes('purificador') || t.includes('bebedouro') || t.includes('filtro'); }
   }
 };
@@ -223,9 +230,14 @@ document.addEventListener('DOMContentLoaded', function() {
   // CTA button
   var ctaBtn = document.querySelector('.cta-catalog');
   if (ctaBtn) ctaBtn.textContent = '▼ ' + TX.ctaBtn;
-  // Urgency count label
-  var urgEl = document.querySelector('#urgency-label');
-  if (urgEl) urgEl.textContent = TX.urgency;
+  // Badge
+  var bdg = document.getElementById('vsl-badge');
+  if (bdg) bdg.textContent = TX.badge;
+  // Footer
+  var ftr = document.getElementById('vsl-footer');
+  if (ftr) ftr.textContent = TX.footer;
+  // Page title
+  document.title = (IS_PURI ? 'Purificadores' : 'Microondas') + ' Semi-novos — Reparo Eletro BH';
 });
 
 // ── PRODUTOS ─────────────────────────────────────────────────────────────
