@@ -200,7 +200,7 @@ var TEXTOS = {
     ctaBtn:    'Ver Catálogo de Microondas',
     badge:     '⭐ MICROONDAS SEMI-NOVOS REVISADOS',
     footer:    '© 2025 Reparo Eletro BH — Todos os microondas passam por revisão técnica completa',
-    filtro:    function(p){ var t=(p.tipo||'').toLowerCase(); return t.includes('microondas') || t.includes('micro'); }
+    filtro:    function(p){ var t=(p.tipo||''); return t==='Microondas' || t.toLowerCase().includes('micro'); }
   },
   purificador: {
     headline1: 'Não compre seu',
@@ -211,7 +211,7 @@ var TEXTOS = {
     ctaBtn:    'Ver Catálogo de Purificadores',
     badge:     '⭐ PURIFICADORES SEMI-NOVOS REVISADOS',
     footer:    '© 2025 Reparo Eletro BH — Todos os purificadores passam por revisão técnica completa',
-    filtro:    function(p){ var t=(p.tipo||'').toLowerCase(); return t.includes('purificador') || t.includes('bebedouro') || t.includes('filtro'); }
+    filtro:    function(p){ var t=(p.tipo||''); return t==='Bebedouro' || t.toLowerCase().includes('bebedouro') || t.toLowerCase().includes('purificador'); }
   }
 };
 var TX = TEXTOS[PRODUTO] || TEXTOS.microondas;
@@ -248,7 +248,7 @@ function mSVG(label){
 }
 async function loadProdutos(){
   try{
-    var d = await fetch('/api/tv-vendas?action=load').then(function(r){return r.json();});
+    var d = await fetch('/api/vendas?action=load').then(function(r){return r.json();});
     var todos = (d.produtos||[]).filter(function(p){return !p.vendido;});
     // Filtrar pelo tipo de produto da URL
     PROD = todos.filter(TX.filtro).map(function(p){
@@ -256,9 +256,9 @@ async function loadProdutos(){
       var precoOld = Math.round(parseFloat(p.preco)*2.3);
       return {
         id: p.id, os: p.codigo||'—',
-        nome: (p.tipo?p.tipo+' ':'')+p.codigo,
-        desc: p.descricao||'Equipamento revisado com garantia de funcionamento.',
-        specs: [p.capacidade, p.tipo].filter(Boolean),
+        nome: p.descricao || (p.tipo?p.tipo+' ':'')+p.codigo,
+        desc: p.observacao || p.obs || 'Equipamento revisado com garantia de funcionamento.',
+        specs: [p.capacidade||p.litros, p.tensao||p.voltagem, p.tipo].filter(Boolean),
         fotos: fotos, preco: parseFloat(p.preco), precoOld: precoOld
       };
     });
