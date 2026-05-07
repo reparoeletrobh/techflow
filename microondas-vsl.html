@@ -10,7 +10,7 @@
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0a0a0a;--bg2:#111;--bg3:#171717;--text:#f0f0e8;--muted:#5a5a50;--muted2:#919180;--gold:#c9b298;--gold2:rgba(201,178,152,0.12);--green:#10b981;--blue:#3b82f6;--fh:'Playfair Display',serif;--fb:'Inter',sans-serif}
 html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-family:var(--fb);overflow-x:hidden}
-.vsl-section{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 20px 36px;position:relative;overflow:hidden}
+.vsl-section{display:flex;flex-direction:column;align-items:center;padding:80px 20px 60px;position:relative;overflow:hidden}
 .vsl-section::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:.4}
 .logo-bar{display:flex;align-items:center;gap:10px;margin-bottom:20px}
 .logo-bar span{font-family:var(--fh);font-size:22px;font-weight:700}
@@ -104,8 +104,8 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
 .btn-checkout-submit:hover{background:#d4be9e;transform:translateY(-1px)}
 .checkout-close-btn{position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;background:var(--bg2);border:1px solid rgba(201,178,152,0.15);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;color:var(--text);transition:.2s}
 .checkout-close-btn:hover{background:var(--gold);color:#000}
-.ab-toggle{position:fixed;bottom:20px;right:20px;z-index:100;background:var(--bg3);border:1px solid rgba(201,178,152,0.2);border-radius:10px;padding:10px 14px;font-size:10px;font-weight:600;letter-spacing:1px;color:var(--gold);text-transform:uppercase;cursor:pointer;transition:.2s;display:flex;align-items:center;gap:8px}
-.ab-toggle:hover{border-color:var(--gold)}
+
+
 .ab-dot{width:8px;height:8px;border-radius:50%}
 .ab-dot-a{background:var(--green)}
 .ab-dot-b{background:var(--blue)}
@@ -175,7 +175,7 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
     </div>
   </div>
 </div>
-<div class="ab-toggle" onclick="toggleAB()" id="ab-btn"><span class="ab-dot ab-dot-a" id="ab-dot"></span><span id="ab-label">Versão A: WhatsApp</span></div>
+
 <script>
 // ── 4 VERSÕES POR URL ────────────────────────────────────────────────────
 // ─── OS 4 LINKS DO PROJETO ────────────────────────────────────────────────
