@@ -191,7 +191,7 @@ async function loadAll() {
       analisePagamento:  (finRes.records||[]).filter(function(r){return r.phaseId==='analise_pagamento';}),
       pecasPendentes:    (compPecasRes.pecas||[]).filter(function(p){return p.status==='pendente';}),
       pecasAgPagamento:  (compPecasRes.pecas||[]).filter(function(p){return p.status==='aguardando_pagamento';}),
-      pecasOnline:       (compPecasRes.pecas||[]).filter(function(p){return p.tipoCompra==='online'&&p.previsaoChegada&&p.status!=='pago';}),
+      pecasOnline:       (compPecasRes.pecas||[]).filter(function(p){return p.tipoCompra==='online'&&p.previsaoChegada&&p.status!=='pago'&&p.status!=='recebido';}),
       remarcar:          remarcarRes.cards || [],
     };
 
