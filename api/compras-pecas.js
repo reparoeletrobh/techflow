@@ -173,7 +173,15 @@ module.exports = async (req, res) => {
     return res.status(200).json({ ok:true });
   }
 
-    if(action==="limpar-tv-indevidos"){const antes=db.pecas.length;db.pecas=db.pecas.filter(p=>p.origem!=="tv_aprovado");const removidas=antes-db.pecas.length;if(removidas>0)await dbSet(KEY,db);return res.status(200).json({ok:true,removidas,total:db.pecas.length});}
+    if (req.method === "POST" && action === "purge-recebidos") {
+    const antes = db.pecas.length;
+    db.pecas = db.pecas.filter(p => p.status !== "recebido");
+    const removidas = antes - db.pecas.length;
+    if (removidas > 0) await dbSet(KEY, db);
+    return res.status(200).json({ ok: true, removidas, restantes: db.pecas.length });
+  }
+
+  if(action==="limpar-tv-indevidos"){const antes=db.pecas.length;db.pecas=db.pecas.filter(p=>p.origem!=="tv_aprovado");const removidas=antes-db.pecas.length;if(removidas>0)await dbSet(KEY,db);return res.status(200).json({ok:true,removidas,total:db.pecas.length});}
 
   // ── TV actions — chave separada, não mistura com ADM ─────────
   if (action === "tv-load") {
