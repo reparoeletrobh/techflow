@@ -10,15 +10,15 @@
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0a0a0a;--bg2:#111;--bg3:#171717;--text:#f0f0e8;--muted:#5a5a50;--muted2:#919180;--gold:#c9b298;--gold2:rgba(201,178,152,0.12);--green:#10b981;--blue:#3b82f6;--fh:'Playfair Display',serif;--fb:'Inter',sans-serif}
 html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-family:var(--fb);overflow-x:hidden}
-.vsl-section{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px 80px;position:relative;overflow:hidden}
+.vsl-section{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 20px 36px;position:relative;overflow:hidden}
 .vsl-section::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:.4}
-.logo-bar{display:flex;align-items:center;gap:10px;margin-bottom:40px}
+.logo-bar{display:flex;align-items:center;gap:10px;margin-bottom:20px}
 .logo-bar span{font-family:var(--fh);font-size:22px;font-weight:700}
 .logo-bar span b{color:var(--gold)}
-.badge-pill{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(201,178,152,0.35);border-radius:999px;padding:7px 16px;font-size:10px;font-weight:600;letter-spacing:2.5px;color:var(--gold);text-transform:uppercase;margin-bottom:28px}
-.vsl-headline{font-family:var(--fh);font-size:clamp(32px,5vw,62px);font-weight:900;line-height:1.15;text-align:center;max-width:820px;margin-bottom:30px}
+
+.vsl-headline{font-family:var(--fh);font-size:clamp(32px,5vw,62px);font-weight:900;line-height:1.15;text-align:center;max-width:820px;margin-bottom:18px}
 .vsl-headline em{font-style:italic;color:var(--gold)}
-.vsl-sub{font-size:16px;color:var(--muted2);text-align:center;max-width:560px;line-height:1.65;margin-bottom:36px}
+.vsl-sub{font-size:16px;color:var(--muted2);text-align:center;max-width:560px;line-height:1.65;margin-bottom:20px}
 .vsl-sub strong{color:var(--green);font-weight:600}
 .video-wrap{width:100%;max-width:780px;aspect-ratio:16/9;background:var(--bg3);border:1px solid rgba(201,178,152,0.15);border-radius:14px;position:relative;overflow:hidden;margin-bottom:36px}
 .video-wrap::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,rgba(201,178,152,0.06) 0%,transparent 70%)}
@@ -30,8 +30,8 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
 .vturb-placeholder{font-size:11px;color:var(--muted);position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(10,10,10,0.8);padding:4px 10px;border-radius:4px;white-space:nowrap}
 .btn-cta-primary{display:inline-flex;align-items:center;gap:10px;background:var(--gold);color:#0a0a0a;font-family:var(--fh);font-weight:700;font-size:18px;padding:16px 44px;border-radius:6px;border:none;cursor:pointer;text-decoration:none;letter-spacing:-0.3px;transition:all .2s}
 .btn-cta-primary:hover{background:#d4be9e;transform:translateY(-2px)}
-.scroll-hint{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--muted);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;animation:bounce 2s infinite}
-@keyframes bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(6px)}}
+
+50%{transform:translateX(-50%) translateY(6px)}}
 .catalog-section{min-height:100vh;padding:80px 20px;position:relative}
 .catalog-section::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:1px;height:80px;background:linear-gradient(var(--gold),transparent);opacity:.3}
 .section-label{text-align:center;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:14px}
@@ -124,7 +124,7 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
 <body>
 <section class="vsl-section" id="vsl">
   <div class="logo-bar fade-in"><span>Reparo<b>Eletro</b></span></div>
-  <div class="badge-pill fade-in">⭐ MICROONDAS SEMINOVOS REVISADOS</div>
+  
   <h1 class="vsl-headline fade-in">Nunca compre um microondas<em>sem ver este vídeo antes.</em></h1>
   <p class="vsl-sub fade-in">Você pode economizar até <strong>70% agora mesmo!</strong> — Microondas revisados, garantidos e prontos para uso.</p>
   <div class="video-wrap fade-in" id="vturb-container">
@@ -135,7 +135,7 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
     <span class="vturb-placeholder">[ Insira aqui o código HTML do Vturb ]</span>
   </div>
   <a href="#catalogo" class="btn-cta-primary fade-in">▼ Ver Catálogo de Microondas</a>
-  <div class="scroll-hint">▼ role para baixo</div>
+  
 </section>
 <section class="catalog-section" id="catalogo">
   <p class="section-label fade-in">Catálogo Exclusivo</p>
