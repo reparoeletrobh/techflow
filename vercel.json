@@ -91,6 +91,14 @@
       "destination": "/tv-vendas.html"
     },
     {
+      "source": "/tv/checkout",
+      "destination": "/tv-checkout.html"
+    },
+    {
+      "source": "/api/tv-checkout",
+      "destination": "/api/tv-checkout.js"
+    },
+    {
       "source": "/tv/compra-equip",
       "destination": "/tv-compra-equip.html"
     },
