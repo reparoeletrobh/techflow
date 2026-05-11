@@ -143,8 +143,8 @@ function render(){
   document.getElementById('sub-vend').textContent='Total vendidos: '+D.vendidos.total+' | Disponíveis: '+D.disponiveis;
   document.getElementById('p-vend').innerHTML='<span class="pill">Hoje: <strong>'+D.vendidos.hoje+'</strong></span><span class="pill">Semana: <strong>'+D.vendidos.semana+'</strong></span><span class="pill">Total: <strong>'+D.vendidos.total+'</strong></span>';
   sv('erp-total',D.erp.total);
-  sv('erp-hoje','—','var(--muted)');
-  sv('erp-sem','—','var(--muted)');
+  sv('erp-hoje',D.erp.hoje!=null?D.erp.hoje:'—',D.erp.hoje?'var(--blue)':'var(--muted)');
+  sv('erp-sem',D.erp.semana!=null?D.erp.semana:'—',D.erp.semana?'var(--purple)':'var(--muted)');
   const eb=document.getElementById('erp-badge');
   if(D.erp.semValor===0){eb.textContent='✅ Todos com valor';eb.style.cssText='background:rgba(16,185,129,.1);color:var(--green);border:1px solid rgba(16,185,129,.2)';}
   else{eb.textContent='⚠️ '+D.erp.semValor+' aguardam valor';eb.style.cssText='background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2)';}
@@ -160,7 +160,8 @@ function render(){
   const alEl=document.getElementById('monthly-alert');
   const ant=D.monthly.fichasAnteriores||[];
   if(ant.length>0){
-    const rows=ant.map(f=>'<div class="ficha-row"><div class="ficha-dot ficha-dot-ant"></div><div class="ficha-title">'+f.nome+'</div><div class="ficha-date">'+fmtDate(f.statusAt)+'</div></div>').join('');
+    const antPend=ant.filter(f=>!f.cadastrado);const antCad=ant.filter(f=>f.cadastrado);
+    const rows=(antPend.length?antPend:[]).concat(antCad).map(f=>'<div class="ficha-row"><div class="ficha-dot '+(f.cadastrado?'ficha-dot-ok':'ficha-dot-ant')+'"></div><div class="ficha-title">'+f.nome+(f.cadastrado?' ✓':'')+'</div><div class="ficha-date">'+fmtDate(f.statusAt)+'</div></div>').join('');
     alEl.innerHTML='<div class="alert alert-warn"><div style="width:100%"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:18px">⚠️</span><div class="alert-text"><strong>'+ant.length+' equipamento'+(ant.length>1?'s':'')+' comprado'+(ant.length>1?'s':'')+' em meses anteriores — pendentes de cadastro:</strong></div></div>'+rows+'</div></div>';
   } else {
     alEl.innerHTML='<div class="alert alert-ok"><div class="alert-icon">✅</div><div class="alert-text">Nenhum equipamento pendente de meses anteriores.</div></div>';
