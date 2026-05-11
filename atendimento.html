@@ -8,108 +8,147 @@
 <style>
 :root{--bg:#050508;--s:#0d0d14;--s2:#13131e;--b:#1e1e2e;--text:#e8e8f0;--muted:#5a5a7a;--m2:#8a8aaa;--yellow:#f0b429;--green:#10b981;--blue:#3b9eff;--red:#ef4444;--orange:#f97316;--purple:#a855f7;--fh:'Syne',sans-serif;--fb:'Inter',sans-serif;--fm:'DM Mono',monospace}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:14px;min-height:100vh;padding:24px}
-.ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:12px}
-.pt{font-family:var(--fh);font-size:24px;font-weight:900;display:flex;align-items:center;gap:10px}.pt span{color:var(--yellow)}
-.rb{display:flex;align-items:center;gap:7px;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;border:1px solid var(--b);background:var(--s);color:var(--m2);cursor:pointer;transition:all .15s}.rb:hover{border-color:var(--yellow);color:var(--yellow)}.rb.loading{opacity:.6;pointer-events:none}
-.lu{font-family:var(--fm);font-size:10px;color:var(--muted);letter-spacing:1px;margin-top:4px}
-.mg{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;margin-bottom:24px}
-.mc{background:var(--s);border:1px solid var(--b);border-radius:14px;padding:22px;position:relative;overflow:hidden;transition:border-color .2s}
-.mc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:14px 14px 0 0;background:var(--accent,var(--yellow))}
-.mc:hover{border-color:var(--accent,var(--yellow))}
-.mi{font-size:22px;margin-bottom:12px;display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:10px}
-.ml{font-family:var(--fm);font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--m2);margin-bottom:8px}
-.mv{font-family:var(--fh);font-size:48px;font-weight:900;line-height:1;margin-bottom:6px;transition:all .3s}.mv.pulse{animation:pp .4s ease}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:14px;min-height:100vh;padding:20px}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+.hdr-title{font-family:var(--fh);font-size:22px;font-weight:900;display:flex;align-items:center;gap:8px}.hdr-title span{color:var(--yellow)}
+.lu{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:4px}
+.rb{display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:7px;font-size:12px;font-weight:600;border:1px solid var(--b);background:var(--s);color:var(--m2);cursor:pointer;transition:all .15s}.rb:hover{border-color:var(--yellow);color:var(--yellow)}.rb.loading{opacity:.5;pointer-events:none}
+.period-bar{display:flex;gap:6px;margin-bottom:20px}
+.pf-btn{padding:6px 16px;border-radius:20px;font-family:var(--fm);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;border:1px solid var(--b);color:var(--m2);background:transparent;transition:all .15s}.pf-btn.on{background:var(--yellow);color:#000;border-color:var(--yellow)}
+.mg{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-bottom:18px}
+.mc{background:var(--s);border:1px solid var(--b);border-radius:13px;padding:18px;position:relative;overflow:hidden;transition:border-color .2s}
+.mc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent,var(--yellow))}
+.mc-icon{font-size:20px;width:40px;height:40px;border-radius:9px;display:flex;align-items:center;justify-content:center;margin-bottom:10px}
+.mc-label{font-family:var(--fm);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--m2);margin-bottom:6px}
+.mc-val{font-family:var(--fh);font-size:46px;font-weight:900;line-height:1;transition:all .3s}.mc-val.p{animation:pp .4s ease}
 @keyframes pp{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
-.ms{font-size:12px;color:var(--muted)}
-.pc{background:var(--s);border:1px solid var(--b);border-radius:14px;padding:24px;margin-bottom:16px;position:relative;overflow:hidden}
-.pc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--blue),var(--green))}
-.pch{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
-.pct{font-family:var(--fh);font-size:18px;font-weight:800;margin-bottom:4px}.pcd{font-size:12px;color:var(--m2)}
-.pf{font-family:var(--fh);font-size:34px;font-weight:900;text-align:right}.pf .n{color:var(--blue)}.pf .d{color:var(--muted)}
-.pp2{font-family:var(--fm);font-size:11px;color:var(--m2);text-align:right;margin-top:3px}
-.pbw{background:var(--s2);border-radius:99px;height:14px;overflow:hidden;margin-bottom:14px}
-.pbf{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--blue),var(--green));transition:width .8s cubic-bezier(.4,0,.2,1)}
-.pl{display:flex;justify-content:space-between;font-family:var(--fm);font-size:10px;text-transform:uppercase;letter-spacing:1px}
-.mr{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
-.ms2{background:var(--s2);border-radius:8px;padding:10px 12px;text-align:center}
-.ms2v{font-family:var(--fh);font-size:20px;font-weight:900}.ms2l{font-family:var(--fm);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-top:3px}
-.ec{background:var(--s);border:1px solid var(--b);border-radius:14px;padding:22px;position:relative;overflow:hidden}
-.ec::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--red)}
-.eh{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
-.et2{font-family:var(--fh);font-size:18px;font-weight:800}
-.eb{font-family:var(--fm);font-size:10px;padding:3px 10px;border-radius:5px;background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2)}
-.er{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--b)}.er:last-child{border:none}
-.rl{font-size:13px;color:var(--m2)}.rv{font-family:var(--fh);font-size:26px;font-weight:900}.rv.red{color:var(--red)}.rv.ok{color:var(--green)}
-.sk{animation:sk 1.5s infinite;background:linear-gradient(90deg,var(--s2) 25%,var(--b) 50%,var(--s2) 75%);background-size:200% 100%;border-radius:6px;height:48px;width:90px;display:inline-block}
+.mc-sub{font-size:11px;color:var(--muted);margin-top:5px}
+.mc-pills{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.pill{font-family:var(--fm);font-size:10px;padding:3px 10px;border-radius:20px;border:1px solid var(--b);color:var(--m2)}.pill strong{color:var(--text)}
+.erp-card{background:var(--s);border:1px solid var(--b);border-radius:13px;padding:18px;margin-bottom:18px;position:relative;overflow:hidden}
+.erp-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--red)}
+.erp-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.erp-title{font-family:var(--fh);font-size:17px;font-weight:800}
+.erp-badge{font-family:var(--fm);font-size:10px;padding:3px 10px;border-radius:5px}
+.erp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.erp-stat{background:var(--s2);border-radius:8px;padding:12px;text-align:center}
+.erp-stat-val{font-family:var(--fh);font-size:28px;font-weight:900}
+.erp-stat-lbl{font-family:var(--fm);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-top:3px}
+.monthly-card{background:var(--s);border:1px solid var(--b);border-radius:13px;padding:18px;position:relative;overflow:hidden}
+.monthly-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--blue),var(--green))}
+.m-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+.m-title{font-family:var(--fh);font-size:17px;font-weight:800}
+.m-mes{font-family:var(--fm);font-size:10px;color:var(--m2);padding:3px 10px;border-radius:5px;border:1px solid var(--b)}
+.m-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.m-stat{background:var(--s2);border-radius:9px;padding:14px;text-align:center}
+.m-stat-val{font-family:var(--fh);font-size:32px;font-weight:900}
+.m-stat-lbl{font-family:var(--fm);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.pbar-wrap{background:var(--s2);border-radius:99px;height:12px;overflow:hidden;margin-bottom:8px}
+.pbar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--blue),var(--green));transition:width .8s cubic-bezier(.4,0,.2,1)}
+.pbar-labels{display:flex;justify-content:space-between;font-family:var(--fm);font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
+.alert{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-radius:9px;margin-top:12px}
+.alert-warn{background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.25);color:var(--orange)}
+.alert-ok{background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.25);color:var(--green)}
+.alert-icon{font-size:18px;flex-shrink:0;margin-top:1px}
+.alert-text{font-size:13px;line-height:1.5}.alert-text strong{font-weight:700}
+.sk{animation:sk 1.5s infinite;background:linear-gradient(90deg,var(--s2) 25%,var(--b) 50%,var(--s2) 75%);background-size:200% 100%;border-radius:5px;display:inline-block}
 @keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
-.toast{position:fixed;bottom:20px;right:20px;background:var(--s);border:1px solid var(--b);border-radius:10px;padding:11px 18px;font-size:13px;z-index:999;transform:translateY(16px);opacity:0;transition:all .25s;display:flex;align-items:center;gap:8px}
+.sk-n{height:46px;width:80px}
+.toast{position:fixed;bottom:18px;right:18px;background:var(--s);border:1px solid var(--b);border-radius:9px;padding:10px 16px;font-size:13px;z-index:999;transform:translateY(14px);opacity:0;transition:all .25s;display:flex;align-items:center;gap:8px}
 .toast.show{transform:none;opacity:1}.tok{border-color:rgba(16,185,129,.35);color:var(--green)}.terr{border-color:rgba(239,68,68,.35);color:var(--red)}
-@media(max-width:600px){body{padding:14px}.mg{grid-template-columns:1fr 1fr}.mr{grid-template-columns:1fr 1fr}.pf{font-size:24px}}
+@media(max-width:580px){body{padding:12px}.mg{grid-template-columns:1fr 1fr}.erp-grid{grid-template-columns:1fr 1fr}.m-stats{grid-template-columns:1fr 1fr}}
 </style></head><body>
-<div class="ph">
-  <div><div class="pt">📊 <span>Atendimento</span></div><div class="lu" id="lu">Carregando...</div></div>
+<div class="hdr">
+  <div><div class="hdr-title">📊 <span>Atendimento</span></div><div class="lu" id="lu">Carregando...</div></div>
   <button class="rb" id="rb" onclick="load()"><span id="ri">🔄</span> Atualizar</button>
 </div>
+<div class="period-bar">
+  <button class="pf-btn on" data-p="hoje" onclick="setPeriod(this)">Hoje</button>
+  <button class="pf-btn" data-p="semana" onclick="setPeriod(this)">Semana</button>
+  <button class="pf-btn" data-p="mes" onclick="setPeriod(this)">Mês</button>
+</div>
 <div class="mg">
-  <div class="mc" style="--accent:#3b9eff"><div class="mi" style="background:rgba(59,158,255,.1)">📋</div><div class="ml">Fichas Criadas no Pipefy</div><div class="mv" id="m-fichas" style="color:var(--blue)"><span class="sk"></span></div><div class="ms">Total histórico do pipe</div></div>
-  <div class="mc" style="--accent:#a855f7"><div class="mi" style="background:rgba(168,85,247,.1)">🛒</div><div class="ml">Equipamentos Comprados</div><div class="mv" id="m-comp" style="color:var(--purple)"><span class="sk"></span></div><div class="ms">Marcados como comprado</div></div>
-  <div class="mc" style="--accent:#10b981"><div class="mi" style="background:rgba(16,185,129,.1)">✅</div><div class="ml">Equipamentos Vendidos</div><div class="mv" id="m-vend" style="color:var(--green)"><span class="sk"></span></div><div class="ms">Vendas concluídas</div></div>
-  <div class="mc" style="--accent:#f97316"><div class="mi" style="background:rgba(249,115,22,.1)">🏷️</div><div class="ml">Disponíveis para Venda</div><div class="mv" id="m-disp" style="color:var(--orange)"><span class="sk"></span></div><div class="ms">Cadastrados não vendidos</div></div>
+  <div class="mc" style="--accent:#3b9eff"><div class="mc-icon" style="background:rgba(59,158,255,.1)">📋</div><div class="mc-label">Fichas Criadas no Pipefy</div><div class="mc-val" id="v-fichas" style="color:var(--blue)"><span class="sk sk-n"></span></div><div class="mc-pills" id="p-fichas"></div><div class="mc-sub" id="sub-fichas">Total histórico</div></div>
+  <div class="mc" style="--accent:#a855f7"><div class="mc-icon" style="background:rgba(168,85,247,.1)">🛒</div><div class="mc-label">Equipamentos Comprados</div><div class="mc-val" id="v-comp" style="color:var(--purple)"><span class="sk sk-n"></span></div><div class="mc-pills" id="p-comp"></div><div class="mc-sub" id="sub-comp">Marcados como comprado</div></div>
+  <div class="mc" style="--accent:#10b981"><div class="mc-icon" style="background:rgba(16,185,129,.1)">📦</div><div class="mc-label">Equipamentos Cadastrados</div><div class="mc-val" id="v-cad" style="color:var(--green)"><span class="sk sk-n"></span></div><div class="mc-pills" id="p-cad"></div><div class="mc-sub" id="sub-cad">Registrados para venda</div></div>
+  <div class="mc" style="--accent:#f97316"><div class="mc-icon" style="background:rgba(249,115,22,.1)">✅</div><div class="mc-label">Equipamentos Vendidos</div><div class="mc-val" id="v-vend" style="color:var(--orange)"><span class="sk sk-n"></span></div><div class="mc-pills" id="p-vend"></div><div class="mc-sub" id="sub-vend">Vendas concluídas</div></div>
 </div>
-<div class="pc">
-  <div class="pch">
-    <div><div class="pct">Comprados × Cadastrados para Venda</div><div class="pcd">Dos equipamentos comprados, quantos já estão no catálogo</div></div>
-    <div><div class="pf"><span class="n" id="bc">—</span><span class="d"> / </span><span class="d" id="bk">—</span></div><div class="pp2" id="bpct">— %</div></div>
-  </div>
-  <div class="pbw"><div class="pbf" id="pbar" style="width:0%"></div></div>
-  <div class="pl"><span style="color:var(--blue)">Comprados</span><span style="color:var(--green)">Cadastrados</span></div>
-  <div class="mr">
-    <div class="ms2"><div class="ms2v" id="s-cad">—</div><div class="ms2l">Total Cadastrados</div></div>
-    <div class="ms2"><div class="ms2v" id="s-vend">—</div><div class="ms2l">Vendidos</div></div>
-    <div class="ms2"><div class="ms2v" id="s-disp">—</div><div class="ms2l">Disponíveis</div></div>
+<div class="erp-card">
+  <div class="erp-hdr"><div class="erp-title">⚡ ERP</div><div class="erp-badge" id="erp-badge">verificando...</div></div>
+  <div class="erp-grid">
+    <div class="erp-stat"><div class="erp-stat-val" id="erp-total">—</div><div class="erp-stat-lbl">Total em ERP</div></div>
+    <div class="erp-stat"><div class="erp-stat-val" id="erp-sv" style="color:var(--red)">—</div><div class="erp-stat-lbl">Sem Valor</div></div>
+    <div class="erp-stat"><div class="erp-stat-val" id="erp-cv" style="color:var(--green)">—</div><div class="erp-stat-lbl">Com Valor</div></div>
   </div>
 </div>
-<div class="ec">
-  <div class="eh"><div class="et2">⚠️ ERP — Fichas sem Valor</div><div class="eb" id="ebadge">verificando...</div></div>
-  <div class="er"><span class="rl">Total de cards em ERP</span><span class="rv" id="etot">—</span></div>
-  <div class="er"><span class="rl">Cards <strong>sem valor</strong></span><span class="rv red" id="esv">—</span></div>
-  <div class="er"><span class="rl">Cards <strong>com valor</strong></span><span class="rv ok" id="ecv">—</span></div>
+<div class="monthly-card">
+  <div class="m-hdr"><div class="m-title">📅 Compras deste Mês</div><div class="m-mes" id="m-mes-label">—</div></div>
+  <div class="m-stats">
+    <div class="m-stat"><div class="m-stat-val" id="mc-comp" style="color:var(--purple)">—</div><div class="m-stat-lbl">Comprados</div></div>
+    <div class="m-stat"><div class="m-stat-val" id="mc-cad" style="color:var(--green)">—</div><div class="m-stat-lbl">Cadastrados</div></div>
+    <div class="m-stat"><div class="m-stat-val" id="mc-falta" style="color:var(--yellow)">—</div><div class="m-stat-lbl">Falta Cadastrar</div></div>
+  </div>
+  <div class="pbar-wrap"><div class="pbar-fill" id="mpbar" style="width:0%"></div></div>
+  <div class="pbar-labels"><span style="color:var(--purple)">Comprados</span><span style="color:var(--green)">Cadastrados <span id="mpct"></span></span></div>
+  <div id="monthly-alert"></div>
 </div>
 <div class="toast" id="toast"></div>
 <script>
+var D=null,PERIOD='hoje';
 async function load(){
   const rb=document.getElementById('rb'),ri=document.getElementById('ri');
   rb.classList.add('loading');ri.textContent='⏳';
   try{
     const d=await fetch('/api/atendimento?action=metrics').then(r=>r.json());
     if(!d.ok)throw new Error(d.error);
-    render(d);
+    D=d;render();
     const dt=new Date(d.updatedAt).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
     document.getElementById('lu').textContent=(d.fromCache?'⚠️ cache — ':'✅ atualizado — ')+dt;
   }catch(e){toast('❌ '+e.message,'err');document.getElementById('lu').textContent='❌ Erro';}
   finally{rb.classList.remove('loading');ri.textContent='🔄';}
 }
-function sv(id,val,c){const el=document.getElementById(id);if(!el)return;el.innerHTML=String(val);if(c)el.style.color=c;el.classList.remove('pulse');void el.offsetWidth;el.classList.add('pulse');}
-function render(d){
-  sv('m-fichas',d.fichasCriadas,'var(--blue)');
-  sv('m-comp',d.equipComprados,'var(--purple)');
-  sv('m-vend',d.equipVendidos,'var(--green)');
-  sv('m-disp',d.equipDisponiveis,'var(--orange)');
-  const comp=d.equipComprados||0,cad=d.equipCadastrados||0;
-  const pct=cad>0?Math.min(100,Math.round(comp/cad*100)):0;
-  document.getElementById('bc').textContent=comp;
-  document.getElementById('bk').textContent=cad;
-  document.getElementById('bpct').textContent=pct+'%';
-  setTimeout(()=>{document.getElementById('pbar').style.width=pct+'%';},100);
-  sv('s-cad',cad);sv('s-vend',d.equipVendidos);sv('s-disp',d.equipDisponiveis);
-  const et=d.erpTotal||0,esv=d.erpSemValor||0,ecv=Math.max(0,et-esv);
-  sv('etot',et);
-  sv('esv',esv,esv>0?'var(--red)':'var(--green)');
-  sv('ecv',ecv,ecv>0?'var(--green)':'var(--muted)');
-  const b=document.getElementById('ebadge');
-  if(esv===0){b.textContent='✅ Todos com valor';b.style.cssText='background:rgba(16,185,129,.1);color:var(--green);border-color:rgba(16,185,129,.2)';}
-  else{b.textContent=esv+' sem valor';b.style.cssText='background:rgba(239,68,68,.1);color:var(--red);border-color:rgba(239,68,68,.2)';}
+function setPeriod(btn){document.querySelectorAll('.pf-btn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');PERIOD=btn.dataset.p;if(D)render();}
+function sv(id,val,c){const el=document.getElementById(id);if(!el)return;el.innerHTML=String(val==null?'—':val);if(c)el.style.color=c;el.classList.remove('p');void el.offsetWidth;el.classList.add('p');}
+function render(){
+  if(!D)return;const p=PERIOD;
+  const fv=p==='hoje'?D.fichas.hoje:p==='semana'?D.fichas.semana:D.fichas.mes;
+  sv('v-fichas',fv,'var(--blue)');
+  document.getElementById('sub-fichas').textContent='Total histórico: '+D.fichas.total;
+  document.getElementById('p-fichas').innerHTML='<span class="pill">Hoje: <strong>'+D.fichas.hoje+'</strong></span><span class="pill">Semana: <strong>'+D.fichas.semana+'</strong></span><span class="pill">Mês: <strong>'+D.fichas.mes+'</strong></span>';
+  const cv=p==='hoje'?D.comprados.hoje:p==='semana'?D.comprados.semana:D.comprados.mes;
+  sv('v-comp',cv,'var(--purple)');
+  document.getElementById('sub-comp').textContent='Total comprados: '+D.comprados.total;
+  document.getElementById('p-comp').innerHTML='<span class="pill">Hoje: <strong>'+D.comprados.hoje+'</strong></span><span class="pill">Semana: <strong>'+D.comprados.semana+'</strong></span><span class="pill">Mês: <strong>'+D.comprados.mes+'</strong></span>';
+  const cav=p==='hoje'?D.cadastrados.hoje:p==='semana'?D.cadastrados.semana:D.cadastrados.mes;
+  sv('v-cad',cav,'var(--green)');
+  document.getElementById('sub-cad').textContent='Total no catálogo: '+D.cadastrados.total;
+  document.getElementById('p-cad').innerHTML='<span class="pill">Hoje: <strong>'+D.cadastrados.hoje+'</strong></span><span class="pill">Semana: <strong>'+D.cadastrados.semana+'</strong></span><span class="pill">Mês: <strong>'+D.cadastrados.mes+'</strong></span>';
+  const vv=p==='hoje'?D.vendidos.hoje:p==='semana'?D.vendidos.semana:D.vendidos.total;
+  sv('v-vend',vv,'var(--orange)');
+  document.getElementById('sub-vend').textContent='Total vendidos: '+D.vendidos.total+' | Disponíveis: '+D.disponiveis;
+  document.getElementById('p-vend').innerHTML='<span class="pill">Hoje: <strong>'+D.vendidos.hoje+'</strong></span><span class="pill">Semana: <strong>'+D.vendidos.semana+'</strong></span><span class="pill">Total: <strong>'+D.vendidos.total+'</strong></span>';
+  sv('erp-total',D.erp.total);
+  sv('erp-sv',D.erp.semValor,D.erp.semValor>0?'var(--red)':'var(--green)');
+  sv('erp-cv',D.erp.total-D.erp.semValor,D.erp.semValor<D.erp.total?'var(--green)':'var(--muted)');
+  const eb=document.getElementById('erp-badge');
+  if(D.erp.semValor===0){eb.textContent='✅ Todos com valor';eb.style.cssText='background:rgba(16,185,129,.1);color:var(--green);border:1px solid rgba(16,185,129,.2)';}
+  else{eb.textContent=D.erp.semValor+' sem valor';eb.style.cssText='background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2)';}
+  const now=new Date();
+  const meses=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  document.getElementById('m-mes-label').textContent=meses[now.getMonth()]+' '+now.getFullYear();
+  sv('mc-comp',D.monthly.comprados,'var(--purple)');
+  sv('mc-cad',D.monthly.cadastrados,'var(--green)');
+  sv('mc-falta',D.monthly.falta,D.monthly.falta>0?'var(--yellow)':'var(--green)');
+  const pct=D.monthly.comprados>0?Math.min(100,Math.round(D.monthly.cadastrados/D.monthly.comprados*100)):100;
+  setTimeout(()=>{document.getElementById('mpbar').style.width=pct+'%';},100);
+  document.getElementById('mpct').textContent=pct+'%';
+  const alEl=document.getElementById('monthly-alert');
+  if(D.monthly.compAnteriores>0){
+    const b=D.monthly.backlog;
+    alEl.innerHTML='<div class="alert '+(b>0?'alert-warn':'alert-ok')+'"><div class="alert-icon">'+(b>0?'⚠️':'✅')+'</div><div class="alert-text"><strong>'+D.monthly.compAnteriores+' equipamento'+(D.monthly.compAnteriores>1?'s':'')+' de meses anteriores.</strong> '+(b>0?'Estimativa: <strong>'+b+' ainda não cadastrado'+(b>1?'s':'')+' para venda.</strong>':'Todos aparentemente cadastrados.')+'</div></div>';
+  } else {
+    alEl.innerHTML='<div class="alert alert-ok"><div class="alert-icon">✅</div><div class="alert-text">Nenhum equipamento pendente de meses anteriores.</div></div>';
+  }
 }
 function toast(m,t){const el=document.getElementById('toast');el.textContent=m;el.className='toast show t'+(t==='ok'?'ok':'err');clearTimeout(window._tt);window._tt=setTimeout(()=>el.classList.remove('show'),3500);}
 load();setInterval(load,120000);
