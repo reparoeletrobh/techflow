@@ -1795,7 +1795,39 @@ module.exports = async function handler(req, res) {
     }
 
     // ── BALCÃO: carregar cards ─────────────────────────────────────
-    if (action === 'balcao-load') {
+    if (req.method === 'POST' && action === 'mover-finalizado') {
+    const { pipefyIds } = req.body || {};
+    if (!Array.isArray(pipefyIds) || !pipefyIds.length) return res.status(400).json({ ok: false, error: 'pipefyIds obrigatorio' });
+    const FASE_FINALIZADO = '334875153';
+    const resultados = [];
+    for (const pid of pipefyIds) {
+      try {
+        const mut = await pipefyMutation(`mutation { moveCardToPhase(input: { card_id: "${pid}", destination_phase_id: "${FASE_FINALIZADO}" }) { card { id current_phase { name } } } }`);
+        const phase = mut?.moveCardToPhase?.card?.current_phase?.name || '?';
+        resultados.push({ pipefyId: pid, ok: true, fase: phase });
+      } catch(e) {
+        resultados.push({ pipefyId: pid, ok: false, erro: e.message });
+      }
+    }
+    const ok = resultados.filter(r=>r.ok).length;
+    return res.status(200).json({ ok: true, movidos: ok, total: pipefyIds.length, resultados });
+  }
+
+  if (req.method === 'POST' && action === 'balcao-force-close') {
+    const { pipefyIds } = req.body || {};
+    if (!Array.isArray(pipefyIds) || !pipefyIds.length) return res.status(400).json({ ok: false, error: 'pipefyIds obrigatorio' });
+    const balcao = (await dbGet('reparoeletro_balcao')) || [];
+    let fechados = 0;
+    const now = new Date().toISOString();
+    for (const pid of pipefyIds) {
+      const entry = balcao.find(b => b.pipefyId === String(pid));
+      if (entry && entry.status !== 'pago') { entry.status = 'pago'; entry.pagoEm = now; fechados++; }
+    }
+    if (fechados > 0) await dbSet('reparoeletro_balcao', balcao);
+    return res.status(200).json({ ok: true, fechados, total: pipefyIds.length });
+  }
+
+  if (action === 'balcao-load') {
       const balcao = (await dbGet('reparoeletro_balcao')) || [];
       return res.status(200).json({ ok: true, cards: balcao });
     }
