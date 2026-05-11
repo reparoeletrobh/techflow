@@ -168,12 +168,19 @@ function render(){
   // Populate fichas list for expand
   const fl=document.getElementById('fichas-list');
   const esteMes=D.monthly.fichasEsteMes||[];
-  if(fl){fl.innerHTML=esteMes.length?esteMes.map(f=>'<div class="ficha-row"><div class="ficha-dot"></div><div class="ficha-title">'+f.nome+'</div><div class="ficha-date">'+fmtDate(f.statusAt)+'</div></div>').join(''):'<div style="color:var(--muted);font-size:12px;padding:8px 0">Nenhuma ficha este mês</div>';}
+  if(fl){fl.innerHTML=esteMes.length?esteMes.map(f=>{
+    const cor=f.cadastrado?'var(--green)':'var(--red)';
+    const label=f.cadastrado?'✅':'🔴';
+    return '<div class="ficha-row"><div class="ficha-dot" style="background:'+cor+'"></div><div class="ficha-title">'+f.nome+'</div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:13px">'+label+'</span><div class="ficha-date">'+fmtDate(f.statusAt)+'</div></div></div>';
+  }).join(''):'<div style="color:var(--muted);font-size:12px;padding:8px 0">Nenhuma ficha este mês</div>';}
   const eb2=document.getElementById('expand-btn');
-  if(eb2)eb2.textContent=(fl?.classList.contains('open')?'▲':'▼')+' Ver '+esteMes.length+' ficha'+(esteMes.length!==1?'s':'')+' comprada'+(esteMes.length!==1?'s':'')+' este mês';
+  if(eb2){const v2=esteMes.filter(f=>f.cadastrado).length,r2=esteMes.filter(f=>!f.cadastrado).length;
+  eb2.textContent=(fl?.classList.contains('open')?'▲':'▼')+' Ver '+esteMes.length+' ficha'+(esteMes.length!==1?'s':'')+' — ✅ '+v2+' cadastrada'+(v2!==1?'s':'')+' 🔴 '+r2+' pendente'+(r2!==1?'s':'');}
 }
 function toast(m,t){const el=document.getElementById('toast');el.textContent=m;el.className='toast show t'+(t==='ok'?'ok':'err');clearTimeout(window._tt);window._tt=setTimeout(()=>el.classList.remove('show'),3500);}
 function fmtDate(d){try{return new Date(d).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});}catch{return '—';}}
-function toggleExpand(){const fl=document.getElementById('fichas-list'),btn=document.getElementById('expand-btn');if(!fl)return;fl.classList.toggle('open');const open=fl.classList.contains('open');const n=(window.D?.monthly?.fichasEsteMes||[]).length;btn.textContent=(open?'▲':'▼')+' Ver '+n+' ficha'+(n!==1?'s':'')+' comprada'+(n!==1?'s':'')+' este mês';}
+function toggleExpand(){const fl=document.getElementById('fichas-list'),btn=document.getElementById('expand-btn');if(!fl)return;fl.classList.toggle('open');const open=fl.classList.contains('open');const n=(window.D?.monthly?.fichasEsteMes||[]).length;const verde=(window.D?.monthly?.fichasEsteMes||[]).filter(f=>f.cadastrado).length;
+  const vermelho=(window.D?.monthly?.fichasEsteMes||[]).filter(f=>!f.cadastrado).length;
+  btn.textContent=(open?'▲':'▼')+' Ver '+n+' ficha'+(n!==1?'s':'')+' — ✅ '+verde+' cadastrada'+(verde!==1?'s':'')+' 🔴 '+vermelho+' pendente'+(vermelho!==1?'s':'');}
 load();setInterval(load,120000);
 </script></body></html>
