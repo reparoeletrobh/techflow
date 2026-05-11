@@ -1802,7 +1802,7 @@ module.exports = async function handler(req, res) {
     const resultados = [];
     for (const pid of pipefyIds) {
       try {
-        const mut = await pipefyMutation(`mutation { moveCardToPhase(input: { card_id: "${pid}", destination_phase_id: "${FASE_FINALIZADO}" }) { card { id current_phase { name } } } }`);
+        const mut = await pipefyQuery(`mutation { moveCardToPhase(input: { card_id: "${pid}", destination_phase_id: "${FASE_FINALIZADO}" }) { card { id current_phase { name } } } }`);
         const phase = mut?.moveCardToPhase?.card?.current_phase?.name || '?';
         resultados.push({ pipefyId: pid, ok: true, fase: phase });
       } catch(e) {
