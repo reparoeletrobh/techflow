@@ -54,6 +54,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:14px
 .sk{animation:sk 1.5s infinite;background:linear-gradient(90deg,var(--s2) 25%,var(--b) 50%,var(--s2) 75%);background-size:200% 100%;border-radius:5px;display:inline-block}
 @keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .sk-n{height:46px;width:80px}
+
+.expand-btn{display:flex;align-items:center;gap:6px;margin-top:14px;padding:7px 14px;border-radius:7px;font-family:var(--fm);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;border:1px solid var(--b);color:var(--m2);background:transparent;cursor:pointer;width:100%;justify-content:center;transition:all .15s}
+.expand-btn:hover{border-color:var(--m2);color:var(--text)}
+.fichas-list{display:none;margin-top:12px;border-top:1px solid var(--b);padding-top:12px}
+.fichas-list.open{display:block}
+.ficha-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.ficha-row:last-child{border:none}
+.ficha-dot{width:7px;height:7px;border-radius:50%;background:var(--purple);flex-shrink:0}
+.ficha-dot-ant{background:var(--orange)}
+.ficha-title{flex:1;font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ficha-date{font-family:var(--fm);font-size:10px;color:var(--muted);white-space:nowrap;flex-shrink:0}
 .toast{position:fixed;bottom:18px;right:18px;background:var(--s);border:1px solid var(--b);border-radius:9px;padding:10px 16px;font-size:13px;z-index:999;transform:translateY(14px);opacity:0;transition:all .25s;display:flex;align-items:center;gap:8px}
 .toast.show{transform:none;opacity:1}.tok{border-color:rgba(16,185,129,.35);color:var(--green)}.terr{border-color:rgba(239,68,68,.35);color:var(--red)}
 @media(max-width:580px){body{padding:12px}.mg{grid-template-columns:1fr 1fr}.erp-grid{grid-template-columns:1fr 1fr}.m-stats{grid-template-columns:1fr 1fr}}
@@ -77,7 +88,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:14px
   <div class="erp-hdr"><div class="erp-title">⚡ ERP</div><div class="erp-badge" id="erp-badge">verificando...</div></div>
   <div class="erp-grid">
     <div class="erp-stat"><div class="erp-stat-val" id="erp-total">—</div><div class="erp-stat-lbl">Total em ERP</div></div>
-    <div class="erp-stat"><div class="erp-stat-val" id="erp-sv" style="color:var(--red)">—</div><div class="erp-stat-lbl">Sem Valor</div></div>
+    <div class="erp-stat"><div class="erp-stat-val" id="erp-sv" style="color:var(--red)">—</div><div class="erp-stat-lbl">Aguardam Precif.</div></div>
     <div class="erp-stat"><div class="erp-stat-val" id="erp-cv" style="color:var(--green)">—</div><div class="erp-stat-lbl">Com Valor</div></div>
   </div>
 </div>
@@ -91,6 +102,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:14px
   <div class="pbar-wrap"><div class="pbar-fill" id="mpbar" style="width:0%"></div></div>
   <div class="pbar-labels"><span style="color:var(--purple)">Comprados</span><span style="color:var(--green)">Cadastrados <span id="mpct"></span></span></div>
   <div id="monthly-alert"></div>
+  <button class="expand-btn" id="expand-btn" onclick="toggleExpand()">▼ Ver fichas compradas este mês</button>
+  <div class="fichas-list" id="fichas-list"></div>
 </div>
 <div class="toast" id="toast"></div>
 <script>
@@ -143,13 +156,22 @@ function render(){
   setTimeout(()=>{document.getElementById('mpbar').style.width=pct+'%';},100);
   document.getElementById('mpct').textContent=pct+'%';
   const alEl=document.getElementById('monthly-alert');
-  if(D.monthly.compAnteriores>0){
-    const b=D.monthly.backlog;
-    alEl.innerHTML='<div class="alert '+(b>0?'alert-warn':'alert-ok')+'"><div class="alert-icon">'+(b>0?'⚠️':'✅')+'</div><div class="alert-text"><strong>'+D.monthly.compAnteriores+' equipamento'+(D.monthly.compAnteriores>1?'s':'')+' de meses anteriores.</strong> '+(b>0?'Estimativa: <strong>'+b+' ainda não cadastrado'+(b>1?'s':'')+' para venda.</strong>':'Todos aparentemente cadastrados.')+'</div></div>';
+  const ant=D.monthly.fichasAnteriores||[];
+  if(ant.length>0){
+    const rows=ant.map(f=>'<div class="ficha-row"><div class="ficha-dot ficha-dot-ant"></div><div class="ficha-title">'+f.title+'</div><div class="ficha-date">'+fmtDate(f.statusAt)+'</div></div>').join('');
+    alEl.innerHTML='<div class="alert alert-warn"><div style="width:100%"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:18px">⚠️</span><div class="alert-text"><strong>'+ant.length+' equipamento'+(ant.length>1?'s':'')+' comprado'+(ant.length>1?'s':'')+' em meses anteriores — pendentes de cadastro:</strong></div></div>'+rows+'</div></div>';
   } else {
     alEl.innerHTML='<div class="alert alert-ok"><div class="alert-icon">✅</div><div class="alert-text">Nenhum equipamento pendente de meses anteriores.</div></div>';
   }
+  // Populate fichas list for expand
+  const fl=document.getElementById('fichas-list');
+  const esteMes=D.monthly.fichasEsteMes||[];
+  if(fl){fl.innerHTML=esteMes.length?esteMes.map(f=>'<div class="ficha-row"><div class="ficha-dot"></div><div class="ficha-title">'+f.title+'</div><div class="ficha-date">'+fmtDate(f.statusAt)+'</div></div>').join(''):'<div style="color:var(--muted);font-size:12px;padding:8px 0">Nenhuma ficha este mês</div>';}
+  const eb2=document.getElementById('expand-btn');
+  if(eb2)eb2.textContent=(fl?.classList.contains('open')?'▲':'▼')+' Ver '+esteMes.length+' ficha'+(esteMes.length!==1?'s':'')+' comprada'+(esteMes.length!==1?'s':'')+' este mês';
 }
 function toast(m,t){const el=document.getElementById('toast');el.textContent=m;el.className='toast show t'+(t==='ok'?'ok':'err');clearTimeout(window._tt);window._tt=setTimeout(()=>el.classList.remove('show'),3500);}
+function fmtDate(d){try{return new Date(d).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});}catch{return '—';}}
+function toggleExpand(){const fl=document.getElementById('fichas-list'),btn=document.getElementById('expand-btn');if(!fl)return;fl.classList.toggle('open');const open=fl.classList.contains('open');const n=(window.D?.monthly?.fichasEsteMes||[]).length;btn.textContent=(open?'▲':'▼')+' Ver '+n+' ficha'+(n!==1?'s':'')+' comprada'+(n!==1?'s':'')+' este mês';}
 load();setInterval(load,120000);
 </script></body></html>
