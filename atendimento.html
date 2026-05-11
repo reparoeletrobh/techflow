@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Atendimento — Reparo Eletro ADM</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#050508;--s:#0d0d14;--s2:#13131e;--b:#1e1e2e;--text:#e8e8f0;--muted:#5a5a7a;--m2:#8a8aaa;--yellow:#f0b429;--green:#10b981;--blue:#3b9eff;--red:#ef4444;--orange:#f97316;--purple:#a855f7;--fh:'Syne',sans-serif;--fb:'Inter',sans-serif;--fm:'DM Mono',monospace}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:14px;min-height:100vh;padding:24px}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:12px}
+.page-title{font-family:var(--fh);font-size:24px;font-weight:900;display:flex;align-items:center;gap:10px}
+.page-title span{color:var(--yellow)}
+.refresh-btn{display:flex;align-items:center;gap:7px;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;border:1px solid var(--b);background:var(--s);color:var(--m2);cursor:pointer;transition:all .15s}
+.refresh-btn:hover{border-color:var(--yellow);color:var(--yellow)}.refresh-btn.loading{opacity:.6;pointer-events:none}
+.last-update{font-family:var(--fm);font-size:10px;color:var(--muted);letter-spacing:1px;margin-top:4px}
+.metrics-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;margin-bottom:24px}
+.mc{background:var(--s);border:1px solid var(--b);border-radius:14px;padding:22px;position:relative;overflow:hidden;transition:border-color .2s}
+.mc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:14px 14px 0 0;background:var(--accent,var(--yellow))}
+.mc:hover{border-color:var(--accent,var(--yellow))}
+.mc-icon{font-size:22px;margin-bottom:12px;display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:10px}
+.mc-label{font-family:var(--fm);font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--m2);margin-bottom:8px}
+.mc-value{font-family:var(--fh);font-size:48px;font-weight:900;line-height:1;margin-bottom:6px;transition:all .3s}
+.mc-value.pulse{animation:pulse .4s ease}
+@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
+.mc-sub{font-size:12px;color:var(--muted)}
+.progress-card{background:var(--s);border:1px solid var(--b);border-radius:14px;padding:24px;margin-bottom:16px;position:relative;overflow:hidden}
+.progress-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--blue),var(--green))}
+.progress-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+.progress-title{font-family:var(--fh);font-size:18px;font-weight:800;margin-bottom:4px}
+.progress-desc{font-size:12px;color:var(--m2)}
+.progress-frac{font-family:var(--fh);font-size:34px;font-weight:900;text-align:right}
+.progress-frac .num{color:var(--blue)}.progress-frac .den{color:var(--muted)}
+.progress-pct{font-family:var(--fm);font-size:11px;color:var(--m2);text-align:right;margin-top:3px}
+.progress-bar-wrap{background:var(--s2);border-radius:99px;height:14px;overflow:hidden;margin-bottom:14px}
+.progress-bar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--blue),var(--green));transition:width .8s cubic-bezier(.4,0,.2,1);position:relative}
+.progress-bar-fill::after{content:'';position:absolute;top:0;right:0;bottom:0;width:20px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.15))}
+.progress-labels{display:flex;justify-content:space-between;font-family:var(--fm);font-size:10px;text-transform:uppercase;letter-spacing:1px}
+.mini-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+.mini-stat{background:var(--s2);border-radius:8px;padding:10px 12px;text-align:center}
+.mini-stat-val{font-family:var(--fh);font-size:20px;font-weight:900}
+.mini-stat-lbl{font-family:var(--fm);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-top:3px}
+.erp-card{background:var(--s);border:1px solid var(--b);border-radius:14px;padding:22px;position:relative;overflow:hidden}
+.erp-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--red)}
+.erp-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+.erp-title{font-family:var(--fh);font-size:18px;font-weight:800}
+.erp-badge{font-family:var(--fm);font-size:10px;padding:3px 10px;border-radius:5px;background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.erp-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--b)}.erp-row:last-child{border:none}
+.erp-label{font-size:13px;color:var(--m2)}
+.erp-val{font-family:var(--fh);font-size:26px;font-weight:900}
+.erp-val.red{color:var(--red)}.erp-val.ok{color:var(--green)}
+.skeleton{animation:sk 1.5s infinite;background:linear-gradient(90deg,var(--s2) 25%,var(--b) 50%,var(--s2) 75%);background-size:200% 100%;border-radius:6px}
+@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skel-n{height:48px;width:90px;display:inline-block}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--s);border:1px solid var(--b);border-radius:10px;padding:11px 18px;font-size:13px;z-index:999;transform:translateY(16px);opacity:0;transition:all .25s;display:flex;align-items:center;gap:8px}
+.toast.show{transform:none;opacity:1}.tok{border-color:rgba(16,185,129,.35);color:var(--green)}.terr{border-color:rgba(239,68,68,.35);color:var(--red)}
+@media(max-width:600px){body{padding:14px}.metrics-grid{grid-template-columns:1fr 1fr}.mini-row{grid-template-columns:1fr 1fr}.progress-frac{font-size:24px}}
+</style></head><body>
+<div class="page-header">
+  <div>
+    <div class="page-title">📊 <span>Atendimento</span></div>
+    <div class="last-update" id="last-update">Carregando...</div>
+  </div>
+  <button class="refresh-btn" id="rb" onclick="load()"><span id="ri">🔄</span> Atualizar</button>
+</div>
+<div class="metrics-grid">
+  <div class="mc" style="--accent:#3b9eff"><div class="mc-icon" style="background:rgba(59,158,255,.1)">📋</div><div class="mc-label">Fichas Criadas no Pipefy</div><div class="mc-value" id="m-fichas" style="color:var(--blue)"><span class="skeleton skel-n"></span></div><div class="mc-sub">Total histórico do pipe</div></div>
+  <div class="mc" style="--accent:#a855f7"><div class="mc-icon" style="background:rgba(168,85,247,.1)">🛒</div><div class="mc-label">Equipamentos Comprados</div><div class="mc-value" id="m-comp" style="color:var(--purple)"><span class="skeleton skel-n"></span></div><div class="mc-sub">Marcados como comprado</div></div>
+  <div class="mc" style="--accent:#10b981"><div class="mc-icon" style="background:rgba(16,185,129,.1)">✅</div><div class="mc-label">Equipamentos Vendidos</div><div class="mc-value" id="m-vend" style="color:var(--green)"><span class="skeleton skel-n"></span></div><div class="mc-sub">Vendas concluídas</div></div>
+  <div class="mc" style="--accent:#f97316"><div class="mc-icon" style="background:rgba(249,115,22,.1)">🏷️</div><div class="mc-label">Disponíveis para Venda</div><div class="mc-value" id="m-disp" style="color:var(--orange)"><span class="skeleton skel-n"></span></div><div class="mc-sub">Cadastrados não vendidos</div></div>
+</div>
+<div class="progress-card">
+  <div class="progress-header">
+    <div><div class="progress-title">Comprados × Cadastrados para Venda</div><div class="progress-desc">Dos equipamentos comprados, quantos já estão no catálogo</div></div>
+    <div><div class="progress-frac"><span class="num" id="b-comp">—</span><span class="den"> / </span><span class="den" id="b-cad">—</span></div><div class="progress-pct" id="b-pct">— %</div></div>
+  </div>
+  <div class="progress-bar-wrap"><div class="progress-bar-fill" id="pbar" style="width:0%"></div></div>
+  <div class="progress-labels"><span style="color:var(--blue)">Comprados</span><span style="color:var(--green)">Cadastrados</span></div>
+  <div class="mini-row">
+    <div class="mini-stat"><div class="mini-stat-val" id="ms-cad">—</div><div class="mini-stat-lbl">Total Cadastrados</div></div>
+    <div class="mini-stat"><div class="mini-stat-val" id="ms-vend">—</div><div class="mini-stat-lbl">Vendidos</div></div>
+    <div class="mini-stat"><div class="mini-stat-val" id="ms-disp">—</div><div class="mini-stat-lbl">Disponíveis</div></div>
+  </div>
+</div>
+<div class="erp-card">
+  <div class="erp-header"><div class="erp-title">⚠️ ERP — Fichas sem Valor</div><div class="erp-badge" id="erp-badge">verificando...</div></div>
+  <div class="erp-row"><span class="erp-label">Total de cards em ERP</span><span class="erp-val" id="erp-tot">—</span></div>
+  <div class="erp-row"><span class="erp-label">Cards <strong>sem valor</strong> definido</span><span class="erp-val red" id="erp-sv">—</span></div>
+  <div class="erp-row"><span class="erp-label">Cards <strong>com valor</strong> definido</span><span class="erp-val ok" id="erp-cv">—</span></div>
+</div>
+<div class="toast" id="toast"></div><script>
+async function load(){
+  const rb=document.getElementById('rb'),ri=document.getElementById('ri');
+  rb.classList.add('loading');ri.textContent='⏳';
+  try{
+    const d=await fetch('/api/atendimento?action=metrics').then(r=>r.json());
+    if(!d.ok)throw new Error(d.error);
+    render(d);
+    const dt=new Date(d.updatedAt).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    document.getElementById('last-update').textContent=(d.fromCache?'⚠️ cache — ':'✅ atualizado — ')+dt;
+  }catch(e){toast('❌ '+e.message,'err');document.getElementById('last-update').textContent='❌ Erro ao carregar';}
+  finally{rb.classList.remove('loading');ri.textContent='🔄';}
+}
+function upd(id,val,color){
+  const el=document.getElementById(id);if(!el)return;
+  const old=el.textContent;el.innerHTML=val;
+  if(color)el.style.color=color;
+  if(old!==String(val)){el.classList.remove('pulse');void el.offsetWidth;el.classList.add('pulse');}
+}
+function render(d){
+  upd('m-fichas',d.fichasCriadas,'var(--blue)');
+  upd('m-comp',d.equipComprados,'var(--purple)');
+  upd('m-vend',d.equipVendidos,'var(--green)');
+  upd('m-disp',d.equipDisponiveis,'var(--orange)');
+  const pct=d.equipCadastrados>0?Math.min(100,Math.round(d.equipComprados/d.equipCadastrados*100)):0;
+  document.getElementById('b-comp').textContent=d.equipComprados;
+  document.getElementById('b-cad').textContent=d.equipCadastrados;
+  document.getElementById('b-pct').textContent=pct+'%';
+  setTimeout(()=>{document.getElementById('pbar').style.width=pct+'%';},100);
+  upd('ms-cad',d.equipCadastrados);upd('ms-vend',d.equipVendidos);upd('ms-disp',d.equipDisponiveis);
+  const sv=d.erpSemValor||0,tot=d.erpTotal||0,cv=Math.max(0,tot-sv);
+  upd('erp-tot',tot);
+  upd('erp-sv',sv,sv>0?'var(--red)':'var(--green)');
+  upd('erp-cv',cv,cv>0?'var(--green)':'var(--muted)');
+  const badge=document.getElementById('erp-badge');
+  if(sv===0){badge.textContent='✅ Todos com valor';badge.style.cssText='background:rgba(16,185,129,.1);color:var(--green);border-color:rgba(16,185,129,.2)';}
+  else{badge.textContent=sv+' sem valor';badge.style.cssText='background:rgba(239,68,68,.1);color:var(--red);border-color:rgba(239,68,68,.2)';}
+}
+function toast(msg,type){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show t'+(type==='ok'?'ok':'err');clearTimeout(window._tt);window._tt=setTimeout(()=>t.classList.remove('show'),3500);}
+load();setInterval(load,120000);
+</script></body></html>
