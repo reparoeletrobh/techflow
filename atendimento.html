@@ -86,7 +86,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:14px
   <div class="m-stats">
     <div class="m-stat"><div class="m-stat-val" id="mc-comp" style="color:var(--purple)">—</div><div class="m-stat-lbl">Comprados</div></div>
     <div class="m-stat"><div class="m-stat-val" id="mc-cad" style="color:var(--green)">—</div><div class="m-stat-lbl">Cadastrados</div></div>
-    <div class="m-stat"><div class="m-stat-val" id="mc-falta" style="color:var(--yellow)">—</div><div class="m-stat-lbl">Falta Cadastrar</div></div>
+    <div class="m-stat"><div class="m-stat-val" id="mc-falta" style="color:var(--yellow)">—</div><div class="m-stat-lbl">Pendentes Cadastro</div></div>
   </div>
   <div class="pbar-wrap"><div class="pbar-fill" id="mpbar" style="width:0%"></div></div>
   <div class="pbar-labels"><span style="color:var(--purple)">Comprados</span><span style="color:var(--green)">Cadastrados <span id="mpct"></span></span></div>
@@ -132,7 +132,7 @@ function render(){
   sv('erp-cv',D.erp.total-D.erp.semValor,D.erp.semValor<D.erp.total?'var(--green)':'var(--muted)');
   const eb=document.getElementById('erp-badge');
   if(D.erp.semValor===0){eb.textContent='✅ Todos com valor';eb.style.cssText='background:rgba(16,185,129,.1);color:var(--green);border:1px solid rgba(16,185,129,.2)';}
-  else{eb.textContent=D.erp.semValor+' sem valor';eb.style.cssText='background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2)';}
+  else{eb.textContent='⚠️ '+D.erp.semValor+' pendentes';eb.style.cssText='background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2)';}
   const now=new Date();
   const meses=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   document.getElementById('m-mes-label').textContent=meses[now.getMonth()]+' '+now.getFullYear();
