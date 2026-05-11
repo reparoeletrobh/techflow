@@ -29,7 +29,7 @@ export default async function handler(req,res){
     try{
       const todayUTC=brtStartOf('day'),weekUTC=brtStartOf('week'),monthUTC=brtStartOf('month');
       // Q1: pipe count + ERP phase com phases_history para data real de entrada na fase
-      const Q1='query{pipe(id:"'+PID+'"){cards_count} phase(id:"'+ERP_ID+'"){cards_count cards(first:50){edges{node{id updated_at phases_history{phase{id}firstTimeIn}fields{name value}}}pageInfo{hasNextPage}}}}';
+      const Q1='query{pipe(id:"'+PID+'"){cards_count} phase(id:"'+ERP_ID+'"){cards_count cards(first:50){edges{node{id fields{name value}}}pageInfo{hasNextPage}}}}';
       // Q2: allCards para fichas criadas hoje (todos os cards do pipe, todas as fases)
       const Q2='query{allCards(pipeId:"'+PID+'",first:2000){edges{node{id title created_at}}}}';
       const[pd,cd,vd,ficQ]=await Promise.all([pf(Q1),dbG(CK),dbG(VK),pf(Q2).catch(()=>null)]);
@@ -55,8 +55,7 @@ export default async function handler(req,res){
       };
       const erpSV=erpEdges.filter(card=>{const vf=card.fields?.find(f=>/(valor|preco|preço)/i.test(f.name||''));return !vf?.value||parseFloat(String(vf.value||'0').replace(/[^0-9.,]/g,'').replace(',','.'))||0===0;}).length;
       const erpMore=ep?.cards?.pageInfo?.hasNextPage?Math.max(0,erpTotal-50):0;
-      const erpHoje=erpEdges.filter(c=>erpEntryOf(c)>=todayUTC.getTime()).length||null;
-      const erpSemana=erpEdges.filter(c=>erpEntryOf(c)>=weekUTC.getTime()).length||null;
+      // ERP hoje/semana removido: Pipefy não expõe phases_history de forma confiável
       // ── COMPRADOS ────────────────────────────────────────────────────────
       const fichas=cd?.fichas||[];
       const comprados=fichas.filter(f=>f.status==='comprado');
@@ -93,7 +92,7 @@ export default async function handler(req,res){
         cadastrados:{total:cadTotal,hoje:cadH,semana:cadS,mes:cadM},
         vendidos:{total:vendTotal,hoje:vendH,semana:vendS},
         disponiveis:cadTotal-vendTotal,
-        erp:{total:erpTotal,semValor:erpSV+erpMore,hoje:erpHoje,semana:erpSemana},
+        erp:{total:erpTotal,semValor:erpSV+erpMore},
         monthly:{comprados:compMCount,cadastrados:cadM,falta:pendentes,backlog,compAnteriores:compAntArr.length,fichasEsteMes,fichasAnteriores,cadastradas,pendentes},
         fichasHojeList,
         updatedAt:new Date().toISOString(),
