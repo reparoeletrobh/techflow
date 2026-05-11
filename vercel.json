@@ -123,6 +123,14 @@
       "destination": "/tecnico.html"
     },
     {
+      "source": "/atendimento",
+      "destination": "/atendimento.html"
+    },
+    {
+      "source": "/api/atendimento",
+      "destination": "/api/atendimento.js"
+    },
+    {
       "source": "/financeiro",
       "destination": "/financeiro.html"
     },
