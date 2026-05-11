@@ -12,7 +12,7 @@ export default async function handler(req,res){
   if(req.method==='OPTIONS')return res.status(200).end();
   if(req.query.action==='metrics'){
     try{
-      const Q='query{pipe(id:"'+PID+'"){cards_count phase(id:"'+ERP_ID+'"){cards_count cards(first:50){edges{node{id fields{name value}}}pageInfo{hasNextPage}}}}}';
+      const Q='query{pipe(id:"'+PID+'"){cards_count} phase(id:"'+ERP_ID+'"){cards_count cards(first:50){edges{node{id fields{name value}}}pageInfo{hasNextPage}}}}';
       const[pd,cd,vd]=await Promise.all([pf(Q),dbG(CK),dbG(VK)]);
       const fichasCriadas=pd?.pipe?.cards_count||0;
       const equipComprados=(cd?.fichas||[]).filter(f=>f.status==='comprado').length;
@@ -20,7 +20,7 @@ export default async function handler(req,res){
       const equipCadastrados=produtos.length;
       const equipVendidos=produtos.filter(p=>p.vendido).length;
       const equipDisponiveis=equipCadastrados-equipVendidos;
-      const ep=pd?.pipe?.phase;
+      const ep=pd?.phase;
       const erpTotal=ep?.cards_count||0;
       const sv=(ep?.cards?.edges||[]).filter(e=>{const vf=e.node.fields?.find(f=>/(valor|preco|preço)/i.test(f.name||''));return !vf?.value||parseFloat(String(vf.value||'0').replace(/[^0-9.,]/g,'').replace(',','.'))||0===0;}).length;
       const more=ep?.cards?.pageInfo?.hasNextPage?Math.max(0,erpTotal-50):0;
