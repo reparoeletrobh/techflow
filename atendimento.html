@@ -159,8 +159,7 @@ function render(){
   document.getElementById('mpct').textContent=pct+'%';
   const alEl=document.getElementById('monthly-alert');
   const ant=D.monthly.fichasAnteriores||[];
-  if(antPend.length>0){
-    const antPend=ant.filter(f=>!f.cadastrado);const antCad=ant.filter(f=>f.cadastrado);
+  const antPend=ant.filter(f=>!f.cadastrado);if(antPend.length>0){
     const rows=antPend.map(f=>'<div class="ficha-row"><div class="ficha-dot ficha-dot-ant"></div><div class="ficha-title">'+f.nome+'</div><div class="ficha-date">'+fmtDate(f.statusAt)+'</div></div>').join('');
     alEl.innerHTML='<div class="alert alert-warn"><div style="width:100%"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:18px">⚠️</span><div class="alert-text"><strong>'+ant.length+' equipamento'+(ant.length>1?'s':'')+' comprado'+(antPend.length>1?'s':'')+' em meses anteriores — pendentes de cadastro:</strong></div></div>'+rows+'</div></div>';
   } else {
