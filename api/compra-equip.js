@@ -184,7 +184,18 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, removed: before - db.fichas.length });
   }
 
-  if (req.method === "POST" && action === "marcar-cadastrado-vendas") {
+  if (req.method === "POST" && action === "desmarcar-cadastrado-vendas") {
+    const { id: dId } = req.body || {};
+    if (!dId) return res.status(400).json({ ok: false, error: "id obrigatorio" });
+    const dDb = await dbGet(COMPRA_KEY) || defaultDB();
+    const dF = dDb.fichas.find(f => f.id === dId);
+    if (!dF) return res.status(404).json({ ok: false, error: "ficha nao encontrada" });
+    delete dF.cadastradoVendas;
+    await dbSet(COMPRA_KEY, dDb);
+    return res.status(200).json({ ok: true });
+  }
+
+  if (method === "POST" && action === "marcar-cadastrado-vendas") {
     const { id, dadosVendas } = req.body || {};
     if (!id) return res.status(400).json({ ok: false, error: "id obrigatorio" });
     const db = await dbGet(COMPRA_KEY) || defaultDB();
