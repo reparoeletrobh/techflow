@@ -195,7 +195,7 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  if (method === "POST" && action === "marcar-cadastrado-vendas") {
+  if (req.method === "POST" && action === "marcar-cadastrado-vendas") {
     const { id, dadosVendas } = req.body || {};
     if (!id) return res.status(400).json({ ok: false, error: "id obrigatorio" });
     const db = await dbGet(COMPRA_KEY) || defaultDB();
