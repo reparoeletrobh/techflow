@@ -109,6 +109,12 @@ export default async function handler(req,res){
       return res.status(200).json({ok:true,...m});
     }catch(e){const c=await dbG(CACHE);if(c)return res.status(200).json({ok:true,...c,fromCache:true});return res.status(500).json({ok:false,error:e.message});}
   }
-  if(req.query.action==='pipes-info'){try{const d=await pf('query{me{organization{pipes{id name phases{id name}}}}}');return res.status(200).json({ok:true,pipes:d?.me?.organization?.pipes||[]});}catch(e){return res.status(500).json({ok:false,error:e.message});}}
+  if(req.query.action==='pipes-info'){try{
+    const q='query{adm:pipe(id:"305832912"){id name phases{id name}} me{pipes(first:20){edges{node{id name phases{id name}}}}}}';
+    const d=await pf(q);
+    const admPhases=d?.adm?.phases||[];
+    const otherPipes=(d?.me?.pipes?.edges||[]).map(e=>e.node).filter(p=>p.id!=='305832912');
+    return res.status(200).json({ok:true,adm:d?.adm,other:otherPipes});
+  }catch(e){return res.status(500).json({ok:false,error:e.message});}}
   return res.status(404).json({ok:false,error:'Ação não encontrada'});
 }
