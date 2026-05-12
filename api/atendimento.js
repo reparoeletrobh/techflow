@@ -109,5 +109,6 @@ export default async function handler(req,res){
       return res.status(200).json({ok:true,...m});
     }catch(e){const c=await dbG(CACHE);if(c)return res.status(200).json({ok:true,...c,fromCache:true});return res.status(500).json({ok:false,error:e.message});}
   }
+  if(req.query.action==='pipes-info'){try{const d=await pf('query{me{organization{pipes{id name phases{id name}}}}}');return res.status(200).json({ok:true,pipes:d?.me?.organization?.pipes||[]});}catch(e){return res.status(500).json({ok:false,error:e.message});}}
   return res.status(404).json({ok:false,error:'Ação não encontrada'});
 }
