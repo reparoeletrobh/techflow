@@ -55,7 +55,15 @@ export default async function handler(req,res){
       };
       const erpSV=erpEdges.filter(card=>{const vf=card.fields?.find(f=>/(valor|preco|preço)/i.test(f.name||''));return !vf?.value||parseFloat(String(vf.value||'0').replace(/[^0-9.,]/g,'').replace(',','.'))||0===0;}).length;
       const erpMore=ep?.cards?.pageInfo?.hasNextPage?Math.max(0,erpTotal-50):0;
-      // ERP hoje/semana removido: Pipefy não expõe phases_history de forma confiável
+      // ERP hoje/semana — rastreado via Redis (first-seen: primeira vez que o card aparece na fase ERP)
+      const ERP_SK='reparoeletro_erp_seen';
+      const erpSeen=await dbG(ERP_SK)||{};
+      const nowISO=new Date().toISOString();
+      let erpDirty=false;
+      for(const card of erpEdges){if(!erpSeen[card.id]){erpSeen[card.id]=nowISO;erpDirty=true;}}
+      if(erpDirty) await dbS(ERP_SK,erpSeen);
+      const erpHoje=erpEdges.filter(c=>new Date(erpSeen[c.id]||0).getTime()>=todayUTC.getTime()).length||null;
+      const erpSemana=erpEdges.filter(c=>new Date(erpSeen[c.id]||0).getTime()>=weekUTC.getTime()).length||null;
       // ── COMPRADOS ────────────────────────────────────────────────────────
       const fichas=cd?.fichas||[];
       const comprados=fichas.filter(f=>f.status==='comprado');
@@ -92,7 +100,7 @@ export default async function handler(req,res){
         cadastrados:{total:cadTotal,hoje:cadH,semana:cadS,mes:cadM},
         vendidos:{total:vendTotal,hoje:vendH,semana:vendS},
         disponiveis:cadTotal-vendTotal,
-        erp:{total:erpTotal,semValor:erpSV+erpMore},
+        erp:{total:erpTotal,semValor:erpSV+erpMore,hoje:erpHoje,semana:erpSemana},
         monthly:{comprados:compMCount,cadastrados:cadM,falta:pendentes,backlog,compAnteriores:compAntArr.length,fichasEsteMes,fichasAnteriores,cadastradas,pendentes},
         fichasHojeList,
         updatedAt:new Date().toISOString(),
