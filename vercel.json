@@ -247,6 +247,14 @@
       "destination": "/balcao.html"
     },
     {
+      "source": "/frenteloja",
+      "destination": "/frenteloja.html"
+    },
+    {
+      "source": "/api/frenteloja",
+      "destination": "/api/frenteloja.js"
+    },
+    {
       "source": "/microondas-vsl",
       "destination": "/microondas-vsl.html"
     },
