@@ -196,7 +196,7 @@ function render(){
   document.getElementById('m-mes-label').textContent=meses[now.getMonth()]+' '+now.getFullYear();
   sv('mc-comp',D.monthly.comprados,'var(--purple)');
   sv('mc-cad',D.monthly.cadastrados,'var(--green)');
-  sv('mc-falta',D.monthly.falta,D.monthly.falta>0?'var(--yellow)':'var(--green)');
+  sv('mc-falta',(D.monthly.falta||0)+(D.monthly.backlog||0),((D.monthly.falta||0)+(D.monthly.backlog||0))>0?'var(--yellow)':'var(--green)');
   const pct=D.monthly.comprados>0?Math.min(100,Math.round((D.monthly.cadastradas||0)/D.monthly.comprados*100)):0;
   setTimeout(()=>{document.getElementById('mpbar').style.width=pct+'%';},100);
   document.getElementById('mpct').textContent=pct+'%';
