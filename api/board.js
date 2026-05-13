@@ -571,6 +571,18 @@ module.exports = async function handler(req, res) {
       await dbSet(BOARD_KEY, board);
       await saveLogs(board);
 
+      // ── Notifica Frente de Loja quando loja_feito ─────────────────
+      if (phaseId === 'loja_feito' && card.pipefyId) {
+        try {
+          const flBaseUrl = process.env.VERCEL_URL ? 'https://'+process.env.VERCEL_URL : 'https://reparoeletroadm.com';
+          fetch(flBaseUrl+'/api/frenteloja?action=conserto-realizado', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pipefyCardId: String(card.pipefyId) }),
+          }).catch(e => console.error('[FrenteLoja] loja_feito notify:', e.message));
+        } catch(e) { console.error('[FrenteLoja]:', e.message); }
+      }
+
       // ── Auto-registra no Balcão quando entra em Cliente Loja ──
       if (phaseId === 'cliente_loja') {
         try {
