@@ -1,4 +1,4 @@
-// api/frenteloja.js â Sistema Frente de Loja
+// api/frenteloja.js — Sistema Frente de Loja
 const PIPEFY_API = 'https://api.pipefy.com/graphql';
 const PIPE_ID    = '305832912';
 const FL_KEY     = 'reparoeletro_frenteloja';
@@ -6,7 +6,7 @@ const BALCAO_KEY = 'reparoeletro_balcao';
 
 const U = process.env.UPSTASH_URL;
 const T = process.env.UPSTASH_TOKEN;
-const PT = process.env.PIPEFY_TOKEN;
+const PT = (process.env.PIPEFY_TOKEN||'').trim();
 
 async function dbGet(k){
   try{const r=await fetch(U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();return j[0]?.result?JSON.parse(j[0].result):null;}catch(e){return null;}
@@ -68,7 +68,7 @@ export default async function handler(req,res){
 
   if(req.method==='POST'&&action==='criar'){
     const {nomeContato,equipamento,telefone,descricao}=req.body||{};
-    if(!nomeContato||!equipamento)return res.status(400).json({ok:false,error:'Nome e equipamento obrigatÃ³rios'});
+    if(!nomeContato||!equipamento)return res.status(400).json({ok:false,error:'Nome e equipamento obrigatórios'});
     const db=await dbGet(FL_KEY)||defaultDB();
     const id=nextId(db);const now=new Date().toISOString();
     const ficha={id,nomeContato,equipamento,telefone:(telefone||'').replace(/[^0-9]/g,''),descricao:descricao||'',phase:'analise',createdAt:now,movedAt:now,history:[{phase:'analise',ts:now}]};
@@ -78,10 +78,10 @@ export default async function handler(req,res){
 
   if(req.method==='POST'&&action==='analise'){
     const {id,descricaoTecnica}=req.body||{};
-    if(!id||!descricaoTecnica)return res.status(400).json({ok:false,error:'id e descriÃ§Ã£o obrigatÃ³rios'});
+    if(!id||!descricaoTecnica)return res.status(400).json({ok:false,error:'id e descrição obrigatórios'});
     const db=await dbGet(FL_KEY)||defaultDB();
     const ficha=db.fichas.find(f=>f.id===id);
-    if(!ficha)return res.status(404).json({ok:false,error:'NÃ£o encontrada'});
+    if(!ficha)return res.status(404).json({ok:false,error:'Não encontrada'});
     const now=new Date().toISOString();
     ficha.descricaoTecnica=descricaoTecnica;ficha.phase='orcamento_cadastrado';ficha.movedAt=now;
     ficha.history=(ficha.history||[]).concat([{phase:'orcamento_cadastrado',ts:now}]);
@@ -90,40 +90,64 @@ export default async function handler(req,res){
 
   if(req.method==='POST'&&action==='passar-orcamento'){
     const {id,valor,formaPagamento,decisao}=req.body||{};
-    if(!id)return res.status(400).json({ok:false,error:'id obrigatÃ³rio'});
+    if(!id)return res.status(400).json({ok:false,error:'id obrigatório'});
     const db=await dbGet(FL_KEY)||defaultDB();
     const ficha=db.fichas.find(f=>f.id===id);
-    if(!ficha)return res.status(404).json({ok:false,error:'NÃ£o encontrada'});
+    if(!ficha)return res.status(404).json({ok:false,error:'Não encontrada'});
     const now=new Date().toISOString();
     ficha.orcamento={valor:parseFloat(valor)||0,formaPagamento:formaPagamento||'pix',status:decisao};
-    if(decisao==='reprovado'){db.fichas=db.fichas.filter(f=>f.id!==id);await dbSet(FL_KEY,db);return res.status(200).json({ok:true,ficha:{...ficha,phase:'encerrado'}});}
+
+    // Bug 1 fix: reprovado remove a ficha do banco definitivamente
+    if(decisao==='reprovado'){
+      db.fichas=db.fichas.filter(f=>f.id!==id);
+      await dbSet(FL_KEY,db);
+      return res.status(200).json({ok:true,ficha:{...ficha,phase:'encerrado'}});
+    }
+
     if(decisao==='aprovado'){
       ficha.phase='producao';ficha.movedAt=now;
       ficha.history=(ficha.history||[]).concat([{phase:'producao',ts:now}]);
+
+      // Criar card no Pipefy em fase "Aprovado" — mesmo padrão do vendas.js
       let pipefyId=null;
       try{
         const aprovadoPhaseId=await getPipefyPhaseId('aprovad');
-        if(!aprovadoPhaseId) throw new Error('Fase Aprovado nao encontrada');
+        if(!aprovadoPhaseId) throw new Error('Fase Aprovado nao encontrada no Pipefy');
+
         const valorFmt=parseFloat(ficha.orcamento?.valor||0).toLocaleString('pt-BR',{minimumFractionDigits:2,style:'currency',currency:'BRL'});
-        const titulo=(ficha.nomeContato+' (Loja) - '+ficha.equipamento).replace(/"/g,"'").slice(0,255);
-        const desc=[ficha.equipamento+(ficha.descricao?' - '+ficha.descricao:''),ficha.descricaoTecnica?'Diagnostico: '+ficha.descricaoTecnica:'','Valor: '+valorFmt,'Pgto: '+(ficha.orcamento?.formaPagamento||'pix'),'OS: '+ficha.id].filter(Boolean).join('\n').replace(/"/g,"'").slice(0,3000);
-        const nm=(ficha.nomeContato+' (Loja)').replace(/"/g,"'").slice(0,255);
-        const tel=(ficha.telefone||'').replace(/"/g,"'").slice(0,100);
-        const data=await pipefyQ('mutation { createCard(input: { pipe_id: "'+PIPE_ID+'" phase_id: "'+aprovadoPhaseId+'" title: "'+titulo+'" fields_attributes: [ { field_id: "nome_do_contato" field_value: "'+nm+'" }, { field_id: "telefone" field_value: "'+tel+'" }, { field_id: "descri_o" field_value: "'+desc+'" }, { field_id: "valor_de_contrato" field_value: "'+String(parseFloat(ficha.orcamento?.valor||0).toFixed(2))+'" } ] }) { card { id } } }');
+        const titulo=(ficha.nomeContato+' (Loja) — '+ficha.equipamento).replace(/"/g,"'").slice(0,255);
+        const descPipefy=[
+          ficha.equipamento+(ficha.descricao?' — '+ficha.descricao:''),
+          ficha.descricaoTecnica?'Diagnóstico: '+ficha.descricaoTecnica:'',
+          'Valor: '+valorFmt,
+          'Forma Pgto: '+(ficha.orcamento?.formaPagamento||'pix'),
+          'OS: '+ficha.id,
+        ].filter(Boolean).join('\n').replace(/"/g,"'").slice(0,3000);
+        const nomeCard=(ficha.nomeContato+' (Loja)').replace(/"/g,"'").slice(0,255);
+        const telCard=(ficha.telefone||'').replace(/"/g,"'").slice(0,100);
+
+        const data=await pipefyQ(
+          'mutation { createCard(input: { pipe_id: "'+PIPE_ID+'" phase_id: "'+aprovadoPhaseId+'" title: "'+titulo+'" fields_attributes: [ { field_id: "nome_do_contato" field_value: "'+nomeCard+'" }, { field_id: "telefone" field_value: "'+telCard+'" }, { field_id: "descri_o" field_value: "'+descPipefy+'" } ] }) { card { id } } }'
+        );
         pipefyId=data?.createCard?.card?.id||null;
-        console.log('[FL] Card Aprovado:',pipefyId);
-      }catch(e){console.error('[FL] Pipefy:',e.message);}
+        console.log('[FrenteLoja] Card Pipefy criado:',pipefyId,'fase Aprovado');
+      }catch(e){
+        console.error('[FrenteLoja] Erro Pipefy:',e.message);
+      }
+
       ficha.pipefyCardId=pipefyId||null;
+      // Pipefy sync automaticamente replica para Tecnico e Balcao via board.js
     }
+
     await dbSet(FL_KEY,db);return res.status(200).json({ok:true,ficha});
   }
 
   if(req.method==='POST'&&action==='conserto-realizado'){
     const {pipefyCardId}=req.body||{};
-    if(!pipefyCardId)return res.status(400).json({ok:false,error:'pipefyCardId obrigatÃ³rio'});
+    if(!pipefyCardId)return res.status(400).json({ok:false,error:'pipefyCardId obrigatório'});
     const db=await dbGet(FL_KEY)||defaultDB();
     const ficha=db.fichas.find(f=>f.pipefyCardId===String(pipefyCardId));
-    if(!ficha)return res.status(404).json({ok:false,error:'Ficha nÃ£o encontrada'});
+    if(!ficha)return res.status(404).json({ok:false,error:'Ficha não encontrada'});
     const now=new Date().toISOString();
     ficha.phase='conserto_realizado';ficha.liberadoHoje=true;ficha.movedAt=now;
     ficha.history=(ficha.history||[]).concat([{phase:'conserto_realizado',ts:now}]);
@@ -134,17 +158,17 @@ export default async function handler(req,res){
     const {id}=req.body||{};
     const db=await dbGet(FL_KEY)||defaultDB();
     const ficha=db.fichas.find(f=>f.id===id);
-    if(!ficha)return res.status(404).json({ok:false,error:'NÃ£o encontrada'});
+    if(!ficha)return res.status(404).json({ok:false,error:'Não encontrada'});
     try{const phId=await getPipefyPhaseId('programar entrega');if(ficha.pipefyCardId&&phId)await movePipefyCard(ficha.pipefyCardId,phId);}catch(e){}
     return res.status(200).json({ok:true});
   }
 
   if(req.method==='POST'&&action==='liberar'){
     const {id,valor,formaPagamento}=req.body||{};
-    if(!id)return res.status(400).json({ok:false,error:'id obrigatÃ³rio'});
+    if(!id)return res.status(400).json({ok:false,error:'id obrigatório'});
     const db=await dbGet(FL_KEY)||defaultDB();
     const ficha=db.fichas.find(f=>f.id===id);
-    if(!ficha)return res.status(404).json({ok:false,error:'NÃ£o encontrada'});
+    if(!ficha)return res.status(404).json({ok:false,error:'Não encontrada'});
     const now=new Date().toISOString();
     ficha.phase='pago';ficha.pagoEm=now;ficha.pagoValor=parseFloat(valor)||ficha.orcamento?.valor||0;
     ficha.pagoPor=formaPagamento||ficha.orcamento?.formaPagamento||'pix';ficha.movedAt=now;
@@ -155,7 +179,7 @@ export default async function handler(req,res){
 
   if(action==='rastrear'){
     const q=(req.query.q||'').trim().toLowerCase();
-    if(!q)return res.status(400).json({ok:false,error:'Query obrigatÃ³ria'});
+    if(!q)return res.status(400).json({ok:false,error:'Query obrigatória'});
     const db=await dbGet(FL_KEY)||defaultDB();
     const found=db.fichas.filter(f=>(f.id+' '+f.nomeContato+' '+f.telefone+' '+f.equipamento).toLowerCase().includes(q));
     return res.status(200).json({ok:true,fichas:found});
@@ -163,10 +187,10 @@ export default async function handler(req,res){
 
   if(req.method==='POST'&&action==='mover'){
     const {id,phase,dados}=req.body||{};
-    if(!id||!phase)return res.status(400).json({ok:false,error:'id e phase obrigatÃ³rios'});
+    if(!id||!phase)return res.status(400).json({ok:false,error:'id e phase obrigatórios'});
     const db=await dbGet(FL_KEY)||defaultDB();
     const ficha=db.fichas.find(f=>f.id===id);
-    if(!ficha)return res.status(404).json({ok:false,error:'Ficha nÃ£o encontrada'});
+    if(!ficha)return res.status(404).json({ok:false,error:'Ficha não encontrada'});
     const now=new Date().toISOString();
     ficha.phase=phase;ficha.movedAt=now;
     ficha.history=(ficha.history||[]).concat([{phase,ts:now}]);
@@ -175,5 +199,5 @@ export default async function handler(req,res){
     await dbSet(FL_KEY,db);return res.status(200).json({ok:true,ficha});
   }
 
-  return res.status(404).json({ok:false,error:'AÃ§Ã£o nÃ£o encontrada'});
+  return res.status(404).json({ok:false,error:'Ação não encontrada'});
 }
