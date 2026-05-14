@@ -347,32 +347,8 @@ var LOJA_INFO = {
 var fichas = [];
 var fichaAtual = null;
 
-// ══ SIDEBAR ══════════════════════════════════════════════════
 
-  sidebarEl.classList.toggle('collapsed',isColl);
-  sidebarEl.querySelector('.toggle-label').textContent=isColl?'Expandir':'Recolher';
-  if(isColl) fecharRastrear();
-}
-  if(url===window.location.pathname)return;
-  window.location.href=url;
-}
 
-// ══ RASTREAR SIDEBAR ═══════════════════════════════════════════
-function toggleRastrear(){rastrOpen?fecharRastrear():abrirRastrear();}
-  document.getElementById('rastr-dropdown').classList.add('open');
-  document.getElementById('rastr-arrow').textContent='▲';
-  document.getElementById('rastr-inp').focus();
-}
-  document.getElementById('rastr-dropdown').classList.remove('open');
-  document.getElementById('rastr-arrow').textContent='▼';
-}
-  if(q.length<2){el.textContent='Digite para buscar no sistema';return;}
-  el.textContent='Buscando...';
-  fetch('/api/rastrear?q='+encodeURIComponent(q)).then(r=>r.json()).then(d=>{
-    if(d.results&&d.results.length){el.innerHTML=d.results.slice(0,5).map(r=>'<div style="padding:4px 0;border-bottom:1px solid var(--border);font-size:11px;color:var(--text);">'+r.id+' — '+r.nome+'</div>').join('');
-    }else{el.textContent='Nenhum resultado';}
-  }).catch(()=>{el.textContent='Erro na busca';});
-}
 
 // ══ TABS ═══════════════════════════════════════════════════════
 function setTab(t){
