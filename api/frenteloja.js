@@ -126,14 +126,23 @@ export default async function handler(req,res){
         const nomeCard=(ficha.nomeContato+' (Loja)').replace(/"/g,"'").slice(0,255);
         const telCard=(ficha.telefone||'').replace(/"/g,"'").slice(0,100);
 
+        const titleCompleto=(ficha.nomeContato+' (Loja) - '+ficha.equipamento+
+          ' | '+(ficha.descricao||'')+
+          ' | Diag: '+(ficha.descricaoTecnica||'')+
+          ' | R$'+String(parseFloat(ficha.orcamento?.valor||0).toFixed(2))+
+          ' '+(ficha.orcamento?.formaPagamento||'pix')+' OS:'+ficha.id
+        ).replace(/"/g,"'").slice(0,255);
         const data=await pipefyQ(
-          'mutation { createCard(input: { pipe_id: "'+PIPE_ID+'" phase_id: "'+aprovadoPhaseId+'" title: "'+titulo+'" fields_attributes: [ { field_id: "nome_do_contato" field_value: "'+nomeCard+'" }, { field_id: "telefone" field_value: "'+telCard+'" }, { field_id: "descri_o" field_value: "'+descPipefy+'" }, { field_id: "valor_de_contrato" field_value: "'+String(parseFloat(ficha.orcamento?.valor||0).toFixed(2))+'" } ] }) { card { id } } }'
+          'mutation { createCard(input: { pipe_id: "'+PIPE_ID+'" phase_id: "'+aprovadoPhaseId+'" title: "'+titleCompleto+'" fields_attributes: [ { field_id: "nome_do_contato" field_value: "'+nomeCard+'" }, { field_id: "telefone" field_value: "'+telCard+'" } ] }) { card { id } } }'
         );
         pipefyId=data?.createCard?.card?.id||null;
-        console.log('[FrenteLoja] Card Pipefy criado:',pipefyId,'fase Aprovado');
+        console.log('[FrenteLoja] Card criado:',pipefyId);
+        if(pipefyId){
+          const vn=String(parseFloat(ficha.orcamento?.valor||0).toFixed(2));
+          await pipefyQ('mutation{updateCardField(input:{card_id:"'+pipefyId+'" field_id:"valor_de_contrato" new_value:"'+vn+'"}){success}}').catch(e=>console.error('[FL] valor:',e.message));
+        }
       }catch(e){
         console.error('[FrenteLoja] Erro Pipefy:',e.message);
-        ficha.pipefyDebugError=e.message; // temp debug
       }
 
       ficha.pipefyCardId=pipefyId||null;
