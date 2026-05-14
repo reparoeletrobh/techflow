@@ -785,8 +785,13 @@ async function cvConfirmar() {
 
   if (r.ok) {
     var dadosVendas = { tipo: cvTipoSel, codigo: cod, descricao: desc, preco: preco };
-    // Salva dados do cadastro em vendas na ficha
-    await api('marcar-cadastrado-vendas', { id: cvFichaId, dadosVendas: dadosVendas });
+    // Salva dados do cadastro em vendas na ficha — checa o retorno
+    var mResult = await api('marcar-cadastrado-vendas', { id: cvFichaId, dadosVendas: dadosVendas });
+    if (!mResult || !mResult.ok) {
+      showToast('⚠️','Produto salvo no Vendas, mas houve um erro ao registrar em Equipamentos Comprados.', mResult && mResult.error ? mResult.error : 'Tente novamente');
+      return;
+    }
+    // Só atualiza estado local depois de confirmar que o servidor salvou
     var f = fichas.find(function(x) { return x.id === cvFichaId; });
     if (f) { f.cadastradoVendas = true; f.dadosVendas = dadosVendas; }
     cvCloseModal();
