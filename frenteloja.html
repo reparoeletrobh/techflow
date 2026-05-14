@@ -7,50 +7,9 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='18,2 8,18 15,18 14,30 24,14 17,14' fill='%23fff' stroke='%23fff' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Inter:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0d0d14;--surface:#13131f;--surface2:#1a1a2e;--border:#1e1e32;--text:#e2e8f0;--muted:#64748b;--yellow:#f5c800;--green:#22c55e;--red:#ef4444;--blue:#3b9eff;--orange:#f97316;--purple:#8b5cf6;--sidebar-w:260px;--sidebar-collapsed:60px;--fm:'DM Mono',monospace;--ff:'Inter',sans-serif;}
+:root{--bg:#0d0d14;--surface:#13131f;--surface2:#1a1a2e;--border:#1e1e32;--text:#e2e8f0;--muted:#64748b;--yellow:#f5c800;--green:#22c55e;--red:#ef4444;--blue:#3b9eff;--orange:#f97316;--purple:#8b5cf6;--fm:'DM Mono',monospace;--ff:'Inter',sans-serif;}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;height:100dvh;overflow:hidden;}
-/* ── Sidebar (same as adm.html) ─────────────────────────────── */
-.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;transition:width .25s,min-width .25s;overflow:hidden;z-index:10;}
-.sidebar.collapsed{width:var(--sidebar-collapsed);min-width:var(--sidebar-collapsed);}
-.sidebar-logo{display:flex;align-items:center;gap:10px;padding:0 16px;height:56px;border-bottom:1px solid var(--border);flex-shrink:0;overflow:hidden;white-space:nowrap;}
-.logo-bolt{font-size:22px;flex-shrink:0;}
-.logo-text{font-family:var(--fm);font-size:13px;font-weight:500;color:var(--yellow);white-space:nowrap;transition:opacity .2s;}
-.sidebar.collapsed .logo-text{opacity:0;pointer-events:none;}
-.sidebar-nav{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 0;}
-.nav-sep{height:1px;background:var(--border);margin:6px 0;}
-.nav-item{display:flex;align-items:center;gap:10px;padding:0 10px;height:42px;margin:2px 8px;border-radius:8px;cursor:pointer;transition:background .15s;white-space:nowrap;overflow:hidden;position:relative;background:color-mix(in srgb,var(--item-color,#888) 38%,#0d0d14);border:1px solid color-mix(in srgb,var(--item-color,#888) 55%,transparent);}
-.nav-item:hover{background:color-mix(in srgb,var(--item-color,#888) 50%,#0d0d14);}
-.nav-item.active{background:color-mix(in srgb,var(--item-color,#888) 55%,#0d0d14);border-color:color-mix(in srgb,var(--item-color,#888) 80%,transparent);}
-.nav-item.active .nav-label{color:#fff;font-weight:600;}
-.nav-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
-.nav-label{font-family:var(--fm);font-size:11px;color:var(--muted);letter-spacing:.5px;transition:color .15s;}
-.sidebar.collapsed .nav-label{opacity:0;}
-.sidebar.collapsed .nav-item{margin:2px 6px;justify-content:center;padding:0;}
-.sidebar.collapsed .nav-item:hover::after{content:attr(data-label);position:absolute;left:calc(var(--sidebar-collapsed)+8px);background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--fm);font-size:11px;padding:5px 10px;border-radius:6px;white-space:nowrap;z-index:999;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.4);}
-/* Rastrear btn */
-.rastr-wrap{position:relative;padding:4px 8px;}
-.rastr-btn{display:flex;align-items:center;gap:10px;padding:0 10px;height:42px;border-radius:8px;cursor:pointer;background:rgba(245,200,0,.12);border:1px solid rgba(245,200,0,.25);transition:background .15s;white-space:nowrap;overflow:hidden;}
-.rastr-btn:hover{background:rgba(245,200,0,.2);}
-.rastr-btn-icon{font-size:16px;flex-shrink:0;}
-.rastr-btn-label{font-family:var(--fm);font-size:11px;color:var(--yellow);letter-spacing:.5px;transition:opacity .2s,width .2s;}
-.rastr-btn-arrow{font-size:10px;color:var(--yellow);opacity:.6;transition:opacity .2s,width .2s;margin-left:auto;}
-.rastr-dropdown{display:none;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-top:4px;}
-.rastr-dropdown.open{display:block;}
-.rastr-inp{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-family:var(--fm);font-size:11px;outline:none;}
-.rastr-inp:focus{border-color:var(--yellow);}
-.rastr-state{font-family:var(--fm);font-size:10px;color:var(--muted);padding:6px 2px;}
-.sidebar.collapsed .rastr-btn{justify-content:center;padding:0;}
-.sidebar.collapsed .rastr-btn-label,.sidebar.collapsed .rastr-btn-arrow{opacity:0;width:0;overflow:hidden;}
-.sidebar.collapsed .rastr-wrap:hover::after{content:'Rastrear';position:absolute;left:calc(var(--sidebar-collapsed)+8px);background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--fm);font-size:11px;padding:5px 10px;border-radius:6px;white-space:nowrap;z-index:999;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.4);}
-/* Toggle sidebar */
-.sidebar-toggle{display:flex;align-items:center;gap:8px;padding:10px 16px;border-top:1px solid var(--border);cursor:pointer;font-family:var(--fm);font-size:10px;color:var(--muted);flex-shrink:0;}
-.toggle-icon{font-size:14px;transition:transform .2s;}
-.toggle-label{transition:opacity .2s;}
-.sidebar.collapsed .toggle-icon{transform:scaleX(-1);}
-.sidebar.collapsed .toggle-label{opacity:0;}
-@media(max-width:768px){.sidebar{position:fixed;top:0;left:0;height:100dvh;z-index:300;transform:translateX(-100%);transition:transform .25s;box-shadow:4px 0 24px rgba(0,0,0,.5);width:var(--sidebar-w)!important;min-width:var(--sidebar-w)!important;}.sidebar.mobile-open{transform:translateX(0);}.sidebar.collapsed{width:var(--sidebar-w)!important;min-width:var(--sidebar-w)!important;}.sidebar.collapsed .logo-text,.sidebar.collapsed .nav-label,.sidebar.collapsed .toggle-label,.sidebar.collapsed .rastr-btn-label,.sidebar.collapsed .rastr-btn-arrow{opacity:1!important;width:auto!important;overflow:visible!important;}.sidebar.collapsed .nav-item,.sidebar.collapsed .rastr-btn{justify-content:flex-start!important;padding:0 10px!important;}.sidebar.collapsed .nav-item:hover::after,.sidebar.collapsed .rastr-wrap:hover::after{display:none!important;}.mob-toggle{display:flex!important;}.main-header{padding-left:50px;}}
-.mob-toggle{display:none;position:fixed;top:12px;left:12px;z-index:400;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px;cursor:pointer;font-size:18px;}
+body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;height:100dvh;overflow:hidden;flex-direction:column;}
 /* ── Main ────────────────────────────────────────────────────── */
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
 .main-header{height:56px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:16px;flex-shrink:0;}
@@ -155,80 +114,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
 </head>
 <body>
 
-<button class="mob-toggle" onclick="document.getElementById('sidebar').classList.toggle('mobile-open')" id="mob-toggle">☰</button>
 
-<div class="sidebar" id="sidebar">
-  <div class="sidebar-logo">
-    <span class="logo-bolt">⚡</span>
-    <span class="logo-text">REPARO ELETRO</span>
-  </div>
-  <div class="sidebar-nav">
-    <div class="rastr-wrap" id="rastr-wrap">
-      <div class="rastr-btn" id="rastr-btn-side" onclick="toggleRastrear()">
-        <span class="rastr-btn-icon">🔍</span>
-        <span class="rastr-btn-label">Rastrear</span>
-        <span class="rastr-btn-arrow" id="rastr-arrow">▼</span>
-      </div>
-      <div class="rastr-dropdown" id="rastr-dropdown">
-        <input class="rastr-inp" id="rastr-inp" type="text" placeholder="OS, nome, telefone..." oninput="buscarRastrear(this.value)" onkeydown="if(event.key==='Escape')fecharRastrear()"/>
-        <div class="rastr-state" id="rastr-state">Digite para buscar no sistema</div>
-      </div>
-    </div>
-    <div class="nav-sep"></div>
-    <div class="nav-item active" data-url="/frenteloja" data-label="Frente de Loja" style="--item-color:#f5c800" onclick="openPage(this)">
-      <span class="nav-icon" style="background:rgba(245,200,0,.15);">🏪</span>
-      <span class="nav-label">Frente de Loja</span>
-    </div>
-    <div class="nav-item" data-url="/atendimento" data-label="Atendimento" style="--item-color:#3b9eff" onclick="openPage(this)">
-      <span class="nav-icon" style="background:rgba(59,158,255,.15);">📊</span>
-      <span class="nav-label">Atendimento</span>
-    </div>
-    <div class="nav-item" data-url="/tecnico" data-label="Técnico" style="--item-color:#f5c800" onclick="openPage(this)">
-      <span class="nav-icon" style="background:rgba(245,200,0,.15);">🔧</span>
-      <span class="nav-label">Técnico</span>
-    </div>
-    <div class="nav-item" data-url="/balcao" data-label="Balcão" style="--item-color:#22c55e" onclick="openPage(this)">
-      <span class="nav-icon" style="background:rgba(34,197,94,.15);">🛒</span>
-      <span class="nav-label">Balcão</span>
-    </div>
-    <div class="nav-item" data-url="/financeiro#fichas" data-label="Financeiro" style="--item-color:#22c55e" onclick="openPage(this)">
-      <span class="nav-icon" style="background:rgba(34,197,94,.15);">💰</span>
-      <span class="nav-label">Financeiro</span>
-    </div>
-    <div class="nav-item" data-url="/orcamento" data-label="Orçamento" style="--item-color:#25d366" onclick="openPage(this)">
-      <span class="nav-icon" style="background:rgba(37,211,102,.15);">📋</span>
-      <span class="nav-label">Orçamento</span>
-    </div>
-    <div class="nav-item" data-url="/vendas" data-label="Vendas" style="--item-color:#f97316" onclick="openPage(this)">
-      <span class="nav-icon" style="background:rgba(249,115,22,.15);">🏷️</span>
-      <span class="nav-label">Vendas</span>
-    </div>
-    <div class="nav-item" data-url="/compra-equip" data-label="Compra Equip." style="--item-color:#f59e0b" onclick="openPage(this)">
-      <span class="nav-icon" style="background:rgba(245,158,11,.15);">📦</span>
-      <span class="nav-label">Compra Equip.</span>
-    </div>
-    <div class="nav-item" data-url="/equipamentos" data-label="Equipamentos" style="--item-color:#3b9eff" onclick="openPage(this)">
-      <span class="nav-icon" style="background:rgba(59,158,255,.15);">🖥️</span>
-      <span class="nav-label">Equipamentos</span>
-    </div>
-    <div class="nav-item" data-url="/garantia" data-label="Garantia" style="--item-color:#f59e0b" onclick="openPage(this)">
-      <span class="nav-icon" style="background:rgba(245,158,11,.15);">🛡️</span>
-      <span class="nav-label">Garantia</span>
-    </div>
-    <div class="nav-item" data-url="/aguardando-retirada" data-label="Ag. Retirada" style="--item-color:#f97316" onclick="openPage(this)">
-      <span class="nav-icon" style="background:rgba(249,115,22,.15);">📬</span>
-      <span class="nav-label">Ag. Retirada</span>
-    </div>
-    <div class="nav-item" data-url="/metricas" data-label="Métricas" style="--item-color:#f5c800" onclick="openPage(this)">
-      <span class="nav-icon" style="background:rgba(245,200,0,.15);">📈</span>
-      <span class="nav-label">Métricas</span>
-    </div>
-  </div>
-  <div class="sidebar-toggle" onclick="toggleSidebar()">
-    <span class="toggle-icon">◀</span>
-    <span class="toggle-label">Recolher</span>
-  </div>
-</div>
 
 <div class="main">
   <div class="main-header">
@@ -462,38 +348,24 @@ var fichas = [];
 var fichaAtual = null;
 
 // ══ SIDEBAR ══════════════════════════════════════════════════
-var sidebarEl = document.getElementById('sidebar');
-var isColl = localStorage.getItem('sb-collapsed')==='1';
-if(isColl) sidebarEl.classList.add('collapsed');
 
-function toggleSidebar(){
-  isColl=!isColl;localStorage.setItem('sb-collapsed',isColl?'1':'0');
   sidebarEl.classList.toggle('collapsed',isColl);
   sidebarEl.querySelector('.toggle-label').textContent=isColl?'Expandir':'Recolher';
   if(isColl) fecharRastrear();
 }
-function openPage(el){
-  var url=el.dataset.url;
   if(url===window.location.pathname)return;
   window.location.href=url;
 }
 
 // ══ RASTREAR SIDEBAR ═══════════════════════════════════════════
-var rastrOpen=false;
 function toggleRastrear(){rastrOpen?fecharRastrear():abrirRastrear();}
-function abrirRastrear(){
-  rastrOpen=true;
   document.getElementById('rastr-dropdown').classList.add('open');
   document.getElementById('rastr-arrow').textContent='▲';
   document.getElementById('rastr-inp').focus();
 }
-function fecharRastrear(){
-  rastrOpen=false;
   document.getElementById('rastr-dropdown').classList.remove('open');
   document.getElementById('rastr-arrow').textContent='▼';
 }
-function buscarRastrear(q){
-  var el=document.getElementById('rastr-state');
   if(q.length<2){el.textContent='Digite para buscar no sistema';return;}
   el.textContent='Buscando...';
   fetch('/api/rastrear?q='+encodeURIComponent(q)).then(r=>r.json()).then(d=>{
