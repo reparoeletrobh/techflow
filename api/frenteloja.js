@@ -127,7 +127,7 @@ export default async function handler(req,res){
         const telCard=(ficha.telefone||'').replace(/"/g,"'").slice(0,100);
 
         const data=await pipefyQ(
-          'mutation { createCard(input: { pipe_id: "'+PIPE_ID+'" phase_id: "'+aprovadoPhaseId+'" title: "'+titulo+'" fields_attributes: [ { field_id: "nome_do_contato" field_value: "'+nomeCard+'" }, { field_id: "telefone" field_value: "'+telCard+'" }, { field_id: "descri_o" field_value: "'+descPipefy+'" } ] }) { card { id } } }'
+          'mutation { createCard(input: { pipe_id: "'+PIPE_ID+'" phase_id: "'+aprovadoPhaseId+'" title: "'+titulo+'" fields_attributes: [ { field_id: "nome_do_contato" field_value: "'+nomeCard+'" }, { field_id: "telefone" field_value: "'+telCard+'" }, { field_id: "descri_o" field_value: "'+descPipefy+'" }, { field_id: "valor_de_contrato" field_value: "'+String(parseFloat(ficha.orcamento?.valor||0).toFixed(2))+'" } ] }) { card { id } } }'
         );
         pipefyId=data?.createCard?.card?.id||null;
         console.log('[FrenteLoja] Card Pipefy criado:',pipefyId,'fase Aprovado');
