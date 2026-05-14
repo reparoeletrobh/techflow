@@ -251,6 +251,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
     <div class="popup-btns">
       <button class="btn-primary-popup" onclick="abrirPassarOrcamento()">💰 PASSAR ORÇAMENTO</button>
       <button class="btn-green-popup" onclick="enviarWhatsAppOrcamento()">📲 ENVIAR WHATSAPP</button>
+      <button class="btn-red-popup" onclick="reprovarOrcamento()">❌ REPROVADO</button>
     </div>
   </div>
 </div>
@@ -581,8 +582,20 @@ function gerarOrcamentoLoja(ficha){
   if(preco<0)preco=0;
   var template=regra?regra.template:('Ola, [NOME] bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nRealizamos todos os testes e identificamos o problema. Faremos o reparo completo com substituicao das pecas necessarias.\n\nEste conserto completo fica em [VALOR] apenas. Aprovando ja iniciamos o conserto.');
   var txt=template.replace(/\[NOME\]/g,nome).replace(/\[VALOR\]/g,preco?preco+' reais':'[VALOR]');
-  txt+='\n\n_(Desconto especial para cliente loja)_';
   return {texto:txt,preco:preco};
+}
+function reprovarOrcamento(){
+  if(!fichaAtual)return;
+  fetch('/api/frenteloja?action=passar-orcamento',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:fichaAtual.id,valor:fichaAtual.orcamento?.valor||0,formaPagamento:fichaAtual.orcamento?.formaPagamento||'pix',decisao:'reprovado'})
+  }).then(r=>r.json()).then(d=>{
+    if(!d.ok){toast('Erro: '+(d.error||''),'r');return;}
+    var idx=fichas.findIndex(f=>f.id===d.ficha.id);
+    if(idx>=0)fichas.splice(idx,1);
+    closePopup('pop-orc-cad');
+    renderKanban();renderPainel();
+    toast('Orçamento reprovado — ficha encerrada.','');
+  }).catch(()=>toast('Erro de conexão','r'));
 }
 function enviarWhatsAppOrcamento(){
   if(!fichaAtual)return;
