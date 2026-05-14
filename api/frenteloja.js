@@ -96,25 +96,29 @@ export default async function handler(req,res){
     if(!ficha)return res.status(404).json({ok:false,error:'Não encontrada'});
     const now=new Date().toISOString();
     ficha.orcamento={valor:parseFloat(valor)||0,formaPagamento:formaPagamento||'pix',status:decisao};
+    if(decisao==='reprovado'){db.fichas=db.fichas.filter(f=>f.id!==id);await dbSet(FL_KEY,db);return res.status(200).json({ok:true,ficha:{...ficha,phase:'encerrado'}});}
     if(decisao==='aprovado'){
+      let pipefyId=null;
       ficha.phase='producao';ficha.movedAt=now;
       ficha.history=(ficha.history||[]).concat([{phase:'producao',ts:now}]);
       try{
         const aprovadoPhaseId=await getPipefyPhaseId('aprovad');
         const pipefyId=await createPipefyCard([
           {id:'nome_do_contato',value:ficha.nomeContato+' (Loja)'},
-          {id:'descricao',value:ficha.equipamento+'\n'+ficha.descricao+'\n\nDiagnóstico: '+(ficha.descricaoTecnica||'')+'\n\nOS: '+ficha.id},
+          {id:'descri_o',value:(ficha.equipamento||'')+(ficha.descricao?' - '+ficha.descricao:'')+(ficha.descricaoTecnica?'\nDiagnostico: '+ficha.descricaoTecnica:'')+'\nOS: '+ficha.id},
           {id:'telefone',value:ficha.telefone},
-        ],aprovadoPhaseId).catch(()=>null);
-        ficha.pipefyCardId=pipefyId;
-        if(pipefyId){
-          const balcao=(await dbGet(BALCAO_KEY))||[];
-          if(!balcao.find(b=>b.pipefyId===String(pipefyId))){
-            balcao.unshift({pipefyId:String(pipefyId),nomeContato:ficha.nomeContato+' (Loja)',osCode:ficha.id,descricao:ficha.equipamento+' - '+ficha.descricao,telefone:ficha.telefone,tecnico:null,entradaEm:now,status:'aguardando_pagamento',pagoEm:null,isLoja:true});
-            await dbSet(BALCAO_KEY,balcao);
-          }
+        ],aprovadoPhaseId);
+        console.log('[FL] Pipefy card:',pipefyId);
+      }catch(e){console.error('[FL] Pipefy:',e.message);}
+      ficha.pipefyCardId=pipefyId||null;
+      try{
+        const balcaoId=pipefyId?String(pipefyId):('loja-'+ficha.id);
+        const balcao=(await dbGet(BALCAO_KEY))||[];
+        if(!balcao.find(b=>b.pipefyId===balcaoId)){
+          balcao.unshift({pipefyId:balcaoId,nomeContato:ficha.nomeContato+' (Loja)',osCode:ficha.id,descricao:(ficha.equipamento||'')+(ficha.descricao?' - '+ficha.descricao:''),telefone:ficha.telefone||'',tecnico:null,entradaEm:now,status:'aguardando_pagamento',pagoEm:null,isLoja:true});
+          await dbSet(BALCAO_KEY,balcao);
         }
-      }catch(e){console.error('Pipefy:',e.message);}
+      }catch(e){console.error('[FL] Balcao:',e.message);}
     }
     await dbSet(FL_KEY,db);return res.status(200).json({ok:true,ficha});
   }
