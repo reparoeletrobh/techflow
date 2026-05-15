@@ -494,10 +494,9 @@ function buildCard(f){
     if(f.endereco){
       btns.innerHTML+='<button class="fl-btn" onclick=\'abrirProgEntrega('+JSON.stringify(f.id)+')\'>🚚 PROGRAMAR ENTREGA</button>';
     }
-    if(f.clienteAvisado){
-      btns.innerHTML+='<span class="fl-btn avisado">✅ CLIENTE AVISADO</span>';
-    } else if(f.telefone){
-      btns.innerHTML+='<button class="fl-btn blue" onclick=\'avisarCliente('+JSON.stringify(f.id)+')\'>📲 AVISAR CLIENTE</button>';
+    if(f.telefone){
+      var lblAvisar=f.clienteAvisado?'✅ CLIENTE AVISADO':'📲 AVISAR CLIENTE';
+      btns.innerHTML+='<button class="fl-btn '+(f.clienteAvisado?'avisado':'blue')+'" onclick=\'avisarCliente('+JSON.stringify(f.id)+')\'>'+lblAvisar+'</button>';
     }
   }
   d.appendChild(btns);
@@ -517,8 +516,16 @@ function avisarCliente(id){
     document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
   });
   window.open(link,'_blank');
-  f.clienteAvisado=true;
-  renderKanban();
+  // Salvar permanentemente no servidor
+  fetch('/api/frenteloja?action=marcar-avisado',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok&&d.ficha){
+      var idx=fichas.findIndex(function(x){return x.id===id;});
+      if(idx>=0)fichas[idx]=d.ficha;
+      renderKanban();
+    }
+  });
   toast('📲 Link copiado! WhatsApp aberto.','g');
 }
 
