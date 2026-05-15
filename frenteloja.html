@@ -58,6 +58,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
 .fl-btn.green:hover{background:rgba(34,197,94,.25);}
 .fl-btn.red{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.3);color:var(--red);}
 .fl-btn.blue{background:rgba(59,158,255,.12);border-color:rgba(59,158,255,.3);color:var(--blue);}
+.fl-btn.avisado{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.3);color:var(--green);cursor:default;opacity:.8;}
 /* ── Painel Tab ──────────────────────────────────────────────── */
 .painel-wrap{flex:1;display:flex;gap:0;height:100%;overflow:hidden;}
 .painel-liberados{flex:1;min-width:0;background:rgba(34,197,94,.05);border-right:2px solid var(--green);display:flex;flex-direction:column;overflow:hidden;order:1;}
@@ -493,9 +494,32 @@ function buildCard(f){
     if(f.endereco){
       btns.innerHTML+='<button class="fl-btn" onclick=\'abrirProgEntrega('+JSON.stringify(f.id)+')\'>🚚 PROGRAMAR ENTREGA</button>';
     }
+    if(f.clienteAvisado){
+      btns.innerHTML+='<span class="fl-btn avisado">✅ CLIENTE AVISADO</span>';
+    } else if(f.telefone){
+      btns.innerHTML+='<button class="fl-btn blue" onclick=\'avisarCliente('+JSON.stringify(f.id)+')\'>📲 AVISAR CLIENTE</button>';
+    }
   }
   d.appendChild(btns);
   return d;
+}
+
+// ══ AVISAR CLIENTE ═══════════════════════════════════════════
+function avisarCliente(id){
+  var f=fichas.find(function(x){return x.id===id;});
+  if(!f||!f.telefone)return;
+  var tel=(f.telefone||'').replace(/[^0-9]/g,'');
+  if(tel.length>=10&&!tel.startsWith('55'))tel='55'+tel;
+  var msg=encodeURIComponent('Olá, aqui é a Reparo Eletro. Seu equipamento já está pronto para retirada, aguardo você.');
+  var link='https://wa.me/'+tel+'?text='+msg;
+  navigator.clipboard.writeText(link).catch(function(){
+    var ta=document.createElement('textarea');ta.value=link;
+    document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+  });
+  window.open(link,'_blank');
+  f.clienteAvisado=true;
+  renderKanban();
+  toast('📲 Link copiado! WhatsApp aberto.','g');
 }
 
 // ══ RENDER PAINEL ════════════════════════════════════════════
@@ -512,13 +536,9 @@ function renderPainel(){
   });
 }
 function painelCard(f,libe){
-  // Pago se phase=pago ou f.pago=true
   var isPago=f.pago===true||f.phase==='pago';
   var cls='painel-card';
-  if(libe){
-    // Liberados Hoje: verde se pago, vermelho se não pago
-    cls+=isPago?' liberado':' nao-pago';
-  }
+  if(libe){cls+=isPago?' liberado':' nao-pago';}
   return '<div class="'+cls+'">'+
     '<div class="painel-card-nome">'+f.nomeContato+'</div>'+
     '<div class="painel-card-equip">'+f.equipamento+'</div>'+
@@ -717,7 +737,7 @@ function confirmarPagamento(){
   }).then(r=>r.json()).then(d=>{
     if(!d.ok){toast('Erro: '+(d.error||''),'r');return;}
     var idx=fichas.findIndex(f=>f.id===d.ficha.id);
-    if(idx>=0)fichas[idx]=d.ficha; // mantém na lista com phase='pago' para mostrar verde
+    if(idx>=0)fichas[idx]=d.ficha;
     closePopup('pop-liberar');
     renderKanban();renderPainel();
     toast('Pagamento realizado! Equipamento liberado. Pipefy atualizado.','g');
