@@ -114,6 +114,13 @@ export default async function handler(req,res){
       // Pipefy + sync em background (não bloqueia a resposta)
       (async()=>{
         try{
+          // Evitar duplicidade: checar se já tem pipefyCardId antes de criar
+          const dbCheck=await dbGet(FL_KEY)||defaultDB();
+          const fichaCheck=dbCheck.fichas.find(f=>f.id===ficha.id);
+          if(fichaCheck?.pipefyCardId){
+            console.log('[FrenteLoja] Card já existe:',fichaCheck.pipefyCardId,'— pulando criação');
+            return;
+          }
           const aprovadoPhaseId=await getPipefyPhaseId('aprovad');
           if(!aprovadoPhaseId) throw new Error('Fase Aprovado nao encontrada');
           const titleCompleto=(ficha.nomeContato+' (Loja) - '+ficha.equipamento+
@@ -176,7 +183,7 @@ export default async function handler(req,res){
     const ficha=db.fichas.find(f=>f.id===id);
     if(!ficha)return res.status(404).json({ok:false,error:'Não encontrada'});
     const now=new Date().toISOString();
-    ficha.phase='pago';ficha.pago=true;ficha.pagoEm=now;ficha.pagoValor=parseFloat(valor)||ficha.orcamento?.valor||0;
+    ficha.phase='pago';ficha.pagoEm=now;ficha.pagoValor=parseFloat(valor)||ficha.orcamento?.valor||0;
     ficha.pagoPor=formaPagamento||ficha.orcamento?.formaPagamento||'pix';ficha.movedAt=now;
     ficha.history=(ficha.history||[]).concat([{phase:'pago',ts:now}]);
     try{const phId=await getPipefyPhaseId('receber');if(ficha.pipefyCardId&&phId)await movePipefyCard(ficha.pipefyCardId,phId);}catch(e){}
