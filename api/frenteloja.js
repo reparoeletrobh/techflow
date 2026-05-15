@@ -138,8 +138,14 @@ export default async function handler(req,res){
         pipefyId=data?.createCard?.card?.id||null;
         console.log('[FrenteLoja] Card criado:',pipefyId);
         if(pipefyId){
+          // Atualizar valor_de_contrato
           const vn=String(parseFloat(ficha.orcamento?.valor||0).toFixed(2));
           await pipefyQ('mutation{updateCardField(input:{card_id:"'+pipefyId+'" field_id:"valor_de_contrato" new_value:"'+vn+'"}){success}}').catch(e=>console.error('[FL] valor:',e.message));
+          // Acionar board sync para aplicar regra "loja" → Técnico + Balcão
+          try{
+            await fetch('https://reparoeletroadm.com/api/board?action=sync');
+            console.log('[FrenteLoja] Board sync acionado');
+          }catch(e){console.error('[FrenteLoja] Sync erro:',e.message);}
         }
       }catch(e){
         console.error('[FrenteLoja] Erro Pipefy:',e.message);
