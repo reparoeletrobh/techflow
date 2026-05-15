@@ -299,15 +299,24 @@ module.exports = async function handler(req, res) {
       }
     } catch (e) { pipefyError = e.message; }
 
-    // 2. Remove fichas cujo card foi para ERP ou Finalizado no Pipefy (qualquer fase)
+    // 2. Remove fichas cujo card foi para ERP ou Finalizado no Pipefy
     try {
       const finIds = await fetchFinalizadoIds();
       if (finIds.length > 0) {
         const before = fin.records.length;
+        // Fases que indicam dado histórico valioso — preservar mesmo após ERP/Finalizado
+        const FASES_PRESERVAR = ['pagamento_confirmado','nf_emitida','faturamento','rota_criada'];
+        const cutoff90 = new Date(); cutoff90.setDate(cutoff90.getDate() - 90);
         fin.records = fin.records.filter(r => {
           if (!r.pipefyId) return true;               // sem pipefyId: mantém
           if (r.pipefyId.startsWith("venda-")) return true; // venda interna: mantém
-          return !finIds.includes(r.pipefyId);         // remove se está em ERP/Finalizado
+          if (!finIds.includes(r.pipefyId)) return true; // não finalizado: mantém
+          // Finalizado — só remove se NÃO passou por pagamento_confirmado ou é antigo (>90 dias)
+          const passouPorPagamento = (r.history||[]).some(h => FASES_PRESERVAR.includes(h.phaseId));
+          if (!passouPorPagamento) return false; // sem histórico relevante: remove
+          // Com histórico: mantém por 90 dias para não perder contagens
+          const movedAt = new Date(r.movedAt || r.createdAt || 0);
+          return movedAt >= cutoff90;
         });
         removedCount = before - fin.records.length;
       }
