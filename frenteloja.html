@@ -495,6 +495,16 @@ function buildCard(f){
     if(f.endereco){
       btns.innerHTML+='<button class="fl-btn" onclick=\'abrirProgEntrega('+JSON.stringify(f.id)+')\'>🚚 PROGRAMAR ENTREGA</button>';
     }
+    if(f.telefone){
+      var tel=(f.telefone||'').replace(/[^0-9]/g,'');
+      if(tel.length>=10&&!tel.startsWith('55'))tel='55'+tel;
+      var msg=encodeURIComponent('Olá, aqui é a Reparo Eletro. Seu equipamento já está pronto para retirada, aguardo você.');
+      var aBtn=document.createElement('a');
+      aBtn.className='fl-btn blue';aBtn.style.display='block';aBtn.style.textAlign='center';aBtn.style.textDecoration='none';
+      aBtn.href='https://wa.me/'+tel+'?text='+msg;aBtn.target='_blank';
+      aBtn.textContent='📲 AVISAR CLIENTE';
+      btns.appendChild(aBtn);
+    }
   }
   d.appendChild(btns);
   return d;
@@ -520,19 +530,11 @@ function painelCard(f,libe){
   if(libe)cls+=' liberado';
   else if(f.phase==='conserto_realizado'){cls+=f.pago?' pago':' nao-pago';}
   // Botão avisar cliente apenas em conserto_realizado
-  var btnAvisar='';
-  if(f.phase==='conserto_realizado'&&f.telefone){
-    var tel=(f.telefone||'').replace(/[^0-9]/g,'');
-    if(tel.length>=10&&!tel.startsWith('55'))tel='55'+tel;
-    var msg=encodeURIComponent('Olá, aqui é a Reparo Eletro. Seu equipamento já está pronto para retirada, aguardo você.');
-    btnAvisar='<a class="btn-avisar" href="https://wa.me/'+tel+'?text='+msg+'" target="_blank">📲 AVISAR CLIENTE</a>';
-  }
   return '<div class="'+cls+'">'+
     '<div class="painel-card-nome">'+f.nomeContato+'</div>'+
     '<div class="painel-card-equip">'+f.equipamento+'</div>'+
     (f.descricao?'<div class="painel-card-desc">'+f.descricao.slice(0,60)+'</div>':'')+
     '<div class="painel-card-phase">'+phaseLabel(f.phase)+'</div>'+
-    btnAvisar+
   '</div>';
 }
 function phaseLabel(p){return{analise:'Análise',orcamento_cadastrado:'Orçamento',producao:'Produção',conserto_realizado:'Conserto Realizado',liberado_hoje:'Liberado Hoje',pago:'Pago'}[p]||p;}
