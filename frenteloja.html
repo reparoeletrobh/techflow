@@ -548,6 +548,14 @@ function avisarCliente(id){
 // ══ RENDER PAINEL ════════════════════════════════════════════
 function renderPainel(){
   var liberados=fichas.filter(f=>f.liberadoHoje||f.phase==='liberado_hoje');
+  // Não pagos (vermelho) sempre no topo
+  liberados.sort(function(a,b){
+    var aPago=a.pago===true||a.phase==='pago';
+    var bPago=b.pago===true||b.phase==='pago';
+    if(!aPago&&bPago)return -1;
+    if(aPago&&!bPago)return 1;
+    return 0;
+  });
   document.getElementById('painel-lib-cnt').textContent=liberados.length;
   document.getElementById('painel-liberados-body').innerHTML=liberados.map(f=>painelCard(f,true)).join('');
   ['producao','orcamento_cadastrado','analise'].forEach(function(ph){
