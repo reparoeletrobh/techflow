@@ -57,12 +57,17 @@ export default async function handler(req,res){
   if(req.method==='GET'&&action==='load'){
     const db=await dbGet(FL_KEY)||defaultDB();
     const todayStart=brtStartOfDay();
+    let changed=false;
     db.fichas.forEach(f=>{
-      if(f.phase==='liberado_hoje'&&new Date(f.movedAt)<todayStart){
-        f.phase='conserto_realizado';f.liberadoHoje=false;
+      if(f.liberadoHoje&&new Date(f.movedAt)<todayStart){
+        f.liberadoHoje=false;changed=true;
+      }
+      if(f.phase==='reprovado'&&new Date(f.reprovadoEm||f.movedAt||0)<todayStart){
+        f.phase='encerrado';changed=true;
       }
     });
-    await dbSet(FL_KEY,db);
+    db.fichas=db.fichas.filter(f=>f.phase!=='encerrado');
+    if(changed)await dbSet(FL_KEY,db);
     return res.status(200).json({ok:true,fichas:db.fichas});
   }
 
@@ -97,11 +102,14 @@ export default async function handler(req,res){
     const now=new Date().toISOString();
     ficha.orcamento={valor:parseFloat(valor)||0,formaPagamento:formaPagamento||'pix',status:decisao};
 
-    // Bug 1 fix: reprovado remove a ficha do banco definitivamente
+    // Reprovado: mantém no banco com phase='reprovado' para exibir coluna hoje
     if(decisao==='reprovado'){
-      db.fichas=db.fichas.filter(f=>f.id!==id);
+      ficha.phase='reprovado';
+      ficha.reprovadoEm=now;
+      ficha.motivo=req.body?.motivo||'';
+      ficha.movedAt=now;
       await dbSet(FL_KEY,db);
-      return res.status(200).json({ok:true,ficha:{...ficha,phase:'encerrado'}});
+      return res.status(200).json({ok:true,ficha});
     }
 
     if(decisao==='aprovado'){
@@ -205,15 +213,5 @@ export default async function handler(req,res){
     await dbSet(FL_KEY,db);return res.status(200).json({ok:true,ficha});
   }
 
-  if(req.method==='POST'&&action==='marcar-avisado'){
-    const {id}=req.body||{};
-    if(!id)return res.status(400).json({ok:false,error:'id obrigatório'});
-    const db=await dbGet(FL_KEY)||defaultDB();
-    const ficha=db.fichas.find(f=>f.id===id);
-    if(!ficha)return res.status(404).json({ok:false,error:'Não encontrada'});
-    ficha.clienteAvisado=true;ficha.clienteAvisadoEm=new Date().toISOString();
-    await dbSet(FL_KEY,db);
-    return res.status(200).json({ok:true,ficha});
-  }
   return res.status(404).json({ok:false,error:'Ação não encontrada'});
 }
