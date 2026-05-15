@@ -60,25 +60,23 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
 .fl-btn.blue{background:rgba(59,158,255,.12);border-color:rgba(59,158,255,.3);color:var(--blue);}
 /* ── Painel Tab ──────────────────────────────────────────────── */
 .painel-wrap{flex:1;display:flex;gap:0;height:100%;overflow:hidden;}
-.painel-liberados{flex:1;min-width:0;background:rgba(34,197,94,.05);border-right:2px solid var(--green);display:flex;flex-direction:column;overflow:hidden;order:1;}
+.painel-liberados{flex:2;min-width:320px;background:rgba(34,197,94,.05);border-left:2px solid var(--green);display:flex;flex-direction:column;overflow:hidden;order:2;}
 .painel-liberados-hdr{padding:16px;border-bottom:1px solid rgba(34,197,94,.2);background:rgba(34,197,94,.08);}
 .painel-liberados-hdr h2{font-family:var(--fm);font-size:12px;color:var(--green);letter-spacing:1px;}
 .painel-liberados-body{flex:1;overflow-y:auto;padding:8px;}
-.painel-kanban{flex:3;display:flex;gap:0;overflow-x:auto;order:2;}
+.painel-kanban{flex:1;display:flex;gap:0;overflow-x:auto;order:1;}
 .painel-col{flex:1;min-width:200px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
 .painel-col:last-child{border-right:none;}
 .painel-col-hdr{padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface);}
 .painel-col-hdr h3{font-family:var(--fm);font-size:10px;color:var(--muted);letter-spacing:1px;}
 .painel-col-hdr .cnt{font-family:var(--fm);font-size:20px;color:var(--text);margin-top:2px;}
 .painel-col-body{flex:1;overflow-y:auto;padding:8px;}
-.painel-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;}
-.painel-card.liberado{background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.3);}
+.painel-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;}
+.painel-card.liberado{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.5);border-width:2px;}
 .painel-card.pago{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.5);border-width:2px;}
-.painel-card.nao-pago{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.4);border-width:2px;}
-.btn-avisar{display:block;width:100%;margin-top:8px;padding:6px;background:rgba(37,211,102,.15);border:1px solid rgba(37,211,102,.4);border-radius:6px;font-family:var(--fm);font-size:9px;color:#25d366;cursor:pointer;letter-spacing:.5px;text-align:center;transition:background .15s;}
-.btn-avisar:hover{background:rgba(37,211,102,.3);}
-.painel-card-nome{font-size:clamp(18px,1.6vw,28px);font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;}
-.painel-card-equip{font-size:13px;color:var(--muted);margin-top:3px;}
+.painel-card.nao-pago{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.5);border-width:2px;}
+.painel-card-nome{font-size:clamp(16px,1.5vw,24px);font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;}
+.painel-card-equip{font-size:11px;color:var(--muted);margin-top:2px;}
 .painel-card-desc{font-size:11px;color:var(--muted);margin-top:2px;}
 .painel-card-phase{font-family:var(--fm);font-size:9px;color:var(--yellow);margin-top:4px;letter-spacing:.5px;}
 /* ── Popups ──────────────────────────────────────────────────── */
@@ -188,22 +186,26 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
       <div class="painel-liberados">
         <div class="painel-liberados-hdr">
           <h2>✅ LIBERADOS HOJE</h2>
-          <div id="painel-lib-cnt" style="font-family:var(--fm);font-size:36px;color:var(--green);margin-top:4px;font-weight:700;">0</div>
+          <div id="painel-lib-cnt" style="font-family:var(--fm);font-size:40px;color:var(--green);margin-top:4px;font-weight:700;">0</div>
         </div>
         <div class="painel-liberados-body" id="painel-liberados-body"></div>
       </div>
       <div class="painel-kanban">
         <div class="painel-col">
-          <div class="painel-col-hdr"><h3>PRODUÇÃO</h3><div class="cnt" id="p-cnt-producao">0</div></div>
-          <div class="painel-col-body" id="p-col-producao"></div>
+          <div class="painel-col-hdr"><h3>ANÁLISE</h3><div class="cnt" id="p-cnt-analise">0</div></div>
+          <div class="painel-col-body" id="p-col-analise"></div>
         </div>
         <div class="painel-col">
           <div class="painel-col-hdr"><h3>ORÇAMENTO</h3><div class="cnt" id="p-cnt-orcamento_cadastrado">0</div></div>
           <div class="painel-col-body" id="p-col-orcamento_cadastrado"></div>
         </div>
         <div class="painel-col">
-          <div class="painel-col-hdr"><h3>ANÁLISE</h3><div class="cnt" id="p-cnt-analise">0</div></div>
-          <div class="painel-col-body" id="p-col-analise"></div>
+          <div class="painel-col-hdr"><h3>PRODUÇÃO</h3><div class="cnt" id="p-cnt-producao">0</div></div>
+          <div class="painel-col-body" id="p-col-producao"></div>
+        </div>
+        <div class="painel-col">
+          <div class="painel-col-hdr"><h3>CONSERTO REALIZADO</h3><div class="cnt" id="p-cnt-conserto_realizado">0</div></div>
+          <div class="painel-col-body" id="p-col-conserto_realizado"></div>
         </div>
       </div>
     </div>
@@ -495,16 +497,6 @@ function buildCard(f){
     if(f.endereco){
       btns.innerHTML+='<button class="fl-btn" onclick=\'abrirProgEntrega('+JSON.stringify(f.id)+')\'>🚚 PROGRAMAR ENTREGA</button>';
     }
-    if(f.telefone){
-      var tel=(f.telefone||'').replace(/[^0-9]/g,'');
-      if(tel.length>=10&&!tel.startsWith('55'))tel='55'+tel;
-      var msg=encodeURIComponent('Olá, aqui é a Reparo Eletro. Seu equipamento já está pronto para retirada, aguardo você.');
-      var aBtn=document.createElement('a');
-      aBtn.className='fl-btn blue';aBtn.style.display='block';aBtn.style.textAlign='center';aBtn.style.textDecoration='none';
-      aBtn.href='https://wa.me/'+tel+'?text='+msg;aBtn.target='_blank';
-      aBtn.textContent='📲 AVISAR CLIENTE';
-      btns.appendChild(aBtn);
-    }
   }
   d.appendChild(btns);
   return d;
@@ -515,25 +507,21 @@ function renderPainel(){
   var liberados=fichas.filter(f=>f.liberadoHoje||f.phase==='liberado_hoje');
   document.getElementById('painel-lib-cnt').textContent=liberados.length;
   document.getElementById('painel-liberados-body').innerHTML=liberados.map(f=>painelCard(f,true)).join('');
-  // Ordem: Produção, Orçamento, Análise
-  ['producao','orcamento_cadastrado','analise'].forEach(function(ph){
+  PHASES.forEach(ph=>{
     var col=document.getElementById('p-col-'+ph);
-    var cnt=document.getElementById('p-cnt-'+ph);
-    var fls=fichas.filter(f=>f.phase===ph&&!f.liberadoHoje);
-    if(cnt)cnt.textContent=fls.length;
+    var fls=fichas.filter(f=>f.phase===ph);
+    if(document.getElementById('p-cnt-'+ph))document.getElementById('p-cnt-'+ph).textContent=fls.length;
     if(col)col.innerHTML=fls.map(f=>painelCard(f)).join('');
   });
 }
 function painelCard(f,libe){
-  // Cor: liberado=verde, conserto_realizado pago=verde, nao_pago=vermelho
+  // Pago se phase=pago ou f.pago=true
+  var isPago=f.pago===true||f.phase==='pago';
   var cls='painel-card';
   if(libe){
     // Liberados Hoje: verde se pago, vermelho se não pago
-    cls+=f.pago?' liberado':' nao-pago';
-  } else if(f.phase==='conserto_realizado'){
-    cls+=f.pago?' pago':' nao-pago';
+    cls+=isPago?' liberado':' nao-pago';
   }
-  // Botão avisar cliente apenas em conserto_realizado
   return '<div class="'+cls+'">'+
     '<div class="painel-card-nome">'+f.nomeContato+'</div>'+
     '<div class="painel-card-equip">'+f.equipamento+'</div>'+
@@ -732,7 +720,7 @@ function confirmarPagamento(){
   }).then(r=>r.json()).then(d=>{
     if(!d.ok){toast('Erro: '+(d.error||''),'r');return;}
     var idx=fichas.findIndex(f=>f.id===d.ficha.id);
-    if(idx>=0)fichas.splice(idx,1);
+    if(idx>=0)fichas[idx]=d.ficha; // mantém na lista com phase='pago' para mostrar verde
     closePopup('pop-liberar');
     renderKanban();renderPainel();
     toast('Pagamento realizado! Equipamento liberado. Pipefy atualizado.','g');
