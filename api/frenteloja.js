@@ -114,13 +114,6 @@ export default async function handler(req,res){
       // Pipefy + sync em background (não bloqueia a resposta)
       (async()=>{
         try{
-          // Evitar duplicidade: checar se já tem pipefyCardId antes de criar
-          const dbCheck=await dbGet(FL_KEY)||defaultDB();
-          const fichaCheck=dbCheck.fichas.find(f=>f.id===ficha.id);
-          if(fichaCheck?.pipefyCardId){
-            console.log('[FrenteLoja] Card já existe:',fichaCheck.pipefyCardId,'— pulando criação');
-            return;
-          }
           const aprovadoPhaseId=await getPipefyPhaseId('aprovad');
           if(!aprovadoPhaseId) throw new Error('Fase Aprovado nao encontrada');
           const titleCompleto=(ficha.nomeContato+' (Loja) - '+ficha.equipamento+
@@ -212,5 +205,15 @@ export default async function handler(req,res){
     await dbSet(FL_KEY,db);return res.status(200).json({ok:true,ficha});
   }
 
+  if(req.method==='POST'&&action==='marcar-avisado'){
+    const {id}=req.body||{};
+    if(!id)return res.status(400).json({ok:false,error:'id obrigatório'});
+    const db=await dbGet(FL_KEY)||defaultDB();
+    const ficha=db.fichas.find(f=>f.id===id);
+    if(!ficha)return res.status(404).json({ok:false,error:'Não encontrada'});
+    ficha.clienteAvisado=true;ficha.clienteAvisadoEm=new Date().toISOString();
+    await dbSet(FL_KEY,db);
+    return res.status(200).json({ok:true,ficha});
+  }
   return res.status(404).json({ok:false,error:'Ação não encontrada'});
 }
