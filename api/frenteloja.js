@@ -58,8 +58,9 @@ export default async function handler(req,res){
     const db=await dbGet(FL_KEY)||defaultDB();
     const todayStart=brtStartOfDay();
     db.fichas.forEach(f=>{
-      if(f.phase==='liberado_hoje'&&new Date(f.movedAt)<todayStart){
-        f.phase='conserto_realizado';f.liberadoHoje=false;
+      // Limpar liberadoHoje se a ficha chegou em outro dia
+      if(f.liberadoHoje&&new Date(f.movedAt)<todayStart){
+        f.liberadoHoje=false;
       }
     });
     await dbSet(FL_KEY,db);
