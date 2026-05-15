@@ -417,6 +417,8 @@ module.exports = async function handler(req, res) {
       let board = sanitizeBoard(await dbGet(BOARD_KEY));
       let newCount = 0, pipefyError = null, erpRemoved = 0;
 
+      // Arrays para coletar novos cards — aplicados em re-leitura fresca do Redis
+      const newCards = [], newSyncedIds = [], newMovesLog = [];
       try {
         const approved = await fetchApprovedCards();
         const activeIds  = new Set(board.cards.map(c => c.pipefyId));
@@ -426,19 +428,34 @@ module.exports = async function handler(req, res) {
           if (activeIds.has(c.pipefyId) || syncedSet.has(c.pipefyId)) continue;
           const _txt=((c.nomeContato||'')+' '+(c.descricao||'')+' '+(c.title||'')).toLowerCase();
           const _isLoja=_txt.includes('loja');
-          board.cards.unshift({ ...c, phaseId: _isLoja?'cliente_loja':board.phases[0].id, movedBy:"Pipefy" });
+          const newCard = { ...c, phaseId: _isLoja?'cliente_loja':board.phases[0].id, movedBy:"Pipefy" };
+          newCards.push(newCard);
           if(_isLoja){try{const _b=(await dbGet('reparoeletro_balcao'))||[];if(!_b.find(b=>b.pipefyId===String(c.pipefyId))){_b.unshift({pipefyId:String(c.pipefyId),nomeContato:c.nomeContato||c.title||'—',osCode:c.osCode||null,descricao:c.descricao||null,telefone:c.telefone||null,tecnico:null,entradaEm:new Date().toISOString(),status:'aguardando_pagamento',pagoEm:null});await dbSet('reparoeletro_balcao',_b);}}catch(_e){}}
-          activeIds.add(c.pipefyId); // compra TV via tv-board.js
+          activeIds.add(c.pipefyId);
           if (!board.syncedIds.includes(c.pipefyId)) {
-            board.syncedIds.push(c.pipefyId);
-            board.movesLog.push({ phaseId: "aprovado_entrada", timestamp: new Date().toISOString() });
+            newSyncedIds.push(c.pipefyId);
+            newMovesLog.push({ phaseId: "aprovado_entrada", timestamp: new Date().toISOString() });
           }
           newCount++;
         }
         board.movesLog = trimLog(board.movesLog);
         if (newCount > 0) {
-          await dbSet(BOARD_KEY, board);
-          try { await dbSet(BACKUP_KEY, { ...board, backedUpAt: new Date().toISOString() }); } catch(e) {}
+          // Relê board fresco antes de salvar — evita sobrescrever moves concorrentes
+          const boardFresh = sanitizeBoard(await dbGet(BOARD_KEY));
+          const freshActiveIds = new Set(boardFresh.cards.map(c => c.pipefyId));
+          for (const newCard of newCards) {
+            if (!freshActiveIds.has(newCard.pipefyId)) {
+              boardFresh.cards.unshift(newCard);
+            }
+          }
+          // Preservar syncedIds novos
+          for (const id of newSyncedIds) {
+            if (!boardFresh.syncedIds.includes(id)) boardFresh.syncedIds.push(id);
+          }
+          boardFresh.movesLog = trimLog([...(boardFresh.movesLog||[]), ...newMovesLog]);
+          await dbSet(BOARD_KEY, boardFresh);
+          board = boardFresh; // usar versão fresca para ERP cleanup
+          try { await dbSet(BACKUP_KEY, { ...boardFresh, backedUpAt: new Date().toISOString() }); } catch(e) {}
         }
       await saveLogs(board);
       } catch (e) { pipefyError = e.message; }
@@ -447,26 +464,27 @@ module.exports = async function handler(req, res) {
         // Remove qualquer card que está em ERP, Finalizado ou Reprovado no Pipefy
         const { ids: erpIds } = await fetchErpCardIds();
         if (erpIds.length > 0) {
-          const before = board.cards.length;
+          // Relê board fresco antes de remover — evita sobrescrever moves concorrentes
+          const boardForErp = sanitizeBoard(await dbGet(BOARD_KEY));
+          const before = boardForErp.cards.length;
 
           // Antes de remover: registra no metaLog cards que ainda não foram registrados
-          if (!Array.isArray(board.metaLog)) board.metaLog = [];
-          const seenErpSet = new Set(board.metaLog.filter(m=>m.phaseId==="erp_entrada").map(m=>m.pipefyId));
+          if (!Array.isArray(boardForErp.metaLog)) boardForErp.metaLog = [];
+          const seenErpSet = new Set(boardForErp.metaLog.filter(m=>m.phaseId==="erp_entrada").map(m=>m.pipefyId));
           
-          // Registra novos cards em ERP com timestamp atual (rápido)
-          // Use reprocess-erp-timestamps para corrigir timestamps via phases_history
           const newErpIds = erpIds.filter(id => !seenErpSet.has(id));
           for (const id of newErpIds) {
-            board.metaLog.push({ phaseId: "erp_entrada", pipefyId: id, valor: 0, timestamp: new Date().toISOString(), needsReprocess: true });
+            boardForErp.metaLog.push({ phaseId: "erp_entrada", pipefyId: id, valor: 0, timestamp: new Date().toISOString(), needsReprocess: true });
             seenErpSet.add(id);
           }
 
-          board.cards       = board.cards.filter(c => !erpIds.includes(c.pipefyId));
-          board.rsCards     = (board.rsCards     || []).filter(c => !erpIds.includes(c.pipefyId));
-          board.rsRuaCards  = (board.rsRuaCards  || []).filter(c => !erpIds.includes(c.pipefyId));
-          erpRemoved = before - board.cards.length;
-          if (erpRemoved > 0) await dbSet(BOARD_KEY, board);
-          await saveLogs(board);
+          boardForErp.cards       = boardForErp.cards.filter(c => !erpIds.includes(c.pipefyId));
+          boardForErp.rsCards     = (boardForErp.rsCards     || []).filter(c => !erpIds.includes(c.pipefyId));
+          boardForErp.rsRuaCards  = (boardForErp.rsRuaCards  || []).filter(c => !erpIds.includes(c.pipefyId));
+          erpRemoved = before - boardForErp.cards.length;
+          board = boardForErp;
+          if (erpRemoved > 0) await dbSet(BOARD_KEY, boardForErp);
+          await saveLogs(boardForErp);
         }
       } catch (e) { console.error("ERP/Reprovado check:", e.message); }
 
