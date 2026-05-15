@@ -108,54 +108,44 @@ export default async function handler(req,res){
       ficha.phase='producao';ficha.movedAt=now;
       ficha.history=(ficha.history||[]).concat([{phase:'producao',ts:now}]);
 
-      // Criar card no Pipefy em fase "Aprovado" — mesmo padrão do vendas.js
-      let pipefyId=null;
-      try{
-        const aprovadoPhaseId=await getPipefyPhaseId('aprovad');
-        if(!aprovadoPhaseId) throw new Error('Fase Aprovado nao encontrada no Pipefy');
+      // Salvar no Redis IMEDIATAMENTE e responder — Pipefy roda em background
+      await dbSet(FL_KEY,db);
 
-        const valorFmt=parseFloat(ficha.orcamento?.valor||0).toLocaleString('pt-BR',{minimumFractionDigits:2,style:'currency',currency:'BRL'});
-        const titulo=(ficha.nomeContato+' (Loja) — '+ficha.equipamento).replace(/"/g,"'").slice(0,255);
-        const descPipefy=[
-          ficha.equipamento+(ficha.descricao?' — '+ficha.descricao:''),
-          ficha.descricaoTecnica?'Diagnóstico: '+ficha.descricaoTecnica:'',
-          'Valor: '+valorFmt,
-          'Forma Pgto: '+(ficha.orcamento?.formaPagamento||'pix'),
-          'OS: '+ficha.id,
-        ].filter(Boolean).join('\n').replace(/"/g,"'").slice(0,3000);
-        const nomeCard=(ficha.nomeContato+' (Loja)').replace(/"/g,"'").slice(0,255);
-        const telCard=(ficha.telefone||'').replace(/"/g,"'").slice(0,100);
+      // Pipefy + sync em background (não bloqueia a resposta)
+      (async()=>{
+        try{
+          const aprovadoPhaseId=await getPipefyPhaseId('aprovad');
+          if(!aprovadoPhaseId) throw new Error('Fase Aprovado nao encontrada');
+          const titleCompleto=(ficha.nomeContato+' (Loja) - '+ficha.equipamento+
+            ' | '+(ficha.descricao||'')+' | Diag: '+(ficha.descricaoTecnica||'')+
+            ' | R$'+String(parseFloat(ficha.orcamento?.valor||0).toFixed(2))+
+            ' '+(ficha.orcamento?.formaPagamento||'pix')+' OS:'+ficha.id
+          ).replace(/"/g,"'").slice(0,255);
+          const nomeCard=(ficha.nomeContato+' (Loja)').replace(/"/g,"'").slice(0,255);
+          const telCard=(ficha.telefone||'').replace(/"/g,"'").slice(0,100);
+          const data=await pipefyQ(
+            'mutation { createCard(input: { pipe_id: "'+PIPE_ID+'" phase_id: "'+aprovadoPhaseId+'" title: "'+titleCompleto+'" fields_attributes: [ { field_id: "nome_do_contato" field_value: "'+nomeCard+'" }, { field_id: "telefone" field_value: "'+telCard+'" } ] }) { card { id } } }'
+          );
+          const pipefyId=data?.createCard?.card?.id||null;
+          console.log('[FrenteLoja] Card criado:',pipefyId);
+          if(pipefyId){
+            // Atualizar pipefyCardId no Redis
+            const db2=await dbGet(FL_KEY)||defaultDB();
+            const f2=db2.fichas.find(f=>f.id===ficha.id);
+            if(f2){
+              f2.pipefyCardId=pipefyId;
+              const vn=String(parseFloat(ficha.orcamento?.valor||0).toFixed(2));
+              await pipefyQ('mutation{updateCardField(input:{card_id:"'+pipefyId+'" field_id:"valor_de_contrato" new_value:"'+vn+'"}){success}}').catch(e=>console.error('[FL] valor:',e.message));
+              await dbSet(FL_KEY,db2);
+            }
+            // Board sync para regra loja
+            await fetch('https://reparoeletroadm.com/api/board?action=sync').catch(e=>console.error('[FL] sync:',e.message));
+          }
+        }catch(e){console.error('[FrenteLoja] BG Pipefy:',e.message);}
+      })();
 
-        const titleCompleto=(ficha.nomeContato+' (Loja) - '+ficha.equipamento+
-          ' | '+(ficha.descricao||'')+
-          ' | Diag: '+(ficha.descricaoTecnica||'')+
-          ' | R$'+String(parseFloat(ficha.orcamento?.valor||0).toFixed(2))+
-          ' '+(ficha.orcamento?.formaPagamento||'pix')+' OS:'+ficha.id
-        ).replace(/"/g,"'").slice(0,255);
-        const data=await pipefyQ(
-          'mutation { createCard(input: { pipe_id: "'+PIPE_ID+'" phase_id: "'+aprovadoPhaseId+'" title: "'+titleCompleto+'" fields_attributes: [ { field_id: "nome_do_contato" field_value: "'+nomeCard+'" }, { field_id: "telefone" field_value: "'+telCard+'" } ] }) { card { id } } }'
-        );
-        pipefyId=data?.createCard?.card?.id||null;
-        console.log('[FrenteLoja] Card criado:',pipefyId);
-        if(pipefyId){
-          // Atualizar valor_de_contrato
-          const vn=String(parseFloat(ficha.orcamento?.valor||0).toFixed(2));
-          await pipefyQ('mutation{updateCardField(input:{card_id:"'+pipefyId+'" field_id:"valor_de_contrato" new_value:"'+vn+'"}){success}}').catch(e=>console.error('[FL] valor:',e.message));
-          // Acionar board sync para aplicar regra "loja" → Técnico + Balcão
-          try{
-            await fetch('https://reparoeletroadm.com/api/board?action=sync');
-            console.log('[FrenteLoja] Board sync acionado');
-          }catch(e){console.error('[FrenteLoja] Sync erro:',e.message);}
-        }
-      }catch(e){
-        console.error('[FrenteLoja] Erro Pipefy:',e.message);
-      }
-
-      ficha.pipefyCardId=pipefyId||null;
-      // Pipefy sync automaticamente replica para Tecnico e Balcao via board.js
+      return res.status(200).json({ok:true,ficha});
     }
-
-    await dbSet(FL_KEY,db);return res.status(200).json({ok:true,ficha});
   }
 
   if(req.method==='POST'&&action==='conserto-realizado'){
