@@ -58,9 +58,8 @@ export default async function handler(req,res){
     const db=await dbGet(FL_KEY)||defaultDB();
     const todayStart=brtStartOfDay();
     db.fichas.forEach(f=>{
-      // Limpar liberadoHoje se a ficha chegou em outro dia
-      if(f.liberadoHoje&&new Date(f.movedAt)<todayStart){
-        f.liberadoHoje=false;
+      if(f.phase==='liberado_hoje'&&new Date(f.movedAt)<todayStart){
+        f.phase='conserto_realizado';f.liberadoHoje=false;
       }
     });
     await dbSet(FL_KEY,db);
@@ -177,7 +176,7 @@ export default async function handler(req,res){
     const ficha=db.fichas.find(f=>f.id===id);
     if(!ficha)return res.status(404).json({ok:false,error:'Não encontrada'});
     const now=new Date().toISOString();
-    ficha.phase='pago';ficha.pagoEm=now;ficha.pagoValor=parseFloat(valor)||ficha.orcamento?.valor||0;
+    ficha.phase='pago';ficha.pago=true;ficha.pagoEm=now;ficha.pagoValor=parseFloat(valor)||ficha.orcamento?.valor||0;
     ficha.pagoPor=formaPagamento||ficha.orcamento?.formaPagamento||'pix';ficha.movedAt=now;
     ficha.history=(ficha.history||[]).concat([{phase:'pago',ts:now}]);
     try{const phId=await getPipefyPhaseId('receber');if(ficha.pipefyCardId&&phId)await movePipefyCard(ficha.pipefyCardId,phId);}catch(e){}
