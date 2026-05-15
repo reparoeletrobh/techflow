@@ -574,7 +574,7 @@ module.exports = async function handler(req, res) {
       // ── Notifica Frente de Loja quando loja_feito ─────────────────
       if (phaseId === 'loja_feito' && card.pipefyId) {
         try {
-          const flBaseUrl = process.env.VERCEL_URL ? 'https://'+process.env.VERCEL_URL : 'https://reparoeletroadm.com';
+          const flBaseUrl = process.env.FL_BASE_URL || 'https://reparoeletroadm.com';
           fetch(flBaseUrl+'/api/frenteloja?action=conserto-realizado', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
