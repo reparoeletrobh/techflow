@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Frente de Loja — Reparo Eletro</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='18,2 8,18 15,18 14,30 24,14 17,14' fill='%23fff' stroke='%23fff' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script src="https://cdn.jsdelivr.net/npm/qz-tray@2.2.4/qz-tray.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Inter:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0d0d14;--surface:#13131f;--surface2:#1a1a2e;--border:#1e1e32;--text:#e2e8f0;--muted:#64748b;--yellow:#f5c800;--green:#22c55e;--red:#ef4444;--blue:#3b9eff;--orange:#f97316;--purple:#8b5cf6;--fm:'DM Mono',monospace;--ff:'Inter',sans-serif;}
@@ -538,43 +539,71 @@ function buildReciboHtml(f){
   html+='<div class="pr-cut">- - - - - - - - - -</div>';
   return html;
 }
-function imprimirRecibo(){
-  if(!fichaRecibo)return;
-  // Impressão via iframe oculto — não abre diálogo quando
-  // a impressora padrão está configurada e --kiosk-printing ativo
-  var html=buildReciboHtml(fichaRecibo);
-  var conteudo='<!DOCTYPE html><html><head>'
-    +'<meta charset="UTF-8">'
-    +'<style>'
-    +'*{margin:0;padding:0;box-sizing:border-box;color:#000!important;background:#fff!important;}'
-    +'body{width:72mm;font-family:"Courier New",monospace;font-size:9pt;line-height:1.4;padding:4mm 2mm;}'
-    +'.pr-center{text-align:center;}'
-    +'.pr-bold{font-weight:bold;}'
-    +'.pr-big{font-size:11pt;font-weight:bold;}'
-    +'.pr-sep{border:none;border-top:1px solid #000;margin:4px 0;}'
-    +'.pr-row{display:flex;justify-content:space-between;font-size:8pt;}'
-    +'.pr-row-label{flex:0 0 auto;max-width:28mm;}'
-    +'.pr-row-value{text-align:right;max-width:38mm;word-break:break-word;}'
-    +'.pr-small{font-size:7.5pt;}'
-    +'.pr-cut{display:block;height:50mm;min-height:50mm;}'
-    +'@page{size:80mm auto;margin:0;}'
-    +'</style></head><body>'
-    +html
-    +'</body></html>';
-  var iframe=document.getElementById('print-iframe');
-  if(!iframe){
-    iframe=document.createElement('iframe');
-    iframe.id='print-iframe';
-    iframe.style.cssText='position:fixed;top:-9999px;left:-9999px;width:80mm;height:1px;border:none;visibility:hidden;';
-    document.body.appendChild(iframe);
-  }
-  iframe.onload=function(){
-    try{
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-    }catch(e){ console.error('[Print]',e); }
+// ── QZ TRAY (impressão silenciosa) + fallback window.print() ──
+var _qzOk = false;
+async function qzConectar(){
+  if(_qzOk) return true;
+  try{
+    if(!window.qz) return false;
+    if(!qz.websocket.isActive()) await qz.websocket.connect({retries:2,delay:500});
+    _qzOk=true; return true;
+  }catch(e){ return false; }
+}
+async function imprimirRecibo(){
+  if(!fichaRecibo) return;
+  var f=fichaRecibo;
+  var dt=fmtBrt(f.createdAt||new Date().toISOString());
+  var L=function(k,v){ return (k+':').padEnd(12)+(v||'').toString().slice(0,28)+'\n'; };
+  var S='--------------------------------\n';
+  var esc={
+    centro:'\x1B\x61\x01',
+    esq:'\x1B\x61\x00',
+    bold:'\x1B\x21\x08',
+    norm:'\x1B\x21\x00'
   };
-  iframe.srcdoc=conteudo;
+  var txt=
+    esc.centro+esc.bold+
+    'REPARO ELETRO\n'+
+    esc.norm+
+    'CONSERTO DE ELETRODOMESTICOS\n'+
+    'CNPJ: '+LOJA_INFO.cnpj+'\n'+
+    S+
+    'RECIBO DE ENTRADA\n'+
+    S+
+    esc.esq+
+    L('OS',f.id)+
+    L('Data',dt)+
+    S+
+    L('Cliente',f.nomeContato)+
+    L('Equip.',f.equipamento)+
+    L('Defeito',f.descricao)+
+    (f.descricaoTecnica?L('Diagn.',f.descricaoTecnica):'')+
+    S+
+    esc.centro+
+    'Garantia: '+LOJA_INFO.garantia+'\n'+
+    LOJA_INFO.parcelas+'\n'+
+    'Aguarde contato - 3 a 5 dias uteis\n'+
+    S+
+    '\n\n\n\n\n';  // 5cm espaço corte manual
+
+  var usouQZ=false;
+  try{
+    if(await qzConectar()){
+      var printers=await qz.printers.find('ControlID');
+      if(!printers.length) printers=await qz.printers.find('PrintID');
+      if(!printers.length) printers=[await qz.printers.getDefault()];
+      var cfg=qz.configs.create(printers[0]);
+      await qz.print(cfg,[{type:'raw',format:'plain',data:txt}]);
+      usouQZ=true;
+      toast('✅ Imprimindo...','g');
+    }
+  }catch(e){ console.warn('[QZ]',e.message); }
+
+  if(!usouQZ){
+    // Fallback: impressão via iframe (abre diálogo do browser)
+    document.getElementById('print-receipt').innerHTML=buildReciboHtml(fichaRecibo);
+    window.print();
+  }
 }
 
 // ══ RENDER KANBAN ═════════════════════════════════════════════
