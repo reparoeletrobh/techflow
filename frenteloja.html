@@ -539,71 +539,61 @@ function buildReciboHtml(f){
   html+='<div class="pr-cut">- - - - - - - - - -</div>';
   return html;
 }
-// ── QZ TRAY (impressão silenciosa) + fallback window.print() ──
+// ── QZ TRAY — Impressão silenciosa com certificado assinado ──────
 var _qzOk = false;
+
+// Certificado público para QZ Tray verificar identidade do site
+var QZ_CERT = `-----BEGIN CERTIFICATE-----
+MIIDszCCApugAwIBAgIUTDlHyfybQv9bUBdajijh7rpYje8wDQYJKoZIhvcNAQEL
+BQAwaTELMAkGA1UEBhMCQlIxCzAJBgNVBAgMAk1HMRcwFQYDVQQHDA5CZWxvIEhv
+cml6b250ZTEWMBQGA1UECgwNUmVwYXJvIEVsZXRybzEcMBoGA1UEAwwTcmVwYXJv
+ZWxldHJvYWRtLmNvbTAeFw0yNjA1MTcyMDI3NDhaFw0zNjA1MTQyMDI3NDhaMGkx
+CzAJBgNVBAYTAkJSMQswCQYDVQQIDAJNRzEXMBUGA1UEBwwOQmVsbyBIb3Jpem9u
+dGUxFjAUBgNVBAoMDVJlcGFybyBFbGV0cm8xHDAaBgNVBAMME3JlcGFyb2VsZXRy
+b2FkbS5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDeTskB3Wfi
+ETaBULDa2Khgy879KZjK7Bu00LfxS4ia5xliSD3CG4Gbe+kwM0IcZLzR77hqzjhd
+g9fc/KTt9J0QkpCwAz4jDCbPtLow+58JMGD1r6AckNltM0P959GPmDzqz5tN0E+a
+cNtqcTyRqCqtxzQzLgkQb8bfYAYacPnz73NMJVO0a7S4vLWUEuTkGDIh01MjwCJz
+372Oyj0V9+PLp75pRqpq4w0vsRFUZhJj/imbFyd4AdAdtwUJSJFja7y0vh1Kx4UN
+Y9pU76WFZhsoDp942tPDxR1ayhYZSWEDoCVp9GMQ9dXpAaLXXIGyxsfD5f+DokMt
+uCDFfq75WQoHAgMBAAGjUzBRMB0GA1UdDgQWBBQ+G31y1yGT8/a5StmB5izrEWoT
+GjAfBgNVHSMEGDAWgBQ+G31y1yGT8/a5StmB5izrEWoTGjAPBgNVHRMBAf8EBTAD
+AQH/MA0GCSqGSIb3DQEBCwUAA4IBAQDazA1uGSA1U2hMJ64X47q6or3NmHT0v0Ci
+EQu26mzgjhum/AJopsXJe7CwGDwLRhPUzjet2iz9XCOlZ4po2pFEYlLto63zSkqx
+cCwOqW29bpeBWo073r+96lU7eT6pQjaElYE6r2bHvQPmw0s8TQGCPSbWwmRatchs
+9WxPRqQt5u6ERJtZcTt1L32VjgSO8WbGyZt4lyI6KiNjOmOZafadSVwmys+JA5+P
+jKUasEbdgfHk/A+D9PVpEDv2Aen+OEMpBgIu9YBiQtFGLdg0YuMW0ycvAa30tRLf
+blKQfzc6BIlHN9J0DiQJf/AF+rTa0YjhQj0fwEu/Gx5xAEnim98t
+-----END CERTIFICATE-----`;
+
 async function qzConectar(){
   if(_qzOk) return true;
   try{
     if(!window.qz) return false;
-    if(!qz.websocket.isActive()) await qz.websocket.connect({retries:2,delay:500});
-    _qzOk=true; return true;
-  }catch(e){ return false; }
+
+    // Configurar certificado de confiança
+    qz.security.setCertificatePromise(function(resolve, reject){
+      resolve(QZ_CERT);
+    });
+
+    // Configurar assinatura via nosso endpoint seguro
+    qz.security.setSignatureAlgorithm('SHA512');
+    qz.security.setSignaturePromise(function(toSign){
+      return function(resolve, reject){
+        fetch('/api/qz-sign?request=' + encodeURIComponent(toSign))
+          .then(r => r.text()).then(resolve).catch(reject);
+      };
+    });
+
+    if(!qz.websocket.isActive()) await qz.websocket.connect({retries:3, delay:1000});
+    _qzOk = true;
+    return true;
+  }catch(e){ console.warn('[QZ connect]', e.message); return false; }
 }
-async function imprimirRecibo(){
-  if(!fichaRecibo) return;
-  var f=fichaRecibo;
-  var dt=fmtBrt(f.createdAt||new Date().toISOString());
-  var L=function(k,v){ return (k+':').padEnd(12)+(v||'').toString().slice(0,28)+'\n'; };
-  var S='--------------------------------\n';
-  var esc={
-    centro:'\x1B\x61\x01',
-    esq:'\x1B\x61\x00',
-    bold:'\x1B\x21\x08',
-    norm:'\x1B\x21\x00'
-  };
-  var txt=
-    esc.centro+esc.bold+
-    'REPARO ELETRO\n'+
-    esc.norm+
-    'CONSERTO DE ELETRODOMESTICOS\n'+
-    'CNPJ: '+LOJA_INFO.cnpj+'\n'+
-    S+
-    'RECIBO DE ENTRADA\n'+
-    S+
-    esc.esq+
-    L('OS',f.id)+
-    L('Data',dt)+
-    S+
-    L('Cliente',f.nomeContato)+
-    L('Equip.',f.equipamento)+
-    L('Defeito',f.descricao)+
-    (f.descricaoTecnica?L('Diagn.',f.descricaoTecnica):'')+
-    S+
-    esc.centro+
-    'Garantia: '+LOJA_INFO.garantia+'\n'+
-    LOJA_INFO.parcelas+'\n'+
-    'Aguarde contato - 3 a 5 dias uteis\n'+
-    S+
-    '\n\n\n\n\n';  // 5cm espaço corte manual
-
-  var usouQZ=false;
-  try{
-    if(await qzConectar()){
-      var printers=await qz.printers.find('ControlID');
-      if(!printers.length) printers=await qz.printers.find('PrintID');
-      if(!printers.length) printers=[await qz.printers.getDefault()];
-      var cfg=qz.configs.create(printers[0]);
-      await qz.print(cfg,[{type:'raw',format:'plain',data:txt}]);
-      usouQZ=true;
-      toast('✅ Imprimindo...','g');
-    }
-  }catch(e){ console.warn('[QZ]',e.message); }
-
-  if(!usouQZ){
-    // Fallback: impressão via iframe (abre diálogo do browser)
-    document.getElementById('print-receipt').innerHTML=buildReciboHtml(fichaRecibo);
-    window.print();
-  }
+function imprimirRecibo(){
+  if(!fichaRecibo)return;
+  document.getElementById('print-receipt').innerHTML=buildReciboHtml(fichaRecibo);
+  window.print();
 }
 
 // ══ RENDER KANBAN ═════════════════════════════════════════════
