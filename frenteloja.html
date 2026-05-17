@@ -540,8 +540,41 @@ function buildReciboHtml(f){
 }
 function imprimirRecibo(){
   if(!fichaRecibo)return;
-  document.getElementById('print-receipt').innerHTML=buildReciboHtml(fichaRecibo);
-  window.print();
+  // Impressão via iframe oculto — não abre diálogo quando
+  // a impressora padrão está configurada e --kiosk-printing ativo
+  var html=buildReciboHtml(fichaRecibo);
+  var conteudo='<!DOCTYPE html><html><head>'
+    +'<meta charset="UTF-8">'
+    +'<style>'
+    +'*{margin:0;padding:0;box-sizing:border-box;color:#000!important;background:#fff!important;}'
+    +'body{width:72mm;font-family:"Courier New",monospace;font-size:9pt;line-height:1.4;padding:4mm 2mm;}'
+    +'.pr-center{text-align:center;}'
+    +'.pr-bold{font-weight:bold;}'
+    +'.pr-big{font-size:11pt;font-weight:bold;}'
+    +'.pr-sep{border:none;border-top:1px solid #000;margin:4px 0;}'
+    +'.pr-row{display:flex;justify-content:space-between;font-size:8pt;}'
+    +'.pr-row-label{flex:0 0 auto;max-width:28mm;}'
+    +'.pr-row-value{text-align:right;max-width:38mm;word-break:break-word;}'
+    +'.pr-small{font-size:7.5pt;}'
+    +'.pr-cut{display:block;height:50mm;min-height:50mm;}'
+    +'@page{size:80mm auto;margin:0;}'
+    +'</style></head><body>'
+    +html
+    +'</body></html>';
+  var iframe=document.getElementById('print-iframe');
+  if(!iframe){
+    iframe=document.createElement('iframe');
+    iframe.id='print-iframe';
+    iframe.style.cssText='position:fixed;top:-9999px;left:-9999px;width:80mm;height:1px;border:none;visibility:hidden;';
+    document.body.appendChild(iframe);
+  }
+  iframe.onload=function(){
+    try{
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    }catch(e){ console.error('[Print]',e); }
+  };
+  iframe.srcdoc=conteudo;
 }
 
 // ══ RENDER KANBAN ═════════════════════════════════════════════
