@@ -129,7 +129,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
   #print-frame {
     display: block !important;
     position: fixed; inset: 0;
-    background: white;
+    background: #fff;
+  }
+  /* Tudo em preto puro — sem cinzas */
+  #print-receipt, #print-receipt * {
+    color: #000000 !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   #print-receipt {
     width: 72mm;
@@ -138,18 +145,21 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
     font-family: 'Courier New', Courier, monospace;
     font-size: 9pt;
     line-height: 1.4;
-    color: #000;
-    background: #fff;
   }
   .pr-center { text-align: center; }
   .pr-bold { font-weight: bold; }
   .pr-big { font-size: 11pt; font-weight: bold; }
-  .pr-sep { border: none; border-top: 1px dashed #000; margin: 4px 0; }
+  .pr-sep { border: none; border-top: 1px solid #000; margin: 4px 0; }
   .pr-row { display: flex; justify-content: space-between; font-size: 8pt; }
   .pr-row-label { flex: 0 0 auto; max-width: 28mm; }
   .pr-row-value { text-align: right; max-width: 38mm; word-break: break-word; }
-  .pr-small { font-size: 7.5pt; color: #333; }
-  .pr-cut { text-align: center; font-size: 7pt; color: #666; margin-top: 6mm; letter-spacing: 4px; }
+  .pr-small { font-size: 7.5pt; }
+  /* 5cm de espaço em branco após o último texto para corte manual */
+  .pr-cut {
+    display: block;
+    height: 50mm;
+    min-height: 50mm;
+  }
   @page {
     size: 80mm auto;
     margin: 0;
