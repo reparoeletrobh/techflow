@@ -539,11 +539,9 @@ function buildReciboHtml(f){
   html+='<div class="pr-cut">- - - - - - - - - -</div>';
   return html;
 }
-// ── QZ TRAY — Impressão silenciosa com certificado assinado ──────
-var _qzOk = false;
-
-// Certificado público para QZ Tray verificar identidade do site
-var QZ_CERT = `-----BEGIN CERTIFICATE-----
+// ── QZ TRAY + fallback window.print() ─────────────────────────
+var _qzOk=false;
+var QZ_CERT=`-----BEGIN CERTIFICATE-----
 MIIDszCCApugAwIBAgIUTDlHyfybQv9bUBdajijh7rpYje8wDQYJKoZIhvcNAQEL
 BQAwaTELMAkGA1UEBhMCQlIxCzAJBgNVBAgMAk1HMRcwFQYDVQQHDA5CZWxvIEhv
 cml6b250ZTEWMBQGA1UECgwNUmVwYXJvIEVsZXRybzEcMBoGA1UEAwwTcmVwYXJv
@@ -567,33 +565,73 @@ blKQfzc6BIlHN9J0DiQJf/AF+rTa0YjhQj0fwEu/Gx5xAEnim98t
 -----END CERTIFICATE-----`;
 
 async function qzConectar(){
-  if(_qzOk) return true;
+  if(_qzOk && qz.websocket.isActive()) return true;
   try{
     if(!window.qz) return false;
-
-    // Configurar certificado de confiança
-    qz.security.setCertificatePromise(function(resolve, reject){
-      resolve(QZ_CERT);
-    });
-
-    // Configurar assinatura via nosso endpoint seguro
+    qz.security.setCertificatePromise(function(resolve){ resolve(QZ_CERT); });
     qz.security.setSignatureAlgorithm('SHA512');
     qz.security.setSignaturePromise(function(toSign){
-      return function(resolve, reject){
-        fetch('/api/qz-sign?request=' + encodeURIComponent(toSign))
-          .then(r => r.text()).then(resolve).catch(reject);
+      return function(resolve,reject){
+        fetch('/api/qz-sign?request='+encodeURIComponent(toSign))
+          .then(function(r){return r.text();}).then(resolve).catch(reject);
       };
     });
-
-    if(!qz.websocket.isActive()) await qz.websocket.connect({retries:3, delay:1000});
-    _qzOk = true;
-    return true;
-  }catch(e){ console.warn('[QZ connect]', e.message); return false; }
+    if(!qz.websocket.isActive()) await qz.websocket.connect({retries:2,delay:500});
+    _qzOk=true; return true;
+  }catch(e){ console.warn('[QZ]',e.message); _qzOk=false; return false; }
 }
-function imprimirRecibo(){
-  if(!fichaRecibo)return;
-  document.getElementById('print-receipt').innerHTML=buildReciboHtml(fichaRecibo);
-  window.print();
+
+async function imprimirRecibo(){
+  if(!fichaRecibo) return;
+  var f=fichaRecibo;
+  var dt=fmtBrt(f.createdAt||new Date().toISOString());
+  var L=function(k,v){ return (k+':').padEnd(12)+(v||'').toString().slice(0,28)+'\n'; };
+  var S='--------------------------------\n';
+  var C={ centro:'\x1B\x61\x01', esq:'\x1B\x61\x00', bold:'\x1B\x21\x08', norm:'\x1B\x21\x00' };
+  var txt=
+    C.centro+C.bold+
+    'REPARO ELETRO\n'+C.norm+
+    'CONSERTO DE ELETRODOMESTICOS\n'+
+    'CNPJ: '+LOJA_INFO.cnpj+'\n'+
+    S+'RECIBO DE ENTRADA\n'+S+
+    C.esq+
+    L('OS',f.id)+L('Data',dt)+S+
+    L('Cliente',f.nomeContato)+
+    L('Equip.',f.equipamento)+
+    L('Defeito',f.descricao)+
+    (f.descricaoTecnica?L('Diagn.',f.descricaoTecnica):'')+
+    S+C.centro+
+    'Garantia: '+LOJA_INFO.garantia+'\n'+
+    LOJA_INFO.parcelas+'\n'+
+    'Aguarde contato para orcamento\n'+
+    '3 a 5 dias uteis\n'+
+    S+
+    '\n\n\n\n\n\n\n\n\n\n'; // 5cm espaço para corte manual
+
+  var usouQZ=false;
+  try{
+    if(await qzConectar()){
+      // Buscar impressora: tentar nome exato primeiro
+      var printer=null;
+      var nomes=['Print iD','ControlID_PrintID','Control ID PrintID','PrintiD','Print iD Touch'];
+      for(var nm of nomes){
+        try{ var r=await qz.printers.find(nm); if(r&&r.length){printer=r[0];break;} }catch(e){}
+      }
+      if(!printer){ try{printer=await qz.printers.getDefault();}catch(e){} }
+      if(printer){
+        var cfg=qz.configs.create(printer);
+        await qz.print(cfg,[{type:'raw',format:'plain',data:txt}]);
+        usouQZ=true;
+        toast('✅ Imprimindo...','g');
+      }
+    }
+  }catch(e){ console.warn('[QZ print]',e.message); }
+
+  if(!usouQZ){
+    // Fallback: window.print() via iframe
+    document.getElementById('print-receipt').innerHTML=buildReciboHtml(fichaRecibo);
+    window.print();
+  }
 }
 
 // ══ RENDER KANBAN ═════════════════════════════════════════════
