@@ -118,6 +118,45 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
 .toast{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-family:var(--fm);font-size:11px;color:var(--text);}
 .toast.g{border-color:var(--green);color:var(--green);}
 .toast.r{border-color:var(--red);color:var(--red);}
+
+/* ══ IMPRESSÃO TÉRMICA 80mm ═══════════════════════════════════
+   Funciona com: window.print() + Chrome --kiosk-printing
+   Impressora: Control ID Print iD (ESC/POS, 80mm)
+*/
+@media print {
+  /* Esconder tudo exceto o recibo */
+  body > *:not(#print-frame) { display: none !important; }
+  #print-frame {
+    display: block !important;
+    position: fixed; inset: 0;
+    background: white;
+  }
+  #print-receipt {
+    width: 72mm;
+    margin: 0;
+    padding: 4mm 2mm;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 9pt;
+    line-height: 1.4;
+    color: #000;
+    background: #fff;
+  }
+  .pr-center { text-align: center; }
+  .pr-bold { font-weight: bold; }
+  .pr-big { font-size: 11pt; font-weight: bold; }
+  .pr-sep { border: none; border-top: 1px dashed #000; margin: 4px 0; }
+  .pr-row { display: flex; justify-content: space-between; font-size: 8pt; }
+  .pr-row-label { flex: 0 0 auto; max-width: 28mm; }
+  .pr-row-value { text-align: right; max-width: 38mm; word-break: break-word; }
+  .pr-small { font-size: 7.5pt; color: #333; }
+  .pr-cut { text-align: center; font-size: 7pt; color: #666; margin-top: 6mm; letter-spacing: 4px; }
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+}
+#print-frame { display: none; }
+
 </style>
 </head>
 <body>
@@ -227,10 +266,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
     <h2>🧾 RECIBO DE ENTRADA</h2>
     <div class="recibo" id="recibo-content"></div>
     <div class="popup-btns">
-      <button class="btn-primary-popup" onclick="enviarWhatsAppRecibo()">📲 ENVIAR WHATSAPP</button>
-      <button class="btn-secondary-popup" onclick="imprimirRecibo()">🖨️ IMPRIMIR</button>
+      <button class="btn-secondary-popup" onclick="imprimirRecibo()">🖨️ REIMPRIMIR</button>
     </div>
-    <div id="wa-copied" style="display:none;text-align:center;padding:8px;font-family:var(--fm);font-size:10px;color:var(--green);margin-top:8px;">✅ Link copiado! Abrindo WhatsApp...</div>
   </div>
 </div>
 
@@ -448,6 +485,8 @@ function mostrarRecibo(f){
   document.getElementById('recibo-content').innerHTML=html;
   document.getElementById('wa-copied').style.display='none';
   openPopup('pop-recibo');
+  // Auto-imprimir (funciona sem diálogo com Chrome --kiosk-printing)
+  setTimeout(function(){ imprimirRecibo(); }, 200);
 }
 function textoRecibo(f){
   var dt=fmtBrt(f.createdAt);
@@ -473,9 +512,39 @@ function enviarWhatsAppRecibo(){
   document.getElementById('wa-copied').style.display='block';
   if(tel)setTimeout(()=>window.open(link,'_blank'),300);
 }
+function buildReciboHtml(f){
+  var dt=fmtBrt(f.createdAt||new Date().toISOString());
+  var nome=(f.nomeContato||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  var equip=(f.equipamento||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  var defeito=(f.descricao||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  var html='';
+  html+='<div class="pr-center pr-big">REPARO ELETRO</div>';
+  html+='<div class="pr-center pr-small">CONSERTO DE ELETRODOMÉSTICOS</div>';
+  html+='<div class="pr-center pr-small">CNPJ: '+LOJA_INFO.cnpj+'</div>';
+  html+='<div class="pr-center pr-small">Tel: (31) 99830-1617</div>';
+  html+='<hr class="pr-sep">';
+  html+='<div class="pr-center pr-bold">RECIBO DE ENTRADA</div>';
+  html+='<hr class="pr-sep">';
+  html+='<div class="pr-row"><span class="pr-row-label pr-bold">OS Nº</span><span class="pr-row-value pr-bold">'+f.id+'</span></div>';
+  html+='<div class="pr-row"><span class="pr-row-label">Data</span><span class="pr-row-value">'+dt+'</span></div>';
+  html+='<hr class="pr-sep">';
+  html+='<div class="pr-row"><span class="pr-row-label">Cliente</span><span class="pr-row-value">'+nome+'</span></div>';
+  html+='<div class="pr-row"><span class="pr-row-label">Equip.</span><span class="pr-row-value">'+equip+'</span></div>';
+  html+='<div class="pr-row"><span class="pr-row-label">Defeito</span><span class="pr-row-value">'+defeito+'</span></div>';
+  if(f.descricaoTecnica){html+='<div class="pr-row"><span class="pr-row-label">Diagnós.</span><span class="pr-row-value">'+f.descricaoTecnica+'</span></div>';}
+  html+='<hr class="pr-sep">';
+  html+='<div class="pr-center pr-small">Garantia: '+LOJA_INFO.garantia+' após reparo</div>';
+  html+='<div class="pr-center pr-small">'+LOJA_INFO.parcelas+'</div>';
+  html+='<hr class="pr-sep">';
+  html+='<div class="pr-center pr-small">Aguarde contato para orçamento.</div>';
+  html+='<div class="pr-center pr-small">Prazo médio: 3-5 dias úteis.</div>';
+  html+='<div class="pr-cut">- - - - - - - - - -</div>';
+  return html;
+}
 function imprimirRecibo(){
-  // Placeholder — implementar depois
-  toast('Impressão será implementada em breve','');
+  if(!fichaRecibo)return;
+  document.getElementById('print-receipt').innerHTML=buildReciboHtml(fichaRecibo);
+  window.print();
 }
 
 // ══ RENDER KANBAN ═════════════════════════════════════════════
@@ -822,5 +891,11 @@ function toast(msg,type){
 load();
 setInterval(load,10000);
 </script>
+
+<!-- Frame de impressão térmica 80mm -->
+<div id="print-frame">
+  <div id="print-receipt"></div>
+</div>
+
 </body>
 </html>
