@@ -1,7 +1,5 @@
 // api/qz-sign.js — Assina desafios do QZ Tray com chave privada RSA
-import { createSign } from 'crypto';
-
-const PRIVATE_KEY = process.env.QZ_PRIVATE_KEY || '';
+import { createSign, createPrivateKey } from 'crypto';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -11,12 +9,26 @@ export default async function handler(req, res) {
 
   const request = req.query.request || (req.body && req.body.request) || '';
   if (!request) return res.status(400).json({ error: 'request obrigatorio' });
-  if (!PRIVATE_KEY) return res.status(500).json({ error: 'QZ_PRIVATE_KEY nao configurada' });
+
+  let rawKey = process.env.QZ_PRIVATE_KEY || '';
+  if (!rawKey) return res.status(500).json({ error: 'QZ_PRIVATE_KEY nao configurada' });
 
   try {
+    // Normalizar chave: repor quebras de linha se foram perdidas no Vercel
+    rawKey = rawKey.replace(/\\n/g, '\n');
+    if (!rawKey.includes('\n')) {
+      // Chave colada sem quebras — reconstruir formato PEM
+      rawKey = rawKey
+        .replace('-----BEGIN PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----\n')
+        .replace('-----END PRIVATE KEY-----', '\n-----END PRIVATE KEY-----')
+        .replace(/(.{64})/g, '$1\n');
+    }
+
+    const privateKey = createPrivateKey({ key: rawKey, format: 'pem' });
     const sign = createSign('SHA512');
     sign.update(request);
-    const signature = sign.sign(PRIVATE_KEY, 'base64');
+    const signature = sign.sign(privateKey, 'base64');
+
     res.setHeader('Content-Type', 'text/plain');
     return res.status(200).send(signature);
   } catch (e) {
