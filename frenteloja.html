@@ -483,7 +483,7 @@ function mostrarRecibo(f){
   html+='Atendimento 100% via WhatsApp '+LOJA_INFO.tel;
   html+='</div>';
   document.getElementById('recibo-content').innerHTML=html;
-  document.getElementById('wa-copied').style.display='none';
+  var waCopied=document.getElementById('wa-copied'); if(waCopied)waCopied.style.display='none';
   openPopup('pop-recibo');
   // Auto-imprimir (funciona sem diálogo com Chrome --kiosk-printing)
   setTimeout(function(){ imprimirRecibo(); }, 200);
@@ -509,7 +509,7 @@ function enviarWhatsAppRecibo(){
   navigator.clipboard.writeText(link).catch(()=>{
     var ta=document.createElement('textarea');ta.value=link;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
   });
-  document.getElementById('wa-copied').style.display='block';
+  var waCopied2=document.getElementById('wa-copied'); if(waCopied2)waCopied2.style.display='block';
   if(tel)setTimeout(()=>window.open(link,'_blank'),300);
 }
 function buildReciboHtml(f){
