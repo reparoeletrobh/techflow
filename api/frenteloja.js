@@ -213,5 +213,15 @@ export default async function handler(req,res){
     await dbSet(FL_KEY,db);return res.status(200).json({ok:true,ficha});
   }
 
+  // Limpar fichas reprovadas do banco
+  if(action==='limpar-reprovados'){
+    const db=await dbGet(FL_KEY)||defaultDB();
+    const antes=db.fichas.length;
+    db.fichas=db.fichas.filter(f=>f.phase!=='reprovado');
+    const removidos=antes-db.fichas.length;
+    await dbSet(FL_KEY,db);
+    return res.status(200).json({ok:true,removidos});
+  }
+
   return res.status(404).json({ok:false,error:'Ação não encontrada'});
 }
