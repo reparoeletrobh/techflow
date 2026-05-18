@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Frente de Loja — Reparo Eletro</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='18,2 8,18 15,18 14,30 24,14 17,14' fill='%23fff' stroke='%23fff' stroke-linejoin='round'/%3E%3C/svg%3E">
-<script src="https://cdn.jsdelivr.net/npm/qz-tray@2.2.4/qz-tray.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Inter:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0d0d14;--surface:#13131f;--surface2:#1a1a2e;--border:#1e1e32;--text:#e2e8f0;--muted:#64748b;--yellow:#f5c800;--green:#22c55e;--red:#ef4444;--blue:#3b9eff;--orange:#f97316;--purple:#8b5cf6;--fm:'DM Mono',monospace;--ff:'Inter',sans-serif;}
@@ -458,7 +457,7 @@ function cadastrar(){
     document.getElementById('f-desc').value='';
     renderKanban();renderPainel();
     mostrarRecibo(d.ficha);
-  }).then(function(){ triggerAutoPrint(); }).catch(()=>toast('Erro de conexão','r'));
+  }).catch(()=>toast('Erro de conexão','r')); // impressão desabilitada temporariamente
 }
 
 // ══ RECIBO ════════════════════════════════════════════════════
@@ -539,99 +538,10 @@ function buildReciboHtml(f){
   html+='<div class="pr-cut">- - - - - - - - - -</div>';
   return html;
 }
-// ── QZ TRAY + fallback window.print() ─────────────────────────
-var _qzOk=false;
-var QZ_CERT=`-----BEGIN CERTIFICATE-----
-MIIDszCCApugAwIBAgIUTDlHyfybQv9bUBdajijh7rpYje8wDQYJKoZIhvcNAQEL
-BQAwaTELMAkGA1UEBhMCQlIxCzAJBgNVBAgMAk1HMRcwFQYDVQQHDA5CZWxvIEhv
-cml6b250ZTEWMBQGA1UECgwNUmVwYXJvIEVsZXRybzEcMBoGA1UEAwwTcmVwYXJv
-ZWxldHJvYWRtLmNvbTAeFw0yNjA1MTcyMDI3NDhaFw0zNjA1MTQyMDI3NDhaMGkx
-CzAJBgNVBAYTAkJSMQswCQYDVQQIDAJNRzEXMBUGA1UEBwwOQmVsbyBIb3Jpem9u
-dGUxFjAUBgNVBAoMDVJlcGFybyBFbGV0cm8xHDAaBgNVBAMME3JlcGFyb2VsZXRy
-b2FkbS5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDeTskB3Wfi
-ETaBULDa2Khgy879KZjK7Bu00LfxS4ia5xliSD3CG4Gbe+kwM0IcZLzR77hqzjhd
-g9fc/KTt9J0QkpCwAz4jDCbPtLow+58JMGD1r6AckNltM0P959GPmDzqz5tN0E+a
-cNtqcTyRqCqtxzQzLgkQb8bfYAYacPnz73NMJVO0a7S4vLWUEuTkGDIh01MjwCJz
-372Oyj0V9+PLp75pRqpq4w0vsRFUZhJj/imbFyd4AdAdtwUJSJFja7y0vh1Kx4UN
-Y9pU76WFZhsoDp942tPDxR1ayhYZSWEDoCVp9GMQ9dXpAaLXXIGyxsfD5f+DokMt
-uCDFfq75WQoHAgMBAAGjUzBRMB0GA1UdDgQWBBQ+G31y1yGT8/a5StmB5izrEWoT
-GjAfBgNVHSMEGDAWgBQ+G31y1yGT8/a5StmB5izrEWoTGjAPBgNVHRMBAf8EBTAD
-AQH/MA0GCSqGSIb3DQEBCwUAA4IBAQDazA1uGSA1U2hMJ64X47q6or3NmHT0v0Ci
-EQu26mzgjhum/AJopsXJe7CwGDwLRhPUzjet2iz9XCOlZ4po2pFEYlLto63zSkqx
-cCwOqW29bpeBWo073r+96lU7eT6pQjaElYE6r2bHvQPmw0s8TQGCPSbWwmRatchs
-9WxPRqQt5u6ERJtZcTt1L32VjgSO8WbGyZt4lyI6KiNjOmOZafadSVwmys+JA5+P
-jKUasEbdgfHk/A+D9PVpEDv2Aen+OEMpBgIu9YBiQtFGLdg0YuMW0ycvAa30tRLf
-blKQfzc6BIlHN9J0DiQJf/AF+rTa0YjhQj0fwEu/Gx5xAEnim98t
------END CERTIFICATE-----`;
-
-async function qzConectar(){
-  if(_qzOk && qz.websocket.isActive()) return true;
-  try{
-    if(!window.qz) return false;
-    qz.security.setCertificatePromise(function(resolve){ resolve(QZ_CERT); });
-    qz.security.setSignatureAlgorithm('SHA512');
-    qz.security.setSignaturePromise(function(toSign){
-      return function(resolve,reject){
-        fetch('/api/qz-sign?request='+encodeURIComponent(toSign))
-          .then(function(r){return r.text();}).then(resolve).catch(reject);
-      };
-    });
-    if(!qz.websocket.isActive()) await qz.websocket.connect({retries:2,delay:500});
-    _qzOk=true; return true;
-  }catch(e){ console.warn('[QZ]',e.message); _qzOk=false; return false; }
-}
-
-async function imprimirRecibo(){
-  if(!fichaRecibo) return;
-  var f=fichaRecibo;
-  var dt=fmtBrt(f.createdAt||new Date().toISOString());
-  var L=function(k,v){ return (k+':').padEnd(12)+(v||'').toString().slice(0,28)+'\n'; };
-  var S='--------------------------------\n';
-  var C={ centro:'\x1B\x61\x01', esq:'\x1B\x61\x00', bold:'\x1B\x21\x08', norm:'\x1B\x21\x00' };
-  var txt=
-    C.centro+C.bold+
-    'REPARO ELETRO\n'+C.norm+
-    'CONSERTO DE ELETRODOMESTICOS\n'+
-    'CNPJ: '+LOJA_INFO.cnpj+'\n'+
-    S+'RECIBO DE ENTRADA\n'+S+
-    C.esq+
-    L('OS',f.id)+L('Data',dt)+S+
-    L('Cliente',f.nomeContato)+
-    L('Equip.',f.equipamento)+
-    L('Defeito',f.descricao)+
-    (f.descricaoTecnica?L('Diagn.',f.descricaoTecnica):'')+
-    S+C.centro+
-    'Garantia: '+LOJA_INFO.garantia+'\n'+
-    LOJA_INFO.parcelas+'\n'+
-    'Aguarde contato para orcamento\n'+
-    '3 a 5 dias uteis\n'+
-    S+
-    '\n\n\n\n\n\n\n\n\n\n'; // 5cm espaço para corte manual
-
-  var usouQZ=false;
-  try{
-    if(await qzConectar()){
-      // Buscar impressora: tentar nome exato primeiro
-      var printer=null;
-      var nomes=['Print iD','ControlID_PrintID','Control ID PrintID','PrintiD','Print iD Touch'];
-      for(var nm of nomes){
-        try{ var r=await qz.printers.find(nm); if(r&&r.length){printer=r[0];break;} }catch(e){}
-      }
-      if(!printer){ try{printer=await qz.printers.getDefault();}catch(e){} }
-      if(printer){
-        var cfg=qz.configs.create(printer);
-        await qz.print(cfg,[{type:'raw',format:'plain',data:txt}]);
-        usouQZ=true;
-        toast('✅ Imprimindo...','g');
-      }
-    }
-  }catch(e){ console.warn('[QZ print]',e.message); }
-
-  if(!usouQZ){
-    // Fallback: window.print() via iframe
-    document.getElementById('print-receipt').innerHTML=buildReciboHtml(fichaRecibo);
-    window.print();
-  }
+function imprimirRecibo(){
+  if(!fichaRecibo)return;
+  document.getElementById('print-receipt').innerHTML=buildReciboHtml(fichaRecibo);
+  window.print();
 }
 
 // ══ RENDER KANBAN ═════════════════════════════════════════════
