@@ -6,594 +6,452 @@
 <title>Produto — Reparo Eletro</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,900;1,9..144,300&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" media="print" onload="this.media='all'">
-<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,900;1,9..144,300&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap"></noscript>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700;0,9..144,900;1,9..144,300&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700;0,9..144,900&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap"></noscript>
 <style>
 :root{
-  --bg:#080b0f;--s1:#0f1318;--s2:#161c23;--s3:#1e262f;
-  --border:#252e38;--border2:#2e3a47;
-  --text:#f0f4f8;--muted:#6b7f93;--soft:#98afc4;
-  --yellow:#f5c800;--green:#2dce76;--red:#ff4b4b;--wa:#25d366;
-  --fh:'Fraunces',serif;--fm:'DM Mono',monospace;--fb:'Outfit',sans-serif;
-  --sticky-h:72px;
+  --bg:#080b0f; --s1:#0f1318; --s2:#161c23;
+  --border:#252e38; --border2:#2e3a47;
+  --text:#f0f4f8; --muted:#6b7f93; --soft:#98afc4;
+  --yellow:#f5c800; --green:#2dce76; --wa:#25d366;
+  --fh:'Fraunces',serif; --fm:'DM Mono',monospace; --fb:'Outfit',sans-serif;
+  --bar:88px;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 html{scroll-behavior:smooth;}
-body{background:var(--bg);color:var(--text);font-family:var(--fb);overflow-x:hidden;padding-bottom:var(--sticky-h);}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);overflow-x:hidden;padding-bottom:var(--bar);}
 
-/* ── STICKY BAR ────────────────────────────────────────────── */
-.sticky-bar{
-  position:fixed;bottom:0;left:0;right:0;z-index:100;
-  height:var(--sticky-h);
-  background:rgba(8,11,15,0.96);
-  backdrop-filter:blur(16px);
-  border-top:1px solid var(--border2);
+/* ══ STICKY BAR — estilo FastShop ═══════════════════════════ */
+.sbar{
+  position:fixed;bottom:0;left:0;right:0;z-index:300;
+  height:var(--bar);
+  background:#0d1117;
+  border-top:1.5px solid var(--border2);
+  box-shadow:0 -6px 32px rgba(0,0,0,.75);
   display:flex;align-items:center;
-  padding:0 20px;gap:16px;
+  padding:0 28px;gap:18px;
 }
-.sticky-info{flex:1;min-width:0;}
-.sticky-title{
-  font-family:var(--fh);font-size:15px;font-weight:700;
+/* Imagem do produto na barra */
+.sbar-thumb{
+  width:58px;height:58px;flex-shrink:0;
+  border-radius:10px;overflow:hidden;
+  border:1px solid var(--border2);
+  background:var(--s2);
+}
+.sbar-thumb img{width:100%;height:100%;object-fit:contain;background:#0a0c0f;}
+/* Info */
+.sbar-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
+.sbar-name{
+  font-family:var(--fh);font-size:16px;font-weight:700;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  color:var(--text);
 }
-.sticky-delivery{
-  display:flex;align-items:center;gap:6px;
-  font-size:12px;margin-top:2px;
-}
-.sticky-delivery-txt{color:var(--green);font-weight:500;}
-.sticky-price{
-  font-family:var(--fh);font-size:20px;font-weight:900;
-  color:var(--yellow);white-space:nowrap;
-}
-.sticky-btn{
-  display:flex;align-items:center;gap:8px;
-  padding:11px 22px;border-radius:10px;
+.sbar-del{font-size:12px;font-weight:500;display:flex;align-items:center;gap:5px;}
+.sbar-del b{color:var(--green);}
+/* Preço */
+.sbar-price-wrap{flex-shrink:0;text-align:right;}
+.sbar-price{font-family:var(--fh);font-size:26px;font-weight:900;color:var(--yellow);line-height:1;}
+.sbar-pix{font-size:10px;color:var(--green);margin-top:2px;}
+/* Botão */
+.sbar-cta{
+  flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:0 30px;height:54px;border-radius:10px;
   background:var(--yellow);color:#000;
-  font-family:var(--fb);font-size:13px;font-weight:700;
-  border:none;cursor:pointer;white-space:nowrap;
-  transition:all .2s;flex-shrink:0;
+  font-family:var(--fb);font-size:14px;font-weight:700;
+  border:none;cursor:pointer;white-space:nowrap;letter-spacing:.2px;
+  transition:all .18s;
 }
-.sticky-btn:hover{background:#ffd500;transform:translateY(-1px);}
-@media(max-width:600px){
-  .sticky-price{display:none;}
-  .sticky-title{font-size:13px;}
-  .sticky-btn{padding:10px 16px;font-size:12px;}
+.sbar-cta:hover{background:#ffd500;box-shadow:0 5px 20px rgba(245,200,0,.4);transform:translateY(-1px);}
+@media(max-width:680px){
+  .sbar{padding:0 14px;gap:10px;}
+  .sbar-thumb{width:46px;height:46px;}
+  .sbar-name{font-size:13px;}
+  .sbar-price{font-size:20px;}
+  .sbar-pix{display:none;}
+  .sbar-cta{padding:0 16px;height:46px;font-size:13px;}
 }
 
-/* ── HERO (primeira dobra) ─────────────────────────────────── */
-.hero-wrap{
+/* ══ HERO ══════════════════════════════════════════════════════ */
+.hero{
   display:grid;
-  grid-template-columns:55% 45%;
-  min-height:calc(100vh - var(--sticky-h));
+  grid-template-columns:54% 46%;
+  min-height:calc(100vh - var(--bar));
 }
-@media(max-width:768px){
-  .hero-wrap{grid-template-columns:1fr;min-height:auto;}
-}
+@media(max-width:820px){.hero{grid-template-columns:1fr;min-height:auto;}}
 
-/* ESQUERDA — fotos */
-.hero-left{
-  position:relative;
+/* ── ESQUERDA: galeria ── */
+.gleft{
+  background:var(--s1);
+  border-right:1px solid var(--border);
   display:flex;flex-direction:column;
+}
+/* logo */
+.glogo{
+  padding:16px 20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;
+}
+.glogo-brand{font-family:var(--fh);font-size:18px;font-weight:900;}
+.glogo-brand b{color:var(--yellow);}
+.glogo-sub{font-family:var(--fm);font-size:8px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-top:1px;}
+
+/* foto + thumbs lado a lado — estilo FastShop */
+.gallery-body{
+  flex:1;display:flex;
+  overflow:hidden;
+  min-height:0;
+}
+/* coluna vertical de miniaturas (esquerda da foto) */
+.thumbs-col{
+  width:78px;flex-shrink:0;
+  display:flex;flex-direction:column;gap:6px;
+  padding:10px 8px;
+  overflow-y:auto;
   border-right:1px solid var(--border);
   background:var(--s1);
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
 }
-.hero-logo{
-  padding:20px 24px 16px;
-  border-bottom:1px solid var(--border);
-  display:flex;align-items:center;gap:10px;
+.thumbs-col::-webkit-scrollbar{width:3px;}
+.thumbs-col::-webkit-scrollbar-thumb{background:var(--border);}
+.thumb{
+  width:60px;height:60px;flex-shrink:0;
+  border-radius:8px;overflow:hidden;
+  border:2px solid var(--border);cursor:pointer;
+  transition:all .15s;background:#0a0c0f;
 }
-.hero-logo-txt{
-  font-family:var(--fh);font-size:20px;font-weight:900;letter-spacing:-0.5px;
-}
-.hero-logo-txt span{color:var(--yellow);}
-.hero-logo-sub{
-  font-family:var(--fm);font-size:9px;color:var(--muted);
-  letter-spacing:2px;text-transform:uppercase;margin-top:1px;
-}
-.hero-gallery{
-  flex:1;position:relative;overflow:hidden;
-  background:#0a0c0f;
-  min-height:340px;
-}
-.gallery-track{
-  display:flex;height:100%;
-  transition:transform .38s cubic-bezier(.4,0,.2,1);
-}
-.gallery-slide{
-  min-width:100%;height:100%;flex-shrink:0;
+.thumb img{width:100%;height:100%;object-fit:contain;background:#0a0c0f;}
+.thumb.on{border-color:var(--yellow);}
+.thumb:hover:not(.on){border-color:var(--border2);}
+/* foto principal */
+.gmain-wrap{
+  flex:1;position:relative;
+  background:#08090c;
   display:flex;align-items:center;justify-content:center;
+  overflow:hidden;min-height:300px;
 }
-.gallery-slide img{
+.gmain{
   max-width:100%;max-height:100%;
+  width:100%;height:100%;
   object-fit:contain;
+  transition:opacity .2s;
 }
-.gallery-ph{font-size:80px;color:var(--border);}
+.gph{font-size:72px;color:var(--border);}
 /* setas */
-.gal-btn{
+.garrow{
   position:absolute;top:50%;transform:translateY(-50%);
-  width:40px;height:40px;border-radius:50%;
-  background:rgba(0,0,0,0.72);border:1px solid rgba(255,255,255,0.15);
+  width:38px;height:38px;border-radius:50%;
+  background:rgba(8,11,15,.8);border:1px solid rgba(255,255,255,.15);
   display:flex;align-items:center;justify-content:center;
   cursor:pointer;z-index:5;transition:all .15s;
   -webkit-tap-highlight-color:transparent;
 }
-.gal-btn:hover{background:rgba(0,0,0,0.9);border-color:rgba(255,255,255,0.4);}
-.gal-btn svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
-.gal-prev{left:12px;} .gal-next{right:12px;}
-/* dots */
-.gal-dots{
-  position:absolute;bottom:12px;left:0;right:0;
-  display:flex;justify-content:center;gap:5px;z-index:5;
-}
-.gal-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.3);cursor:pointer;transition:all .2s;}
-.gal-dot.on{background:#fff;width:16px;border-radius:3px;}
-/* contador */
-.gal-count{
-  position:absolute;top:12px;right:12px;
-  background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);
+.garrow:hover{background:rgba(8,11,15,.96);border-color:rgba(255,255,255,.4);}
+.garrow svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
+.garrow.prev{left:10px;}.garrow.next{right:10px;}
+.gcount{
+  position:absolute;bottom:10px;right:12px;z-index:5;
+  background:rgba(0,0,0,.6);backdrop-filter:blur(4px);
   font-family:var(--fm);font-size:10px;color:#fff;
-  padding:3px 9px;border-radius:20px;z-index:5;
+  padding:3px 9px;border-radius:20px;
 }
-/* descrição abaixo das fotos */
-.hero-desc{
-  padding:18px 24px;border-top:1px solid var(--border);
-  font-size:13px;color:var(--soft);line-height:1.65;
-  max-height:120px;overflow-y:auto;
+/* descrição */
+.gdesc{
+  padding:12px 16px;border-top:1px solid var(--border);
+  font-size:12px;color:var(--soft);line-height:1.6;
+}
+@media(max-width:820px){
+  .gleft{border-right:none;border-bottom:1px solid var(--border);}
+  .thumbs-col{width:64px;}
+  .thumb{width:50px;height:50px;}
 }
 
-/* DIREITA — info */
-.hero-right{
-  padding:32px 28px 28px;
-  display:flex;flex-direction:column;gap:20px;
-  background:var(--bg);
+/* ── DIREITA: informações ── */
+.iright{
+  padding:26px 26px 22px;
+  display:flex;flex-direction:column;gap:16px;
   overflow-y:auto;
-  max-height:calc(100vh - var(--sticky-h));
+  max-height:calc(100vh - var(--bar));
+  background:var(--bg);
 }
-@media(max-width:768px){
-  .hero-right{max-height:none;padding:24px 20px;}
-  .hero-left{border-right:none;border-bottom:1px solid var(--border);}
-}
-.prod-code{
-  font-family:var(--fm);font-size:10px;color:var(--yellow);
-  letter-spacing:2px;text-transform:uppercase;
-}
-.prod-title{
-  font-family:var(--fh);font-size:clamp(22px,3vw,34px);
-  font-weight:900;line-height:1.15;letter-spacing:-0.5px;
-}
-.prod-price-block{}
-.prod-price{
-  font-family:var(--fh);font-size:clamp(28px,3.5vw,42px);
-  font-weight:900;color:var(--green);line-height:1;
-}
-.prod-price-pix{
-  font-size:12px;color:var(--green);margin-top:4px;
-  display:flex;align-items:center;gap:5px;
-}
-.prod-price-pix::before{content:'💚';}
-.prod-price-old{
-  font-family:var(--fm);font-size:11px;color:var(--muted);
-  text-decoration:line-through;margin-bottom:4px;
-}
-
-/* Benefícios */
-.benefits{
-  display:flex;flex-direction:column;gap:0;
-  border:1px solid var(--border);border-radius:12px;
-  overflow:hidden;
-}
-.benefit{
-  display:flex;align-items:center;gap:14px;
-  padding:13px 16px;border-bottom:1px solid var(--border);
-  transition:background .15s;
-}
-.benefit:last-child{border-bottom:none;}
-.benefit:hover{background:var(--s1);}
-.benefit-icon{
-  width:36px;height:36px;border-radius:8px;
-  background:var(--s2);border:1px solid var(--border);
-  display:flex;align-items:center;justify-content:center;
-  font-size:18px;flex-shrink:0;
-}
-.benefit-text{}
-.benefit-title{font-size:13px;font-weight:600;color:var(--text);}
-.benefit-sub{font-size:11px;color:var(--muted);margin-top:1px;}
-
-/* CTA */
-.btn-comprar{
-  width:100%;padding:16px;border-radius:12px;
+@media(max-width:820px){.iright{max-height:none;padding:20px 16px;}}
+.pcode{font-family:var(--fm);font-size:9px;color:var(--yellow);letter-spacing:2.5px;text-transform:uppercase;}
+.ptitle{font-family:var(--fh);font-size:clamp(20px,2.6vw,32px);font-weight:900;line-height:1.12;letter-spacing:-.4px;}
+.pold{font-family:var(--fm);font-size:11px;color:var(--muted);text-decoration:line-through;}
+.pprice{font-family:var(--fh);font-size:clamp(28px,3.3vw,40px);font-weight:900;color:var(--green);line-height:1;margin-top:3px;}
+.ppix{font-size:12px;color:var(--green);margin-top:5px;display:flex;align-items:center;gap:5px;}
+.ppix::before{content:'💚';}
+/* benefícios */
+.bens{border:1px solid var(--border);border-radius:11px;overflow:hidden;}
+.ben{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--border);}
+.ben:last-child{border-bottom:none;}
+.bic{width:32px;height:32px;border-radius:7px;background:var(--s2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.bt{font-size:13px;font-weight:600;}
+.bs{font-size:11px;color:var(--muted);margin-top:1px;}
+/* botões */
+.btnbuy{
+  width:100%;padding:15px;border-radius:10px;
   background:var(--yellow);color:#000;
-  font-family:var(--fb);font-size:16px;font-weight:700;
+  font-family:var(--fb);font-size:15px;font-weight:700;
   border:none;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;gap:10px;
-  transition:all .2s;
+  display:flex;align-items:center;justify-content:center;gap:9px;
+  transition:all .2s;letter-spacing:.2px;
 }
-.btn-comprar:hover{background:#ffd500;transform:translateY(-2px);box-shadow:0 8px 28px rgba(245,200,0,.35);}
-.btn-wa{
-  width:100%;padding:13px;border-radius:10px;
+.btnbuy:hover{background:#ffd500;transform:translateY(-2px);box-shadow:0 8px 24px rgba(245,200,0,.36);}
+.btnwa{
+  width:100%;padding:12px;border-radius:9px;
   background:transparent;color:var(--soft);
-  font-family:var(--fb);font-size:14px;font-weight:500;
+  font-family:var(--fb);font-size:13px;font-weight:500;
   border:1px solid var(--border);cursor:pointer;
-  display:flex;align-items:center;justify-content:center;gap:8px;
+  display:flex;align-items:center;justify-content:center;gap:7px;
   transition:all .2s;text-decoration:none;
 }
-.btn-wa:hover{border-color:var(--wa);color:var(--wa);}
+.btnwa:hover{border-color:var(--wa);color:var(--wa);}
 
-/* ── SEÇÕES ABAIXO ─────────────────────────────────────────── */
-.container{max-width:1080px;margin:0 auto;padding:0 20px;}
-.tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--fm);font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:5px 12px;border-radius:100px;border:1px solid;color:var(--yellow);border-color:rgba(245,200,0,.3);background:rgba(245,200,0,.06);}
-.sep{width:48px;height:3px;border-radius:2px;background:var(--yellow);margin:16px 0;}
-.sec-hd{font-family:var(--fh);font-size:clamp(28px,4vw,44px);font-weight:900;line-height:1.1;letter-spacing:-.5px;}
-.sec-hd em{font-style:italic;color:var(--yellow);}
-.sec-sub{font-size:16px;color:var(--soft);line-height:1.7;max-width:580px;margin-top:14px;}
-
-/* PROBLEMA */
-.problema{padding:80px 20px;}
-.problema-grid{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start;margin-top:48px;}
-@media(max-width:768px){.problema-grid{grid-template-columns:1fr;}}
-.dor-list{display:flex;flex-direction:column;gap:16px;}
-.dor-item{display:flex;gap:14px;padding:18px;background:var(--s1);border:1px solid var(--border);border-radius:12px;}
-.dor-icon{font-size:24px;flex-shrink:0;margin-top:2px;}
-.dor-title{font-size:15px;font-weight:600;margin-bottom:4px;}
-.dor-text{font-size:13px;color:var(--soft);line-height:1.6;}
-.solucao-box{background:linear-gradient(135deg,rgba(45,206,118,.08),rgba(45,206,118,.02));border:1px solid rgba(45,206,118,.2);border-radius:16px;padding:32px;}
-.solucao-box .sep{background:var(--green);}
-.solucao-title{font-family:var(--fh);font-size:24px;font-weight:700;margin-bottom:12px;}
-.solucao-text{font-size:14px;color:var(--soft);line-height:1.7;margin-bottom:20px;}
-.solucao-checks{display:flex;flex-direction:column;gap:10px;}
-.solucao-check{display:flex;align-items:center;gap:10px;font-size:14px;}
-.solucao-check::before{content:"✓";color:var(--green);font-weight:700;font-size:16px;flex-shrink:0;}
-
-/* PROVA SOCIAL */
-.prova{padding:60px 20px 80px;background:var(--s1);border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
-.test-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:40px;}
-.test-card{background:var(--s2);border:1px solid var(--border);border-radius:14px;padding:20px;}
-.test-stars{color:var(--yellow);font-size:14px;margin-bottom:10px;letter-spacing:2px;}
-.test-text{font-size:14px;color:var(--soft);line-height:1.65;font-style:italic;margin-bottom:14px;}
-.test-author{display:flex;align-items:center;gap:10px;}
-.test-avatar{width:36px;height:36px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
-.test-name{font-size:13px;font-weight:600;}
-.test-loc{font-family:var(--fm);font-size:10px;color:var(--muted);}
-
-/* GARANTIA */
-.garantia{padding:60px 20px;}
-.garantia-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:40px;}
-@media(max-width:768px){.garantia-grid{grid-template-columns:1fr;}}
-.gar-card{text-align:center;padding:28px 20px;background:var(--s1);border:1px solid var(--border);border-radius:14px;transition:border-color .2s;}
-.gar-card:hover{border-color:var(--border2);}
-.gar-icon{font-size:36px;margin-bottom:14px;}
-.gar-title{font-size:16px;font-weight:700;margin-bottom:8px;}
-.gar-text{font-size:13px;color:var(--soft);line-height:1.6;}
-
-/* CTA FINAL */
-.cta-final{padding:80px 20px;text-align:center;position:relative;overflow:hidden;}
-.cta-final-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 80% at 50% 50%,rgba(245,200,0,.05) 0%,transparent 70%);pointer-events:none;}
-.cta-final .sec-hd{max-width:640px;margin:0 auto 16px;}
-.cta-final .sec-sub{margin:0 auto 36px;}
-.cta-final-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;}
-.btn-cta{display:inline-flex;align-items:center;justify-content:center;gap:9px;padding:16px 36px;border-radius:12px;background:var(--yellow);color:#000;font-family:var(--fb);font-size:15px;font-weight:700;border:none;cursor:pointer;transition:all .2s;text-decoration:none;white-space:nowrap;}
-.btn-cta:hover{background:#ffd500;transform:translateY(-2px);box-shadow:0 8px 32px rgba(245,200,0,.35);}
-.btn-cta.large{padding:20px 48px;font-size:17px;border-radius:14px;}
-.btn-cta.blue{background:#3b9eff;color:#fff;}
-.btn-cta.blue:hover{background:#2589ef;box-shadow:0 8px 32px rgba(59,158,255,.3);}
-
-/* FOOTER */
-footer{padding:32px 20px;border-top:1px solid var(--border);text-align:center;}
-.footer-brand{font-family:var(--fh);font-size:20px;font-weight:900;}
-.footer-brand span{color:var(--yellow);}
-.footer-text{font-family:var(--fm);font-size:11px;color:var(--muted);margin-top:6px;letter-spacing:.5px;}
-
-/* LOADING STATE */
-.loading-hero{
-  display:flex;align-items:center;justify-content:center;
-  min-height:calc(100vh - var(--sticky-h));
-  flex-direction:column;gap:16px;
-}
-.spinner{width:32px;height:32px;border:2px solid var(--border);border-top-color:var(--yellow);border-radius:50%;animation:spin .7s linear infinite;}
+/* ══ SEÇÕES ABAIXO ═══════════════════════════════════════════ */
+.ct{max-width:1080px;margin:0 auto;padding:0 20px;}
+.tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--fm);font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:5px 12px;border-radius:100px;border:1px solid rgba(245,200,0,.3);color:var(--yellow);background:rgba(245,200,0,.06);}
+.sep{width:44px;height:3px;border-radius:2px;background:var(--yellow);margin:14px 0;}
+.sh{font-family:var(--fh);font-size:clamp(24px,3.8vw,40px);font-weight:900;line-height:1.1;letter-spacing:-.5px;}
+.sh em{font-style:italic;color:var(--yellow);}
+.ss{font-size:14px;color:var(--soft);line-height:1.7;max-width:540px;margin-top:12px;}
+.sec-prob{padding:68px 20px;}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start;margin-top:40px;}
+@media(max-width:768px){.pgrid{grid-template-columns:1fr;}}
+.dors{display:flex;flex-direction:column;gap:13px;}
+.dor{display:flex;gap:12px;padding:15px;background:var(--s1);border:1px solid var(--border);border-radius:10px;}
+.dic{font-size:22px;flex-shrink:0;margin-top:2px;}
+.dt{font-size:14px;font-weight:600;margin-bottom:3px;}
+.dx{font-size:12px;color:var(--soft);line-height:1.55;}
+.sol{background:linear-gradient(135deg,rgba(45,206,118,.08),rgba(45,206,118,.02));border:1px solid rgba(45,206,118,.2);border-radius:13px;padding:26px;}
+.sol .sep{background:var(--green);}
+.stitle{font-family:var(--fh);font-size:21px;font-weight:700;margin-bottom:9px;}
+.stxt{font-size:13px;color:var(--soft);line-height:1.65;margin-bottom:16px;}
+.schecks{display:flex;flex-direction:column;gap:8px;}
+.scheck{display:flex;align-items:center;gap:8px;font-size:13px;}
+.scheck::before{content:"✓";color:var(--green);font-weight:700;font-size:15px;flex-shrink:0;}
+.sec-prova{padding:56px 20px;background:var(--s1);border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:13px;margin-top:34px;}
+.tcard{background:var(--s2);border:1px solid var(--border);border-radius:12px;padding:17px;}
+.tstars{color:var(--yellow);font-size:12px;margin-bottom:8px;letter-spacing:2px;}
+.ttxt{font-size:13px;color:var(--soft);line-height:1.6;font-style:italic;margin-bottom:11px;}
+.tauth{display:flex;align-items:center;gap:9px;}
+.tav{width:32px;height:32px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.tnm{font-size:12px;font-weight:600;} .tlc{font-family:var(--fm);font-size:9px;color:var(--muted);}
+.sec-gar{padding:56px 20px;}
+.ggrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:34px;}
+@media(max-width:768px){.ggrid{grid-template-columns:1fr;}}
+.gcard{text-align:center;padding:22px 16px;background:var(--s1);border:1px solid var(--border);border-radius:12px;}
+.gic{font-size:32px;margin-bottom:11px;} .gt{font-size:15px;font-weight:700;margin-bottom:6px;} .gtx{font-size:12px;color:var(--soft);line-height:1.55;}
+.sec-cta{padding:68px 20px;text-align:center;position:relative;overflow:hidden;}
+.cta-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 80% at 50% 50%,rgba(245,200,0,.05),transparent 70%);pointer-events:none;}
+.cta-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:30px;}
+.btncta{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:15px 32px;border-radius:10px;background:var(--yellow);color:#000;font-family:var(--fb);font-size:14px;font-weight:700;border:none;cursor:pointer;transition:all .2s;text-decoration:none;}
+.btncta:hover{background:#ffd500;transform:translateY(-2px);box-shadow:0 8px 24px rgba(245,200,0,.35);}
+.btncta.blue{background:#3b9eff;color:#fff;}
+.btncta.blue:hover{background:#2589ef;box-shadow:0 8px 24px rgba(59,158,255,.3);}
+footer{padding:26px 20px;border-top:1px solid var(--border);text-align:center;}
+.fb{font-family:var(--fh);font-size:17px;font-weight:900;} .fb b{color:var(--yellow);}
+.fs{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:4px;letter-spacing:.5px;}
+.loading{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - var(--bar));flex-direction:column;gap:13px;}
+.spinner{width:28px;height:28px;border:2px solid var(--border);border-top-color:var(--yellow);border-radius:50%;animation:spin .7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg)}}
-.load-txt{font-family:var(--fm);font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;}
+.loading p{font-family:var(--fm);font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;}
 </style>
 </head>
 <body>
 
-<!-- ── STICKY BAR ─────────────────────────────────────────── -->
-<div class="sticky-bar" id="sticky-bar">
-  <div class="sticky-info">
-    <div class="sticky-title" id="sticky-title">Carregando...</div>
-    <div class="sticky-delivery">
-      <span>🚚</span>
-      <span class="sticky-delivery-txt" id="sticky-delivery-txt"></span>
-    </div>
+<!-- ══ STICKY BAR ══════════════════════════════════════════════ -->
+<div class="sbar">
+  <div class="sbar-thumb"><img id="sb-img" src="" alt="" style="display:none"></div>
+  <div class="sbar-info">
+    <div class="sbar-name" id="sb-name">Carregando...</div>
+    <div class="sbar-del">🚚 <b id="sb-del"></b></div>
   </div>
-  <div class="sticky-price" id="sticky-price"></div>
-  <button class="sticky-btn" onclick="abrirCheckout()">🛒 Adicionar ao Carrinho</button>
+  <div class="sbar-price-wrap">
+    <div class="sbar-price" id="sb-price">—</div>
+    <div class="sbar-pix">💚 10% off no PIX</div>
+  </div>
+  <button class="sbar-cta" onclick="abrirWA()">🛒 Adicionar ao Carrinho</button>
 </div>
 
-<!-- ── CONTEÚDO PRINCIPAL ─────────────────────────────────── -->
-<div id="page-content">
-  <div class="loading-hero" id="loading-state">
-    <div class="spinner"></div>
-    <div class="load-txt">Carregando produto...</div>
-  </div>
+<!-- ══ CONTEÚDO ════════════════════════════════════════════════ -->
+<div id="root">
+  <div class="loading"><div class="spinner"></div><p>Carregando produto...</p></div>
 </div>
 
 <script>
-var WA = '5531998301617';
-var PRODUTO = null;
-var GAL_IDX = 0;
+var WA='5531998301617', PROD=null, IDX=0;
 
-// ── ENTREGA: regra por horário ──────────────────────────────
-function textoEntrega(){
-  var h = new Date().getHours(), m = new Date().getMinutes();
-  var total = h * 100 + m;
-  if(total >= 0 && total <= 1545){
-    return 'Comprando nos próximos 15 min — Entregamos <strong>AINDA HOJE!</strong>';
-  } else {
-    return 'Comprando nos próximos 15 min — Entregamos em menos de <strong>24 Horas!</strong>';
-  }
+function R(v){return parseFloat(v).toLocaleString('pt-BR',{minimumFractionDigits:2,style:'currency',currency:'BRL'});}
+
+function delivery(){
+  var h=new Date().getHours(),m=new Date().getMinutes();
+  return (h*100+m)<=1545
+    ?'Comprando nos próximos 15 min — Entregamos <b>AINDA HOJE!</b>'
+    :'Comprando nos próximos 15 min — Entregamos em menos de <b>24 Horas!</b>';
 }
 
-// ── GALERIA ─────────────────────────────────────────────────
-function galGoTo(idx){
-  if(!PRODUTO) return;
-  var n = PRODUTO.fotos.length;
-  GAL_IDX = ((idx % n) + n) % n;
-  var track = document.getElementById('gal-track');
-  if(track) track.style.transform = 'translateX(-'+GAL_IDX*100+'%)';
-  document.querySelectorAll('.gal-dot').forEach(function(d,i){d.classList.toggle('on',i===GAL_IDX);});
-  var cnt = document.getElementById('gal-count');
-  if(cnt) cnt.textContent = (GAL_IDX+1)+' / '+n;
-}
-function galSlide(dir){ galGoTo(GAL_IDX + dir); }
-
-// Swipe touch na galeria
-var _gSx=0, _gSy=0;
-document.addEventListener('touchstart',function(e){
-  var t=e.changedTouches[0]; _gSx=t.clientX; _gSy=t.clientY;
-},{passive:true});
-document.addEventListener('touchend',function(e){
-  var t=e.changedTouches[0], dx=t.clientX-_gSx, dy=t.clientY-_gSy;
-  if(Math.abs(dx)<30||Math.abs(dy)>Math.abs(dx)) return;
-  galSlide(dx<0?1:-1);
-},{passive:true});
-
-// ── CHECKOUT ────────────────────────────────────────────────
-function abrirCheckout(){
-  if(!PRODUTO) return;
-  var R = function(v){ return parseFloat(v).toLocaleString('pt-BR',{minimumFractionDigits:2,style:'currency',currency:'BRL'}); };
-  var msg = encodeURIComponent(
-    'Olá! Tenho interesse no equipamento:\n\n'+
-    '📦 '+PRODUTO.descricao+'\n'+
-    '📋 Cód: '+(PRODUTO.codigo||PRODUTO.id)+'\n'+
-    '💰 Valor: '+R(PRODUTO.preco)+'\n\n'+
-    'Podemos fechar?'
-  );
-  window.open('https://wa.me/'+WA+'?text='+msg,'_blank');
+function goTo(i){
+  if(!PROD||!PROD.fotos.length) return;
+  var n=PROD.fotos.length;
+  IDX=((i%n)+n)%n;
+  var img=document.getElementById('gmain');
+  if(img){img.style.opacity='.3';setTimeout(function(){img.src=PROD.fotos[IDX];img.style.opacity='1';},150);}
+  document.querySelectorAll('.thumb').forEach(function(t,j){t.classList.toggle('on',j===IDX);});
+  var gc=document.getElementById('gcnt');
+  if(gc) gc.textContent=(IDX+1)+' / '+n;
 }
 
-// ── FORMATAR PREÇO ──────────────────────────────────────────
-function R(v){ return parseFloat(v).toLocaleString('pt-BR',{minimumFractionDigits:2,style:'currency',currency:'BRL'}); }
+// swipe
+var _sx=0,_sy=0;
+document.addEventListener('touchstart',function(e){var t=e.changedTouches[0];_sx=t.clientX;_sy=t.clientY;},{passive:true});
+document.addEventListener('touchend',function(e){var t=e.changedTouches[0],dx=t.clientX-_sx,dy=t.clientY-_sy;if(Math.abs(dx)<30||Math.abs(dy)>Math.abs(dx))return;goTo(IDX+(dx<0?1:-1));},{passive:true});
 
-// ── RENDERIZAR HERO ─────────────────────────────────────────
-function renderHero(p){
-  PRODUTO = p;
-  var fotos = p.fotos && p.fotos.length ? p.fotos : [];
-  var precoOld = Math.round(parseFloat(p.preco) * 2.1);
+function abrirWA(){
+  if(!PROD)return;
+  window.open('https://wa.me/'+WA+'?text='+encodeURIComponent('Olá! Tenho interesse:\n\n📦 '+PROD.nome+'\n📋 Cód: '+PROD.codigo+'\n💰 '+R(PROD.preco)+'\n\nPodemos fechar?'),'_blank');
+}
 
-  // Galeria HTML
-  var slidesHtml = fotos.length
-    ? fotos.map(function(f,i){
-        return '<div class="gallery-slide"><img src="'+f+'" alt="'+p.descricao+'" loading="'+(i===0?'eager':'lazy')+'"></div>';
-      }).join('')
-    : '<div class="gallery-slide"><div class="gallery-ph">'+(p.tipo==='Microondas'?'📡':'💧')+'</div></div>';
+function render(p){
+  PROD=p;
+  var F=p.fotos&&p.fotos.length?p.fotos:[];
+  var precoOld=Math.round(parseFloat(p.preco)*2.1);
 
-  var dotsHtml = fotos.length > 1
-    ? fotos.map(function(_,i){return '<div class="gal-dot'+(i===0?' on':'')+'" onclick="galGoTo('+i+')"></div>';}).join('')
-    : '';
+  // thumbs verticais (coluna esquerda)
+  var thumbsHTML=F.length>1
+    ?F.map(function(f,i){return '<div class="thumb'+(i===0?' on':'')+'" onclick="goTo('+i+')"><img src="'+f+'" loading="'+(i<3?'eager':'lazy')+'"></div>';}).join('')
+    :'';
 
-  var arrowsHtml = fotos.length > 1
-    ? '<button class="gal-btn gal-prev" onclick="galSlide(-1)"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>'+
-      '<button class="gal-btn gal-next" onclick="galSlide(1)"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>'+
-      '<div class="gal-count" id="gal-count">1 / '+fotos.length+'</div>'
-    : '';
+  // foto principal
+  var mainHTML=F.length
+    ?'<img class="gmain" id="gmain" src="'+F[0]+'" alt="'+p.nome+'" loading="eager">'
+    :'<div class="gph">'+(p.tipo==='Microondas'?'📡':'💧')+'</div>';
 
-  var heroHtml = '<div class="hero-wrap">'+
-    // ── ESQUERDA ──
-    '<div class="hero-left">'+
-      '<div class="hero-logo">'+
-        '<div>'+
-          '<div class="hero-logo-txt">Reparo<span>Eletro</span></div>'+
-          '<div class="hero-logo-sub">equipamentos revisados</div>'+
+  var arrowsHTML=F.length>1
+    ?'<button class="garrow prev" onclick="goTo(IDX-1)"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>'+
+     '<button class="garrow next" onclick="goTo(IDX+1)"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>'+
+     '<div class="gcount" id="gcnt">1 / '+F.length+'</div>'
+    :'';
+
+  var waHref='https://wa.me/'+WA+'?text='+encodeURIComponent('Olá! Interesse no '+p.nome+' ('+p.codigo+'). Mais informações?');
+
+  var heroHTML=
+    '<div class="hero">'+
+      '<div class="gleft">'+
+        '<div class="glogo"><div><div class="glogo-brand">Reparo<b>Eletro</b></div><div class="glogo-sub">equipamentos revisados</div></div></div>'+
+        '<div class="gallery-body">'+
+          (F.length>1?'<div class="thumbs-col">'+thumbsHTML+'</div>':'')+
+          '<div class="gmain-wrap">'+mainHTML+arrowsHTML+'</div>'+
         '</div>'+
+        '<div class="gdesc">'+p.nome+(p.capacidade?' · '+p.capacidade:'')+(p.tipo?' · '+p.tipo:'')+'</div>'+
       '</div>'+
-      '<div class="hero-gallery">'+
-        '<div class="gallery-track" id="gal-track">'+slidesHtml+'</div>'+
-        arrowsHtml+
-        (dotsHtml?'<div class="gal-dots">'+dotsHtml+'</div>':'')+
+      '<div class="iright">'+
+        (p.codigo?'<div class="pcode">Cód. '+p.codigo+'</div>':'')+
+        '<h1 class="ptitle">'+p.nome+'</h1>'+
+        '<div><div class="pold">De '+R(precoOld)+'</div><div class="pprice">'+R(p.preco)+'</div><div class="ppix">10% de desconto no PIX à vista</div></div>'+
+        '<div class="bens">'+
+          '<div class="ben"><div class="bic">🛡️</div><div><div class="bt">Garantia de 90 Dias</div><div class="bs">Coberta pela nossa equipe técnica</div></div></div>'+
+          '<div class="ben"><div class="bic">💳</div><div><div class="bt">Parcelamos em 3x sem Juros</div><div class="bs">No cartão de crédito</div></div></div>'+
+          '<div class="ben"><div class="bic">💸</div><div><div class="bt">10% de Desconto no Pix</div><div class="bs">Desconto aplicado automaticamente</div></div></div>'+
+          '<div class="ben"><div class="bic">🚚</div><div><div class="bt">Frete Grátis em BH</div><div class="bs">Toda a Região Metropolitana de BH</div></div></div>'+
+        '</div>'+
+        '<button class="btnbuy" onclick="abrirWA()">🛒 Adicionar ao Carrinho</button>'+
+        '<a class="btnwa" href="'+waHref+'" target="_blank"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>Tirar dúvida no WhatsApp</a>'+
       '</div>'+
-      '<div class="hero-desc">'+
-        (p.descricao||'')+(p.observacao?' — '+p.observacao:'')+(p.capacidade?' · '+p.capacidade:'')+(p.tensao?' · '+p.tensao:'')+
-      '</div>'+
-    '</div>'+
-    // ── DIREITA ──
-    '<div class="hero-right">'+
-      (p.codigo?'<div class="prod-code">Cód. '+p.codigo+'</div>':'')+
-      '<h1 class="prod-title">'+p.descricao+'</h1>'+
-      '<div class="prod-price-block">'+
-        '<div class="prod-price-old">De '+R(precoOld)+'</div>'+
-        '<div class="prod-price">'+R(p.preco)+'</div>'+
-        '<div class="prod-price-pix">10% de desconto no PIX à vista</div>'+
-      '</div>'+
-      '<div class="benefits">'+
-        '<div class="benefit"><div class="benefit-icon">🛡️</div><div class="benefit-text"><div class="benefit-title">Garantia de 90 Dias</div><div class="benefit-sub">Coberta pela nossa equipe técnica</div></div></div>'+
-        '<div class="benefit"><div class="benefit-icon">💳</div><div class="benefit-text"><div class="benefit-title">Parcelamos em 3x sem Juros</div><div class="benefit-sub">No cartão de crédito</div></div></div>'+
-        '<div class="benefit"><div class="benefit-icon">💸</div><div class="benefit-text"><div class="benefit-title">10% de Desconto no Pix</div><div class="benefit-sub">Desconto aplicado automaticamente</div></div></div>'+
-        '<div class="benefit"><div class="benefit-icon">🚚</div><div class="benefit-text"><div class="benefit-title">Frete Grátis em BH</div><div class="benefit-sub">Toda a Região Metropolitana de BH</div></div></div>'+
-      '</div>'+
-      '<button class="btn-comprar" onclick="abrirCheckout()">🛒 Adicionar ao Carrinho</button>'+
-      '<a class="btn-wa" href="https://wa.me/'+WA+'?text='+encodeURIComponent('Olá! Tenho interesse no '+p.descricao+' ('+p.codigo+'). Pode me passar mais informações?')+'" target="_blank">'+
-        '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>'+
-        'Tirar dúvida no WhatsApp'+
-      '</a>'+
-    '</div>'+
-  '</div>';
+    '</div>';
 
-  // Seções abaixo (da loja-v3)
-  var abaixoHtml = renderAbaixo(p);
+  var abaixoHTML=`
+<section class="sec-prob"><div class="ct">
+  <div class="tag">📌 Por que comprar revisado?</div><div class="sep"></div>
+  <h2 class="sh">O mercado empurra o novo.<br><em>A gente oferece o inteligente.</em></h2>
+  <p class="ss">Preço de eletrodoméstico novo disparou. Um micro-ondas básico custa R$600–900 em loja. Um purificador de qualidade passa de R$1.000. E ainda vem com garantia de 1 ano que mal cobre o básico.</p>
+  <div class="pgrid">
+    <div class="dors">
+      <div class="dor"><span class="dic">💸</span><div><div class="dt">Preço abusivo no varejo</div><div class="dx">Micro-ondas novo de 30L custa entre R$650 e R$1.200. O mesmo revisado pode sair por R$320.</div></div></div>
+      <div class="dor"><span class="dic">🎲</span><div><div class="dt">Usado sem garantia é roleta russa</div><div class="dx">Comprar no OLX é barato, mas sem revisão você pode levar um aparelho que falha em 2 semanas.</div></div></div>
+      <div class="dor"><span class="dic">🔧</span><div><div class="dt">Assistência técnica cobra um absurdo</div><div class="dx">Conserto de micro-ondas custa R$200–400. Vale mais trocar por um revisado com garantia.</div></div></div>
+    </div>
+    <div class="sol">
+      <div class="tag" style="--yellow:#2dce76;color:var(--green);border-color:rgba(45,206,118,.3);background:rgba(45,206,118,.06)">✅ A solução</div>
+      <div class="sep" style="background:var(--green);margin-top:14px"></div>
+      <div class="stitle">Revisado pela Reparo Eletro.<br>Diferente de qualquer usado.</div>
+      <p class="stxt">Cada equipamento passa pelo nosso processo antes de ser vendido. Isso é o nosso trabalho diário há mais de 10 anos em BH.</p>
+      <div class="schecks">
+        <div class="scheck">Desmontagem e limpeza completa</div>
+        <div class="scheck">Substituição de peças desgastadas</div>
+        <div class="scheck">Testes funcionais em bancada</div>
+        <div class="scheck">Garantia real — retorna pra nós se falhar</div>
+        <div class="scheck">Nota fiscal de venda (quando disponível)</div>
+      </div>
+    </div>
+  </div>
+</div></section>
+<section class="sec-prova"><div class="ct">
+  <div class="tag">💬 O que nossos clientes dizem</div><div class="sep"></div>
+  <h2 class="sh">Quem comprou,<br><em>aprovou.</em></h2>
+  <div class="tgrid">
+    <div class="tcard"><div class="tstars">★★★★★</div><p class="ttxt">"Comprei um micro-ondas revisado por R$280. Já tem 8 meses, funciona perfeitamente. Mesmo aparelho novo custava R$750. Economizei R$470 com garantia."</p><div class="tauth"><div class="tav">👩</div><div><div class="tnm">Fernanda R.</div><div class="tlc">Contagem, MG</div></div></div></div>
+    <div class="tcard"><div class="tstars">★★★★★</div><p class="ttxt">"Purificador chegou impecável, limpo, funcionando. Instalaram no mesmo dia. Atendimento muito atencioso. Recomendo sem hesitar."</p><div class="tauth"><div class="tav">👨</div><div><div class="tnm">Carlos M.</div><div class="tlc">BH — Pampulha</div></div></div></div>
+    <div class="tcard"><div class="tstars">★★★★★</div><p class="ttxt">"Já comprei dois micro-ondas aqui. Qualidade melhor do que esperava. Preço honesto, equipe séria."</p><div class="tauth"><div class="tav">👩</div><div><div class="tnm">Mariana L.</div><div class="tlc">BH — Santa Efigênia</div></div></div></div>
+    <div class="tcard"><div class="tstars">★★★★★</div><p class="ttxt">"Meu micro-ondas parou e fui direto no Reparo Eletro. Saí com um revisado mais potente pagando menos que o conserto."</p><div class="tauth"><div class="tav">👨</div><div><div class="tnm">Roberto A.</div><div class="tlc">BH — Buritis</div></div></div></div>
+  </div>
+</div></section>
+<section class="sec-gar"><div class="ct">
+  <div style="text-align:center"><div class="tag" style="margin:0 auto">🛡️ Nossos compromissos</div><div class="sep" style="margin:14px auto"></div><h2 class="sh">Você compra com<br><em>total segurança</em></h2></div>
+  <div class="ggrid">
+    <div class="gcard"><div class="gic">🔧</div><div class="gt">Revisão completa</div><p class="gtx">Todo equipamento é desmontado, inspecionado e testado. Nada sai sem aprovação técnica.</p></div>
+    <div class="gcard"><div class="gic">🛡️</div><div class="gt">Garantia real</div><p class="gtx">Falhou na garantia, você traz e a gente resolve. Sem burocracia — o conserto é feito por quem vendeu.</p></div>
+    <div class="gcard"><div class="gic">📞</div><div class="gt">Suporte pós-venda</div><p class="gtx">Dúvida sobre instalação? Pode chamar no WhatsApp. Estamos aqui antes e depois da compra.</p></div>
+  </div>
+</div></section>
+<section class="sec-cta"><div class="cta-bg"></div>
+  <div class="ct" style="position:relative">
+    <div class="tag" style="margin:0 auto 16px">🎯 Explore mais equipamentos</div>
+    <h2 class="sh">Temos mais opções<br><em>esperando por você</em></h2>
+    <p class="ss" style="margin:0 auto">Micro-ondas e purificadores revisados, com garantia, entrega em BH.</p>
+    <div class="cta-btns">
+      <a href="/microondas-vsl?produto=microondas&cta=ck" class="btncta">📡 Comprar mais Microondas</a>
+      <a href="/microondas-vsl?produto=purificador&cta=ck" class="btncta blue">💧 Conhecer a Linha de Purificadores</a>
+    </div>
+  </div>
+</section>
+<footer><div class="ct">
+  <div class="fb">Reparo<b>Eletro</b></div>
+  <p class="fs">Belo Horizonte, MG · (31) 99830-1617 · Equipamentos revisados com garantia</p>
+</div></footer>`;
 
-  document.getElementById('page-content').innerHTML = heroHtml + abaixoHtml;
+  document.getElementById('root').innerHTML = heroHTML + abaixoHTML;
 
   // Sticky bar
-  document.getElementById('sticky-title').textContent = p.descricao;
-  document.getElementById('sticky-price').textContent = R(p.preco);
-  document.getElementById('sticky-delivery-txt').innerHTML = textoEntrega();
-}
-
-// ── SEÇÕES ABAIXO DA DOBRA ───────────────────────────────────
-function renderAbaixo(p){
-  var tipoMicro = !p.tipo || p.tipo==='Microondas' || (p.tipo||'').toLowerCase().includes('micro');
-  var urlMicro = 'https://reparoeletroadm.com/microondas-vsl?produto=microondas&cta=ck';
-  var urlPuri  = 'https://reparoeletroadm.com/microondas-vsl?produto=purificador&cta=ck';
-
-  return `
-<!-- PROBLEMA -->
-<section class="problema">
-  <div class="container">
-    <div class="tag">📌 Por que comprar revisado?</div>
-    <div class="sep"></div>
-    <h2 class="sec-hd">O mercado empurra o novo.<br><em>A gente oferece o inteligente.</em></h2>
-    <p class="sec-sub">Preço de eletrodoméstico novo disparou. Um micro-ondas básico custa R$600–900 em loja. Um purificador de qualidade passa de R$1.000. E ainda vem com garantia de 1 ano de fábrica que mal cobre o básico.</p>
-    <div class="problema-grid">
-      <div class="dor-list">
-        <div class="dor-item"><span class="dor-icon">💸</span><div><div class="dor-title">Preço abusivo no varejo</div><div class="dor-text">Micro-ondas novo de 30L custa entre R$650 e R$1.200. O mesmo modelo revisado, com os mesmos componentes funcionando, pode sair por R$320.</div></div></div>
-        <div class="dor-item"><span class="dor-icon">🎲</span><div><div class="dor-title">Usado sem garantia é roleta russa</div><div class="dor-text">Comprar de pessoa física no OLX ou Marketplace é barato, mas sem revisão você pode levar para casa um aparelho que vai falhar em 2 semanas.</div></div></div>
-        <div class="dor-item"><span class="dor-icon">🔧</span><div><div class="dor-title">Assistência técnica cobra um absurdo</div><div class="dor-text">Conserto de micro-ondas no mercado custa R$200–400. Muitas vezes vale mais a pena trocar por um revisado com garantia do que reparar o antigo.</div></div></div>
-      </div>
-      <div class="solucao-box">
-        <div class="tag" style="--yellow:#2dce76;color:var(--green);border-color:rgba(45,206,118,.3);background:rgba(45,206,118,.06);">✅ A solução</div>
-        <div class="sep" style="margin-top:16px;"></div>
-        <div class="solucao-title">Revisado pela Reparo Eletro.<br>Diferente de qualquer usado.</div>
-        <p class="solucao-text">Cada equipamento passa pelo nosso processo antes de ser vendido. Isso não é palavra: é o nosso trabalho diário há mais de 10 anos consertando e devolvendo vida a eletrodomésticos em BH.</p>
-        <div class="solucao-checks">
-          <div class="solucao-check">Desmontagem e limpeza completa</div>
-          <div class="solucao-check">Substituição de peças desgastadas</div>
-          <div class="solucao-check">Testes funcionais em bancada</div>
-          <div class="solucao-check">Garantia real — retorna pra nós se falhar</div>
-          <div class="solucao-check">Nota fiscal de venda (quando disponível)</div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- PROVA SOCIAL -->
-<section class="prova">
-  <div class="container">
-    <div class="tag">💬 O que nossos clientes dizem</div>
-    <div class="sep"></div>
-    <h2 class="sec-hd">Quem comprou,<br><em>aprovou.</em></h2>
-    <div class="test-grid">
-      <div class="test-card"><div class="test-stars">★★★★★</div><p class="test-text">"Comprei um micro-ondas revisado por R$280. Já tem 8 meses, funciona perfeitamente. Mesmo aparelho novo custava R$750 na loja. Economizei R$470 com garantia."</p><div class="test-author"><div class="test-avatar">👩</div><div><div class="test-name">Fernanda R.</div><div class="test-loc">Contagem, MG</div></div></div></div>
-      <div class="test-card"><div class="test-stars">★★★★★</div><p class="test-text">"Purificador de água chegou impecável, limpo, funcionando. Instalaram no mesmo dia. Atendimento muito atencioso. Recomendo sem hesitar para qualquer pessoa."</p><div class="test-author"><div class="test-avatar">👨</div><div><div class="test-name">Carlos M.</div><div class="test-loc">BH — Pampulha</div></div></div></div>
-      <div class="test-card"><div class="test-stars">★★★★★</div><p class="test-text">"Já comprei dois micro-ondas aqui. O segundo ainda está na garantia mas nunca precisei usar. Qualidade melhor do que esperava. Preço honesto, equipe séria."</p><div class="test-author"><div class="test-avatar">👩</div><div><div class="test-name">Mariana L.</div><div class="test-loc">BH — Santa Efigênia</div></div></div></div>
-      <div class="test-card"><div class="test-stars">★★★★★</div><p class="test-text">"Meu micro-ondas parou e fui direto no Reparo Eletro. Saí com um revisado, bem mais potente, pagando menos do que custaria o conserto. Ótima decisão."</p><div class="test-author"><div class="test-avatar">👨</div><div><div class="test-name">Roberto A.</div><div class="test-loc">BH — Buritis</div></div></div></div>
-    </div>
-  </div>
-</section>
-
-<!-- GARANTIA -->
-<section class="garantia">
-  <div class="container">
-    <div style="text-align:center">
-      <div class="tag" style="margin:0 auto">🛡️ Nossos compromissos</div>
-      <div class="sep" style="margin:16px auto"></div>
-      <h2 class="sec-hd">Você compra com<br><em>total segurança</em></h2>
-    </div>
-    <div class="garantia-grid">
-      <div class="gar-card"><div class="gar-icon">🔧</div><div class="gar-title">Revisão completa</div><p class="gar-text">Todo equipamento é desmontado, inspecionado e testado antes de ser colocado à venda. Nada sai sem aprovação técnica.</p></div>
-      <div class="gar-card"><div class="gar-icon">🛡️</div><div class="gar-title">Garantia real</div><p class="gar-text">Falhou na garantia, você nos traz e a gente resolve. Sem burocracia, sem terceirizar — o conserto é feito por quem vendeu.</p></div>
-      <div class="gar-card"><div class="gar-icon">📞</div><div class="gar-title">Suporte pós-venda</div><p class="gar-text">Tem dúvida sobre instalação ou uso? Pode chamar no WhatsApp. Estamos aqui para ajudar — antes e depois da compra.</p></div>
-    </div>
-  </div>
-</section>
-
-<!-- CTA FINAL -->
-<section class="cta-final">
-  <div class="cta-final-bg"></div>
-  <div class="container" style="position:relative">
-    <div class="tag" style="margin:0 auto 20px">🎯 Explore mais equipamentos</div>
-    <h2 class="sec-hd">Temos mais opções<br><em>esperando por você</em></h2>
-    <p class="sec-sub" style="margin:0 auto 36px">Micro-ondas e purificadores revisados, com garantia, entrega em BH. Preço justo, sem enrolação.</p>
-    <div class="cta-final-btns">
-      <a href="${urlMicro}" class="btn-cta large">📡 Comprar mais Microondas</a>
-      <a href="${urlPuri}" class="btn-cta large blue">💧 Conhecer a Linha de Purificadores</a>
-    </div>
-  </div>
-</section>
-
-<footer>
-  <div class="container">
-    <div class="footer-brand">Reparo<span>Eletro</span></div>
-    <p class="footer-text">Belo Horizonte, MG · (31) 99830-1617 · Equipamentos revisados com garantia</p>
-  </div>
-</footer>`;
-}
-
-// ── CARREGAR PRODUTO ─────────────────────────────────────────
-async function init(){
-  var params = new URLSearchParams(location.search);
-  var prodId = params.get('id');
-
-  if(!prodId){
-    document.getElementById('page-content').innerHTML =
-      '<div class="loading-hero"><div style="font-family:var(--fm);color:var(--muted)">Produto não encontrado.<br><a href="javascript:history.back()" style="color:var(--yellow)">← Voltar</a></div></div>';
-    return;
-  }
-
-  // Sticky delivery desde o início
-  document.getElementById('sticky-delivery-txt').innerHTML = textoEntrega();
+  document.getElementById('sb-name').textContent = p.nome;
+  document.getElementById('sb-price').textContent = R(p.preco);
+  document.getElementById('sb-del').innerHTML = delivery().replace('<b>','').replace('</b>','');
+  if(F.length){var si=document.getElementById('sb-img');si.src=F[0];si.style.display='block';}
 
   // Atualizar entrega a cada minuto
-  setInterval(function(){
-    var el = document.getElementById('sticky-delivery-txt');
-    if(el) el.innerHTML = textoEntrega();
-  }, 60000);
-
-  try{
-    // Tentar cache local primeiro
-    var cached = null;
-    try{ cached = JSON.parse(localStorage.getItem('re_vsl_v4')||'null'); }catch(e){}
-
-    var produtos = null;
-    if(cached && cached.ts && (Date.now()-cached.ts) < 300000){
-      produtos = cached.data;
-    } else {
-      var d = await fetch('/api/vendas?action=load').then(function(r){return r.json();});
-      produtos = (d.produtos||[]).filter(function(p){return !p.vendido;}).map(function(p){
-        var fotos = Array.isArray(p.fotos)&&p.fotos.length ? p.fotos : [];
-        return Object.assign({},p,{fotos:fotos});
-      });
-      try{ localStorage.setItem('re_vsl_v4', JSON.stringify({ts:Date.now(),data:produtos})); }catch(e){}
-    }
-
-    var produto = produtos.find(function(p){ return String(p.id)===String(prodId)||p.codigo===prodId; });
-
-    if(!produto){
-      document.getElementById('page-content').innerHTML =
-        '<div class="loading-hero"><div style="font-family:var(--fm);color:var(--muted);text-align:center">Produto não disponível.<br><br><a href="javascript:history.back()" style="color:var(--yellow)">← Voltar ao catálogo</a></div></div>';
-      return;
-    }
-
-    renderHero(produto);
-
-  }catch(e){
-    console.error(e);
-    document.getElementById('page-content').innerHTML =
-      '<div class="loading-hero"><div style="font-family:var(--fm);color:var(--muted)">Erro ao carregar.<br><a href="javascript:history.back()" style="color:var(--yellow)">← Voltar</a></div></div>';
-  }
+  setInterval(function(){var el=document.getElementById('sb-del');if(el)el.innerHTML=delivery().replace('<b>','').replace('</b>','');},60000);
 }
 
+async function init(){
+  var id=new URLSearchParams(location.search).get('id');
+  if(!id){document.getElementById('root').innerHTML='<div class="loading"><p>ID não informado. <a href="javascript:history.back()" style="color:var(--yellow)">← Voltar</a></p></div>';return;}
+  document.getElementById('sb-del').innerHTML=delivery().replace('<b>','').replace('</b>','');
+  try{
+    // Buscar sempre da API (sem depender do cache que pode ter estrutura errada)
+    var d=await fetch('/api/vendas?action=load').then(function(r){return r.json();});
+    var lista=(d.produtos||[]).filter(function(p){return !p.vendido;});
+    var p=lista.find(function(x){return String(x.id)===String(id)||x.codigo===id;});
+    if(!p){
+      document.getElementById('root').innerHTML='<div class="loading"><p>Produto não disponível. <a href="javascript:history.back()" style="color:var(--yellow)">← Voltar</a></p></div>';
+      return;
+    }
+    // Normalizar nome
+    p.nome = p.descricao || (p.tipo?p.tipo+' ':'')+p.codigo || 'Produto';
+    p.fotos = Array.isArray(p.fotos)&&p.fotos.length ? p.fotos : [];
+    render(p);
+  }catch(e){
+    document.getElementById('root').innerHTML='<div class="loading"><p>Erro ao carregar. <a href="javascript:history.back()" style="color:var(--yellow)">← Voltar</a></p></div>';
+  }
+}
 init();
 </script>
 </body>
