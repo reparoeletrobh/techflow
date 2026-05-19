@@ -46,9 +46,8 @@ async function pipefyQuery(query) {
 }
 
 // Busca cards em "Analise de Compra" no Pipefy
-// Query em 2 etapas: primeiro acha o ID da fase, depois busca só os cards dela
 async function fetchAnaliseCompra() {
-  // Etapa 1: achar o ID da fase
+  // Passo 1: achar o ID da fase dentro do pipe
   const phasesData = await pipefyQuery(
     'query { pipe(id: "' + PIPE_ID + '") { phases { id name } } }'
   );
@@ -58,11 +57,13 @@ async function fetchAnaliseCompra() {
     return n === 'analise de compra' || (n.includes('analise') && n.includes('compra'));
   });
   if (!ph) return [];
-  // Etapa 2: buscar cards só dessa fase (query focada, sem peso de outras fases)
+  // Passo 2: buscar cards via pipe.phase (contexto do pipe — evita problema de permissão)
   const cardsData = await pipefyQuery(
-    'query { phase(id: "' + ph.id + '") { cards(first: 200) { edges { node { id title fields { name value } } } } } }'
+    'query { pipe(id: "' + PIPE_ID + '") { phase(id: "' + ph.id + '") { cards_count cards { edges { node { id title fields { name value } } } } } } }'
   );
-  return (cardsData?.phase?.cards?.edges || []).map(({ node }) => {
+  const phaseCards = cardsData?.pipe?.phase;
+  if (!phaseCards) return [];
+  return (phaseCards.cards?.edges || []).map(({ node }) => {
     const fields = node.fields || [];
     const get = (kw) => fields.find(f => f.name.toLowerCase().includes(kw))?.value || "";
     return {
