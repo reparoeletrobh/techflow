@@ -2008,7 +2008,7 @@ module.exports = async function handler(req, res) {
     }
     const newCard = {
       id:          flFichaId + '-loja',
-      pipefyId:    pipefyId || null,
+      pipefyId:    pipefyId || flFichaId, // flFichaId como fallback para UI funcionar
       flFichaId:   flFichaId,
       title:       title,
       nomeContato: nomeContato || '',
