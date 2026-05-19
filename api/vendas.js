@@ -91,6 +91,8 @@ module.exports = async function handler(req, res) {
     const produtos = (db.produtos || []).map(p =>
       p.vendido ? { ...p, fotos: [] } : p
     );
+    // Cache CDN (Vercel Edge): 60s fresh, 5min stale-while-revalidate
+    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
     return res.status(200).json({ ok: true, produtos });
   }
 
