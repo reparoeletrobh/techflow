@@ -723,7 +723,8 @@ async function enviarCheckout(){
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         itens: itens,
-        comprador: {nome:nome, telefone:tel, cpf:cpf, endereco:end, cep:cep}
+        comprador: {nome:nome, telefone:tel, cpf:cpf, endereco:end, cep:cep},
+        metodoPagamento: pix ? 'pix' : 'cartao'
       })
     });
     var d = await r.json();
