@@ -570,10 +570,12 @@ module.exports = async function handler(req, res) {
 
     // ── POST move (OS principal) ───────────────────────────────
     if (req.method === "POST" && action === "move") {
-      const { pipefyId, phaseId, movedBy, tecnico, fotosCompra, descricaoCompra } = req.body || {};
-      if (!pipefyId || !phaseId) return res.status(400).json({ ok: false, error: "pipefyId e phaseId são obrigatórios" });
+      const { pipefyId, flFichaId: movFlFichaId, phaseId, movedBy, tecnico, fotosCompra, descricaoCompra } = req.body || {};
+      if ((!pipefyId && !movFlFichaId) || !phaseId) return res.status(400).json({ ok: false, error: "pipefyId ou flFichaId e phaseId são obrigatórios" });
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
-      const card = board.cards.find(c => c.pipefyId === String(pipefyId));
+      const card = pipefyId
+        ? board.cards.find(c => c.pipefyId === String(pipefyId))
+        : board.cards.find(c => c.flFichaId === String(movFlFichaId));
       if (!card) return res.status(404).json({ ok: false, error: "OS não encontrada" });
       card.phaseId = phaseId; card.movedAt = new Date().toISOString();
       card.movedBy = movedBy || "—"; card.tecnico = tecnico || null;
