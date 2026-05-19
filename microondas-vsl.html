@@ -181,6 +181,15 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
   .cs-btn{padding:0 14px;height:38px;font-size:12px;}
 }
 </style>
+<!-- Vturb speed optimization -->
+<script>!function(i,n){i._plt=i._plt||(n&&n.timeOrigin?n.timeOrigin+n.now():Date.now())}(window,performance);</script>
+<link rel="preload" href="https://scripts.converteai.net/9aeb894a-371d-4c6c-b90b-eba75d742b02/players/6a0bead0ef36953d22525843/v4/player.js" as="script">
+<link rel="preload" href="https://scripts.converteai.net/lib/js/smartplayer-wc/v4/smartplayer.js" as="script">
+<link rel="preload" href="https://cdn.converteai.net/9aeb894a-371d-4c6c-b90b-eba75d742b02/6a0bea87de623d15ed99ce5f/main.m3u8" as="fetch">
+<link rel="dns-prefetch" href="https://cdn.converteai.net">
+<link rel="dns-prefetch" href="https://scripts.converteai.net">
+<link rel="dns-prefetch" href="https://images.converteai.net">
+<link rel="dns-prefetch" href="https://license.vturb.com">
 </head>
 <body>
 <section class="vsl-section" id="vsl">
@@ -189,11 +198,10 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
   <h1 class="vsl-headline fade-in">Nunca compre um microondas<em>sem ver este vídeo antes.</em></h1>
   <p class="vsl-sub fade-in">Você pode economizar até <strong>70% agora mesmo!</strong> — Microondas revisados, garantidos e prontos para uso.</p>
   <div class="video-wrap fade-in" id="vturb-container">
-    <div class="video-placeholder">
+    <div class="video-placeholder" id="video-placeholder">
       <div class="video-play-btn"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
-      <span class="video-label">Assistir ao vídeo</span>
+      <span class="video-label">Carregando vídeo...</span>
     </div>
-    <span class="vturb-placeholder">[ Insira aqui o código HTML do Vturb ]</span>
   </div>
   <a href="#catalogo" class="btn-cta-primary cta-catalog fade-in">▼ Ver Catálogo de Microondas</a>
   
@@ -319,6 +327,37 @@ function irProduto(id){
   if(p){ try{ localStorage.setItem('re_produto_pendente', JSON.stringify(p)); }catch(e){} }
   window.location.href='/produto.html?id='+id;
 }
+
+// ── Carregar vídeo do Vturb via config do Checkout ──────────────────────
+async function loadVideo(){
+  try {
+    var cfg = await fetch('/api/tv-checkout?action=load-config').then(function(r){return r.json();});
+    var html = cfg.config?.videoHtml || '';
+    var container = document.getElementById('vturb-container');
+    var placeholder = document.getElementById('video-placeholder');
+    if(html && container){
+      // Remover placeholder
+      if(placeholder) placeholder.remove();
+      // Criar elemento temporário para extrair scripts e html
+      var tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      // Inserir HTML do player
+      container.innerHTML = html;
+      // Re-executar scripts (innerHTML não executa scripts)
+      container.querySelectorAll('script').forEach(function(oldScript){
+        var newScript = document.createElement('script');
+        Array.from(oldScript.attributes).forEach(function(a){newScript.setAttribute(a.name,a.value);});
+        newScript.textContent = oldScript.textContent;
+        oldScript.parentNode.replaceChild(newScript, oldScript);
+      });
+    } else if(placeholder){
+      placeholder.querySelector('.video-label').textContent = 'Vídeo não configurado';
+    }
+  } catch(e) {
+    console.error('loadVideo:', e);
+  }
+}
+
 var LS_KEY='re_vsl_v4';
 async function loadProdutos(){
   // Cache local
@@ -484,6 +523,7 @@ document.addEventListener('keydown',function(e){
 });
 
 // ── INIT ──────────────────────────────────────────────────────────────────
+loadVideo();
 if('requestIdleCallback'in window){requestIdleCallback(function(){loadProdutos();},{timeout:1500});}else{setTimeout(loadProdutos,100);}
 
 // ── Faixa carrinho persistente ────────────────────────────────
