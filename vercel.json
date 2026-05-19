@@ -261,6 +261,10 @@
     {
       "source": "/((?!api/).*)",
       "destination": "/home.html"
+    },
+    {
+      "source": "/produto",
+      "destination": "/produto.html"
     }
   ],
   "headers": [
