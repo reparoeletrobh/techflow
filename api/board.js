@@ -2000,7 +2000,7 @@ module.exports = async function handler(req, res) {
   if (req.method === 'POST' && action === 'add-loja-card') {
     const { flFichaId, pipefyId, title, nomeContato, telefone, phaseId: startPhase } = req.body || {};
     if (!flFichaId || !title) return res.status(400).json({ ok:false, error:'flFichaId e title obrigatorios' });
-    const board = await loadBoard();
+    const board = sanitizeBoard(await dbGet(BOARD_KEY));
     if (board.cards.find(c => c.flFichaId === flFichaId)) {
       return res.status(200).json({ ok:true, msg:'ja_existe' });
     }
