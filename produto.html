@@ -431,6 +431,25 @@ footer{padding:24px 20px;border-top:1px solid var(--border);text-align:center;}
   padding:10px 13px;font-size:12px;color:var(--green);
   margin-bottom:16px;display:flex;align-items:center;gap:7px;
 }
+
+.pgto-opts{display:flex;flex-direction:column;gap:8px;}
+.pgto-opt{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 14px;border-radius:9px;
+  border:1.5px solid var(--border);cursor:pointer;
+  transition:all .15s;
+}
+.pgto-opt:has(input:checked){border-color:var(--yellow);background:rgba(245,200,0,.05);}
+.pgto-opt input{display:none;}
+.pgto-ic{font-size:20px;flex-shrink:0;}
+.pgto-opt strong{display:block;font-size:13px;font-weight:600;}
+.pgto-opt small{font-size:11px;color:var(--muted);}
+.ck-desconto{
+  text-align:center;font-size:12px;color:var(--green);font-weight:600;
+  margin-bottom:8px;display:none;
+}
+.ck-desconto.show{display:block;}
+
 .ck-submit{
   width:100%;padding:15px;border-radius:10px;
   background:var(--yellow);color:#000;
@@ -641,17 +660,37 @@ function finalizarCarrinho(){
 
 // ── Modal Checkout ──────────────────────────────────────────
 function abrirCK(cart){
-  // Preencher resumo
-  var total = cart.reduce(function(a,x){return a+parseFloat(x.preco);},0);
-  var sumHtml = '<div class="ck-sum-title">Resumo do Pedido</div>';
-  cart.forEach(function(item){
-    sumHtml += '<div class="ck-sum-item"><span>'+item.nome+'</span><span class="ck-sum-price">'+R(item.preco)+'</span></div>';
-  });
-  sumHtml += '<div class="ck-sum-item"><span>Total</span><span class="ck-sum-price">'+R(total)+'</span></div>';
-  document.getElementById('ck-summary').innerHTML = sumHtml;
+  renderResumoCK(cart, isPix());
   document.getElementById('ck-overlay').classList.add('open');
   document.body.style.overflow='hidden';
   setTimeout(function(){document.getElementById('ck-nome').focus();},200);
+}
+
+function isPix(){
+  var sel = document.querySelector('input[name="pgto"]:checked');
+  return !sel || sel.value === 'pix';
+}
+
+function renderResumoCK(cart, pix){
+  var subtotal = cart.reduce(function(a,x){return a+parseFloat(x.preco);},0);
+  var desconto = pix ? subtotal * 0.10 : 0;
+  var total    = subtotal - desconto;
+  var sumHtml  = '<div class="ck-sum-title">Resumo do Pedido</div>';
+  cart.forEach(function(item){
+    sumHtml += '<div class="ck-sum-item"><span>'+item.nome+'</span><span class="ck-sum-price">'+R(item.preco)+'</span></div>';
+  });
+  if(pix && desconto > 0){
+    sumHtml += '<div class="ck-sum-item" style="color:var(--green)"><span>Desconto PIX (-10%)</span><span>- '+R(desconto)+'</span></div>';
+  }
+  sumHtml += '<div class="ck-sum-item"><span>Total</span><span class="ck-sum-price">'+R(total)+'</span></div>';
+  document.getElementById('ck-summary').innerHTML = sumHtml;
+  var badge = document.getElementById('ck-desconto');
+  if(badge) badge.classList.toggle('show', pix && desconto > 0);
+}
+
+function atualizarResumoPgto(){
+  var cart = getCart();
+  renderResumoCK(cart, isPix());
 }
 function fecharCK(){
   document.getElementById('ck-overlay').classList.remove('open');
@@ -672,12 +711,18 @@ async function enviarCheckout(){
   btn.textContent='⏳ Aguarde...';
 
   var cart = getCart();
+  var pix  = isPix();
+  // Aplicar desconto de 10% se forma de pagamento for PIX
+  var itens = cart.map(function(x){
+    var preco = pix ? Math.round(parseFloat(x.preco) * 0.90 * 100) / 100 : parseFloat(x.preco);
+    return {id:x.id, codigo:x.codigo, nome:x.nome + (pix?' (PIX -10%)':''), preco:preco, foto:x.foto};
+  });
   try{
     var r = await fetch('/api/checkout-mp-criar',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
-        itens: cart.map(function(x){return {id:x.id,codigo:x.codigo,nome:x.nome,preco:x.preco,foto:x.foto};}),
+        itens: itens,
         comprador: {nome:nome, telefone:tel, cpf:cpf, endereco:end, cep:cep}
       })
     });
@@ -926,6 +971,28 @@ init();
         <label>CEP <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
         <input type="text" id="ck-cep" placeholder="00000-000" maxlength="9" autocomplete="postal-code">
       </div>
+      <div class="form-row">
+        <label>Forma de pagamento</label>
+        <div class="pgto-opts">
+          <label class="pgto-opt" id="pgto-pix">
+            <input type="radio" name="pgto" value="pix" checked onchange="atualizarResumoPgto()">
+            <span class="pgto-ic">💚</span>
+            <span>
+              <strong>PIX</strong>
+              <small>10% de desconto · recebimento imediato</small>
+            </span>
+          </label>
+          <label class="pgto-opt" id="pgto-card">
+            <input type="radio" name="pgto" value="cartao" onchange="atualizarResumoPgto()">
+            <span class="pgto-ic">💳</span>
+            <span>
+              <strong>Cartão de Crédito</strong>
+              <small>Até 3x sem juros</small>
+            </span>
+          </label>
+        </div>
+      </div>
+      <div class="ck-desconto" id="ck-desconto">💚 10% de desconto aplicado no PIX!</div>
       <button class="ck-submit" id="ck-submit" onclick="enviarCheckout()">
         🔒 Ir para Pagamento Seguro
       </button>
