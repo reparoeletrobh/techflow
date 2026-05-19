@@ -116,7 +116,15 @@ module.exports = async function handler(req, res) {
       }
       for (const card of cards) {
         const jaExiste = db.fichas.find(f => f.pipefyId === card.pipefyId);
-        if (jaExiste) continue;
+        if (jaExiste) {
+          // Se estava comprado e voltou para Analise de Compra no Pipefy → reabrir
+          if (jaExiste.status === 'comprado') {
+            jaExiste.status = 'analise';
+            added++;
+          }
+          // Se nao_comprado → manter bloqueado (decisão explícita)
+          continue;
+        }
         if (db.syncedIds.includes(card.pipefyId)) continue;
         db.fichas.unshift({
           id:          card.pipefyId,
