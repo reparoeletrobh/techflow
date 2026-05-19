@@ -380,6 +380,90 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);overflow-x:hid
 footer{padding:24px 20px;border-top:1px solid var(--border);text-align:center;}
 .fb{font-family:var(--fh);font-size:16px;font-weight:900;}.fb b{color:var(--yellow);}
 .fs{font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:4px;letter-spacing:.5px;}
+
+/* ══ MODAL CHECKOUT ══════════════════════════════════════════ */
+.ck-overlay{
+  position:fixed;inset:0;z-index:500;
+  background:rgba(0,0,0,.8);backdrop-filter:blur(6px);
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;
+  opacity:0;pointer-events:none;transition:opacity .25s;
+}
+.ck-overlay.open{opacity:1;pointer-events:all;}
+.ck-modal{
+  background:#0d1117;border:1px solid var(--border2);
+  border-radius:16px;width:100%;max-width:440px;
+  overflow:hidden;position:relative;
+}
+.ck-hd{
+  padding:20px 22px 16px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.ck-title{font-family:var(--fh);font-size:20px;font-weight:700;}
+.ck-close{
+  width:34px;height:34px;border-radius:50%;
+  background:var(--s2);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:18px;color:var(--soft);transition:all .15s;
+}
+.ck-close:hover{color:var(--text);}
+.ck-body{padding:20px 22px;}
+.ck-summary{
+  background:var(--s1);border:1px solid var(--border);border-radius:10px;
+  padding:14px;margin-bottom:18px;
+}
+.ck-sum-title{font-size:12px;font-weight:600;color:var(--soft);margin-bottom:8px;font-family:var(--fm);text-transform:uppercase;letter-spacing:1px;}
+.ck-sum-item{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:4px;}
+.ck-sum-item:last-child{margin-bottom:0;padding-top:8px;border-top:1px solid var(--border);font-weight:700;}
+.ck-sum-price{color:var(--yellow);font-family:var(--fh);font-size:15px;}
+.form-row{margin-bottom:14px;}
+.form-row label{display:block;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--soft);margin-bottom:5px;}
+.form-row input{
+  width:100%;background:var(--s1);border:1px solid var(--border);
+  border-radius:8px;padding:11px 13px;
+  font-family:var(--fb);font-size:14px;color:var(--text);outline:none;
+  transition:border-color .15s;
+}
+.form-row input:focus{border-color:var(--yellow);}
+.form-row input::placeholder{color:var(--muted);}
+.ck-parcelas{
+  background:var(--s1);border:1px solid rgba(45,206,118,.2);border-radius:8px;
+  padding:10px 13px;font-size:12px;color:var(--green);
+  margin-bottom:16px;display:flex;align-items:center;gap:7px;
+}
+.ck-submit{
+  width:100%;padding:15px;border-radius:10px;
+  background:var(--yellow);color:#000;
+  font-family:var(--fb);font-size:15px;font-weight:700;
+  border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:all .2s;
+}
+.ck-submit:hover{background:#ffd500;}
+.ck-submit:disabled{opacity:.6;cursor:not-allowed;transform:none!important;}
+.ck-footer{padding:12px 22px 18px;text-align:center;font-size:11px;color:var(--muted);}
+.ck-footer svg{vertical-align:middle;margin-right:4px;}
+
+/* Tela de retorno MP */
+.mp-return{
+  display:none;
+  position:fixed;inset:0;z-index:600;
+  background:#080b0f;
+  align-items:center;justify-content:center;
+  flex-direction:column;gap:16px;text-align:center;padding:24px;
+}
+.mp-return.show{display:flex;}
+.mp-return-icon{font-size:64px;}
+.mp-return-title{font-family:var(--fh);font-size:28px;font-weight:900;}
+.mp-return-sub{font-size:14px;color:var(--soft);max-width:360px;line-height:1.6;}
+.mp-return-btn{
+  padding:14px 32px;border-radius:10px;
+  background:var(--yellow);color:#000;
+  font-family:var(--fb);font-size:15px;font-weight:700;
+  border:none;cursor:pointer;transition:all .2s;margin-top:8px;
+}
+.mp-return-btn:hover{background:#ffd500;}
+
 .loading{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - var(--bar));flex-direction:column;gap:12px;}
 .spinner{width:26px;height:26px;border:2px solid var(--border);border-top-color:var(--yellow);border-radius:50%;animation:spin .7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -551,10 +635,67 @@ function tirarDuvidaCarrinho(){
 function finalizarCarrinho(){
   var cart=getCart();
   if(!cart.length)return;
-  // TODO: integrar com Mercado Pago
-  // Por enquanto, armazenar carrinho e redirecionar para checkout
-  try{ localStorage.setItem('re_checkout_cart', JSON.stringify(cart)); }catch(e){}
-  alert('Checkout com Mercado Pago em breve!\n\nEm caso de urgência use o WhatsApp abaixo.');
+  fecharCarrinho();
+  abrirCK(cart);
+}
+
+// ── Modal Checkout ──────────────────────────────────────────
+function abrirCK(cart){
+  // Preencher resumo
+  var total = cart.reduce(function(a,x){return a+parseFloat(x.preco);},0);
+  var sumHtml = '<div class="ck-sum-title">Resumo do Pedido</div>';
+  cart.forEach(function(item){
+    sumHtml += '<div class="ck-sum-item"><span>'+item.nome+'</span><span class="ck-sum-price">'+R(item.preco)+'</span></div>';
+  });
+  sumHtml += '<div class="ck-sum-item"><span>Total</span><span class="ck-sum-price">'+R(total)+'</span></div>';
+  document.getElementById('ck-summary').innerHTML = sumHtml;
+  document.getElementById('ck-overlay').classList.add('open');
+  document.body.style.overflow='hidden';
+  setTimeout(function(){document.getElementById('ck-nome').focus();},200);
+}
+function fecharCK(){
+  document.getElementById('ck-overlay').classList.remove('open');
+  document.body.style.overflow='';
+}
+
+async function enviarCheckout(){
+  var nome  = document.getElementById('ck-nome').value.trim();
+  var tel   = document.getElementById('ck-tel').value.trim();
+  var cpf   = document.getElementById('ck-cpf').value.trim();
+  var end   = document.getElementById('ck-end').value.trim();
+  var cep   = document.getElementById('ck-cep').value.trim();
+  if(!nome || !tel){ alert('Preencha nome e telefone.'); return; }
+  if(!end){ alert('Preencha o endereço de entrega.'); return; }
+
+  var btn = document.getElementById('ck-submit');
+  btn.disabled=true;
+  btn.textContent='⏳ Aguarde...';
+
+  var cart = getCart();
+  try{
+    var r = await fetch('/api/checkout-mp-criar',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        itens: cart.map(function(x){return {id:x.id,codigo:x.codigo,nome:x.nome,preco:x.preco,foto:x.foto};}),
+        comprador: {nome:nome, telefone:tel, cpf:cpf, endereco:end, cep:cep}
+      })
+    });
+    var d = await r.json();
+    if(d.ok && d.checkoutUrl){
+      // Salvar cart para pós-compra
+      try{ localStorage.setItem('re_checkout_cart', JSON.stringify(cart)); }catch(e){}
+      window.location.href = d.checkoutUrl;
+    } else {
+      alert('Erro ao gerar checkout: '+(d.error||'tente novamente'));
+      btn.disabled=false;
+      btn.innerHTML='🔒 Ir para Pagamento Seguro';
+    }
+  }catch(e){
+    alert('Erro de conexão: '+e.message);
+    btn.disabled=false;
+    btn.innerHTML='🔒 Ir para Pagamento Seguro';
+  }
 }
 
 // ── CTAs produto ──────────────────────────────────────────────
@@ -737,6 +878,84 @@ async function init(){
   }
 }
 init();
+
+// Verificar retorno do Mercado Pago
+(function(){
+  var mp = new URLSearchParams(location.search).get('mp');
+  if(mp==='success'){
+    document.getElementById('mp-success').classList.add('show');
+    try{ localStorage.removeItem('re_cart_v1'); }catch(e){} // limpar carrinho
+  } else if(mp==='failure'){
+    document.getElementById('mp-failure').classList.add('show');
+  } else if(mp==='pending'){
+    document.getElementById('mp-pending').classList.add('show');
+  }
+})();
+
 </script>
+
+<!-- ══ MODAL CHECKOUT ════════════════════════════════════════ -->
+<div class="ck-overlay" id="ck-overlay">
+  <div class="ck-modal">
+    <div class="ck-hd">
+      <div class="ck-title">Finalizar Compra</div>
+      <div class="ck-close" onclick="fecharCK()">×</div>
+    </div>
+    <div class="ck-body">
+      <div class="ck-summary" id="ck-summary"></div>
+      <div class="ck-parcelas">
+        💳 Parcelamos em <strong>3x sem juros</strong> no cartão &nbsp;|&nbsp; 💚 10% off no PIX
+      </div>
+      <div class="form-row">
+        <label>Nome completo *</label>
+        <input type="text" id="ck-nome" placeholder="Seu nome" autocomplete="name">
+      </div>
+      <div class="form-row">
+        <label>Telefone / WhatsApp *</label>
+        <input type="tel" id="ck-tel" placeholder="(31) 9 9999-9999" autocomplete="tel">
+      </div>
+      <div class="form-row">
+        <label>CPF <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
+        <input type="text" id="ck-cpf" placeholder="000.000.000-00" maxlength="14" autocomplete="off">
+      </div>
+      <div class="form-row">
+        <label>Endereço completo *</label>
+        <input type="text" id="ck-end" placeholder="Rua, número, bairro, cidade" autocomplete="street-address">
+      </div>
+      <div class="form-row">
+        <label>CEP <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
+        <input type="text" id="ck-cep" placeholder="00000-000" maxlength="9" autocomplete="postal-code">
+      </div>
+      <button class="ck-submit" id="ck-submit" onclick="enviarCheckout()">
+        🔒 Ir para Pagamento Seguro
+      </button>
+    </div>
+    <div class="ck-footer">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--muted)"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+      Pagamento 100% seguro via Mercado Pago
+    </div>
+  </div>
+</div>
+
+<!-- ══ RETORNO MP ══════════════════════════════════════════════ -->
+<div class="mp-return" id="mp-success">
+  <div class="mp-return-icon">✅</div>
+  <div class="mp-return-title" style="color:var(--green)">Pagamento Aprovado!</div>
+  <div class="mp-return-sub">Sua compra foi confirmada. Em breve entraremos em contato para combinar a entrega.</div>
+  <button class="mp-return-btn" onclick="location.href='/'">Voltar ao início</button>
+</div>
+<div class="mp-return" id="mp-failure">
+  <div class="mp-return-icon">❌</div>
+  <div class="mp-return-title" style="color:#ff4b4b">Pagamento não aprovado</div>
+  <div class="mp-return-sub">Houve um problema com o seu pagamento. Tente novamente ou escolha outra forma.</div>
+  <button class="mp-return-btn" onclick="document.getElementById('mp-failure').classList.remove('show')">Tentar novamente</button>
+</div>
+<div class="mp-return" id="mp-pending">
+  <div class="mp-return-icon">⏳</div>
+  <div class="mp-return-title" style="color:var(--yellow)">Pagamento Pendente</div>
+  <div class="mp-return-sub">Seu pagamento está sendo processado. Assim que confirmado, entraremos em contato.</div>
+  <button class="mp-return-btn" onclick="location.href='/'">Voltar ao início</button>
+</div>
+
 </body>
 </html>
