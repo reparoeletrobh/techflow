@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   const MP_TOKEN = process.env.MP_ACCESS_TOKEN || '';
   if (!MP_TOKEN) return res.status(500).json({ ok: false, error: 'MP_ACCESS_TOKEN não configurado' });
 
-  const { itens, comprador } = req.body || {};
+  const { itens, comprador, metodoPagamento } = req.body || {};
   if (!itens?.length) return res.status(400).json({ ok: false, error: 'itens obrigatório' });
 
   const proto = req.headers['x-forwarded-proto'] || 'https';
@@ -42,10 +42,26 @@ export default async function handler(req, res) {
         : undefined
     } : {},
 
-    payment_methods: {
-      installments:         3,   // máximo 3 parcelas
-      no_interest_installments: 3 // até 3x sem juros (merchant absorve)
-    },
+    payment_methods: metodoPagamento === 'pix'
+      ? {
+          // Apenas PIX (preço com 10% de desconto já aplicado)
+          excluded_payment_types: [
+            { id: 'credit_card' },
+            { id: 'debit_card' },
+            { id: 'ticket' },
+            { id: 'atm' }
+          ]
+        }
+      : {
+          // Apenas Cartão de Crédito (preço cheio, 3x sem juros)
+          excluded_payment_types: [
+            { id: 'bank_transfer' }, // exclui PIX
+            { id: 'ticket' },
+            { id: 'atm' }
+          ],
+          installments:             3,
+          no_interest_installments: 3
+        },
 
     back_urls: {
       success: `${siteUrl}/produto.html?mp=success`,
