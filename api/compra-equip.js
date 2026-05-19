@@ -47,23 +47,16 @@ async function pipefyQuery(query) {
 
 // Busca cards em "Analise de Compra" no Pipefy
 async function fetchAnaliseCompra() {
-  // Passo 1: achar o ID da fase dentro do pipe
-  const phasesData = await pipefyQuery(
-    'query { pipe(id: "' + PIPE_ID + '") { phases { id name } } }'
+  const data = await pipefyQuery(
+    'query { pipe(id: "' + PIPE_ID + '") { phases { name cards(first: 200) { edges { node { id title fields { name value } } } } } } }'
   );
-  const phases = phasesData?.pipe?.phases || [];
+  const phases = data?.pipe?.phases || [];
   const ph = phases.find(p => {
     const n = p.name.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     return n === 'analise de compra' || (n.includes('analise') && n.includes('compra'));
   });
   if (!ph) return [];
-  // Passo 2: buscar cards via pipe.phase (contexto do pipe — evita problema de permissão)
-  const cardsData = await pipefyQuery(
-    'query { pipe(id: "' + PIPE_ID + '") { phase(id: "' + ph.id + '") { cards_count cards { edges { node { id title fields { name value } } } } } } }'
-  );
-  const phaseCards = cardsData?.pipe?.phase;
-  if (!phaseCards) return [];
-  return (phaseCards.cards?.edges || []).map(({ node }) => {
+  return (ph.cards?.edges || []).map(({ node }) => {
     const fields = node.fields || [];
     const get = (kw) => fields.find(f => f.name.toLowerCase().includes(kw))?.value || "";
     return {
@@ -98,16 +91,13 @@ module.exports = async function handler(req, res) {
     let added = 0, pipefyError = null;
     try {
       const cards = await fetchAnaliseCompra();
-      // Só limpar syncedIds se encontrou cards (evita limpar tudo quando fase não é encontrada)
       if (cards.length > 0) {
         const idsNaFase = new Set(cards.map(c => c.pipefyId));
         db.syncedIds = db.syncedIds.filter(id => idsNaFase.has(id));
       }
       for (const card of cards) {
-        // Pular se já existe ficha para este card (qualquer status — não re-adicionar)
         const jaExiste = db.fichas.find(f => f.pipefyId === card.pipefyId);
         if (jaExiste) continue;
-        // Pular se já está em syncedIds
         if (db.syncedIds.includes(card.pipefyId)) continue;
         db.fichas.unshift({
           id:          card.pipefyId,
@@ -126,9 +116,8 @@ module.exports = async function handler(req, res) {
       }
       if (added > 0) await dbSet(COMPRA_KEY, db);
     } catch(e) { pipefyError = e.message; }
-    const ph2 = await pipefyQuery('query{pipe(id:"'+PIPE_ID+'"){phases{name}}}').catch(()=>null);
-    const phaseNames = ph2?.pipe?.phases?.map(p=>p.name)||[];
-    return res.status(200).json({ ok:true, added, pipefyError, phaseNames });
+    const _diag = await fetchAnaliseCompra().catch(()=>[]);
+    return res.status(200).json({ ok:true, added, pipefyError, totalNaFase: _diag.length, titulos: _diag.map(x=>x.title||x.nomeContato).slice(0,40) });
   }
 
   // ── POST recomendar — registra recomendação
@@ -213,7 +202,7 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  if (req.method === "POST" && action === "marcar-cadastrado-vendas") {
+  if (method === "POST" && action === "marcar-cadastrado-vendas") {
     const { id, dadosVendas } = req.body || {};
     if (!id) return res.status(400).json({ ok: false, error: "id obrigatorio" });
     const db = await dbGet(COMPRA_KEY) || defaultDB();
