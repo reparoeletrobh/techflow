@@ -48,7 +48,7 @@ async function pipefyQuery(query) {
 // Busca cards em "Analise de Compra" no Pipefy
 async function fetchAnaliseCompra() {
   const data = await pipefyQuery(
-    'query { pipe(id: "' + PIPE_ID + '") { phases { name cards(first: 50) { edges { node { id title fields { name value } } } } } } }'
+    'query { pipe(id: "' + PIPE_ID + '") { phases { name cards(first: 200) { edges { node { id title fields { name value } } } } } } }'
   );
   const phases = data?.pipe?.phases || [];
   const ph = phases.find(p => {
