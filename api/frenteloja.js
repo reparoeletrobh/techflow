@@ -157,15 +157,20 @@ export default async function handler(req,res){
   }
 
   if(req.method==='POST'&&action==='conserto-realizado'){
-    const {pipefyCardId}=req.body||{};
-    if(!pipefyCardId)return res.status(400).json({ok:false,error:'pipefyCardId obrigatório'});
+    const {pipefyCardId, fichaId}=req.body||{};
+    if(!pipefyCardId && !fichaId)
+      return res.status(400).json({ok:false,error:'pipefyCardId ou fichaId obrigatório'});
     const db=await dbGet(FL_KEY)||defaultDB();
-    const ficha=db.fichas.find(f=>f.pipefyCardId===String(pipefyCardId));
+    // Buscar por fichaId (preferencial, sem Pipefy) ou por pipefyCardId (legado)
+    const ficha = fichaId
+      ? db.fichas.find(f=>f.id===String(fichaId))
+      : db.fichas.find(f=>f.pipefyCardId===String(pipefyCardId));
     if(!ficha)return res.status(404).json({ok:false,error:'Ficha não encontrada'});
     const now=new Date().toISOString();
     ficha.phase='conserto_realizado';ficha.liberadoHoje=true;ficha.movedAt=now;
     ficha.history=(ficha.history||[]).concat([{phase:'conserto_realizado',ts:now}]);
-    await dbSet(FL_KEY,db);return res.status(200).json({ok:true,ficha});
+    await dbSet(FL_KEY,db);
+    return res.status(200).json({ok:true,ficha});
   }
 
   if(req.method==='POST'&&action==='programar-entrega'){
