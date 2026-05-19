@@ -2003,8 +2003,14 @@ module.exports = async function handler(req, res) {
     const { flFichaId, pipefyId, title, nomeContato, telefone, phaseId: startPhase } = req.body || {};
     if (!flFichaId || !title) return res.status(400).json({ ok:false, error:'flFichaId e title obrigatorios' });
     const board = sanitizeBoard(await dbGet(BOARD_KEY));
-    if (board.cards.find(c => c.flFichaId === flFichaId)) {
-      return res.status(200).json({ ok:true, msg:'ja_existe' });
+    const existingCard = board.cards.find(c => c.flFichaId === flFichaId);
+    if (existingCard) {
+      // Corrigir pipefyId se estava null
+      if (!existingCard.pipefyId) {
+        existingCard.pipefyId = pipefyId || flFichaId;
+        await dbSet(BOARD_KEY, board);
+      }
+      return res.status(200).json({ ok:true, msg:'ja_existe', pipefyId: existingCard.pipefyId });
     }
     const newCard = {
       id:          flFichaId + '-loja',
