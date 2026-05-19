@@ -141,6 +141,45 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
 .sk-img{height:260px;}.sk-body{padding:16px;display:flex;flex-direction:column;gap:10px;}
 .sk-line{height:12px;}.sk-sm{height:10px;width:55%;}.sk-btn{height:42px;border-radius:8px;margin-top:6px;}
 
+
+/* ── Faixa carrinho persistente (aparece quando tem itens) ── */
+.cart-strip{
+  position:fixed;bottom:0;left:0;right:0;z-index:200;
+  height:62px;
+  background:#0d1117;
+  border-top:1.5px solid var(--yellow);
+  box-shadow:0 -6px 24px rgba(0,0,0,.7);
+  display:none; /* hidden by default */
+  align-items:center;
+  padding:0 20px;gap:14px;
+}
+.cart-strip.show{display:flex;}
+.cs-del{
+  flex:1;font-size:12px;font-weight:500;color:var(--green);
+  display:flex;align-items:center;gap:5px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;
+}
+.cs-btn{
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  padding:0 22px;height:42px;border-radius:9px;
+  background:var(--yellow);color:#000;
+  font-family:var(--fb);font-size:13px;font-weight:700;
+  border:none;cursor:pointer;white-space:nowrap;flex-shrink:0;
+  transition:all .18s;position:relative;
+}
+.cs-btn:hover{background:#ffd500;}
+.cs-badge{
+  position:absolute;top:-6px;right:-6px;
+  width:17px;height:17px;border-radius:50%;
+  background:#ff4b4b;color:#fff;
+  font-size:9px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+}
+@media(max-width:600px){
+  .cart-strip{height:56px;padding:0 14px;gap:8px;}
+  .cs-del{font-size:11px;}
+  .cs-btn{padding:0 14px;height:38px;font-size:12px;}
+}
 </style>
 </head>
 <body>
@@ -446,6 +485,48 @@ document.addEventListener('keydown',function(e){
 
 // ── INIT ──────────────────────────────────────────────────────────────────
 if('requestIdleCallback'in window){requestIdleCallback(function(){loadProdutos();},{timeout:1500});}else{setTimeout(loadProdutos,100);}
+
+// ── Faixa carrinho persistente ────────────────────────────────
+function vslDelivery(){
+  var h=new Date().getHours(),m=new Date().getMinutes();
+  return (h*100+m)<=1545
+    ?'Comprando nos próximos 15 min — Entregamos AINDA HOJE!'
+    :'Comprando nos próximos 15 min — Entregamos em menos de 24 Horas!';
+}
+function getCartVSL(){ try{ return JSON.parse(localStorage.getItem('re_cart_v1')||'[]'); }catch(e){ return []; } }
+function updateCartStrip(){
+  var cart=getCartVSL();
+  var total=cart.reduce(function(a,x){ return a+(x.qty||1); },0);
+  var strip=document.getElementById('cart-strip');
+  var badge=document.getElementById('cs-badge');
+  var del=document.getElementById('cs-del');
+  if(!strip) return;
+  if(total>0){
+    strip.classList.add('show');
+    if(badge) badge.textContent=total;
+    if(del) del.innerHTML='🚚 <b>'+vslDelivery()+'</b>';
+    document.body.style.paddingBottom='70px';
+  } else {
+    strip.classList.remove('show');
+    document.body.style.paddingBottom='';
+  }
+}
+function irCarrinho(){
+  var cart=getCartVSL();
+  if(cart.length>0) window.location.href='/produto.html?id='+cart[0].id;
+}
+updateCartStrip();
+setInterval(updateCartStrip,2000);
+
 </script>
+
+<!-- ── Faixa carrinho persistente ─────────────────────────── -->
+<div class="cart-strip" id="cart-strip">
+  <div class="cs-del" id="cs-del">🚚 </div>
+  <button class="cs-btn" onclick="irCarrinho()" id="cs-btn">
+    🛒 Ver Carrinho
+    <span class="cs-badge" id="cs-badge">0</span>
+  </button>
+</div>
 </body>
 </html>
