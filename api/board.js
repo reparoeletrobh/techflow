@@ -593,9 +593,9 @@ module.exports = async function handler(req, res) {
       if (phaseId === 'loja_feito') {
         try {
           const flBaseUrl = process.env.FL_BASE_URL || 'https://reparoeletroadm.com';
-          // Extrair fichaId do título do card (formato: "... OS:xxxx")
-          const osMatch = (card.title || '').match(/OS:([a-zA-Z0-9]+)/);
-          const fichaId = osMatch ? osMatch[1] : null;
+          // Usar flFichaId direto (confiável) ou extrair do título como fallback
+          const osMatch = (card.title || '').match(/OS:([a-zA-Z0-9-]+)/);
+          const fichaId = card.flFichaId || (osMatch ? osMatch[1] : null);
           fetch(flBaseUrl+'/api/frenteloja?action=conserto-realizado', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1993,6 +1993,32 @@ module.exports = async function handler(req, res) {
     } catch(e) {
       return res.status(500).json({ ok: false, error: e.message });
     }
+  }
+
+
+  // ── POST add-loja-card ──────────────────────────────────────────────────
+  if (req.method === 'POST' && action === 'add-loja-card') {
+    const { flFichaId, pipefyId, title, nomeContato, telefone, phaseId: startPhase } = req.body || {};
+    if (!flFichaId || !title) return res.status(400).json({ ok:false, error:'flFichaId e title obrigatorios' });
+    const board = await loadBoard();
+    if (board.cards.find(c => c.flFichaId === flFichaId)) {
+      return res.status(200).json({ ok:true, msg:'ja_existe' });
+    }
+    const newCard = {
+      id:          flFichaId + '-loja',
+      pipefyId:    pipefyId || null,
+      flFichaId:   flFichaId,
+      title:       title,
+      nomeContato: nomeContato || '',
+      telefone:    telefone   || '',
+      phaseId:     startPhase || 'producao',
+      addedAt:     new Date().toISOString(),
+      movedAt:     new Date().toISOString(),
+      movedBy:     'Frenteloja',
+    };
+    board.cards.push(newCard);
+    await dbSet(BOARD_KEY, board);
+    return res.status(200).json({ ok:true, card: newCard });
   }
 
       return res.status(404).json({ ok: false, error: "Ação não encontrada" });
