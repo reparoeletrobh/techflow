@@ -128,6 +128,12 @@ select option{background:var(--s2)}
   .tabs{gap:0;overflow-x:auto}
   .tab{font-size:9px;padding:8px 12px}
 }
+.vbtns{display:flex;gap:5px;flex-shrink:0;margin-left:4px}
+.vbtn{padding:4px 9px;border-radius:5px;font-size:11px;font-weight:600;border:none;cursor:pointer;transition:all .15s;white-space:nowrap;font-family:var(--fb)}
+.vbtn-ver{background:rgba(59,158,255,.12);color:#3b9eff}.vbtn-ver:hover{background:rgba(59,158,255,.25)}
+.vbtn-wa{background:rgba(37,211,102,.12);color:#25d366}.vbtn-wa:hover{background:rgba(37,211,102,.25)}
+.vbtn-del{background:rgba(255,75,75,.08);color:#ff4b4b}.vbtn-del:hover{background:rgba(255,75,75,.2)}
+.sep-body{font-family:var(--fm);font-size:11px;line-height:1.9;white-space:pre-wrap;color:var(--text);background:var(--s2);border-radius:8px;padding:14px;margin-bottom:14px;max-height:360px;overflow-y:auto}
 </style>
 </head>
 <body>
@@ -230,6 +236,17 @@ select option{background:var(--s2)}
   </div>
 </div>
 
+<!-- MODAL VER VENDA -->
+<div class="ovl" id="ovl-sep">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-title">📦 Ficha de Separação</div>
+    <div class="sep-body" id="sep-body"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn b-primary" id="sep-wa-btn" onclick="enviarSepWA()">💬 Enviar ao Cliente</button>
+      <button class="btn b-ghost" onclick="closeOvl('ovl-sep')">Fechar</button>
+    </div>
+  </div>
+</div>
 <!-- MODAL DESTAQUE -->
 <div class="ovl" id="ovl-dest">
   <div class="modal">
@@ -503,19 +520,68 @@ async function loadVendas(){
   document.getElementById('r-tkt').textContent='R$ '+tkt;
   const fdt=s=>new Date(s).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
   document.getElementById('vlist').innerHTML=VENDAS.length?
-    VENDAS.slice(0,100).map(v=>`<div class="vrow">
+    VENDAS.slice(0,100).map((v,i)=>`<div class="vrow">
       <div class="vos">${v.produto?.codigo||'—'}</div>
       <div class="vinfo">
-        <div class="vnome">${v.produto?.descricao||'—'}</div>
+        <div class="vnome">${v.produto?.descricao||v.produto?.nome||'—'}</div>
         <div class="vcomp">${v.comprador?.nome||'—'} · ${v.comprador?.telefone||''}</div>
       </div>
       <div class="vprov">${v.provedor||'—'}</div>
       <div class="vval">${R(v.valor)}</div>
       <div class="vdata">${fdt(v.criadoEm)}</div>
+      <div class="vbtns">
+        <button class="vbtn vbtn-ver" onclick="verVenda(${i})">📦 Ver Venda</button>
+        <button class="vbtn vbtn-wa" onclick="iniciarConversa(${i})">💬 WA</button>
+        <button class="vbtn vbtn-del" onclick="removerVenda('${v.id}')">✕</button>
+      </div>
     </div>`).join(''):
     '<div style="color:var(--muted);font-family:var(--fm);font-size:12px;padding:8px 0">Sem vendas ainda</div>';
 }
 
+
+var _vSel=null;
+function textoSep(v){
+  const fm=n=>parseFloat(n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,style:'currency',currency:'BRL'});
+  const dt=new Date(v.criadoEm).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',year:'numeric'});
+  const pg=v.paymentMethod==='pix'?'PIX à vista':`Cartão ${v.installments||1}x`;
+  return ['📦 *SEPARAÇÃO — ALMOXARIFADO*','',
+    `📅 Data: ${dt}`,`🏷️ Código: ${v.produto?.codigo||'—'}`,
+    `📦 Produto: ${v.produto?.descricao||v.produto?.nome||'—'}`,
+    `💰 Valor: ${fm(v.valor)}`,`💳 Pagamento: ${pg}`,'',
+    `👤 Comprador: ${v.comprador?.nome||'—'}`,
+    v.comprador?.telefone?`📱 Telefone: ${v.comprador.telefone}`:null,
+    v.comprador?.cpf?`🪪 CPF: ${v.comprador.cpf}`:null,
+    v.comprador?.endereco?`📍 Endereço: ${v.comprador.endereco}`:null,
+    v.comprador?.cep?`📮 CEP: ${v.comprador.cep}`:null,
+    '',`🔑 ID: ${v.paymentId||'—'}`
+  ].filter(l=>l!==null).join('\n');
+}
+function verVenda(i){
+  _vSel=VENDAS[i];if(!_vSel)return;
+  document.getElementById('sep-body').textContent=textoSep(_vSel);
+  document.getElementById('sep-wa-btn').style.display=_vSel.comprador?.telefone?'':'none';
+  document.getElementById('ovl-sep').classList.add('on');
+}
+function enviarSepWA(){
+  if(!_vSel)return;
+  const tel=(_vSel.comprador?.telefone||'').replace(/\D/g,'');
+  if(!tel){toast('Telefone não disponível','err');return;}
+  window.open('https://wa.me/'+(tel.startsWith('55')?tel:'55'+tel)+'?text='+encodeURIComponent(textoSep(_vSel)),'_blank');
+}
+function iniciarConversa(i){
+  const v=VENDAS[i];if(!v)return;
+  const tel=(v.comprador?.telefone||'').replace(/\D/g,'');
+  if(!tel){toast('Telefone não disponível','err');return;}
+  window.open('https://wa.me/'+(tel.startsWith('55')?tel:'55'+tel)+'?text='+encodeURIComponent(textoSep(v)),'_blank');
+}
+async function removerVenda(id){
+  if(!confirm('Remover esta venda do relatório?'))return;
+  const r=await fetch('/api/tv-checkout?action=remover-venda',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({vendaId:id})
+  }).then(r=>r.json()).catch(()=>({}));
+  if(r.ok){toast('✅ Removido','ok');await loadVendas();}
+  else toast('❌ Erro','err');
+}
 // ── HELPERS ──────────────────────────────────────────────────────────────
 function closeOvl(id){document.getElementById(id).classList.remove('on');}
 document.querySelectorAll('.ovl').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('on');}));
