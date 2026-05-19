@@ -274,7 +274,12 @@ function mSVG(label){
   var s='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="#141414"/><text x="200" y="155" text-anchor="middle" fill="rgba(240,180,41,.3)" font-size="13" font-family="DM Mono,monospace">'+label+'</text></svg>';
   return 'data:image/svg+xml,'+encodeURIComponent(s);
 }
-function irProduto(id){ window.location.href='/produto.html?id='+id; }
+function irProduto(id){
+  // Salvar o produto clicado no localStorage para produto.html usar
+  var p = PROD.find(function(x){ return String(x.id)===String(id); });
+  if(p){ try{ localStorage.setItem('re_produto_pendente', JSON.stringify(p)); }catch(e){} }
+  window.location.href='/produto.html?id='+id;
+}
 var LS_KEY='re_vsl_v4';
 async function loadProdutos(){
   // Cache local
