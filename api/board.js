@@ -590,13 +590,19 @@ module.exports = async function handler(req, res) {
       await saveLogs(board);
 
       // ── Notifica Frente de Loja quando loja_feito ─────────────────
-      if (phaseId === 'loja_feito' && card.pipefyId) {
+      if (phaseId === 'loja_feito') {
         try {
           const flBaseUrl = process.env.FL_BASE_URL || 'https://reparoeletroadm.com';
+          // Extrair fichaId do título do card (formato: "... OS:xxxx")
+          const osMatch = (card.title || '').match(/OS:([a-zA-Z0-9]+)/);
+          const fichaId = osMatch ? osMatch[1] : null;
           fetch(flBaseUrl+'/api/frenteloja?action=conserto-realizado', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pipefyCardId: String(card.pipefyId) }),
+            body: JSON.stringify({
+              fichaId:      fichaId,
+              pipefyCardId: card.pipefyId ? String(card.pipefyId) : null,
+            }),
           }).catch(e => console.error('[FrenteLoja] loja_feito notify:', e.message));
         } catch(e) { console.error('[FrenteLoja]:', e.message); }
       }
