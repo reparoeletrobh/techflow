@@ -58,11 +58,24 @@ async function fetchAnaliseCompra() {
   });
   if (!ph) return [];
 
-  // Etapa 2: query raiz `phase(id)` — busca só os cards dessa fase
-  const cardsData = await pipefyQuery(
-    'query { phase(id: "' + ph.id + '") { cards(first: 200) { edges { node { id title fields { name value } } } } } }'
-  );
-  return (cardsData?.phase?.cards?.edges || []).map(({ node }) => {
+  // Etapa 2: buscar todos os cards com paginação por cursor
+  const allEdges = [];
+  let cursor = null;
+  let pagina = 0;
+  do {
+    const afterClause = cursor ? ', after: "' + cursor + '"' : '';
+    const cardsData = await pipefyQuery(
+      'query { phase(id: "' + ph.id + '") { cards(first: 30' + afterClause + ') { pageInfo { hasNextPage endCursor } edges { node { id title fields { name value } } } } } }'
+    );
+    const page = cardsData?.phase?.cards;
+    if (!page) break;
+    allEdges.push(...(page.edges || []));
+    if (!page.pageInfo?.hasNextPage) break;
+    cursor = page.pageInfo.endCursor;
+    pagina++;
+  } while (pagina < 20); // máx 20 páginas = 600 cards
+
+  return allEdges.map(({ node }) => {
     const fields = node.fields || [];
     const get = (kw) => fields.find(f => f.name.toLowerCase().includes(kw))?.value || "";
     return {
