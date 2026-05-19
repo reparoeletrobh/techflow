@@ -5,10 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Microondas Semi-novos — Reparo Eletro BH</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a0a0a'/%3E%3Crect x='4' y='9' width='24' height='14' rx='2' fill='none' stroke='%23c9b298' stroke-width='1.5'/%3E%3Crect x='20' y='11' width='6' height='10' rx='1' fill='%23c9b298' opacity='.4'/%3E%3C/svg%3E">
-<!-- Preconnect para reduzir latência DNS/TLS -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- Fonte não-bloqueante: carrega async, não trava o render -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,400;1,700&family=Inter:wght@300;400;500;600&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,400;1,700&family=Inter:wght@300;400;500;600&display=swap"></noscript>
 <style>
@@ -124,19 +122,11 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
 .btn-ck:hover{background:#d4be9e;transform:translateY(-2px);box-shadow:0 10px 24px rgba(201,178,152,.25)}
 .prod-btn svg{flex-shrink:0}
 
-/* ── SKELETON LOADING ──────────────────────────────────────── */
 @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
-.skeleton{
-  background:linear-gradient(90deg,#1a1a1a 25%,#222 50%,#1a1a1a 75%);
-  background-size:400px 100%;
-  animation:shimmer 1.2s infinite;
-  border-radius:6px;
-}
-.sk-card{background:#171717;border:1px solid rgba(201,178,152,0.08);border-radius:14px;overflow:hidden;}
-.sk-img{height:220px;}
-.sk-body{padding:16px;display:flex;flex-direction:column;gap:10px;}
-.sk-line{height:12px;} .sk-line-sm{height:10px;width:60%;}
-.sk-btn{height:42px;border-radius:8px;margin-top:8px;}
+.skeleton{background:linear-gradient(90deg,#1a1a1a 25%,#242424 50%,#1a1a1a 75%);background-size:400px 100%;animation:shimmer 1.3s infinite;border-radius:6px;}
+.sk-card{background:#171717;border:1px solid rgba(201,178,152,0.07);border-radius:14px;overflow:hidden;margin-bottom:0;}
+.sk-img{height:200px;} .sk-body{padding:16px;display:flex;flex-direction:column;gap:10px;}
+.sk-line{height:12px;} .sk-sm{height:10px;width:55%;} .sk-btn{height:42px;border-radius:8px;margin-top:6px;}
 
 
 .prod-card-img{position:relative;}
@@ -166,12 +156,12 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
     </div>
     <span class="vturb-placeholder">[ Insira aqui o código HTML do Vturb ]</span>
   </div>
-  <a href="#catalogo" class="btn-cta-primary fade-in">▼ Ver Catálogo de Microondas</a>
+  <a href="#catalogo" class="btn-cta-primary cta-catalog fade-in">▼ Ver Catálogo de Microondas</a>
   
 </section>
-<section class="catalog-section" id="catalogo">
+<section class="catalog-section" id="catalogo" style="min-height:400px">
   <p class="section-label fade-in">Catálogo Exclusivo</p>
-  <h2 class="section-title fade-in">Microondas Revisados & Garantidos</h2>
+  <h2 class="section-title catalog-title fade-in">Microondas Revisados & Garantidos</h2>
   <p class="section-sub fade-in">Todos com garantia de 3 meses • Entrega em BH e região</p>
   <div class="catalog-grid" id="catalog-grid"></div>
 </section>
@@ -284,20 +274,17 @@ function mSVG(label){
   var s='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="#141414"/><text x="200" y="155" text-anchor="middle" fill="rgba(240,180,41,.3)" font-size="13" font-family="DM Mono,monospace">'+label+'</text></svg>';
   return 'data:image/svg+xml,'+encodeURIComponent(s);
 }
-var LS_KEY = 'reelc_produtos_v2';
+var LS_KEY='re_vsl_v3';
 async function loadProdutos(){
-  // Mostrar do cache local imediatamente (0ms)
-  var cached = null;
-  try{ cached = JSON.parse(localStorage.getItem(LS_KEY)||'null'); }catch(e){}
-  if(cached && cached.ts && (Date.now()-cached.ts) < 300000){ // 5min
-    PROD = cached.data;
-    renderCatalog();
-    observeFadeIn();
-    document.getElementById('estq') && (document.getElementById('estq').textContent = PROD.length);
+  // Mostrar cache instantaneamente se disponível
+  var cached=null;
+  try{cached=JSON.parse(localStorage.getItem(LS_KEY)||'null');}catch(e){}
+  if(cached&&cached.ts&&(Date.now()-cached.ts)<300000){
+    PROD=cached.data; renderCatalog(); observeFadeIn();
+    var el=document.getElementById('estq'); if(el)el.textContent=PROD.length;
   } else {
-    // Mostrar skeleton enquanto carrega
-    var g = document.getElementById('catalog-grid');
-    if(g) g.innerHTML = Array(3).fill('<div class="sk-card"><div class="skeleton sk-img"></div><div class="sk-body"><div class="skeleton sk-line"></div><div class="skeleton sk-line sk-line-sm"></div><div class="skeleton sk-btn"></div></div></div>').join('');
+    var g=document.getElementById('catalog-grid');
+    if(g) g.innerHTML=Array(3).fill('<div class="sk-card"><div class="skeleton sk-img"></div><div class="sk-body"><div class="skeleton sk-line"></div><div class="skeleton sk-sm skeleton"></div><div class="skeleton sk-btn"></div></div></div>').join('');
   }
   try{
     var d = await fetch('/api/vendas?action=load').then(function(r){return r.json();});
@@ -316,8 +303,7 @@ async function loadProdutos(){
     });
     var el = document.getElementById('estq');
     if(el) el.textContent = PROD.length;
-    // Salvar no cache local para próxima visita
-    try{ localStorage.setItem(LS_KEY, JSON.stringify({ts:Date.now(), data:PROD})); }catch(e){}
+    try{localStorage.setItem(LS_KEY,JSON.stringify({ts:Date.now(),data:PROD}));}catch(e){}
   }catch(e){ console.error('loadProdutos:', e); }
   renderCatalog();
   observeFadeIn();
@@ -384,7 +370,7 @@ function submitCheckout(){
   closeCheckout();
 }
 
-(function(){var sx=0,sy=0,pid=null;document.addEventListener('touchstart',function(e){var t=e.changedTouches[0];sx=t.clientX;sy=t.clientY;var el=e.target;while(el&&!el.id?.startsWith('ph-'))el=el.parentElement;pid=el?el.id.replace('ph-',''):null;},{passive:true});document.addEventListener('touchend',function(e){if(!pid)return;var t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;if(Math.abs(dx)<30||Math.abs(dy)>Math.abs(dx))return;var fakeEv={stopPropagation:function(){}};slideP(pid,dx<0?1:-1,fakeEv);},{passive:true});})();
+(function(){var sx=0,sy=0,pid=null;document.addEventListener('touchstart',function(e){var t=e.changedTouches[0];sx=t.clientX;sy=t.clientY;var el=e.target;while(el&&!el.id?.startsWith('ph-'))el=el.parentElement;pid=el?el.id.replace('ph-',''):null;},{passive:true});document.addEventListener('touchend',function(e){if(!pid)return;var t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;if(Math.abs(dx)<30||Math.abs(dy)>Math.abs(dx))return;var ev={stopPropagation:function(){}};slideP(pid,dx<0?1:-1,ev);},{passive:true});})();
 
 // ── RENDER ────────────────────────────────────────────────────────────────
 function renderCatalog(){
@@ -447,7 +433,12 @@ document.addEventListener('keydown',function(e){
 });
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-loadProdutos();
+// Primeiro paint imediato — catálogo carrega só depois do hero estar visível
+if ('requestIdleCallback' in window) {
+  requestIdleCallback(function(){ loadProdutos(); }, {timeout: 1500});
+} else {
+  setTimeout(loadProdutos, 100);
+}
 </script>
 </body>
 </html>
