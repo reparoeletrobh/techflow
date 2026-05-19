@@ -122,13 +122,6 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
 .btn-ck:hover{background:#d4be9e;transform:translateY(-2px);box-shadow:0 10px 24px rgba(201,178,152,.25)}
 .prod-btn svg{flex-shrink:0}
 
-@keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
-.skeleton{background:linear-gradient(90deg,#1a1a1a 25%,#242424 50%,#1a1a1a 75%);background-size:400px 100%;animation:shimmer 1.3s infinite;border-radius:6px;}
-.sk-card{background:#171717;border:1px solid rgba(201,178,152,0.07);border-radius:14px;overflow:hidden;margin-bottom:0;}
-.sk-img{height:200px;} .sk-body{padding:16px;display:flex;flex-direction:column;gap:10px;}
-.sk-line{height:12px;} .sk-sm{height:10px;width:55%;} .sk-btn{height:42px;border-radius:8px;margin-top:6px;}
-
-
 .prod-card-img{position:relative;}
 .cph{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;background:#0f0f0f;opacity:0;transition:opacity .25s;pointer-events:none;}
 .cph.on{opacity:1;pointer-events:auto;}
@@ -140,6 +133,13 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
 .ph-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.35);transition:all .2s;cursor:pointer;}
 .ph-dot.on{background:#fff;width:14px;border-radius:3px;}
 .prod-badge{position:absolute;top:10px;left:10px;font-size:9px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;padding:4px 10px;border-radius:4px;z-index:5;background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);}
+
+
+@keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+.skeleton{background:linear-gradient(90deg,#1a1a1a 25%,#242424 50%,#1a1a1a 75%);background-size:400px 100%;animation:shimmer 1.3s infinite;border-radius:6px;}
+.sk-card{background:#171717;border:1px solid rgba(201,178,152,0.07);border-radius:14px;overflow:hidden;}
+.sk-img{height:260px;}.sk-body{padding:16px;display:flex;flex-direction:column;gap:10px;}
+.sk-line{height:12px;}.sk-sm{height:10px;width:55%;}.sk-btn{height:42px;border-radius:8px;margin-top:6px;}
 
 </style>
 </head>
@@ -159,7 +159,7 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
   <a href="#catalogo" class="btn-cta-primary cta-catalog fade-in">▼ Ver Catálogo de Microondas</a>
   
 </section>
-<section class="catalog-section" id="catalogo" style="min-height:400px">
+<section class="catalog-section" id="catalogo">
   <p class="section-label fade-in">Catálogo Exclusivo</p>
   <h2 class="section-title catalog-title fade-in">Microondas Revisados & Garantidos</h2>
   <p class="section-sub fade-in">Todos com garantia de 3 meses • Entrega em BH e região</p>
@@ -274,18 +274,16 @@ function mSVG(label){
   var s='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="#141414"/><text x="200" y="155" text-anchor="middle" fill="rgba(240,180,41,.3)" font-size="13" font-family="DM Mono,monospace">'+label+'</text></svg>';
   return 'data:image/svg+xml,'+encodeURIComponent(s);
 }
-var LS_KEY='re_vsl_v3';
+var LS_KEY='re_vsl_v4';
 async function loadProdutos(){
-  // Mostrar cache instantaneamente se disponível
-  var cached=null;
-  try{cached=JSON.parse(localStorage.getItem(LS_KEY)||'null');}catch(e){}
-  if(cached&&cached.ts&&(Date.now()-cached.ts)<300000){
-    PROD=cached.data; renderCatalog(); observeFadeIn();
-    var el=document.getElementById('estq'); if(el)el.textContent=PROD.length;
-  } else {
-    var g=document.getElementById('catalog-grid');
-    if(g) g.innerHTML=Array(3).fill('<div class="sk-card"><div class="skeleton sk-img"></div><div class="sk-body"><div class="skeleton sk-line"></div><div class="skeleton sk-sm skeleton"></div><div class="skeleton sk-btn"></div></div></div>').join('');
-  }
+  // Cache local
+  var _cached=null;try{_cached=JSON.parse(localStorage.getItem(LS_KEY)||'null');}catch(e){}
+  if(_cached&&_cached.ts&&(Date.now()-_cached.ts)<300000){
+    PROD=_cached.data;
+    if(PROD.length>0&&PROD[0].fotos.length>0){var _d=new Image();_d.onload=function(){document.documentElement.style.setProperty('--card-ratio',this.naturalHeight>this.naturalWidth*1.15?'3/4':'4/3');};_d.src=PROD[0].fotos[0];}
+    renderCatalog();observeFadeIn();
+    var _el=document.getElementById('estq');if(_el)_el.textContent=PROD.length;
+  }else{var _g=document.getElementById('catalog-grid');if(_g)_g.innerHTML=Array(3).fill('<div class="sk-card"><div class="skeleton sk-img"></div><div class="sk-body"><div class="skeleton sk-line"></div><div class="skeleton sk-btn"></div></div></div>').join('');}
   try{
     var d = await fetch('/api/vendas?action=load').then(function(r){return r.json();});
     var todos = (d.produtos||[]).filter(function(p){return !p.vendido;});
@@ -305,6 +303,15 @@ async function loadProdutos(){
     if(el) el.textContent = PROD.length;
     try{localStorage.setItem(LS_KEY,JSON.stringify({ts:Date.now(),data:PROD}));}catch(e){}
   }catch(e){ console.error('loadProdutos:', e); }
+  // Detectar orientação da primeira foto e ajustar aspect-ratio dos cards
+  if(PROD.length>0 && PROD[0].fotos.length>0){
+    var _det=new Image();
+    _det.onload=function(){
+      var portrait = this.naturalHeight > this.naturalWidth*1.15;
+      document.documentElement.style.setProperty('--card-ratio', portrait?'3/4':'4/3');
+    };
+    _det.src=PROD[0].fotos[0];
+  }
   renderCatalog();
   observeFadeIn();
 }
@@ -371,7 +378,6 @@ function submitCheckout(){
 }
 
 (function(){var sx=0,sy=0,pid=null;document.addEventListener('touchstart',function(e){var t=e.changedTouches[0];sx=t.clientX;sy=t.clientY;var el=e.target;while(el&&!el.id?.startsWith('ph-'))el=el.parentElement;pid=el?el.id.replace('ph-',''):null;},{passive:true});document.addEventListener('touchend',function(e){if(!pid)return;var t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;if(Math.abs(dx)<30||Math.abs(dy)>Math.abs(dx))return;var ev={stopPropagation:function(){}};slideP(pid,dx<0?1:-1,ev);},{passive:true});})();
-
 // ── RENDER ────────────────────────────────────────────────────────────────
 function renderCatalog(){
   var g = document.getElementById('catalog-grid');
@@ -433,12 +439,7 @@ document.addEventListener('keydown',function(e){
 });
 
 // ── INIT ──────────────────────────────────────────────────────────────────
-// Primeiro paint imediato — catálogo carrega só depois do hero estar visível
-if ('requestIdleCallback' in window) {
-  requestIdleCallback(function(){ loadProdutos(); }, {timeout: 1500});
-} else {
-  setTimeout(loadProdutos, 100);
-}
+if('requestIdleCallback'in window){requestIdleCallback(function(){loadProdutos();},{timeout:1500});}else{setTimeout(loadProdutos,100);}
 </script>
 </body>
 </html>
