@@ -105,7 +105,7 @@ export default async function handler(req, res) {
 
     // 4. Para cada produto: vender (remove catálogo + Pipefy)
     for (const produtoId of produtoIds) {
-      let produtoData = { id: produtoId, codigo: meta.produto_codigos || '' };
+      let produtoInfo = { id: produtoId, codigo: meta.produto_codigos || '' };
       try {
         const vRes = await fetch(`${siteUrl}/api/vendas?action=vender`, {
           method: 'POST',
@@ -121,28 +121,26 @@ export default async function handler(req, res) {
         });
         const vData = await vRes.json();
         if (vData.ok && vData.produto) {
-          // Enriquecer com dados reais do produto (descricao, tipo, capacidade)
-          produtoData = {
-            id:        produtoId,
-            codigo:    vData.produto.codigo    || meta.produto_codigos || '',
-            descricao: vData.produto.descricao || '',
-            nome:      vData.produto.descricao || '',
-            tipo:      vData.produto.tipo      || '',
-            capacidade:vData.produto.capacidade|| '',
-            preco:     vData.produto.preco     || payment.transaction_amount
+          // Enriquecer com dados reais retornados pelo vender
+          produtoInfo = {
+            id:         produtoId,
+            codigo:     vData.produto.codigo     || meta.produto_codigos || '',
+            descricao:  vData.produto.descricao  || '',
+            tipo:       vData.produto.tipo       || '',
+            capacidade: vData.produto.capacidade || ''
           };
-        } else if (!vData.ok) {
-          console.error('vender erro:', produtoId, vData.error);
+        } else {
+          console.error('vender erro:', produtoId, vData?.error);
         }
       } catch(e) { console.error('vender:', e.message); }
 
-      // 5. Espelho no relatório de checkout com dados completos
+      // 5. Espelho no relatório de checkout
       try {
         await fetch(`${siteUrl}/api/tv-checkout?action=registrar-venda`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            produto:       produtoData,
+            produto:       produtoInfo,
             comprador:     { nome: nomeCliente, telefone, cpf, endereco, cep },
             valor:         payment.transaction_amount,
             provedor:      'mercado_pago',
