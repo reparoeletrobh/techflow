@@ -51,7 +51,10 @@ async function fetchAnaliseCompra() {
     'query { pipe(id: "' + PIPE_ID + '") { phases { name cards(first: 50) { edges { node { id title fields { name value } } } } } } }'
   );
   const phases = data?.pipe?.phases || [];
-  const ph = phases.find(p => p.name.toLowerCase().trim() === "analise de compra");
+  const ph = phases.find(p => {
+    const n = p.name.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    return n === 'analise de compra' || (n.includes('analise') && n.includes('compra'));
+  });
   if (!ph) return [];
   return (ph.cards?.edges || []).map(({ node }) => {
     const fields = node.fields || [];
@@ -88,10 +91,16 @@ module.exports = async function handler(req, res) {
     let added = 0, pipefyError = null;
     try {
       const cards = await fetchAnaliseCompra();
-      // Remove syncedIds de cards que saíram da fase
-      const idsNaFase = new Set(cards.map(c => c.pipefyId));
-      db.syncedIds = db.syncedIds.filter(id => idsNaFase.has(id));
+      // Só limpar syncedIds se encontrou cards (evita limpar tudo quando fase não é encontrada)
+      if (cards.length > 0) {
+        const idsNaFase = new Set(cards.map(c => c.pipefyId));
+        db.syncedIds = db.syncedIds.filter(id => idsNaFase.has(id));
+      }
       for (const card of cards) {
+        // Pular se já existe ficha para este card (qualquer status — não re-adicionar)
+        const jaExiste = db.fichas.find(f => f.pipefyId === card.pipefyId);
+        if (jaExiste) continue;
+        // Pular se já está em syncedIds
         if (db.syncedIds.includes(card.pipefyId)) continue;
         db.fichas.unshift({
           id:          card.pipefyId,
@@ -110,7 +119,9 @@ module.exports = async function handler(req, res) {
       }
       if (added > 0) await dbSet(COMPRA_KEY, db);
     } catch(e) { pipefyError = e.message; }
-    return res.status(200).json({ ok: true, added, pipefyError });
+    const ph2 = await pipefyQuery('query{pipe(id:"'+PIPE_ID+'"){phases{name}}}').catch(()=>null);
+    const phaseNames = ph2?.pipe?.phases?.map(p=>p.name)||[];
+    return res.status(200).json({ ok:true, added, pipefyError, phaseNames });
   }
 
   // ── POST recomendar — registra recomendação
