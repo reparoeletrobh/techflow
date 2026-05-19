@@ -85,12 +85,16 @@ export default async function handler(req, res) {
   if (req.method === 'POST' && action === 'registrar-venda') {
     const { produto, comprador, valor, provedor } = req.body || {};
     if (!produto?.id) return res.status(400).json({ ok: false, error: 'produto obrigatorio' });
+    const { paymentId, paymentMethod, installments } = req.body || {};
     const db = (await dbGet(VENDAS_KEY)) || { vendas: [] };
     db.vendas.unshift({
-      id:        Date.now().toString(36),
-      produto, comprador, valor,
-      provedor:  provedor || 'whatsapp',
-      criadoEm:  new Date().toISOString()
+      id:            Date.now().toString(36),
+      produto,       comprador,     valor,
+      provedor:      provedor || 'whatsapp',
+      paymentId:     paymentId     || null,
+      paymentMethod: paymentMethod || null,
+      installments:  installments  || null,
+      criadoEm:      new Date().toISOString()
     });
     await dbSet(VENDAS_KEY, db);
     return res.status(200).json({ ok: true });
@@ -105,10 +109,13 @@ export default async function handler(req, res) {
   }
 
   if(req.method==='POST'&&action==='remover-venda'){
-    const{vendaId}=req.body||{};if(!vendaId)return res.status(400).json({ok:false,error:'vendaId obrigatorio'});
-    const db=(await dbGet(VENDAS_KEY))||{vendas:[]};const antes=db.vendas.length;
-    db.vendas=db.vendas.filter(v=>v.id!==vendaId);await dbSet(VENDAS_KEY,db);
-    return res.status(200).json({ok:true,removidos:antes-db.vendas.length});
+    const{vendaId}=req.body||{};
+    if(!vendaId)return res.status(400).json({ok:false,error:'vendaId obrigatorio'});
+    const db2=(await dbGet(VENDAS_KEY))||{vendas:[]};
+    const antes=db2.vendas.length;
+    db2.vendas=db2.vendas.filter(v=>v.id!==vendaId);
+    await dbSet(VENDAS_KEY,db2);
+    return res.status(200).json({ok:true,removidos:antes-db2.vendas.length});
   }
   return res.status(404).json({ ok: false, error: 'Ação não encontrada' });
 }
