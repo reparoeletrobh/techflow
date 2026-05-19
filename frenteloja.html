@@ -613,8 +613,8 @@ function avisarCliente(id){
 }
 // ══ RENDER PAINEL ════════════════════════════════════════════
 function renderPainel(){
-  var liberados=fichas.filter(f=>f.liberadoHoje||f.phase==='liberado_hoje');
-  // Não pagos (vermelho) sempre no topo
+  // Liberados Hoje = apenas fichas com phase conserto_realizado
+  var liberados=fichas.filter(f=>f.phase==='conserto_realizado');
   liberados.sort(function(a,b){
     var aPago=a.pago===true||a.phase==='pago';
     var bPago=b.pago===true||b.phase==='pago';
@@ -624,10 +624,11 @@ function renderPainel(){
   });
   document.getElementById('painel-lib-cnt').textContent=liberados.length;
   document.getElementById('painel-liberados-body').innerHTML=liberados.map(f=>painelCard(f,true)).join('');
+  // Colunas: cada fase exibe apenas fichas com aquela fase
   ['producao','orcamento_cadastrado','analise'].forEach(function(ph){
     var col=document.getElementById('p-col-'+ph);
     var cnt=document.getElementById('p-cnt-'+ph);
-    var fls=fichas.filter(function(f){return f.phase===ph&&!f.liberadoHoje;});
+    var fls=fichas.filter(function(f){return f.phase===ph;});
     if(cnt)cnt.textContent=fls.length;
     if(col)col.innerHTML=fls.map(function(f){return painelCard(f);}).join('');
   });
