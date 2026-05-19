@@ -104,5 +104,11 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, vendas, total, count: vendas.length });
   }
 
+  if(req.method==='POST'&&action==='remover-venda'){
+    const{vendaId}=req.body||{};if(!vendaId)return res.status(400).json({ok:false,error:'vendaId obrigatorio'});
+    const db=(await dbGet(VENDAS_KEY))||{vendas:[]};const antes=db.vendas.length;
+    db.vendas=db.vendas.filter(v=>v.id!==vendaId);await dbSet(VENDAS_KEY,db);
+    return res.status(200).json({ok:true,removidos:antes-db.vendas.length});
+  }
   return res.status(404).json({ ok: false, error: 'Ação não encontrada' });
 }
