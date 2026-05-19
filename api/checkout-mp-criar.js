@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Produto — Reparo Eletro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700;0,9..144,900;1,9..144,300&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700;0,9..144,900&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap"></noscript>
+<style>
+:root{
+  --bg:#080b0f;--s1:#0f1318;--s2:#161c23;
+  --border:#252e38;--border2:#2e3a47;
+  --text:#f0f4f8;--muted:#6b7f93;--soft:#98afc4;
+  --yellow:#f5c800;--green:#2dce76;--wa:#25d366;
+  --fh:'Fraunces',serif;--fm:'DM Mono',monospace;--fb:'Outfit',sans-serif;
+  --bar:170px; /* DOBRO de altura */
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);overflow-x:hidden;padding-bottom:var(--bar);}
+
+/* ══ STICKY BAR — dobro de altura ════════════════════════════ */
+.sbar{
+  position:fixed;bottom:0;left:0;right:0;z-index:300;
+  height:var(--bar);
+  background:#0d1117;
+  border-top:2px solid var(--yellow);
+  box-shadow:0 -8px 40px rgba(0,0,0,.85);
+  display:flex;flex-direction:column;
+  padding:0 28px;
+  gap:0;
+}
+/* Linha 1: imagem + nome + preço */
+.sbar-row1{
+  flex:1;display:flex;align-items:center;gap:16px;
+  border-bottom:1px solid var(--border);
+  padding:0;
+}
+.sbar-thumb{
+  width:68px;height:68px;flex-shrink:0;
+  border-radius:10px;overflow:hidden;
+  border:1px solid var(--border2);background:var(--s2);
+}
+.sbar-thumb img{width:100%;height:100%;object-fit:contain;background:#0a0c0f;}
+.sbar-info{flex:1;min-width:0;}
+.sbar-name{
+  font-family:var(--fh);font-size:17px;font-weight:700;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.sbar-code{font-family:var(--fm);font-size:9px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;}
+.sbar-price-block{text-align:right;flex-shrink:0;}
+.sbar-old{font-family:var(--fm);font-size:11px;color:var(--muted);text-decoration:line-through;margin-bottom:1px;}
+.sbar-price{font-family:var(--fh);font-size:28px;font-weight:900;color:var(--green);line-height:1;}
+.sbar-pix{font-size:10px;color:var(--green);margin-top:2px;}
+/* Linha 2: entrega + botões */
+.sbar-row2{
+  flex:1;display:flex;align-items:center;gap:12px;
+}
+.sbar-del{
+  flex:1;font-size:13px;font-weight:500;
+  display:flex;align-items:center;gap:6px;
+  color:var(--green)!important;
+}
+.sbar-del b{color:var(--green);}
+.sbar-btns{display:flex;gap:10px;flex-shrink:0;}
+.sbar-btn-cart{
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  padding:0 20px;height:50px;border-radius:9px;
+  background:var(--s2);border:1px solid var(--border2);
+  color:var(--text);font-family:var(--fb);font-size:13px;font-weight:600;
+  cursor:pointer;transition:all .18s;white-space:nowrap;position:relative;
+}
+.sbar-btn-cart:hover{border-color:var(--yellow);color:var(--yellow);}
+.cart-count{
+  position:absolute;top:-6px;right:-6px;
+  width:18px;height:18px;border-radius:50%;
+  background:var(--yellow);color:#000;
+  font-size:10px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  display:none;
+}
+.cart-count.show{display:flex;}
+.sbar-btn-buy{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:0 28px;height:50px;border-radius:9px;
+  background:var(--yellow);color:#000;
+  font-family:var(--fb);font-size:14px;font-weight:700;
+  border:none;cursor:pointer;white-space:nowrap;letter-spacing:.2px;
+  transition:all .18s;
+}
+.sbar-btn-buy:hover{background:#ffd500;box-shadow:0 5px 20px rgba(245,200,0,.4);}
+@media(max-width:700px){
+  :root{--bar:140px;}
+  .sbar{padding:0 14px;gap:0;}
+  .sbar-thumb{width:50px;height:50px;}
+  .sbar-name{font-size:14px;}
+  .sbar-price{font-size:22px;}
+  .sbar-code{display:none;}
+  .sbar-del{font-size:11px;}
+  .sbar-btn-cart{padding:0 12px;height:44px;font-size:12px;}
+  .sbar-btn-buy{padding:0 16px;height:44px;font-size:13px;}
+}
+
+/* ══ CARRINHO LATERAL ════════════════════════════════════════ */
+.cart-overlay{
+  position:fixed;inset:0;z-index:400;
+  background:rgba(0,0,0,.7);backdrop-filter:blur(4px);
+  opacity:0;pointer-events:none;transition:opacity .25s;
+}
+.cart-overlay.open{opacity:1;pointer-events:all;}
+.cart-panel{
+  position:fixed;right:0;top:0;bottom:0;z-index:401;
+  width:min(400px,100vw);
+  background:#0d1117;border-left:1px solid var(--border2);
+  display:flex;flex-direction:column;
+  transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);
+}
+.cart-panel.open{transform:translateX(0);}
+.cart-hd{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:20px 20px 16px;border-bottom:1px solid var(--border);
+}
+.cart-title{font-family:var(--fh);font-size:20px;font-weight:700;}
+.cart-close{
+  width:36px;height:36px;border-radius:50%;
+  background:var(--s2);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:18px;color:var(--soft);
+  transition:all .15s;
+}
+.cart-close:hover{background:var(--border2);color:var(--text);}
+.cart-items{flex:1;overflow-y:auto;padding:12px;}
+.cart-empty{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:200px;gap:12px;
+  font-family:var(--fm);font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;
+}
+.cart-item{
+  display:flex;gap:12px;padding:12px;
+  background:var(--s1);border:1px solid var(--border);border-radius:10px;
+  margin-bottom:8px;
+}
+.ci-img{width:56px;height:56px;border-radius:7px;overflow:hidden;flex-shrink:0;background:var(--s2);}
+.ci-img img{width:100%;height:100%;object-fit:contain;background:#0a0c0f;}
+.ci-info{flex:1;min-width:0;}
+.ci-name{font-size:13px;font-weight:600;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.ci-price{font-family:var(--fh);font-size:16px;font-weight:700;color:var(--yellow);margin-top:4px;}
+.ci-remove{
+  width:28px;height:28px;flex-shrink:0;
+  border-radius:6px;background:transparent;border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;color:var(--muted);font-size:14px;transition:all .15s;
+}
+.ci-remove:hover{background:rgba(255,75,75,.1);border-color:rgba(255,75,75,.4);color:#ff4b4b;}
+.cart-ft{
+  padding:16px 20px;border-top:1px solid var(--border);
+  display:flex;flex-direction:column;gap:10px;
+}
+.cart-total-row{display:flex;justify-content:space-between;align-items:center;}
+.cart-total-lbl{font-size:12px;color:var(--muted);font-family:var(--fm);text-transform:uppercase;letter-spacing:1px;}
+.cart-total-val{font-family:var(--fh);font-size:24px;font-weight:900;color:var(--yellow);}
+.cart-finalizar{
+  width:100%;padding:15px;border-radius:10px;
+  background:var(--yellow);color:#000;
+  font-family:var(--fb);font-size:15px;font-weight:700;
+  border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:all .2s;
+}
+.cart-finalizar:hover{background:#20bc5a;transform:translateY(-1px);}
+.cart-wa-link{
+  width:100%;padding:9px;border-radius:8px;
+  background:transparent;border:1px solid rgba(37,211,102,.25);
+  color:var(--wa);font-family:var(--fb);font-size:12px;font-weight:500;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;
+  transition:all .15s;
+}
+.cart-wa-link:hover{background:rgba(37,211,102,.08);}
+.cart-clear{
+  width:100%;padding:10px;border-radius:8px;
+  background:transparent;border:1px solid var(--border);
+  color:var(--muted);font-family:var(--fb);font-size:13px;
+  cursor:pointer;transition:all .15s;
+}
+.cart-clear:hover{border-color:#ff4b4b;color:#ff4b4b;}
+
+/* ══ HERO ════════════════════════════════════════════════════ */
+.hero{
+  display:grid;
+  grid-template-columns:54% 46%;
+  height:calc(100vh - var(--bar)); /* ALTURA EXATA do viewport menos barra */
+}
+@media(max-width:820px){
+  .hero{grid-template-columns:1fr;height:auto;}
+}
+
+/* ── Esquerda: galeria ── */
+.gleft{
+  display:flex;flex-direction:column;
+  background:var(--s1);border-right:1px solid var(--border);
+  height:100%; /* Ocupa exatamente a altura do hero */
+  overflow:hidden;
+}
+.glogo{
+  padding:14px 18px;border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.glogo-brand{font-family:var(--fh);font-size:17px;font-weight:900;}
+.glogo-brand b{color:var(--yellow);}
+.glogo-sub{font-family:var(--fm);font-size:8px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-top:1px;}
+
+/* gallery-body: thumbs verticais + foto — ocupa o espaço restante */
+.gallery-body{
+  display:flex;
+  flex:1; /* ocupa toda a altura disponível */
+  overflow:hidden;
+  min-height:0;
+}
+/* Miniaturas verticais (estilo FastShop) */
+.thumbs-col{
+  width:72px;flex-shrink:0;
+  display:flex;flex-direction:column;gap:6px;
+  padding:8px;overflow-y:auto;
+  border-right:1px solid var(--border);
+  background:var(--s1);
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+}
+.thumb{
+  width:54px;height:54px;flex-shrink:0;border-radius:7px;
+  overflow:hidden;border:2px solid var(--border);cursor:pointer;
+  transition:border-color .15s;background:#0a0c0f;
+}
+.thumb img{width:100%;height:100%;object-fit:contain;background:#0a0c0f;}
+.thumb.on{border-color:var(--yellow);}
+.thumb:hover:not(.on){border-color:var(--border2);}
+/* Foto principal — precisa ter altura controlada */
+.gmain-wrap{
+  flex:1;position:relative;
+  background:#08090c;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+}
+.gmain{
+  /* Mostrar foto completa SEM cortar — cabe dentro do container */
+  width:100%;height:100%;
+  object-fit:contain; /* sem crop */
+  transition:opacity .2s;
+}
+.gph{font-size:60px;color:var(--border);}
+/* Setas */
+.garrow{
+  position:absolute;top:50%;transform:translateY(-50%);
+  width:36px;height:36px;border-radius:50%;
+  background:rgba(8,11,15,.8);border:1px solid rgba(255,255,255,.15);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;z-index:5;transition:all .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.garrow:hover{background:rgba(8,11,15,.95);border-color:rgba(255,255,255,.4);}
+.garrow svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
+.garrow.prev{left:8px;}.garrow.next{right:8px;}
+.gcount{
+  position:absolute;bottom:8px;right:10px;z-index:5;
+  background:rgba(0,0,0,.65);backdrop-filter:blur(4px);
+  font-family:var(--fm);font-size:10px;color:#fff;
+  padding:3px 8px;border-radius:20px;
+}
+/* Descrição no rodapé da galeria */
+.gdesc{
+  flex-shrink:0;
+  padding:10px 14px;border-top:1px solid var(--border);
+  font-size:11px;color:var(--soft);line-height:1.55;
+  background:var(--s1);
+  /* Limita a 2 linhas */
+  overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+}
+@media(max-width:820px){
+  .gleft{height:auto;border-right:none;border-bottom:1px solid var(--border);}
+  .gallery-body{height:300px;} /* altura fixa no mobile */
+}
+
+/* ── Direita: info — verticalmente centralizada ── */
+.iright{
+  display:flex;flex-direction:column;justify-content:center; /* CENTRALIZA verticalmente */
+  padding:24px 26px;
+  gap:14px;
+  height:100%; /* mesma altura do hero */
+  overflow-y:auto;
+  background:var(--bg);
+}
+@media(max-width:820px){
+  .iright{height:auto;justify-content:flex-start;padding:18px 16px;}
+}
+.pcode{font-family:var(--fm);font-size:9px;color:var(--yellow);letter-spacing:2.5px;text-transform:uppercase;}
+.ptitle{font-family:var(--fh);font-size:clamp(19px,2.4vw,30px);font-weight:900;line-height:1.12;letter-spacing:-.4px;}
+.pold{font-family:var(--fm);font-size:10px;color:var(--muted);text-decoration:line-through;}
+.pprice{font-family:var(--fh);font-size:clamp(26px,3vw,38px);font-weight:900;color:var(--green);line-height:1;margin-top:2px;}
+.ppix{font-size:11px;color:var(--green);margin-top:4px;display:flex;align-items:center;gap:4px;}
+.ppix::before{content:'💚';}
+/* Benefícios */
+.bens{border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.ben{display:flex;align-items:center;gap:11px;padding:10px 13px;border-bottom:1px solid var(--border);}
+.ben:last-child{border-bottom:none;}
+.bic{width:30px;height:30px;border-radius:6px;background:var(--s2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.bt{font-size:12px;font-weight:600;}
+.bs{font-size:10px;color:var(--muted);margin-top:1px;}
+/* Botões dentro da página */
+.page-btns{display:flex;flex-direction:column;gap:8px;}
+.btnmaiss{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  width:100%;padding:13px;border-radius:10px;
+  background:transparent;border:1px solid var(--border2);
+  color:var(--soft);font-family:var(--fb);font-size:14px;font-weight:600;
+  text-decoration:none;transition:all .2s;
+}
+.btnmaiss:hover{border-color:var(--text);color:var(--text);}
+.btnbuy{
+  width:100%;padding:14px;border-radius:10px;
+  background:var(--yellow);color:#000;
+  font-family:var(--fb);font-size:15px;font-weight:700;
+  border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:all .2s;
+}
+.btnbuy:hover{background:#ffd500;transform:translateY(-2px);box-shadow:0 8px 24px rgba(245,200,0,.36);}
+
+.btn-add-cart:hover{border-color:var(--yellow);color:var(--yellow);}
+.btnwa{
+  width:100%;padding:10px;border-radius:9px;
+  background:transparent;border:1px solid var(--border);
+  color:var(--muted);font-family:var(--fb);font-size:12px;font-weight:400;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;
+  transition:all .2s;text-decoration:none;
+}
+.btnwa:hover{border-color:var(--wa);color:var(--wa);}
+/* ══ SEÇÕES ABAIXO ═══════════════════════════════════════════ */
+.ct{max-width:1080px;margin:0 auto;padding:0 20px;}
+.tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--fm);font-size:9px;letter-spacing:2px;text-transform:uppercase;padding:4px 11px;border-radius:100px;border:1px solid rgba(245,200,0,.3);color:var(--yellow);background:rgba(245,200,0,.06);}
+.sep{width:42px;height:3px;border-radius:2px;background:var(--yellow);margin:13px 0;}
+.sh{font-family:var(--fh);font-size:clamp(22px,3.5vw,38px);font-weight:900;line-height:1.1;letter-spacing:-.5px;}
+.sh em{font-style:italic;color:var(--yellow);}
+.ss{font-size:14px;color:var(--soft);line-height:1.7;max-width:520px;margin-top:11px;}
+.sec-prob{padding:64px 20px;}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:start;margin-top:36px;}
+@media(max-width:768px){.pgrid{grid-template-columns:1fr;}}
+.dors{display:flex;flex-direction:column;gap:12px;}
+.dor{display:flex;gap:11px;padding:14px;background:var(--s1);border:1px solid var(--border);border-radius:10px;}
+.dic{font-size:20px;flex-shrink:0;margin-top:2px;}
+.dt{font-size:13px;font-weight:600;margin-bottom:2px;}
+.dx{font-size:12px;color:var(--soft);line-height:1.55;}
+.sol{background:linear-gradient(135deg,rgba(45,206,118,.08),rgba(45,206,118,.02));border:1px solid rgba(45,206,118,.2);border-radius:12px;padding:24px;}
+.sol .sep{background:var(--green);}
+.stitle{font-family:var(--fh);font-size:20px;font-weight:700;margin-bottom:8px;}
+.stxt{font-size:13px;color:var(--soft);line-height:1.65;margin-bottom:14px;}
+.schecks{display:flex;flex-direction:column;gap:7px;}
+.scheck{display:flex;align-items:center;gap:8px;font-size:13px;}
+.scheck::before{content:"✓";color:var(--green);font-weight:700;font-size:14px;flex-shrink:0;}
+.sec-prova{padding:52px 20px;background:var(--s1);border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-top:30px;}
+.tcard{background:var(--s2);border:1px solid var(--border);border-radius:11px;padding:16px;}
+.tstars{color:var(--yellow);font-size:12px;margin-bottom:7px;letter-spacing:2px;}
+.ttxt{font-size:12px;color:var(--soft);line-height:1.6;font-style:italic;margin-bottom:10px;}
+.tauth{display:flex;align-items:center;gap:8px;}
+.tav{width:30px;height:30px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
+.tnm{font-size:12px;font-weight:600;}.tlc{font-family:var(--fm);font-size:9px;color:var(--muted);}
+.sec-gar{padding:52px 20px;}
+.ggrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:30px;}
+@media(max-width:768px){.ggrid{grid-template-columns:1fr;}}
+.gcard{text-align:center;padding:20px 14px;background:var(--s1);border:1px solid var(--border);border-radius:11px;}
+.gic{font-size:30px;margin-bottom:10px;}.gt{font-size:14px;font-weight:700;margin-bottom:5px;}.gtx{font-size:12px;color:var(--soft);line-height:1.55;}
+.sec-cta{padding:64px 20px;text-align:center;position:relative;overflow:hidden;}
+.cta-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 80% at 50% 50%,rgba(245,200,0,.05),transparent 70%);pointer-events:none;}
+.cta-btns{display:flex;gap:11px;justify-content:center;flex-wrap:wrap;margin-top:28px;}
+.btncta{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:14px 30px;border-radius:10px;background:var(--yellow);color:#000;font-family:var(--fb);font-size:14px;font-weight:700;border:none;cursor:pointer;transition:all .2s;text-decoration:none;}
+.btncta:hover{background:#ffd500;transform:translateY(-2px);}
+.btncta.blue{background:#3b9eff;color:#fff;}
+.btncta.blue:hover{background:#2589ef;}
+footer{padding:24px 20px;border-top:1px solid var(--border);text-align:center;}
+.fb{font-family:var(--fh);font-size:16px;font-weight:900;}.fb b{color:var(--yellow);}
+.fs{font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:4px;letter-spacing:.5px;}
+
+/* ══ MODAL CHECKOUT ══════════════════════════════════════════ */
+.ck-overlay{
+  position:fixed;inset:0;z-index:500;
+  background:rgba(0,0,0,.8);backdrop-filter:blur(6px);
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;
+  opacity:0;pointer-events:none;transition:opacity .25s;
+}
+.ck-overlay.open{opacity:1;pointer-events:all;}
+.ck-modal{
+  background:#0d1117;border:1px solid var(--border2);
+  border-radius:16px;width:100%;max-width:440px;
+  overflow:hidden;position:relative;
+}
+.ck-hd{
+  padding:20px 22px 16px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.ck-title{font-family:var(--fh);font-size:20px;font-weight:700;}
+.ck-close{
+  width:34px;height:34px;border-radius:50%;
+  background:var(--s2);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:18px;color:var(--soft);transition:all .15s;
+}
+.ck-close:hover{color:var(--text);}
+.ck-body{padding:20px 22px;}
+.ck-summary{
+  background:var(--s1);border:1px solid var(--border);border-radius:10px;
+  padding:14px;margin-bottom:18px;
+}
+.ck-sum-title{font-size:12px;font-weight:600;color:var(--soft);margin-bottom:8px;font-family:var(--fm);text-transform:uppercase;letter-spacing:1px;}
+.ck-sum-item{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:4px;}
+.ck-sum-item:last-child{margin-bottom:0;padding-top:8px;border-top:1px solid var(--border);font-weight:700;}
+.ck-sum-price{color:var(--yellow);font-family:var(--fh);font-size:15px;}
+.form-row{margin-bottom:14px;}
+.form-row label{display:block;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--soft);margin-bottom:5px;}
+.form-row input{
+  width:100%;background:var(--s1);border:1px solid var(--border);
+  border-radius:8px;padding:11px 13px;
+  font-family:var(--fb);font-size:14px;color:var(--text);outline:none;
+  transition:border-color .15s;
+}
+.form-row input:focus{border-color:var(--yellow);}
+.form-row input::placeholder{color:var(--muted);}
+.ck-parcelas{
+  background:var(--s1);border:1px solid rgba(45,206,118,.2);border-radius:8px;
+  padding:10px 13px;font-size:12px;color:var(--green);
+  margin-bottom:16px;display:flex;align-items:center;gap:7px;
+}
+.ck-submit{
+  width:100%;padding:15px;border-radius:10px;
+  background:var(--yellow);color:#000;
+  font-family:var(--fb);font-size:15px;font-weight:700;
+  border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:all .2s;
+}
+.ck-submit:hover{background:#ffd500;}
+.ck-submit:disabled{opacity:.6;cursor:not-allowed;transform:none!important;}
+.ck-footer{padding:12px 22px 18px;text-align:center;font-size:11px;color:var(--muted);}
+.ck-footer svg{vertical-align:middle;margin-right:4px;}
+
+/* Tela de retorno MP */
+.mp-return{
+  display:none;
+  position:fixed;inset:0;z-index:600;
+  background:#080b0f;
+  align-items:center;justify-content:center;
+  flex-direction:column;gap:16px;text-align:center;padding:24px;
+}
+.mp-return.show{display:flex;}
+.mp-return-icon{font-size:64px;}
+.mp-return-title{font-family:var(--fh);font-size:28px;font-weight:900;}
+.mp-return-sub{font-size:14px;color:var(--soft);max-width:360px;line-height:1.6;}
+.mp-return-btn{
+  padding:14px 32px;border-radius:10px;
+  background:var(--yellow);color:#000;
+  font-family:var(--fb);font-size:15px;font-weight:700;
+  border:none;cursor:pointer;transition:all .2s;margin-top:8px;
+}
+.mp-return-btn:hover{background:#ffd500;}
+
+.loading{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - var(--bar));flex-direction:column;gap:12px;}
+.spinner{width:26px;height:26px;border:2px solid var(--border);border-top-color:var(--yellow);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading p{font-family:var(--fm);font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;}
+</style>
+</head>
+<body>
+
+<!-- ══ STICKY BAR — dobro de altura ══════════════════════════ -->
+<div class="sbar">
+  <div class="sbar-row1">
+    <div class="sbar-thumb"><img id="sb-img" src="" alt="" style="display:none"></div>
+    <div class="sbar-info">
+      <div class="sbar-name" id="sb-name">Carregando...</div>
+      <div class="sbar-code" id="sb-code"></div>
+    </div>
+    <div class="sbar-price-block">
+      <div class="sbar-old" id="sb-old"></div>
+      <div class="sbar-price" id="sb-price">—</div>
+      <div class="sbar-pix">💚 10% off no PIX</div>
+    </div>
+  </div>
+  <div class="sbar-row2">
+    <div class="sbar-del">🚚 <span id="sb-del"></span></div>
+    <div class="sbar-btns">
+      <button class="sbar-btn-cart" onclick="abrirCarrinho()">
+        🛒 Ver Carrinho
+        <span class="cart-count" id="cart-count">0</span>
+      </button>
+      <button class="sbar-btn-buy" onclick="comprarAgora()">⚡ Comprar Agora</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CARRINHO LATERAL ═══════════════════════════════════════ -->
+<div class="cart-overlay" id="cart-overlay" onclick="fecharCarrinho()"></div>
+<div class="cart-panel" id="cart-panel">
+  <div class="cart-hd">
+    <div class="cart-title">🛒 Carrinho</div>
+    <div class="cart-close" onclick="fecharCarrinho()">×</div>
+  </div>
+  <div class="cart-items" id="cart-items">
+    <div class="cart-empty">
+      <span style="font-size:40px">🛒</span>
+      <span>Carrinho vazio</span>
+    </div>
+  </div>
+  <div class="cart-ft" id="cart-ft" style="display:none">
+    <div class="cart-total-row">
+      <span class="cart-total-lbl">Total</span>
+      <span class="cart-total-val" id="cart-total">R$ 0,00</span>
+    </div>
+          <button class="cart-finalizar" onclick="finalizarCarrinho()">
+      ⚡ Finalizar Compra
+    </button>
+    <button class="cart-wa-link" onclick="tirarDuvidaCarrinho()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+      Tirar Dúvidas pelo WhatsApp
+    </button>
+    <button class="cart-clear" onclick="limparCarrinho()">🗑 Limpar carrinho</button>
+  </div>
+</div>
+
+<!-- ══ CONTEÚDO ═══════════════════════════════════════════════ -->
+<div id="root">
+  <div class="loading"><div class="spinner"></div><p>Carregando produto...</p></div>
+</div>
+
+<script>
+var WA='5531998301617', PROD=null, IDX=0;
+
+function R(v){return parseFloat(v).toLocaleString('pt-BR',{minimumFractionDigits:2,style:'currency',currency:'BRL'});}
+
+function delivery(){
+  var h=new Date().getHours(),m=new Date().getMinutes();
+  return (h*100+m)<=1545
+    ?'Comprando nos próximos 15 min — Entregamos <b>AINDA HOJE!</b>'
+    :'Comprando nos próximos 15 min — Entregamos em menos de <b>24 Horas!</b>';
+}
+
+// ── Galeria ──────────────────────────────────────────────────
+function goTo(i){
+  if(!PROD||!PROD.fotos.length)return;
+  var n=PROD.fotos.length;
+  IDX=((i%n)+n)%n;
+  var img=document.getElementById('gmain');
+  if(img){img.style.opacity='.3';setTimeout(function(){img.src=PROD.fotos[IDX];img.style.opacity='1';},120);}
+  document.querySelectorAll('.thumb').forEach(function(t,j){t.classList.toggle('on',j===IDX);});
+  var gc=document.getElementById('gcnt');if(gc)gc.textContent=(IDX+1)+' / '+PROD.fotos.length;
+}
+var _sx=0,_sy=0;
+document.addEventListener('touchstart',function(e){var t=e.changedTouches[0];_sx=t.clientX;_sy=t.clientY;},{passive:true});
+document.addEventListener('touchend',function(e){var t=e.changedTouches[0],dx=t.clientX-_sx,dy=t.clientY-_sy;if(Math.abs(dx)<30||Math.abs(dy)>Math.abs(dx))return;goTo(IDX+(dx<0?1:-1));},{passive:true});
+
+// ── Carrinho (localStorage) ───────────────────────────────────
+function getCart(){try{return JSON.parse(localStorage.getItem('re_cart_v1')||'[]');}catch(e){return[];}}
+function saveCart(c){try{localStorage.setItem('re_cart_v1',JSON.stringify(c));}catch(e){}}
+
+function addToCart(produto){
+  var cart=getCart();
+  // Nunca adicionar mais de 1 unidade do mesmo código
+  var existing=cart.find(function(x){return x.id===produto.id||x.codigo===produto.codigo;});
+  if(existing){
+    toast('ℹ️ Produto já está no carrinho');
+    return;
+  }
+  cart.push({id:produto.id,nome:produto.nome,preco:produto.preco,codigo:produto.codigo,foto:produto.fotos[0]||'',qty:1});
+  saveCart(cart);
+  updateCartBadge();
+  renderCartPanel();
+  toast('✅ Adicionado ao carrinho!');
+}
+
+function removeFromCart(id){
+  var cart=getCart().filter(function(x){return x.id!==id;});
+  saveCart(cart);updateCartBadge();renderCartPanel();
+}
+
+function limparCarrinho(){
+  saveCart([]);updateCartBadge();renderCartPanel();
+}
+
+function updateCartBadge(){
+  var cart=getCart();
+  var total=cart.reduce(function(a,x){return a+(x.qty||1);},0);
+  var el=document.getElementById('cart-count');
+  if(el){el.textContent=total;el.classList.toggle('show',total>0);}
+}
+
+function renderCartPanel(){
+  var cart=getCart();
+  var items=document.getElementById('cart-items');
+  var ft=document.getElementById('cart-ft');
+  if(!cart.length){
+    items.innerHTML='<div class="cart-empty"><span style="font-size:40px">🛒</span><span>Carrinho vazio</span></div>';
+    if(ft)ft.style.display='none';return;
+  }
+  if(ft)ft.style.display='flex';
+  items.innerHTML=cart.map(function(item){
+    return '<div class="cart-item">'+
+      '<div class="ci-img">'+(item.foto?'<img src="'+item.foto+'" loading="lazy">':'')+'</div>'+
+      '<div class="ci-info">'+
+        '<div class="ci-name">'+item.nome+(item.qty>1?' <span style="color:var(--yellow);font-size:11px">×'+item.qty+'</span>':'')+'</div>'+
+        '<div class="ci-price">'+R(item.preco*(item.qty||1))+'</div>'+
+      '</div>'+
+      '<div class="ci-remove" onclick="removeFromCart(\''+item.id+'\')">×</div>'+
+    '</div>';
+  }).join('');
+  var totalVal=cart.reduce(function(a,x){return a+(parseFloat(x.preco)*(x.qty||1));},0);
+  var tv=document.getElementById('cart-total');
+  if(tv)tv.textContent=R(totalVal);
+}
+
+function abrirCarrinho(){
+  renderCartPanel();
+  document.getElementById('cart-overlay').classList.add('open');
+  document.getElementById('cart-panel').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function fecharCarrinho(){
+  document.getElementById('cart-overlay').classList.remove('open');
+  document.getElementById('cart-panel').classList.remove('open');
+  document.body.style.overflow='';
+}
+
+function tirarDuvidaCarrinho(){
+  window.open('https://wa.me/5531998301617?text='+encodeURIComponent('Olá! Tenho dúvidas sobre os produtos do meu carrinho. Pode me ajudar?'),'_blank');
+}
+function finalizarCarrinho(){
+  var cart=getCart();
+  if(!cart.length)return;
+  fecharCarrinho();
+  abrirCK(cart);
+}
+
+// ── Modal Checkout ──────────────────────────────────────────
+function abrirCK(cart){
+  // Preencher resumo
+  var total = cart.reduce(function(a,x){return a+parseFloat(x.preco);},0);
+  var sumHtml = '<div class="ck-sum-title">Resumo do Pedido</div>';
+  cart.forEach(function(item){
+    sumHtml += '<div class="ck-sum-item"><span>'+item.nome+'</span><span class="ck-sum-price">'+R(item.preco)+'</span></div>';
+  });
+  sumHtml += '<div class="ck-sum-item"><span>Total</span><span class="ck-sum-price">'+R(total)+'</span></div>';
+  document.getElementById('ck-summary').innerHTML = sumHtml;
+  document.getElementById('ck-overlay').classList.add('open');
+  document.body.style.overflow='hidden';
+  setTimeout(function(){document.getElementById('ck-nome').focus();},200);
+}
+function fecharCK(){
+  document.getElementById('ck-overlay').classList.remove('open');
+  document.body.style.overflow='';
+}
+
+async function enviarCheckout(){
+  var nome  = document.getElementById('ck-nome').value.trim();
+  var tel   = document.getElementById('ck-tel').value.trim();
+  var cpf   = document.getElementById('ck-cpf').value.trim();
+  var end   = document.getElementById('ck-end').value.trim();
+  var cep   = document.getElementById('ck-cep').value.trim();
+  if(!nome || !tel){ alert('Preencha nome e telefone.'); return; }
+  if(!end){ alert('Preencha o endereço de entrega.'); return; }
+
+  var btn = document.getElementById('ck-submit');
+  btn.disabled=true;
+  btn.textContent='⏳ Aguarde...';
+
+  var cart = getCart();
+  try{
+    var r = await fetch('/api/checkout-mp-criar',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        itens: cart.map(function(x){return {id:x.id,codigo:x.codigo,nome:x.nome,preco:x.preco,foto:x.foto};}),
+        comprador: {nome:nome, telefone:tel, cpf:cpf, endereco:end, cep:cep}
+      })
+    });
+    var d = await r.json();
+    if(d.ok && d.checkoutUrl){
+      // Salvar cart para pós-compra
+      try{ localStorage.setItem('re_checkout_cart', JSON.stringify(cart)); }catch(e){}
+      window.location.href = d.checkoutUrl;
+    } else {
+      alert('Erro ao gerar checkout: '+(d.error||'tente novamente'));
+      btn.disabled=false;
+      btn.innerHTML='🔒 Ir para Pagamento Seguro';
+    }
+  }catch(e){
+    alert('Erro de conexão: '+e.message);
+    btn.disabled=false;
+    btn.innerHTML='🔒 Ir para Pagamento Seguro';
+  }
+}
+
+// ── CTAs produto ──────────────────────────────────────────────
+function urlCatalogo(){
+  if(!PROD) return '/microondas-vsl?produto=microondas&cta=ck';
+  var tipo=(PROD.tipo||'').toLowerCase();
+  var isPuri = tipo.includes('bebedouro')||tipo.includes('purificador');
+  return '/microondas-vsl?produto='+(isPuri?'purificador':'microondas')+'&cta=ck';
+}
+function comprarAgora(){
+  if(!PROD)return;
+  window.open('https://wa.me/'+WA+'?text='+encodeURIComponent('Olá! Quero comprar:\n\n📦 '+PROD.nome+'\n📋 Cód: '+PROD.codigo+'\n💰 '+R(PROD.preco)+'\n\nPodemos fechar?'),'_blank');
+}
+function adicionarCarrinho(){
+  if(PROD)addToCart(PROD);
+}
+
+// ── Toast simples ─────────────────────────────────────────────
+function toast(msg){
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:calc(var(--bar)+14px);left:50%;transform:translateX(-50%);background:#161c23;border:1px solid var(--green);color:#f0f4f8;padding:10px 20px;border-radius:8px;font-family:Outfit,sans-serif;font-size:13px;font-weight:600;z-index:500;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.5);';
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(function(){t.remove();},2500);
+}
+
+// ── Render produto ────────────────────────────────────────────
+function render(p){
+  PROD=p;
+  var F=p.fotos&&p.fotos.length?p.fotos:[];
+  var precoOld=Math.round(parseFloat(p.preco)*2.1);
+  var waHref='https://wa.me/'+WA+'?text='+encodeURIComponent('Olá! Interesse no '+p.nome+' ('+p.codigo+'). Mais informações?');
+
+  var thumbsHTML=F.length>1
+    ?F.map(function(f,i){return '<div class="thumb'+(i===0?' on':'')+'" onclick="goTo('+i+')"><img src="'+f+'" loading="'+(i<2?'eager':'lazy')+'"></div>';}).join('')
+    :'';
+
+  var mainHTML=F.length
+    ?'<img class="gmain" id="gmain" src="'+F[0]+'" alt="'+p.nome+'" loading="eager">'
+    :'<div class="gph">'+(p.tipo==='Microondas'?'📡':'💧')+'</div>';
+
+  var arrowsHTML=F.length>1
+    ?'<button class="garrow prev" onclick="goTo(IDX-1)"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>'+
+     '<button class="garrow next" onclick="goTo(IDX+1)"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>'+
+     '<div class="gcount" id="gcnt">1 / '+F.length+'</div>'
+    :'';
+
+  var heroHTML=
+    '<div class="hero">'+
+      '<div class="gleft">'+
+        '<div class="glogo"><div class="glogo-brand">Reparo<b>Eletro</b></div><div class="glogo-sub">equipamentos revisados</div></div>'+
+        '<div class="gallery-body">'+
+          (F.length>1?'<div class="thumbs-col">'+thumbsHTML+'</div>':'')+
+          '<div class="gmain-wrap">'+mainHTML+arrowsHTML+'</div>'+
+        '</div>'+
+        '<div class="gdesc">'+p.nome+(p.capacidade?' · '+p.capacidade:'')+(p.tipo?' · '+p.tipo:'')+'</div>'+
+      '</div>'+
+      '<div class="iright">'+
+        (p.codigo?'<div class="pcode">Cód. '+p.codigo+'</div>':'')+
+        '<h1 class="ptitle">'+p.nome+'</h1>'+
+        '<div><div class="pold">De '+R(precoOld)+'</div><div class="pprice">'+R(p.preco)+'</div><div class="ppix">10% de desconto no PIX à vista</div></div>'+
+        '<div class="bens">'+
+          '<div class="ben"><div class="bic">🛡️</div><div><div class="bt">Garantia de 90 Dias</div><div class="bs">Coberta pela nossa equipe técnica</div></div></div>'+
+          '<div class="ben"><div class="bic">💳</div><div><div class="bt">Parcelamos em 3x sem Juros</div><div class="bs">No cartão de crédito</div></div></div>'+
+          '<div class="ben"><div class="bic">💸</div><div><div class="bt">10% de Desconto no Pix</div><div class="bs">Desconto aplicado automaticamente</div></div></div>'+
+          '<div class="ben"><div class="bic">🚚</div><div><div class="bt">Frete Grátis em BH e Região Metropolitana</div><div class="bs">Entrega rápida na Grande BH</div></div></div>'+
+        '</div>'+
+        '<div class="page-btns">'+
+          '<button class="btnbuy" onclick="comprarAgora()">⚡ Comprar Agora</button>'+
+          '<a class="btnmaiss" href="'+urlCatalogo()+'" >🔍 Ver Mais Opções</a>'+
+
+          '<a class="btnwa" href="'+waHref+'" target="_blank"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>Tirar dúvida no WhatsApp</a>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+
+  var abaixoHTML=`
+<section class="sec-prob"><div class="ct">
+  <div class="tag">📌 Por que comprar revisado?</div><div class="sep"></div>
+  <h2 class="sh">O mercado empurra o novo.<br><em>A gente oferece o inteligente.</em></h2>
+  <p class="ss">Preço de eletrodoméstico novo disparou. Um micro-ondas básico custa R$600–900 em loja. Um purificador de qualidade passa de R$1.000.</p>
+  <div class="pgrid">
+    <div class="dors">
+      <div class="dor"><span class="dic">💸</span><div><div class="dt">Preço abusivo no varejo</div><div class="dx">Micro-ondas novo de 30L custa entre R$650 e R$1.200. O mesmo revisado pode sair por R$320.</div></div></div>
+      <div class="dor"><span class="dic">🎲</span><div><div class="dt">Usado sem garantia é roleta russa</div><div class="dx">Comprar no OLX é barato, mas sem revisão você leva pra casa um aparelho que falha em 2 semanas.</div></div></div>
+      <div class="dor"><span class="dic">🔧</span><div><div class="dt">Assistência técnica cobra um absurdo</div><div class="dx">Conserto de micro-ondas custa R$200–400. Vale mais trocar por um revisado com garantia.</div></div></div>
+    </div>
+    <div class="sol">
+      <div class="tag" style="--yellow:#2dce76;color:var(--green);border-color:rgba(45,206,118,.3);background:rgba(45,206,118,.06)">✅ A solução</div>
+      <div class="sep" style="background:var(--green);margin-top:13px"></div>
+      <div class="stitle">Revisado pela Reparo Eletro.<br>Diferente de qualquer usado.</div>
+      <p class="stxt">Cada equipamento passa pelo nosso processo antes de ser vendido. Nosso trabalho diário há mais de 10 anos em BH.</p>
+      <div class="schecks">
+        <div class="scheck">Desmontagem e limpeza completa</div>
+        <div class="scheck">Substituição de peças desgastadas</div>
+        <div class="scheck">Testes funcionais em bancada</div>
+        <div class="scheck">Garantia real — retorna pra nós se falhar</div>
+        <div class="scheck">Nota fiscal de venda (quando disponível)</div>
+      </div>
+    </div>
+  </div>
+</div></section>
+<section class="sec-prova"><div class="ct">
+  <div class="tag">💬 O que nossos clientes dizem</div><div class="sep"></div>
+  <h2 class="sh">Quem comprou,<br><em>aprovou.</em></h2>
+  <div class="tgrid">
+    <div class="tcard"><div class="tstars">★★★★★</div><p class="ttxt">"Comprei um micro-ondas revisado por R$280. Já tem 8 meses, funciona perfeitamente. Mesmo aparelho novo custava R$750."</p><div class="tauth"><div class="tav">👩</div><div><div class="tnm">Fernanda R.</div><div class="tlc">Contagem, MG</div></div></div></div>
+    <div class="tcard"><div class="tstars">★★★★★</div><p class="ttxt">"Purificador chegou impecável, limpo, funcionando. Instalaram no mesmo dia. Recomendo sem hesitar."</p><div class="tauth"><div class="tav">👨</div><div><div class="tnm">Carlos M.</div><div class="tlc">BH — Pampulha</div></div></div></div>
+    <div class="tcard"><div class="tstars">★★★★★</div><p class="ttxt">"Já comprei dois micro-ondas aqui. Qualidade melhor do que esperava. Preço honesto, equipe séria."</p><div class="tauth"><div class="tav">👩</div><div><div class="tnm">Mariana L.</div><div class="tlc">BH — Santa Efigênia</div></div></div></div>
+    <div class="tcard"><div class="tstars">★★★★★</div><p class="ttxt">"Fui direto no Reparo Eletro. Saí com um revisado mais potente pagando menos que o conserto."</p><div class="tauth"><div class="tav">👨</div><div><div class="tnm">Roberto A.</div><div class="tlc">BH — Buritis</div></div></div></div>
+  </div>
+</div></section>
+<section class="sec-gar"><div class="ct">
+  <div style="text-align:center"><div class="tag" style="margin:0 auto">🛡️ Nossos compromissos</div><div class="sep" style="margin:13px auto"></div><h2 class="sh">Você compra com<br><em>total segurança</em></h2></div>
+  <div class="ggrid">
+    <div class="gcard"><div class="gic">🔧</div><div class="gt">Revisão completa</div><p class="gtx">Todo equipamento desmontado, inspecionado e testado. Nada sai sem aprovação técnica.</p></div>
+    <div class="gcard"><div class="gic">🛡️</div><div class="gt">Garantia real</div><p class="gtx">Falhou, você traz e a gente resolve. Sem burocracia — o conserto é feito por quem vendeu.</p></div>
+    <div class="gcard"><div class="gic">📞</div><div class="gt">Suporte pós-venda</div><p class="gtx">Dúvida sobre instalação? Pode chamar no WhatsApp. Estamos aqui antes e depois da compra.</p></div>
+  </div>
+</div></section>
+<section class="sec-cta"><div class="cta-bg"></div>
+  <div class="ct" style="position:relative">
+    <div class="tag" style="margin:0 auto 14px">🎯 Explore mais equipamentos</div>
+    <h2 class="sh">Temos mais opções<br><em>esperando por você</em></h2>
+    <p class="ss" style="margin:0 auto">Micro-ondas e purificadores revisados, com garantia, entrega em BH.</p>
+    <div class="cta-btns">
+      <a href="/microondas-vsl?produto=microondas&cta=ck" class="btncta">📡 Conhecer mais Microondas</a>
+      <a href="/microondas-vsl?produto=purificador&cta=ck" class="btncta blue">💧 Conhecer a Linha de Purificadores</a>
+    </div>
+  </div>
+</section>
+<footer><div class="ct">
+  <div class="fb">Reparo<b>Eletro</b></div>
+  <p class="fs">Belo Horizonte, MG · (31) 99830-1617 · Equipamentos revisados com garantia</p>
+</div></footer>`;
+
+  document.getElementById('root').innerHTML = heroHTML + abaixoHTML;
+
+  // Sticky bar
+  document.getElementById('sb-name').textContent=p.nome;
+  var _sbOld=document.getElementById('sb-old');
+  if(_sbOld) _sbOld.textContent='De '+R(Math.round(parseFloat(p.preco)*2.1));
+  document.getElementById('sb-code').textContent='Cód. '+(p.codigo||'');
+  document.getElementById('sb-price').textContent=R(p.preco);
+  document.getElementById('sb-del').innerHTML=delivery().replace(/<b>/g,'').replace(/<\/b>/g,'');
+  if(F.length){var si=document.getElementById('sb-img');si.src=F[0];si.style.display='block';}
+
+  updateCartBadge();
+  setInterval(function(){var el=document.getElementById('sb-del');if(el)el.innerHTML=delivery().replace(/<b>/g,'').replace(/<\/b>/g,'');},60000);
+}
+
+async function init(){
+  var id=new URLSearchParams(location.search).get('id');
+  if(!id){document.getElementById('root').innerHTML='<div class="loading"><p>ID não informado. <a href="javascript:history.back()" style="color:var(--yellow)">← Voltar</a></p></div>';return;}
+  document.getElementById('sb-del').innerHTML=delivery().replace(/<b>/g,'').replace(/<\/b>/g,'');
+  try{
+    // Tentar produto já salvo pela VSL (mais rápido, sem nova requisição)
+    var p=null;
+    try{
+      var pendente=JSON.parse(localStorage.getItem('re_produto_pendente')||'null');
+      if(pendente&&String(pendente.id)===String(id)){
+        p=pendente;
+        localStorage.removeItem('re_produto_pendente'); // usar uma vez só
+      }
+    }catch(e){}
+    // Fallback: buscar da API
+    if(!p){
+      var d=await fetch('/api/vendas?action=load').then(function(r){return r.json();});
+      var lista=(d.produtos||[]).filter(function(p){return !p.vendido;});
+      p=lista.find(function(x){return String(x.id)===String(id)||x.codigo===id;});
+    }
+    if(!p){document.getElementById('root').innerHTML='<div class="loading"><p>Produto não disponível. <a href="javascript:history.back()" style="color:var(--yellow)">← Voltar</a></p></div>';return;}
+    p.nome=p.descricao||p.nome||(p.tipo?p.tipo+' ':'')+p.codigo||'Produto';
+    p.fotos=Array.isArray(p.fotos)&&p.fotos.length?p.fotos:[];
+    render(p);
+    // Auto-adicionar ao carrinho (produto já clicado na VSL)
+    addToCart(p);
+  }catch(e){
+    document.getElementById('root').innerHTML='<div class="loading"><p>Erro ao carregar. <a href="javascript:history.back()" style="color:var(--yellow)">← Voltar</a></p></div>';
+  }
+}
+init();
+
+// Verificar retorno do Mercado Pago
+(function(){
+  var mp = new URLSearchParams(location.search).get('mp');
+  if(mp==='success'){
+    document.getElementById('mp-success').classList.add('show');
+    try{ localStorage.removeItem('re_cart_v1'); }catch(e){} // limpar carrinho
+  } else if(mp==='failure'){
+    document.getElementById('mp-failure').classList.add('show');
+  } else if(mp==='pending'){
+    document.getElementById('mp-pending').classList.add('show');
+  }
+})();
+
+</script>
+
+<!-- ══ MODAL CHECKOUT ════════════════════════════════════════ -->
+<div class="ck-overlay" id="ck-overlay">
+  <div class="ck-modal">
+    <div class="ck-hd">
+      <div class="ck-title">Finalizar Compra</div>
+      <div class="ck-close" onclick="fecharCK()">×</div>
+    </div>
+    <div class="ck-body">
+      <div class="ck-summary" id="ck-summary"></div>
+      <div class="ck-parcelas">
+        💳 Parcelamos em <strong>3x sem juros</strong> no cartão &nbsp;|&nbsp; 💚 10% off no PIX
+      </div>
+      <div class="form-row">
+        <label>Nome completo *</label>
+        <input type="text" id="ck-nome" placeholder="Seu nome" autocomplete="name">
+      </div>
+      <div class="form-row">
+        <label>Telefone / WhatsApp *</label>
+        <input type="tel" id="ck-tel" placeholder="(31) 9 9999-9999" autocomplete="tel">
+      </div>
+      <div class="form-row">
+        <label>CPF <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
+        <input type="text" id="ck-cpf" placeholder="000.000.000-00" maxlength="14" autocomplete="off">
+      </div>
+      <div class="form-row">
+        <label>Endereço completo *</label>
+        <input type="text" id="ck-end" placeholder="Rua, número, bairro, cidade" autocomplete="street-address">
+      </div>
+      <div class="form-row">
+        <label>CEP <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
+        <input type="text" id="ck-cep" placeholder="00000-000" maxlength="9" autocomplete="postal-code">
+      </div>
+      <button class="ck-submit" id="ck-submit" onclick="enviarCheckout()">
+        🔒 Ir para Pagamento Seguro
+      </button>
+    </div>
+    <div class="ck-footer">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--muted)"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+      Pagamento 100% seguro via Mercado Pago
+    </div>
+  </div>
+</div>
+
+<!-- ══ RETORNO MP ══════════════════════════════════════════════ -->
+<div class="mp-return" id="mp-success">
+  <div class="mp-return-icon">✅</div>
+  <div class="mp-return-title" style="color:var(--green)">Pagamento Aprovado!</div>
+  <div class="mp-return-sub">Sua compra foi confirmada. Em breve entraremos em contato para combinar a entrega.</div>
+  <button class="mp-return-btn" onclick="location.href='/'">Voltar ao início</button>
+</div>
+<div class="mp-return" id="mp-failure">
+  <div class="mp-return-icon">❌</div>
+  <div class="mp-return-title" style="color:#ff4b4b">Pagamento não aprovado</div>
+  <div class="mp-return-sub">Houve um problema com o seu pagamento. Tente novamente ou escolha outra forma.</div>
+  <button class="mp-return-btn" onclick="document.getElementById('mp-failure').classList.remove('show')">Tentar novamente</button>
+</div>
+<div class="mp-return" id="mp-pending">
+  <div class="mp-return-icon">⏳</div>
+  <div class="mp-return-title" style="color:var(--yellow)">Pagamento Pendente</div>
+  <div class="mp-return-sub">Seu pagamento está sendo processado. Assim que confirmado, entraremos em contato.</div>
+  <button class="mp-return-btn" onclick="location.href='/'">Voltar ao início</button>
+</div>
+
+</body>
+</html>
