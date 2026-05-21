@@ -150,6 +150,21 @@ export default async function handler(req, res) {
           })
         });
       } catch(e) { console.error('registrar-venda:', e.message); }
+
+      // ── Google Ads: conversão server-side via Measurement Protocol ────
+      try {
+        await fetch('https://www.googletagmanager.com/gtag/js?id=AW-11030361270', {method:'GET'}).catch(()=>{});
+        // Registrar via gtag collect (dispara mesmo se cliente fechou a janela)
+        await fetch('https://www.google-analytics.com/g/collect?' + new URLSearchParams({
+          v:'2', tid:'AW-11030361270',
+          cid: String(payId),
+          en: 'conversion',
+          'epn.value':  String(payment.transaction_amount),
+          'ep.currency':'BRL',
+          'ep.transaction_id': String(payId),
+          'ep.send_to': 'AW-11030361270/saNSCK6yyrAcELbp14sp'
+        }), {method:'POST'}).catch(()=>{});
+      } catch(e){ console.error('[GA] server-side:', e.message); }
     }
 
     return res.status(200).json({ ok: true, processados: produtoIds.length });
