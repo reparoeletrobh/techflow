@@ -7,6 +7,10 @@
     {
       "path": "/api/board?action=scan-erp-full",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/frenteloja?action=sync-fl",
+      "schedule": "*/5 * * * *"
     }
   ],
   "rewrites": [
