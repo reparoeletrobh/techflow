@@ -136,6 +136,21 @@ export default async function handler(req,res){
           );
           const pipefyId=data?.createCard?.card?.id||null;
           console.log('[FrenteLoja] Card criado:',pipefyId);
+          // Registrar no board SEMPRE (com ou sem pipefyId) — não depende do Pipefy
+          const boardBase = process.env.FL_BASE_URL || 'https://reparoeletroadm.com';
+          await fetch(boardBase+'/api/board?action=add-loja-card', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({
+              flFichaId:   ficha.id,
+              pipefyId:    pipefyId || null,
+              title:       titleCompleto,
+              nomeContato: (ficha.nomeContato||'').replace(/\(Loja\)/g,'').trim(),
+              telefone:    ficha.telefone||'',
+              phaseId:     'producao',
+            })
+          }).catch(e=>console.error('[FL] board-card:',e.message));
+
           if(pipefyId){
             // Atualizar pipefyCardId no Redis
             const db2=await dbGet(FL_KEY)||defaultDB();
@@ -146,21 +161,6 @@ export default async function handler(req,res){
               await pipefyQ('mutation{updateCardField(input:{card_id:"'+pipefyId+'" field_id:"valor_de_contrato" new_value:"'+vn+'"}){success}}').catch(e=>console.error('[FL] valor:',e.message));
               await dbSet(FL_KEY,db2);
             }
-            // Board sync para regra loja
-            // Registrar no board com flFichaId para notificação direta
-            const boardBase = process.env.FL_BASE_URL || 'https://reparoeletroadm.com';
-            await fetch(boardBase+'/api/board?action=add-loja-card', {
-              method: 'POST',
-              headers: {'Content-Type':'application/json'},
-              body: JSON.stringify({
-                flFichaId:   ficha.id,
-                pipefyId:    pipefyId,
-                title:       titleCompleto,
-                nomeContato: (ficha.nomeContato||'').replace(/\(Loja\)/g,'').trim(),
-                telefone:    ficha.telefone||'',
-                phaseId:     'producao',
-              })
-            }).catch(e=>console.error('[FL] board-card:',e.message));
             await fetch('https://reparoeletroadm.com/api/board?action=sync').catch(e=>console.error('[FL] sync:',e.message));
           }
         }catch(e){console.error('[FrenteLoja] BG Pipefy:',e.message);}
@@ -239,6 +239,32 @@ export default async function handler(req,res){
       })
     }).then(r=>r.json()).catch(e=>({ok:false,error:e.message}));
     return res.status(200).json({ ok: r.ok, msg: r.msg || null, error: r.error || null });
+  }
+
+
+  // ── GET sync-fl — corrige fichas presas (loja_feito board ≠ conserto_realizado FL) ──
+  if (action === 'sync-fl') {
+    const BOARD_KEY2 = 'reparoeletro_board';
+    const boardDb = await dbGet(BOARD_KEY2) || { cards: [] };
+    const flDb = await dbGet(FL_KEY) || defaultDB();
+    const lojaFeitoCards = (boardDb.cards || []).filter(c => c.phaseId === 'loja_feito');
+    let corrigidos = 0;
+    for (const card of lojaFeitoCards) {
+      const osMatch = (card.title || '').match(/OS:([a-zA-Z0-9-]+)/);
+      const fichaId = card.flFichaId || (osMatch ? osMatch[1] : null);
+      if (!fichaId) continue;
+      const ficha = flDb.fichas.find(f => f.id === String(fichaId));
+      if (!ficha || ficha.phase !== 'producao') continue;
+      // Ficha presa: está em loja_feito no board mas producao no FL → corrigir
+      const now = new Date().toISOString();
+      ficha.phase = 'conserto_realizado';
+      ficha.liberadoHoje = true;
+      ficha.movedAt = now;
+      ficha.history = (ficha.history || []).concat([{ phase: 'conserto_realizado', ts: now, origem: 'sync-fl' }]);
+      corrigidos++;
+    }
+    if (corrigidos > 0) await dbSet(FL_KEY, flDb);
+    return res.status(200).json({ ok: true, corrigidos, total: lojaFeitoCards.length });
   }
 
   if(action==='rastrear'){
