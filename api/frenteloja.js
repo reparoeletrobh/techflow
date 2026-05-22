@@ -147,7 +147,7 @@ export default async function handler(req,res){
               title:       titleCompleto,
               nomeContato: (ficha.nomeContato||'').replace(/\(Loja\)/g,'').trim(),
               telefone:    ficha.telefone||'',
-              phaseId:     'producao',
+              phaseId:     'cliente_loja',
             })
           }).catch(e=>console.error('[FL] board-card:',e.message));
 
@@ -235,7 +235,7 @@ export default async function handler(req,res){
         title:       titulo,
         nomeContato: ficha.nomeContato||'',
         telefone:    ficha.telefone||'',
-        phaseId:     ficha.phase === 'producao' ? 'producao' : 'producao',
+        phaseId:     'cliente_loja',
       })
     }).then(r=>r.json()).catch(e=>({ok:false,error:e.message}));
     return res.status(200).json({ ok: r.ok, msg: r.msg || null, error: r.error || null });
@@ -264,7 +264,18 @@ export default async function handler(req,res){
       corrigidos++;
     }
     if (corrigidos > 0) await dbSet(FL_KEY, flDb);
-    return res.status(200).json({ ok: true, corrigidos, total: lojaFeitoCards.length });
+    // Corrigir cards de loja criados em producao que deveriam estar em cliente_loja
+    const BOARD_KEY3 = 'reparoeletro_board';
+    const boardDb2 = await dbGet(BOARD_KEY3) || { cards: [] };
+    let corrigidosLoja = 0;
+    for(const card of boardDb2.cards){
+      if(card.phaseId === 'producao' && card.flFichaId && String(card.id).includes('-loja')){
+        card.phaseId = 'cliente_loja';
+        corrigidosLoja++;
+      }
+    }
+    if(corrigidosLoja > 0) await dbSet(BOARD_KEY3, boardDb2);
+    return res.status(200).json({ ok: true, corrigidos, total: lojaFeitoCards.length, corrigidosLoja });
   }
 
   if(action==='rastrear'){
