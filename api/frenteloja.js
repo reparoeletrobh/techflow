@@ -250,10 +250,15 @@ export default async function handler(req,res){
     const lojaFeitoCards = (boardDb.cards || []).filter(c => c.phaseId === 'loja_feito');
     let corrigidos = 0;
     for (const card of lojaFeitoCards) {
+      // 3 formas: flFichaId > OS: no título > pipefyId × pipefyCardId
       const osMatch = (card.title || '').match(/OS:([a-zA-Z0-9-]+)/);
-      const fichaId = card.flFichaId || (osMatch ? osMatch[1] : null);
-      if (!fichaId) continue;
-      const ficha = flDb.fichas.find(f => f.id === String(fichaId));
+      let ficha = null;
+      if (card.flFichaId)
+        ficha = flDb.fichas.find(f => f.id === String(card.flFichaId));
+      if (!ficha && osMatch)
+        ficha = flDb.fichas.find(f => f.id === String(osMatch[1]));
+      if (!ficha && card.pipefyId)
+        ficha = flDb.fichas.find(f => f.pipefyCardId && String(f.pipefyCardId) === String(card.pipefyId));
       if (!ficha || ficha.phase !== 'producao') continue;
       // Ficha presa: está em loja_feito no board mas producao no FL → corrigir
       const now = new Date().toISOString();
@@ -261,9 +266,13 @@ export default async function handler(req,res){
       ficha.liberadoHoje = true;
       ficha.movedAt = now;
       ficha.history = (ficha.history || []).concat([{ phase: 'conserto_realizado', ts: now, origem: 'sync-fl' }]);
+      card.flFichaId = ficha.id; // guardar para notificações futuras
       corrigidos++;
     }
-    if (corrigidos > 0) await dbSet(FL_KEY, flDb);
+    if (corrigidos > 0) {
+      await dbSet(FL_KEY, flDb);
+      await dbSet(BOARD_KEY2, boardDb);
+    }
     // Corrigir cards de loja criados em producao que deveriam estar em cliente_loja
     const BOARD_KEY3 = 'reparoeletro_board';
     const boardDb2 = await dbGet(BOARD_KEY3) || { cards: [] };
