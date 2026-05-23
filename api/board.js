@@ -2233,6 +2233,91 @@ module.exports = async function handler(req, res) {
     }
   }
 
+
+  // ── GET balcao-sync-erp-loja — importa histórico de fichas Loja do ERP Pipefy ──
+  if (action === 'balcao-sync-erp-loja') {
+    try {
+      const BALCAO_KEY = 'reparoeletro_balcao';
+      const balcao = (await dbGet(BALCAO_KEY)) || [];
+      const balcaoIds = new Set(balcao.map(c => String(c.pipefyId)));
+      let importados = 0;
+      const ERP_KEYWORDS = ['erp','finaliz','conclu','descar'];
+
+      // Buscar fases com cards+titulo (mesma estrutura do fetchAllPhaseCards + title)
+      const data = await pipefyQuery(`query {
+        pipe(id: "${PIPE_ID}") {
+          phases {
+            id name
+            cards(first: 50) {
+              pageInfo { hasNextPage endCursor }
+              edges { node { id title updated_at } }
+            }
+          }
+        }
+      }`);
+
+      const phases = data?.pipe?.phases || [];
+
+      for (const ph of phases) {
+        const l = ph.name.toLowerCase();
+        if (!ERP_KEYWORDS.some(k => l.includes(k))) continue;
+
+        // Processar cards desta fase
+        const processEdges = async (edges) => {
+          for (const { node } of edges) {
+            if (!((node.title||'').toLowerCase().includes('loja'))) continue;
+            if (balcaoIds.has(String(node.id))) continue;
+            const nomeContato = (node.title||'').replace(/\s*\(Loja\).*/i,'').trim();
+            const osMatch = (node.title||'').match(/OS:(FL-[a-zA-Z0-9-]+)/);
+            balcao.unshift({
+              pipefyId:    String(node.id),
+              nomeContato: nomeContato,
+              osCode:      osMatch ? osMatch[1] : null,
+              descricao:   node.title || '',
+              telefone:    null, tecnico: null,
+              entradaEm:   node.updated_at || new Date().toISOString(),
+              status:      'pago',
+              pagoEm:      node.updated_at || new Date().toISOString(),
+            });
+            balcaoIds.add(String(node.id));
+            importados++;
+          }
+        };
+
+        await processEdges(ph.cards.edges);
+
+        // Paginação
+        let cursor = ph.cards.pageInfo?.hasNextPage ? ph.cards.pageInfo.endCursor : null;
+        while (cursor) {
+          const data2 = await pipefyQuery(`query {
+            pipe(id: "${PIPE_ID}") {
+              phases {
+                name
+                cards(first: 50, after: "${cursor}") {
+                  pageInfo { hasNextPage endCursor }
+                  edges { node { id title updated_at } }
+                }
+              }
+            }
+          }`);
+          const ph2 = (data2?.pipe?.phases||[]).find(p=>p.name===ph.name);
+          if (!ph2) break;
+          await processEdges(ph2.cards.edges);
+          cursor = ph2.cards.pageInfo?.hasNextPage ? ph2.cards.pageInfo.endCursor : null;
+        }
+      }
+
+      if (importados > 0) await dbSet(BALCAO_KEY, balcao);
+      return res.status(200).json({
+        ok: true, importados,
+        fasesErp: phases.filter(p=>ERP_KEYWORDS.some(k=>p.name.toLowerCase().includes(k))).map(p=>p.name),
+        totalBalcao: balcao.length
+      });
+    } catch(e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
       return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch (err) {
