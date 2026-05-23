@@ -337,6 +337,78 @@ export default async function handler(req,res){
     return res.status(200).json({ ok: true, corrigidos, corrigidosLoja, syncAnalise, total: lojaFeitoCards.length });
   }
 
+
+  // ── GET limpar-erp — remove fichas FL que já foram para ERP/Finalizado no Pipefy ──
+  if (action === 'limpar-erp') {
+    const db = await dbGet(FL_KEY) || defaultDB();
+
+    // 1. Buscar todas as fases do pipe com seus cards
+    let erpIds = new Set();
+    let fasesErp = [];
+    try {
+      const data = await pipefyQ(`query {
+        pipe(id: "${PIPE_ID}") {
+          phases {
+            id name
+            cards(first: 100) {
+              edges { node { id } }
+              pageInfo { hasNextPage endCursor }
+            }
+          }
+        }
+      }`);
+      const phases = data?.pipe?.phases || [];
+      for (const ph of phases) {
+        const l = ph.name.toLowerCase();
+        if (l.includes('erp') || l.includes('finaliz') || l.includes('conclu') ||
+            l.includes('descar') || l.includes('reprov')) {
+          fasesErp.push(ph.name);
+          ph.cards.edges.forEach(e => erpIds.add(String(e.node.id)));
+          // Paginação
+          let cursor = ph.cards.pageInfo?.hasNextPage ? ph.cards.pageInfo.endCursor : null;
+          while (cursor) {
+            const data2 = await pipefyQ(`query {
+              pipe(id: "${PIPE_ID}") {
+                phases {
+                  name
+                  cards(first: 100, after: "${cursor}") {
+                    edges { node { id } }
+                    pageInfo { hasNextPage endCursor }
+                  }
+                }
+              }
+            }`);
+            const ph2 = (data2?.pipe?.phases||[]).find(p=>p.name===ph.name);
+            if (!ph2) break;
+            ph2.cards.edges.forEach(e => erpIds.add(String(e.node.id)));
+            cursor = ph2.cards.pageInfo?.hasNextPage ? ph2.cards.pageInfo.endCursor : null;
+          }
+        }
+      }
+    } catch(e) {
+      return res.status(500).json({ ok:false, error:'Erro Pipefy: '+e.message });
+    }
+
+    // 2. Encontrar fichas FL cujo pipefyCardId está em ERP/Finalizado
+    const antes = db.fichas.length;
+    const removidas = db.fichas.filter(f => f.pipefyCardId && erpIds.has(String(f.pipefyCardId)));
+    const idsRemovidos = removidas.map(f => ({ id:f.id, nome:f.nomeContato, phase:f.phase, pipefyId:f.pipefyCardId }));
+
+    // 3. Remover do array
+    db.fichas = db.fichas.filter(f => !f.pipefyCardId || !erpIds.has(String(f.pipefyCardId)));
+
+    if (removidas.length > 0) await dbSet(FL_KEY, db);
+
+    return res.status(200).json({
+      ok: true,
+      fasesErp,
+      totalErpIds: erpIds.size,
+      removidas: idsRemovidos,
+      antes,
+      depois: db.fichas.length
+    });
+  }
+
   if(action==='rastrear'){
     const q=(req.query.q||'').trim().toLowerCase();
     if(!q)return res.status(400).json({ok:false,error:'Query obrigatória'});
