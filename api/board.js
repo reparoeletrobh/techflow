@@ -2149,6 +2149,90 @@ module.exports = async function handler(req, res) {
     }
   }
 
+
+  // ── GET balcao-sync-erp-loja — importa histórico de fichas Loja do ERP Pipefy ──
+  if (action === 'balcao-sync-erp-loja') {
+    try {
+      const BALCAO_KEY = 'reparoeletro_balcao';
+      const balcao = (await dbGet(BALCAO_KEY)) || [];
+      const balcaoIds = new Set(balcao.map(c => String(c.pipefyId)));
+      let importados = 0;
+
+      // Buscar fases ERP com título dos cards (query com title+updated_at)
+      let hasMore = true;
+      const ERP_KEYWORDS = ['erp','finaliz','conclu','descar'];
+
+      // Primeira passagem: obter fases e IDs das fases ERP
+      const allPhasesData = await pipefyQuery(`query {
+        pipe(id: "${PIPE_ID}") {
+          phases { id name }
+        }
+      }`);
+      const todasFases = allPhasesData?.pipe?.phases || [];
+      const fasesErp = todasFases.filter(p => {
+        const l = p.name.toLowerCase();
+        return ERP_KEYWORDS.some(k => l.includes(k));
+      });
+
+      // Para cada fase ERP, buscar cards com título
+      for (const fase of fasesErp) {
+        let cursor = null;
+        do {
+          const q = `query {
+            pipe(id: "${PIPE_ID}") {
+              phase(id: "${fase.id}") {
+                id name
+                cards_can_be_moved_to_phases { id }
+              }
+            }
+          }`;
+          // Usar cards diretamente via pipe.phases com filtro
+          const cardsQ = await pipefyQuery(`query {
+            allCards(pipeId: "${PIPE_ID}", first: 50${cursor ? `, after: "${cursor}"` : ''}, filter: {phase_id: "${fase.id}"}) {
+              pageInfo { hasNextPage endCursor }
+              edges {
+                node {
+                  id title updated_at
+                }
+              }
+            }
+          }`);
+
+          const edges = cardsQ?.allCards?.edges || [];
+          for (const { node } of edges) {
+            const titulo = (node.title || '').toLowerCase();
+            if (!titulo.includes('loja')) continue;
+            if (balcaoIds.has(String(node.id))) continue;
+
+            const nomeContato = (node.title || '').replace(/\s*\(Loja\).*/i, '').trim();
+            const osMatch     = (node.title || '').match(/OS:(FL-[a-zA-Z0-9-]+)/);
+
+            balcao.unshift({
+              pipefyId:    String(node.id),
+              nomeContato: nomeContato,
+              osCode:      osMatch ? osMatch[1] : null,
+              descricao:   node.title || '',
+              telefone:    null,
+              tecnico:     null,
+              entradaEm:   node.updated_at || new Date().toISOString(),
+              status:      'pago',
+              pagoEm:      node.updated_at || new Date().toISOString(),
+            });
+            balcaoIds.add(String(node.id));
+            importados++;
+          }
+          cursor = cardsQ?.allCards?.pageInfo?.hasNextPage
+            ? cardsQ.allCards.pageInfo.endCursor : null;
+        } while (cursor);
+      }
+
+      if (importados > 0) await dbSet(BALCAO_KEY, balcao);
+      return res.status(200).json({ ok: true, importados, fasesErp: fasesErp.map(f=>f.name), totalBalcao: balcao.length });
+    } catch(e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
       return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch (err) {
