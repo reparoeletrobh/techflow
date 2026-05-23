@@ -428,7 +428,11 @@ module.exports = async function handler(req, res) {
           if (activeIds.has(c.pipefyId) || syncedSet.has(c.pipefyId)) continue;
           const _txt=((c.nomeContato||'')+' '+(c.descricao||'')+' '+(c.title||'')).toLowerCase();
           const _isLoja=_txt.includes('loja');
-          const newCard = { ...c, phaseId: _isLoja?'cliente_loja':board.phases[0].id, movedBy:"Pipefy" };
+          // Extrair flFichaId do título (formato: OS:FL-XXXX)
+          const _osMatch = (c.title||'').match(/OS:(FL-[a-zA-Z0-9-]+)/);
+          const _flFichaId = _osMatch ? _osMatch[1] : null;
+          const newCard = { ...c, phaseId: _isLoja?'cliente_loja':board.phases[0].id, movedBy:"Pipefy",
+            flFichaId: _flFichaId || c.flFichaId || null };
           newCards.push(newCard);
           if(_isLoja){try{const _b=(await dbGet('reparoeletro_balcao'))||[];if(!_b.find(b=>b.pipefyId===String(c.pipefyId))){_b.unshift({pipefyId:String(c.pipefyId),nomeContato:c.nomeContato||c.title||'—',osCode:c.osCode||null,descricao:c.descricao||null,telefone:c.telefone||null,tecnico:null,entradaEm:new Date().toISOString(),status:'aguardando_pagamento',pagoEm:null});await dbSet('reparoeletro_balcao',_b);}}catch(_e){}}
           activeIds.add(c.pipefyId);
@@ -2003,18 +2007,24 @@ module.exports = async function handler(req, res) {
     const { flFichaId, pipefyId, title, nomeContato, telefone, phaseId: startPhase } = req.body || {};
     if (!flFichaId || !title) return res.status(400).json({ ok:false, error:'flFichaId e title obrigatorios' });
     const board = sanitizeBoard(await dbGet(BOARD_KEY));
-    const existingCard = board.cards.find(c => c.flFichaId === flFichaId);
+    // Verificar duplicata por flFichaId OU por pipefyId (evita dois cards para mesma ficha)
+    const existingCard = board.cards.find(c =>
+      c.flFichaId === flFichaId ||
+      (pipefyId && c.pipefyId === String(pipefyId) && !c.flFichaId)
+    );
     if (existingCard) {
-      // Corrigir pipefyId se estava null
-      if (!existingCard.pipefyId) {
-        existingCard.pipefyId = pipefyId || flFichaId;
-        await dbSet(BOARD_KEY, board);
+      let updated = false;
+      if (!existingCard.flFichaId) { existingCard.flFichaId = flFichaId; updated = true; }
+      if (!existingCard.pipefyId && pipefyId) { existingCard.pipefyId = String(pipefyId); updated = true; }
+      if (existingCard.phaseId !== (startPhase || 'cliente_loja') && existingCard.phaseId === 'producao') {
+        existingCard.phaseId = startPhase || 'cliente_loja'; updated = true;
       }
+      if (updated) await dbSet(BOARD_KEY, board);
       return res.status(200).json({ ok:true, msg:'ja_existe', pipefyId: existingCard.pipefyId });
     }
     const newCard = {
       id:          flFichaId + '-loja',
-      pipefyId:    pipefyId || flFichaId, // flFichaId como fallback para UI funcionar
+      pipefyId:    pipefyId ? String(pipefyId) : flFichaId, // flFichaId como fallback para UI funcionar
       flFichaId:   flFichaId,
       title:       title,
       nomeContato: nomeContato || '',
@@ -2027,6 +2037,25 @@ module.exports = async function handler(req, res) {
     board.cards.push(newCard);
     await dbSet(BOARD_KEY, board);
     return res.status(200).json({ ok:true, card: newCard });
+  }
+
+
+  // ── GET validate-loja — garante flFichaId em todos os cards (Loja) do board ──
+  if (action === 'validate-loja') {
+    const board = sanitizeBoard(await dbGet(BOARD_KEY));
+    let corrigidos = 0;
+    for (const card of board.cards) {
+      if (card.flFichaId) continue; // já tem
+      const _isLoja = ((card.nomeContato||'')+' '+(card.title||'')).toLowerCase().includes('loja');
+      if (!_isLoja) continue;
+      const osMatch = (card.title||'').match(/OS:(FL-[a-zA-Z0-9-]+)/);
+      if (osMatch) {
+        card.flFichaId = osMatch[1];
+        corrigidos++;
+      }
+    }
+    if (corrigidos > 0) await dbSet(BOARD_KEY, board);
+    return res.status(200).json({ ok: true, corrigidos });
   }
 
       return res.status(404).json({ ok: false, error: "Ação não encontrada" });
