@@ -621,6 +621,11 @@ async function loadBoard() {
         const insertAt = idxAprov >= 0 ? idxAprov : 0;
         board.phases.splice(insertAt, 0, { id: 'analise_loja', name: 'Análise Loja' });
       }
+      // Garante fase analise_loja antes de aprovado
+      if (!board.phases.find(p => p.id === 'analise_loja')) {
+        const idxAprov = board.phases.findIndex(p => p.id === 'aprovado');
+        board.phases.splice(idxAprov >= 0 ? idxAprov : 0, 0, { id: 'analise_loja', name: 'Análise Loja' });
+      }
       // Garante fase virtual "OS em Atraso" entre cliente_loja e urgencia
       if (!board.phases.find(p => p.id === 'atrasados')) {
         const idxLoja = board.phases.findIndex(p => p.id === 'cliente_loja');
@@ -759,7 +764,26 @@ function analiseLojaCardHTML(c) {
     </div>`;
 }
 
+function analiseLojaCardHTML(c) {
+  return `
+    <div class="os-card" style="border-color:rgba(168,85,247,0.3);">
+      <div class="card-bar" style="background:#a855f7"></div>
+      <div style="font-family:var(--fm);font-size:9px;color:#a855f7;margin-bottom:4px;">${c.flFichaId||c.id}</div>
+      <div class="card-title">${c.nomeContato||'—'}</div>
+      <div style="font-size:11px;color:#a855f7;font-family:var(--fm);margin-top:2px;">${(c.title||'').replace(/.*\) - /,'').split('|')[0].trim().slice(0,35)}</div>
+      ${(c.title||'').split('|')[1] ? `<div class="card-desc">${(c.title||'').split('|')[1].trim().slice(0,60)}</div>` : ''}
+      <div class="card-footer" style="margin-top:8px;"><div class="card-age" style="color:#a855f7;">🔍 aguardando diagnóstico</div></div>
+      <button onclick="abrirAnalise('${c.flFichaId}')"
+        style="margin-top:8px;width:100%;font-family:var(--fm);font-size:10px;padding:6px;border-radius:6px;
+               border:1px solid rgba(168,85,247,0.4);background:rgba(168,85,247,0.08);
+               color:#a855f7;cursor:pointer;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">
+        🔧 ANÁLISE TÉCNICA
+      </button>
+    </div>`;
+}
+
 function cardHTML(c, color, isAtrasado) {
+  if (c.phaseId === 'analise_loja') return analiseLojaCardHTML(c);
   if (c.phaseId === 'analise_loja') return analiseLojaCardHTML(c);
   if (c.phaseId === 'analise_loja') return analiseLojaCardHTML(c, color);
   // Calcula tempo na fase atual
@@ -1863,6 +1887,98 @@ async function fazerOrcamento(decisao) {
   }
 }
 
+
+// ── Análise Loja: 2 passos (espelho exato FL) ──────────────────
+let _alFlId = null, _alFicha = null;
+
+function _showMsg(elId, txt, tipo) {
+  const el = document.getElementById(elId);
+  el.textContent = txt; el.style.display = 'block';
+  el.style.background = tipo==='ok' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)';
+  el.style.color = tipo==='ok' ? '#22c55e' : '#ef4444';
+}
+
+function _infoHtml(f) {
+  return `<strong>${f.nomeContato}</strong> — ${f.equipamento||''}<br>
+          <span style="color:#888">${f.descricao||''}</span>`;
+}
+
+async function abrirAnalise(flFichaId) {
+  _alFlId = flFichaId; _alFicha = null;
+  document.getElementById('al-diag').value = '';
+  document.getElementById('al-msg-1').style.display = 'none';
+  document.getElementById('al-overlay-1').style.display = 'flex';
+  try {
+    const r = await fetch('/api/frenteloja?action=load');
+    const d = await r.json();
+    const f = (d.fichas||[]).find(f => f.id === flFichaId);
+    if (f) {
+      _alFicha = f;
+      document.getElementById('al-info-1').innerHTML = _infoHtml(f);
+      if (f.descricaoTecnica) document.getElementById('al-diag').value = f.descricaoTecnica;
+    }
+  } catch(e) {}
+}
+
+function fecharAnalise() {
+  document.getElementById('al-overlay-1').style.display = 'none';
+  document.getElementById('al-overlay-2').style.display = 'none';
+  _alFlId = null; _alFicha = null;
+}
+
+async function enviarOrcamento() {
+  const diag = document.getElementById('al-diag').value.trim();
+  if (!diag) { _showMsg('al-msg-1','Preencha o diagnóstico técnico','err'); return; }
+  const btn = document.querySelector('#al-overlay-1 button:last-of-type');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Salvando...'; }
+  try {
+    await fetch('/api/frenteloja?action=analise', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id: _alFlId, descricaoTecnica: diag })
+    });
+    // Abrir passo 2
+    document.getElementById('al-overlay-1').style.display = 'none';
+    document.getElementById('al-valor').value = _alFicha?.orcamento?.valor || '';
+    document.getElementById('al-pgto').value  = _alFicha?.orcamento?.formaPagamento || 'pix';
+    document.getElementById('al-msg-2').style.display = 'none';
+    const info2 = document.getElementById('al-info-2');
+    if (_alFicha) {
+      info2.innerHTML = _infoHtml(_alFicha) +
+        (_alFicha.descricaoTecnica || diag ? `<br><span style="color:#a855f7">Diagnóstico: ${_alFicha.descricaoTecnica||diag}</span>` : '');
+    }
+    document.getElementById('al-overlay-2').style.display = 'flex';
+  } catch(e) {
+    _showMsg('al-msg-1','Erro de conexão','err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🗒️ ENVIAR ORÇAMENTO'; }
+  }
+}
+
+async function passarOrcamento(decisao) {
+  const valor = parseFloat(document.getElementById('al-valor').value) || 0;
+  const pgto  = document.getElementById('al-pgto').value;
+  const btns  = document.querySelectorAll('#al-overlay-2 button');
+  btns.forEach(b => b.disabled = true);
+  try {
+    const r = await fetch('/api/frenteloja?action=passar-orcamento', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id: _alFlId, valor, formaPagamento: pgto, decisao })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      const msg = decisao==='aprovado' ? '✅ Aprovado! Ficha em Produção' : 'Aguardando resposta do cliente';
+      _showMsg('al-msg-2', msg, 'ok');
+      setTimeout(() => { fecharAnalise(); loadBoard(); }, 1200);
+    } else {
+      _showMsg('al-msg-2','Erro: '+(d.error||'falha'),'err');
+      btns.forEach(b => b.disabled = false);
+    }
+  } catch(e) {
+    _showMsg('al-msg-2','Erro de conexão','err');
+    btns.forEach(b => b.disabled = false);
+  }
+}
+
 </script>
 <!-- MODAL COMPRA PEÇA -->
 <div class="compra-modal-overlay" id="compra-modal-overlay">
@@ -2006,6 +2122,87 @@ async function fazerOrcamento(decisao) {
         </button>
       </div>
 
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL ANÁLISE LOJA — PASSO 1: DIAGNÓSTICO ══════════════ -->
+<div id="al-overlay-1" onclick="if(event.target===this)fecharAnalise()"
+  style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,0.85);
+         backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#0d1117;border:1px solid rgba(168,85,247,0.3);border-radius:16px;
+              width:100%;max-width:420px;max-height:92dvh;display:flex;flex-direction:column;">
+    <div style="padding:14px 18px;border-bottom:1px solid #1f2937;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-family:var(--fh);font-size:15px;font-weight:700;color:#a855f7;">🔧 ANÁLISE TÉCNICA</div>
+      <button onclick="fecharAnalise()" style="width:30px;height:30px;border-radius:50%;background:#1f2937;border:1px solid #333;color:#888;font-size:16px;cursor:pointer;">×</button>
+    </div>
+    <div style="padding:16px 18px 20px;display:flex;flex-direction:column;gap:14px;">
+      <div style="background:#111;border-radius:10px;padding:12px;border:1px solid #1f2937;font-size:13px;">
+        <div id="al-info-1"></div>
+      </div>
+      <div>
+        <label style="font-family:var(--fm);font-size:10px;color:#888;display:block;margin-bottom:6px;letter-spacing:.5px;">DIAGNÓSTICO / PEÇAS NECESSÁRIAS</label>
+        <textarea id="al-diag" rows="4"
+          placeholder="Descreva o diagnóstico técnico e as peças necessárias para o orçamento..."
+          style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#fff;
+                 font-family:var(--fb);font-size:13px;padding:10px;resize:none;box-sizing:border-box;"></textarea>
+      </div>
+      <div id="al-msg-1" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
+      <button onclick="enviarOrcamento()"
+        style="width:100%;padding:13px;border-radius:10px;border:none;background:var(--accent);
+               color:#000;font-family:var(--fb);font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.3px;">
+        🗒️ ENVIAR ORÇAMENTO
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL ANÁLISE LOJA — PASSO 2: ORÇAMENTO ═════════════════ -->
+<div id="al-overlay-2" onclick="if(event.target===this)fecharAnalise()"
+  style="display:none;position:fixed;inset:0;z-index:601;background:rgba(0,0,0,0.85);
+         backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#0d1117;border:1px solid rgba(34,197,94,0.3);border-radius:16px;
+              width:100%;max-width:420px;display:flex;flex-direction:column;">
+    <div style="padding:14px 18px;border-bottom:1px solid #1f2937;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-family:var(--fh);font-size:15px;font-weight:700;color:#22c55e;">💰 PASSAR ORÇAMENTO</div>
+      <button onclick="fecharAnalise()" style="width:30px;height:30px;border-radius:50%;background:#1f2937;border:1px solid #333;color:#888;font-size:16px;cursor:pointer;">×</button>
+    </div>
+    <div style="padding:16px 18px 20px;display:flex;flex-direction:column;gap:14px;">
+      <div style="background:#111;border-radius:10px;padding:12px;border:1px solid #1f2937;font-size:13px;">
+        <div id="al-info-2"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <label style="font-family:var(--fm);font-size:10px;color:#888;display:block;margin-bottom:6px;">VALOR (R$)</label>
+          <input id="al-valor" type="number" placeholder="0.00" min="0"
+            style="width:100%;background:#111;border:1px solid #333;border-radius:8px;
+                   color:#fff;font-family:var(--fb);font-size:14px;padding:10px;box-sizing:border-box;"/>
+        </div>
+        <div>
+          <label style="font-family:var(--fm);font-size:10px;color:#888;display:block;margin-bottom:6px;">FORMA DE PAGAMENTO</label>
+          <select id="al-pgto"
+            style="width:100%;background:#111;border:1px solid #333;border-radius:8px;
+                   color:#fff;font-family:var(--fb);font-size:13px;padding:10px;box-sizing:border-box;">
+            <option value="pix">PIX</option>
+            <option value="dinheiro">Dinheiro</option>
+            <option value="cartao">Cartão</option>
+          </select>
+        </div>
+      </div>
+      <div id="al-msg-2" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <button onclick="passarOrcamento('aguardando')"
+          style="padding:12px;border-radius:10px;border:1px solid #333;background:#1f2937;
+                 color:#888;font-family:var(--fb);font-size:11px;font-weight:600;cursor:pointer;">
+          ⏳ AGUARDANDO RESPOSTA
+        </button>
+        <button onclick="passarOrcamento('aprovado')"
+          style="padding:12px;border-radius:10px;border:none;background:#22c55e;
+                 color:#000;font-family:var(--fb);font-size:13px;font-weight:700;cursor:pointer;">
+          ✅ APROVADO
+        </button>
+      </div>
     </div>
   </div>
 </div>
