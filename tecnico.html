@@ -562,6 +562,7 @@ const PAGES  = ['dashboard','mover','criar','rs','rs-rua','metas'];
 // ── ESTADO ─────────────────────────────────────────────────────
 const DEFAULT_BOARD = {
   phases: [
+    { id: "analise_loja",    name: "Análise Loja"       },
     { id: "aprovado",        name: "Aprovado"           },
     { id: "producao",        name: "Produção"           },
     { id: "cliente_loja",    name: "Cliente Loja"       },
@@ -614,6 +615,12 @@ async function loadBoard() {
       if (!Array.isArray(board.movesLog))   board.movesLog   = [];
       if (!board.rsPhases?.length)    board.rsPhases    = DEFAULT_BOARD.rsPhases;
       if (!board.rsRuaPhases?.length) board.rsRuaPhases = DEFAULT_BOARD.rsRuaPhases;
+      // Garante fase analise_loja antes de aprovado
+      if (!board.phases.find(p => p.id === 'analise_loja')) {
+        const idxAprov = board.phases.findIndex(p => p.id === 'aprovado');
+        const insertAt = idxAprov >= 0 ? idxAprov : 0;
+        board.phases.splice(insertAt, 0, { id: 'analise_loja', name: 'Análise Loja' });
+      }
       // Garante fase virtual "OS em Atraso" entre cliente_loja e urgencia
       if (!board.phases.find(p => p.id === 'atrasados')) {
         const idxLoja = board.phases.findIndex(p => p.id === 'cliente_loja');
@@ -1513,7 +1520,7 @@ function renderSplitRows() {
   const phases = board?.phases || [];
   // Destaque para fases de conclusão e produção
   const keyPhases = phases.filter(p =>
-    ['loja_feito','delivery_feito','aprovado','producao','cliente_loja','urgencia'].includes(p.id)
+    ['loja_feito','delivery_feito','aprovado','producao','cliente_loja','urgencia','analise_loja'].includes(p.id)
   );
 
   container.innerHTML = Array.from({length: splitQty}, (_, i) => `
