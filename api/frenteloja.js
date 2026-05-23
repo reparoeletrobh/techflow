@@ -78,6 +78,14 @@ export default async function handler(req,res){
     const id=nextId(db);const now=new Date().toISOString();
     const ficha={id,nomeContato,equipamento,telefone:(telefone||'').replace(/[^0-9]/g,''),descricao:descricao||'',phase:'analise',createdAt:now,movedAt:now,history:[{phase:'analise',ts:now}]};
     db.fichas.unshift(ficha);await dbSet(FL_KEY,db);
+    // Espelhar no board em analise_loja
+    try{
+      const _base=process.env.FL_BASE_URL||'https://reparoeletroadm.com';
+      const _title=(ficha.nomeContato+' (Loja) - '+(ficha.equipamento||'')+' | '+(ficha.descricao||'')+' OS:'+ficha.id).replace(/"/g,"'").slice(0,255);
+      fetch(_base+'/api/board?action=add-loja-card',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({flFichaId:ficha.id,pipefyId:null,title:_title,nomeContato:ficha.nomeContato||'',telefone:ficha.telefone||'',phaseId:'analise_loja'})
+      }).catch(e=>console.error('[FL] criar→board:',e.message));
+    }catch(e){}
     return res.status(200).json({ok:true,ficha});
   }
 
@@ -138,6 +146,12 @@ export default async function handler(req,res){
           console.log('[FrenteLoja] Card criado:',pipefyId);
           // Registrar no board SEMPRE (com ou sem pipefyId) — não depende do Pipefy
           const boardBase = process.env.FL_BASE_URL || 'https://reparoeletroadm.com';
+          // Se já existe card em analise_loja → mover para cliente_loja
+          await fetch(boardBase+'/api/board?action=move', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ flFichaId: ficha.id, phaseId: 'cliente_loja', movedBy: 'Aprovação FL' })
+          }).catch(()=>{}); // se não existir, ignora
+          // Garantir card no board com flFichaId
           await fetch(boardBase+'/api/board?action=add-loja-card', {
             method: 'POST',
             headers: {'Content-Type':'application/json'},

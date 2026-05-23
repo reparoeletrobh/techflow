@@ -40,6 +40,7 @@ function defaultBoard() {
   return {
     // Fases OS principal
     phases: [
+      { id: "analise_loja",    name: "Análise Loja"       },
       { id: "aprovado",        name: "Aprovado"           },
       { id: "producao",        name: "Produção"           },
       { id: "cliente_loja",    name: "Cliente Loja"       },
