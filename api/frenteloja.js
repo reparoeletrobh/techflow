@@ -220,6 +220,26 @@ export default async function handler(req,res){
     ficha.phase='pago';ficha.pagoEm=now;ficha.pagoValor=parseFloat(valor)||ficha.orcamento?.valor||0;
     ficha.pagoPor=formaPagamento||ficha.orcamento?.formaPagamento||'pix';ficha.movedAt=now;
     ficha.history=(ficha.history||[]).concat([{phase:'pago',ts:now}]);
+    // Sincronizar com o Balcão — marcar como pago
+    try {
+      const boardBase = process.env.FL_BASE_URL || 'https://reparoeletroadm.com';
+      // Buscar card no balcão pelo pipefyCardId ou pelo flFichaId (OS:)
+      let balcaoPipefyId = ficha.pipefyCardId || null;
+      if (!balcaoPipefyId) {
+        const boardDb = await dbGet('reparoeletro_board');
+        const card = (boardDb?.cards||[]).find(c =>
+          c.flFichaId === ficha.id && c.pipefyId && !String(c.pipefyId).startsWith('FL-')
+        );
+        if (card) balcaoPipefyId = card.pipefyId;
+      }
+      if (balcaoPipefyId) {
+        await fetch(boardBase+'/api/board?action=balcao-pagar', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ pipefyId: String(balcaoPipefyId) })
+        }).catch(e=>console.error('[FL] balcao-pagar:', e.message));
+      }
+    } catch(e) { console.error('[FL] balcao sync:', e.message); }
+
     // Mover no Pipefy para "Receber $"
     try {
       const phId = await getPipefyPhaseId('receber');
