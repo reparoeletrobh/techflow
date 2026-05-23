@@ -722,7 +722,25 @@ function renderBoard() {
   setTimeout(() => { const t=document.getElementById('hscroll-thumb'); if(t) t.dispatchEvent(new Event('update')); const w=document.getElementById('kanban-wrapper'); if(w) w.dispatchEvent(new Event('scroll')); }, 50);
 }
 
+// ── Card especial Análise Loja ─────────────────────────────────
+function analiseLojaCardHTML(c, color) {
+  return `
+    <div class="os-card" style="border-color:rgba(168,85,247,0.3);">
+      <div class="card-bar" style="background:#a855f7"></div>
+      <div style="font-family:var(--fm);font-size:9px;color:#a855f7;margin-bottom:4px;">${c.flFichaId||''}</div>
+      <div class="card-title" style="font-size:13px;">${c.nomeContato||c.title||'—'}</div>
+      ${c.descricao ? `<div class="card-desc" style="margin-top:4px;">${c.descricao.slice(0,80)}</div>` : ''}
+      <div class="card-footer" style="margin-top:8px;">
+        <div class="card-age">🕐 aguardando diagnóstico</div>
+      </div>
+      <button onclick="abrirAnalise('${c.flFichaId}')" style="margin-top:8px;width:100%;font-family:var(--fm);font-size:10px;padding:6px;border-radius:6px;border:1px solid rgba(168,85,247,0.4);background:rgba(168,85,247,0.08);color:#a855f7;cursor:pointer;font-weight:700;">
+        📋 Analisar
+      </button>
+    </div>`;
+}
+
 function cardHTML(c, color, isAtrasado) {
+  if (c.phaseId === 'analise_loja') return analiseLojaCardHTML(c, color);
   // Calcula tempo na fase atual
   const refTs = c.movedAt || c.addedAt;
   const diffH = refTs ? Math.floor((Date.now() - new Date(refTs).getTime()) / 3600000) : null;
@@ -1748,6 +1766,94 @@ setInterval(() => {
 setInterval(() => {
   syncPipefy();
 }, 60000);
+
+// ── Análise Loja ────────────────────────────────────────────────────
+let _analiseFlId = null;
+let _analiseFlFicha = null;
+
+async function abrirAnalise(flFichaId) {
+  _analiseFlId = flFichaId;
+  const overlay = document.getElementById('analise-overlay');
+  overlay.style.display = 'flex';
+  document.getElementById('analise-id').textContent = flFichaId;
+  document.getElementById('analise-diag').value = '';
+  document.getElementById('analise-valor').value = '';
+  document.getElementById('analise-msg').style.display = 'none';
+
+  // Buscar dados da ficha no FL
+  try {
+    const r = await fetch('/api/frenteloja?action=load');
+    const d = await r.json();
+    const ficha = (d.fichas||[]).find(f => f.id === flFichaId);
+    if (ficha) {
+      _analiseFlFicha = ficha;
+      document.getElementById('analise-nome').textContent = ficha.nomeContato || '—';
+      document.getElementById('analise-equip').textContent = ficha.equipamento || '';
+      document.getElementById('analise-defeito').textContent = ficha.descricao || '';
+      if (ficha.descricaoTecnica) document.getElementById('analise-diag').value = ficha.descricaoTecnica;
+      if (ficha.orcamento?.valor) document.getElementById('analise-valor').value = ficha.orcamento.valor;
+    }
+  } catch(e) { console.error('analise load:', e); }
+}
+
+function fecharAnalise() {
+  document.getElementById('analise-overlay').style.display = 'none';
+  _analiseFlId = null;
+}
+
+function _analiseMsg(txt, cor) {
+  const el = document.getElementById('analise-msg');
+  el.textContent = txt;
+  el.style.display = 'block';
+  el.style.background = cor === 'ok' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)';
+  el.style.color = cor === 'ok' ? '#22c55e' : '#ef4444';
+}
+
+async function aprovarAnalise() {
+  if (!_analiseFlId) return;
+  const diag  = document.getElementById('analise-diag').value.trim();
+  const valor = document.getElementById('analise-valor').value.trim();
+  const pgto  = document.getElementById('analise-pgto').value;
+  if (!diag)  { _analiseMsg('Preencha o diagnóstico', 'err'); return; }
+  if (!valor) { _analiseMsg('Informe o valor', 'err'); return; }
+
+  try {
+    // 1. Salvar diagnóstico
+    await fetch('/api/frenteloja?action=analise', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id: _analiseFlId, descricaoTecnica: diag })
+    });
+    // 2. Aprovar com orçamento
+    const r = await fetch('/api/frenteloja?action=passar-orcamento', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id: _analiseFlId, decisao:'aprovado', orcamento:{ valor: parseFloat(valor), formaPagamento: pgto } })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      _analiseMsg('✅ Aprovado! Movendo para Cliente Loja...', 'ok');
+      setTimeout(() => { fecharAnalise(); loadBoard(); }, 1500);
+    } else {
+      _analiseMsg('Erro: ' + (d.error||'falha'), 'err');
+    }
+  } catch(e) { _analiseMsg('Erro: ' + e.message, 'err'); }
+}
+
+async function recusarAnalise() {
+  if (!_analiseFlId) return;
+  if (!confirm('Recusar esta ficha?')) return;
+  try {
+    const r = await fetch('/api/frenteloja?action=passar-orcamento', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id: _analiseFlId, decisao:'reprovado' })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      _analiseMsg('Ficha recusada.', 'ok');
+      setTimeout(() => { fecharAnalise(); loadBoard(); }, 1000);
+    }
+  } catch(e) { _analiseMsg('Erro: ' + e.message, 'err'); }
+}
+
 </script>
 <!-- MODAL COMPRA PEÇA -->
 <div class="compra-modal-overlay" id="compra-modal-overlay">
@@ -1770,5 +1876,49 @@ setInterval(() => {
     </div>
   </div>
 </div>
+
+<!-- ══ MODAL ANÁLISE LOJA ══════════════════════════════════════ -->
+<div id="analise-overlay" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,0.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;">
+  <div style="background:#0d1117;border:1px solid rgba(168,85,247,0.3);border-radius:16px;width:100%;max-width:440px;max-height:90dvh;display:flex;flex-direction:column;margin:16px;">
+    <div style="padding:16px 20px;border-bottom:1px solid #1f2937;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+      <div>
+        <div style="font-family:var(--fh);font-size:16px;font-weight:700;color:#a855f7;">Análise Loja</div>
+        <div id="analise-id" style="font-family:var(--fm);font-size:10px;color:#555;margin-top:2px;"></div>
+      </div>
+      <button onclick="fecharAnalise()" style="width:32px;height:32px;border-radius:50%;background:#1f2937;border:1px solid #333;color:#888;font-size:16px;cursor:pointer;">×</button>
+    </div>
+    <div style="padding:16px 20px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px;">
+      <div style="background:#111;border-radius:10px;padding:14px;border:1px solid #1f2937;">
+        <div id="analise-nome" style="font-weight:700;font-size:15px;margin-bottom:4px;"></div>
+        <div id="analise-equip" style="font-size:12px;color:#a855f7;font-family:var(--fm);"></div>
+        <div id="analise-defeito" style="font-size:12px;color:#888;margin-top:6px;"></div>
+      </div>
+      <div>
+        <label style="font-family:var(--fm);font-size:10px;color:#888;display:block;margin-bottom:6px;">DIAGNÓSTICO TÉCNICO</label>
+        <textarea id="analise-diag" rows="3" placeholder="Descreva o diagnóstico..." style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#fff;font-family:var(--fb);font-size:13px;padding:10px;resize:none;box-sizing:border-box;"></textarea>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <label style="font-family:var(--fm);font-size:10px;color:#888;display:block;margin-bottom:6px;">VALOR (R$)</label>
+          <input id="analise-valor" type="number" placeholder="0,00" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#fff;font-family:var(--fb);font-size:14px;padding:10px;box-sizing:border-box;" />
+        </div>
+        <div>
+          <label style="font-family:var(--fm);font-size:10px;color:#888;display:block;margin-bottom:6px;">PAGAMENTO</label>
+          <select id="analise-pgto" style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#fff;font-family:var(--fb);font-size:13px;padding:10px;box-sizing:border-box;">
+            <option value="pix">PIX</option>
+            <option value="cartao">Cartão</option>
+            <option value="dinheiro">Dinheiro</option>
+          </select>
+        </div>
+      </div>
+      <div id="analise-msg" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding-bottom:4px;">
+        <button onclick="recusarAnalise()" style="padding:12px;border-radius:10px;border:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.08);color:#ef4444;font-family:var(--fb);font-size:13px;font-weight:600;cursor:pointer;">✕ Recusar</button>
+        <button onclick="aprovarAnalise()" style="padding:12px;border-radius:10px;border:none;background:#a855f7;color:#fff;font-family:var(--fb);font-size:13px;font-weight:700;cursor:pointer;">✓ Aprovar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
