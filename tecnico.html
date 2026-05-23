@@ -739,7 +739,28 @@ function analiseLojaCardHTML(c, color) {
     </div>`;
 }
 
+function analiseLojaCardHTML(c) {
+  return `
+    <div class="os-card" style="border-color:rgba(168,85,247,0.3);">
+      <div class="card-bar" style="background:#a855f7"></div>
+      <div style="font-family:var(--fm);font-size:9px;color:#a855f7;margin-bottom:4px;">${c.flFichaId||c.id}</div>
+      <div class="card-title">${c.nomeContato||'—'}</div>
+      <div class="card-nome" style="color:#a855f7;font-size:11px;">${(c.title||'').split('|')[0].replace(/.*\) - /,'').trim().slice(0,40)}</div>
+      ${(c.title||'').split('|')[1] ? `<div class="card-desc">${(c.title||'').split('|')[1].trim().slice(0,60)}</div>` : ''}
+      <div class="card-footer" style="margin-top:8px;">
+        <div class="card-age" style="color:#a855f7;">🔍 aguardando diagnóstico</div>
+      </div>
+      <button onclick="abrirAnalise('${c.flFichaId}')"
+        style="margin-top:8px;width:100%;font-family:var(--fm);font-size:10px;padding:6px;border-radius:6px;
+               border:1px solid rgba(168,85,247,0.4);background:rgba(168,85,247,0.08);
+               color:#a855f7;cursor:pointer;font-weight:700;">
+        🔧 ANÁLISE TÉCNICA
+      </button>
+    </div>`;
+}
+
 function cardHTML(c, color, isAtrasado) {
+  if (c.phaseId === 'analise_loja') return analiseLojaCardHTML(c);
   if (c.phaseId === 'analise_loja') return analiseLojaCardHTML(c, color);
   // Calcula tempo na fase atual
   const refTs = c.movedAt || c.addedAt;
@@ -1854,6 +1875,82 @@ async function recusarAnalise() {
   } catch(e) { _analiseMsg('Erro: ' + e.message, 'err'); }
 }
 
+
+// ── Análise Loja (espelho exato do FL) ─────────────────────────
+let _analiseFlId = null;
+
+async function abrirAnalise(flFichaId) {
+  _analiseFlId = flFichaId;
+  document.getElementById('analise-overlay').style.display = 'flex';
+  document.getElementById('analise-id-label').textContent = flFichaId;
+  document.getElementById('analise-diag').value = '';
+  document.getElementById('analise-valor').value = '';
+  document.getElementById('analise-msg').style.display = 'none';
+  try {
+    const r = await fetch('/api/frenteloja?action=load');
+    const d = await r.json();
+    const f = (d.fichas||[]).find(f => f.id === flFichaId);
+    if (f) {
+      document.getElementById('analise-nome').textContent    = f.nomeContato || '—';
+      document.getElementById('analise-equip').textContent   = f.equipamento  || '';
+      document.getElementById('analise-defeito').textContent = f.descricao     || '';
+      if (f.descricaoTecnica) document.getElementById('analise-diag').value  = f.descricaoTecnica;
+      if (f.orcamento?.valor) document.getElementById('analise-valor').value = f.orcamento.valor;
+      if (f.orcamento?.formaPagamento) document.getElementById('analise-pgto').value = f.orcamento.formaPagamento;
+    }
+  } catch(e) {}
+}
+
+function fecharAnalise() {
+  document.getElementById('analise-overlay').style.display = 'none';
+  _analiseFlId = null;
+}
+
+function _analiseMsg(txt, tipo) {
+  const el = document.getElementById('analise-msg');
+  el.textContent = txt;
+  el.style.display = 'block';
+  el.style.background = tipo === 'ok' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)';
+  el.style.color       = tipo === 'ok' ? '#22c55e'             : '#ef4444';
+}
+
+async function fazerOrcamento(decisao) {
+  if (!_analiseFlId) return;
+  const diag  = document.getElementById('analise-diag').value.trim();
+  const valor = parseFloat(document.getElementById('analise-valor').value) || 0;
+  const pgto  = document.getElementById('analise-pgto').value;
+
+  if (!diag) { _analiseMsg('Preencha o diagnóstico técnico', 'err'); return; }
+
+  const btns = document.querySelectorAll('#analise-overlay button');
+  btns.forEach(b => b.disabled = true);
+
+  try {
+    // Passo 1: salvar diagnóstico
+    await fetch('/api/frenteloja?action=analise', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ id: _analiseFlId, descricaoTecnica: diag })
+    });
+    // Passo 2: passar orçamento (aprovado ou aguardando)
+    const r = await fetch('/api/frenteloja?action=passar-orcamento', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ id: _analiseFlId, valor, formaPagamento: pgto, decisao })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      const msg = decisao === 'aprovado' ? '✅ Aprovado! Ficha em Produção' : 'Aguardando resposta do cliente';
+      _analiseMsg(msg, 'ok');
+      setTimeout(() => { fecharAnalise(); loadBoard(); }, 1200);
+    } else {
+      _analiseMsg('Erro: ' + (d.error||'falha'), 'err');
+      btns.forEach(b => b.disabled = false);
+    }
+  } catch(e) {
+    _analiseMsg('Erro de conexão', 'err');
+    btns.forEach(b => b.disabled = false);
+  }
+}
+
 </script>
 <!-- MODAL COMPRA PEÇA -->
 <div class="compra-modal-overlay" id="compra-modal-overlay">
@@ -1916,6 +2013,87 @@ async function recusarAnalise() {
         <button onclick="recusarAnalise()" style="padding:12px;border-radius:10px;border:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.08);color:#ef4444;font-family:var(--fb);font-size:13px;font-weight:600;cursor:pointer;">✕ Recusar</button>
         <button onclick="aprovarAnalise()" style="padding:12px;border-radius:10px;border:none;background:#a855f7;color:#fff;font-family:var(--fb);font-size:13px;font-weight:700;cursor:pointer;">✓ Aprovar</button>
       </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL ANÁLISE LOJA ══════════════════════════════════════ -->
+<div id="analise-overlay" onclick="if(event.target===this)fecharAnalise()"
+  style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,0.85);
+         backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#0d1117;border:1px solid rgba(168,85,247,0.3);border-radius:16px;
+              width:100%;max-width:420px;max-height:92dvh;display:flex;flex-direction:column;">
+
+    <!-- Header -->
+    <div style="padding:16px 18px 14px;border-bottom:1px solid #1f2937;
+                display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+      <div>
+        <div style="font-family:var(--fh);font-size:16px;font-weight:700;color:#a855f7;">🔧 ANÁLISE TÉCNICA</div>
+        <div id="analise-id-label" style="font-family:var(--fm);font-size:10px;color:#555;margin-top:2px;"></div>
+      </div>
+      <button onclick="fecharAnalise()"
+        style="width:32px;height:32px;border-radius:50%;background:#1f2937;border:1px solid #333;
+               color:#888;font-size:18px;cursor:pointer;line-height:1;">×</button>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:16px 18px 20px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px;">
+
+      <!-- Info ficha -->
+      <div style="background:#111;border-radius:10px;padding:14px;border:1px solid #1f2937;">
+        <div id="analise-nome" style="font-weight:700;font-size:15px;"></div>
+        <div id="analise-equip" style="font-size:12px;color:#a855f7;font-family:var(--fm);margin-top:3px;"></div>
+        <div id="analise-defeito" style="font-size:12px;color:#888;margin-top:6px;line-height:1.4;"></div>
+      </div>
+
+      <!-- Diagnóstico -->
+      <div>
+        <label style="font-family:var(--fm);font-size:10px;color:#888;display:block;margin-bottom:6px;">DIAGNÓSTICO TÉCNICO</label>
+        <textarea id="analise-diag" rows="3"
+          placeholder="Descreva o diagnóstico técnico e as peças necessárias para o orçamento..."
+          style="width:100%;background:#111;border:1px solid #333;border-radius:8px;
+                 color:#fff;font-family:var(--fb);font-size:13px;padding:10px;
+                 resize:none;box-sizing:border-box;"></textarea>
+      </div>
+
+      <!-- Valor + Pagamento -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <label style="font-family:var(--fm);font-size:10px;color:#888;display:block;margin-bottom:6px;">VALOR (R$)</label>
+          <input id="analise-valor" type="number" placeholder="0.00" min="0"
+            style="width:100%;background:#111;border:1px solid #333;border-radius:8px;
+                   color:#fff;font-family:var(--fb);font-size:14px;padding:10px;box-sizing:border-box;"/>
+        </div>
+        <div>
+          <label style="font-family:var(--fm);font-size:10px;color:#888;display:block;margin-bottom:6px;">FORMA DE PAGAMENTO</label>
+          <select id="analise-pgto"
+            style="width:100%;background:#111;border:1px solid #333;border-radius:8px;
+                   color:#fff;font-family:var(--fb);font-size:13px;padding:10px;box-sizing:border-box;">
+            <option value="pix">PIX</option>
+            <option value="dinheiro">Dinheiro</option>
+            <option value="cartao">Cartão</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Mensagem feedback -->
+      <div id="analise-msg" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
+
+      <!-- Botões — igual ao FL -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding-bottom:4px;">
+        <button onclick="fazerOrcamento('aguardando')"
+          style="padding:12px;border-radius:10px;border:1px solid #333;background:#1f2937;
+                 color:#888;font-family:var(--fb);font-size:12px;font-weight:600;cursor:pointer;">
+          ⏳ AGUARDANDO RESPOSTA
+        </button>
+        <button onclick="fazerOrcamento('aprovado')"
+          style="padding:12px;border-radius:10px;border:none;background:#22c55e;
+                 color:#000;font-family:var(--fb);font-size:13px;font-weight:700;cursor:pointer;">
+          ✅ APROVADO
+        </button>
+      </div>
+
     </div>
   </div>
 </div>
