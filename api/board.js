@@ -2059,6 +2059,18 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, corrigidos });
   }
 
+
+  // ── POST remove-analise-card — remove card de analise_loja após diagnóstico ──
+  if (req.method === 'POST' && action === 'remove-analise-card') {
+    const { flFichaId } = req.body || {};
+    if (!flFichaId) return res.status(400).json({ ok:false, error:'flFichaId obrigatorio' });
+    const board = sanitizeBoard(await dbGet(BOARD_KEY));
+    const before = board.cards.length;
+    board.cards = board.cards.filter(c => !(c.flFichaId === flFichaId && c.phaseId === 'analise_loja'));
+    if (board.cards.length < before) await dbSet(BOARD_KEY, board);
+    return res.status(200).json({ ok: true, removido: board.cards.length < before });
+  }
+
       return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch (err) {

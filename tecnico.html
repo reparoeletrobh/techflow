@@ -626,6 +626,10 @@ async function loadBoard() {
         const idxAprov = board.phases.findIndex(p => p.id === 'aprovado');
         board.phases.splice(idxAprov >= 0 ? idxAprov : 0, 0, { id: 'analise_loja', name: 'Análise Loja' });
       }
+      if (!board.phases.find(p => p.id === 'analise_loja')) {
+        const idx = board.phases.findIndex(p => p.id === 'aprovado');
+        board.phases.splice(idx >= 0 ? idx : 0, 0, { id: 'analise_loja', name: 'Análise Loja' });
+      }
       // Garante fase virtual "OS em Atraso" entre cliente_loja e urgencia
       if (!board.phases.find(p => p.id === 'atrasados')) {
         const idxLoja = board.phases.findIndex(p => p.id === 'cliente_loja');
@@ -782,7 +786,26 @@ function analiseLojaCardHTML(c) {
     </div>`;
 }
 
+function analiseLojaCardHTML(c) {
+  return `
+    <div class="os-card" style="border-color:rgba(168,85,247,0.3);">
+      <div class="card-bar" style="background:#a855f7"></div>
+      <div style="font-family:var(--fm);font-size:9px;color:#a855f7;margin-bottom:4px;">${c.flFichaId||c.id}</div>
+      <div class="card-title">${c.nomeContato||'—'}</div>
+      <div style="font-size:11px;color:#a855f7;font-family:var(--fm);margin-top:2px;">${(c.title||'').replace(/.*\) - /,'').split('|')[0].trim().slice(0,35)}</div>
+      ${(c.title||'').split('|')[1]?`<div class="card-desc">${(c.title||'').split('|')[1].trim().slice(0,60)}</div>`:''}
+      <div class="card-footer" style="margin-top:8px;"><div class="card-age" style="color:#a855f7;">🔍 aguardando diagnóstico</div></div>
+      <button onclick="abrirAnalise('${c.flFichaId}')"
+        style="margin-top:8px;width:100%;font-family:var(--fm);font-size:10px;padding:6px;border-radius:6px;
+               border:1px solid rgba(168,85,247,0.4);background:rgba(168,85,247,0.08);
+               color:#a855f7;cursor:pointer;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">
+        🔧 ANÁLISE TÉCNICA
+      </button>
+    </div>`;
+}
+
 function cardHTML(c, color, isAtrasado) {
+  if (c.phaseId === 'analise_loja') return analiseLojaCardHTML(c);
   if (c.phaseId === 'analise_loja') return analiseLojaCardHTML(c);
   if (c.phaseId === 'analise_loja') return analiseLojaCardHTML(c);
   if (c.phaseId === 'analise_loja') return analiseLojaCardHTML(c, color);
@@ -1979,6 +2002,68 @@ async function passarOrcamento(decisao) {
   }
 }
 
+
+// ── Análise Loja ────────────────────────────────────────────────
+let _alFlId = null;
+
+async function abrirAnalise(flFichaId) {
+  _alFlId = flFichaId;
+  document.getElementById('al-diag').value = '';
+  document.getElementById('al-msg').style.display = 'none';
+  document.getElementById('al-info').innerHTML = flFichaId;
+  document.getElementById('al-overlay').style.display = 'flex';
+  try {
+    const d = await fetch('/api/frenteloja?action=load').then(r=>r.json());
+    const f = (d.fichas||[]).find(f=>f.id===flFichaId);
+    if (f) {
+      document.getElementById('al-info').innerHTML =
+        `<strong>${f.nomeContato}</strong> — ${f.equipamento||''}<br><span style="color:#888">${f.descricao||''}</span>`;
+      if (f.descricaoTecnica) document.getElementById('al-diag').value = f.descricaoTecnica;
+    }
+  } catch(e) {}
+}
+
+function fecharAnalise() {
+  document.getElementById('al-overlay').style.display = 'none';
+  _alFlId = null;
+}
+
+async function enviarDiagnostico() {
+  const diag = document.getElementById('al-diag').value.trim();
+  if (!diag) {
+    const m = document.getElementById('al-msg');
+    m.textContent = 'Preencha o diagnóstico técnico'; m.style.display = 'block';
+    m.style.background = 'rgba(239,68,68,0.1)'; m.style.color = '#ef4444'; return;
+  }
+  const btn = document.getElementById('al-btn-enviar');
+  btn.disabled = true; btn.textContent = '⏳ Enviando...';
+  try {
+    const r = await fetch('/api/frenteloja?action=analise', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id: _alFlId, descricaoTecnica: diag })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      // Remover card do board analise_loja
+      await fetch('/api/board?action=remove-analise-card', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ flFichaId: _alFlId })
+      }).catch(()=>{});
+      fecharAnalise();
+      loadBoard();
+    } else {
+      const m = document.getElementById('al-msg');
+      m.textContent = 'Erro: '+(d.error||'falha'); m.style.display = 'block';
+      m.style.background = 'rgba(239,68,68,0.1)'; m.style.color = '#ef4444';
+    }
+  } catch(e) {
+    const m = document.getElementById('al-msg');
+    m.textContent = 'Erro de conexão'; m.style.display = 'block';
+    m.style.background = 'rgba(239,68,68,0.1)'; m.style.color = '#ef4444';
+  }
+  btn.disabled = false; btn.textContent = '🗒️ ENVIAR ORÇAMENTO';
+}
+
 </script>
 <!-- MODAL COMPRA PEÇA -->
 <div class="compra-modal-overlay" id="compra-modal-overlay">
@@ -2203,6 +2288,36 @@ async function passarOrcamento(decisao) {
           ✅ APROVADO
         </button>
       </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL ANÁLISE LOJA ══════════════════════════════════════ -->
+<div id="al-overlay" onclick="if(event.target===this)fecharAnalise()"
+  style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,0.85);
+         backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#0d1117;border:1px solid rgba(168,85,247,0.3);border-radius:16px;
+              width:100%;max-width:420px;max-height:92dvh;display:flex;flex-direction:column;">
+    <div style="padding:14px 18px;border-bottom:1px solid #1f2937;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-family:var(--fh);font-size:15px;font-weight:700;color:#a855f7;">🔧 ANÁLISE TÉCNICA</div>
+      <button onclick="fecharAnalise()" style="width:30px;height:30px;border-radius:50%;background:#1f2937;border:1px solid #333;color:#888;font-size:16px;cursor:pointer;">×</button>
+    </div>
+    <div style="padding:16px 18px 20px;display:flex;flex-direction:column;gap:14px;">
+      <div id="al-info" style="background:#111;border-radius:10px;padding:12px;border:1px solid #1f2937;font-size:13px;"></div>
+      <div>
+        <label style="font-family:var(--fm);font-size:10px;color:#888;display:block;margin-bottom:6px;letter-spacing:.5px;">DIAGNÓSTICO / PEÇAS NECESSÁRIAS</label>
+        <textarea id="al-diag" rows="4"
+          placeholder="Descreva o diagnóstico técnico e as peças necessárias para o orçamento..."
+          style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#fff;
+                 font-family:var(--fb);font-size:13px;padding:10px;resize:none;box-sizing:border-box;"></textarea>
+      </div>
+      <div id="al-msg" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
+      <button id="al-btn-enviar" onclick="enviarDiagnostico()"
+        style="width:100%;padding:13px;border-radius:10px;border:none;background:var(--accent);
+               color:#000;font-family:var(--fb);font-size:13px;font-weight:700;cursor:pointer;">
+        🗒️ ENVIAR ORÇAMENTO
+      </button>
     </div>
   </div>
 </div>
