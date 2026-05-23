@@ -220,7 +220,27 @@ export default async function handler(req,res){
     ficha.phase='pago';ficha.pagoEm=now;ficha.pagoValor=parseFloat(valor)||ficha.orcamento?.valor||0;
     ficha.pagoPor=formaPagamento||ficha.orcamento?.formaPagamento||'pix';ficha.movedAt=now;
     ficha.history=(ficha.history||[]).concat([{phase:'pago',ts:now}]);
-    try{const phId=await getPipefyPhaseId('receber');if(ficha.pipefyCardId&&phId)await movePipefyCard(ficha.pipefyCardId,phId);}catch(e){}
+    // Mover no Pipefy para "Receber $"
+    try {
+      const phId = await getPipefyPhaseId('receber');
+      if (phId) {
+        // Tentar pelo pipefyCardId da ficha, senão buscar no board pelo flFichaId
+        let cardId = ficha.pipefyCardId || null;
+        if (!cardId) {
+          const boardDb = await dbGet('reparoeletro_board');
+          const card = (boardDb?.cards||[]).find(c => c.flFichaId === ficha.id && c.pipefyId && !String(c.pipefyId).startsWith('FL-'));
+          if (card) cardId = card.pipefyId;
+        }
+        if (cardId) {
+          await movePipefyCard(String(cardId), phId);
+          console.log('[FL] liberar→Receber$:', ficha.id, cardId, phId);
+        } else {
+          console.warn('[FL] liberar: pipefyCardId nulo para', ficha.id);
+        }
+      } else {
+        console.warn('[FL] liberar: fase Receber$ nao encontrada no Pipefy');
+      }
+    } catch(e) { console.error('[FL] liberar→Pipefy:', e.message); }
     await dbSet(FL_KEY,db);return res.status(200).json({ok:true,ficha});
   }
 
