@@ -2071,6 +2071,84 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, removido: board.cards.length < before });
   }
 
+
+  // ── GET balcao-sync-erp-loja — importa histórico de fichas Loja do ERP Pipefy ──
+  if (action === 'balcao-sync-erp-loja') {
+    try {
+      const BALCAO_KEY = 'reparoeletro_balcao';
+      const balcao = (await dbGet(BALCAO_KEY)) || [];
+      const balcaoIds = new Set(balcao.map(c => String(c.pipefyId)));
+
+      // Buscar todas as fases com cards — filtrando ERP/Finalizado
+      const allPhases = await fetchAllPhaseCards();
+      let importados = 0;
+
+      for (const ph of allPhases) {
+        const l = ph.name.toLowerCase();
+        const isErp = l.includes('erp') || l.includes('finaliz') || l.includes('conclu') || l.includes('descar');
+        if (!isErp) continue;
+
+        // Buscar cards com detalhes (title, updated_at)
+        let cursor = null;
+        do {
+          const q = `query {
+            phase(id: "${ph.id}") {
+              cards_count
+              cards(first: 50${cursor ? `, after: "${cursor}"` : ''}) {
+                pageInfo { hasNextPage endCursor }
+                edges {
+                  node {
+                    id title
+                    updated_at
+                    fields { name value }
+                  }
+                }
+              }
+            }
+          }`;
+          const data = await pipefyQuery(q);
+          const edges = data?.phase?.cards?.edges || [];
+
+          for (const { node } of edges) {
+            const titulo = (node.title || '').toLowerCase();
+            if (!titulo.includes('loja')) continue;
+            if (balcaoIds.has(String(node.id))) continue;
+
+            // Extrair dados do card
+            const getField = (name) => (node.fields || []).find(f => f.name?.toLowerCase().includes(name.toLowerCase()))?.value || null;
+            const nomeContato = node.title?.replace(/\s*\(Loja\).*/i, '').trim() || node.title;
+            const telefone    = getField('telefone') || getField('phone') || null;
+            const osMatch     = (node.title || '').match(/OS:(FL-[a-zA-Z0-9-]+)/);
+            const osCode      = osMatch ? osMatch[1] : null;
+
+            balcao.unshift({
+              pipefyId:    String(node.id),
+              nomeContato: nomeContato,
+              osCode:      osCode,
+              descricao:   node.title || '',
+              telefone:    telefone,
+              tecnico:     null,
+              entradaEm:   node.updated_at || new Date().toISOString(),
+              status:      'pago',
+              pagoEm:      node.updated_at || new Date().toISOString(),
+            });
+            balcaoIds.add(String(node.id));
+            importados++;
+          }
+
+          cursor = data?.phase?.cards?.pageInfo?.hasNextPage
+            ? data.phase.cards.pageInfo.endCursor
+            : null;
+        } while (cursor);
+      }
+
+      if (importados > 0) await dbSet(BALCAO_KEY, balcao);
+      return res.status(200).json({ ok: true, importados, totalBalcao: balcao.length });
+    } catch(e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
       return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch (err) {
