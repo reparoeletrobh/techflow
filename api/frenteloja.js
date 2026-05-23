@@ -298,7 +298,23 @@ export default async function handler(req,res){
       }
     }
     if(corrigidosLoja > 0) await dbSet(BOARD_KEY3, boardDb2);
-    return res.status(200).json({ ok: true, corrigidos, total: lojaFeitoCards.length, corrigidosLoja });
+    // Sync retroativo: fichas em analise sem card → analise_loja
+    const boardDb4 = await dbGet(BOARD_KEY2) || { cards: [] };
+    const boardFlIds = new Set(boardDb4.cards.map(c => c.flFichaId).filter(Boolean));
+    const semCard = (flDb.fichas||[]).filter(f => f.phase === 'analise' && !boardFlIds.has(f.id));
+    let syncAnalise = 0;
+    const _base = process.env.FL_BASE_URL || 'https://reparoeletroadm.com';
+    for (const f of semCard) {
+      try {
+        const t = (f.nomeContato+' (Loja) - '+(f.equipamento||'')+' | '+(f.descricao||'')+' OS:'+f.id).replace(/"/g,"'").slice(0,255);
+        await fetch(_base+'/api/board?action=add-loja-card',{
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ flFichaId:f.id, pipefyId:null, title:t, nomeContato:f.nomeContato||'', telefone:f.telefone||'', phaseId:'analise_loja' })
+        });
+        syncAnalise++;
+      } catch(e){ console.error('[sync-fl] analise→board:', e.message); }
+    }
+    return res.status(200).json({ ok: true, corrigidos, corrigidosLoja, syncAnalise, total: lojaFeitoCards.length });
   }
 
   if(action==='rastrear'){
