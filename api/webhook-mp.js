@@ -14,7 +14,11 @@ async function dbGet(key) {
   });
   const j = await r.json();
   const result = j[0]?.result;
-  return result ? JSON.parse(result) : null;
+  if (!result) return null;
+  const v1 = JSON.parse(result);
+  // Tratar dupla serialização de writes anteriores
+  if (typeof v1 === 'string') { try { return JSON.parse(v1); } catch(e) { return v1; } }
+  return v1;
 }
 
 async function dbSet(key, value) {
