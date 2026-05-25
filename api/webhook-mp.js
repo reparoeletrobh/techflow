@@ -24,14 +24,20 @@ async function dbSet(key, value) {
 }
 
 async function jaProcessado(paymentId) {
-  const lista = (await dbGet(PROC_KEY)) || [];
+  const lista = await normArr(await dbGet(PROC_KEY));
   return lista.includes(String(paymentId));
 }
 
+async function normArr(v) {
+  if (!v) return [];
+  if (Array.isArray(v)) return v;
+  try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch(e) { return []; }
+}
+
 async function marcarProcessado(paymentId) {
-  const lista = (await dbGet(PROC_KEY)) || [];
-  lista.unshift(String(paymentId));
-  await dbSet(PROC_KEY, lista.slice(0, 500)); // manter últimos 500
+  const lista = await normArr(await dbGet(PROC_KEY));
+  if (!lista.includes(String(paymentId))) lista.unshift(String(paymentId));
+  await dbSet(PROC_KEY, lista.slice(0, 500));
 }
 
 async function logEvento(evento) {
