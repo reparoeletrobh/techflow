@@ -200,14 +200,30 @@ module.exports = async function handler(req, res) {
       gerarTexto(eq.tipo, eq.subtipo, eq.servicos, eq.preco)
     );
 
-    // Texto final: se múltiplos, concatenar
+    // Texto final
     let textoFinal, precoFinal;
     if (resultados.length === 1) {
       textoFinal = resultados[0].texto;
       precoFinal = resultados[0].preco;
     } else {
-      textoFinal = resultados.map((r,i) => `Equipamento ${i+1}:\n${r.texto||''}`).join('\n\n');
-      precoFinal = String(resultados.reduce((acc,r)=>acc+parseInt(r.preco||0),0));
+      const qtd      = resultados.length;
+      const soma     = resultados.reduce((acc,r)=>acc+parseInt(r.preco||0),0);
+      const descPerc = qtd === 2 ? 0.10 : qtd === 3 ? 0.15 : 0.20; // max 20%
+      const comDesc  = Math.round(soma * (1 - descPerc));
+      precoFinal     = String(comDesc);
+
+      // Remover "Aprovando ja iniciamos o conserto" de cada texto individual
+      const removeAprovando = (txt) =>
+        (txt||'').replace(/\s*Aprovando ja iniciamos o conserto\.?/gi, '').trimEnd();
+
+      // Montar textos individuais sem a frase final
+      const partes = resultados.map((r,i) =>
+        `Equipamento ${i+1}:\n${removeAprovando(r.texto||'')}`
+      ).join('\n\n');
+
+      // Frase de desconto no final
+      const fraseFinal = `Consertando os ${qtd} juntos eu consigo um desconto para voce de ${soma} para ${comDesc} reais. Aprovando ja iniciamos o conserto.`;
+      textoFinal = partes + '\n\n' + fraseFinal;
     }
 
     // Salvar na Logística
