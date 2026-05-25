@@ -179,47 +179,21 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
       <button class="modal-close" onclick="fecharDiag()">×</button>
     </div>
     <div class="modal-body">
-      <div id="diag-ficha-id" style="font-family:var(--fm);font-size:10px;color:var(--muted);"></div>
+      <div id="diag-ficha-id" style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:4px;"></div>
 
-      <!-- Qtd + Modelo -->
-      <div class="diag-section">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div>
-            <div class="diag-section-label" style="margin-bottom:6px;">Qtd. equipamentos</div>
-            <input class="diag-input" id="diag-qtd" type="number" min="1" value="1" style="width:100%">
-          </div>
-          <div>
-            <div class="diag-section-label" style="margin-bottom:6px;">Modelo</div>
-            <input class="diag-input" id="diag-modelo" type="text" placeholder="Ex: CPB34AS" style="width:100%">
-          </div>
-        </div>
+      <!-- Quantidade -->
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="diag-section-label">Qtd. equipamentos</div>
+        <input class="diag-input" id="diag-qtd" type="number" min="1" max="10" value="1"
+          style="width:70px;text-align:center;"
+          oninput="renderEquips(parseInt(this.value)||1)">
       </div>
 
-      <!-- Tipo de equipamento -->
-      <div class="diag-section">
-        <div class="diag-section-label">Tipo de equipamento</div>
-        <div class="type-grid">
-          <button class="type-btn" data-tipo="microondas" onclick="selecionarTipo(this)">Microondas</button>
-          <button class="type-btn" data-tipo="purificador" onclick="selecionarTipo(this)">Purificador</button>
-          <button class="type-btn" data-tipo="adega" onclick="selecionarTipo(this)">Adega</button>
-          <button class="type-btn" data-tipo="forno" onclick="selecionarTipo(this)">Forno</button>
-        </div>
-      </div>
-
-      <!-- Sub-tipo (Motor/Eletrônico para Purif/Adega) ou (Peq/Grande para Forno) -->
-      <div class="diag-section" id="sec-subtipo" style="display:none;">
-        <div class="diag-section-label" id="subtipo-label">Sub-tipo</div>
-        <div class="type-grid" id="subtipo-grid"></div>
-      </div>
-
-      <!-- Serviços -->
-      <div class="diag-section" id="sec-servicos" style="display:none;">
-        <div class="diag-section-label">Serviços / Peças</div>
-        <div class="srv-grid" id="srv-grid"></div>
-      </div>
+      <!-- Seções por equipamento (renderizadas dinamicamente) -->
+      <div id="diag-equips"></div>
 
       <div id="diag-msg" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:4px;">
         <button class="cbtn cbtn-outline" onclick="fecharDiag()">Cancelar</button>
         <button class="cbtn cbtn-purple" onclick="salvarDiag()">Salvar diagnóstico</button>
       </div>
@@ -413,108 +387,123 @@ function copiar(id) {
 }
 
 // ── MODAL DIAGNÓSTICO ─────────────────────────────────────────
-let diagTipo = null, diagSubtipo = null, diagServicos = [];
-
-function abrirDiag(id) {
-  fichaAtual = fichas.find(f=>f.id===id);
-  if (!fichaAtual) return;
-  diagTipo = null; diagSubtipo = null; diagServicos = [];
-
-  document.getElementById('diag-ficha-id').textContent = fichaAtual.id + ' — ' + fichaAtual.nome;
-  document.getElementById('diag-modelo').value = '';
-  document.getElementById('diag-qtd').value = detectarQtd(fichaAtual);
-
-  // Tentar pré-selecionar tipo pelo equipamento
-  const eq = (fichaAtual.equipamento||'').toLowerCase();
-  let presel = null;
-  if (eq.includes('microondas')) presel = 'microondas';
-  else if (eq.includes('purificador')) presel = 'purificador';
-  else if (eq.includes('adega')) presel = 'adega';
-  else if (eq.includes('forno')) presel = 'forno';
-
-  // Reset visual
-  document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('sel'));
-  document.getElementById('sec-subtipo').style.display='none';
-  document.getElementById('sec-servicos').style.display='none';
-  document.getElementById('diag-msg').style.display='none';
-  document.getElementById('ov-diag').classList.add('open');
-
-  if (presel) {
-    const btn = document.querySelector(`.type-btn[data-tipo="${presel}"]`);
-    if (btn) selecionarTipo(btn);
-  }
-}
+let diagEquips = []; // [{modelo, tipo, subtipo, servicos}]
 
 function detectarQtd(f) {
   const txt = ((f.equipamento||'')+(f.defeito||'')+(f.texto||'')).toLowerCase();
   const nums = txt.match(/\b([2-9]|1[0-9])\s*(equipamento|microondas|purificador|adega|forno|aparelho)/);
-  return nums ? nums[1] : '1';
+  return nums ? parseInt(nums[1]) : 1;
+}
+
+function detectarTipo(f) {
+  const eq = (f.equipamento||'').toLowerCase();
+  if (eq.includes('microondas')) return 'microondas';
+  if (eq.includes('purificador')) return 'purificador';
+  if (eq.includes('adega')) return 'adega';
+  if (eq.includes('forno')) return 'forno';
+  return null;
+}
+
+function abrirDiag(id) {
+  fichaAtual = fichas.find(f=>f.id===id);
+  if (!fichaAtual) return;
+  document.getElementById('diag-ficha-id').textContent = fichaAtual.id + ' — ' + fichaAtual.nome;
+  document.getElementById('diag-msg').style.display='none';
+  const qtd = detectarQtd(fichaAtual);
+  document.getElementById('diag-qtd').value = qtd;
+  diagEquips = Array.from({length: qtd}, ()=>({modelo:'', tipo: detectarTipo(fichaAtual), subtipo:null, servicos:[]}));
+  renderEquips(qtd);
+  document.getElementById('ov-diag').classList.add('open');
 }
 
 function fecharDiag() { document.getElementById('ov-diag').classList.remove('open'); }
 
-function selecionarTipo(btn) {
-  document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('sel'));
-  btn.classList.add('sel');
-  diagTipo = btn.dataset.tipo;
-  diagSubtipo = null;
-  diagServicos = [];
+function renderEquips(qtd) {
+  // Preservar dados já preenchidos
+  while (diagEquips.length < qtd) diagEquips.push({modelo:'', tipo: detectarTipo(fichaAtual), subtipo:null, servicos:[]});
+  diagEquips = diagEquips.slice(0, qtd);
+  const container = document.getElementById('diag-equips');
+  container.innerHTML = diagEquips.map((eq, i) => equipSecHTML(eq, i, qtd)).join('');
+}
 
-  const spec = SERVICOS[diagTipo];
-  const secSub  = document.getElementById('sec-subtipo');
-  const secSrv  = document.getElementById('sec-servicos');
-  const srvGrid = document.getElementById('srv-grid');
+function equipSecHTML(eq, i, total) {
+  const spec = eq.tipo ? SERVICOS[eq.tipo] : null;
+  const label = total > 1 ? `Equipamento ${i+1}` : 'Equipamento';
+  let subtiposHTML = '', servicosHTML = '';
 
-  if (spec.direto) {
-    secSub.style.display = 'none';
-    srvGrid.innerHTML = spec.direto.map(s=>
-      `<button class="srv-btn" onclick="toggleServico(this,'${s}')">${s}</button>`
-    ).join('');
-    secSrv.style.display = 'flex';
-  } else if (spec.subtipos) {
-    const subtipos = Object.keys(spec.subtipos);
-    document.getElementById('subtipo-label').textContent = diagTipo === 'forno' ? 'Porte' : 'Categoria';
-    document.getElementById('subtipo-grid').innerHTML = subtipos.map(s=>
-      `<button class="type-btn" data-sub="${s}" onclick="selecionarSubtipo(this)">${s}</button>`
-    ).join('');
-    secSub.style.display = 'flex';
-    secSrv.style.display = 'none';
-    srvGrid.innerHTML = '';
+  if (spec?.subtipos) {
+    const subs = Object.keys(spec.subtipos);
+    subtiposHTML = `
+      <div class="diag-section-label" style="margin-top:8px;">${eq.tipo==='forno'?'Porte':'Categoria'}</div>
+      <div class="type-grid">
+        ${subs.map(s=>`<button class="type-btn${eq.subtipo===s?' sel':''}" onclick="selSubtipo(${i},'${s}')">${s}</button>`).join('')}
+      </div>`;
+    if (eq.subtipo && spec.subtipos[eq.subtipo]) {
+      servicosHTML = servicosHTML || servicosGridHTML(i, eq, spec.subtipos[eq.subtipo]);
+    }
+  } else if (spec?.direto) {
+    servicosHTML = servicosGridHTML(i, eq, spec.direto);
   }
+
+  return `
+  <div style="border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:10px;display:flex;flex-direction:column;gap:10px;">
+    ${total>1 ? `<div style="font-family:var(--fm);font-size:10px;color:var(--accent);font-weight:600;">${label}</div>` : ''}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div>
+        <div class="diag-section-label" style="margin-bottom:5px;">Modelo</div>
+        <input class="diag-input" value="${eq.modelo||''}" placeholder="Ex: CPB34AS"
+          style="width:100%;" oninput="diagEquips[${i}].modelo=this.value">
+      </div>
+      <div>
+        <div class="diag-section-label" style="margin-bottom:5px;">Tipo</div>
+        <div class="type-grid">
+          ${['microondas','purificador','adega','forno'].map(t=>
+            `<button class="type-btn${eq.tipo===t?' sel':''}" onclick="selTipo(${i},'${t}')">${t.charAt(0).toUpperCase()+t.slice(1)}</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+    ${subtiposHTML}
+    ${servicosHTML ? `<div><div class="diag-section-label" style="margin-bottom:6px;">Serviços / Peças</div><div class="srv-grid">${servicosHTML}</div></div>` : ''}
+  </div>`;
 }
 
-function selecionarSubtipo(btn) {
-  document.querySelectorAll('#subtipo-grid .type-btn').forEach(b=>b.classList.remove('sel'));
-  btn.classList.add('sel');
-  diagSubtipo = btn.dataset.sub;
-  diagServicos = [];
-
-  const servicos = SERVICOS[diagTipo].subtipos[diagSubtipo] || [];
-  const srvGrid = document.getElementById('srv-grid');
-  srvGrid.innerHTML = servicos.map(s=>
-    `<button class="srv-btn" onclick="toggleServico(this,'${s}')">${s}</button>`
+function servicosGridHTML(i, eq, lista) {
+  return lista.map(s =>
+    `<button class="srv-btn${(eq.servicos||[]).includes(s)?' sel':''}" onclick="toggleSrv(${i},'${s}',this)">${s}</button>`
   ).join('');
-  document.getElementById('sec-servicos').style.display = 'flex';
 }
 
-function toggleServico(btn, srv) {
-  const idx = diagServicos.indexOf(srv);
-  if (idx >= 0) { diagServicos.splice(idx,1); btn.classList.remove('sel'); }
-  else { diagServicos.push(srv); btn.classList.add('sel'); }
+function selTipo(i, tipo) {
+  diagEquips[i].tipo = tipo;
+  diagEquips[i].subtipo = null;
+  diagEquips[i].servicos = [];
+  renderEquips(diagEquips.length);
+}
+
+function selSubtipo(i, sub) {
+  diagEquips[i].subtipo = sub;
+  diagEquips[i].servicos = [];
+  renderEquips(diagEquips.length);
+}
+
+function toggleSrv(i, srv, btn) {
+  const eq = diagEquips[i];
+  const idx = eq.servicos.indexOf(srv);
+  if (idx >= 0) { eq.servicos.splice(idx,1); btn.classList.remove('sel'); }
+  else          { eq.servicos.push(srv);     btn.classList.add('sel'); }
 }
 
 async function salvarDiag() {
   if (!fichaAtual) return;
-  if (!diagTipo) { mostrarMsgDiag('Selecione o tipo de equipamento','err'); return; }
-  if (diagServicos.length === 0) { mostrarMsgDiag('Selecione pelo menos um serviço','err'); return; }
+  for (let i = 0; i < diagEquips.length; i++) {
+    const eq = diagEquips[i];
+    const label = diagEquips.length > 1 ? `Equipamento ${i+1}` : 'equipamento';
+    if (!eq.tipo)             { mostrarMsgDiag(`Selecione o tipo do ${label}`,'err'); return; }
+    if (!eq.servicos.length)  { mostrarMsgDiag(`Selecione ao menos um serviço para o ${label}`,'err'); return; }
+  }
 
-  const diagnostico = {
-    tipo:      diagTipo,
-    subtipo:   diagSubtipo,
-    servicos:  diagServicos,
-    qtd:       parseInt(document.getElementById('diag-qtd').value)||1,
-    modelo:    document.getElementById('diag-modelo').value.trim(),
-  };
+  const diagnostico = { equips: diagEquips.map(eq=>({...eq})) };
 
   const r = await fetch('/api/logistica?action=salvar-diagnostico', {
     method:'POST', headers:{'Content-Type':'application/json'},
