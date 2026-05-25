@@ -28,7 +28,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 #busca-input::placeholder{color:var(--muted);}
 
 /* ── BOARD ── */
-.board{display:flex;gap:16px;padding:20px;overflow-x:auto;flex:1;align-items:flex-start;}
+.board{display:flex;gap:12px;padding:16px 12px;overflow-x:auto;flex:1;align-items:flex-start;}
 .board::-webkit-scrollbar{height:4px;}
 .board::-webkit-scrollbar-thumb{background:var(--border);}
 
@@ -98,6 +98,40 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .diag-section{display:flex;flex-direction:column;gap:8px;}
 .diag-section-label{font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
 
+/* ── RESPONSIVO MOBILE ── */
+@media (max-width: 480px) {
+  /* Header */
+  header { padding: 0 12px; gap: 8px; }
+  header .logo span:last-of-type { display: none; } /* oculta " / Logística" */
+  .hbtn { font-size: 9px; padding: 5px 9px; }
+  #busca-input { display: none; } /* esconde no header, já tem na barra */
+
+  /* Barra rastrear */
+  #busca-input { display: block; } /* mostrar na barra rastrear */
+
+  /* Colunas */
+  .col { width: 260px; }
+
+  /* Card — botões empilham melhor */
+  .card-actions { gap: 5px; }
+  .cbtn { font-size: 9px; padding: 5px 9px; }
+
+  /* Modal geral */
+  .modal { max-width: 100%; margin: 8px; border-radius: 12px; max-height: 96dvh; }
+
+  /* Dado row — valor truncado com ellipsis */
+  .dado-row { gap: 6px; }
+  .dado-label { min-width: 62px; font-size: 8px; }
+  .dado-val input { font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .dado-copy { font-size: 8px; padding: 3px 6px; flex-shrink: 0; }
+
+  /* Diagnóstico — Modelo + Tipo em coluna única no mobile */
+  .diag-equip-grid { grid-template-columns: 1fr !important; }
+  .diag-input { font-size: 12px; padding: 8px 10px; }
+  .type-btn { font-size: 10px; padding: 7px 12px; }
+  .srv-btn { font-size: 9px; padding: 5px 9px; }
+}
+
 /* ── TOAST ── */
 .toast{position:fixed;bottom:24px;right:24px;background:#1a1a1a;border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-family:var(--fm);font-size:11px;color:var(--text);z-index:999;opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;}
 .toast.show{opacity:1;transform:translateY(0);}
@@ -106,20 +140,20 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 <body>
 
 <header>
-  <div class="logo">Reparo<span>Eletro</span> <span style="color:var(--muted);font-weight:400;font-size:12px;margin-left:8px;">/ Logística</span></div>
+  <div class="logo">Reparo<span>Eletro</span> <span class="logo-sub" style="color:var(--muted);font-weight:400;font-size:12px;margin-left:8px;">/ Logística</span></div>
   <div class="header-right">
 <button class="hbtn" onclick="load()">↻ Atualizar</button>
     <a href="/adm" class="hbtn">← ADM</a>
   </div>
 </header>
 
-<div style="padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:12px;">
+<div style="padding:12px 14px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
   <span style="font-family:var(--fm);font-size:10px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">🔍 RASTREAR</span>
   <input type="text" id="busca-input" placeholder="Buscar por nome, ID, equipamento ou defeito..."
     oninput="filtrar(this.value)"
-    style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+    style="flex:1;min-width:120px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
            padding:9px 14px;font-family:var(--fb);font-size:13px;color:var(--text);outline:none;
-           transition:border .15s;max-width:500px;"
+           transition:border .15s;"
     onfocus="this.style.borderColor='var(--accent)'"
     onblur="this.style.borderColor='var(--border)'">
   <div id="busca-resultado" style="font-family:var(--fm);font-size:11px;color:var(--muted);white-space:nowrap;"></div>
@@ -459,7 +493,7 @@ function equipSecHTML(eq, i, total) {
   return `
   <div style="border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:10px;display:flex;flex-direction:column;gap:10px;">
     ${total>1 ? `<div style="font-family:var(--fm);font-size:10px;color:var(--accent);font-weight:600;">${label}</div>` : ''}
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+    <div class="diag-equip-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
       <div>
         <div class="diag-section-label" style="margin-bottom:5px;">Modelo</div>
         <input class="diag-input" value="${eq.modelo||''}" placeholder="Ex: CPB34AS"
