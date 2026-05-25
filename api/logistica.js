@@ -79,6 +79,7 @@ module.exports = async function handler(req, res) {
     ficha.phase = phase;
     ficha.movedAt = new Date().toISOString();
     await dbSet(LOG_KEY, db);
+    registrarPassagem(phase).catch(() => {});
     return res.status(200).json({ ok: true, ficha });
   }
 
