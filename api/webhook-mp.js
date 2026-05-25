@@ -45,7 +45,16 @@ async function logEvento(evento) {
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
 
-  if (req.method !== 'POST') return res.status(200).json({ ok: true });
+  // ── GET: diagnóstico de logs ─────────────────────────────────
+  if (req.method === 'GET') {
+    const action = req.query.action;
+    if (action === 'logs') {
+      const logs = (await dbGet(LOG_KEY)) || [];
+      const proc = (await dbGet(PROC_KEY)) || [];
+      return res.status(200).json({ ok: true, logs: logs.slice(0,20), processados: proc.slice(0,20) });
+    }
+    return res.status(200).json({ ok: true, info: 'webhook-mp ativo. Use ?action=logs para ver logs.' });
+  }
 
   const body  = req.body || {};
   const tipo  = body.type || req.query.type || '';
