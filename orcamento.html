@@ -797,6 +797,12 @@ function renderTabela() {
     html += '</div>';
   });
   list.innerHTML = html;
+  // Event delegation para salvar edições no estado
+  list.querySelectorAll('textarea[data-key]').forEach(function(ta) {
+    ta.addEventListener('input', function() {
+      tabelaTemplates[ta.dataset.key].texto = ta.value;
+    });
+  });
 }
 
 function tabelaCardHTML(t) {
@@ -812,7 +818,7 @@ function tabelaCardHTML(t) {
       precoTag+
     '</div>'+
     '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-bottom:2px;">VARIÁVEIS: <span style="color:#3b9eff;">[NOME]</span> = primeiro nome, <span style="color:#f5c800;">[peças]</span> = serviços selecionados, <span style="color:var(--green);">[VALOR]</span> = preço calculado</div>'+
-    '<textarea id="tpl-'+t.key+'" rows="4" oninput="tabelaTemplates[''+t.key+''].texto=this.value" '+
+    '<textarea id="tpl-'+t.key+'" data-key="'+t.key+'" rows="4" '+
       'style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);'+
              'font-family:var(--fb);font-size:12px;padding:10px;resize:vertical;box-sizing:border-box;line-height:1.5;">'+
       escTxt(t.texto)+
