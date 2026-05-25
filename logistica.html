@@ -507,8 +507,10 @@ function selSubtipo(i, sub) {
 function toggleSrv(i, srv, btn) {
   const eq = diagEquips[i];
   const idx = eq.servicos.indexOf(srv);
-  if (idx >= 0) { eq.servicos.splice(idx,1); btn.classList.remove('sel'); }
-  else          { eq.servicos.push(srv);     btn.classList.add('sel'); }
+  if (idx >= 0) { eq.servicos.splice(idx,1); }
+  else          { eq.servicos.push(srv); }
+  // Re-renderizar para mostrar/esconder campo de preço
+  renderEquips(diagEquips.length);
 }
 
 async function salvarDiag() {
