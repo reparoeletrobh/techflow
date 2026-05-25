@@ -133,26 +133,37 @@ module.exports = async function handler(req, res) {
 
     function priNome(n) { return n ? n.trim().split(/\s+/)[0] : 'cliente'; }
 
-    function gerarTexto(tipo, subtipo, servicos, precoInput) {
+    function gerarTexto(tipo, subtipo, servicos, precoInput, templates) {
       const pn = priNome(nome);
       const s  = servicos || [];
       const tem = (lista) => s.some(x => lista.includes(x));
       const pecas = (lista) => s.filter(x => lista.includes(x)).join(', ') || s.join(', ');
       const x2 = (v) => String(Math.round(parseFloat(v||0)*2));
+      const T = templates || {};
+      // Substituir placeholders num template
+      function applyTpl(tpl, pecasStr, preco) {
+        return tpl
+          .replace(/\[NOME\]/g, pn)
+          .replace(/\[peças\]/g, pecasStr || s.join(', '))
+          .replace(/\[VALOR\]/g, preco || '');
+      }
 
       if (tipo === 'microondas') {
         if (tem(['Troca de Placa','Display'])) {
           const p = pecas(['Troca de Placa','Display']);
-          return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto conjunto da ${p}, será feito a reoperação eletrica tambem. Este conserto completo fica em ${x2(precoInput)} reais apenas. Aprovando ja iniciamos o conserto.`, preco:x2(precoInput) };
+          const tpl = T.microondas_placa?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto conjunto da [peças], será feito a reoperação eletrica tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`;
+          return { texto: applyTpl(tpl, p, x2(precoInput)), preco:x2(precoInput) };
         }
         if (tem(['Vidro','Porta'])) {
           const p = pecas(['Vidro','Porta']);
-          return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da ${p}, montagem e regulagem consigo fazer para você por ${x2(precoInput)} reais apenas. Aprovando ja iniciamos o conserto.`, preco:x2(precoInput) };
+          const tpl = T.microondas_vidro?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da [peças], montagem e regulagem consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`;
+          return { texto: applyTpl(tpl, p, x2(precoInput)), preco:x2(precoInput) };
         }
-        if (tem(['Haste'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da haste, montagem e regulagem consigo fazer para você por 350 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'350' };
-        if (tem(['Pintura'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, pintura, montagem, regulagem e revisão consigo fazer para você por 350 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'350' };
+        if (tem(['Haste'])) { const tpl = T.microondas_haste?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da haste, montagem e regulagem consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`; return { texto: applyTpl(tpl, 'haste', '350'), preco:'350' }; }
+        if (tem(['Pintura'])) { const tpl = T.microondas_pintura?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, pintura, montagem, regulagem e revisão consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`; return { texto: applyTpl(tpl, 'pintura', '350'), preco:'350' }; }
         const p = s.join(', ');
-        return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do ${p}, as pecas serao trocadas tambem. Este conserto completo fica em 350 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'350' };
+        const tpl = T.microondas_eletrico?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do [peças], as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`;
+        return { texto: applyTpl(tpl, p, '350'), preco:'350' };
       }
       if (tipo === 'purificador') {
         if (subtipo === 'Motor') {
@@ -195,9 +206,16 @@ module.exports = async function handler(req, res) {
       return { texto: null, preco: null };
     }
 
+    // Carregar templates customizados do Redis
+    let customTemplates = {};
+    try {
+      const tplDb = await dbGet('reparoeletro_orc_templates');
+      if (tplDb) customTemplates = tplDb;
+    } catch(e) { console.error('[Log] templates:', e.message); }
+
     // Gerar texto para cada equipamento
     const resultados = equips.map(eq =>
-      gerarTexto(eq.tipo, eq.subtipo, eq.servicos, eq.preco)
+      gerarTexto(eq.tipo, eq.subtipo, eq.servicos, eq.preco, customTemplates)
     );
 
     // Texto final

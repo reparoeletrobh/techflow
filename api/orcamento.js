@@ -229,6 +229,21 @@ module.exports = async function handler(req, res) {
     }
   }
 
+
+  // ── GET templates-load ────────────────────────────────────────
+  if (action === 'templates-load') {
+    const saved = await dbGet('reparoeletro_orc_templates');
+    return res.status(200).json({ ok: true, templates: saved || {} });
+  }
+
+  // ── POST templates-save ───────────────────────────────────────
+  if (req.method === 'POST' && action === 'templates-save') {
+    const { templates } = req.body || {};
+    if (!templates) return res.status(400).json({ ok: false, error: 'templates ausente' });
+    await dbSet('reparoeletro_orc_templates', templates);
+    return res.status(200).json({ ok: true });
+  }
+
   // ── GET orc-load ──────────────────────────────────────────
   if (action === "orc-load") {
     const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };

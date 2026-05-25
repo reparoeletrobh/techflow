@@ -120,6 +120,9 @@ header{display:flex;align-items:center;padding:0 24px;height:52px;border-bottom:
   <button class="tab" id="tab-ult" onclick="showPage('ultima-chamada')" style="color:#ef4444;">
     🚨 Última Chamada <span class="tab-badge" id="badge-ult" style="background:rgba(239,68,68,.15);color:#ef4444;">0</span>
   </button>
+  <button class="tab" id="tab-tbl" onclick="showPage('tabela')" style="color:#3b9eff;">
+    📋 Tabela
+  </button>
 </div>
 
 <!-- CADASTRO -->
@@ -198,14 +201,15 @@ function showToast(icon, title, msg) {
 }
 
 function showPage(name) {
-  ['cadastro','orcamento','enviado','sem-resposta','ultima-chamada'].forEach(function(p){
+  ['cadastro','orcamento','enviado','sem-resposta','ultima-chamada','tabela'].forEach(function(p){
     document.getElementById('page-'+p).classList.toggle('active', p===name);
   });
-  var tm={cad:'cadastro',orc:'orcamento',env:'enviado',sem:'sem-resposta',ult:'ultima-chamada'};
+  var tm={cad:'cadastro',orc:'orcamento',env:'enviado',sem:'sem-resposta',ult:'ultima-chamada',tbl:'tabela'};
   Object.keys(tm).forEach(function(k){ document.getElementById('tab-'+k).classList.toggle('active', name===tm[k]); });
   if(name==='orcamento'||name==='enviado') orcLoad();
   if(name==='sem-resposta') loadSemResposta();
   if(name==='ultima-chamada') loadUltimaChamada();
+  if(name==='tabela') loadTabela();
 }
 
 function addBot(txt, qrs) {
@@ -648,6 +652,224 @@ function loadMsg(id,msg){var el=document.getElementById(id);if(!el)return;el.inn
 async function loadSemResposta(){loadMsg('list-sem','Carregando...');try{var d=await fetch('/api/orcamento?action=sem-resposta').then(function(r){return r.json();});var bg=document.getElementById('badge-sem');if(bg)bg.textContent=d.cards?d.cards.length:0;if(!d.ok||!d.cards||!d.cards.length){loadMsg('list-sem',d.error||'Nenhum cliente +48h em Aguardando Aprovacao');return;}var list=document.getElementById('list-sem');list.innerHTML='';d.cards.forEach(function(card){list.appendChild(srCard(card));});}catch(e){loadMsg('list-sem','Erro: '+e.message);}}
 async function alertarCliente(pipefyId){var btn=document.getElementById('btn-al-'+pipefyId);if(btn){btn.disabled=true;btn.textContent='...';}try{var d=await fetch('/api/orcamento?action=alertar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pipefyId:pipefyId})}).then(function(r){return r.json();});if(d.ok){showToast('OK','Movido para Ultima Chamada!','Prazo: '+(d.dataLimite||''));loadSemResposta();}else{showToast('Erro',d.error||'','');if(btn){btn.disabled=false;btn.textContent='Mover p/ Ultima Chamada';}}}catch(e){showToast('Erro',e.message,'');if(btn){btn.disabled=false;btn.textContent='Mover p/ Ultima Chamada';}}}
 async function loadUltimaChamada(){loadMsg('list-ult','Carregando...');try{var d=await fetch('/api/orcamento?action=ultima-chamada').then(function(r){return r.json();});var bg=document.getElementById('badge-ult');if(bg)bg.textContent=d.cards?d.cards.length:0;if(!d.ok||!d.cards||!d.cards.length){loadMsg('list-ult',d.error||'Nenhuma ficha em Ultima Chamada');return;}var list=document.getElementById('list-ult');list.innerHTML='';d.cards.forEach(function(card){list.appendChild(ucCard(card));});}catch(e){loadMsg('list-ult','Erro: '+e.message);}}
+
+var DEFAULT_TEMPLATES = {
+  microondas_eletrico: {
+    key: 'microondas_eletrico', label: 'Microondas — Elétrico',
+    descricao: 'Capacitor, Fusível de Alta, Microchave, Recuperação de Placa, Motor de Rotação, Membrana',
+    preco: '350', campoPreco: false,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do [peças], as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  },
+  microondas_placa: {
+    key: 'microondas_placa', label: 'Microondas — Troca de Placa / Display',
+    descricao: 'Troca de Placa, Display', preco: 'custo × 2', campoPreco: true,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto conjunto da [peças], será feito a reoperação eletrica tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  },
+  microondas_haste: {
+    key: 'microondas_haste', label: 'Microondas — Haste',
+    descricao: 'Haste', preco: '350', campoPreco: false,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da haste, montagem e regulagem consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  },
+  microondas_vidro: {
+    key: 'microondas_vidro', label: 'Microondas — Vidro / Porta',
+    descricao: 'Vidro, Porta', preco: 'custo × 2', campoPreco: true,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da [peças], montagem e regulagem consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  },
+  microondas_pintura: {
+    key: 'microondas_pintura', label: 'Microondas — Pintura',
+    descricao: 'Pintura', preco: '350', campoPreco: false,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, pintura, montagem, regulagem e revisão consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  },
+  purificador_motor_gas: {
+    key: 'purificador_motor_gas', label: 'Purificador Motor — Gás',
+    descricao: 'Gás', preco: '490', campoPreco: false,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca da valvula de gas, solda e recarga de gas refrigerante. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  },
+  purificador_motor_pecas: {
+    key: 'purificador_motor_pecas', label: 'Purificador Motor — Peças',
+    descricao: 'Bojo, Dutos e Conexões, Válvula', preco: '490', campoPreco: false,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto da [peças]. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  },
+  purificador_elet_kit: {
+    key: 'purificador_elet_kit', label: 'Purificador Eletrônico — Kit Termo Elétrico',
+    descricao: 'Kit Termo Elétrico', preco: '350', campoPreco: false,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do cooler, placa de resfriamento e pasta termica, as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  },
+  purificador_elet_rec: {
+    key: 'purificador_elet_rec', label: 'Purificador Eletrônico — Recuperação de Placa',
+    descricao: 'Recuperação de Placa', preco: '350', campoPreco: false,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da placa principal, será feito a reoperação da placa tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  },
+  purificador_elet_pecas: {
+    key: 'purificador_elet_pecas', label: 'Purificador Eletrônico — Dutos e Conexões / Válvula',
+    descricao: 'Dutos e Conexões, Válvula', preco: '350', campoPreco: false,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto da [peças]. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  },
+  adega_motor_gas: {
+    key: 'adega_motor_gas', label: 'Adega Motor — Gás',
+    descricao: 'Gás', preco: '490', campoPreco: false,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca da valvula de gas, solda e recarga de gas refrigerante. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  },
+  adega_motor_rec: {
+    key: 'adega_motor_rec', label: 'Adega Motor — Recuperação de Placa',
+    descricao: 'Recuperação de Placa', preco: '490', campoPreco: false,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da placa principal, será feito a reoperação da placa tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  },
+  adega_placa: {
+    key: 'adega_placa', label: 'Adega — Troca de Placa',
+    descricao: 'Troca de Placa (Motor ou Eletrônico)', preco: 'custo × 2', campoPreco: true,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto conjunto da Placa Principal, será feito a reoperação eletrica tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  },
+  adega_elet_kit: {
+    key: 'adega_elet_kit', label: 'Adega Eletrônico — Kit Termo Elétrico',
+    descricao: 'Kit Termo Elétrico', preco: '350', campoPreco: false,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do cooler, placa de resfriamento e pasta termica, as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  },
+  adega_elet_rec: {
+    key: 'adega_elet_rec', label: 'Adega Eletrônico — Recuperação de Placa',
+    descricao: 'Recuperação de Placa', preco: '350', campoPreco: false,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da placa principal, será feito a reoperação da placa tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  },
+  forno_peq_eletrico: {
+    key: 'forno_peq_eletrico', label: 'Forno Pequeno — Elétrico',
+    descricao: 'Resistência, Termostato, Timer', preco: '490', campoPreco: false,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da [peças], será feito a reoperação da placa tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  },
+  forno_peq_placa: {
+    key: 'forno_peq_placa', label: 'Forno Pequeno — Troca de Placa / Display',
+    descricao: 'Troca de Placa, Display', preco: 'custo × 2', campoPreco: true,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto conjunto do [peças]: será feito a reoperação eletrica tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  },
+  forno_peq_estrutura: {
+    key: 'forno_peq_estrutura', label: 'Forno Pequeno — Porta / Vidro / Mola',
+    descricao: 'Porta, Vidro, Mola', preco: 'custo × 2', campoPreco: true,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da [peças], montagem e regulagem consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  },
+  forno_grd_eletrico: {
+    key: 'forno_grd_eletrico', label: 'Forno Grande — Elétrico',
+    descricao: 'Resistência, Termostato, Timer', preco: '790', campoPreco: false,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da [peças], será feito a reoperação da placa tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  },
+  forno_grd_placa: {
+    key: 'forno_grd_placa', label: 'Forno Grande — Troca de Placa / Display',
+    descricao: 'Troca de Placa, Display', preco: 'custo × 2', campoPreco: true,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto conjunto do [peças]: será feito a reoperação eletrica tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  },
+  forno_grd_estrutura: {
+    key: 'forno_grd_estrutura', label: 'Forno Grande — Porta / Vidro / Mola',
+    descricao: 'Porta, Vidro, Mola', preco: 'custo × 2', campoPreco: true,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da [peças], montagem e regulagem consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  }
+};
+var tabelaTemplates = {};
+
+// ── TABELA DE TEMPLATES ──────────────────────────────────────
+async function loadTabela() {
+  var r = await fetch('/api/orcamento?action=templates-load').then(function(r){return r.json();}).catch(function(){return {templates:{}};});
+  var saved = r.templates || {};
+  // Mesclar: saved sobrescreve defaults
+  tabelaTemplates = {};
+  Object.keys(DEFAULT_TEMPLATES).forEach(function(k) {
+    tabelaTemplates[k] = Object.assign({}, DEFAULT_TEMPLATES[k], saved[k] ? {texto: saved[k].texto} : {});
+  });
+  renderTabela();
+}
+
+function renderTabela() {
+  var list = document.getElementById('tbl-list');
+  if (!list) return;
+  // Agrupar por equipamento
+  var grupos = {
+    'Microondas': ['microondas_eletrico','microondas_placa','microondas_haste','microondas_vidro','microondas_pintura'],
+    'Purificador': ['purificador_motor_gas','purificador_motor_pecas','purificador_elet_kit','purificador_elet_rec','purificador_elet_pecas'],
+    'Adega': ['adega_motor_gas','adega_motor_rec','adega_placa','adega_elet_kit','adega_elet_rec'],
+    'Forno Pequeno': ['forno_peq_eletrico','forno_peq_placa','forno_peq_estrutura'],
+    'Forno Grande': ['forno_grd_eletrico','forno_grd_placa','forno_grd_estrutura'],
+  };
+  var html = '';
+  Object.keys(grupos).forEach(function(grupo) {
+    html += '<div style="margin-bottom:6px;"><div style="font-family:var(--fh);font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px;padding:6px 12px;background:rgba(245,200,0,.06);border-radius:6px;border-left:3px solid var(--accent);">'+grupo+'</div>';
+    grupos[grupo].forEach(function(key) {
+      var t = tabelaTemplates[key];
+      if (!t) return;
+      html += tabelaCardHTML(t);
+    });
+    html += '</div>';
+  });
+  list.innerHTML = html;
+}
+
+function tabelaCardHTML(t) {
+  var precoTag = t.campoPreco
+    ? '<span style="font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:10px;background:rgba(59,158,255,.12);color:#3b9eff;">campo preço × 2</span>'
+    : '<span style="font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,.12);color:var(--green);">R$ '+t.preco+' fixo</span>';
+  return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">'+
+      '<div>'+
+        '<div style="font-weight:600;font-size:13px;">'+t.label+'</div>'+
+        '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:2px;">Aplicado quando: '+t.descricao+'</div>'+
+      '</div>'+
+      precoTag+
+    '</div>'+
+    '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-bottom:2px;">VARIÁVEIS: <span style="color:#3b9eff;">[NOME]</span> = primeiro nome, <span style="color:#f5c800;">[peças]</span> = serviços selecionados, <span style="color:var(--green);">[VALOR]</span> = preço calculado</div>'+
+    '<textarea id="tpl-'+t.key+'" rows="4" oninput="tabelaTemplates[''+t.key+''].texto=this.value" '+
+      'style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);'+
+             'font-family:var(--fb);font-size:12px;padding:10px;resize:vertical;box-sizing:border-box;line-height:1.5;">'+
+      escTxt(t.texto)+
+    '</textarea>'+
+  '</div>';
+}
+
+function escTxt(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+async function salvarTabela() {
+  var btn = document.querySelector('#page-tabela button[onclick="salvarTabela()"]');
+  if (btn) btn.textContent = '⏳ Salvando...';
+  // Coletar textos atuais das textareas
+  Object.keys(tabelaTemplates).forEach(function(k) {
+    var ta = document.getElementById('tpl-'+k);
+    if (ta) tabelaTemplates[k].texto = ta.value;
+  });
+  // Montar objeto só com texto (para economizar Redis)
+  var toSave = {};
+  Object.keys(tabelaTemplates).forEach(function(k) { toSave[k] = { texto: tabelaTemplates[k].texto }; });
+  var r = await fetch('/api/orcamento?action=templates-save', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({templates: toSave})
+  }).then(function(r){return r.json();}).catch(function(){ return {ok:false}; });
+  var st = document.getElementById('tbl-status');
+  if (r.ok) {
+    if (st) { st.textContent='✅ Salvo!'; st.style.color='var(--green)'; setTimeout(function(){st.textContent='';},2500); }
+  } else {
+    if (st) { st.textContent='Erro ao salvar'; st.style.color='var(--red)'; }
+  }
+  if (btn) btn.textContent = '💾 Salvar tudo';
+}
+
+function resetTabela() {
+  if (!confirm('Restaurar todos os textos para o padrão original?')) return;
+  Object.keys(DEFAULT_TEMPLATES).forEach(function(k) {
+    tabelaTemplates[k] = Object.assign({}, DEFAULT_TEMPLATES[k]);
+    var ta = document.getElementById('tpl-'+k);
+    if (ta) ta.value = DEFAULT_TEMPLATES[k].texto;
+  });
+  salvarTabela();
+}
+
 </script>
+<div class="page" id="page-tabela">
+  <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+    <div>
+      <div style="font-family:var(--fh);font-size:14px;font-weight:700;color:#3b9eff;">📋 Tabela de Textos</div>
+      <div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px;">Edite os textos usados nos orçamentos. Use [NOME], [peças] e [VALOR] como variáveis.</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span id="tbl-status" style="font-family:var(--fm);font-size:10px;color:var(--muted);"></span>
+      <button onclick="resetTabela()" style="font-family:var(--fm);font-size:10px;padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">↩ Restaurar padrões</button>
+      <button onclick="salvarTabela()" style="font-family:var(--fm);font-size:10px;padding:6px 14px;border-radius:7px;border:none;background:#3b9eff;color:#000;cursor:pointer;font-weight:700;">💾 Salvar tudo</button>
+    </div>
+  </div>
+  <div id="tbl-list" style="padding:16px 20px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:10px;"></div>
+</div>
 </body>
 </html>
