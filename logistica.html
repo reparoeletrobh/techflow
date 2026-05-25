@@ -396,13 +396,17 @@ async function load() {
 
 function filtrar(q) {
   const s = (q||'').toLowerCase().trim();
-  fichasFiltradas = s ? fichas.filter(f=>
-    (f.nome||'').toLowerCase().includes(s) ||
-    (f.id||'').toLowerCase().includes(s) ||
-    (f.equipamento||'').toLowerCase().includes(s) ||
-    (f.defeito||'').toLowerCase().includes(s) ||
-    (f.telefone||'').toLowerCase().includes(s)
-  ) : [...fichas];
+  fichasFiltradas = s ? fichas.filter(f=> {
+    // Busca em todos os campos do card
+    const campos = [
+      f.nome, f.id, f.equipamento, f.defeito,
+      f.telefone, f.endereco, f.motoristaNome,
+      f.texto, f.pipefyCardId,
+      // Label da coluna também
+      (COLS.find(c=>c.id===f.phase)||{}).label
+    ];
+    return campos.some(v => (v||'').toLowerCase().includes(s));
+  }) : [...fichas];
   const res = document.getElementById('busca-resultado');
   if (res) res.textContent = s ? fichasFiltradas.length + ' resultado' + (fichasFiltradas.length !== 1 ? 's' : '') : fichas.length + ' fichas';
   render();
