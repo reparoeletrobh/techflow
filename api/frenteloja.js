@@ -186,7 +186,30 @@ export default async function handler(req,res){
         await dbSet('reparoeletro_board', boardDb);
       } catch(e) { console.error('[FL] board direct write:', e.message); }
 
-      // ── PASSO 3: Salvar FL e responder ───────────────────────────────
+      // ── PASSO 3: Registrar no Balcão (aguardando pagamento) ─────────
+      try {
+        const BALCAO_KEY = 'reparoeletro_balcao';
+        const balcao = (await dbGet(BALCAO_KEY)) || [];
+        const balcaoId = pipefyId ? String(pipefyId) : ficha.id;
+        if (!balcao.find(b => b.pipefyId === balcaoId)) {
+          balcao.unshift({
+            pipefyId:    balcaoId,
+            flFichaId:   ficha.id,
+            nomeContato: ficha.nomeContato || '—',
+            osCode:      ficha.id,
+            descricao:   ficha.descricao || null,
+            telefone:    ficha.telefone || null,
+            tecnico:     null,
+            entradaEm:   now,
+            status:      'aguardando_pagamento',
+            pagoEm:      null,
+          });
+          await dbSet(BALCAO_KEY, balcao);
+          console.log('[FL] Balcao registrado:', balcaoId);
+        }
+      } catch(e) { console.error('[FL] balcao registro:', e.message); }
+
+      // ── PASSO 4: Salvar FL e responder ───────────────────────────────
       await dbSet(FL_KEY, db);
 
       return res.status(200).json({ok:true,ficha});
