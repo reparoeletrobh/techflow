@@ -15,6 +15,10 @@
     {
       "path": "/api/board?action=validate-loja",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/frenteloja?action=retry-pipefy-pending",
+      "schedule": "*/5 * * * *"
     }
   ],
   "rewrites": [

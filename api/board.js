@@ -142,7 +142,8 @@ async function fetchApprovedCards() {
   // Início do dia BRT
   const nowBRT = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
   nowBRT.setHours(0, 0, 0, 0);
-  const todayStartUTC = new Date(nowBRT.getTime() + 3 * 60 * 60 * 1000);
+  // Janela de 3 dias — captura cards que o background task não processou
+  const tresDiasAtras = new Date(nowBRT.getTime() - 3 * 24 * 60 * 60 * 1000);
 
   while (hasNext) {
     const after = cursor ? `, after: "${cursor}"` : "";
@@ -170,10 +171,10 @@ async function fetchApprovedCards() {
     if (!phase) throw new Error('Fase "Aprovado" não encontrada');
 
     for (const { node } of phase.cards.edges) {
-      // updated_at = quando o card foi modificado pela última vez (inclui mover de fase)
       const updatedAt = node.updated_at ? new Date(node.updated_at) : null;
-      const isToday = updatedAt && updatedAt >= todayStartUTC;
-      if (!isToday) continue;
+      // Aceita cards dos últimos 3 dias (não só hoje)
+      const isRecente = updatedAt && updatedAt >= tresDiasAtras;
+      if (!isRecente) continue;
 
       const fields = node.fields || [];
       const nomeField = fields.find(f =>

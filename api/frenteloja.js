@@ -124,61 +124,70 @@ export default async function handler(req,res){
       ficha.phase='producao';ficha.movedAt=now;
       ficha.history=(ficha.history||[]).concat([{phase:'producao',ts:now}]);
 
-      // Salvar no Redis IMEDIATAMENTE e responder — Pipefy roda em background
-      await dbSet(FL_KEY,db);
+      const titleCompleto=(ficha.nomeContato+' (Loja) - '+ficha.equipamento+
+        ' | '+(ficha.descricao||'')+' | Diag: '+(ficha.descricaoTecnica||'')+
+        ' | R$'+String(parseFloat(ficha.orcamento?.valor||0).toFixed(2))+
+        ' '+(ficha.orcamento?.formaPagamento||'pix')+' OS:'+ficha.id
+      ).replace(/"/g,"'").slice(0,255);
 
-      // Pipefy + sync em background (não bloqueia a resposta)
-      (async()=>{
-        try{
-          const aprovadoPhaseId=await getPipefyPhaseId('aprovad');
-          if(!aprovadoPhaseId) throw new Error('Fase Aprovado nao encontrada');
-          const titleCompleto=(ficha.nomeContato+' (Loja) - '+ficha.equipamento+
-            ' | '+(ficha.descricao||'')+' | Diag: '+(ficha.descricaoTecnica||'')+
-            ' | R$'+String(parseFloat(ficha.orcamento?.valor||0).toFixed(2))+
-            ' '+(ficha.orcamento?.formaPagamento||'pix')+' OS:'+ficha.id
-          ).replace(/"/g,"'").slice(0,255);
-          const nomeCard=(ficha.nomeContato+' (Loja)').replace(/"/g,"'").slice(0,255);
-          const telCard=(ficha.telefone||'').replace(/"/g,"'").slice(0,100);
-          const data=await pipefyQ(
-            'mutation { createCard(input: { pipe_id: "'+PIPE_ID+'" phase_id: "'+aprovadoPhaseId+'" title: "'+titleCompleto+'" fields_attributes: [ { field_id: "nome_do_contato" field_value: "'+nomeCard+'" }, { field_id: "telefone" field_value: "'+telCard+'" } ] }) { card { id } } }'
+      // ── PASSO 1: Criar card no Pipefy (SÍNCRONO, antes de responder) ─
+      let pipefyId = null;
+      try {
+        const aprovadoPhaseId = await getPipefyPhaseId('aprovad');
+        if (aprovadoPhaseId) {
+          const nomeCard = (ficha.nomeContato+' (Loja)').replace(/"/g,"'").slice(0,255);
+          const telCard  = (ficha.telefone||'').replace(/"/g,"'").slice(0,100);
+          const data = await pipefyQ(
+            'mutation{createCard(input:{pipe_id:"'+PIPE_ID+'" phase_id:"'+aprovadoPhaseId+'" title:"'+titleCompleto+'" fields_attributes:[{field_id:"nome_do_contato" field_value:"'+nomeCard+'"},{field_id:"telefone" field_value:"'+telCard+'"}]}){card{id}}}'
           );
-          const pipefyId=data?.createCard?.card?.id||null;
-          console.log('[FrenteLoja] Card criado:',pipefyId);
-          // Registrar no board SEMPRE (com ou sem pipefyId) — não depende do Pipefy
-          const boardBase = process.env.FL_BASE_URL || 'https://reparoeletroadm.com';
-          // Se já existe card em analise_loja → mover para cliente_loja
-          await fetch(boardBase+'/api/board?action=move', {
-            method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ flFichaId: ficha.id, phaseId: 'cliente_loja', movedBy: 'Aprovação FL' })
-          }).catch(()=>{}); // se não existir, ignora
-          // Garantir card no board com flFichaId
-          await fetch(boardBase+'/api/board?action=add-loja-card', {
-            method: 'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({
-              flFichaId:   ficha.id,
-              pipefyId:    pipefyId || null,
-              title:       titleCompleto,
-              nomeContato: (ficha.nomeContato||'').replace(/\(Loja\)/g,'').trim(),
-              telefone:    ficha.telefone||'',
-              phaseId:     'cliente_loja',
-            })
-          }).catch(e=>console.error('[FL] board-card:',e.message));
-
-          if(pipefyId){
-            // Atualizar pipefyCardId no Redis
-            const db2=await dbGet(FL_KEY)||defaultDB();
-            const f2=db2.fichas.find(f=>f.id===ficha.id);
-            if(f2){
-              f2.pipefyCardId=pipefyId;
-              const vn=String(parseFloat(ficha.orcamento?.valor||0).toFixed(2));
-              await pipefyQ('mutation{updateCardField(input:{card_id:"'+pipefyId+'" field_id:"valor_de_contrato" new_value:"'+vn+'"}){success}}').catch(e=>console.error('[FL] valor:',e.message));
-              await dbSet(FL_KEY,db2);
-            }
-            await fetch('https://reparoeletroadm.com/api/board?action=sync').catch(e=>console.error('[FL] sync:',e.message));
+          pipefyId = data?.createCard?.card?.id || null;
+          if (pipefyId) {
+            ficha.pipefyCardId = pipefyId;
+            console.log('[FL] Pipefy card criado:', pipefyId);
+            // Atualizar valor no Pipefy (fire-and-forget)
+            const vn = String(parseFloat(ficha.orcamento?.valor||0).toFixed(2));
+            pipefyQ('mutation{updateCardField(input:{card_id:"'+pipefyId+'" field_id:"valor_de_contrato" new_value:"'+vn+'"}){success}}').catch(()=>{});
           }
-        }catch(e){console.error('[FrenteLoja] BG Pipefy:',e.message);}
-      })();
+        } else {
+          console.error('[FL] Fase Aprovado nao encontrada no Pipefy');
+          ficha.pipefyPending = true; // cron vai retentar
+        }
+      } catch(e) {
+        console.error('[FL] Pipefy createCard:', e.message);
+        ficha.pipefyPending = true; // cron vai retentar
+      }
+
+      // ── PASSO 2: Criar card no board DIRETAMENTE no Redis (SÍNCRONO) ─
+      try {
+        const boardDb = await dbGet('reparoeletro_board') || {};
+        const boardCards = boardDb.cards || [];
+        // Mover analise_loja → cliente_loja se já existe, senão criar
+        const existente = boardCards.find(c => c.flFichaId === ficha.id);
+        if (existente) {
+          existente.phaseId = 'cliente_loja';
+          existente.movedAt = now;
+          existente.movedBy = 'Aprovação FL';
+          if (pipefyId) { existente.pipefyId = String(pipefyId); }
+        } else {
+          boardCards.unshift({
+            id:          ficha.id+'-loja',
+            pipefyId:    pipefyId ? String(pipefyId) : ficha.id,
+            flFichaId:   ficha.id,
+            title:       titleCompleto,
+            nomeContato: (ficha.nomeContato||'').replace(/\(Loja\)/g,'').trim(),
+            telefone:    ficha.telefone||'',
+            phaseId:     'cliente_loja',
+            addedAt:     now,
+            movedAt:     now,
+            movedBy:     'Aprovação FL',
+          });
+        }
+        boardDb.cards = boardCards;
+        await dbSet('reparoeletro_board', boardDb);
+      } catch(e) { console.error('[FL] board direct write:', e.message); }
+
+      // ── PASSO 3: Salvar FL e responder ───────────────────────────────
+      await dbSet(FL_KEY, db);
 
       return res.status(200).json({ok:true,ficha});
     }
@@ -407,6 +416,63 @@ export default async function handler(req,res){
       antes,
       depois: db.fichas.length
     });
+  }
+
+
+  // ── GET retry-pipefy-pending — cria cards Pipefy que falharam ──────
+  if (action === 'retry-pipefy-pending') {
+    const db = await dbGet(FL_KEY) || defaultDB();
+    // Fichas pendentes: pipefyPending=true OU producao sem pipefyCardId há mais de 2 min
+    const cutoff = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    const pendentes = db.fichas.filter(f =>
+      f.phase === 'producao' &&
+      !f.pipefyCardId &&
+      (f.pipefyPending || (f.movedAt && f.movedAt < cutoff))
+    );
+
+    if (pendentes.length === 0) return res.status(200).json({ ok:true, pendentes:0 });
+
+    let criados = 0, erros = 0;
+    const aprovadoPhaseId = await getPipefyPhaseId('aprovad').catch(()=>null);
+    if (!aprovadoPhaseId) return res.status(200).json({ ok:false, error:'Fase Aprovado nao encontrada', pendentes:pendentes.length });
+
+    for (const ficha of pendentes) {
+      try {
+        const titleCompleto=(ficha.nomeContato+' (Loja) - '+(ficha.equipamento||'')+
+          ' | '+(ficha.descricao||'')+' | Diag: '+(ficha.descricaoTecnica||'')+
+          ' | R$'+String(parseFloat(ficha.orcamento?.valor||0).toFixed(2))+
+          ' '+(ficha.orcamento?.formaPagamento||'pix')+' OS:'+ficha.id
+        ).replace(/"/g,"'").slice(0,255);
+        const nomeCard = (ficha.nomeContato+' (Loja)').replace(/"/g,"'").slice(0,255);
+        const telCard  = (ficha.telefone||'').replace(/"/g,"'").slice(0,100);
+        const data = await pipefyQ(
+          'mutation{createCard(input:{pipe_id:"'+PIPE_ID+'" phase_id:"'+aprovadoPhaseId+'" title:"'+titleCompleto+'" fields_attributes:[{field_id:"nome_do_contato" field_value:"'+nomeCard+'"},{field_id:"telefone" field_value:"'+telCard+'"}]}){card{id}}}'
+        );
+        const pipefyId = data?.createCard?.card?.id || null;
+        if (pipefyId) {
+          ficha.pipefyCardId = pipefyId;
+          ficha.pipefyPending = false;
+          // Atualizar no board
+          const boardDb = await dbGet('reparoeletro_board') || {};
+          const card = (boardDb.cards||[]).find(c => c.flFichaId === ficha.id);
+          if (card && (!card.pipefyId || card.pipefyId === ficha.id)) {
+            card.pipefyId = String(pipefyId);
+            await dbSet('reparoeletro_board', boardDb);
+          }
+          // Atualizar valor no Pipefy
+          const vn = String(parseFloat(ficha.orcamento?.valor||0).toFixed(2));
+          pipefyQ('mutation{updateCardField(input:{card_id:"'+pipefyId+'" field_id:"valor_de_contrato" new_value:"'+vn+'"}){success}}').catch(()=>{});
+          criados++;
+          console.log('[FL] retry-pipefy: criado', pipefyId, 'para', ficha.id);
+        }
+      } catch(e) {
+        erros++;
+        console.error('[FL] retry-pipefy:', ficha.id, e.message);
+      }
+    }
+
+    await dbSet(FL_KEY, db);
+    return res.status(200).json({ ok:true, pendentes:pendentes.length, criados, erros });
   }
 
   if(action==='rastrear'){
