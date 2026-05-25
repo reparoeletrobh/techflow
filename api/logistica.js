@@ -57,14 +57,13 @@ module.exports = async function handler(req, res) {
     const met = (await dbGet(MET_KEY)) || {};
     const hoje = new Date().toLocaleDateString('pt-BR', {timeZone:'America/Sao_Paulo'}).split('/').reverse().join('-');
 
-    // Auto-backfill: se hoje nao tem dados, semear com fichas ativas
-    if (!met[hoje]) {
+    // Backfill: se hoje nao tem dados, semear com fichas em cada coluna agora
+    // (baseline do dia — a partir daqui cada movimentacao acumula por cima)
+    if (!met[hoje] || !Object.keys(met[hoje]).length) {
       const fichasDb = await dbGet(LOG_KEY) || defaultDB();
-      const hojeDate = new Date(); hojeDate.setHours(0,0,0,0);
       met[hoje] = {};
       for (const f of fichasDb.fichas || []) {
-        const mov = new Date(f.movedAt || f.criadoEm);
-        if (mov >= hojeDate && f.phase) {
+        if (f.phase) {
           met[hoje][f.phase] = (met[hoje][f.phase] || 0) + 1;
         }
       }
