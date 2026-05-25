@@ -90,13 +90,62 @@ export default async function handler(req, res) {
   if (action === 'replay') {
     const payId = req.query.paymentId;
     if (!payId) return res.status(400).json({ ok: false, error: 'paymentId obrigatorio' });
-    // Remover da lista de processados para permitir replay
-    const proc = (await dbGet(PROC_KEY)) || [];
-    const novaLista = proc.filter(id => id !== String(payId));
-    await dbSet(PROC_KEY, novaLista);
-    // Chamar o processamento novamente como se fosse um webhook POST
-    req.method = 'POST';
-    req.body = { type: 'payment', data: { id: payId } };
+    try {
+      // Buscar detalhes do pagamento no MP
+      const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${payId}`, {
+        headers: { Authorization: `Bearer ${MP_TOKEN}` }
+      });
+      const payment = await mpRes.json();
+      if (payment.status !== 'approved') {
+        return res.status(200).json({ ok: false, error: 'pagamento nao aprovado', status: payment.status });
+      }
+
+      const meta        = payment.metadata || {};
+      const produtoIds  = (meta.produto_ids || '').split(',').filter(Boolean);
+      const nomeCliente = meta.comprador_nome || payment.payer?.first_name || 'Comprador Online';
+      const telefone    = meta.comprador_tel || '';
+      const cpf         = meta.comprador_cpf || '';
+      const modPagamento = payment.payment_method_id === 'pix' ? 'PIX' : `Cartao ${payment.installments}x`;
+
+      const VENDAS_KEY = 'reparoeletro_vendas';
+      const FIN_KEY    = 'reparoeletro_financeiro';
+      const resultados = [];
+
+      for (const produtoId of produtoIds) {
+        const [db, fin] = await Promise.all([
+          dbGet(VENDAS_KEY).then(d => d || { produtos: [] }),
+          dbGet(FIN_KEY).then(d => d || { fichas: [] }),
+        ]);
+        const idx = db.produtos.findIndex(p => p.id === String(produtoId));
+        if (idx < 0) { resultados.push({ produtoId, erro: 'nao_encontrado' }); continue; }
+        const p = db.produtos[idx];
+        if (p.vendido) { resultados.push({ produtoId, info: 'ja_vendido' }); continue; }
+
+        const now = new Date().toISOString();
+        db.produtos[idx] = { ...p, vendido: true, soldAt: now, nomeCliente,
+          telefone: telefone||null, cpfCnpj: cpf||null,
+          vendedor: 'Mercado Pago', modalidade: modPagamento,
+          paymentId: String(payId), vendidoEm: now };
+        await dbSet(VENDAS_KEY, db);
+
+        const fichaId = `venda-${Date.now()}`;
+        fin.fichas = fin.fichas || [];
+        fin.fichas.unshift({ id: fichaId, pipefyId: fichaId, osCode: p.codigo,
+          nomeContato: nomeCliente, telefone: telefone||null, cpfCnpj: cpf||null,
+          title: p.descricao.substring(0,60), descricao: p.descricao,
+          valor: parseFloat(p.preco), formaPagamento: modPagamento,
+          vendedor: 'Mercado Pago', dataVenda: now.slice(0,10), criadoEm: now, phase: 'emitir_nf' });
+        await dbSet(FIN_KEY, fin);
+
+        // Marcar como processado
+        await marcarProcessado(String(payId));
+        await logEvento({ tipo: 'replay', paymentId: String(payId), produtoId, status: 'ok' });
+        resultados.push({ produtoId, codigo: p.codigo, descricao: p.descricao, ok: true });
+      }
+      return res.status(200).json({ ok: true, resultados, nomeCliente, valor: payment.transaction_amount });
+    } catch(e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
   }
 
   if (action === 'logs') {
