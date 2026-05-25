@@ -11,7 +11,13 @@ async function dbGet(key) {
     headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` }
   });
   const j = await r.json();
-  return j.result ? JSON.parse(j.result) : null;
+  if (!j.result) return null;
+  try {
+    const v1 = JSON.parse(j.result);
+    // Lidar com dupla serialização (valor é string JSON)
+    if (typeof v1 === 'string') { try { return JSON.parse(v1); } catch(e) { return v1; } }
+    return v1;
+  } catch(e) { return null; }
 }
 
 async function dbSet(key, value) {
