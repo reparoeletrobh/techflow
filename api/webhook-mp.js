@@ -49,9 +49,23 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const action = req.query.action;
     if (action === 'logs') {
-      const logs = (await dbGet(LOG_KEY)) || [];
-      const proc = (await dbGet(PROC_KEY)) || [];
-      return res.status(200).json({ ok: true, logs: logs.slice(0,20), processados: proc.slice(0,20) });
+      try {
+        const logsRaw = await dbGet(LOG_KEY);
+        const procRaw = await dbGet(PROC_KEY);
+        // dbGet pode retornar string ou array dependendo da serialização
+        const logs = Array.isArray(logsRaw) ? logsRaw : (typeof logsRaw === 'string' ? JSON.parse(logsRaw) : []);
+        const proc = Array.isArray(procRaw) ? procRaw : (typeof procRaw === 'string' ? JSON.parse(procRaw) : []);
+        const out = {
+          ok: true,
+          totalLogs: logs.length,
+          ultimosLogs: logs.slice(0, 10),
+          processados: proc.slice(0, 20)
+        };
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(200).end(JSON.stringify(out));
+      } catch(e) {
+        return res.status(200).json({ ok: false, error: e.message });
+      }
     }
     return res.status(200).json({ ok: true, info: 'webhook-mp ativo. Use ?action=logs para ver logs.' });
   }
