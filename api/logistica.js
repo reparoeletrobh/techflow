@@ -99,7 +99,7 @@ module.exports = async function handler(req, res) {
   // ── POST mover ────────────────────────────────────────────
   if (req.method === 'POST' && action === 'mover') {
     const { id, phase } = req.body || {};
-    const PHASES = ['liberado_coleta','em_rota','remarcar','coleta_efetuada','orc_registrado'];
+    const PHASES = ['liberado_coleta','em_rota','motorista_parceiro','remarcar','coleta_efetuada','orc_registrado'];
     if (!id || !PHASES.includes(phase)) return res.status(400).json({ ok: false, error: 'invalido' });
 
     const db = await dbGet(LOG_KEY) || defaultDB();
@@ -109,6 +109,22 @@ module.exports = async function handler(req, res) {
     ficha.movedAt = new Date().toISOString();
     await dbSet(LOG_KEY, db);
     registrarPassagem(phase).catch(() => {});
+    return res.status(200).json({ ok: true, ficha });
+  }
+
+
+  // ── POST mover-motorista: move para Motorista Parceiro salvando o nome ──
+  if (req.method === 'POST' && action === 'mover-motorista') {
+    const { id, motoristaNome } = req.body || {};
+    if (!id || !motoristaNome) return res.status(400).json({ ok: false, error: 'id e motoristaNome obrigatorios' });
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const ficha = db.fichas.find(f => f.id === id);
+    if (!ficha) return res.status(404).json({ ok: false, error: 'nao encontrada' });
+    ficha.phase        = 'motorista_parceiro';
+    ficha.motoristaNome = motoristaNome.trim();
+    ficha.movedAt      = new Date().toISOString();
+    await dbSet(LOG_KEY, db);
+    registrarPassagem('motorista_parceiro').catch(() => {});
     return res.status(200).json({ ok: true, ficha });
   }
 

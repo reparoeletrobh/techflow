@@ -235,6 +235,28 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
     </div>
   </div>
 </div>
+
+<!-- MODAL: MOTORISTA PARCEIRO -->
+<div id="ov-motorista" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:8px;">
+  <div class="modal" style="width:100%;max-width:380px;">
+    <div class="modal-header">
+      <div class="modal-title" style="color:#8b5cf6;">🏍️ Motorista Parceiro</div>
+      <button class="modal-close" onclick="fecharMotorista()">✕</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <div class="diag-section-label" style="margin-bottom:6px;">Nome do motorista</div>
+        <input class="diag-input" id="motorista-nome" placeholder="Ex: João Moto" style="width:100%;"
+          onkeydown="if(event.key==='Enter') confirmarMotorista()">
+      </div>
+      <div id="motorista-msg" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="cbtn cbtn-outline" onclick="fecharMotorista()">Cancelar</button>
+        <button class="cbtn" style="background:#8b5cf6;color:#fff;border:none;" onclick="confirmarMotorista()">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
 <!-- MODAL: VER / EDITAR DADOS -->
 <div class="overlay" id="ov-dados" onclick="if(event.target===this)fecharDados()">
   <div class="modal">
@@ -353,6 +375,7 @@ function precisaPreco(tipo, subtipo, servicos) {
 const COLS = [
   { id:'liberado_coleta',  label:'Liberado para Coleta', cor:'#f5c800' },
   { id:'em_rota',          label:'Equipamento em Rota',  cor:'#3b9eff' },
+  { id:'motorista_parceiro', label:'Motorista Parceiro',   cor:'#8b5cf6' },
   { id:'remarcar',         label:'Remarcar',             cor:'#f97316' },
   { id:'coleta_efetuada',  label:'Coleta Efetuada',      cor:'#22c55e' },
   { id:'orc_registrado',   label:'Orçamento Registrado', cor:'#a855f7' },
@@ -412,11 +435,19 @@ function cardHTML(f, phase) {
     btns = `
       <button class="cbtn cbtn-outline" onclick="abrirDados('${f.id}')">Ver Dados</button>
       <button class="cbtn cbtn-blue" onclick="mover('${f.id}','em_rota')">Equipamento em Rota</button>
+      <button class="cbtn cbtn-purple" onclick="abrirMotorista('${f.id}')">Motorista Parceiro</button>
       <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>
       <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>`;
   } else if (phase === 'em_rota') {
     btns = `
       <button class="cbtn cbtn-green" onclick="mover('${f.id}','coleta_efetuada')">Coleta Efetuada</button>
+      <button class="cbtn cbtn-purple" onclick="abrirMotorista('${f.id}')">Motorista Parceiro</button>
+      <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>`;
+  } else if (phase === 'motorista_parceiro') {
+    const motorista = f.motoristaNome ? `<div style="font-family:var(--fm);font-size:10px;color:#8b5cf6;margin-bottom:2px;">🏍️ ${escHtml(f.motoristaNome)}</div>` : '';
+    btns = motorista + `
+      <button class="cbtn cbtn-green" onclick="mover('${f.id}','coleta_efetuada')">Coleta Efetuada</button>
+      <button class="cbtn cbtn-blue" onclick="mover('${f.id}','em_rota')">Equipamento em Rota</button>
       <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>`;
   } else if (phase === 'remarcar') {
     btns = `
@@ -429,7 +460,7 @@ function cardHTML(f, phase) {
     if (diag) btns = `<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">${diag.tipo||''}${diag.subtipo?' › '+diag.subtipo:''} — ${(diag.servicos||[]).join(', ')}</div>`;
   }
 
-  const emRotaAlerta = phase === 'em_rota' && (Date.now() - new Date(f.movedAt||f.criadoEm).getTime()) > 2 * 60 * 60 * 1000;
+  const emRotaAlerta = (phase === 'em_rota' || phase === 'motorista_parceiro') && (Date.now() - new Date(f.movedAt||f.criadoEm).getTime()) > 2 * 60 * 60 * 1000;
   return `
   <div class="card${emRotaAlerta ? ' alerta-rota' : ''}">
     <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -778,6 +809,51 @@ function mostrarMsgCad(txt, tipo) {
   el.textContent = txt; el.style.display = 'block';
   el.style.background = tipo==='ok' ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)';
   el.style.color = tipo==='ok' ? '#22c55e' : '#ef4444';
+}
+
+
+// ── MOTORISTA PARCEIRO ────────────────────────────────────────
+let motoristaFichaId = null;
+
+function abrirMotorista(id) {
+  motoristaFichaId = id;
+  document.getElementById('motorista-nome').value = '';
+  document.getElementById('motorista-msg').style.display = 'none';
+  document.getElementById('ov-motorista').style.display = 'flex';
+  setTimeout(() => document.getElementById('motorista-nome').focus(), 100);
+}
+
+function fecharMotorista() {
+  document.getElementById('ov-motorista').style.display = 'none';
+  motoristaFichaId = null;
+}
+
+async function confirmarMotorista() {
+  const nome = document.getElementById('motorista-nome').value.trim();
+  if (!nome) {
+    const msg = document.getElementById('motorista-msg');
+    msg.textContent = 'Informe o nome do motorista';
+    msg.style.display = 'block';
+    msg.style.background = 'rgba(239,68,68,.1)';
+    msg.style.color = '#ef4444';
+    return;
+  }
+  const r = await fetch('/api/logistica?action=mover-motorista', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ id: motoristaFichaId, motoristaNome: nome })
+  }).then(r=>r.json()).catch(()=>({ok:false,error:'Erro de rede'}));
+
+  if (r.ok) {
+    fecharMotorista();
+    await load();
+    toast('Ficha enviada para Motorista Parceiro');
+  } else {
+    const msg = document.getElementById('motorista-msg');
+    msg.textContent = 'Erro: ' + r.error;
+    msg.style.display = 'block';
+    msg.style.background = 'rgba(239,68,68,.1)';
+    msg.style.color = '#ef4444';
+  }
 }
 
 </script>
