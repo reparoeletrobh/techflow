@@ -32,6 +32,7 @@ header{
 .filter-btn:hover{border-color:#444;color:var(--text);}
 .filter-btn.active-all{border-color:var(--accent);color:var(--accent);background:rgba(245,200,0,0.07);}
 .filter-btn.active-micro{border-color:#f59e0b;color:#f59e0b;background:rgba(245,158,11,0.08);}
+.filter-btn.active-tv{border-color:#3b9eff;color:#3b9eff;background:rgba(59,158,255,0.08);}
 .filter-btn.active-bebe{border-color:#3b9eff;color:#3b9eff;background:rgba(59,158,255,0.08);}
 
 /* GRID */
@@ -122,6 +123,7 @@ header{
     <button class="filter-btn active-all" id="f-all"   onclick="setFilter(null)">🔍 Todos</button>
     <button class="filter-btn" id="f-micro" onclick="setFilter('Microondas')">📡 Microondas</button>
     <button class="filter-btn" id="f-bebe"  onclick="setFilter('Bebedouro')">💧 Bebedouro</button>
+    <button class="filter-btn" id="f-tv"    onclick="setFilter('TV')">📺 Televisão</button>
   </div>
   <div class="grid-header">
     <div class="grid-title">Equipamentos <span>Disponíveis</span></div>
@@ -140,10 +142,15 @@ const WA_NUMBER = "5531998301617";
 
 async function load() {
   try {
-    const r   = await fetch('/api/vendas?action=load');
-    const res = await r.json();
-    if (!res.ok) throw new Error(res.error);
-    allProdutos = (res.produtos || []).filter(p => !p.vendido);
+    // Carrega Microondas/Bebedouros (api/vendas) + Televisões (api/tv-vendas) em paralelo
+    const [r1, r2] = await Promise.all([
+      fetch('/api/vendas?action=load').then(r=>r.json()),
+      fetch('/api/tv-vendas?action=load').then(r=>r.json()),
+    ]);
+    const equipamentos = ((r1.produtos||[]).filter(p=>!p.vendido));
+    const televisoes   = ((r2.produtos||[]).filter(p=>!p.vendido)
+                           .map(p=>({...p, _fonte:'tv'})));
+    allProdutos = [...equipamentos, ...televisoes];
     setFilter(activeFilter);
   } catch(e) {
     document.getElementById('grid-content').innerHTML =
@@ -155,10 +162,15 @@ let allProdutos = [], activeFilter = null;
 
 function setFilter(tipo) {
   activeFilter = tipo;
-  document.getElementById('f-all').className   = 'filter-btn' + (tipo===null?  ' active-all':'');
+  document.getElementById('f-all').className   = 'filter-btn' + (tipo===null?       ' active-all':'');
   document.getElementById('f-micro').className = 'filter-btn' + (tipo==='Microondas'?' active-micro':'');
-  document.getElementById('f-bebe').className  = 'filter-btn' + (tipo==='Bebedouro'?  ' active-bebe':'');
-  const filtered = tipo ? allProdutos.filter(p => p.tipo === tipo) : allProdutos;
+  document.getElementById('f-bebe').className  = 'filter-btn' + (tipo==='Bebedouro'? ' active-bebe':'');
+  document.getElementById('f-tv').className    = 'filter-btn' + (tipo==='TV'?        ' active-tv':'');
+  const filtered = tipo === 'TV'
+    ? allProdutos.filter(p => p._fonte === 'tv')
+    : tipo
+      ? allProdutos.filter(p => p.tipo === tipo)
+      : allProdutos;
   render(filtered);
 }
 
