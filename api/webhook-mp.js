@@ -96,6 +96,17 @@ for (const produtoId of produtoIds) {
           paymentId:   String(payId) };
         await dbSet(VENDAS_KEY, db);
         }
+        // Registrar no checkout
+        try {
+          const TV_KEY = 'tv_checkout_vendas';
+          const tvDb = (await dbGet(TV_KEY)) || { vendas: [] };
+          tvDb.vendas = tvDb.vendas || [];
+          if (!tvDb.vendas.find(v => v.paymentId === String(payId))) {
+            tvDb.vendas.unshift({ id: Date.now().toString(36), produto: { id: p.id, codigo: p.codigo, descricao: p.descricao, tipo: p.tipo||'', capacidade: p.capacidade||'' }, comprador: { nome: nomeCliente, telefone, cpf, endereco, cep }, valor: payment.transaction_amount, provedor: 'mercado_pago', paymentId: String(payId), paymentMethod: payment.payment_method_id, installments: payment.installments, criadoEm: new Date().toISOString() });
+            tvDb.vendas = tvDb.vendas.slice(0, 500);
+            await dbSet(TV_KEY, tvDb);
+          }
+        } catch(e) {}
         await marcarProcessado(String(payId));
         await logEvento({ tipo: 'register-manual', paymentId: String(payId), produtoId, nomeCliente, valor: payment.transaction_amount });
       }
