@@ -476,6 +476,12 @@ function equipSecHTML(eq, i, total) {
     </div>
     ${subtiposHTML}
     ${servicosHTML ? `<div><div class="diag-section-label" style="margin-bottom:6px;">Serviços / Peças</div><div class="srv-grid">${servicosHTML}</div></div>` : ''}
+    ${precisaPreco(eq.tipo, eq.subtipo, eq.servicos) ? `
+    <div>
+      <div class="diag-section-label" style="margin-bottom:5px;">Preço de custo (R$) — valor final será x2</div>
+      <input class="diag-input" type="number" min="0" placeholder="Ex: 150" value="${eq.preco||''}"
+        style="width:160px;" oninput="diagEquips[${i}].preco=this.value">
+    </div>` : ''}
   </div>`;
 }
 
