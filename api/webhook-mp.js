@@ -48,7 +48,35 @@ export default async function handler(req, res) {
   // ── GET: diagnóstico de logs ─────────────────────────────────
   if (req.method === 'GET') {
     const action = req.query.action;
-    if (action === 'logs') {
+    // ── GET check-payment: busca detalhes de um pagamento no MP ──
+  if (action === 'check-payment') {
+    const payId = req.query.paymentId;
+    if (!payId) return res.status(400).json({ ok: false, error: 'paymentId obrigatorio' });
+    try {
+      const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${payId}`, {
+        headers: { Authorization: `Bearer ${MP_TOKEN}` }
+      });
+      const payment = await mpRes.json();
+      return res.status(200).json({ ok: true, payment });
+    } catch(e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+  // ── GET replay: reprocessar um pagamento aprovado ─────────────
+  if (action === 'replay') {
+    const payId = req.query.paymentId;
+    if (!payId) return res.status(400).json({ ok: false, error: 'paymentId obrigatorio' });
+    // Remover da lista de processados para permitir replay
+    const proc = (await dbGet(PROC_KEY)) || [];
+    const novaLista = proc.filter(id => id !== String(payId));
+    await dbSet(PROC_KEY, novaLista);
+    // Chamar o processamento novamente como se fosse um webhook POST
+    req.method = 'POST';
+    req.body = { type: 'payment', data: { id: payId } };
+  }
+
+  if (action === 'logs') {
       try {
         const logsRaw = await dbGet(LOG_KEY);
         const procRaw = await dbGet(PROC_KEY);
@@ -126,23 +154,54 @@ export default async function handler(req, res) {
     const host    = req.headers['x-forwarded-host']  || req.headers.host || 'reparoeletroadm.com';
     const siteUrl = `${proto}://${host}`;
 
-    // 4. Para cada produto: vender (remove catálogo + Pipefy)
+    // 4. Para cada produto: registrar venda DIRETO no Redis (sem HTTP self-call)
+    const VENDAS_KEY  = 'reparoeletro_vendas';
+    const FIN_KEY     = 'reparoeletro_financeiro';
+
     for (const produtoId of produtoIds) {
       let produtoInfo = { id: produtoId, codigo: meta.produto_codigos || '' };
       try {
-        const vRes = await fetch(`${siteUrl}/api/vendas?action=vender`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            produtoId,
-            nomeCliente,
-            telefone:   telefone || null,
-            cpfCnpj:    cpf      || null,
-            vendedor:   'Mercado Pago',
-            modalidade: modPagamento
-          })
+        const [db, fin] = await Promise.all([
+          dbGet(VENDAS_KEY).then(d => d || { produtos: [], nextId: 1 }),
+          dbGet(FIN_KEY).then(d => d || { fichas: [] }),
+        ]);
+        const idx = db.produtos.findIndex(p => p.id === String(produtoId));
+        if (idx < 0) {
+          console.error('[Webhook] Produto não encontrado:', produtoId);
+          await logEvento({ tipo: 'erro_vender', produtoId, erro: 'produto_nao_encontrado', paymentId: String(payId) });
+          continue;
+        }
+        const p = db.produtos[idx];
+        if (p.vendido) {
+          console.log('[Webhook] Produto já vendido:', produtoId);
+          continue;
+        }
+        const now = new Date().toISOString();
+        const precoFmt = parseFloat(p.preco).toLocaleString('pt-BR',{minimumFractionDigits:2,style:'currency',currency:'BRL'});
+        const dataVenda = new Date().toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'});
+
+        // Marcar produto como vendido
+        db.produtos[idx] = { ...p, vendido: true, soldAt: now,
+          nomeCliente, telefone: telefone||null, cpfCnpj: cpf||null,
+          vendedor: 'Mercado Pago', modalidade: modPagamento,
+          paymentId: String(payId), vendidoEm: now };
+        await dbSet(VENDAS_KEY, db);
+
+        // Registrar no financeiro
+        const fichaId = `venda-${Date.now()}`;
+        fin.fichas = fin.fichas || [];
+        fin.fichas.unshift({
+          id: fichaId, pipefyId: fichaId, osCode: p.codigo,
+          nomeContato: nomeCliente, telefone: telefone||null, cpfCnpj: cpf||null,
+          title: (p.tipo ? p.tipo + ' — ' : '') + p.descricao.substring(0,60),
+          descricao: `${p.tipo||''} ${p.descricao}`.trim(),
+          valor: parseFloat(p.preco), formaPagamento: modPagamento,
+          vendedor: 'Mercado Pago', dataVenda, criadoEm: now, phase: 'emitir_nf',
         });
-        const vData = await vRes.json();
+        await dbSet(FIN_KEY, fin);
+
+        produtoInfo = { id: produtoId, codigo: p.codigo, descricao: p.descricao, tipo: p.tipo||'', capacidade: p.capacidade||'' };
+        const vData = { ok: true, produto: p };
         if (vData.ok && vData.produto) {
           // Enriquecer com dados reais retornados pelo vender
           produtoInfo = {
