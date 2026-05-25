@@ -23,6 +23,19 @@ async function dbSet(key, val) {
 
 function defaultDB() { return { fichas: [], nextId: 1 }; }
 
+
+async function registrarPassagem(phase) {
+  try {
+    const hoje = new Date().toLocaleDateString('pt-BR', {timeZone:'America/Sao_Paulo'}).split('/').reverse().join('-');
+    const db   = (await dbGet('reparoeletro_log_metricas')) || {};
+    if (!db[hoje]) db[hoje] = {};
+    db[hoje][phase] = (db[hoje][phase] || 0) + 1;
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+    Object.keys(db).forEach(d => { if (new Date(d) < cutoff) delete db[d]; });
+    await dbSet('reparoeletro_log_metricas', db);
+  } catch(e) { console.error('registrarPassagem:', e.message); }
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
