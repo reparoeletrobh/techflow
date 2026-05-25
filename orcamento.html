@@ -806,24 +806,28 @@ function renderTabela() {
 }
 
 function tabelaCardHTML(t) {
-  var precoTag = t.campoPreco
-    ? '<span style="font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:10px;background:rgba(59,158,255,.12);color:#3b9eff;">campo preço × 2</span>'
-    : '<span style="font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,.12);color:var(--green);">R$ '+t.preco+' fixo</span>';
-  return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;">'+
-    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">'+
-      '<div>'+
-        '<div style="font-weight:600;font-size:13px;">'+t.label+'</div>'+
-        '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:2px;">Aplicado quando: '+t.descricao+'</div>'+
-      '</div>'+
-      precoTag+
-    '</div>'+
-    '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-bottom:2px;">VARIÁVEIS: <span style="color:#3b9eff;">[NOME]</span> = primeiro nome, <span style="color:#f5c800;">[peças]</span> = serviços selecionados, <span style="color:var(--green);">[VALOR]</span> = preço calculado</div>'+
-    '<textarea id="tpl-'+t.key+'" data-key="'+t.key+'" rows="4" '+
-      'style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);'+
-             'font-family:var(--fb);font-size:12px;padding:10px;resize:vertical;box-sizing:border-box;line-height:1.5;">'+
-      escTxt(t.texto)+
-    '</textarea>'+
-  '</div>';
+  var D = document;
+  var wrap = D.createElement('div');
+  wrap.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;';
+  var top = D.createElement('div');
+  top.style.cssText='display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;';
+  var info = D.createElement('div');
+  var lbl = D.createElement('div'); lbl.style.cssText='font-weight:600;font-size:13px;'; lbl.textContent=t.label;
+  var dsc = D.createElement('div'); dsc.style.cssText='font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:2px;'; dsc.textContent='Aplicado quando: '+t.descricao;
+  info.appendChild(lbl); info.appendChild(dsc);
+  var tag = D.createElement('span');
+  tag.style.cssText='font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:10px;background:'+(t.campoPreco?'rgba(59,158,255,.12)':'rgba(34,197,94,.12)')+';color:'+(t.campoPreco?'#3b9eff':'var(--green)')+';';
+  tag.textContent = t.campoPreco ? 'campo preço × 2' : 'R$ '+t.preco+' fixo';
+  top.appendChild(info); top.appendChild(tag);
+  var hint = D.createElement('div');
+  hint.style.cssText='font-family:var(--fm);font-size:9px;color:var(--muted);margin-bottom:2px;';
+  hint.innerHTML='VARIÁVEIS: <span style="color:#3b9eff">[NOME]</span> = primeiro nome &nbsp; <span style="color:#f5c800">[peças]</span> = serviços &nbsp; <span style="color:var(--green)">[VALOR]</span> = preço';
+  var ta = D.createElement('textarea');
+  ta.id='tpl-'+t.key; ta.dataset.key=t.key; ta.rows=4; ta.value=t.texto;
+  ta.style.cssText='width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--fb);font-size:12px;padding:10px;resize:vertical;box-sizing:border-box;line-height:1.5;';
+  wrap.appendChild(top); wrap.appendChild(hint); wrap.appendChild(ta);
+  var tmp = D.createElement('div'); tmp.appendChild(wrap);
+  return tmp.innerHTML;
 }
 
 function escTxt(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
