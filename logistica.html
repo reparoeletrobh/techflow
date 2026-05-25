@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='18,2 8,18 15,18 14,30 24,14 17,14' fill='%23f5c800' stroke='%23f5c800' stroke-linejoin='round'/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Logística — Reparo Eletro</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--border:#252525;
+  --text:#fff;--muted:#888;--dim:#333;
+  --accent:#f5c800;--green:#22c55e;--red:#ef4444;--blue:#3b9eff;--purple:#a855f7;--orange:#f97316;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;}
+
+/* ── HEADER ── */
+header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;border-bottom:2px solid var(--accent);background:var(--bg);position:sticky;top:0;z-index:200;}
+.logo{font-family:var(--fh);font-size:15px;font-weight:800;}
+.logo span{color:var(--accent);}
+.header-right{display:flex;align-items:center;gap:10px;}
+.hbtn{font-family:var(--fm);font-size:10px;padding:6px 13px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;text-decoration:none;transition:all .15s;}
+.hbtn:hover{color:var(--text);border-color:var(--accent);}
+#busca-input{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-family:var(--fm);font-size:11px;color:var(--text);outline:none;width:200px;transition:border .15s;}
+#busca-input:focus{border-color:var(--accent);}
+#busca-input::placeholder{color:var(--muted);}
+
+/* ── BOARD ── */
+.board{display:flex;gap:16px;padding:20px;overflow-x:auto;flex:1;align-items:flex-start;}
+.board::-webkit-scrollbar{height:4px;}
+.board::-webkit-scrollbar-thumb{background:var(--border);}
+
+/* ── COLUNA ── */
+.col{flex-shrink:0;width:290px;display:flex;flex-direction:column;gap:10px;}
+.col-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:10px;background:var(--surface);}
+.col-title{font-family:var(--fh);font-size:12px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.col-dot{width:8px;height:8px;border-radius:50%;}
+.col-count{font-family:var(--fm);font-size:10px;color:var(--muted);background:var(--surface2);padding:2px 8px;border-radius:10px;}
+
+/* ── CARD ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;transition:border .15s;}
+.card:hover{border-color:#333;}
+.card-id{font-family:var(--fm);font-size:9px;color:var(--muted);}
+.card-nome{font-weight:600;font-size:14px;}
+.card-equip{font-family:var(--fm);font-size:10px;color:var(--accent);}
+.card-defeito{font-size:11px;color:var(--muted);line-height:1.4;}
+.card-time{font-family:var(--fm);font-size:9px;color:var(--dim);}
+.card-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;}
+.cbtn{font-family:var(--fm);font-size:10px;font-weight:600;padding:6px 12px;border-radius:7px;border:none;cursor:pointer;transition:all .15s;letter-spacing:.3px;}
+.cbtn-outline{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.cbtn-outline:hover{border-color:var(--text);color:var(--text);}
+.cbtn-green{background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.25);}
+.cbtn-green:hover{background:rgba(34,197,94,.22);}
+.cbtn-orange{background:rgba(249,115,22,.12);color:var(--orange);border:1px solid rgba(249,115,22,.25);}
+.cbtn-orange:hover{background:rgba(249,115,22,.22);}
+.cbtn-red{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2);}
+.cbtn-red:hover{background:rgba(239,68,68,.2);}
+.cbtn-blue{background:rgba(59,158,255,.12);color:var(--blue);border:1px solid rgba(59,158,255,.25);}
+.cbtn-blue:hover{background:rgba(59,158,255,.22);}
+.cbtn-purple{background:rgba(168,85,247,.12);color:var(--purple);border:1px solid rgba(168,85,247,.25);}
+.cbtn-purple:hover{background:rgba(168,85,247,.22);}
+.cbtn-accent{background:var(--accent);color:#000;border:none;font-weight:700;}
+.cbtn-accent:hover{background:#e6b800;}
+
+/* ── OVERLAY ── */
+.overlay{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:16px;}
+.overlay.open{display:flex;}
+.modal{background:#0d1117;border:1px solid var(--border);border-radius:16px;width:100%;max-width:460px;max-height:90dvh;display:flex;flex-direction:column;}
+.modal-hd{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+.modal-title{font-family:var(--fh);font-size:15px;font-weight:700;}
+.modal-close{width:30px;height:30px;border-radius:50%;background:var(--surface);border:1px solid var(--border);color:var(--muted);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.modal-body{padding:16px 18px 20px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px;}
+
+/* ── DADOS ── */
+.dado-row{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;}
+.dado-label{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;min-width:72px;}
+.dado-val{font-size:13px;flex:1;}
+.dado-val input{background:transparent;border:none;color:var(--text);font-family:var(--fb);font-size:13px;width:100%;outline:none;}
+.dado-copy{font-family:var(--fm);font-size:9px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;flex-shrink:0;}
+.dado-copy:hover{color:var(--text);border-color:var(--accent);}
+
+/* ── DIAGNÓSTICO ── */
+.diag-row{display:flex;align-items:center;gap:10px;}
+.diag-label{font-family:var(--fm);font-size:10px;color:var(--muted);letter-spacing:.5px;min-width:90px;}
+.diag-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-family:var(--fb);font-size:13px;color:var(--text);outline:none;}
+.diag-input:focus{border-color:var(--accent);}
+.type-grid{display:flex;flex-wrap:wrap;gap:8px;}
+.type-btn{font-family:var(--fm);font-size:11px;padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
+.type-btn:hover{border-color:var(--accent);color:var(--text);}
+.type-btn.sel{border-color:var(--accent);background:rgba(245,200,0,.1);color:var(--accent);font-weight:600;}
+.srv-grid{display:flex;flex-wrap:wrap;gap:6px;}
+.srv-btn{font-family:var(--fm);font-size:10px;padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
+.srv-btn:hover{border-color:var(--blue);color:var(--text);}
+.srv-btn.sel{border-color:var(--blue);background:rgba(59,158,255,.1);color:var(--blue);}
+.srv-btn.sub-sel{border-color:var(--purple);background:rgba(168,85,247,.1);color:var(--purple);}
+.diag-section{display:flex;flex-direction:column;gap:8px;}
+.diag-section-label{font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;right:24px;background:#1a1a1a;border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-family:var(--fm);font-size:11px;color:var(--text);z-index:999;opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;}
+.toast.show{opacity:1;transform:translateY(0);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Reparo<span>Eletro</span> <span style="color:var(--muted);font-weight:400;font-size:12px;margin-left:8px;">/ Logística</span></div>
+  <div class="header-right">
+    <input type="text" id="busca-input" placeholder="Buscar por nome, ID, equipamento..." oninput="filtrar(this.value)">
+    <button class="hbtn" onclick="load()">↻ Atualizar</button>
+    <a href="/adm" class="hbtn">← ADM</a>
+  </div>
+</header>
+
+<div class="board" id="board">
+  <!-- Colunas renderizadas via JS -->
+</div>
+
+<!-- MODAL: VER / EDITAR DADOS -->
+<div class="overlay" id="ov-dados" onclick="if(event.target===this)fecharDados()">
+  <div class="modal">
+    <div class="modal-hd">
+      <div class="modal-title">Dados da Ficha</div>
+      <button class="modal-close" onclick="fecharDados()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="dados-id" style="font-family:var(--fm);font-size:10px;color:var(--muted);"></div>
+      <div class="dado-row">
+        <span class="dado-label">Nome</span>
+        <div class="dado-val"><input id="d-nome" type="text"></div>
+        <button class="dado-copy" onclick="copiar('d-nome')">Copiar</button>
+      </div>
+      <div class="dado-row">
+        <span class="dado-label">Telefone</span>
+        <div class="dado-val"><input id="d-tel" type="text"></div>
+        <button class="dado-copy" onclick="copiar('d-tel')">Copiar</button>
+      </div>
+      <div class="dado-row">
+        <span class="dado-label">Endereço</span>
+        <div class="dado-val"><input id="d-end" type="text"></div>
+        <button class="dado-copy" onclick="copiar('d-end')">Copiar</button>
+      </div>
+      <div class="dado-row">
+        <span class="dado-label">Equipamento</span>
+        <div class="dado-val"><input id="d-equip" type="text"></div>
+        <button class="dado-copy" onclick="copiar('d-equip')">Copiar</button>
+      </div>
+      <div class="dado-row">
+        <span class="dado-label">Defeito</span>
+        <div class="dado-val"><input id="d-defeito" type="text"></div>
+        <button class="dado-copy" onclick="copiar('d-defeito')">Copiar</button>
+      </div>
+      <div id="dados-msg" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="cbtn cbtn-outline" onclick="fecharDados()">Fechar</button>
+        <button class="cbtn cbtn-accent" onclick="salvarDados()">Salvar alterações</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: DIAGNÓSTICO -->
+<div class="overlay" id="ov-diag" onclick="if(event.target===this)fecharDiag()">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-hd">
+      <div class="modal-title" style="color:var(--purple);">Diagnóstico</div>
+      <button class="modal-close" onclick="fecharDiag()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="diag-ficha-id" style="font-family:var(--fm);font-size:10px;color:var(--muted);"></div>
+
+      <!-- Qtd + Modelo -->
+      <div class="diag-section">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <div class="diag-section-label" style="margin-bottom:6px;">Qtd. equipamentos</div>
+            <input class="diag-input" id="diag-qtd" type="number" min="1" value="1" style="width:100%">
+          </div>
+          <div>
+            <div class="diag-section-label" style="margin-bottom:6px;">Modelo</div>
+            <input class="diag-input" id="diag-modelo" type="text" placeholder="Ex: CPB34AS" style="width:100%">
+          </div>
+        </div>
+      </div>
+
+      <!-- Tipo de equipamento -->
+      <div class="diag-section">
+        <div class="diag-section-label">Tipo de equipamento</div>
+        <div class="type-grid">
+          <button class="type-btn" data-tipo="microondas" onclick="selecionarTipo(this)">Microondas</button>
+          <button class="type-btn" data-tipo="purificador" onclick="selecionarTipo(this)">Purificador</button>
+          <button class="type-btn" data-tipo="adega" onclick="selecionarTipo(this)">Adega</button>
+          <button class="type-btn" data-tipo="forno" onclick="selecionarTipo(this)">Forno</button>
+        </div>
+      </div>
+
+      <!-- Sub-tipo (Motor/Eletrônico para Purif/Adega) ou (Peq/Grande para Forno) -->
+      <div class="diag-section" id="sec-subtipo" style="display:none;">
+        <div class="diag-section-label" id="subtipo-label">Sub-tipo</div>
+        <div class="type-grid" id="subtipo-grid"></div>
+      </div>
+
+      <!-- Serviços -->
+      <div class="diag-section" id="sec-servicos" style="display:none;">
+        <div class="diag-section-label">Serviços / Peças</div>
+        <div class="srv-grid" id="srv-grid"></div>
+      </div>
+
+      <div id="diag-msg" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="cbtn cbtn-outline" onclick="fecharDiag()">Cancelar</button>
+        <button class="cbtn cbtn-purple" onclick="salvarDiag()">Salvar diagnóstico</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── ESTRUTURA DE SERVIÇOS ────────────────────────────────────
+const SERVICOS = {
+  microondas: {
+    direto: ['Capacitor','Fusível de Alta','Microchave de Acionamento','Troca de Placa',
+             'Recuperação de Placa','Motor de Rotação','Porta','Vidro','Haste',
+             'Pintura','Membrana','Display']
+  },
+  purificador: {
+    subtipos: {
+      'Motor':     ['Gás','Bojo','Dutos e Conexões','Válvula'],
+      'Eletrônico':['Kit Termo Elétrico','Recuperação de Placa','Dutos e Conexões','Válvula'],
+    }
+  },
+  adega: {
+    subtipos: {
+      'Motor':     ['Gás','Recuperação de Placa','Troca de Placa'],
+      'Eletrônico':['Kit Termo Elétrico','Recuperação de Placa','Troca de Placa'],
+    }
+  },
+  forno: {
+    subtipos: {
+      'Pequeno':   ['Resistência','Termostato','Timer','Display','Porta','Vidro','Mola'],
+      'Grande':    ['Resistência','Termostato','Timer','Display','Porta','Vidro','Mola'],
+    }
+  },
+};
+
+// ── COLUNAS ──────────────────────────────────────────────────
+const COLS = [
+  { id:'liberado_coleta',  label:'Liberado para Coleta', cor:'#f5c800' },
+  { id:'em_rota',          label:'Equipamento em Rota',  cor:'#3b9eff' },
+  { id:'remarcar',         label:'Remarcar',             cor:'#f97316' },
+  { id:'coleta_efetuada',  label:'Coleta Efetuada',      cor:'#22c55e' },
+  { id:'orc_registrado',   label:'Orçamento Registrado', cor:'#a855f7' },
+];
+
+let fichas = [], fichasFiltradas = [], fichaAtual = null;
+
+// ── LOAD ─────────────────────────────────────────────────────
+async function load() {
+  const r = await fetch('/api/logistica?action=load').then(r=>r.json()).catch(()=>({fichas:[]}));
+  fichas = r.fichas || [];
+  filtrar(document.getElementById('busca-input').value || '');
+}
+
+function filtrar(q) {
+  const s = (q||'').toLowerCase().trim();
+  fichasFiltradas = s ? fichas.filter(f=>
+    (f.nome||'').toLowerCase().includes(s) ||
+    (f.id||'').toLowerCase().includes(s) ||
+    (f.equipamento||'').toLowerCase().includes(s) ||
+    (f.defeito||'').toLowerCase().includes(s)
+  ) : [...fichas];
+  render();
+}
+
+// ── RENDER ────────────────────────────────────────────────────
+function render() {
+  const board = document.getElementById('board');
+  board.innerHTML = COLS.map(col => {
+    const cards = fichasFiltradas.filter(f => f.phase === col.id);
+    return `
+    <div class="col">
+      <div class="col-header">
+        <div class="col-title">
+          <div class="col-dot" style="background:${col.cor}"></div>
+          ${col.label}
+        </div>
+        <span class="col-count">${cards.length}</span>
+      </div>
+      ${cards.map(f => cardHTML(f, col.id)).join('')}
+    </div>`;
+  }).join('');
+}
+
+function cardHTML(f, phase) {
+  const tempo = tempoRelativo(f.movedAt || f.criadoEm);
+
+  let btns = '';
+  if (phase === 'liberado_coleta') {
+    btns = `
+      <button class="cbtn cbtn-outline" onclick="abrirDados('${f.id}')">Ver Dados</button>
+      <button class="cbtn cbtn-blue" onclick="mover('${f.id}','em_rota')">Equipamento em Rota</button>
+      <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>
+      <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>`;
+  } else if (phase === 'em_rota') {
+    btns = `
+      <button class="cbtn cbtn-green" onclick="mover('${f.id}','coleta_efetuada')">Coleta Efetuada</button>
+      <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>`;
+  } else if (phase === 'remarcar') {
+    btns = `
+      <button class="cbtn cbtn-blue" onclick="mover('${f.id}','liberado_coleta')">Liberar Novamente</button>
+      <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>`;
+  } else if (phase === 'coleta_efetuada') {
+    btns = `<button class="cbtn cbtn-purple" onclick="abrirDiag('${f.id}')">Diagnóstico</button>`;
+  } else if (phase === 'orc_registrado') {
+    const diag = f.diagnostico;
+    if (diag) btns = `<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">${diag.tipo||''}${diag.subtipo?' › '+diag.subtipo:''} — ${(diag.servicos||[]).join(', ')}</div>`;
+  }
+
+  return `
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div class="card-id">${f.id}</div>
+      <div class="card-time">${tempo}</div>
+    </div>
+    <div class="card-nome">${escHtml(f.nome)}</div>
+    ${f.equipamento ? `<div class="card-equip">${escHtml(f.equipamento)}</div>` : ''}
+    ${f.defeito ? `<div class="card-defeito">${escHtml(f.defeito).slice(0,80)}</div>` : ''}
+    <div class="card-actions">${btns}</div>
+  </div>`;
+}
+
+// ── AÇÕES ─────────────────────────────────────────────────────
+async function mover(id, phase) {
+  const r = await fetch('/api/logistica?action=mover', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({id, phase})
+  }).then(r=>r.json());
+  if (r.ok) { await load(); toast('Movido com sucesso'); }
+  else toast('Erro: '+r.error, true);
+}
+
+async function cancelar(id, nome) {
+  if (!confirm(`Cancelar ficha de ${nome}? Esta ação não pode ser desfeita.`)) return;
+  const r = await fetch('/api/logistica?action=cancelar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({id})
+  }).then(r=>r.json());
+  if (r.ok) { await load(); toast('Ficha cancelada'); }
+}
+
+// ── MODAL DADOS ───────────────────────────────────────────────
+function abrirDados(id) {
+  fichaAtual = fichas.find(f=>f.id===id);
+  if (!fichaAtual) return;
+  document.getElementById('dados-id').textContent = fichaAtual.id;
+  document.getElementById('d-nome').value    = fichaAtual.nome || '';
+  document.getElementById('d-tel').value     = fichaAtual.telefone || '';
+  document.getElementById('d-end').value     = fichaAtual.endereco || '';
+  document.getElementById('d-equip').value   = fichaAtual.equipamento || '';
+  document.getElementById('d-defeito').value = fichaAtual.defeito || '';
+  document.getElementById('dados-msg').style.display = 'none';
+  document.getElementById('ov-dados').classList.add('open');
+}
+
+function fecharDados() { document.getElementById('ov-dados').classList.remove('open'); }
+
+async function salvarDados() {
+  if (!fichaAtual) return;
+  const body = {
+    id: fichaAtual.id,
+    nome:        document.getElementById('d-nome').value,
+    telefone:    document.getElementById('d-tel').value,
+    endereco:    document.getElementById('d-end').value,
+    equipamento: document.getElementById('d-equip').value,
+    defeito:     document.getElementById('d-defeito').value,
+  };
+  const r = await fetch('/api/logistica?action=atualizar-dados', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  }).then(r=>r.json());
+  if (r.ok) {
+    const m = document.getElementById('dados-msg');
+    m.textContent='✅ Salvo!'; m.style.display='block';
+    m.style.background='rgba(34,197,94,.1)'; m.style.color='#22c55e';
+    await load();
+    setTimeout(()=>{ m.style.display='none'; fecharDados(); }, 1200);
+  }
+}
+
+function copiar(id) {
+  const el = document.getElementById(id);
+  navigator.clipboard.writeText(el.value || el.textContent).then(()=>toast('Copiado!'));
+}
+
+// ── MODAL DIAGNÓSTICO ─────────────────────────────────────────
+let diagTipo = null, diagSubtipo = null, diagServicos = [];
+
+function abrirDiag(id) {
+  fichaAtual = fichas.find(f=>f.id===id);
+  if (!fichaAtual) return;
+  diagTipo = null; diagSubtipo = null; diagServicos = [];
+
+  document.getElementById('diag-ficha-id').textContent = fichaAtual.id + ' — ' + fichaAtual.nome;
+  document.getElementById('diag-modelo').value = '';
+  document.getElementById('diag-qtd').value = detectarQtd(fichaAtual);
+
+  // Tentar pré-selecionar tipo pelo equipamento
+  const eq = (fichaAtual.equipamento||'').toLowerCase();
+  let presel = null;
+  if (eq.includes('microondas')) presel = 'microondas';
+  else if (eq.includes('purificador')) presel = 'purificador';
+  else if (eq.includes('adega')) presel = 'adega';
+  else if (eq.includes('forno')) presel = 'forno';
+
+  // Reset visual
+  document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('sel'));
+  document.getElementById('sec-subtipo').style.display='none';
+  document.getElementById('sec-servicos').style.display='none';
+  document.getElementById('diag-msg').style.display='none';
+  document.getElementById('ov-diag').classList.add('open');
+
+  if (presel) {
+    const btn = document.querySelector(`.type-btn[data-tipo="${presel}"]`);
+    if (btn) selecionarTipo(btn);
+  }
+}
+
+function detectarQtd(f) {
+  const txt = ((f.equipamento||'')+(f.defeito||'')+(f.texto||'')).toLowerCase();
+  const nums = txt.match(/\b([2-9]|1[0-9])\s*(equipamento|microondas|purificador|adega|forno|aparelho)/);
+  return nums ? nums[1] : '1';
+}
+
+function fecharDiag() { document.getElementById('ov-diag').classList.remove('open'); }
+
+function selecionarTipo(btn) {
+  document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel');
+  diagTipo = btn.dataset.tipo;
+  diagSubtipo = null;
+  diagServicos = [];
+
+  const spec = SERVICOS[diagTipo];
+  const secSub  = document.getElementById('sec-subtipo');
+  const secSrv  = document.getElementById('sec-servicos');
+  const srvGrid = document.getElementById('srv-grid');
+
+  if (spec.direto) {
+    secSub.style.display = 'none';
+    srvGrid.innerHTML = spec.direto.map(s=>
+      `<button class="srv-btn" onclick="toggleServico(this,'${s}')">${s}</button>`
+    ).join('');
+    secSrv.style.display = 'flex';
+  } else if (spec.subtipos) {
+    const subtipos = Object.keys(spec.subtipos);
+    document.getElementById('subtipo-label').textContent = diagTipo === 'forno' ? 'Porte' : 'Categoria';
+    document.getElementById('subtipo-grid').innerHTML = subtipos.map(s=>
+      `<button class="type-btn" data-sub="${s}" onclick="selecionarSubtipo(this)">${s}</button>`
+    ).join('');
+    secSub.style.display = 'flex';
+    secSrv.style.display = 'none';
+    srvGrid.innerHTML = '';
+  }
+}
+
+function selecionarSubtipo(btn) {
+  document.querySelectorAll('#subtipo-grid .type-btn').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel');
+  diagSubtipo = btn.dataset.sub;
+  diagServicos = [];
+
+  const servicos = SERVICOS[diagTipo].subtipos[diagSubtipo] || [];
+  const srvGrid = document.getElementById('srv-grid');
+  srvGrid.innerHTML = servicos.map(s=>
+    `<button class="srv-btn" onclick="toggleServico(this,'${s}')">${s}</button>`
+  ).join('');
+  document.getElementById('sec-servicos').style.display = 'flex';
+}
+
+function toggleServico(btn, srv) {
+  const idx = diagServicos.indexOf(srv);
+  if (idx >= 0) { diagServicos.splice(idx,1); btn.classList.remove('sel'); }
+  else { diagServicos.push(srv); btn.classList.add('sel'); }
+}
+
+async function salvarDiag() {
+  if (!fichaAtual) return;
+  if (!diagTipo) { mostrarMsgDiag('Selecione o tipo de equipamento','err'); return; }
+  if (diagServicos.length === 0) { mostrarMsgDiag('Selecione pelo menos um serviço','err'); return; }
+
+  const diagnostico = {
+    tipo:      diagTipo,
+    subtipo:   diagSubtipo,
+    servicos:  diagServicos,
+    qtd:       parseInt(document.getElementById('diag-qtd').value)||1,
+    modelo:    document.getElementById('diag-modelo').value.trim(),
+  };
+
+  const r = await fetch('/api/logistica?action=salvar-diagnostico', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ id: fichaAtual.id, diagnostico })
+  }).then(r=>r.json());
+
+  if (r.ok) {
+    mostrarMsgDiag('✅ Diagnóstico salvo!','ok');
+    await load();
+    setTimeout(()=>fecharDiag(), 1200);
+  } else {
+    mostrarMsgDiag('Erro: '+r.error,'err');
+  }
+}
+
+function mostrarMsgDiag(txt, tipo) {
+  const el = document.getElementById('diag-msg');
+  el.textContent = txt; el.style.display = 'block';
+  el.style.background = tipo==='ok' ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)';
+  el.style.color = tipo==='ok' ? '#22c55e' : '#ef4444';
+}
+
+// ── UTILS ────────────────────────────────────────────────────
+function tempoRelativo(iso) {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff/60000);
+  if (m < 1) return 'agora';
+  if (m < 60) return m+'min';
+  const h = Math.floor(m/60);
+  if (h < 24) return h+'h';
+  return Math.floor(h/24)+'d';
+}
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+let _toast;
+function toast(msg, err) {
+  const el = document.getElementById('toast');
+  if (_toast) clearTimeout(_toast);
+  el.textContent = msg;
+  el.style.borderColor = err ? 'rgba(239,68,68,.3)' : 'var(--border)';
+  el.classList.add('show');
+  _toast = setTimeout(()=>el.classList.remove('show'), 2200);
+}
+
+// ── INIT ────────────────────────────────────────────────────
+load();
+setInterval(load, 30000);
+</script>
+</body>
+</html>

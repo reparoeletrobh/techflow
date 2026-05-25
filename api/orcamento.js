@@ -196,6 +196,18 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "nome, telefone, aparelho e defeito são obrigatórios" });
     try {
       const card = await createPipefyCard({ phaseId, nome, telefone, aparelho, defeito, endereco: endereco || "" });
+    // Registrar na Logística — Liberado para Coleta
+    try {
+      const base = process.env.FL_BASE_URL || 'https://reparoeletroadm.com';
+      fetch(base+'/api/logistica?action=criar', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          nome, telefone: telefone||'', endereco: endereco||'',
+          equipamento: aparelho||'', defeito: defeito||'',
+          pipefyCardId: card?.id || null, texto: texto||''
+        })
+      }).catch(e=>console.error('[Log] criar:', e.message));
+    } catch(e) {}
       return res.status(200).json({ ok: true, cardId: card?.id, card });
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });

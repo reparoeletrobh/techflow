@@ -277,6 +277,10 @@
     {
       "source": "/produto",
       "destination": "/produto.html"
+    },
+    {
+      "source": "/logistica",
+      "destination": "/logistica.html"
     }
   ],
   "headers": [
