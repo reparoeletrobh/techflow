@@ -364,7 +364,7 @@ let fichas = [], fichasFiltradas = [], fichaAtual = null;
 async function load() {
   const r = await fetch('/api/logistica?action=load').then(r=>r.json()).catch(()=>({fichas:[]}));
   fichas = r.fichas || [];
-  atualizarMetricas();
+  atualizarMetricas(); // async, não bloqueia o render
   const q = document.getElementById('busca-input');
   filtrar(q ? q.value : '');
   const res = document.getElementById('busca-resultado');
@@ -698,33 +698,38 @@ load();
 setInterval(load, 30000);
 
 // ── PAINEL MÉTRICAS ──────────────────────────────────────────
-function atualizarMetricas() {
-  const agora = Date.now();
-  const HOY = new Date(); HOY.setHours(0,0,0,0);
-  const SEM = new Date(); SEM.setDate(SEM.getDate() - 7); SEM.setHours(0,0,0,0);
+async function atualizarMetricas() {
+  try {
+    const r = await fetch('/api/logistica?action=metricas').then(r=>r.json());
+    const db = r.metricas || {};
 
-  function contar(phase, desde) {
-    return fichas.filter(f => {
-      if (f.phase !== phase) return false;
-      const d = new Date(f.movedAt || f.criadoEm);
-      return d >= desde;
-    }).length;
-  }
+    // Data de hoje em BRT (YYYY-MM-DD)
+    const hoje = new Date().toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'})
+                           .split('/').reverse().join('-');
 
-  const map = [
-    ['liberado_coleta', 'm-lib', 'm-lib-s'],
-    ['em_rota',         'm-rot', 'm-rot-s'],
-    ['coleta_efetuada', 'm-col', 'm-col-s'],
-    ['orc_registrado',  'm-orc', 'm-orc-s'],
-  ];
-  map.forEach(([phase, idDia, idSem]) => {
-    const dia = fichas.filter(f => f.phase === phase && new Date(f.movedAt||f.criadoEm) >= HOY).length;
-    const sem = fichas.filter(f => f.phase === phase && new Date(f.movedAt||f.criadoEm) >= SEM).length;
-    const elD = document.getElementById(idDia);
-    const elS = document.getElementById(idSem);
-    if (elD) elD.textContent = dia;
-    if (elS) elS.textContent = sem;
-  });
+    // Últimos 7 dias
+    const ultimos7 = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      ultimos7.push(d.toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}).split('/').reverse().join('-'));
+    }
+
+    const map = [
+      ['liberado_coleta', 'm-lib', 'm-lib-s'],
+      ['em_rota',         'm-rot', 'm-rot-s'],
+      ['coleta_efetuada', 'm-col', 'm-col-s'],
+      ['orc_registrado',  'm-orc', 'm-orc-s'],
+    ];
+
+    map.forEach(([phase, idDia, idSem]) => {
+      const dia = (db[hoje] && db[hoje][phase]) || 0;
+      const sem = ultimos7.reduce((acc, d) => acc + ((db[d] && db[d][phase]) || 0), 0);
+      const elD = document.getElementById(idDia);
+      const elS = document.getElementById(idSem);
+      if (elD) elD.textContent = dia;
+      if (elS) elS.textContent = sem;
+    });
+  } catch(e) { console.error('metricas:', e); }
 }
 
 // ── MODAL CADASTRAR ──────────────────────────────────────────

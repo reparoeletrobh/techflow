@@ -37,6 +37,13 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, fichas: db.fichas || [] });
   }
 
+
+  // ── GET metricas ─────────────────────────────────────────────
+  if (action === 'metricas') {
+    const db = (await dbGet('reparoeletro_log_metricas')) || {};
+    return res.status(200).json({ ok: true, metricas: db });
+  }
+
   // ── POST criar ────────────────────────────────────────────
   if (req.method === 'POST' && action === 'criar') {
     const { nome, telefone, endereco, equipamento, defeito, pipefyCardId, texto } = req.body || {};
@@ -56,6 +63,7 @@ module.exports = async function handler(req, res) {
     db.fichas.unshift(ficha);
     db.nextId = (db.nextId || 1) + 1;
     await dbSet(LOG_KEY, db);
+    registrarPassagem('liberado_coleta').catch(() => {});
     return res.status(201).json({ ok: true, ficha });
   }
 
