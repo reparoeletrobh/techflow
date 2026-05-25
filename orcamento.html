@@ -823,7 +823,7 @@ function tabelaCardHTML(t) {
   hint.style.cssText='font-family:var(--fm);font-size:9px;color:var(--muted);margin-bottom:2px;';
   hint.innerHTML='VARIÁVEIS: <span style="color:#3b9eff">[NOME]</span> = primeiro nome &nbsp; <span style="color:#f5c800">[peças]</span> = serviços &nbsp; <span style="color:var(--green)">[VALOR]</span> = preço';
   var ta = D.createElement('textarea');
-  ta.id='tpl-'+t.key; ta.dataset.key=t.key; ta.rows=4; ta.value=t.texto;
+  ta.id='tpl-'+t.key; ta.dataset.key=t.key; ta.rows=4; ta.textContent=t.texto;
   ta.style.cssText='width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--fb);font-size:12px;padding:10px;resize:vertical;box-sizing:border-box;line-height:1.5;';
   wrap.appendChild(top); wrap.appendChild(hint); wrap.appendChild(ta);
   var tmp = D.createElement('div'); tmp.appendChild(wrap);
