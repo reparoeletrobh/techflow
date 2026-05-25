@@ -53,8 +53,25 @@ module.exports = async function handler(req, res) {
 
   // ── GET metricas ─────────────────────────────────────────────
   if (action === 'metricas') {
-    const db = (await dbGet('reparoeletro_log_metricas')) || {};
-    return res.status(200).json({ ok: true, metricas: db });
+    const MET_KEY = 'reparoeletro_log_metricas';
+    const met = (await dbGet(MET_KEY)) || {};
+    const hoje = new Date().toLocaleDateString('pt-BR', {timeZone:'America/Sao_Paulo'}).split('/').reverse().join('-');
+
+    // Auto-backfill: se hoje nao tem dados, semear com fichas ativas
+    if (!met[hoje]) {
+      const fichasDb = await dbGet(LOG_KEY) || defaultDB();
+      const hojeDate = new Date(); hojeDate.setHours(0,0,0,0);
+      met[hoje] = {};
+      for (const f of fichasDb.fichas || []) {
+        const mov = new Date(f.movedAt || f.criadoEm);
+        if (mov >= hojeDate && f.phase) {
+          met[hoje][f.phase] = (met[hoje][f.phase] || 0) + 1;
+        }
+      }
+      await dbSet(MET_KEY, met);
+    }
+
+    return res.status(200).json({ ok: true, metricas: met });
   }
 
   // ── POST criar ────────────────────────────────────────────
