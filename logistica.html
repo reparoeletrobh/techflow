@@ -108,12 +108,22 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 <header>
   <div class="logo">Reparo<span>Eletro</span> <span style="color:var(--muted);font-weight:400;font-size:12px;margin-left:8px;">/ Logística</span></div>
   <div class="header-right">
-    <input type="text" id="busca-input" placeholder="Buscar por nome, ID, equipamento..." oninput="filtrar(this.value)">
-    <button class="hbtn" onclick="load()">↻ Atualizar</button>
+<button class="hbtn" onclick="load()">↻ Atualizar</button>
     <a href="/adm" class="hbtn">← ADM</a>
   </div>
 </header>
 
+<div style="padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:12px;">
+  <span style="font-family:var(--fm);font-size:10px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">🔍 RASTREAR</span>
+  <input type="text" id="busca-input" placeholder="Buscar por nome, ID, equipamento ou defeito..."
+    oninput="filtrar(this.value)"
+    style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+           padding:9px 14px;font-family:var(--fb);font-size:13px;color:var(--text);outline:none;
+           transition:border .15s;max-width:500px;"
+    onfocus="this.style.borderColor='var(--accent)'"
+    onblur="this.style.borderColor='var(--border)'">
+  <div id="busca-resultado" style="font-family:var(--fm);font-size:11px;color:var(--muted);white-space:nowrap;"></div>
+</div>
 <div class="board" id="board">
   <!-- Colunas renderizadas via JS -->
 </div>
@@ -262,7 +272,10 @@ let fichas = [], fichasFiltradas = [], fichaAtual = null;
 async function load() {
   const r = await fetch('/api/logistica?action=load').then(r=>r.json()).catch(()=>({fichas:[]}));
   fichas = r.fichas || [];
-  filtrar(document.getElementById('busca-input').value || '');
+  const q = document.getElementById('busca-input');
+  filtrar(q ? q.value : '');
+  const res = document.getElementById('busca-resultado');
+  if (res && !(q && q.value)) res.textContent = fichas.length + ' fichas';
 }
 
 function filtrar(q) {
@@ -271,8 +284,11 @@ function filtrar(q) {
     (f.nome||'').toLowerCase().includes(s) ||
     (f.id||'').toLowerCase().includes(s) ||
     (f.equipamento||'').toLowerCase().includes(s) ||
-    (f.defeito||'').toLowerCase().includes(s)
+    (f.defeito||'').toLowerCase().includes(s) ||
+    (f.telefone||'').toLowerCase().includes(s)
   ) : [...fichas];
+  const res = document.getElementById('busca-resultado');
+  if (res) res.textContent = s ? fichasFiltradas.length + ' resultado' + (fichasFiltradas.length !== 1 ? 's' : '') : fichas.length + ' fichas';
   render();
 }
 
