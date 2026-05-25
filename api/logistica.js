@@ -36,6 +36,85 @@ async function registrarPassagem(phase) {
   } catch(e) { console.error('registrarPassagem:', e.message); }
 }
 
+
+// ── PIPEFY: criar card direto em Aguardando Aprovação ────────
+const PIPEFY_API          = 'https://api.pipefy.com/graphql';
+const PIPE_ID             = '305832912';
+const AGUARDANDO_PHASE_ID = '334875152';
+
+async function pipefyQuery(query) {
+  const token = (process.env.PIPEFY_TOKEN || '').trim();
+  const r = await fetch(PIPEFY_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ query })
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+let _pipeFields = null;
+async function getPipeFields() {
+  if (_pipeFields) return _pipeFields;
+  const data = await pipefyQuery(`query { pipe(id: "${PIPE_ID}") { start_form_fields { id label type } phases { name fields { id label type } } } }`);
+  const start = data?.pipe?.start_form_fields || [];
+  const phase = (data?.pipe?.phases || []).flatMap(p => p.fields || []);
+  _pipeFields = [...start, ...phase];
+  return _pipeFields;
+}
+
+function findField(fields, keywords) {
+  return fields.find(f => keywords.some(kw => f.label.toLowerCase().includes(kw)));
+}
+
+async function criarCardPipefy({ nome, telefone, equipamento, defeito, endereco }) {
+  const fields = await getPipeFields();
+  const descricao   = [equipamento, defeito].filter(Boolean).join(' — ');
+  const ultimos4    = (telefone || '').replace(/\D/g, '').slice(-4);
+  const nomeContato = `${nome}${ultimos4 ? ' ' + ultimos4 : ''}`;
+
+  function fmtTel(tel) {
+    let d = (tel || '').replace(/\D/g, '');
+    if (d.length === 13 && d.startsWith('55')) d = d.slice(2);
+    if (d.length === 12 && d.startsWith('55')) d = d.slice(2);
+    if (d.length === 10) d = d.slice(0,2) + '9' + d.slice(2);
+    if (d.length === 11) return '(' + d.slice(0,2) + ')' + d[2] + ' ' + d.slice(3,7) + '-' + d.slice(7);
+    return tel;
+  }
+
+  const nomeF = findField(fields, ['nome']);
+  const telF  = findField(fields, ['telefone','fone','celular']);
+  const descF = findField(fields, ['descrição','descricao','empresa','descri']);
+  const endF  = findField(fields, ['endereço','endereco','endere']);
+
+  const attrs = [];
+  if (nomeF) attrs.push(`{ field_id: "${nomeF.id}", field_value: ${JSON.stringify(nomeContato)} }`);
+  if (telF)  attrs.push(`{ field_id: "${telF.id}",  field_value: ${JSON.stringify(fmtTel(telefone || ''))} }`);
+  if (descF) attrs.push(`{ field_id: "${descF.id}", field_value: ${JSON.stringify(descricao)} }`);
+  if (endF && endereco) attrs.push(`{ field_id: "${endF.id}", field_value: ${JSON.stringify(endereco)} }`);
+
+  try {
+    const data = await pipefyQuery(`mutation {
+      createCard(input: {
+        pipe_id: "${PIPE_ID}"
+        phase_id: "${AGUARDANDO_PHASE_ID}"
+        fields_attributes: [${attrs.join(', ')}]
+      }) { card { id title url } }
+    }`);
+    return data?.createCard?.card;
+  } catch(e) {
+    // Se falhar com phase_id, criar sem (vai para fase inicial)
+    const data = await pipefyQuery(`mutation {
+      createCard(input: {
+        pipe_id: "${PIPE_ID}"
+        fields_attributes: [${attrs.join(', ')}]
+      }) { card { id title url } }
+    }`);
+    return data?.createCard?.card;
+  }
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
@@ -165,21 +244,7 @@ module.exports = async function handler(req, res) {
     if (!ficha) return res.status(404).json({ ok:false, error:'ficha nao encontrada' });
     if (!ficha.diagnostico) return res.status(400).json({ ok:false, error:'sem diagnostico' });
 
-    const PIPEFY_API = 'https://api.pipefy.com/graphql';
-    const PIPE_TOKEN = process.env.PIPEFY_TOKEN || '';
-    const ORC_KEY    = 'reparoeletro_orcamentos';
-    const AGUARDANDO_PHASE_ID = '334875152';
-
-    async function pipefyQ(query) {
-      const r = await fetch(PIPEFY_API, {
-        method:'POST',
-        headers:{'Content-Type':'application/json','Authorization':'Bearer '+PIPE_TOKEN.trim()},
-        body: JSON.stringify({query})
-      });
-      const j = await r.json();
-      if (j.errors) throw new Error(j.errors[0].message);
-      return j.data;
-    }
+    const ORC_KEY = 'reparoeletro_orcamentos';
 
     // Gerar textos para cada equipamento do diagnóstico
     const equips = ficha.diagnostico.equips || [ficha.diagnostico];
@@ -333,16 +398,36 @@ module.exports = async function handler(req, res) {
       }
     } catch(e) { console.error('[Log] orc-key:', e.message); }
 
-    // Mover card Pipefy para Aguardando Aprovação + atualizar valor
-    if (ficha.pipefyCardId) {
-      try {
-        await pipefyQ(`mutation { moveCardToPhase(input: { card_id: "${ficha.pipefyCardId}", destination_phase_id: "${AGUARDANDO_PHASE_ID}" }) { card { id } } }`);
+    // Mover ou CRIAR card no Pipefy em Aguardando Aprovação
+    try {
+      if (ficha.pipefyCardId) {
+        // Card já existe — só mover e atualizar valor
+        await pipefyQuery(`mutation { moveCardToPhase(input: { card_id: "${ficha.pipefyCardId}", destination_phase_id: "${AGUARDANDO_PHASE_ID}" }) { card { id } } }`);
         if (precoFinal) {
-          await pipefyQ(`mutation { updateCardField(input: { card_id: "${ficha.pipefyCardId}", field_id: "valor_de_contrato", new_value: "${precoFinal}" }) { success } }`);
+          await pipefyQuery(`mutation { updateCardField(input: { card_id: "${ficha.pipefyCardId}", field_id: "valor_de_contrato", new_value: "${precoFinal}" }) { success } }`);
         }
         console.log('[Log] Pipefy movido para Aguardando:', ficha.pipefyCardId);
-      } catch(e) { console.error('[Log] Pipefy move:', e.message); }
-    }
+      } else {
+        // Ficha manual — criar card novo direto em Aguardando Aprovação
+        const card = await criarCardPipefy({
+          nome:        ficha.nome,
+          telefone:    ficha.telefone || '',
+          equipamento: ficha.equipamento || '',
+          defeito:     ficha.defeito || '',
+          endereco:    ficha.endereco || ''
+        });
+        if (card?.id) {
+          // Salvar o pipefyCardId na ficha para uso futuro
+          ficha.pipefyCardId = String(card.id);
+          await dbSet(LOG_KEY, db);
+          // Atualizar valor de contrato
+          if (precoFinal) {
+            await pipefyQuery(`mutation { updateCardField(input: { card_id: "${card.id}", field_id: "valor_de_contrato", new_value: "${precoFinal}" }) { success } }`).catch(()=>{});
+          }
+          console.log('[Log] Pipefy card CRIADO:', card.id, card.url);
+        }
+      }
+    } catch(e) { console.error('[Log] Pipefy:', e.message); }
 
     return res.status(200).json({ ok:true, textoFinal, precoFinal, ficha });
   }
