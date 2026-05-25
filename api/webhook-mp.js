@@ -48,7 +48,67 @@ export default async function handler(req, res) {
   // ── GET: diagnóstico de logs ─────────────────────────────────
   if (req.method === 'GET') {
     const action = req.query.action;
-    // ── GET search-payments: busca pagamentos por data ──────────
+  
+  // ── GET register-manual: completa registro de venda já marcada no produto ──
+  if (action === 'register-manual') {
+    const payId = req.query.paymentId;
+    if (!payId) return res.status(400).json({ ok: false, error: 'paymentId obrigatorio' });
+    try {
+      const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${payId}`, {
+        headers: { Authorization: `Bearer ${MP_TOKEN}` }
+      });
+      const payment = await mpRes.json();
+      const meta        = payment.metadata || {};
+      const produtoIds  = (meta.produto_ids || '').split(',').filter(Boolean);
+      const nomeCliente = meta.comprador_nome || payment.payer?.first_name || 'Comprador Online';
+      const telefone    = meta.comprador_tel  || '';
+      const cpf         = meta.comprador_cpf  || '';
+      const modPagamento = payment.payment_method_id === 'pix' ? 'PIX' : `Cartao ${payment.installments}x`;
+
+      const VENDAS_KEY = 'reparoeletro_vendas';
+      const FIN_KEY    = 'reparoeletro_financeiro';
+
+      for (const produtoId of produtoIds) {
+        const [db, fin] = await Promise.all([
+          dbGet(VENDAS_KEY).then(d => d || { produtos: [] }),
+          dbGet(FIN_KEY).then(d => d || { fichas: [] }),
+        ]);
+        const idx = db.produtos.findIndex(p => p.id === String(produtoId));
+        if (idx < 0) continue;
+        const p = db.produtos[idx];
+
+        // Corrigir campos do produto
+        db.produtos[idx] = { ...p, vendido: true,
+          soldAt:      p.soldAt     || new Date().toISOString(),
+          vendidoEm:   p.vendidoEm  || new Date().toISOString(),
+          nomeCliente, telefone:    telefone||null, cpfCnpj: cpf||null,
+          vendedor:    'Mercado Pago', modalidade: modPagamento,
+          paymentId:   String(payId) };
+        await dbSet(VENDAS_KEY, db);
+
+        // Criar ficha no financeiro se não existir
+        fin.fichas = fin.fichas || [];
+        const jaExiste = fin.fichas.find(f => f.osCode === p.codigo && f.nomeContato === nomeCliente);
+        if (!jaExiste) {
+          const fichaId = `venda-mp-${payId}`;
+          fin.fichas.unshift({ id: fichaId, pipefyId: fichaId, osCode: p.codigo,
+            nomeContato: nomeCliente, telefone: telefone||null, cpfCnpj: cpf||null,
+            title: p.descricao.substring(0,60), descricao: p.descricao,
+            valor: parseFloat(p.preco), formaPagamento: modPagamento,
+            vendedor: 'Mercado Pago', dataVenda: new Date().toISOString().slice(0,10),
+            criadoEm: new Date().toISOString(), phase: 'emitir_nf' });
+          await dbSet(FIN_KEY, fin);
+        }
+        await marcarProcessado(String(payId));
+        await logEvento({ tipo: 'register-manual', paymentId: String(payId), produtoId, nomeCliente, valor: payment.transaction_amount });
+      }
+      return res.status(200).json({ ok: true, nomeCliente, valor: payment.transaction_amount, produtoIds, modPagamento });
+    } catch(e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+  // ── GET search-payments: busca pagamentos por data ──────────
   if (action === 'search-payments') {
     const begin = req.query.begin || '2026-05-23T00:00:00.000-03:00';
     const end   = req.query.end   || '2026-05-24T00:00:00.000-03:00';
