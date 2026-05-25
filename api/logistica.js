@@ -38,6 +38,7 @@ async function registrarPassagem(phase) {
 
 
 // ── PIPEFY: criar card direto em Aguardando Aprovação ────────
+// Padrão idêntico ao api/orcamento.js → createPipefyCard
 const PIPEFY_API          = 'https://api.pipefy.com/graphql';
 const PIPE_ID             = '305832912';
 const AGUARDANDO_PHASE_ID = '334875152';
@@ -54,45 +55,58 @@ async function pipefyQuery(query) {
   return j.data;
 }
 
-let _pipeFields = null;
-async function getPipeFields() {
-  if (_pipeFields) return _pipeFields;
-  const data = await pipefyQuery(`query { pipe(id: "${PIPE_ID}") { start_form_fields { id label type } phases { name fields { id label type } } } }`);
-  const start = data?.pipe?.start_form_fields || [];
-  const phase = (data?.pipe?.phases || []).flatMap(p => p.fields || []);
-  _pipeFields = [...start, ...phase];
-  return _pipeFields;
-}
-
-function findField(fields, keywords) {
-  return fields.find(f => keywords.some(kw => f.label.toLowerCase().includes(kw)));
+// Busca APENAS start_form_fields — mesma lógica do orcamento.js
+let _pipeStructure = null;
+async function fetchPipeStructure() {
+  if (_pipeStructure) return _pipeStructure;
+  const data = await pipefyQuery(`query {
+    pipe(id: "${PIPE_ID}") {
+      phases { id name }
+      start_form_fields { id label type }
+    }
+  }`);
+  _pipeStructure = {
+    phases: data?.pipe?.phases || [],
+    fields: data?.pipe?.start_form_fields || [],
+  };
+  return _pipeStructure;
 }
 
 async function criarCardPipefy({ nome, telefone, equipamento, defeito, endereco }) {
-  const fields = await getPipeFields();
-  const descricao   = [equipamento, defeito].filter(Boolean).join(' — ');
+  const descricao   = `${equipamento || ''} — ${defeito || ''}`.replace(/^ — | — $/g,'').trim();
   const ultimos4    = (telefone || '').replace(/\D/g, '').slice(-4);
-  const nomeContato = `${nome}${ultimos4 ? ' ' + ultimos4 : ''}`;
+  const nomeContato = `${nome} ${ultimos4}`.trim();
 
-  function fmtTel(tel) {
-    let d = (tel || '').replace(/\D/g, '');
-    if (d.length === 13 && d.startsWith('55')) d = d.slice(2);
-    if (d.length === 12 && d.startsWith('55')) d = d.slice(2);
+  const { fields } = await fetchPipeStructure();
+
+  function findField(keywords) {
+    return fields.find(f => keywords.some(kw => f.label.toLowerCase().includes(kw)));
+  }
+
+  const nomeField = findField(['nome']);
+  const telField  = findField(['telefone', 'fone', 'celular']);
+  const descField = findField(['descrição', 'descricao', 'empresa', 'descri']);
+  const endField  = findField(['endereço', 'endereco', 'endere']);
+
+  // Formata telefone — idêntico ao orcamento.js
+  function formatarTelefone(tel) {
+    const digits = (tel || '').replace(/\D/g, '');
+    var d = (digits.length === 13 && digits.startsWith('55')) ? digits.slice(2)
+          : (digits.length === 12 && digits.startsWith('55')) ? digits.slice(2)
+          : digits;
     if (d.length === 10) d = d.slice(0,2) + '9' + d.slice(2);
+    if (d.length === 9 && d[0] !== '9') d = '9' + d;  // caso 9 dígitos sem DDD
     if (d.length === 11) return '(' + d.slice(0,2) + ')' + d[2] + ' ' + d.slice(3,7) + '-' + d.slice(7);
     return tel;
   }
+  const telefoneFmt = formatarTelefone(telefone || '');
+  console.log('[Log] telefone original:', telefone, 'formatado:', telefoneFmt);
 
-  const nomeF = findField(fields, ['nome']);
-  const telF  = findField(fields, ['telefone','fone','celular']);
-  const descF = findField(fields, ['descrição','descricao','empresa','descri']);
-  const endF  = findField(fields, ['endereço','endereco','endere']);
-
-  const attrs = [];
-  if (nomeF) attrs.push(`{ field_id: "${nomeF.id}", field_value: ${JSON.stringify(nomeContato)} }`);
-  if (telF)  attrs.push(`{ field_id: "${telF.id}",  field_value: ${JSON.stringify(fmtTel(telefone || ''))} }`);
-  if (descF) attrs.push(`{ field_id: "${descF.id}", field_value: ${JSON.stringify(descricao)} }`);
-  if (endF && endereco) attrs.push(`{ field_id: "${endF.id}", field_value: ${JSON.stringify(endereco)} }`);
+  const fieldsAttr = [];
+  if (nomeField) fieldsAttr.push(`{ field_id: "${nomeField.id}", field_value: ${JSON.stringify(nomeContato)} }`);
+  if (telField)  fieldsAttr.push(`{ field_id: "${telField.id}",  field_value: ${JSON.stringify(telefoneFmt)} }`);
+  if (descField) fieldsAttr.push(`{ field_id: "${descField.id}", field_value: ${JSON.stringify(descricao)} }`);
+  if (endField && endereco) fieldsAttr.push(`{ field_id: "${endField.id}", field_value: ${JSON.stringify(endereco)} }`);
 
   try {
     const data = await pipefyQuery(`mutation {
