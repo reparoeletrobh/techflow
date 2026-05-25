@@ -271,16 +271,16 @@
       "destination": "/microondas-vsl.html"
     },
     {
+      "source": "/logistica",
+      "destination": "/logistica.html"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/home.html"
     },
     {
       "source": "/produto",
       "destination": "/produto.html"
-    },
-    {
-      "source": "/logistica",
-      "destination": "/logistica.html"
     }
   ],
   "headers": [
