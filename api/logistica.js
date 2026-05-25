@@ -275,6 +275,17 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok:true, textoFinal, precoFinal, ficha });
   }
 
+
+  // ── GET limpar-orc-registrado — cron noturno, limpa coluna Orçamento Registrado ──
+  if (action === 'limpar-orc-registrado') {
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const antes = db.fichas.length;
+    db.fichas = db.fichas.filter(f => f.phase !== 'orc_registrado');
+    const removidas = antes - db.fichas.length;
+    if (removidas > 0) await dbSet(LOG_KEY, db);
+    return res.status(200).json({ ok: true, removidas, restantes: db.fichas.length });
+  }
+
   // ── POST cancelar ────────────────────────────────────────
   if (req.method === 'POST' && action === 'cancelar') {
     const { id } = req.body || {};
