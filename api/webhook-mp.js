@@ -22,10 +22,11 @@ async function dbGet(key) {
 
 async function dbSet(key, value) {
   if (!UPSTASH_URL || !UPSTASH_TOKEN) return;
-  await fetch(`${UPSTASH_URL}/set/${encodeURIComponent(key)}`, {
+  // Usar pipeline (mesmo formato do financeiro.js / board.js) — serializa UMA vez
+  await fetch(`${UPSTASH_URL}/pipeline`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(JSON.stringify(value))
+    body: JSON.stringify([['SET', key, JSON.stringify(value)]])
   });
 }
 
@@ -332,18 +333,6 @@ export default async function handler(req, res) {
         await dbSet(VENDAS_KEY, db);
 
         // Registrar no financeiro
-        const fichaId = `venda-${Date.now()}`;
-        fin.fichas = fin.fichas || [];
-        fin.fichas.unshift({
-          id: fichaId, pipefyId: fichaId, osCode: p.codigo,
-          nomeContato: nomeCliente, telefone: telefone||null, cpfCnpj: cpf||null,
-          title: (p.tipo ? p.tipo + ' — ' : '') + p.descricao.substring(0,60),
-          descricao: `${p.tipo||''} ${p.descricao}`.trim(),
-          valor: parseFloat(p.preco), formaPagamento: modPagamento,
-          vendedor: 'Mercado Pago', dataVenda, criadoEm: now, phase: 'emitir_nf',
-        });
-        await dbSet(FIN_KEY, fin);
-
         produtoInfo = { id: produtoId, codigo: p.codigo, descricao: p.descricao, tipo: p.tipo||'', capacidade: p.capacidade||'' };
         const vData = { ok: true, produto: p };
         if (vData.ok && vData.produto) {
