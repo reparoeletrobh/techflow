@@ -196,18 +196,33 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "nome, telefone, aparelho e defeito são obrigatórios" });
     try {
       const card = await createPipefyCard({ phaseId, nome, telefone, aparelho, defeito, endereco: endereco || "" });
-    // Registrar na Logística — Liberado para Coleta
-    try {
-      const base = process.env.FL_BASE_URL || 'https://reparoeletroadm.com';
-      fetch(base+'/api/logistica?action=criar', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({
-          nome, telefone: telefone||'', endereco: endereco||'',
+
+      // Registrar na Logística — SÍNCRONO antes de retornar
+      try {
+        const U2 = process.env.UPSTASH_URL;
+        const T2 = process.env.UPSTASH_TOKEN;
+        const LOG_KEY = 'reparoeletro_logistica';
+        const logDb = await fetch(`${U2}/get/${LOG_KEY}`, { headers: { Authorization: `Bearer ${T2}` } })
+          .then(r=>r.json()).then(j=>j.result ? JSON.parse(j.result) : { fichas:[], nextId:1 });
+        const logId = 'LOG-' + String(logDb.nextId || 1).padStart(4,'0');
+        logDb.fichas.unshift({
+          id: logId, nome, telefone: telefone||'', endereco: endereco||'',
           equipamento: aparelho||'', defeito: defeito||'',
-          pipefyCardId: card?.id || null, texto: texto||''
-        })
-      }).catch(e=>console.error('[Log] criar:', e.message));
-    } catch(e) {}
+          pipefyCardId: card?.id || null, texto: texto||'',
+          phase: 'liberado_coleta',
+          criadoEm: new Date().toISOString(),
+          movedAt: new Date().toISOString(),
+          diagnostico: null,
+        });
+        logDb.nextId = (logDb.nextId || 1) + 1;
+        await fetch(`${U2}/set/${LOG_KEY}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${T2}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(logDb)
+        });
+        console.log('[Log] ficha criada:', logId);
+      } catch(e) { console.error('[Log] criar:', e.message); }
+
       return res.status(200).json({ ok: true, cardId: card?.id, card });
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });
