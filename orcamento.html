@@ -265,7 +265,11 @@ function parseFicha(txt) {
     telefone: get(["telefone","fone","cel","whatsapp","tel"]),
     aparelho: get(["aparelho","equipamento","produto"]),
     defeito:  get(["defeito","problema","defeit","falha"]),
-    endereco: get(["cep","endereco","end","rua","logradouro"]),
+    endereco: (function(){
+      var end    = get(["cep","endereco","end","rua","logradouro"]);
+      var bairro = get(["bairro","cidade","local"]);
+      return bairro ? (end ? end + ", " + bairro : bairro) : end;
+    })(),
   };
 }
 
