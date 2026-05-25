@@ -132,6 +132,19 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   .srv-btn { font-size: 9px; padding: 5px 9px; }
 }
 
+/* ── PAINEL MÉTRICAS ── */
+.metricas{display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--surface);overflow-x:auto;}
+.met-card{flex:1;min-width:130px;padding:12px 16px;display:flex;flex-direction:column;gap:3px;border-right:1px solid var(--border);}
+.met-card:last-child{border-right:none;}
+.met-label{font-family:var(--fm);font-size:9px;color:var(--muted);letter-spacing:.5px;}
+.met-num{font-size:22px;font-weight:700;line-height:1;}
+.met-sub{font-family:var(--fm);font-size:9px;color:var(--muted);}
+/* ── ALERTA EM ROTA > 2H ── */
+.card.alerta-rota{border-color:#ef4444!important;box-shadow:0 0 0 2px rgba(239,68,68,.2);}
+.card.alerta-rota .card-time{color:#ef4444!important;font-weight:600;}
+.alerta-badge{display:inline-flex;align-items:center;gap:4px;font-family:var(--fm);font-size:9px;color:#ef4444;background:rgba(239,68,68,.12);padding:2px 8px;border-radius:10px;}
+/* ── TELEFONE NO CARD ── */
+.card-tel{font-family:var(--fm);font-size:10px;color:var(--muted);}
 /* ── TOAST ── */
 .toast{position:fixed;bottom:24px;right:24px;background:#1a1a1a;border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-family:var(--fm);font-size:11px;color:var(--text);z-index:999;opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;}
 .toast.show{opacity:1;transform:translateY(0);}
@@ -142,6 +155,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 <header>
   <div class="logo">Reparo<span>Eletro</span> <span class="logo-sub" style="color:var(--muted);font-weight:400;font-size:12px;margin-left:8px;">/ Logística</span></div>
   <div class="header-right">
+<button class="hbtn cbtn-green" onclick="abrirCadastro()" style="background:rgba(34,197,94,.15);color:#22c55e;border-color:#22c55e;">+ Cadastrar</button>
 <button class="hbtn" onclick="load()">↻ Atualizar</button>
     <a href="/adm" class="hbtn">← ADM</a>
   </div>
@@ -158,10 +172,69 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
     onblur="this.style.borderColor='var(--border)'">
   <div id="busca-resultado" style="font-family:var(--fm);font-size:11px;color:var(--muted);white-space:nowrap;"></div>
 </div>
+<div class="metricas" id="metricas">
+  <div class="met-card">
+    <div class="met-label">📦 LIBERADO</div>
+    <div class="met-num" id="m-lib">—</div>
+    <div class="met-sub"><span id="m-lib-s">—</span> semana</div>
+  </div>
+  <div class="met-card">
+    <div class="met-label">🚚 EM ROTA</div>
+    <div class="met-num" id="m-rot">—</div>
+    <div class="met-sub"><span id="m-rot-s">—</span> semana</div>
+  </div>
+  <div class="met-card">
+    <div class="met-label">✅ COLETADO</div>
+    <div class="met-num" id="m-col">—</div>
+    <div class="met-sub"><span id="m-col-s">—</span> semana</div>
+  </div>
+  <div class="met-card">
+    <div class="met-label">📋 ORC. REG.</div>
+    <div class="met-num" id="m-orc">—</div>
+    <div class="met-sub"><span id="m-orc-s">—</span> semana</div>
+  </div>
+</div>
 <div class="board" id="board">
   <!-- Colunas renderizadas via JS -->
 </div>
 
+
+<!-- MODAL: CADASTRAR FICHA -->
+<div id="ov-cad" class="overlay" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:8px;">
+  <div class="modal" style="width:100%;max-width:440px;">
+    <div class="modal-header">
+      <div class="modal-title">+ Nova Ficha</div>
+      <button class="modal-close" onclick="fecharCadastro()">✕</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+      <div>
+        <div class="diag-section-label" style="margin-bottom:5px;">Nome do cliente *</div>
+        <input class="diag-input" id="cad-nome" placeholder="Ex: Maria Silva" style="width:100%;">
+      </div>
+      <div>
+        <div class="diag-section-label" style="margin-bottom:5px;">Telefone</div>
+        <input class="diag-input" id="cad-tel" placeholder="Ex: 31999998888" style="width:100%;" type="tel">
+      </div>
+      <div>
+        <div class="diag-section-label" style="margin-bottom:5px;">Equipamento</div>
+        <input class="diag-input" id="cad-equip" placeholder="Ex: Microondas Electrolux 30L" style="width:100%;">
+      </div>
+      <div>
+        <div class="diag-section-label" style="margin-bottom:5px;">Defeito</div>
+        <input class="diag-input" id="cad-defeito" placeholder="Ex: Não esquenta" style="width:100%;">
+      </div>
+      <div>
+        <div class="diag-section-label" style="margin-bottom:5px;">Endereço</div>
+        <input class="diag-input" id="cad-end" placeholder="Ex: Rua das Flores 123, Bairro" style="width:100%;">
+      </div>
+      <div id="cad-msg" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="cbtn cbtn-outline" onclick="fecharCadastro()">Cancelar</button>
+        <button class="cbtn cbtn-green" onclick="salvarCadastro()">Cadastrar ficha</button>
+      </div>
+    </div>
+  </div>
+</div>
 <!-- MODAL: VER / EDITAR DADOS -->
 <div class="overlay" id="ov-dados" onclick="if(event.target===this)fecharDados()">
   <div class="modal">
@@ -291,6 +364,7 @@ let fichas = [], fichasFiltradas = [], fichaAtual = null;
 async function load() {
   const r = await fetch('/api/logistica?action=load').then(r=>r.json()).catch(()=>({fichas:[]}));
   fichas = r.fichas || [];
+  atualizarMetricas();
   const q = document.getElementById('busca-input');
   filtrar(q ? q.value : '');
   const res = document.getElementById('busca-resultado');
@@ -355,13 +429,16 @@ function cardHTML(f, phase) {
     if (diag) btns = `<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">${diag.tipo||''}${diag.subtipo?' › '+diag.subtipo:''} — ${(diag.servicos||[]).join(', ')}</div>`;
   }
 
+  const emRotaAlerta = phase === 'em_rota' && (Date.now() - new Date(f.movedAt||f.criadoEm).getTime()) > 2 * 60 * 60 * 1000;
   return `
-  <div class="card">
+  <div class="card${emRotaAlerta ? ' alerta-rota' : ''}">
     <div style="display:flex;justify-content:space-between;align-items:center;">
       <div class="card-id">${f.id}</div>
-      <div class="card-time">${tempo}</div>
+      <div class="card-time">${tempo}${emRotaAlerta ? ' 🔴' : ''}</div>
     </div>
+    ${emRotaAlerta ? '<div class="alerta-badge">⚠️ Em rota há mais de 2h</div>' : ''}
     <div class="card-nome">${escHtml(f.nome)}</div>
+    ${f.telefone ? `<div class="card-tel">📞 ${escHtml(f.telefone)}</div>` : ''}
     ${f.equipamento ? `<div class="card-equip">${escHtml(f.equipamento)}</div>` : ''}
     ${f.defeito ? `<div class="card-defeito">${escHtml(f.defeito).slice(0,80)}</div>` : ''}
     <div class="card-actions">${btns}</div>
@@ -619,6 +696,85 @@ function toast(msg, err) {
 // ── INIT ────────────────────────────────────────────────────
 load();
 setInterval(load, 30000);
+
+// ── PAINEL MÉTRICAS ──────────────────────────────────────────
+function atualizarMetricas() {
+  const agora = Date.now();
+  const HOY = new Date(); HOY.setHours(0,0,0,0);
+  const SEM = new Date(); SEM.setDate(SEM.getDate() - 7); SEM.setHours(0,0,0,0);
+
+  function contar(phase, desde) {
+    return fichas.filter(f => {
+      if (f.phase !== phase) return false;
+      const d = new Date(f.movedAt || f.criadoEm);
+      return d >= desde;
+    }).length;
+  }
+
+  const map = [
+    ['liberado_coleta', 'm-lib', 'm-lib-s'],
+    ['em_rota',         'm-rot', 'm-rot-s'],
+    ['coleta_efetuada', 'm-col', 'm-col-s'],
+    ['orc_registrado',  'm-orc', 'm-orc-s'],
+  ];
+  map.forEach(([phase, idDia, idSem]) => {
+    const dia = fichas.filter(f => f.phase === phase && new Date(f.movedAt||f.criadoEm) >= HOY).length;
+    const sem = fichas.filter(f => f.phase === phase && new Date(f.movedAt||f.criadoEm) >= SEM).length;
+    const elD = document.getElementById(idDia);
+    const elS = document.getElementById(idSem);
+    if (elD) elD.textContent = dia;
+    if (elS) elS.textContent = sem;
+  });
+}
+
+// ── MODAL CADASTRAR ──────────────────────────────────────────
+function abrirCadastro() {
+  ['cad-nome','cad-tel','cad-equip','cad-defeito','cad-end'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('cad-msg').style.display = 'none';
+  const ov = document.getElementById('ov-cad');
+  ov.style.display = 'flex';
+}
+
+function fecharCadastro() {
+  document.getElementById('ov-cad').style.display = 'none';
+}
+
+async function salvarCadastro() {
+  const nome = document.getElementById('cad-nome').value.trim();
+  if (!nome) {
+    mostrarMsgCad('Nome do cliente é obrigatório', 'err');
+    return;
+  }
+  const body = {
+    nome,
+    telefone:    document.getElementById('cad-tel').value.trim(),
+    equipamento: document.getElementById('cad-equip').value.trim(),
+    defeito:     document.getElementById('cad-defeito').value.trim(),
+    endereco:    document.getElementById('cad-end').value.trim(),
+  };
+  const r = await fetch('/api/logistica?action=criar', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  }).then(r=>r.json()).catch(()=>({ok:false,error:'Erro de rede'}));
+
+  if (r.ok) {
+    mostrarMsgCad('✅ Ficha ' + r.ficha.id + ' criada!', 'ok');
+    await load();
+    setTimeout(() => fecharCadastro(), 1200);
+  } else {
+    mostrarMsgCad('Erro: ' + r.error, 'err');
+  }
+}
+
+function mostrarMsgCad(txt, tipo) {
+  const el = document.getElementById('cad-msg');
+  el.textContent = txt; el.style.display = 'block';
+  el.style.background = tipo==='ok' ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)';
+  el.style.color = tipo==='ok' ? '#22c55e' : '#ef4444';
+}
+
 </script>
 </body>
 </html>
