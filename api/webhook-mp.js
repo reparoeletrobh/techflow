@@ -79,12 +79,9 @@ export default async function handler(req, res) {
       const modPagamento = payment.payment_method_id === 'pix' ? 'PIX' : `Cartao ${payment.installments}x`;
 
       const VENDAS_KEY = 'reparoeletro_vendas';
-      const FIN_KEY    = 'reparoeletro_financeiro';
-
-      for (const produtoId of produtoIds) {
+for (const produtoId of produtoIds) {
         const [db, fin] = await Promise.all([
           dbGet(VENDAS_KEY).then(d => d || { produtos: [] }),
-          dbGet(FIN_KEY).then(d => d || { fichas: [] }),
         ]);
         const idx = db.produtos.findIndex(p => p.id === String(produtoId));
         if (idx < 0) continue;
@@ -98,19 +95,6 @@ export default async function handler(req, res) {
           vendedor:    'Mercado Pago', modalidade: modPagamento,
           paymentId:   String(payId) };
         await dbSet(VENDAS_KEY, db);
-
-        // Criar ficha no financeiro se não existir
-        fin.fichas = fin.fichas || [];
-        const jaExiste = fin.fichas.find(f => f.osCode === p.codigo && f.nomeContato === nomeCliente);
-        if (!jaExiste) {
-          const fichaId = `venda-mp-${payId}`;
-          fin.fichas.unshift({ id: fichaId, pipefyId: fichaId, osCode: p.codigo,
-            nomeContato: nomeCliente, telefone: telefone||null, cpfCnpj: cpf||null,
-            title: p.descricao.substring(0,60), descricao: p.descricao,
-            valor: parseFloat(p.preco), formaPagamento: modPagamento,
-            vendedor: 'Mercado Pago', dataVenda: new Date().toISOString().slice(0,10),
-            criadoEm: new Date().toISOString(), phase: 'emitir_nf' });
-          await dbSet(FIN_KEY, fin);
         }
         await marcarProcessado(String(payId));
         await logEvento({ tipo: 'register-manual', paymentId: String(payId), produtoId, nomeCliente, valor: payment.transaction_amount });
@@ -181,13 +165,11 @@ export default async function handler(req, res) {
       const modPagamento = payment.payment_method_id === 'pix' ? 'PIX' : `Cartao ${payment.installments}x`;
 
       const VENDAS_KEY = 'reparoeletro_vendas';
-      const FIN_KEY    = 'reparoeletro_financeiro';
-      const resultados = [];
+const resultados = [];
 
       for (const produtoId of produtoIds) {
         const [db, fin] = await Promise.all([
           dbGet(VENDAS_KEY).then(d => d || { produtos: [] }),
-          dbGet(FIN_KEY).then(d => d || { fichas: [] }),
         ]);
         const idx = db.produtos.findIndex(p => p.id === String(produtoId));
         if (idx < 0) { resultados.push({ produtoId, erro: 'nao_encontrado' }); continue; }
@@ -202,13 +184,6 @@ export default async function handler(req, res) {
         await dbSet(VENDAS_KEY, db);
 
         const fichaId = `venda-${Date.now()}`;
-        fin.fichas = fin.fichas || [];
-        fin.fichas.unshift({ id: fichaId, pipefyId: fichaId, osCode: p.codigo,
-          nomeContato: nomeCliente, telefone: telefone||null, cpfCnpj: cpf||null,
-          title: p.descricao.substring(0,60), descricao: p.descricao,
-          valor: parseFloat(p.preco), formaPagamento: modPagamento,
-          vendedor: 'Mercado Pago', dataVenda: now.slice(0,10), criadoEm: now, phase: 'emitir_nf' });
-        await dbSet(FIN_KEY, fin);
 
         // Marcar como processado
         await marcarProcessado(String(payId));
@@ -301,14 +276,11 @@ export default async function handler(req, res) {
 
     // 4. Para cada produto: registrar venda DIRETO no Redis (sem HTTP self-call)
     const VENDAS_KEY  = 'reparoeletro_vendas';
-    const FIN_KEY     = 'reparoeletro_financeiro';
-
-    for (const produtoId of produtoIds) {
+for (const produtoId of produtoIds) {
       let produtoInfo = { id: produtoId, codigo: meta.produto_codigos || '' };
       try {
         const [db, fin] = await Promise.all([
           dbGet(VENDAS_KEY).then(d => d || { produtos: [], nextId: 1 }),
-          dbGet(FIN_KEY).then(d => d || { fichas: [] }),
         ]);
         const idx = db.produtos.findIndex(p => p.id === String(produtoId));
         if (idx < 0) {
