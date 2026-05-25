@@ -192,7 +192,7 @@ module.exports = async function handler(req, res) {
   // ── POST mover ────────────────────────────────────────────
   if (req.method === 'POST' && action === 'mover') {
     const { id, phase } = req.body || {};
-    const PHASES = ['liberado_coleta','em_rota','motorista_parceiro','remarcar','coleta_efetuada','orc_registrado'];
+    const PHASES = ['liberado_coleta','horario_marcado','em_rota','motorista_parceiro','remarcar','coleta_efetuada','orc_registrado'];
     if (!id || !PHASES.includes(phase)) return res.status(400).json({ ok: false, error: 'invalido' });
 
     const db = await dbGet(LOG_KEY) || defaultDB();
@@ -218,6 +218,22 @@ module.exports = async function handler(req, res) {
     ficha.movedAt      = new Date().toISOString();
     await dbSet(LOG_KEY, db);
     registrarPassagem('motorista_parceiro').catch(() => {});
+    return res.status(200).json({ ok: true, ficha });
+  }
+
+
+  // ── POST marcar-horario ───────────────────────────────────────
+  if (req.method === 'POST' && action === 'marcar-horario') {
+    const { id, horario } = req.body || {};
+    if (!id || !horario) return res.status(400).json({ ok: false, error: 'id e horario obrigatorios' });
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const ficha = db.fichas.find(f => f.id === id);
+    if (!ficha) return res.status(404).json({ ok: false, error: 'nao encontrada' });
+    ficha.phase          = 'horario_marcado';
+    ficha.horarioColeta  = horario; // ISO datetime string
+    ficha.movedAt        = new Date().toISOString();
+    await dbSet(LOG_KEY, db);
+    registrarPassagem('horario_marcado').catch(() => {});
     return res.status(200).json({ ok: true, ficha });
   }
 

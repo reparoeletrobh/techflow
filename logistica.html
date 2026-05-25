@@ -145,6 +145,13 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .alerta-badge{display:inline-flex;align-items:center;gap:4px;font-family:var(--fm);font-size:9px;color:#ef4444;background:rgba(239,68,68,.12);padding:2px 8px;border-radius:10px;}
 /* ── TELEFONE NO CARD ── */
 .card-tel{font-family:var(--fm);font-size:10px;color:var(--muted);}
+/* ── VENCIMENTO COLETA ── */
+.venc-badge{display:inline-flex;align-items:center;gap:5px;font-family:var(--fm);font-size:11px;font-weight:700;padding:5px 10px;border-radius:8px;width:100%;justify-content:center;margin-bottom:6px;}
+.venc-ok{background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.25);}
+.venc-warn{background:rgba(249,115,22,.12);color:#f97316;border:1px solid rgba(249,115,22,.3);animation:pulse-warn .9s infinite;}
+.venc-late{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.35);animation:pulse-late .6s infinite;}
+@keyframes pulse-warn{0%,100%{opacity:1}50%{opacity:.6}}
+@keyframes pulse-late{0%,100%{opacity:1}50%{opacity:.4}}
 /* ── TOAST ── */
 .toast{position:fixed;bottom:24px;right:24px;background:#1a1a1a;border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-family:var(--fm);font-size:11px;color:var(--text);z-index:999;opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;}
 .toast.show{opacity:1;transform:translateY(0);}
@@ -177,6 +184,11 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
     <div class="met-label">📦 LIBERADO</div>
     <div class="met-num" id="m-lib">—</div>
     <div class="met-sub"><span id="m-lib-s">—</span> semana</div>
+  </div>
+  <div class="met-card">
+    <div class="met-label">🕐 AGENDADO</div>
+    <div class="met-num" id="m-hor">—</div>
+    <div class="met-sub"><span id="m-hor-s">—</span> semana</div>
   </div>
   <div class="met-card">
     <div class="met-label">🚚 EM ROTA</div>
@@ -253,6 +265,31 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
       <div style="display:flex;gap:8px;justify-content:flex-end;">
         <button class="cbtn cbtn-outline" onclick="fecharMotorista()">Cancelar</button>
         <button class="cbtn" style="background:#8b5cf6;color:#fff;border:none;" onclick="confirmarMotorista()">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: HORÁRIO MARCADO -->
+<div id="ov-horario" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:8px;">
+  <div class="modal" style="width:100%;max-width:380px;">
+    <div class="modal-header">
+      <div class="modal-title" style="color:#f97316;">🕐 Horário da Coleta</div>
+      <button class="modal-close" onclick="fecharHorario()">✕</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <div class="diag-section-label" style="margin-bottom:6px;">Data e hora agendada</div>
+        <input class="diag-input" id="horario-input" type="datetime-local" style="width:100%;font-size:14px;"
+          onkeydown="if(event.key==='Enter') confirmarHorario()">
+        <div style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:4px;">
+          Defina quando a coleta está agendada. Alertas automáticos: 🟠 menos de 1h · 🔴 vencido
+        </div>
+      </div>
+      <div id="horario-msg" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="cbtn cbtn-outline" onclick="fecharHorario()">Cancelar</button>
+        <button class="cbtn" style="background:#f97316;color:#fff;border:none;" onclick="confirmarHorario()">Confirmar</button>
       </div>
     </div>
   </div>
@@ -373,7 +410,8 @@ function precisaPreco(tipo, subtipo, servicos) {
 
 // ── COLUNAS ──────────────────────────────────────────────────
 const COLS = [
-  { id:'liberado_coleta',  label:'Liberado para Coleta', cor:'#f5c800' },
+  { id:'liberado_coleta',    label:'Liberado para Coleta', cor:'#f5c800' },
+  { id:'horario_marcado',    label:'Horário Marcado',      cor:'#f97316' },
   { id:'em_rota',          label:'Equipamento em Rota',  cor:'#3b9eff' },
   { id:'motorista_parceiro', label:'Motorista Parceiro',   cor:'#8b5cf6' },
   { id:'remarcar',         label:'Remarcar',             cor:'#f97316' },
@@ -438,10 +476,33 @@ function cardHTML(f, phase) {
   if (phase === 'liberado_coleta') {
     btns = `
       <button class="cbtn cbtn-outline" onclick="abrirDados('${f.id}')">Ver Dados</button>
+      <button class="cbtn" style="background:rgba(249,115,22,.15);color:#f97316;border-color:#f97316;" onclick="abrirHorario('${f.id}')">🕐 Horário Marcado</button>
       <button class="cbtn cbtn-blue" onclick="mover('${f.id}','em_rota')">Equipamento em Rota</button>
       <button class="cbtn cbtn-purple" onclick="abrirMotorista('${f.id}')">Motorista Parceiro</button>
       <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>
       <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>`;
+  } else if (phase === 'horario_marcado') {
+    // Badge de vencimento
+    let vencBadge = '';
+    if (f.horarioColeta) {
+      const diff = new Date(f.horarioColeta).getTime() - Date.now();
+      const abs  = Math.abs(diff);
+      const horas = Math.floor(abs/3600000);
+      const mins  = Math.floor((abs%3600000)/60000);
+      const fmt   = diff >= 0
+        ? (horas > 0 ? `em ${horas}h${mins>0?mins+'m':''}` : `em ${mins}min`)
+        : (horas > 0 ? `${horas}h${mins>0?mins+'m':''} atrás` : `${mins}min atrás`);
+      const cls = diff < 0 ? 'venc-late' : diff < 3600000 ? 'venc-warn' : 'venc-ok';
+      const icon = diff < 0 ? '🔴' : diff < 3600000 ? '🟠' : '🟢';
+      const hora = new Date(f.horarioColeta).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'});
+      const dia  = new Date(f.horarioColeta).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',timeZone:'America/Sao_Paulo'});
+      vencBadge = `<div class="venc-badge ${cls}">${icon} ${dia} às ${hora} · ${fmt}</div>`;
+    }
+    btns = vencBadge + `
+      <button class="cbtn cbtn-blue" onclick="mover('${f.id}','em_rota')">Equipamento em Rota</button>
+      <button class="cbtn cbtn-purple" onclick="abrirMotorista('${f.id}')">Motorista Parceiro</button>
+      <button class="cbtn" style="background:rgba(249,115,22,.15);color:#f97316;border-color:#f97316;" onclick="abrirHorario('${f.id}')">✏️ Alterar Horário</button>
+      <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>`;
   } else if (phase === 'em_rota') {
     btns = `
       <button class="cbtn cbtn-green" onclick="mover('${f.id}','coleta_efetuada')">Coleta Efetuada</button>
@@ -858,6 +919,67 @@ async function confirmarMotorista() {
     msg.style.background = 'rgba(239,68,68,.1)';
     msg.style.color = '#ef4444';
   }
+}
+
+
+// ── HORÁRIO MARCADO ───────────────────────────────────────────
+let horarioFichaId = null;
+
+function abrirHorario(id) {
+  horarioFichaId = id;
+  // Pré-preencher com horário existente se houver
+  const f = fichas.find(x => x.id === id);
+  const input = document.getElementById('horario-input');
+  if (f?.horarioColeta) {
+    // Converter ISO para datetime-local (YYYY-MM-DDTHH:MM)
+    const d = new Date(f.horarioColeta);
+    const local = new Date(d.getTime() - d.getTimezoneOffset()*60000)
+      .toISOString().slice(0,16);
+    input.value = local;
+  } else {
+    // Default: daqui a 2h
+    const now = new Date(Date.now() + 2*3600000);
+    const local = new Date(now.getTime() - now.getTimezoneOffset()*60000)
+      .toISOString().slice(0,16);
+    input.value = local;
+  }
+  document.getElementById('horario-msg').style.display = 'none';
+  document.getElementById('ov-horario').style.display = 'flex';
+  setTimeout(() => input.focus(), 100);
+}
+
+function fecharHorario() {
+  document.getElementById('ov-horario').style.display = 'none';
+  horarioFichaId = null;
+}
+
+async function confirmarHorario() {
+  const val = document.getElementById('horario-input').value;
+  if (!val) {
+    mostrarMsgHorario('Informe a data e hora', 'err'); return;
+  }
+  // Converter datetime-local para ISO (com timezone local)
+  const horarioISO = new Date(val).toISOString();
+
+  const r = await fetch('/api/logistica?action=marcar-horario', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ id: horarioFichaId, horario: horarioISO })
+  }).then(r=>r.json()).catch(()=>({ok:false,error:'Erro de rede'}));
+
+  if (r.ok) {
+    fecharHorario();
+    await load();
+    toast('Horário registrado com sucesso');
+  } else {
+    mostrarMsgHorario('Erro: ' + r.error, 'err');
+  }
+}
+
+function mostrarMsgHorario(txt, tipo) {
+  const el = document.getElementById('horario-msg');
+  el.textContent = txt; el.style.display = 'block';
+  el.style.background = tipo==='ok' ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)';
+  el.style.color = tipo==='ok' ? '#22c55e' : '#ef4444';
 }
 
 </script>
