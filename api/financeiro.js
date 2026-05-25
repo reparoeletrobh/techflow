@@ -327,6 +327,25 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, newCount, removedCount, pipefyError });
   }
 
+
+  // ── POST force-phase: recuperação de emergência — define fase sem validação ─
+  if (req.method === "POST" && action === "force-phase") {
+    const { id, phaseId, cpfCnpj, numeroNF, chaveAcesso } = req.body || {};
+    if (!id || !phaseId) return res.status(400).json({ ok: false, error: "id e phaseId obrigatórios" });
+    const fin = await dbGet(FIN_KEY) || defaultFin();
+    const rec = fin.records.find(r => r.id === id);
+    if (!rec) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
+    rec.phaseId = phaseId;
+    rec.movedAt = new Date().toISOString();
+    rec.history = [...(rec.history || []), { phaseId, ts: rec.movedAt, origem: 'force-phase' }];
+    if (cpfCnpj) rec.cpfCnpj   = cpfCnpj;
+    if (numeroNF)   rec.numeroNF   = numeroNF;
+    if (chaveAcesso) rec.chaveAcesso = chaveAcesso;
+    await dbSet(FIN_KEY, fin);
+    try { await dbSet(FIN_BACKUP_KEY, { ...fin, backedUpAt: new Date().toISOString() }); } catch(e) {}
+    return res.status(200).json({ ok: true, record: rec });
+  }
+
   // ── POST set-cpf ───────────────────────────────────────────
   // Cadastra CPF/CNPJ e move para Emitir NF
   if (req.method === "POST" && action === "set-cpf") {
