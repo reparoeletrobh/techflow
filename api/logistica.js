@@ -102,6 +102,163 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, ficha });
   }
 
+
+  // ── POST gerar-orcamento — gera texto, salva no orc e move Pipefy ──
+  if (req.method === 'POST' && action === 'gerar-orcamento') {
+    const { id } = req.body || {};
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const ficha = db.fichas.find(f => f.id === id);
+    if (!ficha) return res.status(404).json({ ok:false, error:'ficha nao encontrada' });
+    if (!ficha.diagnostico) return res.status(400).json({ ok:false, error:'sem diagnostico' });
+
+    const PIPEFY_API = 'https://api.pipefy.com/graphql';
+    const PIPE_TOKEN = process.env.PIPEFY_TOKEN || '';
+    const ORC_KEY    = 'reparoeletro_orcamentos';
+    const AGUARDANDO_PHASE_ID = '334875152';
+
+    async function pipefyQ(query) {
+      const r = await fetch(PIPEFY_API, {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+PIPE_TOKEN.trim()},
+        body: JSON.stringify({query})
+      });
+      const j = await r.json();
+      if (j.errors) throw new Error(j.errors[0].message);
+      return j.data;
+    }
+
+    // Gerar textos para cada equipamento do diagnóstico
+    const equips = ficha.diagnostico.equips || [ficha.diagnostico];
+    const nome   = ficha.nome || '';
+
+    function priNome(n) { return n ? n.trim().split(/\s+/)[0] : 'cliente'; }
+
+    function gerarTexto(tipo, subtipo, servicos, precoInput) {
+      const pn = priNome(nome);
+      const s  = servicos || [];
+      const tem = (lista) => s.some(x => lista.includes(x));
+      const pecas = (lista) => s.filter(x => lista.includes(x)).join(', ') || s.join(', ');
+      const x2 = (v) => String(Math.round(parseFloat(v||0)*2));
+
+      if (tipo === 'microondas') {
+        if (tem(['Troca de Placa','Display'])) {
+          const p = pecas(['Troca de Placa','Display']);
+          return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto conjunto da ${p}, será feito a reoperação eletrica tambem. Este conserto completo fica em ${x2(precoInput)} reais apenas. Aprovando ja iniciamos o conserto.`, preco:x2(precoInput) };
+        }
+        if (tem(['Vidro','Porta'])) {
+          const p = pecas(['Vidro','Porta']);
+          return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da ${p}, montagem e regulagem consigo fazer para você por ${x2(precoInput)} reais apenas. Aprovando ja iniciamos o conserto.`, preco:x2(precoInput) };
+        }
+        if (tem(['Haste'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da haste, montagem e regulagem consigo fazer para você por 350 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'350' };
+        if (tem(['Pintura'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, pintura, montagem, regulagem e revisão consigo fazer para você por 350 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'350' };
+        const p = s.join(', ');
+        return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do ${p}, as pecas serao trocadas tambem. Este conserto completo fica em 350 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'350' };
+      }
+      if (tipo === 'purificador') {
+        if (subtipo === 'Motor') {
+          if (tem(['Gás'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca da valvula de gas, solda e recarga de gas refrigerante. Este conserto completo fica em 490 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'490' };
+          const p = s.join(', ');
+          return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto da ${p}. Este conserto completo fica em 490 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'490' };
+        }
+        if (subtipo === 'Eletrônico') {
+          if (tem(['Kit Termo Elétrico'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do cooler, placa de resfriamento e pasta termica, as pecas serao trocadas tambem. Este conserto completo fica em 350 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'350' };
+          if (tem(['Recuperação de Placa'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da placa principal, será feito a reoperação da placa tambem. Este conserto completo fica em 350 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'350' };
+          const p = s.join(', ');
+          return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto da ${p}. Este conserto completo fica em 350 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'350' };
+        }
+      }
+      if (tipo === 'adega') {
+        if (subtipo === 'Motor') {
+          if (tem(['Gás'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca da valvula de gas, solda e recarga de gas refrigerante. Este conserto completo fica em 490 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'490' };
+          if (tem(['Recuperação de Placa'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da placa principal, será feito a reoperação da placa tambem. Este conserto completo fica em 490 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'490' };
+          if (tem(['Troca de Placa'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto conjunto da Placa Principal, será feito a reoperação eletrica tambem. Este conserto completo fica em ${x2(precoInput)} reais apenas. Aprovando ja iniciamos o conserto.`, preco:x2(precoInput) };
+        }
+        if (subtipo === 'Eletrônico') {
+          if (tem(['Kit Termo Elétrico'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do cooler, placa de resfriamento e pasta termica, as pecas serao trocadas tambem. Este conserto completo fica em 350 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'350' };
+          if (tem(['Recuperação de Placa'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da placa principal, será feito a reoperação da placa tambem. Este conserto completo fica em 350 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'350' };
+          if (tem(['Troca de Placa'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto conjunto da Placa Principal, será feito a reoperação eletrica tambem. Este conserto completo fica em ${x2(precoInput)} reais apenas. Aprovando ja iniciamos o conserto.`, preco:x2(precoInput) };
+        }
+      }
+      if (tipo === 'forno') {
+        const pb = subtipo === 'Grande' ? '790' : '490';
+        if (tem(['Troca de Placa','Display'])) {
+          const p = pecas(['Troca de Placa','Display']);
+          return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto conjunto do ${p}: será feito a reoperação eletrica tambem. Este conserto completo fica em ${x2(precoInput)} reais apenas. Aprovando ja iniciamos o conserto.`, preco:x2(precoInput) };
+        }
+        if (tem(['Porta','Vidro','Mola'])) {
+          const p = pecas(['Porta','Vidro','Mola']);
+          return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da ${p}, montagem e regulagem consigo fazer para você por ${x2(precoInput)} reais apenas. Aprovando ja iniciamos o conserto.`, preco:x2(precoInput) };
+        }
+        const p = s.join(', ');
+        return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da ${p}, será feito a reoperação da placa tambem. Este conserto completo fica em ${pb} reais apenas. Aprovando ja iniciamos o conserto.`, preco:pb };
+      }
+      return { texto: null, preco: null };
+    }
+
+    // Gerar texto para cada equipamento
+    const resultados = equips.map(eq =>
+      gerarTexto(eq.tipo, eq.subtipo, eq.servicos, eq.preco)
+    );
+
+    // Texto final: se múltiplos, concatenar
+    let textoFinal, precoFinal;
+    if (resultados.length === 1) {
+      textoFinal = resultados[0].texto;
+      precoFinal = resultados[0].preco;
+    } else {
+      textoFinal = resultados.map((r,i) => `Equipamento ${i+1}:\n${r.texto||''}`).join('\n\n');
+      precoFinal = String(resultados.reduce((acc,r)=>acc+parseInt(r.preco||0),0));
+    }
+
+    // Salvar na Logística
+    ficha.diagnostico.textoOrc = textoFinal;
+    ficha.diagnostico.preco    = precoFinal;
+    ficha.phase   = 'orc_registrado';
+    ficha.movedAt = new Date().toISOString();
+    await dbSet(LOG_KEY, db);
+
+    // Salvar no Redis de orçamentos (ORC_KEY) — formato compatível com orc-sync
+    try {
+      const orcDb = (await dbGet(ORC_KEY)) || { fichas:[], syncedIds:[], initialized:true };
+      const orcFicha = {
+        id:            ficha.pipefyCardId || ficha.id,
+        pipefyId:      ficha.pipefyCardId || ficha.id,
+        nome:          ficha.nome,
+        tel:           ficha.telefone || '',
+        desc:          ficha.equipamento + ' — ' + ficha.defeito,
+        end:           ficha.endereco || '',
+        age:           null,
+        comentarios:   [],
+        textoOrc:      textoFinal,
+        precoSugerido: precoFinal,
+        status:        'pendente',
+        preco:         null,
+        createdAt:     new Date().toISOString(),
+      };
+      // Evitar duplicata
+      if (!orcDb.fichas.find(f => f.id === orcFicha.id)) {
+        orcDb.fichas.unshift(orcFicha);
+        if (ficha.pipefyCardId && !orcDb.syncedIds.includes(ficha.pipefyCardId)) {
+          orcDb.syncedIds.push(ficha.pipefyCardId);
+        }
+        await dbSet(ORC_KEY, orcDb);
+      }
+    } catch(e) { console.error('[Log] orc-key:', e.message); }
+
+    // Mover card Pipefy para Aguardando Aprovação + atualizar valor
+    if (ficha.pipefyCardId) {
+      try {
+        await pipefyQ(`mutation { moveCardToPhase(input: { card_id: "${ficha.pipefyCardId}", destination_phase_id: "${AGUARDANDO_PHASE_ID}" }) { card { id } } }`);
+        if (precoFinal) {
+          await pipefyQ(`mutation { updateCardField(input: { card_id: "${ficha.pipefyCardId}", field_id: "valor_de_contrato", new_value: "${precoFinal}" }) { success } }`);
+        }
+        console.log('[Log] Pipefy movido para Aguardando:', ficha.pipefyCardId);
+      } catch(e) { console.error('[Log] Pipefy move:', e.message); }
+    }
+
+    return res.status(200).json({ ok:true, textoFinal, precoFinal, ficha });
+  }
+
   // ── POST cancelar ────────────────────────────────────────
   if (req.method === 'POST' && action === 'cancelar') {
     const { id } = req.body || {};

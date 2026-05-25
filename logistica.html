@@ -231,6 +231,17 @@ const SERVICOS = {
   },
 };
 
+// Serviços que requerem campo de preço (valor x2)
+const ITENS_COM_PRECO = new Set([
+  'Troca de Placa','Display','Vidro','Porta','Mola'
+]);
+
+function precisaPreco(tipo, subtipo, servicos) {
+  if (tipo === 'adega')      return (servicos||[]).includes('Troca de Placa');
+  if (tipo === 'purificador') return false;
+  return (servicos||[]).some(x => ITENS_COM_PRECO.has(x));
+}
+
 // ── COLUNAS ──────────────────────────────────────────────────
 const COLS = [
   { id:'liberado_coleta',  label:'Liberado para Coleta', cor:'#f5c800' },
@@ -499,23 +510,37 @@ async function salvarDiag() {
   for (let i = 0; i < diagEquips.length; i++) {
     const eq = diagEquips[i];
     const label = diagEquips.length > 1 ? `Equipamento ${i+1}` : 'equipamento';
-    if (!eq.tipo)             { mostrarMsgDiag(`Selecione o tipo do ${label}`,'err'); return; }
-    if (!eq.servicos.length)  { mostrarMsgDiag(`Selecione ao menos um serviço para o ${label}`,'err'); return; }
+    if (!eq.tipo)            { mostrarMsgDiag(`Selecione o tipo do ${label}`,'err'); return; }
+    if (!eq.servicos.length) { mostrarMsgDiag(`Selecione ao menos um serviço para o ${label}`,'err'); return; }
+    if (precisaPreco(eq.tipo, eq.subtipo, eq.servicos) && !eq.preco) {
+      mostrarMsgDiag(`Informe o preço de custo do ${label}`,'err'); return;
+    }
   }
 
+  // Passo 1: salvar diagnóstico
   const diagnostico = { equips: diagEquips.map(eq=>({...eq})) };
-
-  const r = await fetch('/api/logistica?action=salvar-diagnostico', {
+  const r1 = await fetch('/api/logistica?action=salvar-diagnostico', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ id: fichaAtual.id, diagnostico })
   }).then(r=>r.json());
+  if (!r1.ok) { mostrarMsgDiag('Erro ao salvar: '+r1.error,'err'); return; }
 
-  if (r.ok) {
-    mostrarMsgDiag('✅ Diagnóstico salvo!','ok');
+  mostrarMsgDiag('⏳ Gerando orçamento e registrando no Pipefy...','ok');
+
+  // Passo 2: gerar orçamento + mover Pipefy
+  const r2 = await fetch('/api/logistica?action=gerar-orcamento', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ id: fichaAtual.id })
+  }).then(r=>r.json());
+
+  if (r2.ok) {
+    mostrarMsgDiag(`✅ Orçamento gerado! R$ ${r2.precoFinal} — enviado ao Pipefy`,'ok');
     await load();
-    setTimeout(()=>fecharDiag(), 1200);
+    setTimeout(()=>fecharDiag(), 2000);
   } else {
-    mostrarMsgDiag('Erro: '+r.error,'err');
+    mostrarMsgDiag('Orçamento gerado mas Pipefy falhou: '+r2.error,'err');
+    await load();
+    setTimeout(()=>fecharDiag(), 2000);
   }
 }
 
