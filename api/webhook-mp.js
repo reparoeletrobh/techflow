@@ -48,7 +48,30 @@ export default async function handler(req, res) {
   // ── GET: diagnóstico de logs ─────────────────────────────────
   if (req.method === 'GET') {
     const action = req.query.action;
-    // ── GET check-payment: busca detalhes de um pagamento no MP ──
+    // ── GET search-payments: busca pagamentos por data ──────────
+  if (action === 'search-payments') {
+    const begin = req.query.begin || '2026-05-23T00:00:00.000-03:00';
+    const end   = req.query.end   || '2026-05-24T00:00:00.000-03:00';
+    try {
+      const url = `https://api.mercadopago.com/v1/payments/search?sort=date_created&criteria=desc&range=date_created&begin_date=${encodeURIComponent(begin)}&end_date=${encodeURIComponent(end)}&limit=20`;
+      const mpRes = await fetch(url, { headers: { Authorization: `Bearer ${MP_TOKEN}` } });
+      const data = await mpRes.json();
+      const pagamentos = (data.results || []).map(p => ({
+        id:       p.id,
+        status:   p.status,
+        valor:    p.transaction_amount,
+        metodo:   p.payment_method_id,
+        data:     p.date_approved || p.date_created,
+        comprador: p.metadata?.comprador_nome || p.payer?.first_name || '?',
+        produto_ids: p.metadata?.produto_ids || '',
+      }));
+      return res.status(200).json({ ok: true, total: data.paging?.total, pagamentos });
+    } catch(e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+  // ── GET check-payment: busca detalhes de um pagamento no MP ──
   if (action === 'check-payment') {
     const payId = req.query.paymentId;
     if (!payId) return res.status(400).json({ ok: false, error: 'paymentId obrigatorio' });
