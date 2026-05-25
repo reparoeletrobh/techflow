@@ -321,21 +321,24 @@ for (const produtoId of produtoIds) {
         }
       } catch(e) { console.error('vender:', e.message); }
 
-      // 5. Espelho no relatório de checkout
+      // 5. Espelho no relatório de checkout — direto no Redis (sem self-call)
       try {
-        await fetch(`${siteUrl}/api/tv-checkout?action=registrar-venda`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            produto:       produtoInfo,
-            comprador:     { nome: nomeCliente, telefone, cpf, endereco, cep },
-            valor:         payment.transaction_amount,
-            provedor:      'mercado_pago',
-            paymentId:     String(payId),
-            paymentMethod: payment.payment_method_id,
-            installments:  payment.installments
-          })
+        const TV_KEY = 'tv_checkout_vendas';
+        const tvDb = (await dbGet(TV_KEY)) || { vendas: [] };
+        tvDb.vendas = tvDb.vendas || [];
+        tvDb.vendas.unshift({
+          id:            Date.now().toString(36),
+          produto:       produtoInfo,
+          comprador:     { nome: nomeCliente, telefone, cpf, endereco, cep },
+          valor:         payment.transaction_amount,
+          provedor:      'mercado_pago',
+          paymentId:     String(payId),
+          paymentMethod: payment.payment_method_id,
+          installments:  payment.installments,
+          criadoEm:      new Date().toISOString()
         });
+        tvDb.vendas = tvDb.vendas.slice(0, 500);
+        await dbSet(TV_KEY, tvDb);
       } catch(e) { console.error('registrar-venda:', e.message); }
 
       // ── Google Ads: conversão server-side via Measurement Protocol ────
