@@ -752,11 +752,15 @@ async function salvarDiag() {
   }).then(r=>r.json());
 
   if (r2.ok) {
-    mostrarMsgDiag(`✅ Orçamento gerado! R$ ${r2.precoFinal} — enviado ao Pipefy`,'ok');
+    if (r2.pipefyOk) {
+      mostrarMsgDiag(`✅ Orçamento R$ ${r2.precoFinal} — registrado no Pipefy com sucesso!`,'ok');
+    } else {
+      mostrarMsgDiag(`✅ Orçamento R$ ${r2.precoFinal} gerado. ⚠️ Pipefy pendente: ${r2.pipefyErro||'erro desconhecido'}. Tente salvar novamente.`,'err');
+    }
     await load();
-    setTimeout(()=>fecharDiag(), 2000);
+    setTimeout(()=>{ if(r2.pipefyOk) fecharDiag(); }, 2500);
   } else {
-    mostrarMsgDiag('Orçamento gerado mas Pipefy falhou: '+r2.error,'err');
+    mostrarMsgDiag('Erro ao gerar orçamento: '+r2.error,'err');
     await load();
     setTimeout(()=>fecharDiag(), 2000);
   }

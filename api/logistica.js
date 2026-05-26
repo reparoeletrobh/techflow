@@ -108,6 +108,7 @@ async function criarCardPipefy({ nome, telefone, equipamento, defeito, endereco 
   if (descField) fieldsAttr.push(`{ field_id: "${descField.id}", field_value: ${JSON.stringify(descricao)} }`);
   if (endField && endereco) fieldsAttr.push(`{ field_id: "${endField.id}", field_value: ${JSON.stringify(endereco)} }`);
 
+  let card = null;
   try {
     const data = await pipefyQuery(`mutation {
       createCard(input: {
@@ -116,17 +117,20 @@ async function criarCardPipefy({ nome, telefone, equipamento, defeito, endereco 
         fields_attributes: [${attrs.join(', ')}]
       }) { card { id title url } }
     }`);
-    return data?.createCard?.card;
+    card = data?.createCard?.card;
   } catch(e) {
-    // Se falhar com phase_id, criar sem (vai para fase inicial)
+    // Se falhar com phase_id, tentar sem (vai para fase inicial e depois move)
     const data = await pipefyQuery(`mutation {
       createCard(input: {
         pipe_id: "${PIPE_ID}"
         fields_attributes: [${attrs.join(', ')}]
       }) { card { id title url } }
     }`);
-    return data?.createCard?.card;
+    card = data?.createCard?.card;
   }
+  // Lançar erro explícito se o Pipefy não retornou id (nunca silencioso)
+  if (!card?.id) throw new Error('Pipefy retornou card sem id: ' + JSON.stringify(card));
+  return card;
 }
 
 module.exports = async function handler(req, res) {
@@ -309,8 +313,8 @@ module.exports = async function handler(req, res) {
     const ficha = db.fichas.find(f => f.id === id);
     if (!ficha) return res.status(404).json({ ok: false, error: 'nao encontrada' });
     ficha.diagnostico = diagnostico;
-    ficha.phase = 'orc_registrado';
-    ficha.movedAt = new Date().toISOString();
+    // Não mover para orc_registrado aqui — a fase muda em gerar-orcamento
+    // (só quando o Pipefy for criado/movido com sucesso)
     await dbSet(LOG_KEY, db);
     return res.status(200).json({ ok: true, ficha });
   }
@@ -519,7 +523,11 @@ module.exports = async function handler(req, res) {
       await dbSet(LOG_KEY, db);
     }
 
-    return res.status(200).json({ ok:true, textoFinal, precoFinal, ficha, pipefyOk: !!ficha.pipefyCardId });
+    return res.status(200).json({
+      ok:true, textoFinal, precoFinal, ficha,
+      pipefyOk: !!ficha.pipefyCardId,
+      pipefyErro: ficha.pipefyErro || null
+    });
   }
 
 
@@ -527,7 +535,11 @@ module.exports = async function handler(req, res) {
   if (action === 'limpar-orc-registrado') {
     const db = await dbGet(LOG_KEY) || defaultDB();
     const antes = db.fichas.length;
-    db.fichas = db.fichas.filter(f => f.phase !== 'orc_registrado');
+    // Só deletar fichas em orc_registrado que já têm pipefyCardId confirmado
+    // Fichas sem pipefyCardId ficam para retry (não perder dados)
+    db.fichas = db.fichas.filter(f =>
+      f.phase !== 'orc_registrado' || !f.pipefyCardId
+    );
     const removidas = antes - db.fichas.length;
     if (removidas > 0) await dbSet(LOG_KEY, db);
     return res.status(200).json({ ok: true, removidas, restantes: db.fichas.length });
