@@ -1,7 +1,7 @@
 // api/checkout-mp-criar.js
 // Cria uma preferência de pagamento no Mercado Pago
 // Suporta: PIX + Cartão de Crédito 3x sem juros
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -50,7 +50,8 @@ export default async function handler(req, res) {
             { id: 'debit_card' },
             { id: 'ticket' },
             { id: 'atm' }
-          ]
+          ],
+          default_payment_method_id: 'pix'
         }
       : {
           // Apenas Cartão de Crédito (preço cheio, 3x sem juros)
@@ -87,14 +88,21 @@ export default async function handler(req, res) {
   };
 
   try {
-    const mpRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
-      method:  'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'Authorization': `Bearer ${MP_TOKEN}`
-      },
-      body: JSON.stringify(preference)
-    });
+    // Timeout de 15s para evitar travar
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    let mpRes;
+    try {
+      mpRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
+        method:  'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${MP_TOKEN}`
+        },
+        body: JSON.stringify(preference),
+        signal: controller.signal
+      });
+    } finally { clearTimeout(timeout); }
 
     const data = await mpRes.json();
 

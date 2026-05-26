@@ -727,16 +727,22 @@ async function enviarCheckout(){
     return {id:x.id, codigo:x.codigo, nome:x.nome + (pix?' (PIX -10%)':''), preco:preco, foto:x.foto};
   });
   try{
-    var r = await fetch('/api/checkout-mp-criar',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        itens: itens,
-        comprador: {nome:nome, telefone:tel, cpf:cpf, endereco:end, cep:cep},
-        metodoPagamento: pix ? 'pix' : 'cartao'
-      })
-    });
-    var d = await r.json();
+    var ctrl = new AbortController();
+    var tmt = setTimeout(function(){ ctrl.abort(); }, 20000);
+    var r, d;
+    try {
+      r = await fetch('/api/checkout-mp-criar',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          itens: itens,
+          comprador: {nome:nome, telefone:tel, cpf:cpf, endereco:end, cep:cep},
+          metodoPagamento: pix ? 'pix' : 'cartao'
+        }),
+        signal: ctrl.signal
+      });
+      d = await r.json();
+    } finally { clearTimeout(tmt); }
     if(d.ok && d.checkoutUrl){
       // Salvar cart para pós-compra
       try{ localStorage.setItem('re_checkout_cart', JSON.stringify(cart)); }catch(e){}
