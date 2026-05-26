@@ -155,7 +155,9 @@ module.exports = async function handler(req, res) {
       (f.id      || '').toLowerCase().includes(q) ||
       (f.telefone|| '').includes(q)
     );
-    return res.status(200).json({ ok: true, total: encontradas.length, fichas: encontradas });
+    // Incluir resultado do último fix para diagnóstico
+    const fixResult = await dbGet('fix_clarice_result').catch(()=>null);
+    return res.status(200).json({ ok: true, total: encontradas.length, fichas: encontradas, fixResult });
   }
 
   // ── GET retry-pipefy: tenta criar card no Pipefy para ficha sem pipefyCardId ──
