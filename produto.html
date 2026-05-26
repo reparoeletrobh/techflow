@@ -761,7 +761,23 @@ function abrirWA(){
   window.open('https://wa.me/'+WA+'?text='+encodeURIComponent('Olá! Quero comprar:\n\n📦 '+PROD.nome+'\n📋 Cód: '+PROD.codigo+'\n💰 '+R(PROD.preco)+'\n\nPodemos fechar?'),'_blank');
 }
 function adicionarCarrinho(){
-  if(PROD)addToCart(PROD);
+  if(!PROD) return;
+  addToCart(PROD);
+  // Feedback visual no botão hero
+  var btn = document.querySelector('.btnbuy');
+  if(btn){
+    btn.textContent = '✅ Adicionado!';
+    btn.style.background = 'var(--green)';
+    btn.style.color = '#000';
+    btn.disabled = true;
+    setTimeout(function(){
+      btn.textContent = '🛒 Adicionar ao Carrinho';
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.disabled = false;
+    }, 2000);
+  }
+  toast('✅ ' + (PROD.nome||PROD.codigo) + ' adicionado ao carrinho!');
 }
 
 // ── Toast simples ─────────────────────────────────────────────
