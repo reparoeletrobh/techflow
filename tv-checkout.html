@@ -211,8 +211,7 @@ select option{background:var(--s2)}
     <button class="btn b-ghost b-sm" onclick="loadEquip()">🔄 Atualizar</button>
   </div>
   <div class="etabs">
-    <div class="etab on" data-t="smart" onclick="filt(this)">📺 Smart TV <span id="ct-smart"></span></div>
-    <div class="etab"    data-t="led"   onclick="filt(this)">🖥️ TV LED <span id="ct-led"></span></div>
+    <div class="etab on" data-t="tv" onclick="filt(this)">📺 Televisão <span id="ct-tv"></span></div>
   </div>
   <div class="egrid" id="egrid">
     <div style="color:var(--muted);font-family:var(--fm);font-size:12px">Carregando...</div>
@@ -273,7 +272,7 @@ select option{background:var(--s2)}
 <div class="toast" id="toast"></div>
 
 <script>
-var CFG={}, EQUIP=[], VENDAS=[], TIPO='smart';
+var CFG={}, EQUIP=[], VENDAS=[], TIPO='tv';
 
 var PROVS=[
   {id:'whatsapp',  ico:'💬',name:'WhatsApp',    desc:'Pedido via WhatsApp (manual)',  flds:[]},
@@ -413,14 +412,12 @@ async function loadEquip(){
   const d=await fetch('/api/tv-checkout?action=load-equipamentos').then(r=>r.json()).catch(()=>({}));
   if(!d.ok)return;
   EQUIP=d.produtos||[];
-  const m=EQUIP.filter(isSmart), b=EQUIP.filter(isLED);
-  document.getElementById('ct-smart').textContent='('+m.length+')';
-  document.getElementById('ct-led').textContent='('+b.length+')';
+  document.getElementById('ct-tv').textContent=EQUIP.length?'('+EQUIP.length+')':'';
   renderEquip();
 }
 
-function isSmart(p){const t=(p.tipo||'').toLowerCase();return t==='smart tv'||t.includes('smart');}
-function isLED(p){const t=(p.tipo||'').toLowerCase();return t==='tv led'||t.includes('led');}
+function isTV(p){return true;} // todas as TVs
+
 
 function filt(el){
   document.querySelectorAll('.etab').forEach(t=>t.classList.remove('on'));
@@ -438,7 +435,7 @@ function calcP(p){
 function R(n){return'R$ '+parseFloat(n).toFixed(2).replace('.',',');}
 
 function renderEquip(){
-  const list=(TIPO==='smart'?EQUIP.filter(isSmart):EQUIP.filter(isLED))
+  const list=EQUIP.slice()
     .sort((a,b)=>(b._destaque?.prioridade||0)-(a._destaque?.prioridade||0));
   const g=document.getElementById('egrid');
   if(!list.length){g.innerHTML='<div style="color:var(--muted);font-family:var(--fm);font-size:12px">Nenhum disponível</div>';return;}

@@ -46,8 +46,7 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
 .tipo-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .tipo-btn{padding:12px;border-radius:9px;border:2px solid var(--border);background:var(--surface2);color:var(--muted);font-family:var(--fb);font-size:13px;cursor:pointer;transition:all 0.15s;text-align:center;}
 .tipo-btn:hover{border-color:#444;color:var(--text);}
-.tipo-btn.selected.smart{border-color:#3b9eff;background:rgba(59,158,255,0.08);color:#3b9eff;}
-.tipo-btn.selected.led{border-color:#22c55e;background:rgba(34,197,94,0.08);color:#22c55e;}
+.tipo-btn.selected.tv{border-color:#3b9eff;background:rgba(59,158,255,0.08);color:#3b9eff;}
 .tipo-icon{font-size:22px;display:block;margin-bottom:4px;}
 
 /* VENDEDOR */
@@ -100,8 +99,7 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
 .td-cap{font-family:var(--fm);font-size:11px;color:var(--muted);}
 .td-price{font-family:var(--fm);font-size:13px;color:var(--green);white-space:nowrap;}
 .tipo-badge{font-family:var(--fm);font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;text-transform:uppercase;}
-.tipo-badge.smart{background:rgba(59,158,255,0.12);color:#3b9eff;}
-.tipo-badge.led{background:rgba(34,197,94,0.12);color:#22c55e;}
+.tipo-badge.tv{background:rgba(59,158,255,0.12);color:#3b9eff;}
 .vendido-badge{font-family:var(--fm);font-size:9px;background:rgba(139,92,246,0.12);color:#8b5cf6;padding:2px 8px;border-radius:4px;}
 .act-btn{padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;font-family:var(--fm);font-size:10px;cursor:pointer;transition:all 0.15s;margin-left:3px;}
 .act-btn.edit{color:var(--blue);}
@@ -268,11 +266,8 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
     <div class="field">
       <label class="field-label">Tipo *</label>
       <div class="tipo-grid">
-        <button class="tipo-btn smart" id="tipo-smart" onclick="setTipo('Smart TV')">
-          <span class="tipo-icon">📺</span>Smart TV
-        </button>
-        <button class="tipo-btn led" id="tipo-led" onclick="setTipo('TV LED')">
-          <span class="tipo-icon">🖥️</span>TV LED
+        <button class="tipo-btn tv" id="tipo-tv" onclick="setTipo('Televisão')">
+          <span class="tipo-icon">📺</span>Televisão
         </button>
       </div>
     </div>
@@ -290,7 +285,7 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
     </div>
     <div class="field">
       <label class="field-label">Tamanho / Especificação</label>
-      <input class="f-input" id="f-capacidade" type="text" placeholder="Ex: 43 polegadas, Full HD, 120Hz..."/>
+      <input class="f-input" id="f-capacidade" type="text" placeholder="Ex: 43 polegadas, 4K, Smart..."/>
     </div>
     <div class="field">
       <label class="field-label">Preço (R$) *</label>
@@ -415,7 +410,7 @@ let produtos = [], editId = null, selVenderId = null;
 let fotos    = [null,null,null,null,null,null];
 let tipoSel  = null, vendedorSel = null, modalidadeSel = null;
 
-const PREFIXOS = { 'Smart TV': 'SM', 'TV LED': 'TL' };
+const PREFIXOS = { 'Televisão': 'TV' };
 
 // ── API ──────────────────────────────────────────────────────
 async function api(action, body) {
@@ -428,8 +423,7 @@ async function api(action, body) {
 // ── TIPO ─────────────────────────────────────────────────────
 function setTipo(t) {
   tipoSel = t;
-  document.getElementById('tipo-smart').classList.toggle('selected', t==='Smart TV');
-  document.getElementById('tipo-led').classList.toggle('selected',   t==='TV LED');
+  document.getElementById('tipo-tv').classList.toggle('selected', t==='Televisão');
   if (!editId) gerarCodigo();
 }
 
@@ -530,7 +524,7 @@ async function salvar() {
   const descricao = document.getElementById('f-descricao').value.trim();
   const capacidade= document.getElementById('f-capacidade').value.trim();
   const preco     = parseFloat(document.getElementById('f-preco').value);
-  if (!tipoSel)              return showToast('⚠️','Selecione o tipo','Smart TV ou TV LED');
+  if (!tipoSel)              return showToast('⚠️','Selecione o tipo','Televisão');
   if (!codigo)               return showToast('⚠️','Código obrigatório','');
   if (!descricao)            return showToast('⚠️','Descrição obrigatória','');
   if (isNaN(preco)||preco<0) return showToast('⚠️','Preço inválido','');
@@ -551,8 +545,7 @@ function editarProduto(id) {
   const p=produtos.find(x=>x.id===id); if(!p) return;
   editId=id;
   tipoSel=p.tipo||null;
-  document.getElementById('tipo-smart').classList.toggle('selected', p.tipo==='Smart TV');
-  document.getElementById('tipo-led').classList.toggle('selected',   p.tipo==='TV LED');
+  document.getElementById('tipo-tv').classList.toggle('selected', p.tipo==='Televisão');
   document.getElementById('f-codigo').value    =p.codigo;
   document.getElementById('f-descricao').value =p.descricao;
   document.getElementById('f-capacidade').value=p.capacidade||'';
@@ -567,7 +560,7 @@ function editarProduto(id) {
 function cancelEdit(){ editId=null; resetForm(); }
 function resetForm(){
   editId=null; tipoSel=null;
-  ['tipo-smart','tipo-led'].forEach(id=>document.getElementById(id).classList.remove('selected'));
+  ['tipo-tv'].forEach(id=>document.getElementById(id).classList.remove('selected'));
   document.getElementById('f-codigo').value='';
   document.getElementById('f-descricao').value='';
   document.getElementById('f-capacidade').value='';
@@ -724,7 +717,7 @@ function renderTable(){
     const thumbs=allFotos.slice(0,3).map((f,fi)=>`<img class="prod-foto-thumb" src="${f}" onclick="openLightbox(JSON.parse(this.closest('tr').dataset.fotos),${fi})" style="cursor:zoom-in"/>`).join('');
     const extra=allFotos.length>3?`<div class="prod-foto-more" onclick="openLightbox(JSON.parse(this.closest('tr').dataset.fotos),3)" style="cursor:zoom-in">+${allFotos.length-3}</div>`:'';;
     const pFmt=parseFloat(p.preco).toLocaleString('pt-BR',{minimumFractionDigits:2,style:'currency',currency:'BRL'});
-    const tipoBadge=p.tipo?`<span class="tipo-badge ${p.tipo==='Smart TV'?'smart':'led'}">${p.tipo}</span>`:'—';
+    const tipoBadge=p.tipo?`<span class="tipo-badge tv">${p.tipo}</span>`:'—';
 
     if (curTab === 'vendidos') {
       const dataVenda = p.soldAt ? new Date(p.soldAt).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}) : '—';
