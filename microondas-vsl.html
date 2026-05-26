@@ -268,6 +268,7 @@ var params  = new URLSearchParams(location.search);
 var PRODUTO = (params.get('produto') || 'microondas').toLowerCase();
 var CTA     = (params.get('cta')     || 'wa').toLowerCase();
 var IS_PURI = PRODUTO === 'purificador';
+var IS_TV   = PRODUTO === 'televisao';
 
 var WA = '5531999999999'; // ← NÚMERO REAL AQUI
 var R  = function(n){ return 'R$ ' + parseFloat(n).toFixed(2).replace('.',','); };
@@ -295,6 +296,17 @@ var TEXTOS = {
     badge:     '⭐ PURIFICADORES SEMI-NOVOS REVISADOS',
     footer:    '© 2025 Reparo Eletro BH — Todos os purificadores passam por revisão técnica completa',
     filtro:    function(p){ var t=(p.tipo||''); return t==='Bebedouro' || t.toLowerCase().includes('bebedouro') || t.toLowerCase().includes('purificador'); }
+  },
+  televisao: {
+    headline1: 'Não compre sua',
+    headline2: 'TELEVISÃO,',
+    headline3: 'sem ver este vídeo antes.',
+    sub:       'Economize até 70% agora mesmo! Garantia de 90 Dias, 3x Sem Juros no Cartão, Entrega Rápida!',
+    secTitle:  'Televisões Semi-novas com Garantia',
+    ctaBtn:    'Ver Catálogo de Televisões',
+    badge:     '⭐ TELEVISÕES SEMI-NOVAS REVISADAS',
+    footer:    '© 2025 Reparo Eletro BH — Todas as televisões passam por revisão técnica completa',
+    filtro:    function(p){ return true; } // tv-vendas só tem televisões
   }
 };
 var TX = TEXTOS[PRODUTO] || TEXTOS.microondas;
@@ -320,7 +332,7 @@ document.addEventListener('DOMContentLoaded', function() {
   var ftr = document.getElementById('vsl-footer');
   if (ftr) ftr.textContent = TX.footer;
   // Page title
-  document.title = (IS_PURI ? 'Purificadores' : 'Microondas') + ' Semi-novos — Reparo Eletro BH';
+  document.title = (IS_TV ? 'Televisões' : IS_PURI ? 'Purificadores' : 'Microondas') + ' Semi-novos — Reparo Eletro BH';
 });
 
 // ── PRODUTOS ─────────────────────────────────────────────────────────────
@@ -330,10 +342,14 @@ function mSVG(label){
   return 'data:image/svg+xml,'+encodeURIComponent(s);
 }
 function irProduto(id){
-  // Salvar o produto clicado no localStorage para produto.html usar
   var p = PROD.find(function(x){ return String(x.id)===String(id); });
-  if(p){ try{ localStorage.setItem('re_produto_pendente', JSON.stringify(p)); }catch(e){} }
-  window.location.href='/produto.html?id='+id;
+  if(p){
+    try{
+      var item = Object.assign({}, p, { _origem: IS_TV ? 'tv' : 'adm' });
+      localStorage.setItem('re_produto_pendente', JSON.stringify(item));
+    }catch(e){}
+  }
+  window.location.href='/produto.html?id='+id+(IS_TV?'&origem=tv':'');
 }
 
 async function loadVideo(){
@@ -368,7 +384,8 @@ async function loadProdutos(){
     var _el=document.getElementById('estq');if(_el)_el.textContent=PROD.length;
   }else{var _g=document.getElementById('catalog-grid');if(_g)_g.innerHTML=Array(3).fill('<div class="sk-card"><div class="skeleton sk-img"></div><div class="sk-body"><div class="skeleton sk-line"></div><div class="skeleton sk-btn"></div></div></div>').join('');}
   try{
-    var d = await fetch('/api/vendas?action=load').then(function(r){return r.json();});
+    var apiUrl = IS_TV ? '/api/tv-vendas?action=load' : '/api/vendas?action=load';
+    var d = await fetch(apiUrl).then(function(r){return r.json();});
     var todos = (d.produtos||[]).filter(function(p){return !p.vendido;});
     // Filtrar pelo tipo de produto da URL
     PROD = todos.filter(TX.filtro).map(function(p){
