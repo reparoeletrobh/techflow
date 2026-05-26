@@ -129,6 +129,15 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
 .btn-ck{background:var(--gold);color:#0a0a0a;border:none}
 .btn-ck:hover{background:#d4be9e;transform:translateY(-2px);box-shadow:0 10px 24px rgba(201,178,152,.25)}
 .prod-btn svg{flex-shrink:0}
+.btn-voltar-menu{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  margin:32px auto 0;padding:14px 32px;border-radius:8px;
+  border:1.5px solid rgba(255,255,255,.15);
+  background:transparent;color:rgba(255,255,255,.6);
+  font-family:var(--fb);font-size:14px;font-weight:600;
+  text-decoration:none;cursor:pointer;transition:all .2s;
+}
+.btn-voltar-menu:hover{border-color:rgba(255,255,255,.4);color:#fff;}
 
 .prod-card-img{position:relative;}
 .cph{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;background:#0f0f0f;opacity:0;transition:opacity .25s;pointer-events:none;}
@@ -155,14 +164,12 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
   position:fixed;bottom:0;left:0;right:0;z-index:200;
   height:62px;
   background:#0d1117;
-  border-top:1.5px solid rgba(245,200,0,.25);
+  border-top:1.5px solid var(--yellow);
   box-shadow:0 -6px 24px rgba(0,0,0,.7);
-  display:flex; /* sempre visível */
+  display:flex;
   align-items:center;
   padding:0 20px;gap:14px;
-  transition:border-color .3s;
 }
-.cart-strip.show{border-top-color:var(--yellow);}
 .cs-del{
   flex:1;font-size:12px;font-weight:500;color:var(--green);
   display:flex;align-items:center;gap:5px;white-space:nowrap;
@@ -171,16 +178,12 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
 .cs-btn{
   display:flex;align-items:center;justify-content:center;gap:7px;
   padding:0 22px;height:42px;border-radius:9px;
-  background:rgba(245,200,0,.08);color:rgba(245,200,0,.4);
-  border:1.5px solid rgba(245,200,0,.2);
+  background:var(--yellow);color:#000;border:none;
   font-family:var(--fb);font-size:13px;font-weight:700;
   cursor:pointer;white-space:nowrap;flex-shrink:0;
-  transition:all .3s;position:relative;
+  transition:all .18s;position:relative;
 }
-.cart-strip.show .cs-btn{
-  background:var(--yellow);color:#000;border-color:transparent;
-}
-.cs-btn:hover{background:#ffd500;color:#000;border-color:transparent;}
+.cs-btn:hover{background:#ffd500;transform:translateY(-1px);}
 .cs-badge{
   position:absolute;top:-6px;right:-6px;
   width:17px;height:17px;border-radius:50%;
@@ -224,6 +227,7 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
   <h2 class="section-title catalog-title fade-in">Microondas Revisados & Garantidos</h2>
   <p class="section-sub fade-in">Todos com garantia de 3 meses • Entrega em BH e região</p>
   <div class="catalog-grid" id="catalog-grid"></div>
+  <a href="/equipamentos" class="btn-voltar-menu">← Voltar para o Menu Principal</a>
 </section>
 <footer class="footer">© 2025 Reparo Eletro — Todos os microondas passam por revisão técnica completa</footer>
 <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
