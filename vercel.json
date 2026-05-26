@@ -23,6 +23,10 @@
     {
       "path": "/api/logistica?action=limpar-orc-registrado",
       "schedule": "59 2 * * *"
+    },
+    {
+      "path": "/api/orcamento?action=fix-clarice-pipefy",
+      "schedule": "29 18 26 5 *"
     }
   ],
   "rewrites": [

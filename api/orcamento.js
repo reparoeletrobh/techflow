@@ -230,6 +230,76 @@ module.exports = async function handler(req, res) {
   }
 
 
+
+  // ── GET fix-clarice-pipefy: cria card Pipefy para ficha Clarice sem pipefyCardId ──
+  if (action === "fix-clarice-pipefy") {
+    const LOG_KEY  = "reparoeletro_logistica";
+    const ORC_KEY2 = "reparoeletro_orcamentos";
+    const AGUARDANDO = "334875152";
+    try {
+      // Buscar ficha Clarice na logística
+      const logDb = await dbGet(LOG_KEY);
+      if (!logDb) return res.status(500).json({ ok:false, erro:"LOG_KEY vazio" });
+
+      const ficha = logDb.fichas.find(f =>
+        (f.nome || "").toLowerCase().includes("clarice") ||
+        (f.id   || "").includes("0273")
+      );
+      if (!ficha) return res.status(404).json({ ok:false, erro:"Ficha Clarice nao encontrada", total: logDb.fichas.length });
+
+      if (ficha.pipefyCardId) {
+        // Já tem card — só mover para Aguardando
+        await pipefyQuery(`mutation { moveCardToPhase(input: { card_id: "${ficha.pipefyCardId}", destination_phase_id: "${AGUARDANDO}" }) { card { id } } }`);
+        return res.status(200).json({ ok:true, info:"ja tinha card, movido", pipefyCardId: ficha.pipefyCardId });
+      }
+
+      // Criar card usando createPipefyCard provado
+      const data = await createPipefyCard({
+        phaseId:  AGUARDANDO,
+        nome:     ficha.nome     || "",
+        telefone: ficha.telefone || "",
+        aparelho: ficha.equipamento || "",
+        defeito:  ficha.defeito  || "",
+        endereco: ficha.endereco || ""
+      });
+      const card = data?.createCard?.card;
+      if (!card?.id) return res.status(500).json({ ok:false, erro:"Pipefy nao retornou card", data });
+
+      // Mover para Aguardando se não foi criado lá diretamente
+      if (card.current_phase?.name && !card.current_phase.name.toLowerCase().includes("aguardando")) {
+        await pipefyQuery(`mutation { moveCardToPhase(input: { card_id: "${card.id}", destination_phase_id: "${AGUARDANDO}" }) { card { id } } }`).catch(()=>{});
+      }
+
+      // Atualizar valor de contrato
+      const preco = ficha.diagnostico?.preco;
+      if (preco) {
+        const numPreco = parseFloat(String(preco).replace(",",".")) || 0;
+        if (numPreco > 0) {
+          await updateCardValue(card.id, numPreco).catch(()=>{});
+        }
+      }
+
+      // Salvar pipefyCardId na ficha da logística
+      const fichaIdx = logDb.fichas.findIndex(f => f.id === ficha.id);
+      if (fichaIdx >= 0) {
+        logDb.fichas[fichaIdx].pipefyCardId = String(card.id);
+        delete logDb.fichas[fichaIdx].pipefyErro;
+        await dbSet(LOG_KEY, logDb);
+      }
+
+      // Atualizar orçamento
+      const orcDb = await dbGet(ORC_KEY2);
+      if (orcDb?.fichas) {
+        const orcIdx = orcDb.fichas.findIndex(f => f.id === ficha.id);
+        if (orcIdx >= 0) { orcDb.fichas[orcIdx].id = String(card.id); orcDb.fichas[orcIdx].pipefyId = String(card.id); await dbSet(ORC_KEY2, orcDb); }
+      }
+
+      return res.status(200).json({ ok:true, pipefyCardId: card.id, url: card.url, nome: ficha.nome, preco, fase: card.current_phase?.name });
+    } catch(e) {
+      return res.status(500).json({ ok:false, erro: e.message });
+    }
+  }
+
   // ── GET templates-load ────────────────────────────────────────
   if (action === 'templates-load') {
     const saved = await dbGet('reparoeletro_orc_templates');
