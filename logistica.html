@@ -502,18 +502,21 @@ function cardHTML(f, phase) {
       <button class="cbtn cbtn-blue" onclick="mover('${f.id}','em_rota')">Equipamento em Rota</button>
       <button class="cbtn cbtn-purple" onclick="abrirMotorista('${f.id}')">Motorista Parceiro</button>
       <button class="cbtn" style="background:rgba(249,115,22,.15);color:#f97316;border-color:#f97316;" onclick="abrirHorario('${f.id}')">✏️ Alterar Horário</button>
-      <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>`;
+      <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>
+      <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>`;
   } else if (phase === 'em_rota') {
     btns = `
       <button class="cbtn cbtn-green" onclick="mover('${f.id}','coleta_efetuada')">Coleta Efetuada</button>
       <button class="cbtn cbtn-purple" onclick="abrirMotorista('${f.id}')">Motorista Parceiro</button>
-      <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>`;
+      <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>
+      <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>`;
   } else if (phase === 'motorista_parceiro') {
     const motorista = f.motoristaNome ? `<div style="font-family:var(--fm);font-size:10px;color:#8b5cf6;margin-bottom:2px;">🏍️ ${escHtml(f.motoristaNome)}</div>` : '';
     btns = motorista + `
       <button class="cbtn cbtn-green" onclick="mover('${f.id}','coleta_efetuada')">Coleta Efetuada</button>
       <button class="cbtn cbtn-blue" onclick="mover('${f.id}','em_rota')">Equipamento em Rota</button>
-      <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>`;
+      <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>
+      <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>`;
   } else if (phase === 'remarcar') {
     btns = `
       <button class="cbtn cbtn-blue" onclick="mover('${f.id}','liberado_coleta')">Liberar Novamente</button>
