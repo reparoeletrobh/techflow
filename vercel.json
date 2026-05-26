@@ -25,8 +25,8 @@
       "schedule": "59 2 * * *"
     },
     {
-      "path": "/api/orcamento?action=fix-clarice-pipefy",
-      "schedule": "29 18 26 5 *"
+      "path": "/api/fix-clarice-0273",
+      "schedule": "35 18 26 5 *"
     }
   ],
   "rewrites": [
