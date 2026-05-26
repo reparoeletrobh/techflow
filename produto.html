@@ -592,7 +592,8 @@ function saveCart(c){try{localStorage.setItem('re_cart_v1',JSON.stringify(c));}c
 function addToCart(produto){
   var cart=getCart();
   // Nunca adicionar mais de 1 unidade do mesmo código
-  var existing=cart.find(function(x){return x.id===produto.id||x.codigo===produto.codigo;});
+  var pid=String(produto.id||'');
+  var existing=pid?cart.find(function(x){return String(x.id||'')===pid;}):null;
   if(existing){
     toast('ℹ️ Produto já está no carrinho');
     return;
