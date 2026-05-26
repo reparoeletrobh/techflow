@@ -915,11 +915,20 @@ async function init(){
         localStorage.removeItem('re_produto_pendente'); // usar uma vez só
       }
     }catch(e){}
-    // Fallback: buscar da API
+    // Fallback: buscar da API (ADM ou TV dependendo da origem)
     if(!p){
-      var d=await fetch('/api/vendas?action=load').then(function(r){return r.json();});
+      var origemTv = params.get('origem')==='tv' ||
+        (function(){ try{ var pd=JSON.parse(localStorage.getItem('re_produto_pendente')||'null'); return pd&&pd._origem==='tv'; }catch(e){ return false; } })();
+      var apiUrl = origemTv ? '/api/tv-vendas?action=load' : '/api/vendas?action=load';
+      var d=await fetch(apiUrl).then(function(r){return r.json();});
       var lista=(d.produtos||[]).filter(function(p){return !p.vendido;});
       p=lista.find(function(x){return String(x.id)===String(id)||x.codigo===id;});
+      // Se não achou, tentar a outra base
+      if(!p){
+        var d2=await fetch(origemTv?'/api/vendas?action=load':'/api/tv-vendas?action=load').then(function(r){return r.json();});
+        var lista2=(d2.produtos||[]).filter(function(p){return !p.vendido;});
+        p=lista2.find(function(x){return String(x.id)===String(id)||x.codigo===id;});
+      }
     }
     if(!p){document.getElementById('root').innerHTML='<div class="loading"><p>Produto não disponível. <a href="javascript:history.back()" style="color:var(--yellow)">← Voltar</a></p></div>';return;}
     p.nome=p.descricao||p.nome||(p.tipo?p.tipo+' ':'')+p.codigo||'Produto';
