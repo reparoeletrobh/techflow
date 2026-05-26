@@ -754,10 +754,7 @@ async function enviarCheckout(){
 
 // ── CTAs produto ──────────────────────────────────────────────
 function urlCatalogo(){
-  if(!PROD) return '/microondas-vsl?produto=microondas&cta=ck';
-  var tipo=(PROD.tipo||'').toLowerCase();
-  var isPuri = tipo.includes('bebedouro')||tipo.includes('purificador');
-  return '/microondas-vsl?produto='+(isPuri?'purificador':'microondas')+'&cta=ck';
+  return '/equipamentos';
 }
 function abrirWA(){
   if(!PROD)return;
@@ -876,8 +873,9 @@ function render(p){
     <h2 class="sh">Temos mais opções<br><em>esperando por você</em></h2>
     <p class="ss" style="margin:0 auto">Micro-ondas e purificadores revisados, com garantia, entrega em BH.</p>
     <div class="cta-btns">
-      <a href="/microondas-vsl?produto=microondas&cta=ck" class="btncta">📡 Conhecer mais Microondas</a>
-      <a href="/microondas-vsl?produto=purificador&cta=ck" class="btncta blue">💧 Conhecer a Linha de Purificadores</a>
+      <a href="/microondas-vsl?produto=microondas&cta=ck" class="btncta">📡 Microondas</a>
+      <a href="/microondas-vsl?produto=purificador&cta=ck" class="btncta blue">💧 Purificadores</a>
+      <a href="/microondas-vsl?produto=televisao&cta=ck" class="btncta" style="background:linear-gradient(135deg,#1a2a3a,#0f1e2e);border-color:rgba(59,158,255,.3);color:#3b9eff;">📺 Televisões</a>
     </div>
   </div>
 </section>
