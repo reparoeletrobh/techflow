@@ -195,7 +195,9 @@ module.exports = async function handler(req, res) {
     if (!nome || !telefone || !aparelho || !defeito)
       return res.status(400).json({ ok: false, error: "nome, telefone, aparelho e defeito são obrigatórios" });
     // horarioColeta vem quando o cliente escolheu "Agendar Coleta"
-    const horarioColeta = req.body?.horarioColeta || null;
+    const horarioColeta  = req.body?.horarioColeta  || null;
+    const coletaAgendada = req.body?.coletaAgendada || false;
+    const coletaDataTexto = req.body?.coletaDataTexto || null;
 
     try {
       const card = await createPipefyCard({ phaseId, nome, telefone, aparelho, defeito, endereco: endereco || "" });
@@ -209,8 +211,8 @@ module.exports = async function handler(req, res) {
           .then(r=>r.json()).then(j=>j.result ? JSON.parse(j.result) : { fichas:[], nextId:1 });
         const logId = 'LOG-' + String(logDb.nextId || 1).padStart(4,'0');
 
-        // Se veio horário agendado → entra direto em horario_marcado
-        const phaseLogistica  = horarioColeta ? 'horario_marcado' : 'liberado_coleta';
+        // Se agendado → horario_marcado (mesmo se o parse do horário falhou)
+        const phaseLogistica  = (horarioColeta || coletaAgendada) ? 'horario_marcado' : 'liberado_coleta';
 
         logDb.fichas.unshift({
           id: logId, nome, telefone: telefone||'', endereco: endereco||'',
@@ -218,6 +220,7 @@ module.exports = async function handler(req, res) {
           pipefyCardId: card?.id || null, texto: texto||'',
           phase: phaseLogistica,
           horarioColeta: horarioColeta || null,
+          horarioColetaTexto: coletaDataTexto || null, // texto original digitado pelo operador
           criadoEm: new Date().toISOString(),
           movedAt: new Date().toISOString(),
           diagnostico: null,

@@ -189,24 +189,58 @@ var botando = false, aguardandoFicha = true, aguardandoColeta = false, aguardand
 // ── Parse data de coleta agendada para ISO ─────────────────
 function parseColetaHorario(str) {
   if (!str) return null;
-  // Formatos: "18/03 as 14:00" | "18/03 às 14:00" | "18/03/2026 as 14:00"
-  var m = str.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\s+(?:as|às|a)\s+(\d{1,2}):(\d{2})/i);
-  if (!m) {
-    // Tentar só hora sem data "14:00" (assume hoje)
-    var mh = str.match(/^(\d{1,2}):(\d{2})$/);
-    if (mh) {
-      var n = new Date();
-      n.setHours(parseInt(mh[1]), parseInt(mh[2]), 0, 0);
-      return n.toISOString();
-    }
-    return null;
+  var s = str.trim();
+  var now = new Date();
+
+  // Extrair hora da string — aceita "14:00", "14h00", "14h", "14hrs"
+  function extrairHora(txt) {
+    var m = txt.match(/(\d{1,2})[h:](\d{2})?/i);
+    if (!m) return null;
+    return { h: parseInt(m[1]), min: parseInt(m[2] || '0') };
   }
-  var day = parseInt(m[1]), month = parseInt(m[2]) - 1;
-  var year = m[3] ? parseInt(m[3]) : new Date().getFullYear();
-  var hour = parseInt(m[4]), min = parseInt(m[5]);
-  var d = new Date(year, month, day, hour, min, 0, 0);
-  if (isNaN(d.getTime())) return null;
-  return d.toISOString();
+
+  // Tentar DD/MM ou DD/MM/YYYY (com ou sem "as"/"às"/"a")
+  var mData = s.match(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{4}))?/);
+  var hora  = extrairHora(s);
+
+  if (mData && hora) {
+    var day   = parseInt(mData[1]);
+    var month = parseInt(mData[2]) - 1;
+    var year  = mData[3] ? parseInt(mData[3]) : now.getFullYear();
+    var d = new Date(year, month, day, hora.h, hora.min, 0, 0);
+    if (!isNaN(d.getTime())) return d.toISOString();
+  }
+
+  // Palavras-chave de dia relativo
+  var diaBase = null;
+  if (/hoje/i.test(s)) {
+    diaBase = new Date(now);
+  } else if (/amanh[ãa]/i.test(s)) {
+    diaBase = new Date(now); diaBase.setDate(diaBase.getDate() + 1);
+  } else {
+    // Dias da semana
+    var dias = ['domingo','segunda','terça','terca','quarta','quinta','sexta','sábado','sabado'];
+    var num  = [0,1,2,2,3,4,5,6,6];
+    for (var i = 0; i < dias.length; i++) {
+      if (s.toLowerCase().includes(dias[i])) {
+        var diff = (num[i] - now.getDay() + 7) % 7 || 7;
+        diaBase = new Date(now); diaBase.setDate(now.getDate() + diff);
+        break;
+      }
+    }
+  }
+  if (diaBase && hora) {
+    diaBase.setHours(hora.h, hora.min, 0, 0);
+    if (!isNaN(diaBase.getTime())) return diaBase.toISOString();
+  }
+
+  // Só hora — assume hoje
+  if (hora) {
+    var d2 = new Date(now); d2.setHours(hora.h, hora.min, 0, 0);
+    return d2.toISOString();
+  }
+
+  return null; // não conseguiu parsear
 }
 var dados = {}, coletaInfo = null;
 
@@ -381,7 +415,9 @@ async function criarCard() {
         aparelho: dados.aparelho, defeito: coletaTexto + dados.defeito,
         endereco: dados.endereco || "", phaseId: solicitarColetaId,
         horarioColeta: (coletaInfo && coletaInfo.tipo === "agendar")
-          ? parseColetaHorario(coletaInfo.dataHora) : null
+          ? parseColetaHorario(coletaInfo.dataHora) : null,
+        coletaAgendada: (coletaInfo && coletaInfo.tipo === "agendar") ? true : false,
+        coletaDataTexto: (coletaInfo && coletaInfo.tipo === "agendar") ? coletaInfo.dataHora : null
       }),
     });
     var d = await r.json(); hideTyping();
