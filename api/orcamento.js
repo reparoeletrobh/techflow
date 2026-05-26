@@ -194,6 +194,9 @@ module.exports = async function handler(req, res) {
 
     if (!nome || !telefone || !aparelho || !defeito)
       return res.status(400).json({ ok: false, error: "nome, telefone, aparelho e defeito são obrigatórios" });
+    // horarioColeta vem quando o cliente escolheu "Agendar Coleta"
+    const horarioColeta = req.body?.horarioColeta || null;
+
     try {
       const card = await createPipefyCard({ phaseId, nome, telefone, aparelho, defeito, endereco: endereco || "" });
 
@@ -205,11 +208,16 @@ module.exports = async function handler(req, res) {
         const logDb = await fetch(`${U2}/get/${LOG_KEY}`, { headers: { Authorization: `Bearer ${T2}` } })
           .then(r=>r.json()).then(j=>j.result ? JSON.parse(j.result) : { fichas:[], nextId:1 });
         const logId = 'LOG-' + String(logDb.nextId || 1).padStart(4,'0');
+
+        // Se veio horário agendado → entra direto em horario_marcado
+        const phaseLogistica  = horarioColeta ? 'horario_marcado' : 'liberado_coleta';
+
         logDb.fichas.unshift({
           id: logId, nome, telefone: telefone||'', endereco: endereco||'',
           equipamento: aparelho||'', defeito: defeito||'',
           pipefyCardId: card?.id || null, texto: texto||'',
-          phase: 'liberado_coleta',
+          phase: phaseLogistica,
+          horarioColeta: horarioColeta || null,
           criadoEm: new Date().toISOString(),
           movedAt: new Date().toISOString(),
           diagnostico: null,

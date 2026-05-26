@@ -185,6 +185,29 @@ header{display:flex;align-items:center;padding:0 24px;height:52px;border-bottom:
 // ── CADASTRO ──────────────────────────────────────────────────
 var phases = [], solicitarColetaId = null;
 var botando = false, aguardandoFicha = true, aguardandoColeta = false, aguardandoDataHora = false;
+
+// ── Parse data de coleta agendada para ISO ─────────────────
+function parseColetaHorario(str) {
+  if (!str) return null;
+  // Formatos: "18/03 as 14:00" | "18/03 às 14:00" | "18/03/2026 as 14:00"
+  var m = str.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\s+(?:as|às|a)\s+(\d{1,2}):(\d{2})/i);
+  if (!m) {
+    // Tentar só hora sem data "14:00" (assume hoje)
+    var mh = str.match(/^(\d{1,2}):(\d{2})$/);
+    if (mh) {
+      var n = new Date();
+      n.setHours(parseInt(mh[1]), parseInt(mh[2]), 0, 0);
+      return n.toISOString();
+    }
+    return null;
+  }
+  var day = parseInt(m[1]), month = parseInt(m[2]) - 1;
+  var year = m[3] ? parseInt(m[3]) : new Date().getFullYear();
+  var hour = parseInt(m[4]), min = parseInt(m[5]);
+  var d = new Date(year, month, day, hour, min, 0, 0);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
 var dados = {}, coletaInfo = null;
 
 function autoResize(el) { el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 160) + "px"; }
@@ -353,7 +376,13 @@ async function criarCard() {
     }
     var r = await fetch("/api/orcamento?action=criar-card", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nome: dados.nome, telefone: dados.telefone, aparelho: dados.aparelho, defeito: coletaTexto + dados.defeito, endereco: dados.endereco || "", phaseId: solicitarColetaId }),
+      body: JSON.stringify({
+        nome: dados.nome, telefone: dados.telefone,
+        aparelho: dados.aparelho, defeito: coletaTexto + dados.defeito,
+        endereco: dados.endereco || "", phaseId: solicitarColetaId,
+        horarioColeta: (coletaInfo && coletaInfo.tipo === "agendar")
+          ? parseColetaHorario(coletaInfo.dataHora) : null
+      }),
     });
     var d = await r.json(); hideTyping();
     if (d.ok) { addBot("✅ Card criado no Pipefy!\n\n" + dados.nome + " cadastrado em Solicitar Coleta.", ["Novo cadastro"]); }
