@@ -72,7 +72,7 @@ export default async function handler(req, res) {
   if (action === 'load-equipamentos') {
     const proto  = req.headers['x-forwarded-proto'] || 'https';
     const host   = req.headers.host;
-    const d      = await fetch(`${proto}://${host}/api/vendas?action=load`).then(r => r.json());
+    const d      = await fetch(`${proto}://${host}/api/tv-vendas?action=load`).then(r => r.json());
     const prods  = (d.produtos || []).filter(p => !p.vendido);
     const cfg    = (await dbGet(CFG_KEY)) || {};
     return res.status(200).json({

@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Checkout ADM</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050508;--s:#0d0d14;--s2:#13131e;--b:#1e1e2e;
+  --text:#e8e8f0;--muted:#5a5a7a;--m2:#8a8aaa;
+  --yellow:#f0b429;--green:#10b981;--blue:#3b9eff;
+  --red:#ef4444;--orange:#f97316;--purple:#a855f7;
+  --fh:'Syne',sans-serif;--fb:'Inter',sans-serif;--fm:'DM Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:14px;min-height:100vh}
+
+/* TABS */
+.tabs{display:flex;gap:2px;padding:20px 20px 0;background:var(--bg);position:sticky;top:0;z-index:50;border-bottom:1px solid var(--b)}
+.tab{padding:9px 18px;border-radius:8px 8px 0 0;font-family:var(--fm);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;color:var(--m2);border:1px solid transparent;border-bottom:none;transition:all .15s;white-space:nowrap}
+.tab.on{background:var(--s);border-color:var(--b);color:var(--text)}
+.tab-n{background:var(--red);color:#fff;border-radius:99px;padding:1px 5px;font-size:9px;margin-left:4px;vertical-align:top}
+
+/* PANELS */
+.panel{display:none;padding:20px;max-width:1140px}
+.panel.on{display:block}
+
+/* CARDS */
+.card{background:var(--s);border:1px solid var(--b);border-radius:12px;padding:20px;margin-bottom:16px}
+.card-hd{font-family:var(--fm);font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--m2);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card-hd::before{content:'';width:3px;height:13px;background:var(--yellow);border-radius:2px;flex-shrink:0}
+
+/* GRID */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.g1{display:grid;grid-template-columns:1fr;gap:14px}
+
+/* FORM */
+label{display:block;font-family:var(--fm);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--m2);margin-bottom:5px}
+input,select,textarea{width:100%;background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:9px 12px;font-family:var(--fb);font-size:13px;color:var(--text);outline:none;transition:border-color .15s;resize:vertical}
+input:focus,select:focus,textarea:focus{border-color:rgba(59,158,255,.4)}
+input::placeholder,textarea::placeholder{color:var(--muted)}
+select option{background:var(--s2)}
+.code-input{font-family:var(--fm);font-size:12px;min-height:100px}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:8px;font-family:var(--fb);font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all .15s;text-decoration:none}
+.b-primary{background:var(--yellow);color:#000}.b-primary:hover{background:#f5c242;transform:translateY(-1px)}
+.b-ghost{background:transparent;color:var(--m2);border:1px solid var(--b)}.b-ghost:hover{color:var(--text);border-color:var(--m2)}
+.b-red{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2)}.b-red:hover{background:rgba(239,68,68,.2)}
+.b-green{background:rgba(16,185,129,.1);color:var(--green);border:1px solid rgba(16,185,129,.2)}.b-green:hover{background:rgba(16,185,129,.2)}
+.b-sm{padding:6px 12px;font-size:12px}
+
+/* ROW HEADER */
+.row-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.sec-title{font-family:var(--fh);font-size:20px;font-weight:800}.sec-title span{color:var(--yellow)}
+
+/* PROVEDOR */
+.prov-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.prov-card{background:var(--s2);border:2px solid var(--b);border-radius:10px;padding:14px 12px;cursor:pointer;transition:all .15s;text-align:center}
+.prov-card:hover{border-color:var(--m2)}.prov-card.sel{border-color:var(--yellow);background:rgba(240,180,41,.05)}
+.prov-icon{font-size:26px;margin-bottom:7px}
+.prov-name{font-weight:600;font-size:13px;margin-bottom:3px}
+.prov-desc{font-size:10px;color:var(--m2);line-height:1.4}
+
+/* EQUIP */
+.etabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.etab{padding:6px 14px;border-radius:6px;font-family:var(--fm);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;border:1px solid var(--b);color:var(--m2);transition:all .15s}
+.etab.on{border-color:var(--yellow);color:var(--yellow);background:rgba(240,180,41,.06)}
+.egrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.ecard{background:var(--s2);border:1px solid var(--b);border-radius:10px;overflow:hidden;transition:border-color .2s}
+.ecard:hover{border-color:rgba(59,158,255,.3)}.ecard.dest{border-color:var(--yellow)}
+.eimg{width:100%;aspect-ratio:4/3;object-fit:cover;background:var(--s);cursor:default}
+.eimg-ph{width:100%;aspect-ratio:4/3;background:var(--s);display:flex;align-items:center;justify-content:center;font-size:32px}
+.ebody{padding:12px}
+.eos{font-family:var(--fm);font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase}
+.ename{font-family:var(--fh);font-size:15px;font-weight:800;margin:3px 0 8px;line-height:1.2}
+.epreco{font-family:var(--fh);font-size:19px;color:var(--green);font-weight:900}
+.epreco-old{font-size:11px;color:var(--muted);text-decoration:line-through;margin-left:5px}
+.ebadges{display:flex;gap:5px;flex-wrap:wrap;margin:7px 0}
+.badge{font-family:var(--fm);font-size:9px;letter-spacing:1px;padding:2px 7px;border-radius:4px}
+.bdest{background:rgba(240,180,41,.12);color:var(--yellow);border:1px solid rgba(240,180,41,.25)}
+.bdisc{background:rgba(16,185,129,.1);color:var(--green);border:1px solid rgba(16,185,129,.2)}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+.stat{background:var(--s2);border:1px solid var(--b);border-radius:10px;padding:16px;text-align:center}
+.stat-val{font-family:var(--fh);font-size:26px;font-weight:900;color:var(--yellow)}
+.stat-lbl{font-size:10px;color:var(--m2);margin-top:4px;font-family:var(--fm);letter-spacing:1px;text-transform:uppercase}
+
+/* VENDA ROW */
+.vrow{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--b)}
+.vrow:last-child{border:none}
+.vos{font-family:var(--fm);font-size:10px;color:var(--muted);width:54px;flex-shrink:0}
+.vinfo{flex:1;min-width:0}
+.vnome{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vcomp{font-size:11px;color:var(--m2)}
+.vprov{font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:4px;background:rgba(59,158,255,.1);color:var(--blue);white-space:nowrap;flex-shrink:0}
+.vval{font-family:var(--fh);font-size:16px;font-weight:900;color:var(--green);white-space:nowrap;flex-shrink:0}
+.vdata{font-family:var(--fm);font-size:10px;color:var(--muted);white-space:nowrap;flex-shrink:0}
+
+/* MODAL */
+.ovl{display:none;position:fixed;inset:0;background:rgba(0,0,0,.87);z-index:200;align-items:center;justify-content:center;padding:16px}
+.ovl.on{display:flex}
+.modal{background:var(--s);border:1px solid var(--b);border-radius:14px;width:100%;max-width:420px;padding:22px}
+.modal-title{font-family:var(--fh);font-size:18px;font-weight:800;margin-bottom:18px}
+
+/* VSL LINKS */
+.vsl-link{background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:12px 14px}
+.vsl-link-label{font-family:var(--fm);font-size:9px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px}
+.vsl-link-url{font-size:11px;color:var(--m2);word-break:break-all;margin-bottom:8px}
+.vsl-link-btns{display:flex;gap:6px}
+
+/* STATUS DOT */
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dok{background:var(--green)}.dwarn{background:var(--yellow)}.derr{background:var(--red)}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--s);border:1px solid var(--b);border-radius:10px;padding:11px 18px;font-size:13px;z-index:999;transform:translateY(16px);opacity:0;transition:all .25s;display:flex;align-items:center;gap:8px;max-width:320px}
+.toast.show{transform:none;opacity:1}
+.tok{border-color:rgba(16,185,129,.35);color:var(--green)}
+.terr{border-color:rgba(239,68,68,.35);color:var(--red)}
+
+@media(max-width:600px){
+  .g2,.g3{grid-template-columns:1fr}
+  .stats{grid-template-columns:1fr 1fr}
+  .tabs{gap:0;overflow-x:auto}
+  .tab{font-size:9px;padding:8px 12px}
+}
+.vbtns{display:flex;gap:5px;flex-shrink:0;margin-left:4px}
+.vbtn{padding:4px 9px;border-radius:5px;font-family:var(--fb);font-size:11px;font-weight:600;border:none;cursor:pointer;transition:all .15s;white-space:nowrap}
+.vbtn-ver{background:rgba(59,158,255,.12);color:#3b9eff}.vbtn-ver:hover{background:rgba(59,158,255,.22)}
+.vbtn-wa{background:rgba(37,211,102,.12);color:#25d366}.vbtn-wa:hover{background:rgba(37,211,102,.22)}
+.vbtn-del{background:rgba(255,75,75,.07);color:#ff4b4b}.vbtn-del:hover{background:rgba(255,75,75,.18)}
+.sep-body{font-family:var(--fm);font-size:11px;line-height:1.9;white-space:pre-wrap;color:var(--text);background:var(--s2);border-radius:8px;padding:14px;margin-bottom:14px;max-height:360px;overflow-y:auto}
+</style>
+</head>
+<body>
+
+<!-- TABS -->
+<div class="tabs" id="tabs">
+  <div class="tab on" onclick="tab('video')">🎬 Vídeo VSL</div>
+  <div class="tab"    onclick="tab('pagamento')">💳 Pagamento</div>
+  <div class="tab"    onclick="tab('catalogo')">📦 Catálogo</div>
+  <div class="tab"    onclick="tab('relatorio')">📊 Relatório<span class="tab-n" id="n-vendas">0</span></div>
+</div>
+
+<!-- ═══ VÍDEO ═══ -->
+<div class="panel on" id="p-video">
+  <div class="row-hd">
+    <div class="sec-title">Vídeo <span>VSL</span></div>
+    <button class="btn b-primary" onclick="saveVideo()">💾 Salvar</button>
+  </div>
+
+  <div class="card">
+    <div class="card-hd">Código Embed do Vídeo</div>
+    <div class="g1">
+      <div>
+        <label>Cole o HTML do VTurb, Wistia, YouTube ou qualquer embed</label>
+        <textarea id="video-html" class="code-input" placeholder='<script src="https://scripts.converteai.net/..."></script>&#10;ou <iframe ...> ou qualquer embed HTML'></textarea>
+      </div>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn b-ghost b-sm" onclick="previewVid()">👁 Preview</button>
+      <button class="btn b-red b-sm"   onclick="document.getElementById('video-html').value='';toast('Limpo','ok')">🗑 Limpar</button>
+      <span id="vid-status" style="font-size:11px;color:var(--muted)"></span>
+    </div>
+  </div>
+
+  <div class="card" id="preview-card" style="display:none">
+    <div class="card-hd">Preview</div>
+    <div id="preview-area" style="background:#000;border-radius:8px;min-height:180px;display:flex;align-items:center;justify-content:center"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd">Links das 4 Versões</div>
+    <div class="g2" id="vsl-links"></div>
+  </div>
+</div>
+
+<!-- ═══ PAGAMENTO ═══ -->
+<div class="panel" id="p-pagamento">
+  <div class="row-hd">
+    <div class="sec-title">Provedor de <span>Pagamento</span></div>
+    <button class="btn b-primary" onclick="savePag()">💾 Salvar</button>
+  </div>
+
+  <div class="card">
+    <div class="card-hd">Escolha o Provedor</div>
+    <div class="prov-grid" id="prov-grid"></div>
+  </div>
+
+  <div class="card" id="prov-cfg-card" style="display:none">
+    <div class="card-hd">Configuração</div>
+    <div id="prov-cfg"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd">Status</div>
+    <div id="integ-status" style="display:flex;align-items:center;gap:10px;font-size:13px">
+      <div class="dot dwarn"></div><span>Configure e salve para ativar</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CATÁLOGO ═══ -->
+<div class="panel" id="p-catalogo">
+  <div class="row-hd">
+    <div class="sec-title">Catálogo de <span>Equipamentos</span></div>
+    <button class="btn b-ghost b-sm" onclick="loadEquip()">🔄 Atualizar</button>
+  </div>
+  <div class="etabs">
+    <div class="etab on" data-t="micro" onclick="filt(this)">📺 Microondas <span id="ct-micro"></span></div>
+    <div class="etab"    data-t="bebe"  onclick="filt(this)">💧 Bebedouros <span id="ct-bebe"></span></div>
+  </div>
+  <div class="egrid" id="egrid">
+    <div style="color:var(--muted);font-family:var(--fm);font-size:12px">Carregando...</div>
+  </div>
+</div>
+
+<!-- ═══ RELATÓRIO ═══ -->
+<div class="panel" id="p-relatorio">
+  <div class="row-hd">
+    <div class="sec-title">Relatório de <span>Vendas</span></div>
+    <button class="btn b-ghost b-sm" onclick="loadVendas()">🔄 Atualizar</button>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-val" id="r-ct">—</div><div class="stat-lbl">Vendas</div></div>
+    <div class="stat"><div class="stat-val" id="r-tot">—</div><div class="stat-lbl">Receita</div></div>
+    <div class="stat"><div class="stat-val" id="r-tkt">—</div><div class="stat-lbl">Ticket Médio</div></div>
+  </div>
+  <div class="card">
+    <div class="card-hd">Vendas Realizadas</div>
+    <div id="vlist"><div style="color:var(--muted);font-family:var(--fm);font-size:12px">Sem vendas ainda</div></div>
+  </div>
+</div>
+
+<!-- MODAL VER VENDA -->
+<div class="ovl" id="ovl-sep">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-title">📦 Ficha de Separação</div>
+    <div class="sep-body" id="sep-body"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn b-primary" id="sep-wa-btn" onclick="enviarSepWA()">💬 Enviar ao Cliente</button>
+      <button class="btn b-ghost" onclick="closeOvl('ovl-sep')">Fechar</button>
+    </div>
+  </div>
+</div>
+<!-- MODAL DESTAQUE -->
+<div class="ovl" id="ovl-dest">
+  <div class="modal">
+    <div class="modal-title">⭐ Destaque / Promoção</div>
+    <input type="hidden" id="d-id">
+    <div class="g1" style="margin-bottom:12px">
+      <div><label>Produto</label><input id="d-nome" disabled style="opacity:.5"></div>
+    </div>
+    <div class="g2" style="margin-bottom:12px">
+      <div><label>Desconto (%)</label><input type="number" id="d-desc" min="0" max="90" placeholder="ex: 20"></div>
+      <div><label>Badge</label><input id="d-badge" placeholder='ex: 🔥 OFERTA, DESTAQUE'></div>
+    </div>
+    <div class="g1" style="margin-bottom:16px">
+      <div><label>Prioridade (maior = primeiro)</label><input type="number" id="d-prio" min="0" placeholder="0"></div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn b-primary" style="flex:1" onclick="saveDest()">💾 Salvar</button>
+      <button class="btn b-red b-sm"   onclick="removeDest()">🗑</button>
+      <button class="btn b-ghost b-sm" onclick="closeOvl('ovl-dest')">✕</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var CFG={}, EQUIP=[], VENDAS=[], TIPO='micro';
+
+var PROVS=[
+  {id:'whatsapp',  ico:'💬',name:'WhatsApp',    desc:'Pedido via WhatsApp (manual)',  flds:[]},
+  {id:'mp',        ico:'🛒',name:'Mercado Pago', desc:'Checkout via link MP',          flds:[{k:'link',l:'Link de Pagamento MP'}]},
+  {id:'stripe',    ico:'⚡',name:'Stripe',        desc:'Checkout Stripe',               flds:[{k:'link',l:'Link do Payment Link'}]},
+  {id:'pagseguro', ico:'🔵',name:'PagSeguro',    desc:'PagSeguro checkout',            flds:[{k:'link',l:'Link PagSeguro'}]},
+  {id:'hotmart',   ico:'🔥',name:'Hotmart',      desc:'Produto Hotmart',               flds:[{k:'link',l:'Link Hotmart'}]},
+  {id:'kiwify',    ico:'🥝',name:'Kiwify',       desc:'Produto Kiwify',                flds:[{k:'link',l:'Link Kiwify'}]},
+  {id:'custom',    ico:'🔗',name:'Link Externo', desc:'Qualquer URL de checkout',      flds:[{k:'link',l:'URL de Checkout'}]},
+];
+
+// ── INIT ─────────────────────────────────────────────────────────────────
+async function init(){
+  renderProvs(); renderLinks();
+  const d=await fetch('/api/adm-checkout?action=load-config').then(r=>r.json()).catch(()=>({}));
+  if(d.ok) applyConfig(d.config||{});
+  await loadEquip();
+  await loadVendas();
+}
+
+function applyConfig(cfg){
+  CFG=cfg;
+  if(cfg.videoHtml) document.getElementById('video-html').value=cfg.videoHtml;
+  updVidStatus();
+  const prov=cfg.pagamento?.provedor||'whatsapp';
+  document.querySelectorAll('.prov-card').forEach(c=>c.classList.toggle('sel',c.dataset.id===prov));
+  renderProvCfg(prov, cfg.pagamento?.config||{});
+  updIntegStatus(prov, cfg.pagamento?.config||{});
+}
+
+// ── TABS ─────────────────────────────────────────────────────────────────
+function tab(id){
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('on',['video','pagamento','catalogo','relatorio'][i]===id));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+  document.getElementById('p-'+id).classList.add('on');
+}
+
+// ── VIDEO ────────────────────────────────────────────────────────────────
+async function saveVideo(){
+  const html=document.getElementById('video-html').value;
+  const r=await fetch('/api/adm-checkout?action=save-config',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({videoHtml:html})
+  }).then(r=>r.json());
+  toast(r.ok?'✅ Vídeo salvo':'❌ '+r.error, r.ok?'ok':'err');
+  updVidStatus();
+}
+
+function updVidStatus(){
+  const v=document.getElementById('video-html').value.trim();
+  const s=document.getElementById('vid-status');
+  s.textContent=v?'✅ Código inserido ('+v.length+' chars)':'⚠️ Sem código';
+  s.style.color=v?'var(--green)':'var(--m2)';
+}
+
+function previewVid(){
+  const html=document.getElementById('video-html').value.trim();
+  if(!html){toast('Cole o código do vídeo','err');return;}
+  const c=document.getElementById('preview-card');
+  const a=document.getElementById('preview-area');
+  c.style.display='block';
+  a.innerHTML=html;
+  c.scrollIntoView({behavior:'smooth'});
+}
+
+function renderLinks(){
+  const base='https://reparoeletroadm.com/microondas-vsl';
+  const links=[
+    {lbl:'Microondas + WhatsApp', url:base+'?produto=microondas&cta=wa', c:'#10b981'},
+    {lbl:'Microondas + Checkout', url:base+'?produto=microondas&cta=ck', c:'var(--yellow)'},
+    {lbl:'Purificador + WhatsApp',url:base+'?produto=purificador&cta=wa',c:'#10b981'},
+    {lbl:'Purificador + Checkout',url:base+'?produto=purificador&cta=ck',c:'var(--yellow)'},
+  ];
+  document.getElementById('vsl-links').innerHTML=links.map(l=>
+    `<div class="vsl-link">
+      <div class="vsl-link-label" style="color:${l.c}">${l.lbl}</div>
+      <div class="vsl-link-url">${l.url}</div>
+      <div class="vsl-link-btns">
+        <button class="btn b-ghost b-sm" onclick="navigator.clipboard.writeText('${l.url}');toast('Copiado!','ok')">📋 Copiar</button>
+        <a href="${l.url}" target="_blank" class="btn b-ghost b-sm">🔗 Abrir</a>
+      </div>
+    </div>`
+  ).join('');
+}
+
+// ── PROVEDORES ───────────────────────────────────────────────────────────
+function renderProvs(){
+  document.getElementById('prov-grid').innerHTML=PROVS.map(p=>
+    `<div class="prov-card" data-id="${p.id}" onclick="selProv('${p.id}')">
+      <div class="prov-icon">${p.ico}</div>
+      <div class="prov-name">${p.name}</div>
+      <div class="prov-desc">${p.desc}</div>
+    </div>`
+  ).join('');
+}
+
+function selProv(id){
+  document.querySelectorAll('.prov-card').forEach(c=>c.classList.toggle('sel',c.dataset.id===id));
+  renderProvCfg(id, CFG.pagamento?.config||{});
+}
+
+function renderProvCfg(id, saved){
+  const p=PROVS.find(x=>x.id===id);
+  const card=document.getElementById('prov-cfg-card');
+  const flds=document.getElementById('prov-cfg');
+  if(!p?.flds?.length){card.style.display='none';return;}
+  card.style.display='block';
+  flds.innerHTML=`<div class="${p.flds.length>1?'g'+p.flds.length:'g1'}">` +
+    p.flds.map(f=>`<div><label>${f.l}</label>
+      <input class="pf" data-k="${f.k}" type="${f.k.includes('secret')||f.k.includes('token')?'password':'text'}"
+        value="${saved[f.k]||''}" placeholder="${f.l}..."></div>`).join('')+'</div>';
+}
+
+async function savePag(){
+  const id=document.querySelector('.prov-card.sel')?.dataset.id||'whatsapp';
+  const cfg={};
+  document.querySelectorAll('.pf').forEach(i=>{cfg[i.dataset.k]=i.value.trim();});
+  const r=await fetch('/api/adm-checkout?action=save-config',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({pagamento:{provedor:id,config:cfg}})
+  }).then(r=>r.json());
+  toast(r.ok?'✅ Salvo':'❌ '+r.error, r.ok?'ok':'err');
+  if(r.ok){CFG.pagamento={provedor:id,config:cfg};updIntegStatus(id,cfg);}
+}
+
+function updIntegStatus(id, cfg){
+  const p=PROVS.find(x=>x.id===id);
+  const ok=!p?.flds?.length||p.flds.every(f=>cfg[f.k]);
+  const s=document.getElementById('integ-status');
+  s.innerHTML=ok
+    ?`<div class="dot dok"></div><span style="color:var(--green)">${p?.ico||''} ${p?.name||''} ativo</span>`
+    :`<div class="dot dwarn"></div><span>Preencha as configurações e salve</span>`;
+}
+
+// ── EQUIPAMENTOS ─────────────────────────────────────────────────────────
+async function loadEquip(){
+  const d=await fetch('/api/adm-checkout?action=load-equipamentos').then(r=>r.json()).catch(()=>({}));
+  if(!d.ok)return;
+  EQUIP=d.produtos||[];
+  const m=EQUIP.filter(isMicro), b=EQUIP.filter(isBebe);
+  document.getElementById('ct-micro').textContent='('+m.length+')';
+  document.getElementById('ct-bebe').textContent='('+b.length+')';
+  renderEquip();
+}
+
+function isMicro(p){const t=(p.tipo||'').toLowerCase();return t==='microondas'||t.includes('micro');}
+function isBebe(p){const t=(p.tipo||'').toLowerCase();return t==='bebedouro'||t.includes('bebe')||t.includes('purif');}
+
+function filt(el){
+  document.querySelectorAll('.etab').forEach(t=>t.classList.remove('on'));
+  el.classList.add('on');TIPO=el.dataset.t;renderEquip();
+}
+
+function calcP(p){
+  const base=parseFloat(p.preco)||0;
+  const d=p._destaque;
+  if(!d?.ativo||!d.desconto)return{final:base,orig:null,pct:0};
+  const pct=parseFloat(d.desconto)||0;
+  return{final:base*(1-pct/100),orig:base,pct};
+}
+
+function R(n){return'R$ '+parseFloat(n).toFixed(2).replace('.',',');}
+
+function renderEquip(){
+  const list=(TIPO==='micro'?EQUIP.filter(isMicro):EQUIP.filter(isBebe))
+    .sort((a,b)=>(b._destaque?.prioridade||0)-(a._destaque?.prioridade||0));
+  const g=document.getElementById('egrid');
+  if(!list.length){g.innerHTML='<div style="color:var(--muted);font-family:var(--fm);font-size:12px">Nenhum disponível</div>';return;}
+  g.innerHTML=list.map(p=>{
+    const f=calcP(p);
+    const foto=Array.isArray(p.fotos)&&p.fotos.length?p.fotos[0]:'';
+    const d=p._destaque;
+    const esc=JSON.stringify(p).replace(/\\/g,'\\\\').replace(/"/g,'&quot;');
+    return `<div class="ecard ${d?.ativo?'dest':''}" id="ec-${p.id}">
+      ${foto?`<img class="eimg" src="${foto}" alt="${p.descricao||''}">`:
+        '<div class="eimg-ph">📦</div>'}
+      <div class="ebody">
+        <div class="eos">${p.codigo||'—'}</div>
+        <div class="ename">${p.descricao||p.tipo||'—'}</div>
+        <div style="display:flex;align-items:baseline;gap:4px">
+          <div class="epreco">${R(f.final)}</div>
+          ${f.orig?`<div class="epreco-old">${R(f.orig)}</div>`:''}
+        </div>
+        <div class="ebadges">
+          ${d?.ativo&&d.badge?`<span class="badge bdest">${d.badge}</span>`:''}
+          ${f.pct>0?`<span class="badge bdisc">-${f.pct}% OFF</span>`:''}
+        </div>
+        <div style="margin-top:8px">
+          <button class="btn b-ghost b-sm" style="width:100%" onclick="openDest(${esc})">
+            ${d?.ativo?'⭐ Editar Destaque':'⭐ Criar Destaque'}
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── DESTAQUE ─────────────────────────────────────────────────────────────
+function openDest(p){
+  document.getElementById('d-id').value=p.id;
+  document.getElementById('d-nome').value=p.descricao||p.tipo||'';
+  const d=p._destaque||{};
+  document.getElementById('d-desc').value=d.desconto||'';
+  document.getElementById('d-badge').value=d.badge||'';
+  document.getElementById('d-prio').value=d.prioridade||'';
+  document.getElementById('ovl-dest').classList.add('on');
+}
+
+async function saveDest(){
+  const id=document.getElementById('d-id').value;
+  const r=await fetch('/api/adm-checkout?action=set-destaque',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      id,
+      desconto:document.getElementById('d-desc').value,
+      badge:document.getElementById('d-badge').value.trim(),
+      prioridade:document.getElementById('d-prio').value,
+      ativo:true
+    })
+  }).then(r=>r.json());
+  if(r.ok){toast('✅ Destaque salvo','ok');closeOvl('ovl-dest');await loadEquip();}
+  else toast('❌ '+r.error,'err');
+}
+
+async function removeDest(){
+  const id=document.getElementById('d-id').value;
+  const r=await fetch('/api/adm-checkout?action=set-destaque',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id,ativo:false})
+  }).then(r=>r.json());
+  if(r.ok){toast('🗑 Removido','ok');closeOvl('ovl-dest');await loadEquip();}
+  else toast('❌ '+r.error,'err');
+}
+
+// ── VENDAS ───────────────────────────────────────────────────────────────
+async function loadVendas(){
+  const d=await fetch('/api/adm-checkout?action=load-vendas').then(r=>r.json()).catch(()=>({}));
+  if(!d.ok)return;
+  VENDAS=d.vendas||[];
+  document.getElementById('n-vendas').textContent=VENDAS.length||'0';
+  document.getElementById('r-ct').textContent=VENDAS.length;
+  document.getElementById('r-tot').textContent='R$ '+(d.total||0).toFixed(2).replace('.',',');
+  const tkt=VENDAS.length?(d.total/VENDAS.length).toFixed(2).replace('.',','):'0,00';
+  document.getElementById('r-tkt').textContent='R$ '+tkt;
+  const fdt=s=>new Date(s).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  document.getElementById('vlist').innerHTML=VENDAS.length?
+    VENDAS.slice(0,100).map((v,i)=>`<div class="vrow">
+      <div class="vos">${v.produto?.codigo||'—'}</div>
+      <div class="vinfo">
+        <div class="vnome">${v.produto?.descricao||v.produto?.nome||'—'}</div>
+        <div class="vcomp">${v.comprador?.nome||'—'} · ${v.comprador?.telefone||''}</div>
+      </div>
+      <div class="vprov">${v.provedor||'—'}</div>
+      <div class="vval">${R(v.valor)}</div>
+      <div class="vdata">${fdt(v.criadoEm)}</div>
+      <div class="vbtns">
+        <button class="vbtn vbtn-ver" onclick="verVenda(${i})">📦 Ver Venda</button>
+        <button class="vbtn vbtn-wa" onclick="iniciarConversa(${i})">💬 WA</button>
+        <button class="vbtn vbtn-del" onclick="removerVenda('${v.id}')">✕</button>
+      </div>
+    </div>`).join(''):
+    '<div style="color:var(--muted);font-family:var(--fm);font-size:12px;padding:8px 0">Sem vendas ainda</div>';
+}
+
+
+// ── VER VENDA / SEPARAÇÃO ────────────────────────────────────────────────
+var _vAtual=null;
+function textoSep(v){
+  const fm=n=>parseFloat(n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,style:'currency',currency:'BRL'});
+  const dt=new Date(v.criadoEm).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',year:'numeric'});
+  const pg=v.paymentMethod==='pix'?'PIX à vista':`Cartão ${v.installments||1}x`;
+  return ['📦 *SEPARAÇÃO — ALMOXARIFADO*','',
+    `📅 Data: ${dt}`,`🏷️ Código: ${v.produto?.codigo||'—'}`,
+    `📦 Produto: ${v.produto?.descricao||v.produto?.nome||'—'}`,
+    `💰 Valor: ${fm(v.valor)}`,`💳 Pagamento: ${pg}`,'',
+    `👤 Comprador: ${v.comprador?.nome||'—'}`,
+    v.comprador?.telefone?`📱 Telefone: ${v.comprador.telefone}`:null,
+    v.comprador?.cpf?`🪪 CPF: ${v.comprador.cpf}`:null,
+    v.comprador?.endereco?`📍 Endereço: ${v.comprador.endereco}`:null,
+    v.comprador?.cep?`📮 CEP: ${v.comprador.cep}`:null,
+    '',`🔑 ID: ${v.paymentId||'—'}`
+  ].filter(l=>l!==null).join('\n');
+}
+function verVenda(i){
+  _vAtual=VENDAS[i];if(!_vAtual)return;
+  document.getElementById('sep-body').textContent=textoSep(_vAtual);
+  document.getElementById('sep-wa-btn').style.display=_vAtual.comprador?.telefone?'':'none';
+  document.getElementById('ovl-sep').classList.add('on');
+}
+function enviarSepWA(){
+  if(!_vAtual)return;
+  const tel=(_vAtual.comprador?.telefone||'').replace(/\D/g,'');
+  if(!tel){toast('Telefone não disponível','err');return;}
+  window.open('https://wa.me/'+(tel.startsWith('55')?tel:'55'+tel)+'?text='+encodeURIComponent(textoSep(_vAtual)),'_blank');
+}
+function iniciarConversa(i){
+  const v=VENDAS[i];if(!v)return;
+  const tel=(v.comprador?.telefone||'').replace(/\D/g,'');
+  if(!tel){toast('Telefone não disponível','err');return;}
+  window.open('https://wa.me/'+(tel.startsWith('55')?tel:'55'+tel)+'?text='+encodeURIComponent(textoSep(v)),'_blank');
+}
+async function removerVenda(id){
+  if(!confirm('Remover esta venda do relatório?'))return;
+  const r=await fetch('/api/adm-checkout?action=remover-venda',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({vendaId:id})
+  }).then(r=>r.json()).catch(()=>({}));
+  if(r.ok){toast('✅ Removido','ok');await loadVendas();}
+  else toast('❌ Erro','err');
+}
+// ── HELPERS ──────────────────────────────────────────────────────────────
+function closeOvl(id){document.getElementById(id).classList.remove('on');}
+document.querySelectorAll('.ovl').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('on');}));
+
+function toast(msg,type){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast show t'+(type==='ok'?'ok':'err');
+  clearTimeout(window._tt);window._tt=setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+init();
+</script>
+</body>
+</html>

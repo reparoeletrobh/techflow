@@ -285,6 +285,14 @@
     {
       "source": "/produto",
       "destination": "/produto.html"
+    },
+    {
+      "source": "/checkout",
+      "destination": "/adm-checkout.html"
+    },
+    {
+      "source": "/api/adm-checkout",
+      "destination": "/api/adm-checkout.js"
     }
   ],
   "headers": [

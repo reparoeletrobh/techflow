@@ -1,0 +1,104 @@
+// api/adm-checkout.js — Checkout ADM (Microondas / Bebedouro)
+// Chaves separadas das de TV para manter relatórios independentes
+
+const U = process.env.UPSTASH_URL;
+const T = process.env.UPSTASH_TOKEN;
+const CFG_KEY    = 'reparoeletro_checkout_config';
+const VENDAS_KEY = 'reparoeletro_checkout_vendas';
+
+async function dbGet(k) {
+  const r = await fetch(`${U}/pipeline`, {
+    method:'POST',
+    headers:{ Authorization:`Bearer ${T}`, 'Content-Type':'application/json' },
+    body: JSON.stringify([['GET', k]])
+  });
+  const j = await r.json();
+  const v = j[0]?.result;
+  if (!v) return null;
+  const p = JSON.parse(v);
+  return typeof p === 'string' ? JSON.parse(p) : p;
+}
+
+async function dbSet(k, val) {
+  await fetch(`${U}/pipeline`, {
+    method:'POST',
+    headers:{ Authorization:`Bearer ${T}`, 'Content-Type':'application/json' },
+    body: JSON.stringify([['SET', k, JSON.stringify(val)]])
+  });
+}
+
+module.exports = async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+
+  const action = req.query.action || '';
+
+  // ── GET load-config ──────────────────────────────────────────
+  if (action === 'load-config') {
+    const cfg = (await dbGet(CFG_KEY)) || {};
+    return res.status(200).json({ ok:true, ...cfg });
+  }
+
+  // ── POST save-config ─────────────────────────────────────────
+  if (req.method === 'POST' && action === 'save-config') {
+    const { provedor, config } = req.body || {};
+    const cfg = (await dbGet(CFG_KEY)) || {};
+    if (provedor !== undefined) cfg.provedor = provedor;
+    if (config   !== undefined) cfg.config   = config;
+    await dbSet(CFG_KEY, cfg);
+    return res.status(200).json({ ok:true });
+  }
+
+  // ── POST set-destaque ────────────────────────────────────────
+  if (req.method === 'POST' && action === 'set-destaque') {
+    const { produtoId, destaque } = req.body || {};
+    const cfg = (await dbGet(CFG_KEY)) || {};
+    cfg.destaques = cfg.destaques || {};
+    if (destaque) cfg.destaques[produtoId] = destaque;
+    else delete cfg.destaques[produtoId];
+    await dbSet(CFG_KEY, cfg);
+    return res.status(200).json({ ok:true });
+  }
+
+  // ── GET load-equipamentos — carrega Microondas/Bebedouro ─────
+  if (action === 'load-equipamentos') {
+    const proto = req.headers['x-forwarded-proto'] || 'https';
+    const host  = req.headers.host;
+    const d     = await fetch(`${proto}://${host}/api/vendas?action=load`).then(r => r.json());
+    const prods = (d.produtos || []).filter(p => !p.vendido);
+    const cfg   = (await dbGet(CFG_KEY)) || {};
+    return res.status(200).json({
+      ok: true,
+      produtos: prods.map(p => ({ ...p, _destaque: cfg.destaques?.[p.id] || null }))
+    });
+  }
+
+  // ── POST registrar-venda ─────────────────────────────────────
+  if (req.method === 'POST' && action === 'registrar-venda') {
+    const { produto, comprador, valor, provedor, paymentId, paymentMethod, installments } = req.body || {};
+    if (!produto?.id) return res.status(400).json({ ok:false, error:'produto obrigatorio' });
+    const db = (await dbGet(VENDAS_KEY)) || { vendas: [] };
+    db.vendas.unshift({
+      id:            Date.now().toString(36),
+      produto, comprador, valor,
+      provedor:      provedor || 'mercado_pago',
+      paymentId:     paymentId     || null,
+      paymentMethod: paymentMethod || null,
+      installments:  installments  || null,
+      criadoEm:      new Date().toISOString()
+    });
+    await dbSet(VENDAS_KEY, db);
+    return res.status(200).json({ ok:true });
+  }
+
+  // ── GET load-vendas ──────────────────────────────────────────
+  if (action === 'load-vendas') {
+    const db    = (await dbGet(VENDAS_KEY)) || { vendas: [] };
+    const vendas = db.vendas || [];
+    const total  = vendas.reduce((s, v) => s + parseFloat(v.valor || 0), 0);
+    return res.status(200).json({ ok:true, vendas, total: parseFloat(total.toFixed(2)), count: vendas.length });
+  }
+
+  return res.status(404).json({ ok:false, error:'ação não encontrada' });
+};

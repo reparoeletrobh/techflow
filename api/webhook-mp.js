@@ -85,17 +85,28 @@ export default async function handler(req, res) {
       const meta=payment.metadata||{}, produtoIds=(meta.produto_ids||'').split(',').filter(Boolean);
       const nomeCliente=meta.comprador_nome||payment.payer?.first_name||'Comprador Online', telefone=meta.comprador_tel||'', cpf=meta.comprador_cpf||'', cep=meta.comprador_cep||'', endereco=meta.comprador_end||'';
       const modPag=payment.payment_method_id==='pix'?'PIX':`Cartao ${payment.installments}x`;
-      const VENDAS_KEY='reparoeletro_vendas', TV_KEY='tv_checkout_vendas';
+      const ADM_KEY='reparoeletro_vendas', TV_PROD_KEY='tv_vendas';
+      const ADM_CK='reparoeletro_checkout_vendas', TV_CK='tv_checkout_vendas';
       for (const produtoId of produtoIds) {
-        const db=(await dbGet(VENDAS_KEY))||{produtos:[]}, tvDb=(await dbGet(TV_KEY))||{vendas:[]};
-        const idx=db.produtos.findIndex(p=>p.id===String(produtoId)); if(idx<0) continue;
+        // Detectar se é ADM ou TV
+        let db, dbKey, ckKey, idx;
+        const admDb = (await dbGet(ADM_KEY))||{produtos:[]};
+        idx = admDb.produtos.findIndex(p=>p.id===String(produtoId));
+        if (idx >= 0) { db=admDb; dbKey=ADM_KEY; ckKey=ADM_CK; }
+        else {
+          const tvDb2 = (await dbGet(TV_PROD_KEY))||{produtos:[]};
+          idx = tvDb2.produtos.findIndex(p=>p.id===String(produtoId));
+          if (idx < 0) continue;
+          db=tvDb2; dbKey=TV_PROD_KEY; ckKey=TV_CK;
+        }
         const p=db.produtos[idx], now=new Date().toISOString();
         db.produtos[idx]={...p,vendido:true,soldAt:p.soldAt||now,vendidoEm:p.vendidoEm||now,nomeCliente,telefone:telefone||null,cpfCnpj:cpf||null,vendedor:'Mercado Pago',modalidade:modPag,paymentId:String(payId)};
-        await dbSet(VENDAS_KEY,db);
-        tvDb.vendas=tvDb.vendas||[];
-        if(!tvDb.vendas.find(v=>v.paymentId===String(payId))) {
-          tvDb.vendas.unshift({id:Date.now().toString(36),produto:{id:p.id,codigo:p.codigo,descricao:p.descricao,tipo:p.tipo||'',capacidade:p.capacidade||''},comprador:{nome:nomeCliente,telefone,cpf,endereco,cep},valor:payment.transaction_amount,provedor:'mercado_pago',paymentId:String(payId),paymentMethod:payment.payment_method_id,installments:payment.installments,criadoEm:now});
-          tvDb.vendas=tvDb.vendas.slice(0,500); await dbSet(TV_KEY,tvDb);
+        await dbSet(dbKey,db);
+        const ckDb=(await dbGet(ckKey))||{vendas:[]};
+        ckDb.vendas=ckDb.vendas||[];
+        if(!ckDb.vendas.find(v=>v.paymentId===String(payId))) {
+          ckDb.vendas.unshift({id:Date.now().toString(36),produto:{id:p.id,codigo:p.codigo,descricao:p.descricao,tipo:p.tipo||'',capacidade:p.capacidade||''},comprador:{nome:nomeCliente,telefone,cpf,endereco,cep},valor:payment.transaction_amount,provedor:'mercado_pago',paymentId:String(payId),paymentMethod:payment.payment_method_id,installments:payment.installments,criadoEm:now});
+          ckDb.vendas=ckDb.vendas.slice(0,500); await dbSet(ckKey,ckDb);
         }
         await marcarProcessado(String(payId));
         await logEvento({tipo:'register-manual',paymentId:String(payId),produtoId,nomeCliente,valor:payment.transaction_amount});
@@ -182,31 +193,77 @@ export default async function handler(req, res) {
     const host    = req.headers['x-forwarded-host']  || req.headers.host || 'reparoeletroadm.com';
     const siteUrl = `${proto}://${host}`;
 
-    // 4. Para cada produto: marcar vendido direto no Redis (sem self-call)
-    const VENDAS_KEY = 'reparoeletro_vendas';
+    // 4. Para cada produto: marcar vendido direto no Redis
+    //    Verifica reparoeletro_vendas (Micro/Bebe) OU tv_vendas (TV)
+    //    e salva no relatório de checkout correto para cada tipo
+    const ADM_VENDAS_KEY     = 'reparoeletro_vendas';
+    const TV_VENDAS_KEY      = 'tv_vendas';
+    const ADM_CHECKOUT_KEY   = 'reparoeletro_checkout_vendas';
+    const TV_CHECKOUT_KEY    = 'tv_checkout_vendas';
+
     for (const produtoId of produtoIds) {
-      let produtoInfo = { id: produtoId, codigo: meta.produto_codigos || '' };
+      let produtoInfo  = { id: produtoId, codigo: meta.produto_codigos || '' };
+      let checkoutKey  = ADM_CHECKOUT_KEY; // default: ADM (Micro/Bebe)
+
       try {
-        const db  = (await dbGet(VENDAS_KEY)) || { produtos: [] };
-        const idx = db.produtos.findIndex(p => p.id === String(produtoId));
-        if (idx < 0) { console.error('[Webhook] Produto não encontrado:', produtoId); await logEvento({ tipo:'erro', produtoId, erro:'nao_encontrado', paymentId:String(payId) }); continue; }
-        const p = db.produtos[idx];
-        if (p.vendido) { console.log('[Webhook] Já vendido:', produtoId); continue; }
-        const now = new Date().toISOString();
-        db.produtos[idx] = { ...p, vendido:true, soldAt:now, nomeCliente, telefone:telefone||null, cpfCnpj:cpf||null, vendedor:'Mercado Pago', modalidade:modPagamento, paymentId:String(payId), vendidoEm:now };
-        await dbSet(VENDAS_KEY, db);
-        produtoInfo = { id:produtoId, codigo:p.codigo, descricao:p.descricao, tipo:p.tipo||'', capacidade:p.capacidade||'' };
+        // Tentar reparoeletro_vendas (Microondas / Bebedouro)
+        const admDb  = (await dbGet(ADM_VENDAS_KEY)) || { produtos: [] };
+        const admIdx = admDb.produtos.findIndex(p => p.id === String(produtoId));
+
+        if (admIdx >= 0) {
+          // ── Produto ADM (Microondas/Bebedouro) ──
+          const p = admDb.produtos[admIdx];
+          if (p.vendido) { console.log('[Webhook] Já vendido (ADM):', produtoId); }
+          else {
+            const now = new Date().toISOString();
+            admDb.produtos[admIdx] = { ...p, vendido:true, soldAt:now, nomeCliente,
+              telefone:telefone||null, cpfCnpj:cpf||null, vendedor:'Mercado Pago',
+              modalidade:modPagamento, paymentId:String(payId), vendidoEm:now };
+            await dbSet(ADM_VENDAS_KEY, admDb);
+          }
+          produtoInfo = { id:produtoId, codigo:p.codigo, descricao:p.descricao,
+            tipo:p.tipo||'', capacidade:p.capacidade||'' };
+          checkoutKey = ADM_CHECKOUT_KEY;
+
+        } else {
+          // ── Tentar tv_vendas (Televisão) ──
+          const tvVendas  = (await dbGet(TV_VENDAS_KEY)) || { produtos: [] };
+          const tvProdIdx = tvVendas.produtos.findIndex(p => p.id === String(produtoId));
+
+          if (tvProdIdx >= 0) {
+            const p = tvVendas.produtos[tvProdIdx];
+            if (p.vendido) { console.log('[Webhook] Já vendido (TV):', produtoId); }
+            else {
+              const now = new Date().toISOString();
+              tvVendas.produtos[tvProdIdx] = { ...p, vendido:true, soldAt:now, nomeCliente,
+                telefone:telefone||null, cpfCnpj:cpf||null, vendedor:'Mercado Pago',
+                modalidade:modPagamento, paymentId:String(payId), vendidoEm:now };
+              await dbSet(TV_VENDAS_KEY, tvVendas);
+            }
+            produtoInfo = { id:produtoId, codigo:p.codigo, descricao:p.descricao,
+              tipo:p.tipo||'', capacidade:p.capacidade||'' };
+            checkoutKey = TV_CHECKOUT_KEY;
+          } else {
+            console.error('[Webhook] Produto não encontrado em nenhum catálogo:', produtoId);
+            await logEvento({ tipo:'erro', produtoId, erro:'nao_encontrado', paymentId:String(payId) });
+            continue;
+          }
+        }
       } catch(e) { console.error('vender:', e.message); }
 
-      // 5. Espelho no relatório de checkout
+      // 5. Registrar no relatório de checkout correto (ADM ou TV)
       try {
-        const TV_KEY = 'tv_checkout_vendas';
-        const tvDb = (await dbGet(TV_KEY)) || { vendas:[] };
-        tvDb.vendas = tvDb.vendas || [];
-        tvDb.vendas.unshift({ id:Date.now().toString(36), produto:produtoInfo, comprador:{nome:nomeCliente,telefone,cpf,endereco,cep}, valor:payment.transaction_amount, provedor:'mercado_pago', paymentId:String(payId), paymentMethod:payment.payment_method_id, installments:payment.installments, criadoEm:new Date().toISOString() });
-        tvDb.vendas = tvDb.vendas.slice(0,500);
-        await dbSet(TV_KEY, tvDb);
-      } catch(e) { console.error('registrar-venda:', e.message); }
+        const ckDb = (await dbGet(checkoutKey)) || { vendas:[] };
+        ckDb.vendas = ckDb.vendas || [];
+        ckDb.vendas.unshift({ id:Date.now().toString(36), produto:produtoInfo,
+          comprador:{nome:nomeCliente,telefone,cpf,endereco,cep},
+          valor:payment.transaction_amount, provedor:'mercado_pago',
+          paymentId:String(payId), paymentMethod:payment.payment_method_id,
+          installments:payment.installments, criadoEm:new Date().toISOString() });
+        ckDb.vendas = ckDb.vendas.slice(0,500);
+        await dbSet(checkoutKey, ckDb);
+        console.log('[Webhook] Checkout registrado em', checkoutKey, '| produto', produtoId);
+      } catch(e) { console.error('registrar-checkout:', e.message); }
 
       // ── Google Ads: conversão server-side via Measurement Protocol ────
       try {
