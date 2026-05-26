@@ -297,6 +297,10 @@
     {
       "source": "/api/fix-clarice-0273",
       "destination": "/api/fix-clarice-0273.js"
+    },
+    {
+      "source": "/api/relatorio-logistica-pipefy",
+      "destination": "/api/relatorio-logistica-pipefy.js"
     }
   ],
   "headers": [
