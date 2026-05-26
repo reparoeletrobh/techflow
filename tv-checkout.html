@@ -414,8 +414,8 @@ async function loadEquip(){
   if(!d.ok)return;
   EQUIP=d.produtos||[];
   const m=EQUIP.filter(isSmart), b=EQUIP.filter(isLED);
-  document.getElementById('ct-micro').textContent='('+m.length+')';
-  document.getElementById('ct-bebe').textContent='('+b.length+')';
+  document.getElementById('ct-smart').textContent='('+m.length+')';
+  document.getElementById('ct-led').textContent='('+b.length+')';
   renderEquip();
 }
 
