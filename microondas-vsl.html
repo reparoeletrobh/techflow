@@ -155,13 +155,14 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
   position:fixed;bottom:0;left:0;right:0;z-index:200;
   height:62px;
   background:#0d1117;
-  border-top:1.5px solid var(--yellow);
+  border-top:1.5px solid rgba(245,200,0,.25);
   box-shadow:0 -6px 24px rgba(0,0,0,.7);
-  display:none; /* hidden by default */
+  display:flex; /* sempre visível */
   align-items:center;
   padding:0 20px;gap:14px;
+  transition:border-color .3s;
 }
-.cart-strip.show{display:flex;}
+.cart-strip.show{border-top-color:var(--yellow);}
 .cs-del{
   flex:1;font-size:12px;font-weight:500;color:var(--green);
   display:flex;align-items:center;gap:5px;white-space:nowrap;
@@ -170,12 +171,16 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
 .cs-btn{
   display:flex;align-items:center;justify-content:center;gap:7px;
   padding:0 22px;height:42px;border-radius:9px;
-  background:var(--yellow);color:#000;
+  background:rgba(245,200,0,.08);color:rgba(245,200,0,.4);
+  border:1.5px solid rgba(245,200,0,.2);
   font-family:var(--fb);font-size:13px;font-weight:700;
-  border:none;cursor:pointer;white-space:nowrap;flex-shrink:0;
-  transition:all .18s;position:relative;
+  cursor:pointer;white-space:nowrap;flex-shrink:0;
+  transition:all .3s;position:relative;
 }
-.cs-btn:hover{background:#ffd500;}
+.cart-strip.show .cs-btn{
+  background:var(--yellow);color:#000;border-color:transparent;
+}
+.cs-btn:hover{background:#ffd500;color:#000;border-color:transparent;}
 .cs-badge{
   position:absolute;top:-6px;right:-6px;
   width:17px;height:17px;border-radius:50%;
@@ -578,7 +583,7 @@ setInterval(updateCartStrip,2000);
 
 <!-- ── Faixa carrinho persistente ─────────────────────────── -->
 <div class="cart-strip" id="cart-strip">
-  <div class="cs-del" id="cs-del">🚚 </div>
+  <div class="cs-del" id="cs-del">🛒 Seu carrinho está vazio</div>
   <button class="cs-btn" onclick="irCarrinho()" id="cs-btn">
     🛒 Ver Carrinho
     <span class="cs-badge" id="cs-badge">0</span>
