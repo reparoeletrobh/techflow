@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   const MP_TOKEN = process.env.MP_ACCESS_TOKEN || '';
   if (!MP_TOKEN) return res.status(500).json({ ok: false, error: 'MP_ACCESS_TOKEN não configurado' });
 
-  const { itens, comprador, metodoPagamento } = req.body || {};
+  const { itens, comprador, metodoPagamento, origem } = req.body || {};
   if (!itens?.length) return res.status(400).json({ ok: false, error: 'itens obrigatório' });
 
   const proto = req.headers['x-forwarded-proto'] || 'https';
@@ -64,9 +64,9 @@ export default async function handler(req, res) {
         },
 
     back_urls: {
-      success: `${siteUrl}/produto.html?mp=success`,
-      failure: `${siteUrl}/produto.html?mp=failure`,
-      pending: `${siteUrl}/produto.html?mp=pending`
+      success: `${siteUrl}/${origem === 'tv' ? 'tv/equipamentos' : 'produto.html'}?mp=success`,
+      failure: `${siteUrl}/${origem === 'tv' ? 'tv/equipamentos' : 'produto.html'}?mp=failure`,
+      pending: `${siteUrl}/${origem === 'tv' ? 'tv/equipamentos' : 'produto.html'}?mp=pending`
     },
     auto_return: 'approved',
 

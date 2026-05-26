@@ -108,6 +108,42 @@ header{
   .card-footer{flex-direction:column;align-items:flex-start;}
   .btn-wa{width:100%;justify-content:center;}
 }
+
+/* ── CHECKOUT MODAL ── */
+.ov-checkout{display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.9);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:12px;overflow-y:auto;}
+.ov-checkout.open{display:flex;}
+.ck-modal{background:#111;border:1px solid #252525;border-radius:16px;width:100%;max-width:440px;max-height:96dvh;overflow-y:auto;display:flex;flex-direction:column;}
+.ck-header{padding:20px 20px 0;display:flex;justify-content:space-between;align-items:center;}
+.ck-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;}
+.ck-close{background:none;border:none;color:#888;font-size:20px;cursor:pointer;padding:4px;}
+.ck-body{padding:20px;display:flex;flex-direction:column;gap:14px;}
+.ck-produto{background:#1a1a1a;border-radius:10px;padding:12px;display:flex;gap:10px;align-items:center;}
+.ck-foto{width:56px;height:56px;border-radius:8px;object-fit:cover;background:#222;flex-shrink:0;}
+.ck-info{flex:1;min-width:0;}
+.ck-cod{font-family:'DM Mono',monospace;font-size:9px;color:#888;}
+.ck-nome{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ck-preco{font-size:15px;font-weight:800;color:#f5c800;}
+.ck-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#888;display:block;margin-bottom:5px;}
+.ck-input{width:100%;background:#1a1a1a;border:1px solid #252525;border-radius:8px;padding:10px 13px;font-family:'Inter',sans-serif;font-size:13px;color:#fff;outline:none;transition:border-color .15s;}
+.ck-input:focus{border-color:rgba(59,158,255,.5);}
+.ck-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.ck-pag{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.ck-pag-btn{padding:12px 8px;border-radius:10px;border:2px solid #252525;background:#1a1a1a;color:#888;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;text-align:center;transition:all .15s;}
+.ck-pag-btn.sel-pix{border-color:#22c55e;background:rgba(34,197,94,.08);color:#22c55e;}
+.ck-pag-btn.sel-cartao{border-color:#3b9eff;background:rgba(59,158,255,.08);color:#3b9eff;}
+.ck-pag-icon{font-size:20px;display:block;margin-bottom:4px;}
+.ck-pag-desc{font-family:'DM Mono',monospace;font-size:8px;color:inherit;opacity:.7;margin-top:2px;}
+.ck-btn{width:100%;padding:14px;border-radius:10px;border:none;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;cursor:pointer;background:#f5c800;color:#000;transition:all .15s;}
+.ck-btn:hover{background:#f5d842;transform:translateY(-1px);}
+.ck-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+.ck-msg{padding:10px 13px;border-radius:8px;font-family:'DM Mono',monospace;font-size:11px;display:none;}
+.ck-msg.ok{background:rgba(34,197,94,.1);color:#22c55e;}
+.ck-msg.err{background:rgba(239,68,68,.1);color:#ef4444;}
+/* ── BOTÃO COMPRAR NO CARD ── */
+.btn-comprar{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:10px;border-radius:8px;border:none;background:#f5c800;color:#000;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;cursor:pointer;margin-top:8px;transition:all .15s;}
+.btn-comprar:hover{background:#f5d842;transform:translateY(-1px);}
+/* ── SUCCESS BANNER ── */
+.mp-success{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.25);border-radius:12px;padding:16px;text-align:center;font-family:'Inter',sans-serif;font-size:13px;color:#22c55e;margin-bottom:16px;display:none;}
 </style>
 </head>
 <body>
@@ -129,7 +165,8 @@ header{
     <div class="grid-title">Equipamentos <span>Disponíveis</span></div>
     <div class="grid-count" id="grid-count"></div>
   </div>
-  <div id="grid-content">
+  <div class="mp-success" id="mp-success-banner">✅ Pagamento aprovado! Em breve entraremos em contato. Obrigado!</div>
+<div id="grid-content">
     <div class="loading">
       <div class="spinner"></div>
       <div style="font-family:var(--fm);font-size:11px;color:var(--muted);">Carregando...</div>
@@ -225,6 +262,7 @@ function cardHTML(p) {
             <div class="card-price">${precoFmt}</div>
             <div class="card-price-sub">à vista</div>
           </div>
+          <button class="btn-comprar" onclick="abrirCheckout('${p.id}')">⚡ Comprar Agora</button>
           <a class="btn-wa" href="https://wa.me/${WA_NUMBER}?text=${msgWA}" target="_blank">
             <svg viewBox="0 0 24 24" fill="currentColor">
               <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
@@ -255,6 +293,201 @@ function goTo(id, idx) {
 }
 
 load();
+
+// ── CHECKOUT TV ──────────────────────────────────────────────
+var ckProduto = null;
+var ckPag     = null;
+
+function abrirCheckout(id) {
+  ckProduto = allProdutos.find(p => p.id === id);
+  if (!ckProduto) return;
+  ckPag = null;
+
+  // Preencher produto no modal
+  var f = (ckProduto.fotos || [])[0] || '';
+  var img = document.getElementById('ck-foto');
+  if (f) { img.src = f; img.style.display = 'block'; } else { img.style.display = 'none'; }
+  document.getElementById('ck-cod').textContent   = ckProduto.codigo || '';
+  document.getElementById('ck-nome').textContent  = ckProduto.descricao || '';
+  document.getElementById('ck-preco').textContent = parseFloat(ckProduto.preco).toLocaleString('pt-BR',{style:'currency',currency:'BRL',minimumFractionDigits:2});
+
+  // Reset campos
+  ['ck-nome-in','ck-tel-in','ck-cpf-in','ck-end-in','ck-cep-in'].forEach(id => {
+    var el = document.getElementById(id); if (el) el.value = '';
+  });
+  ['ck-pix','ck-cartao'].forEach(id => {
+    var el = document.getElementById(id); if (el) el.className = 'ck-pag-btn';
+  });
+  document.getElementById('ck-total').textContent = '—';
+  document.getElementById('ck-btn-pagar').disabled = true;
+  document.getElementById('ck-btn-pagar').textContent = 'Selecione a forma de pagamento';
+  var msg = document.getElementById('ck-msg'); msg.style.display='none';
+
+  document.getElementById('ov-checkout').classList.add('open');
+}
+
+function fecharCheckout() {
+  document.getElementById('ov-checkout').classList.remove('open');
+  ckProduto = null; ckPag = null;
+}
+
+function setPag(tipo) {
+  ckPag = tipo;
+  document.getElementById('ck-pix').className    = 'ck-pag-btn' + (tipo==='pix'?    ' sel-pix':'');
+  document.getElementById('ck-cartao').className = 'ck-pag-btn' + (tipo==='cartao'? ' sel-cartao':'');
+
+  var preco = parseFloat(ckProduto?.preco || 0);
+  var final = tipo === 'pix' ? Math.round(preco * 0.90 * 100) / 100 : preco;
+  document.getElementById('ck-total').textContent =
+    final.toLocaleString('pt-BR',{style:'currency',currency:'BRL',minimumFractionDigits:2}) +
+    (tipo === 'pix' ? ' (PIX -10%)' : ' (3x sem juros)');
+
+  var btn = document.getElementById('ck-btn-pagar');
+  btn.disabled = false;
+  btn.textContent = '🔒 Ir para Pagamento Seguro';
+}
+
+async function finalizarCheckoutTV() {
+  var nome = (document.getElementById('ck-nome-in').value || '').trim();
+  var tel  = (document.getElementById('ck-tel-in').value  || '').trim();
+  if (!nome || !tel) {
+    mostrarMsgCK('Preencha nome e telefone obrigatoriamente', 'err'); return;
+  }
+  if (!ckPag) { mostrarMsgCK('Selecione a forma de pagamento', 'err'); return; }
+
+  var btn = document.getElementById('ck-btn-pagar');
+  btn.disabled = true; btn.textContent = '⏳ Gerando pagamento...';
+
+  var preco = parseFloat(ckProduto.preco);
+  var precoFinal = ckPag === 'pix' ? Math.round(preco * 0.90 * 100) / 100 : preco;
+
+  try {
+    var r = await fetch('/api/checkout-mp-criar', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        itens: [{
+          id:     ckProduto.id,
+          codigo: ckProduto.codigo,
+          nome:   ckProduto.descricao + (ckPag==='pix'?' (PIX -10%)':''),
+          preco:  precoFinal,
+          foto:   (ckProduto.fotos||[])[0] || null
+        }],
+        comprador: {
+          nome:     nome,
+          telefone: tel,
+          cpf:      (document.getElementById('ck-cpf-in').value || '').trim(),
+          endereco: (document.getElementById('ck-end-in').value || '').trim(),
+          cep:      (document.getElementById('ck-cep-in').value || '').trim()
+        },
+        metodoPagamento: ckPag,
+        origem: 'tv'
+      })
+    }).then(r => r.json());
+
+    if (r.ok && r.checkoutUrl) {
+      window.location.href = r.checkoutUrl;
+    } else {
+      mostrarMsgCK('Erro ao gerar pagamento: ' + (r.error || 'tente novamente'), 'err');
+      btn.disabled = false; btn.textContent = '🔒 Ir para Pagamento Seguro';
+    }
+  } catch(e) {
+    mostrarMsgCK('Erro de conexão: ' + e.message, 'err');
+    btn.disabled = false; btn.textContent = '🔒 Ir para Pagamento Seguro';
+  }
+}
+
+function mostrarMsgCK(txt, tipo) {
+  var el = document.getElementById('ck-msg');
+  el.textContent = txt; el.style.display = 'block';
+  el.className = 'ck-msg ' + tipo;
+}
+
+// Mostrar banner de sucesso se retornou do MP
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('mp') === 'success') {
+    var el = document.getElementById('mp-success-banner');
+    if (el) el.style.display = 'block';
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+})();
+
 </script>
+
+<!-- OVERLAY CHECKOUT -->
+<div id="ov-checkout" class="ov-checkout">
+  <div class="ck-modal">
+    <div class="ck-header">
+      <div class="ck-title">⚡ Finalizar Compra</div>
+      <button class="ck-close" onclick="fecharCheckout()">✕</button>
+    </div>
+    <div class="ck-body">
+      <!-- Produto -->
+      <div class="ck-produto">
+        <img id="ck-foto" class="ck-foto" src="" alt="">
+        <div class="ck-info">
+          <div class="ck-cod" id="ck-cod"></div>
+          <div class="ck-nome" id="ck-nome"></div>
+          <div class="ck-preco" id="ck-preco"></div>
+        </div>
+      </div>
+      <!-- Forma de pagamento -->
+      <div>
+        <span class="ck-label">Forma de Pagamento</span>
+        <div class="ck-pag">
+          <button class="ck-pag-btn" id="ck-pix" onclick="setPag('pix')">
+            <span class="ck-pag-icon">🏦</span>
+            PIX
+            <div class="ck-pag-desc">10% de desconto</div>
+          </button>
+          <button class="ck-pag-btn" id="ck-cartao" onclick="setPag('cartao')">
+            <span class="ck-pag-icon">💳</span>
+            Cartão
+            <div class="ck-pag-desc">3x sem juros</div>
+          </button>
+        </div>
+      </div>
+      <!-- Dados pessoais -->
+      <div>
+        <label class="ck-label">Nome completo *</label>
+        <input class="ck-input" id="ck-nome-in" placeholder="Seu nome completo">
+      </div>
+      <div class="ck-row">
+        <div>
+          <label class="ck-label">Telefone *</label>
+          <input class="ck-input" id="ck-tel-in" placeholder="(31) 9 0000-0000" type="tel">
+        </div>
+        <div>
+          <label class="ck-label">CPF</label>
+          <input class="ck-input" id="ck-cpf-in" placeholder="000.000.000-00">
+        </div>
+      </div>
+      <div>
+        <label class="ck-label">Endereço</label>
+        <input class="ck-input" id="ck-end-in" placeholder="Rua, número, bairro">
+      </div>
+      <div class="ck-row">
+        <div>
+          <label class="ck-label">CEP</label>
+          <input class="ck-input" id="ck-cep-in" placeholder="00000-000">
+        </div>
+        <div><!-- espaço --></div>
+      </div>
+      <!-- Preço final -->
+      <div style="background:#1a1a1a;border-radius:10px;padding:12px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-family:'DM Mono',monospace;font-size:11px;color:#888;">TOTAL A PAGAR</span>
+        <span style="font-size:18px;font-weight:800;color:#f5c800;" id="ck-total">—</span>
+      </div>
+      <div class="ck-msg" id="ck-msg"></div>
+      <button class="ck-btn" id="ck-btn-pagar" onclick="finalizarCheckoutTV()" disabled>
+        Selecione a forma de pagamento
+      </button>
+      <div style="text-align:center;font-family:'DM Mono',monospace;font-size:9px;color:#444;">
+        🔒 Pagamento seguro via Mercado Pago · Seus dados estão protegidos
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
