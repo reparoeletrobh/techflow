@@ -117,5 +117,24 @@ export default async function handler(req, res) {
     await dbSet(VENDAS_KEY,db2);
     return res.status(200).json({ok:true,removidos:antes-db2.vendas.length});
   }
+
+  // ── POST limpar-vendas-incorretas: remove vendas de Micro/Bebe que
+  //    foram registradas aqui antes da separação dos checkouts ──────
+  if (req.method === 'POST' && action === 'limpar-vendas-incorretas') {
+    const db = (await dbGet(VENDAS_KEY)) || { vendas: [] };
+    const antes = db.vendas.length;
+    // Manter apenas vendas de televisões (tipo Televisão ou sem tipo definido no ADM)
+    db.vendas = db.vendas.filter(v => {
+      const tipo = (v.produto?.tipo || '').toLowerCase();
+      // Remover se for claramente Microondas ou Bebedouro
+      if (tipo === 'microondas' || tipo.includes('micro')) return false;
+      if (tipo === 'bebedouro'  || tipo.includes('bebe') || tipo.includes('purif')) return false;
+      return true;
+    });
+    const removidas = antes - db.vendas.length;
+    if (removidas > 0) await dbSet(VENDAS_KEY, db);
+    return res.status(200).json({ ok: true, antes, depois: db.vendas.length, removidas });
+  }
+
   return res.status(404).json({ ok: false, error: 'Ação não encontrada' });
 }
