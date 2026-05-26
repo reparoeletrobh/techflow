@@ -171,6 +171,40 @@ module.exports = async function handler(req, res) {
         } else {
           ficha.pipefyErro = pip.error;
         }
+
+        // Delivery → registrar também na Logística em "Liberado para Coleta"
+        try {
+          const U2 = process.env.UPSTASH_URL;
+          const T2 = process.env.UPSTASH_TOKEN;
+          const LOG_KEY = "reparoeletro_logistica";
+          const logDb = await fetch(`${U2}/get/${LOG_KEY}`, {
+            headers: { Authorization: `Bearer ${T2}` }
+          }).then(r=>r.json()).then(j => j.result ? JSON.parse(j.result) : { fichas:[], nextId:1 });
+          const logId = "LOG-" + String(logDb.nextId || 1).padStart(4, "0");
+          logDb.fichas.unshift({
+            id:          logId,
+            nome:        ficha.nome,
+            telefone:    ficha.telefone || "",
+            endereco:    ficha.endereco || "",
+            equipamento: "",
+            defeito:     ficha.defeito || "",
+            pipefyCardId: ficha.pipefyId ? String(ficha.pipefyId) : null,
+            texto:       "[Garantia Delivery]",
+            phase:       "liberado_coleta",
+            origem:      "garantia",
+            garantiaId:  ficha.id,
+            criadoEm:    new Date().toISOString(),
+            movedAt:     new Date().toISOString(),
+            diagnostico: null,
+          });
+          logDb.nextId = (logDb.nextId || 1) + 1;
+          await fetch(`${U2}/set/${LOG_KEY}`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${T2}`, "Content-Type": "application/json" },
+            body: JSON.stringify(logDb)
+          });
+          console.log("[Garantia] ficha logística criada:", logId);
+        } catch(e) { console.error("[Garantia] logística:", e.message); }
       }
 
       db.fichas.unshift(ficha);
