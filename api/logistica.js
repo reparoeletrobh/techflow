@@ -144,6 +144,54 @@ module.exports = async function handler(req, res) {
   }
 
 
+
+  // ── GET buscar-ficha: encontra ficha por nome ou id ──────────
+  if (action === 'buscar-ficha') {
+    const q = (req.query.q || '').toLowerCase().trim();
+    if (!q) return res.status(400).json({ ok: false, error: 'q obrigatorio' });
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const encontradas = db.fichas.filter(f =>
+      (f.nome    || '').toLowerCase().includes(q) ||
+      (f.id      || '').toLowerCase().includes(q) ||
+      (f.telefone|| '').includes(q)
+    );
+    return res.status(200).json({ ok: true, total: encontradas.length, fichas: encontradas });
+  }
+
+  // ── GET retry-pipefy: tenta criar card no Pipefy para ficha sem pipefyCardId ──
+  if (action === 'retry-pipefy') {
+    const id = req.query.id;
+    if (!id) return res.status(400).json({ ok: false, error: 'id obrigatorio' });
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const ficha = db.fichas.find(f => f.id === id);
+    if (!ficha) return res.status(404).json({ ok: false, error: 'ficha nao encontrada' });
+    if (ficha.pipefyCardId) {
+      return res.status(200).json({ ok: true, info: 'ja tem pipefyCardId', pipefyCardId: ficha.pipefyCardId });
+    }
+    try {
+      const card = await criarCardPipefy({
+        nome:        ficha.nome,
+        telefone:    ficha.telefone || '',
+        equipamento: ficha.equipamento || '',
+        defeito:     ficha.defeito || '',
+        endereco:    ficha.endereco || ''
+      });
+      if (!card?.id) return res.status(500).json({ ok: false, error: 'Pipefy nao retornou id', card });
+      ficha.pipefyCardId = String(card.id);
+      await dbSet(LOG_KEY, db);
+      // Atualizar valor se tiver diagnóstico
+      const precoFinal = ficha.diagnostico?.preco;
+      if (precoFinal) {
+        await pipefyQuery(`mutation { updateCardField(input: { card_id: "${card.id}", field_id: "valor_de_contrato", new_value: "${precoFinal}" }) { success } }`).catch(()=>{});
+      }
+      // Mover para Aguardando Aprovação
+      await pipefyQuery(`mutation { moveCardToPhase(input: { card_id: "${card.id}", destination_phase_id: "${AGUARDANDO_PHASE_ID}" }) { card { id } } }`).catch(()=>{});
+      return res.status(200).json({ ok: true, pipefyCardId: card.id, url: card.url, nome: ficha.nome });
+    } catch(e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
   // ── GET metricas ─────────────────────────────────────────────
   if (action === 'metricas') {
     const MET_KEY = 'reparoeletro_log_metricas';
@@ -461,9 +509,15 @@ module.exports = async function handler(req, res) {
           console.log('[Log] Pipefy card CRIADO:', card.id, card.url);
         }
       }
-    } catch(e) { console.error('[Log] Pipefy:', e.message); }
+    } catch(e) {
+      console.error('[Log] Pipefy:', e.message);
+      // Salvar erro para diagnóstico — não é silencioso
+      ficha.pipefyErro = e.message;
+      ficha.pipefyErroTs = new Date().toISOString();
+      await dbSet(LOG_KEY, db);
+    }
 
-    return res.status(200).json({ ok:true, textoFinal, precoFinal, ficha });
+    return res.status(200).json({ ok:true, textoFinal, precoFinal, ficha, pipefyOk: !!ficha.pipefyCardId });
   }
 
 
