@@ -933,8 +933,6 @@ async function init(){
     p.fotos=Array.isArray(p.fotos)&&p.fotos.length?p.fotos:[];
     render(p);
     // Auto-adicionar ao carrinho (produto clicado na VSL)
-    // Limpar carrinho antes para evitar acúmulo de produto anterior
-    saveCart([]);
     addToCart(p);
   }catch(e){
     document.getElementById('root').innerHTML='<div class="loading"><p>Erro ao carregar. <a href="javascript:history.back()" style="color:var(--yellow)">← Voltar</a></p></div>';
