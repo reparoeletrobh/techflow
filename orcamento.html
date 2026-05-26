@@ -656,7 +656,7 @@ async function loadUltimaChamada(){loadMsg('list-ult','Carregando...');try{var d
 var DEFAULT_TEMPLATES = {
   microondas_eletrico: {
     key: 'microondas_eletrico', label: 'Microondas — Elétrico',
-    descricao: 'Capacitor, Fusível de Alta, Microchave, Recuperação de Placa, Motor de Rotação, Membrana',
+    descricao: 'Capacitor, Fusível de Alta, Microchave, Recuperação de Placa, Motor de Rotação, Membrana, Placa Micra',
     preco: '350', campoPreco: false,
     texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do [peças], as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
   },
@@ -680,6 +680,11 @@ var DEFAULT_TEMPLATES = {
     descricao: 'Pintura', preco: '350', campoPreco: false,
     texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, pintura, montagem, regulagem e revisão consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
   },
+  microondas_magnetron: {
+    key: 'microondas_magnetron', label: 'Microondas — Magnetron',
+    descricao: 'Magnetron', preco: '390', campoPreco: false,
+    texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do Magnetron, peca responsavel pelo aquecimento do aparelho. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
+  },
   purificador_motor_gas: {
     key: 'purificador_motor_gas', label: 'Purificador Motor — Gás',
     descricao: 'Gás', preco: '490', campoPreco: false,
@@ -687,7 +692,7 @@ var DEFAULT_TEMPLATES = {
   },
   purificador_motor_pecas: {
     key: 'purificador_motor_pecas', label: 'Purificador Motor — Peças',
-    descricao: 'Bojo, Dutos e Conexões, Válvula', preco: '490', campoPreco: false,
+    descricao: 'Bojo, Dutos e Conexões, Válvula, Kit de Partida', preco: '490', campoPreco: false,
     texto: 'Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto da [peças]. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.'
   },
   purificador_elet_kit: {
@@ -780,7 +785,7 @@ function renderTabela() {
   if (!list) return;
   // Agrupar por equipamento
   var grupos = {
-    'Microondas': ['microondas_eletrico','microondas_placa','microondas_haste','microondas_vidro','microondas_pintura'],
+    'Microondas': ['microondas_eletrico','microondas_placa','microondas_haste','microondas_vidro','microondas_pintura','microondas_magnetron'],
     'Purificador': ['purificador_motor_gas','purificador_motor_pecas','purificador_elet_kit','purificador_elet_rec','purificador_elet_pecas'],
     'Adega': ['adega_motor_gas','adega_motor_rec','adega_placa','adega_elet_kit','adega_elet_rec'],
     'Forno Pequeno': ['forno_peq_eletrico','forno_peq_placa','forno_peq_estrutura'],
