@@ -51,15 +51,8 @@ async function logEvento(evento) {
 
 // ── Pipefy: criar card Receber após venda confirmada pelo MP ────────────────
 function sanitizePipefy(s) {
-  // Remove caracteres que quebram strings GraphQL inline
-  return String(s||'')
-    .replace(/[\\]/g,'')
-    .replace(/"/g,"'")
-    .replace(/\n/g,' ')
-    .replace(/[\u0080-\uFFFF]/g, c => {
-      // Manter ASCII, substituir acentos por versão sem acento
-      return c.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-    });
+  return String(s||'').replace(/[\\]/g,'').replace(/"/g,"'").replace(/\n/g,' ')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x00-\x7F]/g,'');
 }
 
 async function criarCardPipefyVenda(pipeId, produto, comprador, valor, paymentId) {
@@ -84,31 +77,50 @@ async function criarCardPipefyVenda(pipeId, produto, comprador, valor, paymentId
     } catch(e) { clearTimeout(tid); throw e; }
   }
 
-  // Buscar fase Receber
-  const data = await pipefyQ('query { pipe(id: "' + pipeId + '") { phases { id name } } }');
+  // Buscar estrutura do pipe — fases + campos do formulário inicial
+  const data = await pipefyQ('query { pipe(id: "' + pipeId + '") { phases { id name } start_form_fields { id label } } }');
   const phases = data?.pipe?.phases || [];
+  const fields = data?.pipe?.start_form_fields || [];
+
   const phaseReceber = phases.find(p => p.name.toLowerCase().includes('receber'));
   if (!phaseReceber) throw new Error('Fase Receber nao encontrada no pipe ' + pipeId);
 
-  const precoFmt = parseFloat(valor).toLocaleString('pt-BR', { minimumFractionDigits:2, style:'currency', currency:'BRL' });
-  const nomeSafe = sanitizePipefy(comprador.nome);
-  const telSafe  = sanitizePipefy(comprador.telefone || '');
-  const descSafe = sanitizePipefy(
-    (produto.descricao || '') + ' | Valor: ' + precoFmt +
+  // Encontrar campos dinamicamente por label (igual ao logistica.js)
+  function findField(kws) {
+    return fields.find(f => kws.some(kw => (f.label||'').toLowerCase().includes(kw)));
+  }
+  const nomeField = findField(['nome','contato','client']);
+  const telField  = findField(['telefone','fone','celular','tel']);
+  const descField = findField(['descri','empresa','observa','notas']);
+
+  const nomeSafe  = sanitizePipefy(comprador.nome);
+  const telSafe   = sanitizePipefy(comprador.telefone || '');
+  const precoFmt  = parseFloat(valor).toLocaleString('pt-BR',{minimumFractionDigits:2,style:'currency',currency:'BRL'});
+  const descSafe  = sanitizePipefy(
+    (produto.descricao||'') + ' | Valor: ' + precoFmt +
     ' | MP #' + paymentId +
-    (comprador.telefone ? ' | Tel: ' + comprador.telefone : '')
+    (comprador.telefone ? ' | Tel: ' + (comprador.telefone||'') : '')
   );
   const tituloSafe = sanitizePipefy(
     'VENDA MP - ' + (produto.codigo || (produto.descricao||'').substring(0,25)) + ' | ' + (comprador.nome||'')
   );
 
-  // Usar string concatenation idêntico ao api/vendas.js (testado e funcionando)
-  const mutation = 'mutation { createCard(input: { pipe_id: "' + pipeId + '" phase_id: "' + phaseReceber.id + '" title: "' + tituloSafe + '" fields_attributes: [ { field_id: "nome_do_contato" field_value: "' + nomeSafe + '" }, { field_id: "telefone" field_value: "' + telSafe + '" }, { field_id: "descri_o" field_value: "' + descSafe + '" } ] }) { card { id title url } } }';
+  const fieldsAttr = [];
+  if (nomeField) fieldsAttr.push('{ field_id: "' + nomeField.id + '" field_value: "' + nomeSafe + '" }');
+  if (telField)  fieldsAttr.push('{ field_id: "' + telField.id  + '" field_value: "' + telSafe  + '" }');
+  if (descField) fieldsAttr.push('{ field_id: "' + descField.id + '" field_value: "' + descSafe + '" }');
+
+  const mutation = 'mutation { createCard(input: { pipe_id: "' + pipeId +
+    '" phase_id: "' + phaseReceber.id +
+    '" title: "' + tituloSafe + '"' +
+    (fieldsAttr.length ? ' fields_attributes: [' + fieldsAttr.join(' ') + ']' : '') +
+    ' }) { card { id title url } } }';
 
   const result = await pipefyQ(mutation);
-  if (!result?.createCard?.card?.id) throw new Error('Pipefy nao retornou card id: ' + JSON.stringify(result));
+  if (!result?.createCard?.card?.id) throw new Error('Pipefy sem card id: ' + JSON.stringify(result));
   return result.createCard.card;
 }
+
 
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
