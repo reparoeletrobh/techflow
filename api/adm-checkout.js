@@ -94,10 +94,19 @@ module.exports = async function handler(req, res) {
 
   // ── GET load-vendas ──────────────────────────────────────────
   if (action === 'load-vendas') {
-    const db    = (await dbGet(VENDAS_KEY)) || { vendas: [] };
-    const vendas = db.vendas || [];
-    const total  = vendas.reduce((s, v) => s + parseFloat(v.valor || 0), 0);
-    return res.status(200).json({ ok:true, vendas, total: parseFloat(total.toFixed(2)), count: vendas.length });
+    try {
+      const raw = await dbGet(VENDAS_KEY);
+      // Aceitar tanto { vendas: [] } quanto array direto (compatibilidade)
+      let vendas = [];
+      if (raw) {
+        if (Array.isArray(raw))        vendas = raw;
+        else if (Array.isArray(raw.vendas)) vendas = raw.vendas;
+      }
+      const total = vendas.reduce((s, v) => s + parseFloat(v.valor || 0), 0);
+      return res.status(200).json({ ok:true, vendas, total: parseFloat(total.toFixed(2)), count: vendas.length });
+    } catch(e) {
+      return res.status(200).json({ ok:true, vendas:[], total:0, count:0, erro: e.message });
+    }
   }
 
   return res.status(404).json({ ok:false, error:'ação não encontrada' });

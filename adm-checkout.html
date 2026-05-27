@@ -140,10 +140,10 @@ select option{background:var(--s2)}
 
 <!-- TABS -->
 <div class="tabs" id="tabs">
-  <div class="tab on" onclick="tab('video')">🎬 Vídeo VSL</div>
+  <div class="tab on" onclick="tab('relatorio')">📊 Relatório<span class="tab-n" id="n-vendas">0</span></div>
+  <div class="tab"    onclick="tab('video')">🎬 Vídeo VSL</div>
   <div class="tab"    onclick="tab('pagamento')">💳 Pagamento</div>
   <div class="tab"    onclick="tab('catalogo')">📦 Catálogo</div>
-  <div class="tab"    onclick="tab('relatorio')">📊 Relatório<span class="tab-n" id="n-vendas">0</span></div>
 </div>
 
 <!-- ═══ VÍDEO ═══ -->
@@ -292,6 +292,11 @@ async function init(){
   if(d.ok) applyConfig(d.config||{});
   await loadEquip();
   await loadVendas();
+  // Sync automático a cada 30s enquanto a aba estiver aberta
+  setInterval(function(){
+    var rel = document.getElementById('p-relatorio');
+    if(rel && rel.classList.contains('on')) loadVendas();
+  }, 30000);
 }
 
 function applyConfig(cfg){
