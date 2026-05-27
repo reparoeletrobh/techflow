@@ -201,6 +201,14 @@ export default async function handler(req, res) {
         venda.valor,
         pid
       );
+      // Salvar resultado no Redis para diagnóstico
+      await dbSet('pipefy_card_log', {
+        paymentId: pid, cardId, pipeId,
+        comprador: venda.comprador?.nome,
+        produto:   venda.produto?.descricao,
+        valor:     venda.valor,
+        ts:        new Date().toISOString()
+      });
       return res.status(200).json({
         ok: true, cardId,
         pipe: pipeId,
