@@ -92,6 +92,29 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok:true });
   }
 
+
+  // ── GET debug-vendas — mostra raw do Redis para diagnóstico ──
+  if (action === 'debug-vendas') {
+    try {
+      const r = await fetch(`${U}/pipeline`, {
+        method:'POST',
+        headers:{ Authorization:`Bearer ${T}`, 'Content-Type':'application/json' },
+        body: JSON.stringify([['GET', VENDAS_KEY]])
+      });
+      const j = await r.json();
+      const raw = j[0]?.result;
+      const parsed = raw ? JSON.parse(raw) : null;
+      const tipo = Array.isArray(parsed) ? 'array' : typeof parsed;
+      const qtd  = parsed?.vendas?.length ?? (Array.isArray(parsed) ? parsed.length : 0);
+      return res.status(200).json({
+        ok: true, key: VENDAS_KEY, rawLength: raw?.length || 0,
+        tipo, qtd, primeiros2: parsed?.vendas?.slice(0,2) || (Array.isArray(parsed) ? parsed.slice(0,2) : null)
+      });
+    } catch(e) {
+      return res.status(200).json({ ok:false, erro: e.message });
+    }
+  }
+
   // ── GET load-vendas ──────────────────────────────────────────
   if (action === 'load-vendas') {
     try {
