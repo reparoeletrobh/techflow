@@ -488,6 +488,7 @@ function render() {
     return `
     <div class="col">
       <div class="col-header">
+        <div class="col-top-stripe" style="background:${col.cor};opacity:.7;"></div>
         <div class="col-title">
           <div class="col-dot" style="background:${col.cor}"></div>
           ${col.label}
@@ -501,6 +502,8 @@ function render() {
 
 function cardHTML(f, phase) {
   const tempo = tempoRelativo(f.movedAt || f.criadoEm);
+  const col   = COLS.find(c => c.id === phase) || {};
+  const barCor = col.cor || '#444';
 
   let btns = '';
   if (phase === 'liberado_coleta') {
