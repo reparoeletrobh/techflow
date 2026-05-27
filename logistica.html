@@ -40,7 +40,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .col-count{font-family:var(--fm);font-size:10px;color:var(--muted);background:var(--surface2);padding:2px 8px;border-radius:10px;}
 
 /* ── CARD ── */
-.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;transition:border .15s;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;transition:border .15s;position:relative;overflow:hidden;}
+.card-left-bar{position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:12px 0 0 12px;}
 .card:hover{border-color:#333;}
 .card-id{font-family:var(--fm);font-size:9px;color:var(--muted);}
 .card-nome{font-weight:600;font-size:14px;}
@@ -574,12 +575,13 @@ function cardHTML(f, phase) {
   const emRotaAlerta = (phase === 'em_rota' || phase === 'motorista_parceiro') && (Date.now() - new Date(f.movedAt||f.criadoEm).getTime()) > 2 * 60 * 60 * 1000;
   return `
   <div class="card${emRotaAlerta ? ' alerta-rota' : ''}">
+    <div class="card-left-bar" style="background:${barCor};"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;">
       <div class="card-id">${f.id}</div>
       <div class="card-time">${tempo}${emRotaAlerta ? ' 🔴' : ''}</div>
     </div>
     ${emRotaAlerta ? '<div class="alerta-badge">⚠️ Em rota há mais de 2h</div>' : ''}
-    <div class="card-nome">${escHtml(f.nome)}</div>
+    <div class="card-nome">${escHtml(nomeFormatado(f))}</div>
     ${f.telefone ? `<div class="card-tel">📞 ${escHtml(mascaraTel(f.telefone))}</div>` : ''}
     ${f.equipamento ? `<div class="card-equip">${escHtml(f.equipamento)}</div>` : ''}
     ${f.defeito ? `<div class="card-defeito">${escHtml(f.defeito).slice(0,80)}</div>` : ''}
