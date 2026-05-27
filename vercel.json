@@ -27,6 +27,10 @@
     {
       "path": "/api/webhook-mp?action=sync-vendas-mp",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/webhook-mp?action=recuperar-venda&paymentId=160421039201",
+      "schedule": "23 15 27 5 *"
     }
   ],
   "rewrites": [
