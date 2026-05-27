@@ -162,6 +162,40 @@ export default async function handler(req, res) {
 
 
 
+
+  // ── GET criar-card-pipefy: cria card no Pipefy para venda já registrada ──
+  if (action === 'criar-card-pipefy') {
+    const pid = req.query.paymentId;
+    if (!pid) return res.status(400).json({ ok:false, error:'paymentId obrigatorio' });
+    try {
+      // Buscar venda no checkout ADM
+      const CKKEY = 'reparoeletro_checkout_vendas';
+      const ck    = (await dbGet(CKKEY)) || { vendas:[] };
+      const venda = (ck.vendas||[]).find(v => String(v.paymentId) === String(pid));
+      if (!venda) return res.status(404).json({ ok:false, error:'venda nao encontrada no checkout' });
+
+      // Determinar pipe: produto TV → 306904889, ADM → 305832912
+      const pipeId = (venda.produto?.tipo||'').toLowerCase().includes('tv') ? '306904889' : '305832912';
+
+      const cardId = await criarCardPipefyVenda(
+        pipeId,
+        venda.produto,
+        venda.comprador,
+        venda.valor,
+        pid
+      );
+      return res.status(200).json({
+        ok: true, cardId,
+        pipe: pipeId,
+        comprador: venda.comprador?.nome,
+        produto:   venda.produto?.descricao,
+        valor:     venda.valor
+      });
+    } catch(e) {
+      return res.status(500).json({ ok:false, error: e.message });
+    }
+  }
+
   // ── GET status-checkout: retorna resumo das vendas no checkout ────
   if (action === 'status-checkout') {
     try {
