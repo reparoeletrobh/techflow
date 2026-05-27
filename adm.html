@@ -328,7 +328,14 @@ function loadFrame(url, color) {
   frameWrap.classList.add('visible');
   loadBar.classList.add('loading');
   loadBar.style.color = color || 'var(--purple)';
-  frame.src = url;
+  // Se já está na mesma URL, forçar reload (evita iframe preso em cache)
+  var base = url.split('?')[0].split('#')[0];
+  var current = (frame.src || '').split('?')[0].split('#')[0].replace(location.origin, '');
+  if (current === base) {
+    frame.contentWindow.location.reload(true);
+  } else {
+    frame.src = url;
+  }
 }
 function openPage(el) {
   closeMobileSidebar();
