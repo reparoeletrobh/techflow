@@ -173,9 +173,10 @@ module.exports = async function handler(req, res) {
     if (!produtoId || !nomeCliente)
       return res.status(400).json({ ok: false, error: "produtoId e nomeCliente obrigatórios" });
 
+    // FIX: Promise é sempre truthy, usar .then() para fallback correto
     const [db, fin] = await Promise.all([
-      dbGet(VENDAS_KEY) || defaultDB(),
-      dbGet(FIN_KEY)    || defaultFin(),
+      dbGet(VENDAS_KEY).then(d => d || defaultDB()),
+      dbGet(FIN_KEY).then(d    => d || defaultFin()),
     ]);
 
     const idx = db.produtos.findIndex(p => p.id === produtoId);
@@ -214,7 +215,24 @@ module.exports = async function handler(req, res) {
       vendedor: modalidade||vendedor||null,
       updatedAt: now };
 
-    await Promise.all([dbSet(VENDAS_KEY, db), dbSet(FIN_KEY, fin)]);
+    // Registrar no relatório de checkout (tv_checkout_vendas)
+    const TV_CK_KEY = "tv_checkout_vendas";
+    const ck = (await dbGet(TV_CK_KEY)) || { vendas: [] };
+    ck.vendas = ck.vendas || [];
+    ck.vendas.unshift({
+      id:           fichaId,
+      produto:      { id: p.id, codigo: p.codigo, descricao: p.descricao, tipo: p.tipo || "TV" },
+      comprador:    { nome: nomeCliente, telefone: telefone||"", cpf: cpfCnpj||"" },
+      valor:        parseFloat(p.preco),
+      provedor:     modalidade === "online" ? "mercado_pago" : "loja",
+      paymentMethod: modalidade || "",
+      installments:  1,
+      vendedor:      vendedor || "",
+      criadoEm:     now,
+    });
+    ck.vendas = ck.vendas.slice(0, 500);
+
+    await Promise.all([dbSet(VENDAS_KEY, db), dbSet(FIN_KEY, fin), dbSet(TV_CK_KEY, ck)]);
 
     // ── Texto WhatsApp para almoxarifado ──────────────────────────────────
     const textoAlmox = [
@@ -233,10 +251,13 @@ module.exports = async function handler(req, res) {
       `🔖 Modalidade: ${modalidade || "—"}`,
     ].filter(l => l !== null).join("\n");
 
-    // ── Pipefy: card em Receber (almoxarifado) ────────────────────────────
+    // ── Pipefy: card em Receber — timeout 8s para não travar a venda ──────
     let pipefyReceberCardId = null;
     try {
-      const phaseReceber = await getReceberPhaseId();
+      const phaseReceber = await Promise.race([
+        getReceberPhaseId(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error("Pipefy timeout")), 8000))
+      ]);
       if (phaseReceber) {
         const tituloReceber = `VENDA — ${p.codigo || p.tipo || "Equipamento"} | ${nomeCliente}`;
         const descReceber   = [

@@ -414,10 +414,15 @@ const PREFIXOS = { 'Televisão': 'TV' };
 
 // ── API ──────────────────────────────────────────────────────
 async function api(action, body) {
-  const r = await fetch(`/api/tv-vendas?action=${action}`, body ? {
-    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
-  } : {});
-  return r.json();
+  try {
+    const r = await fetch(`/api/tv-vendas?action=${action}`, body ? {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+    } : {});
+    if (!r.ok) return { ok: false, error: `Erro ${r.status} — tente novamente` };
+    return await r.json();
+  } catch(e) {
+    return { ok: false, error: 'Erro de conexão: ' + e.message };
+  }
 }
 
 // ── TIPO ─────────────────────────────────────────────────────
@@ -616,19 +621,25 @@ async function confirmarVenda(){
   if(!modalidadeSel) return showToast('⚠️','Selecione a modalidade','Online, Loja ou Troca');
   const btn=document.getElementById('v-confirm');
   btn.disabled=true; btn.textContent='⏳';
-  const res=await api('vender',{produtoId:selVenderId,nomeCliente:nome,telefone:document.getElementById('v-tel').value.trim(),cpfCnpj:document.getElementById('v-cpf').value.trim(),vendedor:vendedorSel,modalidade:modalidadeSel});
-  if(res.ok){
-    produtos=produtos.map(p=>p.id===selVenderId?res.produto:p);
-    renderTable(); closeModal();
-    setTab('vendidos');
-    showToast('💚','Venda registrada!','Ficha criada no Financeiro e card no Pipefy');
-    // Exibe modal com texto para almoxarifado
-    if(res.textoAlmox){
-      document.getElementById('almox-texto').value = res.textoAlmox;
-      document.getElementById('almox-modal').classList.add('open');
+  try {
+    const res=await api('vender',{produtoId:selVenderId,nomeCliente:nome,telefone:document.getElementById('v-tel').value.trim(),cpfCnpj:document.getElementById('v-cpf').value.trim(),vendedor:vendedorSel,modalidade:modalidadeSel});
+    if(res.ok){
+      produtos=produtos.map(p=>p.id===selVenderId?res.produto:p);
+      renderTable(); closeModal();
+      setTab('vendidos');
+      showToast('💚','Venda registrada!','Ficha criada no Financeiro e card no Pipefy');
+      if(res.textoAlmox){
+        document.getElementById('almox-texto').value = res.textoAlmox;
+        document.getElementById('almox-modal').classList.add('open');
+      }
+    } else {
+      showToast('❌','Erro',res.error||'Tente novamente');
     }
-  } else showToast('❌','Erro',res.error);
-  btn.disabled=false; btn.textContent='✅ Confirmar Venda';
+  } catch(e) {
+    showToast('❌','Erro de conexão',e.message);
+  } finally {
+    btn.disabled=false; btn.textContent='✅ Confirmar Venda';
+  }
 }
 
 function copiarAlmox(){
