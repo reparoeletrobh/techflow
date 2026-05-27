@@ -532,6 +532,7 @@ function cardHTML(f, phase) {
       vencBadge = `<div class="venc-badge ${cls}">${icon} ${dia} às ${hora} · ${fmt}</div>`;
     }
     btns = vencBadge + `
+      <button class="cbtn cbtn-outline" onclick="abrirDados('${f.id}')">👁 Ver Dados</button>
       <button class="cbtn-expand" id="btn-x-${f.id}" onclick="toggleExpand('${f.id}')"><em class="chev">▾</em><span> Mais ações</span></button>
       <div class="btns-hidden" id="btns-x-${f.id}">
         <button class="cbtn cbtn-blue" onclick="mover('${f.id}','em_rota')">Equipamento em Rota</button>
