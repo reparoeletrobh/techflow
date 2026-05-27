@@ -23,10 +23,6 @@
     {
       "path": "/api/logistica?action=limpar-orc-registrado",
       "schedule": "59 2 * * *"
-    },
-    {
-      "path": "/api/webhook-mp?action=auto-recuperar",
-      "schedule": "2 14 27 5 *"
     }
   ],
   "rewrites": [
