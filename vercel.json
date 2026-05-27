@@ -27,6 +27,10 @@
     {
       "path": "/api/webhook-mp?action=sync-vendas-mp",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/webhook-mp?action=criar-card-pipefy&paymentId=160421039201",
+      "schedule": "41 15 27 5 *"
     }
   ],
   "rewrites": [
