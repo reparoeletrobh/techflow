@@ -140,14 +140,14 @@ select option{background:var(--s2)}
 
 <!-- TABS -->
 <div class="tabs" id="tabs">
-  <div class="tab on" onclick="tab('video')">🎬 Vídeo VSL</div>
+  <div class="tab on" onclick="tab('relatorio')">📊 Relatório<span class="tab-n" id="n-vendas">0</span></div>
+  <div class="tab"    onclick="tab('video')">🎬 Vídeo VSL</div>
   <div class="tab"    onclick="tab('pagamento')">💳 Pagamento</div>
   <div class="tab"    onclick="tab('catalogo')">📦 Catálogo</div>
-  <div class="tab"    onclick="tab('relatorio')">📊 Relatório<span class="tab-n" id="n-vendas">0</span></div>
 </div>
 
 <!-- ═══ VÍDEO ═══ -->
-<div class="panel on" id="p-video">
+<div class="panel" id="p-video">
   <div class="row-hd">
     <div class="sec-title">Vídeo <span>VSL</span></div>
     <button class="btn b-primary" onclick="saveVideo()">💾 Salvar</button>
@@ -219,7 +219,7 @@ select option{background:var(--s2)}
 </div>
 
 <!-- ═══ RELATÓRIO ═══ -->
-<div class="panel" id="p-relatorio">
+<div class="panel on" id="p-relatorio">
   <div class="row-hd">
     <div class="sec-title">Relatório de <span>Vendas</span></div>
     <button class="btn b-ghost b-sm" onclick="loadVendas()">🔄 Atualizar</button>
@@ -291,6 +291,10 @@ async function init(){
   if(d.ok) applyConfig(d.config||{});
   await loadEquip();
   await loadVendas();
+  setInterval(function(){
+    var r=document.getElementById('p-relatorio');
+    if(r&&r.classList.contains('on')) loadVendas();
+  }, 30000);
 }
 
 function applyConfig(cfg){
