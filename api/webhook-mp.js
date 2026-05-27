@@ -317,6 +317,15 @@ export default async function handler(req, res) {
             recuperado:   true,
           });
 
+          // Criar card no Pipefy Receber
+          try {
+            const pipeId = checkoutKey === TV_CHECKOUT_KEY ? '306904889' : '305832912';
+            await criarCardPipefyVenda(pipeId,
+              { codigo: ids2[0]||'', descricao: prodDescricao },
+              { nome: meta2.comprador_nome||pmt.payer?.name||'', telefone: meta2.comprador_tel||'', endereco: meta2.comprador_end||'' },
+              pmt.transaction_amount, String(log.paymentId)
+            );
+          } catch(pe) { console.error('[webhook] Pipefy venda:', pe.message); }
           resultado.push({ paymentId: String(log.paymentId), valor: pmt.transaction_amount, comprador: meta2.comprador_nome, produto: prodDescricao, marcouProduto: marcou });
         } catch(e2) {
           resultado.push({ paymentId: String(log.paymentId), erro: e2.message });
@@ -525,6 +534,16 @@ export default async function handler(req, res) {
           }
         }
       } catch(e) { console.error('vender:', e.message); }
+
+      // 4b. Criar card no Pipefy Receber (após marcar produto e antes de salvar checkout)
+      try {
+        const pipeIdVenda = checkoutKey === TV_CHECKOUT_KEY ? '306904889' : '305832912';
+        await criarCardPipefyVenda(pipeIdVenda,
+          produtoInfo,
+          { nome: nomeCliente, telefone, endereco },
+          payment.transaction_amount, String(payId)
+        );
+      } catch(pe) { console.error('[webhook] Pipefy venda tempo-real:', pe.message); }
 
       // 5. Registrar no relatório de checkout correto (ADM ou TV)
       try {

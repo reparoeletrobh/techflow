@@ -215,24 +215,8 @@ module.exports = async function handler(req, res) {
       vendedor: modalidade||vendedor||null,
       updatedAt: now };
 
-    // Registrar no relatório de checkout (tv_checkout_vendas)
-    const TV_CK_KEY = "tv_checkout_vendas";
-    const ck = (await dbGet(TV_CK_KEY)) || { vendas: [] };
-    ck.vendas = ck.vendas || [];
-    ck.vendas.unshift({
-      id:           fichaId,
-      produto:      { id: p.id, codigo: p.codigo, descricao: p.descricao, tipo: p.tipo || "TV" },
-      comprador:    { nome: nomeCliente, telefone: telefone||"", cpf: cpfCnpj||"" },
-      valor:        parseFloat(p.preco),
-      provedor:     modalidade === "online" ? "mercado_pago" : "loja",
-      paymentMethod: modalidade || "",
-      installments:  1,
-      vendedor:      vendedor || "",
-      criadoEm:     now,
-    });
-    ck.vendas = ck.vendas.slice(0, 500);
-
-    await Promise.all([dbSet(VENDAS_KEY, db), dbSet(FIN_KEY, fin), dbSet(TV_CK_KEY, ck)]);
+    // Venda interna → só financeiro e catálogo (NÃO checkout — checkout é exclusivo MP)
+    await Promise.all([dbSet(VENDAS_KEY, db), dbSet(FIN_KEY, fin)]);
 
     // ── Texto WhatsApp para almoxarifado ──────────────────────────────────
     const textoAlmox = [
