@@ -115,6 +115,61 @@ export default async function handler(req, res) {
     } catch(e) { return res.status(500).json({ok:false,error:e.message}); }
   }
 
+
+  // ── GET recuperar-venda: re-processa um paymentId manualmente ──────
+  if (action === 'recuperar-venda') {
+    const pid = req.query.paymentId || req.query.pid;
+    if (!pid) return res.status(400).json({ ok:false, error:'paymentId obrigatorio' });
+    try {
+      const mpR = await fetch(`https://api.mercadopago.com/v1/payments/${pid}`, {
+        headers: { Authorization: `Bearer ${MP_TOKEN}` }
+      });
+      const pmt = await mpR.json();
+      if (!pmt.id) return res.status(404).json({ ok:false, error:'nao encontrado no MP', raw:pmt });
+
+      const meta2 = pmt.metadata || {};
+      const CKKEY = 'reparoeletro_checkout_vendas';
+      const ck    = (await dbGet(CKKEY)) || { vendas:[] };
+      ck.vendas   = ck.vendas || [];
+
+      if (ck.vendas.find(v => v.paymentId === String(pid))) {
+        return res.status(200).json({ ok:true, info:'ja registrado', paymentId:pid });
+      }
+
+      ck.vendas.unshift({
+        id:           Date.now().toString(36),
+        produto:      { id: meta2.produto_ids||'', codigo: meta2.produto_ids||'', descricao: meta2.produto_nome||'Produto recuperado', tipo:'' },
+        comprador:    { nome: meta2.comprador_nome||pmt.payer?.name||'Comprador', telefone: meta2.comprador_tel||'', cpf: meta2.comprador_cpf||'', endereco: meta2.comprador_end||'' },
+        valor:        pmt.transaction_amount,
+        provedor:     'mercado_pago',
+        paymentId:    String(pid),
+        paymentMethod:pmt.payment_method_id,
+        installments: pmt.installments,
+        criadoEm:     new Date().toISOString(),
+        recuperado:   true,
+      });
+      ck.vendas = ck.vendas.slice(0,500);
+      await dbSet(CKKEY, ck);
+
+      // Marcar produto como vendido
+      const admDb = (await dbGet('reparoeletro_vendas')) || { produtos:[] };
+      const ids2  = (meta2.produto_ids||'').split(',').filter(Boolean);
+      let marcou  = false;
+      for (const pid2 of ids2) {
+        const i2 = admDb.produtos.findIndex(p => String(p.id)===pid2 || p.codigo===pid2);
+        if (i2>=0 && !admDb.produtos[i2].vendido) {
+          admDb.produtos[i2] = {...admDb.produtos[i2], vendido:true, soldAt:new Date().toISOString(), nomeCliente:meta2.comprador_nome||'', paymentId:String(pid)};
+          marcou = true;
+        }
+      }
+      if (marcou) await dbSet('reparoeletro_vendas', admDb);
+
+      return res.status(200).json({ ok:true, registrado:true, paymentId:pid, valor:pmt.transaction_amount, status:pmt.status, comprador:meta2.comprador_nome, marcouProduto:marcou });
+    } catch(e) {
+      return res.status(500).json({ ok:false, error:e.message });
+    }
+  }
+
   if (action === 'logs') {
       try {
         const logsRaw = await dbGet(LOG_KEY);
@@ -246,7 +301,9 @@ export default async function handler(req, res) {
           } else {
             console.error('[Webhook] Produto não encontrado em nenhum catálogo:', produtoId);
             await logEvento({ tipo:'erro', produtoId, erro:'nao_encontrado', paymentId:String(payId) });
-            continue;
+            // Registrar mesmo assim — nenhuma venda aprovada pode ser descartada
+            produtoInfo  = { id: produtoId, codigo: produtoId, descricao: meta.produto_nome || 'Produto', tipo: '' };
+            checkoutKey  = ADM_CHECKOUT_KEY;
           }
         }
       } catch(e) { console.error('vender:', e.message); }
