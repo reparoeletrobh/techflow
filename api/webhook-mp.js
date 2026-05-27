@@ -141,6 +141,121 @@ export default async function handler(req, res) {
     }
   }
 
+
+  // ── GET sync-vendas-mp: busca pagamentos aprovados na API do MP e registra os que faltam ──
+  // Chamado pelo cron a cada 10 min — garante que TODA venda aprovada entre no checkout
+  if (action === 'sync-vendas-mp') {
+    try {
+      const agora     = new Date();
+      const inicio    = new Date(agora.getTime() - 30 * 60 * 1000); // últimos 30 min
+      const isoInicio = inicio.toISOString().replace('Z', '-00:00');
+      const isoFim    = agora.toISOString().replace('Z', '-00:00');
+
+      // Buscar pagamentos aprovados recentes no MP
+      const mpUrl = `https://api.mercadopago.com/v1/payments/search?status=approved` +
+        `&sort=date_created&criteria=desc&range=date_created` +
+        `&begin_date=${encodeURIComponent(isoInicio)}&end_date=${encodeURIComponent(isoFim)}` +
+        `&limit=20`;
+
+      const mpRes = await fetch(mpUrl, {
+        headers: { Authorization: `Bearer ${MP_TOKEN}` }
+      });
+      const mpData = await mpRes.json();
+      const pagamentos = mpData.results || [];
+
+      if (!pagamentos.length) {
+        return res.status(200).json({ ok: true, info: 'nenhum pagamento aprovado nos últimos 30min', sincronizados: 0 });
+      }
+
+      // Ler checkout atual
+      const CKKEY = 'reparoeletro_checkout_vendas';
+      const ck    = (await dbGet(CKKEY)) || { vendas: [] };
+      ck.vendas   = ck.vendas || [];
+      const jaNoCheckout = new Set(ck.vendas.map(v => String(v.paymentId)));
+
+      // Filtrar apenas os que ainda não foram registrados
+      const pendentes = pagamentos.filter(p => !jaNoCheckout.has(String(p.id)));
+
+      if (!pendentes.length) {
+        return res.status(200).json({ ok: true, info: 'todos já registrados', total: pagamentos.length, pendentes: 0 });
+      }
+
+      const resultado = [];
+      const admDb  = (await dbGet('reparoeletro_vendas')) || { produtos: [] };
+      let   mudouAdm = false;
+
+      for (const pmt of pendentes) {
+        // Já processado por idempotência?
+        if (await jaProcessado(String(pmt.id))) continue;
+        await marcarProcessado(String(pmt.id));
+
+        const meta         = pmt.metadata || {};
+        const ids          = (meta.produto_ids || '').split(',').filter(Boolean);
+        let   prodDescricao = meta.produto_nome || 'Produto';
+        let   marcou        = false;
+
+        // Marcar produto como vendido
+        for (const pid of ids) {
+          const idx = admDb.produtos.findIndex(p => String(p.id) === pid || p.codigo === pid);
+          if (idx >= 0) {
+            prodDescricao = admDb.produtos[idx].descricao || admDb.produtos[idx].nome || prodDescricao;
+            if (!admDb.produtos[idx].vendido) {
+              admDb.produtos[idx] = {
+                ...admDb.produtos[idx],
+                vendido:     true,
+                soldAt:      new Date().toISOString(),
+                nomeCliente: meta.comprador_nome || pmt.payer?.name || '',
+                paymentId:   String(pmt.id)
+              };
+              mudouAdm = true;
+              marcou   = true;
+            }
+          }
+        }
+
+        ck.vendas.unshift({
+          id:            Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+          produto:       { id: ids[0] || '', codigo: ids[0] || '', descricao: prodDescricao, tipo: '' },
+          comprador:     {
+            nome:    meta.comprador_nome || pmt.payer?.name || 'Comprador',
+            telefone:meta.comprador_tel  || '',
+            cpf:     meta.comprador_cpf  || '',
+            endereco:meta.comprador_end  || ''
+          },
+          valor:         pmt.transaction_amount,
+          provedor:      'mercado_pago',
+          paymentId:     String(pmt.id),
+          paymentMethod: pmt.payment_method_id,
+          installments:  pmt.installments,
+          criadoEm:      pmt.date_approved || new Date().toISOString(),
+          syncAuto:      true
+        });
+
+        await logEvento({
+          paymentId: String(pmt.id), status: 'approved', method: pmt.payment_method_id,
+          amount: pmt.transaction_amount, tipo: 'sync-auto'
+        });
+
+        resultado.push({
+          paymentId: String(pmt.id), valor: pmt.transaction_amount,
+          comprador: meta.comprador_nome || pmt.payer?.name, produto: prodDescricao, marcouProduto: marcou
+        });
+      }
+
+      if (resultado.length > 0) {
+        ck.vendas = ck.vendas.slice(0, 500);
+        await dbSet(CKKEY, ck);
+        if (mudouAdm) await dbSet('reparoeletro_vendas', admDb);
+      }
+
+      return res.status(200).json({
+        ok: true, sincronizados: resultado.length, total: pagamentos.length, resultado
+      });
+    } catch(e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
   // ── GET auto-recuperar: encontra e registra vendas aprovadas perdidas ──
   if (action === 'auto-recuperar') {
     try {
