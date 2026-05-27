@@ -502,6 +502,12 @@ function render() {
   }).join('');
 }
 
+function nomeFormatado(f) {
+  var primeiro = (f.nome || '').split(' ')[0];
+  var d4 = (f.telefone || '').replace(/\D/g, '').slice(-4);
+  return d4 ? primeiro + ' ' + d4 : primeiro;
+}
+
 function cardHTML(f, phase) {
   const tempo = tempoRelativo(f.movedAt || f.criadoEm);
   const col   = COLS.find(c => c.id === phase) || {};
