@@ -198,17 +198,39 @@ module.exports = async function handler(req, res) {
         if (card?.id) {
           ficha.pipefyCardId = String(card.id);
           ficha.pipefyErro   = null;
-          // Atualizar valor no Pipefy se tiver preço
           const precoFinal = ficha.diagnostico?.preco;
           if (precoFinal) {
             await pipefyQuery(
               `mutation { updateCardField(input: { card_id: "${card.id}", field_id: "valor_de_contrato", new_value: "${precoFinal}" }) { success } }`
             ).catch(() => {});
           }
-          // Mover para Aguardando Aprovação
           await pipefyQuery(
             `mutation { moveCardToPhase(input: { card_id: "${card.id}", destination_phase_id: "${AGUARDANDO_PHASE_ID}" }) { card { id } } }`
           ).catch(() => {});
+          // Atualizar reparoeletro_orcamentos para evitar duplicata pelo orc-sync
+          try {
+            const ORC_KEY2 = 'reparoeletro_orcamentos';
+            const orcDb2 = (await dbGet(ORC_KEY2)) || { fichas:[], syncedIds:[], initialized:true };
+            const orcIdx = orcDb2.fichas.findIndex(f => f.id === ficha.id || f.pipefyId === ficha.id);
+            if (orcIdx >= 0) {
+              orcDb2.fichas[orcIdx].id       = String(card.id);
+              orcDb2.fichas[orcIdx].pipefyId = String(card.id);
+            } else {
+              // Ainda não está em orcamentos — adicionar agora
+              orcDb2.fichas.unshift({
+                id: String(card.id), pipefyId: String(card.id),
+                nome: ficha.nome, tel: ficha.telefone||'',
+                desc: (ficha.equipamento||'') + ' — ' + (ficha.defeito||''),
+                end: ficha.endereco||'', textoOrc: ficha.diagnostico?.textoOrc||'',
+                precoSugerido: precoFinal||null, status:'pendente', preco:null,
+                createdAt: new Date().toISOString(),
+              });
+            }
+            if (!orcDb2.syncedIds.includes(String(card.id))) {
+              orcDb2.syncedIds.push(String(card.id));
+            }
+            await dbSet(ORC_KEY2, orcDb2);
+          } catch(oe) { console.error('[Log] forcar sync orc-key:', oe.message); }
           resultado.push({ id: ficha.id, nome: ficha.nome, pipefyCardId: card.id, ok: true });
         } else {
           resultado.push({ id: ficha.id, nome: ficha.nome, ok: false, erro: 'card sem id' });
@@ -573,6 +595,23 @@ module.exports = async function handler(req, res) {
           if (precoFinal) {
             await pipefyQuery(`mutation { updateCardField(input: { card_id: "${card.id}", field_id: "valor_de_contrato", new_value: "${precoFinal}" }) { success } }`).catch(()=>{});
           }
+          // Atualizar reparoeletro_orcamentos: trocar ID local pelo ID real do Pipefy
+          // e adicionar ao syncedIds para orc-sync não duplicar
+          try {
+            const ORC_KEY2 = 'reparoeletro_orcamentos';
+            const orcDb2 = (await dbGet(ORC_KEY2)) || { fichas:[], syncedIds:[], initialized:true };
+            // Trocar entrada com id=ficha.id pelo id/pipefyId real
+            const orcIdx = orcDb2.fichas.findIndex(f => f.id === ficha.id || f.pipefyId === ficha.id);
+            if (orcIdx >= 0) {
+              orcDb2.fichas[orcIdx].id       = String(card.id);
+              orcDb2.fichas[orcIdx].pipefyId = String(card.id);
+            }
+            // Garantir que o ID real está em syncedIds
+            if (!orcDb2.syncedIds.includes(String(card.id))) {
+              orcDb2.syncedIds.push(String(card.id));
+            }
+            await dbSet(ORC_KEY2, orcDb2);
+          } catch(oe) { console.error('[Log] sync orc-key:', oe.message); }
           console.log('[Log] Pipefy card CRIADO:', card.id, card.url);
         }
       }
