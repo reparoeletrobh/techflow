@@ -116,6 +116,85 @@ export default async function handler(req, res) {
   }
 
 
+
+  // ── GET auto-recuperar: encontra e registra vendas aprovadas perdidas ──
+  if (action === 'auto-recuperar') {
+    try {
+      const LOG_KEY  = 'mp_webhook_log';
+      const PROC_KEY = 'mp_processados';
+      const CKKEY    = 'reparoeletro_checkout_vendas';
+
+      const logsRaw = await dbGet(LOG_KEY);
+      const logs = Array.isArray(logsRaw) ? logsRaw
+        : (typeof logsRaw === 'string' ? JSON.parse(logsRaw) : []);
+
+      const ck = (await dbGet(CKKEY)) || { vendas:[] };
+      ck.vendas = ck.vendas || [];
+      const jaNoCheckout = new Set(ck.vendas.map(v => String(v.paymentId)));
+
+      // Filtrar logs: aprovados que não estão no checkout
+      const aprovados = logs.filter(l => l.status === 'approved' && l.paymentId && !jaNoCheckout.has(String(l.paymentId)));
+
+      const resultado = [];
+      for (const log of aprovados) {
+        try {
+          // Buscar detalhes completos no MP
+          const mpR = await fetch(`https://api.mercadopago.com/v1/payments/${log.paymentId}`, {
+            headers: { Authorization: `Bearer ${MP_TOKEN}` }
+          });
+          const pmt = await mpR.json();
+          if (pmt.status !== 'approved') continue;
+
+          const meta2 = pmt.metadata || {};
+          const ids2  = (meta2.produto_ids||'').split(',').filter(Boolean);
+
+          // Marcar produto como vendido
+          const admDb = (await dbGet('reparoeletro_vendas')) || { produtos:[] };
+          let marcou = false, prodDescricao = meta2.produto_nome || 'Produto';
+          for (const pid2 of ids2) {
+            const i2 = admDb.produtos.findIndex(p => String(p.id)===pid2 || p.codigo===pid2);
+            if (i2 >= 0) {
+              prodDescricao = admDb.produtos[i2].descricao || admDb.produtos[i2].nome || prodDescricao;
+              if (!admDb.produtos[i2].vendido) {
+                admDb.produtos[i2] = {...admDb.produtos[i2], vendido:true, soldAt:new Date().toISOString(),
+                  nomeCliente: meta2.comprador_nome||'', paymentId: String(log.paymentId)};
+                marcou = true;
+              }
+            }
+          }
+          if (marcou) await dbSet('reparoeletro_vendas', admDb);
+
+          // Registrar no checkout
+          ck.vendas.unshift({
+            id:           Date.now().toString(36) + Math.random().toString(36).slice(2,5),
+            produto:      { id: ids2[0]||'', codigo: ids2[0]||'', descricao: prodDescricao, tipo:'' },
+            comprador:    { nome: meta2.comprador_nome||pmt.payer?.name||'Comprador', telefone: meta2.comprador_tel||'', cpf: meta2.comprador_cpf||'', endereco: meta2.comprador_end||'' },
+            valor:        pmt.transaction_amount,
+            provedor:     'mercado_pago',
+            paymentId:    String(log.paymentId),
+            paymentMethod:pmt.payment_method_id,
+            installments: pmt.installments,
+            criadoEm:     pmt.date_approved || new Date().toISOString(),
+            recuperado:   true,
+          });
+
+          resultado.push({ paymentId: String(log.paymentId), valor: pmt.transaction_amount, comprador: meta2.comprador_nome, produto: prodDescricao, marcouProduto: marcou });
+        } catch(e2) {
+          resultado.push({ paymentId: String(log.paymentId), erro: e2.message });
+        }
+      }
+
+      if (resultado.length > 0) {
+        ck.vendas = ck.vendas.slice(0,500);
+        await dbSet(CKKEY, ck);
+      }
+
+      return res.status(200).json({ ok:true, encontrados: aprovados.length, recuperados: resultado.filter(r=>!r.erro).length, resultado });
+    } catch(e) {
+      return res.status(500).json({ ok:false, error: e.message });
+    }
+  }
+
   // ── GET recuperar-venda: re-processa um paymentId manualmente ──────
   if (action === 'recuperar-venda') {
     const pid = req.query.paymentId || req.query.pid;
