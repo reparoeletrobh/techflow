@@ -309,6 +309,7 @@ function tab(id){
   document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('on',['video','pagamento','catalogo','relatorio'][i]===id));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
   document.getElementById('p-'+id).classList.add('on');
+  if(id==='relatorio') loadVendas(); // atualiza ao entrar na aba
 }
 
 // ── VIDEO ────────────────────────────────────────────────────────────────
