@@ -450,6 +450,23 @@ function filtrar(q) {
   render();
 }
 
+
+// ── Máscara de telefone: (99) 99999-9999 ──────────────────────
+function mascaraTel(tel) {
+  if (!tel) return '';
+  // Remover tudo que não é dígito
+  var d = String(tel).replace(/\D/g, '');
+  // Remover prefixo 55 (Brasil) se tiver 12 ou 13 dígitos
+  if ((d.length === 13 || d.length === 12) && d.startsWith('55')) d = d.slice(2);
+  // Se 10 dígitos (sem o 9) → adicionar 9 após o DDD
+  if (d.length === 10) d = d.slice(0,2) + '9' + d.slice(2);
+  // Formatar (DD) 9XXXX-XXXX
+  if (d.length === 11) {
+    return '(' + d.slice(0,2) + ') ' + d.slice(2,7) + '-' + d.slice(7);
+  }
+  // Não conseguiu formatar — retorna original
+  return tel;
+}
 // ── RENDER ────────────────────────────────────────────────────
 function render() {
   const board = document.getElementById('board');
@@ -537,7 +554,7 @@ function cardHTML(f, phase) {
     </div>
     ${emRotaAlerta ? '<div class="alerta-badge">⚠️ Em rota há mais de 2h</div>' : ''}
     <div class="card-nome">${escHtml(f.nome)}</div>
-    ${f.telefone ? `<div class="card-tel">📞 ${escHtml(f.telefone)}</div>` : ''}
+    ${f.telefone ? `<div class="card-tel">📞 ${escHtml(mascaraTel(f.telefone))}</div>` : ''}
     ${f.equipamento ? `<div class="card-equip">${escHtml(f.equipamento)}</div>` : ''}
     ${f.defeito ? `<div class="card-defeito">${escHtml(f.defeito).slice(0,80)}</div>` : ''}
     <div class="card-actions">${btns}</div>
@@ -569,7 +586,7 @@ function abrirDados(id) {
   if (!fichaAtual) return;
   document.getElementById('dados-id').textContent = fichaAtual.id;
   document.getElementById('d-nome').value    = fichaAtual.nome || '';
-  document.getElementById('d-tel').value     = fichaAtual.telefone || '';
+  document.getElementById('d-tel').value     = mascaraTel(fichaAtual.telefone);
   document.getElementById('d-end').value     = fichaAtual.endereco || '';
   document.getElementById('d-equip').value   = fichaAtual.equipamento || '';
   document.getElementById('d-defeito').value = fichaAtual.defeito || '';
