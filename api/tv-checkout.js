@@ -102,9 +102,17 @@ export default async function handler(req, res) {
 
   // ── GET load-vendas ────────────────────────────────────────────
   if (action === 'load-vendas') {
-    const db    = (await dbGet(VENDAS_KEY)) || { vendas: [] };
-    const vendas = db.vendas || [];
-    const total  = vendas.reduce((s, v) => s + (parseFloat(v.valor) || 0), 0);
+    const ADM_KEY = 'reparoeletro_checkout_vendas';
+    const [dbTV, dbADM] = await Promise.all([
+      dbGet(VENDAS_KEY).catch(() => null),
+      dbGet(ADM_KEY).catch(() => null)
+    ]);
+    const vendasTV  = dbTV?.vendas  || [];
+    const vendasADM = dbADM?.vendas || [];
+    const vendas = [...vendasTV, ...vendasADM].sort((a, b) =>
+      new Date(b.criadoEm || 0).getTime() - new Date(a.criadoEm || 0).getTime()
+    );
+    const total = vendas.reduce((s, v) => s + (parseFloat(v.valor) || 0), 0);
     return res.status(200).json({ ok: true, vendas, total, count: vendas.length });
   }
 
