@@ -164,6 +164,67 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, total: encontradas.length, fichas: encontradas, fixResult });
   }
 
+
+  // ── GET listar-sem-pipefy — fichas em orc_registrado sem card no Pipefy ──
+  if (action === 'listar-sem-pipefy') {
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const sem = db.fichas.filter(f =>
+      !f.pipefyCardId && (f.phase === 'orc_registrado' || f.pipefyErro)
+    ).map(f => ({
+      id:         f.id,
+      nome:       f.nome,
+      equipamento:f.equipamento || '',
+      fase:       f.phase,
+      pipefyErro: f.pipefyErro || null,
+      criadoEm:   f.criadoEm || ''
+    }));
+    return res.status(200).json({ ok:true, total: sem.length, fichas: sem });
+  }
+
+  // ── GET forcar-pipefy-todos — cria card no Pipefy para todas fichas pendentes ──
+  if (action === 'forcar-pipefy-todos') {
+    const db     = await dbGet(LOG_KEY) || defaultDB();
+    const pendentes = db.fichas.filter(f => !f.pipefyCardId && f.diagnostico);
+    const resultado = [];
+    for (const ficha of pendentes) {
+      try {
+        const card = await criarCardPipefy({
+          nome:        ficha.nome,
+          telefone:    ficha.telefone || '',
+          equipamento: ficha.equipamento || '',
+          defeito:     ficha.defeito || '',
+          endereco:    ficha.endereco || ''
+        });
+        if (card?.id) {
+          ficha.pipefyCardId = String(card.id);
+          ficha.pipefyErro   = null;
+          // Atualizar valor no Pipefy se tiver preço
+          const precoFinal = ficha.diagnostico?.preco;
+          if (precoFinal) {
+            await pipefyQuery(
+              `mutation { updateCardField(input: { card_id: "${card.id}", field_id: "valor_de_contrato", new_value: "${precoFinal}" }) { success } }`
+            ).catch(() => {});
+          }
+          // Mover para Aguardando Aprovação
+          await pipefyQuery(
+            `mutation { moveCardToPhase(input: { card_id: "${card.id}", destination_phase_id: "${AGUARDANDO_PHASE_ID}" }) { card { id } } }`
+          ).catch(() => {});
+          resultado.push({ id: ficha.id, nome: ficha.nome, pipefyCardId: card.id, ok: true });
+        } else {
+          resultado.push({ id: ficha.id, nome: ficha.nome, ok: false, erro: 'card sem id' });
+        }
+      } catch(e) {
+        ficha.pipefyErro   = e.message;
+        ficha.pipefyErroTs = new Date().toISOString();
+        resultado.push({ id: ficha.id, nome: ficha.nome, ok: false, erro: e.message });
+      }
+    }
+    await dbSet(LOG_KEY, db);
+    const ok  = resultado.filter(r => r.ok).length;
+    const err = resultado.filter(r => !r.ok).length;
+    return res.status(200).json({ ok: true, total: pendentes.length, criados: ok, erros: err, resultado });
+  }
+
   // ── GET retry-pipefy: tenta criar card no Pipefy para ficha sem pipefyCardId ──
   if (action === 'retry-pipefy') {
     const id = req.query.id;
