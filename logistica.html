@@ -145,6 +145,19 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .alerta-badge{display:inline-flex;align-items:center;gap:4px;font-family:var(--fm);font-size:9px;color:#ef4444;background:rgba(239,68,68,.12);padding:2px 8px;border-radius:10px;}
 /* ── TELEFONE NO CARD ── */
 .card-tel{font-family:var(--fm);font-size:10px;color:var(--muted);}
+/* ── EXPAND BOTÕES ── */
+.btns-hidden{display:none;flex-direction:column;gap:5px;margin-top:2px;}
+.btns-hidden.open{display:flex;}
+.cbtn-expand{
+  width:100%;padding:5px 0;border-radius:6px;
+  background:transparent;border:1px solid rgba(255,255,255,.08);
+  color:rgba(255,255,255,.35);font-family:var(--fm);font-size:10px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  gap:4px;transition:all .15s;letter-spacing:.5px;
+}
+.cbtn-expand:hover{color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.2);}
+.cbtn-expand .chev{display:inline-block;transition:transform .2s;font-style:normal;}
+.cbtn-expand.open .chev{transform:rotate(180deg);}
 /* ── VENCIMENTO COLETA ── */
 .venc-badge{display:inline-flex;align-items:center;gap:5px;font-family:var(--fm);font-size:11px;font-weight:700;padding:5px 10px;border-radius:8px;width:100%;justify-content:center;margin-bottom:6px;}
 .venc-ok{background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.25);}
@@ -492,12 +505,15 @@ function cardHTML(f, phase) {
   let btns = '';
   if (phase === 'liberado_coleta') {
     btns = `
-      <button class="cbtn cbtn-outline" onclick="abrirDados('${f.id}')">Ver Dados</button>
-      <button class="cbtn" style="background:rgba(249,115,22,.15);color:#f97316;border-color:#f97316;" onclick="abrirHorario('${f.id}')">🕐 Horário Marcado</button>
-      <button class="cbtn cbtn-blue" onclick="mover('${f.id}','em_rota')">Equipamento em Rota</button>
-      <button class="cbtn cbtn-purple" onclick="abrirMotorista('${f.id}')">Motorista Parceiro</button>
-      <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>
-      <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>`;
+      <button class="cbtn cbtn-outline" onclick="abrirDados('${f.id}')">👁 Ver Dados</button>
+      <button class="cbtn-expand" id="btn-x-${f.id}" onclick="toggleExpand('${f.id}')"><em class="chev">▾</em><span> Mais ações</span></button>
+      <div class="btns-hidden" id="btns-x-${f.id}">
+        <button class="cbtn" style="background:rgba(249,115,22,.15);color:#f97316;border-color:#f97316;" onclick="abrirHorario('${f.id}')">🕐 Horário Marcado</button>
+        <button class="cbtn cbtn-blue" onclick="mover('${f.id}','em_rota')">Equipamento em Rota</button>
+        <button class="cbtn cbtn-purple" onclick="abrirMotorista('${f.id}')">Motorista Parceiro</button>
+        <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>
+        <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>
+      </div>`;
   } else if (phase === 'horario_marcado') {
     // Badge de vencimento
     let vencBadge = '';
@@ -516,11 +532,14 @@ function cardHTML(f, phase) {
       vencBadge = `<div class="venc-badge ${cls}">${icon} ${dia} às ${hora} · ${fmt}</div>`;
     }
     btns = vencBadge + `
-      <button class="cbtn cbtn-blue" onclick="mover('${f.id}','em_rota')">Equipamento em Rota</button>
-      <button class="cbtn cbtn-purple" onclick="abrirMotorista('${f.id}')">Motorista Parceiro</button>
-      <button class="cbtn" style="background:rgba(249,115,22,.15);color:#f97316;border-color:#f97316;" onclick="abrirHorario('${f.id}')">✏️ Alterar Horário</button>
-      <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>
-      <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>`;
+      <button class="cbtn-expand" id="btn-x-${f.id}" onclick="toggleExpand('${f.id}')"><em class="chev">▾</em><span> Mais ações</span></button>
+      <div class="btns-hidden" id="btns-x-${f.id}">
+        <button class="cbtn cbtn-blue" onclick="mover('${f.id}','em_rota')">Equipamento em Rota</button>
+        <button class="cbtn cbtn-purple" onclick="abrirMotorista('${f.id}')">Motorista Parceiro</button>
+        <button class="cbtn" style="background:rgba(249,115,22,.15);color:#f97316;border-color:#f97316;" onclick="abrirHorario('${f.id}')">✏️ Alterar Horário</button>
+        <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>
+        <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>
+      </div>`;
   } else if (phase === 'em_rota') {
     btns = `
       <button class="cbtn cbtn-green" onclick="mover('${f.id}','coleta_efetuada')">Coleta Efetuada</button>
@@ -530,10 +549,13 @@ function cardHTML(f, phase) {
   } else if (phase === 'motorista_parceiro') {
     const motorista = f.motoristaNome ? `<div style="font-family:var(--fm);font-size:10px;color:#8b5cf6;margin-bottom:2px;">🏍️ ${escHtml(f.motoristaNome)}</div>` : '';
     btns = motorista + `
-      <button class="cbtn cbtn-green" onclick="mover('${f.id}','coleta_efetuada')">Coleta Efetuada</button>
-      <button class="cbtn cbtn-blue" onclick="mover('${f.id}','em_rota')">Equipamento em Rota</button>
-      <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>
-      <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>`;
+      <button class="cbtn-expand" id="btn-x-${f.id}" onclick="toggleExpand('${f.id}')"><em class="chev">▾</em><span> Mais ações</span></button>
+      <div class="btns-hidden" id="btns-x-${f.id}">
+        <button class="cbtn cbtn-green" onclick="mover('${f.id}','coleta_efetuada')">Coleta Efetuada</button>
+        <button class="cbtn cbtn-blue" onclick="mover('${f.id}','em_rota')">Equipamento em Rota</button>
+        <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>
+        <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>
+      </div>`;
   } else if (phase === 'remarcar') {
     btns = `
       <button class="cbtn cbtn-blue" onclick="mover('${f.id}','liberado_coleta')">Liberar Novamente</button>
@@ -1004,6 +1026,18 @@ function mostrarMsgHorario(txt, tipo) {
   el.textContent = txt; el.style.display = 'block';
   el.style.background = tipo==='ok' ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)';
   el.style.color = tipo==='ok' ? '#22c55e' : '#ef4444';
+}
+
+
+// ── EXPAND / COLLAPSE BOTÕES ─────────────────────────────────
+function toggleExpand(id) {
+  const wrap = document.getElementById('btns-x-'+id);
+  const btn  = document.getElementById('btn-x-'+id);
+  if (!wrap || !btn) return;
+  const open = wrap.classList.toggle('open');
+  btn.classList.toggle('open', open);
+  btn.querySelector('.chev').textContent = open ? '▴' : '▾';
+  btn.childNodes[0].textContent = open ? ' Recolher' : ' Mais ações';
 }
 
 </script>
