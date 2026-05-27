@@ -114,7 +114,7 @@ async function criarCardPipefy({ nome, telefone, equipamento, defeito, endereco 
       createCard(input: {
         pipe_id: "${PIPE_ID}"
         phase_id: "${AGUARDANDO_PHASE_ID}"
-        fields_attributes: [${attrs.join(', ')}]
+        fields_attributes: [${fieldsAttr.join(', ')}]
       }) { card { id title url } }
     }`);
     card = data?.createCard?.card;
@@ -123,7 +123,7 @@ async function criarCardPipefy({ nome, telefone, equipamento, defeito, endereco 
     const data = await pipefyQuery(`mutation {
       createCard(input: {
         pipe_id: "${PIPE_ID}"
-        fields_attributes: [${attrs.join(', ')}]
+        fields_attributes: [${fieldsAttr.join(', ')}]
       }) { card { id title url } }
     }`);
     card = data?.createCard?.card;
