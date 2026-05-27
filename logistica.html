@@ -554,10 +554,13 @@ function cardHTML(f, phase) {
       </div>`;
   } else if (phase === 'em_rota') {
     btns = `
-      <button class="cbtn cbtn-green" onclick="mover('${f.id}','coleta_efetuada')">Coleta Efetuada</button>
-      <button class="cbtn cbtn-purple" onclick="abrirMotorista('${f.id}')">Motorista Parceiro</button>
-      <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>
-      <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>`;
+      <button class="cbtn-expand" id="btn-x-${f.id}" onclick="toggleExpand('${f.id}')"><em class="chev">▾</em><span> Mais ações</span></button>
+      <div class="btns-hidden" id="btns-x-${f.id}">
+        <button class="cbtn cbtn-green" onclick="mover('${f.id}','coleta_efetuada')">Coleta Efetuada</button>
+        <button class="cbtn cbtn-purple" onclick="abrirMotorista('${f.id}')">Motorista Parceiro</button>
+        <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>
+        <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>
+      </div>`;
   } else if (phase === 'motorista_parceiro') {
     const motorista = f.motoristaNome ? `<div style="font-family:var(--fm);font-size:10px;color:#8b5cf6;margin-bottom:2px;">🏍️ ${escHtml(f.motoristaNome)}</div>` : '';
     btns = motorista + `
