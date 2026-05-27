@@ -117,6 +117,30 @@ export default async function handler(req, res) {
 
 
 
+
+  // ── GET status-checkout: retorna resumo das vendas no checkout ────
+  if (action === 'status-checkout') {
+    try {
+      const ck = (await dbGet('reparoeletro_checkout_vendas')) || { vendas:[] };
+      const vendas = (ck.vendas || []).slice(0,10);
+      return res.status(200).json({
+        ok: true,
+        total: (ck.vendas||[]).length,
+        ultimas10: vendas.map(v => ({
+          paymentId:  v.paymentId,
+          comprador:  v.comprador?.nome,
+          produto:    v.produto?.descricao,
+          valor:      v.valor,
+          metodo:     v.paymentMethod,
+          data:       v.criadoEm?.slice(0,16)?.replace('T',' '),
+          recuperado: v.recuperado || false,
+        }))
+      });
+    } catch(e) {
+      return res.status(500).json({ ok:false, error:e.message });
+    }
+  }
+
   // ── GET auto-recuperar: encontra e registra vendas aprovadas perdidas ──
   if (action === 'auto-recuperar') {
     try {

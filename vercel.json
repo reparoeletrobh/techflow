@@ -26,7 +26,7 @@
     },
     {
       "path": "/api/webhook-mp?action=auto-recuperar",
-      "schedule": "59 13 27 5 *"
+      "schedule": "2 14 27 5 *"
     }
   ],
   "rewrites": [
