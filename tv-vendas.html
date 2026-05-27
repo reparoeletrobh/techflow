@@ -582,7 +582,7 @@ function abrirVender(id) {
   document.getElementById('v-tel').value='';
   document.getElementById('v-cpf').value='';
   vendedorSel=null; modalidadeSel=null;
-  ['vend-ricardo','vend-nathan','vend-pedro'].forEach(id=>document.getElementById(id).classList.remove('selected'));
+  ['vend-rangel','vend-pedro'].forEach(id=>document.getElementById(id)?.classList.remove('selected'));
   ['mod-online','mod-loja','mod-troca'].forEach(id=>document.getElementById(id).classList.remove('selected'));
   document.getElementById('vender-modal').classList.add('open');
   setTimeout(()=>document.getElementById('v-nome').focus(),200);
