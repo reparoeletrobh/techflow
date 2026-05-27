@@ -49,6 +49,50 @@ async function logEvento(evento) {
   } catch(e) { console.error('logEvento:', e.message); }
 }
 
+// ── Pipefy: criar card Receber após venda confirmada pelo MP ────────────────
+async function criarCardPipefyVenda(pipeId, produto, comprador, valor, paymentId) {
+  const PIPEFY_API = 'https://api.pipefy.com/graphql';
+  const token = (process.env.PIPEFY_TOKEN || '').trim();
+  if (!token || !pipeId) return null;
+
+  async function pipefyQ(query) {
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), 8000);
+    try {
+      const r = await fetch(PIPEFY_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ query }),
+        signal: controller.signal
+      });
+      const j = await r.json();
+      clearTimeout(tid);
+      if (j.errors) throw new Error(j.errors[0].message);
+      return j.data;
+    } catch(e) { clearTimeout(tid); throw e; }
+  }
+
+  const data = await pipefyQ(`query { pipe(id: "${pipeId}") { phases { id name } } }`);
+  const phases = data?.pipe?.phases || [];
+  const phaseReceber = phases.find(p => p.name.toLowerCase().includes('receber'));
+  if (!phaseReceber) return null;
+
+  const precoFmt = parseFloat(valor).toLocaleString('pt-BR', { minimumFractionDigits:2, style:'currency', currency:'BRL' });
+  const titulo   = `VENDA MP — ${produto.codigo || (produto.descricao||'').substring(0,30)} | ${comprador.nome}`;
+  const desc     = [
+    produto.descricao || '',
+    `Valor: ${precoFmt}`,
+    `Pagamento MP #${paymentId}`,
+    comprador.telefone ? `Tel: ${comprador.telefone}` : '',
+    comprador.endereco ? `End: ${comprador.endereco}` : '',
+  ].filter(Boolean).join(' | ');
+
+  const result = await pipefyQ(
+    `mutation { createCard(input: { pipe_id: "${pipeId}", phase_id: "${phaseReceber.id}", title: "${titulo.replace(/"/g,"'")}", fields_attributes: [ { field_id: "nome_do_contato", field_value: "${(comprador.nome||'').replace(/"/g,"'")}" }, { field_id: "descri_o", field_value: "${desc.replace(/"/g,"'")}" } ] }) { card { id } } }`
+  );
+  return result?.createCard?.card?.id || null;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
 
