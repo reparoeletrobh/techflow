@@ -545,12 +545,6 @@ function cardHTML(f, phase) {
       vencBadge = `<div class="venc-badge venc-ok">🟢 ${escHtml(f.horarioColetaTexto)}</div>`;
     } else {
       vencBadge = `<div class="venc-badge venc-ok">🟢 Agendado</div>`;
-    } else if (f.horarioColetaTexto) {
-      // Parse falhou mas há texto original — badge neutro azul
-      vencBadge = `<div class="venc-badge" style="background:rgba(59,158,255,.12);color:#3b9eff;border:1px solid rgba(59,158,255,.3);">📅 ${escHtml(f.horarioColetaTexto)}</div>`;
-    } else {
-      // Ficha em horario_marcado sem data registrada — badge genérico
-      vencBadge = `<div class="venc-badge" style="background:rgba(59,158,255,.08);color:#3b9eff;border:1px solid rgba(59,158,255,.2);">📅 Horário a confirmar</div>`;
     }
     btns = vencBadge + `
       <button class="cbtn cbtn-outline" onclick="abrirDados('${f.id}')">👁 Ver Dados</button>
