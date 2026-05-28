@@ -1308,12 +1308,9 @@ async function renderLinksMP() {
       var gerado = l.geradoEm ? new Date(l.geradoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}) : '—';
       var pagoEm = l.pagoEm  ? new Date(l.pagoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}) : '—';
       var agend  = l.dataAgendada ? '<div style="font-size:9px;color:#e879f9;">⏰ '+l.dataAgendada+'</div>' : '';
-      var safeUrl = (l.checkoutUrl||'').replace(/"/g,'');
+      var safeUrl = (l.checkoutUrl||'').replace(/["']/g,'');
       var linkHtml = safeUrl
-        ? '<div style="max-width:180px;">' +
-          '<a href="'+safeUrl+'" target="_blank" style="color:#3b9eff;font-size:10px;text-decoration:none;">🔗 Abrir link</a>' +
-          ' <button data-url="'+safeUrl+'" onclick="navigator.clipboard.writeText(this.dataset.url);showToast('📋','Copiado!','')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:9px;">📋</button>' +
-          '</div>'
+        ? '<div style="max-width:180px;"><a href="'+safeUrl+'" target="_blank" style="color:#3b9eff;font-size:10px;">🔗 Link</a> <button data-u="'+safeUrl+'" onclick="copiarLinkBtn(this)" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:9px;">📋</button></div>'
         : '—';
       return '<tr style="border-bottom:1px solid var(--border);">' +
         '<td style="padding:9px 10px;font-size:11px;font-weight:600;">'+l.fichaId+'</td>' +
@@ -1337,6 +1334,8 @@ async function renderLinksMP() {
     tbl.innerHTML = '<div style="padding:32px;color:#ef4444;font-family:var(--fm);">Erro: '+e.message+'</div>';
   }
 }
+
+function copiarLinkBtn(btn) { navigator.clipboard.writeText(btn.dataset.u||""); showToast("📋","Link copiado!",""); }
 
 function exportarLinksMP() {
   if (!linksData || !linksData.links || !linksData.links.length) {
