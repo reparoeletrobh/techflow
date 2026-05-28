@@ -646,6 +646,22 @@ module.exports = async function handler(req, res) {
   }
 
   // ── POST cancelar ────────────────────────────────────────
+
+  // ── POST finalizar-rs: finaliza ficha de garantia sem orçamento ──────────
+  if (req.method === 'POST' && action === 'finalizar-rs') {
+    const { id } = req.body || {};
+    if (!id) return res.status(400).json({ ok: false, error: 'id obrigatorio' });
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const ficha = db.fichas.find(f => f.id === id);
+    if (!ficha) return res.status(404).json({ ok: false, error: 'nao encontrada' });
+    ficha.phase       = 'finalizado_rs';
+    ficha.finalizado  = true;
+    ficha.finalizadoEm = new Date().toISOString();
+    ficha.movedAt     = ficha.finalizadoEm;
+    await dbSet(LOG_KEY, db);
+    return res.status(200).json({ ok: true, ficha });
+  }
+
   if (req.method === 'POST' && action === 'cancelar') {
     const { id } = req.body || {};
     const db = await dbGet(LOG_KEY) || defaultDB();

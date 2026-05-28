@@ -580,7 +580,9 @@ function cardHTML(f, phase) {
       <button class="cbtn cbtn-blue" onclick="mover('${f.id}','liberado_coleta')">Liberar Novamente</button>
       <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>`;
   } else if (phase === 'coleta_efetuada') {
-    btns = `<button class="cbtn cbtn-purple" onclick="abrirDiag('${f.id}')">Diagnóstico</button>`;
+    btns = `
+      <button class="cbtn cbtn-purple" onclick="abrirDiag('${f.id}')">Diagnóstico</button>
+      <button class="cbtn cbtn-green" onclick="finalizarRS('${f.id}','${escHtml(f.nome)}')">✅ RS</button>`;
   } else if (phase === 'orc_registrado') {
     const diag = f.diagnostico;
     if (diag) btns = `<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">${diag.tipo||''}${diag.subtipo?' › '+diag.subtipo:''} — ${(diag.servicos||[]).join(', ')}</div>`;
@@ -611,6 +613,25 @@ async function mover(id, phase) {
   }).then(r=>r.json());
   if (r.ok) { await load(); toast('Movido com sucesso'); }
   else toast('Erro: '+r.error, true);
+}
+
+async function finalizarRS(id, nome) {
+  if (!confirm('Finalizar a ficha ' + id + ' (' + nome + ') como RS?\n\nEsta ação finaliza sem gerar novo orçamento.')) return;
+  try {
+    const r = await fetch('/api/logistica?action=finalizar-rs', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    }).then(r => r.json());
+    if (r.ok) {
+      fichas = fichas.filter(f => f.id !== id);
+      filtrar(document.getElementById('busca-input')?.value || '');
+      showToast('✅', 'RS finalizado', id + ' finalizado com sucesso');
+    } else {
+      showToast('❌', 'Erro', r.error || 'Erro ao finalizar');
+    }
+  } catch(e) {
+    showToast('❌', 'Erro', e.message);
+  }
 }
 
 async function cancelar(id, nome) {
