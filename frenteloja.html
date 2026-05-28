@@ -17,6 +17,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
 .tab-bar{display:flex;gap:4px;margin-left:auto;}
 .tab-btn{font-family:var(--fm);font-size:11px;padding:6px 16px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;letter-spacing:.5px;}
 .tab-btn.active{background:rgba(245,200,0,.15);border-color:var(--yellow);color:var(--yellow);}
+.fl-stat-pill{font-family:var(--fm);font-size:10px;color:var(--muted);display:flex;align-items:center;gap:3px;}
+.fl-stat-pill strong{font-size:13px;font-weight:700;}
+.fl-stat-pill .pct{font-size:9px;color:var(--muted);margin-left:1px;}
+.fl-stat-pill.aprov strong{color:#22c55e;}
+.fl-stat-pill.reprov strong{color:#ef4444;}
+.fl-stat-pill.orc strong{color:var(--yellow);}
+.fl-sep{width:1px;height:14px;background:var(--border);margin:0 4px;}
 /* ── Stats bar topo ─────────────────────────────────────── */
 .fl-stats-bar{display:flex;gap:6px;padding:8px 20px;border-bottom:1px solid var(--border);background:var(--bg);flex-wrap:wrap;}
 .fl-stat{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;flex:1;min-width:0;}
@@ -169,6 +176,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
 <div class="main">
   <div class="main-header">
     <span class="main-title">🏪 FRENTE DE LOJA</span>
+    <div style="display:flex;align-items:center;gap:6px;margin-left:16px;">
+      <div class="fl-stat-pill orc">   <strong id="fs-orc">—</strong>&nbsp;orc.</div>
+      <div class="fl-sep"></div>
+      <div class="fl-stat-pill aprov"> <strong id="fs-aprov">—</strong>&nbsp;aprov.<span class="pct" id="fs-taprov"></span></div>
+      <div class="fl-sep"></div>
+      <div class="fl-stat-pill reprov"><strong id="fs-reprov">—</strong>&nbsp;reprov.<span class="pct" id="fs-treprov"></span></div>
+    </div>
     <div class="tab-bar">
       <button class="tab-btn active" onclick="setTab('cadastro')">Cadastro</button>
       <button class="tab-btn" onclick="setTab('painel')">Painel</button>
@@ -606,7 +620,34 @@ function renderStatsBar() {
   if (el('fs-treprov'))el('fs-treprov').textContent = pReprov != null ? pReprov + '% ✗' : '';
 }
 
-function renderKanban(){ renderStatsBar();
+
+function renderStatsBar() {
+  var agora = new Date();
+  var brt   = new Date(agora.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+  var hojeBRT = brt.getFullYear() + '-' + String(brt.getMonth()+1).padStart(2,'0') + '-' + String(brt.getDate()).padStart(2,'0');
+  function isBRTToday(ts) {
+    if (!ts) return false;
+    var d = new Date(new Date(ts).toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') === hojeBRT;
+  }
+  var orcHoje = 0, aprovHoje = 0, reprovHoje = 0;
+  fichas.forEach(function(f) {
+    if ((f.history||[]).find(function(e){ return e.phase==='orcamento_cadastrado' && isBRTToday(e.ts); })) orcHoje++;
+    if ((f.history||[]).find(function(e){ return e.phase==='producao' && isBRTToday(e.ts); }) && f.orcamento && f.orcamento.status==='aprovado') aprovHoje++;
+    if (f.phase==='reprovado' && isBRTToday(f.reprovadoEm||f.movedAt)) reprovHoje++;
+  });
+  var total = aprovHoje + reprovHoje;
+  var pA = total > 0 ? Math.round(aprovHoje/total*100) : null;
+  var pR = total > 0 ? Math.round(reprovHoje/total*100) : null;
+  var el = function(id){ return document.getElementById(id); };
+  if(el('fs-orc'))    el('fs-orc').textContent    = orcHoje;
+  if(el('fs-aprov'))  el('fs-aprov').textContent  = aprovHoje;
+  if(el('fs-reprov')) el('fs-reprov').textContent = reprovHoje;
+  if(el('fs-taprov')) el('fs-taprov').textContent  = pA  != null ? ' '+pA+'%'  : '';
+  if(el('fs-treprov'))el('fs-treprov').textContent = pR  != null ? ' '+pR+'%'  : '';
+}
+
+function renderKanban(){ renderStatsBar(); renderStatsBar();
   PHASES.forEach(ph=>{
     var col=document.getElementById('col-'+ph);
     if(!col)return;
