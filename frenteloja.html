@@ -17,6 +17,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
 .tab-bar{display:flex;gap:4px;margin-left:auto;}
 .tab-btn{font-family:var(--fm);font-size:11px;padding:6px 16px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;letter-spacing:.5px;}
 .tab-btn.active{background:rgba(245,200,0,.15);border-color:var(--yellow);color:var(--yellow);}
+/* ── Stats bar topo ─────────────────────────────────────── */
+.fl-stats-bar{display:flex;gap:6px;padding:8px 20px;border-bottom:1px solid var(--border);background:var(--bg);flex-wrap:wrap;}
+.fl-stat{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;flex:1;min-width:0;}
+.fl-stat-lbl{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;white-space:nowrap;}
+.fl-stat-val{font-family:var(--fh);font-size:18px;font-weight:800;line-height:1;}
+.fl-stat-pct{font-family:var(--fm);font-size:10px;color:var(--muted);margin-left:auto;white-space:nowrap;}
+.fl-stat.aprov .fl-stat-val{color:#22c55e;}
+.fl-stat.reprov .fl-stat-val{color:#ef4444;}
+.fl-stat.orc    .fl-stat-val{color:#f59e0b;}
+@media(max-width:600px){.fl-stats-bar{gap:4px;padding:6px 12px;}.fl-stat{padding:5px 8px;}.fl-stat-val{font-size:15px;}}
 /* ── Tab Content ─────────────────────────────────────────────── */
 .tab-content{flex:1;overflow:hidden;display:none;}
 .tab-content.active{display:flex;}
@@ -163,6 +173,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
       <button class="tab-btn active" onclick="setTab('cadastro')">Cadastro</button>
       <button class="tab-btn" onclick="setTab('painel')">Painel</button>
     </div>
+  </div>
+  <div class="fl-stats-bar" id="fl-stats-bar">
+    <div class="fl-stat orc">   <div class="fl-stat-lbl">Orçamentos Hoje</div><div class="fl-stat-val" id="fs-orc">—</div></div>
+    <div class="fl-stat aprov"> <div class="fl-stat-lbl">Aprovados</div>      <div class="fl-stat-val" id="fs-aprov">—</div><div class="fl-stat-pct" id="fs-taprov"></div></div>
+    <div class="fl-stat reprov"><div class="fl-stat-lbl">Reprovados</div>     <div class="fl-stat-val" id="fs-reprov">—</div><div class="fl-stat-pct" id="fs-treprov"></div></div>
   </div>
 
   <!-- ── TAB: Cadastro ────────────────────────────────────────── -->
@@ -548,7 +563,50 @@ function imprimirRecibo(){
 var PHASES=['analise','orcamento_cadastrado','producao','conserto_realizado','reprovado'];
 var PHASE_COLORS={analise:'#3b9eff',orcamento_cadastrado:'#f59e0b',producao:'#8b5cf6',conserto_realizado:'#22c55e'};
 
-function renderKanban(){
+
+// ── Stats bar: orçamentos, aprovados e reprovados do dia ────────────────────
+function renderStatsBar() {
+  // Hoje em horário de Brasília
+  var agora = new Date();
+  var brt   = new Date(agora.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+  var hojeBRT = brt.getFullYear() + '-' +
+    String(brt.getMonth()+1).padStart(2,'0') + '-' +
+    String(brt.getDate()).padStart(2,'0');
+
+  function isBRTToday(ts) {
+    if (!ts) return false;
+    var d = new Date(new Date(ts).toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') === hojeBRT;
+  }
+
+  var orcHoje = 0, aprovHoje = 0, reprovHoje = 0;
+
+  fichas.forEach(function(f) {
+    // Orçamento passado hoje = tem history com orcamento_cadastrado hoje
+    var orcHist = (f.history||[]).find(function(e){ return e.phase === 'orcamento_cadastrado' && isBRTToday(e.ts); });
+    if (orcHist) orcHoje++;
+
+    // Aprovado hoje = orcamento.status === 'aprovado' e history producao hoje
+    var prodHist = (f.history||[]).find(function(e){ return e.phase === 'producao' && isBRTToday(e.ts); });
+    if (prodHist && f.orcamento && f.orcamento.status === 'aprovado') aprovHoje++;
+
+    // Reprovado hoje = phase reprovado e reprovadoEm hoje
+    if (f.phase === 'reprovado' && isBRTToday(f.reprovadoEm || f.movedAt)) reprovHoje++;
+  });
+
+  var total = aprovHoje + reprovHoje;
+  var pAprov  = total > 0 ? Math.round(aprovHoje  / total * 100) : null;
+  var pReprov = total > 0 ? Math.round(reprovHoje / total * 100) : null;
+
+  var el = function(id){ return document.getElementById(id); };
+  if (el('fs-orc'))    el('fs-orc').textContent    = orcHoje;
+  if (el('fs-aprov'))  el('fs-aprov').textContent  = aprovHoje;
+  if (el('fs-reprov')) el('fs-reprov').textContent = reprovHoje;
+  if (el('fs-taprov')) el('fs-taprov').textContent  = pAprov  != null ? pAprov  + '% ✓' : '';
+  if (el('fs-treprov'))el('fs-treprov').textContent = pReprov != null ? pReprov + '% ✗' : '';
+}
+
+function renderKanban(){ renderStatsBar();
   PHASES.forEach(ph=>{
     var col=document.getElementById('col-'+ph);
     if(!col)return;
