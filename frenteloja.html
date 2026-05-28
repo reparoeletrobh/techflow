@@ -14,7 +14,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
 .main-header{height:56px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:16px;flex-shrink:0;}
 .main-title{font-family:var(--fm);font-size:14px;font-weight:600;color:var(--yellow);letter-spacing:1px;}
-.tab-bar{display:flex;gap:4px;margin-left:auto;}
+.tab-bar{display:flex;gap:4px;}
 .tab-btn{font-family:var(--fm);font-size:11px;padding:6px 16px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;letter-spacing:.5px;}
 .tab-btn.active{background:rgba(245,200,0,.15);border-color:var(--yellow);color:var(--yellow);}
 .fl-stat-pill{font-family:var(--fm);font-size:10px;color:var(--muted);display:flex;align-items:center;gap:3px;}
@@ -25,15 +25,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
 .fl-stat-pill.orc strong{color:var(--yellow);}
 .fl-sep{width:1px;height:14px;background:var(--border);margin:0 4px;}
 /* ── Stats bar topo ─────────────────────────────────────── */
-.fl-stats-bar{display:flex;gap:6px;padding:8px 20px;border-bottom:1px solid var(--border);background:var(--bg);flex-wrap:wrap;}
-.fl-stat{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;flex:1;min-width:0;}
-.fl-stat-lbl{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;white-space:nowrap;}
-.fl-stat-val{font-family:var(--fh);font-size:18px;font-weight:800;line-height:1;}
-.fl-stat-pct{font-family:var(--fm);font-size:10px;color:var(--muted);margin-left:auto;white-space:nowrap;}
-.fl-stat.aprov .fl-stat-val{color:#22c55e;}
-.fl-stat.reprov .fl-stat-val{color:#ef4444;}
-.fl-stat.orc    .fl-stat-val{color:#f59e0b;}
-@media(max-width:600px){.fl-stats-bar{gap:4px;padding:6px 12px;}.fl-stat{padding:5px 8px;}.fl-stat-val{font-size:15px;}}
 /* ── Tab Content ─────────────────────────────────────────────── */
 .tab-content{flex:1;overflow:hidden;display:none;}
 .tab-content.active{display:flex;}
@@ -176,23 +167,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
 <div class="main">
   <div class="main-header">
     <span class="main-title">🏪 FRENTE DE LOJA</span>
-    <div style="display:flex;align-items:center;gap:6px;margin-left:16px;">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="setTab('cadastro')">Cadastro</button>
+      <button class="tab-btn" onclick="setTab('painel')">Painel</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
       <div class="fl-stat-pill orc">   <strong id="fs-orc">—</strong>&nbsp;orc.</div>
       <div class="fl-sep"></div>
       <div class="fl-stat-pill aprov"> <strong id="fs-aprov">—</strong>&nbsp;aprov.<span class="pct" id="fs-taprov"></span></div>
       <div class="fl-sep"></div>
       <div class="fl-stat-pill reprov"><strong id="fs-reprov">—</strong>&nbsp;reprov.<span class="pct" id="fs-treprov"></span></div>
     </div>
-    <div class="tab-bar">
-      <button class="tab-btn active" onclick="setTab('cadastro')">Cadastro</button>
-      <button class="tab-btn" onclick="setTab('painel')">Painel</button>
-    </div>
   </div>
-  <div class="fl-stats-bar" id="fl-stats-bar">
-    <div class="fl-stat orc">   <div class="fl-stat-lbl">Orçamentos Hoje</div><div class="fl-stat-val" id="fs-orc">—</div></div>
-    <div class="fl-stat aprov"> <div class="fl-stat-lbl">Aprovados</div>      <div class="fl-stat-val" id="fs-aprov">—</div><div class="fl-stat-pct" id="fs-taprov"></div></div>
-    <div class="fl-stat reprov"><div class="fl-stat-lbl">Reprovados</div>     <div class="fl-stat-val" id="fs-reprov">—</div><div class="fl-stat-pct" id="fs-treprov"></div></div>
-  </div>
+
 
   <!-- ── TAB: Cadastro ────────────────────────────────────────── -->
   <div class="tab-content active" id="tab-cadastro">
