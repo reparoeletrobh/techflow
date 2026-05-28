@@ -464,6 +464,46 @@ module.exports = async function handler(req, res) {
     }
   }
 
+
+  // ── GET listar-links-mp: todos os links MP com status atualizado ──────────
+  if (action === "listar-links-mp") {
+    const fin  = await dbGet(FIN_KEY)  || defaultFin();
+    const concil = (await dbGet(FIN_CONCIL_KEY)) || { transacoes: [] };
+    const pagosIds = new Set(
+      concil.transacoes
+        .filter(t => t.tipo === "pagamento_confirmado")
+        .map(t => t.preferenceId)
+        .filter(Boolean)
+    );
+    const links = (fin.records || [])
+      .filter(r => r.mp && r.mp.preferenceId)
+      .map(r => {
+        const pago      = pagosIds.has(r.mp.preferenceId) || r.mp.status === "pago";
+        const concilRec = concil.transacoes.find(t => t.preferenceId === r.mp.preferenceId && t.tipo === "pagamento_confirmado");
+        return {
+          fichaId:       r.id,
+          cliente:       r.nome    || "",
+          cpfCnpj:       r.cpfCnpj || "",
+          valor:         parseFloat(r.valor || r.total || 0),
+          metodo:        r.mp.metodo,
+          preferenceId:  r.mp.preferenceId,
+          checkoutUrl:   r.mp.checkoutUrl,
+          geradoEm:      r.mp.geradoEm,
+          status:        pago ? "pago" : (["faturamento","pagamento_agendado"].includes(r.phaseId) ? "pendente" : r.phaseId),
+          pagoEm:        concilRec?.ts || r.mp.pagoEm || null,
+          paymentId:     concilRec?.paymentId || r.mp.paymentId || null,
+          faseFicha:     r.phaseId,
+          dataAgendada:  r.dataAgendadaDisplay || null
+        };
+      })
+      .sort((a,b) => (b.geradoEm||"").localeCompare(a.geradoEm||""));
+    const total    = links.length;
+    const pagos    = links.filter(l => l.status === "pago").length;
+    const pendentes= links.filter(l => l.status === "pendente").length;
+    const valorPago = links.filter(l=>l.status==="pago").reduce((s,l)=>s+l.valor,0);
+    return res.status(200).json({ ok:true, total, pagos, pendentes, valorPago:parseFloat(valorPago.toFixed(2)), links });
+  }
+
   // ── GET relatorio-financeiro: conciliação bancária por data ────────────────
   if (action === "relatorio-financeiro") {
     const data = req.query.data || dataBRT(new Date());

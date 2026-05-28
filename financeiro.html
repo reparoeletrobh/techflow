@@ -273,14 +273,31 @@ header{
 
 <!-- RELATÓRIO MP -->
 <div id="page-relatorio" class="page">
-  <div style="padding:24px 24px 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-    <span style="font-family:var(--fh);font-size:18px;font-weight:700;">📊 Relatório de Pagamentos MP</span>
-    <input type="date" id="rel-data" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text);font-family:var(--fm);font-size:12px;" onchange="renderRelatorio()">
-    <button onclick="renderRelatorio()" class="sync-btn">↻ Atualizar</button>
-    <button onclick="exportarRelatorio()" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-family:var(--fm);font-size:11px;color:var(--muted);cursor:pointer;">⬇ Exportar CSV</button>
+  <!-- Sub-abas -->
+  <div style="padding:16px 24px 0;display:flex;gap:8px;border-bottom:1px solid var(--border);margin-bottom:0;">
+    <button class="tab-btn active" id="rel-tab-links" onclick="showRelTab('links')" style="font-size:11px;">🔗 Links de Cobrança</button>
+    <button class="tab-btn" id="rel-tab-dia"   onclick="showRelTab('dia')"   style="font-size:11px;">📅 Por Dia</button>
   </div>
-  <div id="rel-resumo" style="padding:16px 24px;display:flex;gap:12px;flex-wrap:wrap;"></div>
-  <div id="rel-content" style="padding:0 24px 32px;"></div>
+  <!-- Seção Links -->
+  <div id="rel-sec-links">
+    <div style="padding:16px 24px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <span style="font-family:var(--fm);font-size:11px;color:var(--muted);">Todos os links gerados e seus status</span>
+      <button onclick="renderLinksMP()" class="sync-btn" style="margin-left:auto;">↻ Atualizar</button>
+      <button onclick="exportarLinksMP()" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-family:var(--fm);font-size:11px;color:var(--muted);cursor:pointer;">⬇ CSV</button>
+    </div>
+    <div id="links-resumo" style="padding:12px 24px;display:flex;gap:10px;flex-wrap:wrap;"></div>
+    <div id="links-table" style="padding:0 24px 32px;"></div>
+  </div>
+  <!-- Seção Por Dia -->
+  <div id="rel-sec-dia" style="display:none;">
+    <div style="padding:16px 24px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <input type="date" id="rel-data" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text);font-family:var(--fm);font-size:12px;" onchange="renderRelatorio()">
+      <button onclick="renderRelatorio()" class="sync-btn">↻ Atualizar</button>
+      <button onclick="exportarRelatorio()" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-family:var(--fm);font-size:11px;color:var(--muted);cursor:pointer;">⬇ CSV</button>
+    </div>
+    <div id="rel-resumo" style="padding:12px 24px;display:flex;gap:10px;flex-wrap:wrap;"></div>
+    <div id="rel-content" style="padding:0 24px 32px;"></div>
+  </div>
 </div>
 
 <!-- KANBAN -->
@@ -981,7 +998,7 @@ function showPage(name) {
     if (records && records.length) renderMover();
     else load().then(function(){ renderMover(); });
   }
-  else if (name==='relatorio') renderRelatorio();
+  else if (name==='relatorio') { showRelTab('links'); }
 }
 
 function showToast(icon,title,msg) {
@@ -1243,6 +1260,98 @@ function exportarRelatorio() {
   a.click(); URL.revokeObjectURL(url);
 }
 
+
+
+// ── Relatório: sub-abas ──────────────────────────────────────────────────────
+function showRelTab(name) {
+  document.getElementById('rel-sec-links').style.display = name==='links' ? '' : 'none';
+  document.getElementById('rel-sec-dia').style.display   = name==='dia'   ? '' : 'none';
+  document.getElementById('rel-tab-links').classList.toggle('active', name==='links');
+  document.getElementById('rel-tab-dia').classList.toggle('active',   name==='dia');
+  if (name==='links') renderLinksMP();
+  else renderRelatorio();
+}
+
+// ── Tabela de Links ───────────────────────────────────────────────────────────
+var linksData = null;
+
+async function renderLinksMP() {
+  var res = document.getElementById('links-resumo');
+  var tbl = document.getElementById('links-table');
+  if (!res || !tbl) return;
+  tbl.innerHTML = '<div style="padding:32px;text-align:center;color:var(--muted);font-family:var(--fm);font-size:12px;">Carregando...</div>';
+  res.innerHTML = '';
+  try {
+    var r = await api('listar-links-mp');
+    if (!r.ok) { tbl.innerHTML = '<div style="padding:32px;color:#ef4444;font-family:var(--fm);">Erro: '+r.error+'</div>'; return; }
+    linksData = r;
+
+    res.innerHTML = [
+      statPill('Links gerados', r.total, '#3b9eff'),
+      statPill('Pendentes', r.pendentes, '#f59e0b'),
+      statPill('Pagos', r.pagos, '#22c55e'),
+      statPill('Total recebido', 'R$ '+(r.valorPago||0).toLocaleString('pt-BR',{minimumFractionDigits:2}), '#22c55e'),
+    ].join('');
+
+    if (!r.links || !r.links.length) {
+      tbl.innerHTML = '<div style="padding:32px;text-align:center;color:var(--muted);font-family:var(--fm);font-size:12px;">Nenhum link gerado ainda</div>';
+      return;
+    }
+
+    var rows = r.links.map(function(l) {
+      var statusHtml = l.status === 'pago'
+        ? '<span style="color:#22c55e;font-weight:700;">✅ Pago</span>'
+        : l.status === 'pendente'
+          ? '<span style="color:#f59e0b;font-weight:600;">⏳ Pendente</span>'
+          : '<span style="color:var(--muted);">'+l.status+'</span>';
+      var metodo = l.metodo === 'pix' ? '📲 PIX' : '💳 PIX+Cartão 3x';
+      var gerado = l.geradoEm ? new Date(l.geradoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}) : '—';
+      var pagoEm = l.pagoEm  ? new Date(l.pagoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}) : '—';
+      var agend  = l.dataAgendada ? '<div style="font-size:9px;color:#e879f9;">⏰ '+l.dataAgendada+'</div>' : '';
+      var linkHtml = l.checkoutUrl
+        ? '<div style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+          '<a href="'+l.checkoutUrl+'" target="_blank" style="color:#3b9eff;font-size:10px;text-decoration:none;" title="'+l.checkoutUrl+'">🔗 Abrir link</a>' +
+          '<button onclick="navigator.clipboard.writeText(''+l.checkoutUrl+'');showToast('📋','Copiado!','')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:9px;margin-left:4px;">📋</button>' +
+          '</div>'
+        : '—';
+      return '<tr style="border-bottom:1px solid var(--border);">' +
+        '<td style="padding:9px 10px;font-size:11px;font-weight:600;">'+l.fichaId+'</td>' +
+        '<td style="padding:9px 10px;font-size:11px;">'+l.cliente+'</td>' +
+        '<td style="padding:9px 10px;font-size:11px;font-family:var(--fh);color:#22c55e;">R$ '+l.valor.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</td>' +
+        '<td style="padding:9px 10px;font-size:11px;">'+metodo+'</td>' +
+        '<td style="padding:9px 10px;">'+statusHtml+agend+'</td>' +
+        '<td style="padding:9px 10px;font-size:10px;color:var(--muted);">'+gerado+'</td>' +
+        '<td style="padding:9px 10px;font-size:10px;color:var(--muted);">'+pagoEm+'</td>' +
+        '<td style="padding:9px 10px;">'+linkHtml+'</td>' +
+      '</tr>';
+    }).join('');
+
+    var heads = ['Ficha','Cliente','Valor','Método','Status','Gerado em','Pago em','Link'];
+    tbl.innerHTML = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border);">' +
+      '<table style="width:100%;border-collapse:collapse;">' +
+      '<thead><tr style="background:var(--surface);border-bottom:1px solid var(--border);">' +
+        heads.map(function(h){ return '<th style="padding:8px 10px;font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;text-align:left;white-space:nowrap;">'+h+'</th>'; }).join('') +
+      '</tr></thead><tbody>'+rows+'</tbody></table></div>';
+  } catch(e) {
+    tbl.innerHTML = '<div style="padding:32px;color:#ef4444;font-family:var(--fm);">Erro: '+e.message+'</div>';
+  }
+}
+
+function exportarLinksMP() {
+  if (!linksData || !linksData.links || !linksData.links.length) {
+    showToast('⚠️','Sem dados','Nenhum link para exportar'); return;
+  }
+  var linhas = ['Ficha,Cliente,CPF/CNPJ,Valor,Método,Status,GeradoEm,PagoEm,PaymentID,PreferenceID,Link'];
+  linksData.links.forEach(function(l) {
+    var g = l.geradoEm ? new Date(l.geradoEm).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}) : '';
+    var p = l.pagoEm   ? new Date(l.pagoEm).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})   : '';
+    linhas.push([l.fichaId,l.cliente,l.cpfCnpj,l.valor,l.metodo,l.status,g,p,l.paymentId||'',l.preferenceId||'',l.checkoutUrl||''].join(','));
+  });
+  var blob = new Blob([linhas.join('\n')], {type:'text/csv;charset=utf-8;'});
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href   = url; a.download = 'links_mp.csv'; a.click(); URL.revokeObjectURL(url);
+}
 
 </script>
 <!-- MODAL EMITIR NF -->
