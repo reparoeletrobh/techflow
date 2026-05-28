@@ -2,7 +2,7 @@
 const U=process.env.UPSTASH_URL,T=process.env.UPSTASH_TOKEN,PT=process.env.PIPEFY_TOKEN;
 const PA='https://api.pipefy.com/graphql',PID='305832912',ERP_ID='339008925';
 const CK='reparoeletro_compra_equip',VK='reparoeletro_vendas',CACHE='reparoeletro_atendimento_cache';
-const ORC_KEY='reparoeletro_orcamentos',FIN_KEY='reparoeletro_financeiro';
+const ORC_KEY='reparoeletro_orcamentos',FIN_KEY='reparoeletro_financeiro',BOARD_KEY='reparoeletro_board';
 async function dbG(k){const r=await fetch(U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T},body:JSON.stringify([['GET',k]])});const j=await r.json();return j[0]?.result?JSON.parse(j[0].result):null;}
 async function dbS(k,v){await fetch(U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
 async function pf(q){const r=await fetch(PA,{method:'POST',headers:{Authorization:'Bearer '+PT,'Content-Type':'application/json'},body:JSON.stringify({query:q})});const j=await r.json();if(j.errors?.length)throw new Error(j.errors[0].message);return j.data;}
@@ -30,9 +30,9 @@ export default async function handler(req,res){
       const todayUTC=brtStartOf('day'),weekUTC=brtStartOf('week'),monthUTC=brtStartOf('month');
       const Q1='query{pipe(id:"'+PID+'"){cards_count} phase(id:"'+ERP_ID+'"){cards_count cards(first:50){edges{node{id fields{name value}}}pageInfo{hasNextPage}}}}';
       const Q2='query{allCards(pipeId:"'+PID+'",first:2000){edges{node{id title created_at}}}}';
-      const[pd,cd,vd,ficQ,orcDb,finDb]=await Promise.all([
+      const[pd,cd,vd,ficQ,orcDb,finDb,boardDb]=await Promise.all([
         pf(Q1),dbG(CK),dbG(VK),pf(Q2).catch(()=>null),
-        dbG(ORC_KEY),dbG(FIN_KEY)
+        dbG(ORC_KEY),dbG(FIN_KEY),dbG(BOARD_KEY).catch(()=>null)
       ]);
       // FICHAS
       const fichasTotal=pd?.pipe?.cards_count||0;
@@ -100,6 +100,17 @@ export default async function handler(req,res){
       const cadastradas=fichasEsteMes.filter(f=>f.cadastrado).length;
       const pendentes=fichasEsteMes.filter(f=>!f.cadastrado).length;
       const backlog=fichasAnteriores.filter(f=>!f.cadastrado).length;
+      // Aprovados (board.movesLog phaseId=aprovado_entrada)
+      const movesLog=(boardDb?.movesLog||[]);
+      function toBRT2(d){return new Date(new Date(d).toLocaleString('en-US',{timeZone:'America/Sao_Paulo'}));}
+      function dayStart2(d){const b=toBRT2(d);b.setHours(0,0,0,0);return new Date(b.getTime()+3*60*60*1000);}
+      function weekStart2(d){const b=toBRT2(d);const dy=b.getDay();b.setDate(b.getDate()+(dy===0?-6:1-dy));b.setHours(0,0,0,0);return new Date(b.getTime()+3*60*60*1000);}
+      const aprvLog=movesLog.filter(m=>m.phaseId==='aprovado_entrada');
+      const aprvTs=aprvLog.map(m=>m.timestamp||m.ts).filter(Boolean);
+      const todayA=dayStart2(new Date()),weekA=weekStart2(new Date());
+      const aprvHoje=aprvTs.filter(t=>new Date(t)>=todayA).length||null;
+      const aprvSem=aprvTs.filter(t=>new Date(t)>=weekA).length||null;
+      const aprvTotal=aprvTs.length||null;
       const m={
         fichas:{total:fichasTotal,hoje:ficHoje,semana:ficSem,mes:ficMes},
         comprados:{total:compTotal,hoje:compH,semana:compS,mes:compMCount},
@@ -109,6 +120,7 @@ export default async function handler(req,res){
         erp:{total:erpTotal,semValor:erpSV+erpMore,hoje:erpHoje,semana:erpSemana},
         orcamento:{hoje:orcHoje,semana:orcSem,timestamps:orcTs},
         pagamento:{hoje:pgHoje,semana:pgSem,timestamps:pgTs},
+        aprovados:{hoje:aprvHoje,semana:aprvSem,total:aprvTotal,timestamps:aprvTs},
         monthly:{comprados:compMCount,cadastrados:cadM,falta:pendentes,backlog,compAnteriores:compAntArr.length,fichasEsteMes,fichasAnteriores,cadastradas,pendentes},
         fichasHojeList,
         updatedAt:new Date().toISOString(),

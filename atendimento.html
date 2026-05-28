@@ -94,6 +94,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:14px
 </div>
 <div class="mg" style="margin-bottom:18px">
   <div class="mc" style="--accent:#f59e0b"><div class="mc-icon" style="background:rgba(245,158,11,.1)">📝</div><div class="mc-label">Orçamentos Enviados</div><div class="mc-val" id="v-orc" style="color:#f59e0b"><span class="sk sk-n"></span></div><div class="mc-pills" id="p-orc"></div><div class="mc-sub" id="sub-orc">Aguardando Aprovação</div></div>
+  <div class="mc" style="--accent:#f5c800"><div class="mc-icon" style="background:rgba(245,200,0,.1)">✅</div><div class="mc-label">Aprovados</div><div class="mc-val" id="v-aprv" style="color:var(--yellow)"><span class="sk sk-n"></span></div><div class="mc-pills" id="p-aprv"></div><div class="mc-sub" id="sub-aprv">Fichas aprovadas</div></div>
   <div class="mc" style="--accent:#10b981"><div class="mc-icon" style="background:rgba(16,185,129,.1)">💳</div><div class="mc-label">Pagamento Confirmado</div><div class="mc-val" id="v-pg" style="color:var(--green)"><span class="sk sk-n"></span></div><div class="mc-pills" id="p-pg"></div><div class="mc-sub" id="sub-pg">Financeiro confirmado</div></div>
 </div>
 <div class="erp-card">
@@ -185,6 +186,16 @@ function render(){
     sv('v-pg',pgV,'var(--green)');
     document.getElementById('sub-pg').textContent='Financeiro — total: '+(D.pagamento.timestamps||[]).length;
     document.getElementById('p-pg').innerHTML='<span class="pill">Hoje: <strong>'+(D.pagamento.hoje!=null?D.pagamento.hoje:'—')+'</strong></span><span class="pill">Semana: <strong>'+(D.pagamento.semana!=null?D.pagamento.semana:'—')+'</strong></span>';
+  }
+  if(D.aprovados){
+    var aprvV;
+    if(PERIOD==='custom'&&window.CUSTOM_FROM&&window.CUSTOM_TO){
+      var apTs=D.aprovados.timestamps||[];
+      aprvV=apTs.filter(function(t){return new Date(t)>=window.CUSTOM_FROM&&new Date(t)<=window.CUSTOM_TO;}).length||null;
+    }else{aprvV=PERIOD==='hoje'?D.aprovados.hoje:PERIOD==='semana'?D.aprovados.semana:(D.aprovados.total||null);}
+    sv('v-aprv',aprvV,'var(--yellow)');
+    document.getElementById('sub-aprv').textContent='Total aprovados: '+(D.aprovados.total||0);
+    document.getElementById('p-aprv').innerHTML='<span class="pill">Hoje: <strong>'+(D.aprovados.hoje!=null?D.aprovados.hoje:'—')+'</strong></span><span class="pill">Semana: <strong>'+(D.aprovados.semana!=null?D.aprovados.semana:'—')+'</strong></span>';
   }
   sv('erp-total',D.erp.total);
   sv('erp-hoje',D.erp.hoje!=null?D.erp.hoje:'—',D.erp.hoje?'var(--blue)':'var(--muted)');
