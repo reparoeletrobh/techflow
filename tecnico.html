@@ -492,7 +492,7 @@ nav{display:flex;gap:5px;flex-wrap:wrap;}
     <div class="metas-header">
       <div>
         <div class="metas-title">Metas da <span>Equipe</span></div>
-        <div class="metas-sub">// atualiza a cada 30 segundos</div>
+        <div class="metas-sub">// atualiza ao entrar na aba</div>
       </div>
       <button class="meta-refresh-btn" onclick="loadGoals()">↻ Atualizar</button>
     </div>
@@ -1489,7 +1489,7 @@ function showPage(name) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   PAGES.forEach((n,i) => { if(n===name) document.querySelectorAll('.nav-btn')[i].classList.add('active'); });
-  if (name === 'metas')   loadGoals();
+  if (name === 'metas')  { logsCarregados = false; loadGoals(); }
   if (name === 'rs')      renderRsBoard('rs');
   if (name === 'rs-rua')  renderRsBoard('rs_rua');
 }
