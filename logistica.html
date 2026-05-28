@@ -582,7 +582,7 @@ function cardHTML(f, phase) {
   } else if (phase === 'coleta_efetuada') {
     btns = `
       <button class="cbtn cbtn-purple" onclick="abrirDiag('${f.id}')">Diagnóstico</button>
-      <button class="cbtn cbtn-green" onclick="finalizarRS('${f.id}','${escHtml(f.nome)}')">✅ RS</button>`;
+      <button class="cbtn cbtn-green" onclick="finalizarRS('${f.id}','${escHtml(f.nome)}')">🔴 RS</button>`;
   } else if (phase === 'orc_registrado') {
     const diag = f.diagnostico;
     if (diag) btns = `<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">${diag.tipo||''}${diag.subtipo?' › '+diag.subtipo:''} — ${(diag.servicos||[]).join(', ')}</div>`;
