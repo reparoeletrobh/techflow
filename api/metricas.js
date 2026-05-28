@@ -243,11 +243,12 @@ module.exports = async function handler(req, res) {
     diasEnriq.sort((a, b) => a.data.localeCompare(b.data));
 
     // --- RELATÓRIO DIÁRIO (últimos 30 dias) ---
-    const hoje30 = Date.now() - 30*24*60*60*1000;
+    const hoje30 = Date.now() - 90*24*60*60*1000; // ampliado para 90 dias
     const diario = diasEnriq
       .filter(d => {
-        const [y,mo,dd] = (d.data||'').split('-').map(Number);
-        return new Date(y, mo-1, dd).getTime() >= hoje30;
+        if (!d.data) return false;
+        // Compara só datas (sem hora) para não excluir por diferença de horário
+        return d.data >= new Date(hoje30).toISOString().slice(0,10);
       })
       .sort((a,b) => a.data.localeCompare(b.data))
       .map(d => ({ ...d, ...calcMetricas([d]) }));

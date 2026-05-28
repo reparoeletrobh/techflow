@@ -608,20 +608,29 @@ function investPorPeriodo(de, ate) {
 }
 
 function calcMetricasJS(dias, de, ate) {
-  var fichas=0, erp=0, valorErp=0, coletas=0, orc=0;
+  var fichas=0, erp=0, valorErp=0, coletas=0, orc=0, investSoma=0, temInvest=false;
   dias.forEach(function(d) {
     fichas   += d.fichas        || 0;
     erp      += d.erpCount      || 0;
     valorErp += d.valorErp      || 0;
     coletas  += d.coletasSolic  || 0;
     orc      += d.orcEnviado    || 0;
+    // Bug 1: usar investimento real do dia se disponível
+    if (d.investimento && d.investimento > 0) { investSoma += d.investimento; temInvest = true; }
   });
-  // Investimento baseado em dias corridos do período (não soma de valores diários)
-  var invest = investPorPeriodo(de, ate);
-  if (invest === null) {
-    // Sem período definido: usa span dos dias disponíveis
-    var datas = dias.map(function(d) { return d.data; }).filter(Boolean).sort();
-    invest = datas.length >= 2 ? investPorPeriodo(datas[0], datas[datas.length-1]) : 0;
+  var invest;
+  if (temInvest) {
+    // Usa soma dos investimentos reais lançados
+    invest = investSoma;
+  } else {
+    // Bug 2: cap ate em hoje para não contar dias futuros
+    var hoje = hj();
+    var ateEfetivo = (ate && ate > hoje) ? hoje : ate;
+    invest = investPorPeriodo(de, ateEfetivo);
+    if (invest === null) {
+      var datas = dias.map(function(d) { return d.data; }).filter(Boolean).sort();
+      invest = datas.length >= 2 ? investPorPeriodo(datas[0], datas[datas.length-1]) : 0;
+    }
   }
   return {
     fichas: fichas, investimento: invest, erpCount: erp, valorErp: valorErp,
