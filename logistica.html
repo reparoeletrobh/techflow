@@ -529,18 +529,24 @@ function cardHTML(f, phase) {
     // Badge de vencimento
     let vencBadge = '';
     if (f.horarioColeta) {
-      const diff = new Date(f.horarioColeta).getTime() - Date.now();
-      const abs  = Math.abs(diff);
+      const diff  = new Date(f.horarioColeta).getTime() - Date.now();
+      const abs   = Math.abs(diff);
       const horas = Math.floor(abs/3600000);
       const mins  = Math.floor((abs%3600000)/60000);
       const fmt   = diff >= 0
         ? (horas > 0 ? `em ${horas}h${mins>0?mins+'m':''}` : `em ${mins}min`)
         : (horas > 0 ? `${horas}h${mins>0?mins+'m':''} atrás` : `${mins}min atrás`);
-      const cls = diff < 0 ? 'venc-late' : diff < 3600000 ? 'venc-warn' : 'venc-ok';
+      const cls  = diff < 0 ? 'venc-late' : diff < 3600000 ? 'venc-warn' : 'venc-ok';
       const icon = diff < 0 ? '🔴' : diff < 3600000 ? '🟠' : '🟢';
       const hora = new Date(f.horarioColeta).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'});
       const dia  = new Date(f.horarioColeta).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',timeZone:'America/Sao_Paulo'});
       vencBadge = `<div class="venc-badge ${cls}">${icon} ${dia} às ${hora} · ${fmt}</div>`;
+    } else if (f.horarioColetaTexto) {
+      // Parse falhou mas há texto original — badge neutro azul
+      vencBadge = `<div class="venc-badge" style="background:rgba(59,158,255,.12);color:#3b9eff;border:1px solid rgba(59,158,255,.3);">📅 ${escHtml(f.horarioColetaTexto)}</div>`;
+    } else {
+      // Ficha em horario_marcado sem data registrada — badge genérico
+      vencBadge = `<div class="venc-badge" style="background:rgba(59,158,255,.08);color:#3b9eff;border:1px solid rgba(59,158,255,.2);">📅 Horário a confirmar</div>`;
     }
     btns = vencBadge + `
       <button class="cbtn cbtn-outline" onclick="abrirDados('${f.id}')">👁 Ver Dados</button>
