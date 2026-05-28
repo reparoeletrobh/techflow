@@ -257,6 +257,7 @@ header{
     <button class="tab-btn" onclick="showPage('painel')">📊 Painel</button>
     <button class="tab-btn active" onclick="showPage('kanban')">📋 Fichas</button>
     <button class="tab-btn" onclick="showPage('mover')" style="border-color:rgba(239,68,68,.4);color:#ef4444;">🔀 Mover OS</button>
+    <button class="tab-btn" onclick="showPage('relatorio')">📊 Relatório</button>
     <span id="sync-status" style="font-family:var(--fm);font-size:10px;color:var(--muted);"></span>
     <button class="sync-btn" onclick="syncPipefy()">↻ Sync</button>
     <div class="live-dot"></div>
@@ -268,6 +269,18 @@ header{
   <div id="painel-content" style="padding:40px;font-family:var(--fm);font-size:12px;color:var(--muted);text-align:center;">
     Carregando...
   </div>
+</div>
+
+<!-- RELATÓRIO MP -->
+<div id="page-relatorio" class="page">
+  <div style="padding:24px 24px 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <span style="font-family:var(--fh);font-size:18px;font-weight:700;">📊 Relatório de Pagamentos MP</span>
+    <input type="date" id="rel-data" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text);font-family:var(--fm);font-size:12px;" onchange="renderRelatorio()">
+    <button onclick="renderRelatorio()" class="sync-btn">↻ Atualizar</button>
+    <button onclick="exportarRelatorio()" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-family:var(--fm);font-size:11px;color:var(--muted);cursor:pointer;">⬇ Exportar CSV</button>
+  </div>
+  <div id="rel-resumo" style="padding:16px 24px;display:flex;gap:12px;flex-wrap:wrap;"></div>
+  <div id="rel-content" style="padding:0 24px 32px;"></div>
 </div>
 
 <!-- KANBAN -->
@@ -960,7 +973,7 @@ function showPage(name) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
-  var tabIdx = name==='painel' ? 0 : name==='kanban' ? 1 : 2;
+  var tabIdx = name==='painel' ? 0 : name==='kanban' ? 1 : name==='mover' ? 2 : 3;
   document.querySelectorAll('.tab-btn')[tabIdx]?.classList.add('active');
   if (name==='painel') renderPainel();
   else if (name==='kanban') renderKanban();
@@ -968,6 +981,7 @@ function showPage(name) {
     if (records && records.length) renderMover();
     else load().then(function(){ renderMover(); });
   }
+  else if (name==='relatorio') renderRelatorio();
 }
 
 function showToast(icon,title,msg) {
@@ -1139,6 +1153,96 @@ function copiarLinkMp() {
   const url = document.getElementById('mp-link-txt').textContent;
   if (url) { navigator.clipboard.writeText(url); showToast('📋','Link copiado!',''); }
 }
+
+
+// ── Relatório de Pagamentos MP ────────────────────────────────────────────────
+var relDados = null;
+
+function dfBRT(ts) {
+  var d = new Date(ts || Date.now());
+  var b = new Date(d.toLocaleString('en-US',{timeZone:'America/Sao_Paulo'}));
+  return b.getFullYear()+'-'+String(b.getMonth()+1).padStart(2,'0')+'-'+String(b.getDate()).padStart(2,'0');
+}
+
+async function renderRelatorio() {
+  var inp  = document.getElementById('rel-data');
+  if (!inp.value) inp.value = dfBRT();
+  var data = inp.value;
+  var res  = document.getElementById('rel-resumo');
+  var cnt  = document.getElementById('rel-content');
+  cnt.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);font-family:var(--fm);font-size:12px;">Carregando...</div>';
+  res.innerHTML = '';
+  try {
+    var r = await api('relatorio-financeiro' + (data ? '&data='+data : ''));
+    if (!r.ok) { cnt.innerHTML = '<div style="padding:40px;color:#ef4444;font-family:var(--fm);">Erro: '+r.error+'</div>'; return; }
+    relDados = r;
+
+    // Resumo
+    var pagoColor = r.totalPago > 0 ? '#22c55e' : 'var(--muted)';
+    res.innerHTML = [
+      statPill('Transações no dia', r.totalTransacoes, '#3b9eff'),
+      statPill('Pagamentos confirmados', r.totalPago, '#22c55e'),
+      statPill('Total recebido', 'R$ ' + (r.valorTotal||0).toLocaleString('pt-BR',{minimumFractionDigits:2}), pagoColor),
+    ].join('');
+
+    if (!r.transacoes || !r.transacoes.length) {
+      cnt.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);font-family:var(--fm);font-size:12px;">Nenhuma transação em '+data+'</div>';
+      return;
+    }
+
+    // Tabela
+    var rows = r.transacoes.map(function(t) {
+      var tipo    = t.tipo === 'pagamento_confirmado' ? '<span style="color:#22c55e;font-weight:600;">✅ Pago</span>' : '<span style="color:#f59e0b;">🔗 Link gerado</span>';
+      var metodo  = t.metodo === 'pix' ? '📲 PIX' : t.metodo === 'credit_card' ? '💳 Cartão' : (t.metodo||'—');
+      var parcelas= (t.parcelas && t.parcelas > 1) ? ' '+t.parcelas+'x' : '';
+      var hora    = t.ts ? new Date(t.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}) : '—';
+      return '<tr style="border-bottom:1px solid var(--border);">' +
+        '<td style="padding:8px 10px;font-size:11px;color:var(--muted);">'+hora+'</td>' +
+        '<td style="padding:8px 10px;font-size:11px;">'+tipo+'</td>' +
+        '<td style="padding:8px 10px;font-size:11px;font-weight:600;">'+(t.fichaId||'—')+'</td>' +
+        '<td style="padding:8px 10px;font-size:11px;">'+(t.cliente||'—')+'</td>' +
+        '<td style="padding:8px 10px;font-size:11px;color:var(--muted);">'+(t.cpfCnpj||'—')+'</td>' +
+        '<td style="padding:8px 10px;font-size:11px;font-family:var(--fh);font-weight:700;color:#22c55e;">R$ '+(t.valor||0).toLocaleString('pt-BR',{minimumFractionDigits:2})+'</td>' +
+        '<td style="padding:8px 10px;font-size:11px;">'+metodo+parcelas+'</td>' +
+        '<td style="padding:8px 10px;font-size:10px;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(t.paymentId||t.preferenceId||'—')+'</td>' +
+      '</tr>';
+    }).join('');
+
+    cnt.innerHTML = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border);">' +
+      '<table style="width:100%;border-collapse:collapse;">' +
+      '<thead><tr style="background:var(--surface);border-bottom:1px solid var(--border);">' +
+        ['Hora','Status','Ficha','Cliente','CPF/CNPJ','Valor','Método','Payment ID'].map(function(h){
+          return '<th style="padding:8px 10px;font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;text-align:left;white-space:nowrap;">'+h+'</th>';
+        }).join('') +
+      '</tr></thead><tbody>'+rows+'</tbody></table></div>';
+  } catch(e) {
+    cnt.innerHTML = '<div style="padding:40px;color:#ef4444;font-family:var(--fm);">Erro: '+e.message+'</div>';
+  }
+}
+
+function statPill(label, val, color) {
+  return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;min-width:140px;">' +
+    '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">'+label+'</div>' +
+    '<div style="font-family:var(--fh);font-size:20px;font-weight:800;color:'+color+';">'+val+'</div>' +
+  '</div>';
+}
+
+function exportarRelatorio() {
+  if (!relDados || !relDados.transacoes || !relDados.transacoes.length) {
+    showToast('⚠️','Sem dados','Nenhuma transação para exportar'); return;
+  }
+  var linhas = ['Hora,Status,Ficha,Cliente,CPF/CNPJ,Valor,Método,Parcelas,PaymentID,PreferenceID'];
+  relDados.transacoes.forEach(function(t) {
+    var hora = t.ts ? new Date(t.ts).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}) : '';
+    linhas.push([hora, t.tipo, t.fichaId, t.cliente, t.cpfCnpj, t.valor, t.metodo, t.parcelas||1, t.paymentId||'', t.preferenceId||''].join(','));
+  });
+  var blob = new Blob([linhas.join('\n')], {type:'text/csv;charset=utf-8;'});
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href   = url; a.download = 'conciliacao_' + (relDados.data||'') + '.csv';
+  a.click(); URL.revokeObjectURL(url);
+}
+
 
 </script>
 <!-- MODAL EMITIR NF -->
