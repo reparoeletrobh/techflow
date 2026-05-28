@@ -183,7 +183,7 @@ export default async function handler(req,res){
           });
         }
         boardDb.cards = boardCards;
-        // Registrar aprovado_entrada no movesLog → contabiliza nas Metas do técnico
+        // Registrar aprovado_entrada no movesLog — contabiliza nas Metas do técnico
         if (!Array.isArray(boardDb.movesLog)) boardDb.movesLog = [];
         boardDb.movesLog.push({
           phaseId:   'aprovado_entrada',
@@ -192,9 +192,8 @@ export default async function handler(req,res){
           origem:    'frente_loja',
           fichaId:   ficha.id
         });
-        // Manter log dos últimos 90 dias
-        const cutoff90fl = new Date(Date.now() - 90*24*60*60*1000).toISOString();
-        boardDb.movesLog = boardDb.movesLog.filter(m => (m.timestamp||m.ts||'') > cutoff90fl);
+        const cutoff90fl = new Date(Date.now()-90*24*60*60*1000).toISOString();
+        boardDb.movesLog = boardDb.movesLog.filter(m=>(m.timestamp||m.ts||'')>cutoff90fl);
         await dbSet('reparoeletro_board', boardDb);
       } catch(e) { console.error('[FL] board direct write:', e.message); }
 
