@@ -1308,10 +1308,11 @@ async function renderLinksMP() {
       var gerado = l.geradoEm ? new Date(l.geradoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}) : '—';
       var pagoEm = l.pagoEm  ? new Date(l.pagoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}) : '—';
       var agend  = l.dataAgendada ? '<div style="font-size:9px;color:#e879f9;">⏰ '+l.dataAgendada+'</div>' : '';
-      var linkHtml = l.checkoutUrl
-        ? '<div style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
-          '<a href="'+l.checkoutUrl+'" target="_blank" style="color:#3b9eff;font-size:10px;text-decoration:none;" title="'+l.checkoutUrl+'">🔗 Abrir link</a>' +
-          '<button onclick="navigator.clipboard.writeText(''+l.checkoutUrl+'');showToast('📋','Copiado!','')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:9px;margin-left:4px;">📋</button>' +
+      var safeUrl = (l.checkoutUrl||'').replace(/"/g,'');
+      var linkHtml = safeUrl
+        ? '<div style="max-width:180px;">' +
+          '<a href="'+safeUrl+'" target="_blank" style="color:#3b9eff;font-size:10px;text-decoration:none;">🔗 Abrir link</a>' +
+          ' <button data-url="'+safeUrl+'" onclick="navigator.clipboard.writeText(this.dataset.url);showToast('📋','Copiado!','')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:9px;">📋</button>' +
           '</div>'
         : '—';
       return '<tr style="border-bottom:1px solid var(--border);">' +
