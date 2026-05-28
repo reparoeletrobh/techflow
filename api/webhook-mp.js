@@ -49,6 +49,121 @@ async function logEvento(evento) {
   } catch(e) { console.error('logEvento:', e.message); }
 }
 
+
+// ── Financeiro: processar pagamento MP → entrega_liberada ────────────────────
+async function processarPagamentoFinanceiro(pmt) {
+  const meta     = pmt.metadata || {};
+  const fichaId  = meta.fichaId;
+  const prefId   = pmt.collector?.id ? null : pmt.additional_info?.items?.[0]?.id; // fallback
+  const valor    = pmt.transaction_amount;
+  const metodo   = pmt.payment_method_id;
+  const now      = new Date().toISOString();
+
+  const fin = await dbGet(FIN_KEY2);
+  if (!fin || !fin.records) {
+    // Redis pode ter sido atualizado agora — enfileirar retry
+    await enfileirarRetry(pmt);
+    return { ok:false, info:"ficha_nao_encontrada_retry_agendado" };
+  }
+
+  // Buscar ficha por fichaId OU por preferenceId
+  const prefIdMp = pmt.preference_id;
+  const rec = fin.records.find(r =>
+    (fichaId && r.id === fichaId) ||
+    (prefIdMp && r.mp?.preferenceId === prefIdMp)
+  );
+
+  if (!rec) {
+    await enfileirarRetry(pmt);
+    return { ok:false, info:"ficha_nao_encontrada_retry_agendado", fichaId, prefIdMp };
+  }
+
+  // Já processado?
+  if (rec.mp?.paymentId === String(pmt.id)) {
+    return { ok:false, info:"ja_processado", fichaId: rec.id };
+  }
+
+  // Só mover se ainda em faturamento ou pagamento_agendado
+  const fasesAceitas = ["faturamento","pagamento_agendado","nf_emitida"];
+  if (!fasesAceitas.includes(rec.phaseId)) {
+    // Só registrar na conciliação, não mover
+    await salvarConciliacaoFin({ rec, pmt, metodo, valor, now, status:"ja_em_"+rec.phaseId });
+    return { ok:true, info:"ficha_ja_movida", fichaId:rec.id, fase:rec.phaseId };
+  }
+
+  // Mover para entrega_liberada
+  rec.mp          = { ...(rec.mp||{}), paymentId:String(pmt.id), pagoEm:now, metodo, valor, status:"pago" };
+  rec.paidAt      = now;
+  rec.phaseId     = "entrega_liberada";
+  rec.movedAt     = now;
+  rec.history     = [...(rec.history||[]), { phaseId:"entrega_liberada", ts:now, via:"webhook_mp", paymentId:String(pmt.id) }];
+
+  await dbSet(FIN_KEY2, fin);
+
+  // Pipefy → Solicitar Entrega
+  let pipefyOk = false;
+  if (rec.pipefyId) {
+    try {
+      const token = (process.env.PIPEFY_TOKEN||"").trim();
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 8000);
+      const pRes = await fetch(PIPEFY_API_FIN, {
+        method:"POST",
+        headers:{"Content-Type":"application/json", Authorization:"Bearer "+token},
+        body:JSON.stringify({ query:`mutation{moveCardToPhase(input:{card_id:"${rec.pipefyId}",destination_phase_id:"${SOLICITAR_ENTREGA_FIN}"}){card{id}}}` }),
+        signal:controller.signal
+      });
+      const pj = await pRes.json();
+      pipefyOk = !!pj.data?.moveCardToPhase?.card?.id;
+    } catch(pe) { console.error("[FinWebhook] Pipefy:", pe.message); }
+  }
+
+  // Salvar conciliação
+  await salvarConciliacaoFin({ rec, pmt, metodo, valor, now, status:"pago", pipefyOk });
+
+  return { ok:true, fichaId:rec.id, pipefyOk, valor, metodo };
+}
+
+async function enfileirarRetry(pmt) {
+  try {
+    const fila = (await dbGet(FIN_RETRY_KEY)) || [];
+    // Não duplicar
+    if (!fila.find(e => e.id === pmt.id)) {
+      fila.push({ id:pmt.id, pmt, tentativas:0, ultimaTentativa:null, criadoEm:new Date().toISOString() });
+      await dbSet(FIN_RETRY_KEY, fila.slice(-50)); // max 50
+    }
+  } catch(e) { console.error("[FinRetry] enfileirar:", e.message); }
+}
+
+async function salvarConciliacaoFin({ rec, pmt, metodo, valor, now, status, pipefyOk }) {
+  try {
+    const db = (await dbGet(FIN_CONCIL2)) || { transacoes:[] };
+    db.transacoes = db.transacoes || [];
+    if (db.transacoes.find(t => t.paymentId === String(pmt.id))) return;
+    const d = new Date(new Date(now).toLocaleString("en-US",{timeZone:"America/Sao_Paulo"}));
+    const dataBRT = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+    db.transacoes.unshift({
+      tipo:         "pagamento_confirmado",
+      fichaId:      rec.id,
+      cliente:      rec.nome    || "",
+      cpfCnpj:      rec.cpfCnpj || "",
+      valor:        parseFloat(valor||0),
+      metodo:       metodo      || pmt.payment_method_id,
+      parcelas:     pmt.installments || 1,
+      preferenceId: rec.mp?.preferenceId || "",
+      paymentId:    String(pmt.id),
+      statusMp:     pmt.status,
+      pipefyOk:     !!pipefyOk,
+      data:         dataBRT,
+      status,
+      ts:           now
+    });
+    const cutoff = new Date(Date.now()-90*24*60*60*1000).toISOString();
+    db.transacoes = db.transacoes.filter(t=>(t.ts||"")>cutoff).slice(0,2000);
+    await dbSet(FIN_CONCIL2, db);
+  } catch(e) { console.error("[ConcilFin]", e.message); }
+}
+
 // ── Pipefy: criar card Receber após venda confirmada pelo MP ────────────────
 function sanitizePipefy(s) {
   return String(s||'').replace(/[\\]/g,'').replace(/"/g,"'").replace(/\n/g,' ')
@@ -458,6 +573,54 @@ export default async function handler(req, res) {
     }
   }
 
+
+  // ── GET sync-fin-mp: reprocessa fila de retry + sync pagamentos financeiro ─
+  if (action === "sync-fin-mp") {
+    const resultado = { retry:[], sync:[] };
+    try {
+      // 1. Processar fila de retry
+      const fila = (await dbGet(FIN_RETRY_KEY)) || [];
+      const pendentes = fila.filter(e => e.tentativas < 5);
+      const novaFila  = [];
+      for (const entry of pendentes) {
+        try {
+          const mpR = await fetch(`https://api.mercadopago.com/v1/payments/${entry.id}`, {
+            headers: { Authorization: `Bearer ${MP_TOKEN}` }
+          });
+          const pmt = await mpR.json();
+          if (pmt.status === "approved" && pmt.metadata?.origem === "financeiro") {
+            const r = await processarPagamentoFinanceiro(pmt);
+            if (r.ok) { resultado.retry.push({ id:entry.id, ok:true }); continue; }
+          }
+          entry.tentativas++;
+          entry.ultimaTentativa = new Date().toISOString();
+          novaFila.push(entry);
+          resultado.retry.push({ id:entry.id, tentativa:entry.tentativas });
+        } catch(e) {
+          entry.tentativas++;
+          novaFila.push(entry);
+          resultado.retry.push({ id:entry.id, erro:e.message });
+        }
+      }
+      await dbSet(FIN_RETRY_KEY, novaFila);
+
+      // 2. Sync MP: últimos 30min de pagamentos fin não processados
+      const agora   = new Date();
+      const inicio  = new Date(agora.getTime() - 30*60*1000);
+      const mpUrl   = `https://api.mercadopago.com/v1/payments/search?status=approved&sort=date_created&criteria=desc&range=date_created&begin_date=${encodeURIComponent(inicio.toISOString())}&end_date=${encodeURIComponent(agora.toISOString())}&limit=20`;
+      const mpRes   = await fetch(mpUrl, { headers:{ Authorization:`Bearer ${MP_TOKEN}` } });
+      const mpData  = await mpRes.json();
+      for (const pmt of (mpData.results||[])) {
+        if (pmt.metadata?.origem !== "financeiro") continue;
+        if (await jaProcessado(String(pmt.id))) continue;
+        await marcarProcessado(String(pmt.id));
+        const r = await processarPagamentoFinanceiro(pmt);
+        resultado.sync.push({ id:pmt.id, ...r });
+      }
+    } catch(e) { resultado.erro = e.message; }
+    return res.status(200).json({ ok:true, ...resultado });
+  }
+
   // ── GET recuperar-venda: re-processa um paymentId manualmente ──────
   if (action === 'recuperar-venda') {
     const pid = req.query.paymentId || req.query.pid;
@@ -649,6 +812,13 @@ export default async function handler(req, res) {
           }
         }
       } catch(e) { console.error('vender:', e.message); }
+
+      // 4a. Se origem=financeiro → processar como pagamento de OS
+      if (meta.origem === 'financeiro') {
+        const finResult = await processarPagamentoFinanceiro(payment);
+        console.log('[webhook] financeiro:', JSON.stringify(finResult));
+        return res.status(200).json({ ok:true, financeiro:true, ...finResult });
+      }
 
       // 4b. Criar card no Pipefy Receber (após marcar produto e antes de salvar checkout)
       try {

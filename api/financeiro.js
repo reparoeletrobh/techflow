@@ -3,6 +3,9 @@ const PIPE_ID       = "305832912";
 const BOARD_KEY     = "reparoeletro_board";
 const FIN_KEY       = "reparoeletro_financeiro";
 const FIN_BACKUP_KEY = "reparoeletro_financeiro_backup";
+const FIN_CONCIL_KEY  = "fin_conciliacao"; // Banco de conciliação bancária MP
+const MP_TOKEN        = (process.env.MP_ACCESS_TOKEN || "").replace(/['"]/g,"").trim();
+const SOLICITAR_ENTREGA_PHASE_FIN = "334875186";
 
 const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g, "").trim();
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g, "").trim();
@@ -180,6 +183,89 @@ function defaultFin() {
   return { records: [], syncedIds: [] };
 }
 
+
+// ── Banco de conciliação — salvar transação ──────────────────────────────────
+function dataBRT(ts) {
+  const d = new Date(new Date(ts).toLocaleString("en-US",{timeZone:"America/Sao_Paulo"}));
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+async function salvarConciliacao(entry) {
+  try {
+    const db = (await dbGet(FIN_CONCIL_KEY)) || { transacoes: [] };
+    db.transacoes = db.transacoes || [];
+    // Idempotência — não duplicar mesmo paymentId
+    if (entry.paymentId && db.transacoes.find(t => t.paymentId === String(entry.paymentId))) return;
+    db.transacoes.unshift({ ...entry, ts: new Date().toISOString() });
+    // Manter 90 dias
+    const cutoff = new Date(Date.now() - 90*24*60*60*1000).toISOString();
+    db.transacoes = db.transacoes.filter(t => (t.ts||"") > cutoff).slice(0, 2000);
+    await dbSet(FIN_CONCIL_KEY, db);
+  } catch(e) { console.error("[Concil]", e.message); }
+}
+
+// ── Criar preferência Mercado Pago ───────────────────────────────────────────
+async function criarPreferenciaMp({ rec, metodo }) {
+  if (!MP_TOKEN) throw new Error("MP_ACCESS_TOKEN não configurado");
+  const valor = parseFloat(rec.valor || rec.total || 0);
+  if (!valor || valor <= 0) throw new Error("Valor inválido: " + valor);
+
+  const isPix = metodo === "pix";
+  const body = {
+    items: [{
+      id:          rec.id,
+      title:       "OS " + rec.id + " — " + (rec.nome || "Cliente"),
+      description: (rec.equipamento || "") + (rec.descricao ? " | " + rec.descricao : ""),
+      quantity:    1,
+      unit_price:  valor,
+      currency_id: "BRL"
+    }],
+    payer: {
+      name:  rec.nome  || "Cliente",
+      email: rec.email || "cliente@reparoeletrobh.com.br",
+      ...(rec.cpfCnpj ? { identification: {
+        type:   rec.cpfCnpj.replace(/\D/g,"").length <= 11 ? "CPF" : "CNPJ",
+        number: rec.cpfCnpj.replace(/\D/g,"")
+      }} : {})
+    },
+    payment_methods: isPix
+      ? {
+          default_payment_method_id: "pix",
+          excluded_payment_types: [{ id: "credit_card" }, { id: "debit_card" }, { id: "ticket" }],
+          installments: 1
+        }
+      : {
+          excluded_payment_types: [],
+          installments:      3,
+          default_installments: 1
+        },
+    metadata: {
+      origem:    "financeiro",
+      fichaId:   rec.id,
+      pipefyId:  rec.pipefyId || "",
+      metodo:    metodo,
+      cliente:   rec.nome || "",
+      valor:     String(valor)
+    },
+    back_urls: {
+      success: "https://reparoeletroadm.com/financeiro",
+      failure: "https://reparoeletroadm.com/financeiro",
+      pending: "https://reparoeletroadm.com/financeiro"
+    },
+    notification_url: "https://reparoeletroadm.com/api/webhook-mp",
+    // SEM expiration_date_to — link sem expiração
+    binary_mode: false
+  };
+
+  const res = await fetch("https://api.mercadopago.com/checkout/preferences", {
+    method:  "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + MP_TOKEN },
+    body:    JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (!data.id) throw new Error("MP não retornou preference id: " + JSON.stringify(data).slice(0,200));
+  return data; // { id, init_point, sandbox_init_point }
+}
+
 // ── Handler ────────────────────────────────────────────────────
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -327,6 +413,72 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, newCount, removedCount, pipefyError });
   }
 
+
+
+  // ── POST gerar-cobranca-mp ─────────────────────────────────────────────────
+  if (req.method === "POST" && action === "gerar-cobranca-mp") {
+    const { id, metodo } = req.body || {};
+    if (!id || !["pix","cartao"].includes(metodo))
+      return res.status(400).json({ ok:false, error: "id e metodo (pix|cartao) obrigatórios" });
+
+    const fin = await dbGet(FIN_KEY) || defaultFin();
+    const rec = fin.records.find(r => r.id === id);
+    if (!rec) return res.status(404).json({ ok:false, error: "Ficha não encontrada" });
+    if (rec.phaseId !== "nf_emitida")
+      return res.status(400).json({ ok:false, error: "Ficha não está em NF Emitida: " + rec.phaseId });
+
+    try {
+      const pref = await criarPreferenciaMp({ rec, metodo });
+
+      // Salvar dados MP na ficha
+      rec.mp = {
+        preferenceId:  pref.id,
+        checkoutUrl:   pref.init_point,
+        metodo,
+        geradoEm:      new Date().toISOString(),
+        status:        "aguardando_pagamento"
+      };
+      rec.phaseId  = "faturamento";
+      rec.movedAt  = new Date().toISOString();
+      rec.history  = [...(rec.history||[]), { phaseId:"faturamento", ts:rec.movedAt, via:"mp_cobranca" }];
+      await dbSet(FIN_KEY, fin);
+      try { await dbSet(FIN_BACKUP_KEY, { ...fin, backedUpAt:new Date().toISOString() }); } catch(e) {}
+
+      // Registrar na conciliação (link gerado, aguardando pagamento)
+      await salvarConciliacao({
+        tipo:         "link_gerado",
+        fichaId:      rec.id,
+        cliente:      rec.nome  || "",
+        cpfCnpj:      rec.cpfCnpj || "",
+        valor:        parseFloat(rec.valor||rec.total||0),
+        metodo,
+        preferenceId: pref.id,
+        checkoutUrl:  pref.init_point,
+        data:         dataBRT(new Date()),
+        status:       "aguardando_pagamento"
+      });
+
+      return res.status(200).json({ ok:true, preferenceId:pref.id, checkoutUrl:pref.init_point, metodo });
+    } catch(e) {
+      return res.status(500).json({ ok:false, error: e.message });
+    }
+  }
+
+  // ── GET relatorio-financeiro: conciliação bancária por data ────────────────
+  if (action === "relatorio-financeiro") {
+    const data = req.query.data || dataBRT(new Date());
+    const db   = (await dbGet(FIN_CONCIL_KEY)) || { transacoes:[] };
+    const dia  = (db.transacoes||[]).filter(t => t.data === data);
+    const pago = dia.filter(t => t.tipo === "pagamento_confirmado");
+    const totalDia = pago.reduce((s,t) => s + (t.valor||0), 0);
+    return res.status(200).json({
+      ok:true, data,
+      totalTransacoes: dia.length,
+      totalPago:       pago.length,
+      valorTotal:      parseFloat(totalDia.toFixed(2)),
+      transacoes:      dia
+    });
+  }
 
   // ── POST force-phase: recuperação de emergência — define fase sem validação ─
   if (req.method === "POST" && action === "force-phase") {

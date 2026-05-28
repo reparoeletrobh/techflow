@@ -123,6 +123,24 @@ header{
 
 /* FIN CARD */
 .fin-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;animation:cardIn 0.25s ease;position:relative;overflow:hidden;}
+/* ── Modal gerar cobrança MP ─────────────────── */
+.mp-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px;}
+.mp-box{background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:24px;width:100%;max-width:400px;display:flex;flex-direction:column;gap:14px;}
+.mp-title{font-family:var(--fh);font-size:17px;font-weight:700;}
+.mp-opts{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.mp-opt{background:var(--bg);border:2px solid var(--border);border-radius:12px;padding:14px 10px;cursor:pointer;text-align:center;transition:.15s;}
+.mp-opt:hover,.mp-opt.sel{border-color:#3b9eff;background:rgba(59,158,255,.08);}
+.mp-opt-icon{font-size:26px;}
+.mp-opt-name{font-family:var(--fh);font-size:13px;font-weight:700;margin-top:4px;}
+.mp-opt-desc{font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:2px;}
+.mp-link-area{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;}
+.mp-link-area label{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;}
+.mp-link-txt{font-family:var(--fm);font-size:10px;color:#3b9eff;word-break:break-all;cursor:pointer;}
+.mp-actions{display:flex;gap:8px;justify-content:flex-end;}
+.mp-btn{padding:9px 18px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:600;font-family:var(--fm);}
+.mp-btn-cancel{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.mp-btn-gerar{background:#3b9eff;color:#fff;opacity:.45;pointer-events:none;}
+.mp-btn-gerar.ok{opacity:1;pointer-events:all;}
 @keyframes cardIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 .fin-card:hover{border-color:#333;}
 .fc-bar{position:absolute;left:0;top:0;bottom:0;width:3px;}
@@ -493,9 +511,20 @@ function buildActions(r) {
       h += '<button class="btn-primary" style="background:#3b9eff;color:#fff;" data-chave="' + r.chaveAcesso + '" data-nome="' + nomeRaw.replace(/"/g,'') + '" onclick="baixarDanfe(this)">📄 Baixar DANFE</button>';
     }
     h += '<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="nfEnviada(\'' + r.id + '\')">✅ NF Enviada → Faturamento</button>';
+    h += '<button class="btn-primary" style="background:#3b9eff;color:#fff;" onclick="abrirModalCobranca(\'' + r.id + '\')">💳 Gerar Cobrança MP</button>';
   }
-    if (r.phaseId==='faturamento')
-    h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="openMoverModal('${r.id}')">💰 Registrar Pagamento</button>`;
+    if (r.phaseId==='faturamento') {
+      if (r.mp?.checkoutUrl) {
+        const metodoLabel = r.mp.metodo === 'pix' ? '📲 PIX' : '💳 PIX + Cartão 3x';
+        h += `<div style="background:rgba(59,158,255,.08);border:1px solid rgba(59,158,255,.3);border-radius:8px;padding:8px 10px;font-family:var(--fm);font-size:10px;color:#3b9eff;">
+          <div style="margin-bottom:4px;font-weight:600;">${metodoLabel} · Link gerado</div>
+          <div style="word-break:break-all;margin-bottom:6px;">${r.mp.checkoutUrl}</div>
+          <button onclick="navigator.clipboard.writeText('${r.mp.checkoutUrl}');showToast('📋','Link copiado!','')" style="background:#3b9eff;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:10px;cursor:pointer;">📋 Copiar Link</button>
+          <button onclick="abrirModalCobranca('${r.id}')" style="background:transparent;border:1px solid #3b9eff;color:#3b9eff;border-radius:6px;padding:4px 10px;font-size:10px;cursor:pointer;margin-left:6px;">🔄 Reenviar</button>
+        </div>`;
+      }
+      h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="openMoverModal('${r.id}')">💰 Registrar Pagamento</button>`;
+    }
   if (r.phaseId==='pagamento_agendado') {
     h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="openMoverModal('${r.id}')">💰 Registrar Pagamento</button>`;
     h += `<button class="btn-primary" style="background:#0ea5e9;color:#fff;" onclick="moverSimples('${r.id}','analise_pagamento','🔍','Enviado para Análise!')">🔍 Analisar Pagamento</button>`;
@@ -1062,6 +1091,55 @@ load();
 showPage('kanban'); // abre em Fichas por padrão
 syncPipefy();
 setInterval(()=>{ load(); syncPipefy(); }, 30000);
+
+// ── Modal de Cobrança MP ──────────────────────────────────────────────────────
+let mpRecId = null, mpMetodo = null;
+
+function abrirModalCobranca(id) {
+  mpRecId  = id;
+  mpMetodo = null;
+  document.getElementById('mp-opt-pix').classList.remove('sel');
+  document.getElementById('mp-opt-cartao').classList.remove('sel');
+  document.getElementById('mp-btn-gerar').classList.remove('ok');
+  document.getElementById('mp-result').style.display = 'none';
+  document.getElementById('mp-link-txt').textContent = '';
+  document.getElementById('mp-modal').style.display  = 'flex';
+}
+function fecharModalMp() {
+  document.getElementById('mp-modal').style.display = 'none';
+}
+function selecionarMetodo(m) {
+  mpMetodo = m;
+  document.getElementById('mp-opt-pix').classList.toggle('sel', m==='pix');
+  document.getElementById('mp-opt-cartao').classList.toggle('sel', m==='cartao');
+  document.getElementById('mp-btn-gerar').classList.add('ok');
+}
+async function gerarCobrancaMp() {
+  if (!mpRecId || !mpMetodo) return;
+  const btn = document.getElementById('mp-btn-gerar');
+  btn.textContent = '⏳ Gerando...'; btn.classList.remove('ok');
+  try {
+    const r = await api('gerar-cobranca-mp', { id: mpRecId, metodo: mpMetodo });
+    if (r.ok) {
+      document.getElementById('mp-result').style.display = 'flex';
+      document.getElementById('mp-link-txt').textContent = r.checkoutUrl;
+      btn.textContent = '✅ Gerado!';
+      updateRecord({ id: mpRecId, phaseId:'faturamento', mp:{ checkoutUrl:r.checkoutUrl, metodo:r.metodo, preferenceId:r.preferenceId } });
+      showToast('💳','Link gerado!','Copie e envie ao cliente');
+    } else {
+      btn.textContent = '⚡ Gerar Link'; btn.classList.add('ok');
+      showToast('❌','Erro ao gerar',r.error||'Tente novamente');
+    }
+  } catch(e) {
+    btn.textContent = '⚡ Gerar Link'; btn.classList.add('ok');
+    showToast('❌','Erro',e.message);
+  }
+}
+function copiarLinkMp() {
+  const url = document.getElementById('mp-link-txt').textContent;
+  if (url) { navigator.clipboard.writeText(url); showToast('📋','Link copiado!',''); }
+}
+
 </script>
 <!-- MODAL EMITIR NF -->
 <div class="modal" id="nf-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
@@ -1130,6 +1208,35 @@ setInterval(()=>{ load(); syncPipefy(); }, 30000);
     <!-- Lista de todas as fichas com fase atual -->
     <div style="font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:10px;">Todas as fichas</div>
     <div id="mover-lista" style="display:flex;flex-direction:column;gap:6px;"></div>
+  </div>
+</div>
+
+
+<!-- ── Modal Gerar Cobrança MP ──────────────────────────────────────────── -->
+<div id="mp-modal" style="display:none;" class="mp-overlay" onclick="if(event.target===this)fecharModalMp()">
+  <div class="mp-box">
+    <div class="mp-title">💳 Gerar Cobrança</div>
+    <div class="mp-opts">
+      <div class="mp-opt" id="mp-opt-pix" onclick="selecionarMetodo('pix')">
+        <div class="mp-opt-icon">📲</div>
+        <div class="mp-opt-name">PIX</div>
+        <div class="mp-opt-desc">Pagamento imediato<br>apenas PIX</div>
+      </div>
+      <div class="mp-opt" id="mp-opt-cartao" onclick="selecionarMetodo('cartao')">
+        <div class="mp-opt-icon">💳</div>
+        <div class="mp-opt-name">Cartão</div>
+        <div class="mp-opt-desc">PIX + Cartão<br>até 3x sem juros</div>
+      </div>
+    </div>
+    <div id="mp-result" style="display:none;" class="mp-link-area">
+      <label>Link de pagamento — copie e envie ao cliente</label>
+      <div class="mp-link-txt" id="mp-link-txt" onclick="copiarLinkMp()"></div>
+      <button onclick="copiarLinkMp()" style="align-self:flex-start;background:#3b9eff;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11px;cursor:pointer;">📋 Copiar Link</button>
+    </div>
+    <div class="mp-actions">
+      <button class="mp-btn mp-btn-cancel" onclick="fecharModalMp()">Fechar</button>
+      <button class="mp-btn mp-btn-gerar" id="mp-btn-gerar" onclick="gerarCobrancaMp()">⚡ Gerar Link</button>
+    </div>
   </div>
 </div>
 
