@@ -333,6 +333,102 @@
     {
       "source": "/api/fin-test",
       "destination": "/api/fin-test.js"
+    },
+    {
+      "source": "/api/aguardando-retirada",
+      "destination": "/api/aguardando-retirada.js"
+    },
+    {
+      "source": "/api/board",
+      "destination": "/api/board.js"
+    },
+    {
+      "source": "/api/checkout-mp-criar",
+      "destination": "/api/checkout-mp-criar.js"
+    },
+    {
+      "source": "/api/compra-equip",
+      "destination": "/api/compra-equip.js"
+    },
+    {
+      "source": "/api/compras-pecas",
+      "destination": "/api/compras-pecas.js"
+    },
+    {
+      "source": "/api/compras",
+      "destination": "/api/compras.js"
+    },
+    {
+      "source": "/api/financeiro",
+      "destination": "/api/financeiro.js"
+    },
+    {
+      "source": "/api/fl-status",
+      "destination": "/api/fl-status.js"
+    },
+    {
+      "source": "/api/garantia",
+      "destination": "/api/garantia.js"
+    },
+    {
+      "source": "/api/lalamove",
+      "destination": "/api/lalamove.js"
+    },
+    {
+      "source": "/api/logistica",
+      "destination": "/api/logistica.js"
+    },
+    {
+      "source": "/api/metas",
+      "destination": "/api/metas.js"
+    },
+    {
+      "source": "/api/metricas",
+      "destination": "/api/metricas.js"
+    },
+    {
+      "source": "/api/nfse",
+      "destination": "/api/nfse.js"
+    },
+    {
+      "source": "/api/nfse-xsd",
+      "destination": "/api/nfse-xsd.js"
+    },
+    {
+      "source": "/api/orcamento",
+      "destination": "/api/orcamento.js"
+    },
+    {
+      "source": "/api/qz-sign",
+      "destination": "/api/qz-sign.js"
+    },
+    {
+      "source": "/api/tv-board",
+      "destination": "/api/tv-board.js"
+    },
+    {
+      "source": "/api/tv-coleta",
+      "destination": "/api/tv-coleta.js"
+    },
+    {
+      "source": "/api/tv-financeiro",
+      "destination": "/api/tv-financeiro.js"
+    },
+    {
+      "source": "/api/tv-metricas",
+      "destination": "/api/tv-metricas.js"
+    },
+    {
+      "source": "/api/tv-orcamento",
+      "destination": "/api/tv-orcamento.js"
+    },
+    {
+      "source": "/api/vendas",
+      "destination": "/api/vendas.js"
+    },
+    {
+      "source": "/api/webhook-mp",
+      "destination": "/api/webhook-mp.js"
     }
   ],
   "headers": [
