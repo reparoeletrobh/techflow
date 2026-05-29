@@ -219,6 +219,35 @@ export default async function handler(req, res) {
   }
 
 
+
+  // ── GET raw-pipefy: retorna resposta RAW do Pipefy para diagnóstico ────────
+  if (action === 'raw-pipefy') {
+    const phId = req.query.phaseId || '334875152';
+    try {
+      const ctrl = new AbortController();
+      setTimeout(() => ctrl.abort(), 15000);
+      const r = await fetch('https://api.pipefy.com/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json', Authorization:`Bearer ${PIPEFY_TOKEN}` },
+        body: JSON.stringify({ query: `query { phase(id:"${phId}") { cards(first:3) { pageInfo { hasNextPage endCursor } edges { node { id title } } } } }` }),
+        signal: ctrl.signal
+      });
+      const text = await r.text();
+      let parsed = null;
+      try { parsed = JSON.parse(text); } catch(e) {}
+      return res.status(200).json({
+        ok: true,
+        httpStatus: r.status,
+        temToken: !!PIPEFY_TOKEN && PIPEFY_TOKEN.length > 10,
+        tokenInicio: PIPEFY_TOKEN ? PIPEFY_TOKEN.substring(0,8)+'...' : 'VAZIO',
+        responseSize: text.length,
+        parsed,
+      });
+    } catch(e) {
+      return res.status(200).json({ ok:false, erro: e.message });
+    }
+  }
+
   // ── GET sync-fase: sincroniza UMA fase por vez (evita timeout) ───────────
   if (action === 'sync-fase') {
     const pipefyPhaseId = req.query.phaseId;
