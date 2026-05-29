@@ -243,7 +243,7 @@ export default async function handler(req, res) {
               msg: 'Fase no Pipefy: "' + fase.nome + '" | Fase no nosso sistema: "' + nosCard.phase + '"'
             });
           } else {
-            ok++;
+            sincronizados++;
           }
         }
       }
@@ -271,7 +271,7 @@ export default async function handler(req, res) {
       ts:           new Date().toISOString(),
       totalPipefy,
       totalNosso,
-      ok, faltando, extra, divergencia,
+      sincronizados, faltando, extra, divergencia,
       log
     };
     var logKey = 'reparoeletro_pipe_log';
