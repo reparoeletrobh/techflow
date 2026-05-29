@@ -52,7 +52,7 @@ async function dbSet(k, v) {
 
 async function pipefyQ(query) {
   const ctrl = new AbortController();
-  const tid  = setTimeout(() => ctrl.abort(), 5000);
+  const tid  = setTimeout(() => ctrl.abort(), 15000);
   try {
     const r = await fetch('https://api.pipefy.com/graphql', {
       method:'POST',
@@ -176,7 +176,7 @@ export default async function handler(req, res) {
     try {
       const data = await pipefyQ(
         `query { phase(id:"${phaseId}") { name cards(first:10) {
-          pageInfo { hasNextPage totalCount }
+          pageInfo { hasNextPage }
           edges { node { id title fields { name value } } }
         }}}`
       );
