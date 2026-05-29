@@ -305,22 +305,45 @@ module.exports = async function handler(req, res) {
       `🔖 Modalidade: ${modalidade}`,
     ].filter(l => l !== null).join("\n");
 
+    // ── Salvar no Pipe ADM (independente do Pipefy) ────────────────────────
+    let pipefyCardId = null;
+    const U_V = (process.env.UPSTASH_URL   || '').replace(/['"]/g,'').trim();
+    const T_V = (process.env.UPSTASH_TOKEN || '').replace(/['"]/g,'').trim();
+    try {
+      async function _vpg(k) {
+        const r = await fetch(U_V+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T_V,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});
+        const j = await r.json(); const v = j[0]?.result; if(!v) return null;
+        let val=JSON.parse(v); if(typeof val==='string'){try{val=JSON.parse(val);}catch(e){}} return(val&&typeof val==='object')?val:null;
+      }
+      async function _vps(k,v){await fetch(U_V+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T_V,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+      const pipeDb=(await _vpg('reparoeletro_pipe'))||{cards:[],syncedPipefyIds:[],lastSync:null};
+      if(!Array.isArray(pipeDb.cards)) pipeDb.cards=[];
+      const now_v=new Date().toISOString();
+      pipeDb.cards.unshift({
+        id:'PIPE-'+String(pipeDb.cards.length+1).padStart(4,'0'),
+        pipefyId:null, phase:'receber',
+        nomeContato:nomeCliente||'', telefone:telefone||'',
+        equipamento:(p.descricao||''), descricao:`VENDA — ${p.codigo||''}`,
+        valor:parseFloat(preco)||0, origem:'venda',
+        criadoEm:now_v, movedAt:now_v, aguardandoDesde:null, history:[], analiseCompra:false
+      });
+      pipeDb.lastSync=now_v;
+      await _vps('reparoeletro_pipe',pipeDb);
+    } catch(epipe){ console.error('[vendas→pipe]', epipe.message); }
+
+    // ── Pipefy (best-effort) ─────────────────────────────────────────────
     try {
       const phaseReceber = await getReceberPhaseId();
-      if (!phaseReceber) return res.status(500).json({ ok:false, error:"Fase Receber não encontrada no Pipefy" });
-      // Título com todas as infos (fallback caso campos não existam)
-      const tituloCompleto = `VENDA — ${p.codigo || "—"} | ${p.tipo || "—"} ${p.descricao} | ${nomeCliente} | ${precoFmt} | ${vendedor} | ${modalidade}`;
-      const titulo = tituloCompleto.replace(/"/g,"'").slice(0, 255);
+      if (phaseReceber) {
+        const tituloCompleto = `VENDA — ${p.codigo || "—"} | ${p.tipo || "—"} ${p.descricao} | ${nomeCliente} | ${precoFmt} | ${vendedor} | ${modalidade}`;
+        const titulo = tituloCompleto.replace(/"/g,"'").slice(0, 255);
+        const mutation = `mutation { createCard(input: { pipe_id: "${PIPE_ID}" phase_id: "${phaseReceber}" title: "${titulo}" }) { card { id } } }`;
+        const data = await pipefyQuery(mutation);
+        pipefyCardId = data?.createCard?.card?.id || null;
+      }
+    } catch(e) { console.warn('[vendas] Pipefy best-effort falhou:', e.message); }
 
-      // Tenta criar o card — primeiro sem campos (garante criação)
-      const mutation = `mutation { createCard(input: { pipe_id: "${PIPE_ID}" phase_id: "${phaseReceber}" title: "${titulo}" }) { card { id } } }`;
-      const data = await pipefyQuery(mutation);
-      const cardId = data?.createCard?.card?.id;
-      if (!cardId) return res.status(500).json({ ok:false, error:"Pipefy não retornou ID do card", raw: JSON.stringify(data).slice(0,300) });
-      return res.status(200).json({ ok:true, pipefyCardId:cardId, textoAlmox });
-    } catch(e) {
-      return res.status(500).json({ ok:false, error:e.message });
-    }
+    return res.status(200).json({ ok:true, pipefyCardId, textoAlmox });
   }
 
   // ── POST excluir ───────────────────────────────────────────

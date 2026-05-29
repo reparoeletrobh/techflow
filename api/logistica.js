@@ -297,8 +297,12 @@ module.exports = async function handler(req, res) {
         defeito:     ficha.defeito || '',
         endereco:    ficha.endereco || ''
       });
-      if (!card?.id) return res.status(500).json({ ok: false, error: 'Pipefy nao retornou id', card });
-      ficha.pipefyCardId = String(card.id);
+      // Pipefy best-effort: continua mesmo sem card
+      if (!card?.id) {
+        console.warn('[log] Pipefy nao retornou id — salvando ficha sem pipefyCardId');
+      } else {
+        ficha.pipefyCardId = String(card.id);
+      }
       await dbSet(LOG_KEY, db);
       // Atualizar valor se tiver diagnóstico
       const precoFinal = ficha.diagnostico?.preco;

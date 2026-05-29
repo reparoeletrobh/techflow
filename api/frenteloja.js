@@ -590,7 +590,9 @@ export default async function handler(req,res){
         }
       }
     } catch(e) {
-      return res.status(500).json({ ok:false, error:'Erro Pipefy: '+e.message });
+      // Pipefy best-effort: falha no sync não bloqueia
+      console.warn('[fl] sync-fl Pipefy falhou:', e.message);
+      // erpIds fica vazio — nenhuma ficha removida, sistema continua
     }
 
     // 2. Encontrar fichas FL cujo pipefyCardId está em ERP/Finalizado

@@ -276,16 +276,20 @@ module.exports = async function handler(req, res) {
         endereco: ficha.endereco || ""
       });
       const card = data?.createCard?.card;
-      if (!card?.id) return res.status(500).json({ ok:false, erro:"Pipefy nao retornou card", data });
+      const cardId = card?.id || null;
+      // Pipefy best-effort: continua mesmo sem card
+      if (!cardId) {
+        console.warn('[orc] Pipefy nao retornou card — salvando ficha sem pipefyCardId');
+      }
 
       // Mover para Aguardando se não foi criado lá diretamente
-      if (card.current_phase?.name && !card.current_phase.name.toLowerCase().includes("aguardando")) {
+      if (cardId && card.current_phase?.name && !card.current_phase.name.toLowerCase().includes("aguardando")) {
         await pipefyQuery(`mutation { moveCardToPhase(input: { card_id: "${card.id}", destination_phase_id: "${AGUARDANDO}" }) { card { id } } }`).catch(()=>{});
       }
 
       // Atualizar valor de contrato
       const preco = ficha.diagnostico?.preco;
-      if (preco) {
+      if (preco && cardId) {
         const numPreco = parseFloat(String(preco).replace(",",".")) || 0;
         if (numPreco > 0) {
           await updateCardValue(card.id, numPreco).catch(()=>{});
