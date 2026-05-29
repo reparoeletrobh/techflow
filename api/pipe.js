@@ -316,6 +316,59 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, movidos });
   }
 
+
+  // ── GET debug-board: mostra cards do board que batem com um nome ──────────
+  if (action === 'debug-board') {
+    const busca = (req.query.q || '').toLowerCase();
+    const pipeDb  = (await dbGet(PIPE_KEY)) || defaultDB();
+    const boardDb = await dbGet('reparoeletro_board');
+    const pipeMatch  = (pipeDb.cards  || []).filter(c => (c.nomeContato||'').toLowerCase().includes(busca) || (c.id||'').toLowerCase().includes(busca));
+    const boardMatch = boardDb ? (boardDb.cards || []).filter(c => (c.nomeContato||c.title||'').toLowerCase().includes(busca) || (c.osCode||'').toLowerCase().includes(busca)) : [];
+    return res.status(200).json({
+      ok: true, busca,
+      pipe:  pipeMatch.map(c => ({ id:c.id, pipefyId:c.pipefyId, nome:c.nomeContato, fase:c.phase })),
+      board: boardMatch.map(c => ({ pipefyId:c.pipefyId, phaseId:c.phaseId, nome:c.nomeContato||c.title, osCode:c.osCode, localOnly:c.localOnly })),
+      boardTotal: boardDb ? (boardDb.cards||[]).length : 0
+    });
+  }
+
+  // ── POST force-board: força criação de card no board pelo id do Pipe ───────
+  if (req.method === 'POST' && action === 'force-board') {
+    const { pipeId } = req.body || {};
+    if (!pipeId) return res.status(400).json({ ok:false, error:'pipeId obrigatorio' });
+    const pipeDb  = (await dbGet(PIPE_KEY)) || defaultDB();
+    const card    = (pipeDb.cards || []).find(c => c.id === pipeId);
+    if (!card) return res.status(404).json({ ok:false, error:'Card nao encontrado no Pipe: '+pipeId });
+    const boardDb = (await dbGet('reparoeletro_board')) || { cards:[], syncedIds:[], movesLog:[], metaLog:[], phases:[], rsPhases:[], rsRuaPhases:[], rsCards:[], rsRuaCards:[] };
+    if (!Array.isArray(boardDb.cards)) boardDb.cards = [];
+    const boardPid = card.pipefyId ? String(card.pipefyId) : ('LOCAL-'+card.id);
+    // Remover entrada antiga se existir
+    boardDb.cards = boardDb.cards.filter(c => c.pipefyId !== boardPid && c.osCode !== card.id);
+    const now = new Date().toISOString();
+    const novoCard = {
+      pipefyId:    boardPid,
+      phaseId:     'producao',
+      nomeContato: card.nomeContato || '',
+      title:       card.descricao || card.nomeContato || '',
+      telefone:    card.telefone || '',
+      descricao:   card.equipamento || card.descricao || '',
+      osCode:      card.id,
+      valor:       card.valor || 0,
+      movedBy:     'Pipe ADM',
+      flFichaId:   null,
+      localOnly:   !card.pipefyId,
+      syncedAt:    now,
+      movedAt:     now
+    };
+    boardDb.cards.unshift(novoCard);
+    if (!boardDb.syncedIds) boardDb.syncedIds = [];
+    if (!boardDb.syncedIds.includes(boardPid)) boardDb.syncedIds.push(boardPid);
+    if (!boardDb.movesLog) boardDb.movesLog = [];
+    boardDb.movesLog.push({ phaseId:'aprovado_entrada', pipefyId:boardPid, timestamp:now });
+    await dbSet('reparoeletro_board', boardDb);
+    return res.status(200).json({ ok:true, card:novoCard, boardTotal:boardDb.cards.length });
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
