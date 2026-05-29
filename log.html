@@ -74,6 +74,11 @@ tr.warn td{border-left:2px solid var(--o);padding-left:8px;}
 </head>
 <body>
 
+<div id="diag-banner" style="background:#f5c800;color:#000;padding:8px 20px;font-family:monospace;font-size:12px;font-weight:bold;">
+  ✅ LOG.HTML CARREGADO — <span id="diag-time"></span>
+  <button onclick="document.getElementById('diag-banner').style.display='none'" style="margin-left:10px;background:#000;color:#f5c800;border:none;padding:2px 8px;cursor:pointer;">✕</button>
+</div>
+<script>document.getElementById('diag-time').textContent=new Date().toLocaleTimeString('pt-BR',{timeZone:'America/Sao_Paulo'});</script>
 <div class="log-header">
   <div class="logo">Reparo<span>Eletro</span><em>📋 Log do Sistema</em></div>
   <div class="hdr-r">
