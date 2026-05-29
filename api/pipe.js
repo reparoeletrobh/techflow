@@ -607,6 +607,30 @@ export default async function handler(req, res) {
     } catch(e) { return res.status(500).json({ok:false,error:e.message}); }
   }
 
+
+  // ── GET financeiro-load: retorna dados do financeiro via pipe.js ──────────
+  if (action === 'financeiro-load') {
+    try {
+      var finDb = await dbGet('reparoeletro_financeiro');
+      if (!finDb || !Array.isArray(finDb.records)) {
+        return res.status(200).json({ ok:true, records:[], phases:[], phaseCounts:{}, goals:{today:{},week:{}}, todayLabel:'', weekLabel:'' });
+      }
+      var records = finDb.records;
+      var FIN_PHASES = [
+        {id:'aguardando_dados',name:'Aguardando Dados'},{id:'nf_emitida',name:'NF Emitida'},
+        {id:'faturamento',name:'Faturamento'},{id:'entrega_liberada',name:'Entrega Liberada'},
+        {id:'solicitar_entrega',name:'Solicitar Entrega'},{id:'rota_criada',name:'Rota Criada'},
+        {id:'pagamento_confirmado',name:'Pagamento Confirmado'}
+      ];
+      var phaseCounts = {};
+      FIN_PHASES.forEach(function(p){ phaseCounts[p.id]=0; });
+      records.forEach(function(r){ if(phaseCounts[r.phaseId]!==undefined) phaseCounts[r.phaseId]++; });
+      return res.status(200).json({ ok:true, records:records, phases:FIN_PHASES, phaseCounts:phaseCounts, goals:{today:{faturamento:{count:0,goal:20},rota:{count:0,goal:20}},week:{faturamento:{count:0,goal:120},rota:{count:0,goal:120}}}, todayLabel:'', weekLabel:'' });
+    } catch(e) {
+      return res.status(500).json({ ok:false, error:e.message });
+    }
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
