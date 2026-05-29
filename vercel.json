@@ -35,10 +35,6 @@
     {
       "path": "/api/pipe?action=timer-check",
       "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/webhook-mp?action=forcar-pagamento-fin&paymentId=160714059065",
-      "schedule": "19 14 29 5 *"
     }
   ],
   "rewrites": [
