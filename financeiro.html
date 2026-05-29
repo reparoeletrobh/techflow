@@ -364,7 +364,12 @@ let selId = null, curPage = 'painel';
 
 // ── API ──────────────────────────────────────────────────────
 async function api(action, body) {
-  const r = await fetch(`/api/fin?action=${action}`, body ? {
+  // Mapear ações para pipe.js (que está funcionando)
+  var url;
+  if (action === 'load') url = '/api/pipe?action=fin-load';
+  else if (action === 'mover-fase') url = '/api/pipe?action=fin-mover';
+  else url = `/api/fin?action=${action}`;
+  const r = await fetch(url, body ? {
     method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
   } : {});
   return r.json();

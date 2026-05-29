@@ -581,6 +581,35 @@ export default async function handler(req, res) {
     }
   }
 
+
+  // ══ FINANCEIRO via pipe.js (bypass de financeiro.js quebrado) ══════════════
+
+  if (action === 'fin-load') {
+    try {
+      var fin = await dbGet('reparoeletro_financeiro');
+      if (!fin || !Array.isArray(fin.records)) fin = { records:[] };
+      var FP = [{id:'aguardando_dados',name:'Aguardando Dados'},{id:'nf_emitida',name:'NF Emitida'},{id:'faturamento',name:'Faturamento'},{id:'entrega_liberada',name:'Entrega Liberada'},{id:'solicitar_entrega',name:'Solicitar Entrega'},{id:'rota_criada',name:'Rota Criada'},{id:'pagamento_confirmado',name:'Pagamento Confirmado'}];
+      var pc={}; FP.forEach(function(p){pc[p.id]=0;});
+      fin.records.forEach(function(r){if(pc[r.phaseId]!==undefined)pc[r.phaseId]++;});
+      return res.status(200).json({ok:true,records:fin.records,phases:FP,phaseCounts:pc,goals:{today:{faturamento:{count:0,goal:20},rota:{count:0,goal:20}},week:{faturamento:{count:0,goal:120},rota:{count:0,goal:120}}},todayLabel:'',weekLabel:''});
+    } catch(e){return res.status(500).json({ok:false,error:e.message});}
+  }
+
+  if (action === 'fin-mover' && req.method === 'POST') {
+    try {
+      var body = req.body || {};
+      var fin = await dbGet('reparoeletro_financeiro');
+      if (!fin || !Array.isArray(fin.records)) return res.status(404).json({ok:false,error:'financeiro vazio'});
+      var rec = fin.records.find(function(r){return r.id===body.id;});
+      if (!rec) return res.status(404).json({ok:false,error:'ficha nao encontrada'});
+      rec.history=(rec.history||[]).concat([{phaseId:rec.phaseId,ts:now}]);
+      rec.phaseId=body.phaseId; rec.movedAt=now;
+      if(body.valor!==undefined) rec.valor=parseFloat(body.valor)||0;
+      await dbSet('reparoeletro_financeiro',fin);
+      return res.status(200).json({ok:true,record:rec,pipefyMoveOk:false});
+    } catch(e){return res.status(500).json({ok:false,error:e.message});}
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
