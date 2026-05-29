@@ -1169,7 +1169,7 @@ export default async function handler(req, res) {
 
     // ── Gatilhos downstream ──────────────────────────────────────────────
     var pid = card.pipefyId;
-    // Aprovados → Board Técnico (producao ou cliente_loja)
+    // Aprovados → Board Técnico (fase: aprovado)
     if (phase === 'aprovados') {
       try {
         var boardPid = pid ? String(pid) : ('LOCAL-' + card.id);
@@ -1193,7 +1193,7 @@ export default async function handler(req, res) {
         // Sempre inserir/recriar o card
         boardDb2.cards.unshift({
           pipefyId:    boardPid,
-          phaseId:     'producao',
+          phaseId:     'aprovado',
           nomeContato: card.nomeContato || '',
           title:       card.descricao   || card.nomeContato || '',
           telefone:    card.telefone    || '',

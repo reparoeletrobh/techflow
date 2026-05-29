@@ -142,7 +142,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   <div class="stat-pill"><span class="stat-lbl">Vídeo Enviado</span>&nbsp;<span class="stat-val" id="st-video" style="color:var(--purple)">—</span></div>
   <div class="stat-pill"><span class="stat-lbl">Receber</span>&nbsp;<span class="stat-val" id="st-receber" style="color:var(--green)">—</span></div>
   <div class="stat-pill" style="border-left:2px solid #22c55e;padding-left:10px;">
-    <span class="stat-lbl">ERP</span>&nbsp;
+    <span class="stat-lbl" title="Dados do Pipe ADM local — não do Pipefy">ERP</span>&nbsp;
     <span class="stat-val" id="st-erp" style="color:var(--green)">—</span>
     <span class="stat-lbl" style="margin-left:6px;">fichas</span>
     <span style="margin:0 5px;color:#333;">|</span>
@@ -296,7 +296,7 @@ function render(){
           '<select class="move-sel" onchange="moverCard(\''+c.id+'\',this.value);this.value=\'\'" >'+
             '<option value="">↕ Mover para…</option>'+opts+
           '</select>'+
-          '<button class="cbtn cbtn-outline" onclick="toggleDados(\''+c.id+'\')">📋 Ver dados</button>'+
+          '<button class="cbtn cbtn-outline" onclick="abrirDadosPipe(\''+c.id+'\')">👁 Ver Dados</button>'+
           '<button class="cbtn cbtn-outline" onclick="abrirEditarPipe(\''+c.id+'\')">✏️</button>'+
           '<button class="cbtn cbtn-blue'+(c.analiseCompra?' active':'')+'" onclick="toggleAC(\''+c.id+'\')" title="Marcar Análise de Compra">🛒</button>'+
           '<button class="cbtn cbtn-red" onclick="excluir(\''+c.id+'\')">✕</button>'+
@@ -710,5 +710,44 @@ async function salvarEditarPipe() {
 
 <button class="scroll-float left"  onclick="scrollBoard(-1)" title="← Coluna anterior">◀</button>
 <button class="scroll-float right" onclick="scrollBoard(1)"  title="→ Próxima coluna">▶</button>
+
+<!-- Modal Ver Dados -->
+<div id="ov-pipe-dados" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px);" onclick="if(event.target===this)fecharDadosPipe()">
+  <div style="background:#111;border:1px solid #222;border-radius:14px;padding:0;width:460px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 12px 48px rgba(0,0,0,.7);">
+    <div style="padding:18px 20px 14px;border-bottom:1px solid #1e1e1e;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#111;z-index:1;">
+      <div>
+        <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:#e8e8e8;">📋 Dados da Ficha</div>
+        <div id="pipe-d-id" style="font-family:'DM Mono',monospace;font-size:9px;color:#555;margin-top:2px;"></div>
+      </div>
+      <button onclick="fecharDadosPipe()" style="background:none;border:none;color:#555;font-size:18px;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:12px;">
+      <style>
+        .pd-row{display:flex;flex-direction:column;gap:4px;}
+        .pd-lbl{font-family:'DM Mono',monospace;font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.05em;}
+        .pd-val{background:#0a0a0a;border:1px solid #1e1e1e;border-radius:6px;padding:8px 10px;color:#e8e8e8;font-size:12px;font-family:'Inter',sans-serif;width:100%;box-sizing:border-box;}
+        .pd-val:focus{border-color:#f5c800;outline:none;}
+        .pd-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+      </style>
+      <div class="pd-row"><span class="pd-lbl">Nome do Cliente</span><input id="pd-nome" class="pd-val"></div>
+      <div class="pd-grid">
+        <div class="pd-row"><span class="pd-lbl">Telefone</span><input id="pd-tel" class="pd-val"></div>
+        <div class="pd-row"><span class="pd-lbl">CPF / CNPJ</span><input id="pd-cpf" class="pd-val"></div>
+      </div>
+      <div class="pd-grid">
+        <div class="pd-row"><span class="pd-lbl">Equipamento</span><input id="pd-equip" class="pd-val"></div>
+        <div class="pd-row"><span class="pd-lbl">Valor (R$)</span><input id="pd-valor" class="pd-val" type="number"></div>
+      </div>
+      <div class="pd-row"><span class="pd-lbl">Defeito / Descrição</span><input id="pd-desc" class="pd-val"></div>
+      <div class="pd-row"><span class="pd-lbl">Endereço</span><input id="pd-end" class="pd-val"></div>
+      <div class="pd-row"><span class="pd-lbl">Serviços / Observações</span><textarea id="pd-serv" class="pd-val" rows="2" style="resize:vertical;"></textarea></div>
+      <div id="pipe-d-msg" style="display:none;padding:8px 12px;border-radius:6px;font-family:'DM Mono',monospace;font-size:11px;"></div>
+    </div>
+    <div style="padding:14px 20px 20px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid #1e1e1e;">
+      <button onclick="fecharDadosPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;border:1px solid #333;background:transparent;color:#666;cursor:pointer;">Fechar</button>
+      <button onclick="salvarDadosPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;border:none;background:#f5c800;color:#000;font-weight:700;cursor:pointer;">💾 Salvar</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
