@@ -493,6 +493,13 @@ document.addEventListener('DOMContentLoaded', function(){
 var ckP = null;
 function openCheckout(productId){
   ckP = PROD.find(function(x){return String(x.id)===String(productId);}); if(!ckP) return;
+  // Mobile: redirecionar para página dedicada (sem popup)
+  if(window.innerWidth <= 768){
+    try{ localStorage.setItem('re_produto_pendente', JSON.stringify(Object.assign({},ckP,{_origem:'barra'}))); }catch(e){}
+    window.location.href = '/produto?id=' + productId + '&origem=barra';
+    return;
+  }
+  // Desktop: abrir popup normalmente
   document.getElementById('co-imgs').innerHTML = '<img class="main-img" src="'+ckP.fotos[0]+'" alt="'+ckP.nome+'" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" onclick="openLightbox('+ckP.id+',0)">';
   document.getElementById('co-name').textContent = ckP.nome;
   document.getElementById('co-price').textContent = R(ckP.preco);

@@ -1053,6 +1053,8 @@ export default async function handler(req, res) {
 
   // ── load ──────────────────────────────────────────────────────────────────
   if (action === 'load') {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
     return res.status(200).json({ ok: true, cards: db.cards || [], phases: PHASES, lastSync: db.lastSync });
   }
