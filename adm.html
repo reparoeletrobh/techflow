@@ -185,8 +185,8 @@ html,body{height:100vh;overflow:hidden;background:var(--bg);color:var(--text);fo
 .lb-err{background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.2);}
 .lb-wrn{background:rgba(249,115,22,.1);color:#f97316;border:1px solid rgba(249,115,22,.2);}
 .log-empty{text-align:center;padding:40px;color:var(--muted);font-family:var(--fm);font-size:11px;}
-.log-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:599;display:none;}
-.log-overlay.open{display:block;}
+.log-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:599;display:none;pointer-events:none;}
+.log-overlay.open{display:block;pointer-events:auto;}
 </style>
 </head>
 <body>
@@ -302,9 +302,7 @@ html,body{height:100vh;overflow:hidden;background:var(--bg);color:var(--text);fo
         <span class="nav-icon">📦</span>
         <span class="nav-label">Ag. Retirada</span>
       </div>
-      <div class="nav-item" data-url="/log" data-label="Log" style="--item-color:#888" onclick="openPage(this)">
-        <span class="nav-icon">📋</span><span class="nav-label">Log</span>
-      </div>
+      
     </div>
 
     <div class="nav-item" onclick="abrirLog()" style="--item-color:#888;border-top:1px solid var(--border);margin-top:4px;">
