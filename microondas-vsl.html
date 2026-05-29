@@ -85,9 +85,9 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
 .lightbox-thumb.active{border-color:var(--gold)}
 .lightbox-thumb img{width:100%;height:100%;object-fit:cover}
 .lightbox-caption{font-family:var(--fh);font-size:18px;font-weight:700;color:var(--text);text-align:center}
-.checkout-overlay{display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.88);align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px}
+.checkout-overlay{display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.88);align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px 12px}
 .checkout-overlay.open{display:flex}
-.checkout-modal{background:var(--bg3);border:1px solid rgba(201,178,152,0.15);border-radius:18px;width:100%;max-width:860px;overflow:hidden;display:grid;grid-template-columns:1fr 1fr}
+.checkout-modal{background:var(--bg3);border:1px solid rgba(201,178,152,0.15);border-radius:18px;width:100%;max-width:860px;overflow:visible;display:grid;grid-template-columns:1fr 1fr}
 @media(max-width:680px){.checkout-modal{grid-template-columns:1fr}}
 .checkout-product{padding:32px;border-right:1px solid rgba(201,178,152,0.1)}
 @media(max-width:680px){.checkout-product{border-right:none;border-bottom:1px solid rgba(201,178,152,.1)}}
@@ -195,6 +195,17 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
   .cart-strip{height:56px;padding:0 14px;gap:8px;}
   .cs-del{font-size:11px;}
   .cs-btn{padding:0 14px;height:38px;font-size:12px;}
+}
+
+@media(max-width:680px){
+  .checkout-overlay{padding:12px 8px;}
+  .checkout-modal{border-radius:12px;overflow:visible;}
+  .checkout-form-side{padding:20px 16px;}
+  .checkout-product{padding:20px 16px;}
+  .checkout-form-side h2{font-size:16px;margin-bottom:16px;}
+  .checkout-price-big{font-size:24px;}
+  .btn-checkout-submit{padding:16px;font-size:15px;position:sticky;bottom:0;}
+  .form-group input,.form-group select{font-size:16px;} /* evita zoom no iOS */
 }
 </style>
 <!-- Vturb speed optimization -->
