@@ -213,14 +213,14 @@ async function criarPreferenciaMp({ rec, metodo }) {
   const body = {
     items: [{
       id:          rec.id,
-      title:       "OS " + rec.id + " — " + (rec.nome || "Cliente"),
+      title:       "OS " + rec.id + " — " + (rec.nomeContato || rec.title || "Cliente"),
       description: (rec.equipamento || "") + (rec.descricao ? " | " + rec.descricao : ""),
       quantity:    1,
       unit_price:  valor,
       currency_id: "BRL"
     }],
     payer: {
-      name:  rec.nome  || "Cliente",
+      name:  rec.nomeContato || rec.title || "Cliente",
       email: rec.email || "cliente@reparoeletrobh.com.br",
       ...(rec.cpfCnpj ? { identification: {
         type:   rec.cpfCnpj.replace(/\D/g,"").length <= 11 ? "CPF" : "CNPJ",
@@ -243,7 +243,7 @@ async function criarPreferenciaMp({ rec, metodo }) {
       fichaId:   rec.id,
       pipefyId:  rec.pipefyId || "",
       metodo:    metodo,
-      cliente:   rec.nome || "",
+      cliente:   rec.nomeContato || rec.title || "",
       valor:     String(valor)
     },
     back_urls: {
@@ -448,7 +448,7 @@ module.exports = async function handler(req, res) {
       await salvarConciliacao({
         tipo:         "link_gerado",
         fichaId:      rec.id,
-        cliente:      rec.nome  || "",
+        cliente:      rec.nomeContato || rec.title || "",
         cpfCnpj:      rec.cpfCnpj || "",
         valor:        parseFloat(rec.valor||rec.total||0),
         metodo,
@@ -482,7 +482,7 @@ module.exports = async function handler(req, res) {
         const concilRec = concil.transacoes.find(t => t.preferenceId === r.mp.preferenceId && t.tipo === "pagamento_confirmado");
         return {
           fichaId:       r.id,
-          cliente:       r.nome    || "",
+          cliente: r.nomeContato || r.title || "",
           cpfCnpj:       r.cpfCnpj || "",
           valor:         parseFloat(r.valor || r.total || 0),
           metodo:        r.mp.metodo,

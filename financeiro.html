@@ -1315,6 +1315,8 @@ async function renderLinksMP() {
       return '<tr style="border-bottom:1px solid var(--border);">' +
         '<td style="padding:9px 10px;font-size:11px;font-weight:600;">'+l.fichaId+'</td>' +
         '<td style="padding:9px 10px;font-size:11px;">'+l.cliente+'</td>' +
+        '<td style="padding:9px 10px;font-size:10px;color:var(--muted);">'+(l.telefone||'—')+'</td>' +
+        '<td style="padding:9px 10px;font-size:10px;color:var(--muted);">'+(l.cpfCnpj||'—')+'</td>' +
         '<td style="padding:9px 10px;font-size:11px;font-family:var(--fh);color:#22c55e;">R$ '+l.valor.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</td>' +
         '<td style="padding:9px 10px;font-size:11px;">'+metodo+'</td>' +
         '<td style="padding:9px 10px;">'+statusHtml+agend+'</td>' +
@@ -1324,7 +1326,7 @@ async function renderLinksMP() {
       '</tr>';
     }).join('');
 
-    var heads = ['Ficha','Cliente','Valor','Método','Status','Gerado em','Pago em','Link'];
+    var heads = ['Ficha','Cliente','Telefone','CPF/CNPJ','Valor','Método','Status','Gerado em','Pago em','Link'];
     tbl.innerHTML = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border);">' +
       '<table style="width:100%;border-collapse:collapse;">' +
       '<thead><tr style="background:var(--surface);border-bottom:1px solid var(--border);">' +

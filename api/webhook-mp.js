@@ -145,8 +145,9 @@ async function salvarConciliacaoFin({ rec, pmt, metodo, valor, now, status, pipe
     db.transacoes.unshift({
       tipo:         "pagamento_confirmado",
       fichaId:      rec.id,
-      cliente:      rec.nome    || "",
+      cliente: rec.nomeContato || rec.title || "",
       cpfCnpj:      rec.cpfCnpj || "",
+    telefone:     rec.telefone  || "",
       valor:        parseFloat(valor||0),
       metodo:       metodo      || pmt.payment_method_id,
       parcelas:     pmt.installments || 1,
@@ -611,7 +612,10 @@ export default async function handler(req, res) {
       const mpRes   = await fetch(mpUrl, { headers:{ Authorization:`Bearer ${MP_TOKEN}` } });
       const mpData  = await mpRes.json();
       for (const pmt of (mpData.results||[])) {
-        if (pmt.metadata?.origem !== "financeiro") continue;
+        // Verificar se é pagamento financeiro por preference_id OU metadata.origem
+        const isFinanceiro = pmt.metadata?.origem === "financeiro" ||
+          ((finDb?.records||[]).some(r => r.mp?.preferenceId === pmt.preference_id));
+        if (!isFinanceiro) continue;
         if (await jaProcessado(String(pmt.id))) continue;
         await marcarProcessado(String(pmt.id));
         const r = await processarPagamentoFinanceiro(pmt);
