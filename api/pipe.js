@@ -581,6 +581,32 @@ export default async function handler(req, res) {
     }
   }
 
+
+  // ── GET diag-financeiro: mostra estrutura do financeiro no Redis ─────────
+  if (action === 'diag-financeiro') {
+    try {
+      var U5=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+      var T5=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+      async function _rd(k){
+        var r=await fetch(U5+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T5,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});
+        var j=await r.json(); var v=j[0]?.result;
+        if(!v) return {existe:false,raw:null};
+        // Tentar single parse
+        try {
+          var val1=JSON.parse(v);
+          if(typeof val1==='string'){
+            var val2=JSON.parse(val1);
+            return {existe:true,parse:'double',tipo:typeof val2,keys:val2&&typeof val2==='object'?Object.keys(val2):null,records:val2?.records?.length??'sem records'};
+          }
+          return {existe:true,parse:'single',tipo:typeof val1,keys:val1&&typeof val1==='object'?Object.keys(val1):null,records:val1?.records?.length??'sem records'};
+        } catch(e) { return {existe:true,parseError:e.message,rawLen:v.length}; }
+      }
+      var fin = await _rd('reparoeletro_financeiro');
+      var bak = await _rd('reparoeletro_financeiro_backup');
+      return res.status(200).json({ ok:true, financeiro:fin, backup:bak });
+    } catch(e) { return res.status(500).json({ok:false,error:e.message}); }
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
