@@ -21,6 +21,9 @@ const PHASES = [
 // Mapeamento: keyword do nome da fase no Pipefy → ID local
 const FASES_ESPELHO = {
   aguardando_aprovacao: ['aguardando aprovação','aguardando aprovacao','aguardando aprov'],
+  aprovados:            ['aprovado'],
+  video_enviado:        ['video enviado','vídeo enviado'],
+  analise_compra:       ['analise de compra','análise de compra'],
   programar_entrega:    ['programar entrega'],
   solicitar_entrega:    ['solicitar entrega'],
   entrega_solicitada:   ['entrega solicitada'],
@@ -239,6 +242,9 @@ export default async function handler(req, res) {
         hasMore = pageInfo.hasNextPage || false;
         cursor  = pageInfo.endCursor   || null;
       }
+      // Salvar após cada fase — se timeout ocorrer, resultado parcial é preservado
+      db.lastSync = new Date().toISOString();
+      await dbSet(PIPE_KEY, db);
     }
 
     db.lastSync = new Date().toISOString();

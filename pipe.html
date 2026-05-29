@@ -242,12 +242,19 @@ async function excluir(id){
 async function syncPipefy(){
   const btn=document.getElementById('btn-sync');
   btn.textContent='⟳ Sincronizando...';btn.disabled=true;
-  const r=await api('sync-pipefy');
-  btn.textContent='⟳ Sincronizar Pipefy';btn.disabled=false;
-  if(r.ok){
-    toast(`✅ ${r.added} fichas importadas, ${r.skipped} já existiam`);
+  try {
+    const r=await api('sync-pipefy');
+    btn.textContent='⟳ Sincronizar Pipefy';btn.disabled=false;
+    if(r.ok){
+      toast('✅ '+r.added+' fichas importadas, '+r.skipped+' já existiam');
+      await load();
+    } else toast(r.error||'Erro na sync',false);
+  } catch(e) {
+    btn.textContent='⟳ Sincronizar Pipefy';btn.disabled=false;
+    // Mesmo em timeout, recarregar — pode ter salvado parcialmente
+    toast('⚠️ Sync pode ter salvado parcialmente — recarregando...',false);
     await load();
-  } else toast(r.error||'Erro na sync',false);
+  }
 }
 
 // ── Modal Nova Ficha ──────────────────────────────────────────────────────────
