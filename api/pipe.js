@@ -485,6 +485,33 @@ export default async function handler(req, res) {
     }
   }
 
+
+  // ── GET restaurar-financeiro: restaura do backup ────────────────────────
+  if (action === 'restaurar-financeiro') {
+    try {
+      var U4=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+      var T4=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+      async function _r4(k){var r=await fetch(U4+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T4,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});var j=await r.json();var v=j[0]?.result;if(!v)return null;try{var val=JSON.parse(v);if(typeof val==='string')val=JSON.parse(val);return(val&&typeof val==='object')?val:null;}catch(e){return null;}}
+      async function _s4(k,v){await fetch(U4+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T4,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+
+      var backup = await _r4('reparoeletro_financeiro_backup');
+      if (!backup || !Array.isArray(backup.records)) {
+        return res.status(404).json({ ok:false, error:'Backup não encontrado ou inválido', backup });
+      }
+      // Remover campo de controle do backup antes de restaurar
+      delete backup.backedUpAt;
+      await _s4('reparoeletro_financeiro', backup);
+      return res.status(200).json({
+        ok: true,
+        restaurados: backup.records.length,
+        backedUpAt: backup.backedUpAt || 'desconhecido',
+        info: 'Financeiro restaurado do backup com sucesso'
+      });
+    } catch(e) {
+      return res.status(500).json({ ok:false, error: e.message });
+    }
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
