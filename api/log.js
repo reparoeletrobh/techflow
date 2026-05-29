@@ -77,5 +77,28 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, info: 'Log limpo' });
   }
 
+
+  // ── GET seed-log: popula com 10 entradas de exemplo ─────────────────────
+  if (action === 'seed') {
+    const now = Date.now();
+    const seeds = [
+      { ts: new Date(now - 1*60*1000).toISOString(),  modulo:'Pipe ADM',     fichaId:'PIPE-0018', ficha:'Ernesto 1212',     acao:'Mover ficha',             de:'aguardando_aprovacao', para:'aprovados',            gatilho:'→ Board Técnico (producao)', status:'ok',   detalhe:'Card criado em Produção no Board' },
+      { ts: new Date(now - 5*60*1000).toISOString(),  modulo:'Pipe ADM',     fichaId:'PIPE-0018', ficha:'Ernesto 1212',     acao:'Mover ficha',             de:'',                     para:'aguardando_aprovacao', gatilho:'Timer 48h iniciado',         status:'ok',   detalhe:'' },
+      { ts: new Date(now - 12*60*1000).toISOString(), modulo:'Balcão',       fichaId:'1358378287',ficha:'Miguel 1599',      acao:'Confirmar pagamento',     de:'',                     para:'erp',                  gatilho:'→ Pipe ERP + Pipefy ERP',    status:'ok',   detalhe:'' },
+      { ts: new Date(now - 18*60*1000).toISOString(), modulo:'Frente de Loja',fichaId:'FL-0207',  ficha:'Miguel 1599',      acao:'Liberar equipamento',     de:'producao',             para:'receber',              gatilho:'→ Pipe receber + Pipefy Receber$', status:'ok', detalhe:'Valor: R$240 pix' },
+      { ts: new Date(now - 25*60*1000).toISOString(), modulo:'Financeiro',   fichaId:'FL-0205',   ficha:'Cláudio 5813',     acao:'Confirmar pagamento',     de:'faturamento',          para:'solicitar_entrega',    gatilho:'→ Pipe solicitar_entrega + Pipefy Solicitar Entrega', status:'ok', detalhe:'Valor: R$300' },
+      { ts: new Date(now - 34*60*1000).toISOString(), modulo:'Pipe ADM',     fichaId:'PIPE-0022', ficha:'Beatriz 1911',     acao:'Mover ficha',             de:'solicitar_entrega',    para:'entrega_solicitada',   gatilho:'',                           status:'ok',   detalhe:'' },
+      { ts: new Date(now - 41*60*1000).toISOString(), modulo:'Orçamento',    fichaId:'1357550324',ficha:'Maria Aparecida',  acao:'Aprovação de orçamento',  de:'',                     para:'aprovados',            gatilho:'→ Pipe aguardando_aprovacao', status:'ok',   detalhe:'Valor: R$350' },
+      { ts: new Date(now - 53*60*1000).toISOString(), modulo:'Logística',    fichaId:'LOG-0089',  ficha:'Glaydson 2737',    acao:'Gerar orçamento',         de:'',                     para:'aguardando_aprovacao', gatilho:'→ Pipe aguardando_aprovacao + Orçamento', status:'ok', detalhe:'Valor: R$490' },
+      { ts: new Date(now - 67*60*1000).toISOString(), modulo:'Pipe ADM',     fichaId:'PIPE-0021', ficha:'Ariane 0410',      acao:'Mover ficha',             de:'programar_entrega',    para:'solicitar_entrega',    gatilho:'',                           status:'ok',   detalhe:'' },
+      { ts: new Date(now - 82*60*1000).toISOString(), modulo:'Vendas',       fichaId:'',          ficha:'Yuri José',        acao:'Registrar venda',         de:'',                     para:'receber',              gatilho:'→ Pipe receber',             status:'ok',   detalhe:'ELECTROLUX ms37r R$350' },
+    ];
+    const log = await logGet();
+    seeds.forEach(function(s){ log.unshift(s); });
+    if (log.length > MAX_ENTRIES) log.splice(MAX_ENTRIES);
+    await logSet(log);
+    return res.status(200).json({ ok: true, inseridas: seeds.length, total: log.length });
+  }
+
   return res.status(404).json({ ok: false, error: 'acao nao encontrada' });
 }
