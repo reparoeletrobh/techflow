@@ -148,6 +148,24 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok:true });
   }
 
+
+  // ── GET debug-pipefy: retorna fases reais do Pipefy ─────────────────────
+  if (action === 'debug-pipefy') {
+    if (!PIPEFY_TOKEN) return res.status(200).json({ ok:false, error:'sem PIPEFY_TOKEN' });
+    try {
+      const data = await pipefyQ(`query { pipe(id:"${PIPE_ID}") { phases { id name } } }`);
+      const fases = (data?.pipe?.phases||[]).map(p => ({
+        id: p.id,
+        name: p.name,
+        lower: p.name.toLowerCase(),
+        mapeada: detectPhase(p.name) || '—'
+      }));
+      return res.status(200).json({ ok:true, total:fases.length, fases });
+    } catch(e) {
+      return res.status(500).json({ ok:false, error: e.message });
+    }
+  }
+
   // ── GET sync-pipefy ───────────────────────────────────────────────────────
   if (action === 'sync-pipefy') {
     if (!PIPEFY_TOKEN) return res.status(400).json({ ok:false, error:'PIPEFY_TOKEN não configurado' });
