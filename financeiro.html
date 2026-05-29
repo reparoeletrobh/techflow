@@ -364,9 +364,7 @@ let selId = null, curPage = 'painel';
 
 // ── API ──────────────────────────────────────────────────────
 async function api(action, body) {
-  // Para load, usar pipe.js (mais estável); para outros, usar financeiro.js normalmente
-  var finUrl = action === 'load' ? '/api/pipe?action=financeiro-load' : `/api/financeiro?action=${action}`;
-  const r = await fetch(finUrl, body ? {
+  const r = await fetch(`/api/financeiro?action=${action}`, body ? {
     method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
   } : {});
   return r.json();
