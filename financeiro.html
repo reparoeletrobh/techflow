@@ -383,8 +383,9 @@ async function load() {
     if (curPage === 'painel') renderPainel();
     else renderKanban();
   } catch(e) {
-    document.getElementById('painel-content').innerHTML =
-      `<div style="color:#ef4444;font-family:var(--fm);font-size:12px;">Erro: ${e.message}</div>`;
+    console.error('[fin-load]', e);
+    const cont = document.getElementById('painel-content') || document.getElementById('kanban-board') || document.body;
+    if (cont) cont.innerHTML = `<div style="color:#ef4444;font-family:monospace;font-size:12px;padding:20px;">Erro: ${e.message}<br><small>${e.stack||''}</small></div>`;
   }
 }
 
@@ -1118,7 +1119,7 @@ async function moverFicha(id, fase) {
 }
 
 // ── INIT ──────────────────────────────────────────────────────
-load();
+document.addEventListener("DOMContentLoaded", function(){ load(); });
 showPage('kanban'); // abre em Fichas por padrão
 syncPipefy();
 setInterval(()=>{ load(); syncPipefy(); }, 30000);
