@@ -284,6 +284,31 @@ module.exports = async function handler(req, res) {
       }
     } catch(e) { console.error("Pipefy Receber card:", e.message); }
 
+    // ── Pipe ADM: criar card em Receber ────────────────────────────────────
+    try {
+      const UV2=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+      const TV2=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+      async function _vg2(k){const r=await fetch(UV2+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+TV2,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();const v=j[0]?.result;if(!v)return null;try{let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+      async function _vs2(k,v){await fetch(UV2+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+TV2,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+      const pdb2=(await _vg2('reparoeletro_pipe'))||{cards:[],syncedPipefyIds:[],lastSync:null};
+      if(!Array.isArray(pdb2.cards))pdb2.cards=[];
+      const nowV=new Date().toISOString();
+      pdb2.cards.unshift({
+        id:'PIPE-'+String(pdb2.cards.length+1).padStart(4,'0'),
+        pipefyId: pipefyReceberCardId||null,
+        phase:'receber',
+        nomeContato: nomeCliente||'',
+        telefone: (req.body.telefone||''),
+        equipamento: p.descricao||'',
+        descricao: 'VENDA — '+(p.codigo||''),
+        valor: parseFloat(p.preco)||0,
+        origem:'venda', criadoEm:nowV, movedAt:nowV,
+        aguardandoDesde:null, history:[], analiseCompra:false
+      });
+      pdb2.lastSync=nowV;
+      await _vs2('reparoeletro_pipe',pdb2);
+    } catch(ev2){ console.error('[venda→pipe]',ev2.message); }
+
     return res.status(200).json({
       ok: true, ficha,
       produto: db.produtos[idx],
