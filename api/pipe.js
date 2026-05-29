@@ -638,6 +638,35 @@ export default async function handler(req, res) {
     } catch(e){return res.status(500).json({ok:false,error:e.message});}
   }
 
+
+  // ── GET mover-fin: move registro do financeiro para fase correta ──────────
+  if (action === 'mover-fin') {
+    var id      = req.query.id      || '';
+    var fase    = req.query.fase    || 'aguardando_dados';
+    var busca   = req.query.busca   || '';
+    try {
+      var U7=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+      var T7=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+      async function _g7(k){var r=await fetch(U7+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T7,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});var j=await r.json();var v=j[0]?.result;if(!v)return null;try{var x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+      async function _s7(k,v){await fetch(U7+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T7,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+      var fin=await _g7('reparoeletro_financeiro');
+      if(!fin||!Array.isArray(fin.records))return res.status(404).json({ok:false,error:'financeiro vazio'});
+      // Buscar por id OU por nome
+      var rec=null;
+      if(id) rec=fin.records.find(function(r){return r.id===id||r.pipefyId===id;});
+      if(!rec&&busca) rec=fin.records.find(function(r){return (r.nomeContato||'').toLowerCase().includes(busca.toLowerCase())||(r.title||'').toLowerCase().includes(busca.toLowerCase());});
+      if(!rec)return res.status(404).json({ok:false,error:'Registro não encontrado',busca:busca,id:id});
+      var faseAnterior=rec.phaseId;
+      rec.history=(rec.history||[]).concat([{phaseId:faseAnterior,ts:rec.movedAt||now}]);
+      rec.phaseId=fase;
+      rec.movedAt=now;
+      // Backup antes de salvar
+      try{await _s7('reparoeletro_financeiro_backup',Object.assign({},fin,{backedUpAt:now}));}catch(e){}
+      await _s7('reparoeletro_financeiro',fin);
+      return res.status(200).json({ok:true,id:rec.id,nome:rec.nomeContato||rec.title,de:faseAnterior,para:fase});
+    } catch(e){return res.status(500).json({ok:false,error:e.message});}
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
