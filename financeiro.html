@@ -364,12 +364,11 @@ let selId = null, curPage = 'painel';
 
 // ── API ──────────────────────────────────────────────────────
 async function api(action, body) {
-  // Mapear ações para pipe.js (que está funcionando)
-  var url;
-  if (action === 'load') url = '/api/pipe?action=fin-load';
-  else if (action === 'mover-fase') url = '/api/pipe?action=fin-mover';
-  else url = `/api/fin?action=${action}`;
-  const r = await fetch(url, body ? {
+  // Tenta /api/financeiro, com fallback para /api/pipe se load falhar
+  var _finUrl = action === 'load'
+    ? '/api/pipe?action=fin-load'
+    : `/api/financeiro?action=${action}`;
+  const r = await fetch(_finUrl, body ? {
     method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
   } : {});
   return r.json();
@@ -1108,7 +1107,7 @@ async function executarMover() {
 
 async function moverFicha(id, fase) {
   try {
-    var r = await fetch('/api/fin?action=mover-fase', {
+    var r = await fetch('/api/financeiro?action=mover-fase', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({id, phaseId: fase})
     }).then(function(r){return r.json();});
