@@ -453,44 +453,51 @@ export default async function handler(req, res) {
     // ── Gatilhos downstream ──────────────────────────────────────────────
     var pid = card.pipefyId;
     // Aprovados → Board Técnico (producao ou cliente_loja)
-    if (phase === 'aprovados' && pid) {
+    // Funciona com OU SEM pipefyId — usa card.id como fallback
+    if (phase === 'aprovados') {
       try {
+        var boardPid = pid ? String(pid) : ('LOCAL-' + card.id);
         var boardDb2 = await dbGet('reparoeletro_board');
         if (!boardDb2) boardDb2 = { cards:[], syncedIds:[], movesLog:[], metaLog:[] };
         if (!Array.isArray(boardDb2.cards)) boardDb2.cards = [];
-        var bc = boardDb2.cards.find(function(x){ return x.pipefyId === String(pid); });
+        // Buscar por pipefyId real OU pelo id local
+        var bc = boardDb2.cards.find(function(x){
+          return x.pipefyId === boardPid || (card.id && x.osCode === card.id);
+        });
         if (bc) {
-          // Card já existe — só atualiza a fase
+          // Card já existe — atualiza fase
           var isFl = !!(bc.flFichaId);
           bc.phaseId = isFl ? 'cliente_loja' : 'producao';
           bc.movedAt = now;
         } else {
-          // Card NÃO existe no board — criar agora
+          // Criar card no board
           boardDb2.cards.unshift({
-            pipefyId:    String(pid),
+            pipefyId:    boardPid,
             phaseId:     'producao',
             nomeContato: card.nomeContato || '',
             title:       card.descricao   || card.nomeContato || '',
             telefone:    card.telefone    || '',
             descricao:   card.equipamento || card.descricao || '',
             osCode:      card.id,
+            valor:       card.valor || 0,
             movedBy:     'Pipe ADM',
             flFichaId:   null,
+            localOnly:   !pid, // card sem pipefyId real
             syncedAt:    now,
             movedAt:     now
           });
           if (!boardDb2.syncedIds) boardDb2.syncedIds = [];
-          if (!boardDb2.syncedIds.includes(String(pid))) boardDb2.syncedIds.push(String(pid));
+          boardDb2.syncedIds.push(boardPid);
           if (!boardDb2.movesLog) boardDb2.movesLog = [];
-          boardDb2.movesLog.push({ phaseId:'aprovado_entrada', pipefyId:String(pid), timestamp:now });
+          boardDb2.movesLog.push({ phaseId:'aprovado_entrada', pipefyId:boardPid, timestamp:now });
           if (!boardDb2.metaLog) boardDb2.metaLog = [];
-          boardDb2.metaLog.push({ phaseId:'aprovado_entrada', pipefyId:String(pid), timestamp:now });
+          boardDb2.metaLog.push({ phaseId:'aprovado_entrada', pipefyId:boardPid, timestamp:now });
         }
         await dbSet('reparoeletro_board', boardDb2);
       } catch(e) { console.error('[pipe→board]', e.message); }
     }
     // Video Enviado → criar ficha no Financeiro
-    if (phase === 'video_enviado' && pid) {
+    if (phase === 'video_enviado') {
       try {
         var finDb2 = await dbGet('reparoeletro_financeiro') || { records: [] };
         if (!Array.isArray(finDb2.records)) finDb2.records = [];
@@ -512,7 +519,7 @@ export default async function handler(req, res) {
       } catch(e) { console.error('[pipe→financeiro]', e.message); }
     }
     // Analise de Compra → criar entrada em compra-equip
-    if (phase === 'analise_compra' && pid) {
+    if (phase === 'analise_compra') {
       try {
         var compraDb2 = await dbGet('reparoeletro_compra_equip') || { fichas: [] };
         if (!Array.isArray(compraDb2.fichas)) compraDb2.fichas = [];
