@@ -329,6 +329,10 @@
     {
       "source": "/api/fin",
       "destination": "/api/fin.js"
+    },
+    {
+      "source": "/api/webhook-mp",
+      "destination": "/api/webhook-mp.js"
     }
   ],
   "headers": [
@@ -378,6 +382,9 @@
   ],
   "functions": {
     "api/pipe.js": {
+      "maxDuration": 60
+    },
+    "api/webhook-mp.js": {
       "maxDuration": 60
     }
   }
