@@ -9,6 +9,17 @@ function fmt4dig(nome, tel) {
   return n + ' ' + last4;
 }
 
+function fmt4dig(nome, tel) {
+  if (!nome) return '';
+  var n = String(nome).trim();
+  if (/\s\d{4}$/.test(n)) return n;
+  if (!tel) return n;
+  var digits = String(tel).replace(/\D/g,'');
+  var last4 = digits.slice(-4);
+  if (last4.length < 4) return n;
+  return n + ' ' + last4;
+}
+
 
 function fmt4dig(nome, tel) {
   if (!nome) return '';
