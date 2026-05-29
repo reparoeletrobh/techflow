@@ -149,15 +149,20 @@ module.exports = async function handler(req, res) {
     const db = rawDb || { dias: [] };
     if (!Array.isArray(db.dias)) db.dias = [];
 
-    // ERP ao vivo do Pipefy — com paginação completa e agrupamento por data de entrada
-    let erpCards = [];
-    try { erpCards = await fetchErpCards(); } catch(e) {}
-
-    const erpAtual = {
-      count: erpCards.length,
-      valor: erpCards.reduce((s, c) => s + c.valor, 0),
-      cards: erpCards,
-    };
+    // ERP ao vivo — direto do Redis local (nao do Pipefy)
+    let erpAtual = { count: 0, valor: 0, cards: [] };
+    try {
+      const PIPE_KEY_M = 'reparoeletro_pipe';
+      const pipeDbM = await dbGet(PIPE_KEY_M);
+      const erpLocais = (pipeDbM && pipeDbM.cards)
+        ? pipeDbM.cards.filter(c => c.phase === 'erp')
+        : [];
+      erpAtual = {
+        count: erpLocais.length,
+        valor: erpLocais.reduce((s,c) => s + (parseFloat(c.valor)||0), 0),
+        cards: erpLocais.map(c => ({ id: c.pipefyId||c.id, nome: c.nomeContato, valor: parseFloat(c.valor)||0 }))
+      };
+    } catch(e) { console.error('ERP Redis:', e.message); }
 
     // metaLog para Coletas e Orçamentos (esses permanecem do log local)
     const metaLog   = logsData?.metaLog || [];
