@@ -794,6 +794,62 @@ export default async function handler(req, res) {
     } catch(e){return res.status(500).json({ok:false,error:e.message});}
   }
 
+
+  // ── GET force-venda-pipe: força última(s) venda(s) para Receber no Pipe ──
+  if (action === 'force-venda-pipe') {
+    var limite = parseInt(req.query.n || '5');
+    try {
+      var UV3=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+      var TV3=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+      async function _vg3(k){var r=await fetch(UV3+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+TV3,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});var j=await r.json();var v=j[0]?.result;if(!v)return null;try{var x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+      async function _vs3(k,v){await fetch(UV3+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+TV3,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+
+      // Ler vendas
+      var vendasDb=await _vg3('reparoeletro_vendas');
+      var produtos=(vendasDb?.produtos||[]).filter(function(p){return p.vendido;});
+      // Ordenar por data de venda (mais recente primeiro)
+      produtos.sort(function(a,b){return new Date(b.soldAt||b.criadoEm||0)-new Date(a.soldAt||a.criadoEm||0);});
+      var ultimas=produtos.slice(0,limite);
+
+      // Ler Pipe
+      var pipeDb2=await _vg3('reparoeletro_pipe')||{cards:[],syncedPipefyIds:[],lastSync:null};
+      if(!Array.isArray(pipeDb2.cards))pipeDb2.cards=[];
+
+      var adicionados=[], ignorados=[];
+      var ts3=new Date().toISOString();
+
+      for(var vi=0;vi<ultimas.length;vi++){
+        var p3=ultimas[vi];
+        // Verificar se já existe no pipe (pelo código ou descrição)
+        var jaExiste=pipeDb2.cards.find(function(c){
+          return c.origem==='venda'&&(
+            c.descricao===('VENDA — '+(p3.codigo||''))||
+            (p3.pipefyCardId&&c.pipefyId===String(p3.pipefyCardId))
+          );
+        });
+        if(jaExiste){ignorados.push({codigo:p3.codigo,nome:p3.compradorNome,fase:jaExiste.phase});continue;}
+
+        pipeDb2.cards.unshift({
+          id:'PIPE-'+String(pipeDb2.cards.length+1).padStart(4,'0'),
+          pipefyId:p3.pipefyCardId||null,
+          phase:'receber',
+          nomeContato:p3.compradorNome||'',
+          telefone:p3.compradorTel||'',
+          equipamento:p3.descricao||'',
+          descricao:'VENDA — '+(p3.codigo||''),
+          valor:parseFloat(p3.preco)||0,
+          origem:'venda',
+          criadoEm:p3.soldAt||ts3, movedAt:ts3,
+          aguardandoDesde:null, history:[], analiseCompra:false
+        });
+        adicionados.push({codigo:p3.codigo,nome:p3.compradorNome,valor:p3.preco});
+      }
+
+      if(adicionados.length>0)await _vs3('reparoeletro_pipe',pipeDb2);
+      return res.status(200).json({ok:true,adicionados:adicionados.length,ignorados:ignorados.length,fichas:adicionados,jaEstavam:ignorados});
+    } catch(e){return res.status(500).json({ok:false,error:e.message});}
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
