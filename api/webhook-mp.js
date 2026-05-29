@@ -4,6 +4,10 @@ const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || '').replace(/['"]/g, '').tri
 const MP_TOKEN      = (process.env.MP_ACCESS_TOKEN || '').replace(/['"]/g, '').trim();
 const LOG_KEY       = 'mp_webhook_log';
 const PROC_KEY      = 'mp_processados'; // IDs já processados (idempotência)
+const FIN_KEY2      = 'reparoeletro_financeiro';
+const FIN_CONCIL2   = 'fin_conciliacao';
+const FIN_RETRY_KEY = 'fin_webhook_retry';
+const SOLICITAR_ENTREGA_FIN = '334875186';
 
 async function dbGet(key) {
   if (!UPSTASH_URL || !UPSTASH_TOKEN) return null;
