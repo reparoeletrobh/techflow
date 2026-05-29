@@ -400,60 +400,6 @@ async function load(){
 
 
 // ── EDITAR PIPE ───────────────────────────────────────────────────────────
-function abrirEditarPipe(id) {
-  var card = cards.find(function(c){ return c.id === id; });
-  if (!card) return;
-  document.getElementById('ep-id').value    = id;
-  document.getElementById('ep-nome').value  = card.nomeContato || '';
-  document.getElementById('ep-tel').value   = card.telefone    || '';
-  document.getElementById('ep-cpf').value   = card.cpfCnpj     || '';
-  document.getElementById('ep-equip').value = card.equipamento || '';
-  document.getElementById('ep-valor').value = card.valor       || '';
-  document.getElementById('ep-desc').value  = card.descricao   || '';
-  document.getElementById('ep-end').value   = card.endereco    || '';
-  document.getElementById('ep-serv').value  = card.servicos    || '';
-  document.getElementById('modal-editar-pipe').style.display = 'flex';
-}
-function fecharEditarPipe() {
-  document.getElementById('modal-editar-pipe').style.display = 'none';
-}
-async function salvarEditarPipe() {
-  var id  = document.getElementById('ep-id').value;
-  var tel = document.getElementById('ep-tel').value;
-  var body = {
-    id:          id,
-    nomeContato: document.getElementById('ep-nome').value,
-    telefone:    tel,
-    cpfCnpj:     document.getElementById('ep-cpf').value,
-    equipamento: document.getElementById('ep-equip').value,
-    valor:       document.getElementById('ep-valor').value,
-    descricao:   document.getElementById('ep-desc').value,
-    endereco:    document.getElementById('ep-end').value,
-    servicos:    document.getElementById('ep-serv').value
-  };
-  try {
-    var r = await fetch('/api/pipe?action=editar-pipe', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    var d = await r.json();
-    if (d.ok) { fecharEditarPipe(); load(); }
-    else alert('Erro: ' + d.error);
-  } catch(e) { alert('Erro: ' + e.message); }
-}
-
-load();
-setInterval(load,90000);
-
-    else alert('Erro: ' + d.error);
-  } catch(e) { alert('Erro: ' + e.message); }
-}
-// modal click-outside handled inline
-
-
-// ── SCROLL HORIZONTAL ─────────────────────────────────────────────────────
-function scrollBoard(dir) {
-  var board = document.getElementById('board');
-  if (!board) return;
-  board.scrollBy({ left: dir * 900, behavior: 'smooth' });
-}
 document.addEventListener('keydown', function(e) {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   if (e.key === 'ArrowLeft')  scrollBoard(-1);
