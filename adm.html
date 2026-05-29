@@ -647,6 +647,56 @@ function highlight(el) {
     el.style.boxShadow = '';
   }, 2500);
 }
+
+// ── LOG DO SISTEMA ────────────────────────────────────────────────────────
+var logAberto = false;
+var logTodos  = [];
+var FASES_LOG = {aguardando_aprovacao:'Ag. Aprovação',ultima_chamada:'Última Chamada',aprovados:'Aprovados',video_enviado:'Vídeo Enviado',analise_compra:'Análise Compra',equipamento_comprado:'Equip. Comprado',programar_entrega:'Prog. Entrega',solicitar_entrega:'Solic. Entrega',entrega_solicitada:'Entrega Solic.',receber:'Receber',erp:'ERP',producao:'Produção',cliente_loja:'Cliente Loja',nf_emitida:'NF Emitida',faturamento:'Faturamento',entrega_liberada:'Entrega Lib.',pago:'Pago'};
+function _fn(id){return FASES_LOG[id]||id||'';}
+function _esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
+function _ts(t){if(!t)return'—';var d=new Date(t);return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'America/Sao_Paulo'});}
+function abrirLog(){
+  document.getElementById('log-panel').classList.add('open');
+  document.getElementById('log-overlay').classList.add('open');
+  logAberto=true;
+  carregarLog();
+}
+function fecharLog(){
+  document.getElementById('log-panel').classList.remove('open');
+  document.getElementById('log-overlay').classList.remove('open');
+  logAberto=false;
+}
+async function carregarLog(){
+  var mod=document.getElementById('lf-mod').value;
+  var sts=document.getElementById('lf-sts').value;
+  var url='/api/log?action=list&limit=200'+(mod?'&modulo='+encodeURIComponent(mod):'')+(sts?'&status='+sts:'');
+  try{
+    var r=await fetch(url);var d=await r.json();
+    logTodos=d.entries||[];
+    document.getElementById('log-total').textContent=d.total+' entr.';
+    var q=document.getElementById('lf-q').value;
+    renderLog(q?logTodos.filter(function(e){return JSON.stringify(e).toLowerCase().includes(q.toLowerCase());}):logTodos);
+  }catch(e){document.getElementById('log-body').innerHTML='<div class="log-empty">Erro: '+_esc(e.message)+'</div>';}
+}
+function renderLog(lista){
+  var body=document.getElementById('log-body');
+  if(!lista.length){body.innerHTML='<div class="log-empty">Nenhuma entrada ainda.<br><small>As ações do sistema aparecem aqui.</small></div>';return;}
+  body.innerHTML=lista.map(function(e){
+    var cls=e.status==='erro'?'log-err':e.status==='aviso'?'log-wrn':'log-ok';
+    var bdg=e.status==='erro'?'<span class="log-bdg lb-err">❌</span>':e.status==='aviso'?'<span class="log-bdg lb-wrn">⚠️</span>':'<span class="log-bdg lb-ok">✅</span>';
+    var dp=e.de&&e.para?_fn(e.de)+' → '+_fn(e.para):e.para?'→ '+_fn(e.para):'';
+    return '<div class="log-entry '+cls+'">'+
+      '<div class="log-line1">'+bdg+'<span class="log-mod">'+_esc(e.modulo)+'</span><span class="log-fid">'+_esc(e.fichaId)+'</span><span class="log-fnm">'+_esc(e.ficha)+'</span><span class="log-ts">'+_ts(e.ts)+'</span></div>'+
+      '<div class="log-acao">'+_esc(e.acao)+(dp?'<span class="log-fases"> · '+_esc(dp)+'</span>':'')+'</div>'+
+      (e.gatilho?'<div class="log-gat">'+_esc(e.gatilho)+'</div>':'')+
+      (e.detalhe?'<div class="log-det">'+_esc(e.detalhe)+'</div>':'')+
+    '</div>';
+  }).join('');
+}
+function filtrarLog(q){if(!q){renderLog(logTodos);return;}renderLog(logTodos.filter(function(e){return JSON.stringify(e).toLowerCase().includes(q.toLowerCase());}));}
+async function limparLog(){if(!confirm('Limpar todo o log?'))return;await fetch('/api/log?action=clear');logTodos=[];document.getElementById('log-total').textContent='0 entr.';renderLog([]);}
+setInterval(function(){if(logAberto)carregarLog();},15000);
+
 </script>
 
 <!-- PAINEL LOG -->
