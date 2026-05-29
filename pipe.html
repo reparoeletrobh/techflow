@@ -110,6 +110,14 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .toast.show{opacity:1;transform:none;}
 
 @media(max-width:600px){.col{width:260px;}.cbtn{font-size:9px;padding:5px 9px;}}
+
+.scroll-float{position:fixed;top:50%;transform:translateY(-50%);z-index:200;
+  width:36px;height:60px;background:rgba(17,17,17,.92);border:1px solid #2a2a2a;
+  border-radius:8px;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;color:#666;font-size:16px;transition:.2s;backdrop-filter:blur(4px);}
+.scroll-float:hover{color:#f5c800;border-color:#f5c800;background:rgba(17,17,17,.98);}
+.scroll-float.left{left:6px;}
+.scroll-float.right{right:6px;}
 </style>
 </head>
 <body>
@@ -422,7 +430,7 @@ function scrollBoard(dir) {
   var board = document.getElementById('board');
   if (!board) return;
   var colWidth = 302; // largura da coluna + gap
-  board.scrollBy({ left: dir * colWidth * 3, behavior: 'smooth' });
+  board.scrollBy({ left: dir * colWidth, behavior: 'smooth' });
 }
 
 // Scroll com teclado ← →
@@ -699,5 +707,8 @@ async function salvarEditarPipe() {
     </div>
   </div>
 </div>
+
+<button class="scroll-float left"  onclick="scrollBoard(-1)" title="← Coluna anterior">◀</button>
+<button class="scroll-float right" onclick="scrollBoard(1)"  title="→ Próxima coluna">▶</button>
 </body>
 </html>

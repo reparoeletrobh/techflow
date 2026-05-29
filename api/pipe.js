@@ -882,6 +882,56 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok:true, ...res2 });
   }
 
+
+  // ── GET diagnostico-erp: conta fases no Redis, detecta divergências ──────
+  if (action === 'diagnostico-erp') {
+    try {
+      var db = await dbGet(PIPE_KEY) || {cards:[]};
+      var cards2 = db.cards || [];
+      // Contar por fase (incluindo variações/erros)
+      var faseCount = {};
+      cards2.forEach(function(c){ faseCount[c.phase||'SEM_FASE']=(faseCount[c.phase||'SEM_FASE']||0)+1; });
+      // Identificar fases com ID do Pipefy ao invés do local
+      var pipefyFases = cards2.filter(function(c){ return /^\d{8,}$/.test(c.phase||''); });
+      // ERP específico
+      var erpLocal    = cards2.filter(function(c){ return c.phase==='erp'; });
+      var erpPipefyId = cards2.filter(function(c){ return c.phase==='339008925'; });
+      var erpValor    = erpLocal.reduce(function(s,c){return s+(parseFloat(c.valor)||0);},0);
+      return res.status(200).json({
+        ok:true,
+        totalCards: cards2.length,
+        porFase: faseCount,
+        erpLocal: erpLocal.length,
+        erpComIdPipefy: erpPipefyId.length,
+        erpValorTotal: erpValor,
+        fasesComIdPipefy: pipefyFases.length,
+        exemplos: pipefyFases.slice(0,5).map(function(c){return {id:c.id,nome:c.nomeContato,phase:c.phase};})
+      });
+    } catch(e){return res.status(500).json({ok:false,error:e.message});}
+  }
+
+  // ── GET fix-fases-erp: converte phase=339008925 → phase=erp no Redis ─────
+  if (action === 'fix-fases-erp') {
+    try {
+      var db=await dbGet(PIPE_KEY)||{cards:[]};
+      var FASE_MAP={
+        '342533760':'aguardando_aprovacao','342533761':'aprovados','342533762':'video_enviado',
+        '342533763':'analise_compra','339008925':'erp','342533764':'solicitar_entrega',
+        '342533765':'entrega_solicitada','342533766':'receber','342533767':'finalizado'
+      };
+      var corrigidos=0;
+      (db.cards||[]).forEach(function(card){
+        if(FASE_MAP[card.phase]){
+          card.phase=FASE_MAP[card.phase];
+          corrigidos++;
+        }
+      });
+      if(corrigidos>0) await dbSet(PIPE_KEY,db);
+      var erpDepois=(db.cards||[]).filter(function(c){return c.phase==='erp';}).length;
+      return res.status(200).json({ok:true,corrigidos,erpDepois,total:(db.cards||[]).length});
+    } catch(e){return res.status(500).json({ok:false,error:e.message});}
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
