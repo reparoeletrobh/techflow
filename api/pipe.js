@@ -26,7 +26,11 @@ async function dbGet(k) {
     });
     const j = await r.json();
     const result = j[0]?.result;
-    return result ? JSON.parse(result) : null;
+    if (!result) return null;
+    let val = JSON.parse(result);
+    // Tolerância a dupla codificação de versões anteriores
+    if (typeof val === 'string') { try { val = JSON.parse(val); } catch(e2) {} }
+    return (val && typeof val === 'object') ? val : null;
   } catch(e) { return null; }
 }
 
@@ -147,6 +151,14 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const action = req.query.action || '';
+
+
+  // ── POST reset-pipe: limpa todos os dados do pipe (dados corrompidos) ──────
+  if (req.method === 'POST' && action === 'reset-pipe') {
+    const fresh = { cards: [], syncedPipefyIds: [], lastSync: null };
+    await dbSet(PIPE_KEY, fresh);
+    return res.status(200).json({ ok: true, info: 'pipe resetado — pronto para nova sincronização' });
+  }
 
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
