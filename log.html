@@ -8,7 +8,7 @@
 <style>
 :root{--bg:#0a0a0a;--s1:#111;--s2:#171717;--b1:#1e1e1e;--b2:#252525;--text:#e8e8e8;--muted:#555;--dim:#2c2c2c;--y:#f5c800;--g:#16c784;--r:#ef4444;--o:#f97316;--b:#3b9eff;--fm:'DM Mono',monospace;--fh:'Syne',sans-serif;--fb:'Inter',sans-serif;}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:12px;min-height:100vh;display:flex;flex-direction:column;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:12px;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
 /* HEADER */
 header{height:50px;display:flex;align-items:center;gap:12px;padding:0 20px;border-bottom:2px solid var(--y);background:var(--bg);flex-shrink:0;position:sticky;top:0;z-index:50;}
 .logo{font-family:var(--fh);font-size:14px;font-weight:800;}.logo span{color:var(--y);}
@@ -27,7 +27,7 @@ header{height:50px;display:flex;align-items:center;gap:12px;padding:0 20px;borde
 .auto-dot{width:6px;height:6px;border-radius:50%;background:var(--g);animation:blink 2s ease infinite;}
 @keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
 /* TABLE */
-.table-wrap{flex:1;overflow:auto;padding:0;}
+.table-wrap{flex:1;overflow:auto;padding:0;min-height:0;}
 table{width:100%;border-collapse:collapse;}
 thead{position:sticky;top:0;z-index:10;}
 th{background:var(--s1);font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:8px 10px;text-align:left;border-bottom:1px solid var(--b1);white-space:nowrap;}
@@ -142,7 +142,7 @@ async function load(){
     var busca = document.getElementById('f-busca').value;
     renderTabela(busca ? allEntries.filter(function(e){ return JSON.stringify(e).toLowerCase().includes(busca.toLowerCase()); }) : allEntries);
   } catch(e) {
-    document.getElementById('log-body').innerHTML = '<tr><td colspan="8" class="empty">Erro ao carregar: '+esc(e.message)+'</td></tr>';
+    console.error('log fetch error:', e); document.getElementById('log-body').innerHTML = '<tr><td colspan="8" class="empty">Erro ao carregar: '+esc(e.message)+'<br><small>Verifique se /api/log está acessível</small></td></tr>';
   }
 }
 

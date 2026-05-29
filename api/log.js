@@ -81,6 +81,9 @@ export default async function handler(req, res) {
   // ── GET seed-log: popula com 10 entradas de exemplo ─────────────────────
   if (action === 'seed') {
     const now = Date.now();
+    // Adicionar só se log estiver vazio ou com menos de 5 entradas
+    const logAtual = await logGet();
+    if (logAtual.length >= 5) return res.status(200).json({ ok: true, info: 'log ja tem entradas', total: logAtual.length });
     const seeds = [
       { ts: new Date(now - 1*60*1000).toISOString(),  modulo:'Pipe ADM',     fichaId:'PIPE-0018', ficha:'Ernesto 1212',     acao:'Mover ficha',             de:'aguardando_aprovacao', para:'aprovados',            gatilho:'→ Board Técnico (producao)', status:'ok',   detalhe:'Card criado em Produção no Board' },
       { ts: new Date(now - 5*60*1000).toISOString(),  modulo:'Pipe ADM',     fichaId:'PIPE-0018', ficha:'Ernesto 1212',     acao:'Mover ficha',             de:'',                     para:'aguardando_aprovacao', gatilho:'Timer 48h iniciado',         status:'ok',   detalhe:'' },
