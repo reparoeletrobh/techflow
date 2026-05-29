@@ -117,6 +117,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 <header>
   <div class="logo">Reparo<span>Eletro</span><em>⚡ Pipe ADM</em></div>
   <div class="header-right">
+    <button class="scroll-btn" onclick="scrollBoard(-1)" title="Rolar esquerda">◀</button>
+    <button class="scroll-btn" onclick="scrollBoard(1)"  title="Rolar direita">▶</button>
     <div class="sync-dot" id="sync-dot"></div>
     <span class="sync-time" id="last-sync">—</span>
     <button class="hbtn" onclick="syncPipefy()" id="btn-sync">⟳ Sincronizar Pipefy</button>
@@ -383,6 +385,18 @@ async function load(){
 
 load();
 setInterval(load,90000);
+
+// ── SCROLL HORIZONTAL ─────────────────────────────────────────────────────
+function scrollBoard(dir) {
+  var board = document.getElementById('board');
+  if (!board) return;
+  board.scrollBy({ left: dir * 900, behavior: 'smooth' });
+}
+document.addEventListener('keydown', function(e) {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.key === 'ArrowLeft')  scrollBoard(-1);
+  if (e.key === 'ArrowRight') scrollBoard(1);
+});
 
 // ── SCROLL HORIZONTAL ─────────────────────────────────────────────────────
 function scrollBoard(dir) {
