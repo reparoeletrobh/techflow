@@ -257,9 +257,7 @@ function toggleDados(id){
 }
 
 function render(){
-  // Métricas — calculadas diretamente do array cards (mesma fonte das colunas)
-  var erp = cards.filter(function(c){return c.phase==='erp';});
-  var erpValor = erp.reduce(function(s,c){return s+(parseFloat(c.valor)||0);},0);
+  // Métricas
   document.getElementById('st-total').textContent=cards.length;
   document.getElementById('st-aguard').textContent=cards.filter(function(c){return c.phase==='aguardando_aprovacao';}).length;
   document.getElementById('st-aprov').textContent=cards.filter(function(c){return c.phase==='aprovados';}).length;
