@@ -1,3 +1,62 @@
+
+// ── Helper: mover card no Pipe ADM pelo pipefyId ─────────────────────────
+async function moverNoPipe(pipefyId, novaFase, dados) {
+  if (!pipefyId) return;
+  try {
+    const PIPE_KEY = 'reparoeletro_pipe';
+    const U = (process.env.UPSTASH_URL   || '').replace(/['"]/g,'').trim();
+    const T = (process.env.UPSTASH_TOKEN || '').replace(/['"]/g,'').trim();
+    async function _pipeGet(k) {
+      const r = await fetch(U + '/pipeline', { method:'POST',
+        headers:{ Authorization:'Bearer '+T,'Content-Type':'application/json' },
+        body: JSON.stringify([['GET', k]]) });
+      const j = await r.json();
+      const v = j[0]?.result; if (!v) return null;
+      let val = JSON.parse(v);
+      if (typeof val === 'string') { try { val = JSON.parse(val); } catch(e) {} }
+      return (val && typeof val === 'object') ? val : null;
+    }
+    async function _pipeSet(k, v) {
+      await fetch(U + '/pipeline', { method:'POST',
+        headers:{ Authorization:'Bearer '+T,'Content-Type':'application/json' },
+        body: JSON.stringify([['SET', k, JSON.stringify(v)]]) });
+    }
+    const db   = (await _pipeGet(PIPE_KEY)) || { cards:[], syncedPipefyIds:[], lastSync:null };
+    const card = (db.cards || []).find(c => c.pipefyId === String(pipefyId));
+    if (!card) {
+      // Card não existe — criar se dados fornecidos
+      if (dados && dados.nomeContato) {
+        const now = new Date().toISOString();
+        db.cards.unshift({
+          id:           'PIPE-' + String(db.cards.length + 1).padStart(4,'0'),
+          pipefyId:     String(pipefyId),
+          phase:        novaFase,
+          nomeContato:  dados.nomeContato || '',
+          telefone:     dados.telefone    || '',
+          equipamento:  dados.equipamento || '',
+          descricao:    dados.descricao   || '',
+          valor:        parseFloat(dados.valor || 0) || 0,
+          origem:       dados.origem      || 'sistema',
+          criadoEm:     now, movedAt: now,
+          aguardandoDesde: novaFase === 'aguardando_aprovacao' ? now : null,
+          history: [], analiseCompra: false
+        });
+        await _pipeSet(PIPE_KEY, db);
+      }
+      return;
+    }
+    const now = new Date().toISOString();
+    card.history = (card.history || []).concat([{ phase: card.phase, ts: now }]);
+    card.phase   = novaFase;
+    card.movedAt = now;
+    if (dados) {
+      if (dados.valor !== undefined) card.valor = parseFloat(dados.valor) || 0;
+      if (dados.nomeContato)         card.nomeContato = dados.nomeContato;
+    }
+    await _pipeSet(PIPE_KEY, db);
+  } catch(e) { console.error('[pipe-mover]', novaFase, e.message); }
+}
+
 const PIPEFY_API = "https://api.pipefy.com/graphql";
 const PIPE_ID    = "305832912";
 const BOARD_KEY   = "reparoeletro_board";
@@ -1902,6 +1961,8 @@ module.exports = async function handler(req, res) {
       const balcao = (await dbGet(BALCAO_KEY)) || [];
       const entry = balcao.find(b => b.pipefyId === String(pipefyId));
       if (entry) { entry.status = 'pago'; entry.pagoEm = new Date().toISOString(); await dbSet(BALCAO_KEY, balcao); }
+      // Pipe ADM: mover para erp
+      await moverNoPipe(String(pipefyId), 'erp').catch(() => {});
       return res.status(200).json({ ok: true });
     }
 

@@ -295,6 +295,27 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok:true, entradas: logDb.entradas || [] });
   }
 
+
+  // ── GET pipe-sem-resposta: move cards 48h+ em aguardando_aprovacao → ultima_chamada ──
+  if (action === 'pipe-sem-resposta') {
+    const db       = (await dbGet(PIPE_KEY)) || defaultDB();
+    const agora    = Date.now();
+    const MS_48H   = 48 * 60 * 60 * 1000;
+    let movidos = 0;
+    for (const card of (db.cards || [])) {
+      if (card.phase !== 'aguardando_aprovacao') continue;
+      const desde = card.aguardandoDesde ? new Date(card.aguardandoDesde).getTime() : 0;
+      if (!desde || (agora - desde) < MS_48H) continue;
+      const now = new Date().toISOString();
+      card.history = (card.history || []).concat([{ phase: 'aguardando_aprovacao', ts: now }]);
+      card.phase   = 'ultima_chamada';
+      card.movedAt = now;
+      movidos++;
+    }
+    if (movidos > 0) await dbSet(PIPE_KEY, db);
+    return res.status(200).json({ ok: true, movidos });
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
@@ -364,7 +385,67 @@ export default async function handler(req, res) {
     card.history = (card.history || []).concat([{ phase: card.phase, ts: now }]);
     card.phase   = phase;
     card.movedAt = now;
+    if (phase === 'aguardando_aprovacao') card.aguardandoDesde = now;
     await dbSet(PIPE_KEY, db);
+
+    // ── Gatilhos downstream ──────────────────────────────────────────────
+    var pid = card.pipefyId;
+    // Aprovados → Board Técnico (producao ou cliente_loja)
+    if (phase === 'aprovados' && pid) {
+      try {
+        var boardDb2 = await dbGet('reparoeletro_board');
+        if (boardDb2) {
+          var bc = (boardDb2.cards || []).find(function(x){ return x.pipefyId === String(pid); });
+          if (bc) {
+            var isFl = !!(bc.flFichaId);
+            bc.phaseId = isFl ? 'cliente_loja' : 'producao';
+            bc.movedAt = now;
+            await dbSet('reparoeletro_board', boardDb2);
+          }
+        }
+      } catch(e) { console.error('[pipe→board]', e.message); }
+    }
+    // Video Enviado → criar ficha no Financeiro
+    if (phase === 'video_enviado' && pid) {
+      try {
+        var finDb2 = await dbGet('reparoeletro_financeiro') || { records: [] };
+        if (!Array.isArray(finDb2.records)) finDb2.records = [];
+        var jaFinExiste = finDb2.records.find(function(r){ return r.pipefyId === String(pid); });
+        if (!jaFinExiste) {
+          finDb2.records.unshift({
+            id: 'FIN-PIPE-' + String(Date.now()),
+            pipefyId: String(pid),
+            nomeContato: card.nomeContato || '',
+            telefone: card.telefone || '',
+            valor: card.valor || 0,
+            phaseId: 'nf_emitida',
+            criadoEm: now, movedAt: now,
+            history: [{ phaseId: 'nf_emitida', ts: now }],
+            origem: 'pipe_video_enviado'
+          });
+          await dbSet('reparoeletro_financeiro', finDb2);
+        }
+      } catch(e) { console.error('[pipe→financeiro]', e.message); }
+    }
+    // Analise de Compra → criar entrada em compra-equip
+    if (phase === 'analise_compra' && pid) {
+      try {
+        var compraDb2 = await dbGet('reparoeletro_compra_equip') || { fichas: [] };
+        if (!Array.isArray(compraDb2.fichas)) compraDb2.fichas = [];
+        var jaCompraExiste = compraDb2.fichas.find(function(f){ return f.pipefyId === String(pid); });
+        if (!jaCompraExiste) {
+          compraDb2.fichas.unshift({
+            id: String(pid), pipefyId: String(pid),
+            nomeContato: card.nomeContato || '',
+            descricao: card.equipamento || card.descricao || '',
+            valor: card.valor || 0,
+            status: 'analise', fotos: [], criadoEm: now
+          });
+          await dbSet('reparoeletro_compra_equip', compraDb2);
+        }
+      } catch(e) { console.error('[pipe→compra]', e.message); }
+    }
+
     return res.status(200).json({ ok: true, card: card });
   }
 
