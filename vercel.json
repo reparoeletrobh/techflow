@@ -31,10 +31,6 @@
     {
       "path": "/api/webhook-mp?action=sync-fin-mp",
       "schedule": "*/10 * * * *"
-    },
-    {
-      "path": "/api/pipe?action=sync-pipefy",
-      "schedule": "34 15 29 5 *"
     }
   ],
   "rewrites": [

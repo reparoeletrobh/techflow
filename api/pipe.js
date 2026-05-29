@@ -83,6 +83,27 @@ export default async function handler(req, res) {
 
   const action = req.query.action || '';
 
+
+  // ── GET status: resumo do banco de dados do pipe ─────────────────────────
+  if (action === 'status') {
+    const db = (await dbGet(PIPE_KEY)) || defaultDB();
+    const porFase = {};
+    for (const ph of PHASES) porFase[ph.name] = 0;
+    for (const card of (db.cards||[])) {
+      const ph = PHASES.find(p => p.id === card.phase);
+      if (ph) porFase[ph.name] = (porFase[ph.name]||0) + 1;
+    }
+    return res.status(200).json({
+      ok: true,
+      total: db.cards?.length || 0,
+      lastSync: db.lastSync || null,
+      porFase,
+      amostra: (db.cards||[]).slice(0,3).map(c => ({
+        id: c.id, nome: c.nomeContato, fase: c.phase, origem: c.origem, pipefyId: c.pipefyId
+      }))
+    });
+  }
+
   // ── GET load ──────────────────────────────────────────────────────────────
   if (action === 'load') {
     const db = (await dbGet(PIPE_KEY)) || defaultDB();
