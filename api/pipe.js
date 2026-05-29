@@ -49,7 +49,7 @@ async function dbSet(k, v) {
 
 async function pipefyQ(query) {
   const ctrl = new AbortController();
-  const tid  = setTimeout(() => ctrl.abort(), 12000);
+  const tid  = setTimeout(() => ctrl.abort(), 5000);
   try {
     const r = await fetch('https://api.pipefy.com/graphql', {
       method:'POST',

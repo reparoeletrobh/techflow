@@ -363,5 +363,10 @@
         }
       ]
     }
-  ]
+  ],
+  "functions": {
+    "api/pipe.js": {
+      "maxDuration": 60
+    }
+  }
 }
