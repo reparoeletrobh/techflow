@@ -149,21 +149,28 @@ module.exports = async function handler(req, res) {
     const db = rawDb || { dias: [] };
     if (!Array.isArray(db.dias)) db.dias = [];
 
-    // ERP ao vivo -- Nosso Pipe (Redis local), nao Pipefy
-    let erpAtual = { count: 0, valor: 0, cards: [] };
+    // ERP ao vivo -- lendo coluna ERP do nosso Pipe (Redis), sem Pipefy e sem HTTP interno
     let erpCards = [];
+    let erpAtual = { count: 0, valor: 0, cards: [] };
     try {
-      const _base2 = process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://reparoeletroadm.com';
-      const _erpR2 = await fetch(_base2 + '/api/pipe?action=erp-cards&_t=' + Date.now());
-      const _erpJ2 = await _erpR2.json();
-      if (_erpJ2.ok && Array.isArray(_erpJ2.cards)) {
-        erpCards = _erpJ2.cards.map(function(card) {
-          return { id: card.pipefyId || card.id, valor: parseFloat(card.valor) || 0,
-                   entradaDate: card.movedAt ? card.movedAt.slice(0,10) : null };
-        });
-        erpAtual = { count: erpCards.length, valor: erpCards.reduce(function(s,c){return s+c.valor;},0), cards: erpCards };
+      const pipeData = await dbGet('reparoeletro_pipe');
+      if (pipeData && Array.isArray(pipeData.cards)) {
+        erpCards = pipeData.cards
+          .filter(function(card) { return card.phase === 'erp'; })
+          .map(function(card) {
+            return {
+              id: card.pipefyId || card.id,
+              valor: parseFloat(card.valor) || 0,
+              entradaDate: card.movedAt ? card.movedAt.slice(0, 10) : null
+            };
+          });
+        erpAtual = {
+          count: erpCards.length,
+          valor: erpCards.reduce(function(s, c) { return s + c.valor; }, 0),
+          cards: erpCards
+        };
       }
-    } catch(e) { console.error('erp-pipe:', e.message); }
+    } catch(e) { console.error('erp-redis:', e.message); }
 
     // metaLog para Coletas e Orçamentos (esses permanecem do log local)
     const metaLog   = logsData?.metaLog || [];
