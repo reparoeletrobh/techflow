@@ -506,47 +506,49 @@ export default async function handler(req, res) {
     // ── Gatilhos downstream ──────────────────────────────────────────────
     var pid = card.pipefyId;
     // Aprovados → Board Técnico (producao ou cliente_loja)
-    // Funciona com OU SEM pipefyId — usa card.id como fallback
     if (phase === 'aprovados') {
       try {
         var boardPid = pid ? String(pid) : ('LOCAL-' + card.id);
-        var boardDb2 = await dbGet('reparoeletro_board');
-        if (!boardDb2) boardDb2 = { cards:[], syncedIds:[], movesLog:[], metaLog:[] };
-        if (!Array.isArray(boardDb2.cards)) boardDb2.cards = [];
-        // Buscar por pipefyId real OU pelo id local
-        var bc = boardDb2.cards.find(function(x){
-          return x.pipefyId === boardPid || (card.id && x.osCode === card.id);
-        });
-        if (bc) {
-          // Card já existe — atualiza fase
-          var isFl = !!(bc.flFichaId);
-          bc.phaseId = isFl ? 'cliente_loja' : 'producao';
-          bc.movedAt = now;
-        } else {
-          // Criar card no board
-          boardDb2.cards.unshift({
-            pipefyId:    boardPid,
-            phaseId:     'producao',
-            nomeContato: card.nomeContato || '',
-            title:       card.descricao   || card.nomeContato || '',
-            telefone:    card.telefone    || '',
-            descricao:   card.equipamento || card.descricao || '',
-            osCode:      card.id,
-            valor:       card.valor || 0,
-            movedBy:     'Pipe ADM',
-            flFichaId:   null,
-            localOnly:   !pid, // card sem pipefyId real
-            syncedAt:    now,
-            movedAt:     now
-          });
-          if (!boardDb2.syncedIds) boardDb2.syncedIds = [];
-          boardDb2.syncedIds.push(boardPid);
-          if (!boardDb2.movesLog) boardDb2.movesLog = [];
-          boardDb2.movesLog.push({ phaseId:'aprovado_entrada', pipefyId:boardPid, timestamp:now });
-          if (!boardDb2.metaLog) boardDb2.metaLog = [];
-          boardDb2.metaLog.push({ phaseId:'aprovado_entrada', pipefyId:boardPid, timestamp:now });
+        // Usar dbGet/dbSet do BOARD (mesmo formato) — leitura direta via Upstash
+        var bU = (process.env.UPSTASH_URL   || '').replace(/['"]/g,'').trim();
+        var bT = (process.env.UPSTASH_TOKEN || '').replace(/['"]/g,'').trim();
+        async function bGet(k) {
+          var r = await fetch(bU+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+bT,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});
+          var j = await r.json(); var v = j[0]?.result; if(!v) return null;
+          try { return JSON.parse(v); } catch(e){ return null; }
         }
-        await dbSet('reparoeletro_board', boardDb2);
+        async function bSet(k,v) {
+          await fetch(bU+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+bT,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});
+        }
+        var BOARD_KEY2 = 'reparoeletro_board';
+        var boardDb2 = await bGet(BOARD_KEY2);
+        if (!boardDb2 || typeof boardDb2 !== 'object') boardDb2 = { cards:[], syncedIds:[], movesLog:[], metaLog:[], phases:[], rsPhases:[], rsRuaPhases:[], rsCards:[], rsRuaCards:[] };
+        if (!Array.isArray(boardDb2.cards)) boardDb2.cards = [];
+        // Remover entrada antiga se existir
+        boardDb2.cards = boardDb2.cards.filter(function(x){ return x.pipefyId !== boardPid && x.osCode !== card.id; });
+        // Sempre inserir/recriar o card
+        boardDb2.cards.unshift({
+          pipefyId:    boardPid,
+          phaseId:     'producao',
+          nomeContato: card.nomeContato || '',
+          title:       card.descricao   || card.nomeContato || '',
+          telefone:    card.telefone    || '',
+          descricao:   card.equipamento || card.descricao || '',
+          osCode:      card.id,
+          valor:       card.valor || 0,
+          movedBy:     'Pipe ADM',
+          flFichaId:   null,
+          localOnly:   !pid,
+          syncedAt:    now,
+          movedAt:     now
+        });
+        if (!Array.isArray(boardDb2.syncedIds)) boardDb2.syncedIds = [];
+        if (!boardDb2.syncedIds.includes(boardPid)) boardDb2.syncedIds.push(boardPid);
+        if (!Array.isArray(boardDb2.movesLog)) boardDb2.movesLog = [];
+        boardDb2.movesLog.push({ phaseId:'aprovado_entrada', pipefyId:boardPid, timestamp:now });
+        if (!Array.isArray(boardDb2.metaLog)) boardDb2.metaLog = [];
+        boardDb2.metaLog.push({ phaseId:'aprovado_entrada', pipefyId:boardPid, timestamp:now });
+        await bSet(BOARD_KEY2, boardDb2);
       } catch(e) { console.error('[pipe→board]', e.message); }
     }
     // Video Enviado → criar ficha no Financeiro
