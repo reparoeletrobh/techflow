@@ -278,6 +278,7 @@ function render(){
             '<option value="">↕ Mover para…</option>'+opts+
           '</select>'+
           '<button class="cbtn cbtn-outline" onclick="toggleDados(\''+c.id+'\')">📋 Ver dados</button>'+
+          '<button class="cbtn cbtn-outline" onclick="abrirEditarPipe(\''+c.id+'\')">✏️</button>'+
           '<button class="cbtn cbtn-blue'+(c.analiseCompra?' active':'')+'" onclick="toggleAC(\''+c.id+'\')" title="Marcar Análise de Compra">🛒</button>'+
           '<button class="cbtn cbtn-red" onclick="excluir(\''+c.id+'\')">✕</button>'+
         '</div>'+
@@ -388,7 +389,7 @@ setInterval(load,90000);
 
 // ── EDITAR PIPE ───────────────────────────────────────────────────────────
 function abrirEditarPipe(id) {
-  var card = allCards.find(function(c){ return c.id === id; });
+  var card = (window._pipeCards||[]).find(function(c){ return c.id === id; });
   if (!card) return;
   document.getElementById('ep-id').value    = id;
   document.getElementById('ep-nome').value  = card.nomeContato || '';
@@ -417,7 +418,7 @@ async function salvarEditarPipe() {
     else alert('Erro: ' + d.error);
   } catch(e) { alert('Erro: ' + e.message); }
 }
-document.getElementById('modal-editar-pipe').addEventListener('click', function(e){ if(e.target===this) fecharEditarPipe(); });
+// modal click-outside handled inline
 
 
 // ── SCROLL HORIZONTAL ─────────────────────────────────────────────────────
@@ -597,6 +598,26 @@ function moverColuna(phaseId,dir){
   render();
 }
 </script>
+
+<!-- Modal editar pipe -->
+<div id="modal-editar-pipe" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(3px);">
+  <div style="background:#111;border:1px solid #2a2a2a;border-radius:12px;padding:24px;width:400px;max-width:94vw;">
+    <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:#e8e8e8;margin-bottom:16px;">✏️ Editar Ficha</div>
+    <input type="hidden" id="ep-id">
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <input id="ep-nome"  placeholder="Nome do cliente"  style="background:#0a0a0a;border:1px solid #2a2a2a;border-radius:6px;padding:8px 10px;color:#e8e8e8;font-size:12px;outline:none;width:100%;box-sizing:border-box;">
+      <input id="ep-valor" placeholder="Valor R$"          style="background:#0a0a0a;border:1px solid #2a2a2a;border-radius:6px;padding:8px 10px;color:#e8e8e8;font-size:12px;outline:none;width:100%;box-sizing:border-box;" type="number">
+      <input id="ep-tel"   placeholder="Telefone"          style="background:#0a0a0a;border:1px solid #2a2a2a;border-radius:6px;padding:8px 10px;color:#e8e8e8;font-size:12px;outline:none;width:100%;box-sizing:border-box;">
+      <input id="ep-equip" placeholder="Equipamento/Defeito" style="background:#0a0a0a;border:1px solid #2a2a2a;border-radius:6px;padding:8px 10px;color:#e8e8e8;font-size:12px;outline:none;width:100%;box-sizing:border-box;">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
+      <button onclick="fecharEditarPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:7px 16px;border-radius:6px;border:1px solid #333;background:transparent;color:#666;cursor:pointer;">Cancelar</button>
+      <button onclick="salvarEditarPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:7px 16px;border-radius:6px;border:none;background:#f5c800;color:#000;font-weight:700;cursor:pointer;">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+
 
 <!-- Modal editar pipe -->
 <div id="modal-editar-pipe" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;align-items:center;justify-content:center;">
