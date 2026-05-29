@@ -198,14 +198,32 @@ html{scroll-behavior:smooth}body{background:var(--bg);color:var(--text);font-fam
 }
 
 @media(max-width:680px){
-  .checkout-overlay{padding:8px 6px;}
-  .checkout-modal{border-radius:12px;overflow:visible;}
-  .checkout-form-side{padding:20px 16px;}
+  .checkout-overlay{
+    padding:0 !important;
+    align-items:flex-start !important;
+    overflow-y:scroll !important;
+    -webkit-overflow-scrolling:touch !important;
+  }
+  .checkout-modal{
+    border-radius:0 !important;
+    min-height:100vh;
+    overflow:visible !important;
+    margin:0 !important;
+    max-width:100% !important;
+  }
   .checkout-product{padding:20px 16px;}
-  .checkout-form-side h2{font-size:16px;margin-bottom:16px;}
-  .checkout-price-big{font-size:24px;}
-  .btn-checkout-submit{padding:16px;font-size:15px;margin-top:12px;width:100%;display:block;}
-  .form-group input,.form-group select{font-size:16px;} /* evita zoom no iOS */
+  .checkout-form-side{padding:20px 16px 60px !important;}
+  .checkout-form-side h2{font-size:16px;margin-bottom:14px;}
+  .checkout-price-big{font-size:22px;}
+  .btn-checkout-submit{
+    padding:18px !important;
+    font-size:15px !important;
+    width:100% !important;
+    display:block !important;
+    margin-top:16px !important;
+  }
+  .form-group input,.form-group select{font-size:16px !important;}
+  .checkout-close-btn{display:none;}
 }
 </style>
 <!-- Vturb speed optimization -->

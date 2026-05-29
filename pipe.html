@@ -590,6 +590,54 @@ function moverColuna(phaseId,dir){
   render();
 }
 
+
+// ── VER DADOS PIPE ────────────────────────────────────────────────────────
+var _cardAtual = null;
+function abrirDadosPipe(id) {
+  _cardAtual = cards.find(function(c){ return c.id === id; });
+  if (!_cardAtual) { console.warn('card nao encontrado:', id); return; }
+  document.getElementById('pipe-d-id').textContent = _cardAtual.id + (_cardAtual.pipefyId ? ' · PF:'+_cardAtual.pipefyId : '');
+  document.getElementById('pd-nome').value  = _cardAtual.nomeContato || '';
+  document.getElementById('pd-tel').value   = _cardAtual.telefone    || '';
+  document.getElementById('pd-cpf').value   = _cardAtual.cpfCnpj     || '';
+  document.getElementById('pd-equip').value = _cardAtual.equipamento || '';
+  document.getElementById('pd-valor').value = _cardAtual.valor       || '';
+  document.getElementById('pd-desc').value  = _cardAtual.descricao   || '';
+  document.getElementById('pd-end').value   = _cardAtual.endereco    || '';
+  document.getElementById('pd-serv').value  = _cardAtual.servicos    || '';
+  document.getElementById('pipe-d-msg').style.display = 'none';
+  document.getElementById('ov-pipe-dados').style.display = 'flex';
+}
+function fecharDadosPipe() {
+  document.getElementById('ov-pipe-dados').style.display = 'none';
+  _cardAtual = null;
+}
+async function salvarDadosPipe() {
+  if (!_cardAtual) return;
+  var body = {
+    id: _cardAtual.id,
+    nomeContato: document.getElementById('pd-nome').value,
+    telefone:    document.getElementById('pd-tel').value,
+    cpfCnpj:     document.getElementById('pd-cpf').value,
+    equipamento: document.getElementById('pd-equip').value,
+    valor:       document.getElementById('pd-valor').value,
+    descricao:   document.getElementById('pd-desc').value,
+    endereco:    document.getElementById('pd-end').value,
+    servicos:    document.getElementById('pd-serv').value
+  };
+  var r = await fetch('/api/pipe?action=editar-pipe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
+  var msg = document.getElementById('pipe-d-msg');
+  if (r.ok) {
+    msg.textContent='✅ Salvo!'; msg.style.display='block';
+    msg.style.cssText='display:block;background:rgba(34,197,94,.1);color:#22c55e;padding:8px;border-radius:6px;font-size:11px;';
+    await load();
+    setTimeout(function(){ fecharDadosPipe(); }, 1200);
+  } else {
+    msg.textContent='Erro: '+r.error; msg.style.display='block';
+    msg.style.cssText='display:block;background:rgba(239,68,68,.1);color:#ef4444;padding:8px;border-radius:6px;font-size:11px;';
+  }
+}
+
 // ── INIT ──────────────────────────────────────────────────────────────────
 load();
 setInterval(load, 90000);
