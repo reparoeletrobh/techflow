@@ -173,7 +173,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 
 <script>
 const PHASE_COLORS = {
-  aguardando_aprovacao:'#f5c800',aprovados:'#22c55e',video_enviado:'#a855f7',
+  aguardando_aprovacao:'#f5c800',ultima_chamada:'#ef4444',aprovados:'#22c55e',video_enviado:'#a855f7',
   analise_compra:'#3b9eff',equipamento_comprado:'#3b9eff',programar_entrega:'#f5c800',
   solicitar_entrega:'#f97316',entrega_solicitada:'#f97316',receber:'#22c55e',erp:'#22c55e'
 };
@@ -228,7 +228,8 @@ function render(){
   document.getElementById('st-erp').textContent=cards.filter(c=>c.phase==='erp').length;
 
   const board=document.getElementById('board');
-  board.innerHTML=PHASES.map(ph=>{
+  var orderedPhases = loadColOrder(PHASES);
+  board.innerHTML=orderedPhases.map(ph=>{
     const cor=PHASE_COLORS[ph.id]||'#555';
     const phCards=cards.filter(c=>c.phase===ph.id);
     const opts=PHASES.filter(p=>p.id!==ph.id).map(p=>'<option value="'+p.id+'">'+p.name+'</option>').join('');
@@ -257,6 +258,7 @@ function render(){
             '<option value="">↕ Mover para…</option>'+opts+
           '</select>'+
           '<button class="cbtn cbtn-outline" onclick="toggleDados(\''+c.id+'\')">📋 Ver dados</button>'+
+          (c.pipefyId?'<button class="cbtn cbtn-outline" onclick="rastrearFicha(\''+c.pipefyId+'\')">🔍 Rastrear</button>':'')+
           '<button class="cbtn cbtn-blue'+(c.analiseCompra?' active':'')+'" onclick="toggleAC(\''+c.id+'\')" title="Marcar Análise de Compra">🛒</button>'+
           '<button class="cbtn cbtn-red" onclick="excluir(\''+c.id+'\')">✕</button>'+
         '</div>'+
@@ -274,7 +276,11 @@ function render(){
       '<div class="col-header">'+
         '<div class="col-top-stripe" style="background:'+cor+'"></div>'+
         '<div class="col-title"><div class="col-dot" style="background:'+cor+'"></div>'+ph.name+'</div>'+
+        '<div style="display:flex;align-items:center;gap:3px;">'+
         '<div class="col-count">'+phCards.length+'</div>'+
+        '<button onclick="moverColuna(\''+ph.id+'\',-1)" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:9px;padding:0 2px;" title="Mover esquerda">◀</button>'+
+        '<button onclick="moverColuna(\''+ph.id+'\',1)"  style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:9px;padding:0 2px;" title="Mover direita">▶</button>'+
+        '</div>'+
       '</div>'+
       cardsHtml+
     '</div>';
@@ -353,6 +359,123 @@ async function load(){
 
 load();
 setInterval(load,90000);
+
+// ── ÚLTIMA CHAMADA: incluída via override local ───────────────────────────
+// Última Chamada é gerenciada pelo Orçamento, mas pode aparecer aqui como fase
+if (!PHASE_COLORS['ultima_chamada']) PHASE_COLORS['ultima_chamada'] = '#ef4444';
+
+// ── RELATÓRIO ─────────────────────────────────────────────────────────────
+function showRelatorio(){
+  document.getElementById('painel-rel').style.display='block';
+  document.getElementById('rel-resultado').innerHTML=
+    '<div style="color:var(--muted);font-family:var(--fm);font-size:11px;padding:20px 0;">'+
+    'Clique em ▶ Rodar agora para comparar com o Pipefy em tempo real.</div>';
+  document.getElementById('rel-historico').style.display='none';
+}
+function fecharRelatorio(){ document.getElementById('painel-rel').style.display='none'; }
+
+async function rodarComparacao(){
+  const btn=document.getElementById('btn-rodar');
+  const res=document.getElementById('rel-resultado');
+  btn.textContent='⟳ Comparando…';btn.disabled=true;
+  res.innerHTML='<div style="color:var(--muted);font-family:var(--fm);font-size:11px;padding:20px 0;">Buscando dados do Pipefy…</div>';
+  try{
+    const r=await api('comparar-pipefy');
+    btn.textContent='▶ Rodar agora';btn.disabled=false;
+    if(!r.ok){res.innerHTML='<div style="color:var(--red);font-family:var(--fm);font-size:11px;">Erro: '+esc(r.error||'falha')+'</div>';return;}
+    renderResultado(r,res);
+  }catch(e){
+    btn.textContent='▶ Rodar agora';btn.disabled=false;
+    res.innerHTML='<div style="color:var(--red);font-family:var(--fm);font-size:11px;">Erro: '+esc(e.message)+'</div>';
+  }
+}
+
+function renderResultado(r,container){
+  var ts=r.ts?new Date(r.ts).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):'—';
+  var totDiv=r.faltando+r.extra+r.divergencia;
+  var html='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">';
+  html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;"><div style="font-family:var(--fm);font-size:9px;color:var(--muted);">PIPEFY</div><div style="font-family:var(--fm);font-size:20px;font-weight:700;color:var(--accent)">'+r.totalPipefy+'</div></div>';
+  html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;"><div style="font-family:var(--fm);font-size:9px;color:var(--muted);">NOSSO SISTEMA</div><div style="font-family:var(--fm);font-size:20px;font-weight:700;color:var(--blue)">'+r.totalNosso+'</div></div>';
+  html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;"><div style="font-family:var(--fm);font-size:9px;color:var(--muted);">SINCRONIZADOS</div><div style="font-family:var(--fm);font-size:20px;font-weight:700;color:var(--green)">'+r.ok+'</div></div>';
+  html+='<div style="background:var(--surface2);border:1px solid '+(totDiv>0?'rgba(239,68,68,.3)':'var(--border)')+';;border-radius:8px;padding:10px 14px;"><div style="font-family:var(--fm);font-size:9px;color:var(--muted);">DIVERGÊNCIAS</div><div style="font-family:var(--fm);font-size:20px;font-weight:700;color:'+(totDiv>0?'var(--red)':'var(--green)')+'">'+totDiv+'</div></div>';
+  html+='</div>';
+  html+='<div style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-bottom:10px;">'+ts+' · Faltando: '+r.faltando+' · Extra: '+r.extra+' · Fase divergente: '+r.divergencia+'</div>';
+  if(!r.log||!r.log.length){
+    html+='<div style="color:var(--green);font-family:var(--fm);font-size:11px;padding:12px;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.15);border-radius:8px;">✅ Nenhuma divergência encontrada</div>';
+  } else {
+    html+='<div style="display:flex;flex-direction:column;gap:5px;">';
+    for(var e of r.log){
+      var cor=e.tipo==='FALTANDO'?'#ef4444':e.tipo==='FASE_DIVERGENTE'?'#f97316':'#888';
+      var icon=e.tipo==='FALTANDO'?'❌':e.tipo==='FASE_DIVERGENTE'?'⚠️':'ℹ️';
+      html+='<div style="background:var(--surface2);border:1px solid var(--border);border-left:3px solid '+cor+';border-radius:8px;padding:10px 12px;">';
+      html+='<div style="font-family:var(--fm);font-size:9px;font-weight:700;color:'+cor+';margin-bottom:3px;">'+icon+' '+e.tipo+(e.fase?' · '+esc(e.fase):'')+'</div>';
+      html+='<div style="font-size:12px;font-weight:600;">'+(e.nomeContato?esc(e.nomeContato):(e.titulo?esc(e.titulo.substring(0,60)):''))+'</div>';
+      html+='<div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:3px;">'+esc(e.msg)+'</div>';
+      if(e.pipefyId)html+='<div style="font-family:var(--fm);font-size:9px;color:var(--dim);margin-top:2px;">PF: '+esc(e.pipefyId)+(e.nossoId?' · ID: '+esc(e.nossoId):'')+'</div>';
+      html+='</div>';
+    }
+    html+='</div>';
+  }
+  container.innerHTML=html;
+}
+
+async function carregarHistorico(){
+  const hDiv=document.getElementById('rel-historico');
+  hDiv.style.display=hDiv.style.display==='none'?'block':'none';
+  if(hDiv.style.display==='none')return;
+  hDiv.innerHTML='<div style="color:var(--muted);font-family:var(--fm);font-size:11px;">Carregando…</div>';
+  const r=await api('historico-log');
+  if(!r.ok||!r.entradas||!r.entradas.length){
+    hDiv.innerHTML='<div style="color:var(--muted);font-family:var(--fm);font-size:11px;margin-top:10px;">Nenhum histórico ainda.</div>';return;
+  }
+  var html='<div style="margin-top:12px;display:flex;flex-direction:column;gap:5px;">';
+  for(var e of r.entradas){
+    var ts=e.ts?new Date(e.ts).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):'—';
+    var div=e.faltando+e.extra+e.divergencia;
+    html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;display:flex;gap:12px;align-items:center;">';
+    html+='<span style="font-family:var(--fm);font-size:9px;color:var(--muted);">'+ts+'</span>';
+    html+='<span style="font-family:var(--fm);font-size:10px;">PF:'+e.totalPipefy+' / Nosso:'+e.totalNosso+'</span>';
+    html+='<span style="font-family:var(--fm);font-size:10px;color:'+(div>0?'var(--red)':'var(--green)')+';">'+(div>0?'⚠️ '+div+' divergência(s)':'✅ ok')+'</span>';
+    html+='</div>';
+  }
+  html+='</div>';
+  hDiv.innerHTML=html;
+}
+
+// ── RASTREAR ──────────────────────────────────────────────────────────────
+function rastrearFicha(pipefyId){
+  if(!pipefyId){toast('Esta ficha não tem ID Pipefy para rastrear',false);return;}
+  window.open('/rastrear?id='+encodeURIComponent(pipefyId),'_blank');
+}
+
+// ── REORDENAR COLUNAS ─────────────────────────────────────────────────────
+var colOrder = null;
+function loadColOrder(phases){
+  try{
+    var saved=localStorage.getItem('pipe_col_order');
+    if(saved){
+      var arr=JSON.parse(saved);
+      // Aplicar ordem salva, garantindo que todas as fases estão presentes
+      var ordered=arr.map(function(id){return phases.find(function(p){return p.id===id;});}).filter(Boolean);
+      phases.filter(function(p){return !arr.includes(p.id);}).forEach(function(p){ordered.push(p);});
+      return ordered;
+    }
+  }catch(e){}
+  return phases.slice();
+}
+function saveColOrder(phases){
+  try{localStorage.setItem('pipe_col_order',JSON.stringify(phases.map(function(p){return p.id;})));}catch(e){}
+}
+function moverColuna(phaseId,dir){
+  var ordered=loadColOrder(PHASES);
+  var idx=ordered.findIndex(function(p){return p.id===phaseId;});
+  if(idx<0)return;
+  var newIdx=idx+dir;
+  if(newIdx<0||newIdx>=ordered.length)return;
+  var tmp=ordered[idx];ordered[idx]=ordered[newIdx];ordered[newIdx]=tmp;
+  saveColOrder(ordered);
+  render();
+}
 </script>
 </body>
 </html>
