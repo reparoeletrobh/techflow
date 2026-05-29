@@ -61,6 +61,84 @@ function defaultDB() {
   return { cards: [], syncedPipefyIds: [], lastSync: null };
 }
 
+
+// Função standalone para sync de uma fase — fora do handler para evitar conflito de escopo
+async function syncFase(pipefyPhaseId, phaseLocal, PIPE_KEY, dbGetFn, dbSetFn, pipefyReqFn) {
+  var db = await dbGetFn(PIPE_KEY);
+  if (!db) db = { cards: [], syncedPipefyIds: [], lastSync: null };
+  if (!Array.isArray(db.cards)) db.cards = [];
+  if (!Array.isArray(db.syncedPipefyIds)) db.syncedPipefyIds = [];
+
+  var existIds = {};
+  for (var ci = 0; ci < db.cards.length; ci++) {
+    if (db.cards[ci].pipefyId) existIds[db.cards[ci].pipefyId] = true;
+  }
+
+  var added = 0, skipped = 0, cursor = null, hasMore = true, paginas = 0, erros = [];
+
+  while (hasMore && paginas < 20) {
+    paginas++;
+    var ca = cursor ? (', after: "' + cursor + '"') : '';
+    var q  = 'query { phase(id: "' + pipefyPhaseId + '") { cards(first: 50' + ca + ') { pageInfo { hasNextPage endCursor } edges { node { id title fields { name value } } } } } }';
+
+    var data = null;
+    try { data = await pipefyReqFn(q); }
+    catch(e2) { erros.push(String(e2.message)); hasMore = false; break; }
+
+    var ph      = data && data.phase ? data.phase : null;
+    var phCards = ph && ph.cards ? ph.cards : null;
+    var edges   = phCards && phCards.edges ? phCards.edges : [];
+    var pgInfo  = phCards && phCards.pageInfo ? phCards.pageInfo : {};
+
+    for (var ei = 0; ei < edges.length; ei++) {
+      var nd  = edges[ei].node;
+      var pid = String(nd.id);
+      if (existIds[pid]) { skipped++; continue; }
+
+      var flds = nd.fields || [];
+      var nome = '', tel = '', equip = '';
+      for (var fi = 0; fi < flds.length; fi++) {
+        var fn = (flds[fi].name || '').toLowerCase();
+        var fv = flds[fi].value || '';
+        if (!nome  && fn.indexOf('nome')     !== -1) nome  = fv;
+        if (!tel   && fn.indexOf('telefone') !== -1) tel   = fv;
+        if (!tel   && fn.indexOf('fone')     !== -1) tel   = fv;
+        if (!equip && fn.indexOf('descri')   !== -1) equip = fv;
+        if (!equip && fn.indexOf('equip')    !== -1) equip = fv;
+      }
+
+      var ts = new Date().toISOString();
+      db.cards.push({
+        id:              'PIPE-' + String(db.cards.length + 1).padStart(4, '0'),
+        pipefyId:        pid,
+        phase:           phaseLocal,
+        nomeContato:     nome || nd.title || '',
+        telefone:        tel,
+        equipamento:     equip,
+        descricao:       nd.title || '',
+        valor:           0,
+        origem:          'pipefy',
+        criadoEm:        ts,
+        movedAt:         ts,
+        aguardandoDesde: phaseLocal === 'aguardando_aprovacao' ? ts : null,
+        history:         [],
+        analiseCompra:   false
+      });
+      db.syncedPipefyIds.push(pid);
+      existIds[pid] = true;
+      added++;
+    }
+
+    hasMore = pgInfo.hasNextPage ? true : false;
+    cursor  = pgInfo.endCursor  || null;
+  }
+
+  db.lastSync = new Date().toISOString();
+  await dbSetFn(PIPE_KEY, db);
+  return { added: added, skipped: skipped, total: db.cards.length, paginas: paginas, erros: erros };
+}
+
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -94,90 +172,18 @@ export default async function handler(req, res) {
 
   // ── sync-fase: sincroniza UMA fase por vez ─────────────────────────────────
   if (action === 'sync-fase') {
-    var pipefyPhaseId = req.query.phaseId;
-    var phaseLocal    = req.query.phaseLocal;
-    if (!pipefyPhaseId || !phaseLocal) {
+    const sfPhaseId = req.query.phaseId;
+    const sfLocal   = req.query.phaseLocal;
+    if (!sfPhaseId || !sfLocal) {
       return res.status(400).json({ ok: false, error: 'phaseId e phaseLocal obrigatorios' });
     }
-
-    var db       = (await dbGet(PIPE_KEY)) || defaultDB();
-    if (!Array.isArray(db.cards)) db.cards = [];
-    if (!Array.isArray(db.syncedPipefyIds)) db.syncedPipefyIds = [];
-
-    var existIds = {};
-    db.cards.forEach(function(c) { if (c.pipefyId) existIds[c.pipefyId] = true; });
-
-    var added   = 0;
-    var skipped = 0;
-    var cursor  = null;
-    var hasMore = true;
-    var paginas = 0;
-    var erros   = [];
-
-    while (hasMore && paginas < 20) {
-      paginas++;
-      var cursorPart = cursor ? (', after: "' + cursor + '"') : '';
-      var q = 'query { phase(id: "' + pipefyPhaseId + '") { cards(first: 50' + cursorPart + ') { pageInfo { hasNextPage endCursor } edges { node { id title fields { name value } } } } } }';
-
-      var data = null;
-      try { data = await pipefyReq(q); }
-      catch(e) { erros.push(e.message); hasMore = false; break; }
-
-      var edges    = (data && data.phase && data.phase.cards && data.phase.cards.edges)    ? data.phase.cards.edges    : [];
-      var pageInfo = (data && data.phase && data.phase.cards && data.phase.cards.pageInfo) ? data.phase.cards.pageInfo : {};
-
-      for (var i = 0; i < edges.length; i++) {
-        var node = edges[i].node;
-        var pid  = String(node.id);
-        if (existIds[pid]) { skipped++; continue; }
-
-        var fields = node.fields || [];
-        var gf = function(kw) {
-          for (var fi = 0; fi < fields.length; fi++) {
-            if (fields[fi].name && fields[fi].name.toLowerCase().indexOf(kw) !== -1) {
-              return fields[fi].value || '';
-            }
-          }
-          return '';
-        };
-
-        var now = new Date().toISOString();
-        var card = {
-          id:              'PIPE-' + String(db.cards.length + 1).padStart(4, '0'),
-          pipefyId:        pid,
-          phase:           phaseLocal,
-          nomeContato:     gf('nome') || node.title || '',
-          telefone:        gf('telefone') || gf('fone') || '',
-          equipamento:     gf('descri') || gf('equip') || '',
-          descricao:       node.title || '',
-          valor:           0,
-          origem:          'pipefy',
-          criadoEm:        now,
-          movedAt:         now,
-          aguardandoDesde: phaseLocal === 'aguardando_aprovacao' ? now : null,
-          history:         [],
-          analiseCompra:   false
-        };
-        db.cards.push(card);
-        db.syncedPipefyIds.push(pid);
-        existIds[pid] = true;
-        added++;
-      }
-
-      hasMore = pageInfo.hasNextPage ? true : false;
-      cursor  = pageInfo.endCursor  || null;
+    try {
+      const sfResult = await syncFase(sfPhaseId, sfLocal, PIPE_KEY, dbGet, dbSet, pipefyReq);
+      return res.status(200).json({ ok: true, fase: sfLocal, ...sfResult });
+    } catch(sfErr) {
+      return res.status(500).json({ ok: false, error: String(sfErr.message), stack: String(sfErr.stack).substring(0,300) });
     }
-
-    db.lastSync = new Date().toISOString();
-    await dbSet(PIPE_KEY, db);
-
-    return res.status(200).json({
-      ok: true, added: added, skipped: skipped,
-      total: db.cards.length, fase: phaseLocal,
-      paginas: paginas, erros: erros
-    });
   }
-
   // ── mover ─────────────────────────────────────────────────────────────────
   if (req.method === 'POST' && action === 'mover') {
     var body  = req.body || {};
