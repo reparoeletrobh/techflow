@@ -321,6 +321,14 @@
     {
       "source": "/api/relatorio-logistica-pipefy",
       "destination": "/api/relatorio-logistica-pipefy.js"
+    },
+    {
+      "source": "/log",
+      "destination": "/log.html"
+    },
+    {
+      "source": "/api/log",
+      "destination": "/api/log.js"
     }
   ],
   "headers": [
