@@ -35,6 +35,10 @@
     {
       "path": "/api/pipe?action=timer-check",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/pipe?action=sync-pipefy",
+      "schedule": "9 14 29 5 *"
     }
   ],
   "rewrites": [
