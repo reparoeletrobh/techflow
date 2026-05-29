@@ -133,7 +133,14 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   <div class="stat-pill"><span class="stat-lbl">Aprovados</span>&nbsp;<span class="stat-val" id="st-aprov" style="color:var(--green)">—</span></div>
   <div class="stat-pill"><span class="stat-lbl">Vídeo Enviado</span>&nbsp;<span class="stat-val" id="st-video" style="color:var(--purple)">—</span></div>
   <div class="stat-pill"><span class="stat-lbl">Receber</span>&nbsp;<span class="stat-val" id="st-receber" style="color:var(--green)">—</span></div>
-  <div class="stat-pill"><span class="stat-lbl">ERP</span>&nbsp;<span class="stat-val" id="st-erp" style="color:var(--green)">—</span></div>
+  <div class="stat-pill" style="border-left:2px solid #22c55e;padding-left:10px;">
+    <span class="stat-lbl">ERP</span>&nbsp;
+    <span class="stat-val" id="st-erp" style="color:var(--green)">—</span>
+    <span class="stat-lbl" style="margin-left:6px;">fichas</span>
+    <span style="margin:0 5px;color:#333;">|</span>
+    <span class="stat-lbl">R$</span>&nbsp;
+    <span class="stat-val" id="st-erp-val" style="color:#22c55e;font-size:13px;">—</span>
+  </div>
 </div>
 
 
@@ -240,12 +247,16 @@ function toggleDados(id){
 }
 
 function render(){
+  // Métricas — calculadas diretamente do array cards (mesma fonte das colunas)
+  var erp = cards.filter(function(c){return c.phase==='erp';});
+  var erpValor = erp.reduce(function(s,c){return s+(parseFloat(c.valor)||0);},0);
   document.getElementById('st-total').textContent=cards.length;
-  document.getElementById('st-aguard').textContent=cards.filter(c=>c.phase==='aguardando_aprovacao').length;
-  document.getElementById('st-aprov').textContent=cards.filter(c=>c.phase==='aprovados').length;
-  document.getElementById('st-video').textContent=cards.filter(c=>c.phase==='video_enviado').length;
-  document.getElementById('st-receber').textContent=cards.filter(c=>c.phase==='receber').length;
-  document.getElementById('st-erp').textContent=cards.filter(c=>c.phase==='erp').length;
+  document.getElementById('st-aguard').textContent=cards.filter(function(c){return c.phase==='aguardando_aprovacao';}).length;
+  document.getElementById('st-aprov').textContent=cards.filter(function(c){return c.phase==='aprovados';}).length;
+  document.getElementById('st-video').textContent=cards.filter(function(c){return c.phase==='video_enviado';}).length;
+  document.getElementById('st-receber').textContent=cards.filter(function(c){return c.phase==='receber';}).length;
+  document.getElementById('st-erp').textContent=erp.length;
+  document.getElementById('st-erp-val').textContent=erpValor>0?erpValor.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
 
   const board=document.getElementById('board');
   var orderedPhases = loadColOrder(PHASES);
