@@ -9,8 +9,6 @@ const PIPEFY_API    = 'https://api.pipefy.com/graphql';
 // Fases que existem no pipeline
 const PHASES = [
   { id:'aguardando_aprovacao', name:'Aguardando Aprovação', cor:'#f5c800' },
-  { id:'sem_resposta',         name:'Sem Resposta',         cor:'#f97316' },
-  { id:'ultima_chamada',       name:'Última Chamada',       cor:'#ef4444' },
   { id:'aprovados',            name:'Aprovados',            cor:'#22c55e' },
   { id:'video_enviado',        name:'Vídeo Enviado',        cor:'#a855f7' },
   { id:'analise_compra',       name:'Análise de Compra',    cor:'#3b9eff' },
@@ -167,30 +165,9 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok:true, analiseCompra:card.analiseCompra });
   }
 
-  // ── GET timer-check: move fichas com mais de 48h/72h (cron) ───────────────
+  // timer-check removido — Sem Resposta e Última Chamada já existem em Orçamento
   if (action === 'timer-check') {
-    const db     = (await dbGet(PIPE_KEY)) || defaultDB();
-    const agora  = Date.now();
-    let moved    = 0;
-    for (const card of db.cards) {
-      if (!card.aguardandoDesde) continue;
-      const desde  = new Date(card.aguardandoDesde).getTime();
-      const horas  = (agora - desde) / 3600000;
-      const now    = new Date().toISOString();
-      if (card.phase === 'aguardando_aprovacao' && horas >= 48) {
-        card.history = [...(card.history||[]), { phase:'aguardando_aprovacao', ts:now, via:'timer_48h' }];
-        card.phase   = 'sem_resposta';
-        card.movedAt = now;
-        moved++;
-      } else if (card.phase === 'sem_resposta' && horas >= 72) {
-        card.history = [...(card.history||[]), { phase:'sem_resposta', ts:now, via:'timer_72h' }];
-        card.phase   = 'ultima_chamada';
-        card.movedAt = now;
-        moved++;
-      }
-    }
-    if (moved > 0) await dbSet(PIPE_KEY, db);
-    return res.status(200).json({ ok:true, moved, total:db.cards.length });
+    return res.status(200).json({ ok:true, info:'gerenciado pelo modulo Orcamento', moved:0 });
   }
 
   // ── GET sync-pipefy: espelha fases do Pipefy ──────────────────────────────
@@ -200,65 +177,52 @@ export default async function handler(req, res) {
     const existIds = new Set(db.cards.map(c => c.pipefyId).filter(Boolean));
     let   added    = 0, skipped = 0;
 
-    try {
-      // Buscar estrutura do pipe com cards
-      let cursor = null;
-      let phases = [];
-      // Buscar todas as fases e seus cards
-      const data = await pipefyQ(`query {
-        pipe(id: "${PIPE_ID}") {
-          phases {
-            id name
-            cards(first: 50) {
-              pageInfo { hasNextPage endCursor }
-              edges { node {
-                id title
-                fields { name value }
-                phases_history { phase { id name } firstTimeIn lastTimeIn }
-              }}
-            }
-          }
-        }
-      }`);
-      phases = data?.pipe?.phases || [];
-    } catch(e) {
-      return res.status(500).json({ ok:false, error:'Pipefy: ' + e.message });
+    // 1. Buscar estrutura do pipe para descobrir IDs de cada fase
+    const estrutura = await pipefyQ(`query { pipe(id:"${PIPE_ID}") { phases { id name } } }`).catch(()=>null);
+    if (!estrutura?.pipe?.phases) {
+      return res.status(500).json({ ok:false, error:'Pipefy: falha ao buscar estrutura do pipe' });
     }
 
-    // Reler após a declaração acima
-    const data2 = await pipefyQ(`query {
-      pipe(id: "${PIPE_ID}") {
-        phases {
-          id name
-          cards(first: 50) {
-            edges { node {
-              id title
-              fields { name value }
-            }}
-          }
-        }
-      }
-    }`).catch(() => null);
+    // Mapear fases por keyword
+    const phaseIdMap = {};
+    for (const ph of estrutura.pipe.phases) {
+      const phLocal = detectPhase(ph.name);
+      if (phLocal) phaseIdMap[ph.id] = phLocal;
+    }
 
-    const phases2 = data2?.pipe?.phases || [];
+    if (Object.keys(phaseIdMap).length === 0) {
+      return res.status(200).json({ ok:true, added:0, skipped:0, info:'Nenhuma fase mapeada — verifique FASES_ESPELHO' });
+    }
 
-    for (const ph of phases2) {
-      const phaseLocal = detectPhase(ph.name);
-      if (!phaseLocal) { skipped += (ph.cards?.edges||[]).length; continue; }
+    // 2. Buscar cards de cada fase mapeada
+    for (const [pipefyPhaseId, phaseLocal] of Object.entries(phaseIdMap)) {
+      let cursor = null;
+      do {
+        const cursorArg = cursor ? `, after:"${cursor}"` : '';
+        const qCards = `query { phase(id:"${pipefyPhaseId}") { cards(first:50${cursorArg}) {
+          pageInfo { hasNextPage endCursor }
+          edges { node { id title fields { name value } } }
+        }}}`;
+        const phData = await pipefyQ(qCards).catch(()=>null);
+        const pageInfo = phData?.phase?.cards?.pageInfo || {};
+        const edges    = phData?.phase?.cards?.edges   || [];
 
-      for (const edge of (ph.cards?.edges||[])) {
-        const node = edge.node;
-        const pid  = String(node.id);
-        if (existIds.has(pid)) { skipped++; continue; }
+        for (const edge of edges) {
+          const node = edge.node;
+          const pid  = String(node.id);
+          skipped++;
+          if (existIds.has(pid)) continue;
+          skipped--;
 
-        const getField = (kw) => {
-          const f = (node.fields||[]).find(f => f.name?.toLowerCase().includes(kw));
-          return f?.value || '';
-        };
+          const getField = (kw) => {
+            const f = (node.fields||[]).find(f => f.name?.toLowerCase().includes(kw));
+            return f?.value || '';
+          };
 
-        const now  = new Date().toISOString();
-        const card = {
-          id:             nextId([...db.cards, ...Array(added).fill({id:'PIPE-0000'})]),
+          const now  = new Date().toISOString();
+          added++;
+          const card = {
+          id:             'PIPE-' + String(db.cards.length + added).padStart(4,'0'),
           pipefyId:       pid,
           phase:          phaseLocal,
           nomeContato:    getField('nome') || node.title || '',
