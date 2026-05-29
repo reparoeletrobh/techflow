@@ -333,8 +333,8 @@ export default async function handler(req, res) {
   }
 
   // ── POST force-board: força criação de card no board pelo id do Pipe ───────
-  if (req.method === 'POST' && action === 'force-board') {
-    const { pipeId } = req.body || {};
+  if (action === 'force-board') {  // aceita GET e POST
+    const { pipeId } = req.body || req.query || {};
     if (!pipeId) return res.status(400).json({ ok:false, error:'pipeId obrigatorio' });
     const pipeDb  = (await dbGet(PIPE_KEY)) || defaultDB();
     const card    = (pipeDb.cards || []).find(c => c.id === pipeId);
