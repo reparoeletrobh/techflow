@@ -364,11 +364,7 @@ let selId = null, curPage = 'painel';
 
 // ── API ──────────────────────────────────────────────────────
 async function api(action, body) {
-  // Tenta /api/financeiro, com fallback para /api/pipe se load falhar
-  var _finUrl = action === 'load'
-    ? '/api/pipe?action=fin-load'
-    : `/api/financeiro?action=${action}`;
-  const r = await fetch(_finUrl, body ? {
+  const r = await fetch(`/api/financeiro?action=${action}`, body ? {
     method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
   } : {});
   return r.json();
