@@ -657,7 +657,11 @@ function buildCard(f){
     btns.innerHTML='<button class="fl-btn" onclick=\'abrirAnalise('+JSON.stringify(f.id)+')\'>🔧 ANÁLISE TÉCNICA</button>';
   }
   if(f.phase==='orcamento_cadastrado'){
-    btns.innerHTML='<button class="fl-btn" onclick=\'abrirOrcCad('+JSON.stringify(f.id)+')\'>💬 VER ORÇAMENTO</button>';
+    var wppCls = f.orcEnviadoWpp ? 'green' : 'red';
+    var wppLbl = f.orcEnviadoWpp ? '✅ ORC. ENVIADO' : '📲 ENVIAR ORC. WPP';
+    btns.innerHTML=
+      '<button class="fl-btn" onclick=\'abrirOrcCad('+JSON.stringify(f.id)+')\'>💬 VER ORÇAMENTO</button>'+
+      '<button class="fl-btn '+wppCls+'" id="wpp-btn-'+f.id+'" onclick=\'marcarOrcWpp('+JSON.stringify(f.id)+')\'>'+ wppLbl +'</button>';
   }
   if(f.phase==='producao'){
     btns.innerHTML='<button class="fl-btn blue" onclick=\'abrirEndereco('+JSON.stringify(f.id)+')\'>📍 CADASTRAR ENDEREÇO</button>';
@@ -683,6 +687,29 @@ function buildCard(f){
   }
   d.appendChild(btns);
   return d;
+}
+
+
+async function marcarOrcWpp(id) {
+  var f = fichas.find(function(x){ return x.id === id; });
+  if (!f || f.orcEnviadoWpp) return; // já marcado
+  try {
+    var r = await fetch('/api/frenteloja?action=marcar-orc-whatsapp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: id })
+    });
+    var d = await r.json();
+    if (d.ok) {
+      f.orcEnviadoWpp = true;
+      var btn = document.getElementById('wpp-btn-' + id);
+      if (btn) {
+        btn.className = 'fl-btn green';
+        btn.textContent = '✅ ORC. ENVIADO';
+        btn.onclick = null; // desabilitar novo clique
+      }
+    }
+  } catch(e) { console.error('marcarOrcWpp:', e.message); }
 }
 
 function avisarCliente(id){

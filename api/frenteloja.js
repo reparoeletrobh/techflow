@@ -270,6 +270,20 @@ export default async function handler(req,res){
     return res.status(200).json({ ok:true, finalizado:true, id:ficha.id, nome:ficha.nomeContato, fase:'conserto_realizado' });
   }
 
+
+  // ── POST marcar-orc-whatsapp: marca orçamento como enviado pelo WhatsApp ──
+  if (req.method === 'POST' && action === 'marcar-orc-whatsapp') {
+    const { id } = req.body || {};
+    if (!id) return res.status(400).json({ ok:false, error:'id obrigatorio' });
+    const db = await dbGet(FL_KEY) || defaultDB();
+    const ficha = db.fichas.find(f => f.id === id);
+    if (!ficha) return res.status(404).json({ ok:false, error:'ficha nao encontrada' });
+    ficha.orcEnviadoWpp     = true;
+    ficha.orcEnviadoWppEm   = new Date().toISOString();
+    await dbSet(FL_KEY, db);
+    return res.status(200).json({ ok:true, id });
+  }
+
   if(req.method==='POST'&&action==='conserto-realizado'){
     const {pipefyCardId, fichaId}=req.body||{};
     if(!pipefyCardId && !fichaId)
