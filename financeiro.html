@@ -524,6 +524,7 @@ function cardHTML(r, color) {
       ${r.cpfCnpj   ? `<div class="fc-cpf">📄 ${r.cpfCnpj}</div>` : ''}
       ${r.phaseId==='pagamento_agendado' && r.dataAgendadaDisplay ? `<div style="font-family:var(--fm);font-size:10px;color:#e879f9;margin-top:4px;">⏰ Cobrança: ${r.dataAgendadaDisplay}</div>` : ''}
       ${r.phaseId==='analise_pagamento' ? `<div style="font-family:var(--fm);font-size:10px;color:#0ea5e9;margin-top:4px;">🔍 Aguardando análise${r.anexo ? ' · 📎 com comprovante' : ''}</div>` : ''}
+      <div style="margin-top:8px;text-align:right;"><button onclick="abrirEditarFin('${r.id}')" style="font-family:var(--fm);font-size:10px;padding:3px 10px;border-radius:5px;border:1px solid #333;background:transparent;color:#888;cursor:pointer;">✏️ Editar</button></div>
       ${r.phaseId==='pagamento_confirmado' ? `<div style="font-family:var(--fm);font-size:10px;color:#22c55e;margin-top:4px;">✅ Pagamento confirmado</div>` : ''}
       ${r.phaseId==='entrega_agendada' && r.dataAgendadaDisplay ? `<div style="font-family:var(--fm);font-size:10px;color:#f97316;margin-top:4px;">📅 ${r.dataAgendadaDisplay}</div>` : ''}
       ${r.age != null ? `<div class="fc-age">🕐 ${r.age}d</div>` : ''}
@@ -1118,6 +1119,42 @@ async function moverFicha(id, fase) {
 }
 
 // ── INIT ──────────────────────────────────────────────────────
+
+function abrirEditarFin(id) {
+  var rec = records.find(function(r){ return r.id === id; });
+  if (!rec) return;
+  document.getElementById('ef-id').value    = id;
+  document.getElementById('ef-nome').value  = rec.nomeContato || rec.title || '';
+  document.getElementById('ef-valor').value = rec.valor || rec.preco || '';
+  document.getElementById('ef-tel').value   = rec.telefone || '';
+  document.getElementById('ef-equip').value = rec.equipamento || rec.descricao || '';
+  document.getElementById('ef-cpf').value   = rec.cpfCnpj || '';
+  document.getElementById('ef-end').value   = rec.endereco || '';
+  document.getElementById('ef-serv').value  = rec.servicos || '';
+  var m = document.getElementById('modal-editar-fin');
+  m.style.display = 'flex';
+  m.onclick = function(e){ if(e.target===m) m.style.display='none'; };
+}
+async function salvarEditarFin() {
+  var id = document.getElementById('ef-id').value;
+  var body = {
+    id:          id,
+    nomeContato: document.getElementById('ef-nome').value,
+    valor:       document.getElementById('ef-valor').value,
+    telefone:    document.getElementById('ef-tel').value,
+    equipamento: document.getElementById('ef-equip').value,
+    cpfCnpj:     document.getElementById('ef-cpf').value,
+    endereco:    document.getElementById('ef-end').value,
+    servicos:    document.getElementById('ef-serv').value
+  };
+  try {
+    var r = await fetch('/api/pipe?action=editar-fin', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    var d = await r.json();
+    if (d.ok) { document.getElementById('modal-editar-fin').style.display='none'; await load(); }
+    else alert('Erro: ' + d.error);
+  } catch(e) { alert('Erro: ' + e.message); }
+}
+
 load();
 showPage('kanban'); // abre em Fichas por padrão
 syncPipefy();
@@ -1454,6 +1491,39 @@ function exportarLinksMP() {
     </div>
   </div>
 </div>
+
+
+<!-- Modal editar financeiro -->
+<div id="modal-editar-fin" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;align-items:center;justify-content:center;">
+  <div style="background:#111;border:1px solid #2a2a2a;border-radius:12px;padding:24px;width:440px;max-width:95vw;max-height:90vh;overflow-y:auto;">
+    <div style="font-family:var(--fh);font-size:15px;font-weight:800;margin-bottom:16px;">✏️ Editar Ficha Financeiro</div>
+    <input type="hidden" id="ef-id">
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <label style="font-family:var(--fm);font-size:10px;color:#666;">NOME</label>
+      <input id="ef-nome" class="ef-inp" placeholder="Nome do cliente">
+      <label style="font-family:var(--fm);font-size:10px;color:#666;">VALOR (R$)</label>
+      <input id="ef-valor" class="ef-inp" placeholder="0.00">
+      <label style="font-family:var(--fm);font-size:10px;color:#666;">TELEFONE</label>
+      <input id="ef-tel" class="ef-inp" placeholder="Telefone">
+      <label style="font-family:var(--fm);font-size:10px;color:#666;">EQUIPAMENTO</label>
+      <input id="ef-equip" class="ef-inp" placeholder="Equipamento">
+      <label style="font-family:var(--fm);font-size:10px;color:#666;">CPF / CNPJ</label>
+      <input id="ef-cpf" class="ef-inp" placeholder="000.000.000-00">
+      <label style="font-family:var(--fm);font-size:10px;color:#666;">ENDEREÇO</label>
+      <input id="ef-end" class="ef-inp" placeholder="Endereço completo">
+      <label style="font-family:var(--fm);font-size:10px;color:#666;">SERVIÇOS</label>
+      <textarea id="ef-serv" class="ef-inp" rows="2" placeholder="Serviços realizados" style="resize:vertical;"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
+      <button onclick="document.getElementById('modal-editar-fin').style.display='none'" style="font-family:var(--fm);font-size:11px;padding:7px 16px;border-radius:6px;border:1px solid #2a2a2a;background:transparent;color:#666;cursor:pointer;">Cancelar</button>
+      <button onclick="salvarEditarFin()" style="font-family:var(--fm);font-size:11px;padding:7px 16px;border-radius:6px;border:none;background:#f5c800;color:#000;font-weight:700;cursor:pointer;">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+<style>
+.ef-inp{background:#0a0a0a;border:1px solid #2a2a2a;border-radius:6px;padding:8px 10px;color:#e8e8e8;font-size:12px;outline:none;font-family:var(--fb);width:100%;box-sizing:border-box;}
+.ef-inp:focus{border-color:#f5c800;}
+</style>
 
 </body>
 </html>
