@@ -169,6 +169,34 @@ export default async function handler(req, res) {
     }
   }
 
+
+  // ── GET test-fase: testa buscar cards de uma fase específica ──────────────
+  if (action === 'test-fase') {
+    const phaseId = req.query.phaseId || '334875152'; // default: Aguardando Aprovação
+    try {
+      const data = await pipefyQ(
+        `query { phase(id:"${phaseId}") { name cards(first:10) {
+          pageInfo { hasNextPage totalCount }
+          edges { node { id title fields { name value } } }
+        }}}`
+      );
+      const cards = (data?.phase?.cards?.edges||[]).map(e => ({
+        id:    e.node.id,
+        title: e.node.title,
+        campos: (e.node.fields||[]).filter(f=>f.value).map(f=>f.name+': '+f.value).slice(0,3)
+      }));
+      return res.status(200).json({
+        ok:true,
+        phase: data?.phase?.name,
+        total: data?.phase?.cards?.pageInfo?.totalCount,
+        amostra: cards,
+        hasMore: data?.phase?.cards?.pageInfo?.hasNextPage
+      });
+    } catch(e) {
+      return res.status(500).json({ ok:false, error:e.message });
+    }
+  }
+
   // ── GET sync-pipefy ───────────────────────────────────────────────────────
   if (action === 'sync-pipefy') {
     if (!PIPEFY_TOKEN) return res.status(400).json({ ok:false, error:'PIPEFY_TOKEN não configurado' });
