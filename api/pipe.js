@@ -406,6 +406,85 @@ export default async function handler(req, res) {
     }
   }
 
+
+  // ── GET video-para-financeiro: cria fichas no financeiro para cards em video_enviado após 15h ──
+  if (action === 'video-para-financeiro') {
+    try {
+      // Limite: 15h horário Brasília = 18h UTC
+      var hoje = new Date();
+      var limite = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), hoje.getUTCDate(), 18, 0, 0)); // 15h BRT = 18h UTC
+      
+      // Ler Pipe
+      var pipeDb = (await dbGet(PIPE_KEY)) || defaultDB();
+      var candidatos = (pipeDb.cards || []).filter(function(c) {
+        if (c.phase !== 'video_enviado') return false;
+        // Verificar se foi movido após as 15h hoje
+        var movedAt = c.movedAt ? new Date(c.movedAt) : null;
+        if (!movedAt) return false;
+        return movedAt >= limite;
+      });
+
+      if (!candidatos.length) {
+        return res.status(200).json({ ok: true, criados: 0, info: 'Nenhum card em video_enviado após 15h hoje', limite: limite.toISOString() });
+      }
+
+      // Ler Financeiro
+      var U3 = (process.env.UPSTASH_URL   || '').replace(/['"]/g,'').trim();
+      var T3 = (process.env.UPSTASH_TOKEN || '').replace(/['"]/g,'').trim();
+      async function _fg(k){var r=await fetch(U3+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T3,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});var j=await r.json();var v=j[0]?.result;if(!v)return null;try{var val=JSON.parse(v);if(typeof val==='string')val=JSON.parse(val);return(val&&typeof val==='object')?val:null;}catch(e){return null;}}
+      async function _fs(k,v){await fetch(U3+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T3,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+
+      var finDb = await _fg('reparoeletro_financeiro');
+      if (!finDb || !Array.isArray(finDb.records)) finDb = { records: [], syncedIds: [], movesLog: [] };
+
+      var criados = [];
+      var ignorados = [];
+
+      for (var i = 0; i < candidatos.length; i++) {
+        var card = candidatos[i];
+        var pid  = card.pipefyId || ('PIPE-LOCAL-' + card.id);
+        // Verificar se já existe no financeiro
+        var jaExiste = finDb.records.find(function(r) {
+          return (card.pipefyId && r.pipefyId === String(card.pipefyId)) ||
+                 (r.osCode && r.osCode === card.id);
+        });
+        if (jaExiste) { ignorados.push({ id: card.id, ficha: card.nomeContato, motivo: 'já existe (phase: '+jaExiste.phaseId+')' }); continue; }
+
+        var novoRec = {
+          id:          'FIN-' + card.id,
+          pipefyId:    card.pipefyId ? String(card.pipefyId) : null,
+          osCode:      card.id,
+          nomeContato: card.nomeContato || '',
+          telefone:    card.telefone    || '',
+          equipamento: card.equipamento || card.descricao || '',
+          valor:       card.valor || 0,
+          phaseId:     'aguardando_dados',
+          criadoEm:    now,
+          movedAt:     now,
+          history:     [{ phaseId: 'aguardando_dados', ts: now }],
+          origem:      'video_enviado_manual'
+        };
+        finDb.records.unshift(novoRec);
+        criados.push({ id: novoRec.id, ficha: novoRec.nomeContato, pipefyId: novoRec.pipefyId, valor: novoRec.valor });
+      }
+
+      if (criados.length > 0) {
+        await _fs('reparoeletro_financeiro', finDb);
+      }
+
+      return res.status(200).json({
+        ok: true,
+        criados: criados.length,
+        ignorados: ignorados.length,
+        fichas: criados,
+        jaTinham: ignorados,
+        limite: limite.toISOString()
+      });
+    } catch(e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
