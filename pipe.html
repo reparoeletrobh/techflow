@@ -404,25 +404,47 @@ async function salvarNovo(){
 }
 
 async function load(){
+  // 1. Buscar erp-count (primária Redis, sem cache) ANTES do load principal
+  var erpAutoritativo = 0;
+  try {
+    var ec0 = await fetch('/api/pipe?action=erp-count&_t='+Date.now()).then(function(x){return x.json();});
+    if(ec0.ok) erpAutoritativo = ec0.erp;
+  } catch(e){}
+
+  // 2. Buscar todos os cards
   const r=await api('load');
   if(!r.ok)return;
   PHASES.length=0;
   (r.phases||[]).forEach(p=>PHASES.push(p));
   cards=r.cards||[];
+
+  // 3. Se o load retornou menos ERP do que o autoritativo, buscar cards ERP faltantes
+  var erpNoLoad = cards.filter(function(c){return c.phase==='erp';}).length;
+  if(erpAutoritativo > erpNoLoad){
+    try {
+      var extra = await fetch('/api/pipe?action=erp-cards&_t='+Date.now()).then(function(x){return x.json();});
+      if(extra.ok && Array.isArray(extra.cards)){
+        // Adicionar cards que não estão em cards[] por pipefyId
+        var idsLocal = {};
+        cards.forEach(function(c){if(c.pipefyId) idsLocal[c.pipefyId]=true; if(c.id) idsLocal[c.id]=true;});
+        extra.cards.forEach(function(c){
+          if(!idsLocal[c.pipefyId||''] && !idsLocal[c.id||'']) cards.push(c);
+        });
+      }
+    } catch(e){}
+  }
+
   if(r.lastSync){
     const d=new Date(r.lastSync);
     document.getElementById('last-sync').textContent=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
   }
   render();
-  // Buscar ERP count diretamente do Redis (garante dado fresco, independente de cache)
-  try {
-    var ec = await fetch('/api/pipe?action=erp-count&_t='+Date.now()).then(function(r){return r.json();});
-    if(ec.ok){
-      document.getElementById('st-erp').textContent = ec.erp;
-      document.getElementById('st-erp-val').textContent = ec.valor>0?ec.valor.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
-      document.getElementById('st-total').textContent = ec.total;
-    }
-  } catch(e){}
+
+  // 4. Atualizar stats ERP com valor autoritativo
+  var erpFinal = cards.filter(function(c){return c.phase==='erp';}).length;
+  var erpValor = cards.filter(function(c){return c.phase==='erp';}).reduce(function(s,c){return s+(parseFloat(c.valor)||0);},0);
+  document.getElementById('st-erp').textContent = erpFinal;
+  document.getElementById('st-erp-val').textContent = erpValor>0?erpValor.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
 }
 
 

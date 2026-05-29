@@ -1033,6 +1033,15 @@ export default async function handler(req, res) {
   }
 
 
+
+  // ── GET erp-cards: retorna todos os cards em fase ERP ────────────────────
+  if (action === 'erp-cards') {
+    res.setHeader('Cache-Control','no-store,no-cache');
+    var db3 = await dbGet(PIPE_KEY);
+    var erpCards = (db3&&db3.cards)?db3.cards.filter(function(c){return c.phase==='erp';}):[];
+    return res.status(200).json({ok:true, count:erpCards.length, cards:erpCards});
+  }
+
   // ── GET erp-count: conta ERP diretamente do Redis (sem cache) ────────────
   if (action === 'erp-count') {
     res.setHeader('Cache-Control','no-store,no-cache');

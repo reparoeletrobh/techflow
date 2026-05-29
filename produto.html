@@ -695,9 +695,26 @@ function finalizarCarrinho(){
 
 // ── Modal Checkout ──────────────────────────────────────────
 function abrirCK(cart){
+  // Mobile: salvar carrinho e ir para página de checkout dedicada
+  if(window.innerWidth <= 700){
+    try{ sessionStorage.setItem('ck_cart', JSON.stringify(cart)); }catch(e){}
+    renderResumoCK(cart, isPix());
+    document.getElementById('ck-overlay').classList.add('open');
+    // Forçar scroll para o topo do overlay após abertura
+    setTimeout(function(){
+      var ov = document.getElementById('ck-overlay');
+      var sc = ov.querySelector('.ck-scroller');
+      if(sc) sc.scrollTop = 0;
+      else ov.scrollTop = 0;
+      var inp = document.getElementById('ck-nome');
+      if(inp) inp.focus();
+    }, 100);
+    return;
+  }
+  // Desktop: modal normal
   renderResumoCK(cart, isPix());
   document.getElementById('ck-overlay').classList.add('open');
-  if(window.innerWidth > 700) document.body.style.overflow='hidden';
+  document.body.style.overflow='hidden';
   setTimeout(function(){document.getElementById('ck-nome').focus();},200);
 }
 
