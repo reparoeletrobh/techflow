@@ -153,6 +153,40 @@ html,body{height:100vh;overflow:hidden;background:var(--bg);color:var(--text);fo
   .hamburger{position:fixed;top:12px;left:12px;}
 }
 @media(min-width:769px){.hamburger,.mobile-overlay{display:none!important;}}
+
+/* ── PAINEL LOG ─────────────────────────────────────── */
+.log-panel{position:fixed;top:0;right:-640px;width:640px;height:100vh;background:var(--surface);border-left:1px solid var(--border);z-index:600;display:flex;flex-direction:column;transition:right .25s cubic-bezier(.4,0,.2,1);box-shadow:-4px 0 32px rgba(0,0,0,.5);}
+.log-panel.open{right:0;}
+.log-hdr{display:flex;align-items:center;gap:10px;padding:0 16px;height:50px;border-bottom:2px solid var(--accent);flex-shrink:0;}
+.log-hdr-title{font-family:var(--fh);font-size:13px;font-weight:800;}
+.log-hdr-right{margin-left:auto;display:flex;gap:6px;align-items:center;}
+.log-tbr{display:flex;gap:6px;padding:8px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;flex-shrink:0;}
+.log-sel{background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:4px 8px;color:var(--text);font-family:var(--fm);font-size:10px;}
+.log-inp{background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:4px 9px;color:var(--text);font-family:var(--fm);font-size:10px;outline:none;width:140px;}
+.log-inp:focus{border-color:var(--accent);}
+.log-body{flex:1;overflow-y:auto;overflow-x:hidden;}
+.log-body::-webkit-scrollbar{width:3px;}.log-body::-webkit-scrollbar-thumb{background:var(--border);}
+.log-entry{padding:10px 16px;border-bottom:1px solid var(--border);transition:background .1s;}
+.log-entry:hover{background:var(--surface2);}
+.log-entry.log-err{border-left:3px solid #ef4444;}
+.log-entry.log-wrn{border-left:3px solid #f97316;}
+.log-entry.log-ok{border-left:3px solid #16c784;}
+.log-line1{display:flex;align-items:center;gap:8px;margin-bottom:3px;}
+.log-mod{font-family:var(--fm);font-size:9px;background:var(--surface2);border:1px solid var(--border);padding:1px 6px;border-radius:3px;color:var(--muted);white-space:nowrap;}
+.log-fid{font-family:var(--fm);font-size:9px;color:var(--accent);}
+.log-fnm{font-size:11px;font-weight:600;color:var(--text);}
+.log-acao{font-size:11px;color:var(--text);}
+.log-fases{font-family:var(--fm);font-size:10px;color:var(--muted);}
+.log-gat{font-family:var(--fm);font-size:10px;color:var(--blue);}
+.log-det{font-size:10px;color:var(--muted);}
+.log-ts{font-family:var(--fm);font-size:9px;color:var(--muted);margin-left:auto;white-space:nowrap;}
+.log-bdg{font-family:var(--fm);font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;}
+.lb-ok{background:rgba(22,199,132,.1);color:#16c784;border:1px solid rgba(22,199,132,.2);}
+.lb-err{background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.2);}
+.lb-wrn{background:rgba(249,115,22,.1);color:#f97316;border:1px solid rgba(249,115,22,.2);}
+.log-empty{text-align:center;padding:40px;color:var(--muted);font-family:var(--fm);font-size:11px;}
+.log-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:599;display:none;}
+.log-overlay.open{display:block;}
 </style>
 </head>
 <body>
@@ -273,7 +307,11 @@ html,body{height:100vh;overflow:hidden;background:var(--bg);color:var(--text);fo
       </div>
     </div>
 
-    <div class="toggle-btn" onclick="toggleSidebar()">
+    <div class="nav-item" onclick="abrirLog()" style="--item-color:#888;border-top:1px solid var(--border);margin-top:4px;">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">Log do Sistema</span>
+      </div>
+      <div class="toggle-btn" onclick="toggleSidebar()">
       <span class="toggle-icon">◀</span>
       <span class="toggle-label">Recolher</span>
     </div>
@@ -612,5 +650,38 @@ function highlight(el) {
   }, 2500);
 }
 </script>
+
+<!-- PAINEL LOG -->
+<div class="log-overlay" id="log-overlay" onclick="fecharLog()"></div>
+<div class="log-panel" id="log-panel">
+  <div class="log-hdr">
+    <div class="log-hdr-title">📋 Log do Sistema</div>
+    <div class="log-hdr-right">
+      <span id="log-total" style="font-family:var(--fm);font-size:9px;background:var(--surface2);border:1px solid var(--border);padding:2px 8px;border-radius:3px;">—</span>
+      <button onclick="carregarLog()" style="font-family:var(--fm);font-size:10px;padding:4px 10px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">↻</button>
+      <button onclick="limparLog()" style="font-family:var(--fm);font-size:10px;padding:4px 10px;border-radius:5px;border:1px solid rgba(239,68,68,.3);background:transparent;color:#ef4444;cursor:pointer;">🗑</button>
+      <button onclick="fecharLog()" style="font-family:var(--fm);font-size:10px;padding:4px 10px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">✕</button>
+    </div>
+  </div>
+  <div class="log-tbr">
+    <select class="log-sel" id="lf-mod" onchange="carregarLog()">
+      <option value="">Todos módulos</option>
+      <option>Pipe ADM</option><option>Orçamento</option><option>Logística</option>
+      <option>Frente de Loja</option><option>Board</option><option>Financeiro</option>
+      <option>Vendas</option><option>Balcão</option>
+    </select>
+    <select class="log-sel" id="lf-sts" onchange="carregarLog()">
+      <option value="">Todos status</option>
+      <option value="ok">✅ OK</option>
+      <option value="erro">❌ Erro</option>
+      <option value="aviso">⚠️ Aviso</option>
+    </select>
+    <input class="log-inp" id="lf-q" placeholder="🔍 Buscar..." oninput="filtrarLog(this.value)">
+  </div>
+  <div class="log-body" id="log-body">
+    <div class="log-empty">Clique em ↻ para carregar o log</div>
+  </div>
+</div>
+
 </body>
 </html>
