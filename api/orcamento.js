@@ -1,31 +1,4 @@
 
-// ── Hook: salvar ficha no Pipe ADM ao criar card no Pipefy ──────────────────
-async function registrarNoPipe(dados) {
-  try {
-    const PIPE_KEY = 'reparoeletro_pipe';
-    const pipeDb   = await dbGet(PIPE_KEY) || { cards:[], syncedPipefyIds:[], lastSync:null };
-    if (!Array.isArray(pipeDb.cards)) pipeDb.cards = [];
-    const pid = dados.pipefyId ? String(dados.pipefyId) : null;
-    if (pid && pipeDb.cards.find(function(c){ return c.pipefyId === pid; })) return;
-    const now = new Date().toISOString();
-    pipeDb.cards.unshift({
-      id:              'PIPE-' + String(pipeDb.cards.length + 1).padStart(4,'0'),
-      pipefyId:        pid,
-      phase:           dados.phase || 'aguardando_aprovacao',
-      nomeContato:     dados.nomeContato || dados.nome || '',
-      telefone:        dados.telefone || '',
-      equipamento:     dados.equipamento || dados.descricao || '',
-      descricao:       dados.descricao || '',
-      valor:           parseFloat(dados.valor || 0) || 0,
-      origem:          dados.origem || 'sistema',
-      criadoEm:        now, movedAt: now,
-      aguardandoDesde: (dados.phase||'aguardando_aprovacao') === 'aguardando_aprovacao' ? now : null,
-      history: [], analiseCompra: false
-    });
-    pipeDb.lastSync = now;
-    await dbSet(PIPE_KEY, pipeDb);
-  } catch(e) { console.error('[pipe-hook]', e.message); }
-}
 
 const PIPEFY_API = "https://api.pipefy.com/graphql";
 const PIPE_ID    = "305832912";
@@ -188,12 +161,7 @@ async function createPipefyCard({ phaseId, nome, telefone, aparelho, defeito, en
     data = await tryCreate(false);
   }
 
-  const card = data?.createCard?.card;
-  // Registrar no Pipe ADM (não bloqueia o fluxo)
-  if (card && card.id) {
-    await registrarNoPipe({ pipefyId: card.id, phase: 'aguardando_aprovacao', origem: 'orcamento' }).catch(() => {});
-  }
-  return card;
+  return data?.createCard?.card;
 }
 
 module.exports = async function handler(req, res) {
@@ -268,19 +236,6 @@ module.exports = async function handler(req, res) {
         console.log('[Log] ficha criada:', logId);
       } catch(e) { console.error('[Log] criar:', e.message); }
 
-      // Registrar no Pipe ADM
-      if (card && card.id) {
-        await registrarNoPipe({
-          pipefyId: card.id,
-          phase: 'aguardando_aprovacao',
-          nomeContato: ficha.nomeContato || ficha.nome || '',
-          telefone: ficha.telefone || '',
-          equipamento: ficha.equipamento || ficha.descricao || '',
-          descricao: ficha.descricao || '',
-          valor: parseFloat(ficha.valorOrcamento || ficha.valor || 0) || 0,
-          origem: 'orcamento'
-        }).catch(() => {});
-      }
       return res.status(200).json({ ok: true, cardId: card?.id, card });
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });
