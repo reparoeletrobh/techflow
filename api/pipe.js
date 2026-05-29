@@ -739,6 +739,61 @@ export default async function handler(req, res) {
     } catch(e){return res.status(500).json({ok:false,error:e.message});}
   }
 
+
+  // ── GET fin-pendentes: lista fichas com link MP mas sem pagamento confirmado ──
+  if (action === 'fin-pendentes') {
+    try {
+      var fin = await dbGet('reparoeletro_financeiro');
+      if (!fin || !Array.isArray(fin.records)) return res.status(200).json({ok:true,pendentes:[]});
+      var pendentes = fin.records.filter(function(r){
+        return r.mp && r.mp.preferenceId &&
+               ['faturamento','pagamento_agendado','nf_emitida','analise_pagamento'].includes(r.phaseId);
+      });
+      return res.status(200).json({ok:true, total:pendentes.length,
+        pendentes: pendentes.map(function(r){return {
+          id:r.id, nome:r.nomeContato, fase:r.phaseId, valor:r.valor,
+          preferenceId:r.mp.preferenceId, geradoEm:r.mp.geradoEm,
+          metodo:r.mp.metodo, pipefyId:r.pipefyId, osCode:r.osCode
+        };})
+      });
+    } catch(e){return res.status(500).json({ok:false,error:e.message});}
+  }
+
+  // ── GET fin-confirmar-manual: confirma pagamento manualmente por id da ficha ──
+  if (action === 'fin-confirmar-manual') {
+    var fichaId = req.query.id || '';
+    var valor   = parseFloat(req.query.valor||0);
+    var metodo  = req.query.metodo || 'manual';
+    if (!fichaId) return res.status(400).json({ok:false,error:'id obrigatorio'});
+    try {
+      var U8=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+      var T8=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+      async function _g8(k){var r=await fetch(U8+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T8,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});var j=await r.json();var v=j[0]?.result;if(!v)return null;try{var x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+      async function _s8(k,v){await fetch(U8+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T8,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+      var fin=await _g8('reparoeletro_financeiro');
+      if(!fin||!Array.isArray(fin.records))return res.status(404).json({ok:false,error:'financeiro vazio'});
+      var rec=fin.records.find(function(r){return r.id===fichaId||r.pipefyId===fichaId;});
+      if(!rec)return res.status(404).json({ok:false,error:'ficha nao encontrada: '+fichaId});
+      if(rec.phaseId==='entrega_liberada')return res.status(200).json({ok:true,info:'ja em entrega_liberada',id:rec.id});
+      var ts=now;
+      rec.paidAt=ts; rec.movedAt=ts;
+      rec.mp=Object.assign(rec.mp||{},{status:'pago',pagoEm:ts,metodo:metodo,valor:valor||rec.valor});
+      rec.history=(rec.history||[]).concat([{phaseId:'pagamento_confirmado',ts:ts,via:'manual'},{phaseId:'entrega_liberada',ts:ts,via:'manual'}]);
+      rec.phaseId='entrega_liberada';
+      // Backup
+      try{await _s8('reparoeletro_financeiro_backup',Object.assign({},fin,{backedUpAt:ts}));}catch(e){}
+      await _s8('reparoeletro_financeiro',fin);
+      // Mover Pipe ADM
+      var pipeDb=await _g8('reparoeletro_pipe');
+      var pipeOk=false;
+      if(pipeDb&&Array.isArray(pipeDb.cards)){
+        var pcard=pipeDb.cards.find(function(c){return (rec.pipefyId&&c.pipefyId===String(rec.pipefyId))||(rec.osCode&&c.id===String(rec.osCode));});
+        if(pcard){pcard.history=(pcard.history||[]).concat([{phase:pcard.phase,ts:ts}]);pcard.phase='solicitar_entrega';pcard.movedAt=ts;await _s8('reparoeletro_pipe',pipeDb);pipeOk=true;}
+      }
+      return res.status(200).json({ok:true,id:rec.id,nome:rec.nomeContato,de:rec.phaseId,para:'entrega_liberada',pipeOk:pipeOk});
+    } catch(e){return res.status(500).json({ok:false,error:e.message});}
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
