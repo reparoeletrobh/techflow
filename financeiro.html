@@ -519,7 +519,7 @@ function cardHTML(r, color) {
       <div class="fc-num">#${r.osCode || r.pipefyId?.slice(-4) || '—'}</div>
       <div class="fc-nome">${r.nomeContato || r.title || '—'}</div>
       ${r.descricao ? `<div class="fc-desc">${r.descricao}</div>` : ''}
-      ${r.valor     ? `<div style="font-family:var(--fm);font-size:11px;color:#22c55e;margin-top:3px;">💰 R$ ${parseFloat((r.valor||"0").replace(",",".").replace(/[^0-9.]/g,""))||r.valor}</div>` : ''}
+      ${r.valor     ? `<div style="font-family:var(--fm);font-size:11px;color:#22c55e;margin-top:3px;">💰 R$ ${parseFloat(String(r.valor||"0").replace(",",".").replace(/[^0-9.]/g,""))||r.valor}</div>` : ''}
       ${r.servicos  ? `<div style="font-family:var(--fm);font-size:10px;color:#888;margin-top:3px;padding:5px 8px;background:var(--surface2);border-radius:5px;border-left:2px solid #333;">🔧 ${r.servicos}</div>` : ''}
       ${r.cpfCnpj   ? `<div class="fc-cpf">📄 ${r.cpfCnpj}</div>` : ''}
       ${r.phaseId==='pagamento_agendado' && r.dataAgendadaDisplay ? `<div style="font-family:var(--fm);font-size:10px;color:#e879f9;margin-top:4px;">⏰ Cobrança: ${r.dataAgendadaDisplay}</div>` : ''}
