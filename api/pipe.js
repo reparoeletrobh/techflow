@@ -19,20 +19,23 @@ const PHASES = [
 
 async function dbGet(k) {
   try {
-    const r = await fetch(UPSTASH_URL + '/get/' + encodeURIComponent(k), {
-      headers: { Authorization: 'Bearer ' + UPSTASH_TOKEN }
+    const r = await fetch(UPSTASH_URL + '/pipeline', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + UPSTASH_TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify([['GET', k]])
     });
     const j = await r.json();
-    return j.result ? JSON.parse(j.result) : null;
+    const result = j[0]?.result;
+    return result ? JSON.parse(result) : null;
   } catch(e) { return null; }
 }
 
 async function dbSet(k, v) {
   try {
-    await fetch(UPSTASH_URL + '/set/' + encodeURIComponent(k), {
+    await fetch(UPSTASH_URL + '/pipeline', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + UPSTASH_TOKEN, 'Content-Type': 'application/json' },
-      body: JSON.stringify(JSON.stringify(v))
+      body: JSON.stringify([['SET', k, JSON.stringify(v)]])
     });
   } catch(e) { console.error('dbSet error:', e.message); }
 }
