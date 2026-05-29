@@ -541,7 +541,7 @@ function buildActions(r) {
       h += '<button class="btn-primary" style="background:#3b9eff;color:#fff;" data-chave="' + r.chaveAcesso + '" data-nome="' + nomeRaw.replace(/"/g,'') + '" onclick="baixarDanfe(this)">📄 Baixar DANFE</button>';
     }
     h += '<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="nfEnviada(\'' + r.id + '\')">✅ NF Enviada → Faturamento</button>';
-    h += '<button class="btn-primary" style="background:#3b9eff;color:#fff;" onclick="abrirModalCobranca(\'' + r.id + '\')">💳 Gerar Cobrança MP</button>';
+    h += '<button class="btn-primary" style="background:#f97316;color:#fff;" onclick="abrirModalCobranca(\'' + r.id + '\')">💳 Gerar Cobrança MP</button>';
   }
     if (r.phaseId==='faturamento') {
       if (r.mp?.checkoutUrl) {
