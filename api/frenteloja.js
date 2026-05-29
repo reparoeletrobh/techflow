@@ -227,6 +227,21 @@ export default async function handler(req,res){
     }
   }
 
+
+  // ── GET buscar-finalizar: localiza ficha por nome+tel e retorna ID ──────────
+  if (action === 'buscar-finalizar') {
+    const nome = (req.query.nome || '').toLowerCase();
+    const tel4 = (req.query.tel4 || '');
+    const db   = await dbGet(FL_KEY) || defaultDB();
+    const ficha = db.fichas.find(f =>
+      (f.nomeContato || '').toLowerCase().startsWith(nome) &&
+      (f.telefone || '').replace(/\D/g,'').slice(-4) === tel4 &&
+      f.phase === 'producao'
+    );
+    if (!ficha) return res.status(404).json({ ok:false, error:'Ficha não encontrada em produção', nome, tel4 });
+    return res.status(200).json({ ok:true, id:ficha.id, nome:ficha.nomeContato, fase:ficha.phase, pipefyCardId:ficha.pipefyCardId||null });
+  }
+
   if(req.method==='POST'&&action==='conserto-realizado'){
     const {pipefyCardId, fichaId}=req.body||{};
     if(!pipefyCardId && !fichaId)
