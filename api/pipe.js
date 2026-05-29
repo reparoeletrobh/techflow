@@ -218,6 +218,67 @@ export default async function handler(req, res) {
     }
   }
 
+
+  // ── GET sync-fase: sincroniza UMA fase por vez (evita timeout) ───────────
+  if (action === 'sync-fase') {
+    const pipefyPhaseId = req.query.phaseId;
+    const phaseLocal    = req.query.phaseLocal;
+    if (!pipefyPhaseId || !phaseLocal) return res.status(400).json({ ok:false, error:'phaseId e phaseLocal obrigatórios' });
+
+    const db       = (await dbGet(PIPE_KEY)) || defaultDB();
+    const existIds = new Set(db.cards.map(c => c.pipefyId).filter(Boolean));
+    let added = 0, skipped = 0, cursor = null, hasMore = true;
+
+    while (hasMore) {
+      const cursorArg = cursor ? `, after:"${cursor}"` : '';
+      const data = await pipefyQ(
+        `query { phase(id:"${pipefyPhaseId}") { cards(first:50${cursorArg}) {
+          pageInfo { hasNextPage endCursor }
+          edges { node { id title fields { name value } } }
+        }}}`
+      ).catch(() => null);
+
+      const edges    = data?.phase?.cards?.edges    || [];
+      const pageInfo = data?.phase?.cards?.pageInfo || {};
+
+      for (const edge of edges) {
+        const node = edge.node;
+        const pid  = String(node.id);
+        if (existIds.has(pid)) { skipped++; continue; }
+
+        const gf = (kw) => {
+          const f = (node.fields||[]).find(f => f.name?.toLowerCase().includes(kw));
+          return f?.value || '';
+        };
+        const now = new Date().toISOString();
+        db.cards.push({
+          id:              'PIPE-' + String(db.cards.length + 1).padStart(4,'0'),
+          pipefyId:        pid,
+          phase:           phaseLocal,
+          nomeContato:     gf('nome') || node.title || '',
+          telefone:        gf('telefone') || gf('fone') || '',
+          equipamento:     gf('descri') || gf('equip') || '',
+          descricao:       node.title || '',
+          valor:           parseFloat((gf('valor')||'').replace(/[^0-9.,]/g,'').replace(',','.')) || 0,
+          origem:          'pipefy',
+          criadoEm:        now,
+          movedAt:         now,
+          aguardandoDesde: phaseLocal === 'aguardando_aprovacao' ? now : null,
+          history:         [],
+          analiseCompra:   false,
+        });
+        existIds.add(pid);
+        added++;
+      }
+      hasMore = pageInfo.hasNextPage || false;
+      cursor  = pageInfo.endCursor   || null;
+    }
+
+    db.lastSync = new Date().toISOString();
+    await dbSet(PIPE_KEY, db);
+    return res.status(200).json({ ok:true, added, skipped, total:db.cards.length, fase:phaseLocal });
+  }
+
   // ── GET sync-pipefy ───────────────────────────────────────────────────────
   if (action === 'sync-pipefy') {
     if (!PIPEFY_TOKEN) return res.status(400).json({ ok:false, error:'PIPEFY_TOKEN não configurado' });

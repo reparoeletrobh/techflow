@@ -239,22 +239,39 @@ async function excluir(id){
 }
 
 // ── Sync Pipefy ───────────────────────────────────────────────────────────────
+// Fases a sincronizar do Pipefy (ID → fase local)
+const SYNC_FASES = [
+  { phaseId:'334875152', local:'aguardando_aprovacao', nome:'Aguardando Aprovação' },
+  { phaseId:'334879132', local:'aprovados',            nome:'Aprovado' },
+  { phaseId:'342533760', local:'video_enviado',        nome:'Vídeo Enviado' },
+  { phaseId:'342584529', local:'analise_compra',       nome:'Análise de Compra' },
+  { phaseId:'338439265', local:'programar_entrega',    nome:'Programar Entrega' },
+  { phaseId:'334875186', local:'solicitar_entrega',    nome:'Solicitar Entrega' },
+  { phaseId:'335066834', local:'entrega_solicitada',   nome:'Entrega Solicitada' },
+  { phaseId:'334875204', local:'receber',              nome:'Receber' },
+  { phaseId:'339008925', local:'erp',                  nome:'ERP' },
+];
+
 async function syncPipefy(){
-  const btn=document.getElementById('btn-sync');
-  btn.textContent='⟳ Sincronizando...';btn.disabled=true;
-  try {
-    const r=await api('sync-pipefy');
-    btn.textContent='⟳ Sincronizar Pipefy';btn.disabled=false;
-    if(r.ok){
-      toast('✅ '+r.added+' fichas importadas, '+r.skipped+' já existiam');
-      await load();
-    } else toast(r.error||'Erro na sync',false);
-  } catch(e) {
-    btn.textContent='⟳ Sincronizar Pipefy';btn.disabled=false;
-    // Mesmo em timeout, recarregar — pode ter salvado parcialmente
-    toast('⚠️ Sync pode ter salvado parcialmente — recarregando...',false);
-    await load();
+  const btn = document.getElementById('btn-sync');
+  btn.disabled = true;
+  let totalAdded = 0, totalSkipped = 0;
+
+  for (let i = 0; i < SYNC_FASES.length; i++) {
+    const fase = SYNC_FASES[i];
+    const pct  = Math.round(((i+1)/SYNC_FASES.length)*100);
+    btn.textContent = '⟳ '+pct+'% — '+fase.nome+'...';
+    try {
+      const r = await fetch('/api/pipe?action=sync-fase&phaseId='+fase.phaseId+'&phaseLocal='+fase.local);
+      const d = await r.json();
+      if (d.ok) { totalAdded += d.added||0; totalSkipped += d.skipped||0; }
+    } catch(e) { console.warn('Fase falhou:', fase.nome, e.message); }
   }
+
+  btn.textContent = '⟳ Sincronizar Pipefy';
+  btn.disabled = false;
+  toast('✅ Sync completo — '+totalAdded+' importadas, '+totalSkipped+' existentes');
+  await load();
 }
 
 // ── Modal Nova Ficha ──────────────────────────────────────────────────────────
