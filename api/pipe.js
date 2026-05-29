@@ -610,6 +610,34 @@ export default async function handler(req, res) {
     } catch(e){return res.status(500).json({ok:false,error:e.message});}
   }
 
+
+  // ── GET fix-fin-records: corrige registros FIN-PIPE sem ts no history ────
+  if (action === 'fix-fin-records') {
+    try {
+      var U6=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+      var T6=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+      async function _g6(k){var r=await fetch(U6+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T6,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});var j=await r.json();var v=j[0]?.result;if(!v)return null;try{var x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+      async function _s6(k,v){await fetch(U6+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T6,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+      var fin=await _g6('reparoeletro_financeiro');
+      if(!fin||!Array.isArray(fin.records))return res.status(200).json({ok:false,msg:'financeiro vazio'});
+      var fixed=0;
+      fin.records.forEach(function(rec){
+        // 1. Garantir ts em cada history item
+        if(Array.isArray(rec.history)){
+          rec.history.forEach(function(h){
+            if(!h.ts) h.ts = rec.criadoEm || rec.createdAt || rec.movedAt || new Date().toISOString();
+          });
+        }
+        // 2. Garantir campos mínimos
+        if(!rec.nomeContato) rec.nomeContato = rec.title || '';
+        if(!rec.valor && rec.preco) rec.valor = rec.preco;
+        fixed++;
+      });
+      await _s6('reparoeletro_financeiro',fin);
+      return res.status(200).json({ok:true,processados:fixed,total:fin.records.length});
+    } catch(e){return res.status(500).json({ok:false,error:e.message});}
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
