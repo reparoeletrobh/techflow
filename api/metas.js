@@ -3,6 +3,7 @@ const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g, "").tri
 const BOARD_KEY     = "reparoeletro_board";
 const LOGS_KEY      = "reparoeletro_logs";
 const VENDAS_KEY    = "reparoeletro_vendas";
+const PIPE_KEY      = "reparoeletro_pipe";
 
 async function dbGet(key) {
   try {
@@ -55,6 +56,10 @@ module.exports = async function handler(req, res) {
     board = await dbGet(BOARD_KEY);
   }
 
+  // Ler Pipe ADM para ERP ao vivo
+  const pipeDb   = await dbGet(PIPE_KEY) || { cards: [] };
+  const pipeErp  = (pipeDb.cards || []).filter(c => c.phase === 'erp');
+
   const movesLog = board?.movesLog || [];
   const metaLog  = board?.metaLog  || [];
   const produtos = vendasDb?.produtos || [];
@@ -72,6 +77,19 @@ module.exports = async function handler(req, res) {
     }).length;
   }
 
+
+  // Contador ERP do Pipe por data de movimentação
+  function cntPipeErp(since) {
+    const seen = new Set();
+    return pipeErp.filter(c => {
+      const ts = new Date(c.movedAt || c.criadoEm);
+      if (ts < since) return false;
+      if (seen.has(c.pipefyId || c.id)) return false;
+      seen.add(c.pipefyId || c.id);
+      return true;
+    }).length;
+  }
+
   // Vendas por canal
   function cntVenda(arr, since, canal) {
     return arr.filter(p => {
@@ -86,7 +104,7 @@ module.exports = async function handler(req, res) {
     orcEnviado:       { count: cnt(metaLog,  "aguardando_aprovacao", todayUTC), goal: 40 },
     aprovadoLoja:     { count: cnt(movesLog, "cliente_loja",         todayUTC), goal: 15 },
     aprovadoTotal:    { count: cnt(movesLog, "aprovado_entrada",     todayUTC), goal: 35 },
-    erp:              { count: cnt(metaLog,  "erp_entrada",          todayUTC), goal: 35 },
+    erp:              { count: cntPipeErp(todayUTC), goal: 35 },
   };
 
   const week = {
@@ -94,7 +112,7 @@ module.exports = async function handler(req, res) {
     orcEnviado:       { count: cnt(metaLog,  "aguardando_aprovacao", weekUTC), goal: 200 },
     aprovadoLoja:     { count: cnt(movesLog, "cliente_loja",         weekUTC), goal: 90  },
     aprovadoTotal:    { count: cnt(movesLog, "aprovado_entrada",     weekUTC), goal: 200 },
-    erp:              { count: cnt(metaLog,  "erp_entrada",          weekUTC), goal: 200 },
+    erp:              { count: cntPipeErp(weekUTC), goal: 200 },
   };
 
   const vendas = {

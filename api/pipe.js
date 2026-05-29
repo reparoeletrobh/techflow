@@ -6,6 +6,7 @@ const PIPE_KEY      = 'reparoeletro_pipe';
 
 const PHASES = [
   { id:'aguardando_aprovacao', name:'Aguardando Aprovação', cor:'#f5c800' },
+  { id:'ultima_chamada',       name:'Última Chamada',       cor:'#ef4444' },
   { id:'aprovados',            name:'Aprovados',            cor:'#22c55e' },
   { id:'video_enviado',        name:'Vídeo Enviado',        cor:'#a855f7' },
   { id:'analise_compra',       name:'Análise de Compra',    cor:'#3b9eff' },
@@ -170,6 +171,7 @@ export default async function handler(req, res) {
     // Fases a comparar (mesmas do sync)
     const FASES = [
       { phId:'334875152', local:'aguardando_aprovacao', nome:'Aguardando Aprovação' },
+      { phId:'338413470', local:'ultima_chamada',       nome:'Última Chamada' },
       { phId:'334879132', local:'aprovados',            nome:'Aprovado' },
       { phId:'342533760', local:'video_enviado',        nome:'Vídeo Enviado' },
       { phId:'342584529', local:'analise_compra',       nome:'Análise de Compra' },
