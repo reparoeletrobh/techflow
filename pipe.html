@@ -130,6 +130,19 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   <div class="stat-pill"><span class="stat-lbl">ERP</span>&nbsp;<span class="stat-val" id="st-erp" style="color:var(--green)">—</span></div>
 </div>
 
+
+<!-- BARRA DE BUSCA -->
+<div style="display:flex;align-items:center;gap:10px;padding:8px 20px;border-bottom:1px solid var(--border);background:var(--bg);">
+  <input id="busca-pipe" type="text" placeholder="🔍  Rastrear por nome, telefone, equipamento ou ID…"
+    style="flex:1;max-width:420px;background:var(--surface);border:1px solid var(--border);border-radius:8px;
+           padding:7px 12px;font-family:var(--fm);font-size:11px;color:var(--text);outline:none;"
+    oninput="filtrarCards(this.value)"
+    onfocus="this.style.borderColor='var(--accent)'"
+    onblur="this.style.borderColor='var(--border)'">
+  <span id="busca-count" style="font-family:var(--fm);font-size:10px;color:var(--muted);"></span>
+  <button onclick="document.getElementById('busca-pipe').value='';filtrarCards('')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;" title="Limpar">✕</button>
+</div>
+
 <div class="board" id="board"></div>
 
 <!-- MODAL NOVA FICHA -->
@@ -269,6 +282,13 @@ function render(){
           '<div class="expand-row"><span class="expand-lbl">Origem</span><span class="expand-val">'+esc(c.origem)+'</span></div>'+
           '<div class="expand-row"><span class="expand-lbl">Criado em</span><span class="expand-val">'+fmtDate(c.criadoEm)+'</span></div>'+
           (c.pipefyId?'<div class="expand-row"><span class="expand-lbl">Pipefy ID</span><span class="expand-val">'+esc(c.pipefyId)+'</span></div>':'')+
+          '<div class="expand-row" style="margin-top:4px;"><span class="expand-lbl" style="padding-top:5px;">Valor</span>'+
+            '<div style="display:flex;gap:5px;align-items:center;">'+
+              '<input type="number" id="val-'+c.id+'" value="'+(c.valor||0)+'" min="0" step="10" '+
+              'style="width:90px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:4px 7px;color:var(--text);font-family:var(--fm);font-size:11px;outline:none;">'+
+              '<button onclick="salvarValor(\''+c.id+'\')" class="cbtn cbtn-yellow" style="padding:4px 10px;font-size:9px;">💾</button>'+
+            '</div>'+
+          '</div>'+
         '</div>'+
       '</div>';
     }).join('')||'<div style="color:var(--dim);font-family:var(--fm);font-size:10px;padding:8px;">— vazio —</div>';
@@ -360,6 +380,39 @@ async function load(){
 
 load();
 setInterval(load,90000);
+
+// ── BUSCA / RASTREAR ──────────────────────────────────────────────────────
+let filtroAtivo = '';
+function filtrarCards(q) {
+  filtroAtivo = (q || '').toLowerCase().trim();
+  const allCards = document.querySelectorAll('.card');
+  let visiveis = 0;
+  allCards.forEach(function(el) {
+    const txt = el.textContent.toLowerCase();
+    const show = !filtroAtivo || txt.includes(filtroAtivo);
+    el.style.display = show ? '' : 'none';
+    if (show) visiveis++;
+  });
+  const cnt = document.getElementById('busca-count');
+  if (cnt) cnt.textContent = filtroAtivo ? visiveis + ' encontrado(s)' : '';
+}
+
+// ── SALVAR VALOR ──────────────────────────────────────────────────────────
+async function salvarValor(id) {
+  const inp = document.getElementById('val-' + id);
+  if (!inp) return;
+  const valor = parseFloat(inp.value) || 0;
+  const r = await api('editar-valor', { id: id, valor: valor });
+  if (r.ok) {
+    const c = cards.find(function(x){ return x.id === id; });
+    if (c) c.valor = valor;
+    toast('✅ Valor atualizado — R$ ' + valor.toLocaleString('pt-BR', {minimumFractionDigits: 2}));
+    render();
+    if (filtroAtivo) filtrarCards(filtroAtivo);
+  } else {
+    toast(r.error || 'Erro ao salvar', false);
+  }
+}
 
 // ── ÚLTIMA CHAMADA: incluída via override local ───────────────────────────
 // Última Chamada é gerenciada pelo Orçamento, mas pode aparecer aqui como fase

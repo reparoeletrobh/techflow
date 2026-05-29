@@ -334,6 +334,21 @@ export default async function handler(req, res) {
       return res.status(500).json({ ok: false, error: String(sfErr.message), stack: String(sfErr.stack).substring(0,300) });
     }
   }
+
+  // ── POST editar-valor ─────────────────────────────────────────────────────
+  if (req.method === 'POST' && action === 'editar-valor') {
+    var body  = req.body || {};
+    var id    = body.id;
+    var valor = parseFloat(body.valor) || 0;
+    if (!id) return res.status(400).json({ ok: false, error: 'id obrigatorio' });
+    var db   = (await dbGet(PIPE_KEY)) || defaultDB();
+    var card = (db.cards || []).find(function(c) { return c.id === id; });
+    if (!card) return res.status(404).json({ ok: false, error: 'nao encontrado' });
+    card.valor = valor;
+    await dbSet(PIPE_KEY, db);
+    return res.status(200).json({ ok: true, valor: valor });
+  }
+
   // ── mover ─────────────────────────────────────────────────────────────────
   if (req.method === 'POST' && action === 'mover') {
     var body  = req.body || {};
