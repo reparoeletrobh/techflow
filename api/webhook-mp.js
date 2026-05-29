@@ -95,35 +95,37 @@ async function processarPagamentoFinanceiro(pmt) {
     return { ok:true, info:"ficha_ja_movida", fichaId:rec.id, fase:rec.phaseId };
   }
 
-  // Mover para entrega_liberada
-  rec.mp          = { ...(rec.mp||{}), paymentId:String(pmt.id), pagoEm:now, metodo, valor, status:"pago" };
-  rec.paidAt      = now;
-  rec.phaseId     = "entrega_liberada";
-  rec.movedAt     = now;
-  rec.history     = [...(rec.history||[]), { phaseId:"entrega_liberada", ts:now, via:"webhook_mp", paymentId:String(pmt.id) }];
-
+  // Atualizar dados de pagamento na ficha
+  rec.mp      = { ...(rec.mp||{}), paymentId:String(pmt.id), pagoEm:now, metodo, valor, status:"pago" };
+  rec.paidAt  = now;
+  rec.movedAt = now;
+  rec.history = [...(rec.history||[]), { phaseId:"pagamento_confirmado", ts:now, via:"webhook_mp", paymentId:String(pmt.id) }];
+  rec.phaseId = "pagamento_confirmado"; // passar por pagamento_confirmado
   await dbSet(FIN_KEY2, fin);
 
-  // Pipefy → Solicitar Entrega
+  // Chamar api/financeiro?action=mover com entrega_liberada
+  // Isso usa o MESMO código do botão manual — garante Pipefy idêntico
   let pipefyOk = false;
-  if (rec.pipefyId) {
-    try {
-      const token = (process.env.PIPEFY_TOKEN||"").trim();
-      const controller = new AbortController();
-      setTimeout(() => controller.abort(), 8000);
-      const pRes = await fetch(PIPEFY_API_FIN, {
-        method:"POST",
-        headers:{"Content-Type":"application/json", Authorization:"Bearer "+token},
-        body:JSON.stringify({ query:`mutation{moveCardToPhase(input:{card_id:"${rec.pipefyId}",destination_phase_id:"${SOLICITAR_ENTREGA_FIN}"}){card{id}}}` }),
-        signal:controller.signal
-      });
-      const pj = await pRes.json();
-      pipefyOk = !!pj.data?.moveCardToPhase?.card?.id;
-    } catch(pe) { console.error("[FinWebhook] Pipefy:", pe.message); }
+  try {
+    const baseUrl  = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "https://reparoeletroadm.com";
+    const moverRes = await fetch(`${baseUrl}/api/financeiro?action=mover`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ id: rec.id, phaseId: "entrega_liberada" })
+    });
+    const moverJson = await moverRes.json();
+    pipefyOk = moverJson.pipefyMoveOk === true;
+    console.log("[FinWebhook] mover entrega_liberada:", JSON.stringify(moverJson));
+  } catch(me) {
+    console.error("[FinWebhook] mover fetch:", me.message);
   }
 
-  // Salvar conciliação
-  await salvarConciliacaoFin({ rec, pmt, metodo, valor, now, status:"pago", pipefyOk });
+  // Salvar conciliação (re-ler ficha atualizada)
+  const finAtual = await dbGet(FIN_KEY2);
+  const recAtual = (finAtual?.records||[]).find(r => r.id === rec.id) || rec;
+  await salvarConciliacaoFin({ rec:recAtual, pmt, metodo, valor, now, status:"pago", pipefyOk });
 
   return { ok:true, fichaId:rec.id, pipefyOk, valor, metodo };
 }
