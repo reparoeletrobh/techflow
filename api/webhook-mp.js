@@ -757,6 +757,22 @@ export default async function handler(req, res) {
     const host    = req.headers['x-forwarded-host']  || req.headers.host || 'reparoeletroadm.com';
     const siteUrl = `${proto}://${host}`;
 
+    // 3b. Verificar se é pagamento de OS financeiro via preference_id
+    // MP NÃO copia metadata da preferência para o pagamento — checar pelo preference_id
+    try {
+      const prefId = payment.preference_id;
+      if (prefId) {
+        const finDb = await dbGet(FIN_KEY2);
+        const fichaFin = (finDb?.records||[]).find(r => r.mp?.preferenceId === prefId);
+        if (fichaFin) {
+          console.log('[webhook] Pagamento financeiro via preference_id:', prefId);
+          const finResult = await processarPagamentoFinanceiro(payment);
+          await logEvento({ tipo:'fin_pago', paymentId:String(payId), fichaId:fichaFin.id, valor:payment.transaction_amount });
+          return res.status(200).json({ ok:true, financeiro:true, ...finResult });
+        }
+      }
+    } catch(finErr) { console.error('[webhook] fin-check:', finErr.message); }
+
     // 4. Para cada produto: marcar vendido direto no Redis
     //    Verifica reparoeletro_vendas (Micro/Bebe) OU tv_vendas (TV)
     //    e salva no relatório de checkout correto para cada tipo
