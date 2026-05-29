@@ -6,205 +6,179 @@
 <title>Log — Reparo Eletro</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0a0a0a;--s1:#111;--s2:#171717;--b1:#1e1e1e;--b2:#252525;--text:#e8e8e8;--muted:#555;--dim:#2c2c2c;--y:#f5c800;--g:#16c784;--r:#ef4444;--o:#f97316;--b:#3b9eff;--fm:'DM Mono',monospace;--fh:'Syne',sans-serif;--fb:'Inter',sans-serif;}
+:root{
+  --bg:#0a0a0a;--s1:#111;--s2:#171717;--b1:#1e1e1e;
+  --text:#e8e8e8;--muted:#555;--y:#f5c800;--g:#16c784;
+  --r:#ef4444;--o:#f97316;--b:#3b9eff;
+  --fm:'DM Mono',monospace;--fh:'Syne',sans-serif;--fb:'Inter',sans-serif;
+}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:12px;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+html,body{background:var(--bg);color:var(--text);font-family:var(--fb);font-size:12px;}
+
 /* HEADER */
-header{height:50px;display:flex;align-items:center;gap:12px;padding:0 20px;border-bottom:2px solid var(--y);background:var(--bg);flex-shrink:0;position:sticky;top:0;z-index:50;}
-.logo{font-family:var(--fh);font-size:14px;font-weight:800;}.logo span{color:var(--y);}
+.log-header{
+  display:flex;align-items:center;gap:12px;padding:0 20px;
+  height:50px;border-bottom:2px solid var(--y);background:var(--s1);
+}
+.logo{font-family:var(--fh);font-size:14px;font-weight:800;}
+.logo span{color:var(--y);}
 .logo em{font-style:normal;font-family:var(--fm);font-size:10px;color:var(--muted);margin-left:8px;}
-.hdr-right{margin-left:auto;display:flex;gap:8px;align-items:center;}
+.hdr-r{margin-left:auto;display:flex;gap:8px;align-items:center;}
 .hbtn{font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--b1);background:transparent;color:var(--muted);cursor:pointer;transition:.15s;}
 .hbtn:hover{color:var(--text);border-color:var(--y);}
-.hbtn.danger{border-color:rgba(239,68,68,.3);color:var(--r);}
-.hbtn.danger:hover{background:rgba(239,68,68,.1);}
-/* TOOLBAR */
-.toolbar{display:flex;align-items:center;gap:10px;padding:10px 20px;border-bottom:1px solid var(--b1);background:var(--bg);flex-wrap:wrap;}
-.filter-sel{background:var(--s1);border:1px solid var(--b1);border-radius:6px;padding:5px 10px;color:var(--text);font-family:var(--fm);font-size:10px;cursor:pointer;}
-.filter-inp{background:var(--s1);border:1px solid var(--b1);border-radius:6px;padding:5px 10px;color:var(--text);font-family:var(--fm);font-size:10px;outline:none;width:200px;}
-.filter-inp:focus{border-color:var(--y);}
-.stat-badge{font-family:var(--fm);font-size:9px;padding:3px 8px;border-radius:4px;background:var(--s2);border:1px solid var(--b1);}
-.auto-dot{width:6px;height:6px;border-radius:50%;background:var(--g);animation:blink 2s ease infinite;}
+.hbtn.danger{color:var(--r);border-color:rgba(239,68,68,.3);}
+.hbtn.danger:hover{background:rgba(239,68,68,.08);}
+.st{font-family:var(--fm);font-size:10px;background:var(--s1);border:1px solid var(--b1);padding:3px 9px;border-radius:4px;}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--g);animation:blink 2s infinite;}
 @keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+/* TOOLBAR */
+.toolbar{
+  display:flex;align-items:center;gap:8px;padding:8px 20px;
+  border-bottom:1px solid var(--b1);background:var(--s1);flex-wrap:wrap;
+}
+.fsel{background:var(--bg);border:1px solid var(--b1);border-radius:6px;padding:5px 8px;color:var(--text);font-family:var(--fm);font-size:10px;}
+.finp{background:var(--bg);border:1px solid var(--b1);border-radius:6px;padding:5px 10px;color:var(--text);font-family:var(--fm);font-size:10px;outline:none;width:180px;}
+.finp:focus{border-color:var(--y);}
+
 /* TABLE */
-.table-wrap{flex:1;overflow:auto;padding:0;min-height:0;}
-table{width:100%;border-collapse:collapse;}
-thead{position:sticky;top:0;z-index:10;}
-th{background:var(--s1);font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:8px 10px;text-align:left;border-bottom:1px solid var(--b1);white-space:nowrap;}
-td{padding:7px 10px;border-bottom:1px solid var(--b1);vertical-align:top;font-size:11px;}
-tr:hover td{background:var(--s2);}
-/* Status */
-.badge{display:inline-block;font-family:var(--fm);font-size:9px;font-weight:600;padding:2px 7px;border-radius:4px;}
-.badge-ok   {background:rgba(22,199,132,.1);color:var(--g);border:1px solid rgba(22,199,132,.2);}
-.badge-erro {background:rgba(239,68,68,.1);color:var(--r);border:1px solid rgba(239,68,68,.2);}
-.badge-aviso{background:rgba(249,115,22,.1);color:var(--o);border:1px solid rgba(249,115,22,.2);}
-/* Módulo */
-.mod{font-family:var(--fm);font-size:9px;padding:2px 6px;border-radius:3px;background:var(--b1);}
-/* Seta */
-.arrow{color:var(--muted);margin:0 3px;}
-/* Timestamp */
+.tbl-wrap{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 120px);}
+table{width:100%;border-collapse:collapse;min-width:900px;}
+thead th{
+  position:sticky;top:0;z-index:5;
+  background:var(--s2);font-family:var(--fm);font-size:9px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.06em;padding:8px 10px;
+  text-align:left;border-bottom:1px solid var(--b1);white-space:nowrap;
+}
+td{padding:7px 10px;border-bottom:1px solid var(--b1);vertical-align:top;}
+tr:hover td{background:rgba(255,255,255,.02);}
+tr.err td{border-left:2px solid var(--r);padding-left:8px;}
+tr.warn td{border-left:2px solid var(--o);padding-left:8px;}
+
 .ts{font-family:var(--fm);font-size:9px;color:var(--muted);white-space:nowrap;}
-/* Ficha */
+.mod{font-family:var(--fm);font-size:9px;background:var(--b1);padding:2px 6px;border-radius:3px;white-space:nowrap;}
 .fid{font-family:var(--fm);font-size:9px;color:var(--y);}
-/* Vazio */
-.empty{text-align:center;padding:60px;color:var(--muted);font-family:var(--fm);font-size:11px;}
-/* Gatilho */
-.gtxt{color:var(--b);font-size:10px;}
-/* Detalhe */
-.dtxt{color:var(--muted);font-size:10px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-tr.erro td{border-left:2px solid var(--r);}
-tr.aviso td{border-left:2px solid var(--o);}
+.fnm{font-size:11px;}
+.acao{font-size:11px;}
+.fase{font-family:var(--fm);font-size:10px;white-space:nowrap;}
+.arrow{color:var(--muted);margin:0 3px;}
+.gtx{color:var(--b);font-size:10px;}
+.det{color:var(--muted);font-size:10px;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.badge{display:inline-block;font-family:var(--fm);font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;}
+.bok {background:rgba(22,199,132,.1);color:var(--g);border:1px solid rgba(22,199,132,.2);}
+.berr{background:rgba(239,68,68,.1);color:var(--r);border:1px solid rgba(239,68,68,.2);}
+.bwrn{background:rgba(249,115,22,.1);color:var(--o);border:1px solid rgba(249,115,22,.2);}
+
+.empty{text-align:center;padding:50px;color:var(--muted);font-family:var(--fm);font-size:11px;}
 </style>
 </head>
 <body>
 
-<header>
+<div class="log-header">
   <div class="logo">Reparo<span>Eletro</span><em>📋 Log do Sistema</em></div>
-  <div class="hdr-right">
-    <div class="auto-dot" title="Auto-refresh 15s"></div>
-    <span id="st-total" class="stat-badge">—</span>
-    <button class="hbtn" onclick="load()">↻ Atualizar</button>
-    <button class="hbtn danger" onclick="limpar()">🗑 Limpar Log</button>
+  <div class="hdr-r">
+    <div class="dot"></div>
+    <span class="st" id="st-total">—</span>
+    <button class="hbtn" onclick="carregar()">↻ Atualizar</button>
+    <button class="hbtn danger" onclick="limpar()">🗑 Limpar</button>
   </div>
-</header>
+</div>
 
 <div class="toolbar">
-  <select class="filter-sel" id="f-modulo" onchange="load()">
+  <select class="fsel" id="f-mod" onchange="carregar()">
     <option value="">Todos os módulos</option>
-    <option value="Pipe ADM">Pipe ADM</option>
-    <option value="Orçamento">Orçamento</option>
-    <option value="Logística">Logística</option>
-    <option value="Frente de Loja">Frente de Loja</option>
-    <option value="Board">Board</option>
-    <option value="Financeiro">Financeiro</option>
-    <option value="Vendas">Vendas</option>
-    <option value="Webhook MP">Webhook MP</option>
-    <option value="Balcão">Balcão</option>
+    <option>Pipe ADM</option><option>Orçamento</option><option>Logística</option>
+    <option>Frente de Loja</option><option>Board</option><option>Financeiro</option>
+    <option>Vendas</option><option>Balcão</option><option>Webhook MP</option>
   </select>
-  <select class="filter-sel" id="f-status" onchange="load()">
+  <select class="fsel" id="f-sts" onchange="carregar()">
     <option value="">Todos os status</option>
     <option value="ok">✅ OK</option>
     <option value="erro">❌ Erro</option>
     <option value="aviso">⚠️ Aviso</option>
   </select>
-  <input class="filter-inp" id="f-busca" type="text" placeholder="Buscar por ficha, ação..." oninput="filtrarTabela(this.value)">
-  <select class="filter-sel" id="f-limit" onchange="load()">
+  <input class="finp" id="f-q" placeholder="🔍 Buscar ficha, ação…" oninput="filtrar(this.value)">
+  <select class="fsel" id="f-lim" onchange="carregar()">
     <option value="100">Últimas 100</option>
     <option value="200" selected>Últimas 200</option>
     <option value="500">Últimas 500</option>
   </select>
 </div>
 
-<div class="table-wrap">
+<div class="tbl-wrap">
   <table>
     <thead>
       <tr>
-        <th>Horário</th>
-        <th>Módulo</th>
-        <th>Ficha</th>
-        <th>Ação</th>
-        <th>De → Para</th>
-        <th>Gatilho</th>
-        <th>Status</th>
-        <th>Detalhe</th>
+        <th>Horário</th><th>Módulo</th><th>Ficha</th><th>Ação</th>
+        <th>De → Para</th><th>Gatilho</th><th>Status</th><th>Detalhe</th>
       </tr>
     </thead>
-    <tbody id="log-body">
-      <tr><td colspan="8" class="empty">Carregando...</td></tr>
-    </tbody>
+    <tbody id="tbody"></tbody>
   </table>
 </div>
 
 <script>
-var allEntries = [];
-
-function esc(s){ var d=document.createElement('div');d.textContent=s||'';return d.innerHTML; }
-function fmtTs(ts){
-  if(!ts) return '—';
-  var d = new Date(ts);
-  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})
-    + ' ' + d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'America/Sao_Paulo'});
+var todos = [];
+var FASES = {aguardando_aprovacao:'Ag. Aprovação',ultima_chamada:'Última Chamada',aprovados:'Aprovados',video_enviado:'Vídeo Enviado',analise_compra:'Análise Compra',equipamento_comprado:'Equip. Comprado',programar_entrega:'Prog. Entrega',solicitar_entrega:'Solic. Entrega',entrega_solicitada:'Entrega Solic.',receber:'Receber',erp:'ERP',producao:'Produção',cliente_loja:'Cliente Loja',nf_emitida:'NF Emitida',faturamento:'Faturamento',entrega_liberada:'Entrega Lib.',rota_criada:'Rota Criada',pago:'Pago',analise:'Análise',comprado:'Comprado'};
+function fn(id){return FASES[id]||id||'';}
+function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
+function ts(t){
+  if(!t)return'—';
+  var d=new Date(t);
+  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'America/Sao_Paulo'});
 }
 
-async function load(){
-  var modulo = document.getElementById('f-modulo').value;
-  var status = document.getElementById('f-status').value;
-  var limit  = document.getElementById('f-limit').value;
-  var url = '/api/log?action=list&limit='+limit;
-  if (modulo) url += '&modulo='+encodeURIComponent(modulo);
-  if (status) url += '&status='+encodeURIComponent(status);
-  try {
-    var r = await fetch(url);
-    var d = await r.json();
-    if (!d.ok) return;
-    allEntries = d.entries || [];
-    document.getElementById('st-total').textContent = d.total + ' entr.';
-    var busca = document.getElementById('f-busca').value;
-    renderTabela(busca ? allEntries.filter(function(e){ return JSON.stringify(e).toLowerCase().includes(busca.toLowerCase()); }) : allEntries);
-  } catch(e) {
-    console.error('log fetch error:', e); document.getElementById('log-body').innerHTML = '<tr><td colspan="8" class="empty">Erro ao carregar: '+esc(e.message)+'<br><small>Verifique se /api/log está acessível</small></td></tr>';
-  }
-}
-
-function renderTabela(entries){
-  var tbody = document.getElementById('log-body');
-  if (!entries.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty">Nenhuma entrada no log ainda.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = entries.map(function(e){
-    var cls = e.status === 'erro' ? 'erro' : e.status === 'aviso' ? 'aviso' : '';
-    var badge = e.status === 'erro'
-      ? '<span class="badge badge-erro">❌ erro</span>'
-      : e.status === 'aviso'
-      ? '<span class="badge badge-aviso">⚠️ aviso</span>'
-      : '<span class="badge badge-ok">✅ ok</span>';
-    var flecha = (e.de && e.para) ? '<span class="arrow">→</span>'+esc(faseNome(e.para)) : (e.para ? esc(faseNome(e.para)) : '—');
-    var de = e.de ? esc(faseNome(e.de)) : '';
-    var deParaHtml = de ? de + '<span class="arrow">→</span>' + esc(faseNome(e.para||'')) : (e.para ? '→ '+esc(faseNome(e.para)) : '—');
+function renderizar(lista){
+  var tb=document.getElementById('tbody');
+  if(!lista.length){tb.innerHTML='<tr><td colspan="8" class="empty">Nenhuma entrada no log ainda.<br><small style="opacity:.5">As ações do sistema aparecerão aqui automaticamente.</small></td></tr>';return;}
+  tb.innerHTML=lista.map(function(e){
+    var cls=e.status==='erro'?'err':e.status==='aviso'?'warn':'';
+    var bdg=e.status==='erro'?'<span class="badge berr">❌ erro</span>':e.status==='aviso'?'<span class="badge bwrn">⚠️ aviso</span>':'<span class="badge bok">✅ ok</span>';
+    var dp=e.de&&e.para?esc(fn(e.de))+'<span class="arrow">→</span>'+esc(fn(e.para)):e.para?'→ '+esc(fn(e.para)):e.de?esc(fn(e.de)):' — ';
     return '<tr class="'+cls+'">'+
-      '<td class="ts">'+fmtTs(e.ts)+'</td>'+
+      '<td class="ts">'+ts(e.ts)+'</td>'+
       '<td><span class="mod">'+esc(e.modulo)+'</span></td>'+
-      '<td><div class="fid">'+esc(e.fichaId)+'</div><div style="color:var(--text);font-size:11px;">'+esc(e.ficha)+'</div></td>'+
-      '<td>'+esc(e.acao)+'</td>'+
-      '<td style="font-family:var(--fm);font-size:10px;">'+deParaHtml+'</td>'+
-      '<td class="gtxt">'+esc(e.gatilho||'—')+'</td>'+
-      badge+'</td>'+
-      '<td class="dtxt" title="'+esc(e.detalhe)+'">'+esc(e.detalhe||'')+'</td>'+
+      '<td><div class="fid">'+esc(e.fichaId)+'</div><div class="fnm">'+esc(e.ficha)+'</div></td>'+
+      '<td class="acao">'+esc(e.acao)+'</td>'+
+      '<td class="fase">'+dp+'</td>'+
+      '<td class="gtx">'+esc(e.gatilho||'—')+'</td>'+
+      '<td>'+bdg+'</td>'+
+      '<td class="det" title="'+esc(e.detalhe)+'">'+esc(e.detalhe||'')+'</td>'+
     '</tr>';
   }).join('');
 }
 
-function faseNome(id){
-  var mapa = {
-    aguardando_aprovacao:'Aguard. Aprovação', ultima_chamada:'Última Chamada',
-    aprovados:'Aprovados', video_enviado:'Vídeo Enviado',
-    analise_compra:'Análise Compra', equipamento_comprado:'Equip. Comprado',
-    programar_entrega:'Prog. Entrega', solicitar_entrega:'Solic. Entrega',
-    entrega_solicitada:'Entrega Solic.', receber:'Receber', erp:'ERP',
-    producao:'Produção', cliente_loja:'Cliente Loja', nf_emitida:'NF Emitida',
-    faturamento:'Faturamento', entrega_liberada:'Entrega Lib.', rota_criada:'Rota Criada',
-    pago:'Pago', conserto_realizado:'Conserto', analise:'Análise', comprado:'Comprado'
-  };
-  return mapa[id] || id;
+async function carregar(){
+  var mod=document.getElementById('f-mod').value;
+  var sts=document.getElementById('f-sts').value;
+  var lim=document.getElementById('f-lim').value;
+  var url='/api/log?action=list&limit='+lim+(mod?'&modulo='+encodeURIComponent(mod):'')+(sts?'&status='+encodeURIComponent(sts):'');
+  try{
+    var r=await fetch(url);
+    var d=await r.json();
+    if(!d.ok)throw new Error(d.error||'Erro na API');
+    todos=d.entries||[];
+    document.getElementById('st-total').textContent=d.total+' entr.';
+    var q=document.getElementById('f-q').value;
+    renderizar(q?todos.filter(function(e){return JSON.stringify(e).toLowerCase().includes(q.toLowerCase());}):todos);
+  }catch(e){
+    document.getElementById('tbody').innerHTML='<tr><td colspan="8" class="empty">Erro: '+esc(e.message)+'</td></tr>';
+  }
 }
 
-function filtrarTabela(q){
-  if (!q) { renderTabela(allEntries); return; }
-  var lower = q.toLowerCase();
-  renderTabela(allEntries.filter(function(e){ return JSON.stringify(e).toLowerCase().includes(lower); }));
+function filtrar(q){
+  if(!q){renderizar(todos);return;}
+  renderizar(todos.filter(function(e){return JSON.stringify(e).toLowerCase().includes(q.toLowerCase());}));
 }
 
 async function limpar(){
-  if (!confirm('Limpar todo o log? Isso não pode ser desfeito.')) return;
+  if(!confirm('Limpar todo o log?'))return;
   await fetch('/api/log?action=clear');
-  allEntries = [];
-  document.getElementById('st-total').textContent = '0 entr.';
-  renderTabela([]);
+  todos=[];document.getElementById('st-total').textContent='0 entr.';renderizar([]);
 }
 
-load();
-setInterval(load, 15000);
+carregar();
+setInterval(carregar,15000);
 </script>
 </body>
 </html>
