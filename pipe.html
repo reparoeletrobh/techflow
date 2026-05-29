@@ -417,6 +417,15 @@ async function load(){
     document.getElementById('last-sync').textContent=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
   }
   render();
+  // Buscar ERP count diretamente do Redis (garante dado fresco, independente de cache)
+  try {
+    var ec = await fetch('/api/pipe?action=erp-count&_t='+Date.now()).then(function(r){return r.json();});
+    if(ec.ok){
+      document.getElementById('st-erp').textContent = ec.erp;
+      document.getElementById('st-erp-val').textContent = ec.valor>0?ec.valor.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
+      document.getElementById('st-total').textContent = ec.total;
+    }
+  } catch(e){}
 }
 
 

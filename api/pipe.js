@@ -1032,6 +1032,17 @@ export default async function handler(req, res) {
     } catch(e){return res.status(500).json({ok:false,error:e.message});}
   }
 
+
+  // ── GET erp-count: conta ERP diretamente do Redis (sem cache) ────────────
+  if (action === 'erp-count') {
+    res.setHeader('Cache-Control','no-store,no-cache');
+    var db2 = await dbGet(PIPE_KEY);
+    var tot  = (db2&&db2.cards)?db2.cards.length:0;
+    var erp2 = (db2&&db2.cards)?db2.cards.filter(function(c){return c.phase==='erp';}).length:0;
+    var val2 = (db2&&db2.cards)?db2.cards.filter(function(c){return c.phase==='erp';}).reduce(function(s,c){return s+(parseFloat(c.valor)||0);},0):0;
+    return res.status(200).json({ok:true,erp:erp2,total:tot,valor:val2});
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();

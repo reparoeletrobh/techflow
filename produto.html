@@ -392,16 +392,40 @@ footer{padding:24px 20px;border-top:1px solid var(--border);text-align:center;}
 /* ══ MODAL CHECKOUT ══════════════════════════════════════════ */
 .ck-overlay{
   position:fixed;inset:0;z-index:500;
-  background:rgba(0,0,0,.8);backdrop-filter:blur(6px);
-  display:flex;align-items:center;justify-content:center;
-  padding:20px;
+  overflow:hidden; /* outer: nunca scrollar aqui */
   opacity:0;pointer-events:none;transition:opacity .25s;
+  background:rgba(0,0,0,.8);backdrop-filter:blur(6px);
 }
 .ck-overlay.open{opacity:1;pointer-events:all;}
+/* Scroller interno — funciona em iOS Safari */
+.ck-scroller{
+  position:absolute;inset:0;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;
+  box-sizing:border-box;
+}
+@media(max-width:700px){
+  .ck-scroller{
+    align-items:flex-start;
+    padding:0;
+  }
+}
 .ck-modal{
   background:#0d1117;border:1px solid var(--border2);
   border-radius:16px;width:100%;max-width:440px;
-  overflow:hidden;position:relative;
+  overflow:visible; /* não cortar conteúdo */
+  position:relative;flex-shrink:0;
+}
+@media(max-width:700px){
+  .ck-modal{
+    border-radius:0;
+    max-width:100%;
+    min-height:100vh;
+  }
+  .ck-body{padding-bottom:40px;}
+  .form-row input{font-size:16px !important;} /* evitar zoom iOS */
 }
 .ck-hd{
   padding:20px 22px 16px;border-bottom:1px solid var(--border);
@@ -1027,6 +1051,7 @@ init();
 
 <!-- ══ MODAL CHECKOUT ════════════════════════════════════════ -->
 <div class="ck-overlay" id="ck-overlay">
+  <div class="ck-scroller">
   <div class="ck-modal">
     <div class="ck-hd">
       <div class="ck-title">Finalizar Compra</div>
