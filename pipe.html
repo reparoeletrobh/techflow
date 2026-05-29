@@ -116,6 +116,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
     <div class="sync-dot" id="sync-dot"></div>
     <span class="sync-time" id="last-sync">—</span>
     <button class="hbtn" onclick="syncPipefy()" id="btn-sync">⟳ Sincronizar Pipefy</button>
+    <button class="hbtn" onclick="showRelatorio()" id="btn-rel">📊 Relatório</button>
     <button class="hbtn primary" onclick="abrirModalNovo()">+ Nova Ficha</button>
   </div>
 </header>
@@ -146,6 +147,27 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
     </div>
   </div>
 </div>
+
+
+<!-- PAINEL RELATÓRIO -->
+<div id="painel-rel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:400;overflow-y:auto;padding:20px;">
+  <div style="max-width:900px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-family:var(--fh);font-size:18px;font-weight:800;">📊 Relatório de Divergências</div>
+        <div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:3px;">Compara nosso sistema (Redis) com o Pipefy em tempo real</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="hbtn" onclick="rodarComparacao()" id="btn-rodar">▶ Rodar agora</button>
+        <button class="hbtn" onclick="carregarHistorico()" id="btn-hist">🕓 Histórico</button>
+        <button class="hbtn" onclick="fecharRelatorio()">✕ Fechar</button>
+      </div>
+    </div>
+    <div id="rel-resultado"></div>
+    <div id="rel-historico" style="display:none;"></div>
+  </div>
+</div>
+
 
 <div class="toast" id="toast"></div>
 

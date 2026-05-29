@@ -160,6 +160,133 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, info: 'pipe resetado — pronto para nova sincronização' });
   }
 
+
+  // ── GET comparar-pipefy: compara Redis vs Pipefy e gera log de divergências ──
+  if (action === 'comparar-pipefy') {
+    if (!PIPEFY_TOKEN) return res.status(200).json({ ok:false, error:'sem PIPEFY_TOKEN' });
+    const db       = (await dbGet(PIPE_KEY)) || defaultDB();
+    const nosCards = db.cards || [];
+
+    // Fases a comparar (mesmas do sync)
+    const FASES = [
+      { phId:'334875152', local:'aguardando_aprovacao', nome:'Aguardando Aprovação' },
+      { phId:'334879132', local:'aprovados',            nome:'Aprovado' },
+      { phId:'342533760', local:'video_enviado',        nome:'Vídeo Enviado' },
+      { phId:'342584529', local:'analise_compra',       nome:'Análise de Compra' },
+      { phId:'338439265', local:'programar_entrega',    nome:'Programar Entrega' },
+      { phId:'334875186', local:'solicitar_entrega',    nome:'Solicitar Entrega' },
+      { phId:'335066834', local:'entrega_solicitada',   nome:'Entrega Solicitada' },
+      { phId:'334875204', local:'receber',              nome:'Receber' },
+      { phId:'339008925', local:'erp',                  nome:'ERP' },
+    ];
+
+    const log = [];
+    let totalPipefy = 0, totalNosso = 0, ok = 0, faltando = 0, extra = 0, divergencia = 0;
+
+    // Mapa dos nossos cards por pipefyId
+    const nosMap = {};
+    for (const c of nosCards) { if (c.pipefyId) nosMap[c.pipefyId] = c; }
+    const nosIdsVistos = new Set();
+
+    // Buscar cada fase no Pipefy
+    for (const fase of FASES) {
+      var pipefyCards = [];
+      var cursor = null;
+      var hasMore = true;
+      var tentativa = 0;
+
+      while (hasMore && tentativa < 10) {
+        tentativa++;
+        var ca = cursor ? ', after: "' + cursor + '"' : '';
+        var data = await pipefyReq(
+          'query { phase(id: "' + fase.phId + '") { cards(first: 50' + ca + ') { pageInfo { hasNextPage endCursor } edges { node { id title } } } } }'
+        ).catch(() => null);
+
+        var edges    = (data && data.phase && data.phase.cards && data.phase.cards.edges) ? data.phase.cards.edges : [];
+        var pageInfo = (data && data.phase && data.phase.cards && data.phase.cards.pageInfo) ? data.phase.cards.pageInfo : {};
+
+        for (var e of edges) {
+          pipefyCards.push({ id: String(e.node.id), title: e.node.title });
+        }
+        hasMore = pageInfo.hasNextPage || false;
+        cursor  = pageInfo.endCursor  || null;
+      }
+
+      totalPipefy += pipefyCards.length;
+
+      for (var pCard of pipefyCards) {
+        nosIdsVistos.add(pCard.id);
+        var nosCard = nosMap[pCard.id];
+
+        if (!nosCard) {
+          faltando++;
+          log.push({
+            tipo: 'FALTANDO',
+            pipefyId: pCard.id,
+            fase: fase.nome,
+            titulo: pCard.title,
+            msg: 'Card existe no Pipefy mas NÃO está no nosso sistema'
+          });
+        } else {
+          // Verificar divergência de fase
+          if (nosCard.phase !== fase.local) {
+            divergencia++;
+            log.push({
+              tipo: 'FASE_DIVERGENTE',
+              pipefyId: pCard.id,
+              nossoId: nosCard.id,
+              nomeContato: nosCard.nomeContato,
+              faseNosso: nosCard.phase,
+              fasePipefy: fase.nome,
+              msg: 'Fase no Pipefy: "' + fase.nome + '" | Fase no nosso sistema: "' + nosCard.phase + '"'
+            });
+          } else {
+            ok++;
+          }
+        }
+      }
+    }
+
+    // Cards no nosso sistema (de origem pipefy) que não foram vistos no Pipefy
+    for (var nc of nosCards) {
+      if (nc.pipefyId && nc.origem === 'pipefy' && !nosIdsVistos.has(nc.pipefyId)) {
+        extra++;
+        log.push({
+          tipo: 'EXTRA_NOSSO',
+          nossoId: nc.id,
+          pipefyId: nc.pipefyId,
+          nomeContato: nc.nomeContato,
+          fase: nc.phase,
+          msg: 'Card no nosso sistema mas NÃO encontrado nas fases monitoradas do Pipefy (pode ter avançado de fase)'
+        });
+      }
+    }
+
+    totalNosso = nosCards.filter(c => c.pipefyId).length;
+
+    // Salvar log no Redis para histórico
+    var logEntry = {
+      ts:           new Date().toISOString(),
+      totalPipefy,
+      totalNosso,
+      ok, faltando, extra, divergencia,
+      log
+    };
+    var logKey = 'reparoeletro_pipe_log';
+    var logDb  = (await dbGet(logKey)) || { entradas: [] };
+    logDb.entradas = [logEntry, ...(logDb.entradas || [])].slice(0, 20); // manter 20 últimas
+    await dbSet(logKey, logDb);
+
+    return res.status(200).json({ ok:true, ...logEntry });
+  }
+
+  // ── GET historico-log: retorna histórico de comparações ───────────────────
+  if (action === 'historico-log') {
+    var logKey = 'reparoeletro_pipe_log';
+    var logDb  = (await dbGet(logKey)) || { entradas: [] };
+    return res.status(200).json({ ok:true, entradas: logDb.entradas || [] });
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
