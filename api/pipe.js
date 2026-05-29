@@ -9,40 +9,6 @@ function fmt4dig(nome, tel) {
   return n + ' ' + last4;
 }
 
-function fmt4dig(nome, tel) {
-  if (!nome) return '';
-  var n = String(nome).trim();
-  if (/\s\d{4}$/.test(n)) return n;
-  if (!tel) return n;
-  var digits = String(tel).replace(/\D/g,'');
-  var last4 = digits.slice(-4);
-  if (last4.length < 4) return n;
-  return n + ' ' + last4;
-}
-
-
-function fmt4dig(nome, tel) {
-  if (!nome) return '';
-  var n = String(nome).trim();
-  if (/\s\d{4}$/.test(n)) return n;
-  if (!tel) return n;
-  var digits = String(tel).replace(/\D/g,'');
-  var last4 = digits.slice(-4);
-  if (last4.length < 4) return n;
-  return n + ' ' + last4;
-}
-
-// ── fmt4dig: padrão Nome 4díg do telefone ────────────────────────────────
-function fmt4dig(nome, tel) {
-  if (!nome) return '';
-  var n = String(nome).trim();
-  if (/\s\d{4}$/.test(n)) return n;
-  if (!tel) return n;
-  var digits = String(tel).replace(/\D/g,'');
-  var last4 = digits.slice(-4);
-  if (last4.length < 4) return n;
-  return n + ' ' + last4;
-}
 
 // ── Helper: gravar no log central ────────────────────────────────────────
 async function logAction(entry) {
@@ -409,7 +375,7 @@ export default async function handler(req, res) {
     const novoCard = {
       pipefyId:    boardPid,
       phaseId:     'producao',
-      nomeContato: fmt4dig(card.nomeContato || '', card.telefone || ''),
+      nomeContato: card.nomeContato || '',
       title:       card.descricao || card.nomeContato || '',
       telefone:    card.telefone || '',
       descricao:   card.equipamento || card.descricao || '',
@@ -979,7 +945,7 @@ export default async function handler(req, res) {
             id: 'FIN-' + (pipefyStr || card.id),
             pipefyId: pipefyStr,
             osCode: card.id,
-            nomeContato: fmt4dig(card.nomeContato || '', card.telefone || ''),
+            nomeContato: card.nomeContato || '',
             telefone: card.telefone || '',
             equipamento: card.equipamento || card.descricao || '',
             valor: card.valor || 0,
