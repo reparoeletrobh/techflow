@@ -213,15 +213,23 @@ async function criarPreferenciaMp({ rec, metodo }) {
   const body = {
     items: [{
       id:          rec.id,
-      title:       "OS " + rec.id + " — " + (rec.nomeContato || rec.title || "Cliente"),
-      description: (rec.equipamento || "") + (rec.descricao ? " | " + rec.descricao : ""),
+      title:       "OS " + rec.id + " | " + (rec.nomeContato || rec.title || "Cliente"),
+      description: "Reparo Eletro BH — Conserto de Eletrodomesticos | " +
+                   (rec.equipamento || rec.descricao || "Eletrodomestico"),
       quantity:    1,
       unit_price:  valor,
-      currency_id: "BRL"
+      currency_id: "BRL",
+      picture_url: process.env.REPARO_LOGO_URL ||
+        "https://reparoeletroadm.com/logo.png" // substitua pela URL pública do logo
     }],
     payer: {
-      name:  rec.nomeContato || rec.title || "Cliente",
+      name:  (rec.nomeContato || rec.title || "Cliente").split(" ").slice(0,2).join(" "),
+      surname: (rec.nomeContato || rec.title || "").split(" ").slice(2).join(" ") || "",
       email: rec.email || "cliente@reparoeletrobh.com.br",
+      phone: rec.telefone
+        ? { area_code: rec.telefone.replace(/\D/g,"").slice(0,2),
+            number:    rec.telefone.replace(/\D/g,"").slice(2) }
+        : undefined,
       ...(rec.cpfCnpj ? { identification: {
         type:   rec.cpfCnpj.replace(/\D/g,"").length <= 11 ? "CPF" : "CNPJ",
         number: rec.cpfCnpj.replace(/\D/g,"")
@@ -253,6 +261,7 @@ async function criarPreferenciaMp({ rec, metodo }) {
       pending: "https://reparoeletroadm.com/financeiro"
     },
     notification_url: "https://reparoeletroadm.com/api/webhook-mp",
+    statement_descriptor: "REPARO ELETRO BH", // aparece na fatura do cartão do cliente
     external_reference: rec.id, // indexável no MP para busca
     // SEM expiration_date_to — link sem expiração
     binary_mode: false
