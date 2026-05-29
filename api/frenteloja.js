@@ -1,3 +1,36 @@
+
+// ── Hook: salvar no Pipe ADM quando nova ficha entra no FL ──────────────────
+async function registrarNoPipe(dados) {
+  try {
+    const PIPE_KEY = 'reparoeletro_pipe';
+    const pipeDb   = await dbGet(PIPE_KEY) || { cards:[], syncedPipefyIds:[], lastSync:null };
+    if (!Array.isArray(pipeDb.cards)) pipeDb.cards = [];
+    const pid = dados.pipefyId ? String(dados.pipefyId) : null;
+    if (pid && pipeDb.cards.find(function(c){ return c.pipefyId === pid; })) return;
+    // Para fichas sem pipefyId, verificar por fichaId local
+    const fid = dados.fichaId ? String(dados.fichaId) : null;
+    if (fid && pipeDb.cards.find(function(c){ return c.fichaId === fid; })) return;
+    const now = new Date().toISOString();
+    pipeDb.cards.unshift({
+      id:              'PIPE-' + String(pipeDb.cards.length + 1).padStart(4,'0'),
+      pipefyId:        pid,
+      fichaId:         fid,
+      phase:           dados.phase || 'aprovados',
+      nomeContato:     dados.nomeContato || '',
+      telefone:        dados.telefone || '',
+      equipamento:     dados.equipamento || '',
+      descricao:       dados.descricao || '',
+      valor:           parseFloat(dados.valor || 0) || 0,
+      origem:          'frenteloja',
+      criadoEm:        now, movedAt: now,
+      aguardandoDesde: null,
+      history: [], analiseCompra: false
+    });
+    pipeDb.lastSync = now;
+    await dbSet(PIPE_KEY, pipeDb);
+  } catch(e) { console.error('[pipe-hook-fl]', e.message); }
+}
+
 // api/frenteloja.js — Sistema Frente de Loja
 const PIPEFY_API = 'https://api.pipefy.com/graphql';
 const PIPE_ID    = '305832912';
@@ -143,6 +176,8 @@ export default async function handler(req,res){
           pipefyId = data?.createCard?.card?.id || null;
           if (pipefyId) {
             ficha.pipefyCardId = pipefyId;
+            // Registrar no Pipe ADM
+            await registrarNoPipe({ pipefyId, fichaId: ficha.id, phase: 'aprovados', nomeContato: ficha.nomeContato||'', telefone: ficha.telefone||'', equipamento: ficha.orcamento?.equipamento||'', valor: ficha.orcamento?.valor||0, origem:'frenteloja' }).catch(()=>{});
             console.log('[FL] Pipefy card criado:', pipefyId);
             // Atualizar valor no Pipefy (fire-and-forget)
             const vn = String(parseFloat(ficha.orcamento?.valor||0).toFixed(2));
