@@ -241,6 +241,7 @@ async function criarPreferenciaMp({ rec, metodo }) {
     metadata: {
       origem:    "financeiro",
       fichaId:   rec.id,
+      ficha_id:  rec.id,  // snake_case para compatibilidade MP
       pipefyId:  rec.pipefyId || "",
       metodo:    metodo,
       cliente:   rec.nomeContato || rec.title || "",
@@ -252,6 +253,7 @@ async function criarPreferenciaMp({ rec, metodo }) {
       pending: "https://reparoeletroadm.com/financeiro"
     },
     notification_url: "https://reparoeletroadm.com/api/webhook-mp",
+    external_reference: rec.id, // indexável no MP para busca
     // SEM expiration_date_to — link sem expiração
     binary_mode: false
   };

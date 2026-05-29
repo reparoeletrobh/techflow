@@ -57,7 +57,7 @@ async function logEvento(evento) {
 // ── Financeiro: processar pagamento MP → entrega_liberada ────────────────────
 async function processarPagamentoFinanceiro(pmt) {
   const meta     = pmt.metadata || {};
-  const fichaId  = meta.fichaId;
+  const fichaId  = meta.fichaId || meta.ficha_id; // MP converte camelCase→snake_case
   const prefId   = pmt.collector?.id ? null : pmt.additional_info?.items?.[0]?.id; // fallback
   const valor    = pmt.transaction_amount;
   const metodo   = pmt.payment_method_id;
@@ -580,6 +580,26 @@ export default async function handler(req, res) {
 
 
 
+
+  // ── GET forcar-pagamento-fin: força processamento de pagamento financeiro ──
+  if (action === "forcar-pagamento-fin") {
+    const pid = req.query.paymentId;
+    if (!pid) return res.status(400).json({ ok:false, error:"paymentId obrigatorio" });
+    try {
+      const mpR = await fetch(`https://api.mercadopago.com/v1/payments/${pid}`, {
+        headers: { Authorization: `Bearer ${MP_TOKEN}` }
+      });
+      const pmt = await mpR.json();
+      if (!pmt.id) return res.status(404).json({ ok:false, error:"pagamento nao encontrado", raw:pmt });
+      const result = await processarPagamentoFinanceiro(pmt);
+      // Garantir que está marcado como processado
+      await marcarProcessado(pid);
+      return res.status(200).json({ ok:true, forcado:true, paymentId:pid, valor:pmt.transaction_amount, status:pmt.status, ...result });
+    } catch(e) {
+      return res.status(500).json({ ok:false, error:e.message });
+    }
+  }
+
   // ── GET processar-pendentes-fin: busca pagamentos de TODAS fichas faturamento pendentes ──
   // Sem limite de janela de tempo — verifica cada preference_id diretamente no MP
   if (action === "processar-pendentes-fin") {
@@ -594,19 +614,29 @@ export default async function handler(req, res) {
 
       for (const ficha of fichasPendentes) {
         try {
-          // Buscar pagamentos vinculados a este preference_id no MP
-          const searchUrl = `https://api.mercadopago.com/v1/payments/search?external_reference=${encodeURIComponent(ficha.mp.preferenceId)}&status=approved&limit=5`;
+          // Buscar por external_reference (ficha ID) que é indexável no MP
+          // Também buscar por ficha_id no metadata (MP converte camelCase→snake_case)
+          const fichaIdMeta = ficha.id.replace(/['"]/g,'');
+          const searchUrl = `https://api.mercadopago.com/v1/payments/search?status=approved&external_reference=${encodeURIComponent(fichaIdMeta)}&limit=10`;
           const r1 = await fetch(searchUrl, { headers:{ Authorization:`Bearer ${MP_TOKEN}` } });
           const d1 = await r1.json();
 
-          // Também tentar por preference_id direto (campo diferente no MP)
-          const searchUrl2 = `https://api.mercadopago.com/v1/payments/search?preference_id=${encodeURIComponent(ficha.mp.preferenceId)}&status=approved&limit=5`;
+          // Busca ampla por data de criação (últimos 30 dias) + filtrar por preference_id nos resultados
+          const inicio30 = new Date(Date.now()-30*24*60*60*1000).toISOString().replace('Z','-00:00');
+          const fim30    = new Date().toISOString().replace('Z','-00:00');
+          const searchUrl2 = `https://api.mercadopago.com/v1/payments/search?status=approved&sort=date_created&criteria=desc&range=date_created&begin_date=${encodeURIComponent(inicio30)}&end_date=${encodeURIComponent(fim30)}&limit=50`;
           const r2 = await fetch(searchUrl2, { headers:{ Authorization:`Bearer ${MP_TOKEN}` } });
           const d2 = await r2.json();
 
-          const pagamentos = [...(d1.results||[]), ...(d2.results||[])];
-          // Remover duplicatas por id
-          const uniq = pagamentos.filter((p,i,a) => a.findIndex(x=>x.id===p.id)===i);
+          // Filtrar resultados por preference_id OU por ficha_id no metadata
+          const prefId = ficha.mp.preferenceId;
+          const todos  = [...(d1.results||[]), ...(d2.results||[])];
+          const uniq   = todos.filter((p,i,a) =>
+            a.findIndex(x=>x.id===p.id)===i &&
+            (p.preference_id === prefId ||
+             p.metadata?.ficha_id  === ficha.id ||
+             p.metadata?.fichaId   === ficha.id)
+          );
 
           if (!uniq.length) { resultado.pendentes++; continue; }
 
