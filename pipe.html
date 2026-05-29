@@ -389,7 +389,7 @@ setInterval(load,90000);
 
 // ── EDITAR PIPE ───────────────────────────────────────────────────────────
 function abrirEditarPipe(id) {
-  var card = (window._pipeCards||[]).find(function(c){ return c.id === id; });
+  var card = cards.find(function(c){ return c.id === id; });
   if (!card) return;
   document.getElementById('ep-id').value    = id;
   document.getElementById('ep-nome').value  = card.nomeContato || '';
