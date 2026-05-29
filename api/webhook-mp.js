@@ -54,6 +54,30 @@ async function logEvento(evento) {
 }
 
 
+
+// ── moverNoPipe: move card no Pipe ADM (solicitar_entrega) ──────────────
+async function moverCardNoPipe(pipefyId, osCode, novaFase) {
+  try {
+    const U=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+    const T=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+    const PIPE_KEY='reparoeletro_pipe';
+    async function _pg(k){const r=await fetch(U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();const v=j[0]?.result;if(!v)return null;try{let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+    async function _ps(k,v){await fetch(U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+    const db=await _pg(PIPE_KEY);
+    if(!db||!Array.isArray(db.cards))return false;
+    const card=db.cards.find(function(c){
+      return (pipefyId&&c.pipefyId===String(pipefyId))||(osCode&&c.id===String(osCode));
+    });
+    if(!card)return false;
+    const now=new Date().toISOString();
+    card.history=(card.history||[]).concat([{phase:card.phase,ts:now}]);
+    card.phase=novaFase;
+    card.movedAt=now;
+    await _ps(PIPE_KEY,db);
+    return true;
+  }catch(e){console.error('[pipe-move]',e.message);return false;}
+}
+
 // ── Financeiro: processar pagamento MP → entrega_liberada ────────────────────
 async function processarPagamentoFinanceiro(pmt) {
   const meta     = pmt.metadata || {};
@@ -106,6 +130,10 @@ async function processarPagamentoFinanceiro(pmt) {
     { phaseId:"entrega_liberada",     ts:now, via:"webhook_mp_auto" }
   ];
   await dbSet(FIN_KEY2, fin);
+
+  // Pipe ADM: mover para solicitar_entrega
+  const pipeOk = await moverCardNoPipe(rec.pipefyId, rec.osCode, 'solicitar_entrega').catch(()=>false);
+  console.log('[webhook-mp] Pipe ADM move:', pipeOk);
 
   // Pipefy: mover para Solicitar Entrega — função própria, sem fetch interno
   let pipefyOk = false;
