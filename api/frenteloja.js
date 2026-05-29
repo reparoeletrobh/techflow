@@ -1,4 +1,20 @@
 
+// ── Helper: gravar no log central ────────────────────────────────────────
+async function logAction(entry) {
+  try {
+    const _U=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+    const _T=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+    const _K='reparoeletro_log';
+    const _r=await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['GET',_K]])});
+    const _j=await _r.json();const _v=_j[0]?.result;
+    let _log=[];if(_v){try{_log=JSON.parse(_v);if(typeof _log==='string')_log=JSON.parse(_log);}catch(e){}}if(!Array.isArray(_log))_log=[];
+    _log.unshift({ts:new Date().toISOString(),modulo:entry.modulo||'—',fichaId:entry.fichaId||'',ficha:entry.ficha||'',acao:entry.acao||'',de:entry.de||'',para:entry.para||'',gatilho:entry.gatilho||'',status:entry.status||'ok',detalhe:entry.detalhe||''});
+    if(_log.length>500)_log.splice(500);
+    await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['SET',_K,JSON.stringify(_log)]])});
+  }catch(e){}
+}
+
+
 // ── Helper: mover card no Pipe ADM pelo pipefyId ─────────────────────────
 async function moverNoPipe(pipefyId, novaFase, dados) {
   if (!pipefyId) return;
@@ -178,6 +194,7 @@ export default async function handler(req,res){
         body:JSON.stringify({flFichaId:ficha.id,pipefyId:null,title:_title,nomeContato:ficha.nomeContato||'',telefone:ficha.telefone||'',phaseId:'analise_loja'})
       }).catch(e=>console.error('[FL] criar→board:',e.message));
     }catch(e){}
+    logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Liberar equipamento', para:'receber', gatilho:'→ Pipe receber + Pipefy Receber$', status:'ok', detalhe:'Valor: R$'+(ficha.pagoValor||0)+' '+ficha.pagoPor }).catch(()=>{});
     return res.status(200).json({ok:true,ficha});
   }
 
@@ -195,6 +212,7 @@ export default async function handler(req,res){
     if (ficha.pipefyCardId) {
       await moverNoPipe(ficha.pipefyCardId, 'receber', { nomeContato: ficha.nomeContato, valor: ficha.pagoValor }).catch(() => {});
     }
+    logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Liberar equipamento', para:'receber', gatilho:'→ Pipe receber + Pipefy Receber$', status:'ok', detalhe:'Valor: R$'+(ficha.pagoValor||0)+' '+ficha.pagoPor }).catch(()=>{});
     return res.status(200).json({ok:true,ficha});
   }
 
@@ -214,7 +232,8 @@ export default async function handler(req,res){
       ficha.motivo=req.body?.motivo||'';
       ficha.movedAt=now;
       await dbSet(FL_KEY,db);
-      return res.status(200).json({ok:true,ficha});
+      logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Liberar equipamento', para:'receber', gatilho:'→ Pipe receber + Pipefy Receber$', status:'ok', detalhe:'Valor: R$'+(ficha.pagoValor||0)+' '+ficha.pagoPor }).catch(()=>{});
+    return res.status(200).json({ok:true,ficha});
     }
 
     if(decisao==='aprovado'){
@@ -322,7 +341,8 @@ export default async function handler(req,res){
       // ── PASSO 4: Salvar FL e responder ───────────────────────────────
       await dbSet(FL_KEY, db);
 
-      return res.status(200).json({ok:true,ficha});
+      logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Liberar equipamento', para:'receber', gatilho:'→ Pipe receber + Pipefy Receber$', status:'ok', detalhe:'Valor: R$'+(ficha.pagoValor||0)+' '+ficha.pagoPor }).catch(()=>{});
+    return res.status(200).json({ok:true,ficha});
     }
   }
 
@@ -397,6 +417,7 @@ export default async function handler(req,res){
     ficha.phase='conserto_realizado';ficha.liberadoHoje=true;ficha.movedAt=now;
     ficha.history=(ficha.history||[]).concat([{phase:'conserto_realizado',ts:now}]);
     await dbSet(FL_KEY,db);
+    logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Liberar equipamento', para:'receber', gatilho:'→ Pipe receber + Pipefy Receber$', status:'ok', detalhe:'Valor: R$'+(ficha.pagoValor||0)+' '+ficha.pagoPor }).catch(()=>{});
     return res.status(200).json({ok:true,ficha});
   }
 
@@ -445,6 +466,7 @@ export default async function handler(req,res){
     if (ficha.pipefyCardId) {
       await moverNoPipe(ficha.pipefyCardId, 'receber', { nomeContato: ficha.nomeContato, valor: ficha.pagoValor }).catch(() => {});
     }
+    logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Liberar equipamento', para:'receber', gatilho:'→ Pipe receber + Pipefy Receber$', status:'ok', detalhe:'Valor: R$'+(ficha.pagoValor||0)+' '+ficha.pagoPor }).catch(()=>{});
     return res.status(200).json({ok:true,ficha});
   }
 
@@ -696,6 +718,7 @@ export default async function handler(req,res){
     if (ficha.pipefyCardId) {
       await moverNoPipe(ficha.pipefyCardId, 'receber', { nomeContato: ficha.nomeContato, valor: ficha.pagoValor }).catch(() => {});
     }
+    logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Liberar equipamento', para:'receber', gatilho:'→ Pipe receber + Pipefy Receber$', status:'ok', detalhe:'Valor: R$'+(ficha.pagoValor||0)+' '+ficha.pagoPor }).catch(()=>{});
     return res.status(200).json({ok:true,ficha});
   }
 

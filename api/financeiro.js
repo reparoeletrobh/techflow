@@ -1,4 +1,20 @@
 
+// ── Helper: gravar no log central ────────────────────────────────────────
+async function logAction(entry) {
+  try {
+    const _U=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+    const _T=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+    const _K='reparoeletro_log';
+    const _r=await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['GET',_K]])});
+    const _j=await _r.json();const _v=_j[0]?.result;
+    let _log=[];if(_v){try{_log=JSON.parse(_v);if(typeof _log==='string')_log=JSON.parse(_log);}catch(e){}}if(!Array.isArray(_log))_log=[];
+    _log.unshift({ts:new Date().toISOString(),modulo:entry.modulo||'—',fichaId:entry.fichaId||'',ficha:entry.ficha||'',acao:entry.acao||'',de:entry.de||'',para:entry.para||'',gatilho:entry.gatilho||'',status:entry.status||'ok',detalhe:entry.detalhe||''});
+    if(_log.length>500)_log.splice(500);
+    await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['SET',_K,JSON.stringify(_log)]])});
+  }catch(e){}
+}
+
+
 // ── Helper: mover card no Pipe ADM pelo pipefyId ─────────────────────────
 async function moverNoPipe(pipefyId, novaFase, dados) {
   if (!pipefyId) return;
@@ -718,6 +734,11 @@ module.exports = async function handler(req, res) {
       await moverNoPipe(rec.pipefyId, 'solicitar_entrega').catch(() => {});
     }
 
+    if (phaseId === 'entrega_liberada') {
+      logAction({ modulo:'Financeiro', fichaId:rec.id||'', ficha:rec.nomeContato||'', acao:'Confirmar pagamento', de:rec.phaseId, para:'solicitar_entrega', gatilho:'→ Pipe solicitar_entrega + Pipefy Solicitar Entrega', status:'ok', detalhe:'Valor: R$'+(rec.valor||0) }).catch(()=>{});
+    } else {
+      logAction({ modulo:'Financeiro', fichaId:rec.id||'', ficha:rec.nomeContato||'', acao:'Mover fase', de:rec.phaseId, para:phaseId, status:'ok' }).catch(()=>{});
+    }
     return res.status(200).json({ ok: true, record: rec, pipefyMoveOk });
   }
 

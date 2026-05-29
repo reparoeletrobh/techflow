@@ -1,4 +1,20 @@
 
+// ── Helper: gravar no log central ────────────────────────────────────────
+async function logAction(entry) {
+  try {
+    const _U=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+    const _T=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+    const _K='reparoeletro_log';
+    const _r=await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['GET',_K]])});
+    const _j=await _r.json();const _v=_j[0]?.result;
+    let _log=[];if(_v){try{_log=JSON.parse(_v);if(typeof _log==='string')_log=JSON.parse(_log);}catch(e){}}if(!Array.isArray(_log))_log=[];
+    _log.unshift({ts:new Date().toISOString(),modulo:entry.modulo||'—',fichaId:entry.fichaId||'',ficha:entry.ficha||'',acao:entry.acao||'',de:entry.de||'',para:entry.para||'',gatilho:entry.gatilho||'',status:entry.status||'ok',detalhe:entry.detalhe||''});
+    if(_log.length>500)_log.splice(500);
+    await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['SET',_K,JSON.stringify(_log)]])});
+  }catch(e){}
+}
+
+
 // ── Helper: mover card no Pipe ADM pelo pipefyId (sem depender do Pipefy) ──
 async function moverNoPipe(pipefyId, novaFase, dados) {
   if (!pipefyId) return;
@@ -1986,6 +2002,7 @@ module.exports = async function handler(req, res) {
 
       // ── Pipe ADM: mover para ERP ───────────────────────────────────────────
       await moverNoPipe(String(pipefyId), 'erp').catch(() => {});
+      logAction({ modulo:'Balcão', fichaId:String(pipefyId), ficha:entry?.nomeContato||'', acao:'Confirmar pagamento', para:'erp', gatilho:'→ Pipe ERP + Pipefy ERP', status:'ok' }).catch(()=>{});
 
       return res.status(200).json({ ok: true });
     }

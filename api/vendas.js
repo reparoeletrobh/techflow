@@ -1,3 +1,19 @@
+
+// ── Helper: gravar no log central ────────────────────────────────────────
+async function logAction(entry) {
+  try {
+    const _U=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+    const _T=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+    const _K='reparoeletro_log';
+    const _r=await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['GET',_K]])});
+    const _j=await _r.json();const _v=_j[0]?.result;
+    let _log=[];if(_v){try{_log=JSON.parse(_v);if(typeof _log==='string')_log=JSON.parse(_log);}catch(e){}}if(!Array.isArray(_log))_log=[];
+    _log.unshift({ts:new Date().toISOString(),modulo:entry.modulo||'—',fichaId:entry.fichaId||'',ficha:entry.ficha||'',acao:entry.acao||'',de:entry.de||'',para:entry.para||'',gatilho:entry.gatilho||'',status:entry.status||'ok',detalhe:entry.detalhe||''});
+    if(_log.length>500)_log.splice(500);
+    await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['SET',_K,JSON.stringify(_log)]])});
+  }catch(e){}
+}
+
 const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g, "").trim();
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g, "").trim();
 const VENDAS_KEY    = "reparoeletro_vendas";
@@ -343,6 +359,7 @@ module.exports = async function handler(req, res) {
       }
     } catch(e) { console.warn('[vendas] Pipefy best-effort falhou:', e.message); }
 
+    logAction({ modulo:'Vendas', fichaId:'', ficha:nomeCliente||'', acao:'Registrar venda', para:'receber', gatilho:'→ Pipe receber', status:'ok', detalhe:(p.descricao||'')+' R$'+preco }).catch(()=>{});
     return res.status(200).json({ ok:true, pipefyCardId, textoAlmox });
   }
 

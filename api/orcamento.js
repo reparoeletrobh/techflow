@@ -1,4 +1,20 @@
 
+// ── Helper: gravar no log central ────────────────────────────────────────
+async function logAction(entry) {
+  try {
+    const _U=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+    const _T=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+    const _K='reparoeletro_log';
+    const _r=await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['GET',_K]])});
+    const _j=await _r.json();const _v=_j[0]?.result;
+    let _log=[];if(_v){try{_log=JSON.parse(_v);if(typeof _log==='string')_log=JSON.parse(_log);}catch(e){}}if(!Array.isArray(_log))_log=[];
+    _log.unshift({ts:new Date().toISOString(),modulo:entry.modulo||'—',fichaId:entry.fichaId||'',ficha:entry.ficha||'',acao:entry.acao||'',de:entry.de||'',para:entry.para||'',gatilho:entry.gatilho||'',status:entry.status||'ok',detalhe:entry.detalhe||''});
+    if(_log.length>500)_log.splice(500);
+    await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['SET',_K,JSON.stringify(_log)]])});
+  }catch(e){}
+}
+
+
 
 const PIPEFY_API = "https://api.pipefy.com/graphql";
 const PIPE_ID    = "305832912";
@@ -236,6 +252,7 @@ module.exports = async function handler(req, res) {
         console.log('[Log] ficha criada:', logId);
       } catch(e) { console.error('[Log] criar:', e.message); }
 
+      logAction({ modulo:'Orçamento', fichaId:ficha.id||'', ficha:ficha.nomeContato||ficha.nome||'', acao:'Aprovação de orçamento', para:'aprovados', gatilho:'→ Pipe aguardando_aprovacao', status:'ok', detalhe:'Valor: R$'+(ficha.valorOrcamento||ficha.valor||0) }).catch(()=>{});
       return res.status(200).json({ ok: true, cardId: card?.id, card });
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });
