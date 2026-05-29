@@ -575,6 +575,55 @@ export default async function handler(req, res) {
   }
 
 
+
+  // ── GET processar-pendentes-fin: busca pagamentos de TODAS fichas faturamento pendentes ──
+  // Sem limite de janela de tempo — verifica cada preference_id diretamente no MP
+  if (action === "processar-pendentes-fin") {
+    const resultado = { verificados: 0, pagos: 0, pendentes: 0, erros: [], processados: [] };
+    try {
+      const finDb = await dbGet(FIN_KEY2);
+      const fichasPendentes = (finDb?.records||[]).filter(r =>
+        r.mp?.preferenceId &&
+        ["faturamento","pagamento_agendado"].includes(r.phaseId)
+      );
+      resultado.verificados = fichasPendentes.length;
+
+      for (const ficha of fichasPendentes) {
+        try {
+          // Buscar pagamentos vinculados a este preference_id no MP
+          const searchUrl = `https://api.mercadopago.com/v1/payments/search?external_reference=${encodeURIComponent(ficha.mp.preferenceId)}&status=approved&limit=5`;
+          const r1 = await fetch(searchUrl, { headers:{ Authorization:`Bearer ${MP_TOKEN}` } });
+          const d1 = await r1.json();
+
+          // Também tentar por preference_id direto (campo diferente no MP)
+          const searchUrl2 = `https://api.mercadopago.com/v1/payments/search?preference_id=${encodeURIComponent(ficha.mp.preferenceId)}&status=approved&limit=5`;
+          const r2 = await fetch(searchUrl2, { headers:{ Authorization:`Bearer ${MP_TOKEN}` } });
+          const d2 = await r2.json();
+
+          const pagamentos = [...(d1.results||[]), ...(d2.results||[])];
+          // Remover duplicatas por id
+          const uniq = pagamentos.filter((p,i,a) => a.findIndex(x=>x.id===p.id)===i);
+
+          if (!uniq.length) { resultado.pendentes++; continue; }
+
+          // Processar o pagamento aprovado mais recente
+          const pmt = uniq.sort((a,b) => new Date(b.date_approved||0)-new Date(a.date_approved||0))[0];
+          if (await jaProcessado(String(pmt.id))) {
+            resultado.processados.push({ fichaId:ficha.id, paymentId:pmt.id, info:'ja_processado' });
+            continue;
+          }
+          await marcarProcessado(String(pmt.id));
+          const res = await processarPagamentoFinanceiro(pmt);
+          resultado.pagos++;
+          resultado.processados.push({ fichaId:ficha.id, paymentId:pmt.id, valor:pmt.transaction_amount, ...res });
+        } catch(e) {
+          resultado.erros.push({ fichaId:ficha.id, erro:e.message });
+        }
+      }
+    } catch(e) { resultado.erroGeral = e.message; }
+    return res.status(200).json({ ok:true, ...resultado });
+  }
+
   // ── GET sync-fin-mp: reprocessa fila de retry + sync pagamentos financeiro ─
   if (action === "sync-fin-mp") {
     const resultado = { retry:[], sync:[] };

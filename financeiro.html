@@ -1326,7 +1326,7 @@ async function renderLinksMP() {
       '</tr>';
     }).join('');
 
-    var heads = ['Ficha','Cliente','Telefone','CPF/CNPJ','Valor','Método','Status','Gerado em','Pago em','Link'];
+    var heads = ['Ficha','Cliente','Tel.','CPF/CNPJ','Valor','Método','Status','ID Referência MP','Payment ID','Gerado em','Pago em','Link'];
     tbl.innerHTML = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border);">' +
       '<table style="width:100%;border-collapse:collapse;">' +
       '<thead><tr style="background:var(--surface);border-bottom:1px solid var(--border);">' +
@@ -1347,7 +1347,7 @@ function exportarLinksMP() {
   linksData.links.forEach(function(l) {
     var g = l.geradoEm ? new Date(l.geradoEm).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}) : '';
     var p = l.pagoEm   ? new Date(l.pagoEm).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})   : '';
-    linhas.push([l.fichaId,l.cliente,l.cpfCnpj,l.valor,l.metodo,l.status,g,p,l.paymentId||'',l.preferenceId||'',l.checkoutUrl||''].join(','));
+    linhas.push([l.fichaId,l.cliente,l.telefone||'',l.cpfCnpj||'',l.valor,l.metodo,l.status,l.preferenceId||'',l.paymentId||'',g,p,l.checkoutUrl||''].join(','));
   });
   var blob = new Blob([linhas.join('\n')], {type:'text/csv;charset=utf-8;'});
   var url  = URL.createObjectURL(blob);
