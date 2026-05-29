@@ -932,6 +932,106 @@ export default async function handler(req, res) {
     } catch(e){return res.status(500).json({ok:false,error:e.message});}
   }
 
+
+  // ── GET arquivar-ultima-chamada: arquiva fichas +90 dias em ultima_chamada ─
+  if (action === 'arquivar-ultima-chamada') {
+    var ARQUIVO_KEY  = 'reparoeletro_arquivo';
+    var LIMITE_DIAS  = parseInt(req.query.dias || '90');
+    var LIMITE_MS    = LIMITE_DIAS * 24 * 60 * 60 * 1000;
+    var corte        = new Date(Date.now() - LIMITE_MS);
+    try {
+      var db  = await dbGet(PIPE_KEY) || {cards:[]};
+      var arq = await dbGet(ARQUIVO_KEY) || {fichas:[], totalArquivado:0};
+      if (!Array.isArray(arq.fichas)) arq.fichas = [];
+
+      var paraArquivar = (db.cards||[]).filter(function(c){
+        if (c.phase !== 'ultima_chamada') return false;
+        var dt = new Date(c.movedAt || c.criadoEm || 0);
+        return dt < corte;
+      });
+
+      if (!paraArquivar.length)
+        return res.status(200).json({ok:true,arquivados:0,msg:'Nenhuma ficha elegível (ultima_chamada > '+LIMITE_DIAS+' dias)'});
+
+      // IDs já arquivados (para idempotência)
+      var jaArq = {};
+      arq.fichas.forEach(function(f){ jaArq[f.id]=true; });
+
+      var novos = 0;
+      paraArquivar.forEach(function(card){
+        if (jaArq[card.id]) return;
+        arq.fichas.unshift(Object.assign({}, card, {
+          arquivadoEm: now,
+          motivoArquivo: 'ultima_chamada_'+LIMITE_DIAS+'d',
+          phaseAntes: card.phase
+        }));
+        novos++;
+      });
+
+      // Remover do pipe ativo
+      var idsArquivados = paraArquivar.map(function(c){return c.id;});
+      db.cards = db.cards.filter(function(c){ return !idsArquivados.includes(c.id); });
+
+      arq.totalArquivado = (arq.totalArquivado||0) + novos;
+      arq.ultimoArquivo  = now;
+
+      // Backup antes de salvar
+      try{await dbSet('reparoeletro_pipe_bak_pre_arquivo',{cards:db.cards,ts:now});}catch(e){}
+
+      await dbSet(PIPE_KEY, db);
+      await dbSet(ARQUIVO_KEY, arq);
+
+      return res.status(200).json({
+        ok:true, arquivados:novos, totalNoArquivo:arq.fichas.length,
+        removidosDoAtivo:idsArquivados.length,
+        fichas: paraArquivar.slice(0,10).map(function(c){return {
+          id:c.id, nome:c.nomeContato, movedAt:c.movedAt||c.criadoEm
+        }})
+      });
+    } catch(e){return res.status(500).json({ok:false,error:e.message});}
+  }
+
+  // ── GET buscar-arquivo: busca fichas arquivadas ──────────────────────────
+  if (action === 'buscar-arquivo') {
+    var q3 = (req.query.q||'').toLowerCase();
+    try {
+      var arq2 = await dbGet('reparoeletro_arquivo') || {fichas:[]};
+      var lista = (arq2.fichas||[]);
+      if (q3) lista = lista.filter(function(f){
+        return JSON.stringify(f).toLowerCase().includes(q3);
+      });
+      return res.status(200).json({
+        ok:true, total:lista.length, totalArquivado:arq2.totalArquivado||0,
+        ultimoArquivo:arq2.ultimoArquivo||null,
+        fichas: lista.slice(0,50).map(function(f){return {
+          id:f.id, nome:f.nomeContato, telefone:f.telefone,
+          equipamento:f.equipamento, valor:f.valor,
+          arquivadoEm:f.arquivadoEm, movedAt:f.movedAt,
+          pipefyId:f.pipefyId
+        };})
+      });
+    } catch(e){return res.status(500).json({ok:false,error:e.message});}
+  }
+
+  // ── GET restaurar-arquivo: devolve uma ficha arquivada para o pipe ───────
+  if (action === 'restaurar-arquivo') {
+    var rid = req.query.id||'';
+    if (!rid) return res.status(400).json({ok:false,error:'id obrigatorio'});
+    try {
+      var arq3  = await dbGet('reparoeletro_arquivo') || {fichas:[]};
+      var db3   = await dbGet(PIPE_KEY) || {cards:[]};
+      var idx3  = (arq3.fichas||[]).findIndex(function(f){return f.id===rid;});
+      if (idx3<0) return res.status(404).json({ok:false,error:'Ficha não encontrada no arquivo: '+rid});
+      var ficha3 = arq3.fichas.splice(idx3,1)[0];
+      ficha3.phase = 'aguardando_aprovacao';
+      ficha3.restauradoEm = now;
+      db3.cards.unshift(ficha3);
+      await dbSet(PIPE_KEY, db3);
+      await dbSet('reparoeletro_arquivo', arq3);
+      return res.status(200).json({ok:true,id:ficha3.id,nome:ficha3.nomeContato,restauradoPara:'aguardando_aprovacao'});
+    } catch(e){return res.status(500).json({ok:false,error:e.message});}
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();

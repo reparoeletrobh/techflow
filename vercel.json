@@ -35,6 +35,10 @@
     {
       "path": "/api/pipe?action=backup-auto",
       "schedule": "0 */1 * * *"
+    },
+    {
+      "path": "/api/pipe?action=arquivar-ultima-chamada",
+      "schedule": "0 3 * * *"
     }
   ],
   "rewrites": [
