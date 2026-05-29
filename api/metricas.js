@@ -149,18 +149,21 @@ module.exports = async function handler(req, res) {
     const db = rawDb || { dias: [] };
     if (!Array.isArray(db.dias)) db.dias = [];
 
-    // ERP ao vivo — direto do Redis local via endpoint erp-count (sem carregar 922 cards)
+    // ERP ao vivo -- Nosso Pipe (Redis local), nao Pipefy
     let erpAtual = { count: 0, valor: 0, cards: [] };
+    let erpCards = [];
     try {
-      const baseUrl = process.env.VERCEL_URL
-        ? 'https://' + process.env.VERCEL_URL
-        : 'https://reparoeletroadm.com';
-      const erpRes = await fetch(baseUrl + '/api/pipe?action=erp-count&_t=' + Date.now());
-      const erpJson = await erpRes.json();
-      if (erpJson.ok) {
-        erpAtual = { count: erpJson.erp, valor: erpJson.valor, cards: [] };
+      const _base2 = process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://reparoeletroadm.com';
+      const _erpR2 = await fetch(_base2 + '/api/pipe?action=erp-cards&_t=' + Date.now());
+      const _erpJ2 = await _erpR2.json();
+      if (_erpJ2.ok && Array.isArray(_erpJ2.cards)) {
+        erpCards = _erpJ2.cards.map(function(card) {
+          return { id: card.pipefyId || card.id, valor: parseFloat(card.valor) || 0,
+                   entradaDate: card.movedAt ? card.movedAt.slice(0,10) : null };
+        });
+        erpAtual = { count: erpCards.length, valor: erpCards.reduce(function(s,c){return s+c.valor;},0), cards: erpCards };
       }
-    } catch(e) { console.error('ERP count:', e.message); }
+    } catch(e) { console.error('erp-pipe:', e.message); }
 
     // metaLog para Coletas e Orçamentos (esses permanecem do log local)
     const metaLog   = logsData?.metaLog || [];
