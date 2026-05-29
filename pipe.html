@@ -570,6 +570,48 @@ function moverColuna(phaseId,dir){
   saveColOrder(ordered);
   render();
 }
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+load();
+setInterval(load, 90000);
+
+// ── EDITAR PIPE ───────────────────────────────────────────────────────────
+function abrirEditarPipe(id) {
+  var card = cards.find(function(c){ return c.id === id; });
+  if (!card) return;
+  document.getElementById('ep-id').value    = id;
+  document.getElementById('ep-nome').value  = card.nomeContato || '';
+  document.getElementById('ep-tel').value   = card.telefone    || '';
+  document.getElementById('ep-cpf').value   = card.cpfCnpj     || '';
+  document.getElementById('ep-equip').value = card.equipamento || '';
+  document.getElementById('ep-valor').value = card.valor       || '';
+  document.getElementById('ep-desc').value  = card.descricao   || '';
+  document.getElementById('ep-end').value   = card.endereco    || '';
+  document.getElementById('ep-serv').value  = card.servicos    || '';
+  document.getElementById('modal-editar-pipe').style.display = 'flex';
+}
+function fecharEditarPipe() {
+  document.getElementById('modal-editar-pipe').style.display = 'none';
+}
+async function salvarEditarPipe() {
+  var id  = document.getElementById('ep-id').value;
+  var tel = document.getElementById('ep-tel').value;
+  var body = {
+    id, nomeContato: document.getElementById('ep-nome').value,
+    telefone: tel, cpfCnpj: document.getElementById('ep-cpf').value,
+    equipamento: document.getElementById('ep-equip').value,
+    valor: document.getElementById('ep-valor').value,
+    descricao: document.getElementById('ep-desc').value,
+    endereco: document.getElementById('ep-end').value,
+    servicos: document.getElementById('ep-serv').value
+  };
+  try {
+    var r = await fetch('/api/pipe?action=editar-pipe', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    var d = await r.json();
+    if (d.ok) { fecharEditarPipe(); load(); }
+    else alert('Erro: ' + d.error);
+  } catch(e) { alert('Erro: ' + e.message); }
+}
 </script>
 
 </div>
@@ -610,6 +652,37 @@ function moverColuna(phaseId,dir){
     <span class="ep-lbl">Serviços / Observações</span>
     <textarea id="ep-serv" class="ep-inp" rows="2" placeholder="Serviços realizados ou observações" style="resize:vertical;"></textarea>
     <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
+      <button onclick="fecharEditarPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;border:1px solid #333;background:transparent;color:#666;cursor:pointer;">Cancelar</button>
+      <button onclick="salvarEditarPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;border:none;background:#f5c800;color:#000;font-weight:700;cursor:pointer;">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-editar-pipe" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(3px);" onclick="if(event.target===this)fecharEditarPipe()">
+  <div style="background:#111;border:1px solid #222;border-radius:12px;padding:24px;width:460px;max-width:95vw;max-height:88vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.6);">
+    <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:#e8e8e8;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
+      <span>✏️ Editar Ficha</span>
+      <button onclick="fecharEditarPipe()" style="background:none;border:none;color:#555;font-size:18px;cursor:pointer;">✕</button>
+    </div>
+    <input type="hidden" id="ep-id">
+    <style>.ep-lbl{font-family:'DM Mono',monospace;font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.05em;margin-top:8px;display:block}.ep-inp{background:#0a0a0a;border:1px solid #222;border-radius:6px;padding:8px 10px;color:#e8e8e8;font-size:12px;outline:none;width:100%;box-sizing:border-box;font-family:'Inter',sans-serif}.ep-inp:focus{border-color:#f5c800}.ep-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}</style>
+    <span class="ep-lbl">Nome do Cliente</span>
+    <input id="ep-nome" class="ep-inp" placeholder="Nome + 4 últimos dígitos do tel">
+    <div class="ep-grid">
+      <div><span class="ep-lbl">Telefone</span><input id="ep-tel" class="ep-inp" placeholder="(31) 9 9999-0000"></div>
+      <div><span class="ep-lbl">CPF / CNPJ</span><input id="ep-cpf" class="ep-inp" placeholder="000.000.000-00"></div>
+    </div>
+    <div class="ep-grid">
+      <div><span class="ep-lbl">Equipamento</span><input id="ep-equip" class="ep-inp" placeholder="Ex: Microondas LG"></div>
+      <div><span class="ep-lbl">Valor (R$)</span><input id="ep-valor" class="ep-inp" type="number" step="0.01" placeholder="0.00"></div>
+    </div>
+    <span class="ep-lbl">Defeito / Descrição</span>
+    <input id="ep-desc" class="ep-inp" placeholder="Descreva o defeito">
+    <span class="ep-lbl">Endereço Completo</span>
+    <input id="ep-end" class="ep-inp" placeholder="Rua, número, bairro, cidade">
+    <span class="ep-lbl">Serviços / Observações</span>
+    <textarea id="ep-serv" class="ep-inp" rows="2" placeholder="Serviços realizados" style="resize:vertical;"></textarea>
+    <div style="display:flex;gap:8px;margin-top:18px;justify-content:flex-end;">
       <button onclick="fecharEditarPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;border:1px solid #333;background:transparent;color:#666;cursor:pointer;">Cancelar</button>
       <button onclick="salvarEditarPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;border:none;background:#f5c800;color:#000;font-weight:700;cursor:pointer;">💾 Salvar</button>
     </div>

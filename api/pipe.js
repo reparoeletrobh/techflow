@@ -853,6 +853,35 @@ export default async function handler(req, res) {
     } catch(e){return res.status(500).json({ok:false,error:e.message});}
   }
 
+
+  // ── GET backup-auto: salva snapshot timestamped de todos os dados críticos
+  if (action === 'backup-auto') {
+    var chaves = ['reparoeletro_pipe','reparoeletro_financeiro','reparoeletro_board',
+                  'reparoeletro_logistica','reparoeletro_frenteloja'];
+    var ts  = new Date().toISOString().replace(/[:.]/g,'-').slice(0,16); // 2026-05-29T14-30
+    var res2 = { ts, salvos:[], erros:[] };
+    for (var ki=0; ki<chaves.length; ki++) {
+      var chave = chaves[ki];
+      try {
+        var dado = await dbGet(chave);
+        if (dado) {
+          var bakKey = chave + '_bak_' + ts;
+          await dbSet(bakKey, dado);
+          // Manter apenas últimos 48 backups por chave (48h se hourly)
+          res2.salvos.push(bakKey);
+        }
+      } catch(e) { res2.erros.push({chave, erro:e.message}); }
+    }
+    // Salvar índice de backups
+    try {
+      var idx2 = (await dbGet('reparoeletro_backup_index')) || [];
+      idx2.push({ ts, chaves: res2.salvos });
+      idx2 = idx2.slice(-96); // últimos 96 backups (4 dias)
+      await dbSet('reparoeletro_backup_index', idx2);
+    } catch(e){}
+    return res.status(200).json({ ok:true, ...res2 });
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
