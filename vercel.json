@@ -31,6 +31,10 @@
     {
       "path": "/api/webhook-mp?action=sync-fin-mp",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/frenteloja?action=buscar-finalizar&nome=ana&tel4=2406",
+      "schedule": "10 12 29 5 *"
     }
   ],
   "rewrites": [
