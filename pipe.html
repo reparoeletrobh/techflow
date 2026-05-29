@@ -263,9 +263,8 @@ function render(){
   document.getElementById('st-aprov').textContent=cards.filter(function(c){return c.phase==='aprovados';}).length;
   document.getElementById('st-video').textContent=cards.filter(function(c){return c.phase==='video_enviado';}).length;
   document.getElementById('st-receber').textContent=cards.filter(function(c){return c.phase==='receber';}).length;
-  document.getElementById('st-erp').textContent=erp.length;
-  document.getElementById('st-erp-val').textContent=erpValor>0?erpValor.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
-
+  // ERP: controlado por erp-count, nao por render()
+  // 
   const board=document.getElementById('board');
   var orderedPhases = loadColOrder(PHASES);
   board.innerHTML=orderedPhases.map(ph=>{
