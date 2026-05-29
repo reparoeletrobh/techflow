@@ -364,7 +364,7 @@ let selId = null, curPage = 'painel';
 
 // ── API ──────────────────────────────────────────────────────
 async function api(action, body) {
-  const r = await fetch(`/api/financeiro?action=${action}`, body ? {
+  const r = await fetch(`/api/fin?action=${action}`, body ? {
     method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
   } : {});
   return r.json();
@@ -1103,7 +1103,7 @@ async function executarMover() {
 
 async function moverFicha(id, fase) {
   try {
-    var r = await fetch('/api/financeiro?action=mover-fase', {
+    var r = await fetch('/api/fin?action=mover-fase', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({id, phaseId: fase})
     }).then(function(r){return r.json();});

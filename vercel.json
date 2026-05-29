@@ -325,6 +325,10 @@
     {
       "source": "/api/log",
       "destination": "/api/log.js"
+    },
+    {
+      "source": "/api/fin",
+      "destination": "/api/fin.js"
     }
   ],
   "headers": [
