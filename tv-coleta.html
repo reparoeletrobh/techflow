@@ -232,14 +232,79 @@ function buildCardEntrega(c,phaseId){
     '</div>';
 }
 
+// ── Diagnóstico com múltiplas TVs ─────────────────────────────────────────────
+var CHIPS_TV = ['barramento','placa','condenada','risco','acrilico'];
+
+function renderDiagEquipSec(pid, idx, total) {
+  var lbl = total > 1 ? '📺 TV '+(idx+1) : '📺 Equipamento';
+  return '<div id="diag-sec-'+pid+'-'+idx+'" style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;">'+
+    (total>1?'<div class="diag-label" style="color:var(--accent);margin-bottom:6px;">'+lbl+'</div>':'')+
+    '<div class="diag-label">Modelo</div>'+
+    '<input class="diag-input" type="text" id="diag-modelo-'+pid+'-'+idx+'" placeholder="Ex: Samsung 43 Smart" style="width:100%;margin-bottom:8px;"/>'+
+    '<div class="diag-label">Diagnóstico</div>'+
+    '<div class="diag-chips">'+
+      '<button class="chip" id="chip-barramento-'+pid+'-'+idx+'" onclick="toggleChipM(\''+pid+'\','+idx+',\'barramento\')">Barramento</button>'+
+      '<button class="chip" id="chip-placa-'+pid+'-'+idx+'" onclick="toggleChipM(\''+pid+'\','+idx+',\'placa\')">Placa</button>'+
+      '<button class="chip condenada" id="chip-condenada-'+pid+'-'+idx+'" onclick="toggleChipM(\''+pid+'\','+idx+',\'condenada\')">Condenada</button>'+
+      '<button class="chip risco" id="chip-risco-'+pid+'-'+idx+'" onclick="toggleChipM(\''+pid+'\','+idx+',\'risco\')">Risco</button>'+
+      '<button class="chip acrilico" id="chip-acrilico-'+pid+'-'+idx+'" onclick="toggleChipM(\''+pid+'\','+idx+',\'acrilico\')">Acrílico</button>'+
+    '</div>'+
+    '<input class="chip-acrilico-val diag-input" type="number" id="chip-acrilico-val-'+pid+'-'+idx+'" placeholder="Valor do Acrílico (R$)" min="0" step="0.01" style="display:none;margin-top:4px;"/>'+
+  '</div>';
+}
+
+function renderDiagEquips(pid, qtd) {
+  var container = document.getElementById('diag-equips-'+pid);
+  if (!container) return;
+  container.innerHTML = Array.from({length:qtd},function(_,i){return renderDiagEquipSec(pid,i,qtd);}).join('');
+}
+
 function abrirDiag(id){var f=document.getElementById('diag-form-'+id);var b=document.getElementById('diag-btn-'+id);if(f)f.classList.toggle('open');if(b)b.style.display=f.classList.contains('open')?'none':'flex';}
 function fecharDiag(id){var f=document.getElementById('diag-form-'+id);var b=document.getElementById('diag-btn-'+id);if(f)f.classList.remove('open');if(b)b.style.display='flex';}
-function toggleChip(pid,nome){var chip=document.getElementById('chip-'+nome+'-'+pid);if(!chip)return;chip.classList.toggle('on');if(nome==='acrilico'){var v=document.getElementById('chip-acrilico-val-'+pid);if(v)v.style.display=chip.classList.contains('on')?'block':'none';}}
-function chipTexto(pid){var chips=['barramento','placa','condenada','risco','acrilico'];var sel=chips.filter(function(c){var el=document.getElementById('chip-'+c+'-'+pid);return el&&el.classList.contains('on');});if(!sel.length)return'';return sel.map(function(c){if(c==='acrilico'){var v=document.getElementById('chip-acrilico-val-'+pid);return'Acrilico'+(v&&v.value?': '+v.value:'');}return c.charAt(0).toUpperCase()+c.slice(1);}).join(' | ');}
+
+function toggleChipM(pid,idx,nome){
+  var chip=document.getElementById('chip-'+nome+'-'+pid+'-'+idx);
+  if(!chip)return;
+  chip.classList.toggle('on');
+  if(nome==='acrilico'){var v=document.getElementById('chip-acrilico-val-'+pid+'-'+idx);if(v)v.style.display=chip.classList.contains('on')?'block':'none';}
+}
+
+function chipTextoIdx(pid,idx){
+  return CHIPS_TV.filter(function(c){
+    var el=document.getElementById('chip-'+c+'-'+pid+'-'+idx);
+    return el&&el.classList.contains('on');
+  }).map(function(c){
+    if(c==='acrilico'){var v=document.getElementById('chip-acrilico-val-'+pid+'-'+idx);return'Acrilico'+(v&&v.value?': R$'+v.value:'');}
+    return c.charAt(0).toUpperCase()+c.slice(1);
+  }).join(' | ');
+}
+
+function chipTexto(pid){ return chipTextoIdx(pid,0); } // compat legado
+
+function chipTextosMultiplos(pid){
+  var qtdEl=document.getElementById('diag-qtd-'+pid);
+  var qtd=qtdEl?parseInt(qtdEl.value)||1:1;
+  var linhas=[];
+  for(var i=0;i<qtd;i++){
+    var modeloEl=document.getElementById('diag-modelo-'+pid+'-'+i);
+    var modelo=modeloEl?modeloEl.value.trim():'';
+    var diag=chipTextoIdx(pid,i);
+    if(!diag)continue;
+    if(qtd>1){
+      linhas.push('TV '+(i+1)+(modelo?' ('+modelo+')':'')+': '+diag);
+    } else {
+      linhas.push((modelo?modelo+': ':'')+diag);
+    }
+  }
+  return linhas.join(' | ');
+}
 async function enviarDiag(pid){
-  var modeloEl=document.getElementById('diag-modelo-'+pid);
-  var modelo=modeloEl?modeloEl.value.trim():'';
-  var texto=chipTexto(pid);
+  var qtdEl=document.getElementById('diag-qtd-'+pid);
+  var qtd=qtdEl?parseInt(qtdEl.value)||1:1;
+  // Modelo da primeira TV (para compatibilidade com campo modelo)
+  var modeloEl0=document.getElementById('diag-modelo-'+pid+'-0');
+  var modelo=modeloEl0?modeloEl0.value.trim():'';
+  var texto=chipTextosMultiplos(pid);
   if(!texto){toast('\u26A0\uFE0F Selecione pelo menos uma opção de diagnóstico','var(--orange)');return;}
   var btn=document.querySelector('#diag-form-'+pid+' .diag-submit');
   if(btn){btn.disabled=true;btn.textContent='Enviando...';}
