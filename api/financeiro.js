@@ -286,6 +286,11 @@ module.exports = async function handler(req, res) {
 
   const { action } = req.query;
 
+  // ── GET ping — health check rápido ─────────────────────────
+  if (action === "ping") {
+    return res.status(200).json({ ok: true, ts: new Date().toISOString() });
+  }
+
   // ── GET load ───────────────────────────────────────────────
   if (action === "load") {
     const fin = await dbGet(FIN_KEY) || defaultFin();
