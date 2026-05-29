@@ -350,6 +350,18 @@ async function syncPipefy(){
   await load();
 }
 
+
+// ── Helper: formato padrão Nome 4dig ─────────────────────────────────────
+function fmt4dig(nome, tel) {
+  if (!nome) return '';
+  var n = String(nome).trim();
+  if (/\s\d{4}$/.test(n)) return n; // já tem 4 dígitos no final
+  if (!tel) return n;
+  var digits = String(tel).replace(/\D/g,'');
+  var last4 = digits.slice(-4);
+  if (last4.length < 4) return n;
+  return n + ' ' + last4;
+}
 function abrirModalNovo(){
   const sel=document.getElementById('f-phase');
   sel.innerHTML=PHASES.map(p=>'<option value="'+p.id+'">'+p.name+'</option>').join('');
@@ -359,9 +371,11 @@ function fecharModal(){document.getElementById('modal-novo').style.display='none
 async function salvarNovo(){
   const nome=document.getElementById('f-nome').value.trim();
   if(!nome){toast('Nome obrigatório',false);return;}
+  var tel=document.getElementById('f-tel').value.trim();
+  var nomeFormatado=fmt4dig(nome,tel);
   const r=await api('add-card',{
-    nomeContato:nome,
-    telefone:document.getElementById('f-tel').value.trim(),
+    nomeContato:nomeFormatado,
+    telefone:tel,
     equipamento:document.getElementById('f-equip').value.trim(),
     valor:parseFloat(document.getElementById('f-valor').value)||0,
     phase:document.getElementById('f-phase').value,
@@ -404,11 +418,13 @@ function fecharEditarPipe() {
 }
 async function salvarEditarPipe() {
   var id    = document.getElementById('ep-id').value;
+  var epTel   = document.getElementById('ep-tel').value;
+  var epNome  = fmt4dig(document.getElementById('ep-nome').value, epTel);
   var body  = {
     id:          id,
-    nomeContato: document.getElementById('ep-nome').value,
+    nomeContato: epNome,
     valor:       document.getElementById('ep-valor').value,
-    telefone:    document.getElementById('ep-tel').value,
+    telefone:    epTel,
     equipamento: document.getElementById('ep-equip').value
   };
   try {

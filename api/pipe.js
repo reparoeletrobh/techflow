@@ -1,4 +1,16 @@
 
+// ── fmt4dig: padrão Nome 4díg do telefone ────────────────────────────────
+function fmt4dig(nome, tel) {
+  if (!nome) return '';
+  var n = String(nome).trim();
+  if (/\s\d{4}$/.test(n)) return n;
+  if (!tel) return n;
+  var digits = String(tel).replace(/\D/g,'');
+  var last4 = digits.slice(-4);
+  if (last4.length < 4) return n;
+  return n + ' ' + last4;
+}
+
 // ── Helper: gravar no log central ────────────────────────────────────────
 async function logAction(entry) {
   try {
@@ -142,7 +154,7 @@ async function syncFase(pipefyPhaseId, phaseLocal, PIPE_KEY, dbGetFn, dbSetFn, p
         id:              'PIPE-' + String(db.cards.length + 1).padStart(4, '0'),
         pipefyId:        pid,
         phase:           phaseLocal,
-        nomeContato:     nome || nd.title || '',
+        nomeContato:     fmt4dig(nome || nd.title || '', tel),
         telefone:        tel,
         equipamento:     equip,
         descricao:       nd.title || '',
@@ -934,7 +946,7 @@ export default async function handler(req, res) {
             id: 'FIN-' + (pipefyStr || card.id),
             pipefyId: pipefyStr,
             osCode: card.id,
-            nomeContato: card.nomeContato || '',
+            nomeContato: fmt4dig(card.nomeContato || '', card.telefone || ''),
             telefone: card.telefone || '',
             equipamento: card.equipamento || card.descricao || '',
             valor: card.valor || 0,
