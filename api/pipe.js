@@ -855,17 +855,31 @@ export default async function handler(req, res) {
       try {
         var finDb2 = await dbGet('reparoeletro_financeiro') || { records: [] };
         if (!Array.isArray(finDb2.records)) finDb2.records = [];
-        var jaFinExiste = finDb2.records.find(function(r){ return r.pipefyId === String(pid); });
-        if (!jaFinExiste) {
+        var pipefyStr = pid ? String(pid) : null;
+        var jaFinExiste = finDb2.records.find(function(r){
+          return (pipefyStr && r.pipefyId === pipefyStr) || (r.osCode && r.osCode === card.id);
+        });
+        if (jaFinExiste) {
+          // Já existe — mover para aguardando_dados
+          if (jaFinExiste.phaseId !== 'aguardando_dados') {
+            jaFinExiste.history = (jaFinExiste.history||[]).concat([{phaseId:jaFinExiste.phaseId,ts:now}]);
+            jaFinExiste.phaseId = 'aguardando_dados';
+            jaFinExiste.movedAt = now;
+            await dbSet('reparoeletro_financeiro', finDb2);
+          }
+        } else {
+          // Novo registro em aguardando_dados
           finDb2.records.unshift({
-            id: 'FIN-PIPE-' + String(Date.now()),
-            pipefyId: String(pid),
+            id: 'FIN-' + (pipefyStr || card.id),
+            pipefyId: pipefyStr,
+            osCode: card.id,
             nomeContato: card.nomeContato || '',
             telefone: card.telefone || '',
+            equipamento: card.equipamento || card.descricao || '',
             valor: card.valor || 0,
-            phaseId: 'nf_emitida',
+            phaseId: 'aguardando_dados',
             criadoEm: now, movedAt: now,
-            history: [{ phaseId: 'nf_emitida', ts: now }],
+            history: [{ phaseId: 'aguardando_dados', ts: now }],
             origem: 'pipe_video_enviado'
           });
           await dbSet('reparoeletro_financeiro', finDb2);
