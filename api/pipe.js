@@ -1,4 +1,15 @@
 
+function fmt4dig(nome, tel) {
+  if (!nome) return '';
+  var n = String(nome).trim();
+  if (/\s\d{4}$/.test(n)) return n;
+  if (!tel) return n;
+  var digits = String(tel).replace(/\D/g,'');
+  var last4 = digits.slice(-4);
+  if (last4.length < 4) return n;
+  return n + ' ' + last4;
+}
+
 // ── fmt4dig: padrão Nome 4díg do telefone ────────────────────────────────
 function fmt4dig(nome, tel) {
   if (!nome) return '';
@@ -376,7 +387,7 @@ export default async function handler(req, res) {
     const novoCard = {
       pipefyId:    boardPid,
       phaseId:     'producao',
-      nomeContato: card.nomeContato || '',
+      nomeContato: fmt4dig(card.nomeContato || '', card.telefone || ''),
       title:       card.descricao || card.nomeContato || '',
       telefone:    card.telefone || '',
       descricao:   card.equipamento || card.descricao || '',
@@ -1002,7 +1013,7 @@ export default async function handler(req, res) {
       id: 'PIPE-' + String(db.cards.length + 1).padStart(4, '0'),
       pipefyId:        body.pipefyId ? String(body.pipefyId) : null,
       phase:           ph,
-      nomeContato:     body.nomeContato || '',
+      nomeContato:     fmt4dig(body.nomeContato || '', body.telefone || ''),
       telefone:        body.telefone    || '',
       equipamento:     body.equipamento || '',
       descricao:       body.descricao   || '',
