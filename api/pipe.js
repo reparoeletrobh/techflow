@@ -370,6 +370,68 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, valor: valor });
   }
 
+
+  // ── GET force-valores: atualiza valores do Pipe via Logística/FL/Redis ──────
+  if (action === 'force-valores') {
+    const db  = (await dbGet(PIPE_KEY)) || defaultDB();
+    const sem = (db.cards || []).filter(function(c){ return !c.valor || c.valor === 0; });
+    let atualizados = 0;
+
+    // Carregar fontes Redis
+    const logDb = await dbGet('reparoeletro_logistica').catch(() => null);
+    const flDb  = await dbGet('reparoeletro_frenteloja').catch(() => null);
+    const logFichas = (logDb && logDb.fichas) ? logDb.fichas : [];
+    const flFichas  = (flDb  && flDb.fichas)  ? flDb.fichas  : [];
+
+    for (var ci = 0; ci < sem.length; ci++) {
+      var card = sem[ci];
+      var pid  = card.pipefyId || null;
+      var novoValor = 0;
+
+      // 1. Tentar logística (diagnostico.preco)
+      var logFicha = logFichas.find(function(f){ return pid && f.pipefyCardId === String(pid); });
+      if (logFicha && logFicha.diagnostico && logFicha.diagnostico.preco) {
+        novoValor = parseFloat(logFicha.diagnostico.preco) || 0;
+      }
+
+      // 2. Tentar frente de loja (orcamento.valor)
+      if (!novoValor) {
+        var flFicha = flFichas.find(function(f){ return pid && f.pipefyCardId === String(pid); });
+        if (flFicha && flFicha.orcamento && flFicha.orcamento.valor) {
+          novoValor = parseFloat(flFicha.orcamento.valor) || 0;
+        }
+      }
+
+      // 3. Tentar Pipefy (valor_de_contrato) se ainda não encontrou
+      if (!novoValor && pid && PIPEFY_TOKEN) {
+        try {
+          var pfData = await pipefyReq(
+            'query { card(id: "' + pid + '") { fields { name value } } }'
+          ).catch(() => null);
+          if (pfData && pfData.card && pfData.card.fields) {
+            var valField = pfData.card.fields.find(function(f){
+              return f.name && (f.name.toLowerCase().includes('valor') || f.name.toLowerCase().includes('contrato'));
+            });
+            if (valField && valField.value) novoValor = parseFloat(valField.value) || 0;
+          }
+        } catch(ep) { /* ignora */ }
+      }
+
+      if (novoValor > 0) {
+        card.valor = novoValor;
+        atualizados++;
+      }
+    }
+
+    if (atualizados > 0) await dbSet(PIPE_KEY, db);
+    return res.status(200).json({
+      ok: true,
+      semValor: sem.length,
+      atualizados: atualizados,
+      restante: sem.length - atualizados
+    });
+  }
+
   // ── mover ─────────────────────────────────────────────────────────────────
   if (req.method === 'POST' && action === 'mover') {
     var body  = req.body || {};
@@ -394,15 +456,37 @@ export default async function handler(req, res) {
     if (phase === 'aprovados' && pid) {
       try {
         var boardDb2 = await dbGet('reparoeletro_board');
-        if (boardDb2) {
-          var bc = (boardDb2.cards || []).find(function(x){ return x.pipefyId === String(pid); });
-          if (bc) {
-            var isFl = !!(bc.flFichaId);
-            bc.phaseId = isFl ? 'cliente_loja' : 'producao';
-            bc.movedAt = now;
-            await dbSet('reparoeletro_board', boardDb2);
-          }
+        if (!boardDb2) boardDb2 = { cards:[], syncedIds:[], movesLog:[], metaLog:[] };
+        if (!Array.isArray(boardDb2.cards)) boardDb2.cards = [];
+        var bc = boardDb2.cards.find(function(x){ return x.pipefyId === String(pid); });
+        if (bc) {
+          // Card já existe — só atualiza a fase
+          var isFl = !!(bc.flFichaId);
+          bc.phaseId = isFl ? 'cliente_loja' : 'producao';
+          bc.movedAt = now;
+        } else {
+          // Card NÃO existe no board — criar agora
+          boardDb2.cards.unshift({
+            pipefyId:    String(pid),
+            phaseId:     'producao',
+            nomeContato: card.nomeContato || '',
+            title:       card.descricao   || card.nomeContato || '',
+            telefone:    card.telefone    || '',
+            descricao:   card.equipamento || card.descricao || '',
+            osCode:      card.id,
+            movedBy:     'Pipe ADM',
+            flFichaId:   null,
+            syncedAt:    now,
+            movedAt:     now
+          });
+          if (!boardDb2.syncedIds) boardDb2.syncedIds = [];
+          if (!boardDb2.syncedIds.includes(String(pid))) boardDb2.syncedIds.push(String(pid));
+          if (!boardDb2.movesLog) boardDb2.movesLog = [];
+          boardDb2.movesLog.push({ phaseId:'aprovado_entrada', pipefyId:String(pid), timestamp:now });
+          if (!boardDb2.metaLog) boardDb2.metaLog = [];
+          boardDb2.metaLog.push({ phaseId:'aprovado_entrada', pipefyId:String(pid), timestamp:now });
         }
+        await dbSet('reparoeletro_board', boardDb2);
       } catch(e) { console.error('[pipe→board]', e.message); }
     }
     // Video Enviado → criar ficha no Financeiro
