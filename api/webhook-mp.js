@@ -610,11 +610,12 @@ export default async function handler(req, res) {
       const inicio  = new Date(agora.getTime() - 30*60*1000);
       const mpUrl   = `https://api.mercadopago.com/v1/payments/search?status=approved&sort=date_created&criteria=desc&range=date_created&begin_date=${encodeURIComponent(inicio.toISOString())}&end_date=${encodeURIComponent(agora.toISOString())}&limit=20`;
       const mpRes   = await fetch(mpUrl, { headers:{ Authorization:`Bearer ${MP_TOKEN}` } });
-      const mpData  = await mpRes.json();
+      const mpData   = await mpRes.json();
+      const finDbSync = await dbGet(FIN_KEY2).catch(()=>null);
       for (const pmt of (mpData.results||[])) {
         // Verificar se é pagamento financeiro por preference_id OU metadata.origem
         const isFinanceiro = pmt.metadata?.origem === "financeiro" ||
-          ((finDb?.records||[]).some(r => r.mp?.preferenceId === pmt.preference_id));
+          ((finDbSync?.records||[]).some(r => r.mp?.preferenceId === pmt.preference_id));
         if (!isFinanceiro) continue;
         if (await jaProcessado(String(pmt.id))) continue;
         await marcarProcessado(String(pmt.id));
