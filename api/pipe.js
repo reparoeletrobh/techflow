@@ -183,7 +183,7 @@ export default async function handler(req, res) {
     ];
 
     const log = [];
-    let totalPipefy = 0, totalNosso = 0, ok = 0, faltando = 0, extra = 0, divergencia = 0;
+    let totalPipefy = 0, totalNosso = 0, sincronizados = 0, faltando = 0, extra = 0, divergencia = 0;
 
     // Mapa dos nossos cards por pipefyId
     const nosMap = {};
