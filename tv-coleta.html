@@ -189,17 +189,14 @@ function buildCardColeta(c,phaseId){
     diagBtns='<div class="c-actions">'+
       '<button class="btn-diag" id="diag-btn-'+c.pipefyId+'" onclick="abrirDiag(\''+c.pipefyId+'\')">\uD83D\uDCCB Diagnóstico</button>'+
       '<div class="diag-form" id="diag-form-'+c.pipefyId+'">'+
-        '<div class="diag-label">Modelo do Equipamento</div>'+
-        '<input class="diag-input" type="text" id="diag-modelo-'+c.pipefyId+'" placeholder="Ex: Samsung UN55TU7020"/>'+
-        '<div class="diag-label">Diagnóstico — selecione uma ou mais opções</div>'+
-        '<div class="diag-chips">'+
-          '<button class="chip" id="chip-barramento-'+c.pipefyId+'" onclick="toggleChip(\''+c.pipefyId+'\',\'barramento\')">Barramento</button>'+
-          '<button class="chip" id="chip-placa-'+c.pipefyId+'" onclick="toggleChip(\''+c.pipefyId+'\',\'placa\')">Placa</button>'+
-          '<button class="chip condenada" id="chip-condenada-'+c.pipefyId+'" onclick="toggleChip(\''+c.pipefyId+'\',\'condenada\')">Condenada</button>'+
-          '<button class="chip risco" id="chip-risco-'+c.pipefyId+'" onclick="toggleChip(\''+c.pipefyId+'\',\'risco\')">Risco</button>'+
-          '<button class="chip acrilico" id="chip-acrilico-'+c.pipefyId+'" onclick="toggleChip(\''+c.pipefyId+'\',\'acrilico\')">Acrílico</button>'+
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'+
+          '<div class="diag-label" style="margin-bottom:0;">Qtd. TVs</div>'+
+          '<input class="diag-input" type="number" min="1" max="10" value="1"'+
+            ' id="diag-qtd-'+c.pipefyId+'"'+
+            ' style="width:54px;text-align:center;padding:4px 6px;"'+
+            ' oninput="renderDiagEquips(\''+c.pipefyId+'\',parseInt(this.value)||1)">'+
         '</div>'+
-        '<input class="chip-acrilico-val diag-input" type="number" id="chip-acrilico-val-'+c.pipefyId+'" placeholder="Valor do Acrílico (R$)" min="0" step="0.01"/>'+
+        '<div id="diag-equips-'+c.pipefyId+'">'+ renderDiagEquipSec(c.pipefyId,0,1) +'</div>'+
         '<button class="diag-submit" onclick="enviarDiag(\''+c.pipefyId+'\')">\u2705 Registrar</button>'+
         '<button class="diag-cancel" onclick="fecharDiag(\''+c.pipefyId+'\')">✕ Cancelar</button>'+
       '</div></div>';
@@ -298,6 +295,42 @@ function chipTextosMultiplos(pid){
   }
   return linhas.join(' | ');
 }
+var CHIPS_TV=['barramento','placa','condenada','risco','acrilico'];
+
+function renderDiagEquipSec(pid,idx,total){
+  var lbl=total>1?'📺 TV '+(idx+1):'📺 Equipamento';
+  return '<div id="diag-sec-'+pid+'-'+idx+'" style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:6px;">'
+    +(total>1?'<div class="diag-label" style="color:var(--accent);margin-bottom:5px;">'+lbl+'</div>':'')
+    +'<div class="diag-label">Modelo</div>'
+    +'<input class="diag-input" type="text" id="diag-modelo-'+pid+'-'+idx+'" placeholder="Ex: Samsung 43 Smart" style="width:100%;margin-bottom:7px;"/>'
+    +'<div class="diag-label">Diagnóstico</div>'
+    +'<div class="diag-chips">'
+      +'<button class="chip" id="chip-barramento-'+pid+'-'+idx+'" onclick="toggleChipM(\''+pid+'\','+idx+',\'barramento\')">Barramento</button>'
+      +'<button class="chip" id="chip-placa-'+pid+'-'+idx+'" onclick="toggleChipM(\''+pid+'\','+idx+',\'placa\')">Placa</button>'
+      +'<button class="chip condenada" id="chip-condenada-'+pid+'-'+idx+'" onclick="toggleChipM(\''+pid+'\','+idx+',\'condenada\')">Condenada</button>'
+      +'<button class="chip risco" id="chip-risco-'+pid+'-'+idx+'" onclick="toggleChipM(\''+pid+'\','+idx+',\'risco\')">Risco</button>'
+      +'<button class="chip acrilico" id="chip-acrilico-'+pid+'-'+idx+'" onclick="toggleChipM(\''+pid+'\','+idx+',\'acrilico\')">Acrílico</button>'
+    +'</div>'
+    +'<input class="chip-acrilico-val diag-input" type="number" id="chip-acrilico-val-'+pid+'-'+idx+'" placeholder="Valor Acrílico (R$)" min="0" step="0.01" style="display:none;margin-top:4px;"/>'
+  +'</div>';
+}
+
+function renderDiagEquips(pid,qtd){
+  var c=document.getElementById('diag-equips-'+pid);
+  if(!c)return;
+  c.innerHTML=Array.from({length:qtd},function(_,i){return renderDiagEquipSec(pid,i,qtd);}).join('');
+}
+
+function abrirDiag(id){var f=document.getElementById('diag-form-'+id);var b=document.getElementById('diag-btn-'+id);if(f)f.classList.toggle('open');if(b)b.style.display=f.classList.contains('open')?'none':'flex';}
+function fecharDiag(id){var f=document.getElementById('diag-form-'+id);var b=document.getElementById('diag-btn-'+id);if(f)f.classList.remove('open');if(b)b.style.display='flex';}
+
+function toggleChipM(pid,idx,nome){var chip=document.getElementById('chip-'+nome+'-'+pid+'-'+idx);if(!chip)return;chip.classList.toggle('on');if(nome==='acrilico'){var v=document.getElementById('chip-acrilico-val-'+pid+'-'+idx);if(v)v.style.display=chip.classList.contains('on')?'block':'none';}}
+
+function chipTextoIdx(pid,idx){return CHIPS_TV.filter(function(c){var el=document.getElementById('chip-'+c+'-'+pid+'-'+idx);return el&&el.classList.contains('on');}).map(function(c){if(c==='acrilico'){var v=document.getElementById('chip-acrilico-val-'+pid+'-'+idx);return'Acrilico'+(v&&v.value?': R$'+v.value:'');}return c.charAt(0).toUpperCase()+c.slice(1);}).join(' | ');}
+
+function chipTexto(pid){return chipTextoIdx(pid,0);}
+
+function chipTextosMultiplos(pid){var qtdEl=document.getElementById('diag-qtd-'+pid);var qtd=qtdEl?parseInt(qtdEl.value)||1:1;var ll=[];for(var i=0;i<qtd;i++){var mEl=document.getElementById('diag-modelo-'+pid+'-'+i);var m=mEl?mEl.value.trim():'';var d=chipTextoIdx(pid,i);if(!d)continue;ll.push(qtd>1?'TV '+(i+1)+(m?' ('+m+')':'')+': '+d:(m?m+': ':'')+d);}return ll.join(' | ');}
 async function enviarDiag(pid){
   var qtdEl=document.getElementById('diag-qtd-'+pid);
   var qtd=qtdEl?parseInt(qtdEl.value)||1:1;
