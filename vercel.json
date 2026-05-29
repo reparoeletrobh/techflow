@@ -479,6 +479,36 @@
   "functions": {
     "api/pipe.js": {
       "maxDuration": 60
+    },
+    "api/financeiro.js": {
+      "maxDuration": 30
+    },
+    "api/board.js": {
+      "maxDuration": 30
+    },
+    "api/orcamento.js": {
+      "maxDuration": 30
+    },
+    "api/logistica.js": {
+      "maxDuration": 30
+    },
+    "api/frenteloja.js": {
+      "maxDuration": 30
+    },
+    "api/vendas.js": {
+      "maxDuration": 30
+    },
+    "api/garantia.js": {
+      "maxDuration": 30
+    },
+    "api/webhook-mp.js": {
+      "maxDuration": 30
+    },
+    "api/fin-test.js": {
+      "maxDuration": 10
+    },
+    "api/log.js": {
+      "maxDuration": 10
     }
   }
 }
