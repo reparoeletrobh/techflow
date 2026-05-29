@@ -132,14 +132,14 @@ export default async function handler(req, res) {
         if (existIds[pid]) { skipped++; continue; }
 
         var fields = node.fields || [];
-        function gf(kw) {
+        var gf = function(kw) {
           for (var fi = 0; fi < fields.length; fi++) {
             if (fields[fi].name && fields[fi].name.toLowerCase().indexOf(kw) !== -1) {
               return fields[fi].value || '';
             }
           }
           return '';
-        }
+        };
 
         var now = new Date().toISOString();
         var card = {
