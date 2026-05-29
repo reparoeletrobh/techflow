@@ -1,4 +1,36 @@
 
+// ── Helper: mover card no Pipe ADM pelo pipefyId (sem depender do Pipefy) ──
+async function moverNoPipe(pipefyId, novaFase, dados) {
+  if (!pipefyId) return;
+  try {
+    const PIPE_KEY_H = 'reparoeletro_pipe';
+    const U = (process.env.UPSTASH_URL   || '').replace(/['"]/g,'').trim();
+    const T = (process.env.UPSTASH_TOKEN || '').replace(/['"]/g,'').trim();
+    async function _pg(k) {
+      const r = await fetch(U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});
+      const j = await r.json(); const v = j[0]?.result; if(!v) return null;
+      let val=JSON.parse(v); if(typeof val==='string'){try{val=JSON.parse(val);}catch(e){}} return(val&&typeof val==='object')?val:null;
+    }
+    async function _ps(k,v){await fetch(U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+    const db=(await _pg(PIPE_KEY_H))||{cards:[],syncedPipefyIds:[],lastSync:null};
+    const card=(db.cards||[]).find(c=>c.pipefyId===String(pipefyId));
+    const now=new Date().toISOString();
+    if(!card){
+      if(dados&&dados.nomeContato){
+        db.cards.unshift({id:'PIPE-'+String(db.cards.length+1).padStart(4,'0'),pipefyId:String(pipefyId),phase:novaFase,nomeContato:dados.nomeContato||'',telefone:dados.telefone||'',equipamento:dados.equipamento||'',descricao:dados.descricao||'',valor:parseFloat(dados.valor||0)||0,origem:dados.origem||'sistema',criadoEm:now,movedAt:now,aguardandoDesde:novaFase==='aguardando_aprovacao'?now:null,history:[],analiseCompra:false});
+        await _ps(PIPE_KEY_H,db);
+      }
+      return;
+    }
+    card.history=(card.history||[]).concat([{phase:card.phase,ts:now}]);
+    card.phase=novaFase; card.movedAt=now;
+    if(novaFase==='aguardando_aprovacao') card.aguardandoDesde=now;
+    if(dados){if(dados.valor!==undefined)card.valor=parseFloat(dados.valor)||0;if(dados.nomeContato)card.nomeContato=dados.nomeContato;}
+    await _ps(PIPE_KEY_H,db);
+  } catch(e){console.error('[pipe-mover]',novaFase,e.message);}
+}
+
+
 // ── Helper: mover card no Pipe ADM pelo pipefyId ─────────────────────────
 async function moverNoPipe(pipefyId, novaFase, dados) {
   if (!pipefyId) return;
@@ -1939,30 +1971,22 @@ module.exports = async function handler(req, res) {
     if (action === 'balcao-pagar') {
       const { pipefyId } = req.body || {};
       if (!pipefyId) return res.status(400).json({ ok: false, error: 'pipefyId obrigatório' });
-      const ERP_PHASE_ID = '339008925';
+
+      // ── Pipefy (best-effort — falha NÃO bloqueia) ────────────────────────
       try {
-        const pipRes = await pipefyQuery(`mutation {
-          moveCardToPhase(input: { card_id: "${pipefyId}", destination_phase_id: "${ERP_PHASE_ID}" }) {
-            card { id }
-          }
-        }`);
-        const pipErrMsg = pipRes?.errors?.[0]?.message || '';
-        // Se já está na fase de destino, trata como sucesso e continua
-        if (pipRes?.errors?.length && !pipErrMsg.toLowerCase().includes('already')) {
-          throw new Error(pipErrMsg);
-        }
-      } catch(pipErr) {
-        // "already in destination phase" = card ja esta em ERP -> prossegue normalmente
-        if (!pipErr.message.toLowerCase().includes('already')) {
-          return res.status(200).json({ ok: false, error: 'Pipefy: ' + pipErr.message });
-        }
-      }
+        const ERP_PHASE_ID = '339008925';
+        await pipefyQuery('mutation { moveCardToPhase(input: { card_id: "' + pipefyId + '", destination_phase_id: "' + ERP_PHASE_ID + '" }) { card { id } } }');
+      } catch(pipErr) { console.warn('[balcao-pagar] Pipefy best-effort:', pipErr.message); }
+
+      // ── Redis: sempre executa, independente do Pipefy ──────────────────────
       const BALCAO_KEY = 'reparoeletro_balcao';
       const balcao = (await dbGet(BALCAO_KEY)) || [];
       const entry = balcao.find(b => b.pipefyId === String(pipefyId));
       if (entry) { entry.status = 'pago'; entry.pagoEm = new Date().toISOString(); await dbSet(BALCAO_KEY, balcao); }
-      // Pipe ADM: mover para erp
+
+      // ── Pipe ADM: mover para ERP ───────────────────────────────────────────
       await moverNoPipe(String(pipefyId), 'erp').catch(() => {});
+
       return res.status(200).json({ ok: true });
     }
 
