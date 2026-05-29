@@ -234,7 +234,9 @@ function toast(msg,ok=true){
   setTimeout(()=>t.className='toast',2800);
 }
 async function api(action,body){
-  const r=await fetch('/api/pipe?action='+action,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
+  var url='/api/pipe?action='+action;
+  if(!body) url+='&_t='+Date.now(); // cache buster para GETs
+  const r=await fetch(url,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
   return r.json();
 }
 function fmtDate(ts){
