@@ -242,6 +242,34 @@ export default async function handler(req,res){
     return res.status(200).json({ ok:true, id:ficha.id, nome:ficha.nomeContato, fase:ficha.phase, pipefyCardId:ficha.pipefyCardId||null });
   }
 
+
+  // ── GET finalizar-por-nome: localiza por nome+tel4 e move para conserto_realizado ──
+  if (action === 'finalizar-por-nome') {
+    const nome = (req.query.nome || '').toLowerCase();
+    const tel4 = (req.query.tel4 || '');
+    const db   = await dbGet(FL_KEY) || defaultDB();
+    const ficha = db.fichas.find(f =>
+      (f.nomeContato || '').toLowerCase().startsWith(nome) &&
+      (f.telefone || '').replace(/\D/g,'').slice(-4) === tel4 &&
+      f.phase === 'producao'
+    );
+    if (!ficha) return res.status(404).json({ ok:false, error:'Ficha não encontrada em produção', nome, tel4 });
+    const now = new Date().toISOString();
+    ficha.phase        = 'conserto_realizado';
+    ficha.liberadoHoje = true;
+    ficha.movedAt      = now;
+    ficha.history      = (ficha.history||[]).concat([{ phase:'conserto_realizado', ts:now, via:'admin_manual' }]);
+    await dbSet(FL_KEY, db);
+    // Mover no Pipefy se tiver card
+    if (ficha.pipefyCardId) {
+      try {
+        const phId = await getPipefyPhaseId('conserto');
+        if (phId) await movePipefyCard(ficha.pipefyCardId, phId);
+      } catch(pe) { console.error('[finalizar-por-nome] Pipefy:', pe.message); }
+    }
+    return res.status(200).json({ ok:true, finalizado:true, id:ficha.id, nome:ficha.nomeContato, fase:'conserto_realizado' });
+  }
+
   if(req.method==='POST'&&action==='conserto-realizado'){
     const {pipefyCardId, fichaId}=req.body||{};
     if(!pipefyCardId && !fichaId)
