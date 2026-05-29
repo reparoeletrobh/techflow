@@ -631,6 +631,54 @@ export default async function handler(req, res) {
     }
   }
 
+
+  // ── GET fin-status: estado rápido do Redis sem processar ─────────────────
+  if (action === 'fin-status') {
+    try {
+      var U=process.env.UPSTASH_URL.replace(/['"]/g,'').trim();
+      var T=process.env.UPSTASH_TOKEN.replace(/['"]/g,'').trim();
+      var resp = await fetch(U+'/pipeline',{method:'POST',
+        headers:{Authorization:'Bearer '+T,'Content-Type':'application/json'},
+        body:JSON.stringify([['STRLEN','reparoeletro_financeiro'],['STRLEN','reparoeletro_financeiro_backup']])
+      });
+      var j = await resp.json();
+      var finBytes  = j[0]?.result || 0;
+      var bakBytes  = j[1]?.result || 0;
+      // Ler os primeiros 200 chars do financeiro para ver estrutura
+      var resp2 = await fetch(U+'/getrange/reparoeletro_financeiro/0/200',{
+        headers:{Authorization:'Bearer '+T}
+      });
+      var preview = await resp2.text();
+      return res.status(200).json({
+        ok: true,
+        financeiro_bytes: finBytes,
+        backup_bytes: bakBytes,
+        preview: preview.slice(0,200)
+      });
+    } catch(e) { return res.status(500).json({ok:false,error:e.message}); }
+  }
+
+  // ── GET fin-restaurar: restaura financeiro do backup ──────────────────────
+  if (action === 'fin-restaurar') {
+    try {
+      var U2=process.env.UPSTASH_URL.replace(/['"]/g,'').trim();
+      var T2=process.env.UPSTASH_TOKEN.replace(/['"]/g,'').trim();
+      async function qGet(k){
+        var r=await fetch(U2+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T2,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});
+        var j=await r.json();var v=j[0]?.result;if(!v)return null;
+        try{var x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}
+      }
+      async function qSet(k,v){
+        await fetch(U2+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T2,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});
+      }
+      var bak=await qGet('reparoeletro_financeiro_backup');
+      if(!bak||!Array.isArray(bak.records))return res.status(200).json({ok:false,msg:'backup vazio ou inválido',bak:typeof bak});
+      delete bak.backedUpAt;
+      await qSet('reparoeletro_financeiro',bak);
+      return res.status(200).json({ok:true,restaurados:bak.records.length});
+    } catch(e){return res.status(500).json({ok:false,error:e.message});}
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
