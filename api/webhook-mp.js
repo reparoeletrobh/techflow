@@ -674,7 +674,21 @@ export default async function handler(req, res) {
           // Processar o pagamento aprovado mais recente
           const pmt = uniq.sort((a,b) => new Date(b.date_approved||0)-new Date(a.date_approved||0))[0];
           if (await jaProcessado(String(pmt.id))) {
-            resultado.processados.push({ fichaId:ficha.id, paymentId:pmt.id, info:'ja_processado' });
+            // Já processado — verificar se fase está correta e corrigir se necessário
+            const finCheck = await dbGet(FIN_KEY2);
+            const recCheck = (finCheck?.records||[]).find(r => r.id===ficha.id || r.mp?.paymentId===String(pmt.id));
+            if (recCheck && recCheck.phaseId !== 'entrega_liberada') {
+              // Fase errada — corrigir
+              const nowFix = new Date().toISOString();
+              recCheck.phaseId = 'entrega_liberada';
+              recCheck.paidAt  = recCheck.paidAt || nowFix;
+              recCheck.movedAt = nowFix;
+              recCheck.history = [...(recCheck.history||[]), { phaseId:'entrega_liberada', ts:nowFix, via:'fix_ja_processado' }];
+              await dbSet(FIN_KEY2, finCheck);
+              resultado.processados.push({ fichaId:ficha.id, paymentId:pmt.id, info:'fase_corrigida', de:recCheck.phaseId, para:'entrega_liberada' });
+            } else {
+              resultado.processados.push({ fichaId:ficha.id, paymentId:pmt.id, info:'ja_processado' });
+            }
             continue;
           }
           await marcarProcessado(String(pmt.id));
