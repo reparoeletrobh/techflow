@@ -154,7 +154,7 @@ export default async function handler(req, res) {
 
 
   // ── POST reset-pipe: limpa todos os dados do pipe (dados corrompidos) ──────
-  if (req.method === 'POST' && action === 'reset-pipe') {
+  if (action === 'reset-pipe') {
     const fresh = { cards: [], syncedPipefyIds: [], lastSync: null };
     await dbSet(PIPE_KEY, fresh);
     return res.status(200).json({ ok: true, info: 'pipe resetado — pronto para nova sincronização' });
