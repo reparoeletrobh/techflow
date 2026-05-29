@@ -385,6 +385,27 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok:true, card:novoCard, boardTotal:boardDb.cards.length });
   }
 
+
+  // ── GET limpar-fin-pipe: remove registros FIN-PIPE-* espúrios do financeiro ──
+  if (action === 'limpar-fin-pipe') {
+    try {
+      const U2 = (process.env.UPSTASH_URL   || '').replace(/['"]/g,'').trim();
+      const T2 = (process.env.UPSTASH_TOKEN || '').replace(/['"]/g,'').trim();
+      async function _fg(k){const r=await fetch(U2+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T2,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();const v=j[0]?.result;if(!v)return null;let val=JSON.parse(v);if(typeof val==='string'){try{val=JSON.parse(val);}catch(e){}}return(val&&typeof val==='object')?val:null;}
+      async function _fs(k,v){await fetch(U2+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T2,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+      const fin = await _fg('reparoeletro_financeiro');
+      if (!fin || !Array.isArray(fin.records)) return res.status(200).json({ ok:true, removidos:0, info:'financeiro vazio ou sem records' });
+      const antes   = fin.records.length;
+      const espurios = fin.records.filter(r => (r.id||'').startsWith('FIN-PIPE-') || r.origem === 'pipe_video_enviado');
+      fin.records    = fin.records.filter(r => !(r.id||'').startsWith('FIN-PIPE-') && r.origem !== 'pipe_video_enviado');
+      const removidos = antes - fin.records.length;
+      if (removidos > 0) await _fs('reparoeletro_financeiro', fin);
+      return res.status(200).json({ ok:true, removidos, restantes:fin.records.length, espurios: espurios.map(r=>({id:r.id,ficha:r.nomeContato,fase:r.phaseId})) });
+    } catch(e) {
+      return res.status(500).json({ ok:false, error: e.message });
+    }
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
@@ -612,7 +633,6 @@ export default async function handler(req, res) {
     // Log da ação
     var gatilhosLog = [];
     if (phase === 'aprovados')       gatilhosLog.push('→ Board Técnico');
-    if (phase === 'video_enviado')   gatilhosLog.push('→ Financeiro criado');
     if (phase === 'analise_compra')  gatilhosLog.push('→ Compra Equip');
     if (phase === 'aguardando_aprovacao') gatilhosLog.push('Timer 48h iniciado');
     logAction({ modulo:'Pipe ADM', fichaId:card.id, ficha:card.nomeContato, acao:'Mover ficha', de:faseAnterior||'', para:phase, gatilho:gatilhosLog.join(' | '), status:'ok' }).catch(()=>{});
@@ -649,7 +669,6 @@ export default async function handler(req, res) {
     // Log da ação
     var gatilhosLog = [];
     if (phase === 'aprovados')       gatilhosLog.push('→ Board Técnico');
-    if (phase === 'video_enviado')   gatilhosLog.push('→ Financeiro criado');
     if (phase === 'analise_compra')  gatilhosLog.push('→ Compra Equip');
     if (phase === 'aguardando_aprovacao') gatilhosLog.push('Timer 48h iniciado');
     logAction({ modulo:'Pipe ADM', fichaId:card.id, ficha:card.nomeContato, acao:'Mover ficha', de:faseAnterior||'', para:phase, gatilho:gatilhosLog.join(' | '), status:'ok' }).catch(()=>{});
