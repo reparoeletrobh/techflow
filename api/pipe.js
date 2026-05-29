@@ -512,6 +512,75 @@ export default async function handler(req, res) {
     }
   }
 
+
+  // ── GET video-para-financeiro: cria fichas no financeiro para video_enviado após 15h ──
+  if (action === 'video-para-financeiro') {
+    try {
+      var U4=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+      var T4=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+
+      async function _rfin(k){
+        var r=await fetch(U4+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T4,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});
+        var j=await r.json();var v=j[0]?.result;
+        if(!v)return null;
+        try{var val=JSON.parse(v);if(typeof val==='string')val=JSON.parse(val);return(val&&typeof val==='object')?val:null;}catch(e){return null;}
+      }
+      async function _sfin(k,v){
+        await fetch(U4+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T4,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});
+      }
+
+      // 1. LER financeiro — abortar se falhar
+      var finDb = await _rfin('reparoeletro_financeiro');
+      if (!finDb) return res.status(500).json({ ok:false, error:'Falha ao ler financeiro — abortando para não corromper dados' });
+      if (!Array.isArray(finDb.records)) return res.status(500).json({ ok:false, error:'Financeiro sem array records — estrutura inesperada', finDb });
+
+      // 2. LER Pipe — abortar se falhar
+      var pipeDb = await _rfin(PIPE_KEY);
+      if (!pipeDb || !Array.isArray(pipeDb.cards)) return res.status(500).json({ ok:false, error:'Falha ao ler Pipe — abortando' });
+
+      // 3. Filtrar cards video_enviado após 15h BRT (18h UTC) de hoje
+      var hoje = new Date();
+      var limite = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), hoje.getUTCDate(), 18, 0, 0));
+      var candidatos = pipeDb.cards.filter(function(card){
+        if (card.phase !== 'video_enviado') return false;
+        var movedAt = card.movedAt ? new Date(card.movedAt) : null;
+        return movedAt && movedAt >= limite;
+      });
+
+      if (!candidatos.length) return res.status(200).json({ ok:true, criados:0, info:'Nenhum card em video_enviado após 15h', limite:limite.toISOString() });
+
+      // 4. Inserir apenas os que não existem
+      var criados=[], ignorados=[];
+      for (var i=0;i<candidatos.length;i++){
+        var card=candidatos[i];
+        var jaExiste=finDb.records.find(function(r){
+          return (card.pipefyId && r.pipefyId===String(card.pipefyId)) || (r.osCode && r.osCode===card.id);
+        });
+        if(jaExiste){ignorados.push({id:card.id,ficha:card.nomeContato,fase:jaExiste.phaseId});continue;}
+        var rec={
+          id:'FIN-'+card.id, pipefyId:card.pipefyId?String(card.pipefyId):null,
+          osCode:card.id, nomeContato:card.nomeContato||'', telefone:card.telefone||'',
+          equipamento:card.equipamento||card.descricao||'', valor:card.valor||0,
+          phaseId:'aguardando_dados', criadoEm:now, movedAt:now,
+          history:[{phaseId:'aguardando_dados',ts:now}], origem:'video_enviado_manual'
+        };
+        finDb.records.unshift(rec);
+        criados.push({id:rec.id,ficha:rec.nomeContato,pipefyId:rec.pipefyId,valor:rec.valor});
+      }
+
+      // 5. Salvar SOMENTE se algo foi criado
+      if(criados.length>0){
+        // Backup antes de salvar
+        try{await _sfin('reparoeletro_financeiro_backup',{...finDb,backedUpAt:now});}catch(e){}
+        await _sfin('reparoeletro_financeiro', finDb);
+      }
+
+      return res.status(200).json({ok:true,criados:criados.length,ignorados:ignorados.length,fichas:criados,jaTinham:ignorados,limite:limite.toISOString()});
+    } catch(e) {
+      return res.status(500).json({ok:false,error:e.message});
+    }
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
