@@ -667,6 +667,67 @@ export default async function handler(req, res) {
     } catch(e){return res.status(500).json({ok:false,error:e.message});}
   }
 
+
+  // ── GET fin-buscar: lista registros recentes do financeiro ────────────────
+  if (action === 'fin-buscar') {
+    var q = (req.query.q||'').toLowerCase();
+    try {
+      var fin = await dbGet('reparoeletro_financeiro');
+      if (!fin||!Array.isArray(fin.records)) return res.status(200).json({ok:true,records:[]});
+      var lista = q
+        ? fin.records.filter(function(r){ return JSON.stringify(r).toLowerCase().includes(q); })
+        : fin.records.slice(0,20);
+      return res.status(200).json({ok:true, total:lista.length,
+        records:lista.map(function(r){return {id:r.id,nome:r.nomeContato||r.title,fase:r.phaseId,valor:r.valor,pipefyId:r.pipefyId};})
+      });
+    } catch(e){return res.status(500).json({ok:false,error:e.message});}
+  }
+
+  // ── POST editar-fin: edita campos de um registro do financeiro ─────────────
+  if (req.method==='POST' && action==='editar-fin') {
+    var body=req.body||{};
+    var {id, nomeContato, valor, telefone, equipamento, cpfCnpj, endereco, servicos, descricao} = body;
+    if (!id) return res.status(400).json({ok:false,error:'id obrigatório'});
+    try {
+      var fin=await dbGet('reparoeletro_financeiro');
+      if(!fin||!Array.isArray(fin.records))return res.status(404).json({ok:false,error:'financeiro vazio'});
+      var rec=fin.records.find(function(r){return r.id===id||r.pipefyId===id;});
+      if(!rec)return res.status(404).json({ok:false,error:'Registro não encontrado: '+id});
+      if(nomeContato!==undefined) rec.nomeContato=nomeContato;
+      if(valor!==undefined)       rec.valor=parseFloat(String(valor).replace(',','.'))||0;
+      if(telefone!==undefined)    rec.telefone=telefone;
+      if(equipamento!==undefined) rec.equipamento=equipamento;
+      if(descricao!==undefined)   rec.descricao=descricao;
+      if(cpfCnpj!==undefined)     rec.cpfCnpj=cpfCnpj;
+      if(endereco!==undefined)    rec.endereco=endereco;
+      if(servicos!==undefined)    rec.servicos=servicos;
+      rec.editadoEm=now;
+      try{await dbSet('reparoeletro_financeiro_backup',Object.assign({},fin,{backedUpAt:now}));}catch(e){}
+      await dbSet('reparoeletro_financeiro',fin);
+      return res.status(200).json({ok:true,record:rec});
+    } catch(e){return res.status(500).json({ok:false,error:e.message});}
+  }
+
+  // ── POST editar-pipe: edita campos de um card do Pipe ─────────────────────
+  if (req.method==='POST' && action==='editar-pipe') {
+    var body=req.body||{};
+    var {id, nomeContato, valor, telefone, equipamento, descricao} = body;
+    if (!id) return res.status(400).json({ok:false,error:'id obrigatório'});
+    try {
+      var db=await dbGet(PIPE_KEY)||defaultDB();
+      var card=db.cards.find(function(c){return c.id===id||c.pipefyId===id;});
+      if(!card)return res.status(404).json({ok:false,error:'Card não encontrado: '+id});
+      if(nomeContato!==undefined) card.nomeContato=nomeContato;
+      if(valor!==undefined)       card.valor=parseFloat(String(valor).replace(',','.'))||0;
+      if(telefone!==undefined)    card.telefone=telefone;
+      if(equipamento!==undefined) card.equipamento=equipamento;
+      if(descricao!==undefined)   card.descricao=descricao;
+      card.editadoEm=now;
+      await dbSet(PIPE_KEY,db);
+      return res.status(200).json({ok:true,card:card});
+    } catch(e){return res.status(500).json({ok:false,error:e.message});}
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
