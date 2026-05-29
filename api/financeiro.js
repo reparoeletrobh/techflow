@@ -661,6 +661,23 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+
+  // ── GET forcar-pipefy-ficha: dispara Pipefy para ficha já em entrega_liberada ──
+  if (action === "forcar-pipefy-ficha") {
+    const id = req.query.id;
+    if (!id) return res.status(400).json({ ok:false, error:"id obrigatorio" });
+    const fin = await dbGet(FIN_KEY) || defaultFin();
+    const rec = fin.records.find(r => r.id === id);
+    if (!rec) return res.status(404).json({ ok:false, error:"ficha nao encontrada" });
+    if (!rec.pipefyId) return res.status(400).json({ ok:false, error:"ficha sem pipefyId" });
+    try {
+      await pipefyMoveCard(rec.pipefyId, SOLICITAR_ENTREGA_PHASE_ID);
+      return res.status(200).json({ ok:true, fichaId:id, pipefyId:rec.pipefyId, phaseId:rec.phaseId, acao:"movido_para_solicitar_entrega" });
+    } catch(e) {
+      return res.status(500).json({ ok:false, error:e.message, fichaId:id, pipefyId:rec.pipefyId });
+    }
+  }
+
   // ── GET nf-pending — retorna NF pendente para o bookmarklet
   if (action === "nf-pending") {
     const fin = await dbGet(FIN_KEY) || defaultFin();
