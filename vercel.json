@@ -31,9 +31,21 @@
     {
       "path": "/api/webhook-mp?action=sync-fin-mp",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/pipe?action=timer-check",
+      "schedule": "0 * * * *"
     }
   ],
   "rewrites": [
+    {
+      "source": "/api/pipe",
+      "destination": "/api/pipe.js"
+    },
+    {
+      "source": "/pipe",
+      "destination": "/pipe.html"
+    },
     {
       "source": "/tv/logistica",
       "destination": "/tv-logistica.html"
