@@ -47,7 +47,7 @@ async function dbSet(k, v) {
 
 async function pipefyReq(query) {
   const ctrl = new AbortController();
-  const tid  = setTimeout(function() { ctrl.abort(); }, 15000);
+  const tid  = setTimeout(function() { ctrl.abort(); }, 25000);
   try {
     const r = await fetch('https://api.pipefy.com/graphql', {
       method:  'POST',
@@ -84,14 +84,20 @@ async function syncFase(pipefyPhaseId, phaseLocal, PIPE_KEY, dbGetFn, dbSetFn, p
 
   var added = 0, skipped = 0, cursor = null, hasMore = true, paginas = 0, erros = [];
 
-  while (hasMore && paginas < 20) {
+  while (hasMore && paginas < 30) {
     paginas++;
     var ca = cursor ? (', after: "' + cursor + '"') : '';
     var q  = 'query { phase(id: "' + pipefyPhaseId + '") { cards(first: 50' + ca + ') { pageInfo { hasNextPage endCursor } edges { node { id title fields { name value } } } } } }';
 
     var data = null;
     try { data = await pipefyReqFn(q); }
-    catch(e2) { erros.push(String(e2.message)); hasMore = false; break; }
+    catch(e2) {
+      erros.push('Pag ' + paginas + ': ' + String(e2.message));
+      // Tentar uma vez mais antes de desistir
+      await new Promise(function(r){ setTimeout(r, 2000); });
+      try { data = await pipefyReqFn(q); }
+      catch(e3) { erros.push('Retry falhou: ' + String(e3.message)); hasMore = false; break; }
+    }
 
     var ph      = data && data.phase ? data.phase : null;
     var phCards = ph && ph.cards ? ph.cards : null;
