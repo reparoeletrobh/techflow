@@ -149,20 +149,18 @@ module.exports = async function handler(req, res) {
     const db = rawDb || { dias: [] };
     if (!Array.isArray(db.dias)) db.dias = [];
 
-    // ERP ao vivo — direto do Redis local (nao do Pipefy)
+    // ERP ao vivo — direto do Redis local via endpoint erp-count (sem carregar 922 cards)
     let erpAtual = { count: 0, valor: 0, cards: [] };
     try {
-      const PIPE_KEY_M = 'reparoeletro_pipe';
-      const pipeDbM = await dbGet(PIPE_KEY_M);
-      const erpLocais = (pipeDbM && pipeDbM.cards)
-        ? pipeDbM.cards.filter(c => c.phase === 'erp')
-        : [];
-      erpAtual = {
-        count: erpLocais.length,
-        valor: erpLocais.reduce((s,c) => s + (parseFloat(c.valor)||0), 0),
-        cards: erpLocais.map(c => ({ id: c.pipefyId||c.id, nome: c.nomeContato, valor: parseFloat(c.valor)||0 }))
-      };
-    } catch(e) { console.error('ERP Redis:', e.message); }
+      const baseUrl = process.env.VERCEL_URL
+        ? 'https://' + process.env.VERCEL_URL
+        : 'https://reparoeletroadm.com';
+      const erpRes = await fetch(baseUrl + '/api/pipe?action=erp-count&_t=' + Date.now());
+      const erpJson = await erpRes.json();
+      if (erpJson.ok) {
+        erpAtual = { count: erpJson.erp, valor: erpJson.valor, cards: [] };
+      }
+    } catch(e) { console.error('ERP count:', e.message); }
 
     // metaLog para Coletas e Orçamentos (esses permanecem do log local)
     const metaLog   = logsData?.metaLog || [];
