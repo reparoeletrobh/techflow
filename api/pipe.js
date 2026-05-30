@@ -947,15 +947,20 @@ export default async function handler(req, res) {
       // Buscar na logistica
       var logDb = await dbGet('reparoeletro_logistica') || {fichas:[]};
       var fichaL = null;
+      // Normalizar busca: remover acentos e caracteres especiais
+      function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); }
+      var buscaN = norm(buscaA);
+
       if (idA) fichaL = (logDb.fichas||[]).find(function(f){ return f.id===idA||f.pipefyCardId===idA; });
-      if (!fichaL && buscaA) fichaL = (logDb.fichas||[]).find(function(f){ return JSON.stringify(f).toLowerCase().includes(buscaA); });
+      if (!fichaL && buscaN) fichaL = (logDb.fichas||[]).find(function(f){ return norm(JSON.stringify(f)).includes(buscaN); });
 
       // Buscar no orçamento se não achou na logística
       var fichaO = null;
       if (!fichaL) {
         var orcDb2 = await dbGet('reparoeletro_orcamentos') || {fichas:[]};
         if (!orcDb2.fichas) orcDb2 = await dbGet('reparoeletro_orc') || {fichas:[]};
-        if (buscaA) fichaO = (orcDb2.fichas||[]).find(function(f){ return JSON.stringify(f).toLowerCase().includes(buscaA); });
+        if (!orcDb2.fichas) orcDb2 = await dbGet('reparoeletro_logistica') || {fichas:[]};
+        if (buscaN) fichaO = (orcDb2.fichas||[]).find(function(f){ return norm(JSON.stringify(f)).includes(buscaN); });
       }
 
       var origem = fichaL || fichaO;
