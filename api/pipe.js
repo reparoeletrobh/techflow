@@ -1024,6 +1024,84 @@ export default async function handler(req, res) {
     } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
   }
 
+
+  // ── GET erp-report: página HTML renderizada server-side ──────────────────
+  if (action === 'erp-report') {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    try {
+      var db = await dbGet(PIPE_KEY) || {cards:[]};
+      var erp = (db.cards||[]).filter(function(c){return c.phase==='erp';});
+      erp.sort(function(a,b){return (parseFloat(a.valor)||0)-(parseFloat(b.valor)||0);});
+      var total  = erp.length;
+      var comVal = erp.filter(function(c){return (parseFloat(c.valor)||0)>0;});
+      var soma   = comVal.reduce(function(s,c){return s+(parseFloat(c.valor)||0);},0);
+      var ticket = comVal.length ? soma/comVal.length : 0;
+      var semVal = total - comVal.length;
+      var maxVal = Math.max.apply(null, erp.map(function(c){return parseFloat(c.valor)||0;}).concat([1]));
+      function BRL(v){return 'R$ '+(+v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+      function cor(v){return !v?'#444':v<200?'#ef4444':v<500?'#f5c800':'#22c55e';}
+      function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+      function orig(c){
+        var o=(c.origem||'').toLowerCase();
+        if(o.includes('venda'))return'Venda';
+        if(o.includes('garantia'))return'Garantia';
+        if(o.includes('loja'))return'Loja';
+        return'Reparo';
+      }
+      var rows = erp.map(function(c,i){
+        var v=parseFloat(c.valor)||0;
+        var pct=Math.round(v/maxVal*100);
+        var tp=orig(c);
+        return '<tr><td style="color:#444">'+(i+1)+'</td>'+
+          '<td>'+esc(c.nomeContato||'—')+'</td>'+
+          '<td><span style="font-size:9px;padding:2px 8px;border-radius:3px;background:rgba(245,200,0,.1);color:#f5c800">'+tp+'</span></td>'+
+          '<td style="font-weight:700;color:'+cor(v)+'">'+( v>0 ? BRL(v) : '<span style="color:#333">—</span>' )+'</td>'+
+          '<td style="min-width:100px"><div style="display:flex;align-items:center;gap:6px">'+
+            '<div style="flex:1;height:3px;background:#111;border-radius:2px;overflow:hidden">'+
+              '<div style="width:'+pct+'%;height:3px;background:'+cor(v)+';border-radius:2px"></div>'+
+            '</div><span style="font-size:9px;color:#444">'+pct+'%</span></div></td></tr>';
+      }).join('');
+      var ticketStr = BRL(ticket);
+      var somaStr   = 'R$ '+(soma||0).toLocaleString('pt-BR',{minimumFractionDigits:0});
+      var ticketCor = ticket<300?'#ef4444':ticket<450?'#f5c800':'#22c55e';
+      var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
+        '<title>Análise ERP</title>'+
+        '<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#080808;color:#e8e8e8;font-family:system-ui,sans-serif}'+
+        '.hd{background:#0f0f0f;border-bottom:1px solid #1e1e1e;padding:14px 20px;display:flex;justify-content:space-between;align-items:center}'+
+        '.hd h1{font-size:16px;font-weight:700}.hd h1 span{color:#f5c800}'+
+        '.hd a{font-size:11px;padding:5px 12px;border:1px solid #333;border-radius:6px;color:#888;text-decoration:none}'+
+        '.hd a:hover{border-color:#f5c800;color:#f5c800}'+
+        '.w{max-width:1100px;margin:0 auto;padding:20px}'+
+        '.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px}'+
+        '.k{background:#0f0f0f;border:1px solid #1e1e1e;border-radius:8px;padding:14px}'+
+        '.k .l{font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}'+
+        '.k .v{font-size:24px;font-weight:700}.k .s{font-size:10px;color:#555;margin-top:3px}'+
+        '.box{background:#0f0f0f;border:1px solid #1e1e1e;border-radius:8px;padding:18px;margin-bottom:14px}'+
+        '.box h2{font-size:13px;font-weight:700;margin-bottom:12px}'+
+        '.tw{max-height:500px;overflow-y:auto}.tw::-webkit-scrollbar{width:3px}.tw::-webkit-scrollbar-thumb{background:#2a2a2a}'+
+        'table{width:100%;border-collapse:collapse;font-size:11px}'+
+        'th{font-size:9px;text-transform:uppercase;color:#444;padding:7px 10px;border-bottom:1px solid #1a1a1a;text-align:left;background:#0f0f0f;position:sticky;top:0}'+
+        'td{padding:8px 10px;border-bottom:1px solid #0d0d0d}</style></head>'+
+        '<body><div class="hd"><h1>📊 Análise <span>ERP</span> — Reparo Eletro BH</h1>'+
+        '<a href="/api/pipe?action=erp-report">↺ Atualizar</a></div>'+
+        '<div class="w">'+
+        '<div class="kpis">'+
+          '<div class="k"><div class="l">Total ERP</div><div class="v" style="color:#f5c800">'+total+'</div></div>'+
+          '<div class="k"><div class="l">Ticket Médio</div><div class="v" style="color:'+ticketCor+'">'+ticketStr+'</div><div class="s">'+comVal.length+' fichas c/ valor</div></div>'+
+          '<div class="k"><div class="l">Volume Total</div><div class="v" style="color:#22c55e">'+somaStr+'</div></div>'+
+          '<div class="k"><div class="l">Sem Valor</div><div class="v" style="color:'+(semVal>5?'#ef4444':'#666')+'">'+semVal+'</div><div class="s">'+(total?Math.round(semVal/total*100):0)+'%</div></div>'+
+          '<div class="k"><div class="l">Total Cards</div><div class="v" style="color:#555">'+(db.cards||[]).length+'</div><div class="s">no pipe</div></div>'+
+        '</div>'+
+        '<div class="box"><h2>Fichas ERP — Menor ao Maior Valor</h2>'+
+        '<div class="tw"><table><thead><tr><th>#</th><th>Nome</th><th>Tipo</th><th>Valor</th><th>Barra</th></tr></thead><tbody>'+
+        rows+'</tbody></table></div></div></div></body></html>';
+      return res.end(html);
+    } catch(e){
+      return res.end('<html><body style="background:#080808;color:#ef4444;font-family:monospace;padding:40px">Erro: '+e.message+'</body></html>');
+    }
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
