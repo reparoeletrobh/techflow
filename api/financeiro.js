@@ -46,7 +46,7 @@ async function pipefyMoveCard(cardId, destPhaseId) {
     moveCardToPhase(input: { card_id: "${cardId}", destination_phase_id: "${destPhaseId}" }) {
       card { id current_phase { name } }
     }
-  }`);
+  }`).catch(()=>{});
 }
 
 // Fase "Solicitar Entrega" no Pipefy
@@ -131,7 +131,7 @@ async function fetchVideoEnviado() {
           }
         }
       }
-    }`);
+    }`).catch(()=>{});
     const phases = data?.pipe?.phases || [];
     const phase  = phases.find(p => {
       const n = p.name.toLowerCase().trim();
@@ -181,7 +181,7 @@ async function fetchFinalizadoIds() {
           }
         }
       }
-    }`);
+    }`).catch(()=>{});
     const phases = data?.pipe?.phases || [];
     const ids = [];
     for (const ph of phases) {
@@ -296,6 +296,12 @@ async function criarPreferenciaMp({ rec, metodo }) {
 }
 
 // ── Handler ────────────────────────────────────────────────────
+
+// ── Pipefy é ESPELHO — nunca bloqueia o fluxo local ─────────────────────
+async function pipefyBestEffort(fn) {
+  try { return await fn(); } catch(e) { console.warn('[Pipefy]', e.message); return null; }
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
@@ -770,7 +776,7 @@ module.exports = async function handler(req, res) {
         pipe(id: "${PIPE_ID}") {
           phases { name cards(first: 3) { edges { node { id title } } } }
         }
-      }`);
+      }`).catch(()=>{});
       result.phases = (data?.pipe?.phases || []).map(p => ({
         name: p.name,
         cards: p.cards.edges.length,

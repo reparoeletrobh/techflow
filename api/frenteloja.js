@@ -1,4 +1,11 @@
 
+// ── Pipefy é ESPELHO — nunca bloqueia o fluxo local ─────────────────────
+async function pipefyBestEffort(fn) {
+  try { return await fn(); }
+  catch(e) { console.warn('[Pipefy best-effort]', e.message); return null; }
+}
+
+
 // ── fmt4dig: padrão Nome 4díg do telefone ────────────────────────────────
 function fmt4dig(nome, tel) {
   if (!nome) return '';

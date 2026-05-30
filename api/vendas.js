@@ -92,6 +92,12 @@ async function dbSet(key, value) {
 function defaultDB()  { return { produtos: [] }; }
 function defaultFin() { return { records: [], syncedIds: [] }; }
 
+
+// ── Pipefy é ESPELHO — nunca bloqueia o fluxo local ─────────────────────
+async function pipefyBestEffort(fn) {
+  try { return await fn(); } catch(e) { console.warn('[Pipefy]', e.message); return null; }
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");

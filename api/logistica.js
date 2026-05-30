@@ -124,7 +124,7 @@ async function fetchPipeStructure() {
       phases { id name }
       start_form_fields { id label type }
     }
-  }`);
+  }`).catch(()=>{});
   _pipeStructure = {
     phases: data?.pipe?.phases || [],
     fields: data?.pipe?.start_form_fields || [],
@@ -176,7 +176,7 @@ async function criarCardPipefy({ nome, telefone, equipamento, defeito, endereco 
         phase_id: "${AGUARDANDO_PHASE_ID}"
         fields_attributes: [${fieldsAttr.join(', ')}]
       }) { card { id title url } }
-    }`);
+    }`).catch(()=>{});
     card = data?.createCard?.card;
   } catch(e) {
     // Se falhar com phase_id, tentar sem (vai para fase inicial e depois move)
@@ -185,12 +185,18 @@ async function criarCardPipefy({ nome, telefone, equipamento, defeito, endereco 
         pipe_id: "${PIPE_ID}"
         fields_attributes: [${fieldsAttr.join(', ')}]
       }) { card { id title url } }
-    }`);
+    }`).catch(()=>{});
     card = data?.createCard?.card;
   }
   // Lançar erro explícito se o Pipefy não retornou id (nunca silencioso)
   if (!card?.id) throw new Error('Pipefy retornou card sem id: ' + JSON.stringify(card));
   return card;
+}
+
+
+// ── Pipefy é ESPELHO — nunca bloqueia o fluxo local ─────────────────────
+async function pipefyBestEffort(fn) {
+  try { return await fn(); } catch(e) { console.warn('[Pipefy]', e.message); return null; }
 }
 
 module.exports = async function handler(req, res) {
@@ -650,9 +656,9 @@ module.exports = async function handler(req, res) {
     try {
       if (ficha.pipefyCardId) {
         // Card já existe — só mover e atualizar valor
-        await pipefyQuery(`mutation { moveCardToPhase(input: { card_id: "${ficha.pipefyCardId}", destination_phase_id: "${AGUARDANDO_PHASE_ID}" }) { card { id } } }`);
+        await pipefyQuery(`mutation { moveCardToPhase(input: { card_id: "${ficha.pipefyCardId}", destination_phase_id: "${AGUARDANDO_PHASE_ID}" }) { card { id } } }`).catch(()=>{});
         if (precoFinal) {
-          await pipefyQuery(`mutation { updateCardField(input: { card_id: "${ficha.pipefyCardId}", field_id: "valor_de_contrato", new_value: "${precoFinal}" }) { success } }`);
+          await pipefyQuery(`mutation { updateCardField(input: { card_id: "${ficha.pipefyCardId}", field_id: "valor_de_contrato", new_value: "${precoFinal}" }) { success } }`).catch(()=>{});
         }
         console.log('[Log] Pipefy movido para Aguardando:', ficha.pipefyCardId);
       } else {
