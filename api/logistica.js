@@ -29,7 +29,9 @@ async function logAction(entry) {
 
 // ── Helper: mover card no Pipe ADM pelo pipefyId (sem depender do Pipefy) ──
 async function moverNoPipe(pipefyId, novaFase, dados) {
-  if (!pipefyId) return;
+  // pipefyId pode ser null quando Pipefy falhou — usar localId como fallback
+  const _refId = pipefyId || (dados && dados.localId) || null;
+  if (!_refId) return;
   try {
     const PIPE_KEY_H = 'reparoeletro_pipe';
     const U = (process.env.UPSTASH_URL   || '').replace(/['"]/g,'').trim();
@@ -41,11 +43,29 @@ async function moverNoPipe(pipefyId, novaFase, dados) {
     }
     async function _ps(k,v){await fetch(U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
     const db=(await _pg(PIPE_KEY_H))||{cards:[],syncedPipefyIds:[],lastSync:null};
-    const card=(db.cards||[]).find(c=>c.pipefyId===String(pipefyId));
+    const refIdStr = String(_refId);
+    const card=(db.cards||[]).find(c=>
+      c.pipefyId===refIdStr || c.id===refIdStr ||
+      (dados?.localId && (c.id===String(dados.localId) || c.pipefyId===String(dados.localId)))
+    );
     const now=new Date().toISOString();
     if(!card){
       if(dados&&dados.nomeContato){
-        db.cards.unshift({id:'PIPE-'+String(db.cards.length+1).padStart(4,'0'),pipefyId:String(pipefyId),phase:novaFase,nomeContato:dados.nomeContato||'',telefone:dados.telefone||'',equipamento:dados.equipamento||'',descricao:dados.descricao||'',valor:parseFloat(dados.valor||0)||0,origem:dados.origem||'sistema',criadoEm:now,movedAt:now,aguardandoDesde:novaFase==='aguardando_aprovacao'?now:null,history:[],analiseCompra:false});
+        db.cards.unshift({
+          id: 'PIPE-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2,5).toUpperCase(),
+          pipefyId: pipefyId ? String(pipefyId) : null,
+          localId:  dados.localId ? String(dados.localId) : null,
+          phase: novaFase,
+          nomeContato: dados.nomeContato||'',
+          telefone: dados.telefone||'',
+          equipamento: dados.equipamento||'',
+          descricao: dados.descricao||'',
+          valor: parseFloat(dados.valor||0)||0,
+          origem: dados.origem||'sistema',
+          criadoEm: now, movedAt: now,
+          aguardandoDesde: novaFase==='aguardando_aprovacao' ? now : null,
+          history:[], analiseCompra:false
+        });
         await _ps(PIPE_KEY_H,db);
       }
       return;
@@ -641,7 +661,7 @@ module.exports = async function handler(req, res) {
 
     // ── Pipe ADM: criar/atualizar card em aguardando_aprovacao (SEM Pipefy) ─────
     const _pipId  = ficha.pipefyCardId || null;
-    const _nome   = ficha.nome || ficha.nomeContato || '';
+    const _nome   = fmt4dig(ficha.nome || ficha.nomeContato || '', ficha.telefone||'');
     const _tel    = ficha.telefone || '';
     const _equip  = ficha.equipamento || '';
     const _desc   = ficha.defeito || '';
@@ -649,7 +669,8 @@ module.exports = async function handler(req, res) {
     await moverNoPipe(_pipId, 'aguardando_aprovacao', {
       nomeContato: _nome, telefone: _tel,
       equipamento: _equip, descricao: _desc,
-      valor: _valor, origem: 'logistica'
+      valor: _valor, origem: 'logistica',
+      localId: ficha.id  // fallback quando não há pipefyCardId
     }).catch(e => console.error('[Log→Pipe]', e.message));
 
     // Mover ou CRIAR card no Pipefy em Aguardando Aprovação
