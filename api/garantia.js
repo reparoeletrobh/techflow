@@ -164,6 +164,32 @@ module.exports = async function handler(req, res) {
 
       // Delivery → cria card no Pipefy imediatamente
       if (tipo === "delivery") {
+        // Criar card na coluna Garantia do Pipe ADM
+        try {
+          const _gU=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+          const _gT=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+          async function _gg(k){const r=await fetch(_gU+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_gT,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();const v=j[0]?.result;if(!v)return null;try{let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+          async function _gs(k,v){await fetch(_gU+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_gT,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+          const pdbG=(await _gg('reparoeletro_pipe'))||{cards:[],syncedPipefyIds:[],lastSync:null};
+          if(!Array.isArray(pdbG.cards))pdbG.cards=[];
+          const nowG=new Date().toISOString();
+          pdbG.cards.unshift({
+            id:'GARANTIA-'+String(Date.now()),
+            phase:'garantia',
+            nomeContato:ficha.nome||'',
+            telefone:ficha.telefone||'',
+            equipamento:ficha.equipamento||'',
+            descricao:ficha.defeito||'',
+            valor:parseFloat(ficha.valorServico)||0,
+            origem:'garantia_delivery',
+            garantiaId:ficha.id,
+            criadoEm:nowG,movedAt:nowG,
+            aguardandoDesde:null,history:[],analiseCompra:false
+          });
+          pdbG.lastSync=nowG;
+          await _gs('reparoeletro_pipe',pdbG);
+        } catch(eg){ console.error('[garantia→pipe]',eg.message); }
+
         const pip = await criarCardPipefy(ficha);
         if (pip.ok) {
           ficha.pipefyId    = pip.pipefyId;

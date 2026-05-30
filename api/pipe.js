@@ -43,6 +43,7 @@ const PHASES = [
   { id:'entrega_solicitada',   name:'Entrega Solicitada',   cor:'#f97316' },
   { id:'receber',              name:'Receber',              cor:'#22c55e' },
   { id:'erp',                  name:'ERP',                  cor:'#22c55e' },
+  { id:'garantia',             name:'Garantia',             cor:'#06b6d4' },
 ];
 
 async function dbGet(k) {

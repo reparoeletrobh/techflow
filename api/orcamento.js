@@ -230,7 +230,15 @@ module.exports = async function handler(req, res) {
     const coletaDataTexto = req.body?.coletaDataTexto || null;
 
     try {
-      const card = await createPipefyCard({ phaseId, nome, telefone, aparelho, defeito, endereco: endereco || "" });
+      // Pipefy best-effort — não bloqueia se falhar
+      let card = null;
+      let pipefyErro = null;
+      try {
+        card = await createPipefyCard({ phaseId, nome, telefone, aparelho, defeito, endereco: endereco || "" });
+      } catch(ep) {
+        pipefyErro = ep.message;
+        console.error('[orcamento] Pipefy falhou (best-effort):', ep.message);
+      }
 
       // Registrar na Logística — SÍNCRONO antes de retornar
       try {
@@ -265,7 +273,7 @@ module.exports = async function handler(req, res) {
       } catch(e) { console.error('[Log] criar:', e.message); }
 
       logAction({ modulo:'Orçamento', fichaId:ficha.id||'', ficha:ficha.nomeContato||ficha.nome||'', acao:'Aprovação de orçamento', para:'aprovados', gatilho:'→ Pipe aguardando_aprovacao', status:'ok', detalhe:'Valor: R$'+(ficha.valorOrcamento||ficha.valor||0) }).catch(()=>{});
-      return res.status(200).json({ ok: true, cardId: card?.id, card });
+      return res.status(200).json({ ok: true, cardId: card?.id, card, pipefyErro });
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });
     }
