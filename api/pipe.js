@@ -937,6 +937,75 @@ export default async function handler(req, res) {
     } catch(e){return res.status(500).json({ok:false,error:e.message});}
   }
 
+
+  // ── GET forcar-aguardando: força ficha da logistica para aguardando_aprovacao no Pipe ──
+  if (action === 'forcar-aguardando') {
+    var buscaA = (req.query.busca||'').toLowerCase();
+    var idA    = req.query.id || '';
+    if (!buscaA && !idA) return res.status(400).json({ok:false,error:'busca ou id obrigatorio'});
+    try {
+      // Buscar na logistica
+      var logDb = await dbGet('reparoeletro_logistica') || {fichas:[]};
+      var fichaL = null;
+      if (idA) fichaL = (logDb.fichas||[]).find(function(f){ return f.id===idA||f.pipefyCardId===idA; });
+      if (!fichaL && buscaA) fichaL = (logDb.fichas||[]).find(function(f){ return JSON.stringify(f).toLowerCase().includes(buscaA); });
+
+      // Buscar no orçamento se não achou na logística
+      var fichaO = null;
+      if (!fichaL) {
+        var orcDb2 = await dbGet('reparoeletro_orcamentos') || {fichas:[]};
+        if (!orcDb2.fichas) orcDb2 = await dbGet('reparoeletro_orc') || {fichas:[]};
+        if (buscaA) fichaO = (orcDb2.fichas||[]).find(function(f){ return JSON.stringify(f).toLowerCase().includes(buscaA); });
+      }
+
+      var origem = fichaL || fichaO;
+      if (!origem) return res.status(404).json({ok:false,error:'Ficha não encontrada na logística/orçamento',busca:buscaA});
+
+      // Criar ou mover no Pipe
+      var pip5 = await dbGet(PIPE_KEY) || {cards:[],syncedPipefyIds:[],lastSync:null};
+      if (!Array.isArray(pip5.cards)) pip5.cards=[];
+      var ts5 = now;
+
+      // Verificar se já existe
+      var jaExiste5 = pip5.cards.find(function(c){
+        return (origem.pipefyCardId && (c.pipefyId===String(origem.pipefyCardId)||c.id===String(origem.pipefyCardId))) ||
+               (origem.id && (c.localId===String(origem.id)||c.id===String(origem.id)));
+      });
+
+      if (jaExiste5) {
+        // Atualizar fase
+        jaExiste5.history=(jaExiste5.history||[]).concat([{phase:jaExiste5.phase,ts:ts5}]);
+        jaExiste5.phase='aguardando_aprovacao';
+        jaExiste5.movedAt=ts5;
+        jaExiste5.aguardandoDesde=ts5;
+      } else {
+        pip5.cards.unshift({
+          id: 'PIPE-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,5).toUpperCase(),
+          pipefyId: origem.pipefyCardId ? String(origem.pipefyCardId) : null,
+          localId:  origem.id ? String(origem.id) : null,
+          phase: 'aguardando_aprovacao',
+          nomeContato: origem.nome||origem.nomeContato||'',
+          telefone: origem.telefone||'',
+          equipamento: origem.equipamento||'',
+          descricao: origem.defeito||origem.descricao||'',
+          valor: parseFloat(origem.valorOrcamento||origem.valor||0)||0,
+          origem: 'logistica_manual',
+          criadoEm: ts5, movedAt: ts5, aguardandoDesde: ts5,
+          history:[], analiseCompra:false
+        });
+      }
+      pip5.lastSync=ts5;
+      await dbSet(PIPE_KEY, pip5);
+
+      return res.status(200).json({
+        ok:true, acao: jaExiste5 ? 'atualizado' : 'criado',
+        nome: origem.nome||origem.nomeContato,
+        fase: 'aguardando_aprovacao',
+        fonte: fichaL ? 'logistica' : 'orcamento'
+      });
+    } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
