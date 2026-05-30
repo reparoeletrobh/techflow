@@ -964,21 +964,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, cards: db.cards || [], phases: PHASES, lastSync: db.lastSync });
   }
 
-  // ── sync-fase: sincroniza UMA fase por vez ─────────────────────────────────
-  if (action === 'sync-fase') {
-    const sfPhaseId = req.query.phaseId;
-    const sfLocal   = req.query.phaseLocal;
-    if (!sfPhaseId || !sfLocal) {
-      return res.status(400).json({ ok: false, error: 'phaseId e phaseLocal obrigatorios' });
-    }
-    try {
-      const sfResult = await syncFase(sfPhaseId, sfLocal, PIPE_KEY, dbGet, dbSet, pipefyReq);
-      return res.status(200).json({ ok: true, fase: sfLocal, ...sfResult });
-    } catch(sfErr) {
-      return res.status(500).json({ ok: false, error: String(sfErr.message), stack: String(sfErr.stack).substring(0,300) });
-    }
-  }
-
   // ── POST editar-valor ─────────────────────────────────────────────────────
   if (req.method === 'POST' && action === 'editar-valor') {
     var body  = req.body || {};
@@ -1028,9 +1013,7 @@ export default async function handler(req, res) {
       // 3. Tentar Pipefy (valor_de_contrato) se ainda não encontrou
       if (!novoValor && pid && PIPEFY_TOKEN) {
         try {
-          var pfData = await pipefyReq(
-            'query { card(id: "' + pid + '") { fields { name value } } }'
-          ).catch(() => null);
+          
           if (pfData && pfData.card && pfData.card.fields) {
             var valField = pfData.card.fields.find(function(f){
               return f.name && (f.name.toLowerCase().includes('valor') || f.name.toLowerCase().includes('contrato'));
