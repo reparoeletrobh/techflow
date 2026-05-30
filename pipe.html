@@ -191,7 +191,7 @@ function showRelatorio(){
   document.getElementById('painel-rel').style.display='block';
   document.getElementById('rel-resultado').innerHTML=
     '<div style="color:var(--muted);font-family:var(--fm);font-size:11px;padding:20px 0;">'+
-    'Clique em ▶ Rodar agora para comparar com o Pipefy em tempo real.</div>';
+    ''
   document.getElementById('rel-historico').style.display='none';
 }
 function fecharRelatorio(){ document.getElementById('painel-rel').style.display='none'; }
@@ -244,7 +244,7 @@ async function carregarHistorico(){
     var div=e.faltando+e.extra+e.divergencia;
     html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;display:flex;gap:12px;align-items:center;">';
     html+='<span style="font-family:var(--fm);font-size:9px;color:var(--muted);">'+ts+'</span>';
-    html+='<span style="font-family:var(--fm);font-size:10px;">PF:'+e.totalPipefy+' / Nosso:'+e.totalNosso+'</span>';
+    
     html+='<span style="font-family:var(--fm);font-size:10px;color:'+(div>0?'var(--red)':'var(--green)')+';">'+(div>0?'⚠️ '+div+' divergência(s)':'✅ ok')+'</span>';
     html+='</div>';
   }
@@ -254,7 +254,7 @@ async function carregarHistorico(){
 
 // ── RASTREAR ──────────────────────────────────────────────────────────────
 function rastrearFicha(pipefyId){
-  if(!pipefyId){toast('Esta ficha não tem ID Pipefy para rastrear',false);return;}
+  
   window.open('/rastrear?id='+encodeURIComponent(pipefyId),'_blank');
 }
 
