@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/board?action=erp-to-finalizado",
-      "schedule": "0 2 * * 1"
+      "schedule": "59 2 * * 1"
     },
     {
       "path": "/api/board?action=scan-erp-full",
