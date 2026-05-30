@@ -1052,6 +1052,74 @@ export default async function handler(req, res) {
     return res.status(200).json({ok:true,erp:erp2,total:tot,valor:val2});
   }
 
+
+  // ── GET relatorio-fichas: relatório completo de fichas por busca ────────────
+  if (action === 'relatorio-fichas') {
+    var termos = (req.query.q || '').split(',').map(function(t){return t.trim().toLowerCase();}).filter(Boolean);
+    if (!termos.length) return res.status(400).json({ok:false,error:'Informe ?q=termo1,termo2'});
+    try {
+      var fin3 = await dbGet('reparoeletro_financeiro') || {records:[]};
+      var pip3 = await dbGet(PIPE_KEY) || {cards:[]};
+      var relFichas = [];
+
+      termos.forEach(function(termo){
+        // Buscar no financeiro
+        var finMatch = (fin3.records||[]).filter(function(r){
+          return JSON.stringify(r).toLowerCase().includes(termo);
+        });
+        // Buscar no pipe
+        var pipMatch = (pip3.cards||[]).filter(function(c){
+          return JSON.stringify(c).toLowerCase().includes(termo);
+        });
+
+        relFichas.push({
+          busca: termo,
+          financeiro: finMatch.map(function(r){return {
+            id: r.id, nome: r.nomeContato, fase: r.phaseId,
+            valor: r.valor, pipefyId: r.pipefyId, osCode: r.osCode,
+            mpPreferenceId: r.mp && r.mp.preferenceId,
+            mpStatus: r.mp && r.mp.status,
+            mpPaymentId: r.mp && r.mp.paymentId,
+            pagoEm: r.mp && r.mp.pagoEm,
+            criadoEm: r.criadoEm
+          };}),
+          pipe: pipMatch.map(function(c){return {
+            id: c.id, nome: c.nomeContato, fase: c.phase,
+            valor: c.valor, pipefyId: c.pipefyId
+          };}),
+          resumo: {
+            finEncontradas: finMatch.length,
+            pipEncontradas: pipMatch.length,
+            faseFin: finMatch.map(function(r){return r.phaseId;}).join(', '),
+            fasePipe: pipMatch.map(function(c){return c.phase;}).join(', ')
+          }
+        });
+      });
+
+      return res.status(200).json({ok:true, termos:termos, fichas:relFichas});
+    } catch(e){return res.status(500).json({ok:false,error:e.message});}
+  }
+
+  // ── GET forcar-solicitar-entrega: força card do pipe para solicitar_entrega ──
+  if (action === 'forcar-solicitar-entrega') {
+    var fseId = req.query.id || '';
+    var fseNome = (req.query.busca||'').toLowerCase();
+    if (!fseId && !fseNome) return res.status(400).json({ok:false,error:'id ou busca obrigatorio'});
+    try {
+      var pip4 = await dbGet(PIPE_KEY) || {cards:[]};
+      var card4 = fseId
+        ? (pip4.cards||[]).find(function(c){return c.id===fseId||c.pipefyId===fseId;})
+        : (pip4.cards||[]).find(function(c){return JSON.stringify(c).toLowerCase().includes(fseNome);});
+      if (!card4) return res.status(404).json({ok:false,error:'Card não encontrado',id:fseId,busca:fseNome});
+      var faseAntes = card4.phase;
+      card4.history = (card4.history||[]).concat([{phase:faseAntes,ts:now}]);
+      card4.phase   = 'solicitar_entrega';
+      card4.movedAt = now;
+      await dbSet(PIPE_KEY, pip4);
+      return res.status(200).json({ok:true,id:card4.id,nome:card4.nomeContato,de:faseAntes,para:'solicitar_entrega'});
+    } catch(e){return res.status(500).json({ok:false,error:e.message});}
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
