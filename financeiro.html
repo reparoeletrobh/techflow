@@ -354,7 +354,7 @@ const PHASES = [
   { id:"analise_pagamento",  name:"Análise de Pagamento",  color:"#0ea5e9" },
   { id:"pagamento_confirmado",name:"Pagamento Confirmado", color:"#22c55e" },
   { id:"entrega_agendada",  name:"Entrega Agendada",   color:"#f97316" },
-  { id:"entrega_liberada",  name:"Entrega Liberada",   color:"#22c55e" },
+  { id:"entrega_liberada",  name:"Pago ✅",             color:"#22c55e" },
   { id:"rota_criada",       name:"Rota Criada",        color:"#8b5cf6" },
   { id:"item_coletado",     name:"Item Coletado",      color:"#ec4899" },
 ];
@@ -567,7 +567,7 @@ function buildActions(r) {
   if (r.phaseId==='pagamento_confirmado')
     h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="openMoverPagConfirmado('${r.id}')">🚚 Liberar / Agendar Entrega</button>`;
   if (r.phaseId==='entrega_agendada')
-    h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="mover('${r.id}','entrega_liberada')">✅ Liberar Entrega</button>`;
+    h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="mover('${r.id}','entrega_liberada')">✅ Confirmar Pagamento</button>`;
   if (r.phaseId==='entrega_liberada')
     h += `<button class="btn-primary" style="background:#8b5cf6;color:#fff;" onclick="mover('${r.id}','rota_criada')">🗺️ Rota Criada</button>`;
   if (r.phaseId==='rota_criada')
@@ -833,7 +833,7 @@ function openMoverPagConfirmado(id) {
       </div>
     </div>
     <button class="btn-primary" style="background:#22c55e;color:#000;padding:11px;"
-      onclick="mover('${id}','entrega_liberada');closeModal('mover-modal')">✅ Entrega Liberada (imediata)</button>`;
+      onclick="mover('${id}','entrega_liberada');closeModal('mover-modal')">✅ Confirmar Pagamento</button>`;
   document.getElementById('mover-modal').classList.add('open');
 }
 
@@ -1018,7 +1018,7 @@ function getFaseName(id) {
     faturamento: 'Faturamento',
     pagamento_agendado: 'Pag. Agendado',
     entrega_agendada: 'Entrega Agendada',
-    entrega_liberada: 'Entrega Liberada',
+    entrega_liberada: 'Pago ✅',
     rota_criada: 'Rota Criada',
     item_coletado: 'Item Coletado'
   };
@@ -1067,7 +1067,7 @@ function renderMover() {
       '<option value="faturamento">Faturamento</option>' +
       '<option value="pagamento_agendado">Pagamento Agendado</option>' +
       '<option value="entrega_agendada">Entrega Agendada</option>' +
-      '<option value="entrega_liberada">Entrega Liberada</option>' +
+      '<option value="entrega_liberada">Pago ✅</option>' +
       '<option value="rota_criada">Rota Criada</option>' +
       '<option value="item_coletado">Item Coletado</option>';
     sel.onchange = (function(rid, selEl) {

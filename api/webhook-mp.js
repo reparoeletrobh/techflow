@@ -65,8 +65,11 @@ async function moverCardNoPipe(pipefyId, osCode, novaFase) {
     async function _ps(k,v){await fetch(U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
     const db=await _pg(PIPE_KEY);
     if(!db||!Array.isArray(db.cards))return false;
+    const pipefyStr  = pipefyId ? String(pipefyId) : null;
+    const osCodeStr  = osCode   ? String(osCode)   : null;
     const card=db.cards.find(function(c){
-      return (pipefyId&&c.pipefyId===String(pipefyId))||(osCode&&c.id===String(osCode));
+      return (pipefyStr && (c.pipefyId===pipefyStr || c.id===pipefyStr)) ||
+             (osCodeStr && (c.id===osCodeStr || c.pipefyId===osCodeStr));
     });
     if(!card)return false;
     const now=new Date().toISOString();
@@ -112,7 +115,7 @@ async function processarPagamentoFinanceiro(pmt) {
   }
 
   // Só mover se ainda em faturamento ou pagamento_agendado
-  const fasesAceitas = ["faturamento","pagamento_agendado","nf_emitida","pagamento_confirmado"];
+  const fasesAceitas = ["faturamento","pagamento_agendado","nf_emitida","pagamento_confirmado","aguardando_dados","analise_pagamento"];
   if (!fasesAceitas.includes(rec.phaseId)) {
     // Só registrar na conciliação, não mover
     await salvarConciliacaoFin({ rec, pmt, metodo, valor, now, status:"ja_em_"+rec.phaseId });

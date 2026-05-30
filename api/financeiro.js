@@ -687,10 +687,12 @@ module.exports = async function handler(req, res) {
         const PIPE_KEY_F = 'reparoeletro_pipe';
         const pipeDbF = await dbGet(PIPE_KEY_F);
         if (pipeDbF && Array.isArray(pipeDbF.cards)) {
+          const pipeFId = rec.pipefyId ? String(rec.pipefyId) : null;
+          const pipeOId = rec.osCode   ? String(rec.osCode)   : null;
           const pCardF = pipeDbF.cards.find(function(c) {
-            return (rec.pipefyId && (c.pipefyId === String(rec.pipefyId) || c.id === String(rec.pipefyId))) ||
-                   (rec.osCode   && (c.id === String(rec.osCode) || c.pipefyId === String(rec.osCode))) ||
-                   c.id === rec.id;
+            return (pipeFId && (c.pipefyId===pipeFId || c.id===pipeFId)) ||
+                   (pipeOId && (c.id===pipeOId || c.pipefyId===pipeOId)) ||
+                   c.id === rec.id || c.id === String(rec.id);
           });
           if (pCardF) {
             const nowF = new Date().toISOString();
