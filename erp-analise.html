@@ -84,8 +84,10 @@ async function init() {
   const root = document.getElementById('root');
   try {
     const res = await fetch('/api/pipe?action=erp-cards&_t='+Date.now());
-    const d   = await res.json();
-    if (!d.ok || !d.cards) { root.innerHTML = '<div class="loading">❌ Erro ao buscar dados</div>'; return; }
+    if (!res.ok) { root.innerHTML = '<div class="loading">❌ HTTP ' + res.status + ' — tente recarregar</div>'; return; }
+    const d = await res.json();
+    if (!d.ok || !d.cards) { root.innerHTML = '<div class="loading">❌ ' + (d.error||'Sem dados') + '</div>'; return; }
+    if (!d.cards.length) { root.innerHTML = '<div class="loading">⚠️ Nenhuma ficha em ERP no momento</div>'; return; }
 
     const cards = d.cards
       .map(c => ({

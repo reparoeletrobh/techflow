@@ -817,7 +817,13 @@ export default async function handler(req, res) {
   if (action === 'erp-cards') {
     res.setHeader('Cache-Control','no-store,no-cache');
     var db3 = await dbGet(PIPE_KEY);
-    var erpCards = (db3&&db3.cards)?db3.cards.filter(function(c){return c.phase==='erp';}):[];
+    var erpCards = (db3&&db3.cards)
+      ? db3.cards.filter(function(c){return c.phase==='erp';}).map(function(c){
+          return { id:c.id, nomeContato:c.nomeContato||c.title||'', valor:c.valor||0,
+                   origem:c.origem||'', descricao:c.descricao||c.equipamento||'',
+                   movedAt:c.movedAt||c.criadoEm||'', pipefyId:c.pipefyId||null };
+        })
+      : [];
     return res.status(200).json({ok:true, count:erpCards.length, cards:erpCards});
   }
 
