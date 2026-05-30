@@ -1469,6 +1469,27 @@ module.exports = async function handler(req, res) {
           }
         }
         const moved = results.filter(r => r.ok).length;
+
+        // Mover também no Pipe ADM local
+        try {
+          const _bU=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+          const _bT=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+          async function _bg2(k){const r=await fetch(_bU+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_bT,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();const v=j[0]?.result;if(!v)return null;try{let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e2){return null;}}
+          async function _bs2(k,v){await fetch(_bU+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_bT,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+          const pipeDb2=await _bg2('reparoeletro_pipe');
+          if(pipeDb2&&Array.isArray(pipeDb2.cards)){
+            const nowB=new Date().toISOString(); let movedB=0;
+            pipeDb2.cards.forEach(function(card){
+              if(card.phase==='erp'){
+                card.history=(card.history||[]).concat([{phase:'erp',ts:nowB}]);
+                card.phase='finalizado'; card.movedAt=nowB; movedB++;
+              }
+            });
+            if(movedB>0){pipeDb2.lastSync=nowB;await _bs2('reparoeletro_pipe',pipeDb2);}
+            console.log('[erp→finalizado] Pipe local: '+movedB+' cards');
+          }
+        } catch(ep){ console.error('[erp→finalizado]',ep.message); }
+
         return res.status(200).json({ ok: true, moved, total: all.length, results });
       } catch(e) {
         return res.status(200).json({ ok: false, error: e.message });
