@@ -616,7 +616,7 @@ export default async function handler(req, res) {
         if(jaExiste){ignorados.push({codigo:p3.codigo,nome:p3.compradorNome,fase:jaExiste.phase});continue;}
 
         pipeDb2.cards.unshift({
-          id:'PIPE-'+String(pipeDb2.cards.length+1).padStart(4,'0'),
+          id:'PIPE-'+Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2,5).toUpperCase(),
           pipefyId:p3.pipefyCardId||null,
           phase:'receber',
           nomeContato:p3.compradorNome||'',
@@ -1181,7 +1181,7 @@ export default async function handler(req, res) {
     var now  = new Date().toISOString();
     var ph   = body.phase || 'aguardando_aprovacao';
     var card = {
-      id: 'PIPE-' + String(db.cards.length + 1).padStart(4, '0'),
+      id: 'PIPE-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2,5).toUpperCase(),
       pipefyId:        body.pipefyId ? String(body.pipefyId) : null,
       phase:           ph,
       nomeContato:     fmt4dig(body.nomeContato || '', body.telefone || ''),

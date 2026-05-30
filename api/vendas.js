@@ -300,7 +300,7 @@ module.exports = async function handler(req, res) {
       if(!Array.isArray(pdb2.cards))pdb2.cards=[];
       const nowV=new Date().toISOString();
       pdb2.cards.unshift({
-        id:'PIPE-'+String(pdb2.cards.length+1).padStart(4,'0'),
+        id:'PIPE-'+Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2,5).toUpperCase(),
         pipefyId: pipefyReceberCardId||null,
         phase:'receber',
         nomeContato: nomeCliente||'',
@@ -367,7 +367,7 @@ module.exports = async function handler(req, res) {
       if(!Array.isArray(pipeDb.cards)) pipeDb.cards=[];
       const now_v=new Date().toISOString();
       pipeDb.cards.unshift({
-        id:'PIPE-'+String(pipeDb.cards.length+1).padStart(4,'0'),
+        id:'PIPE-'+Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2,5).toUpperCase(),
         pipefyId:null, phase:'receber',
         nomeContato:nomeCliente||'', telefone:telefone||'',
         equipamento:(p.descricao||''), descricao:`VENDA — ${p.codigo||''}`,
