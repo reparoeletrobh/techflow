@@ -653,11 +653,14 @@ export default async function handler(req, res) {
         if (jaProc) { resultado.jaProcessados.push(pmt.id); continue; }
 
         // Tentar encontrar ficha correspondente
+        const extRef = pmt.external_reference ? String(pmt.external_reference) : null;
         const ficha2 = fichas.find(f =>
           (f.mp?.preferenceId && f.mp.preferenceId === pmt.preference_id) ||
           (pmt.metadata?.ficha_id && pmt.metadata.ficha_id === f.id) ||
           (pmt.metadata?.fichaId  && pmt.metadata.fichaId  === f.id) ||
-          (pmt.external_reference && pmt.external_reference === f.id)
+          (extRef && extRef === f.id) ||
+          (extRef && f.pipefyId && extRef === String(f.pipefyId)) ||
+          (extRef && f.osCode   && extRef === String(f.osCode))
         );
 
         if (!ficha2) {
