@@ -674,11 +674,34 @@ module.exports = async function handler(req, res) {
     }
     await dbSet(FIN_KEY, fin);
     try { await dbSet(FIN_BACKUP_KEY, { ...fin, backedUpAt: new Date().toISOString() }); } catch(e) {}
-    // Move no Pipefy quando vai para Entrega Liberada
+    // Move no Pipefy quando vai para Entrega Liberada (best-effort)
     let pipefyMoveOk = null;
     if (phaseId === "entrega_liberada" && rec.pipefyId) {
       try { await pipefyMoveCard(rec.pipefyId, SOLICITAR_ENTREGA_PHASE_ID); pipefyMoveOk = true; }
       catch(e) { pipefyMoveOk = false; console.error("pipefyMove:", e.message); }
+    }
+
+    // Move no Pipe ADM (reparoeletro_pipe) → solicitar_entrega
+    if (phaseId === "entrega_liberada") {
+      try {
+        const PIPE_KEY_F = 'reparoeletro_pipe';
+        const pipeDbF = await dbGet(PIPE_KEY_F);
+        if (pipeDbF && Array.isArray(pipeDbF.cards)) {
+          const pCardF = pipeDbF.cards.find(function(c) {
+            return (rec.pipefyId && (c.pipefyId === String(rec.pipefyId) || c.id === String(rec.pipefyId))) ||
+                   (rec.osCode   && (c.id === String(rec.osCode) || c.pipefyId === String(rec.osCode))) ||
+                   c.id === rec.id;
+          });
+          if (pCardF) {
+            const nowF = new Date().toISOString();
+            pCardF.history = (pCardF.history || []).concat([{ phase: pCardF.phase, ts: nowF }]);
+            pCardF.phase   = 'solicitar_entrega';
+            pCardF.movedAt = nowF;
+            await dbSet(PIPE_KEY_F, pipeDbF);
+            console.log('[financeiro] Pipe ADM movido para solicitar_entrega:', pCardF.id);
+          }
+        }
+      } catch(ef) { console.error('[financeiro] Pipe ADM move:', ef.message); }
     }
 
     if (phaseId === 'entrega_liberada') {
