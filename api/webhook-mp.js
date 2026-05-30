@@ -660,7 +660,19 @@ export default async function handler(req, res) {
           (pmt.external_reference && pmt.external_reference === f.id)
         );
 
-        if (!ficha2) continue;
+        if (!ficha2) {
+          resultado.semCorrespondencia = resultado.semCorrespondencia || [];
+          resultado.semCorrespondencia.push({
+            paymentId: pmt.id,
+            valor: pmt.transaction_amount,
+            data: pmt.date_approved,
+            preference_id: pmt.preference_id,
+            external_reference: pmt.external_reference,
+            metadata: pmt.metadata,
+            pagador: pmt.payer?.email || pmt.payer?.identification?.number || '?'
+          });
+          continue;
+        }
 
         // Processar
         const proc = await processarPagamentoFinanceiro(pmt, ficha2.id);
