@@ -144,10 +144,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   <div class="stat-pill" style="border-left:2px solid #22c55e;padding-left:10px;">
     <span class="stat-lbl" title="Dados do Pipe ADM local — não do Pipefy">ERP</span>&nbsp;
     <span class="stat-val" id="st-erp" style="color:var(--green)">—</span>
-    <span class="stat-lbl" style="margin-left:6px;">fichas</span>
-    <span style="margin:0 5px;color:#333;">|</span>
-    <span class="stat-lbl">R$</span>&nbsp;
-    <span class="stat-val" id="st-erp-val" style="color:#22c55e;font-size:13px;">—</span>
+    <span id="st-erp-val" style="display:none;"></span>
   </div>
 </div>
 
@@ -397,6 +394,7 @@ async function salvarNovo(){
     telefone:tel,
     equipamento:document.getElementById('f-equip').value.trim(),
     valor:parseFloat(document.getElementById('f-valor').value)||0,
+    endereco:document.getElementById('f-end') ? document.getElementById('f-end').value.trim() : '',
     phase:document.getElementById('f-phase').value,
     origem:'manual'
   });
