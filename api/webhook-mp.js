@@ -699,9 +699,14 @@ export default async function handler(req, res) {
   if (action === 'sync-fin-pendentes') {
     try {
       const fin4 = await dbGet(FIN_KEY2);
+      // Verificar todas as fases que podem ter link MP gerado
+      const FASES_COM_LINK = ['faturamento','pagamento_agendado','analise_pagamento',
+                              'nf_emitida','aguardando_dados','pagamento_confirmado'];
       const pendentes4 = (fin4?.records||[]).filter(r =>
         r.mp?.preferenceId &&
-        ['faturamento','pagamento_agendado','analise_pagamento'].includes(r.phaseId)
+        r.phaseId !== 'entrega_liberada' &&
+        r.phaseId !== 'rota_criada' &&
+        r.phaseId !== 'item_coletado'
       );
       if (!pendentes4.length) return res.status(200).json({ ok:true, info:'nenhuma ficha pendente', verificados:0 });
 
@@ -709,10 +714,19 @@ export default async function handler(req, res) {
       for (const ficha of pendentes4) {
         try {
           // Buscar diretamente pelo preference_id (mais eficiente)
-          const urlPref4 = `https://api.mercadopago.com/v1/payments/search?preference_id=${encodeURIComponent(ficha.mp.preferenceId)}&limit=5`;
+          // Busca por preference_id
+          const urlPref4 = `https://api.mercadopago.com/v1/payments/search?preference_id=${encodeURIComponent(ficha.mp.preferenceId)}&limit=10`;
           const rPref4   = await fetch(urlPref4, { headers:{ Authorization:`Bearer ${MP_TOKEN}` } });
           const dPref4   = await rPref4.json();
-          const pgtos4   = (dPref4.results||[]).filter(p => p.status==='approved'||p.status==='in_process');
+          let pgtos4 = (dPref4.results||[]).filter(p => p.status==='approved'||p.status==='in_process');
+
+          // Busca alternativa por external_reference se não encontrou pelo preference_id
+          if (!pgtos4.length && ficha.id) {
+            const urlExt4 = `https://api.mercadopago.com/v1/payments/search?external_reference=${encodeURIComponent(ficha.id)}&limit=5`;
+            const rExt4   = await fetch(urlExt4, { headers:{ Authorization:`Bearer ${MP_TOKEN}` } });
+            const dExt4   = await rExt4.json();
+            pgtos4 = (dExt4.results||[]).filter(p => p.status==='approved'||p.status==='in_process');
+          }
           if (!pgtos4.length) continue;
 
           const pmt4 = pgtos4.sort((a,b)=>new Date(b.date_approved||0)-new Date(a.date_approved||0))[0];
