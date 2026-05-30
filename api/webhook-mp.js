@@ -694,6 +694,49 @@ export default async function handler(req, res) {
     } catch(e) { return res.status(500).json({ ok: false, error: e.message }); }
   }
 
+
+  // ── GET sync-fin-pendentes: verifica pagamentos de fichas pendentes (cron 15min) ──
+  if (action === 'sync-fin-pendentes') {
+    try {
+      const fin4 = await dbGet(FIN_KEY2);
+      const pendentes4 = (fin4?.records||[]).filter(r =>
+        r.mp?.preferenceId &&
+        ['faturamento','pagamento_agendado','analise_pagamento'].includes(r.phaseId)
+      );
+      if (!pendentes4.length) return res.status(200).json({ ok:true, info:'nenhuma ficha pendente', verificados:0 });
+
+      const processados4 = [];
+      for (const ficha of pendentes4) {
+        try {
+          // Buscar diretamente pelo preference_id (mais eficiente)
+          const urlPref4 = `https://api.mercadopago.com/v1/payments/search?preference_id=${encodeURIComponent(ficha.mp.preferenceId)}&limit=5`;
+          const rPref4   = await fetch(urlPref4, { headers:{ Authorization:`Bearer ${MP_TOKEN}` } });
+          const dPref4   = await rPref4.json();
+          const pgtos4   = (dPref4.results||[]).filter(p => p.status==='approved'||p.status==='in_process');
+          if (!pgtos4.length) continue;
+
+          const pmt4 = pgtos4.sort((a,b)=>new Date(b.date_approved||0)-new Date(a.date_approved||0))[0];
+          if (await jaProcessado(String(pmt4.id))) {
+            // Já processado mas fase pode estar errada — corrigir
+            const finFix = await dbGet(FIN_KEY2);
+            const recFix = (finFix?.records||[]).find(r => r.id===ficha.id);
+            if (recFix && recFix.phaseId !== 'entrega_liberada') {
+              recFix.phaseId = 'entrega_liberada';
+              recFix.paidAt  = recFix.paidAt || new Date().toISOString();
+              await dbSet(FIN_KEY2, finFix);
+              processados4.push({ fichaId:ficha.id, paymentId:pmt4.id, info:'fase_corrigida' });
+            }
+            continue;
+          }
+          const result4 = await processarPagamentoFinanceiro(pmt4, ficha.id);
+          if (result4.ok) processados4.push({ fichaId:ficha.id, paymentId:pmt4.id, valor:pmt4.transaction_amount });
+        } catch(e4){ console.error('[sync-fin-pendentes]', ficha.id, e4.message); }
+      }
+
+      return res.status(200).json({ ok:true, verificados:pendentes4.length, processados:processados4.length, fichas:processados4 });
+    } catch(e){ return res.status(500).json({ ok:false, error:e.message }); }
+  }
+
   // ── GET processar-pendentes-fin: busca pagamentos de TODAS fichas faturamento pendentes ──
   // Sem limite de janela de tempo — verifica cada preference_id diretamente no MP
   if (action === "processar-pendentes-fin") {
