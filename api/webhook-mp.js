@@ -639,7 +639,8 @@ export default async function handler(req, res) {
       const agora2   = new Date();
       const inicio7d = new Date(agora2.getTime() - 7*24*60*60*1000).toISOString().replace('Z','-00:00');
       const fim7d    = agora2.toISOString().replace('Z','-00:00');
-      const url7d    = `https://api.mercadopago.com/v1/payments/search?status=approved&sort=date_created&criteria=desc&range=date_created&begin_date=${encodeURIComponent(inicio7d)}&end_date=${encodeURIComponent(fim7d)}&limit=100`;
+      // Buscar approved E in_process (cartões em análise passam por in_process antes de approved)
+      const url7d    = `https://api.mercadopago.com/v1/payments/search?sort=date_created&criteria=desc&range=date_created&begin_date=${encodeURIComponent(inicio7d)}&end_date=${encodeURIComponent(fim7d)}&limit=100`;
       const mpR = await fetch(url7d, { headers:{ Authorization:`Bearer ${MP_TOKEN}` } });
       const mpJ = await mpR.json();
       const pagamentos = mpJ.results || [];
@@ -655,6 +656,7 @@ export default async function handler(req, res) {
         // Tentar encontrar ficha correspondente
         const extRef = pmt.external_reference ? String(pmt.external_reference) : null;
         const ficha2 = fichas.find(f =>
+          (pmt._fichaHint && pmt._fichaHint === f.id) ||
           (f.mp?.preferenceId && f.mp.preferenceId === pmt.preference_id) ||
           (pmt.metadata?.ficha_id && pmt.metadata.ficha_id === f.id) ||
           (pmt.metadata?.fichaId  && pmt.metadata.fichaId  === f.id) ||
