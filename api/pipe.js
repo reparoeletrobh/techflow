@@ -680,7 +680,7 @@ export default async function handler(req, res) {
       var erpLocal    = cards2.filter(function(c){ return c.phase==='erp'; });
       var erpPipefyId = cards2.filter(function(c){ return c.phase==='339008925'; });
       var erpValor    = erpLocal.reduce(function(s,c){return s+(parseFloat(c.valor)||0);},0);
-      return res.status(200).json({
+      var resposta = {
         ok:true,
         totalCards: cards2.length,
         porFase: faseCount,
@@ -689,7 +689,14 @@ export default async function handler(req, res) {
         erpValorTotal: erpValor,
         fasesComIdPipefy: pipefyFases.length,
         exemplos: pipefyFases.slice(0,5).map(function(c){return {id:c.id,nome:c.nomeContato,phase:c.phase};})
-      });
+      };
+      // Opcional: incluir dados dos cards ERP quando ?cards=1
+      if (req.query.cards === '1') {
+        resposta.erpCards = erpLocal.map(function(c){
+          return {id:c.id,nomeContato:c.nomeContato||'',valor:c.valor||0,origem:c.origem||'',descricao:c.descricao||c.equipamento||''};
+        });
+      }
+      return res.status(200).json(resposta);
     } catch(e){return res.status(500).json({ok:false,error:e.message});}
   }
 
