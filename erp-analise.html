@@ -7,180 +7,138 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#080808;color:#e8e8e8;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
-.hd{background:#0f0f0f;border-bottom:1px solid #1e1e1e;padding:16px 24px;display:flex;justify-content:space-between;align-items:center}
+.hd{background:#0f0f0f;border-bottom:1px solid #1e1e1e;padding:16px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
 .hd h1{font-size:17px;font-weight:700}.hd h1 span{color:#f5c800}
-.hd .reload{font-size:11px;padding:6px 14px;border-radius:6px;border:1px solid #333;background:transparent;color:#888;cursor:pointer}
-.hd .reload:hover{border-color:#f5c800;color:#f5c800}
-.wrap{max-width:1100px;margin:0 auto;padding:24px}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px}
-.kpi{background:#0f0f0f;border:1px solid #1e1e1e;border-radius:10px;padding:16px}
-.kpi .l{font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
-.kpi .v{font-size:26px;font-weight:700}
-.kpi .s{font-size:10px;color:#555;margin-top:4px}
-.alert{background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:14px 16px;margin-bottom:20px;font-size:12px;color:#fca5a5;line-height:1.6}
-.intel{background:linear-gradient(135deg,rgba(245,200,0,.04),transparent);border:1px solid rgba(245,200,0,.18);border-radius:10px;padding:20px;margin-bottom:20px}
-.intel .title{font-size:13px;font-weight:700;color:#f5c800;margin-bottom:14px}
-.ins{display:flex;gap:10px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #111;line-height:1.6;font-size:12px;color:#ccc}
-.ins:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
-.ins .ic{font-size:16px;flex-shrink:0}
+.hd button{font-size:11px;padding:6px 14px;border-radius:6px;border:1px solid #333;background:transparent;color:#888;cursor:pointer}
+.hd button:hover{border-color:#f5c800;color:#f5c800}
+.wrap{max-width:1100px;margin:0 auto;padding:20px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px}
+.kpi{background:#0f0f0f;border:1px solid #1e1e1e;border-radius:8px;padding:14px}
+.kpi .l{font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.kpi .v{font-size:24px;font-weight:700}
+.kpi .s{font-size:10px;color:#555;margin-top:3px}
+.box{background:#0f0f0f;border:1px solid #1e1e1e;border-radius:8px;padding:18px;margin-bottom:16px}
+.box h2{font-size:13px;font-weight:700;margin-bottom:12px}
+.gold{background:rgba(245,200,0,.04);border-color:rgba(245,200,0,.2)}
+.gold h2{color:#f5c800}
+.ins{display:flex;gap:10px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #111;font-size:12px;color:#bbb;line-height:1.6}
+.ins:last-child{border:none;margin:0;padding:0}
+.ins .ic{font-size:15px;flex-shrink:0}
 .ins strong{color:#e8e8e8}
-.sec{background:#0f0f0f;border:1px solid #1e1e1e;border-radius:10px;padding:20px;margin-bottom:20px}
-.sec .stitle{font-size:13px;font-weight:700;margin-bottom:14px;display:flex;gap:8px;align-items:center}
-.sec .stitle small{font-size:9px;background:#151515;border:1px solid #222;border-radius:4px;padding:2px 8px;color:#555;font-weight:400}
-.tw{max-height:500px;overflow-y:auto}
-.tw::-webkit-scrollbar{width:4px}.tw::-webkit-scrollbar-thumb{background:#2a2a2a}
-table{width:100%;border-collapse:collapse;font-size:11px;font-family:'Courier New',monospace}
-th{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#555;padding:8px 10px;border-bottom:1px solid #1a1a1a;text-align:left;background:#0f0f0f;position:sticky;top:0}
-td{padding:9px 10px;border-bottom:1px solid #0f0f0f}
-tr:hover td{background:rgba(255,255,255,.015)}
-.vtag{font-size:12px;font-weight:700}
-.vbx{display:flex;align-items:center;gap:8px}
-.bar{height:4px;border-radius:2px;flex:1;background:#111;overflow:hidden}
-.bf{height:4px;border-radius:2px}
-.tb{display:inline-block;font-size:9px;padding:2px 8px;border-radius:4px}
-.dist{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
-.di{background:#151515;border:1px solid #1a1a1a;border-radius:8px;padding:14px;text-align:center}
-.di .dp{font-size:22px;font-weight:700}.di .dl{font-size:9px;color:#555;text-transform:uppercase;margin-top:4px}.di .dv{font-size:10px;color:#888;margin-top:4px}
-#msg{text-align:center;padding:60px 24px;font-size:13px;color:#555}
+.dist{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
+.di{background:#151515;border:1px solid #1a1a1a;border-radius:6px;padding:12px;text-align:center}
+.di .p{font-size:20px;font-weight:700}.di .l2{font-size:9px;color:#555;text-transform:uppercase;margin-top:3px}.di .v2{font-size:10px;color:#777;margin-top:3px}
+.tw{max-height:480px;overflow-y:auto}
+.tw::-webkit-scrollbar{width:3px}.tw::-webkit-scrollbar-thumb{background:#2a2a2a}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{font-size:9px;text-transform:uppercase;color:#444;padding:7px 10px;border-bottom:1px solid #1a1a1a;text-align:left;background:#0f0f0f;position:sticky;top:0}
+td{padding:8px 10px;border-bottom:1px solid #0d0d0d}
+tr:hover td{background:rgba(255,255,255,.012)}
+.bar-row{display:flex;align-items:center;gap:6px}
+.bar{height:3px;flex:1;background:#111;border-radius:2px;overflow:hidden}
+.bf{height:3px;border-radius:2px}
+.tag{display:inline-block;font-size:9px;padding:2px 7px;border-radius:3px}
+#msg{text-align:center;padding:60px;color:#555;font-size:13px}
 </style>
 </head>
 <body>
 <div class="hd">
   <h1>📊 Análise <span>ERP</span> — Reparo Eletro BH</h1>
-  <button class="reload" onclick="carregar()">↺ Atualizar</button>
+  <button onclick="load()">↺ Atualizar</button>
 </div>
 <div class="wrap">
-  <div id="msg">⟳ Carregando fichas ERP...</div>
+  <div id="msg">⟳ Carregando...</div>
   <div id="app" style="display:none"></div>
 </div>
-
 <script>
-const BRL = v => 'R$ '+(+v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
-const N = v => 'R$ '+(+v||0).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0});
+const R=v=>'R$'+(+v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+function cor(v){return !v?'#333':v<200?'#ef4444':v<500?'#f5c800':'#22c55e'}
 
-function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+async function load(){
+  const msg=document.getElementById('msg');
+  const app=document.getElementById('app');
+  msg.textContent='⟳ Carregando...'; msg.style.display='block'; app.style.display='none';
+  try{
+    // Usar diagnostico-erp (endpoint confirmado) com ?cards=1 para incluir dados
+    const res=await fetch('/api/pipe?action=diagnostico-erp&cards=1&_t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    if(!d.ok) throw new Error(d.error||'Erro API');
+    render(d);
+  }catch(e){
+    msg.textContent='❌ '+e.message;
+  }
+}
 
 function tipo(c){
-  const o=(c.origem||'').toLowerCase(),d=(c.descricao||'').toLowerCase();
-  if(o.includes('venda')||d.includes('venda'))return'Venda';
-  if(o.includes('garantia')||o.includes('delivery'))return'Garantia';
-  if(o.includes('loja')||o.includes('cliente_loja'))return'Cliente Loja';
-  if(o.includes('frenteloja')||o.includes('fl'))return'Frente de Loja';
-  if(o.includes('manual'))return'Manual';
+  const o=(c.origem||'').toLowerCase();
+  if(o.includes('venda'))return'Venda';
+  if(o.includes('garantia'))return'Garantia';
+  if(o.includes('loja'))return'Loja';
   return'Reparo';
 }
+function corTipo(t){return{Venda:'#22c55e',Garantia:'#a855f7',Loja:'#3b82f6',Reparo:'#f5c800'}[t]||'#f5c800'}
 
-function corTipo(t){
-  return {Venda:'#22c55e',Garantia:'#a855f7','Cliente Loja':'#3b82f6','Frente de Loja':'#3b82f6',Manual:'#666',Reparo:'#f5c800'}[t]||'#f5c800';
-}
-
-function corVal(v){
-  if(!v||v===0)return'#333';
-  if(v<200)return'#ef4444';
-  if(v<500)return'#f5c800';
-  return'#22c55e';
-}
-
-async function carregar(){
-  document.getElementById('msg').style.display='block';
-  document.getElementById('msg').textContent='⟳ Carregando fichas ERP...';
-  document.getElementById('app').style.display='none';
-  try{
-    const r=await fetch('/api/pipe?action=erp-cards&_t='+Date.now(),{cache:'no-store'});
-    const j=await r.json();
-    if(!j.ok)throw new Error(j.error||'Erro na API');
-    const cards=(j.cards||[]).map(c=>({...c,tipo:tipo(c)})).sort((a,b)=>(a.valor||0)-(b.valor||0));
-    renderizar(cards);
-  }catch(e){
-    document.getElementById('msg').textContent='❌ Erro: '+e.message+' — Tente atualizar.';
-    document.getElementById('msg').style.display='block';
-    document.getElementById('app').style.display='none';
-  }
-}
-
-function renderizar(cards){
-  document.getElementById('msg').style.display='none';
+function render(d){
+  const msg=document.getElementById('msg');
   const app=document.getElementById('app');
-  app.style.display='block';
-
-  const total=cards.length;
-  if(!total){
-    app.innerHTML='<div style="text-align:center;padding:60px;color:#555;font-size:13px">Nenhuma ficha em ERP no momento.</div>';
-    return;
-  }
-  const comVal=cards.filter(c=>(c.valor||0)>0);
-  const soma=comVal.reduce((s,c)=>s+(c.valor||0),0);
+  const total=d.erpLocal||0;
+  const soma=d.erpValorTotal||0;
+  const allCards=(d.erpCards||[]).sort((a,b)=>(a.valor||0)-(b.valor||0));
+  const comVal=allCards.filter(c=>(c.valor||0)>0);
   const semVal=total-comVal.length;
   const ticket=comVal.length?soma/comVal.length:0;
-  const maxVal=Math.max(...cards.map(c=>c.valor||0));
+  const maxVal=Math.max(...allCards.map(c=>c.valor||0),1);
   const faixas={b:comVal.filter(c=>c.valor<200).length,m:comVal.filter(c=>c.valor>=200&&c.valor<500).length,a:comVal.filter(c=>c.valor>=500).length};
+
+  // Distribuição por tipo
   const tipos={};
-  cards.forEach(c=>{tipos[c.tipo]=(tipos[c.tipo]||{n:0,s:0});tipos[c.tipo].n++;tipos[c.tipo].s+=(c.valor||0);});
-  const top=Math.ceil(comVal.length*.2);
-  const somaTop=comVal.slice(-top).reduce((s,c)=>s+(c.valor||0),0);
+  allCards.forEach(c=>{const t=tipo(c);tipos[t]=(tipos[t]||{n:0,s:0});tipos[t].n++;tipos[t].s+=(c.valor||0);});
 
-  const alertHtml=semVal>total*.3?`<div class="alert">⚠️ <strong>${semVal} fichas (${Math.round(semVal/total*100)}%) sem valor cadastrado</strong> — isso reduz o ticket médio calculado. Preencha os valores para análise precisa.</div>`:'';
+  // Insights
+  const tMeta=450;
+  const insights=[
+    ticket<300?{i:'📉',t:`<strong>Ticket médio: ${R(ticket)}</strong> — abaixo de R$300. Mercado BH pratica R$350–500. Revise precificação nos reparos simples.`}:
+    ticket<tMeta?{i:'📊',t:`<strong>Ticket médio: ${R(ticket)}</strong>. Falta ${R(tMeta-ticket)} por ficha para atingir R$${tMeta}. Representa +R$${Math.round((tMeta-ticket)*comVal.length).toLocaleString('pt-BR')} no total.`}:
+    {i:'✅',t:`<strong>Ticket médio saudável: ${R(ticket)}</strong> — dentro da faixa ideal.`},
+    semVal>total*.3?{i:'⚠️',t:`<strong>${semVal} fichas (${Math.round(semVal/total*100)}%) sem valor</strong> — distorce análise. Preencha para diagnóstico preciso.`}:null,
+    Math.round(faixas.b/(comVal.length||1)*100)>35?{i:'🎯',t:`<strong>${Math.round(faixas.b/(comVal.length||1)*100)}% abaixo de R$200</strong>. Implemente valor mínimo de serviço de R$150–180.`}:null,
+    {i:'📐',t:`<strong>Top 20% (${Math.ceil(comVal.length*.2)} fichas) = ${Math.round(comVal.slice(-Math.ceil(comVal.length*.2)).reduce((s,c)=>s+(c.valor||0),0)/soma*100)}% do faturamento.</strong> Priorize reparos de alto valor.`},
+  ].filter(Boolean);
 
-  const insHtml=[
-    ticket<300?{i:'📉',t:`<strong>Ticket médio preocupante: ${BRL(ticket)}</strong> — abaixo de R$300. Mercado BH de eletrodomésticos pratica R$350–500. Revise precificação nos reparos simples.`}:
-    ticket<450?{i:'📊',t:`<strong>Ticket médio: ${BRL(ticket)}</strong> — faixa intermediária. Pequeno ajuste de R${Math.round(450-ticket)} por ficha atingiria R$450, representando +${N((450-ticket)*comVal.length)} no total.`}:
-    {i:'✅',t:`<strong>Ticket médio saudável: ${BRL(ticket)}</strong> — dentro da faixa ideal para assistência técnica especializada.`},
-    Math.round(faixas.b/comVal.length*100)>35?{i:'🎯',t:`<strong>${Math.round(faixas.b/comVal.length*100)}% das fichas abaixo de R$200</strong> — alta concentração em tickets baixos. Implemente valor mínimo de serviço de R$150–180.`}:{i:'✅',t:`Distribuição de faixas equilibrada — ${Math.round(faixas.a/comVal.length*100)}% das fichas acima de R$500.`},
-    {i:'📐',t:`<strong>Princípio de Pareto: os ${top} maiores tickets (${Math.round(top/comVal.length*100)}% das fichas) representam ${Math.round(somaTop/soma*100)}% do faturamento total (${N(somaTop)}).</strong> Priorize captação de reparos de alto valor.`},
-    Object.entries(tipos).sort((a,b)=>b[1].n-a[1].n).slice(0,1).map(([t,v])=>({i:'🔍',t:`<strong>${Math.round(v.n/total*100)}% das fichas ERP são "${t}" (${v.n} fichas, ticket médio ${BRL(v.s/v.n)})</strong>.`}))[0]||null
-  ].filter(Boolean).map(i=>`<div class="ins"><div class="ic">${i.i}</div><div>${i.t}</div></div>`).join('');
-
+  msg.style.display='none'; app.style.display='block';
   app.innerHTML=`
-${alertHtml}
 <div class="kpis">
   <div class="kpi"><div class="l">Total ERP</div><div class="v" style="color:#f5c800">${total}</div></div>
-  <div class="kpi"><div class="l">Ticket Médio</div><div class="v" style="color:${ticket<300?'#ef4444':ticket<450?'#f5c800':'#22c55e'}">${BRL(ticket)}</div><div class="s">fichas com valor</div></div>
-  <div class="kpi"><div class="l">Volume Total</div><div class="v" style="color:#22c55e">${N(soma)}</div></div>
-  <div class="kpi"><div class="l">Maior Ticket</div><div class="v" style="color:#22c55e">${N(maxVal)}</div></div>
-  <div class="kpi"><div class="l">Sem Valor</div><div class="v" style="color:${semVal>5?'#ef4444':'#666'}">${semVal}</div><div class="s">${Math.round(semVal/total*100)}% das fichas</div></div>
-  <div class="kpi"><div class="l">Com Valor</div><div class="v">${comVal.length}</div><div class="s">${Math.round(comVal.length/total*100)}%</div></div>
+  <div class="kpi"><div class="l">Ticket Médio</div><div class="v" style="color:${cor(ticket)}">${R(ticket)}</div><div class="s">fichas com valor</div></div>
+  <div class="kpi"><div class="l">Volume Total</div><div class="v" style="color:#22c55e">${'R$'+(soma||0).toLocaleString('pt-BR',{minimumFractionDigits:0})}</div></div>
+  <div class="kpi"><div class="l">Maior Ticket</div><div class="v" style="color:#22c55e">${'R$'+maxVal.toLocaleString('pt-BR',{minimumFractionDigits:0})}</div></div>
+  <div class="kpi"><div class="l">Sem Valor</div><div class="v" style="color:${semVal>5?'#ef4444':'#666'}">${semVal}</div></div>
+  <div class="kpi"><div class="l">Total Cards</div><div class="v" style="color:#555">${d.totalCards||0}</div><div class="s">no pipe</div></div>
 </div>
-
-<div class="intel">
-  <div class="title">🧠 Inteligência — Análise do Ticket Médio</div>
-  ${insHtml}
+<div class="box gold">
+  <h2>🧠 Inteligência — Análise do Ticket Médio</h2>
+  ${insights.map(i=>`<div class="ins"><div class="ic">${i.i}</div><div>${i.t}</div></div>`).join('')}
 </div>
-
-<div class="sec">
-  <div class="stitle">Distribuição por Tipo <small>${Object.keys(tipos).length} categorias</small></div>
-  <div class="dist">
-    ${Object.entries(tipos).sort((a,b)=>b[1].n-a[1].n).map(([t,v])=>`
-      <div class="di">
-        <div class="dp" style="color:${corTipo(t)}">${Math.round(v.n/total*100)}%</div>
-        <div class="dl">${t}</div>
-        <div class="dv">${v.n} fichas · ${BRL(v.s/v.n)}</div>
-      </div>`).join('')}
-    <div class="di"><div class="dp" style="color:#ef4444">${Math.round(faixas.b/comVal.length*100)}%</div><div class="dl">Abaixo R$200</div><div class="dv">${faixas.b} fichas</div></div>
-    <div class="di"><div class="dp" style="color:#f5c800">${Math.round(faixas.m/comVal.length*100)}%</div><div class="dl">R$200–499</div><div class="dv">${faixas.m} fichas</div></div>
-    <div class="di"><div class="dp" style="color:#22c55e">${Math.round(faixas.a/comVal.length*100)}%</div><div class="dl">R$500+</div><div class="dv">${faixas.a} fichas</div></div>
-  </div>
-</div>
-
-<div class="sec">
-  <div class="stitle">Fichas ERP — Menor ao Maior Valor <small>${total} fichas · ${N(soma)} total</small></div>
-  <div class="tw">
-    <table>
-      <thead><tr><th>#</th><th>Nome</th><th>Tipo</th><th>Valor</th><th>Barra</th></tr></thead>
-      <tbody>
-        ${cards.map((c,i)=>`<tr>
-          <td style="color:#444">${i+1}</td>
-          <td>${esc(c.nomeContato||'—')}</td>
-          <td><span class="tb" style="background:${corTipo(c.tipo)}18;color:${corTipo(c.tipo)}">${c.tipo}</span></td>
-          <td class="vtag" style="color:${corVal(c.valor||0)}">${c.valor>0?BRL(c.valor):'<span style="color:#333">—</span>'}</td>
-          <td style="min-width:120px"><div class="vbx"><div class="bar"><div class="bf" style="width:${maxVal>0?Math.round((c.valor||0)/maxVal*100):0}%;background:${corVal(c.valor||0)}"></div></div><span style="font-size:9px;color:#444">${maxVal>0?Math.round((c.valor||0)/maxVal*100):0}%</span></div></td>
-        </tr>`).join('')}
-      </tbody>
-    </table>
-  </div>
-</div>`;
+${Object.keys(tipos).length?`<div class="box"><h2>Distribuição por Tipo</h2><div class="dist">
+  ${Object.entries(tipos).sort((a,b)=>b[1].n-a[1].n).map(([t,v])=>`<div class="di"><div class="p" style="color:${corTipo(t)}">${Math.round(v.n/total*100)}%</div><div class="l2">${t}</div><div class="v2">${v.n} fichas · ${R(v.s/v.n)}</div></div>`).join('')}
+  <div class="di"><div class="p" style="color:#ef4444">${Math.round(faixas.b/(comVal.length||1)*100)}%</div><div class="l2">&lt;R$200</div><div class="v2">${faixas.b}</div></div>
+  <div class="di"><div class="p" style="color:#f5c800">${Math.round(faixas.m/(comVal.length||1)*100)}%</div><div class="l2">R$200–499</div><div class="v2">${faixas.m}</div></div>
+  <div class="di"><div class="p" style="color:#22c55e">${Math.round(faixas.a/(comVal.length||1)*100)}%</div><div class="l2">R$500+</div><div class="v2">${faixas.a}</div></div>
+</div></div>`:''}
+${allCards.length?`<div class="box"><h2>Fichas ERP — Menor ao Maior Valor <small style="font-size:10px;color:#555;font-weight:400">${total} fichas · R$${Math.round(soma).toLocaleString('pt-BR')}</small></h2>
+<div class="tw"><table>
+<thead><tr><th>#</th><th>Nome</th><th>Tipo</th><th>Valor</th><th style="min-width:100px">Barra</th></tr></thead>
+<tbody>${allCards.map((c,i)=>`<tr>
+<td style="color:#444">${i+1}</td>
+<td>${esc(c.nomeContato||'—')}</td>
+<td><span class="tag" style="background:${corTipo(tipo(c))}18;color:${corTipo(tipo(c))}">${tipo(c)}</span></td>
+<td style="font-weight:700;color:${cor(c.valor||0)}">${c.valor>0?R(c.valor):'<span style="color:#333">—</span>'}</td>
+<td><div class="bar-row"><div class="bar"><div class="bf" style="width:${Math.round((c.valor||0)/maxVal*100)}%;background:${cor(c.valor||0)}"></div></div><span style="font-size:9px;color:#444">${Math.round((c.valor||0)/maxVal*100)}%</span></div></td>
+</tr>`).join('')}</tbody>
+</table></div></div>`:'<div class="box" style="text-align:center;color:#555;padding:40px">Dados individuais não disponíveis — use o Pipe para ver cada ficha.</div>'}`;
 }
-
-carregar();
+load();
 </script>
 </body>
 </html>
