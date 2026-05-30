@@ -349,6 +349,10 @@
     {
       "source": "/api/webhook-mp",
       "destination": "/api/webhook-mp.js"
+    },
+    {
+      "source": "/erp-analise",
+      "destination": "/erp-analise.html"
     }
   ],
   "headers": [

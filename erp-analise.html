@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Análise ERP — Reparo Eletro BH</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#080808;--bg2:#0f0f0f;--bg3:#151515;--border:#1e1e1e;--accent:#f5c800;--green:#22c55e;--red:#ef4444;--blue:#3b82f6;--purple:#a855f7;--text:#e8e8e8;--muted:#666;--fm:'DM Mono',monospace;--fh:'Syne',sans-serif;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:var(--fh);min-height:100vh;}
+  .header{background:var(--bg2);border-bottom:1px solid var(--border);padding:20px 32px;display:flex;justify-content:space-between;align-items:center;}
+  .header h1{font-size:20px;font-weight:800;color:var(--text);}
+  .header h1 span{color:var(--accent);}
+  .header .sub{font-family:var(--fm);font-size:11px;color:var(--muted);margin-top:4px;}
+  .container{max-width:1200px;margin:0 auto;padding:32px;}
+  .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:32px;}
+  .kpi{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;transition:.2s;}
+  .kpi:hover{border-color:#333;}
+  .kpi .label{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;}
+  .kpi .value{font-size:28px;font-weight:800;line-height:1;}
+  .kpi .sub{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:6px;}
+  .section{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:24px;}
+  .section-title{font-size:14px;font-weight:800;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+  .section-title .badge{font-family:var(--fm);font-size:9px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:var(--muted);}
+  table{width:100%;border-collapse:collapse;font-family:var(--fm);font-size:11px;}
+  th{color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.06em;padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;position:sticky;top:0;background:var(--bg2);z-index:1;}
+  td{padding:10px 12px;border-bottom:1px solid #111;vertical-align:middle;}
+  tr:hover td{background:rgba(255,255,255,.02);}
+  .rank{font-size:9px;color:var(--muted);}
+  .nome{font-weight:500;color:var(--text);}
+  .valor{font-size:13px;font-weight:700;}
+  .valor.baixo{color:var(--red);}
+  .valor.medio{color:var(--accent);}
+  .valor.alto{color:var(--green);}
+  .tipo-badge{display:inline-block;font-size:9px;padding:2px 8px;border-radius:4px;font-weight:500;}
+  .tipo-venda{background:rgba(34,197,94,.1);color:var(--green);}
+  .tipo-loja{background:rgba(59,130,246,.1);color:var(--blue);}
+  .tipo-delivery{background:rgba(168,85,247,.1);color:var(--purple);}
+  .tipo-reparo{background:rgba(245,200,0,.1);color:var(--accent);}
+  .tipo-garantia{background:rgba(239,68,68,.1);color:var(--red);}
+  .tipo-outros{background:rgba(102,102,102,.1);color:var(--muted);}
+  .bar-wrap{width:100%;background:#111;border-radius:3px;height:4px;overflow:hidden;}
+  .bar-fill{height:4px;border-radius:3px;background:var(--accent);}
+  .inteligencia{background:linear-gradient(135deg,rgba(245,200,0,.05),rgba(245,200,0,.01));border:1px solid rgba(245,200,0,.2);border-radius:12px;padding:24px;margin-bottom:24px;}
+  .inteligencia .title{font-size:14px;font-weight:800;color:var(--accent);margin-bottom:16px;}
+  .insight{display:flex;gap:12px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #1a1a1a;}
+  .insight:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0;}
+  .insight .icon{font-size:18px;flex-shrink:0;margin-top:2px;}
+  .insight .text{font-size:12px;line-height:1.6;color:#ccc;}
+  .insight .text strong{color:var(--text);}
+  .dist-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;}
+  .dist-item{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center;}
+  .dist-item .pct{font-size:22px;font-weight:800;margin-bottom:4px;}
+  .dist-item .dlabel{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;}
+  .dist-item .dval{font-family:var(--fm);font-size:10px;color:var(--text);margin-top:4px;}
+  .loading{text-align:center;padding:80px;color:var(--muted);font-family:var(--fm);font-size:12px;}
+  .table-wrap{max-height:520px;overflow-y:auto;}
+  .table-wrap::-webkit-scrollbar{width:4px;}
+  .table-wrap::-webkit-scrollbar-thumb{background:#333;border-radius:2px;}
+  .ticket-bar{display:flex;align-items:center;gap:8px;}
+  .semana-label{font-size:9px;color:var(--muted);}
+  .alert-box{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:16px;display:flex;gap:12px;align-items:flex-start;margin-bottom:24px;}
+  .alert-box .icon{font-size:20px;}
+  .alert-box .text{font-size:12px;color:#fca5a5;line-height:1.6;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>📊 Análise <span>ERP</span> — Ticket Médio</h1>
+    <div class="sub" id="sub-header">Carregando dados do Redis...</div>
+  </div>
+  <div style="font-family:var(--fm);font-size:10px;color:var(--muted);">Reparo Eletro BH</div>
+</div>
+
+<div class="container">
+  <div id="root"><div class="loading">⟳ Buscando fichas ERP no Redis...</div></div>
+</div>
+
+<script>
+async function init() {
+  const root = document.getElementById('root');
+  try {
+    const res = await fetch('/api/pipe?action=erp-cards&_t='+Date.now());
+    const d   = await res.json();
+    if (!d.ok || !d.cards) { root.innerHTML = '<div class="loading">❌ Erro ao buscar dados</div>'; return; }
+
+    const cards = d.cards
+      .map(c => ({
+        id:     c.id,
+        nome:   c.nomeContato || c.title || '—',
+        valor:  parseFloat(c.valor) || 0,
+        origem: detectarOrigem(c),
+        movedAt: c.movedAt || c.criadoEm || '',
+      }))
+      .sort((a,b) => a.valor - b.valor);
+
+    const total        = cards.length;
+    const soma         = cards.reduce((s,c) => s+c.valor, 0);
+    const ticket       = soma / total;
+    const semValor     = cards.filter(c => c.valor === 0).length;
+    const comValor     = cards.filter(c => c.valor > 0);
+    const ticketComVal = comValor.reduce((s,c)=>s+c.valor,0) / (comValor.length||1);
+    const maxVal       = Math.max(...cards.map(c=>c.valor));
+    const minValNZ     = Math.min(...cards.filter(c=>c.valor>0).map(c=>c.valor));
+
+    // Distribuição por tipo
+    const tipos = {};
+    cards.forEach(c => { tipos[c.origem] = (tipos[c.origem]||{count:0,soma:0}); tipos[c.origem].count++; tipos[c.origem].soma+=c.valor; });
+
+    // Ticket por tipo
+    const faixas = {baixo:cards.filter(c=>c.valor>0&&c.valor<200).length, medio:cards.filter(c=>c.valor>=200&&c.valor<500).length, alto:cards.filter(c=>c.valor>=500).length};
+
+    document.getElementById('sub-header').textContent = `${total} fichas em ERP · Atualizado agora`;
+
+    // Alert se muitos sem valor
+    const alertHtml = semValor > total*0.3 ? `
+      <div class="alert-box">
+        <div class="icon">⚠️</div>
+        <div class="text"><strong>${semValor} fichas (${Math.round(semValor/total*100)}%) não têm valor cadastrado.</strong> Isso está distorcendo o ticket médio real para baixo. Preencha o campo valor nas fichas para uma análise precisa.</div>
+      </div>` : '';
+
+    // Insights de inteligência
+    const insights = gerarInsights(cards, ticket, ticketComVal, semValor, total, tipos, faixas, soma);
+
+    root.innerHTML = `
+      ${alertHtml}
+
+      <!-- KPIs -->
+      <div class="kpi-row">
+        <div class="kpi"><div class="label">Total fichas ERP</div><div class="value" style="color:var(--accent)">${total}</div></div>
+        <div class="kpi"><div class="label">Ticket Médio Geral</div><div class="value" style="color:${ticket<300?'var(--red)':ticket<500?'var(--accent)':'var(--green)'}">${fmt(ticket)}</div><div class="sub">Inclui fichas sem valor</div></div>
+        <div class="kpi"><div class="label">Ticket Médio Real</div><div class="value" style="color:${ticketComVal<300?'var(--red)':ticketComVal<500?'var(--accent)':'var(--green)'}">${fmt(ticketComVal)}</div><div class="sub">Só fichas com valor</div></div>
+        <div class="kpi"><div class="label">Volume Total</div><div class="value" style="color:var(--green)">${fmtBRL(soma)}</div></div>
+        <div class="kpi"><div class="label">Maior Ticket</div><div class="value" style="color:var(--green)">${fmt(maxVal)}</div></div>
+        <div class="kpi"><div class="label">Sem Valor</div><div class="value" style="color:var(--red)">${semValor}</div><div class="sub">${Math.round(semValor/total*100)}% das fichas</div></div>
+      </div>
+
+      <!-- Inteligência -->
+      <div class="inteligencia">
+        <div class="title">🧠 Inteligência — Análise do Ticket Médio</div>
+        ${insights.map(i => `<div class="insight"><div class="icon">${i.icon}</div><div class="text">${i.text}</div></div>`).join('')}
+      </div>
+
+      <!-- Distribuição por tipo -->
+      <div class="section">
+        <div class="section-title">Distribuição por Tipo de Transação</div>
+        <div class="dist-grid">
+          ${Object.entries(tipos).sort((a,b)=>b[1].count-a[1].count).map(([tipo,v])=>`
+            <div class="dist-item">
+              <div class="pct" style="color:${corTipo(tipo)}">${Math.round(v.count/total*100)}%</div>
+              <div class="dlabel">${tipo}</div>
+              <div class="dval">${v.count} fichas · ${fmt(v.soma/v.count)}</div>
+            </div>`).join('')}
+          <div class="dist-item">
+            <div class="pct" style="color:var(--red)">${Math.round(faixas.baixo/(comValor.length||1)*100)}%</div>
+            <div class="dlabel">Tickets &lt; R$200</div>
+            <div class="dval">${faixas.baixo} fichas</div>
+          </div>
+          <div class="dist-item">
+            <div class="pct" style="color:var(--accent)">${Math.round(faixas.medio/(comValor.length||1)*100)}%</div>
+            <div class="dlabel">R$200 – R$499</div>
+            <div class="dval">${faixas.medio} fichas</div>
+          </div>
+          <div class="dist-item">
+            <div class="pct" style="color:var(--green)">${Math.round(faixas.alto/(comValor.length||1)*100)}%</div>
+            <div class="dlabel">Tickets ≥ R$500</div>
+            <div class="dval">${faixas.alto} fichas</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabela -->
+      <div class="section">
+        <div class="section-title">Fichas ERP — Menor ao Maior Valor <span class="badge">${total} fichas · Total ${fmtBRL(soma)}</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>#</th><th>Nome</th><th>Tipo</th><th>Valor</th><th>% do máx</th>
+            </tr></thead>
+            <tbody>
+              ${cards.map((c,i)=>`
+                <tr>
+                  <td class="rank">${i+1}</td>
+                  <td class="nome">${esc(c.nome)}</td>
+                  <td><span class="tipo-badge tipo-${c.origem.toLowerCase().replace(/\s/g,'-')}">${c.origem}</span></td>
+                  <td class="valor ${c.valor===0?'':c.valor<200?'baixo':c.valor<500?'medio':'alto'}">${c.valor===0?'<span style="color:var(--muted)">Sem valor</span>':fmtBRL(c.valor)}</td>
+                  <td>
+                    <div class="ticket-bar">
+                      <div class="bar-wrap" style="flex:1"><div class="bar-fill" style="width:${maxVal>0?Math.round(c.valor/maxVal*100):0}%;background:${c.valor===0?'#222':c.valor<200?'var(--red)':c.valor<500?'var(--accent)':'var(--green)'}"></div></div>
+                      <span class="semana-label">${maxVal>0?Math.round(c.valor/maxVal*100):'0'}%</span>
+                    </div>
+                  </td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } catch(e) {
+    root.innerHTML = `<div class="loading">❌ ${e.message}</div>`;
+  }
+}
+
+function detectarOrigem(c) {
+  const o = (c.origem||'').toLowerCase();
+  const d = (c.descricao||'').toLowerCase();
+  const n = (c.nomeContato||'').toLowerCase();
+  if (o.includes('venda') || d.includes('venda')) return 'Venda';
+  if (o.includes('garantia') || o.includes('delivery')) return 'Garantia';
+  if (o.includes('loja') || o.includes('cliente_loja')) return 'Cliente Loja';
+  if (o.includes('frenteloja') || o.includes('fl')) return 'Frente de Loja';
+  if (o.includes('manual')) return 'Manual';
+  return 'Reparo';
+}
+
+function gerarInsights(cards, ticket, ticketReal, semValor, total, tipos, faixas, soma) {
+  const insights = [];
+  const comValor = cards.filter(c=>c.valor>0);
+
+  // Ticket médio
+  if (ticketReal < 300) {
+    insights.push({icon:'📉', text:`<strong>Ticket médio preocupante: ${fmt(ticketReal)}.</strong> Está abaixo de R$300, o que indica predominância de reparos simples ou precificação abaixo do mercado. Reparos de eletrodomésticos em BH têm ticket médio de mercado entre R$350–R$500.`});
+  } else if (ticketReal < 500) {
+    insights.push({icon:'📊', text:`<strong>Ticket médio: ${fmt(ticketReal)}.</strong> Na faixa intermediária. Com ajustes de precificação nos serviços mais simples, é possível elevar para R$450–R$500.`});
+  }
+
+  // Fichas sem valor
+  if (semValor > 5) {
+    insights.push({icon:'⚠️', text:`<strong>${semValor} fichas sem valor cadastrado distorcem a análise.</strong> Se essas fichas tiverem valor médio similar às demais, o ticket real pode ser ${fmt(ticketReal * 1.15)} a ${fmt(ticketReal * 1.3)} — significativamente maior.`});
+  }
+
+  // Concentração nos menores valores
+  const pctBaixo = Math.round(faixas.baixo/(comValor.length||1)*100);
+  if (pctBaixo > 40) {
+    insights.push({icon:'🎯', text:`<strong>${pctBaixo}% das fichas têm valor abaixo de R$200.</strong> Alta concentração em tickets baixos. Estratégia: diferenciar preço por complexidade do reparo e negociar um valor mínimo de serviço de R$150–R$180 para cobrir custo operacional.`});
+  }
+
+  // Distribuição por tipo
+  const tipoEntries = Object.entries(tipos).sort((a,b)=>b[1].count-a[1].count);
+  if (tipoEntries.length > 0) {
+    const topTipo = tipoEntries[0];
+    const topPct  = Math.round(topTipo[1].count/total*100);
+    insights.push({icon:'🔍', text:`<strong>${topPct}% das fichas ERP são do tipo "${topTipo[0]}" (${topTipo[1].count} fichas, ticket médio ${fmt(topTipo[1].soma/topTipo[1].count)}).</strong> ${topPct > 60 ? 'Alta concentração em um único tipo. Diversificar canais pode aumentar o volume sem comprometer o ticket.' : 'Distribuição saudável entre canais.'}`});
+  }
+
+  // Recomendação ticket médio
+  const metaTicket = 450;
+  const gapTicket  = metaTicket - ticketReal;
+  if (gapTicket > 0) {
+    const faturamentoExtra = gapTicket * comValor.length;
+    insights.push({icon:'💡', text:`<strong>Para chegar a R$${metaTicket} de ticket médio:</strong> aumento de apenas ${fmt(gapTicket)} por ficha. Com ${comValor.length} fichas com valor, isso representaria mais <strong>${fmtBRL(faturamentoExtra)}</strong> de faturamento total neste ciclo.`});
+  }
+
+  // Pareto — top 20%
+  const top20 = Math.ceil(comValor.length * 0.2);
+  const somaTop20 = comValor.slice(-top20).reduce((s,c)=>s+c.valor,0);
+  const pctSomaTop20 = Math.round(somaTop20/soma*100);
+  insights.push({icon:'📐', text:`<strong>Princípio de Pareto: os ${top20} maiores tickets (${Math.round(top20/comValor.length*100)}% das fichas) representam ${pctSomaTop20}% do faturamento total (${fmtBRL(somaTop20)}).</strong> Focar em trazer mais reparos de alto valor é mais eficiente do que aumentar volume.`});
+
+  return insights;
+}
+
+function fmt(v) { return 'R$ ' + (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtBRL(v) { return 'R$ ' + (v||0).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0}); }
+function esc(s) { return (s||'').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function corTipo(t) {
+  const m = {Venda:'var(--green)',Garantia:'var(--purple)',Manual:'var(--muted)',Reparo:'var(--accent)','Frente de Loja':'var(--blue)','Cliente Loja':'var(--blue)'};
+  return m[t] || 'var(--accent)';
+}
+
+init();
+</script>
+</body>
+</html>
