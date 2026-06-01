@@ -442,6 +442,16 @@ module.exports = async function handler(req, res) {
     if (equipamento) ficha.equipamento = equipamento;
     if (defeito)    ficha.defeito = defeito;
     await dbSet(LOG_KEY, db);
+    // Trigger: tv_pipe → aguardando_aprovacao
+    await moverNoTvPipe('aguardando_aprovacao', {
+      localId: ficha.id||null, pipefyId: ficha.pipefyCardId||null,
+      nome: ficha.nome||ficha.nomeContato||'',
+      telefone: ficha.telefone||'',
+      equipamento: ficha.equipamento||ficha.aparelho||'',
+      descricao: ficha.defeito||ficha.descricao||'',
+      endereco: ficha.endereco||'', valor: ficha.valor||0,
+      origem: 'tv_logistica_orcamento'
+    });
     return res.status(200).json({ ok: true, ficha });
   }
 
