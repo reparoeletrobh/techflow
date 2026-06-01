@@ -147,7 +147,7 @@ function card(c){
     '<div class="bc-row"><span class="bc-lbl">Entrada</span><span class="bc-val">'+fmt(c.entradaEm)+'</span></div>'+
     (p?'<div class="bc-row"><span class="bc-lbl">Pago em</span><span class="bc-val" style="color:var(--green)">'+fmt(c.pagoEm)+'</span></div>':'')+
     '</div><div class="bc-foot">'+
-    (!p?'<button class="btn-pagar" data-pid="'+c.pipefyId+'" onclick="pagar(this.dataset.pid)">Confirmar Pagamento</button>':
+    (!p?'<button class="btn-pagar" id="btn-'+c.pipefyId+'" data-pid="'+c.pipefyId+'" onclick="pagar(this.dataset.pid)">Confirmar Pagamento</button>':
     '<span class="pago-label">Ficha enviada para ERP</span>')+
     (_48h ? _waBtn : '')+
     '</div></div>';
