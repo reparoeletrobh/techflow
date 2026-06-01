@@ -824,37 +824,35 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  // ── GET sem-resposta — cards em Aguardando Aprovação há mais de 48h
+  // ── GET sem-resposta — cards em aguardando_aprovacao +48h (Redis local)
   if (action === "sem-resposta") {
     try {
-      const data = await pipefyQuery(`query {
-        phase(id: "${AGUARDANDO_APROVACAO_PHASE_ID}") {
-          cards(first: 50) {
-            edges {
-              node {
-                id title
-                fields { name value }
-                phases_history { phase { id } firstTimeIn }
-              }
-            }
-          }
-        }
-      }`);
-      const agora = Date.now();
-      const QUARENTA_OITO_H_MS = 48 * 60 * 60 * 1000;
-      const cards = (data?.phase?.cards?.edges || []).map(({node}) => {
-        const fields = node.fields || [];
-        const nome = fields.find(f=>f.name.toLowerCase().includes("nome"))?.value || node.title;
-        const tel  = fields.find(f=>f.name.toLowerCase().includes("telefone")||f.name.toLowerCase().includes("fone"))?.value || "";
-        const desc = fields.find(f=>f.name.toLowerCase().includes("descri"))?.value || "";
-        // Usa phases_history para pegar exatamente quando entrou em Aguardando Aprovação
-        const hist = (node.phases_history || []).find(h => h.phase?.id === String(AGUARDANDO_APROVACAO_PHASE_ID));
-        const entradaFaseMs = hist?.firstTimeIn ? new Date(hist.firstTimeIn).getTime() : 0;
-        const diffMs = entradaFaseMs ? (agora - entradaFaseMs) : 0;
-        const ageDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-        return { pipefyId: String(node.id), title: node.title, nome, tel, desc, age: ageDias };
-      }).filter(c => c.age >= 2); // 2+ dias na fase Aguardando Aprovação
-      return res.status(200).json({ ok: true, cards });
+      const _uo2=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+      const _to2=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+      async function _pga2(k){const r=await fetch(_uo2+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_to2,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();const v=j[0]?.result;if(!v)return null;try{let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+      const pipeS = await _pga2('reparoeletro_pipe');
+      const agora2 = Date.now();
+      const MS48 = 48 * 60 * 60 * 1000;
+      const cards = ((pipeS&&pipeS.cards)||[])
+        .filter(function(c){ return c.phase === 'aguardando_aprovacao'; })
+        .map(function(c){
+          var desde = c.aguardandoDesde || c.movedAt || c.criadoEm || null;
+          var desdeMs = desde ? new Date(desde).getTime() : 0;
+          var diffMs = desdeMs ? (agora2 - desdeMs) : 0;
+          var ageDias = Math.floor(diffMs / (1000*60*60*24));
+          return {
+            pipefyId: c.pipefyId || c.id,
+            localId:  c.id,
+            title: c.nomeContato || '',
+            nome:  c.nomeContato || '',
+            tel:   c.telefone || '',
+            desc:  c.descricao || c.equipamento || '',
+            age:   ageDias
+          };
+        })
+        .filter(function(c){ return c.age >= 2; })
+        .sort(function(a,b){ return b.age - a.age; });
+      return res.status(200).json({ ok: true, cards, fonte: 'redis_local' });
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });
     }
@@ -913,6 +911,28 @@ module.exports = async function handler(req, res) {
           card { id due_date }
         }
       }`);
+
+      // Mover também no Pipe ADM local (reparoeletro_pipe)
+      try {
+        const _uo=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+        const _to=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+        async function _pga(k){const r=await fetch(_uo+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_to,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();const v=j[0]?.result;if(!v)return null;try{let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+        async function _psa(k,v){await fetch(_uo+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_to,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+        const pipeA = await _pga('reparoeletro_pipe');
+        if (pipeA && Array.isArray(pipeA.cards)) {
+          const nowA = new Date().toISOString();
+          const cardA = pipeA.cards.find(function(c){
+            return c.pipefyId === String(pipefyId) || c.id === String(pipefyId);
+          });
+          if (cardA) {
+            cardA.history = (cardA.history||[]).concat([{phase:cardA.phase, ts:nowA}]);
+            cardA.phase   = 'ultima_chamada';
+            cardA.movedAt = nowA;
+            pipeA.lastSync = nowA;
+            await _psa('reparoeletro_pipe', pipeA);
+          }
+        }
+      } catch(ea){ console.error('[alertar→pipe]', ea.message); }
 
       return res.status(200).json({ ok: true, pipefyId, phaseId, dataLimite });
     } catch(e) {
