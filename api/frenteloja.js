@@ -485,6 +485,43 @@ export default async function handler(req,res){
   }
 
 
+
+  // ── GET fix-board-por-nome — busca ficha por nome e força no board ───────
+  if (action === 'fix-board-por-nome') {
+    const busca = (req.query.nome || '').toLowerCase().trim();
+    if (!busca) return res.status(400).json({ ok:false, error:'Informe ?nome=...' });
+    const db = await dbGet(FL_KEY) || defaultDB();
+    const fichas = (db.fichas || []).filter(f =>
+      (f.nomeContato||'').toLowerCase().includes(busca) ||
+      (f.telefone||'').includes(busca)
+    );
+    if (!fichas.length) return res.status(404).json({ ok:false, error:'Nenhuma ficha encontrada', busca });
+
+    const resultados = [];
+    for (const ficha of fichas) {
+      const titulo = (ficha.nomeContato + ' (Loja) - ' + (ficha.equipamento||'') +
+        ' | ' + (ficha.descricao||'') +
+        ' | Diag: ' + (ficha.descricaoTecnica||'') +
+        ' | R$' + String(parseFloat(ficha.orcamento?.valor||0).toFixed(2)) +
+        ' OS:' + ficha.id
+      ).replace(/"/g,"'").slice(0,255);
+      const r = await fetch((process.env.FL_BASE_URL||'https://reparoeletroadm.com')+'/api/board?action=add-loja-card', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          flFichaId:   ficha.id,
+          pipefyId:    ficha.pipefyCardId || null,
+          title:       titulo,
+          nomeContato: ficha.nomeContato||'',
+          telefone:    ficha.telefone||'',
+          phaseId:     'cliente_loja',
+        })
+      }).then(r=>r.json()).catch(e=>({ok:false,error:e.message}));
+      resultados.push({ id: ficha.id, nome: ficha.nomeContato, telefone: ficha.telefone, phase: ficha.phase, board: r });
+    }
+    return res.status(200).json({ ok:true, encontradas: fichas.length, resultados });
+  }
+
   // ── POST retentar-board — registra no board fichas que ficaram sem card ──
   if (req.method === 'POST' && action === 'retentar-board') {
     const { id } = req.body || {};
