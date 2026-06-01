@@ -1188,6 +1188,31 @@ export default async function handler(req, res) {
     } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
   }
 
+
+  // ── GET forcar-ultima-chamada: força cards específicos para ultima_chamada ──
+  if (action === 'forcar-ultima-chamada') {
+    var idsParam = (req.query.ids || '').split(',').map(function(x){return x.trim();}).filter(Boolean);
+    var buscaParam = (req.query.busca||'').toLowerCase();
+    if (!idsParam.length && !buscaParam) return res.status(400).json({ok:false,error:'ids ou busca obrigatorio'});
+    try {
+      var pip6 = await dbGet(PIPE_KEY) || {cards:[]};
+      var ts6  = now;
+      var movidos6 = [];
+      (pip6.cards||[]).forEach(function(card){
+        var matchId    = idsParam.length && (idsParam.includes(card.id) || idsParam.includes(card.pipefyId));
+        var matchBusca = buscaParam && JSON.stringify(card).toLowerCase().includes(buscaParam);
+        if (!matchId && !matchBusca) return;
+        if (card.phase === 'ultima_chamada') { movidos6.push({id:card.id,nome:card.nomeContato,info:'ja em ultima_chamada'}); return; }
+        card.history = (card.history||[]).concat([{phase:card.phase,ts:ts6}]);
+        card.phase   = 'ultima_chamada';
+        card.movedAt = ts6;
+        movidos6.push({id:card.id,nome:card.nomeContato,de:card.history.slice(-1)[0]?.phase,para:'ultima_chamada'});
+      });
+      if (movidos6.some(function(m){return m.para==='ultima_chamada';})) await dbSet(PIPE_KEY, pip6);
+      return res.status(200).json({ok:true, movidos:movidos6.length, fichas:movidos6});
+    } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
