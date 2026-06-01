@@ -126,7 +126,6 @@ async function registrarNoPipe(dados) {
 }
 
 // api/frenteloja.js — Sistema Frente de Loja
-const PIPEFY_API = 'https://api.pipefy.com/graphql';
 const PIPE_ID    = '305832912';
 const FL_KEY     = 'reparoeletro_frenteloja';
 const BALCAO_KEY = 'reparoeletro_balcao';
@@ -161,12 +160,8 @@ async function getPipefyPhaseId(keyword){
   return ph?.id||null;
 }
 
-async function createPipefyCard(fields, phaseId){
-  const fieldsArg=fields.map(f=>'{field_id:"'+f.id+'",field_value:"'+String(f.value).replace(/"/g,'\\"')+'"}').join(',');
-  const phaseArg=phaseId?'phase_id:"'+phaseId+'",' :'';
-  const q='mutation{createCard(input:{pipe_id:"'+PIPE_ID+'",'+phaseArg+'fields_attributes:['+fieldsArg+']}){card{id}}}';
-  const d=await pipefyQ(q);
-  return d?.createCard?.card?.id||null;
+async function createPipefyCard() {
+  return null; // Pipefy desconectado
 }
 
 async function movePipefyCard(cardId, phaseId){

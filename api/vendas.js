@@ -19,17 +19,10 @@ const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g, "").tri
 const VENDAS_KEY    = "reparoeletro_vendas";
 const FIN_KEY       = "reparoeletro_financeiro";
 const PIPE_ID       = "305832912";
-const PIPEFY_API    = "https://api.pipefy.com/graphql";
 
-async function pipefyQuery(query) {
-  const r = await fetch(PIPEFY_API, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: "Bearer " + (process.env.PIPEFY_TOKEN||"").trim() },
-    body: JSON.stringify({ query }),
-  });
-  const j = await r.json();
-  if (j.errors) throw new Error(j.errors[0].message);
-  return j.data;
+async function pipefyQuery() {
+  // Pipefy desconectado em 01/06/2026 — ADM opera 100% local (Redis)
+  return null;
 }
 
 async function getProntoParaVendaPhaseId() {
@@ -50,20 +43,7 @@ async function getReceberPhaseId() {
   return phase?.id || null;
 }
 
-async function criarCardPipefy(phaseId, produto, nomeCliente, telefone) {
-  try {
-    const titulo = (produto.tipo ? produto.tipo + " — " : "") + (produto.codigo || produto.descricao.substring(0,40));
-    const descCompleta = produto.descricao + (produto.capacidade ? " — " + produto.capacidade : "");
-    const precoFmt = parseFloat(produto.preco).toLocaleString("pt-BR",{minimumFractionDigits:2,style:"currency",currency:"BRL"});
-    const data = await pipefyQuery(
-      "mutation { createCard(input: { pipe_id: \"" + PIPE_ID + "\" phase_id: \"" + phaseId + "\" title: \"" + titulo.replace(/"/g,"'") + "\" fields_attributes: [ { field_id: \"nome_do_contato\" field_value: \"" + nomeCliente.replace(/"/g,"'") + "\" }, { field_id: \"telefone\" field_value: \"" + (telefone||"").replace(/"/g,"'") + "\" }, { field_id: \"descri_o\" field_value: \"" + descCompleta.replace(/"/g,"'") + " | Valor: " + precoFmt + "\" } ] }) { card { id title } } }"
-    );
-    return data?.createCard?.card?.id || null;
-  } catch(e) {
-    console.error("Pipefy createCard:", e.message);
-    return null;
-  }
-}
+async function criarCardPipefy() { return null; }
 
 async function dbGet(key) {
   try {

@@ -210,25 +210,14 @@ function sanitizePipefy(s) {
 }
 
 async function criarCardPipefyVenda(pipeId, produto, comprador, valor, paymentId) {
-  const PIPEFY_API = 'https://api.pipefy.com/graphql';
-  const token = (process.env.PIPEFY_TOKEN || '').trim();
+    const token = (process.env.PIPEFY_TOKEN || '').trim();
   if (!token || !pipeId) return null;
 
   async function pipefyQ(query) {
     const controller = new AbortController();
     const tid = setTimeout(() => controller.abort(), 10000);
     try {
-      const r = await fetch(PIPEFY_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({ query }),
-        signal: controller.signal
-      });
-      const j = await r.json();
-      clearTimeout(tid);
-      if (j.errors) throw new Error(j.errors[0].message);
-      return j.data;
-    } catch(e) { clearTimeout(tid); throw e; }
+          } catch(e) { clearTimeout(tid); throw e; }
   }
 
   // Buscar estrutura do pipe — fases + campos do formulário inicial

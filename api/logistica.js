@@ -120,20 +120,12 @@ async function registrarPassagem(phase) {
 
 // ── PIPEFY: criar card direto em Aguardando Aprovação ────────
 // Padrão idêntico ao api/orcamento.js → createPipefyCard
-const PIPEFY_API          = 'https://api.pipefy.com/graphql';
 const PIPE_ID             = '305832912';
 const AGUARDANDO_PHASE_ID = '334875152';
 
-async function pipefyQuery(query) {
-  const token = (process.env.PIPEFY_TOKEN || '').trim();
-  const r = await fetch(PIPEFY_API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ query })
-  });
-  const j = await r.json();
-  if (j.errors) throw new Error(j.errors[0].message);
-  return j.data;
+async function pipefyQuery() {
+  // Pipefy desconectado em 01/06/2026 — ADM opera 100% local (Redis)
+  return null;
 }
 
 // Busca APENAS start_form_fields — mesma lógica do orcamento.js
@@ -153,66 +145,7 @@ async function fetchPipeStructure() {
   return _pipeStructure;
 }
 
-async function criarCardPipefy({ nome, telefone, equipamento, defeito, endereco }) {
-  const descricao   = `${equipamento || ''} — ${defeito || ''}`.replace(/^ — | — $/g,'').trim();
-  const ultimos4    = (telefone || '').replace(/\D/g, '').slice(-4);
-  const nomeContato = `${nome} ${ultimos4}`.trim();
-
-  const { fields } = await fetchPipeStructure();
-
-  function findField(keywords) {
-    return fields.find(f => keywords.some(kw => f.label.toLowerCase().includes(kw)));
-  }
-
-  const nomeField = findField(['nome']);
-  const telField  = findField(['telefone', 'fone', 'celular']);
-  const descField = findField(['descrição', 'descricao', 'empresa', 'descri']);
-  const endField  = findField(['endereço', 'endereco', 'endere']);
-
-  // Formata telefone — idêntico ao orcamento.js
-  function formatarTelefone(tel) {
-    const digits = (tel || '').replace(/\D/g, '');
-    var d = (digits.length === 13 && digits.startsWith('55')) ? digits.slice(2)
-          : (digits.length === 12 && digits.startsWith('55')) ? digits.slice(2)
-          : digits;
-    if (d.length === 10) d = d.slice(0,2) + '9' + d.slice(2);
-    if (d.length === 9 && d[0] !== '9') d = '9' + d;  // caso 9 dígitos sem DDD
-    if (d.length === 11) return '(' + d.slice(0,2) + ')' + d[2] + ' ' + d.slice(3,7) + '-' + d.slice(7);
-    return tel;
-  }
-  const telefoneFmt = formatarTelefone(telefone || '');
-  console.log('[Log] telefone original:', telefone, 'formatado:', telefoneFmt);
-
-  const fieldsAttr = [];
-  if (nomeField) fieldsAttr.push(`{ field_id: "${nomeField.id}", field_value: ${JSON.stringify(nomeContato)} }`);
-  if (telField)  fieldsAttr.push(`{ field_id: "${telField.id}",  field_value: ${JSON.stringify(telefoneFmt)} }`);
-  if (descField) fieldsAttr.push(`{ field_id: "${descField.id}", field_value: ${JSON.stringify(descricao)} }`);
-  if (endField && endereco) fieldsAttr.push(`{ field_id: "${endField.id}", field_value: ${JSON.stringify(endereco)} }`);
-
-  let card = null;
-  try {
-    const data = await pipefyQuery(`mutation {
-      createCard(input: {
-        pipe_id: "${PIPE_ID}"
-        phase_id: "${AGUARDANDO_PHASE_ID}"
-        fields_attributes: [${fieldsAttr.join(', ')}]
-      }) { card { id title url } }
-    }`).catch(()=>{});
-    card = data?.createCard?.card;
-  } catch(e) {
-    // Se falhar com phase_id, tentar sem (vai para fase inicial e depois move)
-    const data = await pipefyQuery(`mutation {
-      createCard(input: {
-        pipe_id: "${PIPE_ID}"
-        fields_attributes: [${fieldsAttr.join(', ')}]
-      }) { card { id title url } }
-    }`).catch(()=>{});
-    card = data?.createCard?.card;
-  }
-  // Lançar erro explícito se o Pipefy não retornou id (nunca silencioso)
-  if (!card?.id) throw new Error('Pipefy retornou card sem id: ' + JSON.stringify(card));
-  return card;
-}
+async function criarCardPipefy() { return null; }
 
 
 // ── Pipefy é ESPELHO — nunca bloqueia o fluxo local ─────────────────────

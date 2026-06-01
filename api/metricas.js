@@ -1,5 +1,4 @@
 // api/metricas.js — Painel de Métricas: CAC, Ticket Médio, Custo por Ficha
-const PIPEFY_API     = "https://api.pipefy.com/graphql";
 const PIPE_ID        = "305832912";
 const UPSTASH_URL    = (process.env.UPSTASH_URL    || "").replace(/['"]/g,"").trim();
 const UPSTASH_TOKEN  = (process.env.UPSTASH_TOKEN  || "").replace(/['"]/g,"").trim();
@@ -30,23 +29,9 @@ async function dbSet(key, val) {
   } catch(e) { return false; }
 }
 
-async function pipefyQuery(query) {
-  const r = await fetch(PIPEFY_API, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${(process.env.PIPEFY_TOKEN || "").trim()}`,
-    },
-    body: JSON.stringify({ query }),
-  });
-  const j = await r.json();
-  if (j.errors) {
-    const msg = Array.isArray(j.errors)
-      ? j.errors.map(e => e.message || String(e)).join("; ")
-      : String(j.errors);
-    throw new Error(msg);
-  }
-  return j.data;
+async function pipefyQuery() {
+  // Pipefy desconectado em 01/06/2026 — ADM opera 100% local (Redis)
+  return null;
 }
 
 // Busca cards em ERP com valor + data de entrada (phases_history) — paginação completa

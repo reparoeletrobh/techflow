@@ -105,7 +105,6 @@ async function moverNoPipe(pipefyId, novaFase, dados) {
   } catch(e) { console.error('[pipe-mover]', novaFase, e.message); }
 }
 
-const PIPEFY_API = "https://api.pipefy.com/graphql";
 const PIPE_ID    = "305832912";
 const BOARD_KEY   = "reparoeletro_board";
 const LOGS_KEY    = "reparoeletro_logs";
@@ -209,36 +208,9 @@ function sanitizeBoard(b) {
 }
 
 // ── Pipefy helpers ─────────────────────────────────────────────
-async function pipefyQuery(query, attempt = 1) {
-  const TIMEOUT_MS = 15000;
-  const MAX_RETRIES = 3;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    const res = await fetch(PIPEFY_API, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${(process.env.PIPEFY_TOKEN || "").trim()}`,
-      },
-      body: JSON.stringify({ query }),
-      signal: controller.signal,
-    });
-    const text = await res.text();
-    let json;
-    try { json = JSON.parse(text); }
-    catch(e) { throw new Error("INVALID_RESPONSE"); }
-    if (json.errors) throw new Error(json.errors[0].message);
-    return json.data;
-  } catch(e) {
-    if (attempt < MAX_RETRIES && (e.name === "AbortError" || e.message === "INVALID_RESPONSE")) {
-      await new Promise(r => setTimeout(r, 2000 * attempt));
-      return pipefyQuery(query, attempt + 1);
-    }
-    throw e;
-  } finally {
-    clearTimeout(timer);
-  }
+async function pipefyQuery() {
+  // Pipefy desconectado em 01/06/2026 — ADM opera 100% local (Redis)
+  return null;
 }
 
 // Busca OS aprovadas com paginação

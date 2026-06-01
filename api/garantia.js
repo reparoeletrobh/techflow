@@ -1,6 +1,5 @@
 // api/garantia.js — Sistema de Garantia v2
 const GARANTIA_KEY  = "reparoeletro_garantia_v2";
-const PIPEFY_API    = "https://api.pipefy.com/graphql";
 const PIPE_ID       = "305832912";
 // Fases Pipefy (Reparo Eletro)
 const PIPEFY_FASE_SOLICITAR_COLETA  = "334875150"; // fase inicial para delivery
@@ -36,46 +35,13 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 function pipefyToken() { return (process.env.PIPEFY_TOKEN || "").trim(); }
 
 // ── PIPEFY HELPERS ────────────────────────────────────────────
-async function pipefyQuery(query) {
-  const token = pipefyToken();
-  if (!token) return { error: "PIPEFY_TOKEN ausente" };
-  try {
-    const r = await fetch(PIPEFY_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-      body: JSON.stringify({ query }),
-    });
-    const j = await r.json();
-    if (j.errors) return { error: j.errors[0].message };
-    return { data: j.data };
-  } catch(e) { return { error: e.message }; }
+async function pipefyQuery() {
+  // Pipefy desconectado em 01/06/2026 — ADM opera 100% local (Redis)
+  return null;
 }
 
 // Cria card no Pipefy para delivery
-async function criarCardPipefy(ficha) {
-  const titulo = "RS - " + ficha.defeito;
-  // Monta fields_attributes com campos do pipe
-  const fieldsEsc = (s) => (s || "").replace(/\\/g,"\\\\").replace(/"/g,'\\"');
-  const query = `mutation {
-    createCard(input: {
-      pipe_id: "${PIPE_ID}"
-      phase_id: "${PIPEFY_FASE_SOLICITAR_COLETA}"
-      title: "${fieldsEsc(titulo)}"
-      fields_attributes: [
-        { field_id: "nome_do_contato", field_value: "${fieldsEsc(ficha.nome)}" }
-        { field_id: "telefone", field_value: "${fieldsEsc(ficha.telefone)}" }
-        { field_id: "empresa", field_value: "${fieldsEsc(ficha.defeito)}" }
-        { field_id: "endere_o", field_value: "${fieldsEsc(ficha.endereco || "")}" }
-      ]
-    }) {
-      card { id title }
-    }
-  }`;
-  const r = await pipefyQuery(query);
-  if (r.error) return { ok: false, error: r.error };
-  const card = r.data?.createCard?.card;
-  return { ok: true, pipefyId: card?.id, pipefyTitle: card?.title };
-}
+async function criarCardPipefy() { return null; }
 
 // Move card Pipefy para uma fase
 async function moverCardPipefy(pipefyId, phaseId) {

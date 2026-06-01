@@ -1343,6 +1343,28 @@ export default async function handler(req, res) {
     } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
   }
 
+
+  // ── GET buscar-pipefy: leitura sob demanda do Pipefy (único ponto de contato restante) ──
+  if (action === 'buscar-pipefy') {
+    var bpCardId = req.query.cardId || '';
+    var bpPhaseId = req.query.phaseId || '';
+    if (!bpCardId && !bpPhaseId) return res.status(400).json({ok:false,error:'cardId ou phaseId obrigatorio'});
+    try {
+      const _pt = (process.env.PIPEFY_TOKEN||'').replace(/['"]/g,'').trim();
+      if (!_pt) return res.status(503).json({ok:false,error:'PIPEFY_TOKEN nao configurado'});
+      const query = bpCardId
+        ? `query { card(id:"${bpCardId}") { id title current_phase { id name } fields { name value } } }`
+        : `query { phase(id:"${bpPhaseId}") { id name cards(first:50) { edges { node { id title fields { name value } } } } } }`;
+      const r = await fetch('https://api.pipefy.com/graphql', {
+        method:'POST',
+        headers:{ Authorization:'Bearer '+_pt, 'Content-Type':'application/json' },
+        body: JSON.stringify({query})
+      });
+      const d = await r.json();
+      return res.status(200).json({ok:true, data: d?.data || null, errors: d?.errors || null });
+    } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();

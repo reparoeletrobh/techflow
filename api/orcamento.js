@@ -28,28 +28,11 @@ async function logAction(entry) {
 
 
 
-const PIPEFY_API = "https://api.pipefy.com/graphql";
 const PIPE_ID    = "305832912";
 
-async function pipefyQuery(query) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
-  try {
-    const res = await fetch(PIPEFY_API, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${(process.env.PIPEFY_TOKEN || "").trim()}`,
-      },
-      body: JSON.stringify({ query }),
-      signal: controller.signal,
-    });
-    const text = await res.text();
-    let json;
-    try { json = JSON.parse(text); } catch(e) { throw new Error("Pipefy retornou resposta inválida"); }
-    if (json.errors) throw new Error(json.errors.map(e => e.message).join("; "));
-    return json.data;
-  } finally { clearTimeout(timer); }
+async function pipefyQuery() {
+  // Pipefy desconectado em 01/06/2026 — ADM opera 100% local (Redis)
+  return null;
 }
 
 async function fetchPipeStructure() {
@@ -118,78 +101,8 @@ function parseFichaTexto(txt) {
   return result;
 }
 
-async function createPipefyCard({ phaseId, nome, telefone, aparelho, defeito, endereco }) {
-  const descricao   = `${aparelho} — ${defeito}`;
-  const ultimos4    = telefone.replace(/\D/g, "").slice(-4);
-  const nomeContato = `${nome} ${ultimos4}`;
-
-  const { fields } = await fetchPipeStructure();
-
-  function findField(keywords) {
-    return fields.find(f =>
-      keywords.some(kw => f.label.toLowerCase().includes(kw))
-    );
-  }
-
-  const nomeField = findField(["nome"]);
-  const telField  = findField(["telefone", "fone", "celular"]);
-  const descField = findField(["descrição", "descricao", "empresa", "descri"]);
-  const endField  = findField(["endereço", "endereco", "endere"]);
-
-  const fieldsAttr = [];
-  // Formata telefone para campo phone do Pipefy: (xx)9 xxxx-xxxx
-  // Campo type=phone do Pipefy aceita formato livre mas precisa ser consistente
-  function formatarTelefone(tel) {
-    const digits = tel.replace(/\D/g, "");
-    // Remove prefixo 55 (Brasil) se presente com 12 ou 13 dígitos
-    var d = (digits.length === 13 && digits.startsWith("55")) ? digits.slice(2)
-          : (digits.length === 12 && digits.startsWith("55")) ? digits.slice(2)
-          : digits;
-    // Celular com 10 dígitos (sem o 9): adiciona o 9 após o DDD
-    if (d.length === 10) {
-      d = d.slice(0,2) + "9" + d.slice(2);
-    }
-    // Celular com 9 dígitos (sem DDD): adiciona o 9 na frente
-    if (d.length === 9 && d[0] !== "9") {
-      d = "9" + d;
-    }
-    // Agora formata: 11 dígitos = (DD)9 XXXX-XXXX
-    if (d.length === 11) {
-      return "(" + d.slice(0,2) + ")" + d[2] + " " + d.slice(3,7) + "-" + d.slice(7);
-    }
-    return tel;
-  }
-  const telefoneFmt = formatarTelefone(telefone);
-  console.log("telefone original:", telefone, "formatado:", telefoneFmt);
-
-  if (nomeField) fieldsAttr.push(`{ field_id: "${nomeField.id}", field_value: ${JSON.stringify(nomeContato)} }`);
-  if (telField)  fieldsAttr.push(`{ field_id: "${telField.id}",  field_value: ${JSON.stringify(telefoneFmt)} }`);
-  if (descField) fieldsAttr.push(`{ field_id: "${descField.id}", field_value: ${JSON.stringify(descricao)} }`);
-  if (endField && endereco) fieldsAttr.push(`{ field_id: "${endField.id}", field_value: ${JSON.stringify(endereco)} }`);
-
-  // Tenta criar com phase_id primeiro, se falhar cria sem (vai para fase inicial)
-  const tryCreate = async (usePhaseId) => {
-    const phaseArg = usePhaseId && phaseId ? `\n      phase_id: "${phaseId}"` : "";
-    const mutation = `mutation {
-      createCard(input: {
-        pipe_id: "${PIPE_ID}"${phaseArg}
-        fields_attributes: [${fieldsAttr.join(", ")}]
-      }) {
-        card { id title url current_phase { name } }
-      }
-    }`;
-    return await pipefyQuery(mutation);
-  };
-
-  let data;
-  try {
-    data = await tryCreate(true);
-  } catch(e) {
-    // Se falhar com phase_id, tenta sem
-    data = await tryCreate(false);
-  }
-
-  return data?.createCard?.card;
+async function createPipefyCard() {
+  return null; // Pipefy desconectado
 }
 
 module.exports = async function handler(req, res) {
