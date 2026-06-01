@@ -15,7 +15,7 @@ async function logAction(entry) {
   try {
     const _U = (process.env.UPSTASH_URL   || '').replace(/['"]/g,'').trim();
     const _T = (process.env.UPSTASH_TOKEN || '').replace(/['"]/g,'').trim();
-    const _K = 'reparoeletro_log';
+    const _K = 'tv_log';
     const _r = await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['GET',_K]])});
     const _j = await _r.json(); const _v = _j[0]?.result;
     let _log = []; if(_v){try{_log=JSON.parse(_v);if(typeof _log==='string')_log=JSON.parse(_log);}catch(e){}} if(!Array.isArray(_log))_log=[];
@@ -111,7 +111,7 @@ export default async function handler(req, res) {
 
   // ── GET historico-log: retorna histórico de comparações ───────────────────
   if (action === 'historico-log') {
-    var logKey = 'reparoeletro_pipe_log';
+    var logKey = 'tv_pipe_log';
     var logDb  = (await dbGet(logKey)) || { entradas: [] };
     return res.status(200).json({ ok:true, entradas: logDb.entradas || [] });
   }
@@ -142,7 +142,7 @@ export default async function handler(req, res) {
   if (action === 'debug-board') {
     const busca = (req.query.q || '').toLowerCase();
     const pipeDb  = (await dbGet(PIPE_KEY)) || defaultDB();
-    const boardDb = await dbGet('reparoeletro_board');
+    const boardDb = await dbGet('tv_board');
     const pipeMatch  = (pipeDb.cards  || []).filter(c => (c.nomeContato||'').toLowerCase().includes(busca) || (c.id||'').toLowerCase().includes(busca));
     const boardMatch = boardDb ? (boardDb.cards || []).filter(c => (c.nomeContato||c.title||'').toLowerCase().includes(busca) || (c.osCode||'').toLowerCase().includes(busca)) : [];
     return res.status(200).json({
@@ -160,7 +160,7 @@ export default async function handler(req, res) {
     const pipeDb  = (await dbGet(PIPE_KEY)) || defaultDB();
     const card    = (pipeDb.cards || []).find(c => c.id === pipeId);
     if (!card) return res.status(404).json({ ok:false, error:'Card nao encontrado no Pipe: '+pipeId });
-    const boardDb = (await dbGet('reparoeletro_board')) || { cards:[], syncedIds:[], movesLog:[], metaLog:[], phases:[], rsPhases:[], rsRuaPhases:[], rsCards:[], rsRuaCards:[] };
+    const boardDb = (await dbGet('tv_board')) || { cards:[], syncedIds:[], movesLog:[], metaLog:[], phases:[], rsPhases:[], rsRuaPhases:[], rsCards:[], rsRuaCards:[] };
     if (!Array.isArray(boardDb.cards)) boardDb.cards = [];
     const boardPid = card.pipefyId ? String(card.pipefyId) : ('LOCAL-'+card.id);
     // Remover entrada antiga se existir
@@ -186,7 +186,7 @@ export default async function handler(req, res) {
     if (!boardDb.syncedIds.includes(boardPid)) boardDb.syncedIds.push(boardPid);
     if (!boardDb.movesLog) boardDb.movesLog = [];
     boardDb.movesLog.push({ phaseId:'aprovado_entrada', pipefyId:boardPid, timestamp:now });
-    await dbSet('reparoeletro_board', boardDb);
+    await dbSet('tv_board', boardDb);
     return res.status(200).json({ ok:true, card:novoCard, boardTotal:boardDb.cards.length });
   }
 
@@ -299,7 +299,7 @@ export default async function handler(req, res) {
       async function _r4(k){var r=await fetch(U4+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T4,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});var j=await r.json();var v=j[0]?.result;if(!v)return null;try{var val=JSON.parse(v);if(typeof val==='string')val=JSON.parse(val);return(val&&typeof val==='object')?val:null;}catch(e){return null;}}
       async function _s4(k,v){await fetch(U4+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T4,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
 
-      var backup = await _r4('reparoeletro_financeiro_backup');
+      var backup = await _r4('tv_financeiro_backup');
       if (!backup || !Array.isArray(backup.records)) {
         return res.status(404).json({ ok:false, error:'Backup não encontrado ou inválido', backup });
       }
@@ -376,7 +376,7 @@ export default async function handler(req, res) {
       // 5. Salvar SOMENTE se algo foi criado
       if(criados.length>0){
         // Backup antes de salvar
-        try{await _sfin('reparoeletro_financeiro_backup',{...finDb,backedUpAt:now});}catch(e){}
+        try{await _sfin('tv_financeiro_backup',{...finDb,backedUpAt:now});}catch(e){}
         await _sfin('tv_financeiro', finDb);
       }
 
@@ -466,7 +466,7 @@ export default async function handler(req, res) {
       rec.phaseId=fase;
       rec.movedAt=now;
       // Backup antes de salvar
-      try{await _s7('reparoeletro_financeiro_backup',Object.assign({},fin,{backedUpAt:now}));}catch(e){}
+      try{await _s7('tv_financeiro_backup',Object.assign({},fin,{backedUpAt:now}));}catch(e){}
       await _s7('tv_financeiro',fin);
       return res.status(200).json({ok:true,id:rec.id,nome:rec.nomeContato||rec.title,de:faseAnterior,para:fase});
     } catch(e){return res.status(500).json({ok:false,error:e.message});}
@@ -507,7 +507,7 @@ export default async function handler(req, res) {
       if(endereco!==undefined)    rec.endereco=endereco;
       if(servicos!==undefined)    rec.servicos=servicos;
       rec.editadoEm=now;
-      try{await dbSet('reparoeletro_financeiro_backup',Object.assign({},fin,{backedUpAt:now}));}catch(e){}
+      try{await dbSet('tv_financeiro_backup',Object.assign({},fin,{backedUpAt:now}));}catch(e){}
       await dbSet('tv_financeiro',fin);
       return res.status(200).json({ok:true,record:rec});
     } catch(e){return res.status(500).json({ok:false,error:e.message});}
@@ -578,7 +578,7 @@ export default async function handler(req, res) {
       rec.history=(rec.history||[]).concat([{phaseId:'pagamento_confirmado',ts:ts,via:'manual'},{phaseId:'entrega_liberada',ts:ts,via:'manual'}]);
       rec.phaseId='entrega_liberada';
       // Backup
-      try{await _s8('reparoeletro_financeiro_backup',Object.assign({},fin,{backedUpAt:ts}));}catch(e){}
+      try{await _s8('tv_financeiro_backup',Object.assign({},fin,{backedUpAt:ts}));}catch(e){}
       await _s8('tv_financeiro',fin);
       // Mover Pipe ADM
       var pipeDb=await _g8('tv_pipe');
@@ -602,7 +602,7 @@ export default async function handler(req, res) {
       async function _vs3(k,v){await fetch(UV3+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+TV3,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
 
       // Ler vendas
-      var vendasDb=await _vg3('reparoeletro_vendas');
+      var vendasDb=await _vg3('tv_vendas');
       var produtos=(vendasDb?.produtos||[]).filter(function(p){return p.vendido;});
       // Ordenar por data de venda (mais recente primeiro)
       produtos.sort(function(a,b){return new Date(b.soldAt||b.criadoEm||0)-new Date(a.soldAt||a.criadoEm||0);});
@@ -650,8 +650,8 @@ export default async function handler(req, res) {
 
   // ── GET backup-auto: salva snapshot timestamped de todos os dados críticos
   if (action === 'backup-auto') {
-    var chaves = ['tv_pipe','tv_financeiro','reparoeletro_board',
-                  'reparoeletro_logistica','reparoeletro_frenteloja'];
+    var chaves = ['tv_pipe','tv_financeiro','tv_board',
+                  'tv_logistica','tv_frenteloja'];
     var ts  = new Date().toISOString().replace(/[:.]/g,'-').slice(0,16); // 2026-05-29T14-30
     var res2 = { ts, salvos:[], erros:[] };
     for (var ki=0; ki<chaves.length; ki++) {
@@ -774,7 +774,7 @@ export default async function handler(req, res) {
       arq.ultimoArquivo  = now;
 
       // Backup antes de salvar
-      try{await dbSet('reparoeletro_pipe_bak_pre_arquivo',{cards:db.cards,ts:now});}catch(e){}
+      try{await dbSet('tv_pipe_bak_pre_arquivo',{cards:db.cards,ts:now});}catch(e){}
 
       await dbSet(PIPE_KEY, db);
       await dbSet(ARQUIVO_KEY, arq);
@@ -946,7 +946,7 @@ export default async function handler(req, res) {
       rec9.phaseId='entrega_liberada'; rec9.paidAt=ts9; rec9.movedAt=ts9;
       rec9.mp=Object.assign(rec9.mp||{},{status:'pago',pagoEm:ts9,metodo:metodo9,valor:valor9||rec9.valor,paymentId:payId9||null});
       rec9.history=(rec9.history||[]).concat([{phaseId:'pagamento_confirmado',ts:ts9},{phaseId:'entrega_liberada',ts:ts9}]);
-      try{await _s9('reparoeletro_financeiro_backup',Object.assign({},fin9,{backedUpAt:ts9}));}catch(e){}
+      try{await _s9('tv_financeiro_backup',Object.assign({},fin9,{backedUpAt:ts9}));}catch(e){}
       await _s9('tv_financeiro',fin9);
       // Mover Pipe ADM — busca por pipefyId, osCode ou id
       var pipeDb9=await _g9('tv_pipe'); var pipeOk9=false;
@@ -970,7 +970,7 @@ export default async function handler(req, res) {
     if (!buscaA && !idA) return res.status(400).json({ok:false,error:'busca ou id obrigatorio'});
     try {
       // Buscar na logistica
-      var logDb = await dbGet('reparoeletro_logistica') || {fichas:[]};
+      var logDb = await dbGet('tv_logistica') || {fichas:[]};
       var fichaL = null;
       // Normalizar busca: remover acentos e caracteres especiais
       function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); }
@@ -982,9 +982,9 @@ export default async function handler(req, res) {
       // Buscar no orçamento se não achou na logística
       var fichaO = null;
       if (!fichaL) {
-        var orcDb2 = await dbGet('reparoeletro_orcamentos') || {fichas:[]};
-        if (!orcDb2.fichas) orcDb2 = await dbGet('reparoeletro_orc') || {fichas:[]};
-        if (!orcDb2.fichas) orcDb2 = await dbGet('reparoeletro_logistica') || {fichas:[]};
+        var orcDb2 = await dbGet('tv_orcamentos') || {fichas:[]};
+        if (!orcDb2.fichas) orcDb2 = await dbGet('tv_orcamentos') || {fichas:[]};
+        if (!orcDb2.fichas) orcDb2 = await dbGet('tv_logistica') || {fichas:[]};
         if (buscaN) fichaO = (orcDb2.fichas||[]).find(function(f){ return norm(JSON.stringify(f)).includes(buscaN); });
       }
 
@@ -1392,6 +1392,15 @@ export default async function handler(req, res) {
     } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
   }
 
+
+  // ── GET reset-tv-pipe: limpa COMPLETAMENTE o tv_pipe para re-sync ────────
+  if (action === 'reset-tv-pipe') {
+    try {
+      await dbSet(PIPE_KEY, {cards:[], lastSync:null, resetAt: now});
+      return res.status(200).json({ok:true, msg:'tv_pipe limpo — execute sync-from-pipefy-tv para reimportar'});
+    } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
@@ -1441,8 +1450,8 @@ export default async function handler(req, res) {
     let atualizados = 0;
 
     // Carregar fontes Redis
-    const logDb = await dbGet('reparoeletro_logistica').catch(() => null);
-    const flDb  = await dbGet('reparoeletro_frenteloja').catch(() => null);
+    const logDb = await dbGet('tv_logistica').catch(() => null);
+    const flDb  = await dbGet('tv_frenteloja').catch(() => null);
     const logFichas = (logDb && logDb.fichas) ? logDb.fichas : [];
     const flFichas  = (flDb  && flDb.fichas)  ? flDb.fichas  : [];
 
@@ -1529,7 +1538,7 @@ export default async function handler(req, res) {
         async function bSet(k,v) {
           await fetch(bU+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+bT,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});
         }
-        var BOARD_KEY2 = 'reparoeletro_board';
+        var BOARD_KEY2 = 'tv_board';
         var boardDb2 = await bGet(BOARD_KEY2);
         if (!boardDb2 || typeof boardDb2 !== 'object') boardDb2 = { cards:[], syncedIds:[], movesLog:[], metaLog:[], phases:[], rsPhases:[], rsRuaPhases:[], rsCards:[], rsRuaCards:[] };
         if (!Array.isArray(boardDb2.cards)) boardDb2.cards = [];
