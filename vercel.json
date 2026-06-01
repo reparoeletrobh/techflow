@@ -393,6 +393,18 @@
     {
       "source": "/api/tv-webhook-mp",
       "destination": "/api/tv-webhook-mp.js"
+    },
+    {
+      "source": "/api/tv-rastrear",
+      "destination": "/api/tv-rastrear.js"
+    },
+    {
+      "source": "/api/tv-aguardando-retirada",
+      "destination": "/api/tv-aguardando-retirada.js"
+    },
+    {
+      "source": "/api/tv-frenteloja",
+      "destination": "/api/tv-frenteloja.js"
     }
   ],
   "headers": [

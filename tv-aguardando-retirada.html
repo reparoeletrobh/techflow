@@ -175,7 +175,7 @@ function setTab(t) {
 
 // ── LOAD ─────────────────────────────────────────────────────
 async function load() {
-  var r = await fetch('/api/aguardando-retirada?action=load').then(function(r){return r.json();}).catch(function(){return null;});
+  var r = await fetch('/api/tv-aguardando-retirada?action=load').then(function(r){return r.json();}).catch(function(){return null;});
   if (!r || !r.ok) { showToast('❌','Erro','Não foi possível carregar os dados'); return; }
   cards = r.cards || [];
   updateBadges();
@@ -232,7 +232,7 @@ async function renderAviso() {
   var el = document.getElementById('grid-aviso');
   el.innerHTML = '<div class="loading"><div class="spinner"></div>Buscando dados do Pipefy...</div>';
 
-  var r = await fetch('/api/aguardando-retirada?action=parados').then(function(r){return r.json();}).catch(function(){return null;});
+  var r = await fetch('/api/tv-aguardando-retirada?action=parados').then(function(r){return r.json();}).catch(function(){return null;});
   if (!r || !r.ok) {
     el.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div>Erro ao buscar dados.</div>';
     return;

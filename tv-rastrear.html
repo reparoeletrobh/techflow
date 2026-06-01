@@ -156,7 +156,7 @@ function showSpinner() {
 async function buscar(q) {
   showSpinner();
   try {
-    var r = await fetch('/api/rastrear?q=' + encodeURIComponent(q));
+    var r = await fetch('/api/tv-rastrear?q=' + encodeURIComponent(q));
     var d = await r.json();
     renderResults(q, d.results || []);
   } catch(e) {
