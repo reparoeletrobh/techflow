@@ -185,7 +185,7 @@ module.exports = async function handler(req, res) {
         console.log('[Log] ficha criada:', logId);
       } catch(e) { console.error('[Log] criar:', e.message); }
 
-      logAction({ modulo:'Orçamento', fichaId:ficha.id||'', ficha:ficha.nomeContato||ficha.nome||'', acao:'Aprovação de orçamento', para:'aprovados', gatilho:'→ Pipe aguardando_aprovacao', status:'ok', detalhe:'Valor: R$'+(ficha.valorOrcamento||ficha.valor||0) }).catch(()=>{});
+      logAction({ modulo:'Orçamento', fichaId:'', ficha:nome||'', acao:'Novo orçamento criado', para:'aguardando_aprovacao', gatilho:'→ Pipe aguardando_aprovacao', status:'ok', detalhe:'Valor: R$'+(preco||0) }).catch(()=>{});
       // Criar card no Pipe ADM em aguardando_aprovacao
       try {
         const _UO=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
@@ -198,13 +198,13 @@ module.exports = async function handler(req, res) {
         // Verificar se já existe (por pipefyCardId ou fichaId)
         const jaExisteO = pipeO.cards.find(function(c){
           return (card?.id && (c.pipefyId===String(card.id)||c.id===String(card.id))) ||
-                 (ficha.id && (c.localId===String(ficha.id)||c.id===String(ficha.id)));
+                 false /* ficha.id não disponível em criar-card */;
         });
         if (!jaExisteO) {
           pipeO.cards.unshift({
             id: 'PIPE-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,5).toUpperCase(),
             pipefyId: card?.id ? String(card.id) : null,
-            localId:  ficha.id ? String(ficha.id) : null,
+            localId:  null,
             phase: 'aguardando_aprovacao',
             nomeContato: fmt4dig(nome||'', telefone||''),
             telefone: telefone||'',
