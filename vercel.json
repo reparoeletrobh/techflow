@@ -365,6 +365,10 @@
     {
       "source": "/api/tv-gestao-km",
       "destination": "/api/tv-gestao-km.js"
+    },
+    {
+      "source": "/tv/pipe",
+      "destination": "/tv-pipe.html"
     }
   ],
   "headers": [
