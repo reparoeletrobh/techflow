@@ -528,6 +528,70 @@ export default async function handler(req,res){
     }
   }
 
+
+  // ── GET remover-board-lote — remove do board as fichas adicionadas erroneamente ──
+  if (action === 'remover-board-lote') {
+    const IDS_REMOVER = ["FL-0226", "FL-0224", "FL-0223", "FL-0220", "FL-0219", "FL-0217", "FL-0215", "FL-0213", "FL-0212", "FL-0208", "FL-0205", "FL-0204", "FL-0200", "FL-0198", "FL-0197", "FL-0196", "FL-0194", "FL-0192", "FL-0190", "FL-0188", "FL-0183", "FL-0182", "FL-0180", "FL-0179", "FL-0178", "FL-0176", "FL-0175", "FL-0174", "FL-0173", "FL-0172", "FL-0171", "FL-0168", "FL-0165", "FL-0163", "FL-0161", "FL-0160", "FL-0159", "FL-0158", "FL-0157", "FL-0156", "FL-0155", "FL-0153", "FL-0151"];
+    try {
+      const boardDb = (await dbGet('reparoeletro_board')) || { cards: [] };
+      const antes = (boardDb.cards || []).length;
+      boardDb.cards = (boardDb.cards || []).filter(function(c){
+        return !IDS_REMOVER.includes(c.flFichaId);
+      });
+      const removidos = antes - boardDb.cards.length;
+      await dbSet('reparoeletro_board', boardDb);
+      return res.status(200).json({ ok:true, removidos, totalRestante: boardDb.cards.length });
+    } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
+  }
+
+
+  // ── POST confirmar-pagamento-pipe — confirma pagamento e move para ERP no pipe ──
+  if (req.method === 'POST' && action === 'confirmar-pagamento-pipe') {
+    const { id, valor, formaPagamento } = req.body || {};
+    if (!id) return res.status(400).json({ ok:false, error:'id obrigatório' });
+    const db = await dbGet(FL_KEY) || defaultDB();
+    const ficha = db.fichas.find(f => f.id === id);
+    if (!ficha) return res.status(404).json({ ok:false, error:'Ficha não encontrada' });
+    const now = new Date().toISOString();
+    // Marcar pagamento na ficha FL
+    ficha.pagamentoConfirmado = true;
+    ficha.pagoEm = now;
+    ficha.pagoValor = parseFloat(valor) || ficha.orcamento?.valor || 0;
+    ficha.pagoPor = formaPagamento || ficha.orcamento?.formaPagamento || 'pix';
+    ficha.phase = 'pago';
+    ficha.movedAt = now;
+    await dbSet(FL_KEY, db);
+    // Criar/mover card no pipe ADM para ERP
+    try {
+      const _U=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+      const _T=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+      async function _pg(k){const r=await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();const v=j[0]?.result;if(!v)return null;try{let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+      async function _ps(k,v){await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+      const pipeDb = (await _pg('reparoeletro_pipe')) || { cards:[], lastSync:null };
+      if (!Array.isArray(pipeDb.cards)) pipeDb.cards = [];
+      // Verificar se já existe no pipe
+      const jaExiste = pipeDb.cards.find(c => c.localId===id || c.flFichaId===id);
+      if (jaExiste) {
+        jaExiste.phase = 'erp';
+        jaExiste.movedAt = now;
+      } else {
+        pipeDb.cards.unshift({
+          id: 'PIPE-FL-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,4).toUpperCase(),
+          localId: id, flFichaId: id,
+          phase: 'erp',
+          nomeContato: ficha.nomeContato||'', telefone: ficha.telefone||'',
+          equipamento: ficha.equipamento||'', descricao: ficha.descricao||ficha.descricaoTecnica||'',
+          valor: ficha.pagoValor||0, origem: 'frenteloja_pago',
+          criadoEm: now, movedAt: now, aguardandoDesde: null, history: [], analiseCompra: false
+        });
+      }
+      pipeDb.lastSync = now;
+      await _ps('reparoeletro_pipe', pipeDb);
+      console.log('[FL] pago → pipe ERP:', id);
+    } catch(ep){ console.error('[FL] pipe ERP:', ep.message); }
+    return res.status(200).json({ ok:true, ficha });
+  }
+
   // ── GET fix-board-por-nome — busca ficha por nome e força no board ───────
   if (action === 'fix-board-por-nome') {
     const busca = (req.query.nome || '').toLowerCase().trim();
