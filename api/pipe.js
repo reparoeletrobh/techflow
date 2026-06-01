@@ -1130,6 +1130,64 @@ export default async function handler(req, res) {
     } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
   }
 
+
+  // ── GET limpar-backups-scan: varre Redis e apaga TODAS as chaves _bak_ antigas ──
+  if (action === 'limpar-backups-scan') {
+    try {
+      const _lu=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+      const _lt=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+      // Usar SCAN para encontrar todas as chaves _bak_
+      // Manter apenas os 2 backups mais recentes por chave base
+      const ultimasHoras = 48; // manter backups das últimas 48h
+      const corte = new Date(Date.now() - ultimasHoras*60*60*1000)
+                        .toISOString().replace(/[:.]/g,'-').slice(0,16);
+
+      async function scanKeys(pattern) {
+        var allKeys = [];
+        var cursor = '0';
+        do {
+          const r = await fetch(_lu+'/pipeline', {
+            method:'POST',
+            headers:{ Authorization:'Bearer '+_lt, 'Content-Type':'application/json' },
+            body: JSON.stringify([['SCAN', cursor, 'MATCH', pattern, 'COUNT', '100']])
+          });
+          const j = await r.json();
+          const result = j[0]?.result || ['0',[]];
+          cursor  = String(result[0]);
+          const keys = result[1] || [];
+          allKeys = allKeys.concat(keys);
+        } while (cursor !== '0');
+        return allKeys;
+      }
+
+      const bakKeys = await scanKeys('*_bak_*');
+      var deletados2 = 0, mantidos2 = 0;
+
+      for (var ki=0; ki<bakKeys.length; ki++) {
+        var bk2 = bakKeys[ki];
+        // Extrair timestamp da chave: ex reparoeletro_pipe_bak_2026-05-28T10-00
+        var tsMatch = bk2.match(/_bak_(\d{4}-\d{2}-\d{2}T\d{2}-\d{2})$/);
+        if (tsMatch && tsMatch[1] < corte) {
+          await fetch(_lu+'/pipeline', {
+            method:'POST',
+            headers:{ Authorization:'Bearer '+_lt, 'Content-Type':'application/json' },
+            body: JSON.stringify([['DEL', bk2]])
+          });
+          deletados2++;
+        } else {
+          mantidos2++;
+        }
+      }
+
+      // Limpar índice de backup
+      const idx4 = (await dbGet('reparoeletro_backup_index')) || [];
+      const idxRecente = idx4.filter(function(b){ return !b.ts || b.ts >= corte.replace(/-/g,'').slice(0,13); });
+      await dbSet('reparoeletro_backup_index', idxRecente.slice(-48));
+
+      return res.status(200).json({ ok:true, totalEncontradas:bakKeys.length, deletados:deletados2, mantidos:mantidos2, corte });
+    } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
