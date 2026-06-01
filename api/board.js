@@ -1993,9 +1993,44 @@ module.exports = async function handler(req, res) {
       const entry = balcao.find(b => b.pipefyId === String(pipefyId));
       if (entry) { entry.status = 'pago'; entry.pagoEm = new Date().toISOString(); await dbSet(BALCAO_KEY, balcao); }
 
-      // ── Pipe ADM: mover para ERP ───────────────────────────────────────────
-      await moverNoPipe(String(pipefyId), 'erp').catch(() => {});
-      logAction({ modulo:'Balcão', fichaId:String(pipefyId), ficha:entry?.nomeContato||'', acao:'Confirmar pagamento', para:'erp', gatilho:'→ Pipe ERP + Pipefy ERP', status:'ok' }).catch(()=>{});
+      // ── Pipe ADM: mover para ERP (busca por pipefyId OU flFichaId/localId) ───
+      try {
+        const _bU=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+        const _bT=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+        async function _bpg(k){const r=await fetch(_bU+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_bT,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();const v=j[0]?.result;if(!v)return null;try{let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+        async function _bps(k,v){await fetch(_bU+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_bT,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+        const pipeDb=(await _bpg('reparoeletro_pipe'))||{cards:[],lastSync:null};
+        if(!Array.isArray(pipeDb.cards))pipeDb.cards=[];
+        const flId = entry?.flFichaId || null;
+        const pidStr = String(pipefyId);
+        const now2 = new Date().toISOString();
+        // Buscar por pipefyId, localId ou flFichaId
+        let pipeCard = pipeDb.cards.find(function(c){
+          return c.pipefyId===pidStr ||
+                 (flId && (c.localId===flId || c.flFichaId===flId || c.id===flId));
+        });
+        if(pipeCard){
+          pipeCard.phase='erp'; pipeCard.movedAt=now2;
+          console.log('[balcao-pagar] pipe card movido para erp:', pipeCard.id);
+        } else {
+          // Criar card no pipe em ERP se não existe
+          pipeDb.cards.unshift({
+            id:'PIPE-BAL-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,4).toUpperCase(),
+            pipefyId: !pidStr.startsWith('FL-') ? pidStr : null,
+            localId: flId||null, flFichaId: flId||null,
+            phase:'erp',
+            nomeContato: entry?.nomeContato||'', telefone: entry?.telefone||'',
+            equipamento: entry?.descricao||'', descricao: entry?.descricao||'',
+            valor: parseFloat(entry?.valor)||0, origem:'balcao_pago',
+            criadoEm:now2, movedAt:now2, aguardandoDesde:null, history:[], analiseCompra:false
+          });
+          console.log('[balcao-pagar] pipe card criado em erp para:', flId||pidStr);
+        }
+        pipeDb.lastSync=now2;
+        await _bps('reparoeletro_pipe', pipeDb);
+      } catch(ePipe){ console.error('[balcao-pagar] pipe ERP:', ePipe.message); }
+
+      logAction({ modulo:'Balcão', fichaId:String(pipefyId), ficha:entry?.nomeContato||'', acao:'Confirmar pagamento', para:'erp', gatilho:'→ Pipe ERP', status:'ok' }).catch(()=>{});
 
       return res.status(200).json({ ok: true });
     }
