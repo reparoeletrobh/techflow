@@ -1138,7 +1138,7 @@ export default async function handler(req, res) {
       const _lt=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
       // Usar SCAN para encontrar todas as chaves _bak_
       // Manter apenas os 2 backups mais recentes por chave base
-      const ultimasHoras = 48; // manter backups das últimas 48h
+      const ultimasHoras = 24; // manter backups das últimas 24h
       const corte = new Date(Date.now() - ultimasHoras*60*60*1000)
                         .toISOString().replace(/[:.]/g,'-').slice(0,16);
 
