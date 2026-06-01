@@ -515,6 +515,7 @@ export default async function handler(req, res) {
       var card=db.cards.find(function(c){return c.id===id||c.pipefyId===id;});
       if(!card)return res.status(404).json({ok:false,error:'Card não encontrado: '+id});
       if(nomeContato!==undefined) card.nomeContato=nomeContato;
+      if(body.vencimento!==undefined) card.vencimento=body.vencimento||null;
       if(valor!==undefined)       card.valor=parseFloat(String(valor).replace(',','.'))||0;
       if(telefone!==undefined)    card.telefone=telefone;
       if(equipamento!==undefined) card.equipamento=equipamento;

@@ -78,6 +78,15 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .cbtn-blue{background:rgba(59,158,255,.08);border:1px solid rgba(59,158,255,.2);color:var(--blue);}
 .cbtn-blue:hover{background:rgba(59,158,255,.18);}
 
+
+/* -- VENCIMENTO -- */
+.venc-badge{display:inline-flex;align-items:center;gap:5px;font-family:var(--fm);font-size:10px;font-weight:700;padding:4px 10px;border-radius:7px;margin-top:3px;}
+.venc-ok{background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.25);}
+.venc-warn{background:rgba(249,115,22,.12);color:#f97316;border:1px solid rgba(249,115,22,.3);animation:pulse-warn .9s infinite;}
+.venc-late{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.35);animation:pulse-late .6s infinite;}
+@keyframes pulse-warn{0%,100%{opacity:1}50%{opacity:.6}}
+@keyframes pulse-late{0%,100%{opacity:1}50%{opacity:.4}}
+
 /* Timer badge */
 .timer-badge{display:inline-block;font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:5px;font-weight:600;}
 .timer-ok{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2);}
@@ -287,6 +296,7 @@ function render(){
         descHtml+
         valHtml+
         timerHTML(c)+
+        vencHTML(c)+
         acBadge+
         '<div class="card-time">'+fmtDate(c.movedAt)+'&nbsp;·&nbsp;'+esc(c.origem)+'</div>'+
         '<div class="card-actions">'+
@@ -667,7 +677,8 @@ async function salvarEditarPipe() {
     valor: document.getElementById('ep-valor').value,
     descricao: document.getElementById('ep-desc').value,
     endereco: document.getElementById('ep-end').value,
-    servicos: document.getElementById('ep-serv').value
+    servicos: document.getElementById('ep-serv').value,
+    vencimento: document.getElementById('ep-venc') ? document.getElementById('ep-venc').value : ''
   };
   try {
     var r = await fetch('/api/tv-pipe?action=editar-pipe', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -676,6 +687,24 @@ async function salvarEditarPipe() {
     else alert('Erro: ' + d.error);
   } catch(e) { alert('Erro: ' + e.message); }
 }
+
+function vencHTML(c){
+  if(!c.vencimento) return '';
+  var d=new Date(c.vencimento+'T23:59:59');
+  var diff=d.getTime()-Date.now();
+  var days=Math.ceil(diff/(1000*60*60*24));
+  var p=c.vencimento.split('-'); var fmt=p[2]+'/'+p[1]+'/'+p[0];
+  if(diff<0) return '<div class="venc-badge venc-late">&#x1F534; Vencido '+fmt+'</div>';
+  if(days<=2) return '<div class="venc-badge venc-warn">&#x1F7E0; Vence '+fmt+' ('+days+'d)</div>';
+  return '<div class="venc-badge venc-ok">&#x1F7E2; Vence '+fmt+'</div>';
+}
+async function setVencimento(id){
+  var d=prompt('Data de vencimento (AAAA-MM-DD):',new Date().toISOString().slice(0,10));
+  if(d===null) return;
+  var r=await fetch('/api/tv-pipe?action=editar-pipe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,vencimento:d})}).then(r=>r.json());
+  if(r.ok) load(); else alert('Erro: '+r.error);
+}
+
 </script>
 
 </div>
@@ -718,7 +747,12 @@ async function salvarEditarPipe() {
     <textarea id="ep-serv" class="ep-inp" rows="2" placeholder="Serviços realizados ou observações" style="resize:vertical;"></textarea>
     <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
       <button onclick="fecharEditarPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;border:1px solid #333;background:transparent;color:#666;cursor:pointer;">Cancelar</button>
-      <button onclick="salvarEditarPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;border:none;background:#f5c800;color:#000;font-weight:700;cursor:pointer;">💾 Salvar</button>
+      
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <label style="font-family:var(--fm);font-size:10px;color:var(--muted);">Vencimento</label>
+          <input id="ep-venc" type="date" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--text);font-family:var(--fm);font-size:12px;">
+        </div>
+        <button onclick="salvarEditarPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;border:none;background:#f5c800;color:#000;font-weight:700;cursor:pointer;">💾 Salvar</button>
     </div>
   </div>
 </div>
@@ -749,7 +783,12 @@ async function salvarEditarPipe() {
     <textarea id="ep-serv" class="ep-inp" rows="2" placeholder="Serviços realizados" style="resize:vertical;"></textarea>
     <div style="display:flex;gap:8px;margin-top:18px;justify-content:flex-end;">
       <button onclick="fecharEditarPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;border:1px solid #333;background:transparent;color:#666;cursor:pointer;">Cancelar</button>
-      <button onclick="salvarEditarPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;border:none;background:#f5c800;color:#000;font-weight:700;cursor:pointer;">💾 Salvar</button>
+      
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <label style="font-family:var(--fm);font-size:10px;color:var(--muted);">Vencimento</label>
+          <input id="ep-venc" type="date" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--text);font-family:var(--fm);font-size:12px;">
+        </div>
+        <button onclick="salvarEditarPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;border:none;background:#f5c800;color:#000;font-weight:700;cursor:pointer;">💾 Salvar</button>
     </div>
   </div>
 </div>
