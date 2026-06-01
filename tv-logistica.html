@@ -2,256 +2,382 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='18,2 8,18 15,18 14,30 24,14 17,14' fill='%23f5c800' stroke='%23f5c800' stroke-linejoin='round'/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TV — Logística v4</title>
+<title>TV — Logística — Reparo Eletro</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-:root {
-  --bg:#080d18;--surface:#0d1425;--surface2:#111c30;--border:#1a2540;
-  --text:#dce8f8;--muted:#4a607a;
-  --accent:#3b9eff;--green:#10d982;--red:#f04060;--orange:#f97316;
-  --yellow:#f5c800;--purple:#a855f7;
-  --wilde:#3b9eff;--paulo:#10d982;
+:root{
+  --bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--border:#252525;
+  --text:#fff;--muted:#888;--dim:#333;
+  --accent:#f5c800;--green:#22c55e;--red:#ef4444;--blue:#3b9eff;--purple:#a855f7;--orange:#f97316;
   --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;}
-header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:54px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
-.logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
-.logo-dot{width:9px;height:9px;background:var(--accent);border-radius:50%;box-shadow:0 0 8px var(--accent);}
-.logo em{color:var(--accent);font-style:normal;}
+
+/* ── HEADER ── */
+header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;border-bottom:2px solid var(--accent);background:var(--bg);position:sticky;top:0;z-index:200;}
+.logo{font-family:var(--fh);font-size:15px;font-weight:800;}
+.logo span{color:var(--accent);}
+.header-right{display:flex;align-items:center;gap:10px;}
 .hbtn{font-family:var(--fm);font-size:10px;padding:6px 13px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;text-decoration:none;transition:all .15s;}
 .hbtn:hover{color:var(--text);border-color:var(--accent);}
-.tabs-bar{display:flex;border-bottom:1px solid var(--border);padding:0 24px;background:var(--surface);position:sticky;top:54px;z-index:99;}
-.tab{font-family:var(--fm);font-size:11px;font-weight:600;padding:12px 18px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;display:flex;align-items:center;gap:6px;}
-.tab:hover{color:var(--text);}
-.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
-.page{display:none;flex:1;flex-direction:column;}
-.page.active{display:flex;}
+#busca-input{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-family:var(--fm);font-size:11px;color:var(--text);outline:none;width:200px;transition:border .15s;}
+#busca-input:focus{border-color:var(--accent);}
+#busca-input::placeholder{color:var(--muted);}
 
-/* FORM */
-#page-form{align-items:center;padding:32px 20px;gap:20px;}
-.form-card{width:100%;max-width:560px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;}
-.form-title{font-family:var(--fh);font-size:18px;font-weight:800;margin-bottom:20px;}
-.form-title span{color:var(--accent);}
-.motorista-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
-.moto-btn{border:2px solid var(--border);background:transparent;border-radius:10px;padding:14px;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:6px;}
-.moto-btn .mname{font-family:var(--fh);font-size:16px;font-weight:800;color:var(--muted);}
-.moto-btn .micon{font-size:28px;}
-.moto-btn.wilde.sel{border-color:var(--wilde);background:rgba(59,158,255,.1);}
-.moto-btn.paulo.sel{border-color:var(--paulo);background:rgba(16,217,130,.1);}
-.moto-btn.wilde.sel .mname{color:var(--wilde);}
-.moto-btn.paulo.sel .mname{color:var(--paulo);}
-.moto-btn:hover{border-color:var(--accent);}
-.fl{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:5px;}
-.fi{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 13px;font-family:var(--fm);font-size:13px;color:var(--text);outline:none;transition:border .15s;margin-bottom:14px;}
-.fi:focus{border-color:var(--accent);}
-input[type=date].fi::-webkit-calendar-picker-indicator{filter:invert(.5);}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-.btn-reg{width:100%;background:var(--accent);border:none;border-radius:10px;padding:13px;font-family:var(--fh);font-size:14px;font-weight:800;color:#fff;cursor:pointer;transition:filter .15s;margin-top:4px;}
-.btn-reg:hover{filter:brightness(1.1);}
-.btn-reg:disabled{opacity:.5;cursor:not-allowed;filter:none;}
+/* ── BOARD ── */
+.board{display:flex;gap:12px;padding:16px 12px;overflow-x:auto;flex:1;align-items:flex-start;}
+.board::-webkit-scrollbar{height:4px;}
+.board::-webkit-scrollbar-thumb{background:var(--border);}
 
-/* TABELA */
-#page-tabela{padding:24px;}
-.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
-.fbtn{font-family:var(--fm);font-size:10px;padding:5px 13px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
-.fbtn:hover{border-color:var(--accent);color:var(--accent);}
-.fbtn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
-.fbtn.wf.active{background:var(--wilde);border-color:var(--wilde);}
-.fbtn.pf.active{background:var(--paulo);border-color:var(--paulo);}
-.fi-sm{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-family:var(--fm);font-size:10px;color:var(--text);outline:none;}
-.fi-sm:focus{border-color:var(--accent);}
-input[type=month].fi-sm::-webkit-calendar-picker-indicator{filter:invert(.5);}
-.fi-search{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-family:var(--fm);font-size:11px;color:var(--text);outline:none;width:170px;}
-.fi-search:focus{border-color:var(--accent);}
-table{width:100%;border-collapse:collapse;}
-thead th{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;background:var(--surface2);}
-tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
-tbody tr:hover{background:var(--surface);}
-tbody td{font-family:var(--fm);font-size:11px;padding:10px 12px;color:var(--text);}
-.bm{font-size:9px;font-weight:700;padding:3px 8px;border-radius:99px;}
-.bw{background:rgba(59,158,255,.15);color:var(--wilde);border:1px solid rgba(59,158,255,.3);}
-.bp{background:rgba(16,217,130,.15);color:var(--paulo);border:1px solid rgba(16,217,130,.3);}
-.abt{font-family:var(--fm);font-size:9px;padding:3px 8px;border-radius:5px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);transition:all .15s;margin-right:3px;}
-.abt:hover{color:var(--text);border-color:var(--text);}
-.abt.del:hover{color:var(--red);border-color:var(--red);}
+/* ── COLUNA ── */
+.col{flex-shrink:0;width:290px;display:flex;flex-direction:column;gap:10px;}
+.col-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:10px;background:var(--surface);position:relative;overflow:hidden;}
+.col-title{font-family:var(--fh);font-size:12px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.col-dot{width:8px;height:8px;border-radius:50%;}
+.col-count{font-family:var(--fm);font-size:10px;color:var(--muted);background:var(--surface2);padding:2px 8px;border-radius:10px;}
 
+/* ── CARD ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;transition:border .15s;position:relative;overflow:hidden;}
+.card-left-bar{position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:12px 0 0 12px;}
+.col-top-stripe{position:absolute;top:0;left:0;right:0;height:2px;}
+.card:hover{border-color:#333;}
+.card-id{font-family:var(--fm);font-size:9px;color:var(--muted);}
+.card-nome{font-weight:600;font-size:14px;}
+.card-equip{font-family:var(--fm);font-size:10px;color:var(--accent);}
+.card-defeito{font-size:11px;color:var(--muted);line-height:1.4;}
+.card-time{font-family:var(--fm);font-size:9px;color:var(--dim);}
+.card-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;}
+.cbtn{font-family:var(--fm);font-size:10px;font-weight:600;padding:6px 12px;border-radius:7px;border:none;cursor:pointer;transition:all .15s;letter-spacing:.3px;}
+.cbtn-outline{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.cbtn-outline:hover{border-color:var(--text);color:var(--text);}
+.cbtn-green{background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.25);}
+.cbtn-green:hover{background:rgba(34,197,94,.22);}
+.cbtn-orange{background:rgba(249,115,22,.12);color:var(--orange);border:1px solid rgba(249,115,22,.25);}
+.cbtn-orange:hover{background:rgba(249,115,22,.22);}
+.cbtn-red{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2);}
+.cbtn-red:hover{background:rgba(239,68,68,.2);}
+.cbtn-blue{background:rgba(59,158,255,.12);color:var(--blue);border:1px solid rgba(59,158,255,.25);}
+.cbtn-blue:hover{background:rgba(59,158,255,.22);}
+.cbtn-purple{background:rgba(168,85,247,.12);color:var(--purple);border:1px solid rgba(168,85,247,.25);}
+.cbtn-purple:hover{background:rgba(168,85,247,.22);}
+.cbtn-accent{background:var(--accent);color:#000;border:none;font-weight:700;}
+.cbtn-accent:hover{background:#e6b800;}
 
-/* DASH */
-#page-dash{padding:24px;gap:18px;flex-direction:column;}
-.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:12px;}
-.kc{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;}
-.kc.kw{border-left:3px solid var(--wilde);}
-.kc.kp{border-left:3px solid var(--paulo);}
-.kc.kt{border-left:3px solid var(--accent);}
-.kn{font-family:var(--fh);font-size:26px;font-weight:800;margin-bottom:3px;}
-.kl{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
-.ks{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:3px;}
-.charts2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-@media(max-width:640px){.charts2{grid-template-columns:1fr;}}
-.cc{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;}
-.ct{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:12px;}
-.bl{display:flex;flex-direction:column;gap:7px;}
-.bi{display:flex;align-items:center;gap:8px;}
-.blb{font-family:var(--fm);font-size:10px;color:var(--muted);width:60px;flex-shrink:0;}
-.btr{flex:1;height:14px;background:var(--surface2);border-radius:3px;overflow:hidden;}
-.bf{height:100%;border-radius:3px;transition:width .6s;}
-.bf.bfw{background:rgba(59,158,255,.55);}
-.bf.bfp{background:rgba(16,217,130,.55);}
-.bv{font-family:var(--fm);font-size:10px;color:var(--text);width:44px;text-align:right;flex-shrink:0;}
-.donut-w{display:flex;align-items:center;gap:16px;}
-.don-leg{display:flex;flex-direction:column;gap:7px;}
-.dl{display:flex;align-items:center;gap:6px;font-family:var(--fm);font-size:10px;color:var(--muted);}
-.dd{width:10px;height:10px;border-radius:50%;}
-.spark-r{display:flex;align-items:flex-end;gap:3px;height:58px;}
-.sb{flex:1;min-width:10px;border-radius:2px 2px 0 0;}
-.slr{display:flex;gap:3px;margin-top:3px;}
-.sl{flex:1;font-family:var(--fm);font-size:8px;color:var(--muted);text-align:center;}
+/* ── OVERLAY ── */
+.overlay{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:16px;}
+.overlay.open{display:flex;}
+.modal{background:#0d1117;border:1px solid var(--border);border-radius:16px;width:100%;max-width:460px;max-height:90dvh;display:flex;flex-direction:column;}
+.modal-hd{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+.modal-title{font-family:var(--fh);font-size:15px;font-weight:700;}
+.modal-close{width:30px;height:30px;border-radius:50%;background:var(--surface);border:1px solid var(--border);color:var(--muted);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.modal-body{padding:16px 18px 20px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px;}
 
-/* MODAL */
-.mbg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
-.mbg.open{display:flex;}
-.mc{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:480px;max-width:95vw;}
-.mt{font-family:var(--fh);font-size:16px;font-weight:800;margin-bottom:16px;}
-.mact{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}
-.mb{font-family:var(--fm);font-size:10px;padding:8px 16px;border-radius:7px;cursor:pointer;}
-.mb-c{background:transparent;border:1px solid var(--border);color:var(--muted);}
-.mb-s{background:var(--accent);border:none;color:#fff;font-weight:700;}
+/* ── DADOS ── */
+.dado-row{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;}
+.dado-label{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;min-width:72px;}
+.dado-val{font-size:13px;flex:1;}
+.dado-val input{background:transparent;border:none;color:var(--text);font-family:var(--fb);font-size:13px;width:100%;outline:none;}
+.dado-copy{font-family:var(--fm);font-size:9px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;flex-shrink:0;}
+.dado-copy:hover{color:var(--text);border-color:var(--accent);}
 
-/* TOAST */
-.toast{position:fixed;bottom:20px;right:20px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:10px 16px;font-family:var(--fm);font-size:11px;opacity:0;transform:translateY(20px);transition:all .25s;z-index:999;}
+/* ── DIAGNÓSTICO ── */
+.diag-row{display:flex;align-items:center;gap:10px;}
+.diag-label{font-family:var(--fm);font-size:10px;color:var(--muted);letter-spacing:.5px;min-width:90px;}
+.diag-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-family:var(--fb);font-size:13px;color:var(--text);outline:none;}
+.diag-input:focus{border-color:var(--accent);}
+.type-grid{display:flex;flex-wrap:wrap;gap:8px;}
+.type-btn{font-family:var(--fm);font-size:11px;padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
+.type-btn:hover{border-color:var(--accent);color:var(--text);}
+.type-btn.sel{border-color:var(--accent);background:rgba(245,200,0,.1);color:var(--accent);font-weight:600;}
+.srv-grid{display:flex;flex-wrap:wrap;gap:6px;}
+.srv-btn{font-family:var(--fm);font-size:10px;padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
+.srv-btn:hover{border-color:var(--blue);color:var(--text);}
+.srv-btn.sel{border-color:var(--blue);background:rgba(59,158,255,.1);color:var(--blue);}
+.srv-btn.sub-sel{border-color:var(--purple);background:rgba(168,85,247,.1);color:var(--purple);}
+.diag-section{display:flex;flex-direction:column;gap:8px;}
+.diag-section-label{font-family:var(--fm);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+
+/* ── RESPONSIVO MOBILE ── */
+@media (max-width: 480px) {
+  /* Header */
+  header { padding: 0 12px; gap: 8px; }
+  header .logo span:last-of-type { display: none; } /* oculta " / Logística" */
+  .hbtn { font-size: 9px; padding: 5px 9px; }
+  #busca-input { display: none; } /* esconde no header, já tem na barra */
+
+  /* Barra rastrear */
+  #busca-input { display: block; } /* mostrar na barra rastrear */
+
+  /* Colunas */
+  .col { width: 260px; }
+
+  /* Card — botões empilham melhor */
+  .card-actions { gap: 5px; }
+  .cbtn { font-size: 9px; padding: 5px 9px; }
+
+  /* Modal geral */
+  .modal { max-width: 100%; margin: 8px; border-radius: 12px; max-height: 96dvh; }
+
+  /* Dado row — valor truncado com ellipsis */
+  .dado-row { gap: 6px; }
+  .dado-label { min-width: 62px; font-size: 8px; }
+  .dado-val input { font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .dado-copy { font-size: 8px; padding: 3px 6px; flex-shrink: 0; }
+
+  /* Diagnóstico — Modelo + Tipo em coluna única no mobile */
+  .diag-equip-grid { grid-template-columns: 1fr !important; }
+  .diag-input { font-size: 12px; padding: 8px 10px; }
+  .type-btn { font-size: 10px; padding: 7px 12px; }
+  .srv-btn { font-size: 9px; padding: 5px 9px; }
+}
+
+/* ── PAINEL MÉTRICAS ── */
+.metricas{display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--surface);overflow-x:auto;}
+.met-card{flex:1;min-width:130px;padding:12px 16px;display:flex;flex-direction:column;gap:3px;border-right:1px solid var(--border);}
+.met-card:last-child{border-right:none;}
+.met-label{font-family:var(--fm);font-size:9px;color:var(--muted);letter-spacing:.5px;}
+.met-num{font-size:22px;font-weight:700;line-height:1;}
+.met-sub{font-family:var(--fm);font-size:9px;color:var(--muted);}
+/* ── ALERTA EM ROTA > 2H ── */
+.card.alerta-rota{border-color:#ef4444!important;box-shadow:0 0 0 2px rgba(239,68,68,.2);}
+.card.alerta-rota .card-time{color:#ef4444!important;font-weight:600;}
+.alerta-badge{display:inline-flex;align-items:center;gap:4px;font-family:var(--fm);font-size:9px;color:#ef4444;background:rgba(239,68,68,.12);padding:2px 8px;border-radius:10px;}
+/* ── TELEFONE NO CARD ── */
+.card-tel{font-family:var(--fm);font-size:10px;color:var(--muted);}
+/* ── EXPAND BOTÕES ── */
+.btns-hidden{display:none;flex-direction:column;gap:5px;margin-top:2px;}
+.btns-hidden.open{display:flex;}
+.cbtn-expand{
+  width:100%;padding:5px 0;border-radius:6px;
+  background:transparent;border:1px solid rgba(255,255,255,.08);
+  color:rgba(255,255,255,.35);font-family:var(--fm);font-size:10px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  gap:4px;transition:all .15s;letter-spacing:.5px;
+}
+.cbtn-expand:hover{color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.2);}
+.cbtn-expand .chev{display:inline-block;transition:transform .2s;font-style:normal;}
+.cbtn-expand.open .chev{transform:rotate(180deg);}
+/* ── VENCIMENTO COLETA ── */
+.venc-badge{display:inline-flex;align-items:center;gap:5px;font-family:var(--fm);font-size:11px;font-weight:700;padding:5px 10px;border-radius:8px;width:100%;justify-content:center;margin-bottom:6px;}
+.venc-ok{background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.25);}
+.venc-warn{background:rgba(249,115,22,.12);color:#f97316;border:1px solid rgba(249,115,22,.3);animation:pulse-warn .9s infinite;}
+.venc-late{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.35);animation:pulse-late .6s infinite;}
+@keyframes pulse-warn{0%,100%{opacity:1}50%{opacity:.6}}
+@keyframes pulse-late{0%,100%{opacity:1}50%{opacity:.4}}
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;right:24px;background:#1a1a1a;border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-family:var(--fm);font-size:11px;color:var(--text);z-index:999;opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;}
 .toast.show{opacity:1;transform:translateY(0);}
 </style>
 </head>
 <body>
-<header>
-  <div class="logo"><div class="logo-dot"></div>TV <em>Assistência</em> — Logística</div>
 
+<header>
+  <div class="logo">Reparo<span>Eletro</span> <span class="logo-sub" style="color:var(--muted);font-weight:400;font-size:12px;margin-left:8px;">/ Logística</span></div>
+  <div class="header-right">
+<button class="hbtn cbtn-green" onclick="abrirCadastro()" style="background:rgba(34,197,94,.15);color:#22c55e;border-color:#22c55e;">+ Cadastrar</button>
+<button class="hbtn" onclick="load()">↻ Atualizar</button>
+    <a href="/adm" class="hbtn">← ADM</a>
+  </div>
 </header>
 
-<div class="tabs-bar">
-  <button class="tab active" id="tab-form"   onclick="setTab('form')">📝 Registrar</button>
-  <button class="tab"        id="tab-tabela" onclick="setTab('tabela')">📋 Registros</button>
-  <button class="tab"        id="tab-dash"   onclick="setTab('dash')">📊 Dashboard</button>
+<div style="padding:12px 14px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+  <span style="font-family:var(--fm);font-size:10px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">🔍 RASTREAR</span>
+  <input type="text" id="busca-input" placeholder="Buscar por nome, ID, equipamento ou defeito..."
+    oninput="filtrar(this.value)"
+    style="flex:1;min-width:120px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+           padding:9px 14px;font-family:var(--fb);font-size:13px;color:var(--text);outline:none;
+           transition:border .15s;"
+    onfocus="this.style.borderColor='var(--accent)'"
+    onblur="this.style.borderColor='var(--border)'">
+  <div id="busca-resultado" style="font-family:var(--fm);font-size:11px;color:var(--muted);white-space:nowrap;"></div>
+</div>
+<div class="metricas" id="metricas">
+  <div class="met-card">
+    <div class="met-label">📦 LIBERADO</div>
+    <div class="met-num" id="m-lib">—</div>
+    <div class="met-sub"><span id="m-lib-s">—</span> semana</div>
+  </div>
+  <div class="met-card">
+    <div class="met-label">🕐 AGENDADO</div>
+    <div class="met-num" id="m-hor">—</div>
+    <div class="met-sub"><span id="m-hor-s">—</span> semana</div>
+  </div>
+  <div class="met-card">
+    <div class="met-label">🚚 EM ROTA</div>
+    <div class="met-num" id="m-rot">—</div>
+    <div class="met-sub"><span id="m-rot-s">—</span> semana</div>
+  </div>
+  <div class="met-card">
+    <div class="met-label">✅ COLETADO</div>
+    <div class="met-num" id="m-col">—</div>
+    <div class="met-sub"><span id="m-col-s">—</span> semana</div>
+  </div>
+  <div class="met-card">
+    <div class="met-label">📋 ORC. REG.</div>
+    <div class="met-num" id="m-orc">—</div>
+    <div class="met-sub"><span id="m-orc-s">—</span> semana</div>
+  </div>
+</div>
+<div class="board" id="board">
+  <!-- Colunas renderizadas via JS -->
 </div>
 
-<!-- REGISTRAR -->
-<div class="page active" id="page-form">
-  <div class="form-card">
-    <div class="form-title">🚗 Novo <span>Registro</span></div>
-    <div class="fl">Motorista</div>
-    <div class="motorista-row">
-      <button class="moto-btn wilde" id="btn-wilde" onclick="selMot('Wilde')">
-        <span class="micon">🧑</span><span class="mname">Wilde</span>
-      </button>
-      <button class="moto-btn paulo" id="btn-paulo" onclick="selMot('Paulo')">
-        <span class="micon">👤</span><span class="mname">Paulo</span>
-      </button>
+
+<!-- MODAL: CADASTRAR FICHA -->
+<div id="ov-cad" class="overlay" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:8px;">
+  <div class="modal" style="width:100%;max-width:440px;">
+    <div class="modal-header">
+      <div class="modal-title">+ Nova Ficha</div>
+      <button class="modal-close" onclick="fecharCadastro()">✕</button>
     </div>
-    <div class="fl">Data</div>
-    <input class="fi" id="f-data" type="date">
-    <div class="row2">
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
       <div>
-        <div class="fl">Km rodados</div>
-        <input class="fi" id="f-km" type="number" min="0" step="0.1" placeholder="ex: 87.5">
+        <div class="diag-section-label" style="margin-bottom:5px;">Nome do cliente *</div>
+        <input class="diag-input" id="cad-nome" placeholder="Ex: Maria Silva" style="width:100%;">
       </div>
       <div>
-        <div class="fl">Equipamentos</div>
-        <input class="fi" id="f-eq" type="number" min="0" step="1" placeholder="ex: 12">
+        <div class="diag-section-label" style="margin-bottom:5px;">Telefone</div>
+        <input class="diag-input" id="cad-tel" placeholder="Ex: 31999998888" style="width:100%;" type="tel">
+      </div>
+      <div>
+        <div class="diag-section-label" style="margin-bottom:5px;">Equipamento</div>
+        <input class="diag-input" id="cad-equip" placeholder="Ex: Microondas Electrolux 30L" style="width:100%;">
+      </div>
+      <div>
+        <div class="diag-section-label" style="margin-bottom:5px;">Defeito</div>
+        <input class="diag-input" id="cad-defeito" placeholder="Ex: Não esquenta" style="width:100%;">
+      </div>
+      <div>
+        <div class="diag-section-label" style="margin-bottom:5px;">Endereço</div>
+        <input class="diag-input" id="cad-end" placeholder="Ex: Rua das Flores 123, Bairro" style="width:100%;">
+      </div>
+      <div id="cad-msg" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="cbtn cbtn-outline" onclick="fecharCadastro()">Cancelar</button>
+        <button class="cbtn cbtn-green" onclick="salvarCadastro()">Cadastrar ficha</button>
       </div>
     </div>
-    <div class="fl">Observação (opcional)</div>
-    <input class="fi" id="f-obs" type="text" placeholder="ex: chuva forte, trânsito, rota alterada">
-    <button class="btn-reg" id="btn-reg" onclick="registrar()">✅ Registrar</button>
   </div>
 </div>
 
-<!-- REGISTROS -->
-<div class="page" id="page-tabela">
-  <div class="toolbar">
-    <button class="fbtn active" data-m="todos" onclick="setFM(this,'todos')">Todos</button>
-    <button class="fbtn wf" data-m="Wilde" onclick="setFM(this,'Wilde')">Wilde</button>
-    <button class="fbtn pf" data-m="Paulo" onclick="setFM(this,'Paulo')">Paulo</button>
-    <input type="month" class="fi-sm" id="f-mes" oninput="renderT()">
-    <input type="text" class="fi-search" id="f-busca" placeholder="🔍 Buscar...">
-    <span id="t-count" style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-left:auto;"></span>
-  </div>
-  <div id="empty-r" style="display:none;align-items:center;justify-content:center;padding:48px;font-family:var(--fm);font-size:11px;color:var(--muted);">Nenhum registro encontrado.</div>
-<div style="overflow-x:auto;">
-    <table>
-      <thead><tr>
-        <th onclick="sortBy('data')" style="cursor:pointer">Data ⇅</th>
-        <th>Motorista</th>
-        <th onclick="sortBy('km')" style="cursor:pointer">Km ⇅</th>
-        <th onclick="sortBy('equipamentos')" style="cursor:pointer">Equip. ⇅</th>
-        <th>Km/Equip.</th>
-        <th>Observação</th>
-        <th></th>
-      </tr></thead>
-      <tbody id="tbody"></tbody>
-    </table>
-  </div>
-</div>
-
-<!-- DASHBOARD -->
-<div class="page" id="page-dash">
-  <div class="toolbar" style="gap:6px;flex-wrap:wrap;align-items:center;">
-    <button class="fbtn active" id="dp-sem"  onclick="setPeriodo(this,'semana')">Esta semana</button>
-    <button class="fbtn"        id="dp-7"    onclick="setPeriodo(this,'7dias')">Últimos 7d</button>
-    <button class="fbtn"        id="dp-mes"  onclick="setPeriodo(this,'mes')">Este mês</button>
-    <button class="fbtn"        id="dp-tudo" onclick="setPeriodo(this,'tudo')">Tudo</button>
-    <button class="fbtn"        id="dp-cust" onclick="setPeriodo(this,'custom')">Personalizado</button>
-    <div id="custom-dates" style="display:none;align-items:center;gap:6px;">
-      <input type="date" class="fi-sm" id="d-de"  oninput="renderDash()" placeholder="De">
-      <span style="font-family:var(--fm);font-size:10px;color:var(--muted);">até</span>
-      <input type="date" class="fi-sm" id="d-ate" oninput="renderDash()" placeholder="Até">
+<!-- MODAL: MOTORISTA PARCEIRO -->
+<div id="ov-motorista" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:8px;">
+  <div class="modal" style="width:100%;max-width:380px;">
+    <div class="modal-header">
+      <div class="modal-title" style="color:#8b5cf6;">🏍️ Motorista Parceiro</div>
+      <button class="modal-close" onclick="fecharMotorista()">✕</button>
     </div>
-    <div style="width:1px;height:18px;background:var(--border);margin:0 2px;"></div>
-    <button class="fbtn active" id="dm-todos" onclick="setFD(this,'todos')">Todos</button>
-    <button class="fbtn wf"     id="dm-wilde" onclick="setFD(this,'Wilde')">Wilde</button>
-    <button class="fbtn pf"     id="dm-paulo" onclick="setFD(this,'Paulo')">Paulo</button>
-  </div>
-  <div class="kpi-grid" id="kpi-grid"></div>
-  <div class="charts2">
-    <div class="cc"><div class="ct">Km por motorista</div><div class="bl" id="c-km"></div></div>
-    <div class="cc"><div class="ct">Equipamentos por motorista</div><div class="bl" id="c-eq"></div></div>
-  </div>
-  <div class="charts2">
-    <div class="cc">
-      <div class="ct">Divisão de saídas</div>
-      <div class="donut-w">
-        <svg id="don-svg" viewBox="0 0 100 100" width="100" height="100"></svg>
-        <div class="don-leg" id="don-leg"></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <div class="diag-section-label" style="margin-bottom:6px;">Nome do motorista</div>
+        <input class="diag-input" id="motorista-nome" placeholder="Ex: João Moto" style="width:100%;"
+          onkeydown="if(event.key==='Enter') confirmarMotorista()">
+      </div>
+      <div id="motorista-msg" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="cbtn cbtn-outline" onclick="fecharMotorista()">Cancelar</button>
+        <button class="cbtn" style="background:#8b5cf6;color:#fff;border:none;" onclick="confirmarMotorista()">Confirmar</button>
       </div>
     </div>
-    <div class="cc">
-      <div class="ct">Tendência de km — últimas 15 saídas</div>
-      <div class="spark-r" id="sp-bars"></div>
-      <div class="slr" id="sp-labels"></div>
-    </div>
   </div>
-  <div class="cc"><div class="ct">Km por dia (últimos 20 dias com saída)</div><div class="bl" id="c-daily"></div></div>
 </div>
 
-<!-- MODAL EDITAR -->
-<div class="mbg" id="mbg" onclick="closeMBg(event)">
-  <div class="mc">
-    <div class="mt">✏️ Editar Registro</div>
-    <input type="hidden" id="e-id">
-    <div class="fl">Motorista</div>
-    <select class="fi" id="e-mot"><option value="Wilde">Wilde</option><option value="Paulo">Paulo</option></select>
-    <div class="fl">Data</div>
-    <input class="fi" id="e-data" type="date">
-    <div class="row2">
-      <div><div class="fl">Km</div><input class="fi" id="e-km" type="number" step="0.1"></div>
-      <div><div class="fl">Equipamentos</div><input class="fi" id="e-eq" type="number" step="1"></div>
+<!-- MODAL: HORÁRIO MARCADO -->
+<div id="ov-horario" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:8px;">
+  <div class="modal" style="width:100%;max-width:380px;">
+    <div class="modal-header">
+      <div class="modal-title" style="color:#f97316;">🕐 Horário da Coleta</div>
+      <button class="modal-close" onclick="fecharHorario()">✕</button>
     </div>
-    <div class="fl">Observação</div>
-    <input class="fi" id="e-obs" type="text">
-    <div class="mact">
-      <button class="mb mb-c" onclick="closeM()">Cancelar</button>
-      <button class="mb mb-s" onclick="salvarEd()">Salvar</button>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <div class="diag-section-label" style="margin-bottom:6px;">Data e hora agendada</div>
+        <input class="diag-input" id="horario-input" type="datetime-local" style="width:100%;font-size:14px;"
+          onkeydown="if(event.key==='Enter') confirmarHorario()">
+        <div style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:4px;">
+          Defina quando a coleta está agendada. Alertas automáticos: 🟠 menos de 1h · 🔴 vencido
+        </div>
+      </div>
+      <div id="horario-msg" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="cbtn cbtn-outline" onclick="fecharHorario()">Cancelar</button>
+        <button class="cbtn" style="background:#f97316;color:#fff;border:none;" onclick="confirmarHorario()">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- MODAL: VER / EDITAR DADOS -->
+<div class="overlay" id="ov-dados" onclick="if(event.target===this)fecharDados()">
+  <div class="modal">
+    <div class="modal-hd">
+      <div class="modal-title">Dados da Ficha</div>
+      <button class="modal-close" onclick="fecharDados()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="dados-id" style="font-family:var(--fm);font-size:10px;color:var(--muted);"></div>
+      <div class="dado-row">
+        <span class="dado-label">Nome</span>
+        <div class="dado-val"><input id="d-nome" type="text"></div>
+        <button class="dado-copy" onclick="copiar('d-nome')">Copiar</button>
+      </div>
+      <div class="dado-row">
+        <span class="dado-label">Telefone</span>
+        <div class="dado-val"><input id="d-tel" type="text"></div>
+        <button class="dado-copy" onclick="copiar('d-tel')">Copiar</button>
+      </div>
+      <div class="dado-row">
+        <span class="dado-label">Endereço</span>
+        <div class="dado-val"><input id="d-end" type="text"></div>
+        <button class="dado-copy" onclick="copiar('d-end')">Copiar</button>
+      </div>
+      <div class="dado-row">
+        <span class="dado-label">Equipamento</span>
+        <div class="dado-val"><input id="d-equip" type="text"></div>
+        <button class="dado-copy" onclick="copiar('d-equip')">Copiar</button>
+      </div>
+      <div class="dado-row">
+        <span class="dado-label">Defeito</span>
+        <div class="dado-val"><input id="d-defeito" type="text"></div>
+        <button class="dado-copy" onclick="copiar('d-defeito')">Copiar</button>
+      </div>
+      <div id="dados-msg" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="cbtn cbtn-outline" onclick="fecharDados()">Fechar</button>
+        <button class="cbtn cbtn-accent" onclick="salvarDados()">Salvar alterações</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: DIAGNÓSTICO -->
+<div class="overlay" id="ov-diag" onclick="if(event.target===this)fecharDiag()">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-hd">
+      <div class="modal-title" style="color:var(--purple);">Diagnóstico</div>
+      <button class="modal-close" onclick="fecharDiag()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="diag-ficha-id" style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:4px;"></div>
+
+      <!-- Quantidade -->
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="diag-section-label">Qtd. equipamentos</div>
+        <input class="diag-input" id="diag-qtd" type="number" min="1" max="10" value="1"
+          style="width:70px;text-align:center;"
+          oninput="renderEquips(parseInt(this.value)||1)">
+      </div>
+
+      <!-- Seções por equipamento (renderizadas dinamicamente) -->
+      <div id="diag-equips"></div>
+
+      <div id="diag-msg" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:4px;">
+        <button class="cbtn cbtn-outline" onclick="fecharDiag()">Cancelar</button>
+        <button class="cbtn cbtn-purple" onclick="salvarDiag()">Salvar diagnóstico</button>
+      </div>
     </div>
   </div>
 </div>
@@ -259,313 +385,702 @@ tbody td{font-family:var(--fm);font-size:11px;padding:10px 12px;color:var(--text
 <div class="toast" id="toast"></div>
 
 <script>
-var recs=[], fmot='todos', fdash='todos', periodo='semana', sf='data', sd=true, toastT;
-
-function setTab(t){
-  ['form','tabela','dash'].forEach(function(p){
-    document.getElementById('page-'+p).classList.toggle('active',p===t);
-    document.getElementById('tab-'+p).classList.toggle('active',p===t);
-  });
-  if(t==='tabela') renderT();
-  if(t==='dash')   renderDash();
-}
-
-var motSel='';
-function selMot(m){
-  motSel=m;
-  document.getElementById('btn-wilde').classList.toggle('sel',m==='Wilde');
-  document.getElementById('btn-paulo').classList.toggle('sel',m==='Paulo');
-}
-
-(function init(){
-  var h=new Date().toISOString().slice(0,10), mes=h.slice(0,7);
-  document.getElementById('f-data').value=h;
-  document.getElementById('f-mes').value=mes;
-  document.getElementById('f-busca').addEventListener('input',renderT);
-  load();
-})();
-
-async function load(){
-  try{ var d=await fetch('/api/tv-logistica?action=load').then(r=>r.json()); recs=d.registros||[]; }
-  catch(e){ recs=[]; }
-  renderT();
-}
-
-async function registrar(){
-  if(!motSel){ toast('Selecione o motorista','var(--yellow)'); return; }
-  var km=document.getElementById('f-km').value.trim();
-  var eq=document.getElementById('f-eq').value.trim();
-  var dt=document.getElementById('f-data').value;
-  var ob=document.getElementById('f-obs').value.trim();
-  if(!km||!eq||!dt){ toast('Preencha Km, Equipamentos e Data','var(--yellow)'); return; }
-  var btn=document.getElementById('btn-reg');
-  btn.disabled=true; btn.textContent='⏳ Salvando...';
-  try{
-    var resp=await fetch('/api/tv-logistica?action=registrar',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({motorista:motSel,km:parseFloat(km),equipamentos:parseInt(eq),data:dt,observacao:ob})
-    });
-    var d=await resp.json();
-    if(d && d.ok){
-      if(!Array.isArray(recs)) recs=[];
-      recs.unshift(d.registro);
-      document.getElementById('f-km').value='';
-      document.getElementById('f-eq').value='';
-      document.getElementById('f-obs').value='';
-      motSel='';
-      document.getElementById('btn-wilde').className='moto-btn wilde';
-      document.getElementById('btn-paulo').className='moto-btn paulo';
-      renderT();
-      toast('✅ Registro salvo!','var(--green)');
-    } else {
-      toast('❌ '+(d&&d.error||'Erro ao salvar'),'var(--red)');
+// ── ESTRUTURA DE SERVIÇOS ────────────────────────────────────
+const SERVICOS = {
+  microondas: {
+    direto: ['Capacitor','Fusível de Alta','Microchave de Acionamento','Troca de Placa',
+             'Recuperação de Placa','Motor de Rotação','Porta','Vidro','Haste',
+             'Pintura','Membrana','Display','Magnetron','Placa Micra']
+  },
+  purificador: {
+    subtipos: {
+      'Motor':     ['Gás','Bojo','Dutos e Conexões','Válvula','Kit de Partida'],
+      'Eletrônico':['Kit Termo Elétrico','Recuperação de Placa','Dutos e Conexões','Válvula'],
     }
-  }catch(e){ toast('❌ Erro: '+e.message,'var(--red)'); }
-  btn.disabled=false; btn.textContent='✅ Registrar';
+  },
+  adega: {
+    subtipos: {
+      'Motor':     ['Gás','Recuperação de Placa','Troca de Placa'],
+      'Eletrônico':['Kit Termo Elétrico','Recuperação de Placa','Troca de Placa'],
+    }
+  },
+  forno: {
+    subtipos: {
+      'Pequeno':   ['Resistência','Termostato','Timer','Display','Porta','Vidro','Mola'],
+      'Grande':    ['Resistência','Termostato','Timer','Display','Porta','Vidro','Mola'],
+    }
+  },
+};
+
+// Serviços que requerem campo de preço (valor x2)
+const ITENS_COM_PRECO = new Set([
+  'Troca de Placa','Display','Vidro','Porta','Mola'
+]);
+
+function precisaPreco(tipo, subtipo, servicos) {
+  if (tipo === 'adega')      return (servicos||[]).includes('Troca de Placa');
+  if (tipo === 'purificador') return false;
+  return (servicos||[]).some(x => ITENS_COM_PRECO.has(x));
 }
 
-function setFM(el,m){ document.querySelectorAll('#page-tabela .fbtn').forEach(b=>b.classList.remove('active')); el.classList.add('active'); fmot=m; renderT(); }
-function setFD(el,m){
-  document.querySelectorAll('[id^=dm-]').forEach(b=>b.classList.remove('active'));
-  el.classList.add('active');
-  fdash=m;
-  renderDash();
-}
-function setPeriodo(el,p){
-  document.querySelectorAll('[id^=dp-]').forEach(b=>b.classList.remove('active'));
-  el.classList.add('active');
-  periodo=p;
-  var cd=document.getElementById('custom-dates');
-  if(cd) cd.style.display=p==='custom'?'flex':'none';
-  renderDash();
-}
-function sortBy(f){ if(sf===f) sd=!sd; else{sf=f;sd=true;} renderT(); }
+// ── COLUNAS ──────────────────────────────────────────────────
+const COLS = [
+  { id:'liberado_coleta',    label:'Liberado para Coleta', cor:'#f5c800' },
+  { id:'horario_marcado',    label:'Horário Marcado',      cor:'#f97316' },
+  { id:'em_rota',          label:'Equipamento em Rota',  cor:'#3b9eff' },
+  { id:'motorista_parceiro', label:'Motorista Parceiro',   cor:'#8b5cf6' },
+  { id:'remarcar',         label:'Remarcar',             cor:'#f97316' },
+  { id:'coleta_efetuada',  label:'Coleta Efetuada',      cor:'#22c55e' },
+  { id:'orc_registrado',   label:'Orçamento Registrado', cor:'#a855f7' },
+];
 
-function getFiltered(){
-  var mes=document.getElementById('f-mes').value;
-  var bsc=(document.getElementById('f-busca').value||'').toLowerCase();
-  return recs.filter(function(r){
-    if(fmot!=='todos'&&r.motorista!==fmot) return false;
-    if(mes&&!r.data.startsWith(mes)) return false;
-    if(bsc&&!(r.motorista.toLowerCase().includes(bsc)||(r.observacao||'').toLowerCase().includes(bsc)||r.data.includes(bsc))) return false;
-    return true;
-  }).sort(function(a,b){
-    var av=a[sf],bv=b[sf];
-    if(typeof av==='string') return sd?bv.localeCompare(av):av.localeCompare(bv);
-    return sd?bv-av:av-bv;
+let fichas = [], fichasFiltradas = [], fichaAtual = null;
+
+// ── LOAD ─────────────────────────────────────────────────────
+async function load() {
+  const r = await fetch('/api/tv-logistica?action=load').then(r=>r.json()).catch(()=>({fichas:[]}));
+  fichas = r.fichas || [];
+  atualizarMetricas(); // async, não bloqueia o render
+  const q = document.getElementById('busca-input');
+  filtrar(q ? q.value : '');
+  const res = document.getElementById('busca-resultado');
+  if (res && !(q && q.value)) res.textContent = fichas.length + ' fichas';
+}
+
+function filtrar(q) {
+  const s = (q||'').toLowerCase().trim();
+  fichasFiltradas = s ? fichas.filter(f=> {
+    // Busca em todos os campos do card
+    const campos = [
+      f.nome, f.id, f.equipamento, f.defeito,
+      f.telefone, f.endereco, f.motoristaNome,
+      f.texto, f.pipefyCardId,
+      // Label da coluna também
+      (COLS.find(c=>c.id===f.phase)||{}).label
+    ];
+    return campos.some(v => (v||'').toLowerCase().includes(s));
+  }) : [...fichas];
+  const res = document.getElementById('busca-resultado');
+  if (res) res.textContent = s ? fichasFiltradas.length + ' resultado' + (fichasFiltradas.length !== 1 ? 's' : '') : fichas.length + ' fichas';
+  render();
+}
+
+
+// ── Máscara de telefone: (99) 99999-9999 ──────────────────────
+function mascaraTel(tel) {
+  if (!tel) return '';
+  // Remover tudo que não é dígito
+  var d = String(tel).replace(/\D/g, '');
+  // Remover prefixo 55 (Brasil) se tiver 12 ou 13 dígitos
+  if ((d.length === 13 || d.length === 12) && d.startsWith('55')) d = d.slice(2);
+  // Se 10 dígitos (sem o 9) → adicionar 9 após o DDD
+  if (d.length === 10) d = d.slice(0,2) + '9' + d.slice(2);
+  // Formatar (DD) 9XXXX-XXXX
+  if (d.length === 11) {
+    return '(' + d.slice(0,2) + ') ' + d.slice(2,7) + '-' + d.slice(7);
+  }
+  // Não conseguiu formatar — retorna original
+  return tel;
+}
+// ── RENDER ────────────────────────────────────────────────────
+function render() {
+  const board = document.getElementById('board');
+  board.innerHTML = COLS.map(col => {
+    const cards = fichasFiltradas.filter(f => f.phase === col.id);
+    return `
+    <div class="col">
+      <div class="col-header">
+        <div class="col-top-stripe" style="background:${col.cor};opacity:.7;"></div>
+        <div class="col-title">
+          <div class="col-dot" style="background:${col.cor}"></div>
+          ${col.label}
+        </div>
+        <span class="col-count">${cards.length}</span>
+      </div>
+      ${cards.map(f => cardHTML(f, col.id)).join('')}
+    </div>`;
+  }).join('');
+}
+
+function nomeFormatado(f) {
+  var primeiro = (f.nome || '').split(' ')[0];
+  var d4 = (f.telefone || '').replace(/\D/g, '').slice(-4);
+  return d4 ? primeiro + ' ' + d4 : primeiro;
+}
+
+function cardHTML(f, phase) {
+  const tempo = tempoRelativo(f.movedAt || f.criadoEm);
+  const col   = COLS.find(c => c.id === phase) || {};
+  const barCor = col.cor || '#444';
+
+  let btns = '';
+  if (phase === 'liberado_coleta') {
+    btns = `
+      <button class="cbtn cbtn-outline" onclick="abrirDados('${f.id}')">👁 Ver Dados</button>
+      <button class="cbtn-expand" id="btn-x-${f.id}" onclick="toggleExpand('${f.id}')"><em class="chev">▾</em><span> Mais ações</span></button>
+      <div class="btns-hidden" id="btns-x-${f.id}">
+        <button class="cbtn" style="background:rgba(249,115,22,.15);color:#f97316;border-color:#f97316;" onclick="abrirHorario('${f.id}')">🕐 Horário Marcado</button>
+        <button class="cbtn cbtn-blue" onclick="mover('${f.id}','em_rota')">Equipamento em Rota</button>
+        <button class="cbtn cbtn-purple" onclick="abrirMotorista('${f.id}')">Motorista Parceiro</button>
+        <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>
+        <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>
+      </div>`;
+  } else if (phase === 'horario_marcado') {
+    // Badge de vencimento
+    let vencBadge = '';
+    if (f.horarioColeta) {
+      const diff  = new Date(f.horarioColeta).getTime() - Date.now();
+      const abs   = Math.abs(diff);
+      const horas = Math.floor(abs/3600000);
+      const mins  = Math.floor((abs%3600000)/60000);
+      const fmt   = diff >= 0
+        ? (horas > 0 ? `em ${horas}h${mins>0?mins+'m':''}` : `em ${mins}min`)
+        : (horas > 0 ? `${horas}h${mins>0?mins+'m':''} atrás` : `${mins}min atrás`);
+      const cls  = diff < 0 ? 'venc-late' : diff < 3600000 ? 'venc-warn' : 'venc-ok';
+      const icon = diff < 0 ? '🔴' : diff < 3600000 ? '🟠' : '🟢';
+      const hora = new Date(f.horarioColeta).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'});
+      const dia  = new Date(f.horarioColeta).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',timeZone:'America/Sao_Paulo'});
+      vencBadge = `<div class="venc-badge ${cls}">${icon} ${dia} às ${hora} · ${fmt}</div>`;
+    } else if (f.horarioColetaTexto) {
+      vencBadge = `<div class="venc-badge venc-ok">🟢 ${escHtml(f.horarioColetaTexto)}</div>`;
+    } else {
+      vencBadge = `<div class="venc-badge venc-ok">🟢 Agendado</div>`;
+    }
+    btns = vencBadge + `
+      <button class="cbtn cbtn-outline" onclick="abrirDados('${f.id}')">👁 Ver Dados</button>
+      <button class="cbtn-expand" id="btn-x-${f.id}" onclick="toggleExpand('${f.id}')"><em class="chev">▾</em><span> Mais ações</span></button>
+      <div class="btns-hidden" id="btns-x-${f.id}">
+        <button class="cbtn cbtn-blue" onclick="mover('${f.id}','em_rota')">Equipamento em Rota</button>
+        <button class="cbtn cbtn-purple" onclick="abrirMotorista('${f.id}')">Motorista Parceiro</button>
+        <button class="cbtn" style="background:rgba(249,115,22,.15);color:#f97316;border-color:#f97316;" onclick="abrirHorario('${f.id}')">✏️ Alterar Horário</button>
+        <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>
+        <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>
+      </div>`;
+  } else if (phase === 'em_rota') {
+    btns = `
+      <button class="cbtn-expand" id="btn-x-${f.id}" onclick="toggleExpand('${f.id}')"><em class="chev">▾</em><span> Mais ações</span></button>
+      <div class="btns-hidden" id="btns-x-${f.id}">
+        <button class="cbtn cbtn-green" onclick="mover('${f.id}','coleta_efetuada')">Coleta Efetuada</button>
+        <button class="cbtn cbtn-purple" onclick="abrirMotorista('${f.id}')">Motorista Parceiro</button>
+        <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>
+        <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>
+      </div>`;
+  } else if (phase === 'motorista_parceiro') {
+    const motorista = f.motoristaNome ? `<div style="font-family:var(--fm);font-size:10px;color:#8b5cf6;margin-bottom:2px;">🏍️ ${escHtml(f.motoristaNome)}</div>` : '';
+    btns = motorista + `
+      <button class="cbtn-expand" id="btn-x-${f.id}" onclick="toggleExpand('${f.id}')"><em class="chev">▾</em><span> Mais ações</span></button>
+      <div class="btns-hidden" id="btns-x-${f.id}">
+        <button class="cbtn cbtn-green" onclick="mover('${f.id}','coleta_efetuada')">Coleta Efetuada</button>
+        <button class="cbtn cbtn-blue" onclick="mover('${f.id}','em_rota')">Equipamento em Rota</button>
+        <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>
+        <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>
+      </div>`;
+  } else if (phase === 'remarcar') {
+    btns = `
+      <button class="cbtn cbtn-blue" onclick="mover('${f.id}','liberado_coleta')">Liberar Novamente</button>
+      <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>`;
+  } else if (phase === 'coleta_efetuada') {
+    btns = `
+      <button class="cbtn cbtn-purple" onclick="abrirDiag('${f.id}')">Diagnóstico</button>
+      <button class="cbtn cbtn-red" onclick="finalizarRS('${f.id}','${escHtml(f.nome)}')">🔴 RS</button>`;
+  } else if (phase === 'orc_registrado') {
+    const diag = f.diagnostico;
+    if (diag) btns = `<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">${diag.tipo||''}${diag.subtipo?' › '+diag.subtipo:''} — ${(diag.servicos||[]).join(', ')}</div>`;
+  }
+
+  const emRotaAlerta = (phase === 'em_rota' || phase === 'motorista_parceiro') && (Date.now() - new Date(f.movedAt||f.criadoEm).getTime()) > 2 * 60 * 60 * 1000;
+  return `
+  <div class="card${emRotaAlerta ? ' alerta-rota' : ''}">
+    <div class="card-left-bar" style="background:${barCor};"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div class="card-id">${f.id}</div>
+      <div class="card-time">${tempo}${emRotaAlerta ? ' 🔴' : ''}</div>
+    </div>
+    ${emRotaAlerta ? '<div class="alerta-badge">⚠️ Em rota há mais de 2h</div>' : ''}
+    <div class="card-nome">${escHtml(nomeFormatado(f))}</div>
+    ${f.telefone ? `<div class="card-tel">📞 ${escHtml(mascaraTel(f.telefone))}</div>` : ''}
+    ${f.equipamento ? `<div class="card-equip">${escHtml(f.equipamento)}</div>` : ''}
+    ${f.defeito ? `<div class="card-defeito">${escHtml(f.defeito).slice(0,80)}</div>` : ''}
+    <div class="card-actions">${btns}</div>
+  </div>`;
+}
+
+// ── AÇÕES ─────────────────────────────────────────────────────
+async function mover(id, phase) {
+  const r = await fetch('/api/tv-logistica?action=mover', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({id, phase})
+  }).then(r=>r.json());
+  if (r.ok) { await load(); toast('Movido com sucesso'); }
+  else toast('Erro: '+r.error, true);
+}
+
+async function finalizarRS(id, nome) {
+  if (!confirm('Finalizar a ficha ' + id + ' (' + nome + ') como RS?\n\nEsta ação finaliza sem gerar novo orçamento.')) return;
+  try {
+    const r = await fetch('/api/tv-logistica?action=finalizar-rs', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    }).then(r => r.json());
+    if (r.ok) {
+      fichas = fichas.filter(f => f.id !== id);
+      filtrar(document.getElementById('busca-input')?.value || '');
+      showToast('✅', 'RS finalizado', id + ' finalizado com sucesso');
+    } else {
+      showToast('❌', 'Erro', r.error || 'Erro ao finalizar');
+    }
+  } catch(e) {
+    showToast('❌', 'Erro', e.message);
+  }
+}
+
+async function cancelar(id, nome) {
+  if (!confirm(`Cancelar ficha de ${nome}? Esta ação não pode ser desfeita.`)) return;
+  const r = await fetch('/api/tv-logistica?action=cancelar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({id})
+  }).then(r=>r.json());
+  if (r.ok) { await load(); toast('Ficha cancelada'); }
+}
+
+// ── MODAL DADOS ───────────────────────────────────────────────
+function abrirDados(id) {
+  fichaAtual = fichas.find(f=>f.id===id);
+  if (!fichaAtual) return;
+  document.getElementById('dados-id').textContent = fichaAtual.id;
+  document.getElementById('d-nome').value    = fichaAtual.nome || '';
+  document.getElementById('d-tel').value     = mascaraTel(fichaAtual.telefone);
+  document.getElementById('d-end').value     = fichaAtual.endereco || '';
+  document.getElementById('d-equip').value   = fichaAtual.equipamento || '';
+  document.getElementById('d-defeito').value = fichaAtual.defeito || '';
+  document.getElementById('dados-msg').style.display = 'none';
+  document.getElementById('ov-dados').classList.add('open');
+}
+
+function fecharDados() { document.getElementById('ov-dados').classList.remove('open'); }
+
+async function salvarDados() {
+  if (!fichaAtual) return;
+  const body = {
+    id: fichaAtual.id,
+    nome:        document.getElementById('d-nome').value,
+    telefone:    document.getElementById('d-tel').value,
+    endereco:    document.getElementById('d-end').value,
+    equipamento: document.getElementById('d-equip').value,
+    defeito:     document.getElementById('d-defeito').value,
+  };
+  const r = await fetch('/api/tv-logistica?action=atualizar-dados', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  }).then(r=>r.json());
+  if (r.ok) {
+    const m = document.getElementById('dados-msg');
+    m.textContent='✅ Salvo!'; m.style.display='block';
+    m.style.background='rgba(34,197,94,.1)'; m.style.color='#22c55e';
+    await load();
+    setTimeout(()=>{ m.style.display='none'; fecharDados(); }, 1200);
+  }
+}
+
+function copiar(id) {
+  const el = document.getElementById(id);
+  navigator.clipboard.writeText(el.value || el.textContent).then(()=>toast('Copiado!'));
+}
+
+// ── MODAL DIAGNÓSTICO ─────────────────────────────────────────
+let diagEquips = []; // [{modelo, tipo, subtipo, servicos}]
+
+function detectarQtd(f) {
+  const txt = ((f.equipamento||'')+(f.defeito||'')+(f.texto||'')).toLowerCase();
+  const nums = txt.match(/\b([2-9]|1[0-9])\s*(equipamento|microondas|purificador|adega|forno|aparelho)/);
+  return nums ? parseInt(nums[1]) : 1;
+}
+
+function detectarTipo(f) {
+  const eq = (f.equipamento||'').toLowerCase();
+  if (eq.includes('microondas')) return 'microondas';
+  if (eq.includes('purificador')) return 'purificador';
+  if (eq.includes('adega')) return 'adega';
+  if (eq.includes('forno')) return 'forno';
+  return null;
+}
+
+function abrirDiag(id) {
+  fichaAtual = fichas.find(f=>f.id===id);
+  if (!fichaAtual) return;
+  document.getElementById('diag-ficha-id').textContent = fichaAtual.id + ' — ' + fichaAtual.nome;
+  document.getElementById('diag-msg').style.display='none';
+  const qtd = detectarQtd(fichaAtual);
+  document.getElementById('diag-qtd').value = qtd;
+  diagEquips = Array.from({length: qtd}, ()=>({modelo:'', tipo: detectarTipo(fichaAtual), subtipo:null, servicos:[]}));
+  renderEquips(qtd);
+  document.getElementById('ov-diag').classList.add('open');
+}
+
+function fecharDiag() { document.getElementById('ov-diag').classList.remove('open'); }
+
+function renderEquips(qtd) {
+  // Preservar dados já preenchidos
+  while (diagEquips.length < qtd) diagEquips.push({modelo:'', tipo: detectarTipo(fichaAtual), subtipo:null, servicos:[]});
+  diagEquips = diagEquips.slice(0, qtd);
+  const container = document.getElementById('diag-equips');
+  container.innerHTML = diagEquips.map((eq, i) => equipSecHTML(eq, i, qtd)).join('');
+}
+
+function equipSecHTML(eq, i, total) {
+  const spec = eq.tipo ? SERVICOS[eq.tipo] : null;
+  const label = total > 1 ? `Equipamento ${i+1}` : 'Equipamento';
+  let subtiposHTML = '', servicosHTML = '';
+
+  if (spec?.subtipos) {
+    const subs = Object.keys(spec.subtipos);
+    subtiposHTML = `
+      <div class="diag-section-label" style="margin-top:8px;">${eq.tipo==='forno'?'Porte':'Categoria'}</div>
+      <div class="type-grid">
+        ${subs.map(s=>`<button class="type-btn${eq.subtipo===s?' sel':''}" onclick="selSubtipo(${i},'${s}')">${s}</button>`).join('')}
+      </div>`;
+    if (eq.subtipo && spec.subtipos[eq.subtipo]) {
+      servicosHTML = servicosHTML || servicosGridHTML(i, eq, spec.subtipos[eq.subtipo]);
+    }
+  } else if (spec?.direto) {
+    servicosHTML = servicosGridHTML(i, eq, spec.direto);
+  }
+
+  return `
+  <div style="border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:10px;display:flex;flex-direction:column;gap:10px;">
+    ${total>1 ? `<div style="font-family:var(--fm);font-size:10px;color:var(--accent);font-weight:600;">${label}</div>` : ''}
+    <div class="diag-equip-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div>
+        <div class="diag-section-label" style="margin-bottom:5px;">Modelo</div>
+        <input class="diag-input" value="${eq.modelo||''}" placeholder="Ex: CPB34AS"
+          style="width:100%;" oninput="diagEquips[${i}].modelo=this.value">
+      </div>
+      <div>
+        <div class="diag-section-label" style="margin-bottom:5px;">Tipo</div>
+        <div class="type-grid">
+          ${['microondas','purificador','adega','forno'].map(t=>
+            `<button class="type-btn${eq.tipo===t?' sel':''}" onclick="selTipo(${i},'${t}')">${t.charAt(0).toUpperCase()+t.slice(1)}</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+    ${subtiposHTML}
+    ${servicosHTML ? `<div><div class="diag-section-label" style="margin-bottom:6px;">Serviços / Peças</div><div class="srv-grid">${servicosHTML}</div></div>` : ''}
+    ${precisaPreco(eq.tipo, eq.subtipo, eq.servicos) ? `
+    <div>
+      <div class="diag-section-label" style="margin-bottom:5px;">Preço de custo (R$) — valor final será x2</div>
+      <input class="diag-input" type="number" min="0" placeholder="Ex: 150" value="${eq.preco||''}"
+        style="width:160px;" oninput="diagEquips[${i}].preco=this.value">
+    </div>` : ''}
+  </div>`;
+}
+
+function servicosGridHTML(i, eq, lista) {
+  return lista.map(s =>
+    `<button class="srv-btn${(eq.servicos||[]).includes(s)?' sel':''}" onclick="toggleSrv(${i},'${s}',this)">${s}</button>`
+  ).join('');
+}
+
+function selTipo(i, tipo) {
+  diagEquips[i].tipo = tipo;
+  diagEquips[i].subtipo = null;
+  diagEquips[i].servicos = [];
+  renderEquips(diagEquips.length);
+}
+
+function selSubtipo(i, sub) {
+  diagEquips[i].subtipo = sub;
+  diagEquips[i].servicos = [];
+  renderEquips(diagEquips.length);
+}
+
+function toggleSrv(i, srv, btn) {
+  const eq = diagEquips[i];
+  const idx = eq.servicos.indexOf(srv);
+  if (idx >= 0) { eq.servicos.splice(idx,1); }
+  else          { eq.servicos.push(srv); }
+  // Re-renderizar para mostrar/esconder campo de preço
+  renderEquips(diagEquips.length);
+}
+
+async function salvarDiag() {
+  if (!fichaAtual) return;
+  for (let i = 0; i < diagEquips.length; i++) {
+    const eq = diagEquips[i];
+    const label = diagEquips.length > 1 ? `Equipamento ${i+1}` : 'equipamento';
+    if (!eq.tipo)            { mostrarMsgDiag(`Selecione o tipo do ${label}`,'err'); return; }
+    if (!eq.servicos.length) { mostrarMsgDiag(`Selecione ao menos um serviço para o ${label}`,'err'); return; }
+    if (precisaPreco(eq.tipo, eq.subtipo, eq.servicos) && !eq.preco) {
+      mostrarMsgDiag(`Informe o preço de custo do ${label}`,'err'); return;
+    }
+  }
+
+  // Passo 1: salvar diagnóstico
+  const diagnostico = { equips: diagEquips.map(eq=>({...eq})) };
+  const r1 = await fetch('/api/tv-logistica?action=salvar-diagnostico', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ id: fichaAtual.id, diagnostico })
+  }).then(r=>r.json());
+  if (!r1.ok) { mostrarMsgDiag('Erro ao salvar: '+r1.error,'err'); return; }
+
+  mostrarMsgDiag('⏳ Gerando orçamento e registrando no Pipefy...','ok');
+
+  // Passo 2: gerar orçamento + mover Pipefy
+  const r2 = await fetch('/api/tv-logistica?action=gerar-orcamento', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ id: fichaAtual.id })
+  }).then(r=>r.json());
+
+  if (r2.ok) {
+    if (r2.pipefyOk) {
+      mostrarMsgDiag(`✅ Orçamento R$ ${r2.precoFinal} — registrado no Pipefy com sucesso!`,'ok');
+    } else {
+      mostrarMsgDiag(`✅ Orçamento R$ ${r2.precoFinal} gerado. ⚠️ Pipefy pendente: ${r2.pipefyErro||'erro desconhecido'}. Tente salvar novamente.`,'err');
+    }
+    await load();
+    setTimeout(()=>{ if(r2.pipefyOk) fecharDiag(); }, 2500);
+  } else {
+    mostrarMsgDiag('Erro ao gerar orçamento: '+r2.error,'err');
+    await load();
+    setTimeout(()=>fecharDiag(), 2000);
+  }
+}
+
+function mostrarMsgDiag(txt, tipo) {
+  const el = document.getElementById('diag-msg');
+  el.textContent = txt; el.style.display = 'block';
+  el.style.background = tipo==='ok' ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)';
+  el.style.color = tipo==='ok' ? '#22c55e' : '#ef4444';
+}
+
+// ── UTILS ────────────────────────────────────────────────────
+function tempoRelativo(iso) {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff/60000);
+  if (m < 1) return 'agora';
+  if (m < 60) return m+'min';
+  const h = Math.floor(m/60);
+  if (h < 24) return h+'h';
+  return Math.floor(h/24)+'d';
+}
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+let _toast;
+function toast(msg, err) {
+  const el = document.getElementById('toast');
+  if (_toast) clearTimeout(_toast);
+  el.textContent = msg;
+  el.style.borderColor = err ? 'rgba(239,68,68,.3)' : 'var(--border)';
+  el.classList.add('show');
+  _toast = setTimeout(()=>el.classList.remove('show'), 2200);
+}
+
+// ── INIT ────────────────────────────────────────────────────
+load();
+setInterval(load, 30000);
+
+// ── PAINEL MÉTRICAS ──────────────────────────────────────────
+async function atualizarMetricas() {
+  try {
+    const r = await fetch('/api/tv-logistica?action=metricas').then(r=>r.json());
+    const db = r.metricas || {};
+
+    // Data de hoje em BRT (YYYY-MM-DD)
+    const hoje = new Date().toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'})
+                           .split('/').reverse().join('-');
+
+    // Últimos 7 dias
+    const ultimos7 = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      ultimos7.push(d.toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}).split('/').reverse().join('-'));
+    }
+
+    const map = [
+      ['liberado_coleta', 'm-lib', 'm-lib-s'],
+      ['em_rota',         'm-rot', 'm-rot-s'],
+      ['coleta_efetuada', 'm-col', 'm-col-s'],
+      ['orc_registrado',  'm-orc', 'm-orc-s'],
+    ];
+
+    map.forEach(([phase, idDia, idSem]) => {
+      const dia = (db[hoje] && db[hoje][phase]) || 0;
+      const sem = ultimos7.reduce((acc, d) => acc + ((db[d] && db[d][phase]) || 0), 0);
+      const elD = document.getElementById(idDia);
+      const elS = document.getElementById(idSem);
+      if (elD) elD.textContent = dia;
+      if (elS) elS.textContent = sem;
+    });
+  } catch(e) { console.error('metricas:', e); }
+}
+
+// ── MODAL CADASTRAR ──────────────────────────────────────────
+function abrirCadastro() {
+  ['cad-nome','cad-tel','cad-equip','cad-defeito','cad-end'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
   });
+  document.getElementById('cad-msg').style.display = 'none';
+  const ov = document.getElementById('ov-cad');
+  ov.style.display = 'flex';
 }
 
-function fd(d){ if(!d)return'—'; var p=d.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
-function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function soma(arr,f){ return arr.reduce(function(s,r){ return s+(r[f]||0); },0); }
+function fecharCadastro() {
+  document.getElementById('ov-cad').style.display = 'none';
+}
 
-function renderT(){
-  var list=getFiltered();
-  document.getElementById('t-count').textContent=list.length+' registro'+(list.length!==1?'s':'');
-  var tb=document.getElementById('tbody');
-  var emptyDiv=document.getElementById('empty-r');
-  if(!list.length){
-    tb.innerHTML='';
-    if(emptyDiv) emptyDiv.style.display='flex';
+async function salvarCadastro() {
+  const nome = document.getElementById('cad-nome').value.trim();
+  if (!nome) {
+    mostrarMsgCad('Nome do cliente é obrigatório', 'err');
     return;
   }
-  if(emptyDiv) emptyDiv.style.display='none';
-  tb.innerHTML=list.map(function(r){
-    var b=r.motorista==='Wilde'?'<span class="bm bw">Wilde</span>':'<span class="bm bp">Paulo</span>';
-    var ke=r.equipamentos>0?(r.km/r.equipamentos).toFixed(1)+' km':'—';
-    return '<tr>'
-      +'<td>'+fd(r.data)+'</td>'
-      +'<td>'+b+'</td>'
-      +'<td style="color:var(--yellow)">'+r.km.toFixed(1)+' km</td>'
-      +'<td style="color:var(--orange)">'+r.equipamentos+' equip.</td>'
-      +'<td style="color:var(--purple)">'+ke+'</td>'
-      +'<td style="color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.observacao||'—')+'</td>'
-      +'<td><button class="abt" onclick="abrirEd(\''+r.id+'\')">✏️</button>'
-      +'<button class="abt del" onclick="excluir(\''+r.id+'\')">✕</button></td>'
-      +'</tr>';
-  }).join('');
-}
+  const body = {
+    nome,
+    telefone:    document.getElementById('cad-tel').value.trim(),
+    equipamento: document.getElementById('cad-equip').value.trim(),
+    defeito:     document.getElementById('cad-defeito').value.trim(),
+    endereco:    document.getElementById('cad-end').value.trim(),
+  };
+  const r = await fetch('/api/tv-logistica?action=criar', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  }).then(r=>r.json()).catch(()=>({ok:false,error:'Erro de rede'}));
 
-function getPeriodoDates(){
-  var hoje=new Date(), y=hoje.getFullYear(), m=hoje.getMonth(), d=hoje.getDate();
-  if(periodo==='semana'){
-    var dow=hoje.getDay()||7; // 1=Mon..7=Sun
-    var seg=new Date(y,m,d-(dow-1));
-    return {de:seg.toISOString().slice(0,10), ate:hoje.toISOString().slice(0,10)};
-  }
-  if(periodo==='7dias'){
-    var s=new Date(y,m,d-6);
-    return {de:s.toISOString().slice(0,10), ate:hoje.toISOString().slice(0,10)};
-  }
-  if(periodo==='mes'){
-    return {de:y+'-'+(m+1<10?'0':'')+(m+1)+'-01', ate:hoje.toISOString().slice(0,10)};
-  }
-  if(periodo==='custom'){
-    var de=document.getElementById('d-de').value;
-    var ate=document.getElementById('d-ate').value;
-    return {de:de||null, ate:ate||null};
-  }
-  return {de:null, ate:null}; // tudo
-}
-
-// Filtra por período (ignora motorista) — para gráficos comparativos
-function getByPeriod(){
-  var p=getPeriodoDates();
-  return recs.filter(function(r){
-    if(p.de&&r.data<p.de) return false;
-    if(p.ate&&r.data>p.ate) return false;
-    return true;
-  });
-}
-
-// Filtra por período + motorista — para KPIs do motorista selecionado
-function getDash(){
-  var p=getPeriodoDates();
-  return recs.filter(function(r){
-    if(fdash!=='todos'&&r.motorista!==fdash) return false;
-    if(p.de&&r.data<p.de) return false;
-    if(p.ate&&r.data>p.ate) return false;
-    return true;
-  });
-}
-
-function renderDash(){
-  // Para KPIs: usa filtro de período + motorista (getDash)
-  var data=getDash();
-  // Para barras comparativas: usa só período, sem filtro de motorista (getByPeriod)
-  var allP=getByPeriod();
-  var W=allP.filter(r=>r.motorista==='Wilde');
-  var P=allP.filter(r=>r.motorista==='Paulo');
-
-  var kmT=soma(data,'km'), eqT=soma(data,'equipamentos'), sT=data.length;
-  var kmW=soma(W,'km'),    eqW=soma(W,'equipamentos'),    sW=W.length;
-  var kmP=soma(P,'km'),    eqP=soma(P,'equipamentos'),    sP=P.length;
-  var ke=eqT>0?(kmT/eqT).toFixed(1)+'km':'—';
-  var kmMedia=sT>0?(kmT/sT).toFixed(1):'—';
-
-  // KPIs — muda conforme filtro de motorista
-  var kpis;
-  if(fdash==='todos'){
-    kpis=[
-      {cls:'kt',c:'var(--accent)',n:soma(allP,'km').toFixed(0)+' km',l:'Total km',s:allP.length+' saídas · km/eq: '+(soma(allP,'equipamentos')>0?(soma(allP,'km')/soma(allP,'equipamentos')).toFixed(1)+'km':'—')},
-      {cls:'kt',c:'var(--accent)',n:soma(allP,'equipamentos'),l:'Total equipamentos',s:''},
-      {cls:'kw',c:'var(--wilde)',n:kmW.toFixed(0)+' km',l:'Km — Wilde',s:sW+' saídas · '+eqW+' equip.'},
-      {cls:'kp',c:'var(--paulo)',n:kmP.toFixed(0)+' km',l:'Km — Paulo',s:sP+' saídas · '+eqP+' equip.'},
-      {cls:'kw',c:'var(--wilde)',n:eqW+' equip.',l:'Equip. Wilde',s:sW>0?(eqW/sW).toFixed(1)+' equip/saída':'—'},
-      {cls:'kp',c:'var(--paulo)',n:eqP+' equip.',l:'Equip. Paulo',s:sP>0?(eqP/sP).toFixed(1)+' equip/saída':'—'},
-    ];
+  if (r.ok) {
+    mostrarMsgCad('✅ Ficha ' + r.ficha.id + ' criada!', 'ok');
+    await load();
+    setTimeout(() => fecharCadastro(), 1200);
   } else {
-    var cor=fdash==='Wilde'?'var(--wilde)':'var(--paulo)';
-    var cls=fdash==='Wilde'?'kw':'kp';
-    var melhor=data.length?data.slice().sort((a,b)=>b.km-a.km)[0]:null;
-    kpis=[
-      {cls:cls,c:cor,n:kmT.toFixed(0)+' km',l:'Total km — '+fdash,s:sT+' saídas'},
-      {cls:cls,c:cor,n:eqT+' equip.',l:'Total equipamentos',s:eqT>0&&sT>0?(eqT/sT).toFixed(1)+' equip/saída':'—'},
-      {cls:cls,c:cor,n:kmMedia+' km',l:'Média km/saída',s:''},
-      {cls:cls,c:cor,n:ke,l:'Km por equipamento',s:''},
-      {cls:cls,c:cor,n:melhor?(melhor.km.toFixed(0)+' km'):'—',l:'Melhor saída',s:melhor?fd(melhor.data):''},
-      {cls:'kt',c:'var(--accent)',n:sT,l:'Total saídas',s:''},
-    ];
+    mostrarMsgCad('Erro: ' + r.error, 'err');
   }
-  document.getElementById('kpi-grid').innerHTML=kpis.map(k=>
-    '<div class="kc '+k.cls+'"><div class="kn" style="color:'+k.c+'">'+k.n+'</div><div class="kl">'+k.l+'</div><div class="ks">'+k.s+'</div></div>'
-  ).join('');
-
-  // Barras comparativas — sempre Wilde vs Paulo usando período (sem filtro de motorista)
-  var mkm=Math.max(kmW,kmP,1), meq=Math.max(eqW,eqP,1);
-  document.getElementById('c-km').innerHTML=[{l:'Wilde',v:kmW,c:'bfw'},{l:'Paulo',v:kmP,c:'bfp'}].map(b=>
-    '<div class="bi"><div class="blb">'+b.l+'</div><div class="btr"><div class="bf '+b.c+'" style="width:'+Math.round(b.v/mkm*100)+'%"></div></div><div class="bv">'+b.v.toFixed(0)+'</div></div>'
-  ).join('');
-  document.getElementById('c-eq').innerHTML=[{l:'Wilde',v:eqW,c:'bfw'},{l:'Paulo',v:eqP,c:'bfp'}].map(b=>
-    '<div class="bi"><div class="blb">'+b.l+'</div><div class="btr"><div class="bf '+b.c+'" style="width:'+Math.round(b.v/meq*100)+'%"></div></div><div class="bv">'+b.v+'</div></div>'
-  ).join('');
-
-  renderDonut(W.length, P.length, allP.length);
-
-  // Sparkline — usa dados filtrados por período + motorista
-  var spark=data.slice().sort((a,b)=>a.data.localeCompare(b.data)).slice(-15);
-  var msp=Math.max(...spark.map(r=>r.km),1);
-  document.getElementById('sp-bars').innerHTML=spark.map(r=>{
-    var h=Math.max(4,Math.round(r.km/msp*54));
-    var cor=r.motorista==='Wilde'?'var(--wilde)':'var(--paulo)';
-    return '<div class="sb" style="height:'+h+'px;background:'+cor+';opacity:.65" title="'+r.motorista+' '+fd(r.data)+' '+r.km+' km"></div>';
-  }).join('');
-  document.getElementById('sp-labels').innerHTML=spark.map(r=>'<div class="sl">'+r.data.slice(5).replace('-','/')+'</div>').join('');
-
-  // Gráfico diário — usa dados do período filtrado (sem motorista)
-  var byDay={};
-  allP.forEach(function(r){
-    if(!byDay[r.data]) byDay[r.data]={km:0,eq:0,w:0,p:0};
-    byDay[r.data].km+=r.km; byDay[r.data].eq+=r.equipamentos;
-    if(r.motorista==='Wilde') byDay[r.data].w+=r.km; else byDay[r.data].p+=r.km;
-  });
-  var days=Object.keys(byDay).sort().slice(-20);
-  var md=Math.max(...days.map(d=>byDay[d].km),1);
-  document.getElementById('c-daily').innerHTML=days.length?days.map(function(d){
-    var v=byDay[d];
-    return '<div class="bi">'
-      +'<div class="blb">'+fd(d).slice(0,5)+'</div>'
-      +'<div class="btr" style="position:relative">'
-        +'<div class="bf bfw" style="width:'+Math.round(v.w/md*100)+'%;position:absolute;left:0;top:0;height:100%;opacity:.8;border-radius:3px 0 0 3px"></div>'
-        +'<div class="bf bfp" style="width:'+Math.round(v.p/md*100)+'%;position:absolute;left:'+Math.round(v.w/md*100)+'%;top:0;height:100%;opacity:.8;border-radius:0 3px 3px 0"></div>'
-      +'</div>'
-      +'<div class="bv">'+v.km.toFixed(0)+'</div>'
-      +'<div style="font-family:var(--fm);font-size:9px;color:var(--orange);width:38px;text-align:right">'+v.eq+' eq.</div>'
-      +'</div>';
-  }).join(''):'<div style="font-family:var(--fm);font-size:11px;color:var(--muted);padding:12px">Sem dados no período.</div>';
 }
 
-function renderDonut(sW,sP,sT){
-  if(!sT){ document.getElementById('don-svg').innerHTML='<text x="50" y="54" text-anchor="middle" font-size="9" fill="#4a607a">Sem dados</text>'; document.getElementById('don-leg').innerHTML=''; return; }
-  var items=[{v:sW,c:'#3b9eff',l:'Wilde'},{v:sP,c:'#10d982',l:'Paulo'}].filter(i=>i.v>0);
-  var tot=items.reduce((s,i)=>s+i.v,0), st=-Math.PI/2;
-  var paths=items.map(function(item){
-    var a=item.v/tot*Math.PI*2, en=st+a;
-    var x1=50+40*Math.cos(st),y1=50+40*Math.sin(st);
-    var x2=50+40*Math.cos(en),y2=50+40*Math.sin(en);
-    var lg=a>Math.PI?1:0;
-    var d='M 50 50 L '+x1+' '+y1+' A 40 40 0 '+lg+' 1 '+x2+' '+y2+' Z';
-    st=en;
-    return '<path d="'+d+'" fill="'+item.c+'" opacity="0.7"/>';
-  }).join('');
-  document.getElementById('don-svg').innerHTML='<circle cx="50" cy="50" r="22" fill="var(--surface)"/>'+paths;
-  document.getElementById('don-leg').innerHTML=items.map(i=>'<div class="dl"><div class="dd" style="background:'+i.c+'"></div><span>'+i.l+' — <b>'+i.v+'</b> ('+Math.round(i.v/tot*100)+'%)</span></div>').join('');
+function mostrarMsgCad(txt, tipo) {
+  const el = document.getElementById('cad-msg');
+  el.textContent = txt; el.style.display = 'block';
+  el.style.background = tipo==='ok' ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)';
+  el.style.color = tipo==='ok' ? '#22c55e' : '#ef4444';
 }
 
-function abrirEd(id){
-  var r=recs.find(x=>x.id===id); if(!r) return;
-  document.getElementById('e-id').value=r.id;
-  document.getElementById('e-mot').value=r.motorista;
-  document.getElementById('e-data').value=r.data;
-  document.getElementById('e-km').value=r.km;
-  document.getElementById('e-eq').value=r.equipamentos;
-  document.getElementById('e-obs').value=r.observacao||'';
-  document.getElementById('mbg').classList.add('open');
-}
-function closeM(){ document.getElementById('mbg').classList.remove('open'); }
-function closeMBg(e){ if(e.target.id==='mbg') closeM(); }
 
-async function salvarEd(){
-  var id=document.getElementById('e-id').value;
-  var body={id,motorista:document.getElementById('e-mot').value,data:document.getElementById('e-data').value,km:document.getElementById('e-km').value,equipamentos:document.getElementById('e-eq').value,observacao:document.getElementById('e-obs').value};
-  var d=await fetch('/api/tv-logistica?action=editar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
-  if(d.ok){ var i=recs.findIndex(r=>r.id===id); if(i>=0) recs[i]=d.registro; closeM(); renderT(); toast('✅ Editado!','var(--green)'); }
-  else toast('❌ '+(d.error||'Erro'),'var(--red)');
+// ── MOTORISTA PARCEIRO ────────────────────────────────────────
+let motoristaFichaId = null;
+
+function abrirMotorista(id) {
+  motoristaFichaId = id;
+  document.getElementById('motorista-nome').value = '';
+  document.getElementById('motorista-msg').style.display = 'none';
+  document.getElementById('ov-motorista').style.display = 'flex';
+  setTimeout(() => document.getElementById('motorista-nome').focus(), 100);
 }
 
-async function excluir(id){
-  var r=recs.find(x=>x.id===id);
-  if(!confirm('Excluir registro de '+(r?fd(r.data):'?')+'?')) return;
-  var d=await fetch('/api/tv-logistica?action=excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})}).then(r=>r.json());
-  if(d.ok){ recs=recs.filter(r=>r.id!==id); renderT(); toast('🗑️ Excluído','var(--orange)'); }
+function fecharMotorista() {
+  document.getElementById('ov-motorista').style.display = 'none';
+  motoristaFichaId = null;
 }
 
-function toast(msg,color){
-  var t=document.getElementById('toast'); t.textContent=msg; t.style.borderTopColor=color||'var(--accent)';
-  t.classList.add('show'); clearTimeout(toastT);
-  toastT=setTimeout(function(){ t.classList.remove('show'); },3000);
+async function confirmarMotorista() {
+  const nome = document.getElementById('motorista-nome').value.trim();
+  if (!nome) {
+    const msg = document.getElementById('motorista-msg');
+    msg.textContent = 'Informe o nome do motorista';
+    msg.style.display = 'block';
+    msg.style.background = 'rgba(239,68,68,.1)';
+    msg.style.color = '#ef4444';
+    return;
+  }
+  const r = await fetch('/api/tv-logistica?action=mover-motorista', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ id: motoristaFichaId, motoristaNome: nome })
+  }).then(r=>r.json()).catch(()=>({ok:false,error:'Erro de rede'}));
+
+  if (r.ok) {
+    fecharMotorista();
+    await load();
+    toast('Ficha enviada para Motorista Parceiro');
+  } else {
+    const msg = document.getElementById('motorista-msg');
+    msg.textContent = 'Erro: ' + r.error;
+    msg.style.display = 'block';
+    msg.style.background = 'rgba(239,68,68,.1)';
+    msg.style.color = '#ef4444';
+  }
 }
+
+
+// ── HORÁRIO MARCADO ───────────────────────────────────────────
+let horarioFichaId = null;
+
+function abrirHorario(id) {
+  horarioFichaId = id;
+  // Pré-preencher com horário existente se houver
+  const f = fichas.find(x => x.id === id);
+  const input = document.getElementById('horario-input');
+  if (f?.horarioColeta) {
+    // Converter ISO para datetime-local (YYYY-MM-DDTHH:MM)
+    const d = new Date(f.horarioColeta);
+    const local = new Date(d.getTime() - d.getTimezoneOffset()*60000)
+      .toISOString().slice(0,16);
+    input.value = local;
+  } else {
+    // Default: daqui a 2h
+    const now = new Date(Date.now() + 2*3600000);
+    const local = new Date(now.getTime() - now.getTimezoneOffset()*60000)
+      .toISOString().slice(0,16);
+    input.value = local;
+  }
+  document.getElementById('horario-msg').style.display = 'none';
+  document.getElementById('ov-horario').style.display = 'flex';
+  setTimeout(() => input.focus(), 100);
+}
+
+function fecharHorario() {
+  document.getElementById('ov-horario').style.display = 'none';
+  horarioFichaId = null;
+}
+
+async function confirmarHorario() {
+  const val = document.getElementById('horario-input').value;
+  if (!val) {
+    mostrarMsgHorario('Informe a data e hora', 'err'); return;
+  }
+  // Converter datetime-local para ISO (com timezone local)
+  const horarioISO = new Date(val).toISOString();
+
+  const r = await fetch('/api/tv-logistica?action=marcar-horario', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ id: horarioFichaId, horario: horarioISO })
+  }).then(r=>r.json()).catch(()=>({ok:false,error:'Erro de rede'}));
+
+  if (r.ok) {
+    fecharHorario();
+    await load();
+    toast('Horário registrado com sucesso');
+  } else {
+    mostrarMsgHorario('Erro: ' + r.error, 'err');
+  }
+}
+
+function mostrarMsgHorario(txt, tipo) {
+  const el = document.getElementById('horario-msg');
+  el.textContent = txt; el.style.display = 'block';
+  el.style.background = tipo==='ok' ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)';
+  el.style.color = tipo==='ok' ? '#22c55e' : '#ef4444';
+}
+
+
+// ── EXPAND / COLLAPSE BOTÕES ─────────────────────────────────
+function toggleExpand(id) {
+  const wrap = document.getElementById('btns-x-'+id);
+  const btn  = document.getElementById('btn-x-'+id);
+  if (!wrap || !btn) return;
+  const open = wrap.classList.toggle('open');
+  btn.classList.toggle('open', open);
+  btn.querySelector('.chev').textContent = open ? '▴' : '▾';
+  btn.childNodes[0].textContent = open ? ' Recolher' : ' Mais ações';
+}
+
 </script>
 </body>
 </html>

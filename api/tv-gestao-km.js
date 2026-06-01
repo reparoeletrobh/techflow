@@ -1,7 +1,7 @@
 // tv-logistica v5
 const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g,"").trim();
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g,"").trim();
-const LOG_KEY = "tv_logistica";
+const LOG_KEY = "tv_km"; // Migrado de tv_logistica em FASE 3
 
 async function dbGet(key) {
   try {
