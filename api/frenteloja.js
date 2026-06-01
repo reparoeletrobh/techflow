@@ -486,6 +486,69 @@ export default async function handler(req,res){
 
 
 
+
+  // ── GET fix-board-lote — corrige todas as fichas no balcao sem card no board ──
+  if (action === 'fix-board-lote') {
+    try {
+      const flDb    = await dbGet(FL_KEY) || defaultDB();
+      const balcao  = (await dbGet('reparoeletro_balcao')) || [];
+      const boardDb = (await dbGet('reparoeletro_board')) || { cards: [] };
+      const boardCards = boardDb.cards || [];
+
+      // IDs das fichas que estão no balcão
+      const idsBalcao = new Set(balcao.map(b => b.flFichaId).filter(Boolean));
+      // IDs das fichas que JÁ estão no board
+      const idsBoard  = new Set(boardCards.map(c => c.flFichaId).filter(Boolean));
+
+      // Fichas que estão no balcão mas NÃO no board
+      const fichasSemBoard = (flDb.fichas || []).filter(f =>
+        idsBalcao.has(f.id) && !idsBoard.has(f.id)
+      );
+
+      const resultados = [];
+      const base = process.env.FL_BASE_URL || 'https://reparoeletroadm.com';
+
+      for (const ficha of fichasSemBoard) {
+        const titulo = (
+          ficha.nomeContato + ' (Loja) - ' + (ficha.equipamento||'') +
+          ' | ' + (ficha.descricao||'') +
+          ' | Diag: ' + (ficha.descricaoTecnica||'') +
+          ' | R$' + String(parseFloat(ficha.orcamento?.valor||0).toFixed(2)) +
+          ' OS:' + ficha.id
+        ).replace(/"/g,"'").slice(0,255);
+
+        const r = await fetch(base+'/api/board?action=add-loja-card', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            flFichaId:   ficha.id,
+            pipefyId:    ficha.pipefyCardId || null,
+            title:       titulo,
+            nomeContato: ficha.nomeContato || '',
+            telefone:    ficha.telefone || '',
+            phaseId:     'cliente_loja',
+          })
+        }).then(r=>r.json()).catch(e=>({ ok:false, error:e.message }));
+
+        resultados.push({
+          id:      ficha.id,
+          nome:    ficha.nomeContato,
+          tel:     ficha.telefone,
+          board:   r.ok ? 'corrigido' : ('erro: ' + (r.error||r.msg||'?'))
+        });
+      }
+
+      return res.status(200).json({
+        ok: true,
+        semBoard: fichasSemBoard.length,
+        corrigidas: resultados.filter(r=>r.board==='corrigido').length,
+        resultados
+      });
+    } catch(e) {
+      return res.status(500).json({ ok:false, error: e.message });
+    }
+  }
+
   // ── GET fix-board-por-nome — busca ficha por nome e força no board ───────
   if (action === 'fix-board-por-nome') {
     const busca = (req.query.nome || '').toLowerCase().trim();
