@@ -1608,7 +1608,7 @@ export default async function handler(req, res) {
     // Analise de Compra → criar entrada em compra-equip
     if (phase === 'analise_compra') {
       try {
-        var compraDb2 = await dbGet('reparoeletro_compra_equip') || { fichas: [] };
+        var compraDb2 = await dbGet('tv_compra_equip') || { fichas: [] };
         if (!Array.isArray(compraDb2.fichas)) compraDb2.fichas = [];
         var jaCompraExiste = compraDb2.fichas.find(function(f){ return f.pipefyId === String(pid); });
         if (!jaCompraExiste) {
@@ -1619,7 +1619,7 @@ export default async function handler(req, res) {
             valor: card.valor || 0,
             status: 'analise', fotos: [], criadoEm: now
           });
-          await dbSet('reparoeletro_compra_equip', compraDb2);
+          await dbSet('tv_compra_equip', compraDb2);
         }
       } catch(e) { console.error('[pipe→compra]', e.message); }
     }
