@@ -400,7 +400,7 @@ async function load(){
   cards=r.cards||[];
   if(r.lastSync){
     const d=new Date(r.lastSync);
-    document.getElementById('last-sync').textContent=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('last-sync').textContent=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'});
   }
   render();
 }
@@ -698,7 +698,10 @@ function vencHTML(c){
   return '<div class="venc-badge venc-ok">&#128994; Vence '+fmt+'</div>';
 }
 async function setVencimento(id){
-  var d=prompt('Vencimento (AAAA-MM-DD):',new Date().toISOString().slice(0,10));
+  var hoje=new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});
+  var inp=prompt('Vencimento (DD/MM/AAAA):',hoje.split('-').reverse().join('/'));
+  if(inp===null) return;
+  var d=inp.trim().length===10&&inp.includes('/')?(inp.split('/').reverse().join('-')):inp;
   if(d===null) return;
   var r=await fetch('/api/pipe?action=editar-pipe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,vencimento:d})}).then(r=>r.json());
   if(r.ok) load(); else alert('Erro: '+r.error);

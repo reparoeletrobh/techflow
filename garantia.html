@@ -307,7 +307,7 @@ var TIPO_COLORS = {
 };
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function fmtDate(iso){ if(!iso) return '—'; var d=new Date(iso); return d.toLocaleDateString('pt-BR'); }
+function fmtDate(iso){ if(!iso) return '—'; return new Date(iso).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}); }
 function fmtDur(a,b){ if(!a||!b) return '—'; var ms=new Date(b)-new Date(a); var h=Math.round(ms/3600000); return h<24?h+'h':Math.round(h/24)+'d'; }
 function df(d){ return d.toISOString().slice(0,10); }
 

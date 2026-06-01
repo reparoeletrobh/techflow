@@ -453,7 +453,7 @@ async function loadEnviados() {
       if (f.desc) { var desc=document.createElement('div'); desc.className='orc-desc'; desc.textContent=f.desc.slice(0,100); card.appendChild(desc); }
       var val = document.createElement('div'); val.className='orc-valor'; val.textContent='R$ '+(f.preco||'—'); card.appendChild(val);
       var meta = document.createElement('div'); meta.className='orc-meta';
-      meta.textContent = f.enviadoAt ? 'Enviado em '+new Date(f.enviadoAt).toLocaleDateString('pt-BR') : '';
+      meta.textContent = f.enviadoAt ? 'Enviado em '+new Date(f.enviadoAt).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}) : '';
       card.appendChild(meta);
       list.appendChild(card);
     });
