@@ -127,7 +127,7 @@ const PIPE_ID             = '305832912';
 const AGUARDANDO_PHASE_ID = '334875152';
 
 async function pipefyQuery() {
-  // Pipefy desconectado em 01/06/2026 — ADM opera 100% local (Redis)
+  // Pipefy desconectado — TV opera 100% local (Redis)
   return null;
 }
 

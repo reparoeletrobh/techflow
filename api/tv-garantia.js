@@ -1,7 +1,6 @@
 // garantia.js — Setor de Garantia
 const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g,"").trim();
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g,"").trim();
-const PIPEFY_API    = "https://api.pipefy.com/graphql";
 const PIPE_ID       = "306904889";
 const GARANTIA_KEY  = "tv_garantia";
 
@@ -37,15 +36,9 @@ async function dbSet(key, value) {
 
 function defaultDB() { return { fichas: [], syncedIds: [] }; }
 
-async function pipefyQuery(query) {
-  const r = await fetch(PIPEFY_API, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: "Bearer " + (process.env.PIPEFY_TOKEN||"").trim() },
-    body: JSON.stringify({ query }),
-  });
-  const j = await r.json();
-  if (j.errors) throw new Error(j.errors[0].message);
-  return j.data;
+async function pipefyQuery() {
+  // Pipefy desconectado — TV opera 100% local (Redis)
+  return null;
 }
 
 async function fetchRSCards() {

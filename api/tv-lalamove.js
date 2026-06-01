@@ -6,7 +6,6 @@ const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g,"").trim
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g,"").trim();
 const LALA_KEY      = "tv_lalamove";
 const PIPE_ID       = "306904889";
-const PIPEFY_API    = "https://api.pipefy.com/graphql";
 
 const LALA_HOST_PROD    = "rest.lalamove.com";
 const LALA_HOST_SANDBOX = "rest.sandbox.lalamove.com";

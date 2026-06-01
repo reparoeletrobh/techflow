@@ -5,7 +5,6 @@ const LOGS_KEY  = "tv_logs";
 const LIBERADO_ROTA_PHASE_ID = "341638193"; // "Liberado para Rota"
 const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g,"").trim();
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g,"").trim();
-const PIPEFY_API    = "https://api.pipefy.com/graphql";
 
 async function dbGet(key) {
   try {
@@ -30,21 +29,9 @@ async function dbSet(key, val) {
   } catch(e) { return false; }
 }
 
-async function pipefyQuery(query) {
-  const r = await fetch(PIPEFY_API, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${(process.env.PIPEFY_TOKEN || "").trim()}`,
-    },
-    body: JSON.stringify({ query }),
-  });
-  const j = await r.json();
-  if (j.errors) {
-    const msg = Array.isArray(j.errors) ? j.errors.map(e => e.message).join("; ") : String(j.errors);
-    throw new Error(msg);
-  }
-  return j.data;
+async function pipefyQuery() {
+  // Pipefy desconectado — TV opera 100% local (Redis)
+  return null;
 }
 
 function defaultBoard() {
@@ -164,14 +151,7 @@ async function fetchCardPhase(pipefyId) {
 }
 
 // Move card no Pipefy
-async function moveCardPipefy(cardId, phaseId) {
-  const data = await pipefyQuery(`mutation {
-    moveCardToPhase(input: { card_id: ${cardId}, destination_phase_id: ${phaseId} }) {
-      card { id current_phase { id name } }
-    }
-  }`);
-  return data?.moveCardToPhase?.card;
-}
+async function moveCardPipefy() { return { ok: false }; }
 
 // ── GEOCODIFICAÇÃO — cobre RMBH (Região Metropolitana de BH) ──
 // Cidades: BH, Contagem, Betim, Ribeirão das Neves, Santa Luzia,

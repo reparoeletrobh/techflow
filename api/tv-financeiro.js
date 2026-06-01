@@ -1,4 +1,3 @@
-const PIPEFY_API    = "https://api.pipefy.com/graphql";
 const PIPE_ID       = "306904889";
 const BOARD_KEY     = "tv_board";
 const FIN_KEY       = "tv_financeiro";
@@ -19,13 +18,7 @@ const FIN_PHASES = [
 ];
 
 // Move card no Pipefy para uma fase
-async function pipefyMoveCard(cardId, destPhaseId) {
-  return await pipefyQuery(`mutation {
-    moveCardToPhase(input: { card_id: "${cardId}", destination_phase_id: "${destPhaseId}" }) {
-      card { id current_phase { name } }
-    }
-  }`);
-}
+async function pipefyMoveCard() { return { ok: false }; }
 
 // Fase "Solicitar Entrega" no Pipefy
 const SOLICITAR_ENTREGA_PHASE_ID = "334875186";
@@ -56,36 +49,9 @@ async function dbSet(key, value) {
 }
 
 // ── Pipefy ─────────────────────────────────────────────────────
-async function pipefyQuery(query, attempt = 1) {
-  const TIMEOUT_MS = 15000;
-  const MAX_RETRIES = 3;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    const res = await fetch(PIPEFY_API, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${(process.env.PIPEFY_TOKEN || "").trim()}`,
-      },
-      body: JSON.stringify({ query }),
-      signal: controller.signal,
-    });
-    const text = await res.text();
-    let json;
-    try { json = JSON.parse(text); }
-    catch(e) { throw new Error("INVALID_RESPONSE"); }
-    if (json.errors) throw new Error(json.errors[0].message);
-    return json.data;
-  } catch(e) {
-    if (attempt < MAX_RETRIES && (e.name === "AbortError" || e.message === "INVALID_RESPONSE")) {
-      await new Promise(r => setTimeout(r, 2000 * attempt));
-      return pipefyQuery(query, attempt + 1);
-    }
-    throw e;
-  } finally {
-    clearTimeout(timer);
-  }
+async function pipefyQuery() {
+  // Pipefy desconectado — TV opera 100% local (Redis)
+  return null;
 }
 
 // Busca cards na fase "Video Enviado"
