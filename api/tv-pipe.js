@@ -32,29 +32,20 @@ const PIPEFY_TOKEN  = (process.env.PIPEFY_TOKEN   || '').replace(/['"]/g,'').tri
 const PIPE_KEY      = 'tv_pipe';
 
 const PHASES = [
-  { id:'aguardando_aprovacao',      name:'Aguardando Aprovação',    cor:'#f5c800' },
-  { id:'ultima_chamada',            name:'Última Chamada',          cor:'#ef4444' },
-  { id:'aprovados',                 name:'Aprovados',               cor:'#22c55e' },
-  { id:'analise_compra',            name:'Análise de Compra',       cor:'#3b9eff' },
-  { id:'aguardando_peca',           name:'Aguardando Peça',         cor:'#f97316' },
-  { id:'equipamento_comprado',      name:'Equipamento Comprado',    cor:'#3b9eff' },
-  { id:'programar_entrega',         name:'Programar Entrega',       cor:'#f5c800' },
-  { id:'solicitar_entrega',         name:'Solicitar Entrega',       cor:'#f97316' },
-  { id:'solicitar_coleta',          name:'Solicitar Coleta',        cor:'#f97316' },
-  { id:'clientes_com_horario_marcado', name:'Clientes c/ Horário',  cor:'#f5c800' },
-  { id:'liberado_para_rota',        name:'Liberado p/ Rota',        cor:'#3b9eff' },
-  { id:'rota_em_andamento',         name:'Rota em Andamento',       cor:'#a855f7' },
-  { id:'equipamento_em_rota',       name:'Equipamento em Rota',     cor:'#a855f7' },
-  { id:'remarcar',                  name:'Remarcar',                cor:'#ef4444' },
-  { id:'receber_dolar',             name:'Receber $',               cor:'#22c55e' },
-  { id:'erp',                       name:'ERP',                     cor:'#22c55e' },
-  { id:'rs',                        name:'RS',                      cor:'#6b7280' },
-  { id:'oss_para_fechamento',       name:'OSs p/ Fechamento',       cor:'#6b7280' },
-  { id:'reprovado',                 name:'Reprovado',               cor:'#ef4444' },
-  { id:'garantia',                  name:'Garantia',                cor:'#06b6d4' },
-  { id:'pronto_para_venda',         name:'Pronto p/ Venda',         cor:'#22c55e' },
-  { id:'finalizado',                name:'Finalizado',              cor:'#334155' },
-  { id:'descarte',                  name:'Descarte',                cor:'#7f1d1d' },
+  { id:'aguardando_aprovacao', name:'Aguardando Aprovação', cor:'#f5c800' },
+  { id:'ultima_chamada',       name:'Última Chamada',       cor:'#ef4444' },
+  { id:'aprovados',            name:'Aprovados',            cor:'#22c55e' },
+  { id:'video_enviado',        name:'Vídeo Enviado',        cor:'#a855f7' },
+  { id:'analise_compra',       name:'Análise de Compra',    cor:'#3b9eff' },
+  { id:'equipamento_comprado', name:'Equipamento Comprado', cor:'#3b9eff' },
+  { id:'programar_entrega',    name:'Programar Entrega',    cor:'#f5c800' },
+  { id:'solicitar_entrega',    name:'Solicitar Entrega',    cor:'#f97316' },
+  { id:'entrega_solicitada',   name:'Entrega Solicitada',   cor:'#f97316' },
+  { id:'receber',              name:'Receber',              cor:'#22c55e' },
+  { id:'erp',                  name:'ERP',                  cor:'#22c55e' },
+  { id:'garantia',             name:'Garantia',             cor:'#06b6d4' },
+  { id:'finalizado',           name:'Finalizado',           cor:'#334155' },
+  { id:'descarte',             name:'Descarte',             cor:'#7f1d1d' },
 ];
 
 async function dbGet(k) {
@@ -1474,6 +1465,31 @@ export default async function handler(req, res) {
       await dbSet(PIPE_KEY,pipeDb);
       return res.status(200).json({ok:true,...resultado});
     }catch(e){return res.status(500).json({ok:false,error:e.message});}
+  }
+
+
+  // ── GET migrar-fases-tv: mapeia cards de fases TV-exclusivas → fases ADM ──
+  if (action === 'migrar-fases-tv') {
+    const FASE_MAP = {"solicitar_coleta": "solicitar_entrega", "clientes_com_horario_marcado": "programar_entrega", "liberado_para_rota": "solicitar_entrega", "rota_em_andamento": "entrega_solicitada", "equipamento_em_rota": "entrega_solicitada", "remarcar": "ultima_chamada", "receber_dolar": "receber", "rs": "erp", "oss_para_fechamento": "erp", "reprovado": "finalizado", "pronto_para_venda": "finalizado", "aguardando_orcamento": "aguardando_aprovacao", "aguardando_peca": "analise_compra"};
+    try {
+      const db = (await dbGet(PIPE_KEY)) || {cards:[]};
+      let migrados = 0, erros = [];
+      const now = new Date().toISOString();
+      (db.cards||[]).forEach(function(card){
+        const novaFase = FASE_MAP[card.phase];
+        if (novaFase) {
+          card.history = (card.history||[]).concat([{phase:card.phase, ts:now, migrado:true}]);
+          card.phase = novaFase;
+          card.movedAt = now;
+          migrados++;
+        }
+      });
+      if (migrados > 0) await dbSet(PIPE_KEY, db);
+      // Contar por fase após migração
+      const porFase = {};
+      (db.cards||[]).forEach(function(c){ porFase[c.phase]=(porFase[c.phase]||0)+1; });
+      return res.status(200).json({ok:true, migrados, total:db.cards.length, porFase});
+    } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
   }
 
   // ── GET reset-tv-pipe: limpa COMPLETAMENTE o tv_pipe para re-sync ────────
