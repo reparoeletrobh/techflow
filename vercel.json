@@ -353,6 +353,10 @@
     {
       "source": "/erp-analise",
       "destination": "/erp-analise.html"
+    },
+    {
+      "source": "/api/tv-pipe",
+      "destination": "/api/tv-pipe"
     }
   ],
   "headers": [
