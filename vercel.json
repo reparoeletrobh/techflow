@@ -47,6 +47,26 @@
     {
       "path": "/api/webhook-mp?action=sync-fin-pendentes",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/tv-webhook-mp?action=sync-fin-pendentes",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/tv-webhook-mp?action=reconciliar-mp",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/tv-pipe?action=arquivar-ultima-chamada",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/tv-pipe?action=backup-auto",
+      "schedule": "0 */1 * * *"
+    },
+    {
+      "path": "/api/tv-pipe?action=pipe-sem-resposta",
+      "schedule": "*/5 * * * *"
     }
   ],
   "rewrites": [
@@ -369,6 +389,10 @@
     {
       "source": "/tv/pipe",
       "destination": "/tv-pipe.html"
+    },
+    {
+      "source": "/api/tv-webhook-mp",
+      "destination": "/api/tv-webhook-mp.js"
     }
   ],
   "headers": [
