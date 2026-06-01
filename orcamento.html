@@ -421,7 +421,7 @@ async function criarCard() {
       }),
     });
     var d = await r.json(); hideTyping();
-    if (d.ok) { addBot("✅ Card criado no Pipefy!\n\n" + dados.nome + " cadastrado em Solicitar Coleta.", ["Novo cadastro"]); }
+    if (d.ok) { addBot("✅ Ficha cadastrada com sucesso!\n\n" + dados.nome + " registrado em Aguardando Aprovação.", ["Novo cadastro"]); }
     else { addBot("❌ Erro: " + d.error); document.getElementById("input-area").style.display = "flex"; aguardandoFicha = true; }
   } catch(e) { hideTyping(); addBot("❌ Sem conexão. Tente novamente."); document.getElementById("input-area").style.display = "flex"; aguardandoFicha = true; }
 }
@@ -446,9 +446,9 @@ async function orcSync() {
     await orcLoad(); // sempre atualiza painel
     if (d.newCount > 0) { st.textContent = "+" + d.newCount + " nova" + (d.newCount > 1 ? "s" : ""); setTimeout(function() { st.textContent = ""; }, 4000); }
     else { st.textContent = "atualizado"; setTimeout(function() { st.textContent = ""; }, 2000); }
-    if (d.pipefyError) st.textContent = "Pipefy: " + d.pipefyError;
+    // Pipefy desconectado — não exibe mais erros de Pipefy
   } catch(e) { st.textContent = "Erro: " + e.message; }
-  btn.textContent = "↻ Sync Pipefy"; btn.style.pointerEvents = "";
+  btn.textContent = "↻ Atualizar"; btn.style.pointerEvents = "";
 }
 
 function orcRender() {
@@ -678,7 +678,7 @@ async function init() {
       if (fase) solicitarColetaId = fase.id;
     }
   } catch(e) {}
-  addBot("Olá! Cole a ficha do cliente abaixo para cadastrar no Pipefy.");
+  addBot("Olá! Cole a ficha do cliente abaixo para cadastrar.");
 }
 
 init();

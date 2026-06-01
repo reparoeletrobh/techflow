@@ -102,7 +102,7 @@ function parseFichaTexto(txt) {
 }
 
 async function createPipefyCard() {
-  return null; // Pipefy desconectado
+  return { ok: false, error: 'Pipefy desconectado' };
 }
 
 module.exports = async function handler(req, res) {
