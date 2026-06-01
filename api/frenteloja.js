@@ -289,45 +289,24 @@ export default async function handler(req,res){
         ficha.pipefyPending = true; // cron vai retentar
       }
 
-      // ── PASSO 2: Criar card no board DIRETAMENTE no Redis (SÍNCRONO) ─
+      // ── PASSO 2: Criar/mover card no board via endpoint (evita limite 5MB Upstash) ─
       try {
-        const boardDb = await dbGet('reparoeletro_board') || {};
-        const boardCards = boardDb.cards || [];
-        // Mover analise_loja → cliente_loja se já existe, senão criar
-        const existente = boardCards.find(c => c.flFichaId === ficha.id);
-        if (existente) {
-          existente.phaseId = 'cliente_loja';
-          existente.movedAt = now;
-          existente.movedBy = 'Aprovação FL';
-          if (pipefyId) { existente.pipefyId = String(pipefyId); }
-        } else {
-          boardCards.unshift({
-            id:          ficha.id+'-loja',
-            pipefyId:    pipefyId ? String(pipefyId) : ficha.id,
+        const _boardBase = process.env.FL_BASE_URL || 'https://reparoeletroadm.com';
+        const _boardR = await fetch(_boardBase+'/api/board?action=add-loja-card', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             flFichaId:   ficha.id,
+            pipefyId:    pipefyId || null,
             title:       titleCompleto,
             nomeContato: (ficha.nomeContato||'').replace(/\(Loja\)/g,'').trim(),
             telefone:    ficha.telefone||'',
             phaseId:     'cliente_loja',
-            addedAt:     now,
-            movedAt:     now,
-            movedBy:     'Aprovação FL',
-          });
-        }
-        boardDb.cards = boardCards;
-        // Registrar aprovado_entrada no movesLog — contabiliza nas Metas do técnico
-        if (!Array.isArray(boardDb.movesLog)) boardDb.movesLog = [];
-        boardDb.movesLog.push({
-          phaseId:   'aprovado_entrada',
-          pipefyId:  pipefyId ? String(pipefyId) : null,
-          timestamp: now,
-          origem:    'frente_loja',
-          fichaId:   ficha.id
-        });
-        const cutoff90fl = new Date(Date.now()-90*24*60*60*1000).toISOString();
-        boardDb.movesLog = boardDb.movesLog.filter(m=>(m.timestamp||m.ts||'')>cutoff90fl);
-        await dbSet('reparoeletro_board', boardDb);
-      } catch(e) { console.error('[FL] board direct write:', e.message); }
+          })
+        }).then(r=>r.json()).catch(e=>({ ok:false, error:e.message }));
+        if (!_boardR.ok) console.error('[FL] board via API:', _boardR.error||_boardR.msg);
+        else console.log('[FL] board via API: OK —', _boardR.msg||'criado');
+      } catch(e) { console.error('[FL] board via API exception:', e.message); }
 
       // ── PASSO 3: Registrar no Balcão (aguardando pagamento) ─────────
       try {
