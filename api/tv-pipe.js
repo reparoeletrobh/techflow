@@ -1374,6 +1374,24 @@ export default async function handler(req, res) {
     } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
   }
 
+
+  // ── GET listar-pipes: lista todos os pipes da conta Pipefy ───────────────
+  if (action === 'listar-pipes') {
+    const _pt = (process.env.PIPEFY_TOKEN||'').replace(/['"]/g,'').trim();
+    if (!_pt) return res.status(503).json({ok:false,error:'PIPEFY_TOKEN não configurado'});
+    try {
+      const r = await fetch('https://api.pipefy.com/graphql', {
+        method:'POST',
+        headers:{ Authorization:'Bearer '+_pt, 'Content-Type':'application/json' },
+        body: JSON.stringify({ query: `query { me { organizations { name pipes { id name cards_count } } } }` })
+      });
+      const d = await r.json();
+      const orgs = d?.data?.me?.organizations || [];
+      const pipes = orgs.flatMap(o => (o.pipes||[]).map(p=>({...p, org: o.name})));
+      return res.status(200).json({ ok:true, pipes, total: pipes.length });
+    } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
