@@ -1393,6 +1393,89 @@ export default async function handler(req, res) {
   }
 
 
+
+  // ── GET sync-from-pipefy-tv: importa cards do Pipefy TV para tv_pipe ────
+  if (action === 'sync-from-pipefy-tv') {
+    const _pt = (process.env.PIPEFY_TOKEN||'').replace(/['"]/g,'').trim();
+    if (!_pt) return res.status(503).json({ok:false,error:'PIPEFY_TOKEN não configurado'});
+    const TV_PIPEFY_ID = '306904889';
+    const PHASE_MAP = {
+      'aguardando aprovação':'aguardando_aprovacao','aguardando aprovacao':'aguardando_aprovacao',
+      'aprovados':'aprovados','aprovado':'aprovados',
+      'video enviado':'video_enviado','vídeo enviado':'video_enviado',
+      'análise de compra':'analise_compra','analise de compra':'analise_compra',
+      'equipamento comprado':'equipamento_comprado','programar entrega':'programar_entrega',
+      'solicitar entrega':'solicitar_entrega','solicitar coleta':'solicitar_coleta',
+      'clientes com horario marcado':'clientes_com_horario_marcado',
+      'liberado para rota':'liberado_para_rota','rota em andamento':'rota_em_andamento',
+      'equipamento em rota':'equipamento_em_rota','remarcar':'remarcar',
+      'receber $':'receber_dolar','erp':'erp','rs':'rs',
+      'oss para fechamento':'oss_para_fechamento','reprovado':'reprovado',
+      'garantia':'garantia','pronto para venda':'pronto_para_venda',
+      'finalizado':'finalizado','concluído':'finalizado','concluido':'finalizado',
+      'descarte':'descarte','ultima chamada':'ultima_chamada','última chamada':'ultima_chamada',
+      'aguardando peça':'aguardando_peca','aguardando peca':'aguardando_peca',
+      'aguardando orçamento':'aguardando_orcamento','aguardando orcamento':'aguardando_orcamento',
+    };
+    function mapPhase(n){ return PHASE_MAP[(n||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim()] || (n||'').toLowerCase().replace(/\s+/g,'_'); }
+    async function pipefyQ(q){
+      try{
+        const r=await fetch('https://api.pipefy.com/graphql',{method:'POST',headers:{Authorization:'Bearer '+_pt,'Content-Type':'application/json'},body:JSON.stringify({query:q})});
+        const j=await r.json();
+        if(j.errors){console.error('[tv-sync]',JSON.stringify(j.errors));return null;}
+        return j.data;
+      }catch(e){console.error('[tv-sync]',e.message);return null;}
+    }
+    try {
+      const resultado = { fases:{}, totalImportados:0, jaExistiam:0, novos:0 };
+      // Buscar fases
+      const pipeData = await pipefyQ('query { pipe(id:"'+TV_PIPEFY_ID+'") { phases { id name cards_count } } }');
+      if (!pipeData?.pipe?.phases) return res.status(500).json({ok:false,error:'Não conseguiu acessar o Pipefy TV'});
+      const phases = pipeData.pipe.phases;
+      phases.forEach(p=>{ resultado.fases[mapPhase(p.name)]={pipefyName:p.name,total:p.cards_count||0,importados:0}; });
+      // Buscar cards por fase
+      const pipeDb = (await dbGet(PIPE_KEY)) || {cards:[],lastSync:null};
+      if(!Array.isArray(pipeDb.cards)) pipeDb.cards=[];
+      const existentes = new Set(pipeDb.cards.map(c=>String(c.pipefyId||'')).filter(Boolean));
+      for(const phase of phases){
+        const lp=mapPhase(phase.name);
+        let cursor=null, hasNext=true;
+        while(hasNext){
+          const after=cursor?', after:"'+cursor+'"':'';
+          const qd=await pipefyQ('query{phase(id:"'+phase.id+'"){cards(first:50'+after+'){pageInfo{hasNextPage endCursor}edges{node{id title fields{name value}phases_history{phase{name}firstTimeIn}}}}}}');
+          const page=qd?.phase?.cards;
+          hasNext=page?.pageInfo?.hasNextPage??false;
+          cursor=page?.pageInfo?.endCursor??null;
+          for(const {node} of (page?.edges||[])){
+            resultado.totalImportados++;
+            if(existentes.has(String(node.id))){resultado.jaExistiam++;continue;}
+            const fields=node.fields||[];
+            const fNome=fields.find(f=>/nome|cliente/i.test(f.name))?.value||node.title||'';
+            const fTel=fields.find(f=>/telefone|fone|cel/i.test(f.name))?.value||'';
+            const fEquip=fields.find(f=>/equip|aparelho/i.test(f.name))?.value||'';
+            const fDesc=fields.find(f=>/defei|descri|prob/i.test(f.name))?.value||'';
+            const fVal=fields.find(f=>/valor|preco|preço/i.test(f.name))?.value||'';
+            const fEnd=fields.find(f=>/endere/i.test(f.name))?.value||'';
+            pipeDb.cards.push({
+              id:'PIPE-TV-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,5).toUpperCase(),
+              pipefyId:String(node.id), phase:lp,
+              nomeContato:fNome, telefone:fTel, equipamento:fEquip,
+              descricao:fDesc, endereco:fEnd, valor:parseFloat(fVal)||0,
+              origem:'sync_pipefy_tv', criadoEm:now, movedAt:now,
+              aguardandoDesde:lp==='aguardando_aprovacao'?now:null,
+              history:[], analiseCompra:false
+            });
+            resultado.novos++;
+            if(resultado.fases[lp]) resultado.fases[lp].importados++;
+          }
+        }
+      }
+      pipeDb.lastSync=now;
+      await dbSet(PIPE_KEY,pipeDb);
+      return res.status(200).json({ok:true,...resultado});
+    }catch(e){return res.status(500).json({ok:false,error:e.message});}
+  }
+
   // ── GET reset-tv-pipe: limpa COMPLETAMENTE o tv_pipe para re-sync ────────
   if (action === 'reset-tv-pipe') {
     try {
