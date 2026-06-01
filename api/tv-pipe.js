@@ -1650,6 +1650,38 @@ export default async function handler(req, res) {
 
     // ── Gatilhos downstream ──────────────────────────────────────────────
     var pid = card.pipefyId;
+    // liberado_para_rota → tv_board (phaseId: liberado_rota) para motorista/coleta/rotas
+    if (phase === 'liberado_para_rota') {
+      try {
+        var bU2=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+        var bT2=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+        async function _bGet2(k){var r=await fetch(bU2+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+bT2,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});var j=await r.json();var v=j[0]?.result;if(!v)return null;try{var x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+        async function _bSet2(k,v){await fetch(bU2+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+bT2,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+        var boardDb2=(await _bGet2('tv_board'))||{cards:[],syncedIds:[],movesLog:[],metaLog:[]};
+        if(!Array.isArray(boardDb2.cards)) boardDb2.cards=[];
+        var boardPid2=card.pipefyId?String(card.pipefyId):('TV-PIPE-'+card.id);
+        boardDb2.cards=boardDb2.cards.filter(function(x){return x.pipefyId!==boardPid2&&x.osCode!==card.id;});
+        boardDb2.cards.unshift({
+          pipefyId:    boardPid2,
+          phaseId:     'liberado_rota',
+          nomeContato: card.nomeContato||'',
+          title:       card.descricao||card.nomeContato||'',
+          telefone:    card.telefone||'',
+          descricao:   card.equipamento||card.descricao||'',
+          endereco:    card.endereco||'',
+          osCode:      card.id,
+          valor:       card.valor||0,
+          movedBy:     'TV Pipe',
+          localOnly:   !card.pipefyId,
+          syncedAt:    now, movedAt: now
+        });
+        if(!Array.isArray(boardDb2.syncedIds)) boardDb2.syncedIds=[];
+        if(!boardDb2.syncedIds.includes(boardPid2)) boardDb2.syncedIds.push(boardPid2);
+        await _bSet2('tv_board', boardDb2);
+        console.log('[tv_pipe→tv_board] liberado_para_rota:', boardPid2);
+      } catch(eLR){ console.error('[trigger liberado_para_rota]', eLR.message); }
+    }
+
     // Aprovados → Board Técnico (fase: aprovado)
     if (phase === 'aprovados') {
       try {
