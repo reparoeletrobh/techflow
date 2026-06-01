@@ -1213,6 +1213,27 @@ export default async function handler(req, res) {
     } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
   }
 
+
+  // ── GET restaurar-fase: restaura card por nome exato para fase anterior ──
+  if (action === 'restaurar-fase') {
+    var rNome  = (req.query.nome||'').toLowerCase();
+    var rFase  = req.query.fase || 'aprovados';
+    if (!rNome) return res.status(400).json({ok:false,error:'nome obrigatorio'});
+    try {
+      var pip7 = await dbGet(PIPE_KEY)||{cards:[]};
+      var ts7  = now;
+      var card7 = (pip7.cards||[]).find(function(c){
+        return (c.nomeContato||'').toLowerCase().includes(rNome) && c.phase === 'ultima_chamada';
+      });
+      if (!card7) return res.status(404).json({ok:false,error:'Card nao encontrado em ultima_chamada',nome:rNome});
+      card7.history=(card7.history||[]).concat([{phase:'ultima_chamada',ts:ts7}]);
+      card7.phase  = rFase;
+      card7.movedAt= ts7;
+      await dbSet(PIPE_KEY, pip7);
+      return res.status(200).json({ok:true,id:card7.id,nome:card7.nomeContato,restauradoPara:rFase});
+    } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
