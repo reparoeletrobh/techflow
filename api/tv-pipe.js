@@ -40,6 +40,8 @@ const PHASES = [
   { id:'equipamento_comprado', name:'Equipamento Comprado', cor:'#3b9eff' },
   { id:'programar_entrega',    name:'Programar Entrega',    cor:'#f5c800' },
   { id:'solicitar_entrega',    name:'Solicitar Entrega',    cor:'#f97316' },
+  { id:'liberado_para_rota',    name:'Liberado p/ Rota',      cor:'#3b9eff' },
+  { id:'rota_em_andamento',     name:'Rota em Andamento',     cor:'#a855f7' },
   { id:'entrega_solicitada',   name:'Entrega Solicitada',   cor:'#f97316' },
   { id:'receber',              name:'Receber',              cor:'#22c55e' },
   { id:'erp',                  name:'ERP',                  cor:'#22c55e' },
@@ -1489,6 +1491,32 @@ export default async function handler(req, res) {
       const porFase = {};
       (db.cards||[]).forEach(function(c){ porFase[c.phase]=(porFase[c.phase]||0)+1; });
       return res.status(200).json({ok:true, migrados, total:db.cards.length, porFase});
+    } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
+  }
+
+
+  // ── GET restaurar-liberado-rota: move 17 fichas de solicitar_entrega → liberado_para_rota ──
+  if (action === 'restaurar-liberado-rota') {
+    // As 17 fichas foram movidas para solicitar_entrega na migração
+    // Identificamos pelo pipefyId vindo de liberado_para_rota (LIBERADO_ROTA_PHASE_ID = "341638193")
+    // As fichas têm origem sync_pipefy_tv e foram importadas com phase original liberado_para_rota
+    // Usamos o histórico para identificá-las
+    try {
+      const db17 = (await dbGet(PIPE_KEY)) || {cards:[]};
+      const now17 = new Date().toISOString();
+      let restaurados = 0;
+      // Identificar fichas que tinham fase liberado_para_rota no histórico E estão em solicitar_entrega
+      (db17.cards||[]).forEach(function(card){
+        const eraLiberado = (card.history||[]).some(function(h){ return h.phase==='liberado_para_rota'; });
+        if(eraLiberado && card.phase === 'solicitar_entrega'){
+          card.history=(card.history||[]).concat([{phase:'solicitar_entrega',ts:now17,obs:'restaurado de migração'}]);
+          card.phase='liberado_para_rota';
+          card.movedAt=now17;
+          restaurados++;
+        }
+      });
+      if(restaurados>0) await dbSet(PIPE_KEY, db17);
+      return res.status(200).json({ok:true, restaurados, total:db17.cards.length});
     } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
   }
 
