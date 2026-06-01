@@ -224,6 +224,14 @@ module.exports = async function handler(req, res) {
     // Só mostra fichas na fase inicial (garantia_acionada)
     // Ao mover para em_analise ou servico_finalizado, sai da coluna do kanban tecnico
     const garantias = all.filter(f => f.phaseId === "garantia_acionada");
+    // Trigger: tv_pipe → garantia (delivery)
+    if (req.body?.tipo === 'delivery' || tipo === 'delivery') {
+      await moverNoTvPipe('garantia', {
+        localId: novaGarantia?.id||null, pipefyId: null,
+        nome: req.body?.nome||'', telefone: req.body?.telefone||'',
+        equipamento: req.body?.equipamento||'', origem:'tv_garantia_delivery'
+      });
+    }
     return res.status(200).json({ ok: true, garantias, lojaImediata: [] });
   }
   return res.status(404).json({ ok: false, error: "Acao nao encontrada" });

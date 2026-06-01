@@ -1,3 +1,21 @@
+
+// ── Trigger: move/cria card no tv_pipe ──────────────────────────────────
+async function moverNoTvPipe(phase, dados){
+  try {
+    const _U=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+    const _T=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+    async function _g(k){const r=await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();const v=j[0]?.result;if(!v)return null;try{let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+    async function _s(k,v){await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+    const pipe=(await _g('tv_pipe'))||{cards:[],lastSync:null};
+    if(!Array.isArray(pipe.cards))pipe.cards=[];
+    const now=new Date().toISOString();
+    const jaExiste=dados.localId&&pipe.cards.find(c=>c.localId===String(dados.localId)||c.id===String(dados.localId));
+    if(jaExiste){jaExiste.phase=phase;jaExiste.movedAt=now;}
+    else{pipe.cards.unshift({id:'PIPE-TV-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,5).toUpperCase(),localId:dados.localId||null,pipefyId:dados.pipefyId||null,phase,nomeContato:dados.nome||'',telefone:dados.telefone||'',equipamento:dados.equipamento||'',descricao:dados.descricao||'',endereco:dados.endereco||'',valor:parseFloat(dados.valor)||0,origem:dados.origem||'sistema',criadoEm:now,movedAt:now,aguardandoDesde:phase==='aguardando_aprovacao'?now:null,history:[],analiseCompra:false});}
+    pipe.lastSync=now;
+    await _s('tv_pipe',pipe);
+  }catch(e){console.error('[tv_pipe trigger]',e.message);}
+}
 'use strict';
 // TV WEBHOOK MP — espelho ADM | FASE 6 | 01/06/2026
 
@@ -142,23 +160,14 @@ async function processarPagamentoFinanceiro(pmt) {
   console.log('[webhook-mp] Pipe ADM move:', pipeOk);
 
   // Pipefy: mover para Solicitar Entrega — função própria, sem fetch interno
-  let pipefyOk = false;
-  if (rec.pipefyId) {
-    try {
-      const tok = (process.env.PIPEFY_TOKEN||"").trim();
-      const ctrl = new AbortController();
-      setTimeout(() => ctrl.abort(), 8000);
-      const pRes = await fetch("https://api.pipefy.com/graphql", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + tok },
-        body: JSON.stringify({ query: `mutation{moveCardToPhase(input:{card_id:"${rec.pipefyId}",destination_phase_id:"334875186"}){card{id}}}` }),
-        signal: ctrl.signal
-      });
-      const pj = await pRes.json();
-      pipefyOk = !!pj.data?.moveCardToPhase?.card?.id;
-      if (!pipefyOk && pj.errors) console.error("[FinWebhook] Pipefy:", pj.errors[0]?.message);
-    } catch(pe) { console.error("[FinWebhook] Pipefy timeout:", pe.message); }
-  }
+  // Trigger: tv_pipe → solicitar_entrega (pagamento confirmado)
+  await moverNoTvPipe('solicitar_entrega', {
+    localId: rec.id||null, pipefyId: rec.pipefyId||null,
+    nome: rec.nome||rec.nomeContato||'', telefone: rec.telefone||'',
+    equipamento: rec.equipamento||'', descricao: rec.descricao||'',
+    valor: rec.valor||0, origem:'tv_webhook_mp_pago'
+  });
+  const pipefyOk = false; // Pipefy desconectado
 
   // Salvar conciliação
   await salvarConciliacaoFin({ rec, pmt, metodo, valor, now, status:"pago", pipefyOk });

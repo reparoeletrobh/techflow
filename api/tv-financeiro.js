@@ -404,14 +404,16 @@ module.exports = async function handler(req, res) {
       rec.dataAgendadaDisplay = req.body.dataAgendadaDisplay || req.body.dataAgendada;
     }
     await dbSet(FIN_KEY, fin);
-    // Move no Pipefy quando vai para Entrega Liberada
-    let pipefyMoveOk = null;
-    if (phaseId === "entrega_liberada" && rec.pipefyId) {
-      try { await pipefyMoveCard(rec.pipefyId, SOLICITAR_ENTREGA_PHASE_ID); pipefyMoveOk = true; }
-      catch(e) { pipefyMoveOk = false; console.error("pipefyMove:", e.message); }
+    // Trigger: tv_pipe → solicitar_entrega quando entrega_liberada
+    if (phaseId === "entrega_liberada") {
+      await moverNoTvPipe('solicitar_entrega', {
+        localId: rec.id||null, pipefyId: rec.pipefyId||null,
+        nome: rec.nome||rec.nomeContato||'', telefone: rec.telefone||'',
+        equipamento: rec.equipamento||'', valor: rec.valor||0,
+        origem:'tv_financeiro_entrega_liberada'
+      });
     }
-
-    return res.status(200).json({ ok: true, record: rec, pipefyMoveOk });
+    return res.status(200).json({ ok: true, record: rec, pipefyMoveOk: null });
   }
 
   // ── POST excluir ───────────────────────────────────────────
