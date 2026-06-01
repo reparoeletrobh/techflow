@@ -1,3 +1,691 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='18,2 8,18 15,18 14,30 24,14 17,14' fill='%23f5c800' stroke='%23f5c800' stroke-linejoin='round'/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pipe — Reparo Eletro</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--border:#252525;
+  --text:#fff;--muted:#888;--dim:#333;
+  --accent:#f5c800;--green:#22c55e;--red:#ef4444;--blue:#3b9eff;--purple:#a855f7;--orange:#f97316;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;}
+
+/* ── HEADER ── */
+header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;border-bottom:2px solid var(--accent);background:var(--bg);position:sticky;top:0;z-index:200;}
+.logo{font-family:var(--fh);font-size:15px;font-weight:800;}
+.logo span{color:var(--accent);}
+.logo em{color:var(--muted);font-style:normal;font-size:11px;font-family:var(--fm);margin-left:8px;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.hbtn{font-family:var(--fm);font-size:10px;padding:6px 13px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;text-decoration:none;transition:all .15s;}
+.hbtn:hover{color:var(--text);border-color:var(--accent);}
+.hbtn.primary{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600;}
+.hbtn.primary:hover{background:#e6b800;}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);}
+.sync-dot.spin{background:var(--accent);animation:pulse .8s ease infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+.sync-time{font-family:var(--fm);font-size:9px;color:var(--muted);}
+
+/* ── STATS ── */
+.stats-bar{display:flex;gap:16px;padding:8px 20px;border-bottom:1px solid var(--border);background:var(--bg);align-items:center;flex-wrap:wrap;}
+.stat-pill{display:flex;align-items:center;gap:5px;}
+.stat-lbl{font-family:var(--fm);font-size:9px;color:var(--muted);}
+.stat-val{font-family:var(--fm);font-size:12px;font-weight:600;}
+
+/* ── BOARD ── */
+.board{display:flex;gap:12px;padding:16px 12px 16px;overflow-x:auto;flex:1;align-items:flex-start;scroll-behavior:smooth;}
+.board::-webkit-scrollbar{height:14px;}
+.board::-webkit-scrollbar-thumb{background:#3a3a3a;border-radius:7px;border:3px solid #0d0d0d;}
+.board::-webkit-scrollbar-thumb:hover{background:#f5c800;cursor:grab;}
+.board::-webkit-scrollbar-track{background:#141414;border-radius:7px;}
+.scroll-nav{display:flex;align-items:center;gap:4px;}
+.scroll-btn{background:var(--surface);border:1px solid var(--border);border-radius:6px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:13px;transition:.15s;flex-shrink:0;}
+.scroll-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+/* ── COLUNA ── */
+.col{flex-shrink:0;width:290px;display:flex;flex-direction:column;gap:10px;}
+.col-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:10px;background:var(--surface);position:relative;overflow:hidden;}
+.col-top-stripe{position:absolute;top:0;left:0;right:0;height:2px;}
+.col-title{font-family:var(--fh);font-size:12px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.col-dot{width:8px;height:8px;border-radius:50%;}
+.col-count{font-family:var(--fm);font-size:10px;color:var(--muted);background:var(--surface2);padding:2px 8px;border-radius:10px;}
+
+/* ── CARD ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;transition:border .15s;position:relative;overflow:hidden;}
+.card-left-bar{position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:12px 0 0 12px;}
+.card:hover{border-color:#333;}
+.card-id{font-family:var(--fm);font-size:9px;color:var(--muted);}
+.card-nome{font-weight:600;font-size:14px;}
+.card-equip{font-family:var(--fm);font-size:10px;color:var(--accent);}
+.card-defeito{font-size:11px;color:var(--muted);line-height:1.4;}
+.card-time{font-family:var(--fm);font-size:9px;color:var(--dim);}
+.card-val{font-family:var(--fm);font-size:11px;font-weight:600;color:var(--green);}
+.card-ac{display:inline-flex;align-items:center;gap:3px;font-family:var(--fm);font-size:9px;background:rgba(59,158,255,.1);color:var(--blue);border:1px solid rgba(59,158,255,.2);border-radius:5px;padding:2px 6px;}
+.card-pipefy{font-family:var(--fm);font-size:8px;color:var(--dim);background:var(--surface2);border-radius:4px;padding:1px 5px;}
+.card-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;}
+.cbtn{font-family:var(--fm);font-size:10px;font-weight:600;padding:6px 12px;border-radius:7px;border:none;cursor:pointer;transition:all .15s;letter-spacing:.3px;}
+.cbtn-outline{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.cbtn-outline:hover{border-color:var(--text);color:var(--text);}
+.cbtn-yellow{background:rgba(245,200,0,.12);border:1px solid rgba(245,200,0,.3);color:var(--accent);}
+.cbtn-yellow:hover{background:rgba(245,200,0,.22);}
+.cbtn-red{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:var(--red);}
+.cbtn-red:hover{background:rgba(239,68,68,.18);}
+.cbtn-blue{background:rgba(59,158,255,.08);border:1px solid rgba(59,158,255,.2);color:var(--blue);}
+.cbtn-blue:hover{background:rgba(59,158,255,.18);}
+
+
+/* -- VENCIMENTO -- */
+.venc-badge{display:inline-flex;align-items:center;gap:5px;font-family:var(--fm);font-size:10px;font-weight:700;padding:4px 10px;border-radius:7px;margin-top:3px;}
+.venc-ok{background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.25);}
+.venc-warn{background:rgba(249,115,22,.12);color:#f97316;border:1px solid rgba(249,115,22,.3);animation:pulse-vwarn .9s infinite;}
+.venc-late{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.35);animation:pulse-vlate .6s infinite;}
+@keyframes pulse-vwarn{0%,100%{opacity:1}50%{opacity:.6}}
+@keyframes pulse-vlate{0%,100%{opacity:1}50%{opacity:.4}}
+/* Timer badge */
+.timer-badge{display:inline-block;font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:5px;font-weight:600;}
+.timer-ok{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2);}
+.timer-warn{background:rgba(249,115,22,.1);color:var(--orange);border:1px solid rgba(249,115,22,.2);}
+.timer-late{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2);}
+
+/* Expansão dados */
+.card-expand{display:none;border-top:1px solid var(--border);padding-top:10px;margin-top:2px;display:flex;flex-direction:column;gap:6px;}
+.card-expand.hidden{display:none!important;}
+.expand-row{display:flex;gap:6px;align-items:flex-start;}
+.expand-lbl{font-family:var(--fm);font-size:9px;color:var(--muted);min-width:60px;flex-shrink:0;}
+.expand-val{font-size:11px;color:var(--text);line-height:1.4;word-break:break-word;}
+
+/* Move select */
+.move-sel{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:5px 8px;color:var(--muted);font-family:var(--fm);font-size:10px;cursor:pointer;}
+.move-sel:hover{border-color:var(--accent);}
+
+/* ── OVERLAY MODAL ── */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;}
+.modal{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:22px;width:100%;max-width:400px;display:flex;flex-direction:column;gap:14px;}
+.modal-title{font-family:var(--fh);font-size:16px;font-weight:800;}
+.form-row{display:flex;flex-direction:column;gap:5px;}
+.form-lbl{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;}
+.form-inp{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:var(--fb);font-size:12px;}
+.form-inp:focus{outline:none;border-color:var(--accent);}
+.form-sel{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:var(--fb);font-size:12px;}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end;}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 16px;font-family:var(--fm);font-size:11px;z-index:9999;opacity:0;transform:translateY(6px);transition:.22s;pointer-events:none;}
+.toast.show{opacity:1;transform:none;}
+
+@media(max-width:600px){.col{width:260px;}.cbtn{font-size:9px;padding:5px 9px;}}
+
+.scroll-float{position:fixed;top:50%;transform:translateY(-50%);z-index:200;
+  width:36px;height:60px;background:rgba(17,17,17,.92);border:1px solid #2a2a2a;
+  border-radius:8px;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;color:#666;font-size:16px;transition:.2s;backdrop-filter:blur(4px);}
+.scroll-float:hover{color:#f5c800;border-color:#f5c800;background:rgba(17,17,17,.98);}
+.scroll-float.left{left:6px;}
+.scroll-float.right{right:6px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Reparo<span>Eletro</span><em>⚡ Pipe ADM</em></div>
+  <div class="header-right">
+    <button class="scroll-btn" onclick="scrollBoard(-1)" title="Rolar esquerda">◀</button>
+    <button class="scroll-btn" onclick="scrollBoard(1)"  title="Rolar direita">▶</button>
+    <div class="sync-dot" id="sync-dot"></div>
+    <span class="sync-time" id="last-sync">—</span>
+    <button class="hbtn" onclick="showRelatorio()" id="btn-rel">📊 Relatório</button>
+    <button class="hbtn primary" onclick="abrirModalNovo()">+ Nova Ficha</button>
+  </div>
+</header>
+
+<div class="stats-bar" id="stats-bar">
+  <div class="stat-pill"><span class="stat-lbl">Total</span>&nbsp;<span class="stat-val" id="st-total" style="color:var(--accent)">—</span></div>
+  <div class="stat-pill"><span class="stat-lbl">Aguardando</span>&nbsp;<span class="stat-val" id="st-aguard" style="color:var(--accent)">—</span></div>
+  <div class="stat-pill"><span class="stat-lbl">Aprovados</span>&nbsp;<span class="stat-val" id="st-aprov" style="color:var(--green)">—</span></div>
+  <div class="stat-pill"><span class="stat-lbl">Vídeo Enviado</span>&nbsp;<span class="stat-val" id="st-video" style="color:var(--purple)">—</span></div>
+  <div class="stat-pill"><span class="stat-lbl">Receber</span>&nbsp;<span class="stat-val" id="st-receber" style="color:var(--green)">—</span></div>
+  <div class="stat-pill" style="border-left:2px solid #22c55e;padding-left:10px;">
+    <span class="stat-lbl" title="Dados do Pipe ADM local — não do Pipefy">ERP</span>&nbsp;
+    <span class="stat-val" id="st-erp" style="color:var(--green)">—</span>
+    <span id="st-erp-val" style="display:none;"></span>
+  </div>
+</div>
+
+
+<!-- BARRA DE BUSCA -->
+<div style="display:flex;align-items:center;gap:10px;padding:8px 20px;border-bottom:1px solid var(--border);background:var(--bg);">
+  <input id="busca-pipe" type="text" placeholder="🔍  Rastrear por nome, telefone, equipamento ou ID…"
+    style="flex:1;max-width:420px;background:var(--surface);border:1px solid var(--border);border-radius:8px;
+           padding:7px 12px;font-family:var(--fm);font-size:11px;color:var(--text);outline:none;"
+    oninput="filtrarCards(this.value)"
+    onfocus="this.style.borderColor='var(--accent)'"
+    onblur="this.style.borderColor='var(--border)'">
+  <span id="busca-count" style="font-family:var(--fm);font-size:10px;color:var(--muted);"></span>
+  <button onclick="document.getElementById('busca-pipe').value='';filtrarCards('')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;" title="Limpar">✕</button>
+</div>
+
+<div class="board" id="board"></div>
+
+<!-- MODAL NOVA FICHA -->
+<div class="ov" id="modal-novo" style="display:none;" onclick="if(event.target===this)fecharModal()">
+  <div class="modal">
+    <div class="modal-title">Nova Ficha no Pipe</div>
+    <div class="form-row"><div class="form-lbl">Nome do cliente *</div><input class="form-inp" id="f-nome" placeholder="Ex: João Silva"></div>
+    <div class="form-row"><div class="form-lbl">Telefone</div><input class="form-inp" id="f-tel" placeholder="(31) 9 9999-0000"></div>
+    <div class="form-row"><div class="form-lbl">Equipamento</div><input class="form-inp" id="f-equip" placeholder="Ex: Microondas Electrolux"></div>
+    <div class="form-row"><div class="form-lbl">Valor estimado</div><input class="form-inp" id="f-valor" type="number" placeholder="0.00"></div>
+    <div class="form-row"><div class="form-lbl">Endereço</div><input class="form-inp" id="f-end" placeholder="Rua, número, bairro, cidade"></div>
+    <div class="form-row"><div class="form-lbl">Fase inicial</div><select class="form-sel" id="f-phase"></select></div>
+    <div class="modal-btns">
+      <button class="cbtn cbtn-outline" onclick="fecharModal()">Cancelar</button>
+      <button class="cbtn cbtn-yellow" onclick="salvarNovo()">✅ Criar Ficha</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- PAINEL RELATÓRIO -->
+<div id="painel-rel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:400;overflow-y:auto;padding:20px;">
+  <div style="max-width:900px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-family:var(--fh);font-size:18px;font-weight:800;">📊 Relatório de Divergências</div>
+        <div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:3px;">Compara nosso sistema (Redis) com o Pipefy em tempo real</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="hbtn" onclick="rodarComparacao()" id="btn-rodar">▶ Rodar agora</button>
+        <button class="hbtn" onclick="carregarHistorico()" id="btn-hist">🕓 Histórico</button>
+        <button class="hbtn" onclick="fecharRelatorio()">✕ Fechar</button>
+      </div>
+    </div>
+    <div id="rel-resultado"></div>
+    <div id="rel-historico" style="display:none;"></div>
+  </div>
+</div>
+
+
+<div class="toast" id="toast"></div>
+
+<script>
+const PHASE_COLORS = {
+  aguardando_aprovacao:'#f5c800',ultima_chamada:'#ef4444',aprovados:'#22c55e',video_enviado:'#a855f7',
+  analise_compra:'#3b9eff',equipamento_comprado:'#3b9eff',programar_entrega:'#f5c800',
+  solicitar_entrega:'#f97316',entrega_solicitada:'#f97316',receber:'#22c55e',erp:'#22c55e'
+};
+const SYNC_FASES=[
+  {phaseId:'334875152',local:'aguardando_aprovacao',nome:'Aguardando Aprovação'},
+  {phaseId:'338413470',local:'ultima_chamada',nome:'Última Chamada'},
+  {phaseId:'334879132',local:'aprovados',nome:'Aprovado'},
+  {phaseId:'342533760',local:'video_enviado',nome:'Vídeo Enviado'},
+  {phaseId:'342584529',local:'analise_compra',nome:'Análise de Compra'},
+  {phaseId:'338439265',local:'programar_entrega',nome:'Programar Entrega'},
+  {phaseId:'334875186',local:'solicitar_entrega',nome:'Solicitar Entrega'},
+  {phaseId:'335066834',local:'entrega_solicitada',nome:'Entrega Solicitada'},
+  {phaseId:'334875204',local:'receber',nome:'Receber'},
+  {phaseId:'339008925',local:'erp',nome:'ERP'},
+];
+const PHASES=[];
+let cards=[];
+
+function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
+function toast(msg,ok=true){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast show';
+  t.style.borderColor=ok?'rgba(34,197,94,.3)':'rgba(239,68,68,.3)';
+  setTimeout(()=>t.className='toast',2800);
+}
+async function api(action,body){
+  var url='/api/pipe?action='+action;
+  if(!body) url+='&_t='+Date.now(); // cache buster para GETs
+  const r=await fetch(url,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
+  return r.json();
+}
+function fmtDate(ts){
+  if(!ts)return'—';
+  return new Date(ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'});
+}
+function timerHTML(c){
+  if(!c.aguardandoDesde||c.phase!=='aguardando_aprovacao')return'';
+  const h=(Date.now()-new Date(c.aguardandoDesde).getTime())/3600000;
+  if(h<24)return'<span class="timer-badge timer-ok">⏱ '+Math.round(h)+'h</span>';
+  if(h<48)return'<span class="timer-badge timer-warn">⚠️ '+Math.round(h)+'h sem resposta</span>';
+  return'<span class="timer-badge timer-late">🔴 '+Math.round(h)+'h — AÇÃO NECESSÁRIA</span>';
+}
+
+function toggleDados(id){
+  const el=document.getElementById('expand-'+id);
+  if(el)el.classList.toggle('hidden');
+}
+
+function render(){
+  // Métricas
+  document.getElementById('st-total').textContent=cards.length;
+  document.getElementById('st-aguard').textContent=cards.filter(function(c){return c.phase==='aguardando_aprovacao';}).length;
+  document.getElementById('st-aprov').textContent=cards.filter(function(c){return c.phase==='aprovados';}).length;
+  document.getElementById('st-video').textContent=cards.filter(function(c){return c.phase==='video_enviado';}).length;
+  document.getElementById('st-receber').textContent=cards.filter(function(c){return c.phase==='receber';}).length;
+  // ERP: controlado por erp-count, nao por render()
+  // 
+  const board=document.getElementById('board');
+  var orderedPhases = loadColOrder(PHASES);
+  board.innerHTML=orderedPhases.map(ph=>{
+    const cor=PHASE_COLORS[ph.id]||'#555';
+    const phCards=cards.filter(c=>c.phase===ph.id);
+    const opts=PHASES.filter(p=>p.id!==ph.id).map(p=>'<option value="'+p.id+'">'+p.name+'</option>').join('');
+
+    const cardsHtml=phCards.map(c=>{
+      const pfBadge=c.pipefyId?'<span class="card-pipefy">PF·'+c.pipefyId.slice(-5)+'</span>':'';
+      const valHtml=c.valor>0?'<div class="card-val">R$ '+c.valor.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</div>':'';
+      const acBadge=c.analiseCompra?'<div class="card-ac">🛒 Análise de Compra</div>':'';
+      const equipHtml=c.equipamento?'<div class="card-equip">'+esc(c.equipamento.substring(0,60))+'</div>':'';
+      const descHtml=c.descricao&&c.descricao!==c.equipamento?'<div class="card-defeito">'+esc(c.descricao.substring(0,80))+(c.descricao.length>80?'…':'')+'</div>':'';
+      return '<div class="card" id="card-'+c.id+'">'+
+        '<div class="card-left-bar" style="background:'+cor+'"></div>'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'+
+          '<span class="card-id">'+esc(c.id)+'</span>'+
+          pfBadge+
+        '</div>'+
+        '<div class="card-nome">'+esc(c.nomeContato)+'</div>'+
+        equipHtml+
+        descHtml+
+        valHtml+
+        timerHTML(c)+
+        vencHTML(c)+
+        acBadge+
+        '<div class="card-time">'+fmtDate(c.movedAt)+'&nbsp;·&nbsp;'+esc(c.origem)+'</div>'+
+        '<div class="card-actions">'+
+          '<select class="move-sel" onchange="moverCard(\''+c.id+'\',this.value);this.value=\'\'" >'+
+            '<option value="">↕ Mover para…</option>'+opts+
+          '</select>'+
+          '<button class="cbtn cbtn-outline" onclick="abrirDadosPipe(\''+c.id+'\')">👁 Ver Dados</button>'+
+          '<button class="cbtn cbtn-outline" onclick="abrirEditarPipe(\''+c.id+'\')">✏️</button>'+'<button class="cbtn cbtn-outline" title="Vencimento" onclick="setVencimento(\''+c.id+'\')">[&#128197;]</button>'+
+          '<button class="cbtn cbtn-blue'+(c.analiseCompra?' active':'')+'" onclick="toggleAC(\''+c.id+'\')" title="Marcar Análise de Compra">🛒</button>'+
+          '<button class="cbtn cbtn-red" onclick="excluir(\''+c.id+'\')">✕</button>'+
+        '</div>'+
+        '<div class="card-expand hidden" id="expand-'+c.id+'">'+
+          (c.telefone?'<div class="expand-row"><span class="expand-lbl">Telefone</span><span class="expand-val">'+esc(c.telefone)+'</span></div>':'')+
+          (c.descricao?'<div class="expand-row"><span class="expand-lbl">Descrição</span><span class="expand-val">'+esc(c.descricao)+'</span></div>':'')+
+          '<div class="expand-row"><span class="expand-lbl">Origem</span><span class="expand-val">'+esc(c.origem)+'</span></div>'+
+          '<div class="expand-row"><span class="expand-lbl">Criado em</span><span class="expand-val">'+fmtDate(c.criadoEm)+'</span></div>'+
+          (c.pipefyId?'<div class="expand-row"><span class="expand-lbl">Pipefy ID</span><span class="expand-val">'+esc(c.pipefyId)+'</span></div>':'')+
+          '<div class="expand-row" style="margin-top:4px;"><span class="expand-lbl" style="padding-top:5px;">Valor</span>'+
+            '<div style="display:flex;gap:5px;align-items:center;">'+
+              '<input type="number" id="val-'+c.id+'" value="'+(c.valor||0)+'" min="0" step="10" '+
+              'style="width:90px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:4px 7px;color:var(--text);font-family:var(--fm);font-size:11px;outline:none;">'+
+              '<button onclick="salvarValor(\''+c.id+'\')" class="cbtn cbtn-yellow" style="padding:4px 10px;font-size:9px;">💾</button>'+
+            '</div>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+    }).join('')||'<div style="color:var(--dim);font-family:var(--fm);font-size:10px;padding:8px;">— vazio —</div>';
+
+    return '<div class="col">'+
+      '<div class="col-header">'+
+        '<div class="col-top-stripe" style="background:'+cor+'"></div>'+
+        '<div class="col-title"><div class="col-dot" style="background:'+cor+'"></div>'+ph.name+'</div>'+
+        '<div style="display:flex;align-items:center;gap:3px;">'+
+        '<div class="col-count">'+phCards.length+'</div>'+
+        '<button onclick="moverColuna(\''+ph.id+'\',-1)" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:9px;padding:0 2px;" title="Mover esquerda">◀</button>'+
+        '<button onclick="moverColuna(\''+ph.id+'\',1)"  style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:9px;padding:0 2px;" title="Mover direita">▶</button>'+
+        '</div>'+
+      '</div>'+
+      cardsHtml+
+    '</div>';
+  }).join('');
+}
+
+async function moverCard(id,phase){
+  if(!phase)return;
+  const r=await api('mover',{id,phase});
+  if(r.ok){const c=cards.find(x=>x.id===id);if(c)c.phase=phase;render();toast('Movido → '+PHASES.find(p=>p.id===phase)?.name);}
+  else toast(r.error||'Erro',false);
+}
+async function toggleAC(id){
+  const r=await api('toggle-analise-compra',{id});
+  if(r.ok){const c=cards.find(x=>x.id===id);if(c)c.analiseCompra=r.analiseCompra;render();}
+}
+async function excluir(id){
+  if(!confirm('Remover esta ficha do pipe?'))return;
+  const r=await api('excluir',{id});
+  if(r.ok){cards=cards.filter(c=>c.id!==id);render();toast('Ficha removida');}
+}
+
+
+
+// ── Helper: formato padrão Nome 4dig ─────────────────────────────────────
+function fmt4dig(nome, tel) {
+  if (!nome) return '';
+  var n = String(nome).trim();
+  if (/\s\d{4}$/.test(n)) return n; // já tem 4 dígitos no final
+  if (!tel) return n;
+  var digits = String(tel).replace(/\D/g,'');
+  var last4 = digits.slice(-4);
+  if (last4.length < 4) return n;
+  return n + ' ' + last4;
+}
+function abrirModalNovo(){
+  const sel=document.getElementById('f-phase');
+  sel.innerHTML=PHASES.map(p=>'<option value="'+p.id+'">'+p.name+'</option>').join('');
+  document.getElementById('modal-novo').style.display='flex';
+}
+function fecharModal(){document.getElementById('modal-novo').style.display='none';}
+async function salvarNovo(){
+  const nome=document.getElementById('f-nome').value.trim();
+  if(!nome){toast('Nome obrigatório',false);return;}
+  var tel=document.getElementById('f-tel').value.trim();
+  var nomeFormatado=fmt4dig(nome,tel);
+  const r=await api('add-card',{
+    nomeContato:nomeFormatado,
+    telefone:tel,
+    equipamento:document.getElementById('f-equip').value.trim(),
+    valor:parseFloat(document.getElementById('f-valor').value)||0,
+    endereco:document.getElementById('f-end') ? document.getElementById('f-end').value.trim() : '',
+    phase:document.getElementById('f-phase').value,
+    origem:'manual'
+  });
+  if(r.ok&&r.card){cards.unshift(r.card);render();fecharModal();toast('✅ Ficha criada!');}
+  else toast(r.error||'Erro',false);
+}
+
+async function load(){
+  const r=await api('load');
+  if(!r.ok)return;
+  PHASES.length=0;
+  (r.phases||[]).forEach(p=>PHASES.push(p));
+  cards=r.cards||[];
+  if(r.lastSync){
+    const d=new Date(r.lastSync);
+    document.getElementById('last-sync').textContent=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  }
+  render();
+}
+
+
+// ── EDITAR PIPE ───────────────────────────────────────────────────────────
+document.addEventListener('keydown', function(e) {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.key === 'ArrowLeft')  scrollBoard(-1);
+  if (e.key === 'ArrowRight') scrollBoard(1);
+});
+
+// ── SCROLL HORIZONTAL ─────────────────────────────────────────────────────
+function scrollBoard(dir) {
+  var board = document.getElementById('board');
+  if (!board) return;
+  var colWidth = 302; // largura da coluna + gap
+  board.scrollBy({ left: dir * colWidth, behavior: 'smooth' });
+}
+
+// Scroll com teclado ← →
+document.addEventListener('keydown', function(e) {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+  if (e.key === 'ArrowLeft')  scrollBoard(-1);
+  if (e.key === 'ArrowRight') scrollBoard(1);
+});
+
+// ── BUSCA / RASTREAR ──────────────────────────────────────────────────────
+let filtroAtivo = '';
+function filtrarCards(q) {
+  filtroAtivo = (q || '').toLowerCase().trim();
+  const allCards = document.querySelectorAll('.card');
+  let visiveis = 0;
+  allCards.forEach(function(el) {
+    const txt = el.textContent.toLowerCase();
+    const show = !filtroAtivo || txt.includes(filtroAtivo);
+    el.style.display = show ? '' : 'none';
+    if (show) visiveis++;
+  });
+  const cnt = document.getElementById('busca-count');
+  if (cnt) cnt.textContent = filtroAtivo ? visiveis + ' encontrado(s)' : '';
+}
+
+// ── SALVAR VALOR ──────────────────────────────────────────────────────────
+async function salvarValor(id) {
+  const inp = document.getElementById('val-' + id);
+  if (!inp) return;
+  const valor = parseFloat(inp.value) || 0;
+  const r = await api('editar-valor', { id: id, valor: valor });
+  if (r.ok) {
+    const c = cards.find(function(x){ return x.id === id; });
+    if (c) c.valor = valor;
+    toast('✅ Valor atualizado — R$ ' + valor.toLocaleString('pt-BR', {minimumFractionDigits: 2}));
+    render();
+    if (filtroAtivo) filtrarCards(filtroAtivo);
+  } else {
+    toast(r.error || 'Erro ao salvar', false);
+  }
+}
+
+// ── ÚLTIMA CHAMADA: incluída via override local ───────────────────────────
+// Última Chamada é gerenciada pelo Orçamento, mas pode aparecer aqui como fase
+if (!PHASE_COLORS['ultima_chamada']) PHASE_COLORS['ultima_chamada'] = '#ef4444';
+
+// ── RELATÓRIO ─────────────────────────────────────────────────────────────
+function showRelatorio(){
+  document.getElementById('painel-rel').style.display='block';
+  document.getElementById('rel-resultado').innerHTML=
+    '<div style="color:var(--muted);font-family:var(--fm);font-size:11px;padding:20px 0;">'+
+    'Clique em ▶ Rodar agora para comparar com o Pipefy em tempo real.</div>';
+  document.getElementById('rel-historico').style.display='none';
+}
+function fecharRelatorio(){ document.getElementById('painel-rel').style.display='none'; }
+
+async function rodarComparacao(){
+  const btn=document.getElementById('btn-rodar');
+  const res=document.getElementById('rel-resultado');
+  btn.textContent='⟳ Comparando…';btn.disabled=true;
+  res.innerHTML='<div style="color:var(--muted);font-family:var(--fm);font-size:11px;padding:20px 0;">Buscando dados do Pipefy…</div>';
+  try{
+    
+    btn.textContent='▶ Rodar agora';btn.disabled=false;
+    if(!r.ok){res.innerHTML='<div style="color:var(--red);font-family:var(--fm);font-size:11px;">Erro: '+esc(r.error||'falha')+'</div>';return;}
+    renderResultado(r,res);
+  }catch(e){
+    btn.textContent='▶ Rodar agora';btn.disabled=false;
+    res.innerHTML='<div style="color:var(--red);font-family:var(--fm);font-size:11px;">Erro: '+esc(e.message)+'</div>';
+  }
+}
+
+function renderResultado(r,container){
+  var ts=r.ts?new Date(r.ts).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):'—';
+  var totDiv=r.faltando+r.extra+r.divergencia;
+  var html='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">';
+  html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;"><div style="font-family:var(--fm);font-size:9px;color:var(--muted);">PIPEFY</div><div style="font-family:var(--fm);font-size:20px;font-weight:700;color:var(--accent)">'+r.totalPipefy+'</div></div>';
+  html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;"><div style="font-family:var(--fm);font-size:9px;color:var(--muted);">NOSSO SISTEMA</div><div style="font-family:var(--fm);font-size:20px;font-weight:700;color:var(--blue)">'+r.totalNosso+'</div></div>';
+  html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;"><div style="font-family:var(--fm);font-size:9px;color:var(--muted);">SINCRONIZADOS</div><div style="font-family:var(--fm);font-size:20px;font-weight:700;color:var(--green)">'+r.ok+'</div></div>';
+  html+='<div style="background:var(--surface2);border:1px solid '+(totDiv>0?'rgba(239,68,68,.3)':'var(--border)')+';;border-radius:8px;padding:10px 14px;"><div style="font-family:var(--fm);font-size:9px;color:var(--muted);">DIVERGÊNCIAS</div><div style="font-family:var(--fm);font-size:20px;font-weight:700;color:'+(totDiv>0?'var(--red)':'var(--green)')+'">'+totDiv+'</div></div>';
+  html+='</div>';
+  html+='<div style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-bottom:10px;">'+ts+' · Faltando: '+r.faltando+' · Extra: '+r.extra+' · Fase divergente: '+r.divergencia+'</div>';
+  if(!r.log||!r.log.length){
+    html+='<div style="color:var(--green);font-family:var(--fm);font-size:11px;padding:12px;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.15);border-radius:8px;">✅ Nenhuma divergência encontrada</div>';
+  } else {
+    html+='<div style="display:flex;flex-direction:column;gap:5px;">';
+    for(var e of r.log){
+      var cor=e.tipo==='FALTANDO'?'#ef4444':e.tipo==='FASE_DIVERGENTE'?'#f97316':'#888';
+      var icon=e.tipo==='FALTANDO'?'❌':e.tipo==='FASE_DIVERGENTE'?'⚠️':'ℹ️';
+      html+='<div style="background:var(--surface2);border:1px solid var(--border);border-left:3px solid '+cor+';border-radius:8px;padding:10px 12px;">';
+      html+='<div style="font-family:var(--fm);font-size:9px;font-weight:700;color:'+cor+';margin-bottom:3px;">'+icon+' '+e.tipo+(e.fase?' · '+esc(e.fase):'')+'</div>';
+      html+='<div style="font-size:12px;font-weight:600;">'+(e.nomeContato?esc(e.nomeContato):(e.titulo?esc(e.titulo.substring(0,60)):''))+'</div>';
+      html+='<div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:3px;">'+esc(e.msg)+'</div>';
+      if(e.pipefyId)html+='<div style="font-family:var(--fm);font-size:9px;color:var(--dim);margin-top:2px;">PF: '+esc(e.pipefyId)+(e.nossoId?' · ID: '+esc(e.nossoId):'')+'</div>';
+      html+='</div>';
+    }
+    html+='</div>';
+  }
+  container.innerHTML=html;
+}
+
+async function carregarHistorico(){
+  const hDiv=document.getElementById('rel-historico');
+  hDiv.style.display=hDiv.style.display==='none'?'block':'none';
+  if(hDiv.style.display==='none')return;
+  hDiv.innerHTML='<div style="color:var(--muted);font-family:var(--fm);font-size:11px;">Carregando…</div>';
+  const r=await api('historico-log');
+  if(!r.ok||!r.entradas||!r.entradas.length){
+    hDiv.innerHTML='<div style="color:var(--muted);font-family:var(--fm);font-size:11px;margin-top:10px;">Nenhum histórico ainda.</div>';return;
+  }
+  var html='<div style="margin-top:12px;display:flex;flex-direction:column;gap:5px;">';
+  for(var e of r.entradas){
+    var ts=e.ts?new Date(e.ts).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):'—';
+    var div=e.faltando+e.extra+e.divergencia;
+    html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;display:flex;gap:12px;align-items:center;">';
+    html+='<span style="font-family:var(--fm);font-size:9px;color:var(--muted);">'+ts+'</span>';
+    html+='<span style="font-family:var(--fm);font-size:10px;">PF:'+e.totalPipefy+' / Nosso:'+e.totalNosso+'</span>';
+    html+='<span style="font-family:var(--fm);font-size:10px;color:'+(div>0?'var(--red)':'var(--green)')+';">'+(div>0?'⚠️ '+div+' divergência(s)':'✅ ok')+'</span>';
+    html+='</div>';
+  }
+  html+='</div>';
+  hDiv.innerHTML=html;
+}
+
+// ── RASTREAR ──────────────────────────────────────────────────────────────
+function rastrearFicha(pipefyId){
+  if(!pipefyId){toast('Esta ficha não tem ID Pipefy para rastrear',false);return;}
+  window.open('/rastrear?id='+encodeURIComponent(pipefyId),'_blank');
+}
+
+// ── REORDENAR COLUNAS ─────────────────────────────────────────────────────
+var colOrder = null;
+function loadColOrder(phases){
+  try{
+    var saved=localStorage.getItem('pipe_col_order');
+    if(saved){
+      var arr=JSON.parse(saved);
+      // Aplicar ordem salva, garantindo que todas as fases estão presentes
+      var ordered=arr.map(function(id){return phases.find(function(p){return p.id===id;});}).filter(Boolean);
+      phases.filter(function(p){return !arr.includes(p.id);}).forEach(function(p){ordered.push(p);});
+      return ordered;
+    }
+  }catch(e){}
+  return phases.slice();
+}
+function saveColOrder(phases){
+  try{localStorage.setItem('pipe_col_order',JSON.stringify(phases.map(function(p){return p.id;})));}catch(e){}
+}
+function moverColuna(phaseId,dir){
+  var ordered=loadColOrder(PHASES);
+  var idx=ordered.findIndex(function(p){return p.id===phaseId;});
+  if(idx<0)return;
+  var newIdx=idx+dir;
+  if(newIdx<0||newIdx>=ordered.length)return;
+  var tmp=ordered[idx];ordered[idx]=ordered[newIdx];ordered[newIdx]=tmp;
+  saveColOrder(ordered);
+  render();
+}
+
+
+// ── VER DADOS PIPE ────────────────────────────────────────────────────────
+var _cardAtual = null;
+function abrirDadosPipe(id) {
+  _cardAtual = cards.find(function(c){ return c.id === id; });
+  if (!_cardAtual) { console.warn('card nao encontrado:', id); return; }
+  document.getElementById('pipe-d-id').textContent = _cardAtual.id + (_cardAtual.pipefyId ? ' · PF:'+_cardAtual.pipefyId : '');
+  document.getElementById('pd-nome').value  = _cardAtual.nomeContato || '';
+  document.getElementById('pd-tel').value   = _cardAtual.telefone    || '';
+  document.getElementById('pd-cpf').value   = _cardAtual.cpfCnpj     || '';
+  document.getElementById('pd-equip').value = _cardAtual.equipamento || '';
+  document.getElementById('pd-valor').value = _cardAtual.valor       || '';
+  document.getElementById('pd-desc').value  = _cardAtual.descricao   || '';
+  document.getElementById('pd-end').value   = _cardAtual.endereco    || '';
+  document.getElementById('pd-serv').value  = _cardAtual.servicos    || '';
+  document.getElementById('pipe-d-msg').style.display = 'none';
+  document.getElementById('ov-pipe-dados').style.display = 'flex';
+}
+function fecharDadosPipe() {
+  document.getElementById('ov-pipe-dados').style.display = 'none';
+  _cardAtual = null;
+}
+async function salvarDadosPipe() {
+  if (!_cardAtual) return;
+  var body = {
+    id: _cardAtual.id,
+    nomeContato: document.getElementById('pd-nome').value,
+    telefone:    document.getElementById('pd-tel').value,
+    cpfCnpj:     document.getElementById('pd-cpf').value,
+    equipamento: document.getElementById('pd-equip').value,
+    valor:       document.getElementById('pd-valor').value,
+    descricao:   document.getElementById('pd-desc').value,
+    endereco:    document.getElementById('pd-end').value,
+    servicos:    document.getElementById('pd-serv').value
+  };
+  var r = await fetch('/api/pipe?action=editar-pipe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
+  var msg = document.getElementById('pipe-d-msg');
+  if (r.ok) {
+    msg.textContent='✅ Salvo!'; msg.style.display='block';
+    msg.style.cssText='display:block;background:rgba(34,197,94,.1);color:#22c55e;padding:8px;border-radius:6px;font-size:11px;';
+    await load();
+    setTimeout(function(){ fecharDadosPipe(); }, 1200);
+  } else {
+    msg.textContent='Erro: '+r.error; msg.style.display='block';
+    msg.style.cssText='display:block;background:rgba(239,68,68,.1);color:#ef4444;padding:8px;border-radius:6px;font-size:11px;';
+  }
+}
+
+
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+
+// ── ERP PILL AUTÔNOMO — sem Pipefy, sem cards[], direto do Redis ─────────
+async function atualizarErp(){
+  try{
+    var r=await fetch('/api/pipe?action=erp-count&_t='+Date.now());
+    var d=await r.json();
+    if(d.ok){
+      document.getElementById('st-erp').textContent=d.erp;
+      var vf=document.getElementById('st-erp-val');
+      if(vf) vf.textContent=d.valor>0?d.valor.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
+    }
+  }catch(e){}
+}
+
+load();
+setInterval(load, 90000);
+atualizarErp();
+setInterval(atualizarErp, 20000);
+
+// ── EDITAR PIPE ───────────────────────────────────────────────────────────
+function abrirEditarPipe(id) {
+  var card = cards.find(function(c){ return c.id === id; });
+  if (!card) return;
+  document.getElementById('ep-id').value    = id;
+  document.getElementById('ep-nome').value  = card.nomeContato || '';
+  document.getElementById('ep-tel').value   = card.telefone    || '';
+  document.getElementById('ep-cpf').value   = card.cpfCnpj     || '';
+  document.getElementById('ep-equip').value = card.equipamento || '';
+  document.getElementById('ep-valor').value = card.valor       || '';
+  document.getElementById('ep-desc').value  = card.descricao   || '';
+  document.getElementById('ep-end').value   = card.endereco    || '';
+  document.getElementById('ep-serv').value  = card.servicos    || '';
+  document.getElementById('modal-editar-pipe').style.display = 'flex';
+}
+function fecharEditarPipe() {
+  document.getElementById('modal-editar-pipe').style.display = 'none';
+}
+async function salvarEditarPipe() {
+  var id  = document.getElementById('ep-id').value;
+  var tel = document.getElementById('ep-tel').value;
+  var body = {
+    id, nomeContato: document.getElementById('ep-nome').value,
+    telefone: tel, cpfCnpj: document.getElementById('ep-cpf').value,
+    equipamento: document.getElementById('ep-equip').value,
+    valor: document.getElementById('ep-valor').value,
+    descricao: document.getElementById('ep-desc').value,
+    endereco: document.getElementById('ep-end').value,
+    servicos: document.getElementById('ep-serv').value,
+    vencimento: document.getElementById('ep-venc') ? document.getElementById('ep-venc').value : ''
+  };
+  try {
+    var r = await fetch('/api/pipe?action=editar-pipe', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    var d = await r.json();
+    if (d.ok) { fecharEditarPipe(); load(); }
+    else alert('Erro: ' + d.error);
+  } catch(e) { alert('Erro: ' + e.message); }
+}
 
 function vencHTML(c){
   if(!c.vencimento) return '';
@@ -5,14 +693,140 @@ function vencHTML(c){
   var diff=d.getTime()-Date.now();
   var days=Math.ceil(diff/(1000*60*60*24));
   var p=c.vencimento.split('-'); var fmt=p[2]+'/'+p[1]+'/'+p[0];
-  if(diff<0) return '<div class="venc-badge venc-late">&#x1F534; Vencido '+fmt+'</div>';
-  if(days<=2) return '<div class="venc-badge venc-warn">&#x1F7E0; Vence '+fmt+' ('+days+'d)</div>';
-  return '<div class="venc-badge venc-ok">&#x1F7E2; Vence '+fmt+'</div>';
+  if(diff<0) return '<div class="venc-badge venc-late">&#128308; Vencido '+fmt+'</div>';
+  if(days<=2) return '<div class="venc-badge venc-warn">&#128992; Vence '+fmt+' ('+days+'d)</div>';
+  return '<div class="venc-badge venc-ok">&#128994; Vence '+fmt+'</div>';
 }
 async function setVencimento(id){
-  var d=prompt('Data de vencimento (AAAA-MM-DD):',new Date().toISOString().slice(0,10));
+  var d=prompt('Vencimento (AAAA-MM-DD):',new Date().toISOString().slice(0,10));
   if(d===null) return;
   var r=await fetch('/api/pipe?action=editar-pipe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,vencimento:d})}).then(r=>r.json());
   if(r.ok) load(); else alert('Erro: '+r.error);
 }
 
+</script>
+
+</div>
+
+
+
+</div>
+
+
+
+<!-- Modal editar ficha pipe -->
+<div id="modal-editar-pipe" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(3px);" onclick="if(event.target===this)fecharEditarPipe()">
+  <div style="background:#111;border:1px solid #222;border-radius:12px;padding:24px;width:460px;max-width:95vw;max-height:88vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.6);">
+    <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:#e8e8e8;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
+      <span>✏️ Editar Ficha</span>
+      <button onclick="fecharEditarPipe()" style="background:none;border:none;color:#555;font-size:16px;cursor:pointer;line-height:1;">✕</button>
+    </div>
+    <input type="hidden" id="ep-id">
+    <style>
+      .ep-lbl{font-family:'DM Mono',monospace;font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-top:8px;display:block;}
+      .ep-inp{background:#0a0a0a;border:1px solid #222;border-radius:6px;padding:8px 10px;color:#e8e8e8;font-size:12px;outline:none;width:100%;box-sizing:border-box;font-family:'Inter',sans-serif;}
+      .ep-inp:focus{border-color:#f5c800;}
+      .ep-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    </style>
+    <span class="ep-lbl">Nome do Cliente</span>
+    <input id="ep-nome" class="ep-inp" placeholder="Nome + 4 últimos dígitos">
+    <div class="ep-row">
+      <div><span class="ep-lbl">Telefone</span><input id="ep-tel" class="ep-inp" placeholder="(31) 9 9999-0000"></div>
+      <div><span class="ep-lbl">CPF / CNPJ</span><input id="ep-cpf" class="ep-inp" placeholder="000.000.000-00"></div>
+    </div>
+    <div class="ep-row">
+      <div><span class="ep-lbl">Equipamento</span><input id="ep-equip" class="ep-inp" placeholder="Ex: Microondas LG"></div>
+      <div><span class="ep-lbl">Valor (R$)</span><input id="ep-valor" class="ep-inp" placeholder="0.00" type="number" step="0.01"></div>
+    </div>
+    <span class="ep-lbl">Defeito / Descrição</span>
+    <input id="ep-desc" class="ep-inp" placeholder="Descreva o defeito">
+    <span class="ep-lbl">Endereço</span>
+    <input id="ep-end" class="ep-inp" placeholder="Rua, número, bairro, cidade">
+    <span class="ep-lbl">Serviços / Observações</span>
+    <textarea id="ep-serv" class="ep-inp" rows="2" placeholder="Serviços realizados ou observações" style="resize:vertical;"></textarea>
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
+      <button onclick="fecharEditarPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;border:1px solid #333;background:transparent;color:#666;cursor:pointer;">Cancelar</button>
+      
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <label style="font-family:var(--fm);font-size:10px;color:var(--muted);">Vencimento</label>
+          <input id="ep-venc" type="date" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--text);font-family:var(--fm);font-size:12px;">
+        </div>
+        <button onclick="salvarEditarPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;border:none;background:#f5c800;color:#000;font-weight:700;cursor:pointer;">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-editar-pipe" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(3px);" onclick="if(event.target===this)fecharEditarPipe()">
+  <div style="background:#111;border:1px solid #222;border-radius:12px;padding:24px;width:460px;max-width:95vw;max-height:88vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.6);">
+    <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:#e8e8e8;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
+      <span>✏️ Editar Ficha</span>
+      <button onclick="fecharEditarPipe()" style="background:none;border:none;color:#555;font-size:18px;cursor:pointer;">✕</button>
+    </div>
+    <input type="hidden" id="ep-id">
+    <style>.ep-lbl{font-family:'DM Mono',monospace;font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.05em;margin-top:8px;display:block}.ep-inp{background:#0a0a0a;border:1px solid #222;border-radius:6px;padding:8px 10px;color:#e8e8e8;font-size:12px;outline:none;width:100%;box-sizing:border-box;font-family:'Inter',sans-serif}.ep-inp:focus{border-color:#f5c800}.ep-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}</style>
+    <span class="ep-lbl">Nome do Cliente</span>
+    <input id="ep-nome" class="ep-inp" placeholder="Nome + 4 últimos dígitos do tel">
+    <div class="ep-grid">
+      <div><span class="ep-lbl">Telefone</span><input id="ep-tel" class="ep-inp" placeholder="(31) 9 9999-0000"></div>
+      <div><span class="ep-lbl">CPF / CNPJ</span><input id="ep-cpf" class="ep-inp" placeholder="000.000.000-00"></div>
+    </div>
+    <div class="ep-grid">
+      <div><span class="ep-lbl">Equipamento</span><input id="ep-equip" class="ep-inp" placeholder="Ex: Microondas LG"></div>
+      <div><span class="ep-lbl">Valor (R$)</span><input id="ep-valor" class="ep-inp" type="number" step="0.01" placeholder="0.00"></div>
+    </div>
+    <span class="ep-lbl">Defeito / Descrição</span>
+    <input id="ep-desc" class="ep-inp" placeholder="Descreva o defeito">
+    <span class="ep-lbl">Endereço Completo</span>
+    <input id="ep-end" class="ep-inp" placeholder="Rua, número, bairro, cidade">
+    <span class="ep-lbl">Serviços / Observações</span>
+    <textarea id="ep-serv" class="ep-inp" rows="2" placeholder="Serviços realizados" style="resize:vertical;"></textarea>
+    <div style="display:flex;gap:8px;margin-top:18px;justify-content:flex-end;">
+      <button onclick="fecharEditarPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;border:1px solid #333;background:transparent;color:#666;cursor:pointer;">Cancelar</button>
+      <button onclick="salvarEditarPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;border:none;background:#f5c800;color:#000;font-weight:700;cursor:pointer;">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+<button class="scroll-float left"  onclick="scrollBoard(-1)" title="← Coluna anterior">◀</button>
+<button class="scroll-float right" onclick="scrollBoard(1)"  title="→ Próxima coluna">▶</button>
+
+<!-- Modal Ver Dados -->
+<div id="ov-pipe-dados" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px);" onclick="if(event.target===this)fecharDadosPipe()">
+  <div style="background:#111;border:1px solid #222;border-radius:14px;padding:0;width:460px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 12px 48px rgba(0,0,0,.7);">
+    <div style="padding:18px 20px 14px;border-bottom:1px solid #1e1e1e;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#111;z-index:1;">
+      <div>
+        <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:#e8e8e8;">📋 Dados da Ficha</div>
+        <div id="pipe-d-id" style="font-family:'DM Mono',monospace;font-size:9px;color:#555;margin-top:2px;"></div>
+      </div>
+      <button onclick="fecharDadosPipe()" style="background:none;border:none;color:#555;font-size:18px;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:12px;">
+      <style>
+        .pd-row{display:flex;flex-direction:column;gap:4px;}
+        .pd-lbl{font-family:'DM Mono',monospace;font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.05em;}
+        .pd-val{background:#0a0a0a;border:1px solid #1e1e1e;border-radius:6px;padding:8px 10px;color:#e8e8e8;font-size:12px;font-family:'Inter',sans-serif;width:100%;box-sizing:border-box;}
+        .pd-val:focus{border-color:#f5c800;outline:none;}
+        .pd-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+      </style>
+      <div class="pd-row"><span class="pd-lbl">Nome do Cliente</span><input id="pd-nome" class="pd-val"></div>
+      <div class="pd-grid">
+        <div class="pd-row"><span class="pd-lbl">Telefone</span><input id="pd-tel" class="pd-val"></div>
+        <div class="pd-row"><span class="pd-lbl">CPF / CNPJ</span><input id="pd-cpf" class="pd-val"></div>
+      </div>
+      <div class="pd-grid">
+        <div class="pd-row"><span class="pd-lbl">Equipamento</span><input id="pd-equip" class="pd-val"></div>
+        <div class="pd-row"><span class="pd-lbl">Valor (R$)</span><input id="pd-valor" class="pd-val" type="number"></div>
+      </div>
+      <div class="pd-row"><span class="pd-lbl">Defeito / Descrição</span><input id="pd-desc" class="pd-val"></div>
+      <div class="pd-row"><span class="pd-lbl">Endereço</span><input id="pd-end" class="pd-val"></div>
+      <div class="pd-row"><span class="pd-lbl">Serviços / Observações</span><textarea id="pd-serv" class="pd-val" rows="2" style="resize:vertical;"></textarea></div>
+      <div id="pipe-d-msg" style="display:none;padding:8px 12px;border-radius:6px;font-family:'DM Mono',monospace;font-size:11px;"></div>
+    </div>
+    <div style="padding:14px 20px 20px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid #1e1e1e;">
+      <button onclick="fecharDadosPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;border:1px solid #333;background:transparent;color:#666;cursor:pointer;">Fechar</button>
+      <button onclick="salvarDadosPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;border:none;background:#f5c800;color:#000;font-weight:700;cursor:pointer;">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
