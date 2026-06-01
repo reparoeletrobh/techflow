@@ -40,7 +40,6 @@ const PHASES = [
   { id:'equipamento_comprado', name:'Equipamento Comprado', cor:'#3b9eff' },
   { id:'programar_entrega',    name:'Programar Entrega',    cor:'#f5c800' },
   { id:'solicitar_entrega',    name:'Solicitar Entrega',    cor:'#f97316' },
-  { id:'liberado_para_rota',    name:'Liberado p/ Rota',      cor:'#3b9eff' },
   { id:'rota_em_andamento',     name:'Rota em Andamento',     cor:'#a855f7' },
   { id:'entrega_solicitada',   name:'Entrega Solicitada',   cor:'#f97316' },
   { id:'receber',              name:'Receber',              cor:'#22c55e' },
@@ -1517,6 +1516,41 @@ export default async function handler(req, res) {
       });
       if(restaurados>0) await dbSet(PIPE_KEY, db17);
       return res.status(200).json({ok:true, restaurados, total:db17.cards.length});
+    } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
+  }
+
+
+  // ── GET migrar-liberado-rota: move fichas liberado_para_rota pipe -> logistica ──
+  if (action === 'migrar-liberado-rota') {
+    try {
+      const _U=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+      const _T=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+      async function _mgr(k){const r=await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();const v=j[0]?.result;if(!v)return null;try{let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+      async function _mgs(k,v){await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+      const pipeDb = (await _mgr(PIPE_KEY)) || {cards:[]};
+      const logDb  = (await _mgr('tv_logistica')) || {fichas:[], nextId:1};
+      if(!Array.isArray(logDb.fichas)) logDb.fichas=[];
+      const fichasLR = (pipeDb.cards||[]).filter(function(c){return c.phase==='liberado_para_rota';});
+      let migrados=0;
+      const now=new Date().toISOString();
+      for(var i=0;i<fichasLR.length;i++){
+        var card=fichasLR[i];
+        var logId='LOG-LR-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,4).toUpperCase();
+        logDb.fichas.unshift({
+          id:logId, nome:card.nomeContato||'',
+          telefone:card.telefone||'', endereco:card.endereco||'',
+          equipamento:card.equipamento||'', defeito:card.descricao||'',
+          pipefyCardId:card.pipefyId||null, texto:'',
+          phase:'liberado_para_rota', pipeCardId:card.id,
+          criadoEm:card.criadoEm||now, movedAt:now,
+          diagnostico:null, origem:'migrado_pipe'
+        });
+        migrados++;
+      }
+      pipeDb.cards=(pipeDb.cards||[]).filter(function(c){return c.phase!=='liberado_para_rota';});
+      await _mgs('tv_logistica', logDb);
+      await _mgs(PIPE_KEY, pipeDb);
+      return res.status(200).json({ok:true, migrados, totalLogistica:logDb.fichas.length});
     } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
   }
 

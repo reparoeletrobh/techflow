@@ -427,7 +427,7 @@ function precisaPreco(tipo, subtipo, servicos) {
 const COLS = [
   { id:'liberado_coleta',    label:'Liberado para Coleta', cor:'#f5c800' },
   { id:'horario_marcado',    label:'Horário Marcado',      cor:'#f97316' },
-  { id:'em_rota',          label:'Equipamento em Rota',  cor:'#3b9eff' },
+  { id:'liberado_para_rota', label:'Liberado para Rota',   cor:'#3b9eff' },
   { id:'motorista_parceiro', label:'Motorista Parceiro',   cor:'#8b5cf6' },
   { id:'remarcar',         label:'Remarcar',             cor:'#f97316' },
   { id:'coleta_efetuada',  label:'Coleta Efetuada',      cor:'#22c55e' },
@@ -520,7 +520,7 @@ function cardHTML(f, phase) {
       <button class="cbtn-expand" id="btn-x-${f.id}" onclick="toggleExpand('${f.id}')"><em class="chev">▾</em><span> Mais ações</span></button>
       <div class="btns-hidden" id="btns-x-${f.id}">
         <button class="cbtn" style="background:rgba(249,115,22,.15);color:#f97316;border-color:#f97316;" onclick="abrirHorario('${f.id}')">🕐 Horário Marcado</button>
-        <button class="cbtn cbtn-blue" onclick="mover('${f.id}','em_rota')">Equipamento em Rota</button>
+        <button class="cbtn cbtn-blue" onclick="mover('${f.id}','liberado_para_rota')">Equipamento em Rota</button>
         <button class="cbtn cbtn-purple" onclick="abrirMotorista('${f.id}')">Motorista Parceiro</button>
         <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>
         <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>
@@ -550,13 +550,13 @@ function cardHTML(f, phase) {
       <button class="cbtn cbtn-outline" onclick="abrirDados('${f.id}')">👁 Ver Dados</button>
       <button class="cbtn-expand" id="btn-x-${f.id}" onclick="toggleExpand('${f.id}')"><em class="chev">▾</em><span> Mais ações</span></button>
       <div class="btns-hidden" id="btns-x-${f.id}">
-        <button class="cbtn cbtn-blue" onclick="mover('${f.id}','em_rota')">Equipamento em Rota</button>
+        <button class="cbtn cbtn-blue" onclick="mover('${f.id}','liberado_para_rota')">Equipamento em Rota</button>
         <button class="cbtn cbtn-purple" onclick="abrirMotorista('${f.id}')">Motorista Parceiro</button>
         <button class="cbtn" style="background:rgba(249,115,22,.15);color:#f97316;border-color:#f97316;" onclick="abrirHorario('${f.id}')">✏️ Alterar Horário</button>
         <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>
         <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>
       </div>`;
-  } else if (phase === 'em_rota') {
+  } else if (phase === 'liberado_para_rota') {
     btns = `
       <button class="cbtn-expand" id="btn-x-${f.id}" onclick="toggleExpand('${f.id}')"><em class="chev">▾</em><span> Mais ações</span></button>
       <div class="btns-hidden" id="btns-x-${f.id}">
@@ -571,7 +571,7 @@ function cardHTML(f, phase) {
       <button class="cbtn-expand" id="btn-x-${f.id}" onclick="toggleExpand('${f.id}')"><em class="chev">▾</em><span> Mais ações</span></button>
       <div class="btns-hidden" id="btns-x-${f.id}">
         <button class="cbtn cbtn-green" onclick="mover('${f.id}','coleta_efetuada')">Coleta Efetuada</button>
-        <button class="cbtn cbtn-blue" onclick="mover('${f.id}','em_rota')">Equipamento em Rota</button>
+        <button class="cbtn cbtn-blue" onclick="mover('${f.id}','liberado_para_rota')">Equipamento em Rota</button>
         <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">Remarcar</button>
         <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>
       </div>`;
@@ -588,7 +588,7 @@ function cardHTML(f, phase) {
     if (diag) btns = `<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">${diag.tipo||''}${diag.subtipo?' › '+diag.subtipo:''} — ${(diag.servicos||[]).join(', ')}</div>`;
   }
 
-  const emRotaAlerta = (phase === 'em_rota' || phase === 'motorista_parceiro') && (Date.now() - new Date(f.movedAt||f.criadoEm).getTime()) > 2 * 60 * 60 * 1000;
+  const emRotaAlerta = (phase === 'liberado_para_rota' || phase === 'motorista_parceiro') && (Date.now() - new Date(f.movedAt||f.criadoEm).getTime()) > 2 * 60 * 60 * 1000;
   return `
   <div class="card${emRotaAlerta ? ' alerta-rota' : ''}">
     <div class="card-left-bar" style="background:${barCor};"></div>
@@ -899,7 +899,7 @@ async function atualizarMetricas() {
 
     const map = [
       ['liberado_coleta', 'm-lib', 'm-lib-s'],
-      ['em_rota',         'm-rot', 'm-rot-s'],
+      ['liberado_para_rota',         'm-rot', 'm-rot-s'],
       ['coleta_efetuada', 'm-col', 'm-col-s'],
       ['orc_registrado',  'm-orc', 'm-orc-s'],
     ];

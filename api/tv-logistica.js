@@ -385,7 +385,7 @@ module.exports = async function handler(req, res) {
   // ── POST mover ────────────────────────────────────────────
   if (req.method === 'POST' && action === 'mover') {
     const { id, phase } = req.body || {};
-    const PHASES = ['liberado_coleta','horario_marcado','em_rota','motorista_parceiro','remarcar','coleta_efetuada','orc_registrado'];
+    const PHASES = ['liberado_coleta','horario_marcado','liberado_para_rota','motorista_parceiro','remarcar','coleta_efetuada','orc_registrado'];
     if (!id || !PHASES.includes(phase)) return res.status(400).json({ ok: false, error: 'invalido' });
 
     const db = await dbGet(LOG_KEY) || defaultDB();
@@ -395,6 +395,34 @@ module.exports = async function handler(req, res) {
     ficha.movedAt = new Date().toISOString();
     await dbSet(LOG_KEY, db);
     registrarPassagem(phase).catch(() => {});
+
+    // Trigger: liberado_para_rota -> tv_board
+    if (phase === 'liberado_para_rota') {
+      try {
+        const _bU=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+        const _bT=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+        async function _bgL(k){const r=await fetch(_bU+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_bT,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();const v=j[0]?.result;if(!v)return null;try{let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+        async function _bsL(k,v){await fetch(_bU+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_bT,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+        const boardDb=(await _bgL('tv_board'))||{cards:[],syncedIds:[],movesLog:[],metaLog:[]};
+        if(!Array.isArray(boardDb.cards)) boardDb.cards=[];
+        const boardPid=ficha.pipefyCardId?String(ficha.pipefyCardId):('LOG-'+ficha.id);
+        boardDb.cards=boardDb.cards.filter(function(x){return x.pipefyId!==boardPid&&x.osCode!==ficha.id;});
+        const nowB=new Date().toISOString();
+        boardDb.cards.unshift({
+          pipefyId:boardPid, phaseId:'liberado_rota',
+          nomeContato:ficha.nome||'', title:ficha.equipamento||ficha.nome||'',
+          telefone:ficha.telefone||'', descricao:ficha.equipamento||'',
+          endereco:ficha.endereco||'', osCode:ficha.id,
+          valor:ficha.valor||0, movedBy:'TV Logistica',
+          localOnly:!ficha.pipefyCardId, syncedAt:nowB, movedAt:nowB
+        });
+        if(!Array.isArray(boardDb.syncedIds)) boardDb.syncedIds=[];
+        if(!boardDb.syncedIds.includes(boardPid)) boardDb.syncedIds.push(boardPid);
+        await _bsL('tv_board', boardDb);
+        console.log('[tv_logistica->tv_board] liberado_para_rota:', boardPid);
+      } catch(eLR){ console.error('[trigger lib_rota]', eLR.message); }
+    }
+
     return res.status(200).json({ ok: true, ficha });
   }
 
