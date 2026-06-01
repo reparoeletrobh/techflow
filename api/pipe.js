@@ -1316,6 +1316,32 @@ export default async function handler(req, res) {
     } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
   }
 
+
+  // ── GET fix-nomes-padrao-v2: corrige Patrícia 8490 e Priscila ────────────
+  if (action === 'fix-nomes-padrao-v2') {
+    try {
+      var pip11 = await dbGet(PIPE_KEY) || {cards:[]};
+      var corrigidos11 = [];
+
+      (pip11.cards||[]).forEach(function(card){
+        // 1. Restaurar Patrícia 8490 (foi renomeada por engano para Priscila 8668)
+        if (card.id==='PIPE-0924' && card.nomeContato==='Priscila 8668' && card.phase==='ultima_chamada') {
+          card.nomeContato = 'Patrícia 8490';
+          corrigidos11.push({id:card.id, de:'Priscila 8668', para:'Patrícia 8490', obs:'restaurado'});
+        }
+        // 2. Renomear a Priscila correta (aprovados, pipefyId 1358488260)
+        if (card.id==='PIPE-0924' && card.nomeContato==='Priscila' && card.pipefyId==='1358488260') {
+          card.nomeContato = 'Priscila 8668';
+          corrigidos11.push({id:card.id, de:'Priscila', para:'Priscila 8668', obs:'corrigido'});
+        }
+        // 3. Adriana 4369 ja está correta — nada a fazer
+      });
+
+      if (corrigidos11.length) await dbSet(PIPE_KEY, pip11);
+      return res.status(200).json({ok:true, ajustes:corrigidos11.length, detalhes:corrigidos11});
+    } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
