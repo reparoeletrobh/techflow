@@ -41,14 +41,12 @@ async function pipefyQuery() {
 }
 
 // Cria card no Pipefy para delivery
-async function criarCardPipefy() { return null; }
+async function criarCardPipefy() { return { ok: false, error: 'Pipefy desconectado' }; }
 
 // Move card Pipefy para uma fase
 async function moverCardPipefy(pipefyId, phaseId) {
   const query = `mutation { moveCardToPhase(input: { card_id: "${pipefyId}", destination_phase_id: "${phaseId}" }) { card { id current_phase { name } } } }`;
-  const r = await pipefyQuery(query);
-  if (r.error) return { ok: false, error: r.error };
-  return { ok: true };
+  return { ok: false, error: 'Pipefy desconectado' };
 }
 
 // Fases por tipo
