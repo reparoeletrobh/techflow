@@ -122,13 +122,45 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "nome, telefone, aparelho e defeito são obrigatórios" });
     try {
       const card = await createPipefyCard({ phaseId, nome, telefone, aparelho, defeito, endereco: endereco || "" });
-      // Trigger: tv_pipe → aguardando_aprovacao
+
+      // ── Registrar na tv_logistica ─────────────────────────────────────
+      try {
+        const _U2=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+        const _T2=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+        async function _lg2(k){const r=await fetch(_U2+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T2,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();const v=j[0]?.result;if(!v)return null;try{let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+        async function _ls2(k,v){await fetch(_U2+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T2,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+        const logDb2 = (await _lg2('tv_logistica')) || { fichas:[], nextId:1 };
+        if(!Array.isArray(logDb2.fichas)) logDb2.fichas = [];
+        const logId2 = 'LOG-' + String(logDb2.nextId || 1).padStart(4,'0');
+        // coleta = "Coleta: IMEDIATA" → liberado_coleta | qualquer data → horario_marcado
+        const coletaStr = coleta || '';
+        const isImediata = coletaStr.toLowerCase().includes('imediata');
+        const isAgendada = coletaStr && !isImediata;
+        const phaseLog = isAgendada ? 'horario_marcado' : 'liberado_coleta';
+        const nowLog = new Date().toISOString();
+        logDb2.fichas.unshift({
+          id: logId2, nome, telefone: telefone||'', endereco: endereco||'',
+          equipamento: aparelho||'', defeito: defeito||'',
+          pipefyCardId: card?.id || null, texto: texto||'',
+          phase: phaseLog,
+          horarioColeta: isAgendada ? coletaStr : null,
+          horarioColetaTexto: isAgendada ? coletaStr : null,
+          criadoEm: nowLog, movedAt: nowLog,
+          diagnostico: null, origem: 'tv_orcamento'
+        });
+        logDb2.nextId = (logDb2.nextId || 1) + 1;
+        await _ls2('tv_logistica', logDb2);
+        console.log('[tv-orc→tv_logistica]', logId2, phaseLog);
+      } catch(eLog) { console.error('[tv-orc logistica]', eLog.message); }
+
+      // ── Trigger: tv_pipe → aguardando_aprovacao ───────────────────────
       await moverNoTvPipe('aguardando_aprovacao', {
         localId: null, pipefyId: null,
         nome: nome||'', telefone: telefone||'',
         equipamento: aparelho||'', descricao: defeito||'',
         endereco: endereco||'', valor: 0, origem: 'tv_orcamento_card'
       });
+
       return res.status(200).json({ ok: true, card });
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });
