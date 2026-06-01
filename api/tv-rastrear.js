@@ -129,7 +129,7 @@ module.exports = async (req, res) => {
     }
 
     // ── 2. Garantia ───────────────────────────────────────────────
-    const garDB  = await dbGet('reparoeletro_garantia_v2');
+    const garDB  = await dbGet('tv_garantia');
     const fichas = garDB?.fichas || [];
 
     for (const f of fichas) {
@@ -160,7 +160,7 @@ module.exports = async (req, res) => {
     }
 
     // ── 3. Compras de Peças ───────────────────────────────────────
-    const pecDB = await dbGet('reparoeletro_compras_pecas');
+    const pecDB = await dbGet('tv_compras_pecas');
     const pecas = pecDB?.pecas || [];
 
     for (const p of pecas) {

@@ -313,8 +313,8 @@ export default async function handler(req, res) {
       const meta=payment.metadata||{}, produtoIds=(meta.produto_ids||'').split(',').filter(Boolean);
       const nomeCliente=meta.comprador_nome||payment.payer?.first_name||'Comprador Online', telefone=meta.comprador_tel||'', cpf=meta.comprador_cpf||'', cep=meta.comprador_cep||'', endereco=meta.comprador_end||'';
       const modPag=payment.payment_method_id==='pix'?'PIX':`Cartao ${payment.installments}x`;
-      const ADM_KEY='reparoeletro_vendas', TV_PROD_KEY='tv_vendas';
-      const ADM_CK='reparoeletro_checkout_vendas', TV_CK='tv_checkout_vendas';
+      const ADM_KEY='tv_vendas', TV_PROD_KEY='tv_vendas';
+      const ADM_CK='tv_checkout_vendas', TV_CK='tv_checkout_vendas';
       for (const produtoId of produtoIds) {
         // Detectar se é ADM ou TV
         let db, dbKey, ckKey, idx;
@@ -353,7 +353,7 @@ export default async function handler(req, res) {
     if (!pid) return res.status(400).json({ ok:false, error:'paymentId obrigatorio' });
     try {
       // Buscar venda no checkout ADM
-      const CKKEY = 'reparoeletro_checkout_vendas';
+      const CKKEY = 'tv_checkout_vendas';
       const ck    = (await dbGet(CKKEY)) || { vendas:[] };
       const venda = (ck.vendas||[]).find(v => String(v.paymentId) === String(pid));
       if (!venda) return res.status(404).json({ ok:false, error:'venda nao encontrada no checkout' });
@@ -391,7 +391,7 @@ export default async function handler(req, res) {
   // ── GET status-checkout: retorna resumo das vendas no checkout ────
   if (action === 'status-checkout') {
     try {
-      const ck = (await dbGet('reparoeletro_checkout_vendas')) || { vendas:[] };
+      const ck = (await dbGet('tv_checkout_vendas')) || { vendas:[] };
       const vendas = (ck.vendas || []).slice(0,10);
       return res.status(200).json({
         ok: true,
@@ -438,7 +438,7 @@ export default async function handler(req, res) {
       }
 
       // Ler checkout atual
-      const CKKEY = 'reparoeletro_checkout_vendas';
+      const CKKEY = 'tv_checkout_vendas';
       const ck    = (await dbGet(CKKEY)) || { vendas: [] };
       ck.vendas   = ck.vendas || [];
       const jaNoCheckout = new Set(ck.vendas.map(v => String(v.paymentId)));
@@ -451,7 +451,7 @@ export default async function handler(req, res) {
       }
 
       const resultado = [];
-      const admDb  = (await dbGet('reparoeletro_vendas')) || { produtos: [] };
+      const admDb  = (await dbGet('tv_vendas')) || { produtos: [] };
       let   mudouAdm = false;
 
       for (const pmt of pendentes) {
@@ -515,7 +515,7 @@ export default async function handler(req, res) {
       if (resultado.length > 0) {
         ck.vendas = ck.vendas.slice(0, 500);
         await dbSet(CKKEY, ck);
-        if (mudouAdm) await dbSet('reparoeletro_vendas', admDb);
+        if (mudouAdm) await dbSet('tv_vendas', admDb);
       }
 
       return res.status(200).json({
@@ -531,7 +531,7 @@ export default async function handler(req, res) {
     try {
       const LOG_KEY  = 'mp_webhook_log';
       const PROC_KEY = 'tv_mp_processados';
-      const CKKEY    = 'reparoeletro_checkout_vendas';
+      const CKKEY    = 'tv_checkout_vendas';
 
       const logsRaw = await dbGet(LOG_KEY);
       const logs = Array.isArray(logsRaw) ? logsRaw
@@ -558,7 +558,7 @@ export default async function handler(req, res) {
           const ids2  = (meta2.produto_ids||'').split(',').filter(Boolean);
 
           // Marcar produto como vendido
-          const admDb = (await dbGet('reparoeletro_vendas')) || { produtos:[] };
+          const admDb = (await dbGet('tv_vendas')) || { produtos:[] };
           let marcou = false, prodDescricao = meta2.produto_nome || 'Produto';
           for (const pid2 of ids2) {
             const i2 = admDb.produtos.findIndex(p => String(p.id)===pid2 || p.codigo===pid2);
@@ -571,7 +571,7 @@ export default async function handler(req, res) {
               }
             }
           }
-          if (marcou) await dbSet('reparoeletro_vendas', admDb);
+          if (marcou) await dbSet('tv_vendas', admDb);
 
           // Registrar no checkout
           ck.vendas.unshift({
@@ -890,7 +890,7 @@ export default async function handler(req, res) {
       if (!pmt.id) return res.status(404).json({ ok:false, error:'nao encontrado no MP', raw:pmt });
 
       const meta2 = pmt.metadata || {};
-      const CKKEY = 'reparoeletro_checkout_vendas';
+      const CKKEY = 'tv_checkout_vendas';
       const ck    = (await dbGet(CKKEY)) || { vendas:[] };
       ck.vendas   = ck.vendas || [];
 
@@ -914,7 +914,7 @@ export default async function handler(req, res) {
       await dbSet(CKKEY, ck);
 
       // Marcar produto como vendido
-      const admDb = (await dbGet('reparoeletro_vendas')) || { produtos:[] };
+      const admDb = (await dbGet('tv_vendas')) || { produtos:[] };
       const ids2  = (meta2.produto_ids||'').split(',').filter(Boolean);
       let marcou  = false;
       for (const pid2 of ids2) {
@@ -924,7 +924,7 @@ export default async function handler(req, res) {
           marcou = true;
         }
       }
-      if (marcou) await dbSet('reparoeletro_vendas', admDb);
+      if (marcou) await dbSet('tv_vendas', admDb);
 
       return res.status(200).json({ ok:true, registrado:true, paymentId:pid, valor:pmt.transaction_amount, status:pmt.status, comprador:meta2.comprador_nome, marcouProduto:marcou });
     } catch(e) {
@@ -1029,9 +1029,9 @@ export default async function handler(req, res) {
     // 4. Para cada produto: marcar vendido direto no Redis
     //    Verifica reparoeletro_vendas (Micro/Bebe) OU tv_vendas (TV)
     //    e salva no relatório de checkout correto para cada tipo
-    const ADM_VENDAS_KEY     = 'reparoeletro_vendas';
+    const ADM_VENDAS_KEY     = 'tv_vendas';
     const TV_VENDAS_KEY      = 'tv_vendas';
-    const ADM_CHECKOUT_KEY   = 'reparoeletro_checkout_vendas';
+    const ADM_CHECKOUT_KEY   = 'tv_checkout_vendas';
     const TV_CHECKOUT_KEY    = 'tv_checkout_vendas';
 
     for (const produtoId of produtoIds) {

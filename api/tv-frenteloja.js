@@ -131,7 +131,7 @@ async function registrarNoPipe(dados) {
 // api/frenteloja.js — Sistema Frente de Loja
 const PIPE_ID    = '305832912';
 const FL_KEY     = 'tv_frenteloja';
-const BALCAO_KEY = 'reparoeletro_balcao';
+const BALCAO_KEY = 'tv_balcao';
 
 const U = process.env.UPSTASH_URL;
 const T = process.env.UPSTASH_TOKEN;
@@ -334,7 +334,7 @@ export default async function handler(req,res){
 
       // ── PASSO 3: Registrar no Balcão (aguardando pagamento) ─────────
       try {
-        const BALCAO_KEY = 'reparoeletro_balcao';
+        const BALCAO_KEY = 'tv_balcao';
         const balcao = (await dbGet(BALCAO_KEY)) || [];
         const balcaoId = pipefyId ? String(pipefyId) : ficha.id;
         if (!balcao.find(b => b.pipefyId === balcaoId)) {

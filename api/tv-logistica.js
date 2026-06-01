@@ -140,12 +140,12 @@ function defaultDB() { return { fichas: [], nextId: 1 }; }
 async function registrarPassagem(phase) {
   try {
     const hoje = new Date().toLocaleDateString('pt-BR', {timeZone:'America/Sao_Paulo'}).split('/').reverse().join('-');
-    const db   = (await dbGet('reparoeletro_log_metricas')) || {};
+    const db   = (await dbGet('tv_log_metricas')) || {};
     if (!db[hoje]) db[hoje] = {};
     db[hoje][phase] = (db[hoje][phase] || 0) + 1;
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
     Object.keys(db).forEach(d => { if (new Date(d) < cutoff) delete db[d]; });
-    await dbSet('reparoeletro_log_metricas', db);
+    await dbSet('tv_log_metricas', db);
   } catch(e) { console.error('registrarPassagem:', e.message); }
 }
 
@@ -261,7 +261,7 @@ module.exports = async function handler(req, res) {
           ).catch(() => {});
           // Atualizar reparoeletro_orcamentos para evitar duplicata pelo orc-sync
           try {
-            const ORC_KEY2 = 'reparoeletro_orcamentos';
+            const ORC_KEY2 = 'tv_orcamentos';
             const orcDb2 = (await dbGet(ORC_KEY2)) || { fichas:[], syncedIds:[], initialized:true };
             const orcIdx = orcDb2.fichas.findIndex(f => f.id === ficha.id || f.pipefyId === ficha.id);
             if (orcIdx >= 0) {
@@ -339,7 +339,7 @@ module.exports = async function handler(req, res) {
 
   // ── GET metricas ─────────────────────────────────────────────
   if (action === 'metricas') {
-    const MET_KEY = 'reparoeletro_log_metricas';
+    const MET_KEY = 'tv_log_metricas';
     const met = (await dbGet(MET_KEY)) || {};
     const hoje = new Date().toLocaleDateString('pt-BR', {timeZone:'America/Sao_Paulo'}).split('/').reverse().join('-');
 
@@ -477,7 +477,7 @@ module.exports = async function handler(req, res) {
     if (!ficha) return res.status(404).json({ ok:false, error:'ficha nao encontrada' });
     if (!ficha.diagnostico) return res.status(400).json({ ok:false, error:'sem diagnostico' });
 
-    const ORC_KEY = 'reparoeletro_orcamentos';
+    const ORC_KEY = 'tv_orcamentos';
 
     // Gerar textos para cada equipamento do diagnóstico
     const equips = ficha.diagnostico.equips || [ficha.diagnostico];
@@ -565,7 +565,7 @@ module.exports = async function handler(req, res) {
     // Carregar templates customizados do Redis
     let customTemplates = {};
     try {
-      const tplDb = await dbGet('reparoeletro_orc_templates');
+      const tplDb = await dbGet('tv_orc_templates');
       if (tplDb) customTemplates = tplDb;
     } catch(e) { console.error('[Log] templates:', e.message); }
 
@@ -679,7 +679,7 @@ module.exports = async function handler(req, res) {
           // Atualizar reparoeletro_orcamentos: trocar ID local pelo ID real do Pipefy
           // e adicionar ao syncedIds para orc-sync não duplicar
           try {
-            const ORC_KEY2 = 'reparoeletro_orcamentos';
+            const ORC_KEY2 = 'tv_orcamentos';
             const orcDb2 = (await dbGet(ORC_KEY2)) || { fichas:[], syncedIds:[], initialized:true };
             // Trocar entrada com id=ficha.id pelo id/pipefyId real
             const orcIdx = orcDb2.fichas.findIndex(f => f.id === ficha.id || f.pipefyId === ficha.id);
