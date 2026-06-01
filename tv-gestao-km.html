@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TV — Gestão KM v4</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#080d18;--surface:#0d1425;--surface2:#111c30;--border:#1a2540;
+  --text:#dce8f8;--muted:#4a607a;
+  --accent:#3b9eff;--green:#10d982;--red:#f04060;--orange:#f97316;
+  --yellow:#f5c800;--purple:#a855f7;
+  --wilde:#3b9eff;--paulo:#10d982;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;display:flex;flex-direction:column;}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:54px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.logo-dot{width:9px;height:9px;background:var(--accent);border-radius:50%;box-shadow:0 0 8px var(--accent);}
+.logo em{color:var(--accent);font-style:normal;}
+.hbtn{font-family:var(--fm);font-size:10px;padding:6px 13px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;text-decoration:none;transition:all .15s;}
+.hbtn:hover{color:var(--text);border-color:var(--accent);}
+.tabs-bar{display:flex;border-bottom:1px solid var(--border);padding:0 24px;background:var(--surface);position:sticky;top:54px;z-index:99;}
+.tab{font-family:var(--fm);font-size:11px;font-weight:600;padding:12px 18px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;display:flex;align-items:center;gap:6px;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.page{display:none;flex:1;flex-direction:column;}
+.page.active{display:flex;}
+
+/* FORM */
+#page-form{align-items:center;padding:32px 20px;gap:20px;}
+.form-card{width:100%;max-width:560px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;}
+.form-title{font-family:var(--fh);font-size:18px;font-weight:800;margin-bottom:20px;}
+.form-title span{color:var(--accent);}
+.motorista-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+.moto-btn{border:2px solid var(--border);background:transparent;border-radius:10px;padding:14px;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:6px;}
+.moto-btn .mname{font-family:var(--fh);font-size:16px;font-weight:800;color:var(--muted);}
+.moto-btn .micon{font-size:28px;}
+.moto-btn.wilde.sel{border-color:var(--wilde);background:rgba(59,158,255,.1);}
+.moto-btn.paulo.sel{border-color:var(--paulo);background:rgba(16,217,130,.1);}
+.moto-btn.wilde.sel .mname{color:var(--wilde);}
+.moto-btn.paulo.sel .mname{color:var(--paulo);}
+.moto-btn:hover{border-color:var(--accent);}
+.fl{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:5px;}
+.fi{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 13px;font-family:var(--fm);font-size:13px;color:var(--text);outline:none;transition:border .15s;margin-bottom:14px;}
+.fi:focus{border-color:var(--accent);}
+input[type=date].fi::-webkit-calendar-picker-indicator{filter:invert(.5);}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.btn-reg{width:100%;background:var(--accent);border:none;border-radius:10px;padding:13px;font-family:var(--fh);font-size:14px;font-weight:800;color:#fff;cursor:pointer;transition:filter .15s;margin-top:4px;}
+.btn-reg:hover{filter:brightness(1.1);}
+.btn-reg:disabled{opacity:.5;cursor:not-allowed;filter:none;}
+
+/* TABELA */
+#page-tabela{padding:24px;}
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+.fbtn{font-family:var(--fm);font-size:10px;padding:5px 13px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
+.fbtn:hover{border-color:var(--accent);color:var(--accent);}
+.fbtn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+.fbtn.wf.active{background:var(--wilde);border-color:var(--wilde);}
+.fbtn.pf.active{background:var(--paulo);border-color:var(--paulo);}
+.fi-sm{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-family:var(--fm);font-size:10px;color:var(--text);outline:none;}
+.fi-sm:focus{border-color:var(--accent);}
+input[type=month].fi-sm::-webkit-calendar-picker-indicator{filter:invert(.5);}
+.fi-search{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-family:var(--fm);font-size:11px;color:var(--text);outline:none;width:170px;}
+.fi-search:focus{border-color:var(--accent);}
+table{width:100%;border-collapse:collapse;}
+thead th{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;background:var(--surface2);}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
+tbody tr:hover{background:var(--surface);}
+tbody td{font-family:var(--fm);font-size:11px;padding:10px 12px;color:var(--text);}
+.bm{font-size:9px;font-weight:700;padding:3px 8px;border-radius:99px;}
+.bw{background:rgba(59,158,255,.15);color:var(--wilde);border:1px solid rgba(59,158,255,.3);}
+.bp{background:rgba(16,217,130,.15);color:var(--paulo);border:1px solid rgba(16,217,130,.3);}
+.abt{font-family:var(--fm);font-size:9px;padding:3px 8px;border-radius:5px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);transition:all .15s;margin-right:3px;}
+.abt:hover{color:var(--text);border-color:var(--text);}
+.abt.del:hover{color:var(--red);border-color:var(--red);}
+
+
+/* DASH */
+#page-dash{padding:24px;gap:18px;flex-direction:column;}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:12px;}
+.kc{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;}
+.kc.kw{border-left:3px solid var(--wilde);}
+.kc.kp{border-left:3px solid var(--paulo);}
+.kc.kt{border-left:3px solid var(--accent);}
+.kn{font-family:var(--fh);font-size:26px;font-weight:800;margin-bottom:3px;}
+.kl{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
+.ks{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:3px;}
+.charts2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:640px){.charts2{grid-template-columns:1fr;}}
+.cc{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;}
+.ct{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:12px;}
+.bl{display:flex;flex-direction:column;gap:7px;}
+.bi{display:flex;align-items:center;gap:8px;}
+.blb{font-family:var(--fm);font-size:10px;color:var(--muted);width:60px;flex-shrink:0;}
+.btr{flex:1;height:14px;background:var(--surface2);border-radius:3px;overflow:hidden;}
+.bf{height:100%;border-radius:3px;transition:width .6s;}
+.bf.bfw{background:rgba(59,158,255,.55);}
+.bf.bfp{background:rgba(16,217,130,.55);}
+.bv{font-family:var(--fm);font-size:10px;color:var(--text);width:44px;text-align:right;flex-shrink:0;}
+.donut-w{display:flex;align-items:center;gap:16px;}
+.don-leg{display:flex;flex-direction:column;gap:7px;}
+.dl{display:flex;align-items:center;gap:6px;font-family:var(--fm);font-size:10px;color:var(--muted);}
+.dd{width:10px;height:10px;border-radius:50%;}
+.spark-r{display:flex;align-items:flex-end;gap:3px;height:58px;}
+.sb{flex:1;min-width:10px;border-radius:2px 2px 0 0;}
+.slr{display:flex;gap:3px;margin-top:3px;}
+.sl{flex:1;font-family:var(--fm);font-size:8px;color:var(--muted);text-align:center;}
+
+/* MODAL */
+.mbg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+.mbg.open{display:flex;}
+.mc{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:480px;max-width:95vw;}
+.mt{font-family:var(--fh);font-size:16px;font-weight:800;margin-bottom:16px;}
+.mact{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}
+.mb{font-family:var(--fm);font-size:10px;padding:8px 16px;border-radius:7px;cursor:pointer;}
+.mb-c{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.mb-s{background:var(--accent);border:none;color:#fff;font-weight:700;}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:10px 16px;font-family:var(--fm);font-size:11px;opacity:0;transform:translateY(20px);transition:all .25s;z-index:999;}
+.toast.show{opacity:1;transform:translateY(0);}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-dot"></div>TV <em>Assistência</em> — Gestão KM</div>
+
+</header>
+
+<div class="tabs-bar">
+  <button class="tab active" id="tab-form"   onclick="setTab('form')">📝 Registrar</button>
+  <button class="tab"        id="tab-tabela" onclick="setTab('tabela')">📋 Registros</button>
+  <button class="tab"        id="tab-dash"   onclick="setTab('dash')">📊 Dashboard</button>
+</div>
+
+<!-- REGISTRAR -->
+<div class="page active" id="page-form">
+  <div class="form-card">
+    <div class="form-title">🚗 Novo <span>Registro</span></div>
+    <div class="fl">Motorista</div>
+    <div class="motorista-row">
+      <button class="moto-btn wilde" id="btn-wilde" onclick="selMot('Wilde')">
+        <span class="micon">🧑</span><span class="mname">Wilde</span>
+      </button>
+      <button class="moto-btn paulo" id="btn-paulo" onclick="selMot('Paulo')">
+        <span class="micon">👤</span><span class="mname">Paulo</span>
+      </button>
+    </div>
+    <div class="fl">Data</div>
+    <input class="fi" id="f-data" type="date">
+    <div class="row2">
+      <div>
+        <div class="fl">Km rodados</div>
+        <input class="fi" id="f-km" type="number" min="0" step="0.1" placeholder="ex: 87.5">
+      </div>
+      <div>
+        <div class="fl">Equipamentos</div>
+        <input class="fi" id="f-eq" type="number" min="0" step="1" placeholder="ex: 12">
+      </div>
+    </div>
+    <div class="fl">Observação (opcional)</div>
+    <input class="fi" id="f-obs" type="text" placeholder="ex: chuva forte, trânsito, rota alterada">
+    <button class="btn-reg" id="btn-reg" onclick="registrar()">✅ Registrar</button>
+  </div>
+</div>
+
+<!-- REGISTROS -->
+<div class="page" id="page-tabela">
+  <div class="toolbar">
+    <button class="fbtn active" data-m="todos" onclick="setFM(this,'todos')">Todos</button>
+    <button class="fbtn wf" data-m="Wilde" onclick="setFM(this,'Wilde')">Wilde</button>
+    <button class="fbtn pf" data-m="Paulo" onclick="setFM(this,'Paulo')">Paulo</button>
+    <input type="month" class="fi-sm" id="f-mes" oninput="renderT()">
+    <input type="text" class="fi-search" id="f-busca" placeholder="🔍 Buscar...">
+    <span id="t-count" style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-left:auto;"></span>
+  </div>
+  <div id="empty-r" style="display:none;align-items:center;justify-content:center;padding:48px;font-family:var(--fm);font-size:11px;color:var(--muted);">Nenhum registro encontrado.</div>
+<div style="overflow-x:auto;">
+    <table>
+      <thead><tr>
+        <th onclick="sortBy('data')" style="cursor:pointer">Data ⇅</th>
+        <th>Motorista</th>
+        <th onclick="sortBy('km')" style="cursor:pointer">Km ⇅</th>
+        <th onclick="sortBy('equipamentos')" style="cursor:pointer">Equip. ⇅</th>
+        <th>Km/Equip.</th>
+        <th>Observação</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="page" id="page-dash">
+  <div class="toolbar" style="gap:6px;flex-wrap:wrap;align-items:center;">
+    <button class="fbtn active" id="dp-sem"  onclick="setPeriodo(this,'semana')">Esta semana</button>
+    <button class="fbtn"        id="dp-7"    onclick="setPeriodo(this,'7dias')">Últimos 7d</button>
+    <button class="fbtn"        id="dp-mes"  onclick="setPeriodo(this,'mes')">Este mês</button>
+    <button class="fbtn"        id="dp-tudo" onclick="setPeriodo(this,'tudo')">Tudo</button>
+    <button class="fbtn"        id="dp-cust" onclick="setPeriodo(this,'custom')">Personalizado</button>
+    <div id="custom-dates" style="display:none;align-items:center;gap:6px;">
+      <input type="date" class="fi-sm" id="d-de"  oninput="renderDash()" placeholder="De">
+      <span style="font-family:var(--fm);font-size:10px;color:var(--muted);">até</span>
+      <input type="date" class="fi-sm" id="d-ate" oninput="renderDash()" placeholder="Até">
+    </div>
+    <div style="width:1px;height:18px;background:var(--border);margin:0 2px;"></div>
+    <button class="fbtn active" id="dm-todos" onclick="setFD(this,'todos')">Todos</button>
+    <button class="fbtn wf"     id="dm-wilde" onclick="setFD(this,'Wilde')">Wilde</button>
+    <button class="fbtn pf"     id="dm-paulo" onclick="setFD(this,'Paulo')">Paulo</button>
+  </div>
+  <div class="kpi-grid" id="kpi-grid"></div>
+  <div class="charts2">
+    <div class="cc"><div class="ct">Km por motorista</div><div class="bl" id="c-km"></div></div>
+    <div class="cc"><div class="ct">Equipamentos por motorista</div><div class="bl" id="c-eq"></div></div>
+  </div>
+  <div class="charts2">
+    <div class="cc">
+      <div class="ct">Divisão de saídas</div>
+      <div class="donut-w">
+        <svg id="don-svg" viewBox="0 0 100 100" width="100" height="100"></svg>
+        <div class="don-leg" id="don-leg"></div>
+      </div>
+    </div>
+    <div class="cc">
+      <div class="ct">Tendência de km — últimas 15 saídas</div>
+      <div class="spark-r" id="sp-bars"></div>
+      <div class="slr" id="sp-labels"></div>
+    </div>
+  </div>
+  <div class="cc"><div class="ct">Km por dia (últimos 20 dias com saída)</div><div class="bl" id="c-daily"></div></div>
+</div>
+
+<!-- MODAL EDITAR -->
+<div class="mbg" id="mbg" onclick="closeMBg(event)">
+  <div class="mc">
+    <div class="mt">✏️ Editar Registro</div>
+    <input type="hidden" id="e-id">
+    <div class="fl">Motorista</div>
+    <select class="fi" id="e-mot"><option value="Wilde">Wilde</option><option value="Paulo">Paulo</option></select>
+    <div class="fl">Data</div>
+    <input class="fi" id="e-data" type="date">
+    <div class="row2">
+      <div><div class="fl">Km</div><input class="fi" id="e-km" type="number" step="0.1"></div>
+      <div><div class="fl">Equipamentos</div><input class="fi" id="e-eq" type="number" step="1"></div>
+    </div>
+    <div class="fl">Observação</div>
+    <input class="fi" id="e-obs" type="text">
+    <div class="mact">
+      <button class="mb mb-c" onclick="closeM()">Cancelar</button>
+      <button class="mb mb-s" onclick="salvarEd()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var recs=[], fmot='todos', fdash='todos', periodo='semana', sf='data', sd=true, toastT;
+
+function setTab(t){
+  ['form','tabela','dash'].forEach(function(p){
+    document.getElementById('page-'+p).classList.toggle('active',p===t);
+    document.getElementById('tab-'+p).classList.toggle('active',p===t);
+  });
+  if(t==='tabela') renderT();
+  if(t==='dash')   renderDash();
+}
+
+var motSel='';
+function selMot(m){
+  motSel=m;
+  document.getElementById('btn-wilde').classList.toggle('sel',m==='Wilde');
+  document.getElementById('btn-paulo').classList.toggle('sel',m==='Paulo');
+}
+
+(function init(){
+  var h=new Date().toISOString().slice(0,10), mes=h.slice(0,7);
+  document.getElementById('f-data').value=h;
+  document.getElementById('f-mes').value=mes;
+  document.getElementById('f-busca').addEventListener('input',renderT);
+  load();
+})();
+
+async function load(){
+  try{ var d=await fetch('/api/tv-gestao-km?action=load').then(r=>r.json()); recs=d.registros||[]; }
+  catch(e){ recs=[]; }
+  renderT();
+}
+
+async function registrar(){
+  if(!motSel){ toast('Selecione o motorista','var(--yellow)'); return; }
+  var km=document.getElementById('f-km').value.trim();
+  var eq=document.getElementById('f-eq').value.trim();
+  var dt=document.getElementById('f-data').value;
+  var ob=document.getElementById('f-obs').value.trim();
+  if(!km||!eq||!dt){ toast('Preencha Km, Equipamentos e Data','var(--yellow)'); return; }
+  var btn=document.getElementById('btn-reg');
+  btn.disabled=true; btn.textContent='⏳ Salvando...';
+  try{
+    var resp=await fetch('/api/tv-gestao-km?action=registrar',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({motorista:motSel,km:parseFloat(km),equipamentos:parseInt(eq),data:dt,observacao:ob})
+    });
+    var d=await resp.json();
+    if(d && d.ok){
+      if(!Array.isArray(recs)) recs=[];
+      recs.unshift(d.registro);
+      document.getElementById('f-km').value='';
+      document.getElementById('f-eq').value='';
+      document.getElementById('f-obs').value='';
+      motSel='';
+      document.getElementById('btn-wilde').className='moto-btn wilde';
+      document.getElementById('btn-paulo').className='moto-btn paulo';
+      renderT();
+      toast('✅ Registro salvo!','var(--green)');
+    } else {
+      toast('❌ '+(d&&d.error||'Erro ao salvar'),'var(--red)');
+    }
+  }catch(e){ toast('❌ Erro: '+e.message,'var(--red)'); }
+  btn.disabled=false; btn.textContent='✅ Registrar';
+}
+
+function setFM(el,m){ document.querySelectorAll('#page-tabela .fbtn').forEach(b=>b.classList.remove('active')); el.classList.add('active'); fmot=m; renderT(); }
+function setFD(el,m){
+  document.querySelectorAll('[id^=dm-]').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  fdash=m;
+  renderDash();
+}
+function setPeriodo(el,p){
+  document.querySelectorAll('[id^=dp-]').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  periodo=p;
+  var cd=document.getElementById('custom-dates');
+  if(cd) cd.style.display=p==='custom'?'flex':'none';
+  renderDash();
+}
+function sortBy(f){ if(sf===f) sd=!sd; else{sf=f;sd=true;} renderT(); }
+
+function getFiltered(){
+  var mes=document.getElementById('f-mes').value;
+  var bsc=(document.getElementById('f-busca').value||'').toLowerCase();
+  return recs.filter(function(r){
+    if(fmot!=='todos'&&r.motorista!==fmot) return false;
+    if(mes&&!r.data.startsWith(mes)) return false;
+    if(bsc&&!(r.motorista.toLowerCase().includes(bsc)||(r.observacao||'').toLowerCase().includes(bsc)||r.data.includes(bsc))) return false;
+    return true;
+  }).sort(function(a,b){
+    var av=a[sf],bv=b[sf];
+    if(typeof av==='string') return sd?bv.localeCompare(av):av.localeCompare(bv);
+    return sd?bv-av:av-bv;
+  });
+}
+
+function fd(d){ if(!d)return'—'; var p=d.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function soma(arr,f){ return arr.reduce(function(s,r){ return s+(r[f]||0); },0); }
+
+function renderT(){
+  var list=getFiltered();
+  document.getElementById('t-count').textContent=list.length+' registro'+(list.length!==1?'s':'');
+  var tb=document.getElementById('tbody');
+  var emptyDiv=document.getElementById('empty-r');
+  if(!list.length){
+    tb.innerHTML='';
+    if(emptyDiv) emptyDiv.style.display='flex';
+    return;
+  }
+  if(emptyDiv) emptyDiv.style.display='none';
+  tb.innerHTML=list.map(function(r){
+    var b=r.motorista==='Wilde'?'<span class="bm bw">Wilde</span>':'<span class="bm bp">Paulo</span>';
+    var ke=r.equipamentos>0?(r.km/r.equipamentos).toFixed(1)+' km':'—';
+    return '<tr>'
+      +'<td>'+fd(r.data)+'</td>'
+      +'<td>'+b+'</td>'
+      +'<td style="color:var(--yellow)">'+r.km.toFixed(1)+' km</td>'
+      +'<td style="color:var(--orange)">'+r.equipamentos+' equip.</td>'
+      +'<td style="color:var(--purple)">'+ke+'</td>'
+      +'<td style="color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.observacao||'—')+'</td>'
+      +'<td><button class="abt" onclick="abrirEd(\''+r.id+'\')">✏️</button>'
+      +'<button class="abt del" onclick="excluir(\''+r.id+'\')">✕</button></td>'
+      +'</tr>';
+  }).join('');
+}
+
+function getPeriodoDates(){
+  var hoje=new Date(), y=hoje.getFullYear(), m=hoje.getMonth(), d=hoje.getDate();
+  if(periodo==='semana'){
+    var dow=hoje.getDay()||7; // 1=Mon..7=Sun
+    var seg=new Date(y,m,d-(dow-1));
+    return {de:seg.toISOString().slice(0,10), ate:hoje.toISOString().slice(0,10)};
+  }
+  if(periodo==='7dias'){
+    var s=new Date(y,m,d-6);
+    return {de:s.toISOString().slice(0,10), ate:hoje.toISOString().slice(0,10)};
+  }
+  if(periodo==='mes'){
+    return {de:y+'-'+(m+1<10?'0':'')+(m+1)+'-01', ate:hoje.toISOString().slice(0,10)};
+  }
+  if(periodo==='custom'){
+    var de=document.getElementById('d-de').value;
+    var ate=document.getElementById('d-ate').value;
+    return {de:de||null, ate:ate||null};
+  }
+  return {de:null, ate:null}; // tudo
+}
+
+// Filtra por período (ignora motorista) — para gráficos comparativos
+function getByPeriod(){
+  var p=getPeriodoDates();
+  return recs.filter(function(r){
+    if(p.de&&r.data<p.de) return false;
+    if(p.ate&&r.data>p.ate) return false;
+    return true;
+  });
+}
+
+// Filtra por período + motorista — para KPIs do motorista selecionado
+function getDash(){
+  var p=getPeriodoDates();
+  return recs.filter(function(r){
+    if(fdash!=='todos'&&r.motorista!==fdash) return false;
+    if(p.de&&r.data<p.de) return false;
+    if(p.ate&&r.data>p.ate) return false;
+    return true;
+  });
+}
+
+function renderDash(){
+  // Para KPIs: usa filtro de período + motorista (getDash)
+  var data=getDash();
+  // Para barras comparativas: usa só período, sem filtro de motorista (getByPeriod)
+  var allP=getByPeriod();
+  var W=allP.filter(r=>r.motorista==='Wilde');
+  var P=allP.filter(r=>r.motorista==='Paulo');
+
+  var kmT=soma(data,'km'), eqT=soma(data,'equipamentos'), sT=data.length;
+  var kmW=soma(W,'km'),    eqW=soma(W,'equipamentos'),    sW=W.length;
+  var kmP=soma(P,'km'),    eqP=soma(P,'equipamentos'),    sP=P.length;
+  var ke=eqT>0?(kmT/eqT).toFixed(1)+'km':'—';
+  var kmMedia=sT>0?(kmT/sT).toFixed(1):'—';
+
+  // KPIs — muda conforme filtro de motorista
+  var kpis;
+  if(fdash==='todos'){
+    kpis=[
+      {cls:'kt',c:'var(--accent)',n:soma(allP,'km').toFixed(0)+' km',l:'Total km',s:allP.length+' saídas · km/eq: '+(soma(allP,'equipamentos')>0?(soma(allP,'km')/soma(allP,'equipamentos')).toFixed(1)+'km':'—')},
+      {cls:'kt',c:'var(--accent)',n:soma(allP,'equipamentos'),l:'Total equipamentos',s:''},
+      {cls:'kw',c:'var(--wilde)',n:kmW.toFixed(0)+' km',l:'Km — Wilde',s:sW+' saídas · '+eqW+' equip.'},
+      {cls:'kp',c:'var(--paulo)',n:kmP.toFixed(0)+' km',l:'Km — Paulo',s:sP+' saídas · '+eqP+' equip.'},
+      {cls:'kw',c:'var(--wilde)',n:eqW+' equip.',l:'Equip. Wilde',s:sW>0?(eqW/sW).toFixed(1)+' equip/saída':'—'},
+      {cls:'kp',c:'var(--paulo)',n:eqP+' equip.',l:'Equip. Paulo',s:sP>0?(eqP/sP).toFixed(1)+' equip/saída':'—'},
+    ];
+  } else {
+    var cor=fdash==='Wilde'?'var(--wilde)':'var(--paulo)';
+    var cls=fdash==='Wilde'?'kw':'kp';
+    var melhor=data.length?data.slice().sort((a,b)=>b.km-a.km)[0]:null;
+    kpis=[
+      {cls:cls,c:cor,n:kmT.toFixed(0)+' km',l:'Total km — '+fdash,s:sT+' saídas'},
+      {cls:cls,c:cor,n:eqT+' equip.',l:'Total equipamentos',s:eqT>0&&sT>0?(eqT/sT).toFixed(1)+' equip/saída':'—'},
+      {cls:cls,c:cor,n:kmMedia+' km',l:'Média km/saída',s:''},
+      {cls:cls,c:cor,n:ke,l:'Km por equipamento',s:''},
+      {cls:cls,c:cor,n:melhor?(melhor.km.toFixed(0)+' km'):'—',l:'Melhor saída',s:melhor?fd(melhor.data):''},
+      {cls:'kt',c:'var(--accent)',n:sT,l:'Total saídas',s:''},
+    ];
+  }
+  document.getElementById('kpi-grid').innerHTML=kpis.map(k=>
+    '<div class="kc '+k.cls+'"><div class="kn" style="color:'+k.c+'">'+k.n+'</div><div class="kl">'+k.l+'</div><div class="ks">'+k.s+'</div></div>'
+  ).join('');
+
+  // Barras comparativas — sempre Wilde vs Paulo usando período (sem filtro de motorista)
+  var mkm=Math.max(kmW,kmP,1), meq=Math.max(eqW,eqP,1);
+  document.getElementById('c-km').innerHTML=[{l:'Wilde',v:kmW,c:'bfw'},{l:'Paulo',v:kmP,c:'bfp'}].map(b=>
+    '<div class="bi"><div class="blb">'+b.l+'</div><div class="btr"><div class="bf '+b.c+'" style="width:'+Math.round(b.v/mkm*100)+'%"></div></div><div class="bv">'+b.v.toFixed(0)+'</div></div>'
+  ).join('');
+  document.getElementById('c-eq').innerHTML=[{l:'Wilde',v:eqW,c:'bfw'},{l:'Paulo',v:eqP,c:'bfp'}].map(b=>
+    '<div class="bi"><div class="blb">'+b.l+'</div><div class="btr"><div class="bf '+b.c+'" style="width:'+Math.round(b.v/meq*100)+'%"></div></div><div class="bv">'+b.v+'</div></div>'
+  ).join('');
+
+  renderDonut(W.length, P.length, allP.length);
+
+  // Sparkline — usa dados filtrados por período + motorista
+  var spark=data.slice().sort((a,b)=>a.data.localeCompare(b.data)).slice(-15);
+  var msp=Math.max(...spark.map(r=>r.km),1);
+  document.getElementById('sp-bars').innerHTML=spark.map(r=>{
+    var h=Math.max(4,Math.round(r.km/msp*54));
+    var cor=r.motorista==='Wilde'?'var(--wilde)':'var(--paulo)';
+    return '<div class="sb" style="height:'+h+'px;background:'+cor+';opacity:.65" title="'+r.motorista+' '+fd(r.data)+' '+r.km+' km"></div>';
+  }).join('');
+  document.getElementById('sp-labels').innerHTML=spark.map(r=>'<div class="sl">'+r.data.slice(5).replace('-','/')+'</div>').join('');
+
+  // Gráfico diário — usa dados do período filtrado (sem motorista)
+  var byDay={};
+  allP.forEach(function(r){
+    if(!byDay[r.data]) byDay[r.data]={km:0,eq:0,w:0,p:0};
+    byDay[r.data].km+=r.km; byDay[r.data].eq+=r.equipamentos;
+    if(r.motorista==='Wilde') byDay[r.data].w+=r.km; else byDay[r.data].p+=r.km;
+  });
+  var days=Object.keys(byDay).sort().slice(-20);
+  var md=Math.max(...days.map(d=>byDay[d].km),1);
+  document.getElementById('c-daily').innerHTML=days.length?days.map(function(d){
+    var v=byDay[d];
+    return '<div class="bi">'
+      +'<div class="blb">'+fd(d).slice(0,5)+'</div>'
+      +'<div class="btr" style="position:relative">'
+        +'<div class="bf bfw" style="width:'+Math.round(v.w/md*100)+'%;position:absolute;left:0;top:0;height:100%;opacity:.8;border-radius:3px 0 0 3px"></div>'
+        +'<div class="bf bfp" style="width:'+Math.round(v.p/md*100)+'%;position:absolute;left:'+Math.round(v.w/md*100)+'%;top:0;height:100%;opacity:.8;border-radius:0 3px 3px 0"></div>'
+      +'</div>'
+      +'<div class="bv">'+v.km.toFixed(0)+'</div>'
+      +'<div style="font-family:var(--fm);font-size:9px;color:var(--orange);width:38px;text-align:right">'+v.eq+' eq.</div>'
+      +'</div>';
+  }).join(''):'<div style="font-family:var(--fm);font-size:11px;color:var(--muted);padding:12px">Sem dados no período.</div>';
+}
+
+function renderDonut(sW,sP,sT){
+  if(!sT){ document.getElementById('don-svg').innerHTML='<text x="50" y="54" text-anchor="middle" font-size="9" fill="#4a607a">Sem dados</text>'; document.getElementById('don-leg').innerHTML=''; return; }
+  var items=[{v:sW,c:'#3b9eff',l:'Wilde'},{v:sP,c:'#10d982',l:'Paulo'}].filter(i=>i.v>0);
+  var tot=items.reduce((s,i)=>s+i.v,0), st=-Math.PI/2;
+  var paths=items.map(function(item){
+    var a=item.v/tot*Math.PI*2, en=st+a;
+    var x1=50+40*Math.cos(st),y1=50+40*Math.sin(st);
+    var x2=50+40*Math.cos(en),y2=50+40*Math.sin(en);
+    var lg=a>Math.PI?1:0;
+    var d='M 50 50 L '+x1+' '+y1+' A 40 40 0 '+lg+' 1 '+x2+' '+y2+' Z';
+    st=en;
+    return '<path d="'+d+'" fill="'+item.c+'" opacity="0.7"/>';
+  }).join('');
+  document.getElementById('don-svg').innerHTML='<circle cx="50" cy="50" r="22" fill="var(--surface)"/>'+paths;
+  document.getElementById('don-leg').innerHTML=items.map(i=>'<div class="dl"><div class="dd" style="background:'+i.c+'"></div><span>'+i.l+' — <b>'+i.v+'</b> ('+Math.round(i.v/tot*100)+'%)</span></div>').join('');
+}
+
+function abrirEd(id){
+  var r=recs.find(x=>x.id===id); if(!r) return;
+  document.getElementById('e-id').value=r.id;
+  document.getElementById('e-mot').value=r.motorista;
+  document.getElementById('e-data').value=r.data;
+  document.getElementById('e-km').value=r.km;
+  document.getElementById('e-eq').value=r.equipamentos;
+  document.getElementById('e-obs').value=r.observacao||'';
+  document.getElementById('mbg').classList.add('open');
+}
+function closeM(){ document.getElementById('mbg').classList.remove('open'); }
+function closeMBg(e){ if(e.target.id==='mbg') closeM(); }
+
+async function salvarEd(){
+  var id=document.getElementById('e-id').value;
+  var body={id,motorista:document.getElementById('e-mot').value,data:document.getElementById('e-data').value,km:document.getElementById('e-km').value,equipamentos:document.getElementById('e-eq').value,observacao:document.getElementById('e-obs').value};
+  var d=await fetch('/api/tv-gestao-km?action=editar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
+  if(d.ok){ var i=recs.findIndex(r=>r.id===id); if(i>=0) recs[i]=d.registro; closeM(); renderT(); toast('✅ Editado!','var(--green)'); }
+  else toast('❌ '+(d.error||'Erro'),'var(--red)');
+}
+
+async function excluir(id){
+  var r=recs.find(x=>x.id===id);
+  if(!confirm('Excluir registro de '+(r?fd(r.data):'?')+'?')) return;
+  var d=await fetch('/api/tv-gestao-km?action=excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})}).then(r=>r.json());
+  if(d.ok){ recs=recs.filter(r=>r.id!==id); renderT(); toast('🗑️ Excluído','var(--orange)'); }
+}
+
+function toast(msg,color){
+  var t=document.getElementById('toast'); t.textContent=msg; t.style.borderTopColor=color||'var(--accent)';
+  t.classList.add('show'); clearTimeout(toastT);
+  toastT=setTimeout(function(){ t.classList.remove('show'); },3000);
+}
+</script>
+</body>
+</html>
