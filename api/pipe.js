@@ -1261,6 +1261,28 @@ export default async function handler(req, res) {
     } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
   }
 
+
+  // ── POST corrigir-nomes: atualiza nomes no padrão fmt4dig ──────────────
+  if (req.method === 'POST' && action === 'corrigir-nomes') {
+    // body: { corrections: [{id, novoNome}] }
+    var corrections = (req.body && req.body.corrections) || [];
+    if (!corrections.length) return res.status(400).json({ok:false,error:'corrections obrigatorio'});
+    try {
+      var pip9 = await dbGet(PIPE_KEY) || {cards:[]};
+      var ts9  = now;
+      var corrigidos = [];
+      corrections.forEach(function(fix){
+        var card9 = (pip9.cards||[]).find(function(c){ return c.id===fix.id; });
+        if (!card9) return;
+        var nomeAntes = card9.nomeContato;
+        card9.nomeContato = fix.novoNome;
+        corrigidos.push({id:fix.id, de:nomeAntes, para:fix.novoNome});
+      });
+      if (corrigidos.length) await dbSet(PIPE_KEY, pip9);
+      return res.status(200).json({ok:true, corrigidos});
+    } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
