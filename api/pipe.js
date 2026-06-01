@@ -48,6 +48,16 @@ const PHASES = [
   { id:'descarte',              name:'Descarte',              cor:'#7f1d1d' },
 ];
 
+async function dbFetch(cmd, ...args) {
+  try {
+    const _u=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+    const _t=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+    const r=await fetch(_u+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_t,'Content-Type':'application/json'},body:JSON.stringify([[cmd,...args]])});
+    const j=await r.json();
+    return j[0]?.result;
+  } catch(e){ console.error('[dbFetch]',e.message); return null; }
+}
+
 async function dbGet(k) {
   try {
     const r = await fetch(UPSTASH_URL + '/pipeline', {
