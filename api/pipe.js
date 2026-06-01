@@ -651,7 +651,8 @@ export default async function handler(req, res) {
         if (dado) {
           var bakKey = chave + '_bak_' + ts;
           await dbSet(bakKey, dado);
-          // Manter apenas últimos 48 backups por chave (48h se hourly)
+          // TTL de 4 dias (345600 segundos) — evita acúmulo de storage
+          await dbFetch('EXPIRE', bakKey, 345600);
           res2.salvos.push(bakKey);
         }
       } catch(e) { res2.erros.push({chave, erro:e.message}); }
@@ -1101,6 +1102,32 @@ export default async function handler(req, res) {
     } catch(e){
       return res.end('<html><body style="background:#080808;color:#ef4444;font-family:monospace;padding:40px">Erro: '+e.message+'</body></html>');
     }
+  }
+
+
+  // ── GET limpar-backups: remove chaves de backup antigas do Redis ──────────
+  if (action === 'limpar-backups') {
+    try {
+      const idx3 = (await dbGet('reparoeletro_backup_index')) || [];
+      // Manter apenas os últimos 48 backups no índice
+      const recentes = idx3.slice(-48);
+      const chavesRecentes = new Set(recentes.flatMap(function(b){ return b.chaves||[]; }));
+      // Deletar chaves de backup antigas (não estão nos últimos 48)
+      const antigas = idx3.slice(0,-48);
+      var deletados = 0;
+      for (var bi=0; bi<antigas.length; bi++) {
+        var bck = antigas[bi];
+        for (var bki=0; bki<(bck.chaves||[]).length; bki++) {
+          var bk = bck.chaves[bki];
+          if (!chavesRecentes.has(bk)) {
+            await dbFetch('DEL', bk);
+            deletados++;
+          }
+        }
+      }
+      await dbSet('reparoeletro_backup_index', recentes);
+      return res.status(200).json({ ok:true, deletados, mantidos:chavesRecentes.size });
+    } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
   }
 
   // ── status ────────────────────────────────────────────────────────────────
