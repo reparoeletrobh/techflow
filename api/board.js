@@ -2007,7 +2007,7 @@ module.exports = async function handler(req, res) {
         // Buscar por pipefyId, localId ou flFichaId
         let pipeCard = pipeDb.cards.find(function(c){
           return c.pipefyId===pidStr ||
-                 (flId && (c.localId===flId || c.flFichaId===flId || c.id===flId));
+                 (flId && (c.localId===flId || c.flFichaId===flId || c.id===flId || c.fichaId===flId));
         });
         if(pipeCard){
           pipeCard.phase='erp'; pipeCard.movedAt=now2;

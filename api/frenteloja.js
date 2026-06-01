@@ -222,10 +222,18 @@ export default async function handler(req,res){
     ficha.descricaoTecnica=descricaoTecnica;ficha.phase='orcamento_cadastrado';ficha.movedAt=now;
     ficha.history=(ficha.history||[]).concat([{phase:'orcamento_cadastrado',ts:now}]);
     await dbSet(FL_KEY,db);
-    // Pipe ADM: mover para receber
-    if (ficha.pipefyCardId) {
-      await moverNoPipe(ficha.pipefyCardId, 'receber', { nomeContato: ficha.nomeContato, valor: ficha.pagoValor }).catch(() => {});
-    }
+    // Pipe ADM: mover/registrar em 'receber' — sempre, com ou sem pipefyCardId
+    await registrarNoPipe({
+      pipefyId:    ficha.pipefyCardId || null,
+      fichaId:     ficha.id,
+      phase:       'receber',
+      nomeContato: ficha.nomeContato || '',
+      telefone:    ficha.telefone    || '',
+      equipamento: ficha.equipamento || (ficha.orcamento?.equipamento) || '',
+      descricao:   ficha.descricaoTecnica || ficha.descricao || '',
+      valor:       ficha.pagoValor || ficha.orcamento?.valor || 0,
+      origem:      'frenteloja_liberar'
+    }).catch(() => {});
     logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Liberar equipamento', para:'receber', gatilho:'→ Pipe receber + Pipefy Receber$', status:'ok', detalhe:'Valor: R$'+(ficha.pagoValor||0)+' '+ficha.pagoPor }).catch(()=>{});
     return res.status(200).json({ok:true,ficha});
   }
@@ -455,10 +463,18 @@ export default async function handler(req,res){
       }
     } catch(e) { console.error('[FL] liberar→Pipefy:', e.message); }
     await dbSet(FL_KEY,db);
-    // Pipe ADM: mover para receber
-    if (ficha.pipefyCardId) {
-      await moverNoPipe(ficha.pipefyCardId, 'receber', { nomeContato: ficha.nomeContato, valor: ficha.pagoValor }).catch(() => {});
-    }
+    // Pipe ADM: mover/registrar em 'receber' — sempre, com ou sem pipefyCardId
+    await registrarNoPipe({
+      pipefyId:    ficha.pipefyCardId || null,
+      fichaId:     ficha.id,
+      phase:       'receber',
+      nomeContato: ficha.nomeContato || '',
+      telefone:    ficha.telefone    || '',
+      equipamento: ficha.equipamento || (ficha.orcamento?.equipamento) || '',
+      descricao:   ficha.descricaoTecnica || ficha.descricao || '',
+      valor:       ficha.pagoValor || ficha.orcamento?.valor || 0,
+      origem:      'frenteloja_liberar'
+    }).catch(() => {});
     logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Liberar equipamento', para:'receber', gatilho:'→ Pipe receber + Pipefy Receber$', status:'ok', detalhe:'Valor: R$'+(ficha.pagoValor||0)+' '+ficha.pagoPor }).catch(()=>{});
     return res.status(200).json({ok:true,ficha});
   }
@@ -590,6 +606,37 @@ export default async function handler(req,res){
       console.log('[FL] pago → pipe ERP:', id);
     } catch(ep){ console.error('[FL] pipe ERP:', ep.message); }
     return res.status(200).json({ ok:true, ficha });
+  }
+
+
+  // ── GET inserir-no-pipe — insere fichas do balcão no pipe em 'receber' ────
+  if (action === 'inserir-no-pipe') {
+    const db      = await dbGet(FL_KEY) || defaultDB();
+    const balcao  = (await dbGet('reparoeletro_balcao')) || [];
+    // Fichas no balcão que ainda não foram pagas
+    const pendentes = balcao.filter(b => b.status !== 'pago');
+    const resultados = [];
+    for (const entry of pendentes) {
+      const ficha = (db.fichas||[]).find(f => f.id === entry.flFichaId || f.id === entry.osCode);
+      if (!ficha) { resultados.push({ id: entry.flFichaId, erro: 'ficha nao encontrada' }); continue; }
+      try {
+        await registrarNoPipe({
+          pipefyId:    ficha.pipefyCardId || null,
+          fichaId:     ficha.id,
+          phase:       'receber',
+          nomeContato: ficha.nomeContato || '',
+          telefone:    ficha.telefone    || '',
+          equipamento: ficha.equipamento || (ficha.orcamento?.equipamento) || '',
+          descricao:   ficha.descricaoTecnica || ficha.descricao || '',
+          valor:       ficha.pagoValor || ficha.orcamento?.valor || 0,
+          origem:      'frenteloja_balcao'
+        });
+        resultados.push({ id: ficha.id, nome: ficha.nomeContato, status: 'inserido' });
+      } catch(e) {
+        resultados.push({ id: ficha.id, nome: ficha.nomeContato, erro: e.message });
+      }
+    }
+    return res.status(200).json({ ok:true, total: pendentes.length, resultados });
   }
 
   // ── GET fix-board-por-nome — busca ficha por nome e força no board ───────
@@ -871,10 +918,18 @@ export default async function handler(req,res){
     if(dados&&phase==='endereco')ficha.endereco=dados;
     if(phase==='liberado_hoje')ficha.liberadoHoje=true;
     await dbSet(FL_KEY,db);
-    // Pipe ADM: mover para receber
-    if (ficha.pipefyCardId) {
-      await moverNoPipe(ficha.pipefyCardId, 'receber', { nomeContato: ficha.nomeContato, valor: ficha.pagoValor }).catch(() => {});
-    }
+    // Pipe ADM: mover/registrar em 'receber' — sempre, com ou sem pipefyCardId
+    await registrarNoPipe({
+      pipefyId:    ficha.pipefyCardId || null,
+      fichaId:     ficha.id,
+      phase:       'receber',
+      nomeContato: ficha.nomeContato || '',
+      telefone:    ficha.telefone    || '',
+      equipamento: ficha.equipamento || (ficha.orcamento?.equipamento) || '',
+      descricao:   ficha.descricaoTecnica || ficha.descricao || '',
+      valor:       ficha.pagoValor || ficha.orcamento?.valor || 0,
+      origem:      'frenteloja_liberar'
+    }).catch(() => {});
     logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Liberar equipamento', para:'receber', gatilho:'→ Pipe receber + Pipefy Receber$', status:'ok', detalhe:'Valor: R$'+(ficha.pagoValor||0)+' '+ficha.pagoPor }).catch(()=>{});
     return res.status(200).json({ok:true,ficha});
   }
