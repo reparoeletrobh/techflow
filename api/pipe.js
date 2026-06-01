@@ -1234,6 +1234,33 @@ export default async function handler(req, res) {
     } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
   }
 
+
+  // ── GET analisar-nomes: lista cards que não seguem padrão Nome XXXX ──────
+  if (action === 'analisar-nomes') {
+    try {
+      var db8 = await dbGet(PIPE_KEY) || {cards:[]};
+      var ignorar = ['ultima_chamada','finalizado'];
+      var PADRAO = /^.+ \d{4}(?: \d{4})?$/; // "Nome 1234" ou "Nome 1234 1234"
+      var semPadrao = [];
+      (db8.cards||[]).forEach(function(card){
+        if (ignorar.includes(card.phase)) return;
+        if (!PADRAO.test((card.nomeContato||'').trim())) {
+          semPadrao.push({
+            id: card.id,
+            nome: card.nomeContato||'',
+            fase: card.phase,
+            telefone: card.telefone||'',
+            pipefyId: card.pipefyId||null
+          });
+        }
+      });
+      // Ordenar por fase
+      const ordemFases = ['aguardando_aprovacao','aprovados','video_enviado','analise_compra','programar_entrega','solicitar_entrega','erp','garantia','receber'];
+      semPadrao.sort(function(a,b){ return (ordemFases.indexOf(a.fase)||99)-(ordemFases.indexOf(b.fase)||99); });
+      return res.status(200).json({ ok:true, total:semPadrao.length, cards:semPadrao });
+    } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
@@ -1486,6 +1513,7 @@ export default async function handler(req, res) {
       equipamento:     body.equipamento || '',
       descricao:       body.descricao   || '',
       valor:           parseFloat(body.valor) || 0,
+      endereco:        body.endereco || '',
       origem:          body.origem || 'manual',
       criadoEm:        now, movedAt: now,
       aguardandoDesde: ph === 'aguardando_aprovacao' ? now : null,

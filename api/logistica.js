@@ -60,6 +60,7 @@ async function moverNoPipe(pipefyId, novaFase, dados) {
           telefone: dados.telefone||'',
           equipamento: dados.equipamento||'',
           descricao: dados.descricao||'',
+          endereco: dados.endereco||'',
           valor: parseFloat(dados.valor||0)||0,
           origem: dados.origem||'sistema',
           criadoEm: now, movedAt: now,
@@ -670,6 +671,7 @@ module.exports = async function handler(req, res) {
       nomeContato: _nome, telefone: _tel,
       equipamento: _equip, descricao: _desc,
       valor: _valor, origem: 'logistica',
+      endereco: ficha.endereco || '',
       localId: ficha.id  // fallback quando não há pipefyCardId
     }).catch(e => console.error('[Log→Pipe]', e.message));
 

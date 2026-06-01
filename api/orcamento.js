@@ -297,6 +297,7 @@ module.exports = async function handler(req, res) {
             telefone: telefone||'',
             equipamento: aparelho||'',
             descricao: defeito||'',
+            endereco: endereco||'',
             valor: parseFloat(preco)||0,
             origem: 'orcamento',
             criadoEm: nowO, movedAt: nowO,
