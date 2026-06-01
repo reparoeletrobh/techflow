@@ -304,7 +304,7 @@ function render(){
             '<option value="">↕ Mover para…</option>'+opts+
           '</select>'+
           '<button class="cbtn cbtn-outline" onclick="abrirDadosPipe(\''+c.id+'\')">👁 Ver Dados</button>'+
-          '<button class="cbtn cbtn-outline" onclick="abrirEditarPipe(\''+c.id+'\')">✏️</button>'+
+          '<button class="cbtn cbtn-outline" onclick="abrirEditarPipe(\''+c.id+'\')">✏️</button>'+'<button class="cbtn cbtn-outline" title="Vencimento" onclick="setVencimento(\''+c.id+'\')">📅</button>'+
           '<button class="cbtn cbtn-blue'+(c.analiseCompra?' active':'')+'" onclick="toggleAC(\''+c.id+'\')" title="Marcar Análise de Compra">🛒</button>'+
           '<button class="cbtn cbtn-red" onclick="excluir(\''+c.id+'\')">✕</button>'+
         '</div>'+
