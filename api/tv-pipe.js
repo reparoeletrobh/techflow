@@ -1470,7 +1470,7 @@ export default async function handler(req, res) {
 
   // ── GET migrar-fases-tv: mapeia cards de fases TV-exclusivas → fases ADM ──
   if (action === 'migrar-fases-tv') {
-    const FASE_MAP = {"solicitar_coleta": "solicitar_entrega", "clientes_com_horario_marcado": "programar_entrega", "liberado_para_rota": "solicitar_entrega", "rota_em_andamento": "entrega_solicitada", "equipamento_em_rota": "entrega_solicitada", "remarcar": "ultima_chamada", "receber_dolar": "receber", "rs": "erp", "oss_para_fechamento": "erp", "reprovado": "finalizado", "pronto_para_venda": "finalizado", "aguardando_orcamento": "aguardando_aprovacao", "aguardando_peca": "analise_compra"};
+    const FASE_MAP = {"receber_dolar": "receber", "reprovado": "finalizado", "liberado_para_rota": "solicitar_entrega", "remarcar": "ultima_chamada", "rs": "erp", "aguardando_peca": "analise_compra", "pronto_para_venda": "finalizado", "equipamento_em_rota": "entrega_solicitada", "solicitar_coleta": "solicitar_entrega", "clientes_com_horario_marcado": "programar_entrega", "rota_em_andamento": "entrega_solicitada", "oss_para_fechamento": "erp", "aguardando_orcamento": "aguardando_aprovacao"};
     try {
       const db = (await dbGet(PIPE_KEY)) || {cards:[]};
       let migrados = 0, erros = [];
