@@ -1283,6 +1283,39 @@ export default async function handler(req, res) {
     } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
   }
 
+
+  // ── GET fix-nomes-padrao: corrige as 12 fichas fora do padrão ───────────
+  if (action === 'fix-nomes-padrao') {
+    try {
+      var pip10 = await dbGet(PIPE_KEY) || {cards:[]};
+      var FIXES = [
+        {id:'PIPE-0949', novo:'Weslei 3329'},
+        {id:'PIPE-0942', novo:'Dalila 0402'},
+        {id:'PIPE-0924', novo:'Priscila 8668'},
+        {id:'PIPE-0921', novo:'Adriana 4369'},
+        {id:'PIPE-0111', novo:'Tarcis 3877'},
+        {id:'PIPE-0114', novo:'Edimilson 6386'},
+        {id:'PIPE-0127', novo:'Cida 2077'},
+        {id:'PIPE-0948', novo:'Marcelo 9545'},
+        {id:'PIPE-0946', novo:'Paola 4476'},
+        {id:'PIPE-0945', novo:'Leonardo 5857'},
+        {id:'PIPE-0944', novo:'Simone 7660'},
+        {id:'PIPE-0943', novo:'Silvana 7847'},
+      ];
+      var resultado = [];
+      FIXES.forEach(function(fix){
+        var card10 = (pip10.cards||[]).find(function(c){ return c.id===fix.id; });
+        if (!card10) { resultado.push({id:fix.id, status:'nao encontrado'}); return; }
+        var antes = card10.nomeContato;
+        card10.nomeContato = fix.novo;
+        resultado.push({id:fix.id, de:antes, para:fix.novo, status:'ok'});
+      });
+      var salvos = resultado.filter(function(r){return r.status==='ok';}).length;
+      if (salvos > 0) await dbSet(PIPE_KEY, pip10);
+      return res.status(200).json({ok:true, corrigidos:salvos, detalhes:resultado});
+    } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
+  }
+
   // ── status ────────────────────────────────────────────────────────────────
   if (action === 'status') {
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
