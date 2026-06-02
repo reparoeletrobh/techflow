@@ -124,13 +124,24 @@ async function registrarFichaAtendimento(ficha) {
   } catch(e) { console.error('[atend-log]', e.message); }
 }
 
-async function registrarPassagem(phase) {
+async function registrarPassagem(phase, ficha) {
   try {
     const hoje = new Date().toLocaleDateString('pt-BR', {timeZone:'America/Sao_Paulo'}).split('/').reverse().join('-');
     const db   = (await dbGet('reparoeletro_log_metricas')) || {};
     if (!db[hoje]) db[hoje] = {};
-    db[hoje][phase] = (db[hoje][phase] || 0) + 1;
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+    if (!db[hoje][phase]) db[hoje][phase] = { total: 0, fichas: [] };
+    // Compatibilidade: se era número velho, converter
+    if (typeof db[hoje][phase] === 'number') db[hoje][phase] = { total: db[hoje][phase], fichas: [] };
+    db[hoje][phase].total++;
+    if (ficha) {
+      db[hoje][phase].fichas.push({
+        id: ficha.id, nome: ficha.nome||ficha.nomeContato||'',
+        equipamento: ficha.equipamento||'', ts: new Date().toISOString()
+      });
+      // Limitar lista a 50 por fase por dia
+      db[hoje][phase].fichas = db[hoje][phase].fichas.slice(0, 50);
+    }
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
     Object.keys(db).forEach(d => { if (new Date(d) < cutoff) delete db[d]; });
     await dbSet('reparoeletro_log_metricas', db);
   } catch(e) { console.error('registrarPassagem:', e.message); }
@@ -365,7 +376,7 @@ module.exports = async function handler(req, res) {
     db.fichas.unshift(ficha);
     db.nextId = (db.nextId || 1) + 1;
     await dbSet(LOG_KEY, db);
-    registrarPassagem('liberado_coleta').catch(() => {});
+    registrarPassagem('liberado_coleta', ficha).catch(() => {});
     registrarFichaAtendimento(ficha).catch(() => {});
     return res.status(201).json({ ok: true, ficha });
   }
@@ -382,7 +393,7 @@ module.exports = async function handler(req, res) {
     ficha.phase = phase;
     ficha.movedAt = new Date().toISOString();
     await dbSet(LOG_KEY, db);
-    registrarPassagem(phase).catch(() => {});
+    registrarPassagem(phase, ficha).catch(() => {});
     if (phase === 'liberado_coleta') registrarFichaAtendimento(ficha).catch(() => {});
     return res.status(200).json({ ok: true, ficha });
   }
@@ -399,7 +410,7 @@ module.exports = async function handler(req, res) {
     ficha.motoristaNome = motoristaNome.trim();
     ficha.movedAt      = new Date().toISOString();
     await dbSet(LOG_KEY, db);
-    registrarPassagem('motorista_parceiro').catch(() => {});
+    registrarPassagem('motorista_parceiro', ficha).catch(() => {});
     return res.status(200).json({ ok: true, ficha });
   }
 
