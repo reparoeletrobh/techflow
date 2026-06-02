@@ -339,12 +339,6 @@ module.exports = async function handler(req, res) {
   if (action === 'metricas') {
     const MET_KEY = 'reparoeletro_log_metricas';
     const met = (await dbGet(MET_KEY)) || {};
-    const hoje = new Date().toLocaleDateString('pt-BR', {timeZone:'America/Sao_Paulo'}).split('/').reverse().join('-');
-
-    // Backfill removido — contagem somente por eventos reais
-await dbSet(MET_KEY, met);
-    }
-
     return res.status(200).json({ ok: true, metricas: met });
   }
 
@@ -585,6 +579,7 @@ await dbSet(MET_KEY, met);
     ficha.diagnostico.textoOrc = textoFinal;
     ficha.diagnostico.preco    = precoFinal;
     ficha.phase   = 'orc_registrado';
+    registrarPassagem('orc_registrado', ficha).catch(() => {});
     registrarPassagem('orc_registrado', ficha).catch(() => {});
     ficha.movedAt = new Date().toISOString();
     await dbSet(LOG_KEY, db);
