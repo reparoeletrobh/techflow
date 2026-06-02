@@ -341,17 +341,8 @@ module.exports = async function handler(req, res) {
     const met = (await dbGet(MET_KEY)) || {};
     const hoje = new Date().toLocaleDateString('pt-BR', {timeZone:'America/Sao_Paulo'}).split('/').reverse().join('-');
 
-    // Backfill: se hoje nao tem dados, semear com fichas em cada coluna agora
-    // (baseline do dia — a partir daqui cada movimentacao acumula por cima)
-    if (!met[hoje] || !Object.keys(met[hoje]).length) {
-      const fichasDb = await dbGet(LOG_KEY) || defaultDB();
-      met[hoje] = {};
-      for (const f of fichasDb.fichas || []) {
-        if (f.phase) {
-          met[hoje][f.phase] = (met[hoje][f.phase] || 0) + 1;
-        }
-      }
-      await dbSet(MET_KEY, met);
+    // Backfill removido — contagem somente por eventos reais
+await dbSet(MET_KEY, met);
     }
 
     return res.status(200).json({ ok: true, metricas: met });
@@ -426,7 +417,7 @@ module.exports = async function handler(req, res) {
     ficha.horarioColeta  = horario; // ISO datetime string
     ficha.movedAt        = new Date().toISOString();
     await dbSet(LOG_KEY, db);
-    registrarPassagem('horario_marcado').catch(() => {});
+    registrarPassagem('horario_marcado', ficha).catch(() => {});
     return res.status(200).json({ ok: true, ficha });
   }
 
@@ -594,6 +585,7 @@ module.exports = async function handler(req, res) {
     ficha.diagnostico.textoOrc = textoFinal;
     ficha.diagnostico.preco    = precoFinal;
     ficha.phase   = 'orc_registrado';
+    registrarPassagem('orc_registrado', ficha).catch(() => {});
     ficha.movedAt = new Date().toISOString();
     await dbSet(LOG_KEY, db);
 
