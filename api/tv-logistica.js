@@ -859,7 +859,94 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  // ── GET listar-com-diag — lista fichas que têm diagnóstico ────────────────
+  // ── GET listar-orc — lista tv_orcamentos para diagnóstico ──────────────────
+  if (req.method === 'GET' && action === 'listar-orc') {
+    const orcDb_lo = (await dbGet('tv_orcamentos')) || { fichas:[] };
+    const lista_lo = (orcDb_lo.fichas||[]).map(f => ({
+      id:     f.id,
+      nome:   f.nome,
+      tel:    f.tel||'',
+      status: f.status||'pendente',
+      preco:  f.precoSugerido||f.preco||null,
+      textoOrc: (f.textoOrc||'').substring(0,120)+'…',
+    }));
+    return res.status(200).json({ ok:true, total: lista_lo.length, fichas: lista_lo });
+  }
+
+  // ── POST fix-orc-direto — atualiza textoOrc de orçamento pelo nome ─────────
+  if (req.method === 'POST' && action === 'fix-orc-direto') {
+    const { nome: nomeQ, modelo, chips, acrilicoVal } = req.body || {};
+    if (!nomeQ || !chips || !chips.length) return res.status(400).json({ ok:false, error:'nome e chips obrigatórios' });
+
+    const orcDb_fd = (await dbGet('tv_orcamentos')) || { fichas:[] };
+    const idx_fd   = orcDb_fd.fichas.findIndex(f => (f.nome||'').toLowerCase().includes(nomeQ.toLowerCase()));
+    if (idx_fd < 0) return res.status(404).json({ ok:false, error:'Não encontrado em tv_orcamentos: '+nomeQ });
+
+    const ficha_fd   = orcDb_fd.fichas[idx_fd];
+    const pn_fd      = (ficha_fd.nome||'').trim().split(/\s+/)[0] || 'cliente';
+    const tvModel_fd = modelo || '';
+    let pol_fd = null;
+    const mPol_fd = tvModel_fd.match(/(\d{2})\s*(?:pol(?:egadas?)?|")?/i);
+    if (mPol_fd) { const v=parseInt(mPol_fd[1]); if(v>=30&&v<=79) pol_fd=v; }
+    if (!pol_fd) { const ns=(tvModel_fd.match(/([3-7]\d)/g)||[]); for(const n of ns){const v=parseInt(n);if(v>=30&&v<=79){pol_fd=v;break;}} }
+
+    const TAB_fd=[{min:30,max:39,p:'490'},{min:40,max:49,p:'690'},{min:50,max:59,p:'890'},{min:60,max:69,p:'1490'},{min:70,max:79,p:'1990'}];
+    let precoTab_fd=null;
+    if(pol_fd){for(const f of TAB_fd){if(pol_fd>=f.min&&pol_fd<=f.max){precoTab_fd=f.p;break;}}}
+    const precoStr_fd  = precoTab_fd||'[VALOR]';
+    const modeloStr_fd = tvModel_fd?' '+tvModel_fd:'';
+    const acrVal_fd    = parseFloat(acrilicoVal)||0;
+    const temB=chips.includes('barramento'), temP=chips.includes('placa');
+    const temR=chips.includes('risco'),      temA=chips.includes('acrilico');
+
+    let texto_fd=null, preco_fd=null;
+    if(chips.includes('condenada')){
+      texto_fd=`Olá, bom dia ${pn_fd}, fizemos todos os testes e identificamos que infelizmente não tem conserto viável a TV${modeloStr_fd}. Caso queira ela de volta me fala que providencio a entrega.`;
+    } else if(temB||temP){
+      const peca=(temB&&temP)?'barramento e placa':temB?'barramento':'placa';
+      texto_fd=`Olá, ${pn_fd}, bom dia! Sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:
+
+Foram feitos todos os testes, identificamos que será necessário fazer a troca do ${peca} da TV${modeloStr_fd}, será feito a reoperação elétrica também. Este conserto completo fica em ${precoStr_fd} reais apenas. Aprovando já iniciamos o conserto.`;
+      if(temR) texto_fd+=`
+
+Obs.: Devido às condições da placa do equipamento preciso comunicar o risco de ao trabalhar nela o curto progredir e infelizmente ela apagar completamente. São poucos os casos mas existe esse risco.`;
+      if(temA&&acrVal_fd>0) texto_fd+=`
+
+Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV está com cores mais claras. Sem trocar o acrílico você pode considerar uma qualidade de 80 a 90%. Trocando o Acrílico fica 100% e tem um custo adicional de ${acrVal_fd} reais. Aguardo sua resposta.`;
+      preco_fd=precoTab_fd;
+    } else if(temR){
+      texto_fd=`Olá, ${pn_fd}, bom dia! Sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:
+
+Foram feitos todos os testes, identificamos um problema no conjunto eletrônico da TV${modeloStr_fd}. Este conserto completo fica em ${precoStr_fd} reais apenas.
+
+Obs.: Devido às condições da placa do equipamento preciso comunicar o risco de ao trabalhar nela o curto progredir e infelizmente ela apagar completamente. São poucos os casos mas existe esse risco. Aprovando já iniciamos o conserto.`;
+      preco_fd=precoTab_fd;
+    } else if(temA){
+      texto_fd=`Olá, ${pn_fd}, bom dia! Sou o Alessandro da Reparo Eletro.
+
+Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV está com cores mais claras. Sem trocar o acrílico você pode considerar uma qualidade de 80 a 90%. Trocando o Acrílico fica 100% e tem um custo adicional de ${acrVal_fd>0?acrVal_fd:'[VALOR]'} reais. Aguardo sua resposta.`;
+      preco_fd=acrVal_fd?String(acrVal_fd):null;
+    }
+
+    if(!texto_fd) return res.status(400).json({ok:false,error:'Chips inválidos'});
+
+    orcDb_fd.fichas[idx_fd].textoOrc      = texto_fd;
+    orcDb_fd.fichas[idx_fd].precoSugerido = preco_fd;
+    orcDb_fd.fichas[idx_fd].status        = 'pendente';
+    orcDb_fd.fichas[idx_fd].preco         = null;
+    orcDb_fd.fichas[idx_fd].fixedAt       = new Date().toISOString();
+    await dbSet('tv_orcamentos', orcDb_fd);
+
+    return res.status(200).json({
+      ok: true,
+      nome: ficha_fd.nome,
+      textoGerado: texto_fd,
+      preco: preco_fd,
+      msg: '✅ Orçamento atualizado com novo padrão',
+    });
+  }
+
+    // ── GET listar-com-diag — lista fichas que têm diagnóstico ────────────────
   if (req.method === 'GET' && action === 'listar-com-diag') {
     const db_ld = await dbGet('tv_logistica_log') || defaultDB();
     const lista = (db_ld.fichas||[])
