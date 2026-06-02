@@ -1711,5 +1711,30 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+
+  // ── GET historico-erp ──────────────────────────────────────────────────────
+  if (action === 'historico-erp') {
+    const db = await dbGet(PIPE_KEY) || { cards: [] };
+    const limite = new Date(Date.now() - 72*60*60*1000).toISOString();
+
+    // Cards ATUALMENTE em ERP
+    const emErp = (db.cards||[])
+      .filter(c => c.phase === 'erp')
+      .map(c => ({ id:c.id, pipefyId:c.pipefyId, nome:c.nomeContato||c.title||'—', movedAt:c.movedAt, equip:c.equipamento||'' }));
+
+    // Cards que passaram pelo ERP mas já saíram (têm 'erp' no history)
+    const sairamErp = (db.cards||[])
+      .filter(c => c.phase !== 'erp' && (c.history||[]).some(h => h.phase === 'erp'))
+      .map(c => {
+        const erpH = (c.history||[]).find(h => h.phase === 'erp');
+        return { id:c.id, pipefyId:c.pipefyId, nome:c.nomeContato||c.title||'—',
+                 phaseAtual:c.phase, movedAt:c.movedAt, entradaErp:erpH?.ts||'—', equip:c.equipamento||'' };
+      })
+      .filter(c => c.movedAt > limite)
+      .sort((a,b) => (b.movedAt||'') > (a.movedAt||'') ? 1 : -1);
+
+    return res.status(200).json({ ok:true, totalErpAgora:emErp.length, emErp, sairamDoErpUlt72h:sairamErp });
+  }
+
   return res.status(404).json({ ok: false, error: 'acao nao encontrada: ' + action });
 }
