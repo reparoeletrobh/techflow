@@ -530,23 +530,82 @@ module.exports = async function handler(req, res) {
 
 
       if (tipo === 'tv') {
-        const chips = servicos || [];
-        const tvModelo = modelo || 'TV';
-        const pn = priNome(nome);
+        const chips   = servicos || [];
+        const tvModel = modelo || '';
+        const pn      = priNome(nome);
+
+        // ── Extrair polegada do modelo ────────────────────────────────────
+        let pol = null;
+        const mPol = tvModel.match(/(\d{2})\s*(?:pol(?:egadas?)?|")?/i);
+        if (mPol) { const v = parseInt(mPol[1]); if (v>=30&&v<=79) pol=v; }
+        if (!pol) {
+          const ns = tvModel.match(/\b([3-7]\d)\b/g);
+          if (ns) { for (const n of ns) { const v=parseInt(n); if(v>=30&&v<=79){pol=v;break;} } }
+        }
+
+        // ── Tabela de preços por polegada ─────────────────────────────────
+        const TAB_PRECO = [
+          {min:30,max:39,p:'490'}, {min:40,max:49,p:'690'},
+          {min:50,max:59,p:'890'}, {min:60,max:69,p:'1490'},
+          {min:70,max:79,p:'1990'},
+        ];
+        let precoTab = null;
+        if (pol) { for (const f of TAB_PRECO) { if(pol>=f.min&&pol<=f.max){precoTab=f.p;break;} } }
+        const precoStr   = precoTab || '[VALOR]';
+        const modeloStr  = tvModel ? ' ' + tvModel : '';
+        const acrilicoVal = parseFloat(precoInput) || 0; // campo precoInput = valor do acrílico
+
+        // ── CONDENADA ─────────────────────────────────────────────────────
         if (chips.includes('condenada')) {
-          return { texto: `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro. Fizemos o diagnóstico completo da ${tvModelo} e infelizmente ela está condenada — sem possibilidade de conserto viável. Podemos descartar ou devolver conforme sua preferência.`, preco: null };
+          return {
+            texto: `Olá, bom dia ${pn}, fizemos todos os testes e identificamos que infelizmente não tem conserto viável a TV${modeloStr}. Caso queira ela de volta me fala que providencio a entrega.`,
+            preco: null,
+          };
         }
-        if (chips.includes('risco')) {
-          const p = parseFloat(precoInput) || 0;
-          return { texto: `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro. Fizemos o diagnóstico da ${tvModelo}. Identificamos um problema no ${chips.filter(x=>x!=='risco').join(' e ') || 'circuito'}. O conserto fica por R$ ${p} — há um risco associado ao reparo que precisa da sua aprovação.`, preco: String(p) };
+
+        // ── BARRAMENTO e/ou PLACA (± RISCO, ± ACRILICO) ──────────────────
+        const temBarramento = chips.includes('barramento');
+        const temPlaca      = chips.includes('placa');
+        const temRisco      = chips.includes('risco');
+        const temAcrilico   = chips.includes('acrilico');
+
+        if (temBarramento || temPlaca) {
+          const peca = (temBarramento && temPlaca) ? 'barramento e placa'
+                     : temBarramento ? 'barramento' : 'placa';
+
+          let texto = `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nForam feitos todos os testes, identificamos que será necessário fazer a troca do ${peca} da TV${modeloStr}, será feito a reoperação elétrica também. Este conserto completo fica em ${precoStr} reais apenas. Aprovando já iniciamos o conserto.`;
+
+          if (temRisco) {
+            texto += `\n\nObs.: Devido às condições da placa do equipamento preciso comunicar o risco de ao trabalhar nela o curto progredir e infelizmente ela apagar completamente. São poucos os casos mas existe esse risco.`;
+          }
+
+          if (temAcrilico && acrilicoVal > 0) {
+            texto += `\n\nDevido ao superaquecimento dos barramentos o acrílico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV está com cores mais claras. Sem trocar o acrílico você pode considerar uma qualidade de 80 a 90%. Trocando o Acrílico fica 100% e tem um custo adicional de ${acrilicoVal} reais. Aguardo sua resposta.`;
+          }
+
+          return { texto, preco: precoTab };
         }
-        if (chips.includes('acrilico')) {
-          const p = parseFloat(precoInput) || 0;
-          return { texto: `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro. O diagnóstico da ${tvModelo} está pronto. Vamos fazer a proteção em acrílico + serviços adicionais. Valor total: R$ ${p}. Aprovando já iniciamos.`, preco: String(p) };
+
+        // ── APENAS RISCO (sem barramento/placa) ───────────────────────────
+        if (temRisco) {
+          let texto = `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nForam feitos todos os testes, identificamos um problema no conjunto eletrônico da TV${modeloStr}. Este conserto completo fica em ${precoStr} reais apenas.\n\nObs.: Devido às condições da placa do equipamento preciso comunicar o risco de ao trabalhar nela o curto progredir e infelizmente ela apagar completamente. São poucos os casos mas existe esse risco. Aprovando já iniciamos o conserto.`;
+
+          if (temAcrilico && acrilicoVal > 0) {
+            texto += `\n\nDevido ao superaquecimento dos barramentos o acrílico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV está com cores mais claras. Sem trocar o acrílico você pode considerar uma qualidade de 80 a 90%. Trocando o Acrílico fica 100% e tem um custo adicional de ${acrilicoVal} reais. Aguardo sua resposta.`;
+          }
+
+          return { texto, preco: precoTab };
         }
-        const servStr = chips.filter(x=>!['condenada','risco','acrilico'].includes(x)).join(' e ') || 'componentes';
-        const p = parseFloat(precoInput) || 0;
-        return { texto: `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro. Fizemos o diagnóstico completo da ${tvModelo}. Precisamos fazer a troca/reparo do ${servStr}. O conserto completo fica em R$ ${p||'[valor]'}. Aprovando já iniciamos.`, preco: p ? String(p) : null };
+
+        // ── APENAS ACRILICO ───────────────────────────────────────────────
+        if (temAcrilico) {
+          return {
+            texto: `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro.\n\nDevido ao superaquecimento dos barramentos o acrílico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV está com cores mais claras. Sem trocar o acrílico você pode considerar uma qualidade de 80 a 90%. Trocando o Acrílico fica 100% e tem um custo adicional de ${acrilicoVal > 0 ? acrilicoVal : '[VALOR]'} reais. Aguardo sua resposta.`,
+            preco: acrilicoVal ? String(acrilicoVal) : null,
+          };
+        }
+
+        return { texto: null, preco: null };
       }
 
       if (tipo === 'microondas') {
