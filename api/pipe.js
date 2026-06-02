@@ -104,7 +104,7 @@ export default async function handler(req, res) {
   // ── POST reset-pipe: limpa todos os dados do pipe (dados corrompidos) ──────
   if (action === 'reset-pipe') {
     const fresh = { cards: [], syncedPipefyIds: [], lastSync: null };
-    await dbSet(PIPE_KEY, fresh);
+    await safeWritePipe( fresh);
     return res.status(200).json({ ok: true, info: 'pipe resetado — pronto para nova sincronização' });
   }
 
@@ -134,7 +134,7 @@ export default async function handler(req, res) {
       card.movedAt = now;
       movidos++;
     }
-    if (movidos > 0) await dbSet(PIPE_KEY, db);
+    if (movidos > 0) await safeWritePipe( db);
     return res.status(200).json({ ok: true, movidos });
   }
 
@@ -578,7 +578,7 @@ export default async function handler(req, res) {
       if(cpfCnpj!==undefined)     card.cpfCnpj=cpfCnpj;
       if(servicos!==undefined)    card.servicos=servicos;
       card.editadoEm=now;
-      await dbSet(PIPE_KEY,db);
+      await safeWritePipe(db);
       return res.status(200).json({ok:true,card:card});
     } catch(e){return res.status(500).json({ok:false,error:e.message});}
   }
@@ -771,7 +771,7 @@ export default async function handler(req, res) {
           corrigidos++;
         }
       });
-      if(corrigidos>0) await dbSet(PIPE_KEY,db);
+      if(corrigidos>0) await safeWritePipe(db);
       var erpDepois=(db.cards||[]).filter(function(c){return c.phase==='erp';}).length;
       return res.status(200).json({ok:true,corrigidos,erpDepois,total:(db.cards||[]).length});
     } catch(e){return res.status(500).json({ok:false,error:e.message});}
@@ -823,7 +823,7 @@ export default async function handler(req, res) {
       // Backup antes de salvar
       try{await dbSet('reparoeletro_pipe_bak_pre_arquivo',{cards:db.cards,ts:now});}catch(e){}
 
-      await dbSet(PIPE_KEY, db);
+      await safeWritePipe( db);
       await dbSet(ARQUIVO_KEY, arq);
 
       return res.status(200).json({
@@ -871,7 +871,7 @@ export default async function handler(req, res) {
       ficha3.phase = 'aguardando_aprovacao';
       ficha3.restauradoEm = now;
       db3.cards.unshift(ficha3);
-      await dbSet(PIPE_KEY, db3);
+      await safeWritePipe( db3);
       await dbSet('reparoeletro_arquivo', arq3);
       return res.status(200).json({ok:true,id:ficha3.id,nome:ficha3.nomeContato,restauradoPara:'aguardando_aprovacao'});
     } catch(e){return res.status(500).json({ok:false,error:e.message});}
@@ -966,7 +966,7 @@ export default async function handler(req, res) {
       card4.history = (card4.history||[]).concat([{phase:faseAntes,ts:now}]);
       card4.phase   = 'solicitar_entrega';
       card4.movedAt = now;
-      await dbSet(PIPE_KEY, pip4);
+      await safeWritePipe( pip4);
       return res.status(200).json({ok:true,id:card4.id,nome:card4.nomeContato,de:faseAntes,para:'solicitar_entrega'});
     } catch(e){return res.status(500).json({ok:false,error:e.message});}
   }
@@ -1072,7 +1072,7 @@ export default async function handler(req, res) {
         });
       }
       pip5.lastSync=ts5;
-      await dbSet(PIPE_KEY, pip5);
+      await safeWritePipe( pip5);
 
       return res.status(200).json({
         ok:true, acao: jaExiste5 ? 'atualizado' : 'criado',
@@ -1265,7 +1265,7 @@ export default async function handler(req, res) {
         card.movedAt = ts6;
         movidos6.push({id:card.id,nome:card.nomeContato,de:card.history.slice(-1)[0]?.phase,para:'ultima_chamada'});
       });
-      if (movidos6.some(function(m){return m.para==='ultima_chamada';})) await dbSet(PIPE_KEY, pip6);
+      if (movidos6.some(function(m){return m.para==='ultima_chamada';})) await safeWritePipe( pip6);
       return res.status(200).json({ok:true, movidos:movidos6.length, fichas:movidos6});
     } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
   }
@@ -1286,7 +1286,7 @@ export default async function handler(req, res) {
       card7.history=(card7.history||[]).concat([{phase:'ultima_chamada',ts:ts7}]);
       card7.phase  = rFase;
       card7.movedAt= ts7;
-      await dbSet(PIPE_KEY, pip7);
+      await safeWritePipe( pip7);
       return res.status(200).json({ok:true,id:card7.id,nome:card7.nomeContato,restauradoPara:rFase});
     } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
   }
@@ -1335,7 +1335,7 @@ export default async function handler(req, res) {
         card9.nomeContato = fix.novoNome;
         corrigidos.push({id:fix.id, de:nomeAntes, para:fix.novoNome});
       });
-      if (corrigidos.length) await dbSet(PIPE_KEY, pip9);
+      if (corrigidos.length) await safeWritePipe( pip9);
       return res.status(200).json({ok:true, corrigidos});
     } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
   }
@@ -1368,7 +1368,7 @@ export default async function handler(req, res) {
         resultado.push({id:fix.id, de:antes, para:fix.novo, status:'ok'});
       });
       var salvos = resultado.filter(function(r){return r.status==='ok';}).length;
-      if (salvos > 0) await dbSet(PIPE_KEY, pip10);
+      if (salvos > 0) await safeWritePipe( pip10);
       return res.status(200).json({ok:true, corrigidos:salvos, detalhes:resultado});
     } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
   }
@@ -1394,7 +1394,7 @@ export default async function handler(req, res) {
         // 3. Adriana 4369 ja está correta — nada a fazer
       });
 
-      if (corrigidos11.length) await dbSet(PIPE_KEY, pip11);
+      if (corrigidos11.length) await safeWritePipe( pip11);
       return res.status(200).json({ok:true, ajustes:corrigidos11.length, detalhes:corrigidos11});
     } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
   }
@@ -1458,7 +1458,7 @@ export default async function handler(req, res) {
     var card = (db.cards || []).find(function(c) { return c.id === id; });
     if (!card) return res.status(404).json({ ok: false, error: 'nao encontrado' });
     card.valor = valor;
-    await dbSet(PIPE_KEY, db);
+    await safeWritePipe( db);
     return res.status(200).json({ ok: true, valor: valor });
   }
 
@@ -1513,7 +1513,7 @@ export default async function handler(req, res) {
       }
     }
 
-    if (atualizados > 0) await dbSet(PIPE_KEY, db);
+    if (atualizados > 0) await safeWritePipe( db);
     return res.status(200).json({
       ok: true,
       semValor: sem.length,
@@ -1539,7 +1539,7 @@ export default async function handler(req, res) {
     card.phase   = phase;
     card.movedAt = now;
     if (phase === 'aguardando_aprovacao') card.aguardandoDesde = now;
-    await dbSet(PIPE_KEY, db);
+    await safeWritePipe( db);
 
     // ── Gatilhos downstream ──────────────────────────────────────────────
     var pid = card.pipefyId;
@@ -1680,7 +1680,7 @@ export default async function handler(req, res) {
       history: [], analiseCompra: false
     };
     db.cards.unshift(card);
-    await dbSet(PIPE_KEY, db);
+    await safeWritePipe( db);
     // Log da ação
     var gatilhosLog = [];
     if (phase === 'aprovados')       gatilhosLog.push('→ Board Técnico');
@@ -1698,7 +1698,7 @@ export default async function handler(req, res) {
     var card = (db.cards || []).find(function(c) { return c.id === body.id; });
     if (!card) return res.status(404).json({ ok: false, error: 'nao encontrado' });
     card.analiseCompra = !card.analiseCompra;
-    await dbSet(PIPE_KEY, db);
+    await safeWritePipe( db);
     return res.status(200).json({ ok: true, analiseCompra: card.analiseCompra });
   }
 
@@ -1707,7 +1707,7 @@ export default async function handler(req, res) {
     var body = req.body || {};
     var db   = (await dbGet(PIPE_KEY)) || defaultDB();
     db.cards = (db.cards || []).filter(function(c) { return c.id !== body.id; });
-    await dbSet(PIPE_KEY, db);
+    await safeWritePipe( db);
     return res.status(200).json({ ok: true });
   }
 
@@ -1754,7 +1754,7 @@ export default async function handler(req, res) {
       existe.phase = phase;
       existe.movedAt = now;
       existe.history = (existe.history||[]).concat([{phase:oldPhase,ts:now}]);
-      await dbSet(PIPE_KEY, db);
+      await safeWritePipe( db);
       return res.status(200).json({ ok:true, acao:'atualizado', card:existe });
     }
     const novoCard = {
@@ -1769,7 +1769,7 @@ export default async function handler(req, res) {
       aguardandoDesde: null, analiseCompra: false
     };
     db.cards.unshift(novoCard);
-    await dbSet(PIPE_KEY, db);
+    await safeWritePipe( db);
     return res.status(200).json({ ok:true, acao:'inserido', card:novoCard });
   }
 
@@ -1810,7 +1810,7 @@ export default async function handler(req, res) {
       const old = existe.phase;
       existe.phase = 'erp'; existe.movedAt = now;
       existe.history = (existe.history||[]).concat([{phase:old,ts:now,obs:'restaurado'}]);
-      await dbSet(PIPE_KEY, db);
+      await safeWritePipe( db);
       return res.status(200).json({ ok:true, acao:'fase_atualizada', de:old, para:'erp', card:existe });
     }
     const card = {
@@ -1825,8 +1825,38 @@ export default async function handler(req, res) {
       aguardandoDesde: null, analiseCompra: false
     };
     db.cards.unshift(card);
-    await dbSet(PIPE_KEY, db);
+    await safeWritePipe( db);
     return res.status(200).json({ ok:true, acao:'inserido_em_erp', card });
+  }
+
+
+  // ── POST recuperar-arquivado — restaura card do arquivo ao pipe ────────────
+  if (req.method === 'POST' && action === 'recuperar-arquivado') {
+    const { id, phase } = req.body || {};
+    if (!id) return res.status(400).json({ ok:false, error:'id obrigatório' });
+    const arch3 = await dbGet('reparoeletro_pipe_archive') || { cards:[] };
+    const card3 = arch3.cards.find(c => c.id === id || c.localId === id || c.flFichaId === id);
+    if (!card3) return res.status(404).json({ ok:false, error:'Card não encontrado no arquivo' });
+    const db3 = await dbGet(PIPE_KEY) || defaultDB();
+    const existe3 = (db3.cards||[]).find(c => c.id === card3.id);
+    if (!existe3) {
+      const now3 = new Date().toISOString();
+      db3.cards.unshift({ ...card3, phase: phase||card3.phase, movedAt: now3,
+        history: (card3.history||[]).concat([{phase:phase||card3.phase, ts:now3, obs:'recuperado_arquivo'}]),
+        arquivadoEm: undefined, motivoArchive: undefined });
+      await safeWritePipe(db3);
+    }
+    return res.status(200).json({ ok:true, card: card3, jaExistia: !!existe3 });
+  }
+
+  // ── GET listar-arquivo — lista cards no arquivo ─────────────────────────────
+  if (action === 'listar-arquivo') {
+    const arch4 = await dbGet('reparoeletro_pipe_archive') || { cards:[] };
+    const q4 = (req.query.q||'').toLowerCase();
+    const lista = q4
+      ? arch4.cards.filter(c => (c.nomeContato||c.title||'').toLowerCase().includes(q4))
+      : arch4.cards.slice(0,50);
+    return res.status(200).json({ ok:true, total:arch4.cards.length, cards:lista });
   }
 
   return res.status(404).json({ ok: false, error: 'acao nao encontrada: ' + action });
