@@ -208,7 +208,7 @@ export default async function handler(req,res){
         body:JSON.stringify({flFichaId:ficha.id,pipefyId:null,title:_title,nomeContato:ficha.nomeContato||'',telefone:ficha.telefone||'',phaseId:'analise_loja'})
       }).catch(e=>console.error('[FL] criar→board:',e.message));
     }catch(e){}
-    logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Liberar equipamento', para:'receber', gatilho:'→ Pipe receber + Pipefy Receber$', status:'ok', detalhe:'Valor: R$'+(ficha.pagoValor||0)+' '+ficha.pagoPor }).catch(()=>{});
+    logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Nova ficha criada', para:'analise', gatilho:'', status:'ok' }).catch(()=>{});
     return res.status(200).json({ok:true,ficha});
   }
 
@@ -222,19 +222,7 @@ export default async function handler(req,res){
     ficha.descricaoTecnica=descricaoTecnica;ficha.phase='orcamento_cadastrado';ficha.movedAt=now;
     ficha.history=(ficha.history||[]).concat([{phase:'orcamento_cadastrado',ts:now}]);
     await dbSet(FL_KEY,db);
-    // Pipe ADM: mover/registrar em 'receber' — sempre, com ou sem pipefyCardId
-    await registrarNoPipe({
-      pipefyId:    ficha.pipefyCardId || null,
-      fichaId:     ficha.id,
-      phase:       'receber',
-      nomeContato: ficha.nomeContato || '',
-      telefone:    ficha.telefone    || '',
-      equipamento: ficha.equipamento || (ficha.orcamento?.equipamento) || '',
-      descricao:   ficha.descricaoTecnica || ficha.descricao || '',
-      valor:       ficha.pagoValor || ficha.orcamento?.valor || 0,
-      origem:      'frenteloja_liberar'
-    }).catch(() => {});
-    logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Liberar equipamento', para:'receber', gatilho:'→ Pipe receber + Pipefy Receber$', status:'ok', detalhe:'Valor: R$'+(ficha.pagoValor||0)+' '+ficha.pagoPor }).catch(()=>{});
+    logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Análise técnica', para:'orcamento_cadastrado', gatilho:'', status:'ok' }).catch(()=>{});
     return res.status(200).json({ok:true,ficha});
   }
 
@@ -254,7 +242,7 @@ export default async function handler(req,res){
       ficha.motivo=req.body?.motivo||'';
       ficha.movedAt=now;
       await dbSet(FL_KEY,db);
-      logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Liberar equipamento', para:'receber', gatilho:'→ Pipe receber + Pipefy Receber$', status:'ok', detalhe:'Valor: R$'+(ficha.pagoValor||0)+' '+ficha.pagoPor }).catch(()=>{});
+      logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Orçamento reprovado', para:'reprovado', gatilho:'', status:'ok' }).catch(()=>{});
     return res.status(200).json({ok:true,ficha});
     }
 
@@ -342,7 +330,7 @@ export default async function handler(req,res){
       // ── PASSO 4: Salvar FL e responder ───────────────────────────────
       await dbSet(FL_KEY, db);
 
-      logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Liberar equipamento', para:'receber', gatilho:'→ Pipe receber + Pipefy Receber$', status:'ok', detalhe:'Valor: R$'+(ficha.pagoValor||0)+' '+ficha.pagoPor }).catch(()=>{});
+      logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Orçamento reprovado', para:'reprovado', gatilho:'', status:'ok' }).catch(()=>{});
     return res.status(200).json({ok:true,ficha});
     }
   }
