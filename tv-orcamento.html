@@ -448,13 +448,32 @@ async function loadEnviados() {
     el.innerHTML = '';
     var list = document.createElement('div'); list.className = 'orc-list';
     fichas.forEach(function(f) {
-      var card = document.createElement('div'); card.className = 'orc-card';
-      var nome = document.createElement('div'); nome.className = 'orc-nome'; nome.textContent = f.nome||'—'; card.appendChild(nome);
-      if (f.desc) { var desc=document.createElement('div'); desc.className='orc-desc'; desc.textContent=f.desc.slice(0,100); card.appendChild(desc); }
-      var val = document.createElement('div'); val.className='orc-valor'; val.textContent='R$ '+(f.preco||'—'); card.appendChild(val);
+      var card = document.createElement('div'); card.className = 'orc-card enviado';
+      // Header
+      var headRow = document.createElement('div'); headRow.style.cssText='display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;';
+      var infoDiv = document.createElement('div');
+      var nome = document.createElement('div'); nome.className = 'orc-nome'; nome.textContent = f.nome||'—'; infoDiv.appendChild(nome);
+      if (f.desc) { var desc=document.createElement('div'); desc.className='orc-desc'; desc.textContent=f.desc.slice(0,100); infoDiv.appendChild(desc); }
       var meta = document.createElement('div'); meta.className='orc-meta';
       meta.textContent = f.enviadoAt ? 'Enviado em '+new Date(f.enviadoAt).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}) : '';
-      card.appendChild(meta);
+      infoDiv.appendChild(meta);
+      headRow.appendChild(infoDiv);
+      var val = document.createElement('div'); val.className='orc-valor'; val.style.cssText='flex-shrink:0;'; val.textContent='R$ '+(f.preco||'—'); headRow.appendChild(val);
+      card.appendChild(headRow);
+      // Textarea com texto enviado
+      if (f.textoOrc) {
+        var ta = document.createElement('textarea'); ta.className='orc-textarea'; ta.id='texto-env-'+f.id; ta.rows=4;
+        ta.value = f.textoOrc; ta.readOnly = false;
+        ta.style.cssText='width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--fb);font-size:12px;padding:9px;resize:vertical;line-height:1.5;margin-bottom:6px;';
+        card.appendChild(ta);
+        // Botões: Copiar + Salvar texto
+        var btnRow = document.createElement('div'); btnRow.style.cssText='display:flex;gap:6px;';
+        var btnCopy = document.createElement('button'); btnCopy.className='btn-sm';
+        btnCopy.textContent='📋 Copiar'; btnCopy.onclick=(function(fid){ return function(){ copiarTextoEnv(fid); }; })(f.id);
+        var btnSave = document.createElement('button'); btnSave.className='btn-sm';
+        btnSave.textContent='💾 Salvar'; btnSave.onclick=(function(fid){ return function(){ salvarTextoEnv(fid); }; })(f.id);
+        btnRow.appendChild(btnCopy); btnRow.appendChild(btnSave); card.appendChild(btnRow);
+      }
       list.appendChild(card);
     });
     el.appendChild(list);
@@ -513,7 +532,24 @@ async function alertarCliente(pipefyId) {
 }
 
 // ── ÚLTIMA CHAMADA ────────────────────────────────────────────
-async function loadUlt() {
+async function copiarTextoEnv(fid) {
+  var ta = document.getElementById('texto-env-'+fid); if (!ta) return;
+  try { await navigator.clipboard.writeText(ta.value); }
+  catch(e) { ta.select(); document.execCommand('copy'); }
+  showToast('📋','Copiado!','Texto pronto para o WhatsApp');
+}
+
+async function salvarTextoEnv(fid) {
+  var ta = document.getElementById('texto-env-'+fid); if (!ta) return;
+  var r = await fetch('/api/tv-orcamento?action=orc-update-texto',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({id: fid, textoOrc: ta.value})
+  }).then(function(r){return r.json();});
+  if (r.ok) showToast('💾','Texto salvo!','');
+  else showToast('❌','Erro',r.error||'');
+}
+
+async function loadUlt() { {
   var el = document.getElementById('list-ult');
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>Carregando...</div>';
   try {
