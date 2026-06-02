@@ -1267,5 +1267,42 @@ Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter peque
     });
   }
 
+    // ── GET fix-ronaldo — corrige horarioColeta 2001→2026 tentando todas as chaves
+  if (req.method === 'GET' && action === 'fix-ronaldo') {
+    const KEYS = ['tv_logistica', 'tv_logistica_log', LOG_KEY];
+    let ficha = null, usedKey = null, usedDb = null;
+
+    for (const k of KEYS) {
+      const d = await dbGet(k);
+      const f = (d?.fichas||[]).find(x =>
+        (x.nome||'').toLowerCase().includes('ronaldo') ||
+        (x.telefone||'').includes('1213') ||
+        String(x.id||'') === 'LOG-0010'
+      );
+      if (f) { ficha = f; usedKey = k; usedDb = d; break; }
+    }
+
+    if (!ficha) {
+      const sizes = {};
+      for (const k of KEYS) {
+        const d = await dbGet(k);
+        sizes[k] = d?.fichas?.length ?? (d === null ? 'null' : 'no fichas');
+      }
+      return res.status(404).json({ ok:false, error:'Não encontrado em nenhuma chave', sizes });
+    }
+
+    const original = ficha.horarioColeta;
+    ficha.horarioColeta = '2026-06-04T17:30:00.000Z';
+    ficha.movedAt = new Date().toISOString();
+    await dbSet(usedKey, usedDb);
+
+    return res.status(200).json({
+      ok: true, key: usedKey, id: ficha.id, nome: ficha.nome,
+      original, corrigido: ficha.horarioColeta,
+      display: new Date(ficha.horarioColeta).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}),
+      msg: '✅ Corrigido para 04/06/2026 às 14:30 BRT'
+    });
+  }
+
     return res.status(404).json({ ok: false, error: 'ação não encontrada' });
 };
