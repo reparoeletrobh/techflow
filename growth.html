@@ -191,7 +191,7 @@ var COLS = [
 ];
 
 var cols = [], vals = {}, _editCid = null, _editIid = null, _isNew = false, _tipo = 'check';
-var SK = 'growth_kanban_v4';
+var SK = 'growth_kanban_v5';
 
 function getDK(){ return 'gkd_' + new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'}); }
 function getWK(){
@@ -292,6 +292,7 @@ function mkItem(col, it){
   var top=document.createElement('div'); top.className='ic-top';
   var lbl=document.createElement('span'); lbl.className='ic-lbl'; lbl.textContent=it.label;
   var gr=document.createElement('button'); gr.className='ic-gr'; gr.textContent='⚙';
+  gr.title='Editar tarefa';
   gr.onclick=(function(cid,iid){return function(){openEdit(cid,iid);};})(col.id,it.id);
   top.appendChild(lbl); top.appendChild(gr); el.appendChild(top);
 
@@ -396,9 +397,18 @@ function openNew(cid){
 function openEdit(cid,iid){
   _editCid=cid;_editIid=iid;_isNew=false;
   var col=cols.find(function(c){return c.id===cid;}); var it=col?col.items.find(function(i){return i.id===iid;}):null; if(!it)return;
-  var t=document.getElementById('mdl-title'); t.textContent='⚙ '+it.label; t.style.color=col?col.color:'var(--tx)';
-  document.getElementById('m-lbl').value=it.label; document.getElementById('m-desc').value=it.desc||''; document.getElementById('m-resp').value=it.resp||''; document.getElementById('m-meta').value=it.meta||1;
-  document.getElementById('btn-dx').style.display='block'; document.getElementById('m-tipo-fld').style.display='none'; document.getElementById('m-freq-fld').style.display='none';
+  var t=document.getElementById('mdl-title'); t.textContent='✏️ Editar tarefa'; t.style.color=col?col.color:'var(--tx)';
+  // Preencher todos os campos
+  document.getElementById('m-lbl').value=it.label;
+  document.getElementById('m-desc').value=it.desc||'';
+  document.getElementById('m-resp').value=it.resp||'';
+  document.getElementById('m-meta').value=it.meta||1;
+  // Mostrar/ocultar campos
+  document.getElementById('btn-dx').style.display='block';
+  document.getElementById('m-tipo-fld').style.display='none';
+  document.getElementById('m-freq-fld').style.display='none';
+  document.getElementById('m-meta-fld').style.display='block'; // sempre visível no edit
+  // Preview de progresso
   var v=vals[cid+'_'+iid]||0, m=it.meta||1, p=pct(v,m);
   var pp=document.getElementById('mdl-pp'); pp.style.display='block';
   document.getElementById('pp-fil').style.width=p+'%'; document.getElementById('pp-fil').style.background=col?col.color:sc(p);
@@ -407,6 +417,7 @@ function openEdit(cid,iid){
   document.getElementById('btn-sv').style.background=col?col.color:'var(--or)';
   setTipo(it.tipo||'check');
   document.getElementById('modal').style.display='flex';
+  setTimeout(function(){document.getElementById('m-lbl').focus();},80);
 }
 function closeModal(){ document.getElementById('modal').style.display='none'; }
 function saveAtiv(){
