@@ -1736,5 +1736,56 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok:true, totalErpAgora:emErp.length, emErp, sairamDoErpUlt72h:sairamErp });
   }
 
+
+  // ── POST restaurar-card — insere ou restaura card no pipe ─────────────────
+  if (req.method === 'POST' && action === 'restaurar-card') {
+    const { id, nome, telefone, equipamento, descricao, phase, pipefyId, origem } = req.body || {};
+    if (!nome || !phase) return res.status(400).json({ ok:false, error:'nome e phase obrigatórios' });
+    const db = await dbGet(PIPE_KEY) || defaultDB();
+    if (!Array.isArray(db.cards)) db.cards = [];
+    const now = new Date().toISOString();
+    // Verificar se já existe
+    const existe = db.cards.find(c =>
+      (id && (c.id===id||c.localId===id||c.flFichaId===id)) ||
+      (pipefyId && c.pipefyId===String(pipefyId))
+    );
+    if (existe) {
+      const oldPhase = existe.phase;
+      existe.phase = phase;
+      existe.movedAt = now;
+      existe.history = (existe.history||[]).concat([{phase:oldPhase,ts:now}]);
+      await dbSet(PIPE_KEY, db);
+      return res.status(200).json({ ok:true, acao:'atualizado', card:existe });
+    }
+    const novoCard = {
+      id: id || ('PIPE-REST-'+Date.now().toString(36).toUpperCase()),
+      pipefyId: pipefyId || null,
+      localId: id || null, flFichaId: id || null,
+      phase, nomeContato: nome, telefone: telefone||'',
+      equipamento: equipamento||'', descricao: descricao||'',
+      origem: origem||'restaurado_manual',
+      criadoEm: now, movedAt: now,
+      history: [{ phase, ts: now, obs: 'restaurado_manual' }],
+      aguardandoDesde: null, analiseCompra: false
+    };
+    db.cards.unshift(novoCard);
+    await dbSet(PIPE_KEY, db);
+    return res.status(200).json({ ok:true, acao:'inserido', card:novoCard });
+  }
+
+  // ── GET buscar-card — busca card no pipe por nome/id ──────────────────────
+  if (action === 'buscar-card') {
+    const q = (req.query.q||'').toLowerCase().trim();
+    if (!q) return res.status(400).json({ ok:false, error:'?q= obrigatório' });
+    const db = await dbGet(PIPE_KEY) || defaultDB();
+    const found = (db.cards||[]).filter(c =>
+      (c.nomeContato||'').toLowerCase().includes(q) ||
+      (c.title||'').toLowerCase().includes(q) ||
+      (c.id||'').toLowerCase().includes(q) ||
+      (c.flFichaId||'').toLowerCase().includes(q)
+    ).map(c => ({ id:c.id, pipefyId:c.pipefyId, nome:c.nomeContato||c.title, phase:c.phase, movedAt:c.movedAt }));
+    return res.status(200).json({ ok:true, total:found.length, cards:found });
+  }
+
   return res.status(404).json({ ok: false, error: 'acao nao encontrada: ' + action });
 }
