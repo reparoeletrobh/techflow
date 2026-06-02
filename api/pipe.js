@@ -1787,5 +1787,47 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok:true, total:found.length, cards:found });
   }
 
+
+
+  // ── GET moves-log — histórico completo de movimentos do pipe ─────────────
+  if (action === 'moves-log') {
+    const log = await dbGet('reparoeletro_pipe_moveslog') || { moves:[] };
+    const limit = parseInt(req.query.limit)||100;
+    return res.status(200).json({ ok:true, total:(log.moves||[]).length, moves:(log.moves||[]).slice(0,limit) });
+  }
+
+  // ── GET restaurar-rene — restaura René 2201 (FL-0239) para ERP ──────────────
+  if (action === 'restaurar-rene') {
+    const db = await dbGet(PIPE_KEY) || defaultDB();
+    if (!Array.isArray(db.cards)) db.cards = [];
+    const now = new Date().toISOString();
+    // Verificar se já existe de alguma forma
+    const existe = db.cards.find(c =>
+      c.id === 'FL-0239' || c.localId === 'FL-0239' || c.flFichaId === 'FL-0239' ||
+      (c.nomeContato||'').toLowerCase().includes('ren') && (c.nomeContato||'').includes('2201')
+    );
+    if (existe) {
+      const old = existe.phase;
+      existe.phase = 'erp'; existe.movedAt = now;
+      existe.history = (existe.history||[]).concat([{phase:old,ts:now,obs:'restaurado'}]);
+      await dbSet(PIPE_KEY, db);
+      return res.status(200).json({ ok:true, acao:'fase_atualizada', de:old, para:'erp', card:existe });
+    }
+    const card = {
+      id: 'PIPE-REST-RENE',
+      pipefyId: null, localId: 'FL-0239', flFichaId: 'FL-0239',
+      phase: 'erp',
+      nomeContato: 'Renê 2201', telefone: '31997132694',
+      equipamento: '', descricao: '',
+      origem: 'restaurado_suporte',
+      criadoEm: now, movedAt: now,
+      history: [{ phase:'erp', ts:now, obs:'restaurado_suporte' }],
+      aguardandoDesde: null, analiseCompra: false
+    };
+    db.cards.unshift(card);
+    await dbSet(PIPE_KEY, db);
+    return res.status(200).json({ ok:true, acao:'inserido_em_erp', card });
+  }
+
   return res.status(404).json({ ok: false, error: 'acao nao encontrada: ' + action });
 }
