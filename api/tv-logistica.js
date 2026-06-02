@@ -1110,6 +1110,22 @@ Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter peque
     });
   }
 
+    // ── GET listar-horario — lista fichas com horario_marcado ────────────────────
+  if (req.method === 'GET' && action === 'listar-horario') {
+    const db = await dbGet('tv_logistica_log') || defaultDB();
+    const fichas = (db.fichas||[])
+      .filter(f => f.phase === 'horario_marcado' || f.horarioColeta)
+      .map(f => ({
+        id: f.id, nome: f.nome, tel: f.telefone||'',
+        phase: f.phase,
+        horarioColeta: f.horarioColeta||null,
+        horarioDisplay: f.horarioColeta
+          ? new Date(f.horarioColeta).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})
+          : null,
+      }));
+    return res.status(200).json({ ok:true, total: fichas.length, fichas });
+  }
+
     // ── GET fix-horario — corrige horarioColeta de uma ficha (offset UTC→BRT) ─────
   if (req.method === 'GET' && action === 'fix-horario') {
     const nome_q = (req.query.nome || '').toLowerCase().trim();
