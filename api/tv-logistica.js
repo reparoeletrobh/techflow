@@ -859,7 +859,22 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  // ── GET fix-orcamento — regenera texto do orçamento de um cliente ──────────
+  // ── GET listar-com-diag — lista fichas que têm diagnóstico ────────────────
+  if (req.method === 'GET' && action === 'listar-com-diag') {
+    const db_ld = await dbGet('tv_logistica_log') || defaultDB();
+    const lista = (db_ld.fichas||[])
+      .filter(f => f.diagnostico)
+      .map(f => ({
+        id:   f.id,
+        nome: f.nome,
+        tel:  f.telefone||'',
+        fase: f.phase||'',
+        chips: (f.diagnostico?.equips||[f.diagnostico]).map(e=>({modelo:e.modelo,servicos:e.servicos})),
+      }));
+    return res.status(200).json({ ok:true, total: lista.length, fichas: lista });
+  }
+
+    // ── GET fix-orcamento — regenera texto do orçamento de um cliente ──────────
   if (req.method === 'GET' && action === 'fix-orcamento') {
     const nome_q = (req.query.nome || '').toLowerCase().trim();
     if (!nome_q) return res.status(400).json({ ok:false, error: 'Informe ?nome=xxx' });
