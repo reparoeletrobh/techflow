@@ -961,19 +961,7 @@ export default async function handler(req,res){
     if(dados&&phase==='endereco')ficha.endereco=dados;
     if(phase==='liberado_hoje')ficha.liberadoHoje=true;
     await dbSet(FL_KEY,db);
-    // Pipe ADM: mover/registrar em 'receber' — sempre, com ou sem pipefyCardId
-    await registrarNoPipe({
-      pipefyId:    ficha.pipefyCardId || null,
-      fichaId:     ficha.id,
-      phase:       'receber',
-      nomeContato: ficha.nomeContato || '',
-      telefone:    ficha.telefone    || '',
-      equipamento: ficha.equipamento || (ficha.orcamento?.equipamento) || '',
-      descricao:   ficha.descricaoTecnica || ficha.descricao || '',
-      valor:       ficha.pagoValor || ficha.orcamento?.valor || 0,
-      origem:      'frenteloja_liberar'
-    }).catch(() => {});
-    logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Liberar equipamento', para:'receber', gatilho:'→ Pipe receber + Pipefy Receber$', status:'ok', detalhe:'Valor: R$'+(ficha.pagoValor||0)+' '+ficha.pagoPor }).catch(()=>{});
+    logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Mover fase', para:phase, gatilho:'', status:'ok' }).catch(()=>{});
     return res.status(200).json({ok:true,ficha});
   }
 
