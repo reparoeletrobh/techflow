@@ -1239,5 +1239,33 @@ Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter peque
     });
   }
 
+    // ── GET fix-ronaldo — corrige horarioColeta 2001→2026 do Ronaldo ─────────────
+  if (req.method === 'GET' && action === 'fix-ronaldo') {
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const ficha = (db.fichas||[]).find(f =>
+      (f.nome||'').toLowerCase().includes('ronaldo') ||
+      (f.telefone||'').includes('1213') ||
+      String(f.id||'') === 'LOG-0010'
+    );
+    if (!ficha) return res.status(404).json({
+      ok:false, error:'Ronaldo não encontrado em '+LOG_KEY,
+      total: (db.fichas||[]).length,
+      ids: (db.fichas||[]).slice(0,5).map(f=>({id:f.id,nome:f.nome,phase:f.phase}))
+    });
+
+    const original = ficha.horarioColeta;
+    // 2001-04-06T17:30Z → 2026-06-04T17:30Z (mesmo horário UTC = 14:30 BRT)
+    ficha.horarioColeta = '2026-06-04T17:30:00.000Z';
+    ficha.movedAt = new Date().toISOString();
+    await dbSet(LOG_KEY, db);
+
+    return res.status(200).json({
+      ok: true, id: ficha.id, nome: ficha.nome,
+      original, corrigido: ficha.horarioColeta,
+      display: new Date(ficha.horarioColeta).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}),
+      msg: '✅ Corrigido para 04/06/2026 às 14:30 BRT'
+    });
+  }
+
     return res.status(404).json({ ok: false, error: 'ação não encontrada' });
 };
