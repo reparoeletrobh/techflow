@@ -1079,8 +1079,12 @@ async function confirmarHorario() {
   if (!val) {
     mostrarMsgHorario('Informe a data e hora', 'err'); return;
   }
-  // Converter datetime-local para ISO (com timezone local)
-  const horarioISO = new Date(val).toISOString();
+  // Converter datetime-local para ISO usando hora local explícita
+  // new Date(str) sem timezone é ambíguo — usar construtor com inteiros garante hora local
+  const [dtDate, dtTime] = val.split('T');
+  const [dtY, dtM, dtD] = dtDate.split('-').map(Number);
+  const [dtH, dtMin]    = dtTime.split(':').map(Number);
+  const horarioISO = new Date(dtY, dtM - 1, dtD, dtH, dtMin, 0).toISOString();
 
   const r = await fetch('/api/tv-logistica?action=marcar-horario', {
     method: 'POST', headers: {'Content-Type':'application/json'},
