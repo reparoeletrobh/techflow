@@ -610,7 +610,7 @@ function cardHTML(f, phase) {
           <span class="diag-label-tv" style="margin-bottom:0;">Qtd. TVs</span>
           <input type="number" min="1" max="10" value="1" class="diag-input-tv" style="width:54px;text-align:center;padding:4px 6px;margin-bottom:0;" id="diag-qtd-${f.id}" oninput="renderChipsSecs('${f.id}',parseInt(this.value)||1)">
         </div>
-        <div id="diag-secs-${f.id}">${renderChipSecStr('${f.id}',0,1)}</div>
+        <div id="diag-secs-${f.id}">${renderChipSecStr(f.id,0,1)}</div>
         <button class="btn-diag-submit" onclick="enviarDiagTV('${f.id}')">✅ Salvar Diagnóstico</button>
         <button class="btn-diag-cancel" onclick="toggleDiagTV('${f.id}')">✕ Cancelar</button>
       </div>`;
@@ -909,7 +909,10 @@ function toast(msg, err) {
 
 // ── INIT ────────────────────────────────────────────────────
 load();
-setInterval(load, 30000);
+setInterval(function(){
+  // Não recarregar se houver diagnóstico aberto
+  if (!document.querySelector('.diag-inline.open')) load();
+}, 30000);
 
 // ── PAINEL MÉTRICAS ──────────────────────────────────────────
 async function atualizarMetricas() {
