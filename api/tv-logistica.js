@@ -859,7 +859,45 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  // ── GET listar-orc — lista tv_orcamentos para diagnóstico ──────────────────
+  // ── GET fix-sidney — corrige orçamento do Sidney com novo padrão ─────────────
+  if (req.method === 'GET' && action === 'fix-sidney') {
+    const ORC_KEY_S = 'tv_orcamentos';
+    const orcDb_s   = (await dbGet(ORC_KEY_S)) || { fichas:[] };
+    const idx_s     = orcDb_s.fichas.findIndex(f => f.id === 'LOG-0009' || (f.nome||'').toLowerCase() === 'sidney');
+    if (idx_s < 0) return res.status(404).json({ ok:false, error:'Sidney não encontrado em tv_orcamentos' });
+
+    // TV Un55ru71000 = Samsung 55" → R$ 890 barramento + acrílico R$ 335
+    const texto_s =
+      `Olá, Sidney, bom dia! Sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:
+
+` +
+      `Foram feitos todos os testes, identificamos que será necessário fazer a troca do barramento da TV Un55ru71000, ` +
+      `será feito a reoperação elétrica também. Este conserto completo fica em 890 reais apenas. Aprovando já iniciamos o conserto.
+
+` +
+      `Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter pequenas rachaduras, ` +
+      `o que faz aparecer pequenas rajadas de luz quando a TV está com cores mais claras. ` +
+      `Sem trocar o acrílico você pode considerar uma qualidade de 80 a 90%. ` +
+      `Trocando o Acrílico fica 100% e tem um custo adicional de 335 reais. Aguardo sua resposta.`;
+
+    orcDb_s.fichas[idx_s].textoOrc      = texto_s;
+    orcDb_s.fichas[idx_s].precoSugerido = '890';
+    orcDb_s.fichas[idx_s].status        = 'pendente';
+    orcDb_s.fichas[idx_s].preco         = null;
+    orcDb_s.fichas[idx_s].fixedAt       = new Date().toISOString();
+    await dbSet(ORC_KEY_S, orcDb_s);
+
+    return res.status(200).json({
+      ok: true,
+      nome: 'Sidney',
+      textoGerado: texto_s,
+      preco: '890',
+      acrilicoExtra: '335',
+      msg: '✅ Orçamento do Sidney atualizado com novo padrão (barramento 55" + acrílico)',
+    });
+  }
+
+    // ── GET listar-orc — lista tv_orcamentos para diagnóstico ──────────────────
   if (req.method === 'GET' && action === 'listar-orc') {
     const orcDb_lo = (await dbGet('tv_orcamentos')) || { fichas:[] };
     const lista_lo = (orcDb_lo.fichas||[]).map(f => ({
