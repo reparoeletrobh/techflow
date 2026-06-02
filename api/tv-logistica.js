@@ -1318,221 +1318,73 @@ Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter peque
     });
   }
 
-    // ── GET regenerar-pendentes — regenera todos os orçamentos pendentes ──────────
-  if (req.method === 'GET' && action === 'regenerar-pendentes') {
+    if (req.method === 'GET' && action === 'regenerar-pendentes') {
     const ORC_KEY_B = 'tv_orcamentos';
-    const db_b     = await dbGet(LOG_KEY) || defaultDB();
-    const orcDb_b  = (await dbGet(ORC_KEY_B)) || { fichas: [] };
+    const db_b    = await dbGet(LOG_KEY) || defaultDB();
+    const orcDb_b = (await dbGet(ORC_KEY_B)) || { fichas: [] };
+    const pendentes = (orcDb_b.fichas||[]).filter(f => f.status === 'pendente');
+    if (!pendentes.length) return res.status(200).json({ ok:true, msg:'Nenhum pendente', total:0 });
 
-    // Filtrar pendentes
-    const pendentes = (orcDb_b.fichas || []).filter(f => f.status === 'pendente');
-    if (!pendentes.length) return res.status(200).json({ ok: true, msg: 'Nenhum pendente encontrado', total: 0 });
-
-    const resultados = [];
-
-    for (const orc of pendentes) {
-      // Achar ficha na logistica pelo id
-      const ficha = (db_b.fichas || []).find(f =>
-        f.id === orc.id || f.pipefyCardId === orc.pipefyId ||
-        (f.nome || '').toLowerCase() === (orc.nome || '').toLowerCase()
-      );
-
-      if (!ficha || !ficha.diagnostico) {
-        resultados.push({ id: orc.id, nome: orc.nome, status: 'sem_diagnostico', preco: null, texto: null });
-        continue;
+    const TAB_B = [{min:30,max:39,p:'490'},{min:40,max:49,p:'690'},{min:50,max:59,p:'890'},{min:60,max:69,p:'1490'},{min:70,max:79,p:'1990'}];
+    function priNome_b(n){ return n ? n.trim().split(/\s+/)[0] : 'cliente'; }
+    function extrairPol_b(txt){
+      const pats=[/\b([3-7]\d)\s*(?:pol(?:egadas?)?|")/i,/[Uu][Nn]([3-7]\d)/,/\b([3-7]\d)\b/];
+      for(const re of pats){const m=txt.match(re);if(m){const v=parseInt(m[1]);if(v>=30&&v<=79)return v;}}
+      return null;
+    }
+    function gerarTextoB(ficha_b, eq){
+      const chips=eq.servicos||[], precoInput=eq.preco, modelo=eq.modelo;
+      if(eq.tipo!=='tv') return {texto:null,preco:null};
+      const pn=priNome_b(ficha_b.nome||'');
+      const fontes=[modelo||'',ficha_b.equipamento||'',ficha_b.defeito||''].join(' ');
+      const pol=extrairPol_b(fontes);
+      let precoTab=null;
+      if(pol){for(const f of TAB_B){if(pol>=f.min&&pol<=f.max){precoTab=f.p;break;}}}
+      const precoManual=parseFloat(precoInput)>0?String(Math.round(parseFloat(precoInput))):null;
+      const precoStr=precoTab||precoManual||'[VALOR]';
+      const acrilico=parseFloat(precoInput)||0;
+      const A='Alessandro da Reparo Eletro';
+      const ola='Ol\u00e1, '+pn;
+      const risco_txt='\n\nObs.: Devido \u00e0s condi\u00e7\u00f5es da placa do equipamento preciso comunicar o risco de ao trabalhar nela o curto progredir e infelizmente ela apagar completamente. S\u00e3o poucos os casos mas existe esse risco.';
+      const acr_txt='\n\nDevido ao superaquecimento dos barramentos o acr\u00edlico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV est\u00e1 com cores mais claras. Sem trocar o acr\u00edlico voc\u00ea pode considerar uma qualidade de 80 a 90%. Trocando o Acr\u00edlico fica 100% e tem um custo adicional de '+acrilico+' reais. Aguardo sua resposta.';
+      if(chips.includes('condenada')) return {texto:ola+', bom dia! Sou o '+A+'. Fizemos todos os testes e identificamos que infelizmente n\u00e3o tem conserto vi\u00e1vel a TV. Caso queira ela de volta me fala que providencio a entrega.',preco:null};
+      const temB=chips.includes('barramento'),temP=chips.includes('placa'),temR=chips.includes('risco'),temA=chips.includes('acrilico');
+      if(temB||temP){
+        const peca=(temB&&temP)?'barramento e placa':temB?'barramento':'placa';
+        let t=ola+', bom dia! Sou o '+A+', vou te enviar agora o or\u00e7amento:\n\nForam feitos todos os testes, identificamos que ser\u00e1 necess\u00e1rio fazer a troca do '+peca+' da TV, ser\u00e1 feito a reoper\u00e1\u00e7\u00e3o el\u00e9trica tamb\u00e9m. Este conserto completo fica em '+precoStr+' reais apenas. Aprovando j\u00e1 iniciamos o conserto.';
+        if(temR) t+=risco_txt;
+        if(temA&&acrilico>0) t+=acr_txt;
+        return {texto:t,preco:precoTab};
       }
-
-      // Reusar a mesma lógica do gerar-orcamento
-      const equips = ficha.diagnostico.equips || [ficha.diagnostico];
-      const nome_b = ficha.nome || '';
-
-      function priNome_b(n) { return n ? n.trim().split(/\s+/)[0] : 'cliente'; }
-
-      function extrairPol_b(txt) {
-        const patterns = [
-          /([3-7]\d)\s*(?:pol(?:egadas?)?|")/i,
-          /[Uu][Nn]([3-7]\d)/,
-          /([3-7]\d)/,
-        ];
-        for (const re of patterns) {
-          const m = txt.match(re);
-          if (m) { const v = parseInt(m[1]); if (v >= 30 && v <= 79) return v; }
-        }
-        return null;
+      if(temR){
+        let t=ola+', bom dia! Sou o '+A+', vou te enviar agora o or\u00e7amento:\n\nForam feitos todos os testes, identificamos um problema no conjunto eletr\u00f4nico da TV. Este conserto completo fica em '+precoStr+' reais apenas.'+risco_txt+' Aprovando j\u00e1 iniciamos o conserto.';
+        if(temA&&acrilico>0) t+=acr_txt;
+        return {texto:t,preco:precoTab};
       }
-
-      const TAB_B = [{min:30,max:39,p:'490'},{min:40,max:49,p:'690'},{min:50,max:59,p:'890'},{min:60,max:69,p:'1490'},{min:70,max:79,p:'1990'}];
-
-      function gerarTextoB(tipo, servicos, precoInput, modelo) {
-        const pn = priNome_b(nome_b);
-        if (tipo !== 'tv') return { texto: null, preco: null };
-        const chips = servicos || [];
-
-        const fontes = [modelo || '', ficha.equipamento || '', ficha.defeito || ''].join(' ');
-        const pol    = extrairPol_b(fontes);
-        let precoTab = null;
-        if (pol) { for (const f of TAB_B) { if (pol >= f.min && pol <= f.max) { precoTab = f.p; break; } } }
-
-        const precoManual = parseFloat(precoInput) > 0 ? String(Math.round(parseFloat(precoInput))) : null;
-        const precoStr    = precoTab || precoManual || '[VALOR]';
-        const acrilico    = parseFloat(precoInput) || 0;
-
-        if (chips.includes('condenada')) {
-          return { texto: `Olá, bom dia ${pn}, fizemos todos os testes e identificamos que infelizmente não tem conserto viável a TV. Caso queira ela de volta me fala que providencio a entrega.`, preco: null };
-        }
-        const temB = chips.includes('barramento'), temP = chips.includes('placa');
-        const temR = chips.includes('risco'),       temA = chips.includes('acrilico');
-
-        if (temB || temP) {
-          const peca = (temB && temP) ? 'barramento e placa' : temB ? 'barramento' : 'placa';
-          let texto = `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:
-
-Foram feitos todos os testes, identificamos que será necessário fazer a troca do ${peca} da TV, será feito a reoperação elétrica também. Este conserto completo fica em ${precoStr} reais apenas. Aprovando já iniciamos o conserto.`;
-          if (temR) texto += `
-
-Obs.: Devido às condições da placa do equipamento preciso comunicar o risco de ao trabalhar nela o curto progredir e infelizmente ela apagar completamente. São poucos os casos mas existe esse risco.`;
-          if (temA && acrilico > 0) texto += `
-
-Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV está com cores mais claras. Sem trocar o acrílico você pode considerar uma qualidade de 80 a 90%. Trocando o Acrílico fica 100% e tem um custo adicional de ${acrilico} reais. Aguardo sua resposta.`;
-          return { texto, preco: precoTab };
-        }
-        if (temR) {
-          let texto = `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:
-
-Foram feitos todos os testes, identificamos um problema no conjunto eletrônico da TV. Este conserto completo fica em ${precoStr} reais apenas.
-
-Obs.: Devido às condições da placa do equipamento preciso comunicar o risco de ao trabalhar nela o curto progredir e infelizmente ela apagar completamente. São poucos os casos mas existe esse risco. Aprovando já iniciamos o conserto.`;
-          if (temA && acrilico > 0) texto += `
-
-Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV está com cores mais claras. Sem trocar o acrílico você pode considerar uma qualidade de 80 a 90%. Trocando o Acrílico fica 100% e tem um custo adicional de ${acrilico} reais. Aguardo sua resposta.`;
-          return { texto, preco: precoTab };
-        }
-        if (temA) {
-          return { texto: `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro.
-
-Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV está com cores mais claras. Sem trocar o acrílico você pode considerar uma qualidade de 80 a 90%. Trocando o Acrílico fica 100% e tem um custo adicional de ${acrilico > 0 ? acrilico : '[VALOR]'} reais. Aguardo sua resposta.`, preco: acrilico ? String(acrilico) : null };
-        }
-        return { texto: null, preco: null };
-      }
-
-      const res_equips = equips.map(eq => gerarTextoB(eq.tipo, eq.servicos, eq.preco, eq.modelo));
-      let textoFinal, precoFinal;
-      if (res_equips.length === 1) {
-        textoFinal = res_equips[0].texto; precoFinal = res_equips[0].preco;
-      } else {
-        textoFinal = res_equips.filter(r => r.texto).map((r, i) => `TV ${i+1}:
-${r.texto}`).join('
-
----
-
-');
-        precoFinal = String(res_equips.reduce((s, r) => s + (parseInt(r.preco) || 0), 0)) || null;
-      }
-
-      if (textoFinal) {
-        const idx_b = orcDb_b.fichas.findIndex(f => f.id === orc.id);
-        if (idx_b >= 0) {
-          orcDb_b.fichas[idx_b].textoOrc      = textoFinal;
-          orcDb_b.fichas[idx_b].precoSugerido = precoFinal;
-          orcDb_b.fichas[idx_b].regeneradoEm  = new Date().toISOString();
-        }
-        resultados.push({ id: orc.id, nome: orc.nome, chips: equips.map(e => e.servicos), equipamento: ficha.equipamento, polFound: extrairPol_b([equips[0]?.modelo || '', ficha.equipamento || '', ficha.defeito || ''].join(' ')), preco: precoFinal, textoPrev: textoFinal.substring(0, 120) + '…' });
-      } else {
-        resultados.push({ id: orc.id, nome: orc.nome, status: 'texto_nulo', chips: equips.map(e => e.servicos) });
-      }
+      if(temA) return {texto:ola+', bom dia! Sou o '+A+'.\n\nDevido ao superaquecimento dos barramentos o acr\u00edlico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV est\u00e1 com cores mais claras. Sem trocar o acr\u00edlico voc\u00ea pode considerar uma qualidade de 80 a 90%. Trocando o Acr\u00edlico fica 100% e tem um custo adicional de '+(acrilico>0?acrilico:'[VALOR]')+' reais. Aguardo sua resposta.',preco:acrilico?String(acrilico):null};
+      return {texto:null,preco:null};
     }
 
+    const resultados=[];
+    for(const orc of pendentes){
+      const ficha_b=(db_b.fichas||[]).find(f=>f.id===orc.id||(f.nome||'').toLowerCase().trim()===(orc.nome||'').toLowerCase().trim());
+      if(!ficha_b||!ficha_b.diagnostico){resultados.push({id:orc.id,nome:orc.nome,status:'sem_diagnostico'});continue;}
+      const equips_b=ficha_b.diagnostico.equips||[ficha_b.diagnostico];
+      const res_b=equips_b.map(eq=>gerarTextoB(ficha_b,eq));
+      const textoFinal=res_b.length===1?res_b[0].texto:res_b.filter(r=>r.texto).map((r,i)=>'TV '+(i+1)+':\n'+r.texto).join('\n\n---\n\n');
+      const precoFinal=res_b.length===1?res_b[0].preco:(String(res_b.reduce((s,r)=>s+(parseInt(r.preco)||0),0))||null);
+      if(textoFinal){
+        const idx_b=orcDb_b.fichas.findIndex(f=>f.id===orc.id);
+        if(idx_b>=0){orcDb_b.fichas[idx_b].textoOrc=textoFinal;orcDb_b.fichas[idx_b].precoSugerido=precoFinal;orcDb_b.fichas[idx_b].regeneradoEm=new Date().toISOString();}
+        const pol_r=extrairPol_b([equips_b[0]&&equips_b[0].modelo||'',ficha_b.equipamento||'',ficha_b.defeito||''].join(' '));
+        resultados.push({id:orc.id,nome:orc.nome,equipamento:ficha_b.equipamento,chips:equips_b.map(e=>e.servicos),pol:pol_r,preco:precoFinal,preview:textoFinal.substring(0,160)+'...'});
+      } else {
+        resultados.push({id:orc.id,nome:orc.nome,status:'texto_nulo',chips:equips_b.map(e=>e.servicos)});
+      }
+    }
     await dbSet(ORC_KEY_B, orcDb_b);
-
-    return res.status(200).json({
-      ok: true,
-      total: pendentes.length,
-      regenerados: resultados.filter(r => r.preco !== undefined).length,
-      resultados,
-    });
+    return res.status(200).json({ok:true,total:pendentes.length,resultados});
   }
-
-  
-// ── GET regenerar-pendentes ───────────────────────────────────────────────────
-if (req.method === 'GET' && action === 'regenerar-pendentes') {
-  const ORC_KEY_B = 'tv_orcamentos';
-  const db_b     = await dbGet(LOG_KEY) || defaultDB();
-  const orcDb_b  = (await dbGet(ORC_KEY_B)) || { fichas: [] };
-  const pendentes = (orcDb_b.fichas || []).filter(f => f.status === 'pendente');
-  if (!pendentes.length) return res.status(200).json({ ok:true, msg:'Nenhum pendente', total:0 });
-
-  const TAB_B = [{min:30,max:39,p:'490'},{min:40,max:49,p:'690'},{min:50,max:59,p:'890'},{min:60,max:69,p:'1490'},{min:70,max:79,p:'1990'}];
-
-  function priNome_b(n) { return n ? n.trim().split(/\s+/)[0] : 'cliente'; }
-
-  function extrairPol_b(txt) {
-    const pats = [/\b([3-7]\d)\s*(?:pol(?:egadas?)?|")/i, /[Uu][Nn]([3-7]\d)/, /\b([3-7]\d)\b/];
-    for (const re of pats) { const m = txt.match(re); if (m) { const v=parseInt(m[1]); if(v>=30&&v<=79)return v; } }
-    return null;
-  }
-
-  function gerarTextoB(ficha_b, eq) {
-    const tipo=eq.tipo, chips=eq.servicos||[], precoInput=eq.preco, modelo=eq.modelo;
-    const pn = priNome_b(ficha_b.nome||'');
-    if (tipo !== 'tv') return { texto:null, preco:null };
-    const fontes = [modelo||'', ficha_b.equipamento||'', ficha_b.defeito||''].join(' ');
-    const pol    = extrairPol_b(fontes);
-    let precoTab = null;
-    if (pol) { for (const f of TAB_B) { if(pol>=f.min&&pol<=f.max){precoTab=f.p;break;} } }
-    const precoManual = parseFloat(precoInput)>0 ? String(Math.round(parseFloat(precoInput))) : null;
-    const precoStr = precoTab || precoManual || '[VALOR]';
-    const acrilico = parseFloat(precoInput)||0;
-    if (chips.includes('condenada')) {
-      return { texto: 'Ol\u00e1, bom dia '+pn+', fizemos todos os testes e identificamos que infelizmente n\u00e3o tem conserto vi\u00e1vel a TV. Caso queira ela de volta me fala que providencio a entrega.', preco: null };
-    }
-    const temB=chips.includes('barramento'), temP=chips.includes('placa');
-    const temR=chips.includes('risco'),       temA=chips.includes('acrilico');
-    if (temB||temP) {
-      const peca=(temB&&temP)?'barramento e placa':temB?'barramento':'placa';
-      let t = 'Ol\u00e1, '+pn+', bom dia! Sou o Alessandro da Reparo Eletro, vou te enviar agora o or\u00e7amento:\n\nForam feitos todos os testes, identificamos que ser\u00e1 necess\u00e1rio fazer a troca do '+peca+' da TV, ser\u00e1 feito a reoper\u00e1\u00e7\u00e3o el\u00e9trica tamb\u00e9m. Este conserto completo fica em '+precoStr+' reais apenas. Aprovando j\u00e1 iniciamos o conserto.';
-      if (temR) t += '\n\nObs.: Devido \u00e0s condi\u00e7\u00f5es da placa do equipamento preciso comunicar o risco de ao trabalhar nela o curto progredir e infelizmente ela apagar completamente. S\u00e3o poucos os casos mas existe esse risco.';
-      if (temA&&acrilico>0) t += '\n\nDevido ao superaquecimento dos barramentos o acr\u00edlico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV est\u00e1 com cores mais claras. Sem trocar o acr\u00edlico voc\u00ea pode considerar uma qualidade de 80 a 90%. Trocando o Acr\u00edlico fica 100% e tem um custo adicional de '+acrilico+' reais. Aguardo sua resposta.';
-      return { texto:t, preco:precoTab };
-    }
-    if (temR) {
-      let t = 'Ol\u00e1, '+pn+', bom dia! Sou o Alessandro da Reparo Eletro, vou te enviar agora o or\u00e7amento:\n\nForam feitos todos os testes, identificamos um problema no conjunto eletr\u00f4nico da TV. Este conserto completo fica em '+precoStr+' reais apenas.\n\nObs.: Devido \u00e0s condi\u00e7\u00f5es da placa do equipamento preciso comunicar o risco de ao trabalhar nela o curto progredir e infelizmente ela apagar completamente. S\u00e3o poucos os casos mas existe esse risco. Aprovando j\u00e1 iniciamos o conserto.';
-      if (temA&&acrilico>0) t += '\n\nDevido ao superaquecimento dos barramentos o acr\u00edlico pode ressecar...';
-      return { texto:t, preco:precoTab };
-    }
-    if (temA) {
-      return { texto:'Ol\u00e1, '+pn+', bom dia! Sou o Alessandro da Reparo Eletro.\n\nDevido ao superaquecimento dos barramentos o acr\u00edlico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV est\u00e1 com cores mais claras. Sem trocar o acr\u00edlico voc\u00ea pode considerar uma qualidade de 80 a 90%. Trocando o Acr\u00edlico fica 100% e tem um custo adicional de '+(acrilico>0?acrilico:'[VALOR]')+' reais. Aguardo sua resposta.', preco:acrilico?String(acrilico):null };
-    }
-    return { texto:null, preco:null };
-  }
-
-  const resultados = [];
-  for (const orc of pendentes) {
-    const ficha_b = (db_b.fichas||[]).find(f =>
-      f.id === orc.id ||
-      (f.pipefyCardId && f.pipefyCardId === orc.pipefyId) ||
-      (f.nome||'').toLowerCase().trim() === (orc.nome||'').toLowerCase().trim()
-    );
-    if (!ficha_b || !ficha_b.diagnostico) {
-      resultados.push({ id:orc.id, nome:orc.nome, status:'sem_diagnostico' });
-      continue;
-    }
-    const equips_b = ficha_b.diagnostico.equips || [ficha_b.diagnostico];
-    const res_b = equips_b.map(eq => gerarTextoB(ficha_b, eq));
-    const textoFinal = res_b.length===1 ? res_b[0].texto : res_b.filter(r=>r.texto).map((r,i)=>'TV '+(i+1)+':\n'+r.texto).join('\n\n---\n\n');
-    const precoFinal = res_b.length===1 ? res_b[0].preco : (String(res_b.reduce((s,r)=>s+(parseInt(r.preco)||0),0))||null);
-    if (textoFinal) {
-      const idx_b = orcDb_b.fichas.findIndex(f=>f.id===orc.id);
-      if (idx_b>=0) { orcDb_b.fichas[idx_b].textoOrc=textoFinal; orcDb_b.fichas[idx_b].precoSugerido=precoFinal; orcDb_b.fichas[idx_b].regeneradoEm=new Date().toISOString(); }
-      const fontes_b = [equips_b[0]?.modelo||'', ficha_b.equipamento||'', ficha_b.defeito||''].join(' ');
-      resultados.push({ id:orc.id, nome:orc.nome, equipamento:ficha_b.equipamento, chips:equips_b.map(e=>e.servicos), pol:extrairPol_b(fontes_b), preco:precoFinal, preview:textoFinal.substring(0,150)+'...' });
-    } else {
-      resultados.push({ id:orc.id, nome:orc.nome, status:'texto_nulo', chips:equips_b.map(e=>e.servicos) });
-    }
-  }
-  await dbSet(ORC_KEY_B, orcDb_b);
-  return res.status(200).json({ ok:true, total:pendentes.length, resultados });
-}
-
 
   return res.status(404).json({ ok: false, error: 'ação não encontrada' });
 };
