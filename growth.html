@@ -179,7 +179,7 @@ var COLS = [
 ];
 
 var cols = [], vals = {}, _editCid = null, _editIid = null, _isNew = false, _tipo = 'check';
-var SK = 'growth_kanban_v1';
+var SK = 'growth_kanban_v2';
 
 function getDK(){ return 'gkd_' + new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'}); }
 function getWK(){
@@ -209,8 +209,21 @@ function load(){
   }).catch(function(){loadLocal();render();});
 }
 function loadLocal(){
-  try{var raw=localStorage.getItem(SK);if(raw){var d=JSON.parse(raw);cols=d.cols||JSON.parse(JSON.stringify(COLS));vals=d.vals||{};}else{cols=JSON.parse(JSON.stringify(COLS));vals={};}}
-  catch(e){cols=JSON.parse(JSON.stringify(COLS));vals={};}
+  try{
+    var raw=localStorage.getItem(SK);
+    if(raw){
+      var d=JSON.parse(raw);
+      var saved=d.cols||[];
+      // Merge: manter colunas salvas + adicionar novas que não existam
+      var merged=JSON.parse(JSON.stringify(COLS));
+      merged.forEach(function(defCol){
+        var existing=saved.find(function(c){return c.id===defCol.id;});
+        if(existing) Object.assign(defCol,{items:existing.items});
+      });
+      cols=merged;
+      vals=d.vals||{};
+    }else{cols=JSON.parse(JSON.stringify(COLS));vals={};}
+  }catch(e){cols=JSON.parse(JSON.stringify(COLS));vals={};}
 }
 
 function render(){ renderBoard(); renderScore(); renderConquistas(); }
