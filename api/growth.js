@@ -1,7 +1,7 @@
 'use strict';
-// GROWTH — API | Canais de aquisição + leads + métricas
+// GROWTH GAMIFICADO — API v2 | acoes + registros diários
 
-const GROWTH_KEY = 'reparoeletro_growth';
+const GROWTH_KEY = 'reparoeletro_growth_v2';
 const U=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
 const T=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
 
@@ -18,13 +18,12 @@ module.exports = async function(req, res) {
 
   if (action === 'carregar') {
     const data = await dbGet(GROWTH_KEY);
-    return res.status(200).json({ ok: true, data: data || { canais:[], leads:[] } });
+    return res.status(200).json({ ok: true, data: data || { acoes:[], registros:{} } });
   }
 
   if (action === 'salvar' && req.method === 'POST') {
-    const { canais, leads } = req.body || {};
-    const now = new Date().toISOString();
-    await dbSet(GROWTH_KEY, { canais: canais||[], leads: leads||[], updatedAt: now });
+    const { acoes, registros } = req.body || {};
+    await dbSet(GROWTH_KEY, { acoes: acoes||[], registros: registros||{}, savedAt: new Date().toISOString() });
     return res.status(200).json({ ok: true });
   }
 

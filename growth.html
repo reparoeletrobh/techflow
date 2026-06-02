@@ -548,19 +548,33 @@ function save(){
 
 function load(){
   fetch('/api/growth?action=carregar').then(r=>r.json()).then(d=>{
-    if(d.ok&&d.data&&(d.data.acoes||[]).length){
-      acoes=d.data.acoes||[]; registros=d.data.registros||{};
-    } else { loadLocal(); }
+    if(d.ok && d.data && Array.isArray(d.data.acoes) && d.data.acoes.length>0){
+      acoes=d.data.acoes; registros=d.data.registros||{};
+    } else {
+      loadLocal();
+    }
     renderHoje();
-  }).catch(()=>{loadLocal();renderHoje();});
+  }).catch(function(){
+    loadLocal();
+    renderHoje();
+  });
 }
 
 function loadLocal(){
   try{
     var raw=localStorage.getItem('growth_v2');
-    if(raw){var d=JSON.parse(raw);acoes=d.acoes||[];registros=d.registros||{};}
-    else{acoes=[...DEFAULTS];registros={};}
-  }catch(e){acoes=[...DEFAULTS];registros={};}
+    if(raw){
+      var d=JSON.parse(raw);
+      acoes=Array.isArray(d.acoes)&&d.acoes.length>0 ? d.acoes : [...DEFAULTS];
+      registros=d.registros||{};
+    } else {
+      acoes=[...DEFAULTS];
+      registros={};
+    }
+  }catch(e){
+    acoes=[...DEFAULTS];
+    registros={};
+  }
 }
 
 // Fechar modal no overlay
