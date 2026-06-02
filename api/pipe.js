@@ -1859,5 +1859,38 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok:true, total:arch4.cards.length, cards:lista });
   }
 
+
+  // ── GET restaurar-graciela — insere venda Graciela Queiroz em receber ───────
+  if (action === 'restaurar-graciela') {
+    const db = await dbGet(PIPE_KEY) || defaultDB();
+    if (!Array.isArray(db.cards)) db.cards = [];
+    const existe = db.cards.find(c =>
+      (c.nomeContato||'').toLowerCase().includes('graciela')
+    );
+    if (existe) {
+      return res.status(200).json({ ok:true, acao:'ja_existe', phase:existe.phase, card:existe });
+    }
+    const now = new Date().toISOString();
+    const card = {
+      id: 'PIPE-VENDA-GRACIELA',
+      pipefyId: null,
+      phase: 'receber',
+      nomeContato: 'Graciela Queiroz',
+      telefone: '',
+      equipamento: 'Consul ME18S',
+      descricao: 'VENDA — MI-1938 | Consul ME18S | Pago via Pix MP',
+      title: 'VENDA — MI-1938 | Graciela Queiroz',
+      codEquip: 'MI-1938',
+      valor: 0,
+      origem: 'restaurado_venda_checkout',
+      criadoEm: now, movedAt: now,
+      history: [{ phase:'receber', ts:now, obs:'venda_checkout_mp_restaurado' }],
+      aguardandoDesde: null, analiseCompra: false
+    };
+    db.cards.unshift(card);
+    await safeWritePipe(db);
+    return res.status(200).json({ ok:true, acao:'inserido_em_receber', card });
+  }
+
   return res.status(404).json({ ok: false, error: 'acao nao encontrada: ' + action });
 }
