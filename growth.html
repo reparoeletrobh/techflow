@@ -51,7 +51,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .ic-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:5px;gap:6px;}
 .ic-lbl{font-size:11px;font-weight:600;line-height:1.3;flex:1;}
 .ic-gr{background:none;border:none;padding:0;color:var(--mu);font-size:13px;flex-shrink:0;}
-.ic-rp{font-family:var(--fm);font-size:9px;color:var(--mu);margin-bottom:7px;display:flex;align-items:center;gap:4px;}
+.ic-rp{font-family:var(--fm);font-size:9px;color:var(--mu);margin-bottom:5px;display:flex;align-items:center;gap:4px;}
+.ic-desc{font-family:var(--fm);font-size:9px;color:var(--mu);margin-bottom:6px;line-height:1.4;opacity:.8;}
 .ic-bt{height:4px;background:var(--dim);border-radius:2px;overflow:hidden;margin-bottom:5px;}
 .ic-bf{height:100%;border-radius:2px;transition:width .35s;}
 .ic-bot{display:flex;align-items:center;justify-content:space-between;}
@@ -129,6 +130,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
       <div class="pp-n"><span id="pp-v" style="color:var(--bl)">0</span><span id="pp-p" style="color:var(--mu)">0%</span></div>
     </div>
     <div class="fld"><label>NOME DA ATIVIDADE</label><input id="m-lbl" placeholder="Ex: Publicar Reels"></div>
+    <div class="fld"><label>DESCRIÇÃO</label><input id="m-desc" placeholder="Ex: Peças para campanha da semana"></div>
     <div class="fld" id="m-tipo-fld">
       <label>TIPO</label>
       <div class="tipo-btns">
@@ -137,6 +139,13 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
       </div>
     </div>
     <div class="fld" id="m-meta-fld" style="display:none"><label>META</label><input type="number" id="m-meta" min="1" value="1"></div>
+    <div class="fld" id="m-freq-fld">
+      <label>FREQUÊNCIA</label>
+      <div class="tipo-btns">
+        <button class="tipo-btn sel" id="btn-fd" onclick="setFreqModal('d')">⚡ DIÁRIA</button>
+        <button class="tipo-btn" id="btn-fw" onclick="setFreqModal('w')">📅 SEMANAL</button>
+      </div>
+    </div>
     <div class="fld"><label>RESPONSÁVEL</label><input id="m-resp" placeholder="Ex: Time Conteúdo"></div>
     <div class="mdl-btns">
       <button class="btn-dx" id="btn-dx" style="display:none" onclick="delAtiv()">🗑</button>
@@ -151,15 +160,19 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 <script>
 var COLS = [
   {id:'pago',     label:'Tráfego Pago',  icon:'💰',freq:'d',color:'#3b9eff',
-   items:[{id:'meta',label:'Meta Ads',tipo:'check',meta:1,resp:'Time Mkt'},{id:'google',label:'Google Ads',tipo:'check',meta:1,resp:'Time Mkt'},{id:'yt',label:'YouTube Ads',tipo:'check',meta:1,resp:'Time Mkt'}]},
+   items:[
+     {id:'meta',      label:'Meta Ads',             tipo:'check',   meta:1,  resp:'Time Mkt', desc:''},
+     {id:'google',    label:'Google Ads',            tipo:'check',   meta:1,  resp:'Time Mkt', desc:''},
+     {id:'yt',        label:'YouTube Ads',           tipo:'check',   meta:1,  resp:'Time Mkt', desc:''},
+     {id:'criativos', label:'Criativos Produzidos',  tipo:'counter', meta:10, resp:'Design',   desc:'Peças criativas para campanhas', freq:'w'},
+   ]},
   {id:'organico', label:'Orgânico',      icon:'🎬',freq:'d',color:'#22c55e',
    items:[
      {id:'videos',      label:'Vídeos Orgânicos', tipo:'counter', meta:3, resp:'Conteúdo'},
      {id:'tiktok_live', label:'Live TikTok',       tipo:'check',   meta:1, resp:'Conteúdo'},
      {id:'ig_live',     label:'Live Instagram',    tipo:'check',   meta:1, resp:'Conteúdo'},
    ]},
-  {id:'criativo', label:'Criativos',     icon:'🎨',freq:'w',color:'#a855f7',
-   items:[{id:'criativos',label:'Criativos Produzidos',tipo:'counter',meta:10,resp:'Design'}]},
+
   {id:'influencer',label:'Influencer',   icon:'🌟',freq:'w',color:'#f97316',
    items:[{id:'infl',label:'Contatos Influencer',tipo:'counter',meta:3,resp:'Parcerias'}]},
   {id:'reputacao',label:'Reputação',     icon:'⭐',freq:'d',color:'#f5c800',
@@ -178,7 +191,7 @@ var COLS = [
 ];
 
 var cols = [], vals = {}, _editCid = null, _editIid = null, _isNew = false, _tipo = 'check';
-var SK = 'growth_kanban_v3';
+var SK = 'growth_kanban_v4';
 
 function getDK(){ return 'gkd_' + new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'}); }
 function getWK(){
@@ -282,6 +295,7 @@ function mkItem(col, it){
   gr.onclick=(function(cid,iid){return function(){openEdit(cid,iid);};})(col.id,it.id);
   top.appendChild(lbl); top.appendChild(gr); el.appendChild(top);
 
+  if(it.desc){var dc=document.createElement('div');dc.className='ic-desc';dc.textContent=it.desc;el.appendChild(dc);}
   if(it.resp){var rp=document.createElement('div');rp.className='ic-rp';rp.innerHTML='<span>👤</span><span>'+esc(it.resp)+'</span>';el.appendChild(rp);}
 
   var bt=document.createElement('div'); bt.className='ic-bt';
@@ -353,6 +367,12 @@ function inc(cid,iid,d){var k=cid+'_'+iid;vals[k]=Math.max(0,(vals[k]||0)+d);per
 function resetD(){if(!confirm('Resetar atividades DIÁRIAS?'))return;cols.forEach(function(c){if(c.freq==='d')c.items.forEach(function(it){vals[c.id+'_'+it.id]=0;});});persist();render();toast('↺ Diárias resetadas');}
 function resetW(){if(!confirm('Resetar atividades SEMANAIS?'))return;cols.forEach(function(c){if(c.freq==='w')c.items.forEach(function(it){vals[c.id+'_'+it.id]=0;});});persist();render();toast('↺ Semanais resetadas');}
 
+var _freqModal = 'd';
+function setFreqModal(f){
+  _freqModal=f;
+  document.getElementById('btn-fd').className='tipo-btn'+(f==='d'?' sel':'');
+  document.getElementById('btn-fw').className='tipo-btn'+(f==='w'?' sel':'');
+}
 function setTipo(t){
   _tipo=t;
   document.getElementById('btn-tc').className='tipo-btn'+(t==='check'?' sel':'');
@@ -363,11 +383,13 @@ function openNew(cid){
   _editCid=cid;_editIid=null;_isNew=true;
   var col=cols.find(function(c){return c.id===cid;});
   var t=document.getElementById('mdl-title'); t.textContent='+ Atividade em '+(col?col.label:''); t.style.color=col?col.color:'var(--tx)';
-  document.getElementById('m-lbl').value=''; document.getElementById('m-resp').value=''; document.getElementById('m-meta').value=1;
+  document.getElementById('m-lbl').value=''; document.getElementById('m-desc').value='';
+  document.getElementById('m-resp').value=''; document.getElementById('m-meta').value=1;
   document.getElementById('btn-dx').style.display='none'; document.getElementById('mdl-pp').style.display='none';
   document.getElementById('m-tipo-fld').style.display='block';
+  document.getElementById('m-freq-fld').style.display='block';
   var sv=document.getElementById('btn-sv'); sv.style.background=col?col.color:'var(--or)';
-  setTipo('check');
+  setTipo('check'); setFreqModal(col?col.freq:'d');
   document.getElementById('modal').style.display='flex';
   setTimeout(function(){document.getElementById('m-lbl').focus();},80);
 }
@@ -375,8 +397,8 @@ function openEdit(cid,iid){
   _editCid=cid;_editIid=iid;_isNew=false;
   var col=cols.find(function(c){return c.id===cid;}); var it=col?col.items.find(function(i){return i.id===iid;}):null; if(!it)return;
   var t=document.getElementById('mdl-title'); t.textContent='⚙ '+it.label; t.style.color=col?col.color:'var(--tx)';
-  document.getElementById('m-lbl').value=it.label; document.getElementById('m-resp').value=it.resp||''; document.getElementById('m-meta').value=it.meta||1;
-  document.getElementById('btn-dx').style.display='block'; document.getElementById('m-tipo-fld').style.display='none';
+  document.getElementById('m-lbl').value=it.label; document.getElementById('m-desc').value=it.desc||''; document.getElementById('m-resp').value=it.resp||''; document.getElementById('m-meta').value=it.meta||1;
+  document.getElementById('btn-dx').style.display='block'; document.getElementById('m-tipo-fld').style.display='none'; document.getElementById('m-freq-fld').style.display='none';
   var v=vals[cid+'_'+iid]||0, m=it.meta||1, p=pct(v,m);
   var pp=document.getElementById('mdl-pp'); pp.style.display='block';
   document.getElementById('pp-fil').style.width=p+'%'; document.getElementById('pp-fil').style.background=col?col.color:sc(p);
@@ -389,15 +411,19 @@ function openEdit(cid,iid){
 function closeModal(){ document.getElementById('modal').style.display='none'; }
 function saveAtiv(){
   var lbl=document.getElementById('m-lbl').value.trim(); if(!lbl){document.getElementById('m-lbl').focus();return;}
+  var desc=document.getElementById('m-desc').value.trim();
   var resp=document.getElementById('m-resp').value.trim()||'—';
   var meta=parseInt(document.getElementById('m-meta').value)||1;
-  var tipo=_isNew?_tipo:(cols.find(function(c){return c.id===_editCid;})||{items:[]}).items.find(function(i){return i.id===_editIid;})?.(tipo||'check')||'check';
+  var tipo=_isNew?_tipo:(cols.find(function(c){return c.id===_editCid;})||{items:[]}).items.find(function(i){return i.id===_editIid;})?.tipo||'check';
+  var freq=_isNew?_freqModal:null;
   if(_isNew){
     var nid=Date.now().toString(36);
-    cols.forEach(function(c){if(c.id===_editCid)c.items.push({id:nid,label:lbl,tipo:tipo,meta:meta,resp:resp});});
+    cols.forEach(function(c){
+      if(c.id===_editCid) c.items.push({id:nid,label:lbl,desc:desc,tipo:tipo,meta:meta,resp:resp,customFreq:freq});
+    });
     toast('✅ Adicionado');
   } else {
-    cols.forEach(function(c){if(c.id===_editCid)c.items.forEach(function(it){if(it.id===_editIid){it.label=lbl;it.meta=meta;it.resp=resp;}});});
+    cols.forEach(function(c){if(c.id===_editCid)c.items.forEach(function(it){if(it.id===_editIid){it.label=lbl;it.desc=desc;it.meta=meta;it.resp=resp;}});});
     toast('💾 Salvo');
   }
   persist(); closeModal(); render();
