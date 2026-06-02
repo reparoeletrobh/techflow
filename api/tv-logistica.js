@@ -866,12 +866,12 @@ module.exports = async function handler(req, res) {
     const idx_s     = orcDb_s.fichas.findIndex(f => f.id === 'LOG-0009' || (f.nome||'').toLowerCase() === 'sidney');
     if (idx_s < 0) return res.status(404).json({ ok:false, error:'Sidney não encontrado em tv_orcamentos' });
 
-    // TV Un55ru71000 = Samsung 55" → R$ 890 barramento + acrílico R$ 335
+    // Samsung 55" → R$ 890 barramento + acrílico R$ 335 (sem modelo no texto)
     const texto_s =
       `Olá, Sidney, bom dia! Sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:
 
 ` +
-      `Foram feitos todos os testes, identificamos que será necessário fazer a troca do barramento da TV Un55ru71000, ` +
+      `Foram feitos todos os testes, identificamos que será necessário fazer a troca do barramento da TV, ` +
       `será feito a reoperação elétrica também. Este conserto completo fica em 890 reais apenas. Aprovando já iniciamos o conserto.
 
 ` +
