@@ -94,6 +94,38 @@ function defaultDB() {
 // Função standalone para sync de uma fase — fora do handler para evitar conflito de escopo
 
 
+
+// ── safeWritePipe: mescla antes de salvar — nunca perde cards ───────────────
+async function safeWritePipe(newDb) {
+  try {
+    const current = await dbGet(PIPE_KEY);
+    if (current && Array.isArray(current.cards) && Array.isArray(newDb.cards)) {
+      const newIds = new Set(newDb.cards.map(c => c.id));
+      const perdidos = current.cards.filter(c => !newIds.has(c.id));
+      if (perdidos.length > 0) {
+        console.warn('[safeWritePipe] ' + perdidos.length + ' cards preservados:', perdidos.map(c=>c.id).join(','));
+        try {
+          const arch = await dbGet('reparoeletro_pipe_archive') || { cards: [] };
+          perdidos.forEach(c => {
+            if (!arch.cards.find(a => a.id === c.id)) {
+              arch.cards.unshift({ ...c, arquivadoEm: new Date().toISOString(), motivoArchive: 'merge_protection' });
+            }
+          });
+          arch.cards = arch.cards.slice(0, 5000);
+          await dbSet('reparoeletro_pipe_archive', arch);
+        } catch(e) {}
+        newDb.cards = newDb.cards.concat(perdidos);
+      }
+    }
+    await dbSet(PIPE_KEY, newDb);
+    return true;
+  } catch(e) {
+    console.error('[safeWritePipe]', e.message);
+    try { await dbSet(PIPE_KEY, newDb); } catch(e2) {}
+    return false;
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method === 'OPTIONS') return res.status(200).end();
