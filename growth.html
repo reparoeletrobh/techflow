@@ -2,405 +2,535 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Growth</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#07080a;--s:#0f1114;--s2:#181b1f;--bd:#1e2228;--tx:#f0f2f5;--mu:#5a6270;--dm:#2a2f38;--ac:#f97316;--gn:#22c55e;--rd:#ef4444;--bl:#3b9eff;--yw:#f5c800;--fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;}
+:root{
+  --bg:#07080a;--surface:#0f1114;--surface2:#181b1f;--border:#1e2228;
+  --text:#f0f2f5;--muted:#5a6270;--dim:#2a2f38;
+  --accent:#f97316;--green:#22c55e;--red:#ef4444;--blue:#3b9eff;
+  --yellow:#f5c800;--purple:#a855f7;--cyan:#06b6d4;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+}
 *{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--bg);color:var(--tx);font-family:var(--fb);min-height:100vh;}
-header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;border-bottom:1px solid var(--bd);background:var(--bg);position:sticky;top:0;z-index:100;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;overflow-x:hidden;}
+
+header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;
+  border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:100;}
 .logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
-.logo span{width:28px;height:28px;background:linear-gradient(135deg,var(--ac),var(--yw));border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:15px;}
-.hbtn{font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--bd);background:transparent;color:var(--mu);cursor:pointer;}
-.hbtn:hover{color:var(--tx);border-color:var(--ac);}
-/* SCORE */
-.score-bar{display:flex;align-items:center;gap:16px;padding:14px 20px;background:var(--s);border-bottom:1px solid var(--bd);}
-.sc-num{font-family:var(--fh);font-size:26px;font-weight:800;}
-.sc-body{flex:1;display:flex;flex-direction:column;gap:5px;}
-.sc-track{height:8px;background:var(--dm);border-radius:4px;overflow:hidden;}
-.sc-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--ac),var(--yw));transition:width .4s;}
-.sc-info{display:flex;justify-content:space-between;font-family:var(--fm);font-size:10px;color:var(--mu);}
-.sc-pct{color:var(--tx);font-weight:700;}
-.sc-emoji{font-size:32px;}
-/* TABS */
-.tabs{display:flex;border-bottom:1px solid var(--bd);background:var(--bg);padding:0 20px;position:sticky;top:52px;z-index:90;}
-.tab{font-family:var(--fm);font-size:11px;font-weight:600;padding:11px 18px;border:none;background:transparent;color:var(--mu);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
-.tab.on{color:var(--ac);border-bottom-color:var(--ac);}
-/* PANES */
-.pane{display:none;padding:20px;max-width:860px;margin:0 auto;}
-.pane.on{display:block;}
-/* CARDS AÇÃO */
-.acoes{display:flex;flex-direction:column;gap:8px;}
-.ac{border:1px solid var(--bd);border-radius:10px;background:var(--s);cursor:pointer;transition:all .2s;overflow:hidden;}
-.ac:hover{border-color:var(--dm);}
-.ac.ok{border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.04);}
-.ac.late{border-color:rgba(239,68,68,.5);background:rgba(239,68,68,.04);animation:pulse 1.8s infinite;}
-@keyframes pulse{0%,100%{border-color:rgba(239,68,68,.5)}50%{border-color:rgba(239,68,68,.9)}}
-.ac-inner{display:flex;align-items:center;gap:12px;padding:12px 14px;}
-.check{width:34px;height:34px;border-radius:50%;border:2px solid var(--bd);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;transition:all .2s;}
-.ok .check{background:var(--gn);border-color:var(--gn);color:#000;}
-.ac-body{flex:1;}
-.ac-nome{font-size:13px;font-weight:600;margin-bottom:2px;}
-.ok .ac-nome{text-decoration:line-through;color:var(--mu);}
-.ac-desc{font-family:var(--fm);font-size:10px;color:var(--mu);}
-.ac-tags{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;}
-.tag{font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:4px;border:1px solid var(--bd);color:var(--mu);}
-.ac-meta{text-align:right;flex-shrink:0;}
-.streak{font-family:var(--fh);font-size:14px;font-weight:800;}
-.alerta{font-family:var(--fm);font-size:10px;color:var(--rd);font-weight:700;}
-/* SEMANA */
-.sg{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
-.sr{display:flex;align-items:center;gap:6px;}
-.sr-nome{font-family:var(--fm);font-size:10px;color:var(--mu);width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;}
-.sr-dias{display:flex;gap:4px;}
-.dot{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--fm);font-size:9px;border:1px solid var(--bd);}
-.dot.ok{background:rgba(34,197,94,.2);border-color:rgba(34,197,94,.4);color:var(--gn);}
-.dot.miss{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:var(--rd);}
-.dot.skip{background:transparent;color:var(--dm);}
-.dot.hj{border-color:var(--ac)!important;}
-.sh{display:flex;align-items:center;gap:6px;margin-bottom:4px;}
-.sh-sp{width:200px;flex-shrink:0;}
-.dl{width:26px;text-align:center;font-family:var(--fm);font-size:9px;color:var(--mu);}
-/* CONQUISTAS */
-.clist{display:flex;flex-wrap:wrap;gap:10px;}
-.conq{background:var(--s);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px;min-width:200px;}
-.conq.ok2{border-color:rgba(245,200,0,.4);background:rgba(245,200,0,.04);}
-.conq.off{opacity:.35;}
-.ci{font-size:22px;}
-.cn{font-family:var(--fh);font-size:12px;font-weight:800;}
-.cd{font-family:var(--fm);font-size:9px;color:var(--mu);}
-/* CONFIG */
-.cfg-card{display:flex;align-items:center;justify-content:space-between;background:var(--s);border:1px solid var(--bd);border-radius:8px;padding:12px 14px;margin-bottom:8px;}
-.cfg-nome{font-size:12px;font-weight:600;}
-.cfg-sub{font-family:var(--fm);font-size:9px;color:var(--mu);margin-top:3px;}
-/* MODAL */
-.ov{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;display:none;align-items:center;justify-content:center;}
-.ov.on{display:flex;}
-.modal{background:var(--s);border:1px solid var(--bd);border-radius:12px;width:440px;max-height:88vh;overflow-y:auto;padding:22px;}
-.mt{font-family:var(--fh);font-size:14px;font-weight:800;margin-bottom:16px;}
-.fg{display:flex;flex-direction:column;gap:4px;margin-bottom:12px;}
-.fl{font-family:var(--fm);font-size:10px;color:var(--mu);}
-.fi,.fs,.fta{background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:8px 11px;color:var(--tx);font-family:var(--fm);font-size:12px;outline:none;width:100%;}
-.fi:focus,.fs:focus,.fta:focus{border-color:var(--ac);}
-.fta{min-height:54px;resize:vertical;}
-.ma{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
-.bcl{font-family:var(--fm);font-size:11px;padding:7px 15px;border-radius:6px;border:1px solid var(--bd);background:transparent;color:var(--mu);cursor:pointer;}
-.bsv{font-family:var(--fm);font-size:11px;padding:7px 16px;border-radius:6px;border:none;background:var(--ac);color:#fff;cursor:pointer;font-weight:700;}
-.bdl{font-family:var(--fm);font-size:11px;padding:7px 14px;border-radius:6px;border:1px solid rgba(239,68,68,.3);background:transparent;color:var(--rd);cursor:pointer;margin-right:auto;}
-/* TOAST */
-.toast{position:fixed;bottom:18px;right:18px;background:var(--gn);color:#000;font-family:var(--fm);font-size:12px;font-weight:700;padding:9px 16px;border-radius:7px;opacity:0;transform:translateY(8px);transition:all .25s;z-index:999;pointer-events:none;}
-.toast.on{opacity:1;transform:translateY(0);}
-.sec-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
-.sec-t{font-family:var(--fh);font-size:14px;font-weight:800;}
-.badd{font-family:var(--fm);font-size:11px;padding:6px 14px;border-radius:6px;border:1px solid var(--ac);background:rgba(249,115,22,.1);color:var(--ac);cursor:pointer;font-weight:700;}
-.empty{text-align:center;padding:40px 20px;color:var(--mu);font-family:var(--fm);font-size:12px;}
+.logo-icon{width:28px;height:28px;background:linear-gradient(135deg,var(--accent),var(--yellow));
+  border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;}
+.hdr-right{display:flex;gap:8px;align-items:center;}
+.hbtn{font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;
+  border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
+.hbtn:hover{color:var(--text);border-color:var(--accent);}
+
+.score-bar{display:flex;align-items:center;gap:16px;padding:14px 24px;
+  background:var(--surface);border-bottom:1px solid var(--border);}
+.score-num{font-family:var(--fh);font-size:26px;font-weight:800;color:var(--text);}
+.score-track{flex:1;height:8px;background:var(--dim);border-radius:4px;overflow:hidden;}
+.score-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--accent),var(--yellow));
+  transition:width .4s ease;width:0%;}
+.score-pct{font-family:var(--fh);font-size:15px;font-weight:800;color:var(--text);}
+.score-streak{font-family:var(--fm);font-size:11px;color:var(--muted);}
+.score-emoji{font-size:30px;flex-shrink:0;}
+
+.tabs-bar{display:flex;border-bottom:1px solid var(--border);background:var(--bg);
+  padding:0 24px;position:sticky;top:52px;z-index:90;}
+.tab-btn{font-family:var(--fm);font-size:11px;font-weight:600;padding:11px 18px;
+  border:none;background:transparent;color:var(--muted);cursor:pointer;
+  border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+.tab-pane{display:none;padding:20px 24px;max-width:880px;margin:0 auto;}
+.tab-pane.active{display:block;}
+
+.acoes-list{display:flex;flex-direction:column;gap:8px;}
+.acao-card{border:1px solid var(--border);border-radius:10px;background:var(--surface);
+  cursor:pointer;transition:border-color .2s;}
+.acao-card:hover{border-color:var(--dim);}
+.acao-card.feita{border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.04);}
+.acao-card.atrasada{border-color:rgba(239,68,68,.5);animation:pulseRed 1.8s infinite;}
+@keyframes pulseRed{0%,100%{border-color:rgba(239,68,68,.4)}50%{border-color:rgba(239,68,68,.9)}}
+.acao-inner{display:flex;align-items:center;gap:12px;padding:12px 14px;}
+.check-btn{width:34px;height:34px;border-radius:50%;border:2px solid var(--border);
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .2s;}
+.feita .check-btn{background:var(--green);border-color:var(--green);}
+.acao-body{flex:1;min-width:0;}
+.acao-nome{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.feita .acao-nome{text-decoration:line-through;color:var(--muted);}
+.acao-desc{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px;}
+.acao-tags{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;}
+.tag{font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:4px;border:1px solid var(--border);color:var(--muted);}
+.acao-meta{text-align:right;flex-shrink:0;}
+.streak-val{font-family:var(--fh);font-size:14px;font-weight:800;}
+.alert-val{font-family:var(--fm);font-size:10px;color:var(--red);font-weight:700;margin-top:2px;}
+
+.sec-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.sec-title{font-family:var(--fh);font-size:15px;font-weight:800;color:var(--text);}
+.hoje-sub{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:3px;}
+.btn-add{font-family:var(--fm);font-size:11px;padding:6px 14px;border-radius:7px;
+  border:1px solid var(--accent);background:rgba(249,115,22,.1);color:var(--accent);cursor:pointer;font-weight:700;}
+
+.semana-row{display:flex;align-items:center;gap:6px;margin-bottom:5px;}
+.semana-nome{font-family:var(--fm);font-size:10px;color:var(--muted);width:190px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;}
+.dia-dot{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--fm);font-size:9px;border:1px solid var(--border);}
+.dia-dot.ok{background:rgba(34,197,94,.2);border-color:rgba(34,197,94,.4);color:var(--green);}
+.dia-dot.miss{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:var(--red);}
+.dia-dot.hoje{border-color:var(--accent);}
+
+.conq-grid{display:flex;flex-wrap:wrap;gap:10px;}
+.conq-item{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:12px 14px;display:flex;align-items:center;gap:10px;min-width:190px;}
+.conq-item.desbloqueada{border-color:rgba(245,200,0,.4);background:rgba(245,200,0,.04);}
+.conq-item.bloqueada{opacity:.35;}
+.conq-icon{font-size:22px;}
+.conq-nome{font-family:var(--fh);font-size:12px;font-weight:800;color:var(--text);}
+.conq-desc{font-family:var(--fm);font-size:9px;color:var(--muted);}
+
+.cfg-item{display:flex;align-items:center;justify-content:space-between;
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;}
+.cfg-nome{font-size:12px;font-weight:600;color:var(--text);}
+.cfg-sub{font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:3px;}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;
+  display:none;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  width:440px;max-height:88vh;overflow-y:auto;padding:22px;}
+.modal-title{font-family:var(--fh);font-size:14px;font-weight:800;color:var(--text);margin-bottom:16px;}
+.form-group{display:flex;flex-direction:column;gap:4px;margin-bottom:12px;}
+.form-label{font-family:var(--fm);font-size:10px;color:var(--muted);}
+.form-input,.form-select,.form-textarea{background:var(--surface2);border:1px solid var(--border);
+  border-radius:7px;padding:8px 11px;color:var(--text);font-family:var(--fm);font-size:12px;outline:none;width:100%;}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent);}
+.form-textarea{min-height:54px;resize:vertical;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+.btn-cancel{font-family:var(--fm);font-size:11px;padding:7px 15px;border-radius:6px;
+  border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;}
+.btn-save{font-family:var(--fm);font-size:11px;padding:7px 16px;border-radius:6px;
+  border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:700;}
+.btn-delete{font-family:var(--fm);font-size:11px;padding:7px 14px;border-radius:6px;
+  border:1px solid rgba(239,68,68,.3);background:transparent;color:var(--red);cursor:pointer;margin-right:auto;}
+
+.toast{position:fixed;bottom:18px;right:18px;background:var(--green);color:#000;
+  font-family:var(--fm);font-size:12px;font-weight:700;padding:9px 16px;border-radius:7px;
+  opacity:0;transform:translateY(8px);transition:all .25s;z-index:999;pointer-events:none;}
+.toast.show{opacity:1;transform:translateY(0);}
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted);font-family:var(--fm);font-size:12px;}
 </style>
 </head>
 <body>
+
 <header>
-  <div class="logo"><span>🚀</span>Growth</div>
-  <div style="display:flex;gap:8px;align-items:center;">
-    <span id="hdr-data" style="font-family:var(--fm);font-size:10px;color:var(--mu);"></span>
-    <button class="hbtn" onclick="openModal()">+ Ação</button>
+  <div class="logo">
+    <div class="logo-icon">🚀</div>
+    <span>Growth</span>
+  </div>
+  <div class="hdr-right">
+    <span id="hdr-data" style="font-family:var(--fm);font-size:10px;color:var(--muted);"></span>
+    <button class="hbtn" onclick="abrirModal()">+ Ação</button>
   </div>
 </header>
 
 <div class="score-bar">
-  <div><div style="font-family:var(--fm);font-size:9px;color:var(--mu);margin-bottom:3px;">HOJE</div>
-    <div class="sc-num" id="sc-num">0<span style="font-size:14px;color:var(--mu)">/0</span></div></div>
-  <div class="sc-body">
-    <div class="sc-track"><div class="sc-fill" id="sc-fill" style="width:0%"></div></div>
-    <div class="sc-info">
-      <span class="sc-pct" id="sc-pct">0%</span>
-      <span id="sc-streak">🔥 0 dias seguidos</span>
+  <div>
+    <div style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-bottom:2px;">HOJE</div>
+    <div class="score-num" id="score-num">–</div>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;gap:5px;">
+    <div class="score-track"><div class="score-fill" id="score-fill"></div></div>
+    <div style="display:flex;justify-content:space-between;">
+      <span class="score-pct" id="score-pct">0%</span>
+      <span class="score-streak" id="score-streak">🔥 0 dias seguidos</span>
     </div>
   </div>
-  <div class="sc-emoji" id="sc-emoji">😴</div>
+  <div class="score-emoji" id="score-emoji">😴</div>
 </div>
 
-<div class="tabs">
-  <button class="tab on" onclick="tab('hoje',this)">Hoje</button>
-  <button class="tab" onclick="tab('semana',this)">Semana</button>
-  <button class="tab" onclick="tab('conquistas',this)">Conquistas</button>
-  <button class="tab" onclick="tab('config',this)">Ações</button>
+<div class="tabs-bar">
+  <button class="tab-btn active" onclick="showTab('hoje',this)">Hoje</button>
+  <button class="tab-btn" onclick="showTab('semana',this)">Semana</button>
+  <button class="tab-btn" onclick="showTab('conquistas',this)">Conquistas</button>
+  <button class="tab-btn" onclick="showTab('acoes',this)">Ações</button>
 </div>
 
-<div class="pane on" id="p-hoje">
-  <div style="margin-bottom:14px;">
-    <div class="sec-t" id="hoje-t">Ações de hoje</div>
-    <div style="font-family:var(--fm);font-size:10px;color:var(--mu);margin-top:2px;" id="hoje-sub"></div>
+<div class="tab-pane active" id="tab-hoje">
+  <div class="sec-header" style="margin-bottom:14px;">
+    <div>
+      <div class="sec-title" id="hoje-titulo">Carregando...</div>
+      <div class="hoje-sub" id="hoje-sub"></div>
+    </div>
   </div>
-  <div class="acoes" id="lista"></div>
+  <div class="acoes-list" id="lista-hoje">
+    <div class="empty-state">Carregando ações...</div>
+  </div>
 </div>
 
-<div class="pane" id="p-semana">
-  <div class="sec-hdr"><div class="sec-t">Últimos 7 dias</div></div>
-  <div id="semana"></div>
+<div class="tab-pane" id="tab-semana">
+  <div class="sec-header"><div class="sec-title">Últimos 7 dias</div></div>
+  <div id="semana-grid"></div>
 </div>
 
-<div class="pane" id="p-conquistas">
-  <div class="sec-hdr"><div class="sec-t">🏆 Conquistas</div></div>
-  <div class="clist" id="conqs"></div>
+<div class="tab-pane" id="tab-conquistas">
+  <div class="sec-header"><div class="sec-title">🏆 Conquistas</div></div>
+  <div class="conq-grid" id="lista-conquistas"></div>
 </div>
 
-<div class="pane" id="p-config">
-  <div class="sec-hdr"><div class="sec-t">Gerenciar Ações</div><button class="badd" onclick="openModal()">+ Nova</button></div>
-  <div id="cfg-lista"></div>
+<div class="tab-pane" id="tab-acoes">
+  <div class="sec-header">
+    <div class="sec-title">Gerenciar Ações</div>
+    <button class="btn-add" onclick="abrirModal()">+ Nova Ação</button>
+  </div>
+  <div id="lista-config"></div>
 </div>
 
-<div class="ov" id="ov-modal" onclick="if(event.target===this)closeModal()">
+<div class="modal-overlay" id="modal-acao" onclick="if(event.target===this)fecharModal()">
   <div class="modal">
-    <div class="mt" id="m-title">Nova Ação</div>
-    <input type="hidden" id="m-id">
-    <div class="fg"><label class="fl">Nome</label><input class="fi" id="m-nome" placeholder="ex: Pedir avaliação Google"></div>
-    <div class="fg"><label class="fl">Descrição</label><textarea class="fta" id="m-desc" placeholder="Como fazer?"></textarea></div>
-    <div class="fg"><label class="fl">Categoria</label>
-      <select class="fs" id="m-cat">
-        <option value="google">🔵 Google</option>
+    <div class="modal-title" id="modal-titulo">Nova Ação de Growth</div>
+    <input type="hidden" id="acao-edit-id">
+    <div class="form-group">
+      <label class="form-label">Nome</label>
+      <input class="form-input" id="acao-nome" placeholder="ex: Pedir avaliação Google">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Descrição / Como fazer</label>
+      <textarea class="form-textarea" id="acao-desc" placeholder="Descreva como executar esta ação"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Categoria</label>
+      <select class="form-select" id="acao-cat">
+        <option value="google">🔵 Google / GMB</option>
         <option value="instagram">🟣 Instagram</option>
         <option value="indicacao">🟢 Indicação</option>
         <option value="conteudo">🟡 Conteúdo</option>
-        <option value="pj">🟠 PJ/B2B</option>
+        <option value="pj">🟠 PJ / B2B</option>
         <option value="outros">⚪ Outros</option>
       </select>
     </div>
-    <div class="fg"><label class="fl">Frequência</label>
-      <select class="fs" id="m-freq">
-        <option value="diaria">Diária</option>
-        <option value="seg-sex">Seg a Sex</option>
-        <option value="3x-semana">3x por semana</option>
-        <option value="semanal">Semanal (seg)</option>
+    <div class="form-group">
+      <label class="form-label">Frequência</label>
+      <select class="form-select" id="acao-freq">
+        <option value="diaria">Diária (todo dia)</option>
+        <option value="seg-sex">Seg a Sex (dias úteis)</option>
+        <option value="3x-semana">3x por semana (Seg/Qua/Sex)</option>
+        <option value="semanal">Semanal (segunda-feira)</option>
       </select>
     </div>
-    <div class="ma">
-      <button class="bdl" id="m-del" onclick="del()" style="display:none">Excluir</button>
-      <button class="bcl" onclick="closeModal()">Cancelar</button>
-      <button class="bsv" onclick="save2()">Salvar</button>
+    <div class="modal-actions">
+      <button class="btn-delete" id="btn-excluir" onclick="excluirAcao()" style="display:none">Excluir</button>
+      <button class="btn-cancel" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-save" onclick="salvarAcao()">Salvar</button>
     </div>
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast-msg"></div>
 
 <script>
-var acoes=[], reg={}, editId=null;
-var HOJE=new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});
+// ── Estado ────────────────────────────────────────────────────────────────────
+var acoes = [];
+var registros = {};
+var _editId = null;
+var HOJE = '';
+try { HOJE = new Date().toLocaleDateString('en-CA', {timeZone:'America/Sao_Paulo'}); } catch(e) { HOJE = new Date().toISOString().slice(0,10); }
 
-var DEF=[
-  {id:'g1',nome:'Pedir avaliação Google',desc:'Enviar link GMB pelo WhatsApp para 2 clientes do dia',cat:'google',freq:'diaria'},
-  {id:'g2',nome:'Responder avaliações Google',desc:'Responder todas as avaliações novas no GMB',cat:'google',freq:'diaria'},
-  {id:'g3',nome:'Story no Instagram',desc:'1 story — antes/depois, bastidores ou dica rápida',cat:'instagram',freq:'diaria'},
-  {id:'g4',nome:'Post no Instagram',desc:'1 post no feed com antes/depois',cat:'instagram',freq:'3x-semana'},
-  {id:'g5',nome:'Mensagem de indicação',desc:'WhatsApp para 5 clientes antigos pedindo indicação',cat:'indicacao',freq:'semanal'},
+var DEFAULTS = [
+  {id:'g1',nome:'Pedir avaliação Google',desc:'Enviar link GMB pelo WhatsApp para 2 clientes que retiraram hoje',cat:'google',freq:'diaria'},
+  {id:'g2',nome:'Responder avaliações Google',desc:'Responder todas as avaliações novas no Google Meu Negócio',cat:'google',freq:'diaria'},
+  {id:'g3',nome:'Story no Instagram',desc:'Publicar 1 story (antes/depois, bastidores ou dica rápida)',cat:'instagram',freq:'diaria'},
+  {id:'g4',nome:'Post no Instagram',desc:'Publicar 1 post no feed (antes/depois de conserto)',cat:'instagram',freq:'3x-semana'},
+  {id:'g5',nome:'Mensagem de indicação',desc:'Enviar WhatsApp para 5 clientes antigos pedindo indicação',cat:'indicacao',freq:'semanal'},
   {id:'g6',nome:'Reativar cliente inativo',desc:'Contatar 2 clientes sem visita há 6+ meses',cat:'indicacao',freq:'semanal'},
 ];
 
-function toast(m,e){var t=document.getElementById('toast');t.textContent=m;t.style.background=e?'var(--rd)':'var(--gn)';t.style.color=e?'#fff':'#000';t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2200);}
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-
-function tab(id,btn){
-  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('on'));
-  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
-  document.getElementById('p-'+id).classList.add('on');
-  btn.classList.add('on');
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function showToast(msg, erro) {
+  var t = document.getElementById('toast-msg');
+  t.textContent = msg;
+  t.style.background = erro ? 'var(--red)' : 'var(--green)';
+  t.style.color = erro ? '#fff' : '#000';
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2400);
+}
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showTab(id, btn){
+  document.querySelectorAll('.tab-pane').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.getElementById('tab-'+id).classList.add('active');
+  btn.classList.add('active');
   if(id==='semana') renderSemana();
-  if(id==='conquistas') renderConqs();
-  if(id==='config') renderCfg();
+  if(id==='conquistas') renderConquistas();
+  if(id==='acoes') renderConfig();
+}
+function diasAtras(n){
+  var d = new Date(); d.setDate(d.getDate()-n);
+  try { return d.toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'}); } catch(e){ return d.toISOString().slice(0,10); }
 }
 
-function dayOff(n){var d=new Date();d.setDate(d.getDate()-n);return d.toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});}
-
-function aparece(a,data){
-  var dow=new Date(data+'T12:00:00').getDay();
-  if(a.freq==='diaria')return true;
-  if(a.freq==='seg-sex')return dow>=1&&dow<=5;
-  if(a.freq==='semanal')return dow===1;
-  if(a.freq==='3x-semana')return dow===1||dow===3||dow===5;
+// ── Lógica de frequência ──────────────────────────────────────────────────────
+function aparecerHoje(acao, data){
+  var dow = new Date(data+'T12:00:00').getDay();
+  if(acao.freq==='diaria') return true;
+  if(acao.freq==='seg-sex') return dow>=1&&dow<=5;
+  if(acao.freq==='semanal') return dow===1;
+  if(acao.freq==='3x-semana') return dow===1||dow===3||dow===5;
   return true;
 }
-function dodia(data){return acoes.filter(a=>aparece(a,data));}
+function acoesDoDia(data){ return acoes.filter(function(a){ return aparecerHoje(a,data); }); }
 
-function streak(){
-  var s=0;
-  for(var i=1;i<=90;i++){var d=dayOff(i);var a=dodia(d);if(!a.length)continue;var r=reg[d]||{};if(a.every(x=>r[x.id]))s++;else break;}
-  return s;
+// ── Streaks ───────────────────────────────────────────────────────────────────
+function calcStreakGlobal(){
+  var streak = 0;
+  for(var i=1;i<=90;i++){
+    var d = diasAtras(i);
+    var acs = acoesDoDia(d);
+    if(!acs.length) continue;
+    var reg = registros[d]||{};
+    if(acs.every(function(a){ return reg[a.id]; })) streak++;
+    else break;
+  }
+  return streak;
 }
-function streakA(id){
-  var s=0;
-  for(var i=1;i<=90;i++){var d=dayOff(i);var a=acoes.find(x=>x.id===id);if(!a||!aparece(a,d))continue;var r=reg[d]||{};if(r[id])s++;else break;}
-  return s;
+function calcStreakAcao(id){
+  var streak = 0;
+  for(var i=1;i<=90;i++){
+    var d = diasAtras(i);
+    var acao = acoes.find(function(a){ return a.id===id; });
+    if(!acao||!aparecerHoje(acao,d)) continue;
+    if((registros[d]||{})[id]) streak++;
+    else break;
+  }
+  return streak;
 }
-function diasSem(id){
-  var s=0;
-  for(var i=1;i<=30;i++){var d=dayOff(i);var a=acoes.find(x=>x.id===id);if(!a||!aparece(a,d))continue;if(!(reg[d]||{})[id])s++;else break;}
-  return s;
+function diasSemFazer(id){
+  var dias = 0;
+  for(var i=1;i<=30;i++){
+    var d = diasAtras(i);
+    var acao = acoes.find(function(a){ return a.id===id; });
+    if(!acao||!aparecerHoje(acao,d)) continue;
+    if(!(registros[d]||{})[id]) dias++;
+    else break;
+  }
+  return dias;
 }
 
-function catLabel(c){return{google:'Google',instagram:'Instagram',indicacao:'Indicação',conteudo:'Conteúdo',pj:'PJ/B2B',outros:'Outros'}[c]||c;}
-function freqLabel(f){return{diaria:'Diária','seg-sex':'Seg-Sex','3x-semana':'3x/sem',semanal:'Semanal'}[f]||f;}
+// ── Labels ────────────────────────────────────────────────────────────────────
+function catLabel(c){ return {google:'Google',instagram:'Instagram',indicacao:'Indicação',conteudo:'Conteúdo',pj:'PJ/B2B',outros:'Outros'}[c]||c; }
+function freqLabel(f){ return {diaria:'Diária','seg-sex':'Seg-Sex','3x-semana':'3x/sem',semanal:'Semanal'}[f]||f; }
 
+// ── Render: Hoje ──────────────────────────────────────────────────────────────
 function renderHoje(){
-  var acs=dodia(HOJE);
-  var r=reg[HOJE]||{};
-  var feitas=acs.filter(a=>r[a.id]).length;
-  var total=acs.length;
-  var pct=total?Math.round(feitas/total*100):0;
-  // score
-  document.getElementById('sc-num').innerHTML=feitas+'<span style="font-size:14px;color:var(--mu)">/'+(total)+'</span>';
-  document.getElementById('sc-fill').style.width=pct+'%';
-  document.getElementById('sc-pct').textContent=pct+'%';
-  document.getElementById('sc-streak').textContent='🔥 '+streak()+' dias seguidos';
-  var emjs=[['😴',0],['😐',20],['🙂',40],['💪',60],['🔥',80],['⚡',100]];
-  document.getElementById('sc-emoji').textContent=emjs.reduce((e,x)=>pct>=x[1]?x:e,emjs[0])[0];
-  // header
-  var dtFmt=new Date(HOJE+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',timeZone:'America/Sao_Paulo'});
-  document.getElementById('hdr-data').textContent=dtFmt;
-  document.getElementById('hoje-t').textContent='Ações de hoje ('+feitas+'/'+total+')';
-  document.getElementById('hoje-sub').textContent=pct===100?'✅ Tudo feito! Incrível 🚀':(total-feitas)+' pendente'+(total-feitas!==1?'s':'');
+  var acs = acoesDoDia(HOJE);
+  var reg = registros[HOJE]||{};
+  var feitas = acs.filter(function(a){ return reg[a.id]; }).length;
+  var total = acs.length;
+  var pct = total ? Math.round((feitas/total)*100) : 0;
+
+  // score bar
+  document.getElementById('score-num').innerHTML = feitas + '<span style="font-size:14px;color:var(--muted)">/' + total + '</span>';
+  document.getElementById('score-fill').style.width = pct + '%';
+  document.getElementById('score-pct').textContent = pct + '%';
+  document.getElementById('score-streak').textContent = '🔥 ' + calcStreakGlobal() + ' dias seguidos';
+  var emojis=[['😴',0],['😐',20],['🙂',40],['💪',60],['🔥',80],['⚡',100]];
+  var emoji = emojis.reduce(function(e,x){ return pct>=x[1]?x:e; }, emojis[0])[0];
+  document.getElementById('score-emoji').textContent = emoji;
+
+  // data
+  try {
+    var dtFmt = new Date(HOJE+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',timeZone:'America/Sao_Paulo'});
+    document.getElementById('hdr-data').textContent = dtFmt;
+  } catch(e){}
+
+  document.getElementById('hoje-titulo').textContent = 'Ações de hoje (' + feitas + '/' + total + ')';
+  document.getElementById('hoje-sub').textContent = pct===100 ? '✅ Tudo feito! Incrível 🚀' : (total-feitas) + ' ação' + (total-feitas!==1?'s':'') + ' pendente' + (total-feitas!==1?'s':'');
+
   // lista
-  var pend=acs.filter(a=>!r[a.id]);
-  var done=acs.filter(a=>r[a.id]);
-  var sorted=[...pend,...done];
+  var pendentes = acs.filter(function(a){ return !reg[a.id]; });
+  var feitasAcs = acs.filter(function(a){ return reg[a.id]; });
+  var sorted = pendentes.concat(feitasAcs);
+
   if(!sorted.length){
-    document.getElementById('lista').innerHTML='<div class="empty">Nenhuma ação para hoje.<br>Vá em <b>Ações</b> e cadastre suas rotinas.</div>';
+    document.getElementById('lista-hoje').innerHTML = '<div class="empty-state">Nenhuma ação para hoje.<br>Vá em <b>Ações</b> e cadastre suas rotinas de growth.</div>';
     return;
   }
-  document.getElementById('lista').innerHTML=sorted.map(a=>{
-    var feita=!!r[a.id];
-    var dias=diasSem(a.id);
-    var st=streakA(a.id);
-    var late=dias>=2&&!feita;
-    return '<div class="ac'+(feita?' ok':late?' late':'')+'" id="ac-'+a.id+'" onclick="toggle(\''+a.id+'\')">'+
-      '<div class="ac-inner">'+
-        '<div class="check">'+(feita?'✓':'')+'</div>'+
-        '<div class="ac-body">'+
-          '<div class="ac-nome">'+esc(a.nome)+'</div>'+
-          (a.desc?'<div class="ac-desc">'+esc(a.desc)+'</div>':'')+
-          '<div class="ac-tags">'+
-            '<span class="tag">'+catLabel(a.cat)+'</span>'+
-            '<span class="tag">'+freqLabel(a.freq)+'</span>'+
-          '</div>'+
-        '</div>'+
-        '<div class="ac-meta">'+
-          '<div class="streak" style="color:'+(st>0?'var(--yw)':'var(--mu)')+'">🔥'+st+'</div>'+
-          (late?'<div class="alerta">🚨 '+dias+'d</div>':'')+
-        '</div>'+
-      '</div>'+
+
+  document.getElementById('lista-hoje').innerHTML = sorted.map(function(a){
+    var feita = !!reg[a.id];
+    var dias = diasSemFazer(a.id);
+    var st = calcStreakAcao(a.id);
+    var late = dias >= 2 && !feita;
+    return '<div class="acao-card' + (feita?' feita':late?' atrasada':'') + '" id="ac-'+a.id+'" onclick="toggleAcao(\''+a.id+'\')">' +
+      '<div class="acao-inner">' +
+        '<div class="check-btn">' + (feita?'✓':'') + '</div>' +
+        '<div class="acao-body">' +
+          '<div class="acao-nome">' + esc(a.nome) + '</div>' +
+          (a.desc ? '<div class="acao-desc">' + esc(a.desc) + '</div>' : '') +
+          '<div class="acao-tags">' +
+            '<span class="tag">' + catLabel(a.cat) + '</span>' +
+            '<span class="tag">' + freqLabel(a.freq) + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="acao-meta">' +
+          '<div class="streak-val" style="color:' + (st>0?'var(--yellow)':'var(--muted)') + '">🔥' + st + '</div>' +
+          (late ? '<div class="alert-val">🚨 '+dias+'d</div>' : '') +
+        '</div>' +
+      '</div>' +
     '</div>';
   }).join('');
 }
 
-function toggle(id){
-  if(!reg[HOJE])reg[HOJE]={};
-  reg[HOJE][id]=!reg[HOJE][id];
-  if(reg[HOJE][id])toast('✅ Feito! +1 🔥');
-  save(); renderHoje();
+function toggleAcao(id){
+  if(!registros[HOJE]) registros[HOJE] = {};
+  registros[HOJE][id] = !registros[HOJE][id];
+  if(registros[HOJE][id]) showToast('✅ Feito! +1 🔥');
+  saveData(); renderHoje();
 }
 
+// ── Render: Semana ────────────────────────────────────────────────────────────
 function renderSemana(){
-  var dias7=Array.from({length:7},(_,i)=>dayOff(6-i));
-  var h='<div class="sh"><div class="sh-sp"></div><div style="display:flex;gap:4px;">';
-  dias7.forEach(d=>{var dt=new Date(d+'T12:00:00');h+='<div class="dl">'+['D','S','T','Q','Q','S','S'][dt.getDay()]+'<br>'+dt.getDate()+'</div>';});
-  h+='</div></div><div class="sg">';
-  acoes.forEach(a=>{
-    h+='<div class="sr"><div class="sr-nome" title="'+esc(a.nome)+'">'+esc(a.nome.substring(0,28))+'</div><div class="sr-dias">';
-    dias7.forEach(d=>{
-      if(!aparece(a,d)){h+='<div class="dot skip">·</div>';return;}
-      var feita=!!(reg[d]||{})[a.id];
-      var hj=d===HOJE;
-      h+='<div class="dot'+(feita?' ok':(!hj?' miss':'skip'))+(hj?' hj':'')+'">'+
-        (feita?'✓':(!hj?'✗':''))+
-      '</div>';
-    });
-    h+='</div></div>';
+  var dias7 = Array.from({length:7}, function(_,i){ return diasAtras(6-i); });
+  var h = '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">';
+  h += '<div style="width:190px;flex-shrink:0;"></div>';
+  dias7.forEach(function(d){
+    var dt = new Date(d+'T12:00:00');
+    var dn = ['D','S','T','Q','Q','S','S'][dt.getDay()];
+    h += '<div style="width:26px;text-align:center;font-family:var(--fm);font-size:9px;color:var(--muted);">'+dn+'<br>'+dt.getDate()+'</div>';
   });
-  h+='</div>';
-  document.getElementById('semana').innerHTML=h;
+  h += '</div>';
+  acoes.forEach(function(a){
+    h += '<div class="semana-row"><div class="semana-nome" title="'+esc(a.nome)+'">'+esc(a.nome.substring(0,26))+'</div>';
+    dias7.forEach(function(d){
+      if(!aparecerHoje(a,d)){ h+='<div class="dia-dot" style="color:var(--dim);">·</div>'; return; }
+      var feita = !!(registros[d]||{})[a.id];
+      var hj = d===HOJE;
+      h += '<div class="dia-dot'+(feita?' ok':(!hj?' miss':''))+(hj?' hoje':'')+'">'+(feita?'✓':(!hj?'✗':''))+'</div>';
+    });
+    h += '</div>';
+  });
+  document.getElementById('semana-grid').innerHTML = h || '<div class="empty-state">Nenhuma ação cadastrada.</div>';
 }
 
-function renderConqs(){
-  var st=streak();
-  var total=Object.values(reg).reduce((s,r)=>s+Object.values(r).filter(Boolean).length,0);
-  var CS=[
-    {i:'🔥',n:'Primeira ação',d:'1 check-in',ok:()=>total>=1},
-    {i:'⚡',n:'3 dias seguidos',d:'100% por 3 dias',ok:()=>st>=3},
-    {i:'💪',n:'7 dias seguidos',d:'Uma semana perfeita',ok:()=>st>=7},
-    {i:'🏆',n:'30 dias seguidos',d:'Um mês de consistência',ok:()=>st>=30},
-    {i:'🌟',n:'50 ações',d:'50 check-ins',ok:()=>total>=50},
-    {i:'🚀',n:'100 ações',d:'100 check-ins',ok:()=>total>=100},
-    {i:'📈',n:'Dia perfeito',d:'100% num único dia',ok:()=>{var a=dodia(HOJE);var r=reg[HOJE]||{};return a.length>0&&a.every(x=>r[x.id]);}},
+// ── Render: Conquistas ────────────────────────────────────────────────────────
+function renderConquistas(){
+  var streak = calcStreakGlobal();
+  var totalFeitas = Object.values(registros).reduce(function(s,r){ return s+Object.values(r).filter(Boolean).length; }, 0);
+  var CS = [
+    {i:'🔥',n:'Primeira ação',d:'1º check-in',ok:totalFeitas>=1},
+    {i:'⚡',n:'3 dias seguidos',d:'100% por 3 dias',ok:streak>=3},
+    {i:'💪',n:'7 dias seguidos',d:'Semana perfeita',ok:streak>=7},
+    {i:'🏆',n:'30 dias seguidos',d:'Mês de consistência',ok:streak>=30},
+    {i:'🌟',n:'50 ações feitas',d:'50 check-ins',ok:totalFeitas>=50},
+    {i:'🚀',n:'100 ações feitas',d:'100 check-ins',ok:totalFeitas>=100},
+    {i:'📈',n:'Dia perfeito',d:'100% num dia',ok:(function(){var a=acoesDoDia(HOJE);var r=registros[HOJE]||{};return a.length>0&&a.every(function(x){return r[x.id];});})()},
   ];
-  document.getElementById('conqs').innerHTML=CS.map(c=>{
-    var ok=c.ok();
-    return '<div class="conq'+(ok?' ok2':' off')+'">'+
-      '<div class="ci">'+c.i+'</div>'+
-      '<div><div class="cn">'+esc(c.n)+'</div><div class="cd">'+esc(c.d)+'</div></div>'+
-      '<div style="font-size:18px;margin-left:auto;">'+(ok?'✅':'🔒')+'</div>'+
+  document.getElementById('lista-conquistas').innerHTML = CS.map(function(c){
+    return '<div class="conq-item '+(c.ok?'desbloqueada':'bloqueada')+'">' +
+      '<div class="conq-icon">'+c.i+'</div>' +
+      '<div><div class="conq-nome">'+esc(c.n)+'</div><div class="conq-desc">'+esc(c.d)+'</div></div>' +
+      '<div style="font-size:18px;margin-left:auto;">'+(c.ok?'✅':'🔒')+'</div>' +
     '</div>';
   }).join('');
 }
 
-function renderCfg(){
-  document.getElementById('cfg-lista').innerHTML=acoes.length?acoes.map(a=>{
-    return '<div class="cfg-card">'+
-      '<div><div class="cfg-nome">'+esc(a.nome)+'</div>'+
-      '<div class="cfg-sub">'+catLabel(a.cat)+' · '+freqLabel(a.freq)+'</div></div>'+
-      '<button class="hbtn" onclick="openModal(\''+a.id+'\')">Editar</button>'+
+// ── Render: Config ────────────────────────────────────────────────────────────
+function renderConfig(){
+  document.getElementById('lista-config').innerHTML = acoes.length ? acoes.map(function(a){
+    return '<div class="cfg-item">' +
+      '<div><div class="cfg-nome">'+esc(a.nome)+'</div>' +
+      '<div class="cfg-sub">'+catLabel(a.cat)+' · '+freqLabel(a.freq)+'</div></div>' +
+      '<button class="hbtn" onclick="abrirModal(\''+a.id+'\')">Editar</button>' +
     '</div>';
-  }).join(''):'<div class="empty">Nenhuma ação. Clique em "+ Nova".</div>';
+  }).join('') : '<div class="empty-state">Nenhuma ação. Clique em "+ Nova Ação".</div>';
 }
 
-function openModal(id){
-  editId=id||null;
-  document.getElementById('m-title').textContent=id?'Editar Ação':'Nova Ação';
-  document.getElementById('m-del').style.display=id?'block':'none';
-  if(id){var a=acoes.find(x=>x.id===id)||{};
-    document.getElementById('m-id').value=a.id||'';
-    document.getElementById('m-nome').value=a.nome||'';
-    document.getElementById('m-desc').value=a.desc||'';
-    document.getElementById('m-cat').value=a.cat||'outros';
-    document.getElementById('m-freq').value=a.freq||'diaria';
-  }else{['m-id','m-nome','m-desc'].forEach(x=>document.getElementById(x).value='');
-    document.getElementById('m-cat').value='outros';document.getElementById('m-freq').value='diaria';}
-  document.getElementById('ov-modal').classList.add('on');
-  document.getElementById('m-nome').focus();
+// ── Modal ─────────────────────────────────────────────────────────────────────
+function abrirModal(id){
+  _editId = id || null;
+  document.getElementById('modal-titulo').textContent = id ? 'Editar Ação' : 'Nova Ação de Growth';
+  document.getElementById('btn-excluir').style.display = id ? 'block' : 'none';
+  if(id){
+    var a = acoes.find(function(x){ return x.id===id; }) || {};
+    document.getElementById('acao-edit-id').value = a.id||'';
+    document.getElementById('acao-nome').value = a.nome||'';
+    document.getElementById('acao-desc').value = a.desc||'';
+    document.getElementById('acao-cat').value = a.cat||'outros';
+    document.getElementById('acao-freq').value = a.freq||'diaria';
+  } else {
+    ['acao-edit-id','acao-nome','acao-desc'].forEach(function(x){ document.getElementById(x).value=''; });
+    document.getElementById('acao-cat').value = 'outros';
+    document.getElementById('acao-freq').value = 'diaria';
+  }
+  document.getElementById('modal-acao').classList.add('open');
+  setTimeout(function(){ document.getElementById('acao-nome').focus(); }, 50);
 }
-function closeModal(){document.getElementById('ov-modal').classList.remove('on');}
-function save2(){
-  var nome=document.getElementById('m-nome').value.trim();
-  if(!nome){alert('Nome obrigatório');return;}
-  var a={id:editId||(Date.now().toString(36)),nome,desc:document.getElementById('m-desc').value.trim(),cat:document.getElementById('m-cat').value,freq:document.getElementById('m-freq').value};
-  if(editId){var i=acoes.findIndex(x=>x.id===editId);if(i>-1)acoes[i]=a;}else acoes.push(a);
-  saveData();closeModal();renderHoje();toast(editId?'Ação atualizada':'Ação criada!');
+function fecharModal(){ document.getElementById('modal-acao').classList.remove('open'); }
+function salvarAcao(){
+  var nome = document.getElementById('acao-nome').value.trim();
+  if(!nome){ alert('Informe o nome da ação'); return; }
+  var acao = {
+    id: _editId || (Date.now().toString(36)),
+    nome: nome,
+    desc: document.getElementById('acao-desc').value.trim(),
+    cat:  document.getElementById('acao-cat').value,
+    freq: document.getElementById('acao-freq').value
+  };
+  if(_editId){ var i=acoes.findIndex(function(a){return a.id===_editId;}); if(i>-1)acoes[i]=acao; }
+  else acoes.push(acao);
+  fecharModal(); saveData(); renderHoje();
+  showToast(_editId ? 'Ação atualizada!' : 'Ação criada! 🚀');
 }
-function del(){
-  if(!confirm('Excluir?'))return;
-  acoes=acoes.filter(a=>a.id!==editId);
-  saveData();closeModal();renderHoje();toast('Removida',true);
+function excluirAcao(){
+  if(!confirm('Excluir esta ação?')) return;
+  acoes = acoes.filter(function(a){ return a.id!==_editId; });
+  fecharModal(); saveData(); renderHoje(); showToast('Ação removida', true);
 }
 
+// ── Persistência ──────────────────────────────────────────────────────────────
 function saveData(){
-  var payload=JSON.stringify({acoes,registros:reg});
-  fetch('/api/growth?action=salvar',{method:'POST',headers:{'Content-Type':'application/json'},body:payload}).catch(()=>{});
-  try{localStorage.setItem('growth_v2',payload);}catch(e){}
+  var payload = JSON.stringify({acoes:acoes,registros:registros});
+  try { localStorage.setItem('growth_v2', payload); } catch(e){}
+  fetch('/api/growth?action=salvar', {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: payload
+  }).catch(function(){});
 }
-
 function loadData(){
-  fetch('/api/growth?action=carregar').then(r=>r.json()).then(d=>{
-    if(d.ok&&d.data&&Array.isArray(d.data.acoes)&&d.data.acoes.length){
-      acoes=d.data.acoes;reg=d.data.registros||{};
-    }else{loadLocal();}
+  // 1. Tentar API
+  fetch('/api/growth?action=carregar').then(function(r){ return r.json(); }).then(function(d){
+    if(d && d.ok && d.data && Array.isArray(d.data.acoes) && d.data.acoes.length > 0){
+      acoes = d.data.acoes;
+      registros = d.data.registros || {};
+    } else {
+      loadLocal();
+    }
     renderHoje();
-  }).catch(()=>{loadLocal();renderHoje();});
+  }).catch(function(){
+    loadLocal();
+    renderHoje();
+  });
 }
 function loadLocal(){
-  try{var raw=localStorage.getItem('growth_v2');
-    if(raw){var d=JSON.parse(raw);acoes=Array.isArray(d.acoes)&&d.acoes.length?d.acoes:[...DEF];reg=d.registros||{};}
-    else{acoes=[...DEF];reg={};}
-  }catch(e){acoes=[...DEF];reg={};}
+  try {
+    var raw = localStorage.getItem('growth_v2');
+    if(raw){
+      var d = JSON.parse(raw);
+      acoes = (Array.isArray(d.acoes) && d.acoes.length > 0) ? d.acoes : DEFAULTS.slice();
+      registros = d.registros || {};
+    } else {
+      acoes = DEFAULTS.slice();
+      registros = {};
+    }
+  } catch(e){
+    acoes = DEFAULTS.slice();
+    registros = {};
+  }
 }
 
+// ── Init ──────────────────────────────────────────────────────────────────────
 loadData();
 </script>
 </body>
