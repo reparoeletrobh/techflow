@@ -513,7 +513,7 @@ module.exports = async function handler(req, res) {
 
     function priNome(n) { return n ? n.trim().split(/\s+/)[0] : 'cliente'; }
 
-    function gerarTexto(tipo, subtipo, servicos, precoInput, templates) {
+    function gerarTexto(tipo, subtipo, servicos, precoInput, templates, modelo) {
       const pn = priNome(nome);
       const s  = servicos || [];
       const tem = (lista) => s.some(x => lista.includes(x));
@@ -531,22 +531,22 @@ module.exports = async function handler(req, res) {
 
       if (tipo === 'tv') {
         const chips = servicos || [];
-        const modelo = eq.modelo || 'TV';
+        const tvModelo = modelo || 'TV';
         const pn = priNome(nome);
         if (chips.includes('condenada')) {
-          return { texto: `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro. Fizemos o diagnóstico completo da ${modelo} e infelizmente ela está condenada — sem possibilidade de conserto viável. Podemos descartar ou devolver conforme sua preferência.`, preco: null };
+          return { texto: `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro. Fizemos o diagnóstico completo da ${tvModelo} e infelizmente ela está condenada — sem possibilidade de conserto viável. Podemos descartar ou devolver conforme sua preferência.`, preco: null };
         }
         if (chips.includes('risco')) {
-          const p = parseFloat(eq.preco) || 0;
-          return { texto: `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro. Fizemos o diagnóstico da ${modelo}. Identificamos um problema no ${chips.filter(x=>x!=='risco').join(' e ') || 'circuito'}. O conserto fica por R$ ${p} — há um risco associado ao reparo que precisa da sua aprovação.`, preco: String(p) };
+          const p = parseFloat(precoInput) || 0;
+          return { texto: `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro. Fizemos o diagnóstico da ${tvModelo}. Identificamos um problema no ${chips.filter(x=>x!=='risco').join(' e ') || 'circuito'}. O conserto fica por R$ ${p} — há um risco associado ao reparo que precisa da sua aprovação.`, preco: String(p) };
         }
         if (chips.includes('acrilico')) {
-          const p = parseFloat(eq.preco) || 0;
-          return { texto: `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro. O diagnóstico da ${modelo} está pronto. Vamos fazer a proteção em acrílico + serviços adicionais. Valor total: R$ ${p}. Aprovando já iniciamos.`, preco: String(p) };
+          const p = parseFloat(precoInput) || 0;
+          return { texto: `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro. O diagnóstico da ${tvModelo} está pronto. Vamos fazer a proteção em acrílico + serviços adicionais. Valor total: R$ ${p}. Aprovando já iniciamos.`, preco: String(p) };
         }
         const servStr = chips.filter(x=>!['condenada','risco','acrilico'].includes(x)).join(' e ') || 'componentes';
-        const p = parseFloat(eq.preco) || 0;
-        return { texto: `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro. Fizemos o diagnóstico completo da ${modelo}. Precisamos fazer a troca/reparo do ${servStr}. O conserto completo fica em R$ ${p||'[valor]'}. Aprovando já iniciamos.`, preco: p ? String(p) : null };
+        const p = parseFloat(precoInput) || 0;
+        return { texto: `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro. Fizemos o diagnóstico completo da ${tvModelo}. Precisamos fazer a troca/reparo do ${servStr}. O conserto completo fica em R$ ${p||'[valor]'}. Aprovando já iniciamos.`, preco: p ? String(p) : null };
       }
 
       if (tipo === 'microondas') {
@@ -620,7 +620,7 @@ module.exports = async function handler(req, res) {
 
     // Gerar texto para cada equipamento
     const resultados = equips.map(eq =>
-      gerarTexto(eq.tipo, eq.subtipo, eq.servicos, eq.preco, customTemplates)
+      gerarTexto(eq.tipo, eq.subtipo, eq.servicos, eq.preco, customTemplates, eq.modelo)
     );
 
     // Texto final
