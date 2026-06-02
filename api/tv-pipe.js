@@ -1521,6 +1521,62 @@ export default async function handler(req, res) {
   }
 
 
+
+  // ── GET diagnostico-liberado-rota ───────────────────────────────────────
+  if (action === 'diagnostico-liberado-rota') {
+    try {
+      const _U=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+      const _T=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+      async function _dr(k){const r=await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();const v=j[0]?.result;if(!v)return null;try{let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+      const logDb = (await _dr('tv_logistica')) || {fichas:[]};
+      const fichasLR = (logDb.fichas||[]).filter(f=>f.phase==='liberado_para_rota');
+      // Agrupar por origem e pipefyCardId para detectar duplicatas
+      const porPipefyId = {};
+      fichasLR.forEach(f=>{
+        const pid = f.pipefyCardId || 'sem_pipefy';
+        if(!porPipefyId[pid]) porPipefyId[pid]=[];
+        porPipefyId[pid].push({id:f.id,nome:f.nome,pipefyCardId:f.pipefyCardId,pipeCardId:f.pipeCardId,origem:f.origem,criadoEm:f.criadoEm,movedAt:f.movedAt});
+      });
+      const duplicatas = Object.entries(porPipefyId).filter(([k,v])=>v.length>1).map(([k,v])=>({pipefyId:k,fichas:v}));
+      const unicas = fichasLR.filter(f=>{
+        const pid=f.pipefyCardId||'sem_pipefy';
+        return !duplicatas.some(d=>d.pipefyId===pid);
+      });
+      return res.status(200).json({
+        ok:true,
+        total: fichasLR.length,
+        duplicatas: duplicatas.length,
+        fichasUnicas: unicas.length,
+        lista: fichasLR.map(f=>({id:f.id,nome:f.nome,pipefyCardId:f.pipefyCardId,pipeCardId:f.pipeCardId,origem:f.origem||'?',criadoEm:f.criadoEm})),
+        detalheDuplicatas: duplicatas
+      });
+    } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
+  }
+
+  // ── GET limpar-liberado-rota-dup — remove duplicatas, mantém 1 por pipefyId ──
+  if (action === 'limpar-liberado-rota-dup') {
+    try {
+      const _U=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+      const _T=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+      async function _lr(k){const r=await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();const v=j[0]?.result;if(!v)return null;try{let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+      async function _ls(k,v){await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+      const logDb = (await _lr('tv_logistica')) || {fichas:[]};
+      const antes = (logDb.fichas||[]).length;
+      // Para fichas em liberado_para_rota: manter só a mais recente por pipefyCardId
+      const naoLR = (logDb.fichas||[]).filter(f=>f.phase!=='liberado_para_rota');
+      const lr = (logDb.fichas||[]).filter(f=>f.phase==='liberado_para_rota');
+      const visto = new Set();
+      const lrUnicas = lr.filter(f=>{
+        const key = f.pipefyCardId||f.id;
+        if(visto.has(key)) return false;
+        visto.add(key); return true;
+      });
+      logDb.fichas = [...naoLR, ...lrUnicas];
+      await _ls('tv_logistica', logDb);
+      return res.status(200).json({ok:true, antes, depois:logDb.fichas.length, removidas:antes-logDb.fichas.length, lrRestantes:lrUnicas.length});
+    } catch(e){ return res.status(500).json({ok:false,error:e.message}); }
+  }
+
   // ── GET migrar-liberado-rota: move fichas liberado_para_rota pipe -> logistica ──
   if (action === 'migrar-liberado-rota') {
     try {
