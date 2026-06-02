@@ -10,231 +10,231 @@
   --bg:#07080a;--surface:#0f1114;--surface2:#181b1f;--border:#1e2228;
   --text:#f0f2f5;--muted:#5a6270;--dim:#2a2f38;
   --accent:#f97316;--green:#22c55e;--red:#ef4444;--blue:#3b9eff;
-  --yellow:#f5c800;--purple:#a855f7;--cyan:#06b6d4;
+  --yellow:#f5c800;--purple:#a855f7;
   --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;}
-header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:100;}
+
+/* HEADER */
+header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:100;}
 .logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
-.logo-icon{width:28px;height:28px;background:linear-gradient(135deg,var(--green),var(--blue));border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;}
-.hdr-right{display:flex;gap:8px;}
-.hbtn{font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;transition:all .15s;}
-.hbtn:hover,.hbtn.active{color:var(--text);border-color:var(--accent);background:rgba(249,115,22,.08);}
+.logo-icon{width:28px;height:28px;background:linear-gradient(135deg,#f97316,#f5c800);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:15px;}
+.hdr-right{display:flex;gap:8px;align-items:center;}
+.hbtn{font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
+.hbtn:hover{color:var(--text);border-color:var(--accent);}
+.hbtn.act{color:var(--accent);border-color:rgba(249,115,22,.4);background:rgba(249,115,22,.08);}
+
+/* SCORE DO DIA */
+.score-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:16px;}
+.score-num{font-family:var(--fh);font-size:28px;font-weight:800;}
+.score-label{font-family:var(--fm);font-size:11px;color:var(--muted);}
+.score-track{flex:1;height:8px;background:var(--dim);border-radius:4px;overflow:hidden;}
+.score-fill{height:100%;border-radius:4px;transition:width .4s ease;background:linear-gradient(90deg,var(--accent),var(--yellow));}
+.score-pct{font-family:var(--fh);font-size:16px;font-weight:800;}
+.score-data{font-family:var(--fm);font-size:11px;color:var(--muted);}
+.score-streak{display:flex;align-items:center;gap:4px;font-family:var(--fm);font-size:11px;color:var(--yellow);}
+
 /* TABS */
-.tabs-bar{display:flex;border-bottom:1px solid var(--border);padding:0 24px;background:var(--bg);position:sticky;top:52px;z-index:90;}
-.tab-btn{font-family:var(--fm);font-size:11px;font-weight:600;padding:12px 20px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;}
-.tab-btn:hover{color:var(--text);}
+.tabs-bar{display:flex;padding:0 20px;border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:52px;z-index:90;}
+.tab-btn{font-family:var(--fm);font-size:11px;padding:11px 18px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;}
 .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
-.tab-pane{display:none;padding:24px;max-width:1400px;margin:0 auto;}
-.tab-pane.active{display:block;}
-/* CARDS SUMÁRIO */
-.sumario{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px;}
-.sum-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;}
-.sum-label{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;}
-.sum-val{font-family:var(--fh);font-size:22px;font-weight:800;}
-.sum-sub{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:4px;}
-/* KANBAN CANAIS */
-.kanban{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;}
-.canal-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;position:relative;transition:border-color .15s;}
-.canal-card:hover{border-color:var(--dim);}
-.canal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
-.canal-nome{font-family:var(--fh);font-size:14px;font-weight:800;}
-.semaforo{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
-.s-verde{background:var(--green);box-shadow:0 0 8px rgba(34,197,94,.5);}
-.s-amarelo{background:var(--yellow);box-shadow:0 0 8px rgba(245,200,0,.5);}
-.s-vermelho{background:var(--red);box-shadow:0 0 8px rgba(239,68,68,.5);}
-.s-cinza{background:var(--muted);}
-.canal-tipo{font-family:var(--fm);font-size:9px;color:var(--muted);padding:2px 8px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);}
-.canal-metricas{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0;}
-.met{background:var(--surface2);border-radius:7px;padding:10px 12px;}
-.met-label{font-family:var(--fm);font-size:9px;color:var(--muted);margin-bottom:3px;}
-.met-val{font-family:var(--fh);font-size:16px;font-weight:800;}
-.met-val.good{color:var(--green);}
-.met-val.warn{color:var(--yellow);}
-.met-val.bad{color:var(--red);}
-.ice-bar{display:flex;align-items:center;gap:8px;margin:10px 0;}
-.ice-label{font-family:var(--fm);font-size:9px;color:var(--muted);width:20px;}
-.ice-track{flex:1;height:5px;background:var(--dim);border-radius:3px;}
-.ice-fill{height:100%;border-radius:3px;background:var(--accent);}
-.ice-score-badge{font-family:var(--fh);font-size:20px;font-weight:800;text-align:right;}
-.canal-responsavel{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:8px;}
-.canal-footer{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
-.canal-acao{font-family:var(--fm);font-size:10px;color:var(--blue);}
-.btn-small{font-family:var(--fm);font-size:10px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
-.btn-small:hover{color:var(--text);border-color:var(--accent);}
-/* RANKING */
-.ranking-list{display:flex;flex-direction:column;gap:8px;}
-.rank-item{display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;}
-.rank-num{font-family:var(--fh);font-size:18px;font-weight:800;color:var(--muted);width:24px;}
-.rank-num.top{color:var(--yellow);}
-.rank-info{flex:1;}
-.rank-nome{font-family:var(--fh);font-size:14px;font-weight:800;margin-bottom:2px;}
-.rank-sub{font-family:var(--fm);font-size:10px;color:var(--muted);}
-.rank-barra{width:200px;}
-.rank-track{height:6px;background:var(--dim);border-radius:3px;}
-.rank-fill{height:100%;border-radius:3px;}
-.rank-val{font-family:var(--fh);font-size:16px;font-weight:800;text-align:right;min-width:60px;}
+
+/* PANES */
+.pane{display:none;padding:20px;max-width:900px;margin:0 auto;}
+.pane.active{display:block;}
+
+/* LISTA DE AÇÕES DO DIA */
+.acoes-list{display:flex;flex-direction:column;gap:10px;}
+
+.acao-card{border-radius:12px;border:1px solid var(--border);background:var(--surface);overflow:hidden;transition:all .2s;cursor:pointer;}
+.acao-card:hover{border-color:var(--dim);}
+.acao-card.feita{border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.04);}
+.acao-card.nao-feita.atrasada{border-color:rgba(239,68,68,.5);background:rgba(239,68,68,.04);animation:pulse-red 2s infinite;}
+@keyframes pulse-red{0%,100%{border-color:rgba(239,68,68,.5);}50%{border-color:rgba(239,68,68,.9);}}
+
+.acao-inner{display:flex;align-items:center;gap:14px;padding:14px 16px;}
+.check-btn{width:36px;height:36px;border-radius:50%;border:2px solid var(--border);background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;flex-shrink:0;font-size:18px;}
+.feita .check-btn{background:var(--green);border-color:var(--green);}
+.nao-feita.atrasada .check-btn{border-color:rgba(239,68,68,.6);}
+.acao-body{flex:1;}
+.acao-nome{font-family:var(--fb);font-size:14px;font-weight:600;margin-bottom:3px;transition:all .2s;}
+.feita .acao-nome{text-decoration:line-through;color:var(--muted);}
+.acao-desc{font-family:var(--fm);font-size:10px;color:var(--muted);}
+.acao-meta{display:flex;align-items:center;gap:8px;flex-shrink:0;text-align:right;}
+.streak-badge{font-family:var(--fh);font-size:13px;font-weight:800;display:flex;align-items:center;gap:3px;}
+.freq-badge{font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:4px;border:1px solid var(--border);color:var(--muted);}
+.alert-badge{font-family:var(--fm);font-size:10px;font-weight:700;color:var(--red);display:flex;align-items:center;gap:4px;}
+
+/* SEÇÃO */
+.sec-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.sec-title{font-family:var(--fh);font-size:15px;font-weight:800;}
+.btn-add{font-family:var(--fm);font-size:11px;padding:6px 14px;border-radius:7px;border:1px solid var(--accent);background:rgba(249,115,22,.1);color:var(--accent);cursor:pointer;font-weight:700;}
+
+/* SEMANA VISUAL */
+.semana-grid{display:flex;flex-direction:column;gap:8px;margin-top:16px;}
+.semana-row{display:flex;align-items:center;gap:8px;}
+.semana-nome{font-family:var(--fm);font-size:11px;color:var(--muted);width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;}
+.semana-dias{display:flex;gap:4px;}
+.dia-dot{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--fm);font-size:9px;border:1px solid var(--border);}
+.dia-dot.ok{background:rgba(34,197,94,.2);border-color:rgba(34,197,94,.4);color:var(--green);}
+.dia-dot.miss{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:var(--red);}
+.dia-dot.skip{background:transparent;color:var(--muted);}
+.dia-dot.hoje{border-color:var(--accent);}
+.semana-header{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.semana-header-nome{width:180px;flex-shrink:0;}
+.dia-label{width:28px;text-align:center;font-family:var(--fm);font-size:9px;color:var(--muted);}
+
 /* MODAL */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:none;align-items:center;justify-content:center;}
-.modal-overlay.open{display:flex;}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;width:520px;max-height:90vh;overflow-y:auto;padding:24px;}
-.modal-title{font-family:var(--fh);font-size:16px;font-weight:800;margin-bottom:20px;}
-.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-.form-full{grid-column:1/-1;}
-.form-group{display:flex;flex-direction:column;gap:4px;}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:none;align-items:center;justify-content:center;}
+.overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;width:460px;max-height:90vh;overflow-y:auto;padding:24px;}
+.modal-title{font-family:var(--fh);font-size:15px;font-weight:800;margin-bottom:18px;}
+.form-group{display:flex;flex-direction:column;gap:5px;margin-bottom:14px;}
 .form-label{font-family:var(--fm);font-size:10px;color:var(--muted);}
-.form-input,.form-select,.form-textarea{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px 12px;color:var(--text);font-family:var(--fm);font-size:12px;outline:none;transition:border-color .15s;}
+.form-input,.form-select,.form-textarea{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--text);font-family:var(--fm);font-size:12px;outline:none;transition:border-color .15s;width:100%;}
 .form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent);}
-.form-textarea{min-height:60px;resize:vertical;}
-.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;}
-.btn-cancel{font-family:var(--fm);font-size:11px;padding:8px 18px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;}
+.form-textarea{min-height:56px;resize:vertical;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;}
+.btn-cancel{font-family:var(--fm);font-size:11px;padding:8px 16px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;}
 .btn-save{font-family:var(--fm);font-size:11px;padding:8px 18px;border-radius:7px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:700;}
-.ice-input-row{display:flex;gap:8px;align-items:center;}
-.ice-num{width:60px;}
+.btn-del{font-family:var(--fm);font-size:11px;padding:8px 16px;border-radius:7px;border:1px solid rgba(239,68,68,.3);background:transparent;color:var(--red);cursor:pointer;margin-right:auto;}
+
+/* CONQUISTAS */
+.conquistas{display:flex;flex-wrap:wrap;gap:10px;}
+.conquista{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:10px;}
+.conquista.desbloqueada{border-color:rgba(245,200,0,.4);background:rgba(245,200,0,.04);}
+.conquista.bloqueada{opacity:.4;}
+.conq-icon{font-size:24px;}
+.conq-nome{font-family:var(--fh);font-size:13px;font-weight:800;}
+.conq-desc{font-family:var(--fm);font-size:10px;color:var(--muted);}
+
 /* TOAST */
-.toast{position:fixed;bottom:24px;right:24px;background:var(--green);color:#000;font-family:var(--fm);font-size:12px;font-weight:700;padding:10px 18px;border-radius:8px;transform:translateY(60px);opacity:0;transition:all .3s;z-index:2000;}
-.toast.show{transform:translateY(0);opacity:1;}
-.sec-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
-.sec-title{font-family:var(--fh);font-size:16px;font-weight:800;}
-.btn-add{font-family:var(--fm);font-size:11px;padding:7px 16px;border-radius:7px;border:1px solid var(--accent);background:rgba(249,115,22,.1);color:var(--accent);cursor:pointer;font-weight:700;}
-/* LEADS TAB */
-.leads-table{width:100%;border-collapse:collapse;}
-.leads-table th{font-family:var(--fm);font-size:10px;color:var(--muted);text-align:left;padding:10px 14px;border-bottom:1px solid var(--border);}
-.leads-table td{font-family:var(--fm);font-size:11px;padding:10px 14px;border-bottom:1px solid rgba(30,34,40,.5);}
-.status-badge{padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;}
-.sb-novo{background:rgba(59,158,255,.15);color:var(--blue);}
-.sb-contatado{background:rgba(245,200,0,.15);color:var(--yellow);}
-.sb-convertido{background:rgba(34,197,94,.15);color:var(--green);}
-.sb-perdido{background:rgba(239,68,68,.15);color:var(--red);}
-.empty-state{text-align:center;padding:48px 24px;color:var(--muted);font-family:var(--fm);font-size:12px;}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--green);color:#000;font-family:var(--fm);font-size:12px;font-weight:700;padding:10px 18px;border-radius:8px;opacity:0;transform:translateY(10px);transition:all .25s;z-index:999;pointer-events:none;}
+.toast.show{opacity:1;transform:translateY(0);}
+
+/* AÇÃO FEITA ANIMAÇÃO */
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
+.pop{animation:pop .25s ease;}
+
+/* CAT BADGE */
+.cat-badge{font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:4px;}
+.cat-instagram{background:rgba(168,85,247,.15);color:var(--purple);}
+.cat-google{background:rgba(59,158,255,.15);color:var(--blue);}
+.cat-indicacao{background:rgba(34,197,94,.15);color:var(--green);}
+.cat-conteudo{background:rgba(245,200,0,.15);color:var(--yellow);}
+.cat-pj{background:rgba(249,115,22,.15);color:var(--accent);}
+.cat-outros{background:rgba(90,98,112,.15);color:var(--muted);}
+
+.empty{text-align:center;padding:48px;color:var(--muted);font-family:var(--fm);font-size:12px;}
 </style>
 </head>
 <body>
 
 <header>
   <div class="logo">
-    <div class="logo-icon">📈</div>
+    <div class="logo-icon">🚀</div>
     <span>Growth</span>
   </div>
   <div class="hdr-right">
-    <button class="hbtn" onclick="abrirModalCanal()">+ Canal</button>
-    <button class="hbtn" onclick="abrirModalLead()">+ Lead</button>
-    <button class="hbtn" onclick="load()">↻</button>
+    <span class="score-data" id="hdr-data"></span>
+    <button class="hbtn" onclick="openModalAcao()">+ Ação</button>
   </div>
 </header>
 
+<!-- SCORE BAR -->
+<div class="score-bar">
+  <div>
+    <div class="score-label">HOJE</div>
+    <div class="score-num" id="score-num">0<span style="font-size:16px;color:var(--muted)">/0</span></div>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+    <div class="score-track"><div class="score-fill" id="score-fill" style="width:0%"></div></div>
+    <div style="display:flex;justify-content:space-between;">
+      <span class="score-pct" id="score-pct">0%</span>
+      <span class="score-streak" id="score-streak">🔥 — dias seguidos</span>
+    </div>
+  </div>
+  <div id="score-emoji" style="font-size:36px;margin-left:8px;">😴</div>
+</div>
+
+<!-- TABS -->
 <div class="tabs-bar">
-  <button class="tab-btn active" onclick="showTab('visao-geral',this)">Visão Geral</button>
-  <button class="tab-btn" onclick="showTab('canais',this)">Canais</button>
-  <button class="tab-btn" onclick="showTab('ranking',this)">Ranking ICE</button>
-  <button class="tab-btn" onclick="showTab('leads',this)">Leads</button>
+  <button class="tab-btn active" onclick="showTab('hoje',this)">Hoje</button>
+  <button class="tab-btn" onclick="showTab('semana',this)">Semana</button>
+  <button class="tab-btn" onclick="showTab('conquistas',this)">Conquistas</button>
+  <button class="tab-btn" onclick="showTab('config',this)">Ações</button>
 </div>
 
-<!-- VISÃO GERAL -->
-<div class="tab-pane active" id="tab-visao-geral">
-  <div class="sumario" id="sumario"></div>
-  <div class="sec-header"><span class="sec-title">🚦 Semáforo de Canais</span></div>
-  <div class="kanban" id="kanban-resumo"></div>
-</div>
-
-<!-- CANAIS -->
-<div class="tab-pane" id="tab-canais">
-  <div class="sec-header">
-    <span class="sec-title">Todos os Canais</span>
-    <button class="btn-add" onclick="abrirModalCanal()">+ Novo Canal</button>
+<!-- HOJE -->
+<div class="pane active" id="pane-hoje">
+  <div class="sec-header" style="margin-bottom:16px;">
+    <div>
+      <div class="sec-title" id="hoje-titulo">Ações de hoje</div>
+      <div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px;" id="hoje-sub"></div>
+    </div>
   </div>
-  <div class="kanban" id="kanban-full"></div>
+  <div class="acoes-list" id="lista-hoje"></div>
 </div>
 
-<!-- RANKING ICE -->
-<div class="tab-pane" id="tab-ranking">
-  <div class="sec-header"><span class="sec-title">Ranking por ICE Score</span><span style="font-family:var(--fm);font-size:11px;color:var(--muted)">Impacto × Confiança × Facilidade — onde focar energia</span></div>
-  <div class="ranking-list" id="ranking-list"></div>
+<!-- SEMANA -->
+<div class="pane" id="pane-semana">
+  <div class="sec-header"><div class="sec-title">Histórico da semana</div></div>
+  <div id="semana-content"></div>
 </div>
 
-<!-- LEADS -->
-<div class="tab-pane" id="tab-leads">
+<!-- CONQUISTAS -->
+<div class="pane" id="pane-conquistas">
+  <div class="sec-header"><div class="sec-title">🏆 Conquistas</div></div>
+  <div class="conquistas" id="lista-conquistas"></div>
+</div>
+
+<!-- CONFIG -->
+<div class="pane" id="pane-config">
   <div class="sec-header">
-    <span class="sec-title">Leads</span>
-    <button class="btn-add" onclick="abrirModalLead()">+ Novo Lead</button>
+    <div class="sec-title">Gerenciar Ações</div>
+    <button class="btn-add" onclick="openModalAcao()">+ Nova Ação</button>
   </div>
-  <table class="leads-table">
-    <thead><tr><th>Nome</th><th>Canal</th><th>Telefone</th><th>Status</th><th>Criado</th><th></th></tr></thead>
-    <tbody id="leads-tbody"></tbody>
-  </table>
+  <div class="acoes-list" id="lista-config"></div>
 </div>
 
-<!-- MODAL CANAL -->
-<div class="modal-overlay" id="modal-canal">
+<!-- MODAL AÇÃO -->
+<div class="overlay" id="modal-acao">
   <div class="modal">
-    <div class="modal-title" id="modal-canal-title">Novo Canal</div>
-    <div class="form-grid">
-      <input type="hidden" id="canal-id">
-      <div class="form-group form-full"><label class="form-label">Nome do Canal</label><input class="form-input" id="canal-nome" placeholder="ex: Google Meu Negócio"></div>
-      <div class="form-group"><label class="form-label">Tipo</label>
-        <select class="form-select" id="canal-tipo">
-          <option value="organico">Orgânico</option>
-          <option value="pago">Tráfego Pago</option>
-          <option value="indicacao">Indicação</option>
-          <option value="email">Email</option>
-          <option value="b2b">B2B / PJ</option>
-          <option value="conteudo">Conteúdo</option>
-          <option value="parceria">Parceria</option>
-        </select>
-      </div>
-      <div class="form-group"><label class="form-label">Status</label>
-        <select class="form-select" id="canal-status">
-          <option value="ativo">🟢 Ativo</option>
-          <option value="atencao">🟡 Atenção</option>
-          <option value="pausado">🔴 Pausado</option>
-          <option value="testando">⚪ Testando</option>
-        </select>
-      </div>
-      <div class="form-group"><label class="form-label">Responsável</label><input class="form-input" id="canal-resp" placeholder="Nome do responsável"></div>
-      <div class="form-group"><label class="form-label">Meta de Leads/mês</label><input class="form-input" id="canal-meta" type="number" placeholder="0"></div>
-      <div class="form-group"><label class="form-label">Gasto Mensal (R$)</label><input class="form-input" id="canal-gasto" type="number" placeholder="0"></div>
-      <div class="form-group form-full"><label class="form-label">ICE Score — Impacto / Confiança / Facilidade (1-10)</label>
-        <div class="ice-input-row">
-          <input class="form-input ice-num" id="ice-i" type="number" min="1" max="10" placeholder="I" oninput="calcICE()">
-          <input class="form-input ice-num" id="ice-c" type="number" min="1" max="10" placeholder="C" oninput="calcICE()">
-          <input class="form-input ice-num" id="ice-e" type="number" min="1" max="10" placeholder="E" oninput="calcICE()">
-          <span style="font-family:var(--fh);font-size:20px;font-weight:800;color:var(--accent);margin-left:8px;" id="ice-preview">—</span>
-        </div>
-      </div>
-      <div class="form-group form-full"><label class="form-label">Próxima Ação</label><input class="form-input" id="canal-acao" placeholder="ex: Publicar 3 posts essa semana"></div>
-      <div class="form-group form-full"><label class="form-label">Observações</label><textarea class="form-textarea" id="canal-obs"></textarea></div>
+    <div class="modal-title" id="modal-titulo">Nova Ação de Growth</div>
+    <input type="hidden" id="acao-id">
+    <div class="form-group">
+      <label class="form-label">Nome da ação</label>
+      <input class="form-input" id="acao-nome" placeholder="ex: Pedir avaliação Google para 2 clientes">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Descrição / Como fazer</label>
+      <textarea class="form-textarea" id="acao-desc" placeholder="ex: Após entregar o equipamento, enviar o link do Google pelo WhatsApp"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Categoria</label>
+      <select class="form-select" id="acao-cat">
+        <option value="google">🔵 Google / SEO</option>
+        <option value="instagram">🟣 Instagram</option>
+        <option value="indicacao">🟢 Indicação</option>
+        <option value="conteudo">🟡 Conteúdo</option>
+        <option value="pj">🟠 PJ / B2B</option>
+        <option value="outros">⚪ Outros</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Frequência</label>
+      <select class="form-select" id="acao-freq">
+        <option value="diaria">Diária (todo dia)</option>
+        <option value="seg-sex">Seg a Sex (dias úteis)</option>
+        <option value="semanal">Semanal (1x por semana)</option>
+        <option value="3x-semana">3x por semana</option>
+      </select>
     </div>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="fecharModal('modal-canal')">Cancelar</button>
-      <button class="btn-save" onclick="salvarCanal()">Salvar</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL LEAD -->
-<div class="modal-overlay" id="modal-lead">
-  <div class="modal">
-    <div class="modal-title">Novo Lead</div>
-    <div class="form-grid">
-      <div class="form-group form-full"><label class="form-label">Nome</label><input class="form-input" id="lead-nome" placeholder="Nome do lead"></div>
-      <div class="form-group"><label class="form-label">Telefone</label><input class="form-input" id="lead-tel" placeholder="31999..."></div>
-      <div class="form-group"><label class="form-label">Canal de Origem</label>
-        <select class="form-select" id="lead-canal"></select>
-      </div>
-      <div class="form-group"><label class="form-label">Status</label>
-        <select class="form-select" id="lead-status">
-          <option value="novo">Novo</option>
-          <option value="contatado">Contatado</option>
-          <option value="convertido">Convertido</option>
-          <option value="perdido">Perdido</option>
-        </select>
-      </div>
-      <div class="form-group form-full"><label class="form-label">Observações</label><textarea class="form-textarea" id="lead-obs"></textarea></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="fecharModal('modal-lead')">Cancelar</button>
-      <button class="btn-save" onclick="salvarLead()">Salvar</button>
+      <button class="btn-del" id="btn-del-acao" onclick="deletarAcao()" style="display:none">Excluir</button>
+      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="btn-save" onclick="salvarAcao()">Salvar</button>
     </div>
   </div>
 </div>
@@ -242,293 +242,329 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 <div class="toast" id="toast"></div>
 
 <script>
-var canais=[], leads=[], _editId=null;
+// ── Estado ──────────────────────────────────────────────────────────────────
+var acoes = [];
+var registros = {}; // { "2026-06-01": { "acao-id": true/false } }
+var HOJE = new Date().toLocaleDateString('en-CA', {timeZone:'America/Sao_Paulo'});
+var _editId = null;
 
-// ── ICE Score preview ──────────────────────────────────────────────────────
-function calcICE(){
-  var i=parseFloat(document.getElementById('ice-i').value)||0;
-  var c=parseFloat(document.getElementById('ice-c').value)||0;
-  var e=parseFloat(document.getElementById('ice-e').value)||0;
-  var s = i&&c&&e ? ((i+c+e)/3).toFixed(1) : '—';
-  document.getElementById('ice-preview').textContent = s;
-}
+// ── Defaults (ações pré-carregadas) ─────────────────────────────────────────
+var DEFAULTS = [
+  {id:'g1',nome:'Pedir avaliação Google',desc:'Enviar link do GMB pelo WhatsApp para 2 clientes que retiraram hoje',cat:'google',freq:'diaria'},
+  {id:'g2',nome:'Responder avaliações Google',desc:'Responder todas as avaliações novas no Google Meu Negócio',cat:'google',freq:'diaria'},
+  {id:'g3',nome:'Story no Instagram',desc:'Publicar 1 story (antes/depois, bastidores ou dica rápida)',cat:'instagram',freq:'diaria'},
+  {id:'g4',nome:'Post no Instagram',desc:'Publicar 1 post no feed (antes/depois de conserto)',cat:'instagram',freq:'3x-semana'},
+  {id:'g5',nome:'Mensagem de indicação',desc:'Enviar WhatsApp para 5 clientes antigos pedindo indicação',cat:'indicacao',freq:'semanal'},
+  {id:'g6',nome:'Reativar cliente inativo',desc:'Contatar 2 clientes que não aparecem há mais de 6 meses',cat:'indicacao',freq:'semanal'},
+];
 
-// ── Utils ──────────────────────────────────────────────────────────────────
-function toast(msg,ok){
+// ── Utils ────────────────────────────────────────────────────────────────────
+function toast(msg, cor){
   var t=document.getElementById('toast');
-  t.textContent=msg; t.style.background=ok===false?'var(--red)':'var(--green)';
-  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500);
+  t.textContent=msg; t.style.background=cor||'var(--green)'; t.style.color=cor?'#fff':'#000';
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200);
 }
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function fmtData(iso){ if(!iso)return '—'; var p=iso.slice(0,10).split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
-function fmtMoeda(v){ return 'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:0}); }
 function showTab(id,btn){
-  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('tab-'+id).classList.add('active');
+  document.getElementById('pane-'+id).classList.add('active');
   btn.classList.add('active');
+  if(id==='semana') renderSemana();
+  if(id==='conquistas') renderConquistas();
+  if(id==='config') renderConfig();
 }
-function fecharModal(id){ document.getElementById(id).classList.remove('open'); }
-
-// ── Semáforo ───────────────────────────────────────────────────────────────
-function semClass(status){
-  if(status==='ativo') return 's-verde';
-  if(status==='atencao') return 's-amarelo';
-  if(status==='pausado') return 's-vermelho';
-  return 's-cinza';
-}
-function semLabel(status){
-  if(status==='ativo') return 'Ativo';
-  if(status==='atencao') return 'Atenção';
-  if(status==='pausado') return 'Pausado';
-  return 'Testando';
-}
-function tipoLabel(t){
-  var m={organico:'Orgânico',pago:'Pago',indicacao:'Indicação',email:'E-mail',b2b:'B2B/PJ',conteudo:'Conteúdo',parceria:'Parceria'};
-  return m[t]||t;
-}
-function iceCor(s){
-  if(s>=7) return 'var(--green)';
-  if(s>=5) return 'var(--yellow)';
-  return 'var(--red)';
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+function getDiasAtras(n){
+  var d=new Date();d.setDate(d.getDate()-n);
+  return d.toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});
 }
 
-// ── Leads do canal ─────────────────────────────────────────────────────────
-function leadsDoCanal(canalId){
-  return leads.filter(l=>l.canalId===canalId);
-}
-function convertidos(canalId){
-  return leads.filter(l=>l.canalId===canalId&&l.status==='convertido').length;
-}
-function taxaConv(canalId){
-  var tot=leadsDoCanal(canalId).length;
-  if(!tot)return '—';
-  return ((convertidos(canalId)/tot)*100).toFixed(0)+'%';
-}
-function cac(canal){
-  var g=parseFloat(canal.gastoMensal)||0;
-  var c2=convertidos(canal.id);
-  if(!g||!c2)return '—';
-  return fmtMoeda(g/c2);
-}
-
-// ── Card do canal ──────────────────────────────────────────────────────────
-function cardCanal(c){
-  var lc=leadsDoCanal(c.id).length;
-  var cv=convertidos(c.id);
-  var tc=taxaConv(c.id);
-  var ice=(parseFloat(c.iceI||0)+parseFloat(c.iceC||0)+parseFloat(c.iceE||0))/3;
-  ice=isNaN(ice)?0:ice;
-  return '<div class="canal-card">'+
-    '<div class="canal-header">'+
-      '<div>'+
-        '<div class="canal-nome">'+esc(c.nome)+'</div>'+
-        '<span class="canal-tipo">'+tipoLabel(c.tipo)+'</span>'+
-      '</div>'+
-      '<div style="display:flex;align-items:center;gap:8px;">'+
-        '<span style="font-family:var(--fm);font-size:10px;color:var(--muted)">'+semLabel(c.status)+'</span>'+
-        '<div class="semaforo '+semClass(c.status)+'"></div>'+
-      '</div>'+
-    '</div>'+
-    '<div class="canal-metricas">'+
-      '<div class="met"><div class="met-label">Leads</div><div class="met-val '+(lc>0?'good':'')+'">'+(lc||0)+'</div></div>'+
-      '<div class="met"><div class="met-label">Convertidos</div><div class="met-val '+(cv>0?'good':'')+'">'+(cv||0)+'</div></div>'+
-      '<div class="met"><div class="met-label">Conversão</div><div class="met-val">'+tc+'</div></div>'+
-      '<div class="met"><div class="met-label">CAC</div><div class="met-val">'+cac(c)+'</div></div>'+
-    '</div>'+
-    (ice>0?
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin:8px 0 4px;">'+
-        '<span style="font-family:var(--fm);font-size:9px;color:var(--muted)">ICE Score</span>'+
-        '<span style="font-family:var(--fh);font-size:18px;font-weight:800;color:'+iceCor(ice)+'">'+ice.toFixed(1)+'</span>'+
-      '</div>'+
-      '<div class="ice-track" style="margin:0 0 8px;"><div class="ice-fill" style="width:'+((ice/10)*100)+'%;background:'+iceCor(ice)+'"></div></div>'
-    :'')+
-    '<div class="canal-responsavel">👤 '+(c.responsavel||'—')+(c.metaLeads?'  &nbsp; 🎯 Meta: '+c.metaLeads+'/mês':'' )+'</div>'+
-    (c.proximaAcao?'<div style="font-family:var(--fm);font-size:10px;color:var(--blue);margin-top:8px;">▶ '+esc(c.proximaAcao)+'</div>':'')+
-    '<div class="canal-footer">'+
-      '<span style="font-family:var(--fm);font-size:10px;color:var(--muted)">'+(c.gastoMensal?fmtMoeda(c.gastoMensal)+'/mês':'Grátis')+'</span>'+
-      '<button class="btn-small" onclick="editarCanal(\''+c.id+'\')">Editar</button>'+
-    '</div>'+
-  '</div>';
-}
-
-// ── Render ─────────────────────────────────────────────────────────────────
-function render(){
-  // Sumário
-  var totalLeads=leads.length;
-  var totalConv=leads.filter(l=>l.status==='convertido').length;
-  var totalGasto=canais.reduce((s,c)=>s+(parseFloat(c.gastoMensal)||0),0);
-  var cacGlobal=totalConv?fmtMoeda(totalGasto/totalConv):'—';
-  var canaisAtivos=canais.filter(c=>c.status==='ativo').length;
-  document.getElementById('sumario').innerHTML=
-    '<div class="sum-card"><div class="sum-label">Total de Canais</div><div class="sum-val">'+canais.length+'</div><div class="sum-sub">'+canaisAtivos+' ativos</div></div>'+
-    '<div class="sum-card"><div class="sum-label">Leads este mês</div><div class="sum-val" style="color:var(--blue)">'+totalLeads+'</div><div class="sum-sub">—</div></div>'+
-    '<div class="sum-card"><div class="sum-label">Convertidos</div><div class="sum-val" style="color:var(--green)">'+totalConv+'</div><div class="sum-sub">'+(totalLeads?((totalConv/totalLeads)*100).toFixed(0)+'% de conversão':'—')+'</div></div>'+
-    '<div class="sum-card"><div class="sum-label">Gasto Mensal</div><div class="sum-val" style="color:var(--yellow)">'+fmtMoeda(totalGasto)+'</div><div class="sum-sub">CAC médio: '+cacGlobal+'</div></div>'+
-    '<div class="sum-card"><div class="sum-label">Melhor Canal</div><div class="sum-val" style="font-size:14px;color:var(--accent)">'+melhorCanal()+'</div><div class="sum-sub">maior conversão</div></div>';
-
-  // Kanban resumo
-  var sorted=[...canais].sort((a,b)=>{
-    var oa={'ativo':0,'atencao':1,'testando':2,'pausado':3}; return (oa[a.status]||2)-(oa[b.status]||2);
-  });
-  document.getElementById('kanban-resumo').innerHTML=sorted.length?sorted.map(cardCanal).join(''):'<div class="empty-state">Nenhum canal cadastrado ainda.<br><button class="btn-add" onclick="abrirModalCanal()" style="margin-top:12px">+ Adicionar primeiro canal</button></div>';
-  document.getElementById('kanban-full').innerHTML=canais.length?canais.map(cardCanal).join(''):'<div class="empty-state">Nenhum canal cadastrado.</div>';
-
-  // Ranking ICE
-  var ranked=[...canais].map(c=>{
-    var ice=(parseFloat(c.iceI||0)+parseFloat(c.iceC||0)+parseFloat(c.iceE||0))/3;
-    return {...c, iceScore:isNaN(ice)?0:ice};
-  }).sort((a,b)=>b.iceScore-a.iceScore);
-
-  document.getElementById('ranking-list').innerHTML=ranked.map((c,i)=>{
-    var lc=leadsDoCanal(c.id).length;
-    var cv=convertidos(c.id);
-    return '<div class="rank-item">'+
-      '<span class="rank-num '+(i<3?'top':'')+'">'+('🥇🥈🥉'[i]||('#'+(i+1)))+'</span>'+
-      '<div class="rank-info">'+
-        '<div class="rank-nome">'+esc(c.nome)+'</div>'+
-        '<div class="rank-sub">'+tipoLabel(c.tipo)+' • '+semLabel(c.status)+(c.responsavel?' • 👤 '+esc(c.responsavel):'')+'</div>'+
-      '</div>'+
-      '<div class="rank-barra">'+
-        '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);text-align:right;margin-bottom:3px;">'+lc+' leads / '+cv+' conv.</div>'+
-        '<div class="rank-track"><div class="rank-fill" style="width:'+((c.iceScore/10)*100)+'%;background:'+iceCor(c.iceScore)+'"></div></div>'+
-      '</div>'+
-      '<div class="rank-val" style="color:'+iceCor(c.iceScore)+'">'+c.iceScore.toFixed(1)+'</div>'+
-    '</div>';
-  }).join('')||'<div class="empty-state">Nenhum canal com ICE Score cadastrado.</div>';
-
-  // Leads table
-  var sCanalId={};canais.forEach(c=>sCanalId[c.id]=c.nome);
-  var sStatusClass={novo:'sb-novo',contatado:'sb-contatado',convertido:'sb-convertido',perdido:'sb-perdido'};
-  document.getElementById('leads-tbody').innerHTML=leads.length?[...leads].reverse().map(l=>{
-    return '<tr>'+
-      '<td>'+esc(l.nome)+'</td>'+
-      '<td>'+esc(sCanalId[l.canalId]||l.canalId||'—')+'</td>'+
-      '<td>'+esc(l.telefone||'—')+'</td>'+
-      '<td><span class="status-badge '+(sStatusClass[l.status]||'')+'">'+esc(l.status)+'</span></td>'+
-      '<td>'+fmtData(l.criadoEm)+'</td>'+
-      '<td><button class="btn-small" onclick="editarLeadStatus(\''+l.id+'\')">✏</button></td>'+
-    '</tr>';
-  }).join(''):'<tr><td colspan="6" class="empty-state">Nenhum lead cadastrado.</td></tr>';
-}
-
-function melhorCanal(){
-  if(!canais.length)return '—';
-  var best=canais.reduce((best,c)=>{
-    var t=leadsDoCanal(c.id).length;
-    var cv=convertidos(c.id);
-    var taxa=t?cv/t:0;
-    var bestT=leadsDoCanal(best.id).length;
-    var bestCv=convertidos(best.id);
-    var bestTaxa=bestT?bestCv/bestT:0;
-    return taxa>bestTaxa?c:best;
-  },canais[0]);
-  return best.nome.substring(0,18);
-}
-
-// ── CRUD ───────────────────────────────────────────────────────────────────
-function abrirModalCanal(id){
-  _editId=id||null;
-  document.getElementById('modal-canal-title').textContent=id?'Editar Canal':'Novo Canal';
-  if(id){
-    var c=canais.find(x=>x.id===id)||{};
-    document.getElementById('canal-id').value=c.id||'';
-    document.getElementById('canal-nome').value=c.nome||'';
-    document.getElementById('canal-tipo').value=c.tipo||'organico';
-    document.getElementById('canal-status').value=c.status||'testando';
-    document.getElementById('canal-resp').value=c.responsavel||'';
-    document.getElementById('canal-meta').value=c.metaLeads||'';
-    document.getElementById('canal-gasto').value=c.gastoMensal||'';
-    document.getElementById('ice-i').value=c.iceI||'';
-    document.getElementById('ice-c').value=c.iceC||'';
-    document.getElementById('ice-e').value=c.iceE||'';
-    document.getElementById('canal-acao').value=c.proximaAcao||'';
-    document.getElementById('canal-obs').value=c.observacoes||'';
-    calcICE();
-  } else {
-    ['canal-id','canal-nome','canal-resp','canal-meta','canal-gasto','ice-i','ice-c','ice-e','canal-acao','canal-obs'].forEach(id=>{document.getElementById(id).value='';});
-    document.getElementById('canal-tipo').value='organico';
-    document.getElementById('canal-status').value='testando';
-    document.getElementById('ice-preview').textContent='—';
+// ── Frequência: deveria aparecer hoje? ───────────────────────────────────────
+function aparecerHoje(acao, data){
+  var dow = new Date(data+'T12:00:00').getDay(); // 0=Dom
+  if(acao.freq==='diaria') return true;
+  if(acao.freq==='seg-sex') return dow>=1&&dow<=5;
+  if(acao.freq==='semanal'){
+    // Aparece às segundas
+    return dow===1;
   }
-  document.getElementById('modal-canal').classList.add('open');
-}
-function editarCanal(id){ abrirModalCanal(id); }
-
-function salvarCanal(){
-  var nome=document.getElementById('canal-nome').value.trim();
-  if(!nome){alert('Nome obrigatório');return;}
-  var canal={
-    id: _editId||(Date.now().toString(36).toUpperCase()),
-    nome, tipo:document.getElementById('canal-tipo').value,
-    status:document.getElementById('canal-status').value,
-    responsavel:document.getElementById('canal-resp').value.trim(),
-    metaLeads:parseFloat(document.getElementById('canal-meta').value)||0,
-    gastoMensal:parseFloat(document.getElementById('canal-gasto').value)||0,
-    iceI:parseFloat(document.getElementById('ice-i').value)||0,
-    iceC:parseFloat(document.getElementById('ice-c').value)||0,
-    iceE:parseFloat(document.getElementById('ice-e').value)||0,
-    proximaAcao:document.getElementById('canal-acao').value.trim(),
-    observacoes:document.getElementById('canal-obs').value.trim(),
-  };
-  if(_editId){ var idx=canais.findIndex(c=>c.id===_editId); if(idx>-1)canais[idx]=canal; }
-  else canais.push(canal);
-  save();fecharModal('modal-canal');toast('Canal salvo ✓');render();
+  if(acao.freq==='3x-semana'){
+    // Seg, Qua, Sex
+    return dow===1||dow===3||dow===5;
+  }
+  return true;
 }
 
-function abrirModalLead(){
-  document.getElementById('lead-canal').innerHTML=canais.map(c=>'<option value="'+c.id+'">'+esc(c.nome)+'</option>').join('')||'<option>— sem canais —</option>';
-  ['lead-nome','lead-tel','lead-obs'].forEach(id=>{document.getElementById(id).value='';});
-  document.getElementById('lead-status').value='novo';
-  document.getElementById('modal-lead').classList.add('open');
+function acoesDoDia(data){
+  return acoes.filter(a=>aparecerHoje(a,data));
 }
 
-function salvarLead(){
-  var nome=document.getElementById('lead-nome').value.trim();
-  if(!nome){alert('Nome obrigatório');return;}
-  leads.push({
-    id:Date.now().toString(36).toUpperCase(),
-    nome, telefone:document.getElementById('lead-tel').value.trim(),
-    canalId:document.getElementById('lead-canal').value,
-    status:document.getElementById('lead-status').value,
-    observacoes:document.getElementById('lead-obs').value.trim(),
-    criadoEm:new Date().toISOString()
+// ── Streak global (dias com 100% das ações) ──────────────────────────────────
+function calcStreak(){
+  var streak=0;
+  for(var i=1;i<=90;i++){
+    var d=getDiasAtras(i);
+    var acs=acoesDoDia(d);
+    if(!acs.length) continue;
+    var reg=registros[d]||{};
+    var feitas=acs.filter(a=>reg[a.id]).length;
+    if(feitas===acs.length) streak++;
+    else break;
+  }
+  return streak;
+}
+
+// ── Streak por ação ──────────────────────────────────────────────────────────
+function streakAcao(acaoId){
+  var streak=0;
+  for(var i=1;i<=90;i++){
+    var d=getDiasAtras(i);
+    var reg=registros[d]||{};
+    if(aparecerHoje(acoes.find(a=>a.id===acaoId)||{},d)){
+      if(reg[acaoId]) streak++;
+      else break;
+    }
+  }
+  return streak;
+}
+
+// ── Dias sem fazer (para alertas) ────────────────────────────────────────────
+function diasSemFazer(acaoId){
+  var dias=0;
+  for(var i=1;i<=30;i++){
+    var d=getDiasAtras(i);
+    var acao=acoes.find(a=>a.id===acaoId);
+    if(!acao||!aparecerHoje(acao,d)) continue;
+    var reg=registros[d]||{};
+    if(!reg[acaoId]) dias++;
+    else break;
+  }
+  return dias;
+}
+
+// ── Render hoje ──────────────────────────────────────────────────────────────
+function renderHoje(){
+  var acs=acoesDoDia(HOJE);
+  var reg=registros[HOJE]||{};
+  var feitas=acs.filter(a=>reg[a.id]).length;
+  var total=acs.length;
+  var pct=total?Math.round((feitas/total)*100):0;
+
+  // Score bar
+  document.getElementById('score-num').innerHTML=feitas+'<span style="font-size:16px;color:var(--muted)">/'+(total)+'</span>';
+  document.getElementById('score-fill').style.width=pct+'%';
+  document.getElementById('score-pct').textContent=pct+'%';
+  var streak=calcStreak();
+  document.getElementById('score-streak').innerHTML='🔥 '+streak+' dia'+(streak!==1?'s':'')+' seguidos';
+  var emojis=[['😴',0],['😐',20],['🙂',40],['💪',60],['🔥',80],['⚡',100]];
+  var emoji=emojis.reduce((e,x)=>pct>=x[1]?x:e,emojis[0])[0];
+  document.getElementById('score-emoji').textContent=emoji;
+
+  // Data header
+  var dtFmt=new Date(HOJE+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',timeZone:'America/Sao_Paulo'});
+  document.getElementById('hdr-data').textContent=dtFmt;
+  document.getElementById('hoje-titulo').textContent='Ações de hoje ('+(feitas)+'/'+total+')';
+  document.getElementById('hoje-sub').textContent=pct===100?'✅ Tudo feito hoje! Incrível 🚀':(total-feitas)+' ação'+(total-feitas!==1?'s':'')+' pendente'+(total-feitas!==1?'s':'');
+
+  // Lista — não feitas primeiro (com alerta), depois feitas
+  var pendentes=acs.filter(a=>!reg[a.id]);
+  var feitasAcs=acs.filter(a=>reg[a.id]);
+  var sorted=[...pendentes,...feitasAcs];
+
+  if(!sorted.length){
+    document.getElementById('lista-hoje').innerHTML='<div class="empty">Nenhuma ação para hoje.<br>Vá em <b>Ações</b> e cadastre as suas rotinas de growth.</div>';
+    return;
+  }
+
+  document.getElementById('lista-hoje').innerHTML=sorted.map(a=>{
+    var feita=!!reg[a.id];
+    var dias=diasSemFazer(a.id);
+    var st=streakAcao(a.id);
+    var catClass='cat-'+a.cat;
+    return '<div class="acao-card '+(feita?'feita':'nao-feita')+(dias>=2&&!feita?' atrasada':'')+'" id="card-'+a.id+'" onclick="toggleAcao(\''+a.id+'\')">'+
+      '<div class="acao-inner">'+
+        '<div class="check-btn">'+(feita?'✓':'')+'</div>'+
+        '<div class="acao-body">'+
+          '<div class="acao-nome">'+esc(a.nome)+'</div>'+
+          '<div class="acao-desc">'+(a.desc?esc(a.desc):'')+'</div>'+
+          '<div style="display:flex;gap:6px;margin-top:5px;align-items:center;">'+
+            '<span class="cat-badge '+catClass+'">'+catLabel(a.cat)+'</span>'+
+            '<span class="freq-badge">'+freqLabel(a.freq)+'</span>'+
+          '</div>'+
+        '</div>'+
+        '<div class="acao-meta">'+
+          (st>0?'<div class="streak-badge" style="color:var(--yellow)">🔥'+st+'</div>':'<div class="streak-badge" style="color:var(--muted)">🔥0</div>')+
+          (dias>=2&&!feita?'<div class="alert-badge">🚨 '+dias+'d</div>':'')+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function catLabel(c){
+  var m={google:'Google',instagram:'Instagram',indicacao:'Indicação',conteudo:'Conteúdo',pj:'PJ/B2B',outros:'Outros'};
+  return m[c]||c;
+}
+function freqLabel(f){
+  var m={diaria:'Diária','seg-sex':'Seg-Sex',semanal:'Semanal','3x-semana':'3x/sem'};
+  return m[f]||f;
+}
+
+// ── Toggle ação ───────────────────────────────────────────────────────────────
+function toggleAcao(id){
+  if(!registros[HOJE]) registros[HOJE]={};
+  var foi=!!registros[HOJE][id];
+  registros[HOJE][id]=!foi;
+  if(!foi) toast('✅ Feito! +1 🔥');
+  var card=document.getElementById('card-'+id);
+  if(card){card.classList.add('pop');setTimeout(()=>card.classList.remove('pop'),300);}
+  save();renderHoje();
+}
+
+// ── Render semana ─────────────────────────────────────────────────────────────
+function renderSemana(){
+  var dias7=Array.from({length:7},(_,i)=>getDiasAtras(6-i));
+  var html='<div class="semana-header"><div class="semana-header-nome"></div><div class="semana-dias">';
+  dias7.forEach(d=>{
+    var dt=new Date(d+'T12:00:00');
+    var dow=['D','S','T','Q','Q','S','S'][dt.getDay()];
+    var num=dt.getDate();
+    html+='<div class="dia-label">'+dow+'<br>'+num+'</div>';
   });
-  save();fecharModal('modal-lead');toast('Lead adicionado ✓');render();
+  html+='</div></div>';
+  html+='<div class="semana-grid">';
+  acoes.forEach(a=>{
+    html+='<div class="semana-row"><div class="semana-nome" title="'+esc(a.nome)+'">'+esc(a.nome.substring(0,28))+'</div><div class="semana-dias">';
+    dias7.forEach(d=>{
+      var reg=registros[d]||{};
+      var deveria=aparecerHoje(a,d);
+      var eh_hoje=d===HOJE;
+      if(!deveria){ html+='<div class="dia-dot skip">·</div>'; return; }
+      var feita=!!reg[a.id];
+      var cls=feita?'ok':(eh_hoje?'':'miss');
+      if(eh_hoje&&!feita) cls='skip';
+      html+='<div class="dia-dot '+cls+(eh_hoje?' hoje':'')+'">'+
+        (feita?'✓':(!eh_hoje&&deveria?'✗':''))+
+      '</div>';
+    });
+    html+='</div></div>';
+  });
+  html+='</div>';
+  document.getElementById('semana-content').innerHTML=html;
 }
 
-function editarLeadStatus(id){
-  var l=leads.find(x=>x.id===id);if(!l)return;
-  var s=prompt('Status do lead (novo/contatado/convertido/perdido):',l.status);
-  if(s&&['novo','contatado','convertido','perdido'].includes(s)){l.status=s;save();render();toast('Status atualizado');}
+// ── Render conquistas ─────────────────────────────────────────────────────────
+function renderConquistas(){
+  var streak=calcStreak();
+  var totalFeitas=Object.values(registros).reduce((s,r)=>s+Object.values(r).filter(Boolean).length,0);
+  var CONQUISTAS=[
+    {icon:'🔥',nome:'Primeira ação',desc:'Complete sua 1ª ação',check:()=>totalFeitas>=1},
+    {icon:'⚡',nome:'3 dias seguidos',desc:'100% por 3 dias consecutivos',check:()=>streak>=3},
+    {icon:'💪',nome:'7 dias seguidos',desc:'Uma semana perfeita',check:()=>streak>=7},
+    {icon:'🏆',nome:'30 dias seguidos',desc:'Um mês de consistência',check:()=>streak>=30},
+    {icon:'🌟',nome:'50 ações feitas',desc:'50 check-ins completados',check:()=>totalFeitas>=50},
+    {icon:'🚀',nome:'100 ações feitas',desc:'100 check-ins — você é constante',check:()=>totalFeitas>=100},
+    {icon:'📈',nome:'Todas hoje',desc:'100% de um dia',check:()=>{var a=acoesDoDia(HOJE);var r=registros[HOJE]||{};return a.length>0&&a.every(ac=>r[ac.id]);}},
+  ];
+  document.getElementById('lista-conquistas').innerHTML=CONQUISTAS.map(c=>{
+    var ok=c.check();
+    return '<div class="conquista '+(ok?'desbloqueada':'bloqueada')+'">'+
+      '<div class="conq-icon">'+c.icon+'</div>'+
+      '<div><div class="conq-nome">'+esc(c.nome)+'</div><div class="conq-desc">'+esc(c.desc)+'</div></div>'+
+      (ok?'<div style="font-size:20px;margin-left:auto">✅</div>':'<div style="font-size:16px;margin-left:auto;color:var(--muted)">🔒</div>')+
+    '</div>';
+  }).join('');
 }
 
-// ── Storage ────────────────────────────────────────────────────────────────
+// ── Render config ─────────────────────────────────────────────────────────────
+function renderConfig(){
+  document.getElementById('lista-config').innerHTML=acoes.length?acoes.map(a=>{
+    return '<div class="acao-card" style="cursor:default">'+
+      '<div class="acao-inner">'+
+        '<div class="acao-body">'+
+          '<div class="acao-nome">'+esc(a.nome)+'</div>'+
+          '<div class="acao-desc">'+esc(a.desc||'')+'</div>'+
+          '<div style="display:flex;gap:6px;margin-top:5px;">'+
+            '<span class="cat-badge cat-'+a.cat+'">'+catLabel(a.cat)+'</span>'+
+            '<span class="freq-badge">'+freqLabel(a.freq)+'</span>'+
+          '</div>'+
+        '</div>'+
+        '<button class="hbtn" onclick="openModalAcao(\''+a.id+'\')">Editar</button>'+
+      '</div>'+
+    '</div>';
+  }).join(''):'<div class="empty">Nenhuma ação. Clique em "+ Nova Ação" para começar.</div>';
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+function openModalAcao(id){
+  _editId=id||null;
+  document.getElementById('modal-titulo').textContent=id?'Editar Ação':'Nova Ação de Growth';
+  document.getElementById('btn-del-acao').style.display=id?'block':'none';
+  if(id){
+    var a=acoes.find(x=>x.id===id)||{};
+    document.getElementById('acao-id').value=a.id||'';
+    document.getElementById('acao-nome').value=a.nome||'';
+    document.getElementById('acao-desc').value=a.desc||'';
+    document.getElementById('acao-cat').value=a.cat||'outros';
+    document.getElementById('acao-freq').value=a.freq||'diaria';
+  } else {
+    ['acao-id','acao-nome','acao-desc'].forEach(x=>document.getElementById(x).value='');
+    document.getElementById('acao-cat').value='outros';
+    document.getElementById('acao-freq').value='diaria';
+  }
+  document.getElementById('modal-acao').classList.add('open');
+  document.getElementById('acao-nome').focus();
+}
+function closeModal(){document.getElementById('modal-acao').classList.remove('open');}
+
+function salvarAcao(){
+  var nome=document.getElementById('acao-nome').value.trim();
+  if(!nome){alert('Nome obrigatório');return;}
+  var acao={
+    id: _editId||(Date.now().toString(36)),
+    nome, desc:document.getElementById('acao-desc').value.trim(),
+    cat:document.getElementById('acao-cat').value,
+    freq:document.getElementById('acao-freq').value
+  };
+  if(_editId){ var i=acoes.findIndex(a=>a.id===_editId); if(i>-1)acoes[i]=acao; }
+  else acoes.push(acao);
+  closeModal(); save(); renderHoje();
+  toast(_editId?'Ação atualizada':'Ação criada! Vai aparecer no checklist 🚀');
+}
+
+function deletarAcao(){
+  if(!confirm('Excluir esta ação?'))return;
+  acoes=acoes.filter(a=>a.id!==_editId);
+  closeModal(); save(); renderHoje();
+  toast('Ação removida','var(--red)');
+}
+
+// ── Persistência ─────────────────────────────────────────────────────────────
 function save(){
-  var data={canais,leads,updatedAt:new Date().toISOString()};
-  fetch('/api/growth?action=salvar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
-  .catch(()=>{});
-  localStorage.setItem('growth_data',JSON.stringify(data));
+  var data={acoes,registros,savedAt:new Date().toISOString()};
+  fetch('/api/growth?action=salvar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).catch(()=>{});
+  try{localStorage.setItem('growth_v2',JSON.stringify(data));}catch(e){}
 }
 
 function load(){
-  // Tentar API primeiro, fallback localStorage
   fetch('/api/growth?action=carregar').then(r=>r.json()).then(d=>{
-    if(d.ok&&d.data){ canais=d.data.canais||[]; leads=d.data.leads||[]; render(); }
-    else { loadLocal(); }
-  }).catch(()=>loadLocal());
+    if(d.ok&&d.data&&(d.data.acoes||[]).length){
+      acoes=d.data.acoes||[]; registros=d.data.registros||{};
+    } else { loadLocal(); }
+    renderHoje();
+  }).catch(()=>{loadLocal();renderHoje();});
 }
 
 function loadLocal(){
-  var local=localStorage.getItem('growth_data');
-  if(local){ var d=JSON.parse(local); canais=d.canais||[]; leads=d.leads||[]; }
-  render();
+  try{
+    var raw=localStorage.getItem('growth_v2');
+    if(raw){var d=JSON.parse(raw);acoes=d.acoes||[];registros=d.registros||{};}
+    else{acoes=[...DEFAULTS];registros={};}
+  }catch(e){acoes=[...DEFAULTS];registros={};}
 }
 
-// ── Fechar modal no backdrop ───────────────────────────────────────────────
-document.querySelectorAll('.modal-overlay').forEach(m=>{
-  m.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
-});
+// Fechar modal no overlay
+document.getElementById('modal-acao').addEventListener('click',function(e){if(e.target===this)closeModal();});
 
 load();
 </script>
