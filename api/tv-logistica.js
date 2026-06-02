@@ -1147,6 +1147,35 @@ Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter peque
     return res.status(200).json({ ok:true, total: fichas.length, fichas });
   }
 
+    // ── GET fix-horario-direto — corrige horarioColeta por id da ficha ───────────
+  if (req.method === 'GET' && action === 'fix-horario-direto') {
+    const fid      = (req.query.id  || '').trim();
+    const novaData = (req.query.data|| '').trim(); // formato: YYYY-MM-DDTHH:MM (hora local BRT)
+    if (!fid || !novaData) return res.status(400).json({ ok:false, error: 'Informe ?id=LOG-XXXX&data=YYYY-MM-DDTHH:MM' });
+
+    const db = await dbGet('tv_logistica_log') || defaultDB();
+    const ficha = (db.fichas||[]).find(f => f.id === fid);
+    if (!ficha) return res.status(404).json({ ok:false, error: 'Ficha não encontrada: '+fid });
+
+    const original = ficha.horarioColeta;
+    // Parse manual para garantir hora local BRT (evita ambiguidade UTC)
+    const [datePart, timePart] = novaData.split('T');
+    const [y, m, d]   = datePart.split('-').map(Number);
+    const [hh, mm]    = timePart.split(':').map(Number);
+    const corrigido   = new Date(y, m-1, d, hh, mm, 0).toISOString();
+
+    ficha.horarioColeta = corrigido;
+    ficha.movedAt = new Date().toISOString();
+    await dbSet('tv_logistica_log', db);
+
+    return res.status(200).json({
+      ok: true,
+      id: ficha.id, nome: ficha.nome,
+      original, corrigido,
+      msg: '✅ horarioColeta corrigido',
+    });
+  }
+
     // ── GET fix-horario — corrige horarioColeta de uma ficha (offset UTC→BRT) ─────
   if (req.method === 'GET' && action === 'fix-horario') {
     const nome_q = (req.query.nome || '').toLowerCase().trim();
