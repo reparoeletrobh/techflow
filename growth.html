@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Growth</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#07080a;--surface:#0f1114;--surface2:#181b1f;--border:#1e2228;
+  --text:#f0f2f5;--muted:#5a6270;--dim:#2a2f38;
+  --accent:#f97316;--green:#22c55e;--red:#ef4444;--blue:#3b9eff;
+  --yellow:#f5c800;--purple:#a855f7;--cyan:#06b6d4;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.logo-icon{width:28px;height:28px;background:linear-gradient(135deg,var(--green),var(--blue));border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;}
+.hdr-right{display:flex;gap:8px;}
+.hbtn{font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;transition:all .15s;}
+.hbtn:hover,.hbtn.active{color:var(--text);border-color:var(--accent);background:rgba(249,115,22,.08);}
+/* TABS */
+.tabs-bar{display:flex;border-bottom:1px solid var(--border);padding:0 24px;background:var(--bg);position:sticky;top:52px;z-index:90;}
+.tab-btn{font-family:var(--fm);font-size:11px;font-weight:600;padding:12px 20px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-pane{display:none;padding:24px;max-width:1400px;margin:0 auto;}
+.tab-pane.active{display:block;}
+/* CARDS SUMÁRIO */
+.sumario{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px;}
+.sum-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;}
+.sum-label{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;}
+.sum-val{font-family:var(--fh);font-size:22px;font-weight:800;}
+.sum-sub{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:4px;}
+/* KANBAN CANAIS */
+.kanban{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;}
+.canal-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;position:relative;transition:border-color .15s;}
+.canal-card:hover{border-color:var(--dim);}
+.canal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.canal-nome{font-family:var(--fh);font-size:14px;font-weight:800;}
+.semaforo{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.s-verde{background:var(--green);box-shadow:0 0 8px rgba(34,197,94,.5);}
+.s-amarelo{background:var(--yellow);box-shadow:0 0 8px rgba(245,200,0,.5);}
+.s-vermelho{background:var(--red);box-shadow:0 0 8px rgba(239,68,68,.5);}
+.s-cinza{background:var(--muted);}
+.canal-tipo{font-family:var(--fm);font-size:9px;color:var(--muted);padding:2px 8px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);}
+.canal-metricas{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0;}
+.met{background:var(--surface2);border-radius:7px;padding:10px 12px;}
+.met-label{font-family:var(--fm);font-size:9px;color:var(--muted);margin-bottom:3px;}
+.met-val{font-family:var(--fh);font-size:16px;font-weight:800;}
+.met-val.good{color:var(--green);}
+.met-val.warn{color:var(--yellow);}
+.met-val.bad{color:var(--red);}
+.ice-bar{display:flex;align-items:center;gap:8px;margin:10px 0;}
+.ice-label{font-family:var(--fm);font-size:9px;color:var(--muted);width:20px;}
+.ice-track{flex:1;height:5px;background:var(--dim);border-radius:3px;}
+.ice-fill{height:100%;border-radius:3px;background:var(--accent);}
+.ice-score-badge{font-family:var(--fh);font-size:20px;font-weight:800;text-align:right;}
+.canal-responsavel{font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:8px;}
+.canal-footer{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
+.canal-acao{font-family:var(--fm);font-size:10px;color:var(--blue);}
+.btn-small{font-family:var(--fm);font-size:10px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
+.btn-small:hover{color:var(--text);border-color:var(--accent);}
+/* RANKING */
+.ranking-list{display:flex;flex-direction:column;gap:8px;}
+.rank-item{display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;}
+.rank-num{font-family:var(--fh);font-size:18px;font-weight:800;color:var(--muted);width:24px;}
+.rank-num.top{color:var(--yellow);}
+.rank-info{flex:1;}
+.rank-nome{font-family:var(--fh);font-size:14px;font-weight:800;margin-bottom:2px;}
+.rank-sub{font-family:var(--fm);font-size:10px;color:var(--muted);}
+.rank-barra{width:200px;}
+.rank-track{height:6px;background:var(--dim);border-radius:3px;}
+.rank-fill{height:100%;border-radius:3px;}
+.rank-val{font-family:var(--fh);font-size:16px;font-weight:800;text-align:right;min-width:60px;}
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:none;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;width:520px;max-height:90vh;overflow-y:auto;padding:24px;}
+.modal-title{font-family:var(--fh);font-size:16px;font-weight:800;margin-bottom:20px;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.form-full{grid-column:1/-1;}
+.form-group{display:flex;flex-direction:column;gap:4px;}
+.form-label{font-family:var(--fm);font-size:10px;color:var(--muted);}
+.form-input,.form-select,.form-textarea{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px 12px;color:var(--text);font-family:var(--fm);font-size:12px;outline:none;transition:border-color .15s;}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent);}
+.form-textarea{min-height:60px;resize:vertical;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;}
+.btn-cancel{font-family:var(--fm);font-size:11px;padding:8px 18px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;}
+.btn-save{font-family:var(--fm);font-size:11px;padding:8px 18px;border-radius:7px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:700;}
+.ice-input-row{display:flex;gap:8px;align-items:center;}
+.ice-num{width:60px;}
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--green);color:#000;font-family:var(--fm);font-size:12px;font-weight:700;padding:10px 18px;border-radius:8px;transform:translateY(60px);opacity:0;transition:all .3s;z-index:2000;}
+.toast.show{transform:translateY(0);opacity:1;}
+.sec-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.sec-title{font-family:var(--fh);font-size:16px;font-weight:800;}
+.btn-add{font-family:var(--fm);font-size:11px;padding:7px 16px;border-radius:7px;border:1px solid var(--accent);background:rgba(249,115,22,.1);color:var(--accent);cursor:pointer;font-weight:700;}
+/* LEADS TAB */
+.leads-table{width:100%;border-collapse:collapse;}
+.leads-table th{font-family:var(--fm);font-size:10px;color:var(--muted);text-align:left;padding:10px 14px;border-bottom:1px solid var(--border);}
+.leads-table td{font-family:var(--fm);font-size:11px;padding:10px 14px;border-bottom:1px solid rgba(30,34,40,.5);}
+.status-badge{padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;}
+.sb-novo{background:rgba(59,158,255,.15);color:var(--blue);}
+.sb-contatado{background:rgba(245,200,0,.15);color:var(--yellow);}
+.sb-convertido{background:rgba(34,197,94,.15);color:var(--green);}
+.sb-perdido{background:rgba(239,68,68,.15);color:var(--red);}
+.empty-state{text-align:center;padding:48px 24px;color:var(--muted);font-family:var(--fm);font-size:12px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">📈</div>
+    <span>Growth</span>
+  </div>
+  <div class="hdr-right">
+    <button class="hbtn" onclick="abrirModalCanal()">+ Canal</button>
+    <button class="hbtn" onclick="abrirModalLead()">+ Lead</button>
+    <button class="hbtn" onclick="load()">↻</button>
+  </div>
+</header>
+
+<div class="tabs-bar">
+  <button class="tab-btn active" onclick="showTab('visao-geral',this)">Visão Geral</button>
+  <button class="tab-btn" onclick="showTab('canais',this)">Canais</button>
+  <button class="tab-btn" onclick="showTab('ranking',this)">Ranking ICE</button>
+  <button class="tab-btn" onclick="showTab('leads',this)">Leads</button>
+</div>
+
+<!-- VISÃO GERAL -->
+<div class="tab-pane active" id="tab-visao-geral">
+  <div class="sumario" id="sumario"></div>
+  <div class="sec-header"><span class="sec-title">🚦 Semáforo de Canais</span></div>
+  <div class="kanban" id="kanban-resumo"></div>
+</div>
+
+<!-- CANAIS -->
+<div class="tab-pane" id="tab-canais">
+  <div class="sec-header">
+    <span class="sec-title">Todos os Canais</span>
+    <button class="btn-add" onclick="abrirModalCanal()">+ Novo Canal</button>
+  </div>
+  <div class="kanban" id="kanban-full"></div>
+</div>
+
+<!-- RANKING ICE -->
+<div class="tab-pane" id="tab-ranking">
+  <div class="sec-header"><span class="sec-title">Ranking por ICE Score</span><span style="font-family:var(--fm);font-size:11px;color:var(--muted)">Impacto × Confiança × Facilidade — onde focar energia</span></div>
+  <div class="ranking-list" id="ranking-list"></div>
+</div>
+
+<!-- LEADS -->
+<div class="tab-pane" id="tab-leads">
+  <div class="sec-header">
+    <span class="sec-title">Leads</span>
+    <button class="btn-add" onclick="abrirModalLead()">+ Novo Lead</button>
+  </div>
+  <table class="leads-table">
+    <thead><tr><th>Nome</th><th>Canal</th><th>Telefone</th><th>Status</th><th>Criado</th><th></th></tr></thead>
+    <tbody id="leads-tbody"></tbody>
+  </table>
+</div>
+
+<!-- MODAL CANAL -->
+<div class="modal-overlay" id="modal-canal">
+  <div class="modal">
+    <div class="modal-title" id="modal-canal-title">Novo Canal</div>
+    <div class="form-grid">
+      <input type="hidden" id="canal-id">
+      <div class="form-group form-full"><label class="form-label">Nome do Canal</label><input class="form-input" id="canal-nome" placeholder="ex: Google Meu Negócio"></div>
+      <div class="form-group"><label class="form-label">Tipo</label>
+        <select class="form-select" id="canal-tipo">
+          <option value="organico">Orgânico</option>
+          <option value="pago">Tráfego Pago</option>
+          <option value="indicacao">Indicação</option>
+          <option value="email">Email</option>
+          <option value="b2b">B2B / PJ</option>
+          <option value="conteudo">Conteúdo</option>
+          <option value="parceria">Parceria</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Status</label>
+        <select class="form-select" id="canal-status">
+          <option value="ativo">🟢 Ativo</option>
+          <option value="atencao">🟡 Atenção</option>
+          <option value="pausado">🔴 Pausado</option>
+          <option value="testando">⚪ Testando</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Responsável</label><input class="form-input" id="canal-resp" placeholder="Nome do responsável"></div>
+      <div class="form-group"><label class="form-label">Meta de Leads/mês</label><input class="form-input" id="canal-meta" type="number" placeholder="0"></div>
+      <div class="form-group"><label class="form-label">Gasto Mensal (R$)</label><input class="form-input" id="canal-gasto" type="number" placeholder="0"></div>
+      <div class="form-group form-full"><label class="form-label">ICE Score — Impacto / Confiança / Facilidade (1-10)</label>
+        <div class="ice-input-row">
+          <input class="form-input ice-num" id="ice-i" type="number" min="1" max="10" placeholder="I" oninput="calcICE()">
+          <input class="form-input ice-num" id="ice-c" type="number" min="1" max="10" placeholder="C" oninput="calcICE()">
+          <input class="form-input ice-num" id="ice-e" type="number" min="1" max="10" placeholder="E" oninput="calcICE()">
+          <span style="font-family:var(--fh);font-size:20px;font-weight:800;color:var(--accent);margin-left:8px;" id="ice-preview">—</span>
+        </div>
+      </div>
+      <div class="form-group form-full"><label class="form-label">Próxima Ação</label><input class="form-input" id="canal-acao" placeholder="ex: Publicar 3 posts essa semana"></div>
+      <div class="form-group form-full"><label class="form-label">Observações</label><textarea class="form-textarea" id="canal-obs"></textarea></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="fecharModal('modal-canal')">Cancelar</button>
+      <button class="btn-save" onclick="salvarCanal()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL LEAD -->
+<div class="modal-overlay" id="modal-lead">
+  <div class="modal">
+    <div class="modal-title">Novo Lead</div>
+    <div class="form-grid">
+      <div class="form-group form-full"><label class="form-label">Nome</label><input class="form-input" id="lead-nome" placeholder="Nome do lead"></div>
+      <div class="form-group"><label class="form-label">Telefone</label><input class="form-input" id="lead-tel" placeholder="31999..."></div>
+      <div class="form-group"><label class="form-label">Canal de Origem</label>
+        <select class="form-select" id="lead-canal"></select>
+      </div>
+      <div class="form-group"><label class="form-label">Status</label>
+        <select class="form-select" id="lead-status">
+          <option value="novo">Novo</option>
+          <option value="contatado">Contatado</option>
+          <option value="convertido">Convertido</option>
+          <option value="perdido">Perdido</option>
+        </select>
+      </div>
+      <div class="form-group form-full"><label class="form-label">Observações</label><textarea class="form-textarea" id="lead-obs"></textarea></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="fecharModal('modal-lead')">Cancelar</button>
+      <button class="btn-save" onclick="salvarLead()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var canais=[], leads=[], _editId=null;
+
+// ── ICE Score preview ──────────────────────────────────────────────────────
+function calcICE(){
+  var i=parseFloat(document.getElementById('ice-i').value)||0;
+  var c=parseFloat(document.getElementById('ice-c').value)||0;
+  var e=parseFloat(document.getElementById('ice-e').value)||0;
+  var s = i&&c&&e ? ((i+c+e)/3).toFixed(1) : '—';
+  document.getElementById('ice-preview').textContent = s;
+}
+
+// ── Utils ──────────────────────────────────────────────────────────────────
+function toast(msg,ok){
+  var t=document.getElementById('toast');
+  t.textContent=msg; t.style.background=ok===false?'var(--red)':'var(--green)';
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500);
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function fmtData(iso){ if(!iso)return '—'; var p=iso.slice(0,10).split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+function fmtMoeda(v){ return 'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:0}); }
+function showTab(id,btn){
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+function fecharModal(id){ document.getElementById(id).classList.remove('open'); }
+
+// ── Semáforo ───────────────────────────────────────────────────────────────
+function semClass(status){
+  if(status==='ativo') return 's-verde';
+  if(status==='atencao') return 's-amarelo';
+  if(status==='pausado') return 's-vermelho';
+  return 's-cinza';
+}
+function semLabel(status){
+  if(status==='ativo') return 'Ativo';
+  if(status==='atencao') return 'Atenção';
+  if(status==='pausado') return 'Pausado';
+  return 'Testando';
+}
+function tipoLabel(t){
+  var m={organico:'Orgânico',pago:'Pago',indicacao:'Indicação',email:'E-mail',b2b:'B2B/PJ',conteudo:'Conteúdo',parceria:'Parceria'};
+  return m[t]||t;
+}
+function iceCor(s){
+  if(s>=7) return 'var(--green)';
+  if(s>=5) return 'var(--yellow)';
+  return 'var(--red)';
+}
+
+// ── Leads do canal ─────────────────────────────────────────────────────────
+function leadsDoCanal(canalId){
+  return leads.filter(l=>l.canalId===canalId);
+}
+function convertidos(canalId){
+  return leads.filter(l=>l.canalId===canalId&&l.status==='convertido').length;
+}
+function taxaConv(canalId){
+  var tot=leadsDoCanal(canalId).length;
+  if(!tot)return '—';
+  return ((convertidos(canalId)/tot)*100).toFixed(0)+'%';
+}
+function cac(canal){
+  var g=parseFloat(canal.gastoMensal)||0;
+  var c2=convertidos(canal.id);
+  if(!g||!c2)return '—';
+  return fmtMoeda(g/c2);
+}
+
+// ── Card do canal ──────────────────────────────────────────────────────────
+function cardCanal(c){
+  var lc=leadsDoCanal(c.id).length;
+  var cv=convertidos(c.id);
+  var tc=taxaConv(c.id);
+  var ice=(parseFloat(c.iceI||0)+parseFloat(c.iceC||0)+parseFloat(c.iceE||0))/3;
+  ice=isNaN(ice)?0:ice;
+  return '<div class="canal-card">'+
+    '<div class="canal-header">'+
+      '<div>'+
+        '<div class="canal-nome">'+esc(c.nome)+'</div>'+
+        '<span class="canal-tipo">'+tipoLabel(c.tipo)+'</span>'+
+      '</div>'+
+      '<div style="display:flex;align-items:center;gap:8px;">'+
+        '<span style="font-family:var(--fm);font-size:10px;color:var(--muted)">'+semLabel(c.status)+'</span>'+
+        '<div class="semaforo '+semClass(c.status)+'"></div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="canal-metricas">'+
+      '<div class="met"><div class="met-label">Leads</div><div class="met-val '+(lc>0?'good':'')+'">'+(lc||0)+'</div></div>'+
+      '<div class="met"><div class="met-label">Convertidos</div><div class="met-val '+(cv>0?'good':'')+'">'+(cv||0)+'</div></div>'+
+      '<div class="met"><div class="met-label">Conversão</div><div class="met-val">'+tc+'</div></div>'+
+      '<div class="met"><div class="met-label">CAC</div><div class="met-val">'+cac(c)+'</div></div>'+
+    '</div>'+
+    (ice>0?
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin:8px 0 4px;">'+
+        '<span style="font-family:var(--fm);font-size:9px;color:var(--muted)">ICE Score</span>'+
+        '<span style="font-family:var(--fh);font-size:18px;font-weight:800;color:'+iceCor(ice)+'">'+ice.toFixed(1)+'</span>'+
+      '</div>'+
+      '<div class="ice-track" style="margin:0 0 8px;"><div class="ice-fill" style="width:'+((ice/10)*100)+'%;background:'+iceCor(ice)+'"></div></div>'
+    :'')+
+    '<div class="canal-responsavel">👤 '+(c.responsavel||'—')+(c.metaLeads?'  &nbsp; 🎯 Meta: '+c.metaLeads+'/mês':'' )+'</div>'+
+    (c.proximaAcao?'<div style="font-family:var(--fm);font-size:10px;color:var(--blue);margin-top:8px;">▶ '+esc(c.proximaAcao)+'</div>':'')+
+    '<div class="canal-footer">'+
+      '<span style="font-family:var(--fm);font-size:10px;color:var(--muted)">'+(c.gastoMensal?fmtMoeda(c.gastoMensal)+'/mês':'Grátis')+'</span>'+
+      '<button class="btn-small" onclick="editarCanal(\''+c.id+'\')">Editar</button>'+
+    '</div>'+
+  '</div>';
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function render(){
+  // Sumário
+  var totalLeads=leads.length;
+  var totalConv=leads.filter(l=>l.status==='convertido').length;
+  var totalGasto=canais.reduce((s,c)=>s+(parseFloat(c.gastoMensal)||0),0);
+  var cacGlobal=totalConv?fmtMoeda(totalGasto/totalConv):'—';
+  var canaisAtivos=canais.filter(c=>c.status==='ativo').length;
+  document.getElementById('sumario').innerHTML=
+    '<div class="sum-card"><div class="sum-label">Total de Canais</div><div class="sum-val">'+canais.length+'</div><div class="sum-sub">'+canaisAtivos+' ativos</div></div>'+
+    '<div class="sum-card"><div class="sum-label">Leads este mês</div><div class="sum-val" style="color:var(--blue)">'+totalLeads+'</div><div class="sum-sub">—</div></div>'+
+    '<div class="sum-card"><div class="sum-label">Convertidos</div><div class="sum-val" style="color:var(--green)">'+totalConv+'</div><div class="sum-sub">'+(totalLeads?((totalConv/totalLeads)*100).toFixed(0)+'% de conversão':'—')+'</div></div>'+
+    '<div class="sum-card"><div class="sum-label">Gasto Mensal</div><div class="sum-val" style="color:var(--yellow)">'+fmtMoeda(totalGasto)+'</div><div class="sum-sub">CAC médio: '+cacGlobal+'</div></div>'+
+    '<div class="sum-card"><div class="sum-label">Melhor Canal</div><div class="sum-val" style="font-size:14px;color:var(--accent)">'+melhorCanal()+'</div><div class="sum-sub">maior conversão</div></div>';
+
+  // Kanban resumo
+  var sorted=[...canais].sort((a,b)=>{
+    var oa={'ativo':0,'atencao':1,'testando':2,'pausado':3}; return (oa[a.status]||2)-(oa[b.status]||2);
+  });
+  document.getElementById('kanban-resumo').innerHTML=sorted.length?sorted.map(cardCanal).join(''):'<div class="empty-state">Nenhum canal cadastrado ainda.<br><button class="btn-add" onclick="abrirModalCanal()" style="margin-top:12px">+ Adicionar primeiro canal</button></div>';
+  document.getElementById('kanban-full').innerHTML=canais.length?canais.map(cardCanal).join(''):'<div class="empty-state">Nenhum canal cadastrado.</div>';
+
+  // Ranking ICE
+  var ranked=[...canais].map(c=>{
+    var ice=(parseFloat(c.iceI||0)+parseFloat(c.iceC||0)+parseFloat(c.iceE||0))/3;
+    return {...c, iceScore:isNaN(ice)?0:ice};
+  }).sort((a,b)=>b.iceScore-a.iceScore);
+
+  document.getElementById('ranking-list').innerHTML=ranked.map((c,i)=>{
+    var lc=leadsDoCanal(c.id).length;
+    var cv=convertidos(c.id);
+    return '<div class="rank-item">'+
+      '<span class="rank-num '+(i<3?'top':'')+'">'+('🥇🥈🥉'[i]||('#'+(i+1)))+'</span>'+
+      '<div class="rank-info">'+
+        '<div class="rank-nome">'+esc(c.nome)+'</div>'+
+        '<div class="rank-sub">'+tipoLabel(c.tipo)+' • '+semLabel(c.status)+(c.responsavel?' • 👤 '+esc(c.responsavel):'')+'</div>'+
+      '</div>'+
+      '<div class="rank-barra">'+
+        '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);text-align:right;margin-bottom:3px;">'+lc+' leads / '+cv+' conv.</div>'+
+        '<div class="rank-track"><div class="rank-fill" style="width:'+((c.iceScore/10)*100)+'%;background:'+iceCor(c.iceScore)+'"></div></div>'+
+      '</div>'+
+      '<div class="rank-val" style="color:'+iceCor(c.iceScore)+'">'+c.iceScore.toFixed(1)+'</div>'+
+    '</div>';
+  }).join('')||'<div class="empty-state">Nenhum canal com ICE Score cadastrado.</div>';
+
+  // Leads table
+  var sCanalId={};canais.forEach(c=>sCanalId[c.id]=c.nome);
+  var sStatusClass={novo:'sb-novo',contatado:'sb-contatado',convertido:'sb-convertido',perdido:'sb-perdido'};
+  document.getElementById('leads-tbody').innerHTML=leads.length?[...leads].reverse().map(l=>{
+    return '<tr>'+
+      '<td>'+esc(l.nome)+'</td>'+
+      '<td>'+esc(sCanalId[l.canalId]||l.canalId||'—')+'</td>'+
+      '<td>'+esc(l.telefone||'—')+'</td>'+
+      '<td><span class="status-badge '+(sStatusClass[l.status]||'')+'">'+esc(l.status)+'</span></td>'+
+      '<td>'+fmtData(l.criadoEm)+'</td>'+
+      '<td><button class="btn-small" onclick="editarLeadStatus(\''+l.id+'\')">✏</button></td>'+
+    '</tr>';
+  }).join(''):'<tr><td colspan="6" class="empty-state">Nenhum lead cadastrado.</td></tr>';
+}
+
+function melhorCanal(){
+  if(!canais.length)return '—';
+  var best=canais.reduce((best,c)=>{
+    var t=leadsDoCanal(c.id).length;
+    var cv=convertidos(c.id);
+    var taxa=t?cv/t:0;
+    var bestT=leadsDoCanal(best.id).length;
+    var bestCv=convertidos(best.id);
+    var bestTaxa=bestT?bestCv/bestT:0;
+    return taxa>bestTaxa?c:best;
+  },canais[0]);
+  return best.nome.substring(0,18);
+}
+
+// ── CRUD ───────────────────────────────────────────────────────────────────
+function abrirModalCanal(id){
+  _editId=id||null;
+  document.getElementById('modal-canal-title').textContent=id?'Editar Canal':'Novo Canal';
+  if(id){
+    var c=canais.find(x=>x.id===id)||{};
+    document.getElementById('canal-id').value=c.id||'';
+    document.getElementById('canal-nome').value=c.nome||'';
+    document.getElementById('canal-tipo').value=c.tipo||'organico';
+    document.getElementById('canal-status').value=c.status||'testando';
+    document.getElementById('canal-resp').value=c.responsavel||'';
+    document.getElementById('canal-meta').value=c.metaLeads||'';
+    document.getElementById('canal-gasto').value=c.gastoMensal||'';
+    document.getElementById('ice-i').value=c.iceI||'';
+    document.getElementById('ice-c').value=c.iceC||'';
+    document.getElementById('ice-e').value=c.iceE||'';
+    document.getElementById('canal-acao').value=c.proximaAcao||'';
+    document.getElementById('canal-obs').value=c.observacoes||'';
+    calcICE();
+  } else {
+    ['canal-id','canal-nome','canal-resp','canal-meta','canal-gasto','ice-i','ice-c','ice-e','canal-acao','canal-obs'].forEach(id=>{document.getElementById(id).value='';});
+    document.getElementById('canal-tipo').value='organico';
+    document.getElementById('canal-status').value='testando';
+    document.getElementById('ice-preview').textContent='—';
+  }
+  document.getElementById('modal-canal').classList.add('open');
+}
+function editarCanal(id){ abrirModalCanal(id); }
+
+function salvarCanal(){
+  var nome=document.getElementById('canal-nome').value.trim();
+  if(!nome){alert('Nome obrigatório');return;}
+  var canal={
+    id: _editId||(Date.now().toString(36).toUpperCase()),
+    nome, tipo:document.getElementById('canal-tipo').value,
+    status:document.getElementById('canal-status').value,
+    responsavel:document.getElementById('canal-resp').value.trim(),
+    metaLeads:parseFloat(document.getElementById('canal-meta').value)||0,
+    gastoMensal:parseFloat(document.getElementById('canal-gasto').value)||0,
+    iceI:parseFloat(document.getElementById('ice-i').value)||0,
+    iceC:parseFloat(document.getElementById('ice-c').value)||0,
+    iceE:parseFloat(document.getElementById('ice-e').value)||0,
+    proximaAcao:document.getElementById('canal-acao').value.trim(),
+    observacoes:document.getElementById('canal-obs').value.trim(),
+  };
+  if(_editId){ var idx=canais.findIndex(c=>c.id===_editId); if(idx>-1)canais[idx]=canal; }
+  else canais.push(canal);
+  save();fecharModal('modal-canal');toast('Canal salvo ✓');render();
+}
+
+function abrirModalLead(){
+  document.getElementById('lead-canal').innerHTML=canais.map(c=>'<option value="'+c.id+'">'+esc(c.nome)+'</option>').join('')||'<option>— sem canais —</option>';
+  ['lead-nome','lead-tel','lead-obs'].forEach(id=>{document.getElementById(id).value='';});
+  document.getElementById('lead-status').value='novo';
+  document.getElementById('modal-lead').classList.add('open');
+}
+
+function salvarLead(){
+  var nome=document.getElementById('lead-nome').value.trim();
+  if(!nome){alert('Nome obrigatório');return;}
+  leads.push({
+    id:Date.now().toString(36).toUpperCase(),
+    nome, telefone:document.getElementById('lead-tel').value.trim(),
+    canalId:document.getElementById('lead-canal').value,
+    status:document.getElementById('lead-status').value,
+    observacoes:document.getElementById('lead-obs').value.trim(),
+    criadoEm:new Date().toISOString()
+  });
+  save();fecharModal('modal-lead');toast('Lead adicionado ✓');render();
+}
+
+function editarLeadStatus(id){
+  var l=leads.find(x=>x.id===id);if(!l)return;
+  var s=prompt('Status do lead (novo/contatado/convertido/perdido):',l.status);
+  if(s&&['novo','contatado','convertido','perdido'].includes(s)){l.status=s;save();render();toast('Status atualizado');}
+}
+
+// ── Storage ────────────────────────────────────────────────────────────────
+function save(){
+  var data={canais,leads,updatedAt:new Date().toISOString()};
+  fetch('/api/growth?action=salvar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+  .catch(()=>{});
+  localStorage.setItem('growth_data',JSON.stringify(data));
+}
+
+function load(){
+  // Tentar API primeiro, fallback localStorage
+  fetch('/api/growth?action=carregar').then(r=>r.json()).then(d=>{
+    if(d.ok&&d.data){ canais=d.data.canais||[]; leads=d.data.leads||[]; render(); }
+    else { loadLocal(); }
+  }).catch(()=>loadLocal());
+}
+
+function loadLocal(){
+  var local=localStorage.getItem('growth_data');
+  if(local){ var d=JSON.parse(local); canais=d.canais||[]; leads=d.leads||[]; }
+  render();
+}
+
+// ── Fechar modal no backdrop ───────────────────────────────────────────────
+document.querySelectorAll('.modal-overlay').forEach(m=>{
+  m.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
+});
+
+load();
+</script>
+</body>
+</html>

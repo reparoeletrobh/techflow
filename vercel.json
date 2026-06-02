@@ -405,6 +405,14 @@
     {
       "source": "/api/tv-frenteloja",
       "destination": "/api/tv-frenteloja.js"
+    },
+    {
+      "source": "/growth",
+      "destination": "/growth.html"
+    },
+    {
+      "source": "/api/growth",
+      "destination": "/api/growth.js"
     }
   ],
   "headers": [
