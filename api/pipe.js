@@ -302,7 +302,52 @@ export default async function handler(req, res) {
 
       var backup = await _r4('reparoeletro_financeiro_backup');
       if (!backup || !Array.isArray(backup.records)) {
-        return res.status(404).json({ ok:false, error:'Backup não encontrado ou inválido', backup });
+      
+  // ── GET historico-erp — mostra quem saiu do ERP recentemente ──────────────
+  if (action === 'historico-erp') {
+    const db = await dbGet(PIPE_KEY) || { cards: [] };
+    const agora = Date.now();
+    const limite48h = new Date(agora - 48*60*60*1000).toISOString();
+
+    // Cards ATUALMENTE em ERP
+    const emErp = (db.cards||[]).filter(c => c.phase === 'erp').map(c => ({
+      id: c.id, pipefyId: c.pipefyId, nome: c.nomeContato||c.title||'',
+      movedAt: c.movedAt, equipamento: c.equipamento||''
+    }));
+
+    // Cards que JÁ FORAM para ERP (têm 'erp' no history) mas saíram
+    const passaramPeloErp = (db.cards||[]).filter(c => {
+      if (c.phase === 'erp') return false;
+      return (c.history||[]).some(h => h.phase === 'erp');
+    }).map(c => {
+      const erpEntry = (c.history||[]).find(h => h.phase === 'erp');
+      const saidaEntry = (c.history||[]).slice().reverse().find(h => h.ts > (erpEntry?.ts||''));
+      return {
+        id: c.id, pipefyId: c.pipefyId, nome: c.nomeContato||c.title||'',
+        phaseAtual: c.phase, movedAt: c.movedAt,
+        entradaErpEm: erpEntry?.ts, saidaErpEm: saidaEntry?.ts||c.movedAt,
+        equipamento: c.equipamento||''
+      };
+    }).filter(c => c.saidaErpEm > limite48h);
+
+    // Cards movidos recentemente (últimas 48h) de qualquer fase
+    const movimentosRecentes = (db.cards||[])
+      .filter(c => c.movedAt > limite48h && c.phase !== 'erp')
+      .map(c => ({ id: c.id, pipefyId: c.pipefyId, nome: c.nomeContato||'',
+                   phase: c.phase, movedAt: c.movedAt }))
+      .sort((a,b) => (b.movedAt||'') > (a.movedAt||'') ? 1 : -1)
+      .slice(0, 20);
+
+    return res.status(200).json({
+      ok: true,
+      totalErpAgora: emErp.length,
+      emErp,
+      sairamDoErpUlt48h: passaramPeloErp,
+      movimentosRecentes
+    });
+  }
+
+  return res.status(404).json({ ok:false, error:'Backup não encontrado ou inválido', backup });
       }
       // Remover campo de controle do backup antes de restaurar
       delete backup.backedUpAt;
