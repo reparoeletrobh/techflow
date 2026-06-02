@@ -371,6 +371,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
     <button class="popup-close" onclick="closePopup('pop-liberar')">✕</button>
     <h2>🔓 LIBERAR EQUIPAMENTO</h2>
     <div id="pop-liberar-info" style="background:var(--surface2);border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px;color:var(--muted);"></div>
+    <div id="pop-liberar-diag" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:12px;">
+      <div style="font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;">🔬 Diagnóstico</div>
+      <div id="pop-liberar-diag-texto" style="font-size:12px;color:var(--text);line-height:1.5;white-space:pre-wrap;"></div>
+    </div>
     <div class="popup-field">
       <label>VALOR A COBRAR (R$)</label>
       <input type="number" id="lib-valor" placeholder="0.00" min="0">
@@ -944,6 +948,16 @@ function abrirLiberar(id){
   document.getElementById('pop-liberar-info').innerHTML=
     '<strong>'+fichaAtual.nomeContato+'</strong> — '+fichaAtual.equipamento+
     (fichaAtual.orcamento?'<br><span style="color:var(--yellow)">Valor orçado: '+fmtMoeda(fichaAtual.orcamento.valor)+'</span>':'');
+  // Mostrar diagnóstico da análise se existir
+  var diagDiv = document.getElementById('pop-liberar-diag');
+  var diagTxt = document.getElementById('pop-liberar-diag-texto');
+  var diag = fichaAtual.descricaoTecnica || fichaAtual.descricao || '';
+  if (diag) {
+    diagTxt.textContent = diag;
+    diagDiv.style.display = 'block';
+  } else {
+    diagDiv.style.display = 'none';
+  }
   document.getElementById('lib-valor').value=fichaAtual.orcamento?.valor||'';
   document.getElementById('lib-pgto').value=fichaAtual.orcamento?.formaPagamento||'pix';
   openPopup('pop-liberar');
