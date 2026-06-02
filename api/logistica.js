@@ -105,6 +105,25 @@ async function dbSet(key, val) {
 function defaultDB() { return { fichas: [], nextId: 1 }; }
 
 
+
+const ATEND_LOG_KEY = 'reparoeletro_atend_logistica';
+async function registrarFichaAtendimento(ficha) {
+  try {
+    const db = (await dbGet(ATEND_LOG_KEY)) || { fichas: [] };
+    if (!Array.isArray(db.fichas)) db.fichas = [];
+    if (db.fichas.find(function(f){ return f.id === ficha.id; })) return;
+    db.fichas.unshift({
+      id: ficha.id, nome: ficha.nome || ficha.nomeContato || '',
+      telefone: ficha.telefone || '', equipamento: ficha.equipamento || '',
+      defeito: ficha.defeito || '', registradoEm: new Date().toISOString(),
+      origem: ficha.origem || 'logistica'
+    });
+    var cutoff = new Date(Date.now() - 90*24*60*60*1000).toISOString();
+    db.fichas = db.fichas.filter(function(f){ return (f.registradoEm||'') > cutoff; });
+    await dbSet(ATEND_LOG_KEY, db);
+  } catch(e) { console.error('[atend-log]', e.message); }
+}
+
 async function registrarPassagem(phase) {
   try {
     const hoje = new Date().toLocaleDateString('pt-BR', {timeZone:'America/Sao_Paulo'}).split('/').reverse().join('-');
@@ -347,6 +366,7 @@ module.exports = async function handler(req, res) {
     db.nextId = (db.nextId || 1) + 1;
     await dbSet(LOG_KEY, db);
     registrarPassagem('liberado_coleta').catch(() => {});
+    registrarFichaAtendimento(ficha).catch(() => {});
     return res.status(201).json({ ok: true, ficha });
   }
 
@@ -363,6 +383,7 @@ module.exports = async function handler(req, res) {
     ficha.movedAt = new Date().toISOString();
     await dbSet(LOG_KEY, db);
     registrarPassagem(phase).catch(() => {});
+    if (phase === 'liberado_coleta') registrarFichaAtendimento(ficha).catch(() => {});
     return res.status(200).json({ ok: true, ficha });
   }
 

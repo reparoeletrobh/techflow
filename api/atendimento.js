@@ -34,17 +34,15 @@ export default async function handler(req,res){
         pf(Q1),dbG(CK),dbG(VK),pf(Q2).catch(()=>null),
         dbG(ORC_KEY),dbG(FIN_KEY),dbG(BOARD_KEY).catch(()=>null)
       ]);
-      // FICHAS
-      const fichasTotal=pd?.pipe?.cards_count||0;
-      const allEdges=ficQ?.allCards?.edges||[];
-      const ficDateOf=e=>new Date(e?.node?.created_at||0).getTime();
-      const ficHojeEdges=allEdges.filter(e=>ficDateOf(e)>=todayUTC.getTime());
-      const ficSemEdges=allEdges.filter(e=>ficDateOf(e)>=weekUTC.getTime());
-      const ficMesEdges=allEdges.filter(e=>ficDateOf(e)>=monthUTC.getTime());
-      const ficHoje=ficHojeEdges.length||null;
-      const ficSem=ficSemEdges.length||null;
-      const ficMes=ficMesEdges.length||null;
-      const fichasHojeList=ficHojeEdges.map(e=>({id:e.node.id,title:e.node.title||'Sem título',createdAt:e.node.created_at}));
+      // FICHAS — logistica (reparoeletro_atend_logistica)
+      const atendLogDb=await dbG('reparoeletro_atend_logistica').catch(()=>null);
+      const atendFichas=atendLogDb?.fichas||[];
+      const fichasTotal=atendFichas.length;
+      const ficDateOf=f=>new Date(f.registradoEm||0).getTime();
+      const ficHoje=atendFichas.filter(f=>ficDateOf(f)>=todayUTC.getTime()).length||null;
+      const ficSem=atendFichas.filter(f=>ficDateOf(f)>=weekUTC.getTime()).length||null;
+      const ficMes=atendFichas.filter(f=>ficDateOf(f)>=monthUTC.getTime()).length||null;
+      const fichasHojeList=atendFichas.filter(f=>ficDateOf(f)>=todayUTC.getTime()).map(f=>({id:f.id,title:(f.nome||'')+(f.equipamento?' — '+f.equipamento:''),createdAt:f.registradoEm}));
       // ERP
       const ep=pd?.phase;
       const erpTotal=ep?.cards_count||0;
