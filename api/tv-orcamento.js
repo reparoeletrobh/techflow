@@ -173,7 +173,28 @@ module.exports = async function handler(req, res) {
     // Deduplica por id
     const seen = new Set();
     db.fichas = (db.fichas || []).filter(f => { if (seen.has(f.id)) return false; seen.add(f.id); return true; });
-    return res.status(200).json({ ok: true, fichas: db.fichas || [] });
+
+    // Enriquecer com chips/diagnóstico da logística
+    const LOG_K = 'tv_logistica';
+    const logDb = await dbGet(LOG_K).catch(()=>null) || { fichas: [] };
+    const fichasEnriq = (db.fichas||[]).map(orc => {
+      const fl = (logDb.fichas||[]).find(f =>
+        f.id === orc.id ||
+        (f.nome||'').toLowerCase().trim() === (orc.nome||'').toLowerCase().trim()
+      );
+      if (!fl || !fl.diagnostico) return orc;
+      const equips = fl.diagnostico.equips || [fl.diagnostico];
+      const chips  = [...new Set(equips.flatMap(e => e.servicos || []))];
+      return {
+        ...orc,
+        chips,
+        modeloDiag:       equips[0]?.modelo || fl.equipamento || '',
+        descricaoTecnica: fl.descricaoTecnica || fl.descricao || '',
+        equipamento:      orc.equipamento || fl.equipamento || '',
+      };
+    });
+
+    return res.status(200).json({ ok: true, fichas: fichasEnriq });
   }
 
   // ── GET orc-sync ───────────────────────────────────────────

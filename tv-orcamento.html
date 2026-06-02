@@ -85,6 +85,18 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .orc-card{background:linear-gradient(135deg,#080d18 0%,#060c18 100%);
   border:1px solid var(--border);border-radius:12px;padding:18px 20px;
   transition:all .2s;position:relative;overflow:hidden;}
+.orc-card.condenada{border-color:rgba(240,48,96,.5)!important;background:linear-gradient(180deg,rgba(240,48,96,.06) 0%,var(--surface) 60%)!important;}
+.condenada-banner{display:flex;align-items:center;gap:6px;font-family:var(--fm);font-size:10px;font-weight:700;color:#f03060;letter-spacing:.08em;background:rgba(240,48,96,.12);border:1px solid rgba(240,48,96,.3);border-radius:6px;padding:6px 10px;margin-bottom:8px;}
+.diag-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;}
+.diag-chip{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;letter-spacing:.06em;text-transform:uppercase;}
+.chip-barramento{background:rgba(59,158,255,.15);color:#3b9eff;border:1px solid rgba(59,158,255,.3);}
+.chip-placa{background:rgba(168,85,247,.15);color:#a855f7;border:1px solid rgba(168,85,247,.3);}
+.chip-risco{background:rgba(245,200,0,.15);color:#f5c800;border:1px solid rgba(245,200,0,.3);}
+.chip-acrilico{background:rgba(6,182,212,.15);color:#06b6d4;border:1px solid rgba(6,182,212,.3);}
+.chip-condenada{background:rgba(240,48,96,.15);color:#f03060;border:1px solid rgba(240,48,96,.3);}
+.diag-desc{font-family:var(--fm);font-size:10px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;margin-bottom:8px;line-height:1.5;white-space:pre-wrap;}
+.diag-label{font-family:var(--fm);font-size:9px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;}
+
 .orc-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
   background:linear-gradient(90deg,transparent,rgba(59,158,255,.3),rgba(6,214,214,.15),transparent);}
 .orc-card:hover{border-color:rgba(59,158,255,.4);
@@ -346,7 +358,7 @@ async function loadOrc() {
 }
 
 function orcCard(f) {
-  var wrap = document.createElement('div'); wrap.className = 'orc-card'; wrap.id = 'orc-'+f.id;
+  var wrap = document.createElement('div'); wrap.className = 'orc-card'+(isCondenada?' condenada':''); wrap.id = 'orc-'+f.id;
 
   // Cabeçalho: nome + tel + age + badge
   var head = document.createElement('div'); head.style.cssText='display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px;';
@@ -354,12 +366,29 @@ function orcCard(f) {
   var nome = document.createElement('div'); nome.className='orc-nome'; nome.textContent=f.nome||'—'; info.appendChild(nome);
   if (f.tel) { var telEl=document.createElement('div'); telEl.style.cssText='font-family:var(--fm);font-size:10px;color:var(--muted);margin-top:2px;'; telEl.textContent='📞 '+f.tel; info.appendChild(telEl); }
   if (f.age) { var ageEl=document.createElement('div'); ageEl.style.cssText='font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:2px;'; ageEl.textContent='⏳ '+f.age+' dia(s) em Aguardando Aprovação'; info.appendChild(ageEl); }
-  var isCondenada = (f.textoOrc||'').toLowerCase().includes('nao tem conserto viavel');
+  var isCondenada = !!(f.chips&&f.chips.includes('condenada')) || (!f.preco&&!f.precoSugerido&&f.textoOrc&&f.textoOrc.length>0) || (f.textoOrc||'').toLowerCase().includes('conserto vi');
   var badge = document.createElement('span'); badge.style.cssText='font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;flex-shrink:0;';
   if (isCondenada) { badge.textContent='❌ Condenada'; badge.style.cssText+=';background:rgba(240,64,96,.15);color:var(--red);border:1px solid rgba(240,64,96,.3);'; }
   else { badge.textContent='⏳ Pendente'; badge.style.cssText+=';background:rgba(59,158,255,.1);color:var(--accent);border:1px solid rgba(59,158,255,.25);'; }
   head.appendChild(info); head.appendChild(badge); wrap.appendChild(head);
 
+  // Banner condenada
+  if (isCondenada) {
+    var banner=document.createElement('div'); banner.className='condenada-banner';
+    banner.innerHTML='🔴 EQUIPAMENTO CONDENADO &mdash; Sem conserto vi&aacute;vel';
+    wrap.appendChild(banner);
+  }
+  // Diagnóstico: chips + descrição técnica
+  if (f.chips && f.chips.length) {
+    var diagSec=document.createElement('div'); diagSec.style.marginBottom='8px';
+    var diagLbl=document.createElement('div'); diagLbl.className='diag-label'; diagLbl.textContent='\uD83D\uDD2C Diagn\u00f3stico'; diagSec.appendChild(diagLbl);
+    var chipsRow=document.createElement('div'); chipsRow.className='diag-chips';
+    var CL={'barramento':'Barramento','placa':'Placa','risco':'Risco de Curto','acrilico':'Acr\u00edlico','condenada':'Condenada'};
+    f.chips.forEach(function(c){ var sp=document.createElement('span'); sp.className='diag-chip chip-'+c; sp.textContent=CL[c]||c; chipsRow.appendChild(sp); });
+    diagSec.appendChild(chipsRow);
+    if (f.descricaoTecnica) { var dtD=document.createElement('div'); dtD.className='diag-desc'; dtD.textContent=f.descricaoTecnica; diagSec.appendChild(dtD); }
+    wrap.appendChild(diagSec);
+  }
   if (f.desc) { var desc=document.createElement('div'); desc.className='orc-desc'; desc.textContent=f.desc; desc.style.marginBottom='6px'; wrap.appendChild(desc); }
   if (f.end)  { var end=document.createElement('div'); end.className='orc-meta'; end.textContent='📍 '+f.end; end.style.marginBottom='6px'; wrap.appendChild(end); }
   if (f.comentarios && f.comentarios.length) {
