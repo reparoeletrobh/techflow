@@ -170,6 +170,27 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 /* ── TOAST ── */
 .toast{position:fixed;bottom:24px;right:24px;background:#1a1a1a;border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-family:var(--fm);font-size:11px;color:var(--text);z-index:999;opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;}
 .toast.show{opacity:1;transform:translateY(0);}
+
+/* ── CHIPS TV (igual tv-coleta) ── */
+.diag-chips-tv{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;}
+.chip-tv{font-family:var(--fm);font-size:10px;padding:5px 11px;border-radius:99px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;transition:all .15s;user-select:none;}
+.chip-tv:hover{border-color:var(--accent);color:var(--text);}
+.chip-tv.on{background:rgba(59,158,255,.15);border-color:var(--blue);color:var(--blue);}
+.chip-tv.on.chip-condenada{background:rgba(239,68,68,.15);border-color:var(--red);color:var(--red);}
+.chip-tv.on.chip-risco{background:rgba(245,200,0,.15);border-color:var(--yellow);color:var(--yellow);}
+.chip-tv.on.chip-acrilico{background:rgba(34,197,94,.15);border-color:var(--green);color:var(--green);}
+.diag-inline{display:none;margin-top:8px;border:1px solid var(--border);border-radius:8px;padding:10px;background:var(--surface);}
+.diag-inline.open{display:block;}
+.diag-inline-sec{border:1px solid var(--border);border-radius:7px;padding:9px;margin-bottom:7px;}
+.diag-label-tv{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;}
+.diag-input-tv{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 9px;color:var(--text);font-family:var(--fm);font-size:11px;outline:none;margin-bottom:6px;}
+.diag-input-tv:focus{border-color:var(--green);}
+.diag-qtd-wrap{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.btn-diag-submit{width:100%;margin-top:6px;font-family:var(--fm);font-size:10px;font-weight:700;padding:7px;border-radius:6px;border:none;cursor:pointer;background:var(--green);color:#000;transition:filter .15s;}
+.btn-diag-submit:hover{filter:brightness(1.1);}
+.btn-diag-submit:disabled{opacity:.4;cursor:not-allowed;}
+.btn-diag-cancel{width:100%;margin-top:4px;font-family:var(--fm);font-size:10px;padding:5px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;}
+
 </style>
 </head>
 <body>
@@ -580,9 +601,19 @@ function cardHTML(f, phase) {
       <button class="cbtn cbtn-blue" onclick="mover('${f.id}','liberado_coleta')">Liberar Novamente</button>
       <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>`;
   } else if (phase === 'coleta_efetuada') {
+    var diagFeito = f.diagnostico && (f.diagnostico.equips||[]).length > 0;
     btns = `
-      <button class="cbtn cbtn-purple" onclick="abrirDiag('${f.id}')">Diagnóstico</button>
-      <button class="cbtn cbtn-red" onclick="finalizarRS('${f.id}','${escHtml(f.nome)}')">🔴 RS</button>`;
+      <button class="cbtn cbtn-purple" id="dbtn-${f.id}" onclick="toggleDiagTV('${f.id}')">${diagFeito ? '✅ Rediagnosticar' : '📋 Diagnóstico'}</button>
+      <button class="cbtn cbtn-red" onclick="finalizarRS('${f.id}','${escHtml(f.nome)}')">🔴 RS</button>
+      <div class="diag-inline" id="diag-inline-${f.id}">
+        <div class="diag-qtd-wrap">
+          <span class="diag-label-tv" style="margin-bottom:0;">Qtd. TVs</span>
+          <input type="number" min="1" max="10" value="1" class="diag-input-tv" style="width:54px;text-align:center;padding:4px 6px;margin-bottom:0;" id="diag-qtd-${f.id}" oninput="renderChipsSecs('${f.id}',parseInt(this.value)||1)">
+        </div>
+        <div id="diag-secs-${f.id}">${renderChipSecStr('${f.id}',0,1)}</div>
+        <button class="btn-diag-submit" onclick="enviarDiagTV('${f.id}')">✅ Salvar Diagnóstico</button>
+        <button class="btn-diag-cancel" onclick="toggleDiagTV('${f.id}')">✕ Cancelar</button>
+      </div>`;
   } else if (phase === 'orc_registrado') {
     const diag = f.diagnostico;
     if (diag) btns = `<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">${diag.tipo||''}${diag.subtipo?' › '+diag.subtipo:''} — ${(diag.servicos||[]).join(', ')}</div>`;
@@ -1079,6 +1110,101 @@ function toggleExpand(id) {
   btn.classList.toggle('open', open);
   btn.querySelector('.chev').textContent = open ? '▴' : '▾';
   btn.childNodes[0].textContent = open ? ' Recolher' : ' Mais ações';
+}
+
+
+// ── DIAGNÓSTICO TV (inline, igual tv-coleta) ──────────────────────────────
+var CHIPS_TV_LOG = ['barramento','placa','condenada','risco','acrilico'];
+
+function renderChipSecStr(fid, idx, total) {
+  var lbl = total > 1 ? '📺 TV ' + (idx+1) : '📺 Equipamento';
+  return '<div id="dls-'+fid+'-'+idx+'" class="diag-inline-sec">' +
+    (total>1?'<div class="diag-label-tv" style="color:var(--accent);margin-bottom:5px;">'+lbl+'</div>':'') +
+    '<div class="diag-label-tv">Modelo</div>' +
+    '<input class="diag-input-tv" type="text" id="dlm-'+fid+'-'+idx+'" placeholder="Ex: Samsung 43 Smart"/>' +
+    '<div class="diag-label-tv">Diagnóstico</div>' +
+    '<div class="diag-chips-tv">' +
+      '<button class="chip-tv" id="dlc-barramento-'+fid+'-'+idx+'" onclick="toggleChipTV(\''+fid+'\','+idx+',\'barramento\')">Barramento</button>' +
+      '<button class="chip-tv" id="dlc-placa-'+fid+'-'+idx+'" onclick="toggleChipTV(\''+fid+'\','+idx+',\'placa\')">Placa</button>' +
+      '<button class="chip-tv chip-condenada" id="dlc-condenada-'+fid+'-'+idx+'" onclick="toggleChipTV(\''+fid+'\','+idx+',\'condenada\')">Condenada</button>' +
+      '<button class="chip-tv chip-risco" id="dlc-risco-'+fid+'-'+idx+'" onclick="toggleChipTV(\''+fid+'\','+idx+',\'risco\')">Risco</button>' +
+      '<button class="chip-tv chip-acrilico" id="dlc-acrilico-'+fid+'-'+idx+'" onclick="toggleChipTV(\''+fid+'\','+idx+',\'acrilico\')">Acrílico</button>' +
+    '</div>' +
+    '<input class="diag-input-tv" type="number" id="dlv-'+fid+'-'+idx+'" placeholder="Valor Acrílico (R$)" min="0" step="0.01" style="display:none;"/>' +
+  '</div>';
+}
+
+function renderChipsSecs(fid, qtd) {
+  var c = document.getElementById('diag-secs-'+fid);
+  if (!c) return;
+  c.innerHTML = Array.from({length:qtd}, function(_,i){ return renderChipSecStr(fid,i,qtd); }).join('');
+}
+
+function toggleDiagTV(fid) {
+  var el = document.getElementById('diag-inline-'+fid);
+  if (el) el.classList.toggle('open');
+}
+
+function toggleChipTV(fid, idx, nome) {
+  var chip = document.getElementById('dlc-'+nome+'-'+fid+'-'+idx);
+  if (!chip) return;
+  chip.classList.toggle('on');
+  if (nome === 'acrilico') {
+    var v = document.getElementById('dlv-'+fid+'-'+idx);
+    if (v) v.style.display = chip.classList.contains('on') ? 'block' : 'none';
+  }
+}
+
+function coletarChipsSecs(fid) {
+  var qtdEl = document.getElementById('diag-qtd-'+fid);
+  var qtd = qtdEl ? parseInt(qtdEl.value)||1 : 1;
+  var equips = [];
+  for (var i = 0; i < qtd; i++) {
+    var modeloEl = document.getElementById('dlm-'+fid+'-'+i);
+    var modelo = modeloEl ? modeloEl.value.trim() : '';
+    var chips = CHIPS_TV_LOG.filter(function(c){
+      var el = document.getElementById('dlc-'+c+'-'+fid+'-'+i);
+      return el && el.classList.contains('on');
+    });
+    var acrilicoValEl = document.getElementById('dlv-'+fid+'-'+i);
+    var acrilicoVal = acrilicoValEl ? parseFloat(acrilicoValEl.value)||0 : 0;
+    if (chips.length > 0) equips.push({ modelo: modelo, tipo: 'tv', servicos: chips, preco: acrilicoVal||0 });
+  }
+  return equips;
+}
+
+async function enviarDiagTV(fid) {
+  var equips = coletarChipsSecs(fid);
+  if (!equips.length) { toast('Selecione pelo menos uma opção', 'error'); return; }
+  var btn = document.querySelector('#diag-inline-'+fid+' .btn-diag-submit');
+  if (btn) { btn.disabled = true; btn.textContent = 'Salvando...'; }
+  try {
+    // Passo 1: salvar diagnóstico
+    var r1 = await fetch('/api/tv-logistica?action=salvar-diagnostico', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ id: fid, diagnostico: { equips: equips } })
+    }).then(r=>r.json());
+    if (!r1.ok) throw new Error(r1.error || 'Erro ao salvar diagnóstico');
+
+    if (btn) btn.textContent = 'Gerando orçamento...';
+
+    // Passo 2: gerar orçamento → tv_orcamentos + tv_pipe aguardando_aprovacao
+    var r2 = await fetch('/api/tv-logistica?action=gerar-orcamento', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ id: fid })
+    }).then(r=>r.json());
+
+    if (r2.ok) {
+      toast('✅ Orçamento gerado! Ficha enviada para Aguardando Aprovação.', 'success');
+      toggleDiagTV(fid);
+      await load();
+    } else {
+      throw new Error(r2.error || 'Erro ao gerar orçamento');
+    }
+  } catch(e) {
+    toast('❌ ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Salvar Diagnóstico'; }
+  }
 }
 
 </script>

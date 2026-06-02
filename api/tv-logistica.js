@@ -528,6 +528,27 @@ module.exports = async function handler(req, res) {
           .replace(/\[VALOR\]/g, preco || '');
       }
 
+
+      if (tipo === 'tv') {
+        const chips = servicos || [];
+        const modelo = eq.modelo || 'TV';
+        const pn = priNome(nome);
+        if (chips.includes('condenada')) {
+          return { texto: `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro. Fizemos o diagnóstico completo da ${modelo} e infelizmente ela está condenada — sem possibilidade de conserto viável. Podemos descartar ou devolver conforme sua preferência.`, preco: null };
+        }
+        if (chips.includes('risco')) {
+          const p = parseFloat(eq.preco) || 0;
+          return { texto: `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro. Fizemos o diagnóstico da ${modelo}. Identificamos um problema no ${chips.filter(x=>x!=='risco').join(' e ') || 'circuito'}. O conserto fica por R$ ${p} — há um risco associado ao reparo que precisa da sua aprovação.`, preco: String(p) };
+        }
+        if (chips.includes('acrilico')) {
+          const p = parseFloat(eq.preco) || 0;
+          return { texto: `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro. O diagnóstico da ${modelo} está pronto. Vamos fazer a proteção em acrílico + serviços adicionais. Valor total: R$ ${p}. Aprovando já iniciamos.`, preco: String(p) };
+        }
+        const servStr = chips.filter(x=>!['condenada','risco','acrilico'].includes(x)).join(' e ') || 'componentes';
+        const p = parseFloat(eq.preco) || 0;
+        return { texto: `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro. Fizemos o diagnóstico completo da ${modelo}. Precisamos fazer a troca/reparo do ${servStr}. O conserto completo fica em R$ ${p||'[valor]'}. Aprovando já iniciamos.`, preco: p ? String(p) : null };
+      }
+
       if (tipo === 'microondas') {
         if (tem(['Troca de Placa','Display'])) {
           const p = pecas(['Troca de Placa','Display']);
