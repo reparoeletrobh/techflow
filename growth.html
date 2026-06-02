@@ -153,7 +153,7 @@ var COLS = [
   {id:'pago',     label:'Tráfego Pago',  icon:'💰',freq:'d',color:'#3b9eff',
    items:[{id:'meta',label:'Meta Ads',tipo:'check',meta:1,resp:'Time Mkt'},{id:'google',label:'Google Ads',tipo:'check',meta:1,resp:'Time Mkt'},{id:'yt',label:'YouTube Ads',tipo:'check',meta:1,resp:'Time Mkt'}]},
   {id:'organico', label:'Orgânico',      icon:'🎬',freq:'d',color:'#22c55e',
-   items:[{id:'videos',label:'Vídeos Orgânicos',tipo:'counter',meta:3,resp:'Conteúdo'},{id:'tiktok',label:'Live TikTok',tipo:'check',meta:1,resp:'Conteúdo'}]},
+   items:[{id:'videos',label:'Vídeos Orgânicos',tipo:'counter',meta:3,resp:'Conteúdo'}]},
   {id:'criativo', label:'Criativos',     icon:'🎨',freq:'w',color:'#a855f7',
    items:[{id:'criativos',label:'Criativos Produzidos',tipo:'counter',meta:10,resp:'Design'}]},
   {id:'influencer',label:'Influencer',   icon:'🌟',freq:'w',color:'#f97316',
@@ -164,6 +164,18 @@ var COLS = [
    items:[{id:'pj',label:'Abordagens PJ',tipo:'counter',meta:5,resp:'Comercial'}]},
   {id:'seo',      label:'SEO / IA',      icon:'🤖',freq:'w',color:'#e879f9',
    items:[{id:'seo_c',label:'Conteúdo SEO/IA',tipo:'counter',meta:5,resp:'Conteúdo'}]},
+  {id:'lives',    label:'Lives',          icon:'📡',freq:'d',color:'#f43f5e',
+   items:[
+     {id:'tiktok_live', label:'Live TikTok',     tipo:'check',  meta:1,resp:'Conteúdo'},
+     {id:'ig_live',     label:'Live Instagram',  tipo:'check',  meta:1,resp:'Conteúdo'},
+     {id:'yt_live',     label:'Live YouTube',    tipo:'check',  meta:1,resp:'Conteúdo'},
+   ]},
+  {id:'indicacoes',label:'Indicações',    icon:'🔗',freq:'w',color:'#10d982',
+   items:[
+     {id:'ind_solicit', label:'Indicações Solicitadas', tipo:'counter', meta:10, resp:'Atend.'},
+     {id:'ind_receb',   label:'Avaliações Recebidas',   tipo:'counter', meta:5,  resp:'Atend.'},
+     {id:'ind_google',  label:'Google Reviews',         tipo:'counter', meta:3,  resp:'Atend.'},
+   ]},
 ];
 
 var cols = [], vals = {}, _editCid = null, _editIid = null, _isNew = false, _tipo = 'check';
@@ -313,6 +325,8 @@ function renderConquistas(){
     {i:'🤝',n:'Hunter PJ',          d:'5+ abordagens PJ no dia',         ok:(vals['comercial_pj']||0)>=5},
     {i:'⭐',n:'Reputação Ativa',    d:'5+ ações Google Meu Negócio',     ok:(vals['reputacao_gmb']||0)>=5},
     {i:'🚀',n:'Growth Total',       d:'Todas as colunas com progresso',  ok:cols.every(function(c){return!c.items.length||c.items.some(function(it){return(vals[c.id+'_'+it.id]||0)>0;});})},
+    {i:'🔗',n:'Indicação Ativa',    d:'10+ indicações solicitadas',      ok:(vals['indicacoes_ind_solicit']||0)>=10},
+    {i:'📡',n:'Ao Vivo!',           d:'Live feita no dia',               ok:(vals['lives_tiktok_live']||0)>=1||(vals['lives_ig_live']||0)>=1||(vals['lives_yt_live']||0)>=1},
   ];
   var grid=document.getElementById('cq-grid'); grid.innerHTML='';
   CS.forEach(function(c){
