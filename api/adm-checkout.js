@@ -89,6 +89,39 @@ module.exports = async function handler(req, res) {
       criadoEm:      new Date().toISOString()
     });
     await dbSet(VENDAS_KEY, db);
+
+    // ── Pipe ADM: criar card em Receber para separação ─────────────────────
+    try {
+      async function _cg(k){const r=await fetch(`${U}/pipeline`,{method:'POST',headers:{Authorization:`Bearer ${T}`,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();const v=j[0]?.result;if(!v)return null;try{let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+      async function _cs(k,v){await fetch(`${U}/pipeline`,{method:'POST',headers:{Authorization:`Bearer ${T}`,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+      const pdb=(await _cg('reparoeletro_pipe'))||{cards:[],lastSync:null};
+      if(!Array.isArray(pdb.cards))pdb.cards=[];
+      const nowC=new Date().toISOString();
+      const prod=produto||{};
+      const compNome=(comprador?.nome||comprador?.name||'Cliente');
+      const titulo=`VENDA — ${prod.codigo||prod.id||'Equipamento'} | ${compNome}`;
+      const descricao=[prod.descricao||prod.nome||'',`Valor: R$${parseFloat(valor||0).toFixed(2)}`,`MP: ${paymentId||'—'}`,`Método: ${paymentMethod||'pix'}`].filter(Boolean).join(' | ');
+      pdb.cards.unshift({
+        id: 'PIPE-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,4).toUpperCase(),
+        pipefyId: null, phase:'receber',
+        nomeContato: compNome,
+        telefone: comprador?.telefone||comprador?.phone||'',
+        equipamento: prod.tipo||prod.nome||'',
+        descricao: descricao,
+        title: titulo,
+        valor: parseFloat(valor||0),
+        origem: 'venda_checkout',
+        vendaProdutoId: prod.id||null,
+        codEquip: prod.codigo||null,
+        criadoEm: nowC, movedAt: nowC,
+        history:[{phase:'receber',ts:nowC,obs:'venda_checkout_mp'}],
+        aguardandoDesde: null, analiseCompra: false
+      });
+      pdb.lastSync=nowC;
+      await _cs('reparoeletro_pipe', pdb);
+      console.log('[checkout] Card criado em receber para:', compNome, prod.codigo||prod.id);
+    } catch(ep){ console.error('[checkout] pipe receber:', ep.message); }
+
     return res.status(200).json({ ok:true });
   }
 
