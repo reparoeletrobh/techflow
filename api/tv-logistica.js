@@ -1110,5 +1110,36 @@ Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter peque
     });
   }
 
+    // ── GET fix-horario — corrige horarioColeta de uma ficha (offset UTC→BRT) ─────
+  if (req.method === 'GET' && action === 'fix-horario') {
+    const nome_q = (req.query.nome || '').toLowerCase().trim();
+    const add_h  = parseInt(req.query.add) || 3; // horas a adicionar (padrão +3 = BRT)
+    if (!nome_q) return res.status(400).json({ ok:false, error: 'Informe ?nome=xxx' });
+
+    const db = await dbGet('tv_logistica_log') || defaultDB();
+    const ficha = db.fichas.find(f =>
+      (f.nome||'').toLowerCase().includes(nome_q) ||
+      (f.telefone||'').includes(nome_q)
+    );
+    if (!ficha) return res.status(404).json({ ok:false, error: 'Ficha não encontrada: '+nome_q });
+    if (!ficha.horarioColeta) return res.status(400).json({ ok:false, error: 'Ficha sem horarioColeta', ficha: {id:ficha.id, nome:ficha.nome} });
+
+    const original = ficha.horarioColeta;
+    const corrigido = new Date(new Date(original).getTime() + add_h * 3600 * 1000).toISOString();
+
+    ficha.horarioColeta = corrigido;
+    ficha.movedAt = new Date().toISOString();
+    await dbSet('tv_logistica_log', db);
+
+    return res.status(200).json({
+      ok: true,
+      nome: ficha.nome,
+      original,
+      corrigido,
+      add_horas: add_h,
+      msg: `✅ horarioColeta corrigido +${add_h}h`,
+    });
+  }
+
     return res.status(404).json({ ok: false, error: 'ação não encontrada' });
 };
