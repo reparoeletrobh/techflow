@@ -56,7 +56,7 @@ async function logEvento(evento) {
 
 
 // ── moverNoPipe: move card no Pipe ADM (solicitar_entrega) ──────────────
-async function moverCardNoPipe(pipefyId, osCode, novaFase) {
+async function moverCardNoPipe(pipefyId, osCode, novaFase, fichaId) {
   try {
     const U=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
     const T=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
@@ -67,9 +67,11 @@ async function moverCardNoPipe(pipefyId, osCode, novaFase) {
     if(!db||!Array.isArray(db.cards))return false;
     const pipefyStr  = pipefyId ? String(pipefyId) : null;
     const osCodeStr  = osCode   ? String(osCode)   : null;
+    const fichaStr   = fichaId  ? String(fichaId)  : null;
     const card=db.cards.find(function(c){
       return (pipefyStr && (c.pipefyId===pipefyStr || c.id===pipefyStr)) ||
-             (osCodeStr && (c.id===osCodeStr || c.pipefyId===osCodeStr));
+             (osCodeStr && (c.id===osCodeStr || c.pipefyId===osCodeStr)) ||
+             (fichaStr  && (c.id===fichaStr  || c.pipefyId===fichaStr || c.localId===fichaStr || c.flFichaId===fichaStr));
     });
     if(!card)return false;
     const now=new Date().toISOString();
@@ -135,7 +137,7 @@ async function processarPagamentoFinanceiro(pmt) {
   await dbSet(FIN_KEY2, fin);
 
   // Pipe ADM: mover para solicitar_entrega
-  const pipeOk = await moverCardNoPipe(rec.pipefyId, rec.osCode, 'solicitar_entrega').catch(()=>false);
+  const pipeOk = await moverCardNoPipe(rec.pipefyId, rec.osCode, 'solicitar_entrega', rec.id).catch(()=>false);
   console.log('[webhook-mp] Pipe ADM move:', pipeOk);
 
   // Pipefy: mover para Solicitar Entrega — função própria, sem fetch interno
