@@ -639,6 +639,61 @@ export default async function handler(req,res){
     return res.status(200).json({ ok:true, total: pendentes.length, resultados });
   }
 
+
+  // ── GET fichas-antigas — lista fichas >48h em frente de caixa e balcão ──
+  if (action === 'fichas-antigas') {
+    const LIMITE_MS = 48 * 60 * 60 * 1000;
+    const agora = Date.now();
+    const flDb   = await dbGet(FL_KEY) || defaultDB();
+    const balcao = (await dbGet('reparoeletro_balcao')) || [];
+    const result = { frenteDeCaixa: [], balcao: [], geradoEm: new Date().toISOString() };
+
+    // Frente de caixa: fichas ativas (não pagas, não entregues)
+    const fasesAtivas = ['analise','orcamento','conserto','conserto_realizado','aguardando_aprovacao','aprovado'];
+    (flDb.fichas||[]).forEach(f => {
+      const fase = f.phase||'';
+      const ativa = fasesAtivas.some(fa => fase.includes(fa)) || !['pago','entregue','cancelado','arquivado'].includes(fase);
+      if (!ativa) return;
+      const entrada = new Date(f.criadoEm||f.createdAt||f.addedAt||0).getTime();
+      const horas = Math.floor((agora - entrada) / (1000*60*60));
+      if (horas >= 48) {
+        result.frenteDeCaixa.push({
+          id:       f.id,
+          nome:     f.nomeContato || f.nome || '—',
+          telefone: f.telefone || '—',
+          fase:     f.phase || '—',
+          entrada:  f.criadoEm || f.createdAt || '—',
+          horas,
+        });
+      }
+    });
+
+    // Balcão: fichas não pagas
+    balcao.forEach(b => {
+      if (b.status === 'pago') return;
+      const entrada = new Date(b.addedAt||b.criadoEm||b.createdAt||0).getTime();
+      const horas = Math.floor((agora - entrada) / (1000*60*60));
+      if (horas >= 48) {
+        result.balcao.push({
+          id:       b.pipefyId || b.flFichaId || '—',
+          nome:     b.nomeContato || '—',
+          telefone: b.telefone || '—',
+          entrada:  b.addedAt || b.criadoEm || '—',
+          horas,
+          descricao: b.descricao || '—',
+        });
+      }
+    });
+
+    // Ordenar por mais antigo primeiro
+    result.frenteDeCaixa.sort((a,b) => b.horas - a.horas);
+    result.balcao.sort((a,b) => b.horas - a.horas);
+    result.totalFC = result.frenteDeCaixa.length;
+    result.totalBalcao = result.balcao.length;
+
+    return res.status(200).json({ ok: true, ...result });
+  }
+
   // ── GET fix-board-por-nome — busca ficha por nome e força no board ───────
   if (action === 'fix-board-por-nome') {
     const busca = (req.query.nome || '').toLowerCase().trim();
