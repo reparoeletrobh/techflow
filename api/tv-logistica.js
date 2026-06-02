@@ -1110,6 +1110,27 @@ Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter peque
     });
   }
 
+    // ── GET buscar-ficha — busca ficha por nome/tel em toda a logistica ──────────
+  if (req.method === 'GET' && action === 'buscar-ficha') {
+    const q = (req.query.q || '').toLowerCase().trim();
+    if (!q) return res.status(400).json({ ok:false, error: 'Informe ?q=xxx' });
+    const db = await dbGet('tv_logistica_log') || defaultDB();
+    const found = (db.fichas||[]).filter(f =>
+      (f.nome||'').toLowerCase().includes(q) ||
+      (f.telefone||'').includes(q) ||
+      (f.id||'').toLowerCase().includes(q)
+    ).map(f => ({
+      id: f.id, nome: f.nome, tel: f.telefone||'',
+      phase: f.phase,
+      horarioColeta: f.horarioColeta||null,
+      horarioDisplay: f.horarioColeta
+        ? new Date(f.horarioColeta).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})
+        : null,
+      criadoEm: f.criadoEm, movedAt: f.movedAt,
+    }));
+    return res.status(200).json({ ok:true, total: found.length, fichas: found });
+  }
+
     // ── GET listar-horario — lista fichas com horario_marcado ────────────────────
   if (req.method === 'GET' && action === 'listar-horario') {
     const db = await dbGet('tv_logistica_log') || defaultDB();
