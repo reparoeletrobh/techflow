@@ -531,17 +531,29 @@ module.exports = async function handler(req, res) {
 
       if (tipo === 'tv') {
         const chips   = servicos || [];
-        const tvModel = modelo || '';
         const pn      = priNome(nome);
 
-        // ── Extrair polegada do modelo ────────────────────────────────────
-        let pol = null;
-        const mPol = tvModel.match(/(\d{2})\s*(?:pol(?:egadas?)?|")?/i);
-        if (mPol) { const v = parseInt(mPol[1]); if (v>=30&&v<=79) pol=v; }
-        if (!pol) {
-          const ns = tvModel.match(/\b([3-7]\d)\b/g);
-          if (ns) { for (const n of ns) { const v=parseInt(n); if(v>=30&&v<=79){pol=v;break;} } }
+        // ── Extrair polegada: modelo → equipamento → defeito da ficha ─────
+        const fontesBusca = [
+          modelo || '',
+          ficha.equipamento || '',
+          ficha.defeito || '',
+        ].join(' ');
+
+        function extrairPol(txt) {
+          // "65 pol", "65"", "55 polegadas", "Samsung 55 Smart", "UN65RU7100"
+          const patterns = [
+            /\b([3-7]\d)\s*(?:pol(?:egadas?)?|")/i,  // 65 pol / 65"
+            /[Uu][Nn]([3-7]\d)/,                       // UN55/UN65 Samsung
+            /\b([3-7]\d)\b/,                           // número solto 30-79
+          ];
+          for (const re of patterns) {
+            const m = txt.match(re);
+            if (m) { const v = parseInt(m[1]); if (v>=30&&v<=79) return v; }
+          }
+          return null;
         }
+        const pol = extrairPol(fontesBusca);
 
         // ── Tabela de preços por polegada ─────────────────────────────────
         const TAB_PRECO = [
@@ -551,9 +563,11 @@ module.exports = async function handler(req, res) {
         ];
         let precoTab = null;
         if (pol) { for (const f of TAB_PRECO) { if(pol>=f.min&&pol<=f.max){precoTab=f.p;break;} } }
-        const precoStr   = precoTab || '[VALOR]';
-        const modeloStr  = tvModel ? ' ' + tvModel : '';
-        const acrilicoVal = parseFloat(precoInput) || 0; // campo precoInput = valor do acrílico
+
+        // Fallback: se não achou por polegada mas há preço manual no eq.preco (fichas antigas)
+        const precoManual = parseFloat(precoInput) > 0 ? String(Math.round(parseFloat(precoInput))) : null;
+        const precoStr    = precoTab || precoManual || '[VALOR]';
+        const acrilicoVal = parseFloat(precoInput) || 0; // para chip acrílico
 
         // ── CONDENADA ─────────────────────────────────────────────────────
         if (chips.includes('condenada')) {
