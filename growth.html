@@ -90,6 +90,33 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .pp-t{height:5px;background:var(--dim);border-radius:3px;overflow:hidden;margin-bottom:5px;}
 .pp-f{height:100%;border-radius:3px;}
 .pp-n{display:flex;justify-content:space-between;font-family:var(--fm);font-size:10px;}
+.infl-sec{padding:0 24px 48px;}
+.infl-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.infl-title{font-family:var(--fh);font-size:16px;font-weight:800;}
+.infl-sub{font-family:var(--fm);font-size:10px;color:var(--mu);margin-bottom:18px;}
+.btn-add-infl{font-family:var(--fm);font-size:10px;padding:8px 16px;border-radius:7px;border:none;background:var(--or);color:#000;font-weight:700;cursor:pointer;letter-spacing:.06em;}
+.btn-add-infl:hover{filter:brightness(1.1);}
+.infl-table-wrap{overflow-x:auto;}
+.infl-table{width:100%;border-collapse:collapse;}
+.infl-table th{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--mu);text-align:left;padding:8px 12px;border-bottom:2px solid var(--bdr);white-space:nowrap;}
+.infl-table td{font-family:var(--fm);font-size:11px;padding:10px 12px;border-bottom:1px solid rgba(30,37,53,.6);vertical-align:middle;}
+.infl-table tr:hover td{background:var(--s2);}
+.infl-nome{font-weight:700;color:var(--tx);font-size:12px;}
+.infl-ig{color:var(--or);text-decoration:none;}
+.infl-ig:hover{text-decoration:underline;}
+.infl-seg{font-family:var(--fh);font-weight:800;color:var(--bl);}
+.infl-del{background:none;border:none;cursor:pointer;color:var(--mu);font-size:13px;padding:2px 6px;border-radius:4px;}
+.infl-del:hover{color:var(--re);background:rgba(240,64,96,.1);}
+.infl-empty{text-align:center;font-family:var(--fm);font-size:11px;color:var(--mu);padding:32px 0;}
+.infl-ov{position:fixed;inset:0;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(5px);}
+.infl-mdl{background:var(--s1);border:1px solid var(--bdr);border-radius:14px;padding:22px;width:320px;display:flex;flex-direction:column;gap:12px;}
+.infl-mdl-t{font-family:var(--fm);font-size:12px;font-weight:700;letter-spacing:.05em;color:var(--or);}
+.infl-fld label{font-family:var(--fm);font-size:9px;color:var(--mu);letter-spacing:.1em;display:block;margin-bottom:5px;}
+.infl-fld input{width:100%;background:var(--s2);border:1px solid var(--bdr);border-radius:7px;color:var(--tx);font-family:var(--fm);font-size:11px;padding:8px 10px;outline:none;}
+.infl-fld input:focus{border-color:var(--or);}
+.infl-mbts{display:flex;gap:8px;margin-top:4px;}
+.btn-ic{flex:1;padding:8px;background:transparent;border:1px solid var(--bdr);border-radius:7px;color:var(--mu);font-family:var(--fm);font-size:10px;cursor:pointer;}
+.btn-is{flex:2;padding:8px;border:none;border-radius:7px;color:#000;font-weight:700;font-family:var(--fm);font-size:10px;cursor:pointer;background:var(--or);letter-spacing:.06em;}
 .toast{position:fixed;bottom:20px;right:20px;background:var(--s1);border:1px solid var(--bdr);
   border-radius:8px;padding:10px 16px;font-family:var(--fm);font-size:11px;color:var(--tx);
   z-index:300;box-shadow:0 8px 32px rgba(0,0,0,.6);display:none;}
@@ -151,6 +178,40 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
       <button class="btn-dx" id="btn-dx" style="display:none" onclick="delAtiv()">🗑</button>
       <button class="btn-cc" onclick="closeModal()">Cancelar</button>
       <button class="btn-sv" id="btn-sv" onclick="saveAtiv()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="infl-sec">
+  <div class="infl-header">
+    <div>
+      <div class="infl-title">🌟 Tabela de Influencers</div>
+      <div class="infl-sub">// cadastro e gestão de influencers parceiros</div>
+    </div>
+    <button class="btn-add-infl" onclick="abrirInflModal()">+ Cadastrar Influencer</button>
+  </div>
+  <div class="infl-table-wrap">
+    <table class="infl-table">
+      <thead><tr>
+        <th>Nome</th><th>Telefone</th><th>Cidade</th><th>Instagram</th><th>Seguidores</th><th>Cadastrado</th><th></th>
+      </tr></thead>
+      <tbody id="infl-tbody"><tr><td colspan="7" class="infl-empty">Carregando...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal Influencer -->
+<div class="infl-ov" id="infl-modal" style="display:none" onclick="if(event.target===this)fecharInflModal()">
+  <div class="infl-mdl" onclick="event.stopPropagation()">
+    <div class="infl-mdl-t">🌟 Cadastrar Influencer</div>
+    <div class="infl-fld"><label>NOME</label><input id="if-nome" placeholder="Ex: João Silva"></div>
+    <div class="infl-fld"><label>TELEFONE / WHATSAPP</label><input id="if-tel" placeholder="(31) 9 9999-9999"></div>
+    <div class="infl-fld"><label>CIDADE</label><input id="if-cidade" placeholder="Ex: Belo Horizonte - MG"></div>
+    <div class="infl-fld"><label>INSTAGRAM (link ou @)</label><input id="if-ig" placeholder="@usuario ou https://instagram.com/usuario"></div>
+    <div class="infl-fld"><label>SEGUIDORES</label><input id="if-seg" type="number" min="0" placeholder="Ex: 15000"></div>
+    <div class="infl-mbts">
+      <button class="btn-ic" onclick="fecharInflModal()">Cancelar</button>
+      <button class="btn-is" onclick="salvarInfluencer()">Cadastrar</button>
     </div>
   </div>
 </div>
@@ -448,7 +509,88 @@ function delAtiv(){
 var _tt;
 function toast(msg){var el=document.getElementById('toast');el.textContent=msg;el.style.display='block';clearTimeout(_tt);_tt=setTimeout(function(){el.style.display='none';},2200);}
 
+// ── INFLUENCERS ────────────────────────────────────────────────────────────
+var INFL_KEY = 'growth_influencers_v1';
+var _influencers = [];
+
+async function loadInfluencers(){
+  try{
+    var r = await window.storage.get(INFL_KEY).catch(function(){return null;});
+    _influencers = r ? JSON.parse(r.value) : [];
+  }catch(e){ _influencers=[]; }
+  renderInfluencers();
+}
+
+async function salvarInflDB(){
+  try{ await window.storage.set(INFL_KEY, JSON.stringify(_influencers)); }catch(e){}
+}
+
+function renderInfluencers(){
+  var tbody = document.getElementById('infl-tbody'); if(!tbody) return;
+  if(!_influencers.length){
+    tbody.innerHTML='<tr><td colspan="7" class="infl-empty">Nenhum influencer cadastrado ainda. Clique em "+ Cadastrar Influencer".</td></tr>';
+    return;
+  }
+  tbody.innerHTML = _influencers.map(function(inf,i){
+    var igLink = inf.ig ? (inf.ig.startsWith('http')?inf.ig:'https://instagram.com/'+(inf.ig.replace('@',''))) : '';
+    var igDisplay = inf.ig ? (inf.ig.startsWith('@')?inf.ig:'@'+inf.ig.replace(/.*instagram\.com\//,'').replace('/','')) : '—';
+    var seg = inf.seg ? parseInt(inf.seg).toLocaleString('pt-BR') : '—';
+    var data = inf.criadoEm ? new Date(inf.criadoEm).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}) : '—';
+    return '<tr>'+
+      '<td><span class="infl-nome">'+esc(inf.nome)+'</span></td>'+
+      '<td>'+esc(inf.tel||'—')+'</td>'+
+      '<td>'+esc(inf.cidade||'—')+'</td>'+
+      '<td>'+(igLink?'<a class="infl-ig" href="'+igLink+'" target="_blank">'+esc(igDisplay)+'</a>':'—')+'</td>'+
+      '<td><span class="infl-seg">'+seg+'</span></td>'+
+      '<td style="color:var(--mu);font-size:10px">'+data+'</td>'+
+      '<td><button class="infl-del" onclick="removerInfluencer('+i+')" title="Remover">🗑</button></td>'+
+    '</tr>';
+  }).join('');
+}
+
+function abrirInflModal(){
+  ['if-nome','if-tel','if-cidade','if-ig','if-seg'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value='';
+  });
+  document.getElementById('infl-modal').style.display='flex';
+  setTimeout(function(){var el=document.getElementById('if-nome');if(el)el.focus();},80);
+}
+
+function fecharInflModal(){
+  document.getElementById('infl-modal').style.display='none';
+}
+
+function salvarInfluencer(){
+  var nome = (document.getElementById('if-nome')||{value:''}).value.trim();
+  if(!nome){ document.getElementById('if-nome').focus(); return; }
+  var inf = {
+    id:       Date.now().toString(36),
+    nome:     nome,
+    tel:      (document.getElementById('if-tel')||{value:''}).value.trim(),
+    cidade:   (document.getElementById('if-cidade')||{value:''}).value.trim(),
+    ig:       (document.getElementById('if-ig')||{value:''}).value.trim(),
+    seg:      (document.getElementById('if-seg')||{value:''}).value.trim(),
+    criadoEm: new Date().toISOString(),
+  };
+  _influencers.unshift(inf);
+  salvarInflDB();
+  renderInfluencers();
+  fecharInflModal();
+  toast('✅ '+nome+' cadastrado!');
+}
+
+function removerInfluencer(i){
+  if(!confirm('Remover este influencer?')) return;
+  _influencers.splice(i,1);
+  salvarInflDB();
+  renderInfluencers();
+  toast('🗑 Removido');
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
 load();
+loadInfluencers();
 setInterval(function(){renderBoard();},60000);
 </script>
 </body>
