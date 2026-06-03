@@ -127,7 +127,74 @@ module.exports = async function handler(req, res) {
 
 
   // ── GET debug-vendas — mostra raw do Redis para diagnóstico ──
-  if (action === 'debug-vendas') {
+  // ── GET fix-receber — cria card receber para venda sem card no pipe ─────────
+  if (action === 'fix-receber') {
+    try {
+      const VENDAS_K = 'reparoeletro_checkout_vendas';
+      const PIPE_K   = 'reparoeletro_pipe';
+      const ck  = (await dbGet(VENDAS_K)) || { vendas: [] };
+      const pdb = (await dbGet(PIPE_K))   || { cards: [] };
+      if (!Array.isArray(pdb.cards)) pdb.cards = [];
+
+      // Pegar a venda mais recente
+      const n = parseInt(req.query.n || '1');
+      const vendas = (ck.vendas || []).slice(0, n);
+      if (!vendas.length) return res.status(404).json({ ok:false, error:'Nenhuma venda encontrada' });
+
+      const criados = [];
+      for (const venda of vendas) {
+        // Verificar se já tem card no pipe para este paymentId
+        const jaExiste = pdb.cards.some(c =>
+          c.origem === 'venda_checkout' &&
+          (c.vendaProdutoId === venda.produto?.id || c.descricao?.includes(venda.paymentId||''))
+        );
+        if (jaExiste) { criados.push({ venda: venda.produto?.descricao, status: 'ja_existe' }); continue; }
+
+        const nowC = new Date().toISOString();
+        const prod = venda.produto || {};
+        const compNome = venda.comprador?.nome || 'Cliente';
+        const titulo = 'VENDA — ' + (prod.codigo || prod.id || 'Equipamento') + ' | ' + compNome;
+        const descricao = [
+          prod.descricao || prod.nome || '',
+          'Valor: R$' + parseFloat(venda.valor || 0).toFixed(2),
+          'MP: ' + (venda.paymentId || '—'),
+          'Método: ' + (venda.paymentMethod || 'pix'),
+        ].filter(Boolean).join(' | ');
+
+        pdb.cards.unshift({
+          id: 'PIPE-' + Date.now().toString(36).toUpperCase() + '-FIX',
+          pipefyId: null, phase: 'receber',
+          nomeContato: compNome,
+          telefone: venda.comprador?.telefone || '',
+          equipamento: prod.tipo || prod.nome || '',
+          descricao: descricao,
+          title: titulo,
+          valor: parseFloat(venda.valor || 0),
+          origem: 'venda_checkout',
+          vendaProdutoId: prod.id || null,
+          codEquip: prod.codigo || null,
+          criadoEm: nowC, movedAt: nowC,
+          history: [{ phase: 'receber', ts: nowC, obs: 'fix-receber-manual' }],
+          aguardandoDesde: null, analiseCompra: false,
+        });
+        criados.push({ venda: titulo, status: 'criado', produto: prod.descricao || prod.id });
+      }
+
+      pdb.lastSync = new Date().toISOString();
+      await dbSet(PIPE_K, pdb);
+
+      return res.status(200).json({
+        ok: true,
+        totalVendas: vendas.length,
+        criados,
+        msg: '✅ Cards criados em receber no pipe ADM',
+      });
+    } catch(e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+    if (action === 'debug-vendas') {
     try {
       const r = await fetch(`${U}/pipeline`, {
         method:'POST',
