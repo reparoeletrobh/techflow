@@ -411,6 +411,10 @@
       "destination": "/growth.html"
     },
     {
+      "source": "/pj",
+      "destination": "/pj.html"
+    },
+    {
       "source": "/api/growth",
       "destination": "/api/growth.js"
     }
