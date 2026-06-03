@@ -120,7 +120,20 @@ module.exports = async function handler(req, res) {
       pdb.lastSync=nowC;
       await _cs('reparoeletro_pipe', pdb);
       console.log('[checkout] Card criado em receber para:', compNome, prod.codigo||prod.id);
-    } catch(ep){ console.error('[checkout] pipe receber:', ep.message); }
+    } catch(ep){
+      console.error('[checkout] pipe receber:', ep.message);
+      // Registrar falha no log central para rastreabilidade
+      try {
+        const _LK='reparoeletro_log';
+        const _lr=await fetch(U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T,'Content-Type':'application/json'},body:JSON.stringify([['GET',_LK]])});
+        const _lj=await _lr.json(); const _lv=_lj[0]?.result;
+        let _log=[]; if(_lv){try{_log=JSON.parse(_lv);if(typeof _log==='string')_log=JSON.parse(_log);}catch(e){}}
+        if(!Array.isArray(_log))_log=[];
+        _log.unshift({ts:new Date().toISOString(),modulo:'adm-checkout',fichaId:paymentId||'',ficha:(req.body?.comprador?.nome||''),acao:'criar-card-receber',status:'erro',detalhe:ep.message});
+        if(_log.length>2000)_log.splice(2000);
+        await fetch(U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T,'Content-Type':'application/json'},body:JSON.stringify([['SET',_LK,JSON.stringify(_log)]])});
+      } catch(el){}
+    }
 
     return res.status(200).json({ ok:true });
   }
