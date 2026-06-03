@@ -137,6 +137,7 @@ select option{background:var(--s2);}
   <button class="tab on" id="t-prospects" onclick="ir('prospects')">🏢 Prospects <span class="tbadge" id="b-prospects">0</span></button>
   <button class="tab" id="t-inbox" onclick="ir('inbox')">📬 Inbox <span class="tbadge" id="b-inbox" style="background:rgba(240,64,96,.15);color:var(--re);border-color:rgba(240,64,96,.3)">0</span></button>
   <button class="tab" id="t-campanha" onclick="ir('campanha')">📧 Campanhas</button>
+  <button class="tab" id="t-listas" onclick="ir('listas')">📋 Listas</button>
   <button class="tab" id="t-forn" onclick="ir('forn')">✅ Fornecedores <span class="tbadge" id="b-forn" style="background:rgba(16,217,130,.15);color:var(--gr);border-color:rgba(16,217,130,.3)">0</span></button>
 </div>
 
@@ -176,9 +177,12 @@ select option{background:var(--s2);}
       <div class="fld grid1"><label>DESTINATÁRIOS</label>
         <select id="c-filtro" onchange="contarDest()" style="width:100%;background:var(--s2);border:1px solid var(--bdr);border-radius:7px;color:var(--tx);font-family:var(--fm);font-size:11px;padding:8px 10px;outline:none;">
           <option value="todos">Todos os prospects</option>
-          <option value="novo">Somente: Novo</option>
-          <option value="contatado">Somente: Contatado</option>
-          <option value="aguardando">Somente: Aguardando</option>
+          <optgroup label="── Por Status ──">
+            <option value="st:novo">Status: Novo</option>
+            <option value="st:contatado">Status: Contatado</option>
+            <option value="st:aguardando">Status: Aguardando</option>
+          </optgroup>
+          <optgroup label="── Por Lista ──" id="opt-listas-camp"></optgroup>
         </select>
       </div>
       <div id="c-count" style="font-family:var(--fm);font-size:10px;color:var(--mu);margin-bottom:12px;"></div>
@@ -190,6 +194,15 @@ select option{background:var(--s2);}
   </div>
   <div style="margin-top:20px;font-family:var(--fh);font-size:13px;font-weight:800;margin-bottom:10px;">Histórico</div>
   <div id="lista-camp"></div>
+</div>
+
+<!-- LISTAS -->
+<div class="pg" id="pg-listas">
+  <div class="pg-head">
+    <div><div class="pg-title">📋 Listas de Prospecção</div><div class="pg-sub">// organize seus leads em listas para disparos segmentados</div></div>
+    <button class="btn btn-bl" onclick="criarLista()">+ Nova Lista</button>
+  </div>
+  <div id="lista-listas"><div class="empty"><div class="spin"></div>Carregando...</div></div>
 </div>
 
 <!-- FORNECEDORES -->
@@ -213,6 +226,12 @@ select option{background:var(--s2);}
   <div class="fld"><label>EMAIL</label><input id="p-email" type="email" placeholder="email@empresa.com"></div></div>
   <div class="grid3"><div class="fld"><label>CIDADE</label><input id="p-cid" placeholder="BH"></div>
   <div class="fld"><label>UF</label><input id="p-uf" placeholder="MG" maxlength="2"></div>
+  <div class="fld"><label>LISTA</label>
+    <select id="p-lista" style="width:100%;background:var(--s2);border:1px solid var(--bdr);border-radius:7px;color:var(--tx);font-family:var(--fm);font-size:11px;padding:8px 10px;outline:none;">
+      <option value="">Sem lista</option>
+    </select>
+  </div></div>
+  <div class="grid3"><div class="fld"></div><div class="fld"></div>
   <div class="fld"><label>SEGMENTO</label>
     <select id="p-seg" style="width:100%;background:var(--s2);border:1px solid var(--bdr);border-radius:7px;color:var(--tx);font-family:var(--fm);font-size:11px;padding:8px 10px;outline:none;">
       <option value="">—</option><option>Escritório</option><option>Clínica</option><option>Hotel</option>
@@ -287,12 +306,13 @@ function fecharOv(id){g(id).style.display='none';}
 // Navegação
 function ir(t){
   _tabAtual=t;
-  ['prospects','inbox','campanha','forn'].forEach(function(p){
+  ['prospects','inbox','campanha','listas','forn'].forEach(function(p){
     g('pg-'+p).classList.toggle('on',p===t);
     g('t-'+p).classList.toggle('on',p===t);
   });
   if(t==='inbox') carregarInbox();
   if(t==='forn') carregarForn();
+  if(t==='listas') carregarListas();
   if(t==='campanha') contarDest();
 }
 
@@ -328,7 +348,7 @@ function renderProspects(lista){
       (p.telefone?'<span>📞 '+esc(p.telefone)+'</span>':'')+
       (p.email?'<span>✉️ '+esc(p.email)+'</span>':'')+
       (p.cidade?'<span>📍 '+esc(p.cidade)+(p.uf?' - '+p.uf:'')+'</span>':'')+
-      (p.segmento?'<span>🏷 '+esc(p.segmento)+'</span>':'')+
+      (p.segmento?'<span>🏷 '+esc(p.segmento)+'</span>':'')+(p.listaId&&_LISTAS[p.listaId]?'<span style="color:var(--bl)">📋 '+esc(_LISTAS[p.listaId])+'</span>':'')+
       '</div>'+
       '<div class="pc-btns">'+
       '<button onclick="alterarStatus(\''+p.id+'\')">↕ Status</button>'+
@@ -492,9 +512,118 @@ async function criarFornecedor(){
   else toast('❌ '+(r.error||'Erro'));
 }
 
+// ── LISTAS ────────────────────────────────────────────────────────────────
+var _LISTAS={}; // {id: nome}
+
+async function carregarListasGlobal(){
+  try{
+    var r=await fetch('/api/pj-prospects?action=load-listas').then(function(x){return x.json();});
+    var lista=r.listas||[];
+    _LISTAS={};
+    lista.forEach(function(l){_LISTAS[l.id]=l.nome;});
+    // Atualizar select no modal
+    var sel=g('p-lista'); if(sel){sel.innerHTML='<option value="">Sem lista</option>';
+      lista.forEach(function(l){sel.innerHTML+='<option value="'+l.id+'">'+esc(l.nome)+'</option>';});}
+    // Atualizar optgroup nas campanhas
+    var og=g('opt-listas-camp'); if(og){og.innerHTML=lista.map(function(l){
+      return '<option value="lst:'+l.id+'">Lista: '+esc(l.nome)+'</option>';}).join('');}
+  }catch(e){}
+}
+
+async function carregarListas(){
+  try{
+    var r=await fetch('/api/pj-prospects?action=load-listas').then(function(x){return x.json();});
+    var lista=r.listas||[]; var el=g('lista-listas');
+    if(!lista.length){el.innerHTML='<div class="empty">Nenhuma lista criada. Clique em "+ Nova Lista".</div>';return;}
+    el.innerHTML=lista.map(function(l){
+      var qtd=_P.filter(function(p){return p.listaId===l.id;}).length;
+      return '<div style="background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:14px;margin-bottom:9px;display:flex;justify-content:space-between;align-items:center;">'
+        +'<div><div style="font-weight:700;font-size:14px">📋 '+esc(l.nome)+'</div>'
+        +'<div style="font-family:var(--fm);font-size:9px;color:var(--mu);margin-top:3px">'+qtd+' prospect(s) · criada '+fmtDt(l.criadoEm)+'</div></div>'
+        +'<div style="display:flex;gap:8px">'
+        +'<button class="btn btn-bl" style="font-size:9px;padding:5px 10px" onclick="ir(\"prospects\"); setTimeout(function(){document.getElementById(\"sf-p\").value=\"\"; filtrarLstProspect(\"'+l.id+'\")},100)">Ver Prospects</button>'
+        +'<button class="btn" style="font-size:9px;padding:5px 10px;background:transparent;color:var(--re);border:1px solid rgba(240,64,96,.4)" onclick="deletarLista(\"'+l.id+'\",\"'+esc(l.nome)+'\")" >🗑</button>'
+        +'</div></div>';
+    }).join('');
+  }catch(e){g('lista-listas').innerHTML='<div class="empty" style="color:var(--re)">Erro: '+esc(e.message)+'</div>';}
+}
+
+async function criarLista(){
+  var nome=prompt('Nome da lista (ex: Lista A, Clínicas BH):');
+  if(!nome||!nome.trim())return;
+  var r=await fetch('/api/pj-prospects?action=criar-lista',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({nome:nome.trim()})}).then(function(x){return x.json();});
+  if(r.ok){await carregarListasGlobal();carregarListas();toast('✅ Lista "'+nome+'" criada!');}
+  else toast('❌ '+(r.error||'Erro'));
+}
+
+async function deletarLista(id,nome){
+  if(!confirm('Deletar lista "'+nome+'"? Os prospects não serão deletados.'))return;
+  await fetch('/api/pj-prospects?action=deletar-lista',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+  await carregarListasGlobal(); carregarListas(); toast('🗑 Lista removida');
+}
+
+function filtrarLstProspect(listaId){
+  renderProspects(_P.filter(function(p){return p.listaId===listaId;}));
+}
+
+// Atualizar contarDest para suportar filtro por lista
+var _contarDestOrig=contarDest;
+contarDest=function(){
+  var f=g('c-filtro').value;
+  var lista;
+  if(f==='todos') lista=_P;
+  else if(f.startsWith('st:')) lista=_P.filter(function(p){return p.status===f.slice(3);});
+  else if(f.startsWith('lst:')) lista=_P.filter(function(p){return p.listaId===f.slice(4);});
+  else lista=_P;
+  var com=lista.filter(function(p){return !!p.email;});
+  g('c-count').textContent=com.length+' destinatário(s) com email — de '+lista.length+' no filtro';
+};
+
+// Atualizar disparar para suportar filtro por lista
+var _dispararOrig=disparar;
+disparar=async function(){
+  var assunto=gv('c-assunto'), body=g('c-body').value.trim(), de=gv('c-de'), f=g('c-filtro').value;
+  if(!assunto||!body){toast('⚠️ Preencha assunto e corpo');return;}
+  var lista;
+  if(f==='todos') lista=_P;
+  else if(f.startsWith('st:')) lista=_P.filter(function(p){return p.status===f.slice(3);});
+  else if(f.startsWith('lst:')) lista=_P.filter(function(p){return p.listaId===f.slice(4);});
+  else lista=_P;
+  var dest=lista.filter(function(p){return !!p.email;}).map(function(p){return{email:p.email,empresa:p.empresa,responsavel:p.responsavel||''};});
+  if(!dest.length){toast('⚠️ Sem destinatários com email na seleção');return;}
+  if(!confirm('Enviar para '+dest.length+' empresas?'))return;
+  var btn=event.target; btn.textContent='⏳...'; btn.disabled=true;
+  var r=await fetch('/api/pj-email?action=enviar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({de,para:dest,assunto,html:body,texto:body.replace(/<[^>]+>/g,'')})}).then(function(x){return x.json();});
+  btn.textContent='📧 Disparar'; btn.disabled=false;
+  if(r.ok){
+    var msg='✅ '+r.enviados+'/'+r.total+' enviados';
+    if(r.falhas>0) msg+=' | ❌ '+r.falhas+' falha(s): '+(r.erros||[]).map(function(e){return e.email+': '+e.erro;}).join(', ').slice(0,100);
+    toast(msg);
+    if(r.erros&&r.erros.length) alert('Detalhes das falhas:\n'+(r.erros||[]).map(function(e){return e.email+': '+e.erro;}).join('\n'));
+  } else toast('❌ '+(r.error||'Erro'));
+  carregarCamp();
+};
+
+// Atualizar criarProspect para incluir lista
+var _criarOriginal=criarProspect;
+criarProspect=async function(){
+  var emp=gv('p-emp'); if(!emp){g('p-emp').focus();return;}
+  var r=await fetch('/api/pj-prospects?action=criar',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({empresa:emp,cnpj:gv('p-cnpj'),responsavel:gv('p-resp'),cargo:gv('p-cargo'),
+      telefone:gv('p-tel'),email:gv('p-email'),cidade:gv('p-cid'),uf:gv('p-uf'),
+      segmento:g('p-seg')&&g('p-seg').value,listaId:g('p-lista')&&g('p-lista').value||null,obs:gv('p-obs')})}).then(function(x){return x.json();});
+  if(r.ok){fecharOv('ov-p');carregarProspects();toast('✅ '+emp+' cadastrado!');}
+  else toast('❌ '+(r.error||'Erro'));
+};
+
 // INIT
 carregarProspects();
 carregarCamp();
+carregarListasGlobal();
 </script>
 </body>
 </html>

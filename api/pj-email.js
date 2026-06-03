@@ -56,12 +56,13 @@ module.exports = async function handler(req,res){
     }
     // Salvar campanha no log
     const cDb=await dbGet(CAMP_KEY)||{campanhas:[]};
+    const falhasDetalhe=resultados.filter(r=>!r.ok).map(r=>({email:r.email,erro:r.erro||'erro desconhecido'}));
     cDb.campanhas.unshift({id:Date.now().toString(36),assunto,total:destinatarios.length,
       enviados:resultados.filter(r=>r.ok).length,falhas:resultados.filter(r=>!r.ok).length,
-      criadoEm:new Date().toISOString()});
+      falhasDetalhe,criadoEm:new Date().toISOString()});
     cDb.campanhas=cDb.campanhas.slice(0,100);
     await dbSet(CAMP_KEY,cDb);
-    return res.status(200).json({ok:true,resultados,total:destinatarios.length,enviados:resultados.filter(r=>r.ok).length});
+    return res.status(200).json({ok:true,resultados,total:destinatarios.length,enviados:resultados.filter(r=>r.ok).length,falhas:resultados.filter(r=>!r.ok).length,erros:resultados.filter(r=>!r.ok).map(r=>({email:r.email,erro:r.erro}))});
   }
 
   // GET campanhas

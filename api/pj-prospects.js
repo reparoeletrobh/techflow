@@ -65,5 +65,38 @@ module.exports = async function handler(req,res){
     return res.status(200).json({ok:true});
   }
 
-  return res.status(404).json({ok:false,error:'action não encontrada'});
+  // ── Listas ──────────────────────────────────────────────────────────────
+  if(action==='load-listas'){
+    const db=await dbGet(KEY)||{prospects:[],nextId:1,listas:[]};
+    return res.status(200).json({ok:true,listas:db.listas||[]});
+  }
+  if(req.method==='POST'&&action==='criar-lista'){
+    const{nome}=req.body||{};
+    if(!nome)return res.status(400).json({ok:false,error:'nome obrigatório'});
+    const db=await dbGet(KEY)||{prospects:[],nextId:1,listas:[]};
+    if(!db.listas)db.listas=[];
+    const id='LST-'+Date.now().toString(36).toUpperCase();
+    db.listas.push({id,nome,criadoEm:new Date().toISOString()});
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true,id,nome});
+  }
+  if(req.method==='POST'&&action==='deletar-lista'){
+    const{id}=req.body||{};
+    const db=await dbGet(KEY)||{prospects:[],nextId:1,listas:[]};
+    db.listas=(db.listas||[]).filter(l=>l.id!==id);
+    // Remover lista dos prospects
+    (db.prospects||[]).forEach(p=>{if(p.listaId===id)p.listaId=null;});
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true});
+  }
+  if(req.method==='POST'&&action==='atribuir-lista'){
+    const{id,listaId}=req.body||{};
+    const db=await dbGet(KEY)||{prospects:[],nextId:1,listas:[]};
+    const p=db.prospects.find(x=>x.id===id);
+    if(!p)return res.status(404).json({ok:false,error:'não encontrado'});
+    p.listaId=listaId||null;
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true});
+  }
+    return res.status(404).json({ok:false,error:'action não encontrada'});
 };
