@@ -335,7 +335,22 @@ function mkCol(col, secs){
   el.appendChild(head);
 
   var items=document.createElement('div'); items.className='col-items';
-  col.items.forEach(function(it){ items.appendChild(mkItem(col,it)); });
+  col.items.forEach(function(it){
+    items.appendChild(mkItem(col,it));
+    // Botão Cadastrar Influencer logo abaixo do card correto
+    var lbl=(it.label||'').toLowerCase();
+    if(col.id==='influencer' && (lbl.includes('tabela')||lbl.includes('influenc'))){
+      var btnInfl=document.createElement('button');
+      btnInfl.textContent='🌟 Cadastrar Influencer';
+      btnInfl.style.cssText='width:100%;padding:7px;border-radius:8px;background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.4);color:#f97316;font-family:var(--fm);font-size:10px;letter-spacing:.06em;cursor:pointer;font-weight:700;margin-top:4px;transition:all .15s;';
+      btnInfl.onmouseenter=function(){this.style.background='rgba(249,115,22,.22)';this.style.borderColor='rgba(249,115,22,.7)';};
+      btnInfl.onmouseleave=function(){this.style.background='rgba(249,115,22,.12)';this.style.borderColor='rgba(249,115,22,.4)';};
+      (function(cid,iid){
+        btnInfl.onclick=function(e){e.stopPropagation(); abrirInflModal(cid,iid);};
+      })(col.id, it.id);
+      items.appendChild(btnInfl);
+    }
+  });
   el.appendChild(items);
 
   var add=document.createElement('div'); add.className='col-add';
@@ -556,7 +571,10 @@ function renderInfluencers(){
   }).join('');
 }
 
-function abrirInflModal(){
+var _inflColId='influencer', _inflItemId='infl';
+function abrirInflModal(cid,iid){
+  if(cid) _inflColId=cid;
+  if(iid) _inflItemId=iid;
   ['if-nome','if-tel','if-cidade','if-ig','if-seg'].forEach(function(id){
     var el=document.getElementById(id); if(el) el.value='';
   });
@@ -584,7 +602,7 @@ function salvarInfluencer(){
   salvarInflDB();
   renderInfluencers();
   // Incrementar contador da coluna Influencer no kanban
-  inc('influencer','infl',1);
+  inc(_inflColId,_inflItemId,1);
   fecharInflModal();
   toast('✅ '+nome+' cadastrado!');
 }
