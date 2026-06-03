@@ -339,15 +339,8 @@ function mkCol(col, secs){
   el.appendChild(items);
 
   var add=document.createElement('div'); add.className='col-add';
-  var btn=document.createElement('button'); btn.className='btn-ai';
-  if(col.id==='influencer'){
-    btn.textContent='🌟 Cadastrar Influencer';
-    btn.style.cssText='width:100%;padding:8px;border-radius:8px;background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.45);color:#f97316;font-family:var(--fm);font-size:10px;letter-spacing:.06em;cursor:pointer;font-weight:700;';
-    btn.onclick=function(){ abrirInflModal(); };
-  } else {
-    btn.textContent='+ ADICIONAR ATIVIDADE';
-    btn.onclick=(function(cid){return function(){openNew(cid);};})(col.id);
-  }
+  var btn=document.createElement('button'); btn.className='btn-ai'; btn.textContent='+ ADICIONAR ATIVIDADE';
+  btn.onclick=(function(cid){return function(){openNew(cid);};})(col.id);
   add.appendChild(btn); el.appendChild(add);
   return el;
 }
@@ -393,6 +386,14 @@ function mkItem(col, it){
     act.appendChild(cnt); act.appendChild(bdec); act.appendChild(binc);
   }
   bot.appendChild(st); bot.appendChild(act); el.appendChild(bot);
+  // Botão Cadastrar Influencer dentro do card específico
+  if(col.id==='influencer' && it.id==='infl'){
+    var btnInfl=document.createElement('button');
+    btnInfl.textContent='🌟 Cadastrar Influencer';
+    btnInfl.style.cssText='width:100%;margin-top:8px;padding:7px;border-radius:7px;background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.4);color:#f97316;font-family:var(--fm);font-size:10px;letter-spacing:.06em;cursor:pointer;font-weight:700;transition:all .15s;';
+    btnInfl.onclick=function(e){e.stopPropagation();abrirInflModal();};
+    el.appendChild(btnInfl);
+  }
   return el;
 }
 
