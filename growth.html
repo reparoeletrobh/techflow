@@ -575,6 +575,8 @@ function salvarInfluencer(){
   _influencers.unshift(inf);
   salvarInflDB();
   renderInfluencers();
+  // Incrementar contador da coluna Influencer no kanban
+  inc('influencer','infl',1);
   fecharInflModal();
   toast('✅ '+nome+' cadastrado!');
 }
