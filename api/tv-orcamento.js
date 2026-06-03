@@ -570,6 +570,8 @@ module.exports = async function handler(req, res) {
     const ficha = db.fichas.find(f => f.id === id);
     if (!ficha) return res.status(404).json({ ok: false, error: "Ficha não encontrada" });
     ficha.status = status;
+    // Preservar preco se veio no body (caso aprovação sem envio prévio)
+    if (req.body.preco && !ficha.preco) ficha.preco = req.body.preco;
     await dbSet(ORC_KEY, db);
     // Se aprovado: tira da Ultima Chamada no Pipefy e volta para Aguardando Aprovacao
     if (status === "aprovado" && ficha.pipefyId) {

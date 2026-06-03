@@ -480,9 +480,12 @@ async function marcarEnviado(fid, preco) {
 
 async function confirmarAprovado(fid) {
   if (!confirm('Confirmar aprovação?')) return;
+  // Passar preco junto para garantir que seja salvo mesmo sem envio prévio
+  var precoEl = document.getElementById('price-'+fid);
+  var precoAtual = precoEl ? precoEl.value : '';
   var r = await fetch('/api/tv-orcamento?action=orc-status',{
     method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({id:fid, status:'aprovado'})
+    body:JSON.stringify({id:fid, status:'aprovado', preco:precoAtual||undefined})
   }).then(function(r){return r.json();});
   if (r.ok) { showToast('✅','Aprovado!',''); loadOrc(); }
   else showToast('❌','Erro',r.error||'');
