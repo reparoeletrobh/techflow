@@ -317,7 +317,28 @@ module.exports = async function handler(req, res) {
   }
 
   // ── GET orc-load ──────────────────────────────────────────
-  if (action === "orc-load") {
+  // ── GET gmb-load — fichas em ERP para solicitação de avaliação GMB ──────────
+  if (action === "gmb-load") {
+    const PIPE_KEY_GMB = 'reparoeletro_pipe';
+    const db_gmb = await dbGet(PIPE_KEY_GMB);
+    if (!db_gmb || !Array.isArray(db_gmb.cards)) {
+      return res.status(200).json({ ok: true, cards: [] });
+    }
+    const erp = (db_gmb.cards || [])
+      .filter(c => c.phase === 'erp')
+      .map(c => ({
+        id:         c.id || c.pipefyId,
+        pipefyId:   c.pipefyId || c.id,
+        nome:       c.nomeContato || c.title || '—',
+        tel:        c.telefone || c.tel || '',
+        desc:       c.equipamento || c.desc || '',
+        valor:      c.valor || null,
+        movedAt:    c.movedAt || null,
+      }));
+    return res.status(200).json({ ok: true, total: erp.length, cards: erp });
+  }
+
+    if (action === "orc-load") {
     const db = await dbGet(ORC_KEY) || { fichas: [], syncedIds: [] };
     // Deduplica por id
     const seen = new Set();

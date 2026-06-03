@@ -89,6 +89,18 @@ header{display:flex;align-items:center;padding:0 24px;height:52px;border-bottom:
 
 .toast{position:fixed;bottom:18px;right:18px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:11px 14px;font-family:var(--fm);font-size:11px;display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);z-index:9999;}
 .toast.show{transform:translateY(0);opacity:1;}
+.gmb-card{background:var(--surface);border:1px solid rgba(16,217,130,.25);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;}
+.gmb-card:hover{border-color:rgba(16,217,130,.5);}
+.gmb-nome{font-weight:600;font-size:14px;}
+.gmb-desc{font-family:var(--fm);font-size:10px;color:var(--muted);}
+.gmb-ta{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:var(--fm);font-size:11px;resize:vertical;line-height:1.6;outline:none;min-height:100px;box-sizing:border-box;}
+.gmb-ta:focus{border-color:rgba(16,217,130,.5);}
+.gmb-btns{display:flex;gap:8px;}
+.gmb-btn{font-family:var(--fm);font-size:11px;padding:7px 14px;border-radius:7px;cursor:pointer;font-weight:600;transition:all .15s;}
+.gmb-copy{border:1px solid rgba(16,217,130,.4);background:rgba(16,217,130,.1);color:#10d982;}
+.gmb-copy:hover{background:rgba(16,217,130,.2);}
+.gmb-wa{border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.1);color:#22c55e;text-decoration:none;display:inline-flex;align-items:center;gap:5px;}
+.gmb-wa:hover{background:rgba(34,197,94,.2);}
 .sr-card{background:var(--surface);border:1px solid var(--border);border-left:3px solid #f59e0b;border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;}
 .uc-card{background:var(--surface);border:1px solid var(--border);border-left:3px solid #ef4444;border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;}
 .sr-nome{font-size:13px;font-weight:600;}
@@ -119,6 +131,9 @@ header{display:flex;align-items:center;padding:0 24px;height:52px;border-bottom:
   </button>
   <button class="tab" id="tab-ult" onclick="showPage('ultima-chamada')" style="color:#ef4444;">
     🚨 Última Chamada <span class="tab-badge" id="badge-ult" style="background:rgba(239,68,68,.15);color:#ef4444;">0</span>
+  </button>
+    <button class="tab" id="tab-gmb" onclick="showPage('gmb')" style="color:#10d982;">
+    ⭐ Google Meu Negócio <span class="tab-badge" id="badge-gmb" style="background:rgba(16,217,130,.15);color:#10d982;">0</span>
   </button>
   <button class="tab" id="tab-tbl" onclick="showPage('tabela')" style="color:#3b9eff;">
     📋 Tabela
@@ -264,7 +279,7 @@ function showPage(name) {
   var tm={cad:'cadastro',orc:'orcamento',env:'enviado',sem:'sem-resposta',ult:'ultima-chamada',tbl:'tabela'};
   Object.keys(tm).forEach(function(k){ document.getElementById('tab-'+k).classList.toggle('active', name===tm[k]); });
   if(name==='orcamento'||name==='enviado') orcLoad();
-  if(name==='sem-resposta') loadSemResposta();
+  if(name==='sem-resposta') loadSemResposta(); if(name==='gmb') loadGMB();
   if(name==='ultima-chamada') loadUltimaChamada();
   if(name==='tabela') loadTabela();
 }
@@ -714,6 +729,56 @@ var MSG_UC=MSG_PARTES.join("\n");
 function srCard(c){var tel=(c.tel||'').replace(/[^0-9]/g,'');if(tel.slice(0,2)==='55'&&tel.length>=12)tel=tel.slice(2);if(tel.length===10)tel=tel.slice(0,2)+'9'+tel.slice(2);var waLink=tel?'https://wa.me/55'+tel+'?text='+encodeURIComponent(MSG_UC):null;var id=c.pipefyId;var w=document.createElement('div');w.className='sr-card';var n=document.createElement('div');n.className='sr-nome';n.textContent=c.nome||c.title||'';w.appendChild(n);if(c.desc){var d=document.createElement('div');d.className='sr-desc';d.textContent=c.desc.substring(0,80)+'...';w.appendChild(d);}var a=document.createElement('div');a.className='sr-age';a.textContent=c.age+' dia(s) em Aguardando Aprovacao';w.appendChild(a);var b=document.createElement('div');b.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;';if(waLink){var bc=document.createElement('button');bc.className='sr-btn';bc.textContent='Copiar e Enviar';bc.onclick=(function(i,lk){return function(){navigator.clipboard.writeText(lk).catch(function(){var ta=document.createElement('textarea');ta.value=lk;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);});alertarCliente(i);};})(id,waLink);b.appendChild(bc);}var bm=document.createElement('button');bm.className='sr-btn';bm.id='btn-al-'+id;bm.style.cssText='background:transparent;border:1px solid var(--border);color:var(--muted);';bm.textContent='Mover p/ Ultima Chamada';bm.onclick=(function(i){return function(){alertarCliente(i);};})(id);b.appendChild(bm);w.appendChild(b);return w;}
 function ucCard(c){var w=document.createElement('div');w.className='uc-card';var n=document.createElement('div');n.className='sr-nome';n.textContent=c.nome||c.title||'';w.appendChild(n);if(c.desc){var d=document.createElement('div');d.className='sr-desc';d.textContent=c.desc.substring(0,80)+'...';w.appendChild(d);}var a=document.createElement('div');a.className='uc-age';a.textContent=c.age+' dia(s) - '+(c.dataEncerramento?'Prazo: '+c.dataEncerramento:'Sem data');w.appendChild(a);return w;}
 function loadMsg(id,msg){var el=document.getElementById(id);if(!el)return;el.innerHTML='';var d=document.createElement('div');d.style.cssText='font-family:var(--fm);font-size:11px;color:var(--muted);text-align:center;padding:40px;';d.textContent=msg;el.appendChild(d);}
+var _gmbCards=[];
+function gmbTexto(nome){
+  return 'Bom dia, '+nome+'! Ontem efetuamos a entrega do seu equipamento.\n\nGostaria de saber se chegou tudo certinho e você já conseguiu utilizar. Qualquer dúvida que tiver estou pronto pra te atender.\n\nAguardo sua resposta sobre a entrega.';
+}
+
+async function loadGMB(){
+  loadMsg('list-gmb','Carregando...');
+  try{
+    var d=await fetch('/api/orcamento?action=gmb-load').then(function(r){return r.json();});
+    var bg=document.getElementById('badge-gmb'); if(bg) bg.textContent=d.total||0;
+    if(!d.ok||!d.cards||!d.cards.length){loadMsg('list-gmb','Nenhuma ficha em ERP no momento.');return;}
+    _gmbCards=d.cards;
+    var list=document.getElementById('list-gmb'); list.innerHTML='';
+    d.cards.forEach(function(c){list.appendChild(gmbCard(c));});
+  }catch(e){loadMsg('list-gmb','Erro: '+e.message);}
+}
+
+function gmbCard(c){
+  var nome=c.nome||'—', pri=nome.trim().split(' ')[0];
+  var texto=gmbTexto(pri);
+  var tel=(c.tel||'').replace(/[^0-9]/g,'');
+  if(tel.slice(0,2)==='55'&&tel.length>=12)tel=tel.slice(2);
+  if(tel.length===10)tel=tel.slice(0,2)+'9'+tel.slice(2);
+  var waLink=tel?'https://wa.me/55'+tel+'?text='+encodeURIComponent(texto):null;
+  var w=document.createElement('div'); w.className='gmb-card'; w.setAttribute('data-nome',nome.toLowerCase());
+  var n=document.createElement('div'); n.className='gmb-nome'; n.textContent=nome; w.appendChild(n);
+  if(c.desc){var dc=document.createElement('div');dc.className='gmb-desc';dc.textContent=c.desc;w.appendChild(dc);}
+  if(c.valor){var vl=document.createElement('div');vl.style.cssText='font-family:var(--fm);font-size:10px;color:#10d982;';vl.textContent='R$ '+parseFloat(c.valor).toLocaleString('pt-BR');w.appendChild(vl);}
+  var tid='gmb-ta-'+c.id;
+  var ta=document.createElement('textarea'); ta.className='gmb-ta'; ta.id=tid; ta.value=texto; w.appendChild(ta);
+  var btns=document.createElement('div'); btns.className='gmb-btns';
+  var bc=document.createElement('button'); bc.className='gmb-btn gmb-copy'; bc.textContent='📋 Copiar';
+  bc.onclick=(function(xid,btn){return function(){
+    var t=document.getElementById(xid); if(!t)return;
+    try{navigator.clipboard.writeText(t.value);}catch(e){t.select();document.execCommand('copy');}
+    btn.textContent='✅ Copiado!'; setTimeout(function(){btn.textContent='📋 Copiar';},2000);
+  };})(tid,bc);
+  btns.appendChild(bc);
+  if(waLink){var bw=document.createElement('a');bw.className='gmb-btn gmb-wa';bw.href=waLink;bw.target='_blank';bw.innerHTML='💬 WhatsApp';btns.appendChild(bw);}
+  w.appendChild(btns);
+  return w;
+}
+
+function filtrarGMB(){
+  var q=document.getElementById('busca-gmb').value.toLowerCase().trim();
+  document.querySelectorAll('#list-gmb .gmb-card').forEach(function(c){
+    c.style.display=!q||(c.getAttribute('data-nome')||'').includes(q)?'':'none';
+  });
+}
+
 async function loadSemResposta(){loadMsg('list-sem','Carregando...');try{var d=await fetch('/api/orcamento?action=sem-resposta').then(function(r){return r.json();});var bg=document.getElementById('badge-sem');if(bg)bg.textContent=d.cards?d.cards.length:0;if(!d.ok||!d.cards||!d.cards.length){loadMsg('list-sem',d.error||'Nenhum cliente +48h em Aguardando Aprovacao');return;}var list=document.getElementById('list-sem');list.innerHTML='';d.cards.forEach(function(card){list.appendChild(srCard(card));});}catch(e){loadMsg('list-sem','Erro: '+e.message);}}
 async function alertarCliente(pipefyId){var btn=document.getElementById('btn-al-'+pipefyId);if(btn){btn.disabled=true;btn.textContent='...';}try{var d=await fetch('/api/orcamento?action=alertar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pipefyId:pipefyId})}).then(function(r){return r.json();});if(d.ok){showToast('OK','Movido para Ultima Chamada!','Prazo: '+(d.dataLimite||''));loadSemResposta();}else{showToast('Erro',d.error||'','');if(btn){btn.disabled=false;btn.textContent='Mover p/ Ultima Chamada';}}}catch(e){showToast('Erro',e.message,'');if(btn){btn.disabled=false;btn.textContent='Mover p/ Ultima Chamada';}}}
 async function loadUltimaChamada(){loadMsg('list-ult','Carregando...');try{var d=await fetch('/api/orcamento?action=ultima-chamada').then(function(r){return r.json();});var bg=document.getElementById('badge-ult');if(bg)bg.textContent=d.cards?d.cards.length:0;if(!d.ok||!d.cards||!d.cards.length){loadMsg('list-ult',d.error||'Nenhuma ficha em Ultima Chamada');return;}var list=document.getElementById('list-ult');list.innerHTML='';d.cards.forEach(function(card){list.appendChild(ucCard(card));});}catch(e){loadMsg('list-ult','Erro: '+e.message);}}
@@ -937,6 +1002,18 @@ function resetTabela() {
 }
 
 </script>
+<div class="page" id="page-gmb">
+  <div style="padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);">
+    <span style="font-family:var(--fm);font-size:10px;color:var(--muted);">Fichas em ERP — solicitar avaliação no Google</span>
+    <div style="display:flex;gap:8px;">
+      <input id="busca-gmb" placeholder="🔍 Buscar nome..." oninput="filtrarGMB()"
+        style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px 12px;color:var(--text);font-family:var(--fm);font-size:11px;outline:none;width:200px;">
+      <button onclick="loadGMB()" style="font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">&#8635;</button>
+    </div>
+  </div>
+  <div id="list-gmb" style="padding:16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;"></div>
+</div>
+
 <div class="page" id="page-tabela">
   <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
     <div>
