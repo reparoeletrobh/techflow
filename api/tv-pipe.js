@@ -1089,7 +1089,7 @@ export default async function handler(req, res) {
         'th{font-size:9px;text-transform:uppercase;color:#444;padding:7px 10px;border-bottom:1px solid #1a1a1a;text-align:left;background:#0f0f0f;position:sticky;top:0}'+
         'td{padding:8px 10px;border-bottom:1px solid #0d0d0d}</style></head>'+
         '<body><div class="hd"><h1>📊 Análise <span>ERP</span> — Reparo Eletro BH</h1>'+
-        '<a href="/api/pipe?action=erp-report">↺ Atualizar</a></div>'+
+        '<a href="/api/tv-pipe?action=erp-report">↺ Atualizar</a></div>'+
         '<div class="w">'+
         '<div class="kpis">'+
           '<div class="k"><div class="l">Total ERP</div><div class="v" style="color:#f5c800">'+total+'</div></div>'+
