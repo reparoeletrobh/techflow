@@ -344,12 +344,15 @@ module.exports = async function handler(req, res) {
 
     if (action === "gmb-load") {
     const PIPE_KEY_GMB = 'reparoeletro_pipe';
+    const GMB_ENV_KEY  = 'gmb_enviados';
     const db_gmb = await dbGet(PIPE_KEY_GMB);
+    const db_env = (await dbGet(GMB_ENV_KEY)) || { fichas: [] };
+    const jaEnviados = new Set((db_env.fichas || []).map(f => String(f.id)));
     if (!db_gmb || !Array.isArray(db_gmb.cards)) {
-      return res.status(200).json({ ok: true, cards: [] });
+      return res.status(200).json({ ok: true, cards: [], total: 0 });
     }
     const erp = (db_gmb.cards || [])
-      .filter(c => c.phase === 'erp')
+      .filter(c => c.phase === 'erp' && !jaEnviados.has(String(c.id || c.pipefyId)))
       .map(c => ({
         id:         c.id || c.pipefyId,
         pipefyId:   c.pipefyId || c.id,
