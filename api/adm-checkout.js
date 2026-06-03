@@ -207,6 +207,53 @@ module.exports = async function handler(req, res) {
     }
   }
 
+    // ── GET buscar-transacao — localiza transação por paymentId, nome ou código ──
+  if (action === 'buscar-transacao') {
+    const q = (req.query.q || '').toLowerCase().trim();
+    if (!q) return res.status(400).json({ ok:false, error:'Informe ?q=nome_ou_paymentId' });
+
+    const KEYS = [
+      { key:'reparoeletro_checkout_vendas', campo:'vendas',  label:'Checkout ADM' },
+      { key:'tv_checkout_vendas',            campo:'vendas',  label:'Checkout TV'  },
+      { key:'mp_webhook_log',                campo:null,      label:'Webhook MP'   },
+      { key:'reparoeletro_financeiro',       campo:'records', label:'Financeiro ADM'},
+    ];
+
+    const resultados = [];
+    for (const k of KEYS) {
+      try {
+        const db = await dbGet(k.key);
+        if (!db) continue;
+        const items = k.campo ? (db[k.campo] || []) : (Array.isArray(db) ? db : []);
+        items.forEach(function(item) {
+          const txt = JSON.stringify(item).toLowerCase();
+          if (txt.includes(q)) {
+            resultados.push({
+              fonte: k.label,
+              chave: k.key,
+              id:          item.id || item.paymentId || item.payment_id || '—',
+              paymentId:   item.paymentId || item.payment_id || item.id || '—',
+              nome:        item.comprador?.nome || item.clienteNome || item.nomeContato || item.payer?.first_name || '—',
+              email:       item.comprador?.email || item.payer?.email || '—',
+              valor:       item.valor || item.transaction_amount || item.preco || '—',
+              status:      item.status || item.phaseId || '—',
+              produto:     item.produto?.descricao || item.produto?.codigo || '—',
+              data:        item.criadoEm || item.createdAt || item.date_created || '—',
+              raw:         JSON.stringify(item).slice(0, 300),
+            });
+          }
+        });
+      } catch(e) { /* continua */ }
+    }
+
+    return res.status(200).json({
+      ok: true, query: q,
+      total: resultados.length,
+      resultados,
+      msg: resultados.length ? '✅ '+resultados.length+' resultado(s) encontrado(s)' : '❌ Nenhuma transação encontrada para: '+q,
+    });
+  }
+
     if (action === 'debug-vendas') {
     try {
       const r = await fetch(`${U}/pipeline`, {
