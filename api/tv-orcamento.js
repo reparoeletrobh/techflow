@@ -560,6 +560,29 @@ module.exports = async function handler(req, res) {
         console.error("updateCardValue:", e.message);
       }
     }
+    // ── Atualizar tv_pipe Redis com o preço ────────────────────────────────
+    if (preco) {
+      try {
+        const TV_PIPE_KEY = 'tv_pipe';
+        const pipeDb = await dbGet(TV_PIPE_KEY);
+        if (pipeDb && Array.isArray(pipeDb.cards)) {
+          // Buscar card por pipefyId, id ou nome
+          const pCard = pipeDb.cards.find(function(c) {
+            return (ficha.pipefyId && (c.pipefyId === ficha.pipefyId || c.id === ficha.pipefyId))
+              || c.id === ficha.id
+              || (ficha.nome && (c.nomeContato||''). toLowerCase().trim() === (ficha.nome||''). toLowerCase().trim());
+          });
+          if (pCard) {
+            pCard.valor    = parseFloat(String(preco).replace(',','.')) || 0;
+            pCard.precoOrc = String(preco);
+            pCard.precoAtualizadoEm = new Date().toISOString();
+            await dbSet(TV_PIPE_KEY, pipeDb);
+            console.log('[orc-enviar] tv_pipe atualizado com valor:', pCard.valor, 'para', pCard.nomeContato);
+          }
+        }
+      } catch(ep) { console.error('[orc-enviar] tv_pipe update:', ep.message); }
+    }
+
     return res.status(200).json({ ok: true, ficha, pipefyUpdateOk, pipefyUpdateError });
   }
 
