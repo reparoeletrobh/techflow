@@ -71,5 +71,50 @@ module.exports = async function handler(req,res){
     return res.status(200).json({ok:true,campanhas:db.campanhas||[]});
   }
 
-  return res.status(404).json({ok:false,error:'action não encontrada'});
+  // ── GET testar-resend — diagnóstico completo da integração Resend ─────────────
+  if (action === 'testar-resend') {
+    const chave = RESEND_KEY ? RESEND_KEY.slice(0,8)+'...' : 'NÃO CONFIGURADA';
+    if (!RESEND_KEY) {
+      return res.status(200).json({ ok:false, erro:'RESEND_API_KEY não configurada no Vercel', chave });
+    }
+    // Testar chamada à API Resend (listar domínios)
+    try {
+      const r = await fetch('https://api.resend.com/domains', {
+        headers:{ Authorization:'Bearer '+RESEND_KEY }
+      });
+      const j = await r.json();
+      const dominios = (j.data||[]).map(d=>({ nome:d.name, status:d.status, regiao:d.region }));
+      // Testar envio com endereço de teste
+      const rEnvio = await fetch('https://api.resend.com/emails', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+RESEND_KEY},
+        body: JSON.stringify({
+          from: 'Pedro <pedro@comercial.reparoeletrobh.com.br>',
+          to: ['delivered@resend.dev'], // endereço de teste oficial do Resend
+          subject: 'Teste Reparo Eletro BH',
+          text: 'Teste de envio — diagnóstico do sistema PJ.'
+        })
+      });
+      const jEnvio = await rEnvio.json();
+      return res.status(200).json({
+        ok: !jEnvio.statusCode,
+        chave,
+        dominiosVerificados: dominios,
+        testeEnvio: {
+          sucesso: !jEnvio.statusCode,
+          id: jEnvio.id || null,
+          erro: jEnvio.message || jEnvio.error || null,
+          statusCode: jEnvio.statusCode || null,
+          nomeErro: jEnvio.name || null,
+        },
+        diagnostico: !jEnvio.statusCode
+          ? '✅ Resend configurado corretamente'
+          : '❌ Falha: ' + (jEnvio.message || jEnvio.error || JSON.stringify(jEnvio))
+      });
+    } catch(e) {
+      return res.status(200).json({ ok:false, chave, erro: e.message });
+    }
+  }
+
+    return res.status(404).json({ok:false,error:'action não encontrada'});
 };
