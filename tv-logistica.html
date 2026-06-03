@@ -241,6 +241,11 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
     <div class="met-num" id="m-orc">—</div>
     <div class="met-sub"><span id="m-orc-s">—</span> semana</div>
   </div>
+  <div class="met-card" style="border-left:2px solid var(--green);">
+    <div class="met-label" style="color:var(--green)">🔧 ERP</div>
+    <div class="met-num" id="m-erp" style="color:var(--green)">—</div>
+    <div class="met-sub" id="m-erp-sub">ao vivo</div>
+  </div>
 </div>
 <div class="board" id="board">
   <!-- Colunas renderizadas via JS -->
@@ -947,6 +952,19 @@ async function atualizarMetricas() {
       if (elS) elS.textContent = sem;
     });
   } catch(e) { console.error('metricas:', e); }
+
+  // ERP ao vivo — busca separada do tv-metricas
+  try {
+    const erp = await fetch('/api/tv-metricas?action=erp-ao-vivo').then(r=>r.json());
+    const elErp = document.getElementById('m-erp');
+    const elSub = document.getElementById('m-erp-sub');
+    if (elErp) elErp.textContent = erp.ok ? erp.count : '—';
+    if (elSub && erp.ok && erp.valorTotal > 0) {
+      elSub.textContent = 'R$ ' + erp.valorTotal.toLocaleString('pt-BR', {minimumFractionDigits:0, maximumFractionDigits:0});
+    } else if (elSub) {
+      elSub.textContent = 'ao vivo';
+    }
+  } catch(e) { console.error('erp-ao-vivo:', e); }
 }
 
 // ── MODAL CADASTRAR ──────────────────────────────────────────
