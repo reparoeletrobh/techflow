@@ -587,7 +587,7 @@ module.exports = async function handler(req, res) {
           const peca = (temBarramento && temPlaca) ? 'barramento e placa'
                      : temBarramento ? 'barramento' : 'placa';
 
-          let texto = `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nForam feitos todos os testes, identificamos que será necessário fazer a troca do ${peca} da TV, será feito a reoperação elétrica também. Este conserto completo fica em ${precoStr} reais apenas. Aprovando já iniciamos o conserto.`;
+          let texto = `Olá, ${pn}, bom dia! Sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:\n\nForam feitos todos os testes, identificamos que será necessário fazer a troca do ${peca} da TV, será feito a reoperação elétrica também. Este conserto completo fica em ${precoStr} reais apenas. Aprovando já iniciamos o conserto.`;
 
           if (temRisco) {
             texto += `\n\nObs.: Devido às condições da placa do equipamento preciso comunicar o risco de ao trabalhar nela o curto progredir e infelizmente ela apagar completamente. São poucos os casos mas existe esse risco.`;
@@ -602,7 +602,7 @@ module.exports = async function handler(req, res) {
 
         // ── APENAS RISCO (sem barramento/placa) ───────────────────────────
         if (temRisco) {
-          let texto = `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nForam feitos todos os testes, identificamos um problema no conjunto eletrônico da TV. Este conserto completo fica em ${precoStr} reais apenas.\n\nObs.: Devido às condições da placa do equipamento preciso comunicar o risco de ao trabalhar nela o curto progredir e infelizmente ela apagar completamente. São poucos os casos mas existe esse risco. Aprovando já iniciamos o conserto.`;
+          let texto = `Olá, ${pn}, bom dia! Sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:\n\nForam feitos todos os testes, identificamos um problema no conjunto eletrônico da TV. Este conserto completo fica em ${precoStr} reais apenas.\n\nObs.: Devido às condições da placa do equipamento preciso comunicar o risco de ao trabalhar nela o curto progredir e infelizmente ela apagar completamente. São poucos os casos mas existe esse risco. Aprovando já iniciamos o conserto.`;
 
           if (temAcrilico && acrilicoVal > 0) {
             texto += `\n\nDevido ao superaquecimento dos barramentos o acrílico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV está com cores mais claras. Sem trocar o acrílico você pode considerar uma qualidade de 80 a 90%. Trocando o Acrílico fica 100% e tem um custo adicional de ${acrilicoVal} reais. Aguardo sua resposta.`;
@@ -614,7 +614,7 @@ module.exports = async function handler(req, res) {
         // ── APENAS ACRILICO ───────────────────────────────────────────────
         if (temAcrilico) {
           return {
-            texto: `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro.\n\nDevido ao superaquecimento dos barramentos o acrílico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV está com cores mais claras. Sem trocar o acrílico você pode considerar uma qualidade de 80 a 90%. Trocando o Acrílico fica 100% e tem um custo adicional de ${acrilicoVal > 0 ? acrilicoVal : '[VALOR]'} reais. Aguardo sua resposta.`,
+            texto: `Olá, ${pn}, bom dia! Sou o Pedro da Reparo Eletro.\n\nDevido ao superaquecimento dos barramentos o acrílico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV está com cores mais claras. Sem trocar o acrílico você pode considerar uma qualidade de 80 a 90%. Trocando o Acrílico fica 100% e tem um custo adicional de ${acrilicoVal > 0 ? acrilicoVal : '[VALOR]'} reais. Aguardo sua resposta.`,
             preco: acrilicoVal ? String(acrilicoVal) : null,
           };
         }
@@ -882,7 +882,7 @@ module.exports = async function handler(req, res) {
 
     // Samsung 55" → R$ 890 barramento + acrílico R$ 335 (sem modelo no texto)
     const texto_s =
-      `Olá, Sidney, bom dia! Sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:
+      `Olá, Sidney, bom dia! Sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:
 
 ` +
       `Foram feitos todos os testes, identificamos que será necessário fazer a troca do barramento da TV, ` +
@@ -956,7 +956,7 @@ module.exports = async function handler(req, res) {
       texto_fd=`Olá, bom dia ${pn_fd}, fizemos todos os testes e identificamos que infelizmente não tem conserto viável a TV${modeloStr_fd}. Caso queira ela de volta me fala que providencio a entrega.`;
     } else if(temB||temP){
       const peca=(temB&&temP)?'barramento e placa':temB?'barramento':'placa';
-      texto_fd=`Olá, ${pn_fd}, bom dia! Sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:
+      texto_fd=`Olá, ${pn_fd}, bom dia! Sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:
 
 Foram feitos todos os testes, identificamos que será necessário fazer a troca do ${peca} da TV${modeloStr_fd}, será feito a reoperação elétrica também. Este conserto completo fica em ${precoStr_fd} reais apenas. Aprovando já iniciamos o conserto.`;
       if(temR) texto_fd+=`
@@ -967,14 +967,14 @@ Obs.: Devido às condições da placa do equipamento preciso comunicar o risco d
 Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV está com cores mais claras. Sem trocar o acrílico você pode considerar uma qualidade de 80 a 90%. Trocando o Acrílico fica 100% e tem um custo adicional de ${acrVal_fd} reais. Aguardo sua resposta.`;
       preco_fd=precoTab_fd;
     } else if(temR){
-      texto_fd=`Olá, ${pn_fd}, bom dia! Sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:
+      texto_fd=`Olá, ${pn_fd}, bom dia! Sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:
 
 Foram feitos todos os testes, identificamos um problema no conjunto eletrônico da TV${modeloStr_fd}. Este conserto completo fica em ${precoStr_fd} reais apenas.
 
 Obs.: Devido às condições da placa do equipamento preciso comunicar o risco de ao trabalhar nela o curto progredir e infelizmente ela apagar completamente. São poucos os casos mas existe esse risco. Aprovando já iniciamos o conserto.`;
       preco_fd=precoTab_fd;
     } else if(temA){
-      texto_fd=`Olá, ${pn_fd}, bom dia! Sou o Alessandro da Reparo Eletro.
+      texto_fd=`Olá, ${pn_fd}, bom dia! Sou o Pedro da Reparo Eletro.
 
 Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV está com cores mais claras. Sem trocar o acrílico você pode considerar uma qualidade de 80 a 90%. Trocando o Acrílico fica 100% e tem um custo adicional de ${acrVal_fd>0?acrVal_fd:'[VALOR]'} reais. Aguardo sua resposta.`;
       preco_fd=acrVal_fd?String(acrVal_fd):null;
@@ -1062,18 +1062,18 @@ Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter peque
       const temA = chips.includes('acrilico');
       if (temB || temP) {
         const peca = (temB&&temP)?'barramento e placa':temB?'barramento':'placa';
-        let texto = `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nForam feitos todos os testes, identificamos que será necessário fazer a troca do ${peca} da TV, será feito a reoperação elétrica também. Este conserto completo fica em ${precoStr} reais apenas. Aprovando já iniciamos o conserto.`;
+        let texto = `Olá, ${pn}, bom dia! Sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:\n\nForam feitos todos os testes, identificamos que será necessário fazer a troca do ${peca} da TV, será feito a reoperação elétrica também. Este conserto completo fica em ${precoStr} reais apenas. Aprovando já iniciamos o conserto.`;
         if (temR) texto += `\n\nObs.: Devido às condições da placa do equipamento preciso comunicar o risco de ao trabalhar nela o curto progredir e infelizmente ela apagar completamente. São poucos os casos mas existe esse risco.`;
         if (temA && acrilicoVal>0) texto += `\n\nDevido ao superaquecimento dos barramentos o acrílico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV está com cores mais claras. Sem trocar o acrílico você pode considerar uma qualidade de 80 a 90%. Trocando o Acrílico fica 100% e tem um custo adicional de ${acrilicoVal} reais. Aguardo sua resposta.`;
         return { texto, preco: precoTab };
       }
       if (temR) {
-        let texto = `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nForam feitos todos os testes, identificamos um problema no conjunto eletrônico da TV. Este conserto completo fica em ${precoStr} reais apenas.\n\nObs.: Devido às condições da placa do equipamento preciso comunicar o risco de ao trabalhar nela o curto progredir e infelizmente ela apagar completamente. São poucos os casos mas existe esse risco. Aprovando já iniciamos o conserto.`;
+        let texto = `Olá, ${pn}, bom dia! Sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:\n\nForam feitos todos os testes, identificamos um problema no conjunto eletrônico da TV. Este conserto completo fica em ${precoStr} reais apenas.\n\nObs.: Devido às condições da placa do equipamento preciso comunicar o risco de ao trabalhar nela o curto progredir e infelizmente ela apagar completamente. São poucos os casos mas existe esse risco. Aprovando já iniciamos o conserto.`;
         if (temA && acrilicoVal>0) texto += `\n\nDevido ao superaquecimento dos barramentos o acrílico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV está com cores mais claras. Sem trocar o acrílico você pode considerar uma qualidade de 80 a 90%. Trocando o Acrílico fica 100% e tem um custo adicional de ${acrilicoVal} reais. Aguardo sua resposta.`;
         return { texto, preco: precoTab };
       }
       if (temA) {
-        return { texto: `Olá, ${pn}, bom dia! Sou o Alessandro da Reparo Eletro.\n\nDevido ao superaquecimento dos barramentos o acrílico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV está com cores mais claras. Sem trocar o acrílico você pode considerar uma qualidade de 80 a 90%. Trocando o Acrílico fica 100% e tem um custo adicional de ${acrilicoVal>0?acrilicoVal:'[VALOR]'} reais. Aguardo sua resposta.`, preco: acrilicoVal?String(acrilicoVal):null };
+        return { texto: `Olá, ${pn}, bom dia! Sou o Pedro da Reparo Eletro.\n\nDevido ao superaquecimento dos barramentos o acrílico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV está com cores mais claras. Sem trocar o acrílico você pode considerar uma qualidade de 80 a 90%. Trocando o Acrílico fica 100% e tem um custo adicional de ${acrilicoVal>0?acrilicoVal:'[VALOR]'} reais. Aguardo sua resposta.`, preco: acrilicoVal?String(acrilicoVal):null };
       }
       return { texto: null, preco: null };
     }
@@ -1343,7 +1343,7 @@ Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter peque
       const precoManual=parseFloat(precoInput)>0?String(Math.round(parseFloat(precoInput))):null;
       const precoStr=precoTab||precoManual||'[VALOR]';
       const acrilico=parseFloat(precoInput)||0;
-      const A='Alessandro da Reparo Eletro';
+      const A='Pedro da Reparo Eletro';
       const ola='Ol\u00e1, '+pn;
       const risco_txt='\n\nObs.: Devido \u00e0s condi\u00e7\u00f5es da placa do equipamento preciso comunicar o risco de ao trabalhar nela o curto progredir e infelizmente ela apagar completamente. S\u00e3o poucos os casos mas existe esse risco.';
       const acr_txt='\n\nDevido ao superaquecimento dos barramentos o acr\u00edlico pode ressecar e ter pequenas rachaduras, o que faz aparecer pequenas rajadas de luz quando a TV est\u00e1 com cores mais claras. Sem trocar o acr\u00edlico voc\u00ea pode considerar uma qualidade de 80 a 90%. Trocando o Acr\u00edlico fica 100% e tem um custo adicional de '+acrilico+' reais. Aguardo sua resposta.';
