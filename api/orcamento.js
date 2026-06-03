@@ -347,12 +347,28 @@ module.exports = async function handler(req, res) {
     const GMB_ENV_KEY  = 'gmb_enviados';
     const db_gmb = await dbGet(PIPE_KEY_GMB);
     const db_env = (await dbGet(GMB_ENV_KEY)) || { fichas: [] };
-    const jaEnviados = new Set((db_env.fichas || []).map(f => String(f.id)));
+    // Filtrar por ID e por nome (evita voltar por ID diferente)
+    const jaEnviadosIds   = new Set((db_env.fichas || []).map(f => String(f.id)));
+    const jaEnviadosNomes = new Set((db_env.fichas || []).map(f => (f.nome||'').toLowerCase().trim()));
+    function foiEnviado(card) {
+      const id   = String(card.id || card.pipefyId || '');
+      const nome = (card.nomeContato || card.title || '').toLowerCase().trim();
+      return jaEnviadosIds.has(id) || (nome && jaEnviadosNomes.has(nome));
+    }
     if (!db_gmb || !Array.isArray(db_gmb.cards)) {
       return res.status(200).json({ ok: true, cards: [], total: 0 });
     }
+    // Filtrar enviados + deduplicar por nome
+    const nomesVistos = new Set();
     const erp = (db_gmb.cards || [])
-      .filter(c => c.phase === 'erp' && !jaEnviados.has(String(c.id || c.pipefyId)))
+      .filter(c => {
+        if (c.phase !== 'erp') return false;
+        if (foiEnviado(c)) return false;
+        const nome = (c.nomeContato || c.title || '').toLowerCase().trim();
+        if (nome && nomesVistos.has(nome)) return false; // dedup por nome
+        if (nome) nomesVistos.add(nome);
+        return true;
+      })
       .map(c => ({
         id:         c.id || c.pipefyId,
         pipefyId:   c.pipefyId || c.id,
