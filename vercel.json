@@ -331,6 +331,10 @@
       "destination": "/logistica.html"
     },
     {
+      "source": "/pj",
+      "destination": "/pj.html"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/home.html"
     },
@@ -409,10 +413,6 @@
     {
       "source": "/growth",
       "destination": "/growth.html"
-    },
-    {
-      "source": "/pj",
-      "destination": "/pj.html"
     },
     {
       "source": "/api/growth",
