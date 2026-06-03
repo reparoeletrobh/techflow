@@ -339,8 +339,15 @@ function mkCol(col, secs){
   el.appendChild(items);
 
   var add=document.createElement('div'); add.className='col-add';
-  var btn=document.createElement('button'); btn.className='btn-ai'; btn.textContent='+ ADICIONAR ATIVIDADE';
-  btn.onclick=(function(cid){return function(){openNew(cid);};})(col.id);
+  var btn=document.createElement('button'); btn.className='btn-ai';
+  if(col.id==='influencer'){
+    btn.textContent='🌟 Cadastrar Influencer';
+    btn.style.cssText='width:100%;padding:8px;border-radius:8px;background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.45);color:#f97316;font-family:var(--fm);font-size:10px;letter-spacing:.06em;cursor:pointer;font-weight:700;';
+    btn.onclick=function(){ abrirInflModal(); };
+  } else {
+    btn.textContent='+ ADICIONAR ATIVIDADE';
+    btn.onclick=(function(cid){return function(){openNew(cid);};})(col.id);
+  }
   add.appendChild(btn); el.appendChild(add);
   return el;
 }
