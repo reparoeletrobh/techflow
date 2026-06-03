@@ -375,7 +375,77 @@ module.exports = async function handler(req, res) {
   }
 
   // ── POST excluir ───────────────────────────────────────────
-  if (req.method === "POST" && action === "excluir") {
+  // ── GET diagnostico — relatório completo do banco de vendas ─────────────────
+  if (action === "diagnostico") {
+    const db  = await dbGet(VENDAS_KEY) || defaultDB();
+    const ck  = await dbGet("reparoeletro_checkout_vendas") || { vendas: [] };
+    const produtos = db.produtos || [];
+
+    // 1. Contagens básicas
+    const total       = produtos.length;
+    const disponiveis = produtos.filter(p => !p.vendido && !p.excluido).length;
+    const vendidos    = produtos.filter(p =>  p.vendido).length;
+    const semFlag     = produtos.filter(p =>  p.vendido === undefined).length;
+
+    // 2. Inconsistências: constam no checkout como vendidos mas flag vendido=false
+    const idsVendidosCK = new Set((ck.vendas || []).map(v => v.produto?.id).filter(Boolean));
+    const inconsistentes = produtos.filter(p => idsVendidosCK.has(p.id) && !p.vendido);
+
+    // 3. Duplicatas
+    const ids = produtos.map(p => p.id);
+    const dupes = ids.filter((id, i) => ids.indexOf(id) !== i);
+
+    // 4. Produtos sem ID
+    const semId = produtos.filter(p => !p.id).length;
+
+    // 5. Produtos "vendido=false" que têm soldAt (inconsistência grave)
+    const vendidoFalseComSoldAt = produtos.filter(p => !p.vendido && p.soldAt);
+
+    // 6. Últimas 10 operações (mais recentes criados)
+    const recentes = [...produtos]
+      .sort((a,b) => new Date(b.updatedAt||b.createdAt||0) - new Date(a.updatedAt||a.createdAt||0))
+      .slice(0, 10)
+      .map(p => ({ id: p.id, codigo: p.codigo, descricao: p.descricao?.slice(0,40), vendido: p.vendido, soldAt: p.soldAt, updatedAt: p.updatedAt }));
+
+    // 7. Verificar Cache-Control ativo
+    const cacheHeader = "s-maxage=60, stale-while-revalidate=300";
+
+    return res.status(200).json({
+      ok: true,
+      geradoEm: new Date().toISOString(),
+      contagens: { total, disponiveis, vendidos, semFlagVendido: semFlag },
+      inconsistencias: {
+        totalInconsistentes: inconsistentes.length,
+        detalhes: inconsistentes.map(p => ({
+          id: p.id, codigo: p.codigo,
+          descricao: p.descricao?.slice(0, 40),
+          vendido: p.vendido,
+          soldAt: p.soldAt,
+          apareceuNoCheckout: true
+        })),
+      },
+      duplicatas: { total: dupes.length, ids: [...new Set(dupes)].slice(0, 10) },
+      semId,
+      vendidoFalseComSoldAt: vendidoFalseComSoldAt.map(p => ({
+        id: p.id, codigo: p.codigo,
+        descricao: p.descricao?.slice(0, 40),
+        soldAt: p.soldAt
+      })),
+      recentes,
+      checkoutVendas: (ck.vendas || []).length,
+      alerta: inconsistentes.length > 0
+        ? "⚠️ " + inconsistentes.length + " produto(s) no checkout como vendido mas flag=false na loja"
+        : "✅ Sem inconsistências de flag encontradas",
+      causaProvavel: [
+        inconsistentes.length > 0 ? "Produtos vendidos via MP mas flag vendido não atualizada no Redis (race condition webhook)" : null,
+        vendidoFalseComSoldAt.length > 0 ? "Produtos com soldAt mas vendido=false — cancelar-venda acidentalmente chamado" : null,
+        dupes.length > 0 ? "IDs duplicados no banco" : null,
+        "Cache Vercel Edge ativo (s-maxage=60, stale=300s) — pode servir dados desatualizados por até 5 min",
+      ].filter(Boolean),
+    });
+  }
+
+    if (req.method === "POST" && action === "excluir") {
     const { id } = req.body || {};
     if (!id) return res.status(400).json({ ok: false, error: "id obrigatório" });
     const db = await dbGet(VENDAS_KEY) || defaultDB();
