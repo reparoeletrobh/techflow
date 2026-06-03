@@ -40,8 +40,24 @@ const FIN_PHASES = [
 ];
 
 // Move card no Pipefy para uma fase
-async function pipefyMoveCard() {
-  return null; // Pipefy desconectado
+async function pipefyMoveCard(cardId, destPhaseId) {
+  if (!cardId || !destPhaseId) return null;
+  const PIPEFY_API = 'https://api.pipefy.com/graphql';
+  const PIPEFY_TOKEN = (process.env.PIPEFY_TOKEN || '').trim();
+  if (!PIPEFY_TOKEN) { console.warn('[pipefyMoveCard] sem PIPEFY_TOKEN'); return null; }
+  try {
+    const r = await fetch(PIPEFY_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + PIPEFY_TOKEN },
+      body: JSON.stringify({ query:
+        'mutation { moveCardToPhase(input: { card_id: "' + cardId +
+        '", destination_phase_id: "' + destPhaseId + '" }) { card { id current_phase { name } } } }'
+      }),
+    });
+    const j = await r.json();
+    if (j.errors) { console.error('[pipefyMoveCard] errors:', JSON.stringify(j.errors)); return null; }
+    return j.data?.moveCardToPhase?.card || null;
+  } catch(e) { console.error('[pipefyMoveCard]', e.message); return null; }
 }
 
 // Fase "Solicitar Entrega" no Pipefy
@@ -810,5 +826,58 @@ module.exports = async function handler(req, res) {
     } catch(e) { return res.status(200).json({ ok: false, error: e.message }); }
   }
 
-  return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+  // ── GET fix-heloisa — força move para solicitar_entrega ─────────────────────
+  if (req.method === 'GET' && action === 'fix-heloisa') {
+    const q = (req.query.nome || 'heloisa').toLowerCase().trim();
+    const fin = (await dbGet(FIN_KEY)) || { records: [] };
+    const rec = (fin.records || []).find(r =>
+      (r.nome||'').toLowerCase().includes(q) ||
+      (r.clienteNome||'').toLowerCase().includes(q) ||
+      (r.tel||'').includes('0495') || (r.telefone||'').includes('0495')
+    );
+    if (!rec) return res.status(404).json({ ok: false, error: 'Não encontrada: '+q,
+      total: fin.records.length, amostra: fin.records.slice(0,5).map(r=>({id:r.id,nome:r.nome||r.clienteNome,fase:r.phaseId})) });
+
+    const pipefyId = rec.pipefyId || rec.pipefyCardId || null;
+    let pipefyResult = null;
+    if (pipefyId) {
+      pipefyResult = await pipefyMoveCard(String(pipefyId), SOLICITAR_ENTREGA_PHASE_FIN);
+    }
+
+    // Também mover no reparoeletro_pipe (Redis)
+    let pipeRedisOk = false;
+    try {
+      const PIPE_KEY_F = 'reparoeletro_pipe';
+      const pipeDbF = await dbGet(PIPE_KEY_F);
+      if (pipeDbF && Array.isArray(pipeDbF.cards)) {
+        const pCardF = pipeDbF.cards.find(c =>
+          (pipefyId && (c.pipefyId===String(pipefyId)||c.id===String(pipefyId))) ||
+          c.id === rec.id || c.id === String(rec.id) ||
+          (c.nome||'').toLowerCase().includes(q)
+        );
+        if (pCardF) {
+          pCardF.history = (pCardF.history||[]).concat([{phase:pCardF.phase,ts:new Date().toISOString()}]);
+          pCardF.phase   = 'solicitar_entrega';
+          pCardF.movedAt = new Date().toISOString();
+          await dbSet(PIPE_KEY_F, pipeDbF);
+          pipeRedisOk = true;
+        }
+      }
+    } catch(e) { console.error('fix-heloisa pipe:', e.message); }
+
+    return res.status(200).json({
+      ok: true,
+      nome: rec.nome || rec.clienteNome,
+      pipefyId,
+      pipefyMoved: !!pipefyResult,
+      pipefyResult,
+      pipeRedisOk,
+      faseAtual: rec.phaseId,
+      msg: pipefyId
+        ? (pipefyResult ? '✅ Card movido no Pipefy para Solicitar Entrega' : '⚠️ Pipefy não confirmou — verifique token')
+        : '⚠️ Sem pipefyId — Redis atualizado apenas',
+    });
+  }
+
+    return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 };
