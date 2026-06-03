@@ -339,7 +339,7 @@ function mkCol(col, secs){
     items.appendChild(mkItem(col,it));
     // Botão Cadastrar Influencer logo abaixo do card correto
     var lbl=(it.label||'').toLowerCase();
-    if(col.id==='influencer' && (lbl.includes('tabela')||lbl.includes('influenc'))){
+    if(col.id==='influencer' && lbl.includes('tabela')){
       var btnInfl=document.createElement('button');
       btnInfl.textContent='🌟 Cadastrar Influencer';
       btnInfl.style.cssText='width:100%;padding:7px;border-radius:8px;background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.4);color:#f97316;font-family:var(--fm);font-size:10px;letter-spacing:.06em;cursor:pointer;font-weight:700;margin-top:4px;transition:all .15s;';
