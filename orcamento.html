@@ -273,10 +273,10 @@ function showToast(icon, title, msg) {
 }
 
 function showPage(name) {
-  ['cadastro','orcamento','enviado','sem-resposta','ultima-chamada','tabela'].forEach(function(p){
+  ['cadastro','orcamento','enviado','sem-resposta','ultima-chamada','tabela','gmb'].forEach(function(p){
     document.getElementById('page-'+p).classList.toggle('active', p===name);
   });
-  var tm={cad:'cadastro',orc:'orcamento',env:'enviado',sem:'sem-resposta',ult:'ultima-chamada',tbl:'tabela'};
+  var tm={cad:'cadastro',orc:'orcamento',env:'enviado',sem:'sem-resposta',ult:'ultima-chamada',tbl:'tabela',gmb:'gmb'};
   Object.keys(tm).forEach(function(k){ document.getElementById('tab-'+k).classList.toggle('active', name===tm[k]); });
   if(name==='orcamento'||name==='enviado') orcLoad();
   if(name==='sem-resposta') loadSemResposta(); if(name==='gmb') loadGMB();
