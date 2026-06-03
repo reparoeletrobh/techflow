@@ -318,7 +318,31 @@ module.exports = async function handler(req, res) {
 
   // ── GET orc-load ──────────────────────────────────────────
   // ── GET gmb-load — fichas em ERP para solicitação de avaliação GMB ──────────
-  if (action === "gmb-load") {
+  // ── POST gmb-marcar-enviado — salva ficha como contatada GMB ──────────────
+  if (req.method === 'POST' && action === 'gmb-marcar-enviado') {
+    const { id, nome, tel, desc } = req.body || {};
+    const GMB_ENV_KEY = 'gmb_enviados';
+    const db_g = (await dbGet(GMB_ENV_KEY)) || { fichas: [] };
+    // Evitar duplicatas
+    if (!db_g.fichas.find(f => f.id === id)) {
+      db_g.fichas.unshift({
+        id, nome, tel, desc,
+        enviadoEm: new Date().toISOString()
+      });
+      db_g.fichas = db_g.fichas.slice(0, 200);
+      await dbSet(GMB_ENV_KEY, db_g);
+    }
+    return res.status(200).json({ ok: true });
+  }
+
+  // ── GET gmb-enviados — lista fichas já contatadas ──────────────────────────
+  if (action === 'gmb-enviados') {
+    const GMB_ENV_KEY = 'gmb_enviados';
+    const db_g = (await dbGet(GMB_ENV_KEY)) || { fichas: [] };
+    return res.status(200).json({ ok: true, fichas: db_g.fichas || [] });
+  }
+
+    if (action === "gmb-load") {
     const PIPE_KEY_GMB = 'reparoeletro_pipe';
     const db_gmb = await dbGet(PIPE_KEY_GMB);
     if (!db_gmb || !Array.isArray(db_gmb.cards)) {

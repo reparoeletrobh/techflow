@@ -279,7 +279,7 @@ function showPage(name) {
   var tm={cad:'cadastro',orc:'orcamento',env:'enviado',sem:'sem-resposta',ult:'ultima-chamada',tbl:'tabela',gmb:'gmb'};
   Object.keys(tm).forEach(function(k){ document.getElementById('tab-'+k).classList.toggle('active', name===tm[k]); });
   if(name==='orcamento'||name==='enviado') orcLoad();
-  if(name==='sem-resposta') loadSemResposta(); if(name==='gmb') loadGMB();
+  if(name==='sem-resposta') loadSemResposta(); if(name==='gmb'){ loadGMB(); loadGmbEnviados(); }
   if(name==='ultima-chamada') loadUltimaChamada();
   if(name==='tabela') loadTabela();
 }
@@ -754,22 +754,64 @@ function gmbCard(c){
   if(tel.length===10)tel=tel.slice(0,2)+'9'+tel.slice(2);
   var waLink=tel?'https://wa.me/55'+tel+'?text='+encodeURIComponent(texto):null;
   var w=document.createElement('div'); w.className='gmb-card'; w.setAttribute('data-nome',nome.toLowerCase());
+  // Header: nome + desc
   var n=document.createElement('div'); n.className='gmb-nome'; n.textContent=nome; w.appendChild(n);
   if(c.desc){var dc=document.createElement('div');dc.className='gmb-desc';dc.textContent=c.desc;w.appendChild(dc);}
   if(c.valor){var vl=document.createElement('div');vl.style.cssText='font-family:var(--fm);font-size:10px;color:#10d982;';vl.textContent='R$ '+parseFloat(c.valor).toLocaleString('pt-BR');w.appendChild(vl);}
+  // Texto editável
   var tid='gmb-ta-'+c.id;
   var ta=document.createElement('textarea'); ta.className='gmb-ta'; ta.id=tid; ta.value=texto; w.appendChild(ta);
+  // Botão único: Copiar e Enviar (igual ao orçamento)
   var btns=document.createElement('div'); btns.className='gmb-btns';
-  var bc=document.createElement('button'); bc.className='gmb-btn gmb-copy'; bc.textContent='📋 Copiar';
-  bc.onclick=(function(xid,btn){return function(){
-    var t=document.getElementById(xid); if(!t)return;
-    try{navigator.clipboard.writeText(t.value);}catch(e){t.select();document.execCommand('copy');}
-    btn.textContent='✅ Copiado!'; setTimeout(function(){btn.textContent='📋 Copiar';},2000);
-  };})(tid,bc);
+  var bc=document.createElement('button'); bc.className='gmb-btn gmb-copy';
+  bc.innerHTML='📋 Copiar e Enviar';
+  bc.onclick=(function(card,link,btn,wrap){
+    return function(){
+      var conteudo = link || gmbTexto((card.nome||'').trim().split(' ')[0]);
+      try{navigator.clipboard.writeText(conteudo);}catch(e){
+        var ta=document.createElement('textarea');ta.value=conteudo;
+        document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+      }
+      btn.innerHTML='✅ Copiado!';
+      // Marcar como enviado na API e remover da lista
+      fetch('/api/orcamento?action=gmb-marcar-enviado',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:card.id,nome:card.nome,tel:card.tel,desc:card.desc})
+      }).then(function(){});
+      // Remover card da lista imediatamente
+      setTimeout(function(){
+        wrap.style.transition='opacity .3s';
+        wrap.style.opacity='0';
+        setTimeout(function(){wrap.remove(); loadGmbEnviados();},320);
+      },600);
+    };
+  })(c, waLink, bc, w);
   btns.appendChild(bc);
-  if(waLink){var bw=document.createElement('a');bw.className='gmb-btn gmb-wa';bw.href=waLink;bw.target='_blank';bw.innerHTML='💬 WhatsApp';btns.appendChild(bw);}
   w.appendChild(btns);
   return w;
+}
+
+async function loadGmbEnviados(){
+  try{
+    var d=await fetch('/api/orcamento?action=gmb-enviados').then(function(r){return r.json();});
+    var fichas=d.fichas||[];
+    var bg=document.getElementById('badge-gmb-env'); if(bg) bg.textContent=fichas.length;
+    var list=document.getElementById('list-gmb-env'); if(!list) return;
+    if(!fichas.length){list.innerHTML='<div style="font-family:var(--fm);font-size:10px;color:var(--muted);padding:8px 0">Nenhum enviado ainda.</div>';return;}
+    list.innerHTML=fichas.map(function(f){
+      var dt=f.enviadoEm?new Date(f.enviadoEm).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit'}):'';
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;">'+'<div><div style="font-size:12px;font-weight:600">'+( f.nome||'—')+'</div>'+'<div style="font-family:var(--fm);font-size:9px;color:var(--muted)">'+( f.desc||'')+'</div></div>'+'<div style="font-family:var(--fm);font-size:9px;color:#10d982">✅ '+dt+'</div></div>';
+    }).join('');
+  }catch(e){}
+}
+
+function toggleGmbEnv(){
+  var el=document.getElementById('list-gmb-env');
+  var ar=document.getElementById('gmb-env-arrow');
+  if(!el)return;
+  var vis=el.style.display==='flex';
+  el.style.display=vis?'none':'flex'; el.style.flexDirection='column';
+  if(ar) ar.textContent=vis?'▼':'▲';
 }
 
 function filtrarGMB(){
@@ -1011,7 +1053,16 @@ function resetTabela() {
       <button onclick="loadGMB()" style="font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">&#8635;</button>
     </div>
   </div>
-  <div id="list-gmb" style="padding:16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;"></div>
+  <div id="list-gmb" style="padding:16px;display:flex;flex-direction:column;gap:10px;"></div>
+  <!-- Sub-sessão Enviados GMB -->
+  <div style="padding:0 16px 8px;">
+    <div style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 0;border-top:1px solid var(--border);" onclick="toggleGmbEnv()">
+      <span style="font-family:var(--fm);font-size:10px;color:var(--muted);">✅ ENVIADOS</span>
+      <span class="tab-badge" id="badge-gmb-env" style="background:rgba(16,217,130,.12);color:#10d982;border:1px solid rgba(16,217,130,.25);">0</span>
+      <span id="gmb-env-arrow" style="font-size:10px;color:var(--muted);margin-left:auto;">▼</span>
+    </div>
+    <div id="list-gmb-env" style="display:none;flex-direction:column;gap:8px;padding-bottom:16px;"></div>
+  </div>
 </div>
 
 <div class="page" id="page-tabela">
