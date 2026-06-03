@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Google Meu Negócio — Reparo Eletro BH</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#03060e;--s1:#080d18;--s2:#0d1425;--s3:#121c35;--bdr:#1a2540;
+  --tx:#dce8f8;--mu:#4a607a;--dim:#060c18;
+  --gr:#10d982;--ye:#f5c800;--re:#f04060;--bl:#3b9eff;--or:#f97316;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--tx);font-family:var(--fb);min-height:100vh;}
+button,a{cursor:pointer;font-family:inherit;transition:opacity .15s;}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;
+  border-bottom:1px solid var(--bdr);background:var(--s1);position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:10px;}
+.logo-ic{width:30px;height:30px;background:linear-gradient(135deg,#10d982,#3b9eff);
+  border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.hbtn{font-family:var(--fm);font-size:10px;padding:6px 14px;border-radius:6px;
+  border:1px solid var(--bdr);background:transparent;color:var(--mu);text-decoration:none;display:inline-flex;align-items:center;}
+.hbtn:hover{color:var(--tx);border-color:var(--gr);}
+.tabs{display:flex;border-bottom:1px solid var(--bdr);background:var(--s1);padding:0 24px;position:sticky;top:52px;z-index:90;}
+.tab{font-family:var(--fm);font-size:11px;font-weight:600;padding:12px 20px;border:none;
+  background:transparent;color:var(--mu);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.tab:hover{color:var(--tx);}
+.tab.active{color:var(--gr);border-bottom-color:var(--gr);}
+.tab-badge{font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:99px;
+  background:rgba(16,217,130,.15);color:var(--gr);border:1px solid rgba(16,217,130,.3);margin-left:6px;}
+.page{display:none;padding:20px 24px;max-width:900px;margin:0 auto;}
+.page.active{display:block;}
+/* cards */
+.rv-card{background:var(--s1);border:1px solid var(--bdr);border-radius:12px;padding:16px;
+  margin-bottom:12px;transition:border-color .2s;}
+.rv-card.sem-resp{border-color:rgba(245,200,0,.3);}
+.rv-card.respondida{border-color:rgba(16,217,130,.2);opacity:.85;}
+.rv-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;gap:12px;}
+.rv-nome{font-weight:600;font-size:14px;}
+.rv-stars{font-size:16px;letter-spacing:2px;margin-top:2px;}
+.rv-data{font-family:var(--fm);font-size:9px;color:var(--mu);margin-top:2px;}
+.rv-comment{font-size:13px;line-height:1.6;color:var(--tx);margin-bottom:10px;}
+.rv-reply-box{background:var(--s2);border-left:3px solid var(--gr);border-radius:0 8px 8px 0;
+  padding:10px 14px;margin-bottom:10px;font-size:12px;color:var(--mu);line-height:1.5;}
+.rv-reply-label{font-family:var(--fm);font-size:9px;color:var(--gr);letter-spacing:.08em;margin-bottom:4px;}
+.rv-reply-text{font-size:12px;color:var(--tx);}
+.rv-ta{width:100%;background:var(--s2);border:1px solid var(--bdr);border-radius:8px;
+  padding:10px 12px;color:var(--tx);font-family:var(--fb);font-size:12px;resize:vertical;
+  line-height:1.6;outline:none;min-height:80px;margin-bottom:8px;}
+.rv-ta:focus{border-color:var(--gr);}
+.rv-btns{display:flex;gap:8px;align-items:center;}
+.btn-resp{font-family:var(--fm);font-size:10px;padding:7px 16px;border-radius:7px;
+  border:none;background:var(--gr);color:#000;font-weight:700;cursor:pointer;}
+.btn-resp:hover{filter:brightness(1.1);}
+.btn-sec{font-family:var(--fm);font-size:10px;padding:7px 14px;border-radius:7px;
+  border:1px solid var(--bdr);background:transparent;color:var(--mu);cursor:pointer;}
+.btn-sec:hover{color:var(--tx);}
+.btn-del{font-family:var(--fm);font-size:10px;padding:7px 14px;border-radius:7px;
+  border:1px solid rgba(240,64,96,.4);background:transparent;color:var(--re);cursor:pointer;}
+.star-filter{display:flex;gap:6px;margin-bottom:16px;align-items:center;flex-wrap:wrap;}
+.star-btn{font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:20px;
+  border:1px solid var(--bdr);background:transparent;color:var(--mu);cursor:pointer;}
+.star-btn:hover,.star-btn.active{border-color:var(--ye);color:var(--ye);background:rgba(245,200,0,.08);}
+.search-gmb{display:flex;gap:8px;margin-bottom:16px;}
+.s-in{flex:1;background:var(--s2);border:1px solid var(--bdr);border-radius:7px;color:var(--tx);
+  font-family:var(--fm);font-size:11px;padding:8px 12px;outline:none;}
+.s-in:focus{border-color:var(--gr);}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+.kpi{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:14px;text-align:center;}
+.kpi-v{font-family:var(--fh);font-size:24px;font-weight:800;line-height:1;}
+.kpi-l{font-family:var(--fm);font-size:9px;color:var(--mu);margin-top:4px;text-transform:uppercase;letter-spacing:.08em;}
+.not-auth{text-align:center;padding:60px 24px;max-width:500px;margin:0 auto;}
+.not-auth h2{font-family:var(--fh);font-size:20px;margin-bottom:12px;}
+.not-auth p{font-family:var(--fm);font-size:11px;color:var(--mu);line-height:1.8;margin-bottom:24px;}
+.btn-auth{display:inline-flex;align-items:center;gap:8px;font-family:var(--fm);font-size:12px;
+  padding:12px 24px;border-radius:8px;border:none;background:var(--gr);color:#000;font-weight:700;cursor:pointer;}
+.spinner{width:18px;height:18px;border:2px solid var(--bdr);border-top-color:var(--gr);
+  border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{color:var(--mu);font-family:var(--fm);font-size:11px;text-align:center;padding:40px 0;}
+.ok-badge{display:inline-flex;align-items:center;gap:4px;font-family:var(--fm);font-size:10px;
+  padding:3px 10px;border-radius:99px;background:rgba(16,217,130,.12);color:var(--gr);
+  border:1px solid rgba(16,217,130,.25);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="logo-ic">⭐</div>Google Meu Negócio
+    <span id="status-badge" style="display:none"></span>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <button class="hbtn" onclick="loadReviews(1)">↻ Atualizar</button>
+    <a href="/adm" class="hbtn">← ADM</a>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" id="tab-pend" onclick="setTab('pend')">
+    ⚠️ Sem Resposta <span class="tab-badge" id="badge-pend">0</span>
+  </button>
+  <button class="tab" id="tab-resp" onclick="setTab('resp')">✅ Respondidas</button>
+  <button class="tab" id="tab-all"  onclick="setTab('all')">📋 Todas</button>
+</div>
+
+<div id="main-content" style="max-width:900px;margin:0 auto;padding:20px 24px;">
+  <div class="empty"><div class="spinner"></div>&nbsp; Carregando avaliações...</div>
+</div>
+
+<div class="page" id="page-pend"></div>
+<div class="page" id="page-resp"></div>
+<div class="page" id="page-all"></div>
+
+<script>
+var _reviews = [], _tab = 'pend', _authorized = false;
+
+function fmtData(ts) {
+  if (!ts) return '';
+  try { return new Date(ts).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',year:'numeric'}); }
+  catch(e){ return ts; }
+}
+function stars(n) {
+  var filled='⭐'.repeat(n), empty='☆'.repeat(5-n);
+  return '<span style="color:var(--ye)">'+filled+'</span><span style="color:var(--mu);font-size:12px">'+empty+'</span>';
+}
+
+async function init() {
+  // Verificar se acabou de autorizar
+  if (new URLSearchParams(location.search).get('authorized') === '1') {
+    document.getElementById('status-badge').style.display = 'inline-flex';
+    document.getElementById('status-badge').innerHTML = '<span class="ok-badge">✅ Autorizado!</span>';
+    history.replaceState({}, '', '/gmb.html');
+  }
+  // Verificar status
+  var st = await fetch('/api/gmb?action=status').then(function(r){return r.json();}).catch(function(){return {ok:false};});
+  if (!st.autorizado) { showNotAuth(); return; }
+  _authorized = true;
+  loadReviews(0);
+}
+
+function showNotAuth() {
+  document.getElementById('main-content').innerHTML =
+    '<div class="not-auth">'+
+    '<div style="font-size:48px;margin-bottom:16px">⭐</div>'+
+    '<h2>Conectar Google Meu Negócio</h2>'+
+    '<p>Para ver e responder avaliações direto da plataforma,<br>você precisa autorizar o acesso uma única vez.</p>'+
+    '<button class="btn-auth" onclick="autorizar()">🔑 Autorizar com Google</button>'+
+    '<p style="margin-top:16px;font-size:10px;color:var(--mu)">Você será redirecionado para o Google e voltará automaticamente.</p>'+
+    '</div>';
+  document.querySelector('.tabs').style.display = 'none';
+}
+
+async function autorizar() {
+  var r = await fetch('/api/gmb?action=auth-url').then(function(r){return r.json();});
+  if (r.authUrl) window.location.href = r.authUrl;
+  else alert('Erro: ' + (r.error || 'Variáveis GMB não configuradas no Vercel'));
+}
+
+async function loadReviews(forceRefresh) {
+  document.getElementById('main-content').innerHTML = '<div class="empty"><div class="spinner"></div>&nbsp; Carregando avaliações...</div>';
+  document.querySelector('.tabs').style.display = '';
+  try {
+    var url = '/api/gmb?action=reviews' + (forceRefresh ? '&refresh=1' : '');
+    var d = await fetch(url).then(function(r){return r.json();});
+    if (!d.ok) { document.getElementById('main-content').innerHTML = '<div class="empty" style="color:var(--re)">Erro: '+d.error+'</div>'; return; }
+    _reviews = d.reviews || [];
+    document.getElementById('main-content').innerHTML = '';
+    document.getElementById('main-content').style.display = 'none';
+    document.querySelectorAll('.page').forEach(function(p){p.style.display='';});
+    // Atualizar badges
+    var pend = _reviews.filter(function(r){return !r.reply;}).length;
+    document.getElementById('badge-pend').textContent = pend;
+    renderKPIs(d);
+    renderTab(_tab);
+  } catch(e) {
+    document.getElementById('main-content').innerHTML = '<div class="empty" style="color:var(--re)">Erro: '+e.message+'</div>';
+  }
+}
+
+function renderKPIs(d) {
+  var total = _reviews.length;
+  var pend  = _reviews.filter(function(r){return !r.reply;}).length;
+  var avg   = total ? (_reviews.reduce(function(s,r){return s+r.stars;},0)/total).toFixed(1) : '—';
+  var neg   = _reviews.filter(function(r){return r.stars<=2;}).length;
+  // Inserir KPIs no topo da primeira página ativa
+  var kpiHtml =
+    '<div class="kpis">'+
+    '<div class="kpi"><div class="kpi-v" style="color:var(--gr)">'+total+'</div><div class="kpi-l">Total</div></div>'+
+    '<div class="kpi"><div class="kpi-v" style="color:var(--ye)">'+avg+' ⭐</div><div class="kpi-l">Média</div></div>'+
+    '<div class="kpi"><div class="kpi-v" style="color:'+(pend>0?'var(--or)':'var(--gr)')+'">'+pend+'</div><div class="kpi-l">Sem Resposta</div></div>'+
+    '<div class="kpi"><div class="kpi-v" style="color:'+(neg>0?'var(--re)':'var(--gr)')+'">'+neg+'</div><div class="kpi-l">Negativas (≤2★)</div></div>'+
+    '</div>';
+  document.getElementById('page-pend').dataset.kpis = kpiHtml;
+  document.getElementById('page-resp').dataset.kpis = kpiHtml;
+  document.getElementById('page-all').dataset.kpis  = kpiHtml;
+}
+
+function setTab(t) {
+  _tab = t;
+  document.querySelectorAll('.tab').forEach(function(b){b.classList.remove('active');});
+  document.getElementById('tab-'+t).classList.add('active');
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+  document.getElementById('page-'+t).classList.add('active');
+  renderTab(t);
+}
+
+function renderTab(t) {
+  var page = document.getElementById('page-'+t);
+  var filtered;
+  if (t==='pend') filtered = _reviews.filter(function(r){return !r.reply;});
+  else if (t==='resp') filtered = _reviews.filter(function(r){return !!r.reply;});
+  else filtered = _reviews.slice();
+
+  var html = (page.dataset.kpis||'');
+
+  // Filtros
+  html += '<div class="search-gmb"><input class="s-in" id="s-'+t+'" placeholder="🔍 Buscar por nome..." oninput="filtrarCards(\''+t+'\')"><div class="star-filter">';
+  html += '<button class="star-btn active" id="sf-'+t+'-0" onclick="filtroEstrela(\''+t+'\',0)">Todas</button>';
+  for(var s=5;s>=1;s--){
+    html += '<button class="star-btn" id="sf-'+t+'-'+s+'" onclick="filtroEstrela(\''+t+'\','+s+')">'+s+'★</button>';
+  }
+  html += '</div></div>';
+
+  if (!filtered.length) { html += '<div class="empty">Nenhuma avaliação '+(t==='pend'?'sem resposta':t==='resp'?'respondida':'')+'</div>'; }
+  else {
+    filtered.forEach(function(r){
+      var haReply = !!r.reply;
+      html += '<div class="rv-card '+(haReply?'respondida':'sem-resp')+'" data-nome="'+(r.reviewer||'').toLowerCase()+'" data-stars="'+r.stars+'" data-id="'+r.name+'">';
+      html += '<div class="rv-head">';
+      html += '<div><div class="rv-nome">'+escH(r.reviewer)+'</div><div class="rv-stars">'+stars(r.stars)+'</div><div class="rv-data">'+fmtData(r.publishedAt)+'</div></div>';
+      if (haReply) html += '<span style="font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;background:rgba(16,217,130,.12);color:var(--gr);border:1px solid rgba(16,217,130,.25);">✓ Respondida</span>';
+      else html += '<span style="font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;background:rgba(245,200,0,.12);color:var(--ye);border:1px solid rgba(245,200,0,.25);">Aguardando</span>';
+      html += '</div>';
+      if (r.comment) html += '<div class="rv-comment">'+escH(r.comment)+'</div>';
+      if (haReply) {
+        html += '<div class="rv-reply-box"><div class="rv-reply-label">SUA RESPOSTA</div><div class="rv-reply-text">'+escH(r.reply.comment)+'</div></div>';
+        html += '<div class="rv-btns"><button class="btn-del" onclick="deletarResposta(this,\''+escA(r.name)+'\')">🗑 Remover resposta</button></div>';
+      } else {
+        html += '<textarea class="rv-ta" id="ta-'+escA(r.reviewId)+'" placeholder="Digite sua resposta..."></textarea>';
+        html += '<div class="rv-btns"><button class="btn-resp" onclick="responder(this,\''+escA(r.name)+'\',\''+escA(r.reviewId)+'\')">✉️ Responder</button><span id="msg-'+escA(r.reviewId)+'" style="font-family:var(--fm);font-size:10px;color:var(--mu);"></span></div>';
+      }
+      html += '</div>';
+    });
+  }
+  page.innerHTML = html;
+  page.classList.add('active');
+}
+
+async function responder(btn, reviewName, reviewId) {
+  var ta = document.getElementById('ta-'+reviewId);
+  if (!ta || !ta.value.trim()) { alert('Digite uma resposta antes de enviar'); return; }
+  btn.disabled = true; btn.textContent = '⏳ Enviando...';
+  var msg = document.getElementById('msg-'+reviewId);
+  try {
+    var r = await fetch('/api/gmb?action=reply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reviewName,comment:ta.value.trim()})}).then(function(r){return r.json();});
+    if (r.ok) { if(msg)msg.textContent='✅ Enviado!'; setTimeout(function(){loadReviews(1);},1500); }
+    else { if(msg)msg.textContent='❌ '+r.error; btn.disabled=false; btn.textContent='✉️ Responder'; }
+  } catch(e) { if(msg)msg.textContent='❌ Erro'; btn.disabled=false; btn.textContent='✉️ Responder'; }
+}
+
+async function deletarResposta(btn, reviewName) {
+  if (!confirm('Remover a resposta desta avaliação?')) return;
+  btn.disabled=true; btn.textContent='⏳';
+  try {
+    var r = await fetch('/api/gmb?action=delete-reply',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({reviewName})}).then(function(r){return r.json();});
+    if (r.ok) loadReviews(1);
+    else { alert('Erro: '+r.error); btn.disabled=false; btn.textContent='🗑 Remover resposta'; }
+  } catch(e) { btn.disabled=false; btn.textContent='🗑 Remover resposta'; }
+}
+
+var _sfSel = {pend:0,resp:0,all:0};
+function filtroEstrela(t, s) {
+  _sfSel[t] = s;
+  document.querySelectorAll('[id^="sf-'+t+'-"]').forEach(function(b){b.classList.remove('active');});
+  document.getElementById('sf-'+t+'-'+s).classList.add('active');
+  filtrarCards(t);
+}
+function filtrarCards(t) {
+  var q  = (document.getElementById('s-'+t)||{value:''}).value.toLowerCase();
+  var sf = _sfSel[t]||0;
+  document.querySelectorAll('#page-'+t+' .rv-card').forEach(function(c){
+    var nome  = c.getAttribute('data-nome')||'';
+    var stars = parseInt(c.getAttribute('data-stars'))||0;
+    var show  = (!q||nome.includes(q)) && (!sf||stars===sf);
+    c.style.display = show?'':'none';
+  });
+}
+function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escA(s){ return String(s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+
+init();
+</script>
+</body>
+</html>
