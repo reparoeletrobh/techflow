@@ -48,6 +48,13 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 
 .page{display:none;flex:1;flex-direction:column;padding:20px 24px;gap:12px;max-width:860px;}
 .page.active{display:flex;}
+.search-bar-orc{display:flex;gap:8px;margin-bottom:14px;align-items:center;}
+.search-bar-orc input{flex:1;background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:9px 13px;color:var(--text);font-family:var(--fm);font-size:12px;outline:none;transition:border .15s;}
+.search-bar-orc input:focus{border-color:var(--accent);}
+.search-bar-orc input::placeholder{color:var(--muted);}
+.search-badge{font-family:var(--fm);font-size:9px;padding:3px 8px;border-radius:99px;
+  background:rgba(249,115,22,.12);color:var(--accent);border:1px solid rgba(249,115,22,.25);flex-shrink:0;}
 .page-title{font-family:var(--fh);font-size:18px;font-weight:800;letter-spacing:.5px;
   text-shadow:0 0 20px rgba(59,158,255,.15);}
 .page-title span{color:var(--accent);}
@@ -214,6 +221,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 <div class="page" id="page-orc">
   <div class="page-title">Orçamento <span>// Pendentes</span></div>
   <div class="page-sub">// fichas aguardando envio do orçamento</div>
+  <div class="search-bar-orc">
+    <input type="text" id="busca-orc" placeholder="🔍 Buscar por nome, telefone..." oninput="filtrarLista('orc')">
+    <span class="search-badge" id="badge-count-orc">0</span>
+  </div>
   <div class="orc-list" id="list-orc">
     <div class="spinner-wrap"><div class="spinner"></div>Carregando...</div>
   </div>
@@ -223,6 +234,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 <div class="page" id="page-enviados">
   <div class="page-title">Enviados <span>// Aguardando Aprovação</span></div>
   <div class="page-sub">// orçamentos enviados aguardando resposta do cliente</div>
+  <div class="search-bar-orc">
+    <input type="text" id="busca-env" placeholder="🔍 Buscar por nome, telefone..." oninput="filtrarLista('env')">
+    <span class="search-badge" id="badge-count-env">0</span>
+  </div>
   <div class="orc-list" id="list-enviados">
     <div class="spinner-wrap"><div class="spinner"></div>Carregando...</div>
   </div>
@@ -232,6 +247,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 <div class="page" id="page-sem">
   <div class="page-title">Sem Resposta <span>// +48h</span></div>
   <div class="page-sub">// clientes sem resposta há mais de 48h</div>
+  <div class="search-bar-orc">
+    <input type="text" id="busca-sem" placeholder="🔍 Buscar por nome, telefone..." oninput="filtrarLista('sem')">
+    <span class="search-badge" id="badge-count-sem">0</span>
+  </div>
   <div class="orc-list" id="list-sem">
     <div class="spinner-wrap"><div class="spinner"></div>Carregando...</div>
   </div>
@@ -241,6 +260,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 <div class="page" id="page-ult">
   <div class="page-title">Última Chamada <span>// Prazo Final</span></div>
   <div class="page-sub">// fichas com prazo de encerramento</div>
+  <div class="search-bar-orc">
+    <input type="text" id="busca-ult" placeholder="🔍 Buscar por nome, telefone..." oninput="filtrarLista('ult')">
+    <span class="search-badge" id="badge-count-ult">0</span>
+  </div>
   <div class="orc-list" id="list-ult">
     <div class="spinner-wrap"><div class="spinner"></div>Carregando...</div>
   </div>
@@ -347,7 +370,7 @@ async function loadOrc() {
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>Carregando...</div>';
   try {
     var d = await fetch('/api/tv-orcamento?action=orc-load').then(function(r){return r.json();});
-    var fichas = (d.fichas||[]).filter(function(f){return f.status==='pendente';});
+    var fichas = (d.fichas||[]).filter(function(f){return f.status==='pendente';}); atualizarBadgeBusca('orc', fichas.length);
     document.getElementById('badge-orc').textContent = fichas.length;
     if (!fichas.length) { el.innerHTML = '<div class="loading-msg">Nenhuma ficha aguardando orçamento.</div>'; return; }
     el.innerHTML = '';
@@ -471,7 +494,7 @@ async function loadEnviados() {
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>Carregando...</div>';
   try {
     var d = await fetch('/api/tv-orcamento?action=orc-load').then(function(r){return r.json();});
-    var fichas = (d.fichas||[]).filter(function(f){return f.status==='enviado';});
+    var fichas = (d.fichas||[]).filter(function(f){return f.status==='enviado';}); atualizarBadgeBusca('env', fichas.length);
     document.getElementById('badge-env').textContent = fichas.length;
     if (!fichas.length) { el.innerHTML = '<div class="loading-msg">Nenhum orçamento enviado.</div>'; return; }
     el.innerHTML = '';
@@ -512,7 +535,7 @@ async function loadSem() {
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>Carregando...</div>';
   try {
     var d = await fetch('/api/tv-orcamento?action=sem-resposta').then(function(r){return r.json();});
-    document.getElementById('badge-sem').textContent = d.cards?.length||0;
+    atualizarBadgeBusca('sem', fichas.length); document.getElementById('badge-sem').textContent = d.cards?.length||0;
     if (!d.ok||!d.cards?.length) { el.innerHTML = '<div class="loading-msg">Nenhum cliente sem resposta há mais de 48h.</div>'; return; }
     el.innerHTML = '';
     var list = document.createElement('div'); list.className = 'orc-list';
@@ -563,7 +586,7 @@ async function loadUlt() {
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>Carregando...</div>';
   try {
     var d = await fetch('/api/tv-orcamento?action=ultima-chamada').then(function(r){return r.json();});
-    document.getElementById('badge-ult').textContent = d.cards?.length||0;
+    atualizarBadgeBusca('ult', fichas.length); document.getElementById('badge-ult').textContent = d.cards?.length||0;
     if (!d.ok||!d.cards?.length) { el.innerHTML = '<div class="loading-msg">Nenhuma ficha em Última Chamada.</div>'; return; }
     el.innerHTML = '';
     var list = document.createElement('div'); list.className = 'orc-list';
@@ -633,6 +656,33 @@ function loadAll() {
 }
 
 // Auto-sync: busca novos cards no Pipefy a cada 3 minutos
+// ── FILTRO DE BUSCA ──────────────────────────────────────────────────────────
+var _cacheOrc = [], _cacheEnv = [], _cacheSem = [], _cacheUlt = [];
+
+function filtrarLista(prefix) {
+  var q = (document.getElementById('busca-'+prefix)||{value:''}).value.toLowerCase().trim();
+  var cache = prefix==='orc'?_cacheOrc:prefix==='env'?_cacheEnv:prefix==='sem'?_cacheSem:_cacheUlt;
+  var listId = prefix==='orc'?'list-orc':prefix==='env'?'list-enviados':prefix==='sem'?'list-sem':'list-ult';
+  var el = document.getElementById(listId); if(!el) return;
+  var cards = el.querySelectorAll('.orc-card');
+  var visible = 0;
+  cards.forEach(function(card) {
+    var text = card.textContent.toLowerCase();
+    var show = !q || text.includes(q);
+    card.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  var badge = document.getElementById('badge-count-'+prefix);
+  if (badge) badge.textContent = visible + (q ? ' resultado'+(visible!==1?'s':'') : ' total');
+}
+
+function atualizarBadgeBusca(prefix, total) {
+  var badge = document.getElementById('badge-count-'+prefix);
+  if (badge) badge.textContent = total + ' total';
+  var inp = document.getElementById('busca-'+prefix);
+  if (inp && inp.value) filtrarLista(prefix);
+}
+
 async function autoSync() {
   try {
     var r = await fetch('/api/tv-orcamento?action=orc-sync').then(function(r){return r.json();});
