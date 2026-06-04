@@ -470,6 +470,9 @@
     },
     "api/webhook-mp.js": {
       "maxDuration": 60
+    },
+    "api/nfse.js": {
+      "maxDuration": 60
     }
   }
 }

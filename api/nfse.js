@@ -229,6 +229,9 @@ function chamarAPI(dpsXmlGZipB64, certOpts) {
       r.on("data", c => chunks.push(c));
       r.on("end", () => res({ status: r.statusCode, body: Buffer.concat(chunks).toString("utf8") }));
     });
+    req.setTimeout(40000, () => {
+      req.destroy(new Error("SEFAZ timeout — servidor demorou mais de 40s para responder"));
+    });
     req.on("error", rej);
     req.write(body);
     req.end();
@@ -616,7 +619,19 @@ module.exports = async function handler(req, res) {
       const xml    = montarDPS({ cpfcnpj: tomadorCpfCnpj, nome: tomadorNome, discriminacao, valor, numDPS });
       const xmlAss = await assinarXML(xml, certOpts.pfx, certOpts.passphrase);
       const b64gz  = await gzipBase64(xmlAss);
-      const { status, body } = await chamarAPI(b64gz, certOpts);
+      // Retry automático: até 3 tentativas (SEFAZ pode ter lentidão)
+      let status, body, lastErrNf;
+      for (let t = 1; t <= 3; t++) {
+        try {
+          ({ status, body } = await chamarAPI(b64gz, certOpts));
+          break;
+        } catch(eNf) {
+          lastErrNf = eNf;
+          console.error("[nfse] tentativa " + t + "/3:", eNf.message);
+          if (t < 3) await new Promise(r => setTimeout(r, 4000 * t));
+        }
+      }
+      if (status === undefined) throw new Error("SEFAZ indisponível após 3 tentativas: " + (lastErrNf?.message || "ECONNRESET"));
       const parsed = parseResp(body);
       if (parsed.ok) {
         await buscarESalvarDanfe(parsed.chaveAcesso, certOpts).catch(e => console.error("DANFE:", e.message));
