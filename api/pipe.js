@@ -1662,13 +1662,20 @@ export default async function handler(req, res) {
       try {
         var compraDb2 = await dbGet('reparoeletro_compra_equip') || { fichas: [] };
         if (!Array.isArray(compraDb2.fichas)) compraDb2.fichas = [];
-        var jaCompraExiste = compraDb2.fichas.find(function(f){ return f.pipefyId === String(pid); });
+        // Usar card.id como chave primária (pipefyId pode ser null em fichas locais)
+        var compraId = (pid && String(pid) !== 'null' && String(pid) !== 'undefined')
+          ? String(pid) : (card.id || card.osCode || String(Date.now()));
+        var jaCompraExiste = compraDb2.fichas.find(function(f){
+          return f.id === compraId || f.pipefyId === compraId ||
+                 (card.nomeContato && (f.nomeContato||'').toLowerCase() === (card.nomeContato||'').toLowerCase());
+        });
         if (!jaCompraExiste) {
           compraDb2.fichas.unshift({
-            id: String(pid), pipefyId: String(pid),
+            id: compraId, pipefyId: compraId,
             nomeContato: card.nomeContato || '',
             descricao: card.equipamento || card.descricao || '',
             valor: card.valor || 0,
+            osCode: card.osCode || card.id || '',
             status: 'analise', fotos: [], criadoEm: now
           });
           await dbSet('reparoeletro_compra_equip', compraDb2);
@@ -1734,7 +1741,34 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, analiseCompra: card.analiseCompra });
   }
 
-  // ── excluir ───────────────────────────────────────────────────────────────
+  // ── GET fix-compra — força criação de ficha em compra_equip ─────────────────
+  if (action === 'fix-compra') {
+    var q = (req.query.q || '').toLowerCase().trim();
+    if (!q) return res.status(400).json({ ok:false, error:'Informe ?q=nome_ou_id' });
+    var db = (await dbGet(PIPE_KEY)) || defaultDB();
+    var card = (db.cards || []).find(function(c) {
+      return (c.nomeContato||'').toLowerCase().includes(q) ||
+             (c.id||'').toLowerCase().includes(q) ||
+             (c.osCode||'').toLowerCase().includes(q);
+    });
+    if (!card) return res.status(404).json({ ok:false, error:'Card não encontrado: '+q,
+      amostra:(db.cards||[]).slice(0,5).map(function(c){return {id:c.id,nome:c.nomeContato,phase:c.phase};}) });
+    var compraDb = await dbGet('reparoeletro_compra_equip') || { fichas: [] };
+    if (!Array.isArray(compraDb.fichas)) compraDb.fichas = [];
+    var compraId = card.pipefyId && String(card.pipefyId) !== 'null' ? String(card.pipefyId) : (card.id || String(Date.now()));
+    var jaExiste = compraDb.fichas.find(function(f){
+      return f.id===compraId || (card.nomeContato && (f.nomeContato||'').toLowerCase()===(card.nomeContato||'').toLowerCase());
+    });
+    if (jaExiste) return res.status(200).json({ ok:true, msg:'Já existe em compra_equip', ficha:jaExiste });
+    var now = new Date().toISOString();
+    var nova = { id:compraId, pipefyId:compraId, nomeContato:card.nomeContato||'', osCode:card.osCode||card.id||'',
+      descricao:card.equipamento||card.descricao||'', valor:card.valor||0, status:'analise', fotos:[], criadoEm:now };
+    compraDb.fichas.unshift(nova);
+    await dbSet('reparoeletro_compra_equip', compraDb);
+    return res.status(200).json({ ok:true, msg:'✅ Ficha criada em Compra de Equipamentos', ficha:nova });
+  }
+
+    // ── excluir ───────────────────────────────────────────────────────────────
   if (req.method === 'POST' && action === 'excluir') {
     var body = req.body || {};
     var db   = (await dbGet(PIPE_KEY)) || defaultDB();
