@@ -1768,6 +1768,51 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok:true, msg:'✅ Ficha criada em Compra de Equipamentos', ficha:nova });
   }
 
+    // ── GET erp-hoje — fichas que entraram em ERP hoje ─────────────────────────
+  if (action === 'erp-hoje') {
+    const db = (await dbGet(PIPE_KEY)) || defaultDB();
+    const agora = new Date();
+    // Data de hoje em horário de Brasília (UTC-3)
+    const hoje = new Date(agora.getTime() - 3*60*60*1000).toISOString().slice(0,10);
+
+    const cards = (db.cards || []).filter(function(c) {
+      if (c.phase !== 'erp') return false;
+      // Verificar movedAt ou último history
+      const ts = c.movedAt || c.updatedAt || c.criadoEm || '';
+      if (!ts) return false;
+      const dia = new Date(new Date(ts).getTime() - 3*60*60*1000).toISOString().slice(0,10);
+      return dia === hoje;
+    });
+
+    // Ordenar por horário de entrada
+    cards.sort(function(a,b){
+      return new Date(b.movedAt||b.updatedAt||0) - new Date(a.movedAt||a.updatedAt||0);
+    });
+
+    const tabela = cards.map(function(c) {
+      const ts = c.movedAt || c.updatedAt || c.criadoEm || '';
+      const horario = ts ? new Date(new Date(ts).getTime()-3*60*60*1000)
+        .toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',
+          day:'2-digit',month:'2-digit',year:'numeric',
+          hour:'2-digit',minute:'2-digit'}) : '—';
+      return {
+        id:       c.id,
+        nome:     c.nomeContato || c.title || '—',
+        telefone: c.telefone || c.tel || '—',
+        equipamento: (c.equipamento || c.descricao || '').slice(0,40),
+        valor:    c.valor ? 'R$ '+parseFloat(c.valor).toLocaleString('pt-BR') : '—',
+        horario,
+      };
+    });
+
+    return res.status(200).json({
+      ok: true,
+      data: hoje,
+      total: tabela.length,
+      cards: tabela,
+    });
+  }
+
     // ── excluir ───────────────────────────────────────────────────────────────
   if (req.method === 'POST' && action === 'excluir') {
     var body = req.body || {};
