@@ -56,7 +56,7 @@ async function logEvento(evento) {
 
 
 // ── moverNoPipe: move card no Pipe ADM (solicitar_entrega) ──────────────
-async function moverCardNoPipe(pipefyId, osCode, novaFase, fichaId) {
+async function moverCardNoPipe(pipefyId, osCode, novaFase, fichaId, nomeContato) {
   try {
     const U=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
     const T=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
@@ -68,12 +68,23 @@ async function moverCardNoPipe(pipefyId, osCode, novaFase, fichaId) {
     const pipefyStr  = pipefyId ? String(pipefyId) : null;
     const osCodeStr  = osCode   ? String(osCode)   : null;
     const fichaStr   = fichaId  ? String(fichaId)  : null;
+    const nomeStr = nomeContato ? String(nomeContato).toLowerCase().trim() : null;
     const card=db.cards.find(function(c){
       return (pipefyStr && (c.pipefyId===pipefyStr || c.id===pipefyStr)) ||
              (osCodeStr && (c.id===osCodeStr || c.pipefyId===osCodeStr)) ||
-             (fichaStr  && (c.id===fichaStr  || c.pipefyId===fichaStr || c.localId===fichaStr || c.flFichaId===fichaStr));
+             (fichaStr  && (c.id===fichaStr  || c.pipefyId===fichaStr || c.localId===fichaStr || c.flFichaId===fichaStr)) ||
+             (nomeStr   && (
+               (c.nomeContato||'').toLowerCase().trim()===nomeStr ||
+               (c.nomeContato||'').toLowerCase().includes(nomeStr) ||
+               nomeStr.includes((c.nomeContato||'').toLowerCase().trim().split(' ')[0])
+             ));
     });
-    if(!card)return false;
+    if(!card){
+      console.error('[moverCardNoPipe] card nao encontrado. pipefyId='+pipefyStr+' osCode='+osCodeStr+' fichaId='+fichaStr+' nome='+nomeStr+' total_cards='+db.cards.length);
+      // Log amostra dos primeiros 5 cards para debug
+      console.error('[moverCardNoPipe] amostra:', JSON.stringify(db.cards.slice(0,5).map(function(x){return {id:x.id,nome:x.nomeContato,phase:x.phase};})));
+      return false;
+    }
     const now=new Date().toISOString();
     card.history=(card.history||[]).concat([{phase:card.phase,ts:now}]);
     card.phase=novaFase;
@@ -137,7 +148,8 @@ async function processarPagamentoFinanceiro(pmt) {
   await dbSet(FIN_KEY2, fin);
 
   // Pipe ADM: mover para solicitar_entrega
-  const pipeOk = await moverCardNoPipe(rec.pipefyId, rec.osCode, 'solicitar_entrega', rec.id).catch(()=>false);
+  const nomeRec = (rec.nomeContato || rec.nome || rec.clienteNome || '').trim();
+  const pipeOk = await moverCardNoPipe(rec.pipefyId, rec.osCode, 'solicitar_entrega', rec.id, nomeRec).catch(()=>false);
   console.log('[webhook-mp] Pipe ADM move:', pipeOk);
 
   // Pipefy: mover para Solicitar Entrega — função própria, sem fetch interno
