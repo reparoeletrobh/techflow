@@ -658,24 +658,21 @@ module.exports = async function handler(req, res) {
     }
     await dbSet(FIN_KEY, fin);
     try { await dbSet(FIN_BACKUP_KEY, { ...fin, backedUpAt: new Date().toISOString() }); } catch(e) {}
-    // Move no Pipefy quando vai para Entrega Liberada (best-effort)
-    let pipefyMoveOk = null;
-    if (phaseId === "entrega_liberada" && rec.pipefyId) {
-      try { await pipefyMoveCard(rec.pipefyId, SOLICITAR_ENTREGA_PHASE_ID); pipefyMoveOk = true; }
-      catch(e) { pipefyMoveOk = false; console.error("pipefyMove:", e.message); }
-    }
-
     // Move no Pipe ADM (reparoeletro_pipe) → solicitar_entrega
+    // (comunicação 100% interna via Redis)
     if (phaseId === "entrega_liberada") {
       try {
         const PIPE_KEY_F = 'reparoeletro_pipe';
         const pipeDbF = await dbGet(PIPE_KEY_F);
         if (pipeDbF && Array.isArray(pipeDbF.cards)) {
-          const pipeFId = rec.pipefyId ? String(rec.pipefyId) : null;
-          const pipeOId = rec.osCode   ? String(rec.osCode)   : null;
+          // Busca por múltiplos campos — não depende de pipefyId
+          const recNome = (rec.nome||rec.clienteNome||'').toLowerCase().trim();
+          const recId   = String(rec.id||'');
+          const recOS   = String(rec.osCode||rec.numeroOS||'');
           const pCardF = pipeDbF.cards.find(function(c) {
-            return (pipeFId && (c.pipefyId===pipeFId || c.id===pipeFId)) ||
-                   (pipeOId && (c.id===pipeOId || c.pipefyId===pipeOId)) ||
+            return c.id === recId ||
+                   (recOS && (c.id===recOS || c.osCode===recOS)) ||
+                   (recNome && (c.nomeContato||'').toLowerCase().trim()===recNome) ||
                    c.id === rec.id || c.id === String(rec.id);
           });
           if (pCardF) {
@@ -827,55 +824,54 @@ module.exports = async function handler(req, res) {
   }
 
   // ── GET fix-heloisa — força move para solicitar_entrega ─────────────────────
-  if (req.method === 'GET' && action === 'fix-heloisa') {
-    const q = (req.query.nome || 'heloisa').toLowerCase().trim();
+  // ── GET fix-pipe — força mover ficha para solicitar_entrega (100% Redis) ────
+  if (req.method === 'GET' && (action === 'fix-pipe' || action === 'fix-heloisa')) {
+    const q = (req.query.nome || req.query.q || '').toLowerCase().trim();
+    if (!q) return res.status(400).json({ ok:false, error:'Informe ?nome=nome_do_cliente' });
     const fin = (await dbGet(FIN_KEY)) || { records: [] };
     const rec = (fin.records || []).find(r =>
       (r.nome||'').toLowerCase().includes(q) ||
       (r.clienteNome||'').toLowerCase().includes(q) ||
-      (r.tel||'').includes('0495') || (r.telefone||'').includes('0495')
+      (r.tel||'').includes(q) || (r.telefone||'').includes(q) ||
+      (r.osCode||'').includes(q) || (r.id||'').includes(q)
     );
-    if (!rec) return res.status(404).json({ ok: false, error: 'Não encontrada: '+q,
-      total: fin.records.length, amostra: fin.records.slice(0,5).map(r=>({id:r.id,nome:r.nome||r.clienteNome,fase:r.phaseId})) });
+    if (!rec) return res.status(404).json({ ok:false, error:'Não encontrado: '+q,
+      amostra: (fin.records||[]).slice(0,8).map(r=>({id:r.id,nome:r.nome||r.clienteNome,fase:r.phaseId})) });
 
-    const pipefyId = rec.pipefyId || rec.pipefyCardId || null;
-    let pipefyResult = null;
-    if (pipefyId) {
-      pipefyResult = await pipefyMoveCard(String(pipefyId), SOLICITAR_ENTREGA_PHASE_FIN);
-    }
-
-    // Também mover no reparoeletro_pipe (Redis)
+    // Mover no reparoeletro_pipe por múltiplos campos (sem pipefyId)
     let pipeRedisOk = false;
+    let cardEncontrado = null;
     try {
       const PIPE_KEY_F = 'reparoeletro_pipe';
       const pipeDbF = await dbGet(PIPE_KEY_F);
       if (pipeDbF && Array.isArray(pipeDbF.cards)) {
-        const pCardF = pipeDbF.cards.find(c =>
-          (pipefyId && (c.pipefyId===String(pipefyId)||c.id===String(pipefyId))) ||
-          c.id === rec.id || c.id === String(rec.id) ||
-          (c.nome||'').toLowerCase().includes(q)
-        );
+        const recNome = (rec.nome||rec.clienteNome||'').toLowerCase().trim();
+        const pCardF = pipeDbF.cards.find(function(c) {
+          return c.id === String(rec.id) ||
+                 (rec.osCode && c.id === rec.osCode) ||
+                 (recNome && (c.nomeContato||'').toLowerCase().trim() === recNome) ||
+                 (rec.pipefyId && (c.pipefyId===String(rec.pipefyId)||c.id===String(rec.pipefyId)));
+        });
         if (pCardF) {
           pCardF.history = (pCardF.history||[]).concat([{phase:pCardF.phase,ts:new Date().toISOString()}]);
           pCardF.phase   = 'solicitar_entrega';
           pCardF.movedAt = new Date().toISOString();
           await dbSet(PIPE_KEY_F, pipeDbF);
           pipeRedisOk = true;
+          cardEncontrado = { id:pCardF.id, nome:pCardF.nomeContato, faseAnterior:pCardF.history.slice(-1)[0]?.phase };
         }
       }
-    } catch(e) { console.error('fix-heloisa pipe:', e.message); }
+    } catch(e) { console.error('fix-pipe:', e.message); }
 
     return res.status(200).json({
-      ok: true,
+      ok: pipeRedisOk,
       nome: rec.nome || rec.clienteNome,
-      pipefyId,
-      pipefyMoved: !!pipefyResult,
-      pipefyResult,
+      faseFinanceiro: rec.phaseId,
       pipeRedisOk,
-      faseAtual: rec.phaseId,
-      msg: pipefyId
-        ? (pipefyResult ? '✅ Card movido no Pipefy para Solicitar Entrega' : '⚠️ Pipefy não confirmou — verifique token')
-        : '⚠️ Sem pipefyId — Redis atualizado apenas',
+      card: cardEncontrado,
+      msg: pipeRedisOk
+        ? '✅ Card movido para Solicitar Entrega no pipe interno'
+        : '⚠️ Card não encontrado no reparoeletro_pipe — verifique se foi criado no Pipe ADM',
     });
   }
 
