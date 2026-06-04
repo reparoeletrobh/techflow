@@ -77,12 +77,25 @@ module.exports = async function handler(req,res){
     if (!RESEND_KEY) {
       return res.status(200).json({ ok:false, erro:'RESEND_API_KEY não configurada no Vercel', chave });
     }
-    // Testar chamada à API Resend (listar domínios)
     try {
       const r = await fetch('https://api.resend.com/domains', {
         headers:{ Authorization:'Bearer '+RESEND_KEY }
       });
       const j = await r.json();
+      // Acionar verificação para domínio não verificado
+      const dominio = (j.data||[]).find(d => d.name && d.name.includes('reparoeletrobh'));
+      if (dominio && dominio.status !== 'verified') {
+        await fetch('https://api.resend.com/domains/'+dominio.id+'/verify', {
+          method:'POST', headers:{ Authorization:'Bearer '+RESEND_KEY }
+        }).catch(()=>{});
+        await new Promise(r=>setTimeout(r,3000));
+        // Buscar status atualizado
+        const r2 = await fetch('https://api.resend.com/domains/'+dominio.id, {
+          headers:{ Authorization:'Bearer '+RESEND_KEY }
+        });
+        const j2 = await r2.json();
+        if (j2.status) dominio.status = j2.status;
+      }
       const dominios = (j.data||[]).map(d=>({ nome:d.name, status:d.status, regiao:d.region }));
       // Testar envio com endereço de teste
       const rEnvio = await fetch('https://api.resend.com/emails', {
