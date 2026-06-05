@@ -142,6 +142,23 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 
 <div class="board-wrap"><div class="board" id="board"></div></div>
 
+<div class="infl-sec">
+  <div class="infl-header">
+    <div>
+      <div class="infl-title">🌟 Tabela de Influencers</div>
+      <div class="infl-sub">// cadastro e gestão de influencers parceiros</div>
+    </div>
+    <button class="btn-add-infl" onclick="abrirInflModal()">+ Cadastrar Influencer</button>
+  </div>
+  <div class="infl-table-wrap">
+    <table class="infl-table">
+      <thead><tr>
+        <th>Nome</th><th>Telefone</th><th>Cidade</th><th>Instagram</th><th>Seguidores</th><th>Cadastrado</th><th></th>
+      </tr></thead>
+      <tbody id="infl-tbody"><tr><td colspan="7" class="infl-empty">Carregando...</td></tr></tbody>
+    </table>
+  </div>
+
 <div class="conq-sec">
   <div class="conq-h">🏆 Conquistas</div>
   <div class="conq-s">// desbloqueadas com base no seu progresso acumulado</div>
@@ -182,22 +199,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   </div>
 </div>
 
-<div class="infl-sec">
-  <div class="infl-header">
-    <div>
-      <div class="infl-title">🌟 Tabela de Influencers</div>
-      <div class="infl-sub">// cadastro e gestão de influencers parceiros</div>
-    </div>
-    <button class="btn-add-infl" onclick="abrirInflModal()">+ Cadastrar Influencer</button>
-  </div>
-  <div class="infl-table-wrap">
-    <table class="infl-table">
-      <thead><tr>
-        <th>Nome</th><th>Telefone</th><th>Cidade</th><th>Instagram</th><th>Seguidores</th><th>Cadastrado</th><th></th>
-      </tr></thead>
-      <tbody id="infl-tbody"><tr><td colspan="7" class="infl-empty">Carregando...</td></tr></tbody>
-    </table>
-  </div>
+
 </div>
 
 <!-- Modal Influencer -->
@@ -552,15 +554,13 @@ async function loadInfluencers(){
 }
 
 async function salvarInflDB(){
-  // Salvar no Redis via API
-  try{
-    fetch('/api/growth?action=salvar-influencers',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({influencers:_influencers})
-    }).catch(function(){});
-  }catch(e){}
-  // Backup em localStorage
+  // 1. localStorage PRIMEIRO (síncrono — nunca perde)
   try{ localStorage.setItem('growth_influencers_v1', JSON.stringify(_influencers)); }catch(e){}
+  // 2. Redis em background (não aguarda)
+  fetch('/api/growth?action=salvar-influencers',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({influencers:_influencers})
+  }).catch(function(){});
 }
 
 function renderInfluencers(){
