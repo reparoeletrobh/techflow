@@ -88,11 +88,34 @@ async function moverCardNoPipe(pipefyId, osCode, novaFase) {
     if(!db||!Array.isArray(db.cards))return false;
     const pipefyStr  = pipefyId ? String(pipefyId) : null;
     const osCodeStr  = osCode   ? String(osCode)   : null;
+    const nomeStr2 = dados.nome ? String(dados.nome).toLowerCase().trim() : null;
     const card=db.cards.find(function(c){
       return (pipefyStr && (c.pipefyId===pipefyStr || c.id===pipefyStr)) ||
-             (osCodeStr && (c.id===osCodeStr || c.pipefyId===osCodeStr));
+             (osCodeStr && (c.id===osCodeStr || c.pipefyId===osCodeStr)) ||
+             (nomeStr2  && (
+               (c.nomeContato||'').toLowerCase().trim()===nomeStr2 ||
+               (c.nomeContato||'').toLowerCase().includes(nomeStr2) ||
+               nomeStr2.includes((c.nomeContato||'').toLowerCase().trim().split(' ')[0])
+             ));
     });
-    if(!card)return false;
+    // Se não achou o card, criar novo na fase solicitada (venda checkout sem card prévio)
+    if(!card){
+      const now2=new Date().toISOString();
+      const novoCard={
+        id:'TVPIPE-'+Date.now().toString(36).toUpperCase(),
+        phase: novaFase,
+        nomeContato: dados.nome||'',
+        telefone: dados.telefone||'',
+        equipamento: dados.equipamento||dados.descricao||'',
+        valor: dados.valor||0,
+        origem: dados.origem||'tv_checkout',
+        criadoEm: now2, movedAt: now2,
+        history:[{phase:novaFase,ts:now2,via:'tv_webhook_mp_auto'}]
+      };
+      db.cards.unshift(novoCard);
+      await _ps(PIPE_KEY,db);
+      return true;
+    }
     const now=new Date().toISOString();
     card.history=(card.history||[]).concat([{phase:card.phase,ts:now}]);
     card.phase=novaFase;
