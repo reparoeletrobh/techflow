@@ -346,6 +346,9 @@ html,body{height:100vh;overflow:hidden;background:var(--bg);color:var(--text);fo
 </div>
 
 <script>
+
+function fmtTel(t){if(!t)return "";var d=String(t).replace(/\D/g,"");if(d.length>11)d=d.slice(-11);if(d.length===11)return "("+d.slice(0,2)+") "+d.slice(2,7)+"-"+d.slice(7);if(d.length===10)return "("+d.slice(0,2)+") "+d.slice(2,6)+"-"+d.slice(6);return t;}
+function cpTel(t,e){navigator.clipboard.writeText(t).then(function(){if(e&&e.target){e.target.textContent="✅";setTimeout(function(){if(e.target)e.target.textContent="📋";},1500);}}).catch(function(){});}
 var sidebar    = document.getElementById('sidebar');
 var welcome    = document.getElementById('welcome');
 var frameWrap  = document.getElementById('frame-wrap');
