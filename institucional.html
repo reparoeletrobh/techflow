@@ -218,6 +218,12 @@ footer{
 .footer-logo{font-family:var(--fh);font-size:14px;font-weight:800;color:var(--orange);}
 
 /* ── RESPONSIVE ── */
+@media(max-width:900px){
+  .contact-grid{grid-template-columns:1fr;}
+  .cf-row{grid-template-columns:1fr;}
+  .steps-wrap{grid-template-columns:1fr 1fr;}
+  .step{border-right:none;border-bottom:1px solid var(--border);}
+}
 @media(max-width:768px){
   nav{padding:16px 24px;}
   .hero{padding:100px 24px 60px;}
@@ -238,6 +244,19 @@ footer{
 .reveal-delay-1{transition-delay:.1s;}
 .reveal-delay-2{transition-delay:.2s;}
 .reveal-delay-3{transition-delay:.3s;}
+@media(max-width:480px){
+  .hero-stats{gap:24px;}
+  .stat-n{font-size:28px;}
+  .diff-grid{grid-template-columns:1fr;}
+  .hero-title{font-size:clamp(34px,8vw,60px);}
+  .hero-actions{flex-direction:column;align-items:flex-start;}
+  .btn-primary,.btn-ghost{width:100%;text-align:center;}
+  nav{padding:14px 18px;}
+  .nav-name{font-size:13px;}
+  section{padding:56px 20px;}
+  .cta-band-inner{padding:40px 20px;}
+  footer{padding:28px 20px;}
+}
 </style>
 </head>
 <body>
@@ -270,7 +289,7 @@ footer{
     <div class="hero-stats">
       <div><div class="stat-n">+500</div><div class="stat-l">Empresas Atendidas</div></div>
       <div><div class="stat-n">98%</div><div class="stat-l">Taxa de Resolução</div></div>
-      <div><div class="stat-n">12h</div><div class="stat-l">Tempo Médio de Coleta</div></div>
+      <div><div class="stat-n">15min</div><div class="stat-l">Tempo Médio de Resolução</div></div>
       <div><div class="stat-n">BH</div><div class="stat-l">e Região Metropolitana</div></div>
     </div>
   </div>
