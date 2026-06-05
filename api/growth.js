@@ -1,18 +1,4 @@
-'use strict';  // ── GET carregar-influencers ─────────────────────────────────────────────────
-  if (action === 'carregar-influencers') {
-    const db = await dbGet('growth_influencers') || { influencers: [] };
-    return res.status(200).json({ ok: true, influencers: db.influencers || [] });
-  }
-
-  // ── POST salvar-influencers ───────────────────────────────────────────────────
-  if (action === 'salvar-influencers' && req.method === 'POST') {
-    const { influencers } = req.body || {};
-    if (!Array.isArray(influencers)) return res.status(400).json({ ok: false, error: 'influencers deve ser array' });
-    await dbSet('growth_influencers', { influencers });
-    return res.status(200).json({ ok: true, total: influencers.length });
-  }
-
-  
+'use strict';
 // GROWTH GAMIFICADO — API v2 | acoes + registros diários
 
 const GROWTH_KEY = 'reparoeletro_growth_v2';
@@ -51,15 +37,5 @@ module.exports = async function(req, res) {
     await dbSet('growth_influencers', { influencers });
     return res.status(200).json({ ok: true, total: influencers.length });
   }
-  if (action === 'carregar-influencers') {
-    const db = await dbGet('growth_influencers') || { influencers: [] };
-    return res.status(200).json({ ok: true, influencers: db.influencers || [] });
-  }
-  if (action === 'salvar-influencers' && req.method === 'POST') {
-    const { influencers } = req.body || {};
-    if (!Array.isArray(influencers)) return res.status(400).json({ ok: false, error: 'array obrigatorio' });
-    await dbSet('growth_influencers', { influencers });
-    return res.status(200).json({ ok: true, total: influencers.length });
-  }
-    return res.status(400).json({ ok: false, error: 'acao nao encontrada: '+action });
+  return res.status(400).json({ ok: false, error: 'acao nao encontrada: '+action });
 };
