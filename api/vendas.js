@@ -481,6 +481,26 @@ module.exports = async function handler(req, res) {
     });
   }
 
+    // ── POST fix-venda-flag — marca produto como vendido manualmente ─────────────
+  if (req.method === "POST" && action === "fix-venda-flag") {
+    const { codigo } = req.body || {};
+    if (!codigo) return res.status(400).json({ ok:false, error:"codigo obrigatorio" });
+    const db = await dbGet(VENDAS_KEY) || defaultDB();
+    const produto = (db.produtos||[]).find(p =>
+      (p.codigo||"").toLowerCase().includes(codigo.toLowerCase()) ||
+      (p.id||"").toString() === codigo
+    );
+    if (!produto) return res.status(404).json({ ok:false, error:"produto nao encontrado: "+codigo });
+    if (produto.vendido) return res.status(200).json({ ok:true, msg:"ja estava vendido", produto });
+    const now = new Date().toISOString();
+    produto.vendido   = true;
+    produto.soldAt    = now;
+    produto.updatedAt = now;
+    produto.fixadoEm  = now;
+    await dbSet(VENDAS_KEY, db);
+    return res.status(200).json({ ok:true, msg:"✅ "+produto.codigo+" marcado como vendido", produto });
+  }
+
     if (action === "diagnostico") {
     const db  = await dbGet(VENDAS_KEY) || defaultDB();
     const ck  = await dbGet("reparoeletro_checkout_vendas") || { vendas: [] };
