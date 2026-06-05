@@ -140,8 +140,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   <div class="s-pct" id="s-pct" style="color:var(--re)">0%</div>
 </div>
 
-<div class="board-wrap"><div class="board" id="board"></div></div>
-
 <div class="infl-sec">
   <div class="infl-header">
     <div>
@@ -201,6 +199,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 
 
 </div>
+
+<div class="board-wrap"><div class="board" id="board"></div></div>
+
+
 
 <!-- Modal Influencer -->
 <div class="infl-ov" id="infl-modal" style="display:none" onclick="if(event.target===this)fecharInflModal()">
@@ -302,7 +304,7 @@ function loadLocal(){
   }catch(e){cols=JSON.parse(JSON.stringify(COLS));vals={};}
 }
 
-function render(){ renderBoard(); renderScore(); renderConquistas(); }
+function render(){ renderBoard(); renderScore(); renderConquistas(); renderInfluencers(); }
 
 function renderBoard(){
   var board = document.getElementById('board'); board.innerHTML='';
