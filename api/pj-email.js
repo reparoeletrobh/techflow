@@ -43,7 +43,7 @@ module.exports = async function handler(req,res){
           method:'POST',
           headers:{'Content-Type':'application/json','Authorization':'Bearer '+RESEND_KEY},
           body:JSON.stringify({
-            from: remetente||de||'Pedro <pedro@comercial.reparoeletrobh.com.br>',
+            from: remetente||de||'Pedro <pedro@comercial.reparoeletroadm.com>',
             to:[dest.email||dest],
             subject:assunto.replace(/\{\{empresa\}\}/g,dest.empresa||'').replace(/\{\{responsavel\}\}/g,dest.responsavel||''),
             html:(html||'').replace(/\{\{empresa\}\}/g,dest.empresa||'').replace(/\{\{responsavel\}\}/g,dest.responsavel||'').replace(/\{\{cidade\}\}/g,dest.cidade||''),
@@ -102,7 +102,7 @@ module.exports = async function handler(req,res){
         method:'POST',
         headers:{'Content-Type':'application/json','Authorization':'Bearer '+RESEND_KEY},
         body: JSON.stringify({
-          from: 'Pedro <pedro@comercial.reparoeletrobh.com.br>',
+          from: 'Pedro <pedro@comercial.reparoeletroadm.com>',
           to: ['delivered@resend.dev'], // endereço de teste oficial do Resend
           subject: 'Teste Reparo Eletro BH',
           text: 'Teste de envio — diagnóstico do sistema PJ.'
