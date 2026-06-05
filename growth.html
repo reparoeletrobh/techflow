@@ -139,9 +139,66 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   <div class="s-trk"><div class="s-fil" id="s-fil" style="width:0%"></div></div>
   <div class="s-pct" id="s-pct" style="color:var(--re)">0%</div>
 </div>
+
 <div class="board-wrap"><div class="board" id="board"></div></div>
 
+<div class="conq-sec">
+  <div class="conq-h">🏆 Conquistas</div>
+  <div class="conq-s">// desbloqueadas com base no seu progresso acumulado</div>
+  <div class="conq-grid" id="cq-grid"></div>
+</div>
 
+<div class="ov" id="modal" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="mdl" onclick="event.stopPropagation()">
+    <div class="mdl-t" id="mdl-title">+ Atividade</div>
+    <div class="pp" id="mdl-pp" style="display:none">
+      <div class="pp-l">PROGRESSO ATUAL</div>
+      <div class="pp-t"><div class="pp-f" id="pp-fil" style="width:0%"></div></div>
+      <div class="pp-n"><span id="pp-v" style="color:var(--bl)">0</span><span id="pp-p" style="color:var(--mu)">0%</span></div>
+    </div>
+    <div class="fld"><label>NOME DA ATIVIDADE</label><input id="m-lbl" placeholder="Ex: Publicar Reels"></div>
+    <div class="fld"><label>DESCRIÇÃO</label><input id="m-desc" placeholder="Ex: Peças para campanha da semana"></div>
+    <div class="fld" id="m-tipo-fld">
+      <label>TIPO</label>
+      <div class="tipo-btns">
+        <button class="tipo-btn sel" id="btn-tc" onclick="setTipo('check')">✓ CHECK</button>
+        <button class="tipo-btn" id="btn-tn" onclick="setTipo('counter')"># CONTADOR</button>
+      </div>
+    </div>
+    <div class="fld" id="m-meta-fld" style="display:none"><label>META</label><input type="number" id="m-meta" min="1" value="1"></div>
+    <div class="fld" id="m-freq-fld">
+      <label>FREQUÊNCIA</label>
+      <div class="tipo-btns">
+        <button class="tipo-btn sel" id="btn-fd" onclick="setFreqModal('d')">⚡ DIÁRIA</button>
+        <button class="tipo-btn" id="btn-fw" onclick="setFreqModal('w')">📅 SEMANAL</button>
+      </div>
+    </div>
+    <div class="fld"><label>RESPONSÁVEL</label><input id="m-resp" placeholder="Ex: Time Conteúdo"></div>
+    <div class="mdl-btns">
+      <button class="btn-dx" id="btn-dx" style="display:none" onclick="delAtiv()">🗑</button>
+      <button class="btn-cc" onclick="closeModal()">Cancelar</button>
+      <button class="btn-sv" id="btn-sv" onclick="saveAtiv()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="infl-sec">
+  <div class="infl-header">
+    <div>
+      <div class="infl-title">🌟 Tabela de Influencers</div>
+      <div class="infl-sub">// cadastro e gestão de influencers parceiros</div>
+    </div>
+    <button class="btn-add-infl" onclick="abrirInflModal()">+ Cadastrar Influencer</button>
+  </div>
+  <div class="infl-table-wrap">
+    <table class="infl-table">
+      <thead><tr>
+        <th>Nome</th><th>Telefone</th><th>Cidade</th><th>Instagram</th><th>Seguidores</th><th>Cadastrado</th><th></th>
+      </tr></thead>
+      <tbody id="infl-tbody"><tr><td colspan="7" class="infl-empty">Carregando...</td></tr></tbody>
+    </table>
+  </div>
+</div>
 
 <!-- Modal Influencer -->
 <div class="infl-ov" id="infl-modal" style="display:none" onclick="if(event.target===this)fecharInflModal()">
@@ -220,16 +277,16 @@ function persist(){
 }
 function load(){
   fetch('/api/growth?action=carregar-kanban').then(function(r){return r.json();}).then(function(d){
-    if(d&&d.ok&&d.cols&&d.cols.length){cols=d.cols;vals=d.vals||{};if(d.influencers&&d.influencers.length){_influencers=d.influencers;try{localStorage.setItem('growth_infl_v2',JSON.stringify(_influencers));}catch(e){}}}else{loadLocal();}
-    render(); renderInfluencers();
-  }).catch(function(){loadLocal();render();renderInfluencers();});
+    if(d&&d.ok&&d.cols&&d.cols.length){cols=d.cols;vals=d.vals||{};}else{loadLocal();}
+    render();
+  }).catch(function(){loadLocal();render();});
 }
 function loadLocal(){
   try{
     var raw=localStorage.getItem(SK);
     if(raw){
       var d=JSON.parse(raw);
-      if(d.influencers&&d.influencers.length){_influencers=d.influencers;try{localStorage.setItem('growth_infl_v2',JSON.stringify(_influencers));}catch(e){}}
+      if(d.influencers&&d.influencers.length){_influencers=d.influencers;try{localStorage.setItem("growth_infl_v2",JSON.stringify(_influencers));}catch(ex){}}
       var saved=d.cols||[];
       // Merge: manter colunas salvas + adicionar novas que não existam
       var merged=JSON.parse(JSON.stringify(COLS));
@@ -478,615 +535,39 @@ function toast(msg){var el=document.getElementById('toast');el.textContent=msg;e
 
 // ── INFLUENCERS ────────────────────────────────────────────────────────────
 var INFL_KEY = 'growth_influencers_v1';
-// Influencers carregados sincronamente — sem race condition
-var _influencers=(function(){try{var s=localStorage.getItem('growth_infl_v2');return s?JSON.parse(s):[];}catch(e){return [];}})();
+var _influencers = [];
 
 function loadInfluencers(){
-  try{var s=localStorage.getItem('growth_infl_v2');if(s)_influencers=JSON.parse(s);}catch(e){}
+  try{ var s=localStorage.getItem('growth_infl_v2'); if(s) _influencers=JSON.parse(s); }catch(e){}
   renderInfluencers();
 }
 
-var _inflColId='influencer', _inflItemId='infl';
-function abrirInflModal(cid,iid){
-  if(cid) _inflColId=cid;
-  if(iid) _inflItemId=iid;
-  ['if-nome','if-tel','if-cidade','if-ig','if-seg'].forEach(function(id){
-    var el=document.getElementById(id); if(el) el.value='';
-  });
-  document.getElementById('infl-modal').style.display='flex';
-  setTimeout(function(){var el=document.getElementById('if-nome');if(el)el.focus();},80);
-}
-
-function fecharInflModal(){
-  document.getElementById('infl-modal').style.display='none';
-}
-
-function salvarInfluencer(){
-  var nome = (document.getElementById('if-nome')||{value:''}).value.trim();
-  if(!nome){ document.getElementById('if-nome').focus(); return; }
-  var inf = {
-    id:       Date.now().toString(36),
-    nome:     nome,
-    tel:      (document.getElementById('if-tel')||{value:''}).value.trim(),
-    cidade:   (document.getElementById('if-cidade')||{value:''}).value.trim(),
-    ig:       (document.getElementById('if-ig')||{value:''}).value.trim(),
-    seg:      (document.getElementById('if-seg')||{value:''}).value.trim(),
-    criadoEm: new Date().toISOString(),
-  };
-  _influencers.unshift(inf);
-  salvarInflDB();
-  renderInfluencers();
-  // Incrementar contador da coluna Influencer no kanban
-  inc(_inflColId,_inflItemId,1);
-  fecharInflModal();
-  toast('✅ '+nome+' cadastrado!');
-}
-
-function removerInfluencer(i){
-  if(!confirm('Remover este influencer?')) return;
-  _influencers.splice(i,1);
-  salvarInflDB();
-  renderInfluencers();
-  toast('🗑 Removido');
-}
-
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-
-load();
-loadInfluencers();
-setInterval(function(){renderBoard();},60000);
-</script>
-</body>
-</html<div class="infl-sec">
-  <div class="infl-header">
-    <div>
-      <div class="infl-title">🌟 Tabela de Influencers</div>
-      <div class="infl-sub">// cadastro e gestão de influencers parceiros</div>
-    </div>
-    <button class="btn-add-infl" onclick="abrirInflModal()">+ Cadastrar Influencer</button>
-  </div>
-  <div class="infl-table-wrap">
-    <table class="infl-table">
-      <thead><tr>
-        <th>Nome</th><th>Telefone</th><th>Cidade</th><th>Instagram</th><th>Seguidores</th><th>Cadastrado</th><th></th>
-      </tr></thead>
-      <tbody id="infl-tbody"><tr><td colspan="7" class="infl-empty">Carregando...</td></tr></tbody>
-    </table>
-  </div>
-
-<div class="conq-sec">
-  <div class="conq-h">🏆 Conquistas</div>
-  <div class="conq-s">// desbloqueadas com base no seu progresso acumulado</div>
-  <div class="conq-grid" id="cq-grid"></div>
-</div>
-
-<div class="ov" id="modal" style="display:none" onclick="if(event.target===this)closeModal()">
-  <div class="mdl" onclick="event.stopPropagation()">
-    <div class="mdl-t" id="mdl-title">+ Atividade</div>
-    <div class="pp" id="mdl-pp" style="display:none">
-      <div class="pp-l">PROGRESSO ATUAL</div>
-      <div class="pp-t"><div class="pp-f" id="pp-fil" style="width:0%"></div></div>
-      <div class="pp-n"><span id="pp-v" style="color:var(--bl)">0</span><span id="pp-p" style="color:var(--mu)">0%</span></div>
-    </div>
-    <div class="fld"><label>NOME DA ATIVIDADE</label><input id="m-lbl" placeholder="Ex: Publicar Reels"></div>
-    <div class="fld"><label>DESCRIÇÃO</label><input id="m-desc" placeholder="Ex: Peças para campanha da semana"></div>
-    <div class="fld" id="m-tipo-fld">
-      <label>TIPO</label>
-      <div class="tipo-btns">
-        <button class="tipo-btn sel" id="btn-tc" onclick="setTipo('check')">✓ CHECK</button>
-        <button class="tipo-btn" id="btn-tn" onclick="setTipo('counter')"># CONTADOR</button>
-      </div>
-    </div>
-    <div class="fld" id="m-meta-fld" style="display:none"><label>META</label><input type="number" id="m-meta" min="1" value="1"></div>
-    <div class="fld" id="m-freq-fld">
-      <label>FREQUÊNCIA</label>
-      <div class="tipo-btns">
-        <button class="tipo-btn sel" id="btn-fd" onclick="setFreqModal('d')">⚡ DIÁRIA</button>
-        <button class="tipo-btn" id="btn-fw" onclick="setFreqModal('w')">📅 SEMANAL</button>
-      </div>
-    </div>
-    <div class="fld"><label>RESPONSÁVEL</label><input id="m-resp" placeholder="Ex: Time Conteúdo"></div>
-    <div class="mdl-btns">
-      <button class="btn-dx" id="btn-dx" style="display:none" onclick="delAtiv()">🗑</button>
-      <button class="btn-cc" onclick="closeModal()">Cancelar</button>
-      <button class="btn-sv" id="btn-sv" onclick="saveAtiv()">Salvar</button>
-    </div>
-  </div>
-</div>
-
-
-</div>
-
-function salvarInflDB(){
-  try{localStorage.setItem('growth_infl_v2',JSON.stringify(_influencers));}catch(e){}
+async function salvarInflDB(){
+  try{ localStorage.setItem('growth_infl_v2', JSON.stringify(_influencers)); }catch(e){}
   persist();
-}!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Growth</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-<style>
-:root{--bg:#07080a;--s1:#0f1114;--s2:#181b1f;--s3:#1a2030;--bdr:#1e2228;
-  --tx:#f0f2f5;--mu:#5a6270;--dim:#2a2f38;
-  --gr:#22c55e;--ye:#f5c800;--re:#ef4444;--bl:#3b9eff;
-  --or:#f97316;--pu:#a855f7;--cy:#06b6d4;
-  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;}
-*{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--bg);color:var(--tx);font-family:var(--fb);min-height:100vh;}
-button{cursor:pointer;font-family:inherit;transition:opacity .15s;}
-button:hover{opacity:.8;}
-header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;
-  border-bottom:1px solid var(--bdr);background:var(--bg);position:sticky;top:0;z-index:100;}
-.logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
-.logo-ic{width:28px;height:28px;background:linear-gradient(135deg,var(--gr),var(--bl));
-  border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;}
-.hbtn{font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;
-  border:1px solid var(--bdr);background:transparent;color:var(--mu);}
-.hbtn:hover{color:var(--tx);border-color:var(--or);}
-.score-bar{display:flex;align-items:center;gap:16px;padding:12px 24px;
-  background:var(--s1);border-bottom:1px solid var(--bdr);}
-.s-lbl{font-family:var(--fm);font-size:10px;color:var(--mu);letter-spacing:.08em;}
-.s-sub{font-family:var(--fm);font-size:10px;color:var(--mu);margin-top:1px;}
-.s-trk{flex:1;height:7px;background:var(--dim);border-radius:4px;overflow:hidden;}
-.s-fil{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--or),var(--ye));transition:width .5s;}
-.s-pct{font-family:var(--fh);font-size:18px;font-weight:800;}
-.board-wrap{overflow-x:auto;padding:20px 24px 0;}
-.board{display:flex;gap:14px;min-width:max-content;align-items:flex-start;}
-.col{width:240px;flex-shrink:0;background:var(--s1);border:1px solid var(--bdr);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;}
-.col-head{padding:14px 16px 10px;border-bottom:1px solid var(--bdr);}
-.col-head-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
-.col-title{display:flex;align-items:center;gap:7px;}
-.col-nm{font-family:var(--fm);font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;}
-.col-fr{font-family:var(--fm);font-size:9px;padding:2px 6px;border-radius:4px;background:var(--s2);color:var(--mu);border:1px solid var(--bdr);}
-.col-bt{height:5px;background:var(--s2);border-radius:3px;overflow:hidden;margin-bottom:5px;}
-.col-bf{height:100%;border-radius:3px;transition:width .4s;}
-.col-st{display:flex;justify-content:space-between;}
-.col-items{padding:10px 10px 4px;display:flex;flex-direction:column;gap:7px;flex:1;min-height:40px;}
-.col-add{padding:8px 10px 12px;}
-.btn-ai{width:100%;padding:7px;border-radius:8px;background:transparent;
-  border:1px dashed var(--bdr);color:var(--mu);font-family:var(--fm);font-size:10px;letter-spacing:.08em;}
-.btn-ai:hover{border-color:var(--or);color:var(--or);}
-.ic{background:var(--s2);border:1px solid var(--bdr);border-radius:10px;padding:10px 11px;transition:border-color .2s;}
-.ic.done{border-color:rgba(34,197,94,.4);}
-.ic-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:5px;gap:6px;}
-.ic-lbl{font-size:11px;font-weight:600;line-height:1.3;flex:1;}
-.ic-gr{background:none;border:none;padding:0;color:var(--mu);font-size:13px;flex-shrink:0;}
-.ic-rp{font-family:var(--fm);font-size:9px;color:var(--mu);margin-bottom:5px;display:flex;align-items:center;gap:4px;}
-.ic-desc{font-family:var(--fm);font-size:9px;color:var(--mu);margin-bottom:6px;line-height:1.4;opacity:.8;}
-.ic-bt{height:4px;background:var(--dim);border-radius:2px;overflow:hidden;margin-bottom:5px;}
-.ic-bf{height:100%;border-radius:2px;transition:width .35s;}
-.ic-bot{display:flex;align-items:center;justify-content:space-between;}
-.ic-st{font-family:var(--fm);font-size:9px;letter-spacing:.06em;}
-.ic-act{display:flex;align-items:center;gap:4px;}
-.ic-cnt{font-family:var(--fm);font-size:10px;color:var(--mu);min-width:32px;text-align:right;}
-.btn-chk{width:28px;height:28px;border-radius:6px;border:1px solid var(--bdr);background:var(--s1);font-size:14px;display:flex;align-items:center;justify-content:center;padding:0;}
-.btn-dec,.btn-inc{width:24px;height:24px;border-radius:5px;border:1px solid var(--bdr);background:transparent;color:var(--mu);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0;}
-.conq-sec{padding:28px 24px 48px;}
-.conq-h{font-family:var(--fh);font-size:16px;font-weight:800;margin-bottom:4px;}
-.conq-s{font-family:var(--fm);font-size:10px;color:var(--mu);margin-bottom:18px;}
-.conq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;}
-.cq{background:var(--s1);border:1px solid var(--bdr);border-radius:11px;padding:14px 15px;display:flex;align-items:center;gap:12px;transition:border-color .2s;}
-.cq.ok{border-color:rgba(245,200,0,.35);background:rgba(245,200,0,.04);}
-.cq.lk{opacity:.45;}
-.cq-ic{font-size:26px;flex-shrink:0;}
-.cq-nm{font-size:12px;font-weight:600;margin-bottom:2px;}
-.cq-ds{font-family:var(--fm);font-size:9px;color:var(--mu);}
-.cq-ck{margin-left:auto;font-size:16px;flex-shrink:0;}
-.ov{position:fixed;inset:0;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(5px);}
-.mdl{background:var(--s1);border:1px solid var(--bdr);border-radius:14px;padding:22px;width:300px;display:flex;flex-direction:column;gap:12px;}
-.mdl-t{font-family:var(--fm);font-size:12px;font-weight:700;letter-spacing:.05em;}
-.fld label{font-family:var(--fm);font-size:9px;color:var(--mu);letter-spacing:.1em;display:block;margin-bottom:5px;}
-.fld input,.fld select{width:100%;background:var(--s2);border:1px solid var(--bdr);border-radius:7px;color:var(--tx);font-family:var(--fm);font-size:11px;padding:8px 10px;outline:none;}
-.fld input:focus,.fld select:focus{border-color:var(--bl);}
-.tipo-btns{display:flex;gap:8px;}
-.tipo-btn{flex:1;padding:7px;border-radius:7px;font-family:var(--fm);font-size:10px;letter-spacing:.08em;border:1px solid var(--bdr);background:var(--s2);color:var(--mu);}
-.tipo-btn.sel{background:rgba(59,158,255,.15);border-color:var(--bl);color:var(--bl);}
-.mdl-btns{display:flex;gap:8px;margin-top:4px;}
-.btn-cc{flex:1;padding:8px;background:transparent;border:1px solid var(--bdr);border-radius:7px;color:var(--mu);font-family:var(--fm);font-size:10px;}
-.btn-sv{flex:1;padding:8px;border:none;border-radius:7px;color:#000;font-weight:700;font-family:var(--fm);font-size:10px;letter-spacing:.06em;}
-.btn-dx{padding:8px 12px;background:transparent;border:1px solid rgba(240,48,96,.4);border-radius:7px;color:var(--re);font-family:var(--fm);font-size:10px;}
-.pp{background:var(--s2);border-radius:8px;padding:10px 12px;}
-.pp-l{font-family:var(--fm);font-size:9px;color:var(--mu);letter-spacing:.08em;margin-bottom:6px;}
-.pp-t{height:5px;background:var(--dim);border-radius:3px;overflow:hidden;margin-bottom:5px;}
-.pp-f{height:100%;border-radius:3px;}
-.pp-n{display:flex;justify-content:space-between;font-family:var(--fm);font-size:10px;}
-.infl-sec{padding:0 24px 48px;}
-.infl-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
-.infl-title{font-family:var(--fh);font-size:16px;font-weight:800;}
-.infl-sub{font-family:var(--fm);font-size:10px;color:var(--mu);margin-bottom:18px;}
-.btn-add-infl{font-family:var(--fm);font-size:10px;padding:8px 16px;border-radius:7px;border:none;background:var(--or);color:#000;font-weight:700;cursor:pointer;letter-spacing:.06em;}
-.btn-add-infl:hover{filter:brightness(1.1);}
-.infl-table-wrap{overflow-x:auto;}
-.infl-table{width:100%;border-collapse:collapse;}
-.infl-table th{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--mu);text-align:left;padding:8px 12px;border-bottom:2px solid var(--bdr);white-space:nowrap;}
-.infl-table td{font-family:var(--fm);font-size:11px;padding:10px 12px;border-bottom:1px solid rgba(30,37,53,.6);vertical-align:middle;}
-.infl-table tr:hover td{background:var(--s2);}
-.infl-nome{font-weight:700;color:var(--tx);font-size:12px;}
-.infl-ig{color:var(--or);text-decoration:none;}
-.infl-ig:hover{text-decoration:underline;}
-.infl-seg{font-family:var(--fh);font-weight:800;color:var(--bl);}
-.infl-del{background:none;border:none;cursor:pointer;color:var(--mu);font-size:13px;padding:2px 6px;border-radius:4px;}
-.infl-del:hover{color:var(--re);background:rgba(240,64,96,.1);}
-.infl-empty{text-align:center;font-family:var(--fm);font-size:11px;color:var(--mu);padding:32px 0;}
-.infl-ov{position:fixed;inset:0;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(5px);}
-.infl-mdl{background:var(--s1);border:1px solid var(--bdr);border-radius:14px;padding:22px;width:320px;display:flex;flex-direction:column;gap:12px;}
-.infl-mdl-t{font-family:var(--fm);font-size:12px;font-weight:700;letter-spacing:.05em;color:var(--or);}
-.infl-fld label{font-family:var(--fm);font-size:9px;color:var(--mu);letter-spacing:.1em;display:block;margin-bottom:5px;}
-.infl-fld input{width:100%;background:var(--s2);border:1px solid var(--bdr);border-radius:7px;color:var(--tx);font-family:var(--fm);font-size:11px;padding:8px 10px;outline:none;}
-.infl-fld input:focus{border-color:var(--or);}
-.infl-mbts{display:flex;gap:8px;margin-top:4px;}
-.btn-ic{flex:1;padding:8px;background:transparent;border:1px solid var(--bdr);border-radius:7px;color:var(--mu);font-family:var(--fm);font-size:10px;cursor:pointer;}
-.btn-is{flex:2;padding:8px;border:none;border-radius:7px;color:#000;font-weight:700;font-family:var(--fm);font-size:10px;cursor:pointer;background:var(--or);letter-spacing:.06em;}
-.toast{position:fixed;bottom:20px;right:20px;background:var(--s1);border:1px solid var(--bdr);
-  border-radius:8px;padding:10px 16px;font-family:var(--fm);font-size:11px;color:var(--tx);
-  z-index:300;box-shadow:0 8px 32px rgba(0,0,0,.6);display:none;}
-</style>
-</head>
-<body>
-
-<header>
-  <div class="logo"><div class="logo-ic">📈</div>Growth Board
-    <span style="font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:4px;background:var(--s2);color:var(--mu);border:1px solid var(--bdr);font-weight:400;letter-spacing:.1em">KANBAN</span>
-  </div>
-  <div style="display:flex;gap:8px">
-    <button class="hbtn" onclick="resetD()">↺ Diário</button>
-    <button class="hbtn" onclick="resetW()">↺ Semanal</button>
-  </div>
-</header>
-
-<div class="score-bar">
-  <div><div class="s-lbl">PROGRESSO GERAL</div><div class="s-sub" id="s-sub">carregando...</div></div>
-  <div class="s-trk"><div class="s-fil" id="s-fil" style="width:0%"></div></div>
-  <div class="s-pct" id="s-pct" style="color:var(--re)">0%</div>
-</div>
-<div class="board-wrap"><div class="board" id="board"></div></div>
-
-
-
-<!-- Modal Influencer -->
-<div class="infl-ov" id="infl-modal" style="display:none" onclick="if(event.target===this)fecharInflModal()">
-  <div class="infl-mdl" onclick="event.stopPropagation()">
-    <div class="infl-mdl-t">🌟 Cadastrar Influencer</div>
-    <div class="infl-fld"><label>NOME</label><input id="if-nome" placeholder="Ex: João Silva"></div>
-    <div class="infl-fld"><label>TELEFONE / WHATSAPP</label><input id="if-tel" placeholder="(31) 9 9999-9999"></div>
-    <div class="infl-fld"><label>CIDADE</label><input id="if-cidade" placeholder="Ex: Belo Horizonte - MG"></div>
-    <div class="infl-fld"><label>INSTAGRAM (link ou @)</label><input id="if-ig" placeholder="@usuario ou https://instagram.com/usuario"></div>
-    <div class="infl-fld"><label>SEGUIDORES</label><input id="if-seg" type="number" min="0" placeholder="Ex: 15000"></div>
-    <div class="infl-mbts">
-      <button class="btn-ic" onclick="fecharInflModal()">Cancelar</button>
-      <button class="btn-is" onclick="salvarInfluencer()">Cadastrar</button>
-    </div>
-  </div>
-</div>
-
-<div class="toast" id="toast"></div>
-
-<script>
-var COLS = [
-  {id:'pago',     label:'Tráfego Pago',  icon:'💰',freq:'d',color:'#3b9eff',
-   items:[
-     {id:'meta',      label:'Meta Ads',             tipo:'check',   meta:1,  resp:'Time Mkt', desc:''},
-     {id:'google',    label:'Google Ads',            tipo:'check',   meta:1,  resp:'Time Mkt', desc:''},
-     {id:'yt',        label:'YouTube Ads',           tipo:'check',   meta:1,  resp:'Time Mkt', desc:''},
-     {id:'criativos', label:'Criativos Produzidos',  tipo:'counter', meta:10, resp:'Design',   desc:'Peças criativas para campanhas', freq:'w'},
-   ]},
-  {id:'organico', label:'Orgânico',      icon:'🎬',freq:'d',color:'#22c55e',
-   items:[
-     {id:'videos',      label:'Vídeos Orgânicos', tipo:'counter', meta:3, resp:'Conteúdo'},
-     {id:'tiktok_live', label:'Live TikTok',       tipo:'check',   meta:1, resp:'Conteúdo'},
-     {id:'ig_live',     label:'Live Instagram',    tipo:'check',   meta:1, resp:'Conteúdo'},
-   ]},
-
-  {id:'influencer',label:'Influencer',   icon:'🌟',freq:'w',color:'#f97316',
-   items:[{id:'infl',label:'Contatos Influencer',tipo:'counter',meta:3,resp:'Parcerias'}]},
-  {id:'reputacao',label:'Reputação',     icon:'⭐',freq:'d',color:'#f5c800',
-   items:[{id:'gmb',label:'Google Meu Negócio',tipo:'counter',meta:5,resp:'Atend.'}]},
-  {id:'comercial',label:'Comercial PJ',  icon:'🤝',freq:'d',color:'#06b6d4',
-   items:[{id:'pj',label:'Abordagens PJ',tipo:'counter',meta:5,resp:'Comercial'}]},
-  {id:'seo',      label:'SEO / IA',      icon:'🤖',freq:'w',color:'#e879f9',
-   items:[{id:'seo_c',label:'Conteúdo SEO/IA',tipo:'counter',meta:5,resp:'Conteúdo'}]},
-
-  {id:'indicacoes',label:'Indicações',    icon:'🔗',freq:'w',color:'#10d982',
-   items:[
-     {id:'ind_solicit', label:'Indicações Solicitadas', tipo:'counter', meta:10, resp:'Atend.'},
-     {id:'ind_receb',   label:'Avaliações Recebidas',   tipo:'counter', meta:5,  resp:'Atend.'},
-     {id:'ind_google',  label:'Google Reviews',         tipo:'counter', meta:3,  resp:'Atend.'},
-   ]},
-];
-
-var cols = [], vals = {}, _editCid = null, _editIid = null, _isNew = false, _tipo = 'check';
-var SK = 'growth_kanban_v5';
-
-function getDK(){ return 'gkd_' + new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'}); }
-function getWK(){
-  var d = new Date(new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo'}));
-  var diff = d.getDate() - d.getDay() + (d.getDay()===0?-6:1);
-  var m = new Date(d); m.setDate(diff);
-  return 'gkw_' + m.toLocaleDateString('en-CA');
-}
-function secsD(){var n=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo'}));var m=new Date(n);m.setHours(24,0,0,0);return Math.max(0,Math.floor((m-n)/1000));}
-function secsW(){var n=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo'}));var days=n.getDay()===0?1:8-n.getDay();var m=new Date(n);m.setDate(n.getDate()+days);m.setHours(0,0,0,0);return Math.max(0,Math.floor((m-n)/1000));}
-function fmtS(s){if(s<=0)return'—';var d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60);if(d>0)return d+'d '+h+'h';if(h>0)return h+'h '+m+'m';return m+'m';}
-function pct(v,m){return m?Math.min(100,Math.round(v/m*100)):(v?100:0);}
-function sc(p){return p>=100?'#22c55e':p>=50?'#f5c800':p>0?'#f97316':'#ef4444';}
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-
-function persist(){
-  try{
-    var pl = JSON.stringify({cols:cols,vals:vals,influencers:_influencers});
-    localStorage.setItem(SK,pl);
-    fetch('/api/growth?action=salvar-kanban',{method:'POST',headers:{'Content-Type':'application/json'},body:pl}).catch(function(){});
-  }catch(e){}
-}
-function load(){
-  fetch('/api/growth?action=carregar-kanban').then(function(r){return r.json();}).then(function(d){
-    if(d&&d.ok&&d.cols&&d.cols.length){cols=d.cols;vals=d.vals||{};if(d.influencers&&d.influencers.length){_influencers=d.influencers;try{localStorage.setItem('growth_infl_v2',JSON.stringify(_influencers));}catch(e){}}}else{loadLocal();}
-    render(); renderInfluencers();
-  }).catch(function(){loadLocal();render();renderInfluencers();});
-}
-function loadLocal(){
-  try{
-    var raw=localStorage.getItem(SK);
-    if(raw){
-      var d=JSON.parse(raw);
-      if(d.influencers&&d.influencers.length){_influencers=d.influencers;try{localStorage.setItem('growth_infl_v2',JSON.stringify(_influencers));}catch(e){}}
-      var saved=d.cols||[];
-      // Merge: manter colunas salvas + adicionar novas que não existam
-      var merged=JSON.parse(JSON.stringify(COLS));
-      merged.forEach(function(defCol){
-        var existing=saved.find(function(c){return c.id===defCol.id;});
-        if(existing) Object.assign(defCol,{items:existing.items});
-      });
-      cols=merged;
-      vals=d.vals||{};
-    }else{cols=JSON.parse(JSON.stringify(COLS));vals={};}
-  }catch(e){cols=JSON.parse(JSON.stringify(COLS));vals={};}
 }
 
-function render(){ renderBoard(); renderScore(); renderConquistas(); renderInfluencers(); }
-
-function renderBoard(){
-  var board = document.getElementById('board'); board.innerHTML='';
-  var sd=secsD(), sw=secsW();
-  cols.forEach(function(col){ board.appendChild(mkCol(col, col.freq==='d'?sd:sw)); });
-}
-
-function mkCol(col, secs){
-  var urg = col.freq==='d'?(secs<3600?'#ef4444':secs<10800?'#f5c800':'#5a6270'):(secs<86400?'#ef4444':secs<259200?'#f5c800':'#5a6270');
-  var total=col.items.length,done=0,sumP=0;
-  col.items.forEach(function(it){var v=vals[col.id+'_'+it.id]||0,p=pct(v,it.meta||1);sumP+=p;if(p>=100)done++;});
-  var cp=total?Math.round(sumP/total):0;
-
-  var el=document.createElement('div'); el.className='col';
-
-  var head=document.createElement('div'); head.className='col-head';
-  var ht=document.createElement('div'); ht.className='col-head-top';
-  var tit=document.createElement('div'); tit.className='col-title';
-  var ic=document.createElement('span'); ic.style.fontSize='16px'; ic.textContent=col.icon;
-  var nm=document.createElement('span'); nm.className='col-nm'; nm.style.color=col.color; nm.textContent=col.label;
-  tit.appendChild(ic); tit.appendChild(nm);
-  var fr=document.createElement('span'); fr.className='col-fr'; fr.textContent=col.freq==='d'?'DIÁRIO':'SEMANAL';
-  ht.appendChild(tit); ht.appendChild(fr); head.appendChild(ht);
-
-  var bt=document.createElement('div'); bt.className='col-bt';
-  var bf=document.createElement('div'); bf.className='col-bf'; bf.style.width=cp+'%'; bf.style.background=col.color; bf.style.opacity='.85';
-  bt.appendChild(bf); head.appendChild(bt);
-
-  var st=document.createElement('div'); st.className='col-st';
-  var p1=document.createElement('span'); p1.style.fontFamily='var(--fm)'; p1.style.fontSize='9px'; p1.style.color=sc(cp); p1.style.letterSpacing='.08em'; p1.textContent=done+'/'+total+' · '+cp+'%';
-  var p2=document.createElement('span'); p2.style.fontFamily='var(--fm)'; p2.style.fontSize='9px'; p2.style.color=urg; p2.textContent='⏱ '+fmtS(secs);
-  st.appendChild(p1); st.appendChild(p2); head.appendChild(st);
-  el.appendChild(head);
-
-  var items=document.createElement('div'); items.className='col-items';
-  col.items.forEach(function(it){
-    items.appendChild(mkItem(col,it));
-    // Botão Cadastrar Influencer logo abaixo do card correto
-    var lbl=(it.label||'').toLowerCase();
-    if(col.id==='influencer' && lbl.includes('tabela')){
-      var btnInfl=document.createElement('button');
-      btnInfl.textContent='🌟 Cadastrar Influencer';
-      btnInfl.style.cssText='width:100%;padding:7px;border-radius:8px;background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.4);color:#f97316;font-family:var(--fm);font-size:10px;letter-spacing:.06em;cursor:pointer;font-weight:700;margin-top:4px;transition:all .15s;';
-      btnInfl.onmouseenter=function(){this.style.background='rgba(249,115,22,.22)';this.style.borderColor='rgba(249,115,22,.7)';};
-      btnInfl.onmouseleave=function(){this.style.background='rgba(249,115,22,.12)';this.style.borderColor='rgba(249,115,22,.4)';};
-      (function(cid,iid){
-        btnInfl.onclick=function(e){e.stopPropagation(); abrirInflModal(cid,iid);};
-      })(col.id, it.id);
-      items.appendChild(btnInfl);
-    }
-  });
-  el.appendChild(items);
-
-  var add=document.createElement('div'); add.className='col-add';
-  var btn=document.createElement('button'); btn.className='btn-ai'; btn.textContent='+ ADICIONAR ATIVIDADE';
-  btn.onclick=(function(cid){return function(){openNew(cid);};})(col.id);
-  add.appendChild(btn); el.appendChild(add);
-  return el;
-}
-
-function mkItem(col, it){
-  var v=vals[col.id+'_'+it.id]||0, m=it.meta||1, p=pct(v,m), done=p>=100, color=sc(p);
-  var el=document.createElement('div'); el.className='ic'+(done?' done':'');
-  if(done) el.style.borderColor=col.color+'66';
-
-  var top=document.createElement('div'); top.className='ic-top';
-  var lbl=document.createElement('span'); lbl.className='ic-lbl'; lbl.textContent=it.label;
-  var gr=document.createElement('button'); gr.className='ic-gr'; gr.textContent='⚙';
-  gr.title='Editar tarefa';
-  gr.onclick=(function(cid,iid){return function(){openEdit(cid,iid);};})(col.id,it.id);
-  top.appendChild(lbl); top.appendChild(gr); el.appendChild(top);
-
-  if(it.desc){var dc=document.createElement('div');dc.className='ic-desc';dc.textContent=it.desc;el.appendChild(dc);}
-  if(it.resp){var rp=document.createElement('div');rp.className='ic-rp';rp.innerHTML='<span>👤</span><span>'+esc(it.resp)+'</span>';el.appendChild(rp);}
-
-  var bt=document.createElement('div'); bt.className='ic-bt';
-  var bf=document.createElement('div'); bf.className='ic-bf'; bf.style.width=p+'%'; bf.style.background=color;
-  bt.appendChild(bf); el.appendChild(bt);
-
-  var bot=document.createElement('div'); bot.className='ic-bot';
-  var st=document.createElement('span'); st.className='ic-st'; st.style.color=color;
-  st.textContent=done?'✓ FEITO':p>0?(p+'% EM ANDAMENTO'):'PENDENTE';
-  var act=document.createElement('div'); act.className='ic-act';
-
-  if(it.tipo==='check'){
-    var btn=document.createElement('button'); btn.className='btn-chk'+(done?' done':'');
-    btn.style.borderColor=done?col.color:'var(--bdr)'; btn.style.color=done?col.color:'var(--mu)';
-    if(done){btn.style.background=col.color+'22';}
-    btn.textContent=done?'✓':'○';
-    btn.onclick=(function(cid,iid){return function(){toggle(cid,iid);};})(col.id,it.id);
-    act.appendChild(btn);
-  } else {
-    var cnt=document.createElement('span'); cnt.className='ic-cnt'; cnt.textContent=v+'/'+m;
-    var bdec=document.createElement('button'); bdec.className='btn-dec'; bdec.textContent='−';
-    bdec.onclick=(function(cid,iid){return function(){inc(cid,iid,-1);};})(col.id,it.id);
-    var binc=document.createElement('button'); binc.className='btn-inc';
-    binc.style.borderColor=col.color+'44'; binc.style.color=col.color; binc.textContent='+';
-    binc.onclick=(function(cid,iid){return function(){inc(cid,iid,1);};})(col.id,it.id);
-    act.appendChild(cnt); act.appendChild(bdec); act.appendChild(binc);
+function renderInfluencers(){
+  var tbody = document.getElementById('infl-tbody'); if(!tbody) return;
+  if(!_influencers.length){
+    tbody.innerHTML='<tr><td colspan="7" class="infl-empty">Nenhum influencer cadastrado ainda. Clique em "+ Cadastrar Influencer".</td></tr>';
+    return;
   }
-  bot.appendChild(st); bot.appendChild(act); el.appendChild(bot);
-  // Botão Cadastrar Influencer dentro do card específico
-  if(col.id==='influencer' && it.id==='infl'){
-    var btnInfl=document.createElement('button');
-    btnInfl.textContent='🌟 Cadastrar Influencer';
-    btnInfl.style.cssText='width:100%;margin-top:8px;padding:7px;border-radius:7px;background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.4);color:#f97316;font-family:var(--fm);font-size:10px;letter-spacing:.06em;cursor:pointer;font-weight:700;transition:all .15s;';
-    btnInfl.onclick=function(e){e.stopPropagation();abrirInflModal();};
-    el.appendChild(btnInfl);
-  }
-  return el;
-}
-
-function renderScore(){
-  var total=0,done=0;
-  cols.forEach(function(c){c.items.forEach(function(it){total++;if(pct(vals[c.id+'_'+it.id]||0,it.meta||1)>=100)done++;});});
-  var p=total?Math.round(done/total*100):0;
-  document.getElementById('s-fil').style.width=p+'%';
-  var pe=document.getElementById('s-pct'); pe.textContent=p+'%'; pe.style.color=sc(p);
-  document.getElementById('s-sub').textContent=done+'/'+total+' atividades concluídas';
-}
-
-function renderConquistas(){
-  var total=0,done=0;
-  cols.forEach(function(c){c.items.forEach(function(it){total++;if(pct(vals[c.id+'_'+it.id]||0,it.meta||1)>=100)done++;});});
-  var gp=total?Math.round(done/total*100):0;
-  var CS=[
-    {i:'🔥',n:'Primeiro Check',    d:'1ª atividade concluída',          ok:done>=1},
-    {i:'⚡',n:'5 Feitas',           d:'5 atividades concluídas',         ok:done>=5},
-    {i:'💪',n:'Meio Caminho',       d:'50% do board concluído',          ok:gp>=50},
-    {i:'🏆',n:'Dia Perfeito',       d:'100% do board concluído',         ok:gp>=100},
-    {i:'🎯',n:'Tráfego Ativo',      d:'Todos os canais de tráfego ok',   ok:(function(){var c=cols.find(function(x){return x.id==='pago';});return c?c.items.every(function(it){return(vals['pago_'+it.id]||0)>=1;}):false;})()},
-    {i:'🎬',n:'Produtor',           d:'Meta de vídeos batida',           ok:(vals['organico_videos']||0)>=3},
-    {i:'🎨',n:'Semana Criativa',    d:'10 criativos na semana',          ok:(vals['criativo_criativos']||0)>=10},
-    {i:'🤝',n:'Hunter PJ',          d:'5+ abordagens PJ no dia',         ok:(vals['comercial_pj']||0)>=5},
-    {i:'⭐',n:'Reputação Ativa',    d:'5+ ações Google Meu Negócio',     ok:(vals['reputacao_gmb']||0)>=5},
-    {i:'🚀',n:'Growth Total',       d:'Todas as colunas com progresso',  ok:cols.every(function(c){return!c.items.length||c.items.some(function(it){return(vals[c.id+'_'+it.id]||0)>0;});})},
-    {i:'🔗',n:'Indicação Ativa',    d:'10+ indicações solicitadas',      ok:(vals['indicacoes_ind_solicit']||0)>=10},
-    {i:'📡',n:'Ao Vivo!',           d:'Live feita no dia',               ok:(vals['organico_tiktok_live']||0)>=1||(vals['organico_ig_live']||0)>=1},
-  ];
-  var grid=document.getElementById('cq-grid'); grid.innerHTML='';
-  CS.forEach(function(c){
-    var el=document.createElement('div'); el.className='cq'+(c.ok?' ok':' lk');
-    el.innerHTML='<div class="cq-ic">'+c.i+'</div><div><div class="cq-nm">'+esc(c.n)+'</div><div class="cq-ds">'+esc(c.d)+'</div></div><div class="cq-ck">'+(c.ok?'✅':'🔒')+'</div>';
-    grid.appendChild(el);
-  });
-}
-
-function toggle(cid,iid){var k=cid+'_'+iid;vals[k]=vals[k]?0:1;persist();render();}
-function inc(cid,iid,d){var k=cid+'_'+iid;vals[k]=Math.max(0,(vals[k]||0)+d);persist();render();}
-function resetD(){if(!confirm('Resetar atividades DIÁRIAS?'))return;cols.forEach(function(c){if(c.freq==='d')c.items.forEach(function(it){vals[c.id+'_'+it.id]=0;});});persist();render();toast('↺ Diárias resetadas');}
-function resetW(){if(!confirm('Resetar atividades SEMANAIS?'))return;cols.forEach(function(c){if(c.freq==='w')c.items.forEach(function(it){vals[c.id+'_'+it.id]=0;});});persist();render();toast('↺ Semanais resetadas');}
-
-var _freqModal = 'd';
-function setFreqModal(f){
-  _freqModal=f;
-  document.getElementById('btn-fd').className='tipo-btn'+(f==='d'?' sel':'');
-  document.getElementById('btn-fw').className='tipo-btn'+(f==='w'?' sel':'');
-}
-function setTipo(t){
-  _tipo=t;
-  document.getElementById('btn-tc').className='tipo-btn'+(t==='check'?' sel':'');
-  document.getElementById('btn-tn').className='tipo-btn'+(t==='counter'?' sel':'');
-  document.getElementById('m-meta-fld').style.display=t==='counter'?'block':'none';
-}
-function openNew(cid){
-  _editCid=cid;_editIid=null;_isNew=true;
-  var col=cols.find(function(c){return c.id===cid;});
-  var t=document.getElementById('mdl-title'); t.textContent='+ Atividade em '+(col?col.label:''); t.style.color=col?col.color:'var(--tx)';
-  document.getElementById('m-lbl').value=''; document.getElementById('m-desc').value='';
-  document.getElementById('m-resp').value=''; document.getElementById('m-meta').value=1;
-  document.getElementById('btn-dx').style.display='none'; document.getElementById('mdl-pp').style.display='none';
-  document.getElementById('m-tipo-fld').style.display='block';
-  document.getElementById('m-freq-fld').style.display='block';
-  var sv=document.getElementById('btn-sv'); sv.style.background=col?col.color:'var(--or)';
-  setTipo('check'); setFreqModal(col?col.freq:'d');
-  document.getElementById('modal').style.display='flex';
-  setTimeout(function(){document.getElementById('m-lbl').focus();},80);
-}
-function openEdit(cid,iid){
-  _editCid=cid;_editIid=iid;_isNew=false;
-  var col=cols.find(function(c){return c.id===cid;}); var it=col?col.items.find(function(i){return i.id===iid;}):null; if(!it)return;
-  var t=document.getElementById('mdl-title'); t.textContent='✏️ Editar tarefa'; t.style.color=col?col.color:'var(--tx)';
-  // Preencher todos os campos
-  document.getElementById('m-lbl').value=it.label;
-  document.getElementById('m-desc').value=it.desc||'';
-  document.getElementById('m-resp').value=it.resp||'';
-  document.getElementById('m-meta').value=it.meta||1;
-  // Mostrar/ocultar campos
-  document.getElementById('btn-dx').style.display='block';
-  document.getElementById('m-tipo-fld').style.display='none';
-  document.getElementById('m-freq-fld').style.display='none';
-  document.getElementById('m-meta-fld').style.display='block'; // sempre visível no edit
-  // Preview de progresso
-  var v=vals[cid+'_'+iid]||0, m=it.meta||1, p=pct(v,m);
-  var pp=document.getElementById('mdl-pp'); pp.style.display='block';
-  document.getElementById('pp-fil').style.width=p+'%'; document.getElementById('pp-fil').style.background=col?col.color:sc(p);
-  document.getElementById('pp-v').textContent=v+' / '+m; document.getElementById('pp-v').style.color=col?col.color:'var(--bl)';
-  document.getElementById('pp-p').textContent=p+'%';
-  document.getElementById('btn-sv').style.background=col?col.color:'var(--or)';
-  setTipo(it.tipo||'check');
-  document.getElementById('modal').style.display='flex';
-  setTimeout(function(){document.getElementById('m-lbl').focus();},80);
-}
-function closeModal(){ document.getElementById('modal').style.display='none'; }
-function saveAtiv(){
-  var lbl=document.getElementById('m-lbl').value.trim(); if(!lbl){document.getElementById('m-lbl').focus();return;}
-  var desc=document.getElementById('m-desc').value.trim();
-  var resp=document.getElementById('m-resp').value.trim()||'—';
-  var meta=parseInt(document.getElementById('m-meta').value)||1;
-  var tipo=_isNew?_tipo:(cols.find(function(c){return c.id===_editCid;})||{items:[]}).items.find(function(i){return i.id===_editIid;})?.tipo||'check';
-  var freq=_isNew?_freqModal:null;
-  if(_isNew){
-    var nid=Date.now().toString(36);
-    cols.forEach(function(c){
-      if(c.id===_editCid) c.items.push({id:nid,label:lbl,desc:desc,tipo:tipo,meta:meta,resp:resp,customFreq:freq});
-    });
-    toast('✅ Adicionado');
-  } else {
-    cols.forEach(function(c){if(c.id===_editCid)c.items.forEach(function(it){if(it.id===_editIid){it.label=lbl;it.desc=desc;it.meta=meta;it.resp=resp;}});});
-    toast('💾 Salvo');
-  }
-  persist(); closeModal(); render();
-}
-function delAtiv(){
-  if(!confirm('Remover esta atividade?'))return;
-  cols.forEach(function(c){if(c.id===_editCid)c.items=c.items.filter(function(i){return i.id!==_editIid;});});
-  delete vals[_editCid+'_'+_editIid];
-  persist(); closeModal(); render(); toast('🗑 Removido');
-}
-var _tt;
-function toast(msg){var el=document.getElementById('toast');el.textContent=msg;el.style.display='block';clearTimeout(_tt);_tt=setTimeout(function(){el.style.display='none';},2200);}
-
-// ── INFLUENCERS ────────────────────────────────────────────────────────────
-var INFL_KEY = 'growth_influencers_v1';
-// Influencers carregados sincronamente — sem race condition
-var _influencers=(function(){try{var s=localStorage.getItem('growth_infl_v2');return s?JSON.parse(s):[];}catch(e){return [];}}()); return s?JSON.parse(s):[]; }catch(e){ return []; }
-})();
-
-function loadInfluencers(){
-  try{ var s=localStorage.getItem('growth_infl_v2'); if(s)_influencers=JSON.parse(s); }catch(e){}
-  renderInfluencers();
+  tbody.innerHTML = _influencers.map(function(inf,i){
+    var igLink = inf.ig ? (inf.ig.startsWith('http')?inf.ig:'https://instagram.com/'+(inf.ig.replace('@',''))) : '';
+    var igDisplay = inf.ig ? (inf.ig.startsWith('@')?inf.ig:'@'+inf.ig.replace(/.*instagram\.com\//,'').replace('/','')) : '—';
+    var seg = inf.seg ? parseInt(inf.seg).toLocaleString('pt-BR') : '—';
+    var data = inf.criadoEm ? new Date(inf.criadoEm).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}) : '—';
+    return '<tr>'+
+      '<td><span class="infl-nome">'+esc(inf.nome)+'</span></td>'+
+      '<td>'+esc(inf.tel||'—')+'</td>'+
+      '<td>'+esc(inf.cidade||'—')+'</td>'+
+      '<td>'+(igLink?'<a class="infl-ig" href="'+igLink+'" target="_blank">'+esc(igDisplay)+'</a>':'—')+'</td>'+
+      '<td><span class="infl-seg">'+seg+'</span></td>'+
+      '<td style="color:var(--mu);font-size:10px">'+data+'</td>'+
+      '<td><button class="infl-del" onclick="removerInfluencer('+i+')" title="Remover">🗑</button></td>'+
+    '</tr>';
+  }).join('');
 }
 
 var _inflColId='influencer', _inflItemId='infl';
@@ -1140,64 +621,4 @@ loadInfluencers();
 setInterval(function(){renderBoard();},60000);
 </script>
 </body>
-</html<div class="infl-sec">
-  <div class="infl-header">
-    <div>
-      <div class="infl-title">🌟 Tabela de Influencers</div>
-      <div class="infl-sub">// cadastro e gestão de influencers parceiros</div>
-    </div>
-    <button class="btn-add-infl" onclick="abrirInflModal()">+ Cadastrar Influencer</button>
-  </div>
-  <div class="infl-table-wrap">
-    <table class="infl-table">
-      <thead><tr>
-        <th>Nome</th><th>Telefone</th><th>Cidade</th><th>Instagram</th><th>Seguidores</th><th>Cadastrado</th><th></th>
-      </tr></thead>
-      <tbody id="infl-tbody"><tr><td colspan="7" class="infl-empty">Carregando...</td></tr></tbody>
-    </table>
-  </div>
-
-<div class="conq-sec">
-  <div class="conq-h">🏆 Conquistas</div>
-  <div class="conq-s">// desbloqueadas com base no seu progresso acumulado</div>
-  <div class="conq-grid" id="cq-grid"></div>
-</div>
-
-<div class="ov" id="modal" style="display:none" onclick="if(event.target===this)closeModal()">
-  <div class="mdl" onclick="event.stopPropagation()">
-    <div class="mdl-t" id="mdl-title">+ Atividade</div>
-    <div class="pp" id="mdl-pp" style="display:none">
-      <div class="pp-l">PROGRESSO ATUAL</div>
-      <div class="pp-t"><div class="pp-f" id="pp-fil" style="width:0%"></div></div>
-      <div class="pp-n"><span id="pp-v" style="color:var(--bl)">0</span><span id="pp-p" style="color:var(--mu)">0%</span></div>
-    </div>
-    <div class="fld"><label>NOME DA ATIVIDADE</label><input id="m-lbl" placeholder="Ex: Publicar Reels"></div>
-    <div class="fld"><label>DESCRIÇÃO</label><input id="m-desc" placeholder="Ex: Peças para campanha da semana"></div>
-    <div class="fld" id="m-tipo-fld">
-      <label>TIPO</label>
-      <div class="tipo-btns">
-        <button class="tipo-btn sel" id="btn-tc" onclick="setTipo('check')">✓ CHECK</button>
-        <button class="tipo-btn" id="btn-tn" onclick="setTipo('counter')"># CONTADOR</button>
-      </div>
-    </div>
-    <div class="fld" id="m-meta-fld" style="display:none"><label>META</label><input type="number" id="m-meta" min="1" value="1"></div>
-    <div class="fld" id="m-freq-fld">
-      <label>FREQUÊNCIA</label>
-      <div class="tipo-btns">
-        <button class="tipo-btn sel" id="btn-fd" onclick="setFreqModal('d')">⚡ DIÁRIA</button>
-        <button class="tipo-btn" id="btn-fw" onclick="setFreqModal('w')">📅 SEMANAL</button>
-      </div>
-    </div>
-    <div class="fld"><label>RESPONSÁVEL</label><input id="m-resp" placeholder="Ex: Time Conteúdo"></div>
-    <div class="mdl-btns">
-      <button class="btn-dx" id="btn-dx" style="display:none" onclick="delAtiv()">🗑</button>
-      <button class="btn-cc" onclick="closeModal()">Cancelar</button>
-      <button class="btn-sv" id="btn-sv" onclick="saveAtiv()">Salvar</button>
-    </div>
-  </div>
-</div>
-
-
-</div>
-
->
+</html>
