@@ -16,14 +16,15 @@ module.exports = async function(req, res) {
   res.setHeader('Access-Control-Allow-Origin','*');
   const action = req.query.action || '';
 
-  if (action === 'carregar') {
+  if (action === 'carregar' || action === 'carregar-kanban') {
     const data = await dbGet(GROWTH_KEY);
-    return res.status(200).json({ ok: true, data: data || { acoes:[], registros:{} } });
+    const d2 = data || {};
+    return res.status(200).json({ ok:true, data: d2, acoes:d2.acoes||[], registros:d2.registros||{}, cols:d2.cols||[], vals:d2.vals||{}, influencers:d2.influencers||[] });
   }
 
-  if (action === 'salvar' && req.method === 'POST') {
-    const { acoes, registros } = req.body || {};
-    await dbSet(GROWTH_KEY, { acoes: acoes||[], registros: registros||{}, savedAt: new Date().toISOString() });
+  if ((action === 'salvar' || action === 'salvar-kanban') && req.method === 'POST') {
+    const { acoes, registros, cols, vals, influencers } = req.body || {};
+    await dbSet(GROWTH_KEY, { acoes: acoes||[], registros: registros||{}, cols: cols||[], vals: vals||{}, influencers: influencers||[], savedAt: new Date().toISOString() });
     return res.status(200).json({ ok: true });
   }
 

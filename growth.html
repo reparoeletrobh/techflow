@@ -272,22 +272,23 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 
 function persist(){
   try{
-    var pl = JSON.stringify({cols:cols,vals:vals});
+    var pl = JSON.stringify({cols:cols,vals:vals,influencers:_influencers});
     localStorage.setItem(SK,pl);
     fetch('/api/growth?action=salvar-kanban',{method:'POST',headers:{'Content-Type':'application/json'},body:pl}).catch(function(){});
   }catch(e){}
 }
 function load(){
   fetch('/api/growth?action=carregar-kanban').then(function(r){return r.json();}).then(function(d){
-    if(d&&d.ok&&d.cols&&d.cols.length){cols=d.cols;vals=d.vals||{};}else{loadLocal();}
-    render();
-  }).catch(function(){loadLocal();render();});
+    if(d&&d.ok&&d.cols&&d.cols.length){cols=d.cols;vals=d.vals||{};if(d.influencers&&d.influencers.length){_influencers=d.influencers;}}else{loadLocal();}
+    render(); renderInfluencers();
+  }).catch(function(){loadLocal();render();renderInfluencers();});
 }
 function loadLocal(){
   try{
     var raw=localStorage.getItem(SK);
     if(raw){
       var d=JSON.parse(raw);
+      if(d.influencers&&d.influencers.length)_influencers=d.influencers;
       var saved=d.cols||[];
       // Merge: manter colunas salvas + adicionar novas que não existam
       var merged=JSON.parse(JSON.stringify(COLS));
@@ -538,30 +539,9 @@ function toast(msg){var el=document.getElementById('toast');el.textContent=msg;e
 var INFL_KEY = 'growth_influencers_v1';
 var _influencers = [];
 
-async function loadInfluencers(){
-  try{
-    var r = await fetch('/api/growth?action=carregar-influencers').then(function(x){return x.json();});
-    _influencers = (r&&r.ok) ? (r.influencers||[]) : [];
-    // Fallback: localStorage
-    if(!_influencers.length){
-      var local = localStorage.getItem('growth_influencers_v1');
-      if(local){ _influencers=JSON.parse(local); salvarInflDB(); }
-    }
-  }catch(e){
-    try{ var local=localStorage.getItem('growth_influencers_v1'); _influencers=local?JSON.parse(local):[]; }catch(e2){ _influencers=[]; }
-  }
-  renderInfluencers();
-}
+function loadInfluencers(){ renderInfluencers(); }
 
-async function salvarInflDB(){
-  // 1. localStorage PRIMEIRO (síncrono — nunca perde)
-  try{ localStorage.setItem('growth_influencers_v1', JSON.stringify(_influencers)); }catch(e){}
-  // 2. Redis em background (não aguarda)
-  fetch('/api/growth?action=salvar-influencers',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({influencers:_influencers})
-  }).catch(function(){});
-}
+async function salvarInflDB(){ persist(); }
 
 function renderInfluencers(){
   var tbody = document.getElementById('infl-tbody'); if(!tbody) return;
