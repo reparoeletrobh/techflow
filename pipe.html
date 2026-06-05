@@ -232,6 +232,13 @@ const SYNC_FASES=[
 const PHASES=[];
 let cards=[];
 
+function fmtTel(t){
+  if(!t) return "";
+  var d=String(t).replace(/\D/g,"");
+  if(d.length===11) return "("+d.slice(0,2)+") "+d.slice(2,3)+" "+d.slice(3,7)+"-"+d.slice(7);
+  if(d.length===10) return "("+d.slice(0,2)+") "+d.slice(2,6)+"-"+d.slice(6);
+  return t;
+}
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
 function toast(msg,ok=true){
   const t=document.getElementById('toast');
@@ -291,6 +298,7 @@ function render(){
           pfBadge+
         '</div>'+
         '<div class="card-nome">'+esc(c.nomeContato)+'</div>'+
+        (c.telefone ? '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:-2px">📞 '+fmtTel(c.telefone)+'</div>' : '')+
         equipHtml+
         descHtml+
         valHtml+
