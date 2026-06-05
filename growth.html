@@ -538,14 +538,29 @@ var _influencers = [];
 
 async function loadInfluencers(){
   try{
-    var r = await window.storage.get(INFL_KEY).catch(function(){return null;});
-    _influencers = r ? JSON.parse(r.value) : [];
-  }catch(e){ _influencers=[]; }
+    var r = await fetch('/api/growth?action=carregar-influencers').then(function(x){return x.json();});
+    _influencers = (r&&r.ok) ? (r.influencers||[]) : [];
+    // Fallback: localStorage
+    if(!_influencers.length){
+      var local = localStorage.getItem('growth_influencers_v1');
+      if(local){ _influencers=JSON.parse(local); salvarInflDB(); }
+    }
+  }catch(e){
+    try{ var local=localStorage.getItem('growth_influencers_v1'); _influencers=local?JSON.parse(local):[]; }catch(e2){ _influencers=[]; }
+  }
   renderInfluencers();
 }
 
 async function salvarInflDB(){
-  try{ await window.storage.set(INFL_KEY, JSON.stringify(_influencers)); }catch(e){}
+  // Salvar no Redis via API
+  try{
+    fetch('/api/growth?action=salvar-influencers',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({influencers:_influencers})
+    }).catch(function(){});
+  }catch(e){}
+  // Backup em localStorage
+  try{ localStorage.setItem('growth_influencers_v1', JSON.stringify(_influencers)); }catch(e){}
 }
 
 function renderInfluencers(){
