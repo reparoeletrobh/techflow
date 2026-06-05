@@ -83,7 +83,7 @@ module.exports = async function handler(req,res){
       });
       const j = await r.json();
       // Acionar verificação para domínio não verificado
-      const dominio = (j.data||[]).find(d => d.name && d.name.includes('reparoeletrobh'));
+      const dominio = (j.data||[]).find(d => d.name && d.name.includes('reparoeletroadm'));
       if (dominio && dominio.status !== 'verified') {
         await fetch('https://api.resend.com/domains/'+dominio.id+'/verify', {
           method:'POST', headers:{ Authorization:'Bearer '+RESEND_KEY }
@@ -138,7 +138,7 @@ module.exports = async function handler(req,res){
         headers:{ Authorization:'Bearer '+RESEND_KEY }
       });
       const jDom = await rDom.json();
-      const dominio = (jDom.data||[]).find(d => d.name && d.name.includes('reparoeletrobh'));
+      const dominio = (jDom.data||[]).find(d => d.name && d.name.includes('reparoeletroadm'));
       
       if (!dominio) return res.status(200).json({ ok:false, erro:'Domínio não encontrado no Resend' });
 
