@@ -479,7 +479,7 @@ function toast(msg){var el=document.getElementById('toast');el.textContent=msg;e
 // ── INFLUENCERS ────────────────────────────────────────────────────────────
 var INFL_KEY = 'growth_influencers_v1';
 // Influencers carregados sincronamente — sem race condition
-var _influencers=(function(){try{var s=localStorage.getItem('growth_infl_v2');return s?JSON.parse(s):[];}catch(e){return [];}}()); return s?JSON.parse(s):[]; }catch(e){ return []; }
+var _influencers=(function(){try{var s=localStorage.getItem('growth_infl_v2');return s?JSON.parse(s):[];}catch(e){return [];}})();
 })();
 
 function loadInfluencers(){
