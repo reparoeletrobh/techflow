@@ -129,5 +129,60 @@ module.exports = async function handler(req,res){
     }
   }
 
+    // ── GET status-completo — verifica records DNS + status detalhado ───────────
+  if (action === 'status-completo') {
+    if (!RESEND_KEY) return res.status(200).json({ ok:false, erro:'RESEND_API_KEY não configurada' });
+    try {
+      // 1. Buscar domínio
+      const rDom = await fetch('https://api.resend.com/domains', {
+        headers:{ Authorization:'Bearer '+RESEND_KEY }
+      });
+      const jDom = await rDom.json();
+      const dominio = (jDom.data||[]).find(d => d.name && d.name.includes('reparoeletrobh'));
+      
+      if (!dominio) return res.status(200).json({ ok:false, erro:'Domínio não encontrado no Resend' });
+
+      // 2. Acionar verificação
+      await fetch('https://api.resend.com/domains/'+dominio.id+'/verify', {
+        method:'POST', headers:{ Authorization:'Bearer '+RESEND_KEY }
+      }).catch(()=>{});
+      
+      // 3. Aguardar e buscar detalhes completos
+      await new Promise(r=>setTimeout(r,2000));
+      const rDet = await fetch('https://api.resend.com/domains/'+dominio.id, {
+        headers:{ Authorization:'Bearer '+RESEND_KEY }
+      });
+      const jDet = await rDet.json();
+      
+      // 4. Analisar cada record DNS
+      const records = (jDet.records||[]).map(rec => ({
+        tipo: rec.type,
+        nome: rec.name,
+        valor: (rec.value||'').slice(0,60),
+        status: rec.status,
+        ok: rec.status === 'verified',
+      }));
+      
+      const totalVerificados = records.filter(r=>r.ok).length;
+      const totalPendentes   = records.filter(r=>!r.ok).length;
+      
+      return res.status(200).json({
+        ok: jDet.status === 'verified',
+        dominio: jDet.name,
+        status: jDet.status,
+        totalRecords: records.length,
+        verificados: totalVerificados,
+        pendentes: totalPendentes,
+        records,
+        podeEnviar: jDet.status === 'verified',
+        mensagem: jDet.status === 'verified'
+          ? '✅ Domínio verificado — pode disparar!'
+          : '⏳ '+totalPendentes+' record(s) ainda pendentes. DNS pode demorar até 24h para propagar.',
+      });
+    } catch(e) {
+      return res.status(200).json({ ok:false, erro: e.message });
+    }
+  }
+
     return res.status(404).json({ok:false,error:'action não encontrada'});
 };
