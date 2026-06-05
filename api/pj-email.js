@@ -133,22 +133,20 @@ module.exports = async function handler(req,res){
   if (action === 'status-completo') {
     if (!RESEND_KEY) return res.status(200).json({ ok:false, erro:'RESEND_API_KEY não configurada' });
     try {
-      // 1. Buscar domínio
+      // 1. Listar TODOS os domínios (sem acionar verify — não reseta status)
       const rDom = await fetch('https://api.resend.com/domains', {
         headers:{ Authorization:'Bearer '+RESEND_KEY }
       });
       const jDom = await rDom.json();
+      const todosOsDominios = (jDom.data||[]).map(d=>({nome:d.name,status:d.status,id:d.id}));
       const dominio = (jDom.data||[]).find(d => d.name && d.name.includes('reparoeletroadm'));
       
-      if (!dominio) return res.status(200).json({ ok:false, erro:'Domínio não encontrado no Resend' });
+      if (!dominio) return res.status(200).json({ 
+        ok:false, erro:'Domínio reparoeletroadm não encontrado no Resend',
+        todosOsDominios
+      });
 
-      // 2. Acionar verificação
-      await fetch('https://api.resend.com/domains/'+dominio.id+'/verify', {
-        method:'POST', headers:{ Authorization:'Bearer '+RESEND_KEY }
-      }).catch(()=>{});
-      
-      // 3. Aguardar e buscar detalhes completos
-      await new Promise(r=>setTimeout(r,2000));
+      // 2. Buscar detalhes SEM acionar verify
       const rDet = await fetch('https://api.resend.com/domains/'+dominio.id, {
         headers:{ Authorization:'Bearer '+RESEND_KEY }
       });
