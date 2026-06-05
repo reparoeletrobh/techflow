@@ -1673,6 +1673,7 @@ export default async function handler(req, res) {
           compraDb2.fichas.unshift({
             id: compraId, pipefyId: compraId,
             nomeContato: card.nomeContato || '',
+            telefone: card.telefone || '',
             descricao: card.equipamento || card.descricao || '',
             valor: card.valor || 0,
             osCode: card.osCode || card.id || '',
@@ -1762,6 +1763,7 @@ export default async function handler(req, res) {
     if (jaExiste) return res.status(200).json({ ok:true, msg:'Já existe em compra_equip', ficha:jaExiste });
     var now = new Date().toISOString();
     var nova = { id:compraId, pipefyId:compraId, nomeContato:card.nomeContato||'', osCode:card.osCode||card.id||'',
+      telefone:card.telefone||'',
       descricao:card.equipamento||card.descricao||'', valor:card.valor||0, status:'analise', fotos:[], criadoEm:now };
     compraDb.fichas.unshift(nova);
     await dbSet('reparoeletro_compra_equip', compraDb);
