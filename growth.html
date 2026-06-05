@@ -538,12 +538,33 @@ var INFL_KEY = 'growth_influencers_v1';
 var _influencers = (function(){ try{ var s=localStorage.getItem('growth_infl_v2'); return s ? JSON.parse(s) : []; } catch(e){ return []; } })();
 
 function loadInfluencers(){
-  try{ var s=localStorage.getItem('growth_infl_v2'); if(s) _influencers=JSON.parse(s); }catch(e){}
-  renderInfluencers();
+  // Primeiro tenta Redis (dados compartilhados entre browsers)
+  fetch('/api/growth?action=carregar-influencers')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d && d.ok && d.influencers && d.influencers.length){
+        _influencers = d.influencers;
+        try{ localStorage.setItem('growth_infl_v2', JSON.stringify(_influencers)); }catch(e){}
+      } else {
+        // Fallback: localStorage deste browser
+        try{ var s=localStorage.getItem('growth_infl_v2'); if(s) _influencers=JSON.parse(s); }catch(e){}
+      }
+      renderInfluencers();
+    })
+    .catch(function(){
+      try{ var s=localStorage.getItem('growth_infl_v2'); if(s) _influencers=JSON.parse(s); }catch(e){}
+      renderInfluencers();
+    });
 }
 
 async function salvarInflDB(){
+  // 1. localStorage (síncrono — backup local)
   try{ localStorage.setItem('growth_infl_v2', JSON.stringify(_influencers)); }catch(e){}
+  // 2. Redis (assíncrono — compartilhado entre browsers)
+  fetch('/api/growth?action=salvar-influencers',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({influencers: _influencers})
+  }).catch(function(){});
   persist();
 }
 
