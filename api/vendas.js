@@ -375,7 +375,113 @@ module.exports = async function handler(req, res) {
 
   // ── POST excluir ───────────────────────────────────────────
   // ── GET diagnostico — relatório completo do banco de vendas ─────────────────
-  if (action === "diagnostico") {
+  // ── GET cruzar-os — cruzamento completo de OSs entre catálogo e vendas ──────
+  if (action === "cruzar-os") {
+    const codigos = (req.query.codigos || "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+    if (!codigos.length) return res.status(400).json({ ok:false, error:"Informe ?codigos=2277,3376,..." });
+
+    // Carregar todas as fontes em paralelo
+    const [dbVendas, dbCheckout, dbFin, dbPipe, dbLog] = await Promise.all([
+      dbGet("reparoeletro_vendas"),
+      dbGet("reparoeletro_checkout_vendas"),
+      dbGet("reparoeletro_financeiro"),
+      dbGet("reparoeletro_pipe"),
+      dbGet("reparoeletro_log"),
+    ]);
+
+    const produtos   = (dbVendas?.produtos    || []);
+    const vendas     = (dbCheckout?.vendas    || []);
+    const records    = (dbFin?.records        || []);
+    const cards      = (dbPipe?.cards         || []);
+    const logs       = Array.isArray(dbLog)   ? dbLog : (dbLog?.entries || []);
+
+    const resultado = codigos.map(function(cod) {
+      // Buscar no catálogo por código ou ID
+      const produto = produtos.find(p =>
+        (p.codigo||"").toLowerCase().includes(cod) ||
+        (p.id||"").toLowerCase().includes(cod) ||
+        (p.descricao||"").toLowerCase().includes(cod)
+      );
+      // Buscar no checkout (vendas concluídas)
+      const vendaCheckout = vendas.filter(v =>
+        JSON.stringify(v).toLowerCase().includes(cod)
+      );
+      // Buscar no financeiro
+      const recFin = records.filter(r =>
+        JSON.stringify(r).toLowerCase().includes(cod)
+      );
+      // Buscar no pipe
+      const cardPipe = cards.filter(c =>
+        JSON.stringify(c).toLowerCase().includes(cod)
+      );
+      // Buscar no log
+      const logEntries = logs.filter(l =>
+        JSON.stringify(l).toLowerCase().includes(cod)
+      ).slice(0, 5);
+
+      return {
+        codigo: cod,
+        catalogo: produto ? {
+          id:          produto.id,
+          codigo:      produto.codigo,
+          descricao:   produto.descricao,
+          preco:       produto.preco,
+          vendido:     produto.vendido,
+          soldAt:      produto.soldAt || null,
+          updatedAt:   produto.updatedAt || null,
+          status:      produto.vendido ? "VENDIDO" : "DISPONÍVEL",
+        } : null,
+        naLoja:        !!produto && !produto.vendido,
+        foiVendido:    !!produto?.vendido,
+        checkoutVenda: vendaCheckout.map(v => ({
+          id:        v.id,
+          comprador: v.comprador?.nome || v.compradorNome || "—",
+          valor:     v.valor,
+          data:      v.criadoEm || v.data,
+          status:    v.status,
+          produto:   v.produto?.codigo || v.produtoCodigo || "—",
+        })),
+        financeiro: recFin.map(r => ({
+          id:      r.id,
+          nome:    r.nome || r.nomeContato,
+          fase:    r.phaseId,
+          valor:   r.valor,
+          paidAt:  r.paidAt,
+          osCode:  r.osCode,
+        })),
+        pipe: cardPipe.map(c2 => ({
+          id:     c2.id,
+          nome:   c2.nomeContato || c2.title,
+          fase:   c2.phase,
+          valor:  c2.valor,
+          history:(c2.history||[]).slice(-3),
+        })),
+        log: logEntries,
+        diagnostico: (() => {
+          if (!produto) return "❓ Não encontrado no catálogo";
+          if (!produto.vendido && vendaCheckout.length > 0) return "⚠️ VENDA NO CHECKOUT MAS FLAG vendido=false NO CATÁLOGO";
+          if (!produto.vendido && recFin.some(r => r.paidAt)) return "⚠️ PAGO NO FINANCEIRO MAS FLAG vendido=false NO CATÁLOGO";
+          if (produto.vendido) return "✅ Vendido corretamente (vendido=true)";
+          return "📋 Disponível no catálogo, sem movimentação";
+        })(),
+      };
+    });
+
+    return res.status(200).json({
+      ok:       true,
+      total:    codigos.length,
+      geradoEm: new Date().toISOString(),
+      resultados: resultado,
+      resumo: resultado.map(r => ({
+        codigo:      r.codigo,
+        naLoja:      r.naLoja,
+        foiVendido:  r.foiVendido,
+        diagnostico: r.diagnostico,
+      })),
+    });
+  }
+
+    if (action === "diagnostico") {
     const db  = await dbGet(VENDAS_KEY) || defaultDB();
     const ck  = await dbGet("reparoeletro_checkout_vendas") || { vendas: [] };
     const produtos = db.produtos || [];
