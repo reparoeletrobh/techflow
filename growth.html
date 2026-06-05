@@ -279,7 +279,7 @@ function persist(){
 }
 function load(){
   fetch('/api/growth?action=carregar-kanban').then(function(r){return r.json();}).then(function(d){
-    if(d&&d.ok&&d.cols&&d.cols.length){cols=d.cols;vals=d.vals||{};if(d.influencers&&d.influencers.length){_influencers=d.influencers;}}else{loadLocal();}
+    if(d&&d.ok&&d.cols&&d.cols.length){cols=d.cols;vals=d.vals||{};if(d.influencers&&d.influencers.length){_influencers=d.influencers;try{localStorage.setItem('growth_infl_v2',JSON.stringify(_influencers));}catch(e){}}}else{loadLocal();}
     render(); renderInfluencers();
   }).catch(function(){loadLocal();render();renderInfluencers();});
 }
@@ -288,7 +288,7 @@ function loadLocal(){
     var raw=localStorage.getItem(SK);
     if(raw){
       var d=JSON.parse(raw);
-      if(d.influencers&&d.influencers.length)_influencers=d.influencers;
+      if(d.influencers&&d.influencers.length){_influencers=d.influencers;try{localStorage.setItem('growth_infl_v2',JSON.stringify(_influencers));}catch(e){}}
       var saved=d.cols||[];
       // Merge: manter colunas salvas + adicionar novas que não existam
       var merged=JSON.parse(JSON.stringify(COLS));
@@ -537,33 +537,14 @@ function toast(msg){var el=document.getElementById('toast');el.textContent=msg;e
 
 // ── INFLUENCERS ────────────────────────────────────────────────────────────
 var INFL_KEY = 'growth_influencers_v1';
-var _influencers = [];
+// Influencers carregados sincronamente — sem race condition
+var _influencers = (function(){
+  try{ var s=localStorage.getItem('growth_infl_v2'); return s?JSON.parse(s):[]; }catch(e){ return []; }
+})();
 
-function loadInfluencers(){ renderInfluencers(); }
-
-async function salvarInflDB(){ persist(); }
-
-function renderInfluencers(){
-  var tbody = document.getElementById('infl-tbody'); if(!tbody) return;
-  if(!_influencers.length){
-    tbody.innerHTML='<tr><td colspan="7" class="infl-empty">Nenhum influencer cadastrado ainda. Clique em "+ Cadastrar Influencer".</td></tr>';
-    return;
-  }
-  tbody.innerHTML = _influencers.map(function(inf,i){
-    var igLink = inf.ig ? (inf.ig.startsWith('http')?inf.ig:'https://instagram.com/'+(inf.ig.replace('@',''))) : '';
-    var igDisplay = inf.ig ? (inf.ig.startsWith('@')?inf.ig:'@'+inf.ig.replace(/.*instagram\.com\//,'').replace('/','')) : '—';
-    var seg = inf.seg ? parseInt(inf.seg).toLocaleString('pt-BR') : '—';
-    var data = inf.criadoEm ? new Date(inf.criadoEm).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}) : '—';
-    return '<tr>'+
-      '<td><span class="infl-nome">'+esc(inf.nome)+'</span></td>'+
-      '<td>'+esc(inf.tel||'—')+'</td>'+
-      '<td>'+esc(inf.cidade||'—')+'</td>'+
-      '<td>'+(igLink?'<a class="infl-ig" href="'+igLink+'" target="_blank">'+esc(igDisplay)+'</a>':'—')+'</td>'+
-      '<td><span class="infl-seg">'+seg+'</span></td>'+
-      '<td style="color:var(--mu);font-size:10px">'+data+'</td>'+
-      '<td><button class="infl-del" onclick="removerInfluencer('+i+')" title="Remover">🗑</button></td>'+
-    '</tr>';
-  }).join('');
+function loadInfluencers(){
+  try{ var s=localStorage.getItem('growth_infl_v2'); if(s)_influencers=JSON.parse(s); }catch(e){}
+  renderInfluencers();
 }
 
 var _inflColId='influencer', _inflItemId='infl';
