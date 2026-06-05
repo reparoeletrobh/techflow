@@ -439,7 +439,7 @@ function buildCard(f) {
     '<div>' +
       (os ? '<div class="ficha-os">' + os + '</div>' : '') +
       '<div class="ficha-nome">' + nome + '</div>' +
-      (f.telefone ? '<div class="ficha-tel">' + f.telefone + '</div>' : '') +
+      (f.telefone ? '<div class="ficha-tel">' + telHtml(f.telefone) + '</div>' : '') +
     '</div>' +
     '<span class="status-badge ' + statusClass + '">' + statusLabel + '</span>' +
   '</div>';
@@ -505,7 +505,7 @@ function renderPainel() {
     var tr = document.createElement('tr');
     tr.innerHTML =
       '<td><div class="td-name">' + nome + '</div><div class="td-mono">' + os + '</div></td>' +
-      '<td class="td-mono">' + (f.telefone || '—') + '</td>' +
+      '<td class="td-mono">' + telHtml(f.telefone) + '</td>' +
       '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:11px;">' + (f.descricao || '—') + '</td>' +
       '<td>' + recHtml + '</td>' +
       '<td><span class="status-badge ' + statusClass + '">' + statusLabel + '</span></td>' +
@@ -625,7 +625,7 @@ function renderComprados() {
     tr.innerHTML =
       '<td style="font-family:var(--fm);font-size:10px;color:var(--accent);padding:10px 12px;border-bottom:1px solid var(--border);white-space:nowrap">' + os + '</td>' +
       '<td style="font-size:12px;font-weight:500;padding:10px 12px;border-bottom:1px solid var(--border);">' + nome + '</td>' +
-      '<td style="font-family:var(--fm);font-size:10px;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--border);white-space:nowrap">' + (f.telefone || '—') + '</td>' +
+      '<td style="font-family:var(--fm);font-size:10px;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--border);white-space:nowrap">' + telHtml(f.telefone) + '</td>' +
       '<td style="font-size:11px;color:var(--muted);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:10px 12px;border-bottom:1px solid var(--border);" title="' + (f.descricao||'') + '">' + (f.descricao || '—') + '</td>' +
       '<td style="padding:10px 12px;border-bottom:1px solid var(--border);">' + recHtml + '</td>' +
       '<td style="font-family:var(--fm);font-size:10px;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--border);">' + (nFotos ? '📸 ' + nFotos : '—') + '</td>' +
@@ -658,7 +658,7 @@ function buildCompradoCard(f) {
       '<div>' +
         (os ? '<div class="ficha-os">' + os + '</div>' : '') +
         '<div class="ficha-nome">' + nome + '</div>' +
-        (f.telefone ? '<div class="ficha-tel">' + f.telefone + '</div>' : '') +
+        (f.telefone ? '<div class="ficha-tel">' + telHtml(f.telefone) + '</div>' : '') +
       '</div>' +
       '<span class="status-badge comprado">Comprado</span>' +
     '</div>' +
@@ -821,6 +821,27 @@ function showToast(icon, title, msg) {
 // Ao abrir: carrega dados e já sincroniza com Pipefy automaticamente
 load().then(function() { sync(true); });
 setInterval(function() { load().then(function() { sync(true); }); }, 60000);
+
+// ── UTILS TELEFONE ────────────────────────────────────────────────────
+function fmtTel(t){
+  if(!t)return "";
+  var d=String(t).replace(/\D/g,"");
+  if(d.length>11)d=d.slice(-11);
+  if(d.length===11)return "("+d.slice(0,2)+") "+d.slice(2,7)+"-"+d.slice(7);
+  if(d.length===10)return "("+d.slice(0,2)+") "+d.slice(2,6)+"-"+d.slice(6);
+  return t;
+}
+function telHtml(t){
+  if(!t||t==="—")return "—";
+  var f=fmtTel(t);
+  var digits=String(t).replace(/\D/g,"");
+  return f+' <button onclick="cpTel(\''+digits+'\',event)" title="Copiar" style="background:none;border:none;cursor:pointer;padding:0 2px;font-size:10px;opacity:.6;">📋</button>';
+}
+function cpTel(t,e){
+  navigator.clipboard.writeText(t).then(function(){
+    if(e&&e.target){e.target.textContent="✅";setTimeout(function(){if(e.target)e.target.textContent="📋";},1500);}
+  }).catch(function(){});
+}
 </script>
 </body>
 </html>

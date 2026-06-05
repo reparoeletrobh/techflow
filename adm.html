@@ -512,7 +512,7 @@ function buildCard(r) {
   var urgBadge = r.urgente ? '<span class="rastr-r-urgente">URGENTE</span>' : '';
 
   // Phone
-  var phone = r.telefone ? '<span class="rastr-r-phone">📞 ' + esc(r.telefone) + '</span>' : '';
+  var phone = r.telefone ? '<span class="rastr-r-phone">📞 '+fmtTel(r.telefone)+' <button onclick="cpTel(\''+r.telefone.replace(/\\D/g,'')+'\'" title="Copiar" style="background:none;border:none;cursor:pointer;padding:0 2px;font-size:10px;opacity:.6;">📋</button></span>' : '';
 
   // Descrição truncada (só se existir)
   var desc = r.descricao ? '<div class="rastr-r-desc">' + esc(r.descricao.slice(0,60)) + (r.descricao.length > 60 ? '…' : '') + '</div>' : '';
@@ -710,6 +710,27 @@ function filtrarLog(q){if(!q){renderLog(logTodos);return;}renderLog(logTodos.fil
 async function limparLog(){if(!confirm('Limpar todo o log?'))return;await fetch('/api/log?action=clear');logTodos=[];document.getElementById('log-total').textContent='0 entr.';renderLog([]);}
 setInterval(function(){if(logAberto)carregarLog();},15000);
 
+
+// ── UTILS TELEFONE ────────────────────────────────────────────────────
+function fmtTel(t){
+  if(!t)return "";
+  var d=String(t).replace(/\D/g,"");
+  if(d.length>11)d=d.slice(-11);
+  if(d.length===11)return "("+d.slice(0,2)+") "+d.slice(2,7)+"-"+d.slice(7);
+  if(d.length===10)return "("+d.slice(0,2)+") "+d.slice(2,6)+"-"+d.slice(6);
+  return t;
+}
+function telHtml(t){
+  if(!t||t==="—")return "—";
+  var f=fmtTel(t);
+  var digits=String(t).replace(/\D/g,"");
+  return f+' <button onclick="cpTel(\''+digits+'\',event)" title="Copiar" style="background:none;border:none;cursor:pointer;padding:0 2px;font-size:10px;opacity:.6;">📋</button>';
+}
+function cpTel(t,e){
+  navigator.clipboard.writeText(t).then(function(){
+    if(e&&e.target){e.target.textContent="✅";setTimeout(function(){if(e.target)e.target.textContent="📋";},1500);}
+  }).catch(function(){});
+}
 </script>
 
 <!-- PAINEL LOG -->

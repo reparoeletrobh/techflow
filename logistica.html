@@ -495,6 +495,9 @@ function filtrar(q) {
 
 
 // ── Máscara de telefone: (99) 99999-9999 ──────────────────────
+function cpTel(t,e){
+  navigator.clipboard.writeText(t).then(function(){if(e&&e.target){e.target.textContent="✅";setTimeout(function(){if(e.target)e.target.textContent="📋";},1500);}}).catch(function(){});
+}
 function mascaraTel(tel) {
   if (!tel) return '';
   // Remover tudo que não é dígito
@@ -626,7 +629,7 @@ function cardHTML(f, phase) {
     </div>
     ${emRotaAlerta ? '<div class="alerta-badge">⚠️ Em rota há mais de 2h</div>' : ''}
     <div class="card-nome">${escHtml(nomeFormatado(f))}</div>
-    ${f.telefone ? `<div class="card-tel">📞 ${escHtml(mascaraTel(f.telefone))}</div>` : ''}
+    ${f.telefone ? `<div class="card-tel" style="cursor:default">📞 ${escHtml(mascaraTel(f.telefone))} <button onclick="cpTel('${f.telefone.replace(/\D/g,'')}',event)" title="Copiar" style="background:none;border:none;cursor:pointer;padding:0 2px;font-size:10px;opacity:.6;">📋</button></div>` : ''}
     ${f.equipamento ? `<div class="card-equip">${escHtml(f.equipamento)}</div>` : ''}
     ${f.defeito ? `<div class="card-defeito">${escHtml(f.defeito).slice(0,80)}</div>` : ''}
     <div class="card-actions">${btns}</div>

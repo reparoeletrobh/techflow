@@ -232,6 +232,15 @@ const SYNC_FASES=[
 const PHASES=[];
 let cards=[];
 
+function telHtml(t){
+  if(!t||t==="—")return "—";
+  var f=fmtTel(t);
+  var digits=String(t).replace(/\D/g,"");
+  return f+' <button onclick="cpTel(\'"+digits+"\'",event)" title="Copiar" style="background:none;border:none;cursor:pointer;padding:0 2px;font-size:10px;opacity:.6;">📋</button>';
+}
+function cpTel(t,e){
+  navigator.clipboard.writeText(t).then(function(){if(e&&e.target){e.target.textContent="✅";setTimeout(function(){if(e.target)e.target.textContent="📋";},1500);}}).catch(function(){});
+}
 function fmtTel(t){
   if(!t) return "";
   var d=String(t).replace(/\D/g,"");
@@ -298,7 +307,7 @@ function render(){
           pfBadge+
         '</div>'+
         '<div class="card-nome">'+esc(c.nomeContato)+'</div>'+
-        (c.telefone ? '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:-2px">📞 '+fmtTel(c.telefone)+'</div>' : '')+
+        (c.telefone ? '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:-2px">📞 '+telHtml(c.telefone)+'</div>' : '')+
         equipHtml+
         descHtml+
         valHtml+

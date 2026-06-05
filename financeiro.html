@@ -1352,7 +1352,7 @@ async function renderLinksMP() {
       return '<tr style="border-bottom:1px solid var(--border);">' +
         '<td style="padding:9px 10px;font-size:11px;font-weight:600;">'+l.fichaId+'</td>' +
         '<td style="padding:9px 10px;font-size:11px;">'+l.cliente+'</td>' +
-        '<td style="padding:9px 10px;font-size:10px;color:var(--muted);">'+(l.telefone||'—')+'</td>' +
+        '<td style="padding:9px 10px;font-size:10px;color:var(--muted);">'+telHtml(l.telefone)+'</td>' +
         '<td style="padding:9px 10px;font-size:10px;color:var(--muted);">'+(l.cpfCnpj||'—')+'</td>' +
         '<td style="padding:9px 10px;font-size:11px;font-family:var(--fh);color:#22c55e;">R$ '+l.valor.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</td>' +
         '<td style="padding:9px 10px;font-size:11px;">'+metodo+'</td>' +
@@ -1392,6 +1392,27 @@ function exportarLinksMP() {
   a.href   = url; a.download = 'links_mp.csv'; a.click(); URL.revokeObjectURL(url);
 }
 
+
+// ── UTILS TELEFONE ────────────────────────────────────────────────────
+function fmtTel(t){
+  if(!t)return "";
+  var d=String(t).replace(/\D/g,"");
+  if(d.length>11)d=d.slice(-11);
+  if(d.length===11)return "("+d.slice(0,2)+") "+d.slice(2,7)+"-"+d.slice(7);
+  if(d.length===10)return "("+d.slice(0,2)+") "+d.slice(2,6)+"-"+d.slice(6);
+  return t;
+}
+function telHtml(t){
+  if(!t||t==="—")return "—";
+  var f=fmtTel(t);
+  var digits=String(t).replace(/\D/g,"");
+  return f+' <button onclick="cpTel(\''+digits+'\',event)" title="Copiar" style="background:none;border:none;cursor:pointer;padding:0 2px;font-size:10px;opacity:.6;">📋</button>';
+}
+function cpTel(t,e){
+  navigator.clipboard.writeText(t).then(function(){
+    if(e&&e.target){e.target.textContent="✅";setTimeout(function(){if(e.target)e.target.textContent="📋";},1500);}
+  }).catch(function(){});
+}
 </script>
 <!-- MODAL EMITIR NF -->
 <div class="modal" id="nf-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
