@@ -1760,7 +1760,20 @@ export default async function handler(req, res) {
     var jaExiste = compraDb.fichas.find(function(f){
       return f.id===compraId || (card.nomeContato && (f.nomeContato||'').toLowerCase()===(card.nomeContato||'').toLowerCase());
     });
-    if (jaExiste) return res.status(200).json({ ok:true, msg:'Já existe em compra_equip', ficha:jaExiste });
+    if (jaExiste) {
+      // Se já existe mas sem telefone, atualizar
+      var atualizou = false;
+      if (!jaExiste.telefone && card.telefone) {
+        jaExiste.telefone = card.telefone;
+        atualizou = true;
+      }
+      if (!jaExiste.nomeContato && card.nomeContato) {
+        jaExiste.nomeContato = card.nomeContato;
+        atualizou = true;
+      }
+      if (atualizou) await dbSet('reparoeletro_compra_equip', compraDb);
+      return res.status(200).json({ ok:true, msg: atualizou ? '✅ Telefone atualizado' : 'Já existe em compra_equip', ficha:jaExiste });
+    }
     var now = new Date().toISOString();
     var nova = { id:compraId, pipefyId:compraId, nomeContato:card.nomeContato||'', osCode:card.osCode||card.id||'',
       telefone:card.telefone||'',
@@ -1812,6 +1825,34 @@ export default async function handler(req, res) {
       data: hoje,
       total: tabela.length,
       cards: tabela,
+    });
+  }
+
+    // ── GET fix-compra-lote — atualiza telefone em todas fichas sem telefone ────
+  if (action === 'fix-compra-lote') {
+    var pipeDb2 = (await dbGet(PIPE_KEY)) || defaultDB();
+    var compraDb3 = await dbGet('reparoeletro_compra_equip') || { fichas: [] };
+    var atualizados = 0, semMatch = 0;
+    (compraDb3.fichas || []).forEach(function(ficha) {
+      if (ficha.telefone) return; // já tem telefone
+      // Buscar card no pipe por nome
+      var nomeFicha = (ficha.nomeContato||'').toLowerCase().trim();
+      var pipeCard = (pipeDb2.cards||[]).find(function(c) {
+        return (c.nomeContato||'').toLowerCase().trim() === nomeFicha ||
+               c.id === ficha.id || c.id === ficha.pipefyId ||
+               c.osCode === ficha.osCode;
+      });
+      if (pipeCard && pipeCard.telefone) {
+        ficha.telefone = pipeCard.telefone;
+        atualizados++;
+      } else { semMatch++; }
+    });
+    if (atualizados > 0) await dbSet('reparoeletro_compra_equip', compraDb3);
+    return res.status(200).json({
+      ok: true,
+      msg: '✅ '+atualizados+' ficha(s) atualizada(s) com telefone',
+      atualizados, semMatch,
+      total: (compraDb3.fichas||[]).length
     });
   }
 
