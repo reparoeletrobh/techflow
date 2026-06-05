@@ -205,6 +205,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
           <input id="f-tel" type="text" placeholder="(31) 9 0000-0000" oninput="formatTel(this)">
         </div>
         <div>
+          <label>CPF</label>
+          <input id="f-cpf" type="text" placeholder="000.000.000-00" maxlength="14" oninput="fmtCpf(this)">
+        </div>
+        <div>
+          <label>EMAIL</label>
+          <input id="f-email" type="email" placeholder="cliente@email.com">
+        </div>
+        <div>
           <label>DEFEITO / DESCRIÇÃO</label>
           <textarea id="f-desc" placeholder="Descreva o problema relatado pelo cliente..."></textarea>
         </div>
@@ -441,6 +449,13 @@ function load(){
 }
 
 // ══ FORMATAÇÃO ════════════════════════════════════════════════
+function fmtCpf(input){
+  var v=input.value.replace(/\D/g,'').slice(0,11);
+  if(v.length>9) v=v.slice(0,3)+'.'+v.slice(3,6)+'.'+v.slice(6,9)+'-'+v.slice(9);
+  else if(v.length>6) v=v.slice(0,3)+'.'+v.slice(3,6)+'.'+v.slice(6);
+  else if(v.length>3) v=v.slice(0,3)+'.'+v.slice(3);
+  input.value=v;
+}
 function formatTel(input){
   var v=input.value.replace(/[^0-9]/g,'');
   if(v.length>11)v=v.slice(0,11);
@@ -465,9 +480,11 @@ function cadastrar(){
   var equip=document.getElementById('f-equip').value.trim();
   var tel=document.getElementById('f-tel').value.trim();
   var desc=document.getElementById('f-desc').value.trim();
+  var cpf=(document.getElementById('f-cpf')||{value:''}).value.trim();
+  var email=(document.getElementById('f-email')||{value:''}).value.trim();
   if(!nome||!equip){toast('Nome e equipamento obrigatórios','r');return;}
   fetch('/api/frenteloja?action=criar',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({nomeContato:nome,equipamento:equip,telefone:tel,descricao:desc})
+    body:JSON.stringify({nomeContato:nome,equipamento:equip,telefone:tel,descricao:desc,cpf,email})
   }).then(r=>r.json()).then(d=>{
     if(!d.ok){toast('Erro: '+(d.error||''),'r');return;}
     fichas.unshift(d.ficha);

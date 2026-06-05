@@ -194,18 +194,25 @@ export default async function handler(req,res){
   }
 
   if(req.method==='POST'&&action==='criar'){
-    const {nomeContato,equipamento,telefone,descricao}=req.body||{};
+    const {nomeContato,equipamento,telefone,descricao,cpf,email}=req.body||{};
     if(!nomeContato||!equipamento)return res.status(400).json({ok:false,error:'Nome e equipamento obrigatórios'});
     const db=await dbGet(FL_KEY)||defaultDB();
     const id=nextId(db);const now=new Date().toISOString();
-    const ficha={id,nomeContato,equipamento,telefone:(telefone||'').replace(/[^0-9]/g,''),descricao:descricao||'',phase:'analise',createdAt:now,movedAt:now,history:[{phase:'analise',ts:now}]};
+    const ficha={id,nomeContato,equipamento,telefone:(telefone||'').replace(/[^0-9]/g,''),
+      cpf:cpf||'',email:email||'',
+      descricao:descricao||'',phase:'analise',createdAt:now,movedAt:now,
+      history:[{phase:'analise',ts:now}]};
     db.fichas.unshift(ficha);await dbSet(FL_KEY,db);
     // Espelhar no board em analise_loja
     try{
       const _base=process.env.FL_BASE_URL||'https://reparoeletroadm.com';
       const _title=(ficha.nomeContato+' (Loja) - '+(ficha.equipamento||'')+' | '+(ficha.descricao||'')+' OS:'+ficha.id).replace(/"/g,"'").slice(0,255);
       fetch(_base+'/api/board?action=add-loja-card',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({flFichaId:ficha.id,pipefyId:null,title:_title,nomeContato:ficha.nomeContato||'',telefone:ficha.telefone||'',phaseId:'analise_loja'})
+        body:JSON.stringify({flFichaId:ficha.id,pipefyId:null,title:_title,
+          nomeContato:ficha.nomeContato||'',telefone:ficha.telefone||'',
+          cpf:ficha.cpf||'',email:ficha.email||'',
+          equipamento:ficha.equipamento||'',descricao:ficha.descricao||'',
+          phaseId:'analise_loja'})
       }).catch(e=>console.error('[FL] criar→board:',e.message));
     }catch(e){}
     logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'', acao:'Nova ficha criada', para:'analise', gatilho:'', status:'ok' }).catch(()=>{});

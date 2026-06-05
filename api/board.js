@@ -2136,7 +2136,7 @@ module.exports = async function handler(req, res) {
 
   // ── POST add-loja-card ──────────────────────────────────────────────────
   if (req.method === 'POST' && action === 'add-loja-card') {
-    const { flFichaId, pipefyId, title, nomeContato, telefone, phaseId: startPhase } = req.body || {};
+    const { flFichaId, pipefyId, title, nomeContato, telefone, cpf, email, equipamento, descricao, phaseId: startPhase } = req.body || {};
     if (!flFichaId || !title) return res.status(400).json({ ok:false, error:'flFichaId e title obrigatorios' });
     const board = sanitizeBoard(await dbGet(BOARD_KEY));
     // Verificar duplicata por flFichaId OU por pipefyId (evita dois cards para mesma ficha)
