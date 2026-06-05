@@ -335,6 +335,10 @@
       "destination": "/pj.html"
     },
     {
+      "source": "/institucional",
+      "destination": "/institucional.html"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/home.html"
     },

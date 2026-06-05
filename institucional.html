@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Reparo Eletro BH — Manutenção de Equipamentos para Empresas</title>
+<meta name="description" content="Serviço especializado em manutenção de eletrodomésticos e equipamentos para empresas. Coleta, entrega, faturamento, NF e prazo de pagamento.">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --ink:#080810;--surface:#0f0f1a;--card:#14141f;--border:#1e1e30;
+  --orange:#f97316;--amber:#f59e0b;--white:#f0eff5;--muted:#64627a;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fi:'Instrument Serif',serif;
+}
+html{scroll-behavior:smooth;}
+body{background:var(--ink);color:var(--white);font-family:var(--fm);overflow-x:hidden;}
+
+/* ── NOISE TEXTURE ── */
+body::before{
+  content:'';position:fixed;inset:0;opacity:.025;pointer-events:none;z-index:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── NAV ── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 48px;
+  background:rgba(8,8,16,.85);backdrop-filter:blur(20px);
+  border-bottom:1px solid rgba(249,115,22,.15);
+}
+.nav-logo{display:flex;align-items:center;gap:12px;}
+.nav-logo-mark{
+  width:36px;height:36px;background:var(--orange);border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--fh);font-size:16px;font-weight:900;color:#000;
+}
+.nav-name{font-family:var(--fh);font-size:15px;font-weight:800;letter-spacing:-.01em;}
+.nav-name span{color:var(--orange);}
+.nav-cta{
+  font-family:var(--fm);font-size:11px;font-weight:500;
+  padding:10px 20px;border-radius:6px;
+  background:var(--orange);color:#000;border:none;cursor:pointer;
+  text-decoration:none;letter-spacing:.05em;
+  transition:transform .15s,box-shadow .15s;
+}
+.nav-cta:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(249,115,22,.4);}
+
+/* ── HERO ── */
+.hero{
+  min-height:100vh;display:flex;align-items:center;
+  padding:120px 48px 80px;
+  position:relative;overflow:hidden;
+}
+.hero-grid{
+  position:absolute;inset:0;opacity:.04;
+  background-image:linear-gradient(rgba(249,115,22,.4) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(249,115,22,.4) 1px,transparent 1px);
+  background-size:60px 60px;
+}
+.hero-glow{
+  position:absolute;top:-20%;left:50%;transform:translateX(-50%);
+  width:600px;height:600px;border-radius:50%;
+  background:radial-gradient(circle,rgba(249,115,22,.12) 0%,transparent 70%);
+  pointer-events:none;
+}
+.hero-inner{position:relative;z-index:1;max-width:1100px;margin:0 auto;width:100%;}
+.hero-eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  font-family:var(--fm);font-size:10px;letter-spacing:.15em;color:var(--orange);
+  border:1px solid rgba(249,115,22,.3);border-radius:99px;padding:6px 14px;
+  margin-bottom:32px;
+}
+.hero-eyebrow::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--orange);animation:pulse 2s ease infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+.hero-title{
+  font-family:var(--fh);font-size:clamp(44px,6vw,88px);font-weight:900;
+  line-height:.95;letter-spacing:-.03em;margin-bottom:28px;
+}
+.hero-title .line2{color:var(--orange);}
+.hero-title .line3{
+  font-family:var(--fi);font-style:italic;font-size:clamp(36px,5vw,72px);
+  color:rgba(240,239,245,.5);
+}
+.hero-desc{
+  font-size:14px;line-height:1.7;color:rgba(240,239,245,.6);
+  max-width:520px;margin-bottom:44px;
+}
+.hero-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.btn-primary{
+  font-family:var(--fm);font-size:12px;letter-spacing:.08em;
+  padding:14px 32px;border-radius:8px;border:none;cursor:pointer;
+  background:var(--orange);color:#000;font-weight:700;text-decoration:none;
+  transition:transform .15s,box-shadow .15s;display:inline-block;
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(249,115,22,.5);}
+.btn-ghost{
+  font-family:var(--fm);font-size:12px;letter-spacing:.08em;
+  padding:14px 32px;border-radius:8px;cursor:pointer;
+  border:1px solid var(--border);color:var(--muted);background:transparent;
+  text-decoration:none;transition:border-color .15s,color .15s;display:inline-block;
+}
+.btn-ghost:hover{border-color:var(--orange);color:var(--white);}
+.hero-stats{
+  display:flex;gap:48px;margin-top:80px;padding-top:48px;
+  border-top:1px solid var(--border);flex-wrap:wrap;
+}
+.stat-n{font-family:var(--fh);font-size:36px;font-weight:900;color:var(--orange);}
+.stat-l{font-family:var(--fm);font-size:9px;color:var(--muted);letter-spacing:.1em;margin-top:4px;}
+
+/* ── DIVIDER ── */
+.divider{height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);}
+
+/* ── SECTION ── */
+section{padding:96px 48px;max-width:1100px;margin:0 auto;}
+.sec-eyebrow{font-family:var(--fm);font-size:10px;letter-spacing:.15em;color:var(--orange);margin-bottom:16px;}
+.sec-title{font-family:var(--fh);font-size:clamp(28px,3.5vw,48px);font-weight:900;line-height:1;letter-spacing:-.02em;margin-bottom:16px;}
+.sec-sub{font-size:13px;color:var(--muted);line-height:1.6;max-width:480px;}
+
+/* ── DIFERENCIAIS ── */
+.diff-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+  gap:2px;margin-top:56px;
+}
+.diff-card{
+  background:var(--card);padding:36px 32px;position:relative;overflow:hidden;
+  transition:background .2s;cursor:default;
+}
+.diff-card::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(249,115,22,.06) 0%,transparent 60%);
+  opacity:0;transition:opacity .3s;
+}
+.diff-card:hover{background:#18182a;}
+.diff-card:hover::before{opacity:1;}
+.diff-icon{
+  width:44px;height:44px;border-radius:10px;
+  background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;margin-bottom:20px;
+}
+.diff-num{
+  position:absolute;top:28px;right:28px;
+  font-family:var(--fh);font-size:48px;font-weight:900;
+  color:rgba(249,115,22,.06);line-height:1;
+}
+.diff-title{font-family:var(--fh);font-size:18px;font-weight:800;margin-bottom:10px;line-height:1.2;}
+.diff-desc{font-size:11px;color:var(--muted);line-height:1.7;}
+
+/* ── COMO FUNCIONA ── */
+.steps-wrap{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;margin-top:56px;}
+.step{padding:40px;border-right:1px solid var(--border);}
+.step:last-child{border-right:none;}
+.step-n{
+  font-family:var(--fh);font-size:64px;font-weight:900;
+  color:rgba(249,115,22,.15);line-height:1;margin-bottom:20px;
+}
+.step-title{font-family:var(--fh);font-size:20px;font-weight:800;margin-bottom:10px;}
+.step-desc{font-size:11px;color:var(--muted);line-height:1.7;}
+
+/* ── CTA BAND ── */
+.cta-band{
+  margin:0;padding:0;
+  background:linear-gradient(135deg,var(--orange) 0%,var(--amber) 100%);
+  position:relative;overflow:hidden;
+}
+.cta-band-inner{
+  max-width:1100px;margin:0 auto;
+  padding:80px 48px;
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:32px;
+}
+.cta-band::after{
+  content:'';position:absolute;right:-80px;top:-80px;
+  width:400px;height:400px;border-radius:50%;
+  background:rgba(255,255,255,.08);pointer-events:none;
+}
+.cta-band-title{font-family:var(--fh);font-size:clamp(24px,3vw,40px);font-weight:900;color:#000;line-height:1.1;}
+.cta-band-sub{font-size:13px;color:rgba(0,0,0,.6);margin-top:8px;}
+.btn-dark{
+  font-family:var(--fm);font-size:12px;letter-spacing:.08em;font-weight:700;
+  padding:16px 36px;border-radius:8px;background:#000;color:var(--white);
+  border:none;cursor:pointer;text-decoration:none;white-space:nowrap;
+  transition:transform .15s,box-shadow .15s;display:inline-block;
+}
+.btn-dark:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(0,0,0,.4);}
+
+/* ── CONTATO ── */
+.contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:64px;margin-top:56px;}
+.contact-form{display:flex;flex-direction:column;gap:16px;}
+.cf-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.cf-field label{font-family:var(--fm);font-size:9px;letter-spacing:.12em;color:var(--muted);display:block;margin-bottom:8px;}
+.cf-field input,.cf-field textarea,.cf-field select{
+  width:100%;background:var(--card);border:1px solid var(--border);
+  border-radius:7px;color:var(--white);font-family:var(--fm);font-size:12px;
+  padding:12px 14px;outline:none;transition:border-color .15s;
+}
+.cf-field input:focus,.cf-field textarea:focus,.cf-field select:focus{border-color:var(--orange);}
+.cf-field textarea{resize:vertical;min-height:100px;}
+select option{background:var(--card);}
+.contact-info{display:flex;flex-direction:column;gap:28px;}
+.ci-item{display:flex;gap:16px;align-items:flex-start;}
+.ci-icon{
+  width:40px;height:40px;border-radius:9px;flex-shrink:0;
+  background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.2);
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+}
+.ci-label{font-family:var(--fm);font-size:9px;letter-spacing:.12em;color:var(--muted);margin-bottom:4px;}
+.ci-value{font-size:13px;line-height:1.5;}
+
+/* ── FOOTER ── */
+footer{
+  border-top:1px solid var(--border);
+  padding:40px 48px;
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;
+  font-family:var(--fm);font-size:10px;color:var(--muted);
+}
+.footer-logo{font-family:var(--fh);font-size:14px;font-weight:800;color:var(--orange);}
+
+/* ── RESPONSIVE ── */
+@media(max-width:768px){
+  nav{padding:16px 24px;}
+  .hero{padding:100px 24px 60px;}
+  section{padding:64px 24px;}
+  .diff-grid{grid-template-columns:1fr;}
+  .steps-wrap{grid-template-columns:1fr;}
+  .step{border-right:none;border-bottom:1px solid var(--border);}
+  .step:last-child{border-bottom:none;}
+  .contact-grid{grid-template-columns:1fr;}
+  .cf-row{grid-template-columns:1fr;}
+  .cta-band-inner{padding:48px 24px;}
+  footer{padding:32px 24px;flex-direction:column;text-align:center;}
+}
+
+/* ── ANIMAÇÕES DE ENTRADA ── */
+.reveal{opacity:0;transform:translateY(28px);transition:opacity .6s ease,transform .6s ease;}
+.reveal.visible{opacity:1;transform:none;}
+.reveal-delay-1{transition-delay:.1s;}
+.reveal-delay-2{transition-delay:.2s;}
+.reveal-delay-3{transition-delay:.3s;}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">
+    <div class="nav-logo-mark">R</div>
+    <span class="nav-name">Reparo Eletro <span>BH</span></span>
+  </div>
+  <a href="#contato" class="nav-cta">Solicitar Proposta</a>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+  <div class="hero-inner">
+    <div class="hero-eyebrow">Parceiro Especializado para Empresas</div>
+    <h1 class="hero-title">
+      <span class="line1">Seus equipamentos</span><br>
+      <span class="line2">sempre prontos.</span><br>
+      <span class="line3">Sua empresa sempre operando.</span>
+    </h1>
+    <p class="hero-desc">Manutenção especializada em eletrodomésticos e equipamentos corporativos — com coleta, entrega, nota fiscal, faturamento e prazo. Tudo que uma empresa precisa.</p>
+    <div class="hero-actions">
+      <a href="#contato" class="btn-primary">Solicitar Proposta →</a>
+      <a href="#diferenciais" class="btn-ghost">Ver Diferenciais</a>
+    </div>
+    <div class="hero-stats">
+      <div><div class="stat-n">+500</div><div class="stat-l">Empresas Atendidas</div></div>
+      <div><div class="stat-n">98%</div><div class="stat-l">Taxa de Resolução</div></div>
+      <div><div class="stat-n">12h</div><div class="stat-l">Tempo Médio de Coleta</div></div>
+      <div><div class="stat-n">BH</div><div class="stat-l">e Região Metropolitana</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- DIFERENCIAIS -->
+<section id="diferenciais">
+  <div class="sec-eyebrow reveal">DIFERENCIAIS</div>
+  <h2 class="sec-title reveal reveal-delay-1">Por que escolher<br>a Reparo Eletro BH?</h2>
+  <p class="sec-sub reveal reveal-delay-2">Desenvolvemos um modelo de atendimento pensado especialmente para o contexto corporativo — com processos, documentação e flexibilidade que a sua empresa precisa.</p>
+
+  <div class="diff-grid">
+    <div class="diff-card reveal">
+      <div class="diff-num">01</div>
+      <div class="diff-icon">🚚</div>
+      <div class="diff-title">Coleta & Entrega</div>
+      <div class="diff-desc">Buscamos e devolvemos o equipamento na sua empresa. Zero deslocamento para a sua equipe. Agendamento flexível com janelas de horário.</div>
+    </div>
+    <div class="diff-card reveal reveal-delay-1">
+      <div class="diff-num">02</div>
+      <div class="diff-icon">📄</div>
+      <div class="diff-title">Faturamento Corporativo</div>
+      <div class="diff-desc">Emitimos fatura mensal consolidada com todos os serviços realizados no período. Compatível com os processos de contas a pagar da sua empresa.</div>
+    </div>
+    <div class="diff-card reveal reveal-delay-2">
+      <div class="diff-num">03</div>
+      <div class="diff-icon">🧾</div>
+      <div class="diff-title">Emissão de Nota Fiscal</div>
+      <div class="diff-desc">Emitimos NFS-e para cada serviço realizado, com CNPJ da sua empresa como tomador. Processo contábil limpo e rastreável.</div>
+    </div>
+    <div class="diff-card reveal">
+      <div class="diff-num">04</div>
+      <div class="diff-icon">🏦</div>
+      <div class="diff-title">Emissão de Boleto</div>
+      <div class="diff-desc">Pagamento via boleto bancário com data combinada, sem necessidade de cartão ou pagamento imediato. Integrado ao seu fluxo financeiro.</div>
+    </div>
+    <div class="diff-card reveal reveal-delay-1">
+      <div class="diff-num">05</div>
+      <div class="diff-icon">📅</div>
+      <div class="diff-title">Prazo de Pagamento</div>
+      <div class="diff-desc">Negociamos prazos de 7, 15, 30 ou 30/60 dias conforme o porte e volume de serviços. Flexibilidade real para o seu departamento financeiro.</div>
+    </div>
+    <div class="diff-card reveal reveal-delay-2">
+      <div class="diff-num">06</div>
+      <div class="diff-icon">💲</div>
+      <div class="diff-title">Preço Diferenciado PJ</div>
+      <div class="diff-desc">Contratos corporativos têm tabela especial com descontos progressivos por volume. Quanto mais equipamentos, menor o custo unitário.</div>
+    </div>
+    <div class="diff-card reveal">
+      <div class="diff-num">07</div>
+      <div class="diff-icon">🔄</div>
+      <div class="diff-title">Equipamento Emprestado</div>
+      <div class="diff-desc">Enquanto o equipamento está em manutenção, disponibilizamos um substituto para sua empresa não parar. Continuidade operacional garantida.</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- COMO FUNCIONA -->
+<section id="como-funciona">
+  <div class="sec-eyebrow reveal">COMO FUNCIONA</div>
+  <h2 class="sec-title reveal reveal-delay-1">Processo simples,<br>resultado garantido.</h2>
+  <div class="steps-wrap">
+    <div class="step reveal">
+      <div class="step-n">01</div>
+      <div class="step-title">Diagnóstico & Proposta</div>
+      <div class="step-desc">Você nos contata, identificamos os equipamentos e enviamos uma proposta comercial com tabela de preços, prazos e condições.</div>
+    </div>
+    <div class="step reveal reveal-delay-1">
+      <div class="step-n">02</div>
+      <div class="step-title">Coleta & Manutenção</div>
+      <div class="step-desc">Agendamos a coleta, realizamos o conserto com peças originais e mantemos você informado do andamento via sistema.</div>
+    </div>
+    <div class="step reveal reveal-delay-2">
+      <div class="step-n">03</div>
+      <div class="step-title">Entrega & Faturamento</div>
+      <div class="step-desc">Devolvemos o equipamento funcionando, emitimos nota fiscal e boleto com o prazo acordado. Simples assim.</div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA BAND -->
+<div class="cta-band">
+  <div class="cta-band-inner">
+    <div>
+      <div class="cta-band-title">Pronto para ter um parceiro<br>de manutenção de verdade?</div>
+      <div class="cta-band-sub">Fale com a gente e receba uma proposta personalizada em até 24h.</div>
+    </div>
+    <a href="#contato" class="btn-dark">Quero uma Proposta →</a>
+  </div>
+</div>
+
+<!-- CONTATO -->
+<section id="contato">
+  <div class="sec-eyebrow reveal">CONTATO</div>
+  <h2 class="sec-title reveal reveal-delay-1">Vamos conversar.</h2>
+  <div class="contact-grid">
+    <form class="contact-form reveal" onsubmit="enviarContato(event)">
+      <div class="cf-row">
+        <div class="cf-field"><label>NOME</label><input type="text" id="ct-nome" placeholder="Seu nome" required></div>
+        <div class="cf-field"><label>EMPRESA</label><input type="text" id="ct-empresa" placeholder="Razão social" required></div>
+      </div>
+      <div class="cf-row">
+        <div class="cf-field"><label>TELEFONE</label><input type="tel" id="ct-tel" placeholder="(31) 9 0000-0000"></div>
+        <div class="cf-field"><label>EMAIL</label><input type="email" id="ct-email" placeholder="email@empresa.com" required></div>
+      </div>
+      <div class="cf-field">
+        <label>TIPO DE EQUIPAMENTO</label>
+        <select id="ct-equip">
+          <option value="">Selecionar...</option>
+          <option>Microondas / Fornos</option>
+          <option>Purificadores / Bebedouros</option>
+          <option>Geladeiras / Freezers</option>
+          <option>Ar Condicionado</option>
+          <option>Televisores</option>
+          <option>Outros equipamentos</option>
+        </select>
+      </div>
+      <div class="cf-field"><label>MENSAGEM</label><textarea id="ct-msg" placeholder="Descreva sua necessidade, quantidade de equipamentos, etc."></textarea></div>
+      <button type="submit" class="btn-primary" id="ct-btn">Enviar Solicitação →</button>
+      <div id="ct-status" style="font-size:11px;color:var(--orange);display:none;margin-top:8px;"></div>
+    </form>
+    <div class="contact-info reveal reveal-delay-1">
+      <div class="ci-item">
+        <div class="ci-icon">📍</div>
+        <div>
+          <div class="ci-label">LOCALIZAÇÃO</div>
+          <div class="ci-value">Belo Horizonte, MG<br>Atendemos toda a Região Metropolitana</div>
+        </div>
+      </div>
+      <div class="ci-item">
+        <div class="ci-icon">📞</div>
+        <div>
+          <div class="ci-label">TELEFONE / WHATSAPP</div>
+          <div class="ci-value"><a href="tel:+5531971324642" style="color:var(--white);text-decoration:none;">(31) 9 7132-4642</a></div>
+        </div>
+      </div>
+      <div class="ci-item">
+        <div class="ci-icon">✉️</div>
+        <div>
+          <div class="ci-label">EMAIL COMERCIAL</div>
+          <div class="ci-value"><a href="mailto:pedro@comercial.reparoeletroadm.com" style="color:var(--white);text-decoration:none;">pedro@comercial.reparoeletroadm.com</a></div>
+        </div>
+      </div>
+      <div class="ci-item">
+        <div class="ci-icon">⏰</div>
+        <div>
+          <div class="ci-label">HORÁRIO DE ATENDIMENTO</div>
+          <div class="ci-value">Segunda a Sexta: 8h às 18h<br>Sábado: 8h às 13h</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;padding:24px;background:var(--card);border:1px solid var(--border);border-radius:12px;">
+        <div style="font-family:var(--fm);font-size:9px;letter-spacing:.12em;color:var(--orange);margin-bottom:12px;">RESPOSTA RÁPIDA</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.7;">Propostas respondidas em até <strong style="color:var(--white)">24 horas úteis</strong>. Para urgências, entre em contato via WhatsApp.</div>
+        <a href="https://wa.me/5531971324642?text=Olá!%20Quero%20saber%20sobre%20manutenção%20de%20equipamentos%20para%20empresa." target="_blank" class="btn-primary" style="display:inline-block;margin-top:16px;font-size:11px;padding:10px 20px;">
+          💬 WhatsApp Comercial
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">Reparo Eletro BH</div>
+  <div style="text-align:center;">Especialistas em manutenção de eletrodomésticos · Belo Horizonte, MG</div>
+  <div>© 2026 — Todos os direitos reservados</div>
+</footer>
+
+<script>
+// Scroll reveal
+var obs = new IntersectionObserver(function(entries){
+  entries.forEach(function(e){ if(e.isIntersecting) e.target.classList.add('visible'); });
+},{threshold:.1});
+document.querySelectorAll('.reveal').forEach(function(el){ obs.observe(el); });
+
+// Formulário de contato (salva no Redis da Reparo Eletro como lead PJ)
+async function enviarContato(e){
+  e.preventDefault();
+  var btn=document.getElementById('ct-btn');
+  var status=document.getElementById('ct-status');
+  btn.textContent='Enviando...'; btn.disabled=true;
+  var dados={
+    empresa:   document.getElementById('ct-empresa').value,
+    nome:      document.getElementById('ct-nome').value,
+    telefone:  document.getElementById('ct-tel').value,
+    email:     document.getElementById('ct-email').value,
+    segmento:  document.getElementById('ct-equip').value,
+    obs:       document.getElementById('ct-msg').value,
+  };
+  try{
+    var r = await fetch('/api/pj-prospects?action=criar',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(dados)
+    });
+    var j = await r.json();
+    if(j.ok){
+      status.textContent='✅ Solicitação recebida! Retornaremos em até 24h.';
+      status.style.display='block';
+      e.target.reset();
+    } else {
+      status.textContent='❌ Erro ao enviar. Tente pelo WhatsApp.';
+      status.style.display='block';
+    }
+  }catch(err){
+    status.textContent='❌ Erro. Tente pelo WhatsApp.';
+    status.style.display='block';
+  }
+  btn.textContent='Enviar Solicitação →'; btn.disabled=false;
+}
+</script>
+</body>
+</html>
