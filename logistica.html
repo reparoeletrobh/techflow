@@ -514,10 +514,28 @@ function mascaraTel(tel) {
   return tel;
 }
 // ── RENDER ────────────────────────────────────────────────────
+// Retorna true se a ficha está em estado de alerta vermelho
+function isEmAlerta(f) {
+  if (f.phase === 'horario_marcado' && f.horarioColeta) {
+    return new Date(f.horarioColeta).getTime() < Date.now(); // vencido
+  }
+  if (f.phase === 'em_rota' || f.phase === 'motorista_parceiro') {
+    var ref = f.movedAt || f.criadoEm;
+    if (ref) return (Date.now() - new Date(ref).getTime()) > 2 * 60 * 60 * 1000; // > 2h
+  }
+  return false;
+}
+
 function render() {
   const board = document.getElementById('board');
   board.innerHTML = COLS.map(col => {
-    const cards = fichasFiltradas.filter(f => f.phase === col.id);
+    const cards = fichasFiltradas
+      .filter(f => f.phase === col.id)
+      .sort((a, b) => {
+        const aA = isEmAlerta(a) ? 1 : 0;
+        const bA = isEmAlerta(b) ? 1 : 0;
+        return bA - aA; // alertas primeiro
+      });
     return `
     <div class="col">
       <div class="col-header">
