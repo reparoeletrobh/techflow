@@ -40,7 +40,7 @@ const FIN_PHASES = [
 ];
 
 // Move card no Pipefy para uma fase
-  // ── GET verificar-pagamento — consulta status real na API do MP ─────────
+  
   if (action === 'verificar-pagamento') {
     const q = (req.query.q || '').toLowerCase().trim();
     if (!q) return res.status(400).json({ ok:false, error:'Informe ?q=nome' });
