@@ -660,7 +660,7 @@ module.exports = async function handler(req, res) {
     try { await dbSet(FIN_BACKUP_KEY, { ...fin, backedUpAt: new Date().toISOString() }); } catch(e) {}
     // Move no Pipe ADM (reparoeletro_pipe) → solicitar_entrega
     // (comunicação 100% interna via Redis)
-    if (phaseId === "entrega_liberada") {
+    if (phaseId === "entrega_liberada" || phaseId === "pagamento_confirmado") {
       try {
         const PIPE_KEY_F = 'reparoeletro_pipe';
         const pipeDbF = await dbGet(PIPE_KEY_F);
