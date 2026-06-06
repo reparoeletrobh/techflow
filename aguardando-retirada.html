@@ -282,17 +282,18 @@ async function renderAviso() {
 
 // ── COPIAR E ENVIAR ───────────────────────────────────────────
 function copiarEnviar(waLink) {
-  // Copia o texto para o clipboard
-  navigator.clipboard.writeText(MSG_RETIRADA).catch(function() {
+  // Copia apenas o texto — sem abrir nova guia
+  navigator.clipboard.writeText(MSG_RETIRADA).then(function() {
+    showToast('✅', 'Copiado!', 'Mensagem copiada para a área de transferência.');
+  }).catch(function() {
     var ta = document.createElement('textarea');
     ta.value = MSG_RETIRADA;
     document.body.appendChild(ta);
     ta.select();
     document.execCommand('copy');
     document.body.removeChild(ta);
+    showToast('✅', 'Copiado!', 'Mensagem copiada para a área de transferência.');
   });
-  showToast('📋', 'Copiado!', 'Abrindo WhatsApp...');
-  setTimeout(function() { window.open(waLink, '_blank'); }, 800);
 }
 
 // ── TOAST ─────────────────────────────────────────────────────
