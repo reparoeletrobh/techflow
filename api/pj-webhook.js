@@ -29,42 +29,69 @@ module.exports = async function handler(req, res) {
   if (req.method === 'POST') {
     try {
       const event = req.body || {};
+      const LOG_KEY = 'pj_webhook_log';
 
-      // Aceitar qualquer evento (verificação ou email real)
-      if (event.type !== 'email.received') {
-        return res.status(200).json({ ok: true, ignored: true });
+      // Logar TUDO que chega (para diagnóstico)
+      const logDb = (await dbGet(LOG_KEY)) || { eventos: [] };
+      logDb.eventos.unshift({
+        ts: new Date().toISOString(),
+        type: event.type || 'sem_type',
+        keys: Object.keys(event),
+        dataKeys: event.data ? Object.keys(event.data) : [],
+        raw: JSON.stringify(event).slice(0, 500)
+      });
+      logDb.eventos = logDb.eventos.slice(0, 50);
+      await dbSet(LOG_KEY, logDb);
+
+      // Aceitar email.received OU qualquer estrutura com 'from'/'subject'
+      const data = event.data || event;
+      const isEmail = event.type === 'email.received' ||
+                      data.from || data.subject || data.email_id;
+
+      if (!isEmail) {
+        return res.status(200).json({ ok: true, ignored: true, type: event.type });
       }
 
       // Salvar email recebido no Redis
       const inbox = (await dbGet(INBOX_KEY)) || { emails: [] };
+      const to = Array.isArray(data.to) ? data.to.join(', ') : (data.to || '');
       inbox.emails.unshift({
-        id:          event.data?.email_id || Date.now().toString(36),
-        de:          event.data?.from || '',
-        para:        event.data?.to   || '',
-        assunto:     event.data?.subject || '',
-        texto:       event.data?.text || '',
-        html:        event.data?.html || '',
-        recebidoEm:  event.data?.created_at || new Date().toISOString(),
-        lido:        false,
+        id:         data.email_id || data.id || Date.now().toString(36),
+        de:         data.from || '',
+        para:       to,
+        assunto:    data.subject || '',
+        texto:      data.text || data.plain_text || '',
+        html:       data.html || '',
+        recebidoEm: data.created_at || new Date().toISOString(),
+        lido:       false,
       });
       inbox.emails = inbox.emails.slice(0, 500);
       await dbSet(INBOX_KEY, inbox);
 
-      return res.status(200).json({ ok: true });
+      return res.status(200).json({ ok: true, saved: true });
     } catch(e) {
       console.error('pj-webhook:', e.message);
-      return res.status(200).json({ ok: true }); // sempre 200 pro Resend
+      return res.status(200).json({ ok: true });
     }
   }
 
-  // GET — health check / verificação manual
+  // GET — health check + diagnóstico
   if (req.method === 'GET') {
-    const inbox = (await dbGet(INBOX_KEY)) || { emails: [] };
+    const inbox  = (await dbGet(INBOX_KEY))    || { emails: [] };
+    const logDb  = (await dbGet('pj_webhook_log')) || { eventos: [] };
     return res.status(200).json({
       ok: true,
       status: 'Webhook PJ ativo',
       emails: inbox.emails.length,
-      ultimoRecebido: inbox.emails[0]?.recebidoEm || null,
+      ultimoEmail: inbox.emails[0] ? {
+        de: inbox.emails[0].de,
+        assunto: inbox.emails[0].assunto,
+        recebidoEm: inbox.emails[0].recebidoEm
+      } : null,
+      ultimosEventos: logDb.eventos.slice(0, 5),
+      diagnostico: logDb.eventos.length === 0
+        ? '⚠️ Nenhum evento recebido — Resend não está disparando o webhook'
+        : '✅ Webhook ativo — '+logDb.eventos.length+' evento(s) recebido(s)'
     });
   }
 
