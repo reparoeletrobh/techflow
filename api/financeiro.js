@@ -461,7 +461,7 @@ module.exports = async function handler(req, res) {
       rec.movedAt  = new Date().toISOString();
       rec.history  = [...(rec.history||[]), { phaseId:"faturamento", ts:rec.movedAt, via:"mp_cobranca" }];
       await dbSet(FIN_KEY, fin);
-      try { await dbSet(FIN_BACKUP_KEY, { ...fin, backedUpAt:new Date().toISOString() }); } catch(e) {}
+      dbSet(FIN_BACKUP_KEY, { ...fin, backedUpAt:new Date().toISOString() }).catch(()=>{}); // async
 
       // Registrar na conciliação (link gerado, aguardando pagamento)
       await salvarConciliacao({
@@ -904,6 +904,34 @@ module.exports = async function handler(req, res) {
         '⚠️ Backup síncrono: cada ação escreve 2x no Redis (FIN_KEY + FIN_BACKUP_KEY)',
         antigos > 50 ? '💡 '+antigos+' registros com +90 dias podem ser arquivados para aliviar o banco' : '✅ Poucos registros antigos',
       ]
+    });
+  }
+
+    // ── POST arquivar-concluidos — move fichas finalizadas para arquivo ─────────
+  if (req.method === 'POST' && action === 'arquivar-concluidos') {
+    const ARQUIVO_KEY = 'reparoeletro_financeiro_arquivo';
+    const fin = (await dbGet(FIN_KEY)) || { records: [] };
+    const arquivo = (await dbGet(ARQUIVO_KEY)) || { records: [] };
+    // Fases consideradas finalizadas para arquivo
+    const fasesArquivo = ['nf_emitida', 'faturamento'];
+    const paraArquivar = (fin.records||[]).filter(r => fasesArquivo.includes(r.phaseId));
+    const manter = (fin.records||[]).filter(r => !fasesArquivo.includes(r.phaseId));
+    if (paraArquivar.length === 0) {
+      return res.status(200).json({ ok:true, msg:'Nenhuma ficha para arquivar', total: fin.records.length });
+    }
+    // Mover para arquivo sem anexo (economiza espaço)
+    const arquivadas = paraArquivar.map(r => ({ ...r, anexo: null }));
+    arquivo.records = [...arquivadas, ...(arquivo.records||[])].slice(0, 2000);
+    fin.records = manter;
+    await Promise.all([
+      dbSet(FIN_KEY, fin),
+      dbSet(ARQUIVO_KEY, arquivo)
+    ]);
+    return res.status(200).json({
+      ok: true,
+      arquivadas: paraArquivar.length,
+      restantes: manter.length,
+      msg: `✅ ${paraArquivar.length} fichas arquivadas — banco principal aliviado`
     });
   }
 
