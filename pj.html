@@ -533,7 +533,9 @@ function responderEmail(de,assunto){
 
 function copiarEmail(de){
   navigator.clipboard.writeText(de).then(function(){toast('📋 Copiado!');}).catch(function(){});
-} ── CAMPANHAS ──────────────────────────────────────────────────────────────
+}
+
+// ── CAMPANHAS ──────────────────────────────────────────────────────────────
 function contarDest(){
   var f=g('c-filtro').value;
   var lista=f==='todos'?_P:_P.filter(function(p){return p.status===f;});
