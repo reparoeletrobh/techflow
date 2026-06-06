@@ -670,7 +670,6 @@ function buildCard(f){
   d.className='fl-card';
   d.innerHTML='<div class="fl-card-os">'+f.id+'</div>'+
     '<div class="fl-card-nome">'+f.nomeContato+'</div>'+
-    (f.telefone?'<div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin:2px 0;">📞 '+mascaraTel(f.telefone)+'</div>':'')+
     '<div class="fl-card-equip">'+f.equipamento+'</div>'+
     (f.descricao?'<div class="fl-card-desc">'+f.descricao.slice(0,60)+'...</div>':'');
   // Botões por fase
