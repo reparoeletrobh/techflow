@@ -915,5 +915,45 @@ module.exports = async function handler(req, res) {
     });
   }
 
-    return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+      // ── GET verificar-pagamento ─────────────────────────────────────────────────
+  if (action === 'verificar-pagamento') {
+    const q = (req.query.q || '').toLowerCase().trim();
+    if (!q) return res.status(400).json({ ok:false, error:'Informe ?q=nome' });
+    const fin = (await dbGet(FIN_KEY)) || { records:[] };
+    const rec = (fin.records||[]).find(r =>
+      (r.nome||'').toLowerCase().includes(q) ||
+      (r.nomeContato||'').toLowerCase().includes(q) ||
+      (r.tel||'').includes(q)
+    );
+    if (!rec) return res.status(404).json({ ok:false, error:'Não encontrado: '+q,
+      amostra:(fin.records||[]).slice(0,5).map(r=>({id:r.id,nome:r.nome||r.nomeContato,fase:r.phaseId,paidAt:r.paidAt}))
+    });
+    const base = { id:rec.id, nome:rec.nome||rec.nomeContato, fase:rec.phaseId,
+      valor:rec.valor, paidAt:rec.paidAt||null,
+      paymentId:rec.paymentId||rec.mpPaymentId||null,
+      preferenceId:rec.preferenceId||null };
+    const diag = [];
+    let statusMP = null;
+    const pid = rec.paymentId || rec.mpPaymentId;
+    if (pid && MP_TOKEN) {
+      try {
+        const mpR = await fetch('https://api.mercadopago.com/v1/payments/'+pid,
+          { headers:{ Authorization:'Bearer '+MP_TOKEN } });
+        const mp = await mpR.json();
+        statusMP = { id:mp.id, status:mp.status, statusDetail:mp.status_detail,
+          valor:mp.transaction_amount, payer:mp.payer?.email||mp.payer?.first_name||'—',
+          dataAprovacao:mp.date_approved, metodoPagamento:mp.payment_method_id };
+        if (mp.status==='approved') diag.push('✅ MP APROVADO — dinheiro entrou na conta');
+        else if (mp.status==='pending') diag.push('⚠️ MP PENDENTE — ainda não aprovado');
+        else if (mp.status==='rejected') diag.push('❌ MP REJEITADO — dinheiro NÃO entrou');
+        else diag.push('⚠️ Status MP: '+mp.status+' / '+mp.status_detail);
+      } catch(e){ diag.push('❌ Erro ao consultar MP: '+e.message); }
+    } else if (!pid) {
+      diag.push('🔴 SEM paymentId — ficha marcada como paga SEM confirmação do webhook MP');
+      diag.push('💡 Possível: PIX falso, link não foi pago, ou fase movida manualmente');
+    }
+    return res.status(200).json({ ok:true, ficha:base, statusMP, diagnostico:diag });
+  }
+
+  return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 };
