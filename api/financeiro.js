@@ -875,7 +875,39 @@ module.exports = async function handler(req, res) {
     });
   }
 
-      // ── GET verificar-pagamento — verifica status real do pagamento na API do MP ──
+      // ── GET perf-check — diagnóstico de performance do financeiro ─────────────
+  if (action === 'perf-check') {
+    const fin = (await dbGet(FIN_KEY)) || { records: [] };
+    const bkp = await dbGet(FIN_BACKUP_KEY).catch(()=>null);
+    const records = fin.records || [];
+    const now = Date.now();
+    // Tamanho estimado
+    const finJson = JSON.stringify(fin);
+    const bkpJson = bkp ? JSON.stringify(bkp) : '{}';
+    // Distribuição de fases
+    const porFase = {};
+    records.forEach(r => { porFase[r.phaseId] = (porFase[r.phaseId]||0)+1; });
+    // Registros antigos (mais de 90 dias)
+    const cutoff90 = new Date(now - 90*24*60*60*1000).toISOString();
+    const antigos = records.filter(r => r.criadoEm < cutoff90).length;
+    return res.status(200).json({
+      ok: true,
+      totalRecords: records.length,
+      tamanhoBanco_KB: Math.round(finJson.length / 1024),
+      tamanhoBackup_KB: Math.round(bkpJson.length / 1024),
+      totalKB: Math.round((finJson.length + bkpJson.length) / 1024),
+      porFase,
+      registrosAntigos90dias: antigos,
+      diagnostico: [
+        records.length > 500 ? '⚠️ '+records.length+' registros — banco grande, considerar arquivar antigos' : '✅ Volume de registros ok',
+        finJson.length > 500000 ? '🔴 Banco > 500KB — cada botão faz ler/escrever esse volume' : finJson.length > 200000 ? '⚠️ Banco > 200KB — lento' : '✅ Tamanho ok',
+        '⚠️ Backup síncrono: cada ação escreve 2x no Redis (FIN_KEY + FIN_BACKUP_KEY)',
+        antigos > 50 ? '💡 '+antigos+' registros com +90 dias podem ser arquivados para aliviar o banco' : '✅ Poucos registros antigos',
+      ]
+    });
+  }
+
+    // ── GET verificar-pagamento — verifica status real do pagamento na API do MP ──
   if (action === 'verificar-pagamento') {
     const q2 = (req.query.q || '').toLowerCase().trim();
     if (!q2) return res.status(400).json({ ok:false, error:'Informe ?q=nome' });
