@@ -735,15 +735,22 @@ async function marcarOrcWpp(id) {
 
 function avisarCliente(id){
   var f=fichas.find(function(x){return x.id===id;});
-  if(!f||!f.telefone)return;
-  var tel=(f.telefone||'').replace(/[^0-9]/g,'');
-  if(tel.length>=10&&!tel.startsWith('55'))tel='55'+tel;
-  var msg=encodeURIComponent('Olá, aqui é a Reparo Eletro. Seu equipamento já está pronto para retirada, aguardo você.');
-  var link='https://wa.me/'+tel+'?text='+msg;
-  navigator.clipboard.writeText(link).catch(function(){var ta=document.createElement('textarea');ta.value=link;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);});
-  window.open(link,'_blank');
+  if(!f)return;
+  var texto='Olá, aqui é a Reparo Eletro. Seu equipamento já está pronto para retirada, aguardo você.';
+  // Copiar apenas o texto — sem abrir nova guia
+  navigator.clipboard.writeText(texto).then(function(){
+    toast('✅ Mensagem copiada para a área de transferência!','g');
+  }).catch(function(){
+    var ta=document.createElement('textarea');
+    ta.value=texto;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('✅ Mensagem copiada para a área de transferência!','g');
+  });
+  // Marcar como avisado no sistema
   fetch('/api/frenteloja?action=marcar-avisado',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json();}).then(function(d){if(d.ok&&d.ficha){var idx=fichas.findIndex(function(x){return x.id===id;});if(idx>=0)fichas[idx]=d.ficha;renderKanban();}});
-  toast('📲 Link copiado! WhatsApp aberto.','g');
 }
 // ══ RENDER PAINEL ════════════════════════════════════════════
 function renderPainel(){
