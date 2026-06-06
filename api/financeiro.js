@@ -935,6 +935,57 @@ module.exports = async function handler(req, res) {
     });
   }
 
+    // ── GET arquivar-automatico — cron diário: arquiva fichas pagas há +15 dias ───
+  if (action === 'arquivar-automatico') {
+    const ARQUIVO_KEY = 'reparoeletro_financeiro_arquivo';
+    const CORTE_DIAS  = 15;
+    const cutoff      = new Date(Date.now() - CORTE_DIAS * 24 * 60 * 60 * 1000).toISOString();
+
+    const fin     = (await dbGet(FIN_KEY))     || { records: [] };
+    const arquivo = (await dbGet(ARQUIVO_KEY)) || { records: [] };
+
+    // Fases consideradas "concluídas" para arquivamento
+    const fasesArquivar = ['entrega_liberada', 'nf_emitida', 'faturamento', 'item_coletado'];
+
+    const paraArquivar = (fin.records || []).filter(r =>
+      fasesArquivar.includes(r.phaseId) &&
+      (r.paidAt || r.movedAt || r.criadoEm || '') < cutoff
+    );
+    const manter = (fin.records || []).filter(r => !paraArquivar.includes(r));
+
+    if (paraArquivar.length === 0) {
+      return res.status(200).json({
+        ok: true, arquivadas: 0, restantes: manter.length,
+        msg: 'Nenhuma ficha elegível para arquivamento (< 15 dias)',
+      });
+    }
+
+    // Arquivar sem campo anexo (economiza espaço)
+    const arquivadas = paraArquivar.map(r => ({ ...r, anexo: null }));
+    arquivo.records  = [...arquivadas, ...(arquivo.records || [])].slice(0, 3000);
+    fin.records      = manter;
+
+    await Promise.all([
+      dbSet(FIN_KEY, fin),
+      dbSet(ARQUIVO_KEY, arquivo),
+    ]);
+
+    // Log
+    console.log('[cron-arquivar] Arquivadas:', paraArquivar.length,
+      '| Restantes:', manter.length,
+      '| Data corte:', cutoff.slice(0,10));
+
+    return res.status(200).json({
+      ok: true,
+      arquivadas:  paraArquivar.length,
+      restantes:   manter.length,
+      corteDias:   CORTE_DIAS,
+      dataCorte:   cutoff.slice(0, 10),
+      fasesArquivadas: fasesArquivar,
+      msg: `✅ ${paraArquivar.length} ficha(s) arquivada(s) — banco aliviado`,
+    });
+  }
+
     // ── GET verificar-pagamento — verifica status real do pagamento na API do MP ──
   if (action === 'verificar-pagamento') {
     const q2 = (req.query.q || '').toLowerCase().trim();
