@@ -1,11 +1,25 @@
 // api/pj-sdr.js — Módulo SDR CRM | Reparo Eletro BH
-const { Redis } = require('@upstash/redis');
-const redis = new Redis({ url: process.env.UPSTASH_URL, token: process.env.UPSTASH_TOKEN });
+const U = (process.env.UPSTASH_URL   ||'').replace(/['"]/g,'').trim();
+const T = (process.env.UPSTASH_TOKEN ||'').replace(/['"]/g,'').trim();
 const SDR_KEY   = 'pj_sdr';
 const INBOX_KEY = 'pj_inbox';
 
-async function dbGet(k){ try{ return await redis.get(k); }catch(e){ return null; }}
-async function dbSet(k,v){ try{ return await redis.set(k,v); }catch(e){ return null; }}
+async function dbGet(k){
+  try{
+    const r=await fetch(U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});
+    const j=await r.json();
+    const v=j[0]?.result;
+    if(!v)return null;
+    let x=JSON.parse(v);
+    if(typeof x==='string')x=JSON.parse(x);
+    return x;
+  }catch(e){return null;}
+}
+async function dbSet(k,v){
+  try{
+    await fetch(U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});
+  }catch(e){}
+}
 
 // ── Cadência oficial (9 toques, 21 dias) ─────────────────────────────────────
 const CADENCIA_STEPS = [
