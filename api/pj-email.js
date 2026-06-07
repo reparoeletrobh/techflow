@@ -15,9 +15,13 @@ module.exports = async function handler(req,res){
 
   // GET inbox
   if(action==='inbox'){
-    const db=await dbGet(INBOX_KEY)||{emails:[]};
-    const naoLidos=(db.emails||[]).filter(e=>!e.lido).length;
-    return res.status(200).json({ok:true,emails:db.emails||[],naoLidos});
+    // Apenas emails RECEBIDOS via webhook — não misturar com enviados
+    try{
+      const local=(await dbGet('pj_inbox'))||{emails:[]};
+      const emails=local.emails||[];
+      const naoLidos=emails.filter(e=>!e.lido).length;
+      return res.status(200).json({ok:true,emails,naoLidos,total:emails.length});
+    }catch(e){return res.status(500).json({ok:false,error:e.message});}
   }
 
   // POST marcar-lido
@@ -63,7 +67,28 @@ module.exports = async function handler(req,res){
       falhasDetalhe,criadoEm:new Date().toISOString()});
     cDb.campanhas=cDb.campanhas.slice(0,100);
     await dbSet(CAMP_KEY,cDb);
+    // Salvar em pj_enviados para a caixa de enviados
+    const ENVIADOS_KEY='pj_enviados';
+    const eDb=await dbGet(ENVIADOS_KEY)||{emails:[]};
+    const paraTexto=destinatarios.map(d=>d.email||d).join(', ');
+    eDb.emails.unshift({
+      id:Date.now().toString(36),
+      para:paraTexto,
+      assunto,
+      corpo:texto||html||'',
+      criadoEm:new Date().toISOString(),
+      totalDest:destinatarios.length,
+      enviados:resultados.filter(r=>r.ok).length,
+    });
+    eDb.emails=eDb.emails.slice(0,500);
+    await dbSet(ENVIADOS_KEY,eDb);
     return res.status(200).json({ok:true,resultados,total:destinatarios.length,enviados:resultados.filter(r=>r.ok).length,falhas:resultados.filter(r=>!r.ok).length,erros:resultados.filter(r=>!r.ok).map(r=>({email:r.email,erro:r.erro}))});
+  }
+
+  // GET listar-enviados — caixa de enviados
+  if(action==='listar-enviados'){
+    const eDb=await dbGet('pj_enviados')||{emails:[]};
+    return res.status(200).json({ok:true,emails:eDb.emails||[]});
   }
 
   // GET campanhas
