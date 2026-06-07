@@ -199,6 +199,109 @@ select option{background:var(--s2);}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--s1);
   border:1px solid var(--bdr);border-radius:7px;padding:9px 18px;font-family:var(--fm);
   font-size:11px;z-index:999;display:none;}
+
+/* ── SDR CRM ─────────────────────────────────────────────────────────────── */
+.sdr-wrap{display:flex;flex-direction:column;gap:16px;padding:4px 0;}
+
+/* Painel de inteligência */
+.sdr-painel{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;}
+.sdr-card{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
+.sdr-card:hover{border-color:var(--bl);transform:translateY(-1px);}
+.sdr-card.destaque{border-color:rgba(249,115,22,.4);background:rgba(249,115,22,.06);}
+.sdr-card-n{font-family:var(--fh);font-size:28px;font-weight:900;line-height:1;}
+.sdr-card-l{font-family:var(--fm);font-size:9px;color:var(--mu);margin-top:4px;letter-spacing:.05em;}
+.sdr-card-icon{position:absolute;right:12px;top:12px;font-size:20px;opacity:.3;}
+
+/* Toolbar */
+.sdr-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.sdr-view-btns{display:flex;gap:4px;}
+.sdr-view-btn{background:var(--s2);border:1px solid var(--bdr);border-radius:6px;color:var(--mu);font-family:var(--fm);font-size:10px;padding:6px 12px;transition:all .15s;}
+.sdr-view-btn.active{background:var(--bl);border-color:var(--bl);color:#fff;}
+.sdr-filters{display:flex;gap:6px;align-items:center;margin-left:auto;}
+.sdr-filter-sel{background:var(--s2);border:1px solid var(--bdr);border-radius:6px;color:var(--tx);font-family:var(--fm);font-size:10px;padding:6px 10px;outline:none;}
+
+/* Kanban Pipeline */
+.sdr-kanban{display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;}
+.sdr-col{min-width:190px;width:190px;flex-shrink:0;background:var(--s1);border:1px solid var(--bdr);border-radius:10px;overflow:hidden;}
+.sdr-col-head{padding:10px 12px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:6px;}
+.sdr-col-dot{width:8px;height:8px;border-radius:50%;}
+.sdr-col-name{font-family:var(--fh);font-size:11px;font-weight:700;}
+.sdr-col-cnt{margin-left:auto;font-family:var(--fm);font-size:9px;background:var(--s2);border-radius:99px;padding:1px 7px;}
+.sdr-col-body{padding:8px;display:flex;flex-direction:column;gap:6px;min-height:80px;}
+
+/* Lead card */
+.sdr-lead{background:var(--s2);border:1px solid var(--bdr);border-radius:8px;padding:10px 10px 8px;cursor:pointer;transition:all .15s;}
+.sdr-lead:hover{border-color:var(--bl);background:rgba(59,130,246,.06);}
+.sdr-lead.atrasado{border-left:3px solid var(--re);}
+.sdr-lead-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
+.sdr-lead-emp{font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px;}
+.sdr-lead-score{font-family:var(--fm);font-size:9px;font-weight:700;background:var(--s1);border-radius:99px;padding:1px 6px;}
+.sdr-lead-nome{font-family:var(--fm);font-size:9px;color:var(--mu);margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sdr-lead-badges{display:flex;gap:4px;flex-wrap:wrap;}
+.badge{font-size:9px;padding:1px 5px;border-radius:4px;font-family:var(--fm);}
+.badge-email{background:rgba(59,130,246,.15);color:var(--bl);}
+.badge-wa{background:rgba(16,217,130,.15);color:var(--gr);}
+.badge-hot{background:rgba(249,115,22,.15);color:var(--or);}
+.badge-atrasado{background:rgba(240,64,96,.15);color:var(--re);}
+.sdr-lead-cad{font-family:var(--fm);font-size:8px;color:var(--mu);margin-top:5px;display:flex;align-items:center;gap:3px;}
+
+/* Modal cadastro lead */
+.sdr-modal-body{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.sdr-modal-full{grid-column:1/-1;}
+.sdr-modal-section{font-family:var(--fm);font-size:9px;letter-spacing:.1em;color:var(--or);grid-column:1/-1;margin-top:8px;}
+
+/* Painel lateral do lead */
+.sdr-detail{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:20px;display:none;}
+.sdr-detail.show{display:block;}
+.sdr-detail-nome{font-family:var(--fh);font-size:18px;font-weight:800;}
+.sdr-detail-emp{font-size:12px;color:var(--mu);margin-bottom:14px;}
+.sdr-detail-score-bar{height:6px;border-radius:99px;background:var(--s2);margin:8px 0;}
+.sdr-detail-score-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--bl),var(--or));transition:width .5s;}
+.cad-step{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid rgba(26,37,64,.4);}
+.cad-step:last-child{border-bottom:none;}
+.cad-step-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;border:1px solid var(--bdr);}
+.cad-step.done .cad-step-icon{background:rgba(16,217,130,.15);border-color:var(--gr);}
+.cad-step.respondeu .cad-step-icon{background:rgba(249,115,22,.2);border-color:var(--or);}
+.cad-step.proximo .cad-step-icon{background:rgba(59,130,246,.15);border-color:var(--bl);animation:pulse-bl 2s ease infinite;}
+@keyframes pulse-bl{0%,100%{box-shadow:0 0 0 0 rgba(59,130,246,.4);}50%{box-shadow:0 0 0 4px rgba(59,130,246,.0);}}
+.cad-step-info{flex:1;}
+.cad-step-label{font-size:11px;font-weight:500;}
+.cad-step-dia{font-family:var(--fm);font-size:9px;color:var(--mu);}
+.cad-step-actions{display:flex;gap:4px;margin-top:4px;}
+.cad-btn{font-family:var(--fm);font-size:9px;padding:3px 8px;border-radius:5px;border:1px solid var(--bdr);cursor:pointer;transition:all .15s;}
+.cad-btn-ok{background:rgba(16,217,130,.1);border-color:var(--gr);color:var(--gr);}
+.cad-btn-resp{background:rgba(249,115,22,.1);border-color:var(--or);color:var(--or);}
+.cad-btn-copy{background:var(--s2);color:var(--mu);}
+.cad-btn:hover{opacity:.8;}
+
+/* Ações do dia */
+.acoes-dia{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:14px 16px;}
+.acoes-dia-title{font-family:var(--fh);font-size:12px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.acao-item{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(26,37,64,.5);cursor:pointer;}
+.acao-item:last-child{border-bottom:none;}
+.acao-item:hover .acao-emp{color:var(--bl);}
+.acao-canal{font-size:14px;width:20px;text-align:center;}
+.acao-emp{font-size:11px;font-weight:600;flex:1;}
+.acao-step{font-family:var(--fm);font-size:9px;color:var(--mu);}
+.acao-score{font-family:var(--fm);font-size:9px;background:var(--s2);border-radius:99px;padding:1px 6px;}
+
+/* Tabela */
+.sdr-table{width:100%;border-collapse:collapse;}
+.sdr-table th{font-family:var(--fm);font-size:9px;letter-spacing:.08em;color:var(--mu);padding:8px 10px;text-align:left;border-bottom:1px solid var(--bdr);}
+.sdr-table td{font-size:11px;padding:9px 10px;border-bottom:1px solid rgba(26,37,64,.4);}
+.sdr-table tr:hover td{background:var(--s1);}
+.sdr-table tr{cursor:pointer;}
+
+/* Score colors */
+.score-hot{color:var(--or);}
+.score-warm{color:var(--ye);}
+.score-cold{color:var(--mu);}
+@media(max-width:900px){
+  .sdr-painel{grid-template-columns:repeat(3,1fr);}
+  .sdr-kanban{flex-direction:column;}
+  .sdr-col{width:100%;}
+}
+
 </style>
 </head>
 <body>
@@ -219,7 +322,8 @@ select option{background:var(--s2);}
 </header>
 
 <div class="tabs">
-  <button class="tab on" id="t-prospects" onclick="ir('prospects')">🏢 Prospects <span class="tbadge" id="b-prospects">0</span></button>
+  <button class="tab on" id="t-sdr" onclick="ir('sdr')">🎯 SDR Pipeline</button>
+  <button class="tab" id="t-prospects" onclick="ir('prospects')">🏢 Prospects <span class="tbadge" id="b-prospects">0</span></button>
   <button class="tab" id="t-inbox" onclick="ir('inbox')">📬 Inbox <span class="tbadge" id="b-inbox" style="background:rgba(240,64,96,.15);color:var(--re);border-color:rgba(240,64,96,.3)">0</span></button>
   <button class="tab" id="t-campanha" onclick="ir('campanha')">📧 Campanhas</button>
   <button class="tab" id="t-listas" onclick="ir('listas')">📋 Listas</button>
@@ -227,7 +331,140 @@ select option{background:var(--s2);}
 </div>
 
 <!-- PROSPECTS -->
-<div class="pg on" id="pg-prospects">
+<div class="pg on" id="pg-sdr">
+  <div class="sdr-wrap">
+    <!-- PAINEL INTELIGÊNCIA -->
+    <div class="sdr-painel" id="sdr-painel">
+      <div class="sdr-card destaque" onclick="sdrFiltrar('respondeuEmail')" title="Leads que responderam email">
+        <div class="sdr-card-icon">📬</div>
+        <div class="sdr-card-n" id="sp-email">0</div>
+        <div class="sdr-card-l">RESPONDERAM EMAIL</div>
+      </div>
+      <div class="sdr-card" onclick="sdrFiltrar('quentes')" title="Score acima de 60">
+        <div class="sdr-card-icon">🔥</div>
+        <div class="sdr-card-n" id="sp-hot">0</div>
+        <div class="sdr-card-l">LEADS QUENTES</div>
+      </div>
+      <div class="sdr-card" onclick="sdrFiltrar('acoes')" title="Ações pendentes hoje">
+        <div class="sdr-card-icon">⏰</div>
+        <div class="sdr-card-n" id="sp-acoes">0</div>
+        <div class="sdr-card-l">AÇÕES HOJE</div>
+      </div>
+      <div class="sdr-card" onclick="sdrFiltrar('reunioes')">
+        <div class="sdr-card-icon">📅</div>
+        <div class="sdr-card-n" id="sp-reun">0</div>
+        <div class="sdr-card-l">REUNIÕES</div>
+      </div>
+      <div class="sdr-card" onclick="sdrFiltrar('emCadencia')">
+        <div class="sdr-card-icon">🔄</div>
+        <div class="sdr-card-n" id="sp-cad">0</div>
+        <div class="sdr-card-l">EM CADÊNCIA</div>
+      </div>
+      <div class="sdr-card">
+        <div class="sdr-card-icon">💰</div>
+        <div class="sdr-card-n" id="sp-pipe" style="font-size:16px;padding-top:6px">R$0</div>
+        <div class="sdr-card-l">PIPELINE EST.</div>
+      </div>
+    </div>
+
+    <!-- TOOLBAR -->
+    <div class="sdr-toolbar">
+      <div class="sdr-view-btns">
+        <button class="sdr-view-btn active" id="btn-view-kanban" onclick="sdrSetView('kanban')">⬛ Pipeline</button>
+        <button class="sdr-view-btn" id="btn-view-table" onclick="sdrSetView('table')">☰ Tabela</button>
+      </div>
+      <button class="btn btn-pri" onclick="abrirNovoLead()">+ Novo Lead</button>
+      <div class="sdr-filters">
+        <select class="sdr-filter-sel" id="sdr-f-fase" onchange="sdrRender()">
+          <option value="">Todas as fases</option>
+          <option value="novo">Novo</option>
+          <option value="primeiro_contato">1º Contato</option>
+          <option value="em_cadencia">Em Cadência</option>
+          <option value="respondeu">Respondeu</option>
+          <option value="qualificado">Qualificado</option>
+          <option value="proposta">Proposta</option>
+          <option value="cliente">Cliente</option>
+          <option value="perdido">Perdido</option>
+        </select>
+        <select class="sdr-filter-sel" id="sdr-f-seg" onchange="sdrRender()">
+          <option value="">Todos segmentos</option>
+          <option>Escritório</option><option>Restaurante</option><option>Hotel</option>
+          <option>Escola</option><option>Clínica</option><option>Condomínio</option>
+        </select>
+        <input class="sdr-filter-sel" id="sdr-busca" placeholder="🔍 Buscar..." oninput="sdrRender()" style="width:140px">
+      </div>
+    </div>
+
+    <!-- KANBAN / TABELA -->
+    <div id="sdr-kanban-wrap">
+      <div class="sdr-kanban" id="sdr-kanban"></div>
+    </div>
+    <div id="sdr-table-wrap" style="display:none;overflow-x:auto;">
+      <table class="sdr-table" id="sdr-table"></table>
+    </div>
+
+    <!-- AÇÕES DO DIA -->
+    <div class="acoes-dia" id="sdr-acoes-dia">
+      <div class="acoes-dia-title">⏰ Ações do Dia <span id="sdr-acoes-cnt" style="font-family:var(--fm);font-size:9px;background:var(--re);color:#fff;border-radius:99px;padding:1px 6px;"></span></div>
+      <div id="sdr-acoes-lista">Carregando...</div>
+    </div>
+  </div>
+
+  <!-- MODAL NOVO LEAD -->
+  <div class="modal-bg" id="sdr-modal" style="display:none" onclick="if(event.target===this)fecharSdrModal()">
+    <div class="modal" style="max-width:560px;max-height:85vh;overflow-y:auto;">
+      <div class="modal-hd"><span id="sdr-modal-titulo">Novo Lead</span><button class="modal-x" onclick="fecharSdrModal()">✕</button></div>
+      <div class="sdr-modal-body">
+        <div class="sdr-modal-section">EMPRESA</div>
+        <div class="fld sdr-modal-full"><label>EMPRESA *</label><input id="sl-empresa" type="text" placeholder="Nome da empresa"></div>
+        <div class="fld"><label>RESPONSÁVEL *</label><input id="sl-responsavel" type="text" placeholder="Nome do contato"></div>
+        <div class="fld"><label>CARGO</label><input id="sl-cargo" type="text" placeholder="Ex: Gerente Adm"></div>
+        <div class="sdr-modal-section">CONTATO</div>
+        <div class="fld"><label>EMAIL</label><input id="sl-email" type="email" placeholder="email@empresa.com"></div>
+        <div class="fld"><label>WHATSAPP</label><input id="sl-tel" type="text" placeholder="(31) 9 0000-0000" oninput="formatTelSdr(this)"></div>
+        <div class="fld"><label>CIDADE</label><input id="sl-cidade" type="text" placeholder="Belo Horizonte" value="Belo Horizonte"></div>
+        <div class="sdr-modal-section">QUALIFICAÇÃO</div>
+        <div class="fld">
+          <label>SEGMENTO</label>
+          <select id="sl-seg" class="sdr-filter-sel" style="width:100%">
+            <option>Escritório</option><option>Restaurante</option><option>Hotel</option>
+            <option>Escola</option><option>Clínica</option><option>Hospital</option><option>Condomínio</option><option>Outro</option>
+          </select>
+        </div>
+        <div class="fld">
+          <label>Nº FUNCIONÁRIOS</label>
+          <select id="sl-func" class="sdr-filter-sel" style="width:100%">
+            <option value="1-10">1 – 10</option><option value="11-50">11 – 50</option>
+            <option value="51-200">51 – 200</option><option value="200+">200+</option>
+          </select>
+        </div>
+        <div class="fld">
+          <label>Nº EQUIPAMENTOS EST.</label>
+          <select id="sl-equip" class="sdr-filter-sel" style="width:100%">
+            <option value="1-5">1 – 5</option><option value="6-15">6 – 15</option>
+            <option value="16-50">16 – 50</option><option value="50+">50+</option>
+          </select>
+        </div>
+        <div class="fld">
+          <label>POTENCIAL MENSAL (R$)</label>
+          <input id="sl-pot" type="number" placeholder="500" min="0">
+        </div>
+        <div class="fld sdr-modal-full"><label>OBSERVAÇÕES</label><textarea id="sl-obs" rows="2" style="width:100%;resize:vertical;background:var(--s2);border:1px solid var(--bdr);border-radius:7px;color:var(--tx);padding:8px;font-family:var(--fm);font-size:11px;outline:none"></textarea></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+        <button class="btn btn-x" onclick="fecharSdrModal()">Cancelar</button>
+        <button class="btn btn-pri" onclick="salvarLead()" id="sdr-save-btn">Salvar Lead</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAINEL LATERAL DO LEAD -->
+  <div class="modal-bg" id="sdr-detail-bg" style="display:none" onclick="if(event.target===this)fecharDetalhe()">
+    <div class="modal" style="max-width:520px;max-height:88vh;overflow-y:auto;" id="sdr-detail-panel"></div>
+  </div>
+</div>
+
+<div class="pg" id="pg-prospects">
   <div class="pg-head">
     <div><div class="pg-title">🏢 Prospects</div><div class="pg-sub">// base de empresas em prospecção</div></div>
     <button class="btn btn-bl" onclick="abrirOv('ov-p')">+ Cadastrar Empresa</button>
@@ -462,6 +699,7 @@ function ir(t){
     g('pg-'+p).classList.toggle('on',p===t);
     g('t-'+p).classList.toggle('on',p===t);
   });
+  if(t==='sdr') carregarSDR();
   if(t==='inbox') carregarInbox();
   if(t==='forn') carregarForn();
   if(t==='listas') carregarListas();
@@ -1043,6 +1281,397 @@ criarProspect=async function(){
 carregarProspects();
 carregarCamp();
 carregarListasGlobal();
+
+// ────────────────────────────────────────────────────────────────────────────
+// SDR CRM
+// ────────────────────────────────────────────────────────────────────────────
+var _sdrLeads = [], _sdrView = 'kanban', _sdrFiltro = '', _sdrLeadAtual = null;
+var _sdrTemplates = {}, _sdrSteps = [];
+
+const SDR_FASES = [
+  { id:'novo',            label:'Novo',         cor:'#4a607a' },
+  { id:'primeiro_contato',label:'1º Contato',   cor:'#3b82f6' },
+  { id:'em_cadencia',     label:'Em Cadência',  cor:'#8b5cf6' },
+  { id:'respondeu',       label:'Respondeu 💬', cor:'#f97316' },
+  { id:'qualificado',     label:'Qualificado ✅',cor:'#10d982' },
+  { id:'proposta',        label:'Proposta 📄',  cor:'#f5c800' },
+  { id:'cliente',         label:'Cliente 🏆',   cor:'#10d982' },
+  { id:'perdido',         label:'Perdido ❌',   cor:'#f04060' },
+];
+
+const CANAL_ICON = { email:'📧', whatsapp:'💬', linkedin:'💼', ligacao:'📞' };
+
+async function carregarSDR() {
+  try {
+    var r = await fetch('/api/pj-sdr?action=listar').then(x=>x.json());
+    _sdrLeads = r.leads || [];
+    sdrAtualizarPainel(r.painel || {});
+    sdrRender();
+    sdrRenderAcoes();
+    // Carregar templates
+    var t = await fetch('/api/pj-sdr?action=templates').then(x=>x.json());
+    _sdrTemplates = t.templates || {};
+    _sdrSteps = t.steps || [];
+  } catch(e) { console.error('SDR:', e); }
+}
+
+function sdrAtualizarPainel(p) {
+  var el = function(id,v){ var e=g(id); if(e) e.textContent=v; };
+  el('sp-email', p.respondeuEmail||0);
+  el('sp-hot',   p.quentes||0);
+  el('sp-acoes', p.acoesHoje||0);
+  el('sp-reun',  p.reunioes||0);
+  el('sp-cad',   p.emCadencia||0);
+  var pipe = p.pipelineEstimado||0;
+  el('sp-pipe',  pipe >= 1000 ? 'R$'+(pipe/1000).toFixed(1)+'k' : 'R$'+pipe);
+}
+
+function sdrFiltrar(tipo) {
+  _sdrFiltro = tipo;
+  sdrRender();
+}
+
+function sdrSetView(v) {
+  _sdrView = v;
+  g('btn-view-kanban').classList.toggle('active', v==='kanban');
+  g('btn-view-table').classList.toggle('active', v==='table');
+  g('sdr-kanban-wrap').style.display = v==='kanban' ? '' : 'none';
+  g('sdr-table-wrap').style.display  = v==='table'  ? '' : 'none';
+  sdrRender();
+}
+
+function sdrLeadsFiltrados() {
+  var fase  = gv('sdr-f-fase') || '';
+  var seg   = gv('sdr-f-seg')  || '';
+  var busca = (gv('sdr-busca')||'').toLowerCase();
+  return _sdrLeads.filter(function(l) {
+    if (fase  && l.fase !== fase) return false;
+    if (seg   && l.segmento !== seg) return false;
+    if (busca && !(l.empresa+' '+l.responsavel+' '+l.email).toLowerCase().includes(busca)) return false;
+    if (_sdrFiltro === 'respondeuEmail' && !l.emailRespondeu && !l.emailNoInbox) return false;
+    if (_sdrFiltro === 'quentes'  && l.score < 61) return false;
+    if (_sdrFiltro === 'acoes'    && !l.atrasado)  return false;
+    if (_sdrFiltro === 'reunioes' && !l.reuniaoAgendada) return false;
+    if (_sdrFiltro === 'emCadencia' && ['cliente','perdido','novo'].includes(l.fase)) return false;
+    return true;
+  });
+}
+
+function sdrRender() {
+  var lista = sdrLeadsFiltrados();
+  if (_sdrView === 'kanban') renderKanban(lista);
+  else renderTabela(lista);
+}
+
+function renderKanban(lista) {
+  var board = g('sdr-kanban'); if(!board) return;
+  board.innerHTML = SDR_FASES.map(function(fase) {
+    var cards = lista.filter(l => l.fase === fase.id);
+    return '<div class="sdr-col">'+
+      '<div class="sdr-col-head">'+
+      '<div class="sdr-col-dot" style="background:'+fase.cor+'"></div>'+
+      '<span class="sdr-col-name">'+fase.label+'</span>'+
+      '<span class="sdr-col-cnt">'+cards.length+'</span>'+
+      '</div>'+
+      '<div class="sdr-col-body">'+
+      cards.map(function(l){ return sdrCardHTML(l); }).join('')+
+      '</div></div>';
+  }).join('');
+}
+
+function sdrCardHTML(l) {
+  var badges = '';
+  var emailBadge = (l.emailRespondeu || l.emailNoInbox)
+    ? '<span class="badge badge-email" style="cursor:pointer" onclick="var e=event;e.stopPropagation();sdrIrEmailById('+JSON.stringify(l.id)+')">\u{1F4EC} Email</span>'
+    : '';
+  badges += emailBadge;
+  if (l.waRespondeu)  badges += '<span class="badge badge-wa">\u{1F4AC} WA</span>';
+  if (l.score >= 61)  badges += '<span class="badge badge-hot">'+l.scoreBadge+' '+l.score+'</span>';
+  if (l.atrasado)     badges += '<span class="badge badge-atrasado">\u26A0\uFE0F Atrasado</span>';
+  var prox = l.proximaAcao;
+  var proxTxt = prox
+    ? '<div class="sdr-lead-cad">'+(CANAL_ICON[prox.canal]||'\u25BA')+' '+prox.label.replace(/ \u2014.*/,'')+'</div>'
+    : '<div class="sdr-lead-cad" style="color:var(--gr)">\u2705 Cadência completa</div>';
+  return '<div class="sdr-lead'+(l.atrasado?' atrasado':'')+'" onclick="abrirDetalhe('+JSON.stringify(l.id)+')">'+
+    '<div class="sdr-lead-top">'+
+    '<span class="sdr-lead-emp">'+esc(l.empresa)+'</span>'+
+    '<span class="sdr-lead-score" style="color:'+(l.score>=61?'var(--or)':l.score>=31?'var(--ye)':'var(--mu)')+'">'+l.score+'</span>'+
+    '</div>'+
+    '<div class="sdr-lead-nome">'+esc(l.responsavel)+' \u00B7 '+esc(l.segmento)+'</div>'+
+    (badges ? '<div class="sdr-lead-badges">'+badges+'</div>' : '')+
+    proxTxt+
+    '</div>';
+}
+
+function renderTabela(lista) {
+  var t = g('sdr-table'); if(!t) return;
+  t.innerHTML = '<thead><tr>'+
+    '<th>EMPRESA</th><th>RESPONSÁVEL</th><th>FASE</th>'+
+    '<th>SCORE</th><th>SEGMENTO</th><th>FUNCIONÁRIOS</th>'+
+    '<th>PRÓXIMA AÇÃO</th><th>EMAIL</th>'+
+    '</tr></thead><tbody>'+
+    lista.map(function(l) {
+      var fase = SDR_FASES.find(f=>f.id===l.fase) || {label:l.fase,cor:'#666'};
+      var prox = l.proximaAcao;
+      return '<tr onclick="abrirDetalhe('+JSON.stringify(l.id)+')">'+
+        '<td><strong>'+esc(l.empresa)+'</strong></td>'+
+        '<td>'+esc(l.responsavel)+'</td>'+
+        '<td><span style="color:'+fase.cor+';font-size:10px">'+fase.label+'</span></td>'+
+        '<td><span style="font-family:var(--fm);color:'+(l.score>=61?'var(--or)':l.score>=31?'var(--ye)':'var(--mu)')+'">'+(l.scoreBadge)+' '+l.score+'</span></td>'+
+        '<td>'+esc(l.segmento)+'</td>'+
+        '<td>'+esc(l.funcionarios)+'</td>'+
+        '<td style="font-size:9px;color:var(--mu)">'+(prox?CANAL_ICON[prox.canal]+' '+prox.label.split('—')[0]:'✅')+'</td>'+
+        '<td style="font-size:10px">'+(l.email?'<a href="mailto:'+l.email+'" onclick="event.stopPropagation()">'+l.email+'</a>':'—')+'</td>'+
+        '</tr>';
+    }).join('')+
+    '</tbody>';
+}
+
+function sdrRenderAcoes() {
+  fetch('/api/pj-sdr?action=acoes-hoje').then(x=>x.json()).then(function(r){
+    var lista = r.acoes || [];
+    var el = g('sdr-acoes-lista'); if(!el) return;
+    var cnt = g('sdr-acoes-cnt'); if(cnt) cnt.textContent = lista.length > 0 ? lista.length : '';
+    if (!lista.length) { el.innerHTML = '<div style="font-family:var(--fm);font-size:10px;color:var(--mu);padding:8px 0">Nenhuma ação pendente hoje 🎉</div>'; return; }
+    el.innerHTML = lista.map(function(a) {
+      return '<div class="acao-item" onclick="abrirDetalhe('+JSON.stringify(a.lead.id)+')">'+
+        '<span class="acao-canal">'+(CANAL_ICON[a.prox.canal]||'▶')+'</span>'+
+        '<span class="acao-emp">'+esc(a.lead.empresa)+' <span style="font-weight:400;color:var(--mu)">· '+esc(a.lead.responsavel)+'</span></span>'+
+        '<span class="acao-step">'+a.prox.label.split('—')[0].trim()+'</span>'+
+        '<span class="acao-score">'+a.lead.score+'</span>'+
+        '</div>';
+    }).join('');
+  }).catch(function(){});
+}
+
+function sdrIrEmail(leadId) {
+  var l = _sdrLeads.find(x=>x.id===leadId);
+  if (!l || !l.emailInboxId) { toast('Email não encontrado no inbox','r'); return; }
+  ir('inbox');
+  setTimeout(function(){
+    // Abrir o email correspondente no inbox
+    var fn = function(){ abrirEmail(l.emailInboxId); };
+    setTimeout(fn, 600);
+  }, 200);
+}
+
+// ── Detalhe do lead ──────────────────────────────────────────────────────────
+function abrirDetalhe(id) {
+  var l = _sdrLeads.find(function(x){return x.id===id;}); if(!l) return;
+  _sdrLeadAtual = l;
+  var panel = g('sdr-detail-panel'); if(!panel) return;
+  var scoreColor = l.score>=61?'var(--or)':l.score>=31?'var(--ye)':'var(--bl)';
+  var toqueMap = {};
+  (l.toques||[]).forEach(function(t){ toqueMap[t.passo]=t; });
+
+  // Fases buttons
+  var faseBtns = SDR_FASES.map(function(f) {
+    var ativo = l.fase===f.id;
+    var btn = document.createElement('button');
+    btn.textContent = f.label;
+    btn.dataset.lid = l.id;
+    btn.dataset.fase = f.id;
+    btn.className = 'cad-btn';
+    btn.style.cssText = 'font-size:9px;padding:3px 8px;border-radius:6px;border:1px solid '+(ativo?f.cor:'var(--bdr)')+';background:'+(ativo?f.cor+'22':'transparent')+';color:'+(ativo?f.cor:'var(--mu)')+';cursor:pointer;margin:2px';
+    btn.onclick = function(){ moverFase(this.dataset.lid, this.dataset.fase); };
+    return btn.outerHTML;
+  }).join('');
+
+  // Cadência steps
+  var steps = _sdrSteps.length ? _sdrSteps : [];
+  var cadHTML = steps.map(function(step) {
+    var toque = toqueMap[step.passo];
+    var feito = toque && toque.realizado;
+    var respondeu = toque && toque.respondeu;
+    var cls = respondeu ? 'respondeu' : feito ? 'done' : (proximaCadStep(l)===step.passo ? 'proximo' : '');
+    var icon = respondeu ? '💬' : feito ? '✓' : (CANAL_ICON[step.canal]||'○');
+    var acoes = '';
+    if (!feito) {
+      var b1 = document.createElement('button');
+      b1.textContent='✓ Feito'; b1.className='cad-btn cad-btn-ok';
+      b1.dataset.lid=l.id; b1.dataset.passo=step.passo; b1.dataset.resp='false';
+      b1.onclick=function(){ registrarToque(this.dataset.lid, parseInt(this.dataset.passo), false); };
+      var b2 = document.createElement('button');
+      b2.textContent='💬 Respondeu'; b2.className='cad-btn cad-btn-resp';
+      b2.dataset.lid=l.id; b2.dataset.passo=step.passo;
+      b2.onclick=function(){ registrarToque(this.dataset.lid, parseInt(this.dataset.passo), true); };
+      var b3 = '';
+      if (step.templateId) {
+        var bt = document.createElement('button');
+        bt.textContent='📋 Copiar'; bt.className='cad-btn cad-btn-copy';
+        bt.dataset.tmpl=step.templateId; bt.dataset.lid=l.id;
+        bt.onclick=function(){ copiarTemplate(this.dataset.tmpl, this.dataset.lid); };
+        b3 = bt.outerHTML;
+      }
+      acoes = '<div class="cad-step-actions">'+b1.outerHTML+b2.outerHTML+b3+'</div>';
+    }
+    return '<div class="cad-step '+cls+'">'+
+      '<div class="cad-step-icon">'+icon+'</div>'+
+      '<div class="cad-step-info">'+
+      '<div class="cad-step-label">'+step.label+'</div>'+
+      '<div class="cad-step-dia">Dia '+step.dia+(feito?' · realizado':'')+'</div>'+
+      acoes+'</div></div>';
+  }).join('');
+
+  // Flags
+  var flagsHtml = [
+    ['emailRespondeu','📬 Email respondeu'],
+    ['waRespondeu','💬 WA respondeu'],
+    ['reuniaoAgendada','📅 Reunião agendada'],
+    ['propostaSolicitada','📄 Proposta solicitada'],
+  ].map(function(pair) {
+    var field=pair[0], label=pair[1], val=l[field];
+    var btn = document.createElement('button');
+    btn.textContent=label; btn.dataset.lid=l.id; btn.dataset.field=field;
+    btn.style.cssText='font-family:var(--fm);font-size:9px;padding:4px 10px;border-radius:6px;border:1px solid '+(val?'var(--or)':'var(--bdr)')+';background:'+(val?'rgba(249,115,22,.15)':'transparent')+';color:'+(val?'var(--or)':'var(--mu)')+';cursor:pointer;margin:2px';
+    btn.onclick=function(){ toggleFlag(this.dataset.lid, this.dataset.field); };
+    return btn.outerHTML;
+  }).join('');
+
+  // Botões finais
+  var btnEmail = '';
+  if (l.email) {
+    var be = document.createElement('button');
+    be.textContent='📧 Enviar Email'; be.className='btn btn-pri'; be.style.fontSize='10px';
+    be.dataset.lid=l.id;
+    be.onclick=function(){ sdrEnviarEmail(this.dataset.lid); };
+    btnEmail = be.outerHTML;
+  }
+  var btnExcluir = document.createElement('button');
+  btnExcluir.textContent='🗑️ Excluir'; btnExcluir.className='btn btn-x'; btnExcluir.style.cssText='font-size:10px;color:var(--re)';
+  btnExcluir.dataset.lid=l.id;
+  btnExcluir.onclick=function(){ excluirLead(this.dataset.lid); };
+
+  panel.innerHTML =
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">'+
+    '<div><div class="sdr-detail-nome">'+esc(l.empresa)+'</div>'+
+    '<div class="sdr-detail-emp">'+esc(l.responsavel)+(l.cargo?' · '+esc(l.cargo):'')+(l.cidade?' · '+l.cidade:'')+'</div></div>'+
+    '<button class="modal-x" onclick="fecharDetalhe()">✕</button></div>'+
+    '<div style="background:var(--s2);border:1px solid var(--bdr);border-radius:8px;padding:12px;margin-bottom:14px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'+
+    '<span style="font-family:var(--fm);font-size:10px;color:var(--mu)">LEAD SCORE</span>'+
+    '<span style="font-family:var(--fh);font-size:20px;font-weight:900;color:'+scoreColor+'">'+l.scoreBadge+' '+l.score+'</span></div>'+
+    '<div class="sdr-detail-score-bar"><div class="sdr-detail-score-fill" style="width:'+l.score+'%;background:'+scoreColor+'"></div></div></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">'+
+    sdrInfoChip('📧',l.email||'—')+sdrInfoChip('📱',l.telefone||'—')+sdrInfoChip('🏢',l.segmento)+
+    sdrInfoChip('👥 Func.',l.funcionarios)+sdrInfoChip('🔧 Equip.',l.equipamentos)+sdrInfoChip('💰',l.potencial?'R$'+l.potencial+'/mês':'—')+
+    '</div>'+
+    '<div style="margin-bottom:12px">'+faseBtns+'</div>'+
+    '<div style="margin-bottom:12px">'+flagsHtml+'</div>'+
+    '<div style="font-family:var(--fm);font-size:9px;letter-spacing:.1em;color:var(--or);margin-bottom:10px">CADÊNCIA ('+((l.toques||[]).filter(function(t){return t.realizado;}).length)+'/9)</div>'+
+    cadHTML+
+    (l.obs?'<div style="margin-top:12px;padding:10px;background:var(--s2);border-radius:8px;font-size:11px;color:var(--mu)">📝 '+esc(l.obs)+'</div>':'')+
+    '<div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">'+btnEmail+btnExcluir.outerHTML+'</div>';
+
+  g('sdr-detail-bg').style.display = 'flex';
+}
+
+function sdrInfoChip(label, val) {
+  return '<div style="background:var(--s2);border:1px solid var(--bdr);border-radius:7px;padding:8px 10px">'+
+    '<div style="font-family:var(--fm);font-size:8px;color:var(--mu)">'+label+'</div>'+
+    '<div style="font-size:11px;font-weight:500;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(String(val))+'</div></div>';
+}
+
+function fecharDetalhe() {
+  g('sdr-detail-bg').style.display='none';
+  _sdrLeadAtual=null;
+}
+
+// ── Ações do detalhe ─────────────────────────────────────────────────────────
+async function registrarToque(id, passo, respondeu) {
+  var r = await fetch('/api/pj-sdr?action=registrar-toque', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ id, passo, respondeu: !!respondeu })
+  }).then(x=>x.json());
+  if (r.ok) {
+    await carregarSDR();
+    // Reabrir o detalhe atualizado
+    abrirDetalhe(id);
+    toast(respondeu ? '💬 Resposta registrada! Lead avançado' : '✓ Toque registrado', 'g');
+  }
+}
+
+async function toggleFlag(id, field) {
+  var l = _sdrLeads.find(x=>x.id===id); if(!l) return;
+  var body = { id }; body[field] = !l[field];
+  var r = await fetch('/api/pj-sdr?action=atualizar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  }).then(x=>x.json());
+  if (r.ok) { await carregarSDR(); abrirDetalhe(id); }
+}
+
+async function moverFase(id, fase) {
+  var r = await fetch('/api/pj-sdr?action=mover-fase', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ id, fase })
+  }).then(x=>x.json());
+  if (r.ok) { await carregarSDR(); abrirDetalhe(id); toast('Fase atualizada','g'); }
+}
+
+function copiarTemplate(templateId, leadId) {
+  var l = _sdrLeads.find(x=>x.id===leadId); if(!l) return;
+  var tmpl = _sdrTemplates[templateId] || '';
+  var texto = tmpl
+    .replace(/\{\{responsavel\}\}/g, l.responsavel||'')
+    .replace(/\{\{empresa\}\}/g, l.empresa||'')
+    .replace(/\{\{cidade\}\}/g, l.cidade||'BH');
+  navigator.clipboard.writeText(texto).then(function(){
+    toast('📋 Mensagem copiada para a área de transferência!','g');
+  }).catch(function(){});
+}
+
+function sdrEnviarEmail(id) {
+  var l = _sdrLeads.find(x=>x.id===id); if(!l||!l.email) return;
+  fecharDetalhe();
+  ir('inbox');
+  setTimeout(function(){
+    abrirCompose(l.email, '', '');
+  }, 400);
+}
+
+async function excluirLead(id) {
+  if (!confirm('Excluir este lead?')) return;
+  await fetch('/api/pj-sdr?action=excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+  fecharDetalhe();
+  await carregarSDR();
+  toast('Lead excluído','r');
+}
+
+// ── Novo Lead ────────────────────────────────────────────────────────────────
+function abrirNovoLead() {
+  ['sl-empresa','sl-responsavel','sl-cargo','sl-email','sl-tel','sl-obs'].forEach(function(id){ var e=g(id); if(e) e.value=''; });
+  g('sdr-modal').style.display='flex';
+  setTimeout(function(){ if(g('sl-empresa')) g('sl-empresa').focus(); },100);
+}
+
+function fecharSdrModal() { g('sdr-modal').style.display='none'; }
+
+async function salvarLead() {
+  var empresa = gv('sl-empresa'), responsavel = gv('sl-responsavel');
+  if (!empresa || !responsavel) { toast('Empresa e responsável obrigatórios','r'); return; }
+  var btn = g('sdr-save-btn'); if(btn){btn.disabled=true;btn.textContent='Salvando...';}
+  var r = await fetch('/api/pj-sdr?action=criar',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      empresa, responsavel, cargo:gv('sl-cargo'), email:gv('sl-email'),
+      telefone:gv('sl-tel'), cidade:gv('sl-cidade'),
+      segmento:gv('sl-seg'), funcionarios:gv('sl-func'),
+      equipamentos:gv('sl-equip'), potencial:gv('sl-pot'), obs:gv('sl-obs')
+    })
+  }).then(x=>x.json());
+  if(btn){btn.disabled=false;btn.textContent='Salvar Lead';}
+  if (r.ok) { fecharSdrModal(); await carregarSDR(); toast('✅ Lead cadastrado!','g'); }
+  else toast('Erro: '+(r.error||'falha'),'r');
+}
+
+function formatTelSdr(input) {
+  var v=input.value.replace(/\D/g,'').slice(0,11);
+  if(v.length>7) v='('+v.slice(0,2)+') '+v.slice(2,7)+'-'+v.slice(7);
+  else if(v.length>2) v='('+v.slice(0,2)+') '+v.slice(2);
+  input.value=v;
+}
+
 </script>
 </body>
 </html>
