@@ -2,6 +2,7 @@
 const UPSTASH_URL   = (process.env.UPSTASH_URL   || '').replace(/['"]/g,'').trim();
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || '').replace(/['"]/g,'').trim();
 const INBOX_KEY     = 'pj_inbox';
+const RESEND_KEY    = (process.env.RESEND_API_KEY||'').trim();
 
 async function dbGet(key) {
   try {
@@ -52,16 +53,31 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, ignored: true, type: event.type });
       }
 
+      // Buscar corpo do email via Resend Receiving API (webhook só tem metadados)
+      const emailId = data.email_id || data.id;
+      let textoFinal = data.text || data.plain_text || '';
+      let htmlFinal  = data.html || '';
+      if (emailId && RESEND_KEY && (!textoFinal && !htmlFinal)) {
+        try {
+          const bodyRes = await fetch('https://api.resend.com/emails/' + emailId, {
+            headers: { Authorization: 'Bearer ' + RESEND_KEY }
+          });
+          const bodyData = await bodyRes.json();
+          textoFinal = bodyData.text || textoFinal;
+          htmlFinal  = bodyData.html || htmlFinal;
+        } catch(ef) { console.error('fetch body:', ef.message); }
+      }
+
       // Salvar email recebido no Redis
       const inbox = (await dbGet(INBOX_KEY)) || { emails: [] };
       const to = Array.isArray(data.to) ? data.to.join(', ') : (data.to || '');
       inbox.emails.unshift({
-        id:         data.email_id || data.id || Date.now().toString(36),
+        id:         emailId || Date.now().toString(36),
         de:         data.from || '',
         para:       to,
         assunto:    data.subject || '',
-        texto:      data.text || data.plain_text || '',
-        html:       data.html || '',
+        texto:      textoFinal,
+        html:       htmlFinal,
         recebidoEm: data.created_at || new Date().toISOString(),
         lido:       false,
       });
