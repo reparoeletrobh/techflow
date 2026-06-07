@@ -466,15 +466,15 @@ async function carregarInbox(){
 function renderListaInbox(lista){
   var el=g('lista-inbox');
   if(!lista.length){el.innerHTML='<div class="empty" style="padding:40px 0">Nenhuma mensagem ainda.</div>';return;}
-  el.innerHTML=lista.map(function(e){
-    var inicial=(e.de||'?')[0].toUpperCase();
-    var ativo=_emailAtivo&&_emailAtivo.id===e.id?' ativo':'';
-    var lido=e.lido?'':' nao-lido';
-    return '<div class="email-row'+ativo+lido+'" onclick="abrirEmail('+JSON.stringify(e.id)+')" id="row-'+e.id+'">'+
-      '<div class="er-top"><span class="er-remetente">'+esc(e.de)+'</span>'+
-      '<span class="er-data">'+fmtDt(e.recebidoEm)+'</span></div>'+
-      '<div class="er-assunto">'+esc(e.assunto||'(sem assunto)')+'</div>'+
-      '<div class="er-preview">'+esc((e.texto||'').slice(0,80))+'</div>'+
+  el.innerHTML=lista.map(function(em){
+    var ativo=_emailAtivo&&_emailAtivo.id===em.id?' ativo':'';
+    var lido=em.lido?'':' nao-lido';
+    var eid=String(em.id).replace(/"/g,'').replace(/'/g,'');
+    return '<div class="email-row'+ativo+lido+'" id="row-'+eid+'" data-eid="'+eid+'" onclick="abrirEmail(this.getAttribute(\'data-eid\'))">'+
+      '<div class="er-top"><span class="er-remetente">'+esc(em.de)+'</span>'+
+      '<span class="er-data">'+fmtDt(em.recebidoEm)+'</span></div>'+
+      '<div class="er-assunto">'+esc(em.assunto||'(sem assunto)')+'</div>'+
+      '<div class="er-preview">'+esc((em.texto||'').slice(0,80))+'</div>'+
       '</div>';
   }).join('');
 }
