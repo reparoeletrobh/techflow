@@ -776,9 +776,10 @@ function fecharOv(id){g(id).style.display='none';}
 // Navegação
 function ir(t){
   _tabAtual=t;
-  ['prospects','inbox','campanha','listas','forn'].forEach(function(p){
-    g('pg-'+p).classList.toggle('on',p===t);
-    g('t-'+p).classList.toggle('on',p===t);
+  ['sdr','prospects','inbox','campanha','listas','forn'].forEach(function(p){
+    var pg=g('pg-'+p), tab=g('t-'+p);
+    if(pg) pg.classList.toggle('on',p===t);
+    if(tab) tab.classList.toggle('on',p===t);
   });
   if(t==='sdr') carregarSDR();
   if(t==='inbox') carregarInbox();
