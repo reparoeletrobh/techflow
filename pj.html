@@ -780,7 +780,7 @@ function abrirReply(){
     '<textarea id="gm-reply-text" class="gm-reply-textarea" placeholder="Escreva sua resposta..."></textarea>'+
     '<div class="gm-reply-footer">'+
     '<button class="btn btn-pri" style="font-size:10px" onclick="enviarReply('+JSON.stringify(paraEmail)+','+JSON.stringify(em.assunto||'')+')" id="gm-reply-btn">Enviar Resposta</button>'+
-    '<button class="btn btn-x" style="font-size:10px;opacity:.6" onclick="document.getElementById('gm-reply-area').innerHTML=''">Cancelar</button>'+
+    '<button class="btn btn-x" style="font-size:10px;opacity:.6" onclick="limparReply()">Cancelar</button>'+'
     '</div></div>';
   setTimeout(function(){var t=g('gm-reply-text');if(t)t.focus();},100);
 }
