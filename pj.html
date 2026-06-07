@@ -302,6 +302,81 @@ select option{background:var(--s2);}
   .sdr-col{width:100%;}
 }
 
+
+/* ── MODAL BASE (faltava no CSS) ───────────────────────────────────────────── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:150;padding:16px;overflow-y:auto;}
+.modal{background:var(--s1);border:1px solid var(--bdr);border-radius:12px;padding:20px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.5);}
+.modal-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;font-family:var(--fh);font-size:14px;font-weight:800;}
+.modal-x{background:none;border:none;color:var(--mu);font-size:18px;cursor:pointer;padding:4px 8px;border-radius:6px;line-height:1;}
+.modal-x:hover{color:var(--tx);background:var(--s2);}
+
+/* ── BOTÕES BASE ───────────────────────────────────────────────────────────── */
+.btn{font-family:var(--fm);font-size:11px;font-weight:600;padding:8px 16px;border-radius:7px;border:none;cursor:pointer;transition:all .15s;}
+.btn-pri{background:var(--bl);color:#fff;}
+.btn-pri:hover{background:#2563eb;}
+.btn-pri:disabled{opacity:.5;cursor:not-allowed;}
+.btn-x{background:var(--s2);border:1px solid var(--bdr);color:var(--mu);}
+.btn-x:hover{border-color:var(--re);color:var(--re);}
+.btn-gr{background:var(--gr);color:#000;}
+.btn-gr:hover{opacity:.85;}
+
+/* ── SPINNER ───────────────────────────────────────────────────────────────── */
+.spin{width:18px;height:18px;border:2px solid var(--bdr);border-top-color:var(--bl);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── MOBILE RESPONSIVO GERAL ───────────────────────────────────────────────── */
+@media(max-width:640px){
+  /* Header */
+  header{padding:0 12px;height:44px;}
+  .logo-sub{display:none;}
+
+  /* Tabs — scroll horizontal */
+  .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{white-space:nowrap;padding:10px 12px;font-size:10px;}
+
+  /* SDR painel */
+  .sdr-wrap{gap:10px;padding:2px 0;}
+  .sdr-painel{grid-template-columns:repeat(2,1fr);gap:6px;}
+  .sdr-card{padding:10px 12px;}
+  .sdr-card-n{font-size:22px;}
+  .sdr-card-icon{font-size:16px;right:8px;top:8px;}
+
+  /* Toolbar */
+  .sdr-toolbar{gap:6px;}
+  .sdr-filters{flex-wrap:wrap;gap:4px;margin-left:0;width:100%;}
+  .sdr-filter-sel{font-size:9px;padding:5px 8px;flex:1;min-width:80px;}
+
+  /* Kanban — coluna única */
+  .sdr-kanban{gap:8px;}
+  .sdr-col{width:100%;}
+
+  /* Modal novo lead — tela cheia no mobile */
+  .modal-bg{padding:0;align-items:flex-end;}
+  .modal{border-radius:16px 16px 0 0;max-width:100% !important;max-height:92dvh !important;overflow-y:auto;padding:16px;}
+  .modal-hd{font-size:13px;position:sticky;top:0;background:var(--s1);padding-bottom:12px;z-index:1;}
+
+  /* Form modal — coluna única */
+  .sdr-modal-body{grid-template-columns:1fr !important;gap:8px;}
+  .sdr-modal-full{grid-column:1 !important;}
+  .fld input,.fld select,.fld textarea{font-size:16px !important;} /* evita zoom no iOS */
+  
+  /* Ações do dia */
+  .acoes-dia{padding:10px 12px;}
+  .acao-emp{font-size:10px;}
+  .acao-step{display:none;}
+
+  /* Botões flutuantes do modal */
+  .modal > div[style*="justify-content:flex-end"]{
+    position:sticky;bottom:0;background:var(--s1);padding-top:12px;margin-top:8px;
+  }
+}
+
+@media(max-width:400px){
+  .sdr-painel{grid-template-columns:repeat(2,1fr);}
+  .sdr-card-n{font-size:18px;}
+}
+
 </style>
 </head>
 <body>
