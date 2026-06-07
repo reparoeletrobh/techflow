@@ -75,7 +75,47 @@ module.exports = async function handler(req,res){
   // ── GET testar-resend — diagnóstico completo da integração Resend ─────────────
   // ── GET inbox — busca emails recebidos direto da API Resend + Redis ──────────
   // ── GET get-email-body — busca o corpo do email da API Resend ───────────────
-  if (action === 'get-email-body') {
+  // ── POST fix-inbox-body — busca corpo de todos emails sem texto ─────────────
+  if (action === 'fix-inbox-body') {
+    const INBOX_KEY = 'pj_inbox';
+    const inbox = (await dbGet(INBOX_KEY)) || { emails: [] };
+    const semCorpo = (inbox.emails||[]).filter(e => !e.texto && !e.html && e.id);
+    let atualizados = 0;
+    for (const em of semCorpo) {
+      try {
+        // Tentar Receiving API
+        let r = await fetch('https://api.resend.com/emails/receiving/' + em.id, {
+          headers: { Authorization: 'Bearer ' + RESEND_KEY }
+        });
+        if (!r.ok) {
+          r = await fetch('https://api.resend.com/emails/' + em.id, {
+            headers: { Authorization: 'Bearer ' + RESEND_KEY }
+          });
+        }
+        if (r.ok) {
+          const d = await r.json();
+          const texto = d.text || d.plain_text || d.body_plain || '';
+          const html  = d.html || d.body_html || '';
+          if (texto || html) {
+            em.texto = texto;
+            em.html  = html;
+            atualizados++;
+          }
+        }
+      } catch(e) { console.error('fix-inbox-body:', em.id, e.message); }
+    }
+    if (atualizados > 0) await dbSet(INBOX_KEY, inbox);
+    return res.status(200).json({
+      ok: true,
+      semCorpo: semCorpo.length,
+      atualizados,
+      msg: atualizados > 0
+        ? '✅ ' + atualizados + ' email(s) com corpo recuperado'
+        : 'Nenhum email atualizado — API pode não retornar corpo para emails antigos'
+    });
+  }
+
+    if (action === 'get-email-body') {
     const emailId = req.query.id;
     if (!emailId || !RESEND_KEY) return res.status(400).json({ ok:false, error:'id ou key faltando' });
     try {
