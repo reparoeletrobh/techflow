@@ -73,7 +73,58 @@ module.exports = async function handler(req,res){
   }
 
   // ── GET testar-resend — diagnóstico completo da integração Resend ─────────────
-  if (action === 'testar-resend') {
+  // ── GET inbox — busca emails recebidos direto da API Resend + Redis ──────────
+  if (action === 'inbox') {
+    try {
+      const INBOX_KEY = 'pj_inbox';
+      // 1. Buscar do Redis (emails salvos pelo webhook)
+      const local = (await dbGet(INBOX_KEY)) || { emails: [] };
+      let emails = local.emails || [];
+
+      // 2. Tentar buscar da API do Resend (emails recebidos recentes)
+      if (RESEND_KEY) {
+        try {
+          // Buscar emails recebidos pela Receiving API
+          const r = await fetch('https://api.resend.com/emails?limit=50', {
+            headers: { Authorization: 'Bearer ' + RESEND_KEY }
+          });
+          const data = await r.json();
+          const resendEmails = (data.data || []).filter(e => e.direction === 'inbound' || e.type === 'received');
+
+          // Também buscar emails da conta toda — o Resend armazena inbound
+          // Checar se tem emails novos não salvos no Redis
+          if (resendEmails.length > 0) {
+            const idsLocais = new Set(emails.map(e => e.id));
+            const novos = resendEmails.filter(e => !idsLocais.has(e.id));
+            if (novos.length > 0) {
+              const emailsFormatados = novos.map(e => ({
+                id: e.id,
+                de: e.from || '',
+                para: Array.isArray(e.to) ? e.to.join(', ') : (e.to || ''),
+                assunto: e.subject || '',
+                texto: e.text || '',
+                html: e.html || '',
+                recebidoEm: e.created_at || new Date().toISOString(),
+                lido: false,
+              }));
+              emails = [...emailsFormatados, ...emails];
+              local.emails = emails.slice(0, 500);
+              await dbSet(INBOX_KEY, local);
+            }
+          }
+        } catch(eApi) {
+          console.log('API Resend inbox error (non-fatal):', eApi.message);
+        }
+      }
+
+      const naoLidos = emails.filter(e => !e.lido).length;
+      return res.status(200).json({ ok: true, emails, naoLidos, total: emails.length });
+    } catch(e) {
+      return res.status(500).json({ ok:false, error: e.message });
+    }
+  }
+
+    if (action === 'testar-resend') {
     const chave = RESEND_KEY ? RESEND_KEY.slice(0,8)+'...' : 'NÃO CONFIGURADA';
     if (!RESEND_KEY) {
       return res.status(200).json({ ok:false, erro:'RESEND_API_KEY não configurada no Vercel', chave });
