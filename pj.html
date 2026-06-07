@@ -377,6 +377,12 @@ select option{background:var(--s2);}
   .sdr-card-n{font-size:18px;}
 }
 
+
+/* Botão de ação nos cards do kanban */
+.sdr-card-btn-wrap{margin-top:6px;padding-top:6px;border-top:1px solid rgba(26,37,64,.5);}
+.sdr-card-btn{width:100%;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);border-radius:6px;color:var(--bl);font-family:var(--fm);font-size:9px;font-weight:600;padding:5px 0;cursor:pointer;transition:all .15s;letter-spacing:.04em;}
+.sdr-card-btn:hover{background:rgba(59,130,246,.25);border-color:var(--bl);}
+
 </style>
 </head>
 <body>
@@ -1467,6 +1473,7 @@ function sdrCardHTML(l) {
   var proxTxt = prox
     ? '<div class="sdr-lead-cad">'+(CANAL_ICON[prox.canal]||'\u25BA')+' '+prox.label.replace(/ \u2014.*/,'')+'</div>'
     : '<div class="sdr-lead-cad" style="color:var(--gr)">\u2705 Cadência completa</div>';
+  var btnAcao = '<div class="sdr-card-btn-wrap"><button class="sdr-card-btn" onclick="event.stopPropagation();abrirDetalhe('+JSON.stringify(l.id)+')">Ver ações \u2192</button></div>';
   return '<div class="sdr-lead'+(l.atrasado?' atrasado':'')+'" onclick="abrirDetalhe('+JSON.stringify(l.id)+')">'+
     '<div class="sdr-lead-top">'+
     '<span class="sdr-lead-emp">'+esc(l.empresa)+'</span>'+
@@ -1475,6 +1482,7 @@ function sdrCardHTML(l) {
     '<div class="sdr-lead-nome">'+esc(l.responsavel)+' \u00B7 '+esc(l.segmento)+'</div>'+
     (badges ? '<div class="sdr-lead-badges">'+badges+'</div>' : '')+
     proxTxt+
+    btnAcao+
     '</div>';
 }
 
