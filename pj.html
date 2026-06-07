@@ -92,37 +92,92 @@ select option{background:var(--s2);}
   color:var(--tx);font-family:var(--fm);font-size:11px;padding:7px 11px;outline:none;}
 .sin:focus{border-color:var(--bl);}
 
-/* INBOX GMAIL-STYLE */
-.inbox-wrap{display:flex;height:calc(100vh - 160px);min-height:400px;gap:0;border:1px solid var(--bdr);border-radius:10px;overflow:hidden;}
-.inbox-list{width:380px;flex-shrink:0;border-right:1px solid var(--bdr);overflow-y:auto;background:var(--s1);}
-.inbox-view{flex:1;overflow-y:auto;background:var(--bg);display:flex;align-items:center;justify-content:center;}
-.inbox-empty-view{text-align:center;color:var(--mu);font-family:var(--fm);font-size:11px;}
-.inbox-empty-view div{font-size:40px;margin-bottom:12px;}
-.email-row{padding:12px 16px;border-bottom:1px solid var(--bdr);cursor:pointer;transition:background .15s;position:relative;}
-.email-row:hover{background:var(--s2);}
-.email-row.ativo{background:rgba(59,130,246,.1);border-left:3px solid var(--bl);}
-.email-row.nao-lido .er-remetente{font-weight:700;color:var(--tx);}
-.email-row.nao-lido .er-assunto{font-weight:600;color:var(--tx);}
-.email-row.nao-lido::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--bl);position:absolute;left:6px;top:50%;transform:translateY(-50%);}
-.er-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;}
-.er-remetente{font-size:12px;color:var(--mu);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.er-data{font-family:var(--fm);font-size:9px;color:var(--mu);flex-shrink:0;}
-.er-assunto{font-family:var(--fm);font-size:10px;color:var(--mu);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.er-preview{font-size:10px;color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.7;}
-.email-detail{padding:28px 32px;width:100%;}
-.ed-header{border-bottom:1px solid var(--bdr);padding-bottom:16px;margin-bottom:20px;}
-.ed-assunto{font-family:var(--fh);font-size:18px;font-weight:800;margin-bottom:12px;line-height:1.3;}
-.ed-meta{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
-.ed-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--bl),var(--pu));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;}
-.ed-info{flex:1;}
-.ed-de{font-size:13px;font-weight:600;}
-.ed-para{font-family:var(--fm);font-size:9px;color:var(--mu);margin-top:2px;}
-.ed-data-full{font-family:var(--fm);font-size:9px;color:var(--mu);text-align:right;flex-shrink:0;}
-.ed-body{font-size:13px;line-height:1.8;color:rgba(220,232,248,.85);white-space:pre-wrap;word-break:break-word;}
-.ed-actions{display:flex;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid var(--bdr);}
-.inbox-toolbar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--bdr);background:var(--s2);}
-.inbox-search{flex:1;background:var(--s1);border:1px solid var(--bdr);border-radius:6px;color:var(--tx);font-family:var(--fm);font-size:10px;padding:6px 10px;outline:none;margin-right:8px;}
-.inbox-search:focus{border-color:var(--bl);}
+/* ── GMAIL-STYLE INBOX ──────────────────────────────────────────────────────── */
+.gm-wrap{display:flex;height:calc(100vh - 120px);min-height:500px;background:var(--bg);}
+
+/* Sidebar */
+.gm-side{width:200px;flex-shrink:0;padding:12px 8px;border-right:1px solid var(--bdr);display:flex;flex-direction:column;gap:4px;}
+.gm-compose{display:flex;align-items:center;gap:10px;background:var(--s2);border:1px solid var(--bdr);border-radius:24px;padding:14px 20px;font-family:var(--fh);font-size:13px;font-weight:700;color:var(--tx);width:100%;margin-bottom:12px;transition:all .2s;box-shadow:0 2px 8px rgba(0,0,0,.3);}
+.gm-compose:hover{background:var(--s1);box-shadow:0 4px 16px rgba(59,130,246,.2);border-color:var(--bl);}
+.gm-compose-icon{font-size:16px;}
+.gm-nav{display:flex;flex-direction:column;gap:2px;}
+.gm-nav-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer;color:var(--mu);transition:all .15s;user-select:none;}
+.gm-nav-item:hover{background:var(--s2);color:var(--tx);}
+.gm-nav-item.active{background:rgba(59,130,246,.15);color:var(--bl);font-weight:600;}
+.gm-nav-icon{font-size:14px;width:20px;text-align:center;}
+.gm-badge{margin-left:auto;background:var(--bl);color:#fff;font-family:var(--fm);font-size:9px;font-weight:700;border-radius:99px;padding:1px 6px;min-width:18px;text-align:center;}
+.gm-badge:empty{display:none;}
+
+/* Lista de emails */
+.gm-list-wrap{width:340px;flex-shrink:0;border-right:1px solid var(--bdr);display:flex;flex-direction:column;overflow:hidden;}
+.gm-search-bar{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--bdr);background:var(--s1);}
+.gm-search-icon{font-size:12px;color:var(--mu);}
+.gm-search-input{flex:1;background:transparent;border:none;outline:none;color:var(--tx);font-family:var(--fm);font-size:10px;}
+.gm-search-input::placeholder{color:var(--mu);}
+.gm-refresh-btn{background:none;border:none;color:var(--mu);font-size:14px;padding:2px 6px;border-radius:4px;transition:color .15s;}
+.gm-refresh-btn:hover{color:var(--bl);}
+.gm-list{flex:1;overflow-y:auto;}
+.gm-loading{display:flex;align-items:center;justify-content:center;padding:40px;}
+
+/* Linha de email */
+.gm-row{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid rgba(26,37,64,.5);cursor:pointer;transition:background .1s;position:relative;}
+.gm-row:hover{background:var(--s1);}
+.gm-row.ativo{background:rgba(59,130,246,.08);border-left:2px solid var(--bl);}
+.gm-row.nao-lido .gm-row-nome,.gm-row.nao-lido .gm-row-assunto{font-weight:700;color:var(--tx);}
+.gm-row-avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:var(--fh);font-weight:700;font-size:13px;color:#fff;}
+.gm-row-body{flex:1;min-width:0;}
+.gm-row-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;}
+.gm-row-nome{font-size:12px;font-weight:500;color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;}
+.gm-row-data{font-family:var(--fm);font-size:9px;color:var(--mu);flex-shrink:0;}
+.gm-row-assunto{font-family:var(--fm);font-size:10px;color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:2px;}
+.gm-row-preview{font-size:10px;color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.65;}
+.gm-unread-dot{width:8px;height:8px;border-radius:50%;background:var(--bl);position:absolute;left:5px;top:50%;transform:translateY(-50%);flex-shrink:0;}
+
+/* Painel de leitura */
+.gm-view{flex:1;overflow-y:auto;display:flex;flex-direction:column;}
+.gm-empty-view{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--mu);}
+.gm-empty-icon{font-size:48px;opacity:.3;}
+.gm-empty-text{font-family:var(--fh);font-size:16px;font-weight:700;}
+.gm-empty-sub{font-family:var(--fm);font-size:10px;opacity:.5;}
+.gm-email-view{padding:24px 28px;flex:1;}
+.gm-email-subject{font-family:var(--fh);font-size:20px;font-weight:800;line-height:1.2;margin-bottom:16px;}
+.gm-email-meta{display:flex;align-items:flex-start;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--bdr);margin-bottom:20px;}
+.gm-email-av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--fh);font-weight:800;font-size:16px;color:#fff;flex-shrink:0;}
+.gm-email-info{flex:1;}
+.gm-email-nome{font-size:13px;font-weight:600;}
+.gm-email-addr{font-family:var(--fm);font-size:9px;color:var(--mu);margin-top:2px;}
+.gm-email-data-full{font-family:var(--fm);font-size:9px;color:var(--mu);text-align:right;}
+.gm-email-body{font-size:13px;line-height:1.8;color:rgba(220,232,248,.85);white-space:pre-wrap;word-break:break-word;}
+.gm-email-body-loading{font-family:var(--fm);font-size:10px;color:var(--mu);padding:20px 0;}
+.gm-email-actions{display:flex;gap:8px;margin-top:24px;padding-top:16px;border-top:1px solid var(--bdr);}
+.gm-reply-box{margin-top:16px;border:1px solid var(--bdr);border-radius:10px;overflow:hidden;background:var(--s1);}
+.gm-reply-header{padding:8px 14px;font-family:var(--fm);font-size:9px;color:var(--mu);border-bottom:1px solid var(--bdr);}
+.gm-reply-textarea{width:100%;background:transparent;border:none;outline:none;color:var(--tx);font-family:var(--fb);font-size:12px;padding:12px 14px;resize:vertical;min-height:100px;}
+.gm-reply-footer{display:flex;gap:8px;padding:8px 14px;border-top:1px solid var(--bdr);}
+
+/* Compose Modal (floating - bottom right) */
+.gm-compose-modal{position:fixed;bottom:0;right:28px;width:480px;background:var(--s1);border:1px solid var(--bdr);border-radius:12px 12px 0 0;box-shadow:0 -4px 32px rgba(0,0,0,.5);z-index:200;overflow:hidden;}
+.gm-compose-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--s2);border-bottom:1px solid var(--bdr);font-family:var(--fh);font-size:12px;font-weight:700;}
+.gm-compose-actions{display:flex;gap:4px;}
+.gm-compose-actions button{background:none;border:none;color:var(--mu);font-size:14px;padding:2px 6px;border-radius:4px;transition:color .15s;}
+.gm-compose-actions button:hover{color:var(--tx);}
+.gm-compose-field{padding:6px 12px;border-bottom:1px solid rgba(26,37,64,.5);}
+.gm-compose-border{border-bottom:1px solid var(--bdr);}
+.gm-compose-input{width:100%;background:transparent;border:none;outline:none;color:var(--tx);font-family:var(--fb);font-size:12px;padding:4px 0;}
+.gm-compose-input::placeholder{color:var(--mu);}
+.gm-compose-text-wrap{padding:8px 12px;}
+.gm-compose-textarea{width:100%;background:transparent;border:none;outline:none;color:var(--tx);font-family:var(--fb);font-size:12px;resize:none;height:180px;line-height:1.6;}
+.gm-compose-textarea::placeholder{color:var(--mu);}
+.gm-compose-footer{display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid var(--bdr);}
+.gm-compose-modal.minimized .gm-compose-body{display:none;}
+
+@media(max-width:900px){
+  .gm-side{display:none;}
+  .gm-list-wrap{width:100%;border-right:none;}
+  .gm-view{display:none;}
+  .gm-view.show{display:flex;position:fixed;inset:0;background:var(--bg);z-index:50;overflow-y:auto;}
+  .gm-compose-modal{width:calc(100vw - 32px);right:16px;}
+}
 
 
 /* FOR */
@@ -190,24 +245,81 @@ select option{background:var(--s2);}
 
 <!-- INBOX -->
 <div class="pg" id="pg-inbox">
-  <div class="inbox-wrap">
-    <div class="inbox-list" id="inbox-list">
-      <div class="inbox-toolbar">
-        <input class="inbox-search" id="inbox-search" placeholder="🔍 Buscar emails..." oninput="filtrarInbox()">
-        <button class="btn btn-x" style="font-size:9px;padding:5px 10px" onclick="carregarInbox()">↻</button>
-      </div>
-      <div id="lista-inbox"><div class="empty" style="padding:40px 0"><div class="spin"></div>Carregando...</div></div>
+  <div class="gm-wrap">
+    <!-- SIDEBAR -->
+    <div class="gm-side">
+      <button class="gm-compose" onclick="abrirCompose()">
+        <span class="gm-compose-icon">✏️</span>
+        <span>Escrever</span>
+      </button>
+      <nav class="gm-nav">
+        <a class="gm-nav-item active" onclick="setNavInbox('entrada')" id="nav-entrada">
+          <span class="gm-nav-icon">📥</span>
+          <span>Entrada</span>
+          <span class="gm-badge" id="b-inbox">0</span>
+        </a>
+        <a class="gm-nav-item" onclick="setNavInbox('enviados')" id="nav-enviados">
+          <span class="gm-nav-icon">📤</span>
+          <span>Enviados</span>
+        </a>
+        <a class="gm-nav-item" onclick="setNavInbox('rascunhos')" id="nav-rascunhos">
+          <span class="gm-nav-icon">📝</span>
+          <span>Rascunhos</span>
+        </a>
+      </nav>
     </div>
-    <div class="inbox-view" id="inbox-view">
-      <div class="inbox-empty-view">
-        <div>✉️</div>
-        Selecione um email para ler
+
+    <!-- LISTA -->
+    <div class="gm-list-wrap">
+      <div class="gm-search-bar">
+        <span class="gm-search-icon">🔍</span>
+        <input class="gm-search-input" id="inbox-search" placeholder="Buscar no email..." oninput="filtrarInbox()">
+        <button class="gm-refresh-btn" onclick="carregarInbox()" title="Atualizar">↻</button>
+      </div>
+      <div class="gm-list" id="lista-inbox">
+        <div class="gm-loading"><div class="spin"></div></div>
+      </div>
+    </div>
+
+    <!-- PAINEL EMAIL -->
+    <div class="gm-view" id="gm-view">
+      <div class="gm-empty-view">
+        <div class="gm-empty-icon">✉️</div>
+        <div class="gm-empty-text">Selecione um email para ler</div>
+        <div class="gm-empty-sub">Ou escreva um novo email clicando em Escrever</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPOSE MODAL (Gmail-style floating) -->
+  <div class="gm-compose-modal" id="gm-compose-modal" style="display:none">
+    <div class="gm-compose-header">
+      <span>Nova Mensagem</span>
+      <div class="gm-compose-actions">
+        <button onclick="minimizarCompose()" title="Minimizar">−</button>
+        <button onclick="fecharCompose()" title="Fechar">✕</button>
+      </div>
+    </div>
+    <div class="gm-compose-body" id="gm-compose-body">
+      <div class="gm-compose-field">
+        <input id="cm-para" type="email" placeholder="Para" class="gm-compose-input">
+      </div>
+      <div class="gm-compose-field gm-compose-border">
+        <input id="cm-assunto" type="text" placeholder="Assunto" class="gm-compose-input">
+      </div>
+      <div class="gm-compose-text-wrap">
+        <textarea id="cm-corpo" class="gm-compose-textarea" placeholder="Escreva sua mensagem..."></textarea>
+      </div>
+      <div class="gm-compose-footer">
+        <button class="btn btn-pri" onclick="enviarComposeEmail()" id="cm-send-btn">
+          <span id="cm-send-label">Enviar</span>
+        </button>
+        <button class="btn btn-x" onclick="fecharCompose()" style="font-size:10px;opacity:.6">Descartar</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- CAMPANHAS -->
 <div class="pg" id="pg-campanha">
   <div class="pg-title" style="margin-bottom:14px">📧 Disparar Campanha</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
@@ -451,88 +563,296 @@ function promoverForn(id){
 }
 
 // ── INBOX ──────────────────────────────────────────────────────────────────
-var _emails=[], _emailAtivo=null;
+// ── INBOX GMAIL ────────────────────────────────────────────────────────────────
+var _emails=[], _emailAtivo=null, _navAtual='entrada', _drafts=[];
 
+// Cores de avatar por letra
+function avatarColor(str){
+  var colors=['#3b82f6','#10d982','#f97316','#f04060','#8b5cf6','#06b6d4','#f5c800'];
+  var idx=((str||'A').charCodeAt(0)-65)%colors.length;
+  return colors[Math.max(0,idx)];
+}
+
+function setNavInbox(tipo){
+  _navAtual=tipo;
+  document.querySelectorAll('.gm-nav-item').forEach(function(el){el.classList.remove('active');});
+  var el=document.getElementById('nav-'+tipo);
+  if(el) el.classList.add('active');
+  if(tipo==='entrada') carregarInbox();
+  else if(tipo==='enviados') carregarEnviados();
+  else if(tipo==='rascunhos') renderRascunhos();
+}
+
+// ── CARREGARINBOX ──
 async function carregarInbox(){
-  g('lista-inbox').innerHTML='<div class="empty" style="padding:40px 0"><div class="spin"></div></div>';
+  g('lista-inbox').innerHTML='<div class="gm-loading"><div class="spin"></div></div>';
   try{
     var r=await fetch('/api/pj-email?action=inbox').then(function(x){return x.json();});
     _emails=r.emails||[];
-    g('b-inbox').textContent=r.naoLidos||0;
+    var cnt=r.naoLidos||0;
+    var b=g('b-inbox'); if(b){b.textContent=cnt>0?cnt:''; b.style.display=cnt>0?'':'none';}
     renderListaInbox(_emails);
-  }catch(er){g('lista-inbox').innerHTML='<div class="empty" style="color:var(--re)">Erro: '+esc(er.message)+'</div>';}
+  }catch(er){
+    g('lista-inbox').innerHTML='<div style="padding:20px;font-family:var(--fm);font-size:10px;color:var(--re)">Erro: '+esc(er.message)+'</div>';
+  }
 }
 
+async function carregarEnviados(){
+  g('lista-inbox').innerHTML='<div class="gm-loading"><div class="spin"></div></div>';
+  try{
+    var r=await fetch('/api/pj-email?action=listar-enviados').then(function(x){return x.json();});
+    var enviados=(r.emails||r.enviados||[]);
+    renderListaEnviados(enviados);
+  }catch(er){
+    g('lista-inbox').innerHTML='<div style="padding:20px;font-family:var(--fm);font-size:10px;color:var(--re)">Erro ao carregar enviados</div>';
+  }
+}
+
+function renderRascunhos(){
+  var lista=_drafts;
+  if(!lista.length){
+    g('lista-inbox').innerHTML='<div style="padding:40px;text-align:center;font-family:var(--fm);font-size:10px;color:var(--mu)">Nenhum rascunho salvo.</div>';
+    return;
+  }
+  g('lista-inbox').innerHTML=lista.map(function(d,i){
+    return '<div class="gm-row" onclick="abrirRascunho('+i+')" style="border-left:2px solid var(--ye)">'+
+      '<div class="gm-row-avatar" style="background:var(--ye)">📝</div>'+
+      '<div class="gm-row-body">'+
+      '<div class="gm-row-top"><span class="gm-row-nome">Para: '+esc(d.para||'(sem destinatário)')+'</span>'+
+      '<span class="gm-row-data">Rascunho</span></div>'+
+      '<div class="gm-row-assunto">'+esc(d.assunto||'(sem assunto)')+'</div>'+
+      '</div></div>';
+  }).join('');
+}
+
+// ── RENDERIZAR LISTA ──
 function renderListaInbox(lista){
   var el=g('lista-inbox');
-  if(!lista.length){el.innerHTML='<div class="empty" style="padding:40px 0">Nenhuma mensagem ainda.</div>';return;}
+  if(!lista.length){
+    el.innerHTML='<div style="padding:60px 20px;text-align:center;font-family:var(--fm);font-size:10px;color:var(--mu)">'+
+      '<div style="font-size:32px;margin-bottom:12px;opacity:.3">📭</div>Nenhuma mensagem ainda.</div>';
+    return;
+  }
   el.innerHTML=lista.map(function(em){
     var ativo=_emailAtivo&&_emailAtivo.id===em.id?' ativo':'';
     var lido=em.lido?'':' nao-lido';
-    var eid=String(em.id).replace(/"/g,'').replace(/'/g,'');
-    return '<div class="email-row'+ativo+lido+'" id="row-'+eid+'" data-eid="'+eid+'" onclick="abrirEmail(this.getAttribute(\'data-eid\'))">'+
-      '<div class="er-top"><span class="er-remetente">'+esc(em.de)+'</span>'+
-      '<span class="er-data">'+fmtDt(em.recebidoEm)+'</span></div>'+
-      '<div class="er-assunto">'+esc(em.assunto||'(sem assunto)')+'</div>'+
-      '<div class="er-preview">'+esc((em.texto||'').slice(0,80))+'</div>'+
-      '</div>';
+    var inicial=(em.de||'?').replace(/.*<([^>]+)>$/,'$1')[0].toUpperCase();
+    var cor=avatarColor(inicial);
+    var eid=String(em.id).replace(/[^a-zA-Z0-9_-]/g,'_');
+    var dot=em.lido?'':'<div class="gm-unread-dot"></div>';
+    return '<div class="gm-row'+ativo+lido+'" id="row-'+eid+'" data-eid="'+eid+'" data-id="'+em.id+'" onclick="abrirEmail(this.dataset.id)">'+
+      dot+
+      '<div class="gm-row-avatar" style="background:'+cor+'">'+inicial+'</div>'+
+      '<div class="gm-row-body">'+
+      '<div class="gm-row-top">'+
+      '<span class="gm-row-nome">'+esc((em.de||'').replace(/<[^>]+>/g,'').trim())+'</span>'+
+      '<span class="gm-row-data">'+fmtDt(em.recebidoEm)+'</span>'+
+      '</div>'+
+      '<div class="gm-row-assunto">'+esc(em.assunto||'(sem assunto)')+'</div>'+
+      '<div class="gm-row-preview">'+esc((em.texto||'').replace(/\s+/g,' ').trim().slice(0,80))+'</div>'+
+      '</div></div>';
+  }).join('');
+}
+
+function renderListaEnviados(lista){
+  var el=g('lista-inbox');
+  if(!lista.length){
+    el.innerHTML='<div style="padding:60px 20px;text-align:center;font-family:var(--fm);font-size:10px;color:var(--mu)">'+
+      '<div style="font-size:32px;margin-bottom:12px;opacity:.3">📤</div>Nenhum email enviado.</div>';
+    return;
+  }
+  el.innerHTML=lista.map(function(em){
+    var cor=avatarColor('P');
+    return '<div class="gm-row" onclick="abrirEmailEnviado('+JSON.stringify(em)+')">'+
+      '<div class="gm-row-avatar" style="background:'+cor+'">P</div>'+
+      '<div class="gm-row-body">'+
+      '<div class="gm-row-top">'+
+      '<span class="gm-row-nome">Para: '+esc((em.para||em.to||'').toString().replace(/<[^>]+>/g,''))+'</span>'+
+      '<span class="gm-row-data">'+fmtDt(em.criadoEm||em.createdAt)+'</span>'+
+      '</div>'+
+      '<div class="gm-row-assunto">'+esc(em.assunto||em.subject||'(sem assunto)')+'</div>'+
+      '</div></div>';
   }).join('');
 }
 
 function filtrarInbox(){
-  var q=(g('inbox-search').value||'').toLowerCase();
+  var q=(gv('inbox-search')||'').toLowerCase().trim();
   if(!q){renderListaInbox(_emails);return;}
-  renderListaInbox(_emails.filter(function(e){
-    return (e.de+e.assunto+e.texto).toLowerCase().includes(q);
+  renderListaInbox(_emails.filter(function(em){
+    return (em.de+' '+em.assunto+' '+em.texto).toLowerCase().includes(q);
   }));
 }
 
+// ── ABRIR EMAIL ──
 async function abrirEmail(id){
-  var e=_emails.find(function(x){return x.id===id;}); if(!e) return;
-  _emailAtivo=e;
+  var em=_emails.find(function(x){return x.id===id;}); if(!em) return;
+  _emailAtivo=em;
+  // Marcar visual ativo
+  document.querySelectorAll('.gm-row').forEach(function(r){r.classList.remove('ativo');});
+  var row=document.querySelector('[data-id="'+id+'"]');
+  if(row){row.classList.remove('nao-lido','gm-row-nao-lido');row.classList.add('ativo');
+    var dot=row.querySelector('.gm-unread-dot'); if(dot) dot.remove();}
   // Marcar como lido
-  if(!e.lido){
-    e.lido=true;
-    fetch('/api/pj-email?action=marcar-lido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
-    var badge=g('b-inbox'); badge.textContent=Math.max(0,(parseInt(badge.textContent)||1)-1);
+  if(!em.lido){
+    em.lido=true;
+    fetch('/api/pj-email?action=marcar-lido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})}).catch(function(){});
+    var b=g('b-inbox');
+    if(b){var n=Math.max(0,(parseInt(b.textContent)||1)-1);b.textContent=n>0?n:'';b.style.display=n>0?'':'none';}
   }
-  // Atualizar lista
-  document.querySelectorAll('.email-row').forEach(function(r){r.classList.remove('ativo');});
-  var row=document.getElementById('row-'+id); if(row){row.classList.remove('nao-lido');row.classList.add('ativo');}
-  // Mostrar detalhe
-  var inicial=(e.de||'?')[0].toUpperCase();
-  var corpo=e.html
-    ? '<iframe srcdoc="'+esc(e.html).replace(/"/g,'&quot;')+'" style="width:100%;height:400px;border:none;background:#fff;border-radius:6px;"></iframe>'
-    : '<div class="ed-body">'+esc(e.texto||'(sem conteúdo)')+'</div>';
-  g('inbox-view').innerHTML=
-    '<div class="email-detail">'+
-    '<div class="ed-header">'+
-    '<div class="ed-assunto">'+esc(e.assunto||'(sem assunto)')+'</div>'+
-    '<div class="ed-meta">'+
-    '<div class="ed-avatar">'+inicial+'</div>'+
-    '<div class="ed-info"><div class="ed-de">'+esc(e.de)+'</div>'+
-    '<div class="ed-para">Para: '+esc(e.para)+'</div></div>'+
-    '<div class="ed-data-full">'+fmtDtFull(e.recebidoEm)+'</div>'+
-    '</div></div>'+
+  // Mostrar painel com loading
+  var inicial=(em.de||'?').replace(/.*<([^>]+)>$/,'$1')[0].toUpperCase();
+  var cor=avatarColor(inicial);
+  var deDisplay=(em.de||'').replace(/<[^>]+>/g,'').trim();
+  renderEmailView(em, cor, inicial, deDisplay, true);
+  // Buscar corpo completo se não tiver
+  if(!em.texto && !em.html){
+    try{
+      var r=await fetch('/api/pj-email?action=get-email-body&id='+encodeURIComponent(id)).then(function(x){return x.json();});
+      if(r.ok){em.texto=r.texto||''; em.html=r.html||'';}
+    }catch(e){}
+  }
+  renderEmailView(em, cor, inicial, deDisplay, false);
+}
+
+function abrirEmailEnviado(em){
+  _emailAtivo=em;
+  var cor=avatarColor('P');
+  renderEmailView({
+    de:'pedro@comercial.reparoeletroadm.com',
+    para:em.para||em.to||'',
+    assunto:em.assunto||em.subject||'',
+    texto:em.corpo||em.body||em.text||'',
+    html:em.html||'',
+    recebidoEm:em.criadoEm||em.createdAt||'',
+  }, cor, 'P', 'Pedro | Reparo Eletro', false, true);
+}
+
+function abrirRascunho(i){
+  var d=_drafts[i]; if(!d) return;
+  abrirCompose(d.para, d.assunto, d.corpo);
+  _drafts.splice(i,1);
+  renderRascunhos();
+}
+
+function renderEmailView(em, cor, inicial, deDisplay, loading, enviado){
+  var corpo;
+  if(loading){
+    corpo='<div class="gm-email-body-loading"><div class="spin" style="margin-right:6px"></div>Carregando mensagem...</div>';
+  } else if(em.html){
+    corpo='<iframe srcdoc="'+em.html.replace(/"/g,'&quot;')+'" style="width:100%;min-height:300px;border:none;background:#fff;border-radius:8px;"></iframe>';
+  } else if(em.texto){
+    corpo='<div class="gm-email-body">'+esc(em.texto)+'</div>';
+  } else {
+    corpo='<div class="gm-email-body" style="opacity:.4;font-family:var(--fm);font-size:10px">(Conteúdo não disponível — verifique no painel Resend)</div>';
+  }
+  var actionsHtml = enviado ? '' : (
+    '<div class="gm-email-actions">'+
+    '<button class="btn btn-pri" style="font-size:10px" onclick="abrirReply()">↩ Responder</button>'+
+    '<button class="btn btn-x" style="font-size:10px" onclick="encaminhar()">→ Encaminhar</button>'+
+    '</div>'+
+    '<div id="gm-reply-area"></div>'
+  );
+  g('gm-view').innerHTML=
+    '<div class="gm-email-view">'+
+    '<div class="gm-email-subject">'+esc(em.assunto||'(sem assunto)')+'</div>'+
+    '<div class="gm-email-meta">'+
+    '<div class="gm-email-av" style="background:'+cor+'">'+inicial+'</div>'+
+    '<div class="gm-email-info">'+
+    '<div class="gm-email-nome">'+esc(deDisplay)+'</div>'+
+    '<div class="gm-email-addr">'+esc(em.de||'')+(em.para?'<br>Para: '+esc(em.para):'')+'</div>'+
+    '</div>'+
+    '<div class="gm-email-data-full">'+fmtDtFull(em.recebidoEm)+'</div>'+
+    '</div>'+
     corpo+
-    '<div class="ed-actions">'+
-    '<button class="btn btn-pri" style="font-size:10px" onclick="responderEmail('+JSON.stringify(e.de)+','+JSON.stringify(e.assunto)+')">↩ Responder</button>'+
-    '<button class="btn btn-x" style="font-size:10px" onclick="copiarEmail('+JSON.stringify(e.de)+')">📋 Copiar remetente</button>'+
+    actionsHtml+
+    '</div>';
+}
+
+// ── REPLY ──
+function abrirReply(){
+  var em=_emailAtivo; if(!em) return;
+  var deEmail=(em.de||'').match(/<([^>]+)>/);
+  var paraEmail=deEmail?deEmail[1]:em.de;
+  var replyArea=g('gm-reply-area'); if(!replyArea) return;
+  replyArea.innerHTML=
+    '<div class="gm-reply-box">'+
+    '<div class="gm-reply-header">Responder para: '+esc(em.de)+'</div>'+
+    '<textarea id="gm-reply-text" class="gm-reply-textarea" placeholder="Escreva sua resposta..."></textarea>'+
+    '<div class="gm-reply-footer">'+
+    '<button class="btn btn-pri" style="font-size:10px" onclick="enviarReply('+JSON.stringify(paraEmail)+','+JSON.stringify(em.assunto||'')+')" id="gm-reply-btn">Enviar Resposta</button>'+
+    '<button class="btn btn-x" style="font-size:10px;opacity:.6" onclick="document.getElementById('gm-reply-area').innerHTML=''">Cancelar</button>'+
     '</div></div>';
+  setTimeout(function(){var t=g('gm-reply-text');if(t)t.focus();},100);
+}
+
+async function enviarReply(para,assunto){
+  var corpo=(g('gm-reply-text')||{}).value||''; if(!corpo.trim()) return;
+  var btn=g('gm-reply-btn'); if(btn){btn.disabled=true;btn.textContent='Enviando...';}
+  try{
+    var r=await fetch('/api/pj-email?action=enviar',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({para:para,assunto:'Re: '+assunto.replace(/^Re: /i,''),corpo,de:''})
+    }).then(function(x){return x.json();});
+    if(r.ok){
+      toast('✅ Resposta enviada!','g');
+      if(g('gm-reply-area')) g('gm-reply-area').innerHTML='';
+    } else { toast('Erro: '+(r.error||'falha'),'r'); }
+  }catch(e){ toast('Erro de rede','r'); }
+  if(btn){btn.disabled=false;btn.textContent='Enviar Resposta';}
+}
+
+function encaminhar(){
+  var em=_emailAtivo; if(!em) return;
+  abrirCompose('','Fwd: '+(em.assunto||''), '\n\n--- Mensagem encaminhada ---\nDe: '+em.de+'\nAssunto: '+(em.assunto||'')+'\n\n'+(em.texto||''));
+}
+
+// ── COMPOSE ──
+function abrirCompose(para,assunto,corpo){
+  var m=g('gm-compose-modal'); m.style.display='block'; m.classList.remove('minimized');
+  if(para!==undefined) g('cm-para').value=para||'';
+  if(assunto!==undefined) g('cm-assunto').value=assunto||'';
+  if(corpo!==undefined) g('cm-corpo').value=corpo||'';
+  else g('cm-corpo').value='';
+  setTimeout(function(){g(para?'cm-corpo':'cm-para').focus();},100);
+}
+
+function fecharCompose(){
+  var para=gv('cm-para'), assunto=gv('cm-assunto'), corpo=(g('cm-corpo')||{}).value||'';
+  if((para||assunto||corpo.trim()) && confirm('Salvar como rascunho?')){
+    _drafts.push({para,assunto,corpo});
+    toast('📝 Rascunho salvo','g');
+  }
+  g('gm-compose-modal').style.display='none';
+}
+
+function minimizarCompose(){
+  g('gm-compose-modal').classList.toggle('minimized');
+}
+
+async function enviarComposeEmail(){
+  var para=gv('cm-para'), assunto=gv('cm-assunto'), corpo=(g('cm-corpo')||{}).value||'';
+  if(!para){toast('Informe o destinatário','r');g('cm-para').focus();return;}
+  if(!corpo.trim()){toast('Escreva a mensagem','r');g('cm-corpo').focus();return;}
+  var btn=g('cm-send-btn'); if(btn){btn.disabled=true;}
+  var lbl=g('cm-send-label'); if(lbl) lbl.textContent='Enviando...';
+  try{
+    var r=await fetch('/api/pj-email?action=enviar',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({para,assunto,corpo,de:gv('c-de')||''})
+    }).then(function(x){return x.json();});
+    if(r.ok){
+      toast('✅ Email enviado!','g');
+      g('gm-compose-modal').style.display='none';
+      g('cm-para').value=''; g('cm-assunto').value=''; g('cm-corpo').value='';
+    } else { toast('Erro: '+(r.error||'falha ao enviar'),'r'); }
+  }catch(e){ toast('Erro de rede','r'); }
+  if(btn){btn.disabled=false;} if(lbl) lbl.textContent='Enviar';
 }
 
 function fmtDtFull(ts){
-  if(!ts) return '';
-  try{return new Date(ts).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}catch(e){return '';}
-}
-
-function responderEmail(de,assunto){
-  var link='mailto:'+de+'?subject=Re: '+encodeURIComponent(assunto||'');
-  window.open(link);
-}
-
-function copiarEmail(de){
-  navigator.clipboard.writeText(de).then(function(){toast('📋 Copiado!');}).catch(function(){});
+  if(!ts)return '';
+  try{return new Date(ts).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}
+  catch(e){return ts||'';}
 }
 
 // ── CAMPANHAS ──────────────────────────────────────────────────────────────

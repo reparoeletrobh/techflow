@@ -74,7 +74,40 @@ module.exports = async function handler(req,res){
 
   // ── GET testar-resend — diagnóstico completo da integração Resend ─────────────
   // ── GET inbox — busca emails recebidos direto da API Resend + Redis ──────────
-  if (action === 'inbox') {
+  // ── GET get-email-body — busca o corpo do email da API Resend ───────────────
+  if (action === 'get-email-body') {
+    const emailId = req.query.id;
+    if (!emailId || !RESEND_KEY) return res.status(400).json({ ok:false, error:'id ou key faltando' });
+    try {
+      // Tentar endpoint de emails recebidos
+      const r = await fetch('https://api.resend.com/emails/' + emailId, {
+        headers: { Authorization: 'Bearer ' + RESEND_KEY }
+      });
+      const d = await r.json();
+      // Atualizar no Redis também
+      const INBOX_KEY = 'pj_inbox';
+      const inbox = (await dbGet(INBOX_KEY)) || { emails: [] };
+      const em = (inbox.emails||[]).find(e => e.id === emailId);
+      if (em && (d.text || d.html)) {
+        em.texto = d.text || em.texto || '';
+        em.html  = d.html || em.html || '';
+        await dbSet(INBOX_KEY, inbox);
+      }
+      return res.status(200).json({
+        ok: true,
+        texto: d.text || d.plain_text || '',
+        html:  d.html || '',
+        de:    d.from || d.sender || '',
+        para:  Array.isArray(d.to) ? d.to.join(', ') : (d.to || ''),
+        assunto: d.subject || '',
+        raw: d,
+      });
+    } catch(e) {
+      return res.status(500).json({ ok:false, error: e.message });
+    }
+  }
+
+    if (action === 'inbox') {
     try {
       const INBOX_KEY = 'pj_inbox';
       // 1. Buscar do Redis (emails salvos pelo webhook)
