@@ -58,19 +58,31 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, ignored: true, type: event.type });
       }
 
-      // Buscar corpo do email via Resend Receiving API (webhook só tem metadados)
+      // Webhook só tem metadados — buscar corpo via Receiving API imediatamente
       const emailId = data.email_id || data.id;
       let textoFinal = data.text || data.plain_text || '';
       let htmlFinal  = data.html || '';
-      if (emailId && RESEND_KEY && (!textoFinal && !htmlFinal)) {
+      if (emailId && RESEND_KEY) {
         try {
-          const bodyRes = await fetch('https://api.resend.com/emails/' + emailId, {
+          // Tentar endpoint da Receiving API
+          let bodyRes = await fetch('https://api.resend.com/emails/receiving/' + emailId, {
             headers: { Authorization: 'Bearer ' + RESEND_KEY }
           });
-          const bodyData = await bodyRes.json();
-          textoFinal = bodyData.text || textoFinal;
-          htmlFinal  = bodyData.html || htmlFinal;
-        } catch(ef) { console.error('fetch body:', ef.message); }
+          // Fallback para endpoint genérico se receiving não existir
+          if (!bodyRes.ok) {
+            bodyRes = await fetch('https://api.resend.com/emails/' + emailId, {
+              headers: { Authorization: 'Bearer ' + RESEND_KEY }
+            });
+          }
+          if (bodyRes.ok) {
+            const bd = await bodyRes.json();
+            textoFinal = bd.text || bd.plain_text || bd.body_plain || textoFinal;
+            htmlFinal  = bd.html || bd.body_html || htmlFinal;
+            console.log('[webhook] corpo buscado, chars:', textoFinal.length + htmlFinal.length);
+          } else {
+            console.log('[webhook] API retornou:', bodyRes.status, 'para', emailId);
+          }
+        } catch(ef) { console.error('[webhook] fetch body error:', ef.message); }
       }
 
       // Salvar email recebido no Redis
