@@ -39,7 +39,12 @@ module.exports = async function handler(req, res) {
         type: event.type || 'sem_type',
         keys: Object.keys(event),
         dataKeys: event.data ? Object.keys(event.data) : [],
-        raw: JSON.stringify(event).slice(0, 500)
+        raw: JSON.stringify(event).slice(0, 800),
+        // Campos específicos para diagnóstico
+        emailId: event.data?.email_id || null,
+        fromField: event.data?.from || null,
+        subjectField: event.data?.subject || null,
+        hasBody: !!(event.data?.html || event.data?.plain_text || event.data?.text)
       });
       logDb.eventos = logDb.eventos.slice(0, 50);
       await dbSet(LOG_KEY, logDb);

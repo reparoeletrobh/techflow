@@ -79,10 +79,16 @@ module.exports = async function handler(req,res){
     const emailId = req.query.id;
     if (!emailId || !RESEND_KEY) return res.status(400).json({ ok:false, error:'id ou key faltando' });
     try {
-      // Tentar endpoint de emails recebidos
-      const r = await fetch('https://api.resend.com/emails/' + emailId, {
+      // Endpoint da Receiving API do Resend (diferente dos emails enviados)
+      let r = await fetch('https://api.resend.com/emails/receiving/' + emailId, {
         headers: { Authorization: 'Bearer ' + RESEND_KEY }
       });
+      // Se receiving endpoint falhar, tentar endpoint geral
+      if (!r.ok) {
+        r = await fetch('https://api.resend.com/emails/' + emailId, {
+          headers: { Authorization: 'Bearer ' + RESEND_KEY }
+        });
+      }
       const d = await r.json();
       // Atualizar no Redis também
       const INBOX_KEY = 'pj_inbox';
@@ -95,7 +101,7 @@ module.exports = async function handler(req,res){
       }
       return res.status(200).json({
         ok: true,
-        texto: d.text || d.plain_text || '',
+        texto: d.text || d.plain_text || d.body_plain || '',
         html:  d.html || '',
         de:    d.from || d.sender || '',
         para:  Array.isArray(d.to) ? d.to.join(', ') : (d.to || ''),
