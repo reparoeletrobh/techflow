@@ -44,6 +44,7 @@ module.exports = async function handler(req,res){
           headers:{'Content-Type':'application/json','Authorization':'Bearer '+RESEND_KEY},
           body:JSON.stringify({
             from: remetente||de||'Pedro | Reparo Eletro <pedro@send.comercial.reparoeletroadm.com>',
+            reply_to: ['pedro@ciacaluuir.resend.app'],
             to:[dest.email||dest],
             subject:assunto.replace(/\{\{empresa\}\}/g,dest.empresa||'').replace(/\{\{responsavel\}\}/g,dest.responsavel||''),
             html:(html||'').replace(/\{\{empresa\}\}/g,dest.empresa||'').replace(/\{\{responsavel\}\}/g,dest.responsavel||'').replace(/\{\{cidade\}\}/g,dest.cidade||''),
