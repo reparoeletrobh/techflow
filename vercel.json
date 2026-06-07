@@ -343,6 +343,10 @@
       "destination": "/institucional.html"
     },
     {
+      "source": "/api/pj-sdr",
+      "destination": "/api/pj-sdr.js"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/home.html"
     },
