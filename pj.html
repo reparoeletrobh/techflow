@@ -1756,6 +1756,13 @@ function formatTelSdr(input) {
   input.value=v;
 }
 
+// ── INIT ──
+document.addEventListener("DOMContentLoaded",function(){
+  carregarSDR();
+  fetch('/api/pj-email?action=inbox').then(x=>x.json())
+    .then(r=>{var b=g('b-inbox');if(b&&r.naoLidos>0){b.textContent=r.naoLidos;}})
+    .catch(()=>{});
+});
 </script>
 </body>
 </html>
