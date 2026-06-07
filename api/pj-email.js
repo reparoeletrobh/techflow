@@ -43,7 +43,7 @@ module.exports = async function handler(req,res){
           method:'POST',
           headers:{'Content-Type':'application/json','Authorization':'Bearer '+RESEND_KEY},
           body:JSON.stringify({
-            from: remetente||de||'Pedro | Reparo Eletro <pedro@comercial.reparoeletroadm.com>',
+            from: remetente||de||'Pedro Teixeira | Reparo Eletro, Microondas e Bebedouros <pedro@comercial.reparoeletroadm.com>',
             reply_to: ['pedro@ciacaluuir.resend.app'],
             to:[dest.email||dest],
             subject:assunto.replace(/\{\{empresa\}\}/g,dest.empresa||'').replace(/\{\{responsavel\}\}/g,dest.responsavel||''),
@@ -233,7 +233,7 @@ module.exports = async function handler(req,res){
         method:'POST',
         headers:{'Content-Type':'application/json','Authorization':'Bearer '+RESEND_KEY},
         body: JSON.stringify({
-          from: 'Pedro | Reparo Eletro <pedro@comercial.reparoeletroadm.com>',
+          from: 'Pedro Teixeira | Reparo Eletro, Microondas e Bebedouros <pedro@comercial.reparoeletroadm.com>',
           to: ['delivered@resend.dev'], // endereço de teste oficial do Resend
           subject: 'Teste Reparo Eletro BH',
           text: 'Teste de envio — diagnóstico do sistema PJ.'
