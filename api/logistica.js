@@ -384,6 +384,19 @@ module.exports = async function handler(req, res) {
   }
 
 
+  // ── POST marcar-checado: marca ficha como checada (verde), reseta alerta ──
+  if (req.method === 'POST' && action === 'marcar-checado') {
+    const { id } = req.body || {};
+    if (!id) return res.status(400).json({ ok: false, error: 'id obrigatorio' });
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const ficha = (db.fichas || []).find(f => f.id === id);
+    if (!ficha) return res.status(404).json({ ok: false, error: 'ficha nao encontrada' });
+    ficha.checado   = true;
+    ficha.checadoEm = new Date().toISOString();
+    await dbSet(LOG_KEY, db);
+    return res.status(200).json({ ok: true, id, checado: true });
+  }
+
   // ── POST mover-motorista: move para Motorista Parceiro salvando o nome ──
   if (req.method === 'POST' && action === 'mover-motorista') {
     const { id, motoristaNome } = req.body || {};
