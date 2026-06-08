@@ -347,6 +347,10 @@
       "destination": "/api/pj-sdr.js"
     },
     {
+      "source": "/api/busca-ficha",
+      "destination": "/api/busca-ficha.js"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/home.html"
     },
