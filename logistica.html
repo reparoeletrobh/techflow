@@ -170,10 +170,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 /* ── TOAST ── */
 .toast{position:fixed;bottom:24px;right:24px;background:#1a1a1a;border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-family:var(--fm);font-size:11px;color:var(--text);z-index:999;opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;}
 .toast.show{opacity:1;transform:translateY(0);}
-
-/* Card checado — verde */
 .checado-rota{border-color:#22c55e!important;box-shadow:0 0 0 2px rgba(34,197,94,.25)!important;}
-.checado-badge{display:inline-flex;align-items:center;gap:4px;font-family:var(--fm);font-size:9px;font-weight:700;color:#22c55e;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:2px 7px;margin-bottom:5px;}
+.checado-badge{font-family:var(--fm);font-size:9px;font-weight:700;color:#22c55e;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:2px 7px;margin-bottom:4px;display:inline-block;}
 </style>
 </head>
 <body>
@@ -610,11 +608,13 @@ function cardHTML(f, phase) {
         <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>
       </div>`;
   } else if (phase === 'em_rota') {
-    const alertaBtns = emRotaAlerta ? `
-      <button class="cbtn cbtn-blue" onclick="mover('${f.id}','liberado_coleta')">🔓 Liberar Novamente</button>
-      <button class="cbtn cbtn-green" onclick="marcarChecado('${f.id}')">✅ Checado</button>` : '';
-    const checadoBadge = emChecado ? `<div class="checado-badge">✅ Checado</div>` : '';
-    btns = checadoBadge + alertaBtns + `
+    var _alerta = !f.checado && (Date.now()-new Date(f.movedAt||f.criadoEm).getTime())>7200000;
+    var _checado = !!f.checado;
+    btns = (_alerta
+      ? '<button class="cbtn cbtn-blue" onclick="mover(\''+f.id+'\',\'liberado_coleta\')">🔓 Liberar Novamente</button>'
+      + '<button class="cbtn cbtn-green" onclick="marcarChecado(\''+f.id+'\')"  >✅ Checado</button>'
+      : (_checado ? '<div class="checado-badge">✅ Checado</div>' : ''))
+    + `
       <button class="cbtn-expand" id="btn-x-${f.id}" onclick="toggleExpand('${f.id}')"><em class="chev">▾</em><span> Mais ações</span></button>
       <div class="btns-hidden" id="btns-x-${f.id}">
         <button class="cbtn cbtn-green" onclick="mover('${f.id}','coleta_efetuada')">Coleta Efetuada</button>
@@ -624,11 +624,14 @@ function cardHTML(f, phase) {
       </div>`;
   } else if (phase === 'motorista_parceiro') {
     const motorista = f.motoristaNome ? `<div style="font-family:var(--fm);font-size:10px;color:#8b5cf6;margin-bottom:2px;">🏍️ ${escHtml(f.motoristaNome)}</div>` : '';
-    const alertaBtnsMot = emRotaAlerta ? `
-      <button class="cbtn cbtn-blue" onclick="mover('${f.id}','liberado_coleta')">🔓 Liberar Novamente</button>
-      <button class="cbtn cbtn-green" onclick="marcarChecado('${f.id}')">✅ Checado</button>` : '';
-    const checadoBadgeMot = emChecado ? `<div class="checado-badge">✅ Checado</div>` : '';
-    btns = motorista + checadoBadgeMot + alertaBtnsMot + `
+    var _alertaMot = !f.checado && (Date.now()-new Date(f.movedAt||f.criadoEm).getTime())>7200000;
+    var _checadoMot = !!f.checado;
+    btns = motorista
+    + (_alertaMot
+      ? '<button class="cbtn cbtn-blue" onclick="mover(\''+f.id+'\',\'liberado_coleta\')">🔓 Liberar Novamente</button>'
+      + '<button class="cbtn cbtn-green" onclick="marcarChecado(\''+f.id+'\')"  >✅ Checado</button>'
+      : (_checadoMot ? '<div class="checado-badge">✅ Checado</div>' : ''))
+    + `
       <button class="cbtn-expand" id="btn-x-${f.id}" onclick="toggleExpand('${f.id}')"><em class="chev">▾</em><span> Mais ações</span></button>
       <div class="btns-hidden" id="btns-x-${f.id}">
         <button class="cbtn cbtn-green" onclick="mover('${f.id}','coleta_efetuada')">Coleta Efetuada</button>
@@ -649,8 +652,7 @@ function cardHTML(f, phase) {
     if (diag) btns = `<div style="font-family:var(--fm);font-size:10px;color:var(--muted);">${diag.tipo||''}${diag.subtipo?' › '+diag.subtipo:''} — ${(diag.servicos||[]).join(', ')}</div>`;
   }
 
-  const _tempoRota = Date.now() - new Date(f.movedAt||f.criadoEm).getTime();
-  const emRotaAlerta = (phase === 'em_rota' || phase === 'motorista_parceiro') && !f.checado && _tempoRota > 2 * 60 * 60 * 1000;
+  const emRotaAlerta = (phase === 'em_rota' || phase === 'motorista_parceiro') && !f.checado && (Date.now() - new Date(f.movedAt||f.criadoEm).getTime()) > 2 * 60 * 60 * 1000;
   const emChecado    = (phase === 'em_rota' || phase === 'motorista_parceiro') && !!f.checado;
   return `
   <div class="card${emRotaAlerta ? ' alerta-rota' : ''}${emChecado ? ' checado-rota' : ''}">
@@ -698,12 +700,12 @@ async function finalizarRS(id, nome) {
 }
 
 async function marcarChecado(id) {
-  const r = await fetch('/api/logistica?action=marcar-checado', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({id})
+  const r = await fetch('/api/logistica?action=marcar-checado',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id})
   }).then(r=>r.json());
-  if (r.ok) { await load(); toast('✅ Ficha marcada como checada'); }
-  else toast('Erro: ' + (r.error||'falha'), true);
+  if(r.ok){await load();toast('✅ Ficha checada');}
+  else toast('Erro: '+(r.error||'falha'),true);
 }
 
 async function cancelar(id, nome) {
