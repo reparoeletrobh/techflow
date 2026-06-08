@@ -534,9 +534,9 @@ function render() {
     const cards = fichasFiltradas
       .filter(f => f.phase === col.id)
       .sort((a, b) => {
-        const aA = isEmAlerta(a) ? 1 : 0;
-        const bA = isEmAlerta(b) ? 1 : 0;
-        return bA - aA; // alertas primeiro
+        // vermelho (alerta) = topo, normal = meio, verde (checado) = fundo
+        const peso = f => isEmAlerta(f) ? 2 : f.checado ? 0 : 1;
+        return peso(b) - peso(a);
       });
     return `
     <div class="col">
