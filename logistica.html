@@ -952,7 +952,8 @@ function toast(msg, err) {
 
 // ── INIT ────────────────────────────────────────────────────
 load();
-setInterval(load, 30000);
+setInterval(load, 30000);   // rebusca servidor a cada 30s
+setInterval(render, 60000); // reclassifica cores/posições a cada 1min
 
 // ── PAINEL MÉTRICAS ──────────────────────────────────────────
 async function atualizarMetricas() {
