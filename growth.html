@@ -131,6 +131,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   <div style="display:flex;gap:8px">
     <button class="hbtn" onclick="resetD()">↺ Diário</button>
     <button class="hbtn" onclick="resetW()">↺ Semanal</button>
+    <button class="hbtn" id="btn-hist" onclick="abrirHistorico()" style="background:rgba(59,130,246,.15);border-color:rgba(59,130,246,.4);color:#3b82f6">📊 Histórico</button>
   </div>
 </header>
 
@@ -219,6 +220,71 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 <div class="toast" id="toast"></div>
 
 <script>
+// ── HISTÓRICO SEMANAL ────────────────────────────────────────────────────────
+async function abrirHistorico() {
+  var modal = document.getElementById('hist-modal');
+  modal.style.display = 'flex';
+  var el = document.getElementById('hist-content');
+  el.innerHTML = '<div style="padding:40px">Carregando...</div>';
+  try {
+    var r = await fetch('/api/growth?action=historico').then(function(x){return x.json();});
+    var semanas = r.semanas || [];
+    if (!semanas.length) {
+      el.innerHTML = '<div style="padding:40px;text-align:center;opacity:.5">Nenhum histórico ainda.<br><br>O progresso de cada semana será salvo automaticamente toda segunda-feira.</div>';
+      return;
+    }
+    el.innerHTML = semanas.map(function(s) {
+      var totalTarefas = 0, totalFeitas = 0;
+      (s.cols||[]).forEach(function(col) {
+        (col.items||[]).forEach(function(it) {
+          var val = (s.vals||{})[col.id+'_'+it.id] || 0;
+          var meta = it.meta || 1;
+          totalTarefas += meta;
+          totalFeitas  += Math.min(val, meta);
+        });
+      });
+      var pct = totalTarefas > 0 ? Math.round(totalFeitas/totalTarefas*100) : 0;
+      var cor = pct >= 80 ? '#10d982' : pct >= 50 ? '#f5c800' : '#f04060';
+      var barW = Math.max(2, pct);
+
+      // Detalhes por coluna
+      var detalhes = (s.cols||[]).map(function(col) {
+        var feitos=0, total=0;
+        (col.items||[]).forEach(function(it){
+          var v=(s.vals||{})[col.id+'_'+it.id]||0;
+          var m=it.meta||1;
+          total+=m; feitos+=Math.min(v,m);
+        });
+        var pctCol = total>0?Math.round(feitos/total*100):0;
+        return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(26,37,64,.4);">'+
+          '<span style="font-size:14px">'+(col.icon||'')+'</span>'+
+          '<span style="flex:1;color:#dce8f8;font-size:11px">'+(col.label||col.id)+'</span>'+
+          '<span style="color:'+cor+'">'+(col.freq==='d'?'diário':'semanal')+'</span>'+
+          '<span style="font-weight:700;color:'+cor+'">'+feitos+'/'+total+'</span>'+
+          '</div>';
+      }).join('');
+
+      return '<div style="background:#0d1425;border:1px solid #1a2540;border-radius:8px;padding:16px;margin-bottom:12px;">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'+
+        '<div style="font-size:13px;font-weight:700;color:#dce8f8;">Semana de '+s.semanaInicio+'</div>'+
+        '<div style="font-size:22px;font-weight:900;color:'+cor+'">'+pct+'%</div>'+
+        '</div>'+
+        '<div style="height:6px;background:#1a2540;border-radius:99px;margin-bottom:12px;">'+
+        '<div style="height:100%;width:'+barW+'%;background:'+cor+';border-radius:99px;transition:width .5s"></div>'+
+        '</div>'+
+        detalhes+
+        '</div>';
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<div style="color:#f04060;padding:20px">Erro: '+e.message+'</div>';
+  }
+}
+
+function fecharHistorico() {
+  document.getElementById('hist-modal').style.display = 'none';
+}
+
+
 var COLS = [
   {id:'pago',     label:'Tráfego Pago',  icon:'💰',freq:'d',color:'#3b9eff',
    items:[
@@ -270,7 +336,7 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 
 function persist(){
   try{
-    var pl = JSON.stringify({cols:cols,vals:vals,influencers:_influencers});
+    var pl = JSON.stringify({cols:cols,vals:vals,influencers:_influencers,lastDailyReset:getHoje(),lastWeeklyReset:getSegundaFeira()});
     localStorage.setItem(SK,pl);
     fetch('/api/growth?action=salvar-kanban',{method:'POST',headers:{'Content-Type':'application/json'},body:pl}).catch(function(){});
   }catch(e){}
@@ -637,9 +703,82 @@ function removerInfluencer(i){
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
+
+// ── AUTO-RESET SEMANAL/DIÁRIO ────────────────────────────────────────────────
+
+function getHoje() {
+  return new Date().toLocaleDateString('sv-SE', {timeZone:'America/Sao_Paulo'});
+}
+
+function getSegundaFeira(dateStr) {
+  var d = new Date(dateStr || Date.now());
+  var day = d.getDay(); // 0=dom
+  var diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toLocaleDateString('sv-SE', {timeZone:'America/Sao_Paulo'});
+}
+
+async function verificarAutoReset(data) {
+  var hoje = getHoje();
+  var semanaAtual = getSegundaFeira();
+  var lastD = data.lastDailyReset  || '';
+  var lastW = data.lastWeeklyReset || '';
+
+  if (lastD === hoje && lastW === semanaAtual) return data; // nada a fazer
+
+  try {
+    var r = await fetch('/api/growth?action=auto-reset', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        hoje, semanaAtual,
+        vals: data.vals || {}, cols: data.cols || [],
+        lastDailyReset: lastD, lastWeeklyReset: lastW
+      })
+    }).then(function(x){return x.json();});
+
+    if (r.resetDiario) {
+      (data.cols||[]).forEach(function(c) {
+        if (c.freq === 'd') (c.items||[]).forEach(function(it) {
+          data.vals = data.vals || {};
+          data.vals[c.id+'_'+it.id] = 0;
+        });
+      });
+      data.lastDailyReset = hoje;
+      console.log('[Growth] Reset diário executado');
+    }
+
+    if (r.resetSemanal) {
+      (data.cols||[]).forEach(function(c) {
+        if (c.freq === 'w') (c.items||[]).forEach(function(it) {
+          data.vals = data.vals || {};
+          data.vals[c.id+'_'+it.id] = 0;
+        });
+      });
+      data.lastWeeklyReset = semanaAtual;
+      console.log('[Growth] Reset semanal executado, snapshot salvo');
+      if (lastW) toast('↺ Semana ' + lastW + ' arquivada! Tarefas semanais zeradas.');
+    }
+  } catch(e) { console.error('[Growth] auto-reset error:', e); }
+
+  return data;
+}
+
 load();
 loadInfluencers();
 setInterval(function(){renderBoard();},60000);
 </script>
+
+<!-- MODAL HISTÓRICO SEMANAL -->
+<div id="hist-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;padding:20px;overflow-y:auto;align-items:flex-start;justify-content:center;">
+  <div style="background:#080d18;border:1px solid #1a2540;border-radius:12px;width:100%;max-width:700px;margin:20px auto;padding:24px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h2 style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:#dce8f8;">📊 Progresso Semanal</h2>
+      <button onclick="fecharHistorico()" style="background:none;border:none;color:#4a607a;font-size:20px;cursor:pointer;">✕</button>
+    </div>
+    <div id="hist-content" style="font-family:'DM Mono',monospace;font-size:10px;color:#4a607a;padding:20px;text-align:center;">
+      Carregando...
+    </div>
+  </div>
+</div>
 </body>
 </html>
