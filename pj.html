@@ -1057,20 +1057,27 @@ function renderEmailView(em, cor, inicial, deDisplay, loading, enviado){
 function abrirReply(){
   var em=_emailAtivo; if(!em) return;
   var deEmail=(em.de||'').match(/<([^>]+)>/);
-  var paraEmail=deEmail?deEmail[1]:em.de;
+  // Guardar dados do reply globalmente — evita aspas no onclick
+  window._replyPara   = deEmail ? deEmail[1] : em.de;
+  window._replyAssunto= em.assunto||'';
   var replyArea=g('gm-reply-area'); if(!replyArea) return;
   replyArea.innerHTML=
     '<div class="gm-reply-box">'+
     '<div class="gm-reply-header">Responder para: '+esc(em.de)+'</div>'+
     '<textarea id="gm-reply-text" class="gm-reply-textarea" placeholder="Escreva sua resposta..."></textarea>'+
     '<div class="gm-reply-footer">'+
-    '<button class="btn btn-pri" style="font-size:10px" onclick="enviarReply('+JSON.stringify(paraEmail)+','+JSON.stringify(em.assunto||'')+')" id="gm-reply-btn">Enviar Resposta</button>'+
-    '<button class="btn btn-x" style="font-size:10px;opacity:.6" onclick="limparReply()">Cancelar</button></div></div>';
+    '<button class="btn btn-pri" style="font-size:10px" id="gm-reply-btn" onclick="window._enviarReply()">Enviar Resposta</button>'+
+    '<button class="btn btn-x" style="font-size:10px;opacity:.6" onclick="limparReply()">Cancelar</button>'+
+    '</div></div>';
   setTimeout(function(){var t=g('gm-reply-text');if(t)t.focus();},100);
 }
 
-async function enviarReply(para,assunto){
-  var corpo=(g('gm-reply-text')||{}).value||''; if(!corpo.trim()) return;
+async window._enviarReply = async function(){
+  var para   = window._replyPara    || '';
+  var assunto= window._replyAssunto || '';
+  var corpo  = (g('gm-reply-text')||{}).value||'';
+  if(!para)   { toast('Destinatário não encontrado','r'); return; }
+  if(!corpo.trim()) { toast('Escreva a resposta antes de enviar','r'); return; }
   var btn=g('gm-reply-btn'); if(btn){btn.disabled=true;btn.textContent='Enviando...';}
   try{
     var r=await fetch('/api/pj-email?action=enviar',{method:'POST',
