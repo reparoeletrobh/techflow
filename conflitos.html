@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Conflitos — TechFlow</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#03060e;--s1:#080d18;--s2:#0d1425;--s3:#111c30;
+  --bdr:#1a2540;--bdr2:#243050;
+  --tx:#dce8f8;--mu:#4a607a;--mu2:#6a80a0;
+  --red:#f04060;--red2:rgba(240,64,96,.12);--red3:rgba(240,64,96,.25);
+  --yel:#f5c800;--yel2:rgba(245,200,0,.1);
+  --blu:#3b82f6;--blu2:rgba(59,130,246,.12);
+  --grn:#10d982;--grn2:rgba(16,217,130,.1);
+  --or:#f97316;
+  --fm:'DM Mono',monospace;--fh:'Syne',sans-serif;--fb:'Inter',sans-serif;
+}
+body{background:var(--bg);color:var(--tx);font-family:var(--fb);min-height:100vh;}
+button{cursor:pointer;font-family:inherit;}
+a{text-decoration:none;color:inherit;}
+
+header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:50px;background:var(--s1);border-bottom:1px solid var(--bdr);position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--fh);font-size:13px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.logo-ic{width:28px;height:28px;background:var(--red);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;}
+.back-btn{font-family:var(--fm);font-size:10px;color:var(--mu);background:var(--s2);border:1px solid var(--bdr);border-radius:6px;padding:5px 12px;transition:all .15s;}
+.back-btn:hover{color:var(--tx);border-color:var(--bdr2);}
+
+.page{max-width:1000px;margin:0 auto;padding:24px 20px;}
+.top-bar{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap;}
+.page-title{font-family:var(--fh);font-size:22px;font-weight:900;flex:1;}
+.page-title em{color:var(--red);font-style:normal;}
+
+.btn{font-family:var(--fm);font-size:10px;padding:8px 14px;border-radius:7px;border:1px solid var(--bdr);background:var(--s2);color:var(--mu);transition:all .15s;}
+.btn:hover{border-color:var(--bdr2);color:var(--tx);}
+.btn-new{background:var(--red);border-color:var(--red);color:#fff;font-family:var(--fh);font-size:12px;font-weight:700;padding:9px 18px;}
+.btn-new:hover{background:#d83050;}
+.btn-rel{display:flex;align-items:center;gap:5px;}
+
+.metricas{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
+.met{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden;}
+.met::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.met.r::before{background:var(--red);}
+.met.y::before{background:var(--yel);}
+.met.g::before{background:var(--grn);}
+.met.b::before{background:var(--blu);}
+.met-n{font-family:var(--fh);font-size:26px;font-weight:900;}
+.met.r .met-n{color:var(--red);}
+.met.y .met-n{color:var(--yel);}
+.met.g .met-n{color:var(--grn);}
+.met.b .met-n{color:var(--blu);}
+.met-l{font-family:var(--fm);font-size:9px;color:var(--mu);margin-top:3px;letter-spacing:.06em;}
+
+.filtros{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;}
+.fb{font-family:var(--fm);font-size:10px;padding:6px 12px;border-radius:6px;border:1px solid var(--bdr);background:var(--s2);color:var(--mu);transition:all .15s;}
+.fb:hover,.fb.on{background:var(--s3);color:var(--tx);border-color:var(--bdr2);}
+.fb.r.on{border-color:var(--red);color:var(--red);background:var(--red2);}
+.fb.y.on{border-color:var(--yel);color:var(--yel);background:var(--yel2);}
+.fb.g.on{border-color:var(--grn);color:var(--grn);background:var(--grn2);}
+
+.secao{margin-bottom:22px;}
+.sec-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.sec-dot{width:9px;height:9px;border-radius:50%;}
+.sec-lbl{font-family:var(--fm);font-size:10px;font-weight:500;letter-spacing:.1em;}
+.sec-cnt{font-family:var(--fm);font-size:9px;background:var(--s2);border-radius:99px;padding:1px 8px;color:var(--mu);}
+
+.ccard{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:14px 16px;margin-bottom:8px;transition:border-color .15s;}
+.ccard:hover{border-color:var(--bdr2);}
+.ccard.r{border-left:3px solid var(--red);}
+.ccard.y{border-left:3px solid var(--yel);}
+.ccard.b{border-left:3px solid var(--blu);}
+.ccard.resolved{opacity:.5;}
+
+.cc-top{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;}
+.cc-prio{font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:4px;flex-shrink:0;margin-top:1px;}
+.cc-prio.r{background:var(--red2);color:var(--red);border:1px solid var(--red3);}
+.cc-prio.y{background:var(--yel2);color:var(--yel);border:1px solid rgba(245,200,0,.25);}
+.cc-prio.b{background:var(--blu2);color:var(--blu);border:1px solid rgba(59,130,246,.25);}
+.cc-titulo{font-size:13px;font-weight:600;flex:1;line-height:1.4;}
+.cc-tempo{font-family:var(--fm);font-size:9px;color:var(--mu);flex-shrink:0;white-space:nowrap;margin-top:2px;}
+.cc-tempo.urg{color:var(--red);}
+.cc-tempo.ok{color:var(--grn);}
+
+.cc-meta{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:8px;}
+.tag{font-family:var(--fm);font-size:9px;background:var(--s2);border:1px solid var(--bdr);border-radius:4px;padding:2px 7px;color:var(--mu2);}
+.tag.ficha{border-color:var(--blu);color:var(--blu);background:var(--blu2);}
+.status-b{font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:4px;margin-left:auto;}
+.status-b.aberto{background:var(--red2);color:var(--red);}
+.status-b.andamento{background:var(--yel2);color:var(--yel);}
+.status-b.resolvido{background:var(--grn2);color:var(--grn);}
+
+.cc-desc{font-size:11px;color:var(--mu);line-height:1.6;margin-bottom:10px;}
+.cc-solucao{font-size:11px;color:var(--grn);line-height:1.5;margin-bottom:8px;padding:8px 10px;background:var(--grn2);border-radius:6px;}
+
+.cc-btns{display:flex;gap:6px;flex-wrap:wrap;}
+.cc-btn{font-family:var(--fm);font-size:9px;padding:5px 10px;border-radius:6px;border:1px solid var(--bdr);background:var(--s2);color:var(--mu);transition:all .15s;}
+.cc-btn:hover{border-color:var(--bdr2);color:var(--tx);}
+.cc-btn.assumir{border-color:var(--yel);color:var(--yel);background:var(--yel2);}
+.cc-btn.resolver{border-color:var(--grn);color:var(--grn);background:var(--grn2);}
+
+.toggle-res{display:flex;align-items:center;gap:8px;cursor:pointer;font-family:var(--fm);font-size:10px;color:var(--mu);padding:10px 0;border-top:1px solid var(--bdr);margin-top:4px;transition:color .15s;}
+.toggle-res:hover{color:var(--tx);}
+.empty{text-align:center;padding:60px 20px;font-family:var(--fm);font-size:11px;color:var(--mu);}
+.empty-icon{font-size:36px;margin-bottom:12px;opacity:.3;}
+.spin{width:20px;height:20px;border:2px solid var(--bdr);border-top-color:var(--blu);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading{display:flex;align-items:center;justify-content:center;padding:60px;}
+
+/* Modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;opacity:0;pointer-events:none;transition:opacity .2s;}
+.modal-bg.show{opacity:1;pointer-events:all;}
+.modal{background:var(--s1);border:1px solid var(--bdr);border-radius:12px;width:100%;max-width:520px;padding:22px;transform:translateY(16px);transition:transform .25s;max-height:88vh;overflow-y:auto;}
+.modal-bg.show .modal{transform:translateY(0);}
+.modal-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+.modal-titulo{font-family:var(--fh);font-size:15px;font-weight:800;}
+.modal-x{background:none;border:none;color:var(--mu);font-size:18px;padding:4px;}
+.modal-x:hover{color:var(--tx);}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.ffull{grid-column:1/-1;}
+.fld{margin-bottom:2px;}
+.fld label{display:block;font-family:var(--fm);font-size:9px;color:var(--mu);letter-spacing:.07em;margin-bottom:5px;}
+.fld input,.fld select,.fld textarea{width:100%;background:var(--s2);border:1px solid var(--bdr);border-radius:7px;color:var(--tx);font-family:var(--fb);font-size:12px;padding:8px 11px;outline:none;transition:border-color .15s;}
+.fld input:focus,.fld select:focus,.fld textarea:focus{border-color:var(--blu);}
+.fld textarea{resize:vertical;min-height:80px;}
+.fld select option{background:var(--s2);}
+.prio-row{display:flex;gap:8px;margin-bottom:2px;}
+.prio-o{flex:1;text-align:center;padding:8px;border-radius:7px;border:1px solid var(--bdr);font-family:var(--fm);font-size:10px;background:var(--s2);color:var(--mu);transition:all .15s;}
+.prio-o:hover{border-color:var(--bdr2);}
+.prio-o.on-r{border-color:var(--red);color:var(--red);background:var(--red2);}
+.prio-o.on-y{border-color:var(--yel);color:var(--yel);background:var(--yel2);}
+.prio-o.on-b{border-color:var(--blu);color:var(--blu);background:var(--blu2);}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:1px solid var(--bdr);}
+.btn-cancel{background:var(--s2);border:1px solid var(--bdr);color:var(--mu);font-family:var(--fm);font-size:11px;padding:8px 14px;border-radius:7px;}
+.btn-salvar{background:var(--red);color:#fff;border:none;font-family:var(--fh);font-size:12px;font-weight:700;padding:8px 18px;border-radius:7px;transition:all .2s;}
+.btn-salvar:hover{background:#d83050;}
+.btn-salvar:disabled{opacity:.5;cursor:not-allowed;}
+.btn-resolver-ok{background:var(--grn);color:#000;border:none;font-family:var(--fh);font-size:12px;font-weight:700;padding:8px 18px;border-radius:7px;}
+
+/* Relatório */
+.rel-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.rel-item{background:var(--s2);border:1px solid var(--bdr);border-radius:8px;padding:12px;}
+.rel-n{font-family:var(--fh);font-size:22px;font-weight:900;}
+.rel-l{font-family:var(--fm);font-size:9px;color:var(--mu);margin-top:2px;}
+.barra{height:5px;background:var(--s1);border-radius:99px;margin:3px 0 6px;}
+.barra-fill{height:100%;border-radius:99px;}
+.barra-row{display:flex;justify-content:space-between;font-family:var(--fm);font-size:9px;color:var(--mu);margin-bottom:1px;}
+.alerta-box{background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.3);border-radius:8px;padding:12px;font-family:var(--fm);font-size:10px;line-height:1.8;color:#f97316;}
+
+/* Toast */
+.toast-el{position:fixed;bottom:20px;right:20px;background:var(--s3);border:1px solid var(--bdr);border-radius:8px;padding:10px 16px;font-family:var(--fm);font-size:11px;z-index:500;transform:translateY(60px);opacity:0;transition:all .3s;max-width:280px;}
+.toast-el.show{transform:translateY(0);opacity:1;}
+
+@media(max-width:640px){
+  .metricas{grid-template-columns:repeat(2,1fr);}
+  .fgrid{grid-template-columns:1fr;}
+  .ffull{grid-column:1;}
+  .rel-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-ic">⚡</div>Conflitos</div>
+  <a href="/home" class="back-btn">← Início</a>
+</header>
+
+<div class="page">
+  <div class="top-bar">
+    <div class="page-title">Con<em>flitos</em></div>
+    <button class="btn btn-rel" onclick="abrirRelatorio()">📊 Relatório</button>
+    <button class="btn btn-new" onclick="abrirModal()">+ Registrar</button>
+  </div>
+
+  <div class="metricas">
+    <div class="met r"><div class="met-n" id="m-criticos">–</div><div class="met-l">CRÍTICOS ABERTOS</div></div>
+    <div class="met y"><div class="met-n" id="m-abertos">–</div><div class="met-l">TOTAL ABERTOS</div></div>
+    <div class="met g"><div class="met-n" id="m-semresp">–</div><div class="met-l">SEM RESPONSÁVEL</div></div>
+    <div class="met b"><div class="met-n" id="m-total">–</div><div class="met-l">TOTAL REGISTRADOS</div></div>
+  </div>
+
+  <div class="filtros">
+    <button class="fb on" onclick="setF('todos',this)">Todos</button>
+    <button class="fb r" onclick="setF('critico',this)">🔴 Crítico</button>
+    <button class="fb y" onclick="setF('alto',this)">🟡 Alto</button>
+    <button class="fb" onclick="setF('normal',this)">🔵 Normal</button>
+    <button class="fb" onclick="setF('aberto',this)" style="margin-left:8px">Abertos</button>
+    <button class="fb" onclick="setF('andamento',this)">Em Andamento</button>
+    <button class="fb g" onclick="setF('resolvido',this)">✅ Resolvidos</button>
+  </div>
+
+  <div id="board"><div class="loading"><div class="spin"></div></div></div>
+</div>
+
+<!-- Modal Registrar -->
+<div class="modal-bg" id="m-reg">
+  <div class="modal">
+    <div class="modal-hd"><span class="modal-titulo">⚡ Registrar Conflito</span><button class="modal-x" onclick="fM('m-reg')">✕</button></div>
+    <div style="margin-bottom:14px">
+      <div style="font-family:var(--fm);font-size:9px;color:var(--mu);margin-bottom:7px;letter-spacing:.07em">PRIORIDADE *</div>
+      <div class="prio-row">
+        <button class="prio-o" onclick="selP(this,'r')" id="p-critico">🔴<br>Crítico</button>
+        <button class="prio-o" onclick="selP(this,'y')" id="p-alto">🟡<br>Alto</button>
+        <button class="prio-o" onclick="selP(this,'b')" id="p-normal">🔵<br>Normal</button>
+      </div>
+    </div>
+    <div class="fgrid">
+      <div class="fld ffull"><label>TÍTULO DO CONFLITO *</label><input id="f-titulo" placeholder="O que aconteceu?"></div>
+      <div class="fld"><label>TIPO</label>
+        <select id="f-tipo">
+          <option>😠 Cliente Insatisfeito</option><option>🔄 Retrabalho</option>
+          <option>💥 Dano em Manuseio</option><option>🔧 Problema Técnico</option>
+          <option>📦 Fornecedor</option><option>💰 Financeiro</option>
+          <option>⚙️ Processo Interno</option><option>📋 Outro</option>
+        </select>
+      </div>
+      <div class="fld"><label>SETOR DE ORIGEM</label>
+        <select id="f-setor">
+          <option>Pipe ADM</option><option>TV Pipe</option><option>Logística</option>
+          <option>TV Logística</option><option>Frente de Loja</option>
+          <option>Financeiro</option><option>Compras</option><option>Técnico</option><option>Outro</option>
+        </select>
+      </div>
+      <div class="fld"><label>Nº DA FICHA (opcional)</label><input id="f-ficha" placeholder="Ex: FL-0303 ou 3848"></div>
+      <div class="fld"><label>RESPONSÁVEL</label><input id="f-resp" placeholder="Quem vai resolver?"></div>
+      <div class="fld ffull"><label>DESCRIÇÃO</label><textarea id="f-desc" rows="3" placeholder="Detalhes para o líder técnico..."></textarea></div>
+      <div class="fld ffull"><label>REGISTRADO POR</label><input id="f-regpor" placeholder="Seu nome"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="fM('m-reg')">Cancelar</button>
+      <button class="btn-salvar" id="btn-salvar" onclick="salvarConflito()">Registrar →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Resolver -->
+<div class="modal-bg" id="m-resolver">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-hd"><span class="modal-titulo">✅ Registrar Resolução</span><button class="modal-x" onclick="fM('m-resolver')">✕</button></div>
+    <input type="hidden" id="r-id">
+    <div class="fld" style="margin-bottom:12px"><label>SOLUÇÃO APLICADA *</label><textarea id="r-solucao" rows="3" placeholder="Como o conflito foi resolvido?"></textarea></div>
+    <div class="fld"><label>AÇÃO PREVENTIVA (opcional)</label><input id="r-prev" placeholder="O que evitará recorrência?"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="fM('m-resolver')">Cancelar</button>
+      <button class="btn-resolver-ok" id="btn-resolver" onclick="confirmarResolucao()">Marcar como Resolvido ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Editar -->
+<div class="modal-bg" id="m-editar">
+  <div class="modal">
+    <div class="modal-hd"><span class="modal-titulo">✏️ Editar Conflito</span><button class="modal-x" onclick="fM('m-editar')">✕</button></div>
+    <input type="hidden" id="e-id">
+    <div class="fgrid">
+      <div class="fld ffull"><label>TÍTULO *</label><input id="e-titulo"></div>
+      <div class="fld"><label>TIPO</label>
+        <select id="e-tipo">
+          <option>😠 Cliente Insatisfeito</option><option>🔄 Retrabalho</option>
+          <option>💥 Dano em Manuseio</option><option>🔧 Problema Técnico</option>
+          <option>📦 Fornecedor</option><option>💰 Financeiro</option>
+          <option>⚙️ Processo Interno</option><option>📋 Outro</option>
+        </select>
+      </div>
+      <div class="fld"><label>PRIORIDADE</label>
+        <select id="e-prio">
+          <option value="critico">🔴 Crítico</option>
+          <option value="alto">🟡 Alto</option>
+          <option value="normal">🔵 Normal</option>
+        </select>
+      </div>
+      <div class="fld"><label>RESPONSÁVEL</label><input id="e-resp"></div>
+      <div class="fld"><label>Nº FICHA</label><input id="e-ficha"></div>
+      <div class="fld ffull"><label>DESCRIÇÃO</label><textarea id="e-desc" rows="3"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="fM('m-editar')">Cancelar</button>
+      <button class="btn-salvar" id="btn-editar" onclick="confirmarEdicao()">Salvar →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Relatório -->
+<div class="modal-bg" id="m-rel">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-hd"><span class="modal-titulo">📊 Relatório Semanal</span><button class="modal-x" onclick="fM('m-rel')">✕</button></div>
+    <div id="rel-content"><div class="loading"><div class="spin"></div></div></div>
+    <div class="modal-footer"><button class="btn-cancel" onclick="fM('m-rel')">Fechar</button></div>
+  </div>
+</div>
+
+<div class="toast-el" id="toast"></div>
+
+<script>
+var _dados=[], _filtro='todos', _prioSel='';
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function fM(id){document.getElementById(id).classList.remove('show');}
+function abrirM(id){document.getElementById(id).classList.add('show');}
+function toast(msg,cor){
+  var t=document.getElementById('toast'); t.textContent=msg;
+  t.style.borderColor=cor==='g'?'var(--grn)':cor==='r'?'var(--red)':'var(--bdr)';
+  t.classList.add('show'); clearTimeout(t._t);
+  t._t=setTimeout(function(){t.classList.remove('show');},2800);
+}
+document.querySelectorAll('.modal-bg').forEach(function(m){
+  m.addEventListener('click',function(e){if(e.target===this)this.classList.remove('show');});
+});
+
+function tempoRelativo(ts){
+  if(!ts) return '';
+  var ms=Date.now()-new Date(ts).getTime();
+  var h=Math.floor(ms/3600000), m=Math.floor((ms%3600000)/60000);
+  if(ms<3600000) return m+'min';
+  if(ms<86400000) return h+'h '+(m?m+'min':'');
+  return Math.floor(ms/86400000)+'d '+(h%24?h%24+'h':'');
+}
+function prioLabel(p){return p==='critico'?'🔴 CRÍTICO':p==='alto'?'🟡 ALTO':'🔵 NORMAL';}
+function prioCls(p){return p==='critico'?'r':p==='alto'?'y':'b';}
+
+// ── Carregar ──────────────────────────────────────────────────────────────────
+async function carregar(){
+  try{
+    var r=await fetch('/api/conflitos?action=listar').then(x=>x.json());
+    _dados=r.conflitos||[];
+    var m=function(id,v){var e=document.getElementById(id);if(e)e.textContent=v;};
+    m('m-criticos',r.criticos||0); m('m-abertos',r.abertos||0);
+    m('m-semresp',r.semResp||0);   m('m-total',r.total||0);
+    render();
+  }catch(e){ document.getElementById('board').innerHTML='<div class="loading" style="color:var(--red)">Erro ao carregar</div>'; }
+}
+
+function setF(f,btn){
+  _filtro=f;
+  document.querySelectorAll('.fb').forEach(function(b){b.classList.remove('on');});
+  btn.classList.add('on');
+  render();
+}
+
+function filtrados(){
+  return _dados.filter(function(c){
+    if(_filtro==='todos') return true;
+    if(_filtro==='critico') return c.prioridade==='critico'&&c.status!=='resolvido';
+    if(_filtro==='alto')    return c.prioridade==='alto'&&c.status!=='resolvido';
+    if(_filtro==='normal')  return c.prioridade==='normal'&&c.status!=='resolvido';
+    if(_filtro==='aberto')  return c.status==='aberto';
+    if(_filtro==='andamento')return c.status==='andamento';
+    if(_filtro==='resolvido')return c.status==='resolvido';
+    return true;
+  });
+}
+
+function render(){
+  var lista=filtrados();
+  var board=document.getElementById('board');
+  if(!lista.length){
+    board.innerHTML='<div class="empty"><div class="empty-icon">✅</div>Nenhum conflito encontrado para esse filtro.</div>';
+    return;
+  }
+  var grupos={critico:[],alto:[],normal:[],resolvido:[]};
+  lista.forEach(function(c){
+    if(c.status==='resolvido') grupos.resolvido.push(c);
+    else grupos[c.prioridade]=grupos[c.prioridade]||[];grupos[c.prioridade].push(c);
+  });
+
+  var html='';
+  // Críticos
+  if(grupos.critico&&grupos.critico.length){
+    html+='<div class="secao"><div class="sec-head"><div class="sec-dot" style="background:var(--red)"></div><span class="sec-lbl" style="color:var(--red)">CRÍTICO</span><span class="sec-cnt">'+grupos.critico.length+'</span></div>';
+    html+=grupos.critico.map(cardHTML).join('');
+    html+='</div>';
+  }
+  // Altos
+  if(grupos.alto&&grupos.alto.length){
+    html+='<div class="secao"><div class="sec-head"><div class="sec-dot" style="background:var(--yel)"></div><span class="sec-lbl" style="color:var(--yel)">ALTO</span><span class="sec-cnt">'+grupos.alto.length+'</span></div>';
+    html+=grupos.alto.map(cardHTML).join('');
+    html+='</div>';
+  }
+  // Normais
+  if(grupos.normal&&grupos.normal.length){
+    html+='<div class="secao"><div class="sec-head"><div class="sec-dot" style="background:var(--blu)"></div><span class="sec-lbl" style="color:var(--blu)">NORMAL</span><span class="sec-cnt">'+grupos.normal.length+'</span></div>';
+    html+=grupos.normal.map(cardHTML).join('');
+    html+='</div>';
+  }
+  // Resolvidos
+  if(grupos.resolvido&&grupos.resolvido.length){
+    html+='<div class="toggle-res" onclick="toggleRes(this)"><span>▶</span><span>'+grupos.resolvido.length+' conflito(s) resolvido(s)</span><span style="margin-left:auto;font-size:9px">clique para ver</span></div>';
+    html+='<div class="res-lista" style="display:none">'+grupos.resolvido.map(cardHTML).join('')+'</div>';
+  }
+  board.innerHTML=html;
+}
+
+function cardHTML(c){
+  var cls=prioCls(c.prioridade);
+  var ms=Date.now()-new Date(c.criadoEm).getTime();
+  var urgente=ms>4*3600000&&c.status!=='resolvido';
+  var tempoCls=c.status==='resolvido'?'ok':urgente?'urg':'';
+  var tempoTxt=c.status==='resolvido'?'✓ resolvido em '+tempoRelativo(c.resolvidoEm):tempoRelativo(c.criadoEm)+' atrás';
+  var statusTxt=c.status==='aberto'?'ABERTO':c.status==='andamento'?'EM ANDAMENTO':'RESOLVIDO';
+  var resolved=c.status==='resolvido';
+
+  var btns='';
+  if(!resolved){
+    if(c.status==='aberto') btns+='<button class="cc-btn assumir" data-id="'+c.id+'" onclick="assumir(this.dataset.id)">▶ Assumir</button>';
+    btns+='<button class="cc-btn resolver" data-id="'+c.id+'" onclick="abrirResolver(this.dataset.id)">✓ Resolver</button>';
+    btns+='<button class="cc-btn" data-id="'+c.id+'" onclick="abrirEditar(this.dataset.id)">✏️ Editar</button>';
+  }
+  btns+='<button class="cc-btn" style="margin-left:auto;color:var(--red);border-color:rgba(240,64,96,.3)" data-id="'+c.id+'" onclick="excluir(this.dataset.id)">🗑️</button>';
+
+  return '<div class="ccard '+cls+(resolved?' resolved':'')+'">'+
+    '<div class="cc-top">'+
+    '<span class="cc-prio '+cls+'">'+prioLabel(c.prioridade)+'</span>'+
+    '<span class="cc-titulo">'+esc(c.titulo)+'</span>'+
+    '<span class="cc-tempo '+tempoCls+'">'+tempoTxt+'</span>'+
+    '</div>'+
+    '<div class="cc-meta">'+
+    (c.tipo?'<span class="tag">'+esc(c.tipo)+'</span>':'')+
+    (c.setor?'<span class="tag">'+esc(c.setor)+'</span>':'')+
+    (c.ficha?'<span class="tag ficha">📋 '+esc(c.ficha)+'</span>':'')+
+    (c.responsavel?'<span class="tag">👤 '+esc(c.responsavel)+'</span>':'<span class="tag" style="color:var(--red);border-color:var(--red)">⚠️ Sem responsável</span>')+
+    '<span class="status-b '+c.status+'">'+statusTxt+'</span>'+
+    '</div>'+
+    (c.descricao?'<div class="cc-desc">'+esc(c.descricao)+'</div>':'')+
+    (c.solucao?'<div class="cc-solucao">✅ '+esc(c.solucao)+'</div>':'')+
+    '<div class="cc-btns">'+btns+'</div>'+
+    '</div>';
+}
+
+function toggleRes(el){
+  var lista=el.nextElementSibling;
+  var show=lista.style.display==='none';
+  lista.style.display=show?'block':'none';
+  el.querySelector('span').textContent=show?'▼':'▶';
+}
+
+// ── Ações ─────────────────────────────────────────────────────────────────────
+function selP(btn,tipo){
+  document.querySelectorAll('.prio-o').forEach(function(b){b.className='prio-o';});
+  btn.classList.add('on-'+tipo);
+  _prioSel=tipo==='r'?'critico':tipo==='y'?'alto':'normal';
+}
+
+function abrirModal(){
+  _prioSel='';
+  document.querySelectorAll('.prio-o').forEach(function(b){b.className='prio-o';});
+  ['f-titulo','f-ficha','f-resp','f-desc','f-regpor'].forEach(function(id){document.getElementById(id).value='';});
+  abrirM('m-reg');
+  setTimeout(function(){document.getElementById('f-titulo').focus();},100);
+}
+
+async function salvarConflito(){
+  if(!_prioSel){toast('Selecione a prioridade','r');return;}
+  var titulo=document.getElementById('f-titulo').value.trim();
+  if(!titulo){toast('Título obrigatório','r');return;}
+  var btn=document.getElementById('btn-salvar');
+  btn.disabled=true; btn.textContent='Salvando...';
+  try{
+    var r=await fetch('/api/conflitos?action=criar',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        titulo, prioridade:_prioSel,
+        tipo:document.getElementById('f-tipo').value,
+        setor:document.getElementById('f-setor').value,
+        ficha:document.getElementById('f-ficha').value.trim(),
+        responsavel:document.getElementById('f-resp').value.trim(),
+        descricao:document.getElementById('f-desc').value.trim(),
+        registradoPor:document.getElementById('f-regpor').value.trim(),
+      })
+    }).then(x=>x.json());
+    if(r.ok){fM('m-reg');await carregar();toast('⚡ Conflito registrado!','g');}
+    else toast('Erro: '+(r.error||'falha'),'r');
+  }catch(e){toast('Erro de rede','r');}
+  btn.disabled=false; btn.textContent='Registrar →';
+}
+
+async function assumir(id){
+  var resp=prompt('Seu nome:'); if(!resp) return;
+  var r=await fetch('/api/conflitos?action=assumir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,responsavel:resp})}).then(x=>x.json());
+  if(r.ok){await carregar();toast('▶ Conflito assumido!','g');}
+  else toast('Erro','r');
+}
+
+function abrirResolver(id){
+  document.getElementById('r-id').value=id;
+  document.getElementById('r-solucao').value='';
+  document.getElementById('r-prev').value='';
+  abrirM('m-resolver');
+  setTimeout(function(){document.getElementById('r-solucao').focus();},100);
+}
+
+async function confirmarResolucao(){
+  var id=document.getElementById('r-id').value;
+  var solucao=document.getElementById('r-solucao').value.trim();
+  if(!solucao){toast('Descreva a solução aplicada','r');return;}
+  var btn=document.getElementById('btn-resolver');
+  btn.disabled=true; btn.textContent='Salvando...';
+  try{
+    var r=await fetch('/api/conflitos?action=resolver',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,solucao,acaoPreventiva:document.getElementById('r-prev').value.trim()})}).then(x=>x.json());
+    if(r.ok){fM('m-resolver');await carregar();toast('✅ Conflito resolvido!','g');}
+    else toast('Erro: '+(r.error||'falha'),'r');
+  }catch(e){toast('Erro de rede','r');}
+  btn.disabled=false; btn.textContent='Marcar como Resolvido ✓';
+}
+
+function abrirEditar(id){
+  var c=_dados.find(function(x){return x.id===id;}); if(!c) return;
+  document.getElementById('e-id').value=id;
+  document.getElementById('e-titulo').value=c.titulo||'';
+  document.getElementById('e-resp').value=c.responsavel||'';
+  document.getElementById('e-ficha').value=c.ficha||'';
+  document.getElementById('e-desc').value=c.descricao||'';
+  document.getElementById('e-prio').value=c.prioridade||'normal';
+  var tipoEl=document.getElementById('e-tipo');
+  for(var i=0;i<tipoEl.options.length;i++){if(tipoEl.options[i].text===c.tipo){tipoEl.selectedIndex=i;break;}}
+  abrirM('m-editar');
+}
+
+async function confirmarEdicao(){
+  var id=document.getElementById('e-id').value;
+  var titulo=document.getElementById('e-titulo').value.trim();
+  if(!titulo){toast('Título obrigatório','r');return;}
+  var btn=document.getElementById('btn-editar');
+  btn.disabled=true; btn.textContent='Salvando...';
+  try{
+    var r=await fetch('/api/conflitos?action=editar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      id,titulo,prioridade:document.getElementById('e-prio').value,
+      tipo:document.getElementById('e-tipo').value,
+      responsavel:document.getElementById('e-resp').value.trim(),
+      ficha:document.getElementById('e-ficha').value.trim(),
+      descricao:document.getElementById('e-desc').value.trim(),
+    })}).then(x=>x.json());
+    if(r.ok){fM('m-editar');await carregar();toast('✅ Conflito atualizado!','g');}
+    else toast('Erro: '+(r.error||'falha'),'r');
+  }catch(e){toast('Erro de rede','r');}
+  btn.disabled=false; btn.textContent='Salvar →';
+}
+
+async function excluir(id){
+  if(!confirm('Excluir este conflito?')) return;
+  var r=await fetch('/api/conflitos?action=excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})}).then(x=>x.json());
+  if(r.ok){await carregar();toast('Conflito excluído','r');}
+  else toast('Erro','r');
+}
+
+async function abrirRelatorio(){
+  abrirM('m-rel');
+  document.getElementById('rel-content').innerHTML='<div class="loading"><div class="spin"></div></div>';
+  try{
+    var r=await fetch('/api/conflitos?action=relatorio').then(x=>x.json());
+    var cores=['var(--red)','var(--yel)','var(--blu)','var(--or)','var(--grn)','var(--mu)'];
+    var maxTipo=r.tiposOrdenados&&r.tiposOrdenados.length?r.tiposOrdenados[0][1]:1;
+    var barras=r.tiposOrdenados?r.tiposOrdenados.slice(0,5).map(function(t,i){
+      var pct=Math.round(t[1]/maxTipo*100);
+      return '<div class="barra-row"><span>'+esc(t[0])+'</span><span>'+t[1]+'</span></div>'+
+             '<div class="barra"><div class="barra-fill" style="width:'+pct+'%;background:'+cores[i]+'"></div></div>';
+    }).join(''):'<div style="color:var(--mu);font-size:10px">Nenhum dado ainda.</div>';
+
+    var alertas=[];
+    if(r.semResponsavel>0) alertas.push('• '+r.semResponsavel+' conflito(s) sem responsável designado');
+    if(r.criticos>0) alertas.push('• '+r.criticos+' crítico(s) aberto(s) — requer atenção imediata');
+    if(!alertas.length) alertas.push('• Nenhum alerta crítico no momento ✅');
+
+    document.getElementById('rel-content').innerHTML=
+      '<div style="font-family:var(--fm);font-size:9px;color:var(--mu);margin-bottom:14px">'+r.periodo.de+' – '+r.periodo.ate+'</div>'+
+      '<div class="rel-grid">'+
+      '<div class="rel-item"><div class="rel-n" style="color:var(--red)">'+r.abertos+'</div><div class="rel-l">ABERTOS</div></div>'+
+      '<div class="rel-item"><div class="rel-n" style="color:var(--grn)">'+r.resolvidosSemana+'</div><div class="rel-l">RESOLVIDOS ESSA SEMANA</div></div>'+
+      '<div class="rel-item"><div class="rel-n" style="color:var(--yel)">'+r.tempoMedioHoras+'h</div><div class="rel-l">TEMPO MÉDIO RESOLUÇÃO</div></div>'+
+      '<div class="rel-item"><div class="rel-n" style="color:var(--blu)">'+r.totalSemana+'</div><div class="rel-l">REGISTRADOS NA SEMANA</div></div>'+
+      '</div>'+
+      (r.tiposOrdenados&&r.tiposOrdenados.length?'<div style="font-family:var(--fm);font-size:9px;color:var(--mu);margin-bottom:10px;letter-spacing:.07em">TIPOS MAIS FREQUENTES</div>'+barras:'') +
+      '<div class="alerta-box" style="margin-top:14px"><strong style="display:block;margin-bottom:4px">⚠️ Atenção do Líder</strong>'+alertas.join('<br>')+'</div>';
+  }catch(e){document.getElementById('rel-content').innerHTML='<div style="color:var(--red);padding:20px;font-family:var(--fm)">Erro ao carregar relatório</div>';}
+}
+
+// Carregar ao abrir + refresh a cada 2min
+carregar();
+setInterval(carregar, 120000);
+</script>
+</body>
+</html>

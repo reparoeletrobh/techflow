@@ -351,6 +351,14 @@
       "destination": "/api/busca-ficha.js"
     },
     {
+      "source": "/conflitos",
+      "destination": "/conflitos.html"
+    },
+    {
+      "source": "/api/conflitos",
+      "destination": "/api/conflitos.js"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/home.html"
     },
