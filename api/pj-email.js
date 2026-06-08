@@ -37,7 +37,8 @@ module.exports = async function handler(req,res){
   // POST enviar — envia email para um ou vários destinatários
   if(req.method==='POST'&&action==='enviar'){
     if(!RESEND_KEY)return res.status(400).json({ok:false,error:'RESEND_API_KEY não configurado'});
-    const{de,para,assunto,html,texto,remetente}=req.body||{};
+    const{de,para,assunto,html,remetente}=req.body||{};
+    const texto=(req.body||{}).texto||(req.body||{}).corpo||'';
     if(!para||!assunto)return res.status(400).json({ok:false,error:'para e assunto obrigatórios'});
     const destinatarios=Array.isArray(para)?para:[para];
     const resultados=[];

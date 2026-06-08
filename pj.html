@@ -832,6 +832,7 @@ function promoverForn(id){
 // ── INBOX ──────────────────────────────────────────────────────────────────
 // ── INBOX GMAIL ────────────────────────────────────────────────────────────────
 var _emails=[], _emailAtivo=null, _navAtual='entrada', _drafts=[];
+var _enviados=[];
 
 // Cores de avatar por letra
 function avatarColor(str){
@@ -868,8 +869,8 @@ async function carregarEnviados(){
   g('lista-inbox').innerHTML='<div class="gm-loading"><div class="spin"></div></div>';
   try{
     var r=await fetch('/api/pj-email?action=listar-enviados').then(function(x){return x.json();});
-    var enviados=(r.emails||r.enviados||[]);
-    renderListaEnviados(enviados);
+    _enviados=(r.emails||r.enviados||[]);
+    renderListaEnviados(_enviados);
   }catch(er){
     g('lista-inbox').innerHTML='<div style="padding:20px;font-family:var(--fm);font-size:10px;color:var(--re)">Erro ao carregar enviados</div>';
   }
@@ -900,7 +901,7 @@ function renderListaInbox(lista){
       '<div style="font-size:32px;margin-bottom:12px;opacity:.3">📭</div>Nenhuma mensagem ainda.</div>';
     return;
   }
-  el.innerHTML=lista.map(function(em){
+  el.innerHTML=lista.map(function(em,i){
     var ativo=_emailAtivo&&_emailAtivo.id===em.id?' ativo':'';
     var lido=em.lido?'':' nao-lido';
     var inicial=(em.de||'?').replace(/.*<([^>]+)>$/,'$1')[0].toUpperCase();
@@ -930,7 +931,7 @@ function renderListaEnviados(lista){
   }
   el.innerHTML=lista.map(function(em){
     var cor=avatarColor('P');
-    return '<div class="gm-row" onclick="abrirEmailEnviado('+JSON.stringify(em)+')">'+
+    return '<div class="gm-row" data-env-idx="'+i+'" onclick="abrirEmailEnviado(+this.dataset.envIdx)">'+
       '<div class="gm-row-avatar" style="background:'+cor+'">P</div>'+
       '<div class="gm-row-body">'+
       '<div class="gm-row-top">'+
@@ -981,7 +982,8 @@ async function abrirEmail(id){
   renderEmailView(em, cor, inicial, deDisplay, false);
 }
 
-function abrirEmailEnviado(em){
+function abrirEmailEnviado(idx){
+  var em=_enviados[idx]; if(!em) return;
   _emailAtivo=em;
   var cor=avatarColor('P');
   renderEmailView({
