@@ -391,7 +391,7 @@ function abrirModalNovo(){
   document.getElementById('modal-novo').style.display='flex';
 }
 function fecharModal(){document.getElementById('modal-novo').style.display='none';}
-async async function salvarNovo(){
+async function salvarNovo(){
   // Evitar double-click
   var _btn=document.querySelector('[onclick*="salvarNovo"]');
   if(_btn&&_btn.disabled)return;
