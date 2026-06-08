@@ -326,5 +326,43 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok:true, acoes });
   }
 
-  return res.status(404).json({ ok:false, error:'ação não encontrada: '+action });
+  // ── POST enviar-apresentacao ────────────────────────────────────────────────
+  if (req.method === 'POST' && action === 'enviar-apresentacao') {
+    const { id } = req.body || {};
+    const lead = db.leads.find(l => l.id === id);
+    if (!lead || !lead.email) return res.status(400).json({ ok:false, error:'lead sem email' });
+    const RESEND_KEY = process.env.RESEND_API_KEY;
+    if (!RESEND_KEY) return res.status(500).json({ ok:false, error:'chave Resend não configurada' });
+    try {
+      const html = TEMPLATES.e0_html
+        .replace(/\{\{responsavel\}\}/g, lead.responsavel)
+        .replace(/\{\{empresa\}\}/g, lead.empresa);
+      const text = TEMPLATES.e0_plain
+        .replace(/\{\{responsavel\}\}/g, lead.responsavel)
+        .replace(/\{\{empresa\}\}/g, lead.empresa);
+      const er = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: 'Pedro Teixeira | Reparo Eletro, Microondas e Bebedouros <pedro@comercial.reparoeletroadm.com>',
+          reply_to: ['pedro@ciacaluuir.resend.app'],
+          to: [lead.email],
+          subject: 'Manutenção de Microondas e Bebedouros para ' + lead.empresa,
+          html, text,
+        })
+      });
+      const ed = await er.json();
+      if (!ed.id) return res.status(500).json({ ok:false, error: ed.message || 'falha Resend' });
+      // Registrar toque D0 se ainda não foi feito
+      if (!lead.toques.find(t => t.passo === 1)) {
+        lead.toques.push({ passo:1, canal:'email', label:'Email D0 — Apresentação Comercial', realizado:true, data:new Date().toISOString(), respondeu:false });
+        if (!lead.inicioEm) lead.inicioEm = new Date().toISOString();
+        if (lead.fase === 'novo') lead.fase = 'primeiro_contato';
+        await dbSet(SDR_KEY, db);
+      }
+      return res.status(200).json({ ok:true, emailId: ed.id });
+    } catch(e) { return res.status(500).json({ ok:false, error: e.message }); }
+  }
+
+    return res.status(404).json({ ok:false, error:'ação não encontrada: '+action });
 };
