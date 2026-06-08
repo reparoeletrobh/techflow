@@ -2473,6 +2473,28 @@ module.exports = async function handler(req, res) {
     }
   }
 
+      // ── GET erp-local — move ERP→finalizado só no pipe local ──────────────────
+      if (action === "erp-local") {
+        try {
+          const pipe = await dbGet('reparoeletro_pipe');
+          if (!pipe || !Array.isArray(pipe.cards))
+            return res.status(200).json({ ok:false, error:'pipe não encontrado' });
+          const now = new Date().toISOString();
+          let moved = 0; const erp = [];
+          pipe.cards.forEach(function(card){
+            if(card.phase==='erp'){
+              erp.push(card.numero||card.id||'');
+              card.history=(card.history||[]).concat([{phase:'erp',ts:now}]);
+              card.phase='finalizado'; card.movedAt=now; moved++;
+            }
+          });
+          if(moved>0){ pipe.lastSync=now; await dbSet('reparoeletro_pipe',pipe); }
+          return res.status(200).json({ ok:true, moved, total:pipe.cards.length, exemplos:erp.slice(0,10) });
+        } catch(e) {
+          return res.status(200).json({ ok:false, error:e.message });
+        }
+      }
+
       return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch (err) {
