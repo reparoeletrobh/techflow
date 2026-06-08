@@ -10,13 +10,14 @@ async function moverNoTvPipe(phase, dados){
     if(!Array.isArray(pipe.cards))pipe.cards=[];
     const now=new Date().toISOString();
     const jaExiste = dados.localId && pipe.cards.find(c=>c.localId===String(dados.localId)||c.id===String(dados.localId));
-    if(jaExiste){ jaExiste.phase=phase; jaExiste.movedAt=now; }
+    if(jaExiste){ jaExiste.phase=phase; jaExiste.movedAt=now; if(dados.modelo) jaExiste.modelo=dados.modelo; }
     else {
       pipe.cards.unshift({
         id:'PIPE-TV-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,5).toUpperCase(),
         localId:dados.localId||null, pipefyId:dados.pipefyId||null,
         phase, nomeContato:dados.nome||'', telefone:dados.telefone||'',
         equipamento:dados.equipamento||'', descricao:dados.descricao||'',
+        modelo:dados.modelo||'',
         endereco:dados.endereco||'', valor:parseFloat(dados.valor)||0,
         origem:dados.origem||'sistema', criadoEm:now, movedAt:now,
         aguardandoDesde:phase==='aguardando_aprovacao'?now:null,
@@ -471,11 +472,15 @@ module.exports = async function handler(req, res) {
     if (defeito)    ficha.defeito = defeito;
     await dbSet(LOG_KEY, db);
     // Trigger: tv_pipe → aguardando_aprovacao
+    // Extrair modelo do diagnóstico para exibir no TV Pipe
+    const _diagEquips = ficha.diagnostico?.equips || (ficha.diagnostico ? [ficha.diagnostico] : []);
+    const _modelo = _diagEquips.map(e => e.modelo||'').filter(Boolean).join(' / ');
     await moverNoTvPipe('aguardando_aprovacao', {
       localId: ficha.id||null, pipefyId: ficha.pipefyCardId||null,
       nome: ficha.nome||ficha.nomeContato||'',
       telefone: ficha.telefone||'',
       equipamento: ficha.equipamento||ficha.aparelho||'',
+      modelo: _modelo || '',
       descricao: ficha.defeito||ficha.descricao||'',
       endereco: ficha.endereco||'', valor: ficha.valor||0,
       origem: 'tv_logistica_orcamento'

@@ -128,6 +128,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .scroll-float:hover{color:#f5c800;border-color:#f5c800;background:rgba(17,17,17,.98);}
 .scroll-float.left{left:6px;}
 .scroll-float.right{right:6px;}
+.card-modelo{font-family:var(--fm);font-size:11px;font-weight:700;color:#3b9eff;background:rgba(59,158,255,.1);border:1px solid rgba(59,158,255,.25);border-radius:4px;padding:2px 7px;margin:3px 0;display:inline-block;}
 </style>
 </head>
 <body>
@@ -284,6 +285,7 @@ function render(){
       const valHtml=c.valor>0?'<div class="card-val">R$ '+c.valor.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</div>':'';
       const acBadge=c.analiseCompra?'<div class="card-ac">🛒 Análise de Compra</div>':'';
       const equipHtml=c.equipamento?'<div class="card-equip">'+esc(c.equipamento.substring(0,45))+'</div>':'';
+      const modeloHtml=c.modelo?'<div class="card-modelo">📺 '+esc(c.modelo)+'</div>':'';
       const descHtml=c.descricao&&c.descricao!==c.equipamento?'<div class="card-defeito">'+esc(c.descricao.substring(0,60))+(c.descricao.length>60?'…':'')+'</div>':'';
       return '<div class="card" id="card-'+c.id+'">'+
         '<div class="card-left-bar" style="background:'+cor+'"></div>'+
@@ -293,6 +295,7 @@ function render(){
         '</div>'+
         '<div class="card-nome">'+esc(c.nomeContato)+'</div>'+
         equipHtml+
+        modeloHtml+
         descHtml+
         valHtml+
         timerHTML(c)+
