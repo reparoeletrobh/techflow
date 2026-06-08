@@ -412,6 +412,7 @@ async function salvarNovo(){
   });
   if(r.ok&&r.card){cards.unshift(r.card);render();fecharModal();toast('✅ Ficha criada!');}
   else toast(r.error||'Erro',false);
+  }finally{if(_btn){_btn.disabled=false;_btn.textContent='Salvar';}}
 }
 
 async function load(){
