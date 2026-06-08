@@ -391,9 +391,14 @@ function abrirModalNovo(){
   document.getElementById('modal-novo').style.display='flex';
 }
 function fecharModal(){document.getElementById('modal-novo').style.display='none';}
-async function salvarNovo(){
+async async function salvarNovo(){
+  // Evitar double-click
+  var _btn=document.querySelector('[onclick*="salvarNovo"]');
+  if(_btn&&_btn.disabled)return;
+  if(_btn){_btn.disabled=true;_btn.textContent='Salvando...';}
+  try{
   const nome=document.getElementById('f-nome').value.trim();
-  if(!nome){toast('Nome obrigatório',false);return;}
+  if(!nome){toast('Nome obrigatório',false);if(_btn){_btn.disabled=false;_btn.textContent='Salvar';}return;}
   var tel=document.getElementById('f-tel').value.trim();
   var nomeFormatado=fmt4dig(nome,tel);
   const r=await api('add-card',{

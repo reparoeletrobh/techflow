@@ -1700,8 +1700,22 @@ export default async function handler(req, res) {
     if (!body.nomeContato) return res.status(400).json({ ok: false, error: 'nomeContato obrigatorio' });
     var db = (await dbGet(PIPE_KEY)) || defaultDB();
     if (!Array.isArray(db.cards)) db.cards = [];
+    // Checar duplicata por pipefyId
     if (body.pipefyId && db.cards.find(function(c) { return c.pipefyId === String(body.pipefyId); }))
-      return res.status(200).json({ ok: true, info: 'ja existe' });
+      return res.status(200).json({ ok: true, info: 'ja existe (pipefyId)' });
+    // Checar duplicata por nome+telefone nos últimos 60 segundos
+    var JANELA_MS = 60 * 1000;
+    var agora60 = Date.now();
+    var nomeNorm = (body.nomeContato||'').trim().toLowerCase();
+    var telNorm  = (body.telefone||'').replace(/\D/g,'');
+    var dupRecente = db.cards.find(function(c) {
+      var msDiff = agora60 - new Date(c.criadoEm||0).getTime();
+      if (msDiff > JANELA_MS) return false;
+      var cNome = (c.nomeContato||'').trim().toLowerCase();
+      var cTel  = (c.telefone||'').replace(/\D/g,'');
+      return cNome === nomeNorm && (telNorm === '' || cTel === telNorm);
+    });
+    if (dupRecente) return res.status(200).json({ ok: true, info: 'ja existe (duplicata recente)', card: dupRecente });
     var now  = new Date().toISOString();
     var ph   = body.phase || 'aguardando_aprovacao';
     var card = {
@@ -2044,6 +2058,35 @@ export default async function handler(req, res) {
     db.cards.unshift(card);
     await safeWritePipe(db);
     return res.status(200).json({ ok:true, acao:'inserido_em_receber', card });
+  }
+
+  // ── GET dedup-pipe — remove cards duplicados ──────────────────────────────
+  if (action === 'dedup-pipe') {
+    const db2 = await dbGet(PIPE_KEY) || defaultDB();
+    const cards = db2.cards || [];
+    const vistos = new Map();
+    const remover = new Set();
+    const ordenados = [...cards].sort((a,b)=>new Date(a.criadoEm||0)-new Date(b.criadoEm||0));
+    ordenados.forEach(function(card) {
+      const nome = (card.nomeContato||'').trim().toLowerCase();
+      const tel  = (card.telefone||'').replace(/\D/g,'');
+      const key  = nome + '|' + tel;
+      if (vistos.has(key)) {
+        const primeiro = vistos.get(key);
+        if (primeiro.phase === card.phase) remover.add(card.id);
+      } else {
+        vistos.set(key, card);
+      }
+    });
+    if (remover.size > 0) {
+      db2.cards = cards.filter(function(c){ return !remover.has(c.id); });
+      await safeWritePipe(db2);
+    }
+    const exemplos = [...remover].slice(0,10).map(function(id){
+      const c3 = cards.find(function(x){return x.id===id;});
+      return c3 ? c3.nomeContato+' ('+c3.phase+')' : id;
+    });
+    return res.status(200).json({ ok:true, removidos: remover.size, totalAntes: cards.length, totalDepois: (db2.cards||[]).length, exemplos });
   }
 
   return res.status(404).json({ ok: false, error: 'acao nao encontrada: ' + action });
