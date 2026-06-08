@@ -1317,14 +1317,9 @@ carregarListasGlobal();
 var _sdrLeads = [], _sdrView = 'kanban', _sdrFiltro = '', _sdrLeadAtual = null;
 
 // Função global acessível por onclick inline — mais confiável que event delegation
-window._sdrOpen = function(id) {
-  alert('_sdrOpen chamado! id=' + id);
-  if (!id) { toast('SDR: id vazio','r'); return; }
-  if (!_sdrLeads.length) {
-    toast('Recarregando leads...','');
-    carregarSDR().then(function(){ abrirDetalhe(id); });
-    return;
-  }
+window._sdrOpen = async function(id) {
+  if (!id) return;
+  if (!_sdrLeads.length) await carregarSDR();
   abrirDetalhe(id);
 };
 var _sdrTemplates = {}, _sdrSteps = [];
@@ -1499,10 +1494,15 @@ function sdrIrEmail(leadId) {
 }
 
 // ── Detalhe do lead ──────────────────────────────────────────────────────────
-function abrirDetalhe(id) {
-  alert('abrirDetalhe chamado! id=' + id + ' | leads=' + _sdrLeads.length);
+async function abrirDetalhe(id) {
   var l = _sdrLeads.find(function(x){ return x.id === id; });
-  if (!l) { toast('Erro: lead não encontrado (total: '+_sdrLeads.length+')','r'); return; }
+  if (!l) {
+    // Tentar recarregar e buscar novamente
+    toast('Carregando...', '');
+    await carregarSDR();
+    l = _sdrLeads.find(function(x){ return x.id === id; });
+    if (!l) { toast('Lead não encontrado. Total: ' + _sdrLeads.length, 'r'); return; }
+  }
   _sdrLeadAtual = l;
   var panel = g('sdr-detail-panel'); if (!panel) return;
   var scoreColor = l.score>=61?'var(--or)':l.score>=31?'var(--ye)':'var(--bl)';
