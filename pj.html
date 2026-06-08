@@ -490,59 +490,6 @@ select option{background:var(--s2);}
       <div id="sdr-acoes-lista">Carregando...</div>
     </div>
   </div>
-
-  <!-- MODAL NOVO LEAD -->
-  <div class="modal-bg" id="sdr-modal" style="display:none" onclick="if(event.target===this)fecharSdrModal()">
-    <div class="modal" style="max-width:560px;max-height:85vh;overflow-y:auto;">
-      <div class="modal-hd"><span id="sdr-modal-titulo">Novo Lead</span><button class="modal-x" onclick="fecharSdrModal()">✕</button></div>
-      <div class="sdr-modal-body">
-        <div class="sdr-modal-section">EMPRESA</div>
-        <div class="fld sdr-modal-full"><label>EMPRESA *</label><input id="sl-empresa" type="text" placeholder="Nome da empresa"></div>
-        <div class="fld"><label>RESPONSÁVEL *</label><input id="sl-responsavel" type="text" placeholder="Nome do contato"></div>
-        <div class="fld"><label>CARGO</label><input id="sl-cargo" type="text" placeholder="Ex: Gerente Adm"></div>
-        <div class="sdr-modal-section">CONTATO</div>
-        <div class="fld"><label>EMAIL</label><input id="sl-email" type="email" placeholder="email@empresa.com"></div>
-        <div class="fld"><label>WHATSAPP</label><input id="sl-tel" type="text" placeholder="(31) 9 0000-0000" oninput="formatTelSdr(this)"></div>
-        <div class="fld"><label>CIDADE</label><input id="sl-cidade" type="text" placeholder="Belo Horizonte" value="Belo Horizonte"></div>
-        <div class="sdr-modal-section">QUALIFICAÇÃO</div>
-        <div class="fld">
-          <label>SEGMENTO</label>
-          <select id="sl-seg" class="sdr-filter-sel" style="width:100%">
-            <option>Escritório</option><option>Restaurante</option><option>Hotel</option>
-            <option>Escola</option><option>Clínica</option><option>Hospital</option><option>Condomínio</option><option>Outro</option>
-          </select>
-        </div>
-        <div class="fld">
-          <label>Nº FUNCIONÁRIOS</label>
-          <select id="sl-func" class="sdr-filter-sel" style="width:100%">
-            <option value="1-10">1 – 10</option><option value="11-50">11 – 50</option>
-            <option value="51-200">51 – 200</option><option value="200+">200+</option>
-          </select>
-        </div>
-        <div class="fld">
-          <label>Nº EQUIPAMENTOS EST.</label>
-          <select id="sl-equip" class="sdr-filter-sel" style="width:100%">
-            <option value="1-5">1 – 5</option><option value="6-15">6 – 15</option>
-            <option value="16-50">16 – 50</option><option value="50+">50+</option>
-          </select>
-        </div>
-        <div class="fld">
-          <label>POTENCIAL MENSAL (R$)</label>
-          <input id="sl-pot" type="number" placeholder="500" min="0">
-        </div>
-        <div class="fld sdr-modal-full"><label>OBSERVAÇÕES</label><textarea id="sl-obs" rows="2" style="width:100%;resize:vertical;background:var(--s2);border:1px solid var(--bdr);border-radius:7px;color:var(--tx);padding:8px;font-family:var(--fm);font-size:11px;outline:none"></textarea></div>
-      </div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
-        <button class="btn btn-x" onclick="fecharSdrModal()">Cancelar</button>
-        <button class="btn btn-pri" onclick="salvarLead()" id="sdr-save-btn">Salvar Lead</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- PAINEL LATERAL DO LEAD -->
-  <div class="modal-bg" id="sdr-detail-bg" style="display:none" onclick="if(event.target===this)fecharDetalhe()">
-    <div class="modal" style="max-width:520px;max-height:88vh;overflow-y:auto;" id="sdr-detail-panel"></div>
-  </div>
 </div>
 
 <div class="pg" id="pg-prospects">
@@ -1371,8 +1318,12 @@ var _sdrLeads = [], _sdrView = 'kanban', _sdrFiltro = '', _sdrLeadAtual = null;
 
 // Função global acessível por onclick inline — mais confiável que event delegation
 window._sdrOpen = function(id) {
-  console.log('[SDR] _sdrOpen chamado, id=', id, 'leads=', _sdrLeads.length);
-  if (!id) { toast('Erro: id vazio', 'r'); return; }
+  if (!id) { toast('SDR: id vazio','r'); return; }
+  if (!_sdrLeads.length) {
+    toast('Recarregando leads...','');
+    carregarSDR().then(function(){ abrirDetalhe(id); });
+    return;
+  }
   abrirDetalhe(id);
 };
 var _sdrTemplates = {}, _sdrSteps = [];
@@ -1798,5 +1749,61 @@ document.addEventListener("DOMContentLoaded",function(){
     .catch(()=>{});
 });
 </script>
+
+
+<!-- MODAIS SDR — fora de qualquer .pg para não sofrer display:none -->
+<!-- MODAL NOVO LEAD -->
+  <div class="modal-bg" id="sdr-modal" style="display:none" onclick="if(event.target===this)fecharSdrModal()">
+    <div class="modal" style="max-width:560px;max-height:85vh;overflow-y:auto;">
+      <div class="modal-hd"><span id="sdr-modal-titulo">Novo Lead</span><button class="modal-x" onclick="fecharSdrModal()">✕</button></div>
+      <div class="sdr-modal-body">
+        <div class="sdr-modal-section">EMPRESA</div>
+        <div class="fld sdr-modal-full"><label>EMPRESA *</label><input id="sl-empresa" type="text" placeholder="Nome da empresa"></div>
+        <div class="fld"><label>RESPONSÁVEL *</label><input id="sl-responsavel" type="text" placeholder="Nome do contato"></div>
+        <div class="fld"><label>CARGO</label><input id="sl-cargo" type="text" placeholder="Ex: Gerente Adm"></div>
+        <div class="sdr-modal-section">CONTATO</div>
+        <div class="fld"><label>EMAIL</label><input id="sl-email" type="email" placeholder="email@empresa.com"></div>
+        <div class="fld"><label>WHATSAPP</label><input id="sl-tel" type="text" placeholder="(31) 9 0000-0000" oninput="formatTelSdr(this)"></div>
+        <div class="fld"><label>CIDADE</label><input id="sl-cidade" type="text" placeholder="Belo Horizonte" value="Belo Horizonte"></div>
+        <div class="sdr-modal-section">QUALIFICAÇÃO</div>
+        <div class="fld">
+          <label>SEGMENTO</label>
+          <select id="sl-seg" class="sdr-filter-sel" style="width:100%">
+            <option>Escritório</option><option>Restaurante</option><option>Hotel</option>
+            <option>Escola</option><option>Clínica</option><option>Hospital</option><option>Condomínio</option><option>Outro</option>
+          </select>
+        </div>
+        <div class="fld">
+          <label>Nº FUNCIONÁRIOS</label>
+          <select id="sl-func" class="sdr-filter-sel" style="width:100%">
+            <option value="1-10">1 – 10</option><option value="11-50">11 – 50</option>
+            <option value="51-200">51 – 200</option><option value="200+">200+</option>
+          </select>
+        </div>
+        <div class="fld">
+          <label>Nº EQUIPAMENTOS EST.</label>
+          <select id="sl-equip" class="sdr-filter-sel" style="width:100%">
+            <option value="1-5">1 – 5</option><option value="6-15">6 – 15</option>
+            <option value="16-50">16 – 50</option><option value="50+">50+</option>
+          </select>
+        </div>
+        <div class="fld">
+          <label>POTENCIAL MENSAL (R$)</label>
+          <input id="sl-pot" type="number" placeholder="500" min="0">
+        </div>
+        <div class="fld sdr-modal-full"><label>OBSERVAÇÕES</label><textarea id="sl-obs" rows="2" style="width:100%;resize:vertical;background:var(--s2);border:1px solid var(--bdr);border-radius:7px;color:var(--tx);padding:8px;font-family:var(--fm);font-size:11px;outline:none"></textarea></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+        <button class="btn btn-x" onclick="fecharSdrModal()">Cancelar</button>
+        <button class="btn btn-pri" onclick="salvarLead()" id="sdr-save-btn">Salvar Lead</button>
+      </div>
+    </div>
+  </div>
+
+<!-- PAINEL LATERAL DO LEAD -->
+  <div class="modal-bg" id="sdr-detail-bg" style="display:none" onclick="if(event.target===this)fecharDetalhe()">
+    <div class="modal" style="max-width:520px;max-height:88vh;overflow-y:auto;" id="sdr-detail-panel"></div>
+  </div>
+
 </body>
 </html>
