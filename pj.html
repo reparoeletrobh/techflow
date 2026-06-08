@@ -866,14 +866,22 @@ async function carregarInbox(){
 }
 
 async function carregarEnviados(){
-  g('lista-inbox').innerHTML='<div class="gm-loading"><div class="spin"></div></div>';
+  var el=g('lista-inbox');
+  el.innerHTML='<div class="gm-loading"><div class="spin"></div></div>';
+  var r;
   try{
-    var r=await fetch('/api/pj-email?action=listar-enviados').then(function(x){return x.json();});
-    _enviados=(r.emails||r.enviados||[]);
-    renderListaEnviados(_enviados);
+    var resp=await fetch('/api/pj-email?action=listar-enviados');
+    r=await resp.json();
   }catch(er){
-    g('lista-inbox').innerHTML='<div style="padding:20px;font-family:var(--fm);font-size:10px;color:var(--re)">Erro ao carregar enviados</div>';
+    el.innerHTML='<div style="padding:20px;font-family:var(--fm);font-size:10px;color:var(--re)">Erro de rede: '+esc(er.message)+'</div>';
+    return;
   }
+  if(!r||!r.ok){
+    el.innerHTML='<div style="padding:20px;font-family:var(--fm);font-size:10px;color:var(--re)">Erro API: '+(r&&r.error?esc(r.error):'resposta inválida')+'</div>';
+    return;
+  }
+  _enviados=r.emails||[];
+  renderListaEnviados(_enviados);
 }
 
 function renderRascunhos(){
@@ -924,23 +932,31 @@ function renderListaInbox(lista){
 
 function renderListaEnviados(lista){
   var el=g('lista-inbox');
-  if(!lista.length){
+  if(!lista||!lista.length){
     el.innerHTML='<div style="padding:60px 20px;text-align:center;font-family:var(--fm);font-size:10px;color:var(--mu)">'+
-      '<div style="font-size:32px;margin-bottom:12px;opacity:.3">📤</div>Nenhum email enviado.</div>';
+      '<div style="font-size:32px;margin-bottom:12px;opacity:.3">📤</div>Nenhum email enviado ainda.</div>';
     return;
   }
-  el.innerHTML=lista.map(function(em){
+  el.innerHTML=lista.map(function(em,i){
     var cor=avatarColor('P');
-    return '<div class="gm-row" data-env-idx="'+i+'" onclick="abrirEmailEnviado(+this.dataset.envIdx)">'+
+    var paraStr=(em.para||em.to||'').toString().replace(/<[^>]+>/g,'');
+    var assunto=em.assunto||em.subject||'(sem assunto)';
+    var data=fmtDt(em.criadoEm||em.createdAt||'');
+    return '<div class="gm-row" data-ei="'+i+'" style="cursor:pointer">'+
       '<div class="gm-row-avatar" style="background:'+cor+'">P</div>'+
       '<div class="gm-row-body">'+
       '<div class="gm-row-top">'+
-      '<span class="gm-row-nome">Para: '+esc((em.para||em.to||'').toString().replace(/<[^>]+>/g,''))+'</span>'+
-      '<span class="gm-row-data">'+fmtDt(em.criadoEm||em.createdAt)+'</span>'+
+      '<span class="gm-row-nome">Para: '+esc(paraStr.slice(0,40))+'</span>'+
+      '<span class="gm-row-data">'+data+'</span>'+
       '</div>'+
-      '<div class="gm-row-assunto">'+esc(em.assunto||em.subject||'(sem assunto)')+'</div>'+
+      '<div class="gm-row-assunto">'+esc(assunto)+'</div>'+
       '</div></div>';
   }).join('');
+  // Event delegation — sem onclick inline
+  el.onclick=function(e){
+    var row=e.target.closest('[data-ei]');
+    if(row) abrirEmailEnviado(parseInt(row.dataset.ei));
+  };
 }
 
 function filtrarInbox(){
