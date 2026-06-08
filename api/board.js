@@ -1425,7 +1425,31 @@ module.exports = async function handler(req, res) {
           hasNext = data.phase.cards.pageInfo?.hasNextPage ?? false;
           cursor  = data.phase.cards.pageInfo?.endCursor ?? null;
         }
-        if (!all.length) return res.status(200).json({ ok: true, moved: 0, msg: "Nenhum card em ERP" });
+        // NÃO retornar cedo — sempre rodar a limpeza local mesmo sem cards no Pipefy
+        if (!all.length) {
+          // Ainda faz a limpeza local
+          try {
+            const _bU2=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+            const _bT2=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+            async function _bg3(k){const r=await fetch(_bU2+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_bT2,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();const v=j[0]?.result;if(!v)return null;try{let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e2){return null;}}
+            async function _bs3(k,v){await fetch(_bU2+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_bT2,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+            const pipeDb3=await _bg3('reparoeletro_pipe');
+            let movedLocal=0;
+            if(pipeDb3&&Array.isArray(pipeDb3.cards)){
+              const nowB=new Date().toISOString();
+              pipeDb3.cards.forEach(function(card){
+                if(card.phase==='erp'){
+                  card.history=(card.history||[]).concat([{phase:'erp',ts:nowB}]);
+                  card.phase='finalizado'; card.movedAt=nowB; movedLocal++;
+                }
+              });
+              if(movedLocal>0){pipeDb3.lastSync=new Date().toISOString();await _bs3('reparoeletro_pipe',pipeDb3);}
+            }
+            return res.status(200).json({ ok: true, moved: 0, movedLocal, msg: "Nenhum card em ERP no Pipefy — "+movedLocal+" cards locais movidos" });
+          } catch(elErr) {
+            return res.status(200).json({ ok: true, moved: 0, msg: "Nenhum card em ERP" });
+          }
+        }
 
         const results = [];
         for (const card of all) {
