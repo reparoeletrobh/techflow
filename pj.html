@@ -1726,8 +1726,17 @@ async function salvarLead() {
     })
   }).then(x=>x.json());
   if(btn){btn.disabled=false;btn.textContent='Salvar Lead';}
-  if (r.ok) { fecharSdrModal(); await carregarSDR(); toast('✅ Lead cadastrado!','g'); }
-  else toast('Erro: '+(r.error||'falha'),'r');
+  if (r.ok) {
+    fecharSdrModal();
+    await carregarSDR();
+    if (r.emailD0Enviado) {
+      toast('✅ Lead cadastrado + apresentação enviada por email!','g');
+    } else if (r.lead && r.lead.email) {
+      toast('✅ Lead cadastrado (email não pôde ser enviado)','g');
+    } else {
+      toast('✅ Lead cadastrado! Adicione o email para enviar a apresentação.','g');
+    }
+  } else toast('Erro: '+(r.error||'falha'),'r');
 }
 
 function formatTelSdr(input) {
@@ -1755,6 +1764,7 @@ document.addEventListener('click', function(e) {
     if (a==='toque')  { registrarToque(lid, parseInt(act.dataset.passo), act.dataset.resp==='1'); return; }
     if (a==='copiar') { copiarTemplate(act.dataset.tmpl, lid); return; }
     if (a==='email')  { sdrEnviarEmail(lid); return; }
+    if (a==='apresentacao') { sdrEnviarApresentacao(lid); return; }
     if (a==='excluir'){ excluirLead(lid); return; }
   }
 });

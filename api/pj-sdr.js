@@ -36,7 +36,7 @@ const CADENCIA_STEPS = [
 
 // ── Templates de mensagem ─────────────────────────────────────────────────────
 const TEMPLATES = {
-  e0: `Oi {{responsavel}}, aqui é o Pedro Teixeira da Reparo Eletro BH.\n\nA gente faz manutenção especializada de microondas e bebedouros para empresas como a {{empresa}} — com coleta e entrega na sede, nota fiscal e boleto com prazo.\n\nVale 5 minutos pra eu te mostrar como funciona?\n\nAbraço,\nPedro`,
+  e0_plain: `Oi {{responsavel}}, aqui é o Pedro Teixeira da Reparo Eletro BH.\n\nA gente faz manutenção especializada de microondas e bebedouros para empresas como a {{empresa}} — com coleta e entrega na sede, nota fiscal e boleto com prazo.\n\nVale 5 minutos pra eu te mostrar como funciona?\n\nAbraço,\nPedro`,
   w2: `Oi {{responsavel}}, Pedro da Reparo Eletro aqui 👋\nVocês têm microondas ou bebedouro no escritório que eventualmente precisa de manutenção?\nPergunto pois trabalho com empresas em BH e tenho coleta e NF. 🙂`,
   e4: `{{responsavel}}, passando pra reforçar:\n\nA gente busca o equipamento na {{empresa}}, conserta e devolve funcionando — sem que ninguém precise sair do escritório. Emitimos NF e aceitamos boleto com prazo de 15 a 30 dias.\n\nQuer receber nossa tabela de preços?`,
   l6: `Oi {{responsavel}}, mandei um email sobre manutenção de equipamentos para a {{empresa}}. Trabalho com coleta, NF e boleto. Posso te enviar nossa proposta por aqui?`,
@@ -44,6 +44,74 @@ const TEMPLATES = {
   w12:`{{responsavel}}, você teria uns 10 minutos essa semana pra eu te mostrar como funciona nossa manutenção corporativa? Atendo toda BH e região 🔧`,
   e15:`{{responsavel}}, preparei um checklist rápido: "5 sinais que seu microondas corporativo precisa de manutenção".\n\nMando pra você? É gratuito e pode ajudar a evitar quebras no pior momento.`,
   lg18:`Script D18 — Ligação direta:\n"Oi {{responsavel}}, aqui é o Pedro da Reparo Eletro BH. Mandei alguns emails sobre manutenção de equipamentos para a {{empresa}}. Você tem 2 minutinhos?"`,
+  e0_html: `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:'Segoe UI',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:24px 0;"><tr><td align="center">
+<table width="580" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
+<tr><td style="background:#1a1a2e;padding:24px 36px;text-align:center;">
+  <div style="font-size:20px;font-weight:800;color:#fff;letter-spacing:1px;">⚡ REPARO ELETRO BH</div>
+  <div style="font-size:10px;color:#8899aa;margin-top:3px;letter-spacing:2px;">MICROONDAS · BEBEDOUROS · CORPORATIVO</div>
+</td></tr>
+<tr><td style="padding:28px 36px 0;">
+  <p style="margin:0;font-size:15px;color:#222;">Olá, <strong>{{responsavel}}</strong>!</p>
+  <p style="margin:10px 0 0;font-size:14px;color:#444;line-height:1.7;">Meu nome é <strong>Pedro Teixeira</strong> da <strong>Reparo Eletro BH</strong>. Somos especialistas em manutenção de <strong>microondas e bebedouros corporativos</strong> em BH e região.</p>
+  <p style="margin:10px 0 0;font-size:14px;color:#444;line-height:1.7;">Acredito que podemos ajudar a <strong>{{empresa}}</strong> a reduzir custos e evitar paradas por equipamentos com defeito.</p>
+</td></tr>
+<tr><td style="padding:20px 36px 0;">
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td width="50%" style="padding:0 6px 10px 0;vertical-align:top;">
+        <table cellpadding="12" cellspacing="0" style="background:#f8f9ff;border-left:3px solid #3b82f6;border-radius:0 6px 6px 0;width:100%;"><tr><td>
+          <div style="font-size:18px">🚚</div><div style="font-size:12px;font-weight:700;color:#1a1a2e;">Coleta e Entrega</div>
+          <div style="font-size:11px;color:#666;margin-top:2px;">Buscamos e devolvemos na sua empresa.</div>
+        </td></tr></table>
+      </td>
+      <td width="50%" style="padding:0 0 10px 6px;vertical-align:top;">
+        <table cellpadding="12" cellspacing="0" style="background:#f8f9ff;border-left:3px solid #10d982;border-radius:0 6px 6px 0;width:100%;"><tr><td>
+          <div style="font-size:18px">📄</div><div style="font-size:12px;font-weight:700;color:#1a1a2e;">Nota Fiscal</div>
+          <div style="font-size:11px;color:#666;margin-top:2px;">NF para todas as manutenções.</div>
+        </td></tr></table>
+      </td>
+    </tr>
+    <tr>
+      <td width="50%" style="padding:0 6px 0 0;vertical-align:top;">
+        <table cellpadding="12" cellspacing="0" style="background:#f8f9ff;border-left:3px solid #f5c800;border-radius:0 6px 6px 0;width:100%;"><tr><td>
+          <div style="font-size:18px">💳</div><div style="font-size:12px;font-weight:700;color:#1a1a2e;">Boleto 15-30 dias</div>
+          <div style="font-size:11px;color:#666;margin-top:2px;">Facilita o fluxo de caixa.</div>
+        </td></tr></table>
+      </td>
+      <td width="50%" style="padding:0 0 0 6px;vertical-align:top;">
+        <table cellpadding="12" cellspacing="0" style="background:#f8f9ff;border-left:3px solid #f97316;border-radius:0 6px 6px 0;width:100%;"><tr><td>
+          <div style="font-size:18px">⚡</div><div style="font-size:12px;font-weight:700;color:#1a1a2e;">Diagnóstico 24h</div>
+          <div style="font-size:11px;color:#666;margin-top:2px;">Prazo médio: 5 a 7 dias úteis.</div>
+        </td></tr></table>
+      </td>
+    </tr>
+  </table>
+</td></tr>
+<tr><td style="padding:20px 36px;">
+  <p style="margin:0 0 16px;font-size:14px;color:#444;line-height:1.7;">Posso enviar uma <strong>tabela de preços</strong> para a {{empresa}}? Leva menos de 5 minutos.</p>
+  <table cellpadding="0" cellspacing="0"><tr>
+    <td style="background:#3b82f6;border-radius:6px;padding:11px 24px;">
+      <a href="https://reparoeletroadm.com/institucional" style="color:#fff;text-decoration:none;font-size:13px;font-weight:700;">Ver Apresentação Completa →</a>
+    </td>
+  </tr></table>
+</td></tr>
+<tr><td style="padding:0 36px 28px;">
+  <table cellpadding="0" cellspacing="0" style="border-top:1px solid #e8ecf0;padding-top:18px;width:100%;">
+    <tr>
+      <td style="vertical-align:middle;padding-right:12px;">
+        <div style="width:40px;height:40px;background:#1a1a2e;border-radius:50%;text-align:center;line-height:40px;font-size:18px;">⚡</div>
+      </td>
+      <td style="vertical-align:middle;">
+        <div style="font-size:13px;font-weight:700;color:#1a1a2e;">Pedro Teixeira</div>
+        <div style="font-size:11px;color:#3b82f6;font-weight:600;">Reparo Eletro, Microondas e Bebedouros</div>
+        <div style="font-size:10px;color:#888;margin-top:2px;">📍 BH &nbsp;|&nbsp; 🌐 reparoeletroadm.com/institucional &nbsp;|&nbsp; 📧 pedro@comercial.reparoeletroadm.com</div>
+      </td>
+    </tr>
+  </table>
+</td></tr>
+</table></td></tr></table></body></html>`,
   e21:`{{responsavel}}, entendo que talvez não seja o momento certo para a {{empresa}}.\n\nVou deixar nossa linha aberta — se precisar de manutenção de microondas ou bebedouros, é só chamar.\n\nAbraço,\nPedro Teixeira | Reparo Eletro BH`,
 };
 
@@ -144,7 +212,40 @@ module.exports = async function handler(req, res) {
     };
     db.leads.unshift(novo);
     await dbSet(SDR_KEY, db);
-    return res.status(200).json({ ok:true, lead: novo });
+    // Enviar email D0 automaticamente se tiver email
+    let emailEnviado = false;
+    if (novo.email && process.env.RESEND_API_KEY) {
+      try {
+        const htmlBody = TEMPLATES.e0_html
+          .replace(/\{\{responsavel\}\}/g, novo.responsavel)
+          .replace(/\{\{empresa\}\}/g, novo.empresa);
+        const plainBody = TEMPLATES.e0_plain
+          .replace(/\{\{responsavel\}\}/g, novo.responsavel)
+          .replace(/\{\{empresa\}\}/g, novo.empresa);
+        const er = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + process.env.RESEND_API_KEY, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from: 'Pedro Teixeira | Reparo Eletro, Microondas e Bebedouros <pedro@comercial.reparoeletroadm.com>',
+            reply_to: ['pedro@ciacaluuir.resend.app'],
+            to: [novo.email],
+            subject: 'Manutenção de Microondas e Bebedouros para ' + novo.empresa,
+            html: htmlBody,
+            text: plainBody,
+          })
+        });
+        const ed = await er.json();
+        if (ed.id) {
+          emailEnviado = true;
+          // Registrar toque D0 automaticamente
+          novo.toques.push({ passo:1, canal:'email', label:'Email D0 — Apresentação + Dor', realizado:true, data:new Date().toISOString(), respondeu:false });
+          novo.fase = 'primeiro_contato';
+          novo.inicioEm = novo.criadoEm;
+          await dbSet(SDR_KEY, db);
+        }
+      } catch(ef) { console.error('Email D0 error:', ef.message); }
+    }
+    return res.status(200).json({ ok:true, lead: novo, emailD0Enviado: emailEnviado });
   }
 
   // ── POST atualizar ──────────────────────────────────────────────────────────
