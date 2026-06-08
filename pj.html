@@ -1072,7 +1072,7 @@ function abrirReply(){
   setTimeout(function(){var t=g('gm-reply-text');if(t)t.focus();},100);
 }
 
-async window._enviarReply = async function(){
+window._enviarReply = async function(){
   var para   = window._replyPara    || '';
   var assunto= window._replyAssunto || '';
   var corpo  = (g('gm-reply-text')||{}).value||'';
