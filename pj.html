@@ -1318,6 +1318,7 @@ var _sdrLeads = [], _sdrView = 'kanban', _sdrFiltro = '', _sdrLeadAtual = null;
 
 // Função global acessível por onclick inline — mais confiável que event delegation
 window._sdrOpen = function(id) {
+  alert('_sdrOpen chamado! id=' + id);
   if (!id) { toast('SDR: id vazio','r'); return; }
   if (!_sdrLeads.length) {
     toast('Recarregando leads...','');
@@ -1499,6 +1500,7 @@ function sdrIrEmail(leadId) {
 
 // ── Detalhe do lead ──────────────────────────────────────────────────────────
 function abrirDetalhe(id) {
+  alert('abrirDetalhe chamado! id=' + id + ' | leads=' + _sdrLeads.length);
   var l = _sdrLeads.find(function(x){ return x.id === id; });
   if (!l) { toast('Erro: lead não encontrado (total: '+_sdrLeads.length+')','r'); return; }
   _sdrLeadAtual = l;
