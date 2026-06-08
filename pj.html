@@ -1553,54 +1553,46 @@ function sdrIrEmail(leadId) {
 
 // ── Detalhe do lead ──────────────────────────────────────────────────────────
 function abrirDetalhe(id) {
-  var l = _sdrLeads.find(function(x){return x.id===id;}); if(!l) return;
+  var l = _sdrLeads.find(function(x){ return x.id === id; });
+  if (!l) { console.warn('Lead não encontrado:', id, 'Total:', _sdrLeads.length); return; }
   _sdrLeadAtual = l;
-  var panel = g('sdr-detail-panel'); if(!panel) return;
+  var panel = g('sdr-detail-panel'); if (!panel) return;
   var scoreColor = l.score>=61?'var(--or)':l.score>=31?'var(--ye)':'var(--bl)';
   var toqueMap = {};
-  (l.toques||[]).forEach(function(t){ toqueMap[t.passo]=t; });
+  (l.toques||[]).forEach(function(t){ toqueMap[t.passo] = t; });
 
-  // Fases buttons
+  // Fases
   var faseBtns = SDR_FASES.map(function(f) {
-    var ativo = l.fase===f.id;
-    var btn = document.createElement('button');
-    btn.textContent = f.label;
-    btn.dataset.lid = l.id;
-    btn.dataset.fase = f.id;
-    btn.className = 'cad-btn';
-    btn.style.cssText = 'font-size:9px;padding:3px 8px;border-radius:6px;border:1px solid '+(ativo?f.cor:'var(--bdr)')+';background:'+(ativo?f.cor+'22':'transparent')+';color:'+(ativo?f.cor:'var(--mu)')+';cursor:pointer;margin:2px';
-    btn.onclick = function(){ moverFase(this.dataset.lid, this.dataset.fase); };
-    return btn.outerHTML;
+    var ativo = l.fase === f.id;
+    return '<button class="cad-btn sdr-act" data-action="fase" data-lid="'+l.id+'" data-fase="'+f.id+'" style="font-size:9px;padding:3px 8px;border-radius:6px;border:1px solid '+(ativo?f.cor:'var(--bdr)')+';background:'+(ativo?f.cor+'22':'transparent')+';color:'+(ativo?f.cor:'var(--mu)')+';cursor:pointer;margin:2px">'+f.label+'</button>';
   }).join('');
 
-  // Cadência steps
+  // Flags
+  var FLAGS = [
+    ['emailRespondeu','📬 Email respondeu'],
+    ['waRespondeu','💬 WA respondeu'],
+    ['reuniaoAgendada','📅 Reunião agendada'],
+    ['propostaSolicitada','📄 Proposta solicitada'],
+  ];
+  var flagBtns = FLAGS.map(function(p) {
+    var val = l[p[0]];
+    return '<button class="sdr-act" data-action="flag" data-lid="'+l.id+'" data-field="'+p[0]+'" style="font-family:var(--fm);font-size:9px;padding:4px 10px;border-radius:6px;border:1px solid '+(val?'var(--or)':'var(--bdr)')+';background:'+(val?'rgba(249,115,22,.15)':'transparent')+';color:'+(val?'var(--or)':'var(--mu)')+';cursor:pointer;margin:2px">'+p[1]+'</button>';
+  }).join('');
+
+  // Cadência
   var steps = _sdrSteps.length ? _sdrSteps : [];
   var cadHTML = steps.map(function(step) {
     var toque = toqueMap[step.passo];
     var feito = toque && toque.realizado;
-    var respondeu = toque && toque.respondeu;
-    var cls = respondeu ? 'respondeu' : feito ? 'done' : (proximaCadStep(l)===step.passo ? 'proximo' : '');
-    var icon = respondeu ? '💬' : feito ? '✓' : (CANAL_ICON[step.canal]||'○');
-    var acoes = '';
-    if (!feito) {
-      var b1 = document.createElement('button');
-      b1.textContent='✓ Feito'; b1.className='cad-btn cad-btn-ok';
-      b1.dataset.lid=l.id; b1.dataset.passo=step.passo; b1.dataset.resp='false';
-      b1.onclick=function(){ registrarToque(this.dataset.lid, parseInt(this.dataset.passo), false); };
-      var b2 = document.createElement('button');
-      b2.textContent='💬 Respondeu'; b2.className='cad-btn cad-btn-resp';
-      b2.dataset.lid=l.id; b2.dataset.passo=step.passo;
-      b2.onclick=function(){ registrarToque(this.dataset.lid, parseInt(this.dataset.passo), true); };
-      var b3 = '';
-      if (step.templateId) {
-        var bt = document.createElement('button');
-        bt.textContent='📋 Copiar'; bt.className='cad-btn cad-btn-copy';
-        bt.dataset.tmpl=step.templateId; bt.dataset.lid=l.id;
-        bt.onclick=function(){ copiarTemplate(this.dataset.tmpl, this.dataset.lid); };
-        b3 = bt.outerHTML;
-      }
-      acoes = '<div class="cad-step-actions">'+b1.outerHTML+b2.outerHTML+b3+'</div>';
-    }
+    var resp  = toque && toque.respondeu;
+    var cls   = resp ? 'respondeu' : feito ? 'done' : (proximaCadStep(l)===step.passo ? 'proximo' : '');
+    var icon  = resp ? '💬' : feito ? '✓' : (CANAL_ICON[step.canal]||'○');
+    var acoes = feito ? '' :
+      '<div class="cad-step-actions">'+
+      '<button class="cad-btn cad-btn-ok sdr-act" data-action="toque" data-lid="'+l.id+'" data-passo="'+step.passo+'" data-resp="0">✓ Feito</button>'+
+      '<button class="cad-btn cad-btn-resp sdr-act" data-action="toque" data-lid="'+l.id+'" data-passo="'+step.passo+'" data-resp="1">💬 Respondeu</button>'+
+      (step.templateId ? '<button class="cad-btn cad-btn-copy sdr-act" data-action="copiar" data-tmpl="'+step.templateId+'" data-lid="'+l.id+'">📋 Copiar</button>' : '')+
+      '</div>';
     return '<div class="cad-step '+cls+'">'+
       '<div class="cad-step-icon">'+icon+'</div>'+
       '<div class="cad-step-info">'+
@@ -1609,57 +1601,70 @@ function abrirDetalhe(id) {
       acoes+'</div></div>';
   }).join('');
 
-  // Flags
-  var flagsHtml = [
-    ['emailRespondeu','📬 Email respondeu'],
-    ['waRespondeu','💬 WA respondeu'],
-    ['reuniaoAgendada','📅 Reunião agendada'],
-    ['propostaSolicitada','📄 Proposta solicitada'],
-  ].map(function(pair) {
-    var field=pair[0], label=pair[1], val=l[field];
-    var btn = document.createElement('button');
-    btn.textContent=label; btn.dataset.lid=l.id; btn.dataset.field=field;
-    btn.style.cssText='font-family:var(--fm);font-size:9px;padding:4px 10px;border-radius:6px;border:1px solid '+(val?'var(--or)':'var(--bdr)')+';background:'+(val?'rgba(249,115,22,.15)':'transparent')+';color:'+(val?'var(--or)':'var(--mu)')+';cursor:pointer;margin:2px';
-    btn.onclick=function(){ toggleFlag(this.dataset.lid, this.dataset.field); };
-    return btn.outerHTML;
-  }).join('');
-
-  // Botões finais
-  var btnEmail = '';
-  if (l.email) {
-    var be = document.createElement('button');
-    be.textContent='📧 Enviar Email'; be.className='btn btn-pri'; be.style.fontSize='10px';
-    be.dataset.lid=l.id;
-    be.onclick=function(){ sdrEnviarEmail(this.dataset.lid); };
-    btnEmail = be.outerHTML;
-  }
-  var btnExcluir = document.createElement('button');
-  btnExcluir.textContent='🗑️ Excluir'; btnExcluir.className='btn btn-x'; btnExcluir.style.cssText='font-size:10px;color:var(--re)';
-  btnExcluir.dataset.lid=l.id;
-  btnExcluir.onclick=function(){ excluirLead(this.dataset.lid); };
+  // Info chips
+  var chips =
+    sdrInfoChip('📧 Email',   l.email||'—') +
+    sdrInfoChip('📱 WA',      l.telefone||'—') +
+    sdrInfoChip('🏢 Segmento',l.segmento) +
+    sdrInfoChip('👥 Func.',   l.funcionarios) +
+    sdrInfoChip('🔧 Equip.',  l.equipamentos) +
+    sdrInfoChip('💰 Potencial',l.potencial?'R$'+l.potencial+'/mês':'—');
 
   panel.innerHTML =
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">'+
     '<div><div class="sdr-detail-nome">'+esc(l.empresa)+'</div>'+
     '<div class="sdr-detail-emp">'+esc(l.responsavel)+(l.cargo?' · '+esc(l.cargo):'')+(l.cidade?' · '+l.cidade:'')+'</div></div>'+
-    '<button class="modal-x" onclick="fecharDetalhe()">✕</button></div>'+
+    '<button class="modal-x" data-action="fechar-detalhe">✕</button></div>'+
+    // Score
     '<div style="background:var(--s2);border:1px solid var(--bdr);border-radius:8px;padding:12px;margin-bottom:14px">'+
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'+
     '<span style="font-family:var(--fm);font-size:10px;color:var(--mu)">LEAD SCORE</span>'+
-    '<span style="font-family:var(--fh);font-size:20px;font-weight:900;color:'+scoreColor+'">'+l.scoreBadge+' '+l.score+'</span></div>'+
+    '<span style="font-family:var(--fh);font-size:22px;font-weight:900;color:'+scoreColor+'">'+l.scoreBadge+' '+l.score+'</span></div>'+
     '<div class="sdr-detail-score-bar"><div class="sdr-detail-score-fill" style="width:'+l.score+'%;background:'+scoreColor+'"></div></div></div>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">'+
-    sdrInfoChip('📧',l.email||'—')+sdrInfoChip('📱',l.telefone||'—')+sdrInfoChip('🏢',l.segmento)+
-    sdrInfoChip('👥 Func.',l.funcionarios)+sdrInfoChip('🔧 Equip.',l.equipamentos)+sdrInfoChip('💰',l.potencial?'R$'+l.potencial+'/mês':'—')+
-    '</div>'+
-    '<div style="margin-bottom:12px">'+faseBtns+'</div>'+
-    '<div style="margin-bottom:12px">'+flagsHtml+'</div>'+
-    '<div style="font-family:var(--fm);font-size:9px;letter-spacing:.1em;color:var(--or);margin-bottom:10px">CADÊNCIA ('+((l.toques||[]).filter(function(t){return t.realizado;}).length)+'/9)</div>'+
+    // Chips
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">'+chips+'</div>'+
+    // Fases
+    '<div style="margin-bottom:12px"><div style="font-family:var(--fm);font-size:9px;color:var(--mu);margin-bottom:6px">MOVER PARA:</div>'+faseBtns+'</div>'+
+    // Flags
+    '<div style="margin-bottom:14px">'+flagBtns+'</div>'+
+    // Cadência
+    '<div style="font-family:var(--fm);font-size:9px;letter-spacing:.1em;color:var(--or);margin-bottom:10px">CADÊNCIA ('+(l.toques||[]).filter(function(t){return t.realizado;}).length+'/9)</div>'+
     cadHTML+
+    // Obs
     (l.obs?'<div style="margin-top:12px;padding:10px;background:var(--s2);border-radius:8px;font-size:11px;color:var(--mu)">📝 '+esc(l.obs)+'</div>':'')+
-    '<div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">'+btnEmail+btnExcluir.outerHTML+'</div>';
+    // Ações finais
+    '<div style="display:flex;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--bdr);justify-content:flex-end">'+
+    (l.email?'<button class="btn btn-pri sdr-act" style="font-size:10px" data-action="email" data-lid="'+l.id+'">📧 Enviar Email</button>':'')+
+    '<button class="btn btn-x sdr-act" style="font-size:10px;color:var(--re)" data-action="excluir" data-lid="'+l.id+'">🗑️ Excluir</button>'+
+    '</div>';
+
+  // Event delegation no painel — UM listener resolve tudo
+  panel.onclick = function(e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    var act = btn.dataset.action;
+    var lid = btn.dataset.lid;
+    if (act === 'fechar-detalhe') { fecharDetalhe(); return; }
+    if (act === 'fase')   { moverFase(lid, btn.dataset.fase); return; }
+    if (act === 'flag')   { toggleFlag(lid, btn.dataset.field); return; }
+    if (act === 'toque')  { registrarToque(lid, parseInt(btn.dataset.passo), btn.dataset.resp==='1'); return; }
+    if (act === 'copiar') { copiarTemplate(btn.dataset.tmpl, lid); return; }
+    if (act === 'email')  { sdrEnviarEmail(lid); return; }
+    if (act === 'excluir'){ excluirLead(lid); return; }
+  };
 
   g('sdr-detail-bg').style.display = 'flex';
+}
+
+function sdrInfoChip(label, val) {
+  return '<div style="background:var(--s2);border:1px solid var(--bdr);border-radius:7px;padding:8px 10px">'+
+    '<div style="font-family:var(--fm);font-size:8px;color:var(--mu)">'+label+'</div>'+
+    '<div style="font-size:11px;font-weight:500;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(String(val))+'</div></div>';
+}
+
+function fecharDetalhe() {
+  g('sdr-detail-bg').style.display='none';
+  _sdrLeadAtual=null;
 }
 
 function sdrInfoChip(label, val) {
