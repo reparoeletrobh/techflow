@@ -1611,6 +1611,21 @@ function sdrInfoChip(label, val) {
     '<div style="font-size:11px;font-weight:500;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(String(val))+'</div></div>';
 }
 
+function proximaCadStep(lead) {
+  var feitos = new Set((lead.toques||[]).filter(function(t){return t.realizado;}).map(function(t){return t.passo;}));
+  var steps = _sdrSteps.length ? _sdrSteps : [{passo:1},{passo:2},{passo:3},{passo:4},{passo:5},{passo:6},{passo:7},{passo:8},{passo:9}];
+  var prox = steps.find(function(s){ return !feitos.has(s.passo); });
+  return prox ? prox.passo : null;
+}
+
+function sdrIrEmailById(id) {
+  var l = _sdrLeads.find(function(x){ return x.id===id; });
+  if (!l || !l.emailInboxId) { toast('Email não encontrado no inbox','r'); return; }
+  ir('inbox');
+  setTimeout(function(){ abrirEmail(l.emailInboxId); }, 600);
+}
+
+
 function fecharDetalhe() {
   g('sdr-detail-bg').style.display='none';
   _sdrLeadAtual=null;
