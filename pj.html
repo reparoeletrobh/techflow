@@ -1245,7 +1245,7 @@ function renderForn(){
         '<div style="font-family:var(--fm);font-size:10px;color:var(--mu);margin-top:2px">'+(f.cnpj?f.cnpj+' · ':'')+esc(f.segmento||'')+'</div></div>'+
         '<div style="display:flex;gap:5px">'+
           '<button class="btn" style="font-size:9px" data-fid="'+f.id+'" onclick="abrirEditarForn(this.dataset.fid)">✏️ Editar</button>'+
-          '<button class="btn" style="font-size:9px;color:var(--or);border-color:rgba(249,115,22,.5)" onclick="abrirHistorico('"+f.id+"')">📋 Histórico</button>'+
+          '<button class="btn" style="font-size:9px;color:var(--or);border-color:rgba(249,115,22,.5)" data-fid="'+f.id+'" onclick="abrirHistorico(this.dataset.fid)">📋 Histórico</button>'+
           '<button class="btn btn-gr" style="font-size:9px;font-weight:700" data-fid="'+f.id+'" onclick="abrirGerarCobranca(this.dataset.fid)">💰 Cobrança</button>'+
         '</div>'+
       '</div>'+
@@ -1689,63 +1689,67 @@ function diasRestantes(venc, status) {
 
 function abrirHistorico(id) {
   var f = _fornLista.find(function(x){ return x.id===id; });
-  if (!f) { return; }
-  var cobs = (f.cobrancas||[]).slice().sort(function(a,b){
-    return (b.criadoEm||'').localeCompare(a.criadoEm||'');
-  });
-  if (g('hist-titulo')) g('hist-titulo').textContent = '📋 Histórico — ' + f.razaoSocial;
-  if (!cobs.length) {
-    if (g('hist-body')) g('hist-body').innerHTML = '<div class="empty" style="padding:20px;text-align:center;color:var(--mu)">Nenhuma cobrança registrada.</div>';
-    abrirOv('ov-hist');
-    return;
-  }
-  var hoje = new Date().toISOString().slice(0,10);
-  var rows = cobs.map(function(c) {
-    var status = c.status==='recebido'?'recebido':(c.vencimento&&c.vencimento<hoje?'vencido':'pendente');
-    var cor    = status==='recebido'?'var(--gr)':status==='vencido'?'var(--re)':'var(--bl)';
-    var lbl    = status==='recebido'?'✅ Recebido':status==='vencido'?'🔴 Vencido':'⏳ Pendente';
-    var nfBtn  = c.nfChave
-      ? '<a href="/api/nfse?action=danfe&chave='+c.nfChave+'" target="_blank" class="btn" style="font-size:9px;padding:2px 7px;color:var(--gr);border-color:var(--gr);display:inline-block;margin:1px">📄 NF</a>'
-      : '';
-    var bolBtn = c.boletoUrl
-      ? '<a href="'+c.boletoUrl+'" target="_blank" class="btn" style="font-size:9px;padding:2px 7px;color:#3b82f6;border-color:#3b82f6;display:inline-block;margin:1px">🔵 Boleto</a>'
-      : (status!=='recebido'
-          ? '<button class="btn" style="font-size:9px;padding:2px 7px;color:#3b82f6;border-color:#3b82f6" data-cid="'+f.id+'" data-cobid="'+c.id+'" onclick="reemitirBoleto(this.dataset.cid,this.dataset.cobid)">+ Boleto</button>'
-          : '');
-    var dias='';
-    if(c.vencimento&&status!=='recebido'){
-      var diff=Math.ceil((new Date(c.vencimento)-new Date(hoje))/86400000);
-      dias=diff>0?'<span style="color:var(--bl)">+'+diff+'d</span>':diff===0?'<span style="color:var(--yel)">Hoje</span>':'<span style="color:var(--re)">'+diff+'d</span>';
-    }
-    return '<tr style="border-bottom:1px solid var(--bdr)">'
-      + '<td style="padding:7px 8px;font-family:var(--fm);font-size:9px;color:var(--mu)">'+(c.criadoEm||'').slice(0,10)+'</td>'
-      + '<td style="padding:7px 8px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--mu)">'+esc(c.descricao||'—')+'</td>'
-      + '<td style="padding:7px 8px;text-align:right;font-weight:700">R$ '+parseFloat(c.valor||0).toFixed(2).replace('.',',')+'</td>'
-      + '<td style="padding:7px 8px;text-align:center;font-family:var(--fm);font-size:10px">'+(c.vencimento||'—')+'</td>'
-      + '<td style="padding:7px 8px;text-align:center">'+dias+'</td>'
-      + '<td style="padding:7px 8px;text-align:center"><span style="font-family:var(--fm);font-size:9px;color:'+cor+'">'+lbl+'</span></td>'
-      + '<td style="padding:7px 8px;text-align:center">'+nfBtn+bolBtn+'</td>'
-      + '</tr>';
-  }).join('');
-  var table = '<table style="width:100%;border-collapse:collapse;font-size:11px">'
-    + '<thead><tr style="font-family:var(--fm);font-size:9px;color:var(--mu)">'
-    + '<th style="padding:7px 8px;text-align:left">DATA</th>'
-    + '<th style="padding:7px 8px;text-align:left">DESCRIÇÃO</th>'
-    + '<th style="padding:7px 8px;text-align:right">VALOR</th>'
-    + '<th style="padding:7px 8px;text-align:center">VENCIMENTO</th>'
-    + '<th style="padding:7px 8px;text-align:center">DIAS</th>'
-    + '<th style="padding:7px 8px;text-align:center">STATUS</th>'
-    + '<th style="padding:7px 8px;text-align:center">DOCUMENTOS</th>'
-    + '</tr></thead><tbody>'+rows+'</tbody></table>';
-  if (g('hist-body')) g('hist-body').innerHTML = table;
-  abrirOv('ov-hist');
-  // Atualizar em background
+  if (!f) return;
+  _desenharHistorico(f);
+  // Atualizar silenciosamente
   fetch('/api/pj-fornecedores?action=load')
     .then(function(x){return x.json();})
     .then(function(r){
-      if(r.ok){ _fornLista=r.fornecedores||[]; abrirHistorico(id); }
+      if(!r.ok) return;
+      _fornLista = r.fornecedores||[];
+      var ff = _fornLista.find(function(x){return x.id===id;});
+      if(ff) _desenharHistorico(ff);
     }).catch(function(){});
 }
+
+function _desenharHistorico(f) {
+  var cobs = (f.cobrancas||[]).slice().sort(function(a,b){
+    return (b.criadoEm||'').localeCompare(a.criadoEm||'');
+  });
+  var titulo = g('hist-titulo');
+  var body   = g('hist-body');
+  var modal  = g('ov-hist');
+  if(titulo) titulo.textContent = '📋 Histórico — ' + f.razaoSocial;
+  if(!cobs.length){
+    if(body) body.innerHTML='<div style="padding:20px;text-align:center;font-family:var(--fm);font-size:11px;color:var(--mu)">Nenhuma cobrança registrada.</div>';
+    if(modal) modal.style.display='flex';
+    return;
+  }
+  var hoje=new Date().toISOString().slice(0,10);
+  var rows=cobs.map(function(c){
+    var st=c.status==='recebido'?'recebido':(c.vencimento&&c.vencimento<hoje?'vencido':'pendente');
+    var cor=st==='recebido'?'var(--gr)':st==='vencido'?'var(--re)':'var(--bl)';
+    var lbl=st==='recebido'?'✅ Recebido':st==='vencido'?'🔴 Vencido':'⏳ Pendente';
+    var nf=c.nfChave?'<a href="/api/nfse?action=danfe&chave='+c.nfChave+'" target="_blank" class="btn" style="font-size:9px;padding:2px 6px;color:var(--gr);border-color:var(--gr);margin:1px">📄 NF</a>':'';
+    var bol=c.boletoUrl?'<a href="'+c.boletoUrl+'" target="_blank" class="btn" style="font-size:9px;padding:2px 6px;color:#3b82f6;border-color:#3b82f6;margin:1px">🔵 Boleto</a>'
+      :(st!=='recebido'?'<button class="btn" style="font-size:9px;padding:2px 6px;color:#3b82f6;border-color:#3b82f6" data-cid="'+f.id+'" data-cobid="'+c.id+'" onclick="reemitirBoleto(this.dataset.cid,this.dataset.cobid)">+ Boleto</button>':'');
+    var dias='';
+    if(c.vencimento&&st!=='recebido'){
+      var d=Math.ceil((new Date(c.vencimento)-new Date(hoje))/86400000);
+      dias=d>0?'<b style="color:var(--bl)">+'+d+'d</b>':d===0?'<b style="color:var(--yel)">Hoje</b>':'<b style="color:var(--re)">'+d+'d</b>';
+    }
+    return '<tr style="border-bottom:1px solid var(--bdr)">'
+      +'<td style="padding:7px;font-family:var(--fm);font-size:9px;color:var(--mu)">'+(c.criadoEm||'').slice(0,10)+'</td>'
+      +'<td style="padding:7px;color:var(--mu);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c.descricao||'—')+'</td>'
+      +'<td style="padding:7px;text-align:right;font-weight:700">R$ '+parseFloat(c.valor||0).toFixed(2).replace('.',',')+'</td>'
+      +'<td style="padding:7px;text-align:center;font-family:var(--fm);font-size:10px">'+(c.vencimento||'—')+'</td>'
+      +'<td style="padding:7px;text-align:center">'+dias+'</td>'
+      +'<td style="padding:7px;text-align:center"><span style="font-family:var(--fm);font-size:9px;color:'+cor+'">'+lbl+'</span></td>'
+      +'<td style="padding:7px;text-align:center">'+nf+bol+'</td>'
+      +'</tr>';
+  }).join('');
+  var t='<table style="width:100%;border-collapse:collapse;font-size:11px">'
+    +'<thead><tr style="font-family:var(--fm);font-size:9px;color:var(--mu)">'
+    +'<th style="padding:7px;text-align:left">DATA</th><th style="padding:7px;text-align:left">DESCRIÇÃO</th>'
+    +'<th style="padding:7px;text-align:right">VALOR</th><th style="padding:7px;text-align:center">VENC.</th>'
+    +'<th style="padding:7px;text-align:center">DIAS</th><th style="padding:7px;text-align:center">STATUS</th>'
+    +'<th style="padding:7px;text-align:center">DOCS</th>'
+    +'</tr></thead><tbody>'+rows+'</tbody></table>';
+  if(body)  body.innerHTML=t;
+  if(modal) modal.style.display='flex';
+}
+
+
 window.abrirHistorico = abrirHistorico;
 
 
