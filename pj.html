@@ -1688,132 +1688,172 @@ function diasRestantes(venc, status) {
 }
 
 
-// ══ HISTÓRICO DE COBRANÇAS ═══════════════════════════════════════════════════
-var _histClienteId = '';
 
+// ══ HISTÓRICO COBRANÇAS PJ ═══════════════════════════════════════════════════
 function abrirHistorico(id) {
-  _histClienteId = id;
   var f = _fornLista.find(function(x){ return x.id===id; });
   if (!f) { toast('Cliente não encontrado','r'); return; }
-  _renderHistModal(f);
+  _buildHist(f);
   abrirOv('ov-hist');
-  // Atualizar dados em background
   fetch('/api/pj-fornecedores?action=load')
     .then(function(x){ return x.json(); })
     .then(function(r){
       if (!r.ok) return;
       _fornLista = r.fornecedores||[];
       var ff = _fornLista.find(function(x){ return x.id===id; });
-      if (ff) _renderHistModal(ff);
+      if (ff && g('ov-hist') && g('ov-hist').style.display!=='none') _buildHist(ff);
     }).catch(function(){});
 }
 
-function _renderHistModal(f) {
-  var el = g('hist-titulo');
-  if (el) el.textContent = '📋 ' + f.razaoSocial + ' — Cobranças';
-  var body = g('hist-body');
-  if (!body) return;
-  var cobs = (f.cobrancas||[]).slice().sort(function(a,b){
-    return (b.criadoEm||'').localeCompare(a.criadoEm||'');
-  });
-  if (!cobs.length) {
-    body.innerHTML = '<div style="padding:24px;text-align:center;font-family:var(--fm);font-size:12px;color:var(--mu)">Nenhuma cobrança registrada para este cliente.</div>';
+function _buildHist(f) {
+  var el=g('hist-titulo'); if(el) el.textContent=f.razaoSocial+' — Cobranças';
+  var body=g('hist-body'); if(!body) return;
+  var cobs=(f.cobrancas||[]).slice().sort(function(a,b){ return (b.criadoEm||'').localeCompare(a.criadoEm||''); });
+  if(!cobs.length){
+    body.innerHTML='<div style="padding:32px;text-align:center;color:var(--mu);font-family:var(--fm);font-size:12px">Nenhuma cobrança registrada.</div>';
     return;
   }
-  var hoje = new Date().toISOString().slice(0,10);
-  body.innerHTML = cobs.map(function(c) {
-    var st  = c.status==='recebido'?'recebido':(c.vencimento&&c.vencimento<hoje?'vencido':'pendente');
-    var cor = st==='recebido'?'var(--gr)':st==='vencido'?'var(--re)':'var(--bl)';
-    var lbl = st==='recebido'?'✅ Recebido':st==='vencido'?'🔴 Vencido':'⏳ Pendente';
-    var vlr = 'R$ '+parseFloat(c.valor||0).toFixed(2).replace('.',',');
+  var hoje=new Date().toISOString().slice(0,10);
+  body.innerHTML=cobs.map(function(c){
+    var st=c.status==='recebido'?'recebido':(c.vencimento&&c.vencimento<hoje?'vencido':'pendente');
+    var bg=st==='recebido'?'rgba(16,217,130,.06)':st==='vencido'?'rgba(240,64,96,.05)':'rgba(59,130,246,.05)';
+    var brd=st==='recebido'?'rgba(16,217,130,.3)':st==='vencido'?'rgba(240,64,96,.3)':'rgba(59,130,246,.25)';
+    var cor=st==='recebido'?'var(--gr)':st==='vencido'?'var(--re)':'var(--bl)';
+    var lbl=st==='recebido'?'✅ Recebido':st==='vencido'?'🔴 Vencido':'⏳ Pendente';
+    var vlr='R$\u00a0'+parseFloat(c.valor||0).toFixed(2).replace('.',',');
     var dias='';
-    if(c.vencimento && st!=='recebido'){
+    if(c.vencimento&&st!=='recebido'){
       var diff=Math.ceil((new Date(c.vencimento)-new Date(hoje))/86400000);
-      dias=diff>0?' · <span style="color:var(--bl)">+'+diff+'d</span>':diff===0?' · <span style="color:var(--yel)">Vence hoje</span>':' · <span style="color:var(--re)">'+Math.abs(diff)+'d atraso</span>';
+      dias=diff>0?' <b style="color:var(--bl)">+'+diff+'d</b>':diff===0?' <b style="color:var(--yel)">Hoje</b>':' <b style="color:var(--re)">'+Math.abs(diff)+'d atraso</b>';
     }
-    // Bloco NF
-    var nfBlock = c.nfChave
-      ? '<div style="border:1px solid rgba(16,217,130,.3);border-radius:8px;overflow:hidden;margin-bottom:8px">'
-        +'<div style="background:rgba(16,217,130,.06);padding:10px 12px;display:flex;align-items:center;justify-content:space-between">'
-          +'<div style="display:flex;align-items:center;gap:8px">'
-            +'<span style="font-size:16px">📄</span>'
-            +'<div><div style="font-family:var(--fm);font-size:9px;font-weight:700;color:var(--gr)">NOTA FISCAL EMITIDA</div>'
-            +'<div style="font-family:var(--fm);font-size:9px;color:var(--mu)">Chave: ...'+c.nfChave.slice(-12)+'</div></div>'
-          +'</div>'
-          +'<div style="display:flex;gap:5px">'
-            +'<a href="/api/nfse?action=danfe&chave='+c.nfChave+'" target="_blank" class="btn" style="font-size:9px;padding:3px 8px;color:var(--bl)">👁 Ver PDF</a>'
-            +'<a href="/api/nfse?action=danfe&chave='+c.nfChave+'" download="NF-'+c.nfChave.slice(-8)+'.pdf" class="btn" style="font-size:9px;padding:3px 8px;color:var(--gr)">⬇ Download</a>'
-          +'</div>'
-        +'</div>'
-        +'<div style="padding:8px 12px;background:var(--s1);display:flex;gap:5px">'
-          +'<button class="btn" style="font-size:9px;color:var(--re);border-color:rgba(240,64,96,.4)" data-action="cancelar-nf" data-cid="'+f.id+'" data-cobid="'+c.id+'">❌ Cancelar NF</button>'
-          +'<button class="btn" style="font-size:9px;color:var(--yel);border-color:rgba(245,200,0,.4)" data-action="reemitir-nf" data-cid="'+f.id+'" data-cobid="'+c.id+'">🔄 Re-emitir NF</button>'
-        +'</div>'
+    // Seção editar — SEMPRE VISÍVEL e pré-preenchida
+    var sEdit=
+      '<div style="padding:14px 16px;border-top:1px solid '+brd+';background:var(--s2)">'
+      +'<div style="font-family:var(--fm);font-size:9px;color:var(--mu);letter-spacing:.07em;margin-bottom:10px">✏️ ALTERAR DADOS — salve antes de re-emitir</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
+        +'<div><label style="font-family:var(--fm);font-size:9px;color:var(--mu);display:block;margin-bottom:4px">VALOR (R$)</label>'
+          +'<input id="hv-'+c.id+'" type="number" step="0.01" value="'+parseFloat(c.valor||0).toFixed(2)+'" style="width:100%;background:var(--s1);border:1px solid var(--bdr);border-radius:6px;color:var(--tx);font-family:var(--fb);font-size:14px;font-weight:700;padding:8px 10px;outline:none;box-sizing:border-box"></div>'
+        +'<div><label style="font-family:var(--fm);font-size:9px;color:var(--mu);display:block;margin-bottom:4px">VENCIMENTO</label>'
+          +'<input id="hn-'+c.id+'" type="date" value="'+(c.vencimento||'')+'" style="width:100%;background:var(--s1);border:1px solid var(--bdr);border-radius:6px;color:var(--tx);font-family:var(--fb);font-size:12px;padding:8px 10px;outline:none;box-sizing:border-box"></div>'
       +'</div>'
-      : '<div style="border:1px dashed var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">'
-          +'<span style="font-family:var(--fm);font-size:10px;color:var(--mu)">📄 Nota fiscal não emitida</span>'
-          +'<button class="btn" style="font-size:9px;color:var(--yel);border-color:rgba(245,200,0,.4)" data-action="reemitir-nf" data-cid="'+f.id+'" data-cobid="'+c.id+'">+ Emitir NF</button>'
+      +'<div style="margin-bottom:10px"><label style="font-family:var(--fm);font-size:9px;color:var(--mu);display:block;margin-bottom:4px">DESCRIÇÃO</label>'
+        +'<input id="hd-'+c.id+'" value="'+esc(c.descricao||'')+'" placeholder="Ex: Manutenção preventiva março/2026" style="width:100%;background:var(--s1);border:1px solid var(--bdr);border-radius:6px;color:var(--tx);font-family:var(--fb);font-size:12px;padding:8px 10px;outline:none;box-sizing:border-box"></div>'
+      +'<button data-action="h-salvar" data-cid="'+f.id+'" data-cobid="'+c.id+'" style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:9px 20px;font-family:var(--fb);font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.03em">'
+        +'\uD83D\uDCBE Salvar Alterações</button>'
+      +'</div>';
+    // NF
+    var sNF=c.nfChave
+      ?'<div style="padding:12px 16px;border-top:1px solid '+brd+'">'
+        +'<div style="font-family:var(--fm);font-size:9px;color:var(--mu);letter-spacing:.07em;margin-bottom:8px">📄 NOTA FISCAL</div>'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">'
+          +'<span style="font-family:var(--fm);font-size:10px;color:var(--gr);font-weight:600">✅ Emitida · ...'+c.nfChave.slice(-12)+'</span>'
+          +'<div style="display:flex;gap:6px">'
+            +'<a href="/api/nfse?action=danfe&chave='+c.nfChave+'" target="_blank" style="display:inline-block;background:var(--s1);color:var(--bl);border:1px solid var(--bdr);border-radius:6px;padding:5px 12px;font-family:var(--fb);font-size:10px;font-weight:600;text-decoration:none">👁 Ver PDF</a>'
+            +'<a href="/api/nfse?action=danfe&chave='+c.nfChave+'" download style="display:inline-block;background:rgba(16,217,130,.15);color:var(--gr);border:1px solid rgba(16,217,130,.3);border-radius:6px;padding:5px 12px;font-family:var(--fb);font-size:10px;font-weight:600;text-decoration:none">⬇ Baixar</a>'
+          +'</div>'
+        +'</div>'
+        +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+          +'<button data-action="h-cancelar-nf" data-cid="'+f.id+'" data-cobid="'+c.id+'" style="background:rgba(240,64,96,.12);color:#e02040;border:1px solid rgba(240,64,96,.35);border-radius:6px;padding:6px 12px;font-family:var(--fb);font-size:10px;cursor:pointer;font-weight:600">❌ Cancelar NF</button>'
+          +'<button data-action="h-reemitir-nf" data-cid="'+f.id+'" data-cobid="'+c.id+'" style="background:rgba(245,200,0,.15);color:#8a6e00;border:1px solid rgba(245,200,0,.45);border-radius:6px;padding:6px 14px;font-family:var(--fb);font-size:10px;cursor:pointer;font-weight:700">🔄 Re-emitir NF com dados acima</button>'
+        +'</div>'
+        +'</div>'
+      :'<div style="padding:12px 16px;border-top:1px solid '+brd+';display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'
+        +'<span style="font-family:var(--fm);font-size:10px;color:var(--mu)">📄 NF não emitida</span>'
+        +'<button data-action="h-reemitir-nf" data-cid="'+f.id+'" data-cobid="'+c.id+'" style="background:rgba(16,217,130,.15);color:#0a8c55;border:1px solid rgba(16,217,130,.35);border-radius:6px;padding:7px 16px;font-family:var(--fb);font-size:10px;font-weight:700;cursor:pointer">+ Emitir NF com dados acima</button>'
         +'</div>';
-    // Bloco Boleto
-    var bolBlock = c.boletoUrl
-      ? '<div style="border:1px solid rgba(59,130,246,.3);border-radius:8px;overflow:hidden;margin-bottom:8px">'
-          +'<div style="background:rgba(59,130,246,.06);padding:10px 12px;display:flex;align-items:center;justify-content:space-between">'
-            +'<div style="display:flex;align-items:center;gap:8px">'
-              +'<span style="font-size:16px">🔵</span>'
-              +'<div><div style="font-family:var(--fm);font-size:9px;font-weight:700;color:#3b82f6">BOLETO GERADO</div>'
-              +'<div style="font-family:var(--fm);font-size:9px;color:var(--mu)">Venc: '+c.vencimento+' · '+vlr+'</div></div>'
-            +'</div>'
-            +'<a href="'+c.boletoUrl+'" target="_blank" class="btn" style="font-size:9px;padding:3px 8px;color:#3b82f6;border-color:#3b82f6">🔵 Acessar Boleto</a>'
-          +'</div>'
-          +'<div style="padding:8px 12px;background:var(--s1);display:flex;gap:5px">'
-            +'<button class="btn" style="font-size:9px;color:var(--re);border-color:rgba(240,64,96,.4)" data-action="cancelar-boleto" data-cid="'+f.id+'" data-cobid="'+c.id+'">❌ Cancelar Boleto</button>'
-            +'<button class="btn" style="font-size:9px;color:var(--yel);border-color:rgba(245,200,0,.4)" data-action="hist-reemitir-boleto" data-cid="'+f.id+'" data-cobid="'+c.id+'">🔄 Re-emitir Boleto</button>'
-          +'</div>'
+    // Boleto
+    var sBol=c.boletoUrl
+      ?'<div style="padding:12px 16px;border-top:1px solid '+brd+'">'
+        +'<div style="font-family:var(--fm);font-size:9px;color:var(--mu);letter-spacing:.07em;margin-bottom:8px">🔵 BOLETO</div>'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">'
+          +'<span style="font-family:var(--fm);font-size:10px;color:#3b82f6;font-weight:600">✅ Gerado · Venc: '+(c.vencimento||'—')+' · '+vlr+'</span>'
+          +'<a href="'+c.boletoUrl+'" target="_blank" style="display:inline-block;background:rgba(59,130,246,.15);color:#1d4ed8;border:1px solid rgba(59,130,246,.35);border-radius:6px;padding:5px 12px;font-family:var(--fb);font-size:10px;font-weight:700;text-decoration:none">🔵 Acessar Boleto</a>'
         +'</div>'
-      : '<div style="border:1px dashed var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">'
-          +'<span style="font-family:var(--fm);font-size:10px;color:var(--mu)">🔵 Boleto não gerado</span>'
-          +'<button class="btn" style="font-size:9px;color:#3b82f6;border-color:rgba(59,130,246,.4)" data-action="hist-reemitir-boleto" data-cid="'+f.id+'" data-cobid="'+c.id+'">+ Gerar Boleto</button>'
+        +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+          +'<button data-action="h-cancelar-boleto" data-cid="'+f.id+'" data-cobid="'+c.id+'" style="background:rgba(240,64,96,.12);color:#e02040;border:1px solid rgba(240,64,96,.35);border-radius:6px;padding:6px 12px;font-family:var(--fb);font-size:10px;cursor:pointer;font-weight:600">❌ Cancelar Boleto</button>'
+          +'<button data-action="h-reemitir-boleto" data-cid="'+f.id+'" data-cobid="'+c.id+'" style="background:rgba(245,200,0,.15);color:#8a6e00;border:1px solid rgba(245,200,0,.45);border-radius:6px;padding:6px 14px;font-family:var(--fb);font-size:10px;cursor:pointer;font-weight:700">🔄 Re-emitir Boleto com dados acima</button>'
+        +'</div>'
+        +'</div>'
+      :'<div style="padding:12px 16px;border-top:1px solid '+brd+';display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'
+        +'<span style="font-family:var(--fm);font-size:10px;color:var(--mu)">🔵 Boleto não gerado</span>'
+        +'<button data-action="h-reemitir-boleto" data-cid="'+f.id+'" data-cobid="'+c.id+'" style="background:rgba(59,130,246,.15);color:#1d4ed8;border:1px solid rgba(59,130,246,.35);border-radius:6px;padding:7px 16px;font-family:var(--fb);font-size:10px;font-weight:700;cursor:pointer">+ Gerar Boleto com dados acima</button>'
         +'</div>';
-    // Editar dados inline
-    var editBlock = st!=='recebido'
-      ? '<div id="hist-edit-'+c.id+'" style="display:none;border:1px solid var(--bdr);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--s2)">'
-          +'<div style="font-family:var(--fm);font-size:9px;color:var(--mu);margin-bottom:8px;letter-spacing:.07em">✏️ ALTERAR DADOS</div>'
-          +'<div class="grid2" style="margin-bottom:8px">'
-            +'<div class="fld"><label>VALOR (R$)</label><input class="hist-edit-valor" value="'+c.valor+'" type="number" step="0.01" style="width:100%"></div>'
-            +'<div class="fld"><label>VENCIMENTO</label><input class="hist-edit-venc" value="'+(c.vencimento||'')+'" type="date" style="width:100%"></div>'
-            +'<div class="fld" style="grid-column:1/-1"><label>DESCRIÇÃO</label><input class="hist-edit-desc" value="'+esc(c.descricao||'')+'" style="width:100%"></div>'
-          +'</div>'
-          +'<div style="display:flex;gap:6px;justify-content:flex-end">'
-            +'<button class="btn" style="font-size:10px" data-action="fechar-edit-hist" data-editid="hist-edit-'+c.id+'">Cancelar</button>'
-            +'<button class="btn btn-gr" style="font-size:10px" data-action="salvar-alteracao" data-cid="'+f.id+'" data-cobid="'+c.id+'" data-editid="hist-edit-'+c.id+'">✅ Salvar</button>'
-          +'</div>'
+    var sFooter=st!=='recebido'
+      ?'<div style="padding:10px 16px;border-top:1px solid '+brd+';display:flex;justify-content:flex-end;background:rgba(0,0,0,.02)">'
+          +'<button data-action="h-recebido" data-cid="'+f.id+'" data-cobid="'+c.id+'" style="background:#10d982;color:#0a1628;border:none;border-radius:6px;padding:9px 22px;font-family:var(--fb);font-size:11px;font-weight:800;cursor:pointer;letter-spacing:.02em">✓ Confirmar Recebimento</button>'
         +'</div>'
-      : '';
-    return '<div style="border:1px solid var(--bdr);border-radius:10px;margin-bottom:12px;overflow:hidden">'
-      // Cabeçalho da cobrança
-      +'<div style="background:var(--s2);padding:10px 14px;display:flex;align-items:center;justify-content:space-between">'
-        +'<div>'
-          +'<div style="font-weight:600;font-size:13px">'+vlr
-            +' <span style="font-family:var(--fm);font-size:10px;color:'+cor+'">'+lbl+'</span>'+dias+'</div>'
-          +'<div style="font-family:var(--fm);font-size:10px;color:var(--mu);margin-top:2px">'+esc(c.descricao||'Sem descrição')+' · '+(c.criadoEm||'').slice(0,10)+'</div>'
-        +'</div>'
-        +(st!=='recebido'
-          ? '<div style="display:flex;gap:5px">'
-              +'<button class="btn" style="font-size:9px;color:var(--mu)" data-action="abrir-edit-hist" data-editid="hist-edit-'+c.id+'">✏️ Alterar</button>'
-              +'<button class="btn btn-gr" style="font-size:9px" data-action="marcar-recebido-hist" data-cid="'+f.id+'" data-cobid="'+c.id+'">✓ Recebeu</button>'
-            +'</div>'
-          : '<span style="font-family:var(--fm);font-size:9px;color:var(--gr)">✅ '+( c.recebidoEm?c.recebidoEm.slice(0,10):'Recebido')+'</span>'
-        )
+      :'<div style="padding:8px 16px;border-top:1px solid '+brd+';text-align:right;font-family:var(--fm);font-size:10px;color:var(--gr)">Recebido em '+(c.recebidoEm||'').slice(0,10)+'</div>';
+    return '<div style="border:1px solid '+brd+';border-radius:10px;margin-bottom:16px;overflow:hidden;background:'+bg+'">'
+      +'<div style="padding:13px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'
+        +'<div><div style="font-size:17px;font-weight:800">'+vlr+' <span style="font-family:var(--fm);font-size:11px;font-weight:500;color:'+cor+'">'+lbl+dias+'</span></div>'
+          +'<div style="font-family:var(--fm);font-size:10px;color:var(--mu);margin-top:3px">'+esc(c.descricao||'Sem descrição')+' · '+(c.criadoEm||'').slice(0,10)+'</div></div>'
+        +(c.vencimento?'<div style="font-family:var(--fm);font-size:11px;color:var(--mu);text-align:right">Vence em<br><b style="color:var(--tx);font-size:12px">'+c.vencimento+'</b></div>':'')
       +'</div>'
-      // Corpo
-      +'<div style="padding:12px 14px">'
-        +editBlock
-        +nfBlock
-        +bolBlock
-      +'</div>'
+      +sEdit+sNF+sBol+sFooter
     +'</div>';
   }).join('');
 }
+
+// Ações do histórico
+async function _hSalvar(btn){
+  var cid=btn.dataset.cid,cobId=btn.dataset.cobid;
+  var vEl=document.getElementById('hv-'+cobId),nEl=document.getElementById('hn-'+cobId),dEl=document.getElementById('hd-'+cobId);
+  if(!vEl||!nEl){toast('Campos não encontrados','r');return;}
+  btn.textContent='\u23F3 Salvando...';btn.disabled=true;
+  var r=await fetch('/api/pj-cobranca?action=atualizar-cobranca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clienteId:cid,cobId,valor:parseFloat(vEl.value),vencimento:nEl.value,descricao:dEl?dEl.value:''})}).then(function(x){return x.json();});
+  btn.textContent='\uD83D\uDCBE Salvar Alterações';btn.disabled=false;
+  if(r.ok){await _hReload(cid);toast('\u2705 Dados salvos! Agora re-emita os documentos.','g');}
+  else toast('Erro: '+(r.error||'falha'),'r');
+}
+async function _hReemitirNF(btn){
+  var cid=btn.dataset.cid,cobId=btn.dataset.cobid;
+  var vEl=document.getElementById('hv-'+cobId),nEl=document.getElementById('hn-'+cobId),dEl=document.getElementById('hd-'+cobId);
+  btn.textContent='\u23F3 Emitindo...';btn.disabled=true;
+  var r=await fetch('/api/pj-cobranca?action=faturar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clienteId:cid,cobId,valor:parseFloat(vEl?vEl.value:0),vencimento:nEl?nEl.value:'',descricao:dEl?dEl.value:'',apenasNF:true})}).then(function(x){return x.json();});
+  btn.textContent='\uD83D\uDD04 Re-emitir NF com dados acima';btn.disabled=false;
+  if(r.nf||r.ok){await _hReload(cid);toast('\u2705 NF emitida!','g');}
+  else toast('Erro NF: '+((r.errors||[]).join(' ')||r.error||'falha'),'r');
+}
+async function _hReemitirBoleto(btn){
+  var cid=btn.dataset.cid,cobId=btn.dataset.cobid;
+  btn.textContent='\u23F3 Gerando...';btn.disabled=true;
+  var r=await fetch('/api/pj-cobranca?action=reemitir-boleto',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clienteId:cid,cobId})}).then(function(x){return x.json();});
+  btn.textContent='\uD83D\uDD04 Re-emitir Boleto com dados acima';btn.disabled=false;
+  if(r.ok){await _hReload(cid);toast('\u2705 Boleto gerado!','g');}
+  else toast('Erro: '+(r.error||'falha'),'r');
+}
+async function _hCancelarNF(btn){
+  if(!confirm('Cancelar esta NF? Ação irreversível.'))return;
+  btn.disabled=true;
+  var r=await fetch('/api/pj-cobranca?action=cancelar-nf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clienteId:btn.dataset.cid,cobId:btn.dataset.cobid})}).then(function(x){return x.json();});
+  btn.disabled=false;
+  if(r.ok){await _hReload(btn.dataset.cid);toast('\u2705 NF cancelada','g');}
+  else toast('Erro: '+(r.error||'falha'),'r');
+}
+async function _hCancelarBoleto(btn){
+  if(!confirm('Cancelar este boleto?'))return;
+  btn.disabled=true;
+  var r=await fetch('/api/pj-cobranca?action=cancelar-boleto',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clienteId:btn.dataset.cid,cobId:btn.dataset.cobid})}).then(function(x){return x.json();});
+  btn.disabled=false;
+  if(r.ok){await _hReload(btn.dataset.cid);toast('\u2705 Boleto cancelado','g');}
+  else toast('Erro: '+(r.error||'falha'),'r');
+}
+async function _hRecebido(btn){
+  if(!confirm('Confirmar recebimento?'))return;
+  btn.disabled=true;
+  var r=await fetch('/api/pj-fornecedores?action=marcar-recebido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clienteId:btn.dataset.cid,cobId:btn.dataset.cobid})}).then(function(x){return x.json();});
+  btn.disabled=false;
+  if(r.ok){await _hReload(btn.dataset.cid);toast('\u2705 Recebimento confirmado'+(r.pipeOk?' + Pipe!':''),'g');}
+  else toast('Erro: '+(r.error||'falha'),'r');
+}
+async function _hReload(cid){
+  var r=await fetch('/api/pj-fornecedores?action=load').then(function(x){return x.json();});
+  if(r.ok){_fornLista=r.fornecedores||[];renderForn();}
+  var ff=_fornLista.find(function(x){return x.id===cid;});
+  if(ff) _buildHist(ff);
+}
+
+
 
 
 
@@ -2529,15 +2569,13 @@ document.addEventListener('click', function(e) {
     if (a==='apresentacao') { sdrEnviarApresentacao(lid); return; }
     if (a==='excluir')  { excluirLead(lid); return; }
     if (a==='converter') { converterClientePJ(lid); return; }
-    if (a==='historico') { abrirHistorico(act.dataset.fid); return; }
-    if (a==='abrir-edit-hist') { var ed=g(act.dataset.editid); if(ed) ed.style.display=ed.style.display==='none'?'block':'none'; return; }
-    if (a==='fechar-edit-hist') { var ed2=g(act.dataset.editid); if(ed2) ed2.style.display='none'; return; }
-    if (a==='salvar-alteracao') { histSalvarAlteracao(act); return; }
-    if (a==='cancelar-nf') { histCancelarNF(act.dataset.cid, act.dataset.cobid); return; }
-    if (a==='reemitir-nf') { histReemitirNF(act.dataset.cid, act.dataset.cobid); return; }
-    if (a==='cancelar-boleto') { histCancelarBoleto(act.dataset.cid, act.dataset.cobid); return; }
-    if (a==='hist-reemitir-boleto') { histReemitirBoleto(act.dataset.cid, act.dataset.cobid); return; }
-    if (a==='marcar-recebido-hist') { histMarcarRecebido(act.dataset.cid, act.dataset.cobid); return; }
+    if (a==='historico')         { abrirHistorico(act.dataset.fid); return; }
+    if (a==='h-salvar')          { _hSalvar(act); return; }
+    if (a==='h-reemitir-nf')     { _hReemitirNF(act); return; }
+    if (a==='h-reemitir-boleto') { _hReemitirBoleto(act); return; }
+    if (a==='h-cancelar-nf')     { _hCancelarNF(act); return; }
+    if (a==='h-cancelar-boleto') { _hCancelarBoleto(act); return; }
+    if (a==='h-recebido')        { _hRecebido(act); return; }
   }
 });
 
@@ -2838,11 +2876,14 @@ document.addEventListener("DOMContentLoaded",function(){
 </div>
 
 <!-- MODAL HISTÓRICO COMPLETO -->
-<div class="ov" id="ov-hist" style="display:none;align-items:flex-start;padding:16px;overflow-y:auto" onclick="if(event.target===this)fecharOv('ov-hist')">
-<div class="mdl" style="max-width:720px;width:100%;margin:auto">
-  <div class="mdl-t" style="display:flex;align-items:center;justify-content:space-between">
-    <span id="hist-titulo">📋 Histórico de Cobranças</span>
-    <button class="btn" style="font-size:10px" onclick="fecharOv('ov-hist')">✕ Fechar</button>
+<div class="ov" id="ov-hist" style="display:none;align-items:flex-start;padding:16px 12px;overflow-y:auto" onclick="if(event.target===this)fecharOv('ov-hist')">
+<div class="mdl" style="max-width:700px;width:100%;margin:auto">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div>
+      <div class="mdl-t" style="margin-bottom:2px" id="hist-titulo">Cobranças</div>
+      <div style="font-family:var(--fm);font-size:10px;color:var(--mu)">Edite os dados antes de re-emitir os documentos</div>
+    </div>
+    <button onclick="fecharOv('ov-hist')" style="background:var(--s2);border:1px solid var(--bdr);color:var(--tx);border-radius:6px;padding:7px 14px;cursor:pointer;font-family:var(--fm);font-size:11px">✕ Fechar</button>
   </div>
   <div id="hist-body"></div>
 </div>
