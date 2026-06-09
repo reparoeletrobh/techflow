@@ -1687,7 +1687,8 @@ function diasRestantes(venc, status) {
   return '<span style="color:var(--re)">' + diff + 'd</span>';
 }
 
-function abrirHistorico(id) {
+async function abrirHistorico(id) {
+  await carregarForn(); // garante dados frescos
   var f = _fornLista.find(function(x){ return x.id===id; });
   if (!f) return;
   var cobs = (f.cobrancas||[]).slice().sort(function(a,b){
