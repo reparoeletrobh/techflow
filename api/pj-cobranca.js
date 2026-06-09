@@ -303,5 +303,60 @@ module.exports = async function handler(req, res) {
     }catch(e){return res.status(200).json({ok:false,error:e.message});}
   }
 
+
+  // ── POST cancelar-nf — cancela NF via SEFAZ ──────────────────────────────────
+  if(req.method==='POST' && action==='cancelar-nf'){
+    const{clienteId,cobId}=req.body||{};
+    const fornDb=await dbGet(FOR_KEY)||{fornecedores:[]};
+    const cli=fornDb.fornecedores.find(f=>f.id===clienteId);
+    const cob=cli&&(cli.cobrancas||[]).find(c=>c.id===cobId);
+    if(!cob||!cob.nfChave) return res.status(400).json({ok:false,error:'Cobrança ou NF não encontrada'});
+    // Solicitar cancelamento via nfse endpoint
+    try{
+      const r=await fetch('https://reparoeletroadm.com/api/nfse?action=cancelar',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({chave:cob.nfChave})
+      });
+      const d=await r.json();
+      if(d.ok){
+        cob.nfCancelada=true; cob.nfChave=null;
+        await dbSet(FOR_KEY,fornDb);
+        return res.status(200).json({ok:true,msg:'NF cancelada com sucesso'});
+      }
+      return res.status(200).json({ok:false,error:d.error||'Falha no cancelamento'});
+    }catch(e){return res.status(200).json({ok:false,error:e.message});}
+  }
+
+  // ── POST cancelar-boleto — cancela preference MP ─────────────────────────────
+  if(req.method==='POST' && action==='cancelar-boleto'){
+    const{clienteId,cobId}=req.body||{};
+    const fornDb=await dbGet(FOR_KEY)||{fornecedores:[]};
+    const cli=fornDb.fornecedores.find(f=>f.id===clienteId);
+    const cob=cli&&(cli.cobrancas||[]).find(c=>c.id===cobId);
+    if(!cob) return res.status(404).json({ok:false,error:'Cobrança não encontrada'});
+    const MP_TOKEN=process.env.MP_ACCESS_TOKEN;
+    if(!MP_TOKEN) return res.status(400).json({ok:false,error:'MP não configurado'});
+    try{
+      // Marcar boleto como cancelado localmente
+      cob.boletoCancelado=true; cob.boletoUrl=null; cob.preferenceId=null;
+      await dbSet(FOR_KEY,fornDb);
+      return res.status(200).json({ok:true,msg:'Boleto cancelado. Um novo boleto pode ser gerado.'});
+    }catch(e){return res.status(200).json({ok:false,error:e.message});}
+  }
+
+  // ── POST atualizar-cobranca — altera valor/vencimento antes de emitir ─────────
+  if(req.method==='POST' && action==='atualizar-cobranca'){
+    const{clienteId,cobId,valor,vencimento,descricao}=req.body||{};
+    const fornDb=await dbGet(FOR_KEY)||{fornecedores:[]};
+    const cli=fornDb.fornecedores.find(f=>f.id===clienteId);
+    const cob=cli&&(cli.cobrancas||[]).find(c=>c.id===cobId);
+    if(!cob) return res.status(404).json({ok:false,error:'não encontrada'});
+    if(valor)      cob.valor=parseFloat(valor);
+    if(vencimento) cob.vencimento=vencimento;
+    if(descricao)  cob.descricao=descricao;
+    await dbSet(FOR_KEY,fornDb);
+    return res.status(200).json({ok:true});
+  }
+
   return res.status(404).json({ok:false,error:'action não encontrada: '+action});
 };

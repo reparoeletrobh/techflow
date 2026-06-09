@@ -1376,75 +1376,204 @@ function selecionarFicha(el){
   if(g('cob-resultados')) g('cob-resultados').style.display='none';
 }
 
+
 async function executarFaturamento(){
   var valor=parseFloat((gv('cob-valor')||'0').replace(',','.'));
   var venc=gv('cob-venc');
   if(!valor||valor<=0){toast('Informe o valor','r');return;}
   if(!venc){toast('Informe o vencimento','r');return;}
   var btn=g('btn-faturar');
-  if(btn){btn.disabled=true;btn.textContent='⏳ Emitindo NF e boleto...';}
+  if(btn){btn.disabled=true;btn.textContent='⏳ Emitindo...';}
   try{
     var retiss=g('cob-retiss')&&g('cob-retiss').value==='1';
     var r=await fetch('/api/pj-cobranca?action=faturar',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         clienteId:_cobClienteId, fichaId:_cobFichaId||null,
-        valor, vencimento:venc,
-        descricao:gv('cob-desc'),
+        valor, vencimento:venc, descricao:gv('cob-desc'),
         retencaoISS:retiss,
       })
     }).then(function(x){return x.json();});
 
-    // Guardar dados para email
-    _cobNfChave=r.nf&&r.nf.chave||'';
-    _cobBoletoUrl=r.boleto&&r.boleto.url||'';
-    _cobBarcode=r.boleto&&r.boleto.barcode||'';
-    _cobCobId=r.cobId||'';
+    _cobNfChave   = r.nf&&r.nf.chave||'';
+    _cobBoletoUrl = r.boleto&&r.boleto.url||'';
+    _cobBarcode   = r.boleto&&r.boleto.barcode||'';
+    _cobCobId     = r.cobId||'';
     _cobValor=valor; _cobVenc=venc;
 
-    // Preencher email do cliente
+    if(g('cob-cobid-atual')) g('cob-cobid-atual').value=_cobCobId;
+
+    // Preencher email
     var f=_fornLista.find(function(x){return x.id===_cobClienteId;});
     if(f&&f.email&&g('cob-email-dest')) g('cob-email-dest').value=f.email;
 
-    // Mostrar resultado
-    if(g('cob-step-faturar')) g('cob-step-faturar').style.display='none';
-    if(g('cob-resultado')) g('cob-resultado').style.display='block';
+    // Trocar steps
+    if(g('cob-step1')) g('cob-step1').style.display='none';
+    if(g('cob-step2')) g('cob-step2').style.display='block';
 
-    // NF
-    if(r.nf){
-      var nfBlock=g('cob-nf-block');
-      if(nfBlock){
-        nfBlock.style.display='block';
-        var danfeUrl='/api/nfse?action=danfe&chave='+r.nf.chave;
-        if(g('cob-nf-link')) g('cob-nf-link').href=danfeUrl;
-        if(g('cob-nf-download')){g('cob-nf-download').href=danfeUrl;g('cob-nf-download').download='NF-'+r.nf.chave.slice(-8)+'.pdf';}
-        if(g('cob-nf-chave')) g('cob-nf-chave').textContent='Chave: '+r.nf.chave;
-      }
+    // Bloco NF
+    if(r.nf&&r.nf.chave){
+      var danfe='/api/nfse?action=danfe&chave='+r.nf.chave;
+      mostrarBlocoNF(true, r.nf.chave, danfe, null);
+    } else {
+      var errNF=(r.errors||[]).find(function(e){return e.indexOf('NF')>=0;})||'Falha na emissão';
+      mostrarBlocoNF(false, null, null, errNF);
     }
 
-    // Boleto
-    if(r.boleto){
-      var bBlock=g('cob-boleto-block');
-      if(bBlock){
-        bBlock.style.display='block';
-        if(g('cob-boleto-link')) g('cob-boleto-link').href=r.boleto.url;
-        if(g('cob-barcode')) g('cob-barcode').textContent=r.boleto.barcode||'Linha digitável não disponível';
-      }
-    }
-
-    // Erros parciais
-    if(r.errors&&r.errors.length){
-      var erEl=g('cob-erros');
-      if(erEl){erEl.style.display='block';erEl.textContent='⚠️ '+r.errors.join(' | ');}
+    // Bloco Boleto
+    if(r.boleto&&r.boleto.url){
+      mostrarBlocoBoleto(true, r.boleto.url, r.boleto.barcode, null, valor, venc);
+    } else {
+      var errBol=(r.errors||[]).find(function(e){return e.indexOf('Boleto')>=0;})||'Falha na emissão';
+      mostrarBlocoBoleto(false, null, null, errBol, valor, venc);
     }
 
     await carregarForn();
-    toast(r.ok?'✅ Faturamento gerado!':'⚠️ Parcialmente gerado — verifique os erros',r.ok?'g':'');
-  }catch(e){
-    toast('Erro: '+e.message,'r');
-  }
+  }catch(e){ toast('Erro: '+e.message,'r'); }
   if(btn){btn.disabled=false;btn.textContent='⚡ Emitir NF + Boleto →';}
 }
+
+function mostrarBlocoNF(ok, chave, danfeUrl, erro){
+  if(ok){
+    g('cob-nf-block').style.display='block';
+    g('cob-nf-erro').style.display='none';
+    var status='Emitida com sucesso'+(chave?' · '+chave.slice(-8):'');
+    if(g('cob-nf-status')) g('cob-nf-status').textContent=status;
+    if(g('cob-nf-chave'))  g('cob-nf-chave').textContent='Chave: '+chave;
+    if(g('cob-nf-view'))  {g('cob-nf-view').href=danfeUrl;}
+    if(g('cob-nf-dl'))    {g('cob-nf-dl').href=danfeUrl;g('cob-nf-dl').download='NF-'+chave.slice(-8)+'.pdf';}
+  } else {
+    g('cob-nf-block').style.display='none';
+    g('cob-nf-erro').style.display='block';
+    if(g('cob-nf-erro-msg')) g('cob-nf-erro-msg').textContent=erro;
+  }
+}
+
+function mostrarBlocoBoleto(ok, url, barcode, erro, valor, venc){
+  if(ok){
+    g('cob-boleto-block').style.display='block';
+    g('cob-boleto-erro').style.display='none';
+    var vlrFmt='R$ '+parseFloat(valor||0).toFixed(2).replace('.',',');
+    if(g('cob-boleto-status')) g('cob-boleto-status').textContent=vlrFmt+' · Venc: '+venc;
+    if(g('cob-boleto-link'))  {g('cob-boleto-link').href=url;}
+    if(g('cob-barcode'))       g('cob-barcode').textContent=barcode||'(linha digitável disponível no link acima)';
+  } else {
+    g('cob-boleto-block').style.display='none';
+    g('cob-boleto-erro').style.display='block';
+    if(g('cob-boleto-erro-msg')) g('cob-boleto-erro-msg').textContent=erro;
+  }
+}
+
+function abrirEditarCobranca(){
+  var cobId=g('cob-cobid-atual')&&g('cob-cobid-atual').value||'';
+  var f=_fornLista.find(function(x){return x.id===_cobClienteId;});
+  var cob=f&&(f.cobrancas||[]).find(function(c){return c.id===cobId;});
+  if(g('cob-edit-valor')) g('cob-edit-valor').value=cob?cob.valor:_cobValor;
+  if(g('cob-edit-venc'))  g('cob-edit-venc').value=cob?cob.vencimento:_cobVenc;
+  if(g('cob-edit-desc'))  g('cob-edit-desc').value=cob?cob.descricao:gv('cob-desc');
+  if(g('cob-editar-wrap')) g('cob-editar-wrap').style.display='block';
+}
+
+async function salvarAlteracoes(){
+  var cobId=g('cob-cobid-atual')&&g('cob-cobid-atual').value||'';
+  if(!cobId){toast('Salve a cobrança primeiro','r');return;}
+  var r=await fetch('/api/pj-cobranca?action=atualizar-cobranca',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      clienteId:_cobClienteId, cobId,
+      valor:gv('cob-edit-valor'), vencimento:gv('cob-edit-venc'),
+      descricao:gv('cob-edit-desc'),
+    })
+  }).then(function(x){return x.json();});
+  if(r.ok){
+    if(g('cob-editar-wrap')) g('cob-editar-wrap').style.display='none';
+    await carregarForn();
+    toast('✅ Dados atualizados. Agora re-emita o documento desejado.','g');
+  } else toast('Erro: '+(r.error||'falha'),'r');
+}
+
+async function cancelarNF(){
+  if(!confirm('Cancelar esta nota fiscal?\nEsta ação é irreversível.')) return;
+  var cobId=g('cob-cobid-atual')&&g('cob-cobid-atual').value||'';
+  var r=await fetch('/api/pj-cobranca?action=cancelar-nf',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({clienteId:_cobClienteId,cobId})
+  }).then(function(x){return x.json();});
+  if(r.ok){
+    _cobNfChave='';
+    if(g('cob-nf-block')) g('cob-nf-block').style.display='none';
+    if(g('cob-nf-erro'))  {g('cob-nf-erro').style.display='block'; if(g('cob-nf-erro-msg')) g('cob-nf-erro-msg').textContent='NF cancelada. Re-emita se necessário.';}
+    await carregarForn();
+    toast('✅ NF cancelada','g');
+  } else toast('Erro: '+(r.error||'falha'),'r');
+}
+
+async function reemitirNF(){
+  var cobId=g('cob-cobid-atual')&&g('cob-cobid-atual').value||'';
+  var f=_fornLista.find(function(x){return x.id===_cobClienteId;});
+  var cob=f&&(f.cobrancas||[]).find(function(c){return c.id===cobId;});
+  var btn=g('btn-reemitir-nf'); if(btn){btn.disabled=true;btn.textContent='⏳...';}
+  try{
+    var r=await fetch('/api/pj-cobranca?action=faturar',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        clienteId:_cobClienteId, cobId,
+        valor:cob?cob.valor:_cobValor,
+        vencimento:cob?cob.vencimento:_cobVenc,
+        descricao:cob?cob.descricao:'',
+        retencaoISS:g('cob-retiss')&&g('cob-retiss').value==='1',
+        apenasNF:true,
+      })
+    }).then(function(x){return x.json();});
+    if(r.nf&&r.nf.chave){
+      _cobNfChave=r.nf.chave;
+      var danfe='/api/nfse?action=danfe&chave='+r.nf.chave;
+      mostrarBlocoNF(true,r.nf.chave,danfe,null);
+      await carregarForn();
+      toast('✅ NF re-emitida!','g');
+    } else {
+      var err=(r.errors||[]).join(' ')||'Falha';
+      mostrarBlocoNF(false,null,null,err);
+      toast('Erro NF: '+err,'r');
+    }
+  }catch(e){toast('Erro: '+e.message,'r');}
+  if(btn){btn.disabled=false;btn.textContent='🔄 Re-emitir NF';}
+}
+
+async function cancelarBoleto(){
+  if(!confirm('Cancelar este boleto?\nUm novo poderá ser gerado.')) return;
+  var cobId=g('cob-cobid-atual')&&g('cob-cobid-atual').value||'';
+  var r=await fetch('/api/pj-cobranca?action=cancelar-boleto',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({clienteId:_cobClienteId,cobId})
+  }).then(function(x){return x.json();});
+  if(r.ok){
+    _cobBoletoUrl='';
+    if(g('cob-boleto-block')) g('cob-boleto-block').style.display='none';
+    if(g('cob-boleto-erro'))  {g('cob-boleto-erro').style.display='block'; if(g('cob-boleto-erro-msg')) g('cob-boleto-erro-msg').textContent='Boleto cancelado. Clique em re-emitir para gerar um novo.';}
+    await carregarForn();
+    toast('✅ Boleto cancelado','g');
+  } else toast('Erro: '+(r.error||'falha'),'r');
+}
+
+async function reemitirBoletoModal(){
+  var cobId=g('cob-cobid-atual')&&g('cob-cobid-atual').value||'';
+  var btn=g('btn-reemitir-bol'); if(btn){btn.disabled=true;btn.textContent='⏳...';}
+  var r=await fetch('/api/pj-cobranca?action=reemitir-boleto',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({clienteId:_cobClienteId,cobId})
+  }).then(function(x){return x.json();});
+  if(btn){btn.disabled=false;btn.textContent='🔄 Re-emitir Boleto';}
+  if(r.ok&&r.url){
+    _cobBoletoUrl=r.url;
+    var f=_fornLista.find(function(x){return x.id===_cobClienteId;});
+    var cob=f&&(f.cobrancas||[]).find(function(c){return c.id===cobId;});
+    mostrarBlocoBoleto(true,r.url,'',null,cob?cob.valor:_cobValor,cob?cob.vencimento:_cobVenc);
+    await carregarForn();
+    toast('✅ Boleto re-emitido!','g');
+  } else toast('Erro: '+(r.error||'falha'),'r');
+}
+
 
 function copiarBarcode(){
   var txt=g('cob-barcode')&&g('cob-barcode').textContent||'';
@@ -2326,88 +2455,163 @@ document.addEventListener("DOMContentLoaded",function(){
 
 <!-- MODAL COBRANÇA EXPANDIDO -->
 <div class="ov" id="ov-cob" style="display:none;align-items:flex-start;padding:20px;overflow-y:auto" onclick="if(event.target===this)fecharOv('ov-cob')">
-<div class="mdl" style="max-width:680px;width:100%;margin:auto">
-  <div class="mdl-t" style="display:flex;justify-content:space-between;align-items:center">
+<div class="mdl" style="max-width:740px;width:100%;margin:auto">
+
+  <!-- Cabeçalho -->
+  <div class="mdl-t" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
     <span>💰 COBRANÇA PJ</span>
-    <span id="cob-cliente-tag" style="font-family:var(--fm);font-size:10px;color:var(--bl);font-weight:400"></span>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span id="cob-cliente-tag" style="font-family:var(--fm);font-size:10px;color:var(--bl);font-weight:400"></span>
+      <button class="btn" style="font-size:10px" onclick="fecharOv('ov-cob')">✕</button>
+    </div>
   </div>
   <input type="hidden" id="cob-cid">
   <input type="hidden" id="cob-retiss">
+  <input type="hidden" id="cob-cobid-atual">
 
-  <!-- Busca de ficha -->
-  <div style="margin-bottom:14px">
-    <label style="font-family:var(--fm);font-size:9px;color:var(--mu);display:block;margin-bottom:5px;letter-spacing:.07em">BUSCAR FICHA / OS (opcional)</label>
-    <div style="position:relative">
-      <input id="cob-busca" style="width:100%;background:var(--s2);border:1px solid var(--bdr);border-radius:7px;color:var(--tx);font-family:var(--fb);font-size:12px;padding:8px 12px;outline:none" placeholder="🔍 Nome do cliente, número da OS, equipamento..." oninput="cobBuscarFicha(this.value)">
-      <div id="cob-resultados" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--s1);border:1px solid var(--bdr);border-radius:0 0 7px 7px;z-index:10;max-height:200px;overflow-y:auto"></div>
+  <!-- ── STEP 1: EDITAR DADOS ───────────────────────────────────────────── -->
+  <div id="cob-step1">
+    <!-- Busca de ficha -->
+    <div style="margin-bottom:12px">
+      <label style="font-family:var(--fm);font-size:9px;color:var(--mu);display:block;margin-bottom:5px;letter-spacing:.07em">BUSCAR FICHA / OS (opcional)</label>
+      <div style="position:relative">
+        <input id="cob-busca" style="width:100%;background:var(--s2);border:1px solid var(--bdr);border-radius:7px;color:var(--tx);font-family:var(--fb);font-size:12px;padding:8px 12px;outline:none" placeholder="🔍 Nome, OS, equipamento..." oninput="cobBuscarFicha(this.value)">
+        <div id="cob-resultados" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--s1);border:1px solid var(--bdr);border-radius:0 0 7px 7px;z-index:10;max-height:180px;overflow-y:auto"></div>
+      </div>
+      <div id="cob-ficha-selecionada" style="display:none;margin-top:6px;padding:7px 12px;background:var(--s2);border:1px solid rgba(59,130,246,.3);border-radius:7px;font-family:var(--fm);font-size:10px;color:var(--bl)"></div>
     </div>
-    <div id="cob-ficha-selecionada" style="display:none;margin-top:8px;padding:8px 12px;background:var(--s2);border:1px solid rgba(59,130,246,.3);border-radius:7px;font-family:var(--fm);font-size:10px;color:var(--bl)"></div>
+
+    <div class="grid2">
+      <div class="fld"><label>VALOR (R$) *</label>
+        <input id="cob-valor" type="number" min="0" step="0.01" placeholder="0,00" style="font-size:16px;width:100%">
+      </div>
+      <div class="fld"><label>DATA DE VENCIMENTO *</label>
+        <input id="cob-venc" type="date" style="width:100%">
+      </div>
+      <div class="fld" style="grid-column:1/-1"><label>DESCRIÇÃO / SERVIÇO</label>
+        <textarea id="cob-desc" rows="2" style="width:100%;resize:vertical" placeholder="Ex: Manutenção preventiva mensal microondas e bebedouros"></textarea>
+      </div>
+    </div>
+
+    <div id="cob-iss-info" style="font-family:var(--fm);font-size:10px;padding:8px 12px;border-radius:6px;margin-bottom:14px;background:var(--s2);border:1px solid var(--bdr)"></div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn" onclick="fecharOv('ov-cob')">Cancelar</button>
+      <button class="btn btn-gr" id="btn-faturar" onclick="executarFaturamento()" style="font-weight:700;font-size:12px;padding:10px 24px">⚡ Emitir NF + Boleto →</button>
+    </div>
   </div>
 
-  <div class="grid2">
-    <div class="fld">
-      <label>VALOR (R$) *</label>
-      <input id="cob-valor" type="number" min="0" step="0.01" placeholder="0,00" style="font-size:16px;width:100%">
+  <!-- ── STEP 2: RESULTADO ──────────────────────────────────────────────── -->
+  <div id="cob-step2" style="display:none">
+
+    <!-- Editar antes de re-emitir -->
+    <div id="cob-editar-wrap" style="display:none;margin-bottom:14px;padding:12px;background:var(--s2);border:1px solid var(--bdr);border-radius:8px">
+      <div style="font-family:var(--fm);font-size:9px;color:var(--mu);margin-bottom:10px;letter-spacing:.07em">✏️ ALTERAR ANTES DE RE-EMITIR</div>
+      <div class="grid2">
+        <div class="fld"><label>VALOR (R$)</label><input id="cob-edit-valor" type="number" min="0" step="0.01" style="width:100%"></div>
+        <div class="fld"><label>VENCIMENTO</label><input id="cob-edit-venc" type="date" style="width:100%"></div>
+        <div class="fld" style="grid-column:1/-1"><label>DESCRIÇÃO</label><input id="cob-edit-desc" style="width:100%"></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+        <button class="btn" style="font-size:10px" onclick="g('cob-editar-wrap').style.display='none'">Fechar</button>
+        <button class="btn btn-gr" style="font-size:10px" onclick="salvarAlteracoes()">✅ Salvar Alterações</button>
+      </div>
     </div>
-    <div class="fld">
-      <label>DATA DE VENCIMENTO *</label>
-      <input id="cob-venc" type="date" style="width:100%">
-    </div>
-    <div class="fld" style="grid-column:1/-1">
-      <label>DESCRIÇÃO / SERVIÇO</label>
-      <textarea id="cob-desc" rows="2" style="width:100%;resize:vertical" placeholder="Ex: Manutenção preventiva mensal de microondas e bebedouros"></textarea>
-    </div>
-  </div>
 
-  <div id="cob-iss-info" style="font-family:var(--fm);font-size:10px;padding:8px 12px;border-radius:6px;margin-bottom:14px;background:var(--s2);border:1px solid var(--bdr)"></div>
-
-  <!-- Botão Faturar -->
-  <div id="cob-step-faturar" style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:16px">
-    <button class="btn" onclick="fecharOv('ov-cob')">Cancelar</button>
-    <button class="btn btn-gr" id="btn-faturar" onclick="executarFaturamento()" style="font-weight:700;font-size:12px;padding:10px 24px">⚡ Emitir NF + Boleto →</button>
-  </div>
-
-  <!-- Resultado do faturamento -->
-  <div id="cob-resultado" style="display:none">
-    <div style="height:1px;background:var(--bdr);margin-bottom:16px"></div>
-
-    <!-- NF -->
-    <div id="cob-nf-block" style="display:none;margin-bottom:12px;padding:12px;background:var(--s2);border:1px solid var(--bdr);border-radius:8px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <span style="font-family:var(--fm);font-size:10px;font-weight:700;color:var(--gr)">📄 NOTA FISCAL EMITIDA</span>
-        <div style="display:flex;gap:6px">
-          <a id="cob-nf-link" href="#" target="_blank" class="btn" style="font-size:9px;color:var(--bl)">👁 Visualizar</a>
-          <a id="cob-nf-download" href="#" download class="btn" style="font-size:9px;color:var(--gr)">⬇ Download PDF</a>
+    <!-- Bloco NF -->
+    <div id="cob-nf-block" style="display:none;margin-bottom:12px;border:1px solid var(--bdr);border-radius:10px;overflow:hidden">
+      <div style="background:var(--s2);padding:10px 14px;display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:18px">📄</span>
+          <div>
+            <div style="font-family:var(--fm);font-size:10px;font-weight:700;color:var(--gr)">NOTA FISCAL</div>
+            <div id="cob-nf-status" style="font-family:var(--fm);font-size:9px;color:var(--mu)"></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <a id="cob-nf-view" href="#" target="_blank" class="btn" style="font-size:9px;color:var(--bl)">👁 Visualizar</a>
+          <a id="cob-nf-dl" href="#" download class="btn" style="font-size:9px;color:var(--gr)">⬇ PDF</a>
         </div>
       </div>
-      <div id="cob-nf-chave" style="font-family:var(--fm);font-size:9px;color:var(--mu);word-break:break-all"></div>
-    </div>
-
-    <!-- Boleto -->
-    <div id="cob-boleto-block" style="display:none;margin-bottom:12px;padding:12px;background:var(--s2);border:1px solid var(--bdr);border-radius:8px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <span style="font-family:var(--fm);font-size:10px;font-weight:700;color:var(--bl)">🔵 BOLETO GERADO</span>
-        <a id="cob-boleto-link" href="#" target="_blank" class="btn btn-bl" style="font-size:9px">Ver / Imprimir Boleto</a>
+      <div style="padding:10px 14px;background:var(--s1);border-top:1px solid var(--bdr)">
+        <div id="cob-nf-chave" style="font-family:var(--fm);font-size:9px;color:var(--mu);word-break:break-all;margin-bottom:8px"></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn" style="font-size:9px;color:var(--re);border-color:rgba(240,64,96,.4)" id="btn-cancelar-nf" onclick="cancelarNF()">❌ Cancelar NF</button>
+          <button class="btn" style="font-size:9px;color:var(--yel);border-color:rgba(245,200,0,.4)" id="btn-reemitir-nf" onclick="reemitirNF()">🔄 Re-emitir NF</button>
+          <button class="btn" style="font-size:9px;color:var(--mu)" onclick="abrirEditarCobranca()">✏️ Alterar dados</button>
+        </div>
       </div>
-      <div id="cob-barcode" style="font-family:var(--fm);font-size:10px;color:var(--mu);word-break:break-all;cursor:pointer" onclick="copiarBarcode()" title="Clique para copiar"></div>
     </div>
 
-    <!-- Erros parciais -->
-    <div id="cob-erros" style="display:none;margin-bottom:12px;padding:10px 12px;background:var(--red2);border:1px solid var(--red3);border-radius:8px;font-family:var(--fm);font-size:10px;color:var(--re)"></div>
+    <!-- NF com erro -->
+    <div id="cob-nf-erro" style="display:none;margin-bottom:12px;border:1px solid rgba(240,64,96,.3);border-radius:10px;overflow:hidden">
+      <div style="background:var(--red2);padding:10px 14px;display:flex;align-items:center;gap:8px">
+        <span style="font-size:18px">📄</span>
+        <div>
+          <div style="font-family:var(--fm);font-size:10px;font-weight:700;color:var(--re)">NOTA FISCAL — FALHOU</div>
+          <div id="cob-nf-erro-msg" style="font-family:var(--fm);font-size:9px;color:var(--re)"></div>
+        </div>
+      </div>
+      <div style="padding:10px 14px;background:var(--s1);border-top:1px solid rgba(240,64,96,.3)">
+        <div style="display:flex;gap:6px">
+          <button class="btn" style="font-size:9px;color:var(--yel);border-color:rgba(245,200,0,.4)" onclick="reemitirNF()">🔄 Re-emitir NF</button>
+          <button class="btn" style="font-size:9px;color:var(--mu)" onclick="abrirEditarCobranca()">✏️ Alterar dados</button>
+        </div>
+      </div>
+    </div>
 
-    <!-- Enviar por email -->
-    <div style="padding-top:14px;border-top:1px solid var(--bdr)">
-      <div style="font-family:var(--fm);font-size:10px;color:var(--mu);margin-bottom:10px;letter-spacing:.06em">ENVIAR POR EMAIL</div>
-      <div style="display:flex;gap:8px;align-items:center">
+    <!-- Bloco Boleto -->
+    <div id="cob-boleto-block" style="display:none;margin-bottom:12px;border:1px solid var(--bdr);border-radius:10px;overflow:hidden">
+      <div style="background:var(--s2);padding:10px 14px;display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:18px">🔵</span>
+          <div>
+            <div style="font-family:var(--fm);font-size:10px;font-weight:700;color:#3b82f6">BOLETO BANCÁRIO</div>
+            <div id="cob-boleto-status" style="font-family:var(--fm);font-size:9px;color:var(--mu)"></div>
+          </div>
+        </div>
+        <a id="cob-boleto-link" href="#" target="_blank" class="btn" style="font-size:9px;color:#3b82f6;border-color:#3b82f6">🔵 Acessar / Imprimir</a>
+      </div>
+      <div style="padding:10px 14px;background:var(--s1);border-top:1px solid var(--bdr)">
+        <div id="cob-barcode" style="font-family:var(--fm);font-size:10px;color:var(--mu);word-break:break-all;cursor:pointer;margin-bottom:8px" onclick="copiarBarcode()" title="Clique para copiar linha digitável"></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn" style="font-size:9px;color:var(--re);border-color:rgba(240,64,96,.4)" onclick="cancelarBoleto()">❌ Cancelar Boleto</button>
+          <button class="btn" style="font-size:9px;color:var(--yel);border-color:rgba(245,200,0,.4)" id="btn-reemitir-bol" onclick="reemitirBoletoModal()">🔄 Re-emitir Boleto</button>
+          <button class="btn" style="font-size:9px;color:var(--mu)" onclick="abrirEditarCobranca()">✏️ Alterar dados</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Boleto com erro -->
+    <div id="cob-boleto-erro" style="display:none;margin-bottom:12px;border:1px solid rgba(240,64,96,.3);border-radius:10px;overflow:hidden">
+      <div style="background:var(--red2);padding:10px 14px;display:flex;align-items:center;gap:8px">
+        <span style="font-size:18px">🔵</span>
+        <div>
+          <div style="font-family:var(--fm);font-size:10px;font-weight:700;color:var(--re)">BOLETO — FALHOU</div>
+          <div id="cob-boleto-erro-msg" style="font-family:var(--fm);font-size:9px;color:var(--re)"></div>
+        </div>
+      </div>
+      <div style="padding:10px 14px;background:var(--s1);border-top:1px solid rgba(240,64,96,.3)">
+        <div style="display:flex;gap:6px">
+          <button class="btn" style="font-size:9px;color:var(--yel);border-color:rgba(245,200,0,.4)" onclick="reemitirBoletoModal()">🔄 Re-emitir Boleto</button>
+          <button class="btn" style="font-size:9px;color:var(--mu)" onclick="abrirEditarCobranca()">✏️ Alterar dados</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Email -->
+    <div style="padding-top:12px;border-top:1px solid var(--bdr)">
+      <div style="font-family:var(--fm);font-size:9px;color:var(--mu);margin-bottom:8px;letter-spacing:.06em">📧 ENVIAR POR EMAIL</div>
+      <div style="display:flex;gap:8px">
         <input id="cob-email-dest" style="flex:1;background:var(--s2);border:1px solid var(--bdr);border-radius:7px;color:var(--tx);font-family:var(--fb);font-size:12px;padding:8px 12px;outline:none" placeholder="email@empresa.com">
         <button class="btn btn-gr" id="btn-enviar-email" onclick="enviarEmailCobranca()" style="font-size:10px;font-weight:700;white-space:nowrap">📧 Enviar NF + Boleto</button>
       </div>
-      <div id="cob-email-status" style="font-family:var(--fm);font-size:10px;margin-top:6px"></div>
+      <div id="cob-email-status" style="font-family:var(--fm);font-size:10px;margin-top:5px"></div>
     </div>
   </div>
-</div>
-</div>
 
+</div>
+</div>
 
 <!-- MODAL HISTÓRICO -->
 <div class="ov" id="ov-hist" style="display:none;align-items:flex-start;padding:20px;overflow-y:auto" onclick="if(event.target===this)fecharOv('ov-hist')">
