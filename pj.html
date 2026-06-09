@@ -1291,6 +1291,7 @@ async function salvarForn(){
   var dados={razaoSocial:rs,cnpj:gv('f-cnpj'),inscricaoEstadual:gv('f-ie')||'',
     responsavel:gv('f-resp'),telefone:gv('f-tel'),email:gv('f-email'),
     endereco:gv('f-end'),prazoAcordado:sel('f-prazo')||'30 dias',
+    retencaoISS:!!(g('f-retiss')&&g('f-retiss').value==='1'),
     regime:sel('f-regime'),emiteNF:sel('f-nf'),tipoAtendimento:sel('f-atend'),
     obsNF:gv('f-nfobs'),equipamentos:gv('f-equip'),obs:gv('f-obs')};
   if(id)dados.id=id;
