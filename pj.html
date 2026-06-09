@@ -1245,7 +1245,7 @@ function renderForn(){
         '<div style="font-family:var(--fm);font-size:10px;color:var(--mu);margin-top:2px">'+(f.cnpj?f.cnpj+' · ':'')+esc(f.segmento||'')+'</div></div>'+
         '<div style="display:flex;gap:5px">'+
           '<button class="btn" style="font-size:9px" data-fid="'+f.id+'" onclick="abrirEditarForn(this.dataset.fid)">✏️ Editar</button>'+
-          '<button class="btn" style="font-size:9px;color:var(--or);border-color:rgba(249,115,22,.5)" data-fid="'+f.id+'" onclick="abrirHistorico(this.dataset.fid)">📋 Histórico</button>'+
+          '<button class="btn" style="font-size:9px;color:var(--or);border-color:rgba(249,115,22,.5)" data-action="historico" data-fid="'+f.id+'">📋 Histórico</button>'+
           '<button class="btn btn-gr" style="font-size:9px;font-weight:700" data-fid="'+f.id+'" onclick="abrirGerarCobranca(this.dataset.fid)">💰 Cobrança</button>'+
         '</div>'+
       '</div>'+
@@ -1688,9 +1688,8 @@ function diasRestantes(venc, status) {
 }
 
 function abrirHistorico(id) {
-  toast("🔍 Histórico: id=" + id + " lista=" + _fornLista.length, "g");
   var f = _fornLista.find(function(x){ return x.id===id; });
-  if (!f) { toast("Não achou: " + id, "r"); return; }
+  if (!f) { toast("Cliente não encontrado", "r"); return; }
   _desenharHistorico(f);
   // Atualizar silenciosamente
   fetch('/api/pj-fornecedores?action=load')
@@ -2466,6 +2465,11 @@ document.addEventListener('click', function(e) {
 });
 
 // ── INIT ──
+document.addEventListener("click", function(e) {
+  var el = e.target.closest('[data-action="historico"]');
+  if (el) { abrirHistorico(el.dataset.fid); return; }
+});
+
 document.addEventListener("DOMContentLoaded",function(){
   carregarSDR();
   fetch('/api/pj-email?action=inbox').then(x=>x.json())
