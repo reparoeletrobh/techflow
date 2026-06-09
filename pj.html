@@ -1688,9 +1688,13 @@ function diasRestantes(venc, status) {
 }
 
 async function abrirHistorico(id) {
-  await carregarForn(); // garante dados frescos
+  try {
+  // Buscar dados frescos direto da API
+  var _r = await fetch('/api/pj-fornecedores?action=load').then(function(x){return x.json();});
+  if (_r.ok) _fornLista = _r.fornecedores || [];
+  } catch(e) { /* usa _fornLista atual se falhar */ }
   var f = _fornLista.find(function(x){ return x.id===id; });
-  if (!f) return;
+  if (!f) { toast('Cliente não encontrado (id:'+id+')','r'); return; }
   var cobs = (f.cobrancas||[]).slice().sort(function(a,b){
     return (b.criadoEm||'').localeCompare(a.criadoEm||'');
   });
