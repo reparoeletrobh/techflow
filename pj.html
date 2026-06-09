@@ -1525,8 +1525,11 @@ function renderFaturamento(){
     lista.map(function(c){
       var cor=c.status==='recebido'?'var(--gr)':c.status==='vencido'?'var(--re)':'var(--bl)';
       var lbl=c.status==='recebido'?'\u2705 Recebido':c.status==='vencido'?'\uD83D\uDD34 Vencido':'\u23F3 Pendente';
+      var btnBoleto=(c.boletoUrl&&c.status!=='recebido')
+        ?'<a href="'+c.boletoUrl+'" target="_blank" class="btn" style="font-size:9px;padding:4px 8px;color:#3b82f6;border-color:#3b82f6">🔵 Boleto</a> '
+        :(c.status!=='recebido'?'<button class="btn" style="font-size:9px;padding:4px 8px;color:#3b82f6;border-color:#3b82f6" data-cid="'+c.clienteId+'" data-cobid="'+c.id+'" onclick="reemitirBoleto(this.dataset.cid,this.dataset.cobid)">+ Gerar Boleto</button> ':'');
       var btn=c.status!=='recebido'
-        ?'<button class="btn btn-gr" style="font-size:9px;padding:4px 10px" data-cid="'+c.clienteId+'" data-cobid="'+c.id+'" onclick="marcarRecebido(this.dataset.cid,this.dataset.cobid)">\u2713 Recebeu</button>'
+        ?btnBoleto+'<button class="btn btn-gr" style="font-size:9px;padding:4px 10px" data-cid="'+c.clienteId+'" data-cobid="'+c.id+'" onclick="marcarRecebido(this.dataset.cid,this.dataset.cobid)">\u2713 Recebeu</button>'
         :'<span style="font-family:var(--fm);font-size:9px;color:var(--mu)">'+(c.recebidoEm?c.recebidoEm.slice(0,10):'')+'</span>';
       return '<tr style="border-bottom:1px solid var(--bdr)">'+
         '<td style="padding:10px"><div style="font-weight:600">'+esc(c.clienteNome)+'</div>'+
