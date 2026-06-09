@@ -1688,8 +1688,9 @@ function diasRestantes(venc, status) {
 }
 
 function abrirHistorico(id) {
+  toast("🔍 Histórico: id=" + id + " lista=" + _fornLista.length, "g");
   var f = _fornLista.find(function(x){ return x.id===id; });
-  if (!f) return;
+  if (!f) { toast("Não achou: " + id, "r"); return; }
   _desenharHistorico(f);
   // Atualizar silenciosamente
   fetch('/api/pj-fornecedores?action=load')
