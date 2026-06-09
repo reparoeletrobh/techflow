@@ -1245,6 +1245,7 @@ function renderForn(){
         '<div style="font-family:var(--fm);font-size:10px;color:var(--mu);margin-top:2px">'+(f.cnpj?f.cnpj+' · ':'')+esc(f.segmento||'')+'</div></div>'+
         '<div style="display:flex;gap:5px">'+
           '<button class="btn" style="font-size:9px" data-fid="'+f.id+'" onclick="abrirEditarForn(this.dataset.fid)">✏️ Editar</button>'+
+          '<button class="btn" style="font-size:9px;color:var(--or);border-color:rgba(249,115,22,.5)" data-fid="'+f.id+'" onclick="abrirHistorico(this.dataset.fid)">📋 Histórico</button>'+
           '<button class="btn btn-gr" style="font-size:9px;font-weight:700" data-fid="'+f.id+'" onclick="abrirGerarCobranca(this.dataset.fid)">💰 Cobrança</button>'+
         '</div>'+
       '</div>'+
@@ -1520,6 +1521,7 @@ function renderFaturamento(){
     '<th style="padding:8px;text-align:right">VALOR</th>'+
     '<th style="padding:8px;text-align:center">VENCIMENTO</th>'+
     '<th style="padding:8px;text-align:center">STATUS</th>'+
+    '<th style="padding:8px;text-align:center">DOCUMENTOS</th>'+
     '<th style="padding:8px;text-align:center">A\u00C7\u00C3O</th>'+
     '</tr></thead><tbody>'+
     lista.map(function(c){
@@ -1538,10 +1540,72 @@ function renderFaturamento(){
         '<td style="padding:10px;text-align:right;font-family:var(--fm);font-weight:700">R$ '+(parseFloat(c.valor)||0).toFixed(2).replace('.',',')+'</td>'+
         '<td style="padding:10px;text-align:center;font-family:var(--fm);font-size:10px">'+(c.vencimento||'\u2014')+'</td>'+
         '<td style="padding:10px;text-align:center"><span style="font-family:var(--fm);font-size:9px;color:'+cor+'">'+lbl+'</span></td>'+
+        '<td style="padding:8px;text-align:center">'+
+          (c.nfChave?'<a href="/api/nfse?action=danfe&chave='+c.nfChave+'" target="_blank" class="btn" style="font-size:9px;padding:3px 7px;color:var(--gr);border-color:var(--gr)">📄 NF</a> ':'')+ 
+          (c.boletoUrl?'<a href="'+c.boletoUrl+'" target="_blank" class="btn" style="font-size:9px;padding:3px 7px;color:#3b82f6;border-color:#3b82f6">🔵 Boleto</a>':'')+ 
+        '</td>'+
         '<td style="padding:10px;text-align:center">'+btn+'</td>'+
       '</tr>';
     }).join('')+'</tbody></table>';
 }
+
+function diasRestantes(venc, status) {
+  if (!venc || status === 'recebido') return '';
+  var hoje = new Date().toISOString().slice(0,10);
+  var diff = Math.ceil((new Date(venc) - new Date(hoje)) / 86400000);
+  if (diff > 0) return '<span style="color:var(--bl)">+' + diff + 'd</span>';
+  if (diff === 0) return '<span style="color:var(--yel)">Hoje</span>';
+  return '<span style="color:var(--re)">' + diff + 'd</span>';
+}
+
+function abrirHistorico(id) {
+  var f = _fornLista.find(function(x){ return x.id===id; });
+  if (!f) return;
+  var cobs = (f.cobrancas||[]).slice().sort(function(a,b){
+    return (b.criadoEm||'').localeCompare(a.criadoEm||'');
+  });
+  if (g('hist-titulo')) g('hist-titulo').textContent = '📋 Histórico — ' + f.razaoSocial;
+  if (!cobs.length) {
+    if (g('hist-body')) g('hist-body').innerHTML = '<div class="empty">Nenhuma cobrança registrada.</div>';
+    abrirOv('ov-hist'); return;
+  }
+  var hoje = new Date().toISOString().slice(0,10);
+  var rows = cobs.map(function(c) {
+    var status = c.status==='recebido'?'recebido':(c.vencimento&&c.vencimento<hoje?'vencido':'pendente');
+    var cor    = status==='recebido'?'var(--gr)':status==='vencido'?'var(--re)':'var(--bl)';
+    var lbl    = status==='recebido'?'✅ Recebido':status==='vencido'?'🔴 Vencido':'⏳ Pendente';
+    var nfBtn  = c.nfChave
+      ? '<a href="/api/nfse?action=danfe&chave='+c.nfChave+'" target="_blank" class="btn" style="font-size:9px;padding:2px 7px;color:var(--gr);border-color:var(--gr);display:inline-block;margin:1px">📄 NF</a>'
+      : '';
+    var bolBtn = c.boletoUrl
+      ? '<a href="'+c.boletoUrl+'" target="_blank" class="btn" style="font-size:9px;padding:2px 7px;color:#3b82f6;border-color:#3b82f6;display:inline-block;margin:1px">🔵 Boleto</a>'
+      : (status!=='recebido'
+          ? '<button class="btn" style="font-size:9px;padding:2px 7px;color:#3b82f6;border-color:#3b82f6" data-cid="'+f.id+'" data-cobid="'+c.id+'" onclick="reemitirBoleto(this.dataset.cid,this.dataset.cobid)">+ Boleto</button>'
+          : '');
+    return '<tr style="border-bottom:1px solid var(--bdr)">'
+      + '<td style="padding:7px 8px;font-family:var(--fm);font-size:9px;color:var(--mu)">'+(c.criadoEm||'').slice(0,10)+'</td>'
+      + '<td style="padding:7px 8px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--mu)">'+esc(c.descricao||'—')+'</td>'
+      + '<td style="padding:7px 8px;text-align:right;font-weight:700">R$ '+parseFloat(c.valor||0).toFixed(2).replace('.',',')+'</td>'
+      + '<td style="padding:7px 8px;text-align:center;font-family:var(--fm);font-size:10px">'+(c.vencimento||'—')+'</td>'
+      + '<td style="padding:7px 8px;text-align:center">'+diasRestantes(c.vencimento,status)+'</td>'
+      + '<td style="padding:7px 8px;text-align:center"><span style="font-family:var(--fm);font-size:9px;color:'+cor+'">'+lbl+'</span></td>'
+      + '<td style="padding:7px 8px;text-align:center">'+nfBtn+bolBtn+'</td>'
+      + '</tr>';
+  }).join('');
+  var table = '<table style="width:100%;border-collapse:collapse;font-size:11px">'
+    + '<thead><tr style="font-family:var(--fm);font-size:9px;color:var(--mu)">'
+    + '<th style="padding:7px 8px;text-align:left">DATA</th>'
+    + '<th style="padding:7px 8px;text-align:left">DESCRIÇÃO</th>'
+    + '<th style="padding:7px 8px;text-align:right">VALOR</th>'
+    + '<th style="padding:7px 8px;text-align:center">VENCIMENTO</th>'
+    + '<th style="padding:7px 8px;text-align:center">DIAS</th>'
+    + '<th style="padding:7px 8px;text-align:center">STATUS</th>'
+    + '<th style="padding:7px 8px;text-align:center">DOCUMENTOS</th>'
+    + '</tr></thead><tbody>'+rows+'</tbody></table>';
+  if (g('hist-body')) g('hist-body').innerHTML = table;
+  abrirOv('ov-hist');
+}
+
 
 async function reemitirBoleto(clienteId,cobId){
   if(!confirm("Gerar novo link de boleto para esta cobrança?")) return;
@@ -2344,4 +2408,15 @@ document.addEventListener("DOMContentLoaded",function(){
 </div>
 </div>
 
+
+<!-- MODAL HISTÓRICO -->
+<div class="ov" id="ov-hist" style="display:none;align-items:flex-start;padding:20px;overflow-y:auto" onclick="if(event.target===this)fecharOv('ov-hist')">
+<div class="mdl" style="max-width:800px;width:100%;margin:auto">
+  <div class="mdl-t" style="display:flex;align-items:center;justify-content:space-between">
+    <span id="hist-titulo">📋 Histórico</span>
+    <button class="btn" style="font-size:10px" onclick="fecharOv('ov-hist')">✕ Fechar</button>
+  </div>
+  <div id="hist-body" style="margin-top:8px;overflow-x:auto"></div>
+</div>
+</div>
 </body>
