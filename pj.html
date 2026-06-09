@@ -409,6 +409,7 @@ select option{background:var(--s2);}
   <button class="tab" id="t-campanha" onclick="ir('campanha')">📧 Campanhas</button>
   <button class="tab" id="t-listas" onclick="ir('listas')">📋 Listas</button>
   <button class="tab" id="t-forn" onclick="ir('forn')">🏢 Clientes PJ <span class="tbadge" id="b-forn" style="background:rgba(16,217,130,.15);color:var(--gr);border-color:rgba(16,217,130,.3)">0</span></button>
+  <button class="tab" id="t-fat" onclick="ir('fat')">💰 Faturamento</button>
 </div>
 
 <!-- PROSPECTS -->
@@ -631,6 +632,21 @@ select option{background:var(--s2);}
   <div style="margin-bottom:12px"><input style="width:100%;background:var(--s1);border:1px solid var(--bdr);border-radius:8px;color:var(--tx);font-family:var(--fb);font-size:12px;padding:9px 14px;outline:none" placeholder="🔍 Buscar por nome, CNPJ ou email..." oninput="fornBuscar(this.value)"></div><div id="lista-forn"><div class="empty"><div class="spin"></div>Carregando...</div></div>
 </div>
 
+<!-- FATURAMENTO PJ -->
+<div class="pg" id="pg-fat">
+  <div class="pg-head">
+    <div><div class="pg-title">💰 Faturamento PJ</div><div class="pg-sub">// cobranças e recebimentos</div></div>
+  </div>
+  <div id="fat-dash" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px"></div>
+  <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+    <button class="btn" id="fat-f-todos"    onclick="fatSetFiltro('todos',this)"    style="font-size:9px">Todos</button>
+    <button class="btn" id="fat-f-pendente" onclick="fatSetFiltro('pendente',this)" style="font-size:9px">⏳ Pendentes</button>
+    <button class="btn" id="fat-f-vencido"  onclick="fatSetFiltro('vencido',this)"  style="font-size:9px;color:var(--re)">🔴 Vencidos</button>
+    <button class="btn" id="fat-f-recebido" onclick="fatSetFiltro('recebido',this)" style="font-size:9px;color:var(--gr)">✅ Recebidos</button>
+  </div>
+  <div id="fat-lista"></div>
+</div>
+
 <!-- MODAL PROSPECT -->
 <div class="ov" id="ov-p" style="display:none" onclick="if(event.target===this)fecharOv('ov-p')">
 <div class="mdl">
@@ -723,7 +739,7 @@ function fecharOv(id){g(id).style.display='none';}
 // Navegação
 function ir(t){
   _tabAtual=t;
-  ['sdr','prospects','inbox','campanha','listas','forn'].forEach(function(p){
+  ['sdr','prospects','inbox','campanha','listas','forn','fat'].forEach(function(p){
     var pg=g('pg-'+p), tab=g('t-'+p);
     if(pg) pg.classList.toggle('on',p===t);
     if(tab) tab.classList.toggle('on',p===t);
@@ -731,6 +747,7 @@ function ir(t){
   if(t==='sdr') carregarSDR();
   if(t==='inbox') carregarInbox();
   if(t==='forn') carregarForn();
+  if(t==='fat') carregarFaturamento();
   if(t==='listas') carregarListas();
   if(t==='campanha') contarDest();
 }
