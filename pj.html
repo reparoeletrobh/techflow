@@ -386,6 +386,7 @@ select option{background:var(--s2);}
 
 .cob-ficha-item{padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--bdr);font-family:var(--fb);font-size:12px;transition:background .1s;}
 .cob-ficha-item:hover{background:var(--s2);}
+.cob-fi{padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--bdr);font-size:12px;transition:background .1s;}.cob-fi:hover{background:var(--s2);}
 </style>
 </head>
 <body>
@@ -1347,7 +1348,7 @@ function cobBuscarFicha(q){
         el.innerHTML='<div style="padding:10px;font-family:var(--fm);font-size:10px;color:var(--mu)">Nenhuma ficha encontrada</div>';
       } else {
         el.innerHTML=lista.map(function(f){
-          return '<div style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--bdr);font-family:var(--fb);font-size:12px" data-id="'+f.id+'" data-nome="'+esc(f.nome)+'" data-val="'+(f.valor||'')+'" data-equip="'+esc(f.equipamento||'')+'" onmouseover="this.style.background='var(--s2)'" onmouseout="this.style.background=''" onclick="selecionarFicha(this)">'+
+          return '<div class="cob-fi" data-id="'+f.id+'" data-nome="'+esc(f.nome)+'" data-val="'+(f.valor||'')+'" data-equip="'+esc(f.equipamento||'')+'" onclick="selecionarFicha(this)">'+
             '<div style="font-weight:600">'+esc(f.nome)+'</div>'+
             '<div style="font-family:var(--fm);font-size:9px;color:var(--mu)">'+esc(f.numero)+' · '+esc(f.equipamento)+' · R$'+(f.valor||0).toFixed(2).replace('.',',')+'</div>'+
           '</div>';
