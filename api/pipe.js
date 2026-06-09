@@ -730,7 +730,8 @@ export default async function handler(req, res) {
   // ── GET backup-auto: salva snapshot timestamped de todos os dados críticos
   if (action === 'backup-auto') {
     var chaves = ['reparoeletro_pipe','reparoeletro_financeiro','reparoeletro_board',
-                  'reparoeletro_logistica','reparoeletro_frenteloja'];
+                  'reparoeletro_logistica','reparoeletro_frenteloja',
+                  'reparoeletro_conflitos','pj_fornecedores'];
     var ts  = new Date().toISOString().replace(/[:.]/g,'-').slice(0,16); // 2026-05-29T14-30
     var res2 = { ts, salvos:[], erros:[] };
     for (var ki=0; ki<chaves.length; ki++) {

@@ -363,6 +363,10 @@
       "destination": "/api/pj-cobranca.js"
     },
     {
+      "source": "/api/recovery",
+      "destination": "/api/recovery.js"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/home.html"
     },
