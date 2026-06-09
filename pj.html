@@ -1547,16 +1547,23 @@ const CANAL_ICON = { email:'📧', whatsapp:'💬', linkedin:'💼', ligacao:'�
 
 async function carregarSDR() {
   try {
-    var r = await fetch('/api/pj-sdr?action=listar').then(x=>x.json());
+    var r = await fetch('/api/pj-sdr?action=listar').then(function(x){return x.json();});
+    if (!r || !r.ok) { toast('Erro SDR: '+(r&&r.error||'API falhou'),'r'); return; }
     _sdrLeads = r.leads || [];
+    console.log('[SDR] leads carregados:', _sdrLeads.length);
     sdrAtualizarPainel(r.painel || {});
     sdrRender();
     sdrRenderAcoes();
-    // Carregar templates
-    var t = await fetch('/api/pj-sdr?action=templates').then(x=>x.json());
-    _sdrTemplates = t.templates || {};
-    _sdrSteps = t.steps || [];
-  } catch(e) { console.error('SDR:', e); }
+    // Carregar templates (não bloquear o render se falhar)
+    try {
+      var t = await fetch('/api/pj-sdr?action=templates').then(function(x){return x.json();});
+      _sdrTemplates = t.templates || {};
+      _sdrSteps = t.steps || [];
+    } catch(te) { _sdrTemplates={}; _sdrSteps=[]; }
+  } catch(e) {
+    console.error('[SDR] carregarSDR erro:', e);
+    toast('Erro ao carregar SDR: '+e.message,'r');
+  }
 }
 
 function sdrAtualizarPainel(p) {
@@ -1608,7 +1615,9 @@ function sdrRender() {
 }
 
 function renderKanban(lista) {
-  var board = g('sdr-kanban'); if (!board) return;
+  var board = g('sdr-kanban');
+  if (!board) { console.warn('[SDR] sdr-kanban não encontrado no DOM'); return; }
+  console.log('[SDR] renderKanban lista:', lista.length, 'leads');
   board.innerHTML = SDR_FASES.map(function(fase) {
     var cards = lista.filter(function(l){ return l.fase === fase.id; });
     return '<div class="sdr-col">' +
