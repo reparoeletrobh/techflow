@@ -90,57 +90,70 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // ── 2. CRIAR BOLETO via Mercado Pago ────────────────────────────────────────
+    // ── 2. CRIAR BOLETO via Mercado Pago (Preferences API — mesmo padrão do financeiro.js) ───
     const MP_TOKEN = process.env.MP_ACCESS_TOKEN;
     if(!MP_TOKEN){
       resultado.errors.push('Boleto: MP_ACCESS_TOKEN não configurado');
     } else {
       try {
-        const nomeArr = (cliente.responsavel||cliente.razaoSocial||'Cliente').split(' ');
-        const cnpjLimpo = (cliente.cnpj||'').replace(/\D/g,'');
-        const vencISO   = vencimento+'T23:59:59.000-03:00';
-        const boletoBody = {
-          transaction_amount: vlr,
-          description: 'Manutenção de eletrodomésticos – '+(cliente.razaoSocial||'Cliente'),
-          payment_method_id: 'boleto',
-          date_of_expiration: vencISO,
-          payer: {
-            email:      cliente.email||'financeiro@reparoeletroadm.com',
-            first_name: nomeArr[0]||'Cliente',
-            last_name:  nomeArr.slice(1).join(' ')||'PJ',
-            identification: cnpjLimpo.length===14
-              ? {type:'CNPJ', number:cnpjLimpo}
-              : {type:'CPF',  number:cnpjLimpo.slice(0,11)},
+        const nomeArr  = (cliente.responsavel||cliente.razaoSocial||'Cliente').split(' ');
+        const cnpjLimpo= (cliente.cnpj||'').replace(/\D/g,'');
+        const prefBody = {
+          items:[{
+            id:          clienteId+'-'+Date.now(),
+            title:       'Manutenção – '+(cliente.razaoSocial||'Cliente'),
+            description: descricao||('Serviços de manutenção de eletrodomésticos'),
+            quantity:    1,
+            unit_price:  vlr,
+            currency_id: 'BRL',
+          }],
+          payer:{
+            name:    nomeArr.slice(0,2).join(' '),
+            surname: nomeArr.slice(2).join(' ')||'PJ',
+            email:   cliente.email||'financeiro@reparoeletroadm.com',
+            ...(cnpjLimpo ? {identification:{
+              type:   cnpjLimpo.length===14?'CNPJ':'CPF',
+              number: cnpjLimpo.length===14?cnpjLimpo:cnpjLimpo.slice(0,11),
+            }}:{}),
           },
-          metadata: {
-            origem:'pj_cobranca', clienteId, fichaId:fichaId||'', cobId:Date.now()
+          payment_methods:{
+            excluded_payment_types:[{id:'credit_card'},{id:'debit_card'},{id:'pix'}],
+            installments:1,
           },
+          expiration_date_from: new Date().toISOString(),
+          expiration_date_to:   vencimento+'T23:59:59.000-03:00',
+          metadata:{ origem:'pj_cobranca', clienteId, fichaId:fichaId||'' },
           notification_url:'https://reparoeletroadm.com/api/webhook-mp',
-        };
-        const bRes = await fetch('https://api.mercadopago.com/v1/payments',{
-          method:'POST',
-          headers:{
-            'Content-Type':'application/json',
-            'Authorization':'Bearer '+MP_TOKEN,
-            'X-Idempotency-Key':clienteId+'-'+Date.now(),
+          back_urls:{
+            success:'https://reparoeletroadm.com/pj',
+            failure:'https://reparoeletroadm.com/pj',
           },
-          body:JSON.stringify(boletoBody),
+          auto_return:'approved',
+          binary_mode:false,
+        };
+        const bRes = await fetch('https://api.mercadopago.com/checkout/preferences',{
+          method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':'Bearer '+MP_TOKEN},
+          body:JSON.stringify(prefBody),
         });
         const bData = await bRes.json();
+        console.log('[pj-cobranca] MP preference response:', JSON.stringify(bData).slice(0,300));
         if(bData.id){
           resultado.boleto = {
-            id:          bData.id,
-            status:      bData.status,
-            url:         bData.transaction_details?.external_resource_url||'',
-            barcode:     bData.barcode?.content||'',
-            vencimento:  vencimento,
-            valor:       vlr,
+            preferenceId: bData.id,
+            url:          bData.init_point||'',    // link de checkout MP
+            sandboxUrl:   bData.sandbox_init_point||'',
+            vencimento,
+            valor:        vlr,
           };
         } else {
-          resultado.errors.push('Boleto: '+(bData.message||bData.error||'falha MP'));
+          const mpErr = bData.message||bData.error||JSON.stringify(bData).slice(0,200);
+          resultado.errors.push('Boleto MP: '+mpErr);
+          console.error('[pj-cobranca] MP erro:', mpErr);
         }
       } catch(be){
         resultado.errors.push('Boleto: '+be.message);
+        console.error('[pj-cobranca] Boleto catch:', be.message);
       }
     }
 
@@ -244,6 +257,50 @@ module.exports = async function handler(req, res) {
     }catch(ee){
       return res.status(200).json({ok:false,error:ee.message});
     }
+  }
+
+  // ── POST reemitir-boleto — gera novo link de boleto para cobrança existente ──
+  if(req.method==='POST' && action==='reemitir-boleto'){
+    const{clienteId,cobId}=req.body||{};
+    const fornDb=await dbGet(FOR_KEY)||{fornecedores:[]};
+    const cli=fornDb.fornecedores.find(f=>f.id===clienteId);
+    if(!cli) return res.status(404).json({ok:false,error:'cliente não encontrado'});
+    const cob=(cli.cobrancas||[]).find(c=>c.id===cobId);
+    if(!cob) return res.status(404).json({ok:false,error:'cobrança não encontrada'});
+    const MP_TOKEN=process.env.MP_ACCESS_TOKEN;
+    if(!MP_TOKEN) return res.status(400).json({ok:false,error:'MP_ACCESS_TOKEN não configurado'});
+    try{
+      const nomeArr=(cli.responsavel||cli.razaoSocial||'Cliente').split(' ');
+      const cnpjLimpo=(cli.cnpj||'').replace(/\D/g,'');
+      const vlr=parseFloat(cob.valor);
+      const prefBody={
+        items:[{id:cobId,title:'Manutenção – '+(cli.razaoSocial||'Cliente'),
+          description:cob.descricao||'Serviços de manutenção',
+          quantity:1,unit_price:vlr,currency_id:'BRL'}],
+        payer:{
+          name:nomeArr.slice(0,2).join(' '),surname:nomeArr.slice(2).join(' ')||'PJ',
+          email:cli.email||'financeiro@reparoeletroadm.com',
+          ...(cnpjLimpo?{identification:{type:cnpjLimpo.length===14?'CNPJ':'CPF',
+            number:cnpjLimpo.length===14?cnpjLimpo:cnpjLimpo.slice(0,11)}}:{}),
+        },
+        payment_methods:{excluded_payment_types:[{id:'credit_card'},{id:'debit_card'},{id:'pix'}],installments:1},
+        expiration_date_to:cob.vencimento+'T23:59:59.000-03:00',
+        notification_url:'https://reparoeletroadm.com/api/webhook-mp',
+        binary_mode:false,
+      };
+      const bRes=await fetch('https://api.mercadopago.com/checkout/preferences',{
+        method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+MP_TOKEN},
+        body:JSON.stringify(prefBody),
+      });
+      const bData=await bRes.json();
+      if(bData.id){
+        cob.boletoUrl=bData.init_point||'';
+        cob.preferenceId=bData.id;
+        await dbSet(FOR_KEY,fornDb);
+        return res.status(200).json({ok:true,url:bData.init_point,preferenceId:bData.id});
+      }
+      return res.status(200).json({ok:false,error:bData.message||bData.error||'falha MP'});
+    }catch(e){return res.status(200).json({ok:false,error:e.message});}
   }
 
   return res.status(404).json({ok:false,error:'action não encontrada: '+action});

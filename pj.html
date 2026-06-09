@@ -1540,6 +1540,18 @@ function renderFaturamento(){
     }).join('')+'</tbody></table>';
 }
 
+async function reemitirBoleto(clienteId,cobId){
+  if(!confirm("Gerar novo link de boleto para esta cobrança?")) return;
+  var r=await fetch('/api/pj-cobranca?action=reemitir-boleto',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({clienteId,cobId})
+  }).then(function(x){return x.json();});
+  if(r.ok){
+    await carregarFaturamento();
+    toast('✅ Boleto gerado! Clique em "🔵 Boleto" para acessar.','g');
+  } else toast('Erro: '+(r.error||'falha'),'r');
+}
+
 async function marcarRecebido(clienteId,cobId){
   if(!confirm('Confirmar recebimento?\nUma ficha ser\u00E1 criada no Pipe.'))return;
   var r=await fetch('/api/pj-fornecedores?action=marcar-recebido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clienteId,cobId})}).then(function(x){return x.json();});
