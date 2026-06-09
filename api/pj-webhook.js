@@ -23,6 +23,34 @@ async function dbSet(key,val) {
 }
 
 module.exports = async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', 'https://reparoeletroadm.com');
+  // ── Verificar assinatura do Resend (svix-signature) ──────────────────────
+  const RESEND_WEBHOOK_SECRET = process.env.RESEND_WEBHOOK_SECRET || '';
+  if (req.method === 'POST' && RESEND_WEBHOOK_SECRET) {
+    try {
+      const crypto = require('crypto');
+      const svixId        = req.headers['svix-id'] || '';
+      const svixTimestamp = req.headers['svix-timestamp'] || '';
+      const svixSig       = req.headers['svix-signature'] || '';
+      // Verificar timestamp (janela de 5 minutos)
+      const tsNum = parseInt(svixTimestamp);
+      if (Math.abs(Date.now()/1000 - tsNum) > 300) {
+        console.warn('[pj-webhook] Timestamp fora da janela');
+        return res.status(401).json({ ok: false, error: 'Timestamp inválido' });
+      }
+      // Verificar assinatura
+      const rawBody = JSON.stringify(req.body);
+      const toSign  = `${svixId}.${svixTimestamp}.${rawBody}`;
+      const secret  = Buffer.from(RESEND_WEBHOOK_SECRET.replace('whsec_',''), 'base64');
+      const expected= crypto.createHmac('sha256', secret).update(toSign).digest('base64');
+      const sigs    = svixSig.split(' ').map(s=>s.replace('v1,',''));
+      if (svixSig && !sigs.some(s=>s===expected)) {
+        console.warn('[pj-webhook] Assinatura Resend inválida');
+        return res.status(401).json({ ok: false, error: 'Assinatura inválida' });
+      }
+    } catch(e) { console.warn('[pj-webhook] Erro assinatura:', e.message); }
+  }
+
   res.setHeader('Access-Control-Allow-Origin','*');
   if (req.method === 'OPTIONS') return res.status(200).end();
 

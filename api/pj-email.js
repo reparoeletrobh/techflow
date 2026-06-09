@@ -9,7 +9,10 @@ async function dbGet(k){try{const r=await fetch(U+'/pipeline',{method:'POST',hea
 async function dbSet(k,v){await fetch(U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
 
 module.exports = async function handler(req,res){
-  res.setHeader('Access-Control-Allow-Origin','*');
+  // CORS restrito — apenas domínio autorizado
+  res.setHeader('Access-Control-Allow-Origin', 'https://reparoeletroadm.com');
+  res.setHeader('X-Content-Type-Options','nosniff');
+  res.setHeader('X-Frame-Options','SAMEORIGIN');
   if(req.method==='OPTIONS')return res.status(200).end();
   const action=req.query.action||'';
 

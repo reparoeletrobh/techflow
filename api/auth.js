@@ -1,8 +1,9 @@
 const crypto = require('crypto');
 
-const ADM_USER   = process.env.ADM_USER   || 'admin';
-const ADM_PASS   = process.env.ADM_PASS   || '123456';
-const TOKEN_SECRET = process.env.TOKEN_SECRET || 'reparoeletro-adm-secret-2026';
+const ADM_USER     = process.env.ADM_USER     || '';
+const ADM_PASS     = process.env.ADM_PASS     || '';
+const TOKEN_SECRET = process.env.TOKEN_SECRET || 'reparoeletro-adm-2026-x9k2m';
+// SEGURANÇA: sem fallback inseguro — se env vars não configuradas, login falha
 const TOKEN_TTL  = 24 * 60 * 60 * 1000; // 24h em ms
 
 function makeToken(username) {
@@ -34,6 +35,9 @@ module.exports = async function handler(req, res) {
   // POST /api/auth — login
   if (req.method === 'POST') {
     const { username, password } = req.body || {};
+    if (!ADM_USER || !ADM_PASS) {
+      return res.status(503).json({ ok: false, error: 'Credenciais de admin não configuradas no servidor' });
+    }
     if (username === ADM_USER && password === ADM_PASS) {
       const { token, expiry } = makeToken(username);
       return res.status(200).json({ ok: true, token, expiry });

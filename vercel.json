@@ -347,16 +347,16 @@
       "destination": "/api/pj-sdr.js"
     },
     {
-      "source": "/api/busca-ficha",
-      "destination": "/api/busca-ficha.js"
-    },
-    {
       "source": "/conflitos",
       "destination": "/conflitos.html"
     },
     {
       "source": "/api/conflitos",
       "destination": "/api/conflitos.js"
+    },
+    {
+      "source": "/api/security-status",
+      "destination": "/api/security-status.js"
     },
     {
       "source": "/((?!api/).*)",

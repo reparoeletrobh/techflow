@@ -19,7 +19,14 @@ function scoreOrdem(c){
 }
 
 module.exports = async function handler(req,res){
-  res.setHeader('Access-Control-Allow-Origin','*');
+  // CORS restrito — apenas domínio autorizado
+  res.setHeader('Access-Control-Allow-Origin', 'https://reparoeletroadm.com');
+  // Limite de payload — rejeitar requisições > 512KB
+  if (req.method === 'POST' && parseInt(req.headers['content-length']||0) > 524288) {
+    return res.status(413).json({ok:false,error:'Payload muito grande (máx 512KB)'});
+  }
+  res.setHeader('X-Content-Type-Options','nosniff');
+  res.setHeader('X-Frame-Options','SAMEORIGIN');
   res.setHeader('Access-Control-Allow-Methods','GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers','Content-Type');
   if(req.method==='OPTIONS') return res.status(200).end();

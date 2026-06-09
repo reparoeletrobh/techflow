@@ -301,6 +301,31 @@ async function criarCardPipefyVenda(pipeId, produto, comprador, valor, paymentId
 
 
 export default async function handler(req, res) {
+  // ── Validação assinatura Mercado Pago (HMAC-SHA256) ──────────────────────
+  res.setHeader('Access-Control-Allow-Origin', 'https://reparoeletroadm.com');
+  const MP_SECRET = process.env.MP_WEBHOOK_SECRET || '';
+  if (req.method === 'POST' && MP_SECRET) {
+    try {
+      const crypto = require('crypto');
+      const xSig   = req.headers['x-signature'] || '';
+      const xReqId = req.headers['x-request-id'] || '';
+      if (xSig) {
+        const parts = xSig.split(',');
+        const ts  = (parts.find(p=>p.startsWith('ts='))||'').replace('ts=','');
+        const v1  = (parts.find(p=>p.startsWith('v1='))||'').replace('v1=','');
+        const dataId = req.query.id || (req.body&&req.body.data&&req.body.data.id) || '';
+        const manifest = `id:${dataId};request-id:${xReqId};ts:${ts};`;
+        const expected = crypto.createHmac('sha256', MP_SECRET).update(manifest).digest('hex');
+        const v1buf = Buffer.from(v1.padEnd(expected.length,'0'), 'hex');
+        const expbuf= Buffer.from(expected, 'hex');
+        if (v1 && v1buf.length===expbuf.length && !crypto.timingSafeEqual(v1buf, expbuf)) {
+          console.warn('[webhook-mp] Assinatura HMAC inválida');
+          return res.status(401).json({ ok: false, error: 'Assinatura inválida' });
+        }
+      }
+    } catch(e) { console.warn('[webhook-mp] Erro HMAC:', e.message); }
+  }
+
   res.setHeader('Content-Type', 'application/json');
 
   // ── GET: diagnóstico de logs ─────────────────────────────────
