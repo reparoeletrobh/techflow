@@ -626,9 +626,9 @@ select option{background:var(--s2);}
 <div class="pg" id="pg-forn">
   <div class="pg-head">
     <div><div class="pg-title">🏢 Clientes PJ</div><div class="pg-sub">// clientes B2B ativos</div></div>
-    <button class="btn btn-gr" onclick="abrirOv('ov-f')">+ Cadastrar</button>
+    <button class="btn btn-gr" onclick="abrirNovoForn()">+ Cadastrar</button>
   </div>
-  <div id="lista-forn"><div class="empty"><div class="spin"></div>Carregando...</div></div>
+  <div style="margin-bottom:12px"><input style="width:100%;background:var(--s1);border:1px solid var(--bdr);border-radius:8px;color:var(--tx);font-family:var(--fb);font-size:12px;padding:9px 14px;outline:none" placeholder="🔍 Buscar por nome, CNPJ ou email..." oninput="fornBuscar(this.value)"></div><div id="lista-forn"><div class="empty"><div class="spin"></div>Carregando...</div></div>
 </div>
 
 <!-- MODAL PROSPECT -->
@@ -1187,27 +1187,183 @@ async function carregarCamp(){
 }
 
 // ── FORNECEDORES ──────────────────────────────────────────────────────────
+async 
+// ── CLIENTES PJ ─────────────────────────────────────────────────────────────
+var _fornLista=[], _fornFiltro='';
+
 async function carregarForn(){
   g('lista-forn').innerHTML='<div class="empty"><div class="spin"></div>Carregando...</div>';
-  var r=await fetch('/api/pj-fornecedores?action=load').then(function(x){return x.json();});
-  var lista=r.fornecedores||[];
-  g('b-forn').textContent=lista.length;
-  if(!lista.length){g('lista-forn').innerHTML='<div class="empty">Nenhum cliente PJ ainda.</div>';return;}
+  try{
+    var r=await fetch('/api/pj-fornecedores?action=load').then(function(x){return x.json();});
+    _fornLista=r.fornecedores||[];
+    g('b-forn').textContent=_fornLista.length;
+    renderForn();
+  }catch(e){g('lista-forn').innerHTML='<div class="empty">Erro ao carregar</div>';}
+}
+
+function renderForn(){
+  var lista=_fornFiltro?_fornLista.filter(function(f){
+    var q=_fornFiltro.toLowerCase();
+    return (f.razaoSocial||'').toLowerCase().includes(q)||(f.responsavel||'').toLowerCase().includes(q)||(f.cnpj||'').includes(q)||(f.email||'').toLowerCase().includes(q);
+  }):_fornLista;
+  if(!lista.length){g('lista-forn').innerHTML='<div class="empty">'+ (_fornFiltro?'Nenhum resultado.':'Nenhum cliente PJ ainda.')+'</div>';return;}
+  var hoje=new Date().toISOString().slice(0,10);
   g('lista-forn').innerHTML=lista.map(function(f){
+    var cobs=f.cobrancas||[];
+    var pend=cobs.filter(function(c){return c.status!=='recebido';});
+    var venc=pend.filter(function(c){return c.vencimento&&c.vencimento<hoje;});
+    var tot=pend.reduce(function(s,c){return s+(parseFloat(c.valor)||0);},0);
+    var cobBadge=pend.length?'<span style="font-family:var(--fm);font-size:9px;padding:2px 7px;border-radius:4px;background:'+(venc.length?'var(--red2)':'rgba(59,130,246,.12)')+';color:'+(venc.length?'var(--re)':'var(--bl)')+';border:1px solid '+(venc.length?'rgba(240,64,96,.3)':'rgba(59,130,246,.3)')+'">'+  (venc.length?'🔴 ':'⏳ ')+pend.length+' cob. — R$ '+tot.toFixed(2).replace('.',',')+'</span>':'';
     return '<div class="for-card">'+
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start">'+
-      '<div><div style="font-weight:700;font-size:13px">'+esc(f.razaoSocial)+'</div>'+
-      '<div style="font-family:var(--fm);font-size:10px;color:var(--mu)">CNPJ: '+esc(f.cnpj)+'</div></div>'+
-      '<span style="font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;background:rgba(16,217,130,.12);color:var(--gr);border:1px solid rgba(16,217,130,.25)">Ativo</span></div>'+
-      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'+
-      (f.prazo?'<span style="font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;background:var(--s2);border:1px solid var(--bdr);color:var(--mu)">💳 '+esc(f.prazo)+'</span>':'')+
-      (f.regime?'<span style="font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;background:var(--s2);border:1px solid var(--bdr);color:var(--mu)">📋 '+esc(f.regime)+'</span>':'')+
-      (f.emiteNf?'<span style="font-family:var(--fm);font-size:9px;padding:2px 8px;border-radius:99px;background:var(--s2);border:1px solid var(--bdr);color:var(--mu)">🧾 NF: '+esc(f.emiteNf)+'</span>':'')+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'+
+        '<div><div style="font-size:13px;font-weight:600">'+esc(f.razaoSocial)+'</div>'+
+        '<div style="font-family:var(--fm);font-size:10px;color:var(--mu);margin-top:2px">'+(f.cnpj?f.cnpj+' · ':'')+esc(f.segmento||'')+'</div></div>'+
+        '<div style="display:flex;gap:5px">'+
+          '<button class="btn" style="font-size:9px" data-fid="'+f.id+'" onclick="abrirEditarForn(this.dataset.fid)">✏️ Editar</button>'+
+          '<button class="btn btn-gr" style="font-size:9px;font-weight:700" data-fid="'+f.id+'" onclick="abrirGerarCobranca(this.dataset.fid)">💰 Cobrança</button>'+
+        '</div>'+
       '</div>'+
-      (f.nfObs?'<div style="font-family:var(--fm);font-size:9px;color:var(--or);margin-top:6px">⚠️ NF: '+esc(f.nfObs)+'</div>':'')+
-      '</div>';
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;font-family:var(--fm);font-size:10px;color:var(--mu);margin-bottom:8px">'+
+        (f.responsavel?'<span>👤 '+esc(f.responsavel)+'</span>':'')+
+        (f.telefone?'<span>📱 '+esc(f.telefone)+'</span>':'')+
+        (f.email?'<span>📧 '+esc(f.email)+'</span>':'')+
+        (f.prazoAcordado?'<span>⏱ Prazo '+f.prazoAcordado+'d</span>':'')+
+      '</div>'+
+      (cobBadge?'<div>'+cobBadge+'</div>':'')+
+    '</div>';
   }).join('');
 }
+
+function fornBuscar(q){_fornFiltro=q.trim();renderForn();}
+
+function abrirNovoForn(){
+  g('ov-f-titulo').textContent='🏢 CADASTRAR CLIENTE PJ';
+  g('f-id').value='';
+  ['f-rs','f-cnpj','f-ie','f-resp2','f-cargo2','f-tel2','f-email2','f-prazo','f-obsnf','f-obs2'].forEach(function(id){var el=g(id);if(el)el.value='';});
+  if(g('f-prazo'))g('f-prazo').value='30';
+  abrirOv('ov-f');
+}
+
+function abrirEditarForn(id){
+  var f=_fornLista.find(function(x){return x.id===id;}); if(!f) return;
+  g('ov-f-titulo').textContent='✏️ EDITAR CLIENTE PJ';
+  g('f-id').value=f.id;
+  var set=function(elId,val){var el=g(elId);if(el)el.value=val||'';};
+  set('f-rs',f.razaoSocial);set('f-cnpj',f.cnpj);set('f-ie',f.inscricaoEstadual);
+  set('f-resp2',f.responsavel);set('f-cargo2',f.cargo);set('f-tel2',f.telefone);
+  set('f-email2',f.email);set('f-prazo',f.prazoAcordado||30);
+  set('f-obsnf',f.obsNF);set('f-obs2',f.obs);
+  if(g('f-seg2')){var s=g('f-seg2');for(var i=0;i<s.options.length;i++){if(s.options[i].text===f.segmento)s.selectedIndex=i;}}
+  abrirOv('ov-f');
+}
+
+async function salvarForn(){
+  var id=g('f-id')?g('f-id').value:'';
+  var rs=gv('f-rs').trim(); if(!rs){toast('Razão social obrigatória','r');return;}
+  var btn=g('btn-salvar-forn'); if(btn){btn.disabled=true;btn.textContent='Salvando...';}
+  var dados={razaoSocial:rs,cnpj:gv('f-cnpj'),inscricaoEstadual:gv('f-ie')||'',responsavel:gv('f-resp2'),cargo:gv('f-cargo2'),telefone:gv('f-tel2'),email:gv('f-email2'),segmento:g('f-seg2')?g('f-seg2').value:'',prazoAcordado:parseInt(gv('f-prazo'))||30,obsNF:gv('f-obsnf'),obs:gv('f-obs2')};
+  if(id)dados.id=id;
+  var r=await fetch('/api/pj-fornecedores?action='+(id?'atualizar':'criar'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(dados)}).then(function(x){return x.json();});
+  if(btn){btn.disabled=false;btn.textContent='Salvar Cliente PJ \u2192';}
+  if(r.ok){fecharOv('ov-f');await carregarForn();toast('\u2705 Cliente PJ salvo!','g');}
+  else toast('Erro: '+(r.error||'falha'),'r');
+}
+
+function formatTelForn(inp){var v=inp.value.replace(/\D/g,'').slice(0,11);if(v.length>7)v='('+v.slice(0,2)+') '+v.slice(2,7)+'-'+v.slice(7);else if(v.length>2)v='('+v.slice(0,2)+') '+v.slice(2);inp.value=v;}
+
+var _cobClienteId='';
+
+function abrirGerarCobranca(id){
+  _cobClienteId=id;
+  var f=_fornLista.find(function(x){return x.id===id;});
+  if(g('cob-nome'))g('cob-nome').textContent=f?f.razaoSocial:'';
+  if(g('cob-valor'))g('cob-valor').value='';
+  if(g('cob-desc'))g('cob-desc').value='';
+  var dias=(f&&f.prazoAcordado)?parseInt(f.prazoAcordado):30;
+  var d=new Date(); d.setDate(d.getDate()+dias);
+  if(g('cob-venc'))g('cob-venc').value=d.toISOString().slice(0,10);
+  abrirOv('ov-cob');
+}
+
+async function confirmarCobranca(){
+  var valor=parseFloat((gv('cob-valor')||'0').replace(',','.'));
+  var venc=gv('cob-venc'), desc=gv('cob-desc');
+  if(!valor||valor<=0){toast('Informe o valor','r');return;}
+  if(!venc){toast('Informe o vencimento','r');return;}
+  var btn=g('btn-cob'); if(btn){btn.disabled=true;btn.textContent='Gerando...';}
+  var r=await fetch('/api/pj-fornecedores?action=gerar-cobranca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clienteId:_cobClienteId,valor,vencimento:venc,descricao:desc})}).then(function(x){return x.json();});
+  if(btn){btn.disabled=false;btn.textContent='Gerar Cobran\u00E7a \u2192';}
+  if(r.ok){fecharOv('ov-cob');await carregarForn();toast('\uD83D\uDCB0 Cobran\u00E7a gerada!','g');}
+  else toast('Erro: '+(r.error||'falha'),'r');
+}
+
+var _fatDados=[], _fatFiltro='todos';
+
+async function carregarFaturamento(){
+  g('fat-lista').innerHTML='<div class="empty"><div class="spin"></div>Carregando...</div>';
+  try{
+    var r=await fetch('/api/pj-fornecedores?action=faturamento').then(function(x){return x.json();});
+    _fatDados=r.cobran\u00E7as||[];
+    g('fat-dash').innerHTML=
+      fatMet('\u23F3 Pendente','R$ '+(r.totalPendente||0).toFixed(2).replace('.',','),r.qtdPendentes||0,'#3b82f6')+
+      fatMet('\uD83D\uDD34 Vencido','R$ '+(r.totalVencido||0).toFixed(2).replace('.',','),r.qtdVencidas||0,'#f04060')+
+      fatMet('\u2705 Recebido','R$ '+(r.totalRecebido||0).toFixed(2).replace('.',','),0,'#10d982');
+    renderFaturamento();
+  }catch(e){g('fat-lista').innerHTML='<div class="empty">Erro ao carregar</div>';}
+}
+
+function fatMet(label,val,qtd,cor){
+  return '<div style="background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:14px 16px;border-top:2px solid '+cor+'">'+
+    '<div style="font-family:var(--fh);font-size:20px;font-weight:900;color:'+cor+'">'+val+'</div>'+
+    '<div style="font-family:var(--fm);font-size:9px;color:var(--mu);margin-top:3px">'+label+(qtd?' \xB7 '+qtd+' cobr.':'')+'</div>'+
+  '</div>';
+}
+
+function fatSetFiltro(f,btn){
+  _fatFiltro=f;
+  document.querySelectorAll('[id^="fat-f-"]').forEach(function(b){b.style.borderColor='';b.style.color='';});
+  if(btn){btn.style.borderColor='var(--bl)';btn.style.color='var(--bl)';}
+  renderFaturamento();
+}
+
+function renderFaturamento(){
+  var lista=_fatDados.filter(function(c){return _fatFiltro==='todos'||c.status===_fatFiltro;})
+    .sort(function(a,b){return(a.vencimento||'').localeCompare(b.vencimento||'');});
+  if(!lista.length){g('fat-lista').innerHTML='<div class="empty">Nenhuma cobran\u00E7a.</div>';return;}
+  g('fat-lista').innerHTML='<table style="width:100%;border-collapse:collapse;font-size:11px">'+
+    '<thead><tr style="font-family:var(--fm);font-size:9px;color:var(--mu)">'+
+    '<th style="padding:8px 10px;text-align:left">CLIENTE</th>'+
+    '<th style="padding:8px;text-align:left">DESCRI\u00C7\u00C3O</th>'+
+    '<th style="padding:8px;text-align:right">VALOR</th>'+
+    '<th style="padding:8px;text-align:center">VENCIMENTO</th>'+
+    '<th style="padding:8px;text-align:center">STATUS</th>'+
+    '<th style="padding:8px;text-align:center">A\u00C7\u00C3O</th>'+
+    '</tr></thead><tbody>'+
+    lista.map(function(c){
+      var cor=c.status==='recebido'?'var(--gr)':c.status==='vencido'?'var(--re)':'var(--bl)';
+      var lbl=c.status==='recebido'?'\u2705 Recebido':c.status==='vencido'?'\uD83D\uDD34 Vencido':'\u23F3 Pendente';
+      var btn=c.status!=='recebido'
+        ?'<button class="btn btn-gr" style="font-size:9px;padding:4px 10px" data-cid="'+c.clienteId+'" data-cobid="'+c.id+'" onclick="marcarRecebido(this.dataset.cid,this.dataset.cobid)">\u2713 Recebeu</button>'
+        :'<span style="font-family:var(--fm);font-size:9px;color:var(--mu)">'+(c.recebidoEm?c.recebidoEm.slice(0,10):'')+'</span>';
+      return '<tr style="border-bottom:1px solid var(--bdr)">'+
+        '<td style="padding:10px"><div style="font-weight:600">'+esc(c.clienteNome)+'</div>'+
+        '<div style="font-family:var(--fm);font-size:9px;color:var(--mu)">'+esc(c.clienteResp||'')+'</div></td>'+
+        '<td style="padding:10px;color:var(--mu)">'+esc(c.descricao||'\u2014')+'</td>'+
+        '<td style="padding:10px;text-align:right;font-family:var(--fm);font-weight:700">R$ '+(parseFloat(c.valor)||0).toFixed(2).replace('.',',')+'</td>'+
+        '<td style="padding:10px;text-align:center;font-family:var(--fm);font-size:10px">'+(c.vencimento||'\u2014')+'</td>'+
+        '<td style="padding:10px;text-align:center"><span style="font-family:var(--fm);font-size:9px;color:'+cor+'">'+lbl+'</span></td>'+
+        '<td style="padding:10px;text-align:center">'+btn+'</td>'+
+      '</tr>';
+    }).join('')+'</tbody></table>';
+}
+
+async function marcarRecebido(clienteId,cobId){
+  if(!confirm('Confirmar recebimento?\nUma ficha ser\u00E1 criada no Pipe.'))return;
+  var r=await fetch('/api/pj-fornecedores?action=marcar-recebido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clienteId,cobId})}).then(function(x){return x.json();});
+  if(r.ok){await carregarFaturamento();toast('\u2705 Recebimento confirmado'+(r.pipeOk?' + ficha no Pipe!':''),'g');}
+  else toast('Erro: '+(r.error||'falha'),'r');
+}
+
 
 async function criarFornecedor(){
   var rs=gv('f-rs'), cnpj=gv('f-cnpj');
@@ -1895,6 +2051,31 @@ document.addEventListener("DOMContentLoaded",function(){
   <div class="modal-bg" id="sdr-detail-bg" style="display:none" onclick="if(event.target===this)fecharDetalhe()">
     <div class="modal" style="max-width:520px;max-height:88vh;overflow-y:auto;" id="sdr-detail-panel"></div>
   </div>
+
+
+<!-- MODAL COBRANÇA -->
+<div class="ov" id="ov-cob" style="display:none" onclick="if(event.target===this)fecharOv('ov-cob')">
+<div class="mdl" style="max-width:380px">
+  <div class="mdl-t">💰 GERAR COBRANÇA</div>
+  <div style="font-family:var(--fm);font-size:11px;color:var(--bl);margin-bottom:14px;font-weight:700" id="cob-nome"></div>
+  <div class="fld" style="margin-bottom:12px">
+    <label>VALOR (R$) *</label>
+    <input id="cob-valor" type="number" min="0" step="0.01" placeholder="0,00" style="font-size:16px;width:100%">
+  </div>
+  <div class="fld" style="margin-bottom:12px">
+    <label>DATA DE VENCIMENTO *</label>
+    <input id="cob-venc" type="date" style="width:100%">
+  </div>
+  <div class="fld" style="margin-bottom:14px">
+    <label>DESCRIÇÃO / SERVIÇO</label>
+    <input id="cob-desc" placeholder="Ex: Manutenção mensal março/2026" style="width:100%">
+  </div>
+  <div style="display:flex;gap:8px;justify-content:flex-end">
+    <button class="btn" onclick="fecharOv('ov-cob')">Cancelar</button>
+    <button class="btn btn-gr" id="btn-cob" onclick="confirmarCobranca()" style="font-weight:700">Gerar Cobrança →</button>
+  </div>
+</div>
+</div>
 
 </body>
 </html>
