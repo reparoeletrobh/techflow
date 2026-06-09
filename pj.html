@@ -1687,67 +1687,135 @@ function diasRestantes(venc, status) {
   return '<span style="color:var(--re)">' + diff + 'd</span>';
 }
 
+
+// ══ HISTÓRICO DE COBRANÇAS ═══════════════════════════════════════════════════
+var _histClienteId = '';
+
 function abrirHistorico(id) {
+  _histClienteId = id;
   var f = _fornLista.find(function(x){ return x.id===id; });
-  if (!f) { toast("Cliente não encontrado", "r"); return; }
-  _desenharHistorico(f);
-  // Atualizar silenciosamente
+  if (!f) { toast('Cliente não encontrado','r'); return; }
+  _renderHistModal(f);
+  abrirOv('ov-hist');
+  // Atualizar dados em background
   fetch('/api/pj-fornecedores?action=load')
-    .then(function(x){return x.json();})
+    .then(function(x){ return x.json(); })
     .then(function(r){
-      if(!r.ok) return;
+      if (!r.ok) return;
       _fornLista = r.fornecedores||[];
-      var ff = _fornLista.find(function(x){return x.id===id;});
-      if(ff) _desenharHistorico(ff);
+      var ff = _fornLista.find(function(x){ return x.id===id; });
+      if (ff) _renderHistModal(ff);
     }).catch(function(){});
 }
 
-function _desenharHistorico(f) {
+function _renderHistModal(f) {
+  var el = g('hist-titulo');
+  if (el) el.textContent = '📋 ' + f.razaoSocial + ' — Cobranças';
+  var body = g('hist-body');
+  if (!body) return;
   var cobs = (f.cobrancas||[]).slice().sort(function(a,b){
     return (b.criadoEm||'').localeCompare(a.criadoEm||'');
   });
-  var titulo = g('hist-titulo');
-  var body   = g('hist-body');
-  var modal  = g('ov-hist');
-  if(titulo) titulo.textContent = '📋 Histórico — ' + f.razaoSocial;
-  if(!cobs.length){
-    if(body) body.innerHTML='<div style="padding:20px;text-align:center;font-family:var(--fm);font-size:11px;color:var(--mu)">Nenhuma cobrança registrada.</div>';
-    if(modal) modal.style.display='flex';
+  if (!cobs.length) {
+    body.innerHTML = '<div style="padding:24px;text-align:center;font-family:var(--fm);font-size:12px;color:var(--mu)">Nenhuma cobrança registrada para este cliente.</div>';
     return;
   }
-  var hoje=new Date().toISOString().slice(0,10);
-  var rows=cobs.map(function(c){
-    var st=c.status==='recebido'?'recebido':(c.vencimento&&c.vencimento<hoje?'vencido':'pendente');
-    var cor=st==='recebido'?'var(--gr)':st==='vencido'?'var(--re)':'var(--bl)';
-    var lbl=st==='recebido'?'✅ Recebido':st==='vencido'?'🔴 Vencido':'⏳ Pendente';
-    var nf=c.nfChave?'<a href="/api/nfse?action=danfe&chave='+c.nfChave+'" target="_blank" class="btn" style="font-size:9px;padding:2px 6px;color:var(--gr);border-color:var(--gr);margin:1px">📄 NF</a>':'';
-    var bol=c.boletoUrl?'<a href="'+c.boletoUrl+'" target="_blank" class="btn" style="font-size:9px;padding:2px 6px;color:#3b82f6;border-color:#3b82f6;margin:1px">🔵 Boleto</a>'
-      :(st!=='recebido'?'<button class="btn" style="font-size:9px;padding:2px 6px;color:#3b82f6;border-color:#3b82f6" data-cid="'+f.id+'" data-cobid="'+c.id+'" onclick="reemitirBoleto(this.dataset.cid,this.dataset.cobid)">+ Boleto</button>':'');
+  var hoje = new Date().toISOString().slice(0,10);
+  body.innerHTML = cobs.map(function(c) {
+    var st  = c.status==='recebido'?'recebido':(c.vencimento&&c.vencimento<hoje?'vencido':'pendente');
+    var cor = st==='recebido'?'var(--gr)':st==='vencido'?'var(--re)':'var(--bl)';
+    var lbl = st==='recebido'?'✅ Recebido':st==='vencido'?'🔴 Vencido':'⏳ Pendente';
+    var vlr = 'R$ '+parseFloat(c.valor||0).toFixed(2).replace('.',',');
     var dias='';
-    if(c.vencimento&&st!=='recebido'){
-      var d=Math.ceil((new Date(c.vencimento)-new Date(hoje))/86400000);
-      dias=d>0?'<b style="color:var(--bl)">+'+d+'d</b>':d===0?'<b style="color:var(--yel)">Hoje</b>':'<b style="color:var(--re)">'+d+'d</b>';
+    if(c.vencimento && st!=='recebido'){
+      var diff=Math.ceil((new Date(c.vencimento)-new Date(hoje))/86400000);
+      dias=diff>0?' · <span style="color:var(--bl)">+'+diff+'d</span>':diff===0?' · <span style="color:var(--yel)">Vence hoje</span>':' · <span style="color:var(--re)">'+Math.abs(diff)+'d atraso</span>';
     }
-    return '<tr style="border-bottom:1px solid var(--bdr)">'
-      +'<td style="padding:7px;font-family:var(--fm);font-size:9px;color:var(--mu)">'+(c.criadoEm||'').slice(0,10)+'</td>'
-      +'<td style="padding:7px;color:var(--mu);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c.descricao||'—')+'</td>'
-      +'<td style="padding:7px;text-align:right;font-weight:700">R$ '+parseFloat(c.valor||0).toFixed(2).replace('.',',')+'</td>'
-      +'<td style="padding:7px;text-align:center;font-family:var(--fm);font-size:10px">'+(c.vencimento||'—')+'</td>'
-      +'<td style="padding:7px;text-align:center">'+dias+'</td>'
-      +'<td style="padding:7px;text-align:center"><span style="font-family:var(--fm);font-size:9px;color:'+cor+'">'+lbl+'</span></td>'
-      +'<td style="padding:7px;text-align:center">'+nf+bol+'</td>'
-      +'</tr>';
+    // Bloco NF
+    var nfBlock = c.nfChave
+      ? '<div style="border:1px solid rgba(16,217,130,.3);border-radius:8px;overflow:hidden;margin-bottom:8px">'
+        +'<div style="background:rgba(16,217,130,.06);padding:10px 12px;display:flex;align-items:center;justify-content:space-between">'
+          +'<div style="display:flex;align-items:center;gap:8px">'
+            +'<span style="font-size:16px">📄</span>'
+            +'<div><div style="font-family:var(--fm);font-size:9px;font-weight:700;color:var(--gr)">NOTA FISCAL EMITIDA</div>'
+            +'<div style="font-family:var(--fm);font-size:9px;color:var(--mu)">Chave: ...'+c.nfChave.slice(-12)+'</div></div>'
+          +'</div>'
+          +'<div style="display:flex;gap:5px">'
+            +'<a href="/api/nfse?action=danfe&chave='+c.nfChave+'" target="_blank" class="btn" style="font-size:9px;padding:3px 8px;color:var(--bl)">👁 Ver PDF</a>'
+            +'<a href="/api/nfse?action=danfe&chave='+c.nfChave+'" download="NF-'+c.nfChave.slice(-8)+'.pdf" class="btn" style="font-size:9px;padding:3px 8px;color:var(--gr)">⬇ Download</a>'
+          +'</div>'
+        +'</div>'
+        +'<div style="padding:8px 12px;background:var(--s1);display:flex;gap:5px">'
+          +'<button class="btn" style="font-size:9px;color:var(--re);border-color:rgba(240,64,96,.4)" data-action="cancelar-nf" data-cid="'+f.id+'" data-cobid="'+c.id+'">❌ Cancelar NF</button>'
+          +'<button class="btn" style="font-size:9px;color:var(--yel);border-color:rgba(245,200,0,.4)" data-action="reemitir-nf" data-cid="'+f.id+'" data-cobid="'+c.id+'">🔄 Re-emitir NF</button>'
+        +'</div>'
+      +'</div>'
+      : '<div style="border:1px dashed var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">'
+          +'<span style="font-family:var(--fm);font-size:10px;color:var(--mu)">📄 Nota fiscal não emitida</span>'
+          +'<button class="btn" style="font-size:9px;color:var(--yel);border-color:rgba(245,200,0,.4)" data-action="reemitir-nf" data-cid="'+f.id+'" data-cobid="'+c.id+'">+ Emitir NF</button>'
+        +'</div>';
+    // Bloco Boleto
+    var bolBlock = c.boletoUrl
+      ? '<div style="border:1px solid rgba(59,130,246,.3);border-radius:8px;overflow:hidden;margin-bottom:8px">'
+          +'<div style="background:rgba(59,130,246,.06);padding:10px 12px;display:flex;align-items:center;justify-content:space-between">'
+            +'<div style="display:flex;align-items:center;gap:8px">'
+              +'<span style="font-size:16px">🔵</span>'
+              +'<div><div style="font-family:var(--fm);font-size:9px;font-weight:700;color:#3b82f6">BOLETO GERADO</div>'
+              +'<div style="font-family:var(--fm);font-size:9px;color:var(--mu)">Venc: '+c.vencimento+' · '+vlr+'</div></div>'
+            +'</div>'
+            +'<a href="'+c.boletoUrl+'" target="_blank" class="btn" style="font-size:9px;padding:3px 8px;color:#3b82f6;border-color:#3b82f6">🔵 Acessar Boleto</a>'
+          +'</div>'
+          +'<div style="padding:8px 12px;background:var(--s1);display:flex;gap:5px">'
+            +'<button class="btn" style="font-size:9px;color:var(--re);border-color:rgba(240,64,96,.4)" data-action="cancelar-boleto" data-cid="'+f.id+'" data-cobid="'+c.id+'">❌ Cancelar Boleto</button>'
+            +'<button class="btn" style="font-size:9px;color:var(--yel);border-color:rgba(245,200,0,.4)" data-action="hist-reemitir-boleto" data-cid="'+f.id+'" data-cobid="'+c.id+'">🔄 Re-emitir Boleto</button>'
+          +'</div>'
+        +'</div>'
+      : '<div style="border:1px dashed var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">'
+          +'<span style="font-family:var(--fm);font-size:10px;color:var(--mu)">🔵 Boleto não gerado</span>'
+          +'<button class="btn" style="font-size:9px;color:#3b82f6;border-color:rgba(59,130,246,.4)" data-action="hist-reemitir-boleto" data-cid="'+f.id+'" data-cobid="'+c.id+'">+ Gerar Boleto</button>'
+        +'</div>';
+    // Editar dados inline
+    var editBlock = st!=='recebido'
+      ? '<div id="hist-edit-'+c.id+'" style="display:none;border:1px solid var(--bdr);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--s2)">'
+          +'<div style="font-family:var(--fm);font-size:9px;color:var(--mu);margin-bottom:8px;letter-spacing:.07em">✏️ ALTERAR DADOS</div>'
+          +'<div class="grid2" style="margin-bottom:8px">'
+            +'<div class="fld"><label>VALOR (R$)</label><input class="hist-edit-valor" value="'+c.valor+'" type="number" step="0.01" style="width:100%"></div>'
+            +'<div class="fld"><label>VENCIMENTO</label><input class="hist-edit-venc" value="'+(c.vencimento||'')+'" type="date" style="width:100%"></div>'
+            +'<div class="fld" style="grid-column:1/-1"><label>DESCRIÇÃO</label><input class="hist-edit-desc" value="'+esc(c.descricao||'')+'" style="width:100%"></div>'
+          +'</div>'
+          +'<div style="display:flex;gap:6px;justify-content:flex-end">'
+            +'<button class="btn" style="font-size:10px" onclick="g('hist-edit-'+c.id+'').style.display='none'">Cancelar</button>'
+            +'<button class="btn btn-gr" style="font-size:10px" data-action="salvar-alteracao" data-cid="'+f.id+'" data-cobid="'+c.id+'" data-editid="hist-edit-'+c.id+'">✅ Salvar</button>'
+          +'</div>'
+        +'</div>'
+      : '';
+    return '<div style="border:1px solid var(--bdr);border-radius:10px;margin-bottom:12px;overflow:hidden">'
+      // Cabeçalho da cobrança
+      +'<div style="background:var(--s2);padding:10px 14px;display:flex;align-items:center;justify-content:space-between">'
+        +'<div>'
+          +'<div style="font-weight:600;font-size:13px">'+vlr
+            +' <span style="font-family:var(--fm);font-size:10px;color:'+cor+'">'+lbl+'</span>'+dias+'</div>'
+          +'<div style="font-family:var(--fm);font-size:10px;color:var(--mu);margin-top:2px">'+esc(c.descricao||'Sem descrição')+' · '+(c.criadoEm||'').slice(0,10)+'</div>'
+        +'</div>'
+        +(st!=='recebido'
+          ? '<div style="display:flex;gap:5px">'
+              +'<button class="btn" style="font-size:9px;color:var(--mu)" data-action="abrir-edit-hist" data-editid="hist-edit-'+c.id+'">✏️ Alterar</button>'
+              +'<button class="btn btn-gr" style="font-size:9px" data-action="marcar-recebido-hist" data-cid="'+f.id+'" data-cobid="'+c.id+'">✓ Recebeu</button>'
+            +'</div>'
+          : '<span style="font-family:var(--fm);font-size:9px;color:var(--gr)">✅ '+( c.recebidoEm?c.recebidoEm.slice(0,10):'Recebido')+'</span>'
+        )
+      +'</div>'
+      // Corpo
+      +'<div style="padding:12px 14px">'
+        +editBlock
+        +nfBlock
+        +bolBlock
+      +'</div>'
+    +'</div>';
   }).join('');
-  var t='<table style="width:100%;border-collapse:collapse;font-size:11px">'
-    +'<thead><tr style="font-family:var(--fm);font-size:9px;color:var(--mu)">'
-    +'<th style="padding:7px;text-align:left">DATA</th><th style="padding:7px;text-align:left">DESCRIÇÃO</th>'
-    +'<th style="padding:7px;text-align:right">VALOR</th><th style="padding:7px;text-align:center">VENC.</th>'
-    +'<th style="padding:7px;text-align:center">DIAS</th><th style="padding:7px;text-align:center">STATUS</th>'
-    +'<th style="padding:7px;text-align:center">DOCS</th>'
-    +'</tr></thead><tbody>'+rows+'</tbody></table>';
-  if(body)  body.innerHTML=t;
-  if(modal) modal.style.display='flex';
 }
+
+
 
 
 window.abrirHistorico = abrirHistorico;
@@ -2462,6 +2530,13 @@ document.addEventListener('click', function(e) {
     if (a==='excluir')  { excluirLead(lid); return; }
     if (a==='converter') { converterClientePJ(lid); return; }
     if (a==='historico') { abrirHistorico(act.dataset.fid); return; }
+    if (a==='abrir-edit-hist') { var ed=g(act.dataset.editid); if(ed) ed.style.display=ed.style.display==='none'?'block':'none'; return; }
+    if (a==='salvar-alteracao') { histSalvarAlteracao(act); return; }
+    if (a==='cancelar-nf') { histCancelarNF(act.dataset.cid, act.dataset.cobid); return; }
+    if (a==='reemitir-nf') { histReemitirNF(act.dataset.cid, act.dataset.cobid); return; }
+    if (a==='cancelar-boleto') { histCancelarBoleto(act.dataset.cid, act.dataset.cobid); return; }
+    if (a==='hist-reemitir-boleto') { histReemitirBoleto(act.dataset.cid, act.dataset.cobid); return; }
+    if (a==='marcar-recebido-hist') { histMarcarRecebido(act.dataset.cid, act.dataset.cobid); return; }
   }
 });
 
@@ -2470,6 +2545,72 @@ document.addEventListener("click", function(e) {
   var el = e.target.closest('[data-action="historico"]');
   if (el) { abrirHistorico(el.dataset.fid); return; }
 });
+
+
+async function histSalvarAlteracao(btn) {
+  var editDiv = g(btn.dataset.editid);
+  var valor = editDiv.querySelector('.hist-edit-valor').value;
+  var venc  = editDiv.querySelector('.hist-edit-venc').value;
+  var desc  = editDiv.querySelector('.hist-edit-desc').value;
+  var r = await fetch('/api/pj-cobranca?action=atualizar-cobranca',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({clienteId:btn.dataset.cid,cobId:btn.dataset.cobid,valor,vencimento:venc,descricao:desc})
+  }).then(function(x){return x.json();});
+  if(r.ok){
+    editDiv.style.display='none';
+    await carregarForn();
+    var f=_fornLista.find(function(x){return x.id===btn.dataset.cid;});
+    if(f) _renderHistModal(f);
+    toast('✅ Dados atualizados','g');
+  } else toast('Erro: '+(r.error||'falha'),'r');
+}
+
+async function histCancelarNF(cid,cobId){
+  if(!confirm('Cancelar a nota fiscal?')) return;
+  var r=await fetch('/api/pj-cobranca?action=cancelar-nf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clienteId:cid,cobId})}).then(function(x){return x.json();});
+  if(r.ok){await _reloadHist(cid);toast('✅ NF cancelada','g');}
+  else toast('Erro: '+(r.error||'falha'),'r');
+}
+
+async function histReemitirNF(cid,cobId){
+  toast('⏳ Re-emitindo NF...','');
+  var f=_fornLista.find(function(x){return x.id===cid;});
+  var cob=f&&(f.cobrancas||[]).find(function(c){return c.id===cobId;});
+  var r=await fetch('/api/pj-cobranca?action=faturar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({clienteId:cid,cobId,valor:cob?cob.valor:0,vencimento:cob?cob.vencimento:'',descricao:cob?cob.descricao:'',apenasNF:true})
+  }).then(function(x){return x.json();});
+  if(r.ok||r.nf){await _reloadHist(cid);toast('✅ NF re-emitida!','g');}
+  else toast('Erro NF: '+((r.errors||[]).join(' ')||r.error||'falha'),'r');
+}
+
+async function histCancelarBoleto(cid,cobId){
+  if(!confirm('Cancelar o boleto?')) return;
+  var r=await fetch('/api/pj-cobranca?action=cancelar-boleto',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clienteId:cid,cobId})}).then(function(x){return x.json();});
+  if(r.ok){await _reloadHist(cid);toast('✅ Boleto cancelado','g');}
+  else toast('Erro: '+(r.error||'falha'),'r');
+}
+
+async function histReemitirBoleto(cid,cobId){
+  toast('⏳ Gerando boleto...','');
+  var r=await fetch('/api/pj-cobranca?action=reemitir-boleto',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clienteId:cid,cobId})}).then(function(x){return x.json();});
+  if(r.ok){await _reloadHist(cid);toast('✅ Boleto gerado!','g');}
+  else toast('Erro: '+(r.error||'falha'),'r');
+}
+
+async function histMarcarRecebido(cid,cobId){
+  if(!confirm('Confirmar recebimento?')) return;
+  var r=await fetch('/api/pj-fornecedores?action=marcar-recebido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clienteId:cid,cobId})}).then(function(x){return x.json();});
+  if(r.ok){await _reloadHist(cid);toast('✅ Recebimento confirmado'+(r.pipeOk?' + ficha no Pipe!':''),'g');}
+  else toast('Erro: '+(r.error||'falha'),'r');
+}
+
+async function _reloadHist(cid){
+  var r=await fetch('/api/pj-fornecedores?action=load').then(function(x){return x.json();});
+  if(r.ok) _fornLista=r.fornecedores||[];
+  var ff=_fornLista.find(function(x){return x.id===cid;});
+  if(ff) _renderHistModal(ff);
+  renderForn();
+}
 
 document.addEventListener("DOMContentLoaded",function(){
   carregarSDR();
@@ -2695,14 +2836,15 @@ document.addEventListener("DOMContentLoaded",function(){
 </div>
 </div>
 
-<!-- MODAL HISTÓRICO -->
-<div class="ov" id="ov-hist" style="display:none;align-items:flex-start;padding:20px;overflow-y:auto" onclick="if(event.target===this)fecharOv('ov-hist')">
-<div class="mdl" style="max-width:800px;width:100%;margin:auto">
+<!-- MODAL HISTÓRICO COMPLETO -->
+<div class="ov" id="ov-hist" style="display:none;align-items:flex-start;padding:16px;overflow-y:auto" onclick="if(event.target===this)fecharOv('ov-hist')">
+<div class="mdl" style="max-width:720px;width:100%;margin:auto">
   <div class="mdl-t" style="display:flex;align-items:center;justify-content:space-between">
-    <span id="hist-titulo">📋 Histórico</span>
+    <span id="hist-titulo">📋 Histórico de Cobranças</span>
     <button class="btn" style="font-size:10px" onclick="fecharOv('ov-hist')">✕ Fechar</button>
   </div>
-  <div id="hist-body" style="margin-top:8px;overflow-x:auto"></div>
+  <div id="hist-body"></div>
 </div>
 </div>
+
 </body>
