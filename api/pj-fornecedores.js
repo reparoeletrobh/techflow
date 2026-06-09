@@ -81,7 +81,7 @@ module.exports=async function handler(req,res){
     const idx=db.fornecedores.findIndex(x=>x.id===id);
     if(idx<0)return res.status(404).json({ok:false,error:'cliente não encontrado'});
     // Campos editáveis (não sobrescreve id, cobrancas, criadoEm)
-    const editaveis=['razaoSocial','cnpj','inscricaoEstadual','responsavel','email','telefone','endereco','prazoAcordado','regime','emiteNF','tipoAtendimento','obsNF','equipamentos','obs'];
+    const editaveis=['razaoSocial','cnpj','inscricaoEstadual','responsavel','email','telefone','endereco','prazoAcordado','retencaoISS','regime','emiteNF','tipoAtendimento','obsNF','equipamentos','obs'];
     editaveis.forEach(k=>{if(campos[k]!==undefined)db.fornecedores[idx][k]=campos[k];});
     db.fornecedores[idx].atualizadoEm=new Date().toISOString();
     await dbSet(KEY,db);
