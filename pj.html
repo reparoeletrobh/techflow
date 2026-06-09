@@ -681,7 +681,7 @@ select option{background:var(--s2);}
 <!-- MODAL FORNECEDOR -->
 <div class="ov" id="ov-f" style="display:none" onclick="if(event.target===this)fecharOv('ov-f')">
 <div class="mdl" style="max-width:600px">
-  <div class="mdl-t">✅ CADASTRAR CLIENTE PJ / CLIENTE PJ</div>
+  <input type="hidden" id="f-id"><div class="mdl-t" id="ov-f-titulo">🏢 CADASTRAR CLIENTE PJ</div>
   <div class="grid2"><div class="fld"><label>RAZÃO SOCIAL *</label><input id="f-rs"></div>
   <div class="fld"><label>CNPJ *</label><input id="f-cnpj"></div></div>
   <div class="grid2"><div class="fld"><label>RESPONSÁVEL</label><input id="f-resp"></div>
@@ -718,7 +718,7 @@ select option{background:var(--s2);}
   <div class="fld grid1"><label>OBSERVAÇÕES</label><textarea id="f-obs"></textarea></div>
   <div class="mdl-btns">
     <button class="btn btn-x" onclick="fecharOv('ov-f')">Cancelar</button>
-    <button class="btn btn-gr" onclick="criarFornecedor()">Cadastrar</button>
+    <button class="btn btn-gr" id="btn-salvar-forn" onclick="salvarForn()">Salvar →</button>
   </div>
 </div></div>
 
@@ -1256,8 +1256,7 @@ function fornBuscar(q){_fornFiltro=q.trim();renderForn();}
 function abrirNovoForn(){
   g('ov-f-titulo').textContent='🏢 CADASTRAR CLIENTE PJ';
   g('f-id').value='';
-  ['f-rs','f-cnpj','f-ie','f-resp2','f-cargo2','f-tel2','f-email2','f-prazo','f-obsnf','f-obs2'].forEach(function(id){var el=g(id);if(el)el.value='';});
-  if(g('f-prazo'))g('f-prazo').value='30';
+  ['f-rs','f-cnpj','f-ie','f-resp','f-tel','f-email','f-end','f-nfobs','f-equip','f-obs'].forEach(function(id){var el=g(id);if(el)el.value='';});
   abrirOv('ov-f');
 }
 
@@ -1265,12 +1264,13 @@ function abrirEditarForn(id){
   var f=_fornLista.find(function(x){return x.id===id;}); if(!f) return;
   g('ov-f-titulo').textContent='✏️ EDITAR CLIENTE PJ';
   g('f-id').value=f.id;
-  var set=function(elId,val){var el=g(elId);if(el)el.value=val||'';};
-  set('f-rs',f.razaoSocial);set('f-cnpj',f.cnpj);set('f-ie',f.inscricaoEstadual);
-  set('f-resp2',f.responsavel);set('f-cargo2',f.cargo);set('f-tel2',f.telefone);
-  set('f-email2',f.email);set('f-prazo',f.prazoAcordado||30);
-  set('f-obsnf',f.obsNF);set('f-obs2',f.obs);
-  if(g('f-seg2')){var s=g('f-seg2');for(var i=0;i<s.options.length;i++){if(s.options[i].text===f.segmento)s.selectedIndex=i;}}
+  var set=function(elId,val){var el=g(elId);if(el)el.value=val||'';if(el&&el.tagName==='SELECT'){for(var i=0;i<el.options.length;i++){if(el.options[i].value===val||el.options[i].text===val)el.selectedIndex=i;}}};
+  set('f-rs',f.razaoSocial);set('f-cnpj',f.cnpj);set('f-ie',f.inscricaoEstadual||'');
+  set('f-resp',f.responsavel);set('f-tel',f.telefone);set('f-email',f.email);
+  set('f-end',f.endereco||'');set('f-prazo',f.prazoAcordado||'30 dias');
+  set('f-regime',f.regime||'');set('f-nf',f.emiteNF||'Sim');
+  set('f-atend',f.tipoAtendimento||'');set('f-nfobs',f.obsNF||'');
+  set('f-equip',f.equipamentos||'');set('f-obs',f.obs||'');
   abrirOv('ov-f');
 }
 
@@ -1278,7 +1278,12 @@ async function salvarForn(){
   var id=g('f-id')?g('f-id').value:'';
   var rs=gv('f-rs').trim(); if(!rs){toast('Razão social obrigatória','r');return;}
   var btn=g('btn-salvar-forn'); if(btn){btn.disabled=true;btn.textContent='Salvando...';}
-  var dados={razaoSocial:rs,cnpj:gv('f-cnpj'),inscricaoEstadual:gv('f-ie')||'',responsavel:gv('f-resp2'),cargo:gv('f-cargo2'),telefone:gv('f-tel2'),email:gv('f-email2'),segmento:g('f-seg2')?g('f-seg2').value:'',prazoAcordado:parseInt(gv('f-prazo'))||30,obsNF:gv('f-obsnf'),obs:gv('f-obs2')};
+  var sel=function(id){var el=g(id);return el?(el.tagName==='SELECT'?el.options[el.selectedIndex]&&el.options[el.selectedIndex].text:''):'';};
+  var dados={razaoSocial:rs,cnpj:gv('f-cnpj'),inscricaoEstadual:gv('f-ie')||'',
+    responsavel:gv('f-resp'),telefone:gv('f-tel'),email:gv('f-email'),
+    endereco:gv('f-end'),prazoAcordado:sel('f-prazo')||'30 dias',
+    regime:sel('f-regime'),emiteNF:sel('f-nf'),tipoAtendimento:sel('f-atend'),
+    obsNF:gv('f-nfobs'),equipamentos:gv('f-equip'),obs:gv('f-obs')};
   if(id)dados.id=id;
   var r=await fetch('/api/pj-fornecedores?action='+(id?'atualizar':'criar'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(dados)}).then(function(x){return x.json();});
   if(btn){btn.disabled=false;btn.textContent='Salvar Cliente PJ \u2192';}
