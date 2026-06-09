@@ -187,6 +187,22 @@ html,body{height:100vh;overflow:hidden;background:var(--bg);color:var(--text);fo
 .log-empty{text-align:center;padding:40px;color:var(--muted);font-family:var(--fm);font-size:11px;}
 .log-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:599;display:none;pointer-events:none;}
 .log-overlay.open{display:block;pointer-events:auto;}
+
+/* ── ALERTA CONFLITO ─────────────────────────────────────────────── */
+@keyframes conf-pulse{0%,100%{box-shadow:0 0 0 0 rgba(240,64,96,.7);}50%{box-shadow:0 0 0 12px rgba(240,64,96,0);}}
+@keyframes conf-blink{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.3;transform:scale(1.25);}}
+@keyframes conf-in{from{transform:translateX(110%);opacity:0;}to{transform:translateX(0);opacity:1;}}
+@keyframes conf-out{from{transform:translateX(0);opacity:1;}to{transform:translateX(110%);opacity:0;}}
+#nav-conflitos.alertando{animation:conf-pulse 1.1s ease infinite;}
+#nav-conf-badge.alertando{animation:conf-blink .65s ease infinite;}
+.conf-notif{position:fixed;bottom:24px;right:24px;z-index:9999;background:#0d0d14;border:2px solid #f04060;border-radius:14px;padding:16px 20px 14px;max-width:300px;box-shadow:0 8px 40px rgba(240,64,96,.45);display:flex;align-items:flex-start;gap:12px;animation:conf-in .4s cubic-bezier(.16,1,.3,1) forwards;cursor:pointer;}
+.conf-notif.out{animation:conf-out .3s ease forwards;}
+.conf-notif-ic{font-size:26px;animation:conf-blink 1s ease infinite;flex-shrink:0;}
+.conf-notif-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:#f04060;margin-bottom:4px;}
+.conf-notif-msg{font-family:'DM Mono',monospace;font-size:10px;color:#8080a0;line-height:1.5;}
+.conf-notif-x{position:absolute;top:8px;right:10px;background:none;border:none;color:#5a5a7a;font-size:14px;cursor:pointer;padding:2px 6px;}
+.conf-notif-x:hover{color:#fff;}
+
 </style>
 </head>
 <body>
@@ -775,6 +791,108 @@ function cpTel(t,e){
     <div class="log-empty">Clique em ↻ para carregar o log</div>
   </div>
 </div>
+
+
+<script>
+// ── ALERTAS DE CONFLITO ───────────────────────────────────────────────────────
+var _confPrev   = parseInt(sessionStorage.getItem('_cPrev') || '0');
+var _confNotif  = null;
+
+function tocarSomConflito() {
+  try {
+    var A = window.AudioContext || window.webkitAudioContext;
+    if (!A) return;
+    var ctx = new A();
+    function nota(freq, t0, dur, vol) {
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.type = 'sine';
+      o.frequency.setValueAtTime(freq, ctx.currentTime + t0);
+      g.gain.setValueAtTime(0, ctx.currentTime + t0);
+      g.gain.linearRampToValueAtTime(vol, ctx.currentTime + t0 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t0 + dur);
+      o.start(ctx.currentTime + t0);
+      o.stop(ctx.currentTime + t0 + dur + 0.05);
+    }
+    nota(880,  0.00, 0.15, 0.4);
+    nota(1100, 0.18, 0.15, 0.4);
+    nota(1320, 0.36, 0.28, 0.5);
+    nota(1100, 0.66, 0.12, 0.3);
+    nota(1320, 0.80, 0.35, 0.5);
+  } catch(e) {}
+}
+
+function mostrarNotifConflito(n) {
+  if (_confNotif) { _confNotif.remove(); _confNotif = null; }
+  var d = document.createElement('div');
+  d.className = 'conf-notif';
+  d.innerHTML =
+    '<button class="conf-notif-x" onclick="fecharNotif(event)">✕</button>' +
+    '<div class="conf-notif-ic">⚡</div>' +
+    '<div>' +
+      '<div class="conf-notif-title">Conflito Crítico!</div>' +
+      '<div class="conf-notif-msg">' + n + ' conflito' + (n>1?'s':'') +
+      ' crítico' + (n>1?'s':'') + ' em aberto.<br>' +
+      '<span style="color:#f04060;font-weight:700">Clique para ver →</span></div>' +
+    '</div>';
+  d.onclick = function(e) {
+    if (e.target.classList.contains('conf-notif-x')) return;
+    fecharNotif();
+    var item = document.getElementById('nav-conflitos');
+    if (item) openPage(item);
+  };
+  document.body.appendChild(d);
+  _confNotif = d;
+  setTimeout(fecharNotif, 9000);
+}
+
+function fecharNotif(e) {
+  if (e) e.stopPropagation();
+  if (_confNotif) {
+    _confNotif.classList.add('out');
+    var el = _confNotif; _confNotif = null;
+    setTimeout(function(){ el && el.remove(); }, 320);
+  }
+}
+
+function atualizarBadge(criticos, abertos) {
+  var b = document.getElementById('nav-conf-badge');
+  var item = document.getElementById('nav-conflitos');
+  if (!b) return;
+  if (criticos > 0) {
+    b.textContent = criticos;
+    b.style.display = 'inline';
+    b.classList.add('alertando');
+    if (item) item.classList.add('alertando');
+  } else if (abertos > 0) {
+    b.textContent = abertos;
+    b.style.display = 'inline';
+    b.classList.remove('alertando');
+    if (item) item.classList.remove('alertando');
+  } else {
+    b.style.display = 'none';
+    b.classList.remove('alertando');
+    if (item) item.classList.remove('alertando');
+  }
+}
+
+async function checarConflitos(silencioso) {
+  try {
+    var d = await fetch('/api/conflitos?action=badge').then(function(r){return r.json();});
+    var crit = d.criticos || 0, aber = d.abertos || 0;
+    atualizarBadge(crit, aber);
+    if (!silencioso && crit > _confPrev) {
+      tocarSomConflito();
+      mostrarNotifConflito(crit);
+    }
+    _confPrev = crit;
+    sessionStorage.setItem('_cPrev', String(crit));
+  } catch(e) {}
+}
+
+checarConflitos(true);
+setInterval(function(){ checarConflitos(false); }, 30000);
+</script>
 
 </body>
 </html>
