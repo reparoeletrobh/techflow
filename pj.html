@@ -1279,6 +1279,7 @@ function abrirEditarForn(id){
   set('f-regime',f.regime||'');set('f-nf',f.emiteNF||'Sim');
   set('f-atend',f.tipoAtendimento||'');set('f-nfobs',f.obsNF||'');
   set('f-equip',f.equipamentos||'');set('f-obs',f.obs||'');
+  if(g('f-retiss')) g('f-retiss').value=f.retencaoISS?'1':'0';
   abrirOv('ov-f');
 }
 
