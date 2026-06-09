@@ -408,7 +408,7 @@ select option{background:var(--s2);}
   <button class="tab" id="t-inbox" onclick="ir('inbox')">📬 Inbox <span class="tbadge" id="b-inbox" style="background:rgba(240,64,96,.15);color:var(--re);border-color:rgba(240,64,96,.3)">0</span></button>
   <button class="tab" id="t-campanha" onclick="ir('campanha')">📧 Campanhas</button>
   <button class="tab" id="t-listas" onclick="ir('listas')">📋 Listas</button>
-  <button class="tab" id="t-forn" onclick="ir('forn')">✅ Fornecedores <span class="tbadge" id="b-forn" style="background:rgba(16,217,130,.15);color:var(--gr);border-color:rgba(16,217,130,.3)">0</span></button>
+  <button class="tab" id="t-forn" onclick="ir('forn')">🏢 Clientes PJ <span class="tbadge" id="b-forn" style="background:rgba(16,217,130,.15);color:var(--gr);border-color:rgba(16,217,130,.3)">0</span></button>
 </div>
 
 <!-- PROSPECTS -->
@@ -495,7 +495,7 @@ select option{background:var(--s2);}
 <div class="pg" id="pg-prospects">
   <div class="pg-head">
     <div><div class="pg-title">🏢 Prospects</div><div class="pg-sub">// base de empresas em prospecção</div></div>
-    <button class="btn btn-bl" onclick="abrirOv('ov-p')">+ Cadastrar Empresa</button>
+    <button class="btn btn-bl" onclick="abrirOv('ov-p')">+ Cadastrar Cliente PJ</button>
   </div>
   <div class="sbar">
     <input class="sin" id="sin-p" placeholder="🔍 Buscar..." oninput="filtrarP()">
@@ -625,7 +625,7 @@ select option{background:var(--s2);}
 <!-- FORNECEDORES -->
 <div class="pg" id="pg-forn">
   <div class="pg-head">
-    <div><div class="pg-title">✅ Fornecedores / Clientes PJ</div><div class="pg-sub">// cadastros qualificados</div></div>
+    <div><div class="pg-title">🏢 Clientes PJ</div><div class="pg-sub">// clientes B2B ativos</div></div>
     <button class="btn btn-gr" onclick="abrirOv('ov-f')">+ Cadastrar</button>
   </div>
   <div id="lista-forn"><div class="empty"><div class="spin"></div>Carregando...</div></div>
@@ -665,7 +665,7 @@ select option{background:var(--s2);}
 <!-- MODAL FORNECEDOR -->
 <div class="ov" id="ov-f" style="display:none" onclick="if(event.target===this)fecharOv('ov-f')">
 <div class="mdl" style="max-width:600px">
-  <div class="mdl-t">✅ CADASTRAR FORNECEDOR / CLIENTE PJ</div>
+  <div class="mdl-t">✅ CADASTRAR CLIENTE PJ / CLIENTE PJ</div>
   <div class="grid2"><div class="fld"><label>RAZÃO SOCIAL *</label><input id="f-rs"></div>
   <div class="fld"><label>CNPJ *</label><input id="f-cnpj"></div></div>
   <div class="grid2"><div class="fld"><label>RESPONSÁVEL</label><input id="f-resp"></div>
@@ -1192,7 +1192,7 @@ async function carregarForn(){
   var r=await fetch('/api/pj-fornecedores?action=load').then(function(x){return x.json();});
   var lista=r.fornecedores||[];
   g('b-forn').textContent=lista.length;
-  if(!lista.length){g('lista-forn').innerHTML='<div class="empty">Nenhum fornecedor ainda.</div>';return;}
+  if(!lista.length){g('lista-forn').innerHTML='<div class="empty">Nenhum cliente PJ ainda.</div>';return;}
   g('lista-forn').innerHTML=lista.map(function(f){
     return '<div class="for-card">'+
       '<div style="display:flex;justify-content:space-between;align-items:flex-start">'+
@@ -1219,7 +1219,7 @@ async function criarFornecedor(){
       prazo:g('f-prazo').value,regime:g('f-regime').value,emiteNf:g('f-nf').value,
       nfObs:gv('f-nfobs'),atendimento:g('f-atend').value,equipamentos:gv('f-equip'),obs:gv('f-obs')})
   }).then(function(x){return x.json();});
-  if(r.ok){fecharOv('ov-f');carregarForn();toast('✅ Fornecedor cadastrado!');}
+  if(r.ok){fecharOv('ov-f');carregarForn();toast('✅ Cliente PJ cadastrado!');}
   else toast('❌ '+(r.error||'Erro'));
 }
 
@@ -1607,6 +1607,7 @@ async function abrirDetalhe(id) {
     // Ações finais
     '<div style="display:flex;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--bdr);justify-content:flex-end">'+
     (l.email?'<button class="btn btn-pri sdr-act" style="font-size:10px" data-action="email" data-sdr-lid="'+l.id+'">📧 Enviar Email</button>':'')+
+    '<button class="btn btn-gr sdr-act" style="font-size:10px;font-weight:700" data-action="converter" data-sdr-lid="'+l.id+'">🏆 Converter em Cliente PJ</button> '+
     '<button class="btn btn-x sdr-act" style="font-size:10px;color:var(--re)" data-action="excluir" data-sdr-lid="'+l.id+'">🗑️ Excluir</button>'+
     '</div>';
 
@@ -1720,6 +1721,42 @@ function sdrEnviarEmail(id) {
   }, 400);
 }
 
+async function converterClientePJ(id) {
+  var l = _sdrLeads.find(function(x){ return x.id===id; });
+  if (!l) { toast('Lead não encontrado','r'); return; }
+  if (!confirm('Converter "'+l.empresa+'" em Cliente PJ?\n\nIsso vai:\n• Cadastrar na aba Clientes PJ\n• Mover para fase Cliente no pipeline')) return;
+  try {
+    // 1. Cadastrar como Cliente PJ
+    var r1 = await fetch('/api/pj-fornecedores?action=criar', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        razaoSocial: l.empresa,
+        cnpj:        l.cnpj||'—',
+        responsavel: l.responsavel,
+        cargo:       l.cargo||'',
+        email:       l.email||'',
+        telefone:    l.telefone||'',
+        segmento:    l.segmento||'',
+        funcionarios:l.funcionarios||'',
+        potencial:   l.potencial||'',
+        origem:      'SDR — convertido',
+        leadId:      l.id,
+        obs:         l.obs||''
+      })
+    }).then(function(x){ return x.json(); });
+    if (!r1.ok) { toast('Erro ao cadastrar: '+(r1.error||'falha'),'r'); return; }
+    // 2. Mover lead para fase "cliente" no pipeline
+    await fetch('/api/pj-sdr?action=mover-fase', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id: l.id, fase: 'cliente' })
+    });
+    fecharDetalhe();
+    await carregarSDR();
+    toast('🏆 '+l.empresa+' agora é um Cliente PJ!','g');
+  } catch(e) { toast('Erro: '+e.message,'r'); }
+}
+
+
 async function excluirLead(id) {
   if (!confirm('Excluir este lead?')) return;
   await fetch('/api/pj-sdr?action=excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
@@ -1790,7 +1827,8 @@ document.addEventListener('click', function(e) {
     if (a==='copiar') { copiarTemplate(act.dataset.tmpl, lid); return; }
     if (a==='email')  { sdrEnviarEmail(lid); return; }
     if (a==='apresentacao') { sdrEnviarApresentacao(lid); return; }
-    if (a==='excluir'){ excluirLead(lid); return; }
+    if (a==='excluir')  { excluirLead(lid); return; }
+    if (a==='converter') { converterClientePJ(lid); return; }
   }
 });
 
