@@ -359,6 +359,10 @@
       "destination": "/api/security-status.js"
     },
     {
+      "source": "/api/pj-cobranca",
+      "destination": "/api/pj-cobranca.js"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/home.html"
     },
