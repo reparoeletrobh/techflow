@@ -1687,21 +1687,29 @@ function diasRestantes(venc, status) {
   return '<span style="color:var(--re)">' + diff + 'd</span>';
 }
 
-async function abrirHistorico(id) {
-  try {
-  // Buscar dados frescos direto da API
-  var _r = await fetch('/api/pj-fornecedores?action=load').then(function(x){return x.json();});
-  if (_r.ok) _fornLista = _r.fornecedores || [];
-  } catch(e) { /* usa _fornLista atual se falhar */ }
+function abrirHistorico(id) {
+  // Abrir imediatamente com dados atuais
+  _renderHistorico(id);
+  // Atualizar dados silenciosamente e re-renderizar
+  fetch('/api/pj-fornecedores?action=load')
+    .then(function(x){ return x.json(); })
+    .then(function(r){
+      if(r.ok){ _fornLista=r.fornecedores||[]; _renderHistorico(id); }
+    })
+    .catch(function(){});
+}
+
+function _renderHistorico(id) {
   var f = _fornLista.find(function(x){ return x.id===id; });
-  if (!f) { toast('Cliente não encontrado (id:'+id+')','r'); return; }
+  if (!f) return;
   var cobs = (f.cobrancas||[]).slice().sort(function(a,b){
     return (b.criadoEm||'').localeCompare(a.criadoEm||'');
   });
   if (g('hist-titulo')) g('hist-titulo').textContent = '📋 Histórico — ' + f.razaoSocial;
   if (!cobs.length) {
-    if (g('hist-body')) g('hist-body').innerHTML = '<div class="empty">Nenhuma cobrança registrada.</div>';
-    abrirOv('ov-hist'); return;
+    if (g('hist-body')) g('hist-body').innerHTML = '<div class="empty" style="padding:20px;text-align:center;color:var(--mu)">Nenhuma cobrança registrada.</div>';
+    if (g('ov-hist')) g('ov-hist').style.display='flex';
+    return;
   }
   var hoje = new Date().toISOString().slice(0,10);
   var rows = cobs.map(function(c) {
@@ -1716,12 +1724,19 @@ async function abrirHistorico(id) {
       : (status!=='recebido'
           ? '<button class="btn" style="font-size:9px;padding:2px 7px;color:#3b82f6;border-color:#3b82f6" data-cid="'+f.id+'" data-cobid="'+c.id+'" onclick="reemitirBoleto(this.dataset.cid,this.dataset.cobid)">+ Boleto</button>'
           : '');
+    var dias='';
+    if(c.vencimento&&status!=='recebido'){
+      var diff=Math.ceil((new Date(c.vencimento)-new Date(hoje))/86400000);
+      dias=diff>0?'<span style="color:var(--bl)">+'+diff+'d</span>'
+          :diff===0?'<span style="color:var(--yel)">Hoje</span>'
+          :'<span style="color:var(--re)">'+diff+'d</span>';
+    }
     return '<tr style="border-bottom:1px solid var(--bdr)">'
       + '<td style="padding:7px 8px;font-family:var(--fm);font-size:9px;color:var(--mu)">'+(c.criadoEm||'').slice(0,10)+'</td>'
       + '<td style="padding:7px 8px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--mu)">'+esc(c.descricao||'—')+'</td>'
       + '<td style="padding:7px 8px;text-align:right;font-weight:700">R$ '+parseFloat(c.valor||0).toFixed(2).replace('.',',')+'</td>'
       + '<td style="padding:7px 8px;text-align:center;font-family:var(--fm);font-size:10px">'+(c.vencimento||'—')+'</td>'
-      + '<td style="padding:7px 8px;text-align:center">'+diasRestantes(c.vencimento,status)+'</td>'
+      + '<td style="padding:7px 8px;text-align:center">'+dias+'</td>'
       + '<td style="padding:7px 8px;text-align:center"><span style="font-family:var(--fm);font-size:9px;color:'+cor+'">'+lbl+'</span></td>'
       + '<td style="padding:7px 8px;text-align:center">'+nfBtn+bolBtn+'</td>'
       + '</tr>';
@@ -1737,8 +1752,9 @@ async function abrirHistorico(id) {
     + '<th style="padding:7px 8px;text-align:center">DOCUMENTOS</th>'
     + '</tr></thead><tbody>'+rows+'</tbody></table>';
   if (g('hist-body')) g('hist-body').innerHTML = table;
-  abrirOv('ov-hist');
+  if (g('ov-hist')) g('ov-hist').style.display='flex';
 }
+
 
 
 async function reemitirBoleto(clienteId,cobId){
