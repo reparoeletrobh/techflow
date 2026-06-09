@@ -1784,7 +1784,7 @@ function _renderHistModal(f) {
             +'<div class="fld" style="grid-column:1/-1"><label>DESCRIÇÃO</label><input class="hist-edit-desc" value="'+esc(c.descricao||'')+'" style="width:100%"></div>'
           +'</div>'
           +'<div style="display:flex;gap:6px;justify-content:flex-end">'
-            +'<button class="btn" style="font-size:10px" onclick="g('hist-edit-'+c.id+'').style.display='none'">Cancelar</button>'
+            +'<button class="btn" style="font-size:10px" data-action="fechar-edit-hist" data-editid="hist-edit-'+c.id+'">Cancelar</button>'
             +'<button class="btn btn-gr" style="font-size:10px" data-action="salvar-alteracao" data-cid="'+f.id+'" data-cobid="'+c.id+'" data-editid="hist-edit-'+c.id+'">✅ Salvar</button>'
           +'</div>'
         +'</div>'
@@ -2531,6 +2531,7 @@ document.addEventListener('click', function(e) {
     if (a==='converter') { converterClientePJ(lid); return; }
     if (a==='historico') { abrirHistorico(act.dataset.fid); return; }
     if (a==='abrir-edit-hist') { var ed=g(act.dataset.editid); if(ed) ed.style.display=ed.style.display==='none'?'block':'none'; return; }
+    if (a==='fechar-edit-hist') { var ed2=g(act.dataset.editid); if(ed2) ed2.style.display='none'; return; }
     if (a==='salvar-alteracao') { histSalvarAlteracao(act); return; }
     if (a==='cancelar-nf') { histCancelarNF(act.dataset.cid, act.dataset.cobid); return; }
     if (a==='reemitir-nf') { histReemitirNF(act.dataset.cid, act.dataset.cobid); return; }
