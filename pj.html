@@ -1849,6 +1849,7 @@ async function _hEnviarEmail(btn) {
 
     if(btnEl){btnEl.disabled=false;btnEl.textContent='📧 Enviar NF + Boleto por Email';}
     if(r.ok){
+      try{ setNavInbox("enviados"); if(typeof ir==="function") ir("inbox"); }catch(navErr){}
       var anexos=r.anexos||[];
       var anexosTxt=anexos.length
         ?'\n📎 Anexos: '+anexos.join(', ')

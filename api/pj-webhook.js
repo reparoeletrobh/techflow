@@ -77,13 +77,17 @@ module.exports = async function handler(req, res) {
       logDb.eventos = logDb.eventos.slice(0, 50);
       await dbSet(LOG_KEY, logDb);
 
-      // Aceitar email.received OU qualquer estrutura com 'from'/'subject'
       const data = event.data || event;
-      const isEmail = event.type === 'email.received' ||
-                      data.from || data.subject || data.email_id;
+      // Apenas email.received vai para a Entrada
+      // Eventos email.sent/delivered/bounced/opened são ignorados para inbox
+      const tipoEvento = event.type || '';
+      const isInbound = tipoEvento === 'email.received' ||
+                        tipoEvento === 'inbound' ||
+                        (!tipoEvento && (data.from && data.subject)); // fallback legacy
 
-      if (!isEmail) {
-        return res.status(200).json({ ok: true, ignored: true, type: event.type });
+      if (!isInbound) {
+        console.log('[pj-webhook] Evento ignorado (não é inbound):', tipoEvento);
+        return res.status(200).json({ ok: true, ignored: true, type: tipoEvento });
       }
 
       // Webhook só tem metadados — buscar corpo via Receiving API imediatamente
