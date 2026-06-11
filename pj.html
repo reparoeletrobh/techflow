@@ -1166,6 +1166,8 @@ async function enviarComposeEmail(){
       toast('✅ Email enviado!','g');
       g('gm-compose-modal').style.display='none';
       g('cm-para').value=''; g('cm-assunto').value=''; g('cm-corpo').value='';
+      // Navegar para Enviados automaticamente
+      try{ setNavInbox('enviados'); }catch(navErr){}
     } else { toast('Erro: '+(r.error||'falha ao enviar'),'r'); }
   }catch(e){ toast('Erro de rede','r'); }
   if(btn){btn.disabled=false;} if(lbl) lbl.textContent='Enviar';
@@ -1200,6 +1202,7 @@ async function disparar(){
   btn.textContent='📧 Disparar'; btn.disabled=false;
   toast(r.ok?'✅ '+r.enviados+'/'+r.total+' enviados':'❌ '+(r.error||'Erro'));
   carregarCamp();
+  if(r.ok) try{ ir('inbox'); setTimeout(function(){ setNavInbox('enviados'); },300); }catch(e){}
 }
 
 async function carregarCamp(){
@@ -2542,7 +2545,8 @@ function sdrEnviarEmail(id) {
   fecharDetalhe();
   ir('inbox');
   setTimeout(function(){
-    abrirCompose(l.email, '', '');
+    // Preencher compose com email do lead e assunto padrão
+    abrirCompose(l.email, 'Manutenção de Microondas e Bebedouros — ' + esc(l.empresa), '');
   }, 400);
 }
 
