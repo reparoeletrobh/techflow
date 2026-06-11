@@ -594,7 +594,7 @@ export default async function handler(req, res) {
   // ── POST editar-pipe: edita campos de um card do Pipe ─────────────────────
   if (req.method==='POST' && action==='editar-pipe') {
     var body=req.body||{};
-    var {id, nomeContato, valor, telefone, equipamento, descricao, endereco, cpfCnpj, servicos} = body;
+    var {id, nomeContato, valor, telefone, equipamento, descricao, endereco, cpfCnpj, servicos, modelo} = body;
     if (!id) return res.status(400).json({ok:false,error:'id obrigatório'});
     try {
       var db=await dbGet(PIPE_KEY)||defaultDB();
@@ -609,6 +609,7 @@ export default async function handler(req, res) {
       if(endereco!==undefined)    card.endereco=endereco;
       if(cpfCnpj!==undefined)     card.cpfCnpj=cpfCnpj;
       if(servicos!==undefined)    card.servicos=servicos;
+      if(modelo!==undefined)      card.modelo=modelo;
       card.editadoEm=now;
       await safeWritePipe(db);
       return res.status(200).json({ok:true,card:card});

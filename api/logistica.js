@@ -59,6 +59,7 @@ async function moverNoPipe(pipefyId, novaFase, dados) {
           nomeContato: dados.nomeContato||'',
           telefone: dados.telefone||'',
           equipamento: dados.equipamento||'',
+          modelo: dados.modelo||'',
           descricao: dados.descricao||'',
           endereco: dados.endereco||'',
           valor: parseFloat(dados.valor||0)||0,
@@ -74,7 +75,7 @@ async function moverNoPipe(pipefyId, novaFase, dados) {
     card.history=(card.history||[]).concat([{phase:card.phase,ts:now}]);
     card.phase=novaFase; card.movedAt=now;
     if(novaFase==='aguardando_aprovacao') card.aguardandoDesde=now;
-    if(dados){if(dados.valor!==undefined)card.valor=parseFloat(dados.valor)||0;if(dados.nomeContato)card.nomeContato=dados.nomeContato;}
+    if(dados){if(dados.valor!==undefined)card.valor=parseFloat(dados.valor)||0;if(dados.nomeContato)card.nomeContato=dados.nomeContato;if(dados.modelo!==undefined&&dados.modelo)card.modelo=dados.modelo;}
     await _ps(PIPE_KEY_H,db);
   } catch(e){console.error('[pipe-mover]',novaFase,e.message);}
 }
@@ -638,11 +639,14 @@ module.exports = async function handler(req, res) {
     const _equip  = ficha.equipamento || '';
     const _desc   = ficha.defeito || '';
     const _valor  = parseFloat(precoFinal) || 0;
+    // Extrair modelo do diagnóstico (primeiro equipamento)
+    const _modelo = (ficha.diagnostico?.equips?.[0]?.modelo || '').trim();
     await moverNoPipe(_pipId, 'aguardando_aprovacao', {
       nomeContato: _nome, telefone: _tel,
       equipamento: _equip, descricao: _desc,
       valor: _valor, origem: 'logistica',
       endereco: ficha.endereco || '',
+      modelo: _modelo,
       localId: ficha.id  // fallback quando não há pipefyCardId
     }).catch(e => console.error('[Log→Pipe]', e.message));
 
