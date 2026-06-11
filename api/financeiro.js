@@ -41,23 +41,8 @@ const FIN_PHASES = [
 
 // Move card no Pipefy para uma fase
 async function pipefyMoveCard(cardId, destPhaseId) {
-  if (!cardId || !destPhaseId) return null;
-  const PIPEFY_API = 'https://api.pipefy.com/graphql';
-  const PIPEFY_TOKEN = (process.env.PIPEFY_TOKEN || '').trim();
-  if (!PIPEFY_TOKEN) { console.warn('[pipefyMoveCard] sem PIPEFY_TOKEN'); return null; }
-  try {
-    const r = await fetch(PIPEFY_API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + PIPEFY_TOKEN },
-      body: JSON.stringify({ query:
-        'mutation { moveCardToPhase(input: { card_id: "' + cardId +
-        '", destination_phase_id: "' + destPhaseId + '" }) { card { id current_phase { name } } } }'
-      }),
-    });
-    const j = await r.json();
-    if (j.errors) { console.error('[pipefyMoveCard] errors:', JSON.stringify(j.errors)); return null; }
-    return j.data?.moveCardToPhase?.card || null;
-  } catch(e) { console.error('[pipefyMoveCard]', e.message); return null; }
+  // Pipefy desconectado em 01/06/2026 — ADM opera 100% local (Redis)
+  return null;
 }
 
 // Fase "Solicitar Entrega" no Pipefy
@@ -779,7 +764,7 @@ module.exports = async function handler(req, res) {
   if (action === "debug") {
     const result = {};
     try {
-      const data = await pipefyQuery(`query {
+      pipefyQuery(`query {
         pipe(id: "${PIPE_ID}") {
           phases { name cards(first: 3) { edges { node { id title } } } }
         }
