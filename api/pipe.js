@@ -2091,5 +2091,35 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok:true, removidos: remover.size, totalAntes: cards.length, totalDepois: (db2.cards||[]).length, exemplos });
   }
 
+  // ── GET mover-tv-log — move ficha TV logística entre fases ─────────────────
+  if (action === 'mover-tv-log') {
+    const tel  = (req.query.tel  || '').replace(/\D/g,'');
+    const para = req.query.para  || 'liberado_para_coleta';
+    const de   = req.query.de   || 'coleta_efetuada';
+    if (!tel) return res.status(400).json({ ok:false, error:'tel obrigatório' });
+    try {
+      const TV_KEY = 'tv_logistica';
+      const tvDb = (await dbGet(TV_KEY)) || { fichas:[] };
+      const fichas = tvDb.fichas || [];
+      const now = new Date().toISOString();
+      const movidas = [];
+      fichas.forEach(function(f) {
+        if (f.phase !== de) return;
+        const fTel = (f.telefone||'').replace(/\D/g,'');
+        const match = fTel.includes(tel) || tel.includes(fTel.slice(-4)) || fTel.slice(-4)===tel;
+        if (!match) return;
+        f.phase   = para;
+        f.movedAt = now;
+        f.history = (f.history||[]).concat([{ phase:para, ts:now, via:'correcao_manual' }]);
+        movidas.push({ id:f.id, nome:f.nome||f.nomeContato, tel:f.telefone });
+      });
+      if (movidas.length) {
+        tvDb.fichas = fichas;
+        await dbSet(TV_KEY, tvDb);
+      }
+      return res.status(200).json({ ok:true, movidas, total:movidas.length });
+    } catch(e) { return res.status(200).json({ ok:false, error:e.message }); }
+  }
+
   return res.status(404).json({ ok: false, error: 'acao nao encontrada: ' + action });
 }
