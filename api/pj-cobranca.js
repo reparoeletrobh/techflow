@@ -9,6 +9,13 @@ const PIPE_KEY='reparoeletro_pipe';
 async function dbGet(k){try{const r=await fetch(U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();const v=j[0]?.result;if(!v)return null;let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
 async function dbSet(k,v){try{await fetch(U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}catch(e){}}
 
+function normData(d){
+  if(!d) return d;
+  d=String(d).trim();
+  if(d.includes('/')){const p=d.split('/');if(p.length===3&&p[0].length<=2)return p[2]+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0');}
+  return d;
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin','https://reparoeletroadm.com');
   res.setHeader('Access-Control-Allow-Methods','GET,POST,OPTIONS');
@@ -90,73 +97,120 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // ── 2. CRIAR BOLETO via Mercado Pago (Preferences API — mesmo padrão do financeiro.js) ───
-    const MP_TOKEN = process.env.MP_ACCESS_TOKEN;
-    if(!MP_TOKEN){
-      resultado.errors.push('Boleto: MP_ACCESS_TOKEN não configurado');
+    // ── 2. CRIAR BOLETO via Asaas ─────────────────────────────────────────────
+    const ASAAS_KEY = (process.env.ASAAS_API_KEY||'').trim();
+    const ASAAS_URL = ASAAS_KEY.includes('sandbox')
+      ? 'https://api-sandbox.asaas.com/v3'
+      : 'https://api.asaas.com/v3';
+
+    if (!ASAAS_KEY) {
+      resultado.errors.push('Boleto: ASAAS_API_KEY não configurada no Vercel');
     } else {
       try {
-        const nomeArr  = (cliente.responsavel||cliente.razaoSocial||'Cliente').split(' ');
-        const cnpjLimpo= (cliente.cnpj||'').replace(/\D/g,'');
-        const prefBody = {
-          items:[{
-            id:          clienteId+'-'+Date.now(),
-            title:       'Manutenção – '+(cliente.razaoSocial||'Cliente'),
-            description: descricao||('Serviços de manutenção de eletrodomésticos'),
-            quantity:    1,
-            unit_price:  vlr,
-            currency_id: 'BRL',
-          }],
-          payer:{
-            name:    nomeArr.slice(0,2).join(' '),
-            surname: nomeArr.slice(2).join(' ')||'PJ',
-            email:   cliente.email||'financeiro@reparoeletroadm.com',
-            ...(cnpjLimpo ? {identification:{
-              type:   cnpjLimpo.length===14?'CNPJ':'CPF',
-              number: cnpjLimpo.length===14?cnpjLimpo:cnpjLimpo.slice(0,11),
-            }}:{}),
-          },
-          payment_methods:{
-            excluded_payment_types:[{id:'credit_card'},{id:'debit_card'},{id:'pix'}],
-            installments:1,
-          },
-          expiration_date_from: new Date().toISOString(),
-          expiration_date_to:   vencimento+'T23:59:59.000-03:00',
-          metadata:{ origem:'pj_cobranca', clienteId, fichaId:fichaId||'' },
-          notification_url:'https://reparoeletroadm.com/api/webhook-mp',
-          back_urls:{
-            success:'https://reparoeletroadm.com/pj',
-            failure:'https://reparoeletroadm.com/pj',
-          },
-          auto_return:'approved',
-          binary_mode:false,
+        const asaasHdr = {
+          'Content-Type': 'application/json',
+          'access_token':  ASAAS_KEY,
         };
-        const bRes = await fetch('https://api.mercadopago.com/checkout/preferences',{
-          method:'POST',
-          headers:{'Content-Type':'application/json','Authorization':'Bearer '+MP_TOKEN},
-          body:JSON.stringify(prefBody),
-        });
-        const bData = await bRes.json();
-        console.log('[pj-cobranca] MP preference response:', JSON.stringify(bData).slice(0,300));
-        if(bData.id){
-          resultado.boleto = {
-            preferenceId: bData.id,
-            url:          bData.init_point||'',    // link de checkout MP
-            sandboxUrl:   bData.sandbox_init_point||'',
-            vencimento,
-            valor:        vlr,
-          };
-        } else {
-          const mpErr = bData.message||bData.error||JSON.stringify(bData).slice(0,200);
-          resultado.errors.push('Boleto MP: '+mpErr);
-          console.error('[pj-cobranca] MP erro:', mpErr);
+
+        // 2a. Buscar/criar cliente no Asaas pelo CNPJ
+        const cnpjLimpo = (cliente.cnpj||'').replace(/\D/g,'');
+        let asaasCustomerId = cliente.asaasCustomerId || null;
+
+        if (!asaasCustomerId && cnpjLimpo) {
+          const busca = await fetch(
+            `${ASAAS_URL}/customers?cpfCnpj=${cnpjLimpo}&limit=1`,
+            { headers: asaasHdr }
+          ).then(r=>r.json()).catch(()=>null);
+          if (busca?.data?.length > 0) asaasCustomerId = busca.data[0].id;
         }
-      } catch(be){
+
+        if (!asaasCustomerId) {
+          const custRes = await fetch(`${ASAAS_URL}/customers`, {
+            method: 'POST', headers: asaasHdr,
+            body: JSON.stringify({
+              name:    cliente.razaoSocial || cliente.responsavel || 'Cliente PJ',
+              email:   cliente.email || '',
+              phone:   (cliente.telefone||'').replace(/\D/g,''),
+              ...(cnpjLimpo ? { cpfCnpj: cnpjLimpo } : {}),
+              externalReference: clienteId,
+            }),
+          }).then(r=>r.json());
+
+          if (custRes.id) {
+            asaasCustomerId = custRes.id;
+            cliente.asaasCustomerId = asaasCustomerId;
+            await dbSet(FOR_KEY, fornDb);
+            // Configurar notificações: apenas WhatsApp
+            try {
+              const notifRes = await fetch(`${ASAAS_URL}/customers/${asaasCustomerId}/notifications`,
+                { headers: asaasHdr }).then(r=>r.json()).catch(()=>null);
+              if (notifRes?.data?.length > 0) {
+                for (const notif of notifRes.data) {
+                  await fetch(`${ASAAS_URL}/customers/${asaasCustomerId}/notifications/${notif.id}`,{
+                    method:'PUT', headers: asaasHdr,
+                    body: JSON.stringify({ enabled:true, emailEnabledForCustomer:false, smsEnabledForCustomer:false, whatsappEnabledForCustomer:true, phoneCallEnabledForCustomer:false }),
+                  }).catch(()=>{});
+                }
+              }
+            } catch(wErr) { console.warn('[pj-cobranca] notif WhatsApp:', wErr.message); }
+          } else {
+            throw new Error('Erro ao criar cliente Asaas: '+(custRes.errors?.[0]?.description||JSON.stringify(custRes).slice(0,100)));
+          }
+        }
+
+        // 2b. Emitir boleto
+        const payRes = await fetch(`${ASAAS_URL}/payments`, {
+          method: 'POST', headers: asaasHdr,
+          body: JSON.stringify({
+            customer:        asaasCustomerId,
+            billingType:     'BOLETO',
+            value:           vlr,
+            dueDate:         normData(vencimentoNorm),
+            description:     descricao || `Manutenção — ${cliente.razaoSocial||'Cliente PJ'}`,
+            externalReference: `${clienteId}-${cobId||Date.now()}`,
+            fine:    { value: 2 },
+            interest:{ value: 1 },
+          }),
+        }).then(r=>r.json());
+
+        if (payRes.id && payRes.bankSlipUrl) {
+          resultado.boleto = {
+            asaasPaymentId: payRes.id,
+            url:            payRes.bankSlipUrl,
+            invoiceUrl:     payRes.invoiceUrl||'',
+            nossoNumero:    payRes.nossoNumero||'',
+            vencimento:     vencimentoNorm,
+            valor:          vlr,
+            status:         payRes.status,
+          };
+
+          // 2c. Anexar PDF da NF na fatura Asaas (se NF foi emitida)
+          if (resultado.nf?.chave) {
+            try {
+              const nfPdfRes = await fetch(`https://reparoeletroadm.com/api/nfse?action=danfe&chave=${resultado.nf.chave}`);
+              if (nfPdfRes.ok) {
+                const pdfBlob = new Blob([await nfPdfRes.arrayBuffer()], { type:'application/pdf' });
+                const fd = new FormData();
+                fd.append('availableAfterPayment','false');
+                fd.append('type','INVOICE');
+                fd.append('file', pdfBlob, `NF-${resultado.nf.chave.slice(-8)}.pdf`);
+                const docRes = await fetch(`${ASAAS_URL}/payments/${payRes.id}/documents`,{
+                  method:'POST', headers:{ 'access_token': ASAAS_KEY }, body: fd,
+                }).then(r=>r.json()).catch(()=>null);
+                if (docRes?.id) resultado.boleto.nfAnexada = true;
+              }
+            } catch(nfErr) { console.warn('[pj-cobranca] NF upload:', nfErr.message); }
+          }
+        } else {
+          const err = payRes.errors?.[0]?.description || payRes.description || JSON.stringify(payRes).slice(0,200);
+          resultado.errors.push('Boleto Asaas: '+err);
+          console.error('[pj-cobranca] Asaas erro:', err);
+        }
+      } catch(be) {
         resultado.errors.push('Boleto: '+be.message);
         console.error('[pj-cobranca] Boleto catch:', be.message);
       }
     }
-
     // ── 3. Salvar cobrança no cliente ───────────────────────────────────────────
     if(resultado.nf||resultado.boleto){
       const cli = fornDb.fornecedores.find(f=>f.id===clienteId);
@@ -259,51 +313,75 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // ── POST reemitir-boleto — gera novo link de boleto para cobrança existente ──
+  // ── POST reemitir-boleto — cancela anterior e gera novo boleto Asaas ──────
   if(req.method==='POST' && action==='reemitir-boleto'){
-    const{clienteId,cobId}=req.body||{};
+    const{clienteId,cobId,vencimento:vencReq,valor:valorReq}=req.body||{};
     const fornDb=await dbGet(FOR_KEY)||{fornecedores:[]};
     const cli=fornDb.fornecedores.find(f=>f.id===clienteId);
     if(!cli) return res.status(404).json({ok:false,error:'cliente não encontrado'});
     const cob=(cli.cobrancas||[]).find(c=>c.id===cobId);
     if(!cob) return res.status(404).json({ok:false,error:'cobrança não encontrada'});
-    const MP_TOKEN=process.env.MP_ACCESS_TOKEN;
-    if(!MP_TOKEN) return res.status(400).json({ok:false,error:'MP_ACCESS_TOKEN não configurado'});
-    try{
-      const nomeArr=(cli.responsavel||cli.razaoSocial||'Cliente').split(' ');
-      const cnpjLimpo=(cli.cnpj||'').replace(/\D/g,'');
-      const vlr=parseFloat(cob.valor);
-      const prefBody={
-        items:[{id:cobId,title:'Manutenção – '+(cli.razaoSocial||'Cliente'),
-          description:cob.descricao||'Serviços de manutenção',
-          quantity:1,unit_price:vlr,currency_id:'BRL'}],
-        payer:{
-          name:nomeArr.slice(0,2).join(' '),surname:nomeArr.slice(2).join(' ')||'PJ',
-          email:cli.email||'financeiro@reparoeletroadm.com',
-          ...(cnpjLimpo?{identification:{type:cnpjLimpo.length===14?'CNPJ':'CPF',
-            number:cnpjLimpo.length===14?cnpjLimpo:cnpjLimpo.slice(0,11)}}:{}),
-        },
-        payment_methods:{excluded_payment_types:[{id:'credit_card'},{id:'debit_card'},{id:'pix'}],installments:1},
-        expiration_date_to:cob.vencimento+'T23:59:59.000-03:00',
-        notification_url:'https://reparoeletroadm.com/api/webhook-mp',
-        binary_mode:false,
-      };
-      const bRes=await fetch('https://api.mercadopago.com/checkout/preferences',{
-        method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+MP_TOKEN},
-        body:JSON.stringify(prefBody),
-      });
-      const bData=await bRes.json();
-      if(bData.id){
-        cob.boletoUrl=bData.init_point||'';
-        cob.preferenceId=bData.id;
-        await dbSet(FOR_KEY,fornDb);
-        return res.status(200).json({ok:true,url:bData.init_point,preferenceId:bData.id});
+
+    const ASAAS_KEY=(process.env.ASAAS_API_KEY||'').trim();
+    const ASAAS_URL=ASAAS_KEY.includes('sandbox')
+      ?'https://api-sandbox.asaas.com/v3':'https://api.asaas.com/v3';
+    if(!ASAAS_KEY) return res.status(200).json({ok:false,error:'ASAAS_API_KEY não configurada'});
+
+    try {
+      const asaasHdr={'Content-Type':'application/json','access_token':ASAAS_KEY};
+
+      // Cancelar boleto anterior se existir
+      if(cob.asaasPaymentId){
+        await fetch(`${ASAAS_URL}/payments/${cob.asaasPaymentId}`,{
+          method:'DELETE', headers:asaasHdr
+        }).catch(()=>{});
       }
-      return res.status(200).json({ok:false,error:bData.message||bData.error||'falha MP'});
+
+      // Garantir cliente Asaas
+      let asaasCustomerId=cli.asaasCustomerId||null;
+      if(!asaasCustomerId){
+        const cnpjLimpo=(cli.cnpj||'').replace(/\D/g,'');
+        const custRes=await fetch(`${ASAAS_URL}/customers`,{
+          method:'POST', headers:asaasHdr,
+          body:JSON.stringify({
+            name:cli.razaoSocial||cli.responsavel||'Cliente PJ',
+            email:cli.email||'',
+            phone:(cli.telefone||'').replace(/\D/g,''),
+            ...(cnpjLimpo?{cpfCnpj:cnpjLimpo}:{}),
+            externalReference:clienteId,
+          }),
+        }).then(r=>r.json());
+        if(custRes.id){ asaasCustomerId=custRes.id; cli.asaasCustomerId=custRes.id; }
+      }
+
+      // Emitir novo boleto com data/valor do input (ou do Redis como fallback)
+      const dueDate = normData(vencReq||cob.vencimento);
+      const valor   = parseFloat(valorReq||cob.valor||0);
+      const payRes  = await fetch(`${ASAAS_URL}/payments`,{
+        method:'POST', headers:asaasHdr,
+        body:JSON.stringify({
+          customer:asaasCustomerId,
+          billingType:'BOLETO',
+          value:valor,
+          dueDate,
+          description:cob.descricao||`Manutenção — ${cli.razaoSocial||'Cliente PJ'}`,
+          externalReference:`${clienteId}-${cobId}-reemissao`,
+          fine:{value:2}, interest:{value:1},
+        }),
+      }).then(r=>r.json());
+
+      if(payRes.id && payRes.bankSlipUrl){
+        cob.boletoUrl      = payRes.bankSlipUrl;
+        cob.invoiceUrl     = payRes.invoiceUrl||'';
+        cob.asaasPaymentId = payRes.id;
+        cob.nossoNumero    = payRes.nossoNumero||'';
+        await dbSet(FOR_KEY,fornDb);
+        return res.status(200).json({ok:true,boletoUrl:payRes.bankSlipUrl,invoiceUrl:payRes.invoiceUrl||''});
+      }
+      const err=payRes.errors?.[0]?.description||JSON.stringify(payRes).slice(0,150);
+      return res.status(200).json({ok:false,error:'Asaas: '+err});
     }catch(e){return res.status(200).json({ok:false,error:e.message});}
   }
-
-
   // ── POST cancelar-nf — cancela NF via SEFAZ ──────────────────────────────────
   if(req.method==='POST' && action==='cancelar-nf'){
     const{clienteId,cobId}=req.body||{};
@@ -327,23 +405,33 @@ module.exports = async function handler(req, res) {
     }catch(e){return res.status(200).json({ok:false,error:e.message});}
   }
 
-  // ── POST cancelar-boleto — cancela preference MP ─────────────────────────────
+  // ── POST cancelar-boleto — cancela no Asaas (DELETE /v3/payments/{id}) ───────
   if(req.method==='POST' && action==='cancelar-boleto'){
     const{clienteId,cobId}=req.body||{};
     const fornDb=await dbGet(FOR_KEY)||{fornecedores:[]};
     const cli=fornDb.fornecedores.find(f=>f.id===clienteId);
     const cob=cli&&(cli.cobrancas||[]).find(c=>c.id===cobId);
     if(!cob) return res.status(404).json({ok:false,error:'Cobrança não encontrada'});
-    const MP_TOKEN=process.env.MP_ACCESS_TOKEN;
-    if(!MP_TOKEN) return res.status(400).json({ok:false,error:'MP não configurado'});
     try{
-      // Marcar boleto como cancelado localmente
-      cob.boletoCancelado=true; cob.boletoUrl=null; cob.preferenceId=null;
+      const ASAAS_KEY=(process.env.ASAAS_API_KEY||'').trim();
+      const ASAAS_URL=ASAAS_KEY.includes('sandbox')
+        ?'https://api-sandbox.asaas.com/v3':'https://api.asaas.com/v3';
+      if(cob.asaasPaymentId && ASAAS_KEY){
+        const r=await fetch(`${ASAAS_URL}/payments/${cob.asaasPaymentId}`,{
+          method:'DELETE',headers:{'access_token':ASAAS_KEY}
+        }).then(res=>res.json()).catch(()=>({deleted:false}));
+        if(r.deleted===true){
+          cob.boletoUrl=''; cob.asaasPaymentId='';
+          await dbSet(FOR_KEY,fornDb);
+          return res.status(200).json({ok:true});
+        }
+        return res.status(200).json({ok:false,error:r?.errors?.[0]?.description||JSON.stringify(r).slice(0,100)});
+      }
+      cob.boletoUrl=''; cob.preferenceId=null;
       await dbSet(FOR_KEY,fornDb);
-      return res.status(200).json({ok:true,msg:'Boleto cancelado. Um novo boleto pode ser gerado.'});
+      return res.status(200).json({ok:true});
     }catch(e){return res.status(200).json({ok:false,error:e.message});}
   }
-
   // ── POST atualizar-cobranca — altera valor/vencimento antes de emitir ─────────
   if(req.method==='POST' && action==='atualizar-cobranca'){
     const{clienteId,cobId,valor,vencimento,descricao}=req.body||{};
@@ -352,7 +440,7 @@ module.exports = async function handler(req, res) {
     const cob=cli&&(cli.cobrancas||[]).find(c=>c.id===cobId);
     if(!cob) return res.status(404).json({ok:false,error:'não encontrada'});
     if(valor)      cob.valor=parseFloat(valor);
-    if(vencimento) cob.vencimento=vencimento;
+    if(vencimento) cob.vencimento=normData(vencimento);
     if(descricao)  cob.descricao=descricao;
     await dbSet(FOR_KEY,fornDb);
     return res.status(200).json({ok:true});
