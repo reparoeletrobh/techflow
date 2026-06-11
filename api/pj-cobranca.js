@@ -239,7 +239,7 @@ module.exports = async function handler(req, res) {
 
   // ── POST enviar-email — envia NF + boleto por email ──────────────────────────
   if(req.method==='POST' && action==='enviar-email'){
-    const {para,clienteNome,valor,vencimento,nfChave,boletoUrl,barcodeContent,cobId} = req.body||{};
+    const {para,destinos,clienteNome,valor,vencimento,nfChave,boletoUrl,barcodeContent,cobId,assunto,msgExtra} = req.body||{};
     const RESEND_KEY = process.env.RESEND_API_KEY;
     if(!RESEND_KEY) return res.status(400).json({ok:false,error:'RESEND_API_KEY não configurado'});
     if(!para) return res.status(400).json({ok:false,error:'destinatário obrigatório'});
@@ -262,8 +262,8 @@ module.exports = async function handler(req, res) {
     const emailBody = {
       from:'Pedro Teixeira | Reparo Eletro, Microondas e Bebedouros <pedro@comercial.reparoeletroadm.com>',
       reply_to:['pedro@ciacaluuir.resend.app'],
-      to:[para],
-      subject:'Cobrança e Nota Fiscal – '+clienteNome,
+      to: destinos && destinos.length ? destinos : [para],
+      subject: assunto || ('Cobrança e Nota Fiscal – '+clienteNome),
       attachments,
       html:`<!DOCTYPE html><html><body style="font-family:'Segoe UI',sans-serif;background:#f4f4f4;padding:32px 0">
 <table width="580" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;margin:0 auto;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)">
