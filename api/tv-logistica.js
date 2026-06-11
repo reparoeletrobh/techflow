@@ -1391,5 +1391,32 @@ Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter peque
     return res.status(200).json({ok:true,total:pendentes.length,resultados});
   }
 
+  // ── GET corrigir-fase — move fichas TV logística entre fases por nome/tel ──
+  if (action === 'corrigir-fase') {
+    const nomes   = (req.query.nomes || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
+    const deFase  = req.query.de   || 'coleta_efetuada';
+    const paraFase= req.query.para || 'liberado_para_coleta';
+    try {
+      const db = (await dbGet('tv_logistica')) || { fichas: [] };
+      const fichas = db.fichas || [];
+      const now = new Date().toISOString();
+      const movidas = [];
+      fichas.forEach(function(f) {
+        if (f.phase !== deFase) return;
+        const nome = (f.nome || f.nomeContato || '').toLowerCase();
+        const tel  = (f.telefone || '').replace(/\D/g,'');
+        const match = nomes.some(function(n){ return nome.includes(n) || tel.includes(n); });
+        if (match) {
+          f.phase   = paraFase;
+          f.movedAt = now;
+          f.history = (f.history||[]).concat([{ phase: paraFase, ts: now, via: 'correcao_manual' }]);
+          movidas.push({ id: f.id, nome: f.nome, tel: f.telefone });
+        }
+      });
+      if (movidas.length > 0) { db.fichas = fichas; await dbSet('tv_logistica', db); }
+      return res.status(200).json({ ok: true, movidas, total: movidas.length });
+    } catch(e) { return res.status(200).json({ ok: false, error: e.message }); }
+  }
+
   return res.status(404).json({ ok: false, error: 'ação não encontrada' });
 };
