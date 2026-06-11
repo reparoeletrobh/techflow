@@ -509,6 +509,12 @@ module.exports = async function handler(req, res) {
         const tpl = T.microondas_eletrico?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do [peças], as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`;
         return { texto: applyTpl(tpl, p, '350'), preco:'350' };
       }
+      if (tipo === 'bblend') {
+        // Bblend — preço fixo R$ 1.490 independente das peças selecionadas
+        const p = s.join(', ') || 'conjunto do motor';
+        return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do ${p}. Este conserto completo fica em 1490 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'1490' };
+      }
+
       if (tipo === 'purificador') {
         if (subtipo === 'Motor') {
           if (tem(['Gás'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca da valvula de gas, solda e recarga de gas refrigerante. Este conserto completo fica em 490 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'490' };
