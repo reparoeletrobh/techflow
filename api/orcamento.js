@@ -123,7 +123,7 @@ module.exports = async function handler(req, res) {
   }
 
   if (req.method === "POST" && action === "criar-card") {
-    let { nome, telefone, aparelho, defeito, endereco, phaseId, texto } = req.body || {};
+    let { nome, telefone, aparelho, defeito, endereco, phaseId, texto, preco } = req.body || {};
 
     // Se veio texto bruto, faz o parse
     if (texto && !nome) {
@@ -221,7 +221,16 @@ module.exports = async function handler(req, res) {
         }
       } catch(eo){ console.error('[orc→pipe]', eo.message); }
 
-      return res.status(200).json({ ok: true, cardId: card?.id, card, pipefyErro });
+      return res.status(200).json({
+        ok:       true,
+        cardId:   card?.id || null,
+        pipefyErro,
+        fichaInfo: {
+          nome:       nome,
+          equipamento: aparelho,
+          destinos:   ['Logística', 'Pipe ADM → Aguardando Aprovação']
+        }
+      });
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });
     }

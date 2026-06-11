@@ -436,8 +436,24 @@ async function criarCard() {
       }),
     });
     var d = await r.json(); hideTyping();
-    if (d.ok) { addBot("✅ Ficha cadastrada com sucesso!\n\n" + dados.nome + " registrado em Aguardando Aprovação.", ["Novo cadastro"]); }
-    else { addBot("❌ Erro: " + d.error); document.getElementById("input-area").style.display = "flex"; aguardandoFicha = true; }
+    if (d.ok) {
+      var destinos = (d.fichaInfo && d.fichaInfo.destinos) ? d.fichaInfo.destinos.join(' e ') : 'Logística e Pipe ADM';
+      var equip = (d.fichaInfo && d.fichaInfo.equipamento) ? d.fichaInfo.equipamento : dados.aparelho;
+      addBot(
+        "✅ Ficha cadastrada com sucesso!
+
+" +
+        "👤 Cliente: " + dados.nome + "
+" +
+        "🔧 Equipamento: " + equip + "
+" +
+        "📍 Registrado em: " + destinos + "
+
+" +
+        "A equipe de Logística já está ciente da coleta.",
+        ["Novo cadastro"]
+      );
+    } else { addBot("❌ Erro ao cadastrar: " + d.error); document.getElementById("input-area").style.display = "flex"; aguardandoFicha = true; }
   } catch(e) { hideTyping(); addBot("❌ Sem conexão. Tente novamente."); document.getElementById("input-area").style.display = "flex"; aguardandoFicha = true; }
 }
 
