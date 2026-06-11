@@ -93,7 +93,9 @@ const TEMPLATES = {
   <p style="margin:0 0 16px;font-size:14px;color:#444;line-height:1.7;">Posso enviar uma <strong>tabela de preços</strong> para a {{empresa}}? Leva menos de 5 minutos.</p>
   <table cellpadding="0" cellspacing="0"><tr>
     <td style="background:#3b82f6;border-radius:6px;padding:11px 24px;">
-      <a href="https://reparoeletroadm.com/institucional" style="color:#fff;text-decoration:none;font-size:13px;font-weight:700;">Ver Apresentação Completa →</a>
+      <a href="https://reparoeletroadm.com/api/pj-track?e=apresentacao&id={{leadId}}" style="color:#fff;text-decoration:none;font-size:13px;font-weight:700;">Ver Apresentação Completa →</a>
+    &nbsp;&nbsp;
+    <a href="https://reparoeletroadm.com/api/pj-track?e=proposta&id={{leadId}}" style="display:inline-block;background:#22c55e;color:#fff;padding:13px 26px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:700;">Solicitar Proposta →</a>
     </td>
   </tr></table>
 </td></tr>
@@ -111,7 +113,7 @@ const TEMPLATES = {
     </tr>
   </table>
 </td></tr>
-</table></td></tr></table></body></html>`,
+<img src="https://reparoeletroadm.com/api/pj-track?e=open&id={{leadId}}" width="1" height="1" style="display:none;border:0;" alt=""></table></td></tr></table></body></html>`,
   e21:`{{responsavel}}, entendo que talvez não seja o momento certo para a {{empresa}}.\n\nVou deixar nossa linha aberta — se precisar de manutenção de microondas ou bebedouros, é só chamar.\n\nAbraço,\nPedro Teixeira | Reparo Eletro BH`,
 };
 
@@ -124,6 +126,7 @@ function calcScore(lead) {
   if (lead.reuniaoAgendada)     s += 50;
   if (lead.propostaSolicitada)  s += 40;
   if (lead.emailAberto)         s += 15;
+  if (lead.apresentacaoVista)   s += 20;
   if (lead.linkedinRespondeu)   s += 20;
   // Perfil
   if (lead.funcionarios === '51-200') s += 20;
@@ -225,7 +228,8 @@ module.exports = async function handler(req, res) {
       try {
         const htmlBody = TEMPLATES.e0_html
           .replace(/\{\{responsavel\}\}/g, novo.responsavel)
-          .replace(/\{\{empresa\}\}/g, novo.empresa);
+          .replace(/\{\{empresa\}\}/g, novo.empresa)
+          .replace(/\{\{leadId\}\}/g, novo.id);
         const plainBody = TEMPLATES.e0_plain
           .replace(/\{\{responsavel\}\}/g, novo.responsavel)
           .replace(/\{\{empresa\}\}/g, novo.empresa);
@@ -343,7 +347,8 @@ module.exports = async function handler(req, res) {
     try {
       const html = TEMPLATES.e0_html
         .replace(/\{\{responsavel\}\}/g, lead.responsavel)
-        .replace(/\{\{empresa\}\}/g, lead.empresa);
+        .replace(/\{\{empresa\}\}/g, lead.empresa)
+        .replace(/\{\{leadId\}\}/g, lead.id);
       const text = TEMPLATES.e0_plain
         .replace(/\{\{responsavel\}\}/g, lead.responsavel)
         .replace(/\{\{empresa\}\}/g, lead.empresa);

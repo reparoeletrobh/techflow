@@ -449,6 +449,10 @@
     {
       "source": "/api/growth",
       "destination": "/api/growth.js"
+    },
+    {
+      "source": "/api/pj-track",
+      "destination": "/api/pj-track.js"
     }
   ],
   "headers": [
