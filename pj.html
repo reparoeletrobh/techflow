@@ -233,6 +233,10 @@ select option{background:var(--s2);}
 .sdr-lead{background:var(--s2);border:1px solid var(--bdr);border-radius:8px;padding:10px 10px 8px;cursor:pointer;transition:all .15s;}
 .sdr-lead:hover{border-color:var(--bl);background:rgba(59,130,246,.06);}
 .sdr-lead.atrasado{border-left:3px solid var(--re);}
+.sdr-lead.score-frio   {border-left:3px solid #475569;}
+.sdr-lead.score-morno  {border-left:3px solid #f59e0b;background:rgba(245,158,11,.04);}
+.sdr-lead.score-quente {border-left:3px solid #f97316;background:rgba(249,115,22,.06);}
+.sdr-lead.score-hot    {border-left:3px solid #ef4444;background:rgba(239,68,68,.07);}
 .sdr-lead-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
 .sdr-lead-emp{font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px;}
 .sdr-lead-score{font-family:var(--fm);font-size:9px;font-weight:700;background:var(--s1);border-radius:99px;padding:1px 6px;}
@@ -2264,29 +2268,33 @@ function renderKanban(lista) {
 }
 
 function sdrCardHTML(l) {
+  var sc = l.score || 0;
+  var scoreCls = sc >= 81 ? 'score-hot' : sc >= 61 ? 'score-quente' : sc >= 31 ? 'score-morno' : 'score-frio';
+  var scoreIcon = sc >= 81 ? '🔥' : sc >= 61 ? '♨️' : sc >= 31 ? '🌡️' : '🧊';
+  var scoreColor = sc >= 81 ? '#ef4444' : sc >= 61 ? '#f97316' : sc >= 31 ? '#f59e0b' : '#64748b';
+  var scoreBg = sc >= 81 ? 'rgba(239,68,68,.15)' : sc >= 61 ? 'rgba(249,115,22,.15)' : sc >= 31 ? 'rgba(245,158,11,.12)' : 'var(--s1)';
   var badges = '';
   if (l.emailRespondeu || l.emailNoInbox) badges += '<span class="badge badge-email">\u{1F4EC} Email</span>';
   if (l.waRespondeu)  badges += '<span class="badge badge-wa">\u{1F4AC} WA</span>';
-  if (l.score >= 61)  badges += '<span class="badge badge-hot">' + l.scoreBadge + ' ' + l.score + '</span>';
   if (l.atrasado)     badges += '<span class="badge badge-atrasado">\u26A0 Atrasado</span>';
+  if (l.apresentacaoVista) badges += '<span class="badge" style="background:rgba(139,92,246,.15);color:#8b5cf6;border:1px solid rgba(139,92,246,.2);">🖥️ Viu apresentação</span>';
+  if (l.propostaSolicitada) badges += '<span class="badge" style="background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.2);">📋 Proposta</span>';
   var prox = l.proximaAcao;
   var proxTxt = prox
     ? '<div class="sdr-lead-cad">' + (CANAL_ICON[prox.canal]||'\u25BA') + ' ' + prox.label.split(' \u2014')[0] + '</div>'
     : '<div class="sdr-lead-cad" style="color:var(--gr)">\u2705 Cad\xEAncia completa</div>';
-  // ID sem caracteres especiais — só alphanumerico e hífen
   var safeId = String(l.id).replace(/[^a-zA-Z0-9_-]/g, '');
   return (
-    '<div class="sdr-lead' + (l.atrasado ? ' atrasado' : '') + '" onclick="window._sdrOpen(' + "'" + safeId + "'" + ')">' +
-    '<div class="sdr-lead-top">' +
-    '<span class="sdr-lead-emp">' + esc(l.empresa) + '</span>' +
-    '<span class="sdr-lead-score" style="color:' + (l.score>=61?'var(--or)':l.score>=31?'var(--ye)':'var(--mu)') + '">' + l.score + '</span>' +
-    '</div>' +
-    '<div class="sdr-lead-nome">' + esc(l.responsavel) + ' \xB7 ' + esc(l.segmento) + '</div>' +
-    (badges ? '<div class="sdr-lead-badges">' + badges + '</div>' : '') +
+    '<div class="sdr-lead ' + scoreCls + (l.atrasado ? ' atrasado' : '') + '" onclick="window._sdrOpen(\'' + safeId + '\')">'+
+    '<div class="sdr-lead-top">'+
+    '<span class="sdr-lead-emp">' + esc(l.empresa) + '</span>'+
+    '<span class="sdr-lead-score" style="color:' + scoreColor + ';background:' + scoreBg + ';font-weight:800;font-size:10px;padding:2px 7px;">' +
+      scoreIcon + ' ' + sc +
+    '</span>'+
+    '</div>'+
+    '<div class="sdr-lead-nome">' + esc(l.responsavel) + ' \xB7 ' + esc(l.segmento) + '</div>'+
+    (badges ? '<div class="sdr-lead-badges">' + badges + '</div>' : '')+
     proxTxt +
-    '<div class="sdr-card-btn-wrap">' +
-    '<button class="sdr-card-btn" onclick="event.stopPropagation();window._sdrOpen(' + "'" + safeId + "'" + ')">Ver a\xE7\xF5es \u2192</button>' +
-    '</div>' +
     '</div>'
   );
 }
