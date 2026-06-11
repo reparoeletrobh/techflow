@@ -435,6 +435,25 @@ module.exports = async function handler(req, res) {
     try {
       const pref = await criarPreferenciaMp({ rec, metodo });
 
+      // Buscar pipeCardId para facilitar o move no webhook
+      let pipeCardId = rec.pipeCardId || null;
+      if (!pipeCardId) {
+        try {
+          const pipeDb = await dbGet('reparoeletro_pipe');
+          if (pipeDb && Array.isArray(pipeDb.cards)) {
+            const nomeRec = (rec.nomeContato || rec.title || '').toLowerCase().trim();
+            const primeiroNome = nomeRec.split(' ')[0];
+            // Buscar card em video_enviado com nome parecido
+            const pipeCard = pipeDb.cards.find(function(card) {
+              if (!['video_enviado','solicitar_entrega','aprovado'].includes(card.phase)) return false;
+              const cardNome = (card.nomeContato || '').toLowerCase();
+              return cardNome.includes(primeiroNome) || nomeRec.includes(cardNome.split(' ')[0]);
+            });
+            if (pipeCard) pipeCardId = pipeCard.id;
+          }
+        } catch(pe) { console.warn('[gerar-cobranca] pipeCardId:', pe.message); }
+      }
+
       // Salvar dados MP na ficha
       rec.mp = {
         preferenceId:  pref.id,
@@ -443,6 +462,7 @@ module.exports = async function handler(req, res) {
         geradoEm:      new Date().toISOString(),
         status:        "aguardando_pagamento"
       };
+      if (pipeCardId) rec.pipeCardId = pipeCardId;
       rec.phaseId  = "faturamento";
       rec.movedAt  = new Date().toISOString();
       rec.history  = [...(rec.history||[]), { phaseId:"faturamento", ts:rec.movedAt, via:"mp_cobranca" }];

@@ -149,8 +149,15 @@ async function processarPagamentoFinanceiro(pmt) {
 
   // Pipe ADM: mover para solicitar_entrega
   const nomeRec = (rec.nomeContato || rec.nome || rec.clienteNome || '').trim();
-  const pipeOk = await moverCardNoPipe(rec.pipefyId, rec.osCode, 'solicitar_entrega', rec.id, nomeRec).catch(()=>false);
-  console.log('[webhook-mp] Pipe ADM move:', pipeOk);
+  // Usar pipeCardId direto se disponível (salvo no gerar-cobranca-mp)
+  const pipeOk = await moverCardNoPipe(
+    rec.pipefyId,
+    rec.pipeCardId || rec.osCode,  // pipeCardId tem prioridade sobre osCode
+    'solicitar_entrega',
+    rec.pipeCardId || rec.id,      // usar ID do card do pipe diretamente
+    nomeRec
+  ).catch(()=>false);
+  console.log('[webhook-mp] Pipe ADM move:', pipeOk, '| pipeCardId:', rec.pipeCardId||'(não salvo)');
 
   // Pipefy: mover para Solicitar Entrega — função própria, sem fetch interno
   let pipefyOk = false;
