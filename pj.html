@@ -1809,6 +1809,67 @@ function _buildHist(f) {
   }).join('');
 }
 
+
+// ── Enviar NF + Boleto por email a partir do histórico ───────────────────
+async function _hEnviarEmail(btn) {
+  var cid=btn.dataset.cid, cobId=btn.dataset.cobid;
+  var paraEl   =document.getElementById('he-para-'+cobId);
+  var assuntoEl=document.getElementById('he-assunto-'+cobId);
+  var msgEl    =document.getElementById('he-msg-'+cobId);
+  var stEl     =document.getElementById('he-st-'+cobId);
+  var btnEl    =document.getElementById('he-btn-'+cobId);
+
+  var para=(paraEl?paraEl.value:'').trim();
+  if(!para){toast('Informe pelo menos um email destinatário','r');return;}
+
+  var assunto=(assuntoEl?assuntoEl.value:'').trim()||'Cobrança e Nota Fiscal';
+  var msgExtra=(msgEl?msgEl.value:'').trim();
+
+  var f2=_fornLista.find(function(x){return x.id===cid;});
+  var cob2=f2&&(f2.cobrancas||[]).find(function(x){return x.id===cobId;});
+  var destinos=para.split(',').map(function(e){return e.trim();}).filter(Boolean);
+
+  if(btnEl){btnEl.disabled=true;btnEl.textContent='⏳ Enviando...';}
+  if(stEl){stEl.textContent='';stEl.style.color='var(--mu)';}
+
+  try{
+    var r=await fetch('/api/pj-cobranca?action=enviar-email',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        para:destinos.join(','), destinos,
+        clienteNome:f2?f2.razaoSocial:'Cliente',
+        valor:cob2?cob2.valor:0,
+        vencimento:cob2?cob2.vencimento:'',
+        nfChave:cob2?cob2.nfChave||null:null,
+        boletoUrl:cob2?cob2.boletoUrl||null:null,
+        cobId, assunto, msgExtra,
+        clienteId:cid,
+      })
+    }).then(function(x){return x.json();});
+
+    if(btnEl){btnEl.disabled=false;btnEl.textContent='📧 Enviar NF + Boleto por Email';}
+    if(r.ok){
+      var anexos=r.anexos||[];
+      var anexosTxt=anexos.length
+        ?'\n📎 Anexos: '+anexos.join(', ')
+        :'\n⚠️ Sem anexos (NF ou boleto não disponíveis)';
+      var dest=destinos.length>1?destinos.length+' destinatários':destinos[0];
+      if(stEl){
+        stEl.style.color='var(--gr)';
+        stEl.innerHTML='✅ Enviado para <b>'+dest+'</b>'+anexosTxt.replace(/\n/g,'<br>');
+      }
+      toast('✅ Email enviado com sucesso!','g');
+    } else {
+      if(stEl){stEl.style.color='#e02040';stEl.textContent='❌ '+(r.error||'Erro ao enviar');}
+      toast('Erro: '+(r.error||'falha'),'r');
+    }
+  }catch(ex){
+    if(btnEl){btnEl.disabled=false;btnEl.textContent='📧 Enviar NF + Boleto por Email';}
+    if(stEl){stEl.style.color='#e02040';stEl.textContent='❌ Sem conexão';}
+    toast('Erro de conexão','r');
+  }
+}
+
 // Ações do histórico
 async function _hSalvar(btn){
   var cid=btn.dataset.cid,cobId=btn.dataset.cobid;
@@ -2591,6 +2652,7 @@ document.addEventListener('click', function(e) {
     if (a==='h-cancelar-nf')     { _hCancelarNF(act); return; }
     if (a==='h-cancelar-boleto') { _hCancelarBoleto(act); return; }
     if (a==='h-recebido')        { _hRecebido(act); return; }
+    if (a==='h-enviar-email')    { _hEnviarEmail(act); return; }
   }
 });
 

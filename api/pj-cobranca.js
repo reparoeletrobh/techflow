@@ -246,6 +246,7 @@ module.exports = async function handler(req, res) {
 
     // Buscar PDF da NF para anexar
     const attachments = [];
+    const anexosList = [];
     if(nfChave){
       try{
         const pdfRes = await fetch('https://reparoeletroadm.com/api/nfse?action=danfe&chave='+nfChave);
@@ -253,11 +254,13 @@ module.exports = async function handler(req, res) {
           const buf = await pdfRes.arrayBuffer();
           const b64 = Buffer.from(buf).toString('base64');
           attachments.push({filename:'NotaFiscal-'+nfChave.slice(-8)+'.pdf',content:b64});
+          anexosList.push('Nota Fiscal PDF');
         }
       }catch(pe){console.warn('NF pdf erro:',pe.message);}
     }
 
     const vlrFmt = 'R$ '+parseFloat(valor||0).toFixed(2).replace('.',',');
+    if(boletoUrl) anexosList.push('Boleto (link no email)');
 
     const emailBody = {
       from:'Pedro Teixeira | Reparo Eletro, Microondas e Bebedouros <pedro@comercial.reparoeletroadm.com>',
@@ -306,7 +309,25 @@ module.exports = async function handler(req, res) {
         body:JSON.stringify(emailBody),
       });
       const ed = await er.json();
-      if(ed.id) return res.status(200).json({ok:true,emailId:ed.id});
+      if(ed.id){
+        // Salvar em pj_enviados para aparecer no inbox
+        try{
+          const eDb=(await dbGet('pj_enviados'))||{emails:[]};
+          eDb.emails.unshift({
+            id:'ENV-'+Date.now(),
+            para: destinos||[para],
+            assunto: assunto||('Cobrança e Nota Fiscal – '+clienteNome),
+            clienteNome, cobId, clienteId,
+            anexos: anexosList,
+            enviadoEm: new Date().toISOString(),
+            emailId: ed.id,
+          });
+          if(eDb.emails.length>200) eDb.emails=eDb.emails.slice(0,200);
+          await dbSet('pj_enviados',eDb);
+        }catch(eSv){console.warn('[pj-cobranca] salvar enviado:',eSv.message);}
+
+        return res.status(200).json({ok:true, emailId:ed.id, anexos:anexosList});
+      }
       return res.status(200).json({ok:false,error:ed.message||'falha Resend'});
     }catch(ee){
       return res.status(200).json({ok:false,error:ee.message});
