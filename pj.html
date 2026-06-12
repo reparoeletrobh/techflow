@@ -1900,10 +1900,16 @@ async function _hReemitirNF(btn){
 }
 async function _hReemitirBoleto(btn){
   var cid=btn.dataset.cid,cobId=btn.dataset.cobid;
+  var vEl=document.getElementById('hv-'+cobId);
+  var nEl=document.getElementById('hn-'+cobId);
   btn.textContent='\u23F3 Gerando...';btn.disabled=true;
-  var r=await fetch('/api/pj-cobranca?action=reemitir-boleto',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clienteId:cid,cobId})}).then(function(x){return x.json();});
+  var r=await fetch('/api/pj-cobranca?action=reemitir-boleto',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    clienteId:cid, cobId,
+    valor:      parseFloat(vEl?vEl.value:0)||0,
+    vencimento: nEl?nEl.value:''
+  })}).then(function(x){return x.json();});
   btn.textContent='\uD83D\uDD04 Re-emitir Boleto com dados acima';btn.disabled=false;
-  if(r.ok){await _hReload(cid);toast('\u2705 Boleto gerado!','g');}
+  if(r.ok){await _hReload(cid);toast('\u2705 Boleto re-emitido com novos dados!','g');}
   else toast('Erro: '+(r.error||'falha'),'r');
 }
 async function _hCancelarNF(btn){
