@@ -972,7 +972,7 @@ function renderListaEnviados(lista){
     var cor=avatarColor('P');
     var paraStr=(em.para||em.to||'').toString().replace(/<[^>]+>/g,'');
     var assunto=em.assunto||em.subject||'(sem assunto)';
-    var data=fmtDt(em.criadoEm||em.createdAt||'');
+    var data=fmtDt(em.criadoEm||em.createdAt||em.enviadoEm||'');
     return '<div class="gm-row" data-ei="'+i+'" style="cursor:pointer">'+
       '<div class="gm-row-avatar" style="background:'+cor+'">P</div>'+
       '<div class="gm-row-body">'+
@@ -1039,7 +1039,7 @@ function abrirEmailEnviado(idx){
     assunto:em.assunto||em.subject||'',
     texto:em.corpo||em.body||em.text||'',
     html:em.html||'',
-    recebidoEm:em.criadoEm||em.createdAt||'',
+    recebidoEm:em.criadoEm||em.createdAt||em.enviadoEm||'',
   }, cor, 'P', 'Pedro Teixeira | Reparo Eletro, Microondas e Bebedouros', false, true);
 }
 

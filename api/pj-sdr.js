@@ -365,6 +365,22 @@ module.exports = async function handler(req, res) {
       });
       const ed = await er.json();
       if (!ed.id) return res.status(500).json({ ok:false, error: ed.message || 'falha Resend' });
+      // Salvar em pj_enviados para o inbox
+      try {
+        const evDb = (await dbGet('pj_enviados')) || { emails: [] };
+        evDb.emails.unshift({
+          id: 'SDR-' + Date.now().toString(36),
+          para: lead.email,
+          assunto: 'Manutenção de Microondas e Bebedouros para ' + lead.empresa,
+          corpo: text || '',
+          criadoEm: new Date().toISOString(),
+          tipo: 'apresentacao',
+          leadId: lead.id,
+          empresa: lead.empresa,
+        });
+        if (evDb.emails.length > 500) evDb.emails = evDb.emails.slice(0, 500);
+        await dbSet('pj_enviados', evDb);
+      } catch(evErr) { console.warn('[sdr] salvar enviado:', evErr.message); }
       // Registrar toque D0 se ainda não foi feito
       if (!lead.toques.find(t => t.passo === 1)) {
         lead.toques.push({ passo:1, canal:'email', label:'Email D0 — Apresentação Comercial', realizado:true, data:new Date().toISOString(), respondeu:false });
