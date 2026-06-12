@@ -2535,6 +2535,52 @@ async function abrirDetalhe(id) {
     '<span style="font-family:var(--fm);font-size:10px;color:var(--mu)">LEAD SCORE</span>'+
     '<span style="font-family:var(--fh);font-size:22px;font-weight:900;color:'+scoreColor+'">'+l.scoreBadge+' '+l.score+'</span></div>'+
     '<div class="sdr-detail-score-bar"><div class="sdr-detail-score-fill" style="width:'+l.score+'%;background:'+scoreColor+'"></div></div></div>'+
+    // Score Breakdown
+    (function(){
+      var items=[
+        {label:'Email aberto',         pts:15, earned:!!l.emailAberto,        icon:'📧', tipo:'comportamento'},
+        {label:'Viu apresentação',      pts:20, earned:!!l.apresentacaoVista,  icon:'🖥️', tipo:'comportamento'},
+        {label:'Email respondido',      pts:40, earned:!!l.emailRespondeu,     icon:'✉️', tipo:'comportamento'},
+        {label:'WhatsApp respondido',   pts:30, earned:!!l.waRespondeu,        icon:'💬', tipo:'comportamento'},
+        {label:'Proposta solicitada',   pts:40, earned:!!l.propostaSolicitada, icon:'📋', tipo:'comportamento'},
+        {label:'Reunião agendada',      pts:50, earned:!!l.reuniaoAgendada,    icon:'📅', tipo:'comportamento'},
+        {label:'LinkedIn respondeu',    pts:20, earned:!!l.linkedinRespondeu,  icon:'💼', tipo:'comportamento'},
+        {label:'51-200 funcionários',   pts:20, earned:l.funcionarios==='51-200', icon:'🏢', tipo:'perfil'},
+        {label:'200+ funcionários',     pts:30, earned:l.funcionarios==='200+',   icon:'🏢', tipo:'perfil'},
+        {label:'16-50 equipamentos',    pts:15, earned:l.equipamentos==='16-50',  icon:'🔧', tipo:'perfil'},
+        {label:'50+ equipamentos',      pts:25, earned:l.equipamentos==='50+',    icon:'🔧', tipo:'perfil'},
+        {label:'Cargo decisor',         pts:15, earned:['sócio','ceo','diretor','proprietário','dono','c-level'].some(function(c){return (l.cargo||'').toLowerCase().includes(c);}), icon:'👤', tipo:'perfil'},
+        {label:'Segmento premium',      pts:10, earned:['Restaurante','Hotel','Escola','Clínica','Hospital'].includes(l.segmento), icon:'🏆', tipo:'perfil'},
+      ];
+      var ganhos=items.filter(function(i){return i.earned;});
+      var html='<div style="background:var(--s1);border-radius:8px;padding:10px 12px;margin-bottom:14px">';
+      html+='<div style="font-family:var(--fm);font-size:9px;color:var(--mu);margin-bottom:8px;letter-spacing:.06em">DETALHAMENTO DO SCORE</div>';
+      if(!ganhos.length){
+        html+='<div style="font-family:var(--fm);font-size:10px;color:var(--mu);padding:4px 0">Nenhum critério atingido ainda.</div>';
+      } else {
+        html+=ganhos.map(function(it){
+          return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--bdr)">'+
+            '<span style="font-size:13px">'+it.icon+'</span>'+
+            '<span style="flex:1;font-family:var(--fm);font-size:10px;color:var(--tx)">'+it.label+'</span>'+
+            '<span style="font-family:var(--fm);font-size:10px;font-weight:700;color:var(--gr)">+'+it.pts+' pts</span>'+
+          '</div>';
+        }).join('');
+      }
+      // Critérios pendentes
+      var pendentes=items.filter(function(i){return !i.earned && i.tipo==='comportamento';});
+      if(pendentes.length){
+        html+='<div style="font-family:var(--fm);font-size:9px;color:var(--mu);margin-top:8px;margin-bottom:4px;letter-spacing:.06em">PODE AINDA GANHAR</div>';
+        html+=pendentes.map(function(it){
+          return '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;opacity:.5">'+
+            '<span style="font-size:12px">'+it.icon+'</span>'+
+            '<span style="flex:1;font-family:var(--fm);font-size:10px;color:var(--mu)">'+it.label+'</span>'+
+            '<span style="font-family:var(--fm);font-size:10px;color:var(--mu)">+'+it.pts+' pts</span>'+
+          '</div>';
+        }).join('');
+      }
+      html+='</div>';
+      return html;
+    })()+
     // Chips
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">'+chips+'</div>'+
     // Fases
