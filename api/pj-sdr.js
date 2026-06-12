@@ -248,6 +248,23 @@ module.exports = async function handler(req, res) {
         const ed = await er.json();
         if (ed.id) {
           emailEnviado = true;
+          // Salvar em pj_enviados para aparecer no Inbox Enviados
+          try {
+            const evDb = (await dbGet('pj_enviados')) || { emails: [] };
+            evDb.emails.unshift({
+              id: 'SDR-D0-' + Date.now().toString(36),
+              para: novo.email,
+              assunto: 'Manutenção de Microondas e Bebedouros para ' + novo.empresa,
+              corpo: '',
+              criadoEm: new Date().toISOString(),
+              tipo: 'apresentacao_d0',
+              leadId: novo.id,
+              empresa: novo.empresa,
+              responsavel: novo.responsavel,
+            });
+            if (evDb.emails.length > 500) evDb.emails = evDb.emails.slice(0, 500);
+            await dbSet('pj_enviados', evDb);
+          } catch(evErr) { console.warn('[sdr criar] salvar enviado:', evErr.message); }
           // Registrar toque D0 automaticamente
           novo.toques.push({ passo:1, canal:'email', label:'Email D0 — Apresentação + Dor', realizado:true, data:new Date().toISOString(), respondeu:false });
           novo.fase = 'primeiro_contato';
@@ -390,6 +407,36 @@ module.exports = async function handler(req, res) {
       }
       return res.status(200).json({ ok:true, emailId: ed.id });
     } catch(e) { return res.status(500).json({ ok:false, error: e.message }); }
+  }
+
+  // ── GET recuperar-emails-leads — injeta emails dos últimos N leads no pj_enviados ──
+  if (action === 'recuperar-emails-leads') {
+    const qtd = parseInt(req.query.qtd||'2')||2;
+    try {
+      const leads = (db.leads||[]).slice().sort((a,b)=>(b.criadoEm||'').localeCompare(a.criadoEm||'')).slice(0,qtd);
+      const evDb = (await dbGet('pj_enviados')) || { emails: [] };
+      let adicionados = 0;
+      const now = new Date().toISOString();
+      for (const lead of leads) {
+        const jaExiste = evDb.emails.some(e=>e.leadId===lead.id && e.tipo==='apresentacao_d0');
+        if (!jaExiste && lead.email) {
+          evDb.emails.unshift({
+            id: 'SDR-REC-'+Date.now().toString(36)+'-'+adicionados,
+            para: lead.email,
+            assunto: 'Manutenção de Microondas e Bebedouros para '+lead.empresa,
+            corpo: 'Email de apresentação enviado automaticamente ao cadastrar o lead.',
+            criadoEm: lead.criadoEm||now,
+            tipo: 'apresentacao_d0',
+            leadId: lead.id,
+            empresa: lead.empresa,
+            responsavel: lead.responsavel,
+          });
+          adicionados++;
+        }
+      }
+      if (adicionados>0) { await dbSet('pj_enviados', evDb); }
+      return res.status(200).json({ ok:true, adicionados, leads: leads.map(l=>({id:l.id,empresa:l.empresa,email:l.email})) });
+    } catch(e) { return res.status(200).json({ ok:false, error:e.message }); }
   }
 
     return res.status(404).json({ ok:false, error:'ação não encontrada: '+action });
