@@ -120,17 +120,21 @@ select option{background:var(--s2);}
 .gm-loading{display:flex;align-items:center;justify-content:center;padding:40px;}
 
 /* Linha de email */
-.gm-row{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid rgba(26,37,64,.5);cursor:pointer;transition:background .1s;position:relative;}
+.gm-row{display:flex;align-items:center;gap:10px;padding:0 14px;height:52px;min-height:52px;max-height:52px;border-bottom:1px solid rgba(26,37,64,.4);cursor:pointer;transition:background .12s;position:relative;box-sizing:border-box;overflow:hidden;user-select:none;}
 .gm-row:hover{background:var(--s1);}
 .gm-row.ativo{background:rgba(59,130,246,.08);border-left:2px solid var(--bl);}
-.gm-row.nao-lido .gm-row-nome,.gm-row.nao-lido .gm-row-assunto{font-weight:700;color:var(--tx);}
+.gm-row.nao-lido .gm-row-nome{font-weight:700;color:var(--tx);}
+.gm-row.nao-lido .gm-row-assunto{font-weight:600;color:var(--tx);}
+.gm-unread-dot{width:8px;height:8px;border-radius:50%;background:var(--bl);flex-shrink:0;margin-right:2px;}
 .gm-row-avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:var(--fh);font-weight:700;font-size:13px;color:#fff;}
 .gm-row-body{flex:1;min-width:0;}
-.gm-row-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;}
-.gm-row-nome{font-size:12px;font-weight:500;color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;}
+.gm-row-top{display:flex;justify-content:space-between;align-items:center;gap:6px;width:100%;}
+.gm-row-nome{font-size:12px;font-weight:500;color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;max-width:160px;}
 .gm-row-data{font-family:var(--fm);font-size:9px;color:var(--mu);flex-shrink:0;}
-.gm-row-assunto{font-family:var(--fm);font-size:10px;color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:2px;}
-.gm-row-preview{font-size:10px;color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.65;}
+.gm-row-assunto{font-family:var(--fm);font-size:10px;color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;}
+.gm-row-sub-line{display:flex;align-items:center;gap:4px;min-width:0;overflow:hidden;}
+.gm-row-preview{font-size:10px;color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.55;flex-shrink:1;min-width:0;}
+.gm-row-sep{font-size:10px;color:var(--mu);opacity:.35;flex-shrink:0;}
 .gm-unread-dot{width:8px;height:8px;border-radius:50%;background:var(--bl);position:absolute;left:5px;top:50%;transform:translateY(-50%);flex-shrink:0;}
 
 /* Painel de leitura */
@@ -938,56 +942,45 @@ function renderListaInbox(lista){
   if(!lista.length){
     el.innerHTML='<div style="padding:60px 20px;text-align:center;font-family:var(--fm);font-size:10px;color:var(--mu)">'+
       '<div style="font-size:32px;margin-bottom:12px;opacity:.3">📭</div>Nenhuma mensagem ainda.</div>';
-    return;
+    el.onclick=null; return;
   }
-  el.innerHTML=lista.map(function(em,i){
-    var ativo=_emailAtivo&&_emailAtivo.id===em.id?' ativo':'';
-    var lido=em.lido?'':' nao-lido';
-    var inicial=(em.de||'?').replace(/.*<([^>]+)>$/,'$1')[0].toUpperCase();
+  el.innerHTML=lista.map(function(em){
+    var lido=em.lido;
+    var cls='gm-row'+((_emailAtivo&&_emailAtivo.id===em.id)?' ativo':'')+(lido?'':' nao-lido');
+    var inicial=(em.de||'?').replace(/.*<([^>]+)>$/,'$1').trim()[0].toUpperCase()||'?';
     var cor=avatarColor(inicial);
-    var eid=String(em.id).replace(/[^a-zA-Z0-9_-]/g,'_');
-    var dot=em.lido?'':'<div class="gm-unread-dot"></div>';
-    return '<div class="gm-row'+ativo+lido+'" id="row-'+eid+'" data-eid="'+eid+'" data-id="'+em.id+'" onclick="abrirEmail(this.dataset.id)">'+
+    var de=esc((em.de||'').replace(/<[^>]+>/g,'').trim().split('@')[0].split('<')[0].trim().slice(0,22));
+    var assunto=esc(em.assunto||'(sem assunto)');
+    var preview=esc((em.texto||'').replace(/\s+/g,' ').trim().slice(0,60));
+    var data=fmtDt(em.recebidoEm||em.criadoEm||'');
+    var dot=lido?'':'<span class="gm-unread-dot"></span>';
+    var safe=String(em.id).replace(/"/g,'&quot;');
+    return '<div class="'+cls+'" data-emid="'+safe+'" tabindex="0" role="button" aria-label="'+assunto+'">'+
       dot+
-      '<div class="gm-row-avatar" style="background:'+cor+'">'+inicial+'</div>'+
-      '<div class="gm-row-body">'+
-      '<div class="gm-row-top">'+
-      '<span class="gm-row-nome">'+esc((em.de||'').replace(/<[^>]+>/g,'').trim())+'</span>'+
-      '<span class="gm-row-data">'+fmtDt(em.recebidoEm)+'</span>'+
+      '<div class="gm-row-avatar" style="background:'+cor+';flex-shrink:0;">'+inicial+'</div>'+
+      '<div class="gm-row-body" style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:2px;overflow:hidden;">'+
+        '<div class="gm-row-top">'+
+          '<span class="gm-row-nome">'+de+'</span>'+
+          '<span class="gm-row-data" style="flex-shrink:0;margin-left:8px;">'+data+'</span>'+
+        '</div>'+
+        '<div class="gm-row-sub-line">'+
+          '<span class="gm-row-assunto">'+assunto+'</span>'+
+          (preview?'<span class="gm-row-sep">—</span><span class="gm-row-preview">'+preview+'</span>':'')+
+        '</div>'+
       '</div>'+
-      '<div class="gm-row-assunto">'+esc(em.assunto||'(sem assunto)')+'</div>'+
-      '<div class="gm-row-preview">'+esc((em.texto||'').replace(/\s+/g,' ').trim().slice(0,80))+'</div>'+
-      '</div></div>';
+    '</div>';
   }).join('');
+  // Event delegation — UMA única listener no container, sem onclick inline
+  el.onclick = null;
+  el.removeEventListener('click', _inboxClickDelegation);
+  el.addEventListener('click', _inboxClickDelegation);
 }
 
-function renderListaEnviados(lista){
-  var el=g('lista-inbox');
-  if(!lista||!lista.length){
-    el.innerHTML='<div style="padding:60px 20px;text-align:center;font-family:var(--fm);font-size:10px;color:var(--mu)">'+
-      '<div style="font-size:32px;margin-bottom:12px;opacity:.3">📤</div>Nenhum email enviado ainda.</div>';
-    return;
-  }
-  el.innerHTML=lista.map(function(em,i){
-    var cor=avatarColor('P');
-    var paraStr=(em.para||em.to||'').toString().replace(/<[^>]+>/g,'');
-    var assunto=em.assunto||em.subject||'(sem assunto)';
-    var data=fmtDt(em.criadoEm||em.createdAt||em.enviadoEm||'');
-    return '<div class="gm-row" data-ei="'+i+'" style="cursor:pointer">'+
-      '<div class="gm-row-avatar" style="background:'+cor+'">P</div>'+
-      '<div class="gm-row-body">'+
-      '<div class="gm-row-top">'+
-      '<span class="gm-row-nome">Para: '+esc(paraStr.slice(0,40))+'</span>'+
-      '<span class="gm-row-data">'+data+'</span>'+
-      '</div>'+
-      '<div class="gm-row-assunto">'+esc(assunto)+'</div>'+
-      '</div></div>';
-  }).join('');
-  // Event delegation — sem onclick inline
-  el.onclick=function(e){
-    var row=e.target.closest('[data-ei]');
-    if(row) abrirEmailEnviado(parseInt(row.dataset.ei));
-  };
+function _inboxClickDelegation(e){
+  var row=e.target.closest('[data-emid]');
+  if(!row) return;
+  e.stopPropagation();
+  abrirEmail(row.dataset.emid);
 }
 
 function filtrarInbox(){
@@ -1004,7 +997,7 @@ async function abrirEmail(id){
   _emailAtivo=em;
   // Marcar visual ativo
   document.querySelectorAll('.gm-row').forEach(function(r){r.classList.remove('ativo');});
-  var row=document.querySelector('[data-id="'+id+'"]');
+  var row=document.querySelector('[data-emid="'+id.replace(/"/g,'&quot;')+'"],[data-id="'+id+'"]');
   if(row){row.classList.remove('nao-lido','gm-row-nao-lido');row.classList.add('ativo');
     var dot=row.querySelector('.gm-unread-dot'); if(dot) dot.remove();}
   // Marcar como lido
