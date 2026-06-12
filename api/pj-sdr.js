@@ -82,8 +82,8 @@ const TEMPLATES = {
       </td>
       <td width="50%" style="padding:0 0 0 6px;vertical-align:top;">
         <table cellpadding="12" cellspacing="0" style="background:#f8f9ff;border-left:3px solid #f97316;border-radius:0 6px 6px 0;width:100%;"><tr><td>
-          <div style="font-size:18px">⚡</div><div style="font-size:12px;font-weight:700;color:#1a1a2e;">Diagnóstico 24h</div>
-          <div style="font-size:11px;color:#666;margin-top:2px;">Prazo médio: 5 a 7 dias úteis.</div>
+          <div style="font-size:18px">⚡</div><div style="font-size:12px;font-weight:700;color:#1a1a2e;">Diagnóstico Imediato</div>
+          <div style="font-size:11px;color:#666;margin-top:2px;">Prazo médio de até 24 horas para conserto.</div>
         </td></tr></table>
       </td>
     </tr>
@@ -94,8 +94,7 @@ const TEMPLATES = {
   <table cellpadding="0" cellspacing="0"><tr>
     <td style="background:#3b82f6;border-radius:6px;padding:11px 24px;">
       <a href="https://reparoeletroadm.com/api/pj-track?e=apresentacao&id={{leadId}}" style="color:#fff;text-decoration:none;font-size:13px;font-weight:700;">Ver Apresentação Completa →</a>
-    &nbsp;&nbsp;
-    <a href="https://reparoeletroadm.com/api/pj-track?e=proposta&id={{leadId}}" style="display:inline-block;background:#22c55e;color:#fff;padding:13px 26px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:700;">Solicitar Proposta →</a>
+
     </td>
   </tr></table>
 </td></tr>
