@@ -40,7 +40,7 @@ module.exports = async function handler(req,res){
   // POST enviar — envia email para um ou vários destinatários
   if(req.method==='POST'&&action==='enviar'){
     if(!RESEND_KEY)return res.status(400).json({ok:false,error:'RESEND_API_KEY não configurado'});
-    const{de,para,assunto,html,remetente}=req.body||{};
+    const{de,para,assunto,html,remetente,attachments}=req.body||{};
     const texto=(req.body||{}).texto||(req.body||{}).corpo||'';
     if(!para||!assunto)return res.status(400).json({ok:false,error:'para e assunto obrigatórios'});
     const destinatarios=Array.isArray(para)?para:[para];
@@ -57,6 +57,7 @@ module.exports = async function handler(req,res){
             subject:assunto.replace(/\{\{empresa\}\}/g,dest.empresa||'').replace(/\{\{responsavel\}\}/g,dest.responsavel||''),
             html:(html||'').replace(/\{\{empresa\}\}/g,dest.empresa||'').replace(/\{\{responsavel\}\}/g,dest.responsavel||'').replace(/\{\{cidade\}\}/g,dest.cidade||''),
             text:(texto||'').replace(/\{\{empresa\}\}/g,dest.empresa||'').replace(/\{\{responsavel\}\}/g,dest.responsavel||''),
+            ...(attachments&&attachments.length?{attachments:attachments.map(function(a){return {filename:a.filename,content:a.content};})}:{}),
           })
         });
         const j=await r.json();

@@ -589,6 +589,11 @@ select option{background:var(--s2);}
         <textarea id="cm-corpo" class="gm-compose-textarea" placeholder="Escreva sua mensagem..."></textarea>
       </div>
       <div class="gm-compose-footer">
+        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;padding:6px 10px;border-radius:6px;border:1px solid var(--bdr);background:var(--s2);color:var(--mu);font-family:var(--fm);font-size:10px;font-weight:600;">
+          📎 Anexar
+          <input type="file" id="cm-files" multiple style="display:none;" onchange="cmShowFiles(this)">
+        </label>
+        <div id="cm-files-list" style="flex:1;display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-family:var(--fm);font-size:9px;color:var(--mu);"></div>
         <button class="btn btn-pri" onclick="enviarComposeEmail()" id="cm-send-btn">
           <span id="cm-send-label">Enviar</span>
         </button>
@@ -742,7 +747,36 @@ select option{background:var(--s2);}
 
 <div class="toast" id="toast"></div>
 
-<script>
+<script>function renderListaEnviados(lista){
+  var el=g('lista-inbox');
+  if(!lista||!lista.length){
+    el.innerHTML='<div style="padding:60px 20px;text-align:center;font-family:var(--fm);font-size:10px;color:var(--mu)">'+
+      '<div style="font-size:32px;margin-bottom:12px;opacity:.3">📤</div>Nenhum email enviado ainda.</div>';
+    _inboxAttachListener(el, 'enviados'); return;
+  }
+  el.innerHTML=lista.map(function(em,i){
+    var cor=avatarColor('P');
+    var safe=String(em.id||i).replace(/"/g,'&quot;');
+    var assunto=esc(em.assunto||em.subject||'(sem assunto)');
+    var paraStr=esc((em.para||em.to||'').toString().replace(/<[^>]+>/g,'').slice(0,30));
+    var data=fmtDt(em.criadoEm||em.createdAt||em.enviadoEm||'');
+    return '<div class="gm-row enviado-row" data-emid="'+safe+'" data-ei="'+i+'" tabindex="0">'+
+      '<div class="gm-row-avatar" style="background:'+cor+';flex-shrink:0;">P</div>'+
+      '<div class="gm-row-body" style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:2px;overflow:hidden;">'+
+        '<div class="gm-row-top">'+
+          '<span class="gm-row-nome" style="color:var(--mu)">Para: '+paraStr+'</span>'+
+          '<span class="gm-row-data" style="flex-shrink:0;margin-left:8px;">'+data+'</span>'+
+        '</div>'+
+        '<div class="gm-row-sub-line">'+
+          '<span class="gm-row-assunto">'+assunto+'</span>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+  _inboxAttachListener(el, 'enviados');
+}
+
+
 var _P=[], _tabAtual='prospects';
 
 // Utils
@@ -970,17 +1004,33 @@ function renderListaInbox(lista){
       '</div>'+
     '</div>';
   }).join('');
-  // Event delegation — UMA única listener no container, sem onclick inline
-  el.onclick = null;
-  el.removeEventListener('click', _inboxClickDelegation);
-  el.addEventListener('click', _inboxClickDelegation);
+  _inboxAttachListener(el, 'entrada');
 }
 
+// ── Delegation central do inbox — garante 1 listener por vez ────────────────
+var _inboxListenerMode = '';
 function _inboxClickDelegation(e){
   var row=e.target.closest('[data-emid]');
   if(!row) return;
   e.stopPropagation();
-  abrirEmail(row.dataset.emid);
+  var id=row.dataset.emid;
+  if(_inboxListenerMode==='enviados'){
+    var idx=parseInt(row.dataset.ei)||0;
+    abrirEmailEnviado(idx);
+  } else {
+    abrirEmail(id);
+  }
+}
+function _inboxAttachListener(el, modo){
+  _inboxListenerMode=modo;
+  el.onclick=null;
+  // Clonar o elemento para remover TODOS os listeners de uma vez
+  var clone=el.cloneNode(false);
+  while(el.firstChild) clone.appendChild(el.firstChild);
+  el.parentNode.replaceChild(clone, el);
+  clone.addEventListener('click', _inboxClickDelegation);
+  // Atualizar referência
+  window._listaInboxEl=clone;
 }
 
 function filtrarInbox(){
@@ -1090,6 +1140,9 @@ function abrirReply(){
     '<div class="gm-reply-header">Responder para: '+esc(em.de)+'</div>'+
     '<textarea id="gm-reply-text" class="gm-reply-textarea" placeholder="Escreva sua resposta..."></textarea>'+
     '<div class="gm-reply-footer">'+
+    '<label style="cursor:pointer;display:flex;align-items:center;gap:3px;padding:5px 8px;border-radius:5px;border:1px solid var(--bdr);background:var(--s2);color:var(--mu);font-family:var(--fm);font-size:9px;">'+
+    '📎 Anexar<input type="file" id="rp-files" multiple style="display:none;" onchange="rpShowFiles(this)"></label>'+
+    '<div id="rp-files-list" style="flex:1;display:flex;flex-wrap:wrap;gap:3px;font-family:var(--fm);font-size:9px;color:var(--mu);"></div>'+
     '<button class="btn btn-pri" style="font-size:10px" id="gm-reply-btn" onclick="window._enviarReply()">Enviar Resposta</button>'+
     '<button class="btn btn-x" style="font-size:10px;opacity:.6" onclick="limparReply()">Cancelar</button>'+
     '</div></div>';
@@ -1106,7 +1159,16 @@ window._enviarReply = async function(){
   try{
     var r=await fetch('/api/pj-email?action=enviar',{method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({para:para,assunto:'Re: '+assunto.replace(/^Re: /i,''),corpo,de:''})
+      body:JSON.stringify({para:para,assunto:'Re: '+assunto.replace(/^Re: /i,''),corpo,de:'',
+        attachments:await (async function(){
+          var att=[];
+          for(var ri=0;ri<_rpFiles.length;ri++){
+            var rf=_rpFiles[ri];
+            var rb=await new Promise(function(res,rej){var r=new FileReader();r.onload=function(e){res(e.target.result.split(',')[1]);};r.onerror=rej;r.readAsDataURL(rf);});
+            att.push({filename:rf.name,content:rb});
+          }
+          return att;
+        })()})
     }).then(function(x){return x.json();});
     if(r.ok){
       toast('✅ Resposta enviada!','g');
@@ -1144,6 +1206,44 @@ function minimizarCompose(){
   g('gm-compose-modal').classList.toggle('minimized');
 }
 
+// ── Gerenciar anexos do compose ─────────────────────────────────────────────
+var _cmFiles = [];
+function cmShowFiles(input){
+  var lista = g('cm-files-list'); if(!lista) return;
+  var novos = Array.from(input.files);
+  _cmFiles = _cmFiles.concat(novos);
+  lista.innerHTML = _cmFiles.map(function(f,i){
+    var kb = (f.size/1024).toFixed(0);
+    return '<span style="background:var(--s1);border:1px solid var(--bdr);border-radius:4px;padding:2px 6px;display:flex;align-items:center;gap:4px;">'+
+      '📎 '+esc(f.name.slice(0,20))+(f.name.length>20?'...':'')+' ('+kb+'KB)'+
+      '<span onclick="cmRemoveFile('+i+')" style="cursor:pointer;color:var(--re);margin-left:2px">×</span>'+
+    '</span>';
+  }).join('');
+}
+function cmRemoveFile(i){
+  _cmFiles.splice(i,1);
+  cmShowFiles({files:[]});
+}
+function cmClearFiles(){
+  _cmFiles=[];
+  var lista=g('cm-files-list'); if(lista) lista.innerHTML='';
+  var inp=g('cm-files'); if(inp) inp.value='';
+}
+async function cmReadAttachments(){
+  var results=[];
+  for(var i=0;i<_cmFiles.length;i++){
+    var f=_cmFiles[i];
+    var b64=await new Promise(function(res,rej){
+      var r=new FileReader();
+      r.onload=function(e){ res(e.target.result.split(',')[1]); };
+      r.onerror=rej;
+      r.readAsDataURL(f);
+    });
+    results.push({ filename:f.name, content:b64, type:f.type });
+  }
+  return results;
+}
+
 async function enviarComposeEmail(){
   var para=gv('cm-para'), assunto=gv('cm-assunto'), corpo=(g('cm-corpo')||{}).value||'';
   if(!para){toast('Informe o destinatário','r');g('cm-para').focus();return;}
@@ -1151,20 +1251,35 @@ async function enviarComposeEmail(){
   var btn=g('cm-send-btn'); if(btn){btn.disabled=true;}
   var lbl=g('cm-send-label'); if(lbl) lbl.textContent='Enviando...';
   try{
-    var r=await fetch('/api/pj-email?action=enviar',{method:'POST',
+    var attachments=[];
+  if(_cmFiles.length>0){
+    try{ attachments=await cmReadAttachments(); }catch(attErr){ console.warn('anexo erro:',attErr); }
+  }
+  var r=await fetch('/api/pj-email?action=enviar',{method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({para,assunto,corpo,de:gv('c-de')||''})
+      body:JSON.stringify({para,assunto,corpo,de:gv('c-de')||'',attachments})
     }).then(function(x){return x.json();});
     if(r.ok){
       toast('✅ Email enviado!','g');
       g('gm-compose-modal').style.display='none';
-      g('cm-para').value=''; g('cm-assunto').value=''; g('cm-corpo').value='';
+      g('cm-para').value=''; g('cm-assunto').value=''; g('cm-corpo').value=''; cmClearFiles();
       // Navegar para Enviados automaticamente
       try{ setNavInbox('enviados'); }catch(navErr){}
     } else { toast('Erro: '+(r.error||'falha ao enviar'),'r'); }
   }catch(e){ toast('Erro de rede','r'); }
   if(btn){btn.disabled=false;} if(lbl) lbl.textContent='Enviar';
 }
+
+var _rpFiles=[];
+function rpShowFiles(input){
+  var lista=g('rp-files-list'); if(!lista) return;
+  var novos=Array.from(input.files);
+  _rpFiles=_rpFiles.concat(novos);
+  lista.innerHTML=_rpFiles.map(function(f,i){
+    return '<span style="background:var(--s1);border:1px solid var(--bdr);border-radius:3px;padding:1px 5px;">📎'+esc(f.name.slice(0,15))+'<span onclick="rpRemoveFile('+i+')" style="cursor:pointer;color:var(--re);margin-left:2px">×</span></span>';
+  }).join('');
+}
+function rpRemoveFile(i){_rpFiles.splice(i,1);rpShowFiles({files:[]});}
 
 function limparReply(){var el=document.getElementById("gm-reply-area");if(el)el.innerHTML="";}
 function fmtDtFull(ts){
