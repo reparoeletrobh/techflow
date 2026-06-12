@@ -406,12 +406,11 @@ footer{
         <label>TIPO DE EQUIPAMENTO</label>
         <select id="ct-equip">
           <option value="">Selecionar...</option>
-          <option>Microondas / Fornos</option>
-          <option>Purificadores / Bebedouros</option>
-          <option>Geladeiras / Freezers</option>
-          <option>Ar Condicionado</option>
-          <option>Televisores</option>
-          <option>Outros equipamentos</option>
+          <option value="Microondas">Microondas</option>
+          <option value="Bebedouro">Bebedouro</option>
+          <option value="Purificador">Purificador de Água</option>
+          <option value="Microondas e Bebedouro">Microondas e Bebedouro</option>
+          <option value="Outros">Outros equipamentos</option>
         </select>
       </div>
       <div class="cf-field"><label>MENSAGEM</label><textarea id="ct-msg" placeholder="Descreva sua necessidade, quantidade de equipamentos, etc."></textarea></div>
@@ -479,15 +478,16 @@ async function enviarContato(e){
   var status=document.getElementById('ct-status');
   btn.textContent='Enviando...'; btn.disabled=true;
   var dados={
-    empresa:   document.getElementById('ct-empresa').value,
-    nome:      document.getElementById('ct-nome').value,
-    telefone:  document.getElementById('ct-tel').value,
-    email:     document.getElementById('ct-email').value,
-    segmento:  document.getElementById('ct-equip').value,
-    obs:       document.getElementById('ct-msg').value,
+    empresa:    document.getElementById('ct-empresa').value,
+    responsavel:document.getElementById('ct-nome').value,
+    telefone:   document.getElementById('ct-tel').value,
+    email:      document.getElementById('ct-email').value,
+    segmento:   document.getElementById('ct-equip').value,
+    obs:        document.getElementById('ct-msg').value,
+    origem:     'site_institucional',
   };
   try{
-    var r = await fetch('/api/pj-prospects?action=criar',{
+    var r = await fetch('/api/pj-sdr?action=criar',{
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(dados)
     });
