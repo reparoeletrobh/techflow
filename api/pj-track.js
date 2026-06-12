@@ -5,7 +5,7 @@
 
 const U = (process.env.UPSTASH_URL   || '').replace(/['"]/g,'').trim();
 const T = (process.env.UPSTASH_TOKEN || '').replace(/['"]/g,'').trim();
-const KEY = 'pj_sdr_leads';
+const KEY = 'pj_sdr';
 
 async function dbGet(k){
   try{
