@@ -329,6 +329,10 @@ tr:hover td{background:rgba(255,255,255,.02);}
       <textarea class="cv-input" id="cv-desc" placeholder="Marca, modelo, estado, defeito corrigido..."></textarea>
     </div>
     <div class="cv-field">
+      <div class="cv-label">Capacidade / Especificação</div>
+      <input class="cv-input" id="cv-capacidade" type="text" placeholder="Ex: 30L, 127V, 1200W..."/>
+    </div>
+    <div class="cv-field">
       <div class="cv-label">Preço (R$) *</div>
       <input class="cv-input price" id="cv-preco" type="number" min="0" step="0.01" placeholder="0,00"/>
     </div>
@@ -758,6 +762,7 @@ function cvCloseModal() {
 async function cvConfirmar() {
   if (!cvTipoSel) return showToast('⚠️','Selecione o tipo','Microondas ou Bebedouro');
   var desc  = document.getElementById('cv-desc').value.trim();
+  var cap   = document.getElementById('cv-capacidade').value.trim();
   var preco = document.getElementById('cv-preco').value.trim();
   var cod   = document.getElementById('cv-codigo').value.trim();
   if (!desc)  return showToast('⚠️','Informe a descrição','');
@@ -773,18 +778,19 @@ async function cvConfirmar() {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({
-      tipo:      cvTipoSel,
-      codigo:    cod,
-      descricao: desc,
-      preco:     preco,
-      fotos:     fotosValidas,
+      tipo:       cvTipoSel,
+      codigo:     cod,
+      descricao:  desc,
+      capacidade: cap,
+      preco:      preco,
+      fotos:      fotosValidas,
     })
   }).then(function(r) { return r.json(); }).catch(function(e) { return {ok:false,error:e.message}; });
 
   btn.disabled = false; btn.textContent = '✅ Cadastrar no Vendas';
 
   if (r.ok) {
-    var dadosVendas = { tipo: cvTipoSel, codigo: cod, descricao: desc, preco: preco };
+    var dadosVendas = { tipo: cvTipoSel, codigo: cod, descricao: desc, capacidade: cap, preco: preco };
     // Salva dados do cadastro em vendas na ficha — checa o retorno
     var mResult = await api('marcar-cadastrado-vendas', { id: cvFichaId, dadosVendas: dadosVendas });
     if (!mResult || !mResult.ok) {
