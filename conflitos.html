@@ -190,6 +190,23 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
     <button class="fb g" onclick="setF('resolvido',this)">✅ Resolvidos</button>
   </div>
 
+
+  <div style="display:flex;gap:0;margin:12px 16px 0;border-bottom:1px solid var(--bdr)">
+    <button id="aba-aberto" onclick="trocarAba('aberto')"
+      style="background:none;border:none;border-bottom:2px solid var(--red);color:var(--red);padding:9px 18px;font-family:var(--fm);font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.06em">
+      🔴 EM ABERTO <span id="badge-ab" style="background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:9px;margin-left:4px">0</span>
+    </button>
+    <button id="aba-res" onclick="trocarAba('resolvido')"
+      style="background:none;border:none;border-bottom:2px solid transparent;color:var(--mu);padding:9px 18px;font-family:var(--fm);font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.06em">
+      ✅ FINALIZADOS <span id="badge-res" style="background:var(--gr);color:#000;border-radius:10px;padding:1px 7px;font-size:9px;margin-left:4px">0</span>
+    </button>
+  </div>
+  <div style="padding:8px 16px 4px">
+    <input id="busca-c" placeholder="🔍 Buscar por OS, nome, equipamento, responsável..."
+      oninput="render()"
+      style="width:100%;background:var(--s1);border:1px solid var(--bdr);border-radius:6px;color:var(--tx);font-family:var(--fm);font-size:11px;padding:8px 12px;outline:none;box-sizing:border-box">
+  </div>
+
   <div id="board"><div class="loading"><div class="spin"></div></div></div>
 </div>
 
@@ -352,42 +369,70 @@ function filtrados(){
   });
 }
 
+var _aba='aberto';
+
+function trocarAba(aba){
+  _aba=aba;
+  var btnA=document.getElementById('aba-aberto');
+  var btnR=document.getElementById('aba-res');
+  if(btnA){ btnA.style.borderBottomColor=aba==='aberto'?'var(--red)':'transparent'; btnA.style.color=aba==='aberto'?'var(--red)':'var(--mu)'; }
+  if(btnR){ btnR.style.borderBottomColor=aba==='resolvido'?'var(--gr)':'transparent'; btnR.style.color=aba==='resolvido'?'var(--gr)':'var(--mu)'; }
+  render();
+}
+
 function render(){
-  var lista=filtrados();
-  var board=document.getElementById('board');
-  if(!lista.length){
-    board.innerHTML='<div class="empty"><div class="empty-icon">✅</div>Nenhum conflito encontrado para esse filtro.</div>';
-    return;
-  }
-  var grupos={critico:[],alto:[],normal:[],resolvido:[]};
-  lista.forEach(function(c){
-    if(c.status==='resolvido') grupos.resolvido.push(c);
-    else grupos[c.prioridade]=grupos[c.prioridade]||[];grupos[c.prioridade].push(c);
+  var busca=((document.getElementById('busca-c')||{value:''}).value||'').toLowerCase().trim();
+  var todos=filtrados();
+
+  // Badges
+  var nAb=todos.filter(function(c){return c.status!=='resolvido';}).length;
+  var nRe=todos.filter(function(c){return c.status==='resolvido';}).length;
+  var bA=document.getElementById('badge-ab'); if(bA)bA.textContent=nAb;
+  var bR=document.getElementById('badge-res'); if(bR)bR.textContent=nRe;
+
+  // Filtrar pela aba ativa
+  var lista=todos.filter(function(c){
+    var res=c.status==='resolvido';
+    if(_aba==='aberto'&&res) return false;
+    if(_aba==='resolvido'&&!res) return false;
+    if(busca){
+      var txt=((c.titulo||'')+(c.os||'')+(c.ficha||'')+(c.equipamento||'')+(c.responsavel||'')+(c.descricao||'')+(c.id||'')).toLowerCase();
+      return txt.includes(busca);
+    }
+    return true;
   });
 
+  var board=document.getElementById('board');
+  if(!lista.length){
+    var msgVazia=_aba==='resolvido'?'<div class="empty"><div class="empty-icon">📭</div>Nenhum conflito finalizado.</div>':'<div class="empty"><div class="empty-icon">🎉</div>Sem conflitos em aberto!</div>';
+    board.innerHTML=msgVazia;
+    return;
+  }
+
   var html='';
-  // Críticos
-  if(grupos.critico&&grupos.critico.length){
-    html+='<div class="secao"><div class="sec-head"><div class="sec-dot" style="background:var(--red)"></div><span class="sec-lbl" style="color:var(--red)">CRÍTICO</span><span class="sec-cnt">'+grupos.critico.length+'</span></div>';
-    html+=grupos.critico.map(cardHTML).join('');
+  if(_aba==='aberto'){
+    // Agrupar por prioridade — SEM misturar resolvidos
+    var grupos={critico:[],alto:[],normal:[]};
+    lista.forEach(function(c){
+      var p=c.prioridade;
+      if(grupos[p]) grupos[p].push(c);
+      else grupos.normal.push(c);
+    });
+    var ordem=['critico','alto','normal'];
+    var labels={critico:'CRÍTICO',alto:'ALTO',normal:'NORMAL'};
+    var cores={critico:'var(--red)',alto:'var(--yel)',normal:'var(--blu)'};
+    ordem.forEach(function(pri){
+      if(!grupos[pri]||!grupos[pri].length) return;
+      html+='<div class="secao"><div class="sec-head"><div class="sec-dot" style="background:'+cores[pri]+'"></div><span class="sec-lbl" style="color:'+cores[pri]+'">'+labels[pri]+'</span><span class="sec-cnt">'+grupos[pri].length+'</span></div>';
+      html+=grupos[pri].map(cardHTML).join('');
+      html+='</div>';
+    });
+  } else {
+    // Aba Finalizados — ordenar do mais recente
+    lista.sort(function(a,b){return (b.resolvidoEm||b.atualizadoEm||'').localeCompare(a.resolvidoEm||a.atualizadoEm||'');});
+    html+='<div class="secao"><div class="sec-head"><div class="sec-dot" style="background:var(--gr)"></div><span class="sec-lbl" style="color:var(--gr)">FINALIZADOS</span><span class="sec-cnt">'+lista.length+'</span></div>';
+    html+=lista.map(cardHTML).join('');
     html+='</div>';
-  }
-  // Altos
-  if(grupos.alto&&grupos.alto.length){
-    html+='<div class="secao"><div class="sec-head"><div class="sec-dot" style="background:var(--yel)"></div><span class="sec-lbl" style="color:var(--yel)">ALTO</span><span class="sec-cnt">'+grupos.alto.length+'</span></div>';
-    html+=grupos.alto.map(cardHTML).join('');
-    html+='</div>';
-  }
-  // Normais
-  if(grupos.normal&&grupos.normal.length){
-    html+='<div class="secao"><div class="sec-head"><div class="sec-dot" style="background:var(--blu)"></div><span class="sec-lbl" style="color:var(--blu)">NORMAL</span><span class="sec-cnt">'+grupos.normal.length+'</span></div>';
-    html+=grupos.normal.map(cardHTML).join('');
-    html+='</div>';
-  }
-  // Resolvidos
-  if(grupos.resolvido&&grupos.resolvido.length){
-    html+='<div class="toggle-res" onclick="toggleRes(this)"><span>▶</span><span>'+grupos.resolvido.length+' conflito(s) resolvido(s)</span><span style="margin-left:auto;font-size:9px">clique para ver</span></div>';
-    html+='<div class="res-lista" style="display:none">'+grupos.resolvido.map(cardHTML).join('')+'</div>';
   }
   board.innerHTML=html;
 }
