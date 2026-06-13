@@ -97,8 +97,11 @@ module.exports = async (req, res) => {
     const results = [];
 
     // ── 1. OS / Board ─────────────────────────────────────────────
-    const boardDB = await dbGet('tv_board');
-    const cards   = boardDB?.cards || [];
+    const boardDB  = await dbGet('tv_board');
+    const cards    = boardDB?.cards || [];
+    // Carregar tv_logistica para cruzar diagnóstico (modelo, valor, peças)
+    const logDB    = await dbGet('tv_logistica');
+    const logFichas= logDB?.fichas || [];
 
     for (const c of cards) {
       if (!match(q, c.nomeContato, c.title, c.osCode, c.descricao, c.pipefyId)) continue;
@@ -107,14 +110,30 @@ module.exports = async (req, res) => {
       const compras   = BOARD_COMPRAS[c.phaseId] || null;
       const isCompras = !!compras;
 
+      // Cruzar com logística para pegar diagnóstico
+      const logFicha = logFichas.find(function(f) {
+        return f.pipefyId === c.pipefyId || f.pipefyCardId === c.pipefyId ||
+               (f.nome && c.nomeContato && f.nome.toLowerCase() === (c.nomeContato||'').toLowerCase());
+      });
+      const diag   = logFicha?.diagnostico || null;
+      const equip0 = diag?.equips?.[0] || null;
+      const modelo = equip0?.modelo || c.modelo || null;
+      const valor  = logFicha?.valor || c.valor || null;
+      const servicos = equip0?.servicos?.length
+        ? equip0.servicos.join(', ')
+        : null;
+
       results.push({
         tipo:       'os',
         id:         c.pipefyId,
         // Campos para buildCard
         label:      c.nomeContato || c.title || '—',
-        sublabel:   c.osCode ? '#' + c.osCode : null,       // ref badge
-        descricao:  c.descricao || c.title || null,          // texto descritivo
-        telefone:   null,                                    // board não armazena
+        sublabel:   c.osCode ? '#' + c.osCode : null,
+        descricao:  c.descricao || c.title || null,
+        modelo:     modelo,
+        valor:      valor ? 'R$ ' + parseFloat(valor).toFixed(2).replace('.',',') : null,
+        pecas:      servicos,
+        telefone:   null,
         urgente:    false,
         tipoCor:    null,
         fase:       fase.label,

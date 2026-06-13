@@ -209,17 +209,26 @@ function renderResults(q, results) {
 
 function buildCard(r) {
   var cor = r.cor || '#5a5a7a';
-  // Borda e background do badge com opacidade — inline sem CSS vars dinâmicas
   var badgeStyle = 'color:' + cor + ';border-color:' + cor + '55;background:' + cor + '18;';
   var iconClass = 'result-icon ' + r.tipo;
   var dataStr = encodeURIComponent(JSON.stringify(r));
 
-  return '<div class="result" onclick=\'irPara(' + JSON.stringify(r.url) + ',' + JSON.stringify(r.tipo) + ',' + JSON.stringify(r.id) + ')\'>' +
+  // Linha de diagnóstico: modelo · valor · peças
+  var diagParts = [];
+  if (r.modelo) diagParts.push('🔧 ' + esc(r.modelo));
+  if (r.valor)  diagParts.push('💰 ' + esc(r.valor));
+  if (r.pecas)  diagParts.push('🔩 ' + esc(r.pecas));
+  var diagLine = diagParts.length
+    ? '<div style="font-size:11px;color:#7a8ba0;margin-top:5px;line-height:1.6">' + diagParts.join('  ·  ') + '</div>'
+    : '';
+
+  return '<div class="result" onclick='irPara(' + JSON.stringify(r.url) + ',' + JSON.stringify(r.tipo) + ',' + JSON.stringify(r.id) + ')'>' +
     '<div class="' + iconClass + '">' + TIPO_ICON[r.tipo] + '</div>' +
     '<div class="result-body">' +
       '<div class="result-label">' + esc(r.label) + '</div>' +
       (r.sublabel ? '<div class="result-sub">' + esc(r.sublabel) + '</div>' : '') +
       (r.descricao ? '<div style="font-size:12px;font-weight:600;color:var(--text);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px;">' + esc(r.descricao) + '</div>' : '') +
+      diagLine +
     '</div>' +
     '<div class="result-right">' +
       '<span class="fase-badge" style="' + badgeStyle + '">' + esc(r.fase) + '</span>' +
