@@ -136,7 +136,7 @@ function card(c){
   var _msg = encodeURIComponent('Bom dia, Pedro aqui da Reparo Eletro.\n\nEstamos com pouco espaço na loja e esta muito dificil de trabalhar, precisamos que o equipamento seja retirado ou entregue.\n\nConto com a sua colaboração pois esta nos prejudicando muito ficar sem espaço.');
   var _waHref = _tel ? 'https://wa.me/'+_tel+'?text='+_msg : 'https://api.whatsapp.com/send?text='+_msg;
   var _msgTexto = 'Bom dia, Pedro aqui da Reparo Eletro.\n\nEstamos com pouco espaço na loja e está muito difícil de trabalhar, precisamos que o equipamento seja retirado ou entregue.\n\nConto com a sua colaboração pois está nos prejudicando muito ficar sem espaço.';
-  var _waBtn = _48h ? '<button class="btn-wa48" onclick="cpMsgRetirada(this)">📋 Solicitar Retirada</button>' : '';
+  var _waBtn = _48h ? '<button class="btn-wa48" data-wa="'+_waHref+'" onclick="cpMsgRetirada(this)">📋 Solicitar Retirada</button>' : '';
   var _msgRetirada = _msgTexto;
   return '<div class="bc-card'+(p?' pago':'')+'" id="bc-'+c.pipefyId+'">'+
     '<button class="btn-excluir" onclick="excluir(\'' + c.pipefyId + '\')">✕</button>'+
@@ -186,22 +186,29 @@ load();
 setInterval(load,30000);
 
 function cpMsgRetirada(btn) {
-  var texto = btn.closest('.bc-card') 
-    ? 'Bom dia, Pedro aqui da Reparo Eletro.\n\nEstamos com pouco espaço na loja e está muito difícil de trabalhar, precisamos que o equipamento seja retirado ou entregue.\n\nConto com a sua colaboração pois está nos prejudicando muito ficar sem espaço.'
-    : '';
-  navigator.clipboard.writeText(texto).then(function() {
+  var waLink = btn.dataset.wa || '';
+  var texto = waLink || 'Solicitar retirada — Reparo Eletro';
+  var copia = function(){
     btn.textContent = '✅ Copiado!';
-    setTimeout(function() { btn.textContent = '📋 Solicitar Retirada'; }, 2000);
-  }).catch(function() {
-    var ta = document.createElement('textarea');
-    ta.value = texto;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    btn.textContent = '✅ Copiado!';
-    setTimeout(function() { btn.textContent = '📋 Solicitar Retirada'; }, 2000);
-  });
+    setTimeout(function(){ btn.textContent = '📋 Solicitar Retirada'; }, 2500);
+  };
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(texto).then(copia).catch(function(){
+        var ta=document.createElement('textarea'); ta.value=texto;
+        ta.style.cssText='position:fixed;opacity:0;top:0;left:0';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); document.body.removeChild(ta);
+        copia();
+      });
+    } else {
+      var ta=document.createElement('textarea'); ta.value=texto;
+      ta.style.cssText='position:fixed;opacity:0;top:0;left:0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+      copia();
+    }
+  } catch(err) { copia(); }
 }
 </script>
 </body>
