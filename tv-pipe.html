@@ -596,6 +596,7 @@ function abrirDadosPipe(id) {
   document.getElementById('pd-valor').value = _cardAtual.valor       || '';
   document.getElementById('pd-desc').value  = _cardAtual.descricao   || '';
   document.getElementById('pd-end').value   = _cardAtual.endereco    || '';
+  document.getElementById('pd-modelo').value = _cardAtual.modelo || (_cardAtual.diagnostico && _cardAtual.diagnostico.equips && _cardAtual.diagnostico.equips[0] ? _cardAtual.diagnostico.equips[0].modelo || '' : '') || '';
   document.getElementById('pd-serv').value  = _cardAtual.servicos    || '';
   document.getElementById('pipe-d-msg').style.display = 'none';
   document.getElementById('ov-pipe-dados').style.display = 'flex';
@@ -615,7 +616,8 @@ async function salvarDadosPipe() {
     valor:       document.getElementById('pd-valor').value,
     descricao:   document.getElementById('pd-desc').value,
     endereco:    document.getElementById('pd-end').value,
-    servicos:    document.getElementById('pd-serv').value
+    servicos:    document.getElementById('pd-serv').value,
+    modelo:      document.getElementById('pd-modelo') ? document.getElementById('pd-modelo').value : ''
   };
   var r = await fetch('/api/tv-pipe?action=editar-pipe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
   var msg = document.getElementById('pipe-d-msg');
@@ -829,7 +831,8 @@ async function setVencimento(id){
         <div class="pd-row"><span class="pd-lbl">Equipamento</span><input id="pd-equip" class="pd-val"></div>
         <div class="pd-row"><span class="pd-lbl">Valor (R$)</span><input id="pd-valor" class="pd-val" type="number"></div>
       </div>
-      <div class="pd-row"><span class="pd-lbl">Defeito / Descrição</span><input id="pd-desc" class="pd-val"></div>
+      <div class="pd-row"><span class="pd-lbl">Defeito / Descrição</span><div style="display:flex;gap:6px;align-items:center;"><input id="pd-desc" class="pd-val" style="flex:1;"><button onclick="navigator.clipboard.writeText(document.getElementById('pd-desc').value).then(function(){event.target.textContent='✅';setTimeout(function(){event.target.textContent='📋';},1500)})" style="background:#1e1e1e;border:1px solid #333;border-radius:6px;padding:6px 10px;color:#aaa;font-size:11px;cursor:pointer;">📋</button></div></div>
+      <div class="pd-row"><span class="pd-lbl">Modelo do Equipamento</span><div style="display:flex;gap:6px;align-items:center;"><input id="pd-modelo" class="pd-val" placeholder="Ex: CPB34AS..." style="flex:1;"><button onclick="navigator.clipboard.writeText(document.getElementById('pd-modelo').value).then(function(){event.target.textContent='✅';setTimeout(function(){event.target.textContent='📋';},1500)})" style="background:#1e1e1e;border:1px solid #333;border-radius:6px;padding:6px 10px;color:#aaa;font-size:11px;cursor:pointer;">📋</button></div></div>
       <div class="pd-row"><span class="pd-lbl">Endereço</span><input id="pd-end" class="pd-val"></div>
       <div class="pd-row"><span class="pd-lbl">Serviços / Observações</span><textarea id="pd-serv" class="pd-val" rows="2" style="resize:vertical;"></textarea></div>
       <div id="pipe-d-msg" style="display:none;padding:8px 12px;border-radius:6px;font-family:'DM Mono',monospace;font-size:11px;"></div>
