@@ -158,6 +158,18 @@ async function processarPagamentoFinanceiro(pmt) {
     return { ok:false, info:"ja_processado", fichaId: rec.id };
   }
 
+  // ── VALIDAÇÃO CRÍTICA TV: só processar se pagamento APROVADO ────────────────
+  const pmtStatusTV = pmt.status || '';
+  if (pmtStatusTV !== 'approved') {
+    console.warn('[tv-webhook-fin] Pagamento NÃO aprovado — ignorando:', {
+      fichaId: rec.id, status: pmtStatusTV, detail: pmt.status_detail, paymentId: pmt.id
+    });
+    await salvarConciliacaoFin({ rec, pmt, metodo, valor, now,
+      status: 'nao_aprovado_' + pmtStatusTV }).catch(()=>{});
+    return { ok:false, info:'pagamento_nao_aprovado_tv', fichaId:rec.id,
+      status:pmtStatusTV, paymentId:pmt.id };
+  }
+
   // Só mover se ainda em faturamento ou pagamento_agendado
   const fasesAceitas = ["faturamento","pagamento_agendado","nf_emitida","pagamento_confirmado","aguardando_dados","analise_pagamento"];
   if (!fasesAceitas.includes(rec.phaseId)) {
