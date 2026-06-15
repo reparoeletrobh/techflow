@@ -324,9 +324,9 @@ module.exports = async function handler(req, res) {
   }
 
   // ── POST gmb-filtrar-data — redefine gmb_pendentes apenas com fichas de uma data ──
-  if (req.method === 'POST' && action === 'gmb-filtrar-data') {
-    const { data } = req.body || {};  // ex: '2026-06-13'
-    if (!data) return res.status(400).json({ ok:false, error:'data obrigatória (YYYY-MM-DD)' });
+  if (action === 'gmb-filtrar-data') {
+    const data = req.query.data || (req.body && req.body.data) || '';  // ex: 2026-06-13
+    if (!data) return res.status(400).json({ ok:false, error:'data obrigatória ?data=YYYY-MM-DD' });
     try {
       const BALCAO_KEY   = 'reparoeletro_balcao';
       const PIPE_KEY_GMB = 'reparoeletro_pipe';
