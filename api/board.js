@@ -1437,10 +1437,24 @@ module.exports = async function handler(req, res) {
             let movedLocal=0;
             if(pipeDb3&&Array.isArray(pipeDb3.cards)){
               const nowB=new Date().toISOString();
+              // Verificar gmb_pendentes antes de mover
+              let gmbPendIds=new Set();
+              try{
+                const gmbP=await _bg3('gmb_pendentes');
+                gmbPendIds=new Set((gmbP&&gmbP.ids||[]).map(String));
+              }catch(gmbErr){}
               pipeDb3.cards.forEach(function(card){
                 if(card.phase==='erp'){
-                  card.history=(card.history||[]).concat([{phase:'erp',ts:nowB}]);
-                  card.phase='finalizado'; card.movedAt=nowB; movedLocal++;
+                  const cid=String(card.id||card.pipefyId||'');
+                  if(gmbPendIds.has(cid)){
+                    // Card pendente no GMB — mover para finalizado mas manter no pool
+                    card.history=(card.history||[]).concat([{phase:'erp',ts:nowB}]);
+                    card.phase='finalizado'; card.movedAt=nowB; movedLocal++;
+                    // NÃO remover do gmb_pendentes — GMB continuará mostrando
+                  } else {
+                    card.history=(card.history||[]).concat([{phase:'erp',ts:nowB}]);
+                    card.phase='finalizado'; card.movedAt=nowB; movedLocal++;
+                  }
                 }
               });
               if(movedLocal>0){pipeDb3.lastSync=new Date().toISOString();await _bs3('reparoeletro_pipe',pipeDb3);}

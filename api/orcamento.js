@@ -295,7 +295,14 @@ module.exports = async function handler(req, res) {
   // ── POST gmb-marcar-enviado — salva ficha como contatada GMB ──────────────
   if (req.method === 'POST' && action === 'gmb-marcar-enviado') {
     const { id, nome, tel, desc } = req.body || {};
-    const GMB_ENV_KEY = 'gmb_enviados';
+    const GMB_ENV_KEY  = 'gmb_enviados';
+    const GMB_PEND_KEY = 'gmb_pendentes';
+    // Remover do pool pendente
+    try {
+      const db_pend = (await dbGet(GMB_PEND_KEY)) || { ids: [] };
+      db_pend.ids = (db_pend.ids || []).filter(i => String(i) !== String(id));
+      await dbSet(GMB_PEND_KEY, db_pend);
+    } catch(ep) { console.warn('[gmb] remover pendente:', ep.message); }
     const db_g = (await dbGet(GMB_ENV_KEY)) || { fichas: [] };
     // Evitar duplicatas
     if (!db_g.fichas.find(f => f.id === id)) {
@@ -316,42 +323,115 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, fichas: db_g.fichas || [] });
   }
 
+  // ── GET gmb-restaurar — recupera fichas movidas para finalizado pelo cron ──
+  if (action === 'gmb-restaurar') {
+    try {
+      const PIPE_KEY_GMB  = 'reparoeletro_pipe';
+      const GMB_ENV_KEY   = 'gmb_enviados';
+      const GMB_PEND_KEY  = 'gmb_pendentes';
+      const db_gmb  = await dbGet(PIPE_KEY_GMB);
+      const db_env  = (await dbGet(GMB_ENV_KEY))  || { fichas: [] };
+      const db_pend = (await dbGet(GMB_PEND_KEY)) || { ids: [] };
+
+      if (!db_gmb || !Array.isArray(db_gmb.cards))
+        return res.status(200).json({ ok:true, restauradas:[], total:0 });
+
+      const jaEnviadosIds = new Set((db_env.fichas||[]).map(f=>String(f.id)));
+      const pendIds = new Set((db_pend.ids||[]).map(String));
+      const horaLimite = req.query.desde || '2026-06-09T00:00:00Z'; // segunda 02:59 UTC
+      const horaCutoff = req.query.ate   || new Date().toISOString();
+
+      // Fichas em 'finalizado' que foram movidas dentro da janela do cron
+      const restauradas = [];
+      let pendUpdated = false;
+
+      for (const card of db_gmb.cards) {
+        const cardId = String(card.id || card.pipefyId || '');
+        if (card.phase !== 'finalizado') continue;
+        if (jaEnviadosIds.has(cardId)) continue; // já foi enviado para GMB
+        if (pendIds.has(cardId)) continue; // já está no pool
+
+        // Verificar se foi de ERP para finalizado pelo cron (history)
+        const hist = (card.history || []);
+        const tevERP = hist.some(h => h.phase === 'erp') || (card.movedAt >= horaLimite && card.movedAt <= horaCutoff);
+        if (!tevERP) continue;
+
+        // Adicionar ao pool pendente para aparecer no GMB
+        db_pend.ids.push(cardId);
+        pendIds.add(cardId);
+        pendUpdated = true;
+
+        restauradas.push({
+          id: cardId, nome: card.nomeContato||'—',
+          tel: card.telefone||'', valor: card.valor||null,
+          movedAt: card.movedAt,
+        });
+      }
+
+      if (pendUpdated) await dbSet(GMB_PEND_KEY, db_pend);
+      return res.status(200).json({ ok:true, restauradas, total: restauradas.length, msg: restauradas.length + ' fichas restauradas no pool GMB' });
+    } catch(e) {
+      return res.status(200).json({ ok:false, error: e.message });
+    }
+  }
+
     if (action === "gmb-load") {
-    const PIPE_KEY_GMB = 'reparoeletro_pipe';
-    const GMB_ENV_KEY  = 'gmb_enviados';
-    const db_gmb = await dbGet(PIPE_KEY_GMB);
-    const db_env = (await dbGet(GMB_ENV_KEY)) || { fichas: [] };
-    // Filtrar por ID e por nome (evita voltar por ID diferente)
+    const PIPE_KEY_GMB  = 'reparoeletro_pipe';
+    const GMB_ENV_KEY   = 'gmb_enviados';
+    const GMB_PEND_KEY  = 'gmb_pendentes';
+    const db_gmb  = await dbGet(PIPE_KEY_GMB);
+    const db_env  = (await dbGet(GMB_ENV_KEY))  || { fichas: [] };
+    const db_pend = (await dbGet(GMB_PEND_KEY)) || { ids: [] };
+
     const jaEnviadosIds   = new Set((db_env.fichas || []).map(f => String(f.id)));
     const jaEnviadosNomes = new Set((db_env.fichas || []).map(f => (f.nome||'').toLowerCase().trim()));
-    function foiEnviado(card) {
-      const id   = String(card.id || card.pipefyId || '');
-      const nome = (card.nomeContato || card.title || '').toLowerCase().trim();
-      return jaEnviadosIds.has(id) || (nome && jaEnviadosNomes.has(nome));
-    }
+
     if (!db_gmb || !Array.isArray(db_gmb.cards)) {
       return res.status(200).json({ ok: true, cards: [], total: 0 });
     }
-    // Filtrar enviados + deduplicar por nome
+
+    // Coletar IDs pendentes (pool separado que não é afetado pelo cron ERP→Finalizado)
+    const pendIds = new Set((db_pend.ids || []).map(String));
+
+    // Também adicionar ao pool fichas em phase==='erp' que ainda não estão no pool
+    let pendUpdated = false;
     const nomesVistos = new Set();
-    const erp = (db_gmb.cards || [])
-      .filter(c => {
-        if (c.phase !== 'erp') return false;
-        if (foiEnviado(c)) return false;
-        const nome = (c.nomeContato || c.title || '').toLowerCase().trim();
-        if (nome && nomesVistos.has(nome)) return false; // dedup por nome
-        if (nome) nomesVistos.add(nome);
-        return true;
-      })
-      .map(c => ({
-        id:         c.id || c.pipefyId,
-        pipefyId:   c.pipefyId || c.id,
-        nome:       c.nomeContato || c.title || '—',
-        tel:        c.telefone || c.tel || '',
-        desc:       c.equipamento || c.desc || '',
-        valor:      c.valor || null,
-        movedAt:    c.movedAt || null,
-      }));
+    const erp = [];
+
+    for (const card of db_gmb.cards) {
+      const cardId = String(card.id || card.pipefyId || '');
+      const nome   = (card.nomeContato || card.title || '').toLowerCase().trim();
+      const eErp   = card.phase === 'erp';
+      const ePend  = pendIds.has(cardId);
+
+      // Adicionar ao pool se está em erp e não estava ainda
+      if (eErp && cardId && !pendIds.has(cardId)) {
+        pendIds.add(cardId);
+        db_pend.ids = db_pend.ids || [];
+        db_pend.ids.push(cardId);
+        pendUpdated = true;
+      }
+
+      // Mostrar se está no pool pendente (independente da phase atual)
+      if (!ePend && !eErp) continue;
+      if (jaEnviadosIds.has(cardId)) continue;
+      if (nome && jaEnviadosNomes.has(nome)) continue;
+      if (nome && nomesVistos.has(nome)) continue;
+      if (nome) nomesVistos.add(nome);
+
+      erp.push({
+        id:      cardId,
+        pipefyId: card.pipefyId || card.id,
+        nome:    card.nomeContato || card.title || '—',
+        tel:     card.telefone || card.tel || '',
+        desc:    card.equipamento || card.desc || '',
+        valor:   card.valor || null,
+        movedAt: card.movedAt || null,
+        phase:   card.phase,
+      });
+    }
+
+    if (pendUpdated) await dbSet(GMB_PEND_KEY, db_pend);
     return res.status(200).json({ ok: true, total: erp.length, cards: erp });
   }
 
