@@ -502,6 +502,37 @@ module.exports = async function handler(req, res) {
     } catch(e) { return res.status(200).json({ ok:false, error:e.message }); }
   }
 
+  // ── GET gmb-adicionar — adiciona IDs específicos ao pool GMB via query string ──
+  if (action === 'gmb-adicionar') {
+    const idsParam = req.query.ids || '';
+    const novos = idsParam.split(',').map(s=>s.trim()).filter(Boolean);
+    if (!novos.length) return res.status(400).json({ ok:false, error:'?ids=ID1,ID2,...' });
+    try {
+      const GMB_PEND_KEY = 'gmb_pendentes';
+      const GMB_ENV_KEY  = 'gmb_enviados';
+      const db_pend = (await dbGet(GMB_PEND_KEY)) || { ids: [] };
+      const db_env  = (await dbGet(GMB_ENV_KEY))  || { fichas: [] };
+      const jaEnviados = new Set((db_env.fichas||[]).map(f=>String(f.id)));
+      const pendSet = new Set((db_pend.ids||[]).map(String));
+      const adicionados = [];
+      const jaExistiam  = [];
+      novos.forEach(function(id) {
+        if (jaEnviados.has(id)) return;
+        if (pendSet.has(id)) { jaExistiam.push(id); return; }
+        pendSet.add(id);
+        db_pend.ids.push(id);
+        adicionados.push(id);
+      });
+      if (adicionados.length) await dbSet(GMB_PEND_KEY, db_pend);
+      return res.status(200).json({
+        ok: true,
+        adicionados, jaExistiam,
+        totalPool: db_pend.ids.length,
+        msg: adicionados.length + ' IDs adicionados ao pool GMB'
+      });
+    } catch(e) { return res.status(200).json({ ok:false, error:e.message }); }
+  }
+
   // ── GET gmb-restaurar — recupera fichas movidas para finalizado pelo cron ──
   if (action === 'gmb-restaurar') {
     try {
