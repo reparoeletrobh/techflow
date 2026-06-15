@@ -339,13 +339,59 @@ module.exports = async function handler(req, res) {
 
       const jaEnviadosIds = new Set((db_env.fichas||[]).map(f=>String(f.id)));
 
-      // 1. IDs dos cards pagos (entraram em ERP) na data escolhida
+      // 1. IDs dos cards que entraram em ERP na data — busca em múltiplas fontes
+
       const idsNaData = new Set();
+      const fontes = [];
+
+      // 1a. Balcão: pagoEm ou entradaEm
       (Array.isArray(db_balcao) ? db_balcao : []).forEach(function(b) {
-        const pagoEm = b.pagoEm || b.entradaEm || '';
-        if (pagoEm.startsWith(data) && b.pipefyId) {
+        const dt = b.pagoEm || b.entradaEm || '';
+        if (dt.startsWith(data) && b.pipefyId) {
           idsNaData.add(String(b.pipefyId));
+          if (b.flFichaId) idsNaData.add(String(b.flFichaId));
+          fontes.push({ id: String(b.pipefyId), fonte: 'balcao' });
         }
+      });
+
+      // 1b. Logística: fichas com entregaRealizadaEm ou movedAt na data (fase entrega_realizada ou finalizado)
+      try {
+        const db_log = (await dbGet('reparoeletro_logistica')) || { fichas: [] };
+        (db_log.fichas || []).forEach(function(f) {
+          const dt = f.entregaRealizadaEm || f.movedAt || f.pagoEm || f.finalizadoEm || '';
+          const fase = f.phase || f.fase || '';
+          if (dt.startsWith(data) && (fase === 'entrega_realizada' || fase === 'finalizado' || fase === 'erp')) {
+            const id = f.pipefyCardId || f.pipefyId || f.id || '';
+            if (id) { idsNaData.add(String(id)); fontes.push({ id: String(id), fonte: 'logistica' }); }
+          }
+        });
+      } catch(el) { console.warn('log search:', el.message); }
+
+      // 1c. Financeiro: fichas pagas na data
+      try {
+        const db_fin = (await dbGet('reparoeletro_financeiro')) || { fichas: [] };
+        (db_fin.fichas || []).forEach(function(f) {
+          const dt = f.pagoEm || f.dataConfirmacao || f.movedAt || '';
+          if (dt.startsWith(data) && f.status === 'pago') {
+            const id = f.pipeCardId || f.pipefyId || f.pipefyCardId || '';
+            if (id) { idsNaData.add(String(id)); fontes.push({ id: String(id), fonte: 'financeiro' }); }
+          }
+        });
+      } catch(ef) { console.warn('fin search:', ef.message); }
+
+      // 1d. Pipe: cards com movedAt na data E phase=erp ou history com erp nessa data
+      const cards_all = (db_gmb && Array.isArray(db_gmb.cards)) ? db_gmb.cards : [];
+      cards_all.forEach(function(card) {
+        const mt = card.movedAt || '';
+        // Fichas que foram movidas PARA ERP nessa data (antes do cron sobrescrever)
+        // Detectar pelo history: se há entrada anterior com phase!=erp e o próximo é erp nessa data
+        const hist = card.history || [];
+        hist.forEach(function(h) {
+          // O cron registra {phase:'erp', ts: quando saiu do erp}
+          // Não é confiável para data de entrada — ignorar
+        });
+        // Mas se o card tem pipefyId numérico pequeno e estava em ERP, pode ter entrado via balcão
+        // já coberto acima
       });
 
       // 2. Enriquecer fichas FL- com dados da Frente de Loja
