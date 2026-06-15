@@ -208,6 +208,15 @@ select option{background:var(--s2);}
 .sdr-wrap{display:flex;flex-direction:column;gap:16px;padding:4px 0;}
 
 /* Painel de inteligência */
+.sdr-metas{background:var(--s1);border:1px solid var(--bdr);border-radius:12px;padding:14px 16px;margin-bottom:14px;display:flex;gap:16px;align-items:stretch;}
+.sdr-meta-item{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0;}
+.sdr-meta-hd{display:flex;justify-content:space-between;align-items:center;}
+.sdr-meta-label{font-family:var(--fm);font-size:9px;color:var(--mu);letter-spacing:.06em;font-weight:700;}
+.sdr-meta-val{font-family:var(--fh);font-size:16px;font-weight:900;}
+.sdr-meta-bar{height:6px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden;}
+.sdr-meta-fill{height:100%;border-radius:99px;transition:width .4s cubic-bezier(.4,0,.2,1);}
+.sdr-meta-pct{font-family:var(--fm);font-size:8px;color:var(--mu);}
+.sdr-meta-sep{width:1px;background:var(--bdr);align-self:stretch;}
 .sdr-painel{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;}
 .sdr-card{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
 .sdr-card:hover{border-color:var(--bl);transform:translateY(-1px);}
@@ -427,6 +436,39 @@ select option{background:var(--s2);}
 <!-- PROSPECTS -->
 <div class="pg on" id="pg-sdr">
   <div class="sdr-wrap">
+    <!-- METAS DE CADASTRO -->
+    <div class="sdr-metas" id="sdr-metas">
+      <div class="sdr-meta-item">
+        <div class="sdr-meta-hd">
+          <span class="sdr-meta-label">🎯 HOJE</span>
+          <span class="sdr-meta-pct" id="meta-dia-pct">0 / 50</span>
+        </div>
+        <div class="sdr-meta-val" id="meta-dia-val" style="color:var(--tx)">0</div>
+        <div class="sdr-meta-bar"><div class="sdr-meta-fill" id="meta-dia-bar" style="width:0%;background:#f97316"></div></div>
+        <div class="sdr-meta-pct" style="margin-top:2px">Meta diária: 50 leads</div>
+      </div>
+      <div class="sdr-meta-sep"></div>
+      <div class="sdr-meta-item">
+        <div class="sdr-meta-hd">
+          <span class="sdr-meta-label">📅 SEMANA</span>
+          <span class="sdr-meta-pct" id="meta-sem-pct">0 / 250</span>
+        </div>
+        <div class="sdr-meta-val" id="meta-sem-val" style="color:var(--tx)">0</div>
+        <div class="sdr-meta-bar"><div class="sdr-meta-fill" id="meta-sem-bar" style="width:0%;background:#3b82f6"></div></div>
+        <div class="sdr-meta-pct" style="margin-top:2px">Meta semanal: 250 leads</div>
+      </div>
+      <div class="sdr-meta-sep"></div>
+      <div class="sdr-meta-item">
+        <div class="sdr-meta-hd">
+          <span class="sdr-meta-label">🗓️ MÊS</span>
+          <span class="sdr-meta-pct" id="meta-mes-pct">0 / 1000</span>
+        </div>
+        <div class="sdr-meta-val" id="meta-mes-val" style="color:var(--tx)">0</div>
+        <div class="sdr-meta-bar"><div class="sdr-meta-fill" id="meta-mes-bar" style="width:0%;background:#22c55e"></div></div>
+        <div class="sdr-meta-pct" style="margin-top:2px">Meta mensal: 1.000 leads</div>
+      </div>
+    </div>
+
     <!-- PAINEL INTELIGÊNCIA -->
     <div class="sdr-painel" id="sdr-painel">
       <div class="sdr-card destaque" onclick="sdrFiltrar('respondeuEmail')" title="Leads que responderam email">
@@ -860,7 +902,7 @@ async function criarProspect(){
       telefone:gv('p-tel'),email:gv('p-email'),cidade:gv('p-cid'),uf:gv('p-uf'),
       segmento:g('p-seg').value,obs:gv('p-obs')})
   }).then(function(x){return x.json();});
-  if(r.ok){fecharOv('ov-p');carregarProspects();toast('✅ '+emp+' cadastrado!');}
+  if(r.ok){fecharOv('ov-p');carregarProspects();toast('✅ '+emp+' cadastrado!');carregarSDR();}
   else toast('❌ '+(r.error||'Erro'));
 }
 
@@ -2303,6 +2345,7 @@ async function carregarSDR() {
     _sdrLeads = r.leads || [];
     console.log('[SDR] leads carregados:', _sdrLeads.length);
     sdrAtualizarPainel(r.painel || {});
+    sdrAtualizarMetas(_sdrLeads);
     sdrRender();
     sdrRenderAcoes();
     // Carregar templates (não bloquear o render se falhar)
@@ -2315,6 +2358,51 @@ async function carregarSDR() {
     console.error('[SDR] carregarSDR erro:', e);
     toast('Erro ao carregar SDR: '+e.message,'r');
   }
+}
+
+function sdrAtualizarMetas(leads) {
+  var agora  = new Date();
+  var hoje   = agora.toISOString().slice(0,10);
+  // Início da semana (segunda-feira)
+  var diaSem = agora.getDay() || 7; // 0=dom → 7
+  var iniSem = new Date(agora); iniSem.setDate(agora.getDate()-(diaSem-1));
+  var iniSemStr = iniSem.toISOString().slice(0,10);
+  // Início do mês
+  var iniMes = agora.getFullYear()+'-'+String(agora.getMonth()+1).padStart(2,'0')+'-01';
+
+  var dia=0, sem=0, mes=0;
+  leads.forEach(function(l){
+    var dt=(l.criadoEm||l.createdAt||'').slice(0,10);
+    if(!dt) return;
+    if(dt===hoje)   dia++;
+    if(dt>=iniSemStr) sem++;
+    if(dt>=iniMes)  mes++;
+  });
+
+  var MDIA=50, MSEM=250, MMES=1000;
+  function pct(v,m){ return Math.min(100,Math.round(v/m*100)); }
+  function cor(p){ return p>=100?'#22c55e':p>=70?'#f97316':p>=40?'#f59e0b':'#ef4444'; }
+
+  // Dia
+  var pDia=pct(dia,MDIA);
+  var elDiaV=g('meta-dia-val'), elDiaB=g('meta-dia-bar'), elDiaP=g('meta-dia-pct');
+  if(elDiaV){ elDiaV.textContent=dia; elDiaV.style.color=cor(pDia); }
+  if(elDiaB){ elDiaB.style.width=pDia+'%'; elDiaB.style.background=cor(pDia); }
+  if(elDiaP) elDiaP.textContent=dia+' / '+MDIA;
+
+  // Semana
+  var pSem=pct(sem,MSEM);
+  var elSemV=g('meta-sem-val'), elSemB=g('meta-sem-bar'), elSemP=g('meta-sem-pct');
+  if(elSemV){ elSemV.textContent=sem; elSemV.style.color=cor(pSem); }
+  if(elSemB){ elSemB.style.width=pSem+'%'; elSemB.style.background=cor(pSem); }
+  if(elSemP) elSemP.textContent=sem+' / '+MSEM;
+
+  // Mês
+  var pMes=pct(mes,MMES);
+  var elMesV=g('meta-mes-val'), elMesB=g('meta-mes-bar'), elMesP=g('meta-mes-pct');
+  if(elMesV){ elMesV.textContent=mes; elMesV.style.color=cor(pMes); }
+  if(elMesB){ elMesB.style.width=pMes+'%'; elMesB.style.background=cor(pMes); }
+  if(elMesP) elMesP.textContent=mes+' / '+MMES;
 }
 
 function sdrAtualizarPainel(p) {
