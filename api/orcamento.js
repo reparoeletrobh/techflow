@@ -460,6 +460,48 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // ── GET gmb-inspecionar — mostra todos cards que o cron moveu para identificar os de 13/06 ──
+  if (action === 'gmb-inspecionar') {
+    try {
+      const db_gmb   = await dbGet('reparoeletro_pipe');
+      const db_fl    = (await dbGet('reparoeletro_frenteloja')) || { fichas: [] };
+      const db_bal   = (await dbGet('reparoeletro_balcao')) || [];
+      const GMB_PEND = (await dbGet('gmb_pendentes')) || { ids: [] };
+      const GMB_ENV  = (await dbGet('gmb_enviados'))  || { fichas: [] };
+      const pendIds  = new Set((GMB_PEND.ids||[]).map(String));
+      const envIds   = new Set((GMB_ENV.fichas||[]).map(f=>String(f.id)));
+
+      const cards = (db_gmb && Array.isArray(db_gmb.cards)) ? db_gmb.cards : [];
+      // Cards movidos pelo cron de 15/06 02:59 UTC
+      const cronTs = '2026-06-15T02:59:46';
+      const movidos = cards
+        .filter(c => (c.movedAt||'').startsWith(cronTs) && c.phase==='finalizado')
+        .map(function(c) {
+          const cid = String(c.id||c.pipefyId||'');
+          // Tentar enriquecer com dados do balcão
+          const bal = (Array.isArray(db_bal)?db_bal:[]).find(b=>
+            String(b.pipefyId||'')===cid || String(b.flFichaId||'')===cid
+          );
+          // Enriquecer com frenteloja
+          const fl = (db_fl.fichas||[]).find(f=> f.id===cid || f.pipefyId===cid);
+          const nome = c.nomeContato||c.title||(fl&&(fl.nome||fl.nomeContato))||'—';
+          const tel  = c.telefone||(bal&&bal.telefone)||(fl&&fl.telefone)||'';
+          const pagoEm = (bal&&(bal.pagoEm||bal.entradaEm))||'';
+          return {
+            id: cid,
+            nome: nome.slice(0,30),
+            tel,
+            valor: c.valor||null,
+            pagoEm: pagoEm.slice(0,10)||'—',
+            noGMB: pendIds.has(cid) ? 'SIM' : envIds.has(cid) ? 'ENVIADO' : 'NÃO',
+          };
+        })
+        .sort((a,b) => a.pagoEm.localeCompare(b.pagoEm));
+
+      return res.status(200).json({ ok:true, total: movidos.length, cards: movidos });
+    } catch(e) { return res.status(200).json({ ok:false, error:e.message }); }
+  }
+
   // ── GET gmb-restaurar — recupera fichas movidas para finalizado pelo cron ──
   if (action === 'gmb-restaurar') {
     try {
