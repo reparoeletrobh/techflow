@@ -383,6 +383,14 @@ textarea.f-input{resize:vertical;min-height:80px;line-height:1.5;}
       <label class="field-label">CPF ou CNPJ</label>
       <input class="f-input" id="v-cpf" type="text" placeholder="000.000.000-00" oninput="maskCpfCnpj(this)"/>
     </div>
+    <div class="field" style="margin-top:8px;">
+      <label class="field-label">🎟️ Cupom de Desconto (opcional)</label>
+      <div style="display:flex;gap:8px;">
+        <input class="f-input" id="v-cupom" type="text" placeholder="Digite o código" style="text-transform:uppercase;flex:1;" oninput="this.value=this.value.toUpperCase()">
+        <button type="button" onclick="validarCupomVenda()" style="background:rgba(249,115,22,.15);color:var(--or);border:1px solid rgba(249,115,22,.3);border-radius:8px;padding:0 14px;font-family:var(--fm);font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;">Validar</button>
+      </div>
+      <div id="v-cupom-msg" style="font-family:var(--fm);font-size:9px;margin-top:5px;display:none;"></div>
+    </div>
     <div class="field">
       <label class="field-label">Vendedor *</label>
       <div class="vend-grid">
@@ -617,6 +625,26 @@ function setModalidade(m) {
   });
 }
 
+// ── Cupom em Vendas ─────────────────────────────────────────────────────────
+var _cupomVendasValido = null;
+
+async function validarCupomVenda() {
+  var codigo = (document.getElementById('v-cupom')||{value:''}).value.trim().toUpperCase();
+  var msg = document.getElementById('v-cupom-msg');
+  if (!codigo) return;
+  msg.style.display='block'; msg.textContent='Validando...'; msg.style.color='var(--muted)';
+  var r = await fetch('/api/cupons?action=validar&codigo='+encodeURIComponent(codigo)).then(function(x){return x.json();});
+  if (r.valido) {
+    _cupomVendasValido = { codigo, desconto:r.desconto, msg:r.msg };
+    msg.textContent = '✅ '+r.msg;
+    msg.style.color = '#22c55e';
+  } else {
+    _cupomVendasValido = null;
+    msg.textContent = '❌ '+(r.error||'Cupom inválido');
+    msg.style.color = '#ef4444';
+  }
+}
+
 async function confirmarVenda(){
   const nome=document.getElementById('v-nome').value.trim();
   if(!nome) return showToast('⚠️','Nome obrigatório','');
@@ -624,6 +652,14 @@ async function confirmarVenda(){
   if(!modalidadeSel) return showToast('⚠️','Selecione a modalidade','Online, Loja ou Troca');
   const btn=document.getElementById('v-confirm');
   btn.disabled=true; btn.textContent='⏳';
+  // Registrar cupom se válido
+  if (_cupomVendasValido) {
+    const nome=document.getElementById('v-nome').value.trim();
+    fetch('/api/cupons?action=usar',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({codigo:_cupomVendasValido.codigo,valorOriginal:0,fichaId:'',cliente:nome,origem:'vendas'})
+    }).catch(function(){});
+    _cupomVendasValido = null;
+  }
   const res=await api('vender',{produtoId:selVenderId,nomeCliente:nome,telefone:document.getElementById('v-tel').value.trim(),cpfCnpj:document.getElementById('v-cpf').value.trim(),vendedor:vendedorSel,modalidade:modalidadeSel});
   if(res.ok){
     produtos=produtos.map(p=>p.id===selVenderId?res.produto:p);

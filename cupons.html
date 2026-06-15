@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Cupons</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#07080a;--s1:#0f1114;--s2:#181b1f;--bdr:#1e2228;--tx:#f0f2f5;--mu:#5a6270;
+  --gr:#22c55e;--ye:#f5c800;--re:#ef4444;--bl:#3b9eff;--or:#f97316;--pu:#a855f7;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--tx);font-family:var(--fb);min-height:100vh;}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;border-bottom:1px solid var(--bdr);position:sticky;top:0;background:var(--bg);z-index:50;}
+.logo{font-family:var(--fh);font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.logo-ic{width:28px;height:28px;background:linear-gradient(135deg,var(--or),var(--ye));border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;}
+/* TABS */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--bdr);padding:0 24px;background:var(--s1);}
+.tab{font-family:var(--fm);font-size:10px;font-weight:700;padding:12px 18px;border-bottom:2px solid transparent;color:var(--mu);cursor:pointer;letter-spacing:.06em;transition:all .15s;}
+.tab.ativa{color:var(--or);border-bottom-color:var(--or);}
+.pg{display:none;padding:24px;}
+.pg.show{display:block;}
+/* CARDS STATS */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+.stat{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:14px 16px;}
+.stat-lbl{font-family:var(--fm);font-size:9px;color:var(--mu);letter-spacing:.08em;margin-bottom:6px;}
+.stat-val{font-family:var(--fh);font-size:22px;font-weight:800;}
+/* TABELA */
+.tbl-wrap{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;overflow:hidden;}
+.tbl{width:100%;border-collapse:collapse;}
+.tbl th{font-family:var(--fm);font-size:9px;color:var(--mu);letter-spacing:.08em;padding:10px 14px;text-align:left;border-bottom:1px solid var(--bdr);background:var(--s2);}
+.tbl td{font-family:var(--fm);font-size:10px;padding:10px 14px;border-bottom:1px solid var(--bdr);vertical-align:middle;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:rgba(255,255,255,.02);}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:99px;font-family:var(--fm);font-size:9px;font-weight:700;}
+.badge-ativo{background:rgba(34,197,94,.15);color:var(--gr);border:1px solid rgba(34,197,94,.2);}
+.badge-inativo{background:rgba(239,68,68,.12);color:var(--re);border:1px solid rgba(239,68,68,.2);}
+.badge-pct{background:rgba(59,158,255,.12);color:var(--bl);}
+.badge-fixo{background:rgba(168,85,247,.12);color:var(--pu);}
+/* FORM */
+.form-card{background:var(--s1);border:1px solid var(--bdr);border-radius:12px;padding:22px;max-width:520px;}
+.form-title{font-family:var(--fm);font-size:11px;font-weight:700;letter-spacing:.06em;margin-bottom:18px;color:var(--or);}
+.fld{margin-bottom:14px;}
+.fld label{font-family:var(--fm);font-size:9px;color:var(--mu);letter-spacing:.1em;display:block;margin-bottom:5px;}
+.fld input,.fld select,.fld textarea{width:100%;background:var(--s2);border:1px solid var(--bdr);border-radius:7px;color:var(--tx);font-family:var(--fm);font-size:11px;padding:9px 12px;outline:none;transition:border-color .15s;}
+.fld input:focus,.fld select:focus{border-color:var(--or);}
+.fld-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.btn-primary{background:var(--or);color:#000;font-family:var(--fm);font-size:11px;font-weight:700;padding:10px 22px;border:none;border-radius:8px;cursor:pointer;transition:opacity .15s;}
+.btn-primary:hover{opacity:.85;}
+.btn-sm{font-family:var(--fm);font-size:9px;padding:4px 10px;border-radius:5px;border:1px solid var(--bdr);background:var(--s2);color:var(--mu);cursor:pointer;transition:all .15s;}
+.btn-sm:hover{border-color:var(--or);color:var(--or);}
+.btn-danger{border-color:rgba(239,68,68,.3);color:var(--re);}
+.btn-danger:hover{background:rgba(239,68,68,.1);border-color:var(--re);}
+/* RELATÓRIO */
+.rel-filtros{display:flex;gap:10px;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;}
+.rel-filtros .fld{margin:0;min-width:130px;}
+.rel-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;}
+.rel-card{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:16px;}
+.rel-card-title{font-family:var(--fm);font-size:9px;color:var(--mu);letter-spacing:.08em;margin-bottom:12px;}
+.infl-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bdr);}
+.infl-row:last-child{border-bottom:none;}
+.infl-nome{font-size:11px;font-weight:600;flex:1;}
+.infl-stat{font-family:var(--fm);font-size:9px;color:var(--mu);}
+.infl-bar{height:4px;background:var(--or);border-radius:2px;margin-top:4px;}
+.empty{padding:40px;text-align:center;color:var(--mu);font-family:var(--fm);font-size:10px;}
+.toast-wrap{position:fixed;bottom:20px;right:20px;z-index:999;display:flex;flex-direction:column;gap:8px;}
+.toast{background:var(--s1);border:1px solid var(--bdr);border-radius:8px;padding:10px 16px;font-family:var(--fm);font-size:10px;min-width:200px;animation:slideIn .2s ease;}
+.toast.g{border-color:rgba(34,197,94,.4);color:var(--gr);}
+.toast.r{border-color:rgba(239,68,68,.4);color:var(--re);}
+@keyframes slideIn{from{transform:translateX(20px);opacity:0;}to{transform:translateX(0);opacity:1;}}
+/* MODAL EDITAR */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;z-index:200;}
+.ov.show{display:flex;}
+.mdl{background:var(--s1);border:1px solid var(--bdr);border-radius:14px;padding:22px;width:440px;max-height:90vh;overflow-y:auto;}
+.mdl-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.mdl-title{font-family:var(--fm);font-size:11px;font-weight:700;letter-spacing:.06em;}
+.mdl-close{background:none;border:none;color:var(--mu);font-size:20px;cursor:pointer;line-height:1;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="logo-ic">🎟️</div> Cupons</div>
+  <button class="btn-sm" onclick="trocarAba('criar')" style="color:var(--or);border-color:rgba(249,115,22,.3);">+ Novo Cupom</button>
+</header>
+
+<div class="tabs">
+  <div class="tab ativa" id="tab-lista" onclick="trocarAba('lista')">🎟️ CUPONS</div>
+  <div class="tab" id="tab-criar" onclick="trocarAba('criar')">✚ CRIAR</div>
+  <div class="tab" id="tab-relatorio" onclick="trocarAba('relatorio')">📊 RELATÓRIO</div>
+</div>
+
+<!-- ABA LISTA -->
+<div class="pg show" id="pg-lista">
+  <div class="stats">
+    <div class="stat"><div class="stat-lbl">CUPONS ATIVOS</div><div class="stat-val" id="st-ativos" style="color:var(--gr)">—</div></div>
+    <div class="stat"><div class="stat-lbl">TOTAL DE USOS</div><div class="stat-val" id="st-usos" style="color:var(--or)">—</div></div>
+    <div class="stat"><div class="stat-lbl">DESCONTO TOTAL</div><div class="stat-val" id="st-desc" style="color:var(--ye)">—</div></div>
+    <div class="stat"><div class="stat-lbl">VALOR MOVIMENTADO</div><div class="stat-val" id="st-mov" style="color:var(--bl)">—</div></div>
+  </div>
+  <div class="tbl-wrap">
+    <table class="tbl">
+      <thead><tr>
+        <th>CÓDIGO</th><th>INFLUENCIADORA</th><th>TIPO</th><th>DESCONTO</th>
+        <th>USOS</th><th>DESCONTO DADO</th><th>VALIDADE</th><th>STATUS</th><th></th>
+      </tr></thead>
+      <tbody id="tbody-cupons"><tr><td colspan="9" class="empty">Carregando...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ABA CRIAR -->
+<div class="pg" id="pg-criar">
+  <div class="form-card">
+    <div class="form-title">✚ NOVO CUPOM</div>
+    <div class="fld">
+      <label>CÓDIGO DO CUPOM *</label>
+      <input id="f-codigo" type="text" placeholder="Ex: JULIA10" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase().replace(/\s/g,'')">
+    </div>
+    <div class="fld">
+      <label>INFLUENCIADORA</label>
+      <select id="f-influencer">
+        <option value="">Sem influenciadora</option>
+      </select>
+    </div>
+    <div class="fld-row">
+      <div class="fld">
+        <label>TIPO DE DESCONTO *</label>
+        <select id="f-tipo">
+          <option value="percentual">Percentual (%)</option>
+          <option value="fixo">Fixo (R$)</option>
+        </select>
+      </div>
+      <div class="fld">
+        <label>VALOR DO DESCONTO *</label>
+        <input id="f-valor" type="number" min="0" step="0.01" placeholder="Ex: 10 ou 30">
+      </div>
+    </div>
+    <div class="fld-row">
+      <div class="fld">
+        <label>DATA DE INÍCIO</label>
+        <input id="f-inicio" type="date">
+      </div>
+      <div class="fld">
+        <label>DATA DE FIM (opcional)</label>
+        <input id="f-fim" type="date">
+      </div>
+    </div>
+    <div class="fld">
+      <label>LIMITE DE USOS (opcional)</label>
+      <input id="f-limite" type="number" min="1" placeholder="Deixe em branco para ilimitado">
+    </div>
+    <div class="fld">
+      <label>OBSERVAÇÕES</label>
+      <input id="f-obs" type="text" placeholder="Observações internas">
+    </div>
+    <button class="btn-primary" onclick="criarCupom()">Criar Cupom</button>
+    <div id="f-msg" style="margin-top:10px;font-family:var(--fm);font-size:10px;display:none;"></div>
+  </div>
+</div>
+
+<!-- ABA RELATÓRIO -->
+<div class="pg" id="pg-relatorio">
+  <div class="rel-filtros">
+    <div class="fld"><label>DE</label><input id="r-de" type="date"></div>
+    <div class="fld"><label>ATÉ</label><input id="r-ate" type="date"></div>
+    <div class="fld"><label>INFLUENCIADORA</label>
+      <select id="r-influencer"><option value="">Todas</option></select>
+    </div>
+    <button class="btn-primary" onclick="carregarRelatorio()" style="align-self:flex-end;">Filtrar</button>
+  </div>
+  <!-- Totais -->
+  <div class="stats" style="margin-bottom:20px;">
+    <div class="stat"><div class="stat-lbl">USOS NO PERÍODO</div><div class="stat-val" id="r-usos" style="color:var(--or)">—</div></div>
+    <div class="stat"><div class="stat-lbl">DESCONTO DADO</div><div class="stat-val" id="r-desc" style="color:var(--re)">—</div></div>
+    <div class="stat"><div class="stat-lbl">VALOR MOVIMENTADO</div><div class="stat-val" id="r-mov" style="color:var(--gr)">—</div></div>
+    <div class="stat"><div class="stat-lbl">TICKET MÉDIO</div><div class="stat-val" id="r-ticket" style="color:var(--bl)">—</div></div>
+  </div>
+  <div class="rel-grid">
+    <div class="rel-card">
+      <div class="rel-card-title">POR INFLUENCIADORA</div>
+      <div id="r-por-influencer"></div>
+    </div>
+    <div class="rel-card">
+      <div class="rel-card-title">POR DIA</div>
+      <div id="r-por-dia" style="overflow-y:auto;max-height:300px;"></div>
+    </div>
+  </div>
+  <div class="tbl-wrap">
+    <table class="tbl">
+      <thead><tr><th>DATA</th><th>CUPOM</th><th>INFLUENCIADORA</th><th>CLIENTE</th><th>ORIGEM</th><th>V. ORIGINAL</th><th>DESCONTO</th><th>V. FINAL</th></tr></thead>
+      <tbody id="r-usos-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- MODAL EDITAR -->
+<div class="ov" id="ov-editar" onclick="if(event.target===this) fecharEditar()">
+  <div class="mdl">
+    <div class="mdl-hd">
+      <div class="mdl-title">✏️ EDITAR CUPOM</div>
+      <button class="mdl-close" onclick="fecharEditar()">×</button>
+    </div>
+    <input type="hidden" id="e-id">
+    <div class="fld"><label>INFLUENCIADORA</label>
+      <select id="e-influencer"></select>
+    </div>
+    <div class="fld-row">
+      <div class="fld"><label>TIPO</label>
+        <select id="e-tipo">
+          <option value="percentual">Percentual (%)</option>
+          <option value="fixo">Fixo (R$)</option>
+        </select>
+      </div>
+      <div class="fld"><label>VALOR</label>
+        <input id="e-valor" type="number" min="0" step="0.01">
+      </div>
+    </div>
+    <div class="fld"><label>DATA DE FIM</label><input id="e-fim" type="date"></div>
+    <div class="fld"><label>LIMITE DE USOS</label><input id="e-limite" type="number" min="1" placeholder="Ilimitado"></div>
+    <div class="fld"><label>STATUS</label>
+      <select id="e-ativo">
+        <option value="true">Ativo</option>
+        <option value="false">Inativo</option>
+      </select>
+    </div>
+    <div class="fld"><label>OBSERVAÇÕES</label><input id="e-obs" type="text"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px;">
+      <button class="btn-sm" onclick="fecharEditar()">Cancelar</button>
+      <button class="btn-primary" onclick="salvarEdicao()">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script>
+var _cupons = [], _influencers = [];
+
+function g(id){ return document.getElementById(id); }
+function esc(s){ var d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+function fmtMoeda(v){ return 'R$ '+(v||0).toFixed(2).replace('.',','); }
+function fmtDt(s){ if(!s) return '—'; var d=new Date(s); return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
+
+function toast(msg, tipo) {
+  var w=g('toast-wrap');
+  var el=document.createElement('div');
+  el.className='toast '+(tipo||'g');
+  el.textContent=msg;
+  w.appendChild(el);
+  setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); }, 3500);
+}
+
+function trocarAba(id) {
+  ['lista','criar','relatorio'].forEach(function(t){
+    g('pg-'+t).classList.toggle('show', t===id);
+    g('tab-'+t).classList.toggle('ativa', t===id);
+  });
+  if (id==='lista') carregarCupons();
+  if (id==='relatorio') iniciarRelatorio();
+}
+
+// ── Carregar influenciadoras do Growth ──────────────────────────────────────
+async function carregarInfluencers() {
+  try {
+    var r = await fetch('/api/growth?action=listar-influencers').then(function(x){return x.json();});
+    _influencers = r.influencers || [];
+  } catch(e) { _influencers = []; }
+  // Tentar também do localStorage do Growth
+  try {
+    var ls = localStorage.getItem('growth_infl_v2');
+    if (ls) { var arr = JSON.parse(ls); if (arr.length > _influencers.length) _influencers = arr; }
+  } catch(e) {}
+  popularSelectInfluencers();
+}
+
+function popularSelectInfluencers() {
+  var opts = '<option value="">Sem influenciadora</option>' +
+    _influencers.map(function(i){
+      return '<option value="'+esc(i.id)+'">'+esc(i.nome)+'</option>';
+    }).join('');
+  ['f-influencer','e-influencer','r-influencer'].forEach(function(id){
+    var el=g(id); if(el) el.innerHTML = id==='r-influencer' ? '<option value="">Todas</option>'+_influencers.map(function(i){ return '<option value="'+esc(i.nome)+'">'+esc(i.nome)+'</option>'; }).join('') : opts;
+  });
+}
+
+// ── Carregar cupons ──────────────────────────────────────────────────────────
+async function carregarCupons() {
+  var r = await fetch('/api/cupons?action=listar').then(function(x){return x.json();});
+  _cupons = r.cupons || [];
+  renderCupons();
+  renderStats();
+}
+
+function renderStats() {
+  var ativos = _cupons.filter(function(c){ return c.ativo; }).length;
+  var usos   = _cupons.reduce(function(s,c){ return s+(c.usosRealizados||0); }, 0);
+  var desc   = _cupons.reduce(function(s,c){ return s+(c.descontoTotal||0); }, 0);
+  var mov    = _cupons.reduce(function(s,c){ return s+(c.valorMovimentado||0); }, 0);
+  g('st-ativos').textContent = ativos;
+  g('st-usos').textContent   = usos;
+  g('st-desc').textContent   = fmtMoeda(desc);
+  g('st-mov').textContent    = fmtMoeda(mov);
+}
+
+function renderCupons() {
+  if (!_cupons.length) { g('tbody-cupons').innerHTML='<tr><td colspan="9" class="empty">Nenhum cupom cadastrado ainda.</td></tr>'; return; }
+  g('tbody-cupons').innerHTML = _cupons.map(function(c){
+    var valDesc = c.tipo==='percentual' ? c.valor+'%' : fmtMoeda(c.valor);
+    var lim = c.usosMaximos ? (c.usosRealizados||0)+'/'+c.usosMaximos : (c.usosRealizados||0)+'/∞';
+    return '<tr>'+
+      '<td><strong style="color:var(--or);font-family:var(--fm)">'+esc(c.codigo)+'</strong></td>'+
+      '<td>'+esc(c.influencerNome||'—')+'</td>'+
+      '<td><span class="badge badge-'+(c.tipo==='percentual'?'pct':'fixo')+'">'+c.tipo+'</span></td>'+
+      '<td style="color:var(--gr);font-weight:700">'+valDesc+'</td>'+
+      '<td>'+lim+'</td>'+
+      '<td>'+fmtMoeda(c.descontoTotal||0)+'</td>'+
+      '<td style="font-size:9px">'+((c.dataFim)||'Sem expiração')+'</td>'+
+      '<td><span class="badge badge-'+(c.ativo?'ativo':'inativo')+'">'+(c.ativo?'ATIVO':'INATIVO')+'</span></td>'+
+      '<td><button class="btn-sm" onclick="abrirEditar(\''+c.id+'\')">✏️ Editar</button></td>'+
+    '</tr>';
+  }).join('');
+}
+
+// ── Criar cupom ──────────────────────────────────────────────────────────────
+async function criarCupom() {
+  var codigo = g('f-codigo').value.trim().toUpperCase();
+  var tipo   = g('f-tipo').value;
+  var valor  = parseFloat(g('f-valor').value||'0');
+  if (!codigo) { toast('Informe o código do cupom','r'); return; }
+  if (!valor)  { toast('Informe o valor do desconto','r'); return; }
+  var inflId = g('f-influencer').value;
+  var inflObj = _influencers.find(function(i){ return i.id===inflId; });
+  var r = await fetch('/api/cupons?action=criar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      codigo, tipo, valor,
+      influencerId: inflId||null,
+      influencerNome: inflObj ? inflObj.nome : '',
+      dataInicio: g('f-inicio').value||'',
+      dataFim:    g('f-fim').value||'',
+      usosMaximos: g('f-limite').value||'',
+      obs: g('f-obs').value||'',
+    })
+  }).then(function(x){return x.json();});
+  if (r.ok) {
+    toast('✅ Cupom '+codigo+' criado!');
+    ['f-codigo','f-valor','f-limite','f-obs','f-fim'].forEach(function(id){ var e=g(id); if(e) e.value=''; });
+    g('f-influencer').value='';
+    trocarAba('lista');
+  } else { toast('Erro: '+(r.error||'falha'),'r'); }
+}
+
+// ── Editar cupom ─────────────────────────────────────────────────────────────
+function abrirEditar(id) {
+  var c = _cupons.find(function(x){ return x.id===id; });
+  if (!c) return;
+  g('e-id').value = c.id;
+  g('e-tipo').value = c.tipo;
+  g('e-valor').value = c.valor;
+  g('e-fim').value = c.dataFim||'';
+  g('e-limite').value = c.usosMaximos||'';
+  g('e-ativo').value = String(c.ativo);
+  g('e-obs').value = c.obs||'';
+  var inflOpts = '<option value="">Sem influenciadora</option>'+
+    _influencers.map(function(i){
+      return '<option value="'+esc(i.id)+'"'+(i.id===c.influencerId?' selected':'')+'>'+esc(i.nome)+'</option>';
+    }).join('');
+  g('e-influencer').innerHTML = inflOpts;
+  g('ov-editar').classList.add('show');
+}
+function fecharEditar() { g('ov-editar').classList.remove('show'); }
+
+async function salvarEdicao() {
+  var id = g('e-id').value;
+  var inflId = g('e-influencer').value;
+  var inflObj = _influencers.find(function(i){ return i.id===inflId; });
+  var r = await fetch('/api/cupons?action=editar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      id, tipo: g('e-tipo').value,
+      valor: parseFloat(g('e-valor').value||'0'),
+      influencerId: inflId||null,
+      influencerNome: inflObj ? inflObj.nome : '',
+      dataFim: g('e-fim').value||null,
+      usosMaximos: g('e-limite').value||null,
+      ativo: g('e-ativo').value === 'true',
+      obs: g('e-obs').value,
+    })
+  }).then(function(x){return x.json();});
+  if (r.ok) { toast('✅ Cupom atualizado!'); fecharEditar(); carregarCupons(); }
+  else toast('Erro: '+(r.error||'falha'),'r');
+}
+
+// ── Relatório ────────────────────────────────────────────────────────────────
+function iniciarRelatorio() {
+  var hoje = new Date().toISOString().slice(0,10);
+  var ini  = new Date(Date.now()-30*864e5).toISOString().slice(0,10);
+  if (!g('r-de').value)  g('r-de').value  = ini;
+  if (!g('r-ate').value) g('r-ate').value = hoje;
+  carregarRelatorio();
+}
+
+async function carregarRelatorio() {
+  var de  = g('r-de').value  || new Date(Date.now()-30*864e5).toISOString().slice(0,10);
+  var ate = g('r-ate').value || new Date().toISOString().slice(0,10);
+  var infl = g('r-influencer').value || '';
+  var url = '/api/cupons?action=relatorio&de='+de+'&ate='+ate+(infl?'&influencer='+encodeURIComponent(infl):'');
+  var r = await fetch(url).then(function(x){return x.json();});
+  if (!r.ok) return;
+  // Totais
+  g('r-usos').textContent   = r.totais.usos;
+  g('r-desc').textContent   = fmtMoeda(r.totais.descontoTotal);
+  g('r-mov').textContent    = fmtMoeda(r.totais.valorMovimentado);
+  g('r-ticket').textContent = r.totais.usos ? fmtMoeda(r.totais.valorMovimentado/r.totais.usos) : '—';
+  // Por influenciadora
+  var maxUsos = r.porInfluencer.length ? r.porInfluencer[0].usos : 1;
+  g('r-por-influencer').innerHTML = r.porInfluencer.length
+    ? r.porInfluencer.map(function(inf){
+        var pct = Math.round(inf.usos/maxUsos*100);
+        return '<div class="infl-row"><div style="flex:1"><div class="infl-nome">'+esc(inf.nome)+'</div>'+
+          '<div class="infl-bar" style="width:'+pct+'%"></div>'+
+          '</div><div class="infl-stat">'+inf.usos+' usos · '+fmtMoeda(inf.descontoTotal)+'</div></div>';
+      }).join('')
+    : '<div class="empty">Nenhum uso no período</div>';
+  // Por dia
+  g('r-por-dia').innerHTML = r.porDia.length
+    ? r.porDia.map(function(d){
+        return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bdr);font-family:var(--fm);font-size:9px;">'+
+          '<span>'+d.data+'</span><span style="color:var(--mu)">'+d.usos+' usos</span><span style="color:var(--or)">'+fmtMoeda(d.descontoTotal)+'</span></div>';
+      }).join('')
+    : '<div class="empty">Nenhum uso no período</div>';
+  // Tabela de usos
+  g('r-usos-tbody').innerHTML = r.usos.length
+    ? r.usos.map(function(u){
+        return '<tr>'+
+          '<td style="font-size:9px">'+((u.usadoEm||'').slice(0,10))+'</td>'+
+          '<td><strong style="color:var(--or)">'+esc(u.cupomCodigo)+'</strong></td>'+
+          '<td>'+esc(u.influencerNome||'—')+'</td>'+
+          '<td>'+esc(u.fichaCliente||'—')+'</td>'+
+          '<td><span style="font-size:9px;color:var(--mu)">'+esc(u.origem||'—')+'</span></td>'+
+          '<td>'+fmtMoeda(u.valorOriginal)+'</td>'+
+          '<td style="color:var(--re)">-'+fmtMoeda(u.desconto)+'</td>'+
+          '<td style="color:var(--gr);font-weight:700">'+fmtMoeda(u.valorFinal)+'</td>'+
+        '</tr>';
+      }).join('')
+    : '<tr><td colspan="8" class="empty">Nenhum uso no período</td></tr>';
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+g('f-inicio').value = new Date().toISOString().slice(0,10);
+carregarInfluencers();
+carregarCupons();
+</script>
+</body>
+</html>

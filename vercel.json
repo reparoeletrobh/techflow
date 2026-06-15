@@ -453,6 +453,14 @@
     {
       "source": "/api/pj-track",
       "destination": "/api/pj-track.js"
+    },
+    {
+      "source": "/api/cupons",
+      "destination": "/api/cupons.js"
+    },
+    {
+      "source": "/cupons",
+      "destination": "/cupons.html"
     }
   ],
   "headers": [

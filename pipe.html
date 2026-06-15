@@ -316,6 +316,7 @@ function render(){
         acBadge+
         '<div class="card-time">'+fmtDate(c.movedAt)+'&nbsp;·&nbsp;'+esc(c.origem)+'</div>'+
         '<div class="card-actions">'+
+          (c.phase==='aguardando_aprovacao' ? '<button class="cbtn" style="background:rgba(249,115,22,.1);color:var(--or);border:1px solid rgba(249,115,22,.3);font-size:9px;" onclick="abrirCupomModal(\''+c.id+'\','+parseFloat(c.valor||0)+')" title="Aplicar cupom de desconto">🎟️ Cupom</button>' : '')+
           '<select class="move-sel" onchange="moverCard(\''+c.id+'\',this.value);this.value=\'\'" >'+
             '<option value="">↕ Mover para…</option>'+opts+
           '</select>'+
@@ -590,6 +591,61 @@ function loadColOrder(phases){
 function saveColOrder(phases){
   try{localStorage.setItem('pipe_col_order',JSON.stringify(phases.map(function(p){return p.id;})));}catch(e){}
 }
+// ── CUPONS no Pipe ────────────────────────────────────────────────────────────
+var _cupomPipeCardId = '', _cupomPipeValor = 0;
+
+function abrirCupomModal(cardId, valor) {
+  _cupomPipeCardId = cardId;
+  _cupomPipeValor  = valor || 0;
+  var el = document.getElementById('cupom-pipe-modal');
+  if (!el) return;
+  document.getElementById('cpm-codigo').value = '';
+  document.getElementById('cpm-resultado').style.display = 'none';
+  document.getElementById('cpm-msg').textContent = '';
+  document.getElementById('cpm-valor-orig').textContent = valor ? 'R$ '+parseFloat(valor).toFixed(2).replace('.',',') : '—';
+  el.style.display = 'flex';
+}
+function fecharCupomModal() {
+  var el = document.getElementById('cupom-pipe-modal');
+  if (el) el.style.display = 'none';
+}
+async function validarCupomPipe() {
+  var codigo = (document.getElementById('cpm-codigo').value||'').trim().toUpperCase();
+  if (!codigo) return;
+  var r = await fetch('/api/cupons?action=validar&codigo='+encodeURIComponent(codigo)+'&valor='+_cupomPipeValor).then(function(x){return x.json();});
+  var msg = document.getElementById('cpm-msg');
+  var res = document.getElementById('cpm-resultado');
+  if (r.valido) {
+    msg.textContent = '✅ '+r.msg+' — De R$'+(_cupomPipeValor).toFixed(2)+' → R$'+(r.valorFinal||0).toFixed(2);
+    msg.style.color = '#22c55e';
+    res.style.display = 'block';
+    document.getElementById('cpm-btn-aplicar').dataset.desconto = r.desconto;
+    document.getElementById('cpm-btn-aplicar').dataset.valorfinal = r.valorFinal;
+    document.getElementById('cpm-btn-aplicar').dataset.codigo = codigo;
+  } else {
+    msg.textContent = '❌ '+(r.error||'Cupom inválido');
+    msg.style.color = '#ef4444';
+    res.style.display = 'none';
+  }
+}
+async function aplicarCupomPipe(btn) {
+  var codigo    = btn.dataset.codigo;
+  var desconto  = parseFloat(btn.dataset.desconto||'0');
+  var valorFinal = parseFloat(btn.dataset.valorfinal||'0');
+  var card = cards.find(function(c){ return c.id===_cupomPipeCardId; });
+  var cliente = card ? (card.nomeContato||card.title||'') : '';
+  // Registrar uso
+  await fetch('/api/cupons?action=usar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      codigo, valorOriginal:_cupomPipeValor,
+      fichaId:_cupomPipeCardId, cliente, origem:'pipe'
+    })
+  });
+  fecharCupomModal();
+  toast('🎟️ Cupom '+codigo+' aplicado! Desconto de R$'+desconto.toFixed(2));
+}
+
 function moverColuna(phaseId,dir){
   var ordered=loadColOrder(PHASES);
   var idx=ordered.findIndex(function(p){return p.id===phaseId;});
@@ -878,6 +934,34 @@ async function setVencimento(id){
     <div style="padding:14px 20px 20px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid #1e1e1e;">
       <button onclick="fecharDadosPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;border:1px solid #333;background:transparent;color:#666;cursor:pointer;">Fechar</button>
       <button onclick="salvarDadosPipe()" style="font-family:'DM Mono',monospace;font-size:11px;padding:8px 18px;border-radius:6px;border:none;background:#f5c800;color:#000;font-weight:700;cursor:pointer;">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- MODAL CUPOM PIPE -->
+<div id="cupom-pipe-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);align-items:center;justify-content:center;z-index:300;" onclick="if(event.target===this)fecharCupomModal()">
+  <div style="background:var(--s1);border:1px solid var(--bdr);border-radius:14px;padding:22px;width:360px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div style="font-family:var(--fm);font-size:12px;font-weight:700;color:var(--or);">🎟️ APLICAR CUPOM</div>
+      <button onclick="fecharCupomModal()" style="background:none;border:none;color:var(--mu);font-size:20px;cursor:pointer;">×</button>
+    </div>
+    <div style="font-family:var(--fm);font-size:9px;color:var(--mu);margin-bottom:12px;">Valor do serviço: <span id="cpm-valor-orig" style="color:var(--tx);">—</span></div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <input id="cpm-codigo" type="text" placeholder="Digite o código do cupom"
+        style="flex:1;background:var(--s2);border:1px solid var(--bdr);border-radius:7px;color:var(--tx);font-family:var(--fm);font-size:11px;padding:9px 12px;outline:none;text-transform:uppercase;"
+        oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')validarCupomPipe()">
+      <button onclick="validarCupomPipe()" style="background:var(--or);color:#000;font-family:var(--fm);font-size:10px;font-weight:700;padding:9px 16px;border:none;border-radius:7px;cursor:pointer;">Validar</button>
+    </div>
+    <div id="cpm-msg" style="font-family:var(--fm);font-size:10px;margin-bottom:10px;"></div>
+    <div id="cpm-resultado" style="display:none;">
+      <button id="cpm-btn-aplicar" onclick="aplicarCupomPipe(this)"
+        style="width:100%;background:rgba(34,197,94,.15);color:var(--gr);border:1px solid rgba(34,197,94,.3);font-family:var(--fm);font-size:11px;font-weight:700;padding:10px;border-radius:8px;cursor:pointer;">
+        ✅ Registrar Uso do Cupom
+      </button>
+    </div>
+    <div style="margin-top:12px;text-align:right;">
+      <button onclick="fecharCupomModal()" style="font-family:var(--fm);font-size:10px;padding:7px 14px;border-radius:6px;border:1px solid var(--bdr);background:var(--s2);color:var(--mu);cursor:pointer;">Sem cupom</button>
     </div>
   </div>
 </div>
