@@ -90,7 +90,7 @@ const TEMPLATES = {
   </table>
 </td></tr>
 <tr><td style="padding:20px 36px;">
-  <p style="margin:0 0 16px;font-size:14px;color:#444;line-height:1.7;">Posso enviar uma <strong>tabela de preços</strong> para a {{empresa}}? Leva menos de 5 minutos.</p>
+  <p style="margin:0 0 16px;font-size:14px;color:#444;line-height:1.7;">Segue abaixo a nossa apresentação, <strong>{{empresa}}</strong>. Leva menos de 2 minutos.</p>
   <table cellpadding="0" cellspacing="0"><tr>
     <td style="background:#3b82f6;border-radius:6px;padding:11px 24px;">
       <a href="https://reparoeletroadm.com/api/pj-track?e=apresentacao&id={{leadId}}" style="color:#fff;text-decoration:none;font-size:13px;font-weight:700;">Ver Apresentação Completa →</a>
