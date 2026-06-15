@@ -2869,9 +2869,11 @@ async function salvarLead() {
     fecharSdrModal();
     await carregarSDR();
     if (r.emailD0Enviado) {
-      toast('✅ Lead cadastrado + apresentação enviada por email!','g');
+      toast('✅ Lead cadastrado + apresentação enviada!','g');
+    } else if (r.emailMotivo === 'sem_email') {
+      toast('✅ Lead salvo. Sem email cadastrado — adicione para enviar a apresentação.','y');
     } else if (r.lead && r.lead.email) {
-      toast('✅ Lead cadastrado (email não pôde ser enviado)','g');
+      toast('⚠️ Lead salvo, mas o email não foi entregue. Verifique o endereço: '+r.lead.email,'r');
     } else {
       toast('✅ Lead cadastrado! Adicione o email para enviar a apresentação.','g');
     }

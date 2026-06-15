@@ -273,7 +273,13 @@ module.exports = async function handler(req, res) {
         }
       } catch(ef) { console.error('Email D0 error:', ef.message); }
     }
-    return res.status(200).json({ ok:true, lead: novo, emailD0Enviado: emailEnviado });
+    // Motivo da falha do email (para o cliente mostrar)
+    let emailMotivo = '';
+    if (!novo.email) emailMotivo = 'sem_email';
+    else if (!process.env.RESEND_API_KEY) emailMotivo = 'sem_chave';
+    else if (!emailEnviado) emailMotivo = 'falha_envio';
+
+    return res.status(200).json({ ok:true, lead: novo, emailD0Enviado: emailEnviado, emailMotivo });
   }
 
   // ── POST atualizar ──────────────────────────────────────────────────────────
