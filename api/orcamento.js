@@ -323,6 +323,67 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, fichas: db_g.fichas || [] });
   }
 
+  // ── POST gmb-filtrar-data — redefine gmb_pendentes apenas com fichas de uma data ──
+  if (req.method === 'POST' && action === 'gmb-filtrar-data') {
+    const { data } = req.body || {};  // ex: '2026-06-13'
+    if (!data) return res.status(400).json({ ok:false, error:'data obrigatória (YYYY-MM-DD)' });
+    try {
+      const BALCAO_KEY   = 'reparoeletro_balcao';
+      const PIPE_KEY_GMB = 'reparoeletro_pipe';
+      const GMB_ENV_KEY  = 'gmb_enviados';
+      const GMB_PEND_KEY = 'gmb_pendentes';
+
+      const db_balcao = (await dbGet(BALCAO_KEY)) || [];
+      const db_gmb    = await dbGet(PIPE_KEY_GMB);
+      const db_env    = (await dbGet(GMB_ENV_KEY)) || { fichas: [] };
+
+      const jaEnviadosIds = new Set((db_env.fichas||[]).map(f=>String(f.id)));
+
+      // 1. IDs dos cards pagos (entraram em ERP) na data escolhida
+      const idsNaData = new Set();
+      (Array.isArray(db_balcao) ? db_balcao : []).forEach(function(b) {
+        const pagoEm = b.pagoEm || b.entradaEm || '';
+        if (pagoEm.startsWith(data) && b.pipefyId) {
+          idsNaData.add(String(b.pipefyId));
+        }
+      });
+
+      // 2. Cruzar com cards do pipe — pegar o card correspondente
+      const cards   = (db_gmb && Array.isArray(db_gmb.cards)) ? db_gmb.cards : [];
+      const novasIds = [];
+      const fichasEncontradas = [];
+
+      for (const id of idsNaData) {
+        if (jaEnviadosIds.has(id)) continue; // já foi enviado avaliação
+        const card = cards.find(function(c) {
+          return String(c.id||'')===id || String(c.pipefyId||'')===id;
+        });
+        const cardId = id;
+        novasIds.push(cardId);
+        fichasEncontradas.push({
+          id: cardId,
+          nome: card ? (card.nomeContato||card.title||'—') : '—',
+          tel:  card ? (card.telefone||'') : '',
+          valor: card ? (card.valor||null) : null,
+          phase: card ? card.phase : '?',
+        });
+      }
+
+      // 3. Salvar novo gmb_pendentes com APENAS essas fichas
+      await dbSet(GMB_PEND_KEY, { ids: novasIds });
+
+      return res.status(200).json({
+        ok: true,
+        data,
+        total: novasIds.length,
+        fichas: fichasEncontradas,
+        msg: novasIds.length + ' fichas de ' + data + ' definidas no pool GMB'
+      });
+    } catch(e) {
+      return res.status(200).json({ ok:false, error: e.message });
+    }
+  }
+
   // ── GET gmb-restaurar — recupera fichas movidas para finalizado pelo cron ──
   if (action === 'gmb-restaurar') {
     try {
