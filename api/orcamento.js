@@ -186,41 +186,6 @@ module.exports = async function handler(req, res) {
       } catch(e) { console.error('[Log] criar:', e.message); }
 
       logAction({ modulo:'Orçamento', fichaId:'', ficha:nome||'', acao:'Novo orçamento criado', para:'aguardando_aprovacao', gatilho:'→ Pipe aguardando_aprovacao', status:'ok', detalhe:'Valor: R$'+(preco||0) }).catch(()=>{});
-      // Criar card no Pipe ADM em aguardando_aprovacao
-      try {
-        const _UO=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
-        const _TO=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
-        async function _pgo(k){const r=await fetch(_UO+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_TO,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();const v=j[0]?.result;if(!v)return null;try{let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
-        async function _pso(k,v){await fetch(_UO+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_TO,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
-        const pipeO=(await _pgo('reparoeletro_pipe'))||{cards:[],syncedPipefyIds:[],lastSync:null};
-        if(!Array.isArray(pipeO.cards)) pipeO.cards=[];
-        const nowO=new Date().toISOString();
-        // Verificar se já existe (por pipefyCardId ou fichaId)
-        const jaExisteO = pipeO.cards.find(function(c){
-          return (card?.id && (c.pipefyId===String(card.id)||c.id===String(card.id))) ||
-                 false /* ficha.id não disponível em criar-card */;
-        });
-        if (!jaExisteO) {
-          pipeO.cards.unshift({
-            id: 'PIPE-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,5).toUpperCase(),
-            pipefyId: card?.id ? String(card.id) : null,
-            localId:  null,
-            phase: 'aguardando_aprovacao',
-            nomeContato: fmt4dig(nome||'', telefone||''),
-            telefone: telefone||'',
-            equipamento: aparelho||'',
-            descricao: defeito||'',
-            endereco: endereco||'',
-            valor: parseFloat(preco)||0,
-            origem: 'orcamento',
-            criadoEm: nowO, movedAt: nowO,
-            aguardandoDesde: nowO, history:[], analiseCompra:false
-          });
-          pipeO.lastSync = nowO;
-          await _pso('reparoeletro_pipe', pipeO);
-        }
-      } catch(eo){ console.error('[orc→pipe]', eo.message); }
-
       return res.status(200).json({
         ok:       true,
         cardId:   card?.id || null,
@@ -228,7 +193,7 @@ module.exports = async function handler(req, res) {
         fichaInfo: {
           nome:       nome,
           equipamento: aparelho,
-          destinos:   ['Logística', 'Pipe ADM → Aguardando Aprovação']
+          destinos:   ['Logística (diagnóstico pendente)']
         }
       });
     } catch(e) {
