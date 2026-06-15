@@ -348,23 +348,53 @@ module.exports = async function handler(req, res) {
         }
       });
 
-      // 2. Cruzar com cards do pipe — pegar o card correspondente
+      // 2. Enriquecer fichas FL- com dados da Frente de Loja
+      const FL_KEY = 'reparoeletro_frenteloja';
+      const db_fl  = (await dbGet(FL_KEY)) || { fichas: [] };
+      const flFichas = db_fl.fichas || [];
+
+      // 3. Cruzar com cards do pipe — busca por pipefyId, flFichaId, localId ou id
       const cards   = (db_gmb && Array.isArray(db_gmb.cards)) ? db_gmb.cards : [];
       const novasIds = [];
       const fichasEncontradas = [];
 
       for (const id of idsNaData) {
-        if (jaEnviadosIds.has(id)) continue; // já foi enviado avaliação
+        if (jaEnviadosIds.has(id)) continue;
+        const sid = String(id);
+        // Buscar no pipe por qualquer campo de ID
         const card = cards.find(function(c) {
-          return String(c.id||'')===id || String(c.pipefyId||'')===id;
+          return String(c.id||'')===sid ||
+                 String(c.pipefyId||'')===sid ||
+                 String(c.localId||'')===sid ||
+                 String(c.flFichaId||'')===sid;
         });
-        const cardId = id;
-        novasIds.push(cardId);
+        // Para fichas FL-, buscar dados na frenteloja
+        let nome = card ? (card.nomeContato||card.title||'') : '';
+        let tel  = card ? (card.telefone||'') : '';
+        let valor = card ? (card.valor||null) : null;
+        if (sid.startsWith('FL-') && (!nome || !tel)) {
+          const fl = flFichas.find(function(f) { return f.id === sid; });
+          if (fl) {
+            nome  = nome  || fl.nome  || fl.nomeContato || '';
+            tel   = tel   || fl.telefone || '';
+            valor = valor || fl.valor || null;
+          }
+        }
+        // Usar também dados diretos do balcão
+        const balEntry = (Array.isArray(db_balcao) ? db_balcao : []).find(function(b) {
+          return String(b.pipefyId||'')===sid || String(b.flFichaId||'')===sid;
+        });
+        if (balEntry) {
+          nome  = nome  || balEntry.nomeContato || '';
+          tel   = tel   || balEntry.telefone    || '';
+          valor = valor || balEntry.valor       || null;
+        }
+        novasIds.push(sid);
         fichasEncontradas.push({
-          id: cardId,
-          nome: card ? (card.nomeContato||card.title||'—') : '—',
-          tel:  card ? (card.telefone||'') : '',
-          valor: card ? (card.valor||null) : null,
+          id:    sid,
+          nome:  nome  || '—',
+          tel:   tel   || '',
+          valor: valor || null,
           phase: card ? card.phase : '?',
         });
       }
