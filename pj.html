@@ -2851,7 +2851,7 @@ function abrirNovoLead() {
 
 function fecharSdrModal() { g('sdr-modal').style.display='none'; }
 
-async async function salvarLead() {
+async function salvarLead() {
   var empresa = gv('sl-empresa'), responsavel = gv('sl-responsavel');
   if (!empresa || !responsavel) { toast('Empresa e responsável obrigatórios','r'); return; }
   var btn = g('sdr-save-btn'); if(btn){btn.disabled=true;btn.textContent='Salvando...';}
