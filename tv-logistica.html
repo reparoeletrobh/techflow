@@ -425,11 +425,6 @@ const SERVICOS = {
       'Eletrônico':['Kit Termo Elétrico','Recuperação de Placa','Dutos e Conexões','Válvula'],
     }
   },
-  bblend: {
-    subtipos: {
-      'Motor': ['Gás','Bojo','Dutos e Conexões','Válvula','Kit de Partida'],
-    }
-  },
   adega: {
     subtipos: {
       'Motor':     ['Gás','Recuperação de Placa','Troca de Placa'],
@@ -452,7 +447,6 @@ const ITENS_COM_PRECO = new Set([
 function precisaPreco(tipo, subtipo, servicos) {
   if (tipo === 'adega')      return (servicos||[]).includes('Troca de Placa');
   if (tipo === 'purificador') return false;
-  if (tipo === 'bblend')     return false; // preço fixo R$1.490
   return (servicos||[]).some(x => ITENS_COM_PRECO.has(x));
 }
 
@@ -743,7 +737,6 @@ function detectarTipo(f) {
   const eq = (f.equipamento||'').toLowerCase();
   if (eq.includes('microondas')) return 'microondas';
   if (eq.includes('purificador')) return 'purificador';
-  if (eq.includes('bblend')) return 'bblend';
   if (eq.includes('adega')) return 'adega';
   if (eq.includes('forno')) return 'forno';
   return null;
@@ -802,7 +795,7 @@ function equipSecHTML(eq, i, total) {
       <div>
         <div class="diag-section-label" style="margin-bottom:5px;">Tipo</div>
         <div class="type-grid">
-          ${['microondas','purificador','bblend','adega','forno'].map(t=>
+          ${['microondas','purificador','adega','forno'].map(t=>
             `<button class="type-btn${eq.tipo===t?' sel':''}" onclick="selTipo(${i},'${t}')">${t.charAt(0).toUpperCase()+t.slice(1)}</button>`
           ).join('')}
         </div>
