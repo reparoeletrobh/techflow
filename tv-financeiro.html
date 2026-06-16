@@ -238,6 +238,8 @@ header{
   <div class="hdr-right">
     <button class="tab-btn" onclick="showPage('painel')">📊 Painel</button>
     <button class="tab-btn active" onclick="showPage('kanban')">📋 Fichas</button>
+    <button class="tab-btn" onclick="showPage('links')" style="border-color:rgba(59,158,255,.4);color:#3b9eff;">💳 Cobrança MP</button>
+    <button class="tab-btn" onclick="showPage('relatorio')" style="border-color:rgba(245,200,0,.4);color:#f5c800;">📊 Relatório</button>
     <button class="tab-btn" onclick="showPage('mover')" style="border-color:rgba(239,68,68,.4);color:#ef4444;">🔀 Mover OS</button>
     <span id="sync-status" style="font-family:var(--fm);font-size:10px;color:var(--muted);"></span>
     <button class="sync-btn" onclick="syncPipefy()">↻ Sync</button>
@@ -489,6 +491,11 @@ function cardHTML(r, color) {
 
 function buildActions(r) {
   let h = '';
+  // Botão Editar Ficha — sempre disponível
+  h += '<button class="btn-secondary" style="font-size:10px;padding:5px 10px;" onclick="abrirEditarFin('' + r.id + '')">✏️ Editar</button>';
+  // Botão Gerar Cobrança MP — nas fases de pagamento
+  if (['faturamento','pagamento_agendado','nf_emitida'].includes(r.phaseId))
+    h += '<button class="btn-primary" style="background:#f97316;color:#fff;" onclick="abrirModalCobranca('' + r.id + '')">💳 Gerar Cobrança MP</button>';
   if (r.phaseId==='aguardando_dados')
     h += `<button class="btn-primary" style="background:var(--accent);color:#000;" onclick="openNfModal('${r.id}')">📋 Informar CPF / CNPJ</button>`;
   if (r.phaseId==='nf_emitida') {
@@ -818,10 +825,18 @@ function showPage(name) {
   curPage = name;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('page-'+name).classList.add('active');
-  document.querySelectorAll('.tab-btn')[name==='painel'?0:1].classList.add('active');
-  if (name==='painel') renderPainel();
-  else renderKanban();
+  var pg = document.getElementById('page-'+name);
+  if (pg) pg.classList.add('active');
+  // Marcar aba ativa
+  var tabs = document.querySelectorAll('.tab-btn');
+  var tabMap = {painel:0, kanban:1, links:2, relatorio:3, mover:4};
+  var ti = tabMap[name];
+  if (ti !== undefined && tabs[ti]) tabs[ti].classList.add('active');
+  // Ação de cada página
+  if (name==='painel')    renderPainel();
+  else if (name==='kanban') renderKanban();
+  else if (name==='links') renderLinksMP();
+  else if (name==='relatorio') renderRelatorio();
 }
 
 function showToast(icon,title,msg) {
@@ -1025,7 +1040,299 @@ function verAnexo(id) {
   document.body.appendChild(overlay);
 }
 
-</script>
+
+
+
+// ── Variáveis para Cobrança MP e Relatório TV ────────────────────────────────
+var mpRecId = null, mpMetodo = null;
+var relTab = 'dia';
+
+
+function dfBRT(ts) {
+  var d = new Date(ts || Date.now());
+  var b = new Date(d.toLocaleString('en-US',{timeZone:'America/Sao_Paulo'}));
+  return b.getFullYear()+'-'+String(b.getMonth()+1).padStart(2,'0')+'-'+String(b.getDate()).padStart(2,'0');
+}
+
+function fmtTel(t){
+  if(!t)return "";
+  var d=String(t).replace(/\D/g,"");
+  if(d.length>11)d=d.slice(-11);
+  if(d.length===11)return "("+d.slice(0,2)+") "+d.slice(2,7)+"-"+d.slice(7);
+  if(d.length===10)return "("+d.slice(0,2)+") "+d.slice(2,6)+"-"+d.slice(6);
+  return t;
+}
+
+function cpTel(t,e){
+  navigator.clipboard.writeText(t).then(function(){
+    if(e&&e.target){e.target.textContent="✅";setTimeout(function(){if(e.target)e.target.textContent="📋";},1500);}
+  }).catch(function(){});
+}
+
+function telHtml(t){
+  if(!t||t==="—")return "—";
+  var f=fmtTel(t);
+  var digits=String(t).replace(/\D/g,"");
+  return f+' <button onclick="cpTel(\''+digits+'\',event)" title="Copiar" style="background:none;border:none;cursor:pointer;padding:0 2px;font-size:10px;opacity:.6;">📋</button>';
+}
+
+function statPill(label, val, color) {
+  return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;min-width:140px;">' +
+    '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">'+label+'</div>' +
+    '<div style="font-family:var(--fh);font-size:20px;font-weight:800;color:'+color+';">'+val+'</div>' +
+  '</div>';
+}
+
+function abrirModalCobranca(id) {
+  mpRecId  = id;
+  mpMetodo = null;
+  document.getElementById('mp-opt-pix').classList.remove('sel');
+  document.getElementById('mp-opt-cartao').classList.remove('sel');
+  document.getElementById('mp-btn-gerar').classList.remove('ok');
+  document.getElementById('mp-result').style.display = 'none';
+  document.getElementById('mp-link-txt').textContent = '';
+  document.getElementById('mp-modal').style.display  = 'flex';
+}
+
+function fecharModalMp() {
+  document.getElementById('mp-modal').style.display = 'none';
+}
+
+function selecionarMetodo(m) {
+  mpMetodo = m;
+  document.getElementById('mp-opt-pix').classList.toggle('sel', m==='pix');
+  document.getElementById('mp-opt-cartao').classList.toggle('sel', m==='cartao');
+  document.getElementById('mp-btn-gerar').classList.add('ok');
+}
+
+async function gerarCobrancaMp() {
+  if (!mpRecId || !mpMetodo) return;
+  const btn = document.getElementById('mp-btn-gerar');
+  btn.textContent = '⏳ Gerando...'; btn.classList.remove('ok');
+  try {
+    const r = await api('gerar-cobranca-mp', { id: mpRecId, metodo: mpMetodo });
+    if (r.ok) {
+      document.getElementById('mp-result').style.display = 'flex';
+      document.getElementById('mp-link-txt').textContent = r.checkoutUrl;
+      btn.textContent = '✅ Gerado!';
+      updateRecord({ id: mpRecId, phaseId:'faturamento', mp:{ checkoutUrl:r.checkoutUrl, metodo:r.metodo, preferenceId:r.preferenceId } });
+      showToast('💳','Link gerado!','Copie e envie ao cliente');
+    } else {
+      btn.textContent = '⚡ Gerar Link'; btn.classList.add('ok');
+      showToast('❌','Erro ao gerar',r.error||'Tente novamente');
+    }
+  } catch(e) {
+    btn.textContent = '⚡ Gerar Link'; btn.classList.add('ok');
+    showToast('❌','Erro',e.message);
+  }
+}
+
+function copiarLinkMp() {
+  const url = document.getElementById('mp-link-txt').textContent;
+  if (url) { navigator.clipboard.writeText(url); showToast('📋','Link copiado!',''); }
+}
+
+function copiarLinkBtn(btn) { navigator.clipboard.writeText(btn.dataset.u||""); showToast("📋","Link copiado!",""); }
+
+async function renderLinksMP() {
+  var res = document.getElementById('links-resumo');
+  var tbl = document.getElementById('links-table');
+  if (!res || !tbl) return;
+  tbl.innerHTML = '<div style="padding:32px;text-align:center;color:var(--muted);font-family:var(--fm);font-size:12px;">Carregando...</div>';
+  res.innerHTML = '';
+  try {
+    var r = await api('listar-links-mp');
+    if (!r.ok) { tbl.innerHTML = '<div style="padding:32px;color:#ef4444;font-family:var(--fm);">Erro: '+r.error+'</div>'; return; }
+    linksData = r;
+
+    res.innerHTML = [
+      statPill('Links gerados', r.total, '#3b9eff'),
+      statPill('Pendentes', r.pendentes, '#f59e0b'),
+      statPill('Pagos', r.pagos, '#22c55e'),
+      statPill('Total recebido', 'R$ '+(r.valorPago||0).toLocaleString('pt-BR',{minimumFractionDigits:2}), '#22c55e'),
+    ].join('');
+
+    if (!r.links || !r.links.length) {
+      tbl.innerHTML = '<div style="padding:32px;text-align:center;color:var(--muted);font-family:var(--fm);font-size:12px;">Nenhum link gerado ainda</div>';
+      return;
+    }
+
+    var rows = r.links.map(function(l) {
+      var statusHtml = l.status === 'pago'
+        ? '<span style="color:#22c55e;font-weight:700;">✅ Pago</span>'
+        : l.status === 'pendente'
+          ? '<span style="color:#f59e0b;font-weight:600;">⏳ Pendente</span>'
+          : '<span style="color:var(--muted);">'+l.status+'</span>';
+      var metodo = l.metodo === 'pix' ? '📲 PIX' : '💳 PIX+Cartão 3x';
+      var gerado = l.geradoEm ? new Date(l.geradoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}) : '—';
+      var pagoEm = l.pagoEm  ? new Date(l.pagoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}) : '—';
+      var agend  = l.dataAgendada ? '<div style="font-size:9px;color:#e879f9;">⏰ '+l.dataAgendada+'</div>' : '';
+      var safeUrl = (l.checkoutUrl||'').replace(/["']/g,'');
+      var linkHtml = safeUrl
+        ? '<div style="max-width:180px;"><a href="'+safeUrl+'" target="_blank" style="color:#3b9eff;font-size:10px;">🔗 Link</a> <button data-u="'+safeUrl+'" onclick="copiarLinkBtn(this)" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:9px;">📋</button></div>'
+        : '—';
+      return '<tr style="border-bottom:1px solid var(--border);">' +
+        '<td style="padding:9px 10px;font-size:11px;font-weight:600;">'+l.fichaId+'</td>' +
+        '<td style="padding:9px 10px;font-size:11px;">'+l.cliente+'</td>' +
+        '<td style="padding:9px 10px;font-size:10px;color:var(--muted);">'+telHtml(l.telefone)+'</td>' +
+        '<td style="padding:9px 10px;font-size:10px;color:var(--muted);">'+(l.cpfCnpj||'—')+'</td>' +
+        '<td style="padding:9px 10px;font-size:11px;font-family:var(--fh);color:#22c55e;">R$ '+l.valor.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</td>' +
+        '<td style="padding:9px 10px;font-size:11px;">'+metodo+'</td>' +
+        '<td style="padding:9px 10px;">'+statusHtml+agend+'</td>' +
+        '<td style="padding:9px 10px;font-size:10px;color:var(--muted);">'+gerado+'</td>' +
+        '<td style="padding:9px 10px;font-size:10px;color:var(--muted);">'+pagoEm+'</td>' +
+        '<td style="padding:9px 10px;">'+linkHtml+'</td>' +
+      '</tr>';
+    }).join('');
+
+    var heads = ['Ficha','Cliente','Tel.','CPF/CNPJ','Valor','Método','Status','ID Referência MP','Payment ID','Gerado em','Pago em','Link'];
+    tbl.innerHTML = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border);">' +
+      '<table style="width:100%;border-collapse:collapse;">' +
+      '<thead><tr style="background:var(--surface);border-bottom:1px solid var(--border);">' +
+        heads.map(function(h){ return '<th style="padding:8px 10px;font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;text-align:left;white-space:nowrap;">'+h+'</th>'; }).join('') +
+      '</tr></thead><tbody>'+rows+'</tbody></table></div>';
+  } catch(e) {
+    tbl.innerHTML = '<div style="padding:32px;color:#ef4444;font-family:var(--fm);">Erro: '+e.message+'</div>';
+  }
+}
+
+function exportarLinksMP() {
+  if (!linksData || !linksData.links || !linksData.links.length) {
+    showToast('⚠️','Sem dados','Nenhum link para exportar'); return;
+  }
+  var linhas = ['Ficha,Cliente,CPF/CNPJ,Valor,Método,Status,GeradoEm,PagoEm,PaymentID,PreferenceID,Link'];
+  linksData.links.forEach(function(l) {
+    var g = l.geradoEm ? new Date(l.geradoEm).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}) : '';
+    var p = l.pagoEm   ? new Date(l.pagoEm).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})   : '';
+    linhas.push([l.fichaId,l.cliente,l.telefone||'',l.cpfCnpj||'',l.valor,l.metodo,l.status,l.preferenceId||'',l.paymentId||'',g,p,l.checkoutUrl||''].join(','));
+  });
+  var blob = new Blob([linhas.join('\n')], {type:'text/csv;charset=utf-8;'});
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href   = url; a.download = 'links_mp.csv'; a.click(); URL.revokeObjectURL(url);
+}
+
+function abrirEditarFin(id) {
+  var rec = records.find(function(r){ return r.id === id; });
+  if (!rec) return;
+  document.getElementById('ef-id').value    = id;
+  document.getElementById('ef-nome').value  = rec.nomeContato || rec.title || '';
+  document.getElementById('ef-valor').value = rec.valor || rec.preco || '';
+  document.getElementById('ef-tel').value   = rec.telefone || '';
+  document.getElementById('ef-equip').value = rec.equipamento || rec.descricao || '';
+  document.getElementById('ef-cpf').value   = rec.cpfCnpj || '';
+  document.getElementById('ef-end').value   = rec.endereco || '';
+  document.getElementById('ef-serv').value  = rec.servicos || '';
+  var m = document.getElementById('modal-editar-fin');
+  m.style.display = 'flex';
+  m.onclick = function(e){ if(e.target===m) m.style.display='none'; };
+}
+
+async function salvarEditarFin() {
+  var id = document.getElementById('ef-id').value;
+  var body = {
+    id:          id,
+    nomeContato: document.getElementById('ef-nome').value,
+    valor:       document.getElementById('ef-valor').value,
+    telefone:    document.getElementById('ef-tel').value,
+    equipamento: document.getElementById('ef-equip').value,
+    cpfCnpj:     document.getElementById('ef-cpf').value,
+    endereco:    document.getElementById('ef-end').value,
+    servicos:    document.getElementById('ef-serv').value
+  };
+  try {
+    var r = await fetch('/api/pipe?action=editar-fin', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    var d = await r.json();
+    if (d.ok) { document.getElementById('modal-editar-fin').style.display='none'; await load(); }
+    else alert('Erro: ' + d.error);
+  } catch(e) { alert('Erro: ' + e.message); }
+}
+
+load();
+showPage('kanban'); // abre em Fichas por padrão
+syncPipefy();
+setInterval(()=>{ load(); syncPipefy(); }, 30000);
+
+function showRelTab(name) {
+  document.getElementById('rel-sec-links').style.display = name==='links' ? '' : 'none';
+  document.getElementById('rel-sec-dia').style.display   = name==='dia'   ? '' : 'none';
+  document.getElementById('rel-tab-links').classList.toggle('active', name==='links');
+  document.getElementById('rel-tab-dia').classList.toggle('active',   name==='dia');
+  if (name==='links') renderLinksMP();
+  else renderRelatorio();
+}
+
+async function renderRelatorio() {
+  var inp  = document.getElementById('rel-data');
+  if (!inp.value) inp.value = dfBRT();
+  var data = inp.value;
+  var res  = document.getElementById('rel-resumo');
+  var cnt  = document.getElementById('rel-content');
+  cnt.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);font-family:var(--fm);font-size:12px;">Carregando...</div>';
+  res.innerHTML = '';
+  try {
+    var r = await api('relatorio-financeiro' + (data ? '&data='+data : ''));
+    if (!r.ok) { cnt.innerHTML = '<div style="padding:40px;color:#ef4444;font-family:var(--fm);">Erro: '+r.error+'</div>'; return; }
+    relDados = r;
+
+    // Resumo
+    var pagoColor = r.totalPago > 0 ? '#22c55e' : 'var(--muted)';
+    res.innerHTML = [
+      statPill('Transações no dia', r.totalTransacoes, '#3b9eff'),
+      statPill('Pagamentos confirmados', r.totalPago, '#22c55e'),
+      statPill('Total recebido', 'R$ ' + (r.valorTotal||0).toLocaleString('pt-BR',{minimumFractionDigits:2}), pagoColor),
+    ].join('');
+
+    if (!r.transacoes || !r.transacoes.length) {
+      cnt.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);font-family:var(--fm);font-size:12px;">Nenhuma transação em '+data+'</div>';
+      return;
+    }
+
+    // Tabela
+    var rows = r.transacoes.map(function(t) {
+      var tipo    = t.tipo === 'pagamento_confirmado' ? '<span style="color:#22c55e;font-weight:600;">✅ Pago</span>' : '<span style="color:#f59e0b;">🔗 Link gerado</span>';
+      var metodo  = t.metodo === 'pix' ? '📲 PIX' : t.metodo === 'credit_card' ? '💳 Cartão' : (t.metodo||'—');
+      var parcelas= (t.parcelas && t.parcelas > 1) ? ' '+t.parcelas+'x' : '';
+      var hora    = t.ts ? new Date(t.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}) : '—';
+      return '<tr style="border-bottom:1px solid var(--border);">' +
+        '<td style="padding:8px 10px;font-size:11px;color:var(--muted);">'+hora+'</td>' +
+        '<td style="padding:8px 10px;font-size:11px;">'+tipo+'</td>' +
+        '<td style="padding:8px 10px;font-size:11px;font-weight:600;">'+(t.fichaId||'—')+'</td>' +
+        '<td style="padding:8px 10px;font-size:11px;">'+(t.cliente||'—')+'</td>' +
+        '<td style="padding:8px 10px;font-size:11px;color:var(--muted);">'+(t.cpfCnpj||'—')+'</td>' +
+        '<td style="padding:8px 10px;font-size:11px;font-family:var(--fh);font-weight:700;color:#22c55e;">R$ '+(t.valor||0).toLocaleString('pt-BR',{minimumFractionDigits:2})+'</td>' +
+        '<td style="padding:8px 10px;font-size:11px;">'+metodo+parcelas+'</td>' +
+        '<td style="padding:8px 10px;font-size:10px;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(t.paymentId||t.preferenceId||'—')+'</td>' +
+      '</tr>';
+    }).join('');
+
+    cnt.innerHTML = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border);">' +
+      '<table style="width:100%;border-collapse:collapse;">' +
+      '<thead><tr style="background:var(--surface);border-bottom:1px solid var(--border);">' +
+        ['Hora','Status','Ficha','Cliente','CPF/CNPJ','Valor','Método','Payment ID'].map(function(h){
+          return '<th style="padding:8px 10px;font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;text-align:left;white-space:nowrap;">'+h+'</th>';
+        }).join('') +
+      '</tr></thead><tbody>'+rows+'</tbody></table></div>';
+  } catch(e) {
+    cnt.innerHTML = '<div style="padding:40px;color:#ef4444;font-family:var(--fm);">Erro: '+e.message+'</div>';
+  }
+}
+
+function exportarRelatorio() {
+  if (!relDados || !relDados.transacoes || !relDados.transacoes.length) {
+    showToast('⚠️','Sem dados','Nenhuma transação para exportar'); return;
+  }
+  var linhas = ['Hora,Status,Ficha,Cliente,CPF/CNPJ,Valor,Método,Parcelas,PaymentID,PreferenceID'];
+  relDados.transacoes.forEach(function(t) {
+    var hora = t.ts ? new Date(t.ts).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}) : '';
+    linhas.push([hora, t.tipo, t.fichaId, t.cliente, t.cpfCnpj, t.valor, t.metodo, t.parcelas||1, t.paymentId||'', t.preferenceId||''].join(','));
+  });
+  var blob = new Blob([linhas.join('\n')], {type:'text/csv;charset=utf-8;'});
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href   = url; a.download = 'conciliacao_' + (relDados.data||'') + '.csv';
+  a.click(); URL.revokeObjectURL(url);
+}</script>
 <!-- MODAL EMITIR NF -->
 <div class="modal" id="nf-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
   <div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid #3b9eff;border-radius:14px;padding:24px;max-width:440px;width:92%;max-height:90vh;overflow-y:auto;">
@@ -1060,5 +1367,96 @@ function verAnexo(id) {
     </div>
   </div>
 </div>
+
+<!-- Página Links MP -->
+<div id="page-links" class="page" style="display:none;">
+  <div style="padding:16px 0 8px;display:flex;align-items:center;justify-content:space-between;">
+    <div style="font-family:var(--fh);font-size:16px;font-weight:800;">💳 Links de Cobrança MP</div>
+    <button onclick="exportarLinksMP()" style="font-family:var(--fm);font-size:10px;padding:6px 14px;border-radius:6px;border:1px solid rgba(245,200,0,.3);background:rgba(245,200,0,.1);color:#f5c800;cursor:pointer;">📤 Exportar CSV</button>
+  </div>
+  <div id="links-mp-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+</div>
+
+<!-- Página Relatório -->
+<div id="page-relatorio" class="page" style="display:none;">
+  <div style="padding:16px 0 8px;">
+    <div style="font-family:var(--fh);font-size:16px;font-weight:800;margin-bottom:12px;">📊 Relatório Financeiro</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+      <div style="font-family:var(--fm);font-size:9px;color:var(--muted);">PERÍODO</div>
+      <input type="date" id="rel-de" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--fm);font-size:10px;padding:5px 8px;outline:none;">
+      <span style="color:var(--muted);font-family:var(--fm);font-size:10px;">até</span>
+      <input type="date" id="rel-ate" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--fm);font-size:10px;padding:5px 8px;outline:none;">
+      <button onclick="renderRelatorio()" style="font-family:var(--fm);font-size:10px;padding:6px 14px;border-radius:6px;border:none;background:#f5c800;color:#000;font-weight:700;cursor:pointer;">Filtrar</button>
+      <button onclick="renderRelatorio('semana')" style="font-family:var(--fm);font-size:9px;padding:5px 10px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">Semana</button>
+      <button onclick="renderRelatorio('mes')" style="font-family:var(--fm);font-size:9px;padding:5px 10px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">Mês</button>
+      <button onclick="exportarRelatorio()" style="font-family:var(--fm);font-size:9px;padding:5px 10px;border-radius:5px;border:1px solid rgba(59,158,255,.3);background:rgba(59,158,255,.08);color:#3b9eff;cursor:pointer;">📤 CSV</button>
+    </div>
+    <div id="rel-stats" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;"></div>
+    <div id="rel-chart" style="margin-bottom:14px;"></div>
+    <div id="rel-tabela" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:auto;"></div>
+  </div>
+</div>
+
+
+<!-- Modal Gerar Cobrança MP -->
+<div id="mp-modal" style="display:none;" class="mp-overlay" onclick="if(event.target===this)fecharModalMp()">
+  <div class="mp-box">
+    <div class="mp-title">💳 Gerar Cobrança</div>
+    <div class="mp-opts">
+      <div class="mp-opt" id="mp-opt-pix" onclick="selecionarMetodo('pix')">
+        <div class="mp-opt-icon">📲</div>
+        <div class="mp-opt-name">PIX</div>
+        <div class="mp-opt-desc">Pagamento imediato<br>apenas PIX</div>
+      </div>
+      <div class="mp-opt" id="mp-opt-cartao" onclick="selecionarMetodo('cartao')">
+        <div class="mp-opt-icon">💳</div>
+        <div class="mp-opt-name">Cartão</div>
+        <div class="mp-opt-desc">PIX + Cartão<br>até 3x sem juros</div>
+      </div>
+    </div>
+    <div id="mp-result" style="display:none;" class="mp-link-area">
+      <label>Link de pagamento — copie e envie ao cliente</label>
+      <div class="mp-link-txt" id="mp-link-txt" onclick="copiarLinkMp()"></div>
+      <button onclick="copiarLinkMp()" style="align-self:flex-start;background:#3b9eff;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11px;cursor:pointer;">📋 Copiar Link</button>
+    </div>
+    <div class="mp-actions">
+      <button class="mp-btn mp-btn-cancel" onclick="fecharModalMp()">Fechar</button>
+      <button class="mp-btn mp-btn-gerar" id="mp-btn-gerar" onclick="gerarCobrancaMp()">⚡ Gerar Link</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal editar financeiro TV -->
+<div id="modal-editar-fin" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;width:440px;max-width:95vw;max-height:90vh;overflow-y:auto;">
+    <div style="font-family:var(--fh);font-size:15px;font-weight:800;margin-bottom:16px;">✏️ Editar Ficha Financeiro</div>
+    <input type="hidden" id="ef-id">
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <label style="font-family:var(--fm);font-size:10px;color:var(--muted);">NOME</label>
+      <input id="ef-nome" class="ef-inp" placeholder="Nome do cliente">
+      <label style="font-family:var(--fm);font-size:10px;color:var(--muted);">VALOR (R$)</label>
+      <input id="ef-valor" class="ef-inp" type="number" step="0.01" placeholder="0.00">
+      <label style="font-family:var(--fm);font-size:10px;color:var(--muted);">TELEFONE</label>
+      <input id="ef-tel" class="ef-inp" placeholder="Telefone">
+      <label style="font-family:var(--fm);font-size:10px;color:var(--muted);">EQUIPAMENTO</label>
+      <input id="ef-equip" class="ef-inp" placeholder="Equipamento">
+      <label style="font-family:var(--fm);font-size:10px;color:var(--muted);">CPF / CNPJ</label>
+      <input id="ef-cpf" class="ef-inp" placeholder="000.000.000-00">
+      <label style="font-family:var(--fm);font-size:10px;color:var(--muted);">ENDEREÇO</label>
+      <input id="ef-end" class="ef-inp" placeholder="Endereço completo">
+      <label style="font-family:var(--fm);font-size:10px;color:var(--muted);">SERVIÇOS</label>
+      <textarea id="ef-serv" class="ef-inp" rows="2" placeholder="Serviços realizados" style="resize:vertical;"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
+      <button onclick="document.getElementById('modal-editar-fin').style.display='none'" style="font-family:var(--fm);font-size:11px;padding:7px 16px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">Cancelar</button>
+      <button onclick="salvarEditarFin()" style="font-family:var(--fm);font-size:11px;padding:7px 16px;border-radius:6px;border:none;background:#f5c800;color:#000;font-weight:700;cursor:pointer;">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+<style>
+.ef-inp{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:12px;outline:none;font-family:var(--fb);width:100%;box-sizing:border-box;}
+.ef-inp:focus{border-color:#f5c800;}
+</style>
+
 </body>
 </html>
