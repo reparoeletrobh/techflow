@@ -117,7 +117,9 @@ export default async function handler(req, res) {
     let movidos = 0;
     for (const card of (db.cards || [])) {
       if (card.phase !== 'aguardando_aprovacao') continue;
-      const desde = card.aguardandoDesde ? new Date(card.aguardandoDesde).getTime() : 0;
+      // Fallback: se aguardandoDesde não foi setado, usar criadoEm ou movedAt
+      const dtRef = card.aguardandoDesde || card.movedAt || card.criadoEm;
+      const desde = dtRef ? new Date(dtRef).getTime() : 0;
       if (!desde || (agora - desde) < MS_48H) continue;
       const now = new Date().toISOString();
       card.history = (card.history || []).concat([{ phase: 'aguardando_aprovacao', ts: now }]);
@@ -630,7 +632,7 @@ export default async function handler(req, res) {
           valor:parseFloat(p3.preco)||0,
           origem:'venda',
           criadoEm:p3.soldAt||ts3, movedAt:ts3,
-          aguardandoDesde:null, history:[], analiseCompra:false
+          aguardandoDesde:ts3, history:[], analiseCompra:false
         });
         adicionados.push({codigo:p3.codigo,nome:p3.compradorNome,valor:p3.preco});
       }

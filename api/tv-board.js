@@ -863,6 +863,58 @@ async function otimizarPontos(pontos, pontoInicio) {
       });
     }
 
+    // ── limpar-aprovado-board — remove fichas de aprovado que não estão no pipe ──
+    if (action === 'limpar-aprovado-board') {
+      const boardDB = await dbGet(BOARD_KEY);
+      const pipeDB  = await dbGet('tv_pipe');
+      if (!boardDB || !Array.isArray(boardDB.cards))
+        return res.status(200).json({ ok:false, error:'board vazio' });
+
+      // IDs aprovados no pipe TV (usa c.phase)
+      const pipeIds = new Set();
+      (pipeDB?.cards || []).forEach(function(c) {
+        if (c.phase === 'aprovados') {
+          if (c.id)       pipeIds.add(String(c.id));
+          if (c.pipefyId) pipeIds.add(String(c.pipefyId));
+        }
+      });
+
+      // Remover prefixo LOCAL- para comparar com pipe
+      function normalizeId(id) {
+        return String(id).replace(/^LOCAL-/, '');
+      }
+
+      const antes = boardDB.cards.filter(function(c){ return c.phaseId==='aprovado'; }).length;
+      const removidos = [], mantidos = [];
+
+      // Separar: manter só os que têm correspondência no pipe
+      boardDB.cards = boardDB.cards.filter(function(card) {
+        if (card.phaseId !== 'aprovado') return true; // outras fases: manter sempre
+        const idNorm   = normalizeId(card.id || card.pipefyId || '');
+        const pipefyN  = normalizeId(card.pipefyId || card.id || '');
+        const osNorm   = normalizeId(card.osCode || '').replace(/^PIPE-/, '');
+        const noP = pipeIds.has(String(card.id)) ||
+                    pipeIds.has(String(card.pipefyId)) ||
+                    pipeIds.has(idNorm) || pipeIds.has(pipefyN);
+        if (noP) { mantidos.push({ nome: card.nomeContato||'—', id: card.id }); return true; }
+        removidos.push({ nome: card.nomeContato||'—', id: card.id, osCode: card.osCode||'' });
+        return false;
+      });
+
+      const depois = boardDB.cards.filter(function(c){ return c.phaseId==='aprovado'; }).length;
+      boardDB.lastClean = new Date().toISOString();
+      await dbSet(BOARD_KEY, boardDB);
+
+      return res.status(200).json({
+        ok: true,
+        antes, depois,
+        removidos: removidos.length, mantidos: mantidos.length,
+        fichasRemovidas: removidos,
+        fichasMantidas:  mantidos,
+        resumo: removidos.length + ' fichas removidas de aprovado, ' + mantidos.length + ' mantidas'
+      });
+    }
+
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch(e) {
