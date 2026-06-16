@@ -175,7 +175,7 @@ function defaultFin() {
 }
 
 // ── Handler ────────────────────────────────────────────────────
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "https://reparoeletroadm.com");
   res.setHeader("X-Content-Type-Options","nosniff");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");

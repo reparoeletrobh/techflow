@@ -1046,6 +1046,9 @@ function verAnexo(id) {
 // ── Variáveis para Cobrança MP e Relatório TV ────────────────────────────────
 var mpRecId = null, mpMetodo = null;
 var relTab = 'dia';
+var relDados = null;
+var goals = null;
+var phaseCounts = {};
 
 
 function dfBRT(ts) {
@@ -1369,7 +1372,7 @@ function exportarRelatorio() {
 </div>
 
 <!-- Página Links MP -->
-<div id="page-links" class="page" style="display:none;">
+<div id="page-links" class="page">
   <div style="padding:16px 0 8px;display:flex;align-items:center;justify-content:space-between;">
     <div style="font-family:var(--fh);font-size:16px;font-weight:800;">💳 Links de Cobrança MP</div>
     <button onclick="exportarLinksMP()" style="font-family:var(--fm);font-size:10px;padding:6px 14px;border-radius:6px;border:1px solid rgba(245,200,0,.3);background:rgba(245,200,0,.1);color:#f5c800;cursor:pointer;">📤 Exportar CSV</button>
@@ -1378,7 +1381,7 @@ function exportarRelatorio() {
 </div>
 
 <!-- Página Relatório -->
-<div id="page-relatorio" class="page" style="display:none;">
+<div id="page-relatorio" class="page">
   <div style="padding:16px 0 8px;">
     <div style="font-family:var(--fh);font-size:16px;font-weight:800;margin-bottom:12px;">📊 Relatório Financeiro</div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
