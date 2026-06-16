@@ -1984,5 +1984,62 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── resetar-timers-48h ────────────────────────────────────────────────────
+  if (action === 'resetar-timers-48h') {
+    const db = (await dbGet(PIPE_KEY)) || defaultDB();
+    const now = new Date().toISOString();
+    let count = 0;
+    (db.cards || []).forEach(function(card) {
+      if (card.phase === 'aguardando_aprovacao') {
+        card.aguardandoDesde = now;
+        count++;
+      }
+    });
+    if (count > 0) await dbSet(PIPE_KEY, db);
+    return res.status(200).json({
+      ok: true, count,
+      msg: count + ' fichas: timer reiniciado para ' + now.slice(0,19) + '. Em 48h vao para Ultima Chamada.'
+    });
+  }
+
+  // ── listar-duplicatas ──────────────────────────────────────────────────────
+  if (action === 'listar-duplicatas') {
+    const db = (await dbGet(PIPE_KEY)) || defaultDB();
+    const cards = db.cards || [];
+    const fases_ativas = ['aguardando_aprovacao','ultima_chamada','aprovados','video_enviado',
+      'analise_compra','equipamento_comprado','programar_entrega','solicitar_entrega',
+      'rota_em_andamento','entrega_solicitada','receber','erp','garantia'];
+    const ativos = cards.filter(function(c) { return fases_ativas.includes(c.phase); });
+
+    const porNome = {}, porTel = {};
+    ativos.forEach(function(card) {
+      const nome = (card.nomeContato || '').toLowerCase().trim();
+      const tel  = (card.telefone || '').replace(/[^0-9]/g,'');
+      if (nome) { if (!porNome[nome]) porNome[nome]=[]; porNome[nome].push(card); }
+      if (tel && tel.length >= 8) { if (!porTel[tel]) porTel[tel]=[]; porTel[tel].push(card); }
+    });
+
+    const porNomeList = [], porTelList = [];
+    Object.entries(porNome).forEach(function([nome, lista]) {
+      if (lista.length > 1) porNomeList.push({
+        nome: lista[0].nomeContato, total: lista.length,
+        fichas: lista.map(function(c){ return { id:c.id, phase:c.phase, valor:c.valor||0, criadoEm:(c.criadoEm||'').slice(0,10) }; })
+      });
+    });
+    Object.entries(porTel).forEach(function([tel, lista]) {
+      if (lista.length > 1) porTelList.push({
+        telefone: lista[0].telefone, total: lista.length,
+        fichas: lista.map(function(c){ return { id:c.id, nome:c.nomeContato, phase:c.phase, valor:c.valor||0, criadoEm:(c.criadoEm||'').slice(0,10) }; })
+      });
+    });
+
+    return res.status(200).json({
+      ok: true, totalAtivos: ativos.length,
+      totalDupNome: porNomeList.length, totalDupTel: porTelList.length,
+      porNome: porNomeList.sort(function(a,b){return b.total-a.total;}),
+      porTel:  porTelList.sort(function(a,b){return b.total-a.total;}),
+    });
+  }
+
   return res.status(404).json({ ok: false, error: 'acao nao encontrada: ' + action });
 }
