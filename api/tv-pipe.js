@@ -2041,5 +2041,28 @@ export default async function handler(req, res) {
     });
   }
 
+  // ── remover-por-ids — remove fichas específicas do pipe TV ──────────────────
+  if (req.method === 'POST' && action === 'remover-por-ids') {
+    const body   = req.body || {};
+    const ids    = body.ids || [];
+    if (!ids.length) return res.status(400).json({ ok:false, error:'ids obrigatório' });
+    const db = (await dbGet(PIPE_KEY)) || defaultDB();
+    const idsSet = new Set(ids.map(String));
+    const antes  = db.cards.length;
+    const removidos = [];
+    db.cards = (db.cards || []).filter(function(card) {
+      if (idsSet.has(String(card.id)) || idsSet.has(String(card.pipefyId))) {
+        removidos.push({ id:card.id, nome:card.nomeContato||'—', phase:card.phase });
+        return false;
+      }
+      return true;
+    });
+    if (removidos.length > 0) await dbSet(PIPE_KEY, db);
+    return res.status(200).json({
+      ok: true, antes, depois: db.cards.length,
+      removidos: removidos.length, fichas: removidos
+    });
+  }
+
   return res.status(404).json({ ok: false, error: 'acao nao encontrada: ' + action });
 }
