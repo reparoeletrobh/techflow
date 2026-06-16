@@ -807,6 +807,61 @@ async function otimizarPontos(pontos, pontoInicio) {
       return res.status(200).json({ ok: true, adicionados, total: cpDb.pecas.length });
     }
 
+    // ── comparar-tecnico-pipe — compara aprovados do board vs pipe TV ──────────
+    if (action === 'comparar-tecnico-pipe') {
+      const boardDB = await dbGet(BOARD_KEY);
+      const PIPE_KEY = 'tv_pipe';
+      const pipeDB  = await dbGet(PIPE_KEY);
+
+      // Cards em aprovado no board TV (técnico)
+      const boardAprov = (boardDB?.cards || []).filter(function(c) {
+        return c.phase === 'aprovado';
+      }).map(function(c) {
+        return {
+          id: c.id || c.pipefyId,
+          pipefyId: c.pipefyId || c.id,
+          nome: c.nomeContato || c.title || c.nome || '—',
+          osCode: c.osCode || '',
+          phase: c.phase,
+        };
+      });
+
+      // Cards em aprovados no pipe TV
+      const pipeAprov = (pipeDB?.cards || []).filter(function(c) {
+        return c.phase === 'aprovados';
+      }).map(function(c) {
+        return {
+          id: c.id || c.pipefyId,
+          pipefyId: c.pipefyId || c.id,
+          nome: c.nomeContato || c.title || '—',
+          phase: c.phase,
+        };
+      });
+
+      // IDs em aprovados no pipe
+      const pipeAprovIds = new Set(pipeAprov.map(function(c) { return String(c.pipefyId || c.id); }));
+      const pipeAprovIds2= new Set(pipeAprov.map(function(c) { return String(c.id); }));
+
+      // Comparar
+      const permanecem = [], saem = [];
+      boardAprov.forEach(function(c) {
+        const id  = String(c.pipefyId || c.id);
+        const id2 = String(c.id);
+        const noP = pipeAprovIds.has(id) || pipeAprovIds.has(id2) ||
+                    pipeAprovIds2.has(id) || pipeAprovIds2.has(id2);
+        if (noP) permanecem.push(c);
+        else saem.push(c);
+      });
+
+      return res.status(200).json({
+        ok: true,
+        totalTecnico: boardAprov.length,
+        totalPipe: pipeAprov.length,
+        permanecem, saem,
+        resumo: saem.length + ' saem · ' + permanecem.length + ' permanecem',
+      });
+    }
+
     return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch(e) {
