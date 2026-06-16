@@ -461,6 +461,14 @@
     {
       "source": "/cupons",
       "destination": "/cupons.html"
+    },
+    {
+      "source": "/api/tv-pecas",
+      "destination": "/api/tv-pecas.js"
+    },
+    {
+      "source": "/tv/pecas",
+      "destination": "/tv-pecas.html"
     }
   ],
   "headers": [
