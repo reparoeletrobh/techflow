@@ -825,9 +825,9 @@ async function otimizarPontos(pontos, pontoInicio) {
         };
       });
 
-      // TV Pipe: cards com phaseId === 'aprovados'
+      // TV Pipe: cards com phase === 'aprovados' (tv_pipe usa 'phase', não 'phaseId')
       const pipeAprov = (pipeDB?.cards || []).filter(function(c) {
-        return c.phaseId === 'aprovados';
+        return c.phase === 'aprovados';
       }).map(function(c) {
         return {
           id:       c.id       || c.pipefyId || '',
