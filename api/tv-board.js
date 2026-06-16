@@ -810,55 +810,56 @@ async function otimizarPontos(pontos, pontoInicio) {
     // ── comparar-tecnico-pipe — compara aprovados do board vs pipe TV ──────────
     if (action === 'comparar-tecnico-pipe') {
       const boardDB = await dbGet(BOARD_KEY);
-      const PIPE_KEY = 'tv_pipe';
-      const pipeDB  = await dbGet(PIPE_KEY);
+      const pipeDB  = await dbGet('tv_pipe');
 
-      // Cards em aprovado no board TV (técnico)
+      // TV Técnico: cards com phaseId === 'aprovado'
       const boardAprov = (boardDB?.cards || []).filter(function(c) {
-        return c.phase === 'aprovado';
+        return c.phaseId === 'aprovado';
       }).map(function(c) {
         return {
-          id: c.id || c.pipefyId,
-          pipefyId: c.pipefyId || c.id,
-          nome: c.nomeContato || c.title || c.nome || '—',
-          osCode: c.osCode || '',
-          phase: c.phase,
+          id:       c.id       || c.pipefyId || '',
+          pipefyId: c.pipefyId || c.id       || '',
+          nome:     c.nomeContato || c.title  || '—',
+          osCode:   c.osCode   || '',
+          phaseId:  c.phaseId,
         };
       });
 
-      // Cards em aprovados no pipe TV
+      // TV Pipe: cards com phaseId === 'aprovados'
       const pipeAprov = (pipeDB?.cards || []).filter(function(c) {
-        return c.phase === 'aprovados';
+        return c.phaseId === 'aprovados';
       }).map(function(c) {
         return {
-          id: c.id || c.pipefyId,
-          pipefyId: c.pipefyId || c.id,
-          nome: c.nomeContato || c.title || '—',
-          phase: c.phase,
+          id:       c.id       || c.pipefyId || '',
+          pipefyId: c.pipefyId || c.id       || '',
+          nome:     c.nomeContato || c.title  || '—',
         };
       });
 
-      // IDs em aprovados no pipe
-      const pipeAprovIds = new Set(pipeAprov.map(function(c) { return String(c.pipefyId || c.id); }));
-      const pipeAprovIds2= new Set(pipeAprov.map(function(c) { return String(c.id); }));
+      // Construir set de IDs do pipe para busca rápida
+      const pipeIds = new Set();
+      pipeAprov.forEach(function(c) {
+        if (c.id)       pipeIds.add(String(c.id));
+        if (c.pipefyId) pipeIds.add(String(c.pipefyId));
+      });
 
-      // Comparar
+      // Comparar: ficha do técnico está no pipe?
       const permanecem = [], saem = [];
       boardAprov.forEach(function(c) {
-        const id  = String(c.pipefyId || c.id);
-        const id2 = String(c.id);
-        const noP = pipeAprovIds.has(id) || pipeAprovIds.has(id2) ||
-                    pipeAprovIds2.has(id) || pipeAprovIds2.has(id2);
+        const noP = pipeIds.has(String(c.id)) || pipeIds.has(String(c.pipefyId));
         if (noP) permanecem.push(c);
-        else saem.push(c);
+        else     saem.push(c);
       });
 
+      // Debug: mostrar todos os IDs para análise
       return res.status(200).json({
         ok: true,
         totalTecnico: boardAprov.length,
-        totalPipe: pipeAprov.length,
-        permanecem, saem,
-        resumo: saem.length + ' saem · ' + permanecem.length + ' permanecem',
+        totalPipe:    pipeAprov.length,
+        permanecem,
+        saem,
+        pipeIds: Array.from(pipeIds).slice(0, 50),
+        resumo: saem.length + ' saem · ' + permanecem.length + ' permanecem de ' + boardAprov.length + ' no técnico',
       });
     }
 
