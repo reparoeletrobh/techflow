@@ -2064,5 +2064,90 @@ export default async function handler(req, res) {
     });
   }
 
+  // ── executar-limpeza-duplicatas — remove as 25 fichas duplicadas identificadas ──
+  if (action === 'executar-limpeza-duplicatas') {
+    const IDS_REMOVER = [
+      // Leonardo (2 antigas)
+      'PIPE-TV-MQ9WDN57-CML','PIPE-TV-MQ5Q39GU-DOJ',
+      // Maria (sem valor)
+      'PIPE-TV-MQF71QWU-70P',
+      // Rodney (antiga)
+      'PIPE-TV-MQ9HJJ7A-H97',
+      // Luiz (2 antigas)
+      'PIPE-TV-MPZKVIJW-WN2','PIPE-TV-MPWV7T7V-NPQ',
+      // Jeferson (antiga)
+      'PIPE-TV-MQ12HN55-LPD',
+      // Deisi (2 antigas)
+      'PIPE-TV-MQ6MGTYB-IKJ','PIPE-TV-MQ5Q5CJL-PVL',
+      // Gleziane (2 antigas)
+      'PIPE-TV-MQAYMTEP-47F','PIPE-TV-MQAYDII8-IMI',
+      // Alexandre (antiga)
+      'PIPE-TV-MQA0JKZI-UR0',
+      // José (aguardando — manter aprovados)
+      'PIPE-MQF7H7JI-T6V',
+      // Robson (2 antigas)
+      'PIPE-TV-MQ6MCB8K-9LJ','PIPE-TV-MQ5EZIR5-4VT',
+      // Kennedy (antiga)
+      'PIPE-TV-MQ5EXA3B-3NU',
+      // Camille (antiga)
+      'PIPE-TV-MPYC0QQ6-P0T',
+      // Junior (antiga)
+      'PIPE-TV-MQ58UF2H-6JQ',
+      // Cristina (antiga)
+      'PIPE-TV-MQ2ABB5T-GJP',
+      // Kenia (antiga)
+      'PIPE-TV-MQ2AG08Q-NZM',
+      // Rafael Xavier (antiga)
+      'PIPE-TV-MPY2579V-1X8',
+      // Ana (2 antigas)
+      'PIPE-TV-MPVMHUN7-KP2','PIPE-TV-MPVMBVHO-ZQL',
+      // José Cláudio (antiga)
+      'PIPE-TV-MQ2AD73W-L06',
+      // Wallace (antiga)
+      'PIPE-TV-MQ0VTE1K-EMQ',
+    ];
+    const idsSet = new Set(IDS_REMOVER);
+    const db = (await dbGet(PIPE_KEY)) || defaultDB();
+    const antes = db.cards.length;
+    const removidos = [];
+    db.cards = (db.cards || []).filter(function(card) {
+      if (idsSet.has(String(card.id)) || idsSet.has(String(card.pipefyId))) {
+        removidos.push({ id:card.id, nome:card.nomeContato||'—', phase:card.phase });
+        return false;
+      }
+      return true;
+    });
+    if (removidos.length > 0) await dbSet(PIPE_KEY, db);
+    return res.status(200).json({
+      ok: true, antes, depois: db.cards.length,
+      removidos: removidos.length,
+      fichas: removidos,
+      resumo: removidos.length + ' fichas duplicadas removidas'
+    });
+  }
+
+  // ── remover-por-ids ────────────────────────────────────────────────────────
+  if (req.method === 'POST' && action === 'remover-por-ids') {
+    const body   = req.body || {};
+    const ids    = body.ids || [];
+    if (!ids.length) return res.status(400).json({ ok:false, error:'ids obrigatório' });
+    const db = (await dbGet(PIPE_KEY)) || defaultDB();
+    const idsSet = new Set(ids.map(String));
+    const antes  = db.cards.length;
+    const removidos = [];
+    db.cards = (db.cards || []).filter(function(card) {
+      if (idsSet.has(String(card.id)) || idsSet.has(String(card.pipefyId))) {
+        removidos.push({ id:card.id, nome:card.nomeContato||'—', phase:card.phase });
+        return false;
+      }
+      return true;
+    });
+    if (removidos.length > 0) await dbSet(PIPE_KEY, db);
+    return res.status(200).json({
+      ok: true, antes, depois: db.cards.length,
+      removidos: removidos.length, fichas: removidos
+    });
+  }
+
   return res.status(404).json({ ok: false, error: 'acao nao encontrada: ' + action });
 }
