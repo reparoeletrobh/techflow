@@ -1743,6 +1743,47 @@ export default async function handler(req, res) {
 
     // ── Gatilhos downstream ──────────────────────────────────────────────
     var pid = card.pipefyId;
+
+    // ── aprovados → tv_board Técnico (phaseId: aprovado) ─────────────────────
+    if (phase === 'aprovados') {
+      try {
+        var bU3=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+        var bT3=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+        async function _bGet3(k){var r=await fetch(bU3+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+bT3,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});var j=await r.json();var v=j[0]?.result;if(!v)return null;try{var x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+        async function _bSet3(k,v){await fetch(bU3+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+bT3,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+        var TV_BOARD_KEY = 'tv_board';
+        var tvBoardDb = await _bGet3(TV_BOARD_KEY);
+        if (!tvBoardDb || typeof tvBoardDb !== 'object') tvBoardDb = { cards:[], syncedIds:[], movesLog:[], phases:[], rsPhases:[], rsRuaPhases:[], rsCards:[], rsRuaCards:[] };
+        if (!Array.isArray(tvBoardDb.cards)) tvBoardDb.cards = [];
+        var boardPid3 = pid ? String(pid) : ('LOCAL-' + card.id);
+        // Remover entrada antiga se existir
+        tvBoardDb.cards = tvBoardDb.cards.filter(function(x){
+          return x.pipefyId !== boardPid3 && x.pipefyId !== card.id && x.osCode !== card.id;
+        });
+        // Inserir card no board do técnico
+        tvBoardDb.cards.unshift({
+          pipefyId:    boardPid3,
+          phaseId:     'aprovado',
+          nomeContato: card.nomeContato || '',
+          title:       card.descricao   || card.nomeContato || '',
+          telefone:    card.telefone    || '',
+          descricao:   card.equipamento || card.descricao || '',
+          osCode:      card.id,
+          valor:       card.valor || 0,
+          movedBy:     'TV Pipe',
+          localOnly:   !pid,
+          syncedAt:    now,
+          movedAt:     now,
+        });
+        if (!Array.isArray(tvBoardDb.syncedIds)) tvBoardDb.syncedIds = [];
+        if (!tvBoardDb.syncedIds.includes(boardPid3)) tvBoardDb.syncedIds.push(boardPid3);
+        if (!Array.isArray(tvBoardDb.movesLog)) tvBoardDb.movesLog = [];
+        tvBoardDb.movesLog.push({ phaseId:'aprovado_entrada', pipefyId:boardPid3, timestamp:now });
+        await _bSet3(TV_BOARD_KEY, tvBoardDb);
+        console.log('[tv-pipe→tv-board] card adicionado em aprovado:', boardPid3);
+      } catch(eB) { console.error('[tv-pipe→tv-board]', eB.message); }
+    }
+
     // liberado_para_rota → tv_board (phaseId: liberado_rota) para motorista/coleta/rotas
     if (phase === 'liberado_para_rota') {
       try {
