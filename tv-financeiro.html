@@ -321,7 +321,7 @@ let records = [], goals = null, phaseCounts = {}, todayLabel = '', weekLabel = '
 let selId = null, curPage = 'painel';
 
 // ── API ──────────────────────────────────────────────────────
-async function api(action, body) {
+async async function api(action, body) {
   const r = await fetch(`/api/tv-financeiro?action=${action}`, body ? {
     method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
   } : {});
@@ -556,7 +556,7 @@ function nfModalClose() {
   document.getElementById('nf-modal').style.display = 'none';
 }
 
-function nfStatus(msg, color) {
+async function nfStatus(msg, color) {
   const el = document.getElementById('nf-status');
   el.textContent = msg;
   el.style.background = color + '22';
@@ -631,7 +631,7 @@ function openCpfModal(id) {
   setTimeout(()=>document.getElementById('cpf-input').focus(),200);
 }
 
-function maskCpfCnpj(input) {
+async function maskCpfCnpj(input) {
   let v = input.value.replace(/\D/g,'');
   if (v.length<=11) v=v.replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2');
   else v=v.replace(/^(\d{2})(\d)/,'$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/,'$1.$2.$3').replace(/\.(\d{3})(\d)/,'.$1/$2').replace(/(\d{4})(\d)/,'$1-$2');
@@ -682,7 +682,7 @@ async function salvarDanfeDoPortal(chave) {
   }
 }
 
-function baixarDanfe(btn) {
+async function baixarDanfe(btn) {
   const chave = btn.dataset.chave;
   const nome  = btn.dataset.nome || 'danfe';
   const url = '/api/nfse?action=danfe&chave=' + encodeURIComponent(chave) + '&nome=' + encodeURIComponent(nome);
@@ -695,7 +695,7 @@ async function nfEnviada(id) {
   else showToast('❌','Erro',res.error);
 }
 
-function openMoverModal(id) {
+async function openMoverModal(id) {
   selId = id;
   const r = records.find(x=>x.id===id);
   const todayStr = new Date().toLocaleDateString('en-CA', { timeZone:'America/Sao_Paulo' });
@@ -751,7 +751,7 @@ function openMoverPagAgendado(id) {
   moverSimples(id,'analise_pagamento','🔍','Enviado para Análise!');
 }
 
-function openMoverPagConfirmado(id) {
+async function openMoverPagConfirmado(id) {
   selId = id;
   const r = records.find(x=>x.id===id);
   const todayStr = new Date().toLocaleDateString('en-CA', { timeZone:'America/Sao_Paulo' });
@@ -839,7 +839,7 @@ function showPage(name) {
   else if (name==='relatorio') renderRelatorio();
 }
 
-function showToast(icon,title,msg) {
+async function showToast(icon,title,msg) {
   document.getElementById('t-icon').textContent=icon;
   document.getElementById('t-title').textContent=title;
   document.getElementById('t-body').textContent=msg;
@@ -862,7 +862,7 @@ async function executarMover() {
   await moverFicha(id, fase);
 }
 
-function getFaseName(id) {
+async function getFaseName(id) {
   var map = {
     aguardando_dados: 'Aguardando Dados',
     nf_emitida: 'NF Emitida',
@@ -1098,7 +1098,7 @@ function fecharModalMp() {
   document.getElementById('mp-modal').style.display = 'none';
 }
 
-function selecionarMetodo(m) {
+async function selecionarMetodo(m) {
   mpMetodo = m;
   document.getElementById('mp-opt-pix').classList.toggle('sel', m==='pix');
   document.getElementById('mp-opt-cartao').classList.toggle('sel', m==='cartao');
@@ -1132,7 +1132,7 @@ function copiarLinkMp() {
   if (url) { navigator.clipboard.writeText(url); showToast('📋','Link copiado!',''); }
 }
 
-function copiarLinkBtn(btn) { navigator.clipboard.writeText(btn.dataset.u||""); showToast("📋","Link copiado!",""); }
+async function copiarLinkBtn(btn) { navigator.clipboard.writeText(btn.dataset.u||""); showToast("📋","Link copiado!",""); }
 
 async function renderLinksMP() {
   var res = document.getElementById('links-resumo');
@@ -1212,7 +1212,7 @@ function exportarLinksMP() {
   a.href   = url; a.download = 'links_mp.csv'; a.click(); URL.revokeObjectURL(url);
 }
 
-function abrirEditarFin(id) {
+async function abrirEditarFin(id) {
   var rec = records.find(function(r){ return r.id === id; });
   if (!rec) return;
   document.getElementById('ef-id').value    = id;
@@ -1253,7 +1253,7 @@ showPage('kanban'); // abre em Fichas por padrão
 syncPipefy();
 setInterval(()=>{ load(); syncPipefy(); }, 30000);
 
-function showRelTab(name) {
+async function showRelTab(name) {
   document.getElementById('rel-sec-links').style.display = name==='links' ? '' : 'none';
   document.getElementById('rel-sec-dia').style.display   = name==='dia'   ? '' : 'none';
   document.getElementById('rel-tab-links').classList.toggle('active', name==='links');
