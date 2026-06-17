@@ -32,7 +32,7 @@ nav{display:flex;gap:5px;flex-wrap:wrap;}
   border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all 0.15s;
 }
 .nav-btn:hover{color:var(--text);border-color:var(--blue);}
-.nav-btn.active{background:var(--blue);color:#000;border-color:var(--blue);font-weight:600;}
+.nav-btn.active{background:var(--accent);color:#fff;border-color:var(--blue);font-weight:600;}
 .header-right{display:flex;gap:12px;align-items:center;}
 .stat-pill{font-family:var(--fm);font-size:10px;color:var(--muted);display:flex;align-items:center;gap:4px;}
 .stat-pill strong{color:var(--blue);font-size:13px;}
@@ -405,6 +405,7 @@ nav{display:flex;gap:5px;flex-wrap:wrap;}
         <label class="field-label">Técnico</label>
         <div class="tecnico-grid" id="tecnico-grid">
           <button class="tecnico-btn" onclick="pickTecnico('Jose')">Jose</button>
+          <button class="tecnico-btn" onclick="pickTecnico('Venâncio')">Venâncio</button>
         </div>
       </div>
 
