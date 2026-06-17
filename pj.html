@@ -1667,29 +1667,21 @@ async function cancelarNF(){
 
 async function reemitirNF(){
   var cobId=g('cob-cobid-atual')&&g('cob-cobid-atual').value||'';
-  var f=_fornLista.find(function(x){return x.id===_cobClienteId;});
-  var cob=f&&(f.cobrancas||[]).find(function(c){return c.id===cobId;});
-  var btn=g('btn-reemitir-nf'); if(btn){btn.disabled=true;btn.textContent='⏳...';}
+  if(!cobId){toast('Cobrança não identificada','r');return;}
+  var btn=g('btn-reemitir-nf'); if(btn){btn.disabled=true;btn.textContent='⏳ Emitindo NF...';}
   try{
-    var r=await fetch('/api/pj-cobranca?action=faturar',{
+    var r=await fetch('/api/pj-cobranca?action=reemitir-nf',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        clienteId:_cobClienteId, cobId,
-        valor:cob?cob.valor:_cobValor,
-        vencimento:cob?cob.vencimento:_cobVenc,
-        descricao:cob?cob.descricao:'',
-        retencaoISS:g('cob-retiss')&&g('cob-retiss').value==='1',
-        apenasNF:true,
-      })
+      body:JSON.stringify({clienteId:_cobClienteId, cobId})
     }).then(function(x){return x.json();});
-    if(r.nf&&r.nf.chave){
-      _cobNfChave=r.nf.chave;
-      var danfe='/api/nfse?action=danfe&chave='+r.nf.chave;
-      mostrarBlocoNF(true,r.nf.chave,danfe,null);
+    if(r.ok&&r.chaveAcesso){
+      _cobNfChave=r.chaveAcesso;
+      var danfe=r.danfeUrl||('/api/nfse?action=danfe&chave='+r.chaveAcesso);
+      mostrarBlocoNF(true,r.chaveAcesso,danfe,null);
       await carregarForn();
-      toast('✅ NF re-emitida!','g');
+      toast('✅ NF re-emitida!'+(r.nfAnexada?' e anexada ao boleto':''),'g');
     } else {
-      var err=(r.errors||[]).join(' ')||'Falha';
+      var err=r.error||'Falha ao re-emitir NF';
       mostrarBlocoNF(false,null,null,err);
       toast('Erro NF: '+err,'r');
     }

@@ -165,7 +165,7 @@ module.exports = async function handler(req, res) {
             customer:        asaasCustomerId,
             billingType:     'BOLETO',
             value:           vlr,
-            dueDate:         normData(vencimentoNorm),
+            dueDate:         normData(vencimento),
             description:     descricao || `Manutenção — ${cliente.razaoSocial||'Cliente PJ'}`,
             externalReference: `${clienteId}-${cobId||Date.now()}`,
             fine:    { value: 2 },
@@ -179,7 +179,7 @@ module.exports = async function handler(req, res) {
             url:            payRes.bankSlipUrl,
             invoiceUrl:     payRes.invoiceUrl||'',
             nossoNumero:    payRes.nossoNumero||'',
-            vencimento:     vencimentoNorm,
+            vencimento:     normData(vencimento),
             valor:          vlr,
             status:         payRes.status,
           };
@@ -222,7 +222,7 @@ module.exports = async function handler(req, res) {
           id:cobId, valor:vlr, vencimento, descricao:descricao||'',
           status:'pendente', criadoEm:new Date().toISOString(),
           nfChave:resultado.nf?.chave||null,
-          boletoId:resultado.boleto?.id||null,
+          boletoId:resultado.boleto?.asaasPaymentId||null,
           boletoUrl:resultado.boleto?.url||null,
           fichaId:fichaId||null,
           retencaoISS:!!(retencaoISS||cliente.retencaoISS),
@@ -235,6 +235,81 @@ module.exports = async function handler(req, res) {
     resultado.ok = resultado.errors.length === 0 ||
                    !!(resultado.nf||resultado.boleto);
     return res.status(200).json(resultado);
+  }
+
+  // ── POST reemitir-nf — re-emite NF quando falhou na emissão original ──────────
+  if(req.method==='POST' && action==='reemitir-nf'){
+    const {clienteId, cobId} = req.body||{};
+    if(!clienteId||!cobId) return res.status(400).json({ok:false,error:'clienteId e cobId obrigatórios'});
+
+    const fornDb = await dbGet(FOR_KEY)||{fornecedores:[]};
+    const cliente = fornDb.fornecedores.find(f=>f.id===clienteId);
+    if(!cliente) return res.status(404).json({ok:false,error:'cliente não encontrado'});
+
+    const cob = (cliente.cobrancas||[]).find(c=>c.id===cobId);
+    if(!cob) return res.status(404).json({ok:false,error:'cobrança não encontrada'});
+    if(cob.nfChave) return res.status(400).json({ok:false,error:'NF já emitida para esta cobrança: '+cob.nfChave});
+
+    const cnpj = (cliente.cnpj||'').replace(/\D/g,'');
+    if(!cnpj) return res.status(400).json({ok:false,error:'Cliente sem CNPJ cadastrado — cadastre o CNPJ antes de re-emitir'});
+
+    const NFSE_CERT = process.env.NFSE_CERT_PFX;
+    if(!NFSE_CERT) return res.status(400).json({ok:false,error:'NFSE_CERT_PFX não configurado'});
+
+    try {
+      const discr = cob.descricao || ('Manutenção de eletrodomésticos – '+cliente.razaoSocial+(cob.fichaId?' – OS '+cob.fichaId:''));
+      const nfBody = {
+        tomadorCpfCnpj: cnpj,
+        tomadorNome:    cliente.razaoSocial,
+        discriminacao:  discr,
+        valor:          parseFloat(cob.valor),
+        retencaoISS:    !!(cob.retencaoISS||cliente.retencaoISS),
+      };
+      const nfRes  = await fetch('https://reparoeletroadm.com/api/nfse?action=emitir',
+        {method:'POST',headers:{'Content-Type':'application/json','x-internal-call':'1'},body:JSON.stringify(nfBody)});
+      const nfData = await nfRes.json();
+
+      if(!nfData.ok||!nfData.chaveAcesso)
+        return res.status(200).json({ok:false,error:'NF: '+(nfData.error||'falha na emissão')});
+
+      // Atualizar cobrança com a chave da NF
+      cob.nfChave    = nfData.chaveAcesso;
+      cob.nfEmitidaEm = new Date().toISOString();
+      await dbSet(FOR_KEY, fornDb);
+
+      // Tentar anexar PDF no boleto Asaas (se boletoId disponível)
+      let nfAnexada = false;
+      const boletoAsaasId = cob.boletoId||cob.asaasPaymentId||null;
+      if(boletoAsaasId){
+        try {
+          const ASAAS_KEY = (process.env.ASAAS_API_KEY||'').trim();
+          const ASAAS_URL = ASAAS_KEY.includes('sandbox')
+            ? 'https://api-sandbox.asaas.com/v3' : 'https://api.asaas.com/v3';
+          const pdfRes = await fetch('https://reparoeletroadm.com/api/nfse?action=danfe&chave='+nfData.chaveAcesso);
+          if(pdfRes.ok){
+            const buf = await pdfRes.arrayBuffer();
+            const fd = new FormData();
+            fd.append('availableAfterPayment','false');
+            fd.append('type','INVOICE');
+            fd.append('file', new Blob([buf],{type:'application/pdf'}), 'NF-'+nfData.chaveAcesso.slice(-8)+'.pdf');
+            const docRes = await fetch(`${ASAAS_URL}/payments/${boletoAsaasId}/documents`,
+              {method:'POST',headers:{'access_token':ASAAS_KEY},body:fd}).then(r=>r.json()).catch(()=>null);
+            if(docRes?.id) nfAnexada = true;
+          }
+        } catch(ae){ console.warn('[reemitir-nf] anexar Asaas:',ae.message); }
+      }
+
+      return res.status(200).json({
+        ok:true,
+        chaveAcesso: nfData.chaveAcesso,
+        danfeUrl:    '/api/nfse?action=danfe&chave='+nfData.chaveAcesso,
+        nfAnexada,
+        cobId,
+        msg: 'NF emitida com sucesso'+(nfAnexada?' e anexada ao boleto Asaas':''),
+      });
+    } catch(e){
+      return res.status(200).json({ok:false,error:'Erro ao re-emitir NF: '+e.message});
+    }
   }
 
   // ── POST enviar-email — envia NF + boleto por email ──────────────────────────
