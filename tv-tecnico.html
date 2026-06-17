@@ -180,17 +180,17 @@ nav{display:flex;gap:5px;flex-wrap:wrap;}
 
 /* Technician select */
 .tecnico-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
-.tecnico-btn{
-  padding:9px 10px;border-radius:8px;border:1px solid var(--border);
-  background:var(--surface2);color:var(--muted);font-family:var(--fb);
-  font-size:12px;cursor:pointer;transition:all 0.15s;text-align:center;
-}
+.tecnico-btn{padding:10px 16px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-family:var(--fb);font-size:12px;font-weight:500;cursor:pointer;transition:all 0.15s;}
+.tecnico-btn:hover{border-color:var(--green);color:var(--green);}
+.tecnico-btn.selected{border-color:var(--green);background:rgba(16,217,130,.12);color:var(--green);font-weight:700;}
 .tecnico-btn:hover{border-color:rgba(245,200,0,0.3);color:var(--text);}
 .tecnico-btn.selected{background:var(--blue);color:#000;border-color:var(--blue);font-weight:600;}
 
 /* Stages grid */
-.stages-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
-.stage-btn{padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:var(--fb);font-size:12px;cursor:pointer;transition:all 0.15s;text-align:left;display:flex;align-items:center;gap:8px;}
+.stages-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-top:2px;}
+.stage-btn{padding:10px 14px;border-radius:9px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-family:var(--fb);font-size:12px;font-weight:500;cursor:pointer;transition:all 0.15s;text-align:left;display:flex;align-items:center;gap:7px;}
+.stage-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(59,158,255,.07);}
+.stage-btn.selected{border-color:var(--accent);background:rgba(59,158,255,.15);color:var(--accent);font-weight:700;}
 .stage-btn:hover{border-color:rgba(245,200,0,0.3);color:var(--text);}
 .stage-btn.selected{color:#000;border-color:transparent;font-weight:600;}
 .stage-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
@@ -208,11 +208,9 @@ nav{display:flex;gap:5px;flex-wrap:wrap;}
 .type-btn[data-type="rs"].selected{background:var(--c-rs);}
 .type-btn[data-type="rs_rua"].selected{background:var(--c-rsrua);}
 
-.submit-btn{
-  width:100%;padding:13px;border-radius:8px;background:var(--blue);color:#000;
-  font-family:var(--fh);font-size:14px;font-weight:700;border:none;cursor:pointer;
-  transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:8px;
-}
+.submit-btn{width:100%;padding:14px;border-radius:9px;background:var(--accent);color:#fff;font-family:var(--fh);font-size:14px;font-weight:700;border:none;cursor:pointer;transition:all 0.15s;display:block;margin-top:8px;}
+.submit-btn:hover:not(:disabled){background:#2d8ce8;transform:translateY(-1px);}
+.submit-btn:disabled{background:var(--border2);color:var(--muted);cursor:not-allowed;}
 .submit-btn:hover:not(:disabled){background:var(--accent2);transform:translateY(-1px);}
 .submit-btn:disabled{opacity:0.3;cursor:not-allowed;}
 
@@ -387,7 +385,7 @@ nav{display:flex;gap:5px;flex-wrap:wrap;}
 <div id="page-mover" class="page">
   <div class="form-wrap">
     <div class="form-title">Mover <span>OS</span></div>
-    <div class="form-sub">// código, nome ou descrição da OS</div>
+    <div class="form-sub">// busque o código, nome ou descrição</div>
     <div class="form-card">
       <div class="field-group">
         <label class="field-label">Buscar OS</label>
@@ -396,7 +394,7 @@ nav{display:flex;gap:5px;flex-wrap:wrap;}
             placeholder="0000 ou nome..." autocomplete="off"
             style="font-size:20px;" oninput="onOsNumInput()"/>
         </div>
-        <div id="os-found-info" style="display:none;background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--blue);border-radius:8px;padding:10px 12px;">
+        <div id="os-found-info" style="display:none;background:rgba(59,158,255,.07);border:1px solid rgba(59,158,255,.25);border-left:3px solid var(--accent);border-radius:9px;padding:12px 14px;margin-top:8px;">
           <div style="font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:3px;">OS ENCONTRADA</div>
           <div id="os-found-title" style="font-size:13px;font-weight:500;"></div>
           <div id="os-found-phase" style="font-size:11px;color:var(--muted);margin-top:2px;font-family:var(--fm);"></div>
