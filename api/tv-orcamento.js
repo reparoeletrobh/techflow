@@ -105,7 +105,7 @@ module.exports = async function handler(req, res) {
   }
 
   if (req.method === "POST" && action === "criar-card") {
-    let { nome, telefone, aparelho, defeito, endereco, phaseId, texto, coleta } = req.body || {};
+    let { nome, telefone, aparelho, defeito, endereco, phaseId, texto, coleta, dataColeta } = req.body || {};
     if (texto && !nome) {
       const parsed = parseFichaTexto(texto);
       nome = parsed.nome||nome; telefone = parsed.telefone||telefone;
@@ -138,12 +138,20 @@ module.exports = async function handler(req, res) {
         const isAgendada = coletaStr && !isImediata;
         const phaseLog = isAgendada ? 'horario_marcado' : 'liberado_coleta';
         const nowLog = new Date().toISOString();
+        // Converter dataColeta (YYYY-MM-DD) para ISO completo às 09:00 BRT
+        let horarioColetaISO = null;
+        if (isAgendada && dataColeta) {
+          try {
+            // Usar hora padrão 09:00 BRT (12:00 UTC)
+            horarioColetaISO = dataColeta + 'T12:00:00.000Z';
+          } catch(e) { horarioColetaISO = null; }
+        }
         logDb2.fichas.unshift({
           id: logId2, nome, telefone: telefone||'', endereco: endereco||'',
           equipamento: aparelho||'', defeito: defeito||'',
           pipefyCardId: card?.id || null, texto: texto||'',
           phase: phaseLog,
-          horarioColeta: isAgendada ? coletaStr : null,
+          horarioColeta: horarioColetaISO,
           horarioColetaTexto: isAgendada ? coletaStr : null,
           criadoEm: nowLog, movedAt: nowLog,
           diagnostico: null, origem: 'tv_orcamento'

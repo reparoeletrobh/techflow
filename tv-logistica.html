@@ -576,7 +576,7 @@ function cardHTML(f, phase) {
   } else if (phase === 'horario_marcado') {
     // Badge de vencimento
     let vencBadge = '';
-    if (f.horarioColeta) {
+    if (f.horarioColeta && !isNaN(new Date(f.horarioColeta).getTime())) {
       const diff  = new Date(f.horarioColeta).getTime() - Date.now();
       const abs   = Math.abs(diff);
       const horas = Math.floor(abs/3600000);
@@ -1092,11 +1092,18 @@ function abrirHorario(id) {
   const f = fichas.find(x => x.id === id);
   const input = document.getElementById('horario-input');
   if (f?.horarioColeta) {
-    // Converter ISO para datetime-local (YYYY-MM-DDTHH:MM)
-    const d = new Date(f.horarioColeta);
-    const local = new Date(d.getTime() - d.getTimezoneOffset()*60000)
-      .toISOString().slice(0,16);
-    input.value = local;
+    // Converter ISO para datetime-local (YYYY-MM-DDTHH:MM) — com fallback se data inválida
+    try {
+      const d = new Date(f.horarioColeta);
+      if (isNaN(d.getTime())) throw new Error('data inválida');
+      const local = new Date(d.getTime() - d.getTimezoneOffset()*60000)
+        .toISOString().slice(0,16);
+      input.value = local;
+    } catch(e) {
+      // horarioColeta não é data ISO válida — default +2h
+      const now = new Date(Date.now() + 2*3600000);
+      input.value = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,16);
+    }
   } else {
     // Default: daqui a 2h
     const now = new Date(Date.now() + 2*3600000);

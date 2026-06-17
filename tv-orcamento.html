@@ -334,7 +334,11 @@ async function enviarFicha() {
   try {
     var r = await fetch('/api/tv-orcamento?action=criar-card', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({texto: txt, coleta: coletaStr})
+      body: JSON.stringify({
+        texto: txt,
+        coleta: coletaStr,
+        dataColeta: tipoColetaSel === 'agendada' ? document.getElementById('coleta-data').value : null
+      })
     }).then(function(r){return r.json();});
     removeById('msg-loading');
     if (r.ok) {
