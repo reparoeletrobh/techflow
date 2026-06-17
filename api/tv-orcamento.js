@@ -161,14 +161,7 @@ module.exports = async function handler(req, res) {
         console.log('[tv-orc→tv_logistica]', logId2, phaseLog);
       } catch(eLog) { console.error('[tv-orc logistica]', eLog.message); }
 
-      // ── Trigger: tv_pipe → aguardando_aprovacao ───────────────────────
-      await moverNoTvPipe('aguardando_aprovacao', {
-        localId: null, pipefyId: null,
-        nome: nome||'', telefone: telefone||'',
-        equipamento: aparelho||'', descricao: defeito||'',
-        endereco: endereco||'', valor: 0, origem: 'tv_orcamento_card'
-      });
-
+      // Ficha criada na logística — entra no pipe APENAS após diagnóstico em tv-logistica.js
       return res.status(200).json({ ok: true, card });
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });
