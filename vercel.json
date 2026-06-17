@@ -469,6 +469,10 @@
     {
       "source": "/tv/pecas",
       "destination": "/tv-pecas.html"
+    },
+    {
+      "source": "/geladeira",
+      "destination": "/geladeira.html"
     }
   ],
   "headers": [
