@@ -69,7 +69,7 @@ async function dbSet(key, value) {
 function defaultDB()  { return { produtos: [] }; }
 function defaultFin() { return { records: [], syncedIds: [] }; }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -251,6 +251,39 @@ module.exports = async function handler(req, res) {
         pipefyReceberCardId = dataAlmox?.createCard?.card?.id || null;
       }
     } catch(e) { console.error("Pipefy Receber card:", e.message); }
+
+    // ── tv_pipe: criar card em Receber ──────────────────────────────────────
+    try {
+      const _UV=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+      const _TV=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+      async function _vPGet(k){const r=await fetch(_UV+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_TV,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();const v=j[0]?.result;if(!v)return null;let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}
+      async function _vPSet(k,v){await fetch(_UV+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_TV,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+      const tvPipe = (await _vPGet('tv_pipe')) || {cards:[],syncedPipefyIds:[],lastSync:null};
+      if(!Array.isArray(tvPipe.cards)) tvPipe.cards=[];
+      const nowVenda = new Date().toISOString();
+      const cardId = 'PIPE-VENDA-TV-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,4).toUpperCase();
+      tvPipe.cards.unshift({
+        id:          cardId,
+        pipefyId:    cardId,
+        phase:       'receber',
+        nomeContato: nomeCliente||'',
+        telefone:    telefone||'',
+        cpfCnpj:     cpfCnpj||'',
+        equipamento: p.tipo||p.descricao||'',
+        descricao:   'VENDA — '+(p.codigo||p.tipo||'Equipamento')+' | '+nomeCliente,
+        valor:       parseFloat(p.preco)||0,
+        origem:      'venda_tv',
+        vendedor:    vendedor||'',
+        modalidade:  modalidade||'',
+        criadoEm:    nowVenda,
+        movedAt:     nowVenda,
+        aguardandoDesde: nowVenda,
+        history:     [],
+      });
+      tvPipe.lastSync = nowVenda;
+      await _vPSet('tv_pipe', tvPipe);
+      console.log('[tv-vendas→tv_pipe] card receber criado:', cardId);
+    } catch(ePipe) { console.error('[tv-vendas→tv_pipe]', ePipe.message); }
 
     return res.status(200).json({
       ok: true, ficha,
