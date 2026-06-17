@@ -965,7 +965,12 @@ function pickMoveCard(pipefyId) {
 }
 
 function checkMove() {
-  document.getElementById('btn-move').disabled = !((selCardId || selGarantiaId) && selMovePhase);
+  const pode = !!((selCardId || selGarantiaId) && selMovePhase);
+  const btn = document.getElementById('btn-move');
+  if (btn) {
+    btn.disabled = !pode;
+    btn.style.opacity = pode ? '1' : '0.45';
+  }
 }
 function checkCreate() {
   const nome = document.getElementById('create-nome').value.trim();
@@ -1065,8 +1070,9 @@ async function submitMove() {
   const btn = document.getElementById('btn-move');
   btn.disabled = true; btn.textContent = '⏳ Movendo...';
   try {
-    const res = await api('POST', 'move', { pipefyId: selCardId, phaseId: selMovePhase, tecnico: selTecnico });
-    if (!res.ok) throw new Error(res.error);
+    console.log('[submitMove] pipefyId:', selCardId, 'phaseId:', selMovePhase, 'tecnico:', selTecnico);
+    const res = await api('POST', 'move', { pipefyId: selCardId, phaseId: selMovePhase, techName: selTecnico, tecnico: selTecnico });
+    if (!res || !res.ok) throw new Error((res && res.error) || 'Falha na chamada à API');
     const ph = board.phases.find(p => p.id === selMovePhase);
     showToast('✅','OS movida!', (selTecnico ? selTecnico + ' → ' : '') + ph?.name);
     if (selMovePhase === 'cliente_loja') playClienteLoja();
@@ -1365,6 +1371,7 @@ function showPage(name) {
   if (name === 'metas')   loadGoals();
   if (name === 'rs')      renderRsBoard('rs');
   if (name === 'rs-rua')  renderRsBoard('rs_rua');
+  if (name === 'mover')   { renderStageGrids(); document.getElementById('os-num-input').focus(); }
 }
 
 // ── TOAST ──────────────────────────────────────────────────────
