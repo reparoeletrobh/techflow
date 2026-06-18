@@ -1928,6 +1928,39 @@ export default async function handler(req, res) {
     });
   }
 
+    // ── GET buscar-amplo — busca em pipe+board+frenteloja ADM+TV por nome ────────
+  if (action === 'buscar-amplo') {
+    const q = (req.query.q||'').toLowerCase().trim();
+    if (!q) return res.status(400).json({ ok:false, error:'?q= obrigatório' });
+
+    const BOARD_KEY   = 'reparoeletro_board';
+    const FL_ADM_KEY  = 'reparoeletro_frenteloja';
+    const FL_TV_KEY   = 'tv_frenteloja';
+    const TV_BOARD    = 'tv_board';
+
+    const [pipeDb, boardDb, flAdm, flTv, tvBoard] = await Promise.all([
+      dbGet(PIPE_KEY).catch(()=>null),
+      dbGet(BOARD_KEY).catch(()=>null),
+      dbGet(FL_ADM_KEY).catch(()=>null),
+      dbGet(FL_TV_KEY).catch(()=>null),
+      dbGet(TV_BOARD).catch(()=>null),
+    ]);
+
+    function match(c){ return (c.nomeContato||c.nome||c.title||'').toLowerCase().includes(q) || (c.telefone||c.tel||'').replace(/[^0-9]/g,'').includes(q.replace(/[^0-9]/g,'')); }
+    function fmtDt(ts){ try{ return ts ? new Date(ts).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'; }catch(e){return ts||'—';} }
+
+    const resultado = {
+      pipe:        (pipeDb?.cards||[]).filter(match).map(c=>({ id:c.id, nome:c.nomeContato||c.title, tel:c.telefone, phase:c.phase, equipamento:(c.equipamento||c.descricao||'').slice(0,50), valor:c.valor, movedAt:fmtDt(c.movedAt), criadoEm:fmtDt(c.criadoEm) })),
+      board_adm:   (boardDb?.cards||[]).filter(match).map(c=>({ id:c.pipefyId||c.id, nome:c.nomeContato||c.title, tel:c.telefone, phaseId:c.phaseId, movedAt:fmtDt(c.movedAt), tecnico:c.tecnico })),
+      frenteloja_adm: (flAdm?.fichas||[]).filter(match).map(f=>({ id:f.id, nome:f.nomeContato||f.nome, tel:f.telefone, phase:f.phase, equipamento:f.equipamento||f.aparelho, criadoEm:fmtDt(f.criadoEm), updatedAt:fmtDt(f.updatedAt) })),
+      frenteloja_tv:  (flTv?.fichas||[]).filter(match).map(f=>({ id:f.id, nome:f.nomeContato||f.nome, tel:f.telefone, phase:f.phase, equipamento:f.equipamento, criadoEm:fmtDt(f.criadoEm), updatedAt:fmtDt(f.updatedAt) })),
+      board_tv:    (tvBoard?.cards||[]).filter(match).map(c=>({ id:c.pipefyId||c.id, nome:c.nomeContato||c.title, tel:c.telefone, phaseId:c.phaseId, movedAt:fmtDt(c.movedAt), tecnico:c.tecnico })),
+    };
+
+    const total = Object.values(resultado).reduce(function(s,a){return s+a.length;},0);
+    return res.status(200).json({ ok:true, busca:q, total, ...resultado });
+  }
+
     // ── GET fix-compra-lote — atualiza telefone em todas fichas sem telefone ────
   if (action === 'fix-compra-lote') {
     var pipeDb2 = (await dbGet(PIPE_KEY)) || defaultDB();
