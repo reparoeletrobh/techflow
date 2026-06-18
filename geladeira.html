@@ -3,960 +3,542 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Conserto de geladeira em BH — Frost Free, Side by Side, French Door. Troca de compressor, gaxeta, termostato e placa eletrônica. Retirada e entrega, garantia inclusa.">
+<meta name="description" content="Conserto de geladeira em BH com retirada e entrega. Compressor, gaxeta, termostato, placa eletrônica. Diagnóstico grátis. Garantia de 90 dias. (31) 9 9785-6023.">
 <meta name="theme-color" content="#0F4C81">
-<meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
-<title>Conserto de Geladeira em BH | Reparo Eletro — Frost Free, Side by Side, French Door</title>
+<title>Conserto de Geladeira em BH | Reparo Eletro — Retirada e Entrega</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Syne:wght@700;800&display=swap');
-</style>
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* ── RESET ────────────────────────────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#111;background:#fff;line-height:1.6;-webkit-font-smoothing:antialiased;}
+a{text-decoration:none;color:inherit;}
+img{max-width:100%;display:block;}
 
-  :root {
-    --blue: #0F4C81;
-    --blue-dark: #0a3460;
-    --blue-light: #1a5fa0;
-    --accent: #F5A623;
-    --green: #27AE60;
-    --text: #1a1a2e;
-    --muted: #6b7280;
-    --light: #f8fafc;
-    --border: #e5e7eb;
-    --white: #ffffff;
-    --radius: 12px;
-    --shadow: 0 4px 24px rgba(15,76,129,.08);
-    --shadow-md: 0 8px 40px rgba(15,76,129,.14);
-  }
+/* ── VARS ─────────────────────────────────────────────────────── */
+:root{
+  --blue:#0F4C81;
+  --blue2:#0a3460;
+  --green:#16a34a;
+  --orange:#ea580c;
+  --yellow:#ca8a04;
+  --gray:#6b7280;
+  --lightgray:#f9fafb;
+  --border:#e5e7eb;
+}
 
-  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: var(--text); background: #fff; line-height: 1.6; }
+/* ── NAV ──────────────────────────────────────────────────────── */
+nav{background:var(--blue);position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2);}
+.nav-w{max-width:1080px;margin:0 auto;padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;}
+.logo{color:#fff;font-size:18px;font-weight:800;letter-spacing:-.5px;}
+.logo b{color:#fbbf24;}
+.nav-cta{background:#fbbf24;color:#000;font-size:13px;font-weight:700;padding:8px 18px;border-radius:6px;transition:background .15s;}
+.nav-cta:hover{background:#f59e0b;}
 
-  a { text-decoration: none; color: inherit; }
-  img { max-width: 100%; display: block; }
+/* ── URGENCY BAR ──────────────────────────────────────────────── */
+.urgbar{background:#16a34a;color:#fff;text-align:center;padding:9px 16px;font-size:13px;font-weight:600;letter-spacing:.01em;}
+.urgbar span{opacity:.75;margin:0 8px;}
 
-  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+/* ── HERO ─────────────────────────────────────────────────────── */
+.hero{background:var(--blue);padding:48px 20px 0;overflow:hidden;}
+.hero-w{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:1fr 380px;gap:40px;align-items:flex-end;}
+.hero-tag{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#fbbf24;margin-bottom:14px;}
+.hero-h1{font-size:clamp(30px,4.5vw,50px);font-weight:900;line-height:1.1;color:#fff;margin-bottom:18px;}
+.hero-h1 em{font-style:italic;color:#fbbf24;}
+.hero-sub{font-size:15px;color:rgba(255,255,255,.7);margin-bottom:26px;line-height:1.6;}
+.hero-sub strong{color:#fff;}
+.hero-btns{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:32px;}
+.btn-wa{display:inline-flex;align-items:center;gap:9px;background:#22c55e;color:#fff;font-size:15px;font-weight:700;padding:14px 26px;border-radius:8px;transition:background .15s,transform .1s;}
+.btn-wa:hover{background:#16a34a;transform:translateY(-1px);}
+.btn-tel{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.25);color:#fff;font-size:14px;font-weight:600;padding:13px 22px;border-radius:8px;transition:background .15s;}
+.btn-tel:hover{background:rgba(255,255,255,.1);}
+.hero-trust{display:flex;gap:24px;flex-wrap:wrap;}
+.htag{display:flex;align-items:center;gap:7px;color:rgba(255,255,255,.85);font-size:13px;font-weight:600;}
+.htag-dot{width:7px;height:7px;border-radius:50%;background:#22c55e;flex-shrink:0;}
+.hero-img{align-self:flex-end;display:flex;align-items:flex-end;justify-content:center;}
+.hero-visual{width:320px;height:340px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:16px 16px 0 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:rgba(255,255,255,.5);font-size:13px;}
+.hero-visual-icon{font-size:72px;line-height:1;}
 
-  /* ─── NAV ─────────────────────────────────────────────────────────── */
-  nav {
-    background: var(--blue);
-    position: sticky; top: 0; z-index: 100;
-    box-shadow: 0 2px 12px rgba(0,0,0,.18);
-  }
-  .nav-inner {
-    display: flex; align-items: center; justify-content: space-between;
-    height: 64px; max-width: 1100px; margin: 0 auto; padding: 0 24px;
-  }
-  .nav-logo {
-    display: flex; align-items: center; gap: 10px;
-    font-family: 'Syne', -apple-system, sans-serif; font-size: 20px; font-weight: 800;
-    color: #fff; letter-spacing: -.3px;
-  }
-  .nav-logo span { color: var(--accent); }
-  .nav-logo-icon {
-    width: 36px; height: 36px;
-    background: rgba(255,255,255,.15);
-    border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px;
-  }
-  .nav-links { display: flex; align-items: center; gap: 6px; }
-  .nav-links a {
-    color: rgba(255,255,255,.85); font-size: 14px; font-weight: 500;
-    padding: 8px 12px; border-radius: 6px;
-    transition: background .15s, color .15s;
-  }
-  .nav-links a:hover { background: rgba(255,255,255,.12); color: #fff; }
-  .nav-cta {
-    background: var(--accent); color: #fff !important;
-    font-weight: 700 !important; font-size: 13px !important;
-    padding: 9px 18px !important;
-    border-radius: 8px !important;
-  }
-  .nav-cta:hover { background: #e09418 !important; }
-  .nav-mobile-btn { display: none; background: none; border: none; cursor: pointer; }
+/* ── STATS ────────────────────────────────────────────────────── */
+.stats{background:#fff;border-bottom:1px solid var(--border);}
+.stats-w{max-width:1080px;margin:0 auto;padding:28px 20px;display:grid;grid-template-columns:repeat(4,1fr);gap:0;}
+.st{text-align:center;padding:8px;border-right:1px solid var(--border);}
+.st:last-child{border-right:none;}
+.st-num{font-size:26px;font-weight:900;color:var(--blue);line-height:1;}
+.st-lbl{font-size:12px;color:var(--gray);margin-top:3px;}
 
-  /* ─── BREADCRUMB ──────────────────────────────────────────────────── */
-  .breadcrumb {
-    background: var(--blue); border-bottom: 1px solid rgba(255,255,255,.1);
-    padding: 10px 0;
-  }
-  .breadcrumb-inner {
-    max-width: 1100px; margin: 0 auto; padding: 0 24px;
-    display: flex; align-items: center; gap: 6px;
-    font-size: 13px; color: rgba(255,255,255,.65);
-  }
-  .breadcrumb-inner a { color: rgba(255,255,255,.65); }
-  .breadcrumb-inner a:hover { color: #fff; }
-  .breadcrumb-inner span { color: #fff; font-weight: 500; }
-  .breadcrumb-sep { opacity: .4; }
+/* ── SECTION COMMONS ──────────────────────────────────────────── */
+section{padding:72px 20px;}
+section.alt{background:var(--lightgray);}
+.sec-w{max-width:1080px;margin:0 auto;}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--blue);margin-bottom:10px;}
+.sec-h{font-size:clamp(24px,3.5vw,36px);font-weight:900;line-height:1.15;margin-bottom:16px;}
+.sec-h em{font-style:italic;color:var(--blue);}
+.sec-desc{font-size:16px;color:var(--gray);max-width:560px;line-height:1.7;}
 
-  /* ─── MODEL TABS ──────────────────────────────────────────────────── */
-  .model-tabs {
-    background: var(--blue);
-    padding: 0 24px;
-  }
-  .model-tabs-inner {
-    max-width: 1100px; margin: 0 auto;
-    display: flex; gap: 4px; padding-bottom: 0;
-    overflow-x: auto; -webkit-overflow-scrolling: touch;
-  }
-  .model-tab {
-    padding: 11px 20px; font-size: 13px; font-weight: 600;
-    color: rgba(255,255,255,.6); cursor: pointer;
-    border-bottom: 3px solid transparent;
-    white-space: nowrap; transition: all .15s;
-  }
-  .model-tab.active { color: #fff; border-bottom-color: var(--accent); }
-  .model-tab:hover:not(.active) { color: rgba(255,255,255,.85); }
+/* ── DORES (hero das dores) ───────────────────────────────────── */
+.dores{background:#fff;}
+.dores-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:center;}
+.dores-list{display:flex;flex-direction:column;gap:18px;margin:28px 0;}
+.dor{display:flex;gap:14px;align-items:flex-start;}
+.dor-icon{width:40px;height:40px;border-radius:10px;background:#fff1f2;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.dor-title{font-size:15px;font-weight:700;margin-bottom:2px;}
+.dor-desc{font-size:14px;color:var(--gray);}
+.dores-img{background:linear-gradient(135deg,#dbeafe,#bfdbfe);border-radius:14px;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;font-size:72px;position:relative;}
+.dores-badge{position:absolute;bottom:-14px;right:20px;background:#16a34a;color:#fff;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;box-shadow:0 4px 16px rgba(22,163,74,.3);}
 
-  /* ─── HERO ────────────────────────────────────────────────────────── */
-  .hero {
-    background: var(--blue);
-    padding: 60px 0 0;
-    overflow: hidden;
-  }
-  .hero-inner {
-    max-width: 1100px; margin: 0 auto; padding: 0 24px;
-    display: grid; grid-template-columns: 1fr 420px; gap: 48px;
-    align-items: flex-end;
-  }
-  .hero-eyebrow {
-    font-size: 12px; font-weight: 700; letter-spacing: .12em;
-    color: var(--accent); text-transform: uppercase;
-    margin-bottom: 16px;
-  }
-  .hero-title {
-    font-family: 'Syne', -apple-system, sans-serif;
-    font-size: clamp(32px, 4.5vw, 52px);
-    font-weight: 800; line-height: 1.1;
-    color: #fff;
-    margin-bottom: 20px;
-  }
-  .hero-title em { font-style: italic; color: var(--accent); }
-  .hero-specs {
-    font-size: 14px; color: rgba(255,255,255,.65);
-    margin-bottom: 28px; letter-spacing: .02em;
-  }
-  .hero-specs span { margin: 0 6px; opacity: .4; }
-  .hero-btns { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 40px; }
-  .btn-primary {
-    background: var(--accent); color: #fff;
-    padding: 14px 28px; border-radius: 8px;
-    font-weight: 700; font-size: 15px;
-    transition: background .15s, transform .1s;
-    display: inline-flex; align-items: center; gap: 8px;
-  }
-  .btn-primary:hover { background: #e09418; transform: translateY(-1px); }
-  .btn-ghost {
-    background: rgba(255,255,255,.1); color: #fff;
-    padding: 14px 28px; border-radius: 8px;
-    font-weight: 600; font-size: 15px; border: 1px solid rgba(255,255,255,.2);
-    transition: background .15s;
-  }
-  .btn-ghost:hover { background: rgba(255,255,255,.18); }
-  .hero-stats {
-    display: flex; gap: 28px; flex-wrap: wrap;
-  }
-  .hero-stat { }
-  .hero-stat-val {
-    font-family: 'Syne', -apple-system, sans-serif;
-    font-size: 22px; font-weight: 800; color: #fff;
-    line-height: 1;
-  }
-  .hero-stat-lbl {
-    font-size: 12px; color: rgba(255,255,255,.55); margin-top: 3px;
-  }
-  .hero-img-wrap {
-    align-self: flex-end;
-    display: flex; align-items: flex-end; justify-content: center;
-  }
-  .hero-product-img {
-    width: 100%; max-width: 360px;
-    filter: drop-shadow(0 -8px 40px rgba(0,0,0,.35));
-    border-radius: 16px 16px 0 0;
-  }
-  /* placeholder geladeira svg */
-  .hero-product-placeholder {
-    width: 320px; height: 380px;
-    background: rgba(255,255,255,.07);
-    border-radius: 18px 18px 0 0;
-    border: 1px solid rgba(255,255,255,.12);
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 16px; color: rgba(255,255,255,.4);
-  }
-  .hero-product-placeholder svg { width: 80px; height: 80px; opacity: .5; }
+/* ── SERVIÇOS ─────────────────────────────────────────────────── */
+.serv-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:36px;}
+.serv-card{border:1px solid var(--border);border-radius:12px;padding:22px;background:#fff;transition:border-color .15s,box-shadow .15s,transform .1s;cursor:pointer;}
+.serv-card:hover{border-color:var(--blue);box-shadow:0 4px 24px rgba(15,76,129,.1);transform:translateY(-2px);}
+.serv-icon{font-size:28px;margin-bottom:12px;}
+.serv-problem{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#dc2626;margin-bottom:6px;}
+.serv-title{font-size:16px;font-weight:800;margin-bottom:6px;}
+.serv-desc{font-size:13px;color:var(--gray);line-height:1.55;margin-bottom:14px;}
+.serv-link{font-size:13px;font-weight:700;color:var(--blue);display:flex;align-items:center;gap:4px;}
+.serv-link::after{content:'→';transition:transform .15s;}
+.serv-card:hover .serv-link::after{transform:translateX(4px);}
+.serv-note{margin-top:24px;text-align:center;font-size:14px;color:var(--gray);}
+.serv-note a{color:var(--blue);font-weight:700;}
 
-  /* ─── SECTION GENERICS ────────────────────────────────────────────── */
-  section { padding: 80px 0; }
-  section.alt { background: var(--light); }
-  .section-eyebrow {
-    font-size: 11px; font-weight: 700; letter-spacing: .14em;
-    text-transform: uppercase; color: var(--blue); margin-bottom: 10px;
-  }
-  .section-title {
-    font-family: 'Syne', -apple-system, sans-serif;
-    font-size: clamp(26px, 3.5vw, 40px);
-    font-weight: 800; line-height: 1.15;
-    color: var(--text); margin-bottom: 20px;
-  }
-  .section-title em { font-style: italic; color: var(--blue); }
-  .section-desc { font-size: 16px; color: var(--muted); max-width: 560px; line-height: 1.7; }
+/* ── COMO FUNCIONA ────────────────────────────────────────────── */
+.flow{background:var(--blue);}
+.flow .eyebrow{color:#fbbf24;}
+.flow .sec-h{color:#fff;}
+.flow .sec-desc{color:rgba(255,255,255,.65);}
+.flow-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:40px;}
+.step{padding:24px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:12px;}
+.step-n{font-size:11px;font-weight:700;letter-spacing:.1em;color:#fbbf24;margin-bottom:12px;}
+.step-icon{font-size:28px;margin-bottom:10px;}
+.step-title{font-size:15px;font-weight:800;color:#fff;margin-bottom:6px;}
+.step-desc{font-size:13px;color:rgba(255,255,255,.6);line-height:1.5;}
+.step-flow-arrow{display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.25);font-size:20px;align-self:center;}
 
-  /* ─── SERVIÇO PRINCIPAL ───────────────────────────────────────────── */
-  .main-service { padding: 80px 0 0; }
-  .main-service-inner {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 64px;
-    align-items: center;
-  }
-  .main-service-steps { margin: 36px 0 32px; display: flex; flex-direction: column; gap: 22px; }
-  .step { display: flex; gap: 16px; align-items: flex-start; }
-  .step-num {
-    width: 32px; height: 32px; border-radius: 50%;
-    background: var(--blue); color: #fff;
-    font-size: 13px; font-weight: 800;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; margin-top: 2px;
-  }
-  .step-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
-  .step-desc { font-size: 14px; color: var(--muted); line-height: 1.5; }
-  .main-service-img {
-    position: relative;
-  }
-  .main-service-img-inner {
-    border-radius: 16px; overflow: hidden;
-    background: linear-gradient(135deg, #e8f0fe, #c7d7f5);
-    aspect-ratio: 4/3;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 80px;
-  }
-  .img-badge {
-    position: absolute; bottom: -16px; right: 24px;
-    background: var(--green); color: #fff;
-    padding: 8px 16px; border-radius: 8px;
-    font-size: 12px; font-weight: 700;
-    box-shadow: var(--shadow-md);
-    display: flex; align-items: center; gap: 6px;
-  }
-  .main-service-badges {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
-    margin-top: 48px; padding-top: 40px;
-    border-top: 1px solid var(--border);
-  }
-  .badge-card {
-    display: flex; gap: 12px; align-items: flex-start;
-  }
-  .badge-icon {
-    width: 40px; height: 40px; border-radius: 10px;
-    background: rgba(15,76,129,.08);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px; flex-shrink: 0;
-  }
-  .badge-title { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
-  .badge-desc { font-size: 13px; color: var(--muted); line-height: 1.4; }
+/* ── GARANTIA ─────────────────────────────────────────────────── */
+.garantia-box{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:16px;padding:36px;display:grid;grid-template-columns:64px 1fr;gap:24px;align-items:start;margin-top:36px;}
+.garantia-icon{width:64px;height:64px;background:#16a34a;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:30px;flex-shrink:0;}
+.garantia-title{font-size:20px;font-weight:900;color:#14532d;margin-bottom:8px;}
+.garantia-desc{font-size:15px;color:#166534;line-height:1.65;}
+.garantia-items{display:flex;gap:16px;flex-wrap:wrap;margin-top:16px;}
+.g-item{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#16a34a;}
+.g-item::before{content:'✓';font-weight:900;}
 
-  /* ─── TODOS OS SERVIÇOS ───────────────────────────────────────────── */
-  .services-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
-    margin-top: 40px;
-  }
-  .service-card {
-    border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 22px; background: #fff;
-    transition: border-color .15s, box-shadow .15s, transform .15s;
-    cursor: pointer;
-  }
-  .service-card:hover {
-    border-color: var(--blue);
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
-  }
-  .service-card-icon { font-size: 28px; margin-bottom: 12px; }
-  .service-card-title { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
-  .service-card-desc { font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 14px; }
-  .service-card-cta {
-    font-size: 13px; font-weight: 600; color: var(--blue);
-    display: flex; align-items: center; gap: 4px;
-  }
-  .service-card-cta::after { content: '→'; transition: transform .15s; }
-  .service-card:hover .service-card-cta::after { transform: translateX(4px); }
-  .services-note {
-    margin-top: 28px; text-align: center;
-    font-size: 14px; color: var(--muted);
-  }
-  .services-note a { color: var(--blue); font-weight: 600; }
+/* ── COMPARE ──────────────────────────────────────────────────── */
+.compare-grid{display:grid;grid-template-columns:1fr auto 1fr;gap:20px;align-items:stretch;margin-top:36px;}
+.compare-col{background:#fff;border:1px solid var(--border);border-radius:12px;padding:28px;text-align:center;}
+.compare-col.us{border-color:var(--blue);border-width:2px;background:#eff6ff;}
+.compare-vs{display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:var(--gray);}
+.compare-logo{font-size:24px;font-weight:900;margin-bottom:14px;}
+.compare-logo.us-logo{color:var(--blue);}
+.compare-stat-big{font-size:42px;font-weight:900;line-height:1;margin:10px 0 6px;}
+.compare-stat-big.green{color:#16a34a;}
+.compare-stat-big.red{color:#dc2626;}
+.compare-label{font-size:13px;color:var(--gray);line-height:1.4;}
+.compare-source{font-size:11px;color:var(--gray);margin-top:20px;opacity:.6;}
 
-  /* ─── VIDEO ───────────────────────────────────────────────────────── */
-  .video-section { background: var(--light); }
-  .video-inner {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 56px;
-    align-items: center;
-  }
-  .video-embed {
-    border-radius: 14px; overflow: hidden;
-    aspect-ratio: 16/9; background: #000;
-    box-shadow: var(--shadow-md);
-  }
-  .video-embed iframe { width: 100%; height: 100%; border: none; display: block; }
-  .video-bullets { margin: 24px 0 32px; display: flex; flex-direction: column; gap: 14px; }
-  .video-bullet {
-    display: flex; gap: 12px; align-items: flex-start;
-  }
-  .bullet-icon {
-    width: 28px; height: 28px; border-radius: 50%;
-    background: rgba(15,76,129,.1);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 13px; flex-shrink: 0;
-  }
-  .bullet-title { font-size: 14px; font-weight: 700; margin-bottom: 1px; }
-  .bullet-desc { font-size: 13px; color: var(--muted); }
+/* ── REVIEWS ──────────────────────────────────────────────────── */
+.reviews-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:36px;}
+.review{background:#fff;border:1px solid var(--border);border-radius:12px;padding:22px;}
+.review-stars{color:#fbbf24;font-size:14px;margin-bottom:10px;}
+.review-text{font-size:14px;color:#374151;line-height:1.65;margin-bottom:16px;font-style:italic;}
+.review-author{display:flex;align-items:center;gap:10px;}
+.review-av{width:34px;height:34px;border-radius:50%;background:var(--blue);color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.review-name{font-size:13px;font-weight:700;}
+.review-src{font-size:11px;color:var(--gray);}
 
-  /* ─── STATS ───────────────────────────────────────────────────────── */
-  .stats-section { padding: 64px 0; }
-  .stats-grid {
-    display: grid; grid-template-columns: repeat(3,1fr);
-    gap: 0; border: 1px solid var(--border); border-radius: var(--radius);
-    overflow: hidden; background: #fff;
-  }
-  .stat-item {
-    padding: 40px 32px; text-align: center;
-    border-right: 1px solid var(--border);
-  }
-  .stat-item:last-child { border-right: none; }
-  .stat-num {
-    font-family: 'Syne', -apple-system, sans-serif;
-    font-size: 48px; font-weight: 800;
-    color: var(--blue); line-height: 1;
-    margin-bottom: 8px;
-  }
-  .stat-lbl { font-size: 15px; color: var(--muted); font-weight: 500; }
+/* ── MARCAS ───────────────────────────────────────────────────── */
+.marcas-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-top:32px;}
+.marca{border:1px solid var(--border);border-radius:10px;padding:18px 12px;text-align:center;font-size:13px;font-weight:700;color:var(--gray);}
+.marca:hover{border-color:var(--blue);color:var(--blue);}
 
-  /* ─── WHY US ──────────────────────────────────────────────────────── */
-  .why-grid {
-    display: grid; grid-template-columns: repeat(2,1fr); gap: 24px;
-    margin-top: 40px;
-  }
-  .why-card {
-    background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 28px; box-shadow: var(--shadow);
-  }
-  .why-card-icon { font-size: 28px; margin-bottom: 14px; }
-  .why-card-title { font-size: 17px; font-weight: 800; margin-bottom: 8px; font-family: 'Syne', -apple-system, sans-serif; }
-  .why-card-desc { font-size: 14px; color: var(--muted); line-height: 1.65; }
+/* ── CTA FINAL ────────────────────────────────────────────────── */
+.cta-final{background:var(--blue);text-align:center;padding:80px 20px;}
+.cta-final-h{font-size:clamp(24px,4vw,40px);font-weight:900;color:#fff;line-height:1.15;margin-bottom:14px;}
+.cta-final-h em{font-style:italic;color:#fbbf24;}
+.cta-final-desc{font-size:16px;color:rgba(255,255,255,.7);margin-bottom:36px;}
+.cta-final-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;}
+.cta-small{font-size:13px;color:rgba(255,255,255,.55);margin-top:18px;}
 
-  /* ─── REVIEWS ─────────────────────────────────────────────────────── */
-  .reviews-section { background: var(--light); }
-  .reviews-grid {
-    display: grid; grid-template-columns: repeat(3,1fr); gap: 20px;
-    margin-top: 40px;
-  }
-  .review-card {
-    background: #fff; border-radius: var(--radius);
-    padding: 24px; border: 1px solid var(--border);
-    box-shadow: var(--shadow);
-  }
-  .review-stars { color: #FBBF24; font-size: 16px; margin-bottom: 12px; }
-  .review-text { font-size: 14px; color: var(--text); line-height: 1.65; margin-bottom: 16px; font-style: italic; }
-  .review-author { display: flex; align-items: center; gap: 10px; }
-  .review-avatar {
-    width: 36px; height: 36px; border-radius: 50%;
-    background: var(--blue); color: #fff;
-    font-size: 14px; font-weight: 700;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-  }
-  .review-name { font-size: 13px; font-weight: 700; }
-  .review-source { font-size: 11px; color: var(--muted); }
+/* ── FOOTER ───────────────────────────────────────────────────── */
+footer{background:#0a2240;padding:36px 20px;border-top:1px solid rgba(255,255,255,.06);}
+.footer-w{max-width:1080px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;}
+.footer-logo{color:#fff;font-size:17px;font-weight:900;}
+.footer-logo b{color:#fbbf24;}
+.footer-info{font-size:13px;color:rgba(255,255,255,.5);line-height:1.7;text-align:center;}
+.footer-info a{color:rgba(255,255,255,.7);}
+.footer-links{font-size:12px;color:rgba(255,255,255,.4);text-align:right;}
+.footer-links a{color:rgba(255,255,255,.5);margin-left:12px;}
 
-  /* ─── GALLERY ─────────────────────────────────────────────────────── */
-  .gallery-grid {
-    display: grid; grid-template-columns: repeat(3,1fr); gap: 10px;
-    margin-top: 32px;
-  }
-  .gallery-item {
-    border-radius: 10px; overflow: hidden;
-    aspect-ratio: 4/3; cursor: pointer;
-    transition: transform .2s, box-shadow .2s;
-  }
-  .gallery-item:hover { transform: scale(1.02); box-shadow: var(--shadow-md); }
-  .gallery-item-inner {
-    width: 100%; height: 100%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 36px;
-  }
+/* ── WA FLOAT ─────────────────────────────────────────────────── */
+.wa{position:fixed;bottom:22px;right:22px;z-index:200;width:56px;height:56px;border-radius:50%;background:#22c55e;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(34,197,94,.4);animation:wap 2.5s infinite;}
+@keyframes wap{0%,100%{box-shadow:0 4px 20px rgba(34,197,94,.4);}50%{box-shadow:0 4px 32px rgba(34,197,94,.65),0 0 0 8px rgba(34,197,94,.1);}}
 
-  /* ─── CTA FINAL ───────────────────────────────────────────────────── */
-  .cta-final {
-    background: var(--blue);
-    padding: 80px 0; text-align: center;
-  }
-  .cta-final-title {
-    font-family: 'Syne', -apple-system, sans-serif;
-    font-size: clamp(26px, 3.5vw, 40px); font-weight: 800;
-    color: #fff; line-height: 1.15; margin-bottom: 16px;
-  }
-  .cta-final-title em { font-style: italic; color: var(--accent); }
-  .cta-final-desc { font-size: 16px; color: rgba(255,255,255,.7); margin-bottom: 36px; }
-  .cta-final-btns { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-
-  /* ─── FOOTER ──────────────────────────────────────────────────────── */
-  footer {
-    background: var(--blue-dark); padding: 40px 0;
-    border-top: 1px solid rgba(255,255,255,.08);
-  }
-  .footer-inner {
-    max-width: 1100px; margin: 0 auto; padding: 0 24px;
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 24px; flex-wrap: wrap;
-  }
-  .footer-logo {
-    font-family: 'Syne', -apple-system, sans-serif; font-size: 18px; font-weight: 800;
-    color: #fff;
-  }
-  .footer-logo span { color: var(--accent); }
-  .footer-info {
-    font-size: 13px; color: rgba(255,255,255,.55); line-height: 1.7; text-align: center;
-  }
-  .footer-info a { color: rgba(255,255,255,.7); }
-  .footer-info strong { color: rgba(255,255,255,.85); }
-
-  /* ─── WHATSAPP FLOAT ──────────────────────────────────────────────── */
-  .wa-float {
-    position: fixed; bottom: 24px; right: 24px; z-index: 200;
-    width: 58px; height: 58px; border-radius: 50%;
-    background: #25D366; color: #fff;
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 20px rgba(37,211,102,.45);
-    animation: wa-pulse 2.5s infinite;
-    cursor: pointer;
-  }
-  @keyframes wa-pulse {
-    0%,100% { box-shadow: 0 4px 20px rgba(37,211,102,.45); }
-    50% { box-shadow: 0 4px 32px rgba(37,211,102,.7), 0 0 0 8px rgba(37,211,102,.12); }
-  }
-
-  /* ─── RESPONSIVE ──────────────────────────────────────────────────── */
-  @media (max-width: 900px) {
-    .hero-inner { grid-template-columns: 1fr; }
-    .hero-img-wrap { display: none; }
-    .main-service-inner { grid-template-columns: 1fr; }
-    .main-service-img { order: -1; }
-    .video-inner { grid-template-columns: 1fr; }
-    .services-grid { grid-template-columns: 1fr 1fr; }
-    .reviews-grid { grid-template-columns: 1fr 1fr; }
-  }
-  @media (max-width: 640px) {
-    .nav-links { display: none; }
-    .nav-mobile-btn { display: block; padding: 8px; }
-    section { padding: 56px 0; }
-    .services-grid { grid-template-columns: 1fr; }
-    .why-grid { grid-template-columns: 1fr; }
-    .reviews-grid { grid-template-columns: 1fr; }
-    .stats-grid { grid-template-columns: 1fr; }
-    .stat-item { border-right: none; border-bottom: 1px solid var(--border); }
-    .stat-item:last-child { border-bottom: none; }
-    .gallery-grid { grid-template-columns: repeat(2,1fr); }
-    .hero-btns { flex-direction: column; }
-    .hero-btns a { text-align: center; justify-content: center; }
-    .main-service-badges { grid-template-columns: 1fr; }
-  }
+/* ── MOBILE ───────────────────────────────────────────────────── */
+@media(max-width:768px){
+  .hero-w{grid-template-columns:1fr;}
+  .hero-img{display:none;}
+  .stats-w{grid-template-columns:1fr 1fr;}
+  .st:nth-child(2){border-right:none;}
+  .st:nth-child(3){border-right:1px solid var(--border);}
+  .dores-grid,.compare-grid{grid-template-columns:1fr;}
+  .compare-vs{display:none;}
+  .flow-steps{grid-template-columns:1fr 1fr;}
+  .serv-grid{grid-template-columns:1fr 1fr;}
+  .reviews-grid{grid-template-columns:1fr;}
+  .marcas-grid{grid-template-columns:repeat(3,1fr);}
+  .garantia-box{grid-template-columns:1fr;}
+  .footer-w{flex-direction:column;text-align:center;}
+  .footer-links{text-align:center;}
+}
+@media(max-width:480px){
+  .hero-btns{flex-direction:column;}
+  .hero-btns a{text-align:center;justify-content:center;}
+  .serv-grid{grid-template-columns:1fr;}
+  .flow-steps{grid-template-columns:1fr;}
+  .marcas-grid{grid-template-columns:1fr 1fr;}
+  .stats-w{grid-template-columns:1fr 1fr;gap:0;}
+}
 </style>
 </head>
 <body>
 
-<!-- ── NAV ──────────────────────────────────────────────────────────── -->
-<!-- GELADEIRA v3 -->
+<!-- NAV -->
 <nav>
-  <div class="nav-inner">
-    <a href="/" class="nav-logo">
-      <div class="nav-logo-icon">⚡</div>
-      Reparo<span>Eletro</span>
-    </a>
-    <div class="nav-links">
-      <a href="/">Home</a>
-      <a href="/geladeira">Geladeira</a>
-      <a href="/microondas">Microondas</a>
-      <a href="/bebedouro">Bebedouro</a>
-      <a href="#">Quem somos</a>
-      <a href="https://wa.me/5531997856023?text=Olá!+Vim+do+site+e+preciso+de+um+orçamento!" class="nav-cta">
-        Orçamento grátis
-      </a>
-    </div>
-    <button class="nav-mobile-btn" onclick="document.querySelector('.nav-links').style.display = document.querySelector('.nav-links').style.display === 'flex' ? 'none' : 'flex'">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
-        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-      </svg>
-    </button>
+  <div class="nav-w">
+    <a href="/" class="logo">Reparo<b>Eletro</b></a>
+    <a href="https://wa.me/5531997856023?text=Olá!+Preciso+de+orçamento+para+conserto+de+geladeira!" class="nav-cta">💬 Orçamento grátis</a>
   </div>
 </nav>
 
-<!-- ── BREADCRUMB ────────────────────────────────────────────────────── -->
-<div class="breadcrumb">
-  <div class="breadcrumb-inner">
-    <a href="/">Home</a>
-    <span class="breadcrumb-sep">›</span>
-    <a href="/eletrodomesticos">Eletrodomésticos</a>
-    <span class="breadcrumb-sep">›</span>
-    <span>Geladeira</span>
-  </div>
+<!-- URGENCY BAR -->
+<div class="urgbar">
+  ⚡ Resposta em até 30 minutos <span>·</span> Retirada hoje em BH <span>·</span> Diagnóstico gratuito
 </div>
 
-<!-- ── MODEL TABS ────────────────────────────────────────────────────── -->
-<div class="model-tabs">
-  <div class="model-tabs-inner">
-    <div class="model-tab active" onclick="setTab(this)">Frost Free</div>
-    <div class="model-tab" onclick="setTab(this)">Side by Side</div>
-    <div class="model-tab" onclick="setTab(this)">French Door</div>
-    <div class="model-tab" onclick="setTab(this)">Degelo Manual</div>
-  </div>
-</div>
-
-<!-- ── HERO ──────────────────────────────────────────────────────────── -->
+<!-- HERO -->
 <section class="hero">
-  <div class="hero-inner">
-    <div class="hero-content">
-      <div class="hero-eyebrow">Reparo Eletro BH · Desde 2017</div>
-      <h1 class="hero-title">
-        <em>Geladeira com problema?</em><br>
-        A gente conserta<br>no mesmo dia.
+  <div class="hero-w">
+    <div>
+      <div class="hero-tag">Reparo Eletro BH · Desde 2017</div>
+      <h1 class="hero-h1">
+        Geladeira parou.<br>
+        Compressor falhou.<br>
+        <em>A gente resolve hoje.</em>
       </h1>
-      <p class="hero-specs">
-        Compressor<span>·</span>Gaxeta<span>·</span>Termostato<span>·</span>Placa Eletrônica
-        <span>·</span>Frost Free e Side by Side
+      <p class="hero-sub">
+        <strong>Buscamos no seu endereço em BH,</strong> consertamos com peça original e devolvemos com <strong>90 dias de garantia por escrito.</strong>
       </p>
       <div class="hero-btns">
-        <a href="https://wa.me/5531997856023?text=Olá!+Minha+geladeira+está+com+problema,+preciso+de+orçamento!" class="btn-primary">
-          💬 Pedir orçamento agora
+        <a href="https://wa.me/5531997856023?text=Olá!+Minha+geladeira+está+com+problema.+Quero+orçamento+gratuito!" class="btn-wa">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          Pedir orçamento grátis
         </a>
-        <a href="#todos-servicos" class="btn-ghost">Ver serviços</a>
+        <a href="tel:5531997856023" class="btn-tel">📞 (31) 9 9785-6023</a>
       </div>
-      <div class="hero-stats">
-        <div class="hero-stat">
-          <div class="hero-stat-val">15.000+</div>
-          <div class="hero-stat-lbl">reparos realizados</div>
-        </div>
-        <div class="hero-stat">
-          <div class="hero-stat-val">4.9</div>
-          <div class="hero-stat-lbl">no Google</div>
-        </div>
-        <div class="hero-stat">
-          <div class="hero-stat-val">Grátis</div>
-          <div class="hero-stat-lbl">diagnóstico</div>
-        </div>
-        <div class="hero-stat">
-          <div class="hero-stat-val">BH</div>
-          <div class="hero-stat-lbl">retirada e entrega</div>
-        </div>
+      <div class="hero-trust">
+        <div class="htag"><div class="htag-dot"></div>+15.000 reparos</div>
+        <div class="htag"><div class="htag-dot"></div>★ 4.9 no Google</div>
+        <div class="htag"><div class="htag-dot"></div>90 dias de garantia</div>
+        <div class="htag"><div class="htag-dot"></div>Retirada e entrega</div>
       </div>
     </div>
-    <div class="hero-img-wrap">
-      <div class="hero-product-placeholder">
-        <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="16" y="8" width="48" height="64" rx="4" stroke="white" stroke-width="2.5"/>
-          <line x1="16" y1="38" x2="64" y2="38" stroke="white" stroke-width="2"/>
-          <line x1="28" y1="24" x2="28" y2="32" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
-          <line x1="28" y1="50" x2="28" y2="62" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
-        </svg>
-        <span style="font-size:13px;font-family:'Inter',sans-serif;font-weight:500;">Geladeira</span>
+    <div class="hero-img">
+      <div class="hero-visual">
+        <div class="hero-visual-icon">🌡️</div>
+        <span>Geladeira</span>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ── SERVIÇO PRINCIPAL ─────────────────────────────────────────────── -->
-<section class="main-service">
-  <div class="container">
-    <div class="section-eyebrow">Serviço principal</div>
-    <div class="main-service-inner">
+<!-- STATS -->
+<div class="stats">
+  <div class="stats-w">
+    <div class="st"><div class="st-num">15.000+</div><div class="st-lbl">Reparos realizados</div></div>
+    <div class="st"><div class="st-num">4.9 ★</div><div class="st-lbl">Avaliação Google</div></div>
+    <div class="st"><div class="st-num">8 anos</div><div class="st-lbl">Desde 2017 em BH</div></div>
+    <div class="st"><div class="st-num">90 dias</div><div class="st-lbl">Garantia por escrito</div></div>
+  </div>
+</div>
+
+<!-- SINTOMAS / DORES -->
+<section class="dores">
+  <div class="sec-w">
+    <div class="dores-grid">
       <div>
-        <h2 class="section-title">
-          <em>Conserto de compressor</em><br>
-          sem comprar geladeira nova
-        </h2>
-        <p class="section-desc">
-          Geladeira quente, barulhando ou não gelando? Na maioria dos casos é compressor ou gás — 
-          resolvemos com peça original e garantia sem você precisar gastar em um equipamento novo.
-        </p>
-        <div class="main-service-steps">
-          <div class="step">
-            <div class="step-num">1</div>
+        <div class="eyebrow">Reconhece algum desses problemas?</div>
+        <h2 class="sec-h">Geladeira com<br><em>problema tem solução</em></h2>
+        <p class="sec-desc">Na maioria dos casos não é preciso comprar uma nova. Identificamos o problema e resolvemos com peça original e garantia.</p>
+        <div class="dores-list">
+          <div class="dor">
+            <div class="dor-icon">🥵</div>
             <div>
-              <div class="step-title">Orçamento pelo WhatsApp</div>
-              <div class="step-desc">Valor, prazo e diagnóstico de forma clara. Sem surpresas.</div>
+              <div class="dor-title">Geladeira quente ou não gela</div>
+              <div class="dor-desc">Problema no compressor, gás ou termostato. Resolvemos no mesmo dia na maioria dos casos.</div>
             </div>
           </div>
-          <div class="step">
-            <div class="step-num">2</div>
+          <div class="dor">
+            <div class="dor-icon">🧊</div>
             <div>
-              <div class="step-title">Buscamos no seu endereço em BH</div>
-              <div class="step-desc">Motoboy retira ou nosso técnico vai até você. Rápido e seguro.</div>
+              <div class="dor-title">Acumulando gelo ou vazando água</div>
+              <div class="dor-desc">Resistência de degelo, dreno entupido ou sensor com defeito. Diagnóstico gratuito.</div>
             </div>
           </div>
-          <div class="step">
-            <div class="step-num">3</div>
+          <div class="dor">
+            <div class="dor-icon">🔊</div>
             <div>
-              <div class="step-title">Laboratório com equipamento próprio</div>
-              <div class="step-desc">Diagnóstico completo, peças originais e serviço com procedência.</div>
+              <div class="dor-title">Fazendo barulho excessivo</div>
+              <div class="dor-desc">Compressor, motor do ventilador ou vibração da base. Identificamos e resolvemos.</div>
             </div>
           </div>
-          <div class="step">
-            <div class="step-num">4</div>
+          <div class="dor">
+            <div class="dor-icon">🚪</div>
             <div>
-              <div class="step-title">Devolvemos com garantia</div>
-              <div class="step-desc">Garantia de 90 dias em peças e mão de obra. Por escrito.</div>
+              <div class="dor-title">Borracha da porta desgastada</div>
+              <div class="dor-desc">Gaxeta soltando ou ressecada faz a geladeira perder frio e gastar mais energia.</div>
             </div>
           </div>
         </div>
-        <a href="https://wa.me/5531997856023?text=Olá!+Quero+orçamento+para+conserto+de+compressor+da+geladeira!" class="btn-primary">
-          Pedir orçamento de compressor
+        <a href="https://wa.me/5531997856023?text=Olá!+Minha+geladeira+está+com+problema.+Pode+me+ajudar?" class="btn-wa" style="display:inline-flex;">
+          Descrever meu problema →
         </a>
-      </div>
-      <div class="main-service-img">
-        <div class="main-service-img-inner">🔧</div>
-        <div class="img-badge">✓ Pronto em até 24h</div>
-      </div>
-    </div>
-
-    <div class="main-service-badges">
-      <div class="badge-card">
-        <div class="badge-icon">🔬</div>
-        <div>
-          <div class="badge-title">Laboratório próprio</div>
-          <div class="badge-desc">Equipamentos especializados em refrigeração doméstica.</div>
-        </div>
-      </div>
-      <div class="badge-card">
-        <div class="badge-icon">💰</div>
-        <div>
-          <div class="badge-title">Até 60% mais barato</div>
-          <div class="badge-desc">Do que comprar uma nova. Peça original, preço justo.</div>
-        </div>
-      </div>
-      <div class="badge-card">
-        <div class="badge-icon">🛡️</div>
-        <div>
-          <div class="badge-title">Garantia de 90 dias</div>
-          <div class="badge-desc">Em peças e mão de obra. Documento entregue com o produto.</div>
-        </div>
-      </div>
-      <div class="badge-card">
-        <div class="badge-icon">⚡</div>
-        <div>
-          <div class="badge-title">Pronto em 24h</div>
-          <div class="badge-desc">Na maioria dos casos. Mesmo dia quando possível.</div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ── TODOS OS SERVIÇOS ─────────────────────────────────────────────── -->
-<section class="alt" id="todos-servicos">
-  <div class="container">
-    <div class="section-eyebrow">Todos os serviços</div>
-    <h2 class="section-title">
-      Outros reparos para<br>
-      <em>a sua geladeira</em>
-    </h2>
-    <p class="section-desc">Além do compressor, realizamos todos os principais reparos. O diagnóstico é gratuito.</p>
-    <div class="services-grid">
-      <a href="https://wa.me/5531997856023?text=Olá!+Preciso+trocar+a+gaxeta+da+minha+geladeira!" class="service-card">
-        <div class="service-card-icon">🪟</div>
-        <div class="service-card-title">Troca de Gaxeta</div>
-        <div class="service-card-desc">Borracha desgastada, geladeira perdendo frio pela porta. Vedação original.</div>
-        <div class="service-card-cta">Solicitar orçamento</div>
-      </a>
-      <a href="https://wa.me/5531997856023?text=Olá!+Minha+geladeira+está+acumulando+gelo,+preciso+de+orçamento!" class="service-card">
-        <div class="service-card-icon">🧊</div>
-        <div class="service-card-title">Degelo / Dreno</div>
-        <div class="service-card-desc">Geladeira acumulando gelo excessivo ou água vazando. Resistência e dreno.</div>
-        <div class="service-card-cta">Solicitar orçamento</div>
-      </a>
-      <a href="https://wa.me/5531997856023?text=Olá!+Minha+geladeira+está+com+problema+no+termostato!" class="service-card">
-        <div class="service-card-icon">🌡️</div>
-        <div class="service-card-title">Termostato</div>
-        <div class="service-card-desc">Geladeira muito gelada, muito quente ou temperatura instável.</div>
-        <div class="service-card-cta">Solicitar orçamento</div>
-      </a>
-      <a href="https://wa.me/5531997856023?text=Olá!+A+placa+eletrônica+da+minha+geladeira+está+com+problema!" class="service-card">
-        <div class="service-card-icon">🖥️</div>
-        <div class="service-card-title">Placa Eletrônica</div>
-        <div class="service-card-desc">Erro no painel, display apagado, geladeira que não liga.</div>
-        <div class="service-card-cta">Solicitar orçamento</div>
-      </a>
-      <a href="https://wa.me/5531997856023?text=Olá!+Minha+geladeira+está+fazendo+muito+barulho!" class="service-card">
-        <div class="service-card-icon">🔊</div>
-        <div class="service-card-title">Motor / Ventilador</div>
-        <div class="service-card-desc">Barulho excessivo, ventilador parado, geladeira vibrando muito.</div>
-        <div class="service-card-cta">Solicitar orçamento</div>
-      </a>
-      <a href="https://wa.me/5531997856023?text=Olá!+Tenho+outro+problema+na+minha+geladeira,+pode+me+ajudar?" class="service-card">
-        <div class="service-card-icon">🔩</div>
-        <div class="service-card-title">Outros Reparos</div>
-        <div class="service-card-desc">Prateleiras, iluminação, dispenser de água, diagnóstico geral.</div>
-        <div class="service-card-cta">Consultar especialista</div>
-      </a>
-    </div>
-    <p class="services-note">
-      Não sabe qual é o problema? <a href="https://wa.me/5531997856023?text=Minha+geladeira+está+com+problema.+Diagnóstico+gratuito?">O diagnóstico é gratuito.</a>
-    </p>
-  </div>
-</section>
-
-<!-- ── VIDEO ─────────────────────────────────────────────────────────── -->
-<section>
-  <div class="container">
-    <div class="section-eyebrow">Veja na prática</div>
-    <div class="video-inner">
-      <div class="video-embed">
-        <iframe
-          src="https://www.youtube.com/embed/dQw4w9WgXcQ"
-          title="Como fazemos o conserto de geladeiras"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowfullscreen>
-        </iframe>
       </div>
       <div>
-        <h2 class="section-title">Como fazemos o conserto<br><em>da sua geladeira</em></h2>
-        <div class="video-bullets">
-          <div class="video-bullet">
-            <div class="bullet-icon">🔧</div>
-            <div>
-              <div class="bullet-title">Técnico especializado em refrigeração</div>
-              <div class="bullet-desc">Experiência exclusiva em geladeiras de todas as marcas e modelos.</div>
-            </div>
-          </div>
-          <div class="video-bullet">
-            <div class="bullet-icon">✅</div>
-            <div>
-              <div class="bullet-title">Peças originais ou de primeira linha</div>
-              <div class="bullet-desc">Compressor, gás, gaxeta — só usamos o que garante durabilidade.</div>
-            </div>
-          </div>
-          <div class="video-bullet">
-            <div class="bullet-icon">⚡</div>
-            <div>
-              <div class="bullet-title">Pronto em até 24 horas</div>
-              <div class="bullet-desc">Na maioria dos casos o equipamento é devolvido no dia seguinte.</div>
-            </div>
-          </div>
+        <div class="dores-img">🔧
+          <div class="dores-badge">✓ Pronto em até 24h</div>
         </div>
-        <a href="https://wa.me/5531997856023?text=Vi+o+vídeo+e+quero+orçamento+para+minha+geladeira!" class="btn-primary">
-          Quero meu orçamento
-        </a>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ── STATS ──────────────────────────────────────────────────────────── -->
-<section class="stats-section alt">
-  <div class="container">
-    <div class="section-eyebrow" style="text-align:center;margin-bottom:32px;">Números que falam</div>
-    <div class="stats-grid">
-      <div class="stat-item">
-        <div class="stat-num">15.000+</div>
-        <div class="stat-lbl">Eletrodomésticos reparados</div>
+<!-- SERVIÇOS -->
+<section class="alt" id="servicos">
+  <div class="sec-w">
+    <div class="eyebrow">Todos os serviços</div>
+    <h2 class="sec-h">O que consertamos<br><em>na sua geladeira</em></h2>
+    <p class="sec-desc">Atendemos todas as marcas. O diagnóstico é gratuito — você só paga se quiser prosseguir.</p>
+    <div class="serv-grid">
+      <a href="https://wa.me/5531997856023?text=Olá!+Preciso+de+orçamento+para+conserto+de+compressor+da+geladeira!" class="serv-card">
+        <div class="serv-icon">🔧</div>
+        <div class="serv-problem">Mais comum</div>
+        <div class="serv-title">Compressor</div>
+        <div class="serv-desc">Geladeira não gela, fica quente ou o motor trava. Compressor original com garantia.</div>
+        <div class="serv-link">Pedir orçamento</div>
+      </a>
+      <a href="https://wa.me/5531997856023?text=Olá!+Preciso+de+orçamento+para+troca+da+gaxeta+da+geladeira!" class="serv-card">
+        <div class="serv-icon">🪟</div>
+        <div class="serv-problem">Gasta energia</div>
+        <div class="serv-title">Gaxeta (Borracha)</div>
+        <div class="serv-desc">Borracha da porta desgastada ou soltando — geladeira perde frio e consome mais.</div>
+        <div class="serv-link">Pedir orçamento</div>
+      </a>
+      <a href="https://wa.me/5531997856023?text=Olá!+Minha+geladeira+está+acumulando+gelo+e+vazando+água!" class="serv-card">
+        <div class="serv-icon">💧</div>
+        <div class="serv-problem">Água no piso</div>
+        <div class="serv-title">Degelo / Dreno</div>
+        <div class="serv-desc">Acúmulo de gelo no freezer ou água vazando embaixo. Resistência e dreno.</div>
+        <div class="serv-link">Pedir orçamento</div>
+      </a>
+      <a href="https://wa.me/5531997856023?text=Olá!+Minha+geladeira+está+com+temperatura+errada!" class="serv-card">
+        <div class="serv-icon">🌡️</div>
+        <div class="serv-problem">Temperatura errada</div>
+        <div class="serv-title">Termostato</div>
+        <div class="serv-desc">Geladeira muito gelada, muito quente ou variando demais. Termostato ou sensor.</div>
+        <div class="serv-link">Pedir orçamento</div>
+      </a>
+      <a href="https://wa.me/5531997856023?text=Olá!+A+placa+eletrônica+da+minha+geladeira+está+com+problema!" class="serv-card">
+        <div class="serv-icon">🖥️</div>
+        <div class="serv-problem">Não liga</div>
+        <div class="serv-title">Placa Eletrônica</div>
+        <div class="serv-desc">Erro no painel, display apagado ou geladeira que não responde ao controle.</div>
+        <div class="serv-link">Pedir orçamento</div>
+      </a>
+      <a href="https://wa.me/5531997856023?text=Olá!+Minha+geladeira+está+fazendo+barulho+e+preciso+de+ajuda!" class="serv-card">
+        <div class="serv-icon">🔩</div>
+        <div class="serv-problem">Outros</div>
+        <div class="serv-title">Motor / Outros</div>
+        <div class="serv-desc">Ventilador, iluminação, dispenser de água, prateleiras. Diagnóstico gratuito.</div>
+        <div class="serv-link">Consultar</div>
+      </a>
+    </div>
+    <p class="serv-note">Não sabe o que é? <a href="https://wa.me/5531997856023?text=Olá!+Minha+geladeira+está+com+problema+mas+não+sei+o+que+é.+Podem+fazer+o+diagnóstico?">Descrevemos o problema por você — diagnóstico grátis.</a></p>
+  </div>
+</section>
+
+<!-- COMO FUNCIONA -->
+<section class="flow">
+  <div class="sec-w">
+    <div class="eyebrow">Simples assim</div>
+    <h2 class="sec-h" style="color:#fff;">Como funciona</h2>
+    <p class="sec-desc">Em 4 passos você tem sua geladeira funcionando sem sair de casa.</p>
+    <div class="flow-steps">
+      <div class="step">
+        <div class="step-n">PASSO 01</div>
+        <div class="step-icon">💬</div>
+        <div class="step-title">Orçamento pelo WhatsApp</div>
+        <div class="step-desc">Resposta em até 30 minutos. Valor, prazo e diagnóstico claros. Sem surpresas.</div>
       </div>
-      <div class="stat-item">
-        <div class="stat-num">4.9</div>
-        <div class="stat-lbl">Avaliação Google</div>
+      <div class="step">
+        <div class="step-n">PASSO 02</div>
+        <div class="step-icon">🚗</div>
+        <div class="step-title">Buscamos no seu endereço</div>
+        <div class="step-desc">Retirada em BH e região metropolitana. Agendamos no horário que melhor te atende.</div>
       </div>
-      <div class="stat-item">
-        <div class="stat-num">8 anos</div>
-        <div class="stat-lbl">Desde 2017 em Belo Horizonte</div>
+      <div class="step">
+        <div class="step-n">PASSO 03</div>
+        <div class="step-icon">🔬</div>
+        <div class="step-title">Laboratório próprio</div>
+        <div class="step-desc">Diagnóstico completo, peças originais e reparo com procedência e cuidado.</div>
+      </div>
+      <div class="step">
+        <div class="step-n">PASSO 04</div>
+        <div class="step-icon">🛡️</div>
+        <div class="step-title">Entregamos com garantia</div>
+        <div class="step-desc">90 dias em peças e mão de obra. Documento entregue junto com o equipamento.</div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ── POR QUE A REPARO ELETRO ───────────────────────────────────────── -->
+<!-- GARANTIA -->
 <section>
-  <div class="container">
-    <div class="section-eyebrow">Por que a Reparo Eletro</div>
-    <h2 class="section-title">O padrão que um<br><em>eletrodoméstico merece</em></h2>
-    <div class="why-grid">
-      <div class="why-card">
-        <div class="why-card-icon">🔬</div>
-        <div class="why-card-title">Laboratório próprio</div>
-        <div class="why-card-desc">
-          Equipamentos especializados em refrigeração doméstica. Diagnóstico preciso sem achismos.
-          Temos estrutura para atender todas as marcas: Brastemp, Consul, Electrolux, Samsung, LG e outras.
-        </div>
-      </div>
-      <div class="why-card">
-        <div class="why-card-icon">🎁</div>
-        <div class="why-card-title">Diagnóstico gratuito</div>
-        <div class="why-card-desc">
-          Levamos seu equipamento, fazemos o diagnóstico completo sem custo e te informamos
-          o valor antes de qualquer reparo. Você decide.
-        </div>
-      </div>
-      <div class="why-card">
-        <div class="why-card-icon">⚡</div>
-        <div class="why-card-title">Mesmo dia quando possível</div>
-        <div class="why-card-desc">
-          Para os problemas mais comuns — gaxeta, termostato, resistência de degelo —
-          resolvemos no mesmo dia da retirada.
-        </div>
-      </div>
-      <div class="why-card">
-        <div class="why-card-icon">🚗</div>
-        <div class="why-card-title">Retirada e entrega em BH</div>
-        <div class="why-card-desc">
-          Buscamos no seu endereço em Belo Horizonte e região metropolitana. Agendamos no
-          horário mais conveniente para você.
+  <div class="sec-w">
+    <div class="eyebrow">Segurança total</div>
+    <h2 class="sec-h">Garantia de 90 dias<br><em>por escrito</em></h2>
+    <div class="garantia-box">
+      <div class="garantia-icon">🛡️</div>
+      <div>
+        <div class="garantia-title">Você está protegido</div>
+        <div class="garantia-desc">Toda peça substituída e todo serviço realizado tem <strong>90 dias de garantia</strong> documentada. Se o problema voltar no período de garantia, resolvemos <strong>sem custo adicional</strong>. Ponto.</div>
+        <div class="garantia-items">
+          <div class="g-item">Peças originais</div>
+          <div class="g-item">Mão de obra incluída</div>
+          <div class="g-item">Documento entregue</div>
+          <div class="g-item">Sem letras miúdas</div>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ── REVIEWS ────────────────────────────────────────────────────────── -->
-<section class="reviews-section">
-  <div class="container">
-    <div class="section-eyebrow">Avaliações Google</div>
-    <h2 class="section-title">O que dizem<br><em>nossos clientes</em></h2>
+<!-- DIFERENCIAIS vs COMPRAR NOVA -->
+<section class="alt">
+  <div class="sec-w">
+    <div class="eyebrow">Por que consertar?</div>
+    <h2 class="sec-h">Conserto vs<br><em>Geladeira nova</em></h2>
+    <p class="sec-desc">Antes de comprar uma nova, compare. Na maioria dos casos o conserto é a escolha mais inteligente.</p>
+    <div class="compare-grid">
+      <div class="compare-col us">
+        <div class="compare-logo us-logo">Reparo Eletro</div>
+        <div class="compare-stat-big green">R$ 350</div>
+        <div class="compare-label">custo médio de reparo de compressor</div>
+        <div style="margin-top:20px;text-align:left;font-size:13px;display:flex;flex-direction:column;gap:8px;">
+          <div style="color:#16a34a;font-weight:600;">✓ Diagnóstico gratuito</div>
+          <div style="color:#16a34a;font-weight:600;">✓ 90 dias de garantia</div>
+          <div style="color:#16a34a;font-weight:600;">✓ Peças originais</div>
+          <div style="color:#16a34a;font-weight:600;">✓ Pronto em 24h</div>
+        </div>
+        <div class="compare-source">Preço médio para conserto de compressor</div>
+      </div>
+      <div class="compare-vs">VS</div>
+      <div class="compare-col">
+        <div class="compare-logo" style="color:#6b7280;">Geladeira Nova</div>
+        <div class="compare-stat-big red">R$ 3.500</div>
+        <div class="compare-label">custo médio de uma geladeira Frost Free nova</div>
+        <div style="margin-top:20px;text-align:left;font-size:13px;display:flex;flex-direction:column;gap:8px;">
+          <div style="color:#dc2626;font-weight:600;">✗ Descarte do equipamento</div>
+          <div style="color:#dc2626;font-weight:600;">✗ Prazo de entrega</div>
+          <div style="color:#dc2626;font-weight:600;">✗ Custo 10x maior</div>
+          <div style="color:#dc2626;font-weight:600;">✗ Impacto ambiental</div>
+        </div>
+        <div class="compare-source">Preço médio mercado, junho 2026</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MARCAS QUE ATENDEMOS -->
+<section>
+  <div class="sec-w">
+    <div class="eyebrow">Atendemos todas as marcas</div>
+    <h2 class="sec-h">Qual é a sua<br><em>geladeira?</em></h2>
+    <p class="sec-desc">Brastemp, Consul, Electrolux, Samsung, LG, Whirlpool — consertamos todas.</p>
+    <div class="marcas-grid">
+      <div class="marca">Brastemp</div>
+      <div class="marca">Consul</div>
+      <div class="marca">Electrolux</div>
+      <div class="marca">Samsung</div>
+      <div class="marca">LG</div>
+      <div class="marca">Whirlpool</div>
+      <div class="marca">Panasonic</div>
+      <div class="marca">Philco</div>
+      <div class="marca">Midea</div>
+      <div class="marca">Outras →</div>
+    </div>
+  </div>
+</section>
+
+<!-- REVIEWS -->
+<section class="alt">
+  <div class="sec-w">
+    <div class="eyebrow">O que dizem os clientes</div>
+    <h2 class="sec-h">+15.000 reparos.<br><em>Clientes satisfeitos.</em></h2>
     <div class="reviews-grid">
-      <div class="review-card">
+      <div class="review">
         <div class="review-stars">★★★★★</div>
-        <p class="review-text">"Levei minha geladeira Brastemp Frost Free que estava parando de gelar. Em menos de 24h já estava funcionando perfeitamente. Atendimento excelente e preço justo."</p>
-        <div class="review-author">
-          <div class="review-avatar">M</div>
-          <div>
-            <div class="review-name">Maria Fernanda C.</div>
-            <div class="review-source">Avaliação verificada · Google</div>
-          </div>
-        </div>
+        <p class="review-text">"Geladeira Brastemp Frost Free parou de gelar. Em menos de 24h já estava funcionando. Atendimento excelente e preço muito justo."</p>
+        <div class="review-author"><div class="review-av">M</div><div><div class="review-name">Maria Fernanda C.</div><div class="review-src">Avaliação verificada · Google</div></div></div>
       </div>
-      <div class="review-card">
+      <div class="review">
         <div class="review-stars">★★★★★</div>
-        <p class="review-text">"Atendimento incrível! O técnico foi super cuidadoso, explicou tudo o que ia fazer antes de fazer. Trocaram o compressor e a geladeira ficou nova. Recomendo!"</p>
-        <div class="review-author">
-          <div class="review-avatar">R</div>
-          <div>
-            <div class="review-name">Ricardo Alves</div>
-            <div class="review-source">Avaliação verificada · Google</div>
-          </div>
-        </div>
+        <p class="review-text">"Técnico foi super cuidadoso, explicou tudo antes de fazer. Trocaram o compressor e a geladeira ficou como nova. Muito obrigado!"</p>
+        <div class="review-author"><div class="review-av">R</div><div><div class="review-name">Ricardo Alves</div><div class="review-src">Avaliação verificada · Google</div></div></div>
       </div>
-      <div class="review-card">
+      <div class="review">
         <div class="review-stars">★★★★★</div>
-        <p class="review-text">"Minha Side by Side estava acumulando gelo e vazando água. Vieram no mesmo dia, diagnosticaram o problema e resolveram. Garantia de 90 dias e tudo por escrito."</p>
-        <div class="review-author">
-          <div class="review-avatar">A</div>
-          <div>
-            <div class="review-name">Ana Paula S.</div>
-            <div class="review-source">Avaliação verificada · Google</div>
-          </div>
-        </div>
-      </div>
-      <div class="review-card">
-        <div class="review-stars">★★★★★</div>
-        <p class="review-text">"Super profissionais! Geladeira Electrolux Frost Free com problema elétrico. Resolveram rápido, com peça original e a garantia deles realmente vale. 10 de 10!"</p>
-        <div class="review-author">
-          <div class="review-avatar">J</div>
-          <div>
-            <div class="review-name">João Luís M.</div>
-            <div class="review-source">Avaliação verificada · Google</div>
-          </div>
-        </div>
-      </div>
-      <div class="review-card">
-        <div class="review-stars">★★★★★</div>
-        <p class="review-text">"Precisava trocar a borracha da porta da geladeira. Atendimento pelo WhatsApp muito rápido. Vieram buscar, resolveram e entregaram em perfeito estado. Ótima experiência."</p>
-        <div class="review-author">
-          <div class="review-avatar">C</div>
-          <div>
-            <div class="review-name">Carla Beatriz</div>
-            <div class="review-source">Avaliação verificada · Google</div>
-          </div>
-        </div>
-      </div>
-      <div class="review-card">
-        <div class="review-stars">★★★★★</div>
-        <p class="review-text">"Indicado por uma amiga e não me arrependo. Técnico pontual, simpático e muito competente. Minha geladeira Samsung voltou a funcionar como nova. Muito obrigado!"</p>
-        <div class="review-author">
-          <div class="review-avatar">P</div>
-          <div>
-            <div class="review-name">Pedro Henrique T.</div>
-            <div class="review-source">Avaliação verificada · Google</div>
-          </div>
-        </div>
+        <p class="review-text">"Side by Side acumulando gelo e vazando água. Vieram no mesmo dia, diagnosticaram e resolveram. Garantia de 90 dias e tudo documentado."</p>
+        <div class="review-author"><div class="review-av">A</div><div><div class="review-name">Ana Paula S.</div><div class="review-src">Avaliação verificada · Google</div></div></div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ── NOSSA ESTRUTURA ────────────────────────────────────────────────── -->
-<section>
-  <div class="container">
-    <div class="section-eyebrow">Nossa estrutura</div>
-    <h2 class="section-title">Laboratório e loja<br><em>em BH</em></h2>
-    <p class="section-desc" style="margin-bottom:32px;">Barro Preto · Belo Horizonte. Clique nas fotos para ampliar.</p>
-    <div class="gallery-grid">
-      <div class="gallery-item"><div class="gallery-item-inner" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe)">🔧</div></div>
-      <div class="gallery-item"><div class="gallery-item-inner" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0)">❄️</div></div>
-      <div class="gallery-item"><div class="gallery-item-inner" style="background:linear-gradient(135deg,#fef3c7,#fde68a)">⚡</div></div>
-      <div class="gallery-item"><div class="gallery-item-inner" style="background:linear-gradient(135deg,#f3e8ff,#e9d5ff)">🛠️</div></div>
-      <div class="gallery-item"><div class="gallery-item-inner" style="background:linear-gradient(135deg,#fee2e2,#fecaca)">🔬</div></div>
-      <div class="gallery-item"><div class="gallery-item-inner" style="background:linear-gradient(135deg,#ecfdf5,#a7f3d0)">✅</div></div>
-    </div>
-  </div>
-</section>
-
-<!-- ── CTA FINAL ──────────────────────────────────────────────────────── -->
+<!-- CTA FINAL -->
 <section class="cta-final">
-  <div class="container">
-    <h2 class="cta-final-title">Sua geladeira com problema?<br><em>A gente resolve hoje.</em></h2>
-    <p class="cta-final-desc">Orçamento gratuito, sem compromisso. Fale com um especialista agora.</p>
+  <div class="sec-w">
+    <div class="eyebrow" style="color:#fbbf24;">Pronto para resolver?</div>
+    <h2 class="cta-final-h">Sua geladeira com problema?<br><em>A gente resolve hoje.</em></h2>
+    <p class="cta-final-desc">Orçamento gratuito, sem compromisso. Retirada no mesmo dia em BH.</p>
     <div class="cta-final-btns">
-      <a href="https://wa.me/5531997856023?text=Olá!+Minha+geladeira+está+com+problema.+Preciso+de+orçamento!" class="btn-primary">
-        💬 Falar com especialista
+      <a href="https://wa.me/5531997856023?text=Olá!+Minha+geladeira+está+com+problema.+Preciso+de+orçamento+gratuito!" class="btn-wa" style="font-size:16px;padding:16px 30px;">
+        💬 Falar agora no WhatsApp
       </a>
-      <a href="tel:5531997856023" class="btn-ghost">📞 (31) 9 9785-6023</a>
+      <a href="tel:5531997856023" class="btn-tel" style="font-size:15px;">📞 (31) 9 9785-6023</a>
     </div>
+    <p class="cta-small">⚡ Resposta em até 30 minutos · Diagnóstico gratuito · 90 dias de garantia</p>
   </div>
 </section>
 
-<!-- ── FOOTER ─────────────────────────────────────────────────────────── -->
+<!-- FOOTER -->
 <footer>
-  <div class="footer-inner">
-    <div>
-      <div class="footer-logo">Reparo<span>Eletro</span></div>
-    </div>
+  <div class="footer-w">
+    <div class="footer-logo">Reparo<b>Eletro</b></div>
     <div class="footer-info">
-      <strong>Reparo Eletro BH</strong> — Rua Barro Preto, 663 · Belo Horizonte – MG<br>
-      📞 <a href="tel:5531997856023">(31) 9 9785-6023</a> · Seg–Sex 08h–18h · Sáb 08h–13h
+      Rua Barro Preto, 663 · Belo Horizonte – MG<br>
+      <a href="tel:5531997856023">(31) 9 9785-6023</a> · Seg–Sex 08h–18h · Sáb 08h–13h
     </div>
-    <div class="footer-info" style="text-align:right;">
-      REPARO ELETRO ASSISTÊNCIA TÉCNICA<br>
-      <a href="/geladeira">Geladeira</a> · <a href="/microondas">Microondas</a> · <a href="/bebedouro">Bebedouro</a>
+    <div class="footer-links">
+      © 2026 Reparo Eletro BH<br>
+      <a href="/geladeira">Geladeira</a>
+      <a href="/">Home</a>
     </div>
   </div>
 </footer>
 
-<!-- ── WHATSAPP FLOAT ─────────────────────────────────────────────────── -->
-<a class="wa-float" href="https://wa.me/5531997856023?text=Olá!+Minha+geladeira+está+com+problema!" target="_blank" aria-label="WhatsApp">
-  <svg width="28" height="28" viewBox="0 0 24 24" fill="#fff">
-    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-  </svg>
+<!-- WA FLOAT -->
+<a class="wa" href="https://wa.me/5531997856023?text=Olá!+Minha+geladeira+está+com+problema!" target="_blank" aria-label="WhatsApp">
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
 </a>
 
-<script>
-  // Model tabs
-  function setTab(el) {
-    document.querySelectorAll('.model-tab').forEach(t => t.classList.remove('active'));
-    el.classList.add('active');
-  }
-
-  // Smooth scroll
-  document.querySelectorAll('a[href^="#"]').forEach(a => {
-    a.addEventListener('click', e => {
-      const target = document.querySelector(a.getAttribute('href'));
-      if (target) { e.preventDefault(); target.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-    });
-  });
-</script>
 </body>
 </html>
