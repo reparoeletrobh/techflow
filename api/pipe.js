@@ -1881,6 +1881,53 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok:true, data:hoje, totalErp:erp.length, totalFin:fin.length, erp, finalizado:fin });
   }
 
+    // ── GET debug-ficha — busca ficha por nome/tel em pipe + board + frenteloja ─────
+  if (action === 'debug-ficha') {
+    const q = (req.query.q||'').toLowerCase().trim();
+    if (!q) return res.status(400).json({ ok:false, error:'?q= obrigatório' });
+
+    const BOARD_KEY = 'reparoeletro_board';
+    const FL_KEY    = 'reparoeletro_frenteloja';
+
+    const [pipeDb, boardDb, flDb] = await Promise.all([
+      dbGet(PIPE_KEY),
+      dbGet(BOARD_KEY),
+      dbGet(FL_KEY),
+    ]);
+
+    function matchQ(c) {
+      return (c.nomeContato||c.nome||c.title||'').toLowerCase().includes(q) ||
+             (c.telefone||c.tel||'').replace(/\D/g,'').includes(q.replace(/\D/g,'')) ||
+             (c.id||'').toLowerCase().includes(q);
+    }
+
+    const pipeCards = (pipeDb?.cards||[]).filter(matchQ).map(function(c){
+      return { origem:'pipe', id:c.id, nome:c.nomeContato||c.title, tel:c.telefone,
+               phase:c.phase, valor:c.valor, equipamento:c.equipamento||c.descricao,
+               movedAt:c.movedAt, criadoEm:c.criadoEm, history:(c.history||[]).slice(-5) };
+    });
+
+    const boardCards = (boardDb?.cards||[]).filter(matchQ).map(function(c){
+      return { origem:'board', id:c.pipefyId||c.id, nome:c.nomeContato||c.title, tel:c.telefone,
+               phaseId:c.phaseId, movedAt:c.movedAt, tecnico:c.tecnico,
+               localOnly:c.localOnly, age:c.age };
+    });
+
+    const flCards = ((flDb?.fichas||flDb?.cards||[]).filter(matchQ)).map(function(c){
+      return { origem:'frenteloja', id:c.id, nome:c.nome||c.nomeContato, tel:c.telefone,
+               phase:c.phase||c.status, equipamento:c.equipamento||c.aparelho,
+               criadoEm:c.criadoEm, obs:c.obs };
+    });
+
+    return res.status(200).json({
+      ok: true, busca: q,
+      total: pipeCards.length + boardCards.length + flCards.length,
+      pipe:       pipeCards,
+      board:      boardCards,
+      frenteloja: flCards,
+    });
+  }
+
     // ── GET fix-compra-lote — atualiza telefone em todas fichas sem telefone ────
   if (action === 'fix-compra-lote') {
     var pipeDb2 = (await dbGet(PIPE_KEY)) || defaultDB();
