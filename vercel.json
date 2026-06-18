@@ -75,6 +75,10 @@
   ],
   "rewrites": [
     {
+      "source": "/buscar-ficha",
+      "destination": "/buscar-ficha.html"
+    },
+    {
       "source": "/geladeira",
       "destination": "/geladeira.html"
     },

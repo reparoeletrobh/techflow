@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Buscar Ficha — Reparo Eletro</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#07080a;--s1:#0f1114;--s2:#181b1f;--bdr:#1e2228;--tx:#f0f2f5;--mu:#5a6270;--gr:#22c55e;--ye:#f5c800;--re:#ef4444;--bl:#3b9eff;--or:#f97316;--pu:#a855f7;--fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--tx);font-family:var(--fb);min-height:100vh;padding:0 0 60px;}
+header{background:var(--s1);border-bottom:1px solid var(--bdr);padding:16px 20px;display:flex;align-items:center;gap:12px;}
+.logo{font-family:var(--fh);font-size:16px;font-weight:800;}
+.logo span{color:var(--ye);}
+.back{font-size:12px;color:var(--mu);text-decoration:none;padding:6px 12px;border:1px solid var(--bdr);border-radius:6px;}
+.back:hover{color:var(--tx);border-color:var(--bl);}
+.search-area{padding:32px 20px 20px;max-width:700px;margin:0 auto;}
+.search-title{font-family:var(--fh);font-size:22px;font-weight:800;margin-bottom:6px;}
+.search-sub{font-size:13px;color:var(--mu);margin-bottom:20px;}
+.search-row{display:flex;gap:10px;}
+.search-input{flex:1;background:var(--s1);border:1px solid var(--bdr);border-radius:10px;color:var(--tx);font-family:var(--fm);font-size:14px;padding:12px 16px;outline:none;transition:border-color .15s;}
+.search-input:focus{border-color:var(--bl);}
+.search-btn{background:var(--bl);color:#fff;border:none;border-radius:10px;padding:12px 22px;font-family:var(--fm);font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;}
+.search-btn:hover{background:#2d8ce8;}
+.results{max-width:700px;margin:0 auto;padding:0 20px;}
+.loading{text-align:center;padding:40px;color:var(--mu);font-size:13px;display:none;}
+.empty{text-align:center;padding:40px;color:var(--mu);font-size:13px;display:none;}
+.origem-title{font-family:var(--fm);font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--mu);margin:24px 0 10px;text-transform:uppercase;display:flex;align-items:center;gap:8px;}
+.origem-title::after{content:'';flex:1;height:1px;background:var(--bdr);}
+.card{background:var(--s1);border:1px solid var(--bdr);border-radius:12px;padding:16px;margin-bottom:10px;}
+.card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px;}
+.card-nome{font-size:15px;font-weight:700;}
+.card-id{font-family:var(--fm);font-size:10px;color:var(--mu);}
+.phase-badge{font-family:var(--fm);font-size:10px;font-weight:700;padding:4px 10px;border-radius:99px;flex-shrink:0;}
+.phase-erp{background:rgba(249,115,22,.15);color:var(--or);border:1px solid rgba(249,115,22,.2);}
+.phase-finalizado{background:rgba(34,197,94,.1);color:var(--gr);border:1px solid rgba(34,197,94,.2);}
+.phase-aprovados{background:rgba(34,197,94,.1);color:var(--gr);border:1px solid rgba(34,197,94,.2);}
+.phase-producao{background:rgba(59,158,255,.1);color:var(--bl);border:1px solid rgba(59,158,255,.2);}
+.phase-aguardando_aprovacao{background:rgba(245,200,0,.1);color:var(--ye);border:1px solid rgba(245,200,0,.2);}
+.phase-ultima_chamada{background:rgba(239,68,68,.1);color:var(--re);border:1px solid rgba(239,68,68,.2);}
+.phase-default{background:var(--s2);color:var(--mu);border:1px solid var(--bdr);}
+.card-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.field{background:var(--s2);border-radius:6px;padding:8px 10px;}
+.field-lbl{font-family:var(--fm);font-size:9px;color:var(--mu);letter-spacing:.08em;margin-bottom:3px;}
+.field-val{font-size:13px;word-break:break-word;}
+.field-val.mono{font-family:var(--fm);font-size:11px;}
+.history-title{font-family:var(--fm);font-size:9px;color:var(--mu);letter-spacing:.08em;margin:12px 0 6px;}
+.history-row{display:flex;gap:8px;align-items:center;font-family:var(--fm);font-size:10px;color:var(--mu);padding:4px 0;border-bottom:1px solid var(--bdr);}
+.history-row:last-child{border-bottom:none;}
+.history-phase{color:var(--tx);font-weight:500;}
+.history-ts{font-size:9px;opacity:.6;}
+.copy-btn{font-family:var(--fm);font-size:9px;padding:3px 8px;border-radius:4px;border:1px solid var(--bdr);background:transparent;color:var(--mu);cursor:pointer;transition:all .15s;flex-shrink:0;}
+.copy-btn:hover{border-color:var(--bl);color:var(--bl);}
+.total-badge{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--ye);color:#000;font-size:11px;font-weight:800;}
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/adm.html" class="back">← ADM</a>
+  <div class="logo">Reparo<span>Eletro</span></div>
+  <span style="font-family:var(--fm);font-size:11px;color:var(--mu);">Buscar Ficha</span>
+</header>
+
+<div class="search-area">
+  <div class="search-title">🔍 Buscar Ficha</div>
+  <div class="search-sub">Busque por nome, telefone ou ID da ficha — pipe, board e frente de loja</div>
+  <div class="search-row">
+    <input class="search-input" id="q" type="text" placeholder="Ex: Jerusa, 8874, PIPE-123..." 
+      onkeydown="if(event.key==='Enter')buscar()">
+    <button class="search-btn" onclick="buscar()">Buscar</button>
+  </div>
+</div>
+
+<div class="results">
+  <div class="loading" id="loading">⏳ Buscando...</div>
+  <div class="empty" id="empty">Nenhuma ficha encontrada para "<span id="empty-q"></span>"</div>
+  <div id="result-body"></div>
+</div>
+
+<script>
+function g(id){return document.getElementById(id);}
+function fmtDt(ts){
+  if(!ts)return'—';
+  try{
+    var d=new Date(ts);
+    return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){return ts;}
+}
+function phaseName(p){
+  var map={erp:'ERP',finalizado:'Finalizado',aprovados:'Aprovados',producao:'Produção',
+    aguardando_aprovacao:'Aguardando Aprovação',ultima_chamada:'Última Chamada',
+    video_enviado:'Vídeo Enviado',solicitar_entrega:'Solicitar Entrega',
+    receber:'Receber',garantia:'Garantia',analise_compra:'Análise Compra'};
+  return map[p]||p||'—';
+}
+function phaseCls(p){
+  var m={erp:'phase-erp',finalizado:'phase-finalizado',aprovados:'phase-aprovados',
+    producao:'phase-producao',aguardando_aprovacao:'phase-aguardando_aprovacao',
+    ultima_chamada:'phase-ultima_chamada'};
+  return 'phase-badge '+(m[p]||'phase-default');
+}
+function copyText(txt,btn){
+  navigator.clipboard.writeText(txt).then(function(){
+    btn.textContent='✅';setTimeout(function(){btn.textContent='📋';},1200);
+  }).catch(function(){
+    var el=document.createElement('textarea');el.value=txt;
+    document.body.appendChild(el);el.select();document.execCommand('copy');
+    document.body.removeChild(el);
+    btn.textContent='✅';setTimeout(function(){btn.textContent='📋';},1200);
+  });
+}
+
+async function buscar(){
+  var q=g('q').value.trim();
+  if(!q)return;
+  g('loading').style.display='block';
+  g('empty').style.display='none';
+  g('result-body').innerHTML='';
+
+  try{
+    var r=await fetch('/api/pipe?action=debug-ficha&q='+encodeURIComponent(q)).then(x=>x.json());
+    g('loading').style.display='none';
+
+    if(!r.ok||r.total===0){
+      g('empty-q').textContent=q;
+      g('empty').style.display='block';
+      return;
+    }
+
+    var html='';
+
+    // ── PIPE ──────────────────────────────────────────────────
+    if(r.pipe&&r.pipe.length){
+      html+=`<div class="origem-title"><span class="total-badge">${r.pipe.length}</span> PIPE (Sistema Principal)</div>`;
+      r.pipe.forEach(function(c){
+        var hist='';
+        if(c.history&&c.history.length){
+          hist='<div class="history-title">HISTÓRICO DE MOVIMENTAÇÃO</div>';
+          hist+=c.history.map(function(h){
+            return '<div class="history-row"><span class="history-phase">'+phaseName(h.phase||h.to||h)+'</span><span class="history-ts">'+fmtDt(h.ts||h.movedAt||'')+'</span></div>';
+          }).join('');
+        }
+        html+=`<div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-nome">${c.nome||'—'}</div>
+              <div class="card-id">${c.id}</div>
+            </div>
+            <span class="${phaseCls(c.phase)}">${phaseName(c.phase)}</span>
+          </div>
+          <div class="card-fields">
+            <div class="field"><div class="field-lbl">TELEFONE</div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <div class="field-val mono">${c.tel||'—'}</div>
+                ${c.tel&&c.tel!=='—'?`<button class="copy-btn" onclick="copyText('${(c.tel||'').replace(/\D/g,'')}',this)">📋</button>`:''}
+              </div>
+            </div>
+            <div class="field"><div class="field-lbl">VALOR</div><div class="field-val">${c.valor||'—'}</div></div>
+            <div class="field" style="grid-column:1/-1"><div class="field-lbl">EQUIPAMENTO</div><div class="field-val">${c.equipamento||'—'}</div></div>
+            <div class="field"><div class="field-lbl">ENTROU NA FASE</div><div class="field-val mono" style="font-size:11px;">${fmtDt(c.movedAt)}</div></div>
+            <div class="field"><div class="field-lbl">CRIADO EM</div><div class="field-val mono" style="font-size:11px;">${fmtDt(c.criadoEm)}</div></div>
+          </div>
+          ${hist ? '<div style="margin-top:12px;">'+hist+'</div>' : ''}
+        </div>`;
+      });
+    }
+
+    // ── BOARD ──────────────────────────────────────────────────
+    if(r.board&&r.board.length){
+      html+=`<div class="origem-title"><span class="total-badge">${r.board.length}</span> BOARD (Técnico)</div>`;
+      r.board.forEach(function(c){
+        html+=`<div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-nome">${c.nome||'—'}</div>
+              <div class="card-id">${c.id}</div>
+            </div>
+            <span class="phase-badge phase-producao">${c.phaseId||'—'}</span>
+          </div>
+          <div class="card-fields">
+            <div class="field"><div class="field-lbl">TÉCNICO</div><div class="field-val">${c.tecnico||'—'}</div></div>
+            <div class="field"><div class="field-lbl">IDADE</div><div class="field-val">${c.age!=null?c.age+'d':'—'}</div></div>
+            <div class="field"><div class="field-lbl">MOVIDO EM</div><div class="field-val mono" style="font-size:11px;">${fmtDt(c.movedAt)}</div></div>
+            <div class="field"><div class="field-lbl">LOCAL</div><div class="field-val">${c.localOnly?'Sim':'Não'}</div></div>
+          </div>
+        </div>`;
+      });
+    }
+
+    // ── FRENTE DE LOJA ─────────────────────────────────────────
+    if(r.frenteloja&&r.frenteloja.length){
+      html+=`<div class="origem-title"><span class="total-badge">${r.frenteloja.length}</span> FRENTE DE LOJA</div>`;
+      r.frenteloja.forEach(function(c){
+        html+=`<div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-nome">${c.nome||'—'}</div>
+              <div class="card-id">${c.id}</div>
+            </div>
+            <span class="phase-badge ${c.phase==='producao'?'phase-producao':'phase-default'}">${phaseName(c.phase)}</span>
+          </div>
+          <div class="card-fields">
+            <div class="field"><div class="field-lbl">TELEFONE</div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <div class="field-val mono">${c.tel||'—'}</div>
+                ${c.tel&&c.tel!=='—'?`<button class="copy-btn" onclick="copyText('${(c.tel||'').replace(/\D/g,'')}',this)">📋</button>`:''}
+              </div>
+            </div>
+            <div class="field"><div class="field-lbl">CRIADO EM</div><div class="field-val mono" style="font-size:11px;">${fmtDt(c.criadoEm)}</div></div>
+            <div class="field" style="grid-column:1/-1"><div class="field-lbl">EQUIPAMENTO</div><div class="field-val">${c.equipamento||'—'}</div></div>
+            ${c.obs?`<div class="field" style="grid-column:1/-1"><div class="field-lbl">OBS</div><div class="field-val">${c.obs}</div></div>`:''}
+          </div>
+        </div>`;
+      });
+    }
+
+    g('result-body').innerHTML=html;
+  }catch(e){
+    g('loading').style.display='none';
+    g('result-body').innerHTML='<div style="color:var(--re);font-family:var(--fm);font-size:12px;padding:20px;">Erro: '+e.message+'</div>';
+  }
+}
+
+// Buscar automaticamente se há ?q= na URL
+var qs=new URLSearchParams(location.search).get('q');
+if(qs){ g('q').value=qs; buscar(); }
+</script>
+</body>
+</html>
