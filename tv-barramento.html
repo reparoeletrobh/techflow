@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Barramento — TV Técnico</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500;600&family=Syne:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#07080a;--s1:#0f1114;--s2:#181b1f;--bdr:#1e2228;--tx:#f0f2f5;--mu:#5a6270;
+  --gr:#22c55e;--ye:#f5c800;--re:#ef4444;--bl:#3b9eff;--or:#f97316;--pu:#e879f9;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--tx);font-family:var(--fb);min-height:100vh;}
+
+/* HEADER */
+header{background:var(--s1);border-bottom:1px solid var(--bdr);height:52px;
+  display:flex;align-items:center;padding:0 16px;gap:10px;position:sticky;top:0;z-index:50;}
+.logo{font-family:var(--fh);font-size:15px;font-weight:800;}
+.logo span{color:var(--pu);}
+.back{font-family:var(--fm);font-size:10px;padding:5px 10px;border:1px solid var(--bdr);
+  border-radius:6px;color:var(--mu);text-decoration:none;}
+.back:hover{color:var(--tx);border-color:var(--pu);}
+.hbtn{font-family:var(--fm);font-size:10px;font-weight:700;padding:6px 14px;
+  border-radius:6px;border:none;cursor:pointer;transition:opacity .15s;}
+.hbtn:hover{opacity:.85;}
+.hbtn-pu{background:var(--pu);color:#000;}
+.hbtn-gr{background:var(--gr);color:#000;}
+
+/* BODY */
+.main{padding:16px;max-width:1000px;margin:0 auto;}
+.section-title{font-family:var(--fh);font-size:16px;font-weight:800;margin-bottom:12px;
+  display:flex;align-items:center;gap:8px;}
+.count-badge{font-family:var(--fm);font-size:11px;font-weight:700;
+  background:var(--pu);color:#000;border-radius:99px;padding:2px 9px;}
+
+/* GRID BARRAMENTO */
+.barr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:28px;}
+.barr-card{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:14px;}
+.barr-card.concluido{border-color:rgba(245,200,0,.3);background:rgba(245,200,0,.03);}
+.bc-num{font-family:var(--fm);font-size:10px;color:var(--mu);margin-bottom:4px;}
+.bc-nome{font-size:14px;font-weight:700;margin-bottom:6px;}
+.bc-info{background:rgba(232,121,249,.08);border:1px solid rgba(232,121,249,.15);
+  border-radius:6px;padding:8px 10px;margin-bottom:10px;}
+.bc-pol{font-family:var(--fh);font-size:20px;font-weight:800;color:var(--pu);line-height:1;}
+.bc-peca{font-family:var(--fm);font-size:10px;color:var(--pu);margin-top:2px;}
+.bc-desc{font-family:var(--fm);font-size:10px;color:var(--mu);margin-top:3px;}
+.bc-btns{display:flex;gap:6px;}
+.btn-sm{flex:1;font-family:var(--fm);font-size:10px;font-weight:700;
+  padding:6px 4px;border-radius:6px;cursor:pointer;border:none;transition:opacity .15s;}
+.btn-sm:hover{opacity:.85;}
+.btn-local{background:rgba(34,197,94,.12);color:var(--gr);border:1px solid rgba(34,197,94,.25) !important;border:none;}
+.btn-inet{background:rgba(59,158,255,.12);color:var(--bl);border:1px solid rgba(59,158,255,.25) !important;border:none;}
+
+/* GRID PRODUÇÃO (aguardando barramento) */
+.prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:28px;}
+.prod-card{background:var(--s1);border:1px solid rgba(245,200,0,.25);border-radius:10px;padding:14px;}
+.prod-card.disponivel{border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.04);}
+.pc-badge{font-family:var(--fm);font-size:9px;font-weight:700;letter-spacing:.08em;
+  padding:3px 8px;border-radius:99px;margin-bottom:8px;display:inline-block;}
+.badge-aguard{background:rgba(245,200,0,.12);color:var(--ye);}
+.badge-disp{background:rgba(34,197,94,.12);color:var(--gr);}
+.btn-chegou{width:100%;font-family:var(--fm);font-size:10px;font-weight:700;
+  padding:7px;border-radius:6px;border:none;background:var(--gr);color:#000;
+  cursor:pointer;margin-top:8px;transition:opacity .15s;}
+.btn-chegou:hover{opacity:.85;}
+
+/* FORM ADICIONAR */
+.add-form{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:16px;margin-bottom:24px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+.form-row-3{display:grid;grid-template-columns:80px 1fr 1fr;gap:8px;margin-bottom:8px;}
+.inp{width:100%;background:var(--s2);border:1px solid var(--bdr);border-radius:6px;
+  color:var(--tx);font-family:var(--fm);font-size:11px;padding:8px 10px;outline:none;}
+.inp:focus{border-color:var(--pu);}
+.inp-label{font-family:var(--fm);font-size:9px;color:var(--mu);letter-spacing:.08em;
+  margin-bottom:4px;display:block;}
+.btn-add{font-family:var(--fm);font-size:11px;font-weight:700;padding:9px 20px;
+  border-radius:7px;border:none;background:var(--pu);color:#000;cursor:pointer;}
+
+/* MODAL COMPRAR */
+.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:200;
+  align-items:center;justify-content:center;}
+.ov.open{display:flex;}
+.modal{background:var(--s1);border:1px solid var(--bdr);border-radius:14px;
+  padding:20px;width:460px;max-width:95vw;max-height:88vh;
+  display:flex;flex-direction:column;gap:12px;}
+.modal-h{display:flex;align-items:center;justify-content:space-between;}
+.modal-title{font-family:var(--fh);font-size:14px;font-weight:800;}
+.modal-close{background:none;border:none;color:var(--mu);font-size:22px;cursor:pointer;}
+.modal-list{overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px;}
+.modal-item{background:var(--s2);border-radius:7px;padding:10px 12px;
+  display:flex;align-items:center;gap:10px;}
+.mi-info{flex:1;}
+.mi-nome{font-size:12px;font-weight:700;}
+.mi-linha{font-family:var(--fm);font-size:10px;color:var(--mu);margin-top:2px;}
+.btn-copy{font-family:var(--fm);font-size:9px;padding:4px 10px;border-radius:5px;
+  border:1px solid var(--bdr);background:transparent;color:var(--mu);cursor:pointer;}
+.btn-copy:hover{border-color:var(--pu);color:var(--pu);}
+.modal-footer{border-top:1px solid var(--bdr);padding-top:10px;
+  display:flex;flex-direction:column;gap:8px;}
+.lote-txt{width:100%;background:var(--s2);border:1px solid var(--bdr);border-radius:6px;
+  color:var(--tx);font-family:var(--fm);font-size:10px;padding:8px;resize:none;}
+.modal-btns{display:flex;gap:8px;}
+.btn-modal{flex:1;font-family:var(--fm);font-size:10px;font-weight:700;
+  padding:8px;border-radius:6px;cursor:pointer;border:1px solid var(--bdr);}
+.btn-copy-all{background:transparent;color:var(--tx);}
+.btn-concluir{background:var(--ye);color:#000;border-color:transparent;}
+
+/* TOAST */
+.toast-w{position:fixed;bottom:18px;right:18px;z-index:999;display:flex;flex-direction:column;gap:6px;}
+.toast{background:var(--s1);border:1px solid var(--bdr);border-radius:8px;
+  padding:10px 14px;font-family:var(--fm);font-size:10px;
+  animation:slideUp .2s ease;}
+.toast.g{border-color:rgba(34,197,94,.4);color:var(--gr);}
+.toast.r{border-color:rgba(239,68,68,.4);color:var(--re);}
+@keyframes slideUp{from{transform:translateY(8px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/tv/tecnico" class="back">← Técnico</a>
+  <div class="logo" style="flex:1;">🔩 Bar<span>ramento</span></div>
+  <button class="hbtn hbtn-pu" onclick="abrirComprar()" id="btn-comprar" style="display:none;">🛒 Comprar</button>
+  <button class="hbtn" onclick="carregar()" style="background:var(--s2);color:var(--mu);">↻</button>
+</header>
+
+<div class="main">
+
+  <!-- ADICIONAR CARD NO BARRAMENTO -->
+  <div class="add-form">
+    <div style="font-family:var(--fm);font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--pu);margin-bottom:12px;">MOVER CARD PARA BARRAMENTO</div>
+    <div class="form-row">
+      <div>
+        <label class="inp-label">Nº OS / NOME DO CARD</label>
+        <input class="inp" id="add-os" placeholder="Ex: PIPE-ABC123 ou nome...">
+      </div>
+      <div>
+        <label class="inp-label">TÉCNICO (opcional)</label>
+        <input class="inp" id="add-tec" placeholder="Ex: José">
+      </div>
+    </div>
+    <div class="form-row-3">
+      <div>
+        <label class="inp-label">POLEGADAS</label>
+        <input class="inp" id="add-pol" placeholder="43">
+      </div>
+      <div>
+        <label class="inp-label">TIPO DE PEÇA</label>
+        <input class="inp" id="add-peca" placeholder="Barramento" value="Barramento">
+      </div>
+      <div>
+        <label class="inp-label">MODELO / DESCRIÇÃO</label>
+        <input class="inp" id="add-desc" placeholder="Ex: Samsung UN43T5300">
+      </div>
+    </div>
+    <button class="btn-add" onclick="adicionarBarramento()">🔩 Enviar para Barramento</button>
+    <span id="add-msg" style="font-family:var(--fm);font-size:10px;color:var(--gr);margin-left:10px;display:none;"></span>
+  </div>
+
+  <!-- CARDS EM BARRAMENTO -->
+  <div id="sec-barramento">
+    <div class="section-title">
+      🔩 Em Barramento
+      <span class="count-badge" id="count-barr">0</span>
+    </div>
+    <div class="barr-grid" id="barr-grid">
+      <div style="color:var(--mu);font-family:var(--fm);font-size:10px;">Carregando...</div>
+    </div>
+  </div>
+
+  <!-- CARDS EM PRODUÇÃO AGUARDANDO BARRAMENTO -->
+  <div id="sec-prod" style="display:none;">
+    <div class="section-title" style="margin-top:16px;">
+      ⏳ Aguardando Chegada
+      <span class="count-badge" id="count-prod" style="background:var(--ye);">0</span>
+    </div>
+    <div class="prod-grid" id="prod-grid"></div>
+  </div>
+
+</div>
+
+<!-- MODAL COMPRAR -->
+<div id="comprar-ov" class="ov" onclick="if(event.target===this)fecharComprar()">
+  <div class="modal">
+    <div class="modal-h">
+      <div class="modal-title">🛒 Lista para Compra</div>
+      <button class="modal-close" onclick="fecharComprar()">×</button>
+    </div>
+    <div class="modal-list" id="comprar-list"></div>
+    <div class="modal-footer">
+      <label class="inp-label">COPIAR TUDO EM LOTE</label>
+      <textarea class="lote-txt" id="lote-txt" rows="4" readonly></textarea>
+      <div class="modal-btns">
+        <button class="btn-modal btn-copy-all" onclick="copiarLote()">📋 Copiar tudo</button>
+        <button class="btn-modal btn-concluir" onclick="concluir()">✅ Concluir</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-w" id="toast-w"></div>
+
+<script>
+var _board = null;
+
+function toast(msg, tipo) {
+  var w = document.getElementById('toast-w');
+  var el = document.createElement('div');
+  el.className = 'toast ' + (tipo||'g');
+  el.textContent = msg;
+  w.appendChild(el);
+  setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); }, 2800);
+}
+
+async function carregar() {
+  try {
+    var r = await fetch('/api/tv-board?action=load').then(function(x){return x.json();});
+    if (!r.board) throw new Error('Board vazio');
+    _board = r.board;
+    renderBarramento();
+    renderProducao();
+  } catch(e) {
+    toast('Erro ao carregar: ' + e.message, 'r');
+  }
+}
+
+function renderBarramento() {
+  var cards = (_board.cards||[]).filter(function(c){ return c.phaseId === 'barramento'; });
+  document.getElementById('count-barr').textContent = cards.length;
+  document.getElementById('btn-comprar').style.display = cards.length ? '' : 'none';
+  var grid = document.getElementById('barr-grid');
+  if (!cards.length) {
+    grid.innerHTML = '<div style="color:var(--mu);font-family:var(--fm);font-size:10px;padding:20px 0;">Nenhum card em Barramento</div>';
+    return;
+  }
+  grid.innerHTML = cards.map(function(c) {
+    var num = c.osCode || ('#' + String(c.pipefyId).slice(-4));
+    var pol = c.polegadas || '?';
+    var peca = c.pecaDiag || 'Barramento';
+    var desc = c.descricaoDiag || '';
+    var cls = c.barramentoConcluido ? 'barr-card concluido' : 'barr-card';
+    return '<div class="' + cls + '" id="bc-' + c.pipefyId + '">' +
+      '<div class="bc-num">' + num + '</div>' +
+      '<div class="bc-nome">' + (c.nomeContato || c.title || '—') + '</div>' +
+      '<div class="bc-info">' +
+        '<div class="bc-pol">' + pol + '"</div>' +
+        '<div class="bc-peca">' + peca + '</div>' +
+        (desc ? '<div class="bc-desc">' + desc + '</div>' : '') +
+      '</div>' +
+      '<div class="bc-btns">' +
+        '<button class="btn-sm btn-local" onclick="comprarLocal(\'' + c.pipefyId + '\')">📦 Local</button>' +
+        '<button class="btn-sm btn-inet"  onclick="comprarInternet(\'' + c.pipefyId + '\')">🌐 Internet</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function renderProducao() {
+  var cards = (_board.cards||[]).filter(function(c){ return c.phaseId === 'producao' && (c.barramentoStatus === 'aguardando' || c.barramentoStatus === 'disponivel'); });
+  var sec = document.getElementById('sec-prod');
+  if (!cards.length) { sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  document.getElementById('count-prod').textContent = cards.length;
+  // Disponíveis primeiro
+  cards.sort(function(a,b){ return (b.barramentoStatus==='disponivel'?1:0)-(a.barramentoStatus==='disponivel'?1:0); });
+  document.getElementById('prod-grid').innerHTML = cards.map(function(c) {
+    var disp = c.barramentoStatus === 'disponivel';
+    var prazo = c.barramentoPrazo ? ' · ' + c.barramentoPrazo.split('-').reverse().join('/') : '';
+    var badgeTxt = disp ? '✅ Barramento disponível' : ('⏳ Aguardando chegada' + prazo);
+    var badgeCls = disp ? 'badge-disp' : 'badge-aguard';
+    return '<div class="prod-card ' + (disp?'disponivel':'') + '">' +
+      '<div class="pc-badge ' + badgeCls + '">' + badgeTxt + '</div>' +
+      '<div style="font-size:13px;font-weight:700;">' + (c.nomeContato||c.title||'—') + '</div>' +
+      '<div style="font-family:var(--fm);font-size:10px;color:var(--mu);margin-top:3px;">' + (c.osCode||String(c.pipefyId).slice(-4)) + '</div>' +
+      (c.polegadas ? '<div style="font-family:var(--fm);font-size:10px;color:var(--pu);margin-top:4px;">📺 ' + c.polegadas + '" · ' + (c.pecaDiag||'Barramento') + '</div>' : '') +
+      (!disp ? '<button class="btn-chegou" onclick="chegou(\'' + c.pipefyId + '\')">✅ Barramento chegou</button>' : '') +
+    '</div>';
+  }).join('');
+}
+
+async function adicionarBarramento() {
+  var os   = document.getElementById('add-os').value.trim();
+  var pol  = document.getElementById('add-pol').value.trim();
+  var peca = document.getElementById('add-peca').value.trim() || 'Barramento';
+  var desc = document.getElementById('add-desc').value.trim();
+  var tec  = document.getElementById('add-tec').value.trim();
+  if (!os) { toast('Informe o nº da OS ou nome', 'r'); return; }
+  if (!pol) { toast('Informe as polegadas', 'r'); return; }
+
+  // Encontrar o card no board
+  var card = (_board.cards||[]).find(function(c){
+    return (c.osCode||'').toLowerCase().includes(os.toLowerCase()) ||
+           (c.pipefyId||'').toLowerCase().includes(os.toLowerCase()) ||
+           (c.nomeContato||'').toLowerCase().includes(os.toLowerCase());
+  });
+  if (!card) { toast('Card não encontrado: ' + os, 'r'); return; }
+
+  try {
+    var res = await fetch('/api/tv-board?action=move', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        pipefyId: card.pipefyId,
+        phaseId: 'barramento',
+        polegadas: pol,
+        pecaDiag: peca,
+        descricaoDiag: desc,
+        techName: tec || card.techName || card.tecnico,
+        isBarramento: true,
+      })
+    }).then(function(x){return x.json();});
+    if (!res.ok) throw new Error(res.error);
+    toast('✅ ' + (card.nomeContato||os) + ' → Barramento');
+    document.getElementById('add-os').value = '';
+    document.getElementById('add-pol').value = '';
+    document.getElementById('add-desc').value = '';
+    var msg = document.getElementById('add-msg');
+    msg.textContent = '✅ ' + (card.nomeContato||os) + ' adicionado!';
+    msg.style.display = '';
+    setTimeout(function(){ msg.style.display = 'none'; }, 3000);
+    await carregar();
+  } catch(e) { toast('Erro: ' + e.message, 'r'); }
+}
+
+async function comprarLocal(pipefyId) {
+  try {
+    var res = await fetch('/api/tv-board?action=set-barramento-compra', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({pipefyId, tipo:'local'})
+    }).then(function(x){return x.json();});
+    if (!res.ok) throw new Error(res.error);
+    toast('✅ Comprado local — movido para Produção');
+    await carregar();
+  } catch(e){ toast('Erro: '+e.message,'r'); }
+}
+
+async function comprarInternet(pipefyId) {
+  var prazo = prompt('📅 Previsão de chegada (DD/MM/AAAA):', '');
+  if (prazo === null) return;
+  var p = prazo.trim().split('/');
+  var prazoISO = p.length===3 ? p[2]+'-'+p[1]+'-'+p[0] : null;
+  try {
+    var res = await fetch('/api/tv-board?action=set-barramento-compra', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({pipefyId, tipo:'internet', prazo:prazoISO})
+    }).then(function(x){return x.json();});
+    if (!res.ok) throw new Error(res.error);
+    toast('✅ Pedido pela internet — movido para Produção');
+    await carregar();
+  } catch(e){ toast('Erro: '+e.message,'r'); }
+}
+
+async function chegou(pipefyId) {
+  try {
+    var res = await fetch('/api/tv-board?action=barramento-chegou', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({pipefyId})
+    }).then(function(x){return x.json();});
+    if (!res.ok) throw new Error(res.error);
+    toast('✅ Barramento disponível — topo da Produção');
+    await carregar();
+  } catch(e){ toast('Erro: '+e.message,'r'); }
+}
+
+function abrirComprar() {
+  var cards = (_board.cards||[]).filter(function(c){ return c.phaseId==='barramento'; });
+  var linhas = cards.map(function(c){
+    return (c.polegadas||'?') + '" | ' + (c.descricaoDiag||c.nomeContato||'—') + ' | ' + (c.pecaDiag||'Barramento');
+  });
+  document.getElementById('comprar-list').innerHTML = cards.map(function(c, i){
+    return '<div class="modal-item">' +
+      '<div class="mi-info">' +
+        '<div class="mi-nome">' + (c.nomeContato||c.osCode||'—') + '</div>' +
+        '<div class="mi-linha">' + linhas[i] + '</div>' +
+      '</div>' +
+      '<button class="btn-copy" onclick="cp(\'' + linhas[i].replace(/'/g,"\\'") + '\',this)">📋</button>' +
+    '</div>';
+  }).join('') || '<div style="color:var(--mu);font-family:var(--fm);font-size:10px;text-align:center;padding:16px;">Nenhum card</div>';
+  document.getElementById('lote-txt').value = linhas.join('\n');
+  document.getElementById('comprar-ov').classList.add('open');
+}
+
+function fecharComprar(){ document.getElementById('comprar-ov').classList.remove('open'); }
+
+function cp(txt, btn){
+  navigator.clipboard.writeText(txt).then(function(){
+    btn.textContent='✅'; setTimeout(function(){ btn.textContent='📋'; },1400);
+  }).catch(function(){});
+}
+
+function copiarLote(){
+  navigator.clipboard.writeText(document.getElementById('lote-txt').value).catch(function(){});
+  toast('✅ Copiado!');
+}
+
+async function concluir(){
+  var cards = (_board.cards||[]).filter(function(c){ return c.phaseId==='barramento'; });
+  for (var i=0;i<cards.length;i++){
+    await fetch('/api/tv-board?action=update-card',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({pipefyId:cards[i].pipefyId,barramentoConcluido:true})
+    }).catch(function(){});
+  }
+  fecharComprar();
+  await carregar();
+  toast('✅ Compras concluídas — fichas marcadas');
+}
+
+carregar();
+</script>
+</body>
+</html>

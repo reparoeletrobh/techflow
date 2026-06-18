@@ -75,6 +75,10 @@
   ],
   "rewrites": [
     {
+      "source": "/tv/barramento",
+      "destination": "/tv-barramento.html"
+    },
+    {
       "source": "/buscar-ficha",
       "destination": "/buscar-ficha.html"
     },
