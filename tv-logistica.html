@@ -631,6 +631,7 @@ function cardHTML(f, phase) {
     var diagFeito = f.diagnostico && (f.diagnostico.equips||[]).length > 0;
     btns = `
       <button class="cbtn cbtn-purple" id="dbtn-${f.id}" onclick="toggleDiagTV('${f.id}')">${diagFeito ? '✅ Rediagnosticar' : '📋 Diagnóstico'}</button>
+      <button class="cbtn cbtn-orange" onclick="mover('${f.id}','remarcar')">📅 Remarcar</button>
       <button class="cbtn cbtn-red" onclick="finalizarRS('${f.id}','${escHtml(f.nome)}')">🔴 RS</button>
       <div class="diag-inline" id="diag-inline-${f.id}">
         <div class="diag-qtd-wrap">
