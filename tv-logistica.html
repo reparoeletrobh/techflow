@@ -401,6 +401,12 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
       <!-- Seções por equipamento (renderizadas dinamicamente) -->
       <div id="diag-equips"></div>
 
+      <!-- Barramento -->
+      <div style="display:flex;align-items:center;gap:10px;margin:12px 0 4px;padding:10px;background:rgba(232,121,249,.06);border:1px solid rgba(232,121,249,.15);border-radius:8px;">
+        <input type="checkbox" id="diag-barramento" style="width:16px;height:16px;accent-color:#e879f9;cursor:pointer;">
+        <label for="diag-barramento" style="font-family:var(--fm);font-size:12px;font-weight:700;color:#e879f9;cursor:pointer;">🔩 Precisa de Barramento</label>
+      </div>
+
       <div id="diag-msg" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
       <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:4px;">
         <button class="cbtn cbtn-outline" onclick="fecharDiag()">Cancelar</button>
@@ -769,6 +775,8 @@ function abrirDiag(id) {
   if (!fichaAtual) return;
   document.getElementById('diag-ficha-id').textContent = fichaAtual.id + ' — ' + fichaAtual.nome;
   document.getElementById('diag-msg').style.display='none';
+  var cbBarr = document.getElementById('diag-barramento');
+  if (cbBarr) cbBarr.checked = !!(fichaAtual.isBarramento);
   const qtd = detectarQtd(fichaAtual);
   document.getElementById('diag-qtd').value = qtd;
   diagEquips = Array.from({length: qtd}, ()=>({modelo:'', tipo: detectarTipo(fichaAtual), subtipo:null, servicos:[]}));
@@ -878,7 +886,7 @@ async function salvarDiag() {
   const diagnostico = { equips: diagEquips.map(eq=>({...eq})) };
   const r1 = await fetch('/api/tv-logistica?action=salvar-diagnostico', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ id: fichaAtual.id, diagnostico })
+    body: JSON.stringify({ id: fichaAtual.id, diagnostico, isBarramento: document.getElementById('diag-barramento')?.checked || false })
   }).then(r=>r.json());
   if (!r1.ok) { mostrarMsgDiag('Erro ao salvar: '+r1.error,'err'); return; }
 

@@ -482,6 +482,10 @@ module.exports = async function handler(req, res) {
     const ficha = db.fichas.find(f => f.id === id);
     if (!ficha) return res.status(404).json({ ok: false, error: 'nao encontrada' });
     ficha.diagnostico = diagnostico;
+    // Persistir flag de barramento se informada
+    if (typeof req.body.isBarramento !== 'undefined') {
+      ficha.isBarramento = !!req.body.isBarramento;
+    }
     // Não mover para orc_registrado aqui — a fase muda em gerar-orcamento
     // (só quando o Pipefy for criado/movido com sucesso)
     await dbSet(LOG_KEY, db);
@@ -758,6 +762,7 @@ module.exports = async function handler(req, res) {
     const _valor  = parseFloat(precoFinal) || 0;
     await moverNoPipe(_pipId, 'aguardando_aprovacao', {
       nomeContato: _nome, telefone: _tel,
+      isBarramento: !!(ficha.isBarramento),
       equipamento: _equip, descricao: _desc,
       valor: _valor, origem: 'logistica',
       endereco: ficha.endereco || '',
