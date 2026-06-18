@@ -420,6 +420,21 @@ export default async function handler(req,res){
     return res.status(200).json({ ok:true, id });
   }
 
+  // ── buscar-geral — busca em TODAS as fases por nome ou tel ──────────────────
+  if (action === 'buscar-geral') {
+    const q = (req.query.q||'').toLowerCase().trim();
+    if (!q) return res.status(400).json({ ok:false, error:'?q= obrigatório' });
+    const db = await dbGet(FL_KEY) || defaultDB();
+    const found = (db.fichas||[]).filter(function(f){
+      return (f.nomeContato||'').toLowerCase().includes(q) ||
+             (f.telefone||'').replace(/\D/g,'').includes(q.replace(/\D/g,''));
+    }).map(function(f){
+      return { id:f.id, nome:f.nomeContato, tel:f.telefone, phase:f.phase,
+               equipamento:f.equipamento||'', criadoEm:f.criadoEm||'', updatedAt:f.updatedAt||'' };
+    });
+    return res.status(200).json({ ok:true, total:found.length, fichas:found });
+  }
+
   // ── fix-loja-feito-por-nome — conserta ficha presa em producao por nome/tel ──
   if (action === 'fix-loja-feito-por-nome') {
     const nome = (req.query.nome || '').toLowerCase().trim();
