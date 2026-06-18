@@ -1961,6 +1961,31 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok:true, busca:q, total, ...resultado });
   }
 
+    // ── GET fix-gerusa — força Gerusa 8874 para conserto_realizado ─────────────
+  if (action === 'fix-gerusa') {
+    const now = new Date().toISOString();
+    const resultados = [];
+    for (const FL_KEY of ['reparoeletro_frenteloja','tv_frenteloja']) {
+      const db = await dbGet(FL_KEY);
+      if (!db || !Array.isArray(db.fichas)) { resultados.push({sistema:FL_KEY, erro:'vazio'}); continue; }
+      const found = db.fichas.filter(function(f){
+        const n=(f.nomeContato||f.nome||'').toLowerCase();
+        const t=(f.telefone||'').replace(/[^0-9]/g,'');
+        return (n.includes('gerusa')||n.includes('jerusa')) && t.slice(-4)==='8874';
+      });
+      if (!found.length) { resultados.push({sistema:FL_KEY, encontrado:false}); continue; }
+      found.forEach(function(f){
+        const antes=f.phase;
+        f.phase='conserto_realizado';
+        f.consertoEm=now;
+        f.updatedAt=now;
+        resultados.push({sistema:FL_KEY,id:f.id,nome:f.nomeContato||f.nome,antes,depois:f.phase,equipamento:f.equipamento||''});
+      });
+      await dbSet(FL_KEY,db);
+    }
+    return res.status(200).json({ok:true,resultados});
+  }
+
     // ── GET fix-compra-lote — atualiza telefone em todas fichas sem telefone ────
   if (action === 'fix-compra-lote') {
     var pipeDb2 = (await dbGet(PIPE_KEY)) || defaultDB();
