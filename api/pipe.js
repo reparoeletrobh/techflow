@@ -1844,6 +1844,43 @@ export default async function handler(req, res) {
     });
   }
 
+    // ── GET erp-fin-hoje — ERP e Finalizado enviados hoje ──────────────────────
+  if (action === 'erp-fin-hoje') {
+    const db  = (await dbGet(PIPE_KEY)) || defaultDB();
+    const agora = new Date();
+    const hoje = new Date(agora.getTime()-3*60*60*1000).toISOString().slice(0,10);
+
+    function mapCard(c) {
+      const ts = c.movedAt || c.updatedAt || c.criadoEm || '';
+      const diaCard = ts ? new Date(new Date(ts).getTime()-3*60*60*1000).toISOString().slice(0,10) : '';
+      const horario = ts ? new Date(new Date(ts).getTime()-3*60*60*1000)
+        .toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',
+          day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+      return { diaCard, horario,
+        id: c.id, nome: c.nomeContato||c.title||'—',
+        telefone: c.telefone||'—',
+        equipamento: (c.equipamento||c.descricao||'').slice(0,50),
+        valor: c.valor ? 'R$ '+parseFloat(c.valor).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '—',
+        endereco: c.endereco||'—',
+        phase: c.phase,
+      };
+    }
+
+    const erp = (db.cards||[]).filter(function(c){
+      if(c.phase!=='erp') return false;
+      const ts=c.movedAt||c.updatedAt||c.criadoEm||'';
+      return ts && new Date(new Date(ts).getTime()-3*60*60*1000).toISOString().slice(0,10)===hoje;
+    }).map(mapCard).sort(function(a,b){ return b.horario.localeCompare(a.horario); });
+
+    const fin = (db.cards||[]).filter(function(c){
+      if(c.phase!=='finalizado') return false;
+      const ts=c.movedAt||c.updatedAt||c.criadoEm||'';
+      return ts && new Date(new Date(ts).getTime()-3*60*60*1000).toISOString().slice(0,10)===hoje;
+    }).map(mapCard).sort(function(a,b){ return b.horario.localeCompare(a.horario); });
+
+    return res.status(200).json({ ok:true, data:hoje, totalErp:erp.length, totalFin:fin.length, erp, finalizado:fin });
+  }
+
     // ── GET fix-compra-lote — atualiza telefone em todas fichas sem telefone ────
   if (action === 'fix-compra-lote') {
     var pipeDb2 = (await dbGet(PIPE_KEY)) || defaultDB();
