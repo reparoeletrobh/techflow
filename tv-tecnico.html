@@ -634,7 +634,7 @@ async function syncPipefy() {
     const changed = res.newCount > 0 || res.erpRemoved > 0;
     if (changed) {
       board = res.board;
-      renderBoard(); renderStageGrids(); if(typeof patchBarramentoUI==="function") patchBarramentoUI();
+      renderBoard(); renderStageGrids();
       document.getElementById('stat-total').textContent = board.cards.length;
       if (res.newCount > 0) {
         const b = document.getElementById('new-badge');
@@ -699,10 +699,6 @@ function cardHTML(c, color) {
       <div class="card-title">${c.title}</div>
       ${c.nomeContato ? `<div class="card-nome">👤 ${c.nomeContato}</div>` : ''}
       ${c.descricao   ? `<div class="card-desc">${c.descricao}</div>` : ''}
-      ${c.polegadas ? `<div class="card-desc" style="color:#e879f9;margin-top:2px;font-weight:600;">📺 ${c.polegadas}" · ${c.pecaDiag||''}</div>` : ''}
-      ${c.descricaoDiag && !c.polegadas ? `<div class="card-desc" style="color:#e879f9;margin-top:2px;">🔩 ${c.descricaoDiag}</div>` : ''}
-      ${c.barramentoStatus==='disponivel' ? `<div class="card-desc" style="color:#22c55e;font-weight:700;">✅ Barramento disponível</div>` : ''}
-      ${c.barramentoStatus==='aguardando' && c.phaseId==='producao' ? `<div class="card-desc" style="color:#f59e0b;">⏳ Aguardando barramento${c.barramentoPrazo ? ' · '+c.barramentoPrazo.split('-').reverse().join('/') : ''}</div>` : ''}
       ${c.descricaoCompra ? `<div class="card-desc" style="color:#f59e0b;border-left:2px solid #f59e0b;padding-left:5px;margin-top:3px;">🔩 ${c.descricaoCompra}</div>` : ''}
       ${c.previsao ? `<div class="card-desc" style="color:#3b9eff;margin-top:2px;">📅 Previsão: ${c.previsao.split('-').reverse().join('/')}</div>` : ''}
       ${c.alertaCompra && !c.previsao ? `<div class="card-desc" style="color:#22c55e;margin-top:2px;">${c.alertaCompra}</div>` : ''}
@@ -711,7 +707,6 @@ function cardHTML(c, color) {
         <div class="card-by">${c.tecnico || c.movedBy || '—'}</div>
       </div>
       <button onclick="openSplitModal('${c.pipefyId}')" style="margin-top:7px;width:100%;font-family:var(--fm);font-size:10px;padding:5px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all 0.15s;" onmouseover="this.style.borderColor='rgba(245,200,0,0.4)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">✂️ Quebrar</button>
-      ${c.phaseId==='aprovado' ? `<button onclick="moverParaBarramento('${c.pipefyId}')" style="margin-top:5px;width:100%;font-family:var(--fm);font-size:10px;padding:5px;border-radius:6px;border:1px solid rgba(232,121,249,.3);background:rgba(232,121,249,.08);color:#e879f9;cursor:pointer;">🔩 → Barramento</button>` : ''}
     </div>`;
 }
 
@@ -1579,7 +1574,7 @@ async function submitSplit() {
     });
     if (!res.ok) throw new Error(res.error);
     board = (await (await fetch('/api/tv-board?action=load')).json()).board || board;
-    renderBoard(); renderStageGrids(); if(typeof patchBarramentoUI==="function") patchBarramentoUI();
+    renderBoard(); renderStageGrids();
     document.getElementById('stat-total').textContent = board.cards.length;
     closeSplitModal();
     showToast('✂️', 'OS quebrada!', `${res.created} fichas criadas`);
@@ -1704,7 +1699,6 @@ function initHScroll() {
 // Renderiza fases imediatamente com board padrão — não espera API
 renderBoard();
 renderStageGrids();
-patchBarramentoUI();
 initHScroll();
 // Busca dados reais do banco em seguida
 loadBoard();
@@ -1742,173 +1736,5 @@ setInterval(() => {
     </div>
   </div>
 </div>
-
-<style>
-.barr-btn{margin-top:5px;width:100%;font-family:var(--fm);font-size:10px;padding:5px;border-radius:6px;cursor:pointer;transition:all .15s;}
-#barr-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:300;align-items:center;justify-content:center;}
-#barr-ov.open{display:flex;}
-</style>
-
-<div id="barr-ov" onclick="if(event.target===this)fecharComprarBarramento()">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px;width:460px;max-width:95vw;max-height:86vh;display:flex;flex-direction:column;gap:12px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-family:var(--fh);font-size:14px;font-weight:800;">🛒 Comprar Barramento</div>
-      <button onclick="fecharComprarBarramento()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;">×</button>
-    </div>
-    <div id="barr-list" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:8px;"></div>
-    <div style="border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:8px;">
-      <label style="font-family:var(--fm);font-size:9px;color:var(--muted);">COPIAR TUDO EM LOTE</label>
-      <textarea id="barr-lote" rows="3" readonly style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--fm);font-size:10px;padding:8px;resize:none;"></textarea>
-      <div style="display:flex;gap:8px;">
-        <button onclick="copiarLote()" style="flex:1;font-family:var(--fm);font-size:10px;font-weight:700;padding:8px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;">📋 Copiar tudo</button>
-        <button onclick="concluirBarramento()" style="flex:1;font-family:var(--fm);font-size:10px;font-weight:700;padding:8px;border-radius:6px;border:none;background:#f59e0b;color:#000;cursor:pointer;">✅ Concluir</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
-// ── BARRAMENTO ────────────────────────────────────────────────────────────────
-
-function patchBarramentoUI() {
-  // Após renderBoard(), adicionar botão Comprar na coluna barramento
-  var cols = document.querySelectorAll('.kanban-col');
-  cols.forEach(function(col) {
-    var titleEl = col.querySelector('.col-title');
-    if (!titleEl) return;
-    var title = titleEl.textContent.trim();
-
-    if (title === 'Barramento') {
-      var header = col.querySelector('.col-header');
-      if (header && !col.querySelector('.barr-comprar-btn')) {
-        var barrCards = (board.cards||[]).filter(function(c){ return c.phaseId==='barramento'; });
-        if (barrCards.length > 0) {
-          var btn = document.createElement('button');
-          btn.className = 'barr-comprar-btn';
-          btn.style.cssText = 'width:100%;margin-top:6px;font-family:var(--fm);font-size:10px;font-weight:700;padding:5px 8px;border-radius:6px;border:none;background:#3b9eff;color:#fff;cursor:pointer;';
-          btn.textContent = '🛒 Comprar';
-          btn.onclick = abrirComprarBarramento;
-          header.appendChild(btn);
-        }
-        // Adicionar botões nos cards de barramento
-        var cardEls = col.querySelectorAll('.os-card');
-        cardEls.forEach(function(cardEl, i) {
-          if (barrCards[i] && !cardEl.querySelector('.barr-action-btns')) {
-            var c = barrCards[i];
-            var div = document.createElement('div');
-            div.className = 'barr-action-btns';
-            div.style.cssText = 'display:flex;gap:5px;margin-top:8px;flex-wrap:wrap;';
-            div.innerHTML =
-              '<button class="barr-btn" style="flex:1;border:1px solid rgba(34,197,94,.3);background:rgba(34,197,94,.08);color:#22c55e;" onclick="setBarramentoCompra('' + c.pipefyId + '','local')">📦 Local</button>' +
-              '<button class="barr-btn" style="flex:1;border:1px solid rgba(59,158,255,.3);background:rgba(59,158,255,.08);color:#3b9eff;" onclick="setBarramentoCompra('' + c.pipefyId + '','internet')">🌐 Internet</button>';
-            cardEl.appendChild(div);
-          }
-        });
-      }
-    }
-
-    if (title === 'Produção') {
-      // Adicionar botão "Barramento chegou" nos cards aguardando
-      var prodCards = (board.cards||[]).filter(function(c){ return c.phaseId==='producao' && c.barramentoStatus==='aguardando'; });
-      if (!prodCards.length) return;
-      var cardEls = col.querySelectorAll('.os-card');
-      cardEls.forEach(function(cardEl) {
-        var numEl = cardEl.querySelector('.card-num');
-        if (!numEl) return;
-        var numText = numEl.textContent.replace('#','').trim();
-        var match = prodCards.find(function(c){ return (c.osCode||'').includes(numText) || String(c.pipefyId).slice(-4)===numText.slice(-4); });
-        if (match && !cardEl.querySelector('.barr-chegou-btn')) {
-          var btn = document.createElement('button');
-          btn.className = 'barr-chegou-btn';
-          btn.style.cssText = 'margin-top:6px;width:100%;font-family:var(--fm);font-size:10px;font-weight:700;padding:5px;border-radius:6px;border:none;background:#22c55e;color:#fff;cursor:pointer;';
-          btn.textContent = '✅ Barramento chegou';
-          btn.onclick = function(){ barramentoChegou(match.pipefyId); };
-          cardEl.appendChild(btn);
-        }
-      });
-    }
-  });
-}
-
-async function moverParaBarramento(pipefyId) {
-  var pol  = prompt('📺 Polegadas da TV (ex: 43):','');
-  if (pol===null) return;
-  var peca = prompt('🔩 Tipo de peça (ex: Barramento, Tela):','Barramento');
-  if (peca===null) return;
-  var desc = prompt('📝 Modelo / descrição:','');
-  if (desc===null) return;
-  try {
-    var res = await api('POST','move',{ pipefyId, phaseId:'barramento', polegadas:pol.trim(), pecaDiag:(peca.trim()||'Barramento'), descricaoDiag:desc.trim(), isBarramento:true });
-    if (!res.ok) throw new Error(res.error);
-    showToast('🔩','→ Barramento', pol+'" · '+(peca||'Barramento'));
-    await loadBoard();
-  } catch(e){ showToast('❌','Erro',e.message); }
-}
-
-function abrirComprarBarramento() {
-  var cards = (board.cards||[]).filter(function(c){ return c.phaseId==='barramento'; });
-  var list = document.getElementById('barr-list');
-  var lote = document.getElementById('barr-lote');
-  list.innerHTML = cards.map(function(c){
-    var linha = (c.polegadas||'?')+'" | '+(c.descricaoDiag||c.nomeContato||'—')+' | '+(c.pecaDiag||'Barramento');
-    return '<div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--surface2);border-radius:6px;">' +
-      '<div style="flex:1;font-family:var(--fm);font-size:10px;"><div style="font-weight:700;color:var(--text);">' + (c.nomeContato||c.osCode||'—') + '</div>' +
-      '<div style="color:var(--muted);margin-top:2px;">' + linha + '</div></div>' +
-      '<button onclick="cpBarr(''+linha.replace(/'/g,'\'')+'',this)" style="font-family:var(--fm);font-size:9px;padding:4px 10px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">📋</button></div>';
-  }).join('') || '<div style="color:var(--muted);font-size:11px;text-align:center;padding:20px;">Nenhum card em Barramento</div>';
-  lote.value = cards.map(function(c){ return (c.polegadas||'?')+'" | '+(c.descricaoDiag||c.nomeContato||'—')+' | '+(c.pecaDiag||'Barramento'); }).join('
-');
-  document.getElementById('barr-ov').classList.add('open');
-}
-
-function fecharComprarBarramento(){ document.getElementById('barr-ov').classList.remove('open'); }
-
-function cpBarr(txt,btn){
-  navigator.clipboard.writeText(txt).then(function(){ btn.textContent='✅'; setTimeout(function(){ btn.textContent='📋'; },1400); }).catch(function(){});
-}
-
-function copiarLote(){
-  var txt=document.getElementById('barr-lote').value;
-  navigator.clipboard.writeText(txt).catch(function(){});
-  var btn=document.querySelector('#barr-ov button[onclick="copiarLote()"]');
-  if(btn){ btn.textContent='✅ Copiado!'; setTimeout(function(){ btn.textContent='📋 Copiar tudo'; },1400); }
-}
-
-async function concluirBarramento(){
-  var cards=(board.cards||[]).filter(function(c){ return c.phaseId==='barramento'; });
-  for(var i=0;i<cards.length;i++){
-    await api('POST','update-card',{pipefyId:cards[i].pipefyId,barramentoConcluido:true}).catch(function(){});
-  }
-  fecharComprarBarramento();
-  await loadBoard();
-  showToast('✅','Compras concluídas','');
-}
-
-async function setBarramentoCompra(pipefyId, tipo){
-  var prazo=null;
-  if(tipo==='internet'){
-    prazo=prompt('📅 Previsão de chegada (DD/MM/AAAA):','');
-    if(prazo===null) return;
-    var p=prazo.trim().split('/');
-    if(p.length===3) prazo=p[2]+'-'+p[1]+'-'+p[0];
-  }
-  try{
-    var res=await api('POST','set-barramento-compra',{pipefyId,tipo,prazo});
-    if(!res.ok) throw new Error(res.error);
-    showToast('✅',tipo==='local'?'Comprado local':'Pedido na internet',prazo||'');
-    await loadBoard();
-  }catch(e){ showToast('❌','Erro',e.message); }
-}
-
-async function barramentoChegou(pipefyId){
-  try{
-    var res=await api('POST','barramento-chegou',{pipefyId});
-    if(!res.ok) throw new Error(res.error);
-    showToast('✅','Barramento disponível','Topo da Produção');
-    await loadBoard();
-  }catch(e){ showToast('❌','Erro',e.message); }
-}
-</script>
-
 </body>
 </html>
