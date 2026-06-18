@@ -420,6 +420,29 @@ export default async function handler(req,res){
     return res.status(200).json({ ok:true, id });
   }
 
+  // ── fix-loja-feito-por-nome — conserta ficha presa em producao por nome/tel ──
+  if (action === 'fix-loja-feito-por-nome') {
+    const nome = (req.query.nome || '').toLowerCase().trim();
+    const tel4 = (req.query.tel4 || '').replace(/\D/g,'');
+    if (!nome) return res.status(400).json({ ok:false, error:'?nome= obrigatório' });
+    const db = await dbGet(FL_KEY) || defaultDB();
+    const now = new Date().toISOString();
+    // Buscar em producao
+    const fichas = (db.fichas||[]).filter(function(f){
+      const nomeMatch = (f.nomeContato||'').toLowerCase().includes(nome);
+      const telMatch  = !tel4 || (f.telefone||'').replace(/\D/g,'').slice(-4) === tel4;
+      return nomeMatch && telMatch && f.phase === 'producao';
+    });
+    if (!fichas.length) return res.status(404).json({ ok:false, error:'Ficha não encontrada em producao com esse nome/tel', nome, tel4 });
+    fichas.forEach(function(f){
+      f.phase      = 'conserto_realizado';
+      f.consertoEm = now;
+      f.updatedAt  = now;
+    });
+    await dbSet(FL_KEY, db);
+    return res.status(200).json({ ok:true, consertadas: fichas.length, fichas: fichas.map(function(f){ return {id:f.id, nome:f.nomeContato, phase:f.phase}; }) });
+  }
+
   if(req.method==='POST'&&action==='conserto-realizado'){
     const {pipefyCardId, fichaId}=req.body||{};
     if(!pipefyCardId && !fichaId)

@@ -365,6 +365,37 @@ module.exports = async function handler(req, res) {
       board.movesLog = trimLog([...(board.movesLog || []),
         { id: pipefyId, phase: phaseId, tech: techName, ts: Date.now() }]);
       await dbSet(BOARD_KEY, board);
+
+      // ── Gatilho: loja_feito → tv_frenteloja conserto-realizado ──────────────
+      if (phaseId === 'loja_feito') {
+        try {
+          const _U=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+          const _T=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
+          async function _flGet(k){const r=await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();let v=j[0]?.result;if(!v)return null;try{let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
+          async function _flSet(k,v){await fetch(_U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+_T,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+          const FL_KEY = 'tv_frenteloja';
+          const flDb   = await _flGet(FL_KEY);
+          if (flDb && Array.isArray(flDb.fichas)) {
+            const now2 = new Date().toISOString();
+            // Buscar por fichaId (campo no card do board) ou por nome+tel
+            let ficha = card.fichaId
+              ? flDb.fichas.find(function(f){ return f.id === String(card.fichaId); })
+              : flDb.fichas.find(function(f){
+                  return f.phase === 'producao' &&
+                    (card.nomeContato||'').toLowerCase().includes((f.nomeContato||'').toLowerCase().split(' ')[0]) ||
+                    (f.telefone||'').replace(/\D/g,'').slice(-4) === (card.telefone||'').replace(/\D/g,'').slice(-4);
+                });
+            if (ficha && ficha.phase === 'producao') {
+              ficha.phase      = 'conserto_realizado';
+              ficha.consertoEm = now2;
+              ficha.updatedAt  = now2;
+              await _flSet(FL_KEY, flDb);
+              console.log('[tv-board loja_feito→frenteloja] conserto-realizado:', ficha.id, ficha.nomeContato);
+            }
+          }
+        } catch(eFL) { console.error('[tv-board loja_feito→frenteloja]', eFL.message); }
+      }
+
       // Move no Pipefy se phase ID real foi fornecido
       let pipefyResult = null;
       if (pipefyPhaseId) {
