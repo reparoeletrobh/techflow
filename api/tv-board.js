@@ -38,6 +38,7 @@ function defaultBoard() {
   return {
     phases: [
       { id: "aprovado",        name: "Aprovado"           },
+      { id: "barramento",      name: "Barramento"         },
       { id: "producao",        name: "Produção"           },
       { id: "urgencia",        name: "Urgência"           },
       { id: "comprar_peca",    name: "Comprar Peça"       },
@@ -58,6 +59,12 @@ function defaultBoard() {
 function sanitizeBoard(b) {
   if (!b) return defaultBoard();
   if (!Array.isArray(b.phases))    b.phases    = defaultBoard().phases;
+  // Garantir fase barramento existe (adicionada em 18/06/2026)
+  if (!b.phases.find(function(p){ return p.id === 'barramento'; })) {
+    var idxAprov = b.phases.findIndex(function(p){ return p.id === 'aprovado'; });
+    var insAt = idxAprov >= 0 ? idxAprov + 1 : 1;
+    b.phases.splice(insAt, 0, { id: 'barramento', name: 'Barramento' });
+  }
   if (!Array.isArray(b.cards))     b.cards     = [];
   if (!Array.isArray(b.syncedIds)) b.syncedIds = [];
   if (!Array.isArray(b.movesLog))  b.movesLog  = [];
@@ -915,7 +922,43 @@ async function otimizarPontos(pontos, pontoInicio) {
       });
     }
 
-    return res.status(404).json({ ok: false, error: "Ação não encontrada" });
+    // ── POST set-barramento-compra ───────────────────────────────────────────────
+    if (req.method === 'POST' && action === 'set-barramento-compra') {
+      const bd = req.body || {};
+      const db = await dbGet(BOARD_KEY) || defaultBoard();
+      const card = (db.cards || []).find(function(c){ return c.pipefyId === bd.pipefyId; });
+      if (!card) return res.status(404).json({ ok: false, error: 'Card não encontrado' });
+      // Marcar compra
+      card.barramentoTipo    = bd.tipo || 'local';     // 'local' | 'internet'
+      card.barramentoPrazo   = bd.prazo || null;       // data estimada se internet
+      card.barramentoStatus  = 'aguardando';           // esperando chegar
+      card.barramentoCompraEm = new Date().toISOString();
+      // Mover para producao
+      card.phaseId           = 'producao';
+      card.movedAt           = new Date().toISOString();
+      await dbSet(BOARD_KEY, db);
+      return res.status(200).json({ ok: true, card });
+    }
+
+    // ── POST barramento-chegou ────────────────────────────────────────────────────
+    if (req.method === 'POST' && action === 'barramento-chegou') {
+      const bd = req.body || {};
+      const db = await dbGet(BOARD_KEY) || defaultBoard();
+      const idx = (db.cards || []).findIndex(function(c){ return c.pipefyId === bd.pipefyId; });
+      if (idx < 0) return res.status(404).json({ ok: false, error: 'Card não encontrado' });
+      const card = db.cards[idx];
+      card.barramentoStatus  = 'disponivel';
+      card.barramentoChegouEm = new Date().toISOString();
+      card.phaseId            = 'producao';
+      card.movedAt            = new Date().toISOString();
+      // Mover para o TOPO da producao (remover e reinserir no início do array)
+      db.cards.splice(idx, 1);
+      db.cards.unshift(card);
+      await dbSet(BOARD_KEY, db);
+      return res.status(200).json({ ok: true, card });
+    }
+
+        return res.status(404).json({ ok: false, error: "Ação não encontrada" });
 
   } catch(e) {
     console.error("tv-board handler:", e.message);

@@ -1761,9 +1761,11 @@ export default async function handler(req, res) {
           return x.pipefyId !== boardPid3 && x.pipefyId !== card.id && x.osCode !== card.id;
         });
         // Inserir card no board do técnico
+        // Redirecionar para barramento se diagnóstico indicar
+        var _targetPhase = (card.isBarramento || card.barramentoFlag) ? 'barramento' : 'aprovado';
         tvBoardDb.cards.unshift({
           pipefyId:    boardPid3,
-          phaseId:     'aprovado',
+          phaseId:     _targetPhase,
           nomeContato: card.nomeContato || '',
           title:       card.descricao   || card.nomeContato || '',
           telefone:    card.telefone    || '',

@@ -673,6 +673,44 @@ function renderBoard() {
   board.phases.forEach((ph, i) => {
     const color = COLORS[i % COLORS.length];
     const cards = board.cards.filter(c => c.phaseId === ph.id);
+
+    // ── Coluna BARRAMENTO — renderização especial ──────────────────────────
+    if (ph.id === 'barramento') {
+      const col = document.createElement('div'); col.className = 'kanban-col';
+      col.innerHTML = `
+        <div class="col-header" style="flex-wrap:wrap;gap:4px;">
+          <div class="col-stripe" style="background:${color}"></div>
+          <div class="col-title" style="flex:1;">${ph.name}</div>
+          <div class="col-count">${cards.length}</div>
+          ${cards.length > 0 ? `<button onclick="abrirComprarBarramento()" style="margin-top:4px;width:100%;font-family:var(--fm);font-size:10px;font-weight:700;padding:5px 8px;border-radius:6px;border:none;background:#3b9eff;color:#fff;cursor:pointer;">🛒 Comprar</button>` : ''}
+        </div>
+        <div class="col-body">
+          ${cards.length === 0 ? '<div class="empty-col">— vazio —</div>' : cards.map(function(c) {
+            return `<div class="os-card" style="${c.barramentoConcluido ? 'border-left:3px solid #f59e0b;' : ''}">
+              <div class="card-bar" style="background:${color}"></div>
+              <div class="card-num">#${c.osCode || String(c.pipefyId).slice(-4)}</div>
+              <div class="card-title">${c.title || c.nomeContato || '—'}</div>
+              ${c.nomeContato ? `<div class="card-nome">👤 ${c.nomeContato}</div>` : ''}
+              ${c.polegadas ? `<div class="card-desc" style="color:#e879f9;font-weight:700;">📺 ${c.polegadas}" · ${c.pecaDiag||'Barramento'}</div>` : ''}
+              ${c.descricaoDiag ? `<div class="card-desc" style="color:#a0aec0;font-size:10px;">${c.descricaoDiag}</div>` : ''}
+              <div style="display:flex;gap:5px;margin-top:8px;flex-wrap:wrap;">
+                <button onclick="setBarramentoCompra('${c.pipefyId}','local')" style="flex:1;font-family:var(--fm);font-size:9px;padding:5px 4px;border-radius:5px;border:1px solid rgba(34,197,94,.3);background:rgba(34,197,94,.08);color:#22c55e;cursor:pointer;">📦 Local</button>
+                <button onclick="abrirBarramentoInternet('${c.pipefyId}')" style="flex:1;font-family:var(--fm);font-size:9px;padding:5px 4px;border-radius:5px;border:1px solid rgba(59,158,255,.3);background:rgba(59,158,255,.08);color:#3b9eff;cursor:pointer;">🌐 Internet</button>
+              </div>
+              <div class="card-footer"><div class="card-age">🕐 ${c.age != null ? c.age+'d' : '—'}</div><div class="card-by">${c.tecnico||'—'}</div></div>
+            </div>`;
+          }).join('')}
+        </div>`;
+      b.appendChild(col);
+      return;
+    }
+
+    // ── Coluna PRODUÇÃO — mostrar cards de barramento disponível no topo (verde) ─
+    const cardsOrdered = ph.id === 'producao' ? [
+      ...cards.filter(c => c.barramentoStatus === 'disponivel'),
+      ...cards.filter(c => c.barramentoStatus !== 'disponivel')
+    ] : cards;
+
     const col = document.createElement('div'); col.className = 'kanban-col';
     col.innerHTML = `
       <div class="col-header">
@@ -681,7 +719,13 @@ function renderBoard() {
         <div class="col-count">${cards.length}</div>
       </div>
       <div class="col-body">
-        ${cards.length === 0 ? '<div class="empty-col">— vazio —</div>' : cards.map(c => cardHTML(c, color)).join('')}
+        ${cardsOrdered.length === 0 ? '<div class="empty-col">— vazio —</div>' : cardsOrdered.map(c => {
+          const isBarrDisp = c.barramentoStatus === 'disponivel';
+          const cStyle = isBarrDisp ? 'border:2px solid #22c55e;background:rgba(34,197,94,.04);' : '';
+          const barrBtn = c.barramentoStatus === 'aguardando' ?
+            `<button onclick="barramentoChegou('${c.pipefyId}')" style="margin-top:6px;width:100%;font-family:var(--fm);font-size:9px;padding:5px;border-radius:5px;border:none;background:#22c55e;color:#fff;cursor:pointer;">✅ Barramento chegou</button>` : '';
+          return cardHTML(c, isBarrDisp ? '#22c55e' : color).replace('<div class="os-card">', `<div class="os-card" style="${cStyle}">`) + barrBtn;
+        }).join('')}
       </div>`;
     b.appendChild(col);
   });
@@ -702,13 +746,137 @@ function cardHTML(c, color) {
       ${c.descricaoCompra ? `<div class="card-desc" style="color:#f59e0b;border-left:2px solid #f59e0b;padding-left:5px;margin-top:3px;">🔩 ${c.descricaoCompra}</div>` : ''}
       ${c.previsao ? `<div class="card-desc" style="color:#3b9eff;margin-top:2px;">📅 Previsão: ${c.previsao.split('-').reverse().join('/')}</div>` : ''}
       ${c.alertaCompra && !c.previsao ? `<div class="card-desc" style="color:#22c55e;margin-top:2px;">${c.alertaCompra}</div>` : ''}
+      ${c.polegadas ? `<div class="card-desc" style="color:#e879f9;margin-top:2px;">📺 ${c.polegadas}" · ${c.pecaDiag||'Peça'}</div>` : ''}
+      ${c.descricaoDiag && !c.polegadas ? `<div class="card-desc" style="color:#e879f9;margin-top:2px;">🔩 ${c.descricaoDiag}</div>` : ''}
+      ${c.barramentoStatus === 'disponivel' ? '<div class="card-desc" style="color:#22c55e;font-weight:700;margin-top:3px;">✅ Barramento disponível</div>' : ''}
+      ${c.barramentoStatus === 'aguardando' && c.phaseId === 'producao' ? `<div class="card-desc" style="color:#f59e0b;margin-top:2px;">⏳ Aguardando barramento${c.barramentoPrazo ? ' · ' + c.barramentoPrazo.split('-').reverse().join('/') : ''}</div>` : ''}
       <div class="card-footer">
         <div class="card-age">🕐 ${c.age != null ? c.age+'d' : '—'}</div>
         <div class="card-by">${c.tecnico || c.movedBy || '—'}</div>
       </div>
       <button onclick="openSplitModal('${c.pipefyId}')" style="margin-top:7px;width:100%;font-family:var(--fm);font-size:10px;padding:5px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all 0.15s;" onmouseover="this.style.borderColor='rgba(245,200,0,0.4)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">✂️ Quebrar</button>
+      ${c.phaseId === 'aprovado' ? `<button class="btn-barr" onclick="moverParaBarramento('${c.pipefyId}')">🔩 → Barramento</button>` : ''}
     </div>`;
 }
+
+
+// ── BARRAMENTO ─────────────────────────────────────────────────────────────
+
+// Modal para mover card APROVADO → BARRAMENTO
+async function moverParaBarramento(pipefyId) {
+  var nome = (board.cards.find(function(c){return c.pipefyId===pipefyId;})||{}).nomeContato||pipefyId;
+  var pol  = prompt('📺 Polegadas da TV (ex: 43, 55, 65):','');
+  if (pol === null) return;
+  var peca = prompt('🔩 Tipo de peça (ex: Barramento, Tela, Fonte):','Barramento');
+  if (peca === null) return;
+  var desc = prompt('📝 Descrição (modelo, observação):','');
+  if (desc === null) return;
+  try {
+    const res = await api('POST','move',{
+      pipefyId, phaseId:'barramento',
+      polegadas: pol.trim(),
+      pecaDiag:  peca.trim() || 'Barramento',
+      descricaoDiag: desc.trim(),
+      isBarramento: true,
+    });
+    if (!res.ok) throw new Error(res.error);
+    showToast('🔩','Enviado para Barramento', pol+'" · '+(peca||'Barramento'));
+    await loadBoard();
+  } catch(e) { showToast('❌','Erro', e.message); }
+}
+
+// Abrir modal "Comprar" — lista todos os cards de barramento
+function abrirComprarBarramento() {
+  var cards = (board.cards||[]).filter(function(c){return c.phaseId==='barramento';});
+  var ov = document.getElementById('barr-comprar-ov');
+  var list = document.getElementById('barr-comprar-list');
+  if (!ov || !list) return;
+  list.innerHTML = cards.map(function(c) {
+    var linha = (c.polegadas||'?')+'" | '+(c.descricaoDiag||c.nomeContato||'—')+' | '+(c.pecaDiag||'Barramento');
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--surface2);border-radius:6px;margin-bottom:6px;">' +
+      '<div style="flex:1;font-family:var(--fm);font-size:10px;color:var(--text);">' +
+        '<div style="font-weight:700;">'+escHtml(c.nomeContato||c.osCode||'—')+'</div>' +
+        '<div style="color:var(--muted);margin-top:2px;">'+escHtml(linha)+'</div>' +
+      '</div>' +
+      '<button onclick="copiarBarramento(''+escHtml(linha.replace(/'/g,''))+'',this)" style="font-family:var(--fm);font-size:9px;padding:4px 10px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">📋 Copiar</button>' +
+    '</div>';
+  }).join('') || '<div style="color:var(--muted);font-size:11px;text-align:center;padding:20px;">Nenhum card em Barramento</div>';
+  document.getElementById('barr-todos-txt').value = cards.map(function(c){
+    return (c.polegadas||'?')+'" | '+(c.descricaoDiag||c.nomeContato||'—')+' | '+(c.pecaDiag||'Barramento');
+  }).join('\n');
+  ov.classList.add('open');
+}
+
+function fecharComprarBarramento() {
+  var ov = document.getElementById('barr-comprar-ov');
+  if (ov) ov.classList.remove('open');
+}
+
+function copiarBarramento(texto, btn) {
+  navigator.clipboard.writeText(texto).then(function(){
+    btn.textContent='✅ Copiado!';
+    setTimeout(function(){ btn.textContent='📋 Copiar'; }, 1500);
+  }).catch(function(){
+    var el=document.createElement('textarea'); el.value=texto;
+    document.body.appendChild(el); el.select(); document.execCommand('copy');
+    document.body.removeChild(el);
+    btn.textContent='✅ Copiado!';
+    setTimeout(function(){ btn.textContent='📋 Copiar'; }, 1500);
+  });
+}
+
+function copiarTodosBarramento() {
+  var txt = document.getElementById('barr-todos-txt').value;
+  copiarBarramento(txt, document.getElementById('barr-copiar-todos'));
+}
+
+async function concluirCompraBarramento() {
+  var cards = (board.cards||[]).filter(function(c){return c.phaseId==='barramento';});
+  cards.forEach(function(c){ c.barramentoConcluido = true; });
+  // Salvar via update-card em lote
+  for (var i=0;i<cards.length;i++){
+    await api('POST','update-card',{pipefyId:cards[i].pipefyId,barramentoConcluido:true}).catch(function(){});
+  }
+  fecharComprarBarramento();
+  await loadBoard();
+  showToast('✅','Compras concluídas','Todas as fichas marcadas');
+}
+
+// Compra LOCAL → mover para Produção aguardando barramento
+async function setBarramentoCompra(pipefyId, tipo) {
+  var prazo = null;
+  if (tipo === 'internet') {
+    prazo = prompt('📅 Previsão de chegada (DD/MM/AAAA):','');
+    if (prazo === null) return;
+    // Converter para YYYY-MM-DD
+    var parts = prazo.trim().split('/');
+    if (parts.length === 3) prazo = parts[2]+'-'+parts[1]+'-'+parts[0];
+  }
+  try {
+    const res = await api('POST','set-barramento-compra',{ pipefyId, tipo, prazo });
+    if (!res.ok) throw new Error(res.error);
+    showToast('✅', tipo==='local'?'Comprado local':'Pedido na internet', prazo||'');
+    await loadBoard();
+  } catch(e) { showToast('❌','Erro',e.message); }
+}
+
+function abrirBarramentoInternet(pipefyId) {
+  setBarramentoCompra(pipefyId, 'internet');
+}
+
+// Barramento chegou → topo de Produção em verde
+async function barramentoChegou(pipefyId) {
+  try {
+    const res = await api('POST','barramento-chegou',{ pipefyId });
+    if (!res.ok) throw new Error(res.error);
+    showToast('✅','Barramento disponível','Card movido para topo da Produção');
+    await loadBoard();
+  } catch(e) { showToast('❌','Erro',e.message); }
+}
+
+function escHtml(s) { var d=document.createElement('div');d.textContent=s||'';return d.innerHTML; }
+
+
 
 // ── RS BOARDS ──────────────────────────────────────────────────
 function renderRsBoard(type) {
@@ -1736,5 +1904,39 @@ setInterval(() => {
     </div>
   </div>
 </div>
+
+<!-- ── OVERLAY COMPRAR BARRAMENTO ───────────────────────────── -->
+<div id="barr-comprar-ov" class="overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:300;align-items:center;justify-content:center;" onclick="if(event.target===this)fecharComprarBarramento()">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px;width:460px;max-width:95vw;max-height:88vh;display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-family:var(--fh);font-size:14px;font-weight:800;">🛒 Comprar Barramento</div>
+      <button onclick="fecharComprarBarramento()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;">×</button>
+    </div>
+    <div id="barr-comprar-list" style="overflow-y:auto;flex:1;"></div>
+    <div style="border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:8px;">
+      <label style="font-family:var(--fm);font-size:9px;color:var(--muted);letter-spacing:.08em;">COPIAR TODOS EM LOTE</label>
+      <textarea id="barr-todos-txt" rows="3" readonly style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--fm);font-size:10px;padding:8px;resize:none;"></textarea>
+      <div style="display:flex;gap:8px;">
+        <button id="barr-copiar-todos" onclick="copiarTodosBarramento()" style="flex:1;font-family:var(--fm);font-size:10px;font-weight:700;padding:8px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;">📋 Copiar tudo</button>
+        <button onclick="concluirCompraBarramento()" style="flex:1;font-family:var(--fm);font-size:10px;font-weight:700;padding:8px;border-radius:6px;border:none;background:#f59e0b;color:#000;cursor:pointer;">✅ Concluir</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+/* Estilo adicional para overlay barramento */
+#barr-comprar-ov.open { display:flex !important; }
+/* Botão barramento no card aprovado */
+.btn-barr {
+  margin-top:7px;width:100%;
+  font-family:var(--fm);font-size:10px;padding:5px;
+  border-radius:6px;border:1px solid rgba(232,121,249,.3);
+  background:rgba(232,121,249,.08);color:#e879f9;
+  cursor:pointer;transition:all .15s;
+}
+.btn-barr:hover{background:rgba(232,121,249,.16);}
+</style>
+
 </body>
 </html>
