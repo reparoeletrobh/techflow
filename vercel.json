@@ -75,6 +75,10 @@
   ],
   "rewrites": [
     {
+      "source": "/geladeira",
+      "destination": "/geladeira.html"
+    },
+    {
       "source": "/api/pipe",
       "destination": "/api/pipe.js"
     },
@@ -469,10 +473,6 @@
     {
       "source": "/tv/pecas",
       "destination": "/tv-pecas.html"
-    },
-    {
-      "source": "/geladeira",
-      "destination": "/geladeira.html"
     }
   ],
   "headers": [

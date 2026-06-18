@@ -30,19 +30,8 @@ h1 span{color:#f5c800;}
 <body>
   <h1>Reparo<span>Eletro</span></h1>
 
-<a href="/conflitos" id="conf-badge" style="position:fixed;top:16px;right:16px;display:none;align-items:center;gap:8px;background:#080d18;border:1px solid rgba(240,64,96,.4);border-radius:99px;padding:8px 16px;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:#f04060;text-decoration:none;z-index:100;box-shadow:0 0 20px rgba(240,64,96,.2);">
-  <span style="width:8px;height:8px;border-radius:50%;background:#f04060;display:inline-block"></span>
-  <span id="conf-txt">Conflitos</span>
-</a>
+
 <!-- botão conflitos removido -->
-<script>
-fetch('/api/conflitos?action=badge').then(function(r){return r.json();}).then(function(d){
-  if(d.criticos>0){
-    var el=document.getElementById('conf-badge');
-    document.getElementById('conf-txt').textContent=d.criticos+' conflito'+(d.criticos>1?'s':'')+' crítico'+(d.criticos>1?'s':'');
-    el.style.display='flex';
-  }
-}).catch(function(){});
-</script>
+
 </body>
 </html>
