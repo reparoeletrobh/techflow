@@ -38,6 +38,7 @@ img{max-width:100%;display:block;}
 
 /* SEÇÃO BASE */
 .sec{padding:48px 20px;}
+.sec.autoridade-sec{padding-top:20px;}
 .sec.alt{background:var(--light);}
 .sec-w{max-width:680px;margin:0 auto;}
 .sec-tag{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--blue2);margin-bottom:8px;text-align:center;}
@@ -75,7 +76,7 @@ img{max-width:100%;display:block;}
 
 /* MARCAS */
 .marcas-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:20px;}
-.marca{background:var(--light);border:1px solid var(--border);border-radius:8px;padding:14px 8px;text-align:center;font-size:13px;font-weight:700;color:var(--gray);}
+.marca{background:var(--light);border:1px solid var(--border);border-radius:8px;padding:18px 10px;text-align:center;font-size:13px;font-weight:700;color:var(--gray);min-height:60px;display:flex;align-items:center;justify-content:center;}
 
 /* ESTRAGOU */
 .estragou{background:var(--blue);}
@@ -101,7 +102,7 @@ footer{background:#060e1a;padding:20px;text-align:center;font-size:12px;color:rg
 
 @media(max-width:480px){
   .hero-inner{grid-template-columns:1fr;}
-  .hero-img{display:none;}
+  .hero-img{display:flex;justify-content:center;margin-top:16px;}
   .stats-bar-inner{grid-template-columns:1fr 1fr;}
   .sb-item:nth-child(2){border-right:none;}
   .sb-item:nth-child(3){border-right:1px solid var(--border);}
@@ -114,7 +115,7 @@ footer{background:#060e1a;padding:20px;text-align:center;font-size:12px;color:rg
 <body>
 
 <!-- DOBRA 1: HERO -->
-<div class="hero-top">⚡ Técnico disponível agora em BH — Atendimento Rápido, Garantia, Peças Originais</div>
+<div class="hero-top">⚡ Técnico disponível agora em BH e região</div>
 <section class="hero">
   <div class="hero-inner">
     <div>
@@ -125,7 +126,7 @@ footer{background:#060e1a;padding:20px;text-align:center;font-size:12px;color:rg
         <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
         CLIQUE PARA ATENDIMENTO
       </a>
-      <p class="hero-note">📞 (31) 9 9785-6023 · Seg–Sáb 08h–18h</p>
+      <p class="hero-note">📞 (31) 9 9785-6023 · Seg–Sáb 08h–21h</p>
     </div>
     <div class="hero-img">
       <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=300,h=400,fit=crop/AR0VPkywZoSw7lZk/download__1_-removebg-preview-m6LvQaR4ewHV65vd.webp"
@@ -137,9 +138,9 @@ footer{background:#060e1a;padding:20px;text-align:center;font-size:12px;color:rg
 <!-- STATS BAR -->
 <div class="stats-bar">
   <div class="stats-bar-inner">
-    <div class="sb-item"><div class="sb-num">10mil+</div><div class="sb-lbl">Consertos</div></div>
+    <div class="sb-item"><div class="sb-num">39mil+</div><div class="sb-lbl">Consertos</div></div>
     <div class="sb-item"><div class="sb-num">4.9★</div><div class="sb-lbl">Google</div></div>
-    <div class="sb-item"><div class="sb-num">8 anos</div><div class="sb-lbl">Em BH</div></div>
+    <div class="sb-item"><div class="sb-num">15 anos</div><div class="sb-lbl">Em BH</div></div>
     <div class="sb-item"><div class="sb-num">90 dias</div><div class="sb-lbl">Garantia</div></div>
   </div>
 </div>
@@ -187,17 +188,25 @@ footer{background:#060e1a;padding:20px;text-align:center;font-size:12px;color:rg
 </section>
 
 <!-- DOBRA 4: AUTORIDADE -->
-<section class="sec alt">
+<section class="sec alt autoridade-sec">
   <div class="sec-w">
     <img class="aut-img"
       src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=680,h=300,fit=crop/AR0VPkywZoSw7lZk/clima-2-AzGrxBDZWKILDO8w.webp"
       alt="Reparo Eletro BH — conserto de geladeira" width="680" height="220" loading="lazy">
     <div class="sec-tag">Quem somos</div>
-    <h2 class="sec-h">Mais de <em>8 anos</em> consertando geladeiras em BH</h2>
+    <h2 class="sec-h">Mais de <em>15 anos</em> consertando geladeiras em BH</h2>
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="width:120px;height:120px;border-radius:50%;overflow:hidden;margin:0 auto;border:3px solid var(--yellow);background:var(--light);">
+        <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=300,h=300,fit=crop/AR0VPkywZoSw7lZk/verificado-removebg-preview-A1aKxBj4QyH4NoW1.png"
+             alt="Qualidade verificada" width="120" height="120" loading="lazy"
+             style="width:100%;height:100%;object-fit:cover;"
+             onerror="this.parentNode.innerHTML='<div style=&quot;width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:40px;&quot;>✅</div>'">
+      </div>
+    </div>
     <div class="stats-grid">
-      <div class="stat-box"><div class="stat-num">10mil+</div><div class="stat-lbl">Geladeiras consertadas</div></div>
+      <div class="stat-box"><div class="stat-num">39mil+</div><div class="stat-lbl">Geladeiras consertadas</div></div>
       <div class="stat-box"><div class="stat-num">4.9★</div><div class="stat-lbl">Avaliação Google</div></div>
-      <div class="stat-box"><div class="stat-num">8 anos</div><div class="stat-lbl">Desde 2017 em BH</div></div>
+      <div class="stat-box"><div class="stat-num">15 anos</div><div class="stat-lbl">Desde 2010 em BH</div></div>
       <div class="stat-box"><div class="stat-num">90 dias</div><div class="stat-lbl">Garantia por escrito</div></div>
     </div>
     <div class="aut-list">
@@ -256,6 +265,9 @@ footer{background:#060e1a;padding:20px;text-align:center;font-size:12px;color:rg
       <div class="marca">Panasonic</div>
       <div class="marca">Midea</div>
       <div class="marca">Philco</div>
+      <div class="marca">Bosch</div>
+      <div class="marca">Continental</div>
+      <div class="marca">Outras ✓</div>
     </div>
   </div>
 </section>
