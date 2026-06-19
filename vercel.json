@@ -75,6 +75,30 @@
   ],
   "rewrites": [
     {
+      "source": "/geladeira-6",
+      "destination": "/geladeira.html"
+    },
+    {
+      "source": "/geladeira-5",
+      "destination": "/geladeira.html"
+    },
+    {
+      "source": "/geladeira-4",
+      "destination": "/geladeira.html"
+    },
+    {
+      "source": "/geladeira-3",
+      "destination": "/geladeira.html"
+    },
+    {
+      "source": "/geladeira-2",
+      "destination": "/geladeira.html"
+    },
+    {
+      "source": "/geladeira-1",
+      "destination": "/geladeira.html"
+    },
+    {
       "source": "/tv/barramento",
       "destination": "/tv-barramento.html"
     },
