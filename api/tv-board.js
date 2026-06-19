@@ -41,6 +41,7 @@ function defaultBoard() {
       { id: "barramento",      name: "Barramento"         },
       { id: "producao",        name: "Produção"           },
       { id: "urgencia",        name: "Urgência"           },
+      { id: "condenado",       name: "Condenado"          },
       { id: "comprar_peca",    name: "Comprar Peça"       },
       { id: "aguardando_peca", name: "Aguardando Peça"    },
       { id: "peca_disponivel", name: "Peça Disponível"    },
@@ -64,6 +65,11 @@ function sanitizeBoard(b) {
     var idxAprov = b.phases.findIndex(function(p){ return p.id === 'aprovado'; });
     var insAt = idxAprov >= 0 ? idxAprov + 1 : 1;
     b.phases.splice(insAt, 0, { id: 'barramento', name: 'Barramento' });
+  }
+  if (!b.phases.find(function(p){ return p.id === 'condenado'; })) {
+    var idxUrg = b.phases.findIndex(function(p){ return p.id === 'urgencia'; });
+    var insAt2 = idxUrg >= 0 ? idxUrg + 1 : 3;
+    b.phases.splice(insAt2, 0, { id: 'condenado', name: 'Condenado' });
   }
   if (!Array.isArray(b.cards))     b.cards     = [];
   if (!Array.isArray(b.syncedIds)) b.syncedIds = [];
