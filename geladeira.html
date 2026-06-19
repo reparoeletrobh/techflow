@@ -7,195 +7,178 @@
 <meta name="theme-color" content="#0a2240">
 <title>Conserto de Geladeira em BH | Reparo Eletro — Técnico a Domicílio</title>
 <style>
-/* ── RESET MÍNIMO ─────────────────────────────────────────────────────── */
 *{margin:0;padding:0;box-sizing:border-box;}
 html{scroll-behavior:smooth;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  color:#1a1a2e;background:#fff;line-height:1.6;-webkit-font-smoothing:antialiased;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1a1a2e;background:#fff;line-height:1.6;-webkit-font-smoothing:antialiased;}
 a{text-decoration:none;color:inherit;}
+img{max-width:100%;display:block;}
+:root{--blue:#0a2240;--blue2:#0F4C81;--green:#16a34a;--wa:#25D366;--yellow:#fbbf24;--gray:#6b7280;--light:#f8fafc;--border:#e5e7eb;}
 
-/* ── VARIÁVEIS ────────────────────────────────────────────────────────── */
-:root{
-  --blue:#0a2240;
-  --blue2:#0F4C81;
-  --green:#16a34a;
-  --wa:#25D366;
-  --yellow:#fbbf24;
-  --gray:#6b7280;
-  --light:#f8fafc;
-  --border:#e5e7eb;
-}
-
-/* ── HERO ─────────────────────────────────────────────────────────────── */
-.hero{background:var(--blue);padding:0;}
-.hero-top{background:var(--yellow);text-align:center;padding:10px 16px;
-  font-size:13px;font-weight:800;color:#000;letter-spacing:.02em;}
-.hero-body{padding:48px 20px 40px;max-width:680px;margin:0 auto;text-align:center;}
-.hero-eyebrow{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
-  color:rgba(255,255,255,.55);margin-bottom:14px;}
-.hero-h1{font-size:clamp(28px,6vw,48px);font-weight:900;line-height:1.1;
-  color:#fff;margin-bottom:18px;}
+/* HERO */
+.hero-top{background:var(--yellow);text-align:center;padding:10px 16px;font-size:13px;font-weight:800;color:#000;}
+.hero{background:var(--blue);}
+.hero-inner{max-width:680px;margin:0 auto;padding:40px 20px 0;display:grid;grid-template-columns:1fr auto;gap:24px;align-items:flex-end;}
+.hero-eyebrow{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:12px;}
+.hero-h1{font-size:clamp(26px,6vw,44px);font-weight:900;line-height:1.1;color:#fff;margin-bottom:14px;}
 .hero-h1 em{font-style:italic;color:var(--yellow);}
-.hero-sub{font-size:16px;color:rgba(255,255,255,.72);margin-bottom:32px;max-width:480px;margin-left:auto;margin-right:auto;}
-.btn-wa-hero{display:inline-flex;align-items:center;justify-content:center;gap:10px;
-  background:var(--wa);color:#fff;font-size:17px;font-weight:800;
-  padding:18px 36px;border-radius:10px;width:100%;max-width:400px;
-  box-shadow:0 6px 24px rgba(37,211,102,.4);
-  animation:pulse-btn 2s infinite;letter-spacing:.01em;}
-@keyframes pulse-btn{
-  0%,100%{box-shadow:0 6px 24px rgba(37,211,102,.4);}
-  50%{box-shadow:0 6px 40px rgba(37,211,102,.65),0 0 0 6px rgba(37,211,102,.12);}
-}
-.btn-wa-hero:active{transform:scale(.98);}
-.hero-note{font-size:12px;color:rgba(255,255,255,.4);margin-top:14px;}
+.hero-sub{font-size:15px;color:rgba(255,255,255,.7);margin-bottom:28px;}
+.btn-wa-hero{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--wa);color:#fff;font-size:16px;font-weight:800;padding:16px 28px;border-radius:10px;width:100%;box-shadow:0 6px 24px rgba(37,211,102,.4);animation:pulse-btn 2s infinite;margin-bottom:12px;}
+@keyframes pulse-btn{0%,100%{box-shadow:0 6px 24px rgba(37,211,102,.4);}50%{box-shadow:0 6px 40px rgba(37,211,102,.65),0 0 0 6px rgba(37,211,102,.12);}}
+.hero-note{font-size:12px;color:rgba(255,255,255,.4);text-align:center;padding-bottom:32px;}
+.hero-img{width:140px;flex-shrink:0;align-self:flex-end;}
+.hero-img img{width:140px;object-fit:contain;filter:drop-shadow(0 8px 24px rgba(0,0,0,.3));}
 
-/* ── SEÇÃO 2: BENEFÍCIOS ──────────────────────────────────────────────── */
-.beneficios{background:#fff;padding:52px 20px;}
+/* STATS RÁPIDOS */
+.stats-bar{background:#fff;border-bottom:1px solid var(--border);}
+.stats-bar-inner{max-width:680px;margin:0 auto;padding:20px;display:grid;grid-template-columns:repeat(4,1fr);text-align:center;gap:0;}
+.sb-item{border-right:1px solid var(--border);padding:0 8px;}
+.sb-item:last-child{border-right:none;}
+.sb-num{font-size:20px;font-weight:900;color:var(--blue2);line-height:1;}
+.sb-lbl{font-size:10px;color:var(--gray);margin-top:2px;}
+
+/* SEÇÃO BASE */
+.sec{padding:48px 20px;}
+.sec.alt{background:var(--light);}
 .sec-w{max-width:680px;margin:0 auto;}
-.ben-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px;}
-.ben-item{background:var(--light);border:1px solid var(--border);border-radius:12px;
-  padding:20px 16px;text-align:center;}
-.ben-icon{font-size:32px;margin-bottom:10px;line-height:1;}
-.ben-title{font-size:14px;font-weight:800;color:var(--blue);margin-bottom:4px;}
-.ben-desc{font-size:12px;color:var(--gray);line-height:1.5;}
-.sec-tagline{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
-  color:var(--blue2);margin-bottom:8px;text-align:center;}
-.sec-h{font-size:clamp(22px,5vw,32px);font-weight:900;line-height:1.15;
-  text-align:center;margin-bottom:6px;}
+.sec-tag{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--blue2);margin-bottom:8px;text-align:center;}
+.sec-h{font-size:clamp(22px,5vw,34px);font-weight:900;line-height:1.15;text-align:center;margin-bottom:24px;}
 .sec-h em{font-style:italic;color:var(--blue2);}
 
-/* ── SEÇÃO 3: URGÊNCIA ────────────────────────────────────────────────── */
-.urgencia{background:var(--blue);padding:52px 20px;text-align:center;}
-.urg-h{font-size:clamp(26px,6vw,40px);font-weight:900;line-height:1.1;
-  color:#fff;margin-bottom:16px;}
+/* BENEFÍCIOS */
+.ben-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.ben{background:#fff;border:1px solid var(--border);border-radius:12px;padding:18px 14px;display:flex;gap:14px;align-items:flex-start;}
+.ben-icon{width:44px;height:44px;border-radius:10px;background:rgba(15,76,129,.08);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+.ben-title{font-size:14px;font-weight:800;color:var(--blue);margin-bottom:3px;}
+.ben-desc{font-size:12px;color:var(--gray);line-height:1.4;}
+
+/* URGÊNCIA */
+.urg{background:var(--blue);}
+.urg-inner{max-width:680px;margin:0 auto;padding:48px 20px;}
+.urg-img{border-radius:14px;overflow:hidden;margin-bottom:28px;max-height:260px;object-fit:cover;width:100%;}
+.urg-h{font-size:clamp(24px,6vw,38px);font-weight:900;line-height:1.1;color:#fff;margin-bottom:14px;}
 .urg-h em{color:var(--yellow);font-style:italic;}
-.urg-sub{font-size:16px;color:rgba(255,255,255,.7);margin-bottom:12px;max-width:480px;margin-left:auto;margin-right:auto;}
-.urg-alert{display:inline-flex;align-items:center;gap:8px;
-  background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);
-  border-radius:8px;padding:10px 18px;margin-bottom:28px;
-  font-size:14px;font-weight:700;color:#fca5a5;}
-.btn-wa-sec{display:inline-flex;align-items:center;justify-content:center;gap:10px;
-  background:var(--wa);color:#fff;font-size:16px;font-weight:800;
-  padding:16px 32px;border-radius:10px;width:100%;max-width:380px;}
-.btn-wa-sec:active{transform:scale(.98);}
+.urg-sub{font-size:15px;color:rgba(255,255,255,.7);margin-bottom:12px;}
+.urg-alert{display:inline-flex;align-items:center;gap:8px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:10px 16px;margin-bottom:24px;font-size:13px;font-weight:700;color:#fca5a5;}
+.btn-wa-sec{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--wa);color:#fff;font-size:15px;font-weight:800;padding:15px 28px;border-radius:10px;width:100%;}
 
-/* ── SEÇÃO 4: AUTORIDADE ──────────────────────────────────────────────── */
-.autoridade{background:var(--light);padding:52px 20px;}
-.stats-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:28px 0;}
-.stat-box{background:#fff;border:1px solid var(--border);border-radius:12px;
-  padding:20px 14px;text-align:center;}
-.stat-num{font-size:32px;font-weight:900;color:var(--blue2);line-height:1;margin-bottom:4px;}
-.stat-lbl{font-size:12px;color:var(--gray);font-weight:500;}
-.aut-list{display:flex;flex-direction:column;gap:12px;margin:24px 0;}
-.aut-item{display:flex;align-items:flex-start;gap:12px;
-  background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;}
+/* AUTORIDADE */
+.aut-img{border-radius:14px;overflow:hidden;width:100%;max-height:220px;object-fit:cover;margin-bottom:24px;}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;}
+.stat-box{background:#fff;border:1px solid var(--border);border-radius:12px;padding:18px 12px;text-align:center;}
+.stat-num{font-size:28px;font-weight:900;color:var(--blue2);line-height:1;margin-bottom:3px;}
+.stat-lbl{font-size:11px;color:var(--gray);}
+.aut-list{display:flex;flex-direction:column;gap:10px;margin-bottom:24px;}
+.aut-item{display:flex;gap:12px;align-items:flex-start;background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;}
 .aut-icon{font-size:20px;flex-shrink:0;margin-top:1px;}
-.aut-text{font-size:14px;color:#374151;line-height:1.55;}
-.aut-text strong{color:var(--blue);display:block;font-size:15px;margin-bottom:2px;}
+.aut-text{font-size:14px;color:#374151;line-height:1.5;}
+.aut-text strong{color:var(--blue);display:block;font-weight:800;margin-bottom:2px;}
 
-/* ── SEÇÃO 5: MARCAS ──────────────────────────────────────────────────── */
-.marcas{background:#fff;padding:52px 20px;}
-.marcas-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:24px;}
-.marca{background:var(--light);border:1px solid var(--border);border-radius:8px;
-  padding:14px 8px;text-align:center;font-size:13px;font-weight:700;color:var(--gray);}
+/* MARCAS */
+.marcas-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:20px;}
+.marca{background:var(--light);border:1px solid var(--border);border-radius:8px;padding:14px 8px;text-align:center;font-size:13px;font-weight:700;color:var(--gray);}
 
-/* ── CTA FINAL ────────────────────────────────────────────────────────── */
+/* ESTRAGOU */
+.estragou{background:var(--blue);}
+.estragou-inner{max-width:680px;margin:0 auto;padding:0 20px 48px;}
+.estragou-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px;}
+.estragou-img{border-radius:12px;overflow:hidden;width:100%;}
+.estragou-img img{width:100%;height:220px;object-fit:cover;}
+
+/* CTA FINAL */
 .cta-final{background:var(--blue);padding:52px 20px;text-align:center;}
-.cta-h{font-size:clamp(24px,5vw,36px);font-weight:900;color:#fff;
-  line-height:1.15;margin-bottom:12px;}
+.cta-h{font-size:clamp(24px,5vw,36px);font-weight:900;color:#fff;line-height:1.15;margin-bottom:12px;}
 .cta-h em{color:var(--yellow);font-style:italic;}
 .cta-desc{font-size:15px;color:rgba(255,255,255,.65);margin-bottom:28px;}
 .cta-note{font-size:12px;color:rgba(255,255,255,.4);margin-top:16px;}
+.sec-w-cta{max-width:680px;margin:0 auto;}
 
-/* ── FOOTER MÍNIMO ────────────────────────────────────────────────────── */
-footer{background:#060e1a;padding:24px 20px;text-align:center;
-  font-size:12px;color:rgba(255,255,255,.35);}
+/* FOOTER */
+footer{background:#060e1a;padding:20px;text-align:center;font-size:12px;color:rgba(255,255,255,.3);}
 
-/* ── WA FLOAT ─────────────────────────────────────────────────────────── */
-.wa-float{position:fixed;bottom:20px;right:16px;z-index:100;
-  width:54px;height:54px;border-radius:50%;background:var(--wa);
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:0 4px 20px rgba(37,211,102,.45);
-  animation:wa-pulse 2.5s infinite;}
-@keyframes wa-pulse{
-  0%,100%{box-shadow:0 4px 20px rgba(37,211,102,.45);}
-  50%{box-shadow:0 4px 32px rgba(37,211,102,.7),0 0 0 8px rgba(37,211,102,.1);}
-}
+/* WA FLOAT */
+.wa-float{position:fixed;bottom:20px;right:16px;z-index:100;width:54px;height:54px;border-radius:50%;background:var(--wa);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(37,211,102,.45);animation:wa-pulse 2.5s infinite;}
+@keyframes wa-pulse{0%,100%{box-shadow:0 4px 20px rgba(37,211,102,.45);}50%{box-shadow:0 4px 32px rgba(37,211,102,.7),0 0 0 8px rgba(37,211,102,.1);}}
 
-/* ── MOBILE ───────────────────────────────────────────────────────────── */
-@media(max-width:400px){
+@media(max-width:480px){
+  .hero-inner{grid-template-columns:1fr;}
+  .hero-img{display:none;}
+  .stats-bar-inner{grid-template-columns:1fr 1fr;}
+  .sb-item:nth-child(2){border-right:none;}
+  .sb-item:nth-child(3){border-right:1px solid var(--border);}
   .ben-grid{grid-template-columns:1fr;}
-  .stats-row{grid-template-columns:1fr 1fr;}
-  .marcas-grid{grid-template-columns:repeat(2,1fr);}
+  .marcas-grid{grid-template-columns:1fr 1fr;}
+  .estragou-grid{grid-template-columns:1fr;}
 }
 </style>
 </head>
 <body>
 
-<!-- ═══ DOBRA 1 — HERO ════════════════════════════════════════════════ -->
+<!-- DOBRA 1: HERO -->
+<div class="hero-top">⚡ Técnico disponível agora em BH — Atendimento Rápido, Garantia, Peças Originais</div>
 <section class="hero">
-  <div class="hero-top">
-    ⚡ Técnico disponível agora em BH — Ligue ou chame no WhatsApp
-  </div>
-  <div class="hero-body">
-    <div class="hero-eyebrow">Reparo Eletro BH · Desde 2017</div>
-    <h1 class="hero-h1">
-      Conserto de Geladeira<br>
-      em <em>Belo Horizonte</em>
-    </h1>
-    <p class="hero-sub">
-      Técnico especializado vai até você. Diagnóstico gratuito, peças originais e 90 dias de garantia por escrito.
-    </p>
-    <a href="https://wa.me/5531997856023?text=Olá!+Preciso+de+conserto+de+geladeira+em+BH.+Podem+me+atender?" class="btn-wa-hero">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-      CLIQUE PARA ATENDIMENTO
-    </a>
-    <p class="hero-note">📞 (31) 9 9785-6023 · Seg–Sáb 08h–18h</p>
+  <div class="hero-inner">
+    <div>
+      <div class="hero-eyebrow">Reparo Eletro BH · Desde 2017</div>
+      <h1 class="hero-h1">Conserto de<br>Geladeira em<br><em>Belo Horizonte</em></h1>
+      <p class="hero-sub">Técnico especializado vai até você. Diagnóstico gratuito e 90 dias de garantia.</p>
+      <a href="https://wa.me/5531997856023?text=Olá!+Preciso+de+conserto+de+geladeira+em+BH.+Podem+me+atender?" class="btn-wa-hero">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        CLIQUE PARA ATENDIMENTO
+      </a>
+      <p class="hero-note">📞 (31) 9 9785-6023 · Seg–Sáb 08h–18h</p>
+    </div>
+    <div class="hero-img">
+      <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=300,h=400,fit=crop/AR0VPkywZoSw7lZk/download__1_-removebg-preview-m6LvQaR4ewHV65vd.webp"
+           alt="Geladeira" width="140" height="200" loading="eager">
+    </div>
   </div>
 </section>
 
-<!-- ═══ DOBRA 2 — BENEFÍCIOS ══════════════════════════════════════════ -->
-<section class="beneficios">
+<!-- STATS BAR -->
+<div class="stats-bar">
+  <div class="stats-bar-inner">
+    <div class="sb-item"><div class="sb-num">10mil+</div><div class="sb-lbl">Consertos</div></div>
+    <div class="sb-item"><div class="sb-num">4.9★</div><div class="sb-lbl">Google</div></div>
+    <div class="sb-item"><div class="sb-num">8 anos</div><div class="sb-lbl">Em BH</div></div>
+    <div class="sb-item"><div class="sb-num">90 dias</div><div class="sb-lbl">Garantia</div></div>
+  </div>
+</div>
+
+<!-- DOBRA 2: BENEFÍCIOS -->
+<section class="sec alt">
   <div class="sec-w">
-    <div class="sec-tagline">Por que a Reparo Eletro</div>
+    <div class="sec-tag">Por que a Reparo Eletro</div>
     <h2 class="sec-h">Atendimento que <em>você merece</em></h2>
     <div class="ben-grid">
-      <div class="ben-item">
+      <div class="ben">
         <div class="ben-icon">⚡</div>
-        <div class="ben-title">Atendimento Rápido</div>
-        <div class="ben-desc">Técnico disponível hoje em BH e região metropolitana</div>
+        <div><div class="ben-title">Atendimento Rápido</div><div class="ben-desc">Técnico disponível hoje em BH e região metropolitana</div></div>
       </div>
-      <div class="ben-item">
+      <div class="ben">
         <div class="ben-icon">💳</div>
-        <div class="ben-title">Pagamento Facilitado</div>
-        <div class="ben-desc">Cartão, PIX ou dinheiro. Parcelamos no cartão</div>
+        <div><div class="ben-title">Pagamento Facilitado</div><div class="ben-desc">Cartão, PIX ou dinheiro. Parcelamos no cartão</div></div>
       </div>
-      <div class="ben-item">
+      <div class="ben">
         <div class="ben-icon">🛡️</div>
-        <div class="ben-title">Garantia no Serviço</div>
-        <div class="ben-desc">90 dias em peças e mão de obra, por escrito</div>
+        <div><div class="ben-title">Garantia no Serviço</div><div class="ben-desc">90 dias em peças e mão de obra, por escrito</div></div>
       </div>
-      <div class="ben-item">
+      <div class="ben">
         <div class="ben-icon">🔧</div>
-        <div class="ben-title">Peças Originais</div>
-        <div class="ben-desc">Compressor, gaxeta, termostato — só peça original</div>
+        <div><div class="ben-title">Peças Originais</div><div class="ben-desc">Compressor, gaxeta, termostato — só peça original</div></div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ═══ DOBRA 3 — URGÊNCIA ════════════════════════════════════════════ -->
-<section class="urgencia">
-  <div class="sec-w">
-    <h2 class="urg-h">
-      Conserto de Geladeira<br>
-      <em>a Domicílio na Hora</em>
-    </h2>
+<!-- DOBRA 3: URGÊNCIA COM FOTO DO TÉCNICO -->
+<section class="urg">
+  <div class="urg-inner">
+    <img class="urg-img"
+      src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=680,h=360,fit=crop/AR0VPkywZoSw7lZk/clima-3-AR0JDXya33FaW51M.webp"
+      alt="Técnico consertando geladeira em BH" width="680" height="260" loading="lazy">
+    <h2 class="urg-h">Conserto de Geladeira<br><em>a Domicílio na Hora</em></h2>
     <p class="urg-sub">Enviamos um técnico agora para o seu endereço em BH.</p>
-    <div class="urg-alert">
-      🚨 Não perca sua comida por demora no atendimento
-    </div>
-    <br>
+    <div class="urg-alert">🚨 Não perca sua comida por demora no atendimento</div>
     <a href="https://wa.me/5531997856023?text=Olá!+Minha+geladeira+parou+e+preciso+de+um+técnico+agora+em+BH!" class="btn-wa-sec">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
       AGENDAR POR WHATSAPP
@@ -203,63 +186,65 @@ footer{background:#060e1a;padding:24px 20px;text-align:center;
   </div>
 </section>
 
-<!-- ═══ DOBRA 4 — AUTORIDADE ══════════════════════════════════════════ -->
-<section class="autoridade">
+<!-- DOBRA 4: AUTORIDADE -->
+<section class="sec alt">
   <div class="sec-w">
-    <div class="sec-tagline">Quem somos</div>
+    <img class="aut-img"
+      src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=680,h=300,fit=crop/AR0VPkywZoSw7lZk/clima-2-AzGrxBDZWKILDO8w.webp"
+      alt="Reparo Eletro BH — conserto de geladeira" width="680" height="220" loading="lazy">
+    <div class="sec-tag">Quem somos</div>
     <h2 class="sec-h">Mais de <em>8 anos</em> consertando geladeiras em BH</h2>
-    <div class="stats-row">
-      <div class="stat-box">
-        <div class="stat-num">10mil+</div>
-        <div class="stat-lbl">Geladeiras consertadas</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-num">4.9★</div>
-        <div class="stat-lbl">Avaliação Google</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-num">8 anos</div>
-        <div class="stat-lbl">Desde 2017 em BH</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-num">90 dias</div>
-        <div class="stat-lbl">Garantia por escrito</div>
-      </div>
+    <div class="stats-grid">
+      <div class="stat-box"><div class="stat-num">10mil+</div><div class="stat-lbl">Geladeiras consertadas</div></div>
+      <div class="stat-box"><div class="stat-num">4.9★</div><div class="stat-lbl">Avaliação Google</div></div>
+      <div class="stat-box"><div class="stat-num">8 anos</div><div class="stat-lbl">Desde 2017 em BH</div></div>
+      <div class="stat-box"><div class="stat-num">90 dias</div><div class="stat-lbl">Garantia por escrito</div></div>
     </div>
     <div class="aut-list">
       <div class="aut-item">
         <div class="aut-icon">🏠</div>
-        <div class="aut-text">
-          <strong>Atendimento a Domicílio</strong>
-          Vamos até o seu endereço em Belo Horizonte e região metropolitana. Sem precisar sair de casa.
-        </div>
+        <div class="aut-text"><strong>Atendimento a Domicílio</strong>Vamos até o seu endereço em BH e região. Sem precisar sair de casa.</div>
       </div>
       <div class="aut-item">
         <div class="aut-icon">🥩</div>
-        <div class="aut-text">
-          <strong>Não perca sua comida</strong>
-          Já salvamos milhares de famílias de perderem suas compras por demora no atendimento.
-        </div>
+        <div class="aut-text"><strong>Não perca sua comida</strong>Já salvamos milhares de famílias de perderem suas compras por demora no atendimento.</div>
       </div>
       <div class="aut-item">
         <div class="aut-icon">💰</div>
-        <div class="aut-text">
-          <strong>Conserto custa muito menos que uma nova</strong>
-          Na maioria dos casos o reparo é 60% mais barato do que comprar uma geladeira nova.
-        </div>
+        <div class="aut-text"><strong>Muito mais barato que uma nova</strong>Na maioria dos casos o reparo é 60% mais barato do que comprar uma geladeira nova.</div>
       </div>
     </div>
-    <a href="https://wa.me/5531997856023?text=Olá!+Quero+agendar+o+conserto+da+minha+geladeira!" class="btn-wa-sec" style="display:inline-flex;width:100%;max-width:380px;margin:0 auto;">
+    <a href="https://wa.me/5531997856023?text=Olá!+Quero+agendar+o+conserto+da+minha+geladeira!" class="btn-wa-sec">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
       AGENDAR POR WHATSAPP
     </a>
   </div>
 </section>
 
-<!-- ═══ DOBRA 5 — MARCAS ══════════════════════════════════════════════ -->
-<section class="marcas">
+<!-- DOBRA "SUA GELADEIRA ESTRAGOU" -->
+<section class="estragou">
+  <div class="estragou-inner">
+    <div class="estragou-grid">
+      <div class="estragou-img">
+        <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=340,h=340,fit=crop/AR0VPkywZoSw7lZk/sua-geladeira-estragou-1-AE045zPRW5HgWzeN.webp"
+             alt="Sua geladeira estragou?" width="340" height="220" loading="lazy">
+      </div>
+      <div class="estragou-img">
+        <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=340,h=340,fit=crop/AR0VPkywZoSw7lZk/sua-geladeira-estragou-YD04yzlRbvcnzy2v.webp"
+             alt="Conserto de geladeira BH" width="340" height="220" loading="lazy">
+      </div>
+    </div>
+    <a href="https://wa.me/5531997856023?text=Olá!+Minha+geladeira+estragou.+Preciso+de+atendimento+urgente!" class="btn-wa-sec">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+      FALAR AGORA NO WHATSAPP
+    </a>
+  </div>
+</section>
+
+<!-- DOBRA 5: MARCAS -->
+<section class="sec">
   <div class="sec-w">
-    <div class="sec-tagline">Marcas que Atendemos</div>
+    <div class="sec-tag">Marcas que Atendemos</div>
     <h2 class="sec-h">Conserto de <em>todas as marcas</em></h2>
     <div class="marcas-grid">
       <div class="marca">Brastemp</div>
@@ -275,15 +260,12 @@ footer{background:#060e1a;padding:24px 20px;text-align:center;
   </div>
 </section>
 
-<!-- ═══ CTA FINAL ══════════════════════════════════════════════════════ -->
+<!-- CTA FINAL -->
 <section class="cta-final">
-  <div class="sec-w">
-    <h2 class="cta-h">
-      Geladeira parou?<br>
-      <em>Chama agora.</em>
-    </h2>
+  <div class="sec-w-cta">
+    <h2 class="cta-h">Geladeira parou?<br><em>Chama agora.</em></h2>
     <p class="cta-desc">Técnico em BH · Diagnóstico grátis · Garantia 90 dias</p>
-    <a href="https://wa.me/5531997856023?text=Olá!+Minha+geladeira+está+com+problema.+Preciso+de+atendimento!" class="btn-wa-sec" style="display:inline-flex;max-width:360px;margin:0 auto;">
+    <a href="https://wa.me/5531997856023?text=Olá!+Minha+geladeira+está+com+problema.+Preciso+de+atendimento!" class="btn-wa-sec" style="max-width:360px;margin:0 auto;">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
       FALAR COM ESPECIALISTA
     </a>
@@ -291,11 +273,8 @@ footer{background:#060e1a;padding:24px 20px;text-align:center;
   </div>
 </section>
 
-<footer>
-  © 2026 Reparo Eletro Assistência Técnica · BH
-</footer>
+<footer>© 2026 Reparo Eletro Assistência Técnica · BH</footer>
 
-<!-- WA FLOAT -->
 <a class="wa-float" href="https://wa.me/5531997856023?text=Olá!+Preciso+de+conserto+de+geladeira!" target="_blank" aria-label="WhatsApp">
   <svg width="26" height="26" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
 </a>
