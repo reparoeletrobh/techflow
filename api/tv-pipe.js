@@ -1991,7 +1991,34 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  // ── resetar-timers-48h ────────────────────────────────────────────────────
+// ── reverter-ultima-chamada: move de volta p/ aguardando_aprovacao os que foram
+  // movidos automaticamente (sem alertadoEm) — correção única do bug do pipe-sem-resposta
+  if (action === 'reverter-ultima-chamada') {
+    const db   = (await dbGet(PIPE_KEY)) || defaultDB();
+    const agora = Date.now();
+    // 49h atrás = garante que aparecem imediatamente na aba Sem Resposta (+48h)
+    const QUARENTA_NOVE_H_ATRAS = new Date(agora - 49 * 60 * 60 * 1000).toISOString();
+    let revertidos = 0;
+    const revertidos_ids = [];
+    for (const card of (db.cards || [])) {
+      if (card.phase !== 'ultima_chamada') continue;
+      if (card.alertadoEm) continue; // foi movido corretamente pelo usuário — não mexer
+      // Foi movido automaticamente pelo bug — reverter
+      card.history = (card.history || []).concat([{
+        phase: 'ultima_chamada', ts: new Date().toISOString(),
+        obs: 'Revertido — movido automaticamente sem notificação'
+      }]);
+      card.phase           = 'aguardando_aprovacao';
+      card.aguardandoDesde = card.aguardandoDesde || QUARENTA_NOVE_H_ATRAS;
+      card.movedAt         = new Date().toISOString();
+      revertidos++;
+      revertidos_ids.push(card.id + ' — ' + (card.nomeContato || card.nome || '?'));
+    }
+    if (revertidos > 0) await dbSet(PIPE_KEY, db);
+    return res.status(200).json({ ok: true, revertidos, ids: revertidos_ids });
+  }
+
+    // ── resetar-timers-48h ────────────────────────────────────────────────────
   if (action === 'resetar-timers-48h') {
     const db = (await dbGet(PIPE_KEY)) || defaultDB();
     const now = new Date().toISOString();
