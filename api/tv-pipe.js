@@ -109,26 +109,31 @@ export default async function handler(req, res) {
   }
 
 
-  // ── GET pipe-sem-resposta: move cards 48h+ em aguardando_aprovacao → ultima_chamada ──
+  // ── GET pipe-sem-resposta: lista cards 48h+ em aguardando_aprovacao (SEM mover) ──
+  // IMPORTANTE: a movimentação para ultima_chamada só acontece manualmente
+  // pelo usuário na aba "Sem Resposta" do tv-orcamento.html após enviar a mensagem
   if (action === 'pipe-sem-resposta') {
-    const db       = (await dbGet(PIPE_KEY)) || defaultDB();
-    const agora    = Date.now();
-    const MS_48H   = 48 * 60 * 60 * 1000;
-    let movidos = 0;
-    for (const card of (db.cards || [])) {
-      if (card.phase !== 'aguardando_aprovacao') continue;
-      // Fallback: se aguardandoDesde não foi setado, usar criadoEm ou movedAt
+    const db    = (await dbGet(PIPE_KEY)) || defaultDB();
+    const agora = Date.now();
+    const MS_48H = 48 * 60 * 60 * 1000;
+    const cards = (db.cards || []).filter(card => {
+      if (card.phase !== 'aguardando_aprovacao') return false;
       const dtRef = card.aguardandoDesde || card.movedAt || card.criadoEm;
-      const desde = dtRef ? new Date(dtRef).getTime() : 0;
-      if (!desde || (agora - desde) < MS_48H) continue;
-      const now = new Date().toISOString();
-      card.history = (card.history || []).concat([{ phase: 'aguardando_aprovacao', ts: now }]);
-      card.phase   = 'ultima_chamada';
-      card.movedAt = now;
-      movidos++;
-    }
-    if (movidos > 0) await dbSet(PIPE_KEY, db);
-    return res.status(200).json({ ok: true, movidos });
+      if (!dtRef) return false;
+      return (agora - new Date(dtRef).getTime()) >= MS_48H;
+    }).map(card => {
+      const dtRef  = card.aguardandoDesde || card.movedAt || card.criadoEm;
+      const ageHrs = Math.floor((agora - new Date(dtRef).getTime()) / (1000*60*60));
+      return {
+        id:          card.id,
+        nome:        card.nomeContato || card.nome || '—',
+        tel:         card.telefone   || card.tel  || '',
+        equipamento: card.equipamento || '',
+        ageHrs,
+        ageDias: Math.floor(ageHrs / 24),
+      };
+    });
+    return res.status(200).json({ ok: true, total: cards.length, cards });
   }
 
 

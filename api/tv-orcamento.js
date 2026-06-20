@@ -772,34 +772,35 @@ module.exports = async function handler(req, res) {
 
   // ── GET sem-resposta — cards em Aguardando Aprovação há mais de 48h
   if (action === "sem-resposta") {
+    // Lê do Redis tv_pipe — cards em aguardando_aprovacao há mais de 48h
     try {
-      const data = await pipefyQuery(`query {
-        phase(id: "${AGUARDANDO_APROVACAO_PHASE_ID}") {
-          cards(first: 50) {
-            edges {
-              node {
-                id title
-                fields { name value }
-                phases_history { phase { id } firstTimeIn }
-              }
-            }
-          }
-        }
-      }`);
-      const agora = Date.now();
-      const QUARENTA_OITO_H_MS = 48 * 60 * 60 * 1000;
-      const cards = (data?.phase?.cards?.edges || []).map(({node}) => {
-        const fields = node.fields || [];
-        const nome = fields.find(f=>f.name.toLowerCase().includes("nome"))?.value || node.title;
-        const tel  = fields.find(f=>f.name.toLowerCase().includes("telefone")||f.name.toLowerCase().includes("fone"))?.value || "";
-        const desc = fields.find(f=>f.name.toLowerCase().includes("descri"))?.value || "";
-        // Usa phases_history para pegar exatamente quando entrou em Aguardando Aprovação
-        const hist = (node.phases_history || []).find(h => h.phase?.id === String(AGUARDANDO_APROVACAO_PHASE_ID));
-        const entradaFaseMs = hist?.firstTimeIn ? new Date(hist.firstTimeIn).getTime() : 0;
-        const diffMs = entradaFaseMs ? (agora - entradaFaseMs) : 0;
-        const ageDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-        return { pipefyId: String(node.id), title: node.title, nome, tel, desc, age: ageDias };
-      }).filter(c => c.age >= 2); // 2+ dias na fase Aguardando Aprovação
+      const pipeDb = (await dbGet('tv_pipe')) || { cards: [] };
+      const agora  = Date.now();
+      const MS_48H = 48 * 60 * 60 * 1000;
+      const cards  = (pipeDb.cards || [])
+        .filter(card => {
+          if (card.phase !== 'aguardando_aprovacao') return false;
+          const dtRef = card.aguardandoDesde || card.movedAt || card.criadoEm;
+          if (!dtRef) return false;
+          return (agora - new Date(dtRef).getTime()) >= MS_48H;
+        })
+        .map(card => {
+          const dtRef   = card.aguardandoDesde || card.movedAt || card.criadoEm;
+          const diffMs  = agora - new Date(dtRef).getTime();
+          const ageHrs  = Math.floor(diffMs / (1000 * 60 * 60));
+          const ageDias = Math.floor(ageHrs / 24);
+          return {
+            id:          card.id,
+            pipefyId:    card.id,           // compatibilidade com HTML
+            nome:        card.nomeContato || card.nome || card.title || '—',
+            tel:         card.telefone    || card.tel  || '',
+            equipamento: card.equipamento || '',
+            desc:        card.defeito     || card.desc || '',
+            age:         ageDias,
+            ageHrs:      ageHrs,
+          };
+        })
+        .sort((a, b) => b.ageHrs - a.ageHrs); // mais antigos primeiro
       return res.status(200).json({ ok: true, cards });
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });
@@ -838,29 +839,23 @@ module.exports = async function handler(req, res) {
 
   // ── POST alertar — move card para Ultima Chamada + preenche data +7 dias úteis
   if (req.method === "POST" && action === "alertar") {
-    const { pipefyId } = req.body || {};
-    if (!pipefyId) return res.status(400).json({ ok: false, error: "pipefyId obrigatorio" });
+    // Move card de aguardando_aprovacao → ultima_chamada no Redis tv_pipe
+    const { pipefyId, id } = req.body || {};
+    const cardId = id || pipefyId;
+    if (!cardId) return res.status(400).json({ ok: false, error: "id obrigatorio" });
     try {
-      const phaseId    = "341638208"; // TV Assistência: Ultima Chamada ✅
-      const dataLimite = addDiasUteis(7);
-
-      // Move para Ultima Chamada (ignora erro se já estiver lá)
-      try {
-        await pipefyQuery(`mutation {
-          moveCardToPhase(input: { card_id: "${pipefyId}", destination_phase_id: "${phaseId}" }) {
-            card { id }
-          }
-        }`);
-      } catch(moveErr) { /* ignora "already in phase" */ }
-
-      // Seta due_date nativa do card (+7 dias úteis)
-      await pipefyQuery(`mutation {
-        updateCard(input: { id: "${pipefyId}", due_date: "${dataLimite}T23:59:00-03:00" }) {
-          card { id due_date }
-        }
-      }`);
-
-      return res.status(200).json({ ok: true, pipefyId, phaseId, dataLimite });
+      const pipeDb = (await dbGet('tv_pipe')) || { cards: [] };
+      const card = (pipeDb.cards || []).find(c => c.id === cardId);
+      if (!card) return res.status(404).json({ ok: false, error: "Card não encontrado" });
+      const now = new Date().toISOString();
+      card.history = (card.history || []).concat([{
+        phase: card.phase, ts: now, obs: 'Alertado — mensagem enviada'
+      }]);
+      card.phase             = 'ultima_chamada';
+      card.movedAt           = now;
+      card.alertadoEm        = now;
+      await dbSet('tv_pipe', pipeDb);
+      return res.status(200).json({ ok: true, id: cardId, phase: 'ultima_chamada' });
     } catch(e) {
       return res.status(200).json({ ok: false, error: e.message });
     }

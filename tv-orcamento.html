@@ -552,39 +552,91 @@ async function loadSem() {
 }
 
 function srCard(card) {
+  var cardId = card.id || card.pipefyId;
   var tel = (card.tel||'').replace(/[^0-9]/g,'');
   if (tel.slice(0,2)==='55'&&tel.length>=12) tel=tel.slice(2);
   if (tel.length===10) tel=tel.slice(0,2)+'9'+tel.slice(2);
   var waLink = tel ? 'https://wa.me/55'+tel+'?text='+encodeURIComponent(MSG_UC) : null;
   var wrap = document.createElement('div'); wrap.className = 'sr-card';
-  var nome = document.createElement('div'); nome.className='sr-nome'; nome.textContent=card.nome||'—'; wrap.appendChild(nome);
-  if (card.desc) { var desc=document.createElement('div'); desc.className='sr-desc'; desc.textContent=card.desc.slice(0,100)+'...'; wrap.appendChild(desc); }
-  var age = document.createElement('div'); age.className='sr-age'; age.textContent='⏱ '+card.age+' dia(s) sem resposta'; wrap.appendChild(age);
-  var btns = document.createElement('div'); btns.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;';
+
+  // Nome + equipamento
+  var nome = document.createElement('div'); nome.className='sr-nome';
+  nome.textContent=(card.nome||'—') + (card.equipamento ? ' · '+card.equipamento : '');
+  wrap.appendChild(nome);
+
+  // Defeito
+  if (card.desc) {
+    var desc=document.createElement('div'); desc.className='sr-desc';
+    desc.textContent=card.desc.slice(0,120); wrap.appendChild(desc);
+  }
+
+  // Tempo sem resposta
+  var age = document.createElement('div'); age.className='sr-age';
+  age.textContent='⏱ '+card.age+' dia(s) sem resposta'; wrap.appendChild(age);
+
+  // Texto da mensagem (expansível)
+  var msgBox = document.createElement('div');
+  msgBox.style.cssText='background:rgba(245,200,0,.07);border:1px solid rgba(245,200,0,.2);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--muted);white-space:pre-wrap;margin-top:4px;display:none;';
+  msgBox.textContent = MSG_UC;
+  wrap.appendChild(msgBox);
+
+  var btns = document.createElement('div'); btns.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;';
+
+  // Botão ver mensagem
+  var bv=document.createElement('button'); bv.className='sr-btn';
+  bv.style.cssText='background:transparent;border:1px solid rgba(245,200,0,.4);color:var(--yellow);font-size:11px;padding:6px 10px;';
+  bv.textContent='👁 Ver mensagem';
+  bv.onclick=(function(box,btn){return function(){
+    var vis=box.style.display==='none';
+    box.style.display=vis?'block':'none';
+    btn.textContent=vis?'👁 Ocultar mensagem':'👁 Ver mensagem';
+  };})(msgBox,bv);
+  btns.appendChild(bv);
+
+  // Botão copiar + abrir WA
   if (waLink) {
-    var bc=document.createElement('button'); bc.className='sr-btn'; bc.textContent='📋 Copiar e Enviar';
+    var bc=document.createElement('button'); bc.className='sr-btn'; bc.textContent='📋 Copiar e Enviar WA';
     bc.onclick=(function(id,link){return function(){
-      navigator.clipboard.writeText(link).catch(function(){var ta=document.createElement('textarea');ta.value=link;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);});
-      alertarCliente(id);
-    };})(card.pipefyId,waLink);
+      navigator.clipboard.writeText(MSG_UC).catch(function(){
+        var ta=document.createElement('textarea');ta.value=MSG_UC;
+        document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+      });
+      window.open(link,'_blank');
+    };})(cardId,waLink);
     btns.appendChild(bc);
   }
-  var bm=document.createElement('button'); bm.className='sr-btn'; bm.id='btn-al-'+card.pipefyId;
-  bm.style.cssText='background:transparent;border:1px solid var(--border);color:var(--muted);';
-  bm.textContent='Mover p/ Última Chamada';
-  bm.onclick=(function(id){return function(){alertarCliente(id);};})(card.pipefyId);
-  btns.appendChild(bm); wrap.appendChild(btns);
+
+  // Botão mover p/ última chamada
+  var bm=document.createElement('button'); bm.className='sr-btn'; bm.id='btn-al-'+cardId;
+  bm.style.cssText='background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#fca5a5;';
+  bm.textContent='🔴 Mover p/ Última Chamada';
+  bm.onclick=(function(id,b){return function(){alertarCliente(id,b);};})(cardId,bm);
+  btns.appendChild(bm);
+
+  wrap.appendChild(btns);
   return wrap;
 }
 
-async function alertarCliente(pipefyId) {
-  var btn=document.getElementById('btn-al-'+pipefyId);
-  if(btn){btn.disabled=true;btn.textContent='...';}
+async function alertarCliente(id, btnEl) {
+  var btn = btnEl || document.getElementById('btn-al-'+id);
+  if(btn){btn.disabled=true;btn.textContent='Movendo...';}
   try {
-    var d=await fetch('/api/tv-orcamento?action=alertar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pipefyId})}).then(function(r){return r.json();});
-    if(d.ok){showToast('✅','Movido para Última Chamada!','Prazo: '+(d.dataLimite||''));loadSem();}
-    else{showToast('❌','Erro',d.error||'');if(btn){btn.disabled=false;btn.textContent='Mover p/ Última Chamada';}}
-  }catch(e){showToast('❌','Erro',e.message);if(btn){btn.disabled=false;btn.textContent='Mover p/ Última Chamada';}}
+    var d=await fetch('/api/tv-orcamento?action=alertar',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id, pipefyId:id})
+    }).then(function(r){return r.json();});
+    if(d.ok){
+      showToast('✅','Movido para Última Chamada!','Mensagem enviada e ficha arquivada');
+      loadSem();
+    } else {
+      showToast('❌','Erro',d.error||'Falha ao mover');
+      if(btn){btn.disabled=false;btn.textContent='🔴 Mover p/ Última Chamada';}
+    }
+  }catch(e){
+    showToast('❌','Erro',e.message);
+    if(btn){btn.disabled=false;btn.textContent='🔴 Mover p/ Última Chamada';}
+  }
 }
 
 // ── ÚLTIMA CHAMADA ────────────────────────────────────────────
