@@ -592,6 +592,5 @@
   "github": {
     "enabled": true,
     "autoJobCancelation": true
-  },
-  "ignoreCommand": "git diff HEAD~1 --name-only | grep -qE '\\.(js|html|json|css|webp|jpg|png|avif)$'"
+  }
 }
