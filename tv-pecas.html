@@ -389,7 +389,7 @@ function badgeStatus(p) {
 function renderEstoque() {
   var grid = g('pecas-grid');
   if (!_pecas.length) {
-    grid.innerHTML='<div class="empty" style="grid-column:1/-1;">Nenhuma peça encontrada.</div>';
+    grid.innerHTML='<div class="empty" style="grid-column:1/-1;text-align:center;padding:40px 20px;"><div style="font-size:40px;margin-bottom:12px;">📦</div><div style="font-size:15px;font-weight:600;color:var(--tx);">Catálogo vazio</div><div style="font-size:12px;color:var(--mu);margin-top:6px;">Clique em <strong style=\"color:var(--or);\">+ Cadastrar Peça</strong> para adicionar a primeira peça ao estoque.</div></div>';
     return;
   }
   grid.innerHTML = _pecas.map(function(p){

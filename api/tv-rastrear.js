@@ -96,6 +96,37 @@ module.exports = async (req, res) => {
   try {
     const results = [];
 
+    // ── 0. TV Pipe — cards aguardando aprovação e outras fases ────
+    const TV_PIPE_FASES = {
+      aguardando_aprovacao: { label: 'Aguardando Aprovação', cor: '#f5c800' },
+      ultima_chamada:       { label: 'Última Chamada',       cor: '#ef4444' },
+      aprovados:            { label: 'Aprovado',             cor: '#22c55e' },
+      barramento:           { label: 'Barramento',           cor: '#e879f9' },
+    };
+    const pipeDB  = await dbGet('tv_pipe');
+    const pipeCards = pipeDB?.cards || [];
+    for (const c of pipeCards) {
+      if (!match(q, c.nomeContato, c.nome, c.id, c.telefone, c.equipamento, c.descricao)) continue;
+      const fase = TV_PIPE_FASES[c.phase] || { label: c.phase || '—', cor: '#5a5a7a' };
+      results.push({
+        tipo:       'pipe',
+        id:         c.id,
+        label:      c.nomeContato || c.nome || '—',
+        sublabel:   c.equipamento || c.descricao || null,
+        descricao:  c.diagnosticoResumo || null,
+        telefone:   c.telefone || null,
+        urgente:    false,
+        tipoCor:    null,
+        fase:       fase.label,
+        cor:        fase.cor,
+        url:        null,
+        osFaseKey:  null,
+        elementId:  c.id,
+        pecaTab:    null,
+        garantiaTipo: null,
+      });
+    }
+
     // ── 1. OS / Board ─────────────────────────────────────────────
     const boardDB  = await dbGet('tv_board');
     const cards    = boardDB?.cards || [];
