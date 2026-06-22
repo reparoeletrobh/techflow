@@ -75,6 +75,34 @@
   ],
   "rewrites": [
     {
+      "source": "/lava-e-seca-6",
+      "destination": "/lava-e-seca.html"
+    },
+    {
+      "source": "/lava-e-seca-5",
+      "destination": "/lava-e-seca.html"
+    },
+    {
+      "source": "/lava-e-seca-4",
+      "destination": "/lava-e-seca.html"
+    },
+    {
+      "source": "/lava-e-seca-3",
+      "destination": "/lava-e-seca.html"
+    },
+    {
+      "source": "/lava-e-seca-2",
+      "destination": "/lava-e-seca.html"
+    },
+    {
+      "source": "/lava-e-seca-1",
+      "destination": "/lava-e-seca.html"
+    },
+    {
+      "source": "/lava-e-seca",
+      "destination": "/lava-e-seca.html"
+    },
+    {
       "source": "/geladeira-6",
       "destination": "/geladeira.html"
     },
@@ -508,6 +536,23 @@
     }
   ],
   "headers": [
+    {
+      "source": "/lava-e-seca:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Pragma",
+          "value": "no-cache"
+        },
+        {
+          "key": "Expires",
+          "value": "0"
+        }
+      ]
+    },
     {
       "source": "/tv/:path*",
       "headers": [
