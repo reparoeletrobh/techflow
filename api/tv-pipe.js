@@ -2006,8 +2006,16 @@ export default async function handler(req, res) {
       let enrPipe=0, enrBoard=0;
 
       // Helpers para normalizar nome e telefone para matching
-      const normNome = s => (s||'').toLowerCase().trim().split(/\s+/).slice(0,2).join(' ');
+      const normNome = s => (s||'').toLowerCase().trim().split(/\s+/)[0]; // só 1ª palavra
       const normTel  = s => (s||'').replace(/\D/g,'').slice(-8);
+      const last4    = s => (s||'').replace(/\D/g,'').slice(-4);
+
+      // Índice: tel8 → ficha (para lookup rápido)
+      const fichaByTel = {};
+      for (const f of fichas) {
+        const t = normTel(f.telefone||'');
+        if (t.length >= 6) { if (!fichaByTel[t]) fichaByTel[t]=[]; fichaByTel[t].push(f); }
+      }
 
       for (const ficha of fichas) {
         if (!ficha.diagnostico) continue;
@@ -2022,34 +2030,33 @@ export default async function handler(req, res) {
         const fichaPipId = ficha.pipefyCardId ? String(ficha.pipefyCardId) : '';
         const fichaNome  = normNome(ficha.nome || ficha.nomeContato || '');
         const fichaTel   = normTel(ficha.telefone || '');
+        const fichaLast4 = last4(ficha.telefone || '');
 
-        // ── Enriquecer pipe card (match por id, pipefyId ou nome+tel) ──
-        const pCard = pCards.find(c => {
+        function matchCard(c) {
           if (fichaId    && (c.id === fichaId || c.localId === fichaId)) return true;
           if (fichaPipId && (c.pipefyId === fichaPipId || c.id === fichaPipId)) return true;
-          if (fichaNome && fichaTel) {
-            const cNome = normNome(c.nomeContato || c.nome || '');
-            const cTel  = normTel(c.telefone || '');
-            if (cNome === fichaNome && cTel === fichaTel && cTel.length >= 6) return true;
+          const cTel  = normTel(c.telefone || '');
+          const cNome = normNome(c.nomeContato || c.nome || '');
+          // Match por tel8 + 1ª palavra do nome
+          if (fichaTel && cTel === fichaTel && cTel.length >= 6 && fichaNome && cNome === fichaNome) return true;
+          // Match por 4 dígitos finais do tel (embutidos no nomeContato ex: "João 4997")
+          if (fichaLast4 && c.nomeContato) {
+            const cLast4 = last4(c.nomeContato);
+            if (cLast4 === fichaLast4 && cLast4.length === 4 && fichaNome && cNome === fichaNome) return true;
           }
           return false;
-        });
+        }
+
+        // ── Enriquecer pipe card ──
+        const pCard = pCards.find(matchCard);
         if (pCard && (!pCard.diagnosticoResumo || !pCard.modeloTv)) {
           pCard.diagnosticoResumo = pCard.diagnosticoResumo || diagRes;
           pCard.modeloTv          = pCard.modeloTv          || modelo;
           enrPipe++;
         }
 
-        // ── Enriquecer board card (match por pipefyId ou nome+tel) ──
-        const bCard = bCards.find(c => {
-          if (fichaPipId && c.pipefyId === fichaPipId) return true;
-          if (fichaNome && fichaTel) {
-            const cNome = normNome(c.nomeContato || c.nome || '');
-            const cTel  = normTel(c.telefone || '');
-            if (cNome === fichaNome && cTel === fichaTel && cTel.length >= 6) return true;
-          }
-          return false;
-        });
+        // ── Enriquecer board card ──
+        const bCard = bCards.find(matchCard);
         if (bCard && (!bCard.diagnosticoResumo || !bCard.modeloTv)) {
           bCard.diagnosticoResumo = bCard.diagnosticoResumo || diagRes;
           bCard.modeloTv          = bCard.modeloTv          || modelo;

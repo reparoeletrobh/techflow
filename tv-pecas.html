@@ -339,13 +339,21 @@ function limparBusca() {
 
 // ── Carregar peças ────────────────────────────────────────────────────────────
 async function carregarPecas() {
-  var q = g('search').value.trim();
-  var url = '/api/tv-pecas?action=listar' + (q ? '&q='+encodeURIComponent(q) : '');
-  var r = await fetch(url).then(function(x){return x.json();});
-  _pecas = r.pecas || [];
-  renderEstoque();
-  renderStats();
-  verificarAlertas();
+  var grid = g('pecas-grid');
+  if (grid) grid.innerHTML = '<div class="empty" style="grid-column:1/-1;text-align:center;padding:30px;color:var(--mu);">⏳ Carregando...</div>';
+  try {
+    var q = g('search').value.trim();
+    var url = '/api/tv-pecas?action=listar' + (q ? '&q='+encodeURIComponent(q) : '');
+    var r = await fetch(url).then(function(x){return x.json();});
+    if (!r.ok && r.error) throw new Error(r.error);
+    _pecas = r.pecas || [];
+    renderEstoque();
+    renderStats();
+    verificarAlertas();
+  } catch(e) {
+    if (grid) grid.innerHTML = '<div class="empty" style="grid-column:1/-1;text-align:center;padding:30px;color:var(--re);">❌ Erro ao carregar: ' + e.message + '</div>';
+    console.error('[tv-pecas]', e);
+  }
 }
 
 function renderStats() {
