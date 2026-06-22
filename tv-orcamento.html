@@ -542,7 +542,7 @@ async function loadSem() {
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>Carregando...</div>';
   try {
     var d = await fetch('/api/tv-orcamento?action=sem-resposta').then(function(r){return r.json();});
-    atualizarBadgeBusca('sem', fichas.length); document.getElementById('badge-sem').textContent = d.cards?.length||0;
+    document.getElementById('badge-sem').textContent = d.cards?.length||0;
     if (!d.ok||!d.cards?.length) { el.innerHTML = '<div class="loading-msg">Nenhum cliente sem resposta há mais de 48h.</div>'; return; }
     el.innerHTML = '';
     var list = document.createElement('div'); list.className = 'orc-list';
@@ -649,7 +649,7 @@ async function loadUlt() {
   el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>Carregando...</div>';
   try {
     var d = await fetch('/api/tv-orcamento?action=ultima-chamada').then(function(r){return r.json();});
-    atualizarBadgeBusca('ult', fichas.length); document.getElementById('badge-ult').textContent = d.cards?.length||0;
+    document.getElementById('badge-ult').textContent = d.cards?.length||0;
     if (!d.ok||!d.cards?.length) { el.innerHTML = '<div class="loading-msg">Nenhuma ficha em Última Chamada.</div>'; return; }
     el.innerHTML = '';
     var list = document.createElement('div'); list.className = 'orc-list';
