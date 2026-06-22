@@ -310,8 +310,8 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
         <span class="nav-label">Compra Equip.</span>
       </div>
 
-      <div class="nav-item" data-url="/tv/pecas" data-label="Catálogo de Peças"
-           style="--item-color:#3b9eff" onclick="openPage(this)">
+      <div class="nav-item" data-label="Catálogo Peças"
+           style="--item-color:#3b9eff" onclick="abrirPainelCatalogo()">
         <span class="nav-icon">🗂️</span>
         <span class="nav-label">Catálogo Peças</span>
       </div>
@@ -535,6 +535,254 @@ async function executarRastrear(q) {
     el.innerHTML = '<div style="color:#ef4444;font-size:13px;text-align:center;padding:20px;">Erro: ' + e.message + '</div>';
   }
 }
+</script>
+
+
+<!-- PAINEL CATÁLOGO INLINE -->
+<div id="catalogo-overlay" onclick="fecharPainelCatalogo(event)"
+  style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.6);">
+  <div id="catalogo-painel" onclick="event.stopPropagation()"
+    style="position:absolute;bottom:0;left:0;right:0;height:92vh;
+           background:#0f1114;border-top:2px solid #1e2228;
+           border-radius:16px 16px 0 0;display:flex;flex-direction:column;overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;
+                padding:14px 20px;border-bottom:1px solid #1e2228;flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:20px;">🗂️</span>
+        <span style="font-size:15px;font-weight:700;color:#f0f2f5;">Catálogo de Peças</span>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="catSetTab('cad')"
+          style="background:rgba(249,115,22,.15);border:1px solid rgba(249,115,22,.3);color:#fb923c;
+                 padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">✚ Cadastrar</button>
+        <button onclick="fecharCatalogo()"
+          style="background:transparent;border:none;color:#5a6270;font-size:22px;cursor:pointer;">✕</button>
+      </div>
+    </div>
+    <div style="padding:10px 20px;border-bottom:1px solid #1e2228;flex-shrink:0;">
+      <input id="cat-search" type="text" placeholder="🔍 Buscar peça, modelo, código..." oninput="catBuscar()"
+        style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:8px;
+               padding:10px 14px;color:#f0f2f5;font-size:14px;outline:none;">
+    </div>
+    <div id="cat-alerta" style="display:none;padding:8px 20px;background:rgba(245,200,0,.08);
+         border-bottom:1px solid rgba(245,200,0,.2);font-size:12px;color:#f5c800;flex-shrink:0;"></div>
+    <div style="display:flex;border-bottom:1px solid #1e2228;flex-shrink:0;">
+      <button id="cat-tab-est" onclick="catSetTab('est')"
+        style="padding:11px 18px;font-size:11px;font-weight:800;color:#3b9eff;
+               border:none;border-bottom:2px solid #3b9eff;background:transparent;cursor:pointer;">📦 ESTOQUE</button>
+      <button id="cat-tab-cad" onclick="catSetTab('cad')"
+        style="padding:11px 18px;font-size:11px;font-weight:800;color:#5a6270;
+               border:none;border-bottom:2px solid transparent;background:transparent;cursor:pointer;">✚ CADASTRAR</button>
+      <button id="cat-tab-his" onclick="catSetTab('his')"
+        style="padding:11px 18px;font-size:11px;font-weight:800;color:#5a6270;
+               border:none;border-bottom:2px solid transparent;background:transparent;cursor:pointer;">📋 HISTÓRICO</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;">
+      <div id="cat-est" style="padding:16px 20px;">
+        <div id="cat-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;"></div>
+        <div id="cat-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;">
+          <div style="grid-column:1/-1;text-align:center;padding:50px 20px;">
+            <div style="font-size:36px;margin-bottom:10px;">📦</div>
+            <div style="font-size:15px;font-weight:700;color:#f0f2f5;margin-bottom:6px;">Catálogo vazio</div>
+            <div style="font-size:12px;color:#5a6270;">Clique em <strong style="color:#fb923c;">✚ Cadastrar</strong> para adicionar peças ao estoque.</div>
+          </div>
+        </div>
+      </div>
+      <div id="cat-cad" style="display:none;padding:16px 20px;">
+        <div style="max-width:480px;background:#181b1f;border:1px solid #1e2228;border-radius:12px;padding:18px;">
+          <div style="font-size:12px;font-weight:800;color:#f5c800;letter-spacing:.08em;margin-bottom:14px;">✚ NOVA PEÇA</div>
+          <div id="cat-cad-msg" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:12px;"></div>
+          <div style="margin-bottom:10px;">
+            <div style="font-size:10px;color:#5a6270;text-transform:uppercase;margin-bottom:4px;">Nome *</div>
+            <input id="cat-nome" placeholder="Ex: Placa Principal, Capacitor, Magnetron..."
+              style="width:100%;background:#0f1114;border:1px solid #2a2f38;border-radius:8px;
+                     padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <div>
+              <div style="font-size:10px;color:#5a6270;text-transform:uppercase;margin-bottom:4px;">Tipo</div>
+              <select id="cat-tipo" style="width:100%;background:#0f1114;border:1px solid #2a2f38;
+                      border-radius:8px;padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;">
+                <option value="">—</option><option>TV</option><option>Microondas</option>
+                <option>Bebedouro</option><option>Purificador</option><option>Adega</option>
+                <option>Forno</option><option>Geral</option>
+              </select>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#5a6270;text-transform:uppercase;margin-bottom:4px;">Marca</div>
+              <input id="cat-marca" placeholder="Samsung, LG..."
+                style="width:100%;background:#0f1114;border:1px solid #2a2f38;border-radius:8px;
+                       padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;">
+            </div>
+          </div>
+          <div style="margin-bottom:10px;">
+            <div style="font-size:10px;color:#5a6270;text-transform:uppercase;margin-bottom:4px;">Modelo Compatível</div>
+            <input id="cat-modelo" placeholder="UN55T4300 (vazio = todos)"
+              style="width:100%;background:#0f1114;border:1px solid #2a2f38;border-radius:8px;
+                     padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <div>
+              <div style="font-size:10px;color:#5a6270;text-transform:uppercase;margin-bottom:4px;">Qtd Estoque *</div>
+              <input id="cat-qtd" type="number" min="0" value="1"
+                style="width:100%;background:#0f1114;border:1px solid #2a2f38;border-radius:8px;
+                       padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;">
+            </div>
+            <div>
+              <div style="font-size:10px;color:#5a6270;text-transform:uppercase;margin-bottom:4px;">Qtd Mínima</div>
+              <input id="cat-min" type="number" min="0" value="1"
+                style="width:100%;background:#0f1114;border:1px solid #2a2f38;border-radius:8px;
+                       padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;">
+            </div>
+          </div>
+          <div style="margin-bottom:14px;">
+            <div style="font-size:10px;color:#5a6270;text-transform:uppercase;margin-bottom:4px;">Observações</div>
+            <input id="cat-obs" placeholder="Código de referência, localização..."
+              style="width:100%;background:#0f1114;border:1px solid #2a2f38;border-radius:8px;
+                     padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;">
+          </div>
+          <button onclick="catCadastrar()"
+            style="width:100%;background:#3b9eff;border:none;color:#fff;padding:11px;
+                   border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">✚ Cadastrar Peça</button>
+        </div>
+      </div>
+      <div id="cat-his" style="display:none;padding:16px 20px;">
+        <div id="cat-his-list"><div style="text-align:center;padding:40px;color:#5a6270;">Sem histórico ainda.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+var _catPecas=[];
+function abrirPainelCatalogo(){
+  document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
+  document.querySelectorAll('.nav-item').forEach(function(n){if(n.textContent.includes('Cat'))n.classList.add('active');});
+  if(typeof closeMobile==='function')closeMobile();
+  document.getElementById('catalogo-overlay').style.display='block';
+  catCarregar();
+}
+function fecharPainelCatalogo(e){if(e&&e.target!==document.getElementById('catalogo-overlay'))return;fecharCatalogo();}
+function fecharCatalogo(){document.getElementById('catalogo-overlay').style.display='none';document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});}
+function catSetTab(t){
+  ['est','cad','his'].forEach(function(id){
+    var pg=document.getElementById('cat-'+id);
+    var bt=document.getElementById('cat-tab-'+id);
+    if(pg)pg.style.display=t===id?'block':'none';
+    if(bt){bt.style.color=t===id?'#3b9eff':'#5a6270';bt.style.borderBottomColor=t===id?'#3b9eff':'transparent';}
+  });
+  if(t==='his')catCarregarHistorico();
+}
+function catBuscar(){clearTimeout(catBuscar._t);catBuscar._t=setTimeout(catCarregar,300);}
+async function catCarregar(){
+  var grid=document.getElementById('cat-grid');if(!grid)return;
+  grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:#5a6270;">⏳ Carregando...</div>';
+  try{
+    var q=(document.getElementById('cat-search').value||'').trim();
+    var r=await fetch('/api/tv-pecas?action=listar'+(q?'&q='+encodeURIComponent(q):'')).then(function(x){return x.json();});
+    _catPecas=r.pecas||[];catRenderGrid();catRenderStats();catRenderAlertas(_catPecas);
+  }catch(e){grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:#ef4444;">❌ Erro: '+e.message+'</div>';}
+}
+function catRenderGrid(){
+  var grid=document.getElementById('cat-grid');
+  if(!_catPecas.length){
+    grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:50px 20px;">'
+      +'<div style="font-size:36px;margin-bottom:10px;">📦</div>'
+      +'<div style="font-size:15px;font-weight:700;color:#f0f2f5;margin-bottom:6px;">Catálogo vazio</div>'
+      +'<div style="font-size:12px;color:#5a6270;">Clique em <strong style="color:#fb923c;">✚ Cadastrar</strong> para adicionar peças.</div>'
+      +'</div>';
+    return;
+  }
+  grid.innerHTML=_catPecas.map(function(p){
+    var qtd=p.qtd||0,min=p.qtdMin||1;
+    var cor=qtd===0?'#ef4444':qtd<=min?'#f5c800':'#22c55e';
+    var pct=Math.min(100,Math.round(qtd/Math.max(min*2,1)*100));
+    var status=qtd===0?'Esgotado':qtd<=min?'Baixo':'OK';
+    return '<div style="background:#181b1f;border:1px solid #1e2228;border-radius:10px;padding:14px;">'
+      +'<div style="display:flex;justify-content:space-between;margin-bottom:6px;">'
+        +'<div style="font-size:13px;font-weight:700;color:#f0f2f5;">'+catEsc(p.nomePeca)+'</div>'
+        +'<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:'+cor+'22;color:'+cor+';">'+status+'</span>'
+      +'</div>'
+      +'<div style="font-size:11px;color:#5a6270;margin-bottom:8px;">'+(p.tipo||'')+(p.marca?' · '+p.marca:'')+'</div>'
+      +'<div style="display:flex;align-items:baseline;gap:4px;margin-bottom:6px;">'
+        +'<span style="font-size:22px;font-weight:800;color:'+cor+';">'+qtd+'</span>'
+        +'<span style="font-size:11px;color:#5a6270;">unid. / mín '+min+'</span>'
+      +'</div>'
+      +'<div style="background:#1e2228;border-radius:4px;height:5px;margin-bottom:10px;">'
+        +'<div style="height:5px;border-radius:4px;background:'+cor+';width:'+pct+'%;"></div>'
+      +'</div>'
+      +'<div style="display:flex;gap:6px;">'
+        +'<button onclick="catDarBaixa(\''+p.id+'\',\''+catEsc(p.nomePeca)+'\','+qtd+')" '
+          +'style="flex:1;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.25);'
+          +'color:#fca5a5;padding:7px;border-radius:6px;font-size:11px;cursor:pointer;">− Usar</button>'
+        +'<button onclick="catRepor(\''+p.id+'\',\''+catEsc(p.nomePeca)+'\')" '
+          +'style="flex:1;background:#1e2228;border:none;color:#f0f2f5;padding:7px;border-radius:6px;font-size:11px;cursor:pointer;">+ Repor</button>'
+      +'</div></div>';
+  }).join('');
+}
+function catRenderStats(){
+  var el=document.getElementById('cat-stats');if(!el)return;
+  var tot=_catPecas.length,ok=0,al=0,es=0;
+  _catPecas.forEach(function(p){var q=p.qtd||0,m=p.qtdMin||1;if(q===0)es++;else if(q<=m)al++;else ok++;});
+  el.innerHTML=[['Cadastradas',tot,'#3b9eff'],['Em Estoque',ok,'#22c55e'],['Alertas',al,'#f5c800'],['Esgotadas',es,'#ef4444']]
+    .map(function(s){return '<div style="background:#181b1f;border:1px solid #1e2228;border-radius:8px;padding:10px 12px;">'
+      +'<div style="font-size:9px;color:#5a6270;text-transform:uppercase;margin-bottom:3px;">'+s[0]+'</div>'
+      +'<div style="font-size:20px;font-weight:800;color:'+s[2]+';">'+s[1]+'</div></div>';}).join('');
+}
+function catRenderAlertas(pecas){
+  var el=document.getElementById('cat-alerta');if(!el)return;
+  var baixas=pecas.filter(function(p){return (p.qtd||0)<=(p.qtdMin||1);});
+  if(baixas.length){el.textContent='⚠️ Estoque baixo: '+baixas.map(function(p){return p.nomePeca+' ('+p.qtd+' un.)';}).join(' · ');el.style.display='block';}
+  else el.style.display='none';
+}
+async function catCadastrar(){
+  var nome=(document.getElementById('cat-nome').value||'').trim();
+  if(!nome){alert('Informe o nome da peça');return;}
+  var msg=document.getElementById('cat-cad-msg');msg.style.display='none';
+  try{
+    var r=await fetch('/api/tv-pecas?action=cadastrar',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({nomePeca:nome,tipo:document.getElementById('cat-tipo').value||'',
+        marca:document.getElementById('cat-marca').value||'',modelo:document.getElementById('cat-modelo').value||'',
+        qtd:parseInt(document.getElementById('cat-qtd').value)||0,
+        qtdMin:parseInt(document.getElementById('cat-min').value)||1,
+        obs:document.getElementById('cat-obs').value||''})
+    }).then(function(x){return x.json();});
+    if(r.ok){
+      ['cat-nome','cat-marca','cat-modelo','cat-obs'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+      document.getElementById('cat-qtd').value='1';document.getElementById('cat-min').value='1';document.getElementById('cat-tipo').value='';
+      msg.style.cssText='display:block;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:8px 12px;font-size:12px;color:#86efac;margin-bottom:12px;';
+      msg.textContent='✅ Peça cadastrada!';
+      setTimeout(function(){catSetTab('est');catCarregar();},800);
+    }else{
+      msg.style.cssText='display:block;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:8px 12px;font-size:12px;color:#fca5a5;margin-bottom:12px;';
+      msg.textContent='❌ '+(r.error||'Erro');
+    }
+  }catch(e){msg.style.cssText='display:block;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:8px 12px;font-size:12px;color:#fca5a5;margin-bottom:12px;';msg.textContent='❌ '+e.message;}
+}
+async function catDarBaixa(id,nome,qtdDisp){
+  var qtd=parseInt(prompt('Dar baixa em "'+nome+'"\nDisponível: '+qtdDisp+'\nQuantidade usada:','1'));
+  if(!qtd||qtd<1)return;
+  try{var r=await fetch('/api/tv-pecas?action=dar-baixa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pecaId:id,qtdUsada:qtd})}).then(function(x){return x.json();});if(r.ok)catCarregar();else alert('Erro: '+(r.error||'falha'));}catch(e){alert('Erro: '+e.message);}
+}
+async function catRepor(id,nome){
+  var qtd=parseInt(prompt('Repor estoque de "'+nome+'"\nQuantidade a adicionar:','1'));
+  if(!qtd||qtd<1)return;
+  try{var r=await fetch('/api/tv-pecas?action=repor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pecaId:id,qtd:qtd})}).then(function(x){return x.json();});if(r.ok)catCarregar();else alert('Erro: '+(r.error||'falha'));}catch(e){alert('Erro: '+e.message);}
+}
+async function catCarregarHistorico(){
+  var el=document.getElementById('cat-his-list');if(!el)return;
+  el.innerHTML='<div style="text-align:center;padding:30px;color:#5a6270;">⏳ Carregando...</div>';
+  try{
+    var r=await fetch('/api/tv-pecas?action=historico').then(function(x){return x.json();});
+    var usos=r.usos||[];
+    if(!usos.length){el.innerHTML='<div style="text-align:center;padding:40px;color:#5a6270;">Sem histórico ainda.</div>';return;}
+    el.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="color:#5a6270;"><th style="padding:8px;text-align:left;">Peça</th><th>Qtd</th><th>Técnico</th><th>Data</th></tr></thead><tbody>'
+      +usos.map(function(u){return '<tr style="border-top:1px solid #1e2228;"><td style="padding:8px;color:#f0f2f5;">'+catEsc(u.nomePeca)+'</td><td style="color:#5a6270;">'+u.qtdUsada+'</td><td style="color:#5a6270;">'+catEsc(u.tecnico||'—')+'</td><td style="color:#5a6270;font-size:11px;">'+catFmtDt(u.usadoEm)+'</td></tr>';}).join('')
+      +'</tbody></table>';
+  }catch(e){el.innerHTML='<div style="color:#ef4444;padding:20px;">❌ '+e.message+'</div>';}
+}
+function catEsc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
+function catFmtDt(s){if(!s)return'—';try{var d=new Date(s);return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}catch(e){return s;}}
 </script>
 
 </body>
