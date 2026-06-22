@@ -596,13 +596,17 @@ function srCard(card) {
   // Botão copiar + abrir WA
   if (waLink) {
     var bc=document.createElement('button'); bc.className='sr-btn'; bc.textContent='📋 Copiar e Enviar WA';
-    bc.onclick=(function(id,link){return function(){
+    bc.onclick=(function(id,link,b){return function(){
+      // 1. Copia a mensagem
       navigator.clipboard.writeText(MSG_UC).catch(function(){
         var ta=document.createElement('textarea');ta.value=MSG_UC;
         document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
       });
+      // 2. Abre WhatsApp
       window.open(link,'_blank');
-    };})(cardId,waLink);
+      // 3. Move card para Última Chamada (igual ao ADM)
+      alertarCliente(id, b);
+    };})(cardId,waLink,bm);
     btns.appendChild(bc);
   }
 
