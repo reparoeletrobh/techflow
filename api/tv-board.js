@@ -320,6 +320,8 @@ module.exports = async function handler(req, res) {
               descricao:c.descricao||c.title||"TV aprovada",
               modelo:_cc?(_cc.modelo||null):null,
               peca:_cc?(_cc.diagnostico||null):null,
+              diagnosticoResumo:c.diagnosticoResumo||'',
+              modeloTv:c.modeloTv||(_cc?(_cc.modelo||''):''),
               status:"pendente",createdAt:new Date().toISOString(),
               urgente:false,obs:"",quantidade:1
             });
@@ -841,6 +843,8 @@ async function otimizarPontos(pontos, pontoInicio) {
             descricao: c.descricao || c.title || "TV aprovada",
             modelo: cc ? (cc.modelo || null) : null,
             peca:   cc ? (cc.diagnostico || null) : null,
+            diagnosticoResumo: c.diagnosticoResumo || '',
+            modeloTv: c.modeloTv || (cc ? (cc.modelo || '') : ''),
             status: "pendente", createdAt: now,
             urgente: false, obs: "", quantidade: 1
           });

@@ -98,6 +98,8 @@ async function moverNoPipe(pipefyId, novaFase, dados) {
           origem: dados.origem||'sistema',
           criadoEm: now, movedAt: now,
           aguardandoDesde: novaFase==='aguardando_aprovacao' ? now : null,
+          diagnosticoResumo: dados.diagnosticoResumo || '',
+          modeloTv: dados.modeloTv || '',
           history:[], analiseCompra:false
         });
         await _ps(PIPE_KEY_H,db);
@@ -107,7 +109,12 @@ async function moverNoPipe(pipefyId, novaFase, dados) {
     card.history=(card.history||[]).concat([{phase:card.phase,ts:now}]);
     card.phase=novaFase; card.movedAt=now;
     if(novaFase==='aguardando_aprovacao') card.aguardandoDesde=now;
-    if(dados){if(dados.valor!==undefined)card.valor=parseFloat(dados.valor)||0;if(dados.nomeContato)card.nomeContato=dados.nomeContato;}
+    if(dados){
+      if(dados.valor!==undefined) card.valor=parseFloat(dados.valor)||0;
+      if(dados.nomeContato) card.nomeContato=dados.nomeContato;
+      if(dados.diagnosticoResumo!==undefined) card.diagnosticoResumo=dados.diagnosticoResumo;
+      if(dados.modeloTv!==undefined) card.modeloTv=dados.modeloTv;
+    }
     await _ps(PIPE_KEY_H,db);
   } catch(e){console.error('[pipe-mover]',novaFase,e.message);}
 }
@@ -760,11 +767,18 @@ module.exports = async function handler(req, res) {
     const _equip  = ficha.equipamento || '';
     const _desc   = ficha.defeito || '';
     const _valor  = parseFloat(precoFinal) || 0;
+    // Extrair resumo do diagnóstico para exibir no pipe, board e rastrear
+    const _equips0   = (ficha.diagnostico.equips || [ficha.diagnostico])[0] || {};
+    const _servicos  = _equips0.servicos || [];
+    const _diagResmo = _servicos.length ? _servicos.join(' | ') : '';
+    const _modeloTv  = _equips0.modelo || ficha.equipamento || '';
     await moverNoPipe(_pipId, 'aguardando_aprovacao', {
       nomeContato: _nome, telefone: _tel,
       isBarramento: !!(ficha.isBarramento),
       equipamento: _equip, descricao: _desc,
       valor: _valor, origem: 'logistica',
+      diagnosticoResumo: _diagResmo,
+      modeloTv: _modeloTv,
       endereco: ficha.endereco || '',
       localId: ficha.id  // fallback quando não há pipefyCardId
     }).catch(e => console.error('[Log→Pipe]', e.message));

@@ -158,10 +158,58 @@ async function buscar(){
             </div>
             <div class="field"><div class="field-lbl">VALOR</div><div class="field-val">${c.valor||'—'}</div></div>
             <div class="field" style="grid-column:1/-1"><div class="field-lbl">EQUIPAMENTO</div><div class="field-val">${c.equipamento||'—'}</div></div>
+            ${c.modeloTv?`<div class="field" style="grid-column:1/-1"><div class="field-lbl" style="color:#93c5fd;">📺 MODELO TV</div><div class="field-val" style="color:#93c5fd;">${c.modeloTv}</div></div>`:''}
+            ${c.diagnosticoResumo?`<div class="field" style="grid-column:1/-1"><div class="field-lbl" style="color:#fbbf24;">🔧 DIAGNÓSTICO</div><div class="field-val" style="color:#fbbf24;">${c.diagnosticoResumo}</div></div>`:''}
             <div class="field"><div class="field-lbl">ENTROU NA FASE</div><div class="field-val mono" style="font-size:11px;">${fmtDt(c.movedAt)}</div></div>
             <div class="field"><div class="field-lbl">CRIADO EM</div><div class="field-val mono" style="font-size:11px;">${fmtDt(c.criadoEm)}</div></div>
           </div>
           ${hist ? '<div style="margin-top:12px;">'+hist+'</div>' : ''}
+        </div>`;
+      });
+    }
+
+    // ── TV PIPE ──────────────────────────────────────────────
+    if(r.tv_pipe&&r.tv_pipe.length){
+      html+=`<div class="origem-title" style="color:#60a5fa;"><span class="total-badge" style="background:rgba(96,165,250,.15);color:#60a5fa;">${r.tv_pipe.length}</span> TV PIPE</div>`;
+      r.tv_pipe.forEach(function(c){
+        html+=`<div class="card" style="border-left:3px solid #60a5fa;">
+          <div class="card-header">
+            <div>
+              <div class="card-nome">${c.nome||'—'}</div>
+              <div class="card-id">${c.id}</div>
+            </div>
+            <span class="${phaseCls(c.phase)}">${phaseName(c.phase)}</span>
+          </div>
+          <div class="card-fields">
+            <div class="field"><div class="field-lbl">TELEFONE</div><div class="field-val mono">${c.tel||'—'}</div></div>
+            <div class="field"><div class="field-lbl">VALOR</div><div class="field-val">${c.valor||'—'}</div></div>
+            ${c.modeloTv?`<div class="field" style="grid-column:1/-1"><div class="field-lbl" style="color:#93c5fd;">📺 MODELO TV</div><div class="field-val" style="color:#93c5fd;">${c.modeloTv}</div></div>`:''}
+            ${c.diagnosticoResumo?`<div class="field" style="grid-column:1/-1"><div class="field-lbl" style="color:#fbbf24;">🔧 DIAGNÓSTICO</div><div class="field-val" style="color:#fbbf24;">${c.diagnosticoResumo}</div></div>`:''}
+            <div class="field"><div class="field-lbl">EQUIPAMENTO</div><div class="field-val">${c.equipamento||'—'}</div></div>
+            <div class="field"><div class="field-lbl">ATUALIZADO</div><div class="field-val mono" style="font-size:11px;">${fmtDt(c.movedAt)}</div></div>
+          </div>
+        </div>`;
+      });
+    }
+
+    // ── TV BOARD ─────────────────────────────────────────────
+    if(r.tv_board&&r.tv_board.length){
+      html+=`<div class="origem-title" style="color:#a78bfa;"><span class="total-badge" style="background:rgba(167,139,250,.15);color:#a78bfa;">${r.tv_board.length}</span> TV TÉCNICO (Board)</div>`;
+      r.tv_board.forEach(function(c){
+        html+=`<div class="card" style="border-left:3px solid #a78bfa;">
+          <div class="card-header">
+            <div>
+              <div class="card-nome">${c.nome||'—'}</div>
+              <div class="card-id">${c.id}</div>
+            </div>
+            <span class="${phaseCls(c.phaseId)}">${phaseName(c.phaseId)}</span>
+          </div>
+          <div class="card-fields">
+            <div class="field"><div class="field-lbl">TÉCNICO</div><div class="field-val">${c.tecnico||'—'}</div></div>
+            ${c.modeloTv?`<div class="field" style="grid-column:1/-1"><div class="field-lbl" style="color:#93c5fd;">📺 MODELO TV</div><div class="field-val" style="color:#93c5fd;">${c.modeloTv}</div></div>`:''}
+            ${c.diagnosticoResumo?`<div class="field" style="grid-column:1/-1"><div class="field-lbl" style="color:#fbbf24;">🔧 DIAGNÓSTICO</div><div class="field-val" style="color:#fbbf24;">${c.diagnosticoResumo}</div></div>`:''}
+            <div class="field"><div class="field-lbl">ATUALIZADO</div><div class="field-val mono" style="font-size:11px;">${fmtDt(c.movedAt)}</div></div>
+          </div>
         </div>`;
       });
     }

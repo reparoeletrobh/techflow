@@ -1991,7 +1991,63 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-// ── reverter-ultima-chamada: move de volta p/ aguardando_aprovacao os que foram
+// ── enriquecer-diagnostico: backfill — lê tv_logistica e enriquece tv_pipe/tv_board
+  // com diagnosticoResumo e modeloTv para os cards já existentes
+  if (action === 'enriquecer-diagnostico') {
+    try {
+      const [pipeDb, logDb, boardDb] = await Promise.all([
+        dbGet(PIPE_KEY),
+        dbGet('tv_logistica'),
+        dbGet('tv_board'),
+      ]);
+      const fichas  = logDb?.fichas  || [];
+      const pCards  = pipeDb?.cards  || [];
+      const bCards  = boardDb?.cards || [];
+      let enrPipe=0, enrBoard=0;
+
+      for (const ficha of fichas) {
+        if (!ficha.diagnostico) continue;
+        const equips  = ficha.diagnostico.equips || [ficha.diagnostico];
+        const equip0  = equips[0] || {};
+        const servics = equip0.servicos || [];
+        const diagRes = servics.length ? servics.join(' | ') : '';
+        const modelo  = equip0.modelo || ficha.equipamento || '';
+        if (!diagRes && !modelo) continue;
+
+        // Enriquecer pipe card pelo localId ou pipefyCardId
+        const pCard = pCards.find(c =>
+          (c.id && ficha.id && c.id === ficha.id) ||
+          (ficha.pipefyCardId && (c.pipefyId === String(ficha.pipefyCardId) || c.id === String(ficha.pipefyCardId))) ||
+          (c.localId && c.localId === ficha.id)
+        );
+        if (pCard && (!pCard.diagnosticoResumo || !pCard.modeloTv)) {
+          pCard.diagnosticoResumo = pCard.diagnosticoResumo || diagRes;
+          pCard.modeloTv          = pCard.modeloTv          || modelo;
+          enrPipe++;
+        }
+
+        // Enriquecer board card pelo pipefyId
+        if (ficha.pipefyCardId) {
+          const bCard = bCards.find(c => c.pipefyId === String(ficha.pipefyCardId));
+          if (bCard && (!bCard.diagnosticoResumo || !bCard.modeloTv)) {
+            bCard.diagnosticoResumo = bCard.diagnosticoResumo || diagRes;
+            bCard.modeloTv          = bCard.modeloTv          || modelo;
+            enrBoard++;
+          }
+        }
+      }
+
+      if (enrPipe  > 0) await dbSet(PIPE_KEY,   pipeDb);
+      if (enrBoard > 0) await dbSet('tv_board',  boardDb);
+
+      return res.status(200).json({ ok:true, enrPipe, enrBoard,
+        msg: `${enrPipe} cards pipe + ${enrBoard} cards board enriquecidos com diagnóstico` });
+    } catch(e) {
+      return res.status(500).json({ ok:false, error:e.message });
+    }
+  }
+
+  // ── reverter-ultima-chamada: move de volta p/ aguardando_aprovacao os que foram
   // movidos automaticamente (sem alertadoEm) — correção única do bug do pipe-sem-resposta
   if (action === 'reverter-ultima-chamada') {
     const db   = (await dbGet(PIPE_KEY)) || defaultDB();

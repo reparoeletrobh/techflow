@@ -1889,10 +1889,12 @@ export default async function handler(req, res) {
     const BOARD_KEY = 'reparoeletro_board';
     const FL_KEY    = 'reparoeletro_frenteloja';
 
-    const [pipeDb, boardDb, flDb] = await Promise.all([
+    const [pipeDb, boardDb, flDb, tvPipeDb, tvBoardDb] = await Promise.all([
       dbGet(PIPE_KEY),
       dbGet(BOARD_KEY),
       dbGet(FL_KEY),
+      dbGet('tv_pipe'),
+      dbGet('tv_board'),
     ]);
 
     function matchQ(c) {
@@ -1904,6 +1906,7 @@ export default async function handler(req, res) {
     const pipeCards = (pipeDb?.cards||[]).filter(matchQ).map(function(c){
       return { origem:'pipe', id:c.id, nome:c.nomeContato||c.title, tel:c.telefone,
                phase:c.phase, valor:c.valor, equipamento:c.equipamento||c.descricao,
+               diagnosticoResumo:c.diagnosticoResumo||'', modeloTv:c.modeloTv||'',
                movedAt:c.movedAt, criadoEm:c.criadoEm, history:(c.history||[]).slice(-5) };
     });
 
@@ -1919,12 +1922,28 @@ export default async function handler(req, res) {
                criadoEm:c.criadoEm, obs:c.obs };
     });
 
+    // Cards TV pipe
+    const tvPipeCards = ((tvPipeDb?.cards||[]).filter(matchQ)).map(function(c){
+      return { origem:'tv_pipe', id:c.id, nome:c.nomeContato||c.title, tel:c.telefone,
+               phase:c.phase, valor:c.valor, equipamento:c.equipamento||c.descricao,
+               diagnosticoResumo:c.diagnosticoResumo||'', modeloTv:c.modeloTv||'',
+               movedAt:c.movedAt, criadoEm:c.criadoEm, history:(c.history||[]).slice(-5) };
+    });
+    // Cards TV board
+    const tvBoardCards = ((tvBoardDb?.cards||[]).filter(matchQ)).map(function(c){
+      return { origem:'tv_board', id:c.pipefyId||c.id, nome:c.nomeContato||c.title, tel:c.telefone,
+               phaseId:c.phaseId, movedAt:c.movedAt, tecnico:c.tecnico,
+               diagnosticoResumo:c.diagnosticoResumo||'', modeloTv:c.modeloTv||'' };
+    });
+
     return res.status(200).json({
       ok: true, busca: q,
-      total: pipeCards.length + boardCards.length + flCards.length,
+      total: pipeCards.length + boardCards.length + flCards.length + tvPipeCards.length + tvBoardCards.length,
       pipe:       pipeCards,
       board:      boardCards,
       frenteloja: flCards,
+      tv_pipe:    tvPipeCards,
+      tv_board:   tvBoardCards,
     });
   }
 
