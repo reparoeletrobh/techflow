@@ -371,12 +371,16 @@ function abrirComprar() {
     return (c.polegadas||c.modeloTv||'—') + '" | ' + (c.descricaoDiag||c.diagnosticoResumo||c.nomeContato||'—') + ' | ' + (c.pecaDiag||'Barramento');
   });
   document.getElementById('comprar-list').innerHTML = cards.map(function(c, i){
+    // Escapa aspas para evitar quebrar atributos HTML
+    var nomeEsc  = (c.nomeContato||c.title||c.osCode||'—').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    var linhaEsc = linhas[i].replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    var linhaAttr= linhas[i].replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     return '<div class="modal-item">' +
       '<div class="mi-info">' +
-        '<div class="mi-nome">' + (c.nomeContato||c.osCode||'—') + '</div>' +
-        '<div class="mi-linha">' + linhas[i] + '</div>' +
+        '<div class="mi-nome">' + nomeEsc + '</div>' +
+        '<div class="mi-linha">' + linhaEsc + '</div>' +
       '</div>' +
-      '<button class="btn-copy" onclick="cp(\'' + linhas[i].replace(/'/g,"\\'") + '\',this)">📋</button>' +
+      '<button class="btn-copy" onclick="cp(\'' + linhaAttr + '\',this)">📋</button>' +
     '</div>';
   }).join('') || '<div style="color:var(--mu);font-family:var(--fm);font-size:10px;text-align:center;padding:16px;">Nenhum card</div>';
   document.getElementById('lote-txt').value = linhas.join('\n');
