@@ -234,10 +234,12 @@ function renderBarramento() {
     return;
   }
   grid.innerHTML = cards.map(function(c) {
-    var cid  = c.pipefyId || c.id;          // compatível com cards pré e pós-Pipefy
+    var cid  = c.pipefyId || c.id;
     var num  = c.osCode || ('#' + String(cid).slice(-4));
-    var pol  = c.polegadas || '—';          // era '?' — trocado por '—' mais claro
-    var peca = c.pecaDiag || 'Barramento';
+    // Modelo: usa polegadas (form) ou modeloTv (diagnóstico) como fallback
+    var pol  = c.polegadas || c.modeloTv || '—';
+    // Peça: usa pecaDiag (form) ou diagnosticoResumo (diagnóstico) como fallback
+    var peca = c.pecaDiag || c.diagnosticoResumo || 'Barramento';
     var desc = c.descricaoDiag || '';
     var cls  = c.barramentoConcluido ? 'barr-card concluido' : 'barr-card';
     return '<div class="' + cls + '" id="bc-' + cid + '">' +
