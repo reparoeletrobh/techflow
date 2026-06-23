@@ -34,6 +34,20 @@ export default async function handler(req, res) {
       .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,80);
   }
 
+  // ── LISTAR MODELOS DISPONÍVEIS ───────────────────────────────────────────
+  if (action==='listar-modelos') {
+    if (!AKEY) return res.status(200).json({ok:false,erro:'Chave não configurada'});
+    try {
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${AKEY}`);
+      const data = await resp.json();
+      if (data.error) return res.status(200).json({ok:false,erro:data.error.message,status:resp.status});
+      const modelos = (data.models||[]).filter(m=>m.supportedGenerationMethods?.includes('generateContent')).map(m=>m.name);
+      return res.status(200).json({ok:true,modelos});
+    } catch(e) {
+      return res.status(200).json({ok:false,erro:e.message});
+    }
+  }
+
   // ── TESTAR API GEMINI ────────────────────────────────────────────────────
   if (action==='testar-api') {
     if (!AKEY) return res.status(200).json({ok:false,erro:'Chave não configurada'});
