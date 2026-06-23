@@ -597,14 +597,13 @@ function srCard(card) {
   if (waLink) {
     var bc=document.createElement('button'); bc.className='sr-btn'; bc.textContent='📋 Copiar e Enviar WA';
     bc.onclick=(function(id,link,b){return function(){
-      // 1. Copia a mensagem
-      navigator.clipboard.writeText(MSG_UC).catch(function(){
-        var ta=document.createElement('textarea');ta.value=MSG_UC;
+      // Copia o link wa.me completo para área de transferência (igual ao ADM)
+      // Não abre nova aba — usuário cola o link no WhatsApp manualmente
+      navigator.clipboard.writeText(link).catch(function(){
+        var ta=document.createElement('textarea');ta.value=link;
         document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
       });
-      // 2. Abre WhatsApp
-      window.open(link,'_blank');
-      // 3. Move card para Última Chamada (igual ao ADM)
+      // Move card para Última Chamada
       alertarCliente(id, b);
     };})(cardId,waLink,bm);
     btns.appendChild(bc);
