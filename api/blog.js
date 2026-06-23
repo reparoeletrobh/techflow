@@ -34,6 +34,27 @@ export default async function handler(req, res) {
       .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,80);
   }
 
+  // ── TESTAR API GEMINI ────────────────────────────────────────────────────
+  if (action==='testar-api') {
+    if (!AKEY) return res.status(200).json({ok:false,erro:'Chave não configurada'});
+    try {
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${AKEY}`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          contents:[{parts:[{text:'Diga apenas: OK'}]}],
+          generationConfig:{maxOutputTokens:10}
+        })
+      });
+      const data = await resp.json();
+      if (data.error) return res.status(200).json({ok:false,erro:data.error.message,detalhe:data.error,status:resp.status});
+      const txt = data.candidates?.[0]?.content?.parts?.[0]?.text||'';
+      return res.status(200).json({ok:true,resposta:txt,modelo:'gemini-1.5-flash'});
+    } catch(e) {
+      return res.status(200).json({ok:false,erro:e.message});
+    }
+  }
+
   // ── CHECK CONFIG ─────────────────────────────────────────────────────────
   if (action==='check-config') {
     const cfg = await dbGet('blog_config');
