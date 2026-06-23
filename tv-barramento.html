@@ -368,7 +368,7 @@ async function chegou(pipefyId) {
 function abrirComprar() {
   var cards = (_board.cards||[]).filter(function(c){ return c.phaseId==='barramento'; });
   var linhas = cards.map(function(c){
-    return (c.polegadas||'?') + '" | ' + (c.descricaoDiag||c.nomeContato||'—') + ' | ' + (c.pecaDiag||'Barramento');
+    return (c.polegadas||c.modeloTv||'—') + '" | ' + (c.descricaoDiag||c.diagnosticoResumo||c.nomeContato||'—') + ' | ' + (c.pecaDiag||'Barramento');
   });
   document.getElementById('comprar-list').innerHTML = cards.map(function(c, i){
     return '<div class="modal-item">' +
