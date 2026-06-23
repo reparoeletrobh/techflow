@@ -8,7 +8,12 @@ export default async function handler(req, res) {
 
   const U=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
   const T=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
-  const AKEY=(process.env.ANTHROPIC_API_KEY||'').trim();
+  // API key: primeiro env var, depois Redis (configurável pelo admin)
+  let AKEY=(process.env.ANTHROPIC_API_KEY||'').trim();
+  if (!AKEY) {
+    const cfg = await dbGet('blog_config');
+    AKEY = (cfg?.anthropic_key||'').trim();
+  }
 
   async function dbGet(k){try{const r=await fetch(U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});const j=await r.json();let v=j[0]?.result;if(!v)return null;try{let x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}catch(e){return null;}}
   async function dbSet(k,v){await fetch(U+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
@@ -19,8 +24,32 @@ export default async function handler(req, res) {
   function slugify(t){return t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,80);}
 
   // ── GERAR: pesquisa + geração dos 5 posts ──────────────────────────────
+  // ── SALVAR CONFIG (chave Anthropic) ────────────────────────────────────
+  if (req.method==='POST' && action==='salvar-config') {
+    const { anthropic_key } = req.body || {};
+    if (!anthropic_key) return res.status(400).json({ ok:false, error:'Chave obrigatória' });
+    const cfg = (await dbGet('blog_config')) || {};
+    cfg.anthropic_key = anthropic_key.trim();
+    await dbSet('blog_config', cfg);
+    return res.status(200).json({ ok:true });
+  }
+
+  // ── CHECK CONFIG ─────────────────────────────────────────────────────────
+  if (req.method==='GET' && action==='check-config') {
+    const cfg = await dbGet('blog_config');
+    const envKey = (process.env.ANTHROPIC_API_KEY||'').trim();
+    return res.status(200).json({
+      ok: true,
+      configurado: !!(envKey || cfg?.anthropic_key),
+      fonte: envKey ? 'env' : (cfg?.anthropic_key ? 'redis' : 'nenhuma')
+    });
+  }
+
   if (req.method==='POST' && action==='gerar') {
     const { regenerar, padroes } = req.body || {};
+    if (!AKEY) {
+      return res.status(200).json({ ok:false, error:'ANTHROPIC_API_KEY não configurada. Acesse Configurações no Blog Manager para adicionar a chave.' });
+    }
     const padrao = await dbGet('blog_padrao') || { voz:'', exemplos:[] };
     const dataHoje = new Date().toLocaleDateString('pt-BR', {weekday:'long',year:'numeric',month:'long',day:'numeric',timeZone:'America/Sao_Paulo'});
 

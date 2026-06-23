@@ -104,6 +104,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <span style="font-size:12px;color:#5a6270;">Reparo Eletro BH</span>
   </div>
   <div style="display:flex;gap:8px;">
+    <button class="btn-sec" onclick="abrirConfig()" style="padding:7px 14px;" title="Configurações">⚙️</button>
     <a href="/blog" target="_blank" class="btn-sec" style="text-decoration:none;padding:7px 14px;">🌐 Ver Blog</a>
     <a href="/" class="btn-sec" style="text-decoration:none;padding:7px 14px;">← ADM</a>
   </div>
@@ -498,5 +499,101 @@ function copiarLink(slug) {
 
 function escH(s){ var d=document.createElement('div');d.textContent=s||'';return d.innerHTML; }
 </script>
+
+<!-- MODAL CONFIGURAÇÃO -->
+<div id="config-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;display:none;align-items:center;justify-content:center;">
+  <div style="background:#0f1114;border:1px solid #1e2228;border-radius:14px;padding:24px;width:90%;max-width:480px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div style="font-size:14px;font-weight:800;">⚙️ Configuração do Blog</div>
+      <button onclick="fecharConfig()" style="background:transparent;border:none;color:#5a6270;font-size:20px;cursor:pointer;">✕</button>
+    </div>
+
+    <div id="config-status" style="margin-bottom:16px;"></div>
+
+    <div style="margin-bottom:14px;">
+      <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">🔑 Chave API Anthropic</div>
+      <input id="cfg-key" type="password" placeholder="sk-ant-api03-..."
+        style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:8px;padding:10px 14px;color:#f0f2f5;font-size:13px;outline:none;font-family:monospace;">
+      <div style="font-size:10px;color:#5a6270;margin-top:6px;">
+        Obtenha em <a href="https://console.anthropic.com/account/keys" target="_blank" style="color:#3b9eff;text-decoration:none;">console.anthropic.com</a> → API Keys → Create Key
+      </div>
+    </div>
+
+    <button onclick="salvarConfig()" style="width:100%;background:#3b9eff;border:none;color:#fff;padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:12px;">
+      💾 Salvar Chave
+    </button>
+
+    <div style="background:#181b1f;border:1px solid #1e2228;border-radius:8px;padding:12px;font-size:11px;color:#5a6270;line-height:1.7;">
+      <strong style="color:#f0f2f5;">Alternativa:</strong> Adicione <code style="background:#0f1114;padding:2px 6px;border-radius:4px;color:#f5c800;">ANTHROPIC_API_KEY</code>
+      nas variáveis de ambiente do Vercel:<br>
+      Vercel → seu projeto → Settings → Environment Variables
+    </div>
+  </div>
+</div>
+
+<script>
+// ── VERIFICAR SETUP NA INICIALIZAÇÃO ──────────────────────────────────────
+async function verificarConfig() {
+  try {
+    var r = await fetch('/api/blog?action=check-config').then(function(x){return x.json();});
+    if (!r.configurado) {
+      // Mostrar aviso no topo
+      var aviso = document.createElement('div');
+      aviso.id = 'config-aviso';
+      aviso.style.cssText = 'background:rgba(245,200,0,.08);border:1px solid rgba(245,200,0,.3);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#f5c800;display:flex;align-items:center;justify-content:space-between;gap:12px;';
+      aviso.innerHTML = '<span>⚠️ <strong>Chave Anthropic não configurada.</strong> Clique em ⚙️ para adicionar antes de gerar posts.</span>'
+        +'<button onclick="abrirConfig()" style="background:rgba(245,200,0,.2);border:1px solid rgba(245,200,0,.3);color:#f5c800;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Configurar agora</button>';
+      var content = document.querySelector('.content');
+      if (content) content.insertBefore(aviso, content.firstChild);
+    }
+  } catch(e) {}
+}
+
+function abrirConfig() {
+  var ov = document.getElementById('config-overlay');
+  ov.style.display = 'flex';
+  // Verificar status
+  fetch('/api/blog?action=check-config').then(function(x){return x.json();}).then(function(r){
+    var el = document.getElementById('config-status');
+    if (r.configurado) {
+      el.innerHTML = '<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:6px;padding:8px 12px;font-size:12px;color:#86efac;">✅ Chave configurada via <strong>'+r.fonte+'</strong></div>';
+    } else {
+      el.innerHTML = '<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:6px;padding:8px 12px;font-size:12px;color:#fca5a5;">❌ Sem chave API — posts não podem ser gerados</div>';
+    }
+  });
+}
+
+function fecharConfig() {
+  document.getElementById('config-overlay').style.display = 'none';
+}
+
+async function salvarConfig() {
+  var key = document.getElementById('cfg-key').value.trim();
+  if (!key) { alert('Informe a chave API'); return; }
+  if (!key.startsWith('sk-ant')) { alert('A chave deve começar com sk-ant...'); return; }
+  try {
+    var r = await fetch('/api/blog?action=salvar-config', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ anthropic_key: key })
+    }).then(function(x){return x.json();});
+    if (r.ok) {
+      document.getElementById('config-status').innerHTML = '<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:6px;padding:8px 12px;font-size:12px;color:#86efac;">✅ Chave salva! Agora você pode gerar posts.</div>';
+      document.getElementById('cfg-key').value = '';
+      var aviso = document.getElementById('config-aviso');
+      if (aviso) aviso.remove();
+      setTimeout(fecharConfig, 1500);
+    } else { alert('Erro: '+r.error); }
+  } catch(e) { alert('Erro: '+e.message); }
+}
+
+// Fechar clicando fora
+document.getElementById('config-overlay').addEventListener('click', function(e){
+  if (e.target === this) fecharConfig();
+});
+
+// Verificar ao carregar
+verificarConfig();
+</script>
+
 </body>
 </html>
