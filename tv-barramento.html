@@ -234,22 +234,23 @@ function renderBarramento() {
     return;
   }
   grid.innerHTML = cards.map(function(c) {
-    var num = c.osCode || ('#' + String(c.pipefyId).slice(-4));
-    var pol = c.polegadas || '?';
+    var cid  = c.pipefyId || c.id;          // compatível com cards pré e pós-Pipefy
+    var num  = c.osCode || ('#' + String(cid).slice(-4));
+    var pol  = c.polegadas || '—';          // era '?' — trocado por '—' mais claro
     var peca = c.pecaDiag || 'Barramento';
     var desc = c.descricaoDiag || '';
-    var cls = c.barramentoConcluido ? 'barr-card concluido' : 'barr-card';
-    return '<div class="' + cls + '" id="bc-' + c.pipefyId + '">' +
+    var cls  = c.barramentoConcluido ? 'barr-card concluido' : 'barr-card';
+    return '<div class="' + cls + '" id="bc-' + cid + '">' +
       '<div class="bc-num">' + num + '</div>' +
       '<div class="bc-nome">' + (c.nomeContato || c.title || '—') + '</div>' +
       '<div class="bc-info">' +
-        '<div class="bc-pol">' + pol + '"</div>' +
+        '<div class="bc-pol">' + pol + '</div>' +
         '<div class="bc-peca">' + peca + '</div>' +
         (desc ? '<div class="bc-desc">' + desc + '</div>' : '') +
       '</div>' +
       '<div class="bc-btns">' +
-        '<button class="btn-sm btn-local" onclick="comprarLocal(\'' + c.pipefyId + '\')">📦 Local</button>' +
-        '<button class="btn-sm btn-inet"  onclick="comprarInternet(\'' + c.pipefyId + '\')">🌐 Internet</button>' +
+        '<button class="btn-sm btn-local" onclick="comprarLocal(\'' + cid + '\')">📦 Local</button>' +
+        '<button class="btn-sm btn-inet"  onclick="comprarInternet(\'' + cid + '\')">🌐 Internet</button>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -273,7 +274,7 @@ function renderProducao() {
       '<div style="font-size:13px;font-weight:700;">' + (c.nomeContato||c.title||'—') + '</div>' +
       '<div style="font-family:var(--fm);font-size:10px;color:var(--mu);margin-top:3px;">' + (c.osCode||String(c.pipefyId).slice(-4)) + '</div>' +
       (c.polegadas ? '<div style="font-family:var(--fm);font-size:10px;color:var(--pu);margin-top:4px;">📺 ' + c.polegadas + '" · ' + (c.pecaDiag||'Barramento') + '</div>' : '') +
-      (!disp ? '<button class="btn-chegou" onclick="chegou(\'' + c.pipefyId + '\')">✅ Barramento chegou</button>' : '') +
+      (!disp ? '<button class="btn-chegou" onclick="chegou(\'' + (c.pipefyId||c.id) + '\')">✅ Barramento chegou</button>' : '') +
     '</div>';
   }).join('');
 }
@@ -300,7 +301,7 @@ async function adicionarBarramento() {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
-        pipefyId: card.pipefyId,
+        pipefyId: card.pipefyId || card.id,
         phaseId: 'barramento',
         polegadas: pol,
         pecaDiag: peca,

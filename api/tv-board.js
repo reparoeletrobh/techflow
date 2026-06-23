@@ -362,13 +362,23 @@ module.exports = async function handler(req, res) {
 
     // ── POST move — move card para fase (local + Pipefy) ─────────
     if (req.method === "POST" && action === "move") {
-      const { pipefyId, phaseId, pipefyPhaseId, techName } = req.body || {};
-      if (!pipefyId || !phaseId) return res.status(400).json({ ok: false, error: "pipefyId e phaseId obrigatórios" });
+      const bd = req.body || {};
+      const { pipefyId, phaseId, pipefyPhaseId, techName } = bd;
+      if (!phaseId) return res.status(400).json({ ok: false, error: "phaseId obrigatório" });
+      if (!pipefyId) return res.status(400).json({ ok: false, error: "pipefyId obrigatório" });
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
-      const card  = board.cards.find(function(c) { return c.pipefyId === String(pipefyId); });
+      // Busca por pipefyId OU por id (cards pós-Pipefy)
+      const card  = board.cards.find(function(c) {
+        return c.pipefyId === String(pipefyId) || c.id === String(pipefyId);
+      });
       if (!card) return res.status(404).json({ ok: false, error: "Card não encontrado" });
       card.phaseId = phaseId;
       if (techName) card.techName = techName;
+      // Salvar campos extras do barramento
+      if (bd.polegadas    !== undefined) card.polegadas    = bd.polegadas;
+      if (bd.pecaDiag     !== undefined) card.pecaDiag     = bd.pecaDiag;
+      if (bd.descricaoDiag!== undefined) card.descricaoDiag= bd.descricaoDiag;
+      if (bd.isBarramento !== undefined) card.isBarramento = bd.isBarramento;
       card.movidoEm = new Date().toISOString();
       board.movesLog = trimLog([...(board.movesLog || []),
         { id: pipefyId, phase: phaseId, tech: techName, ts: Date.now() }]);
@@ -967,7 +977,9 @@ async function otimizarPontos(pontos, pontoInicio) {
     if (req.method === 'POST' && action === 'set-barramento-compra') {
       const bd = req.body || {};
       const db = await dbGet(BOARD_KEY) || defaultBoard();
-      const card = (db.cards || []).find(function(c){ return c.pipefyId === bd.pipefyId; });
+      const card = (db.cards || []).find(function(c){
+        return c.pipefyId === bd.pipefyId || c.id === bd.pipefyId;
+      });
       if (!card) return res.status(404).json({ ok: false, error: 'Card não encontrado' });
       // Marcar compra
       card.barramentoTipo    = bd.tipo || 'local';     // 'local' | 'internet'
@@ -985,7 +997,9 @@ async function otimizarPontos(pontos, pontoInicio) {
     if (req.method === 'POST' && action === 'barramento-chegou') {
       const bd = req.body || {};
       const db = await dbGet(BOARD_KEY) || defaultBoard();
-      const idx = (db.cards || []).findIndex(function(c){ return c.pipefyId === bd.pipefyId; });
+      const idx = (db.cards || []).findIndex(function(c){
+        return c.pipefyId === bd.pipefyId || c.id === bd.pipefyId;
+      });
       if (idx < 0) return res.status(404).json({ ok: false, error: 'Card não encontrado' });
       const card = db.cards[idx];
       card.barramentoStatus  = 'disponivel';
