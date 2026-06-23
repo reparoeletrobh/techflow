@@ -52,7 +52,7 @@ export default async function handler(req, res) {
   if (action==='testar-api') {
     if (!AKEY) return res.status(200).json({ok:false,erro:'Chave não configurada'});
     try {
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${AKEY}`,{
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${AKEY}`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
@@ -121,7 +121,7 @@ ${padrao.exemplos?.length?'EXEMPLOS APROVADOS:\n'+padrao.exemplos.slice(-2).join
     const posts=[];
     for (const cat of categorias) {
       try {
-        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${AKEY}`,{
+        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${AKEY}`,{
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body:JSON.stringify({
@@ -260,7 +260,7 @@ Responda APENAS JSON válido (sem markdown), neste formato exato:
     const msgs=(historico||[]).map(m=>({role:m.role,content:m.content}));
     msgs.push({role:'user',content:mensagem});
     const chatPrompt = `Assistente de copywriting para o blog da Reparo Eletro BH. Post atual: "${post_titulo}". Sugira melhorias específicas, foco em SEO local BH e conversão.\n\n`+msgs.map(m=>m.role+': '+m.content).join('\n');
-    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${AKEY}`,{
+    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${AKEY}`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({contents:[{parts:[{text:chatPrompt}]}],generationConfig:{maxOutputTokens:1000}})
