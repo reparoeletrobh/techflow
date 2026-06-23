@@ -22,11 +22,11 @@ export default async function handler(req, res) {
 
   const action=req.query.action||'';
 
-  // API key: env var primeiro, depois Redis
-  let AKEY=(process.env.ANTHROPIC_API_KEY||'').trim();
+  // Gemini API key: env var primeiro, depois Redis
+  let AKEY=(process.env.GEMINI_API_KEY||'').trim();
   if (!AKEY) {
     const cfg = await dbGet('blog_config');
-    AKEY = (cfg?.anthropic_key||'').trim();
+    AKEY = (cfg?.gemini_key||'').trim();
   }
 
   function slugify(t){
@@ -37,20 +37,20 @@ export default async function handler(req, res) {
   // ── CHECK CONFIG ─────────────────────────────────────────────────────────
   if (action==='check-config') {
     const cfg = await dbGet('blog_config');
-    const envKey = (process.env.ANTHROPIC_API_KEY||'').trim();
+    const envKey = (process.env.GEMINI_API_KEY||'').trim();
     return res.status(200).json({
       ok:true,
-      configurado:!!(envKey||cfg?.anthropic_key),
-      fonte: envKey?'env':(cfg?.anthropic_key?'redis':'nenhuma')
+      configurado:!!(envKey||cfg?.gemini_key),
+      fonte: envKey?'env':(cfg?.gemini_key?'redis':'nenhuma')
     });
   }
 
   // ── SALVAR CONFIG ─────────────────────────────────────────────────────────
   if (req.method==='POST' && action==='salvar-config') {
-    const {anthropic_key}=req.body||{};
+    const {anthropic_key}=req.body||{};  // campo reutilizado para gemini_key
     if (!anthropic_key) return res.status(400).json({ok:false,error:'Chave obrigatória'});
     const cfg=(await dbGet('blog_config'))||{};
-    cfg.anthropic_key=anthropic_key.trim();
+    cfg.gemini_key=anthropic_key.trim();
     await dbSet('blog_config',cfg);
     return res.status(200).json({ok:true});
   }
@@ -86,14 +86,11 @@ ${padrao.exemplos?.length?'EXEMPLOS APROVADOS:\n'+padrao.exemplos.slice(-2).join
     const posts=[];
     for (const cat of categorias) {
       try {
-        const resp = await fetch('https://api.anthropic.com/v1/messages',{
+        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${AKEY}`,{
           method:'POST',
-          headers:{'Content-Type':'application/json','x-api-key':AKEY,'anthropic-version':'2023-06-01'},
+          headers:{'Content-Type':'application/json'},
           body:JSON.stringify({
-            model:'claude-sonnet-4-6',
-            max_tokens:2500,
-            system:sys,
-            messages:[{role:'user',content:`Gere um post de blog para: ${cat.nome} ${cat.emoji}
+            contents:[{parts:[{text: sys + '\n\n---\n\n' + `Gere um post de blog para: ${cat.nome} ${cat.emoji}
 Data: ${dataHoje}
 Keyword principal: "${cat.kw}"
 
@@ -116,12 +113,13 @@ Responda APENAS JSON válido (sem markdown), neste formato exato:
     {"q": "Atendem toda a RMBH?", "a": "Sim! Atendemos BH, Contagem, Betim, Santa Luzia, Ribeirão das Neves, Ibirité e Nova Lima."},
     {"q": "Como chamar técnico?", "a": "WhatsApp (31) 9 9785-6023 ou clique no botão abaixo."}
   ]
-}`}]
+}`}]}],
+            generationConfig:{temperature:0.8,maxOutputTokens:2500}
           })
         });
         const data=await resp.json();
         if (data.error) throw new Error(data.error.message||JSON.stringify(data.error));
-        const texto=data.content?.[0]?.text||'{}';
+        const texto=data.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
         let post;
         try{post=JSON.parse(texto.replace(/```json|```/g,'').trim());}
         catch(e){post={titulo:`${cat.nome} — ${dataHoje}`,corpo_html:'<p>Erro ao gerar conteúdo.</p>',status:'erro'};}
@@ -226,18 +224,15 @@ Responda APENAS JSON válido (sem markdown), neste formato exato:
     const {post_titulo,post_corpo,mensagem,historico}=req.body||{};
     const msgs=(historico||[]).map(m=>({role:m.role,content:m.content}));
     msgs.push({role:'user',content:mensagem});
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+    const chatPrompt = `Assistente de copywriting para o blog da Reparo Eletro BH. Post atual: "${post_titulo}". Sugira melhorias específicas, foco em SEO local BH e conversão.\n\n`+msgs.map(m=>m.role+': '+m.content).join('\n');
+    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${AKEY}`,{
       method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':AKEY,'anthropic-version':'2023-06-01'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-6',max_tokens:1000,
-        system:`Assistente de copywriting para o blog da Reparo Eletro BH. Post atual: "${post_titulo}". Sugira melhorias específicas, foco em SEO local BH e conversão (leads WA).`,
-        messages:msgs
-      })
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{parts:[{text:chatPrompt}]}],generationConfig:{maxOutputTokens:1000}})
     });
     const data=await resp.json();
     if (data.error) return res.status(200).json({ok:false,error:data.error.message});
-    return res.status(200).json({ok:true,resposta:data.content?.[0]?.text||'Sem resposta'});
+    return res.status(200).json({ok:true,resposta:data.candidates?.[0]?.content?.parts?.[0]?.text||'Sem resposta'});
   }
 
   // ── SALVAR PADRÃO ─────────────────────────────────────────────────────────
