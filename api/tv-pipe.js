@@ -166,19 +166,21 @@ export default async function handler(req, res) {
     boardDb.cards = boardDb.cards.filter(c => c.pipefyId !== boardPid && c.osCode !== card.id);
     const now = new Date().toISOString();
     const novoCard = {
-      pipefyId:    boardPid,
-      phaseId:     'producao',
-      nomeContato: card.nomeContato || '',
-      title:       card.descricao || card.nomeContato || '',
-      telefone:    card.telefone || '',
-      descricao:   card.equipamento || card.descricao || '',
-      osCode:      card.id,
-      valor:       card.valor || 0,
-      movedBy:     'Pipe ADM',
-      flFichaId:   null,
-      localOnly:   !card.pipefyId,
-      syncedAt:    now,
-      movedAt:     now
+      pipefyId:          boardPid,
+      phaseId:           'producao',
+      nomeContato:       card.nomeContato || '',
+      title:             card.descricao || card.nomeContato || '',
+      telefone:          card.telefone || '',
+      descricao:         card.equipamento || card.descricao || '',
+      osCode:            card.id,
+      valor:             card.valor || 0,
+      diagnosticoResumo: card.diagnosticoResumo || '',
+      modeloTv:          card.modeloTv          || '',
+      movedBy:           'Pipe ADM',
+      flFichaId:         null,
+      localOnly:         !card.pipefyId,
+      syncedAt:          now,
+      movedAt:           now
     };
     boardDb.cards.unshift(novoCard);
     if (!boardDb.syncedIds) boardDb.syncedIds = [];
@@ -1769,18 +1771,20 @@ export default async function handler(req, res) {
         // Redirecionar para barramento se diagnóstico indicar
         var _targetPhase = (card.isBarramento || card.barramentoFlag) ? 'barramento' : 'aprovado';
         tvBoardDb.cards.unshift({
-          pipefyId:    boardPid3,
-          phaseId:     _targetPhase,
-          nomeContato: card.nomeContato || '',
-          title:       card.descricao   || card.nomeContato || '',
-          telefone:    card.telefone    || '',
-          descricao:   card.equipamento || card.descricao || '',
-          osCode:      card.id,
-          valor:       card.valor || 0,
-          movedBy:     'TV Pipe',
-          localOnly:   !pid,
-          syncedAt:    now,
-          movedAt:     now,
+          pipefyId:          boardPid3,
+          phaseId:           _targetPhase,
+          nomeContato:       card.nomeContato || '',
+          title:             card.descricao   || card.nomeContato || '',
+          telefone:          card.telefone    || '',
+          descricao:         card.equipamento || card.descricao || '',
+          osCode:            card.id,
+          valor:             card.valor || 0,
+          diagnosticoResumo: card.diagnosticoResumo || '',
+          modeloTv:          card.modeloTv          || '',
+          movedBy:           'TV Pipe',
+          localOnly:         !pid,
+          syncedAt:          now,
+          movedAt:           now,
         });
         if (!Array.isArray(tvBoardDb.syncedIds)) tvBoardDb.syncedIds = [];
         if (!tvBoardDb.syncedIds.includes(boardPid3)) tvBoardDb.syncedIds.push(boardPid3);
