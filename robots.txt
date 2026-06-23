@@ -1,0 +1,26 @@
+User-agent: *
+Allow: /
+Allow: /blog/
+Disallow: /api/
+Disallow: /tv/
+Disallow: /blog-manager
+Disallow: /tv-adm
+Disallow: /adm
+
+# Principais crawlers de IA
+User-agent: GPTBot
+Allow: /blog/
+Allow: /blog
+
+User-agent: Claude-Web
+Allow: /blog/
+Allow: /blog
+
+User-agent: PerplexityBot
+Allow: /blog/
+Allow: /blog
+
+User-agent: Googlebot
+Allow: /
+
+Sitemap: https://reparoeletroadm.com/sitemap.xml

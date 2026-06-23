@@ -75,6 +75,10 @@
   ],
   "rewrites": [
     {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap.js"
+    },
+    {
       "source": "/blog-manager",
       "destination": "/blog-manager.html"
     },
