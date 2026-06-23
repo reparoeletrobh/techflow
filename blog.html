@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Blog — Reparo Eletro BH | Conserto de Eletrodomésticos</title>
+<meta name="description" content="Dicas, tutoriais e informações sobre conserto de eletrodomésticos em Belo Horizonte e Região Metropolitana. TV, microondas, geladeira, lava e seca, purificador.">
+<meta property="og:title" content="Blog Reparo Eletro BH">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔧</text></svg>">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;color:#1e293b;}
+.hdr{background:#fff;border-bottom:1px solid #e2e8f0;padding:0 20px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+.logo{font-size:16px;font-weight:800;color:#1e293b;text-decoration:none;display:flex;align-items:center;gap:8px;}
+.logo-sub{font-size:11px;font-weight:400;color:#64748b;}
+.cta-hdr{background:#22c55e;color:#fff;padding:8px 18px;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap;}
+.hero{background:linear-gradient(135deg,#1e3a5f,#0f2040);color:#fff;padding:48px 20px;text-align:center;}
+.hero h1{font-size:28px;font-weight:800;margin-bottom:8px;}
+.hero p{font-size:14px;opacity:.8;max-width:500px;margin:0 auto 20px;}
+.filtros{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+.filtro{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:6px 14px;border-radius:20px;font-size:12px;cursor:pointer;transition:all .2s;}
+.filtro.on,.filtro:hover{background:#22c55e;border-color:#22c55e;}
+.container{max-width:1000px;margin:0 auto;padding:32px 20px;}
+.posts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:20px;}
+.post-card{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:transform .2s,box-shadow .2s;cursor:pointer;}
+.post-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.1);}
+.post-img{width:100%;height:160px;object-fit:cover;display:block;background:#e2e8f0;}
+.post-body{padding:16px;}
+.post-cat{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;background:#f0fdf4;color:#16a34a;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;}
+.post-title{font-size:15px;font-weight:700;line-height:1.4;margin-bottom:6px;color:#1e293b;}
+.post-resumo{font-size:12px;color:#64748b;line-height:1.6;margin-bottom:10px;}
+.post-footer{display:flex;align-items:center;justify-content:space-between;}
+.post-meta{font-size:10px;color:#94a3b8;}
+.post-link{background:#22c55e;color:#fff;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;}
+.empty{text-align:center;padding:60px 20px;color:#64748b;}
+.empty-icon{font-size:48px;margin-bottom:12px;}
+.banner-cta{background:linear-gradient(135deg,#22c55e,#16a34a);border-radius:14px;padding:28px;text-align:center;color:#fff;margin:32px 0;}
+.banner-cta h2{font-size:20px;font-weight:800;margin-bottom:6px;}
+.banner-cta p{font-size:13px;opacity:.9;margin-bottom:16px;}
+.banner-cta a{background:#fff;color:#16a34a;padding:10px 28px;border-radius:8px;font-weight:800;text-decoration:none;font-size:14px;display:inline-block;}
+.footer{border-top:1px solid #e2e8f0;padding:20px;text-align:center;font-size:11px;color:#94a3b8;margin-top:40px;}
+@media(max-width:480px){.hero h1{font-size:22px;}.posts-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <a href="/" class="logo">🔧 Reparo Eletro BH <span class="logo-sub">Blog</span></a>
+  <a href="https://wa.me/5531997856023?text=Olá, vi o blog e preciso de um orçamento" target="_blank" class="cta-hdr">📱 Pedir Orçamento</a>
+</header>
+
+<div class="hero">
+  <h1>🔧 Blog Reparo Eletro BH</h1>
+  <p>Dicas, diagnósticos e tudo sobre conserto de eletrodomésticos em BH e Região Metropolitana</p>
+  <div class="filtros">
+    <button class="filtro on" onclick="filtrar('todos',this)">Todos</button>
+    <button class="filtro" onclick="filtrar('tv',this)">📺 TV</button>
+    <button class="filtro" onclick="filtrar('microondas',this)">📡 Microondas</button>
+    <button class="filtro" onclick="filtrar('purificador',this)">💧 Purificador</button>
+    <button class="filtro" onclick="filtrar('geladeira',this)">🧊 Geladeira</button>
+    <button class="filtro" onclick="filtrar('lavaseca',this)">👕 Lava e Seca</button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="posts-grid" id="posts-grid">
+    <div class="empty" style="grid-column:1/-1;"><div class="loading-spinner" style="display:inline-block;width:24px;height:24px;border:3px solid #e2e8f0;border-top-color:#22c55e;border-radius:50%;animation:spin .8s linear infinite;"></div><style>@keyframes spin{to{transform:rotate(360deg);}}</style></div>
+  </div>
+
+  <div class="banner-cta">
+    <h2>Seu eletrodoméstico deu problema?</h2>
+    <p>Técnico vai até você em BH e toda a Região Metropolitana. Diagnóstico rápido, peça original e garantia.</p>
+    <a href="https://wa.me/5531997856023?text=Olá, preciso de um técnico para conserto" target="_blank" onclick="trackCTA('blog-listing')">📱 Chamar Técnico agora — Gratuito</a>
+  </div>
+</div>
+
+<footer class="footer">
+  Reparo Eletro BH · Conserto de Eletrodomésticos em BH e RMBH · (31) 9 9785-6023 · Seg–Sáb 8h–21h
+</footer>
+
+<script>
+var _todosPostsArr = [];
+var _catFiltro = 'todos';
+
+async function carregar() {
+  try {
+    var r = await fetch('/api/blog?action=listar').then(function(x){return x.json();});
+    _todosPostsArr = r.posts||[];
+    renderCards(_todosPostsArr);
+    // Track view
+    fetch('/api/blog?action=view', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:'listing',referrer:document.referrer})});
+  } catch(e) {
+    document.getElementById('posts-grid').innerHTML = '<div class="empty" style="grid-column:1/-1;"><div class="empty-icon">⚠️</div><div>Erro ao carregar posts.<br><small>'+e.message+'</small></div></div>';
+  }
+}
+
+function renderCards(posts) {
+  var grid = document.getElementById('posts-grid');
+  if (!posts.length) {
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1;"><div class="empty-icon">✍️</div><div style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:6px;">Blog em construção</div><div>Em breve publicaremos dicas sobre conserto de eletrodomésticos!</div><a href="https://wa.me/5531997856023" style="display:inline-block;margin-top:16px;background:#22c55e;color:#fff;padding:10px 24px;border-radius:8px;font-weight:700;text-decoration:none;">Falar com Técnico</a></div>';
+    return;
+  }
+  grid.innerHTML = posts.map(function(p){
+    var imgUrl = 'https://source.unsplash.com/400x200/?'+(p.imagem_query||p.categoriaNome)+',repair,appliance';
+    return '<div class="post-card" onclick="window.location.href=\'/blog/\'+\''+p.slug+'\'">'
+      +'<img class="post-img" src="'+imgUrl+'" alt="'+escH(p.imagem_alt||p.titulo)+'" loading="lazy">'
+      +'<div class="post-body">'
+      +'<div class="post-cat">'+escH(p.emoji)+' '+escH(p.categoriaNome)+'</div>'
+      +'<div class="post-title">'+escH(p.titulo)+'</div>'
+      +'<div class="post-resumo">'+escH(p.resumo||'')+'</div>'
+      +'<div class="post-footer">'
+      +'<div class="post-meta">⏱ '+escH(p.tempo_leitura||'5 min')+' · '+p.views+' leituras</div>'
+      +'<a href="/blog/'+escH(p.slug)+'" class="post-link">Ler →</a>'
+      +'</div></div></div>';
+  }).join('');
+}
+
+function filtrar(cat, btn) {
+  _catFiltro = cat;
+  document.querySelectorAll('.filtro').forEach(function(b){b.classList.remove('on');});
+  btn.classList.add('on');
+  var filtrados = cat==='todos' ? _todosPostsArr : _todosPostsArr.filter(function(p){return p.categoria===cat;});
+  renderCards(filtrados);
+}
+
+function trackCTA(slug) {
+  fetch('/api/blog?action=cta', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:slug})});
+}
+
+function escH(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
+
+carregar();
+</script>
+</body>
+</html>

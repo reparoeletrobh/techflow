@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Blog Manager — Reparo Eletro BH</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#07080a;color:#f0f2f5;min-height:100vh;}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;border-bottom:1px solid #1e2228;background:#0d0e12;position:sticky;top:0;z-index:50;}
+.logo{font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}<br>.logo-sub{font-size:10px;color:#5a6270;margin-left:4px;font-weight:400;}
+.tabs{display:flex;gap:0;border-bottom:1px solid #1e2228;background:#0d0e12;}
+.tab{padding:12px 20px;font-size:11px;font-weight:800;letter-spacing:.08em;cursor:pointer;color:#5a6270;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;}
+.tab.on{color:#3b9eff;border-bottom-color:#3b9eff;}
+.content{padding:20px;max-width:1200px;margin:0 auto;}
+
+/* GERADOR */
+.gerar-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.btn-gerar{background:#3b9eff;border:none;color:#fff;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:8px;transition:opacity .2s;}
+.btn-gerar:hover{opacity:.85;} .btn-gerar:disabled{opacity:.5;cursor:not-allowed;}
+.cats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px;}
+.cat-card{background:#0f1114;border:1px solid #1e2228;border-radius:12px;padding:16px;cursor:pointer;transition:all .2s;}
+.cat-card.ativo{border-color:#3b9eff;background:#0a1628;}
+.cat-card.gerado{border-color:#22c55e;}
+.cat-emoji{font-size:28px;margin-bottom:8px;}
+.cat-nome{font-size:12px;font-weight:700;}
+.cat-status{font-size:10px;color:#5a6270;margin-top:4px;}
+.cat-card.gerado .cat-status{color:#22c55e;}
+
+/* PREVIEW */
+.preview-wrap{display:none;background:#0f1114;border:1px solid #1e2228;border-radius:12px;overflow:hidden;}
+.preview-wrap.show{display:block;}
+.preview-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #1e2228;background:#181b1f;}
+.preview-title{font-size:13px;font-weight:700;}
+.preview-actions{display:flex;gap:8px;}
+.btn-pub{background:#22c55e;border:none;color:#fff;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;}
+.btn-pub:hover{opacity:.85;}
+.btn-sec{background:#181b1f;border:1px solid #1e2228;color:#f0f2f5;padding:8px 14px;border-radius:8px;font-size:12px;cursor:pointer;}
+.preview-body{display:grid;grid-template-columns:1fr 340px;height:600px;}
+.preview-post{overflow-y:auto;padding:24px;}
+.preview-chat{border-left:1px solid #1e2228;display:flex;flex-direction:column;}
+.chat-hdr{padding:12px 16px;border-bottom:1px solid #1e2228;font-size:11px;font-weight:800;color:#3b9eff;text-transform:uppercase;letter-spacing:.08em;}
+.chat-msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;}
+.chat-msg{padding:8px 12px;border-radius:8px;font-size:12px;line-height:1.5;}
+.chat-msg.user{background:#1a2a3a;color:#93c5fd;align-self:flex-end;max-width:85%;}
+.chat-msg.ai{background:#181b1f;color:#f0f2f5;max-width:95%;}
+.chat-input-wrap{padding:10px;border-top:1px solid #1e2228;display:flex;gap:6px;}
+.chat-input{flex:1;background:#181b1f;border:1px solid #1e2228;border-radius:8px;padding:8px 12px;color:#f0f2f5;font-size:12px;outline:none;resize:none;}
+.chat-send{background:#3b9eff;border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:14px;}
+
+/* POST PREVIEW STYLES */
+.preview-post .post-img{width:100%;height:220px;object-fit:cover;border-radius:8px;margin-bottom:16px;background:#181b1f;}
+.preview-post h1{font-size:22px;font-weight:800;line-height:1.3;margin-bottom:6px;}
+.preview-post .post-sub{font-size:14px;color:#5a6270;margin-bottom:12px;}
+.preview-post .post-meta{display:flex;align-items:center;gap:12px;font-size:11px;color:#5a6270;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #1e2228;}
+.preview-post .post-h2{font-size:16px;font-weight:700;margin:16px 0 8px;color:#f0f2f5;}
+.preview-post .post-p{font-size:13px;line-height:1.7;color:#c4cad4;margin-bottom:12px;}
+.preview-post .post-ul{padding-left:20px;margin-bottom:12px;}
+.preview-post .post-ul li{font-size:13px;line-height:1.7;color:#c4cad4;margin-bottom:4px;}
+.preview-post .post-cta{background:linear-gradient(135deg,#22c55e,#16a34a);border-radius:12px;padding:20px;margin-top:20px;text-align:center;}
+.preview-post .post-cta h3{font-size:16px;font-weight:800;margin-bottom:6px;}
+.preview-post .post-cta p{font-size:12px;opacity:.85;margin-bottom:14px;}
+.preview-post .post-cta a{background:#fff;color:#16a34a;padding:10px 24px;border-radius:8px;font-weight:800;text-decoration:none;font-size:13px;display:inline-block;}
+.seo-meta{background:#181b1f;border:1px solid #1e2228;border-radius:8px;padding:12px;margin-bottom:16px;}
+.seo-item{display:flex;gap:8px;margin-bottom:6px;font-size:11px;}
+.seo-lbl{color:#5a6270;width:90px;flex-shrink:0;}
+.seo-val{color:#f0f2f5;}
+
+/* ANALYTICS */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+.stat{background:#0f1114;border:1px solid #1e2228;border-radius:10px;padding:16px;}
+.stat-lbl{font-size:9px;color:#5a6270;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;}
+.stat-val{font-size:24px;font-weight:800;}
+.posts-table{background:#0f1114;border:1px solid #1e2228;border-radius:10px;overflow:hidden;}
+.posts-hdr{display:grid;grid-template-columns:3fr 80px 80px 80px 80px 80px;gap:0;padding:10px 16px;border-bottom:1px solid #1e2228;font-size:9px;color:#5a6270;text-transform:uppercase;letter-spacing:.08em;}
+.posts-row{display:grid;grid-template-columns:3fr 80px 80px 80px 80px 80px;gap:0;padding:12px 16px;border-bottom:1px solid #0d0e12;font-size:12px;align-items:center;}
+.posts-row:hover{background:#141720;}
+.post-cat-badge{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:#1e2228;margin-left:6px;}
+.taxa-bar{height:4px;background:#1e2228;border-radius:2px;margin-top:4px;}
+.taxa-fill{height:4px;border-radius:2px;background:#22c55e;}
+
+/* LOADING */
+.loading-spinner{display:inline-block;width:16px;height:16px;border:2px solid #1e2228;border-top-color:#3b9eff;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.progress-bar{height:4px;background:#1e2228;border-radius:2px;margin:8px 0;}
+.progress-fill{height:4px;border-radius:2px;background:#3b9eff;transition:width .3s;}
+
+/* UTILS */
+.empty{text-align:center;padding:60px 20px;color:#5a6270;}
+.empty-icon{font-size:40px;margin-bottom:10px;}
+@media(max-width:768px){
+  .cats-grid{grid-template-columns:repeat(3,1fr);}
+  .preview-body{grid-template-columns:1fr;}
+  .preview-chat{height:300px;border-left:none;border-top:1px solid #1e2228;}
+  .stats-row{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div style="display:flex;align-items:center;gap:6px;">
+    <span style="font-size:18px;">✍️</span>
+    <span style="font-size:14px;font-weight:800;">Blog</span>
+    <span style="font-size:12px;color:#5a6270;">Reparo Eletro BH</span>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <a href="/blog" target="_blank" class="btn-sec" style="text-decoration:none;padding:7px 14px;">🌐 Ver Blog</a>
+    <a href="/" class="btn-sec" style="text-decoration:none;padding:7px 14px;">← ADM</a>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab on" onclick="setTab('gerar')">✍️ GERAR POSTS</button>
+  <button class="tab" onclick="setTab('metricas')">📊 MÉTRICAS</button>
+  <button class="tab" onclick="setTab('publicados')">📋 PUBLICADOS</button>
+</div>
+
+<!-- ABA GERAR -->
+<div id="tab-gerar" class="content">
+  <div class="gerar-header">
+    <div>
+      <div style="font-size:16px;font-weight:800;">Posts de Hoje</div>
+      <div style="font-size:11px;color:#5a6270;margin-top:2px;" id="data-hoje"></div>
+    </div>
+    <button class="btn-gerar" id="btn-gerar" onclick="gerarPosts()">
+      🔍 Fazer Pesquisa Completa
+    </button>
+  </div>
+
+  <!-- Progress -->
+  <div id="gen-progress" style="display:none;background:#0f1114;border:1px solid #1e2228;border-radius:10px;padding:16px;margin-bottom:16px;">
+    <div id="gen-msg" style="font-size:12px;color:#5a6270;margin-bottom:8px;">Gerando posts...</div>
+    <div class="progress-bar"><div class="progress-fill" id="gen-bar" style="width:0%"></div></div>
+    <div style="font-size:10px;color:#5a6270;margin-top:6px;" id="gen-step"></div>
+  </div>
+
+  <!-- Categoria cards -->
+  <div class="cats-grid">
+    <div class="cat-card" id="cat-tv" onclick="selecionarCat('tv')">
+      <div class="cat-emoji">📺</div>
+      <div class="cat-nome">Televisão</div>
+      <div class="cat-status" id="status-tv">Aguardando geração</div>
+    </div>
+    <div class="cat-card" id="cat-microondas" onclick="selecionarCat('microondas')">
+      <div class="cat-emoji">📡</div>
+      <div class="cat-nome">Microondas</div>
+      <div class="cat-status" id="status-microondas">Aguardando geração</div>
+    </div>
+    <div class="cat-card" id="cat-purificador" onclick="selecionarCat('purificador')">
+      <div class="cat-emoji">💧</div>
+      <div class="cat-nome">Purificador/Bebedouro</div>
+      <div class="cat-status" id="status-purificador">Aguardando geração</div>
+    </div>
+    <div class="cat-card" id="cat-geladeira" onclick="selecionarCat('geladeira')">
+      <div class="cat-emoji">🧊</div>
+      <div class="cat-nome">Geladeira</div>
+      <div class="cat-status" id="status-geladeira">Aguardando geração</div>
+    </div>
+    <div class="cat-card" id="cat-lavaseca" onclick="selecionarCat('lavaseca')">
+      <div class="cat-emoji">👕</div>
+      <div class="cat-nome">Lava e Seca</div>
+      <div class="cat-status" id="status-lavaseca">Aguardando geração</div>
+    </div>
+  </div>
+
+  <!-- Preview do post selecionado -->
+  <div class="preview-wrap" id="preview-wrap">
+    <div class="preview-header">
+      <div class="preview-title" id="preview-title">Selecione uma categoria</div>
+      <div class="preview-actions">
+        <button class="btn-sec" onclick="regenerar()">🔄 Regenerar este</button>
+        <button class="btn-pub" onclick="publicar()" id="btn-pub">✅ Publicar</button>
+      </div>
+    </div>
+    <div class="preview-body">
+      <!-- Post preview -->
+      <div class="preview-post" id="preview-post"></div>
+      <!-- Chat de melhorias -->
+      <div class="preview-chat">
+        <div class="chat-hdr">🤖 Chat IA — Melhorias</div>
+        <div class="chat-msgs" id="chat-msgs">
+          <div class="chat-msg ai">Olá! Posso sugerir melhorias para o post, reescrever seções, ajustar o tom ou otimizar a CTA. O que você gostaria de melhorar?</div>
+        </div>
+        <div class="chat-input-wrap">
+          <textarea class="chat-input" id="chat-input" rows="2" placeholder="Peça melhorias, reescreva o título, ajuste a CTA..." onkeydown="if(event.ctrlKey&&event.key==='Enter')enviarChat()"></textarea>
+          <button class="chat-send" onclick="enviarChat()">↑</button>
+        </div>
+        <div style="padding:8px 10px;border-top:1px solid #1e2228;">
+          <button onclick="salvarPadrao()" style="width:100%;background:#1e2228;border:none;color:#5a6270;padding:6px;border-radius:6px;font-size:10px;cursor:pointer;">💾 Salvar como padrão aprovado</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ABA MÉTRICAS -->
+<div id="tab-metricas" class="content" style="display:none;">
+  <div class="gerar-header">
+    <div style="font-size:16px;font-weight:800;">📊 Métricas do Blog</div>
+    <button class="btn-sec" onclick="carregarMetricas()">↻ Atualizar</button>
+  </div>
+  <div class="stats-row" id="stats-row">
+    <div class="stat"><div class="stat-lbl">Total de Visualizações</div><div class="stat-val" style="color:#3b9eff;" id="m-views">—</div></div>
+    <div class="stat"><div class="stat-lbl">Cliques no CTA</div><div class="stat-val" style="color:#22c55e;" id="m-cta">—</div></div>
+    <div class="stat"><div class="stat-lbl">Taxa de Conversão</div><div class="stat-val" style="color:#f5c800;" id="m-taxa">—</div></div>
+    <div class="stat"><div class="stat-lbl">Posts Publicados</div><div class="stat-val" style="color:#a855f7;" id="m-posts">—</div></div>
+  </div>
+  <div class="posts-table">
+    <div class="posts-hdr"><span>Post</span><span>Cat</span><span>Views</span><span>CTAs</span><span>Taxa</span><span>Data</span></div>
+    <div id="metricas-body"><div class="empty"><div class="empty-icon">📊</div><div>Carregando métricas...</div></div></div>
+  </div>
+</div>
+
+<!-- ABA PUBLICADOS -->
+<div id="tab-publicados" class="content" style="display:none;">
+  <div class="gerar-header">
+    <div style="font-size:16px;font-weight:800;">📋 Posts Publicados</div>
+    <button class="btn-sec" onclick="carregarPublicados()">↻ Atualizar</button>
+  </div>
+  <div id="publicados-body"><div class="empty"><div class="empty-icon">📋</div><div>Carregando posts...</div></div></div>
+</div>
+
+<script>
+var _posts = {};      // posts gerados por categoria
+var _catSel = null;   // categoria selecionada
+var _chatHist = [];   // histórico do chat
+
+// ── Data ──────────────────────────────────────────────────────────────────
+document.getElementById('data-hoje').textContent = new Date().toLocaleDateString('pt-BR', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+
+// ── TABS ──────────────────────────────────────────────────────────────────
+function setTab(t) {
+  ['gerar','metricas','publicados'].forEach(function(id){
+    document.getElementById('tab-'+id).style.display = t===id?'block':'none';
+    document.querySelectorAll('.tab')[['gerar','metricas','publicados'].indexOf(id)].classList.toggle('on', t===id);
+  });
+  if (t==='metricas') carregarMetricas();
+  if (t==='publicados') carregarPublicados();
+}
+
+// ── GERAR POSTS ───────────────────────────────────────────────────────────
+async function gerarPosts() {
+  var btn = document.getElementById('btn-gerar');
+  var prog = document.getElementById('gen-progress');
+  var msg = document.getElementById('gen-msg');
+  var bar = document.getElementById('gen-bar');
+  var step = document.getElementById('gen-step');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading-spinner"></span> Pesquisando e gerando...';
+  prog.style.display = 'block';
+
+  var cats = ['tv','microondas','purificador','geladeira','lavaseca'];
+  cats.forEach(function(c){
+    document.getElementById('cat-'+c).className = 'cat-card';
+    document.getElementById('status-'+c).textContent = 'Aguardando...';
+  });
+
+  msg.textContent = '🔍 Pesquisando tendências e gerando conteúdo com IA...';
+  bar.style.width = '10%';
+  step.textContent = 'Conectando à IA...';
+
+  try {
+    var r = await fetch('/api/blog?action=gerar', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({})
+    }).then(function(x){return x.json();});
+
+    if (!r.ok) throw new Error(r.error||'Erro ao gerar');
+
+    bar.style.width = '90%';
+    msg.textContent = '✅ Posts gerados com sucesso!';
+
+    r.posts.forEach(function(post, i) {
+      _posts[post.categoria] = post;
+      var el = document.getElementById('cat-'+post.categoria);
+      var st = document.getElementById('status-'+post.categoria);
+      if (post.status === 'erro') {
+        el.className = 'cat-card';
+        st.textContent = '❌ Erro ao gerar';
+        st.style.color = '#ef4444';
+      } else {
+        el.className = 'cat-card gerado';
+        st.textContent = '✅ Pronto — clique para ver';
+        st.style.color = '#22c55e';
+      }
+      setTimeout(function(){ bar.style.width = (90 + Math.round((i+1)/r.posts.length*10))+'%'; }, i*100);
+    });
+
+    // Auto-selecionar primeiro post
+    if (r.posts.length) setTimeout(function(){ selecionarCat(r.posts[0].categoria); }, 300);
+
+  } catch(e) {
+    msg.textContent = '❌ Erro: '+e.message;
+    bar.style.background = '#ef4444';
+  }
+
+  setTimeout(function(){
+    btn.disabled = false;
+    btn.innerHTML = '🔍 Fazer Pesquisa Completa';
+    bar.style.width = '100%';
+  }, 1000);
+}
+
+// ── SELECIONAR CATEGORIA ──────────────────────────────────────────────────
+function selecionarCat(catId) {
+  _catSel = catId;
+  var post = _posts[catId];
+  document.querySelectorAll('.cat-card').forEach(function(el){ el.classList.remove('ativo'); });
+  var el = document.getElementById('cat-'+catId);
+  if (el) el.classList.add('ativo');
+
+  var wrap = document.getElementById('preview-wrap');
+  if (!post) { wrap.classList.remove('show'); return; }
+  wrap.classList.add('show');
+  _chatHist = [];
+  document.getElementById('chat-msgs').innerHTML = '<div class="chat-msg ai">Olá! Post "'+escH(post.titulo)+'" pronto para revisão. Posso sugerir melhorias, reescrever seções ou ajustar a CTA. O que deseja?</div>';
+  document.getElementById('preview-title').textContent = post.emoji+' '+post.categoriaNome;
+  renderPreview(post);
+}
+
+function renderPreview(post) {
+  var imgUrl = 'https://source.unsplash.com/800x400/?'+(post.imagem_query||post.categoriaNome)+',repair,appliance';
+  var html = '';
+  // SEO meta
+  html += '<div class="seo-meta">';
+  html += '<div class="seo-item"><span class="seo-lbl">🔗 Slug:</span><span class="seo-val">/blog/'+escH(post.slug)+'</span></div>';
+  html += '<div class="seo-item"><span class="seo-lbl">📝 Meta:</span><span class="seo-val">'+escH(post.meta_descricao||'')+'</span></div>';
+  if (post.keywords?.length) html += '<div class="seo-item"><span class="seo-lbl">🏷️ Keywords:</span><span class="seo-val">'+post.keywords.join(' · ')+'</span></div>';
+  html += '</div>';
+  // Imagem
+  html += '<img class="post-img" src="'+imgUrl+'" alt="'+escH(post.imagem_alt||'')+'" loading="lazy">';
+  html += '<h1>'+escH(post.titulo||'')+'</h1>';
+  html += '<div class="post-sub">'+escH(post.subtitulo||'')+'</div>';
+  html += '<div class="post-meta"><span>⏱ '+escH(post.tempo_leitura||'5 min')+'</span><span>📅 '+new Date().toLocaleDateString('pt-BR')+'</span>';
+  if (post.tags?.length) html += '<span>🏷️ '+post.tags.slice(0,3).join(', ')+'</span>';
+  html += '</div>';
+  // Corpo HTML
+  html += (post.corpo_html||'<p>Conteúdo não disponível.</p>');
+  document.getElementById('preview-post').innerHTML = html;
+}
+
+// ── PUBLICAR ──────────────────────────────────────────────────────────────
+async function publicar() {
+  if (!_catSel || !_posts[_catSel]) return alert('Selecione um post para publicar');
+  var btn = document.getElementById('btn-pub');
+  btn.disabled = true; btn.textContent = '⏳ Publicando...';
+  try {
+    var r = await fetch('/api/blog?action=publicar', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(_posts[_catSel])
+    }).then(function(x){return x.json();});
+    if (r.ok) {
+      btn.textContent = '✅ Publicado!';
+      btn.style.background = '#16a34a';
+      setTimeout(function(){ btn.disabled=false; btn.textContent='✅ Publicar'; btn.style.background=''; }, 3000);
+    } else { throw new Error(r.error); }
+  } catch(e) {
+    alert('Erro: '+e.message);
+    btn.disabled=false; btn.textContent='✅ Publicar';
+  }
+}
+
+// ── REGENERAR ─────────────────────────────────────────────────────────────
+async function regenerar() {
+  if (!_catSel) return;
+  var status = document.getElementById('status-'+_catSel);
+  status.textContent = '⏳ Regenerando...'; status.style.color = '#f5c800';
+  try {
+    var r = await fetch('/api/blog?action=gerar', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ regenerar: _catSel })
+    }).then(function(x){return x.json();});
+    if (r.ok && r.posts?.length) {
+      var post = r.posts.find(function(p){return p.categoria===_catSel;}) || r.posts[0];
+      _posts[_catSel] = post;
+      renderPreview(post);
+      status.textContent = '✅ Regenerado'; status.style.color = '#22c55e';
+    }
+  } catch(e) { status.textContent = '❌ Erro'; status.style.color = '#ef4444'; }
+}
+
+// ── CHAT ──────────────────────────────────────────────────────────────────
+async function enviarChat() {
+  var input = document.getElementById('chat-input');
+  var msgs = document.getElementById('chat-msgs');
+  var txt = input.value.trim();
+  if (!txt) return;
+  if (!_catSel || !_posts[_catSel]) { alert('Selecione um post primeiro'); return; }
+
+  input.value = '';
+  msgs.innerHTML += '<div class="chat-msg user">'+escH(txt)+'</div>';
+  msgs.innerHTML += '<div class="chat-msg ai" id="ai-typing">⏳ IA pensando...</div>';
+  msgs.scrollTop = msgs.scrollHeight;
+
+  _chatHist.push({ role:'user', content:txt });
+
+  try {
+    var r = await fetch('/api/blog?action=chat', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        post_titulo: _posts[_catSel].titulo,
+        post_corpo: _posts[_catSel].corpo_html,
+        mensagem: txt,
+        historico: _chatHist.slice(-6)
+      })
+    }).then(function(x){return x.json();});
+
+    var typing = document.getElementById('ai-typing');
+    if (typing) typing.remove();
+    _chatHist.push({ role:'assistant', content:r.resposta });
+    msgs.innerHTML += '<div class="chat-msg ai">'+r.resposta.replace(/\n/g,'<br>')+'</div>';
+    msgs.scrollTop = msgs.scrollHeight;
+  } catch(e) {
+    var typing = document.getElementById('ai-typing');
+    if (typing) typing.textContent = '❌ Erro: '+e.message;
+  }
+}
+
+// ── SALVAR PADRÃO ─────────────────────────────────────────────────────────
+async function salvarPadrao() {
+  if (!_catSel || !_posts[_catSel]) return;
+  await fetch('/api/blog?action=salvar-padrao', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ trecho: _posts[_catSel].titulo+'\n'+(_posts[_catSel].resumo||'') })
+  });
+  alert('✅ Padrão salvo! A IA aprenderá com este estilo nos próximos posts.');
+}
+
+// ── MÉTRICAS ──────────────────────────────────────────────────────────────
+async function carregarMetricas() {
+  document.getElementById('metricas-body').innerHTML = '<div class="empty"><div class="loading-spinner"></div> Carregando...</div>';
+  try {
+    var r = await fetch('/api/blog?action=metricas').then(function(x){return x.json();});
+    if (!r.ok) throw new Error(r.error);
+    document.getElementById('m-views').textContent = r.total_views;
+    document.getElementById('m-cta').textContent = r.total_cta;
+    var taxa = r.total_views ? Math.round(r.total_cta/r.total_views*100)+'%' : '0%';
+    document.getElementById('m-taxa').textContent = taxa;
+    document.getElementById('m-posts').textContent = r.por_post.length;
+
+    if (!r.por_post.length) {
+      document.getElementById('metricas-body').innerHTML = '<div class="empty"><div class="empty-icon">📊</div><div>Nenhum post publicado ainda.</div></div>';
+      return;
+    }
+
+    document.getElementById('metricas-body').innerHTML = r.por_post.map(function(p){
+      var taxa2 = p.views ? Math.round(p.cta_clicks/p.views*100) : 0;
+      return '<div class="posts-row">'
+        +'<div><div style="font-size:12px;font-weight:600;">'+escH(p.titulo)+'</div>'
+        +'<div style="font-size:10px;color:#5a6270;">'+new Date(p.publicadoEm).toLocaleDateString('pt-BR')+'</div>'
+        +'<div class="taxa-bar"><div class="taxa-fill" style="width:'+Math.min(100,taxa2*5)+'%;"></div></div></div>'
+        +'<span class="post-cat-badge">'+escH(p.emoji)+' '+escH(p.categoria)+'</span>'
+        +'<span style="color:#3b9eff;font-weight:700;">'+p.views+'</span>'
+        +'<span style="color:#22c55e;font-weight:700;">'+p.cta_clicks+'</span>'
+        +'<span style="color:#f5c800;">'+taxa2+'%</span>'
+        +'<a href="/blog/'+escH(p.slug)+'" target="_blank" style="color:#5a6270;font-size:10px;text-decoration:none;">→ Ver</a>'
+        +'</div>';
+    }).join('');
+  } catch(e) {
+    document.getElementById('metricas-body').innerHTML = '<div class="empty">❌ Erro: '+e.message+'</div>';
+  }
+}
+
+// ── PUBLICADOS ────────────────────────────────────────────────────────────
+async function carregarPublicados() {
+  document.getElementById('publicados-body').innerHTML = '<div class="empty"><div class="loading-spinner"></div> Carregando...</div>';
+  try {
+    var r = await fetch('/api/blog?action=listar').then(function(x){return x.json();});
+    if (!r.ok) throw new Error(r.error);
+    if (!r.posts.length) {
+      document.getElementById('publicados-body').innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div>Nenhum post publicado ainda.<br><span style="font-size:12px;">Gere e publique posts na aba "Gerar Posts".</span></div></div>';
+      return;
+    }
+    document.getElementById('publicados-body').innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">'
+      +r.posts.map(function(p){
+        var imgUrl = 'https://source.unsplash.com/400x200/?'+(p.imagem_query||p.categoriaNome)+',repair';
+        return '<div style="background:#0f1114;border:1px solid #1e2228;border-radius:10px;overflow:hidden;">'
+          +'<img src="'+imgUrl+'" style="width:100%;height:120px;object-fit:cover;" loading="lazy">'
+          +'<div style="padding:14px;">'
+          +'<div style="font-size:10px;color:#5a6270;margin-bottom:6px;">'+escH(p.emoji)+' '+escH(p.categoriaNome)+' · '+escH(p.tempo_leitura||'5 min')+' · '+p.views+' views</div>'
+          +'<div style="font-size:13px;font-weight:700;margin-bottom:6px;line-height:1.4;">'+escH(p.titulo)+'</div>'
+          +'<div style="font-size:11px;color:#5a6270;margin-bottom:10px;">'+escH(p.resumo||'')+'</div>'
+          +'<div style="display:flex;gap:6px;">'
+          +'<a href="/blog/'+escH(p.slug)+'" target="_blank" style="flex:1;background:#1e2228;color:#f0f2f5;padding:6px;border-radius:6px;font-size:11px;text-align:center;text-decoration:none;">🌐 Ver post</a>'
+          +'<button onclick="copiarLink(\''+escH(p.slug)+'\')" style="background:#1e2228;border:none;color:#5a6270;padding:6px 10px;border-radius:6px;font-size:11px;cursor:pointer;">📋</button>'
+          +'</div></div></div>';
+      }).join('')+'</div>';
+  } catch(e) {
+    document.getElementById('publicados-body').innerHTML = '<div class="empty">❌ Erro: '+e.message+'</div>';
+  }
+}
+
+function copiarLink(slug) {
+  navigator.clipboard.writeText(window.location.origin+'/blog/'+slug);
+  alert('Link copiado!');
+}
+
+function escH(s){ var d=document.createElement('div');d.textContent=s||'';return d.innerHTML; }
+</script>
+</body>
+</html>

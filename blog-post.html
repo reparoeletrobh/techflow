@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title id="pg-title">Blog — Reparo Eletro BH</title>
+<meta name="description" id="pg-desc" content="Reparo Eletro BH — Conserto de eletrodomésticos em BH e RMBH">
+<meta property="og:title" id="og-title" content="">
+<meta property="og:description" id="og-desc" content="">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔧</text></svg>">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;color:#1e293b;}
+.hdr{background:#fff;border-bottom:1px solid #e2e8f0;padding:0 20px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+.logo{font-size:16px;font-weight:800;color:#1e293b;text-decoration:none;display:flex;align-items:center;gap:8px;}
+.cta-hdr{background:#22c55e;color:#fff;padding:8px 18px;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;}
+.container{max-width:720px;margin:0 auto;padding:32px 20px;}
+.breadcrumb{font-size:11px;color:#94a3b8;margin-bottom:20px;}
+.breadcrumb a{color:#64748b;text-decoration:none;}
+.post-cat-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:4px;background:#f0fdf4;color:#16a34a;margin-bottom:12px;}
+h1{font-size:28px;font-weight:800;line-height:1.3;color:#1e293b;margin-bottom:8px;}
+.post-sub{font-size:16px;color:#64748b;margin-bottom:16px;line-height:1.5;}
+.post-meta{display:flex;align-items:center;gap:16px;font-size:12px;color:#94a3b8;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e2e8f0;}
+.post-img-hero{width:100%;max-height:380px;object-fit:cover;border-radius:12px;margin-bottom:24px;display:block;}
+/* Conteúdo do post */
+.post-corpo .post-h2{font-size:20px;font-weight:700;margin:24px 0 10px;color:#1e293b;}
+.post-corpo .post-p{font-size:15px;line-height:1.8;color:#374151;margin-bottom:14px;}
+.post-corpo .post-ul{padding-left:20px;margin-bottom:14px;}
+.post-corpo .post-ul li{font-size:15px;line-height:1.8;color:#374151;margin-bottom:6px;}
+.post-corpo .post-cta{background:linear-gradient(135deg,#22c55e,#16a34a);border-radius:14px;padding:28px;text-align:center;color:#fff;margin-top:28px;}
+.post-corpo .post-cta h3{font-size:20px;font-weight:800;margin-bottom:8px;}
+.post-corpo .post-cta p{font-size:14px;opacity:.9;margin-bottom:18px;}
+.post-corpo .post-cta a{background:#fff;color:#16a34a;padding:12px 32px;border-radius:8px;font-weight:800;text-decoration:none;font-size:15px;display:inline-block;}
+/* Float CTA */
+.float-cta{position:fixed;bottom:20px;right:20px;z-index:100;background:#22c55e;color:#fff;padding:12px 20px;border-radius:50px;font-weight:800;font-size:13px;text-decoration:none;box-shadow:0 4px 15px rgba(34,197,94,.4);display:flex;align-items:center;gap:8px;transition:transform .2s;}
+.float-cta:hover{transform:scale(1.05);}
+.tags-wrap{margin-top:20px;display:flex;gap:6px;flex-wrap:wrap;}
+.tag{background:#f1f5f9;color:#64748b;padding:4px 10px;border-radius:4px;font-size:11px;}
+.nav-posts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:32px;}
+.nav-post-card{background:#fff;border-radius:10px;padding:14px;border:1px solid #e2e8f0;cursor:pointer;transition:border-color .2s;}
+.nav-post-card:hover{border-color:#22c55e;}
+.nav-lbl{font-size:10px;color:#94a3b8;margin-bottom:4px;}
+.nav-title{font-size:13px;font-weight:600;line-height:1.4;}
+.error-wrap{text-align:center;padding:60px 20px;}
+.footer{border-top:1px solid #e2e8f0;padding:20px;text-align:center;font-size:11px;color:#94a3b8;margin-top:40px;}
+@media(max-width:480px){h1{font-size:22px;}.post-corpo .post-h2{font-size:18px;}.float-cta{bottom:12px;right:12px;padding:10px 16px;font-size:12px;}}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <a href="/blog" class="logo">🔧 Reparo Eletro BH <span style="font-size:11px;color:#64748b;font-weight:400;margin-left:4px;">← Blog</span></a>
+  <a href="https://wa.me/5531997856023?text=Olá, li o blog e preciso de ajuda" target="_blank" class="cta-hdr" id="cta-hdr" onclick="trackCTA()">📱 Pedir Orçamento</a>
+</header>
+
+<div class="container" id="main-content">
+  <div style="text-align:center;padding:60px 0;"><div style="display:inline-block;width:32px;height:32px;border:3px solid #e2e8f0;border-top-color:#22c55e;border-radius:50%;animation:spin .8s linear infinite;"></div><style>@keyframes spin{to{transform:rotate(360deg);}}</style></div>
+</div>
+
+<a href="https://wa.me/5531997856023?text=Olá, li o blog e preciso de um técnico" target="_blank" class="float-cta" id="float-cta" onclick="trackCTA()">
+  📱 Chamar Técnico Agora
+</a>
+
+<footer class="footer">
+  Reparo Eletro BH · Conserto de Eletrodomésticos em BH e RMBH · (31) 9 9785-6023 · Seg–Sáb 8h–21h
+</footer>
+
+<script>
+var _slug = window.location.pathname.replace('/blog/','').replace(/\/$/,'');
+var _postData = null;
+
+async function carregarPost() {
+  try {
+    var r = await fetch('/api/blog?action=post&slug='+encodeURIComponent(_slug)).then(function(x){return x.json();});
+    if (!r.ok) throw new Error(r.error||'Post não encontrado');
+    _postData = r.post;
+    renderPost(r.post);
+    // Track view
+    fetch('/api/blog?action=view', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:_slug,referrer:document.referrer})});
+    // Schema markup
+    var schema = document.createElement('script');
+    schema.type = 'application/ld+json';
+    schema.text = JSON.stringify({
+      "@context":"https://schema.org","@type":"Article",
+      "headline":r.post.titulo,"description":r.post.meta_descricao||r.post.resumo||'',
+      "datePublished":r.post.publicadoEm,"author":{"@type":"Organization","name":"Reparo Eletro BH"},
+      "publisher":{"@type":"Organization","name":"Reparo Eletro BH","logo":{"@type":"ImageObject","url":"https://reparoeletroadm.com/favicon.ico"}},
+      "mainEntityOfPage":{"@type":"WebPage","@id":"https://reparoeletroadm.com/blog/"+_slug}
+    });
+    document.head.appendChild(schema);
+  } catch(e) {
+    document.getElementById('main-content').innerHTML = '<div class="error-wrap"><div style="font-size:48px;margin-bottom:12px;">🔍</div><h2 style="margin-bottom:8px;">Post não encontrado</h2><p style="color:#64748b;margin-bottom:16px;">O post que você está procurando não existe ou foi removido.</p><a href="/blog" style="background:#22c55e;color:#fff;padding:10px 24px;border-radius:8px;font-weight:700;text-decoration:none;">← Ver todos os posts</a></div>';
+  }
+}
+
+function renderPost(p) {
+  // Update meta tags
+  document.getElementById('pg-title').textContent = p.titulo+' | Reparo Eletro BH';
+  document.getElementById('pg-desc').content = p.meta_descricao||p.resumo||'';
+  document.getElementById('og-title').content = p.titulo;
+  document.getElementById('og-desc').content = p.meta_descricao||p.resumo||'';
+
+  var imgUrl = 'https://source.unsplash.com/800x400/?'+(p.imagem_query||p.categoriaNome)+',repair,appliance';
+  var waMsg = encodeURIComponent('Olá! Li o artigo "'+p.titulo+'" no blog de vocês e gostaria de um orçamento.');
+  var waLink = 'https://wa.me/5531997856023?text='+waMsg;
+
+  document.getElementById('cta-hdr').href = waLink;
+  document.getElementById('float-cta').href = waLink;
+
+  var tags = (p.tags||[]).map(function(t){return '<span class="tag">'+escH(t)+'</span>';}).join('');
+
+  document.getElementById('main-content').innerHTML =
+    '<div class="breadcrumb"><a href="/">Home</a> › <a href="/blog">Blog</a> › '+escH(p.categoriaNome||'')+'</div>'
+    +'<div class="post-cat-badge">'+escH(p.emoji||'🔧')+' '+escH(p.categoriaNome||'')+'</div>'
+    +'<h1>'+escH(p.titulo)+'</h1>'
+    +'<div class="post-sub">'+escH(p.subtitulo||'')+'</div>'
+    +'<div class="post-meta">'
+    +'<span>📅 '+new Date(p.publicadoEm).toLocaleDateString('pt-BR',{day:'numeric',month:'long',year:'numeric'})+'</span>'
+    +'<span>⏱ '+escH(p.tempo_leitura||'5 min')+' de leitura</span>'
+    +'<span>📍 BH e RMBH</span>'
+    +'</div>'
+    +'<img class="post-img-hero" src="'+imgUrl+'" alt="'+escH(p.imagem_alt||p.titulo)+'" loading="eager">'
+    +'<div class="post-corpo">'+(p.corpo_html||'<p>Conteúdo não disponível.</p>')+'</div>'
+    +(tags ? '<div class="tags-wrap">'+tags+'</div>' : '')
+    +'</div>';
+
+  // Substituir CTAs no corpo pelo link correto
+  document.querySelectorAll('.post-cta a').forEach(function(a){
+    a.href = waLink;
+    a.onclick = function(){ trackCTA(); };
+  });
+}
+
+function trackCTA() {
+  fetch('/api/blog?action=cta', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:_slug})});
+}
+
+function escH(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
+
+if (_slug) carregarPost();
+else window.location.href = '/blog';
+</script>
+</body>
+</html>

@@ -75,6 +75,22 @@
   ],
   "rewrites": [
     {
+      "source": "/blog-manager",
+      "destination": "/blog-manager.html"
+    },
+    {
+      "source": "/blog/:slug",
+      "destination": "/blog-post.html"
+    },
+    {
+      "source": "/blog",
+      "destination": "/blog.html"
+    },
+    {
+      "source": "/api/blog",
+      "destination": "/api/blog.js"
+    },
+    {
       "source": "/lava-e-seca-6",
       "destination": "/lava-e-seca.html"
     },
@@ -536,6 +552,23 @@
     }
   ],
   "headers": [
+    {
+      "source": "/blog-manager",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Pragma",
+          "value": "no-cache"
+        },
+        {
+          "key": "Expires",
+          "value": "0"
+        }
+      ]
+    },
     {
       "source": "/lava-e-seca:path*",
       "headers": [
