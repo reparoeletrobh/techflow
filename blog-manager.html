@@ -512,7 +512,7 @@ function escH(s){ var d=document.createElement('div');d.textContent=s||'';return
 
     <div style="margin-bottom:14px;">
       <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">🔑 Chave API Google Gemini (gratuita)</div>
-      <input id="cfg-key" type="password" placeholder="AIzaSy..."
+      <input id="cfg-key" type="password" placeholder="Cole aqui a chave do Google AI Studio"
         style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:8px;padding:10px 14px;color:#f0f2f5;font-size:13px;outline:none;font-family:monospace;">
       <div style="font-size:10px;color:#5a6270;margin-top:6px;">
         Obtenha <strong>grátis</strong> em <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#3b9eff;text-decoration:none;">aistudio.google.com</a> → <strong>Get API key</strong> → Create API key (sem cartão, só login Google)
@@ -570,8 +570,7 @@ function fecharConfig() {
 async function salvarConfig() {
   var key = document.getElementById('cfg-key').value.trim();
   if (!key) { alert('Informe a chave API'); return; }
-  if (!key.startsWith('AIza')) { alert('A chave Gemini deve começar com AIza...'); return; }
-  try {
+    try {
     var r = await fetch('/api/blog?action=salvar-config', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ anthropic_key: key })
