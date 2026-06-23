@@ -981,13 +981,13 @@ async function otimizarPontos(pontos, pontoInicio) {
         return c.pipefyId === bd.pipefyId || c.id === bd.pipefyId;
       });
       if (!card) return res.status(404).json({ ok: false, error: 'Card não encontrado' });
-      // Marcar compra
+      // Marcar compra — card FICA em barramento até o barramento chegar fisicamente
       card.barramentoTipo    = bd.tipo || 'local';     // 'local' | 'internet'
       card.barramentoPrazo   = bd.prazo || null;       // data estimada se internet
       card.barramentoStatus  = 'aguardando';           // esperando chegar
       card.barramentoCompraEm = new Date().toISOString();
-      // Mover para producao
-      card.phaseId           = 'producao';
+      // NÃO move para producao — fica em barramento com status 'aguardando'
+      // Só vai para producao quando 'barramento-chegou' for acionado
       card.movedAt           = new Date().toISOString();
       await dbSet(BOARD_KEY, db);
       return res.status(200).json({ ok: true, card });

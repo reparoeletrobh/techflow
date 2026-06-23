@@ -234,32 +234,55 @@ function renderBarramento() {
     return;
   }
   grid.innerHTML = cards.map(function(c) {
-    var cid  = c.pipefyId || c.id;
-    var num  = c.osCode || ('#' + String(cid).slice(-4));
-    // Modelo: usa polegadas (form) ou modeloTv (diagnóstico) como fallback
-    var pol  = c.polegadas || c.modeloTv || '—';
-    // Peça: usa pecaDiag (form) ou diagnosticoResumo (diagnóstico) como fallback
-    var peca = c.pecaDiag || c.diagnosticoResumo || 'Barramento';
-    var desc = c.descricaoDiag || '';
-    var cls  = c.barramentoConcluido ? 'barr-card concluido' : 'barr-card';
+    var cid    = c.pipefyId || c.id;
+    var num    = c.osCode || ('#' + String(cid).slice(-4));
+    var pol    = c.polegadas || c.modeloTv || '—';
+    var peca   = c.pecaDiag || c.diagnosticoResumo || 'Barramento';
+    var desc   = c.descricaoDiag || '';
+    var aguard = c.barramentoStatus === 'aguardando';   // comprado, aguardando chegada
+    var cls    = c.barramentoConcluido ? 'barr-card concluido' : 'barr-card';
+
+    // Badge de status
+    var statusBadge = aguard
+      ? '<div style="display:inline-flex;align-items:center;gap:5px;background:rgba(245,200,0,.12);' +
+        'border:1px solid rgba(245,200,0,.3);border-radius:6px;padding:4px 10px;margin-bottom:8px;' +
+        'font-size:10px;font-weight:700;color:var(--ye);">⏳ Aguardando Barramento' +
+        (c.barramentoPrazo ? ' · ' + c.barramentoPrazo.slice(0,10) : '') + '</div>'
+      : '';
+
+    // Prazo se internet
+    var prazoInfo = (!aguard && c.barramentoPrazo)
+      ? '<div style="font-size:10px;color:var(--mu);margin-top:4px;">Prazo: ' + c.barramentoPrazo.slice(0,10) + '</div>'
+      : '';
+
+    // Botões: se aguardando → só "Chegou"; se não → "Local" e "Internet"
+    var btns = aguard
+      ? '<button class="btn-chegou" onclick="chegou(\'' + cid + '\')" ' +
+        'style="width:100%;margin-top:6px;">✅ Barramento chegou</button>'
+      : '<div class="bc-btns">' +
+          '<button class="btn-sm btn-local" onclick="comprarLocal(\'' + cid + '\')">📦 Local</button>' +
+          '<button class="btn-sm btn-inet"  onclick="comprarInternet(\'' + cid + '\')">🌐 Internet</button>' +
+        '</div>';
+
     return '<div class="' + cls + '" id="bc-' + cid + '">' +
       '<div class="bc-num">' + num + '</div>' +
       '<div class="bc-nome">' + (c.nomeContato || c.title || '—') + '</div>' +
+      statusBadge +
       '<div class="bc-info">' +
         '<div class="bc-pol">' + pol + '</div>' +
         '<div class="bc-peca">' + peca + '</div>' +
         (desc ? '<div class="bc-desc">' + desc + '</div>' : '') +
       '</div>' +
-      '<div class="bc-btns">' +
-        '<button class="btn-sm btn-local" onclick="comprarLocal(\'' + cid + '\')">📦 Local</button>' +
-        '<button class="btn-sm btn-inet"  onclick="comprarInternet(\'' + cid + '\')">🌐 Internet</button>' +
-      '</div>' +
+      prazoInfo +
+      btns +
     '</div>';
   }).join('');
 }
 
 function renderProducao() {
-  var cards = (_board.cards||[]).filter(function(c){ return c.phaseId === 'producao' && (c.barramentoStatus === 'aguardando' || c.barramentoStatus === 'disponivel'); });
+  // Cards ainda em barramento com compra feita são mostrados no renderBarramento()
+  // Esta seção agora mostra apenas os que estão em producao (barramento chegou, prontos)
+  var cards = (_board.cards||[]).filter(function(c){ return c.phaseId === 'barramento' && c.barramentoStatus === 'aguardando'; });
   var sec = document.getElementById('sec-prod');
   if (!cards.length) { sec.style.display = 'none'; return; }
   sec.style.display = '';
