@@ -1,513 +1,412 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Agendamentos — Reparo Eletro BH</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#07080a;color:#f0f2f5;min-height:100vh;}
 .hdr{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;background:#0d0e12;border-bottom:1px solid #1e2228;position:sticky;top:0;z-index:50;}
-.hdr-title{font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.hdr-t{font-size:15px;font-weight:800;}
 .tabs{display:flex;background:#0d0e12;border-bottom:1px solid #1e2228;}
-.tab{padding:11px 20px;font-size:11px;font-weight:800;letter-spacing:.08em;cursor:pointer;color:#5a6270;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;}
+.tab{padding:11px 18px;font-size:11px;font-weight:800;letter-spacing:.06em;cursor:pointer;color:#5a6270;border:none;border-bottom:2px solid transparent;background:none;}
 .tab.on{color:#3b9eff;border-bottom-color:#3b9eff;}
-.content{padding:20px;max-width:1100px;margin:0 auto;}
-
-/* CHAT INPUT */
-.chat-box{background:#0f1114;border:1px solid #1e2228;border-radius:14px;padding:20px;margin-bottom:20px;}
-.chat-title{font-size:12px;font-weight:800;color:#3b9eff;text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
-.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
-.form-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;}
-.field-lbl{font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;}
-.field-inp{width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:8px;padding:10px 14px;color:#f0f2f5;font-size:13px;outline:none;}
-.field-inp:focus{border-color:#3b9eff;}
-select.field-inp option{background:#181b1f;}
-.msg-ok{font-size:11px;color:#86efac;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);border-radius:6px;padding:8px 12px;margin-bottom:10px;display:none;}
-.btn-criar{background:#22c55e;border:none;color:#fff;padding:11px 28px;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;width:100%;}
-.btn-criar:hover{opacity:.88;}
-
+.pg{display:none;padding:20px;max-width:1100px;margin:0 auto;}
+.pg.on{display:block;}
+/* CHAT */
+.chat-box{background:#0f1114;border:1px solid #1e2228;border-radius:12px;padding:20px;margin-bottom:20px;}
+.chat-box h3{font-size:12px;font-weight:800;color:#3b9eff;text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px;}
+.exemplo{background:#181b1f;border:1px solid #2a2f38;border-radius:8px;padding:10px 14px;font-size:11px;color:#5a6270;font-family:monospace;line-height:1.8;margin-bottom:12px;}
+.ta{width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:8px;padding:10px 14px;color:#f0f2f5;font-size:12px;font-family:monospace;outline:none;resize:vertical;}
+.ta:focus{border-color:#3b9eff;}
+.btn{padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;}
+.btn-blue{background:#3b9eff;color:#fff;width:100%;margin-top:10px;}
+.btn-green{background:#22c55e;color:#fff;width:100%;}
+.btn-sec{background:#1e2228;color:#f0f2f5;}
+.step2{display:none;margin-top:4px;}
+.form2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.lbl{font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;}
+.inp{width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:8px;padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;}
+.inp:focus{border-color:#3b9eff;}
+.ok-msg{display:none;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:#86efac;border-radius:6px;padding:8px 12px;font-size:12px;margin-bottom:10px;}
 /* STATS */
-.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
-.stat-card{background:#0f1114;border:1px solid #1e2228;border-radius:10px;padding:14px;}
-.stat-lbl{font-size:9px;color:#5a6270;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;}
-.stat-val{font-size:22px;font-weight:800;}
-
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
+.stat{background:#0f1114;border:1px solid #1e2228;border-radius:10px;padding:14px;}
+.stat-l{font-size:9px;color:#5a6270;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;}
+.stat-v{font-size:22px;font-weight:800;}
 /* TABELA */
-.table-wrap{background:#0f1114;border:1px solid #1e2228;border-radius:10px;overflow:hidden;margin-bottom:20px;}
-.table-hdr{display:grid;gap:0;padding:10px 14px;border-bottom:1px solid #1e2228;font-size:9px;color:#5a6270;text-transform:uppercase;letter-spacing:.08em;}
-.table-hdr.pendentes{grid-template-columns:1.5fr 1fr 1.5fr 1fr 1.5fr 90px 130px 130px;}
-.table-hdr.hist{grid-template-columns:1.5fr 1fr 1.5fr 1fr 1.5fr 90px 90px 110px;}
-.row{display:grid;gap:0;padding:12px 14px;border-bottom:1px solid #0d0e12;align-items:center;transition:background .1s;}
-.row:last-child{border-bottom:none;}
-.row:hover{background:#141720;}
-.row.pendentes{grid-template-columns:1.5fr 1fr 1.5fr 1fr 1.5fr 90px 130px 130px;}
-.row.hist{grid-template-columns:1.5fr 1fr 1.5fr 1fr 1.5fr 90px 90px 110px;}
-.cell{font-size:12px;color:#f0f2f5;padding-right:8px;}
-.cell.muted{color:#5a6270;}
-.cell.green{color:#22c55e;font-weight:700;}
-.cell.red{color:#ef4444;}
-.badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;}
-.badge.realizado{background:rgba(34,197,94,.12);color:#22c55e;}
-.badge.cancelado{background:rgba(239,68,68,.12);color:#ef4444;}
-.badge.pendente{background:rgba(245,200,0,.12);color:#f5c800;}
-.preco-inp{background:#181b1f;border:1px solid #2a2f38;border-radius:6px;padding:5px 8px;color:#f0f2f5;font-size:11px;width:80px;outline:none;}
-.preco-inp:focus{border-color:#3b9eff;}
-.btn-sm{padding:6px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:none;white-space:nowrap;}
-.btn-ok{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.25);}
-.btn-ok:hover{background:rgba(34,197,94,.25);}
-.btn-cancel{background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.2);}
-.btn-cancel:hover{background:rgba(239,68,68,.22);}
-.empty{text-align:center;padding:48px 20px;color:#5a6270;}
-.empty-icon{font-size:32px;margin-bottom:8px;}
-
-/* DATAS — sistema de cores igual à logística */
-.data-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;}
-.data-ok{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.25);}
-.data-warn{background:rgba(249,115,22,.15);color:#fb923c;border:1px solid rgba(249,115,22,.25);}
-.data-late{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.25);}
-.row.agendado{border-left:3px solid #3b9eff;}
-.date-input-wrap{display:flex;align-items:center;gap:4px;}
-.date-inp{background:#181b1f;border:1px solid #2a2f38;border-radius:6px;padding:4px 6px;color:#f0f2f5;font-size:11px;outline:none;width:120px;}
-.date-inp:focus{border-color:#3b9eff;}
-
-/* RELATÓRIO */
-.rel-section{background:#0f1114;border:1px solid #1e2228;border-radius:10px;padding:16px;margin-bottom:16px;}
-.rel-title{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;}
-
-@media(max-width:768px){
-  .form-grid,.form-grid-3{grid-template-columns:1fr;}
-  .stats-row{grid-template-columns:1fr 1fr;}
-  .table-hdr,.row{font-size:10px;}
-}
+.tbl{background:#0f1114;border:1px solid #1e2228;border-radius:10px;overflow-x:auto;}
+.tr{display:grid;padding:10px 14px;border-bottom:1px solid #0d0e12;align-items:center;font-size:12px;}
+.tr:last-child{border:none;}
+.tr:hover{background:#141720;}
+.th{color:#5a6270;font-size:9px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid #1e2228;}
+.th.tr{padding:8px 14px;}
+.empty-row{padding:40px;text-align:center;color:#5a6270;}
+.g-pend{grid-template-columns:1.4fr 1fr 1.5fr 1fr 1.5fr 80px 130px 90px 90px;}
+.g-hist{grid-template-columns:1.4fr 1fr 1.5fr 1fr 1.5fr 80px 90px 90px 110px;}
+/* DATA badge */
+.dbadge{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:700;}
+.d-ok{background:rgba(34,197,94,.15);color:#22c55e;}
+.d-warn{background:rgba(249,115,22,.15);color:#fb923c;}
+.d-late{background:rgba(239,68,68,.15);color:#ef4444;}
+/* inputs tabela */
+.date-i{background:#181b1f;border:1px solid #2a2f38;border-radius:5px;padding:4px 6px;color:#f0f2f5;font-size:11px;outline:none;width:118px;}
+.price-i{background:#181b1f;border:1px solid #2a2f38;border-radius:5px;padding:4px 7px;color:#f0f2f5;font-size:11px;outline:none;width:80px;}
+.ba{padding:5px 9px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;border:none;white-space:nowrap;}
+.ba-ok{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.25);}
+.ba-cx{background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.2);}
+/* rel table */
+.rtbl{width:100%;border-collapse:collapse;font-size:12px;}
+.rtbl th{padding:8px 10px;text-align:left;color:#5a6270;font-size:10px;text-transform:uppercase;border-bottom:1px solid #1e2228;}
+.rtbl td{padding:8px 10px;border-top:1px solid #0d0e12;}
 </style>
 </head>
 <body>
 
 <div class="hdr">
-  <div class="hdr-title">📅 Agendamentos</div>
+  <div class="hdr-t">📅 Agendamentos</div>
   <a href="/" style="color:#5a6270;font-size:12px;text-decoration:none;">← ADM</a>
 </div>
 
-<div class="tabs">
-  <button class="tab on" onclick="setTab('pendentes')">📋 PENDENTES</button>
-  <button class="tab" onclick="setTab('agendados')">📅 AGENDADOS</button>
-  <button class="tab" onclick="setTab('realizados')">✅ REALIZADOS</button>
-  <button class="tab" onclick="setTab('cancelados')">❌ CANCELADOS</button>
-  <button class="tab" onclick="setTab('relatorio')">📊 RELATÓRIO</button>
+<div class="tabs" id="tabs-bar">
+  <button class="tab on" onclick="ir(0)">📋 PENDENTES</button>
+  <button class="tab"    onclick="ir(1)">📅 AGENDADOS</button>
+  <button class="tab"    onclick="ir(2)">✅ REALIZADOS</button>
+  <button class="tab"    onclick="ir(3)">❌ CANCELADOS</button>
+  <button class="tab"    onclick="ir(4)">📊 RELATÓRIO</button>
 </div>
 
-<!-- ABA PENDENTES -->
-<div id="tab-pendentes" class="content">
-
-  <!-- CHAT INTELIGENTE -->
+<!-- PENDENTES -->
+<div class="pg on" id="pg0">
+  <!-- CHAT -->
   <div class="chat-box">
-    <div class="chat-title">🤖 Criar Agendamento — Cole a Ficha</div>
-
-    <!-- Etapa 1: colar a ficha -->
-    <div id="step-colar">
-      <div style="font-size:11px;color:#5a6270;margin-bottom:10px;line-height:1.6;">
-        Cole abaixo o conteúdo da ficha do cliente (WhatsApp, anotação, etc.).<br>
-        O sistema extrai nome, telefone, endereço, equipamento e taxa automaticamente.
-      </div>
-      <div style="background:#181b1f;border:1px solid #2a2f38;border-radius:10px;padding:12px;margin-bottom:6px;font-size:11px;color:#5a6270;font-family:monospace;line-height:1.7;">
-        Exemplo:<br>Cliente<br>Weber 4256<br>(33) 98727-4256<br>Endereço: Rua dos Cometas 35, apto 302, milionários<br>Maquina Brastemp parou de funcionar<br>Taxa 30 ok
-      </div>
-      <textarea id="chat-ficha" rows="8" class="field-inp"
-        style="font-family:monospace;font-size:12px;line-height:1.7;resize:vertical;margin-bottom:10px;"
-        placeholder="Cole aqui o conteúdo da ficha..."></textarea>
-      <button class="btn-criar" onclick="extrairFicha()">🔍 Extrair Dados da Ficha</button>
+    <h3>🤖 Novo Agendamento — Cole a Ficha</h3>
+    <div class="exemplo">
+      Cliente<br>
+      Weber 4256<br>
+      (33) 98727-4256<br>
+      Endereço: Rua dos Cometas 35, apto 302, milionários<br>
+      Maquina Brastemp parou de funcionar<br>
+      Taxa 30 ok
     </div>
-
-    <!-- Etapa 2: confirmar dados extraídos -->
-    <div id="step-confirmar" style="display:none;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
-        <span style="font-size:16px;">✅</span>
-        <span style="font-size:12px;color:#86efac;font-weight:700;">Dados extraídos! Confirme antes de criar:</span>
-        <button onclick="voltarColar()" style="margin-left:auto;background:transparent;border:none;color:#5a6270;font-size:11px;cursor:pointer;text-decoration:underline;">← Editar ficha</button>
+    <!-- STEP 1 -->
+    <div id="s1">
+      <textarea id="ta" class="ta" rows="8" placeholder="Cole aqui o conteúdo da ficha..."></textarea>
+      <button class="btn btn-blue" id="btn-extrair">🔍 Extrair Dados da Ficha</button>
+    </div>
+    <!-- STEP 2 -->
+    <div class="step2" id="s2">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <span style="color:#86efac;font-size:12px;font-weight:700;">✅ Dados extraídos — confirme:</span>
+        <button class="btn btn-sec" style="padding:5px 12px;font-size:11px;margin-left:auto;" id="btn-voltar">← Editar ficha</button>
       </div>
-      <div id="msg-ok" class="msg-ok">✅ Agendamento criado!</div>
-      <div class="form-grid">
-        <div><div class="field-lbl">Nome *</div><input id="f-nome" class="field-inp"></div>
-        <div><div class="field-lbl">Telefone *</div><input id="f-tel" class="field-inp"></div>
+      <div id="ok-msg" class="ok-msg"></div>
+      <div class="form2">
+        <div><div class="lbl">Nome *</div><input id="i-nome" class="inp"></div>
+        <div><div class="lbl">Telefone *</div><input id="i-tel" class="inp"></div>
       </div>
-      <div style="margin-bottom:10px;">
-        <div class="field-lbl">Endereço</div>
-        <input id="f-end" class="field-inp">
+      <div style="margin-bottom:10px;"><div class="lbl">Endereço</div><input id="i-end" class="inp"></div>
+      <div class="form2">
+        <div><div class="lbl">Equipamento</div><input id="i-equip" class="inp"></div>
+        <div><div class="lbl">Defeito</div><input id="i-def" class="inp"></div>
       </div>
-      <div class="form-grid">
-        <div><div class="field-lbl">Equipamento</div><input id="f-equip" class="field-inp"></div>
-        <div><div class="field-lbl">Defeito</div><input id="f-def" class="field-inp"></div>
+      <div class="form2" style="margin-bottom:14px;">
+        <div><div class="lbl">Taxa de Visita</div><input id="i-taxa" class="inp"></div>
+        <div><div class="lbl">Preço Serviço</div><input id="i-preco" class="inp" placeholder="Preencher depois"></div>
       </div>
-      <div class="form-grid" style="margin-bottom:14px;">
-        <div><div class="field-lbl">Taxa de Visita</div><input id="f-taxa" class="field-inp"></div>
-        <div><div class="field-lbl">Preço do Serviço</div><input id="f-preco" class="field-inp" placeholder="Preencher depois"></div>
-      </div>
-      <button class="btn-criar" onclick="criar()">📅 Criar Agendamento</button>
+      <button class="btn btn-green" id="btn-criar">📅 Criar Agendamento</button>
     </div>
   </div>
-
   <!-- STATS -->
-  <div class="stats-row" id="stats-row">
-    <div class="stat-card"><div class="stat-lbl">Pendentes</div><div class="stat-val" id="st-pend" style="color:#f5c800;">—</div></div>
-    <div class="stat-card"><div class="stat-lbl">Realizados</div><div class="stat-val" id="st-real" style="color:#22c55e;">—</div></div>
-    <div class="stat-card"><div class="stat-lbl">Cancelados</div><div class="stat-val" id="st-canc" style="color:#ef4444;">—</div></div>
-    <div class="stat-card"><div class="stat-lbl">Total Faturado</div><div class="stat-val" id="st-fat" style="color:#a855f7;">—</div></div>
+  <div class="stats" id="stats">
+    <div class="stat"><div class="stat-l">Pendentes</div><div class="stat-v" id="n-pend" style="color:#f5c800;">—</div></div>
+    <div class="stat"><div class="stat-l">Agendados</div><div class="stat-v" id="n-ag" style="color:#3b9eff;">—</div></div>
+    <div class="stat"><div class="stat-l">Realizados</div><div class="stat-v" id="n-real" style="color:#22c55e;">—</div></div>
+    <div class="stat"><div class="stat-l">Faturado</div><div class="stat-v" id="n-fat" style="color:#a855f7;">—</div></div>
   </div>
-
-  <!-- TABELA PENDENTES -->
-  <div class="table-wrap">
-    <div class="table-hdr" style="grid-template-columns:1.5fr 1.2fr 1fr 1.2fr 80px 130px 90px 150px;">
-      <span>Nome / Tel</span><span>Endereço</span><span>Equipamento</span>
-      <span>Defeito</span><span>Taxa</span><span>Data Agendada</span>
-      <span>Preço</span><span>Ações</span>
-    </div>
-    <div id="lista-pendentes"><div class="empty"><div class="empty-icon">📋</div><div>Nenhum agendamento pendente</div></div></div>
+  <!-- TABELA -->
+  <div class="tbl">
+    <div class="tr th g-pend"><span>Nome</span><span>Telefone</span><span>Endereço</span><span>Equip.</span><span>Defeito</span><span>Taxa</span><span>Data</span><span>Preço</span><span>Ações</span></div>
+    <div id="lst-pend"><div class="empty-row">Carregando...</div></div>
   </div>
 </div>
 
-<!-- ABA AGENDADOS -->
-<div id="tab-agendados" class="content" style="display:none;">
-  <div class="table-wrap">
-    <div class="table-hdr" style="grid-template-columns:1.5fr 1.2fr 1fr 1.2fr 80px 130px 90px 150px;">
-      <span>Nome / Tel</span><span>Endereço</span><span>Equipamento</span>
-      <span>Defeito</span><span>Taxa</span><span>Data Agendada</span>
-      <span>Preço</span><span>Ações</span>
-    </div>
-    <div id="lista-agendados"><div class="empty"><div class="empty-icon">📅</div><div>Nenhum agendamento com data marcada</div></div></div>
+<!-- AGENDADOS -->
+<div class="pg" id="pg1">
+  <div class="tbl">
+    <div class="tr th g-pend"><span>Nome</span><span>Telefone</span><span>Endereço</span><span>Equip.</span><span>Defeito</span><span>Taxa</span><span>Data</span><span>Preço</span><span>Ações</span></div>
+    <div id="lst-ag"><div class="empty-row">Carregando...</div></div>
   </div>
 </div>
 
-<!-- ABA REALIZADOS -->
-<div id="tab-realizados" class="content" style="display:none;">
-  <div class="table-wrap">
-    <div class="table-hdr hist">
-      <span>Nome</span><span>Telefone</span><span>Endereço</span>
-      <span>Equipamento</span><span>Defeito</span><span>Taxa</span><span>Preço</span><span>Finalizado</span>
-    </div>
-    <div id="lista-realizados"><div class="empty"><div class="empty-icon">✅</div><div>Nenhum serviço realizado ainda</div></div></div>
+<!-- REALIZADOS -->
+<div class="pg" id="pg2">
+  <div class="tbl">
+    <div class="tr th g-hist"><span>Nome</span><span>Telefone</span><span>Endereço</span><span>Equip.</span><span>Defeito</span><span>Taxa</span><span>Preço</span><span>Data</span><span>Finalizado</span></div>
+    <div id="lst-real"><div class="empty-row">Carregando...</div></div>
   </div>
 </div>
 
-<!-- ABA CANCELADOS -->
-<div id="tab-cancelados" class="content" style="display:none;">
-  <div class="table-wrap">
-    <div class="table-hdr hist">
-      <span>Nome</span><span>Telefone</span><span>Endereço</span>
-      <span>Equipamento</span><span>Defeito</span><span>Taxa</span><span>Preço</span><span>Cancelado em</span>
-    </div>
-    <div id="lista-cancelados"><div class="empty"><div class="empty-icon">❌</div><div>Nenhum cancelamento</div></div></div>
+<!-- CANCELADOS -->
+<div class="pg" id="pg3">
+  <div class="tbl">
+    <div class="tr th g-hist"><span>Nome</span><span>Telefone</span><span>Endereço</span><span>Equip.</span><span>Defeito</span><span>Taxa</span><span>Preço</span><span>Data</span><span>Cancelado</span></div>
+    <div id="lst-canc"><div class="empty-row">Carregando...</div></div>
   </div>
 </div>
 
-<!-- ABA RELATÓRIO -->
-<div id="tab-relatorio" class="content" style="display:none;">
-  <div class="stats-row">
-    <div class="stat-card"><div class="stat-lbl">Total Agendamentos</div><div class="stat-val" id="r-total" style="color:#3b9eff;">—</div></div>
-    <div class="stat-card"><div class="stat-lbl">Realizados</div><div class="stat-val" id="r-real" style="color:#22c55e;">—</div></div>
-    <div class="stat-card"><div class="stat-lbl">Cancelados</div><div class="stat-val" id="r-canc" style="color:#ef4444;">—</div></div>
-    <div class="stat-card"><div class="stat-lbl">Faturado (Realizados)</div><div class="stat-val" id="r-fat" style="color:#a855f7;">—</div></div>
+<!-- RELATÓRIO -->
+<div class="pg" id="pg4">
+  <div class="stats" style="margin-bottom:20px;">
+    <div class="stat"><div class="stat-l">Total</div><div class="stat-v" id="r-tot" style="color:#3b9eff;">—</div></div>
+    <div class="stat"><div class="stat-l">Realizados</div><div class="stat-v" id="r-real" style="color:#22c55e;">—</div></div>
+    <div class="stat"><div class="stat-l">Cancelados</div><div class="stat-v" id="r-canc" style="color:#ef4444;">—</div></div>
+    <div class="stat"><div class="stat-l">Faturado</div><div class="stat-v" id="r-fat" style="color:#a855f7;">—</div></div>
   </div>
-  <div class="rel-section">
-    <div class="rel-title" style="color:#22c55e;">✅ Serviços Realizados</div>
-    <div id="rel-realizados"></div>
+  <div class="chat-box">
+    <h3 style="color:#22c55e;">✅ Serviços Realizados</h3>
+    <div id="r-lst-real"><div class="empty-row" style="padding:20px;">—</div></div>
   </div>
-  <div class="rel-section">
-    <div class="rel-title" style="color:#ef4444;">❌ Serviços Cancelados</div>
-    <div id="rel-cancelados"></div>
+  <div class="chat-box" style="margin-top:12px;">
+    <h3 style="color:#ef4444;">❌ Cancelados</h3>
+    <div id="r-lst-canc"><div class="empty-row" style="padding:20px;">—</div></div>
   </div>
 </div>
 
 <script>
+// ── Dados globais ──────────────────────────────────────────────────────────
 var _ags = [];
 
-function setTab(t) {
-  ['pendentes','agendados','realizados','cancelados','relatorio'].forEach(function(id,i){
-    document.getElementById('tab-'+id).style.display = t===id?'block':'none';
-    document.querySelectorAll('.tab')[i].classList.toggle('on', t===id);
+// ── Tabs ───────────────────────────────────────────────────────────────────
+function ir(n) {
+  document.querySelectorAll('.pg').forEach(function(p,i){ p.className = 'pg'+(i===n?' on':''); });
+  document.querySelectorAll('.tab').forEach(function(t,i){ t.className = 'tab'+(i===n?' on':''); });
+  if (n===4) renderRel();
+}
+
+// ── API ────────────────────────────────────────────────────────────────────
+function apiCall(action, body) {
+  var opts = { headers: { 'Content-Type': 'application/json' } };
+  if (body) { opts.method = 'POST'; opts.body = JSON.stringify(body); }
+  return fetch('/api/agendamento?action=' + action, opts).then(function(r){ return r.json(); });
+}
+
+// ── Carregar ───────────────────────────────────────────────────────────────
+function carregar() {
+  apiCall('relatorio').then(function(r) {
+    if (!r.ok) return;
+    _ags = r.agendamentos || [];
+    var pend = _ags.filter(function(a){ return a.status==='pendente'; });
+    var ags  = _ags.filter(function(a){ return a.status==='agendado'; });
+    var real = _ags.filter(function(a){ return a.status==='realizado'; });
+    document.getElementById('n-pend').textContent = pend.length;
+    document.getElementById('n-ag').textContent   = ags.length;
+    document.getElementById('n-real').textContent = real.length;
+    document.getElementById('n-fat').textContent  = 'R$'+r.totalRealizado.toFixed(0);
+    // Aba badge
+    document.querySelectorAll('.tab')[1].textContent = ags.length > 0 ? '📅 AGENDADOS ('+ags.length+')' : '📅 AGENDADOS';
+    renderPend(pend);
+    renderAgs(ags);
+    renderHist('lst-real', real);
+    renderHist('lst-canc', _ags.filter(function(a){ return a.status==='cancelado'; }));
   });
-  if(t==='relatorio') renderRelatorio();
-  if(t==='agendados') renderAgendados();
 }
 
-async function api(action, body) {
-  var opts = {headers:{'Content-Type':'application/json'}};
-  if(body){opts.method='POST';opts.body=JSON.stringify(body);}
-  var r = await fetch('/api/agendamento?action='+action, opts);
-  return r.json();
+// ── Helpers ────────────────────────────────────────────────────────────────
+function esc(s){ var d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+function fdt(s){ if(!s) return '—'; var d=new Date(s); return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
+function fdtShort(s){ if(!s) return '—'; return new Date(s).toLocaleDateString('pt-BR'); }
+
+function dataBadge(ds) {
+  if (!ds) return '<input type="date" class="date-i" onchange="agendarData(this)" data-id="__ID__">';
+  var hoje = new Date(); hoje.setHours(0,0,0,0);
+  var dt   = new Date(ds+'T00:00:00');
+  var diff = Math.round((dt - hoje) / 86400000);
+  var fmt  = dt.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
+  var cls  = diff < 0 ? 'd-late' : diff <= 1 ? 'd-warn' : 'd-ok';
+  var lbl  = diff < 0 ? fmt+' ⚠️' : diff===0 ? 'Hoje 🔴' : diff===1 ? 'Amanhã 🟠' : fmt+' 🟢';
+  return '<span class="dbadge '+cls+'">'+lbl+'</span><br><input type="date" class="date-i" value="'+ds+'" onchange="agendarData(this)" data-id="__ID__">';
 }
 
-async function agendar(id, dataAgendada) {
-  var r = await api('agendar',{id,dataAgendada});
-  if(r.ok){
-    carregar();
-  } else { alert('Erro: '+(r.error||'falha')); }
-}
-
-async function agendar(id, dataAgendada) {
-  var r = await api('agendar',{id, dataAgendada});
-  if(r.ok){ await carregar(); }
-  else { alert('Erro: '+(r.error||'falha')); }
-}
-
-async function carregar() {
-  var r = await api('relatorio');
-  if(!r.ok) return;
-  _ags = r.agendamentos||[];
-  document.getElementById('st-pend').textContent = r.pendentes;
-  document.getElementById('st-real').textContent = r.realizados;
-  document.getElementById('st-canc').textContent = r.cancelados;
-  document.getElementById('st-fat').textContent  = 'R$ '+r.totalRealizado.toFixed(2).replace('.',',');
-  renderPendentes();
-  renderAgendados();
-  renderHistorico('realizados');
-  renderHistorico('cancelados');
-  // Atualizar badge da aba agendados com contagem
-  var nAg = _ags.filter(function(a){return a.status==='agendado';}).length;
-  var tabAg = document.querySelectorAll('.tab')[1];
-  tabAg.textContent = nAg > 0 ? '📅 AGENDADOS ('+nAg+')' : '📅 AGENDADOS';
-}
-
-// Cor do badge de data
-function corData(d) {
-  if(!d) return null;
-  var hoje=new Date(); hoje.setHours(0,0,0,0);
-  var dt=new Date(d+'T00:00:00');
-  var diff=Math.round((dt-hoje)/(86400000));
-  if(diff<0)  return 'data-late';
-  if(diff<=1) return 'data-warn';
-  return 'data-ok';
-}
-function labelData(d) {
-  if(!d) return '';
-  var hoje=new Date(); hoje.setHours(0,0,0,0);
-  var dt=new Date(d+'T00:00:00');
-  var diff=Math.round((dt-hoje)/(86400000));
-  var fmt=dt.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
-  if(diff<0)  return fmt+' ⚠️';
-  if(diff===0)return 'Hoje 🔴';
-  if(diff===1)return 'Amanhã 🟠';
-  return fmt+' 🟢';
-}
-
-function rowCells(a, showDatePicker) {
-  var dateBadge = a.dataAgendada
-    ? '<span class="data-badge '+corData(a.dataAgendada)+'">'+labelData(a.dataAgendada)+'</span><br>'
-    : '';
-  return '<div class="cell"><div style="font-weight:600;font-size:12px;">'+escH(a.nome)+'</div>'
-    +'<div style="font-size:10px;color:#5a6270;">'+escH(a.telefone)+'</div></div>'
-    +'<div class="cell muted" style="font-size:10px;">'+escH(a.endereco||'—')+'</div>'
-    +'<div class="cell" style="font-size:11px;">'+escH(a.equipamento||'—')+'</div>'
-    +'<div class="cell muted" style="font-size:10px;">'+escH(a.defeito||'—')+'</div>'
-    +'<div class="cell green" style="font-size:11px;">'+escH(a.taxa||'—')+'</div>'
-    +'<div class="cell">'+dateBadge
-      +'<input type="date" class="date-inp" value="'+escH(a.dataAgendada||'')+'" onchange="agendar(''+a.id+'',this.value)"></div>'
-    +'<div class="cell"><input class="preco-inp" id="preco-'+a.id+'" value="'+escH(a.preco||'')+'" placeholder="R$" '
-      +'onblur="salvarPreco(''+a.id+'')" onkeydown="if(event.key==='Enter')salvarPreco(''+a.id+'')"></div>'
-    +'<div class="cell" style="display:flex;flex-direction:column;gap:4px;">'
-      +'<button class="btn-sm btn-ok" onclick="finalizar(''+a.id+'','realizado')">✅ Realizado</button>'
-      +'<button class="btn-sm btn-cancel" onclick="finalizar(''+a.id+'','cancelado')">❌ Cancelar</button>'
+function rowPend(a) {
+  var badge = dataBadge(a.dataAgendada).replace(/__ID__/g, a.id);
+  return '<div class="tr g-pend" data-id="'+a.id+'">'
+    +'<div><b style="font-size:12px;">'+esc(a.nome)+'</b><br><span style="font-size:10px;color:#5a6270;">'+esc(a.telefone)+'</span></div>'
+    +'<div style="font-size:11px;color:#5a6270;">'+esc(a.telefone)+'</div>'
+    +'<div style="font-size:10px;color:#5a6270;">'+esc(a.endereco||'—')+'</div>'
+    +'<div style="font-size:11px;">'+esc(a.equipamento||'—')+'</div>'
+    +'<div style="font-size:10px;color:#5a6270;">'+esc(a.defeito||'—')+'</div>'
+    +'<div style="font-size:11px;color:#22c55e;">'+esc(a.taxa||'—')+'</div>'
+    +'<div>'+badge+'</div>'
+    +'<div><input type="text" class="price-i" value="'+esc(a.preco||'')+'" placeholder="R$" onblur="salvarPreco(this)" data-id="'+a.id+'"></div>'
+    +'<div style="display:flex;flex-direction:column;gap:4px;">'
+      +'<button class="ba ba-ok" onclick="finalizar(\''+a.id+'\',\'realizado\')">✅ Realizado</button>'
+      +'<button class="ba ba-cx" onclick="finalizar(\''+a.id+'\',\'cancelado\')">❌ Cancelar</button>'
+    +'</div>'
     +'</div>';
 }
 
-var GRID_COLS = '1.5fr 1.2fr 1fr 1.2fr 80px 130px 90px 150px';
-
-function renderPendentes() {
-  var pend = _ags.filter(function(a){return a.status==='pendente';});
-  var el   = document.getElementById('lista-pendentes');
-  if(!pend.length){el.innerHTML='<div class="empty"><div class="empty-icon">📋</div><div>Nenhum agendamento pendente</div></div>';return;}
-  el.innerHTML = pend.map(function(a){
-    return '<div class="row" style="grid-template-columns:'+GRID_COLS+';" id="row-'+a.id+'">'+rowCells(a)+'</div>';
-  }).join('');
+function renderPend(lista) {
+  var el = document.getElementById('lst-pend');
+  el.innerHTML = lista.length ? lista.map(rowPend).join('') : '<div class="empty-row">📋 Nenhum agendamento pendente</div>';
 }
 
-function renderAgendados() {
-  var ags = _ags.filter(function(a){return a.status==='agendado';});
-  var el  = document.getElementById('lista-agendados');
-  if(!ags.length){el.innerHTML='<div class="empty"><div class="empty-icon">📅</div><div>Nenhum agendamento com data marcada</div></div>';return;}
-  ags.sort(function(a,b){return (a.dataAgendada||'zz').localeCompare(b.dataAgendada||'zz');});
-  el.innerHTML = ags.map(function(a){
-    return '<div class="row agendado" style="grid-template-columns:'+GRID_COLS+';" id="row-'+a.id+'">'+rowCells(a)+'</div>';
-  }).join('');
+function renderAgs(lista) {
+  var el = document.getElementById('lst-ag');
+  lista.sort(function(a,b){ return (a.dataAgendada||'zz').localeCompare(b.dataAgendada||'zz'); });
+  el.innerHTML = lista.length ? lista.map(rowPend).join('') : '<div class="empty-row">📅 Nenhum agendamento com data</div>';
 }
 
-
-function renderHistorico(status) {
-  var lista = _ags.filter(function(a){return a.status===status;});
-  var el = document.getElementById('lista-'+status);
-  var emoji = status==='realizado' ? '✅' : '❌';
-  var msg   = status==='realizado' ? 'Nenhum serviço realizado ainda' : 'Nenhum cancelamento';
-  if(!lista.length){el.innerHTML='<div class="empty"><div class="empty-icon">'+emoji+'</div><div>'+msg+'</div></div>';return;}
+function renderHist(elId, lista) {
+  var el = document.getElementById(elId);
+  if (!lista.length) { el.innerHTML='<div class="empty-row">Nenhum registro</div>'; return; }
   el.innerHTML = lista.map(function(a){
-    return '<div class="row hist">'
-      +'<div class="cell">'+escH(a.nome)+'</div>'
-      +'<div class="cell muted">'+escH(a.telefone)+'</div>'
-      +'<div class="cell muted" style="font-size:11px;">'+escH(a.endereco||'—')+'</div>'
-      +'<div class="cell">'+escH(a.equipamento||'—')+'</div>'
-      +'<div class="cell muted" style="font-size:11px;">'+escH(a.defeito||'—')+'</div>'
-      +'<div class="cell green">'+escH(a.taxa||'—')+'</div>'
-      +'<div class="cell" style="color:#a855f7;font-weight:700;">'+escH(a.preco||'—')+'</div>'
-      +'<div class="cell muted" style="font-size:10px;">'+fmtDt(a.finalizadoEm)+'</div>'
+    return '<div class="tr g-hist">'
+      +'<div><b>'+esc(a.nome)+'</b></div>'
+      +'<div style="color:#5a6270;">'+esc(a.telefone)+'</div>'
+      +'<div style="font-size:10px;color:#5a6270;">'+esc(a.endereco||'—')+'</div>'
+      +'<div>'+esc(a.equipamento||'—')+'</div>'
+      +'<div style="font-size:10px;color:#5a6270;">'+esc(a.defeito||'—')+'</div>'
+      +'<div style="color:#22c55e;">'+esc(a.taxa||'—')+'</div>'
+      +'<div style="color:#a855f7;font-weight:700;">'+esc(a.preco||'—')+'</div>'
+      +'<div style="color:#3b9eff;">'+esc(a.dataAgendada?fdtShort(a.dataAgendada+'T00:00:00'):'—')+'</div>'
+      +'<div style="font-size:10px;color:#5a6270;">'+fdt(a.finalizadoEm)+'</div>'
     +'</div>';
   }).join('');
 }
 
-function renderRelatorio() {
-  var reals = _ags.filter(function(a){return a.status==='realizado';});
-  var cancs = _ags.filter(function(a){return a.status==='cancelado';});
-  var total = _ags.length;
-  var fat   = reals.reduce(function(s,a){return s+(parseFloat((a.preco||'0').replace(/[^\d.,]/g,'').replace(',','.'))||0);},0);
-  document.getElementById('r-total').textContent = total;
-  document.getElementById('r-real').textContent  = reals.length;
-  document.getElementById('r-canc').textContent  = cancs.length;
-  document.getElementById('r-fat').textContent   = 'R$ '+fat.toFixed(2).replace('.',',');
-  document.getElementById('rel-realizados').innerHTML = reals.length ? tabRelatorio(reals) : '<div style="color:#5a6270;font-size:12px;padding:12px 0;">Nenhum serviço realizado.</div>';
-  document.getElementById('rel-cancelados').innerHTML = cancs.length ? tabRelatorio(cancs) : '<div style="color:#5a6270;font-size:12px;padding:12px 0;">Nenhum cancelamento.</div>';
+function renderRel() {
+  var real = _ags.filter(function(a){ return a.status==='realizado'; });
+  var canc = _ags.filter(function(a){ return a.status==='cancelado'; });
+  var fat  = real.reduce(function(s,a){ return s+(parseFloat((a.preco||'0').replace(/[^0-9.,]/g,'').replace(',','.'))||0); }, 0);
+  document.getElementById('r-tot').textContent  = _ags.length;
+  document.getElementById('r-real').textContent = real.length;
+  document.getElementById('r-canc').textContent = canc.length;
+  document.getElementById('r-fat').textContent  = 'R$ '+fat.toFixed(2).replace('.',',');
+  function tblRel(lst) {
+    if (!lst.length) return '<p style="color:#5a6270;font-size:12px;padding:12px 0;">Nenhum registro.</p>';
+    return '<table class="rtbl"><thead><tr><th>Nome</th><th>Tel</th><th>Equip.</th><th>Defeito</th><th>Taxa</th><th>Preço</th><th>Data</th></tr></thead><tbody>'
+      +lst.map(function(a){return '<tr>'
+        +'<td>'+esc(a.nome)+'</td><td style="color:#5a6270;">'+esc(a.telefone)+'</td>'
+        +'<td>'+esc(a.equipamento||'—')+'</td><td style="color:#5a6270;">'+esc(a.defeito||'—')+'</td>'
+        +'<td style="color:#22c55e;">'+esc(a.taxa||'—')+'</td>'
+        +'<td style="color:#a855f7;font-weight:700;">'+esc(a.preco||'—')+'</td>'
+        +'<td style="color:#5a6270;">'+fdt(a.finalizadoEm||a.criadoEm)+'</td>'
+      +'</tr>';}).join('')+'</tbody></table>';
+  }
+  document.getElementById('r-lst-real').innerHTML = tblRel(real);
+  document.getElementById('r-lst-canc').innerHTML = tblRel(canc);
 }
 
-function tabRelatorio(lista) {
-  return '<table style="width:100%;border-collapse:collapse;font-size:11px;">'
-    +'<thead><tr style="color:#5a6270;">'
-    +'<th style="padding:8px 10px;text-align:left;">Nome</th>'
-    +'<th style="padding:8px 10px;text-align:left;">Telefone</th>'
-    +'<th style="padding:8px 10px;text-align:left;">Equipamento</th>'
-    +'<th style="padding:8px 10px;text-align:left;">Defeito</th>'
-    +'<th style="padding:8px 10px;text-align:left;">Taxa</th>'
-    +'<th style="padding:8px 10px;text-align:left;">Preço</th>'
-    +'<th style="padding:8px 10px;text-align:left;">Data</th>'
-    +'</tr></thead><tbody>'
-    +lista.map(function(a){
-      return '<tr style="border-top:1px solid #1e2228;">'
-        +'<td style="padding:8px 10px;color:#f0f2f5;">'+escH(a.nome)+'</td>'
-        +'<td style="padding:8px 4px;color:#5a6270;">'+escH(a.telefone)+'</td>'
-        +'<td style="padding:8px 4px;color:#f0f2f5;">'+escH(a.equipamento||'—')+'</td>'
-        +'<td style="padding:8px 4px;color:#5a6270;">'+escH(a.defeito||'—')+'</td>'
-        +'<td style="padding:8px 4px;color:#22c55e;">'+escH(a.taxa||'—')+'</td>'
-        +'<td style="padding:8px 4px;color:#a855f7;font-weight:700;">'+escH(a.preco||'—')+'</td>'
-        +'<td style="padding:8px 4px;color:#5a6270;">'+fmtDt(a.finalizadoEm||a.criadoEm)+'</td>'
-        +'</tr>';
-    }).join('')
-    +'</tbody></table>';
+// ── Ações ──────────────────────────────────────────────────────────────────
+function agendarData(input) {
+  var id = input.getAttribute('data-id');
+  apiCall('agendar', { id: id, dataAgendada: input.value }).then(function(r){ if(r.ok) carregar(); });
 }
 
-function extrairFicha() {
-  var texto = document.getElementById('chat-ficha').value.trim();
+function salvarPreco(input) {
+  var id = input.getAttribute('data-id');
+  apiCall('atualizar-preco', { id: id, preco: input.value });
+}
+
+function finalizar(id, status) {
+  var preco = '';
+  var pi = document.querySelector('.price-i[data-id="'+id+'"]');
+  if (pi) preco = pi.value;
+  apiCall('finalizar', { id: id, status: status, preco: preco }).then(function(r){
+    if (r.ok) carregar(); else alert('Erro: '+(r.error||'falha'));
+  });
+}
+
+// ── Extração de ficha ──────────────────────────────────────────────────────
+function extrair() {
+  var texto = document.getElementById('ta').value.trim();
   if (!texto) { alert('Cole o conteúdo da ficha primeiro.'); return; }
 
-  var linhas = texto.split('\n').map(function(l){return l.trim();}).filter(function(l){return l.length>0;});
+  var linhas = [];
+  texto.split('\n').forEach(function(l) {
+    var t = l.trim();
+    if (t) linhas.push(t);
+  });
 
   var nome='', tel='', end='', equip='', def='', taxa='';
 
   for (var i=0; i<linhas.length; i++) {
-    var l = linhas[i];
+    var l  = linhas[i];
     var ll = l.toLowerCase();
 
-    // Pular cabeçalho
-    if (ll==='cliente'||ll==='novo cliente'||ll==='ficha') continue;
+    if (ll==='cliente' || ll==='novo cliente' || ll==='ficha') continue;
 
-    // Telefone: contém apenas dígitos, parênteses, hífen, espaço, +
-    if (!tel && /^[+\(]?[0-9][0-9\s\-\.\(\)]{6,}$/.test(l)) {
+    if (!tel && /^[\(\+0-9]/.test(l) && /[0-9].*[0-9].*[0-9].*[0-9].*[0-9]/.test(l) && l.length < 25) {
       tel = l; continue;
     }
-
-    // Endereço: começa com "Endereço" ou "End:"
     if (!end && /^end/i.test(l)) {
-      end = l.replace(/^[Ee]ndere[cç]o[:\s]*/,'').replace(/^[Ee]nd[:\s]*/,'').trim(); continue;
+      end = l.replace(/^endere.o\s*:?\s*/i,'').replace(/^end\s*:?\s*/i,'').trim(); continue;
     }
-
-    // Taxa: contém a palavra taxa
-    if (!taxa && ll.indexOf('taxa')>=0) {
-      var numTaxa = l.match(/(\d[\d.,]*)/);
-      taxa = numTaxa ? 'R$ '+numTaxa[1] : l; continue;
+    if (!taxa && ll.indexOf('taxa') >= 0) {
+      var m = l.match(/[0-9]+[.,]?[0-9]*/);
+      taxa = m ? 'R$ '+m[0] : l; continue;
     }
-
-    // Nome: tem 4 dígitos no final (padrão "Weber 4256") OU é a 1ª linha restante
     if (!nome) { nome = l; continue; }
-
-    // Equipamento e defeito: linhas restantes
-    if (!equip) { equip = l; continue; }
-    if (!def)   { def = l;   continue; }
+    if (!equip){ equip = l; continue; }
+    if (!def)  { def   = l; continue; }
   }
 
-  // Tentar separar equipamento de defeito se ainda não foi
   if (equip && !def) {
-    var palavrasDefeito = ['parou','nao','não','barulho','vazando','queimou','travou','esquentando','gelando'];
-    for (var w=0; w<palavrasDefeito.length; w++) {
-      var pos = equip.toLowerCase().indexOf(palavrasDefeito[w]);
-      if (pos > 3) {
-        def   = equip.slice(pos).trim();
-        equip = equip.slice(0, pos).trim();
-        break;
-      }
+    var kws = ['parou','nao','nao','barulho','vazand','queimou','travou','gelando','esquentando'];
+    for (var w=0; w<kws.length; w++) {
+      var pos = equip.toLowerCase().indexOf(kws[w]);
+      if (pos > 3) { def = equip.slice(pos); equip = equip.slice(0,pos).trim(); break; }
     }
   }
 
-  // Preencher campos
-  document.getElementById('f-nome').value  = nome;
-  document.getElementById('f-tel').value   = tel;
-  document.getElementById('f-end').value   = end;
-  document.getElementById('f-equip').value = equip;
-  document.getElementById('f-def').value   = def;
-  document.getElementById('f-taxa').value  = taxa;
-  document.getElementById('f-preco').value = '';
+  document.getElementById('i-nome').value  = nome;
+  document.getElementById('i-tel').value   = tel;
+  document.getElementById('i-end').value   = end;
+  document.getElementById('i-equip').value = equip;
+  document.getElementById('i-def').value   = def;
+  document.getElementById('i-taxa').value  = taxa;
+  document.getElementById('i-preco').value = '';
 
-  // Mostrar etapa de confirmação
-  document.getElementById('step-colar').style.display     = 'none';
-  document.getElementById('step-confirmar').style.display = 'block';
+  document.getElementById('s1').style.display = 'none';
+  document.getElementById('s2').style.display = 'block';
 }
 
-function voltarColar() {
-  document.getElementById('step-confirmar').style.display = 'none';
-  document.getElementById('step-colar').style.display     = 'block';
+function voltar() {
+  document.getElementById('s2').style.display = 'none';
+  document.getElementById('s1').style.display = 'block';
 }
 
-async function criar() {
-  var nome = document.getElementById('f-nome').value.trim();
-  var tel  = document.getElementById('f-tel').value.trim();
-  if(!nome||!tel){alert('Nome e telefone são obrigatórios');return;}
-  var r = await api('criar',{
-    nome,
-    telefone:tel,
-    endereco: document.getElementById('f-end').value.trim(),
-    equipamento: document.getElementById('f-equip').value,
-    defeito: document.getElementById('f-def').value.trim(),
-    taxa:  document.getElementById('f-taxa').value.trim(),
-    preco: document.getElementById('f-preco').value.trim()
+function criar() {
+  var nome = document.getElementById('i-nome').value.trim();
+  var tel  = document.getElementById('i-tel').value.trim();
+  if (!nome || !tel) { alert('Nome e telefone são obrigatórios'); return; }
+  apiCall('criar', {
+    nome: nome, telefone: tel,
+    endereco:    document.getElementById('i-end').value.trim(),
+    equipamento: document.getElementById('i-equip').value.trim(),
+    defeito:     document.getElementById('i-def').value.trim(),
+    taxa:        document.getElementById('i-taxa').value.trim(),
+    preco:       document.getElementById('i-preco').value.trim()
+  }).then(function(r) {
+    if (r.ok) {
+      var msg = document.getElementById('ok-msg');
+      msg.textContent = '✅ Agendamento criado com sucesso!';
+      msg.style.display = 'block';
+      document.getElementById('ta').value = '';
+      setTimeout(function(){ msg.style.display='none'; voltar(); carregar(); }, 2000);
+    } else { alert('Erro: '+(r.error||'falha')); }
   });
-  if(r.ok){
-    ['f-nome','f-tel','f-end','f-def','f-taxa','f-preco'].forEach(function(id){document.getElementById(id).value='';});
-    document.getElementById('f-equip').value='';
-    var ok=document.getElementById('msg-ok');
-    ok.style.display='block';
-    setTimeout(function(){ok.style.display='none';},3000);
-    // Voltar ao chat
-    document.getElementById('chat-ficha').value='';
-    voltarColar();
-    carregar();
-  } else { alert('Erro: '+(r.error||'falha')); }
 }
 
-async function salvarPreco(id) {
-  var preco = document.getElementById('preco-'+id)?.value||'';
-  await api('atualizar-preco',{id,preco});
-  var ag = _ags.find(function(a){return a.id===id;});
-  if(ag) ag.preco=preco;
-}
-
-async function finalizar(id, status) {
-  var preco = document.getElementById('preco-'+id)?.value||'';
-  var r = await api('finalizar',{id,status,preco});
-  if(r.ok){
-    // Remove a linha da tabela suavemente
-    var row = document.getElementById('row-'+id);
-    if(row){row.style.opacity='0';row.style.transition='opacity .3s';setTimeout(function(){carregar();},300);}
-    else carregar();
-  } else { alert('Erro: '+(r.error||'falha')); }
-}
-
-function fmtDt(s){if(!s)return'—';try{var d=new Date(s);return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}catch(e){return s;}}
-function escH(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
-
-carregar();
+// ── Event listeners (mais confiável que onclick inline) ────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('btn-extrair').addEventListener('click', extrair);
+  document.getElementById('btn-voltar').addEventListener('click', voltar);
+  document.getElementById('btn-criar').addEventListener('click', criar);
+  carregar();
+});
 </script>
 </body>
 </html>
