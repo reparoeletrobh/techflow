@@ -393,60 +393,51 @@ function extrairFicha() {
   var texto = document.getElementById('chat-ficha').value.trim();
   if (!texto) { alert('Cole o conteúdo da ficha primeiro.'); return; }
 
-  // Limpar linhas vazias e espaços
-  var linhas = texto.split('\n')
-    .map(function(l){ return l.trim(); })
-    .filter(function(l){ return l.length > 0; });
+  var linhas = texto.split('\n').map(function(l){return l.trim();}).filter(function(l){return l.length>0;});
 
   var nome='', tel='', end='', equip='', def='', taxa='';
 
-  linhas.forEach(function(l) {
+  for (var i=0; i<linhas.length; i++) {
+    var l = linhas[i];
     var ll = l.toLowerCase();
 
-    // Telefone: linha com padrão de número brasileiro
-    if (!tel && /^[\(\+]?\d[\d\s\-\.\(\)]{7,}/.test(l)) {
-      tel = l; return;
-    }
-    // Endereço: linha com "Endereço:", "End:", "rua ", "av ", "alameda"
-    if (!end && /^endere[cç]o[:\s]/i.test(l)) {
-      end = l.replace(/^endere[cç]o[:\s]*/i,'').trim(); return;
-    }
-    // Taxa: linha com "taxa" ou "tx"
-    if (!taxa && /\btaxa\b|\btx\b/i.test(l)) {
-      var m = l.match(/[Rr]\$?\s*([\d.,]+)/);
-      taxa = m ? 'R$ '+m[1] : l; return;
-    }
-    // Ignorar cabeçalho "Cliente"
-    if (ll === 'cliente' || ll === 'novo cliente' || ll === 'ficha') return;
+    // Pular cabeçalho
+    if (ll==='cliente'||ll==='novo cliente'||ll==='ficha') continue;
 
-    // Nome: linha com 4 dígitos no final (padrão "Weber 4256")
-    if (!nome && /\d{4}\s*$/.test(l) && l.length < 40) {
-      nome = l; return;
+    // Telefone: contém apenas dígitos, parênteses, hífen, espaço, +
+    if (!tel && /^[+\(]?[0-9][0-9\s\-\.\(\)]{6,}$/.test(l)) {
+      tel = l; continue;
     }
-    // Equipamento/defeito: restante
-    if (!nome && !tel && !end) { nome = l; return; }
-    if (!equip) { equip = l; return; }
-    if (!def)   { def   = l; return; }
-  });
 
-  // Se nome ainda vazio, pegar primeira linha não especial
-  if (!nome) {
-    linhas.some(function(l){
-      if (!/^endere[cç]o/i.test(l) && !/\btaxa\b/i.test(l) && !/^[\(\+]?\d/.test(l) && l.toLowerCase()!=='cliente') {
-        nome=l; return true;
-      }
-    });
+    // Endereço: começa com "Endereço" ou "End:"
+    if (!end && /^end/i.test(l)) {
+      end = l.replace(/^[Ee]ndere[cç]o[:\s]*/,'').replace(/^[Ee]nd[:\s]*/,'').trim(); continue;
+    }
+
+    // Taxa: contém a palavra taxa
+    if (!taxa && ll.indexOf('taxa')>=0) {
+      var numTaxa = l.match(/(\d[\d.,]*)/);
+      taxa = numTaxa ? 'R$ '+numTaxa[1] : l; continue;
+    }
+
+    // Nome: tem 4 dígitos no final (padrão "Weber 4256") OU é a 1ª linha restante
+    if (!nome) { nome = l; continue; }
+
+    // Equipamento e defeito: linhas restantes
+    if (!equip) { equip = l; continue; }
+    if (!def)   { def = l;   continue; }
   }
 
-  // Separar equipamento e defeito se estiverem juntos
+  // Tentar separar equipamento de defeito se ainda não foi
   if (equip && !def) {
-    // Ex: "Maquina Brastemp parou de funcionar"
-    var partes = equip.match(/^(.*?\b(?:brastemp|samsung|lg|electrolux|consul|midea|panasonic|philco|arno)[^\s]*\s*\w*)\s+(.*)/i);
-    if (partes) { equip = partes[1]; def = partes[2]; }
-    else {
-      // separar na palavra-chave de defeito
-      var kw = equip.search(/parou|não|nao|barulho|vazando|queimou|travou|com defeito|esquentando|gelando|batendo/i);
-      if (kw > 5) { def = equip.slice(kw); equip = equip.slice(0,kw).trim(); }
+    var palavrasDefeito = ['parou','nao','não','barulho','vazando','queimou','travou','esquentando','gelando'];
+    for (var w=0; w<palavrasDefeito.length; w++) {
+      var pos = equip.toLowerCase().indexOf(palavrasDefeito[w]);
+      if (pos > 3) {
+        def   = equip.slice(pos).trim();
+        equip = equip.slice(0, pos).trim();
+        break;
+      }
     }
   }
 
@@ -460,7 +451,7 @@ function extrairFicha() {
   document.getElementById('f-preco').value = '';
 
   // Mostrar etapa de confirmação
-  document.getElementById('step-colar').style.display    = 'none';
+  document.getElementById('step-colar').style.display     = 'none';
   document.getElementById('step-confirmar').style.display = 'block';
 }
 
