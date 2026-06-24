@@ -94,6 +94,17 @@ async function carregar() {
   }
 }
 
+function imgDoCat(cat) {
+  if (cat === 'geladeira') return '/imgs/3geladeiras.webp';
+  if (cat === 'lavaseca')  return '/imgs/3lavaseca.webp';
+  return '';  // demais: usa placeholder CSS
+}
+function placeholderCat(cat, emoji) {
+  var cores = {tv:'#1a2a4a',microondas:'#1a3a2a',purificador:'#0a2a4a'};
+  var bg = cores[cat] || '#1e293b';
+  return '<div class="post-img" style="background:'+bg+';display:flex;align-items:center;justify-content:center;font-size:48px;">'+escH(emoji||'🔧')+'</div>';
+}
+
 function renderCards(posts) {
   var grid = document.getElementById('posts-grid');
   if (!posts.length) {
@@ -101,9 +112,12 @@ function renderCards(posts) {
     return;
   }
   grid.innerHTML = posts.map(function(p){
-    var imgUrl = p.categoria==='geladeira'?'/imgs/3geladeiras.webp':p.categoria==='lavaseca'?'/imgs/3lavaseca.webp':'data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3Crect fill='%231e293b' width='400' height='200'/%3E%3Ctext x='50%25' y='50%25' fill='%23475569' font-size='40' text-anchor='middle' dominant-baseline='middle'%3E🔧%3C/text%3E%3C/svg%3E';
-    return '<div class="post-card" onclick="window.location.href=\'/blog/\'+\''+p.slug+'\'">'
-      +'<img class="post-img" src="'+imgUrl+'" alt="'+escH(p.imagem_alt||p.titulo)+'" loading="lazy">'
+    var url = imgDoCat(p.categoria);
+    var imgHtml = url
+      ? '<img class="post-img" src="'+url+'" alt="'+escH(p.imagem_alt||p.titulo)+'" loading="lazy">'
+      : placeholderCat(p.categoria, p.emoji);
+    return '<div class="post-card" onclick="window.location.href=\'/blog/'+escH(p.slug)+'\'">'
+      +imgHtml
       +'<div class="post-body">'
       +'<div class="post-cat">'+escH(p.emoji)+' '+escH(p.categoriaNome)+'</div>'
       +'<div class="post-title">'+escH(p.titulo)+'</div>'
