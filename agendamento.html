@@ -43,7 +43,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .th{color:#5a6270;font-size:9px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid #1e2228;}
 .th.tr{padding:8px 14px;}
 .empty-row{padding:40px;text-align:center;color:#5a6270;}
-.g-pend{grid-template-columns:1.4fr 1fr 1.5fr 1fr 1.5fr 80px 130px 90px 90px;}
+.g-pend{grid-template-columns:1.4fr 1fr 1.4fr 1fr 1.4fr 75px 130px 85px 120px;}
 .g-hist{grid-template-columns:1.4fr 1fr 1.5fr 1fr 1.5fr 80px 90px 90px 110px;}
 /* DATA badge */
 .dbadge{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:700;}
@@ -60,6 +60,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .rtbl{width:100%;border-collapse:collapse;font-size:12px;}
 .rtbl th{padding:8px 10px;text-align:left;color:#5a6270;font-size:10px;text-transform:uppercase;border-bottom:1px solid #1e2228;}
 .rtbl td{padding:8px 10px;border-top:1px solid #0d0e12;}
+/* MODAL EDIÇÃO */
+.modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:999;overflow-y:auto;padding:20px;}
+.modal-box{background:#0f1114;border:1px solid #1e2228;border-radius:14px;max-width:520px;margin:40px auto;overflow:hidden;}
+.modal-hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #1e2228;background:#181b1f;}
+.modal-hdr h4{font-size:14px;font-weight:800;}
+.modal-body{padding:20px;}
+.btn-close{background:transparent;border:none;color:#5a6270;font-size:22px;cursor:pointer;line-height:1;}
 </style>
 </head>
 <body>
@@ -267,6 +274,7 @@ function rowPend(a) {
     +'<div>'+badge+'</div>'
     +'<div><input type="text" class="price-i" value="'+esc(a.preco||'')+'" placeholder="R$" onblur="salvarPreco(this)" data-id="'+a.id+'"></div>'
     +'<div style="display:flex;flex-direction:column;gap:4px;">'
+      +'<button class="ba" style="background:rgba(59,158,255,.12);color:#3b9eff;border:1px solid rgba(59,158,255,.2);" onclick="abrirEditar(\''+a.id+'\')" >✏️ Editar</button>'
       +'<button class="ba ba-ok" onclick="finalizar(\''+a.id+'\',\'realizado\')">✅ Realizado</button>'
       +'<button class="ba ba-cx" onclick="finalizar(\''+a.id+'\',\'cancelado\')">❌ Cancelar</button>'
     +'</div>'
@@ -504,12 +512,89 @@ function buscaGeral() {
 }
 
 // ── Event listeners (mais confiável que onclick inline) ────────────────────
+// ── Editar ficha ──────────────────────────────────────────────────────────
+function abrirEditar(id) {
+  var ag = _ags.find(function(a){ return a.id===id; });
+  if (!ag) return;
+  document.getElementById('ed-id').value    = ag.id;
+  document.getElementById('ed-nome').value  = ag.nome        || '';
+  document.getElementById('ed-tel').value   = ag.telefone    || '';
+  document.getElementById('ed-end').value   = ag.endereco    || '';
+  document.getElementById('ed-equip').value = ag.equipamento || '';
+  document.getElementById('ed-def').value   = ag.defeito     || '';
+  document.getElementById('ed-taxa').value  = ag.taxa        || '';
+  document.getElementById('ed-preco').value = ag.preco       || '';
+  document.getElementById('modal-editar').style.display = 'block';
+}
+
+function fecharModal() {
+  document.getElementById('modal-editar').style.display = 'none';
+}
+
+function salvarEdicao() {
+  var id = document.getElementById('ed-id').value;
+  apiCall('editar', {
+    id:          id,
+    nome:        document.getElementById('ed-nome').value.trim(),
+    telefone:    document.getElementById('ed-tel').value.trim(),
+    endereco:    document.getElementById('ed-end').value.trim(),
+    equipamento: document.getElementById('ed-equip').value.trim(),
+    defeito:     document.getElementById('ed-def').value.trim(),
+    taxa:        document.getElementById('ed-taxa').value.trim(),
+    preco:       document.getElementById('ed-preco').value.trim()
+  }).then(function(r) {
+    if (r.ok) { fecharModal(); carregar(); }
+    else { alert('Erro ao salvar: '+(r.error||'falha')); }
+  });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('btn-extrair').addEventListener('click', extrair);
   document.getElementById('btn-voltar').addEventListener('click', voltar);
   document.getElementById('btn-criar').addEventListener('click', criar);
+  document.getElementById('btn-fechar-modal').addEventListener('click', fecharModal);
+  document.getElementById('btn-cancel-modal').addEventListener('click', fecharModal);
+  document.getElementById('btn-salvar-edicao').addEventListener('click', salvarEdicao);
+  // Fechar clicando fora do modal
+  document.getElementById('modal-editar').addEventListener('click', function(e){
+    if (e.target === this) fecharModal();
+  });
   carregar();
 });
 </script>
+
+<!-- MODAL EDIÇÃO -->
+<div class="modal-ov" id="modal-editar">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <h4>✏️ Editar Ficha</h4>
+      <button class="btn-close" id="btn-fechar-modal">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="ed-id">
+      <div class="form2" style="margin-bottom:10px;">
+        <div><div class="lbl">Nome</div><input id="ed-nome" class="inp"></div>
+        <div><div class="lbl">Telefone</div><input id="ed-tel" class="inp"></div>
+      </div>
+      <div style="margin-bottom:10px;">
+        <div class="lbl">Endereço</div>
+        <input id="ed-end" class="inp">
+      </div>
+      <div class="form2" style="margin-bottom:10px;">
+        <div><div class="lbl">Equipamento</div><input id="ed-equip" class="inp"></div>
+        <div><div class="lbl">Defeito</div><input id="ed-def" class="inp"></div>
+      </div>
+      <div class="form2" style="margin-bottom:16px;">
+        <div><div class="lbl">Taxa de Visita</div><input id="ed-taxa" class="inp"></div>
+        <div><div class="lbl">Preço do Serviço</div><input id="ed-preco" class="inp"></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-sec" style="padding:9px 20px;" id="btn-cancel-modal">Cancelar</button>
+        <button class="btn" style="background:#3b9eff;color:#fff;padding:9px 24px;" id="btn-salvar-edicao">💾 Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

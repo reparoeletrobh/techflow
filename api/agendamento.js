@@ -55,6 +55,23 @@ export default async function handler(req, res) {
     return res.status(200).json({ok:true});
   }
 
+  // ── EDITAR FICHA COMPLETA ──────────────────────────────────────────────────
+  if(req.method==='POST'&&action==='editar'){
+    const b=req.body||{};
+    const ag=db.agendamentos.find(a=>a.id===b.id);
+    if(!ag) return res.status(404).json({ok:false,error:'Não encontrado'});
+    if(b.nome!==undefined)        ag.nome=b.nome;
+    if(b.telefone!==undefined)    ag.telefone=b.telefone;
+    if(b.endereco!==undefined)    ag.endereco=b.endereco;
+    if(b.equipamento!==undefined) ag.equipamento=b.equipamento;
+    if(b.defeito!==undefined)     ag.defeito=b.defeito;
+    if(b.taxa!==undefined)        ag.taxa=b.taxa;
+    if(b.preco!==undefined)       ag.preco=b.preco;
+    ag.atualizadoEm=new Date().toISOString();
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true,agendamento:ag});
+  }
+
   // ── ATUALIZAR PREÇO ───────────────────────────────────────────────────────
   if(req.method==='POST'&&action==='atualizar-preco'){
     const {id,preco}=req.body||{};
