@@ -476,15 +476,19 @@ async function carregarPublicados() {
     }
     document.getElementById('publicados-body').innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">'
       +r.posts.map(function(p){
-        var imgUrl = 'https://source.unsplash.com/400x200/?'+(p.imagem_query||p.categoriaNome)+',repair';
+        var imgUrl = p.categoria==='geladeira'?'/imgs/3geladeiras.webp':p.categoria==='lavaseca'?'/imgs/3lavaseca.webp':'';
+        var imgTag = imgUrl
+          ? '<img src="'+imgUrl+'" style="width:100%;height:120px;object-fit:cover;" loading="lazy">'
+          : '<div style="width:100%;height:80px;background:#181b1f;display:flex;align-items:center;justify-content:center;font-size:32px;">'+escH(p.emoji||'🔧')+'</div>';
         return '<div style="background:#0f1114;border:1px solid #1e2228;border-radius:10px;overflow:hidden;">'
-          +'<img src="'+imgUrl+'" style="width:100%;height:120px;object-fit:cover;" loading="lazy">'
+          +imgTag
           +'<div style="padding:14px;">'
-          +'<div style="font-size:10px;color:#5a6270;margin-bottom:6px;">'+escH(p.emoji)+' '+escH(p.categoriaNome)+' · '+escH(p.tempo_leitura||'5 min')+' · '+p.views+' views</div>'
+          +'<div style="font-size:10px;color:#5a6270;margin-bottom:6px;">'+escH(p.emoji)+' '+escH(p.categoriaNome)+' · '+escH(p.tempo_leitura||'5 min')+' · '+p.views+' views · '+p.cta_clicks+' CTAs</div>'
           +'<div style="font-size:13px;font-weight:700;margin-bottom:6px;line-height:1.4;">'+escH(p.titulo)+'</div>'
           +'<div style="font-size:11px;color:#5a6270;margin-bottom:10px;">'+escH(p.resumo||'')+'</div>'
           +'<div style="display:flex;gap:6px;">'
-          +'<a href="/blog/'+escH(p.slug)+'" target="_blank" style="flex:1;background:#1e2228;color:#f0f2f5;padding:6px;border-radius:6px;font-size:11px;text-align:center;text-decoration:none;">🌐 Ver post</a>'
+          +'<button onclick="editarPublicado(\''+escH(p.slug)+'\')" style="flex:1;background:rgba(59,158,255,.15);border:1px solid rgba(59,158,255,.3);color:#3b9eff;padding:6px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:700;">✏️ Editar</button>'
+          +'<a href="/blog/'+escH(p.slug)+'" target="_blank" style="flex:1;background:#1e2228;color:#f0f2f5;padding:6px;border-radius:6px;font-size:11px;text-align:center;text-decoration:none;">🌐 Ver</a>'
           +'<button onclick="copiarLink(\''+escH(p.slug)+'\')" style="background:#1e2228;border:none;color:#5a6270;padding:6px 10px;border-radius:6px;font-size:11px;cursor:pointer;">📋</button>'
           +'</div></div></div>';
       }).join('')+'</div>';
@@ -496,6 +500,29 @@ async function carregarPublicados() {
 function copiarLink(slug) {
   navigator.clipboard.writeText(window.location.origin+'/blog/'+slug);
   alert('Link copiado!');
+}
+
+async function editarPublicado(slug) {
+  // Carrega o post completo (com corpo_html) da API
+  var el = document.getElementById('publicados-body');
+  try {
+    var r = await fetch('/api/blog?action=post&slug='+encodeURIComponent(slug)).then(function(x){return x.json();});
+    if (!r.ok || !r.post) { alert('Erro ao carregar post: '+(r.error||'não encontrado')); return; }
+    var p = r.post;
+    // Preencher o editor
+    document.getElementById('ed-titulo').value    = p.titulo    || '';
+    document.getElementById('ed-subtitulo').value = p.subtitulo || '';
+    document.getElementById('ed-resumo').value    = p.resumo    || '';
+    document.getElementById('ed-corpo').value     = p.corpo_html|| '';
+    // Guardar o post completo para republicar depois
+    window._editandoPost = p;
+    document.getElementById('editor-overlay').style.display = 'block';
+    toggleEditorView('html');
+    // Sobrescrever salvarEdicao para republicar
+    window._modoEdicaoPublicado = true;
+  } catch(e) {
+    alert('Erro: '+e.message);
+  }
 }
 
 function escH(s){ var d=document.createElement('div');d.textContent=s||'';return d.innerHTML; }
@@ -667,17 +694,42 @@ function toggleEditorView(mode) {
     btnH.style.background = '#1e2228'; btnH.style.color = '#5a6270';
   }
 }
-function salvarEdicao() {
-  if (!_catSel || !_posts[_catSel]) return;
-  _posts[_catSel].titulo    = document.getElementById('ed-titulo').value.trim();
-  _posts[_catSel].subtitulo = document.getElementById('ed-subtitulo').value.trim();
-  _posts[_catSel].resumo    = document.getElementById('ed-resumo').value.trim();
-  _posts[_catSel].corpo_html= document.getElementById('ed-corpo').value;
-  fecharEditor();
-  // Atualizar preview
-  renderPreview(_posts[_catSel]);
-  document.getElementById('preview-title').textContent = _posts[_catSel].emoji+' '+_posts[_catSel].categoriaNome;
-  alert('✅ Alterações salvas! Clique em "Publicar" para publicar a versão editada.');
+async function salvarEdicao() {
+  var titulo    = document.getElementById('ed-titulo').value.trim();
+  var subtitulo = document.getElementById('ed-subtitulo').value.trim();
+  var resumo    = document.getElementById('ed-resumo').value.trim();
+  var corpo     = document.getElementById('ed-corpo').value;
+
+  if (window._modoEdicaoPublicado && window._editandoPost) {
+    // Modo: editar post já publicado → republicar
+    var post = Object.assign({}, window._editandoPost, {
+      titulo: titulo, subtitulo: subtitulo, resumo: resumo, corpo_html: corpo
+    });
+    try {
+      var r = await fetch('/api/blog?action=publicar', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(post)
+      }).then(function(x){return x.json();});
+      if (r.ok) {
+        fecharEditor();
+        window._modoEdicaoPublicado = false;
+        window._editandoPost = null;
+        alert('✅ Post republicado com as alterações!');
+        carregarPublicados(); // atualiza a lista
+      } else { alert('Erro ao republicar: '+(r.error||'falha')); }
+    } catch(e) { alert('Erro: '+e.message); }
+  } else {
+    // Modo: editar rascunho gerado (não publicado ainda)
+    if (!_catSel || !_posts[_catSel]) return;
+    _posts[_catSel].titulo    = titulo;
+    _posts[_catSel].subtitulo = subtitulo;
+    _posts[_catSel].resumo    = resumo;
+    _posts[_catSel].corpo_html= corpo;
+    fecharEditor();
+    renderPreview(_posts[_catSel]);
+    document.getElementById('preview-title').textContent = _posts[_catSel].emoji+' '+_posts[_catSel].categoriaNome;
+    alert('✅ Alterações salvas! Clique em "Publicar" para publicar a versão editada.');
+  }
 }
 </script>
 
