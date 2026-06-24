@@ -642,7 +642,7 @@ module.exports = async function handler(req, res) {
           const comRevisao = tem(['Revisão']);
           const preco = comRevisao ? '390' : '350';
           const textoBase = `Olá, sou Alessandra, Reparo Eletro, e vou te passar seu orçamento agora. Fizemos as análises e para fazer a desmontagem do equipamento, lixar, pintar, refazer as instalações e montar novamente, fica em [VALOR] reais apenas. Aprovando, já iniciamos a reforma.`.replace('[VALOR]', preco);
-          const textoFinal = textoBase + (comRevisao ? ` Observação: foi identificado que existem componentes que estão apresentando falhas e será necessário também fazer uma revisão completa para que além da reforma o equipamento fique em perfeito funcionamento.` : '');
+          const textoFinal = textoBase + (comRevisao ? ` Observação: foi identificado que existem componentes que estão apresentando falhas e será necessário também fazer uma revisão completa para que além da reforma o equipamento fique em perfeito funcionamento. Esta revisão não terá nenhum custo adicional.` : '');
           return { texto: textoFinal, preco };
         }
         if (tem(['Magnetron'])) {
