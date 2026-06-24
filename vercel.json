@@ -75,6 +75,66 @@
   ],
   "rewrites": [
     {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "riorefrigeracao.com"
+        }
+      ],
+      "destination": "/rio-refrigeracao.html"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.riorefrigeracao.com"
+        }
+      ],
+      "destination": "/rio-refrigeracao.html"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "cabofriogeladeiras.com"
+        }
+      ],
+      "destination": "/cabo-frio-geladeiras.html"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.cabofriogeladeiras.com"
+        }
+      ],
+      "destination": "/cabo-frio-geladeiras.html"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "rjgeladeiras.com"
+        }
+      ],
+      "destination": "/rj-geladeiras.html"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.rjgeladeiras.com"
+        }
+      ],
+      "destination": "/rj-geladeiras.html"
+    },
+    {
       "source": "/api/agendamento",
       "destination": "/api/agendamento.js"
     },
@@ -564,6 +624,57 @@
     }
   ],
   "headers": [
+    {
+      "source": "/rj-geladeiras",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Pragma",
+          "value": "no-cache"
+        },
+        {
+          "key": "Expires",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "source": "/cabo-frio-geladeiras",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Pragma",
+          "value": "no-cache"
+        },
+        {
+          "key": "Expires",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "source": "/rio-refrigeracao",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Pragma",
+          "value": "no-cache"
+        },
+        {
+          "key": "Expires",
+          "value": "0"
+        }
+      ]
+    },
     {
       "source": "/agendamento",
       "headers": [
