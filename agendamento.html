@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agendamentos — Reparo Eletro BH</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#07080a;color:#f0f2f5;min-height:100vh;}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;background:#0d0e12;border-bottom:1px solid #1e2228;position:sticky;top:0;z-index:50;}
+.hdr-title{font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.tabs{display:flex;background:#0d0e12;border-bottom:1px solid #1e2228;}
+.tab{padding:11px 20px;font-size:11px;font-weight:800;letter-spacing:.08em;cursor:pointer;color:#5a6270;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;}
+.tab.on{color:#3b9eff;border-bottom-color:#3b9eff;}
+.content{padding:20px;max-width:1100px;margin:0 auto;}
+
+/* CHAT INPUT */
+.chat-box{background:#0f1114;border:1px solid #1e2228;border-radius:14px;padding:20px;margin-bottom:20px;}
+.chat-title{font-size:12px;font-weight:800;color:#3b9eff;text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.form-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;}
+.field-lbl{font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;}
+.field-inp{width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:8px;padding:10px 14px;color:#f0f2f5;font-size:13px;outline:none;}
+.field-inp:focus{border-color:#3b9eff;}
+select.field-inp option{background:#181b1f;}
+.msg-ok{font-size:11px;color:#86efac;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);border-radius:6px;padding:8px 12px;margin-bottom:10px;display:none;}
+.btn-criar{background:#22c55e;border:none;color:#fff;padding:11px 28px;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;width:100%;}
+.btn-criar:hover{opacity:.88;}
+
+/* STATS */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
+.stat-card{background:#0f1114;border:1px solid #1e2228;border-radius:10px;padding:14px;}
+.stat-lbl{font-size:9px;color:#5a6270;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;}
+.stat-val{font-size:22px;font-weight:800;}
+
+/* TABELA */
+.table-wrap{background:#0f1114;border:1px solid #1e2228;border-radius:10px;overflow:hidden;margin-bottom:20px;}
+.table-hdr{display:grid;gap:0;padding:10px 14px;border-bottom:1px solid #1e2228;font-size:9px;color:#5a6270;text-transform:uppercase;letter-spacing:.08em;}
+.table-hdr.pendentes{grid-template-columns:1.5fr 1fr 1.5fr 1fr 1.5fr 90px 130px 130px;}
+.table-hdr.hist{grid-template-columns:1.5fr 1fr 1.5fr 1fr 1.5fr 90px 90px 110px;}
+.row{display:grid;gap:0;padding:12px 14px;border-bottom:1px solid #0d0e12;align-items:center;transition:background .1s;}
+.row:last-child{border-bottom:none;}
+.row:hover{background:#141720;}
+.row.pendentes{grid-template-columns:1.5fr 1fr 1.5fr 1fr 1.5fr 90px 130px 130px;}
+.row.hist{grid-template-columns:1.5fr 1fr 1.5fr 1fr 1.5fr 90px 90px 110px;}
+.cell{font-size:12px;color:#f0f2f5;padding-right:8px;}
+.cell.muted{color:#5a6270;}
+.cell.green{color:#22c55e;font-weight:700;}
+.cell.red{color:#ef4444;}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;}
+.badge.realizado{background:rgba(34,197,94,.12);color:#22c55e;}
+.badge.cancelado{background:rgba(239,68,68,.12);color:#ef4444;}
+.badge.pendente{background:rgba(245,200,0,.12);color:#f5c800;}
+.preco-inp{background:#181b1f;border:1px solid #2a2f38;border-radius:6px;padding:5px 8px;color:#f0f2f5;font-size:11px;width:80px;outline:none;}
+.preco-inp:focus{border-color:#3b9eff;}
+.btn-sm{padding:6px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:none;white-space:nowrap;}
+.btn-ok{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.25);}
+.btn-ok:hover{background:rgba(34,197,94,.25);}
+.btn-cancel{background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.2);}
+.btn-cancel:hover{background:rgba(239,68,68,.22);}
+.empty{text-align:center;padding:48px 20px;color:#5a6270;}
+.empty-icon{font-size:32px;margin-bottom:8px;}
+
+/* RELATÓRIO */
+.rel-section{background:#0f1114;border:1px solid #1e2228;border-radius:10px;padding:16px;margin-bottom:16px;}
+.rel-title{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;}
+
+@media(max-width:768px){
+  .form-grid,.form-grid-3{grid-template-columns:1fr;}
+  .stats-row{grid-template-columns:1fr 1fr;}
+  .table-hdr,.row{font-size:10px;}
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-title">📅 Agendamentos</div>
+  <a href="/" style="color:#5a6270;font-size:12px;text-decoration:none;">← ADM</a>
+</div>
+
+<div class="tabs">
+  <button class="tab on" onclick="setTab('pendentes')">📋 PENDENTES</button>
+  <button class="tab" onclick="setTab('realizados')">✅ REALIZADOS</button>
+  <button class="tab" onclick="setTab('cancelados')">❌ CANCELADOS</button>
+  <button class="tab" onclick="setTab('relatorio')">📊 RELATÓRIO</button>
+</div>
+
+<!-- ABA PENDENTES -->
+<div id="tab-pendentes" class="content">
+
+  <!-- CHAT / FORM CRIAR -->
+  <div class="chat-box">
+    <div class="chat-title">🤖 Novo Agendamento</div>
+    <div id="msg-ok" class="msg-ok">✅ Agendamento criado!</div>
+    <div class="form-grid">
+      <div><div class="field-lbl">Nome do Cliente *</div><input id="f-nome" class="field-inp" placeholder="Ex: Maria Silva"></div>
+      <div><div class="field-lbl">Telefone *</div><input id="f-tel" class="field-inp" placeholder="(31) 9 9999-9999"></div>
+    </div>
+    <div style="margin-bottom:10px;">
+      <div class="field-lbl">Endereço</div>
+      <input id="f-end" class="field-inp" placeholder="Rua, número, bairro, cidade">
+    </div>
+    <div class="form-grid">
+      <div>
+        <div class="field-lbl">Tipo de Equipamento</div>
+        <select id="f-equip" class="field-inp">
+          <option value="">Selecionar...</option>
+          <option>Geladeira</option><option>TV</option><option>Microondas</option>
+          <option>Lava e Seca</option><option>Purificador</option><option>Bebedouro</option>
+          <option>Adega</option><option>Forno</option><option>Outro</option>
+        </select>
+      </div>
+      <div><div class="field-lbl">Defeito Relatado</div><input id="f-def" class="field-inp" placeholder="Ex: Não gela, faz barulho..."></div>
+    </div>
+    <div class="form-grid" style="margin-bottom:14px;">
+      <div><div class="field-lbl">Valor da Taxa de Visita</div><input id="f-taxa" class="field-inp" placeholder="Ex: R$ 80,00"></div>
+      <div><div class="field-lbl">Preço do Serviço (se souber)</div><input id="f-preco" class="field-inp" placeholder="Ex: R$ 250,00"></div>
+    </div>
+    <button class="btn-criar" onclick="criar()">📅 Criar Agendamento</button>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-row" id="stats-row">
+    <div class="stat-card"><div class="stat-lbl">Pendentes</div><div class="stat-val" id="st-pend" style="color:#f5c800;">—</div></div>
+    <div class="stat-card"><div class="stat-lbl">Realizados</div><div class="stat-val" id="st-real" style="color:#22c55e;">—</div></div>
+    <div class="stat-card"><div class="stat-lbl">Cancelados</div><div class="stat-val" id="st-canc" style="color:#ef4444;">—</div></div>
+    <div class="stat-card"><div class="stat-lbl">Total Faturado</div><div class="stat-val" id="st-fat" style="color:#a855f7;">—</div></div>
+  </div>
+
+  <!-- TABELA PENDENTES -->
+  <div class="table-wrap">
+    <div class="table-hdr pendentes">
+      <span>Nome</span><span>Telefone</span><span>Endereço</span>
+      <span>Equipamento</span><span>Defeito</span><span>Taxa</span>
+      <span>Preço Serviço</span><span>Ações</span>
+    </div>
+    <div id="lista-pendentes"><div class="empty"><div class="empty-icon">📋</div><div>Nenhum agendamento pendente</div></div></div>
+  </div>
+</div>
+
+<!-- ABA REALIZADOS -->
+<div id="tab-realizados" class="content" style="display:none;">
+  <div class="table-wrap">
+    <div class="table-hdr hist">
+      <span>Nome</span><span>Telefone</span><span>Endereço</span>
+      <span>Equipamento</span><span>Defeito</span><span>Taxa</span><span>Preço</span><span>Finalizado</span>
+    </div>
+    <div id="lista-realizados"><div class="empty"><div class="empty-icon">✅</div><div>Nenhum serviço realizado ainda</div></div></div>
+  </div>
+</div>
+
+<!-- ABA CANCELADOS -->
+<div id="tab-cancelados" class="content" style="display:none;">
+  <div class="table-wrap">
+    <div class="table-hdr hist">
+      <span>Nome</span><span>Telefone</span><span>Endereço</span>
+      <span>Equipamento</span><span>Defeito</span><span>Taxa</span><span>Preço</span><span>Cancelado em</span>
+    </div>
+    <div id="lista-cancelados"><div class="empty"><div class="empty-icon">❌</div><div>Nenhum cancelamento</div></div></div>
+  </div>
+</div>
+
+<!-- ABA RELATÓRIO -->
+<div id="tab-relatorio" class="content" style="display:none;">
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-lbl">Total Agendamentos</div><div class="stat-val" id="r-total" style="color:#3b9eff;">—</div></div>
+    <div class="stat-card"><div class="stat-lbl">Realizados</div><div class="stat-val" id="r-real" style="color:#22c55e;">—</div></div>
+    <div class="stat-card"><div class="stat-lbl">Cancelados</div><div class="stat-val" id="r-canc" style="color:#ef4444;">—</div></div>
+    <div class="stat-card"><div class="stat-lbl">Faturado (Realizados)</div><div class="stat-val" id="r-fat" style="color:#a855f7;">—</div></div>
+  </div>
+  <div class="rel-section">
+    <div class="rel-title" style="color:#22c55e;">✅ Serviços Realizados</div>
+    <div id="rel-realizados"></div>
+  </div>
+  <div class="rel-section">
+    <div class="rel-title" style="color:#ef4444;">❌ Serviços Cancelados</div>
+    <div id="rel-cancelados"></div>
+  </div>
+</div>
+
+<script>
+var _ags = [];
+
+function setTab(t) {
+  ['pendentes','realizados','cancelados','relatorio'].forEach(function(id,i){
+    document.getElementById('tab-'+id).style.display = t===id?'block':'none';
+    document.querySelectorAll('.tab')[i].classList.toggle('on', t===id);
+  });
+  if(t==='relatorio') renderRelatorio();
+}
+
+async function api(action, body) {
+  var opts = {headers:{'Content-Type':'application/json'}};
+  if(body){opts.method='POST';opts.body=JSON.stringify(body);}
+  var r = await fetch('/api/agendamento?action='+action, opts);
+  return r.json();
+}
+
+async function carregar() {
+  var r = await api('relatorio');
+  if(!r.ok) return;
+  _ags = r.agendamentos||[];
+  document.getElementById('st-pend').textContent = r.pendentes;
+  document.getElementById('st-real').textContent = r.realizados;
+  document.getElementById('st-canc').textContent = r.cancelados;
+  document.getElementById('st-fat').textContent  = 'R$ '+r.totalRealizado.toFixed(2).replace('.',',');
+  renderPendentes();
+  renderHistorico('realizados');
+  renderHistorico('cancelados');
+}
+
+function renderPendentes() {
+  var pend = _ags.filter(function(a){return a.status==='pendente';});
+  var el = document.getElementById('lista-pendentes');
+  if(!pend.length){el.innerHTML='<div class="empty"><div class="empty-icon">📋</div><div>Nenhum agendamento pendente</div></div>';return;}
+  el.innerHTML = pend.map(function(a){
+    return '<div class="row pendentes" id="row-'+a.id+'">'
+      +'<div class="cell">'+escH(a.nome)+'</div>'
+      +'<div class="cell muted">'+escH(a.telefone)+'</div>'
+      +'<div class="cell muted" style="font-size:11px;">'+escH(a.endereco||'—')+'</div>'
+      +'<div class="cell">'+escH(a.equipamento||'—')+'</div>'
+      +'<div class="cell muted" style="font-size:11px;">'+escH(a.defeito||'—')+'</div>'
+      +'<div class="cell green">'+escH(a.taxa||'—')+'</div>'
+      +'<div class="cell"><input class="preco-inp" id="preco-'+a.id+'" value="'+escH(a.preco||'')+'" placeholder="R$ 0,00" onblur="salvarPreco(\''+a.id+'\')" onkeydown="if(event.key===\'Enter\')salvarPreco(\''+a.id+'\')"></div>'
+      +'<div class="cell" style="display:flex;gap:5px;">'
+        +'<button class="btn-sm btn-ok" onclick="finalizar(\''+a.id+'\',\'realizado\')">✅ Realizado</button>'
+        +'<button class="btn-sm btn-cancel" onclick="finalizar(\''+a.id+'\',\'cancelado\')">❌ Cancelar</button>'
+      +'</div>'
+    +'</div>';
+  }).join('');
+}
+
+function renderHistorico(status) {
+  var lista = _ags.filter(function(a){return a.status===status;});
+  var el = document.getElementById('lista-'+status);
+  var emoji = status==='realizado' ? '✅' : '❌';
+  var msg   = status==='realizado' ? 'Nenhum serviço realizado ainda' : 'Nenhum cancelamento';
+  if(!lista.length){el.innerHTML='<div class="empty"><div class="empty-icon">'+emoji+'</div><div>'+msg+'</div></div>';return;}
+  el.innerHTML = lista.map(function(a){
+    return '<div class="row hist">'
+      +'<div class="cell">'+escH(a.nome)+'</div>'
+      +'<div class="cell muted">'+escH(a.telefone)+'</div>'
+      +'<div class="cell muted" style="font-size:11px;">'+escH(a.endereco||'—')+'</div>'
+      +'<div class="cell">'+escH(a.equipamento||'—')+'</div>'
+      +'<div class="cell muted" style="font-size:11px;">'+escH(a.defeito||'—')+'</div>'
+      +'<div class="cell green">'+escH(a.taxa||'—')+'</div>'
+      +'<div class="cell" style="color:#a855f7;font-weight:700;">'+escH(a.preco||'—')+'</div>'
+      +'<div class="cell muted" style="font-size:10px;">'+fmtDt(a.finalizadoEm)+'</div>'
+    +'</div>';
+  }).join('');
+}
+
+function renderRelatorio() {
+  var reals = _ags.filter(function(a){return a.status==='realizado';});
+  var cancs = _ags.filter(function(a){return a.status==='cancelado';});
+  var total = _ags.length;
+  var fat   = reals.reduce(function(s,a){return s+(parseFloat((a.preco||'0').replace(/[^\d.,]/g,'').replace(',','.'))||0);},0);
+  document.getElementById('r-total').textContent = total;
+  document.getElementById('r-real').textContent  = reals.length;
+  document.getElementById('r-canc').textContent  = cancs.length;
+  document.getElementById('r-fat').textContent   = 'R$ '+fat.toFixed(2).replace('.',',');
+  document.getElementById('rel-realizados').innerHTML = reals.length ? tabRelatorio(reals) : '<div style="color:#5a6270;font-size:12px;padding:12px 0;">Nenhum serviço realizado.</div>';
+  document.getElementById('rel-cancelados').innerHTML = cancs.length ? tabRelatorio(cancs) : '<div style="color:#5a6270;font-size:12px;padding:12px 0;">Nenhum cancelamento.</div>';
+}
+
+function tabRelatorio(lista) {
+  return '<table style="width:100%;border-collapse:collapse;font-size:11px;">'
+    +'<thead><tr style="color:#5a6270;">'
+    +'<th style="padding:8px 10px;text-align:left;">Nome</th>'
+    +'<th style="padding:8px 10px;text-align:left;">Telefone</th>'
+    +'<th style="padding:8px 10px;text-align:left;">Equipamento</th>'
+    +'<th style="padding:8px 10px;text-align:left;">Defeito</th>'
+    +'<th style="padding:8px 10px;text-align:left;">Taxa</th>'
+    +'<th style="padding:8px 10px;text-align:left;">Preço</th>'
+    +'<th style="padding:8px 10px;text-align:left;">Data</th>'
+    +'</tr></thead><tbody>'
+    +lista.map(function(a){
+      return '<tr style="border-top:1px solid #1e2228;">'
+        +'<td style="padding:8px 10px;color:#f0f2f5;">'+escH(a.nome)+'</td>'
+        +'<td style="padding:8px 4px;color:#5a6270;">'+escH(a.telefone)+'</td>'
+        +'<td style="padding:8px 4px;color:#f0f2f5;">'+escH(a.equipamento||'—')+'</td>'
+        +'<td style="padding:8px 4px;color:#5a6270;">'+escH(a.defeito||'—')+'</td>'
+        +'<td style="padding:8px 4px;color:#22c55e;">'+escH(a.taxa||'—')+'</td>'
+        +'<td style="padding:8px 4px;color:#a855f7;font-weight:700;">'+escH(a.preco||'—')+'</td>'
+        +'<td style="padding:8px 4px;color:#5a6270;">'+fmtDt(a.finalizadoEm||a.criadoEm)+'</td>'
+        +'</tr>';
+    }).join('')
+    +'</tbody></table>';
+}
+
+async function criar() {
+  var nome = document.getElementById('f-nome').value.trim();
+  var tel  = document.getElementById('f-tel').value.trim();
+  if(!nome||!tel){alert('Nome e telefone são obrigatórios');return;}
+  var r = await api('criar',{
+    nome,
+    telefone:tel,
+    endereco: document.getElementById('f-end').value.trim(),
+    equipamento: document.getElementById('f-equip').value,
+    defeito: document.getElementById('f-def').value.trim(),
+    taxa:  document.getElementById('f-taxa').value.trim(),
+    preco: document.getElementById('f-preco').value.trim()
+  });
+  if(r.ok){
+    ['f-nome','f-tel','f-end','f-def','f-taxa','f-preco'].forEach(function(id){document.getElementById(id).value='';});
+    document.getElementById('f-equip').value='';
+    var ok=document.getElementById('msg-ok');
+    ok.style.display='block';
+    setTimeout(function(){ok.style.display='none';},3000);
+    carregar();
+  } else { alert('Erro: '+(r.error||'falha')); }
+}
+
+async function salvarPreco(id) {
+  var preco = document.getElementById('preco-'+id)?.value||'';
+  await api('atualizar-preco',{id,preco});
+  var ag = _ags.find(function(a){return a.id===id;});
+  if(ag) ag.preco=preco;
+}
+
+async function finalizar(id, status) {
+  var preco = document.getElementById('preco-'+id)?.value||'';
+  var r = await api('finalizar',{id,status,preco});
+  if(r.ok){
+    // Remove a linha da tabela suavemente
+    var row = document.getElementById('row-'+id);
+    if(row){row.style.opacity='0';row.style.transition='opacity .3s';setTimeout(function(){carregar();},300);}
+    else carregar();
+  } else { alert('Erro: '+(r.error||'falha')); }
+}
+
+function fmtDt(s){if(!s)return'—';try{var d=new Date(s);return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}catch(e){return s;}}
+function escH(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
+
+carregar();
+</script>
+</body>
+</html>

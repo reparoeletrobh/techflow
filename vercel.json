@@ -75,6 +75,14 @@
   ],
   "rewrites": [
     {
+      "source": "/api/agendamento",
+      "destination": "/api/agendamento.js"
+    },
+    {
+      "source": "/agendamento",
+      "destination": "/agendamento.html"
+    },
+    {
       "source": "/sitemap.xml",
       "destination": "/api/sitemap.js"
     },
