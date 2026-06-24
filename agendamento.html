@@ -78,6 +78,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 
 <!-- PENDENTES -->
+<!-- BUSCA GERAL -->
+<div id="busca-geral-wrap" style="background:#0d0e12;border-bottom:1px solid #1e2228;padding:10px 20px;display:flex;gap:10px;align-items:center;">
+  <input id="busca-geral" class="inp" style="max-width:400px;background:#181b1f;"
+    placeholder="🔍 Pesquisa geral — busca em todas as abas..."
+    oninput="buscaGeral()">
+  <button onclick="document.getElementById('busca-geral').value='';buscaGeral();"
+    style="background:transparent;border:none;color:#5a6270;cursor:pointer;font-size:18px;">✕</button>
+  <span id="busca-geral-info" style="font-size:11px;color:#5a6270;"></span>
+</div>
+<!-- RESULTADOS BUSCA GERAL -->
+<div id="busca-geral-results" style="display:none;padding:20px;max-width:1100px;margin:0 auto;">
+  <div class="tbl">
+    <div class="tr th g-pend"><span>Nome</span><span>Telefone</span><span>Endereço</span><span>Equip.</span><span>Defeito</span><span>Taxa</span><span>Data</span><span>Preço</span><span>Status</span></div>
+    <div id="busca-geral-lista"></div>
+  </div>
+</div>
+
 <div class="pg on" id="pg0">
   <!-- CHAT -->
   <div class="chat-box">
@@ -124,6 +141,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="stat"><div class="stat-l">Agendados</div><div class="stat-v" id="n-ag" style="color:#3b9eff;">—</div></div>
     <div class="stat"><div class="stat-l">Realizados</div><div class="stat-v" id="n-real" style="color:#22c55e;">—</div></div>
     <div class="stat"><div class="stat-l">Faturado</div><div class="stat-v" id="n-fat" style="color:#a855f7;">—</div></div>
+  </div>
+  <!-- FILTRO LOCAL -->
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
+    <input id="busca-local" class="inp" style="max-width:340px;"
+      placeholder="🔍 Filtrar por nome, telefone, endereço, equipamento..."
+      oninput="filtrarLocal()">
+    <span id="busca-local-count" style="font-size:11px;color:#5a6270;"></span>
+    <button onclick="document.getElementById('busca-local').value='';filtrarLocal();"
+      style="background:transparent;border:none;color:#5a6270;cursor:pointer;font-size:11px;">✕ Limpar</button>
   </div>
   <!-- TABELA -->
   <div class="tbl">
@@ -398,6 +424,83 @@ function criar() {
       setTimeout(function(){ msg.style.display='none'; voltar(); carregar(); }, 2000);
     } else { alert('Erro: '+(r.error||'falha')); }
   });
+}
+
+// ── Filtro local (tabela pendentes) ──────────────────────────────────────
+function filtrarLocal() {
+  var q = document.getElementById('busca-local').value.toLowerCase().trim();
+  var pend = _ags.filter(function(a){ return a.status==='pendente'; });
+  var filtrados = q ? pend.filter(function(a){
+    return (a.nome||'').toLowerCase().indexOf(q)>=0
+      || (a.telefone||'').toLowerCase().indexOf(q)>=0
+      || (a.endereco||'').toLowerCase().indexOf(q)>=0
+      || (a.equipamento||'').toLowerCase().indexOf(q)>=0
+      || (a.defeito||'').toLowerCase().indexOf(q)>=0
+      || (a.taxa||'').toLowerCase().indexOf(q)>=0;
+  }) : pend;
+  renderPend(filtrados);
+  var cnt = document.getElementById('busca-local-count');
+  cnt.textContent = q ? filtrados.length+' resultado(s) de '+pend.length : '';
+}
+
+// ── Busca geral (todas as abas) ────────────────────────────────────────────
+function buscaGeral() {
+  var q = document.getElementById('busca-geral').value.toLowerCase().trim();
+  var wrap = document.getElementById('busca-geral-results');
+  var info = document.getElementById('busca-geral-info');
+  var pgs  = document.querySelectorAll('.pg');
+  var tabsEl = document.getElementById('tabs-bar');
+
+  if (!q) {
+    wrap.style.display = 'none';
+    pgs.forEach(function(p){ p.style.display=''; });
+    // Restaurar tab ativa
+    var onIdx = 0;
+    document.querySelectorAll('.tab').forEach(function(t,i){ if(t.classList.contains('on')) onIdx=i; });
+    ir(onIdx);
+    info.textContent = '';
+    return;
+  }
+
+  // Esconder todas as abas e mostrar resultados
+  pgs.forEach(function(p){ p.style.display='none'; });
+  wrap.style.display = 'block';
+
+  var STATUS_LABEL = { pendente:'⏳ Pendente', agendado:'📅 Agendado', realizado:'✅ Realizado', cancelado:'❌ Cancelado' };
+  var STATUS_COR   = { pendente:'#f5c800', agendado:'#3b9eff', realizado:'#22c55e', cancelado:'#ef4444' };
+
+  var resultados = _ags.filter(function(a){
+    return (a.nome||'').toLowerCase().indexOf(q)>=0
+      || (a.telefone||'').toLowerCase().indexOf(q)>=0
+      || (a.endereco||'').toLowerCase().indexOf(q)>=0
+      || (a.equipamento||'').toLowerCase().indexOf(q)>=0
+      || (a.defeito||'').toLowerCase().indexOf(q)>=0;
+  });
+
+  info.textContent = resultados.length + ' resultado(s) em todas as abas';
+
+  var lista = document.getElementById('busca-geral-lista');
+  if (!resultados.length) {
+    lista.innerHTML = '<div class="empty-row">Nenhuma ficha encontrada para "'+esc(q)+'"</div>';
+    return;
+  }
+
+  lista.innerHTML = resultados.map(function(a){
+    var badge = dataBadge(a.dataAgendada).replace(/__ID__/g, a.id);
+    var statusCor = STATUS_COR[a.status] || '#5a6270';
+    var statusLabel = STATUS_LABEL[a.status] || a.status;
+    return '<div class="tr g-pend" style="border-left:3px solid '+statusCor+';">'
+      +'<div><b style="font-size:12px;">'+esc(a.nome)+'</b></div>'
+      +'<div style="font-size:11px;color:#5a6270;">'+esc(a.telefone)+'</div>'
+      +'<div style="font-size:10px;color:#5a6270;">'+esc(a.endereco||'—')+'</div>'
+      +'<div style="font-size:11px;">'+esc(a.equipamento||'—')+'</div>'
+      +'<div style="font-size:10px;color:#5a6270;">'+esc(a.defeito||'—')+'</div>'
+      +'<div style="color:#22c55e;font-size:11px;">'+esc(a.taxa||'—')+'</div>'
+      +'<div style="font-size:11px;color:#3b9eff;">'+esc(a.dataAgendada||'—')+'</div>'
+      +'<div style="color:#a855f7;font-weight:700;">'+esc(a.preco||'—')+'</div>'
+      +'<div><span style="font-size:11px;font-weight:700;color:'+statusCor+';">'+statusLabel+'</span></div>'
+    +'</div>';
+  }).join('');
 }
 
 // ── Event listeners (mais confiável que onclick inline) ────────────────────
