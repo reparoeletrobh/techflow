@@ -101,7 +101,7 @@ function renderCards(posts) {
     return;
   }
   grid.innerHTML = posts.map(function(p){
-    var imgUrl = 'https://source.unsplash.com/400x200/?'+(p.imagem_query||p.categoriaNome)+',repair,appliance';
+    var imgUrl = 'https://loremflickr.com/400/200/'+(p.imagem_query||p.categoriaNome||'appliance').replace(/\s+/g,',')+',repair';
     return '<div class="post-card" onclick="window.location.href=\'/blog/\'+\''+p.slug+'\'">'
       +'<img class="post-img" src="'+imgUrl+'" alt="'+escH(p.imagem_alt||p.titulo)+'" loading="lazy">'
       +'<div class="post-body">'

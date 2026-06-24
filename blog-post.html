@@ -27,7 +27,7 @@
 <!-- Favicon -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔧</text></svg>">
 <!-- Preconnect -->
-<link rel="preconnect" href="https://source.unsplash.com">
+<link rel="preconnect" href="https://loremflickr.com">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;color:#1e293b;}
@@ -123,6 +123,46 @@ function setWaLink(titulo) {
   document.getElementById('float-cta').href = _waLink;
 }
 
+
+// Injeta imagens reais após cada H2 e substitui placeholders do prompt
+function injetarImagens(html, query) {
+  var kw = (query||'appliance repair').replace(/\s+/g,',');
+  var seed = 0;
+  // Substituir placeholders [IMAGEM ...] por imagens reais
+  html = html.replace(/\[IMAGEM[^\]]*\]/gi, function() {
+    seed++;
+    return '<img src="https://loremflickr.com/720/400/'+kw+'?lock='+seed+'" '
+      +'alt="Conserto em Belo Horizonte — Reparo Eletro BH" '
+      +'style="width:100%;border-radius:10px;margin:16px 0;" loading="lazy">';
+  });
+  html = html.replace(/\[INFOGR[^\]]*\]/gi, function() {
+    return '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;'
+      +'padding:20px;margin:20px 0;">'
+      +'<div style="font-size:14px;font-weight:700;color:#16a34a;margin-bottom:12px;">✅ Checklist Rápido</div>'
+      +'<p style="font-size:13px;color:#166534;">Veja os principais sinais de que seu equipamento precisa de um técnico.</p>'
+      +'</div>';
+  });
+  html = html.replace(/\[BANNER[^\]]*\]/gi, function() {
+    return '<div style="background:linear-gradient(135deg,#22c55e,#16a34a);border-radius:12px;'
+      +'padding:20px;margin:20px 0;text-align:center;color:#fff;">'
+      +'<div style="font-size:16px;font-weight:800;margin-bottom:6px;">Técnico disponível agora em BH</div>'
+      +'<div style="font-size:13px;opacity:.9;margin-bottom:14px;">Seg–Sáb até 21h · Técnico vai até você</div>'
+      +'<a href="'+_waLink+'" onclick="trackCTA()" style="background:#fff;color:#16a34a;padding:10px 24px;'
+      +'border-radius:8px;font-weight:800;text-decoration:none;font-size:14px;">📱 Chamar Técnico</a>'
+      +'</div>';
+  });
+  // Auto-injetar imagem após cada H2 que ainda não tenha imagem depois
+  var imgCount = 0;
+  html = html.replace(/(<h2[^>]*>.*?<\/h2>)(?!\s*<img)/gi, function(match) {
+    imgCount++;
+    if (imgCount > 4) return match; // máximo 4 imagens de seção
+    return match + '<img src="https://loremflickr.com/720/380/'+kw+'?lock='+(seed+imgCount)+'" '
+      +'alt="Conserto em Belo Horizonte — Reparo Eletro BH" '
+      +'style="width:100%;border-radius:10px;margin:12px 0 16px;" loading="lazy">';
+  });
+  return html;
+}
+
 async function carregarPost() {
   try {
     var r = await fetch('/api/blog?action=post&slug='+encodeURIComponent(_slug)).then(function(x){return x.json();});
@@ -139,7 +179,7 @@ async function carregarPost() {
 
 function renderPost(p) {
   var BASE = 'https://reparoeletroadm.com';
-  var imgUrl = 'https://source.unsplash.com/800x400/?'+(p.imagem_query||p.categoriaNome)+',repair,appliance';
+  var imgUrl = 'https://loremflickr.com/800/400/'+(p.imagem_query||p.categoriaNome||'appliance').replace(/\s+/g,',');
   var imgFull = imgUrl;
 
   // Meta tags dinâmicas
@@ -202,7 +242,7 @@ function renderPost(p) {
     // Imagem
     +'<img class="post-img-hero" itemprop="image" src="'+imgUrl+'" alt="'+escH(p.imagem_alt||p.titulo)+' — Reparo Eletro BH" loading="eager" width="720" height="380">'
     // Corpo
-    +'<div class="post-corpo" itemprop="articleBody">'+(p.corpo_html||'<p>Conteúdo em breve.</p>')+'</div>'
+    +'<div class="post-corpo" itemprop="articleBody">'+injetarImagens(p.corpo_html||'<p>Conteúdo em breve.</p>', p.imagem_query||p.categoriaNome)+'</div>'
     // FAQ
     +faqHtml
     // Tags
@@ -228,7 +268,7 @@ function renderPost(p) {
 // ── Schemas IA ────────────────────────────────────────────────────────────
 function injectSchemas(p) {
   var BASE = 'https://reparoeletroadm.com';
-  var imgUrl = 'https://source.unsplash.com/800x400/?'+(p.imagem_query||p.categoriaNome)+',repair';
+  var imgUrl = 'https://loremflickr.com/800/400/'+(p.imagem_query||p.categoriaNome||'appliance').replace(/\s+/g,',');
   var palavras = (p.corpo_html||'').replace(/<[^>]+>/g,' ').trim().split(/\s+/).length;
 
   // 1. Article Schema (E-E-A-T completo)
