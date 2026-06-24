@@ -43,6 +43,18 @@ export default async function handler(req, res) {
     return res.status(200).json({ok:true,agendamento:novo});
   }
 
+  // ── AGENDAR: setar data de agendamento ──────────────────────────────────
+  if(req.method==='POST'&&action==='agendar'){
+    const {id,dataAgendada}=req.body||{};
+    const ag=db.agendamentos.find(a=>a.id===id);
+    if(!ag) return res.status(404).json({ok:false,error:'Não encontrado'});
+    ag.status='agendado';
+    ag.dataAgendada=dataAgendada;
+    ag.atualizadoEm=new Date().toISOString();
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true});
+  }
+
   // ── ATUALIZAR PREÇO ───────────────────────────────────────────────────────
   if(req.method==='POST'&&action==='atualizar-preco'){
     const {id,preco}=req.body||{};
@@ -71,7 +83,7 @@ export default async function handler(req, res) {
   // ── RELATÓRIO ─────────────────────────────────────────────────────────────
   if(action==='relatorio'){
     const ags=db.agendamentos||[];
-    const pendentes  =ags.filter(a=>a.status==='pendente');
+    const pendentes  =ags.filter(a=>a.status==='pendente'||a.status==='agendado');
     const realizados =ags.filter(a=>a.status==='realizado');
     const cancelados =ags.filter(a=>a.status==='cancelado');
     const totalRealizado=realizados.reduce((s,a)=>s+parseFloat((a.preco||'0').replace(/[^\d.,]/g,'').replace(',','.'))||0,0);
