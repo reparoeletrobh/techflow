@@ -124,6 +124,34 @@ function setWaLink(titulo) {
 }
 
 
+
+// Imagem para o post — usa imagens do próprio site quando disponíveis
+function imgUrl(query, cat, w, h) {
+  var catMap = {
+    'geladeira':   '/imgs/3geladeiras.webp',
+    'lavaseca':    '/imgs/3lavaseca.webp'
+  };
+  var catKey = (cat||'').toLowerCase().replace(/\s/g,'').replace('lavaeseca','lavaseca');
+  if (catMap[catKey]) return catMap[catKey];
+  // Placeholder estilizado (sem dependência externa)
+  return null;
+}
+
+// Gera placeholder visual com emoji e cor
+function imgPlaceholder(cat, label) {
+  var emojis = {'tv':'📺','microondas':'📡','purificador':'💧','geladeira':'🧊','lavaseca':'👕'};
+  var colors = {'tv':'#1a2a4a','microondas':'#1a3a2a','purificador':'#0a2a4a','geladeira':'#0a1a3a','lavaseca':'#2a1a4a'};
+  var catKey = (cat||'').toLowerCase().replace(/\s/g,'');
+  var emoji  = emojis[catKey] || '🔧';
+  var color  = colors[catKey] || '#1e293b';
+  return '<div style="width:100%;height:240px;background:'+color+';border-radius:12px;'
+    +'display:flex;flex-direction:column;align-items:center;justify-content:center;'
+    +'margin-bottom:24px;gap:10px;">'
+    +'<div style="font-size:56px;">'+emoji+'</div>'
+    +'<div style="font-size:13px;color:rgba(255,255,255,.6);font-weight:600;">'+label+'</div>'
+    +'</div>';
+}
+
 // Injeta imagens reais após cada H2 e substitui placeholders do prompt
 function injetarImagens(html, query) {
   var kw = (query||'appliance repair').replace(/\s+/g,',');
@@ -131,9 +159,9 @@ function injetarImagens(html, query) {
   // Substituir placeholders [IMAGEM ...] por imagens reais
   html = html.replace(/\[IMAGEM[^\]]*\]/gi, function() {
     seed++;
-    return '<img src="https://loremflickr.com/720/400/'+kw+'?lock='+seed+'" '
-      +'alt="Conserto em Belo Horizonte — Reparo Eletro BH" '
-      +'style="width:100%;border-radius:10px;margin:16px 0;" loading="lazy">';
+    return '<div style="width:100%;height:160px;background:#f1f5f9;border-radius:10px;margin:16px 0;'
+      +'display:flex;align-items:center;justify-content:center;gap:10px;color:#94a3b8;font-size:13px;">'
+      +'🔧 Imagem ilustrativa — Reparo Eletro BH</div>';
   });
   html = html.replace(/\[INFOGR[^\]]*\]/gi, function() {
     return '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;'
@@ -156,9 +184,9 @@ function injetarImagens(html, query) {
   html = html.replace(/(<h2[^>]*>.*?<\/h2>)(?!\s*<img)/gi, function(match) {
     imgCount++;
     if (imgCount > 4) return match; // máximo 4 imagens de seção
-    return match + '<img src="https://loremflickr.com/720/380/'+kw+'?lock='+(seed+imgCount)+'" '
-      +'alt="Conserto em Belo Horizonte — Reparo Eletro BH" '
-      +'style="width:100%;border-radius:10px;margin:12px 0 16px;" loading="lazy">';
+    return match + '<div style="width:100%;height:140px;background:#f8fafc;border:1px solid #e2e8f0;'
+      +'border-radius:10px;margin:12px 0 16px;display:flex;align-items:center;'
+      +'justify-content:center;color:#94a3b8;font-size:12px;">🔧 Reparo Eletro BH</div>';
   });
   return html;
 }
@@ -179,8 +207,8 @@ async function carregarPost() {
 
 function renderPost(p) {
   var BASE = 'https://reparoeletroadm.com';
-  var imgUrl = 'https://loremflickr.com/800/400/'+(p.imagem_query||p.categoriaNome||'appliance').replace(/\s+/g,',');
-  var imgFull = imgUrl;
+  var _imgUrl = imgUrl(p.imagem_query, p.categoria, 800, 400);
+  var imgFull = _imgUrl || 'https://reparoeletroadm.com/imgs/3geladeiras.webp';
 
   // Meta tags dinâmicas
   document.getElementById('pg-title').textContent = p.titulo+' | Reparo Eletro BH — Conserto em BH e RMBH';
@@ -240,7 +268,9 @@ function renderPost(p) {
     +'Reparo Eletro BH · +15 anos de experiência · +39.000 consertos realizados em BH e RMBH</div>'
     +'</div>'
     // Imagem
-    +'<img class="post-img-hero" itemprop="image" src="'+imgUrl+'" alt="'+escH(p.imagem_alt||p.titulo)+' — Reparo Eletro BH" loading="eager" width="720" height="380">'
+    +(_imgUrl
+      ? '<img class="post-img-hero" itemprop="image" src="'+_imgUrl+'" alt="'+escH(p.imagem_alt||p.titulo)+' — Reparo Eletro BH" loading="eager" width="720" height="380" style="width:100%;max-height:380px;object-fit:cover;border-radius:12px;margin-bottom:24px;">'
+      : imgPlaceholder(p.categoria, p.categoriaNome+' — Reparo Eletro BH'))
     // Corpo
     +'<div class="post-corpo" itemprop="articleBody">'+injetarImagens(p.corpo_html||'<p>Conteúdo em breve.</p>', p.imagem_query||p.categoriaNome)+'</div>'
     // FAQ

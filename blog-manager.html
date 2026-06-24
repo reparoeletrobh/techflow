@@ -169,7 +169,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="preview-header">
       <div class="preview-title" id="preview-title">Selecione uma categoria</div>
       <div class="preview-actions">
-        <button class="btn-sec" onclick="regenerar()">🔄 Regenerar este</button>
+        <button class="btn-sec" onclick="regenerar()">🔄 Regenerar</button>
+        <button class="btn-sec" onclick="abrirEditor()" id="btn-edit">✏️ Editar</button>
         <button class="btn-pub" onclick="publicar()" id="btn-pub">✅ Publicar</button>
       </div>
     </div>
@@ -592,6 +593,92 @@ document.getElementById('config-overlay').addEventListener('click', function(e){
 
 // Verificar ao carregar
 verificarConfig();
+</script>
+
+
+<!-- MODAL EDITOR DE POST -->
+<div id="editor-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:990;overflow-y:auto;padding:20px;">
+  <div style="background:#0f1114;border:1px solid #1e2228;border-radius:14px;max-width:800px;margin:0 auto;overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #1e2228;background:#181b1f;">
+      <div style="font-size:14px;font-weight:800;">✏️ Editar Post</div>
+      <button onclick="fecharEditor()" style="background:transparent;border:none;color:#5a6270;font-size:22px;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Título</div>
+        <input id="ed-titulo" style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:8px;padding:10px 14px;color:#f0f2f5;font-size:14px;font-weight:700;outline:none;">
+      </div>
+      <div>
+        <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Subtítulo</div>
+        <input id="ed-subtitulo" style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:8px;padding:10px 14px;color:#f0f2f5;font-size:13px;outline:none;">
+      </div>
+      <div>
+        <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Resumo (aparece no card do blog)</div>
+        <textarea id="ed-resumo" rows="3" style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:8px;padding:10px 14px;color:#f0f2f5;font-size:12px;outline:none;resize:vertical;"></textarea>
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.08em;">Corpo do Post (HTML)</div>
+          <div style="display:flex;gap:6px;">
+            <button onclick="toggleEditorView('html')" id="ed-btn-html" style="font-size:10px;padding:4px 10px;border-radius:5px;background:#3b9eff;border:none;color:#fff;cursor:pointer;">HTML</button>
+            <button onclick="toggleEditorView('preview')" id="ed-btn-prev" style="font-size:10px;padding:4px 10px;border-radius:5px;background:#1e2228;border:none;color:#5a6270;cursor:pointer;">Prévia</button>
+          </div>
+        </div>
+        <textarea id="ed-corpo" rows="18" style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:8px;padding:12px 14px;color:#f0f2f5;font-size:12px;font-family:monospace;outline:none;resize:vertical;"></textarea>
+        <div id="ed-preview-wrap" style="display:none;background:#fff;border-radius:8px;padding:20px;max-height:400px;overflow-y:auto;font-family:sans-serif;font-size:14px;line-height:1.7;color:#1e293b;"></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:4px;">
+        <button onclick="fecharEditor()" style="background:#1e2228;border:none;color:#f0f2f5;padding:10px 20px;border-radius:8px;font-size:13px;cursor:pointer;">Cancelar</button>
+        <button onclick="salvarEdicao()" style="background:#22c55e;border:none;color:#fff;padding:10px 24px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">💾 Salvar Alterações</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function abrirEditor() {
+  if (!_catSel || !_posts[_catSel]) return alert('Selecione um post primeiro');
+  var p = _posts[_catSel];
+  document.getElementById('ed-titulo').value    = p.titulo    || '';
+  document.getElementById('ed-subtitulo').value = p.subtitulo || '';
+  document.getElementById('ed-resumo').value    = p.resumo    || '';
+  document.getElementById('ed-corpo').value     = p.corpo_html|| '';
+  document.getElementById('editor-overlay').style.display = 'block';
+  toggleEditorView('html');
+}
+function fecharEditor() {
+  document.getElementById('editor-overlay').style.display = 'none';
+}
+function toggleEditorView(mode) {
+  var ta   = document.getElementById('ed-corpo');
+  var prev = document.getElementById('ed-preview-wrap');
+  var btnH = document.getElementById('ed-btn-html');
+  var btnP = document.getElementById('ed-btn-prev');
+  if (mode === 'html') {
+    ta.style.display   = 'block';
+    prev.style.display = 'none';
+    btnH.style.background = '#3b9eff'; btnH.style.color = '#fff';
+    btnP.style.background = '#1e2228'; btnP.style.color = '#5a6270';
+  } else {
+    prev.innerHTML = ta.value;
+    ta.style.display   = 'none';
+    prev.style.display = 'block';
+    btnP.style.background = '#3b9eff'; btnP.style.color = '#fff';
+    btnH.style.background = '#1e2228'; btnH.style.color = '#5a6270';
+  }
+}
+function salvarEdicao() {
+  if (!_catSel || !_posts[_catSel]) return;
+  _posts[_catSel].titulo    = document.getElementById('ed-titulo').value.trim();
+  _posts[_catSel].subtitulo = document.getElementById('ed-subtitulo').value.trim();
+  _posts[_catSel].resumo    = document.getElementById('ed-resumo').value.trim();
+  _posts[_catSel].corpo_html= document.getElementById('ed-corpo').value;
+  fecharEditor();
+  // Atualizar preview
+  renderPreview(_posts[_catSel]);
+  document.getElementById('preview-title').textContent = _posts[_catSel].emoji+' '+_posts[_catSel].categoriaNome;
+  alert('✅ Alterações salvas! Clique em "Publicar" para publicar a versão editada.');
+}
 </script>
 
 </body>

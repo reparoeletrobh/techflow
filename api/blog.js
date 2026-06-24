@@ -125,7 +125,7 @@ NÃO é publicidade direta. É conteúdo educativo onde a Reparo Eletro BH surge
 → 1.500 a 2.000 palavras (sweet spot para SEO Google + AI Overviews)
 → Indicar "8 min de leitura" no post
 → Parágrafos curtos (3–4 linhas máximo)
-→ TL;DR de 3 frases no início do post
+→ Resumo Rápido em português (2-3 frases) no início do post, sob o título, com a label "📋 Resumo Rápido:"
 
 ════ ESTRUTURA OBRIGATÓRIA ════
 1. GANCHO (150–200 palavras)

@@ -101,7 +101,7 @@ function renderCards(posts) {
     return;
   }
   grid.innerHTML = posts.map(function(p){
-    var imgUrl = 'https://loremflickr.com/400/200/'+(p.imagem_query||p.categoriaNome||'appliance').replace(/\s+/g,',')+',repair';
+    var imgUrl = p.categoria==='geladeira'?'/imgs/3geladeiras.webp':p.categoria==='lavaseca'?'/imgs/3lavaseca.webp':'data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3Crect fill='%231e293b' width='400' height='200'/%3E%3Ctext x='50%25' y='50%25' fill='%23475569' font-size='40' text-anchor='middle' dominant-baseline='middle'%3E🔧%3C/text%3E%3C/svg%3E';
     return '<div class="post-card" onclick="window.location.href=\'/blog/\'+\''+p.slug+'\'">'
       +'<img class="post-img" src="'+imgUrl+'" alt="'+escH(p.imagem_alt||p.titulo)+'" loading="lazy">'
       +'<div class="post-body">'
