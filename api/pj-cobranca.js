@@ -168,8 +168,9 @@ module.exports = async function handler(req, res) {
             dueDate:         normData(vencimento),
             description:     descricao || `Manutenção — ${cliente.razaoSocial||'Cliente PJ'}`,
             externalReference: `${clienteId}-${cobId||Date.now()}`,
-            fine:    { value: 2 },
-            interest:{ value: 1 },
+            fine:     { value: 2 },
+            interest: { value: 1 },
+            discount: { value: 0, dueDateLimitDays: 0, type: 'PERCENTAGE' },
           }),
         }).then(r=>r.json());
 
