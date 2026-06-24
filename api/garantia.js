@@ -263,6 +263,19 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, ficha });
     }
 
+    // ── POST marcar-wpp: cliente comunicado via WhatsApp ─────────
+    if (action === 'marcar-wpp') {
+      const { id } = req.body || {};
+      if (!id) return res.status(400).json({ ok:false, error:'id obrigatório' });
+      const db = (await dbGet(GARANTIA_KEY)) || defaultDB();
+      const ficha = (db.fichas||[]).find(f => f.id === id);
+      if (!ficha) return res.status(404).json({ ok:false, error:'Ficha não encontrada' });
+      ficha.wppComunicado   = true;
+      ficha.wppComunicadoEm = new Date().toISOString();
+      await dbSet(GARANTIA_KEY, db);
+      return res.status(200).json({ ok:true });
+    }
+
     // ── POST excluir ───────────────────────────────────────────
     if (req.method === "POST" && action === "excluir") {
       const { id } = req.body || {};

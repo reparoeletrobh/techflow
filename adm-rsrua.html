@@ -142,6 +142,12 @@ header{
   box-shadow:0 8px 30px rgba(0,0,0,.6);
 }
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* Card comunicado via WhatsApp */
+.os-card.wpp-ok { border:2px solid #25d366 !important; background:rgba(37,211,102,.06) !important; }
+.wpp-badge { display:flex; align-items:center; gap:6px; background:rgba(37,211,102,.12);
+  border:1px solid rgba(37,211,102,.3); border-radius:7px; padding:6px 10px;
+  font-size:11px; font-weight:700; color:#25d366; margin-top:8px; }
 </style>
 </head>
 <body>
@@ -282,13 +288,14 @@ function card(f) {
   var twoActions = tel && mapUrl;
   var actRow = twoActions
     ? '<div class="row2">'+
-        '<a class="act wpp" href="https://wa.me/55'+tel+'?text='+wppMsg+'" target="_blank">💬 WhatsApp</a>'+
+        '<a class="act wpp" href="https://wa.me/55'+tel+'?text='+wppMsg+'" target="_blank" onclick="marcarWpp(\''+f.id+'\')" >💬 WhatsApp</a>'+
         '<a class="act maps" href="'+mapUrl+'" target="_blank">🗺️ Maps</a>'+
       '</div>'
-    : (tel ? '<a class="act wpp" href="https://wa.me/55'+tel+'?text='+wppMsg+'" target="_blank">💬 WhatsApp</a>' : '')
+    : (tel ? '<a class="act wpp" href="https://wa.me/55'+tel+'?text='+wppMsg+'" target="_blank" onclick="marcarWpp(\''+f.id+'\')" >💬 WhatsApp</a>' : '')
     + (mapUrl ? '<a class="act maps" href="'+mapUrl+'" target="_blank">🗺️ Ir ao Endereço</a>' : '');
 
-  return '<div class="os-card" id="c-'+f.id+'">' +
+  var wppBadge = f.wppComunicado ? '<div class="wpp-badge">✅ Cliente comunicado via WhatsApp</div>' : '';
+  return '<div class="os-card'+(f.wppComunicado?' wpp-ok':'')+'" id="c-'+f.id+'">' +
     '<div class="card-top">'+
       '<div class="os-nome">'+esc(f.nome)+'</div>'+
       '<div class="os-def">'+esc(f.defeito)+'</div>'+
@@ -298,6 +305,7 @@ function card(f) {
       '</div>'+
       '<div class="fase-badge">'+fase.icon+' '+esc(fase.label.replace('\n',' '))+'</div>'+
     '</div>'+
+    wppBadge +
     '<div class="fase-sel">'+pills+'</div>'+
     '<div class="actions">'+
       actRow+
@@ -343,6 +351,30 @@ async function reabrirOS(id) {
 
 load();
 setInterval(load, 60000);
+
+async function marcarWpp(id) {
+  // 1. Atualizar visualmente o card imediatamente
+  var card = document.getElementById('c-' + id);
+  if (card) {
+    card.classList.add('wpp-ok');
+    // Adicionar badge se não existir
+    if (!card.querySelector('.wpp-badge')) {
+      var badge = document.createElement('div');
+      badge.className = 'wpp-badge';
+      badge.textContent = '✅ Cliente comunicado via WhatsApp';
+      var faseBtns = card.querySelector('.fase-btns');
+      if (faseBtns) faseBtns.after(badge);
+      else card.appendChild(badge);
+    }
+  }
+  // 2. Salvar no servidor
+  try {
+    await api('marcar-wpp', { id: id });
+  } catch(e) {
+    console.warn('Erro ao salvar wpp:', e.message);
+  }
+}
+
 </script>
 </body>
 </html>
