@@ -99,35 +99,51 @@ select.field-inp option{background:#181b1f;}
 <!-- ABA PENDENTES -->
 <div id="tab-pendentes" class="content">
 
-  <!-- CHAT / FORM CRIAR -->
+  <!-- CHAT INTELIGENTE -->
   <div class="chat-box">
-    <div class="chat-title">🤖 Novo Agendamento</div>
-    <div id="msg-ok" class="msg-ok">✅ Agendamento criado!</div>
-    <div class="form-grid">
-      <div><div class="field-lbl">Nome do Cliente *</div><input id="f-nome" class="field-inp" placeholder="Ex: Maria Silva"></div>
-      <div><div class="field-lbl">Telefone *</div><input id="f-tel" class="field-inp" placeholder="(31) 9 9999-9999"></div>
-    </div>
-    <div style="margin-bottom:10px;">
-      <div class="field-lbl">Endereço</div>
-      <input id="f-end" class="field-inp" placeholder="Rua, número, bairro, cidade">
-    </div>
-    <div class="form-grid">
-      <div>
-        <div class="field-lbl">Tipo de Equipamento</div>
-        <select id="f-equip" class="field-inp">
-          <option value="">Selecionar...</option>
-          <option>Geladeira</option><option>TV</option><option>Microondas</option>
-          <option>Lava e Seca</option><option>Purificador</option><option>Bebedouro</option>
-          <option>Adega</option><option>Forno</option><option>Outro</option>
-        </select>
+    <div class="chat-title">🤖 Criar Agendamento — Cole a Ficha</div>
+
+    <!-- Etapa 1: colar a ficha -->
+    <div id="step-colar">
+      <div style="font-size:11px;color:#5a6270;margin-bottom:10px;line-height:1.6;">
+        Cole abaixo o conteúdo da ficha do cliente (WhatsApp, anotação, etc.).<br>
+        O sistema extrai nome, telefone, endereço, equipamento e taxa automaticamente.
       </div>
-      <div><div class="field-lbl">Defeito Relatado</div><input id="f-def" class="field-inp" placeholder="Ex: Não gela, faz barulho..."></div>
+      <div style="background:#181b1f;border:1px solid #2a2f38;border-radius:10px;padding:12px;margin-bottom:6px;font-size:11px;color:#5a6270;font-family:monospace;line-height:1.7;">
+        Exemplo:<br>Cliente<br>Weber 4256<br>(33) 98727-4256<br>Endereço: Rua dos Cometas 35, apto 302, milionários<br>Maquina Brastemp parou de funcionar<br>Taxa 30 ok
+      </div>
+      <textarea id="chat-ficha" rows="8" class="field-inp"
+        style="font-family:monospace;font-size:12px;line-height:1.7;resize:vertical;margin-bottom:10px;"
+        placeholder="Cole aqui o conteúdo da ficha..."></textarea>
+      <button class="btn-criar" onclick="extrairFicha()">🔍 Extrair Dados da Ficha</button>
     </div>
-    <div class="form-grid" style="margin-bottom:14px;">
-      <div><div class="field-lbl">Valor da Taxa de Visita</div><input id="f-taxa" class="field-inp" placeholder="Ex: R$ 80,00"></div>
-      <div><div class="field-lbl">Preço do Serviço (se souber)</div><input id="f-preco" class="field-inp" placeholder="Ex: R$ 250,00"></div>
+
+    <!-- Etapa 2: confirmar dados extraídos -->
+    <div id="step-confirmar" style="display:none;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+        <span style="font-size:16px;">✅</span>
+        <span style="font-size:12px;color:#86efac;font-weight:700;">Dados extraídos! Confirme antes de criar:</span>
+        <button onclick="voltarColar()" style="margin-left:auto;background:transparent;border:none;color:#5a6270;font-size:11px;cursor:pointer;text-decoration:underline;">← Editar ficha</button>
+      </div>
+      <div id="msg-ok" class="msg-ok">✅ Agendamento criado!</div>
+      <div class="form-grid">
+        <div><div class="field-lbl">Nome *</div><input id="f-nome" class="field-inp"></div>
+        <div><div class="field-lbl">Telefone *</div><input id="f-tel" class="field-inp"></div>
+      </div>
+      <div style="margin-bottom:10px;">
+        <div class="field-lbl">Endereço</div>
+        <input id="f-end" class="field-inp">
+      </div>
+      <div class="form-grid">
+        <div><div class="field-lbl">Equipamento</div><input id="f-equip" class="field-inp"></div>
+        <div><div class="field-lbl">Defeito</div><input id="f-def" class="field-inp"></div>
+      </div>
+      <div class="form-grid" style="margin-bottom:14px;">
+        <div><div class="field-lbl">Taxa de Visita</div><input id="f-taxa" class="field-inp"></div>
+        <div><div class="field-lbl">Preço do Serviço</div><input id="f-preco" class="field-inp" placeholder="Preencher depois"></div>
+      </div>
+      <button class="btn-criar" onclick="criar()">📅 Criar Agendamento</button>
     </div>
-    <button class="btn-criar" onclick="criar()">📅 Criar Agendamento</button>
   </div>
 
   <!-- STATS -->
@@ -373,6 +389,86 @@ function tabRelatorio(lista) {
     +'</tbody></table>';
 }
 
+function extrairFicha() {
+  var texto = document.getElementById('chat-ficha').value.trim();
+  if (!texto) { alert('Cole o conteúdo da ficha primeiro.'); return; }
+
+  // Limpar linhas vazias e espaços
+  var linhas = texto.split('\n')
+    .map(function(l){ return l.trim(); })
+    .filter(function(l){ return l.length > 0; });
+
+  var nome='', tel='', end='', equip='', def='', taxa='';
+
+  linhas.forEach(function(l) {
+    var ll = l.toLowerCase();
+
+    // Telefone: linha com padrão de número brasileiro
+    if (!tel && /^[\(\+]?\d[\d\s\-\.\(\)]{7,}/.test(l)) {
+      tel = l; return;
+    }
+    // Endereço: linha com "Endereço:", "End:", "rua ", "av ", "alameda"
+    if (!end && /^endere[cç]o[:\s]/i.test(l)) {
+      end = l.replace(/^endere[cç]o[:\s]*/i,'').trim(); return;
+    }
+    // Taxa: linha com "taxa" ou "tx"
+    if (!taxa && /\btaxa\b|\btx\b/i.test(l)) {
+      var m = l.match(/[Rr]\$?\s*([\d.,]+)/);
+      taxa = m ? 'R$ '+m[1] : l; return;
+    }
+    // Ignorar cabeçalho "Cliente"
+    if (ll === 'cliente' || ll === 'novo cliente' || ll === 'ficha') return;
+
+    // Nome: linha com 4 dígitos no final (padrão "Weber 4256")
+    if (!nome && /\d{4}\s*$/.test(l) && l.length < 40) {
+      nome = l; return;
+    }
+    // Equipamento/defeito: restante
+    if (!nome && !tel && !end) { nome = l; return; }
+    if (!equip) { equip = l; return; }
+    if (!def)   { def   = l; return; }
+  });
+
+  // Se nome ainda vazio, pegar primeira linha não especial
+  if (!nome) {
+    linhas.some(function(l){
+      if (!/^endere[cç]o/i.test(l) && !/\btaxa\b/i.test(l) && !/^[\(\+]?\d/.test(l) && l.toLowerCase()!=='cliente') {
+        nome=l; return true;
+      }
+    });
+  }
+
+  // Separar equipamento e defeito se estiverem juntos
+  if (equip && !def) {
+    // Ex: "Maquina Brastemp parou de funcionar"
+    var partes = equip.match(/^(.*?\b(?:brastemp|samsung|lg|electrolux|consul|midea|panasonic|philco|arno)[^\s]*\s*\w*)\s+(.*)/i);
+    if (partes) { equip = partes[1]; def = partes[2]; }
+    else {
+      // separar na palavra-chave de defeito
+      var kw = equip.search(/parou|não|nao|barulho|vazando|queimou|travou|com defeito|esquentando|gelando|batendo/i);
+      if (kw > 5) { def = equip.slice(kw); equip = equip.slice(0,kw).trim(); }
+    }
+  }
+
+  // Preencher campos
+  document.getElementById('f-nome').value  = nome;
+  document.getElementById('f-tel').value   = tel;
+  document.getElementById('f-end').value   = end;
+  document.getElementById('f-equip').value = equip;
+  document.getElementById('f-def').value   = def;
+  document.getElementById('f-taxa').value  = taxa;
+  document.getElementById('f-preco').value = '';
+
+  // Mostrar etapa de confirmação
+  document.getElementById('step-colar').style.display    = 'none';
+  document.getElementById('step-confirmar').style.display = 'block';
+}
+
+function voltarColar() {
+  document.getElementById('step-confirmar').style.display = 'none';
+  document.getElementById('step-colar').style.display     = 'block';
+}
+
 async function criar() {
   var nome = document.getElementById('f-nome').value.trim();
   var tel  = document.getElementById('f-tel').value.trim();
@@ -392,6 +488,9 @@ async function criar() {
     var ok=document.getElementById('msg-ok');
     ok.style.display='block';
     setTimeout(function(){ok.style.display='none';},3000);
+    // Voltar ao chat
+    document.getElementById('chat-ficha').value='';
+    voltarColar();
     carregar();
   } else { alert('Erro: '+(r.error||'falha')); }
 }
