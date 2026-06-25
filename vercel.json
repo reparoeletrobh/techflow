@@ -75,6 +75,14 @@
   ],
   "rewrites": [
     {
+      "source": "/api/tv-conflitos",
+      "destination": "/api/tv-conflitos.js"
+    },
+    {
+      "source": "/tv/conflitos",
+      "destination": "/tv-conflitos.html"
+    },
+    {
       "source": "/api/tv-notas",
       "destination": "/api/tv-notas.js"
     },

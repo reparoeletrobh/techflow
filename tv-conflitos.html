@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Conflitos TV — Reparo Eletro BH</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#07080a;color:#f0f2f5;min-height:100vh;}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;background:#0d0e12;border-bottom:1px solid #1e2228;position:sticky;top:0;z-index:50;}
+.hdr-t{font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.content{padding:20px;max-width:900px;margin:0 auto;}
+
+/* FORM */
+.form-box{background:#0f1114;border:1px solid #1e2228;border-radius:12px;padding:20px;margin-bottom:20px;}
+.form-box h3{font-size:11px;font-weight:800;color:#f04060;text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px;}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.lbl{font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;}
+.inp{width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:8px;padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;}
+.inp:focus{border-color:#f04060;}
+.prio-btns{display:flex;gap:6px;margin-bottom:10px;}
+.pb{padding:7px 16px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid transparent;background:#181b1f;color:#5a6270;}
+.pb.on.critico{background:rgba(239,68,68,.15);color:#ef4444;border-color:rgba(239,68,68,.3);}
+.pb.on.alto   {background:rgba(245,158,11,.15);color:#f59e0b;border-color:rgba(245,158,11,.3);}
+.pb.on.normal {background:rgba(59,130,246,.15);color:#60a5fa;border-color:rgba(59,130,246,.3);}
+.btn{padding:10px 24px;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;border:none;}
+.btn-red{background:#f04060;color:#fff;width:100%;margin-top:8px;}
+.ok-msg{display:none;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:#86efac;border-radius:6px;padding:8px 12px;font-size:12px;margin-top:8px;}
+
+/* CONFLITO CARD */
+.c-card{background:#181b1f;border-radius:12px;padding:16px;margin-bottom:14px;border:1px solid #1e2228;}
+.c-card.critico{border-color:rgba(239,68,68,.35);}
+.c-card.alto   {border-color:rgba(245,158,11,.35);}
+.c-card.resolvido{opacity:.55;}
+.c-titulo{font-size:13px;font-weight:700;margin-bottom:4px;}
+.c-desc{font-size:11px;color:#5a6270;line-height:1.5;margin-bottom:8px;}
+.c-badges{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;}
+.badge-crit{background:rgba(239,68,68,.12);color:#ef4444;}
+.badge-alto{background:rgba(245,158,11,.12);color:#f59e0b;}
+.badge-norm{background:rgba(59,130,246,.12);color:#60a5fa;}
+.badge-res {background:rgba(34,197,94,.12);color:#22c55e;}
+.badge-ab  {background:rgba(239,68,68,.1);color:#fca5a5;}
+.c-actions{display:flex;gap:6px;margin-bottom:12px;}
+.ba{padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:none;}
+.ba-res{background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.2);}
+.ba-del{background:rgba(239,68,68,.1);color:#fca5a5;border:1px solid rgba(239,68,68,.2);}
+
+/* NOTAS */
+.notas-wrap{border-top:1px solid #1e2228;padding-top:12px;}
+.notas-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.notas-lbl{font-size:10px;font-weight:800;color:#f59e0b;text-transform:uppercase;letter-spacing:.06em;}
+.btn-nova{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.2);color:#f59e0b;padding:4px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;}
+.nota-form{display:none;background:#0f1114;border:1px solid #2a2f38;border-radius:8px;padding:12px;margin-bottom:8px;}
+.nota-form textarea{width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:6px;padding:8px;color:#f0f2f5;font-size:12px;outline:none;resize:none;margin-bottom:8px;}
+.nota-form .nfg{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:flex-end;}
+.nf-inp{width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:6px;padding:6px 8px;color:#f0f2f5;font-size:12px;outline:none;}
+.btn-salvar-nota{background:#f59e0b;border:none;color:#000;padding:7px 14px;border-radius:6px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;}
+.nota-item{background:#0f1114;border:1px solid #2a2f38;border-radius:7px;padding:9px 11px;margin-bottom:6px;}
+.nota-txt{font-size:12px;color:#f0f2f5;line-height:1.5;margin-bottom:5px;}
+.nota-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.nd-ok  {font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(34,197,94,.12);color:#22c55e;}
+.nd-warn{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(245,158,11,.12);color:#f59e0b;}
+.nd-late{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(239,68,68,.12);color:#ef4444;}
+.nota-del{background:transparent;border:none;color:#5a6270;cursor:pointer;margin-left:auto;font-size:12px;}
+.sec-title{font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.08em;margin:20px 0 10px;}
+.empty{text-align:center;padding:40px;color:#5a6270;}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div class="hdr-t">⚡ Conflitos TV</div>
+  <div style="font-size:11px;color:#5a6270;">Sistema exclusivo TV</div>
+</div>
+<div class="content">
+
+  <!-- NOVO CONFLITO -->
+  <div class="form-box">
+    <h3>⚡ Registrar Novo Conflito</h3>
+    <div id="ok-msg" class="ok-msg">✅ Conflito registrado!</div>
+    <div style="margin-bottom:10px;">
+      <div class="lbl">Título *</div>
+      <input id="f-titulo" class="inp" placeholder="Descreva o conflito brevemente">
+    </div>
+    <div class="fg">
+      <div><div class="lbl">Setor</div><input id="f-setor" class="inp" placeholder="Ex: Barramento, Técnico..."></div>
+      <div><div class="lbl">Registrado por</div><input id="f-autor" class="inp" placeholder="Seu nome"></div>
+    </div>
+    <div style="margin-bottom:10px;">
+      <div class="lbl">Descrição</div>
+      <textarea id="f-desc" class="inp" rows="3" style="resize:vertical;"></textarea>
+    </div>
+    <div style="margin-bottom:10px;">
+      <div class="lbl">Prioridade *</div>
+      <div class="prio-btns">
+        <button class="pb critico" onclick="selPrio('critico',this)">🔴 Crítico</button>
+        <button class="pb alto"    onclick="selPrio('alto',this)">🟠 Alto</button>
+        <button class="pb normal"  onclick="selPrio('normal',this)">🔵 Normal</button>
+      </div>
+    </div>
+    <button class="btn btn-red" onclick="criar()">⚡ Registrar Conflito</button>
+  </div>
+
+  <!-- LISTA -->
+  <div id="sec-abertos" class="sec-title">⚠️ Conflitos Abertos</div>
+  <div id="lista-abertos"><div class="empty">Carregando...</div></div>
+
+  <div class="sec-title" id="sec-res" style="cursor:pointer;" onclick="toggleRes()">▶ Resolvidos</div>
+  <div id="lista-res" style="display:none;"></div>
+</div>
+
+<script>
+var _prio = '';
+var _showRes = false;
+
+function selPrio(p, btn) {
+  _prio = p;
+  document.querySelectorAll('.pb').forEach(function(b){ b.classList.remove('on'); });
+  btn.classList.add('on');
+}
+
+function corData(ds) {
+  if(!ds) return null;
+  var hoje=new Date(); hoje.setHours(0,0,0,0);
+  var dt=new Date(ds+'T00:00:00');
+  var d=Math.round((dt-hoje)/86400000);
+  var fmt=dt.toLocaleDateString('pt-BR');
+  if(d<0)  return {cls:'nd-late', lbl:fmt+' ⚠️ Vencida'};
+  if(d===0)return {cls:'nd-late', lbl:'Hoje 🔴'};
+  if(d<=2) return {cls:'nd-warn', lbl:fmt+' 🟠'};
+  return         {cls:'nd-ok',   lbl:fmt+' 🟢'};
+}
+
+function esc(s){ var d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+
+function notaHtml(n, cid) {
+  var cor = corData(n.vencimento);
+  return '<div class="nota-item">'
+    +'<div class="nota-txt">'+esc(n.texto)+'</div>'
+    +'<div class="nota-meta">'
+    +(cor?'<span class="'+cor.cls+'">📅 '+cor.lbl+'</span>':'')
+    +(n.autor?'<span style="font-size:10px;color:#5a6270;">👤 '+esc(n.autor)+'</span>':'')
+    +'<button class="nota-del" onclick="excluirNota(\''+cid+'\',\''+n.nid+'\')">🗑</button>'
+    +'</div></div>';
+}
+
+function card(c) {
+  var priCls = c.prioridade==='critico'?'critico':c.prioridade==='alto'?'alto':'';
+  var badgeCls = c.prioridade==='critico'?'badge-crit':c.prioridade==='alto'?'badge-alto':'badge-norm';
+  var priLbl = c.prioridade==='critico'?'🔴 CRÍTICO':c.prioridade==='alto'?'🟠 ALTO':'🔵 NORMAL';
+  var notas = c.notas||[];
+  var vencidas = notas.filter(function(n){ var cor=corData(n.vencimento); return cor&&cor.cls==='nd-late'; }).length;
+
+  return '<div class="c-card '+priCls+(c.status==='resolvido'?' resolvido':'')+'" id="cc-'+c.id+'">'
+    +'<div class="c-titulo">'+esc(c.titulo)+'</div>'
+    +(c.descricao?'<div class="c-desc">'+esc(c.descricao)+'</div>':'')
+    +'<div class="c-badges">'
+      +'<span class="badge '+badgeCls+'">'+priLbl+'</span>'
+      +(c.status==='resolvido'?'<span class="badge badge-res">✅ Resolvido</span>':'<span class="badge badge-ab">⚠️ Aberto</span>')
+      +(c.setor?'<span class="badge" style="background:#1e2228;color:#5a6270;">📁 '+esc(c.setor)+'</span>':'')
+      +(c.registradoPor?'<span class="badge" style="background:#1e2228;color:#5a6270;">👤 '+esc(c.registradoPor)+'</span>':'')
+    +'</div>'
+    +(c.status!=='resolvido'?
+      '<div class="c-actions">'
+        +'<button class="ba ba-res" onclick="resolver(\''+c.id+'\')">✅ Resolver</button>'
+        +'<button class="ba ba-del" onclick="excluir(\''+c.id+'\')">🗑 Excluir</button>'
+      +'</div>':'')
+    // NOTAS
+    +'<div class="notas-wrap">'
+      +'<div class="notas-hdr">'
+        +'<span class="notas-lbl">📝 Notas ('+notas.length+')'+(vencidas?' <span style="background:#ef4444;color:#fff;font-size:9px;padding:1px 5px;border-radius:6px;">'+vencidas+' vencida'+(vencidas>1?'s':'')+'</span>':'')+'</span>'
+        +'<button class="btn-nova" onclick="toggleForm(\''+c.id+'\')">✚ Nova nota</button>'
+      +'</div>'
+      +'<div id="nf-'+c.id+'" class="nota-form">'
+        +'<textarea id="nt-'+c.id+'" rows="3" placeholder="Escreva a nota..."></textarea>'
+        +'<div class="nfg">'
+          +'<div><div class="lbl">📅 Vencimento</div><input type="date" id="nv-'+c.id+'" class="nf-inp"></div>'
+          +'<div><div class="lbl">👤 Autor</div><input type="text" id="na-'+c.id+'" class="nf-inp" placeholder="Seu nome"></div>'
+          +'<button class="btn-salvar-nota" onclick="salvarNota(\''+c.id+'\')">Salvar</button>'
+        +'</div>'
+      +'</div>'
+      +(notas.length?notas.slice().reverse().map(function(n){return notaHtml(n,c.id);}).join('')
+        :'<div style="font-size:11px;color:#5a6270;padding:6px 0;">Nenhuma nota ainda.</div>')
+    +'</div>'
+  +'</div>';
+}
+
+async function api(action, body) {
+  var opts = { headers: {'Content-Type':'application/json'} };
+  if(body){ opts.method='POST'; opts.body=JSON.stringify(body); }
+  return fetch('/api/tv-conflitos?action='+action, opts).then(function(r){return r.json();});
+}
+
+async function carregar() {
+  try {
+    var r = await api('listar');
+    var ab = (r.conflitos||[]).filter(function(c){return c.status!=='resolvido';});
+    var res= (r.conflitos||[]).filter(function(c){return c.status==='resolvido';});
+    document.getElementById('sec-abertos').textContent='⚠️ Conflitos Abertos ('+ab.length+')';
+    document.getElementById('lista-abertos').innerHTML = ab.length
+      ? ab.map(card).join('')
+      : '<div class="empty">Nenhum conflito aberto 🎉</div>';
+    document.getElementById('lista-res').innerHTML = res.length
+      ? res.map(card).join('')
+      : '<div class="empty">Nenhum conflito resolvido.</div>';
+    document.getElementById('sec-res').textContent = (_showRes?'▼':'▶')+' Resolvidos ('+res.length+')';
+  } catch(e) {
+    document.getElementById('lista-abertos').innerHTML='<div class="empty" style="color:#ef4444;">❌ Erro: '+e.message+'</div>';
+  }
+}
+
+async function criar() {
+  var titulo = document.getElementById('f-titulo').value.trim();
+  if(!titulo){ alert('Informe o título do conflito'); return; }
+  if(!_prio) { alert('Selecione a prioridade'); return; }
+  var r = await api('criar', {
+    titulo, prioridade: _prio,
+    setor:  document.getElementById('f-setor').value.trim(),
+    descricao: document.getElementById('f-desc').value.trim(),
+    registradoPor: document.getElementById('f-autor').value.trim()
+  });
+  if(r.ok){
+    document.getElementById('f-titulo').value='';
+    document.getElementById('f-desc').value='';
+    document.getElementById('f-setor').value='';
+    document.getElementById('f-autor').value='';
+    _prio='';
+    document.querySelectorAll('.pb').forEach(function(b){b.classList.remove('on');});
+    var m=document.getElementById('ok-msg');
+    m.style.display='block';
+    setTimeout(function(){m.style.display='none';},2000);
+    carregar();
+  } else alert('Erro: '+(r.error||'falha'));
+}
+
+async function resolver(id){
+  if(!confirm('Marcar como resolvido?')) return;
+  var r = await api('resolver',{id});
+  if(r.ok) carregar();
+}
+
+async function excluir(id){
+  if(!confirm('Excluir este conflito?')) return;
+  var r = await api('excluir',{id});
+  if(r.ok) carregar();
+}
+
+function toggleForm(id){
+  var el=document.getElementById('nf-'+id);
+  if(el) el.style.display=el.style.display==='none'||el.style.display===''?'block':'none';
+}
+
+async function salvarNota(id){
+  var texto=(document.getElementById('nt-'+id)||{}).value||'';
+  var venc =(document.getElementById('nv-'+id)||{}).value||'';
+  var autor=(document.getElementById('na-'+id)||{}).value||'';
+  if(!texto.trim()){alert('Escreva o conteúdo da nota.');return;}
+  if(!venc)        {alert('Escolha uma data de vencimento.');return;}
+  var r = await api('adicionar-nota',{id,texto:texto.trim(),vencimento:venc,autor:autor.trim()});
+  if(r.ok){ document.getElementById('nf-'+id).style.display='none'; carregar(); }
+  else alert('Erro: '+(r.error||'falha'));
+}
+
+async function excluirNota(id,nid){
+  if(!confirm('Excluir esta nota?')) return;
+  var r = await api('excluir-nota',{id,nid});
+  if(r.ok) carregar();
+}
+
+function toggleRes(){
+  _showRes=!_showRes;
+  document.getElementById('lista-res').style.display=_showRes?'block':'none';
+  carregar();
+}
+
+carregar();
+</script>
+</body>
+</html>
