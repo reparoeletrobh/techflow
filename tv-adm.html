@@ -316,6 +316,12 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
         <span class="nav-label">Catálogo Peças</span>
       </div>
 
+      <div class="nav-item" data-label="Notas"
+           style="--item-color:#f59e0b" onclick="abrirPainelNotas()">
+        <span class="nav-icon" style="background:rgba(245,158,11,.15);">📝</span>
+        <span class="nav-label">Notas</span>
+      </div>
+
       <div class="nav-item" data-url="/tv/compras-pecas" data-label="Compra de Peças"
            style="--item-color:#f97316" onclick="openPage(this)">
         <span class="nav-icon">🔩</span>
@@ -783,6 +789,217 @@ async function catCarregarHistorico(){
 }
 function catEsc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
 function catFmtDt(s){if(!s)return'—';try{var d=new Date(s);return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}catch(e){return s;}}
+</script>
+
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- PAINEL NOTAS — INLINE (sem iframe)                  -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div id="notas-overlay" onclick="fecharPainelNotas(event)"
+  style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.6);">
+  <div id="notas-painel" onclick="event.stopPropagation()"
+    style="position:absolute;bottom:0;left:0;right:0;height:92vh;
+           background:#0f1114;border-top:2px solid #1e2228;
+           border-radius:16px 16px 0 0;display:flex;flex-direction:column;overflow:hidden;">
+
+    <!-- Cabeçalho -->
+    <div style="display:flex;align-items:center;justify-content:space-between;
+                padding:14px 20px;border-bottom:1px solid #1e2228;flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:20px;">📝</span>
+        <span style="font-size:15px;font-weight:700;color:#f0f2f5;">Notas</span>
+        <span id="notas-badge" style="display:none;background:#ef4444;color:#fff;
+          font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;">0</span>
+      </div>
+      <button onclick="fecharNotasPainel()"
+        style="background:transparent;border:none;color:#5a6270;font-size:22px;cursor:pointer;">✕</button>
+    </div>
+
+    <!-- Formulário nova nota -->
+    <div style="padding:14px 20px;border-bottom:1px solid #1e2228;flex-shrink:0;background:#181b1f;">
+      <div style="font-size:10px;color:#f59e0b;text-transform:uppercase;font-weight:800;letter-spacing:.08em;margin-bottom:10px;">✚ Nova Nota</div>
+      <div id="notas-msg" style="display:none;padding:6px 10px;border-radius:6px;font-size:11px;margin-bottom:8px;"></div>
+      <textarea id="nota-texto" rows="3" placeholder="Escreva a nota aqui..."
+        style="width:100%;background:#0f1114;border:1px solid #2a2f38;border-radius:8px;
+               padding:10px 14px;color:#f0f2f5;font-size:13px;outline:none;resize:none;margin-bottom:10px;"></textarea>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <div style="flex:1;">
+          <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">📅 Vencimento</div>
+          <input type="date" id="nota-vencimento"
+            style="background:#0f1114;border:1px solid #2a2f38;border-radius:8px;
+                   padding:8px 12px;color:#f0f2f5;font-size:13px;outline:none;width:100%;">
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">👤 Autor (opcional)</div>
+          <input type="text" id="nota-autor" placeholder="Seu nome..."
+            style="background:#0f1114;border:1px solid #2a2f38;border-radius:8px;
+                   padding:8px 12px;color:#f0f2f5;font-size:13px;outline:none;width:100%;">
+        </div>
+        <div style="padding-top:16px;">
+          <button onclick="notaCriar()"
+            style="background:#f59e0b;border:none;color:#000;padding:9px 20px;
+                   border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;">
+            ✚ Adicionar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lista de notas -->
+    <div style="flex:1;overflow-y:auto;padding:16px 20px;">
+      <!-- Ativas -->
+      <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;">
+        📋 Notas Ativas
+      </div>
+      <div id="notas-lista-ativas">
+        <div style="text-align:center;padding:30px;color:#5a6270;">Carregando...</div>
+      </div>
+
+      <!-- Concluídas (colapsável) -->
+      <div style="margin-top:20px;">
+        <button onclick="toggleNotasConcluidas()" id="btn-concluidas"
+          style="background:transparent;border:none;color:#5a6270;font-size:11px;
+                 cursor:pointer;display:flex;align-items:center;gap:6px;">
+          ▶ Ver notas concluídas
+        </button>
+        <div id="notas-lista-concluidas" style="display:none;margin-top:10px;"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+var _notasVisivelConcluidas = false;
+
+function abrirPainelNotas() {
+  document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
+  document.querySelectorAll('.nav-item').forEach(function(n){
+    if(n.textContent.includes('Notas')) n.classList.add('active');
+  });
+  if(typeof closeMobile==='function') closeMobile();
+  document.getElementById('notas-overlay').style.display='block';
+  notasCarregar();
+}
+function fecharPainelNotas(e){
+  if(e && e.target!==document.getElementById('notas-overlay')) return;
+  fecharNotasPainel();
+}
+function fecharNotasPainel(){
+  document.getElementById('notas-overlay').style.display='none';
+  document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
+}
+
+// Cor do badge de data
+function notaCorData(ds){
+  if(!ds) return null;
+  var hoje=new Date(); hoje.setHours(0,0,0,0);
+  var dt=new Date(ds+'T00:00:00');
+  var diff=Math.round((dt-hoje)/86400000);
+  if(diff<0)  return {cls:'#ef4444',bg:'rgba(239,68,68,.12)',label:dt.toLocaleDateString('pt-BR')+'  ⚠️ Vencida'};
+  if(diff===0)return {cls:'#ef4444',bg:'rgba(239,68,68,.12)',label:'Hoje 🔴'};
+  if(diff<=2) return {cls:'#f59e0b',bg:'rgba(245,158,11,.12)',label:dt.toLocaleDateString('pt-BR')+' 🟠'};
+  return       {cls:'#22c55e',bg:'rgba(34,197,94,.12)',label:dt.toLocaleDateString('pt-BR')+' 🟢'};
+}
+
+function notaCard(n, concluida) {
+  var cor = concluida ? null : notaCorData(n.vencimento);
+  var dataBadge = n.vencimento
+    ? '<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;'
+      +(cor?'background:'+cor.bg+';color:'+cor.cls:'background:#1e2228;color:#5a6270')+';">'
+      +(cor?cor.label:new Date(n.vencimento+'T00:00:00').toLocaleDateString('pt-BR'))+'</span>'
+    : '';
+  var op = concluida ? 'opacity:.55;' : '';
+  return '<div style="background:#181b1f;border:1px solid '+(concluida?'#1e2228':(cor?cor.cls+'33':'#1e2228'))
+    +';border-radius:10px;padding:14px;margin-bottom:10px;'+op+'">'
+    +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px;">'
+      +'<div style="font-size:13px;color:#f0f2f5;line-height:1.6;flex:1;">'+notaEsc(n.texto)+'</div>'
+      +'<div style="display:flex;gap:6px;flex-shrink:0;">'
+        +(concluida?'':'<button onclick="notaConcluir(''+n.id+'')" style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.2);color:#22c55e;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;">✅ Concluir</button>')
+        +'<button onclick="notaExcluir(''+n.id+'')" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:#fca5a5;padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer;">🗑</button>'
+      +'</div>'
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      +dataBadge
+      +(n.autor?'<span style="font-size:10px;color:#5a6270;">👤 '+notaEsc(n.autor)+'</span>':'')
+      +'<span style="font-size:10px;color:#5a6270;">'+new Date(n.criadaEm).toLocaleDateString('pt-BR')+'</span>'
+      +(concluida?'<span style="font-size:10px;color:#22c55e;">✅ Concluída</span>':'')
+    +'</div>'
+    +'</div>';
+}
+
+async function notasCarregar(){
+  try {
+    var r=await fetch('/api/tv-notas?action=listar').then(function(x){return x.json();});
+    var ativas=  (r.notas||[]).filter(function(n){return n.status==='ativa';});
+    var concl=   (r.notas||[]).filter(function(n){return n.status==='concluida';});
+    var vencidas=ativas.filter(function(n){var d=notaCorData(n.vencimento);return d&&d.cls==='#ef4444';});
+
+    // Badge de vencidas
+    var badge=document.getElementById('notas-badge');
+    if(vencidas.length){badge.textContent=vencidas.length;badge.style.display='inline';}
+    else badge.style.display='none';
+
+    // Ordenar: vencidas primeiro, depois próximas, depois futuras
+    ativas.sort(function(a,b){return a.vencimento.localeCompare(b.vencimento);});
+
+    var elA=document.getElementById('notas-lista-ativas');
+    elA.innerHTML=ativas.length?ativas.map(function(n){return notaCard(n,false);}).join('')
+      :'<div style="text-align:center;padding:30px;color:#5a6270;">Nenhuma nota ativa 🎉</div>';
+
+    var elC=document.getElementById('notas-lista-concluidas');
+    elC.innerHTML=concl.length?concl.map(function(n){return notaCard(n,true);}).join('')
+      :'<div style="padding:16px;color:#5a6270;font-size:12px;">Nenhuma nota concluída.</div>';
+
+    document.getElementById('btn-concluidas').textContent=
+      (_notasVisivelConcluidas?'▼':'▶')+' Notas concluídas ('+concl.length+')';
+  }catch(e){
+    document.getElementById('notas-lista-ativas').innerHTML=
+      '<div style="color:#ef4444;padding:16px;">❌ Erro: '+e.message+'</div>';
+  }
+}
+
+async function notaCriar(){
+  var texto=document.getElementById('nota-texto').value.trim();
+  var venc= document.getElementById('nota-vencimento').value;
+  var autor=document.getElementById('nota-autor').value.trim();
+  var msg=document.getElementById('notas-msg');
+  if(!texto){alert('Escreva o conteúdo da nota');return;}
+  if(!venc) {alert('Escolha uma data de vencimento');return;}
+  msg.style.display='none';
+  try{
+    var r=await fetch('/api/tv-notas?action=criar',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({texto,vencimento:venc,autor})
+    }).then(function(x){return x.json();});
+    if(r.ok){
+      document.getElementById('nota-texto').value='';
+      document.getElementById('nota-vencimento').value='';
+      document.getElementById('nota-autor').value='';
+      msg.style.cssText='display:block;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:6px;padding:6px 10px;font-size:11px;color:#86efac;margin-bottom:8px;';
+      msg.textContent='✅ Nota adicionada!';
+      setTimeout(function(){msg.style.display='none';},2000);
+      notasCarregar();
+    }
+  }catch(e){alert('Erro: '+e.message);}
+}
+
+async function notaConcluir(id){
+  var r=await fetch('/api/tv-notas?action=concluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})}).then(function(x){return x.json();});
+  if(r.ok) notasCarregar();
+}
+async function notaExcluir(id){
+  if(!confirm('Excluir esta nota?')) return;
+  var r=await fetch('/api/tv-notas?action=excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})}).then(function(x){return x.json();});
+  if(r.ok) notasCarregar();
+}
+function toggleNotasConcluidas(){
+  _notasVisivelConcluidas=!_notasVisivelConcluidas;
+  document.getElementById('notas-lista-concluidas').style.display=_notasVisivelConcluidas?'block':'none';
+  document.getElementById('btn-concluidas').textContent=
+    (_notasVisivelConcluidas?'▼':'▶')+' Notas concluídas';
+}
+function notaEsc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
 </script>
 
 </body>

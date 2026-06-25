@@ -75,6 +75,14 @@
   ],
   "rewrites": [
     {
+      "source": "/api/tv-notas",
+      "destination": "/api/tv-notas.js"
+    },
+    {
+      "source": "/notas",
+      "destination": "/notas.html"
+    },
+    {
       "source": "/1",
       "has": [
         {
