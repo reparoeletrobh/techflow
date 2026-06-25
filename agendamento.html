@@ -257,8 +257,8 @@ function carregar() {
   apiCall('relatorio').then(function(r) {
     if (!r.ok) return;
     _ags = r.agendamentos || [];
-    var pend = _ags.filter(function(a){ return a.status==='pendente'; });
-    var ags  = _ags.filter(function(a){ return a.status==='agendado'; });
+    var pend = _ags.filter(function(a){ return a.status==='pendente' && !a.aprovado; });
+        var ags  = _ags.filter(function(a){ return a.status==='agendado' && !a.aprovado; });
     var real = _ags.filter(function(a){ return a.status==='realizado'; });
     document.getElementById('n-pend').textContent = pend.length;
     document.getElementById('n-ag').textContent   = ags.length;
@@ -359,6 +359,7 @@ function renderAprov(lista) {
 
 function renderAgs(lista) {
   var el = document.getElementById('lst-ag');
+  lista = lista.filter(function(a){ return !a.aprovado; });
   lista.sort(function(a,b){ return (a.dataAgendada||'zz').localeCompare(b.dataAgendada||'zz'); });
   el.innerHTML = lista.length ? lista.map(rowPend).join('') : '<div class="empty-row">📅 Nenhum agendamento com data</div>';
 }
