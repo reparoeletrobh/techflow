@@ -56,6 +56,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .ba{padding:5px 9px;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;border:none;white-space:nowrap;}
 .ba-ok{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.25);}
 .ba-cx{background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.2);}
+.ba-apr{background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.25);font-weight:800;}
+.ba-apr.on{background:rgba(34,197,94,.25);color:#16a34a;border:1px solid rgba(34,197,94,.5);}
+/* Linha aprovada — fundo verde suave */
+.row-aprovada{background:rgba(34,197,94,.07) !important;border-left:3px solid #22c55e;}
+.row-aprovada:hover{background:rgba(34,197,94,.12) !important;}
 /* rel table */
 .rtbl{width:100%;border-collapse:collapse;font-size:12px;}
 .rtbl th{padding:8px 10px;text-align:left;color:#5a6270;font-size:10px;text-transform:uppercase;border-bottom:1px solid #1e2228;}
@@ -275,6 +280,7 @@ function rowPend(a) {
     +'<div><input type="text" class="price-i" value="'+esc(a.preco||'')+'" placeholder="R$" onblur="salvarPreco(this)" data-id="'+a.id+'"></div>'
     +'<div style="display:flex;flex-direction:column;gap:4px;">'
       +'<button class="ba" style="background:rgba(59,158,255,.12);color:#3b9eff;border:1px solid rgba(59,158,255,.2);" onclick="abrirEditar(\''+a.id+'\')" >✏️ Editar</button>'
+      +'<button class="ba ba-apr'+(a.aprovado?' on':'')+'" onclick="aprovar(\''+a.id+'\')">👍 '+(a.aprovado?'Aprovado':'Aprovar')+'</button>'
       +'<button class="ba ba-ok" onclick="finalizar(\''+a.id+'\',\'realizado\')">✅ Realizado</button>'
       +'<button class="ba ba-cx" onclick="finalizar(\''+a.id+'\',\'cancelado\')">❌ Cancelar</button>'
     +'</div>'
@@ -334,6 +340,12 @@ function renderRel() {
 }
 
 // ── Ações ──────────────────────────────────────────────────────────────────
+async function aprovar(id) {
+  var r = await apiCall('aprovar', {id});
+  if (r.ok) carregar();
+  else alert('Erro: '+(r.error||'falha'));
+}
+
 function agendarData(input) {
   var id = input.getAttribute('data-id');
   apiCall('agendar', { id: id, dataAgendada: input.value }).then(function(r){ if(r.ok) carregar(); });

@@ -43,6 +43,18 @@ export default async function handler(req, res) {
     return res.status(200).json({ok:true,agendamento:novo});
   }
 
+  // ── APROVAR: marca linha como aprovada (fica verde na tabela) ──────────────
+  if(req.method==='POST'&&action==='aprovar'){
+    const{id}=req.body||{};
+    const ag=db.agendamentos.find(a=>a.id===id);
+    if(!ag) return res.status(404).json({ok:false,error:'Não encontrado'});
+    ag.aprovado=!ag.aprovado; // toggle — clica de novo para desmarcar
+    ag.aprovadoEm=ag.aprovado?new Date().toISOString():null;
+    ag.atualizadoEm=new Date().toISOString();
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true,aprovado:ag.aprovado});
+  }
+
   // ── AGENDAR: setar data de agendamento ──────────────────────────────────
   if(req.method==='POST'&&action==='agendar'){
     const {id,dataAgendada}=req.body||{};
