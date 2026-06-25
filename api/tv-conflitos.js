@@ -36,12 +36,18 @@ export default async function handler(req,res){
 
   // ── CRIAR ─────────────────────────────────────────────────────────────────
   if(req.method==='POST'&&action==='criar'){
-    const{titulo,prioridade,setor,descricao,registradoPor}=req.body||{};
+    const{titulo,prioridade,tipo,setor,ficha,responsavel,descricao,registradoPor}=req.body||{};
     if(!titulo||!prioridade) return res.status(400).json({ok:false,error:'titulo e prioridade obrigatórios'});
     const novo={
       id:'tvc-'+Date.now().toString(36),
-      titulo, prioridade, setor:setor||'', descricao:descricao||'',
-      registradoPor:registradoPor||'', status:'aberto',
+      titulo, prioridade,
+      tipo:tipo||'',
+      setor:setor||'',
+      ficha:ficha||'',
+      responsavel:responsavel||'',
+      descricao:descricao||'',
+      registradoPor:registradoPor||'',
+      status:'aberto',
       criadoEm:new Date().toISOString(), atualizadoEm:new Date().toISOString(),
       notas:[]
     };
