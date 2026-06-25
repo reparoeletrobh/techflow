@@ -236,16 +236,23 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
   .content { padding-top: 52px; }
 }
 
-/* Conflitos glow — outline nao e cortado por overflow:hidden */
-@keyframes conf-pulse{
-  0%,100%{outline:0px solid rgba(240,64,96,.8);outline-offset:0px;}
-  50%{outline:4px solid rgba(240,64,96,0);outline-offset:3px;}
+/* Conflitos — animações que funcionam dentro de overflow:hidden */
+@keyframes conf-border{
+  0%,100%{border-color:rgba(240,64,96,.35);background:color-mix(in srgb,#f04060 12%,#0d0d14);}
+  50%{border-color:rgba(240,64,96,1);background:color-mix(in srgb,#f04060 30%,#0d0d14);}
 }
-@keyframes conf-blink{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.3;transform:scale(1.35);}}
-@keyframes conf-bg{0%,100%{background:rgba(240,64,96,.18);}50%{background:rgba(240,64,96,.38);}}
-#nav-conflitos{overflow:visible !important;}
-#nav-conflitos.alertando{animation:conf-pulse 1.1s ease infinite, conf-bg 1.1s ease infinite;}
-#nav-conf-badge.alertando{animation:conf-blink .65s ease infinite;}
+@keyframes conf-blink{
+  0%,100%{opacity:1;transform:scale(1);background:#f04060;}
+  50%{opacity:.6;transform:scale(1.3);background:#ff2050;}
+}
+#nav-conflitos.alertando{
+  animation:conf-border .9s ease infinite;
+  border-color:rgba(240,64,96,.7) !important;
+}
+#nav-conf-badge.alertando{
+  display:inline !important;
+  animation:conf-blink .65s ease infinite;
+}
 </style>
 </head>
 <body>
