@@ -500,7 +500,7 @@ function cardHTML(c){
       +'<div class="cc-nota-meta">'
       +(lbl?'<span class="'+cls2+'">📅 '+lbl+'</span>':'')
       +(n.autor?'<span style="font-size:10px;color:var(--mu);">👤 '+esc(n.autor)+'</span>':'')
-      +'<button class="cc-nota-del" onclick="notaExcluir(''+c.id+'',''+n.nid+'')">🗑</button>'
+      +'<button class="cc-nota-del" data-cid="'+c.id+'" data-nid="'+n.nid+'" onclick="notaExcluirBtn(this)">🗑</button>'
       +'</div></div>';
   }).join('') : '<div class="cc-nota-vazia">Nenhuma nota ainda.</div>';
 
@@ -509,14 +509,14 @@ function cardHTML(c){
       +'<span class="cc-notas-lbl">📝 Notas ('+notas.length+')'
         +(notasVenc?' <span style="background:#f04060;color:#fff;font-size:9px;padding:1px 5px;border-radius:6px;">'+notasVenc+' vencida'+(notasVenc>1?'s':'')+'</span>':'')
       +'</span>'
-      +'<button class="cc-nota-add" onclick="notaToggleForm(''+c.id+'')">✚ Nova nota</button>'
+      +'<button class="cc-nota-add" data-cid="'+c.id+'" onclick="notaToggleFormBtn(this)">✚ Nova nota</button>'
     +'</div>'
     +'<div id="cc-nf-'+c.id+'" class="cc-nota-form">'
       +'<textarea id="cc-nt-'+c.id+'" rows="3" placeholder="Escreva a nota..."></textarea>'
       +'<div class="cc-nota-form-row">'
         +'<div><div class="cc-nota-form-lbl">📅 Vencimento</div><input type="date" id="cc-nv-'+c.id+'"></div>'
         +'<div><div class="cc-nota-form-lbl">👤 Autor</div><input type="text" id="cc-na-'+c.id+'" placeholder="Seu nome"></div>'
-        +'<button class="btn-nota-salvar" onclick="notaSalvar(''+c.id+'')">Salvar</button>'
+        +'<button class="btn-nota-salvar" data-cid="'+c.id+'" onclick="notaSalvarBtn(this)">Salvar</button>'
       +'</div>'
     +'</div>'
     +notasItens
@@ -694,6 +694,10 @@ carregar();
 setInterval(carregar, 120000);
 
 // ── Notas nos conflitos ────────────────────────────────────────────────────
+function notaToggleFormBtn(btn){ notaToggleForm(btn.getAttribute('data-cid')); }
+function notaSalvarBtn(btn){ notaSalvar(btn.getAttribute('data-cid')); }
+function notaExcluirBtn(btn){ notaExcluir(btn.getAttribute('data-cid'), btn.getAttribute('data-nid')); }
+
 function notaToggleForm(id){
   var el=document.getElementById('cc-nf-'+id);
   if(el) el.style.display=el.style.display==='block'?'none':'block';
@@ -713,7 +717,7 @@ async function notaSalvar(id){
     }).then(function(x){return x.json();});
     if(r.ok){
       document.getElementById('cc-nf-'+id).style.display='none';
-      await carregarConflitos();
+      await carregar();
       toast('Nota adicionada','g');
     } else toast(r.error||'Erro ao salvar','r');
   }catch(e){toast('Erro: '+e.message,'r');}
@@ -726,7 +730,7 @@ async function notaExcluir(id,nid){
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({id,nid})
     }).then(function(x){return x.json();});
-    if(r.ok) await carregarConflitos();
+    if(r.ok) await carregar();
     else toast(r.error||'Erro','r');
   }catch(e){toast('Erro: '+e.message,'r');}
 }
