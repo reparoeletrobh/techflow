@@ -360,6 +360,7 @@ function renderAprov(lista) {
 function renderAgs(lista) {
   var el = document.getElementById('lst-ag');
   lista = lista.filter(function(a){ return !a.aprovado; });
+  lista = lista.filter(function(a){ return !a.aprovado; });
   lista.sort(function(a,b){ return (a.dataAgendada||'zz').localeCompare(b.dataAgendada||'zz'); });
   el.innerHTML = lista.length ? lista.map(rowPend).join('') : '<div class="empty-row">📅 Nenhum agendamento com data</div>';
 }
@@ -515,7 +516,7 @@ function criar() {
 // ── Filtro local (tabela pendentes) ──────────────────────────────────────
 function filtrarLocal() {
   var q = document.getElementById('busca-local').value.toLowerCase().trim();
-  var pend = _ags.filter(function(a){ return a.status==='pendente'; });
+  var pend = _ags.filter(function(a){ return a.status==='pendente' && !a.aprovado; });
   var filtrados = q ? pend.filter(function(a){
     return (a.nome||'').toLowerCase().indexOf(q)>=0
       || (a.telefone||'').toLowerCase().indexOf(q)>=0
