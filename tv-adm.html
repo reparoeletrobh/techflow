@@ -1198,18 +1198,24 @@ function confAtualizarBadge(criticos, abertos){
   var b=document.getElementById('nav-conf-badge');
   var item=document.getElementById('nav-conflitos');
   if(!b) return;
-  if(criticos>0){
-    b.textContent=criticos; b.style.display='inline';
+  if(abertos>0){
+    // Mostra badge com total de abertos
+    b.textContent=abertos; b.style.display='inline';
+    // Pulsa sempre que há abertos — crítico pulsa mais forte
     b.classList.add('alertando');
     if(item) item.classList.add('alertando');
-  } else if(abertos>0){
-    b.textContent=abertos; b.style.display='inline';
-    b.classList.remove('alertando');
-    if(item) item.classList.remove('alertando');
+    // Cor extra vermelha se crítico
+    if(criticos>0){
+      b.style.background='#f04060';
+      if(item) item.style.setProperty('--item-color','#f04060');
+    } else {
+      b.style.background='#f59e0b';
+      if(item) item.style.setProperty('--item-color','#f59e0b');
+    }
   } else {
     b.style.display='none';
     b.classList.remove('alertando');
-    if(item) item.classList.remove('alertando');
+    if(item){ item.classList.remove('alertando'); item.style.setProperty('--item-color','#f04060'); }
   }
 }
 
