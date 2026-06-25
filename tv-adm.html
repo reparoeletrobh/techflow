@@ -235,6 +235,12 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
   .hamburger span::after  { top:  5px; }
   .content { padding-top: 52px; }
 }
+
+/* Conflitos glow — igual ao ADM */
+@keyframes conf-pulse{0%,100%{box-shadow:0 0 0 0 rgba(240,64,96,.7);}50%{box-shadow:0 0 0 12px rgba(240,64,96,0);}}
+@keyframes conf-blink{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.3;transform:scale(1.25);}}
+#nav-conflitos.alertando{animation:conf-pulse 1.1s ease infinite;}
+#nav-conf-badge.alertando{animation:conf-blink .65s ease infinite;}
 </style>
 </head>
 <body>
@@ -251,7 +257,20 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
 
     <div class="nav-list">
 
-            <div class="nav-item" data-url="/tv-pipe.html" data-label="Pipe"
+      <!-- ⚡ CONFLITOS — sempre no topo -->
+      <div class="nav-item" id="nav-conflitos" data-label="Conflitos"
+           style="--item-color:#f04060" onclick="abrirPainelConflitos()">
+        <span class="nav-icon">⚡</span>
+        <span class="nav-label">Conflitos
+          <span id="nav-conf-badge"
+            style="display:none;background:#f04060;color:#fff;font-size:9px;
+                   font-weight:700;border-radius:8px;padding:1px 6px;margin-left:4px;
+                   vertical-align:middle;"></span>
+        </span>
+      </div>
+      <div style="height:1px;background:#1e2228;margin:4px 12px;"></div>
+
+                  <div class="nav-item" data-url="/tv-pipe.html" data-label="Pipe"
            style="--item-color:#f5c800" onclick="openPage(this)">
         <span class="nav-icon">⚡</span>
         <span class="nav-label">Pipe</span>
@@ -314,12 +333,6 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
            style="--item-color:#3b9eff" onclick="abrirPainelCatalogo()">
         <span class="nav-icon">🗂️</span>
         <span class="nav-label">Catálogo Peças</span>
-      </div>
-
-      <div class="nav-item" data-label="Conflitos"
-           style="--item-color:#ef4444" onclick="abrirPainelConflitos()">
-        <span class="nav-icon" style="background:rgba(239,68,68,.15);">⚠️</span>
-        <span class="nav-label" id="nav-conf-lbl">Conflitos</span>
       </div>
 
       <div class="nav-item" data-label="Notas"
@@ -1035,172 +1048,180 @@ function notaEsc(s){var d=document.createElement('div');d.textContent=s||'';retu
 
 <script>
 // ── TV Conflitos ────────────────────────────────────────────────────────────
+var _confPrev = 0;
+
 function abrirPainelConflitos(){
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
-  document.querySelectorAll('.nav-item').forEach(function(n){if(n.textContent.includes('Conflito'))n.classList.add('active');});
+  document.getElementById('nav-conflitos').classList.add('active');
   if(typeof closeMobile==='function')closeMobile();
   document.getElementById('conf-overlay').style.display='block';
   confCarregar();
 }
-function fecharConfOverlay(e){if(e&&e.target!==document.getElementById('conf-overlay'))return;fecharConfPainel();}
+function fecharConfOverlay(e){
+  if(e && e.target !== document.getElementById('conf-overlay')) return;
+  fecharConfPainel();
+}
 function fecharConfPainel(){
   document.getElementById('conf-overlay').style.display='none';
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
 }
 
 function confCorData(ds){
-  if(!ds)return null;
-  var hoje=new Date();hoje.setHours(0,0,0,0);
+  if(!ds) return {bg:'#1e2228',cor:'#5a6270',lbl:''};
+  var hoje=new Date(); hoje.setHours(0,0,0,0);
   var dt=new Date(ds+'T00:00:00');
   var d=Math.round((dt-hoje)/86400000);
-  if(d<0)  return{bg:'rgba(239,68,68,.12)',cor:'#ef4444',lbl:dt.toLocaleDateString('pt-BR')+' ⚠️'};
-  if(d===0)return{bg:'rgba(239,68,68,.12)',cor:'#ef4444',lbl:'Hoje 🔴'};
-  if(d<=2) return{bg:'rgba(245,158,11,.12)',cor:'#f59e0b',lbl:dt.toLocaleDateString('pt-BR')+' 🟠'};
-  return   {bg:'rgba(34,197,94,.12)',cor:'#22c55e',lbl:dt.toLocaleDateString('pt-BR')+' 🟢'};
+  var fmt=dt.toLocaleDateString('pt-BR');
+  if(d<0)  return {bg:'rgba(239,68,68,.15)',cor:'#ef4444',lbl:fmt+' ⚠️ Vencida'};
+  if(d===0)return {bg:'rgba(239,68,68,.15)',cor:'#ef4444',lbl:'Hoje 🔴'};
+  if(d<=2) return {bg:'rgba(245,158,11,.15)',cor:'#f59e0b',lbl:fmt+' 🟠'};
+  return         {bg:'rgba(34,197,94,.12)', cor:'#22c55e',lbl:fmt+' 🟢'};
 }
-
 function confEsc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
 
-function confRenderNota(nota, confId){
-  var cor=confCorData(nota.vencimento);
-  return '<div style="background:#0f1114;border:1px solid #2a2f38;border-radius:8px;padding:10px 12px;margin-bottom:6px;">'
-    +'<div style="font-size:12px;color:#f0f2f5;margin-bottom:6px;line-height:1.5;">'+confEsc(nota.texto)+'</div>'
-    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-    +(nota.vencimento?'<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:'+cor.bg+';color:'+cor.cor+';">📅 '+cor.lbl+'</span>':'')
-    +(nota.autor?'<span style="font-size:10px;color:#5a6270;">👤 '+confEsc(nota.autor)+'</span>':'')
-    +'<button onclick="confExcluirNota(''+confId+'',''+nota.nid+'')" style="margin-left:auto;background:transparent;border:none;color:#5a6270;font-size:11px;cursor:pointer;padding:2px 6px;">🗑</button>'
-    +'</div></div>';
+async function confCarregar(){
+  var lista = document.getElementById('conf-lista');
+  if(!lista) return;
+  lista.innerHTML='<div style="text-align:center;padding:30px;color:#5a6270;">⏳ Carregando...</div>';
+  try{
+    var r = await fetch('/api/conflitos?action=listar').then(function(x){return x.json();});
+    if(!r.ok) throw new Error(r.error||'Erro na API');
+    var todos = r.conflitos||[];
+    var abertos   = todos.filter(function(c){return c.status!=='resolvido';});
+    var resolvidos = todos.filter(function(c){return c.status==='resolvido';});
+
+    confAtualizarBadge(r.criticos||0, r.abertos||0);
+
+    if(!todos.length){
+      lista.innerHTML='<div style="text-align:center;padding:40px;color:#5a6270;">Nenhum conflito registrado.</div>';
+      return;
+    }
+
+    var html = '';
+    if(abertos.length){
+      html += '<div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;">⚠️ Abertos ('+abertos.length+')</div>';
+      html += abertos.map(confCard).join('');
+    }
+    if(resolvidos.length){
+      html += '<div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.08em;margin:20px 0 12px;">✅ Resolvidos ('+resolvidos.length+')</div>';
+      html += resolvidos.map(confCard).join('');
+    }
+    lista.innerHTML = html;
+  }catch(e){
+    lista.innerHTML='<div style="color:#ef4444;padding:20px;font-size:12px;">❌ Erro: '+e.message+'</div>';
+  }
 }
 
-function confRenderCard(c){
+function confCard(c){
   var priCor = c.prioridade==='critico'?'#ef4444':c.prioridade==='alto'?'#f59e0b':'#3b9eff';
   var priLbl = c.prioridade==='critico'?'🔴 CRÍTICO':c.prioridade==='alto'?'🟠 ALTO':'🔵 NORMAL';
-  var stCor  = c.status==='resolvido'?'#22c55e':c.status==='andamento'?'#f59e0b':'#ef4444';
   var stLbl  = c.status==='resolvido'?'✅ Resolvido':c.status==='andamento'?'⚙️ Em andamento':'⚠️ Aberto';
   var notas  = c.notas||[];
-  var notasVenc = notas.filter(function(n){
-    if(!n.vencimento)return false;
-    var cor=confCorData(n.vencimento);
-    return cor&&cor.cor==='#ef4444';
-  }).length;
+  var notasHtml = notas.length
+    ? notas.slice().reverse().map(function(n){
+        var cor=confCorData(n.vencimento);
+        return '<div style="background:#0f1114;border:1px solid #2a2f38;border-radius:7px;padding:9px 11px;margin-bottom:6px;">'
+          +'<div style="font-size:12px;color:#f0f2f5;line-height:1.5;margin-bottom:5px;">'+confEsc(n.texto)+'</div>'
+          +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+          +(n.vencimento?'<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:'+cor.bg+';color:'+cor.cor+';">📅 '+cor.lbl+'</span>':'')
+          +(n.autor?'<span style="font-size:10px;color:#5a6270;">👤 '+confEsc(n.autor)+'</span>':'')
+          +'<button onclick="confExcluirNota(''+c.id+'',''+n.nid+'')" style="margin-left:auto;background:transparent;border:none;color:#5a6270;cursor:pointer;font-size:12px;">🗑</button>'
+          +'</div></div>';
+      }).join('')
+    : '<div style="font-size:11px;color:#5a6270;padding:6px 0;">Nenhuma nota ainda.</div>';
 
   return '<div style="background:#181b1f;border:1px solid '+(c.status==='resolvido'?'#1e2228':priCor+'44')+';border-radius:12px;padding:16px;margin-bottom:14px;">'
-    // Cabeçalho do conflito
-    +'<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;">'
+    +'<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;">'
       +'<div style="flex:1;">'
         +'<div style="font-size:13px;font-weight:700;color:#f0f2f5;margin-bottom:4px;">'+confEsc(c.titulo)+'</div>'
-        +(c.descricao?'<div style="font-size:11px;color:#5a6270;line-height:1.5;margin-bottom:4px;">'+confEsc(c.descricao)+'</div>':'')
+        +(c.descricao?'<div style="font-size:11px;color:#5a6270;line-height:1.5;margin-bottom:6px;">'+confEsc(c.descricao)+'</div>':'')
         +'<div style="display:flex;gap:8px;flex-wrap:wrap;">'
           +'<span style="font-size:10px;font-weight:700;color:'+priCor+';">'+priLbl+'</span>'
-          +'<span style="font-size:10px;color:'+stCor+';font-weight:700;">'+stLbl+'</span>'
+          +'<span style="font-size:10px;color:#5a6270;">'+stLbl+'</span>'
           +(c.setor?'<span style="font-size:10px;color:#5a6270;">📁 '+confEsc(c.setor)+'</span>':'')
           +(c.responsavel?'<span style="font-size:10px;color:#5a6270;">👤 '+confEsc(c.responsavel)+'</span>':'')
         +'</div>'
       +'</div>'
     +'</div>'
-    // Seção Notas
-    +'<div style="border-top:1px solid #1e2228;margin-top:12px;padding-top:12px;">'
-      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
-        +'<span style="font-size:10px;font-weight:800;color:#f59e0b;text-transform:uppercase;letter-spacing:.08em;">📝 Notas'
-          +(notasVenc?' <span style="background:#ef4444;color:#fff;font-size:8px;padding:1px 5px;border-radius:8px;">'+notasVenc+' vencida'+(notasVenc>1?'s':'')+'</span>':'')+'</span>'
-        +'<button onclick="confToggleNovaNota(''+c.id+'')" style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.2);color:#f59e0b;padding:4px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;">✚ Adicionar</button>'
+    // Notas
+    +'<div style="border-top:1px solid #1e2228;padding-top:12px;">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+        +'<span style="font-size:10px;font-weight:800;color:#f59e0b;text-transform:uppercase;letter-spacing:.06em;">📝 Notas ('+notas.length+')</span>'
+        +'<button onclick="confToggleForm(''+c.id+'')" style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.2);color:#f59e0b;padding:4px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;">✚ Nova nota</button>'
       +'</div>'
-      // Form nova nota (oculto por padrão)
-      +'<div id="form-nota-'+c.id+'" style="display:none;background:#0f1114;border:1px solid #2a2f38;border-radius:8px;padding:12px;margin-bottom:10px;">'
-        +'<textarea id="nt-texto-'+c.id+'" rows="3" placeholder="Escreva a nota..." style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:6px;padding:8px 10px;color:#f0f2f5;font-size:12px;outline:none;resize:none;margin-bottom:8px;"></textarea>'
-        +'<div style="display:flex;gap:8px;align-items:center;">'
-          +'<div style="flex:1;">'
-            +'<div style="font-size:9px;color:#5a6270;margin-bottom:3px;">📅 VENCIMENTO</div>'
-            +'<input type="date" id="nt-venc-'+c.id+'" style="background:#181b1f;border:1px solid #2a2f38;border-radius:6px;padding:6px 10px;color:#f0f2f5;font-size:12px;outline:none;width:100%;">'
-          +'</div>'
-          +'<div style="flex:1;">'
-            +'<div style="font-size:9px;color:#5a6270;margin-bottom:3px;">👤 AUTOR</div>'
-            +'<input type="text" id="nt-autor-'+c.id+'" placeholder="Seu nome" style="background:#181b1f;border:1px solid #2a2f38;border-radius:6px;padding:6px 10px;color:#f0f2f5;font-size:12px;outline:none;width:100%;">'
-          +'</div>'
-          +'<div style="padding-top:14px;">'
-            +'<button onclick="confSalvarNota(''+c.id+'')" style="background:#f59e0b;border:none;color:#000;padding:7px 14px;border-radius:6px;font-size:11px;font-weight:800;cursor:pointer;">Salvar</button>'
-          +'</div>'
+      // Form oculto
+      +'<div id="fn-'+c.id+'" style="display:none;background:#0f1114;border:1px solid #2a2f38;border-radius:8px;padding:12px;margin-bottom:10px;">'
+        +'<textarea id="nt-'+c.id+'" rows="3" placeholder="Escreva a nota..." style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:6px;padding:8px;color:#f0f2f5;font-size:12px;outline:none;resize:none;margin-bottom:8px;"></textarea>'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:flex-end;">'
+          +'<div><div style="font-size:9px;color:#5a6270;margin-bottom:3px;">📅 VENCIMENTO</div><input type="date" id="nv-'+c.id+'" style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:6px;padding:6px 8px;color:#f0f2f5;font-size:12px;outline:none;"></div>'
+          +'<div><div style="font-size:9px;color:#5a6270;margin-bottom:3px;">👤 AUTOR</div><input type="text" id="na-'+c.id+'" placeholder="Seu nome" style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:6px;padding:6px 8px;color:#f0f2f5;font-size:12px;outline:none;"></div>'
+          +'<button onclick="confSalvarNota(''+c.id+'')" style="background:#f59e0b;border:none;color:#000;padding:7px 14px;border-radius:6px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;">Salvar</button>'
         +'</div>'
       +'</div>'
-      // Lista de notas
-      +'<div id="notas-'+c.id+'">'
-        +(notas.length?notas.slice().reverse().map(function(n){return confRenderNota(n,c.id);}).join('')
-        :'<div style="font-size:11px;color:#5a6270;padding:8px 0;">Nenhuma nota ainda.</div>')
-      +'</div>'
+      +notasHtml
     +'</div>'
   +'</div>';
 }
 
-async function confCarregar(){
-  try{
-    var r=await fetch('/api/conflitos?action=listar').then(function(x){return x.json();});
-    var todos=r.conflitos||[];
-
-    // Badge no nav
-    var ab=todos.filter(function(c){return c.status!=='resolvido';}).length;
-    var badge=document.getElementById('conf-badge-count');
-    var navLbl=document.getElementById('nav-conf-lbl');
-    if(ab>0){
-      badge.textContent=ab; badge.style.display='inline';
-      if(navLbl) navLbl.textContent='Conflitos ('+ab+')';
-    } else {
-      badge.style.display='none';
-      if(navLbl) navLbl.textContent='Conflitos';
-    }
-
-    var lista=document.getElementById('conf-lista');
-    if(!todos.length){lista.innerHTML='<div style="text-align:center;padding:40px;color:#5a6270;">Nenhum conflito registrado.</div>';return;}
-
-    // Separar abertos e resolvidos
-    var abertos   =todos.filter(function(c){return c.status!=='resolvido';});
-    var resolvidos=todos.filter(function(c){return c.status==='resolvido';});
-
-    lista.innerHTML='<div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;">⚠️ Conflitos Abertos ('+abertos.length+')</div>'
-      +(abertos.length?abertos.map(confRenderCard).join(''):'<div style="color:#5a6270;font-size:12px;padding:16px;">Nenhum conflito aberto 🎉</div>')
-      +(resolvidos.length?'<div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.08em;margin:20px 0 12px;">✅ Resolvidos ('+resolvidos.length+')</div>'
-        +resolvidos.map(confRenderCard).join(''):'');
-  }catch(e){
-    document.getElementById('conf-lista').innerHTML='<div style="color:#ef4444;padding:20px;">❌ Erro: '+e.message+'</div>';
-  }
+function confToggleForm(id){
+  var el=document.getElementById('fn-'+id);
+  if(el) el.style.display=el.style.display==='none'?'block':'none';
 }
 
-function confToggleNovaNota(confId){
-  var el=document.getElementById('form-nota-'+confId);
-  el.style.display=el.style.display==='none'?'block':'none';
-}
-
-async function confSalvarNota(confId){
-  var texto=document.getElementById('nt-texto-'+confId).value.trim();
-  var venc =document.getElementById('nt-venc-'+confId).value;
-  var autor=document.getElementById('nt-autor-'+confId).value.trim();
+async function confSalvarNota(id){
+  var texto=(document.getElementById('nt-'+id)||{}).value||'';
+  var venc =(document.getElementById('nv-'+id)||{}).value||'';
+  var autor=(document.getElementById('na-'+id)||{}).value||'';
+  texto=texto.trim();
   if(!texto){alert('Escreva o conteúdo da nota.');return;}
   if(!venc) {alert('Escolha uma data de vencimento.');return;}
   try{
     var r=await fetch('/api/conflitos?action=adicionar-nota',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({id:confId,texto,vencimento:venc,autor})
+      body:JSON.stringify({id,texto,vencimento:venc,autor})
     }).then(function(x){return x.json();});
-    if(r.ok){
-      document.getElementById('nt-texto-'+confId).value='';
-      document.getElementById('nt-venc-'+confId).value='';
-      document.getElementById('nt-autor-'+confId).value='';
-      document.getElementById('form-nota-'+confId).style.display='none';
-      confCarregar();
-    }else alert('Erro: '+(r.error||'falha'));
+    if(r.ok) confCarregar();
+    else alert('Erro: '+(r.error||'falha'));
   }catch(e){alert('Erro: '+e.message);}
 }
 
-async function confExcluirNota(confId, nid){
+async function confExcluirNota(id,nid){
   if(!confirm('Excluir esta nota?'))return;
   var r=await fetch('/api/conflitos?action=excluir-nota',{
     method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({id:confId,nid})
+    body:JSON.stringify({id,nid})
   }).then(function(x){return x.json();});
   if(r.ok) confCarregar();
 }
 
-// Carregar badge ao iniciar
-confCarregar();
+function confAtualizarBadge(criticos, abertos){
+  var b=document.getElementById('nav-conf-badge');
+  var item=document.getElementById('nav-conflitos');
+  if(!b) return;
+  if(criticos>0){
+    b.textContent=criticos; b.style.display='inline';
+    b.classList.add('alertando');
+    if(item) item.classList.add('alertando');
+  } else if(abertos>0){
+    b.textContent=abertos; b.style.display='inline';
+    b.classList.remove('alertando');
+    if(item) item.classList.remove('alertando');
+  } else {
+    b.style.display='none';
+    b.classList.remove('alertando');
+    if(item) item.classList.remove('alertando');
+  }
+}
+
+async function checarConflitosBadge(){
+  try{
+    var d=await fetch('/api/conflitos?action=badge').then(function(r){return r.json();});
+    confAtualizarBadge(d.criticos||0, d.abertos||0);
+  }catch(e){}
+}
+
+checarConflitosBadge();
+setInterval(checarConflitosBadge, 30000);
 </script>
 
 </body>
