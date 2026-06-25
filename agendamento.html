@@ -91,9 +91,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="tabs" id="tabs-bar">
   <button class="tab on" onclick="ir(0)">📋 PENDENTES</button>
   <button class="tab"    onclick="ir(1)">📅 AGENDADOS</button>
-  <button class="tab"    onclick="ir(2)">✅ REALIZADOS</button>
-  <button class="tab"    onclick="ir(3)">❌ CANCELADOS</button>
-  <button class="tab"    onclick="ir(4)">📊 RELATÓRIO</button>
+  <button class="tab"    onclick="ir(2)">👍 APROVADOS</button>
+  <button class="tab"    onclick="ir(3)">✅ REALIZADOS</button>
+  <button class="tab"    onclick="ir(4)">❌ CANCELADOS</button>
+  <button class="tab"    onclick="ir(5)">📊 RELATÓRIO</button>
 </div>
 
 <!-- PENDENTES -->
@@ -185,8 +186,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   </div>
 </div>
 
-<!-- REALIZADOS -->
+<!-- APROVADOS -->
 <div class="pg" id="pg2">
+  <div class="tbl">
+    <div class="tr th g-pend"><span>Nome / Tel</span><span>Endereço</span><span>Equipamento</span><span>Defeito</span><span>Taxa</span><span>Data</span><span>Preço</span><span>Aprovado em</span></div>
+    <div id="lst-aprov"><div class="empty-row">Carregando...</div></div>
+  </div>
+</div>
+
+<!-- REALIZADOS -->
+<div class="pg" id="pg3">
   <div class="tbl">
     <div class="tr th g-hist"><span>Nome</span><span>Telefone</span><span>Endereço</span><span>Equip.</span><span>Defeito</span><span>Taxa</span><span>Preço</span><span>Data</span><span>Finalizado</span></div>
     <div id="lst-real"><div class="empty-row">Carregando...</div></div>
@@ -194,7 +203,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 
 <!-- CANCELADOS -->
-<div class="pg" id="pg3">
+<div class="pg" id="pg4">
   <div class="tbl">
     <div class="tr th g-hist"><span>Nome</span><span>Telefone</span><span>Endereço</span><span>Equip.</span><span>Defeito</span><span>Taxa</span><span>Preço</span><span>Data</span><span>Cancelado</span></div>
     <div id="lst-canc"><div class="empty-row">Carregando...</div></div>
@@ -202,7 +211,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 
 <!-- RELATÓRIO -->
-<div class="pg" id="pg4">
+<div class="pg" id="pg5">
   <div class="stats" style="margin-bottom:20px;">
     <div class="stat"><div class="stat-l">Total</div><div class="stat-v" id="r-tot" style="color:#3b9eff;">—</div></div>
     <div class="stat"><div class="stat-l">Realizados</div><div class="stat-v" id="r-real" style="color:#22c55e;">—</div></div>
@@ -251,10 +260,15 @@ function carregar() {
     document.getElementById('n-fat').textContent  = 'R$'+r.totalRealizado.toFixed(0);
     // Aba badge
     document.querySelectorAll('.tab')[1].textContent = ags.length > 0 ? '📅 AGENDADOS ('+ags.length+')' : '📅 AGENDADOS';
+    var aprov = _ags.filter(function(a){ return a.aprovado===true; });
     renderPend(pend);
     renderAgs(ags);
+    renderAprov(aprov);
     renderHist('lst-real', real);
     renderHist('lst-canc', _ags.filter(function(a){ return a.status==='cancelado'; }));
+    // Badge aba Aprovados
+    var tabAprov = document.querySelectorAll('.tab')[2];
+    if(tabAprov) tabAprov.textContent = aprov.length > 0 ? '👍 APROVADOS ('+aprov.length+')' : '👍 APROVADOS';
   });
 }
 
@@ -299,6 +313,28 @@ function rowPend(a) {
 function renderPend(lista) {
   var el = document.getElementById('lst-pend');
   el.innerHTML = lista.length ? lista.map(rowPend).join('') : '<div class="empty-row">📋 Nenhum agendamento pendente</div>';
+}
+
+function renderAprov(lista) {
+  var el = document.getElementById('lst-aprov');
+  if(!el) return;
+  if(!lista.length){ el.innerHTML='<div class="empty-row">👍 Nenhum agendamento aprovado</div>'; return; }
+  // Ordenar por data de aprovação mais recente primeiro
+  lista.sort(function(a,b){ return (b.aprovadoEm||'').localeCompare(a.aprovadoEm||''); });
+  el.innerHTML = lista.map(function(a){
+    var badge = a.dataAgendada ? dataBadge(a.dataAgendada).replace(/__ID__/g,a.id) : '—';
+    return '<div class="tr g-pend row-aprovada" id="row-'+a.id+'">'
+      +'<div class="cell"><div style="font-weight:600;font-size:12px;">'+esc(a.nome)+'</div>'
+        +'<div style="font-size:10px;color:#bbf7d0;">'+esc(a.telefone)+'</div></div>'
+      +'<div class="cell muted" style="font-size:10px;">'+esc(a.endereco||'—')+'</div>'
+      +'<div class="cell" style="font-size:11px;">'+esc(a.equipamento||'—')+'</div>'
+      +'<div class="cell muted" style="font-size:10px;">'+esc(a.defeito||'—')+'</div>'
+      +'<div class="cell green" style="font-size:11px;">'+esc(a.taxa||'—')+'</div>'
+      +'<div class="cell" style="font-size:11px;">'+badge+'</div>'
+      +'<div class="cell" style="color:#a855f7;font-weight:700;">'+esc(a.preco||'—')+'</div>'
+      +'<div class="cell muted" style="font-size:10px;">'+fdt(a.aprovadoEm)+'</div>'
+    +'</div>';
+  }).join('');
 }
 
 function renderAgs(lista) {
