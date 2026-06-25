@@ -141,5 +141,34 @@ module.exports = async function handler(req,res){
     });
   }
 
+  // ── POST adicionar-nota ─────────────────────────────────────────────────────
+  if(req.method==='POST'&&action==='adicionar-nota'){
+    const{id,texto,vencimento,autor}=req.body||{};
+    const c=db.conflitos.find(x=>x.id===id);
+    if(!c) return res.status(404).json({ok:false,error:'conflito não encontrado'});
+    if(!c.notas) c.notas=[];
+    c.notas.push({
+      nid:'n-'+Date.now().toString(36),
+      texto:texto||'',
+      vencimento:vencimento||'',
+      autor:autor||'',
+      criadaEm:new Date().toISOString()
+    });
+    c.atualizadoEm=new Date().toISOString();
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true,conflito:c});
+  }
+
+  // ── POST excluir-nota ────────────────────────────────────────────────────────
+  if(req.method==='POST'&&action==='excluir-nota'){
+    const{id,nid}=req.body||{};
+    const c=db.conflitos.find(x=>x.id===id);
+    if(!c) return res.status(404).json({ok:false,error:'conflito não encontrado'});
+    c.notas=(c.notas||[]).filter(n=>n.nid!==nid);
+    c.atualizadoEm=new Date().toISOString();
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true});
+  }
+
   return res.status(404).json({ok:false,error:'ação não encontrada: '+action});
 };
