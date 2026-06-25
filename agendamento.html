@@ -43,7 +43,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .th{color:#5a6270;font-size:9px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid #1e2228;}
 .th.tr{padding:8px 14px;}
 .empty-row{padding:40px;text-align:center;color:#5a6270;}
-.g-pend{grid-template-columns:1.4fr 1fr 1.4fr 1fr 1.4fr 75px 130px 85px 120px;}
+.g-pend{grid-template-columns:1.4fr 1.2fr 1fr 1.2fr 75px 120px 85px 95px 130px;}
 .g-hist{grid-template-columns:1.4fr 1fr 1.5fr 1fr 1.5fr 80px 90px 90px 110px;}
 /* DATA badge */
 .dbadge{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:700;}
@@ -116,7 +116,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <!-- RESULTADOS BUSCA GERAL -->
 <div id="busca-geral-results" style="display:none;padding:20px;max-width:1100px;margin:0 auto;">
   <div class="tbl">
-    <div class="tr th g-pend"><span>Nome</span><span>Telefone</span><span>Endereço</span><span>Equip.</span><span>Defeito</span><span>Taxa</span><span>Data</span><span>Preço</span><span>Status</span></div>
+    <div class="tr th g-pend"><span>Nome / Tel</span><span>Endereço</span><span>Equip.</span><span>Defeito</span><span>Taxa</span><span>Data</span><span>Preço</span><span>Criado</span><span>Ações</span></div>
     <div id="busca-geral-lista"></div>
   </div>
 </div>
@@ -313,7 +313,6 @@ function rowPend(a) {
     +'<div><b style="font-size:12px;">'+esc(a.nome)+'</b>'
     +(a.aprovado?' <span style="background:#16a34a;color:#fff;font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;vertical-align:middle;">✅ APROVADO</span>':'')
     +'<br><span style="font-size:10px;color:#5a6270;">'+esc(a.telefone)+'</span></div>'
-    +'<div style="font-size:11px;color:#5a6270;">'+esc(a.telefone)+'</div>'
     +'<div style="font-size:10px;color:#5a6270;">'+esc(a.endereco||'—')+'</div>'
     +'<div style="font-size:11px;">'+esc(a.equipamento||'—')+'</div>'
     +'<div style="font-size:10px;color:#5a6270;">'+esc(a.defeito||'—')+'</div>'
