@@ -484,7 +484,8 @@ function openPage(el) {
   frameWrap.classList.add('visible');
   loadBar.classList.add('loading');
   frame.onload = function() { loadBar.classList.remove('loading'); };
-  frame.src = url;
+  // Cache-busting: força o browser buscar versão nova a cada abertura
+  frame.src = url + (url.includes('?') ? '&' : '?') + '_v=' + Date.now();
 }
 
 </script>
