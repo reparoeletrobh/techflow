@@ -620,7 +620,7 @@ function cardHTML(f, phase) {
     const orcInfo = (f.orcPeca || f.orcValor) ? `<div style="background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.2);border-radius:6px;padding:7px 9px;margin-bottom:6px;font-size:11px;"><span style="font-size:9px;color:#5a6270;text-transform:uppercase;">Peça</span><div style="color:#f0f2f5;font-weight:700;">${escHtml(f.orcPeca||'—')}</div><span style="font-size:9px;color:#5a6270;text-transform:uppercase;">Valor</span><div style="color:#22c55e;font-weight:700;">${escHtml(f.orcValor||'—')}</div></div>` : '';
     btns = orcInfo + `
       <button class="cbtn" style="background:rgba(34,197,94,.15);color:#22c55e;border-color:#22c55e;" onclick="aprovarOrcLog('${f.id}')">✅ Aprovar</button>
-      <button class="cbtn" style="background:rgba(239,68,68,.12);color:#ef4444;border-color:#ef4444;" onclick="reprovarOrcLog('${f.id}')">❌ Reprovar</button>`,
+      <button class="cbtn" style="background:rgba(239,68,68,.12);color:#ef4444;border-color:#ef4444;" onclick="reprovarOrcLog('${f.id}')">❌ Reprovar</button>`;
   } else if (phase === 'liberado_para_rota') {
     btns = `
       <button class="cbtn-expand" id="btn-x-${f.id}" onclick="toggleExpand('${f.id}')"><em class="chev">▾</em><span> Mais ações</span></button>

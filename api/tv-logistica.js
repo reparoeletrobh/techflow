@@ -393,7 +393,7 @@ module.exports = async function handler(req, res) {
   // ── POST mover ────────────────────────────────────────────
   if (req.method === 'POST' && action === 'mover') {
     const { id, phase } = req.body || {};
-    const PHASES = ['liberado_coleta','horario_marcado','liberado_para_rota','motorista_parceiro','remarcar','coleta_efetuada','orc_registrado'];
+    const PHASES = ['liberado_coleta','horario_marcado','orc_enviado','liberado_para_rota','motorista_parceiro','remarcar','coleta_efetuada','orc_registrado'];
     if (!id || !PHASES.includes(phase)) return res.status(400).json({ ok: false, error: 'invalido' });
 
     const db = await dbGet(LOG_KEY) || defaultDB();
@@ -1410,7 +1410,7 @@ Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter peque
     const deFase  = req.query.de   || 'coleta_efetuada';
     const paraFase= req.query.para || 'liberado_para_coleta';
     try {
-      const db = (await dbGet('tv_logistica')) || { fichas: [] };
+      const db = (await dbGet(LOG_KEY)) || { fichas: [] };
       const fichas = db.fichas || [];
       const now = new Date().toISOString();
       const movidas = [];
@@ -1426,7 +1426,7 @@ Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter peque
           movidas.push({ id: f.id, nome: f.nome, tel: f.telefone });
         }
       });
-      if (movidas.length > 0) { db.fichas = fichas; await dbSet('tv_logistica', db); }
+      if (movidas.length > 0) { db.fichas = fichas; await dbSet(LOG_KEY, db); }
       return res.status(200).json({ ok: true, movidas, total: movidas.length });
     } catch(e) { return res.status(200).json({ ok: false, error: e.message }); }
   }
@@ -1434,22 +1434,22 @@ Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter peque
   // ── PASSAR ORÇAMENTO → move ficha para orc_enviado ───────────────────────
   if (req.method === 'POST' && action === 'passar-orcamento') {
     const { id, peca, valor } = req.body || {};
-    const db = (await dbGet('tv_logistica')) || { fichas: [] };
+    const db = (await dbGet(LOG_KEY)) || { fichas: [] };
     const f = db.fichas.find(x => x.id === id);
     if (!f) return res.status(404).json({ ok: false, error: 'ficha não encontrada' });
-    f.fase     = 'orc_enviado';
+    f.phase    = 'orc_enviado';
     f.orcPeca  = peca  || '';
     f.orcValor = valor || '';
     f.orcEnviadoEm = new Date().toISOString();
     f.movedAt  = new Date().toISOString();
-    await dbSet('tv_logistica', db);
+    await dbSet(LOG_KEY, db);
     return res.status(200).json({ ok: true });
   }
 
   // ── APROVAR ORÇAMENTO → board TV fase aprovado + cliente_loja ─────────────
   if (req.method === 'POST' && action === 'aprovar-orcamento') {
     const { id } = req.body || {};
-    const db = (await dbGet('tv_logistica')) || { fichas: [] };
+    const db = (await dbGet(LOG_KEY)) || { fichas: [] };
     const f = db.fichas.find(x => x.id === id);
     if (!f) return res.status(404).json({ ok: false, error: 'ficha não encontrada' });
 
@@ -1485,22 +1485,22 @@ Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter peque
 
     // Remover da logística
     db.fichas = db.fichas.filter(x => x.id !== id);
-    await dbSet('tv_logistica', db);
+    await dbSet(LOG_KEY, db);
     return res.status(200).json({ ok: true });
   }
 
   // ── REPROVAR ORÇAMENTO → volta para remarcar ───────────────────────────────
   if (req.method === 'POST' && action === 'reprovar-orcamento') {
     const { id } = req.body || {};
-    const db = (await dbGet('tv_logistica')) || { fichas: [] };
+    const db = (await dbGet(LOG_KEY)) || { fichas: [] };
     const f = db.fichas.find(x => x.id === id);
     if (!f) return res.status(404).json({ ok: false, error: 'ficha não encontrada' });
-    f.fase         = 'remarcar';
-    f.orcPeca      = '';
-    f.orcValor     = '';
+    f.phase       = 'remarcar';
+    f.orcPeca     = '';
+    f.orcValor    = '';
     f.orcReprovadoEm = new Date().toISOString();
-    f.movedAt      = new Date().toISOString();
-    await dbSet('tv_logistica', db);
+    f.movedAt     = new Date().toISOString();
+    await dbSet(LOG_KEY, db);
     return res.status(200).json({ ok: true });
   }
 
