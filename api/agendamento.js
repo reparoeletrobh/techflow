@@ -115,6 +115,9 @@ export default async function handler(req, res) {
     ag.status=status; // 'realizado' | 'cancelado'
     ag.finalizadoEm=new Date().toISOString();
     ag.atualizadoEm=new Date().toISOString();
+    // Limpar flags especiais ao finalizar
+    ag.orcEnviado=false; ag.orcEnviadoEm=null;
+    ag.aprovado=false;   ag.aprovadoEm=null;
     if(preco!==undefined) ag.preco=preco;
     if(obs) ag.obs=obs;
     await dbSet(KEY,db);
