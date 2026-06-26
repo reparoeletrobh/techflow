@@ -989,5 +989,22 @@ export default async function handler(req,res){
     return res.status(200).json({ok:true,removidos});
   }
 
+    // ── load-producao: fichas em fase producao ─────────────────────────────
+  if (action === 'load-producao') {
+    try {
+      const flDb = (await dbGet(FL_KEY)) || defaultDB();
+      const fichas = (flDb.fichas || []).filter(f => f.phase === 'producao');
+      return res.status(200).json({ ok:true, fichas, total:fichas.length });
+    } catch(e) { return res.status(500).json({ ok:false, error:e.message }); }
+  }
+
+  // ── load-board: todos os cards do board técnico ──────────────────────────
+  if (action === 'load-board') {
+    try {
+      const boardDb = (await dbGet('reparoeletro_board')) || { cards:[] };
+      return res.status(200).json({ ok:true, cards: boardDb.cards || [] });
+    } catch(e) { return res.status(500).json({ ok:false, error:e.message }); }
+  }
+
   return res.status(404).json({ok:false,error:'Ação não encontrada'});
 }

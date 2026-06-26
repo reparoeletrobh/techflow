@@ -75,6 +75,10 @@
   ],
   "rewrites": [
     {
+      "source": "/analise-producao",
+      "destination": "/analise-producao.html"
+    },
+    {
       "source": "/api/tv-conflitos",
       "destination": "/api/tv-conflitos.js"
     },
