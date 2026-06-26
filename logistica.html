@@ -446,6 +446,11 @@ const SERVICOS = {
       'Grande':    ['Resistência','Termostato','Timer','Display','Porta','Vidro','Mola'],
     }
   },
+  tv: {
+    subtipos: {
+      'TU': ['TU + Barramento', 'TU + Placa'],
+    }
+  },
 };
 
 // Serviços que requerem campo de preço (valor x2)
@@ -457,6 +462,7 @@ function precisaPreco(tipo, subtipo, servicos) {
   if (tipo === 'adega')      return (servicos||[]).includes('Troca de Placa');
   if (tipo === 'purificador') return false;
   if (tipo === 'bblend')     return false; // preço fixo R$1.490
+  if (tipo === 'tv')         return false; // preço fixo R$1.290
   return (servicos||[]).some(x => ITENS_COM_PRECO.has(x));
 }
 
@@ -841,7 +847,7 @@ function equipSecHTML(eq, i, total) {
       <div>
         <div class="diag-section-label" style="margin-bottom:5px;">Tipo</div>
         <div class="type-grid">
-          ${['microondas','purificador','bblend','adega','forno'].map(t=>
+          ${['microondas','purificador','bblend','adega','forno','tv'].map(t=>
             `<button class="type-btn${eq.tipo===t?' sel':''}" onclick="selTipo(${i},'${t}')">${t.charAt(0).toUpperCase()+t.slice(1)}</button>`
           ).join('')}
         </div>
