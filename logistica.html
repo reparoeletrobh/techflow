@@ -826,7 +826,7 @@ function equipSecHTML(eq, i, total) {
   if (spec?.subtipos) {
     const subs = Object.keys(spec.subtipos);
     subtiposHTML = `
-      <div class="diag-section-label" style="margin-top:8px;">${eq.tipo==='forno'?'Porte':'Categoria'}</div>
+      <div class="diag-section-label" style="margin-top:8px;">${eq.tipo==='forno'?'Porte':eq.tipo==='tv'?'Tipo TU':'Categoria'}</div>
       <div class="type-grid">
         ${subs.map(s=>`<button class="type-btn${eq.subtipo===s?' sel':''}" onclick="selSubtipo(${i},'${s}')">${s}</button>`).join('')}
       </div>`;
