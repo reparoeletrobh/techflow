@@ -70,6 +70,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 /* Data de criação — indicadores visuais */
 .row-hoje{border:2px solid rgba(255,255,255,.55) !important;border-left:4px solid #fff !important;}
 .row-atrasada{border:2px dashed rgba(239,68,68,.7) !important;border-left:4px dashed #ef4444 !important;}
+/* Orçamento enviado — azul */
+.row-orc{background:rgba(59,130,246,.08)!important;border-left:4px solid #3b82f6!important;border:1px solid rgba(59,130,246,.25)!important;border-left:4px solid #3b82f6!important;}
+.row-orc:hover{background:rgba(59,130,246,.14)!important;}
+.ba-orc{background:rgba(59,130,246,.12);color:#60a5fa;border:1px solid rgba(59,130,246,.25);font-weight:800;}
+.ba-orc.on{background:#2563eb;color:#fff;border:1px solid #1d4ed8;font-weight:800;}
 .badge-hoje{display:inline-block;background:rgba(255,255,255,.15);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;border:1px solid rgba(255,255,255,.3);}
 .badge-atrasada{display:inline-block;background:rgba(239,68,68,.12);color:#ef4444;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;border:1px solid rgba(239,68,68,.3);}
 .badge-normal{display:inline-block;color:#5a6270;font-size:9px;padding:2px 6px;}
@@ -98,9 +103,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <button class="tab on" onclick="ir(0)">📋 PENDENTES</button>
   <button class="tab"    onclick="ir(1)">📅 AGENDADOS</button>
   <button class="tab"    onclick="ir(2)">👍 APROVADOS</button>
-  <button class="tab"    onclick="ir(3)">✅ REALIZADOS</button>
-  <button class="tab"    onclick="ir(4)">❌ CANCELADOS</button>
-  <button class="tab"    onclick="ir(5)">📊 RELATÓRIO</button>
+  <button class="tab"    onclick="ir(3)">📄 ORC. ENVIADOS</button>
+  <button class="tab"    onclick="ir(4)">✅ REALIZADOS</button>
+  <button class="tab"    onclick="ir(5)">❌ CANCELADOS</button>
+  <button class="tab"    onclick="ir(6)">📊 RELATÓRIO</button>
 </div>
 
 <!-- PENDENTES -->
@@ -200,8 +206,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   </div>
 </div>
 
-<!-- REALIZADOS -->
+<!-- ORC ENVIADOS -->
 <div class="pg" id="pg3">
+  <div class="tbl">
+    <div class="tr th g-pend"><span>Nome / Tel</span><span>Endereço</span><span>Equip.</span><span>Defeito</span><span>Taxa</span><span>Data</span><span>Preço</span><span>Criado</span><span>Ações</span></div>
+    <div id="lst-orc"><div class="empty-row">Carregando...</div></div>
+  </div>
+</div>
+
+<!-- REALIZADOS -->
+<div class="pg" id="pg4">
   <div class="tbl">
     <div class="tr th g-hist"><span>Nome</span><span>Telefone</span><span>Endereço</span><span>Equip.</span><span>Defeito</span><span>Taxa</span><span>Preço</span><span>Data</span><span>Finalizado</span></div>
     <div id="lst-real"><div class="empty-row">Carregando...</div></div>
@@ -209,7 +223,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 
 <!-- CANCELADOS -->
-<div class="pg" id="pg4">
+<div class="pg" id="pg5">
   <div class="tbl">
     <div class="tr th g-hist"><span>Nome</span><span>Telefone</span><span>Endereço</span><span>Equip.</span><span>Defeito</span><span>Taxa</span><span>Preço</span><span>Data</span><span>Cancelado</span></div>
     <div id="lst-canc"><div class="empty-row">Carregando...</div></div>
@@ -217,7 +231,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 
 <!-- RELATÓRIO -->
-<div class="pg" id="pg5">
+<div class="pg" id="pg6">
   <div class="stats" style="margin-bottom:20px;">
     <div class="stat"><div class="stat-l">Total</div><div class="stat-v" id="r-tot" style="color:#3b9eff;">—</div></div>
     <div class="stat"><div class="stat-l">Realizados</div><div class="stat-v" id="r-real" style="color:#22c55e;">—</div></div>
@@ -257,8 +271,8 @@ function carregar() {
   apiCall('relatorio').then(function(r) {
     if (!r.ok) return;
     _ags = r.agendamentos || [];
-    var pend = _ags.filter(function(a){ return a.status==='pendente' && !a.aprovado; });
-        var ags  = _ags.filter(function(a){ return a.status==='agendado' && !a.aprovado; });
+    var pend = _ags.filter(function(a){ return a.status==='pendente' && !a.aprovado && !a.orcEnviado; });
+        var ags  = _ags.filter(function(a){ return a.status==='agendado' && !a.aprovado && !a.orcEnviado; });
     var real = _ags.filter(function(a){ return a.status==='realizado'; });
     document.getElementById('n-pend').textContent = pend.length;
     document.getElementById('n-ag').textContent   = ags.length;
@@ -266,15 +280,19 @@ function carregar() {
     document.getElementById('n-fat').textContent  = 'R$'+r.totalRealizado.toFixed(0);
     // Aba badge
     document.querySelectorAll('.tab')[1].textContent = ags.length > 0 ? '📅 AGENDADOS ('+ags.length+')' : '📅 AGENDADOS';
-    var aprov = _ags.filter(function(a){ return a.aprovado===true; });
+    var aprov  = _ags.filter(function(a){ return a.aprovado===true; });
+    var orcEnv = _ags.filter(function(a){ return a.orcEnviado===true; });
     renderPend(pend);
     renderAgs(ags);
     renderAprov(aprov);
+    renderOrcEnviados(orcEnv);
     renderHist('lst-real', real);
     renderHist('lst-canc', _ags.filter(function(a){ return a.status==='cancelado'; }));
     // Badge aba Aprovados
     var tabAprov = document.querySelectorAll('.tab')[2];
     if(tabAprov) tabAprov.textContent = aprov.length > 0 ? '👍 APROVADOS ('+aprov.length+')' : '👍 APROVADOS';
+    var tabOrc = document.querySelectorAll('.tab')[3];
+    if(tabOrc) tabOrc.textContent = orcEnv.length > 0 ? '📄 ORC. ENVIADOS ('+orcEnv.length+')' : '📄 ORC. ENVIADOS';
   });
 }
 
@@ -308,7 +326,7 @@ function dataBadge(ds) {
 function rowPend(a) {
   var badge = dataBadge(a.dataAgendada).replace(/__ID__/g, a.id);
   var _ec = estadoCriacao(a.criadoEm);
-  var _rowCls = a.aprovado ? 'row-aprovada' : _ec.row;
+  var _rowCls = a.aprovado ? 'row-aprovada' : a.orcEnviado ? 'row-orc' : _ec.row;
   return '<div class="tr g-pend '+_rowCls+'" data-id="'+a.id+'">'
     +'<div><b style="font-size:12px;">'+esc(a.nome)+'</b>'
     +(a.aprovado?' <span style="background:#16a34a;color:#fff;font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;vertical-align:middle;">✅ APROVADO</span>':'')
@@ -323,6 +341,7 @@ function rowPend(a) {
     +'<div style="display:flex;flex-direction:column;gap:4px;">'
       +'<button class="ba" style="background:rgba(59,158,255,.12);color:#3b9eff;border:1px solid rgba(59,158,255,.2);" onclick="abrirEditar(\''+a.id+'\')" >✏️ Editar</button>'
       +'<button class="ba ba-apr'+(a.aprovado?' on':'')+'" onclick="aprovar(\''+a.id+'\')">👍 '+(a.aprovado?'Aprovado':'Aprovar')+'</button>'
+      +'<button class="ba ba-orc'+(a.orcEnviado?' on':'')+'" onclick="orcEnviado(\''+a.id+'\')">📄 '+(a.orcEnviado?'Orç. Enviado':'Orç. Enviado')+'</button>'
       +'<button class="ba ba-ok" onclick="finalizar(\''+a.id+'\',\'realizado\')">✅ Realizado</button>'
       +'<button class="ba ba-cx" onclick="finalizar(\''+a.id+'\',\'cancelado\')">❌ Cancelar</button>'
     +'</div>'
@@ -338,27 +357,21 @@ function renderAprov(lista) {
   var el = document.getElementById('lst-aprov');
   if(!el) return;
   if(!lista.length){ el.innerHTML='<div class="empty-row">👍 Nenhum agendamento aprovado</div>'; return; }
-  // Ordenar por data de aprovação mais recente primeiro
   lista.sort(function(a,b){ return (b.aprovadoEm||'').localeCompare(a.aprovadoEm||''); });
-  el.innerHTML = lista.map(function(a){
-    var badge = a.dataAgendada ? dataBadge(a.dataAgendada).replace(/__ID__/g,a.id) : '—';
-    return '<div class="tr g-pend row-aprovada" id="row-'+a.id+'">'
-      +'<div class="cell"><div style="font-weight:600;font-size:12px;">'+esc(a.nome)+'</div>'
-        +'<div style="font-size:10px;color:#bbf7d0;">'+esc(a.telefone)+'</div></div>'
-      +'<div class="cell muted" style="font-size:10px;">'+esc(a.endereco||'—')+'</div>'
-      +'<div class="cell" style="font-size:11px;">'+esc(a.equipamento||'—')+'</div>'
-      +'<div class="cell muted" style="font-size:10px;">'+esc(a.defeito||'—')+'</div>'
-      +'<div class="cell green" style="font-size:11px;">'+esc(a.taxa||'—')+'</div>'
-      +'<div class="cell" style="font-size:11px;">'+badge+'</div>'
-      +'<div class="cell" style="color:#a855f7;font-weight:700;">'+esc(a.preco||'—')+'</div>'
-      +'<div class="cell muted" style="font-size:10px;">'+fdt(a.aprovadoEm)+'</div>'
-    +'</div>';
-  }).join('');
+  el.innerHTML = lista.map(rowPend).join('');
+}
+
+function renderOrcEnviados(lista) {
+  var el = document.getElementById('lst-orc');
+  if(!el) return;
+  if(!lista.length){ el.innerHTML='<div class="empty-row">📄 Nenhum orçamento enviado</div>'; return; }
+  lista.sort(function(a,b){ return (b.orcEnviadoEm||'').localeCompare(a.orcEnviadoEm||''); });
+  el.innerHTML = lista.map(rowPend).join('');
 }
 
 function renderAgs(lista) {
   var el = document.getElementById('lst-ag');
-  lista = lista.filter(function(a){ return !a.aprovado; });
+  lista = lista.filter(function(a){ return !a.aprovado && !a.orcEnviado; });
   lista = lista.filter(function(a){ return !a.aprovado; });
   lista.sort(function(a,b){ return (a.dataAgendada||'zz').localeCompare(b.dataAgendada||'zz'); });
   el.innerHTML = lista.length ? lista.map(rowPend).join('') : '<div class="empty-row">📅 Nenhum agendamento com data</div>';
@@ -408,6 +421,12 @@ function renderRel() {
 // ── Ações ──────────────────────────────────────────────────────────────────
 async function aprovar(id) {
   var r = await apiCall('aprovar', {id});
+  if (r.ok) carregar();
+  else alert('Erro: '+(r.error||'falha'));
+}
+
+async function orcEnviado(id) {
+  var r = await apiCall('orc-enviado', {id});
   if (r.ok) carregar();
   else alert('Erro: '+(r.error||'falha'));
 }
