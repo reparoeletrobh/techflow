@@ -9,6 +9,7 @@ const BOARD_KEY     = "tv_board";
 const COLETA_PHASES = [
   { id: "liberado_coleta",       name: "Liberado para Coleta" },
   { id: "comunicacao_realizada", name: "Comunicacao Realizada" },
+  { id: "orc_enviado",           name: "Orcamento Enviado" },
   { id: "coleta_realizada",      name: "Coleta Realizada" },
   { id: "remarcar",              name: "Remarcar" },
   { id: "orcamento_registrado",  name: "Orcamento Registrado" },
@@ -609,6 +610,76 @@ module.exports = async function handler(req, res) {
     }
     return res.status(200).json({ok:true, results});
   }
+
+  // ── PASSAR ORÇAMENTO → move card para orc_enviado ─────────────────────
+  if (req.method === 'POST' && action === 'passar-orcamento') {
+    const { pipefyId, peca, valor } = req.body || {};
+    const coleta = (await dbGet(COLETA_KEY)) || { cards: [] };
+    const card = coleta.cards.find(c => String(c.pipefyId) === String(pipefyId));
+    if (!card) return res.status(404).json({ ok: false, error: 'card nao encontrado' });
+    card.coletaPhase  = 'orc_enviado';
+    card.orcPeca      = peca || '';
+    card.orcValor     = valor || '';
+    card.orcEnviadoEm = new Date().toISOString();
+    await dbSet(COLETA_KEY, coleta);
+    return res.status(200).json({ ok: true });
+  }
+
+  // ── APROVAR ORÇAMENTO → board TV fase aprovado + cliente_loja ───────────
+  if (req.method === 'POST' && action === 'aprovar-orcamento') {
+    const { pipefyId } = req.body || {};
+    const coleta = (await dbGet(COLETA_KEY)) || { cards: [] };
+    const card = coleta.cards.find(c => String(c.pipefyId) === String(pipefyId));
+    if (!card) return res.status(404).json({ ok: false, error: 'card nao encontrado' });
+
+    const board = (await dbGet(BOARD_KEY)) || { phases: [], cards: [], syncedIds: [], movesLog: [] };
+    if (!board.syncedIds) board.syncedIds = [];
+    const jaExiste = board.cards.find(bc => String(bc.pipefyId) === String(pipefyId));
+    if (!jaExiste) {
+      board.cards.push({
+        id:          'orc_aprov_' + Date.now().toString(36),
+        pipefyId:    card.pipefyId,
+        title:       card.title || card.nomeContato || 'Cliente',
+        nomeContato: card.nomeContato || '',
+        telefone:    card.telefone   || '',
+        endereco:    card.endereco   || '',
+        descricao:   card.descricao  || '',
+        phaseId:     'aprovado',
+        clienteTipo: 'cliente_loja',
+        orcPeca:     card.orcPeca  || '',
+        orcValor:    card.orcValor || '',
+        movedAt:     new Date().toISOString(),
+        criadoEm:   new Date().toISOString(),
+      });
+      board.syncedIds.push(String(pipefyId));
+    } else {
+      jaExiste.phaseId     = 'aprovado';
+      jaExiste.clienteTipo = 'cliente_loja';
+      jaExiste.orcPeca     = card.orcPeca  || '';
+      jaExiste.orcValor    = card.orcValor || '';
+      jaExiste.movedAt     = new Date().toISOString();
+    }
+    await dbSet(BOARD_KEY, board);
+    coleta.cards = coleta.cards.filter(c => String(c.pipefyId) !== String(pipefyId));
+    await dbSet(COLETA_KEY, coleta);
+    return res.status(200).json({ ok: true });
+  }
+
+  // ── REPROVAR ORÇAMENTO → volta para remarcar ─────────────────────────────
+  if (req.method === 'POST' && action === 'reprovar-orcamento') {
+    const { pipefyId } = req.body || {};
+    const coleta = (await dbGet(COLETA_KEY)) || { cards: [] };
+    const card = coleta.cards.find(c => String(c.pipefyId) === String(pipefyId));
+    if (!card) return res.status(404).json({ ok: false, error: 'card nao encontrado' });
+    card.coletaPhase    = 'remarcar';
+    card.orcReprovadoEm = new Date().toISOString();
+    card.orcPeca  = '';
+    card.orcValor = '';
+    await dbSet(COLETA_KEY, coleta);
+    return res.status(200).json({ ok: true });
+  }
+
+  return res.status(404).json({ ok: false, error: "Acao nao encontrada: " + action });
 
   return res.status(404).json({ ok: false, error: "Acao nao encontrada: " + action });
 

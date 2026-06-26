@@ -44,6 +44,15 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .col[data-phase="remarcar"] .col-name{color:var(--orange);}
 .col[data-phase="remarcar"] .col-badge{background:rgba(249,115,22,.15);color:var(--orange);}
 .col[data-phase="orcamento_registrado"] .col-name{color:var(--yellow);}
+.col[data-phase="orc_enviado"] .col-name{color:#06b6d4;}
+.col[data-phase="orc_enviado"] .col-badge{background:rgba(6,182,212,.15);color:#06b6d4;}
+.btn-orc{background:rgba(6,182,212,.12);border:1px solid rgba(6,182,212,.25);color:#06b6d4;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;width:100%;margin-top:6px;}
+.btn-orc:hover{background:rgba(6,182,212,.22);}
+.btn-aprov{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.25);color:#22c55e;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;width:100%;margin-top:4px;}
+.btn-reprov{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:#ef4444;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;width:100%;margin-top:4px;}
+.orc-info{background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.15);border-radius:6px;padding:7px 9px;margin:6px 0;font-size:11px;}
+.orc-info-lbl{font-size:9px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;}
+.orc-info-val{color:#f0f2f5;font-weight:700;margin-top:1px;}
 .col[data-phase="orcamento_registrado"] .col-badge{background:rgba(245,200,0,.15);color:var(--yellow);}
 .col[data-phase="liberado_entrega"] .col-name{color:var(--orange);}
 .col[data-phase="liberado_entrega"] .col-badge{background:rgba(249,115,22,.15);color:var(--orange);}
@@ -185,8 +194,30 @@ function renderKanban(phases){
 function buildCardColeta(c,phaseId){
   var num=osNum(c);
   var diagBtns='';
+
+  // Botão Passar Orçamento nas fases de liberado/horário marcado
+  if(phaseId==='liberado_coleta'||phaseId==='comunicacao_realizada'){
+    diagBtns+='<div class="c-actions">'+
+      '<button class="btn-orc" onclick="abrirPassarOrc(\''+c.pipefyId+'\')">📄 Passar Orçamento</button>'+
+    '</div>';
+  }
+
+  // Exibir orçamento e botões Aprovar/Reprovar
+  if(phaseId==='orc_enviado'){
+    diagBtns+='<div class="orc-info">'+
+      '<div class="orc-info-lbl">Peça</div>'+
+      '<div class="orc-info-val">'+esc(c.orcPeca||'—')+'</div>'+
+      '<div class="orc-info-lbl" style="margin-top:5px;">Valor</div>'+
+      '<div class="orc-info-val" style="color:#22c55e;">'+esc(c.orcValor||'—')+'</div>'+
+    '</div>'+
+    '<div class="c-actions">'+
+      '<button class="btn-aprov" onclick="aprovarOrc(\''+c.pipefyId+'\')">✅ Aprovar</button>'+
+      '<button class="btn-reprov" onclick="reprovarOrc(\''+c.pipefyId+'\')">❌ Reprovar</button>'+
+    '</div>';
+  }
+
   if(phaseId==='coleta_realizada'){
-    diagBtns='<div class="c-actions">'+
+    diagBtns+='<div class="c-actions">'+
       '<button class="btn-diag" id="diag-btn-'+c.pipefyId+'" onclick="abrirDiag(\''+c.pipefyId+'\')">\uD83D\uDCCB Diagnóstico</button>'+
       '<div class="diag-form" id="diag-form-'+c.pipefyId+'">'+
         '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'+
@@ -385,6 +416,108 @@ async function excluirFicha(pid, type) {
 
 loadCurrent();
 setInterval(loadCurrent,60000);
+
+// ── Orçamento TV ───────────────────────────────────────────────────────────
+function abrirPassarOrc(pipefyId) {
+  document.getElementById('orc-pipefyId').value = pipefyId;
+  document.getElementById('orc-peca').value  = '';
+  document.getElementById('orc-valor').value = '';
+  var m = document.getElementById('modal-orc');
+  m.style.display = 'flex';
+  setTimeout(function(){ document.getElementById('orc-peca').focus(); }, 100);
+}
+
+function fecharModalOrc() {
+  document.getElementById('modal-orc').style.display = 'none';
+}
+
+async function enviarOrcamento() {
+  var pipefyId = document.getElementById('orc-pipefyId').value;
+  var peca     = document.getElementById('orc-peca').value.trim();
+  var valor    = document.getElementById('orc-valor').value.trim();
+  if (!peca)  { alert('Informe a peça'); return; }
+  if (!valor) { alert('Informe o valor'); return; }
+  try {
+    var r = await fetch('/api/tv-coleta?action=passar-orcamento', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pipefyId, peca, valor })
+    }).then(function(x){ return x.json(); });
+    if (r.ok) {
+      fecharModalOrc();
+      loadCurrent();
+    } else {
+      alert('Erro: ' + (r.error || 'falha'));
+    }
+  } catch(e) { alert('Erro: ' + e.message); }
+}
+
+async function aprovarOrc(pipefyId) {
+  if (!confirm('Aprovar orçamento? O card irá para o board TV como Cliente Loja.')) return;
+  try {
+    var r = await fetch('/api/tv-coleta?action=aprovar-orcamento', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pipefyId })
+    }).then(function(x){ return x.json(); });
+    if (r.ok) {
+      loadCurrent();
+    } else {
+      alert('Erro: ' + (r.error || 'falha'));
+    }
+  } catch(e) { alert('Erro: ' + e.message); }
+}
+
+async function reprovarOrc(pipefyId) {
+  if (!confirm('Reprovar orçamento? O card voltará para Remarcar.')) return;
+  try {
+    var r = await fetch('/api/tv-coleta?action=reprovar-orcamento', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pipefyId })
+    }).then(function(x){ return x.json(); });
+    if (r.ok) {
+      loadCurrent();
+    } else {
+      alert('Erro: ' + (r.error || 'falha'));
+    }
+  } catch(e) { alert('Erro: ' + e.message); }
+}
+
+// Fechar modal clicando fora
+document.addEventListener('click', function(e) {
+  var m = document.getElementById('modal-orc');
+  if (m && e.target === m) fecharModalOrc();
+});
+
 </script>
+
+<!-- MODAL PASSAR ORÇAMENTO -->
+<div id="modal-orc" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:999;align-items:center;justify-content:center;">
+  <div style="background:#0f1114;border:1px solid #1e2228;border-radius:14px;width:90%;max-width:380px;overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #1e2228;background:#181b1f;">
+      <span style="font-size:13px;font-weight:800;color:#06b6d4;">📄 Passar Orçamento</span>
+      <button onclick="fecharModalOrc()" style="background:transparent;border:none;color:#5a6270;font-size:20px;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:18px;">
+      <input type="hidden" id="orc-pipefyId">
+      <div style="margin-bottom:12px;">
+        <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">🔧 Peça</div>
+        <input id="orc-peca" type="text" placeholder="Ex: Placa principal, Fusível, Backlight..."
+          style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:8px;padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;">
+      </div>
+      <div style="margin-bottom:16px;">
+        <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">💰 Valor</div>
+        <input id="orc-valor" type="text" placeholder="Ex: R$ 350,00"
+          style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:8px;padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;">
+      </div>
+      <button onclick="enviarOrcamento()"
+        style="background:#06b6d4;border:none;color:#000;width:100%;padding:11px;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;">
+        📤 Enviar Orçamento
+      </button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
