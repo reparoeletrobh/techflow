@@ -351,6 +351,7 @@ const PHASES = [
   { id:"nf_emitida",        name:"NF Emitida",          color:"#3b9eff" },
   { id:"faturamento",       name:"Faturamento",        color:"#f59e0b" },
   { id:"pagamento_agendado",  name:"Pagamento Agendado",    color:"#e879f9" },
+  { id:"retirar_em_loja",    name:"Retirar em Loja",       color:"#f59e0b" },
   { id:"analise_pagamento",  name:"Análise de Pagamento",  color:"#0ea5e9" },
   { id:"pagamento_confirmado",name:"Pagamento Confirmado", color:"#22c55e" },
   { id:"entrega_agendada",  name:"Entrega Agendada",   color:"#f97316" },
@@ -572,6 +573,15 @@ function buildActions(r) {
     h += `<button class="btn-primary" style="background:#8b5cf6;color:#fff;" onclick="mover('${r.id}','rota_criada')">🗺️ Rota Criada</button>`;
   if (r.phaseId==='rota_criada')
     h += `<button class="btn-primary" style="background:#ec4899;color:#fff;" onclick="mover('${r.id}','item_coletado')">📦 Item Coletado</button>`;
+  // Botão Retirar em Loja — disponível em qualquer fase exceto a própria
+  if (r.phaseId !== 'retirar_em_loja') {
+    h += `<button class="btn-secondary" style="background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.3);" onclick="moverSimples('${r.id}','retirar_em_loja','🏪','Mover para Retirar em Loja?')">🏪 Retirar em Loja</button>`;
+  }
+  // Botões específicos da fase retirar_em_loja
+  if (r.phaseId === 'retirar_em_loja') {
+    h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="mover('${r.id}','pagamento_confirmado')">✅ Pagamento Confirmado</button>`;
+    h += `<button class="btn-primary" style="background:#0ea5e9;color:#fff;" onclick="mover('${r.id}','analise_pagamento')">🔍 Análise de Pagamento</button>`;
+  }
   h += `<button class="btn-secondary btn-danger" onclick="excluir('${r.id}')">✕ Excluir</button>`;
   return h;
 }

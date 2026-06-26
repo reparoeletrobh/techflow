@@ -634,14 +634,17 @@ module.exports = async function handler(req, res) {
 
     // Valida transições permitidas
     const allowed = {
-      nf_emitida:      ["faturamento"],
-      faturamento:      ["pagamento_agendado", "analise_pagamento", "entrega_agendada", "entrega_liberada"],
-      pagamento_agendado: ["analise_pagamento", "entrega_agendada", "entrega_liberada"],
-      analise_pagamento:  ["pagamento_confirmado"],
-      pagamento_confirmado: ["entrega_agendada", "entrega_liberada"],
-      entrega_agendada: ["entrega_liberada"],
-      entrega_liberada: ["rota_criada"],
-      rota_criada:      ["item_coletado"],
+      nf_emitida:        ["faturamento", "retirar_em_loja"],
+      faturamento:       ["pagamento_agendado", "analise_pagamento", "retirar_em_loja", "entrega_agendada", "entrega_liberada"],
+      pagamento_agendado:["analise_pagamento", "retirar_em_loja", "entrega_agendada", "entrega_liberada"],
+      retirar_em_loja:   ["pagamento_confirmado", "analise_pagamento", "entrega_liberada"],
+      analise_pagamento: ["pagamento_confirmado", "retirar_em_loja"],
+      pagamento_confirmado: ["entrega_agendada", "entrega_liberada", "retirar_em_loja"],
+      entrega_agendada:  ["entrega_liberada", "retirar_em_loja"],
+      entrega_liberada:  ["rota_criada", "retirar_em_loja"],
+      rota_criada:       ["item_coletado", "retirar_em_loja"],
+      item_coletado:     ["retirar_em_loja"],
+      aguardando_dados:  ["retirar_em_loja"],
     };
 
     const fin = await dbGet(FIN_KEY) || defaultFin();
