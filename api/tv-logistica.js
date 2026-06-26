@@ -1431,5 +1431,78 @@ Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter peque
     } catch(e) { return res.status(200).json({ ok: false, error: e.message }); }
   }
 
+  // ── PASSAR ORÇAMENTO → move ficha para orc_enviado ───────────────────────
+  if (req.method === 'POST' && action === 'passar-orcamento') {
+    const { id, peca, valor } = req.body || {};
+    const db = (await dbGet('tv_logistica')) || { fichas: [] };
+    const f = db.fichas.find(x => x.id === id);
+    if (!f) return res.status(404).json({ ok: false, error: 'ficha não encontrada' });
+    f.fase     = 'orc_enviado';
+    f.orcPeca  = peca  || '';
+    f.orcValor = valor || '';
+    f.orcEnviadoEm = new Date().toISOString();
+    f.movedAt  = new Date().toISOString();
+    await dbSet('tv_logistica', db);
+    return res.status(200).json({ ok: true });
+  }
+
+  // ── APROVAR ORÇAMENTO → board TV fase aprovado + cliente_loja ─────────────
+  if (req.method === 'POST' && action === 'aprovar-orcamento') {
+    const { id } = req.body || {};
+    const db = (await dbGet('tv_logistica')) || { fichas: [] };
+    const f = db.fichas.find(x => x.id === id);
+    if (!f) return res.status(404).json({ ok: false, error: 'ficha não encontrada' });
+
+    // Adicionar ao board TV como aprovado/cliente_loja
+    const board = (await dbGet('tv_board')) || { phases:[], cards:[], syncedIds:[], movesLog:[] };
+    if (!board.syncedIds) board.syncedIds = [];
+    const jaExiste = (board.cards||[]).find(c => String(c.pipefyId) === String(f.pipefyId || f.id));
+    if (!jaExiste) {
+      board.cards = board.cards || [];
+      board.cards.push({
+        id:          'log_aprov_' + Date.now().toString(36),
+        pipefyId:    f.pipefyId || f.id,
+        title:       f.nome || f.title || 'Cliente',
+        nomeContato: f.nome || '',
+        telefone:    f.telefone || '',
+        endereco:    f.endereco || '',
+        descricao:   f.descricao || (f.orcPeca ? 'Peça: '+f.orcPeca+' | Valor: '+f.orcValor : ''),
+        phaseId:     'aprovado',
+        clienteTipo: 'cliente_loja',
+        orcPeca:     f.orcPeca  || '',
+        orcValor:    f.orcValor || '',
+        movedAt:     new Date().toISOString(),
+        criadoEm:    new Date().toISOString(),
+      });
+    } else {
+      jaExiste.phaseId     = 'aprovado';
+      jaExiste.clienteTipo = 'cliente_loja';
+      jaExiste.orcPeca     = f.orcPeca  || '';
+      jaExiste.orcValor    = f.orcValor || '';
+      jaExiste.movedAt     = new Date().toISOString();
+    }
+    await dbSet('tv_board', board);
+
+    // Remover da logística
+    db.fichas = db.fichas.filter(x => x.id !== id);
+    await dbSet('tv_logistica', db);
+    return res.status(200).json({ ok: true });
+  }
+
+  // ── REPROVAR ORÇAMENTO → volta para remarcar ───────────────────────────────
+  if (req.method === 'POST' && action === 'reprovar-orcamento') {
+    const { id } = req.body || {};
+    const db = (await dbGet('tv_logistica')) || { fichas: [] };
+    const f = db.fichas.find(x => x.id === id);
+    if (!f) return res.status(404).json({ ok: false, error: 'ficha não encontrada' });
+    f.fase         = 'remarcar';
+    f.orcPeca      = '';
+    f.orcValor     = '';
+    f.orcReprovadoEm = new Date().toISOString();
+    f.movedAt      = new Date().toISOString();
+    await dbSet('tv_logistica', db);
+    return res.status(200).json({ ok: true });
+  }
+
   return res.status(404).json({ ok: false, error: 'ação não encontrada' });
 };
