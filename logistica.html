@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='18,2 8,18 15,18 14,30 24,14 17,14' fill='%23f5c800' stroke='%23f5c800' stroke-linejoin='round'/%3E%3C/svg%3E">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Logística — Reparo Eletro</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -848,7 +850,7 @@ function equipSecHTML(eq, i, total) {
         <div class="diag-section-label" style="margin-bottom:5px;">Tipo</div>
         <div class="type-grid">
           ${['microondas','purificador','bblend','adega','forno','tv'].map(t=>
-            `<button class="type-btn${eq.tipo===t?' sel':''}" onclick="selTipo(${i},'${t}')">${t.charAt(0).toUpperCase()+t.slice(1)}</button>`
+            `<button class="type-btn${eq.tipo===t?' sel':''}" onclick="selTipo(${i},'${t}')">${t==='tv'?'TV':t.charAt(0).toUpperCase()+t.slice(1)}</button>`
           ).join('')}
         </div>
       </div>
