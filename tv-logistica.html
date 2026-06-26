@@ -179,6 +179,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .chip-tv.on.chip-condenada{background:rgba(239,68,68,.15);border-color:var(--red);color:var(--red);}
 .chip-tv.on.chip-risco{background:rgba(245,200,0,.15);border-color:var(--yellow);color:var(--yellow);}
 .chip-tv.on.chip-acrilico{background:rgba(34,197,94,.15);border-color:var(--green);color:var(--green);}
+.chip-tv.on.chip-tu{background:rgba(6,182,212,.15);border-color:#06b6d4;color:#06b6d4;}
+#tu-sub-wrap{display:none;margin-top:6px;gap:5px;flex-wrap:wrap;}
+#tu-sub-wrap.open{display:flex;}
 .diag-inline{display:none;margin-top:8px;border:1px solid var(--border);border-radius:8px;padding:10px;background:var(--surface);}
 .diag-inline.open{display:block;}
 .diag-inline-sec{border:1px solid var(--border);border-radius:7px;padding:9px;margin-bottom:7px;}
@@ -1188,7 +1191,7 @@ function toggleExpand(id) {
 
 
 // ── DIAGNÓSTICO TV (inline, igual tv-coleta) ──────────────────────────────
-var CHIPS_TV_LOG = ['barramento','placa','condenada','risco','acrilico'];
+var CHIPS_TV_LOG = ['barramento','placa','condenada','risco','acrilico','tu'];
 
 function renderChipSecStr(fid, idx, total) {
   var lbl = total > 1 ? '📺 TV ' + (idx+1) : '📺 Equipamento';
@@ -1203,6 +1206,14 @@ function renderChipSecStr(fid, idx, total) {
       '<button class="chip-tv chip-condenada" id="dlc-condenada-'+fid+'-'+idx+'" onclick="toggleChipTV(\''+fid+'\','+idx+',\'condenada\')">Condenada</button>' +
       '<button class="chip-tv chip-risco" id="dlc-risco-'+fid+'-'+idx+'" onclick="toggleChipTV(\''+fid+'\','+idx+',\'risco\')">Risco</button>' +
       '<button class="chip-tv chip-acrilico" id="dlc-acrilico-'+fid+'-'+idx+'" onclick="toggleChipTV(\''+fid+'\','+idx+',\'acrilico\')">Acrílico</button>' +
+      '<button class="chip-tv chip-tu" id="dlc-tu-'+fid+'-'+idx+'" onclick="toggleChipTU(\''+fid+'\','+idx+')">TU</button>' +
+    '</div>' +
+    '<div id="tu-sub-'+fid+'-'+idx+'" style="display:none;margin-top:6px;">' +
+      '<div class="diag-label-tv" style="font-size:9px;">Tipo TU:</div>' +
+      '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:3px;">' +
+        '<button class="chip-tv" id="dlc-tu-bar-'+fid+'-'+idx+'" onclick="selTuSub(\''+fid+'\','+idx+',\'TU + Barramento\')">TU + Barramento</button>' +
+        '<button class="chip-tv" id="dlc-tu-placa-'+fid+'-'+idx+'" onclick="selTuSub(\''+fid+'\','+idx+',\'TU + Placa\')">TU + Placa</button>' +
+      '</div>' +
     '</div>' +
     '<input class="diag-input-tv" type="number" id="dlv-'+fid+'-'+idx+'" placeholder="Valor Acrílico (R$)" min="0" step="0.01" style="display:none;"/>' +
   '</div>';
@@ -1229,6 +1240,35 @@ function toggleChipTV(fid, idx, nome) {
   }
 }
 
+function toggleChipTU(fid, idx) {
+  var chip = document.getElementById('dlc-tu-'+fid+'-'+idx);
+  if (!chip) return;
+  chip.classList.toggle('on');
+  var sub = document.getElementById('tu-sub-'+fid+'-'+idx);
+  if (sub) sub.style.display = chip.classList.contains('on') ? 'block' : 'none';
+  // Limpar sub-seleção ao desmarcar
+  if (!chip.classList.contains('on')) {
+    ['dlc-tu-bar-'+fid+'-'+idx,'dlc-tu-placa-'+fid+'-'+idx].forEach(function(id){
+      var el=document.getElementById(id); if(el) el.classList.remove('on');
+    });
+  }
+}
+
+function selTuSub(fid, idx, opcao) {
+  // Toggle exclusivo: só uma sub-opção ativa por vez
+  var barEl   = document.getElementById('dlc-tu-bar-'+fid+'-'+idx);
+  var placaEl = document.getElementById('dlc-tu-placa-'+fid+'-'+idx);
+  if (!barEl || !placaEl) return;
+  var isBar = opcao.includes('Barramento');
+  if (isBar) {
+    barEl.classList.toggle('on');
+    placaEl.classList.remove('on');
+  } else {
+    placaEl.classList.toggle('on');
+    barEl.classList.remove('on');
+  }
+}
+
 function coletarChipsSecs(fid) {
   var qtdEl = document.getElementById('diag-qtd-'+fid);
   var qtd = qtdEl ? parseInt(qtdEl.value)||1 : 1;
@@ -1236,13 +1276,22 @@ function coletarChipsSecs(fid) {
   for (var i = 0; i < qtd; i++) {
     var modeloEl = document.getElementById('dlm-'+fid+'-'+i);
     var modelo = modeloEl ? modeloEl.value.trim() : '';
+    var tuBar   = document.getElementById('dlc-tu-bar-'+fid+'-'+i);
+    var tuPlaca = document.getElementById('dlc-tu-placa-'+fid+'-'+i);
+    var tuSub   = tuBar&&tuBar.classList.contains('on') ? 'TU + Barramento'
+                : tuPlaca&&tuPlaca.classList.contains('on') ? 'TU + Placa' : null;
     var chips = CHIPS_TV_LOG.filter(function(c){
+      if (c==='tu') return false; // TU tem tratamento próprio
       var el = document.getElementById('dlc-'+c+'-'+fid+'-'+i);
       return el && el.classList.contains('on');
     });
     var acrilicoValEl = document.getElementById('dlv-'+fid+'-'+i);
     var acrilicoVal = acrilicoValEl ? parseFloat(acrilicoValEl.value)||0 : 0;
-    if (chips.length > 0) equips.push({ modelo: modelo, tipo: 'tv', servicos: chips, preco: acrilicoVal||0 });
+    var tuChipEl = document.getElementById('dlc-tu-'+fid+'-'+i);
+    var hasTU = tuChipEl && tuChipEl.classList.contains('on');
+    if (chips.length > 0 || hasTU) {
+      equips.push({ modelo: modelo, tipo: 'tv', servicos: chips, tuSub: tuSub, preco: hasTU ? 1290 : (acrilicoVal||0) });
+    }
   }
   return equips;
 }

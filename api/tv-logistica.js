@@ -516,7 +516,7 @@ module.exports = async function handler(req, res) {
 
     function priNome(n) { return n ? n.trim().split(/\s+/)[0] : 'cliente'; }
 
-    function gerarTexto(tipo, subtipo, servicos, precoInput, templates, modelo) {
+    function gerarTexto(tipo, subtipo, servicos, precoInput, templates, modelo, tuSub) {
       const pn = priNome(nome);
       const s  = servicos || [];
       const tem = (lista) => s.some(x => lista.includes(x));
@@ -571,6 +571,14 @@ module.exports = async function handler(req, res) {
         const precoManual = parseFloat(precoInput) > 0 ? String(Math.round(parseFloat(precoInput))) : null;
         const precoStr    = precoTab || precoManual || '[VALOR]';
         const acrilicoVal = parseFloat(precoInput) || 0; // para chip acrílico
+
+        // ── TU (TU + Barramento ou TU + Placa) — preço fixo R$ 1.290 ──────
+        if (tuSub) {
+          return {
+            texto: `Olá, ${pn}, bom dia! Sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:\n\nForam feitos todos os testes e identificamos que será necessário realizar a troca do ${tuSub} da TV. Este conserto completo fica em 1290 reais apenas. Aprovando já iniciamos o conserto.`,
+            preco: '1290',
+          };
+        }
 
         // ── CONDENADA ─────────────────────────────────────────────────────
         if (chips.includes('condenada')) {
@@ -703,7 +711,7 @@ module.exports = async function handler(req, res) {
 
     // Gerar texto para cada equipamento
     const resultados = equips.map(eq =>
-      gerarTexto(eq.tipo, eq.subtipo, eq.servicos, eq.preco, customTemplates, eq.modelo)
+      gerarTexto(eq.tipo, eq.subtipo, eq.servicos, eq.preco, customTemplates, eq.modelo, eq.tuSub)
     );
 
     // Texto final
