@@ -43,6 +43,21 @@ export default async function handler(req, res) {
     return res.status(200).json({ok:true,agendamento:novo});
   }
 
+  // ── RETORNAR PARA PENDENTES (de cancelado) ───────────────────────────────
+  if(req.method==='POST'&&action==='retornar-pendente'){
+    const{id}=req.body||{};
+    const ag=db.agendamentos.find(a=>a.id===id);
+    if(!ag) return res.status(404).json({ok:false,error:'Não encontrado'});
+    ag.status='pendente';
+    ag.dataAgendada=null;
+    ag.finalizadoEm=null;
+    ag.aprovado=false; ag.aprovadoEm=null;
+    ag.orcEnviado=false; ag.orcEnviadoEm=null;
+    ag.atualizadoEm=new Date().toISOString();
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true});
+  }
+
   // ── ORÇAMENTO ENVIADO (toggle) ──────────────────────────────────────────
   if(req.method==='POST'&&action==='orc-enviado'){
     const{id}=req.body||{};
