@@ -310,7 +310,7 @@ module.exports = async function handler(req, res) {
         id, nome, tel, desc,
         enviadoEm: new Date().toISOString()
       });
-      db_g.fichas = db_g.fichas.slice(0, 200);
+      db_g.fichas = db_g.fichas.slice(0, 5000); // limite alto p/ não derrubar dedup (bug corrigido em 30/06)
       await dbSet(GMB_ENV_KEY, db_g);
     }
     return res.status(200).json({ ok: true });
