@@ -36,7 +36,7 @@ const CADENCIA_STEPS = [
 
 // ── Templates de mensagem ─────────────────────────────────────────────────────
 const TEMPLATES = {
-  e0_plain: `Oi {{responsavel}}, aqui é o Pedro Teixeira da Reparo Eletro BH.\n\nA gente faz manutenção especializada de microondas e bebedouros para empresas como a {{empresa}} — com coleta e entrega na sede, nota fiscal e boleto com prazo.\n\nVale 5 minutos pra eu te mostrar como funciona?\n\nAbraço,\nPedro`,
+  e0_plain: `Oi {{responsavel}}, aqui é o Pedro Teixeira da Reparo Eletro BH.\n\nA gente faz manutenção especializada de equipamentos para empresas como a {{empresa}} — com coleta e entrega na sede, nota fiscal e boleto com prazo.\n\nAtendemos: microondas, forno, adega, purificador de água, bebedouro, geladeiras, freezers e refrigeração industrial.\n\nVale 5 minutos pra eu te mostrar como funciona?\n\nAbraço,\nPedro`,
   w2: `Oi {{responsavel}}, Pedro da Reparo Eletro aqui 👋\nVocês têm microondas ou bebedouro no escritório que eventualmente precisa de manutenção?\nPergunto pois trabalho com empresas em BH e tenho coleta e NF. 🙂`,
   e4: `{{responsavel}}, passando pra reforçar:\n\nA gente busca o equipamento na {{empresa}}, conserta e devolve funcionando — sem que ninguém precise sair do escritório. Emitimos NF e aceitamos boleto com prazo de 15 a 30 dias.\n\nQuer receber nossa tabela de preços?`,
   l6: `Oi {{responsavel}}, mandei um email sobre manutenção de equipamentos para a {{empresa}}. Trabalho com coleta, NF e boleto. Posso te enviar nossa proposta por aqui?`,
@@ -50,12 +50,25 @@ const TEMPLATES = {
 <table width="580" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
 <tr><td style="background:#1a1a2e;padding:24px 36px;text-align:center;">
   <div style="font-size:20px;font-weight:800;color:#fff;letter-spacing:1px;">⚡ REPARO ELETRO BH</div>
-  <div style="font-size:10px;color:#8899aa;margin-top:3px;letter-spacing:2px;">MICROONDAS · BEBEDOUROS · CORPORATIVO</div>
+  <div style="font-size:10px;color:#8899aa;margin-top:3px;letter-spacing:2px;">MANUTENÇÃO DE ELETRODOMÉSTICOS CORPORATIVOS</div>
 </td></tr>
 <tr><td style="padding:28px 36px 0;">
   <p style="margin:0;font-size:15px;color:#222;">Olá, <strong>{{responsavel}}</strong>!</p>
-  <p style="margin:10px 0 0;font-size:14px;color:#444;line-height:1.7;">Meu nome é <strong>Pedro Teixeira</strong> da <strong>Reparo Eletro BH</strong>. Somos especialistas em manutenção de <strong>microondas e bebedouros corporativos</strong> em BH e região.</p>
+  <p style="margin:10px 0 0;font-size:14px;color:#444;line-height:1.7;">Meu nome é <strong>Pedro Teixeira</strong> da <strong>Reparo Eletro BH</strong>. Somos especialistas em manutenção de <strong>eletrodomésticos corporativos</strong> em BH e região.</p>
   <p style="margin:10px 0 0;font-size:14px;color:#444;line-height:1.7;">Acredito que podemos ajudar a <strong>{{empresa}}</strong> a reduzir custos e evitar paradas por equipamentos com defeito.</p>
+</td></tr>
+<tr><td style="padding:16px 36px 0;">
+  <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Atendemos:</div>
+  <table cellpadding="0" cellspacing="0" width="100%"><tr><td>
+    <span style="display:inline-block;background:#f0f4ff;color:#1a1a2e;font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;margin:0 6px 8px 0;">🍕 Microondas</span>
+    <span style="display:inline-block;background:#f0f4ff;color:#1a1a2e;font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;margin:0 6px 8px 0;">🔥 Forno</span>
+    <span style="display:inline-block;background:#f0f4ff;color:#1a1a2e;font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;margin:0 6px 8px 0;">🍷 Adega</span>
+    <span style="display:inline-block;background:#f0f4ff;color:#1a1a2e;font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;margin:0 6px 8px 0;">💧 Purificador de Água</span>
+    <span style="display:inline-block;background:#f0f4ff;color:#1a1a2e;font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;margin:0 6px 8px 0;">🚰 Bebedouro</span>
+    <span style="display:inline-block;background:#f0f4ff;color:#1a1a2e;font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;margin:0 6px 8px 0;">🧊 Geladeiras</span>
+    <span style="display:inline-block;background:#f0f4ff;color:#1a1a2e;font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;margin:0 6px 8px 0;">❄️ Freezers</span>
+    <span style="display:inline-block;background:#f0f4ff;color:#1a1a2e;font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;margin:0 6px 8px 0;">🏭 Refrigeração Industrial</span>
+  </td></tr></table>
 </td></tr>
 <tr><td style="padding:20px 36px 0;">
   <table width="100%" cellpadding="0" cellspacing="0">
@@ -238,10 +251,10 @@ module.exports = async function handler(req, res) {
           method: 'POST',
           headers: { 'Authorization': 'Bearer ' + process.env.RESEND_API_KEY, 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            from: 'Pedro Teixeira | Reparo Eletro, Microondas e Bebedouros <pedro@comercial.reparoeletroadm.com>',
+            from: 'Pedro Teixeira | Reparo Eletro BH <pedro@comercial.reparoeletroadm.com>',
             reply_to: ['pedro@ciacaluuir.resend.app'],
             to: [novo.email],
-            subject: 'Manutenção de Microondas e Bebedouros para ' + novo.empresa,
+            subject: 'Manutenção de Eletrodomésticos Corporativos para ' + novo.empresa,
             html: htmlBody,
             text: plainBody,
           })
@@ -255,7 +268,7 @@ module.exports = async function handler(req, res) {
             evDb.emails.unshift({
               id: 'SDR-D0-' + Date.now().toString(36),
               para: novo.email,
-              assunto: 'Manutenção de Microondas e Bebedouros para ' + novo.empresa,
+              assunto: 'Manutenção de Eletrodomésticos Corporativos para ' + novo.empresa,
               corpo: plainBody || '',
               html: htmlBody || '',
               criadoEm: new Date().toISOString(),
@@ -381,10 +394,10 @@ module.exports = async function handler(req, res) {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          from: 'Pedro Teixeira | Reparo Eletro, Microondas e Bebedouros <pedro@comercial.reparoeletroadm.com>',
+          from: 'Pedro Teixeira | Reparo Eletro BH <pedro@comercial.reparoeletroadm.com>',
           reply_to: ['pedro@ciacaluuir.resend.app'],
           to: [lead.email],
-          subject: 'Manutenção de Microondas e Bebedouros para ' + lead.empresa,
+          subject: 'Manutenção de Eletrodomésticos Corporativos para ' + lead.empresa,
           html, text,
         })
       });
@@ -396,7 +409,7 @@ module.exports = async function handler(req, res) {
         evDb.emails.unshift({
           id: 'SDR-' + Date.now().toString(36),
           para: lead.email,
-          assunto: 'Manutenção de Microondas e Bebedouros para ' + lead.empresa,
+          assunto: 'Manutenção de Eletrodomésticos Corporativos para ' + lead.empresa,
           corpo: text || '',
           html: html || '',
           criadoEm: new Date().toISOString(),
@@ -432,7 +445,7 @@ module.exports = async function handler(req, res) {
           evDb.emails.unshift({
             id: 'SDR-REC-'+Date.now().toString(36)+'-'+adicionados,
             para: lead.email,
-            assunto: 'Manutenção de Microondas e Bebedouros para '+lead.empresa,
+            assunto: 'Manutenção de Eletrodomésticos Corporativos para '+lead.empresa,
             corpo: 'Email de apresentação enviado automaticamente ao cadastrar o lead.',
             criadoEm: lead.criadoEm||now,
             tipo: 'apresentacao_d0',
