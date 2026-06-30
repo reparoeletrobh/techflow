@@ -188,8 +188,10 @@ module.exports = async function handler(req, res) {
       proximaAcao: proximaAcao(l),
       atrasado: acaoAtrasada(l),
       // Cruzar com inbox — tem email desse lead no inbox?
-      emailNoInbox: emailsRecebidos.some(e => e.includes((l.email||'').toLowerCase().split('@')[0]) || (l.email||'') && e === l.email.toLowerCase()),
-      emailInboxId: (inbox.emails||[]).find(e => (e.de||'').toLowerCase().includes((l.email||'').split('@')[0]))?.id || null,
+      // Fix 30/06: match EXATO do email completo — substring por prefixo (ex: 'contato')
+      // gerava falso positivo cruzando com qualquer remetente não relacionado da inbox
+      emailNoInbox: !!(l.email) && emailsRecebidos.includes(l.email.toLowerCase().trim()),
+      emailInboxId: (inbox.emails||[]).find(e => (e.de||'').toLowerCase().trim() === (l.email||'').toLowerCase().trim())?.id || null,
     }));
     // Painel de inteligência
     const painel = {
