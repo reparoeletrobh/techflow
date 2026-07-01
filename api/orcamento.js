@@ -615,7 +615,8 @@ module.exports = async function handler(req, res) {
       const ePend  = pendIds.has(cardId);
 
       // Adicionar ao pool se está em erp e não estava ainda
-      if (eErp && cardId && !pendIds.has(cardId)) {
+      if (eErp && cardId && !pendIds.has(cardId) && !jaEnviadosIds.has(cardId)) {
+        // Só re-adiciona ao pool pendente se NÃO foi enviado antes
         pendIds.add(cardId);
         db_pend.ids = db_pend.ids || [];
         db_pend.ids.push(cardId);
