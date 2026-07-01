@@ -75,6 +75,18 @@
   ],
   "rewrites": [
     {
+      "source": "/api/fichas",
+      "destination": "/api/fichas.js"
+    },
+    {
+      "source": "/tv/fichas",
+      "destination": "/tv-fichas.html"
+    },
+    {
+      "source": "/fichas",
+      "destination": "/fichas.html"
+    },
+    {
       "source": "/analise-producao",
       "destination": "/analise-producao.html"
     },
