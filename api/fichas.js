@@ -1,7 +1,7 @@
 const U = (process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
 const T = (process.env.UPSTASH_TOKEN||'').replace(/[\n\r'"]/g,'').trim();
 
-const SHEET_ID = process.env.FICHAS_SHEET_ID || '';
+const SHEET_ID = process.env.FICHAS_SHEET_ID || '1ovSEGZ7if5-wdNZpd1cbLlyg0PZpsrT9fQwOIzfG_mw';
 const GAPI_KEY = process.env.GOOGLE_API_KEY  || '';
 
 const KEY_ADM    = 'fichas_adm';
@@ -39,7 +39,9 @@ function gerarId(row, tel) {
 function waNum(tel) {
   const d = String(tel||'').replace(/\D/g,'');
   if (d.startsWith('55') && d.length >= 12) return d;
-  return '55' + d;
+  if (d.length === 11) return '55' + d;
+  if (d.length === 10) return '55' + d;
+  return d.length >= 12 ? d : '55' + d;
 }
 
 const TEXTO_ADM = `Olá, tudo bem? Alessandro aqui, responsável pela logística da Reparo Eletro.\n\nTEMOS 2 OPÇÕES: COLETA E ENTREGA / ATENDIMENTO NO BALCÃO\n\n*ATENÇÃO: Você trazendo aqui na loja seu equipamento o orçamento é gratuito e consertamos em 15 minutos! Estamos na Rua Ouro Preto 663 - Barro Preto*\n\nCaso você prefira usar a nossa coleta e entrega, podemos buscar hoje mesmo na sua casa! Aguardo sua resposta.\n\nJá estamos prontos para te atender! Me fala qual opção escolheu por favor.`;
@@ -56,7 +58,7 @@ export default async function handler(req, res) {
     if (!SHEET_ID || !GAPI_KEY)
       return res.status(200).json({ ok:false, error:'FICHAS_SHEET_ID ou GOOGLE_API_KEY não configurado', novas:0 });
     try {
-      const url  = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/A:E?key=${GAPI_KEY}`;
+      const url  = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/A2:H?key=${GAPI_KEY}`;
       const resp = await fetch(url);
       const data = await resp.json();
       if (!resp.ok) return res.status(200).json({ ok:false, error: data.error?.message||'Sheets API erro', novas:0 });
@@ -83,11 +85,11 @@ export default async function handler(req, res) {
       for (let i = 0; i < novasRows.length; i++) {
         const row    = novasRows[i];
         const rowNum = cursor.row + i + 1;
-        const nome   = (row[0]||'').trim();
-        const tel    = (row[1]||'').trim();
-        const end    = (row[2]||'').trim();
-        const equip  = (row[3]||'').trim();
-        const def    = (row[4]||'').trim();
+        const tel    = (row[0]||'').replace(/\D/g,'').trim(); // coluna A: telefone
+        const nome   = (row[1]||'').trim();                    // coluna B: nome
+        const equip  = (row[2]||'').trim();                    // coluna C: equipamento
+        const def    = (row[3]||'').trim();                    // coluna D: defeito
+        const end    = (row[4]||'').trim();                    // coluna E: endereço
         if (!nome && !tel) continue;
 
         const sistema = detectSistema(equip);
