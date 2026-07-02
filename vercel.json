@@ -75,6 +75,10 @@
   ],
   "rewrites": [
     {
+      "source": "/tv/atendimento",
+      "destination": "/tv-atendimento.html"
+    },
+    {
       "source": "/api/fichas",
       "destination": "/api/fichas.js"
     },

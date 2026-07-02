@@ -256,9 +256,66 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok:true, msg:'Cursor zerado. Acesse /api/fichas?action=sync para reinicializar.' });
   }
 
-  // ── BADGE: retorna contagem de fichas novas ─────────────────────────────
+  // ── BADGE: faz sync da planilha + retorna contagem de fichas novas ─────────
   if (action === 'badge') {
     const sistema = req.query.sistema || 'adm';
+    // Sync automático (não bloqueia se der erro)
+    try {
+      const resp = await fetch(SHEET_CSV, { redirect:'follow' });
+      if (resp.ok) {
+        const text = await resp.text();
+        const rows = parseCSV(text);
+        const total = rows.length;
+        const cursor = await dbGet(KEY_CURSOR);
+        if (cursor && cursor.row != null && total > cursor.row) {
+          const novasRows = rows.slice(cursor.row).filter(r =>
+            String(r[0]||'').trim() || String(r[1]||'').trim()
+          );
+          if (novasRows.length > 0) {
+            const dbAdm = (await dbGet(KEY_ADM)) || { fichas:[] };
+            const dbTv  = (await dbGet(KEY_TV))  || { fichas:[] };
+            let importadas = 0;
+            for (let i = 0; i < novasRows.length; i++) {
+              const row    = novasRows[i];
+              const rowNum = cursor.row + i + 1;
+              const tel    = String(row[0]||'').replace(/\D/g,'').trim();
+              const nome   = String(row[1]||'').trim();
+              const equip  = String(row[2]||'').trim();
+              const def    = String(row[3]||'').trim();
+              const end    = String(row[4]||'').trim();
+              const hora   = String(row[6]||'').trim();
+              if (!nome && !tel) continue;
+              const sis = detectSistema(equip);
+              const ficha = {
+                id: `fsh_${rowNum}_${tel.slice(-4)}_${Date.now().toString(36)}`,
+                sheetRow: rowNum, nome, telefone: tel, endereco: end,
+                equipamento: equip, defeito: def, horario: hora, sistema: sis,
+                waNum: waNum(tel),
+                textoCopiar: sis === 'tv' ? TEXTO_TV : TEXTO_ADM,
+                status: 'criada', criadoEm: new Date().toISOString(),
+                contatoFeitoEm: null, logisticaEm: null,
+              };
+              if (sis === 'tv') dbTv.fichas.unshift(ficha);
+              else              dbAdm.fichas.unshift(ficha);
+              importadas++;
+            }
+            if (importadas > 0) {
+              await dbSet(KEY_ADM, dbAdm);
+              await dbSet(KEY_TV,  dbTv);
+            }
+            // Atualizar cursor para última linha com dado
+            let novoUltimo = cursor.row;
+            for (let i = rows.length - 1; i >= 1; i--) {
+              if (String(rows[i][0]||'').trim() || String(rows[i][1]||'').trim()) {
+                novoUltimo = i + 1; break;
+              }
+            }
+            await dbSet(KEY_CURSOR, { row: novoUltimo, atualizadoEm: new Date().toISOString() });
+          }
+        }
+      }
+    } catch(_) {}
+    // Retornar contagem atual
     const key = sistema === 'tv' ? KEY_TV : KEY_ADM;
     const db  = (await dbGet(key)) || { fichas:[] };
     const novas = (db.fichas||[]).filter(f => f.status === 'criada').length;

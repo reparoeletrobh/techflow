@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache">
+<title>Atendimento TV</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#07080a;color:#f0f2f5;min-height:100vh;}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:52px;background:#0f1114;border-bottom:1px solid #1e2228;position:sticky;top:0;z-index:10;}
+.h-title{font-size:13px;font-weight:800;color:#06b6d4;}
+.btn-atualizar{padding:7px 14px;border-radius:7px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:#3b9eff;color:#fff;}
+.btn-atualizar:disabled{opacity:.5;}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;padding:16px;}
+.card{background:#0f1114;border:1px solid #1e2228;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:6px;}
+.card-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5a6270;margin-bottom:4px;}
+.card-main{font-size:28px;font-weight:800;}
+.card-sub{font-size:11px;color:#5a6270;}
+.row{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:4px 0;border-bottom:1px solid #1a1d22;}
+.row:last-child{border:none;}
+.row-lbl{color:#5a6270;}
+.row-val{font-weight:700;}
+.c-cyan{color:#06b6d4;} .c-green{color:#22c55e;} .c-yellow{color:#f5c800;}
+.c-orange{color:#f97316;} .c-purple{color:#a855f7;} .c-red{color:#ef4444;}
+.c-blue{color:#3b9eff;}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid #1e2228;border-top-color:#3b9eff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.last-update{font-size:10px;color:#5a6270;padding:0 16px 12px;text-align:right;}
+.section-label{font-size:10px;font-weight:700;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;padding:14px 16px 4px;grid-column:1/-1;}
+</style>
+</head>
+<body>
+<header>
+  <div class="h-title">📺 Atendimento TV</div>
+  <button class="btn-atualizar" id="btn-atl" onclick="carregar()">↺ Atualizar</button>
+</header>
+
+<div class="grid" id="grid">
+  <div class="section-label">Carregando...</div>
+</div>
+<div class="last-update" id="last-upd"></div>
+
+<script>
+function fmtN(n){ return n==null?'—':Number(n).toLocaleString('pt-BR'); }
+
+async function carregar(){
+  var btn=document.getElementById('btn-atl');
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span>';
+  try {
+    var [fichasR, boardR, orcR, finR, logR] = await Promise.all([
+      fetch('/api/fichas?action=load&sistema=tv').then(r=>r.json()).catch(()=>({fichas:[]})),
+      fetch('/api/tv-board?action=load').then(r=>r.json()).catch(()=>({cards:[]})),
+      fetch('/api/tv-orcamento?action=load').then(r=>r.json()).catch(()=>({fichas:[]})),
+      fetch('/api/tv-financeiro?action=load').then(r=>r.json()).catch(()=>({records:[]})),
+      fetch('/api/tv-logistica?action=load').then(r=>r.json()).catch(()=>({fichas:[]})),
+    ]);
+
+    var fichas = fichasR.fichas  || [];
+    var cards  = boardR.cards    || boardR.fichas || [];
+    var orcs   = orcR.fichas     || orcR.cards    || [];
+    var fins   = finR.records    || finR.fichas   || [];
+    var logs   = logR.fichas     || [];
+
+    // ── FICHAS (planilha) ─────────────────────────────────────────────────
+    var hoje = new Date(); hoje.setHours(0,0,0,0);
+    var ficHoje  = fichas.filter(f=>new Date(f.criadoEm)>=hoje).length;
+    var ficCont  = fichas.filter(f=>f.contatoFeitoEm).length;
+    var ficLog   = fichas.filter(f=>f.logisticaEm).length;
+    var ficPend  = fichas.filter(f=>f.status==='criada').length;
+    var ficEntrar= fichas.filter(f=>f.status==='entrar_contato').length;
+
+    // ── BOARD TV (fases) ──────────────────────────────────────────────────
+    var fases={};
+    cards.forEach(function(c){ var p=c.phaseId||c.phase||'?'; fases[p]=(fases[p]||0)+1; });
+
+    // ── LOGÍSTICA TV ──────────────────────────────────────────────────────
+    var logFases={};
+    logs.forEach(function(f){ var p=f.phase||'?'; logFases[p]=(logFases[p]||0)+1; });
+
+    // ── ORÇAMENTOS TV ────────────────────────────────────────────────────
+    var orcHoje = orcs.filter(function(o){
+      var t=o.criadoEm||o.enviadoEm||o.createdAt; return t && new Date(t)>=hoje;
+    }).length;
+    var orcSem = orcs.filter(function(o){
+      var sem=new Date(); sem.setDate(sem.getDate()-7);
+      var t=o.criadoEm||o.enviadoEm||o.createdAt; return t && new Date(t)>=sem;
+    }).length;
+
+    // ── FINANCEIRO TV ────────────────────────────────────────────────────
+    var pgHoje = fins.filter(function(r){
+      var h2=(r.history||[]).find(function(e){return e.phaseId==='pagamento_confirmado';});
+      return h2 && new Date(h2.ts||h2.movedAt)>=hoje;
+    }).length;
+    var pgTotal = fins.filter(function(r){
+      return (r.history||[]).some(function(e){return e.phaseId==='pagamento_confirmado';});
+    }).length;
+
+    // ── Render ──────────────────────────────────────────────────────────
+    var g=document.getElementById('grid');
+    g.innerHTML=
+
+    // FICHAS
+    '<div class="section-label">📋 Fichas (Planilha)</div>'+
+    '<div class="card">'+
+      '<div class="card-title">Novas Fichas Hoje</div>'+
+      '<div class="card-main c-cyan">'+fmtN(ficHoje)+'</div>'+
+      '<div class="card-sub">Total no sistema: '+fmtN(fichas.length)+'</div>'+
+    '</div>'+
+    '<div class="card">'+
+      '<div class="card-title">Contatos Feitos</div>'+
+      '<div class="card-main c-green">'+fmtN(ficCont)+'</div>'+
+      '<div class="row"><span class="row-lbl">Enviadas para Logística</span><span class="row-val c-blue">'+fmtN(ficLog)+'</span></div>'+
+      '<div class="row"><span class="row-lbl">Aguardando contato</span><span class="row-val c-yellow">'+fmtN(ficPend)+'</span></div>'+
+      '<div class="row"><span class="row-lbl">⚠️ Entrar em contato</span><span class="row-val c-red">'+fmtN(ficEntrar)+'</span></div>'+
+    '</div>'+
+
+    // BOARD TV
+    '<div class="section-label">🖥️ Board Técnico TV</div>'+
+    '<div class="card">'+
+      '<div class="card-title">Fases Ativas</div>'+
+      '<div class="card-main c-purple">'+fmtN(cards.length)+'</div>'+
+      ['aprovado','producao','urgencia','barramento','aguardando_peca','peca_disponivel','comprar_peca','loja_feito','delivery_feito','aguardando_ret'].map(function(f){
+        return '<div class="row"><span class="row-lbl">'+f.replace(/_/g,' ')+'</span><span class="row-val">'+fmtN(fases[f]||0)+'</span></div>';
+      }).join('')+
+    '</div>'+
+
+    // LOGÍSTICA TV
+    '<div class="section-label">🚚 Logística TV</div>'+
+    '<div class="card">'+
+      '<div class="card-title">Em Andamento</div>'+
+      '<div class="card-main c-orange">'+fmtN(logs.length)+'</div>'+
+      ['liberado_coleta','horario_marcado','orc_enviado','liberado_para_rota','coleta_efetuada','orc_registrado'].map(function(f){
+        return '<div class="row"><span class="row-lbl">'+f.replace(/_/g,' ')+'</span><span class="row-val">'+fmtN(logFases[f]||0)+'</span></div>';
+      }).join('')+
+    '</div>'+
+
+    // ORÇAMENTOS E FINANCEIRO
+    '<div class="section-label">💰 Orçamentos & Financeiro</div>'+
+    '<div class="card">'+
+      '<div class="card-title">Orçamentos Enviados</div>'+
+      '<div class="card-main c-green">'+fmtN(orcs.length)+'</div>'+
+      '<div class="row"><span class="row-lbl">Hoje</span><span class="row-val c-green">'+fmtN(orcHoje)+'</span></div>'+
+      '<div class="row"><span class="row-lbl">Últimos 7 dias</span><span class="row-val">'+fmtN(orcSem)+'</span></div>'+
+    '</div>'+
+    '<div class="card">'+
+      '<div class="card-title">Pagamentos Confirmados</div>'+
+      '<div class="card-main c-yellow">'+fmtN(pgTotal)+'</div>'+
+      '<div class="row"><span class="row-lbl">Hoje</span><span class="row-val c-green">'+fmtN(pgHoje)+'</span></div>'+
+    '</div>';
+
+    document.getElementById('last-upd').textContent='Atualizado: '+new Date().toLocaleTimeString('pt-BR');
+  } catch(e) {
+    document.getElementById('grid').innerHTML='<div class="section-label" style="color:#ef4444;">Erro: '+e.message+'</div>';
+  }
+  btn.disabled=false; btn.textContent='↺ Atualizar';
+}
+
+carregar();
+setInterval(carregar, 2*60*1000); // atualiza a cada 2 min
+</script>
+</body>
+</html>

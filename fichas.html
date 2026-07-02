@@ -169,11 +169,18 @@ function render(){
   document.getElementById('b2').textContent=contatos.length;
   document.getElementById('b3').textContent=entrar.length;
 
-  // Contadores
-  document.getElementById('st-novas').textContent=criadas.length;
-  document.getElementById('st-contato').textContent=contatos.length;
-  document.getElementById('st-log').textContent=logs.length;
-  document.getElementById('st-entrar').textContent=entrar.length;
+  // Contadores CUMULATIVOS (total que passou por cada etapa)
+  var totalEntrou  = _fichas.length;
+  var totalContato = _fichas.filter(function(f){return !!f.contatoFeitoEm;}).length;
+  var totalLog     = _fichas.filter(function(f){return !!f.logisticaEm;}).length;
+  var totalEntrar  = _fichas.filter(function(f){
+    return f.status==='entrar_contato'||(f.contatoFeitoEm&&!f.logisticaEm&&
+      (Date.now()-new Date(f.contatoFeitoEm).getTime())>24*60*60*1000);
+  }).length;
+  document.getElementById('st-novas').textContent=totalEntrou;
+  document.getElementById('st-contato').textContent=totalContato;
+  document.getElementById('st-log').textContent=totalLog;
+  document.getElementById('st-entrar').textContent=totalEntrar;
 
   // Badge aba ativa
   var total=criadas.length+entrar.length;
