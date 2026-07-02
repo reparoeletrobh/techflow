@@ -320,7 +320,7 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
         <span class="nav-label">Fichas
           <span id="nav-fich-badge"
             style="display:none;background:#06b6d4;color:#000;font-size:9px;
-                   font-weight:700;border-radius:8px;padding:1px 6px;margin-left:4px;
+                   font-weight:700;border-radius:99px;padding:1px 6px;margin-left:4px;
                    vertical-align:middle;"></span>
         </span>
       </div>
@@ -1183,7 +1183,7 @@ async async function checarFichas(silencioso) {
     if (badge) {
       if (novas > 0) {
         badge.textContent = novas;
-        badge.style.display = 'inline-block';
+        badge.style.display = 'inline';
         badge.classList.add('alertando');
         if (navEl) navEl.classList.add('alertando');
       } else {
