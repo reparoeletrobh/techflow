@@ -91,15 +91,24 @@ export default async function handler(req, res) {
       // Linha 0 é o header — dados começam na linha 1
       const total = rows.length; // inclui header
 
-      // ── Primeira execução: salva cursor, não importa nada ─────────────────
+      // ── Primeira execução: salva cursor na ÚLTIMA LINHA COM DADOS (não a última da planilha) ──
       const cursor = await dbGet(KEY_CURSOR);
       if (!cursor || cursor.row == null) {
-        await dbSet(KEY_CURSOR, { row: total, iniciadoEm: new Date().toISOString() });
-        return res.status(200).json({ ok:true, novas:0, total, msg:`Cursor iniciado na linha ${total}. Somente fichas novas serão importadas daqui em diante.` });
+        // Encontrar índice da última linha com conteúdo real
+        let ultimaComDado = 0;
+        for (let i = rows.length - 1; i >= 1; i--) {
+          if (rows[i].some(c => String(c).trim() !== '')) {
+            ultimaComDado = i + 1; // próxima posição após a última linha com dado
+            break;
+          }
+        }
+        await dbSet(KEY_CURSOR, { row: ultimaComDado, iniciadoEm: new Date().toISOString() });
+        return res.status(200).json({ ok:true, novas:0, totalPlanilha: total, ultimaLinhaComDado: ultimaComDado, msg:`Cursor iniciado na linha ${ultimaComDado} (última com dado). Somente fichas novas serão importadas.` });
       }
 
       // ── Processar apenas linhas após o cursor ──────────────────────────────
-      const novasRows = rows.slice(cursor.row); // slice pega de cursor.row até o fim
+      // Pegar só linhas após cursor E com conteúdo real (ignora linhas vazias pré-alocadas)
+      const novasRows = rows.slice(cursor.row).filter(r => r.some(c => String(c).trim() !== ''));
       if (!novasRows.length) {
         return res.status(200).json({ ok:true, novas:0, total });
       }
@@ -146,7 +155,15 @@ export default async function handler(req, res) {
         await dbSet(KEY_ADM, dbAdm);
         await dbSet(KEY_TV,  dbTv);
       }
-      await dbSet(KEY_CURSOR, { row: total, atualizadoEm: new Date().toISOString() });
+      // Atualizar cursor para última linha com dado (não total pré-alocado)
+      let novoUltimo = cursor.row;
+      for (let i = rows.length - 1; i >= 1; i--) {
+        if (rows[i].some(c => String(c).trim() !== '')) {
+          novoUltimo = i + 1;
+          break;
+        }
+      }
+      await dbSet(KEY_CURSOR, { row: novoUltimo, atualizadoEm: new Date().toISOString() });
 
       return res.status(200).json({ ok:true, novas, total });
     } catch(e) {
