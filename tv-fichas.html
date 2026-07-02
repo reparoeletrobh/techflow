@@ -131,9 +131,14 @@ function render(){
   const criadas = _fichas.filter(f=>f.status==='criada');
   const contatos= _fichas.filter(f=>f.status==='contato_feito');
   const entrar  = _fichas.filter(f=>f.status==='entrar_contato');
+  const logs=_fichas.filter(f=>f.status==='logistica');
   document.getElementById('b1').textContent=criadas.length;
   document.getElementById('b2').textContent=contatos.length;
   document.getElementById('b3').textContent=entrar.length;
+  var sn=document.getElementById('st-novas');if(sn)sn.textContent=criadas.length;
+  var sc=document.getElementById('st-contato');if(sc)sc.textContent=contatos.length;
+  var sl=document.getElementById('st-log');if(sl)sl.textContent=logs.length;
+  var se=document.getElementById('st-entrar');if(se)se.textContent=entrar.length;
   document.getElementById('col-criada').innerHTML =criadas.length ?criadas.map(cardHTML).join(''):'<div class="empty">Nenhuma ficha nova</div>';
   document.getElementById('col-contato').innerHTML=contatos.length?contatos.map(cardHTML).join(''):'<div class="empty">Nenhum contato feito</div>';
   document.getElementById('col-entrar').innerHTML =entrar.length ?entrar.map(cardHTML).join(''):'<div class="empty">Tudo em dia ✅</div>';
@@ -161,9 +166,10 @@ async function sincronizar(){
 async function copiarEnviar(id){
   const f=_fichas.find(x=>x.id===id);
   if(!f) return;
-  const texto=`https://wa.me/${f.waNum}\n\n${f.textoCopiar}`;
-  try{ await navigator.clipboard.writeText(texto); }
-  catch{ const ta=document.createElement('textarea');ta.value=texto;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta); }
+  const numDigitos=String(f.waNum||'').replace(/\D/g,'');
+  const linkWA='https://wa.me/'+numDigitos+'?text='+encodeURIComponent(f.textoCopiar||'');
+  try{ await navigator.clipboard.writeText(linkWA); }
+  catch{ const ta=document.createElement('textarea');ta.value=linkWA;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta); }
   const t=document.getElementById('toast');t.style.display='block';setTimeout(()=>t.style.display='none',2000);
   // Mover para contato_feito
   await fetch('/api/fichas?action=mover-contato',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,sistema:SISTEMA})});
