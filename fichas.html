@@ -82,8 +82,16 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 </div>
 
 <!-- Contadores -->
-<div style="padding:8px 16px 0;display:flex;justify-content:flex-end;">
-  <button onclick="abrirRastrear()" style="padding:7px 16px;border-radius:8px;border:1px solid #2a2f38;background:#181b1f;color:#f0f2f5;font-size:11px;font-weight:700;cursor:pointer;">🔍 Rastrear</button>
+<div id="barra-rastrear" style="padding:10px 16px;border-bottom:1px solid #1e2228;background:#0a0b0e;display:flex;align-items:center;gap:10px;">
+  <span id="rastrear-label" style="font-family:'DM Mono',monospace;font-size:10px;color:#5a6270;letter-spacing:.5px;white-space:nowrap;">🔍 RASTREAR ADM</span>
+  <input type="text" id="rastrear-field"
+    placeholder="Buscar por nome, telefone, equipamento ou defeito..."
+    oninput="filtrarFichas(this.value)"
+    onfocus="this.style.borderColor='#06b6d4'"
+    onblur="this.style.borderColor='#22272f'"
+    style="flex:1;background:#181b1f;border:1px solid #22272f;border-radius:8px;
+           padding:9px 14px;font-size:13px;color:#f0f2f5;outline:none;transition:border .15s;">
+  <span id="rastrear-count" style="font-family:'DM Mono',monospace;font-size:11px;color:#5a6270;white-space:nowrap;"></span>
 </div>
 <div class="stats">
   <div class="stat-box"><span class="stat-lbl">📋 Novas</span><span class="stat-val c-green" id="st-novas">0</span></div>
@@ -122,6 +130,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 <script>
 var SISTEMA = 'adm';
 var _fichas = [];
+var _fichasFiltradas = [];
+var _buscaAdm = '';
+var _buscaTv  = '';
 
 function esc(s){ var d=document.createElement('div');d.textContent=s||'';return d.innerHTML; }
 function fdtAge(iso){
@@ -136,6 +147,9 @@ function mudarAba(s){
   SISTEMA=s;
   document.getElementById('tab-adm').classList.toggle('active', s==='adm');
   document.getElementById('tab-tv').classList.toggle('active',  s==='tv');
+  // Restaurar busca da aba
+  var campo=document.getElementById('rastrear-field');
+  if(campo) campo.value = s==='adm' ? _buscaAdm : _buscaTv;
   load();
 }
 
@@ -161,11 +175,31 @@ function cardHTML(f){
     +'</div>';
 }
 
+function filtrarFichas(q) {
+  if (SISTEMA === 'adm') _buscaAdm = q || '';
+  else                   _buscaTv  = q || '';
+  render();
+}
+
 function render(){
-  var criadas =_fichas.filter(function(f){return f.status==='criada';});
-  var contatos=_fichas.filter(function(f){return f.status==='contato_feito';});
-  var entrar  =_fichas.filter(function(f){return f.status==='entrar_contato';});
-  var logs    =_fichas.filter(function(f){return f.status==='logistica';});
+  // Filtro de busca
+  var _busca = (SISTEMA==='adm'?_buscaAdm:_buscaTv).toLowerCase().trim();
+  var base = _busca ? _fichas.filter(function(f){
+    return ['nome','telefone','equipamento','defeito','endereco'].some(function(k){
+      return (f[k]||'').toLowerCase().includes(_busca);
+    });
+  }) : _fichas;
+
+  var criadas =base.filter(function(f){return f.status==='criada';});
+  var contatos=base.filter(function(f){return f.status==='contato_feito';});
+  var entrar  =base.filter(function(f){return f.status==='entrar_contato';});
+  var logs    =_fichas.filter(function(f){return f.status==='logistica';}); // logs sempre sem filtro p/ contador
+
+  // Atualizar contador e label do rastrear
+  var labelEl=document.getElementById('rastrear-label');
+  var countEl=document.getElementById('rastrear-count');
+  if(labelEl) labelEl.textContent='🔍 RASTREAR '+(SISTEMA==='adm'?'ADM':'TV');
+  if(countEl) countEl.textContent=_busca?(criadas.length+contatos.length+entrar.length)+' resultado(s)':'';
 
   // Badges colunas
   document.getElementById('b1').textContent=criadas.length;
