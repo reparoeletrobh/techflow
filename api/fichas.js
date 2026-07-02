@@ -256,5 +256,14 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok:true, msg:'Cursor zerado. Acesse /api/fichas?action=sync para reinicializar.' });
   }
 
+  // ── BADGE: retorna contagem de fichas novas ─────────────────────────────
+  if (action === 'badge') {
+    const sistema = req.query.sistema || 'adm';
+    const key = sistema === 'tv' ? KEY_TV : KEY_ADM;
+    const db  = (await dbGet(key)) || { fichas:[] };
+    const novas = (db.fichas||[]).filter(f => f.status === 'criada').length;
+    return res.status(200).json({ ok:true, novas });
+  }
+
   return res.status(404).json({ ok:false, error:'Ação não encontrada' });
 }
