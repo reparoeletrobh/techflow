@@ -97,7 +97,7 @@ export default async function handler(req, res) {
         // Encontrar índice da última linha com conteúdo real
         let ultimaComDado = 0;
         for (let i = rows.length - 1; i >= 1; i--) {
-          if (rows[i].some(c => String(c).trim() !== '')) {
+          if (String(rows[i][0]||'').trim() || String(rows[i][1]||'').trim()) { // A=tel ou B=nome
             ultimaComDado = i + 1; // próxima posição após a última linha com dado
             break;
           }
@@ -108,7 +108,8 @@ export default async function handler(req, res) {
 
       // ── Processar apenas linhas após o cursor ──────────────────────────────
       // Pegar só linhas após cursor E com conteúdo real (ignora linhas vazias pré-alocadas)
-      const novasRows = rows.slice(cursor.row).filter(r => r.some(c => String(c).trim() !== ''));
+      // Apenas linhas onde A (telefone) ou B (nome) têm conteúdo
+      const novasRows = rows.slice(cursor.row).filter(r => String(r[0]||'').trim() || String(r[1]||'').trim());
       if (!novasRows.length) {
         return res.status(200).json({ ok:true, novas:0, total });
       }
@@ -158,7 +159,7 @@ export default async function handler(req, res) {
       // Atualizar cursor para última linha com dado (não total pré-alocado)
       let novoUltimo = cursor.row;
       for (let i = rows.length - 1; i >= 1; i--) {
-        if (rows[i].some(c => String(c).trim() !== '')) {
+        if (String(rows[i][0]||'').trim() || String(rows[i][1]||'').trim()) { // A=tel ou B=nome
           novoUltimo = i + 1;
           break;
         }
