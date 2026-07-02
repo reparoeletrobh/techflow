@@ -243,5 +243,11 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok:true });
   }
 
+  // ── RESET-CURSOR: zera cursor para ser recalculado no próximo sync ────────
+  if (action === 'reset-cursor') {
+    await dbSet(KEY_CURSOR, null);
+    return res.status(200).json({ ok:true, msg:'Cursor zerado. Acesse /api/fichas?action=sync para reinicializar.' });
+  }
+
   return res.status(404).json({ ok:false, error:'Ação não encontrada' });
 }
