@@ -27,28 +27,34 @@ async function dbSet(key, val) {
   } catch { return false; }
 }
 
-// ── CSV parser (lida com campos entre aspas com vírgula dentro) ──────────────
+// ── CSV parser robusto (suporta campos com quebras de linha dentro de aspas) ──
 function parseCSV(text) {
   const rows = [];
-  const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    const cols = [];
-    let cur = '', inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      const c = line[i];
+  const t = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  let i = 0, cols = [], cur = '', inQ = false;
+
+  while (i < t.length) {
+    const c = t[i];
+    if (inQ) {
       if (c === '"') {
-        if (inQ && line[i+1] === '"') { cur += '"'; i++; }
-        else inQ = !inQ;
-      } else if (c === ',' && !inQ) {
-        cols.push(cur); cur = '';
+        if (t[i+1] === '"') { cur += '"'; i += 2; } // aspas escapadas
+        else { inQ = false; i++; }                    // fecha aspas
       } else {
-        cur += c;
+        cur += c; i++;                                 // conteúdo dentro de aspas (inclui \n)
       }
+    } else {
+      if (c === '"') { inQ = true; i++; }
+      else if (c === ',') { cols.push(cur); cur = ''; i++; }
+      else if (c === '\n') {
+        cols.push(cur);
+        if (cols.some(x => x.trim())) rows.push(cols); // só salva se tem conteúdo
+        cols = []; cur = ''; i++;
+      } else { cur += c; i++; }
     }
-    cols.push(cur);
-    rows.push(cols);
   }
+  // última linha
+  cols.push(cur);
+  if (cols.some(x => x.trim())) rows.push(cols);
   return rows;
 }
 
