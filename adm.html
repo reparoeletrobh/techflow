@@ -903,7 +903,7 @@ function atualizarBadge(criticos, abertos) {
   }
 }
 
-async function checarFichas(silencioso) {
+async async function checarFichas(silencioso) {
   try {
     var d=await fetch('/api/fichas?action=badge&sistema=adm').then(function(r){return r.json();});
     var novas=d.novas||0;
