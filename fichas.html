@@ -64,7 +64,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
   <div class="h-title">📋 Fichas</div>
   <div class="h-btns">
     <span class="sync-info" id="sync-info">—</span>
-    <button class="btn" style="background:#1e2228;color:#f0f2f5;" onclick="abrirRastrear()">🔍 Rastrear</button>
     <button class="btn btn-sync" id="btn-sync" onclick="sincronizar()">🔄 Sincronizar</button>
     <a href="/adm" class="btn" style="background:#1e2228;color:#f0f2f5;text-decoration:none;">← ADM</a>
   </div>
@@ -83,6 +82,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 </div>
 
 <!-- Contadores -->
+<div style="padding:8px 16px 0;display:flex;justify-content:flex-end;">
+  <button onclick="abrirRastrear()" style="padding:7px 16px;border-radius:8px;border:1px solid #2a2f38;background:#181b1f;color:#f0f2f5;font-size:11px;font-weight:700;cursor:pointer;">🔍 Rastrear</button>
+</div>
 <div class="stats">
   <div class="stat-box"><span class="stat-lbl">📋 Novas</span><span class="stat-val c-green" id="st-novas">0</span></div>
   <div class="stat-box"><span class="stat-lbl">✅ Contato Feito</span><span class="stat-val c-blue" id="st-contato">0</span></div>
@@ -238,9 +240,40 @@ async function copiarEnviar(id){
   await load();
 }
 
-async function cadastrarLogistica(id){
-  if(!confirm('Cadastrar esta ficha em Logística (Liberado para Coleta)?')) return;
-  var r=await fetch('/api/fichas?action=cadastrar-logistica',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,sistema:SISTEMA})}).then(function(x){return x.json();});
+function cadastrarLogistica(id){
+  _logFichaId = id;
+  document.getElementById('log-modal').style.display='flex';
+}
+var _logFichaId = null;
+
+function fecharLogModal(){
+  document.getElementById('log-modal').style.display='none';
+  document.getElementById('log-agendado-wrap').style.display='none';
+  document.getElementById('log-data').value='';
+  document.getElementById('log-faixa').value='';
+  _logFichaId=null;
+}
+
+function logTipo(tipo){
+  document.getElementById('log-agendado-wrap').style.display=tipo==='agendado'?'block':'none';
+}
+
+async function confirmarLogistica(){
+  if(!_logFichaId) return;
+  var tipo=document.querySelector('input[name="log-tipo"]:checked');
+  if(!tipo){ alert('Selecione o tipo de coleta'); return; }
+  var payload={id:_logFichaId, sistema:SISTEMA, tipoColeta:tipo.value};
+  if(tipo.value==='agendado'){
+    var data=document.getElementById('log-data').value;
+    var faixa=document.getElementById('log-faixa').value;
+    if(!data){ alert('Informe a data'); return; }
+    if(!faixa){ alert('Informe a faixa de horário'); return; }
+    payload.dataAgendada=data;
+    payload.faixaHorario=faixa;
+  }
+  var r=await fetch('/api/fichas?action=cadastrar-logistica',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(x){return x.json();});
+  fecharLogModal();
   if(r.ok) await load();
   else alert('Erro: '+(r.error||'falha'));
 }
@@ -342,6 +375,54 @@ async function executarRastrear(q) {
   }
 }
 </script>
+
+
+<!-- ── MODAL TIPO COLETA ─────────────────────────────────────────────── -->
+<div id="log-modal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,.7);align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#0f1114;border:1px solid #1e2228;border-radius:14px;width:100%;max-width:340px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #1e2228;">
+      <span style="font-weight:800;font-size:13px;">🚚 Tipo de Coleta</span>
+      <button onclick="fecharLogModal()" style="background:none;border:none;color:#5a6270;font-size:20px;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:18px;display:flex;flex-direction:column;gap:12px;">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px;background:#181b1f;border:1px solid #22272f;border-radius:8px;">
+        <input type="radio" name="log-tipo" value="imediato" onchange="logTipo('imediato')" style="accent-color:#22c55e;">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#22c55e;">⚡ Coleta Imediata</div>
+          <div style="font-size:11px;color:#5a6270;">Vai direto para Liberado para Coleta</div>
+        </div>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px;background:#181b1f;border:1px solid #22272f;border-radius:8px;">
+        <input type="radio" name="log-tipo" value="agendado" onchange="logTipo('agendado')" style="accent-color:#3b9eff;">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#3b9eff;">📅 Coleta Agendada</div>
+          <div style="font-size:11px;color:#5a6270;">Vai para Horário Marcado com data</div>
+        </div>
+      </label>
+      <div id="log-agendado-wrap" style="display:none;background:#181b1f;border:1px solid #1e2228;border-radius:8px;padding:12px;display:none;flex-direction:column;gap:8px;">
+        <div>
+          <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">📅 Data</div>
+          <input id="log-data" type="date" style="width:100%;background:#0f1114;border:1px solid #2a2f38;border-radius:6px;padding:8px 10px;color:#f0f2f5;font-size:13px;outline:none;box-sizing:border-box;">
+        </div>
+        <div>
+          <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">⏰ Faixa de Horário</div>
+          <select id="log-faixa" style="width:100%;background:#0f1114;border:1px solid #2a2f38;border-radius:6px;padding:8px 10px;color:#f0f2f5;font-size:13px;outline:none;box-sizing:border-box;">
+            <option value="">Selecione...</option>
+            <option value="08:00 - 10:00">08:00 - 10:00</option>
+            <option value="10:00 - 12:00">10:00 - 12:00</option>
+            <option value="12:00 - 14:00">12:00 - 14:00</option>
+            <option value="14:00 - 16:00">14:00 - 16:00</option>
+            <option value="16:00 - 18:00">16:00 - 18:00</option>
+            <option value="18:00 - 20:00">18:00 - 20:00</option>
+          </select>
+        </div>
+      </div>
+      <button onclick="confirmarLogistica()" style="background:#22c55e;color:#000;border:none;border-radius:8px;padding:11px;font-size:13px;font-weight:800;cursor:pointer;width:100%;">
+        ✅ Confirmar Cadastro
+      </button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>

@@ -220,17 +220,24 @@ export default async function handler(req, res) {
 
     const LOG_KEY = 'reparoeletro_logistica';
     const logDb   = (await dbGet(LOG_KEY)) || { fichas:[] };
+    const tipoColeta   = req.body.tipoColeta  || 'imediato';
+    const dataAgendada = req.body.dataAgendada || null;
+    const faixaHorario = req.body.faixaHorario || null;
+    // imediato → liberado_coleta | agendado → horario_marcado
+    const phase = tipoColeta === 'agendado' ? 'horario_marcado' : 'liberado_coleta';
     logDb.fichas.unshift({
-      id:          'log_' + Date.now().toString(36),
-      nome:        ficha.nome,
-      telefone:    ficha.telefone,
-      endereco:    ficha.endereco,
-      equipamento: ficha.equipamento,
-      defeito:     ficha.defeito,
-      phase:       'liberado_coleta',
-      origem:      'ficha_planilha',
-      criadoEm:    new Date().toISOString(),
-      movedAt:     new Date().toISOString(),
+      id:           'log_' + Date.now().toString(36),
+      nome:         ficha.nome,
+      telefone:     ficha.telefone,
+      endereco:     ficha.endereco,
+      equipamento:  ficha.equipamento,
+      defeito:      ficha.defeito,
+      phase,
+      dataAgendada: dataAgendada || null,
+      faixaHorario: faixaHorario || null,
+      origem:       'ficha_planilha',
+      criadoEm:     new Date().toISOString(),
+      movedAt:      new Date().toISOString(),
     });
     await dbSet(LOG_KEY, logDb);
 
