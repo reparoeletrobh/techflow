@@ -171,6 +171,7 @@ function mudarAba(s){
   var campo=document.getElementById('rastrear-field');
   if(campo) campo.value = s==='adm' ? _buscaAdm : _buscaTv;
   load();
+  atualizarBadgeOutraAba(); // manter o badge da aba que saiu em dia
 }
 
 function cardHTML(f){
@@ -260,11 +261,12 @@ function render(){
   document.getElementById('st-log-sem').textContent   = logSem;
   document.getElementById('st-entrar').textContent    = totalEntrar;
 
-  // Badge aba ativa
-  var total=criadas.length+entrar.length;
+  // Badge aba ativa — SEM filtro de busca, só fichas novas (status 'criada'),
+  // mesma definição da API badge e do nav (evita números dessincronizados)
+  var totalBadge=_fichas.filter(function(f){return f.status==='criada';}).length;
   var badgeId=SISTEMA==='adm'?'badge-adm':'badge-tv';
   var badgeEl=document.getElementById(badgeId);
-  if(badgeEl){badgeEl.textContent=total;badgeEl.style.display=total>0?'inline-block':'none';}
+  if(badgeEl){badgeEl.textContent=totalBadge;badgeEl.style.display=totalBadge>0?'inline-block':'none';}
 
   document.getElementById('col-criada').innerHTML =criadas.length ?criadas.map(cardHTML).join(''):'<div class="empty">Nenhuma ficha nova</div>';
   document.getElementById('col-contato').innerHTML=contatos.length?contatos.map(cardHTML).join(''):'<div class="empty">Nenhum contato feito</div>';
