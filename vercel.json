@@ -75,6 +75,14 @@
   ],
   "rewrites": [
     {
+      "source": "/api/prospeccao",
+      "destination": "/api/prospeccao.js"
+    },
+    {
+      "source": "/prospeccao",
+      "destination": "/prospeccao.html"
+    },
+    {
       "source": "/api/tv-atendimento",
       "destination": "/api/tv-atendimento.js"
     },

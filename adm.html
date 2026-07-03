@@ -197,6 +197,8 @@ html,body{height:100vh;overflow:hidden;background:var(--bg);color:var(--text);fo
   @keyframes fich-pulse{0%,100%{box-shadow:0 0 0 0 rgba(6,182,212,.7);}50%{box-shadow:0 0 0 12px rgba(6,182,212,0);}}
   #nav-fichas.alertando{animation:fich-pulse 1.1s ease infinite;}
   #nav-fich-badge.alertando{animation:conf-blink .65s ease infinite;}
+  #nav-prosp-badge.alertando{animation:conf-blink .65s ease infinite;}
+  #nav-prosp.alertando{animation:fich-pulse 1.1s ease infinite;}
 #nav-conf-badge.alertando{animation:conf-blink .65s ease infinite;}
 .conf-notif{position:fixed;bottom:24px;right:24px;z-index:9999;background:#0d0d14;border:2px solid #f04060;border-radius:14px;padding:16px 20px 14px;max-width:300px;box-shadow:0 8px 40px rgba(240,64,96,.45);display:flex;align-items:flex-start;gap:12px;animation:conf-in .4s cubic-bezier(.16,1,.3,1) forwards;cursor:pointer;}
 .conf-notif.out{animation:conf-out .3s ease forwards;}
@@ -255,6 +257,12 @@ html,body{height:100vh;overflow:hidden;background:var(--bg);color:var(--text);fo
       <div class="nav-item" id="nav-fichas" data-url="/fichas" data-label="Fichas" style="--item-color:#06b6d4" onclick="openPage(this)">
         <span class="nav-icon">📋</span>
         <span class="nav-label">Fichas <span id="nav-fich-badge" style="display:none;background:#06b6d4;color:#000;font-family:var(--fm);font-size:9px;font-weight:700;border-radius:99px;padding:1px 6px;margin-left:4px;"></span></span>
+      </div>
+
+      <!-- 🔭 PROSPECÇÃO -->
+      <div class="nav-item" id="nav-prosp" data-url="/prospeccao" data-label="Prospecção" style="--item-color:#a855f7" onclick="openPage(this)">
+        <span class="nav-icon">🔭</span>
+        <span class="nav-label">Prospecção <span id="nav-prosp-badge" style="display:none;background:#a855f7;color:#fff;font-family:var(--fm);font-size:9px;font-weight:700;border-radius:99px;padding:1px 6px;margin-left:4px;"></span></span>
       </div>
 
       <div class="nav-sep"></div>
@@ -904,7 +912,20 @@ function atualizarBadge(criticos, abertos) {
   }
 }
 
-async async function checarFichas(silencioso) {
+async async function checarProspeccao(silencioso) {
+  try{
+    var d=await fetch('/api/prospeccao?action=badge').then(function(r){return r.json();});
+    var n=d.novas||0;
+    var badge=document.getElementById('nav-prosp-badge');
+    var navEl=document.getElementById('nav-prosp');
+    if(badge){
+      if(n>0){badge.textContent=n;badge.style.display='inline';badge.classList.add('alertando');if(navEl)navEl.classList.add('alertando');}
+      else{badge.style.display='none';badge.classList.remove('alertando');if(navEl)navEl.classList.remove('alertando');}
+    }
+  }catch(e){}
+}
+
+async function checarFichas(silencioso) {
   try {
     var d=await fetch('/api/fichas?action=badge&sistema=adm').then(function(r){return r.json();});
     var novas=d.novas||0;

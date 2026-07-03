@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache">
+<title>Prospecção — Reparo Eletro</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#07080a;color:#f0f2f5;min-height:100vh;display:flex;flex-direction:column;}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:52px;background:#0f1114;border-bottom:1px solid #1e2228;flex-shrink:0;}
+.h-title{font-size:13px;font-weight:800;color:#a855f7;}
+.h-btns{display:flex;gap:8px;align-items:center;}
+.btn{padding:7px 14px;border-radius:7px;border:none;font-size:11px;font-weight:700;cursor:pointer;}
+.btn-sync{background:#a855f7;color:#fff;}
+.btn-sync:disabled{opacity:.5;}
+.sync-info{font-size:10px;color:#5a6270;}
+
+/* Stats */
+.stats{display:flex;gap:8px;padding:10px 16px;background:#0a0b0e;border-bottom:1px solid #1e2228;flex-wrap:wrap;}
+.stat-box{background:#0f1114;border:1px solid #1e2228;border-radius:8px;padding:7px 14px;font-size:11px;display:flex;align-items:center;gap:6px;}
+.stat-lbl{color:#5a6270;}
+.stat-val{font-weight:800;font-size:14px;}
+
+/* Rastrear */
+#barra-rastrear{padding:10px 16px;border-bottom:1px solid #1e2228;background:#0a0b0e;display:flex;align-items:center;gap:10px;}
+#rastrear-field{flex:1;background:#181b1f;border:1px solid #22272f;border-radius:8px;padding:9px 14px;font-size:13px;color:#f0f2f5;outline:none;transition:border .15s;}
+#rastrear-label{font-family:'DM Mono',monospace;font-size:10px;color:#5a6270;letter-spacing:.5px;white-space:nowrap;}
+#rastrear-count{font-family:'DM Mono',monospace;font-size:11px;color:#5a6270;white-space:nowrap;}
+
+/* Board */
+.board{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:12px 16px;flex:1;overflow:hidden;}
+.col{background:#0f1114;border:1px solid #1e2228;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;}
+.col-hdr{padding:11px 14px;border-bottom:1px solid #1e2228;display:flex;align-items:center;gap:8px;}
+.col-title{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;}
+.badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(255,255,255,.07);color:#5a6270;margin-left:auto;}
+.col-body{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px;}
+.col1{border-top:3px solid #a855f7;}
+.col2{border-top:3px solid #f97316;}
+.col3{border-top:3px solid #3b9eff;}
+.card{background:#181b1f;border:1px solid #22272f;border-radius:10px;padding:12px;}
+.card-nome{font-size:13px;font-weight:700;margin-bottom:3px;}
+.card-equip{font-size:11px;color:#a855f7;font-weight:600;margin-bottom:2px;}
+.card-info{font-size:11px;color:#5a6270;margin-bottom:2px;line-height:1.4;}
+.card-tel{font-size:11px;color:#f0f2f5;margin-bottom:2px;}
+.card-hora{font-size:10px;color:#5a6270;}
+.card-btns{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+.cbtn{padding:6px 11px;border-radius:6px;border:1px solid;font-size:11px;font-weight:700;cursor:pointer;background:transparent;}
+.cbtn-ret{color:#f97316;border-color:rgba(249,115,22,.3);background:rgba(249,115,22,.07);}
+.cbtn-cli{color:#3b9eff;border-color:rgba(59,130,246,.3);background:rgba(59,130,246,.07);}
+.cbtn-log{color:#22c55e;border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.08);}
+.cbtn-del{color:#5a6270;border-color:rgba(90,98,112,.2);}
+.empty{text-align:center;padding:30px;color:#5a6270;font-size:12px;}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#a855f7;color:#fff;padding:10px 20px;border-radius:8px;font-size:12px;font-weight:700;display:none;z-index:999;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="h-title">🔭 Prospecção</div>
+  <div class="h-btns">
+    <span class="sync-info" id="sync-info">—</span>
+    <button class="btn btn-sync" id="btn-sync" onclick="sincronizar()">🔄 Sincronizar</button>
+    <a href="/adm" class="btn" style="background:#1e2228;color:#f0f2f5;text-decoration:none;">← ADM</a>
+  </div>
+</header>
+
+<div class="stats">
+  <div class="stat-box"><span class="stat-lbl">🔭 Leads</span><span class="stat-val" style="color:#a855f7;" id="st-lead">0</span></div>
+  <div class="stat-box"><span class="stat-lbl">↩ Retornar</span><span class="stat-val" style="color:#f97316;" id="st-ret">0</span></div>
+  <div class="stat-box"><span class="stat-lbl">🏪 Cliente Loja</span><span class="stat-val" style="color:#3b9eff;" id="st-cli">0</span></div>
+  <div class="stat-box"><span class="stat-lbl">🚚 Logística</span><span class="stat-val" style="color:#22c55e;" id="st-log">0</span></div>
+  <div class="stat-box"><span class="stat-lbl">📋 Total</span><span class="stat-val" style="color:#5a6270;" id="st-tot">0</span></div>
+</div>
+
+<div id="barra-rastrear">
+  <span id="rastrear-label">🔍 RASTREAR PROSPECÇÃO</span>
+  <input type="text" id="rastrear-field"
+    placeholder="Buscar por nome, telefone, equipamento ou defeito..."
+    oninput="filtrar(this.value)"
+    onfocus="this.style.borderColor='#a855f7'"
+    onblur="this.style.borderColor='#22272f'">
+  <span id="rastrear-count"></span>
+</div>
+
+<div class="board">
+  <div class="col col1">
+    <div class="col-hdr">
+      <span class="col-title" style="color:#a855f7;">🔭 Lead</span>
+      <span class="badge" id="b1">0</span>
+    </div>
+    <div class="col-body" id="col-lead"></div>
+  </div>
+  <div class="col col2">
+    <div class="col-hdr">
+      <span class="col-title" style="color:#f97316;">↩ Retornar</span>
+      <span class="badge" id="b2">0</span>
+    </div>
+    <div class="col-body" id="col-ret"></div>
+  </div>
+  <div class="col col3">
+    <div class="col-hdr">
+      <span class="col-title" style="color:#3b9eff;">🏪 Cliente Loja</span>
+      <span class="badge" id="b3">0</span>
+    </div>
+    <div class="col-body" id="col-cli"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast">✅ Feito!</div>
+
+<!-- Modal Logística -->
+<div id="log-modal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,.75);align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#0f1114;border:1px solid #1e2228;border-radius:14px;width:100%;max-width:340px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #1e2228;">
+      <span style="font-weight:800;font-size:13px;">🚚 Cadastrar em Logística</span>
+      <button onclick="fecharLogModal()" style="background:none;border:none;color:#5a6270;font-size:20px;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:18px;display:flex;flex-direction:column;gap:12px;">
+      <input type="hidden" id="log-prosp-id">
+      <!-- Sistema -->
+      <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Sistema</div>
+      <div style="display:flex;gap:8px;">
+        <label style="flex:1;display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px;background:#181b1f;border:1px solid #22272f;border-radius:8px;">
+          <input type="radio" name="log-sis" value="adm" checked style="accent-color:#3b9eff;">
+          <span style="font-size:12px;font-weight:700;color:#3b9eff;">ADM</span>
+        </label>
+        <label style="flex:1;display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px;background:#181b1f;border:1px solid #22272f;border-radius:8px;">
+          <input type="radio" name="log-sis" value="tv" style="accent-color:#06b6d4;">
+          <span style="font-size:12px;font-weight:700;color:#06b6d4;">TV</span>
+        </label>
+      </div>
+      <!-- Tipo -->
+      <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Tipo de Coleta</div>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px;background:#181b1f;border:1px solid #22272f;border-radius:8px;">
+        <input type="radio" name="log-tipo" value="imediato" onchange="logTipo('imediato')" style="accent-color:#22c55e;">
+        <div><div style="font-size:12px;font-weight:700;color:#22c55e;">⚡ Coleta Imediata</div><div style="font-size:10px;color:#5a6270;">Vai para Liberado para Coleta</div></div>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px;background:#181b1f;border:1px solid #22272f;border-radius:8px;">
+        <input type="radio" name="log-tipo" value="agendado" onchange="logTipo('agendado')" style="accent-color:#3b9eff;">
+        <div><div style="font-size:12px;font-weight:700;color:#3b9eff;">📅 Coleta Agendada</div><div style="font-size:10px;color:#5a6270;">Vai para Horário Marcado com data</div></div>
+      </label>
+      <div id="log-agend-wrap" style="display:none;flex-direction:column;gap:8px;">
+        <input id="log-data" type="date" style="background:#0f1114;border:1px solid #2a2f38;border-radius:6px;padding:8px 10px;color:#f0f2f5;font-size:13px;outline:none;width:100%;">
+        <select id="log-faixa" style="background:#0f1114;border:1px solid #2a2f38;border-radius:6px;padding:8px 10px;color:#f0f2f5;font-size:13px;outline:none;width:100%;">
+          <option value="">Selecione a faixa...</option>
+          <option>08:00 - 10:00</option><option>10:00 - 12:00</option>
+          <option>12:00 - 14:00</option><option>14:00 - 16:00</option>
+          <option>16:00 - 18:00</option><option>18:00 - 20:00</option>
+        </select>
+      </div>
+      <button onclick="confirmarLogistica()" style="background:#22c55e;color:#000;border:none;border-radius:8px;padding:11px;font-size:13px;font-weight:800;cursor:pointer;width:100%;">
+        ✅ Confirmar Cadastro
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+var _fichas=[], _busca='';
+
+function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
+function fdtAge(iso){
+  if(!iso)return'';
+  var d=Math.floor((Date.now()-new Date(iso).getTime())/60000);
+  if(d<60)return d+'min atrás';if(d<1440)return Math.floor(d/60)+'h atrás';
+  return Math.floor(d/1440)+'d atrás';
+}
+
+function logTipo(t){
+  var w=document.getElementById('log-agend-wrap');
+  if(w)w.style.display=t==='agendado'?'flex':'none';
+}
+
+function abrirLogModal(id){
+  document.getElementById('log-prosp-id').value=id;
+  // Reset
+  document.querySelectorAll('input[name="log-tipo"]').forEach(function(r){r.checked=false;});
+  document.getElementById('log-agend-wrap').style.display='none';
+  document.getElementById('log-data').value='';
+  document.getElementById('log-faixa').value='';
+  document.getElementById('log-modal').style.display='flex';
+}
+function fecharLogModal(){document.getElementById('log-modal').style.display='none';}
+
+async function confirmarLogistica(){
+  var id=document.getElementById('log-prosp-id').value;
+  var sis=document.querySelector('input[name="log-sis"]:checked');
+  var tipo=document.querySelector('input[name="log-tipo"]:checked');
+  if(!sis){alert('Selecione ADM ou TV');return;}
+  if(!tipo){alert('Selecione o tipo de coleta');return;}
+  var payload={id,sistema:sis.value,tipoColeta:tipo.value};
+  if(tipo.value==='agendado'){
+    var data=document.getElementById('log-data').value;
+    var faixa=document.getElementById('log-faixa').value;
+    if(!data){alert('Informe a data');return;}
+    if(!faixa){alert('Informe a faixa de horário');return;}
+    payload.dataAgendada=data;payload.faixaHorario=faixa;
+  }
+  var r=await fetch('/api/prospeccao?action=cadastrar-logistica',{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
+  }).then(function(x){return x.json();});
+  fecharLogModal();
+  if(r.ok){mostrarToast('✅ Cadastrado em Logística!');await load();}
+  else alert('Erro: '+(r.error||'falha'));
+}
+
+function mostrarToast(msg){
+  var t=document.getElementById('toast');t.textContent=msg;
+  t.style.display='block';setTimeout(function(){t.style.display='none';},2500);
+}
+
+function cardHTML(f){
+  if(f.status==='logistica')return'';
+  var isLead=f.status==='lead',isRet=f.status==='retornar',isCli=f.status==='cliente_loja';
+  var btns='';
+  if(isLead){
+    btns='<button class="cbtn cbtn-ret" onclick="mover(\''+f.id+'\',\'retornar\')">↩ Retornar</button>'+
+         '<button class="cbtn cbtn-cli" onclick="mover(\''+f.id+'\',\'cliente_loja\')">🏪 Cliente Loja</button>'+
+         '<button class="cbtn cbtn-log" onclick="abrirLogModal(\''+f.id+'\')">🚚 Logística</button>'+
+         '<button class="cbtn cbtn-del" onclick="excluir(\''+f.id+'\')">✕</button>';
+  }else if(isRet){
+    btns='<button class="cbtn cbtn-cli" onclick="mover(\''+f.id+'\',\'cliente_loja\')">🏪 Cliente Loja</button>'+
+         '<button class="cbtn cbtn-log" onclick="abrirLogModal(\''+f.id+'\')">🚚 Logística</button>'+
+         '<button class="cbtn cbtn-del" onclick="excluir(\''+f.id+'\')">✕</button>';
+  }else if(isCli){
+    btns='<button class="cbtn cbtn-log" onclick="abrirLogModal(\''+f.id+'\')">🚚 Logística</button>'+
+         '<button class="cbtn cbtn-del" onclick="excluir(\''+f.id+'\')">✕</button>';
+  }
+  return'<div class="card" id="card-'+f.id+'">'+
+    '<div class="card-nome">'+esc(f.nome||'—')+'</div>'+
+    '<div class="card-equip">'+esc(f.equipamento||'—')+'</div>'+
+    '<div class="card-info">'+esc(f.defeito||'—')+'</div>'+
+    (f.endereco?'<div class="card-info">'+esc(f.endereco)+'</div>':'')+
+    '<div class="card-tel">📞 '+esc(f.telefone||'—')+'</div>'+
+    (f.horario?'<div class="card-hora">⏰ '+esc(f.horario)+'</div>':'')+
+    '<div class="card-btns">'+btns+'</div>'+
+  '</div>';
+}
+
+function filtrar(q){_busca=(q||'').toLowerCase().trim();render();}
+
+function render(){
+  var base=_busca?_fichas.filter(function(f){
+    return['nome','telefone','equipamento','defeito','endereco'].some(function(k){
+      return(f[k]||'').toLowerCase().includes(_busca);
+    });
+  }):_fichas;
+
+  var leads=base.filter(function(f){return f.status==='lead';});
+  var rets  =base.filter(function(f){return f.status==='retornar';});
+  var clis  =base.filter(function(f){return f.status==='cliente_loja';});
+  var logs  =_fichas.filter(function(f){return f.status==='logistica';});
+
+  document.getElementById('b1').textContent=leads.length;
+  document.getElementById('b2').textContent=rets.length;
+  document.getElementById('b3').textContent=clis.length;
+  document.getElementById('st-lead').textContent=leads.length;
+  document.getElementById('st-ret').textContent=rets.length;
+  document.getElementById('st-cli').textContent=clis.length;
+  document.getElementById('st-log').textContent=logs.length;
+  document.getElementById('st-tot').textContent=_fichas.length;
+
+  var cnt=document.getElementById('rastrear-count');
+  if(cnt)cnt.textContent=_busca?(leads.length+rets.length+clis.length)+' resultado(s)':'';
+
+  document.getElementById('col-lead').innerHTML=leads.length?leads.map(cardHTML).join(''):'<div class="empty">Nenhum lead</div>';
+  document.getElementById('col-ret').innerHTML=rets.length?rets.map(cardHTML).join(''):'<div class="empty">Nenhum para retornar</div>';
+  document.getElementById('col-cli').innerHTML=clis.length?clis.map(cardHTML).join(''):'<div class="empty">Nenhum cliente loja</div>';
+}
+
+async function load(){
+  try{
+    var r=await fetch('/api/prospeccao?action=load').then(function(x){return x.json();});
+    _fichas=r.fichas||[];render();
+  }catch(e){console.error(e);}
+}
+
+async function sincronizar(){
+  var btn=document.getElementById('btn-sync');
+  btn.disabled=true;btn.textContent='⏳';
+  try{
+    var r=await fetch('/api/prospeccao?action=sync').then(function(x){return x.json();});
+    document.getElementById('sync-info').textContent=r.novas?'+'+r.novas+' nova(s)':(r.ok?'Atualizado':'Erro');
+    await load();
+  }catch(e){document.getElementById('sync-info').textContent='Erro';}
+  btn.disabled=false;btn.textContent='🔄 Sincronizar';
+}
+
+async function mover(id,status){
+  var r=await fetch('/api/prospeccao?action=mover',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id,status})
+  }).then(function(x){return x.json();});
+  if(r.ok)await load();
+  else alert('Erro: '+(r.error||'falha'));
+}
+
+async function excluir(id){
+  if(!confirm('Remover este lead?'))return;
+  await fetch('/api/prospeccao?action=excluir',{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})
+  });
+  await load();
+}
+
+load();
+sincronizar();
+// Sync a cada 2 horas
+setInterval(function(){sincronizar();},2*60*60*1000);
+</script>
+</body>
+</html>
