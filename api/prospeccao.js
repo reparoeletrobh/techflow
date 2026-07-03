@@ -195,19 +195,21 @@ export default async function handler(req,res){
     return res.status(200).json({ok:true});
   }
 
-  // ── INFO: lista abas via Sheets v3 API ─────────────────────────────────
+  // ── INFO: descobre gid da aba Criadas ──────────────────────────────────
   if(action==='info'){
     try{
-      // Sheets v3 feed lista todas as abas com gid
-      const url=`https://spreadsheets.google.com/feeds/worksheets/${SHEET_ID}/public/basic?alt=json`;
+      // gviz com sheet inválido retorna erro com lista das abas válidas
+      const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=XXXXXXXXXX`;
       const r=await fetch(url,{redirect:'follow'});
-      const data=await r.json();
-      const entries=(data.feed?.entry||[]).map(e=>({
-        title: e.title?.$t,
-        id:    e.id?.$t,
-        link:  (e.link||[]).find(l=>l.rel==='http://schemas.google.com/spreadsheets/2006#cellsfeed')?.href
-      }));
-      return res.status(200).json({ok:true,abas:entries});
+      const raw=await r.text();
+      // Também tentar pegar o nome real da aba do gviz sem sheet param
+      const url2=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&tq=SELECT+*+LIMIT+0&sheet=Criadas`;
+      const r2=await fetch(url2,{redirect:'follow'});
+      const raw2=await r2.text();
+      return res.status(200).json({ok:true,
+        erro_aba_invalida: raw.substring(0,500),
+        criadas_response:  raw2.substring(0,300)
+      });
     }catch(e){return res.status(200).json({ok:false,error:e.message});}
   }
 
