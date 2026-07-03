@@ -195,23 +195,19 @@ export default async function handler(req,res){
     return res.status(200).json({ok:true});
   }
 
-  // ── INFO: testa se sheet=Criadas tem dados diferentes ───────────────────
+  // ── INFO: lista abas via Sheets v3 API ─────────────────────────────────
   if(action==='info'){
     try{
-      const base=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
-      // Pegar primeira linha de Página1 (padrão) e de Criadas
-      const [r1,r2,r3]=await Promise.all([
-        fetch(base,{redirect:'follow'}).then(r=>r.text()).then(t=>t.split('\n').slice(1,3).join('|')),
-        fetch(base+'&sheet=Criadas',{redirect:'follow'}).then(r=>r.text()).then(t=>t.split('\n').slice(1,3).join('|')),
-        fetch(base+'&sheet=criadas',{redirect:'follow'}).then(r=>r.text()).then(t=>t.split('\n').slice(1,3).join('|')),
-      ]);
-      return res.status(200).json({ok:true,
-        pagina1:r1.substring(0,120),
-        'Criadas':r2.substring(0,120),
-        'criadas':r3.substring(0,120),
-        iguais_Criadas: r1===r2,
-        iguais_criadas: r1===r3
-      });
+      // Sheets v3 feed lista todas as abas com gid
+      const url=`https://spreadsheets.google.com/feeds/worksheets/${SHEET_ID}/public/basic?alt=json`;
+      const r=await fetch(url,{redirect:'follow'});
+      const data=await r.json();
+      const entries=(data.feed?.entry||[]).map(e=>({
+        title: e.title?.$t,
+        id:    e.id?.$t,
+        link:  (e.link||[]).find(l=>l.rel==='http://schemas.google.com/spreadsheets/2006#cellsfeed')?.href
+      }));
+      return res.status(200).json({ok:true,abas:entries});
     }catch(e){return res.status(200).json({ok:false,error:e.message});}
   }
 
