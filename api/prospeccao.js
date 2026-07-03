@@ -154,6 +154,13 @@ export default async function handler(req,res){
     const logDb=(await dbGet(LOG_KEY))||{fichas:[]};
     const phase=tipoColeta==='agendado'?'horario_marcado':'liberado_coleta';
 
+    // Montar horarioColeta no formato que a logística usa (datetime-local)
+    let horarioColeta=null;
+    if(tipoColeta==='agendado'&&dataAgendada&&faixaHorario){
+      const horaInicio=(faixaHorario.split(' - ')[0])||'08:00';
+      horarioColeta=`${dataAgendada}T${horaInicio}`;
+    }
+
     logDb.fichas.unshift({
       id:          'log_'+Date.now().toString(36),
       nome:        ficha.nome,
@@ -164,6 +171,7 @@ export default async function handler(req,res){
       phase,
       dataAgendada:dataAgendada||null,
       faixaHorario:faixaHorario||null,
+      horarioColeta,
       origem:      'prospeccao',
       criadoEm:    new Date().toISOString(),
       movedAt:     new Date().toISOString(),
