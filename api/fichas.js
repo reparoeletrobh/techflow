@@ -138,6 +138,11 @@ export default async function handler(req, res) {
 
         if (!nome && !tel) continue;
 
+        // Deduplicação: pular se sheetRow já existe
+        const jaExisteSync = dbAdm.fichas.some(f => f.sheetRow === rowNum) ||
+                             dbTv.fichas.some(f => f.sheetRow === rowNum);
+        if (jaExisteSync) continue;
+
         const sistema = detectSistema(equip);
         const id = `fsh_${rowNum}_${tel.slice(-4)}_${Date.now().toString(36)}`;
 
@@ -293,6 +298,12 @@ export default async function handler(req, res) {
               const end    = String(row[4]||'').trim();
               const hora   = String(row[6]||'').trim();
               if (!nome && !tel) continue;
+
+              // Deduplicação: pular se sheetRow já existe
+              const jaExisteBadge = dbAdm.fichas.some(f => f.sheetRow === rowNum) ||
+                                    dbTv.fichas.some(f => f.sheetRow === rowNum);
+              if (jaExisteBadge) continue;
+
               const sis = detectSistema(equip);
               const ficha = {
                 id: `fsh_${rowNum}_${tel.slice(-4)}_${Date.now().toString(36)}`,
@@ -328,6 +339,25 @@ export default async function handler(req, res) {
     const db  = (await dbGet(key)) || { fichas:[] };
     const novas = (db.fichas||[]).filter(f => f.status === 'criada').length;
     return res.status(200).json({ ok:true, novas });
+  }
+
+  // ── LIMPAR-DUPLICATAS: remove fichas com sheetRow repetido ─────────────
+  if (action === 'limpar-duplicatas') {
+    let total = 0;
+    for (const key of [KEY_ADM, KEY_TV]) {
+      const db = (await dbGet(key)) || { fichas:[] };
+      const vistas = new Set();
+      const antes  = db.fichas.length;
+      db.fichas = db.fichas.filter(f => {
+        if (!f.sheetRow) return true; // sem sheetRow, mantém
+        if (vistas.has(f.sheetRow)) return false; // duplicata, remove
+        vistas.add(f.sheetRow);
+        return true;
+      });
+      const removidas = antes - db.fichas.length;
+      if (removidas > 0) { await dbSet(key, db); total += removidas; }
+    }
+    return res.status(200).json({ ok:true, removidas: total });
   }
 
   return res.status(404).json({ ok:false, error:'Ação não encontrada' });
