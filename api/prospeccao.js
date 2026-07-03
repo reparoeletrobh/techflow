@@ -137,10 +137,8 @@ export default async function handler(req,res){
 
   // ── BADGE: retorna contagem de leads novos (+ faz sync) ────────────────
   if(action==='badge'){
-    try{
-      // Sync em background
-      fetch(`https://${req.headers.host}/api/prospeccao?action=sync`).catch(()=>{});
-    }catch{}
+    // Badge apenas LÊ o Redis; sync fica com a página /prospeccao (2h).
+    // Self-fetch removido: dobrava as invocations no Vercel.
     const db=(await dbGet(KEY))||{fichas:[]};
     const novas=(db.fichas||[]).filter(f=>f.status==='lead').length;
     return res.status(200).json({ok:true,novas});

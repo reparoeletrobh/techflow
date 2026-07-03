@@ -1174,7 +1174,7 @@ function atualizarBadge(criticos, abertos) {
   }
 }
 
-async async function checarFichas(silencioso) {
+async function checarFichas(silencioso) {
   try {
     var d = await fetch('/api/fichas?action=badge&sistema=tv').then(function(r){return r.json();});
     var novas = d.novas || 0;

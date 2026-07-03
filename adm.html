@@ -912,7 +912,7 @@ function atualizarBadge(criticos, abertos) {
   }
 }
 
-async async function checarProspeccao(silencioso) {
+async function checarProspeccao(silencioso) {
   try{
     var d=await fetch('/api/prospeccao?action=badge').then(function(r){return r.json();});
     var n=d.novas||0;

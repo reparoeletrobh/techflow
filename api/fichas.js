@@ -279,14 +279,27 @@ export default async function handler(req, res) {
   // ── BADGE: faz sync da planilha + retorna contagem de fichas novas ─────────
   if (action === 'badge') {
     const sistema = req.query.sistema || 'adm';
-    // Sync automático (não bloqueia se der erro)
+    // Sync com THROTTLE de 3min: evita N usuários x polling 30s
+    // gerarem centenas de downloads da planilha por hora
     try {
+      const cursorPre = await dbGet(KEY_CURSOR);
+      const lastSync  = cursorPre?.atualizadoEm || cursorPre?.iniciadoEm || null;
+      const throttleOk = !lastSync || (Date.now() - new Date(lastSync).getTime()) > 3*60*1000;
+      if (!throttleOk) {
+        const dbT = (await dbGet(sistema === 'tv' ? KEY_TV : KEY_ADM)) || { fichas:[] };
+        const novasT = (dbT.fichas||[]).filter(f => f.status === 'criada').length;
+        return res.status(200).json({ ok:true, novas: novasT, throttled:true });
+      }
       const resp = await fetch(SHEET_CSV, { redirect:'follow' });
       if (resp.ok) {
         const text = await resp.text();
         const rows = parseCSV(text);
         const total = rows.length;
         const cursor = await dbGet(KEY_CURSOR);
+        // Atualiza timestamp SEMPRE (necessário p/ throttle), mesmo sem linhas novas
+        if (cursor && cursor.row != null && total <= cursor.row) {
+          await dbSet(KEY_CURSOR, { ...cursor, atualizadoEm: new Date().toISOString() });
+        }
         if (cursor && cursor.row != null && total > cursor.row) {
           const novasRows = rows.slice(cursor.row).filter(r =>
             String(r[0]||'').trim() || String(r[1]||'').trim()
