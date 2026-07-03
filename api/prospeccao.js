@@ -195,32 +195,14 @@ export default async function handler(req,res){
     return res.status(200).json({ok:true});
   }
 
-  // ── INFO: descobre o nome/gid correto da aba Criadas ────────────────────
+  // ── INFO: lista abas via gviz ──────────────────────────────────────────
   if(action==='info'){
-    const base=`https://docs.google.com/spreadsheets/d/${SHEET_ID}`;
-    const testar=[
-      {nome:'Criadas',   url:`${base}/export?format=csv&sheet=Criadas`},
-      {nome:'criadas',   url:`${base}/export?format=csv&sheet=criadas`},
-      {nome:'Criados',   url:`${base}/export?format=csv&sheet=Criados`},
-      {nome:'CRIADAS',   url:`${base}/export?format=csv&sheet=CRIADAS`},
-      {nome:'Página2',   url:`${base}/export?format=csv&sheet=P%C3%A1gina2`},
-      {nome:'Página 2',  url:`${base}/export?format=csv&sheet=P%C3%A1gina%202`},
-      {nome:'gid=1',     url:`${base}/export?format=csv&gid=1`},
-      {nome:'gid=2',     url:`${base}/export?format=csv&gid=2`},
-    ];
-    const resultados=[];
-    for(const t of testar){
-      try{
-        const r=await fetch(t.url,{redirect:'follow'});
-        const txt=await r.text();
-        const linhas=txt.split('
-').filter(l=>l.trim()).length;
-        const primeiraLinha=txt.split('
-')[0].substring(0,80);
-        resultados.push({nome:t.nome,linhas,primeiraLinha,status:r.status});
-      }catch(e){resultados.push({nome:t.nome,erro:e.message});}
-    }
-    return res.status(200).json({ok:true,resultados});
+    try{
+      const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
+      const r=await fetch(url,{redirect:'follow'});
+      const raw=await r.text();
+      return res.status(200).json({ok:true,raw:raw.substring(0,3000)});
+    }catch(e){return res.status(200).json({ok:false,error:e.message});}
   }
 
   // ── LIMPAR-TUDO: zera toda a prospecção (para reimportar corretamente) ──
