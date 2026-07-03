@@ -4,7 +4,7 @@ const U=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
 const T=(process.env.UPSTASH_TOKEN||'').replace(/[\n\r'"]/g,'').trim();
 
 const SHEET_ID  = '1ovSEGZ7if5-wdNZpd1cbLlyg0PZpsrT9fQwOIzfG_mw';
-const SHEET_CSV = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&sheet=Criadas`;
+const SHEET_CSV = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Criadas`;
 const KEY       = 'prospeccao_adm';
 
 async function dbGet(key){
@@ -193,24 +193,6 @@ export default async function handler(req,res){
     db.fichas=db.fichas.filter(x=>x.id!==id);
     await dbSet(KEY,db);
     return res.status(200).json({ok:true});
-  }
-
-  // ── INFO: descobre gid da aba Criadas ──────────────────────────────────
-  if(action==='info'){
-    try{
-      // gviz com sheet inválido retorna erro com lista das abas válidas
-      const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=XXXXXXXXXX`;
-      const r=await fetch(url,{redirect:'follow'});
-      const raw=await r.text();
-      // Também tentar pegar o nome real da aba do gviz sem sheet param
-      const url2=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&tq=SELECT+*+LIMIT+0&sheet=Criadas`;
-      const r2=await fetch(url2,{redirect:'follow'});
-      const raw2=await r2.text();
-      return res.status(200).json({ok:true,
-        erro_aba_invalida: raw.substring(0,500),
-        criadas_response:  raw2.substring(0,300)
-      });
-    }catch(e){return res.status(200).json({ok:false,error:e.message});}
   }
 
   // ── LIMPAR-TUDO: zera toda a prospecção (para reimportar corretamente) ──
