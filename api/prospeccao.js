@@ -121,7 +121,8 @@ export default async function handler(req,res){
         const entradaEm=parseHorarioBR(hora);
         if(debugHorarios.length<3){
           debugHorarios.push({cru:hora, parseado:entradaEm?entradaEm.toISOString():null,
-            idadeHoras:entradaEm?((agora-entradaEm.getTime())/3600000).toFixed(1):null});
+            idadeHoras:entradaEm?((agora-entradaEm.getTime())/3600000).toFixed(1):null,
+            linhaCompleta:row.map(c=>String(c).substring(0,40))});
         }
         // FAIL-CLOSED: sem horário parseável → NÃO importa (aguarda), nunca importa às cegas
         if(!entradaEm){
@@ -151,7 +152,7 @@ export default async function handler(req,res){
       }
 
       if(novas>0)await dbSet(KEY,db);
-      return res.status(200).json({ok:true,novas,aguardando2h:aguardando,semHorario,total:dados.length,naBase:db.fichas.length,debugHorarios});
+      return res.status(200).json({ok:true,novas,aguardando2h:aguardando,semHorario,total:dados.length,naBase:db.fichas.length,header:(rows[0]||[]).map(c=>String(c).substring(0,30)),debugHorarios});
     }catch(e){
       return res.status(200).json({ok:false,error:e.message,novas:0});
     }
