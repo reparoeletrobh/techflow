@@ -81,18 +81,32 @@ export default async function handler(req,res){
         db.fichas.map(f=>String(f.telefone||'').replace(/\D/g,''))
       );
 
-      // Parse do horário BR "15/05/26 23:03" → Date
+      // Parse do horário multi-formato → Date (UTC, assumindo entrada em BRT = UTC-3)
       function parseHorarioBR(s){
-        const m=String(s||'').match(/(\d{2})\/(\d{2})\/(\d{2,4})\s+(\d{1,2}):(\d{2})/);
-        if(!m)return null;
-        let ano=parseInt(m[3],10);if(ano<100)ano+=2000;
-        // new Date(ano, mes-1, dia, hora, min) — horário local BRT ≈ UTC-3
-        return new Date(Date.UTC(ano,parseInt(m[2],10)-1,parseInt(m[1],10),parseInt(m[4],10)+3,parseInt(m[5],10)));
+        const str=String(s||'').trim();
+        // Formato BR: dd/mm/yy ou dd/mm/yyyy + hh:mm (com ou sem :ss)
+        let m=str.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+(\d{1,2}):(\d{2})/);
+        if(m){
+          let ano=parseInt(m[3],10);if(ano<100)ano+=2000;
+          return new Date(Date.UTC(ano,parseInt(m[2],10)-1,parseInt(m[1],10),parseInt(m[4],10)+3,parseInt(m[5],10)));
+        }
+        // Formato ISO: yyyy-mm-dd hh:mm ou yyyy-mm-ddThh:mm
+        m=str.match(/(\d{4})-(\d{2})-(\d{2})[T\s](\d{1,2}):(\d{2})/);
+        if(m){
+          return new Date(Date.UTC(parseInt(m[1],10),parseInt(m[2],10)-1,parseInt(m[3],10),parseInt(m[4],10)+3,parseInt(m[5],10)));
+        }
+        // Formato gviz: Date(2026,4,15,23,3,0) — mês 0-based
+        m=str.match(/Date\((\d{4}),(\d{1,2}),(\d{1,2}),(\d{1,2}),(\d{1,2})/);
+        if(m){
+          return new Date(Date.UTC(parseInt(m[1],10),parseInt(m[2],10),parseInt(m[3],10),parseInt(m[4],10)+3,parseInt(m[5],10)));
+        }
+        return null;
       }
       const DUAS_HORAS=2*60*60*1000;
       const agora=Date.now();
 
-      let novas=0, aguardando=0;
+      let novas=0, aguardando=0, semHorario=0;
+      const debugHorarios=[];
       for(const row of dados){
         const tel  =String(row[0]||'').replace(/\D/g,'').trim();
         const nome =String(row[1]||'').trim();
@@ -104,9 +118,17 @@ export default async function handler(req,res){
         if(!tel&&!nome)continue;
 
         // REGRA: só importa se está na aba Criadas há MAIS de 2 horas
-        // (se tem menos de 2h, o cliente ainda pode concluir o cadastro e virar ficha)
         const entradaEm=parseHorarioBR(hora);
-        if(entradaEm && (agora-entradaEm.getTime())<DUAS_HORAS){
+        if(debugHorarios.length<3){
+          debugHorarios.push({cru:hora, parseado:entradaEm?entradaEm.toISOString():null,
+            idadeHoras:entradaEm?((agora-entradaEm.getTime())/3600000).toFixed(1):null});
+        }
+        // FAIL-CLOSED: sem horário parseável → NÃO importa (aguarda), nunca importa às cegas
+        if(!entradaEm){
+          semHorario++;
+          continue;
+        }
+        if((agora-entradaEm.getTime())<DUAS_HORAS){
           aguardando++;
           continue; // ainda não completou 2h na aba — aguarda próximo sync
         }
@@ -129,7 +151,7 @@ export default async function handler(req,res){
       }
 
       if(novas>0)await dbSet(KEY,db);
-      return res.status(200).json({ok:true,novas,aguardando2h:aguardando,total:dados.length,naBase:db.fichas.length});
+      return res.status(200).json({ok:true,novas,aguardando2h:aguardando,semHorario,total:dados.length,naBase:db.fichas.length,debugHorarios});
     }catch(e){
       return res.status(200).json({ok:false,error:e.message,novas:0});
     }
