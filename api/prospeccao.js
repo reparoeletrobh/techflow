@@ -195,13 +195,23 @@ export default async function handler(req,res){
     return res.status(200).json({ok:true});
   }
 
-  // ── INFO: lista abas via gviz ──────────────────────────────────────────
+  // ── INFO: testa se sheet=Criadas tem dados diferentes ───────────────────
   if(action==='info'){
     try{
-      const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
-      const r=await fetch(url,{redirect:'follow'});
-      const raw=await r.text();
-      return res.status(200).json({ok:true,raw:raw.substring(0,3000)});
+      const base=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
+      // Pegar primeira linha de Página1 (padrão) e de Criadas
+      const [r1,r2,r3]=await Promise.all([
+        fetch(base,{redirect:'follow'}).then(r=>r.text()).then(t=>t.split('\n').slice(1,3).join('|')),
+        fetch(base+'&sheet=Criadas',{redirect:'follow'}).then(r=>r.text()).then(t=>t.split('\n').slice(1,3).join('|')),
+        fetch(base+'&sheet=criadas',{redirect:'follow'}).then(r=>r.text()).then(t=>t.split('\n').slice(1,3).join('|')),
+      ]);
+      return res.status(200).json({ok:true,
+        pagina1:r1.substring(0,120),
+        'Criadas':r2.substring(0,120),
+        'criadas':r3.substring(0,120),
+        iguais_Criadas: r1===r2,
+        iguais_criadas: r1===r3
+      });
     }catch(e){return res.status(200).json({ok:false,error:e.message});}
   }
 
