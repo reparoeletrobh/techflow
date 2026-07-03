@@ -113,7 +113,7 @@ export default async function handler(req,res){
         const equip=String(row[2]||'').trim();
         const def  =String(row[3]||'').trim();
         const end  =String(row[4]||'').trim();
-        const hora =String(row[6]||'').trim();
+        const hora =String(row[5]||'').trim(); // aba Criadas tem 6 colunas (sem Mensagem): horário é a col 5
 
         if(!tel&&!nome)continue;
 
