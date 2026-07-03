@@ -195,5 +195,11 @@ export default async function handler(req,res){
     return res.status(200).json({ok:true});
   }
 
+  // ── LIMPAR-TUDO: zera toda a prospecção (para reimportar corretamente) ──
+  if(action==='limpar-tudo'){
+    await dbSet(KEY,{fichas:[]});
+    return res.status(200).json({ok:true,msg:'Prospecção zerada. Reimporte com action=sync após corrigir o gid.'});
+  }
+
   return res.status(404).json({ok:false,error:'Ação não encontrada'});
 }
