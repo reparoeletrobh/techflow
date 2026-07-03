@@ -94,10 +94,30 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
   <span id="rastrear-count" style="font-family:'DM Mono',monospace;font-size:11px;color:#5a6270;white-space:nowrap;"></span>
 </div>
 <div class="stats">
-  <div class="stat-box"><span class="stat-lbl">📋 Novas</span><span class="stat-val c-green" id="st-novas">0</span></div>
-  <div class="stat-box"><span class="stat-lbl">✅ Contato Feito</span><span class="stat-val c-blue" id="st-contato">0</span></div>
-  <div class="stat-box"><span class="stat-lbl">🚚 Logística</span><span class="stat-val c-purple" id="st-log">0</span></div>
-  <div class="stat-box"><span class="stat-lbl">⚠️ Entrar em Contato</span><span class="stat-val c-red" id="st-entrar">0</span></div>
+  <div class="stat-box">
+    <span class="stat-lbl">📥 Fichas entraram</span>
+    <span class="stat-val c-green" id="st-hoje">0</span><span class="stat-lbl"> hoje</span>
+    <span style="color:#1e2228;margin:0 4px;">|</span>
+    <span class="stat-val c-green" id="st-semana">0</span><span class="stat-lbl"> semana</span>
+    <span style="color:#1e2228;margin:0 4px;">|</span>
+    <span class="stat-val" style="color:#5a6270;" id="st-total">0</span><span class="stat-lbl"> total</span>
+  </div>
+  <div class="stat-box">
+    <span class="stat-lbl">✅ Contato feito</span>
+    <span class="stat-val c-blue" id="st-cont-hoje">0</span><span class="stat-lbl"> hoje</span>
+    <span style="color:#1e2228;margin:0 4px;">|</span>
+    <span class="stat-val c-blue" id="st-cont-sem">0</span><span class="stat-lbl"> semana</span>
+  </div>
+  <div class="stat-box">
+    <span class="stat-lbl">🚚 Logística</span>
+    <span class="stat-val c-purple" id="st-log-hoje">0</span><span class="stat-lbl"> hoje</span>
+    <span style="color:#1e2228;margin:0 4px;">|</span>
+    <span class="stat-val c-purple" id="st-log-sem">0</span><span class="stat-lbl"> semana</span>
+  </div>
+  <div class="stat-box">
+    <span class="stat-lbl">⚠️ Entrar em contato</span>
+    <span class="stat-val c-red" id="st-entrar">0</span>
+  </div>
 </div>
 
 <!-- Board -->
@@ -206,18 +226,39 @@ function render(){
   document.getElementById('b2').textContent=contatos.length;
   document.getElementById('b3').textContent=entrar.length;
 
-  // Contadores CUMULATIVOS (total que passou por cada etapa)
-  var totalEntrou  = _fichas.length;
-  var totalContato = _fichas.filter(function(f){return !!f.contatoFeitoEm;}).length;
-  var totalLog     = _fichas.filter(function(f){return !!f.logisticaEm;}).length;
-  var totalEntrar  = _fichas.filter(function(f){
+  // Contadores com dia e semana — mesmo padrão do balcão
+  var inicioHoje   = new Date(); inicioHoje.setHours(0,0,0,0);
+  var inicioSemana = new Date();
+  inicioSemana.setDate(inicioSemana.getDate() - inicioSemana.getDay());
+  inicioSemana.setHours(0,0,0,0);
+
+  // Fichas que entraram
+  var ficHoje  = _fichas.filter(function(f){return f.criadoEm && new Date(f.criadoEm)>=inicioHoje;}).length;
+  var ficSem   = _fichas.filter(function(f){return f.criadoEm && new Date(f.criadoEm)>=inicioSemana;}).length;
+  var ficTotal = _fichas.length;
+
+  // Contato feito
+  var contHoje = _fichas.filter(function(f){return f.contatoFeitoEm && new Date(f.contatoFeitoEm)>=inicioHoje;}).length;
+  var contSem  = _fichas.filter(function(f){return f.contatoFeitoEm && new Date(f.contatoFeitoEm)>=inicioSemana;}).length;
+
+  // Logística
+  var logHoje  = _fichas.filter(function(f){return f.logisticaEm && new Date(f.logisticaEm)>=inicioHoje;}).length;
+  var logSem   = _fichas.filter(function(f){return f.logisticaEm && new Date(f.logisticaEm)>=inicioSemana;}).length;
+
+  // Entrar em contato (atual)
+  var totalEntrar = _fichas.filter(function(f){
     return f.status==='entrar_contato'||(f.contatoFeitoEm&&!f.logisticaEm&&
       (Date.now()-new Date(f.contatoFeitoEm).getTime())>24*60*60*1000);
   }).length;
-  document.getElementById('st-novas').textContent=totalEntrou;
-  document.getElementById('st-contato').textContent=totalContato;
-  document.getElementById('st-log').textContent=totalLog;
-  document.getElementById('st-entrar').textContent=totalEntrar;
+
+  document.getElementById('st-hoje').textContent    = ficHoje;
+  document.getElementById('st-semana').textContent  = ficSem;
+  document.getElementById('st-total').textContent   = ficTotal;
+  document.getElementById('st-cont-hoje').textContent = contHoje;
+  document.getElementById('st-cont-sem').textContent  = contSem;
+  document.getElementById('st-log-hoje').textContent  = logHoje;
+  document.getElementById('st-log-sem').textContent   = logSem;
+  document.getElementById('st-entrar').textContent    = totalEntrar;
 
   // Badge aba ativa
   var total=criadas.length+entrar.length;
