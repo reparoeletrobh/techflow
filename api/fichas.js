@@ -218,7 +218,8 @@ export default async function handler(req, res) {
     const ficha = db.fichas.find(x => x.id === id);
     if (!ficha) return res.status(404).json({ ok:false, error:'Não encontrado' });
 
-    const LOG_KEY = 'reparoeletro_logistica';
+    // TV → tv_logistica | ADM → reparoeletro_logistica
+    const LOG_KEY = sistema === 'tv' ? 'tv_logistica' : 'reparoeletro_logistica';
     const logDb   = (await dbGet(LOG_KEY)) || { fichas:[] };
     const tipoColeta   = req.body.tipoColeta  || 'imediato';
     const dataAgendada = req.body.dataAgendada || null;
