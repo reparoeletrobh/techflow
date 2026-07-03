@@ -81,7 +81,18 @@ export default async function handler(req,res){
         db.fichas.map(f=>String(f.telefone||'').replace(/\D/g,''))
       );
 
-      let novas=0;
+      // Parse do horário BR "15/05/26 23:03" → Date
+      function parseHorarioBR(s){
+        const m=String(s||'').match(/(\d{2})\/(\d{2})\/(\d{2,4})\s+(\d{1,2}):(\d{2})/);
+        if(!m)return null;
+        let ano=parseInt(m[3],10);if(ano<100)ano+=2000;
+        // new Date(ano, mes-1, dia, hora, min) — horário local BRT ≈ UTC-3
+        return new Date(Date.UTC(ano,parseInt(m[2],10)-1,parseInt(m[1],10),parseInt(m[4],10)+3,parseInt(m[5],10)));
+      }
+      const DUAS_HORAS=2*60*60*1000;
+      const agora=Date.now();
+
+      let novas=0, aguardando=0;
       for(const row of dados){
         const tel  =String(row[0]||'').replace(/\D/g,'').trim();
         const nome =String(row[1]||'').trim();
@@ -91,6 +102,15 @@ export default async function handler(req,res){
         const hora =String(row[6]||'').trim();
 
         if(!tel&&!nome)continue;
+
+        // REGRA: só importa se está na aba Criadas há MAIS de 2 horas
+        // (se tem menos de 2h, o cliente ainda pode concluir o cadastro e virar ficha)
+        const entradaEm=parseHorarioBR(hora);
+        if(entradaEm && (agora-entradaEm.getTime())<DUAS_HORAS){
+          aguardando++;
+          continue; // ainda não completou 2h na aba — aguarda próximo sync
+        }
+
         // Deduplicação por telefone
         const telNorm=tel||'';
         if(existentes.has(telNorm))continue;
@@ -109,7 +129,7 @@ export default async function handler(req,res){
       }
 
       if(novas>0)await dbSet(KEY,db);
-      return res.status(200).json({ok:true,novas,total:dados.length,naBase:db.fichas.length});
+      return res.status(200).json({ok:true,novas,aguardando2h:aguardando,total:dados.length,naBase:db.fichas.length});
     }catch(e){
       return res.status(200).json({ok:false,error:e.message,novas:0});
     }
