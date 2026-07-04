@@ -128,6 +128,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
     <div style="padding:18px;display:flex;flex-direction:column;gap:12px;">
       <input type="hidden" id="log-prosp-id">
       <!-- Sistema -->
+      <div id="log-sis-wrap">
       <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Sistema</div>
       <div style="display:flex;gap:8px;">
         <label style="flex:1;display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px;background:#181b1f;border:1px solid #22272f;border-radius:8px;">
@@ -138,6 +139,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
           <input type="radio" name="log-sis" value="tv" style="accent-color:#06b6d4;">
           <span style="font-size:12px;font-weight:700;color:#06b6d4;">TV</span>
         </label>
+      </div>
       </div>
       <!-- Tipo -->
       <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Tipo de Coleta</div>
@@ -157,6 +159,19 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
           <option>12:00 - 14:00</option><option>14:00 - 16:00</option>
           <option>16:00 - 18:00</option><option>18:00 - 20:00</option>
         </select>
+      </div>
+      <div id="log-pa-wrap" style="display:none;">
+        <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Origem da ficha</div>
+        <div style="display:flex;gap:8px;">
+          <label style="flex:1;display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px;background:#181b1f;border:1px solid #22272f;border-radius:8px;">
+            <input type="radio" name="log-pa" value="passiva" style="accent-color:#22c55e;">
+            <span style="font-size:12px;font-weight:700;color:#22c55e;">🟢 Passiva</span>
+          </label>
+          <label style="flex:1;display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px;background:#181b1f;border:1px solid #22272f;border-radius:8px;">
+            <input type="radio" name="log-pa" value="ativa" style="accent-color:#ef4444;">
+            <span style="font-size:12px;font-weight:700;color:#ef4444;">🔴 Ativa</span>
+          </label>
+        </div>
       </div>
       <button onclick="confirmarLogistica()" style="background:#22c55e;color:#000;border:none;border-radius:8px;padding:11px;font-size:13px;font-weight:800;cursor:pointer;width:100%;">
         ✅ Confirmar Cadastro
@@ -181,9 +196,28 @@ function logTipo(t){
   if(w)w.style.display=t==='agendado'?'flex':'none';
 }
 
+var _logModo='lead', _logEspSistema=null;
+
 function abrirLogModal(id){
+  _logModo='lead'; _logEspSistema=null;
   document.getElementById('log-prosp-id').value=id;
-  // Reset
+  document.getElementById('log-sis-wrap').style.display='block';
+  var paW=document.getElementById('log-pa-wrap'); if(paW)paW.style.display='none';
+  _resetLogModal();
+}
+
+function abrirLogModalEspelho(id, sistema){
+  _logModo='espelho'; _logEspSistema=sistema;
+  document.getElementById('log-prosp-id').value=id;
+  // Sistema já conhecido (origem da ficha) — esconde a pergunta
+  document.getElementById('log-sis-wrap').style.display='none';
+  // Entrar em Contato → pergunta Passiva/Ativa
+  var paW=document.getElementById('log-pa-wrap'); if(paW)paW.style.display='block';
+  document.querySelectorAll('input[name="log-pa"]').forEach(function(r){r.checked=false;});
+  _resetLogModal();
+}
+
+function _resetLogModal(){
   document.querySelectorAll('input[name="log-tipo"]').forEach(function(r){r.checked=false;});
   document.getElementById('log-agend-wrap').style.display='none';
   document.getElementById('log-data').value='';
@@ -194,11 +228,24 @@ function fecharLogModal(){document.getElementById('log-modal').style.display='no
 
 async function confirmarLogistica(){
   var id=document.getElementById('log-prosp-id').value;
-  var sis=document.querySelector('input[name="log-sis"]:checked');
   var tipo=document.querySelector('input[name="log-tipo"]:checked');
-  if(!sis){alert('Selecione ADM ou TV');return;}
   if(!tipo){alert('Selecione o tipo de coleta');return;}
-  var payload={id,sistema:sis.value,tipoColeta:tipo.value};
+
+  var sistema, endpoint, payload;
+  if(_logModo==='espelho'){
+    // Ficha do espelho (Entrar em Contato) → API de fichas, sistema conhecido
+    sistema=_logEspSistema;
+    endpoint='/api/fichas?action=cadastrar-logistica';
+    var pa=document.querySelector('input[name="log-pa"]:checked');
+    if(!pa){alert('Selecione se a ficha é Passiva ou Ativa');return;}
+    payload={id:id,sistema:sistema,tipoColeta:tipo.value,origemTipo:pa.value};
+  } else {
+    var sis=document.querySelector('input[name="log-sis"]:checked');
+    if(!sis){alert('Selecione ADM ou TV');return;}
+    endpoint='/api/prospeccao?action=cadastrar-logistica';
+    payload={id:id,sistema:sis.value,tipoColeta:tipo.value};
+  }
+
   if(tipo.value==='agendado'){
     var data=document.getElementById('log-data').value;
     var faixa=document.getElementById('log-faixa').value;
@@ -206,12 +253,21 @@ async function confirmarLogistica(){
     if(!faixa){alert('Informe a faixa de horário');return;}
     payload.dataAgendada=data;payload.faixaHorario=faixa;
   }
-  var r=await fetch('/api/prospeccao?action=cadastrar-logistica',{
+  var r=await fetch(endpoint,{
     method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
   }).then(function(x){return x.json();});
   fecharLogModal();
   if(r.ok){mostrarToast('✅ Cadastrado em Logística!');await load();}
   else alert('Erro: '+(r.error||'falha'));
+}
+
+async function excluirEspelho(id, sistema){
+  if(!confirm('Remover esta ficha (será removida também de Fichas)?'))return;
+  await fetch('/api/fichas?action=excluir',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id,sistema:sistema})
+  });
+  await load();
 }
 
 function mostrarToast(msg){
@@ -290,7 +346,11 @@ function render(){
       +'<div class="card-info">'+esc(f.defeito||'—')+'</div>'
       +(f.endereco?'<div class="card-info">'+esc(f.endereco)+'</div>':'')
       +'<div class="card-tel">📞 '+esc(f.telefone||'—')+'</div>'
-      +'<div class="card-hora" style="color:#ef4444;">🔴 +24h sem cadastro — gerencie em Fichas</div>'
+      +'<div class="card-hora" style="color:#ef4444;">🔴 +24h sem cadastro</div>'
+      +'<div class="card-btns">'
+        +'<button class="cbtn cbtn-log" onclick="abrirLogModalEspelho(\''+f.id+'\',\''+(f.origemSistema||'adm')+'\')">🚚 Cadastrar em Logística</button>'
+        +'<button class="cbtn cbtn-del" onclick="excluirEspelho(\''+f.id+'\',\''+(f.origemSistema||'adm')+'\')">✕</button>'
+      +'</div>'
     +'</div>';
   }).join(''):'<div class="empty">Nada pendente ✅</div>';
 
