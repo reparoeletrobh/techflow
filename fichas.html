@@ -319,9 +319,17 @@ async function copiarEnviar(id){
 
 function cadastrarLogistica(id){
   _logFichaId = id;
+  var f=_fichas.find(function(x){return x.id===id;});
+  _logFichaStatus = f ? f.status : null;
+  // Passiva/Ativa: só pergunta quando a ficha está em Entrar em Contato
+  var paWrap=document.getElementById('log-pa-wrap');
+  if(paWrap) paWrap.style.display = _logFichaStatus==='entrar_contato' ? 'block' : 'none';
+  var pa=document.querySelectorAll('input[name="log-pa"]');
+  pa.forEach(function(r){r.checked=false;});
   document.getElementById('log-modal').style.display='flex';
 }
 var _logFichaId = null;
+var _logFichaStatus = null;
 
 function fecharLogModal(){
   document.getElementById('log-modal').style.display='none';
@@ -340,6 +348,15 @@ async function confirmarLogistica(){
   var tipo=document.querySelector('input[name="log-tipo"]:checked');
   if(!tipo){ alert('Selecione o tipo de coleta'); return; }
   var payload={id:_logFichaId, sistema:SISTEMA, tipoColeta:tipo.value};
+  // Classificação Passiva/Ativa:
+  // contato_feito → passiva automático | entrar_contato → o que foi selecionado
+  if(_logFichaStatus==='entrar_contato'){
+    var pa=document.querySelector('input[name="log-pa"]:checked');
+    if(!pa){ alert('Selecione se a ficha é Passiva ou Ativa'); return; }
+    payload.origemTipo=pa.value;
+  } else {
+    payload.origemTipo='passiva';
+  }
   if(tipo.value==='agendado'){
     var data=document.getElementById('log-data').value;
     var faixa=document.getElementById('log-faixa').value;
@@ -492,6 +509,19 @@ async function executarRastrear(q) {
             <option value="16:00 - 18:00">16:00 - 18:00</option>
             <option value="18:00 - 20:00">18:00 - 20:00</option>
           </select>
+        </div>
+      </div>
+      <div id="log-pa-wrap" style="display:none;">
+        <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Origem da ficha</div>
+        <div style="display:flex;gap:8px;">
+          <label style="flex:1;display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px;background:#181b1f;border:1px solid #22272f;border-radius:8px;">
+            <input type="radio" name="log-pa" value="passiva" style="accent-color:#22c55e;">
+            <span style="font-size:12px;font-weight:700;color:#22c55e;">🟢 Passiva</span>
+          </label>
+          <label style="flex:1;display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px;background:#181b1f;border:1px solid #22272f;border-radius:8px;">
+            <input type="radio" name="log-pa" value="ativa" style="accent-color:#ef4444;">
+            <span style="font-size:12px;font-weight:700;color:#ef4444;">🔴 Ativa</span>
+          </label>
         </div>
       </div>
       <button onclick="confirmarLogistica()" style="background:#22c55e;color:#000;border:none;border-radius:8px;padding:11px;font-size:13px;font-weight:800;cursor:pointer;width:100%;">

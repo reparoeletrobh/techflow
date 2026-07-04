@@ -214,6 +214,7 @@ export default async function handler(req,res){
       faixaHorario:faixaHorario||null,
       horarioColeta,
       origem:      'prospeccao',
+      origemTipo:  'ativa', // prospecção é sempre ação ativa
       criadoEm:    new Date().toISOString(),
       movedAt:     new Date().toISOString(),
     });
@@ -223,6 +224,7 @@ export default async function handler(req,res){
     ficha.status='logistica';
     ficha.movidoEm=new Date().toISOString();
     ficha.logisticaEm=new Date().toISOString();
+    ficha.logisticaTipo='ativa';
     await dbSet(KEY,db);
     return res.status(200).json({ok:true});
   }
@@ -234,6 +236,25 @@ export default async function handler(req,res){
     db.fichas=db.fichas.filter(x=>x.id!==id);
     await dbSet(KEY,db);
     return res.status(200).json({ok:true});
+  }
+
+  // ── STATS-PA: contagem semanal de fichas → logística por Passiva/Ativa ──
+  if(action==='stats-pa'){
+    // Início da semana (domingo 00:00 BRT = 03:00 UTC)
+    const nowBRT=new Date(Date.now()-3*3600000);
+    const iniSemana=new Date(Date.UTC(nowBRT.getUTCFullYear(),nowBRT.getUTCMonth(),nowBRT.getUTCDate()-nowBRT.getUTCDay(),3,0,0));
+    const [fa,ft,pr]=await Promise.all([dbGet('fichas_adm'),dbGet('fichas_tv'),dbGet(KEY)]);
+    let passiva=0,ativa=0;
+    const conta=(db,fallback)=>{
+      for(const f of (db?.fichas||[])){
+        if(!f.logisticaEm)continue;
+        if(new Date(f.logisticaEm)<iniSemana)continue;
+        const t=f.logisticaTipo||fallback; // histórico sem campo: fichas→passiva, prospecção→ativa
+        if(t==='ativa')ativa++;else passiva++;
+      }
+    };
+    conta(fa,'passiva');conta(ft,'passiva');conta(pr,'ativa');
+    return res.status(200).json({ok:true,passiva,ativa});
   }
 
   // ── LIMPAR-TUDO: zera toda a prospecção (para reimportar corretamente) ──

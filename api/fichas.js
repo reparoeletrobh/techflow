@@ -229,6 +229,7 @@ export default async function handler(req, res) {
     const tipoColeta   = req.body.tipoColeta  || 'imediato';
     const dataAgendada = req.body.dataAgendada || null;
     const faixaHorario = req.body.faixaHorario || null;
+    const origemTipo   = req.body.origemTipo === 'ativa' ? 'ativa' : 'passiva'; // fichas: default passiva
     // imediato → liberado_coleta | agendado → horario_marcado
     const phase = tipoColeta === 'agendado' ? 'horario_marcado' : 'liberado_coleta';
     // Montar horarioColeta no formato datetime-local que a logística usa
@@ -249,13 +250,15 @@ export default async function handler(req, res) {
       faixaHorario: faixaHorario || null,
       horarioColeta,
       origem:       'ficha_planilha',
+      origemTipo,
       criadoEm:     new Date().toISOString(),
       movedAt:      new Date().toISOString(),
     });
     await dbSet(LOG_KEY, logDb);
 
-    ficha.status      = 'logistica';
-    ficha.logisticaEm = new Date().toISOString();
+    ficha.status        = 'logistica';
+    ficha.logisticaEm   = new Date().toISOString();
+    ficha.logisticaTipo = origemTipo;
     await dbSet(key, db);
     return res.status(200).json({ ok:true });
   }

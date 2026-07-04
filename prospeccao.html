@@ -70,6 +70,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
   <div class="stat-box"><span class="stat-lbl">🏪 Cliente Loja</span><span class="stat-val" style="color:#3b9eff;" id="st-cli">0</span></div>
   <div class="stat-box"><span class="stat-lbl">🚚 Logística</span><span class="stat-val" style="color:#22c55e;" id="st-log">0</span></div>
   <div class="stat-box"><span class="stat-lbl">📋 Total</span><span class="stat-val" style="color:#5a6270;" id="st-tot">0</span></div>
+  <div class="stat-box" style="border-color:rgba(34,197,94,.3);"><span class="stat-lbl">🟢 Passiva (semana)</span><span class="stat-val" style="color:#22c55e;" id="st-pa-passiva">0</span></div>
+  <div class="stat-box" style="border-color:rgba(239,68,68,.3);"><span class="stat-lbl">🔴 Ativa (semana)</span><span class="stat-val" style="color:#ef4444;" id="st-pa-ativa">0</span></div>
 </div>
 
 <div id="barra-rastrear">
@@ -273,6 +275,18 @@ async function load(){
     var r=await fetch('/api/prospeccao?action=load').then(function(x){return x.json();});
     _fichas=r.fichas||[];render();
   }catch(e){console.error(e);}
+  carregarStatsPA();
+}
+
+async function carregarStatsPA(){
+  try{
+    var d=await fetch('/api/prospeccao?action=stats-pa').then(function(x){return x.json();});
+    if(!d.ok)return;
+    var ep=document.getElementById('st-pa-passiva');
+    var ea=document.getElementById('st-pa-ativa');
+    if(ep)ep.textContent=d.passiva||0;
+    if(ea)ea.textContent=d.ativa||0;
+  }catch(e){}
 }
 
 async function sincronizar(){
