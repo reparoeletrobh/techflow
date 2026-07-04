@@ -169,8 +169,15 @@ export default async function handler(req,res){
 
   // ── LOAD: retorna todas as prospecções ──────────────────────────────────
   if(action==='load'){
-    const db=(await dbGet(KEY))||{fichas:[]};
-    return res.status(200).json({ok:true,fichas:db.fichas||[]});
+    // Carrega prospecção + ESPELHO das fichas em 'entrar_contato' (ADM e TV)
+    const [db,fa,ft]=await Promise.all([dbGet(KEY),dbGet('fichas_adm'),dbGet('fichas_tv')]);
+    const espelho=[];
+    for(const [src,d] of [['adm',fa],['tv',ft]]){
+      for(const f of (d?.fichas||[])){
+        if(f.status==='entrar_contato') espelho.push({...f,origemSistema:src});
+      }
+    }
+    return res.status(200).json({ok:true,fichas:(db?.fichas)||[],espelhoEntrar:espelho});
   }
 
   // ── MOVER: muda status (lead→retornar→cliente_loja) ───────────────────
