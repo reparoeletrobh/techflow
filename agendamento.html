@@ -719,6 +719,14 @@ document.addEventListener('DOMContentLoaded', function() {
       <option value="">Todos os domínios</option>
     </select>
   </div>
+  <div style="padding:0 20px 12px;">
+    <details style="background:#0d0e12;border:1px solid #1e2228;border-radius:10px;">
+      <summary style="cursor:pointer;padding:12px 16px;font-size:12px;font-weight:800;color:#3b9eff;list-style:none;">
+        🔗 LINKS DAS PÁGINAS (clique para abrir/copiar)
+      </summary>
+      <div id="links-sites" style="padding:4px 16px 14px;"></div>
+    </details>
+  </div>
   <div style="padding:0 20px 20px;overflow-x:auto;">
     <div class="tr th" style="display:grid;grid-template-columns:2fr 1.2fr 1fr 1fr 1fr;gap:8px;">
       <span>Página</span><span>Domínio</span><span>Acessos</span><span>Cliques</span><span>Conversão</span>
@@ -730,6 +738,48 @@ document.addEventListener('DOMContentLoaded', function() {
 <script>
 var _sitesLinhas=[], _sitesPer='hoje';
 
+// ── Links das páginas /autorizada (7 rotas × 4 domínios) ──────────────────
+var LINKS_DOMS=[
+  {nome:'🔵 BH — Reparo Eletro',        base:'https://reparoeletroadm.com'},
+  {nome:'🟢 Rio — Rio Refrigeração',    base:'https://riorefrigeracao.com'},
+  {nome:'🟡 RJ — RJ Geladeiras',        base:'https://rjgeladeiras.com'},
+  {nome:'🟠 Cabo Frio — CF Geladeiras', base:'https://cabofriogeladeiras.com'}
+];
+var LINKS_ROTAS=[
+  {rota:'/autorizada',                                lbl:'Principal (link do anúncio)'},
+  {rota:'/autorizada-geladeira-parou-de-gelar',       lbl:'Sitelink 1 · Parou de gelar'},
+  {rota:'/autorizada-geladeira-parou-de-gelar-embaixo',lbl:'Sitelink 2 · Parou de gelar embaixo'},
+  {rota:'/autorizada-geladeira-vazando-agua',         lbl:'Sitelink 3 · Vazando água'},
+  {rota:'/autorizada-geladeira-congelando-tudo',      lbl:'Sitelink 4 · Congelando tudo'},
+  {rota:'/autorizada-geladeira-nao-liga',             lbl:'Sitelink 5 · Não liga'},
+  {rota:'/autorizada-geladeira-fazendo-barulho',      lbl:'Sitelink 6 · Fazendo barulho'}
+];
+
+function montarLinksSites(){
+  var el=document.getElementById('links-sites');
+  if(!el||el.innerHTML)return;
+  el.innerHTML=LINKS_DOMS.map(function(d){
+    return '<div style="margin-top:12px;">'
+      +'<div style="font-size:11px;font-weight:800;color:#f0f2f5;margin-bottom:6px;">'+d.nome+'</div>'
+      +LINKS_ROTAS.map(function(r){
+        var url=d.base+r.rota;
+        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #16181d;">'
+          +'<span style="flex:none;font-size:10px;color:#5a6270;width:190px;">'+r.lbl+'</span>'
+          +'<a href="'+url+'" target="_blank" style="flex:1;font-family:monospace;font-size:11px;color:#3b9eff;text-decoration:none;word-break:break-all;">'+url+'</a>'
+          +'<button onclick="copiarLink(this,\''+url+'\')" style="flex:none;background:#181b1f;border:1px solid #2a2f38;border-radius:6px;color:#f0f2f5;font-size:10px;padding:4px 9px;cursor:pointer;">📋</button>'
+        +'</div>';
+      }).join('')
+    +'</div>';
+  }).join('');
+}
+
+function copiarLink(btn,url){
+  navigator.clipboard.writeText(url).then(function(){
+    btn.textContent='✅';
+    setTimeout(function(){btn.textContent='📋';},1200);
+  }).catch(function(){});
+}
+
 function sitesPeriodo(p){
   _sitesPer=p;
   ['hoje','semana','total'].forEach(function(x){
@@ -740,6 +790,7 @@ function sitesPeriodo(p){
 }
 
 async function renderSites(){
+  montarLinksSites();
   try{
     var d=await fetch('/api/sites-track?action=stats').then(function(r){return r.json();});
     _sitesLinhas=d.linhas||[];
