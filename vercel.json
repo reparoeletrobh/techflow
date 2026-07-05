@@ -71,9 +71,17 @@
     {
       "path": "/api/financeiro?action=arquivar-automatico",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/backup?action=run",
+      "schedule": "30 6 * * *"
     }
   ],
   "rewrites": [
+    {
+      "source": "/api/backup",
+      "destination": "/api/backup.js"
+    },
     {
       "source": "/api/sites-track",
       "destination": "/api/sites-track.js"

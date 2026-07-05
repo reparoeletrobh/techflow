@@ -378,7 +378,14 @@ async function excluir(id){
   await load();
 }
 
-// Init
+// Init — ?tab=tv abre direto na aba TV (usado pelo redirect de /tv/fichas)
+try{
+  if(new URLSearchParams(location.search).get('tab')==='tv'){
+    SISTEMA='tv';
+    document.getElementById('tab-adm').classList.remove('active');
+    document.getElementById('tab-tv').classList.add('active');
+  }
+}catch(e){}
 load();
 sincronizar();
 atualizarBadgeOutraAba();
