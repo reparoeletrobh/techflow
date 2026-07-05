@@ -75,6 +75,18 @@
   ],
   "rewrites": [
     {
+      "source": "/api/sites-track",
+      "destination": "/api/sites-track.js"
+    },
+    {
+      "source": "/autorizada-:slug",
+      "destination": "/autorizada.html"
+    },
+    {
+      "source": "/autorizada",
+      "destination": "/autorizada.html"
+    },
+    {
       "source": "/api/prospeccao",
       "destination": "/api/prospeccao.js"
     },

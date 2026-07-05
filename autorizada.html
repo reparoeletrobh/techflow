@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Assistência Técnica Autorizada de Geladeiras</title>
+<meta name="description" content="Assistência técnica autorizada de geladeiras. Técnico no seu endereço agora. Diagnóstico na hora e garantia de 90 dias.">
+<style>
+:root{--verde:#16a34a;--verde2:#22c55e;--azul:#0b57d0;--dark:#0e1116;--txt:#1b2430;--muted:#5b6572;--bg:#f6f8fb;--card:#fff;--border:#e5e9f0;--red:#dc2626;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--txt);line-height:1.5;}
+a{text-decoration:none;color:inherit;}
+.topbar{background:var(--dark);color:#e8edf4;font-size:12.5px;font-weight:600;text-align:center;padding:8px 12px;}
+.topbar b{color:#4ade80;}
+header{background:#fff;border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:50;}
+.brand{font-weight:800;font-size:15px;display:flex;align-items:center;gap:8px;}
+.brand .aut{display:block;font-size:10px;font-weight:800;color:var(--azul);letter-spacing:.08em;text-transform:uppercase;}
+.hdr-call{background:var(--verde);color:#fff;font-weight:800;font-size:13px;padding:9px 14px;border-radius:9px;white-space:nowrap;}
+.hero{max-width:680px;margin:0 auto;padding:34px 18px 26px;text-align:center;}
+.selo{display:inline-flex;align-items:center;gap:6px;background:#e8f0fe;color:var(--azul);font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:6px 14px;border-radius:99px;margin-bottom:14px;}
+h1{font-size:clamp(26px,6vw,38px);line-height:1.15;font-weight:900;letter-spacing:-.5px;}
+h1 .agora{color:var(--verde);}
+.hero-sub{color:var(--muted);font-size:15.5px;margin:12px auto 20px;max-width:520px;}
+.hero-sub b{color:var(--red);}
+.btn-wa{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--verde);color:#fff;font-size:17px;font-weight:800;padding:17px 22px;border-radius:13px;box-shadow:0 8px 22px rgba(22,163,74,.35);max-width:420px;margin:0 auto;}
+.btn-wa:active{transform:scale(.98);}
+.btn-tel{display:flex;align-items:center;justify-content:center;gap:8px;background:#fff;border:1.5px solid var(--border);color:var(--txt);font-size:14.5px;font-weight:700;padding:13px 20px;border-radius:11px;max-width:420px;margin:10px auto 0;}
+.provas{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin-top:18px;font-size:12.5px;color:var(--muted);font-weight:600;}
+.provas b{color:var(--txt);}
+section{max-width:680px;margin:0 auto;padding:26px 18px;}
+.sec-t{font-size:20px;font-weight:900;text-align:center;margin-bottom:6px;}
+.sec-s{font-size:13.5px;color:var(--muted);text-align:center;margin-bottom:18px;}
+.alerta{background:#fff7ed;border:1.5px solid #fdba74;border-radius:14px;padding:18px;}
+.alerta-t{font-size:16px;font-weight:900;color:#c2410c;display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+.alerta ol{list-style:none;display:flex;flex-direction:column;gap:10px;}
+.alerta li{display:flex;gap:10px;font-size:14px;align-items:flex-start;}
+.alerta li .n{flex:none;width:22px;height:22px;border-radius:50%;background:#c2410c;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px;}
+.alerta .cta-mini{display:block;text-align:center;background:var(--verde);color:#fff;font-weight:800;font-size:14.5px;padding:13px;border-radius:10px;margin-top:14px;}
+.sintomas{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.sint{background:var(--card);border:1.5px solid var(--border);border-radius:11px;padding:13px 12px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.sint.on{border-color:var(--verde);background:#f0fdf4;}
+.passos{display:flex;flex-direction:column;gap:12px;}
+.passo{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;gap:12px;align-items:flex-start;}
+.passo .pn{flex:none;width:30px;height:30px;border-radius:50%;background:var(--dark);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;}
+.passo b{display:block;font-size:14.5px;}
+.passo span{font-size:12.5px;color:var(--muted);}
+.marcas{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;}
+.marca{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 13px;font-size:12px;font-weight:700;color:var(--muted);}
+.faq-item{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:14px;margin-bottom:9px;}
+.faq-item b{display:block;font-size:14px;margin-bottom:4px;}
+.faq-item p{font-size:13px;color:var(--muted);}
+.cta-final{background:var(--dark);border-radius:18px;padding:28px 20px;text-align:center;color:#fff;}
+.cta-final h2{font-size:22px;font-weight:900;margin-bottom:6px;}
+.cta-final p{font-size:13.5px;color:#9aa7b5;margin-bottom:16px;}
+footer{text-align:center;font-size:12px;color:var(--muted);padding:22px 16px 30px;}
+.wa-float{position:fixed;right:16px;bottom:16px;width:58px;height:58px;border-radius:50%;background:var(--verde);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(22,163,74,.45);z-index:99;}
+.wa-float svg{width:30px;height:30px;fill:#fff;}
+@media(min-width:560px){.sintomas{grid-template-columns:1fr 1fr 1fr;}}
+</style>
+</head>
+<body>
+
+<div class="topbar">⚡ Técnico disponível <b>AGORA</b> em <span class="j-cidade">sua região</span> · Seg–Sáb · 08h às 21h</div>
+
+<header>
+  <div class="brand">🔧
+    <div><span class="j-empresa">Assistência de Geladeiras</span>
+      <span class="aut">Assistência Técnica Autorizada</span>
+    </div>
+  </div>
+  <a class="hdr-call j-tel-link" href="#" onclick="return clique('tel',this)">📞 Ligar</a>
+</header>
+
+<div class="hero">
+  <div class="selo">✅ Assistência Técnica Autorizada · <span class="j-cidade">—</span></div>
+  <h1><span class="j-h1">Geladeira com defeito?</span><br>Técnico no seu endereço <span class="agora">AGORA</span>.</h1>
+  <p class="hero-sub"><b>Não perca a compra do mês.</b> Diagnóstico na hora, conserto no mesmo atendimento e <b style="color:var(--txt);">90 dias de garantia</b> por escrito.</p>
+  <a class="btn-wa j-wa-link" href="#" onclick="return clique('wa',this)">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5.2 14.1c-.2.6-1.2 1.2-1.7 1.2-.4.1-1 .1-1.6-.1a13 13 0 0 1-5.8-5.1c-.6-1-.9-2-.9-2.4 0-.5.3-1.4.8-1.7.3-.2.7-.2.9-.1l.5.9c.2.3.3.6.1.9l-.4.6c-.1.2-.1.4 0 .6.6 1 1.7 2.1 3 2.7.3.1.5.1.7-.1l.6-.7c.2-.3.5-.3.8-.2l1.6.8c.3.1.4.4.4.7z"/></svg>
+    CHAMAR TÉCNICO AGORA
+  </a>
+  <a class="btn-tel j-tel-link" href="#" onclick="return clique('tel',this)">📞 Ou ligue: <span class="j-tel-fmt">—</span></a>
+  <div class="provas">
+    <span>⭐ <b>4.9</b> no Google</span>
+    <span>🔧 <b>39mil+</b> consertos</span>
+    <span>🛡️ <b>90 dias</b> de garantia</span>
+  </div>
+</div>
+
+<section>
+  <div class="alerta">
+    <div class="alerta-t">🚨 Salve seus alimentos AGORA</div>
+    <ol>
+      <li><span class="n">1</span><span><b>Não abra a porta.</b> Fechada, a geladeira segura o frio por até 4 horas.</span></li>
+      <li><span class="n">2</span><span><b>Junte tudo no congelador.</b> Ele mantém a temperatura por mais tempo.</span></li>
+      <li><span class="n">3</span><span><b>Chame o técnico agora.</b> Quanto antes o reparo, menor o risco de perder a compra.</span></li>
+    </ol>
+    <a class="cta-mini j-wa-link" href="#" onclick="return clique('wa',this)">💬 Chamar técnico pelo WhatsApp</a>
+  </div>
+</section>
+
+<section>
+  <div class="sec-t">Qual é o problema da sua geladeira?</div>
+  <div class="sec-s">Toque no sintoma — atendemos todos, agora:</div>
+  <div class="sintomas" id="grid-sintomas"></div>
+</section>
+
+<section>
+  <div class="sec-t">Como funciona</div>
+  <div class="passos">
+    <div class="passo"><span class="pn">1</span><div><b>Você chama no WhatsApp</b><span>Resposta em minutos, dentro do horário de atendimento.</span></div></div>
+    <div class="passo"><span class="pn">2</span><div><b>Técnico vai AGORA até você</b><span>Atendimento no seu endereço, com ferramentas e peças no carro.</span></div></div>
+    <div class="passo"><span class="pn">3</span><div><b>Diagnóstico e conserto na hora</b><span>Orçamento transparente antes de qualquer serviço. Garantia de 90 dias por escrito.</span></div></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-t">Consertamos todas as marcas</div>
+  <div class="marcas">
+    <span class="marca">Brastemp</span><span class="marca">Consul</span><span class="marca">Electrolux</span>
+    <span class="marca">Samsung</span><span class="marca">LG</span><span class="marca">Panasonic</span>
+    <span class="marca">Continental</span><span class="marca">Bosch</span><span class="marca">Midea</span>
+    <span class="marca">Philco</span><span class="marca">+ Outras</span>
+  </div>
+</section>
+
+<section>
+  <div class="sec-t">Perguntas frequentes</div>
+  <div class="faq-item"><b>Quanto custa a visita?</b><p>O diagnóstico é feito no local e você recebe o orçamento completo antes de autorizar qualquer serviço, sem surpresa.</p></div>
+  <div class="faq-item"><b>Vocês atendem agora mesmo?</b><p>Sim. Temos técnicos na rua de segunda a sábado, das 08h às 21h. Chame no WhatsApp e enviamos o técnico disponível mais próximo.</p></div>
+  <div class="faq-item"><b>Quais as formas de pagamento?</b><p>PIX, dinheiro e cartão — inclusive parcelado.</p></div>
+  <div class="faq-item"><b>O serviço tem garantia?</b><p>Sim: 90 dias de garantia em peças e mão de obra, por escrito.</p></div>
+</section>
+
+<section>
+  <div class="cta-final">
+    <h2>😰 Geladeira parada é comida em risco</h2>
+    <p>Técnico disponível AGORA na sua região · Diagnóstico na hora · 90 dias de garantia</p>
+    <a class="btn-wa j-wa-link" href="#" onclick="return clique('wa',this)" style="box-shadow:none;">💬 FALAR COM TÉCNICO AGORA</a>
+  </div>
+</section>
+
+<footer>📞 <span class="j-tel-fmt">—</span> · <span class="j-cidade">—</span><br>© 2026 <span class="j-empresa">—</span> · Assistência Técnica Autorizada</footer>
+
+<a class="wa-float j-wa-link" href="#" onclick="return clique('wa',this)" aria-label="WhatsApp">
+  <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5.2 14.1c-.2.6-1.2 1.2-1.7 1.2-.4.1-1 .1-1.6-.1a13 13 0 0 1-5.8-5.1c-.6-1-.9-2-.9-2.4 0-.5.3-1.4.8-1.7.3-.2.7-.2.9-.1l.5.9c.2.3.3.6.1.9l-.4.6c-.1.2-.1.4 0 .6.6 1 1.7 2.1 3 2.7.3.1.5.1.7-.1l.6-.7c.2-.3.5-.3.8-.2l1.6.8c.3.1.4.4.4.7z"/></svg>
+</a>
+
+<script>
+// ── Config por domínio ─────────────────────────────────────────────────────
+var DOMINIOS = {
+  'riorefrigeracao':  { empresa:'Rio Refrigeração',      cidade:'Rio de Janeiro', tel:'5521974961883', telFmt:'(21) 9 7496-1883', aw:'AW-16654495741', label:'AW-16654495741/lmdaCOvPxMUcEP3fvYU-' },
+  'rjgeladeiras':     { empresa:'RJ Geladeiras',          cidade:'Rio de Janeiro', tel:'5521973849145', telFmt:'(21) 9 7384-9145', aw:'AW-16587199538', label:'AW-16587199538/JjsBCNbYwcUcELKosuU9' },
+  'cabofriogeladeiras':{ empresa:'Cabo Frio Geladeiras',  cidade:'Cabo Frio',      tel:'5522998408927', telFmt:'(22) 9 9840-8927', aw:'AW-17036833483', label:'AW-17036833483/LimUCNXfr8UcEMvl5bs_' },
+  '_default':         { empresa:'Reparo Eletro',          cidade:'Belo Horizonte', tel:'5531997856023', telFmt:'(31) 9 9785-6023', aw:'AW-11030361270', label:'AW-11030361270/ODexCNHJyuobELbp14sp' }
+};
+
+// ── Config por sintoma (rota) ──────────────────────────────────────────────
+var SINTOMAS = {
+  '':                        { h1:'Geladeira com defeito?',            icon:'🔧', msg:'Olá! Minha geladeira está com defeito e preciso de um técnico agora.' },
+  'geladeira-parou-de-gelar':{ h1:'Geladeira parou de gelar?',         icon:'❄️', msg:'Olá! Minha geladeira parou de gelar e preciso de um técnico agora.' },
+  'geladeira-parou-de-gelar-embaixo':{ h1:'Geladeira parou de gelar embaixo?', icon:'🧊', msg:'Olá! Minha geladeira parou de gelar na parte de baixo e preciso de um técnico agora.' },
+  'geladeira-vazando-agua':  { h1:'Geladeira vazando água?',           icon:'💧', msg:'Olá! Minha geladeira está vazando água e preciso de um técnico agora.' },
+  'geladeira-congelando-tudo':{ h1:'Geladeira congelando tudo?',       icon:'🥶', msg:'Olá! Minha geladeira está congelando todos os alimentos e preciso de um técnico agora.' },
+  'geladeira-nao-liga':      { h1:'Geladeira não liga?',               icon:'🔌', msg:'Olá! Minha geladeira não está ligando e preciso de um técnico agora.' },
+  'geladeira-fazendo-barulho':{ h1:'Geladeira fazendo barulho?',       icon:'🔊', msg:'Olá! Minha geladeira está fazendo barulho estranho e preciso de um técnico agora.' }
+};
+
+function detectDominio(){
+  var h=location.hostname.replace('www.','');
+  for(var k in DOMINIOS){ if(k!=='_default' && h.indexOf(k)>-1) return DOMINIOS[k]; }
+  return DOMINIOS._default;
+}
+function detectSlug(){
+  var p=location.pathname.replace(/^\/autorizada-?/,'').replace(/\/$/,'');
+  return SINTOMAS[p]?p:'';
+}
+
+var CFG=detectDominio(), SLUG=detectSlug(), SIN=SINTOMAS[SLUG];
+var PAGINA=SLUG||'autorizada';
+var DOM=location.hostname.replace('www.','');
+
+// ── Preencher página ───────────────────────────────────────────────────────
+document.title=SIN.h1.replace('?','')+' — Autorizada '+CFG.cidade+' | Ligue '+CFG.telFmt;
+document.querySelectorAll('.j-cidade').forEach(function(e){e.textContent=CFG.cidade;});
+document.querySelectorAll('.j-empresa').forEach(function(e){e.textContent=CFG.empresa;});
+document.querySelectorAll('.j-tel-fmt').forEach(function(e){e.textContent=CFG.telFmt;});
+document.querySelector('.j-h1').textContent=SIN.h1;
+
+var waURL='https://wa.me/'+CFG.tel+'?text='+encodeURIComponent(SIN.msg);
+var telURL='tel:+'+CFG.tel;
+document.querySelectorAll('.j-wa-link').forEach(function(e){e.href=waURL;});
+document.querySelectorAll('.j-tel-link').forEach(function(e){e.href=telURL;});
+
+// Grid de sintomas (links entre rotas)
+var grid=document.getElementById('grid-sintomas');
+Object.keys(SINTOMAS).forEach(function(k){
+  if(k==='')return;
+  var s=SINTOMAS[k];
+  var a=document.createElement('a');
+  a.className='sint'+(k===SLUG?' on':'');
+  a.href='/autorizada-'+k;
+  a.innerHTML=s.icon+' '+s.h1.replace('Geladeira ','').replace('?','');
+  grid.appendChild(a);
+});
+
+// ── Google Ads (gtag dinâmico por domínio) ─────────────────────────────────
+var gs=document.createElement('script');
+gs.async=true; gs.src='https://www.googletagmanager.com/gtag/js?id='+CFG.aw;
+document.head.appendChild(gs);
+window.dataLayer=window.dataLayer||[];
+function gtag(){dataLayer.push(arguments);}
+gtag('js',new Date()); gtag('config',CFG.aw);
+
+// ── Tracking próprio ───────────────────────────────────────────────────────
+function track(tipo,extra){
+  try{
+    var q='/api/sites-track?action='+tipo+'&p='+encodeURIComponent(PAGINA)+'&d='+encodeURIComponent(DOM)+(extra||'');
+    if(navigator.sendBeacon) navigator.sendBeacon(q);
+    else fetch(q,{method:'POST'}).catch(function(){});
+  }catch(e){}
+}
+track('hit');
+
+function clique(tipo,el){
+  track('click','&t='+tipo);
+  try{ gtag('event','conversion',{send_to:CFG.label}); }catch(e){}
+  // Deixa o navegador seguir o href normalmente após registrar
+  setTimeout(function(){ location.href=el.href; },150);
+  return false;
+}
+</script>
+</body>
+</html>

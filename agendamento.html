@@ -108,6 +108,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <button class="tab"    onclick="ir(4)">✅ REALIZADOS</button>
   <button class="tab"    onclick="ir(5)">❌ CANCELADOS</button>
   <button class="tab"    onclick="ir(6)">📊 RELATÓRIO</button>
+  <button class="tab"    onclick="ir(7)">🌐 SITES</button>
 </div>
 
 <!-- PENDENTES -->
@@ -258,6 +259,7 @@ function ir(n) {
   document.querySelectorAll('.pg').forEach(function(p,i){ p.className = 'pg'+(i===n?' on':''); });
   document.querySelectorAll('.tab').forEach(function(t,i){ t.className = 'tab'+(i===n?' on':''); });
   if (n===4) renderRel();
+  if (n===7) renderSites();
 }
 
 // ── API ────────────────────────────────────────────────────────────────────
@@ -703,6 +705,79 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
   </div>
 </div>
+
+
+<!-- SITES (conversão páginas /autorizada) -->
+<div class="pg">
+  <div style="padding:14px 20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <span style="font-size:12px;color:#5a6270;font-weight:700;">Período:</span>
+    <button class="ba" id="st-per-hoje"   onclick="sitesPeriodo('hoje')"   style="background:rgba(59,158,255,.15);color:#3b9eff;">Hoje</button>
+    <button class="ba" id="st-per-semana" onclick="sitesPeriodo('semana')">7 dias</button>
+    <button class="ba" id="st-per-total"  onclick="sitesPeriodo('total')">Total</button>
+    <span style="flex:1;"></span>
+    <select id="st-dom" onchange="renderSitesTabela()" style="background:#181b1f;border:1px solid #2a2f38;border-radius:7px;padding:7px 10px;color:#f0f2f5;font-size:12px;">
+      <option value="">Todos os domínios</option>
+    </select>
+  </div>
+  <div style="padding:0 20px 20px;overflow-x:auto;">
+    <div class="tr th" style="display:grid;grid-template-columns:2fr 1.2fr 1fr 1fr 1fr;gap:8px;">
+      <span>Página</span><span>Domínio</span><span>Acessos</span><span>Cliques</span><span>Conversão</span>
+    </div>
+    <div id="lst-sites"></div>
+  </div>
+</div>
+\n
+<script>
+var _sitesLinhas=[], _sitesPer='hoje';
+
+function sitesPeriodo(p){
+  _sitesPer=p;
+  ['hoje','semana','total'].forEach(function(x){
+    var b=document.getElementById('st-per-'+x);
+    if(b){b.style.background=x===p?'rgba(59,158,255,.15)':'transparent';b.style.color=x===p?'#3b9eff':'#5a6270';}
+  });
+  renderSitesTabela();
+}
+
+async function renderSites(){
+  try{
+    var d=await fetch('/api/sites-track?action=stats').then(function(r){return r.json();});
+    _sitesLinhas=d.linhas||[];
+    // Popular select de domínios
+    var sel=document.getElementById('st-dom');
+    var doms={}; _sitesLinhas.forEach(function(l){doms[l.dominio]=1;});
+    var atual=sel.value;
+    sel.innerHTML='<option value="">Todos os domínios</option>'+Object.keys(doms).sort().map(function(x){return '<option'+(x===atual?' selected':'')+'>'+x+'</option>';}).join('');
+    renderSitesTabela();
+  }catch(e){
+    document.getElementById('lst-sites').innerHTML='<div class="empty-row">Erro ao carregar</div>';
+  }
+}
+
+function renderSitesTabela(){
+  var dom=document.getElementById('st-dom').value;
+  var lst=_sitesLinhas.filter(function(l){return !dom||l.dominio===dom;});
+  // Agregar por página quando "Todos"
+  var rows=lst.map(function(l){
+    var v=l[_sitesPer]||{a:0,c:0};
+    return {pagina:l.pagina,dominio:l.dominio,a:v.a,c:v.c};
+  }).filter(function(r){return r.a>0||r.c>0;});
+  rows.sort(function(x,y){return y.c-x.c||y.a-x.a;});
+  var el=document.getElementById('lst-sites');
+  if(!rows.length){el.innerHTML='<div class="empty-row">Nenhum acesso registrado no período</div>';return;}
+  el.innerHTML=rows.map(function(r){
+    var taxa=r.a>0?(100*r.c/r.a):0;
+    var cor=taxa>=25?'#22c55e':taxa>=15?'#f5c800':'#5a6270';
+    return '<div class="tr" style="display:grid;grid-template-columns:2fr 1.2fr 1fr 1fr 1fr;gap:8px;">'
+      +'<div><b>'+r.pagina+'</b></div>'
+      +'<div style="color:#5a6270;font-size:11px;">'+r.dominio+'</div>'
+      +'<div>'+r.a+'</div>'
+      +'<div style="color:#3b9eff;font-weight:700;">'+r.c+'</div>'
+      +'<div style="color:'+cor+';font-weight:800;">'+taxa.toFixed(1)+'%</div>'
+    +'</div>';
+  }).join('');
+}
+</script>
 
 </body>
 </html>
