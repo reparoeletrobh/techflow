@@ -56,6 +56,18 @@ footer{text-align:center;font-size:12px;color:var(--muted);padding:22px 16px 30p
 .wa-float{position:fixed;right:16px;bottom:16px;width:58px;height:58px;border-radius:50%;background:var(--verde);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(22,163,74,.45);z-index:99;}
 .wa-float svg{width:30px;height:30px;fill:#fff;}
 @media(min-width:560px){.sintomas{grid-template-columns:1fr 1fr 1fr;}}
+/* ── CTAs pulsando ─────────────────────────────────────────── */
+@keyframes pulsa-wa{
+  0%,100%{box-shadow:0 8px 22px rgba(22,163,74,.35),0 0 0 0 rgba(34,197,94,.55);transform:scale(1);}
+  50%{box-shadow:0 8px 26px rgba(22,163,74,.45),0 0 0 14px rgba(34,197,94,0);transform:scale(1.02);}
+}
+@keyframes pulsa-tel{
+  0%,100%{box-shadow:0 0 0 0 rgba(11,87,208,.4);}
+  50%{box-shadow:0 0 0 10px rgba(11,87,208,0);}
+}
+.btn-wa,.cta-mini{animation:pulsa-wa 1.6s ease-in-out infinite;}
+.btn-tel,.hdr-call{animation:pulsa-tel 1.6s ease-in-out infinite;}
+.wa-float{animation:pulsa-wa 1.6s ease-in-out infinite;}
 </style>
 </head>
 <body>
