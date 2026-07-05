@@ -758,19 +758,48 @@ var LINKS_ROTAS=[
 function montarLinksSites(){
   var el=document.getElementById('links-sites');
   if(!el||el.innerHTML)return;
-  el.innerHTML=LINKS_DOMS.map(function(d){
+  var html='';
+
+  // ── Estrutura AUTORIZADA (nova) ──
+  html+='<div style="font-size:11px;font-weight:800;color:#22c55e;margin-top:10px;letter-spacing:.05em;">🆕 ESTRUTURA AUTORIZADA</div>';
+  html+=LINKS_DOMS.map(function(d){
     return '<div style="margin-top:12px;">'
       +'<div style="font-size:11px;font-weight:800;color:#f0f2f5;margin-bottom:6px;">'+d.nome+'</div>'
       +LINKS_ROTAS.map(function(r){
-        var url=d.base+r.rota;
-        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #16181d;">'
-          +'<span style="flex:none;font-size:10px;color:#5a6270;width:190px;">'+r.lbl+'</span>'
-          +'<a href="'+url+'" target="_blank" style="flex:1;font-family:monospace;font-size:11px;color:#3b9eff;text-decoration:none;word-break:break-all;">'+url+'</a>'
-          +'<button onclick="copiarLink(this,\''+url+'\')" style="flex:none;background:#181b1f;border:1px solid #2a2f38;border-radius:6px;color:#f0f2f5;font-size:10px;padding:4px 9px;cursor:pointer;">📋</button>'
-        +'</div>';
+        return linhaLink(r.lbl, d.base+r.rota);
       }).join('')
     +'</div>';
   }).join('');
+
+  // ── Estrutura ANTERIOR (sites originais) ──
+  var ANT=[
+    {nome:'🔵 BH — Reparo Eletro',        base:'https://reparoeletroadm.com', pref:'/geladeira', prefN:'/geladeira-'},
+    {nome:'🟢 Rio — Rio Refrigeração',    base:'https://riorefrigeracao.com', pref:'/',          prefN:'/'},
+    {nome:'🟡 RJ — RJ Geladeiras',        base:'https://rjgeladeiras.com',    pref:'/',          prefN:'/'},
+    {nome:'🟠 Cabo Frio — CF Geladeiras', base:'https://cabofriogeladeiras.com', pref:'/',       prefN:'/'}
+  ];
+  html+='<div style="font-size:11px;font-weight:800;color:#f5c800;margin-top:20px;letter-spacing:.05em;">📄 ESTRUTURA ANTERIOR (sites originais)</div>';
+  html+=ANT.map(function(d){
+    var linhas=linhaLink('Principal (link do anúncio)', d.base+(d.pref==='/'?'':d.pref)+(d.pref==='/'?'':'')||d.base);
+    linhas=linhaLink('Principal (link do anúncio)', d.pref==='/' ? d.base : d.base+d.pref);
+    for(var i=1;i<=6;i++){
+      linhas+=linhaLink('Sitelink '+i, d.base+(d.prefN==='/'?'/'+i:d.prefN+i));
+    }
+    return '<div style="margin-top:12px;">'
+      +'<div style="font-size:11px;font-weight:800;color:#f0f2f5;margin-bottom:6px;">'+d.nome+'</div>'
+      +linhas
+    +'</div>';
+  }).join('');
+
+  el.innerHTML=html;
+}
+
+function linhaLink(lbl,url){
+  return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #16181d;">'
+    +'<span style="flex:none;font-size:10px;color:#5a6270;width:190px;">'+lbl+'</span>'
+    +'<a href="'+url+'" target="_blank" style="flex:1;font-family:monospace;font-size:11px;color:#3b9eff;text-decoration:none;word-break:break-all;">'+url+'</a>'
+    +'<button onclick="copiarLink(this,\''+url+'\')" style="flex:none;background:#181b1f;border:1px solid #2a2f38;border-radius:6px;color:#f0f2f5;font-size:10px;padding:4px 9px;cursor:pointer;">📋</button>'
+  +'</div>';
 }
 
 function copiarLink(btn,url){
