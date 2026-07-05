@@ -2,6 +2,7 @@
 // 1) Snapshot no Redis: backup_full_<0-6> (rotação semanal, não cresce)
 // 2) E-mail via Resend com o JSON anexado (cópia off-site)
 // Cron: diário 03:30 BRT (06:30 UTC) — ver vercel.json
+import { gzipSync } from 'zlib';
 const U=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
 const T=(process.env.UPSTASH_TOKEN||'').replace(/[\n\r'"]/g,'').trim();
 const RESEND_KEY=process.env.RESEND_API_KEY||'';
@@ -37,11 +38,14 @@ async function dbGetRaw(key){
 }
 async function dbSetRaw(key,rawStr){
   try{
-    await fetch(`${U}/set/${key}`,{
+    const r=await fetch(`${U}/set/${key}`,{
       method:'POST',
       headers:{Authorization:`Bearer ${T}`,'Content-Type':'application/json'},
       body:rawStr
-    });return true;
+    });
+    if(!r.ok)return false;
+    const j=await r.json().catch(()=>null);
+    return !!(j&&(j.result==='OK'||j.result));
   }catch{return false;}
 }
 
@@ -63,49 +67,66 @@ export default async function handler(req,res){
       const json=JSON.stringify(snapshot);
       const bytes=Buffer.byteLength(json,'utf8');
 
-      // 1) Snapshot no Redis com rotação semanal (backup_full_0 a backup_full_6)
-      const dow=new Date(Date.now()-3*3600000).getUTCDay(); // dia da semana BRT
-      await dbSetRaw(`backup_full_${dow}`,json);
+      // 1) Snapshot no Redis POR CHAVE (rotação de 2 dias: par/ímpar)
+      //    — chaves individuais têm o mesmo tamanho que o sistema já grava
+      //    normalmente, então nenhum SET estoura limite de request
+      const dow=new Date(Date.now()-3*3600000).getUTCDay();
+      const slot=dow%2; // 0 ou 1 → mantém ontem e hoje (retenção longa fica no e-mail)
+      let gravadas=0, falhas=[];
+      for(let i=0;i<CHAVES.length;i++){
+        if(valores[i]==null)continue;
+        const okSet=await dbSetRaw(`bk_${slot}_${CHAVES[i]}`,
+          JSON.stringify({em:snapshot.geradoEm,v:valores[i]}));
+        if(okSet)gravadas++; else falhas.push(CHAVES[i]);
+      }
 
-      // 2) E-mail com anexo (só se < 10MB — acima disso o snapshot Redis basta)
-      let emailStatus='nao_enviado';
-      if(RESEND_KEY && bytes<10*1024*1024){
-        const dia=new Date(Date.now()-3*3600000).toISOString().slice(0,10);
+      // 2) E-mail com anexo comprimido (.json.gz — ~10x menor)
+      let emailStatus='nao_enviado', gzBytes=0;
+      if(RESEND_KEY){
         try{
-          const er=await fetch('https://api.resend.com/emails',{
-            method:'POST',
-            headers:{'Authorization':'Bearer '+RESEND_KEY,'Content-Type':'application/json'},
-            body:JSON.stringify({
-              from:'Backup TechFlow <pedro@comercial.reparoeletroadm.com>',
-              to:[BACKUP_EMAIL],
-              subject:`💾 Backup diário TechFlow — ${dia} (${(bytes/1024).toFixed(0)} KB, ${CHAVES.length-vazias}/${CHAVES.length} chaves)`,
-              html:`<p>Backup automático dos dados operacionais do sistema.</p>
-<p><b>Data:</b> ${dia}<br><b>Chaves com dados:</b> ${CHAVES.length-vazias} de ${CHAVES.length}<br><b>Tamanho:</b> ${(bytes/1024).toFixed(0)} KB</p>
-<p>Guarde este e-mail — o anexo permite restaurar o sistema em caso de perda de dados. Também há um snapshot rotativo dos últimos 7 dias dentro do próprio banco.</p>`,
-              attachments:[{filename:`backup-techflow-${dia}.json`,content:Buffer.from(json).toString('base64')}]
-            })
-          });
-          emailStatus=er.ok?'enviado':`erro_http_${er.status}`;
+          const gz=gzipSync(Buffer.from(json));
+          gzBytes=gz.length;
+          if(gzBytes<15*1024*1024){
+            const dia=new Date(Date.now()-3*3600000).toISOString().slice(0,10);
+            const er=await fetch('https://api.resend.com/emails',{
+              method:'POST',
+              headers:{'Authorization':'Bearer '+RESEND_KEY,'Content-Type':'application/json'},
+              body:JSON.stringify({
+                from:'Backup TechFlow <pedro@comercial.reparoeletroadm.com>',
+                to:[BACKUP_EMAIL],
+                subject:`💾 Backup diário TechFlow — ${dia} (${(bytes/1048576).toFixed(1)} MB → ${(gzBytes/1048576).toFixed(1)} MB comprimido)`,
+                html:`<p>Backup automático dos dados operacionais do sistema.</p>
+<p><b>Data:</b> ${dia}<br><b>Chaves com dados:</b> ${CHAVES.length-vazias} de ${CHAVES.length}<br><b>Tamanho:</b> ${(bytes/1048576).toFixed(1)} MB (anexo comprimido: ${(gzBytes/1048576).toFixed(1)} MB)</p>
+<p>O anexo é um .json.gz — descompacte com qualquer ferramenta de zip para acessar o JSON completo. Guarde este e-mail: ele permite restaurar o sistema em caso de perda de dados.</p>`,
+                attachments:[{filename:`backup-techflow-${dia}.json.gz`,content:gz.toString('base64')}]
+              })
+            });
+            emailStatus=er.ok?'enviado':`erro_http_${er.status}`;
+          } else { emailStatus='muito_grande_mesmo_comprimido'; }
         }catch(e){emailStatus='erro_'+e.message;}
-      } else if(!RESEND_KEY){ emailStatus='sem_chave_resend'; }
-      else { emailStatus='muito_grande_so_redis'; }
+      } else { emailStatus='sem_chave_resend'; }
 
-      return res.status(200).json({ok:true,chaves:CHAVES.length,comDados:CHAVES.length-vazias,bytes,slotRedis:`backup_full_${dow}`,email:emailStatus});
+      return res.status(200).json({ok:true,chaves:CHAVES.length,comDados:CHAVES.length-vazias,
+        bytes,gzBytes,slot,gravadasRedis:gravadas,falhasRedis:falhas,email:emailStatus});
     }catch(e){
       return res.status(200).json({ok:false,error:e.message});
     }
   }
 
-  // ── STATUS: lista os snapshots existentes ────────────────────────────────
+  // ── STATUS: resumo dos snapshots por slot ────────────────────────────────
   if(action==='status'){
-    const slots=await Promise.all([0,1,2,3,4,5,6].map(async d=>{
-      const raw=await dbGetRaw(`backup_full_${d}`);
-      if(!raw)return{slot:d,existe:false};
-      let geradoEm=null;
-      try{ geradoEm=JSON.parse(raw).geradoEm; }catch{}
-      return{slot:d,existe:true,bytes:Buffer.byteLength(String(raw),'utf8'),geradoEm};
-    }));
-    return res.status(200).json({ok:true,slots,emailDestino:BACKUP_EMAIL});
+    const out=[];
+    for(const slot of [0,1]){
+      let chavesOk=0, totalBytes=0, geradoEm=null;
+      const vals=await Promise.all(CHAVES.map(k=>dbGetRaw(`bk_${slot}_${k}`)));
+      vals.forEach(v=>{
+        if(v==null)return;
+        chavesOk++; totalBytes+=Buffer.byteLength(String(v),'utf8');
+        if(!geradoEm){ try{ geradoEm=JSON.parse(v).em; }catch{} }
+      });
+      out.push({slot,chaves:chavesOk,mb:+(totalBytes/1048576).toFixed(2),geradoEm});
+    }
+    return res.status(200).json({ok:true,slots:out,emailDestino:BACKUP_EMAIL});
   }
 
   return res.status(404).json({ok:false,error:'Ação não encontrada'});
