@@ -131,6 +131,11 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
         <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">📅 Data para retornar a ligação</div>
         <input id="ret-data" type="date" style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:7px;padding:9px 12px;color:#f0f2f5;font-size:14px;outline:none;box-sizing:border-box;">
       </div>
+      <div>
+        <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">💬 Observação (opcional)</div>
+        <textarea id="ret-obs" rows="2" placeholder="Ex: pediu para ligar depois das 14h / não atendeu, tentar WhatsApp..."
+          style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:7px;padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;box-sizing:border-box;resize:vertical;"></textarea>
+      </div>
       <button onclick="confirmarRetorno()" style="background:#f97316;color:#000;border:none;border-radius:8px;padding:11px;font-size:13px;font-weight:800;cursor:pointer;width:100%;">
         ↩ Confirmar Retorno
       </button>
@@ -291,12 +296,14 @@ function abrirRetModal(id){
   _retId=id;_retModo='lead';_retSistema=null;
   var d=new Date();d.setDate(d.getDate()+1); // sugestão: amanhã
   document.getElementById('ret-data').value=d.toISOString().slice(0,10);
+  document.getElementById('ret-obs').value='';
   document.getElementById('ret-modal').style.display='flex';
 }
 function abrirRetModalEspelho(id,sistema){
   _retId=id;_retModo='espelho';_retSistema=sistema;
   var d=new Date();d.setDate(d.getDate()+1);
   document.getElementById('ret-data').value=d.toISOString().slice(0,10);
+  document.getElementById('ret-obs').value='';
   document.getElementById('ret-modal').style.display='flex';
 }
 function fecharRetModal(){document.getElementById('ret-modal').style.display='none';_retId=null;}
@@ -305,16 +312,17 @@ async function confirmarRetorno(){
   if(!_retId)return;
   var data=document.getElementById('ret-data').value;
   if(!data){alert('Informe a data de retorno');return;}
+  var obs=document.getElementById('ret-obs').value.trim(); // opcional
   var r;
   if(_retModo==='espelho'){
     r=await fetch('/api/prospeccao?action=espelho-retornar',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({id:_retId,sistema:_retSistema,dataRetorno:data})
+      body:JSON.stringify({id:_retId,sistema:_retSistema,dataRetorno:data,obsRetorno:obs||null})
     }).then(function(x){return x.json();}).catch(function(){return{ok:false};});
   }else{
     r=await fetch('/api/prospeccao?action=mover',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({id:_retId,status:'retornar',dataRetorno:data})
+      body:JSON.stringify({id:_retId,status:'retornar',dataRetorno:data,obsRetorno:obs||null})
     }).then(function(x){return x.json();}).catch(function(){return{ok:false};});
   }
   fecharRetModal();
@@ -571,6 +579,9 @@ function cardHTML(f){
       var corData=vencida?'#ef4444':(hoje?'#22c55e':'#f97316');
       var lblData=f.dataRetorno.split('-').reverse().join('/');
       extraCard+='<div style="font-size:11px;font-weight:800;color:'+corData+';margin-bottom:4px;">📅 Retornar: '+lblData+(vencida?' — VENCIDA':(hoje?' — HOJE':''))+'</div>';
+    }
+    if(f.obsRetorno){
+      extraCard+='<div style="font-size:11px;color:#f5c800;background:rgba(245,200,0,.07);border-left:2px solid rgba(245,200,0,.4);padding:4px 8px;border-radius:0 6px 6px 0;margin-bottom:5px;">💬 '+esc(f.obsRetorno)+'</div>';
     }
   }
   return'<div class="card" id="card-'+f.id+'" style="'+estiloCard+'">'+

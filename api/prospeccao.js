@@ -182,13 +182,14 @@ export default async function handler(req,res){
 
   // ── MOVER: muda status (lead→retornar→cliente_loja) ───────────────────
   if(req.method==='POST'&&action==='mover'){
-    const{id,status,dataRetorno}=req.body||{};
+    const{id,status,dataRetorno,obsRetorno}=req.body||{};
     const db=(await dbGet(KEY))||{fichas:[]};
     const f=db.fichas.find(x=>x.id===id);
     if(!f)return res.status(404).json({ok:false,error:'Não encontrado'});
     f.status=status;f.movidoEm=new Date().toISOString();
     if(status==='retornar'){
       f.dataRetorno=dataRetorno||null;
+      f.obsRetorno=obsRetorno||null;
       f.filaFinal=false; // reagendou → volta ao fluxo normal
     }
     await dbSet(KEY,db);
@@ -210,7 +211,7 @@ export default async function handler(req,res){
 
   // ── ESPELHO-RETORNAR: ficha do espelho entra na cadência de Retornar ─────
   if(req.method==='POST'&&action==='espelho-retornar'){
-    const{id,sistema,dataRetorno}=req.body||{};
+    const{id,sistema,dataRetorno,obsRetorno}=req.body||{};
     const FKEY=sistema==='tv'?'fichas_tv':'fichas_adm';
     const fdb=(await dbGet(FKEY))||{fichas:[]};
     const orig=fdb.fichas.find(x=>x.id===id);
@@ -225,7 +226,7 @@ export default async function handler(req,res){
       equipamento:orig.equipamento||'', defeito:orig.defeito||'',
       endereco:orig.endereco||'', horario:orig.horario||'',
       waNum:orig.waNum||waNum(orig.telefone||''),
-      status:'retornar', dataRetorno:dataRetorno||null, filaFinal:false,
+      status:'retornar', dataRetorno:dataRetorno||null, obsRetorno:obsRetorno||null, filaFinal:false,
       origemEspelho:true, origemSistema:sistema,
       criadoEm:now, movidoEm:now,
     });
