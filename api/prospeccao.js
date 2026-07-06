@@ -245,6 +245,72 @@ export default async function handler(req,res){
     return res.status(200).json({ok:true});
   }
 
+  // ── CRIAR-MANUAL: cadastro manual de ficha (sempre conta como ATIVA) ─────
+  if(req.method==='POST'&&action==='criar-manual'){
+    const{nome,telefone,equipamento,defeito,endereco,destino,sistema,tipoColeta,dataAgendada,faixaHorario}=req.body||{};
+    if(!nome||!String(nome).trim())return res.status(400).json({ok:false,error:'Nome é obrigatório'});
+    const now=new Date().toISOString();
+    const tel=String(telefone||'').replace(/\D/g,'');
+    const db=(await dbGet(KEY))||{fichas:[]};
+
+    const ficha={
+      id:'prosp_man_'+Date.now().toString(36),
+      telefone:tel, nome:String(nome).trim(),
+      equipamento:String(equipamento||'').trim(),
+      defeito:String(defeito||'').trim(),
+      endereco:String(endereco||'').trim(),
+      horario:'', waNum:waNum(tel),
+      origemManual:true, logisticaTipo:'ativa',
+      criadoEm:now, movidoEm:null,
+    };
+
+    if(destino==='logistica'){
+      // Vai direto para a logística escolhida (mesma lógica do cadastrar-logistica)
+      const LOG_KEY=sistema==='tv'?'tv_logistica':'reparoeletro_logistica';
+      const logDb=(await dbGet(LOG_KEY))||{fichas:[]};
+      const phase=tipoColeta==='agendado'?'horario_marcado':'liberado_coleta';
+      let horarioColeta=null;
+      if(tipoColeta==='agendado'&&dataAgendada&&faixaHorario){
+        const horaInicio=(faixaHorario.split(' - ')[0])||'08:00';
+        horarioColeta=`${dataAgendada}T${horaInicio}`;
+      }
+      logDb.fichas.unshift({
+        id:'log_'+Date.now().toString(36),
+        nome:ficha.nome, telefone:ficha.telefone, endereco:ficha.endereco,
+        equipamento:ficha.equipamento, defeito:ficha.defeito,
+        phase, dataAgendada:dataAgendada||null, faixaHorario:faixaHorario||null,
+        horarioColeta, origem:'prospeccao_manual', origemTipo:'ativa',
+        criadoEm:now, movedAt:now,
+      });
+      await dbSet(LOG_KEY,logDb);
+      ficha.status='logistica';
+      ficha.logisticaEm=now;
+    } else {
+      // Cliente Loja
+      ficha.status='cliente_loja';
+      ficha.ativaManualEm=now;
+      ficha.movidoEm=now;
+    }
+
+    db.fichas.unshift(ficha);
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true,ficha});
+  }
+
+  // ── MARCAR-FRENTELOJA: cliente loja virou cadastro no Frente de Loja ─────
+  if(req.method==='POST'&&action==='marcar-frenteloja'){
+    const{id}=req.body||{};
+    const db=(await dbGet(KEY))||{fichas:[]};
+    const f=db.fichas.find(x=>x.id===id);
+    if(!f)return res.status(404).json({ok:false,error:'Não encontrado'});
+    f.status='frenteloja';
+    f.frentelojaEm=new Date().toISOString();
+    f.logisticaTipo='ativa';
+    f.movidoEm=f.frentelojaEm;
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true});
+  }
+
   // ── STATS-PA: contagem semanal de fichas → logística por Passiva/Ativa ──
   if(action==='stats-pa'){
     // Início da semana (domingo 00:00 BRT = 03:00 UTC)
@@ -252,15 +318,18 @@ export default async function handler(req,res){
     const iniSemana=new Date(Date.UTC(nowBRT.getUTCFullYear(),nowBRT.getUTCMonth(),nowBRT.getUTCDate()-nowBRT.getUTCDay(),3,0,0));
     const [fa,ft,pr]=await Promise.all([dbGet('fichas_adm'),dbGet('fichas_tv'),dbGet(KEY)]);
     let passiva=0,ativa=0;
-    const conta=(db,fallback)=>{
+    const conta=(db,fallback,extrator)=>{
       for(const f of (db?.fichas||[])){
-        if(!f.logisticaEm)continue;
-        if(new Date(f.logisticaEm)<iniSemana)continue;
+        const ts=extrator?extrator(f):f.logisticaEm;
+        if(!ts)continue;
+        if(new Date(ts)<iniSemana)continue;
         const t=f.logisticaTipo||fallback; // histórico sem campo: fichas→passiva, prospecção→ativa
         if(t==='ativa')ativa++;else passiva++;
       }
     };
-    conta(fa,'passiva');conta(ft,'passiva');conta(pr,'ativa');
+    conta(fa,'passiva');conta(ft,'passiva');
+    // Prospecção: logística OU frente de loja OU cadastro manual cliente loja — tudo ativa
+    conta(pr,'ativa',f=>f.logisticaEm||f.frentelojaEm||f.ativaManualEm);
     return res.status(200).json({ok:true,passiva,ativa});
   }
 

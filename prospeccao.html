@@ -60,6 +60,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
   <div class="h-title">🔭 Prospecção</div>
   <div class="h-btns">
     <span class="sync-info" id="sync-info">—</span>
+    <button class="btn" style="background:#22c55e;color:#000;" onclick="abrirNovaFicha()">➕ Nova Ficha</button>
     <button class="btn btn-sync" id="btn-sync" onclick="sincronizar()">🔄 Sincronizar</button>
     <a href="/adm" class="btn" style="background:#1e2228;color:#f0f2f5;text-decoration:none;">← ADM</a>
   </div>
@@ -117,6 +118,72 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 </div>
 
 <div class="toast" id="toast">✅ Feito!</div>
+
+<!-- Modal Nova Ficha (cadastro manual — conta como ATIVA) -->
+<div id="nf-modal" style="display:none;position:fixed;inset:0;z-index:820;background:rgba(0,0,0,.75);align-items:center;justify-content:center;padding:16px;overflow-y:auto;">
+  <div style="background:#0f1114;border:1px solid #1e2228;border-radius:14px;width:100%;max-width:380px;margin:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #1e2228;">
+      <span style="font-weight:800;font-size:13px;">➕ Nova Ficha <span style="font-size:9px;font-weight:800;color:#ef4444;background:rgba(239,68,68,.12);border-radius:5px;padding:2px 6px;margin-left:6px;">🔴 ATIVA</span></span>
+      <button onclick="fecharNovaFicha()" style="background:none;border:none;color:#5a6270;font-size:20px;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:18px;display:flex;flex-direction:column;gap:10px;">
+      <div><div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Nome do Cliente *</div>
+        <input id="nf-nome" placeholder="Ex: Maria Silva" style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:7px;padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;box-sizing:border-box;"></div>
+      <div><div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Telefone</div>
+        <input id="nf-tel" type="tel" placeholder="Ex: 31999998888" style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:7px;padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;box-sizing:border-box;"></div>
+      <div><div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Equipamento</div>
+        <input id="nf-equip" placeholder="Ex: Microondas Electrolux 30L" style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:7px;padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;box-sizing:border-box;"></div>
+      <div><div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Defeito</div>
+        <input id="nf-defeito" placeholder="Ex: Não esquenta" style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:7px;padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;box-sizing:border-box;"></div>
+      <div><div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Endereço</div>
+        <input id="nf-end" placeholder="Rua, número, bairro" style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:7px;padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;box-sizing:border-box;"></div>
+
+      <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">Destino</div>
+      <div style="display:flex;gap:8px;">
+        <label style="flex:1;display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px;background:#181b1f;border:1px solid #22272f;border-radius:8px;">
+          <input type="radio" name="nf-dest" value="cliente_loja" onchange="nfDestino()" style="accent-color:#3b9eff;">
+          <span style="font-size:12px;font-weight:700;color:#3b9eff;">🏪 Cliente Loja</span>
+        </label>
+        <label style="flex:1;display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px;background:#181b1f;border:1px solid #22272f;border-radius:8px;">
+          <input type="radio" name="nf-dest" value="logistica" onchange="nfDestino()" style="accent-color:#22c55e;">
+          <span style="font-size:12px;font-weight:700;color:#22c55e;">🚚 Logística</span>
+        </label>
+      </div>
+
+      <div id="nf-log-wrap" style="display:none;flex-direction:column;gap:10px;">
+        <div style="display:flex;gap:8px;">
+          <label style="flex:1;display:flex;align-items:center;gap:8px;cursor:pointer;padding:9px;background:#181b1f;border:1px solid #22272f;border-radius:8px;">
+            <input type="radio" name="nf-sis" value="adm" checked style="accent-color:#3b9eff;"><span style="font-size:12px;font-weight:700;color:#3b9eff;">ADM</span>
+          </label>
+          <label style="flex:1;display:flex;align-items:center;gap:8px;cursor:pointer;padding:9px;background:#181b1f;border:1px solid #22272f;border-radius:8px;">
+            <input type="radio" name="nf-sis" value="tv" style="accent-color:#06b6d4;"><span style="font-size:12px;font-weight:700;color:#06b6d4;">TV</span>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <label style="flex:1;display:flex;align-items:center;gap:8px;cursor:pointer;padding:9px;background:#181b1f;border:1px solid #22272f;border-radius:8px;">
+            <input type="radio" name="nf-tipo" value="imediato" onchange="nfTipo()" style="accent-color:#22c55e;"><span style="font-size:12px;font-weight:700;color:#22c55e;">⚡ Imediata</span>
+          </label>
+          <label style="flex:1;display:flex;align-items:center;gap:8px;cursor:pointer;padding:9px;background:#181b1f;border:1px solid #22272f;border-radius:8px;">
+            <input type="radio" name="nf-tipo" value="agendado" onchange="nfTipo()" style="accent-color:#3b9eff;"><span style="font-size:12px;font-weight:700;color:#3b9eff;">📅 Agendada</span>
+          </label>
+        </div>
+        <div id="nf-agend-wrap" style="display:none;flex-direction:column;gap:8px;">
+          <input id="nf-data" type="date" style="background:#0f1114;border:1px solid #2a2f38;border-radius:6px;padding:8px 10px;color:#f0f2f5;font-size:13px;outline:none;width:100%;box-sizing:border-box;">
+          <select id="nf-faixa" style="background:#0f1114;border:1px solid #2a2f38;border-radius:6px;padding:8px 10px;color:#f0f2f5;font-size:13px;outline:none;width:100%;box-sizing:border-box;">
+            <option value="">Selecione a faixa...</option>
+            <option>08:00 - 10:00</option><option>10:00 - 12:00</option>
+            <option>12:00 - 14:00</option><option>14:00 - 16:00</option>
+            <option>16:00 - 18:00</option><option>18:00 - 20:00</option>
+          </select>
+        </div>
+      </div>
+
+      <button onclick="salvarNovaFicha()" style="background:#22c55e;color:#000;border:none;border-radius:8px;padding:11px;font-size:13px;font-weight:800;cursor:pointer;width:100%;">
+        ✅ Cadastrar Ficha
+      </button>
+    </div>
+  </div>
+</div>
 
 <!-- Modal Logística -->
 <div id="log-modal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,.75);align-items:center;justify-content:center;padding:16px;">
@@ -182,6 +249,90 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 
 <script>
 var _fichas=[], _espelho=[], _busca='';
+
+// ── Nova Ficha (cadastro manual — ATIVA) ─────────────────────────────────
+function abrirNovaFicha(){
+  ['nf-nome','nf-tel','nf-equip','nf-defeito','nf-end','nf-data','nf-faixa'].forEach(function(i){
+    var e=document.getElementById(i); if(e)e.value='';
+  });
+  document.querySelectorAll('input[name="nf-dest"],input[name="nf-tipo"]').forEach(function(r){r.checked=false;});
+  var s=document.querySelector('input[name="nf-sis"][value="adm"]'); if(s)s.checked=true;
+  document.getElementById('nf-log-wrap').style.display='none';
+  document.getElementById('nf-agend-wrap').style.display='none';
+  document.getElementById('nf-modal').style.display='flex';
+}
+function fecharNovaFicha(){document.getElementById('nf-modal').style.display='none';}
+function nfDestino(){
+  var d=document.querySelector('input[name="nf-dest"]:checked');
+  document.getElementById('nf-log-wrap').style.display=(d&&d.value==='logistica')?'flex':'none';
+}
+function nfTipo(){
+  var t=document.querySelector('input[name="nf-tipo"]:checked');
+  document.getElementById('nf-agend-wrap').style.display=(t&&t.value==='agendado')?'flex':'none';
+}
+
+async function salvarNovaFicha(){
+  var nome=document.getElementById('nf-nome').value.trim();
+  if(!nome){alert('Nome do cliente é obrigatório');return;}
+  var dest=document.querySelector('input[name="nf-dest"]:checked');
+  if(!dest){alert('Selecione o destino: Cliente Loja ou Logística');return;}
+
+  var payload={
+    nome:nome,
+    telefone:document.getElementById('nf-tel').value.trim(),
+    equipamento:document.getElementById('nf-equip').value.trim(),
+    defeito:document.getElementById('nf-defeito').value.trim(),
+    endereco:document.getElementById('nf-end').value.trim(),
+    destino:dest.value
+  };
+
+  if(dest.value==='logistica'){
+    var sis=document.querySelector('input[name="nf-sis"]:checked');
+    var tipo=document.querySelector('input[name="nf-tipo"]:checked');
+    if(!tipo){alert('Selecione o tipo de coleta');return;}
+    payload.sistema=sis?sis.value:'adm';
+    payload.tipoColeta=tipo.value;
+    if(tipo.value==='agendado'){
+      var data=document.getElementById('nf-data').value;
+      var faixa=document.getElementById('nf-faixa').value;
+      if(!data){alert('Informe a data');return;}
+      if(!faixa){alert('Informe a faixa de horário');return;}
+      payload.dataAgendada=data;payload.faixaHorario=faixa;
+    }
+  }
+
+  var r=await fetch('/api/prospeccao?action=criar-manual',{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
+  }).then(function(x){return x.json();}).catch(function(){return{ok:false,error:'rede'};});
+  if(!r.ok){alert('Erro: '+(r.error||'falha'));return;}
+  fecharNovaFicha();
+  mostrarToast(dest.value==='logistica'?'✅ Ficha ATIVA cadastrada na Logística!':'✅ Ficha ATIVA em Cliente Loja!');
+  await load();
+}
+
+// ── Cliente Loja → Frente de Loja (conta ATIVA) ──────────────────────────
+async function enviarFrenteLoja(id){
+  var f=_fichas.find(function(x){return x.id===id;});
+  if(!f)return;
+  if(!confirm('Cadastrar "'+(f.nome||'—')+'" no Frente de Loja?'))return;
+  // 1. Cria no Frente de Loja
+  var r=await fetch('/api/frenteloja?action=criar',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      nomeContato:f.nome||'',
+      equipamento:f.equipamento||'',
+      telefone:f.telefone||'',
+      descricao:[f.defeito,f.endereco].filter(Boolean).join(' — ')
+    })
+  }).then(function(x){return x.json();}).catch(function(){return{ok:false,error:'rede'};});
+  if(!r.ok){alert('Erro ao cadastrar no Frente de Loja: '+(r.error||'falha'));return;}
+  // 2. Marca na prospecção (some da coluna + conta ativa)
+  await fetch('/api/prospeccao?action=marcar-frenteloja',{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})
+  });
+  mostrarToast('✅ Cadastrado no Frente de Loja (ATIVA)!');
+  await load();
+}
 
 function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
 function fdtAge(iso){
@@ -289,7 +440,8 @@ function cardHTML(f){
          '<button class="cbtn cbtn-log" onclick="abrirLogModal(\''+f.id+'\')">🚚 Logística</button>'+
          '<button class="cbtn cbtn-del" onclick="excluir(\''+f.id+'\')">✕</button>';
   }else if(isCli){
-    btns='<button class="cbtn cbtn-log" onclick="abrirLogModal(\''+f.id+'\')">🚚 Logística</button>'+
+    btns='<button class="cbtn" style="color:#f5c800;border-color:rgba(245,200,0,.3);background:rgba(245,200,0,.07);" onclick="enviarFrenteLoja(\''+f.id+'\')">🏬 Frente de Loja</button>'+
+         '<button class="cbtn cbtn-log" onclick="abrirLogModal(\''+f.id+'\')">🚚 Logística</button>'+
          '<button class="cbtn cbtn-del" onclick="excluir(\''+f.id+'\')">✕</button>';
   }
   return'<div class="card" id="card-'+f.id+'">'+
