@@ -359,6 +359,34 @@ export default async function handler(req,res){
     return res.status(200).json({ok:true});
   }
 
+  // ── ESPELHO-CLIENTE-LOJA: ficha do espelho vira Cliente Loja na prospecção ─
+  if(req.method==='POST'&&action==='espelho-cliente-loja'){
+    const{id,sistema}=req.body||{};
+    const FKEY=sistema==='tv'?'fichas_tv':'fichas_adm';
+    const fdb=(await dbGet(FKEY))||{fichas:[]};
+    const orig=fdb.fichas.find(x=>x.id===id);
+    if(!orig)return res.status(404).json({ok:false,error:'Ficha não encontrada'});
+
+    const db=(await dbGet(KEY))||{fichas:[]};
+    const now=new Date().toISOString();
+    db.fichas.unshift({
+      id:'prosp_esp_'+Date.now().toString(36),
+      telefone:orig.telefone||'', nome:orig.nome||'',
+      equipamento:orig.equipamento||'', defeito:orig.defeito||'',
+      endereco:orig.endereco||'', horario:orig.horario||'',
+      waNum:orig.waNum||waNum(orig.telefone||''),
+      status:'cliente_loja', filaFinal:false,
+      origemEspelho:true, origemSistema:sistema,
+      criadoEm:now, movidoEm:now,
+    });
+    await dbSet(KEY,db);
+
+    orig.status='prospeccao';
+    orig.prospeccaoEm=now;
+    await dbSet(FKEY,fdb);
+    return res.status(200).json({ok:true});
+  }
+
   // ── STATS-PA: contagem semanal de fichas → logística por Passiva/Ativa ──
   if(action==='stats-pa'){
     // Início da semana (domingo 00:00 BRT = 03:00 UTC)

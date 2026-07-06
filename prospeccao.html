@@ -307,6 +307,16 @@ async function confirmarRetorno(){
   else alert('Erro: '+(r.error||'falha'));
 }
 
+async function espelhoClienteLoja(id,sistema){
+  if(!confirm('Mover esta ficha para Cliente Loja?'))return;
+  var r=await fetch('/api/prospeccao?action=espelho-cliente-loja',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id,sistema:sistema})
+  }).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok){mostrarToast('🏪 Movida para Cliente Loja');await load();}
+  else alert('Erro: '+(r.error||'falha'));
+}
+
 async function fimDaFila(id){
   var r=await fetch('/api/prospeccao?action=fim-fila',{
     method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})
@@ -589,6 +599,7 @@ function render(){
       +'<div class="card-hora" style="color:#ef4444;">🔴 +24h sem cadastro</div>'
       +'<div class="card-btns">'
         +'<button class="cbtn cbtn-ret" onclick="abrirRetModalEspelho(\''+f.id+'\',\''+(f.origemSistema||'adm')+'\')">↩ Retornar</button>'
+        +'<button class="cbtn cbtn-cli" onclick="espelhoClienteLoja(\''+f.id+'\',\''+(f.origemSistema||'adm')+'\')">🏪 Cliente Loja</button>'
         +'<button class="cbtn cbtn-log" onclick="abrirLogModalEspelho(\''+f.id+'\',\''+(f.origemSistema||'adm')+'\')">🚚 Cadastrar em Logística</button>'
         +'<button class="cbtn cbtn-del" onclick="excluirEspelho(\''+f.id+'\',\''+(f.origemSistema||'adm')+'\')">✕</button>'
       +'</div>'
