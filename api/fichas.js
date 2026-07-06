@@ -230,6 +230,15 @@ export default async function handler(req, res) {
     const dataAgendada = req.body.dataAgendada || null;
     const faixaHorario = req.body.faixaHorario || null;
     const origemTipo   = req.body.origemTipo === 'ativa' ? 'ativa' : 'passiva'; // fichas: default passiva
+    // Dados conferidos/corrigidos no modal (principalmente endereço)
+    const dados = req.body.dados;
+    if(dados&&typeof dados==='object'){
+      if(dados.nome)ficha.nome=dados.nome;
+      if(dados.telefone)ficha.telefone=String(dados.telefone).replace(/\D/g,'');
+      if(dados.equipamento)ficha.equipamento=dados.equipamento;
+      if(dados.defeito)ficha.defeito=dados.defeito;
+      if(dados.endereco)ficha.endereco=dados.endereco;
+    }
     // imediato → liberado_coleta | agendado → horario_marcado
     const phase = tipoColeta === 'agendado' ? 'horario_marcado' : 'liberado_coleta';
     // Montar horarioColeta no formato datetime-local que a logística usa

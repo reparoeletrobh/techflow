@@ -241,10 +241,18 @@ export default async function handler(req,res){
 
   // ── CADASTRAR-LOGISTICA ─────────────────────────────────────────────────
   if(req.method==='POST'&&action==='cadastrar-logistica'){
-    const{id,sistema,tipoColeta,dataAgendada,faixaHorario}=req.body||{};
+    const{id,sistema,tipoColeta,dataAgendada,faixaHorario,dados}=req.body||{};
     const db=(await dbGet(KEY))||{fichas:[]};
     const ficha=db.fichas.find(x=>x.id===id);
     if(!ficha)return res.status(404).json({ok:false,error:'Não encontrado'});
+    // Dados conferidos/corrigidos no modal (principalmente endereço)
+    if(dados&&typeof dados==='object'){
+      if(dados.nome)ficha.nome=dados.nome;
+      if(dados.telefone)ficha.telefone=String(dados.telefone).replace(/\D/g,'');
+      if(dados.equipamento)ficha.equipamento=dados.equipamento;
+      if(dados.defeito)ficha.defeito=dados.defeito;
+      if(dados.endereco)ficha.endereco=dados.endereco;
+    }
 
     const LOG_KEY=sistema==='tv'?'tv_logistica':'reparoeletro_logistica';
     const logDb=(await dbGet(LOG_KEY))||{fichas:[]};
