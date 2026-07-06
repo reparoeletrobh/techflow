@@ -273,7 +273,7 @@ module.exports = async function handler(req, res) {
             else if (_tl.includes("backlight")||_tl.includes("led")) _peca = "backlight LED";
             var _preco = null;
             if (_pol) {
-              var _tb = [{min:30,max:39,p:"490,00"},{min:40,max:49,p:"690,00"},{min:50,max:59,p:"890,00"},{min:60,max:69,p:"1.490,00"},{min:70,max:79,p:"1.990,00"}];
+              var _tb = [{min:30,max:34,p:"490,00"},{min:35,max:39,p:"590,00"},{min:40,max:44,p:"690,00"},{min:45,max:49,p:"790,00"},{min:50,max:54,p:"890,00"},{min:55,max:59,p:"990,00"},{min:60,max:64,p:"1.490,00"},{min:65,max:69,p:"1.790,00"},{min:70,max:74,p:"1.990,00"},{min:75,max:79,p:"2.290,00"}];
               for (var _f of _tb) { if (_pol>=_f.min&&_pol<=_f.max){_preco=_f.p;break;} }
             }
             textoOrc = _primeiroNome + " bom dia, sou o Pedro da Reparo Eletro e vou passar seu orcamento:\n\nForam feito os testes, identificamos que sera necessario fazer a troca da " + _peca + " da TV, sera feito a reoperacao eletrica tambem. Este conserto completo fica em " + (_preco || "[VALOR]") + " reais apenas. Aprovando ja iniciamos o conserto.";
