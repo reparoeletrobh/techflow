@@ -560,9 +560,7 @@ module.exports = async function handler(req, res) {
 
         // ── Tabela de preços por polegada ─────────────────────────────────
         const TAB_PRECO = [
-          {min:30,max:39,p:'490'}, {min:40,max:49,p:'690'},
-          {min:50,max:59,p:'890'}, {min:60,max:69,p:'1490'},
-          {min:70,max:79,p:'1990'},
+          {min:30,max:34,p:'490'},{min:35,max:39,p:'590'},{min:40,max:44,p:'690'},{min:45,max:49,p:'790'},{min:50,max:54,p:'890'},{min:55,max:59,p:'990'},{min:60,max:64,p:'1490'},{min:65,max:69,p:'1790'},{min:70,max:74,p:'1990'},{min:75,max:79,p:'2290'},
         ];
         let precoTab = null;
         if (pol) { for (const f of TAB_PRECO) { if(pol>=f.min&&pol<=f.max){precoTab=f.p;break;} } }
@@ -968,7 +966,7 @@ module.exports = async function handler(req, res) {
     if (mPol_fd) { const v=parseInt(mPol_fd[1]); if(v>=30&&v<=79) pol_fd=v; }
     if (!pol_fd) { const ns=(tvModel_fd.match(/([3-7]\d)/g)||[]); for(const n of ns){const v=parseInt(n);if(v>=30&&v<=79){pol_fd=v;break;}} }
 
-    const TAB_fd=[{min:30,max:39,p:'490'},{min:40,max:49,p:'690'},{min:50,max:59,p:'890'},{min:60,max:69,p:'1490'},{min:70,max:79,p:'1990'}];
+    const TAB_fd=[{min:30,max:34,p:'490'},{min:35,max:39,p:'590'},{min:40,max:44,p:'690'},{min:45,max:49,p:'790'},{min:50,max:54,p:'890'},{min:55,max:59,p:'990'},{min:60,max:64,p:'1490'},{min:65,max:69,p:'1790'},{min:70,max:74,p:'1990'},{min:75,max:79,p:'2290'}];
     let precoTab_fd=null;
     if(pol_fd){for(const f of TAB_fd){if(pol_fd>=f.min&&pol_fd<=f.max){precoTab_fd=f.p;break;}}}
     const precoStr_fd  = precoTab_fd||'[VALOR]';
@@ -1072,7 +1070,7 @@ Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter peque
         const ns = tvModel.match(/\b([3-7]\d)\b/g);
         if (ns) { for (const n of ns) { const v=parseInt(n); if(v>=30&&v<=79){pol=v;break;} } }
       }
-      const TAB = [{min:30,max:39,p:'490'},{min:40,max:49,p:'690'},{min:50,max:59,p:'890'},{min:60,max:69,p:'1490'},{min:70,max:79,p:'1990'}];
+      const TAB = [{min:30,max:34,p:'490'},{min:35,max:39,p:'590'},{min:40,max:44,p:'690'},{min:45,max:49,p:'790'},{min:50,max:54,p:'890'},{min:55,max:59,p:'990'},{min:60,max:64,p:'1490'},{min:65,max:69,p:'1790'},{min:70,max:74,p:'1990'},{min:75,max:79,p:'2290'}];
       let precoTab = null;
       if (pol) { for (const f of TAB) { if(pol>=f.min&&pol<=f.max){precoTab=f.p;break;} } }
       const precoStr  = precoTab || '[VALOR]';
@@ -1351,7 +1349,7 @@ Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter peque
     const pendentes = (orcDb_b.fichas||[]).filter(f => f.status === 'pendente');
     if (!pendentes.length) return res.status(200).json({ ok:true, msg:'Nenhum pendente', total:0 });
 
-    const TAB_B = [{min:30,max:39,p:'490'},{min:40,max:49,p:'690'},{min:50,max:59,p:'890'},{min:60,max:69,p:'1490'},{min:70,max:79,p:'1990'}];
+    const TAB_B = [{min:30,max:34,p:'490'},{min:35,max:39,p:'590'},{min:40,max:44,p:'690'},{min:45,max:49,p:'790'},{min:50,max:54,p:'890'},{min:55,max:59,p:'990'},{min:60,max:64,p:'1490'},{min:65,max:69,p:'1790'},{min:70,max:74,p:'1990'},{min:75,max:79,p:'2290'}];
     function priNome_b(n){ return n ? n.trim().split(/\s+/)[0] : 'cliente'; }
     function extrairPol_b(txt){
       const pats=[/\b([3-7]\d)\s*(?:pol(?:egadas?)?|")/i,/[Uu][Nn]([3-7]\d)/,/\b([3-7]\d)\b/];
