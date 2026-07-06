@@ -410,8 +410,14 @@ async function excluir(id){
 
 load();
 sincronizar();
-// Sync a cada 2 horas
+// Sync da planilha a cada 2 horas
 setInterval(function(){sincronizar();},2*60*60*1000);
+// Espelho/colunas: recarregar ao voltar para a aba (custo zero em background)
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState==='visible') load();
+});
+// E polling leve de segurança a cada 5 min (só leitura do Redis)
+setInterval(function(){ if(document.visibilityState==='visible') load(); },5*60*1000);
 </script>
 </body>
 </html>
