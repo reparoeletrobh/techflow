@@ -119,6 +119,25 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 
 <div class="toast" id="toast">✅ Feito!</div>
 
+<!-- Modal Data de Retorno -->
+<div id="ret-modal" style="display:none;position:fixed;inset:0;z-index:830;background:rgba(0,0,0,.75);align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#0f1114;border:1px solid #1e2228;border-radius:14px;width:100%;max-width:320px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #1e2228;">
+      <span style="font-weight:800;font-size:13px;">↩ Agendar Retorno</span>
+      <button onclick="fecharRetModal()" style="background:none;border:none;color:#5a6270;font-size:20px;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:18px;display:flex;flex-direction:column;gap:12px;">
+      <div>
+        <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">📅 Data para retornar a ligação</div>
+        <input id="ret-data" type="date" style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:7px;padding:9px 12px;color:#f0f2f5;font-size:14px;outline:none;box-sizing:border-box;">
+      </div>
+      <button onclick="confirmarRetorno()" style="background:#f97316;color:#000;border:none;border-radius:8px;padding:11px;font-size:13px;font-weight:800;cursor:pointer;width:100%;">
+        ↩ Confirmar Retorno
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Nova Ficha (cadastro manual — conta como ATIVA) -->
 <div id="nf-modal" style="display:none;position:fixed;inset:0;z-index:820;background:rgba(0,0,0,.75);align-items:center;justify-content:center;padding:16px;overflow-y:auto;">
   <div style="background:#0f1114;border:1px solid #1e2228;border-radius:14px;width:100%;max-width:380px;margin:auto;">
@@ -249,6 +268,51 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 
 <script>
 var _fichas=[], _espelho=[], _busca='';
+
+// ── Retornar com data (cadência) ─────────────────────────────────────────
+var _retId=null,_retModo='lead',_retSistema=null;
+
+function abrirRetModal(id){
+  _retId=id;_retModo='lead';_retSistema=null;
+  var d=new Date();d.setDate(d.getDate()+1); // sugestão: amanhã
+  document.getElementById('ret-data').value=d.toISOString().slice(0,10);
+  document.getElementById('ret-modal').style.display='flex';
+}
+function abrirRetModalEspelho(id,sistema){
+  _retId=id;_retModo='espelho';_retSistema=sistema;
+  var d=new Date();d.setDate(d.getDate()+1);
+  document.getElementById('ret-data').value=d.toISOString().slice(0,10);
+  document.getElementById('ret-modal').style.display='flex';
+}
+function fecharRetModal(){document.getElementById('ret-modal').style.display='none';_retId=null;}
+
+async function confirmarRetorno(){
+  if(!_retId)return;
+  var data=document.getElementById('ret-data').value;
+  if(!data){alert('Informe a data de retorno');return;}
+  var r;
+  if(_retModo==='espelho'){
+    r=await fetch('/api/prospeccao?action=espelho-retornar',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:_retId,sistema:_retSistema,dataRetorno:data})
+    }).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  }else{
+    r=await fetch('/api/prospeccao?action=mover',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:_retId,status:'retornar',dataRetorno:data})
+    }).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  }
+  fecharRetModal();
+  if(r.ok){mostrarToast('↩ Retorno agendado para '+data.split('-').reverse().join('/'));await load();}
+  else alert('Erro: '+(r.error||'falha'));
+}
+
+async function fimDaFila(id){
+  var r=await fetch('/api/prospeccao?action=fim-fila',{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})
+  }).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok){mostrarToast('⤵ Final da fila — tentar outro meio no próximo contato');await load();}
+}
 
 // ── Nova Ficha (cadastro manual — ATIVA) ─────────────────────────────────
 function abrirNovaFicha(){
@@ -431,12 +495,14 @@ function cardHTML(f){
   var isLead=f.status==='lead',isRet=f.status==='retornar',isCli=f.status==='cliente_loja';
   var btns='';
   if(isLead){
-    btns='<button class="cbtn cbtn-ret" onclick="mover(\''+f.id+'\',\'retornar\')">↩ Retornar</button>'+
+    btns='<button class="cbtn cbtn-ret" onclick="abrirRetModal(\''+f.id+'\')">↩ Retornar</button>'+
          '<button class="cbtn cbtn-cli" onclick="mover(\''+f.id+'\',\'cliente_loja\')">🏪 Cliente Loja</button>'+
          '<button class="cbtn cbtn-log" onclick="abrirLogModal(\''+f.id+'\')">🚚 Logística</button>'+
          '<button class="cbtn cbtn-del" onclick="excluir(\''+f.id+'\')">✕</button>';
   }else if(isRet){
-    btns='<button class="cbtn cbtn-cli" onclick="mover(\''+f.id+'\',\'cliente_loja\')">🏪 Cliente Loja</button>'+
+    btns='<button class="cbtn cbtn-ret" onclick="abrirRetModal(\''+f.id+'\')">📅 Reagendar</button>'+
+         (f.filaFinal?'':'<button class="cbtn" style="color:#f5c800;border-color:rgba(245,200,0,.35);background:rgba(245,200,0,.07);" onclick="fimDaFila(\''+f.id+'\')">⤵ Fim da Fila</button>')+
+         '<button class="cbtn cbtn-cli" onclick="mover(\''+f.id+'\',\'cliente_loja\')">🏪 Cliente Loja</button>'+
          '<button class="cbtn cbtn-log" onclick="abrirLogModal(\''+f.id+'\')">🚚 Logística</button>'+
          '<button class="cbtn cbtn-del" onclick="excluir(\''+f.id+'\')">✕</button>';
   }else if(isCli){
@@ -444,7 +510,24 @@ function cardHTML(f){
          '<button class="cbtn cbtn-log" onclick="abrirLogModal(\''+f.id+'\')">🚚 Logística</button>'+
          '<button class="cbtn cbtn-del" onclick="excluir(\''+f.id+'\')">✕</button>';
   }
-  return'<div class="card" id="card-'+f.id+'">'+
+  // Card Retornar: data visível (vermelha se vencida) + estilo fim de fila
+  var extraCard='', estiloCard='';
+  if(isRet){
+    if(f.filaFinal){
+      estiloCard='border-color:rgba(245,200,0,.55);background:#1d1a10;';
+      extraCard+='<div style="font-size:10px;font-weight:800;color:#f5c800;margin-bottom:4px;">🔁 FIM DA FILA — tentar outro meio de contato'+(f.tentativas?' ('+f.tentativas+'x)':'')+'</div>';
+    }
+    if(f.dataRetorno){
+      var hojeStr=new Date().toISOString().slice(0,10);
+      var vencida=f.dataRetorno<hojeStr;
+      var hoje=f.dataRetorno===hojeStr;
+      var corData=vencida?'#ef4444':(hoje?'#22c55e':'#f97316');
+      var lblData=f.dataRetorno.split('-').reverse().join('/');
+      extraCard+='<div style="font-size:11px;font-weight:800;color:'+corData+';margin-bottom:4px;">📅 Retornar: '+lblData+(vencida?' — VENCIDA':(hoje?' — HOJE':''))+'</div>';
+    }
+  }
+  return'<div class="card" id="card-'+f.id+'" style="'+estiloCard+'">'+
+    extraCard+
     '<div class="card-nome">'+esc(f.nome||'—')+'</div>'+
     '<div class="card-equip">'+esc(f.equipamento||'—')+'</div>'+
     '<div class="card-info">'+esc(f.defeito||'—')+'</div>'+
@@ -466,6 +549,11 @@ function render(){
 
   var leads=base.filter(function(f){return f.status==='lead';});
   var rets  =base.filter(function(f){return f.status==='retornar';});
+  // Ordena: fila normal por data de retorno; fim de fila sempre no final
+  rets.sort(function(a,b){
+    if((a.filaFinal?1:0)!==(b.filaFinal?1:0))return (a.filaFinal?1:0)-(b.filaFinal?1:0);
+    return String(a.dataRetorno||'9999').localeCompare(String(b.dataRetorno||'9999'));
+  });
   var clis  =base.filter(function(f){return f.status==='cliente_loja';});
   var logs  =_fichas.filter(function(f){return f.status==='logistica';});
 
@@ -500,6 +588,7 @@ function render(){
       +'<div class="card-tel">📞 '+esc(f.telefone||'—')+'</div>'
       +'<div class="card-hora" style="color:#ef4444;">🔴 +24h sem cadastro</div>'
       +'<div class="card-btns">'
+        +'<button class="cbtn cbtn-ret" onclick="abrirRetModalEspelho(\''+f.id+'\',\''+(f.origemSistema||'adm')+'\')">↩ Retornar</button>'
         +'<button class="cbtn cbtn-log" onclick="abrirLogModalEspelho(\''+f.id+'\',\''+(f.origemSistema||'adm')+'\')">🚚 Cadastrar em Logística</button>'
         +'<button class="cbtn cbtn-del" onclick="excluirEspelho(\''+f.id+'\',\''+(f.origemSistema||'adm')+'\')">✕</button>'
       +'</div>'

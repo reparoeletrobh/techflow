@@ -182,12 +182,60 @@ export default async function handler(req,res){
 
   // ── MOVER: muda status (lead→retornar→cliente_loja) ───────────────────
   if(req.method==='POST'&&action==='mover'){
-    const{id,status}=req.body||{};
+    const{id,status,dataRetorno}=req.body||{};
     const db=(await dbGet(KEY))||{fichas:[]};
     const f=db.fichas.find(x=>x.id===id);
     if(!f)return res.status(404).json({ok:false,error:'Não encontrado'});
     f.status=status;f.movidoEm=new Date().toISOString();
+    if(status==='retornar'){
+      f.dataRetorno=dataRetorno||null;
+      f.filaFinal=false; // reagendou → volta ao fluxo normal
+    }
     await dbSet(KEY,db);
+    return res.status(200).json({ok:true});
+  }
+
+  // ── FIM-FILA: não conseguiu contato na data → final da fila + alerta ─────
+  if(req.method==='POST'&&action==='fim-fila'){
+    const{id}=req.body||{};
+    const db=(await dbGet(KEY))||{fichas:[]};
+    const f=db.fichas.find(x=>x.id===id);
+    if(!f)return res.status(404).json({ok:false,error:'Não encontrado'});
+    f.filaFinal=true;
+    f.tentativas=(f.tentativas||0)+1;
+    f.movidoEm=new Date().toISOString();
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true,tentativas:f.tentativas});
+  }
+
+  // ── ESPELHO-RETORNAR: ficha do espelho entra na cadência de Retornar ─────
+  if(req.method==='POST'&&action==='espelho-retornar'){
+    const{id,sistema,dataRetorno}=req.body||{};
+    const FKEY=sistema==='tv'?'fichas_tv':'fichas_adm';
+    const fdb=(await dbGet(FKEY))||{fichas:[]};
+    const orig=fdb.fichas.find(x=>x.id===id);
+    if(!orig)return res.status(404).json({ok:false,error:'Ficha não encontrada'});
+
+    // 1. Cria na prospecção com status retornar
+    const db=(await dbGet(KEY))||{fichas:[]};
+    const now=new Date().toISOString();
+    db.fichas.unshift({
+      id:'prosp_esp_'+Date.now().toString(36),
+      telefone:orig.telefone||'', nome:orig.nome||'',
+      equipamento:orig.equipamento||'', defeito:orig.defeito||'',
+      endereco:orig.endereco||'', horario:orig.horario||'',
+      waNum:orig.waNum||waNum(orig.telefone||''),
+      status:'retornar', dataRetorno:dataRetorno||null, filaFinal:false,
+      origemEspelho:true, origemSistema:sistema,
+      criadoEm:now, movidoEm:now,
+    });
+    await dbSet(KEY,db);
+
+    // 2. Marca a origem — sai do espelho e das colunas de fichas (vive na prospecção)
+    orig.status='prospeccao';
+    orig.prospeccaoEm=now;
+    await dbSet(FKEY,fdb);
+
     return res.status(200).json({ok:true});
   }
 
