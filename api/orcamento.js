@@ -299,8 +299,9 @@ module.exports = async function handler(req, res) {
     const GMB_PEND_KEY = 'gmb_pendentes';
     // Remover do pool pendente
     try {
-      const db_pend = (await dbGet(GMB_PEND_KEY)) || { ids: [] };
-      db_pend.ids = (db_pend.ids || []).filter(i => String(i) !== String(id));
+      const db_pend = (await dbGet(GMB_PEND_KEY)) || { ids: [], fichas: [] };
+      db_pend.ids    = (db_pend.ids    || []).filter(i => String(i)   !== String(id));
+      db_pend.fichas = (db_pend.fichas || []).filter(f => String(f.id) !== String(id));
       await dbSet(GMB_PEND_KEY, db_pend);
     } catch(ep) { console.warn('[gmb] remover pendente:', ep.message); }
     const db_g = (await dbGet(GMB_ENV_KEY)) || { fichas: [] };
@@ -314,6 +315,90 @@ module.exports = async function handler(req, res) {
       await dbSet(GMB_ENV_KEY, db_g);
     }
     return res.status(200).json({ ok: true });
+  }
+
+  // ── GET gmb-diagnostico — estado atual + o que há nos backups ────────────
+  if (action === 'gmb-diagnostico') {
+    const pipe = (await dbGet('reparoeletro_pipe')) || { cards: [] };
+    const pend = (await dbGet('gmb_pendentes')) || { ids: [], fichas: [] };
+    const env  = (await dbGet('gmb_enviados'))  || { fichas: [] };
+    const porPhase = {};
+    const idsNoPipe = new Set();
+    (pipe.cards||[]).forEach(c => {
+      porPhase[c.phase] = (porPhase[c.phase]||0)+1;
+      idsNoPipe.add(String(c.id||c.pipefyId||''));
+    });
+    const pendExistemNoPipe = (pend.ids||[]).filter(i => idsNoPipe.has(String(i))).length;
+
+    // Backups: contar cards em erp por dia de movedAt
+    async function lerBackup(slot){
+      const raw = await dbGet(`bk_${slot}_reparoeletro_pipe`);
+      if (!raw) return null;
+      let v = raw.v ?? raw;
+      if (typeof v === 'string') { try { v = JSON.parse(v); } catch { return { erro:'parse1' }; } }
+      if (typeof v === 'string') { try { v = JSON.parse(v); } catch { return { erro:'parse2' }; } }
+      const cards = (v && v.cards) || [];
+      const erpPorDia = {};
+      cards.forEach(c => {
+        if (c.phase !== 'erp') return;
+        const dia = String(c.movedAt||c.criadoEm||'').slice(0,10);
+        erpPorDia[dia] = (erpPorDia[dia]||0)+1;
+      });
+      return { geradoEm: raw.em || null, totalCards: cards.length, erpPorDia };
+    }
+    const [bk0, bk1] = await Promise.all([lerBackup(0), lerBackup(1)]);
+    return res.status(200).json({ ok:true,
+      pipe: { total:(pipe.cards||[]).length, porPhase },
+      gmb:  { pendIds:(pend.ids||[]).length, pendSnapshots:(pend.fichas||[]).length,
+              pendCujoCardExisteNoPipe: pendExistemNoPipe, enviados:(env.fichas||[]).length },
+      backupSlot0: bk0, backupSlot1: bk1 });
+  }
+
+  // ── GET gmb-restaurar-backup?slot=0&data=2026-07-04 — restaura pool do backup ──
+  if (action === 'gmb-restaurar-backup') {
+    const slot = req.query.slot === '1' ? 1 : 0;
+    const data = req.query.data || '2026-07-04'; // sábado
+    const raw  = await dbGet(`bk_${slot}_reparoeletro_pipe`);
+    if (!raw) return res.status(200).json({ ok:false, error:`Backup bk_${slot}_reparoeletro_pipe não existe` });
+    let v = raw.v ?? raw;
+    if (typeof v === 'string') { try { v = JSON.parse(v); } catch(e) { return res.status(200).json({ ok:false, error:'parse1: '+e.message }); } }
+    if (typeof v === 'string') { try { v = JSON.parse(v); } catch(e) { return res.status(200).json({ ok:false, error:'parse2: '+e.message }); } }
+    const cards = (v && v.cards) || [];
+
+    // Cards que estavam em ERP com movedAt na data pedida (BRT ≈ corte simples por dia UTC-3)
+    const alvo = cards.filter(c => {
+      if (c.phase !== 'erp') return false;
+      const ts = c.movedAt || c.criadoEm || '';
+      if (!ts) return false;
+      const diaBRT = new Date(new Date(ts).getTime() - 3*3600000).toISOString().slice(0,10);
+      return diaBRT === data;
+    });
+
+    const env  = (await dbGet('gmb_enviados'))  || { fichas: [] };
+    const pend = (await dbGet('gmb_pendentes')) || { ids: [], fichas: [] };
+    if (!Array.isArray(pend.ids))    pend.ids    = [];
+    if (!Array.isArray(pend.fichas)) pend.fichas = [];
+    const jaEnv  = new Set((env.fichas||[]).map(f => String(f.id)));
+    const jaPend = new Set(pend.ids.map(String));
+
+    const restauradas = [];
+    for (const card of alvo) {
+      const cardId = String(card.id || card.pipefyId || '');
+      if (!cardId || jaEnv.has(cardId) || jaPend.has(cardId)) continue;
+      pend.ids.push(cardId);
+      pend.fichas.push({
+        id: cardId, pipefyId: card.pipefyId || card.id,
+        nome: card.nomeContato || card.title || '—',
+        tel:  card.telefone || card.tel || '',
+        desc: card.equipamento || card.desc || '',
+        valor: card.valor || null, movedAt: card.movedAt || null,
+        phase: 'erp', restauradoDe: `bk_${slot}`,
+      });
+      restauradas.push(card.nomeContato || card.title || cardId);
+    }
+    if (restauradas.length) await dbSet('gmb_pendentes', pend);
+    return res.status(200).json({ ok:true, data, slot,
+      encontradasNoBackup: alvo.length, restauradas: restauradas.length, nomes: restauradas });
   }
 
   // ── GET gmb-enviados — lista fichas já contatadas ──────────────────────────
@@ -600,37 +685,21 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, cards: [], total: 0 });
     }
 
-    // Coletar IDs pendentes (pool separado que não é afetado pelo cron ERP→Finalizado)
+    // Pool com SNAPSHOT completo: db_pend.fichas guarda os dados da ficha
+    // no momento em que entra no pool → GMB fica IMUNE a qualquer limpeza
+    // ou arquivamento do pipe (causa raiz do sumiço de 05/07)
     const pendIds = new Set((db_pend.ids || []).map(String));
+    if (!Array.isArray(db_pend.fichas)) db_pend.fichas = [];
+    const pendComSnapshot = new Set(db_pend.fichas.map(f => String(f.id)));
 
-    // Também adicionar ao pool fichas em phase==='erp' que ainda não estão no pool
     let pendUpdated = false;
-    const nomesVistos = new Set();
-    const erp = [];
 
     for (const card of db_gmb.cards) {
       const cardId = String(card.id || card.pipefyId || '');
-      const nome   = (card.nomeContato || card.title || '').toLowerCase().trim();
-      const eErp   = card.phase === 'erp';
-      const ePend  = pendIds.has(cardId);
+      if (!cardId) continue;
+      const eErp = card.phase === 'erp';
 
-      // Adicionar ao pool se está em erp e não estava ainda
-      if (eErp && cardId && !pendIds.has(cardId) && !jaEnviadosIds.has(cardId)) {
-        // Só re-adiciona ao pool pendente se NÃO foi enviado antes
-        pendIds.add(cardId);
-        db_pend.ids = db_pend.ids || [];
-        db_pend.ids.push(cardId);
-        pendUpdated = true;
-      }
-
-      // Mostrar se está no pool pendente (independente da phase atual)
-      if (!ePend && !eErp) continue;
-      if (jaEnviadosIds.has(cardId)) continue;
-      if (nome && jaEnviadosNomes.has(nome)) continue;
-      if (nome && nomesVistos.has(nome)) continue;
-      if (nome) nomesVistos.add(nome);
-
-      erp.push({
+      const snap = {
         id:      cardId,
         pipefyId: card.pipefyId || card.id,
         nome:    card.nomeContato || card.title || '—',
@@ -639,7 +708,36 @@ module.exports = async function handler(req, res) {
         valor:   card.valor || null,
         movedAt: card.movedAt || null,
         phase:   card.phase,
-      });
+      };
+
+      // Novo em ERP → entra no pool com snapshot
+      if (eErp && !pendIds.has(cardId) && !jaEnviadosIds.has(cardId)) {
+        pendIds.add(cardId);
+        db_pend.ids = db_pend.ids || [];
+        db_pend.ids.push(cardId);
+        db_pend.fichas.push(snap);
+        pendComSnapshot.add(cardId);
+        pendUpdated = true;
+      }
+      // Já estava no pool por id mas sem snapshot (migração) → grava snapshot
+      else if (pendIds.has(cardId) && !pendComSnapshot.has(cardId)) {
+        db_pend.fichas.push(snap);
+        pendComSnapshot.add(cardId);
+        pendUpdated = true;
+      }
+    }
+
+    // Exibição: a partir dos SNAPSHOTS (sobrevive a limpezas do pipe)
+    const nomesVistos = new Set();
+    const erp = [];
+    for (const f of db_pend.fichas) {
+      const fid  = String(f.id);
+      const nome = (f.nome || '').toLowerCase().trim();
+      if (jaEnviadosIds.has(fid)) continue;
+      if (nome && jaEnviadosNomes.has(nome)) continue;
+      if (nome && nomesVistos.has(nome)) continue;
+      if (nome) nomesVistos.add(nome);
+      erp.push(f);
     }
 
     if (pendUpdated) await dbSet(GMB_PEND_KEY, db_pend);
