@@ -255,6 +255,26 @@ module.exports = async (req, res) => {
     return res.status(200).json({ ok: true, results: results.slice(0, 60) });
 
   } catch(e) {
-    return res.status(200).json({ ok: false, error: e.message, results: [] });
+    
+  // ── Buscar também no ARQUIVO (fichas encerradas arquivadas) ─────────────
+  try {
+    const arqDb = await dbGet('tv_arquivo') || {fichas:[]};
+    const qLow = q.toLowerCase();
+    for (const f of (arqDb.fichas||[])) {
+      const alvo = ((f.nomeContato||'')+' '+(f.telefone||'')+' '+(f.equipamento||'')).toLowerCase();
+      if (!alvo.includes(qLow)) continue;
+      results.push({
+        label: f.nomeContato || '—',
+        sublabel: (f.equipamento||'') + (f.valor ? ' · R$ '+f.valor : ''),
+        descricao: 'Arquivada em ' + String(f.arquivadoEm||'').slice(0,10),
+        telefone: f.telefone || '',
+        sistema: '📦 ARQUIVO TV',
+        cor: '#8b93a1',
+      });
+      if (results.length > 60) break;
+    }
+  } catch(_) {}
+
+  return res.status(200).json({ ok: false, error: e.message, results: [] });
   }
 };

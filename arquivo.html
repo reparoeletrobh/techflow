@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache">
+<title>📦 Arquivo — Reparo Eletro</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#07080a;color:#f0f2f5;min-height:100vh;}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:52px;background:#0f1114;border-bottom:1px solid #1e2228;position:sticky;top:0;z-index:10;}
+.h-title{font-size:13px;font-weight:800;color:#8b93a1;}
+.btn{padding:7px 14px;border-radius:7px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:#1e2228;color:#f0f2f5;text-decoration:none;}
+.tabs{display:flex;padding:0 16px;background:#0a0b0e;border-bottom:1px solid #1e2228;}
+.tab{padding:10px 20px;font-size:12px;font-weight:700;cursor:pointer;color:#5a6270;border-bottom:2px solid transparent;}
+.tab.active{color:#f0f2f5;border-bottom-color:#8b93a1;}
+#barra{padding:10px 16px;border-bottom:1px solid #1e2228;background:#0a0b0e;display:flex;align-items:center;gap:10px;}
+#q{flex:1;background:#181b1f;border:1px solid #22272f;border-radius:8px;padding:9px 14px;font-size:13px;color:#f0f2f5;outline:none;}
+#info{font-family:monospace;font-size:11px;color:#5a6270;white-space:nowrap;}
+.lista{padding:12px 16px;display:flex;flex-direction:column;gap:8px;max-width:900px;margin:0 auto;}
+.card{background:#0f1114;border:1px solid #1e2228;border-left:3px solid #8b93a1;border-radius:10px;padding:12px 14px;}
+.c-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+.c-nome{font-size:13px;font-weight:700;}
+.c-fase{font-size:9px;font-weight:800;padding:2px 7px;border-radius:5px;background:rgba(139,147,161,.12);color:#8b93a1;white-space:nowrap;text-transform:uppercase;}
+.c-info{font-size:11px;color:#5a6270;margin-top:3px;}
+.c-datas{font-size:10px;color:#5a6270;margin-top:5px;}
+.c-datas b{color:#8b93a1;}
+.empty{text-align:center;padding:40px;color:#5a6270;font-size:12px;}
+</style>
+</head>
+<body>
+<header>
+  <div class="h-title">📦 Arquivo — Fichas Encerradas</div>
+  <a href="/adm" class="btn">← ADM</a>
+</header>
+
+<div class="tabs">
+  <div class="tab active" id="tab-adm" onclick="mudarAba('adm')">🔧 Arquivo ADM</div>
+  <div class="tab" id="tab-tv" onclick="mudarAba('tv')">📺 Arquivo TV</div>
+</div>
+
+<div id="barra">
+  <span style="font-family:monospace;font-size:10px;color:#5a6270;">🔍 RASTREAR</span>
+  <input id="q" placeholder="Nome, telefone ou equipamento..." oninput="buscar()">
+  <span id="info">—</span>
+</div>
+
+<div class="lista" id="lista"><div class="empty">Carregando...</div></div>
+
+<script>
+var SISTEMA='adm', _timer=null;
+
+function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
+function fdt(iso){
+  if(!iso)return '—';
+  try{var d=new Date(iso);var p=function(n){return String(n).padStart(2,'0');};
+  return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+String(d.getFullYear()).slice(2);}catch(e){return '—';}
+}
+function faseLbl(m){
+  var s=String(m||'');
+  if(s.indexOf('finalizado')>-1)return '✅ Finalizado';
+  if(s.indexOf('ultima')>-1)return '📞 Última Chamada';
+  if(s.indexOf('descarte')>-1)return '🗑 Descarte';
+  return s||'—';
+}
+
+function mudarAba(s){
+  SISTEMA=s;
+  document.getElementById('tab-adm').classList.toggle('active',s==='adm');
+  document.getElementById('tab-tv').classList.toggle('active',s==='tv');
+  buscarAgora();
+}
+
+function buscar(){ clearTimeout(_timer); _timer=setTimeout(buscarAgora,300); }
+
+async function buscarAgora(){
+  var q=document.getElementById('q').value.trim();
+  var api=SISTEMA==='tv'?'/api/tv-pipe':'/api/pipe';
+  var el=document.getElementById('lista');
+  el.innerHTML='<div class="empty">⏳ Buscando...</div>';
+  try{
+    var d=await fetch(api+'?action=buscar-arquivo&q='+encodeURIComponent(q)).then(function(r){return r.json();});
+    var fichas=d.fichas||[];
+    document.getElementById('info').textContent=fichas.length+' de '+(d.total||0)+' · arquivo total: '+(d.totalArquivado||0);
+    if(!fichas.length){el.innerHTML='<div class="empty">📭 Nenhuma ficha'+(q?' para "'+esc(q)+'"':' no arquivo')+'</div>';return;}
+    el.innerHTML=fichas.map(function(f){
+      return '<div class="card">'
+        +'<div class="c-top"><span class="c-nome">'+esc(f.nome||'—')+'</span>'
+        +'<span class="c-fase">'+faseLbl(f.motivoArquivo)+'</span></div>'
+        +'<div class="c-info">'+esc(f.equipamento||'—')+(f.valor?' · R$ '+f.valor:'')+'</div>'
+        +(f.telefone?'<div class="c-info">📞 '+esc(f.telefone)+'</div>':'')
+        +'<div class="c-datas">Encerrada: <b>'+fdt(f.movedAt)+'</b> · Arquivada: <b>'+fdt(f.arquivadoEm)+'</b>'+(f.pipefyId?' · #'+esc(String(f.pipefyId)):'')+'</div>'
+      +'</div>';
+    }).join('');
+  }catch(e){
+    el.innerHTML='<div class="empty" style="color:#ef4444;">Erro: '+e.message+'</div>';
+  }
+}
+
+buscarAgora();
+</script>
+</body>
+</html>

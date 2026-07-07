@@ -79,6 +79,10 @@
   ],
   "rewrites": [
     {
+      "source": "/arquivo",
+      "destination": "/arquivo.html"
+    },
+    {
       "source": "/api/backup",
       "destination": "/api/backup.js"
     },

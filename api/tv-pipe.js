@@ -744,14 +744,17 @@ export default async function handler(req, res) {
       var arq = await dbGet(ARQUIVO_KEY) || {fichas:[], totalArquivado:0};
       if (!Array.isArray(arq.fichas)) arq.fichas = [];
 
+      // Regras por fase: ultima_chamada 90d | finalizado 7d | descarte 7d
+      var REGRAS_ARQ = { ultima_chamada: LIMITE_DIAS, finalizado: 7, descarte: 7 };
       var paraArquivar = (db.cards||[]).filter(function(c){
-        if (c.phase !== 'ultima_chamada') return false;
+        var diasFase = REGRAS_ARQ[c.phase];
+        if (diasFase == null) return false;
         var dt = new Date(c.movedAt || c.criadoEm || 0);
-        return dt < corte;
+        return dt < new Date(Date.now() - diasFase*24*60*60*1000);
       });
 
       if (!paraArquivar.length)
-        return res.status(200).json({ok:true,arquivados:0,msg:'Nenhuma ficha elegível (ultima_chamada > '+LIMITE_DIAS+' dias)'});
+        return res.status(200).json({ok:true,arquivados:0,msg:'Nenhuma ficha elegível (ultima_chamada>'+LIMITE_DIAS+'d, finalizado>7d, descarte>7d)'});
 
       // IDs já arquivados (para idempotência)
       var jaArq = {};
@@ -762,7 +765,7 @@ export default async function handler(req, res) {
         if (jaArq[card.id]) return;
         arq.fichas.unshift(Object.assign({}, card, {
           arquivadoEm: now,
-          motivoArquivo: 'ultima_chamada_'+LIMITE_DIAS+'d',
+          motivoArquivo: card.phase+'_'+(REGRAS_ARQ[card.phase]||LIMITE_DIAS)+'d',
           phaseAntes: card.phase
         }));
         novos++;
@@ -807,6 +810,7 @@ export default async function handler(req, res) {
           id:f.id, nome:f.nomeContato, telefone:f.telefone,
           equipamento:f.equipamento, valor:f.valor,
           arquivadoEm:f.arquivadoEm, movedAt:f.movedAt,
+          motivoArquivo:f.motivoArquivo||null,
           pipefyId:f.pipefyId
         };})
       });
