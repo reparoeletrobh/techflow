@@ -458,6 +458,15 @@ function render(){
   board.innerHTML=html;
 }
 
+function fmtDataHora(iso){
+  if(!iso)return '—';
+  try{
+    var d=new Date(iso);
+    var p=function(n){return String(n).padStart(2,'0');};
+    return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+String(d.getFullYear()).slice(2)+' '+p(d.getHours())+':'+p(d.getMinutes());
+  }catch(e){return '—';}
+}
+
 function cardHTML(c){
   var cls=prioCls(c.prioridade);
   var ms=Date.now()-new Date(c.criadoEm).getTime();
@@ -528,6 +537,12 @@ function cardHTML(c){
     '<span class="cc-titulo">'+esc(c.titulo)+'</span>'+
     '<span class="cc-tempo '+tempoCls+'">'+tempoTxt+'</span>'+
     '</div>'+
+    (resolved?
+      '<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:10.5px;margin:2px 0 6px;">'+
+        '<span style="color:var(--muted,#5a5a7a);">📂 Aberto: <b style="color:#e8e8f0;">'+fmtDataHora(c.criadoEm)+'</b></span>'+
+        '<span style="color:var(--muted,#5a5a7a);">✅ Finalizado: <b style="color:#22c55e;">'+fmtDataHora(c.resolvidoEm||c.atualizadoEm)+'</b></span>'+
+      '</div>'
+    :'')+
     '<div class="cc-meta">'+
     (c.tipo?'<span class="tag">'+esc(c.tipo)+'</span>':'')+
     (c.setor?'<span class="tag">'+esc(c.setor)+'</span>':'')+
