@@ -1561,6 +1561,54 @@ export default async function handler(req, res) {
   }
 
   // ── mover ─────────────────────────────────────────────────────────────────
+  // ── LISTAR-ERP-VINDAS-DE: cards em ERP cuja fase anterior foi X (diagnóstico) ──
+  if (action === 'listar-erp-vindas-de') {
+    var faseOrigem = req.query.fase || 'solicitar_entrega';
+    var db0 = (await dbGet(PIPE_KEY)) || defaultDB();
+    var achados = (db0.cards || [])
+      .filter(function(c){
+        if (c.phase !== 'erp') return false;
+        var h = c.history || [];
+        if (!h.length) return false;
+        return h[h.length-1].phase === faseOrigem;
+      })
+      .map(function(c){
+        var h = c.history || [];
+        return {
+          id: c.id, pipefyId: c.pipefyId || null,
+          nome: c.nomeContato || c.title || '—',
+          telefone: c.telefone || '',
+          equipamento: c.equipamento || '',
+          movidoEm: h.length ? h[h.length-1].ts : c.movedAt,
+        };
+      })
+      .sort(function(a,b){ return String(b.movidoEm).localeCompare(String(a.movidoEm)); });
+    return res.status(200).json({ ok:true, faseOrigem: faseOrigem, total: achados.length, fichas: achados });
+  }
+
+  // ── REVERTER-FASE: devolve cards para a fase informada (correção de engano) ──
+  if (req.method === 'POST' && action === 'reverter-fase') {
+    var rvBody = req.body || {};
+    var rvIds = rvBody.ids || [];
+    var rvFase = rvBody.phase;
+    if (!rvIds.length || !rvFase) return res.status(400).json({ ok:false, error:'ids[] e phase obrigatorios' });
+    var rvOk = PHASES.find(function(p){ return p.id === rvFase; });
+    if (!rvOk) return res.status(400).json({ ok:false, error:'fase invalida' });
+    var rvDb = (await dbGet(PIPE_KEY)) || defaultDB();
+    var rvNow = new Date().toISOString();
+    var revertidos = [];
+    rvIds.forEach(function(id){
+      var c = (rvDb.cards || []).find(function(x){ return x.id === id; });
+      if (!c) return;
+      c.history = (c.history || []).concat([{ phase: c.phase, ts: rvNow }]);
+      c.phase = rvFase;
+      c.movedAt = rvNow;
+      revertidos.push(c.nomeContato || c.title || c.id);
+    });
+    if (revertidos.length) await safeWritePipe(rvDb);
+    return res.status(200).json({ ok:true, revertidos: revertidos.length, nomes: revertidos });
+  }
+
   if (req.method === 'POST' && action === 'mover') {
     var body  = req.body || {};
     var id    = body.id;
