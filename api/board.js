@@ -149,6 +149,7 @@ function defaultBoard() {
       { id: "analise_loja",    name: "Análise Loja"       },
       { id: "aprovado",        name: "Aprovado"           },
       { id: "producao",        name: "Produção"           },
+      { id: "reforma",         name: "Reforma"            },
       { id: "cliente_loja",    name: "Cliente Loja"       },
       { id: "urgencia",        name: "Urgência"           },
       { id: "comprar_peca",    name: "Comprar Peça"       },

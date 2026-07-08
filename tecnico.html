@@ -565,6 +565,7 @@ const DEFAULT_BOARD = {
     { id: "analise_loja",    name: "Análise Loja"       },
     { id: "aprovado",        name: "Aprovado"           },
     { id: "producao",        name: "Produção"           },
+    { id: "reforma",         name: "Reforma"            },
     { id: "cliente_loja",    name: "Cliente Loja"       },
     { id: "atrasados",       name: "OS em Atraso"       },
     { id: "urgencia",        name: "Urgência"           },
@@ -629,6 +630,13 @@ async function loadBoard() {
       if (!board.phases.find(p => p.id === 'analise_loja')) {
         const idx = board.phases.findIndex(p => p.id === 'aprovado');
         board.phases.splice(idx >= 0 ? idx : 0, 0, { id: 'analise_loja', name: 'Análise Loja' });
+      }
+      // Garante fase "Reforma" entre producao e cliente_loja
+      if (!board.phases.find(p => p.id === 'reforma')) {
+        const idxCliLoja = board.phases.findIndex(p => p.id === 'cliente_loja');
+        const idxProd    = board.phases.findIndex(p => p.id === 'producao');
+        const insertAt   = idxCliLoja >= 0 ? idxCliLoja : (idxProd >= 0 ? idxProd + 1 : board.phases.length);
+        board.phases.splice(insertAt, 0, { id: 'reforma', name: 'Reforma' });
       }
       // Garante fase virtual "OS em Atraso" entre cliente_loja e urgencia
       if (!board.phases.find(p => p.id === 'atrasados')) {
