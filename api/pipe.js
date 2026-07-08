@@ -1587,10 +1587,10 @@ export default async function handler(req, res) {
   }
 
   // ── REVERTER-FASE: devolve cards para a fase informada (correção de engano) ──
-  if (req.method === 'POST' && action === 'reverter-fase') {
+  if (action === 'reverter-fase') {
     var rvBody = req.body || {};
-    var rvIds = rvBody.ids || [];
-    var rvFase = rvBody.phase;
+    var rvIds = rvBody.ids || (req.query.ids ? String(req.query.ids).split(',').map(function(s){return s.trim();}).filter(Boolean) : []);
+    var rvFase = rvBody.phase || req.query.phase;
     if (!rvIds.length || !rvFase) return res.status(400).json({ ok:false, error:'ids[] e phase obrigatorios' });
     var rvOk = PHASES.find(function(p){ return p.id === rvFase; });
     if (!rvOk) return res.status(400).json({ ok:false, error:'fase invalida' });
