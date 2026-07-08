@@ -289,6 +289,7 @@ export default async function handler(req,res){
     ficha.movidoEm=new Date().toISOString();
     ficha.logisticaEm=new Date().toISOString();
     ficha.logisticaTipo='ativa';
+    ficha.logisticaSistema=sistema==='tv'?'tv':'adm';
     await dbSet(KEY,db);
     return res.status(200).json({ok:true});
   }
@@ -342,6 +343,7 @@ export default async function handler(req,res){
       await dbSet(LOG_KEY,logDb);
       ficha.status='logistica';
       ficha.logisticaEm=now;
+      ficha.logisticaSistema=sistema==='tv'?'tv':'adm';
     } else {
       // Cliente Loja
       ficha.status='cliente_loja';
@@ -402,20 +404,28 @@ export default async function handler(req,res){
     const nowBRT=new Date(Date.now()-3*3600000);
     const iniSemana=new Date(Date.UTC(nowBRT.getUTCFullYear(),nowBRT.getUTCMonth(),nowBRT.getUTCDate()-nowBRT.getUTCDay(),3,0,0));
     const [fa,ft,pr]=await Promise.all([dbGet('fichas_adm'),dbGet('fichas_tv'),dbGet(KEY)]);
-    let passiva=0,ativa=0;
-    const conta=(db,fallback,extrator)=>{
+    // Breakdown por sistema: adm/tv × passiva/ativa
+    const bk={adm:{passiva:0,ativa:0},tv:{passiva:0,ativa:0}};
+    const conta=(db,fallback,extrator,sisFixo,sisExtrator)=>{
       for(const f of (db?.fichas||[])){
         const ts=extrator?extrator(f):f.logisticaEm;
         if(!ts)continue;
         if(new Date(ts)<iniSemana)continue;
-        const t=f.logisticaTipo||fallback; // histórico sem campo: fichas→passiva, prospecção→ativa
-        if(t==='ativa')ativa++;else passiva++;
+        const t=(f.logisticaTipo||fallback)==='ativa'?'ativa':'passiva';
+        const s=sisFixo||(sisExtrator?sisExtrator(f):'adm');
+        bk[s==='tv'?'tv':'adm'][t]++;
       }
     };
-    conta(fa,'passiva');conta(ft,'passiva');
-    // Prospecção: logística OU frente de loja OU cadastro manual cliente loja — tudo ativa
-    conta(pr,'ativa',f=>f.logisticaEm||f.frentelojaEm||f.ativaManualEm);
-    return res.status(200).json({ok:true,passiva,ativa});
+    conta(fa,'passiva',null,'adm');
+    conta(ft,'passiva',null,'tv');
+    // Prospecção: logística (sistema gravado) | frente de loja (ADM) | manual cliente loja (ADM)
+    conta(pr,'ativa',
+      f=>f.logisticaEm||f.frentelojaEm||f.ativaManualEm,
+      null,
+      f=>f.logisticaEm?(f.logisticaSistema||'adm'):'adm');
+    const passiva=bk.adm.passiva+bk.tv.passiva;
+    const ativa=bk.adm.ativa+bk.tv.ativa;
+    return res.status(200).json({ok:true,passiva,ativa,adm:bk.adm,tv:bk.tv});
   }
 
   // ── LIMPAR-TUDO: zera toda a prospecção (para reimportar corretamente) ──
