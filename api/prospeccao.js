@@ -74,6 +74,23 @@ async function logEventos(lista){
   }catch(_){}
 }
 
+async function rpushLote(eventos){
+  // RPUSH com múltiplos valores via comando REST — lotes de 300 por request
+  let gravados=0;
+  for(let i=0;i<eventos.length;i+=300){
+    const lote=eventos.slice(i,i+300).map(e=>JSON.stringify(e));
+    try{
+      const r=await fetch(U,{
+        method:'POST',
+        headers:{Authorization:`Bearer ${T}`,'Content-Type':'application/json'},
+        body:JSON.stringify(['RPUSH',EVT_LIST,...lote])
+      });
+      if(r.ok)gravados+=lote.length;
+    }catch(_){}
+  }
+  return gravados;
+}
+
 async function lerEventos(){
   let evs=[];
   try{
@@ -555,13 +572,7 @@ export default async function handler(req,res){
 
     // Gravar na lista atômica
     novos.sort((a,b)=>String(a.ts).localeCompare(String(b.ts)));
-    let gravados=0;
-    for(const e of novos){
-      try{
-        await fetch(`${U}/rpush/${EVT_LIST}/${encodeURIComponent(JSON.stringify(e))}`,{headers:{Authorization:`Bearer ${T}`}});
-        gravados++;
-      }catch(_){}
-    }
+    const gravados=await rpushLote(novos);
     const porTipo={};
     novos.forEach(e=>{porTipo[e.tipo]=(porTipo[e.tipo]||0)+1;});
     return res.status(200).json({ok:true,reconstruidos:gravados,porTipo,
@@ -602,9 +613,7 @@ export default async function handler(req,res){
     }
     // Consolidar tudo na LISTA atômica: DEL + RPUSH dos bons; zerar chave antiga
     try{await fetch(`${U}/del/${EVT_LIST}`,{headers:{Authorization:`Bearer ${T}`}});}catch(_){}
-    for(const e of bons){
-      try{await fetch(`${U}/rpush/${EVT_LIST}/${encodeURIComponent(JSON.stringify(e))}`,{headers:{Authorization:`Bearer ${T}`}});}catch(_){}
-    }
+    if(bons.length)await rpushLote(bons);
     await dbSet(EVT_KEY,{eventos:[],backfillFeito:true});
     return res.status(200).json({ok:true,modo,antes,depois:bons.length,removidos:antes-bons.length});
   }
