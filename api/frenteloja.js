@@ -763,6 +763,40 @@ export default async function handler(req,res){
   }
 
 
+  // ── GET diag-ficha?q=3174 — estado da ficha no FL e no board (diagnóstico) ──
+  if (action === 'diag-ficha') {
+    const q = String(req.query.q || '').toLowerCase();
+    if (!q) return res.status(400).json({ ok:false, error:'informe ?q=' });
+    const flDb = await dbGet(FL_KEY) || defaultDB();
+    const boardDb = await dbGet('reparoeletro_board') || { cards: [] };
+    const fichasFL = (flDb.fichas || [])
+      .filter(f => (f.nomeContato||'').toLowerCase().includes(q) || (f.telefone||'').replace(/\D/g,'').endsWith(q))
+      .map(f => ({ id:f.id, nome:f.nomeContato, tel:f.telefone, phase:f.phase,
+                   movedAt:f.movedAt, pipefyCardId:f.pipefyCardId||null, liberadoHoje:!!f.liberadoHoje }));
+    const cardsBoard = (boardDb.cards || [])
+      .filter(c => (c.title||'').toLowerCase().includes(q))
+      .map(c => ({ pipefyId:c.pipefyId||null, title:c.title, phaseId:c.phaseId,
+                   movedAt:c.movedAt, flFichaId:c.flFichaId||null }));
+    return res.status(200).json({ ok:true, q, fichasFL, cardsBoard });
+  }
+
+  // ── GET forcar-conserto?id=X — move ficha específica para conserto_realizado ──
+  if (action === 'forcar-conserto') {
+    const idF = String(req.query.id || '');
+    if (!idF) return res.status(400).json({ ok:false, error:'informe ?id=' });
+    const flDb = await dbGet(FL_KEY) || defaultDB();
+    const ficha = (flDb.fichas || []).find(f => String(f.id) === idF);
+    if (!ficha) return res.status(404).json({ ok:false, error:'ficha não encontrada', id:idF });
+    const faseAnt = ficha.phase;
+    const now = new Date().toISOString();
+    ficha.phase = 'conserto_realizado';
+    ficha.liberadoHoje = true;
+    ficha.movedAt = now;
+    ficha.history = (ficha.history||[]).concat([{ phase:'conserto_realizado', ts:now, via:'forcar-conserto' }]);
+    await dbSet(FL_KEY, flDb);
+    return res.status(200).json({ ok:true, id:ficha.id, nome:ficha.nomeContato, de:faseAnt, para:'conserto_realizado' });
+  }
+
   // ── GET sync-fl — corrige fichas presas (loja_feito board ≠ conserto_realizado FL) ──
   if (action === 'sync-fl') {
     const BOARD_KEY2 = 'reparoeletro_board';
