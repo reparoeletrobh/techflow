@@ -60,23 +60,33 @@ function gerarId(tel,horario){
 const EVT_KEY='prospeccao_eventos';
 // Identidade contínua: ficha vinda do espelho mantém o id original de fichas
 function idEvt(f){return (f&&(f.origemFichaId||f.id))||null;}
+const EVT_LIST='prospeccao_evt_list'; // lista Redis — escrita ATÔMICA (RPUSH)
 async function logEventos(lista){
-  // lista: [{tipo, sis, id, nome}] — ts adicionado aqui
+  // lista: [{tipo, de?, sis, id, nome}] — ts adicionado aqui
   try{
     if(!lista||!lista.length)return;
-    const db=(await dbGet(EVT_KEY))||{eventos:[]};
-    if(!Array.isArray(db.eventos))db.eventos=[];
     const ts=new Date().toISOString();
     for(const e of lista){
-      db.eventos.push({ts,tipo:e.tipo,sis:e.sis==='tv'?'tv':'adm',id:e.id||null,nome:e.nome||null});
+      const evt=JSON.stringify({ts,tipo:e.tipo,de:e.de??null,sis:e.sis==='tv'?'tv':'adm',id:e.id||null,nome:e.nome||null});
+      // RPUSH é atômico: N requests simultâneos = N eventos, sem sobrescrita
+      await fetch(`${U}/rpush/${EVT_LIST}/${encodeURIComponent(evt)}`,{headers:{Authorization:`Bearer ${T}`}});
     }
-    // Poda: manter 120 dias
-    const corte=new Date(Date.now()-120*86400000).toISOString();
-    if(db.eventos.length>20000||((db.eventos[0]||{}).ts||'')<corte){
-      db.eventos=db.eventos.filter(e=>e.ts>=corte);
-    }
-    await dbSet(EVT_KEY,db);
   }catch(_){}
+}
+
+async function lerEventos(){
+  let evs=[];
+  try{
+    const r=await fetch(`${U}/lrange/${EVT_LIST}/0/-1`,{headers:{Authorization:`Bearer ${T}`}});
+    const j=await r.json();
+    for(const s of (j.result||[])){try{evs.push(JSON.parse(s));}catch(_){}}
+  }catch(_){}
+  try{
+    const old=(await dbGet(EVT_KEY))||{eventos:[]};
+    evs=evs.concat(old.eventos||[]);
+  }catch(_){}
+  evs.sort((a,b)=>String(a.ts).localeCompare(String(b.ts)));
+  return evs;
 }
 
 export default async function handler(req,res){
@@ -493,8 +503,8 @@ export default async function handler(req,res){
 
   // ── EVENTOS-DIAGNOSTICO: raio-x da base de eventos ────────────────────────
   if(action==='eventos-diagnostico'){
-    const db_evt=(await dbGet(EVT_KEY))||{eventos:[]};
-    const evs=db_evt.eventos||[];
+    const evs=await lerEventos();
+    const db_evt={backfillFeito:true};
     const porDia={},porTipo={},semId=0,stats={backfill:0,aoVivoSemDe:0,completos:0};
     let _semId=0;
     for(const e of evs){
@@ -512,29 +522,31 @@ export default async function handler(req,res){
   // ── EVENTOS-LIMPAR?modo=sujos|tudo — higieniza a base do relatório ────────
   if(action==='eventos-limpar'){
     const modo=req.query.modo||'sujos';
-    const db_evt=(await dbGet(EVT_KEY))||{eventos:[]};
-    const antes=(db_evt.eventos||[]).length;
-    if(modo==='tudo'){
-      db_evt.eventos=[];
-    }else{
-      // 'sujos': remove backfill + eventos de transição sem origem (pré-fix)
-      db_evt.eventos=(db_evt.eventos||[]).filter(e=>{
-        if(e.bf)return false; // backfill reconstruído (duplica fatos)
-        if(!e.id)return false; // sem identidade — não entra na árvore
-        if(e.de===undefined&&!['lead','entrar_contato','manual'].includes(e.tipo))return false; // transição sem origem
+    const todos=await lerEventos();
+    const antes=todos.length;
+    let bons=[];
+    if(modo!=='tudo'){
+      bons=todos.filter(e=>{
+        if(e.bf)return false;
+        if(!e.id)return false;
+        if((e.de===undefined||e.de===null)&&!['lead','entrar_contato','manual'].includes(e.tipo))return false;
         return true;
       });
     }
-    db_evt.backfillFeito=true; // nunca mais reconstruir automaticamente
-    await dbSet(EVT_KEY,db_evt);
-    return res.status(200).json({ok:true,modo,antes,depois:db_evt.eventos.length,removidos:antes-db_evt.eventos.length});
+    // Consolidar tudo na LISTA atômica: DEL + RPUSH dos bons; zerar chave antiga
+    try{await fetch(`${U}/del/${EVT_LIST}`,{headers:{Authorization:`Bearer ${T}`}});}catch(_){}
+    for(const e of bons){
+      try{await fetch(`${U}/rpush/${EVT_LIST}/${encodeURIComponent(JSON.stringify(e))}`,{headers:{Authorization:`Bearer ${T}`}});}catch(_){}
+    }
+    await dbSet(EVT_KEY,{eventos:[],backfillFeito:true});
+    return res.status(200).json({ok:true,modo,antes,depois:bons.length,removidos:antes-bons.length});
   }
 
   // ── RELATORIO-ARVORE v2: 4 matrizes (entradas na etapa) + desmembramento
   //    recursivo + conversão final (logística/frente de loja) vs matriz ─────
   if(action==='relatorio-arvore'){
     const periodo=req.query.periodo||'hoje';
-    const db_evt=(await dbGet(EVT_KEY))||{eventos:[]};
+    const db_evt={eventos:await lerEventos()};
 
     const agoraBRT=new Date(Date.now()-3*3600000);
     let corte;

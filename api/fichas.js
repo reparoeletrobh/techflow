@@ -205,11 +205,11 @@ export default async function handler(req, res) {
     if (novosEntrar.length > 0) {
       try {
         const sisEvt = key === 'fichas_tv' ? 'tv' : 'adm';
-        const evDb = (await dbGet('prospeccao_eventos')) || { eventos: [] };
-        if (!Array.isArray(evDb.eventos)) evDb.eventos = [];
         const tsEvt = new Date().toISOString();
-        for (const fEvt of novosEntrar) evDb.eventos.push({ ts: tsEvt, tipo: 'entrar_contato', sis: sisEvt, id: fEvt.id, nome: fEvt.nome });
-        await dbSet('prospeccao_eventos', evDb);
+        for (const fEvt of novosEntrar) {
+          const evt = JSON.stringify({ ts: tsEvt, tipo: 'entrar_contato', de: null, sis: sisEvt, id: fEvt.id, nome: fEvt.nome });
+          await fetch(`${U}/rpush/prospeccao_evt_list/${encodeURIComponent(evt)}`, { headers: { Authorization: `Bearer ${T}` } });
+        }
       } catch(_) {}
     }
     return res.status(200).json({ ok:true, fichas: db.fichas });
@@ -285,11 +285,9 @@ export default async function handler(req, res) {
     // Evento p/ árvore da prospecção: só quando vem da coluna espelhada
     if (stAntesLog === 'entrar_contato') {
       try {
-        const evDb2 = (await dbGet('prospeccao_eventos')) || { eventos: [] };
-        if (!Array.isArray(evDb2.eventos)) evDb2.eventos = [];
-        evDb2.eventos.push({ ts: new Date().toISOString(), tipo: 'logistica', de: 'entrar_contato',
+        const evt2 = JSON.stringify({ ts: new Date().toISOString(), tipo: 'logistica', de: 'entrar_contato',
           sis: sistema === 'tv' ? 'tv' : 'adm', id: ficha.id, nome: ficha.nome });
-        await dbSet('prospeccao_eventos', evDb2);
+        await fetch(`${U}/rpush/prospeccao_evt_list/${encodeURIComponent(evt2)}`, { headers: { Authorization: `Bearer ${T}` } });
       } catch(_) {}
     }
     await dbSet(key, db);
