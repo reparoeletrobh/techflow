@@ -1239,6 +1239,45 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, total: retCards.length, results });
     }
 
+    // ── GET relatorio-movimentacoes?horas=48 — últimas movimentações do board ──
+    if (req.method === "GET" && action === "relatorio-movimentacoes") {
+      const horas = parseInt(req.query.horas || '48', 10);
+      const corte = new Date(Date.now() - horas * 3600000).toISOString();
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+
+      const movs = (board.cards || [])
+        .filter(c => c.movedAt && c.movedAt >= corte)
+        .sort((a, b) => String(b.movedAt).localeCompare(String(a.movedAt)))
+        .slice(0, 120)
+        .map(c => ({
+          titulo: (c.title || '').slice(0, 70),
+          fase: c.phaseId,
+          movidoEm: c.movedAt,
+          movidoPor: c.movedBy || null,
+          tecnico: c.tecnico || null,
+          // sem movedBy e sem tecnico = não veio do botão da tela (suspeito de automático)
+          suspeitoAutomatico: (!c.movedBy || c.movedBy === '—') && !c.tecnico,
+        }));
+
+      const suspeitos = movs.filter(m => m.suspeitoAutomatico);
+      const porFase = {};
+      movs.forEach(m => { porFase[m.fase] = (porFase[m.fase] || 0) + 1; });
+
+      const logRecente = (board.movesLog || [])
+        .filter(l => l.timestamp >= corte)
+        .slice(-40);
+
+      return res.status(200).json({
+        ok: true, horas, corte,
+        totalMovimentacoes: movs.length,
+        suspeitosAutomaticos: suspeitos.length,
+        porFase,
+        suspeitos: suspeitos.slice(0, 40),
+        movimentacoes: movs,
+        movesLogRecente: logRecente,
+      });
+    }
+
     // ── GET cleanup-ret — remove aguardando_ret que foram ERP/Finalizado ──
     if (req.method === "GET" && action === "cleanup-ret") {
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
