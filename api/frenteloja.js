@@ -214,7 +214,7 @@ export default async function handler(req,res){
     try{
       const _base=process.env.FL_BASE_URL||'https://reparoeletroadm.com';
       const _title=(ficha.nomeContato+' (Loja) - '+(ficha.equipamento||'')+' | '+(ficha.descricao||'')+' OS:'+ficha.id).replace(/"/g,"'").slice(0,255);
-      fetch(_base+'/api/board?action=add-loja-card',{method:'POST',headers:{'Content-Type':'application/json'},
+      await fetch(_base+'/api/board?action=add-loja-card',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({flFichaId:ficha.id,pipefyId:null,title:_title,
           nomeContato:ficha.nomeContato||'',telefone:ficha.telefone||'',
           cpf:ficha.cpf||'',email:ficha.email||'',
