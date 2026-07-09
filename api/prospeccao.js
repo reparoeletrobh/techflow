@@ -579,6 +579,26 @@ export default async function handler(req,res){
       nota:'Marcos datados reais. Galhos intermediarios antigos (reagendar/fim de fila) nao possuem data gravada e ficam de fora.'});
   }
 
+  // ── DEDUP-EVENTOS: remove duplicatas exatas (id+tipo+ts idênticos) ────────
+  if(action==='dedup-eventos'){
+    const todos=await lerEventos();
+    const antes=todos.length;
+    const vistos=new Set();
+    const unicos=[];
+    for(const e of todos){
+      const chave=`${e.id}|${e.tipo}|${e.ts}`;
+      if(vistos.has(chave))continue;
+      vistos.add(chave);
+      unicos.push(e);
+    }
+    if(unicos.length<antes){
+      try{await fetch(`${U}/del/${EVT_LIST}`,{headers:{Authorization:`Bearer ${T}`}});}catch(_){}
+      await rpushLote(unicos);
+      await dbSet(EVT_KEY,{eventos:[],backfillFeito:true});
+    }
+    return res.status(200).json({ok:true,antes,depois:unicos.length,duplicatasRemovidas:antes-unicos.length});
+  }
+
   // ── EVENTOS-DIAGNOSTICO: raio-x da base de eventos ────────────────────────
   if(action==='eventos-diagnostico'){
     const evs=await lerEventos();
