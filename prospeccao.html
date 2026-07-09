@@ -143,10 +143,14 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
       <span style="font-weight:800;font-size:13px;">📊 Dashboard da Prospecção</span>
       <button onclick="fecharRelatorio()" style="background:none;border:none;color:#5a6270;font-size:20px;cursor:pointer;">✕</button>
     </div>
-    <div style="padding:14px 18px;display:flex;gap:8px;">
-      <button class="rel-per" id="rp-hoje"   onclick="carregarRel('hoje')"   style="flex:1;padding:9px;border-radius:8px;border:1px solid #2a2f38;background:#181b1f;color:#f0f2f5;font-size:12px;font-weight:800;cursor:pointer;">Hoje</button>
-      <button class="rel-per" id="rp-semana" onclick="carregarRel('semana')" style="flex:1;padding:9px;border-radius:8px;border:1px solid #2a2f38;background:#181b1f;color:#f0f2f5;font-size:12px;font-weight:800;cursor:pointer;">Semanal</button>
-      <button class="rel-per" id="rp-mes"    onclick="carregarRel('mes')"    style="flex:1;padding:9px;border-radius:8px;border:1px solid #2a2f38;background:#181b1f;color:#f0f2f5;font-size:12px;font-weight:800;cursor:pointer;">Mensal</button>
+    <div style="padding:14px 18px 8px;display:flex;gap:8px;">
+      <button id="rp-hoje"   onclick="relPeriodo('hoje')"   style="flex:1;padding:9px;border-radius:8px;border:1px solid #2a2f38;background:#181b1f;color:#f0f2f5;font-size:12px;font-weight:800;cursor:pointer;">Hoje</button>
+      <button id="rp-semana" onclick="relPeriodo('semana')" style="flex:1;padding:9px;border-radius:8px;border:1px solid #2a2f38;background:#181b1f;color:#f0f2f5;font-size:12px;font-weight:800;cursor:pointer;">Semanal</button>
+      <button id="rp-mes"    onclick="relPeriodo('mes')"    style="flex:1;padding:9px;border-radius:8px;border:1px solid #2a2f38;background:#181b1f;color:#f0f2f5;font-size:12px;font-weight:800;cursor:pointer;">Mensal</button>
+    </div>
+    <div style="padding:0 18px 12px;display:flex;gap:8px;">
+      <button id="rs-adm" onclick="relSistema('adm')" style="flex:1;padding:9px;border-radius:8px;border:1px solid #3b9eff;background:rgba(59,158,255,.15);color:#3b9eff;font-size:12px;font-weight:800;cursor:pointer;">🔧 ADM</button>
+      <button id="rs-tv"  onclick="relSistema('tv')"  style="flex:1;padding:9px;border-radius:8px;border:1px solid #2a2f38;background:#181b1f;color:#f0f2f5;font-size:12px;font-weight:800;cursor:pointer;">📺 TV</button>
     </div>
     <div id="rel-corpo" style="padding:0 18px 18px;"><div style="text-align:center;color:#5a6270;font-size:12px;padding:20px;">Selecione o período</div></div>
   </div>
@@ -323,101 +327,91 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 var _fichas=[], _espelho=[], _busca='';
 
 // ── Relatório ────────────────────────────────────────────────────────────
+var _relPer='hoje',_relSis='adm',_relArv=null;
+
 function abrirRelatorio(){
   document.getElementById('rel-modal').style.display='flex';
-  carregarRel('hoje');
+  _relPer='hoje';_relSis='adm';
+  carregarArvore();
 }
 function fecharRelatorio(){document.getElementById('rel-modal').style.display='none';}
+function relPeriodo(p){_relPer=p;carregarArvore();}
+function relSistema(s){_relSis=s;renderArvore();atualizarPillsRel();}
 
-async function carregarRel(per){
+function atualizarPillsRel(){
   ['hoje','semana','mes'].forEach(function(x){
     var b=document.getElementById('rp-'+x);
-    if(b){b.style.background=x===per?'rgba(139,92,246,.2)':'#181b1f';b.style.borderColor=x===per?'#8b5cf6':'#2a2f38';b.style.color=x===per?'#a78bfa':'#f0f2f5';}
+    if(b){b.style.background=x===_relPer?'rgba(139,92,246,.2)':'#181b1f';b.style.borderColor=x===_relPer?'#8b5cf6':'#2a2f38';b.style.color=x===_relPer?'#a78bfa':'#f0f2f5';}
   });
+  var ba=document.getElementById('rs-adm'),bt=document.getElementById('rs-tv');
+  if(ba){ba.style.background=_relSis==='adm'?'rgba(59,158,255,.15)':'#181b1f';ba.style.borderColor=_relSis==='adm'?'#3b9eff':'#2a2f38';ba.style.color=_relSis==='adm'?'#3b9eff':'#f0f2f5';}
+  if(bt){bt.style.background=_relSis==='tv'?'rgba(6,182,212,.15)':'#181b1f';bt.style.borderColor=_relSis==='tv'?'#06b6d4':'#2a2f38';bt.style.color=_relSis==='tv'?'#06b6d4':'#f0f2f5';}
+}
+
+async function carregarArvore(){
+  atualizarPillsRel();
   var corpo=document.getElementById('rel-corpo');
   corpo.innerHTML='<div style="text-align:center;color:#5a6270;font-size:12px;padding:30px;">⏳ Carregando...</div>';
   try{
-    var d=await fetch('/api/prospeccao?action=relatorio&periodo='+per).then(function(r){return r.json();});
+    var d=await fetch('/api/prospeccao?action=relatorio-arvore&periodo='+_relPer).then(function(r){return r.json();});
     if(!d.ok)throw new Error(d.error||'falha');
-    var c=d.contagens;
-
-    var entrAdm=(c.adm.entrar_contato||0)+(c.adm.lead||0);
-    var entrTv=(c.tv.entrar_contato||0)+(c.tv.lead||0);
-    var entradas=entrAdm+entrTv;
-    var pctN=function(n,dv){return dv>0?Math.round(100*n/dv):0;};
-    var pctS=function(n,dv){return dv>0?Math.round(100*n/dv)+'%':'—';};
-
-    // ── KPIs hero ──
-    function kpi(icone,valor,lbl,sub,cor){
-      return '<div style="flex:1;background:#12141a;border:1px solid #1e2228;border-radius:12px;padding:14px 10px;text-align:center;">'
-        +'<div style="font-size:20px;">'+icone+'</div>'
-        +'<div style="font-size:26px;font-weight:900;color:'+cor+';line-height:1.2;">'+valor+'</div>'
-        +'<div style="font-size:9.5px;font-weight:800;color:#5a6270;text-transform:uppercase;letter-spacing:.05em;margin-top:2px;">'+lbl+'</div>'
-        +(sub?'<div style="font-size:10px;font-weight:800;color:'+cor+';background:rgba(255,255,255,.04);border-radius:6px;padding:2px 6px;margin-top:6px;display:inline-block;">'+sub+'</div>':'')
-      +'</div>';
-    }
-    var html='<div style="display:flex;gap:8px;margin-bottom:16px;">'
-      +kpi('📥',entradas,'Entradas','ADM '+entrAdm+' · TV '+entrTv,'#f0f2f5')
-      +kpi('🚚',c.total.logistica||0,'Logística',pctS(c.total.logistica,entradas)+' das entradas','#22c55e')
-      +kpi('🏬',c.total.frenteloja||0,'Frente de Loja',pctS(c.total.frenteloja,c.total.cliente_loja)+' dos cli. loja','#f5c800')
-    +'</div>';
-
-    // ── Funil com barras segmentadas ADM/TV ──
-    var METRICAS=[
-      ['entrar_contato','⚠️','Entrar em Contato'],
-      ['lead','🔭','Lead'],
-      ['retornar','↩','Retornar'],
-      ['cliente_loja','🏪','Cliente Loja'],
-      ['frenteloja','🏬','Frente de Loja'],
-      ['logistica','🚚','Logística'],
-      ['fim_fila','⤵','Fim da Fila']
-    ];
-    var maxV=1;
-    METRICAS.forEach(function(m){maxV=Math.max(maxV,c.total[m[0]]||0);});
-
-    html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
-      +'<span style="font-size:10px;font-weight:800;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;">Funil de Ações</span>'
-      +'<span style="font-size:10px;font-weight:700;"><span style="color:#3b9eff;">▮ ADM</span> &nbsp;<span style="color:#06b6d4;">▮ TV</span></span>'
-    +'</div>';
-    html+='<div style="background:#12141a;border:1px solid #1e2228;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:9px;margin-bottom:16px;">';
-    METRICAS.forEach(function(m){
-      var a=c.adm[m[0]]||0, t=c.tv[m[0]]||0, tot=a+t;
-      var wA=Math.round(100*a/maxV), wT=Math.round(100*t/maxV);
-      html+='<div>'
-        +'<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;">'
-          +'<span style="color:#c9ced6;font-weight:700;">'+m[1]+' '+m[2]+'</span>'
-          +'<span style="font-weight:800;color:#f0f2f5;">'+tot+'<span style="color:#5a6270;font-weight:600;font-size:10px;"> ('+a+'·'+t+')</span></span>'
-        +'</div>'
-        +'<div style="height:8px;background:#1a1d24;border-radius:99px;overflow:hidden;display:flex;">'
-          +'<div style="width:'+wA+'%;background:#3b9eff;"></div>'
-          +'<div style="width:'+wT+'%;background:#06b6d4;"></div>'
-        +'</div>'
-      +'</div>';
-    });
-    html+='</div>';
-
-    // ── Anéis de conversão ──
-    function anel(pcent,cor,titulo,subAdm,subTv){
-      var deg=Math.min(100,pcent)*3.6;
-      return '<div style="flex:1;background:#12141a;border:1px solid #1e2228;border-radius:12px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:8px;">'
-        +'<div style="width:74px;height:74px;border-radius:50%;background:conic-gradient('+cor+' '+deg+'deg,#1a1d24 0);display:flex;align-items:center;justify-content:center;">'
-          +'<div style="width:56px;height:56px;border-radius:50%;background:#12141a;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;color:'+cor+';">'+(pcent>0?pcent+'%':'—')+'</div>'
-        +'</div>'
-        +'<div style="font-size:10px;font-weight:800;color:#c9ced6;text-align:center;line-height:1.4;">'+titulo+'</div>'
-        +'<div style="font-size:10px;color:#5a6270;font-weight:700;">🔧 '+subAdm+' &nbsp;·&nbsp; 📺 '+subTv+'</div>'
-      +'</div>';
-    }
-    html+='<div style="font-size:10px;font-weight:800;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Taxas de Conversão</div>';
-    html+='<div style="display:flex;gap:8px;">'
-      +anel(pctN(c.total.frenteloja,c.total.cliente_loja),'#f5c800','🏪 Cliente Loja → 🏬 Frente de Loja',pctS(c.adm.frenteloja,c.adm.cliente_loja),pctS(c.tv.frenteloja,c.tv.cliente_loja))
-      +anel(pctN(c.total.logistica,entradas),'#22c55e','📥 Entradas → 🚚 Logística',pctS(c.adm.logistica,entrAdm),pctS(c.tv.logistica,entrTv))
-    +'</div>';
-
-    html+='<div style="font-size:10px;color:#5a6270;margin-top:12px;text-align:center;">Período desde '+String(d.desde).slice(0,10).split('-').reverse().join('/')+' · registro completo de eventos a partir de 09/07/26</div>';
-    corpo.innerHTML=html;
+    _relArv=d;
+    renderArvore();
   }catch(e){
     corpo.innerHTML='<div style="text-align:center;color:#ef4444;font-size:12px;padding:20px;">Erro: '+e.message+'</div>';
   }
+}
+
+var REL_META={
+  entrar_contato:['⚠️','Entrar em Contato','#ef4444'],
+  lead:['🔭','Lead','#3b9eff'],
+  manual:['➕','Cadastro Manual','#22c55e'],
+  retornar:['↩','Retornar','#f97316'],
+  reagendar:['📅','Reagendou','#f97316'],
+  cliente_loja:['🏪','Cliente Loja','#3b9eff'],
+  logistica:['🚚','Logística','#22c55e'],
+  frenteloja:['🏬','Frente de Loja','#f5c800'],
+  fim_fila:['⤵','Fim da Fila','#8b93a1']
+};
+
+function noArvoreHTML(tipo,no,paiCount,nivel){
+  var m=REL_META[tipo]||['•',tipo,'#c9ced6'];
+  var pct=paiCount>0?Math.round(100*no.count/paiCount):null;
+  var eFinal=(tipo==='logistica'||tipo==='frenteloja');
+  var html='<div style="margin-left:'+(nivel>0?18:0)+'px;'+(nivel>0?'border-left:2px solid #22272f;padding-left:12px;':'')+'margin-top:'+(nivel===0?'14':'7')+'px;">'
+    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      +(nivel>0?'<span style="color:#3a4150;font-size:11px;">└→</span>':'')
+      +'<span style="font-size:'+(nivel===0?'14':'12')+'px;font-weight:800;color:'+m[2]+';">'+m[0]+' '+m[1]+'</span>'
+      +'<span style="font-size:'+(nivel===0?'16':'13')+'px;font-weight:900;color:#f0f2f5;">'+no.count+'</span>'
+      +(pct!==null?'<span style="font-size:10.5px;font-weight:800;color:'+(eFinal?'#22c55e':'#a78bfa')+';background:'+(eFinal?'rgba(34,197,94,.12)':'rgba(139,92,246,.12)')+';border-radius:6px;padding:2px 7px;">'+pct+'% conv.</span>':'')
+    +'</div>';
+  var filhos=Object.keys(no.filhos||{});
+  // ordem lógica dos galhos
+  var ordem=['retornar','reagendar','fim_fila','cliente_loja','logistica','frenteloja'];
+  filhos.sort(function(a,b){return ordem.indexOf(a)-ordem.indexOf(b);});
+  filhos.forEach(function(ft){
+    html+=noArvoreHTML(ft,no.filhos[ft],no.count,nivel+1);
+  });
+  html+='</div>';
+  return html;
+}
+
+function renderArvore(){
+  if(!_relArv)return;
+  var corpo=document.getElementById('rel-corpo');
+  var arv=_relArv.arvore[_relSis]||{};
+  var raizes=['entrar_contato','lead','manual'];
+  var temDados=raizes.some(function(r){return arv[r]&&arv[r].count>0;});
+  if(!temDados){
+    corpo.innerHTML='<div style="text-align:center;color:#5a6270;font-size:12px;padding:30px;">📭 Nenhuma jornada registrada no período<br><span style="font-size:10px;">(rastreamento completo a partir de 09/07/26)</span></div>';
+    return;
+  }
+  var html='';
+  raizes.forEach(function(r){
+    if(arv[r]&&arv[r].count>0)html+=noArvoreHTML(r,arv[r],0,0);
+  });
+  html+='<div style="font-size:10px;color:#5a6270;margin-top:16px;text-align:center;">Fichas que entraram desde '+String(_relArv.desde).slice(0,10).split('-').reverse().join('/')+' · % = conversão sobre a etapa anterior</div>';
+  corpo.innerHTML=html;
 }
 
 // ── Retornar com data (cadência) ─────────────────────────────────────────

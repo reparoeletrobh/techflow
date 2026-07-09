@@ -58,6 +58,8 @@ function gerarId(tel,horario){
 
 // ── Log de eventos da prospecção (para o relatório) ──────────────────────
 const EVT_KEY='prospeccao_eventos';
+// Identidade contínua: ficha vinda do espelho mantém o id original de fichas
+function idEvt(f){return (f&&(f.origemFichaId||f.id))||null;}
 async function logEventos(lista){
   // lista: [{tipo, sis, id, nome}] — ts adicionado aqui
   try{
@@ -127,6 +129,7 @@ export default async function handler(req,res){
       const agora=Date.now();
 
       let novas=0, aguardando=0, semHorario=0;
+      const novasEvt=[];
       const debugHorarios=[];
       for(const row of dados){
         const tel  =String(row[0]||'').replace(/\D/g,'').trim();
@@ -160,7 +163,7 @@ export default async function handler(req,res){
         if(existentes.has(telNorm))continue;
         existentes.add(telNorm);
 
-        db.fichas.unshift({
+        const novaFicha={
           id:      gerarId(tel,hora),
           telefone:tel, nome, equipamento:equip,
           defeito: def, endereco:end, horario:hora,
@@ -168,12 +171,14 @@ export default async function handler(req,res){
           status:  'lead',
           criadoEm:new Date().toISOString(),
           movidoEm:null,
-        });
+        };
+        db.fichas.unshift(novaFicha);
+        novasEvt.push({tipo:'lead',sis:'adm',id:novaFicha.id,nome:novaFicha.nome});
         novas++;
       }
 
       if(novas>0)await dbSet(KEY,db);
-      if(novas>0)await logEventos(Array.from({length:novas},()=>({tipo:'lead',sis:'adm'})));
+      if(novasEvt.length)await logEventos(novasEvt);
       return res.status(200).json({ok:true,novas,aguardando2h:aguardando,semHorario,total:dados.length,naBase:db.fichas.length,header:(rows[0]||[]).map(c=>String(c).substring(0,30)),debugHorarios});
     }catch(e){
       return res.status(200).json({ok:false,error:e.message,novas:0});
@@ -216,8 +221,11 @@ export default async function handler(req,res){
       f.filaFinal=false; // reagendou → volta ao fluxo normal
     }
     await dbSet(KEY,db);
-    if(status!==stAnt&&(status==='retornar'||status==='cliente_loja')){
-      await logEventos([{tipo:status,sis:f.logisticaSistema||f.origemSistema||'adm',id:f.id,nome:f.nome}]);
+    if(status==='retornar'||status==='cliente_loja'){
+      const tipoEvt=(status==='retornar'&&stAnt==='retornar')?'reagendar':status;
+      if(tipoEvt!=='reagendar'||stAnt==='retornar'){
+        await logEventos([{tipo:tipoEvt,de:stAnt||null,sis:f.origemSistema||'adm',id:idEvt(f),nome:f.nome}]);
+      }
     }
     return res.status(200).json({ok:true});
   }
@@ -232,7 +240,7 @@ export default async function handler(req,res){
     f.tentativas=(f.tentativas||0)+1;
     f.movidoEm=new Date().toISOString();
     await dbSet(KEY,db);
-    await logEventos([{tipo:'fim_fila',sis:f.origemSistema||'adm',id:f.id,nome:f.nome}]);
+    await logEventos([{tipo:'fim_fila',de:'retornar',sis:f.origemSistema||'adm',id:idEvt(f),nome:f.nome}]);
     return res.status(200).json({ok:true,tentativas:f.tentativas});
   }
 
@@ -254,11 +262,11 @@ export default async function handler(req,res){
       endereco:orig.endereco||'', horario:orig.horario||'',
       waNum:orig.waNum||waNum(orig.telefone||''),
       status:'retornar', dataRetorno:dataRetorno||null, obsRetorno:obsRetorno||null, filaFinal:false,
-      origemEspelho:true, origemSistema:sistema,
+      origemEspelho:true, origemSistema:sistema, origemFichaId:orig.id,
       criadoEm:now, movidoEm:now,
     });
     await dbSet(KEY,db);
-    await logEventos([{tipo:'retornar',sis:sistema,nome:orig.nome}]);
+    await logEventos([{tipo:'retornar',de:'entrar_contato',sis:sistema,id:orig.id,nome:orig.nome}]);
 
     // 2. Marca a origem — sai do espelho e das colunas de fichas (vive na prospecção)
     orig.status='prospeccao';
@@ -313,12 +321,13 @@ export default async function handler(req,res){
     await dbSet(LOG_KEY,logDb);
 
     // Marcar como cadastrado em logística
+    const stAntLog=ficha.status;
     ficha.status='logistica';
     ficha.movidoEm=new Date().toISOString();
     ficha.logisticaEm=new Date().toISOString();
     ficha.logisticaTipo='ativa';
     ficha.logisticaSistema=sistema==='tv'?'tv':'adm';
-    await logEventos([{tipo:'logistica',sis:sistema,id:ficha.id,nome:ficha.nome}]);
+    await logEventos([{tipo:'logistica',de:stAntLog||null,sis:sistema,id:idEvt(ficha),nome:ficha.nome}]);
     await dbSet(KEY,db);
     return res.status(200).json({ok:true});
   }
@@ -382,7 +391,11 @@ export default async function handler(req,res){
 
     db.fichas.unshift(ficha);
     await dbSet(KEY,db);
-    await logEventos([{tipo:destino==='logistica'?'logistica':'cliente_loja',sis:destino==='logistica'?(sistema==='tv'?'tv':'adm'):'adm',id:ficha.id,nome:ficha.nome}]);
+    const sisMan=destino==='logistica'?(sistema==='tv'?'tv':'adm'):'adm';
+    await logEventos([
+      {tipo:'manual',sis:sisMan,id:ficha.id,nome:ficha.nome},
+      {tipo:destino==='logistica'?'logistica':'cliente_loja',de:'manual',sis:sisMan,id:ficha.id,nome:ficha.nome}
+    ]);
     return res.status(200).json({ok:true,ficha});
   }
 
@@ -397,7 +410,7 @@ export default async function handler(req,res){
     f.logisticaTipo='ativa';
     f.movidoEm=f.frentelojaEm;
     await dbSet(KEY,db);
-    await logEventos([{tipo:'frenteloja',sis:'adm',id:f.id,nome:f.nome}]);
+    await logEventos([{tipo:'frenteloja',de:'cliente_loja',sis:'adm',id:idEvt(f),nome:f.nome}]);
     return res.status(200).json({ok:true});
   }
 
@@ -418,11 +431,11 @@ export default async function handler(req,res){
       endereco:orig.endereco||'', horario:orig.horario||'',
       waNum:orig.waNum||waNum(orig.telefone||''),
       status:'cliente_loja', filaFinal:false,
-      origemEspelho:true, origemSistema:sistema,
+      origemEspelho:true, origemSistema:sistema, origemFichaId:orig.id,
       criadoEm:now, movidoEm:now,
     });
     await dbSet(KEY,db);
-    await logEventos([{tipo:'cliente_loja',sis:sistema,nome:orig.nome}]);
+    await logEventos([{tipo:'cliente_loja',de:'entrar_contato',sis:sistema,id:orig.id,nome:orig.nome}]);
 
     orig.status='prospeccao';
     orig.prospeccaoEm=now;
@@ -476,6 +489,75 @@ export default async function handler(req,res){
       out[s][e.tipo]++;out.total[e.tipo]++;
     }
     return res.status(200).json({ok:true,periodo,desde:corteISO,contagens:out});
+  }
+
+  // ── RELATORIO-ARVORE: jornada das fichas em árvore com % de conversão ────
+  if(action==='relatorio-arvore'){
+    const periodo=req.query.periodo||'hoje';
+    const db_evt=(await dbGet(EVT_KEY))||{eventos:[]};
+
+    // Corte do período (BRT)
+    const agoraBRT=new Date(Date.now()-3*3600000);
+    let corte;
+    if(periodo==='hoje'){
+      corte=new Date(Date.UTC(agoraBRT.getUTCFullYear(),agoraBRT.getUTCMonth(),agoraBRT.getUTCDate())+3*3600000);
+    }else if(periodo==='mes'){
+      corte=new Date(Date.UTC(agoraBRT.getUTCFullYear(),agoraBRT.getUTCMonth(),1)+3*3600000);
+    }else{
+      const dom=new Date(Date.UTC(agoraBRT.getUTCFullYear(),agoraBRT.getUTCMonth(),agoraBRT.getUTCDate())+3*3600000);
+      dom.setUTCDate(dom.getUTCDate()-agoraBRT.getUTCDay());
+      corte=dom;
+    }
+    const corteISO=corte.toISOString();
+
+    // 1. Agrupar eventos por ficha (id) — ignora eventos sem id (histórico antigo)
+    const porFicha={};
+    for(const e of (db_evt.eventos||[])){
+      if(!e.id)continue;
+      if(!porFicha[e.id])porFicha[e.id]=[];
+      porFicha[e.id].push(e);
+    }
+
+    const RAIZES=['entrar_contato','lead','manual'];
+
+    // 2. Montar árvore por sistema: fichas cuja RAIZ ocorreu no período
+    function novaArvore(){return {count:0,filhos:{}};}
+    const arv={adm:{},tv:{}};
+    RAIZES.forEach(r=>{arv.adm[r]=novaArvore();arv.tv[r]=novaArvore();});
+
+    for(const id of Object.keys(porFicha)){
+      const evs=porFicha[id].slice().sort((a,b)=>String(a.ts).localeCompare(String(b.ts)));
+      // raiz = primeiro evento de tipo raiz
+      const raizEvt=evs.find(e=>RAIZES.includes(e.tipo));
+      if(!raizEvt)continue;
+      if(raizEvt.ts<corteISO)continue; // cohort: entradas do período
+      // sistema da ficha: TV se qualquer evento tv, senão ADM
+      const sis=evs.some(e=>e.sis==='tv')?'tv':'adm';
+      // caminho: sequência de tipos a partir da raiz (sem repetir consecutivos, exceto reagendar)
+      const caminho=[];
+      for(const e of evs){
+        if(e.ts<raizEvt.ts)continue;
+        if(caminho.length===0){
+          if(e.tipo===raizEvt.tipo)caminho.push(e.tipo);
+          continue;
+        }
+        if(e.tipo===caminho[caminho.length-1]&&e.tipo!=='reagendar')continue;
+        caminho.push(e.tipo);
+      }
+      if(!caminho.length)continue;
+      // inserir na árvore
+      let no=arv[sis][caminho[0]];
+      if(!no)continue;
+      no.count++;
+      for(let k=1;k<caminho.length&&k<5;k++){
+        const t=caminho[k];
+        if(!no.filhos[t])no.filhos[t]=novaArvore();
+        no=no.filhos[t];
+        no.count++;
+      }
+    }
+
+    return res.status(200).json({ok:true,periodo,desde:corteISO,arvore:arv});
   }
 
   // ── STATS-PA: contagem semanal de fichas → logística por Passiva/Ativa ──
