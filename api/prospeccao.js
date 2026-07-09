@@ -491,6 +491,45 @@ export default async function handler(req,res){
     return res.status(200).json({ok:true,periodo,desde:corteISO,contagens:out});
   }
 
+  // ── EVENTOS-DIAGNOSTICO: raio-x da base de eventos ────────────────────────
+  if(action==='eventos-diagnostico'){
+    const db_evt=(await dbGet(EVT_KEY))||{eventos:[]};
+    const evs=db_evt.eventos||[];
+    const porDia={},porTipo={},semId=0,stats={backfill:0,aoVivoSemDe:0,completos:0};
+    let _semId=0;
+    for(const e of evs){
+      const dia=String(e.ts||'').slice(0,10);
+      porDia[dia]=(porDia[dia]||0)+1;
+      porTipo[e.tipo]=(porTipo[e.tipo]||0)+1;
+      if(!e.id)_semId++;
+      if(e.bf)stats.backfill++;
+      else if(e.de===undefined&&!['lead','entrar_contato','manual'].includes(e.tipo))stats.aoVivoSemDe++;
+      else stats.completos++;
+    }
+    return res.status(200).json({ok:true,total:evs.length,semId:_semId,stats,porTipo,porDia,backfillFeito:!!db_evt.backfillFeito});
+  }
+
+  // ── EVENTOS-LIMPAR?modo=sujos|tudo — higieniza a base do relatório ────────
+  if(action==='eventos-limpar'){
+    const modo=req.query.modo||'sujos';
+    const db_evt=(await dbGet(EVT_KEY))||{eventos:[]};
+    const antes=(db_evt.eventos||[]).length;
+    if(modo==='tudo'){
+      db_evt.eventos=[];
+    }else{
+      // 'sujos': remove backfill + eventos de transição sem origem (pré-fix)
+      db_evt.eventos=(db_evt.eventos||[]).filter(e=>{
+        if(e.bf)return false; // backfill reconstruído (duplica fatos)
+        if(!e.id)return false; // sem identidade — não entra na árvore
+        if(e.de===undefined&&!['lead','entrar_contato','manual'].includes(e.tipo))return false; // transição sem origem
+        return true;
+      });
+    }
+    db_evt.backfillFeito=true; // nunca mais reconstruir automaticamente
+    await dbSet(EVT_KEY,db_evt);
+    return res.status(200).json({ok:true,modo,antes,depois:db_evt.eventos.length,removidos:antes-db_evt.eventos.length});
+  }
+
   // ── RELATORIO-ARVORE v2: 4 matrizes (entradas na etapa) + desmembramento
   //    recursivo + conversão final (logística/frente de loja) vs matriz ─────
   if(action==='relatorio-arvore'){
