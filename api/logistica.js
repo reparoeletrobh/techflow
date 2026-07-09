@@ -588,9 +588,17 @@ module.exports = async function handler(req, res) {
     } catch(e) { console.error('[Log] templates:', e.message); }
 
     // Gerar texto para cada equipamento
-    const resultados = equips.map(eq =>
-      gerarTexto(eq.tipo, eq.subtipo, eq.servicos, eq.preco, customTemplates)
-    );
+    const resultados = equips.map(eq => {
+      // ⚡ Tabela Dinâmica: orçamento = 40% do valor do equipamento (arredondado)
+      if (eq.tabela === 'dinamica') {
+        const valorEq = parseFloat(String(eq.valorEquip || '0').replace(',', '.')) || 0;
+        const preco40 = String(Math.round(valorEq * 0.4));
+        const pn = priNome(nome);
+        const texto = `Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a recuperacao completa do equipamento, sera feita a reoperacao eletrica tambem. Este conserto completo fica em ${preco40} reais apenas. Aprovando ja iniciamos o conserto.`;
+        return { texto, preco: preco40 };
+      }
+      return gerarTexto(eq.tipo, eq.subtipo, eq.servicos, eq.preco, customTemplates);
+    });
 
     // Texto final
     let textoFinal, precoFinal;
