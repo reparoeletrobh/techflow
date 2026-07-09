@@ -684,7 +684,9 @@ module.exports = async function handler(req, res) {
           // Usar flFichaId direto (confiável) ou extrair do título como fallback
           const osMatch = (card.title || '').match(/OS:([a-zA-Z0-9-]+)/);
           const fichaId = card.flFichaId || (osMatch ? osMatch[1] : null);
-          fetch(flBaseUrl+'/api/frenteloja?action=conserto-realizado', {
+          // AWAIT obrigatório: serverless encerra a função e mata fetchs pendentes
+          // (causa das fichas presas em produção no FL — ex: José 3174 em 09/07)
+          await fetch(flBaseUrl+'/api/frenteloja?action=conserto-realizado', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
