@@ -52,6 +52,11 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 .cbtn-del{color:#5a6270;border-color:rgba(90,98,112,.2);}
 .empty{text-align:center;padding:30px;color:#5a6270;font-size:12px;}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#a855f7;color:#fff;padding:10px 20px;border-radius:8px;font-size:12px;font-weight:700;display:none;z-index:999;}
+@keyframes relFade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+.mx-card{animation:relFade .35s ease both;}
+.mx-card:nth-child(2){animation-delay:.06s;}
+.mx-card:nth-child(3){animation-delay:.12s;}
+.mx-card:nth-child(4){animation-delay:.18s;}
 </style>
 </head>
 <body>
@@ -138,7 +143,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 
 <!-- Modal Relatório -->
 <div id="rel-modal" style="display:none;position:fixed;inset:0;z-index:840;background:rgba(0,0,0,.78);align-items:center;justify-content:center;padding:16px;overflow-y:auto;">
-  <div style="background:#0c0d10;border:1px solid #1e2228;border-radius:16px;width:100%;max-width:560px;margin:auto;">
+  <div style="background:linear-gradient(160deg,#0a0c11 0%,#0d1018 60%,#0a0e16 100%);border:1px solid #1e2430;border-radius:18px;width:100%;max-width:620px;margin:auto;box-shadow:0 0 60px rgba(139,92,246,.08),0 24px 60px rgba(0,0,0,.5);">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #1e2228;">
       <span style="font-weight:800;font-size:13px;">📊 Dashboard da Prospecção</span>
       <button onclick="fecharRelatorio()" style="background:none;border:none;color:#5a6270;font-size:20px;cursor:pointer;">✕</button>
@@ -363,54 +368,94 @@ async function carregarArvore(){
 }
 
 var REL_META={
-  entrar_contato:['⚠️','Entrar em Contato','#ef4444'],
-  lead:['🔭','Lead','#3b9eff'],
-  manual:['➕','Cadastro Manual','#22c55e'],
-  retornar:['↩','Retornar','#f97316'],
+  entrar_contato:['⚠️','ENTRAR EM CONTATO','#ef4444'],
+  lead:['🔭','LEAD','#3b9eff'],
+  retornar:['↩','RETORNAR','#f97316'],
+  cliente_loja:['🏪','CLIENTE LOJA','#8b5cf6'],
   reagendar:['📅','Reagendou','#f97316'],
-  cliente_loja:['🏪','Cliente Loja','#3b9eff'],
   logistica:['🚚','Logística','#22c55e'],
   frenteloja:['🏬','Frente de Loja','#f5c800'],
   fim_fila:['⤵','Fim da Fila','#8b93a1']
 };
 
-function noArvoreHTML(tipo,no,paiCount,nivel){
+function ramoHTML(tipo,no,paiCount,nivel){
   var m=REL_META[tipo]||['•',tipo,'#c9ced6'];
-  var pct=paiCount>0?Math.round(100*no.count/paiCount):null;
+  var pct=paiCount>0?Math.round(100*no.count/paiCount):0;
   var eFinal=(tipo==='logistica'||tipo==='frenteloja');
-  var html='<div style="margin-left:'+(nivel>0?18:0)+'px;'+(nivel>0?'border-left:2px solid #22272f;padding-left:12px;':'')+'margin-top:'+(nivel===0?'14':'7')+'px;">'
-    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-      +(nivel>0?'<span style="color:#3a4150;font-size:11px;">└→</span>':'')
-      +'<span style="font-size:'+(nivel===0?'14':'12')+'px;font-weight:800;color:'+m[2]+';">'+m[0]+' '+m[1]+'</span>'
-      +'<span style="font-size:'+(nivel===0?'16':'13')+'px;font-weight:900;color:#f0f2f5;">'+no.count+'</span>'
-      +(pct!==null?'<span style="font-size:10.5px;font-weight:800;color:'+(eFinal?'#22c55e':'#a78bfa')+';background:'+(eFinal?'rgba(34,197,94,.12)':'rgba(139,92,246,.12)')+';border-radius:6px;padding:2px 7px;">'+pct+'% conv.</span>':'')
+  var html='<div style="position:relative;margin-left:'+(nivel>1?16:0)+'px;padding-left:16px;border-left:1.5px solid '+m[2]+'33;margin-top:7px;">'
+    +'<div style="position:absolute;left:-1px;top:12px;width:10px;height:1.5px;background:'+m[2]+'55;"></div>'
+    +'<div style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,'+m[2]+'14,'+m[2]+'08);border:1px solid '+m[2]+'40;border-radius:10px;padding:6px 11px;">'
+      +'<span style="font-size:12px;">'+m[0]+'</span>'
+      +'<span style="font-size:11px;font-weight:800;color:'+m[2]+';">'+m[1]+'</span>'
+      +'<span style="font-size:14px;font-weight:900;color:#fff;">'+no.count+'</span>'
+      +'<span style="font-size:10px;font-weight:800;color:'+(eFinal?'#4ade80':'#a78bfa')+';background:rgba(0,0,0,.3);border-radius:5px;padding:2px 6px;">'+pct+'%</span>'
     +'</div>';
   var filhos=Object.keys(no.filhos||{});
-  // ordem lógica dos galhos
-  var ordem=['retornar','reagendar','fim_fila','cliente_loja','logistica','frenteloja'];
+  var ordem=['reagendar','fim_fila','retornar','cliente_loja','logistica','frenteloja'];
   filhos.sort(function(a,b){return ordem.indexOf(a)-ordem.indexOf(b);});
-  filhos.forEach(function(ft){
-    html+=noArvoreHTML(ft,no.filhos[ft],no.count,nivel+1);
-  });
+  filhos.forEach(function(ft){html+=ramoHTML(ft,no.filhos[ft],no.count,nivel+1);});
   html+='</div>';
   return html;
+}
+
+function matrizHTML(tipo,mx){
+  var m=REL_META[tipo];
+  var pctLog=mx.count>0?Math.round(100*mx.convLog/mx.count):0;
+  var pctFl=mx.count>0?Math.round(100*mx.convFl/mx.count):0;
+  var filhos=Object.keys(mx.filhos||{});
+  var ordem=['reagendar','fim_fila','retornar','cliente_loja','logistica','frenteloja'];
+  filhos.sort(function(a,b){return ordem.indexOf(a)-ordem.indexOf(b);});
+  var ramos='';
+  filhos.forEach(function(ft){ramos+=ramoHTML(ft,mx.filhos[ft],mx.count,1);});
+
+  return '<div class="mx-card" style="background:linear-gradient(150deg,'+m[2]+'0d 0%,rgba(13,16,24,.9) 45%);border:1px solid '+m[2]+'45;border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 0 24px '+m[2]+'12, inset 0 1px 0 rgba(255,255,255,.04);">'
+    // Header da matriz
+    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">'
+      +'<div style="display:flex;align-items:center;gap:10px;">'
+        +'<span style="font-size:22px;filter:drop-shadow(0 0 8px '+m[2]+'88);">'+m[0]+'</span>'
+        +'<div>'
+          +'<div style="font-size:11px;font-weight:900;letter-spacing:.1em;color:'+m[2]+';">'+m[1]+'</div>'
+          +'<div style="font-size:9px;color:#5a6270;font-weight:700;letter-spacing:.05em;">ENTRADAS NO PERÍODO</div>'
+        +'</div>'
+      +'</div>'
+      +'<span style="font-size:30px;font-weight:900;color:#fff;text-shadow:0 0 20px '+m[2]+'66;line-height:1;">'+mx.count+'</span>'
+    +'</div>'
+    // Placar de conversão final vs matriz
+    +'<div style="display:flex;gap:8px;margin-top:12px;">'
+      +'<div style="flex:1;display:flex;align-items:center;justify-content:center;gap:7px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:10px;padding:8px;">'
+        +'<span style="font-size:13px;">🚚</span>'
+        +'<span style="font-size:16px;font-weight:900;color:#4ade80;">'+pctLog+'%</span>'
+        +'<span style="font-size:9px;font-weight:700;color:#5a6270;">LOGÍSTICA<br>('+mx.convLog+' de '+mx.count+')</span>'
+      +'</div>'
+      +'<div style="flex:1;display:flex;align-items:center;justify-content:center;gap:7px;background:rgba(245,200,0,.07);border:1px solid rgba(245,200,0,.3);border-radius:10px;padding:8px;">'
+        +'<span style="font-size:13px;">🏬</span>'
+        +'<span style="font-size:16px;font-weight:900;color:#f5c800;">'+pctFl+'%</span>'
+        +'<span style="font-size:9px;font-weight:700;color:#5a6270;">FRENTE LOJA<br>('+mx.convFl+' de '+mx.count+')</span>'
+      +'</div>'
+    +'</div>'
+    // Desmembramento
+    +(ramos?'<div style="margin-top:12px;padding-top:10px;border-top:1px dashed '+m[2]+'25;">'
+      +'<div style="font-size:9px;font-weight:800;color:#5a6270;letter-spacing:.08em;margin-bottom:2px;">DESMEMBRAMENTO DA JORNADA</div>'
+      +ramos+'</div>'
+    :'<div style="margin-top:10px;font-size:10px;color:#3a4150;">Sem movimentações registradas a partir desta etapa</div>')
+  +'</div>';
 }
 
 function renderArvore(){
   if(!_relArv)return;
   var corpo=document.getElementById('rel-corpo');
-  var arv=_relArv.arvore[_relSis]||{};
-  var raizes=['entrar_contato','lead','manual'];
-  var temDados=raizes.some(function(r){return arv[r]&&arv[r].count>0;});
+  var mz=_relArv.matrizes[_relSis]||{};
+  var MATRIZES=['entrar_contato','lead','retornar','cliente_loja'];
+  var temDados=MATRIZES.some(function(r){return mz[r]&&mz[r].count>0;});
   if(!temDados){
-    corpo.innerHTML='<div style="text-align:center;color:#5a6270;font-size:12px;padding:30px;">📭 Nenhuma jornada registrada no período<br><span style="font-size:10px;">(rastreamento completo a partir de 09/07/26)</span></div>';
+    corpo.innerHTML='<div style="text-align:center;color:#5a6270;font-size:12px;padding:34px;">📭 Nenhuma entrada registrada no período<br><span style="font-size:10px;">(rastreamento de jornadas ativo desde 09/07/26)</span></div>';
     return;
   }
   var html='';
-  raizes.forEach(function(r){
-    if(arv[r]&&arv[r].count>0)html+=noArvoreHTML(r,arv[r],0,0);
+  MATRIZES.forEach(function(r){
+    if(mz[r]&&mz[r].count>0)html+=matrizHTML(r,mz[r]);
   });
-  html+='<div style="font-size:10px;color:#5a6270;margin-top:16px;text-align:center;">Fichas que entraram desde '+String(_relArv.desde).slice(0,10).split('-').reverse().join('/')+' · % = conversão sobre a etapa anterior</div>';
+  html+='<div style="font-size:10px;color:#5a6270;margin-top:4px;text-align:center;">Entradas desde '+String(_relArv.desde).slice(0,10).split('-').reverse().join('/')+' · % nos ramos = sobre a etapa anterior · placar 🚚/🏬 = conversão final sobre a matriz</div>';
   corpo.innerHTML=html;
 }
 

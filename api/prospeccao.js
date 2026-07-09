@@ -491,12 +491,12 @@ export default async function handler(req,res){
     return res.status(200).json({ok:true,periodo,desde:corteISO,contagens:out});
   }
 
-  // ── RELATORIO-ARVORE: jornada das fichas em árvore com % de conversão ────
+  // ── RELATORIO-ARVORE v2: 4 matrizes (entradas na etapa) + desmembramento
+  //    recursivo + conversão final (logística/frente de loja) vs matriz ─────
   if(action==='relatorio-arvore'){
     const periodo=req.query.periodo||'hoje';
     const db_evt=(await dbGet(EVT_KEY))||{eventos:[]};
 
-    // Corte do período (BRT)
     const agoraBRT=new Date(Date.now()-3*3600000);
     let corte;
     if(periodo==='hoje'){
@@ -510,54 +510,53 @@ export default async function handler(req,res){
     }
     const corteISO=corte.toISOString();
 
-    // 1. Agrupar eventos por ficha (id) — ignora eventos sem id (histórico antigo)
+    // Eventos por ficha, ordenados
     const porFicha={};
     for(const e of (db_evt.eventos||[])){
       if(!e.id)continue;
       if(!porFicha[e.id])porFicha[e.id]=[];
       porFicha[e.id].push(e);
     }
+    Object.values(porFicha).forEach(l=>l.sort((a,b)=>String(a.ts).localeCompare(String(b.ts))));
 
-    const RAIZES=['entrar_contato','lead','manual'];
-
-    // 2. Montar árvore por sistema: fichas cuja RAIZ ocorreu no período
-    function novaArvore(){return {count:0,filhos:{}};}
-    const arv={adm:{},tv:{}};
-    RAIZES.forEach(r=>{arv.adm[r]=novaArvore();arv.tv[r]=novaArvore();});
+    const MATRIZES=['entrar_contato','lead','retornar','cliente_loja'];
+    function novoNo(){return {count:0,filhos:{}};}
+    function novaMatriz(){return {count:0,filhos:{},convLog:0,convFl:0};}
+    const out={adm:{},tv:{}};
+    MATRIZES.forEach(m=>{out.adm[m]=novaMatriz();out.tv[m]=novaMatriz();});
 
     for(const id of Object.keys(porFicha)){
-      const evs=porFicha[id].slice().sort((a,b)=>String(a.ts).localeCompare(String(b.ts)));
-      // raiz = primeiro evento de tipo raiz
-      const raizEvt=evs.find(e=>RAIZES.includes(e.tipo));
-      if(!raizEvt)continue;
-      if(raizEvt.ts<corteISO)continue; // cohort: entradas do período
-      // sistema da ficha: TV se qualquer evento tv, senão ADM
+      const evs=porFicha[id];
       const sis=evs.some(e=>e.sis==='tv')?'tv':'adm';
-      // caminho: sequência de tipos a partir da raiz (sem repetir consecutivos, exceto reagendar)
-      const caminho=[];
-      for(const e of evs){
-        if(e.ts<raizEvt.ts)continue;
-        if(caminho.length===0){
-          if(e.tipo===raizEvt.tipo)caminho.push(e.tipo);
-          continue;
+      for(const M of MATRIZES){
+        // primeira ENTRADA na etapa M dentro do período
+        const iM=evs.findIndex(e=>e.tipo===M&&e.ts>=corteISO);
+        if(iM<0)continue;
+        const matriz=out[sis][M];
+        matriz.count++;
+        // sufixo da jornada a partir de M (sem repetir consecutivos, exceto reagendar)
+        const suf=[];
+        for(let k=iM+1;k<evs.length;k++){
+          const t=evs[k].tipo;
+          if(t===M&&suf.length===0)continue;
+          if(suf.length&&t===suf[suf.length-1]&&t!=='reagendar')continue;
+          suf.push(t);
         }
-        if(e.tipo===caminho[caminho.length-1]&&e.tipo!=='reagendar')continue;
-        caminho.push(e.tipo);
-      }
-      if(!caminho.length)continue;
-      // inserir na árvore
-      let no=arv[sis][caminho[0]];
-      if(!no)continue;
-      no.count++;
-      for(let k=1;k<caminho.length&&k<5;k++){
-        const t=caminho[k];
-        if(!no.filhos[t])no.filhos[t]=novaArvore();
-        no=no.filhos[t];
-        no.count++;
+        // inserir na árvore da matriz
+        let no=matriz;
+        for(let k=0;k<suf.length&&k<5;k++){
+          const t=suf[k];
+          if(!no.filhos[t])no.filhos[t]=novoNo();
+          no=no.filhos[t];
+          no.count++;
+        }
+        // conversões finais vs matriz
+        if(suf.includes('logistica'))matriz.convLog++;
+        if(suf.includes('frenteloja'))matriz.convFl++;
       }
     }
 
-    return res.status(200).json({ok:true,periodo,desde:corteISO,arvore:arv});
+    return res.status(200).json({ok:true,periodo,desde:corteISO,matrizes:out});
   }
 
   // ── STATS-PA: contagem semanal de fichas → logística por Passiva/Ativa ──
