@@ -589,15 +589,18 @@ module.exports = async function handler(req, res) {
 
     // Gerar texto para cada equipamento
     const resultados = equips.map(eq => {
-      // ⚡ Tabela Dinâmica: orçamento = 40% do valor do equipamento (arredondado)
+      const r = gerarTexto(eq.tipo, eq.subtipo, eq.servicos, eq.preco, customTemplates);
+      // ⚡ Tabela Dinâmica: MESMO texto e peças — só o valor vira 40% do equipamento (arredondado)
       if (eq.tabela === 'dinamica') {
         const valorEq = parseFloat(String(eq.valorEquip || '0').replace(',', '.')) || 0;
         const preco40 = String(Math.round(valorEq * 0.4));
-        const pn = priNome(nome);
-        const texto = `Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a recuperacao completa do equipamento, sera feita a reoperacao eletrica tambem. Este conserto completo fica em ${preco40} reais apenas. Aprovando ja iniciamos o conserto.`;
-        return { texto, preco: preco40 };
+        if (r && r.texto && r.preco) {
+          const rx = new RegExp(String(r.preco).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+          return { texto: r.texto.replace(rx, preco40), preco: preco40 };
+        }
+        if (r && r.texto) return { texto: r.texto, preco: preco40 };
       }
-      return gerarTexto(eq.tipo, eq.subtipo, eq.servicos, eq.preco, customTemplates);
+      return r;
     });
 
     // Texto final

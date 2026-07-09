@@ -863,6 +863,8 @@ function equipSecHTML(eq, i, total) {
         <button class="type-btn${eq.tabela==='dinamica'?' sel':''}" onclick="selTabela(${i},'dinamica')">⚡ Tabela Dinâmica</button>
       </div>
     </div>` : ''}
+    ${subtiposHTML}
+    ${servicosHTML ? `<div><div class="diag-section-label" style="margin-bottom:6px;">Serviços / Peças</div><div class="srv-grid">${servicosHTML}</div></div>` : ''}
     ${eq.tabela==='dinamica' ? `
     <div>
       <div class="diag-section-label" style="margin-bottom:5px;">💰 Valor do equipamento (R$)</div>
@@ -871,9 +873,7 @@ function equipSecHTML(eq, i, total) {
       <div id="orc40-${i}" style="margin-top:6px;font-size:13px;font-weight:800;color:var(--accent,#f5c800);">
         Orçamento (40%): ${eq.valorEquip>0?'R$ '+Math.round(parseFloat(eq.valorEquip)*0.4):'—'}
       </div>
-    </div>` : `
-    ${subtiposHTML}
-    ${servicosHTML ? `<div><div class="diag-section-label" style="margin-bottom:6px;">Serviços / Peças</div><div class="srv-grid">${servicosHTML}</div></div>` : ''}`}
+    </div>` : ''}
     ${eq.tabela!=='dinamica' && precisaPreco(eq.tipo, eq.subtipo, eq.servicos) ? `
     <div>
       <div class="diag-section-label" style="margin-bottom:5px;">Preço de custo (R$) — valor final será x2</div>
@@ -898,8 +898,7 @@ function selTipo(i, tipo) {
 }
 
 function selTabela(i, t) {
-  diagEquips[i].tabela = t;
-  if (t === 'dinamica') { diagEquips[i].subtipo = null; diagEquips[i].servicos = []; }
+  diagEquips[i].tabela = t; // peças/subtipo permanecem — só muda a origem do valor
   renderEquips(diagEquips.length);
 }
 
@@ -931,13 +930,11 @@ async function salvarDiag() {
     const eq = diagEquips[i];
     const label = diagEquips.length > 1 ? `Equipamento ${i+1}` : 'equipamento';
     if (!eq.tipo)            { mostrarMsgDiag(`Selecione o tipo do ${label}`,'err'); return; }
+    if (!eq.servicos.length) { mostrarMsgDiag(`Selecione ao menos um serviço para o ${label}`,'err'); return; }
     if (eq.tabela === 'dinamica') {
       const v40 = parseFloat(String(eq.valorEquip||'').replace(',','.'));
       if (!(v40 > 0)) { mostrarMsgDiag(`Informe o valor do equipamento (${label} — Tabela Dinâmica)`,'err'); return; }
-      continue; // dinâmica dispensa serviços/preço de custo
-    }
-    if (!eq.servicos.length) { mostrarMsgDiag(`Selecione ao menos um serviço para o ${label}`,'err'); return; }
-    if (precisaPreco(eq.tipo, eq.subtipo, eq.servicos) && !eq.preco) {
+    } else if (precisaPreco(eq.tipo, eq.subtipo, eq.servicos) && !eq.preco) {
       mostrarMsgDiag(`Informe o preço de custo do ${label}`,'err'); return;
     }
   }
