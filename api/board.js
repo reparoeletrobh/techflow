@@ -1239,6 +1239,49 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, total: retCards.length, results });
     }
 
+    // ── GET saidas-hoje?fases=producao,cliente_loja — diff backup 03:30 × agora ──
+    if (req.method === "GET" && action === "saidas-hoje") {
+      const fases = String(req.query.fases || 'producao,cliente_loja').split(',');
+      // Slot do backup de hoje (rotação par/ímpar por dia da semana BRT)
+      const dowHoje = new Date(Date.now() - 3*3600000).getUTCDay();
+      const slot = dowHoje % 2;
+      const raw = await dbGet(`bk_${slot}_reparoeletro_board`);
+      if (!raw) return res.status(200).json({ ok:false, error:`backup bk_${slot}_reparoeletro_board não encontrado` });
+      let v = raw.v ?? raw;
+      if (typeof v === 'string') { try { v = JSON.parse(v); } catch(e) { return res.status(200).json({ ok:false, error:'parse1' }); } }
+      if (typeof v === 'string') { try { v = JSON.parse(v); } catch(e) { return res.status(200).json({ ok:false, error:'parse2' }); } }
+      const snapCards = (v && v.cards) || [];
+      const snapEm = raw.em || null;
+
+      const atual = sanitizeBoard(await dbGet(BOARD_KEY));
+      const atuaisPorId = {};
+      (atual.cards || []).forEach(c => { atuaisPorId[String(c.pipefyId)] = c; });
+
+      const saidas = [];
+      for (const sc of snapCards) {
+        if (!fases.includes(sc.phaseId)) continue;
+        const agora = atuaisPorId[String(sc.pipefyId)];
+        if (agora && agora.phaseId === sc.phaseId) continue; // ainda na fase
+        saidas.push({
+          titulo: (sc.title || '').slice(0, 80),
+          nome: sc.nomeContato || null,
+          telefone: sc.telefone || null,
+          saiuDe: sc.phaseId,
+          estaAgoraEm: agora ? agora.phaseId : '(removido do board)',
+          movidoEm: agora ? agora.movedAt : null,
+          movidoPor: agora ? (agora.movedBy || null) : null,
+          tecnico: agora ? (agora.tecnico || null) : null,
+        });
+      }
+      saidas.sort((a,b) => String(b.movidoEm||'').localeCompare(String(a.movidoEm||'')));
+      const resumo = {};
+      saidas.forEach(s => { const k = s.saiuDe+' → '+s.estaAgoraEm; resumo[k] = (resumo[k]||0)+1; });
+
+      return res.status(200).json({ ok:true, snapshotDe: snapEm, fases,
+        totalSaidas: saidas.length, resumo, saidas,
+        nota: 'Diff entre o backup da madrugada e agora. Fichas que entraram E saíram da fase no mesmo dia após o backup não aparecem.' });
+    }
+
     // ── GET relatorio-movimentacoes?horas=48 — últimas movimentações do board ──
     if (req.method === "GET" && action === "relatorio-movimentacoes") {
       const horas = parseInt(req.query.horas || '48', 10);
