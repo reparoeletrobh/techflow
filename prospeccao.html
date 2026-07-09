@@ -60,6 +60,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
   <div class="h-title">🔭 Prospecção</div>
   <div class="h-btns">
     <span class="sync-info" id="sync-info">—</span>
+    <button class="btn" style="background:#8b5cf6;color:#fff;" onclick="abrirRelatorio()">📊 Relatório</button>
     <button class="btn" style="background:#22c55e;color:#000;" onclick="abrirNovaFicha()">➕ Nova Ficha</button>
     <button class="btn btn-sync" id="btn-sync" onclick="sincronizar()">🔄 Sincronizar</button>
     <a href="/adm" class="btn" style="background:#1e2228;color:#f0f2f5;text-decoration:none;">← ADM</a>
@@ -134,6 +135,22 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 </div>
 
 <div class="toast" id="toast">✅ Feito!</div>
+
+<!-- Modal Relatório -->
+<div id="rel-modal" style="display:none;position:fixed;inset:0;z-index:840;background:rgba(0,0,0,.78);align-items:center;justify-content:center;padding:16px;overflow-y:auto;">
+  <div style="background:#0f1114;border:1px solid #1e2228;border-radius:14px;width:100%;max-width:460px;margin:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #1e2228;">
+      <span style="font-weight:800;font-size:13px;">📊 Relatório da Prospecção</span>
+      <button onclick="fecharRelatorio()" style="background:none;border:none;color:#5a6270;font-size:20px;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:14px 18px;display:flex;gap:8px;">
+      <button class="rel-per" id="rp-hoje"   onclick="carregarRel('hoje')"   style="flex:1;padding:9px;border-radius:8px;border:1px solid #2a2f38;background:#181b1f;color:#f0f2f5;font-size:12px;font-weight:800;cursor:pointer;">Hoje</button>
+      <button class="rel-per" id="rp-semana" onclick="carregarRel('semana')" style="flex:1;padding:9px;border-radius:8px;border:1px solid #2a2f38;background:#181b1f;color:#f0f2f5;font-size:12px;font-weight:800;cursor:pointer;">Semanal</button>
+      <button class="rel-per" id="rp-mes"    onclick="carregarRel('mes')"    style="flex:1;padding:9px;border-radius:8px;border:1px solid #2a2f38;background:#181b1f;color:#f0f2f5;font-size:12px;font-weight:800;cursor:pointer;">Mensal</button>
+    </div>
+    <div id="rel-corpo" style="padding:0 18px 18px;"><div style="text-align:center;color:#5a6270;font-size:12px;padding:20px;">Selecione o período</div></div>
+  </div>
+</div>
 
 <!-- Modal Data de Retorno -->
 <div id="ret-modal" style="display:none;position:fixed;inset:0;z-index:830;background:rgba(0,0,0,.75);align-items:center;justify-content:center;padding:16px;">
@@ -304,6 +321,66 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 
 <script>
 var _fichas=[], _espelho=[], _busca='';
+
+// ── Relatório ────────────────────────────────────────────────────────────
+function abrirRelatorio(){
+  document.getElementById('rel-modal').style.display='flex';
+  carregarRel('hoje');
+}
+function fecharRelatorio(){document.getElementById('rel-modal').style.display='none';}
+
+async function carregarRel(per){
+  ['hoje','semana','mes'].forEach(function(x){
+    var b=document.getElementById('rp-'+x);
+    if(b){b.style.background=x===per?'rgba(139,92,246,.2)':'#181b1f';b.style.borderColor=x===per?'#8b5cf6':'#2a2f38';b.style.color=x===per?'#a78bfa':'#f0f2f5';}
+  });
+  var corpo=document.getElementById('rel-corpo');
+  corpo.innerHTML='<div style="text-align:center;color:#5a6270;font-size:12px;padding:20px;">⏳ Carregando...</div>';
+  try{
+    var d=await fetch('/api/prospeccao?action=relatorio&periodo='+per).then(function(r){return r.json();});
+    if(!d.ok)throw new Error(d.error||'falha');
+    var c=d.contagens;
+    var METRICAS=[
+      ['entrar_contato','⚠️ Entrar em Contato'],
+      ['lead','🔭 Lead'],
+      ['retornar','↩ Retornar'],
+      ['cliente_loja','🏪 Cliente Loja'],
+      ['frenteloja','🏬 → Frente de Loja'],
+      ['logistica','🚚 Logística'],
+      ['fim_fila','⤵ Fim da Fila']
+    ];
+    function linha(lbl,a,t,tot,destaque){
+      return '<div style="display:grid;grid-template-columns:2fr .8fr .8fr .8fr;gap:6px;padding:7px 0;border-bottom:1px solid #16181d;font-size:12px;'+(destaque?'font-weight:800;':'')+'">'
+        +'<span style="color:#c9ced6;">'+lbl+'</span>'
+        +'<span style="text-align:center;color:#3b9eff;">'+a+'</span>'
+        +'<span style="text-align:center;color:#06b6d4;">'+t+'</span>'
+        +'<span style="text-align:center;color:#f0f2f5;">'+tot+'</span>'
+      +'</div>';
+    }
+    var html='<div style="display:grid;grid-template-columns:2fr .8fr .8fr .8fr;gap:6px;padding:6px 0;font-size:10px;font-weight:800;color:#5a6270;text-transform:uppercase;">'
+      +'<span>Ação</span><span style="text-align:center;color:#3b9eff;">🔧 ADM</span><span style="text-align:center;color:#06b6d4;">📺 TV</span><span style="text-align:center;">Σ</span></div>';
+    METRICAS.forEach(function(m){
+      html+=linha(m[1],c.adm[m[0]]||0,c.tv[m[0]]||0,c.total[m[0]]||0);
+    });
+
+    // Conversões
+    function pct(n,d){return d>0?Math.round(100*n/d)+'%':'—';}
+    html+='<div style="font-size:10px;font-weight:800;color:#8b5cf6;text-transform:uppercase;letter-spacing:.05em;margin:14px 0 4px;">Taxas de Conversão</div>';
+    html+=linha('🏪→🏬 Cliente Loja → Frente de Loja',
+      pct(c.adm.frenteloja,c.adm.cliente_loja),
+      pct(c.tv.frenteloja,c.tv.cliente_loja),
+      pct(c.total.frenteloja,c.total.cliente_loja),true);
+    var entrAdm=(c.adm.entrar_contato||0)+(c.adm.lead||0), entrTv=(c.tv.entrar_contato||0)+(c.tv.lead||0);
+    html+=linha('📥→🚚 Entradas → Logística',
+      pct(c.adm.logistica,entrAdm),
+      pct(c.tv.logistica,entrTv),
+      pct(c.total.logistica,entrAdm+entrTv),true);
+    html+='<div style="font-size:10px;color:#5a6270;margin-top:10px;">Desde '+String(d.desde).slice(0,10).split('-').reverse().join('/')+' · eventos completos a partir de 09/07/26</div>';
+    corpo.innerHTML=html;
+  }catch(e){
+    corpo.innerHTML='<div style="text-align:center;color:#ef4444;font-size:12px;padding:20px;">Erro: '+e.message+'</div>';
+  }
+}
 
 // ── Retornar com data (cadência) ─────────────────────────────────────────
 var _retId=null,_retModo='lead',_retSistema=null;

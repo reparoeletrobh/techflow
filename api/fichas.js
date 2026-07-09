@@ -190,15 +190,28 @@ export default async function handler(req, res) {
     const db  = (await dbGet(key)) || { fichas:[] };
     const agora = Date.now();
     let mudou = false;
+    let novosEntrar = 0;
     for (const f of db.fichas) {
       if (f.status === 'contato_feito' && f.contatoFeitoEm) {
         if (agora - new Date(f.contatoFeitoEm).getTime() > 24*60*60*1000) {
           f.status = 'entrar_contato';
           mudou = true;
+          novosEntrar++;
         }
       }
     }
     if (mudou) await dbSet(key, db);
+    // Evento para o relatório da prospecção (espelho Entrar em Contato)
+    if (novosEntrar > 0) {
+      try {
+        const sisEvt = key === 'fichas_tv' ? 'tv' : 'adm';
+        const evDb = (await dbGet('prospeccao_eventos')) || { eventos: [] };
+        if (!Array.isArray(evDb.eventos)) evDb.eventos = [];
+        const tsEvt = new Date().toISOString();
+        for (let k = 0; k < novosEntrar; k++) evDb.eventos.push({ ts: tsEvt, tipo: 'entrar_contato', sis: sisEvt });
+        await dbSet('prospeccao_eventos', evDb);
+      } catch(_) {}
+    }
     return res.status(200).json({ ok:true, fichas: db.fichas });
   }
 

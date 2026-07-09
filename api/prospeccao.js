@@ -56,6 +56,27 @@ function gerarId(tel,horario){
   return`prosp_${String(tel||'').replace(/\D/g,'').slice(-8)}_${Date.now().toString(36)}`;
 }
 
+// ── Log de eventos da prospecção (para o relatório) ──────────────────────
+const EVT_KEY='prospeccao_eventos';
+async function logEventos(lista){
+  // lista: [{tipo, sis, id, nome}] — ts adicionado aqui
+  try{
+    if(!lista||!lista.length)return;
+    const db=(await dbGet(EVT_KEY))||{eventos:[]};
+    if(!Array.isArray(db.eventos))db.eventos=[];
+    const ts=new Date().toISOString();
+    for(const e of lista){
+      db.eventos.push({ts,tipo:e.tipo,sis:e.sis==='tv'?'tv':'adm',id:e.id||null,nome:e.nome||null});
+    }
+    // Poda: manter 120 dias
+    const corte=new Date(Date.now()-120*86400000).toISOString();
+    if(db.eventos.length>20000||((db.eventos[0]||{}).ts||'')<corte){
+      db.eventos=db.eventos.filter(e=>e.ts>=corte);
+    }
+    await dbSet(EVT_KEY,db);
+  }catch(_){}
+}
+
 export default async function handler(req,res){
   res.setHeader('Access-Control-Allow-Origin','https://reparoeletroadm.com');
   res.setHeader('Cache-Control','no-cache');
@@ -152,6 +173,7 @@ export default async function handler(req,res){
       }
 
       if(novas>0)await dbSet(KEY,db);
+      if(novas>0)await logEventos(Array.from({length:novas},()=>({tipo:'lead',sis:'adm'})));
       return res.status(200).json({ok:true,novas,aguardando2h:aguardando,semHorario,total:dados.length,naBase:db.fichas.length,header:(rows[0]||[]).map(c=>String(c).substring(0,30)),debugHorarios});
     }catch(e){
       return res.status(200).json({ok:false,error:e.message,novas:0});
@@ -186,6 +208,7 @@ export default async function handler(req,res){
     const db=(await dbGet(KEY))||{fichas:[]};
     const f=db.fichas.find(x=>x.id===id);
     if(!f)return res.status(404).json({ok:false,error:'Não encontrado'});
+    const stAnt=f.status;
     f.status=status;f.movidoEm=new Date().toISOString();
     if(status==='retornar'){
       f.dataRetorno=dataRetorno||null;
@@ -193,6 +216,9 @@ export default async function handler(req,res){
       f.filaFinal=false; // reagendou → volta ao fluxo normal
     }
     await dbSet(KEY,db);
+    if(status!==stAnt&&(status==='retornar'||status==='cliente_loja')){
+      await logEventos([{tipo:status,sis:f.logisticaSistema||f.origemSistema||'adm',id:f.id,nome:f.nome}]);
+    }
     return res.status(200).json({ok:true});
   }
 
@@ -206,6 +232,7 @@ export default async function handler(req,res){
     f.tentativas=(f.tentativas||0)+1;
     f.movidoEm=new Date().toISOString();
     await dbSet(KEY,db);
+    await logEventos([{tipo:'fim_fila',sis:f.origemSistema||'adm',id:f.id,nome:f.nome}]);
     return res.status(200).json({ok:true,tentativas:f.tentativas});
   }
 
@@ -231,6 +258,7 @@ export default async function handler(req,res){
       criadoEm:now, movidoEm:now,
     });
     await dbSet(KEY,db);
+    await logEventos([{tipo:'retornar',sis:sistema,nome:orig.nome}]);
 
     // 2. Marca a origem — sai do espelho e das colunas de fichas (vive na prospecção)
     orig.status='prospeccao';
@@ -290,6 +318,7 @@ export default async function handler(req,res){
     ficha.logisticaEm=new Date().toISOString();
     ficha.logisticaTipo='ativa';
     ficha.logisticaSistema=sistema==='tv'?'tv':'adm';
+    await logEventos([{tipo:'logistica',sis:sistema,id:ficha.id,nome:ficha.nome}]);
     await dbSet(KEY,db);
     return res.status(200).json({ok:true});
   }
@@ -353,6 +382,7 @@ export default async function handler(req,res){
 
     db.fichas.unshift(ficha);
     await dbSet(KEY,db);
+    await logEventos([{tipo:destino==='logistica'?'logistica':'cliente_loja',sis:destino==='logistica'?(sistema==='tv'?'tv':'adm'):'adm',id:ficha.id,nome:ficha.nome}]);
     return res.status(200).json({ok:true,ficha});
   }
 
@@ -367,6 +397,7 @@ export default async function handler(req,res){
     f.logisticaTipo='ativa';
     f.movidoEm=f.frentelojaEm;
     await dbSet(KEY,db);
+    await logEventos([{tipo:'frenteloja',sis:'adm',id:f.id,nome:f.nome}]);
     return res.status(200).json({ok:true});
   }
 
@@ -391,11 +422,60 @@ export default async function handler(req,res){
       criadoEm:now, movidoEm:now,
     });
     await dbSet(KEY,db);
+    await logEventos([{tipo:'cliente_loja',sis:sistema,nome:orig.nome}]);
 
     orig.status='prospeccao';
     orig.prospeccaoEm=now;
     await dbSet(FKEY,fdb);
     return res.status(200).json({ok:true});
+  }
+
+  // ── RELATORIO: contagens e conversões por período, separado ADM/TV ───────
+  if(action==='relatorio'){
+    const periodo=req.query.periodo||'hoje';
+    let db_evt=(await dbGet(EVT_KEY))||{eventos:[]};
+
+    // Backfill one-shot: reconstrói eventos dos timestamps já existentes
+    if(!db_evt.backfillFeito){
+      const [pr,fa,ft]=await Promise.all([dbGet(KEY),dbGet('fichas_adm'),dbGet('fichas_tv')]);
+      const ev=db_evt.eventos||[];
+      for(const f of (pr?.fichas||[])){
+        const sisL=f.logisticaSistema||f.origemSistema||'adm';
+        if(f.criadoEm&&!f.origemEspelho)ev.push({ts:f.criadoEm,tipo:'lead',sis:'adm',id:f.id,nome:f.nome,bf:1});
+        if(f.criadoEm&&f.origemEspelho)ev.push({ts:f.criadoEm,tipo:f.status==='cliente_loja'?'cliente_loja':'retornar',sis:f.origemSistema||'adm',id:f.id,nome:f.nome,bf:1});
+        if(f.logisticaEm)ev.push({ts:f.logisticaEm,tipo:'logistica',sis:sisL,id:f.id,nome:f.nome,bf:1});
+        if(f.frentelojaEm)ev.push({ts:f.frentelojaEm,tipo:'frenteloja',sis:'adm',id:f.id,nome:f.nome,bf:1});
+        if(f.ativaManualEm)ev.push({ts:f.ativaManualEm,tipo:'cliente_loja',sis:'adm',id:f.id,nome:f.nome,bf:1});
+      }
+      ev.sort((a,b)=>String(a.ts).localeCompare(String(b.ts)));
+      db_evt={eventos:ev,backfillFeito:true};
+      await dbSet(EVT_KEY,db_evt);
+    }
+
+    // Cortes de período (BRT)
+    const agoraBRT=new Date(Date.now()-3*3600000);
+    let corte;
+    if(periodo==='hoje'){
+      corte=new Date(Date.UTC(agoraBRT.getUTCFullYear(),agoraBRT.getUTCMonth(),agoraBRT.getUTCDate())+3*3600000);
+    }else if(periodo==='mes'){
+      corte=new Date(Date.UTC(agoraBRT.getUTCFullYear(),agoraBRT.getUTCMonth(),1)+3*3600000);
+    }else{ // semana (desde domingo)
+      const dom=new Date(Date.UTC(agoraBRT.getUTCFullYear(),agoraBRT.getUTCMonth(),agoraBRT.getUTCDate())+3*3600000);
+      dom.setUTCDate(dom.getUTCDate()-agoraBRT.getUTCDay());
+      corte=dom;
+    }
+    const corteISO=corte.toISOString();
+
+    const TIPOS=['entrar_contato','lead','retornar','cliente_loja','frenteloja','logistica','fim_fila'];
+    const out={adm:{},tv:{},total:{}};
+    TIPOS.forEach(t=>{out.adm[t]=0;out.tv[t]=0;out.total[t]=0;});
+    for(const e of (db_evt.eventos||[])){
+      if(e.ts<corteISO)continue;
+      if(!TIPOS.includes(e.tipo))continue;
+      const s=e.sis==='tv'?'tv':'adm';
+      out[s][e.tipo]++;out.total[e.tipo]++;
+    }
+    return res.status(200).json({ok:true,periodo,desde:corteISO,contagens:out});
   }
 
   // ── STATS-PA: contagem semanal de fichas → logística por Passiva/Ativa ──
