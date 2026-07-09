@@ -79,6 +79,10 @@
   ],
   "rewrites": [
     {
+      "source": "/concluidas",
+      "destination": "/concluidas.html"
+    },
+    {
       "source": "/arquivo",
       "destination": "/arquivo.html"
     },

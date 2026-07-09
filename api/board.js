@@ -1239,6 +1239,40 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, total: retCards.length, results });
     }
 
+    // ── GET concluidas-dia?data=YYYY-MM-DD — serviços concluídos (régua das metas) ──
+    if (req.method === "GET" && action === "concluidas-dia") {
+      const dataQ = req.query.data || new Date(Date.now()-3*3600000).toISOString().slice(0,10);
+      const ini = new Date(dataQ+'T03:00:00.000Z'); // 00:00 BRT
+      const fim = new Date(ini.getTime()+24*3600000);
+      const board = sanitizeBoard(await dbGet(BOARD_KEY));
+      const porId = {};
+      (board.cards||[]).forEach(c => { porId[String(c.pipefyId)] = c; });
+
+      const linhas = [];
+      const vistos = new Set();
+      for (const m of (board.movesLog||[])) {
+        if (!['loja_feito','delivery_feito'].includes(m.phaseId)) continue;
+        const ts = new Date(m.timestamp||m.ts);
+        if (!(ts>=ini && ts<fim)) continue;
+        const chave = m.pipefyId ? m.phaseId+'|'+m.pipefyId : m.phaseId+'|'+m.timestamp;
+        if (vistos.has(chave)) continue;
+        vistos.add(chave);
+        const card = porId[String(m.pipefyId)];
+        linhas.push({
+          ficha: card ? (card.nomeContato || (card.title||'').slice(0,60)) : String(m.pipefyId||'—'),
+          titulo: card ? (card.title||'').slice(0,80) : null,
+          tipo: m.phaseId==='loja_feito' ? 'Cliente Loja → Loja Feito' : 'Produção → Delivery Feito',
+          tecnico: m.tecnico || '—',
+          hora: new Date(ts.getTime()-3*3600000).toISOString().slice(11,16),
+        });
+      }
+      linhas.sort((a,b)=>a.hora.localeCompare(b.hora));
+      const totLoja = linhas.filter(l=>l.tipo.includes('Loja Feito')).length;
+      const totDel  = linhas.filter(l=>l.tipo.includes('Delivery')).length;
+      return res.status(200).json({ ok:true, data:dataQ, totalConcluidas:linhas.length,
+        lojaFeito:totLoja, deliveryFeito:totDel, linhas });
+    }
+
     // ── GET saidas-hoje?fases=producao,cliente_loja — diff backup 03:30 × agora ──
     if (req.method === "GET" && action === "saidas-hoje") {
       const fases = String(req.query.fases || 'producao,cliente_loja').split(',');
