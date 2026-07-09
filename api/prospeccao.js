@@ -501,6 +501,73 @@ export default async function handler(req,res){
     return res.status(200).json({ok:true,periodo,desde:corteISO,contagens:out});
   }
 
+  // ── BACKFILL-HISTORICO: reconstrói eventos datados desde a criação ────────
+  //    Fiel: usa apenas timestamps reais gravados nas fichas. Dedupe por (id,tipo).
+  if(action==='backfill-historico'){
+    const [pr,fa,ft,existentes]=await Promise.all([
+      dbGet(KEY),dbGet('fichas_adm'),dbGet('fichas_tv'),lerEventos()
+    ]);
+    const ja=new Set(existentes.map(e=>`${e.id}|${e.tipo}`));
+    const novos=[];
+    function add(ts,tipo,sis,id,nome){
+      if(!ts||!id)return;
+      if(ja.has(`${id}|${tipo}`))return;
+      ja.add(`${id}|${tipo}`);
+      novos.push({ts,tipo,de:'hist',sis:sis==='tv'?'tv':'adm',id,nome:nome||null});
+    }
+
+    // 1. Fichas da prospecção
+    for(const f of (pr?.fichas||[])){
+      const id=f.origemFichaId||f.id;
+      const sisBase=f.origemSistema||'adm';
+      if(f.origemEspelho){
+        add(f.criadoEm,'entrar_contato',sisBase,id,f.nome);
+        // primeiro destino do espelho: retornar ou cliente_loja
+        if(f.dataRetorno||f.status==='retornar')add(f.criadoEm,'retornar',sisBase,id,f.nome);
+        else if(f.status==='cliente_loja'||f.frentelojaEm)add(f.criadoEm,'cliente_loja',sisBase,id,f.nome);
+      }else if(f.origemManual){
+        add(f.criadoEm,'manual','adm',id,f.nome);
+      }else{
+        add(f.criadoEm,'lead','adm',id,f.nome);
+      }
+      if(f.ativaManualEm)add(f.ativaManualEm,'cliente_loja','adm',id,f.nome);
+      if(f.status==='retornar'&&!f.origemEspelho)add(f.movidoEm||f.criadoEm,'retornar',sisBase,id,f.nome);
+      if(f.status==='cliente_loja'&&!f.ativaManualEm&&!f.origemEspelho)add(f.movidoEm||f.criadoEm,'cliente_loja',sisBase,id,f.nome);
+      if(f.logisticaEm)add(f.logisticaEm,'logistica',f.logisticaSistema||'adm',id,f.nome);
+      if(f.frentelojaEm)add(f.frentelojaEm,'frenteloja','adm',id,f.nome);
+    }
+
+    // 2. Fichas de fichas_adm/tv que foram trabalhadas pelo espelho
+    for(const [sisF,db] of [['adm',fa],['tv',ft]]){
+      for(const f of (db?.fichas||[])){
+        // Estava em entrar_contato ao cadastrar logística? (regra 24h)
+        if(f.logisticaEm&&f.contatoFeitoEm){
+          const horas=(new Date(f.logisticaEm)-new Date(f.contatoFeitoEm))/3600000;
+          if(horas>24){
+            add(f.contatoFeitoEm,'entrar_contato',sisF,f.id,f.nome);
+            add(f.logisticaEm,'logistica',sisF,f.id,f.nome);
+          }
+        }
+        // Ficha atualmente na coluna espelhada
+        if(f.status==='entrar_contato')add(f.contatoFeitoEm||f.criadoEm,'entrar_contato',sisF,f.id,f.nome);
+      }
+    }
+
+    // Gravar na lista atômica
+    novos.sort((a,b)=>String(a.ts).localeCompare(String(b.ts)));
+    let gravados=0;
+    for(const e of novos){
+      try{
+        await fetch(`${U}/rpush/${EVT_LIST}/${encodeURIComponent(JSON.stringify(e))}`,{headers:{Authorization:`Bearer ${T}`}});
+        gravados++;
+      }catch(_){}
+    }
+    const porTipo={};
+    novos.forEach(e=>{porTipo[e.tipo]=(porTipo[e.tipo]||0)+1;});
+    return res.status(200).json({ok:true,reconstruidos:gravados,porTipo,
+      nota:'Marcos datados reais. Galhos intermediarios antigos (reagendar/fim de fila) nao possuem data gravada e ficam de fora.'});
+  }
+
   // ── EVENTOS-DIAGNOSTICO: raio-x da base de eventos ────────────────────────
   if(action==='eventos-diagnostico'){
     const evs=await lerEventos();
