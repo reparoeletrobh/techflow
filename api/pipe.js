@@ -1561,6 +1561,67 @@ export default async function handler(req, res) {
   }
 
   // ── mover ─────────────────────────────────────────────────────────────────
+  // ── SAIDAS-ERP-HOJE: fichas que saíram da coluna ERP hoje (history + backup) ──
+  if (action === 'saidas-erp-hoje') {
+    var hojeBRT = new Date(Date.now() - 3*3600000).toISOString().slice(0,10);
+    var iniHoje = new Date(hojeBRT + 'T03:00:00.000Z').toISOString(); // 00:00 BRT
+    var dbS = (await dbGet(PIPE_KEY)) || defaultDB();
+    var porIdS = {};
+    (dbS.cards||[]).forEach(function(c){ porIdS[String(c.id)] = c; });
+
+    var saidas = {};
+
+    // A) History: cards fora de erp cujo último registro de saída foi de erp hoje
+    (dbS.cards||[]).forEach(function(c){
+      if (c.phase === 'erp') return;
+      var hst = c.history || [];
+      if (!hst.length) return;
+      var ult = hst[hst.length-1];
+      if (ult.phase === 'erp' && ult.ts >= iniHoje) {
+        saidas[String(c.id)] = {
+          nome: c.nomeContato || c.title || '—',
+          telefone: c.telefone || '',
+          equipamento: c.equipamento || '',
+          destino: c.phase,
+          horaBRT: new Date(new Date(ult.ts).getTime()-3*3600000).toISOString().slice(11,16),
+          fonte: 'history',
+        };
+      }
+    });
+
+    // B) Diff com o backup 03:30 de hoje (pega excluídos/arquivados também)
+    var dowB = new Date(Date.now()-3*3600000).getUTCDay();
+    var rawB = await dbGet('bk_' + (dowB%2) + '_reparoeletro_pipe');
+    var snapEm = null;
+    if (rawB) {
+      var vB = rawB.v ?? rawB; snapEm = rawB.em || null;
+      if (typeof vB === 'string') { try { vB = JSON.parse(vB); } catch(e) { vB = null; } }
+      if (typeof vB === 'string') { try { vB = JSON.parse(vB); } catch(e) { vB = null; } }
+      ((vB && vB.cards) || []).forEach(function(sc){
+        if (sc.phase !== 'erp') return;
+        var agora = porIdS[String(sc.id)];
+        if (agora && agora.phase === 'erp') return; // ainda lá
+        if (saidas[String(sc.id)]) return; // já pego pelo history
+        saidas[String(sc.id)] = {
+          nome: sc.nomeContato || sc.title || '—',
+          telefone: sc.telefone || '',
+          equipamento: sc.equipamento || '',
+          destino: agora ? agora.phase : '(removido do pipe)',
+          horaBRT: agora && agora.movedAt ? new Date(new Date(agora.movedAt).getTime()-3*3600000).toISOString().slice(11,16) : null,
+          fonte: 'diff-backup',
+        };
+      });
+    }
+
+    var lista = Object.keys(saidas).map(function(k){ return Object.assign({id:k}, saidas[k]); });
+    lista.sort(function(a,b){ return String(b.horaBRT||'').localeCompare(String(a.horaBRT||'')); });
+    var porDestino = {};
+    lista.forEach(function(s){ porDestino[s.destino] = (porDestino[s.destino]||0)+1; });
+
+    return res.status(200).json({ ok:true, data:hojeBRT, snapshotBackup:snapEm,
+      totalSaidasErp: lista.length, porDestino: porDestino, fichas: lista });
+  }
+
   // ── LISTAR-ERP-VINDAS-DE: cards em ERP cuja fase anterior foi X (diagnóstico) ──
   if (action === 'listar-erp-vindas-de') {
     var faseOrigem = req.query.fase || 'solicitar_entrega';
