@@ -372,6 +372,7 @@ var REL_META={
   lead:['🔭','LEAD','#3b9eff'],
   retornar:['↩','RETORNAR','#f97316'],
   cliente_loja:['🏪','CLIENTE LOJA','#8b5cf6'],
+  confirmou_loja:['✅','Confirmou Visita','#22c55e'],
   reagendar:['📅','Reagendou','#f97316'],
   logistica:['🚚','Logística','#22c55e'],
   frenteloja:['🏬','Frente de Loja','#f5c800'],
@@ -578,6 +579,37 @@ async function salvarNovaFicha(){
 }
 
 // ── Cliente Loja → Frente de Loja (conta ATIVA) ──────────────────────────
+// ── SLA Cliente Loja: 48h para definir → confirmação → 7 dias para vir ────
+function slaClienteLoja(f){
+  var agora=Date.now();
+  if(f.lojaConfirmouEm){
+    var d7=agora-new Date(f.lojaConfirmouEm).getTime();
+    var dias=d7/86400000;
+    if(dias>7){
+      return {modo:'vencido7d',prio:0,ord:-d7,txt:'Confirmou há '+Math.floor(dias)+' dias e NÃO VEIO'};
+    }
+    var rest=7-dias;
+    return {modo:'confirmado',prio:2,ord:d7,txt:'Cliente confirmou visita — '+(rest>=1?Math.ceil(rest)+' dias':Math.ceil(rest*24)+'h')+' restantes'};
+  }
+  var ent=new Date(f.movidoEm||f.criadoEm||0).getTime();
+  var h48=(agora-ent)/3600000;
+  if(h48>48){
+    return {modo:'vencido48',prio:0,ord:-(agora-ent),txt:'Há '+Math.floor(h48)+'h sem definição (limite 48h)'};
+  }
+  return {modo:'normal48',prio:1,ord:agora-ent,txt:Math.ceil(48-h48)+'h restantes para definir'};
+}
+
+async function confirmouLoja(id){
+  var f=_fichas.find(function(x){return x.id===id;});
+  if(!f)return;
+  if(!confirm('Cliente "'+(f.nome||'—')+'" confirmou que vai vir na loja?'))return;
+  var r=await fetch('/api/prospeccao?action=confirmar-loja',{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})
+  }).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok){mostrarToast('✅ Visita confirmada — prazo de 1 semana iniciado');await load();}
+  else alert('Erro: '+(r.error||'falha'));
+}
+
 async function enviarFrenteLoja(id){
   var f=_fichas.find(function(x){return x.id===id;});
   if(!f)return;
@@ -731,12 +763,29 @@ function cardHTML(f){
          '<button class="cbtn cbtn-log" onclick="abrirLogModal(\''+f.id+'\')">🚚 Logística</button>'+
          '<button class="cbtn cbtn-del" onclick="excluir(\''+f.id+'\')">✕</button>';
   }else if(isCli){
-    btns='<button class="cbtn" style="color:#f5c800;border-color:rgba(245,200,0,.3);background:rgba(245,200,0,.07);" onclick="enviarFrenteLoja(\''+f.id+'\')">🏬 Frente de Loja</button>'+
+    btns=(f.lojaConfirmouEm?'':'<button class="cbtn" style="color:#22c55e;border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.07);" onclick="confirmouLoja(\''+f.id+'\')">✅ Confirmou Visita</button>')+
+         '<button class="cbtn" style="color:#f5c800;border-color:rgba(245,200,0,.3);background:rgba(245,200,0,.07);" onclick="enviarFrenteLoja(\''+f.id+'\')">🏬 Frente de Loja</button>'+
          '<button class="cbtn cbtn-log" onclick="abrirLogModal(\''+f.id+'\')">🚚 Logística</button>'+
          '<button class="cbtn cbtn-del" onclick="excluir(\''+f.id+'\')">✕</button>';
   }
   // Card Retornar: data visível (vermelha se vencida) + estilo fim de fila
   var extraCard='', estiloCard='';
+  // Cliente Loja: SLA 48h → confirmação → SLA 7 dias
+  if(f.status==='cliente_loja'){
+    var st=slaClienteLoja(f);
+    if(st.modo==='vencido48'){
+      estiloCard='border-color:rgba(239,68,68,.6);background:#1c0f10;';
+      extraCard+='<div style="font-size:10.5px;font-weight:800;color:#ef4444;margin-bottom:4px;">🔴 '+st.txt+'</div>';
+    }else if(st.modo==='normal48'){
+      extraCard+='<div style="font-size:10.5px;font-weight:800;color:#f97316;margin-bottom:4px;">⏱ '+st.txt+'</div>';
+    }else if(st.modo==='confirmado'){
+      estiloCard='border-color:rgba(34,197,94,.5);background:#0d1a12;';
+      extraCard+='<div style="font-size:10.5px;font-weight:800;color:#22c55e;margin-bottom:4px;">✅ '+st.txt+'</div>';
+    }else if(st.modo==='vencido7d'){
+      estiloCard='border-color:rgba(239,68,68,.6);background:#1c0f10;';
+      extraCard+='<div style="font-size:10.5px;font-weight:800;color:#ef4444;margin-bottom:4px;">🔴 '+st.txt+'</div>';
+    }
+  }
   if(isRet){
     if(f.filaFinal){
       estiloCard='border-color:rgba(245,200,0,.55);background:#1d1a10;';
@@ -783,6 +832,12 @@ function render(){
     return String(a.dataRetorno||'9999').localeCompare(String(b.dataRetorno||'9999'));
   });
   var clis  =base.filter(function(f){return f.status==='cliente_loja';});
+  // Ordem: 🔴 vencidos (48h ou 7d) no topo · ⏱ dentro das 48h · ✅ confirmados no fundo
+  clis.sort(function(a,b){
+    var sa=slaClienteLoja(a),sb=slaClienteLoja(b);
+    if(sa.prio!==sb.prio)return sa.prio-sb.prio;
+    return sa.ord-sb.ord;
+  });
   var logs  =_fichas.filter(function(f){return f.status==='logistica';});
 
   document.getElementById('b1').textContent=leads.length;
@@ -888,6 +943,8 @@ setInterval(function(){sincronizar();},2*60*60*1000);
 document.addEventListener('visibilitychange',function(){
   if(document.visibilityState==='visible') load();
 });
+// Cronômetros do Cliente Loja: re-render local a cada 60s (sem fetch)
+setInterval(function(){ if(document.visibilityState==='visible')render(); },60*1000);
 // E polling leve de segurança a cada 5 min (só leitura do Redis)
 setInterval(function(){ if(document.visibilityState==='visible') load(); },5*60*1000);
 </script>

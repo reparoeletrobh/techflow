@@ -426,6 +426,18 @@ export default async function handler(req,res){
     return res.status(200).json({ok:true,ficha});
   }
 
+  // ── CONFIRMAR-LOJA: cliente confirmou que vai vir (inicia prazo de 7 dias) ─
+  if(req.method==='POST'&&action==='confirmar-loja'){
+    const{id}=req.body||{};
+    const db=(await dbGet(KEY))||{fichas:[]};
+    const f=db.fichas.find(x=>x.id===id);
+    if(!f)return res.status(404).json({ok:false,error:'Não encontrado'});
+    f.lojaConfirmouEm=new Date().toISOString();
+    await dbSet(KEY,db);
+    await logEventos([{tipo:'confirmou_loja',de:'cliente_loja',sis:f.origemSistema||'adm',id:idEvt(f),nome:f.nome}]);
+    return res.status(200).json({ok:true});
+  }
+
   // ── MARCAR-FRENTELOJA: cliente loja virou cadastro no Frente de Loja ─────
   if(req.method==='POST'&&action==='marcar-frenteloja'){
     const{id}=req.body||{};
