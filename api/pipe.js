@@ -1229,6 +1229,8 @@ export default async function handler(req, res) {
   // ── GET limpar-backups-lote?cursor=0 — limpeza paginada (funciona sob throttling) ──
   if (action === 'limpar-backups-lote') {
     try {
+      const U = (process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+      const T = (process.env.UPSTASH_TOKEN||'').replace(/[\n\r'"]/g,'').trim();
       const cursor = String(req.query.cursor || '0');
       // 1 página de SCAN (até ~200 chaves examinadas)
       const rs = await fetch(`${U}/scan/${cursor}/match/*_bak_*/count/200`,
