@@ -863,7 +863,13 @@ function render(){
     var sisBadge=f.origemSistema==='tv'
       ?'<span style="font-size:9px;font-weight:800;color:#06b6d4;background:rgba(6,182,212,.12);border-radius:5px;padding:2px 6px;">📺 TV</span>'
       :'<span style="font-size:9px;font-weight:800;color:#3b9eff;background:rgba(59,158,255,.12);border-radius:5px;padding:2px 6px;">🔧 ADM</span>';
-    return '<div class="card" style="border-color:rgba(239,68,68,.4);">'
+    if(f.reagendarColeta){
+      sisBadge='<span style="font-size:9px;font-weight:800;color:#f97316;background:rgba(249,115,22,.14);border:1px solid rgba(249,115,22,.4);border-radius:5px;padding:2px 6px;">🔁 REAGENDADO</span> '+sisBadge;
+    }
+    var estiloEsp=f.reagendarColeta
+      ?'border-color:rgba(249,115,22,.65);background:#1c1409;'
+      :'border-color:rgba(239,68,68,.4);';
+    return '<div class="card" style="'+estiloEsp+'">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><div class="card-nome" style="margin:0;">'+esc(f.nome||'—')+'</div>'+sisBadge+'</div>'
       +'<div class="card-equip">'+esc(f.equipamento||'—')+'</div>'
       +'<div class="card-info">'+esc(f.defeito||'—')+'</div>'

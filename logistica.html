@@ -657,6 +657,7 @@ function cardHTML(f, phase) {
   } else if (phase === 'remarcar') {
     btns = `
       <button class="cbtn cbtn-blue" onclick="mover('${f.id}','liberado_coleta')">Liberar Novamente</button>
+      <button class="cbtn cbtn-orange" onclick="enviarProspeccao('${f.id}','${escHtml(f.nome)}')">🔭 Prospecção</button>
       <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>`;
   } else if (phase === 'coleta_efetuada') {
     btns = `
@@ -722,6 +723,16 @@ async function marcarChecado(id) {
   }).then(r=>r.json());
   if(r.ok){await load();toast('✅ Ficha checada');}
   else toast('Erro: '+(r.error||'falha'),true);
+}
+
+async function enviarProspeccao(id, nome) {
+  if (!confirm('Enviar "'+nome+'" para a Prospecção (Entrar em Contato)?\nA equipe comercial ativa fará a ligação para reagendar.')) return;
+  const r = await fetch('/api/logistica?action=enviar-prospeccao', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ id })
+  }).then(r=>r.json()).catch(()=>({ok:false,error:'rede'}));
+  if (r.ok) { mostrarToast ? mostrarToast('🔭 Enviada para a Prospecção') : alert('Enviada para a Prospecção'); carregarFichas ? carregarFichas() : location.reload(); }
+  else alert('Erro: ' + (r.error||'falha'));
 }
 
 async function cancelar(id, nome) {

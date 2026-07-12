@@ -344,6 +344,44 @@ module.exports = async function handler(req, res) {
   }
 
   // ── POST criar ────────────────────────────────────────────
+  // ── ENVIAR-PROSPECCAO: coleta frustrada volta para Entrar em Contato ──────
+  if (req.method === 'POST' && action === 'enviar-prospeccao') {
+    const { id } = req.body || {};
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const ficha = (db.fichas || []).find(f => String(f.id) === String(id));
+    if (!ficha) return res.status(404).json({ ok:false, error:'Ficha não encontrada' });
+
+    // 1. Cria em fichas_adm com flag de reagendamento → aparece no espelho da prospecção
+    const fdb = (await dbGet('fichas_adm')) || { fichas: [] };
+    const now = new Date().toISOString();
+    const nova = {
+      id: 'fic_reag_' + Date.now().toString(36),
+      nome: ficha.nome || '', telefone: String(ficha.telefone||'').replace(/\D/g,''),
+      equipamento: ficha.equipamento || '', defeito: ficha.defeito || '',
+      endereco: ficha.endereco || '',
+      waNum: String(ficha.telefone||'').replace(/\D/g,''),
+      status: 'entrar_contato',
+      reagendarColeta: true,
+      origemLogistica: true, logisticaFichaId: ficha.id,
+      criadoEm: now, contatoFeitoEm: null,
+    };
+    fdb.fichas.unshift(nova);
+    await dbSet('fichas_adm', fdb);
+
+    // 2. Ficha sai da fila de remarcar (vive agora na prospecção)
+    ficha.phase = 'prospeccao';
+    ficha.enviadoProspeccaoEm = now;
+    await dbSet(LOG_KEY, db);
+
+    // 3. Evento para o relatório da prospecção
+    try {
+      const evt = JSON.stringify({ ts: now, tipo: 'entrar_contato', de: null, sis: 'adm', id: nova.id, nome: nova.nome });
+      await fetch(`${U}/rpush/prospeccao_evt_list/${encodeURIComponent(evt)}`, { headers: { Authorization: `Bearer ${T}` } });
+    } catch(_) {}
+
+    return res.status(200).json({ ok:true, fichaProspeccao: nova.id });
+  }
+
   if (req.method === 'POST' && action === 'criar') {
     const { nome, telefone, endereco, equipamento, defeito, pipefyCardId, texto } = req.body || {};
     if (!nome) return res.status(400).json({ ok: false, error: 'nome obrigatorio' });
