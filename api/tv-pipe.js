@@ -783,6 +783,14 @@ export default async function handler(req, res) {
 
       await dbSet(PIPE_KEY, db);
       await dbSet(ARQUIVO_KEY, arq);
+      // Registrar ids arquivados p/ safeWritePipe não restaurá-los (últimos 3000)
+      try {
+        var idsArqDb = (await dbGet('tv_pipe_ids_arquivados')) || { ids: [] };
+        var idsNovos = arq.fichas.map(function(f){ return f.id; });
+        idsArqDb.ids = Array.from(new Set(idsNovos.concat(idsArqDb.ids || []))).slice(0, 3000);
+        idsArqDb.ts = now;
+        await dbSet('tv_pipe_ids_arquivados', idsArqDb);
+      } catch(e) {}
 
       return res.status(200).json({
         ok:true, arquivados:novos, totalNoArquivo:arq.fichas.length,

@@ -101,7 +101,13 @@ async function safeWritePipe(newDb) {
     const current = await dbGet(PIPE_KEY);
     if (current && Array.isArray(current.cards) && Array.isArray(newDb.cards)) {
       const newIds = new Set(newDb.cards.map(c => c.id));
-      const perdidos = current.cards.filter(c => !newIds.has(c.id));
+      // Cards arquivados DE PROPÓSITO não são "perdidos" — não restaurar
+      let idsArq = new Set();
+      try {
+        const arqIds = await dbGet('pipe_ids_arquivados');
+        if (arqIds && Array.isArray(arqIds.ids)) idsArq = new Set(arqIds.ids);
+      } catch(e) {}
+      const perdidos = current.cards.filter(c => !newIds.has(c.id) && !idsArq.has(c.id));
       if (perdidos.length > 0) {
         console.warn('[safeWritePipe] ' + perdidos.length + ' cards preservados:', perdidos.map(c=>c.id).join(','));
         try {
@@ -863,6 +869,14 @@ export default async function handler(req, res) {
 
       await safeWritePipe( db);
       await dbSet(ARQUIVO_KEY, arq);
+      // Registrar ids arquivados p/ safeWritePipe não restaurá-los (últimos 3000)
+      try {
+        var idsArqDb = (await dbGet('pipe_ids_arquivados')) || { ids: [] };
+        var idsNovos = arq.fichas.map(function(f){ return f.id; });
+        idsArqDb.ids = Array.from(new Set(idsNovos.concat(idsArqDb.ids || []))).slice(0, 3000);
+        idsArqDb.ts = now;
+        await dbSet('pipe_ids_arquivados', idsArqDb);
+      } catch(e) {}
 
       return res.status(200).json({
         ok:true, arquivados:novos, totalNoArquivo:arq.fichas.length,
