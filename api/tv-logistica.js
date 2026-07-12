@@ -708,9 +708,20 @@ module.exports = async function handler(req, res) {
     } catch(e) { console.error('[Log] templates:', e.message); }
 
     // Gerar texto para cada equipamento
-    const resultados = equips.map(eq =>
-      gerarTexto(eq.tipo, eq.subtipo, eq.servicos, eq.preco, customTemplates, eq.modelo, eq.tuSub)
-    );
+    const resultados = equips.map(eq => {
+      const r = gerarTexto(eq.tipo, eq.subtipo, eq.servicos, eq.preco, customTemplates, eq.modelo, eq.tuSub);
+      // ⚡ Tabela Dinâmica: MESMO texto e peças — só o valor vira 40% do equipamento (arredondado)
+      if (eq.tabela === 'dinamica') {
+        const valorEq = parseFloat(String(eq.valorEquip || '0').replace(',', '.')) || 0;
+        const preco40 = String(Math.round(valorEq * 0.4));
+        if (r && r.texto && r.preco) {
+          const rx = new RegExp(String(r.preco).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+          return { texto: r.texto.replace(rx, preco40), preco: preco40 };
+        }
+        if (r && r.texto) return { texto: r.texto, preco: preco40 };
+      }
+      return r;
+    });
 
     // Texto final
     let textoFinal, precoFinal;

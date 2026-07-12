@@ -845,8 +845,25 @@ function equipSecHTML(eq, i, total) {
         </div>
       </div>
     </div>
+    ${eq.tipo ? `
+    <div>
+      <div class="diag-section-label" style="margin-bottom:5px;">Tabela de Preço</div>
+      <div class="type-grid">
+        <button class="type-btn${(eq.tabela||'normal')==='normal'?' sel':''}" onclick="selTabela(${i},'normal')">📋 Tabela Normal</button>
+        <button class="type-btn${eq.tabela==='dinamica'?' sel':''}" onclick="selTabela(${i},'dinamica')">⚡ Tabela Dinâmica</button>
+      </div>
+    </div>` : ''}
     ${subtiposHTML}
     ${servicosHTML ? `<div><div class="diag-section-label" style="margin-bottom:6px;">Serviços / Peças</div><div class="srv-grid">${servicosHTML}</div></div>` : ''}
+    ${eq.tabela==='dinamica' ? `
+    <div>
+      <div class="diag-section-label" style="margin-bottom:5px;">💰 Valor do equipamento (R$)</div>
+      <input class="diag-input" type="number" min="0" placeholder="Ex: 2000" value="${eq.valorEquip||''}"
+        style="width:160px;" oninput="diagEquips[${i}].valorEquip=this.value;atualizar40(${i},this.value)">
+      <div id="orc40-${i}" style="margin-top:6px;font-size:13px;font-weight:800;color:var(--accent,#f5c800);">
+        Orçamento (40%): ${eq.valorEquip>0?'R$ '+Math.round(parseFloat(eq.valorEquip)*0.4):'—'}
+      </div>
+    </div>` : ''}
     ${precisaPreco(eq.tipo, eq.subtipo, eq.servicos) ? `
     <div>
       <div class="diag-section-label" style="margin-bottom:5px;">Preço de custo (R$) — valor final será x2</div>
@@ -866,7 +883,20 @@ function selTipo(i, tipo) {
   diagEquips[i].tipo = tipo;
   diagEquips[i].subtipo = null;
   diagEquips[i].servicos = [];
+  diagEquips[i].tabela = 'normal'; // default: fluxo atual
   renderEquips(diagEquips.length);
+}
+
+function selTabela(i, t) {
+  diagEquips[i].tabela = t; // peças/subtipo permanecem — só muda a origem do valor
+  renderEquips(diagEquips.length);
+}
+
+function atualizar40(i, v) {
+  const el = document.getElementById('orc40-'+i);
+  if (!el) return;
+  const n = parseFloat(String(v||'').replace(',','.'));
+  el.textContent = 'Orçamento (40%): ' + (n>0 ? 'R$ '+Math.round(n*0.4) : '—');
 }
 
 function selSubtipo(i, sub) {
@@ -891,7 +921,10 @@ async function salvarDiag() {
     const label = diagEquips.length > 1 ? `Equipamento ${i+1}` : 'equipamento';
     if (!eq.tipo)            { mostrarMsgDiag(`Selecione o tipo do ${label}`,'err'); return; }
     if (!eq.servicos.length) { mostrarMsgDiag(`Selecione ao menos um serviço para o ${label}`,'err'); return; }
-    if (precisaPreco(eq.tipo, eq.subtipo, eq.servicos) && !eq.preco) {
+    if (eq.tabela === 'dinamica') {
+      const v40 = parseFloat(String(eq.valorEquip||'').replace(',','.'));
+      if (!(v40 > 0)) { mostrarMsgDiag(`Informe o valor do equipamento (${label} — Tabela Dinâmica)`,'err'); return; }
+    } else if (precisaPreco(eq.tipo, eq.subtipo, eq.servicos) && !eq.preco) {
       mostrarMsgDiag(`Informe o preço de custo do ${label}`,'err'); return;
     }
   }
