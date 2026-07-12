@@ -79,6 +79,10 @@
   ],
   "rewrites": [
     {
+      "source": "/api/perf",
+      "destination": "/api/perf.js"
+    },
+    {
       "source": "/concluidas",
       "destination": "/concluidas.html"
     },
