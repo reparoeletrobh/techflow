@@ -1249,6 +1249,11 @@ function renderChipSecStr(fid, idx, total) {
       '</div>' +
     '</div>' +
     '<input class="diag-input-tv" type="number" id="dlv-'+fid+'-'+idx+'" placeholder="Valor Acrílico (R$)" min="0" step="0.01" style="display:none;"/>' +
+    '<div style="margin-top:8px;padding-top:6px;border-top:1px dashed rgba(255,255,255,.08);">' +
+      '<button class="chip-tv" id="dlc-din-'+fid+'-'+idx+'" onclick="toggleDinamicaTV(\''+fid+'\','+idx+')">⚡ Tabela Dinâmica</button>' +
+      '<input class="diag-input-tv" type="number" id="dld-'+fid+'-'+idx+'" placeholder="Valor do equipamento (R$)" min="0" style="display:none;margin-top:6px;" oninput="atualizar40TV(\''+fid+'\','+idx+',this.value)"/>' +
+      '<div id="dld40-'+fid+'-'+idx+'" style="display:none;margin-top:4px;font-size:11px;font-weight:800;color:var(--accent,#f5c800);">Orçamento (40%): —</div>' +
+    '</div>' +
   '</div>';
 }
 
@@ -1302,6 +1307,24 @@ function selTuSub(fid, idx, opcao) {
   }
 }
 
+function toggleDinamicaTV(fid, idx) {
+  var chip = document.getElementById('dlc-din-'+fid+'-'+idx);
+  if (!chip) return;
+  chip.classList.toggle('on');
+  var on = chip.classList.contains('on');
+  var campo = document.getElementById('dld-'+fid+'-'+idx);
+  var prev  = document.getElementById('dld40-'+fid+'-'+idx);
+  if (campo) campo.style.display = on ? 'block' : 'none';
+  if (prev)  prev.style.display  = on ? 'block' : 'none';
+}
+
+function atualizar40TV(fid, idx, v) {
+  var el = document.getElementById('dld40-'+fid+'-'+idx);
+  if (!el) return;
+  var n = parseFloat(String(v||'').replace(',','.'));
+  el.textContent = 'Orçamento (40%): ' + (n>0 ? 'R$ '+Math.round(n*0.4) : '—');
+}
+
 function coletarChipsSecs(fid) {
   var qtdEl = document.getElementById('diag-qtd-'+fid);
   var qtd = qtdEl ? parseInt(qtdEl.value)||1 : 1;
@@ -1322,8 +1345,14 @@ function coletarChipsSecs(fid) {
     var acrilicoVal = acrilicoValEl ? parseFloat(acrilicoValEl.value)||0 : 0;
     var tuChipEl = document.getElementById('dlc-tu-'+fid+'-'+i);
     var hasTU = tuChipEl && tuChipEl.classList.contains('on');
+    var dinChip = document.getElementById('dlc-din-'+fid+'-'+i);
+    var dinOn = dinChip && dinChip.classList.contains('on');
+    var dinValEl = document.getElementById('dld-'+fid+'-'+i);
+    var dinVal = dinValEl ? parseFloat(String(dinValEl.value||'').replace(',','.'))||0 : 0;
     if (chips.length > 0 || hasTU) {
-      equips.push({ modelo: modelo, tipo: 'tv', servicos: chips, tuSub: tuSub, preco: hasTU ? 1290 : (acrilicoVal||0) });
+      var eqTV = { modelo: modelo, tipo: 'tv', servicos: chips, tuSub: tuSub, preco: hasTU ? 1290 : (acrilicoVal||0) };
+      if (dinOn) { eqTV.tabela = 'dinamica'; eqTV.valorEquip = dinVal; }
+      equips.push(eqTV);
     }
   }
   return equips;
@@ -1332,6 +1361,11 @@ function coletarChipsSecs(fid) {
 async function enviarDiagTV(fid) {
   var equips = coletarChipsSecs(fid);
   if (!equips.length) { toast('Selecione pelo menos uma opção', 'error'); return; }
+  for (var ve = 0; ve < equips.length; ve++) {
+    if (equips[ve].tabela === 'dinamica' && !(equips[ve].valorEquip > 0)) {
+      toast('⚡ Tabela Dinâmica: informe o valor do equipamento', 'error'); return;
+    }
+  }
   var btn = document.querySelector('#diag-inline-'+fid+' .btn-diag-submit');
   if (btn) { btn.disabled = true; btn.textContent = 'Salvando...'; }
   try {
