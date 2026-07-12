@@ -623,8 +623,8 @@ async function syncPipefy() {
 
 load();
 syncPipefy(); // Sync imediato ao abrir
-setInterval(load, 30000);
-setInterval(syncPipefy, 60000); // Verifica Pipefy a cada 1 min
+setInterval(function(){ if(!document.hidden) load(); },120000);
+setInterval(function(){ if(!document.hidden) syncPipefy(); },180000); // Pipefy a cada 3 min
 </script>
 <!-- PREVIEW MODAL -->
 <div id="preview-overlay">

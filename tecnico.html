@@ -1836,12 +1836,13 @@ scheduleCleanupRet();
 // Banco: atualiza tela a cada 10s
 // Board reload a cada 30s (era 10s — reduzido para aliviar o servidor)
 setInterval(() => {
-  loadBoard();
-}, 30000);
+  if(!document.hidden) loadBoard();
+}, 90000);
 // Pipefy sync a cada 60s — separado do reload
 setInterval(() => {
-  syncPipefy();
-}, 60000);
+  if(!document.hidden) syncPipefy();
+}, 180000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) loadBoard(); });
 
 
 

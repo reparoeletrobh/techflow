@@ -958,7 +958,7 @@ async function checarConflitos(silencioso) {
 }
 
 checarConflitos(true);
-setInterval(function(){ checarConflitos(false); }, 30000);
+setInterval(function(){ if(!document.hidden) checarConflitos(false); }, 120000);
 </script>
 
 </body>

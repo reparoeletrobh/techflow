@@ -1013,7 +1013,7 @@ function toast(msg, err) {
 
 // ── INIT ────────────────────────────────────────────────────
 load();
-setInterval(load, 30000);   // rebusca servidor a cada 30s
+setInterval(function(){ if(!document.hidden) load(); }, 90000); // rebusca servidor
 setInterval(render, 60000); // reclassifica cores/posições a cada 1min
 
 // ── PAINEL MÉTRICAS ──────────────────────────────────────────

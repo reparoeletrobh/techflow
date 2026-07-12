@@ -1148,7 +1148,7 @@ function copiarSel(){
 //  INIT
 // ══════════════════════════════════════════════
 pecLoad().then(function(){ kbBuild(); });
-setInterval(osLoad, 30000);
+setInterval(function(){ if(!document.hidden) osLoad(); },120000);
 setInterval(pecLoad, 60000);
 // ══════════════════════════════════════════════
 //  KANBAN — visão unificada

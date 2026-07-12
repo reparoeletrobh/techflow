@@ -1041,7 +1041,8 @@ function toast(msg,type){
 
 // ══ INIT ══════════════════════════════════════════════════════
 load();
-setInterval(load,10000);
+setInterval(function(){ if(!document.hidden) load(); },60000);
+document.addEventListener('visibilitychange',function(){ if(!document.hidden) load(); });
 </script>
 
 <!-- Frame de impressão térmica 80mm -->

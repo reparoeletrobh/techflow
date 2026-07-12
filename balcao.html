@@ -183,7 +183,7 @@ function toast(msg,type){
   setTimeout(()=>t.remove(),3500);
 }
 load();
-setInterval(load,30000);
+setInterval(function(){ if(!document.hidden) load(); },120000);
 
 function cpMsgRetirada(btn) {
   var waLink = btn.dataset.wa || '';

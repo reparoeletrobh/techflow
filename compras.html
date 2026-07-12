@@ -436,7 +436,7 @@ async function confirmarDados() {
 }
 
 load();
-setInterval(load, 30000);
+setInterval(function(){ if(!document.hidden) load(); },120000);
 </script>
 </body>
 </html>

@@ -183,7 +183,7 @@ async function limpar(){
 }
 
 carregar();
-setInterval(carregar,15000);
+setInterval(function(){ if(!document.hidden) carregar(); },60000);
 </script>
 </body>
 </html>
