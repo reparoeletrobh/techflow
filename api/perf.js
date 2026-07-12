@@ -55,6 +55,39 @@ export default async function handler(req,res){
       todas:linhas});
   }
 
+  // Composição do financeiro: registros por fase, peso dos anexos
+  if(action==='fin-composicao'){
+    try{
+      const r=await fetch(`${U}/get/reparoeletro_financeiro`,{headers:{Authorization:`Bearer ${T}`}});
+      const j=await r.json();
+      let v=j.result;
+      if(typeof v==='string')v=JSON.parse(v);
+      if(typeof v==='string')v=JSON.parse(v);
+      const recs=v?.records||[];
+      const porPhase={},pesoPorPhase={};
+      let comAnexo=0,pesoAnexos=0,maiorAnexo=0;
+      for(const rec of recs){
+        const ph=rec.phaseId||'sem_fase';
+        porPhase[ph]=(porPhase[ph]||0)+1;
+        const peso=JSON.stringify(rec).length;
+        pesoPorPhase[ph]=(pesoPorPhase[ph]||0)+peso;
+        if(rec.anexo){
+          comAnexo++;
+          const pa=String(rec.anexo).length;
+          pesoAnexos+=pa;
+          if(pa>maiorAnexo)maiorAnexo=pa;
+        }
+      }
+      Object.keys(pesoPorPhase).forEach(k=>{pesoPorPhase[k]=+(pesoPorPhase[k]/1048576).toFixed(2);});
+      return res.status(200).json({ok:true,totalRegistros:recs.length,
+        comAnexo,pesoAnexosMb:+(pesoAnexos/1048576).toFixed(2),
+        maiorAnexoKb:Math.round(maiorAnexo/1024),
+        porPhase,pesoMbPorPhase:pesoPorPhase});
+    }catch(e){
+      return res.status(200).json({ok:false,error:e.message});
+    }
+  }
+
   // Contagem por fase do pipe (mais pesado — 1 leitura do pipe)
   if(action==='pipe-fases'){
     try{
