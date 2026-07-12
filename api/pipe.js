@@ -896,13 +896,28 @@ export default async function handler(req, res) {
     try {
       var arq2 = await dbGet('reparoeletro_arquivo') || {fichas:[]};
       var lista = (arq2.fichas||[]);
+      // Contagens por tipo (sobre o arquivo inteiro)
+      var porTipo = {ultima:0, finalizado:0, descarte:0, outros:0};
+      lista.forEach(function(f){
+        var m=String(f.motivoArquivo||'');
+        if(m.indexOf('ultima')>-1)porTipo.ultima++;
+        else if(m.indexOf('finalizado')>-1)porTipo.finalizado++;
+        else if(m.indexOf('descarte')>-1)porTipo.descarte++;
+        else porTipo.outros++;
+      });
+      // Filtro por tipo: ?tipo=ultima|finalizado|descarte
+      var tipo3 = (req.query.tipo||'').toLowerCase();
+      if (tipo3) lista = lista.filter(function(f){
+        return String(f.motivoArquivo||'').indexOf(tipo3)>-1;
+      });
       if (q3) lista = lista.filter(function(f){
         return JSON.stringify(f).toLowerCase().includes(q3);
       });
       return res.status(200).json({
-        ok:true, total:lista.length, totalArquivado:arq2.totalArquivado||0,
+        ok:true, total:lista.length, porTipo:porTipo,
+        totalArquivado:arq2.totalArquivado||0,
         ultimoArquivo:arq2.ultimoArquivo||null,
-        fichas: lista.slice(0,50).map(function(f){return {
+        fichas: lista.slice(0,400).map(function(f){return {
           id:f.id, nome:f.nomeContato, telefone:f.telefone,
           equipamento:f.equipamento, valor:f.valor,
           arquivadoEm:f.arquivadoEm, movedAt:f.movedAt,
@@ -933,6 +948,44 @@ export default async function handler(req, res) {
   }
 
 
+
+  // ── GET desarquivar?id=X&fase=aprovados|solicitar_entrega — cliente retomou ──
+  if (action === 'desarquivar') {
+    var did  = req.query.id || '';
+    var dfase = req.query.fase || '';
+    if (!did) return res.status(400).json({ok:false,error:'id obrigatorio'});
+    if (['aprovados','solicitar_entrega'].indexOf(dfase) < 0) {
+      return res.status(400).json({ok:false,error:'fase deve ser aprovados ou solicitar_entrega'});
+    }
+    try {
+      var arqD = await dbGet('reparoeletro_arquivo') || {fichas:[]};
+      var dbD  = await dbGet(PIPE_KEY) || {cards:[]};
+      var idxD = (arqD.fichas||[]).findIndex(function(f){return f.id===did;});
+      if (idxD < 0) return res.status(404).json({ok:false,error:'Ficha não encontrada no arquivo: '+did});
+      var fD = arqD.fichas.splice(idxD,1)[0];
+
+      // Restaurar como card pleno do pipe (todas as funções voltam a funcionar)
+      var faseAntes = fD.phaseAntes || fD.phase || 'ultima_chamada';
+      delete fD.arquivadoEm; delete fD.motivoArquivo; delete fD.phaseAntes;
+      fD.phase   = dfase;
+      fD.movedAt = now;
+      fD.desarquivadoEm = now;
+      fD.history = (fD.history||[]).concat([{ phase: faseAntes, ts: now, via: 'desarquivar' }]);
+      dbD.cards.unshift(fD);
+
+      // CRÍTICO: remover o id da lista de arquivados ANTES do safeWritePipe
+      // (senão a proteção o trata como arquivado e uma race pode sumir com ele)
+      try {
+        var idsD = (await dbGet('pipe_ids_arquivados')) || { ids: [] };
+        idsD.ids = (idsD.ids||[]).filter(function(x){ return x !== did; });
+        await dbSet('pipe_ids_arquivados', idsD);
+      } catch(e) {}
+
+      await dbSet('reparoeletro_arquivo', arqD);
+      await safeWritePipe( dbD);
+      return res.status(200).json({ok:true,id:fD.id,nome:fD.nomeContato,de:'arquivo ('+faseAntes+')',para:dfase});
+    } catch(e){return res.status(500).json({ok:false,error:e.message});}
+  }
 
   // ── GET erp-cards: retorna todos os cards em fase ERP ────────────────────
   if (action === 'erp-cards') {

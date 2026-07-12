@@ -45,10 +45,31 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
   <span id="info">—</span>
 </div>
 
+<div id="barra-tipo" style="display:flex;gap:6px;padding:8px 16px;border-bottom:1px solid #1e2228;background:#0a0b0e;flex-wrap:wrap;">
+  <button class="pill-tipo" id="pt-" onclick="mudarTipo('')" style="padding:6px 12px;border-radius:99px;border:1px solid #8b5cf6;background:rgba(139,92,246,.15);color:#a78bfa;font-size:11px;font-weight:800;cursor:pointer;">Todos</button>
+  <button class="pill-tipo" id="pt-ultima" onclick="mudarTipo('ultima')" style="padding:6px 12px;border-radius:99px;border:1px solid #2a2f38;background:#181b1f;color:#f0f2f5;font-size:11px;font-weight:800;cursor:pointer;">📞 Última Chamada</button>
+  <button class="pill-tipo" id="pt-finalizado" onclick="mudarTipo('finalizado')" style="padding:6px 12px;border-radius:99px;border:1px solid #2a2f38;background:#181b1f;color:#f0f2f5;font-size:11px;font-weight:800;cursor:pointer;">✅ Finalizado</button>
+  <button class="pill-tipo" id="pt-descarte" onclick="mudarTipo('descarte')" style="padding:6px 12px;border-radius:99px;border:1px solid #2a2f38;background:#181b1f;color:#f0f2f5;font-size:11px;font-weight:800;cursor:pointer;">🗑 Descarte</button>
+</div>
+
 <div class="lista" id="lista"><div class="empty">Carregando...</div></div>
 
 <script>
-var SISTEMA='adm', _timer=null;
+var SISTEMA='adm', TIPO='', _timer=null;
+
+function mudarTipo(t){
+  TIPO=t;
+  ['','ultima','finalizado','descarte'].forEach(function(x){
+    var b=document.getElementById('pt-'+x);
+    if(b){
+      var sel=(x===t);
+      b.style.background=sel?'rgba(139,92,246,.15)':'#181b1f';
+      b.style.borderColor=sel?'#8b5cf6':'#2a2f38';
+      b.style.color=sel?'#a78bfa':'#f0f2f5';
+    }
+  });
+  buscarAgora();
+}
 
 function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
 function fdt(iso){
@@ -81,9 +102,12 @@ async function buscarAgora(){
   var el=document.getElementById('lista');
   el.innerHTML='<div class="empty">⏳ Buscando...</div>';
   try{
-    var d=await fetch(api+'?action=buscar-arquivo&q='+encodeURIComponent(q)).then(function(r){return r.json();});
+    var extra=(SISTEMA!=='fin'&&TIPO)?('&tipo='+TIPO):'';
+    var d=await fetch(api+'?action=buscar-arquivo&q='+encodeURIComponent(q)+extra).then(function(r){return r.json();});
     var fichas=d.fichas||[];
-    document.getElementById('info').textContent=fichas.length+' de '+(d.total||0)+' · arquivo total: '+(d.totalArquivado||0);
+    var infoTx=fichas.length+' de '+(d.total||0);
+    if(d.porTipo)infoTx+=' · 📞 '+(d.porTipo.ultima||0)+' · ✅ '+(d.porTipo.finalizado||0)+' · 🗑 '+(d.porTipo.descarte||0);
+    document.getElementById('info').textContent=infoTx;
     if(!fichas.length){el.innerHTML='<div class="empty">📭 Nenhuma ficha'+(q?' para "'+esc(q)+'"':' no arquivo')+'</div>';return;}
     el.innerHTML=fichas.map(function(f){
       return '<div class="card">'
@@ -92,11 +116,27 @@ async function buscarAgora(){
         +'<div class="c-info">'+esc(f.equipamento||'—')+(f.valor?' · R$ '+f.valor:'')+'</div>'
         +(f.telefone?'<div class="c-info">📞 '+esc(f.telefone)+'</div>':'')
         +'<div class="c-datas">Encerrada: <b>'+fdt(f.movedAt)+'</b> · Arquivada: <b>'+fdt(f.arquivadoEm)+'</b>'+(f.pipefyId?' · #'+esc(String(f.pipefyId)):'')+'</div>'
+        +(SISTEMA==='adm'&&String(f.motivoArquivo||'').indexOf('ultima')>-1
+          ?'<div style="display:flex;gap:6px;margin-top:8px;">'
+            +'<button onclick="desarquivar(\''+f.id+'\',\'aprovados\',\''+esc(f.nome||'')+'\')" style="flex:1;padding:7px;border-radius:7px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.08);color:#22c55e;font-size:11px;font-weight:800;cursor:pointer;">✅ Aprovar → Pipe</button>'
+            +'<button onclick="desarquivar(\''+f.id+'\',\'solicitar_entrega\',\''+esc(f.nome||'')+'\')" style="flex:1;padding:7px;border-radius:7px;border:1px solid rgba(59,158,255,.4);background:rgba(59,158,255,.08);color:#3b9eff;font-size:11px;font-weight:800;cursor:pointer;">📦 Solicitar Entrega → Pipe</button>'
+          +'</div>'
+          :'')
       +'</div>';
     }).join('');
   }catch(e){
     el.innerHTML='<div class="empty" style="color:#ef4444;">Erro: '+e.message+'</div>';
   }
+}
+
+async function desarquivar(id,fase,nome){
+  var lbl=fase==='aprovados'?'APROVADO':'SOLICITAR ENTREGA';
+  if(!confirm('Devolver "'+nome+'" ao Pipe na coluna '+lbl+'?'))return;
+  try{
+    var r=await fetch('/api/pipe?action=desarquivar&id='+encodeURIComponent(id)+'&fase='+fase).then(function(x){return x.json();});
+    if(r.ok){alert('✅ '+(r.nome||nome)+' voltou ao Pipe em '+lbl);buscarAgora();}
+    else alert('Erro: '+(r.error||'falha'));
+  }catch(e){alert('Erro: '+e.message);}
 }
 
 buscarAgora();
