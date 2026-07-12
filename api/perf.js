@@ -88,6 +88,26 @@ export default async function handler(req,res){
     }
   }
 
+  // Peso de cada propriedade RAIZ do objeto financeiro (revela o inquilino oculto)
+  if(action==='fin-raiz'){
+    try{
+      const r=await fetch(`${U}/get/reparoeletro_financeiro`,{headers:{Authorization:`Bearer ${T}`}});
+      const j=await r.json();
+      let v=j.result;
+      if(typeof v==='string')v=JSON.parse(v);
+      if(typeof v==='string')v=JSON.parse(v);
+      const props=Object.keys(v||{}).map(k=>{
+        const val=v[k];
+        return {prop:k,
+          tipo:Array.isArray(val)?`array[${val.length}]`:typeof val,
+          mb:+(JSON.stringify(val).length/1048576).toFixed(3)};
+      }).sort((a,b)=>b.mb-a.mb);
+      return res.status(200).json({ok:true,props});
+    }catch(e){
+      return res.status(200).json({ok:false,error:e.message});
+    }
+  }
+
   // Contagem por fase do pipe (mais pesado — 1 leitura do pipe)
   if(action==='pipe-fases'){
     try{
