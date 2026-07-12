@@ -867,9 +867,8 @@ export default async function handler(req, res) {
       // Backup antes de salvar
       try{await dbSet('reparoeletro_pipe_bak_pre_arquivo',{cards:db.cards,ts:now});}catch(e){}
 
-      await safeWritePipe( db);
-      await dbSet(ARQUIVO_KEY, arq);
-      // Registrar ids arquivados p/ safeWritePipe não restaurá-los (últimos 3000)
+      // 1º Registrar ids arquivados — ANTES do safeWritePipe, senão a proteção
+      //    restaura os cards nesta mesma execução (lista ainda não existiria)
       try {
         var idsArqDb = (await dbGet('pipe_ids_arquivados')) || { ids: [] };
         var idsNovos = arq.fichas.map(function(f){ return f.id; });
@@ -877,6 +876,9 @@ export default async function handler(req, res) {
         idsArqDb.ts = now;
         await dbSet('pipe_ids_arquivados', idsArqDb);
       } catch(e) {}
+      // 2º Gravar o arquivo e o pipe enxuto
+      await dbSet(ARQUIVO_KEY, arq);
+      await safeWritePipe( db);
 
       return res.status(200).json({
         ok:true, arquivados:novos, totalNoArquivo:arq.fichas.length,
