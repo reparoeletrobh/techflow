@@ -999,7 +999,7 @@ module.exports = async function handler(req, res) {
     const arquivo = (await dbGet(ARQUIVO_KEY)) || { records: [] };
 
     // Fases consideradas "concluídas" para arquivamento
-    const fasesArquivar = ['entrega_liberada', 'nf_emitida', 'faturamento', 'item_coletado'];
+    const fasesArquivar = ['entrega_liberada', 'nf_emitida', 'item_coletado']; // faturamento é PENDÊNCIA — nunca arquivar
 
     const paraArquivar = (fin.records || []).filter(r =>
       fasesArquivar.includes(r.phaseId) &&
