@@ -446,17 +446,31 @@ function renderArvore(){
   if(!_relArv)return;
   var corpo=document.getElementById('rel-corpo');
   var mz=_relArv.matrizes[_relSis]||{};
+  var atv=(_relArv.atividade||{})[_relSis]||{};
   var MATRIZES=['entrar_contato','lead','retornar','cliente_loja'];
-  var temDados=MATRIZES.some(function(r){return mz[r]&&mz[r].count>0;});
+
+  // ── AÇÕES DO PERÍODO (tempo real — cada clique conta na hora) ──
+  var kpiHtml='<div style="display:flex;gap:8px;margin-bottom:14px;">'
+    +'<div style="flex:1;background:linear-gradient(150deg,rgba(34,197,94,.12),rgba(13,16,24,.9));border:1px solid rgba(34,197,94,.5);border-radius:14px;padding:14px 10px;text-align:center;box-shadow:0 0 20px rgba(34,197,94,.1);">'
+      +'<div style="font-size:30px;font-weight:900;color:#4ade80;line-height:1;text-shadow:0 0 16px rgba(34,197,94,.5);">'+(atv.logistica||0)+'</div>'
+      +'<div style="font-size:10px;font-weight:800;color:#c9ced6;margin-top:5px;">🚚 cards viraram LOGÍSTICA</div>'
+    +'</div>'
+    +'<div style="flex:1;background:linear-gradient(150deg,rgba(245,200,0,.12),rgba(13,16,24,.9));border:1px solid rgba(245,200,0,.5);border-radius:14px;padding:14px 10px;text-align:center;box-shadow:0 0 20px rgba(245,200,0,.1);">'
+      +'<div style="font-size:30px;font-weight:900;color:#f5c800;line-height:1;text-shadow:0 0 16px rgba(245,200,0,.5);">'+(atv.frenteloja||0)+'</div>'
+      +'<div style="font-size:10px;font-weight:800;color:#c9ced6;margin-top:5px;">🏬 cards viraram FRENTE DE LOJA</div>'
+    +'</div>'
+  +'</div>';
+
+  var temDados=MATRIZES.some(function(r){return mz[r]&&mz[r].count>0;})||(atv.logistica||0)>0||(atv.frenteloja||0)>0;
   if(!temDados){
-    corpo.innerHTML='<div style="text-align:center;color:#5a6270;font-size:12px;padding:34px;">📭 Nenhuma entrada registrada no período<br><span style="font-size:10px;">(rastreamento de jornadas ativo desde 09/07/26)</span></div>';
+    corpo.innerHTML=kpiHtml+'<div style="text-align:center;color:#5a6270;font-size:12px;padding:24px;">📭 Nenhuma entrada registrada no período<br><span style="font-size:10px;">(rastreamento de jornadas ativo desde 09/07/26)</span></div>';
     return;
   }
-  var html='';
+  var html=kpiHtml;
   MATRIZES.forEach(function(r){
     if(mz[r]&&mz[r].count>0)html+=matrizHTML(r,mz[r]);
   });
-  html+='<div style="font-size:10px;color:#5a6270;margin-top:4px;text-align:center;">Entradas desde '+String(_relArv.desde).slice(0,10).split('-').reverse().join('/')+' · % nos ramos = sobre a etapa anterior · placar 🚚/🏬 = conversão final sobre a matriz</div>';
+  html+='<div style="font-size:10px;color:#5a6270;margin-top:4px;text-align:center;">Placar do topo = ações do período (tempo real) · Cards-matriz = jornadas iniciadas desde '+String(_relArv.desde).slice(0,10).split('-').reverse().join('/')+' · % nos ramos = sobre a etapa anterior · placar 🚚/🏬 = conversão final sobre a matriz</div>';
   corpo.innerHTML=html;
 }
 

@@ -715,7 +715,15 @@ export default async function handler(req,res){
       }
     }
 
-    return res.status(200).json({ok:true,periodo,desde:corteISO,matrizes:out});
+    // ATIVIDADE em tempo real: eventos ocorridos no período (independente da jornada)
+    const atividade={adm:{},tv:{}};
+    for(const e of (db_evt.eventos||[])){
+      if(e.ts<corteISO)continue;
+      const s=e.sis==='tv'?'tv':'adm';
+      atividade[s][e.tipo]=(atividade[s][e.tipo]||0)+1;
+    }
+
+    return res.status(200).json({ok:true,periodo,desde:corteISO,matrizes:out,atividade});
   }
 
   // ── STATS-PA: contagem semanal de fichas → logística por Passiva/Ativa ──
