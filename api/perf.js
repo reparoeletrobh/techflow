@@ -114,6 +114,39 @@ export default async function handler(req,res){
     }
   }
 
+  // CURA do financeiro: remove props numéricas (string espalhada por Object.assign)
+  if(action==='fin-curar'){
+    async function curar(chave){
+      const r=await fetch(`${U}/get/${chave}`,{headers:{Authorization:`Bearer ${T}`}});
+      const j=await r.json();
+      let v=j.result;
+      if(!v)return {chave,existia:false};
+      if(typeof v==='string')v=JSON.parse(v);
+      if(typeof v==='string')v=JSON.parse(v);
+      const keys=Object.keys(v||{});
+      const numericas=keys.filter(k=>/^\d+$/.test(k));
+      if(!numericas.length)return {chave,propsAntes:keys.length,removidas:0,jaSaudavel:true};
+      const limpo={};
+      for(const k of keys){ if(!/^\d+$/.test(k))limpo[k]=v[k]; }
+      const body=JSON.stringify(limpo);
+      await fetch(`${U}/set/${chave}`,{
+        method:'POST',
+        headers:{Authorization:`Bearer ${T}`,'Content-Type':'application/json'},
+        body});
+      return {chave,propsAntes:keys.length,removidas:numericas.length,
+        propsDepois:Object.keys(limpo).length,
+        mbAntes:+(JSON.stringify(v).length/1048576).toFixed(2),
+        mbDepois:+(body.length/1048576).toFixed(2)};
+    }
+    try{
+      const r1=await curar('reparoeletro_financeiro');
+      const r2=await curar('reparoeletro_financeiro_backup');
+      return res.status(200).json({ok:true,financeiro:r1,backup:r2});
+    }catch(e){
+      return res.status(200).json({ok:false,error:e.message});
+    }
+  }
+
   // Contagem por fase do pipe (mais pesado — 1 leitura do pipe)
   if(action==='pipe-fases'){
     try{

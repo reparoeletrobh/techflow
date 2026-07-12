@@ -408,7 +408,8 @@ export default async function handler(req, res) {
         if(!v)return null;
         try{var val=JSON.parse(v);if(typeof val==='string')val=JSON.parse(val);return(val&&typeof val==='object')?val:null;}catch(e){return null;}
       }
-      async function _sfin(k,v){
+      function _sanFin(v){ if(v&&typeof v==='object'){ for(var kk in v){ if(/^\d+$/.test(kk)) delete v[kk]; } } return v; }
+      async function _sfin(k,v){ v=_sanFin(v);
         await fetch(U4+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T4,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});
       }
 
@@ -531,7 +532,7 @@ export default async function handler(req, res) {
       var U7=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
       var T7=(process.env.UPSTASH_TOKEN||'').replace(/['"]/g,'').trim();
       async function _g7(k){var r=await fetch(U7+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T7,'Content-Type':'application/json'},body:JSON.stringify([['GET',k]])});var j=await r.json();var v=j[0]?.result;if(!v)return null;try{var x=JSON.parse(v);if(typeof x==='string')x=JSON.parse(x);return x;}catch(e){return null;}}
-      async function _s7(k,v){await fetch(U7+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T7,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
+      async function _s7(k,v){ if(v&&typeof v==='object'){ for(var k7 in v){ if(/^\d+$/.test(k7)) delete v[k7]; } } await fetch(U7+'/pipeline',{method:'POST',headers:{Authorization:'Bearer '+T7,'Content-Type':'application/json'},body:JSON.stringify([['SET',k,JSON.stringify(v)]])});}
       var fin=await _g7('reparoeletro_financeiro');
       if(!fin||!Array.isArray(fin.records))return res.status(404).json({ok:false,error:'financeiro vazio'});
       // Buscar por id OU por nome
