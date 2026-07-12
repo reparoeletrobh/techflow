@@ -650,9 +650,10 @@ async function atualizarErp(){
 }
 
 load();
-setInterval(load, 90000);
+setInterval(function(){ if(!document.hidden) load(); }, 180000);
 atualizarErp();
-setInterval(atualizarErp, 20000);
+setInterval(function(){ if(!document.hidden) atualizarErp(); }, 120000);
+document.addEventListener('visibilitychange',function(){ if(!document.hidden){ load(); atualizarErp(); } });
 
 // ── EDITAR PIPE ───────────────────────────────────────────────────────────
 function abrirEditarPipe(id) {

@@ -1168,7 +1168,8 @@ async function salvarEditarFin() {
 load();
 showPage('kanban'); // abre em Fichas por padrão
 syncPipefy();
-setInterval(()=>{ load(); syncPipefy(); }, 30000);
+setInterval(()=>{ if(!document.hidden){ load(); syncPipefy(); } }, 300000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ load(); } });
 
 // ── Modal de Cobrança MP ──────────────────────────────────────────────────────
 let mpRecId = null, mpMetodo = null;

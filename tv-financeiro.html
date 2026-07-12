@@ -851,7 +851,8 @@ async function showToast(icon,title,msg) {
 load();
 showPage('kanban'); // abre em Fichas por padrão
 syncPipefy();
-setInterval(()=>{ load(); syncPipefy(); }, 30000);
+setInterval(()=>{ if(!document.hidden){ load(); syncPipefy(); } }, 300000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ load(); } });
 
 
 // ── Mover OS ─────────────────────────────
@@ -1254,7 +1255,8 @@ async function salvarEditarFin() {
 load();
 showPage('kanban'); // abre em Fichas por padrão
 syncPipefy();
-setInterval(()=>{ load(); syncPipefy(); }, 30000);
+setInterval(()=>{ if(!document.hidden){ load(); syncPipefy(); } }, 300000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ load(); } });
 
 async function showRelTab(name) {
   document.getElementById('rel-sec-links').style.display = name==='links' ? '' : 'none';
