@@ -944,7 +944,32 @@ module.exports = async function handler(req, res) {
     });
   }
 
-    // ── GET buscar-arquivo?q= — pesquisa no arquivo financeiro (página /arquivo) ──
+    // ── GET desarquivar-fase?fase=faturamento — devolve do arquivo ao ativo ──
+  if (action === 'desarquivar-fase') {
+    const faseQ = String(req.query.fase || '');
+    if (!faseQ) return res.status(400).json({ ok:false, error:'informe ?fase=' });
+    const arq = (await dbGet('reparoeletro_financeiro_arquivo')) || { records: [] };
+    const fin = (await dbGet(FIN_KEY)) || { records: [] };
+    if (!Array.isArray(fin.records)) fin.records = [];
+    const voltar = (arq.records || []).filter(r => r.phaseId === faseQ);
+    if (!voltar.length) return res.status(200).json({ ok:true, devolvidos:0, msg:'Nenhum registro de '+faseQ+' no arquivo' });
+    arq.records = (arq.records || []).filter(r => r.phaseId !== faseQ);
+    const idsAtivos = new Set(fin.records.map(r => String(r.id)));
+    let dev = 0;
+    for (const r of voltar) {
+      if (idsAtivos.has(String(r.id))) continue;
+      delete r.arquivadoEm;
+      fin.records.push(r);
+      dev++;
+    }
+    await dbSet(FIN_KEY, fin);
+    await dbSet('reparoeletro_financeiro_arquivo', arq);
+    return res.status(200).json({ ok:true, devolvidos:dev, fase:faseQ,
+      ativosAgora:fin.records.length, restantesNoArquivo:arq.records.length,
+      nomes: voltar.slice(0,10).map(r => r.nomeContato || r.title || r.id) });
+  }
+
+  // ── GET buscar-arquivo?q= — pesquisa no arquivo financeiro (página /arquivo) ──
   if (action === 'buscar-arquivo') {
     const q = String(req.query.q || '').toLowerCase();
     const arq = (await dbGet('reparoeletro_financeiro_arquivo')) || { records: [] };
