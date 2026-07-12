@@ -10,15 +10,15 @@
     },
     {
       "path": "/api/frenteloja?action=sync-fl",
-      "schedule": "*/5 * * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/board?action=validate-loja",
-      "schedule": "*/5 * * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/frenteloja?action=retry-pipefy-pending",
-      "schedule": "*/5 * * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/logistica?action=limpar-orc-registrado",
@@ -58,7 +58,7 @@
     },
     {
       "path": "/api/tv-pipe?action=pipe-sem-resposta",
-      "schedule": "*/5 * * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/financeiro?action=arquivar-automatico",

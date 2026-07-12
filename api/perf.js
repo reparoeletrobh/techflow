@@ -23,28 +23,26 @@ const CHAVES=[
   'bk_0_reparoeletro_financeiro','bk_1_reparoeletro_financeiro',
 ];
 
-async function strlen(key){
-  try{
-    const r=await fetch(`${U}/strlen/${key}`,{headers:{Authorization:`Bearer ${T}`}});
-    const j=await r.json();
-    return typeof j.result==='number'?j.result:0;
-  }catch{return -1;}
-}
-async function llen(key){
-  try{
-    const r=await fetch(`${U}/llen/${key}`,{headers:{Authorization:`Bearer ${T}`}});
-    const j=await r.json();
-    return typeof j.result==='number'?j.result:0;
-  }catch{return -1;}
-}
-
 export default async function handler(req,res){
   res.setHeader('Cache-Control','no-cache');
   const action=req.query.action||'sizes';
 
   if(action==='sizes'){
-    const tamanhos=await Promise.all(CHAVES.map(k=>strlen(k)));
-    const evtLen=await llen('prospeccao_evt_list');
+    // PIPELINE: todos os STRLENs + LLEN em UMA request (robusto sob throttling)
+    const cmds=CHAVES.map(k=>['STRLEN',k]).concat([['LLEN','prospeccao_evt_list']]);
+    let results=[];
+    try{
+      const r=await fetch(`${U}/pipeline`,{
+        method:'POST',
+        headers:{Authorization:`Bearer ${T}`,'Content-Type':'application/json'},
+        body:JSON.stringify(cmds)
+      });
+      results=await r.json();
+    }catch(e){
+      return res.status(200).json({ok:false,error:'pipeline: '+e.message});
+    }
+    const tamanhos=CHAVES.map((k,i)=>Number(results[i]?.result)||0);
+    const evtLen=Number(results[CHAVES.length]?.result)||0;
 
     const linhas=CHAVES.map((k,i)=>({chave:k,mb:+(tamanhos[i]/1048576).toFixed(2),bytes:tamanhos[i]}))
       .filter(l=>l.bytes>0)

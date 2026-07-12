@@ -1226,6 +1226,35 @@ export default async function handler(req, res) {
   }
 
 
+  // ── GET limpar-backups-lote?cursor=0 — limpeza paginada (funciona sob throttling) ──
+  if (action === 'limpar-backups-lote') {
+    try {
+      const cursor = String(req.query.cursor || '0');
+      // 1 página de SCAN (até ~200 chaves examinadas)
+      const rs = await fetch(`${U}/scan/${cursor}/match/*_bak_*/count/200`,
+        { headers: { Authorization: `Bearer ${T}` } });
+      const js = await rs.json();
+      const [novoCursor, achadas] = js.result || ['0', []];
+      let deletadas = 0;
+      if (achadas && achadas.length) {
+        // DEL de todas as achadas em UM comando via pipeline
+        const rd = await fetch(`${U}/pipeline`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${T}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify([['DEL', ...achadas]])
+        });
+        const jd = await rd.json();
+        deletadas = Number(jd?.[0]?.result) || 0;
+      }
+      const fim = String(novoCursor) === '0';
+      return res.status(200).json({ ok: true, deletadas, cursor: String(novoCursor),
+        terminou: fim,
+        proximo: fim ? null : `/api/pipe?action=limpar-backups-lote&cursor=${novoCursor}` });
+    } catch(e) {
+      return res.status(200).json({ ok:false, error:e.message });
+    }
+  }
+
   // ── GET limpar-backups-scan: varre Redis e apaga TODAS as chaves _bak_ antigas ──
   if (action === 'limpar-backups-scan') {
     try {
