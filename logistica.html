@@ -882,7 +882,7 @@ function equipSecHTML(eq, i, total) {
       <input class="diag-input" type="number" min="0" placeholder="Ex: 2000" value="${eq.valorEquip||''}"
         style="width:160px;" oninput="diagEquips[${i}].valorEquip=this.value;atualizar40(${i},this.value)">
       <div id="orc40-${i}" style="margin-top:6px;font-size:13px;font-weight:800;color:var(--accent,#f5c800);">
-        Orçamento (40%): ${eq.valorEquip>0?'R$ '+Math.round(parseFloat(eq.valorEquip)*0.4):'—'}
+        Orçamento: ${eq.valorEquip>0?'R$ '+Math.round(parseFloat(eq.valorEquip)*0.4):'—'}
       </div>
     </div>` : ''}
     ${eq.tabela!=='dinamica' && precisaPreco(eq.tipo, eq.subtipo, eq.servicos) ? `
@@ -917,7 +917,7 @@ function atualizar40(i, v) {
   const el = document.getElementById('orc40-'+i);
   if (!el) return;
   const n = parseFloat(String(v||'').replace(',','.'));
-  el.textContent = 'Orçamento (40%): ' + (n>0 ? 'R$ '+Math.round(n*0.4) : '—');
+  el.textContent = 'Orçamento: ' + (n>0 ? 'R$ '+Math.round(n*0.4) : '—');
 }
 
 function selSubtipo(i, sub) {

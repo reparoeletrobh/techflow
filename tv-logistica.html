@@ -861,7 +861,7 @@ function equipSecHTML(eq, i, total) {
       <input class="diag-input" type="number" min="0" placeholder="Ex: 2000" value="${eq.valorEquip||''}"
         style="width:160px;" oninput="diagEquips[${i}].valorEquip=this.value;atualizar40(${i},this.value)">
       <div id="orc40-${i}" style="margin-top:6px;font-size:13px;font-weight:800;color:var(--accent,#f5c800);">
-        Orçamento (40%): ${eq.valorEquip>0?'R$ '+Math.round(parseFloat(eq.valorEquip)*0.4):'—'}
+        Orçamento: ${eq.valorEquip>0?'R$ '+Math.round(parseFloat(eq.valorEquip)*0.4):'—'}
       </div>
     </div>` : ''}
     ${precisaPreco(eq.tipo, eq.subtipo, eq.servicos) ? `
@@ -896,7 +896,7 @@ function atualizar40(i, v) {
   const el = document.getElementById('orc40-'+i);
   if (!el) return;
   const n = parseFloat(String(v||'').replace(',','.'));
-  el.textContent = 'Orçamento (40%): ' + (n>0 ? 'R$ '+Math.round(n*0.4) : '—');
+  el.textContent = 'Orçamento: ' + (n>0 ? 'R$ '+Math.round(n*0.4) : '—');
 }
 
 function selSubtipo(i, sub) {
@@ -1252,7 +1252,7 @@ function renderChipSecStr(fid, idx, total) {
     '<div style="margin-top:8px;padding-top:6px;border-top:1px dashed rgba(255,255,255,.08);">' +
       '<button class="chip-tv" id="dlc-din-'+fid+'-'+idx+'" onclick="toggleDinamicaTV(\''+fid+'\','+idx+')">⚡ Tabela Dinâmica</button>' +
       '<input class="diag-input-tv" type="number" id="dld-'+fid+'-'+idx+'" placeholder="Valor do equipamento (R$)" min="0" style="display:none;margin-top:6px;" oninput="atualizar40TV(\''+fid+'\','+idx+',this.value)"/>' +
-      '<div id="dld40-'+fid+'-'+idx+'" style="display:none;margin-top:4px;font-size:11px;font-weight:800;color:var(--accent,#f5c800);">Orçamento (40%): —</div>' +
+      '<div id="dld40-'+fid+'-'+idx+'" style="display:none;margin-top:4px;font-size:11px;font-weight:800;color:var(--accent,#f5c800);">Orçamento: —</div>' +
     '</div>' +
   '</div>';
 }
@@ -1322,7 +1322,7 @@ function atualizar40TV(fid, idx, v) {
   var el = document.getElementById('dld40-'+fid+'-'+idx);
   if (!el) return;
   var n = parseFloat(String(v||'').replace(',','.'));
-  el.textContent = 'Orçamento (40%): ' + (n>0 ? 'R$ '+Math.round(n*0.4) : '—');
+  el.textContent = 'Orçamento: ' + (n>0 ? 'R$ '+Math.round(n*0.4) : '—');
 }
 
 function coletarChipsSecs(fid) {
