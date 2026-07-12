@@ -1147,6 +1147,39 @@ export default async function handler(req, res) {
   }
 
 
+  // ── GET limpar-backups-tudo — recarregue a página (F5) até terminou:true ──
+  if (action === 'limpar-backups-tudo') {
+    try {
+      const U = (process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+      const T = (process.env.UPSTASH_TOKEN||'').replace(/[\n\r'"]/g,'').trim();
+      const inicio = Date.now();
+      let cursor = '0', totalDel = 0, paginas = 0, terminou = false;
+      do {
+        const rs = await fetch(`${U}/scan/${cursor}/match/*_bak_*/count/200`,
+          { headers: { Authorization: `Bearer ${T}` } });
+        const js = await rs.json();
+        const [novoCursor, achadas] = js.result || ['0', []];
+        cursor = String(novoCursor);
+        paginas++;
+        if (achadas && achadas.length) {
+          const rd = await fetch(`${U}/pipeline`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${T}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify([['DEL', ...achadas]])
+          });
+          const jd = await rd.json();
+          totalDel += Number(jd?.[0]?.result) || 0;
+        }
+        if (cursor === '0') { terminou = true; break; }
+      } while (Date.now() - inicio < 8000);
+      return res.status(200).json({ ok:true, deletadasNestaChamada: totalDel, paginas,
+        terminou,
+        instrucao: terminou ? '✅ LIMPEZA CONCLUÍDA' : '🔁 Aperte F5 (recarregar) nesta mesma página para continuar' });
+    } catch(e) {
+      return res.status(200).json({ ok:false, error:e.message });
+    }
+  }
+
   // ── GET limpar-backups-scan: varre Redis e apaga TODAS as chaves _bak_ antigas ──
   if (action === 'limpar-backups-scan') {
     try {
