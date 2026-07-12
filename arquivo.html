@@ -36,6 +36,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 <div class="tabs">
   <div class="tab active" id="tab-adm" onclick="mudarAba('adm')">🔧 Arquivo ADM</div>
   <div class="tab" id="tab-tv" onclick="mudarAba('tv')">📺 Arquivo TV</div>
+  <div class="tab" id="tab-fin" onclick="mudarAba('fin')">💰 Pagos (Financeiro)</div>
 </div>
 
 <div id="barra">
@@ -57,6 +58,7 @@ function fdt(iso){
 }
 function faseLbl(m){
   var s=String(m||'');
+  if(s.indexOf('pago')>-1)return '💰 Pago';
   if(s.indexOf('finalizado')>-1)return '✅ Finalizado';
   if(s.indexOf('ultima')>-1)return '📞 Última Chamada';
   if(s.indexOf('descarte')>-1)return '🗑 Descarte';
@@ -67,6 +69,7 @@ function mudarAba(s){
   SISTEMA=s;
   document.getElementById('tab-adm').classList.toggle('active',s==='adm');
   document.getElementById('tab-tv').classList.toggle('active',s==='tv');
+  document.getElementById('tab-fin').classList.toggle('active',s==='fin');
   buscarAgora();
 }
 
@@ -74,7 +77,7 @@ function buscar(){ clearTimeout(_timer); _timer=setTimeout(buscarAgora,300); }
 
 async function buscarAgora(){
   var q=document.getElementById('q').value.trim();
-  var api=SISTEMA==='tv'?'/api/tv-pipe':'/api/pipe';
+  var api=SISTEMA==='tv'?'/api/tv-pipe':(SISTEMA==='fin'?'/api/financeiro':'/api/pipe');
   var el=document.getElementById('lista');
   el.innerHTML='<div class="empty">⏳ Buscando...</div>';
   try{

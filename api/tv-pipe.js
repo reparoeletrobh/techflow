@@ -736,7 +736,7 @@ export default async function handler(req, res) {
   // ── GET arquivar-ultima-chamada: arquiva fichas +90 dias em ultima_chamada ─
   if (action === 'arquivar-ultima-chamada') {
     var ARQUIVO_KEY  = 'tv_arquivo';
-    var LIMITE_DIAS  = parseInt(req.query.dias || '90');
+    var LIMITE_DIAS  = parseInt(req.query.dias || '7'); // regra 7d geral (ultima_chamada)
     var LIMITE_MS    = LIMITE_DIAS * 24 * 60 * 60 * 1000;
     var corte        = new Date(Date.now() - LIMITE_MS);
     try {
@@ -754,7 +754,7 @@ export default async function handler(req, res) {
       });
 
       if (!paraArquivar.length)
-        return res.status(200).json({ok:true,arquivados:0,msg:'Nenhuma ficha elegível (ultima_chamada>'+LIMITE_DIAS+'d, finalizado>7d, descarte>7d)'});
+        return res.status(200).json({ok:true,arquivados:0,msg:'Nenhuma ficha elegível (ultima_chamada>'+LIMITE_DIAS+'d, finalizado>7d, descarte>7d (regra 7d geral))'});
 
       // IDs já arquivados (para idempotência)
       var jaArq = {};

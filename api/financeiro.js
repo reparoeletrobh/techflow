@@ -944,10 +944,30 @@ module.exports = async function handler(req, res) {
     });
   }
 
-    // ── GET arquivar-automatico — cron diário: arquiva fichas pagas há +15 dias ───
+    // ── GET buscar-arquivo?q= — pesquisa no arquivo financeiro (página /arquivo) ──
+  if (action === 'buscar-arquivo') {
+    const q = String(req.query.q || '').toLowerCase();
+    const arq = (await dbGet('reparoeletro_financeiro_arquivo')) || { records: [] };
+    const todos = arq.records || [];
+    const filtrados = (q
+      ? todos.filter(r => ((r.nomeContato||'')+' '+(r.title||'')+' '+(r.telefone||'')+' '+(r.equipamento||'')).toLowerCase().includes(q))
+      : todos
+    ).slice(0, 50).map(r => ({
+      id: r.id, nome: r.nomeContato || r.title || '—',
+      telefone: r.telefone || '', equipamento: r.equipamento || '',
+      valor: r.valor || null,
+      motivoArquivo: 'pago_' + (r.phaseId||''),
+      movedAt: r.paidAt || r.movedAt || null,
+      arquivadoEm: r.arquivadoEm || null,
+      pipefyId: r.pipefyId || null,
+    }));
+    return res.status(200).json({ ok:true, fichas: filtrados, total: filtrados.length, totalArquivado: todos.length });
+  }
+
+    // ── GET arquivar-automatico — cron diário: arquiva fichas pagas há +7 dias ───
   if (action === 'arquivar-automatico') {
     const ARQUIVO_KEY = 'reparoeletro_financeiro_arquivo';
-    const CORTE_DIAS  = 15;
+    const CORTE_DIAS  = 7;
     const cutoff      = new Date(Date.now() - CORTE_DIAS * 24 * 60 * 60 * 1000).toISOString();
 
     const fin     = (await dbGet(FIN_KEY))     || { records: [] };
