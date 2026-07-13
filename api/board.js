@@ -1556,26 +1556,33 @@ module.exports = async function handler(req, res) {
             let movedLocal=0;
             if(pipeDb3&&Array.isArray(pipeDb3.cards)){
               const nowB=new Date().toISOString();
-              // Verificar gmb_pendentes antes de mover
-              let gmbPendIds=new Set();
+              // SNAPSHOT GMB antes de finalizar: quem sai do ERP entra no pool de pesquisa
+              let gmbPend={ids:[],fichas:[]}, gmbEnvIds=new Set();
               try{
                 const gmbP=await _bg3('gmb_pendentes');
-                gmbPendIds=new Set((gmbP&&gmbP.ids||[]).map(String));
+                if(gmbP){gmbPend.ids=(gmbP.ids||[]).map(String);gmbPend.fichas=gmbP.fichas||[];}
+                const gmbE=await _bg3('gmb_enviados');
+                gmbEnvIds=new Set(((gmbE&&gmbE.fichas)||[]).map(function(f){return String(f.id);}));
               }catch(gmbErr){}
+              const gmbPendIds=new Set(gmbPend.ids);
+              let addPool=0;
               pipeDb3.cards.forEach(function(card){
                 if(card.phase==='erp'){
                   const cid=String(card.id||card.pipefyId||'');
-                  if(gmbPendIds.has(cid)){
-                    // Card pendente no GMB — mover para finalizado mas manter no pool
-                    card.history=(card.history||[]).concat([{phase:'erp',ts:nowB}]);
-                    card.phase='finalizado'; card.movedAt=nowB; movedLocal++;
-                    // NÃO remover do gmb_pendentes — GMB continuará mostrando
-                  } else {
-                    card.history=(card.history||[]).concat([{phase:'erp',ts:nowB}]);
-                    card.phase='finalizado'; card.movedAt=nowB; movedLocal++;
+                  // Entra no pool GMB se ainda não enviado nem pendente
+                  if(cid&&!gmbPendIds.has(cid)&&!gmbEnvIds.has(cid)){
+                    gmbPend.ids.push(cid);gmbPendIds.add(cid);
+                    gmbPend.fichas.push({id:cid,pipefyId:card.pipefyId||card.id,
+                      nome:card.nomeContato||card.title||'—',tel:card.telefone||card.tel||'',
+                      desc:card.equipamento||card.desc||'',valor:card.valor||null,
+                      movedAt:card.movedAt||null,phase:'erp',snapshotDe:'erp-to-finalizado'});
+                    addPool++;
                   }
+                  card.history=(card.history||[]).concat([{phase:'erp',ts:nowB}]);
+                  card.phase='finalizado'; card.movedAt=nowB; movedLocal++;
                 }
               });
+              if(addPool>0){try{await _bs3('gmb_pendentes',gmbPend);}catch(e9){}}
               if(movedLocal>0){pipeDb3.lastSync=new Date().toISOString();await _bs3('reparoeletro_pipe',pipeDb3);}
             }
             return res.status(200).json({ ok: true, moved: 0, movedLocal, msg: "Nenhum card em ERP no Pipefy — "+movedLocal+" cards locais movidos" });
@@ -1608,12 +1615,31 @@ module.exports = async function handler(req, res) {
           const pipeDb2=await _bg2('reparoeletro_pipe');
           if(pipeDb2&&Array.isArray(pipeDb2.cards)){
             const nowB=new Date().toISOString(); let movedB=0;
+            // SNAPSHOT GMB antes de finalizar
+            let gmbPend2={ids:[],fichas:[]}, gmbEnvIds2=new Set();
+            try{
+              const gp=await _bg2('gmb_pendentes');
+              if(gp){gmbPend2.ids=(gp.ids||[]).map(String);gmbPend2.fichas=gp.fichas||[];}
+              const ge=await _bg2('gmb_enviados');
+              gmbEnvIds2=new Set(((ge&&ge.fichas)||[]).map(function(f){return String(f.id);}));
+            }catch(e8){}
+            const pendSet2=new Set(gmbPend2.ids); let addPool2=0;
             pipeDb2.cards.forEach(function(card){
               if(card.phase==='erp'){
+                const cid=String(card.id||card.pipefyId||'');
+                if(cid&&!pendSet2.has(cid)&&!gmbEnvIds2.has(cid)){
+                  gmbPend2.ids.push(cid);pendSet2.add(cid);
+                  gmbPend2.fichas.push({id:cid,pipefyId:card.pipefyId||card.id,
+                    nome:card.nomeContato||card.title||'—',tel:card.telefone||card.tel||'',
+                    desc:card.equipamento||card.desc||'',valor:card.valor||null,
+                    movedAt:card.movedAt||null,phase:'erp',snapshotDe:'erp-to-finalizado'});
+                  addPool2++;
+                }
                 card.history=(card.history||[]).concat([{phase:'erp',ts:nowB}]);
                 card.phase='finalizado'; card.movedAt=nowB; movedB++;
               }
             });
+            if(addPool2>0){try{await _bs2('gmb_pendentes',gmbPend2);}catch(e7){}}
             if(movedB>0){pipeDb2.lastSync=nowB;await _bs2('reparoeletro_pipe',pipeDb2);}
             console.log('[erp→finalizado] Pipe local: '+movedB+' cards');
           }
