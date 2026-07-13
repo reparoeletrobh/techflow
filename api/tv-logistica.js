@@ -368,6 +368,46 @@ module.exports = async function handler(req, res) {
   }
 
   // ── POST criar ────────────────────────────────────────────
+  // ── ENVIAR-PROSPECCAO: coleta frustrada volta para Entrar em Contato (TV) ──
+  if (req.method === 'POST' && action === 'enviar-prospeccao') {
+    const { id } = req.body || {};
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const ficha = (db.fichas || []).find(f => String(f.id) === String(id));
+    if (!ficha) return res.status(404).json({ ok:false, error:'Ficha não encontrada' });
+
+    // 1. Cria em fichas_tv com flag de reagendamento → espelho da prospecção (badge 📺 TV)
+    const fdb = (await dbGet('fichas_tv')) || { fichas: [] };
+    const now = new Date().toISOString();
+    const nova = {
+      id: 'fic_reag_tv_' + Date.now().toString(36),
+      nome: ficha.nome || '', telefone: String(ficha.telefone||'').replace(/\D/g,''),
+      equipamento: ficha.equipamento || '', defeito: ficha.defeito || '',
+      endereco: ficha.endereco || '',
+      waNum: String(ficha.telefone||'').replace(/\D/g,''),
+      status: 'entrar_contato',
+      reagendarColeta: true,
+      origemLogistica: true, logisticaFichaId: ficha.id,
+      criadoEm: now, contatoFeitoEm: null,
+    };
+    fdb.fichas.unshift(nova);
+    await dbSet('fichas_tv', fdb);
+
+    // 2. Ficha sai da fila de remarcar
+    ficha.phase = 'prospeccao';
+    ficha.enviadoProspeccaoEm = now;
+    await dbSet(LOG_KEY, db);
+
+    // 3. Evento para o relatório da prospecção (sistema TV)
+    try {
+      const U2 = (process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
+      const T2 = (process.env.UPSTASH_TOKEN||'').replace(/[\n\r'"]/g,'').trim();
+      const evt = JSON.stringify({ ts: now, tipo: 'entrar_contato', de: null, sis: 'tv', id: nova.id, nome: nova.nome });
+      await fetch(`${U2}/rpush/prospeccao_evt_list/${encodeURIComponent(evt)}`, { headers: { Authorization: `Bearer ${T2}` } });
+    } catch(_) {}
+
+    return res.status(200).json({ ok:true, fichaProspeccao: nova.id });
+  }
+
   if (req.method === 'POST' && action === 'criar') {
     const { nome, telefone, endereco, equipamento, defeito, pipefyCardId, texto } = req.body || {};
     if (!nome) return res.status(400).json({ ok: false, error: 'nome obrigatorio' });
