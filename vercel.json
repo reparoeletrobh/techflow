@@ -79,6 +79,18 @@
   ],
   "rewrites": [
     {
+      "source": "/api/wa-bot",
+      "destination": "/api/wa-bot.js"
+    },
+    {
+      "source": "/api/wa-webhook",
+      "destination": "/api/wa-webhook.js"
+    },
+    {
+      "source": "/bot",
+      "destination": "/bot.html"
+    },
+    {
       "source": "/api/perf",
       "destination": "/api/perf.js"
     },
