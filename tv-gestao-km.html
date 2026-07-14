@@ -142,8 +142,8 @@ tbody td{font-family:var(--fm);font-size:11px;padding:10px 12px;color:var(--text
     <div class="form-title">🚗 Novo <span>Registro</span></div>
     <div class="fl">Motorista</div>
     <div class="motorista-row">
-      <button class="moto-btn wilde" id="btn-wilde" onclick="selMot('Wilde')">
-        <span class="micon">🧑</span><span class="mname">Wilde</span>
+      <button class="moto-btn wilde" id="btn-wilde" onclick="selMot('Jonathan')">
+        <span class="micon">🧑</span><span class="mname">Jonathan</span>
       </button>
       <button class="moto-btn paulo" id="btn-paulo" onclick="selMot('Paulo')">
         <span class="micon">👤</span><span class="mname">Paulo</span>
@@ -171,7 +171,7 @@ tbody td{font-family:var(--fm);font-size:11px;padding:10px 12px;color:var(--text
 <div class="page" id="page-tabela">
   <div class="toolbar">
     <button class="fbtn active" data-m="todos" onclick="setFM(this,'todos')">Todos</button>
-    <button class="fbtn wf" data-m="Wilde" onclick="setFM(this,'Wilde')">Wilde</button>
+    <button class="fbtn wf" data-m="Jonathan" onclick="setFM(this,'Jonathan')">Jonathan</button>
     <button class="fbtn pf" data-m="Paulo" onclick="setFM(this,'Paulo')">Paulo</button>
     <input type="month" class="fi-sm" id="f-mes" oninput="renderT()">
     <input type="text" class="fi-search" id="f-busca" placeholder="🔍 Buscar...">
@@ -209,7 +209,7 @@ tbody td{font-family:var(--fm);font-size:11px;padding:10px 12px;color:var(--text
     </div>
     <div style="width:1px;height:18px;background:var(--border);margin:0 2px;"></div>
     <button class="fbtn active" id="dm-todos" onclick="setFD(this,'todos')">Todos</button>
-    <button class="fbtn wf"     id="dm-wilde" onclick="setFD(this,'Wilde')">Wilde</button>
+    <button class="fbtn wf"     id="dm-wilde" onclick="setFD(this,'Jonathan')">Jonathan</button>
     <button class="fbtn pf"     id="dm-paulo" onclick="setFD(this,'Paulo')">Paulo</button>
   </div>
   <div class="kpi-grid" id="kpi-grid"></div>
@@ -240,7 +240,7 @@ tbody td{font-family:var(--fm);font-size:11px;padding:10px 12px;color:var(--text
     <div class="mt">✏️ Editar Registro</div>
     <input type="hidden" id="e-id">
     <div class="fl">Motorista</div>
-    <select class="fi" id="e-mot"><option value="Wilde">Wilde</option><option value="Paulo">Paulo</option></select>
+    <select class="fi" id="e-mot"><option value="Jonathan">Jonathan</option><option value="Paulo">Paulo</option></select>
     <div class="fl">Data</div>
     <input class="fi" id="e-data" type="date">
     <div class="row2">
@@ -273,7 +273,7 @@ function setTab(t){
 var motSel='';
 function selMot(m){
   motSel=m;
-  document.getElementById('btn-wilde').classList.toggle('sel',m==='Wilde');
+  document.getElementById('btn-wilde').classList.toggle('sel',m==='Jonathan');
   document.getElementById('btn-paulo').classList.toggle('sel',m==='Paulo');
 }
 
@@ -372,7 +372,7 @@ function renderT(){
   }
   if(emptyDiv) emptyDiv.style.display='none';
   tb.innerHTML=list.map(function(r){
-    var b=r.motorista==='Wilde'?'<span class="bm bw">Wilde</span>':'<span class="bm bp">Paulo</span>';
+    var b=r.motorista==='Jonathan'?'<span class="bm bw">Jonathan</span>':'<span class="bm bp">Paulo</span>';
     var ke=r.equipamentos>0?(r.km/r.equipamentos).toFixed(1)+' km':'—';
     return '<tr>'
       +'<td>'+fd(r.data)+'</td>'
@@ -435,7 +435,7 @@ function renderDash(){
   var data=getDash();
   // Para barras comparativas: usa só período, sem filtro de motorista (getByPeriod)
   var allP=getByPeriod();
-  var W=allP.filter(r=>r.motorista==='Wilde');
+  var W=allP.filter(r=>r.motorista==='Jonathan');
   var P=allP.filter(r=>r.motorista==='Paulo');
 
   var kmT=soma(data,'km'), eqT=soma(data,'equipamentos'), sT=data.length;
@@ -450,14 +450,14 @@ function renderDash(){
     kpis=[
       {cls:'kt',c:'var(--accent)',n:soma(allP,'km').toFixed(0)+' km',l:'Total km',s:allP.length+' saídas · km/eq: '+(soma(allP,'equipamentos')>0?(soma(allP,'km')/soma(allP,'equipamentos')).toFixed(1)+'km':'—')},
       {cls:'kt',c:'var(--accent)',n:soma(allP,'equipamentos'),l:'Total equipamentos',s:''},
-      {cls:'kw',c:'var(--wilde)',n:kmW.toFixed(0)+' km',l:'Km — Wilde',s:sW+' saídas · '+eqW+' equip.'},
+      {cls:'kw',c:'var(--wilde)',n:kmW.toFixed(0)+' km',l:'Km — Jonathan',s:sW+' saídas · '+eqW+' equip.'},
       {cls:'kp',c:'var(--paulo)',n:kmP.toFixed(0)+' km',l:'Km — Paulo',s:sP+' saídas · '+eqP+' equip.'},
-      {cls:'kw',c:'var(--wilde)',n:eqW+' equip.',l:'Equip. Wilde',s:sW>0?(eqW/sW).toFixed(1)+' equip/saída':'—'},
+      {cls:'kw',c:'var(--wilde)',n:eqW+' equip.',l:'Equip. Jonathan',s:sW>0?(eqW/sW).toFixed(1)+' equip/saída':'—'},
       {cls:'kp',c:'var(--paulo)',n:eqP+' equip.',l:'Equip. Paulo',s:sP>0?(eqP/sP).toFixed(1)+' equip/saída':'—'},
     ];
   } else {
-    var cor=fdash==='Wilde'?'var(--wilde)':'var(--paulo)';
-    var cls=fdash==='Wilde'?'kw':'kp';
+    var cor=fdash==='Jonathan'?'var(--wilde)':'var(--paulo)';
+    var cls=fdash==='Jonathan'?'kw':'kp';
     var melhor=data.length?data.slice().sort((a,b)=>b.km-a.km)[0]:null;
     kpis=[
       {cls:cls,c:cor,n:kmT.toFixed(0)+' km',l:'Total km — '+fdash,s:sT+' saídas'},
@@ -472,12 +472,12 @@ function renderDash(){
     '<div class="kc '+k.cls+'"><div class="kn" style="color:'+k.c+'">'+k.n+'</div><div class="kl">'+k.l+'</div><div class="ks">'+k.s+'</div></div>'
   ).join('');
 
-  // Barras comparativas — sempre Wilde vs Paulo usando período (sem filtro de motorista)
+  // Barras comparativas — sempre Jonathan vs Paulo usando período (sem filtro de motorista)
   var mkm=Math.max(kmW,kmP,1), meq=Math.max(eqW,eqP,1);
-  document.getElementById('c-km').innerHTML=[{l:'Wilde',v:kmW,c:'bfw'},{l:'Paulo',v:kmP,c:'bfp'}].map(b=>
+  document.getElementById('c-km').innerHTML=[{l:'Jonathan',v:kmW,c:'bfw'},{l:'Paulo',v:kmP,c:'bfp'}].map(b=>
     '<div class="bi"><div class="blb">'+b.l+'</div><div class="btr"><div class="bf '+b.c+'" style="width:'+Math.round(b.v/mkm*100)+'%"></div></div><div class="bv">'+b.v.toFixed(0)+'</div></div>'
   ).join('');
-  document.getElementById('c-eq').innerHTML=[{l:'Wilde',v:eqW,c:'bfw'},{l:'Paulo',v:eqP,c:'bfp'}].map(b=>
+  document.getElementById('c-eq').innerHTML=[{l:'Jonathan',v:eqW,c:'bfw'},{l:'Paulo',v:eqP,c:'bfp'}].map(b=>
     '<div class="bi"><div class="blb">'+b.l+'</div><div class="btr"><div class="bf '+b.c+'" style="width:'+Math.round(b.v/meq*100)+'%"></div></div><div class="bv">'+b.v+'</div></div>'
   ).join('');
 
@@ -488,7 +488,7 @@ function renderDash(){
   var msp=Math.max(...spark.map(r=>r.km),1);
   document.getElementById('sp-bars').innerHTML=spark.map(r=>{
     var h=Math.max(4,Math.round(r.km/msp*54));
-    var cor=r.motorista==='Wilde'?'var(--wilde)':'var(--paulo)';
+    var cor=r.motorista==='Jonathan'?'var(--wilde)':'var(--paulo)';
     return '<div class="sb" style="height:'+h+'px;background:'+cor+';opacity:.65" title="'+r.motorista+' '+fd(r.data)+' '+r.km+' km"></div>';
   }).join('');
   document.getElementById('sp-labels').innerHTML=spark.map(r=>'<div class="sl">'+r.data.slice(5).replace('-','/')+'</div>').join('');
@@ -498,7 +498,7 @@ function renderDash(){
   allP.forEach(function(r){
     if(!byDay[r.data]) byDay[r.data]={km:0,eq:0,w:0,p:0};
     byDay[r.data].km+=r.km; byDay[r.data].eq+=r.equipamentos;
-    if(r.motorista==='Wilde') byDay[r.data].w+=r.km; else byDay[r.data].p+=r.km;
+    if(r.motorista==='Jonathan') byDay[r.data].w+=r.km; else byDay[r.data].p+=r.km;
   });
   var days=Object.keys(byDay).sort().slice(-20);
   var md=Math.max(...days.map(d=>byDay[d].km),1);
@@ -518,7 +518,7 @@ function renderDash(){
 
 function renderDonut(sW,sP,sT){
   if(!sT){ document.getElementById('don-svg').innerHTML='<text x="50" y="54" text-anchor="middle" font-size="9" fill="#4a607a">Sem dados</text>'; document.getElementById('don-leg').innerHTML=''; return; }
-  var items=[{v:sW,c:'#3b9eff',l:'Wilde'},{v:sP,c:'#10d982',l:'Paulo'}].filter(i=>i.v>0);
+  var items=[{v:sW,c:'#3b9eff',l:'Jonathan'},{v:sP,c:'#10d982',l:'Paulo'}].filter(i=>i.v>0);
   var tot=items.reduce((s,i)=>s+i.v,0), st=-Math.PI/2;
   var paths=items.map(function(item){
     var a=item.v/tot*Math.PI*2, en=st+a;

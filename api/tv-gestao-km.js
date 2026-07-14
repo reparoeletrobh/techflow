@@ -62,7 +62,7 @@ module.exports = async function handler(req, res) {
       const equip     = parseInt(b.equipamentos) || 0;
       const obs       = String(b.observacao || "").trim();
 
-      if (motorista !== "Wilde" && motorista !== "Paulo")
+      if (motorista !== "Jonathan" && motorista !== "Paulo" && motorista !== "Wilde")
         return res.status(200).json({ ok: false, error: "Selecione o motorista" });
       if (!data)
         return res.status(200).json({ ok: false, error: "Informe a data" });
