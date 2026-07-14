@@ -67,6 +67,14 @@
     {
       "path": "/api/backup?action=run",
       "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/logistica?action=arquivar-automatico",
+      "schedule": "20 3 * * *"
+    },
+    {
+      "path": "/api/tv-logistica?action=arquivar-automatico",
+      "schedule": "25 3 * * *"
     }
   ],
   "rewrites": [

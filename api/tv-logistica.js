@@ -369,6 +369,45 @@ module.exports = async function handler(req, res) {
 
   // ── POST criar ────────────────────────────────────────────
   // ── ENVIAR-PROSPECCAO: coleta frustrada volta para Entrar em Contato (TV) ──
+  // ── GET arquivar-automatico — orc_registrado +7d → arquivo (cron diário) ──
+  if (action === 'arquivar-automatico') {
+    const CORTE_DIAS = 7;
+    const cutoff = new Date(Date.now() - CORTE_DIAS*86400000).toISOString();
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const arq = (await dbGet('tv_logistica_arquivo')) || { fichas: [] };
+    if (!Array.isArray(arq.fichas)) arq.fichas = [];
+    const now = new Date().toISOString();
+    const paraArq = (db.fichas||[]).filter(f =>
+      f.phase === 'orc_registrado' && ((f.movedAt || f.criadoEm || '') < cutoff)
+    );
+    if (!paraArq.length) return res.status(200).json({ ok:true, arquivadas:0, msg:'Nenhuma ficha de orc_registrado com +'+CORTE_DIAS+'d' });
+    const idsArq = new Set(paraArq.map(f => String(f.id)));
+    db.fichas = (db.fichas||[]).filter(f => !idsArq.has(String(f.id)));
+    for (const f of paraArq) {
+      arq.fichas.unshift(Object.assign({}, f, { arquivadoEm: now, motivoArquivo: 'orc_registrado_7d' }));
+    }
+    if (arq.fichas.length > 4000) arq.fichas = arq.fichas.slice(0, 4000);
+    await dbSet('tv_logistica_arquivo', arq);
+    await dbSet(LOG_KEY, db);
+    return res.status(200).json({ ok:true, arquivadas: paraArq.length, restantes: db.fichas.length,
+      totalNoArquivo: arq.fichas.length,
+      nomes: paraArq.slice(0,10).map(f => f.nome||'—') });
+  }
+
+  // ── GET buscar-arquivo?q= — pesquisa no arquivo da logística ──
+  if (action === 'buscar-arquivo') {
+    const qA = String(req.query.q || '').toLowerCase();
+    const arqB = (await dbGet('tv_logistica_arquivo')) || { fichas: [] };
+    let listaB = arqB.fichas || [];
+    if (qA) listaB = listaB.filter(f =>
+      ((f.nome||'')+' '+(f.telefone||'')+' '+(f.equipamento||'')).toLowerCase().includes(qA));
+    return res.status(200).json({ ok:true, total: listaB.length,
+      fichas: listaB.slice(0,200).map(f => ({
+        id: f.id, nome: f.nome||'—', telefone: f.telefone||'',
+        equipamento: f.equipamento||'', motivoArquivo: f.motivoArquivo,
+        movedAt: f.movedAt||null, arquivadoEm: f.arquivadoEm||null, pipefyId: f.pipefyId||null })) });
+  }
+
   if (req.method === 'POST' && action === 'enviar-prospeccao') {
     const { id } = req.body || {};
     const db = await dbGet(LOG_KEY) || defaultDB();

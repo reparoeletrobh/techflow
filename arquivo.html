@@ -37,6 +37,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
   <div class="tab active" id="tab-adm" onclick="mudarAba('adm')">🔧 Arquivo ADM</div>
   <div class="tab" id="tab-tv" onclick="mudarAba('tv')">📺 Arquivo TV</div>
   <div class="tab" id="tab-fin" onclick="mudarAba('fin')">💰 Pagos (Financeiro)</div>
+  <div class="tab" id="tab-log" onclick="mudarAba('log')">🚚 Logística</div>
+  <div class="tab" id="tab-logtv" onclick="mudarAba('logtv')">🚚 Log. TV</div>
 </div>
 
 <div id="barra">
@@ -79,6 +81,7 @@ function fdt(iso){
 }
 function faseLbl(m){
   var s=String(m||'');
+  if(s.indexOf('orc_registrado')>-1)return '📝 Orçamento Registrado';
   if(s.indexOf('pago')>-1)return '💰 Pago';
   if(s.indexOf('finalizado')>-1)return '✅ Finalizado';
   if(s.indexOf('ultima')>-1)return '📞 Última Chamada';
@@ -91,6 +94,9 @@ function mudarAba(s){
   document.getElementById('tab-adm').classList.toggle('active',s==='adm');
   document.getElementById('tab-tv').classList.toggle('active',s==='tv');
   document.getElementById('tab-fin').classList.toggle('active',s==='fin');
+  document.getElementById('tab-log').classList.toggle('active',s==='log');
+  document.getElementById('tab-logtv').classList.toggle('active',s==='logtv');
+  document.getElementById('barra-tipo').style.display=(s==='adm'||s==='tv')?'flex':'none';
   buscarAgora();
 }
 
@@ -98,7 +104,7 @@ function buscar(){ clearTimeout(_timer); _timer=setTimeout(buscarAgora,300); }
 
 async function buscarAgora(){
   var q=document.getElementById('q').value.trim();
-  var api=SISTEMA==='tv'?'/api/tv-pipe':(SISTEMA==='fin'?'/api/financeiro':'/api/pipe');
+  var api=SISTEMA==='tv'?'/api/tv-pipe':(SISTEMA==='fin'?'/api/financeiro':(SISTEMA==='log'?'/api/logistica':(SISTEMA==='logtv'?'/api/tv-logistica':'/api/pipe')));
   var el=document.getElementById('lista');
   el.innerHTML='<div class="empty">⏳ Buscando...</div>';
   try{
