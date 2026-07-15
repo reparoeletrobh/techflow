@@ -204,8 +204,16 @@ export default async function handler(req,res){
     const {nomeContato,equipamento,telefone,descricao,cpf,email}=req.body||{};
     if(!nomeContato||!equipamento)return res.status(400).json({ok:false,error:'Nome e equipamento obrigatórios'});
     const db=await dbGet(FL_KEY)||defaultDB();
+    // Idempotência: mesmo telefone+equipamento criado há <120s = duplo clique/retry → retorna a existente
+    const telN=(telefone||'').replace(/[^0-9]/g,'');
+    const jaExiste=(db.fichas||[]).find(f=>
+      String(f.telefone||'')===telN && telN.length>=8 &&
+      String(f.equipamento||'').trim().toLowerCase()===String(equipamento||'').trim().toLowerCase() &&
+      (Date.now()-new Date(f.createdAt||0).getTime())<120000
+    );
+    if(jaExiste)return res.status(200).json({ok:true,ficha:jaExiste,duplicataEvitada:true});
     const id=nextId(db);const now=new Date().toISOString();
-    const ficha={id,nomeContato,equipamento,telefone:(telefone||'').replace(/[^0-9]/g,''),
+    const ficha={id,nomeContato,equipamento,telefone:telN,
       cpf:cpf||'',email:email||'',
       descricao:descricao||'',phase:'analise',createdAt:now,movedAt:now,
       history:[{phase:'analise',ts:now}]};

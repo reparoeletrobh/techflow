@@ -484,10 +484,15 @@ function cadastrar(){
   var cpf=(document.getElementById('f-cpf')||{value:''}).value.trim();
   var email=(document.getElementById('f-email')||{value:''}).value.trim();
   if(!nome||!equip){toast('Nome e equipamento obrigatórios','r');return;}
+  var btnCad=document.querySelector('[onclick="cadastrar()"]');
+  if(btnCad){if(btnCad.disabled)return;btnCad.disabled=true;btnCad.dataset.txt=btnCad.textContent;btnCad.textContent='⏳ Salvando...';}
+  function liberarBtn(){if(btnCad){btnCad.disabled=false;btnCad.textContent=btnCad.dataset.txt||'Cadastrar';}}
   fetch('/api/frenteloja?action=criar',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({nomeContato:nome,equipamento:equip,telefone:tel,descricao:desc,cpf,email})
   }).then(r=>r.json()).then(d=>{
+    liberarBtn();
     if(!d.ok){toast('Erro: '+(d.error||''),'r');return;}
+    if(d.duplicataEvitada){toast('⚠️ Ficha já cadastrada há instantes — usando a existente','');}
     fichas.unshift(d.ficha);
     document.getElementById('f-nome').value='';
     document.getElementById('f-equip').value='';
@@ -495,7 +500,7 @@ function cadastrar(){
     document.getElementById('f-desc').value='';
     renderKanban();renderPainel();
     mostrarRecibo(d.ficha);
-  }).catch(()=>toast('Erro de conexão','r')); // impressão desabilitada temporariamente
+  }).catch(function(){liberarBtn();toast('Erro de conexão','r');}); // impressão desabilitada temporariamente
 }
 
 // ══ RECIBO ════════════════════════════════════════════════════
