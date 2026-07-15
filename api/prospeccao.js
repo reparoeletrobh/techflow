@@ -130,6 +130,14 @@ export default async function handler(req,res){
       const existentes=new Set(
         db.fichas.map(f=>String(f.telefone||'').replace(/\D/g,''))
       );
+      // Tombstone: telefones excluídos manualmente não voltam da planilha (60 dias)
+      try{
+        const exc=(await dbGet('prospeccao_excluidos'))||{tels:{}};
+        const corteExc=Date.now()-60*86400000;
+        for(const t of Object.keys(exc.tels||{})){
+          if(new Date(exc.tels[t]).getTime()>corteExc)existentes.add(t);
+        }
+      }catch(_){}
 
       // Parse do horário multi-formato → Date (UTC, assumindo entrada em BRT = UTC-3)
       function parseHorarioBR(s){
@@ -363,8 +371,22 @@ export default async function handler(req,res){
   if(req.method==='POST'&&action==='excluir'){
     const{id}=req.body||{};
     const db=(await dbGet(KEY))||{fichas:[]};
+    const fx=db.fichas.find(x=>x.id===id);
     db.fichas=db.fichas.filter(x=>x.id!==id);
     await dbSet(KEY,db);
+    // Tombstone: excluída não volta pela planilha
+    if(fx&&fx.telefone){
+      try{
+        const exc=(await dbGet('prospeccao_excluidos'))||{tels:{}};
+        if(!exc.tels)exc.tels={};
+        exc.tels[String(fx.telefone)]=new Date().toISOString();
+        // Poda: manter só os últimos 60 dias / máx 5000
+        const corteT=Date.now()-60*86400000;
+        const keys=Object.keys(exc.tels);
+        if(keys.length>5000){for(const k of keys){if(new Date(exc.tels[k]).getTime()<corteT)delete exc.tels[k];}}
+        await dbSet('prospeccao_excluidos',exc);
+      }catch(_){}
+    }
     return res.status(200).json({ok:true});
   }
 
