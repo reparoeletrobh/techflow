@@ -267,7 +267,7 @@ export default async function handler(req,res){
     f.tentativas=(f.tentativas||0)+1;
     f.movidoEm=new Date().toISOString();
     await dbSet(KEY,db);
-    await logEventos([{tipo:'fim_fila',de:'retornar',sis:f.origemSistema||'adm',id:idEvt(f),nome:f.nome}]);
+    await logEventos([{tipo:'fim_fila',de:(f.status==='cliente_loja'?'cliente_loja':'retornar'),sis:f.origemSistema||'adm',id:idEvt(f),nome:f.nome}]);
     return res.status(200).json({ok:true,tentativas:f.tentativas});
   }
 
@@ -433,6 +433,7 @@ export default async function handler(req,res){
     const f=db.fichas.find(x=>x.id===id);
     if(!f)return res.status(404).json({ok:false,error:'Não encontrado'});
     f.lojaConfirmouEm=new Date().toISOString();
+    f.filaFinal=false; // progresso: sai do fim da fila
     await dbSet(KEY,db);
     await logEventos([{tipo:'confirmou_loja',de:'cliente_loja',sis:f.origemSistema||'adm',id:idEvt(f),nome:f.nome}]);
     return res.status(200).json({ok:true});

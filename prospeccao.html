@@ -596,6 +596,10 @@ async function salvarNovaFicha(){
 // ── SLA Cliente Loja: 48h para definir → confirmação → 7 dias para vir ────
 function slaClienteLoja(f){
   var agora=Date.now();
+  if(f.filaFinal&&!f.lojaConfirmouEm){
+    return {modo:'fimfila',prio:3,ord:-(new Date(f.movidoEm||0).getTime()),
+      txt:'⤵ Fim da fila'+(f.tentativas?' · '+f.tentativas+'ª tentativa':'')};
+  }
   if(f.lojaConfirmouEm){
     var d7=agora-new Date(f.lojaConfirmouEm).getTime();
     var dias=d7/86400000;
@@ -780,6 +784,7 @@ function cardHTML(f){
     btns=(f.lojaConfirmouEm?'':'<button class="cbtn" style="color:#22c55e;border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.07);" onclick="confirmouLoja(\''+f.id+'\')">✅ Confirmou Visita</button>')+
          '<button class="cbtn" style="color:#f5c800;border-color:rgba(245,200,0,.3);background:rgba(245,200,0,.07);" onclick="enviarFrenteLoja(\''+f.id+'\')">🏬 Frente de Loja</button>'+
          '<button class="cbtn cbtn-log" onclick="abrirLogModal(\''+f.id+'\')">🚚 Logística</button>'+
+         (f.filaFinal?'':'<button class="cbtn" style="color:#f5c800;border-color:rgba(245,200,0,.35);background:rgba(245,200,0,.07);" onclick="fimDaFila(\''+f.id+'\')">⤵ Fim da Fila</button>')+
          '<button class="cbtn cbtn-del" onclick="excluir(\''+f.id+'\')">✕</button>';
   }
   // Card Retornar: data visível (vermelha se vencida) + estilo fim de fila
@@ -798,6 +803,9 @@ function cardHTML(f){
     }else if(st.modo==='vencido7d'){
       estiloCard='border-color:rgba(239,68,68,.6);background:#1c0f10;';
       extraCard+='<div style="font-size:10.5px;font-weight:800;color:#ef4444;margin-bottom:4px;">🔴 '+st.txt+'</div>';
+    }else if(st.modo==='fimfila'){
+      estiloCard='border-color:rgba(245,200,0,.45);background:#171304;';
+      extraCard+='<div style="font-size:10.5px;font-weight:800;color:#f5c800;margin-bottom:4px;">'+st.txt+'</div>';
     }
   }
   if(isRet){
