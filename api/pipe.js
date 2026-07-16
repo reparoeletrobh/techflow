@@ -1695,6 +1695,27 @@ export default async function handler(req, res) {
   }
 
   // ── mover ─────────────────────────────────────────────────────────────────
+  // ── ENTRADAS-ERP-HOJE: cards que entraram na coluna ERP hoje ──
+  if (action === 'entradas-erp-hoje') {
+    var hojeE = new Date(Date.now() - 3*3600000).toISOString().slice(0,10);
+    var iniE = new Date(hojeE + 'T03:00:00.000Z').toISOString(); // 00:00 BRT
+    var dbE = (await dbGet(PIPE_KEY)) || defaultDB();
+    var lista = (dbE.cards||[])
+      .filter(function(c){ return c.phase === 'erp' && (c.movedAt||'') >= iniE; })
+      .map(function(c){
+        return {
+          nome: c.nomeContato || (c.title||'').slice(0,50) || '—',
+          telefone: c.telefone || '',
+          equipamento: c.equipamento || '',
+          valor: c.valor || null,
+          horaBRT: c.movedAt ? new Date(new Date(c.movedAt).getTime()-3*3600000).toISOString().slice(11,16) : null,
+          veioDe: (c.history&&c.history.length) ? c.history[c.history.length-1].phase : null,
+        };
+      })
+      .sort(function(a,b){ return String(a.horaBRT||'').localeCompare(String(b.horaBRT||'')); });
+    return res.status(200).json({ ok:true, data:hojeE, totalEntradasErp: lista.length, fichas: lista });
+  }
+
   // ── SAIDAS-ERP-HOJE: fichas que saíram da coluna ERP hoje (history + backup) ──
   if (action === 'saidas-erp-hoje') {
     var hojeBRT = new Date(Date.now() - 3*3600000).toISOString().slice(0,10);
