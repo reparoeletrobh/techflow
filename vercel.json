@@ -79,6 +79,14 @@
   ],
   "rewrites": [
     {
+      "source": "/api/cancelamentos",
+      "destination": "/api/cancelamentos.js"
+    },
+    {
+      "source": "/cancelamentos",
+      "destination": "/cancelamentos.html"
+    },
+    {
       "source": "/api/wa-bot",
       "destination": "/api/wa-bot.js"
     },

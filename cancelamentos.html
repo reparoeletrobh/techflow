@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache">
+<title>🚫 Cancelamentos — Reembolsos Lalamove</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#07080a;color:#f0f2f5;min-height:100vh;}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:52px;background:#0f1114;border-bottom:1px solid #1e2228;position:sticky;top:0;z-index:10;}
+.h-title{font-size:13px;font-weight:800;color:#ef4444;}
+.btn{padding:7px 14px;border-radius:7px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:#1e2228;color:#f0f2f5;text-decoration:none;}
+.wrap{max-width:860px;margin:0 auto;padding:16px;}
+.kpis{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+.kpi{flex:1;min-width:150px;background:#12141a;border:1px solid #1e2228;border-radius:12px;padding:12px;text-align:center;}
+.kpi .v{font-size:22px;font-weight:900;}
+.kpi .l{font-size:9.5px;font-weight:800;color:#5a6270;text-transform:uppercase;letter-spacing:.05em;margin-top:3px;}
+.card-add{background:#0d1018;border:1px solid #1e2430;border-radius:14px;padding:16px;margin-bottom:18px;}
+.lbl{font-size:10px;font-weight:800;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
+textarea,input{width:100%;background:#12141a;border:1px solid #2a2f38;border-radius:9px;color:#f0f2f5;font-size:13px;padding:10px;font-family:inherit;outline:none;}
+textarea:focus,input:focus{border-color:#ef4444;}
+.grid-campos{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
+.b-add{width:100%;margin-top:12px;padding:12px;border-radius:9px;border:1px solid rgba(239,68,68,.5);background:rgba(239,68,68,.12);color:#ef4444;font-weight:800;font-size:13px;cursor:pointer;}
+.b-add:disabled{opacity:.5;}
+.item{background:#12141a;border:1px solid #1e2228;border-radius:12px;padding:14px;margin-bottom:10px;}
+.item.vencendo{border-color:rgba(249,115,22,.5);}
+.item.vencido{border-color:rgba(239,68,68,.6);background:#170d0e;}
+.item-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;}
+.item-cod{font-size:13px;font-weight:900;font-family:monospace;}
+.crono{font-size:11px;font-weight:800;border-radius:6px;padding:3px 9px;}
+.crono.ok{color:#22c55e;background:rgba(34,197,94,.1);}
+.crono.meio{color:#f97316;background:rgba(249,115,22,.12);}
+.crono.ruim{color:#ef4444;background:rgba(239,68,68,.12);animation:pulseC 1.6s infinite;}
+@keyframes pulseC{0%,100%{opacity:1;}50%{opacity:.55;}}
+.item-info{font-size:11.5px;color:#c9ced6;margin-top:6px;line-height:1.6;}
+.item-btns{display:flex;gap:8px;margin-top:10px;}
+.b-conf{flex:1;padding:9px;border-radius:8px;border:1px solid rgba(34,197,94,.45);background:rgba(34,197,94,.1);color:#22c55e;font-weight:800;font-size:12px;cursor:pointer;}
+.b-del{padding:9px 14px;border-radius:8px;border:1px solid #2a2f38;background:#181b1f;color:#8b93a1;font-weight:700;font-size:12px;cursor:pointer;}
+.sec-title{font-size:11px;font-weight:800;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin:18px 0 10px;}
+.conf-item{display:flex;justify-content:space-between;gap:10px;padding:9px 12px;background:#0d1210;border:1px solid rgba(34,197,94,.2);border-radius:9px;margin-bottom:6px;font-size:11.5px;flex-wrap:wrap;}
+.empty{text-align:center;color:#5a6270;font-size:12px;padding:24px;}
+</style>
+</head>
+<body>
+<header>
+  <div class="h-title">🚫 Cancelamentos — Reembolsos Lalamove</div>
+  <a href="/adm" class="btn">← ADM</a>
+</header>
+
+<div class="wrap">
+  <div class="kpis">
+    <div class="kpi"><div class="v" style="color:#f97316;" id="k-pend">0</div><div class="l">⏳ Aguardando reembolso</div></div>
+    <div class="kpi"><div class="v" style="color:#f97316;" id="k-pend-v">R$ 0</div><div class="l">💸 Valor a receber</div></div>
+    <div class="kpi"><div class="v" style="color:#22c55e;" id="k-rec-mes">R$ 0</div><div class="l">✅ Recebido no mês</div></div>
+    <div class="kpi"><div class="v" style="color:#22c55e;" id="k-rec">R$ 0</div><div class="l">Σ Recebido total</div></div>
+  </div>
+
+  <div class="card-add">
+    <div class="lbl">📋 Cole aqui os dados da corrida (preenche sozinho)</div>
+    <textarea id="colar" rows="3" placeholder="Cole o texto da corrida do Lalamove — código, motorista, valor e OSs são detectados automaticamente..."></textarea>
+    <div class="grid-campos">
+      <div><div class="lbl">Código da corrida *</div><input id="f-codigo" placeholder="Ex: 11223344556"></div>
+      <div><div class="lbl">Motorista</div><input id="f-motorista" placeholder="Nome do motorista"></div>
+      <div><div class="lbl">OS's da corrida</div><input id="f-oss" placeholder="Ex: 4512, 4788"></div>
+      <div><div class="lbl">Valor da corrida (R$)</div><input id="f-valor" type="text" inputmode="decimal" placeholder="Ex: 45,90"></div>
+    </div>
+    <button class="b-add" id="b-add" onclick="criar()">➕ Registrar Cancelamento</button>
+  </div>
+
+  <div class="sec-title">⏳ Aguardando Reembolso</div>
+  <div id="pendentes"><div class="empty">⏳ Carregando...</div></div>
+
+  <div class="sec-title">✅ Reembolsos Recebidos</div>
+  <div id="confirmados"><div class="empty">—</div></div>
+</div>
+
+<script>
+var _itens=[];
+function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
+function fBRL(v){return 'R$ '+(parseFloat(v)||0).toFixed(2).replace('.',',');}
+function fdt(ts){if(!ts)return'—';var d=new Date(new Date(ts).getTime()-3*3600000);return d.toISOString().slice(8,10)+'/'+d.toISOString().slice(5,7)+' '+d.toISOString().slice(11,16);}
+
+// ── Colagem inteligente: extrai código, valor, motorista, OSs ──
+document.getElementById('colar').addEventListener('input',function(){
+  var t=this.value;
+  if(!t.trim())return;
+  // Código: sequência longa de dígitos (8+) ou padrão com # 
+  var mCod=t.match(/#?\s*(\d{8,})/);
+  if(mCod&&!document.getElementById('f-codigo').value)document.getElementById('f-codigo').value=mCod[1];
+  // Valor: R$ X,XX (pega o último — geralmente o total)
+  var mVals=t.match(/R\$\s*([\d.]+,\d{2}|\d+[.,]\d{2}|\d+)/g);
+  if(mVals&&mVals.length&&!document.getElementById('f-valor').value){
+    var ult=mVals[mVals.length-1].replace(/R\$\s*/,'');
+    document.getElementById('f-valor').value=ult;
+  }
+  // Motorista: linha com "motorista" ou "driver"
+  var mMot=t.match(/(?:motorista|driver)[:\s-]*([A-Za-zÀ-ú ]{3,40})/i);
+  if(mMot&&!document.getElementById('f-motorista').value)document.getElementById('f-motorista').value=mMot[1].trim();
+  // OSs: "OS 1234" / "OS: 1234, 5678" ou números de 4-5 dígitos após OS
+  var mOs=t.match(/OS[.:s]*\s*((?:\d{3,6}[,\s e]*)+)/i);
+  if(mOs&&!document.getElementById('f-oss').value)document.getElementById('f-oss').value=mOs[1].replace(/\s+/g,' ').trim();
+});
+
+async function criar(){
+  var codigo=document.getElementById('f-codigo').value.trim();
+  if(!codigo){alert('Informe o código da corrida');return;}
+  var btn=document.getElementById('b-add');
+  btn.disabled=true;btn.textContent='⏳ Salvando...';
+  try{
+    var d=await fetch('/api/cancelamentos?action=criar',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        codigo:codigo,
+        motorista:document.getElementById('f-motorista').value.trim(),
+        oss:document.getElementById('f-oss').value.trim(),
+        valor:document.getElementById('f-valor').value.trim(),
+        textoOriginal:document.getElementById('colar').value.trim()
+      })
+    }).then(function(r){return r.json();});
+    if(d.ok){
+      if(d.duplicataEvitada)alert('⚠️ Essa corrida já está registrada como pendente');
+      ['colar','f-codigo','f-motorista','f-oss','f-valor'].forEach(function(i){document.getElementById(i).value='';});
+      load();
+    }else alert('Erro: '+(d.error||'falha'));
+  }catch(e){alert('Erro: '+e.message);}
+  btn.disabled=false;btn.textContent='➕ Registrar Cancelamento';
+}
+
+function cronoHTML(criadoEm){
+  var ms=Date.now()-new Date(criadoEm).getTime();
+  var d=Math.floor(ms/86400000), h=Math.floor((ms%86400000)/3600000);
+  var txt=d>0?d+'d '+h+'h aguardando':h>0?h+'h aguardando':'agora há pouco';
+  var cls=d>=5?'ruim':(d>=2?'meio':'ok');
+  return {html:'<span class="crono '+cls+'">⏱ '+txt+'</span>',cls:cls};
+}
+
+function render(){
+  var pend=_itens.filter(function(i){return i.status==='pendente';});
+  var conf=_itens.filter(function(i){return i.status==='confirmado';});
+  var elP=document.getElementById('pendentes');
+  elP.innerHTML=pend.length?pend.map(function(i){
+    var c=cronoHTML(i.criadoEm);
+    return '<div class="item '+(c.cls==='ruim'?'vencido':(c.cls==='meio'?'vencendo':''))+'">'
+      +'<div class="item-top"><span class="item-cod">#'+esc(i.codigo)+'</span>'+c.html+'</div>'
+      +'<div class="item-info">'
+        +(i.motorista?'🧑 '+esc(i.motorista)+' · ':'')
+        +(i.oss?'📋 OS: '+esc(i.oss)+' · ':'')
+        +'💰 <b>'+fBRL(i.valor)+'</b> · registrado '+fdt(i.criadoEm)
+      +'</div>'
+      +'<div class="item-btns">'
+        +'<button class="b-conf" onclick="confirmar(\''+i.id+'\')">✅ Reembolso Recebido</button>'
+        +'<button class="b-del" onclick="excluir(\''+i.id+'\')">✕</button>'
+      +'</div>'
+    +'</div>';
+  }).join(''):'<div class="empty">🎉 Nenhum reembolso pendente</div>';
+
+  var elC=document.getElementById('confirmados');
+  elC.innerHTML=conf.length?conf.slice(0,40).map(function(i){
+    return '<div class="conf-item">'
+      +'<span>✅ <b>#'+esc(i.codigo)+'</b>'+(i.motorista?' · '+esc(i.motorista):'')+(i.oss?' · OS '+esc(i.oss):'')+'</span>'
+      +'<span><b style="color:#22c55e;">'+fBRL(i.valor)+'</b> · recebido '+fdt(i.confirmadoEm)+'</span>'
+    +'</div>';
+  }).join(''):'<div class="empty">Nenhum reembolso confirmado ainda</div>';
+}
+
+async function load(){
+  try{
+    var d=await fetch('/api/cancelamentos?action=load').then(function(r){return r.json();});
+    _itens=d.itens||[];
+    document.getElementById('k-pend').textContent=d.kpi.pendentes;
+    document.getElementById('k-pend-v').textContent=fBRL(d.kpi.pendentesValor);
+    document.getElementById('k-rec-mes').textContent=fBRL(d.kpi.recebidosMesValor);
+    document.getElementById('k-rec').textContent=fBRL(d.kpi.recebidosValor);
+    render();
+  }catch(e){document.getElementById('pendentes').innerHTML='<div class="empty" style="color:#ef4444;">Erro: '+e.message+'</div>';}
+}
+
+async function confirmar(id){
+  var i=_itens.find(function(x){return x.id===id;});
+  if(!confirm('Confirmar recebimento do reembolso de '+fBRL(i?i.valor:0)+' (corrida #'+(i?i.codigo:'')+')?'))return;
+  var d=await fetch('/api/cancelamentos?action=confirmar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json();});
+  if(d.ok)load();else alert('Erro: '+(d.error||'falha'));
+}
+
+async function excluir(id){
+  if(!confirm('Remover este cancelamento da lista?'))return;
+  var d=await fetch('/api/cancelamentos?action=excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json();});
+  if(d.ok)load();else alert('Erro: '+(d.error||'falha'));
+}
+
+load();
+// Cronômetros andando + refresh leve
+setInterval(function(){ if(!document.hidden) render(); }, 60000);
+setInterval(function(){ if(!document.hidden) load(); }, 300000);
+</script>
+</body>
+</html>

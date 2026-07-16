@@ -208,6 +208,11 @@ html,body{height:100vh;overflow:hidden;background:var(--bg);color:var(--text);fo
 .conf-notif-x{position:absolute;top:8px;right:10px;background:none;border:none;color:#5a5a7a;font-size:14px;cursor:pointer;padding:2px 6px;}
 .conf-notif-x:hover{color:#fff;}
 
+@keyframes navBrilho{
+  0%,100%{box-shadow:0 0 6px rgba(239,68,68,.25);border-color:rgba(239,68,68,.35);}
+  50%{box-shadow:0 0 18px rgba(239,68,68,.65);border-color:rgba(239,68,68,.9);}
+}
+.nav-brilho{border:1px solid rgba(239,68,68,.35);border-radius:10px;animation:navBrilho 2s ease-in-out infinite;}
 </style>
 </head>
 <body>
@@ -285,6 +290,11 @@ html,body{height:100vh;overflow:hidden;background:var(--bg);color:var(--text);fo
       <div class="nav-item" data-url="/atendimento" data-label="Atendimento" style="--item-color:#3b9eff" onclick="openPage(this)">
         <span class="nav-icon" style="background:rgba(59,158,255,.15);">📊</span>
         <span class="nav-label">Atendimento</span>
+      </div>
+
+      <div class="nav-item nav-brilho" data-url="/cancelamentos" data-label="Cancelamentos" style="--item-color:#ef4444" onclick="openPage(this)">
+        <span class="nav-icon" style="background:rgba(239,68,68,.15);">🚫</span>
+        <span class="nav-label">Cancelamentos</span>
       </div>
 
       <div class="nav-item" data-url="/tecnico" data-label="Técnico" style="--item-color:#f5c800" onclick="openPage(this)">
