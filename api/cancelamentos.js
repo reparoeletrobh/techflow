@@ -42,11 +42,57 @@ export default async function handler(req, res) {
       recebidosMesValor: +conf.filter(i => (i.confirmadoEm || '') >= iniMes)
         .reduce((s, i) => s + (parseFloat(i.valor) || 0), 0).toFixed(2),
     };
-    return res.status(200).json({ ok: true, kpi, itens: itens.slice(0, 300) });
+    const itensLeves = itens.slice(0, 300).map(i => {
+      const { imagem, ...resto } = i;
+      resto.temImagem = !!imagem;
+      return resto;
+    });
+    return res.status(200).json({ ok: true, kpi, itens: itensLeves });
+  }
+
+  // ── POST ler-imagem — IA lê o print da corrida e extrai os campos ──
+  if (req.method === 'POST' && action === 'ler-imagem') {
+    const AK = (process.env.ANTHROPIC_API_KEY || '').trim();
+    const { imagem, mime } = req.body || {};
+    if (!imagem) return res.status(400).json({ ok: false, error: 'imagem obrigatória' });
+    if (!AK) return res.status(200).json({ ok: false, semIA: true, error: 'ANTHROPIC_API_KEY não configurada — imagem será só anexada' });
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': AK, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 300,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: mime || 'image/jpeg', data: imagem } },
+              { type: 'text', text: 'Este é um print de uma corrida do Lalamove (app de entregas, em português). Extraia: codigo (número/ID do pedido ou da corrida), motorista (nome do motorista, se visível), valor (valor total da corrida em reais, apenas número, ex: 45.90), oss (números de OS, se visíveis no texto/observações). Responda APENAS JSON válido sem markdown: {"codigo":"","motorista":"","valor":"","oss":""} — campos não encontrados ficam string vazia.' }
+            ],
+          }],
+        }),
+      });
+      const j = await r.json();
+      const texto = ((j.content || []).find(b => b.type === 'text') || {}).text || '';
+      let campos;
+      try { campos = JSON.parse(texto.replace(/```json|```/g, '').trim()); }
+      catch { campos = {}; }
+      return res.status(200).json({ ok: true, campos });
+    } catch (e) {
+      return res.status(200).json({ ok: false, error: 'IA: ' + e.message });
+    }
+  }
+
+  // ── GET imagem?id= — retorna o print de um item ──
+  if (action === 'imagem') {
+    const db = (await dbGet(KEY)) || { itens: [] };
+    const item = (db.itens || []).find(i => i.id === req.query.id);
+    if (!item || !item.imagem) return res.status(404).json({ ok: false, error: 'sem imagem' });
+    return res.status(200).json({ ok: true, imagem: item.imagem, mime: item.imagemMime || 'image/jpeg' });
   }
 
   if (req.method === 'POST' && action === 'criar') {
-    const { codigo, motorista, oss, valor, textoOriginal } = req.body || {};
+    const { codigo, motorista, oss, valor, textoOriginal, imagem, imagemMime } = req.body || {};
     if (!codigo) return res.status(400).json({ ok: false, error: 'Código da corrida obrigatório' });
     const db = (await dbGet(KEY)) || { itens: [] };
     if (!Array.isArray(db.itens)) db.itens = [];
@@ -63,6 +109,8 @@ export default async function handler(req, res) {
       status: 'pendente',
       criadoEm: new Date().toISOString(),
       confirmadoEm: null,
+      imagem: (imagem && String(imagem).length < 350000) ? String(imagem) : null,
+      imagemMime: imagemMime || 'image/jpeg',
     };
     db.itens.unshift(item);
     if (db.itens.length > 1000) db.itens = db.itens.slice(0, 1000);
@@ -77,6 +125,7 @@ export default async function handler(req, res) {
     if (!item) return res.status(404).json({ ok: false, error: 'Não encontrado' });
     item.status = 'confirmado';
     item.confirmadoEm = new Date().toISOString();
+    delete item.imagem; // comprovante cumpriu o papel — libera espaço
     await dbSet(KEY, db);
     return res.status(200).json({ ok: true, item });
   }

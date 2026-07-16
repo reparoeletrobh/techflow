@@ -56,8 +56,13 @@ textarea:focus,input:focus{border-color:#ef4444;}
   </div>
 
   <div class="card-add">
-    <div class="lbl">📋 Cole aqui os dados da corrida (preenche sozinho)</div>
-    <textarea id="colar" rows="3" placeholder="Cole o texto da corrida do Lalamove — código, motorista, valor e OSs são detectados automaticamente..."></textarea>
+    <div class="lbl">📋 Cole aqui os dados da corrida — texto OU print/imagem (Ctrl+V) — preenche sozinho</div>
+    <textarea id="colar" rows="3" placeholder="Cole o TEXTO ou o PRINT (Ctrl+V) da corrida do Lalamove — código, motorista, valor e OSs são detectados automaticamente..."></textarea>
+    <div id="img-preview" style="display:none;margin-top:10px;position:relative;">
+      <img id="img-thumb" style="max-width:220px;max-height:140px;border-radius:9px;border:1px solid #2a2f38;display:block;">
+      <div id="img-status" style="font-size:11px;font-weight:700;color:#a78bfa;margin-top:5px;">🖼 Print anexado</div>
+      <button onclick="removerImg()" style="position:absolute;top:-6px;left:206px;background:#ef4444;border:none;color:#fff;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px;font-weight:800;">✕</button>
+    </div>
     <div class="grid-campos">
       <div><div class="lbl">Código da corrida *</div><input id="f-codigo" placeholder="Ex: 11223344556"></div>
       <div><div class="lbl">Motorista</div><input id="f-motorista" placeholder="Nome do motorista"></div>
@@ -79,6 +84,69 @@ var _itens=[];
 function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
 function fBRL(v){return 'R$ '+(parseFloat(v)||0).toFixed(2).replace('.',',');}
 function fdt(ts){if(!ts)return'—';var d=new Date(new Date(ts).getTime()-3*3600000);return d.toISOString().slice(8,10)+'/'+d.toISOString().slice(5,7)+' '+d.toISOString().slice(11,16);}
+
+// ── Colar IMAGEM (Ctrl+V): comprime, anexa e manda a IA ler os campos ──
+var _imgB64=null,_imgMime='image/jpeg';
+document.addEventListener('paste',function(e){
+  var items=(e.clipboardData||{}).items||[];
+  for(var k=0;k<items.length;k++){
+    if(items[k].type&&items[k].type.indexOf('image')===0){
+      e.preventDefault();
+      var file=items[k].getAsFile();
+      comprimirImg(file);
+      return;
+    }
+  }
+});
+
+function comprimirImg(file){
+  var img=new Image();
+  var url=URL.createObjectURL(file);
+  img.onload=function(){
+    var MAX=900;
+    var w=img.width,hh=img.height;
+    if(w>MAX){hh=Math.round(hh*MAX/w);w=MAX;}
+    var cv=document.createElement('canvas');cv.width=w;cv.height=hh;
+    cv.getContext('2d').drawImage(img,0,0,w,hh);
+    var dataUrl=cv.toDataURL('image/jpeg',0.72);
+    _imgB64=dataUrl.split(',')[1];_imgMime='image/jpeg';
+    document.getElementById('img-thumb').src=dataUrl;
+    document.getElementById('img-preview').style.display='block';
+    URL.revokeObjectURL(url);
+    lerImagemIA();
+  };
+  img.src=url;
+}
+
+function removerImg(){
+  _imgB64=null;
+  document.getElementById('img-preview').style.display='none';
+  document.getElementById('img-thumb').src='';
+}
+
+async function lerImagemIA(){
+  if(!_imgB64)return;
+  var st=document.getElementById('img-status');
+  st.textContent='🤖 Lendo o print...';st.style.color='#a78bfa';
+  try{
+    var d=await fetch('/api/cancelamentos?action=ler-imagem',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({imagem:_imgB64,mime:_imgMime})
+    }).then(function(r){return r.json();});
+    if(d.ok&&d.campos){
+      var c=d.campos;
+      if(c.codigo&&!document.getElementById('f-codigo').value)document.getElementById('f-codigo').value=c.codigo;
+      if(c.motorista&&!document.getElementById('f-motorista').value)document.getElementById('f-motorista').value=c.motorista;
+      if(c.valor&&!document.getElementById('f-valor').value)document.getElementById('f-valor').value=String(c.valor);
+      if(c.oss&&!document.getElementById('f-oss').value)document.getElementById('f-oss').value=c.oss;
+      st.textContent='✅ Print lido — confira os campos';st.style.color='#22c55e';
+    }else if(d.semIA){
+      st.textContent='🖼 Print anexado (leitura automática indisponível — preencha os campos)';st.style.color='#f97316';
+    }else{
+      st.textContent='⚠️ Não consegui ler — preencha os campos manualmente';st.style.color='#f97316';
+    }
+  }catch(e){st.textContent='⚠️ Erro na leitura — preencha manualmente';st.style.color='#f97316';}
+}
 
 // ── Colagem inteligente: extrai código, valor, motorista, OSs ──
 document.getElementById('colar').addEventListener('input',function(){
@@ -114,12 +182,14 @@ async function criar(){
         motorista:document.getElementById('f-motorista').value.trim(),
         oss:document.getElementById('f-oss').value.trim(),
         valor:document.getElementById('f-valor').value.trim(),
-        textoOriginal:document.getElementById('colar').value.trim()
+        textoOriginal:document.getElementById('colar').value.trim(),
+        imagem:_imgB64,imagemMime:_imgMime
       })
     }).then(function(r){return r.json();});
     if(d.ok){
       if(d.duplicataEvitada)alert('⚠️ Essa corrida já está registrada como pendente');
       ['colar','f-codigo','f-motorista','f-oss','f-valor'].forEach(function(i){document.getElementById(i).value='';});
+      removerImg();
       load();
     }else alert('Erro: '+(d.error||'falha'));
   }catch(e){alert('Erro: '+e.message);}
@@ -149,6 +219,7 @@ function render(){
       +'</div>'
       +'<div class="item-btns">'
         +'<button class="b-conf" onclick="confirmar(\''+i.id+'\')">✅ Reembolso Recebido</button>'
+        +(i.temImagem?'<button class="b-del" style="color:#a78bfa;border-color:rgba(139,92,246,.4);" onclick="verPrint(\''+i.id+'\')">🖼</button>':'')
         +'<button class="b-del" onclick="excluir(\''+i.id+'\')">✕</button>'
       +'</div>'
     +'</div>';
@@ -186,6 +257,18 @@ async function excluir(id){
   if(!confirm('Remover este cancelamento da lista?'))return;
   var d=await fetch('/api/cancelamentos?action=excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json();});
   if(d.ok)load();else alert('Erro: '+(d.error||'falha'));
+}
+
+async function verPrint(id){
+  try{
+    var d=await fetch('/api/cancelamentos?action=imagem&id='+id).then(function(r){return r.json();});
+    if(!d.ok){alert('Print não disponível');return;}
+    var ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px;cursor:pointer;';
+    ov.innerHTML='<img src="data:'+(d.mime||'image/jpeg')+';base64,'+d.imagem+'" style="max-width:100%;max-height:90vh;border-radius:12px;">';
+    ov.onclick=function(){ov.remove();};
+    document.body.appendChild(ov);
+  }catch(e){alert('Erro: '+e.message);}
 }
 
 load();
