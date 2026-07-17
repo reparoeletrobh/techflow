@@ -82,6 +82,29 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-cache');
   const action = req.query.action || '';
 
+  // ── TESTAR-WEBHOOK: injeta uma mensagem simulada (valida armazenamento) ──
+  if (action === 'testar-webhook') {
+    try {
+      const r = await fetch('https://reparoeletroadm.com/api/wa-webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entry: [{ changes: [{ value: {
+            contacts: [{ wa_id: '5500TESTE', profile: { name: 'Teste Interno' } }],
+            messages: [{ from: '5500TESTE', id: 'wamid.teste.' + Date.now(), timestamp: String(Math.floor(Date.now()/1000)),
+              type: 'text', text: { body: '🧪 mensagem simulada — teste do armazenamento' } }],
+          } }] }],
+        }),
+      });
+      const j = await r.json();
+      const evts = await lerEvts();
+      return res.status(200).json({ ok: true, webhookRespondeu: j, eventosNaLista: evts.length,
+        veredito: evts.length > 0 ? '✅ Armazenamento OK — se a Meta enviar, nós recebemos' : '❌ Webhook respondeu mas nada foi gravado' });
+    } catch (e) {
+      return res.status(200).json({ ok: false, error: e.message });
+    }
+  }
+
   // ── EVENTOS-DEBUG: últimos eventos crus (mensagens + recibos de entrega) ──
   if (action === 'eventos-debug') {
     const evts = await lerEvts();
