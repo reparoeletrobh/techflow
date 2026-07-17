@@ -82,6 +82,12 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-cache');
   const action = req.query.action || '';
 
+  // ── EVENTOS-DEBUG: últimos eventos crus (mensagens + recibos de entrega) ──
+  if (action === 'eventos-debug') {
+    const evts = await lerEvts();
+    return res.status(200).json({ ok: true, total: evts.length, ultimos: evts.slice(-30) });
+  }
+
   // ── SETUP-CREDENCIAIS: grava token/phoneId no Redis (fase de testes) ──
   if (action === 'setup-credenciais') {
     const tk = String(req.query.token || '').trim();
