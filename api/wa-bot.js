@@ -2,8 +2,14 @@
 // actions: conversas | historico&tel= | sugerir&tel= | enviar (POST) | config
 const U = (process.env.UPSTASH_URL || '').replace(/['"]/g, '').trim();
 const T = (process.env.UPSTASH_TOKEN || '').replace(/[\n\r'"]/g, '').trim();
-const WA_TOKEN = (process.env.WA_TOKEN || '').trim();
-const WA_PHONE_ID = (process.env.WA_PHONE_ID || '').trim();
+let WA_TOKEN = (process.env.WA_TOKEN || '').trim();
+let WA_PHONE_ID = (process.env.WA_PHONE_ID || '').trim();
+async function credenciais() {
+  // Envs da Vercel têm prioridade; fallback: chave wa_credenciais no Redis
+  if (WA_TOKEN && WA_PHONE_ID) return { token: WA_TOKEN, phoneId: WA_PHONE_ID };
+  const c = await dbGet('wa_credenciais');
+  return { token: (c && c.token) || WA_TOKEN, phoneId: (c && c.phoneId) || WA_PHONE_ID };
+}
 const ANTHROPIC_KEY = (process.env.ANTHROPIC_API_KEY || '').trim();
 
 const EVT_LIST = 'wa_evt_list';
@@ -75,6 +81,52 @@ const CONFIG_DEFAULT = {
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-cache');
   const action = req.query.action || '';
+
+  // ── SETUP-CREDENCIAIS: grava token/phoneId no Redis (fase de testes) ──
+  if (action === 'setup-credenciais') {
+    const tk = String(req.query.token || '').trim();
+    const pid = String(req.query.phoneId || '').trim();
+    if (!tk || !pid) return res.status(400).json({ ok: false, error: 'informe ?token=&phoneId=' });
+    await dbSet('wa_credenciais', { token: tk, phoneId: pid, em: new Date().toISOString() });
+    return res.status(200).json({ ok: true, msg: 'Credenciais salvas — rode o diag-envio' });
+  }
+
+  // ── DIAG-ENVIO: valida o token, o número e tenta enviar (mostra o erro EXATO da Meta) ──
+  if (action === 'diag-envio') {
+    const tel = String(req.query.tel || '').replace(/\D/g, '');
+    const { token, phoneId } = await credenciais();
+    const out = { credenciais: { temToken: !!token, temPhoneId: !!phoneId, phoneId } };
+    if (!token || !phoneId) return res.status(200).json({ ok: false, ...out, error: 'Credenciais ausentes — rode setup-credenciais primeiro' });
+    // 1. Validar token + número
+    try {
+      const r1 = await fetch(`https://graph.facebook.com/v20.0/${phoneId}?fields=display_phone_number,verified_name,quality_rating`, {
+        headers: { Authorization: `Bearer ${token}` } });
+      out.infoNumero = await r1.json();
+    } catch (e) { out.infoNumero = { erro: e.message }; }
+    // 2. Enviar template hello_world (não exige janela de 24h)
+    if (tel) {
+      try {
+        const r2 = await fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messaging_product: 'whatsapp', to: tel, type: 'template',
+            template: { name: 'hello_world', language: { code: 'en_US' } } }),
+        });
+        out.envioTemplate = await r2.json();
+      } catch (e) { out.envioTemplate = { erro: e.message }; }
+      // 3. Enviar texto livre (exige janela aberta)
+      try {
+        const r3 = await fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messaging_product: 'whatsapp', to: tel, type: 'text',
+            text: { body: '✅ Teste do bot Reparo Eletro — canal funcionando!' } }),
+        });
+        out.envioTexto = await r3.json();
+      } catch (e) { out.envioTexto = { erro: e.message }; }
+    }
+    return res.status(200).json({ ok: true, ...out });
+  }
 
   // ── Lista de conversas (agrupadas da lista de eventos) ──
   if (action === 'conversas') {
@@ -163,11 +215,12 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
   if (req.method === 'POST' && action === 'enviar') {
     const { tel, texto, acaoAprovada } = req.body || {};
     if (!tel || !texto) return res.status(400).json({ ok: false, error: 'tel e texto obrigatórios' });
-    if (!WA_TOKEN || !WA_PHONE_ID) return res.status(200).json({ ok: false, error: 'WA_TOKEN/WA_PHONE_ID não configurados na Vercel' });
+    const { token: tkE, phoneId: pidE } = await credenciais();
+    if (!tkE || !pidE) return res.status(200).json({ ok: false, error: 'Credenciais WhatsApp não configuradas (envs ou setup-credenciais)' });
     try {
-      const r = await fetch(`https://graph.facebook.com/v20.0/${WA_PHONE_ID}/messages`, {
+      const r = await fetch(`https://graph.facebook.com/v20.0/${pidE}/messages`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
+        headers: { Authorization: `Bearer ${tkE}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ messaging_product: 'whatsapp', to: tel, type: 'text', text: { body: String(texto).slice(0, 3800) } }),
       });
       const j = await r.json();
