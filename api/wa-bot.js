@@ -82,6 +82,31 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-cache');
   const action = req.query.action || '';
 
+  // ── WABA-SUBSCRIBE: inscreve o app no WhatsApp Business Account ──
+  // (sem isso, o botão de teste funciona mas eventos REAIS não fluem)
+  if (action === 'waba-subscribe') {
+    const wabaId = String(req.query.waba || '1699351717944043').trim();
+    const { token } = await credenciais();
+    if (!token) return res.status(200).json({ ok: false, error: 'sem token — rode setup-credenciais' });
+    const out = { wabaId };
+    try {
+      const r1 = await fetch(`https://graph.facebook.com/v20.0/${wabaId}/subscribed_apps`, {
+        headers: { Authorization: `Bearer ${token}` } });
+      out.antes = await r1.json();
+    } catch (e) { out.antes = { erro: e.message }; }
+    try {
+      const r2 = await fetch(`https://graph.facebook.com/v20.0/${wabaId}/subscribed_apps`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      out.inscricao = await r2.json();
+    } catch (e) { out.inscricao = { erro: e.message }; }
+    try {
+      const r3 = await fetch(`https://graph.facebook.com/v20.0/${wabaId}/subscribed_apps`, {
+        headers: { Authorization: `Bearer ${token}` } });
+      out.depois = await r3.json();
+    } catch (e) { out.depois = { erro: e.message }; }
+    return res.status(200).json({ ok: true, ...out });
+  }
+
   // ── TESTAR-WEBHOOK: injeta uma mensagem simulada (valida armazenamento) ──
   if (action === 'testar-webhook') {
     try {
