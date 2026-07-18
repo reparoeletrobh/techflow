@@ -60,12 +60,11 @@ export default async function handler(req, res) {
           }
           // Status de entrega (sent/delivered/read) — registrar leve
           for (const st of (value.statuses || [])) {
-            if (st.status === 'read' || st.status === 'failed') {
-              await rpushEvt({
-                ts: new Date().toISOString(), tel: String(st.recipient_id || ''),
-                dir: 'status', texto: st.status, msgId: st.id || null, tipo: 'status',
-              });
-            }
+            await rpushEvt({
+              ts: new Date().toISOString(), tel: String(st.recipient_id || ''),
+              dir: 'status', texto: st.status + (st.errors ? ' | ' + JSON.stringify(st.errors).slice(0,300) : ''),
+              msgId: st.id || null, tipo: 'status',
+            });
           }
         }
       }
