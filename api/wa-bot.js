@@ -48,12 +48,20 @@ async function rpushEvt(evt) {
 }
 
 // Contexto do cliente nos sistemas (por últimos 8 dígitos do telefone)
+const FASE_TECNICO_LBL = {
+  producao: 'em bancada (produção)', aguardando_peca: 'aguardando chegada de peça',
+  conserto_concluido: 'conserto concluído', teste_realizado: 'testado e aprovado no teste de qualidade',
+  aguardando_ret: 'pronto — aguardando retirada na loja', solicitar_entrega: 'pronto — entrega sendo agendada',
+  entrega_realizada: 'entregue', coleta_solicitada: 'coleta a caminho', erp: 'finalizado (registro)',
+};
+
 async function contextoCliente(tel) {
   const d8 = String(tel).replace(/\D/g, '').slice(-8);
-  const ctx = { fichas: [], logistica: [], pipe: [] };
+  const ctx = { fichas: [], logistica: [], pipe: [], tecnico: [], pecas: [] };
   try {
-    const [fa, lg, pp] = await Promise.all([
+    const [fa, lg, pp, bd, pcs] = await Promise.all([
       dbGet('fichas_adm'), dbGet('reparoeletro_logistica'), dbGet('reparoeletro_pipe'),
+      dbGet('reparoeletro_board'), dbGet('reparoeletro_compras_pecas'),
     ]);
     const bate = (t) => String(t || '').replace(/\D/g, '').endsWith(d8);
     for (const f of ((fa && fa.fichas) || [])) if (bate(f.telefone)) {
@@ -65,6 +73,23 @@ async function contextoCliente(tel) {
     }
     for (const c of ((pp && pp.cards) || [])) if (bate(c.telefone)) {
       ctx.pipe.push({ id: c.id, nome: c.nomeContato, fase: c.phase, equipamento: c.equipamento, valor: c.valor || null });
+    }
+    // Board do técnico: estágio REAL da OS (produção/peça/teste/entrega)
+    const nomesCliente = [];
+    for (const c of ((bd && bd.cards) || [])) if (bate(c.telefone || c.tel)) {
+      ctx.tecnico.push({ os: c.os || c.numero || c.id, equipamento: c.equipamento || c.title || '',
+        estagio: FASE_TECNICO_LBL[c.phase] || c.phase, fluxo: c.fluxo || c.tipo || '' });
+      if (c.nomeContato || c.nome) nomesCliente.push(String(c.nomeContato || c.nome).toLowerCase().split(' ')[0]);
+    }
+    // Peças ligadas às OSs do cliente (previsão de chegada)
+    const ossCliente = new Set(ctx.tecnico.map(t => String(t.os)));
+    for (const p of ((pcs && pcs.pecas) || [])) {
+      const pos = String(p.os || p.osNum || '');
+      const pnome = String(p.cliente || p.nome || '').toLowerCase();
+      if ((pos && ossCliente.has(pos)) || (pnome && nomesCliente.some(n => n && pnome.includes(n)))) {
+        ctx.pecas.push({ os: pos, peca: p.peca || p.descricao || '', status: p.status || '',
+          previsao: p.previsao || p.prazo || p.chegadaPrevista || null });
+      }
     }
   } catch (_) {}
   return ctx;
@@ -220,22 +245,26 @@ export default async function handler(req, res) {
     const historico = evts.filter(e => e.tel === tel && e.dir !== 'status').slice(-25)
       .map(e => (e.dir === 'in' ? 'CLIENTE: ' : 'ATENDENTE: ') + e.texto).join('\n');
 
-    const system = `Você é o atendente virtual da Reparo Eletro (assistência técnica de eletrodomésticos em BH: micro-ondas, purificadores, adegas, fornos). Tom: cordial, direto, brasileiro, sem formalidade excessiva. Mensagens CURTAS (WhatsApp).
+    const system = `Você é o atendente virtual da Reparo Eletro (assistência técnica de eletrodomésticos em BH: micro-ondas, purificadores, adegas, fornos e afins). Tom: cordial, direto, brasileiro, sem formalidade excessiva. Mensagens CURTAS de WhatsApp, UMA pergunta por vez.
 
-FLUXO DO ATENDIMENTO: 1) Cliente fez atendimento e tem ficha aberta; oferecemos coleta DELIVERY (buscamos e devolvemos) ou atendimento BALCÃO (traz na loja). 2) Se autorizar a busca → ação cadastrar_logistica. 3) Após diagnóstico enviamos o orçamento. 4) Se aprovar → ação mover_aprovado. 
+QUEM TE PROCURA: clientes que preencheram a ficha de atendimento (formulário) e iniciaram a conversa. A ficha deles aparece no CONTEXTO abaixo (nome, equipamento, defeito). Cumprimente pelo nome e confirme o equipamento/defeito da ficha.
 
-POLÍTICAS DE NEGOCIAÇÃO (use quando o cliente achar caro):
-- Desconto Pix à vista: ${cfg.descontoPix}%
-- Desconto retirando/trazendo na loja (balcão): ${cfg.descontoBalcao}%
-- Troca: ${cfg.politicaTroca}
-- Compra: ${cfg.politicaCompra}
-- Comparação com novo: ${cfg.argumentoNovo}
+ROTEIRO DO ATENDIMENTO:
+1) ABERTURA — cliente iniciou a conversa após criar a ficha: agradeça, confirme os dados e apresente as DUAS modalidades: 🏪 BALCÃO (traz na loja, ${cfg.descontoBalcao}% de desconto no serviço) ou 🚚 DELIVERY (nós buscamos e devolvemos o equipamento).
+2) SE DELIVERY → pergunte: coleta IMEDIATA (hoje/o quanto antes) ou AGENDADA (qual dia e período: manhã/tarde)? Confirme o endereço da ficha.
+3) COLETA CONFIRMADA → ação cadastrar_logistica (informe no motivo: imediata ou agendada + dia/período). O sistema dá baixa na ficha e cria a coleta.
+4) EQUIPAMENTO NA LOJA → diagnóstico → orçamento enviado ao cliente (valor no contexto, em logistica/pipe).
+5) NEGOCIAÇÃO DO ORÇAMENTO — políticas: Pix à vista ${cfg.descontoPix}% | retirada balcão ${cfg.descontoBalcao}% | Troca: ${cfg.politicaTroca} | Compra: ${cfg.politicaCompra}
+6) OBJEÇÃO "pelo preço do conserto compro um novo" — argumento central (comparação honesta): o "novo" desse preço é de categoria MUITO inferior ao equipamento dele (menos potência, capacidade e durabilidade — é comparar um iPhone top com um celular de entrada). Um equipamento NOVO equivalente ao dele custa bem mais; o conserto sai por uma fração disso, com garantia. Se o contexto tiver o valor do orçamento, mostre a conta da economia. ${cfg.argumentoNovo}
+7) APROVOU → ação mover_aprovado (a ficha vai para Aprovados e entra na fila do técnico automaticamente).
+8) REPROVOU → ação registrar_reprovacao: seja gentil, deixe a porta aberta ("vou pedir para um especialista te ligar, às vezes conseguimos uma condição"). O time humano tenta reverter por ligação.
+9) STATUS DO EQUIPAMENTO — use SOMENTE o campo tecnico/pecas do contexto: estágio real (bancada, aguardando peça com previsão, testado, pronto para entrega/retirada). Se aguardando peça SEM previsão no contexto, diga que confirma com o técnico e use escalar_humano se o cliente precisar de resposta imediata. NUNCA invente prazo.
 
-REGRAS: nunca prometa desconto acima das políticas; nunca invente prazo ou valor de orçamento que não esteja no contexto; se o cliente pedir algo fora da alçada ou demonstrar irritação, use a ação escalar_humano.
+REGRAS DURAS: nunca prometa desconto acima das políticas; nunca invente valor, prazo ou informação fora do CONTEXTO; cliente irritado, caso complexo ou fora da alçada → escalar_humano.
 
 CONTEXTO DO CLIENTE NO SISTEMA: ${JSON.stringify(ctx)}
 
-Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem sugerida","acao":{"tipo":"nenhuma|cadastrar_logistica|enviar_orcamento|desconto_pix|desconto_balcao|proposta_troca|mover_aprovado|escalar_humano","motivo":"por quê"},"confianca":"alta|media|baixa"}`;
+Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem sugerida","acao":{"tipo":"nenhuma|cadastrar_logistica|enviar_orcamento|desconto_pix|desconto_balcao|proposta_troca|mover_aprovado|registrar_reprovacao|escalar_humano","motivo":"por quê"},"confianca":"alta|media|baixa"}`;
 
     try {
       const r = await fetch('https://api.anthropic.com/v1/messages', {

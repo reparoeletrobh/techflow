@@ -72,7 +72,7 @@ function fdt(ts){if(!ts)return'';var d=new Date(new Date(ts).getTime()-3*3600000
 
 var ACAO_LBL={cadastrar_logistica:'🚚 Cadastrar em Logística',enviar_orcamento:'📄 Enviar Orçamento',
   desconto_pix:'💠 Desconto Pix',desconto_balcao:'🏪 Desconto Balcão',proposta_troca:'🔄 Proposta de Troca',
-  mover_aprovado:'✅ Mover para Aprovado',escalar_humano:'🙋 Escalar para Humano',nenhuma:''};
+  mover_aprovado:'✅ Mover para Aprovado',registrar_reprovacao:'❌ Orçamento Reprovado (reversão)',escalar_humano:'🙋 Escalar para Humano',nenhuma:''};
 
 async function carregarConversas(){
   var el=document.getElementById('lista-conv');
