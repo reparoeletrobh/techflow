@@ -117,10 +117,10 @@ export default async function handler(req, res) {
         components: [{ type: 'BODY',
           text: 'Olá {{1}}! Aqui é da Reparo Eletro 😊 O diagnóstico do seu {{2}} ficou pronto e já temos o orçamento do conserto. Posso te enviar os detalhes por aqui?',
           example: { body_text: [['Maria', 'micro-ondas']] } }] },
-      { name: 'equipamento_pronto', language: 'pt_BR', category: 'UTILITY',
+      { name: 'conserto_finalizado', language: 'pt_BR', category: 'UTILITY',
         components: [{ type: 'BODY',
-          text: 'Boas notícias, {{1}}! 🎉 Seu {{2}} está pronto: consertado, testado e aprovado no controle de qualidade. Podemos combinar a entrega ou retirada?',
-          example: { body_text: [['Maria', 'micro-ondas']] } }] },
+          text: 'Olá {{1}}! 🛠️ A equipe técnica acabou de finalizar o conserto do seu equipamento. Agora ele entra para a fase de testes. Assim que a fase de testes for finalizada, nossa equipe entrará em contato com você para fazer a entrega.',
+          example: { body_text: [['Maria']] } }] },
       { name: 'coleta_confirmada', language: 'pt_BR', category: 'UTILITY',
         components: [{ type: 'BODY',
           text: 'Olá {{1}}! Sua coleta do {{2}} está confirmada para {{3}}. Nosso motorista entra em contato quando estiver a caminho. 🚚',
@@ -138,6 +138,19 @@ export default async function handler(req, res) {
       } catch (e) { resultados[t.name] = { erro: e.message }; }
     }
     return res.status(200).json({ ok: true, resultados });
+  }
+
+  // ── DELETAR-TEMPLATE: remove um template registrado (?nome=) ──
+  if (action === 'deletar-template') {
+    const wabaId = String(req.query.waba || '1699351717944043').trim();
+    const nomeT = String(req.query.nome || '').trim();
+    const { token } = await credenciais();
+    if (!nomeT) return res.status(400).json({ ok: false, error: 'informe ?nome=' });
+    try {
+      const r = await fetch(`https://graph.facebook.com/v20.0/${wabaId}/message_templates?name=${encodeURIComponent(nomeT)}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+      return res.status(200).json({ ok: true, resultado: await r.json() });
+    } catch (e) { return res.status(200).json({ ok: false, error: e.message }); }
   }
 
   // ── STATUS-TEMPLATES: consulta aprovação dos templates ──
