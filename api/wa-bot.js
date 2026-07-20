@@ -107,6 +107,87 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-cache');
   const action = req.query.action || '';
 
+  // ── CRIAR-TEMPLATES: registra os templates Utility na Meta (aprovação ~horas) ──
+  if (action === 'criar-templates') {
+    const wabaId = String(req.query.waba || '1699351717944043').trim();
+    const { token } = await credenciais();
+    if (!token) return res.status(200).json({ ok: false, error: 'sem token' });
+    const templates = [
+      { name: 'orcamento_pronto', language: 'pt_BR', category: 'UTILITY',
+        components: [{ type: 'BODY',
+          text: 'Olá {{1}}! Aqui é da Reparo Eletro 😊 O diagnóstico do seu {{2}} ficou pronto e já temos o orçamento do conserto. Posso te enviar os detalhes por aqui?',
+          example: { body_text: [['Maria', 'micro-ondas']] } }] },
+      { name: 'equipamento_pronto', language: 'pt_BR', category: 'UTILITY',
+        components: [{ type: 'BODY',
+          text: 'Boas notícias, {{1}}! 🎉 Seu {{2}} está pronto: consertado, testado e aprovado no controle de qualidade. Podemos combinar a entrega ou retirada?',
+          example: { body_text: [['Maria', 'micro-ondas']] } }] },
+      { name: 'coleta_confirmada', language: 'pt_BR', category: 'UTILITY',
+        components: [{ type: 'BODY',
+          text: 'Olá {{1}}! Sua coleta do {{2}} está confirmada para {{3}}. Nosso motorista entra em contato quando estiver a caminho. 🚚',
+          example: { body_text: [['Maria', 'micro-ondas', 'amanhã de manhã']] } }] },
+    ];
+    const resultados = {};
+    for (const t of templates) {
+      try {
+        const r = await fetch(`https://graph.facebook.com/v20.0/${wabaId}/message_templates`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(t),
+        });
+        resultados[t.name] = await r.json();
+      } catch (e) { resultados[t.name] = { erro: e.message }; }
+    }
+    return res.status(200).json({ ok: true, resultados });
+  }
+
+  // ── STATUS-TEMPLATES: consulta aprovação dos templates ──
+  if (action === 'status-templates') {
+    const wabaId = String(req.query.waba || '1699351717944043').trim();
+    const { token } = await credenciais();
+    try {
+      const r = await fetch(`https://graph.facebook.com/v20.0/${wabaId}/message_templates?fields=name,status,category`, {
+        headers: { Authorization: `Bearer ${token}` } });
+      const j = await r.json();
+      return res.status(200).json({ ok: true, templates: (j.data || []).map(t => ({ nome: t.name, status: t.status, cat: t.category })) });
+    } catch (e) { return res.status(200).json({ ok: false, error: e.message }); }
+  }
+
+  // ── JANELA: a conversa com esse tel tem janela de 24h aberta? ──
+  if (action === 'janela') {
+    const telJ = String(req.query.tel || '').replace(/\D/g, '');
+    const evts = await lerEvts();
+    let ultimaIn = null;
+    for (const e of evts) if (e.dir === 'in' && String(e.tel).endsWith(telJ.slice(-8))) ultimaIn = e.ts;
+    const aberta = ultimaIn && (Date.now() - new Date(ultimaIn).getTime()) < 24 * 3600000;
+    return res.status(200).json({ ok: true, tel: telJ, janelaAberta: !!aberta, ultimaMsgCliente: ultimaIn,
+      expiraEm: aberta ? new Date(new Date(ultimaIn).getTime() + 24 * 3600000).toISOString() : null });
+  }
+
+  // ── ENVIAR-TEMPLATE: inicia conversa oficial (POST {tel, template, params[]}) ──
+  if (req.method === 'POST' && action === 'enviar-template') {
+    const { tel, template, params } = req.body || {};
+    const { token, phoneId } = await credenciais();
+    if (!tel || !template) return res.status(400).json({ ok: false, error: 'tel e template obrigatórios' });
+    if (!token || !phoneId) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
+    try {
+      const comps = (params && params.length)
+        ? [{ type: 'body', parameters: params.map(p => ({ type: 'text', text: String(p) })) }] : undefined;
+      const r = await fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messaging_product: 'whatsapp', to: String(tel).replace(/\D/g, ''),
+          type: 'template', template: { name: template, language: { code: 'pt_BR' },
+          ...(comps ? { components: comps } : {}) } }),
+      });
+      const j = await r.json();
+      const okS = !!(j.messages && j.messages[0]);
+      await rpushEvt({ ts: new Date().toISOString(), tel: String(tel).replace(/\D/g, ''), dir: 'out',
+        texto: '📨 [template ' + template + '] ' + (params || []).join(' · '),
+        msgId: okS ? j.messages[0].id : null, tipo: 'template' });
+      return res.status(200).json({ ok: okS, meta: okS ? 'template enviado' : JSON.stringify(j).slice(0, 400) });
+    } catch (e) { return res.status(200).json({ ok: false, error: e.message }); }
+  }
+
   // ── WABA-SUBSCRIBE: inscreve o app no WhatsApp Business Account ──
   // (sem isso, o botão de teste funciona mas eventos REAIS não fluem)
   if (action === 'waba-subscribe') {
