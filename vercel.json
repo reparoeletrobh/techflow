@@ -75,6 +75,10 @@
     {
       "path": "/api/tv-logistica?action=arquivar-automatico",
       "schedule": "25 3 * * *"
+    },
+    {
+      "path": "/api/wa-bot?action=abordagem-fichas",
+      "schedule": "*/5 * * * *"
     }
   ],
   "rewrites": [

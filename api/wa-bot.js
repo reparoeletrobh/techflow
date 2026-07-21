@@ -107,12 +107,67 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-cache');
   const action = req.query.action || '';
 
+  // ── ABORDAGEM-FICHAS (cron 5min): ficha criada há 5-60min sem conversa iniciada → template cadastro_recebido ──
+  // Interruptor: wa_bot_config.abordagemAtiva (false por padrão — ligar quando o número real estiver ativo)
+  if (action === 'abordagem-fichas') {
+    const cfgA = (await dbGet('wa_bot_config')) || {};
+    if (cfgA.abordagemAtiva !== true) return res.status(200).json({ ok: true, msg: 'abordagem desligada (wa_bot_config.abordagemAtiva)' });
+    const { token, phoneId } = await credenciais();
+    if (!token || !phoneId) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
+    const agora = Date.now();
+    const [fdb, evts, abordados] = await Promise.all([
+      dbGet('fichas_adm'), lerEvts(), dbGet('wa_abordados').then(v => v || { tels: {} }),
+    ]);
+    // Telefones que JÁ iniciaram conversa (qualquer evento in)
+    const jaFalaram = new Set(evts.filter(e => e.dir === 'in').map(e => String(e.tel).slice(-8)));
+    const candidatas = ((fdb && fdb.fichas) || []).filter(f => {
+      const idade = agora - new Date(f.criadoEm || 0).getTime();
+      const d8 = String(f.telefone || '').replace(/\D/g, '').slice(-8);
+      return idade > 5 * 60000 && idade < 60 * 60000 && d8.length >= 8 &&
+        !jaFalaram.has(d8) && !abordados.tels[d8];
+    }).slice(0, 10); // máx 10 por ciclo (segurança)
+    const disparadas = [];
+    for (const f of candidatas) {
+      const telA = String(f.telefone).replace(/\D/g, '');
+      const to = telA.startsWith('55') ? telA : '55' + telA;
+      try {
+        const r = await fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template',
+            template: { name: 'cadastro_recebido', language: { code: 'pt_BR' },
+              components: [{ type: 'body', parameters: [
+                { type: 'text', text: (f.nome || 'tudo bem').split(' ')[0] },
+                { type: 'text', text: f.equipamento || 'equipamento' },
+              ] }] } }),
+        });
+        const j = await r.json();
+        const okA = !!(j.messages && j.messages[0]);
+        abordados.tels[telA.slice(-8)] = new Date().toISOString();
+        await rpushEvt({ ts: new Date().toISOString(), tel: to, dir: 'out',
+          texto: '📨 [abordagem automática] cadastro_recebido — ' + (f.nome || ''), tipo: 'template' });
+        disparadas.push({ nome: f.nome, ok: okA });
+      } catch (e) { disparadas.push({ nome: f.nome, erro: e.message }); }
+    }
+    // Poda do registro (30 dias)
+    const corteA = agora - 30 * 86400000;
+    for (const k of Object.keys(abordados.tels)) {
+      if (new Date(abordados.tels[k]).getTime() < corteA) delete abordados.tels[k];
+    }
+    await dbSet('wa_abordados', abordados);
+    return res.status(200).json({ ok: true, candidatas: candidatas.length, disparadas });
+  }
+
   // ── CRIAR-TEMPLATES: registra os templates Utility na Meta (aprovação ~horas) ──
   if (action === 'criar-templates') {
     const wabaId = String(req.query.waba || '1699351717944043').trim();
     const { token } = await credenciais();
     if (!token) return res.status(200).json({ ok: false, error: 'sem token' });
     const templates = [
+      { name: 'cadastro_recebido', language: 'pt_BR', category: 'UTILITY',
+        components: [{ type: 'BODY',
+          text: 'Olá {{1}}! Recebemos o seu cadastro aqui na Reparo Eletro para o conserto do seu {{2}} 😊 Para agilizar o seu atendimento, me conta: você prefere trazer o equipamento na nossa loja ou quer que a gente busque aí com o nosso delivery?',
+          example: { body_text: [['Maria', 'purificador']] } }] },
       { name: 'orcamento_pronto', language: 'pt_BR', category: 'UTILITY',
         components: [{ type: 'BODY',
           text: 'Olá {{1}}! Aqui é da Reparo Eletro 😊 O diagnóstico do seu {{2}} ficou pronto e já temos o orçamento do conserto. Posso te enviar os detalhes por aqui?',
@@ -345,7 +400,8 @@ QUEM TE PROCURA: clientes que preencheram a ficha de atendimento (formulário) e
 
 ROTEIRO DO ATENDIMENTO:
 1) ABERTURA — cliente iniciou a conversa após criar a ficha: agradeça, confirme os dados e apresente as DUAS modalidades: 🏪 BALCÃO (traz na loja, ${cfg.descontoBalcao}% de desconto no serviço) ou 🚚 DELIVERY (nós buscamos e devolvemos o equipamento).
-2) SE DELIVERY → pergunte: coleta IMEDIATA (hoje/o quanto antes) ou AGENDADA (qual dia e período: manhã/tarde)? Confirme o endereço da ficha.
+2) SE DELIVERY → conduza naturalmente para a coleta HOJE MESMO como padrão: "conseguimos buscar ainda hoje!" e pergunte só o período (manhã/tarde). NÃO ofereça agendamento para outro dia espontaneamente — só aceite agendar se o CLIENTE disser que hoje não dá (aí pergunte o melhor dia e período). Confirme o endereço da ficha.
+2b) VANTAGENS DO BALCÃO (apresente na abertura): atendimento mais rápido, ${cfg.descontoBalcao}% de desconto no serviço, e diagnóstico na hora quando possível.
 3) COLETA CONFIRMADA → ação cadastrar_logistica (informe no motivo: imediata ou agendada + dia/período). O sistema dá baixa na ficha e cria a coleta.
 4) EQUIPAMENTO NA LOJA → diagnóstico → orçamento enviado ao cliente (valor no contexto, em logistica/pipe).
 5) NEGOCIAÇÃO DO ORÇAMENTO — políticas: Pix à vista ${cfg.descontoPix}% | retirada balcão ${cfg.descontoBalcao}% | Troca: ${cfg.politicaTroca} | Compra: ${cfg.politicaCompra}
