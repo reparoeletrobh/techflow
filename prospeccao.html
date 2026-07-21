@@ -276,7 +276,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
       </div>
 
       <!-- Sistema -->
-      <div id="log-sis-wrap">
+      <div id="log-destino-aviso" style="display:none;margin-bottom:10px;padding:9px 12px;border-radius:9px;font-size:12px;font-weight:800;"></div>
+  <div id="log-sis-wrap">
       <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Sistema</div>
       <div style="display:flex;gap:8px;">
         <label style="flex:1;display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px;background:#181b1f;border:1px solid #22272f;border-radius:8px;">
@@ -679,6 +680,7 @@ function abrirLogModal(id){
   document.getElementById('log-prosp-id').value=id;
   preencherDadosLog(_fichas.find(function(x){return x.id===id;}));
   document.getElementById('log-sis-wrap').style.display='block';
+  var avL=document.getElementById('log-destino-aviso'); if(avL)avL.style.display='none';
   var paW=document.getElementById('log-pa-wrap'); if(paW)paW.style.display='none';
   _resetLogModal();
 }
@@ -687,8 +689,19 @@ function abrirLogModalEspelho(id, sistema){
   _logModo='espelho'; _logEspSistema=sistema;
   document.getElementById('log-prosp-id').value=id;
   preencherDadosLog(_espelho.find(function(x){return x.id===id;}));
-  // Sistema já conhecido (origem da ficha) — esconde a pergunta
+  // Sistema já conhecido (origem da ficha) — esconde a pergunta e DECLARA o destino
   document.getElementById('log-sis-wrap').style.display='none';
+  var av=document.getElementById('log-destino-aviso');
+  if(av){
+    av.style.display='block';
+    if(sistema==='tv'){
+      av.style.background='rgba(139,92,246,.1)';av.style.border='1px solid rgba(139,92,246,.4)';av.style.color='#a78bfa';
+      av.textContent='📺 Ficha do sistema TV — será cadastrada na LOGÍSTICA TV';
+    }else{
+      av.style.background='rgba(59,158,255,.08)';av.style.border='1px solid rgba(59,158,255,.35)';av.style.color='#3b9eff';
+      av.textContent='🔌 Ficha do sistema principal — será cadastrada na LOGÍSTICA ADM';
+    }
+  }
   // Entrar em Contato → pergunta Passiva/Ativa
   var paW=document.getElementById('log-pa-wrap'); if(paW)paW.style.display='block';
   document.querySelectorAll('input[name="log-pa"]').forEach(function(r){r.checked=false;});
