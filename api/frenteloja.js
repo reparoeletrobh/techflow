@@ -204,6 +204,19 @@ export default async function handler(req,res){
     const {nomeContato,equipamento,telefone,descricao,cpf,email}=req.body||{};
     if(!nomeContato||!equipamento)return res.status(400).json({ok:false,error:'Nome e equipamento obrigatórios'});
     const db=await dbGet(FL_KEY)||defaultDB();
+    // AUDITORIA: registrar quem criou (IP + dispositivo) — investigação de criações não reconhecidas
+    try {
+      const aud = (await dbGet('fl_criar_audit')) || { regs: [] };
+      aud.regs.unshift({
+        ts: new Date().toISOString(),
+        nome: nomeContato || '', tel: (telefone||'').slice(-8),
+        ip: String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '').split(',')[0].trim(),
+        ua: String(req.headers['user-agent'] || '').slice(0, 160),
+        ref: String(req.headers['referer'] || '').slice(0, 120),
+      });
+      aud.regs = aud.regs.slice(0, 200);
+      await dbSet('fl_criar_audit', aud);
+    } catch(e) {}
     // Idempotência: mesmo telefone+equipamento criado há <120s = duplo clique/retry → retorna a existente
     const telN=(telefone||'').replace(/[^0-9]/g,'');
     const jaExiste=(db.fichas||[]).find(f=>
@@ -770,6 +783,12 @@ export default async function handler(req,res){
     return res.status(200).json({ ok: r.ok, msg: r.msg || null, error: r.error || null });
   }
 
+
+  // ── GET audit-criar — últimos registros de auditoria de criação de fichas ──
+  if (action === 'audit-criar') {
+    const aud = (await dbGet('fl_criar_audit')) || { regs: [] };
+    return res.status(200).json({ ok: true, total: aud.regs.length, registros: aud.regs.slice(0, 40) });
+  }
 
   // ── GET remover-fichas-analise?ids=FL-0843,FL-0844 — remove ficha do FL + card da Análise Loja (com backup) ──
   if (action === 'remover-fichas-analise') {
