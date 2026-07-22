@@ -640,7 +640,7 @@ async function enviarFrenteLoja(id){
       nomeContato:f.nome||'',
       equipamento:f.equipamento||'',
       telefone:f.telefone||'',
-      descricao:[f.defeito,f.endereco].filter(Boolean).join(' — ')
+      descricao:[f.defeito,f.endereco].filter(Boolean).join(' — ')+' · 🔭 via Prospecção'
     })
   }).then(function(x){return x.json();}).catch(function(){return{ok:false,error:'rede'};});
   if(!r.ok){alert('Erro ao cadastrar no Frente de Loja: '+(r.error||'falha'));return;}
