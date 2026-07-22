@@ -497,6 +497,12 @@ function setNavActive(url) {
   return null;
 }
 function loadFrame(url, color) {
+  try{
+    if(url&&url.indexOf('/api/')>-1&&url.indexOf('k=')===-1){
+      url+=(url.indexOf('?')>-1?'&':'?')+'k='+encodeURIComponent(localStorage.getItem('tf_key')||'');
+    }
+  }catch(e){}
+
   welcome.classList.add('hidden');
   frameWrap.classList.add('visible');
   loadBar.classList.add('loading');
