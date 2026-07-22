@@ -632,7 +632,7 @@ async function confirmouLoja(id){
 async function enviarFrenteLoja(id){
   var f=_fichas.find(function(x){return x.id===id;});
   if(!f)return;
-  if(!confirm('Cadastrar "'+(f.nome||'—')+'" no Frente de Loja?'))return;
+  if(!confirm('⚠️ ATENÇÃO: isso cria uma FICHA DE ATENDIMENTO no balcão (Frente de Loja) e o card entra na Análise Loja do técnico.\n\nUse SOMENTE quando o cliente CHEGOU (ou está chegando) na loja com o equipamento.\n\nSe o cliente apenas CONFIRMOU que virá, use o botão ✅ Confirmou Visita.\n\nCriar a ficha de "'+(f.nome||'—')+'" no balcão agora?'))return;
   // 1. Cria no Frente de Loja
   var r=await fetch('/api/frenteloja?action=criar',{
     method:'POST',headers:{'Content-Type':'application/json'},
