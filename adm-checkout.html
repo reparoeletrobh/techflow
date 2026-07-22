@@ -9,15 +9,27 @@
   if(!K){location.replace('/login?next='+encodeURIComponent(location.pathname));return;}
   var _f=window.fetch;
   window.fetch=function(u,o){
+    var isApi=false;
     try{
       if(typeof u==='string'&&u.indexOf('/api/')>-1&&u.indexOf('/api/auth')===-1){
-        o=o||{};
+        isApi=true;o=o||{};
         var kk=localStorage.getItem('tf_key')||'';
         if(o.headers&&typeof o.headers.set==='function'){o.headers.set('x-tf-key',kk);}
         else{o.headers=Object.assign({},o.headers||{},{'x-tf-key':kk});}
       }
     }catch(e){}
-    return _f.call(this,u,o);
+    var p=_f.call(this,u,o);
+    if(isApi){
+      p=p.then(function(r){
+        if(r&&r.status===401&&!window.__tfHealed){
+          window.__tfHealed=true;
+          localStorage.removeItem('tf_key');
+          location.replace('/login?next='+encodeURIComponent(location.pathname));
+        }
+        return r;
+      });
+    }
+    return p;
   };
 })();
 </script>
