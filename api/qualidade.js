@@ -48,6 +48,47 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, inspecoes: db.inspecoes, config: db.config });
   }
 
+  // ── SEED-TESTE: 10 fichas simulando a chegada do técnico (leque completo) ──
+  if (action === 'seed-teste') {
+    const TEL = '5531997856023';
+    const seeds = [
+      { cliente: 'Pedro 1',  equipamento: 'adega',       equipDesc: 'Adega termoelétrica 12 garrafas — troca da pastilha Peltier + cooler', tecnico: 'Técnico A', os: 'PIPE-TESTE-01' },
+      { cliente: 'Pedro 2',  equipamento: 'adega',       equipDesc: 'Adega de compressor 33 garrafas — carga de gás + termostato', tecnico: 'Técnico B', os: 'PIPE-TESTE-02' },
+      { cliente: 'Pedro 3',  equipamento: 'purificador', equipDesc: 'Purificador termoelétrico (gela) — troca do módulo + filtro novo', tecnico: 'Técnico A', os: 'PIPE-TESTE-03' },
+      { cliente: 'Pedro 4',  equipamento: 'purificador', equipDesc: 'Purificador natural (sem refrigeração) — troca de dutos, conexões e filtro', tecnico: 'Técnico B', os: 'PIPE-TESTE-04' },
+      { cliente: 'Pedro 5',  equipamento: 'microondas',  equipDesc: 'Micro-ondas 30L — capacitor + fusível de alta + micro chave', tecnico: 'Técnico A', os: 'FL-TESTE-05' },
+      { cliente: 'Pedro 6',  equipamento: 'microondas',  equipDesc: 'Micro-ondas — REFORMA completa: pintura da cavidade + placa mica + acabamento', tecnico: 'Técnico B', os: 'FL-TESTE-06' },
+      { cliente: 'Pedro 7',  equipamento: 'forno',       equipDesc: 'Forno elétrico pequeno — troca do termostato + chave seletora', tecnico: 'Técnico A', os: 'FL-TESTE-07' },
+      { cliente: 'Pedro 8',  equipamento: 'forno',       equipDesc: 'Forno grande — resistência superior + reoperação elétrica', tecnico: 'Técnico B', os: 'FL-TESTE-08' },
+      { cliente: 'Pedro 9',  equipamento: 'tv',          equipDesc: 'TV 50" — TU + barramento (recuperação da placa)', tecnico: 'Técnico A', os: 'TV-TESTE-09' },
+      { cliente: 'Pedro 10', equipamento: 'bblend',      equipDesc: 'B.blend — reparo do circuito hidráulico + higienização do sistema', tecnico: 'Técnico B', os: 'PIPE-TESTE-10' },
+    ];
+    if (!db.config.tecnicos || !db.config.tecnicos.length) db.config.tecnicos = ['Técnico A', 'Técnico B'];
+    const criadas = [];
+    for (const s of seeds) {
+      if (db.inspecoes.some(i => i.cliente === s.cliente && i.tel === TEL)) continue; // dedupe
+      const num = db.config.proximoNum || 1;
+      db.inspecoes.unshift({
+        id: 'QC-' + String(num).padStart(4, '0'), criadoEm: new Date().toISOString(),
+        cliente: s.cliente, tel: TEL, os: s.os, equipamento: s.equipamento, equipDesc: s.equipDesc,
+        tecnico: s.tecnico, inspetor: '', status: 'aguardando', checklist: {}, reprovacoes: [], aprovadoEm: null,
+        teste: true,
+      });
+      db.config.proximoNum = num + 1;
+      criadas.push(s.cliente);
+    }
+    await dbSet(KEY, db);
+    return res.status(200).json({ ok: true, criadas, jaExistiam: seeds.length - criadas.length });
+  }
+
+  // ── LIMPAR-TESTES: remove as fichas de teste ──
+  if (action === 'limpar-testes') {
+    const antes = db.inspecoes.length;
+    db.inspecoes = db.inspecoes.filter(i => !i.teste);
+    await dbSet(KEY, db);
+    return res.status(200).json({ ok: true, removidas: antes - db.inspecoes.length });
+  }
+
   // ── CRIAR inspeção (entrada manual na beta; depois virá do técnico) ──
   if (req.method === 'POST' && action === 'criar') {
     const { cliente, tel, os, equipamento, equipDesc, tecnico } = req.body || {};

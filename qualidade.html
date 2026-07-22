@@ -181,7 +181,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="cert" id="cert-body"></div>
     <div class="mact">
       <button class="btn b-no" onclick="fechar('ov-cert')">Fechar</button>
-      <button class="btn b-ok" onclick="copiarCert()">📋 Copiar texto (WhatsApp)</button>
+      <button class="btn b-ok" onclick="copiarCert()">📋 Copiar texto</button>
+      <button class="btn b-ok" id="btn-zap" style="background:#25d366;" onclick="enviarCertZap()">📨 Enviar no WhatsApp</button>
     </div>
   </div>
 </div>
@@ -480,6 +481,7 @@ function verCert(id){
     '<div><b>Técnico responsável:</b> '+esc(i.tecnico||'—')+' · <b>Inspetor de qualidade:</b> '+esc(i.inspetor||'—')+'</div>'+
     '<div class="ft">Este equipamento passou pelo processo completo de controle de qualidade da Reparo Eletro antes da entrega.</div>';
   document.getElementById('cert-body').innerHTML=html;
+  _certTel=i.tel||'';
   _certTexto='✅ *CERTIFICADO DE CONTROLE DE QUALIDADE*\n_Reparo Eletro — Assistência Técnica Especializada_\n\n'+
     '*Cliente:* '+i.cliente+'\n'+(i.os?'*OS:* '+i.os+'\n':'')+
     '*Equipamento:* '+(EQUIP_LBL[i.equipamento]||'')+(i.equipDesc?' — '+i.equipDesc:'')+'\n'+
@@ -488,6 +490,16 @@ function verCert(id){
     '\n\n*Técnico:* '+(i.tecnico||'—')+'\n*Inspetor:* '+(i.inspetor||'—')+
     '\n\n_Seu equipamento passou pelo nosso processo completo de controle de qualidade antes da entrega._ 💚';
   document.getElementById('ov-cert').classList.add('on');
+}
+var _certTel='';
+async function enviarCertZap(){
+  if(!_certTel){alert('Esta ficha não tem telefone cadastrado.');return;}
+  var b=document.getElementById('btn-zap');b.disabled=true;b.textContent='Enviando...';
+  var r=await fetch('/api/wa-bot?action=enviar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({tel:_certTel,texto:_certTexto,acaoAprovada:'certificado_qc'})}).then(function(x){return x.json();}).catch(function(){return{ok:false,error:'rede'};});
+  b.disabled=false;b.textContent='📨 Enviar no WhatsApp';
+  if(r.ok)alert('✅ Certificado enviado no WhatsApp!');
+  else alert('Não foi possível enviar: '+(r.error||r.meta||'falha')+'\n\nDica: fora da janela de 24h o envio livre é bloqueado pela Meta — use o Copiar texto ou aguarde o cliente responder.');
 }
 function copiarCert(){
   navigator.clipboard.writeText(_certTexto).then(function(){alert('Copiado! Cole no WhatsApp do cliente.');});
