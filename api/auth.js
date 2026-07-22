@@ -32,17 +32,33 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // POST /api/auth — login
+  // POST /api/auth — login (com limite de tentativas: 5 falhas / 10 min por IP)
   if (req.method === 'POST') {
     const { username, password } = req.body || {};
     if (!ADM_USER || !ADM_PASS) {
       return res.status(503).json({ ok: false, error: 'Credenciais de admin não configuradas no servidor' });
     }
+    const U = (process.env.UPSTASH_URL || '').replace(/['"]/g, '').trim();
+    const T = (process.env.UPSTASH_TOKEN || '').replace(/[\n\r'"]/g, '').trim();
+    const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'sem-ip';
+    const rlKey = 'login_rl_' + ip.replace(/[^0-9a-zA-Z.:]/g, '');
+    try {
+      const rlR = await fetch(`${U}/get/${rlKey}`, { headers: { Authorization: `Bearer ${T}` } });
+      const rlJ = await rlR.json();
+      if (parseInt(rlJ.result || '0', 10) >= 5) {
+        return res.status(429).json({ ok: false, error: 'Muitas tentativas. Aguarde 10 minutos.' });
+      }
+    } catch (e) {}
     if (username === ADM_USER && password === ADM_PASS) {
       const { token, expiry } = makeToken(username);
       const apiKey = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
       return res.status(200).json({ ok: true, token, expiry, apiKey });
     }
+    // Falha: incrementa o contador do IP (expira em 10 min)
+    try {
+      await fetch(`${U}/incr/${rlKey}`, { headers: { Authorization: `Bearer ${T}` } });
+      await fetch(`${U}/expire/${rlKey}/600`, { headers: { Authorization: `Bearer ${T}` } });
+    } catch (e) {}
     return res.status(401).json({ ok: false, error: 'Usuário ou senha inválidos' });
   }
 

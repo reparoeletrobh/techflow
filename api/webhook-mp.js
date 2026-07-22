@@ -308,6 +308,15 @@ async function criarCardPipefyVenda(pipeId, produto, comprador, valor, paymentId
 
 
 export default async function handler(req, res) {
+  // 🔐 Fase 2: segredo na URL do webhook (ativar exigência com env WEBHOOK_STRICT=1)
+  if (req.method === 'POST') {
+    const _vt = String((req.query && req.query.vt) || '');
+    const _vtOk = _vt === ((process.env.WA_WEBHOOK_SECRET || 'wh-re2026-Kp8xQm2z').trim());
+    if (String(process.env.WEBHOOK_STRICT || '') === '1' && !_vtOk) {
+      return res.status(401).json({ ok: false, error: 'assinatura ausente' });
+    }
+  }
+
   // ── Validação assinatura Mercado Pago (HMAC-SHA256) ──────────────────────
   res.setHeader('Access-Control-Allow-Origin', 'https://reparoeletroadm.com');
   const MP_SECRET = process.env.MP_WEBHOOK_SECRET || '';
