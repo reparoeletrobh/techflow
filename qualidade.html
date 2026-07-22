@@ -479,7 +479,7 @@ function verCert(id){
     itens.map(function(it){return '<div class="it">✓ '+it.t+'</div>';}).join('')+
     '<div class="ln"></div>'+
     '<div><b>Técnico responsável:</b> '+esc(i.tecnico||'—')+' · <b>Inspetor de qualidade:</b> '+esc(i.inspetor||'—')+'</div>'+
-    '<div class="ft">Este equipamento passou pelo processo completo de controle de qualidade da Reparo Eletro antes da entrega.</div>';
+    '<div class="ft">Este equipamento passou pelo processo completo de controle de qualidade da Reparo Eletro antes da entrega.<br><br><b>Em breve você vai receber o vídeo mostrando os testes na prática — e a nossa equipe prosseguirá para emitir a sua garantia e fazer a sua entrega.</b></div>';
   document.getElementById('cert-body').innerHTML=html;
   _certTel=i.tel||'';
   _certTexto='✅ *CERTIFICADO DE CONTROLE DE QUALIDADE*\n_Reparo Eletro — Assistência Técnica Especializada_\n\n'+
@@ -488,7 +488,7 @@ function verCert(id){
     '*Aprovado em:* '+fmtD(i.aprovadoEm)+'\n\n*Verificações aprovadas:*\n'+
     itens.map(function(it){return '✓ '+it.t;}).join('\n')+
     '\n\n*Técnico:* '+(i.tecnico||'—')+'\n*Inspetor:* '+(i.inspetor||'—')+
-    '\n\n_Seu equipamento passou pelo nosso processo completo de controle de qualidade antes da entrega._ 💚';
+    '\n\n_Seu equipamento passou pelo nosso processo completo de controle de qualidade antes da entrega._\n\n📹 *Em breve você vai receber o vídeo mostrando os testes na prática* — e a nossa equipe prosseguirá para emitir a sua garantia e fazer a sua entrega. 💚';
   document.getElementById('ov-cert').classList.add('on');
 }
 var _certTel='';
