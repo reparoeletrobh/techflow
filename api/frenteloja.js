@@ -771,6 +771,35 @@ export default async function handler(req,res){
   }
 
 
+  // ── GET remover-fichas-analise?ids=FL-0843,FL-0844 — remove ficha do FL + card da Análise Loja (com backup) ──
+  if (action === 'remover-fichas-analise') {
+    const ids = String(req.query.ids || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (!ids.length) return res.status(400).json({ ok: false, error: 'informe ?ids=FL-0001,FL-0002' });
+    try {
+      const db = (await dbGet(FL_KEY)) || { fichas: [] };
+      const board = (await dbGet('reparoeletro_board')) || { cards: [] };
+      const setIds = new Set(ids);
+      const fichasRemovidas = (db.fichas || []).filter(f => setIds.has(String(f.id)));
+      const cardsRemovidos = (board.cards || []).filter(c =>
+        setIds.has(String(c.flFichaId)) && (c.phaseId || c.phase) === 'analise_loja');
+      // Backup antes de remover (recuperável)
+      const bak = (await dbGet('reparoeletro_fl_removidas_bak')) || { itens: [] };
+      bak.itens.unshift({ em: new Date().toISOString(), fichas: fichasRemovidas, cards: cardsRemovidos });
+      bak.itens = bak.itens.slice(0, 20);
+      await dbSet('reparoeletro_fl_removidas_bak', bak);
+      // Remoção
+      db.fichas = (db.fichas || []).filter(f => !setIds.has(String(f.id)));
+      board.cards = (board.cards || []).filter(c =>
+        !(setIds.has(String(c.flFichaId)) && (c.phaseId || c.phase) === 'analise_loja'));
+      await dbSet(FL_KEY, db);
+      await dbSet('reparoeletro_board', board);
+      return res.status(200).json({ ok: true,
+        fichasRemovidas: fichasRemovidas.map(f => ({ id: f.id, nome: f.nomeContato })),
+        cardsRemovidos: cardsRemovidos.length,
+        backup: 'reparoeletro_fl_removidas_bak (últimos 20 lotes)' });
+    } catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
+  }
+
   // ── GET diag-ficha?q=3174 — estado da ficha no FL e no board (diagnóstico) ──
   if (action === 'diag-ficha') {
     const q = String(req.query.q || '').toLowerCase();
