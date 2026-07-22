@@ -50,7 +50,7 @@ module.exports = async function handler(req, res) {
   if (req.method === 'GET' && req.query.action === 'verify') {
     const token = req.headers['x-auth-token'] || req.query.token;
     const data  = verifyToken(token);
-    if (data) return res.status(200).json({ ok: true, ...data });
+    if (data) return res.status(200).json({ ok: true, ...data, apiKey: (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim() });
     return res.status(401).json({ ok: false, error: 'Token inválido ou expirado' });
   }
 

@@ -40,9 +40,20 @@
   <button class="btn" id="btn" onclick="doLogin()">Entrar</button>
 </div>
 <script>
-  (function(){
+  (async function(){
     var d = JSON.parse(localStorage.getItem('adm_auth')||'{}');
-    if(d.token && d.expiry && Date.now() < d.expiry) window.location.replace('/adm');
+    if(d.token && d.expiry && Date.now() < d.expiry){
+      // Sessão válida: garantir a chave de API antes de voltar (evita loop)
+      if(!localStorage.getItem('tf_key')){
+        try{
+          var v=await fetch('/api/auth?action=verify&token='+encodeURIComponent(d.token)).then(function(r){return r.json();});
+          if(v.ok&&v.apiKey)localStorage.setItem('tf_key',v.apiKey);
+          else{localStorage.removeItem('adm_auth');return;} // sessão inválida: fica no login
+        }catch(e){return;}
+      }
+      var nx=new URLSearchParams(location.search).get('next');
+      window.location.replace(nx&&nx.indexOf('/')===0?nx:'/adm');
+    }
   })();
   document.getElementById('user').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('pass').focus();});
   document.getElementById('pass').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
