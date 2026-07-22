@@ -2374,6 +2374,32 @@ module.exports = async function handler(req, res) {
   }
 
 
+  // ── GET diag-analise-loja — relatório dos cards em Análise Loja e sua origem ──
+  if (action === 'diag-analise-loja') {
+    try {
+      const board = (await dbGet('reparoeletro_board')) || { cards: [] };
+      const fl = (await dbGet('reparoeletro_frenteloja')) || { fichas: [] };
+      const flPorId = {};
+      for (const f of (fl.fichas || [])) flPorId[String(f.id)] = f;
+      const cards = (board.cards || []).filter(c => (c.phaseId || c.phase) === 'analise_loja');
+      const rel = cards.map(c => {
+        const ficha = flPorId[String(c.flFichaId)] || null;
+        return {
+          titulo: c.title || '—',
+          nome: c.nomeContato || '—',
+          telefone: c.telefone || '—',
+          flFichaId: c.flFichaId || null,
+          cardCriadoEm: c.criadoEm || c.createdAt || null,
+          fichaFLExiste: !!ficha,
+          fichaFLCriadaEm: ficha ? (ficha.createdAt || ficha.criadoEm || null) : null,
+          fichaFLStatus: ficha ? (ficha.status || ficha.fase || null) : null,
+          fichaFLEquip: ficha ? (ficha.equipamento || null) : null,
+        };
+      });
+      return res.status(200).json({ ok: true, totalAnaliseLoja: rel.length, cards: rel });
+    } catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
+  }
+
   // ── POST remove-analise-card — remove card de analise_loja após diagnóstico ──
   if (req.method === 'POST' && action === 'remove-analise-card') {
     const { flFichaId } = req.body || {};
