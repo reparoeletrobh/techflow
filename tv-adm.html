@@ -542,6 +542,11 @@ function openPage(el) {
   loadBar.classList.add('loading');
   frame.onload = function() { loadBar.classList.remove('loading'); };
   // Cache-busting: força o browser buscar versão nova a cada abertura
+  try{
+    if(url&&url.indexOf('/api/')>-1&&url.indexOf('k=')===-1){
+      url+=(url.indexOf('?')>-1?'&':'?')+'k='+encodeURIComponent(localStorage.getItem('tf_key')||'');
+    }
+  }catch(e){}
   frame.src = url + (url.includes('?') ? '&' : '?') + '_v=' + Date.now();
 }
 
