@@ -635,6 +635,17 @@ export default async function handler(req,res){
   }
 
   // ── EVENTOS-DIAGNOSTICO: raio-x da base de eventos ────────────────────────
+  // Lista crua de eventos por tipo/dia (investigação)
+  if(action==='eventos-listar'){
+    const tipoQ=String(req.query.tipo||'');
+    const diaQ=String(req.query.dia||'');
+    let lista=await lerEventos();
+    if(tipoQ)lista=lista.filter(e=>e.tipo===tipoQ);
+    if(diaQ)lista=lista.filter(e=>String(e.ts||'').slice(0,10)===diaQ);
+    return res.status(200).json({ok:true,total:lista.length,
+      eventos:lista.slice(-50).map(e=>({ts:e.ts,tipo:e.tipo,de:e.de,nome:e.nome,sis:e.sis}))});
+  }
+
   if(action==='eventos-diagnostico'){
     const evs=await lerEventos();
     const db_evt={backfillFeito:true};
