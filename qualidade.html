@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<script>
+/* 🔐 TF-GUARD Fase 1 */
+(function(){
+  if(location.pathname==='/login'||location.pathname==='/login.html')return;
+  var K=localStorage.getItem('tf_key');
+  if(!K){location.replace('/login?next='+encodeURIComponent(location.pathname));return;}
+  var _f=window.fetch;
+  window.fetch=function(u,o){
+    var isApi=false;
+    try{
+      if(typeof u==='string'&&u.indexOf('/api/')>-1&&u.indexOf('/api/auth')===-1){
+        isApi=true;o=o||{};
+        var kk=localStorage.getItem('tf_key')||'';
+        if(o.headers&&typeof o.headers.set==='function'){o.headers.set('x-tf-key',kk);}
+        else{o.headers=Object.assign({},o.headers||{},{'x-tf-key':kk});}
+      }
+    }catch(e){}
+    var p=_f.call(this,u,o);
+    if(isApi){
+      p=p.then(function(r){
+        if(r&&r.status===401&&!window.__tfHealed){
+          window.__tfHealed=true;
+          localStorage.removeItem('tf_key');
+          location.replace('/login?next='+encodeURIComponent(location.pathname));
+        }
+        return r;
+      });
+    }
+    return p;
+  };
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Qualidade — Reparo Eletro</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#07080a;color:#f0f2f5;min-height:100vh;padding:18px;}
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;}
+.top h1{font-size:20px;font-weight:900;}
+.beta{background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.4);color:#c084fc;font-size:10px;font-weight:900;padding:3px 8px;border-radius:20px;letter-spacing:.5px;}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px;}
+.kpi{background:#101318;border:1px solid #1d2330;border-radius:12px;padding:12px 14px;}
+.kpi .v{font-size:22px;font-weight:900;}
+.kpi .l{font-size:11px;color:#8b93a3;margin-top:2px;}
+.tabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.tab{padding:8px 16px;border-radius:10px;background:#101318;border:1px solid #1d2330;font-size:13px;font-weight:800;cursor:pointer;color:#aab2c0;}
+.tab.on{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.5);color:#4ade80;}
+.btn{padding:9px 16px;border-radius:10px;border:none;font-weight:800;font-size:13px;cursor:pointer;}
+.btn:disabled{opacity:.5;cursor:default;}
+.btn-add{background:#22c55e;color:#04110a;margin-left:auto;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px;}
+.card{background:#101318;border:1px solid #1d2330;border-radius:14px;padding:14px;}
+.card .hd{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+.card .nm{font-weight:900;font-size:15px;}
+.card .eq{font-size:12px;color:#8b93a3;margin-top:2px;}
+.pill{font-size:10px;font-weight:900;padding:3px 8px;border-radius:20px;white-space:nowrap;}
+.p-ag{background:rgba(250,204,21,.12);color:#fbbf24;border:1px solid rgba(250,204,21,.35);}
+.p-ap{background:rgba(34,197,94,.12);color:#4ade80;border:1px solid rgba(34,197,94,.35);}
+.p-rp{background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.35);}
+.meta{font-size:11px;color:#6b7383;margin-top:8px;line-height:1.6;}
+.card .acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.b-insp{background:#3b82f6;color:#fff;flex:1;}
+.b-cert{background:rgba(34,197,94,.15);color:#4ade80;border:1px solid rgba(34,197,94,.4);flex:1;}
+.b-re{background:rgba(250,204,21,.12);color:#fbbf24;border:1px solid rgba(250,204,21,.35);flex:1;}
+.b-x{background:rgba(239,68,68,.1);color:#f87171;border:1px solid rgba(239,68,68,.3);}
+.empty{color:#5b6373;font-size:13px;padding:30px;text-align:center;grid-column:1/-1;}
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:flex-start;justify-content:center;padding:20px;z-index:50;overflow:auto;}
+.ov.on{display:flex;}
+.md{background:#0d1015;border:1px solid #232a38;border-radius:16px;padding:20px;width:100%;max-width:660px;margin:auto;}
+.md h2{font-size:17px;font-weight:900;margin-bottom:14px;}
+.fld{margin-bottom:11px;}
+.fld label{display:block;font-size:11px;font-weight:800;color:#8b93a3;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px;}
+.fld input,.fld select,.fld textarea{width:100%;background:#12161d;border:1px solid #242b39;border-radius:9px;padding:10px 12px;color:#f0f2f5;font-size:14px;font-family:inherit;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.mact{display:flex;gap:10px;margin-top:16px;}
+.b-ok{background:#22c55e;color:#04110a;flex:1;}
+.b-no{background:#1a1f29;color:#aab2c0;}
+.b-rep{background:#ef4444;color:#fff;flex:1;}
+/* checklist */
+.sec-t{font-size:12px;font-weight:900;color:#8b93a3;text-transform:uppercase;letter-spacing:.6px;margin:16px 0 8px;}
+.ck{background:#12161d;border:1px solid #202736;border-radius:10px;padding:10px 12px;margin-bottom:8px;}
+.ck .q{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+.ck .t{font-size:13.5px;font-weight:600;}
+.ck .ops{display:flex;gap:6px;flex-shrink:0;}
+.op{width:38px;height:32px;border-radius:8px;border:1px solid #2a3242;background:#171c25;color:#8b93a3;font-weight:900;font-size:14px;cursor:pointer;}
+.op.ok.sel{background:rgba(34,197,94,.2);border-color:#22c55e;color:#4ade80;}
+.op.fl.sel{background:rgba(239,68,68,.2);border-color:#ef4444;color:#f87171;}
+.op.na.sel{background:rgba(148,163,184,.18);border-color:#94a3b8;color:#cbd5e1;font-size:10px;}
+.ck textarea{margin-top:8px;display:none;font-size:13px;min-height:50px;}
+.ck.falha textarea{display:block;}
+.prog{font-size:12px;color:#8b93a3;font-weight:700;margin:8px 0 2px;}
+/* certificado */
+.cert{background:#fff;color:#111;border-radius:14px;padding:26px;font-size:13.5px;line-height:1.65;}
+.cert h3{font-size:19px;font-weight:900;color:#0a7a3d;}
+.cert .sub{color:#555;font-size:12px;margin-bottom:14px;}
+.cert .ln{border-top:2px solid #0a7a3d;margin:12px 0;}
+.cert .it{padding:2px 0;}
+.cert .ft{margin-top:14px;font-size:11.5px;color:#666;}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+.chip{background:#171c25;border:1px solid #2a3242;border-radius:20px;padding:6px 12px;font-size:13px;font-weight:700;display:flex;gap:8px;align-items:center;}
+.chip b{cursor:pointer;color:#f87171;}
+@media(max-width:600px){.row2{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>🔬 Controle de Qualidade</h1>
+  <span class="beta">BETA</span>
+  <button class="btn btn-add" onclick="abrirNova()">+ Nova Inspeção</button>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="v" id="k-ag" style="color:#fbbf24;">0</div><div class="l">🔍 Aguardando inspeção</div></div>
+  <div class="kpi"><div class="v" id="k-ap" style="color:#4ade80;">0</div><div class="l">✅ Aprovadas</div></div>
+  <div class="kpi"><div class="v" id="k-rp" style="color:#f87171;">0</div><div class="l">🔧 Em retrabalho</div></div>
+  <div class="kpi"><div class="v" id="k-tx" style="color:#60a5fa;">—</div><div class="l">🎯 Aprovação de 1ª</div></div>
+</div>
+
+<div class="tabs">
+  <div class="tab on" data-v="fila" onclick="setTab(this)">🔍 Fila</div>
+  <div class="tab" data-v="conc" onclick="setTab(this)">✅ Concluídas</div>
+  <div class="tab" data-v="tec" onclick="setTab(this)">⚙️ Técnicos</div>
+</div>
+
+<div class="grid" id="lista"></div>
+
+<!-- MODAL NOVA -->
+<div class="ov" id="ov-nova">
+  <div class="md">
+    <h2>➕ Nova Inspeção</h2>
+    <div class="row2">
+      <div class="fld"><label>Cliente *</label><input id="n-cliente"></div>
+      <div class="fld"><label>Telefone</label><input id="n-tel"></div>
+    </div>
+    <div class="row2">
+      <div class="fld"><label>Nº OS (opcional)</label><input id="n-os" placeholder="FL-0000 / PIPE-..."></div>
+      <div class="fld"><label>Equipamento *</label>
+        <select id="n-equip">
+          <option value="microondas">Micro-ondas</option>
+          <option value="purificador">Purificador</option>
+          <option value="adega">Adega</option>
+          <option value="forno">Forno</option>
+          <option value="tv">TV</option>
+          <option value="bblend">B.blend</option>
+          <option value="outro">Outro</option>
+        </select>
+      </div>
+    </div>
+    <div class="fld"><label>Descrição (modelo/marca/serviço feito)</label><input id="n-desc"></div>
+    <div class="fld"><label>Técnico que consertou</label><select id="n-tec"></select></div>
+    <div class="mact">
+      <button class="btn b-no" onclick="fechar('ov-nova')">Cancelar</button>
+      <button class="btn b-ok" id="btn-criar" onclick="criar()">Criar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL INSPEÇÃO -->
+<div class="ov" id="ov-insp">
+  <div class="md">
+    <h2 id="i-titulo">Inspeção</h2>
+    <div class="fld"><label>Inspetor (quem está conferindo)</label><select id="i-inspetor"></select></div>
+    <div class="prog" id="i-prog"></div>
+    <div id="i-checks"></div>
+    <div class="mact">
+      <button class="btn b-no" onclick="salvarParcial()">💾 Salvar e fechar</button>
+      <button class="btn b-rep" id="btn-rep" onclick="reprovar()">❌ Reprovar</button>
+      <button class="btn b-ok" id="btn-apr" onclick="aprovar()">✅ Aprovar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CERTIFICADO -->
+<div class="ov" id="ov-cert">
+  <div class="md" style="max-width:600px;">
+    <div class="cert" id="cert-body"></div>
+    <div class="mact">
+      <button class="btn b-no" onclick="fechar('ov-cert')">Fechar</button>
+      <button class="btn b-ok" onclick="copiarCert()">📋 Copiar texto (WhatsApp)</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══ CHECKLISTS ═══
+var CK_UNIVERSAL=[
+  {id:'u1',t:'Liga e opera todas as funções'},
+  {id:'u2',t:'Cabo e plugue íntegros (sem fio exposto)'},
+  {id:'u3',t:'Parafusos completos e tampas fechadas (nada sobrou na bancada)'},
+  {id:'u4',t:'Higienização interna feita'},
+  {id:'u5',t:'Higienização externa feita'},
+  {id:'u6',t:'Sem riscos/danos novos na carcaça'},
+  {id:'u7',t:'Teste de bancada em funcionamento contínuo'},
+  {id:'u8',t:'Etiqueta/nº de série preservados'},
+];
+var CK_ESP={
+  microondas:[
+    {id:'m1',t:'Aquece de verdade (teste do copo d\u2019água ~1 min)'},
+    {id:'m2',t:'Prato giratório funcionando'},
+    {id:'m3',t:'Trava e vedação da porta (segurança)'},
+    {id:'m4',t:'Todas as teclas da membrana respondem'},
+    {id:'m5',t:'Luz interna acende'},
+    {id:'m6',t:'Sem faíscas na cavidade'},
+  ],
+  purificador:[
+    {id:'p1',t:'Água gelando na temperatura correta'},
+    {id:'p2',t:'Zero vazamento sob pressão (teste 15-30 min)'},
+    {id:'p3',t:'Vazão de água boa'},
+    {id:'p4',t:'Filtro validado ou trocado'},
+    {id:'p5',t:'Sem gosto/odor estranho na água'},
+    {id:'p6',t:'Painel e LEDs funcionando'},
+  ],
+  adega:[
+    {id:'a1',t:'Atinge e MANTÉM a temperatura (teste longo com termômetro)'},
+    {id:'a2',t:'Termostato ciclando (liga/desliga sozinho)'},
+    {id:'a3',t:'Vedação da porta perfeita'},
+    {id:'a4',t:'Ruído e vibração normais'},
+    {id:'a5',t:'Iluminação interna'},
+    {id:'a6',t:'Sem condensação anormal'},
+  ],
+  forno:[
+    {id:'f1',t:'Resistências aquecendo (superior e inferior)'},
+    {id:'f2',t:'Termostato desarma na temperatura certa'},
+    {id:'f3',t:'Chave seletora em todas as posições'},
+    {id:'f4',t:'Timer funcionando'},
+    {id:'f5',t:'Porta, mola e vidro firmes'},
+    {id:'f6',t:'Externo não superaquece'},
+  ],
+  tv:[
+    {id:'t1',t:'Imagem sem linhas/manchas (padrão de cores + tela cheia)'},
+    {id:'t2',t:'Som nos dois canais'},
+    {id:'t3',t:'Todas as entradas (HDMI/USB) testadas'},
+    {id:'t4',t:'Funções smart e controle remoto'},
+    {id:'t5',t:'Burn-in de 30+ minutos sem o defeito voltar'},
+    {id:'t6',t:'Carcaça bem fixada'},
+  ],
+  bblend:[
+    {id:'b1',t:'Ciclo completo de preparo de bebida'},
+    {id:'b2',t:'Temperatura da bebida correta'},
+    {id:'b3',t:'Zero vazamento'},
+    {id:'b4',t:'Circuito de água limpo'},
+  ],
+  outro:[],
+};
+var EQUIP_LBL={microondas:'Micro-ondas',purificador:'Purificador',adega:'Adega',forno:'Forno',tv:'TV',bblend:'B.blend',outro:'Outro'};
+
+var _db={inspecoes:[],config:{tecnicos:[]}};
+var _tab='fila';
+var _atual=null;
+
+async function load(){
+  try{
+    var r=await fetch('/api/qualidade?action=load').then(function(x){return x.json();});
+    if(r.ok){_db=r;render();}
+  }catch(e){}
+}
+
+function kpis(){
+  var ag=0,ap=0,rp=0,ap1=0;
+  _db.inspecoes.forEach(function(i){
+    if(i.status==='aguardando')ag++;
+    if(i.status==='aprovado'){ap++;if(!(i.reprovacoes||[]).length)ap1++;}
+    if(i.status==='reprovado')rp++;
+  });
+  document.getElementById('k-ag').textContent=ag;
+  document.getElementById('k-ap').textContent=ap;
+  document.getElementById('k-rp').textContent=rp;
+  document.getElementById('k-tx').textContent=ap?Math.round(ap1/ap*100)+'%':'—';
+}
+
+function render(){
+  kpis();
+  var el=document.getElementById('lista');
+  var list=_db.inspecoes.filter(function(i){
+    if(_tab==='fila')return i.status==='aguardando'||i.status==='reprovado';
+    if(_tab==='conc')return i.status==='aprovado';
+    return false;
+  });
+  if(_tab==='tec'){renderTec();return;}
+  if(!list.length){el.innerHTML='<div class="empty">'+(_tab==='fila'?'Fila vazia — crie uma inspeção no botão acima 👆':'Nenhuma inspeção concluída ainda')+'</div>';return;}
+  el.innerHTML=list.map(function(i){
+    var pill=i.status==='aguardando'?'<span class="pill p-ag">🔍 AGUARDANDO</span>':
+             i.status==='aprovado'?'<span class="pill p-ap">✅ APROVADO</span>':
+             '<span class="pill p-rp">🔧 RETRABALHO</span>';
+    var rep=(i.reprovacoes||[]).length;
+    var acts='';
+    if(i.status==='aguardando')acts='<button class="btn b-insp" onclick="abrirInsp(\''+i.id+'\')">🔍 Inspecionar</button>';
+    if(i.status==='reprovado')acts='<button class="btn b-re" onclick="reinspecionar(\''+i.id+'\')">🔁 Voltou do retrabalho — reinspecionar</button>';
+    if(i.status==='aprovado')acts='<button class="btn b-cert" onclick="verCert(\''+i.id+'\')">📜 Certificado</button>';
+    acts+='<button class="btn b-x" onclick="excluir(\''+i.id+'\')">🗑</button>';
+    return '<div class="card">'+
+      '<div class="hd"><div><div class="nm">'+esc(i.cliente)+'</div>'+
+      '<div class="eq">'+(EQUIP_LBL[i.equipamento]||i.equipamento)+(i.equipDesc?' · '+esc(i.equipDesc):'')+'</div></div>'+pill+'</div>'+
+      '<div class="meta">'+i.id+(i.os?' · OS '+esc(i.os):'')+
+      (i.tecnico?'<br>🔧 Técnico: <b>'+esc(i.tecnico)+'</b>':'')+
+      (i.inspetor?' · 🔍 Inspetor: <b>'+esc(i.inspetor)+'</b>':'')+
+      (rep?'<br>⚠️ '+rep+' reprovação(ões) anteriores':'')+
+      (i.aprovadoEm?'<br>✅ '+fmtD(i.aprovadoEm):'')+'</div>'+
+      '<div class="acts">'+acts+'</div></div>';
+  }).join('');
+}
+
+function renderTec(){
+  var el=document.getElementById('lista');
+  var chips=(_db.config.tecnicos||[]).map(function(t,ix){
+    return '<div class="chip">'+esc(t)+'<b onclick="delTec('+ix+')">✕</b></div>';
+  }).join('')||'<span style="color:#5b6373;font-size:13px;">Nenhum técnico cadastrado</span>';
+  el.innerHTML='<div class="card" style="grid-column:1/-1;">'+
+    '<div class="nm">⚙️ Equipe técnica</div>'+
+    '<div class="eq" style="margin-top:4px;">Os nomes aparecem nos campos "Técnico" e "Inspetor" — e alimentam as métricas de qualidade por pessoa.</div>'+
+    '<div class="chips" id="chips-tec">'+chips+'</div>'+
+    '<div style="display:flex;gap:8px;margin-top:12px;">'+
+    '<input id="novo-tec" placeholder="Nome do técnico" style="flex:1;background:#12161d;border:1px solid #242b39;border-radius:9px;padding:10px 12px;color:#f0f2f5;">'+
+    '<button class="btn b-ok" onclick="addTec()">Adicionar</button></div></div>';
+}
+
+async function addTec(){
+  var v=document.getElementById('novo-tec').value.trim();
+  if(!v)return;
+  var lst=(_db.config.tecnicos||[]).concat([v]);
+  await salvarTec(lst);
+}
+async function delTec(ix){
+  var lst=(_db.config.tecnicos||[]).slice();lst.splice(ix,1);
+  await salvarTec(lst);
+}
+async function salvarTec(lst){
+  var r=await fetch('/api/qualidade?action=config-tecnicos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tecnicos:lst})}).then(function(x){return x.json();});
+  if(r.ok){_db.config.tecnicos=r.tecnicos;render();}
+}
+
+function setTab(el){
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});
+  el.classList.add('on');_tab=el.getAttribute('data-v');render();
+}
+
+// ═══ NOVA ═══
+function abrirNova(){
+  fillTecSelect('n-tec','— selecionar —');
+  document.getElementById('ov-nova').classList.add('on');
+}
+async function criar(){
+  var btn=document.getElementById('btn-criar');btn.disabled=true;
+  var body={
+    cliente:document.getElementById('n-cliente').value.trim(),
+    tel:document.getElementById('n-tel').value.trim(),
+    os:document.getElementById('n-os').value.trim(),
+    equipamento:document.getElementById('n-equip').value,
+    equipDesc:document.getElementById('n-desc').value.trim(),
+    tecnico:document.getElementById('n-tec').value,
+  };
+  if(!body.cliente){alert('Informe o cliente');btn.disabled=false;return;}
+  var r=await fetch('/api/qualidade?action=criar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  btn.disabled=false;
+  if(r.ok){fechar('ov-nova');['n-cliente','n-tel','n-os','n-desc'].forEach(function(id){document.getElementById(id).value='';});load();}
+  else alert('Erro: '+(r.error||'falha'));
+}
+
+// ═══ INSPEÇÃO ═══
+function itensDe(i){return CK_UNIVERSAL.concat(CK_ESP[i.equipamento]||[]);}
+function abrirInsp(id){
+  _atual=_db.inspecoes.find(function(x){return x.id===id;});
+  if(!_atual)return;
+  document.getElementById('i-titulo').textContent='🔍 '+_atual.id+' — '+_atual.cliente+' ('+(EQUIP_LBL[_atual.equipamento]||'')+')';
+  fillTecSelect('i-inspetor','— quem está inspecionando? —');
+  if(_atual.inspetor)document.getElementById('i-inspetor').value=_atual.inspetor;
+  var itens=itensDe(_atual);
+  var espT=EQUIP_LBL[_atual.equipamento]||'Específico';
+  var html='<div class="sec-t">✔️ Verificações gerais</div>';
+  itens.forEach(function(it,ix){
+    if(ix===CK_UNIVERSAL.length)html+='<div class="sec-t">🎯 Específico — '+espT+'</div>';
+    var st=(_atual.checklist||{})[it.id]||{};
+    html+='<div class="ck'+(st.v==='falha'?' falha':'')+'" id="ck-'+it.id+'">'+
+      '<div class="q"><div class="t">'+it.t+'</div><div class="ops">'+
+      '<button class="op ok'+(st.v==='ok'?' sel':'')+'" onclick="mark(\''+it.id+'\',\'ok\')">✓</button>'+
+      '<button class="op fl'+(st.v==='falha'?' sel':'')+'" onclick="mark(\''+it.id+'\',\'falha\')">✗</button>'+
+      '<button class="op na'+(st.v==='na'?' sel':'')+'" onclick="mark(\''+it.id+'\',\'na\')">N/A</button>'+
+      '</div></div>'+
+      '<textarea id="obs-'+it.id+'" placeholder="O que foi encontrado? (obrigatório na falha)">'+esc(st.obs||'')+'</textarea></div>';
+  });
+  document.getElementById('i-checks').innerHTML=html;
+  prog();
+  document.getElementById('ov-insp').classList.add('on');
+}
+function mark(id,v){
+  _atual.checklist=_atual.checklist||{};
+  var cur=_atual.checklist[id]||{};
+  cur.v=v;_atual.checklist[id]=cur;
+  var el=document.getElementById('ck-'+id);
+  el.classList.toggle('falha',v==='falha');
+  el.querySelectorAll('.op').forEach(function(o){o.classList.remove('sel');});
+  el.querySelector('.op.'+(v==='ok'?'ok':v==='falha'?'fl':'na')).classList.add('sel');
+  prog();
+}
+function coletaChecklist(){
+  var ck={};
+  itensDe(_atual).forEach(function(it){
+    var cur=(_atual.checklist||{})[it.id]||{};
+    var obs=document.getElementById('obs-'+it.id);
+    ck[it.id]={v:cur.v||'',obs:obs?obs.value.trim():''};
+  });
+  return ck;
+}
+function prog(){
+  var itens=itensDe(_atual);
+  var f=0;itens.forEach(function(it){if(((_atual.checklist||{})[it.id]||{}).v)f++;});
+  document.getElementById('i-prog').textContent='Progresso: '+f+' / '+itens.length+' itens verificados';
+  document.getElementById('btn-apr').disabled=(f<itens.length);
+}
+async function salvarParcial(){
+  if(!_atual)return;
+  await fetch('/api/qualidade?action=salvar-checklist',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:_atual.id,checklist:coletaChecklist(),inspetor:document.getElementById('i-inspetor').value})});
+  fechar('ov-insp');load();
+}
+async function aprovar(){
+  var ck=coletaChecklist();
+  var falhas=Object.keys(ck).filter(function(k){return ck[k].v==='falha';});
+  if(falhas.length){alert('Há itens marcados com ✗ falha — corrija ou use Reprovar.');return;}
+  var insp=document.getElementById('i-inspetor').value;
+  if(!insp){alert('Informe o inspetor.');return;}
+  var b=document.getElementById('btn-apr');b.disabled=true;
+  var r=await fetch('/api/qualidade?action=aprovar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:_atual.id,checklist:ck,inspetor:insp})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  b.disabled=false;
+  if(r.ok){fechar('ov-insp');await load();verCert(_atual.id);}
+  else alert('Erro: '+(r.error||'falha'));
+}
+async function reprovar(){
+  var ck=coletaChecklist();
+  var falhas=[];
+  itensDe(_atual).forEach(function(it){
+    if((ck[it.id]||{}).v==='falha')falhas.push({item:it.t,obs:(ck[it.id]||{}).obs||''});
+  });
+  if(!falhas.length){alert('Marque com ✗ os itens que falharam antes de reprovar.');return;}
+  var semObs=falhas.filter(function(f){return !f.obs;});
+  if(semObs.length){alert('Descreva o que foi encontrado nos itens com ✗ (é o que volta para o técnico).');return;}
+  var insp=document.getElementById('i-inspetor').value;
+  if(!insp){alert('Informe o inspetor.');return;}
+  if(!confirm('Reprovar e enviar para retrabalho?\n\n'+falhas.map(function(f){return '✗ '+f.item;}).join('\n')))return;
+  var b=document.getElementById('btn-rep');b.disabled=true;
+  var r=await fetch('/api/qualidade?action=reprovar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:_atual.id,checklist:ck,inspetor:insp,itensFalhos:falhas})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  b.disabled=false;
+  if(r.ok){fechar('ov-insp');load();}
+  else alert('Erro: '+(r.error||'falha'));
+}
+async function reinspecionar(id){
+  if(!confirm('O equipamento voltou do retrabalho? O checklist será reiniciado para nova inspeção.'))return;
+  await fetch('/api/qualidade?action=reinspecionar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});
+  load();
+}
+async function excluir(id){
+  if(!confirm('Excluir esta inspeção?'))return;
+  await fetch('/api/qualidade?action=excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});
+  load();
+}
+
+// ═══ CERTIFICADO ═══
+var _certTexto='';
+function verCert(id){
+  var i=_db.inspecoes.find(function(x){return x.id===id;});
+  if(!i)return;
+  var itens=itensDe(i).filter(function(it){return ((i.checklist||{})[it.id]||{}).v==='ok';});
+  var html='<h3>✅ Certificado de Controle de Qualidade</h3>'+
+    '<div class="sub">Reparo Eletro · Assistência Técnica Especializada · Rua Ouro Preto, 663 - Barro Preto, BH</div>'+
+    '<div><b>Cliente:</b> '+esc(i.cliente)+'</div>'+
+    (i.os?'<div><b>OS:</b> '+esc(i.os)+' · <b>QC:</b> '+i.id+'</div>':'<div><b>QC:</b> '+i.id+'</div>')+
+    '<div><b>Equipamento:</b> '+(EQUIP_LBL[i.equipamento]||'')+(i.equipDesc?' — '+esc(i.equipDesc):'')+'</div>'+
+    '<div><b>Data da aprovação:</b> '+fmtD(i.aprovadoEm)+'</div>'+
+    '<div class="ln"></div>'+
+    '<div style="font-weight:800;margin-bottom:6px;">Verificações realizadas e aprovadas:</div>'+
+    itens.map(function(it){return '<div class="it">✓ '+it.t+'</div>';}).join('')+
+    '<div class="ln"></div>'+
+    '<div><b>Técnico responsável:</b> '+esc(i.tecnico||'—')+' · <b>Inspetor de qualidade:</b> '+esc(i.inspetor||'—')+'</div>'+
+    '<div class="ft">Este equipamento passou pelo processo completo de controle de qualidade da Reparo Eletro antes da entrega.</div>';
+  document.getElementById('cert-body').innerHTML=html;
+  _certTexto='✅ *CERTIFICADO DE CONTROLE DE QUALIDADE*\n_Reparo Eletro — Assistência Técnica Especializada_\n\n'+
+    '*Cliente:* '+i.cliente+'\n'+(i.os?'*OS:* '+i.os+'\n':'')+
+    '*Equipamento:* '+(EQUIP_LBL[i.equipamento]||'')+(i.equipDesc?' — '+i.equipDesc:'')+'\n'+
+    '*Aprovado em:* '+fmtD(i.aprovadoEm)+'\n\n*Verificações aprovadas:*\n'+
+    itens.map(function(it){return '✓ '+it.t;}).join('\n')+
+    '\n\n*Técnico:* '+(i.tecnico||'—')+'\n*Inspetor:* '+(i.inspetor||'—')+
+    '\n\n_Seu equipamento passou pelo nosso processo completo de controle de qualidade antes da entrega._ 💚';
+  document.getElementById('ov-cert').classList.add('on');
+}
+function copiarCert(){
+  navigator.clipboard.writeText(_certTexto).then(function(){alert('Copiado! Cole no WhatsApp do cliente.');});
+}
+
+// helpers
+function fillTecSelect(id,ph){
+  var s=document.getElementById(id);
+  s.innerHTML='<option value="">'+ph+'</option>'+(_db.config.tecnicos||[]).map(function(t){return '<option>'+esc(t)+'</option>';}).join('');
+}
+function fechar(id){document.getElementById(id).classList.remove('on');}
+function esc(s){return String(s||'').replace(/</g,'&lt;');}
+function fmtD(iso){if(!iso)return '—';var d=new Date(iso);return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}
+
+load();
+setInterval(function(){if(!document.hidden)load();},120000);
+document.addEventListener('visibilitychange',function(){if(!document.hidden)load();});
+</script>
+</body>
+</html>

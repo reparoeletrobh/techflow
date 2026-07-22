@@ -83,6 +83,14 @@
   ],
   "rewrites": [
     {
+      "source": "/qualidade",
+      "destination": "/qualidade.html"
+    },
+    {
+      "source": "/api/qualidade",
+      "destination": "/api/qualidade.js"
+    },
+    {
       "source": "/api/cancelamentos",
       "destination": "/api/cancelamentos.js"
     },
