@@ -173,6 +173,12 @@ async function movePipefyCard(cardId, phaseId){
 }
 
 export default async function handler(req,res){
+  // 🔐 TF-AUTH (Fase 1): chave obrigatória em toda chamada
+  const _tfk = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
+  if (_tfk !== ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim())) {
+    return res.status(401).json({ ok: false, error: 'não autorizado' });
+  }
+
   res.setHeader('Access-Control-Allow-Origin','*');
   res.setHeader('Access-Control-Allow-Methods','GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers','Content-Type');
@@ -207,7 +213,7 @@ export default async function handler(req,res){
     try{
       const _base=process.env.FL_BASE_URL||'https://reparoeletroadm.com';
       const _title=(ficha.nomeContato+' (Loja) - '+(ficha.equipamento||'')+' | '+(ficha.descricao||'')+' OS:'+ficha.id).replace(/"/g,"'").slice(0,255);
-      fetch(_base+'/api/board?action=add-loja-card',{method:'POST',headers:{'Content-Type':'application/json'},
+      fetch(_base+'/api/board?action=add-loja-card&k=tfk-re2026-Bx7mQp9zKw4Y',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({flFichaId:ficha.id,pipefyId:null,title:_title,nomeContato:ficha.nomeContato||'',telefone:ficha.telefone||'',phaseId:'analise_loja'})
       }).catch(e=>console.error('[FL] criar→board:',e.message));
     }catch(e){}
@@ -541,7 +547,7 @@ export default async function handler(req,res){
       ' OS:' + ficha.id
     ).replace(/"/g,"'").slice(0,255);
     const boardBase = process.env.FL_BASE_URL || 'https://reparoeletroadm.com';
-    const r = await fetch(boardBase+'/api/board?action=add-loja-card', {
+    const r = await fetch(boardBase+'/api/board?action=add-loja-card&k=tfk-re2026-Bx7mQp9zKw4Y', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
@@ -608,7 +614,7 @@ export default async function handler(req,res){
     for (const f of semCard) {
       try {
         const t = (f.nomeContato+' (Loja) - '+(f.equipamento||'')+' | '+(f.descricao||'')+' OS:'+f.id).replace(/"/g,"'").slice(0,255);
-        await fetch(_base+'/api/board?action=add-loja-card',{
+        await fetch(_base+'/api/board?action=add-loja-card&k=tfk-re2026-Bx7mQp9zKw4Y',{
           method:'POST', headers:{'Content-Type':'application/json'},
           body: JSON.stringify({ flFichaId:f.id, pipefyId:null, title:t, nomeContato:f.nomeContato||'', telefone:f.telefone||'', phaseId:'analise_loja' })
         });

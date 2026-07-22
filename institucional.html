@@ -1,6 +1,24 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+<script>
+/* 🔐 TF-GUARD Fase 1 */
+(function(){
+  if(location.pathname==='/login'||location.pathname==='/login.html')return;
+  var K=localStorage.getItem('tf_key');
+  if(!K){location.replace('/login?next='+encodeURIComponent(location.pathname));return;}
+  var _f=window.fetch;
+  window.fetch=function(u,o){
+    try{
+      if(typeof u==='string'&&u.indexOf('/api/')>-1&&u.indexOf('/api/auth')===-1&&u.indexOf('k=')===-1){
+        u+=(u.indexOf('?')>-1?'&':'?')+'k='+encodeURIComponent(localStorage.getItem('tf_key')||'');
+      }
+    }catch(e){}
+    return _f.call(this,u,o);
+  };
+})();
+</script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23f97316'/><text x='50%25' y='50%25' text-anchor='middle' dominant-baseline='central' font-size='18' font-family='sans-serif'>🔧</text></svg>">

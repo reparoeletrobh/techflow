@@ -1,6 +1,24 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+<script>
+/* 🔐 TF-GUARD Fase 1 */
+(function(){
+  if(location.pathname==='/login'||location.pathname==='/login.html')return;
+  var K=localStorage.getItem('tf_key');
+  if(!K){location.replace('/login?next='+encodeURIComponent(location.pathname));return;}
+  var _f=window.fetch;
+  window.fetch=function(u,o){
+    try{
+      if(typeof u==='string'&&u.indexOf('/api/')>-1&&u.indexOf('/api/auth')===-1&&u.indexOf('k=')===-1){
+        u+=(u.indexOf('?')>-1?'&':'?')+'k='+encodeURIComponent(localStorage.getItem('tf_key')||'');
+      }
+    }catch(e){}
+    return _f.call(this,u,o);
+  };
+})();
+</script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Google Meu Negócio — Reparo Eletro BH</title>

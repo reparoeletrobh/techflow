@@ -57,7 +57,9 @@
       var d=await r.json();
       if(d.ok){
         localStorage.setItem('adm_auth',JSON.stringify({token:d.token,expiry:d.expiry}));
-        window.location.replace('/adm');
+        if(d.apiKey)localStorage.setItem('tf_key',d.apiKey);
+        var nx=new URLSearchParams(location.search).get('next');
+        window.location.replace(nx&&nx.indexOf('/')===0?nx:'/adm');
       }else{showErr(d.error||'Usuário ou senha inválidos.');}
     }catch(e){showErr('Erro de conexão. Tente novamente.');}
     btn.disabled=false;btn.textContent='Entrar';

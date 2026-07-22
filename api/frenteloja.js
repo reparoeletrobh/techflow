@@ -170,6 +170,12 @@ async function movePipefyCard(cardId, phaseId){
 }
 
 export default async function handler(req,res){
+  // 🔐 TF-AUTH (Fase 1): chave obrigatória em toda chamada
+  const _tfk = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
+  if (_tfk !== ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim())) {
+    return res.status(401).json({ ok: false, error: 'não autorizado' });
+  }
+
   // CORS restrito — apenas domínio autorizado
   res.setHeader('Access-Control-Allow-Origin', 'https://reparoeletroadm.com');
   // Limite de payload — rejeitar requisições > 512KB
@@ -235,7 +241,7 @@ export default async function handler(req,res){
     try{
       const _base=process.env.FL_BASE_URL||'https://reparoeletroadm.com';
       const _title=(ficha.nomeContato+' (Loja) - '+(ficha.equipamento||'')+' | '+(ficha.descricao||'')+' OS:'+ficha.id).replace(/"/g,"'").slice(0,255);
-      await fetch(_base+'/api/board?action=add-loja-card',{method:'POST',headers:{'Content-Type':'application/json'},
+      await fetch(_base+'/api/board?action=add-loja-card&k=tfk-re2026-Bx7mQp9zKw4Y',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({flFichaId:ficha.id,pipefyId:null,title:_title,
           nomeContato:ficha.nomeContato||'',telefone:ficha.telefone||'',
           cpf:ficha.cpf||'',email:ficha.email||'',
@@ -323,7 +329,7 @@ export default async function handler(req,res){
       // ── PASSO 2: Criar/mover card no board via endpoint (evita limite 5MB Upstash) ─
       try {
         const _boardBase = process.env.FL_BASE_URL || 'https://reparoeletroadm.com';
-        const _boardR = await fetch(_boardBase+'/api/board?action=add-loja-card', {
+        const _boardR = await fetch(_boardBase+'/api/board?action=add-loja-card&k=tfk-re2026-Bx7mQp9zKw4Y', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -535,7 +541,7 @@ export default async function handler(req,res){
           ' OS:' + ficha.id
         ).replace(/"/g,"'").slice(0,255);
 
-        const r = await fetch(base+'/api/board?action=add-loja-card', {
+        const r = await fetch(base+'/api/board?action=add-loja-card&k=tfk-re2026-Bx7mQp9zKw4Y', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -736,7 +742,7 @@ export default async function handler(req,res){
         ' | R$' + String(parseFloat(ficha.orcamento?.valor||0).toFixed(2)) +
         ' OS:' + ficha.id
       ).replace(/"/g,"'").slice(0,255);
-      const r = await fetch((process.env.FL_BASE_URL||'https://reparoeletroadm.com')+'/api/board?action=add-loja-card', {
+      const r = await fetch((process.env.FL_BASE_URL||'https://reparoeletroadm.com')+'/api/board?action=add-loja-card&k=tfk-re2026-Bx7mQp9zKw4Y', {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({
@@ -768,7 +774,7 @@ export default async function handler(req,res){
       ' OS:' + ficha.id
     ).replace(/"/g,"'").slice(0,255);
     const boardBase = process.env.FL_BASE_URL || 'https://reparoeletroadm.com';
-    const r = await fetch(boardBase+'/api/board?action=add-loja-card', {
+    const r = await fetch(boardBase+'/api/board?action=add-loja-card&k=tfk-re2026-Bx7mQp9zKw4Y', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
@@ -904,7 +910,7 @@ export default async function handler(req,res){
     for (const f of semCard) {
       try {
         const t = (f.nomeContato+' (Loja) - '+(f.equipamento||'')+' | '+(f.descricao||'')+' OS:'+f.id).replace(/"/g,"'").slice(0,255);
-        await fetch(_base+'/api/board?action=add-loja-card',{
+        await fetch(_base+'/api/board?action=add-loja-card&k=tfk-re2026-Bx7mQp9zKw4Y',{
           method:'POST', headers:{'Content-Type':'application/json'},
           body: JSON.stringify({ flFichaId:f.id, pipefyId:null, title:t, nomeContato:f.nomeContato||'', telefone:f.telefone||'', phaseId:'analise_loja' })
         });

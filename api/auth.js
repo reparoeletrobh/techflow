@@ -40,7 +40,8 @@ module.exports = async function handler(req, res) {
     }
     if (username === ADM_USER && password === ADM_PASS) {
       const { token, expiry } = makeToken(username);
-      return res.status(200).json({ ok: true, token, expiry });
+      const apiKey = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+      return res.status(200).json({ ok: true, token, expiry, apiKey });
     }
     return res.status(401).json({ ok: false, error: 'Usuário ou senha inválidos' });
   }

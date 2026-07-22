@@ -1,6 +1,12 @@
 // api/security-status.js — Status das configurações de segurança
 // Acesso restrito: só com APP_INTERNAL_KEY
 module.exports = async function(req,res){
+  // 🔐 TF-AUTH (Fase 1): chave obrigatória em toda chamada
+  const _tfk = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
+  if (_tfk !== ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim())) {
+    return res.status(401).json({ ok: false, error: 'não autorizado' });
+  }
+
   const key = req.headers['x-app-key'] || req.query._k || '';
   const APP_KEY = process.env.APP_INTERNAL_KEY || '';
   if (!APP_KEY || key !== APP_KEY) {

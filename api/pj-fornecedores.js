@@ -9,6 +9,12 @@ async function dbSet(k,v){await fetch(U+'/pipeline',{method:'POST',headers:{Auth
 function defaultDB(){return{fornecedores:[],nextId:1,nextCobId:1};}
 
 module.exports=async function handler(req,res){
+  // 🔐 TF-AUTH (Fase 1): chave obrigatória em toda chamada
+  const _tfk = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
+  if (_tfk !== ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim())) {
+    return res.status(401).json({ ok: false, error: 'não autorizado' });
+  }
+
   res.setHeader('Access-Control-Allow-Origin','https://reparoeletroadm.com');
   res.setHeader('Access-Control-Allow-Methods','GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers','Content-Type');

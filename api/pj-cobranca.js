@@ -17,6 +17,12 @@ function normData(d){
 }
 
 module.exports = async function handler(req, res) {
+  // 🔐 TF-AUTH (Fase 1): chave obrigatória em toda chamada
+  const _tfk = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
+  if (_tfk !== ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim())) {
+    return res.status(401).json({ ok: false, error: 'não autorizado' });
+  }
+
   res.setHeader('Access-Control-Allow-Origin','https://reparoeletroadm.com');
   res.setHeader('Access-Control-Allow-Methods','GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers','Content-Type');
@@ -76,7 +82,7 @@ module.exports = async function handler(req, res) {
           retencaoISS:    retencaoISS||cliente.retencaoISS||false,
         };
         const nfRes = await fetch(
-          'https://reparoeletroadm.com/api/nfse?action=emitir',
+          'https://reparoeletroadm.com/api/nfse?action=emitir&k=tfk-re2026-Bx7mQp9zKw4Y',
           {method:'POST',headers:{'Content-Type':'application/json',
             'x-internal-call':'1'},
           body:JSON.stringify(nfBody)}
@@ -187,7 +193,7 @@ module.exports = async function handler(req, res) {
           // 2c. Anexar PDF da NF na fatura Asaas (se NF foi emitida)
           if (resultado.nf?.chave) {
             try {
-              const nfPdfRes = await fetch(`https://reparoeletroadm.com/api/nfse?action=danfe&chave=${resultado.nf.chave}`);
+              const nfPdfRes = await fetch(`https://reparoeletroadm.com/api/nfse?action=danfe&chave=${resultado.nf.chave}&k=tfk-re2026-Bx7mQp9zKw4Y`);
               if (nfPdfRes.ok) {
                 const pdfBlob = new Blob([await nfPdfRes.arrayBuffer()], { type:'application/pdf' });
                 const fd = new FormData();
@@ -265,7 +271,7 @@ module.exports = async function handler(req, res) {
         valor:          parseFloat(cob.valor),
         retencaoISS:    !!(cob.retencaoISS||cliente.retencaoISS),
       };
-      const nfRes  = await fetch('https://reparoeletroadm.com/api/nfse?action=emitir',
+      const nfRes  = await fetch('https://reparoeletroadm.com/api/nfse?action=emitir&k=tfk-re2026-Bx7mQp9zKw4Y',
         {method:'POST',headers:{'Content-Type':'application/json','x-internal-call':'1'},body:JSON.stringify(nfBody)});
       const nfData = await nfRes.json();
 
@@ -285,7 +291,7 @@ module.exports = async function handler(req, res) {
           const ASAAS_KEY = (process.env.ASAAS_API_KEY||'').trim();
           const ASAAS_URL = ASAAS_KEY.includes('sandbox')
             ? 'https://api-sandbox.asaas.com/v3' : 'https://api.asaas.com/v3';
-          const pdfRes = await fetch('https://reparoeletroadm.com/api/nfse?action=danfe&chave='+nfData.chaveAcesso);
+          const pdfRes = await fetch('https://reparoeletroadm.com/api/nfse?action=danfe&chave=&k=tfk-re2026-Bx7mQp9zKw4Y'+nfData.chaveAcesso);
           if(pdfRes.ok){
             const buf = await pdfRes.arrayBuffer();
             const fd = new FormData();
@@ -324,7 +330,7 @@ module.exports = async function handler(req, res) {
     const anexosList = [];
     if(nfChave){
       try{
-        const pdfRes = await fetch('https://reparoeletroadm.com/api/nfse?action=danfe&chave='+nfChave);
+        const pdfRes = await fetch('https://reparoeletroadm.com/api/nfse?action=danfe&chave=&k=tfk-re2026-Bx7mQp9zKw4Y'+nfChave);
         if(pdfRes.ok){
           const buf = await pdfRes.arrayBuffer();
           const b64 = Buffer.from(buf).toString('base64');
@@ -487,7 +493,7 @@ module.exports = async function handler(req, res) {
     if(!cob||!cob.nfChave) return res.status(400).json({ok:false,error:'Cobrança ou NF não encontrada'});
     // Solicitar cancelamento via nfse endpoint
     try{
-      const r=await fetch('https://reparoeletroadm.com/api/nfse?action=cancelar',{
+      const r=await fetch('https://reparoeletroadm.com/api/nfse?action=cancelar&k=tfk-re2026-Bx7mQp9zKw4Y',{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({chave:cob.nfChave})
       });

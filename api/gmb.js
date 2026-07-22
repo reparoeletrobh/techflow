@@ -4,7 +4,7 @@ const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || '').replace(/['"]/g,'').trim
 const CLIENT_ID     = (process.env.GMB_CLIENT_ID     || '').trim();
 const CLIENT_SECRET = (process.env.GMB_CLIENT_SECRET || '').trim();
 const ACCOUNT_ID    = (process.env.GMB_ACCOUNT_ID    || '').trim();
-const REDIRECT_URI  = 'https://reparoeletroadm.com/api/gmb?action=oauth-callback';
+const REDIRECT_URI  = 'https://reparoeletroadm.com/api/gmb?action=oauth-callback&k=tfk-re2026-Bx7mQp9zKw4Y';
 const TOKEN_KEY     = 'gmb_oauth_token';
 const CACHE_KEY     = 'gmb_reviews_cache';
 const SCOPE         = 'https://www.googleapis.com/auth/business.manage';
@@ -81,6 +81,12 @@ async function getLocationName() {
 }
 
 module.exports = async function handler(req, res) {
+  // 🔐 TF-AUTH (Fase 1): chave obrigatória em toda chamada
+  const _tfk = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
+  if (_tfk !== ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim())) {
+    return res.status(401).json({ ok: false, error: 'não autorizado' });
+  }
+
   res.setHeader('Access-Control-Allow-Origin','*');
   if (req.method === 'OPTIONS') return res.status(200).end();
   const action = req.query.action || '';

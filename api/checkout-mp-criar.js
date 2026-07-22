@@ -2,6 +2,12 @@
 // Cria uma preferência de pagamento no Mercado Pago
 // Suporta: PIX + Cartão de Crédito 3x sem juros
 module.exports = async function handler(req, res) {
+  // 🔐 TF-AUTH (Fase 1): chave obrigatória em toda chamada
+  const _tfk = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
+  if (_tfk !== ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim())) {
+    return res.status(401).json({ ok: false, error: 'não autorizado' });
+  }
+
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -71,7 +77,7 @@ module.exports = async function handler(req, res) {
     },
     auto_return: 'approved',
 
-    notification_url: `${siteUrl}/api/webhook-mp`,
+    notification_url: `${siteUrl}/api/webhook-mp?k=tfk-re2026-Bx7mQp9zKw4Y`,
 
     metadata: {
       produto_ids:      itens.map(i => i.id).join(','),

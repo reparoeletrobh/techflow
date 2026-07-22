@@ -22,6 +22,12 @@ async function dbSet(key, val) {
 }
 
 export default async function handler(req, res) {
+  // 🔐 TF-AUTH (Fase 1): chave obrigatória em toda chamada
+  const _tfk = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
+  if (_tfk !== ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim())) {
+    return res.status(401).json({ ok: false, error: 'não autorizado' });
+  }
+
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -72,7 +78,7 @@ export default async function handler(req, res) {
   if (action === 'load-equipamentos') {
     const proto  = req.headers['x-forwarded-proto'] || 'https';
     const host   = req.headers.host;
-    const d      = await fetch(`${proto}://${host}/api/tv-vendas?action=load`).then(r => r.json());
+    const d      = await fetch(`${proto}://${host}/api/tv-vendas?action=load&k=tfk-re2026-Bx7mQp9zKw4Y`).then(r => r.json());
     const prods  = (d.produtos || []).filter(p => !p.vendido);
     const cfg    = (await dbGet(CFG_KEY)) || {};
     return res.status(200).json({
