@@ -994,18 +994,34 @@ function render(){
   var b4=document.getElementById('b4'); if(b4)b4.textContent=confs.length;
   var colC=document.getElementById('col-conf');
   if(colC)colC.innerHTML=confs.length?confs.map(function(f){
-    return '<div class="card" style="border-left:3px solid #ef4444;">'
-      +'<div class="card-nome">'+esc(f.nome||'—')+'</div>'
+    var contatado=!!f.conflitoContatadoEm;
+    var cor=contatado?'#22c55e':'#ef4444';
+    var fundoMotivo=contatado?'rgba(34,197,94,.08)':'rgba(239,68,68,.1)';
+    var bordaMotivo=contatado?'rgba(34,197,94,.3)':'rgba(239,68,68,.35)';
+    var corMotivo=contatado?'#4ade80':'#f87171';
+    return '<div class="card" style="border-left:3px solid '+cor+';'+(contatado?'background:rgba(34,197,94,.04);':'')+'">'
+      +'<div class="card-nome">'+esc(f.nome||'—')+(contatado?' <span style="font-size:9px;background:rgba(34,197,94,.2);color:#4ade80;padding:2px 6px;border-radius:8px;font-weight:900;">EM ATENDIMENTO</span>':'')+'</div>'
       +'<div class="card-info">'+esc(f.telefone||'')+' · '+esc(f.equipamento||'')+'</div>'
-      +(f.motivoConflito?'<div style="margin-top:6px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);border-radius:7px;padding:6px 9px;font-size:11.5px;color:#f87171;font-weight:700;line-height:1.4;">⚡ '+esc(f.motivoConflito)+'</div>':'')
+      +(f.motivoConflito?'<div style="margin-top:6px;background:'+fundoMotivo+';border:1px solid '+bordaMotivo+';border-radius:7px;padding:6px 9px;font-size:11.5px;color:'+corMotivo+';font-weight:700;line-height:1.4;">⚡ '+esc(f.motivoConflito)+'</div>':'')
       +'<div class="card-info" style="margin-top:4px;font-size:10px;">'+(f.criadoEm?new Date(f.criadoEm).toLocaleString('pt-BR').slice(0,16):'')+'</div>'
-      +'<div class="card-acts" style="margin-top:8px;">'
+      +'<div class="card-acts" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">'
+        +'<button class="cbtn" style="background:rgba(37,211,102,.12);color:#25d366;border:1px solid rgba(37,211,102,.4);" onclick="conflitoCopiarEnviar(\''+f.id+'\')">📋 Copiar e Enviar</button>'
         +'<button class="cbtn" style="background:rgba(34,197,94,.15);color:#4ade80;border:1px solid rgba(34,197,94,.4);" onclick="resolverConflito(\''+f.id+'\')">✔ Conflito Resolvido</button>'
       +'</div>'
     +'</div>';
   }).join(''):'<div class="empty">Nenhum conflito 🎉</div>';
 }
 
+var TXT_CONFLITO='Olá! Eu sou o Alessandro aqui da Reparo Eletro, responsável pelo setor de atendimento ao cliente. Vi que você está tendo um problema com a gente — vou prosseguir com o seu atendimento pra resolvermos da melhor forma possível, tá bom?';
+async function conflitoCopiarEnviar(id){
+  var f=_fichas.find(function(x){return x.id===id;});
+  if(!f)return;
+  try{await navigator.clipboard.writeText(TXT_CONFLITO);}catch(e){}
+  var tel=String(f.telefone||'').replace(/\D/g,'');
+  window.open('https://wa.me/'+(tel.indexOf('55')===0?tel:'55'+tel)+'?text='+encodeURIComponent(TXT_CONFLITO),'_blank');
+  await fetch('/api/prospeccao?action=conflito-contatado',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});
+  load();
+}
 async function resolverConflito(id){
   if(!confirm('Marcar este conflito como resolvido?'))return;
   await fetch('/api/prospeccao?action=resolver-conflito',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});

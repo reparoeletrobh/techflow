@@ -662,6 +662,15 @@ export default async function handler(req,res){
     await dbSet(KEY,db);
     return res.status(200).json({ok:true});
   }
+  if(req.method==='POST'&&action==='conflito-contatado'){
+    const {id}=req.body||{};
+    const db=(await dbGet(KEY))||{fichas:[]};
+    const f=(db.fichas||[]).find(x=>x.id===id);
+    if(!f)return res.status(404).json({ok:false,error:'não encontrado'});
+    f.conflitoContatadoEm=new Date().toISOString();
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true});
+  }
   if(req.method==='POST'&&action==='resolver-conflito'){
     const {id}=req.body||{};
     const db=(await dbGet(KEY))||{fichas:[]};
