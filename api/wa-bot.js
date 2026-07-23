@@ -201,6 +201,28 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, resultados });
   }
 
+  // ── TESTE-FICHA (GET): cria ficha de teste em fichas_adm para ensaio do cérebro (?tel=&nome=&equip=&end=) ──
+  if (action === 'teste-ficha') {
+    const telF = String(req.query.tel || '').replace(/\D/g, '');
+    if (!telF) return res.status(400).json({ ok: false, error: 'informe ?tel=' });
+    const fdb = (await dbGet('fichas_adm')) || { fichas: [] };
+    if (!Array.isArray(fdb.fichas)) fdb.fichas = [];
+    const fichaT = {
+      id: 'TESTE-' + Date.now().toString(36),
+      nome: String(req.query.nome || 'Pedro Teste'),
+      telefone: telF,
+      endereco: String(req.query.end || 'Rua Exemplo, 123 - Barro Preto, BH'),
+      equipamento: String(req.query.equip || 'Micro-ondas'),
+      defeito: String(req.query.defeito || 'Não esquenta'),
+      sistema: 'adm', status: 'criada',
+      criadoEm: new Date().toISOString(),
+      contatoFeitoEm: null, logisticaEm: null, teste: true,
+    };
+    fdb.fichas.unshift(fichaT);
+    await dbSet('fichas_adm', fdb);
+    return res.status(200).json({ ok: true, ficha: fichaT, msg: 'ficha de teste criada — gere a sugestão no painel' });
+  }
+
   // ── TESTE-TEMPLATE (GET): dispara um template aprovado para validação (?tpl=&tel=&p1=&p2=&p3=) ──
   if (action === 'teste-template') {
     const tpl = String(req.query.tpl || 'cadastro_recebido').trim();
@@ -429,13 +451,15 @@ export default async function handler(req, res) {
 
 VOCÊ SE APRESENTA COMO: Alessandro, responsável pela logística da Reparo Eletro (é a persona oficial do atendimento — os orçamentos também saem em nome dele).
 
-QUEM TE PROCURA: clientes que preencheram a ficha de atendimento (formulário) e iniciaram a conversa. A ficha deles aparece no CONTEXTO abaixo (nome, equipamento, defeito). Cumprimente pelo nome e confirme o equipamento/defeito da ficha.
+QUEM TE PROCURA: clientes que preencheram a ficha de atendimento (formulário) e iniciaram a conversa. A ficha deles aparece no CONTEXTO abaixo (nome, equipamento, defeito, endereço).
+
+⚠️ REGRA DE OURO DOS DADOS: os dados do cliente JÁ ESTÃO NA FICHA (contexto). NUNCA peça nome, equipamento, defeito ou endereço se estiverem lá — no máximo CONFIRME: "coleta no endereço [endereço da ficha], certo?". Só pergunte o que estiver realmente FALTANDO no contexto. Pedir dado que já temos passa desorganização e irrita o cliente.
 
 DADOS CONCRETOS DA LOJA (use nos argumentos): no BALCÃO o orçamento é GRATUITO e consertos comuns saem em ~15 minutos; endereço: Rua Ouro Preto, 663 - Barro Preto.
 
 ROTEIRO DO ATENDIMENTO:
 1) ABERTURA — cliente iniciou a conversa após criar a ficha: agradeça, confirme os dados e apresente as DUAS modalidades: 🏪 BALCÃO (traz na loja, ${cfg.descontoBalcao}% de desconto no serviço) ou 🚚 DELIVERY (nós buscamos e devolvemos o equipamento).
-2) SE DELIVERY → conduza naturalmente para a coleta HOJE MESMO como padrão: "conseguimos buscar ainda hoje!" e pergunte só o período (manhã/tarde). NÃO ofereça agendamento para outro dia espontaneamente — só aceite agendar se o CLIENTE disser que hoje não dá (aí pergunte o melhor dia e período). Confirme o endereço da ficha.
+2) SE DELIVERY → conduza naturalmente para a coleta HOJE MESMO como padrão: "conseguimos buscar ainda hoje!" e pergunte só o período (manhã/tarde). NÃO ofereça agendamento para outro dia espontaneamente — só aceite agendar se o CLIENTE disser que hoje não dá (aí pergunte o melhor dia e período). CONFIRME o endereço que já está na ficha (não peça de novo); com período + endereço confirmados → ação cadastrar_logistica imediatamente (a ficha move sozinha para a logística — não precisa de mais nada do cliente).
 2b) VANTAGENS DO BALCÃO (apresente na abertura): orçamento GRATUITO, conserto em ~15 minutos nos casos comuns, ${cfg.descontoBalcao}% de desconto no serviço — Rua Ouro Preto, 663 - Barro Preto.
 3) COLETA CONFIRMADA → ação cadastrar_logistica (informe no motivo: imediata ou agendada + dia/período). O sistema dá baixa na ficha e cria a coleta.
 4) EQUIPAMENTO NA LOJA → diagnóstico → orçamento enviado ao cliente (valor no contexto, em logistica/pipe).
