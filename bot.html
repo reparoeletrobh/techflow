@@ -69,7 +69,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 .badge-fase{font-size:10px;font-weight:800;background:rgba(139,92,246,.15);color:#a78bfa;border:1px solid rgba(139,92,246,.4);border-radius:99px;padding:4px 10px;}
 .btn{padding:7px 12px;border-radius:7px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:#1e2228;color:#f0f2f5;text-decoration:none;}
 main{flex:1;display:flex;overflow:hidden;}
-#lista-conv{width:300px;border-right:1px solid #1e2228;overflow-y:auto;background:#0a0b0e;flex-shrink:0;}
+#col-esq{width:300px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid #1e2228;background:#0a0b0e;min-height:0;}
+#lista-conv{flex:1;overflow-y:auto;background:#0a0b0e;}
 .conv{padding:12px 14px;border-bottom:1px solid #14161a;cursor:pointer;}
 .conv:hover{background:#0f1114;}
 .conv.sel{background:#12151d;border-left:3px solid #25d366;}
@@ -92,7 +93,7 @@ main{flex:1;display:flex;overflow:hidden;}
 .b-gerar{padding:10px 14px;border-radius:8px;border:1px solid rgba(139,92,246,.5);background:rgba(139,92,246,.12);color:#a78bfa;font-weight:800;font-size:12px;cursor:pointer;}
 .b-desc{padding:10px 14px;border-radius:8px;border:1px solid #2a2f38;background:#181b1f;color:#8b93a1;font-weight:700;font-size:12px;cursor:pointer;}
 #vazio{flex:1;display:flex;align-items:center;justify-content:center;color:#5a6270;font-size:13px;text-align:center;padding:30px;}
-@media(max-width:760px){#lista-conv{width:110px;}.conv-ultima{display:none;}}
+@media(max-width:760px){#col-esq{width:110px;}.conv-ultima{display:none;}#busca-conv{font-size:10px;padding:6px 7px;}}
 </style>
 </head>
 <body>
@@ -105,8 +106,10 @@ main{flex:1;display:flex;overflow:hidden;}
 </header>
 
 <main>
-  <input id="busca-conv" placeholder="🔎 Buscar nome ou número..." oninput="window._filtroConv=this.value.toLowerCase();if(window._ultD)renderLista(window._ultD);" style="width:calc(100% - 16px);margin:8px;background:#12161d;border:1px solid #242b39;border-radius:9px;padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;box-sizing:border-box;display:block;">
+  <div id="col-esq">
+  <input id="busca-conv" placeholder="🔎 Buscar nome ou número..." oninput="window._filtroConv=this.value.toLowerCase();if(window._ultD)renderLista(window._ultD);" style="width:calc(100% - 16px);margin:8px 8px 6px;background:#12161d;border:1px solid #242b39;border-radius:9px;padding:8px 11px;color:#f0f2f5;font-size:12.5px;outline:none;box-sizing:border-box;display:block;">
   <div id="lista-conv"><div style="padding:20px;color:#5a6270;font-size:11px;text-align:center;">⏳ Carregando...</div></div>
+  </div>
   <div id="chat">
     <div id="vazio">Selecione uma conversa à esquerda.<br><br>💡 As mensagens chegam aqui automaticamente quando o webhook da Meta estiver configurado.</div>
     <div id="msgs" style="display:none;"></div>
