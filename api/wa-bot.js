@@ -327,9 +327,10 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: false, passo: 'sugerir', meta: sg.error || 'sem sugestão' });
       }
       const acaoT = (sg.sugestao.acao && sg.sugestao.acao.tipo) || 'nenhuma';
+      const motivoT = (sg.sugestao.acao && sg.sugestao.acao.motivo) || '';
       const env = await fetch(`${BASE}/api/wa-bot?action=enviar&k=${KCH}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tel: telAR, texto: sg.sugestao.resposta, acaoAprovada: acaoT, via: 'bot-auto' }),
+        body: JSON.stringify({ tel: telAR, texto: sg.sugestao.resposta, acaoAprovada: acaoT, acaoMotivo: motivoT, via: 'bot-auto' }),
       }).then(r => r.json());
       return res.status(200).json({ ok: !!env.ok, acao: acaoT, envio: env.ok ? 'enviado' : env.error });
     } catch (e) { return res.status(200).json({ ok: false, error: e.message }); }
@@ -670,7 +671,7 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
 
   // ── Enviar mensagem aprovada (via Meta Cloud API) ──
   if (req.method === 'POST' && action === 'enviar') {
-    const { tel, texto, acaoAprovada, via } = req.body || {};
+    const { tel, texto, acaoAprovada, acaoMotivo, via } = req.body || {};
     if (!tel || !texto) return res.status(400).json({ ok: false, error: 'tel e texto obrigatórios' });
     const { token: tkE, phoneId: pidE } = await credenciais();
     if (!tkE || !pidE) return res.status(200).json({ ok: false, error: 'Credenciais WhatsApp não configuradas (envs ou setup-credenciais)' });
@@ -716,6 +717,12 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
           const cardX = (ppX.cards || []).find(c => String(c.telefone || '').replace(/\D/g, '').slice(-8) === d8x && c.phase !== 'aprovados');
           if (cardX) {
             cardX.phase = 'aprovados'; cardX.movedAt = new Date().toISOString();
+            // Valor combinado na negociação (extraído do motivo da ação — regra do Fluxo Bot Vendas)
+            const mV = String(acaoMotivo || '').match(/R?\$?\s?(\d{2,5})(?:[.,](\d{2}))?/);
+            if (mV) {
+              const vComb = parseFloat(mV[1] + (mV[2] ? '.' + mV[2] : ''));
+              if (vComb >= 30 && vComb <= 20000) { cardX.valor = vComb; cardX.valorCombinadoBot = true; }
+            }
             await dbSet('reparoeletro_pipe', ppX);
           }
         }
