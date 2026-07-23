@@ -235,6 +235,26 @@ export default async function handler(req, res) {
     } catch (e) { return res.status(200).json({ ok: false, error: e.message }); }
   }
 
+  // ── AUTO-RESPONDER: cérebro responde sozinho (chamado pelo webhook p/ telefones autorizados) ──
+  if (action === 'auto-responder') {
+    const telAR = String(req.query.tel || (req.body && req.body.tel) || '').replace(/\D/g, '');
+    if (!telAR) return res.status(400).json({ ok: false, error: 'informe tel' });
+    const KCH = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+    const BASE = 'https://reparoeletroadm.com';
+    try {
+      const sg = await fetch(`${BASE}/api/wa-bot?action=sugerir&tel=${telAR}&k=${KCH}`).then(r => r.json());
+      if (!sg.ok || !sg.sugestao || !sg.sugestao.resposta) {
+        return res.status(200).json({ ok: false, passo: 'sugerir', meta: sg.error || 'sem sugestão' });
+      }
+      const acaoT = (sg.sugestao.acao && sg.sugestao.acao.tipo) || 'nenhuma';
+      const env = await fetch(`${BASE}/api/wa-bot?action=enviar&k=${KCH}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tel: telAR, texto: sg.sugestao.resposta, acaoAprovada: acaoT, via: 'bot-auto' }),
+      }).then(r => r.json());
+      return res.status(200).json({ ok: !!env.ok, acao: acaoT, envio: env.ok ? 'enviado' : env.error });
+    } catch (e) { return res.status(200).json({ ok: false, error: e.message }); }
+  }
+
   // ── AUTORIZAR-EXEC (GET): adiciona telefone à lista de execução real de ações (?tel=) ──
   if (action === 'autorizar-exec') {
     const telA2 = String(req.query.tel || '').replace(/\D/g, '');
@@ -556,7 +576,7 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
 
   // ── Enviar mensagem aprovada (via Meta Cloud API) ──
   if (req.method === 'POST' && action === 'enviar') {
-    const { tel, texto, acaoAprovada } = req.body || {};
+    const { tel, texto, acaoAprovada, via } = req.body || {};
     if (!tel || !texto) return res.status(400).json({ ok: false, error: 'tel e texto obrigatórios' });
     const { token: tkE, phoneId: pidE } = await credenciais();
     if (!tkE || !pidE) return res.status(200).json({ ok: false, error: 'Credenciais WhatsApp não configuradas (envs ou setup-credenciais)' });
@@ -569,7 +589,7 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
       const j = await r.json();
       const okSend = !!(j.messages && j.messages[0]);
       await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'out', texto: String(texto).slice(0, 2000),
-        msgId: okSend ? j.messages[0].id : null, tipo: 'text', via: 'copiloto',
+        msgId: okSend ? j.messages[0].id : null, tipo: 'text', via: via || 'copiloto',
         acaoAprovada: acaoAprovada || null });
       // ⚙️ EXECUÇÃO REAL DA AÇÃO — TRAVA DE TESTE: só para telefones em wa_bot_config.execTels
       try {

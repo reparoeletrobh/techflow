@@ -6,6 +6,14 @@ const VERIFY_TOKEN = (process.env.WA_VERIFY_TOKEN || 'reparo-eletro-bot-2026').t
 
 const EVT_LIST = 'wa_evt_list'; // lista atômica: {ts,tel,nome,dir,texto,msgId,tipo}
 
+async function dbGet(k) {
+  try {
+    const r = await fetch(`${U}/get/${k}`, { headers: { Authorization: `Bearer ${T}` } });
+    const j = await r.json();
+    return j.result ? JSON.parse(j.result) : null;
+  } catch (e) { return null; }
+}
+
 async function rpushEvt(evt) {
   try {
     await fetch(`${U}/rpush/${EVT_LIST}/${encodeURIComponent(JSON.stringify(evt))}`,
@@ -66,6 +74,16 @@ export default async function handler(req, res) {
               texto: texto.slice(0, 2000), msgId: msg.id || null, tipo: msg.type || 'text',
             });
             recebidas++;
+            // 🤖 AUTO-RESPOSTA (trava de teste): telefones em wa_bot_config.execTels recebem resposta automática do cérebro
+            try {
+              const cfgAuto = await dbGet('wa_bot_config');
+              const telsAuto = (cfgAuto && Array.isArray(cfgAuto.execTels)) ? cfgAuto.execTels : [];
+              const d8w = String(tel).replace(/\D/g, '').slice(-8);
+              if (telsAuto.some(t => String(t).replace(/\D/g, '').slice(-8) === d8w)) {
+                const KW = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+                await fetch(`https://reparoeletroadm.com/api/wa-bot?action=auto-responder&tel=${d8w ? String(tel).replace(/\D/g, '') : ''}&k=${KW}`);
+              }
+            } catch (eAuto) {}
           }
           // Status de entrega (sent/delivered/read) — registrar leve
           for (const st of (value.statuses || [])) {
