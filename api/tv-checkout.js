@@ -22,9 +22,10 @@ async function dbSet(key, val) {
 }
 
 export default async function handler(req, res) {
-  // 🔐 TF-AUTH (Fase 1): chave obrigatória em toda chamada
+  // 🔐 TF-AUTH: load-config pública (funil de venda ao cliente); demais exigem chave
   const _tfk = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
-  if (_tfk !== ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim())) {
+  const _act = (req.query && req.query.action) || '';
+  if (_act !== 'load-config' && _tfk !== ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim())) {
     return res.status(401).json({ ok: false, error: 'não autorizado' });
   }
 
