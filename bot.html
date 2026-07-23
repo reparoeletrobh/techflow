@@ -141,7 +141,7 @@ async function carregarConversas(){
       return;
     }
     window._ultD=d;renderLista(d);
-  }catch(e){}
+  }catch(e){el.innerHTML='<div style="padding:20px;color:#ef4444;font-size:11px;">Erro: '+e.message+'</div>';}
 }
 function renderLista(d){
     var el=document.getElementById('lista-conv');
@@ -155,7 +155,6 @@ function renderLista(d){
         +'<div class="conv-ultima">'+esc(c.ultimaMsg)+'</div>'
       +'</div>';
     }).join('');
-  }catch(e){el.innerHTML='<div style="padding:20px;color:#ef4444;font-size:11px;">Erro: '+e.message+'</div>';}
 }
 
 async function abrirConversa(tel){
