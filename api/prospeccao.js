@@ -344,6 +344,7 @@ export default async function handler(req,res){
     }
 
     logDb.fichas.unshift({
+      observacao: (req.body.dados&&req.body.dados.observacao)?String(req.body.dados.observacao).trim():'',
       id:          'log_'+Date.now().toString(36),
       nome:        ficha.nome,
       telefone:    ficha.telefone,

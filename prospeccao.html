@@ -325,6 +325,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
         <input id="log-d-tel" type="tel" placeholder="Telefone" style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:7px;padding:8px 11px;color:#f0f2f5;font-size:12.5px;outline:none;box-sizing:border-box;">
         <input id="log-d-equip" placeholder="Equipamento" style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:7px;padding:8px 11px;color:#f0f2f5;font-size:12.5px;outline:none;box-sizing:border-box;">
         <input id="log-d-defeito" placeholder="Defeito" style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:7px;padding:8px 11px;color:#f0f2f5;font-size:12.5px;outline:none;box-sizing:border-box;">
+        <textarea id="log-d-obs" rows="2" placeholder="📌 Observação para a logística (opcional — vai piscar no card)" style="width:100%;background:#181b1f;border:1px solid #f59e0b55;border-radius:7px;padding:8px 11px;color:#fbbf24;font-size:12.5px;outline:none;box-sizing:border-box;resize:vertical;"></textarea>
         <div>
           <div style="font-size:10px;font-weight:800;color:#f5c800;margin-bottom:4px;">📍 ENDEREÇO COMPLETO (rua, número, bairro, referência)</div>
           <textarea id="log-d-end" rows="2" placeholder="Complete o endereço para a coleta..."
@@ -726,7 +727,7 @@ var _logModo='lead', _logEspSistema=null;
 
 function preencherDadosLog(f){
   if(!f)return;
-  var m={'log-d-nome':f.nome,'log-d-tel':f.telefone,'log-d-equip':f.equipamento,'log-d-defeito':f.defeito,'log-d-end':f.endereco};
+  var m={'log-d-nome':f.nome,'log-d-tel':f.telefone,'log-d-equip':f.equipamento,'log-d-defeito':f.defeito,'log-d-end':f.endereco,'log-d-obs':''};
   Object.keys(m).forEach(function(id){
     var e=document.getElementById(id); if(e)e.value=m[id]||'';
   });
@@ -782,6 +783,7 @@ async function confirmarLogistica(){
   // Dados conferidos/corrigidos no modal
   var dados={
     nome:document.getElementById('log-d-nome').value.trim(),
+    observacao:document.getElementById('log-d-obs').value.trim(),
     telefone:document.getElementById('log-d-tel').value.trim(),
     equipamento:document.getElementById('log-d-equip').value.trim(),
     defeito:document.getElementById('log-d-defeito').value.trim(),

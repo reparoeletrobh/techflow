@@ -258,6 +258,7 @@ export default async function handler(req, res) {
       if(dados.defeito)ficha.defeito=dados.defeito;
       if(dados.endereco)ficha.endereco=dados.endereco;
     }
+    const obsLog = (dados && dados.observacao) ? String(dados.observacao).trim() : '';
     // imediato → liberado_coleta | agendado → horario_marcado
     const phase = tipoColeta === 'agendado' ? 'horario_marcado' : 'liberado_coleta';
     // Montar horarioColeta no formato datetime-local que a logística usa
@@ -268,6 +269,7 @@ export default async function handler(req, res) {
     }
     logDb.fichas.unshift({
       id:           'log_' + Date.now().toString(36),
+      observacao:   obsLog,
       nome:         ficha.nome,
       telefone:     ficha.telefone,
       endereco:     ficha.endereco,
