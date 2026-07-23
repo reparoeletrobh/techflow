@@ -264,6 +264,88 @@ export default async function handler(req, res) {
       ultimosEventos: outs, cardsNoPipe: cards });
   }
 
+  // ── CONSERTO-FINALIZADO-PENDENTES (cron 3min): card em loja_feito/delivery_feito/controle_qualidade →
+  //    template conserto_finalizado (trava execTels) + fase controle_qualidade cria inspeção no QC (geral)
+  if (action === 'conserto-finalizado-pendentes') {
+    const [cfgC, boardC, avisadosC, qcC] = await Promise.all([
+      dbGet('wa_bot_config'), dbGet('reparoeletro_board'),
+      dbGet('wa_conserto_avisados').then(v => v || { ids: {} }),
+      dbGet('reparoeletro_qualidade').then(v => v || { inspecoes: [], config: { tecnicos: [], proximoNum: 1 } }),
+    ]);
+    const telsC = (cfgC && Array.isArray(cfgC.execTels)) ? cfgC.execTels : [];
+    const d8okC = t => telsC.some(x => String(x).replace(/\D/g, '').slice(-8) === String(t || '').replace(/\D/g, '').slice(-8));
+    const { token: tkC, phoneId: pidC } = await credenciais();
+    const FASES_FEITO = ['loja_feito', 'delivery_feito', 'controle_qualidade'];
+    const tipoEquip = s => {
+      const t = String(s || '').toLowerCase();
+      if (t.includes('micro')) return 'microondas';
+      if (t.includes('purific') || t.includes('filtro')) return 'purificador';
+      if (t.includes('adega')) return 'adega';
+      if (t.includes('forno')) return 'forno';
+      if (t.includes('tv') || t.includes('telev')) return 'tv';
+      if (t.includes('bblend') || t.includes('b.blend')) return 'bblend';
+      return 'outro';
+    };
+    const resultados = [];
+    for (const c of ((boardC && boardC.cards) || [])) {
+      if (!FASES_FEITO.includes(c.phaseId)) continue;
+      const cid = String(c.id || c.os || '');
+      if (!cid) continue;
+      const marca = avisadosC.ids[cid] || {};
+      // 1. Inspeção no QC (fase controle_qualidade, geral, 1x por card)
+      if (c.phaseId === 'controle_qualidade' && !marca.qc) {
+        const jaQc = (qcC.inspecoes || []).some(i => i.os && String(i.os) === cid);
+        if (!jaQc) {
+          const num = qcC.config.proximoNum || 1;
+          qcC.inspecoes.unshift({
+            id: 'QC-' + String(num).padStart(4, '0'), criadoEm: new Date().toISOString(),
+            cliente: c.nomeContato || c.nome || (c.title || '').split('(')[0].trim() || '—',
+            tel: String(c.telefone || c.tel || '').replace(/\D/g, ''),
+            os: cid, equipamento: tipoEquip(c.equipamento || c.title),
+            equipDesc: c.equipamento || '', tecnico: c.tecnico || '',
+            inspetor: '', status: 'aguardando', checklist: {}, reprovacoes: [], aprovadoEm: null,
+            origemTecnico: true,
+          });
+          qcC.config.proximoNum = num + 1;
+        }
+        marca.qc = new Date().toISOString();
+        resultados.push({ card: cid, acao: 'inspecao QC criada' });
+      }
+      // 2. Template conserto_finalizado (só telefones autorizados — trava de teste)
+      const telCd = c.telefone || c.tel || '';
+      if (!marca.tpl && telCd && d8okC(telCd) && tkC && pidC) {
+        const toC = String(telCd).replace(/\D/g, '');
+        const to2 = toC.startsWith('55') ? toC : '55' + toC;
+        try {
+          const r = await fetch(`https://graph.facebook.com/v20.0/${pidC}/messages`, {
+            method: 'POST', headers: { Authorization: `Bearer ${tkC}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messaging_product: 'whatsapp', to: to2, type: 'template',
+              template: { name: 'conserto_finalizado', language: { code: 'pt_BR' },
+                components: [{ type: 'body', parameters: [
+                  { type: 'text', text: String(c.nomeContato || c.nome || 'tudo bem').split(' ')[0] } ] }] } }),
+          });
+          const j = await r.json();
+          const okC = !!(j.messages && j.messages[0]);
+          await rpushEvt({ ts: new Date().toISOString(), tel: to2, dir: 'out',
+            texto: '📨 [conserto_finalizado] ' + (c.nomeContato || c.nome || ''), tipo: 'template', via: 'bot-auto-conserto' });
+          marca.tpl = new Date().toISOString();
+          resultados.push({ card: cid, acao: 'template conserto_finalizado', ok: okC });
+        } catch (e) { resultados.push({ card: cid, erro: e.message }); }
+      }
+      if (marca.qc || marca.tpl) avisadosC.ids[cid] = marca;
+    }
+    // poda 90d
+    const corteC = Date.now() - 90 * 86400000;
+    for (const k of Object.keys(avisadosC.ids)) {
+      const m = avisadosC.ids[k];
+      const ref = m.tpl || m.qc;
+      if (ref && new Date(ref).getTime() < corteC) delete avisadosC.ids[k];
+    }
+    await dbSet('reparoeletro_qualidade', qcC);
+    await dbSet('wa_conserto_avisados', avisadosC);
+    return res.status(200).json({ ok: true, resultados });
+  }
+
   // ── ORCAMENTOS-PENDENTES (cron 3min + manual): orçamento registrado → envia ao cliente ──
   // TRAVA DE TESTE: só age em telefones de wa_bot_config.execTels
   if (action === 'orcamentos-pendentes') {

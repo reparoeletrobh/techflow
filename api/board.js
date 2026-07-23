@@ -157,6 +157,7 @@ function defaultBoard() {
       { id: "peca_disponivel", name: "Peça Disponível"    },
       { id: "loja_feito",      name: "Loja Feito"         },
       { id: "delivery_feito",  name: "Delivery Feito"     },
+    { id: "controle_qualidade", name: "Controle de Qualidade" },
       { id: "aguardando_ret",  name: "Aguardando Retirada"},
     ],
     // Fases RS
@@ -181,6 +182,12 @@ function sanitizeBoard(b) {
   if (!b || typeof b !== "object") return defaultBoard();
   const def = defaultBoard();
   if (!Array.isArray(b.phases)      || !b.phases.length)      b.phases      = def.phases;
+  // Migração: fase Controle de Qualidade (após Delivery Feito)
+  if (!b.phases.some(p => p.id === 'controle_qualidade')) {
+    const idxDF = b.phases.findIndex(p => p.id === 'delivery_feito');
+    const nova = { id: 'controle_qualidade', name: 'Controle de Qualidade' };
+    if (idxDF >= 0) b.phases.splice(idxDF + 1, 0, nova); else b.phases.push(nova);
+  }
   if (!Array.isArray(b.rsPhases)    || !b.rsPhases.length)    b.rsPhases    = def.rsPhases;
   if (!Array.isArray(b.rsRuaPhases) || !b.rsRuaPhases.length) b.rsRuaPhases = def.rsRuaPhases;
   if (!Array.isArray(b.cards))      b.cards      = [];

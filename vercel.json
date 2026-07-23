@@ -83,6 +83,10 @@
     {
       "path": "/api/wa-bot?action=orcamentos-pendentes&k=tfk-re2026-Bx7mQp9zKw4Y",
       "schedule": "*/3 * * * *"
+    },
+    {
+      "path": "/api/wa-bot?action=conserto-finalizado-pendentes&k=tfk-re2026-Bx7mQp9zKw4Y",
+      "schedule": "*/3 * * * *"
     }
   ],
   "rewrites": [
