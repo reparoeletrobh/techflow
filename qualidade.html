@@ -35,6 +35,26 @@
     }
     return p;
   };
+  // Navegação/downloads para /api/ (links e window.open) também levam a chave
+  document.addEventListener('click',function(ev){
+    var a=ev.target&&ev.target.closest?ev.target.closest('a'):null;
+    if(a){
+      var hu=a.getAttribute('href')||'';
+      if(hu.indexOf('/api/')>-1&&hu.indexOf('k=')===-1){
+        a.setAttribute('href',hu+(hu.indexOf('?')>-1?'&':'?')+'k='+encodeURIComponent(localStorage.getItem('tf_key')||''));
+      }
+    }
+  },true);
+  var _wo=window.open;
+  window.open=function(u){
+    try{
+      if(typeof u==='string'&&u.indexOf('/api/')>-1&&u.indexOf('k=')===-1){
+        u+=(u.indexOf('?')>-1?'&':'?')+'k='+encodeURIComponent(localStorage.getItem('tf_key')||'');
+        arguments[0]=u;
+      }
+    }catch(e){}
+    return _wo.apply(window,arguments);
+  };
 })();
 </script>
 <meta charset="UTF-8">
