@@ -716,14 +716,18 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
           const ppX = (await dbGet('reparoeletro_pipe')) || { cards: [] };
           const cardX = (ppX.cards || []).find(c => String(c.telefone || '').replace(/\D/g, '').slice(-8) === d8x && c.phase !== 'aprovados');
           if (cardX) {
-            cardX.phase = 'aprovados'; cardX.movedAt = new Date().toISOString();
-            // Valor combinado na negociação (extraído do motivo da ação — regra do Fluxo Bot Vendas)
+            // Valor combinado na negociação (regra do Fluxo Bot Vendas) — antes do mover oficial
             const mV = String(acaoMotivo || '').match(/R?\$?\s?(\d{2,5})(?:[.,](\d{2}))?/);
             if (mV) {
               const vComb = parseFloat(mV[1] + (mV[2] ? '.' + mV[2] : ''));
-              if (vComb >= 30 && vComb <= 20000) { cardX.valor = vComb; cardX.valorCombinadoBot = true; }
+              if (vComb >= 30 && vComb <= 20000) { cardX.valor = vComb; cardX.valorCombinadoBot = true; await dbSet('reparoeletro_pipe', ppX); }
             }
-            await dbSet('reparoeletro_pipe', ppX);
+            // Mover pela ACTION OFICIAL do pipe → dispara os mesmos gatilhos do mover manual (sessão técnico etc.)
+            const KMV = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+            await fetch(`https://reparoeletroadm.com/api/pipe?action=mover&k=${KMV}`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: cardX.id, phase: 'aprovados' }),
+            });
           }
         }
       } catch (eX) {}

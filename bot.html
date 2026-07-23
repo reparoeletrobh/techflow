@@ -105,6 +105,7 @@ main{flex:1;display:flex;overflow:hidden;}
 </header>
 
 <main>
+  <input id="busca-conv" placeholder="🔎 Buscar nome ou número..." oninput="window._filtroConv=this.value.toLowerCase();if(window._ultD)renderLista(window._ultD);" style="width:calc(100% - 16px);margin:8px;background:#12161d;border:1px solid #242b39;border-radius:9px;padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;box-sizing:border-box;display:block;">
   <div id="lista-conv"><div style="padding:20px;color:#5a6270;font-size:11px;text-align:center;">⏳ Carregando...</div></div>
   <div id="chat">
     <div id="vazio">Selecione uma conversa à esquerda.<br><br>💡 As mensagens chegam aqui automaticamente quando o webhook da Meta estiver configurado.</div>
@@ -139,7 +140,16 @@ async function carregarConversas(){
       el.innerHTML='<div style="padding:20px;color:#5a6270;font-size:11px;text-align:center;">📭 Nenhuma conversa ainda.<br><br>Configure o webhook na Meta e as mensagens aparecem aqui.</div>';
       return;
     }
-    el.innerHTML=d.conversas.map(function(c){
+    window._ultD=d;renderLista(d);
+  }catch(e){}
+}
+function renderLista(d){
+    var el=document.getElementById('lista-conv');
+    var lst=d.conversas||[];
+    var q=window._filtroConv||'';
+    if(q)lst=lst.filter(function(c){return (c.nome||'').toLowerCase().indexOf(q)>-1||String(c.tel||'').indexOf(q.replace(/\D/g,''))>-1;});
+    if(!lst.length){el.innerHTML='<div style="padding:20px;color:#5a6270;font-size:12px;text-align:center;">Nenhuma conversa encontrada</div>';return;}
+    el.innerHTML=lst.map(function(c){
       return '<div class="conv'+(c.tel===_tel?' sel':'')+'" onclick="abrirConversa(\''+c.tel+'\')">'
         +'<div class="conv-nome">'+esc(c.nome||c.tel)+(c.naoRespondida?'<span class="conv-badge">responder</span>':'')+'</div>'
         +'<div class="conv-ultima">'+esc(c.ultimaMsg)+'</div>'
