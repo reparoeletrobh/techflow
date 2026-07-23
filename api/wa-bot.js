@@ -202,6 +202,42 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, resultados });
   }
 
+  // ── PERFIL-CONFIG (GET): descrição, recado, endereço, e-mail, site e categoria do perfil ──
+  if (action === 'perfil-config') {
+    const { token, phoneId } = await credenciais();
+    if (!token || !phoneId) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
+    try {
+      const r = await fetch(`https://graph.facebook.com/v20.0/${phoneId}/whatsapp_business_profile`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          about: 'Assistência técnica especializada em eletrodomésticos',
+          address: 'Rua Ouro Preto, 663 - Barro Preto, Belo Horizonte - MG',
+          description: 'Conserto de micro-ondas, purificadores, adegas, fornos e TVs. Orçamento grátis no balcão e coleta com entrega em BH. Horário: Seg a Sex 08h-17h · Sáb 08h-12h.',
+          email: 'reparoeletrobh@gmail.com',
+          websites: ['https://reparoeletroadm.com/equipamentos'],
+          vertical: 'PROF_SERVICES',
+        }),
+      });
+      const j = await r.json();
+      return res.status(200).json({ ok: !!j.success, meta: j });
+    } catch (e) { return res.status(200).json({ ok: false, error: e.message }); }
+  }
+
+  // ── PERFIL-NOME (GET): solicita a troca do nome de exibição (?nome=) — passa por análise da Meta ──
+  if (action === 'perfil-nome') {
+    const novoNome = String(req.query.nome || '').trim();
+    if (!novoNome) return res.status(400).json({ ok: false, error: 'informe ?nome=' });
+    const { token, phoneId } = await credenciais();
+    try {
+      const r = await fetch(`https://graph.facebook.com/v20.0/${phoneId}?new_display_name=${encodeURIComponent(novoNome)}`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      const j = await r.json();
+      return res.status(200).json({ ok: !!j.success, meta: j });
+    } catch (e) { return res.status(200).json({ ok: false, error: e.message }); }
+  }
+
   // ── PERFIL-FOTO (GET): sobe a logo (do próprio site) como foto de perfil do número via Meta Resumable Upload ──
   if (action === 'perfil-foto') {
     const appId = String(req.query.app || '1007161065497390');
