@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<script>
+/* 🔐 TF-GUARD Fase 1 */
+(function(){
+  if(location.pathname==='/login'||location.pathname==='/login.html')return;
+  var K=localStorage.getItem('tf_key');
+  if(!K){location.replace('/login?next='+encodeURIComponent(location.pathname));return;}
+  // Papel TV: acesso restrito às telas do sistema TV
+  if(localStorage.getItem('tf_role')==='tv'&&location.pathname.indexOf('/tv')!==0){
+    location.replace('/tv-adm');return;
+  }
+  var _f=window.fetch;
+  window.fetch=function(u,o){
+    var isApi=false;
+    try{
+      if(typeof u==='string'&&u.indexOf('/api/')>-1&&u.indexOf('/api/auth')===-1){
+        isApi=true;o=o||{};
+        var kk=localStorage.getItem('tf_key')||'';
+        if(o.headers&&typeof o.headers.set==='function'){o.headers.set('x-tf-key',kk);}
+        else{o.headers=Object.assign({},o.headers||{},{'x-tf-key':kk});}
+      }
+    }catch(e){}
+    var p=_f.call(this,u,o);
+    if(isApi){
+      p=p.then(function(r){
+        if(r&&r.status===401&&!window.__tfHealed){
+          window.__tfHealed=true;
+          localStorage.removeItem('tf_key');
+          location.replace('/login?next='+encodeURIComponent(location.pathname));
+        }
+        return r;
+      });
+    }
+    return p;
+  };
+  // Navegação/downloads para /api/ (links e window.open) também levam a chave
+  document.addEventListener('click',function(ev){
+    var a=ev.target&&ev.target.closest?ev.target.closest('a'):null;
+    if(a){
+      var hu=a.getAttribute('href')||'';
+      if(hu.indexOf('/api/')>-1&&hu.indexOf('k=')===-1){
+        a.setAttribute('href',hu+(hu.indexOf('?')>-1?'&':'?')+'k='+encodeURIComponent(localStorage.getItem('tf_key')||''));
+      }
+    }
+  },true);
+  var _wo=window.open;
+  window.open=function(u){
+    try{
+      if(typeof u==='string'&&u.indexOf('/api/')>-1&&u.indexOf('k=')===-1){
+        u+=(u.indexOf('?')>-1?'&':'?')+'k='+encodeURIComponent(localStorage.getItem('tf_key')||'');
+        arguments[0]=u;
+      }
+    }catch(e){}
+    return _wo.apply(window,arguments);
+  };
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Almoxarifado — Reparo Eletro</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#07080a;color:#f0f2f5;min-height:100vh;padding:14px;padding-bottom:40px;}
+.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.top h1{font-size:19px;font-weight:900;}
+.beta{background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);color:#fbbf24;font-size:10px;font-weight:900;padding:3px 8px;border-radius:20px;}
+.who{display:flex;gap:8px;margin-bottom:12px;}
+.who input{flex:1;background:#12161d;border:1px solid #242b39;border-radius:10px;padding:12px;color:#f0f2f5;font-size:15px;}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
+.kpi{background:#101318;border:1px solid #1d2330;border-radius:12px;padding:10px;text-align:center;}
+.kpi .v{font-size:20px;font-weight:900;}
+.kpi .l{font-size:10px;color:#8b93a3;margin-top:1px;}
+.tabs{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;}
+.tab{padding:9px 14px;border-radius:10px;background:#101318;border:1px solid #1d2330;font-size:13px;font-weight:800;cursor:pointer;color:#aab2c0;white-space:nowrap;}
+.tab.on{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.5);color:#fbbf24;}
+.card{background:#101318;border:1px solid #1d2330;border-radius:14px;padding:14px;margin-bottom:10px;}
+.card.receber{border-left:4px solid #3b82f6;}
+.card.mover{border-left:4px solid #fbbf24;}
+.card.falha-c{border-left:4px solid #ef4444;opacity:.9;}
+.card.feito-c{border-left:4px solid #22c55e;opacity:.85;}
+.tt{font-size:11px;font-weight:900;letter-spacing:.5px;color:#8b93a3;text-transform:uppercase;}
+.nm{font-size:16px;font-weight:900;margin-top:3px;}
+.eq{font-size:13px;color:#aab2c0;margin-top:2px;}
+.rota-mov{display:flex;align-items:center;gap:8px;margin-top:10px;background:#0c0f14;border:1px solid #1d2330;border-radius:10px;padding:10px;font-size:13px;font-weight:800;}
+.rota-mov .de{color:#8b93a3;}
+.rota-mov .seta{color:#fbbf24;font-size:16px;}
+.rota-mov .para{color:#4ade80;}
+.meta{font-size:11px;color:#6b7383;margin-top:8px;}
+.acts{display:flex;gap:8px;margin-top:12px;}
+.btn{padding:13px;border-radius:12px;border:none;font-weight:900;font-size:14px;cursor:pointer;flex:1;}
+.btn:disabled{opacity:.5;}
+.b-ok{background:#22c55e;color:#04110a;}
+.b-no{background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.35);}
+.b-foto{background:#3b82f6;color:#fff;}
+.b-re{background:rgba(250,204,21,.12);color:#fbbf24;border:1px solid rgba(250,204,21,.35);}
+.fld{margin-top:10px;}
+.fld input,.fld textarea{width:100%;background:#12161d;border:1px solid #242b39;border-radius:10px;padding:12px;color:#f0f2f5;font-size:15px;font-family:inherit;}
+.foto-ok{color:#4ade80;font-size:12px;font-weight:800;margin-top:8px;}
+.thumb{max-width:100%;border-radius:10px;margin-top:8px;max-height:180px;object-fit:cover;}
+.empty{color:#5b6373;font-size:14px;padding:36px 10px;text-align:center;}
+.inv-item{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+.loc{font-size:11px;font-weight:900;padding:4px 10px;border-radius:20px;background:rgba(245,158,11,.12);color:#fbbf24;border:1px solid rgba(245,158,11,.3);white-space:nowrap;}
+.search{width:100%;background:#12161d;border:1px solid #242b39;border-radius:10px;padding:12px;color:#f0f2f5;font-size:15px;margin-bottom:10px;}
+</style>
+</head>
+<body>
+<div class="top"><h1>📦 Almoxarifado</h1><span class="beta">BETA</span></div>
+
+<div class="who"><input id="operador" placeholder="👷 Seu nome (quem está operando)" onchange="localStorage.setItem('alm_op',this.value)"></div>
+
+<div class="kpis">
+  <div class="kpi"><div class="v" id="k-p" style="color:#fbbf24;">0</div><div class="l">📋 Pendentes</div></div>
+  <div class="kpi"><div class="v" id="k-f" style="color:#4ade80;">0</div><div class="l">✅ Feitas hoje</div></div>
+  <div class="kpi"><div class="v" id="k-x" style="color:#f87171;">0</div><div class="l">⚠️ Não consegui</div></div>
+</div>
+
+<div class="tabs">
+  <div class="tab on" data-v="pend" onclick="setTab(this)">📋 Tarefas</div>
+  <div class="tab" data-v="inv" onclick="setTab(this)">📍 Inventário</div>
+  <div class="tab" data-v="hist" onclick="setTab(this)">🗂 Histórico</div>
+</div>
+
+<div id="lista"></div>
+
+<script>
+var _db={tarefas:[],inventario:{},faseLbl:{}};
+var _tab='pend';
+document.getElementById('operador').value=localStorage.getItem('alm_op')||'';
+
+function lbl(f){return (_db.faseLbl&&_db.faseLbl[f])||f||'—';}
+function op(){return document.getElementById('operador').value.trim();}
+function exigeOp(){if(!op()){alert('Preenche seu nome no topo primeiro 👷');return false;}return true;}
+
+async function load(){
+  try{
+    var r=await fetch('/api/almoxarifado?action=sync').then(function(x){return x.json();});
+    if(r.ok){_db=r;render();}
+  }catch(e){}
+}
+
+function hoje(iso){if(!iso)return false;var d=new Date(iso),h=new Date();return d.toDateString()===h.toDateString();}
+
+function render(){
+  var p=0,f=0,x=0;
+  _db.tarefas.forEach(function(t){
+    if(t.status==='pendente')p++;
+    if(t.status==='feito'&&hoje(t.feitoEm))f++;
+    if(t.status==='falha')x++;
+  });
+  document.getElementById('k-p').textContent=p;
+  document.getElementById('k-f').textContent=f;
+  document.getElementById('k-x').textContent=x;
+
+  var el=document.getElementById('lista');
+  if(_tab==='inv'){renderInv();return;}
+  var list=_db.tarefas.filter(function(t){
+    if(_tab==='pend')return t.status==='pendente'||t.status==='falha';
+    return t.status==='feito';
+  });
+  if(!list.length){el.innerHTML='<div class="empty">'+(_tab==='pend'?'Nenhuma tarefa pendente 🎉<br><small>As tarefas nascem sozinhas quando os equipamentos se movem no sistema</small>':'Nada concluído ainda')+'</div>';return;}
+  el.innerHTML=list.map(function(t){
+    var cls=t.status==='falha'?'falha-c':t.status==='feito'?'feito-c':t.tipo;
+    var head=t.tipo==='receber'?'📥 RECEBER NA LOJA (foto + modelo)':'📦 MOVER EQUIPAMENTO';
+    var html='<div class="card '+cls+'">'+
+      '<div class="tt">'+head+' · '+t.id+'</div>'+
+      '<div class="nm">'+esc(t.cliente)+'</div>'+
+      '<div class="eq">'+esc(t.equipamento||'—')+(t.modelo?' · '+esc(t.modelo):'')+'</div>'+
+      '<div class="rota-mov"><span class="de">'+lbl(t.origem)+'</span><span class="seta">→</span><span class="para">'+lbl(t.destino)+'</span></div>';
+    if(t.status==='pendente'){
+      if(t.tipo==='receber'){
+        html+='<div class="fld"><input id="mod-'+t.id+'" placeholder="📝 Modelo do equipamento (obrigatório)" value="'+esc(t.modelo||'')+'"></div>';
+        html+=t.temFoto?'<div class="foto-ok">✅ Foto registrada</div>':'';
+        html+='<div class="acts">'+
+          '<button class="btn b-foto" onclick="tirarFoto(\''+t.id+'\')">📷 '+(t.temFoto?'Nova foto':'Tirar foto')+'</button>'+
+          '<button class="btn b-ok" onclick="concluir(\''+t.id+'\')">✅ Recebido</button></div>';
+        html+='<input type="file" accept="image/*" capture="environment" id="file-'+t.id+'" style="display:none" onchange="enviarFoto(\''+t.id+'\',this)">';
+      }else{
+        html+='<div class="acts">'+
+          '<button class="btn b-no" onclick="naoConsegui(\''+t.id+'\')">⚠️ Não consegui</button>'+
+          '<button class="btn b-ok" onclick="concluir(\''+t.id+'\')">✅ Feito</button></div>';
+      }
+    }
+    if(t.status==='falha'){
+      html+='<div class="meta">⚠️ <b>'+esc(t.feitoPor||'')+'</b>: '+esc(t.motivoFalha||'')+'</div>'+
+        '<div class="acts"><button class="btn b-re" onclick="reabrir(\''+t.id+'\')">🔁 Resolvido — reabrir tarefa</button></div>';
+    }
+    if(t.status==='feito'){
+      html+='<div class="meta">✅ '+esc(t.feitoPor||'—')+' · '+fmtD(t.feitoEm)+(t.cardId&&t.tipo==='receber'?' · <a href="#" onclick="verFoto(\''+t.cardId+'\');return false;" style="color:#60a5fa;">ver foto</a>':'')+'</div>';
+    }
+    return html+'</div>';
+  }).join('');
+}
+
+function renderInv(){
+  var el=document.getElementById('lista');
+  var itens=Object.keys(_db.inventario).map(function(k){return Object.assign({cardId:k},_db.inventario[k]);});
+  itens.sort(function(a,b){return (b.atualizadoEm||'').localeCompare(a.atualizadoEm||'');});
+  var html='<input class="search" id="busca" placeholder="🔎 Buscar cliente ou equipamento..." oninput="filtraInv(this.value)">'+
+    '<div id="inv-list">'+invHtml(itens)+'</div>';
+  el.innerHTML=html;
+}
+function invHtml(itens){
+  if(!itens.length)return '<div class="empty">Inventário vazio — vai se preenchendo conforme as tarefas são concluídas</div>';
+  return itens.map(function(i){
+    return '<div class="card"><div class="inv-item"><div>'+
+      '<div class="nm" style="font-size:14px;">'+esc(i.cliente)+'</div>'+
+      '<div class="eq">'+esc(i.equipamento||'')+(i.modelo?' · '+esc(i.modelo):'')+'</div>'+
+      '<div class="meta">'+fmtD(i.atualizadoEm)+(i.por?' · por '+esc(i.por):'')+'</div></div>'+
+      '<div class="loc">'+lbl(i.local)+'</div></div></div>';
+  }).join('');
+}
+function filtraInv(q){
+  q=q.toLowerCase();
+  var itens=Object.keys(_db.inventario).map(function(k){return Object.assign({cardId:k},_db.inventario[k]);})
+    .filter(function(i){return (i.cliente||'').toLowerCase().indexOf(q)>-1||(i.equipamento||'').toLowerCase().indexOf(q)>-1;});
+  document.getElementById('inv-list').innerHTML=invHtml(itens);
+}
+
+function setTab(el){
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});
+  el.classList.add('on');_tab=el.getAttribute('data-v');render();
+}
+
+// ── FOTO (compressão no celular antes de subir) ──
+function tirarFoto(id){document.getElementById('file-'+id).click();}
+function enviarFoto(id,input){
+  var file=input.files&&input.files[0];
+  if(!file)return;
+  var img=new Image();
+  img.onload=function(){
+    var mx=640;
+    var w=img.width,h=img.height;
+    if(w>h&&w>mx){h=h*mx/w;w=mx;}else if(h>mx){w=w*mx/h;h=mx;}
+    var cv=document.createElement('canvas');cv.width=w;cv.height=h;
+    cv.getContext('2d').drawImage(img,0,0,w,h);
+    var dataUrl=cv.toDataURL('image/jpeg',0.55);
+    fetch('/api/almoxarifado?action=foto',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:id,dataUrl:dataUrl})}).then(function(x){return x.json();}).then(function(r){
+        if(r.ok){load();}else alert('Erro na foto: '+(r.error||'falha'));
+      });
+  };
+  img.src=URL.createObjectURL(file);
+}
+async function verFoto(cardId){
+  var r=await fetch('/api/almoxarifado?action=ver-foto&cardId='+encodeURIComponent(cardId)).then(function(x){return x.json();});
+  if(r.ok&&r.foto){
+    var w=window.open('');
+    w.document.write('<body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="'+r.foto.img+'" style="max-width:100%;max-height:100vh;"></body>');
+  }else alert('Foto não encontrada.');
+}
+
+// ── AÇÕES ──
+async function concluir(id){
+  if(!exigeOp())return;
+  var t=_db.tarefas.find(function(x){return x.id===id;});
+  var body={id:id,feitoPor:op()};
+  if(t&&t.tipo==='receber'){
+    var mod=document.getElementById('mod-'+id);
+    body.modelo=mod?mod.value.trim():'';
+    if(!body.modelo){alert('Informe o modelo do equipamento 📝');return;}
+    if(!t.temFoto){alert('Tira a foto do equipamento primeiro 📷 (obrigatória)');return;}
+  }
+  var r=await fetch('/api/almoxarifado?action=concluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
+}
+async function naoConsegui(id){
+  if(!exigeOp())return;
+  var motivo=prompt('⚠️ O que impediu? (obrigatório — vai para o gestor)');
+  if(!motivo)return;
+  var r=await fetch('/api/almoxarifado?action=falha',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,feitoPor:op(),motivo:motivo})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
+}
+async function reabrir(id){
+  await fetch('/api/almoxarifado?action=reabrir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});
+  load();
+}
+
+function esc(s){return String(s||'').replace(/</g,'&lt;').replace(/'/g,'&#39;');}
+function fmtD(iso){if(!iso)return '—';var d=new Date(iso);return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}
+
+load();
+setInterval(function(){if(!document.hidden)load();},60000);
+document.addEventListener('visibilitychange',function(){if(!document.hidden)load();});
+</script>
+</body>
+</html>

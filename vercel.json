@@ -83,6 +83,14 @@
   ],
   "rewrites": [
     {
+      "source": "/almoxarifado",
+      "destination": "/almoxarifado.html"
+    },
+    {
+      "source": "/api/almoxarifado",
+      "destination": "/api/almoxarifado.js"
+    },
+    {
       "source": "/qualidade",
       "destination": "/qualidade.html"
     },
