@@ -69,7 +69,8 @@ async function contextoCliente(tel) {
     }
     for (const f of ((lg && lg.fichas) || [])) if (bate(f.telefone)) {
       ctx.logistica.push({ id: f.id, nome: f.nome, fase: f.phase, equipamento: f.equipamento,
-        orcamento: (f.diagnostico && f.diagnostico.preco) || f.orcamentoValor || null });
+        orcamento: (f.diagnostico && f.diagnostico.preco) || f.orcamentoValor || null,
+        textoOrcamento: (f.diagnostico && f.diagnostico.textoOrc) || null });
     }
     for (const c of ((pp && pp.cards) || [])) if (bate(c.telefone)) {
       ctx.pipe.push({ id: c.id, nome: c.nomeContato, fase: c.phase, equipamento: c.equipamento, valor: c.valor || null });
@@ -496,9 +497,15 @@ ROTEIRO DO ATENDIMENTO:
 2b) VANTAGENS DO BALCÃO (apresente na abertura): orçamento GRATUITO, conserto em ~15 minutos nos casos comuns, ${cfg.descontoBalcao}% de desconto no serviço — Rua Ouro Preto, 663 - Barro Preto.
 3) COLETA CONFIRMADA → ação cadastrar_logistica (informe no motivo: imediata ou agendada + dia/período). O sistema dá baixa na ficha e cria a coleta.
 4) EQUIPAMENTO NA LOJA → diagnóstico → orçamento enviado ao cliente (valor no contexto, em logistica/pipe).
-5) NEGOCIAÇÃO DO ORÇAMENTO — políticas: Pix à vista ${cfg.descontoPix}% | retirada balcão ${cfg.descontoBalcao}% | Troca: ${cfg.politicaTroca} | Compra: ${cfg.politicaCompra}
-6) OBJEÇÃO "pelo preço do conserto compro um novo" — argumento central (comparação honesta): o "novo" desse preço é de categoria MUITO inferior ao equipamento dele (menos potência, capacidade e durabilidade — é comparar um iPhone top com um celular de entrada). Um equipamento NOVO equivalente ao dele custa bem mais; o conserto sai por uma fração disso, com garantia. Se o contexto tiver o valor do orçamento, mostre a conta da economia. ${cfg.argumentoNovo}
-7) APROVOU → ação mover_aprovado (a ficha vai para Aprovados e entra na fila do técnico automaticamente).
+5) NEGOCIAÇÃO DO ORÇAMENTO — 5 FASES SEQUENCIAIS (avance UMA fase por vez, só quando o cliente NÃO aprovar ou pedir desconto):
+   F1. Envio do orçamento do sistema (use o textoOrcamento do contexto se existir — é o orçamento oficial gerado no diagnóstico).
+   F2. Pix: "(Nome), sendo no Pix consigo fazer por (valor com 5% de desconto), pois só trabalhamos com peças originais, fazemos revisão completa, damos certificado de garantia e buscamos e entregamos no seu endereço. Após o conserto ficará tão bom quanto o novo — usamos as mesmas peças do fabricante."
+   F3. Balcão: "Buscando aqui na loja consigo a mesma condição de balcão, retirando o frete: fica por (valor com 5% de desconto) apenas. Estamos na Rua Ouro Preto, 663 - Barro Preto e deixamos pronto entre hoje e amanhã."
+   F4. Troca: "Se estiver pensando em trocar por um mais em conta, temos vendas também — consigo desconto ficando com o seu na troca. Nosso catálogo: https://reparoeletroadm.com/equipamentos" (desconto padrão de R$50 na troca; se questionarem o valor, explique: temos que consertar, dar garantia, pagar imposto, taxa de maquininha, frete).
+   F5. Compra: "Tem interesse em nos VENDER o seu equipamento? Nossa equipe avalia e passa uma proposta em breve." → se aceitar, ação escalar_humano (motivo: mover para Análise de Compra).
+6) OBJEÇÃO "caro / pelo preço compro um novo" — pesquise mentalmente o preço REAL de um equipamento novo EQUIVALENTE ao modelo dele (mesma categoria/qualidade — não o modelo de entrada) e mostre a conta da economia: "um equivalente novo sai por ~R$X; consertando você economiza R$Y". Seja honesto se não souber o modelo exato: peça o modelo ou use a faixa da categoria. O "novo barato" é categoria inferior (iPhone vs celular de entrada). ${cfg.argumentoNovo}
+7) APROVOU → ação mover_aprovado com o VALOR COMBINADO no motivo (ex: "aprovado por R$332 no Pix — F2"). A ficha vai para Aprovados e entra na fila do técnico automaticamente.
+7b) JANELAS DE HORÁRIO (respeite sempre): COLETA: segunda a sexta 08h-14h, sábado 08h-11h — fora da janela, diga que a coleta será entre 08h e 14h do PRÓXIMO dia útil. LOJA/BALCÃO: segunda a sexta 08h-17h, sábado 08h-12h — ao indicar o balcão, reforce endereço e horário.
 8) REPROVOU → ação registrar_reprovacao: seja gentil, deixe a porta aberta ("vou pedir para um especialista te ligar, às vezes conseguimos uma condição"). O time humano tenta reverter por ligação.
 9) STATUS DO EQUIPAMENTO — use SOMENTE o campo tecnico/pecas do contexto: estágio real (bancada, aguardando peça com previsão, testado, pronto para entrega/retirada). Se aguardando peça SEM previsão no contexto, diga que confirma com o técnico e use escalar_humano se o cliente precisar de resposta imediata. NUNCA invente prazo.
 
@@ -553,6 +560,41 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
       await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'out', texto: String(texto).slice(0, 2000),
         msgId: okSend ? j.messages[0].id : null, tipo: 'text', via: 'copiloto',
         acaoAprovada: acaoAprovada || null });
+      // ⚙️ EXECUÇÃO REAL DA AÇÃO — TRAVA DE TESTE: só para telefones em wa_bot_config.execTels
+      try {
+        const cfgX = (await dbGet('wa_bot_config')) || {};
+        const execTels = Array.isArray(cfgX.execTels) ? cfgX.execTels : [];
+        const d8x = String(tel).replace(/\D/g, '').slice(-8);
+        const autorizado = execTels.some(t => String(t).replace(/\D/g, '').slice(-8) === d8x);
+        if (autorizado && acaoAprovada === 'cadastrar_logistica') {
+          const fdbX = (await dbGet('fichas_adm')) || { fichas: [] };
+          const fichaX = (fdbX.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x && f.status !== 'logistica');
+          if (fichaX) {
+            const logX = (await dbGet('reparoeletro_logistica')) || { fichas: [] };
+            const jaLog = (logX.fichas || []).some(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x && f.phase !== 'orc_registrado');
+            if (!jaLog) {
+              logX.fichas.unshift({
+                id: 'log_' + Date.now().toString(36),
+                nome: fichaX.nome, telefone: fichaX.telefone, endereco: fichaX.endereco || '',
+                equipamento: fichaX.equipamento || '', defeito: fichaX.defeito || '',
+                phase: 'liberado_coleta', criadoEm: new Date().toISOString(), movedAt: new Date().toISOString(),
+                origem: 'bot', observacao: '🤖 cadastrado pelo Bot Vendas',
+              });
+              await dbSet('reparoeletro_logistica', logX);
+              fichaX.status = 'logistica'; fichaX.logisticaEm = new Date().toISOString();
+              await dbSet('fichas_adm', fdbX);
+            }
+          }
+        }
+        if (autorizado && acaoAprovada === 'mover_aprovado') {
+          const ppX = (await dbGet('reparoeletro_pipe')) || { cards: [] };
+          const cardX = (ppX.cards || []).find(c => String(c.telefone || '').replace(/\D/g, '').slice(-8) === d8x && c.phase !== 'aprovados');
+          if (cardX) {
+            cardX.phase = 'aprovados'; cardX.movedAt = new Date().toISOString();
+            await dbSet('reparoeletro_pipe', ppX);
+          }
+        }
+      } catch (eX) {}
       // Registro de ação para a timeline do painel
       if (acaoAprovada && acaoAprovada !== 'nenhuma') {
         await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'acao', texto: acaoAprovada, tipo: 'acao' });
