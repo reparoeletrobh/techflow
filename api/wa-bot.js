@@ -235,6 +235,71 @@ export default async function handler(req, res) {
     } catch (e) { return res.status(200).json({ ok: false, error: e.message }); }
   }
 
+  // ── ORCAMENTOS-PENDENTES (cron 3min + manual): orçamento registrado → envia ao cliente ──
+  // TRAVA DE TESTE: só age em telefones de wa_bot_config.execTels
+  if (action === 'orcamentos-pendentes') {
+    const cfgO = (await dbGet('wa_bot_config')) || {};
+    const telsO = Array.isArray(cfgO.execTels) ? cfgO.execTels : [];
+    if (!telsO.length) return res.status(200).json({ ok: true, msg: 'nenhum telefone autorizado' });
+    const { token: tkO, phoneId: pidO } = await credenciais();
+    if (!tkO || !pidO) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
+    const [logO, enviadosO, evtsO] = await Promise.all([
+      dbGet('reparoeletro_logistica'), dbGet('wa_orc_enviados').then(v => v || { ids: {} }), lerEvts(),
+    ]);
+    const d8ok = t => telsO.some(x => String(x).replace(/\D/g, '').slice(-8) === String(t).replace(/\D/g, '').slice(-8));
+    const janelaAberta = tel8 => {
+      let ult = null;
+      for (const e of evtsO) if (e.dir === 'in' && String(e.tel).slice(-8) === tel8) ult = e.ts;
+      return ult && (Date.now() - new Date(ult).getTime()) < 24 * 3600000;
+    };
+    const disparos = [];
+    for (const f of ((logO && logO.fichas) || [])) {
+      if (f.phase !== 'orc_registrado') continue;
+      const txtOrc = f.diagnostico && f.diagnostico.textoOrc;
+      if (!txtOrc) continue;
+      if (!d8ok(f.telefone)) continue;               // trava de teste
+      if (enviadosO.ids[f.id]) continue;              // dedupe
+      const telO = String(f.telefone).replace(/\D/g, '');
+      const to = telO.startsWith('55') ? telO : '55' + telO;
+      const t8 = to.slice(-8);
+      try {
+        if (janelaAberta(t8)) {
+          // Janela aberta → orçamento oficial direto
+          const r = await fetch(`https://graph.facebook.com/v20.0/${pidO}/messages`, {
+            method: 'POST', headers: { Authorization: `Bearer ${tkO}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body: String(txtOrc).slice(0, 3500) } }),
+          });
+          const j = await r.json();
+          const okO = !!(j.messages && j.messages[0]);
+          await rpushEvt({ ts: new Date().toISOString(), tel: to, dir: 'out',
+            texto: String(txtOrc).slice(0, 2000), msgId: okO ? j.messages[0].id : null, tipo: 'text', via: 'bot-auto-orcamento' });
+          disparos.push({ nome: f.nome, modo: 'orcamento-direto', ok: okO });
+        } else {
+          // Janela fechada → template orcamento_pronto (a resposta reabre e o cérebro envia o orçamento)
+          const r = await fetch(`https://graph.facebook.com/v20.0/${pidO}/messages`, {
+            method: 'POST', headers: { Authorization: `Bearer ${tkO}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template',
+              template: { name: 'orcamento_pronto', language: { code: 'pt_BR' },
+                components: [{ type: 'body', parameters: [
+                  { type: 'text', text: (f.nome || 'tudo bem').split(' ')[0] },
+                  { type: 'text', text: f.equipamento || 'equipamento' } ] }] } }),
+          });
+          const j = await r.json();
+          const okO = !!(j.messages && j.messages[0]);
+          await rpushEvt({ ts: new Date().toISOString(), tel: to, dir: 'out',
+            texto: '📨 [template orcamento_pronto] ' + (f.nome || ''), tipo: 'template', via: 'bot-auto-orcamento' });
+          disparos.push({ nome: f.nome, modo: 'template-janela-fechada', ok: okO });
+        }
+        enviadosO.ids[f.id] = new Date().toISOString();
+      } catch (e) { disparos.push({ nome: f.nome, erro: e.message }); }
+    }
+    // poda 60d
+    const corteO = Date.now() - 60 * 86400000;
+    for (const k of Object.keys(enviadosO.ids)) if (new Date(enviadosO.ids[k]).getTime() < corteO) delete enviadosO.ids[k];
+    await dbSet('wa_orc_enviados', enviadosO);
+    return res.status(200).json({ ok: true, disparos });
+  }
+
   // ── AUTO-RESPONDER: cérebro responde sozinho (chamado pelo webhook p/ telefones autorizados) ──
   if (action === 'auto-responder') {
     const telAR = String(req.query.tel || (req.body && req.body.tel) || '').replace(/\D/g, '');

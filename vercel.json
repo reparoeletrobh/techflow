@@ -79,6 +79,10 @@
     {
       "path": "/api/wa-bot?action=abordagem-fichas&k=tfk-re2026-Bx7mQp9zKw4Y",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/wa-bot?action=orcamentos-pendentes&k=tfk-re2026-Bx7mQp9zKw4Y",
+      "schedule": "*/3 * * * *"
     }
   ],
   "rewrites": [
