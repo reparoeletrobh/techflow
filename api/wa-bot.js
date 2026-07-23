@@ -201,6 +201,39 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, resultados });
   }
 
+  // ── PERFIL-FOTO (GET): sobe a logo (do próprio site) como foto de perfil do número via Meta Resumable Upload ──
+  if (action === 'perfil-foto') {
+    const appId = String(req.query.app || '1007161065497390');
+    const { token, phoneId } = await credenciais();
+    if (!token || !phoneId) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
+    try {
+      // 1. Baixar a logo do próprio domínio
+      const imgR = await fetch('https://reparoeletroadm.com/logo-wa.jpg');
+      if (!imgR.ok) return res.status(200).json({ ok: false, error: 'logo-wa.jpg não encontrada no site' });
+      const buf = Buffer.from(await imgR.arrayBuffer());
+      // 2. Abrir sessão de upload
+      const s1 = await fetch(`https://graph.facebook.com/v20.0/${appId}/uploads?file_length=${buf.length}&file_type=image/jpeg&access_token=${encodeURIComponent(token)}`, { method: 'POST' });
+      const j1 = await s1.json();
+      if (!j1.id) return res.status(200).json({ ok: false, passo: 'sessao', meta: j1 });
+      // 3. Enviar o binário
+      const s2 = await fetch(`https://graph.facebook.com/v20.0/${j1.id}`, {
+        method: 'POST',
+        headers: { Authorization: `OAuth ${token}`, file_offset: '0', 'Content-Type': 'application/octet-stream' },
+        body: buf,
+      });
+      const j2 = await s2.json();
+      if (!j2.h) return res.status(200).json({ ok: false, passo: 'upload', meta: j2 });
+      // 4. Aplicar no perfil do número
+      const s3 = await fetch(`https://graph.facebook.com/v20.0/${phoneId}/whatsapp_business_profile`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messaging_product: 'whatsapp', profile_picture_handle: j2.h }),
+      });
+      const j3 = await s3.json();
+      return res.status(200).json({ ok: !!j3.success, aplicado: j3 });
+    } catch (e) { return res.status(200).json({ ok: false, error: e.message }); }
+  }
+
   // ── TESTE-FICHA (GET): cria ficha de teste em fichas_adm para ensaio do cérebro (?tel=&nome=&equip=&end=) ──
   if (action === 'teste-ficha') {
     const telF = String(req.query.tel || '').replace(/\D/g, '');
