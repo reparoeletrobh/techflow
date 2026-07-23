@@ -122,6 +122,7 @@ main{flex:1;display:flex;overflow:hidden;}
         <button class="b-aprovar" onclick="aprovarEnviar()">✅ Aprovar e Enviar</button>
         <button class="b-desc" onclick="document.getElementById('sug-texto').value='';_acaoSug='nenhuma';document.getElementById('sug-acao-box').innerHTML='';">Limpar</button>
         <button id="btn-conf-res" onclick="conflitoResolvido()" style="background:rgba(34,197,94,.15);color:#4ade80;border:1px solid rgba(34,197,94,.4);border-radius:8px;padding:8px 12px;font-size:12px;font-weight:800;cursor:pointer;">✔ Conflito resolvido</button>
+        <button id="btn-takeover" onclick="toggleTakeover()" style="background:rgba(245,158,11,.14);color:#fbbf24;border:1px solid rgba(245,158,11,.4);border-radius:8px;padding:8px 12px;font-size:12px;font-weight:800;cursor:pointer;">✋ Assumir conversa</button>
       </div>
     </div>
   </div>
@@ -155,12 +156,26 @@ function renderLista(d){
     if(!lst.length){el.innerHTML='<div style="padding:20px;color:#5a6270;font-size:12px;text-align:center;">Nenhuma conversa encontrada</div>';return;}
     el.innerHTML=lst.map(function(c){
       return '<div class="conv'+(c.tel===_tel?' sel':'')+'" onclick="abrirConversa(\''+c.tel+'\')">'
-        +'<div class="conv-nome">'+esc(c.nome||c.tel)+(c.naoRespondida?'<span class="conv-badge">responder</span>':'')+'</div>'
+        +'<div class="conv-nome">'+esc(c.nome||c.tel)+(c.pausado?'<span class="conv-badge" style="background:rgba(245,158,11,.25);color:#fbbf24;">✋ manual</span>':(c.naoRespondida?'<span class="conv-badge">responder</span>':''))+'</div>'
         +'<div class="conv-ultima">'+esc(c.ultimaMsg)+'</div>'
       +'</div>';
     }).join('');
 }
 
+var _pausadoAtual=false;
+function atualizarBtnTakeover(){
+  var b=document.getElementById('btn-takeover');
+  if(!b)return;
+  if(_pausadoAtual){b.textContent='▶ Devolver ao bot';b.style.background='rgba(34,197,94,.14)';b.style.color='#4ade80';b.style.border='1px solid rgba(34,197,94,.4)';}
+  else{b.textContent='✋ Assumir conversa';b.style.background='rgba(245,158,11,.14)';b.style.color='#fbbf24';b.style.border='1px solid rgba(245,158,11,.4)';}
+}
+async function toggleTakeover(){
+  if(!_tel)return;
+  var acao=_pausadoAtual?'retomar-bot':'pausar-bot';
+  if(!_pausadoAtual&&!confirm('Assumir esta conversa? O bot fica em silêncio SÓ com este cliente (respostas, orçamentos e ações automáticas pausados) até você devolver.'))return;
+  var r=await fetch('/api/wa-bot?action='+acao,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tel:_tel})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok){_pausadoAtual=!_pausadoAtual;atualizarBtnTakeover();carregarConversas();}
+}
 async function conflitoResolvido(){
   if(!_tel)return;
   if(!confirm('Marcar o conflito desta conversa como resolvido?'))return;
@@ -170,6 +185,10 @@ async function conflitoResolvido(){
 }
 async function abrirConversa(tel){
   _tel=tel;
+  try{
+    var cc=((window._ultD||{}).conversas||[]).find(function(x){return x.tel===tel;});
+    _pausadoAtual=!!(cc&&cc.pausado);atualizarBtnTakeover();
+  }catch(e){}
   document.getElementById('vazio').style.display='none';
   document.getElementById('msgs').style.display='flex';
   document.getElementById('sugestao').style.display='block';

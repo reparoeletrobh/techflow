@@ -309,7 +309,12 @@ export default async function handler(req, res) {
       dbGet('reparoeletro_qualidade').then(v => v || { inspecoes: [], config: { tecnicos: [], proximoNum: 1 } }),
     ]);
     const telsC = (cfgC && Array.isArray(cfgC.execTels)) ? cfgC.execTels : [];
-    const d8okC = t => telsC.some(x => String(x).replace(/\D/g, '').slice(-8) === String(t || '').replace(/\D/g, '').slice(-8));
+    const pzC = (await dbGet('wa_bot_pausados')) || {};
+    const d8okC = t => {
+      const d8v = String(t || '').replace(/\D/g, '').slice(-8);
+      if (pzC[d8v]) return false; // conversa assumida por humano
+      return telsC.some(x => String(x).replace(/\D/g, '').slice(-8) === d8v);
+    };
     const { token: tkC, phoneId: pidC } = await credenciais();
     const FASES_FEITO = ['loja_feito', 'delivery_feito', 'controle_qualidade'];
     const tipoEquip = s => {
@@ -393,7 +398,12 @@ export default async function handler(req, res) {
     const [logO, enviadosO, evtsO] = await Promise.all([
       dbGet('reparoeletro_logistica'), dbGet('wa_orc_enviados').then(v => v || { ids: {} }), lerEvts(),
     ]);
-    const d8ok = t => telsO.some(x => String(x).replace(/\D/g, '').slice(-8) === String(t).replace(/\D/g, '').slice(-8));
+    const pzO = (await dbGet('wa_bot_pausados')) || {};
+    const d8ok = t => {
+      const d8v = String(t).replace(/\D/g, '').slice(-8);
+      if (pzO[d8v]) return false; // conversa assumida por humano
+      return telsO.some(x => String(x).replace(/\D/g, '').slice(-8) === d8v);
+    };
     const janelaAberta = tel8 => {
       let ult = null;
       for (const e of evtsO) if (e.dir === 'in' && String(e.tel).slice(-8) === tel8) ult = e.ts;
@@ -447,10 +457,26 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, disparos });
   }
 
+  // ── PAUSAR-BOT / RETOMAR-BOT (POST {tel}): takeover humano por conversa ──
+  if (req.method === 'POST' && (action === 'pausar-bot' || action === 'retomar-bot')) {
+    const telP = String((req.body && req.body.tel) || '').replace(/\D/g, '');
+    if (!telP) return res.status(400).json({ ok: false, error: 'tel obrigatório' });
+    const d8p = telP.slice(-8);
+    const pz = (await dbGet('wa_bot_pausados')) || {};
+    if (action === 'pausar-bot') pz[d8p] = { em: new Date().toISOString() };
+    else delete pz[d8p];
+    await dbSet('wa_bot_pausados', pz);
+    await rpushEvt({ ts: new Date().toISOString(), tel: telP, dir: 'out', tipo: 'nota',
+      texto: action === 'pausar-bot' ? '⏸ Conversa assumida manualmente (bot pausado)' : '▶ Conversa devolvida ao bot' });
+    return res.status(200).json({ ok: true, pausado: action === 'pausar-bot' });
+  }
+
   // ── AUTO-RESPONDER: cérebro responde sozinho (chamado pelo webhook p/ telefones autorizados) ──
   if (action === 'auto-responder') {
     const telAR = String(req.query.tel || (req.body && req.body.tel) || '').replace(/\D/g, '');
     if (!telAR) return res.status(400).json({ ok: false, error: 'informe tel' });
+    const pzAR = (await dbGet('wa_bot_pausados')) || {};
+    if (pzAR[telAR.slice(-8)]) return res.status(200).json({ ok: true, pausado: true, msg: 'conversa assumida por humano — bot em silêncio' });
     const KCH = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
     const BASE = 'https://reparoeletroadm.com';
     try {
@@ -701,7 +727,9 @@ export default async function handler(req, res) {
       c.ultimaTs = e.ts;
       c.naoRespondida = (e.dir === 'in');
     }
+    const pzL = (await dbGet('wa_bot_pausados')) || {};
     const lista = Object.values(conv).sort((a, b) => String(b.ultimaTs).localeCompare(String(a.ultimaTs)));
+    for (const c of lista) c.pausado = !!pzL[String(c.tel).replace(/\D/g, '').slice(-8)];
     return res.status(200).json({ ok: true, total: lista.length, conversas: lista.slice(0, 100) });
   }
 
@@ -825,7 +853,8 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
         const cfgX = (await dbGet('wa_bot_config')) || {};
         const execTels = Array.isArray(cfgX.execTels) ? cfgX.execTels : [];
         const d8x = String(tel).replace(/\D/g, '').slice(-8);
-        const autorizado = execTels.some(t => String(t).replace(/\D/g, '').slice(-8) === d8x);
+        const pzE = (await dbGet('wa_bot_pausados')) || {};
+        const autorizado = !pzE[d8x] && execTels.some(t => String(t).replace(/\D/g, '').slice(-8) === d8x);
         if (autorizado && acaoAprovada === 'cadastrar_logistica') {
           const fdbX = (await dbGet('fichas_adm')) || { fichas: [] };
           const fichaX = (fdbX.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x && f.status !== 'logistica');
