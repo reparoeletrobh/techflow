@@ -7,6 +7,10 @@
   if(location.pathname==='/login'||location.pathname==='/login.html')return;
   var K=localStorage.getItem('tf_key');
   if(!K){location.replace('/login?next='+encodeURIComponent(location.pathname));return;}
+  // Papel TV: acesso restrito às telas do sistema TV
+  if(localStorage.getItem('tf_role')==='tv'&&location.pathname.indexOf('/tv')!==0){
+    location.replace('/tv-adm');return;
+  }
   var _f=window.fetch;
   window.fetch=function(u,o){
     var isApi=false;

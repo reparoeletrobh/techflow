@@ -49,10 +49,14 @@ module.exports = async function handler(req, res) {
         return res.status(429).json({ ok: false, error: 'Muitas tentativas. Aguarde 10 minutos.' });
       }
     } catch (e) {}
-    if (username === ADM_USER && password === ADM_PASS) {
+    const TV_USER = (process.env.TV_USER || '').trim();
+    const TV_PASS = (process.env.TV_PASS || '').trim();
+    const isAdm = (username === ADM_USER && password === ADM_PASS);
+    const isTv  = (TV_USER && TV_PASS && username === TV_USER && password === TV_PASS);
+    if (isAdm || isTv) {
       const { token, expiry } = makeToken(username);
       const apiKey = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
-      return res.status(200).json({ ok: true, token, expiry, apiKey });
+      return res.status(200).json({ ok: true, token, expiry, apiKey, role: isTv ? 'tv' : 'adm' });
     }
     // Falha: incrementa o contador do IP (expira em 10 min)
     try {
@@ -66,7 +70,11 @@ module.exports = async function handler(req, res) {
   if (req.method === 'GET' && req.query.action === 'verify') {
     const token = req.headers['x-auth-token'] || req.query.token;
     const data  = verifyToken(token);
-    if (data) return res.status(200).json({ ok: true, ...data, apiKey: (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim() });
+    if (data) {
+      const TV_USERv = (process.env.TV_USER || '').trim();
+      const rolev = (TV_USERv && data.username === TV_USERv) ? 'tv' : 'adm';
+      return res.status(200).json({ ok: true, ...data, role: rolev, apiKey: (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim() });
+    }
     return res.status(401).json({ ok: false, error: 'Token inválido ou expirado' });
   }
 

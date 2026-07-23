@@ -46,11 +46,12 @@
       // Sessão válida: SEMPRE renovar a chave de API (corrige chave antiga/errada)
       try{
         var v=await fetch('/api/auth?action=verify&token='+encodeURIComponent(d.token)).then(function(r){return r.json();});
-        if(v.ok&&v.apiKey)localStorage.setItem('tf_key',v.apiKey);
+        if(v.ok&&v.apiKey){localStorage.setItem('tf_key',v.apiKey);localStorage.setItem('tf_role',v.role||'adm');}
         else{localStorage.removeItem('adm_auth');localStorage.removeItem('tf_key');return;}
       }catch(e){return;}
       var nx=new URLSearchParams(location.search).get('next');
-      window.location.replace(nx&&nx.indexOf('/')===0?nx:'/adm');
+      var home=(localStorage.getItem('tf_role')==='tv')?'/tv-adm':'/adm';
+      window.location.replace(nx&&nx.indexOf('/')===0?nx:home);
     }
   })();
   document.getElementById('user').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('pass').focus();});
@@ -67,8 +68,10 @@
       if(d.ok){
         localStorage.setItem('adm_auth',JSON.stringify({token:d.token,expiry:d.expiry}));
         if(d.apiKey)localStorage.setItem('tf_key',d.apiKey);
+        localStorage.setItem('tf_role',d.role||'adm');
         var nx=new URLSearchParams(location.search).get('next');
-        window.location.replace(nx&&nx.indexOf('/')===0?nx:'/adm');
+        var home2=(d.role==='tv')?'/tv-adm':'/adm';
+        window.location.replace(nx&&nx.indexOf('/')===0?nx:home2);
       }else{showErr(d.error||'Usuário ou senha inválidos.');}
     }catch(e){showErr('Erro de conexão. Tente novamente.');}
     btn.disabled=false;btn.textContent='Entrar';
