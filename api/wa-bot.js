@@ -201,6 +201,31 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, resultados });
   }
 
+  // ── TESTE-TEMPLATE (GET): dispara um template aprovado para validação (?tpl=&tel=&p1=&p2=&p3=) ──
+  if (action === 'teste-template') {
+    const tpl = String(req.query.tpl || 'cadastro_recebido').trim();
+    const telT = String(req.query.tel || '').replace(/\D/g, '');
+    if (!telT) return res.status(400).json({ ok: false, error: 'informe ?tel=' });
+    const params = [req.query.p1, req.query.p2, req.query.p3].filter(v => v !== undefined && v !== '');
+    const { token, phoneId } = await credenciais();
+    if (!token || !phoneId) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
+    try {
+      const comps = params.length
+        ? [{ type: 'body', parameters: params.map(p => ({ type: 'text', text: String(p) })) }] : undefined;
+      const r = await fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messaging_product: 'whatsapp', to: telT, type: 'template',
+          template: { name: tpl, language: { code: 'pt_BR' }, ...(comps ? { components: comps } : {}) } }),
+      });
+      const j = await r.json();
+      const okT = !!(j.messages && j.messages[0]);
+      await rpushEvt({ ts: new Date().toISOString(), tel: telT, dir: 'out',
+        texto: '📨 [teste-template ' + tpl + '] ' + params.join(' · '), tipo: 'template' });
+      return res.status(200).json({ ok: okT, template: tpl, meta: okT ? 'enviado — olha o WhatsApp!' : j });
+    } catch (e) { return res.status(200).json({ ok: false, error: e.message }); }
+  }
+
   // ── DELETAR-TEMPLATE: remove um template registrado (?nome=) ──
   if (action === 'deletar-template') {
     const wabaId = String(req.query.waba || '1699351717944043').trim();
