@@ -995,6 +995,8 @@ function render(){
   var colC=document.getElementById('col-conf');
   if(colC)colC.innerHTML=confs.length?confs.map(function(f){
     var contatado=!!f.conflitoContatadoEm;
+    var venceu48=contatado&&(Date.now()-new Date(f.conflitoContatadoEm).getTime())>48*3600000;
+    if(venceu48)contatado=false; // 48h sem resolução → volta ao vermelho
     var cor=contatado?'#22c55e':'#ef4444';
     var fundoMotivo=contatado?'rgba(34,197,94,.08)':'rgba(239,68,68,.1)';
     var bordaMotivo=contatado?'rgba(34,197,94,.3)':'rgba(239,68,68,.35)';
@@ -1004,14 +1006,56 @@ function render(){
       +'<div class="card-info">'+esc(f.telefone||'')+' · '+esc(f.equipamento||'')+'</div>'
       +(f.motivoConflito?'<div style="margin-top:6px;background:'+fundoMotivo+';border:1px solid '+bordaMotivo+';border-radius:7px;padding:6px 9px;font-size:11.5px;color:'+corMotivo+';font-weight:700;line-height:1.4;">⚡ '+esc(f.motivoConflito)+'</div>':'')
       +'<div class="card-info" style="margin-top:4px;font-size:10px;">'+(f.criadoEm?new Date(f.criadoEm).toLocaleString('pt-BR').slice(0,16):'')+'</div>'
+      +(venceu48?'<div style="margin-top:6px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:7px;padding:6px 9px;font-size:11px;color:#f87171;font-weight:800;">⏰ Mais de 48h em atendimento — o conflito foi resolvido?</div>':'')
       +'<div class="card-acts" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">'
         +'<button class="cbtn" style="background:rgba(37,211,102,.12);color:#25d366;border:1px solid rgba(37,211,102,.4);" onclick="conflitoCopiarEnviar(\''+f.id+'\')">📋 Copiar e Enviar</button>'
-        +'<button class="cbtn" style="background:rgba(34,197,94,.15);color:#4ade80;border:1px solid rgba(34,197,94,.4);" onclick="resolverConflito(\''+f.id+'\')">✔ Conflito Resolvido</button>'
+        +'<div style="display:flex;gap:6px;">'
+          +'<button class="cbtn" style="flex:1;background:rgba(34,197,94,.15);color:#4ade80;border:1px solid rgba(34,197,94,.4);" onclick="abrirConflitoAprovar(\''+f.id+'\')">✅ Aprovar</button>'
+          +'<button class="cbtn" style="flex:1;background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.35);" onclick="reprovarConflito(\''+f.id+'\')">❌ Reprovar</button>'
+        +'</div>'
+        +'<button class="cbtn" style="background:rgba(139,146,163,.12);color:#aab2c0;border:1px solid rgba(139,146,163,.3);" onclick="resolverConflito(\''+f.id+'\')">✔ Conflito Resolvido</button>'
       +'</div>'
     +'</div>';
   }).join(''):'<div class="empty">Nenhum conflito 🎉</div>';
 }
 
+var _confAprId=null;
+function abrirConflitoAprovar(id){
+  _confAprId=id;
+  var f=_fichas.find(function(x){return x.id===id;});
+  var html='<div style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:99;display:flex;align-items:center;justify-content:center;padding:20px;" id="conf-apr-ov" onclick="if(event.target.id===\'conf-apr-ov\')fecharConfApr()">'
+    +'<div style="background:#0d1015;border:1px solid #232a38;border-radius:14px;padding:20px;width:100%;max-width:420px;">'
+    +'<div style="font-size:15px;font-weight:900;margin-bottom:12px;">✅ Aprovar — '+(f?String(f.nome||'').replace(/</g,'&lt;'):'')+'</div>'
+    +'<div style="font-size:11px;font-weight:800;color:#8b93a3;margin-bottom:4px;">PREÇO COMBINADO (R$)</div>'
+    +'<input id="conf-apr-valor" type="number" style="width:100%;background:#12161d;border:1px solid #242b39;border-radius:9px;padding:10px 12px;color:#f0f2f5;font-size:14px;box-sizing:border-box;margin-bottom:10px;">'
+    +'<div style="font-size:11px;font-weight:800;color:#8b93a3;margin-bottom:4px;">TIPO DE PAGAMENTO</div>'
+    +'<select id="conf-apr-pag" style="width:100%;background:#12161d;border:1px solid #242b39;border-radius:9px;padding:10px 12px;color:#f0f2f5;font-size:14px;box-sizing:border-box;margin-bottom:10px;">'
+      +'<option>Pix</option><option>Cartão</option><option>Dinheiro</option><option>Cartão 3x</option></select>'
+    +'<div style="font-size:11px;font-weight:800;color:#8b93a3;margin-bottom:4px;">OBSERVAÇÕES (opcional)</div>'
+    +'<textarea id="conf-apr-obs" rows="2" style="width:100%;background:#12161d;border:1px solid #242b39;border-radius:9px;padding:10px 12px;color:#f0f2f5;font-size:13px;box-sizing:border-box;margin-bottom:14px;resize:vertical;"></textarea>'
+    +'<div style="display:flex;gap:8px;">'
+      +'<button onclick="fecharConfApr()" style="flex:1;background:#1a1f29;color:#aab2c0;border:none;border-radius:9px;padding:11px;font-weight:800;cursor:pointer;">Cancelar</button>'
+      +'<button id="conf-apr-btn" onclick="confirmarConflitoAprovar()" style="flex:1;background:#22c55e;color:#04110a;border:none;border-radius:9px;padding:11px;font-weight:900;cursor:pointer;">Aprovar</button>'
+    +'</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+function fecharConfApr(){var el=document.getElementById('conf-apr-ov');if(el)el.remove();}
+async function confirmarConflitoAprovar(){
+  var v=document.getElementById('conf-apr-valor').value;
+  if(!v||parseFloat(v)<=0){alert('Informe o preço combinado');return;}
+  var btn=document.getElementById('conf-apr-btn');btn.disabled=true;
+  var r=await fetch('/api/prospeccao?action=conflito-aprovar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:_confAprId,valor:parseFloat(v),pagamento:document.getElementById('conf-apr-pag').value,obs:document.getElementById('conf-apr-obs').value.trim()})}).then(function(x){return x.json();}).catch(function(){return{ok:false,error:'rede'};});
+  btn.disabled=false;
+  if(r.ok){fecharConfApr();mostrarToast('✅ Aprovado! Card movido no pipe — técnico acionado.');load();}
+  else alert('Erro: '+(r.error||'falha'));
+}
+async function reprovarConflito(id){
+  if(!confirm('Reprovar: o card vai para Solicitar Entrega com a descrição marcada como REPROVADO. Confirmar?'))return;
+  var r=await fetch('/api/prospeccao?action=conflito-reprovar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(x){return x.json();}).catch(function(){return{ok:false,error:'rede'};});
+  if(r.ok){mostrarToast('Card movido para Solicitar Entrega (REPROVADO).');load();}
+  else alert('Erro: '+(r.error||'falha'));
+}
 var TXT_CONFLITO='Olá! Eu sou o Alessandro aqui da Reparo Eletro, responsável pelo setor de atendimento ao cliente. Vi que você está tendo um problema com a gente — vou prosseguir com o seu atendimento pra resolvermos da melhor forma possível, tá bom?';
 async function conflitoCopiarEnviar(id){
   var f=_fichas.find(function(x){return x.id===id;});

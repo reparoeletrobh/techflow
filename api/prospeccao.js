@@ -662,6 +662,48 @@ export default async function handler(req,res){
     await dbSet(KEY,db);
     return res.status(200).json({ok:true});
   }
+  if(req.method==='POST'&&action==='conflito-aprovar'){
+    const {id,valor,pagamento,obs}=req.body||{};
+    const db=(await dbGet(KEY))||{fichas:[]};
+    const f=(db.fichas||[]).find(x=>x.id===id);
+    if(!f)return res.status(404).json({ok:false,error:'não encontrado'});
+    const d8a=String(f.telefone||'').replace(/\D/g,'').slice(-8);
+    const pp=(await dbGet('reparoeletro_pipe'))||{cards:[]};
+    const card=(pp.cards||[]).find(c=>String(c.telefone||'').replace(/\D/g,'').slice(-8)===d8a&&c.phase!=='aprovados');
+    if(!card)return res.status(404).json({ok:false,error:'card do cliente não encontrado no pipe'});
+    const v=parseFloat(valor)||0;
+    if(v>0)card.valor=v;
+    const nota='✔ Aprovado via Conflitos Bot: R$'+(v||card.valor)+' ('+String(pagamento||'—')+')'+(obs?' — '+String(obs).slice(0,150):'');
+    card.descricao=(card.descricao?card.descricao+'\n':'')+nota;
+    await dbSet('reparoeletro_pipe',pp);
+    // Mover pela action oficial → dispara o gatilho do técnico
+    const KA=(process.env.TECHFLOW_KEY||'tfk-re2026-Bx7mQp9zKw4Y').trim();
+    await fetch('https://reparoeletroadm.com/api/pipe?action=mover&k='+KA,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:card.id,phase:'aprovados'})});
+    db.fichas=db.fichas.filter(x=>x.id!==id);
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true,card:card.id});
+  }
+  if(req.method==='POST'&&action==='conflito-reprovar'){
+    const {id}=req.body||{};
+    const db=(await dbGet(KEY))||{fichas:[]};
+    const f=(db.fichas||[]).find(x=>x.id===id);
+    if(!f)return res.status(404).json({ok:false,error:'não encontrado'});
+    const d8r=String(f.telefone||'').replace(/\D/g,'').slice(-8);
+    const pp=(await dbGet('reparoeletro_pipe'))||{cards:[]};
+    const card=(pp.cards||[]).find(c=>String(c.telefone||'').replace(/\D/g,'').slice(-8)===d8r&&c.phase!=='solicitar_entrega');
+    if(!card)return res.status(404).json({ok:false,error:'card do cliente não encontrado no pipe'});
+    card.descricao='REPROVADO - '+String(card.descricao||'');
+    await dbSet('reparoeletro_pipe',pp);
+    const KR=(process.env.TECHFLOW_KEY||'tfk-re2026-Bx7mQp9zKw4Y').trim();
+    await fetch('https://reparoeletroadm.com/api/pipe?action=mover&k='+KR,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:card.id,phase:'solicitar_entrega'})});
+    db.fichas=db.fichas.filter(x=>x.id!==id);
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true,card:card.id});
+  }
   if(req.method==='POST'&&action==='conflito-contatado'){
     const {id}=req.body||{};
     const db=(await dbGet(KEY))||{fichas:[]};
