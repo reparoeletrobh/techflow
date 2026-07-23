@@ -642,6 +642,37 @@ export default async function handler(req,res){
   }
 
   // ── EVENTOS-DIAGNOSTICO: raio-x da base de eventos ────────────────────────
+  // ── CONFLITOS BOT: criação (pelo bot) e resolução (pela equipe) ──
+  if(req.method==='POST'&&action==='criar-conflito'){
+    const {nome,telefone,equipamento,motivo}=req.body||{};
+    if(!telefone)return res.status(400).json({ok:false,error:'telefone obrigatório'});
+    const db=(await dbGet(KEY))||{fichas:[]};
+    if(!Array.isArray(db.fichas))db.fichas=[];
+    const d8c=String(telefone).replace(/\D/g,'').slice(-8);
+    // dedupe: conflito aberto do mesmo tel
+    const jaTem=(db.fichas||[]).some(f=>f.status==='conflitos_bot'&&String(f.telefone||'').replace(/\D/g,'').slice(-8)===d8c);
+    if(jaTem)return res.status(200).json({ok:true,msg:'conflito já aberto para este telefone'});
+    db.fichas.unshift({
+      id:'conf_'+Date.now().toString(36),
+      nome:String(nome||'Cliente WhatsApp'),telefone:String(telefone).replace(/\D/g,''),
+      equipamento:String(equipamento||''),defeito:'',endereco:'',
+      status:'conflitos_bot',motivoConflito:String(motivo||'').slice(0,300),
+      criadoEm:new Date().toISOString(),origemBot:true,
+    });
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true});
+  }
+  if(req.method==='POST'&&action==='resolver-conflito'){
+    const {id}=req.body||{};
+    const db=(await dbGet(KEY))||{fichas:[]};
+    if(!Array.isArray(db.fichas))db.fichas=[];
+    const f=(db.fichas||[]).find(x=>x.id===id);
+    if(!f)return res.status(404).json({ok:false,error:'não encontrado'});
+    db.fichas=db.fichas.filter(x=>x.id!==id);
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true});
+  }
+
   // Lista crua de eventos por tipo/dia (investigação)
   if(action==='eventos-listar'){
     const tipoQ=String(req.query.tipo||'');

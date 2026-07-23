@@ -130,7 +130,7 @@ function fdt(ts){if(!ts)return'';var d=new Date(new Date(ts).getTime()-3*3600000
 
 var ACAO_LBL={cadastrar_logistica:'🚚 Cadastrar em Logística',enviar_orcamento:'📄 Enviar Orçamento',
   desconto_pix:'💠 Desconto Pix',desconto_balcao:'🏪 Desconto Balcão',proposta_troca:'🔄 Proposta de Troca',
-  mover_aprovado:'✅ Mover para Aprovado',registrar_reprovacao:'❌ Orçamento Reprovado (reversão)',escalar_humano:'🙋 Escalar para Humano',nenhuma:''};
+  mover_aprovado:'✅ Mover para Aprovado',registrar_reprovacao:'❌ Orçamento Reprovado (reversão)',registrar_conflito:'⚡ Conflito registrado (humano vai ligar)',escalar_humano:'🙋 Escalar para Humano',nenhuma:''};
 
 async function carregarConversas(){
   var el=document.getElementById('lista-conv');
@@ -157,6 +157,13 @@ function renderLista(d){
     }).join('');
 }
 
+async function conflitoResolvido(){
+  if(!_tel)return;
+  if(!confirm('Marcar o conflito desta conversa como resolvido?'))return;
+  await fetch('/api/wa-bot?action=conflito-resolvido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tel:_tel})});
+  alert('Conflito marcado como resolvido.');
+  carregarConversas();
+}
 async function abrirConversa(tel){
   _tel=tel;
   document.getElementById('vazio').style.display='none';

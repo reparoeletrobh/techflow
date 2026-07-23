@@ -194,6 +194,13 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
     </div>
     <div class="col-body" id="col-cli"></div>
   </div>
+  <div class="col col4">
+    <div class="col-hdr">
+      <span class="col-title" style="color:#ef4444;">🤖⚡ Conflitos Bot</span>
+      <span class="badge" id="b4">0</span>
+    </div>
+    <div class="col-body" id="col-conf"></div>
+  </div>
 </div>
 
 <div class="toast" id="toast">✅ Feito!</div>
@@ -982,6 +989,27 @@ function render(){
   document.getElementById('col-lead').innerHTML=leads.length?leads.map(cardHTML).join(''):'<div class="empty">Nenhum lead</div>';
   document.getElementById('col-ret').innerHTML=rets.length?rets.map(cardHTML).join(''):'<div class="empty">Nenhum para retornar</div>';
   document.getElementById('col-cli').innerHTML=clis.length?clis.map(cardHTML).join(''):'<div class="empty">Nenhum cliente loja</div>';
+
+  var confs=base.filter(function(f){return f.status==='conflitos_bot';});
+  var b4=document.getElementById('b4'); if(b4)b4.textContent=confs.length;
+  var colC=document.getElementById('col-conf');
+  if(colC)colC.innerHTML=confs.length?confs.map(function(f){
+    return '<div class="card" style="border-left:3px solid #ef4444;">'
+      +'<div class="card-nome">'+esc(f.nome||'—')+'</div>'
+      +'<div class="card-info">'+esc(f.telefone||'')+' · '+esc(f.equipamento||'')+'</div>'
+      +(f.motivoConflito?'<div style="margin-top:6px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);border-radius:7px;padding:6px 9px;font-size:11.5px;color:#f87171;font-weight:700;line-height:1.4;">⚡ '+esc(f.motivoConflito)+'</div>':'')
+      +'<div class="card-info" style="margin-top:4px;font-size:10px;">'+(f.criadoEm?new Date(f.criadoEm).toLocaleString('pt-BR').slice(0,16):'')+'</div>'
+      +'<div class="card-acts" style="margin-top:8px;">'
+        +'<button class="cbtn" style="background:rgba(34,197,94,.15);color:#4ade80;border:1px solid rgba(34,197,94,.4);" onclick="resolverConflito(\''+f.id+'\')">✔ Conflito Resolvido</button>'
+      +'</div>'
+    +'</div>';
+  }).join(''):'<div class="empty">Nenhum conflito 🎉</div>';
+}
+
+async function resolverConflito(id){
+  if(!confirm('Marcar este conflito como resolvido?'))return;
+  await fetch('/api/prospeccao?action=resolver-conflito',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});
+  load();
 }
 
 async function load(){

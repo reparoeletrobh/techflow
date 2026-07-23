@@ -235,6 +235,20 @@ export default async function handler(req, res) {
     } catch (e) { return res.status(200).json({ ok: false, error: e.message }); }
   }
 
+  // ── CONFLITO-RESOLVIDO (POST {tel}): resolve a ficha de conflito do telefone + nota na conversa ──
+  if (req.method === 'POST' && action === 'conflito-resolvido') {
+    const telCR = String((req.body && req.body.tel) || '').replace(/\D/g, '');
+    if (!telCR) return res.status(400).json({ ok: false, error: 'tel obrigatório' });
+    const d8cr = telCR.slice(-8);
+    const pdb = (await dbGet('prospeccao_adm')) || { fichas: [] };
+    const antes = (pdb.fichas || []).length;
+    pdb.fichas = (pdb.fichas || []).filter(f => !(f.status === 'conflitos_bot' && String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8cr));
+    await dbSet('prospeccao_adm', pdb);
+    await rpushEvt({ ts: new Date().toISOString(), tel: telCR, dir: 'out', tipo: 'nota',
+      texto: '✔ Conflito marcado como resolvido pela equipe' });
+    return res.status(200).json({ ok: true, resolvidos: antes - pdb.fichas.length });
+  }
+
   // ── DIAG-EXEC: raio-X da execução de ações para um telefone (?tel=) ──
   if (action === 'diag-exec') {
     const telD = String(req.query.tel || '').replace(/\D/g, '');
@@ -633,12 +647,13 @@ DISCIPLINA (CRÍTICO — leia duas vezes):
 - Mensagens CURTAS (2-4 linhas), uma ideia por mensagem. PROIBIDO usar emoji — nenhum, nunca (mensagem com emoji parece robô; escrevemos como uma pessoa real digitando no WhatsApp). Não puxe assunto, não faça small talk, não repita o que já foi dito.
 - Escreva como o Alessandro humano escreveria: natural, direto, brasileiro. Pode usar "pra", "tá", "beleza" com moderação. Nada de linguagem corporativa engessada nem formatação chamativa.
 - NÃO responda perguntas fora do atendimento (política, notícias, outros negócios, conselhos gerais): "vou verificar com a equipe e já te retorno" + escalar_humano.
-- Situação não coberta pelo roteiro, cliente irritado, pedido fora da alçada → escalar_humano. Na dúvida entre inventar e escalar: ESCALE.
+- Situação não coberta pelo roteiro, dúvida pontual fora da alçada → escalar_humano. Na dúvida entre inventar e escalar: ESCALE.
+- CONFLITO (ação registrar_conflito, com o motivo resumido): use quando a conversa NÃO caminha para aprovação e precisa de humano LIGANDO: pedido de garantia, defeito pós-conserto, reclamação/cliente conflituoso ou brigando, recusa final de todas as fases (não quer conserto, troca nem vender), ou dúvida que você não consegue resolver. Responda com acolhimento ("vou acionar nossa equipe pra te ligar e resolver isso") e registre o conflito. A partir daí, NÃO insista em vender.
 - Nunca prometa desconto acima das políticas; nunca invente valor, prazo ou informação fora do CONTEXTO.
 
 CONTEXTO DO CLIENTE NO SISTEMA: ${JSON.stringify(ctx)}
 
-Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem sugerida","acao":{"tipo":"nenhuma|cadastrar_logistica|enviar_orcamento|desconto_pix|desconto_balcao|proposta_troca|mover_aprovado|registrar_reprovacao|escalar_humano","motivo":"por quê"},"confianca":"alta|media|baixa"}`;
+Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem sugerida","acao":{"tipo":"nenhuma|cadastrar_logistica|enviar_orcamento|desconto_pix|desconto_balcao|proposta_troca|mover_aprovado|registrar_reprovacao|registrar_conflito|escalar_humano","motivo":"por quê"},"confianca":"alta|media|baixa"}`;
 
     try {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -711,6 +726,20 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
               await dbSet('fichas_adm', fdbX);
             }
           }
+        }
+        if (autorizado && acaoAprovada === 'registrar_conflito') {
+          const KCF = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+          const fdbC = (await dbGet('fichas_adm')) || { fichas: [] };
+          const fichaC = (fdbC.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
+          await fetch(`https://reparoeletroadm.com/api/prospeccao?action=criar-conflito&k=${KCF}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              nome: (fichaC && fichaC.nome) || 'Cliente WhatsApp',
+              telefone: String(tel).replace(/\D/g, ''),
+              equipamento: (fichaC && fichaC.equipamento) || '',
+              motivo: String(acaoMotivo || 'conflito registrado pelo bot').slice(0, 300),
+            }),
+          });
         }
         if (autorizado && acaoAprovada === 'mover_aprovado') {
           const ppX = (await dbGet('reparoeletro_pipe')) || { cards: [] };
