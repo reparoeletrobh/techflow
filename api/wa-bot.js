@@ -235,6 +235,21 @@ export default async function handler(req, res) {
     } catch (e) { return res.status(200).json({ ok: false, error: e.message }); }
   }
 
+  // ── DIAG-EXEC: raio-X da execução de ações para um telefone (?tel=) ──
+  if (action === 'diag-exec') {
+    const telD = String(req.query.tel || '').replace(/\D/g, '');
+    const d8d = telD.slice(-8);
+    const [cfgD, ppD, evD] = await Promise.all([
+      dbGet('wa_bot_config'), dbGet('reparoeletro_pipe'), lerEvts(),
+    ]);
+    const outs = evD.filter(e => String(e.tel).slice(-8) === d8d && (e.dir === 'out' || e.dir === 'acao')).slice(-8)
+      .map(e => ({ ts: e.ts, dir: e.dir, via: e.via || null, acaoAprovada: e.acaoAprovada || null, texto: String(e.texto || '').slice(0, 90) }));
+    const cards = ((ppD && ppD.cards) || []).filter(c => String(c.telefone || '').replace(/\D/g, '').slice(-8) === d8d)
+      .map(c => ({ id: c.id, phase: c.phase, nome: c.nomeContato, telefone: c.telefone, valor: c.valor }));
+    return res.status(200).json({ ok: true, execTels: (cfgD && cfgD.execTels) || [], telBuscado: d8d,
+      ultimosEventos: outs, cardsNoPipe: cards });
+  }
+
   // ── ORCAMENTOS-PENDENTES (cron 3min + manual): orçamento registrado → envia ao cliente ──
   // TRAVA DE TESTE: só age em telefones de wa_bot_config.execTels
   if (action === 'orcamentos-pendentes') {
