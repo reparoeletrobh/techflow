@@ -405,6 +405,8 @@ async function confirmarLogistica(){
   var tipo=document.querySelector('input[name="log-tipo"]:checked');
   if(!tipo){ alert('Selecione o tipo de coleta'); return; }
   var payload={id:_logFichaId, sistema:SISTEMA, tipoColeta:tipo.value};
+  var obsEl=document.getElementById('log-obs');
+  if(obsEl&&obsEl.value.trim())payload.dados={observacao:obsEl.value.trim()};
   // Classificação Passiva/Ativa:
   // contato_feito → passiva automático | entrar_contato → o que foi selecionado
   if(_logFichaStatus==='entrar_contato'){
