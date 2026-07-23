@@ -796,6 +796,18 @@ export default async function handler(req,res){
     return res.status(200).json({ ok: true, total: aud.regs.length, registros: aud.regs.slice(0, 40) });
   }
 
+  // ── GET conferencia-dump: lista enxuta p/ conferência física (FL + pipe: nome, 4 últimos do tel, fase) ──
+  if (req.method === 'GET' && action === 'conferencia-dump') {
+    const [flDb, pipeDb] = await Promise.all([
+      dbGet(FL_KEY).then(v => v || { fichas: [] }),
+      dbGet('reparoeletro_pipe').then(v => v || { cards: [] }),
+    ]);
+    const t4 = t => String(t || '').replace(/\D/g, '').slice(-4);
+    const fl = (flDb.fichas || []).map(f => ({ id: f.id, n: f.nome || f.cliente || '', t: t4(f.telefone || f.tel), f: f.fase || f.status || '' }));
+    const pp = (pipeDb.cards || []).map(c => ({ id: c.id, n: c.nomeContato || '', t: t4(c.telefone), f: c.phase || '' }));
+    return res.status(200).json({ ok: true, fl, pipe: pp });
+  }
+
   // ── GET remover-fichas-analise?ids=FL-0843,FL-0844 — remove ficha do FL + card da Análise Loja (com backup) ──
   if (action === 'remover-fichas-analise') {
     const ids = String(req.query.ids || '').split(',').map(s => s.trim()).filter(Boolean);
