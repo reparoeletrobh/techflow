@@ -70,9 +70,10 @@ function defaultDB()  { return { produtos: [] }; }
 function defaultFin() { return { records: [], syncedIds: [] }; }
 
 export default async function handler(req, res) {
-  // 🔐 TF-AUTH (Fase 1): chave obrigatória em toda chamada
+  // 🔐 TF-AUTH: catálogo público (action=load liberada p/ clientes); demais exigem chave
   const _tfk = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
-  if (_tfk !== ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim())) {
+  const _act = (req.query && req.query.action) || '';
+  if (_act !== 'load' && _tfk !== ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim())) {
     return res.status(401).json({ ok: false, error: 'não autorizado' });
   }
 
