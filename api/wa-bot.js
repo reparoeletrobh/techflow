@@ -235,6 +235,17 @@ export default async function handler(req, res) {
     } catch (e) { return res.status(200).json({ ok: false, error: e.message }); }
   }
 
+  // ── AUTORIZAR-EXEC (GET): adiciona telefone à lista de execução real de ações (?tel=) ──
+  if (action === 'autorizar-exec') {
+    const telA2 = String(req.query.tel || '').replace(/\D/g, '');
+    if (!telA2) return res.status(400).json({ ok: false, error: 'informe ?tel=' });
+    const cfgE = (await dbGet('wa_bot_config')) || {};
+    cfgE.execTels = Array.isArray(cfgE.execTels) ? cfgE.execTels : [];
+    if (!cfgE.execTels.includes(telA2)) cfgE.execTels.push(telA2);
+    await dbSet('wa_bot_config', cfgE);
+    return res.status(200).json({ ok: true, execTels: cfgE.execTels, msg: 'ações reais autorizadas SÓ para estes telefones' });
+  }
+
   // ── TESTE-FICHA (GET): cria ficha de teste em fichas_adm para ensaio do cérebro (?tel=&nome=&equip=&end=) ──
   if (action === 'teste-ficha') {
     const telF = String(req.query.tel || '').replace(/\D/g, '');
