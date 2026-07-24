@@ -1,63 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<script>
-/* 🔐 TF-GUARD Fase 1 */
-(function(){
-  if(location.pathname==='/login'||location.pathname==='/login.html')return;
-  var K=localStorage.getItem('tf_key');
-  if(!K){location.replace('/login?next='+encodeURIComponent(location.pathname));return;}
-  // Papel TV: acesso restrito às telas do sistema TV
-  if(localStorage.getItem('tf_role')==='tv'&&location.pathname.indexOf('/tv')!==0){
-    location.replace('/tv-adm');return;
-  }
-  var _f=window.fetch;
-  window.fetch=function(u,o){
-    var isApi=false;
-    try{
-      if(typeof u==='string'&&u.indexOf('/api/')>-1&&u.indexOf('/api/auth')===-1){
-        isApi=true;o=o||{};
-        var kk=localStorage.getItem('tf_key')||'';
-        if(o.headers&&typeof o.headers.set==='function'){o.headers.set('x-tf-key',kk);}
-        else{o.headers=Object.assign({},o.headers||{},{'x-tf-key':kk});}
-      }
-    }catch(e){}
-    var p=_f.call(this,u,o);
-    if(isApi){
-      p=p.then(function(r){
-        if(r&&r.status===401&&!window.__tfHealed){
-          window.__tfHealed=true;
-          localStorage.removeItem('tf_key');
-          location.replace('/login?next='+encodeURIComponent(location.pathname));
-        }
-        return r;
-      });
-    }
-    return p;
-  };
-  // Navegação/downloads para /api/ (links e window.open) também levam a chave
-  document.addEventListener('click',function(ev){
-    var a=ev.target&&ev.target.closest?ev.target.closest('a'):null;
-    if(a){
-      var hu=a.getAttribute('href')||'';
-      if(hu.indexOf('/api/')>-1&&hu.indexOf('k=')===-1){
-        a.setAttribute('href',hu+(hu.indexOf('?')>-1?'&':'?')+'k='+encodeURIComponent(localStorage.getItem('tf_key')||''));
-      }
-    }
-  },true);
-  var _wo=window.open;
-  window.open=function(u){
-    try{
-      if(typeof u==='string'&&u.indexOf('/api/')>-1&&u.indexOf('k=')===-1){
-        u+=(u.indexOf('?')>-1?'&':'?')+'k='+encodeURIComponent(localStorage.getItem('tf_key')||'');
-        arguments[0]=u;
-      }
-    }catch(e){}
-    return _wo.apply(window,arguments);
-  };
-})();
-</script>
-
 <meta charset="UTF-8">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='18,2 8,18 15,18 14,30 24,14 17,14' fill='%233b9eff' stroke='%233b9eff' stroke-linejoin='round'/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">

@@ -26,9 +26,11 @@ function hojeBRT(){
 }
 
 export default async function handler(req,res){
-  // 🔐 TF-AUTH (Fase 1): chave obrigatória em toda chamada
+  // 🔐 TF-AUTH com allowlist pública (páginas de cliente)
+  const _pubActs = ['click','hit'];
+  const _act = (req.query && req.query.action) || (req.body && req.body.action) || '';
   const _tfk = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
-  if (_tfk !== ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim())) {
+  if (!_pubActs.includes(_act) && _tfk !== ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim())) {
     return res.status(401).json({ ok: false, error: 'não autorizado' });
   }
 
