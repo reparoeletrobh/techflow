@@ -72,7 +72,9 @@ export default async function handler(req, res) {
       const snapCol = new Set(db.snapshot.logColeta || []);
       const novoSnapPipe = {};
       const novoSnapCol = [];
-      const GATILHOS = { ultima_chamada: 'aguardando_aprovacao', aprovados: 'aguardando_aprovacao', descarte: 'aguardando_aprovacao', garantia: null };
+      // garantia REMOVIDA dos gatilhos: abertura de garantia acontece com o equipamento na casa do cliente;
+      // só vira assunto físico quando chegar em coleta_efetuada e o operador marcar RS
+      const GATILHOS = { ultima_chamada: 'aguardando_aprovacao', aprovados: 'aguardando_aprovacao', descarte: 'aguardando_aprovacao' };
       const jaTem = (cardId, destino) => db.tarefas.some(t => t.cardId === cardId && t.destino === destino && t.status === 'pendente');
 
       // Pipe: entradas novas nas fases-gatilho
