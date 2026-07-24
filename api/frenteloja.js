@@ -803,7 +803,7 @@ export default async function handler(req,res){
       dbGet('reparoeletro_pipe').then(v => v || { cards: [] }),
     ]);
     const t4 = t => String(t || '').replace(/\D/g, '').slice(-4);
-    const fl = (flDb.fichas || []).map(f => ({ id: f.id, n: f.nome || f.cliente || '', t: t4(f.telefone || f.tel), f: f.fase || f.status || '' }));
+    const fl = (flDb.fichas || []).map(f => ({ id: f.id, n: f.nomeContato || f.nome || '', t: t4(f.telefone || f.tel), f: f.phase || f.status || '', em: (f.createdAt || '').slice(0, 16), mv: (f.movedAt || '').slice(0, 16) }));
     const pp = (pipeDb.cards || []).map(c => ({ id: c.id, n: c.nomeContato || '', t: t4(c.telefone), f: c.phase || '' }));
     return res.status(200).json({ ok: true, fl, pipe: pp });
   }
