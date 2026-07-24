@@ -117,11 +117,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 
 <div class="tabs">
-  <div class="tab on" data-v="pend" onclick="setTab(this)">📋 Tarefas</div>
-  <div class="tab" data-v="inv" onclick="setTab(this)">📍 Inventário</div>
-  <div class="tab" data-v="hist" onclick="setTab(this)">🗂 Histórico</div>
+  <div class="tab on" data-v="pend" onclick="setTab(this)">📋 Operação</div>
   <div class="tab" data-v="ml" onclick="setTab(this)">📬 Mercado Livre</div>
-  <div class="tab" data-v="rotas" onclick="setTab(this)">🚚 Rotas</div>
 </div>
 
 <div id="lista"></div>
@@ -137,8 +134,13 @@ function exigeOp(){if(!op()){alert('Preenche seu nome no topo primeiro 👷');re
 
 async function load(){
   try{
-    var r=await fetch('/api/almoxarifado?action=sync').then(function(x){return x.json();});
-    if(r.ok){_db=r;render();}
+    var rs=await Promise.all([
+      fetch('/api/almoxarifado?action=sync').then(function(x){return x.json();}),
+      fetch('/api/almoxarifado?action=rota-list').then(function(x){return x.json();})
+    ]);
+    if(rs[0].ok){_db=rs[0];}
+    if(rs[1].ok){_rotas=rs[1].rotas;}
+    if(_tab==='pend')render();
   }catch(e){}
 }
 
@@ -149,10 +151,9 @@ async function loadRotas(){
   try{var r=await fetch('/api/almoxarifado?action=rota-list').then(function(x){return x.json();});
   if(r.ok){_rotas=r.rotas;renderRotas();}}catch(e){}
 }
-function renderRotas(){
-  var el=document.getElementById('lista');
-  if(!_rotas.length){el.innerHTML='<div class="empty">Nenhuma rota ainda<br><small>Rotas são criadas no Pipe, botão 🚚 Criar Rotas na coluna Solicitar Entrega</small></div>';return;}
-  el.innerHTML=_rotas.map(function(rt){
+function renderRotas(){load();}
+function htmlRotas(lista){
+  return lista.map(function(rt){
     var pend=rt.itens.filter(function(i){return i.status==='pendente';}).length;
     var sep=rt.itens.filter(function(i){return i.status==='separado';}).length;
     var head='🚚 ROTA '+rt.num+' — '+rt.dia.split('-').reverse().slice(0,2).join('/')+' · '+
@@ -185,7 +186,7 @@ async function rotaSeparar(rotaId,cardId){
   if(!exigeOp())return;
   var r=await fetch('/api/almoxarifado?action=rota-separar',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({rotaId:rotaId,cardId:cardId,feitoPor:op()})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
-  if(r.ok)loadRotas();else alert('Erro: '+(r.error||'falha'));
+  if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
 }
 async function rotaNegar(rotaId,cardId){
   if(!exigeOp())return;
@@ -196,7 +197,7 @@ async function rotaNegar(rotaId,cardId){
   if(r.ok){
     await fetch('/api/pipe?action=rota-devolver',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({id:cardId,motivo:motivo})}).catch(function(){});
-    loadRotas();
+    load();
   }else alert('Erro: '+(r.error||'falha'));
 }
 var _rotaSaidaId=null;
@@ -220,7 +221,7 @@ async function fotoRotaSelecionada(inp){
         body:JSON.stringify({id:r.naoSairam[i].cardId,motivo:r.naoSairam[i].motivo||'não saiu na rota'})}).catch(function(){});
     }
     alert('🚛 Saída '+(r.tipo==='parcial'?'PARCIAL':'COMPLETA')+' registrada!'+((r.naoSairam||[]).length?' '+r.naoSairam.length+' ficha(s) voltaram p/ Solicitar Entrega.':''));
-    loadRotas();
+    load();
   }else alert('Erro: '+(r.error||'falha'));
   _rotaSaidaId=null;
 }
@@ -278,14 +279,15 @@ function render(){
 
   var el=document.getElementById('lista');
   if(_tab==='ml'){return;}
-  if(_tab==='rotas'){return;}
-  if(_tab==='inv'){renderInv();return;}
+  var rotasAtivas=(_rotas||[]).filter(function(r){return r.status!=='finalizada';});
+  var rotasHtml=rotasAtivas.length?('<div style="font-size:12px;font-weight:900;color:#f97316;margin:4px 0 8px;">🚚 ROTAS EM SEPARAÇÃO ('+rotasAtivas.length+')</div>'+htmlRotas(rotasAtivas)):'';
   var list=_db.tarefas.filter(function(t){
     if(_tab==='pend')return t.status==='pendente'||t.status==='falha';
     return t.status==='feito';
   });
-  if(!list.length){el.innerHTML='<div class="empty">'+(_tab==='pend'?'Nenhuma tarefa pendente 🎉<br><small>As tarefas nascem sozinhas quando os equipamentos se movem no sistema</small>':'Nada concluído ainda')+'</div>';return;}
-  el.innerHTML=list.map(function(t){
+  var tarefasTitulo='<div style="font-size:12px;font-weight:900;color:#8b93a3;margin:12px 0 8px;">📋 TAREFAS PENDENTES ('+list.length+')</div>';
+  if(!list.length&&!rotasAtivas.length){el.innerHTML='<div class="empty">Nenhuma tarefa pendente 🎉<br><small>Tudo nasce sozinho conforme o sistema se move — sincronização automática ligada</small></div>'+htmlFeitasHoje()+htmlRotasFinalizadas();return;}
+  el.innerHTML=rotasHtml+tarefasTitulo+(list.length?'':'<div class="empty" style="padding:14px;">Nenhuma 🎉</div>')+list.map(function(t){
     var cls=t.status==='falha'?'falha-c':t.status==='feito'?'feito-c':t.tipo;
     var heads={receber:'📥 RECEBER NA LOJA (foto + modelo)','loja-reprovado':'🔴 CLIENTE LOJA REPROVADO → Aguardando Retirada',venda:'💰 VENDA — preparar equipamento','avaliar-compra':'🧐 AVALIAR COMPRA — vale a pena?','levar-area':'📦 EQUIPAMENTO COMPRADO → levar p/ área correta'};
     var head=heads[t.tipo]||(t.destino==='aprovados'?'🔧 LEVAR PARA PRODUÇÃO (confirma e move no sistema técnico)':'📦 MOVER EQUIPAMENTO');
@@ -324,7 +326,20 @@ function render(){
       html+='<div class="meta">✅ '+esc(t.feitoPor||'—')+' · '+fmtD(t.feitoEm)+(t.cardId&&t.tipo==='receber'?' · <a href="#" onclick="verFoto(\''+t.cardId+'\');return false;" style="color:#60a5fa;">ver foto</a>':'')+'</div>';
     }
     return html+'</div>';
+  }).join('')+htmlFeitasHoje()+htmlRotasFinalizadas();
+}
+function htmlFeitasHoje(){
+  var feitas=_db.tarefas.filter(function(t){return t.status==='feito'&&hoje(t.feitoEm);});
+  if(!feitas.length)return '';
+  return '<div style="font-size:12px;font-weight:900;color:#4ade80;margin:14px 0 8px;">✅ CONCLUÍDAS HOJE ('+feitas.length+')</div>'+feitas.map(function(t){
+    return '<div class="card feito-c"><div class="nm" style="font-size:13px;">'+esc(t.cliente)+'</div>'+
+      '<div class="meta">'+esc(t.equipamento||'—')+' · '+lbl(t.origem)+' → '+lbl(t.destino)+' · '+esc(t.feitoPor||'—')+' · '+fmtD(t.feitoEm)+'</div></div>';
   }).join('');
+}
+function htmlRotasFinalizadas(){
+  var fin=(_rotas||[]).filter(function(r){return r.status==='finalizada'&&hoje(r.saidaEm);});
+  if(!fin.length)return '';
+  return '<div style="font-size:12px;font-weight:900;color:#4ade80;margin:14px 0 8px;">🚛 ROTAS QUE SAÍRAM HOJE ('+fin.length+')</div>'+htmlRotas(fin);
 }
 
 function renderInv(){
@@ -356,7 +371,6 @@ function setTab(el){
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});
   el.classList.add('on');_tab=el.getAttribute('data-v');
   if(_tab==='ml'){loadML();return;}
-  if(_tab==='rotas'){loadRotas();return;}
   render();
 }
 
@@ -447,6 +461,7 @@ function fmtD(iso){if(!iso)return '—';var d=new Date(iso);return d.toLocaleDat
 load();
 setInterval(function(){if(!document.hidden)load();},60000);
 document.addEventListener('visibilitychange',function(){if(!document.hidden)load();});
+setInterval(function(){if(!document.hidden){if(_tab==='ml')loadML();else load();}},45000);
 </script>
 <input type="file" accept="image/*" capture="environment" id="file-rota" style="display:none" onchange="fotoRotaSelecionada(this)">
 </body>

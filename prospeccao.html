@@ -267,6 +267,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
         <input id="nf-defeito" placeholder="Ex: Não esquenta" style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:7px;padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;box-sizing:border-box;"></div>
       <div><div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Endereço</div>
         <input id="nf-end" placeholder="Rua, número, bairro" style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:7px;padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;box-sizing:border-box;"></div>
+      <div><div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Observação</div>
+        <textarea id="nf-obs" placeholder="Ex: cliente prefere tarde, portão azul, já foi atendido antes..." rows="2" style="width:100%;background:#181b1f;border:1px solid #2a2f38;border-radius:7px;padding:9px 12px;color:#f0f2f5;font-size:13px;outline:none;box-sizing:border-box;resize:vertical;"></textarea></div>
 
       <div style="font-size:10px;color:#5a6270;text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">Destino</div>
       <div style="display:flex;gap:8px;">
@@ -632,7 +634,7 @@ async function salvarNovaFicha(){
     defeito:document.getElementById('nf-defeito').value.trim(),
     endereco:document.getElementById('nf-end').value.trim(),
     destino:dest.value
-  };
+  ,obs:(document.getElementById('nf-obs')||{}).value||''};
 
   if(dest.value==='logistica'){
     var sis=document.querySelector('input[name="nf-sis"]:checked');

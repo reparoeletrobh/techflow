@@ -399,7 +399,7 @@ export default async function handler(req,res){
 
   // ── CRIAR-MANUAL: cadastro manual de ficha (sempre conta como ATIVA) ─────
   if(req.method==='POST'&&action==='criar-manual'){
-    const{nome,telefone,equipamento,defeito,endereco,destino,sistema,tipoColeta,dataAgendada,faixaHorario}=req.body||{};
+    const{nome,telefone,equipamento,defeito,endereco,destino,sistema,tipoColeta,dataAgendada,faixaHorario,obs}=req.body||{};
     if(!nome||!String(nome).trim())return res.status(400).json({ok:false,error:'Nome é obrigatório'});
     const now=new Date().toISOString();
     const tel=String(telefone||'').replace(/\D/g,'');
@@ -411,6 +411,7 @@ export default async function handler(req,res){
       equipamento:String(equipamento||'').trim(),
       defeito:String(defeito||'').trim(),
       endereco:String(endereco||'').trim(),
+      obs:String(obs||'').trim(),
       horario:'', waNum:waNum(tel),
       origemManual:true, logisticaTipo:'ativa',
       criadoEm:now, movidoEm:null,

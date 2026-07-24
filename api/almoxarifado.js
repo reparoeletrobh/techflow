@@ -96,7 +96,7 @@ export default async function handler(req, res) {
       for (const c of ((log && log.cards) || [])) {
         if (c.phase !== 'coleta_efetuada') continue;
         novoSnapCol.push(c.id);
-        if (snapCol.size === 0 && (db.snapshot.logColeta || []).length === 0 && Object.keys(snapPipe).length === 0) continue; // primeira sync
+        // coleta efetuada SEMPRE gera tarefa de recebimento (equipamento físico na loja agora)
         if (!snapCol.has(c.id)) {
           const existe = db.tarefas.some(t => t.cardId === c.id && t.tipo === 'receber');
           if (!existe) {
