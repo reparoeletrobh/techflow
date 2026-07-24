@@ -796,6 +796,16 @@ export default async function handler(req,res){
     return res.status(200).json({ ok: true, total: aud.regs.length, registros: aud.regs.slice(0, 40) });
   }
 
+  // ── GET conferencia-fl: dump COMPACTO só do FL (texto puro, colável) ──
+  if (req.method === 'GET' && action === 'conferencia-fl') {
+    const flDb = (await dbGet(FL_KEY)) || { fichas: [] };
+    const t4 = t => String(t || '').replace(/\D/g, '').slice(-4);
+    const linhas = (flDb.fichas || []).slice(0, 120).map(f =>
+      [f.id, (f.nomeContato || '').slice(0, 18), t4(f.telefone), f.phase || '', (f.createdAt || '').slice(5, 16)].join('|'));
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    return res.status(200).send('TOTAL:' + (flDb.fichas || []).length + '\n' + linhas.join('\n'));
+  }
+
   // ── GET conferencia-dump: lista enxuta p/ conferência física (FL + pipe: nome, 4 últimos do tel, fase) ──
   if (req.method === 'GET' && action === 'conferencia-dump') {
     const [flDb, pipeDb] = await Promise.all([
