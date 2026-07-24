@@ -120,6 +120,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="tab on" data-v="pend" onclick="setTab(this)">📋 Tarefas</div>
   <div class="tab" data-v="inv" onclick="setTab(this)">📍 Inventário</div>
   <div class="tab" data-v="hist" onclick="setTab(this)">🗂 Histórico</div>
+  <div class="tab" data-v="ml" onclick="setTab(this)">📬 Mercado Livre</div>
 </div>
 
 <div id="lista"></div>
@@ -142,6 +143,42 @@ async function load(){
 
 function hoje(iso){if(!iso)return false;var d=new Date(iso),h=new Date();return d.toDateString()===h.toDateString();}
 
+var _ml={pendentes:[],chegadas:[]};
+async function loadML(){
+  try{
+    var r=await fetch('/api/almoxarifado?action=ml-pendentes').then(function(x){return x.json();});
+    if(r.ok){_ml=r;renderML();}
+  }catch(e){}
+}
+function renderML(){
+  var el=document.getElementById('lista');
+  var stLbl={aguardando_pagamento:'💳 Aguardando pagamento',pago:'✅ Pago — a caminho',a_caminho:'🚚 A caminho'};
+  var html='<div style="font-size:12px;font-weight:900;color:#8b93a3;margin:4px 0 8px;">📦 AGUARDANDO CHEGADA ('+_ml.pendentes.length+')</div>';
+  if(!_ml.pendentes.length)html+='<div class="empty">Nenhuma encomenda pendente</div>';
+  html+=_ml.pendentes.map(function(p){
+    return '<div class="card '+(p.urgente?'falha-c':'receber')+'">'
+      +'<div class="tt">'+(p.sistema==='tv'?'📺 TV':'🔧 ADM')+(p.urgente?' · 🔴 URGENTE':'')+' · '+(stLbl[p.status]||p.status)+'</div>'
+      +'<div class="nm" style="font-size:14px;">'+esc(p.descricao)+'</div>'
+      +'<div class="eq">OS: '+esc(p.os||'—')+' · Qtd: '+p.qtd+(p.previsao?' · Previsão: '+esc(String(p.previsao)).slice(0,10):'')+'</div>'
+      +'<div class="acts"><button class="btn b-ok" onclick="mlChegou(\''+p.id+'\',\''+p.sistema+'\')">📦 Chegou!</button></div>'
+    +'</div>';
+  }).join('');
+  html+='<div style="font-size:12px;font-weight:900;color:#8b93a3;margin:16px 0 8px;">✅ CHEGADAS RECENTES</div>';
+  if(!_ml.chegadas.length)html+='<div class="empty" style="padding:16px;">Nenhuma ainda</div>';
+  html+=_ml.chegadas.map(function(c){
+    return '<div class="card feito-c"><div class="nm" style="font-size:13px;">'+esc(c.descricao)+'</div>'
+      +'<div class="meta">OS '+esc(c.os||'—')+' · → técnico <b>'+esc(c.tecnico)+'</b> · '+fmtD(c.em)+(c.feitoPor?' · por '+esc(c.feitoPor):'')+'</div></div>';
+  }).join('');
+  el.innerHTML=html;
+}
+async function mlChegou(id,sistema){
+  if(!exigeOp())return;
+  var tecnico=prompt('📦 Chegou! Para QUAL TÉCNICO vai essa peça?');
+  if(!tecnico)return;
+  var r=await fetch('/api/almoxarifado?action=ml-chegou',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id,sistema:sistema,tecnico:tecnico,feitoPor:op()})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok)loadML();else alert('Erro: '+(r.error||'falha'));
+}
 function render(){
   var p=0,f=0,x=0;
   _db.tarefas.forEach(function(t){
@@ -154,6 +191,7 @@ function render(){
   document.getElementById('k-x').textContent=x;
 
   var el=document.getElementById('lista');
+  if(_tab==='ml'){return;}
   if(_tab==='inv'){renderInv();return;}
   var list=_db.tarefas.filter(function(t){
     if(_tab==='pend')return t.status==='pendente'||t.status==='falha';
@@ -220,7 +258,9 @@ function filtraInv(q){
 
 function setTab(el){
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});
-  el.classList.add('on');_tab=el.getAttribute('data-v');render();
+  el.classList.add('on');_tab=el.getAttribute('data-v');
+  if(_tab==='ml'){loadML();return;}
+  render();
 }
 
 // ── FOTO (compressão no celular antes de subir) ──

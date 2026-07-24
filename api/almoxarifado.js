@@ -181,6 +181,40 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: !!f, foto: f || null });
   }
 
+  // ── ML-PENDENTES: peças compradas aguardando chegada (ADM + TV) ──
+  if (action === 'ml-pendentes') {
+    const [adm, tv] = await Promise.all([
+      dbGet('reparoeletro_compras_pecas').then(v => v || { pecas: [] }),
+      dbGet('tv_compras_pecas').then(v => v || { pecas: [] }),
+    ]);
+    const mapear = (arr, sis) => (arr.pecas || [])
+      .filter(p => p.status !== 'recebido' && p.status !== 'pendente')
+      .map(p => ({ id: p.id, sistema: sis, descricao: p.descricao, os: p.os || '', qtd: p.quantidade || 1,
+        status: p.status, previsao: p.previsaoChegada || null, urgente: !!p.urgente, compradoEm: p.compradoEm || p.createdAt }));
+    const chegadas = (db.mlEntregas || []).slice(0, 40);
+    return res.status(200).json({ ok: true, pendentes: [...mapear(adm, 'adm'), ...mapear(tv, 'tv')], chegadas });
+  }
+
+  // ── ML-CHEGOU (POST {id, sistema, tecnico, feitoPor}): marca recebida + registra o técnico destino ──
+  if (req.method === 'POST' && action === 'ml-chegou') {
+    const { id, sistema, tecnico, feitoPor } = req.body || {};
+    if (!id || !tecnico) return res.status(400).json({ ok: false, error: 'id e técnico obrigatórios' });
+    const KEYP = sistema === 'tv' ? 'tv_compras_pecas' : 'reparoeletro_compras_pecas';
+    const cdb = (await dbGet(KEYP)) || { pecas: [] };
+    const p = (cdb.pecas || []).find(x => x.id === id);
+    if (!p) return res.status(404).json({ ok: false, error: 'peça não encontrada' });
+    p.status = 'recebido';
+    p.recebidoEm = new Date().toISOString();
+    p.tecnicoDestino = String(tecnico).trim();
+    await dbSet(KEYP, cdb);
+    if (!Array.isArray(db.mlEntregas)) db.mlEntregas = [];
+    db.mlEntregas.unshift({ id: p.id, descricao: p.descricao, os: p.os || '', sistema: sistema || 'adm',
+      tecnico: String(tecnico).trim(), feitoPor: String(feitoPor || '').trim(), em: p.recebidoEm });
+    db.mlEntregas = db.mlEntregas.slice(0, 200);
+    await dbSet(KEY, db);
+    return res.status(200).json({ ok: true });
+  }
+
   // ── SEED-TESTE (fichas simuladas para o beta) ──
   if (action === 'seed-teste') {
     const seeds = [
