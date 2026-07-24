@@ -336,6 +336,13 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, b64: f.b64, em: f.em });
   }
 
+  // ── BADGE leve p/ o hub: pendentes (tarefas + rotas em separação) ──
+  if (action === 'badge') {
+    const pend = (db.tarefas || []).filter(t => t.status === 'pendente' || t.status === 'falha').length;
+    const rotasSep = (db.rotas || []).filter(r => r.status !== 'finalizada').length;
+    return res.status(200).json({ ok: true, pendentes: pend + rotasSep });
+  }
+
   // ── F2: RESET — zera o almoxarifado p/ começar limpo (tarefas/inventário/snapshot) ──
   if (action === 'reset-f2') {
     await dbSet(KEY, defaultDB());
