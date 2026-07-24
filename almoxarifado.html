@@ -200,7 +200,8 @@ function render(){
   if(!list.length){el.innerHTML='<div class="empty">'+(_tab==='pend'?'Nenhuma tarefa pendente 🎉<br><small>As tarefas nascem sozinhas quando os equipamentos se movem no sistema</small>':'Nada concluído ainda')+'</div>';return;}
   el.innerHTML=list.map(function(t){
     var cls=t.status==='falha'?'falha-c':t.status==='feito'?'feito-c':t.tipo;
-    var head=t.tipo==='receber'?'📥 RECEBER NA LOJA (foto + modelo)':'📦 MOVER EQUIPAMENTO';
+    var heads={receber:'📥 RECEBER NA LOJA (foto + modelo)','loja-reprovado':'🔴 CLIENTE LOJA REPROVADO → Aguardando Retirada',venda:'💰 VENDA — preparar equipamento','avaliar-compra':'🧐 AVALIAR COMPRA — vale a pena?','levar-area':'📦 EQUIPAMENTO COMPRADO → levar p/ área correta'};
+    var head=heads[t.tipo]||(t.destino==='aprovados'?'🔧 LEVAR PARA PRODUÇÃO (confirma e move no sistema técnico)':'📦 MOVER EQUIPAMENTO');
     var html='<div class="card '+cls+'">'+
       '<div class="tt">'+head+' · '+t.id+'</div>'+
       '<div class="nm">'+esc(t.cliente)+'</div>'+
@@ -214,6 +215,14 @@ function render(){
           '<button class="btn b-foto" onclick="tirarFoto(\''+t.id+'\')">📷 '+(t.temFoto?'Nova foto':'Tirar foto')+'</button>'+
           '<button class="btn b-ok" onclick="concluir(\''+t.id+'\')">✅ Recebido</button></div>';
         html+='<input type="file" accept="image/*" capture="environment" id="file-'+t.id+'" style="display:none" onchange="enviarFoto(\''+t.id+'\',this)">';
+      }else if(t.tipo==='venda'){
+        html+='<div class="acts">'+
+          '<button class="btn '+(t.videoGravado?'b-ok':'b-foto')+'" onclick="vendaCheck(\''+t.id+'\',\'video\')">'+(t.videoGravado?'✅':'🎥')+' Vídeo gravado</button>'+
+          '<button class="btn '+(t.separado?'b-ok':'b-foto')+'" onclick="vendaCheck(\''+t.id+'\',\'separado\')">'+(t.separado?'✅':'📦')+' Separado p/ entrega</button></div>';
+      }else if(t.tipo==='avaliar-compra'){
+        html+='<div class="acts">'+
+          '<button class="btn b-no" onclick="avaliarCompra(\''+t.id+'\',\'nao\')">👎 Não recomendo</button>'+
+          '<button class="btn b-ok" onclick="avaliarCompra(\''+t.id+'\',\'sim\')">👍 Recomendo + preço</button></div>';
       }else{
         html+='<div class="acts">'+
           '<button class="btn b-no" onclick="naoConsegui(\''+t.id+'\')">⚠️ Não consegui</button>'+
@@ -310,6 +319,20 @@ async function naoConsegui(id){
   var motivo=prompt('⚠️ O que impediu? (obrigatório — vai para o gestor)');
   if(!motivo)return;
   var r=await fetch('/api/almoxarifado?action=falha',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,feitoPor:op(),motivo:motivo})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
+}
+async function vendaCheck(id,qual){
+  if(!exigeOp())return;
+  var r=await fetch(API+'&action=venda-check',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id,qual:qual,feitoPor:op()})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
+}
+async function avaliarCompra(id,parecer){
+  if(!exigeOp())return;
+  var preco='';
+  if(parecer==='sim'){preco=prompt('💰 Preço sugerido de compra (R$):');if(preco===null)return;}
+  var r=await fetch(API+'&action=concluir',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id,feitoPor:op(),parecer:parecer,preco:preco})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
   if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
 }
 async function reabrir(id){

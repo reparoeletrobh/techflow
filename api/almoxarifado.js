@@ -110,7 +110,69 @@ export default async function handler(req, res) {
         }
       }
 
-      db.snapshot = { pipe: novoSnapPipe, logColeta: novoSnapCol };
+      // ══ F2: FL reprovado + Vendas + Checkout + Compra Equip (só leitura nos módulos) ══
+      try {
+        const [fl, vnd, ckv, ceq] = await Promise.all([
+          dbGet('reparoeletro_frenteloja'), dbGet('reparoeletro_vendas'),
+          dbGet('reparoeletro_checkout_vendas'), dbGet('reparoeletro_compra_equip'),
+        ]);
+        const s = db.snapshot;
+        const primeira = !s.f2; // primeira sync F2: só fotografa
+        if (!s.f2) s.f2 = { fl: {}, vendas: [], ck: [], ceAna: [], ceComp: [] };
+        const jaTarefa = (cid, tp) => db.tarefas.some(t => t.cardId === cid && t.tipo === tp);
+
+        // FL → reprovado: levar p/ Aguardando Retirada
+        const novoFl = {};
+        for (const f of ((fl && fl.fichas) || [])) {
+          novoFl[f.id] = f.phase;
+          if (primeira) continue;
+          if (f.phase === 'reprovado' && s.f2.fl[f.id] !== 'reprovado' && !jaTarefa(f.id, 'loja-reprovado')) {
+            db.tarefas.unshift(novaTarefa({ tipo: 'loja-reprovado', cardId: f.id,
+              cliente: f.nomeContato || '—', tel: f.telefone || '', equipamento: f.equipamento || '',
+              origem: 'Frente de Loja', destino: 'aguardando_retirada' }));
+          }
+        }
+        s.f2.fl = novoFl;
+
+        // Vendas + Checkout → tarefa venda (2 checks)
+        const vendaTarefa = (v, orig) => {
+          const cid = orig + '-' + (v.id || v.vendaId || v.createdAt || Math.random());
+          if (!jaTarefa(cid, 'venda')) db.tarefas.unshift(novaTarefa({ tipo: 'venda', cardId: cid,
+            cliente: v.nomeCliente || v.cliente || v.nome || '—', tel: v.telefone || v.tel || '',
+            equipamento: v.equipamento || v.descricao || v.titulo || '—',
+            origem: orig, destino: 'entrega', videoGravado: false, separado: false }));
+        };
+        const novoV = ((vnd && vnd.vendas) || []).map(v => String(v.id || v.createdAt));
+        if (!primeira) ((vnd && vnd.vendas) || []).forEach(v => { if (!s.f2.vendas.includes(String(v.id || v.createdAt))) vendaTarefa(v, 'Vendas'); });
+        s.f2.vendas = novoV;
+        const novoCk = ((ckv && ckv.vendas) || []).map(v => String(v.id || v.createdAt));
+        if (!primeira) ((ckv && ckv.vendas) || []).forEach(v => { if (!s.f2.ck.includes(String(v.id || v.createdAt))) vendaTarefa(v, 'Checkout'); });
+        s.f2.ck = novoCk;
+
+        // Compra Equip: nova ficha em análise → avaliar; status comprado → levar p/ área
+        const novoAna = [], novoComp = [];
+        for (const f of ((ceq && ceq.fichas) || [])) {
+          if (f.status === 'analise') {
+            novoAna.push(f.id);
+            if (!primeira && !s.f2.ceAna.includes(f.id) && !jaTarefa(f.id, 'avaliar-compra')) {
+              db.tarefas.unshift(novaTarefa({ tipo: 'avaliar-compra', cardId: f.id,
+                cliente: f.nomeContato || f.cliente || '—', tel: f.telefone || '', equipamento: f.equipamento || f.descricao || '—',
+                origem: 'Compra Equip', destino: 'analise' }));
+            }
+          }
+          if (f.status === 'comprado') {
+            novoComp.push(f.id);
+            if (!primeira && !s.f2.ceComp.includes(f.id) && !jaTarefa(f.id, 'levar-area')) {
+              db.tarefas.unshift(novaTarefa({ tipo: 'levar-area', cardId: f.id,
+                cliente: f.nomeContato || f.cliente || '—', tel: f.telefone || '', equipamento: f.equipamento || f.descricao || '—',
+                origem: 'Equipamento Comprado', destino: 'area_correta' }));
+            }
+          }
+        }
+        s.f2.ceAna = novoAna; s.f2.ceComp = novoComp;
+      } catch (e) {}
+
+      db.snapshot = { ...db.snapshot, pipe: novoSnapPipe, logColeta: novoSnapCol };
       await dbSet(KEY, db);
     } catch (e) {}
     return res.status(200).json({ ok: true, tarefas: db.tarefas.slice(0, 300), inventario: db.inventario, faseLbl: FASE_LBL });
@@ -125,6 +187,39 @@ export default async function handler(req, res) {
       if (!t.temFoto) return res.status(400).json({ ok: false, error: 'foto obrigatória no recebimento' });
       if (modelo !== undefined) t.modelo = String(modelo || '').trim();
       if (!t.modelo) return res.status(400).json({ ok: false, error: 'informe o modelo' });
+    }
+    // ══ F2 efeitos ══
+    // Aprovado → Produção: confirmar aqui MOVE o card no sistema técnico
+    if (t.tipo === 'mover' && t.destino === 'aprovados') {
+      try {
+        const bdb = await dbGet('reparoeletro_board');
+        if (bdb && Array.isArray(bdb.cards)) {
+          const bc = bdb.cards.find(x => x.osCode === t.cardId || x.pipefyId === t.cardId);
+          if (bc && bc.phaseId === 'aprovado') {
+            bc.phaseId = 'producao'; bc.movedAt = new Date().toISOString(); bc.movedBy = 'Almoxarifado';
+            if (!Array.isArray(bdb.movesLog)) bdb.movesLog = [];
+            bdb.movesLog.push({ phaseId: 'producao', pipefyId: bc.pipefyId, timestamp: bc.movedAt });
+            await dbSet('reparoeletro_board', bdb);
+          }
+        }
+      } catch (e) {}
+    }
+    // Avaliar compra: grava parecer + preço na ficha do Compra Equip (verde/vermelho lá)
+    if (t.tipo === 'avaliar-compra') {
+      const parecer = (req.body || {}).parecer;
+      const preco = (req.body || {}).preco;
+      if (parecer !== 'sim' && parecer !== 'nao') return res.status(400).json({ ok: false, error: 'parecer sim/nao obrigatório' });
+      try {
+        const cdb = await dbGet('reparoeletro_compra_equip');
+        const cf = cdb && (cdb.fichas || []).find(x => x.id === t.cardId);
+        if (cf) {
+          cf.recomendacao = parecer; cf.recomendadoAt = new Date().toISOString();
+          if (parecer === 'sim' && preco) cf.precoSugerido = String(preco).trim();
+          cf.recomendadoPor = 'Almoxarifado' + (feitoPor ? ' - ' + feitoPor : '');
+          await dbSet('reparoeletro_compra_equip', cdb);
+        }
+      } catch (e) {}
+      t.parecer = parecer; if (preco) t.precoSugerido = String(preco).trim();
     }
     t.status = 'feito';
     t.feitoPor = String(feitoPor || '').trim();
@@ -149,6 +244,27 @@ export default async function handler(req, res) {
     t.motivoFalha = String(motivo).trim();
     await dbSet(KEY, db);
     return res.status(200).json({ ok: true });
+  }
+
+  // ── F2: VENDA-CHECK — marca Vídeo Gravado / Separado p/ Entrega (conclui com os 2) ──
+  if (req.method === 'POST' && action === 'venda-check') {
+    const { id, qual, feitoPor } = req.body || {};
+    const t = db.tarefas.find(x => x.id === id);
+    if (!t || t.tipo !== 'venda') return res.status(404).json({ ok: false, error: 'tarefa não encontrada' });
+    if (qual === 'video') t.videoGravado = true;
+    else if (qual === 'separado') t.separado = true;
+    else return res.status(400).json({ ok: false, error: 'qual: video|separado' });
+    if (t.videoGravado && t.separado) {
+      t.status = 'feito'; t.feitoPor = String(feitoPor || '').trim(); t.feitoEm = new Date().toISOString();
+    }
+    await dbSet(KEY, db);
+    return res.status(200).json({ ok: true, videoGravado: !!t.videoGravado, separado: !!t.separado, feito: t.status === 'feito' });
+  }
+
+  // ── F2: RESET — zera o almoxarifado p/ começar limpo (tarefas/inventário/snapshot) ──
+  if (action === 'reset-f2') {
+    await dbSet(KEY, defaultDB());
+    return res.status(200).json({ ok: true, msg: 'Almoxarifado zerado — próxima sync só fotografa, tarefas nascem dos eventos novos' });
   }
 
   // ── REABRIR (falha resolvida → pendente de novo) ──
@@ -188,7 +304,7 @@ export default async function handler(req, res) {
       dbGet('tv_compras_pecas').then(v => v || { pecas: [] }),
     ]);
     const mapear = (arr, sis) => (arr.pecas || [])
-      .filter(p => p.status !== 'recebido' && p.status !== 'pendente')
+      .filter(p => p.status === 'pago' || p.status === 'a_caminho')
       .map(p => ({ id: p.id, sistema: sis, descricao: p.descricao, os: p.os || '', qtd: p.quantidade || 1,
         status: p.status, previsao: p.previsaoChegada || null, urgente: !!p.urgente, compradoEm: p.compradoEm || p.createdAt }));
     const chegadas = (db.mlEntregas || []).slice(0, 40);
@@ -207,6 +323,12 @@ export default async function handler(req, res) {
     p.recebidoEm = new Date().toISOString();
     p.tecnicoDestino = String(tecnico).trim();
     await dbSet(KEYP, cdb);
+    try {
+      const pd = (await dbGet('reparoeletro_pecas_disponiveis')) || { itens: [] };
+      pd.itens.unshift({ os: p.os || '', descricao: p.descricao, tecnico: String(tecnico).trim(), sistema: sistema || 'adm', em: p.recebidoEm });
+      pd.itens = pd.itens.slice(0, 150);
+      await dbSet('reparoeletro_pecas_disponiveis', pd);
+    } catch (e) {}
     if (!Array.isArray(db.mlEntregas)) db.mlEntregas = [];
     db.mlEntregas.unshift({ id: p.id, descricao: p.descricao, os: p.os || '', sistema: sistema || 'adm',
       tecnico: String(tecnico).trim(), feitoPor: String(feitoPor || '').trim(), em: p.recebidoEm });
