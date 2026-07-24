@@ -1838,6 +1838,14 @@ export default async function handler(req, res) {
     if (!itens.length) return res.status(400).json({ ok: false, error: 'itens obrigatórios' });
     var db2 = (await dbGet(PIPE_KEY)) || defaultDB();
     var nowR = new Date().toISOString();
+    // número da rota (reinicia por dia) calculado antes, para etiquetar as fichas
+    var ALMOX_KEY = 'reparoeletro_almoxarifado';
+    var adb = (await dbGet(ALMOX_KEY)) || { tarefas: [], inventario: {}, snapshot: {}, config: {} };
+    if (!Array.isArray(adb.rotas)) adb.rotas = [];
+    var hojeStr = nowR.slice(0, 10);
+    var seqHoje = adb.rotas.filter(function (r) { return (r.criadaEm || '').slice(0, 10) === hojeStr; }).length + 1;
+    var rotaIdNovo = 'R-' + hojeStr.replace(/-/g, '') + '-' + seqHoje;
+    var rotaLabelNovo = 'Rota ' + seqHoje + ' · ' + hojeStr.slice(8, 10) + '/' + hojeStr.slice(5, 7);
     var sel = [];
     for (var ri = 0; ri < itens.length; ri++) {
       var it = itens[ri];
@@ -1845,19 +1853,14 @@ export default async function handler(req, res) {
       if (!cd || cd.phase !== 'solicitar_entrega') continue;
       cd.history = (cd.history || []).concat([{ phase: cd.phase, ts: nowR }]);
       cd.phase = 'entrega_solicitada'; cd.movedAt = nowR; cd.rotaSaiu = false;
+      cd.rotaId = rotaIdNovo; cd.rotaLabel = rotaLabelNovo;
       sel.push({ cardId: cd.id, cliente: cd.nomeContato || '—', tel: cd.telefone || '',
         equipamento: cd.equipamento || cd.descricao || '—', qtd: Math.max(1, parseInt(it.qtd) || 1),
         separado: 0, status: 'pendente', motivo: '' });
     }
     if (!sel.length) return res.status(400).json({ ok: false, error: 'nenhuma ficha válida em Solicitar Entrega' });
     await safeWritePipe(db2);
-    // rota no db do almoxarifado (numeração por dia)
-    var ALMOX_KEY = 'reparoeletro_almoxarifado';
-    var adb = (await dbGet(ALMOX_KEY)) || { tarefas: [], inventario: {}, snapshot: {}, config: {} };
-    if (!Array.isArray(adb.rotas)) adb.rotas = [];
-    var hojeStr = nowR.slice(0, 10);
-    var seqHoje = adb.rotas.filter(function (r) { return (r.criadaEm || '').slice(0, 10) === hojeStr; }).length + 1;
-    var rota = { id: 'R-' + hojeStr.replace(/-/g, '') + '-' + seqHoje, num: seqHoje, dia: hojeStr,
+    var rota = { id: rotaIdNovo, num: seqHoje, dia: hojeStr, label: rotaLabelNovo,
       itens: sel, status: 'separacao', criadaEm: nowR, criadaPor: String(rb.criadaPor || '').trim() };
     adb.rotas.unshift(rota); adb.rotas = adb.rotas.slice(0, 120);
     await dbSet(ALMOX_KEY, adb);
@@ -1874,6 +1877,7 @@ export default async function handler(req, res) {
     var nowD = new Date().toISOString();
     cd2.history = (cd2.history || []).concat([{ phase: cd2.phase, ts: nowD }]);
     cd2.phase = 'solicitar_entrega'; cd2.movedAt = nowD; cd2.rotaSaiu = false;
+    cd2.rotaId = null; cd2.rotaLabel = null;
     cd2.motivoRetornoRota = String(rb2.motivo || '').trim();
     await safeWritePipe(db3);
     return res.status(200).json({ ok: true });

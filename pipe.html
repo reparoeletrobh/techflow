@@ -353,7 +353,8 @@ function render(){
 
     const cardsHtml=phCards.map(c=>{
       const saiuStyle=(c.phase==='entrega_solicitada'&&c.rotaSaiu)?' style="border-left:4px solid #22c55e;background:rgba(34,197,94,.10);"':'';
-      const saiuBadge=(c.phase==='entrega_solicitada'&&c.rotaSaiu)?'<div style="color:#22c55e;font-size:10px;font-weight:800;">✅ Saiu da loja</div>':'';
+      const rotaBadge=(c.rotaLabel&&(c.phase==='entrega_solicitada'||c.phase==='solicitar_entrega'))?'<div style="display:inline-block;background:rgba(249,115,22,.18);color:#f97316;font-size:10px;font-weight:800;padding:1px 7px;border-radius:6px;margin:2px 0;">🚚 '+esc(c.rotaLabel)+'</div>':'';
+      const saiuBadge=((c.phase==='entrega_solicitada'&&c.rotaSaiu)?'<div style="color:#22c55e;font-size:10px;font-weight:800;">✅ Saiu da loja</div>':'')+rotaBadge;
       const pfBadge=c.pipefyId?'<span class="card-pipefy">PF·'+c.pipefyId.slice(-5)+'</span>':'';
       const valHtml=(saiuBadge||'')+(c.valor>0?'<div class="card-val">R$ '+c.valor.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</div>':'');
       const acBadge=c.analiseCompra?'<div class="card-ac">🛒 Análise de Compra</div>':'';
