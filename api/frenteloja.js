@@ -796,6 +796,18 @@ export default async function handler(req,res){
     return res.status(200).json({ ok: true, total: aud.regs.length, registros: aud.regs.slice(0, 40) });
   }
 
+  // ── GET conferencia-fl2: TODAS as fichas ATIVAS do histórico inteiro (texto puro) ──
+  if (req.method === 'GET' && action === 'conferencia-fl2') {
+    const flDb = (await dbGet(FL_KEY)) || { fichas: [] };
+    const t4 = t => String(t || '').replace(/\D/g, '').slice(-4);
+    const ATIVAS = ['analise', 'orcamento_cadastrado', 'producao', 'conserto_realizado'];
+    const ativas = (flDb.fichas || []).filter(f => ATIVAS.includes(f.phase));
+    const linhas = ativas.slice(0, 300).map(f =>
+      [f.id, (f.nomeContato || '').slice(0, 18), t4(f.telefone), f.phase || '', (f.createdAt || '').slice(5, 16)].join('|'));
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    return res.status(200).send('TOTAL_FICHAS:' + (flDb.fichas || []).length + ' ATIVAS:' + ativas.length + '\n' + linhas.join('\n'));
+  }
+
   // ── GET conferencia-fl: dump COMPACTO só do FL (texto puro, colável) ──
   if (req.method === 'GET' && action === 'conferencia-fl') {
     const flDb = (await dbGet(FL_KEY)) || { fichas: [] };
