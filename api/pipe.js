@@ -1831,6 +1831,67 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok:true, revertidos: revertidos.length, nomes: revertidos });
   }
 
+  // ══ F2 ROTAS: criar rota a partir de Solicitar Entrega (numeração reinicia por dia) ══
+  if (req.method === 'POST' && action === 'criar-rota') {
+    var rb = req.body || {};
+    var itens = Array.isArray(rb.itens) ? rb.itens : [];
+    if (!itens.length) return res.status(400).json({ ok: false, error: 'itens obrigatórios' });
+    var db2 = (await dbGet(PIPE_KEY)) || defaultDB();
+    var nowR = new Date().toISOString();
+    var sel = [];
+    for (var ri = 0; ri < itens.length; ri++) {
+      var it = itens[ri];
+      var cd = (db2.cards || []).find(function (c) { return c.id === it.id; });
+      if (!cd || cd.phase !== 'solicitar_entrega') continue;
+      cd.history = (cd.history || []).concat([{ phase: cd.phase, ts: nowR }]);
+      cd.phase = 'entrega_solicitada'; cd.movedAt = nowR; cd.rotaSaiu = false;
+      sel.push({ cardId: cd.id, cliente: cd.nomeContato || '—', tel: cd.telefone || '',
+        equipamento: cd.equipamento || cd.descricao || '—', qtd: Math.max(1, parseInt(it.qtd) || 1),
+        separado: 0, status: 'pendente', motivo: '' });
+    }
+    if (!sel.length) return res.status(400).json({ ok: false, error: 'nenhuma ficha válida em Solicitar Entrega' });
+    await safeWritePipe(db2);
+    // rota no db do almoxarifado (numeração por dia)
+    var ALMOX_KEY = 'reparoeletro_almoxarifado';
+    var adb = (await dbGet(ALMOX_KEY)) || { tarefas: [], inventario: {}, snapshot: {}, config: {} };
+    if (!Array.isArray(adb.rotas)) adb.rotas = [];
+    var hojeStr = nowR.slice(0, 10);
+    var seqHoje = adb.rotas.filter(function (r) { return (r.criadaEm || '').slice(0, 10) === hojeStr; }).length + 1;
+    var rota = { id: 'R-' + hojeStr.replace(/-/g, '') + '-' + seqHoje, num: seqHoje, dia: hojeStr,
+      itens: sel, status: 'separacao', criadaEm: nowR, criadaPor: String(rb.criadaPor || '').trim() };
+    adb.rotas.unshift(rota); adb.rotas = adb.rotas.slice(0, 120);
+    await dbSet(ALMOX_KEY, adb);
+    return res.status(200).json({ ok: true, rota: rota });
+  }
+
+  // ══ F2 ROTAS: devolver ficha p/ Solicitar Entrega (negada na separação ou não saiu) ══
+  if (req.method === 'POST' && action === 'rota-devolver') {
+    var rb2 = req.body || {};
+    if (!rb2.id) return res.status(400).json({ ok: false, error: 'id obrigatório' });
+    var db3 = (await dbGet(PIPE_KEY)) || defaultDB();
+    var cd2 = (db3.cards || []).find(function (c) { return c.id === rb2.id; });
+    if (!cd2) return res.status(404).json({ ok: false, error: 'não encontrado' });
+    var nowD = new Date().toISOString();
+    cd2.history = (cd2.history || []).concat([{ phase: cd2.phase, ts: nowD }]);
+    cd2.phase = 'solicitar_entrega'; cd2.movedAt = nowD; cd2.rotaSaiu = false;
+    cd2.motivoRetornoRota = String(rb2.motivo || '').trim();
+    await safeWritePipe(db3);
+    return res.status(200).json({ ok: true });
+  }
+
+  // ══ F2 ROTAS: marcar saída da loja (fica verde em Entrega Solicitada) ══
+  if (req.method === 'POST' && action === 'rota-saiu') {
+    var ids2 = (req.body || {}).ids || [];
+    if (!ids2.length) return res.status(400).json({ ok: false, error: 'ids obrigatórios' });
+    var db4 = (await dbGet(PIPE_KEY)) || defaultDB();
+    var nowS = new Date().toISOString();
+    (db4.cards || []).forEach(function (c) {
+      if (ids2.includes(c.id)) { c.rotaSaiu = true; c.rotaSaiuEm = nowS; }
+    });
+    await safeWritePipe(db4);
+    return res.status(200).json({ ok: true });
+  }
+
   if (req.method === 'POST' && action === 'mover') {
     var body  = req.body || {};
     var id    = body.id;

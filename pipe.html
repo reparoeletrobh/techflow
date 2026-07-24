@@ -352,12 +352,14 @@ function render(){
     const opts=PHASES.filter(p=>p.id!==ph.id).map(p=>'<option value="'+p.id+'">'+p.name+'</option>').join('');
 
     const cardsHtml=phCards.map(c=>{
+      const saiuStyle=(c.phase==='entrega_solicitada'&&c.rotaSaiu)?' style="border-left:4px solid #22c55e;background:rgba(34,197,94,.10);"':'';
+      const saiuBadge=(c.phase==='entrega_solicitada'&&c.rotaSaiu)?'<div style="color:#22c55e;font-size:10px;font-weight:800;">✅ Saiu da loja</div>':'';
       const pfBadge=c.pipefyId?'<span class="card-pipefy">PF·'+c.pipefyId.slice(-5)+'</span>':'';
-      const valHtml=c.valor>0?'<div class="card-val">R$ '+c.valor.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</div>':'';
+      const valHtml=(saiuBadge||'')+(c.valor>0?'<div class="card-val">R$ '+c.valor.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</div>':'');
       const acBadge=c.analiseCompra?'<div class="card-ac">🛒 Análise de Compra</div>':'';
       const equipHtml=c.equipamento?'<div class="card-equip">'+esc(c.equipamento.substring(0,45))+'</div>':'';
       const descHtml=c.descricao&&c.descricao!==c.equipamento?'<div class="card-defeito">'+esc(c.descricao.substring(0,60))+(c.descricao.length>60?'…':'')+'</div>':'';
-      return '<div class="card" id="card-'+c.id+'">'+
+      return '<div class="card"'+saiuStyle+' id="card-'+c.id+'">'+
         '<div class="card-left-bar" style="background:'+cor+'"></div>'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'+
           '<span class="card-id">'+esc(c.id)+'</span>'+
@@ -404,6 +406,7 @@ function render(){
         '<div class="col-top-stripe" style="background:'+cor+'"></div>'+
         '<div class="col-title"><div class="col-dot" style="background:'+cor+'"></div>'+ph.name+'</div>'+
         '<div style="display:flex;align-items:center;gap:3px;">'+
+        (ph.id==='solicitar_entrega'?'<button onclick="abrirCriarRotas()" style="background:#f97316;border:none;color:#fff;cursor:pointer;font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;">🚚 Criar Rotas</button>':'')+
         '<div class="col-count">'+phCards.length+'</div>'+
         '<button onclick="moverColuna(\''+ph.id+'\',-1)" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:9px;padding:0 2px;" title="Mover esquerda">◀</button>'+
         '<button onclick="moverColuna(\''+ph.id+'\',1)"  style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:9px;padding:0 2px;" title="Mover direita">▶</button>'+
@@ -414,6 +417,36 @@ function render(){
   }).join('');
 }
 
+function abrirCriarRotas(){
+  var fichas=cards.filter(function(c){return c.phase==='solicitar_entrega';});
+  if(!fichas.length){toast('Nenhuma ficha em Solicitar Entrega');return;}
+  var html='<div style="font-weight:900;font-size:14px;margin-bottom:10px;">🚚 Criar Rota — selecione as fichas</div>';
+  html+=fichas.map(function(c){
+    return '<label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;cursor:pointer;">'+
+      '<input type="checkbox" class="rota-chk" value="'+c.id+'">'+
+      '<div style="flex:1;"><b>'+esc(c.nomeContato||'—')+'</b><div style="font-size:11px;color:var(--dim);">'+esc((c.equipamento||c.descricao||'').substring(0,40))+'</div></div>'+
+      '<input type="number" class="rota-qtd" data-id="'+c.id+'" value="1" min="1" style="width:52px;padding:6px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--txt);" title="Qtd de equipamentos">'+
+    '</label>';
+  }).join('');
+  html+='<button onclick="confirmarRota()" style="width:100%;margin-top:8px;padding:12px;background:#f97316;border:none;border-radius:8px;color:#fff;font-weight:900;cursor:pointer;">✅ Confirmar Rota</button>';
+  var ov=document.createElement('div');ov.id='rota-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  ov.innerHTML='<div style="background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:16px;max-width:480px;width:100%;max-height:80vh;overflow:auto;">'+html+'</div>';
+  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  document.body.appendChild(ov);
+}
+async function confirmarRota(){
+  var itens=[];
+  document.querySelectorAll('.rota-chk:checked').forEach(function(ch){
+    var q=document.querySelector('.rota-qtd[data-id="'+ch.value+'"]');
+    itens.push({id:ch.value,qtd:parseInt(q&&q.value)||1});
+  });
+  if(!itens.length){toast('Selecione ao menos 1 ficha');return;}
+  var r=await api('criar-rota',{itens:itens,criadaPor:''});
+  var ov=document.getElementById('rota-ov');if(ov)ov.remove();
+  if(r.ok){toast('🚚 Rota '+r.rota.num+' de hoje criada — separação no Almoxarifado');await load();}
+  else toast('Erro: '+(r.error||'falha'));
+}
 async function moverCard(id,phase){
   if(!phase)return;
   const r=await api('mover',{id,phase});

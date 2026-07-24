@@ -261,6 +261,66 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, videoGravado: !!t.videoGravado, separado: !!t.separado, feito: t.status === 'feito' });
   }
 
+  // ══ F2 ROTAS: listar (ativas + últimas finalizadas) ══
+  if (action === 'rota-list') {
+    const rotas = Array.isArray(db.rotas) ? db.rotas : [];
+    return res.status(200).json({ ok: true, rotas: rotas.slice(0, 30) });
+  }
+
+  // ══ F2 ROTAS: marcar item separado (incrementa por unidade até a qtd) ══
+  if (req.method === 'POST' && action === 'rota-separar') {
+    const { rotaId, cardId, feitoPor } = req.body || {};
+    const rt = (db.rotas || []).find(r => r.id === rotaId);
+    const item = rt && rt.itens.find(i => i.cardId === cardId);
+    if (!item) return res.status(404).json({ ok: false, error: 'item não encontrado' });
+    item.separado = Math.min(item.qtd, (item.separado || 0) + 1);
+    if (item.separado >= item.qtd) item.status = 'separado';
+    item.por = String(feitoPor || '').trim();
+    await dbSet(KEY, db);
+    return res.status(200).json({ ok: true, separado: item.separado, qtd: item.qtd, status: item.status });
+  }
+
+  // ══ F2 ROTAS: negar item (não pode ser separado) — front devolve a ficha no pipe ══
+  if (req.method === 'POST' && action === 'rota-negar') {
+    const { rotaId, cardId, motivo, feitoPor } = req.body || {};
+    if (!motivo) return res.status(400).json({ ok: false, error: 'motivo obrigatório' });
+    const rt2 = (db.rotas || []).find(r => r.id === rotaId);
+    const item2 = rt2 && rt2.itens.find(i => i.cardId === cardId);
+    if (!item2) return res.status(404).json({ ok: false, error: 'item não encontrado' });
+    item2.status = 'negado'; item2.motivo = String(motivo).trim(); item2.por = String(feitoPor || '').trim();
+    await dbSet(KEY, db);
+    return res.status(200).json({ ok: true });
+  }
+
+  // ══ F2 ROTAS: confirmar saída (completa/parcial + foto do motorista) ══
+  if (req.method === 'POST' && action === 'rota-saida') {
+    const { rotaId, motorista, fotoB64, feitoPor } = req.body || {};
+    const rt3 = (db.rotas || []).find(r => r.id === rotaId);
+    if (!rt3) return res.status(404).json({ ok: false, error: 'rota não encontrada' });
+    if (!motorista) return res.status(400).json({ ok: false, error: 'informe o motorista' });
+    if (!fotoB64) return res.status(400).json({ ok: false, error: 'foto do motorista obrigatória' });
+    const sairam = rt3.itens.filter(i => i.status === 'separado');
+    if (!sairam.length) return res.status(400).json({ ok: false, error: 'nenhum item separado para sair' });
+    const naoSairam = rt3.itens.filter(i => i.status !== 'separado');
+    rt3.status = 'finalizada';
+    rt3.tipoSaida = naoSairam.length ? 'parcial' : 'completa';
+    rt3.motorista = String(motorista).trim();
+    rt3.saidaEm = new Date().toISOString();
+    rt3.saidaPor = String(feitoPor || '').trim();
+    naoSairam.forEach(i => { if (i.status === 'pendente') { i.status = 'nao_saiu'; if (!i.motivo) i.motivo = String((req.body || {}).motivoPendentes || 'não saiu na rota').trim(); } });
+    // foto separada do payload principal (Redis lean: 1 chave por rota, sobrescrevível)
+    await dbSet(KEY + '_rotafoto_' + rt3.id, { b64: fotoB64, em: rt3.saidaEm });
+    await dbSet(KEY, db);
+    return res.status(200).json({ ok: true, sairam: sairam.map(i => i.cardId), naoSairam: naoSairam.map(i => ({ cardId: i.cardId, motivo: i.motivo })), tipo: rt3.tipoSaida });
+  }
+
+  // ══ F2 ROTAS: ver foto do motorista ══
+  if (action === 'rota-foto') {
+    const f = await dbGet(KEY + '_rotafoto_' + (req.query.rota || ''));
+    if (!f) return res.status(404).json({ ok: false });
+    return res.status(200).json({ ok: true, b64: f.b64, em: f.em });
+  }
+
   // ── F2: RESET — zera o almoxarifado p/ começar limpo (tarefas/inventário/snapshot) ──
   if (action === 'reset-f2') {
     await dbSet(KEY, defaultDB());

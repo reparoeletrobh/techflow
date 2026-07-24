@@ -121,6 +121,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="tab" data-v="inv" onclick="setTab(this)">📍 Inventário</div>
   <div class="tab" data-v="hist" onclick="setTab(this)">🗂 Histórico</div>
   <div class="tab" data-v="ml" onclick="setTab(this)">📬 Mercado Livre</div>
+  <div class="tab" data-v="rotas" onclick="setTab(this)">🚚 Rotas</div>
 </div>
 
 <div id="lista"></div>
@@ -143,6 +144,91 @@ async function load(){
 
 function hoje(iso){if(!iso)return false;var d=new Date(iso),h=new Date();return d.toDateString()===h.toDateString();}
 
+var _rotas=[];
+async function loadRotas(){
+  try{var r=await fetch('/api/almoxarifado?action=rota-list').then(function(x){return x.json();});
+  if(r.ok){_rotas=r.rotas;renderRotas();}}catch(e){}
+}
+function renderRotas(){
+  var el=document.getElementById('lista');
+  if(!_rotas.length){el.innerHTML='<div class="empty">Nenhuma rota ainda<br><small>Rotas são criadas no Pipe, botão 🚚 Criar Rotas na coluna Solicitar Entrega</small></div>';return;}
+  el.innerHTML=_rotas.map(function(rt){
+    var pend=rt.itens.filter(function(i){return i.status==='pendente';}).length;
+    var sep=rt.itens.filter(function(i){return i.status==='separado';}).length;
+    var head='🚚 ROTA '+rt.num+' — '+rt.dia.split('-').reverse().slice(0,2).join('/')+' · '+
+      (rt.status==='finalizada'?('✅ SAIU ('+(rt.tipoSaida==='parcial'?'PARCIAL':'COMPLETA')+') com '+esc(rt.motorista||'')):'📦 SEPARAÇÃO ('+sep+'/'+rt.itens.length+')');
+    var html='<div class="card '+(rt.status==='finalizada'?'feito-c':'receber')+'">'+
+      '<div class="tt">'+head+'</div>';
+    html+=rt.itens.map(function(i){
+      var st=i.status==='separado'?'✅':i.status==='negado'?'🚫':i.status==='nao_saiu'?'↩️':'⬜';
+      var linha='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);">'+
+        '<span style="font-size:16px;">'+st+'</span>'+
+        '<div style="flex:1;"><b style="font-size:13px;">'+esc(i.cliente)+'</b>'+(i.qtd>1?' <span style="color:#f59e0b;font-weight:800;">×'+i.qtd+'</span>':'')+
+        '<div style="font-size:11px;color:#8b93a3;">'+esc((i.equipamento||'').substring(0,38))+(i.motivo?' · <span style="color:#ef4444;">'+esc(i.motivo)+'</span>':'')+'</div></div>';
+      if(rt.status!=='finalizada'&&i.status==='pendente'){
+        linha+='<button class="btn b-no" style="padding:6px 8px;font-size:11px;" onclick="rotaNegar(\''+rt.id+'\',\''+i.cardId+'\')">🚫</button>'+
+          '<button class="btn b-ok" style="padding:6px 10px;font-size:11px;" onclick="rotaSeparar(\''+rt.id+'\',\''+i.cardId+'\')">✔ '+((i.separado||0))+'/'+i.qtd+'</button>';
+      }
+      return linha+'</div>';
+    }).join('');
+    if(rt.status!=='finalizada'){
+      html+='<div class="acts" style="margin-top:8px;">'+
+        '<button class="btn b-ok" onclick="rotaSaida(\''+rt.id+'\')">🚛 Motorista chegou — confirmar saída</button></div>'+
+        (pend?'<div style="font-size:11px;color:#f59e0b;margin-top:4px;">⚠️ '+pend+' pendente(s): confirmar agora = saída PARCIAL, eles voltam p/ Solicitar Entrega</div>':'');
+    }else{
+      html+='<div class="meta">'+fmtD(rt.saidaEm)+(rt.saidaPor?' · por '+esc(rt.saidaPor):'')+' · <a href="#" onclick="verFotoRota(\''+rt.id+'\');return false;" style="color:#60a5fa;">ver foto motorista</a></div>';
+    }
+    return html+'</div>';
+  }).join('');
+}
+async function rotaSeparar(rotaId,cardId){
+  if(!exigeOp())return;
+  var r=await fetch('/api/almoxarifado?action=rota-separar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({rotaId:rotaId,cardId:cardId,feitoPor:op()})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok)loadRotas();else alert('Erro: '+(r.error||'falha'));
+}
+async function rotaNegar(rotaId,cardId){
+  if(!exigeOp())return;
+  var motivo=prompt('🚫 Por que essa ficha NÃO pode ser separada?');
+  if(!motivo)return;
+  var r=await fetch('/api/almoxarifado?action=rota-negar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({rotaId:rotaId,cardId:cardId,motivo:motivo,feitoPor:op()})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok){
+    await fetch('/api/pipe?action=rota-devolver',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:cardId,motivo:motivo})}).catch(function(){});
+    loadRotas();
+  }else alert('Erro: '+(r.error||'falha'));
+}
+var _rotaSaidaId=null;
+function rotaSaida(rotaId){
+  if(!exigeOp())return;
+  _rotaSaidaId=rotaId;
+  document.getElementById('file-rota').click();
+}
+async function fotoRotaSelecionada(inp){
+  var file=inp.files&&inp.files[0];inp.value='';
+  if(!file||!_rotaSaidaId)return;
+  var motorista=prompt('🚛 Qual MOTORISTA está levando? (Jonathan / Paulo / outro)');
+  if(!motorista){_rotaSaidaId=null;return;}
+  var b64=await comprimirImg(file,700,.62);
+  var r=await fetch('/api/almoxarifado?action=rota-saida',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({rotaId:_rotaSaidaId,motorista:motorista,fotoB64:b64,feitoPor:op()})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok){
+    if(r.sairam&&r.sairam.length)await fetch('/api/pipe?action=rota-saiu',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:r.sairam})}).catch(function(){});
+    for(var i=0;i<(r.naoSairam||[]).length;i++){
+      await fetch('/api/pipe?action=rota-devolver',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:r.naoSairam[i].cardId,motivo:r.naoSairam[i].motivo||'não saiu na rota'})}).catch(function(){});
+    }
+    alert('🚛 Saída '+(r.tipo==='parcial'?'PARCIAL':'COMPLETA')+' registrada!'+((r.naoSairam||[]).length?' '+r.naoSairam.length+' ficha(s) voltaram p/ Solicitar Entrega.':''));
+    loadRotas();
+  }else alert('Erro: '+(r.error||'falha'));
+  _rotaSaidaId=null;
+}
+async function verFotoRota(rotaId){
+  var r=await fetch('/api/almoxarifado?action=rota-foto&rota='+rotaId).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok&&r.b64){var w=window.open('');w.document.write('<img src="'+r.b64+'" style="max-width:100%;">');}
+  else alert('Foto não encontrada');
+}
 var _ml={pendentes:[],chegadas:[]};
 async function loadML(){
   try{
@@ -192,6 +278,7 @@ function render(){
 
   var el=document.getElementById('lista');
   if(_tab==='ml'){return;}
+  if(_tab==='rotas'){return;}
   if(_tab==='inv'){renderInv();return;}
   var list=_db.tarefas.filter(function(t){
     if(_tab==='pend')return t.status==='pendente'||t.status==='falha';
@@ -269,11 +356,25 @@ function setTab(el){
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});
   el.classList.add('on');_tab=el.getAttribute('data-v');
   if(_tab==='ml'){loadML();return;}
+  if(_tab==='rotas'){loadRotas();return;}
   render();
 }
 
 // ── FOTO (compressão no celular antes de subir) ──
 function tirarFoto(id){document.getElementById('file-'+id).click();}
+function comprimirImg(file,mx,q){
+  return new Promise(function(resolve){
+    var img=new Image();
+    img.onload=function(){
+      var w=img.width,hh=img.height;
+      if(w>hh&&w>mx){hh=hh*mx/w;w=mx;}else if(hh>mx){w=w*mx/hh;hh=mx;}
+      var cv=document.createElement('canvas');cv.width=w;cv.height=hh;
+      cv.getContext('2d').drawImage(img,0,0,w,hh);
+      resolve(cv.toDataURL('image/jpeg',q||0.55));
+    };
+    img.src=URL.createObjectURL(file);
+  });
+}
 function enviarFoto(id,input){
   var file=input.files&&input.files[0];
   if(!file)return;
@@ -347,5 +448,6 @@ load();
 setInterval(function(){if(!document.hidden)load();},60000);
 document.addEventListener('visibilitychange',function(){if(!document.hidden)load();});
 </script>
+<input type="file" accept="image/*" capture="environment" id="file-rota" style="display:none" onchange="fotoRotaSelecionada(this)">
 </body>
 </html>
