@@ -302,7 +302,10 @@ function render(){
         html+=t.temFoto?'<div class="foto-ok">✅ Foto registrada</div>':'';
         html+='<div class="acts">'+
           '<button class="btn b-foto" onclick="tirarFoto(\''+t.id+'\')">📷 '+(t.temFoto?'Nova foto':'Tirar foto')+'</button>'+
-          '<button class="btn b-ok" onclick="concluir(\''+t.id+'\')">✅ Recebido</button></div>';
+          '<button class="btn b-ok" onclick="concluir(\''+t.id+'\')">✅ Recebido</button></div>'+
+        '<div class="acts" style="margin-top:6px;">'+
+          '<button class="btn" style="background:rgba(168,85,247,.15);color:#c084fc;border:1px solid rgba(168,85,247,.4);" onclick="receberRS(\''+t.id+'\')">🛡️ É Garantia (RS)</button>'+
+          '<button class="btn b-no" onclick="naoChegou(\''+t.id+'\')">🚫 Não chegou na loja</button></div>';
         html+='<input type="file" accept="image/*" capture="environment" id="file-'+t.id+'" style="display:none" onchange="enviarFoto(\''+t.id+'\',this)">';
       }else if(t.tipo==='venda'){
         html+='<div class="acts">'+
@@ -434,6 +437,24 @@ async function naoConsegui(id){
   var motivo=prompt('⚠️ O que impediu? (obrigatório — vai para o gestor)');
   if(!motivo)return;
   var r=await fetch('/api/almoxarifado?action=falha',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,feitoPor:op(),motivo:motivo})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
+}
+async function receberRS(id){
+  if(!exigeOp())return;
+  var t=_db.tarefas.find(function(x){return x.id===id;});
+  if(t&&!t.temFoto){alert('📷 Tira a foto do equipamento primeiro (obrigatória também na garantia)');return;}
+  var mod=document.getElementById('mod-'+id);
+  var r=await fetch('/api/almoxarifado?action=concluir',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id,feitoPor:op(),modelo:(mod&&mod.value)||'',rs:true})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok){alert('🛡️ Registrado como GARANTIA (RS) — vai entrar no sistema de garantia');load();}
+  else alert('Erro: '+(r.error||'falha'));
+}
+async function naoChegou(id){
+  if(!exigeOp())return;
+  var motivo=prompt('🚫 O equipamento NÃO chegou na loja — qual o motivo?');
+  if(!motivo)return;
+  var r=await fetch('/api/almoxarifado?action=falha',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id,feitoPor:op(),motivo:'NÃO CHEGOU: '+motivo})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
   if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
 }
 async function vendaCheck(id,qual){

@@ -93,7 +93,7 @@ export default async function handler(req, res) {
       }
 
       // Logística: chegadas novas em coleta_efetuada → recebimento com foto
-      for (const c of ((log && log.cards) || [])) {
+      for (const c of ((log && (log.fichas || log.cards)) || [])) {
         if (c.phase !== 'coleta_efetuada') continue;
         novoSnapCol.push(c.id);
         // coleta efetuada SEMPRE gera tarefa de recebimento (equipamento físico na loja agora)
@@ -187,6 +187,7 @@ export default async function handler(req, res) {
       if (!t.temFoto) return res.status(400).json({ ok: false, error: 'foto obrigatória no recebimento' });
       if (modelo !== undefined) t.modelo = String(modelo || '').trim();
       if (!t.modelo) return res.status(400).json({ ok: false, error: 'informe o modelo' });
+      if ((req.body || {}).rs) { t.rs = true; t.destino = 'garantia'; }
     }
     // ══ F2 efeitos ══
     // Aprovado → Produção: confirmar aqui MOVE o card no sistema técnico
