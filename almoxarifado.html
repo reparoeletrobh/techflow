@@ -108,7 +108,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <body>
 <div class="top"><h1>📦 Almoxarifado</h1><span class="beta">BETA</span></div>
 
-<div class="who"><input id="operador" placeholder="👷 Seu nome (quem está operando)" onchange="localStorage.setItem('alm_op',this.value)"></div>
+<div class="who"><input id="operador" style="display:none" placeholder="👷 Seu nome (quem está operando)" onchange="localStorage.setItem('alm_op',this.value)"></div>
 
 <div class="kpis">
   <div class="kpi"><div class="v" id="k-p" style="color:#fbbf24;">0</div><div class="l">📋 Pendentes</div></div>
@@ -130,7 +130,7 @@ document.getElementById('operador').value=localStorage.getItem('alm_op')||'';
 
 function lbl(f){return (_db.faseLbl&&_db.faseLbl[f])||f||'—';}
 function op(){return document.getElementById('operador').value.trim();}
-function exigeOp(){if(!op()){alert('Preenche seu nome no topo primeiro 👷');return false;}return true;}
+function exigeOp(){return true;} // login futuro cuidará da identidade
 
 async function load(){
   try{
@@ -302,10 +302,13 @@ function render(){
         html+=t.temFoto?'<div class="foto-ok">✅ Foto registrada</div>':'';
         html+='<div class="acts">'+
           '<button class="btn b-foto" onclick="tirarFoto(\''+t.id+'\')">📷 '+(t.temFoto?'Nova foto':'Tirar foto')+'</button>'+
-          '<button class="btn b-ok" onclick="concluir(\''+t.id+'\')">✅ Recebido</button></div>'+
+          '<button class="btn" style="background:rgba(168,85,247,.2);color:#c084fc;border:1px solid rgba(168,85,247,.5);font-weight:800;" onclick="irDiagnostico(\''+t.cardId+'\')">🩺 Diagnóstico</button></div>'+
         '<div class="acts" style="margin-top:6px;">'+
-          '<button class="btn" style="background:rgba(168,85,247,.15);color:#c084fc;border:1px solid rgba(168,85,247,.4);" onclick="receberRS(\''+t.id+'\')">🛡️ É Garantia (RS)</button>'+
-          '<button class="btn b-no" onclick="naoChegou(\''+t.id+'\')">🚫 Não chegou na loja</button></div>';
+          '<button class="btn" style="background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.4);" onclick="receberRS(\''+t.id+'\')">🔴 RS (garantia)</button>'+
+          '<button class="btn" style="background:rgba(249,115,22,.15);color:#fb923c;border:1px solid rgba(249,115,22,.4);" onclick="remarcarColeta(\''+t.cardId+'\')">📅 Remarcar</button>'+
+          '<button class="btn b-no" onclick="naoChegou(\''+t.id+'\')">🚫 Não chegou</button></div>'+
+        '<div class="acts" style="margin-top:6px;">'+
+          '<button class="btn b-ok" onclick="concluir(\''+t.id+'\')">✅ Recebido na loja (foto+modelo)</button></div>';
         html+='<input type="file" accept="image/*" capture="environment" id="file-'+t.id+'" style="display:none" onchange="enviarFoto(\''+t.id+'\',this)">';
       }else if(t.tipo==='venda'){
         html+='<div class="acts">'+
@@ -403,8 +406,9 @@ function enviarFoto(id,input){
     var cv=document.createElement('canvas');cv.width=w;cv.height=h;
     cv.getContext('2d').drawImage(img,0,0,w,h);
     var dataUrl=cv.toDataURL('image/jpeg',0.55);
+    var modInp=document.getElementById('mod-'+id);
     fetch('/api/almoxarifado?action=foto',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({id:id,dataUrl:dataUrl})}).then(function(x){return x.json();}).then(function(r){
+      body:JSON.stringify({id:id,dataUrl:dataUrl,modelo:(modInp&&modInp.value)||''})}).then(function(x){return x.json();}).then(function(r){
         if(r.ok){load();}else alert('Erro na foto: '+(r.error||'falha'));
       });
   };
@@ -439,15 +443,28 @@ async function naoConsegui(id){
   var r=await fetch('/api/almoxarifado?action=falha',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,feitoPor:op(),motivo:motivo})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
   if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
 }
+function irDiagnostico(fichaId){
+  location.href='/logistica?diag='+encodeURIComponent(fichaId);
+}
+async function remarcarColeta(fichaId){
+  if(!confirm('📅 Remarcar esta coleta? A ficha volta para Remarcar na Logística.'))return;
+  var r=await fetch('/api/logistica?action=mover',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:fichaId,phase:'remarcar'})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok){alert('📅 Movida para Remarcar');load();}else alert('Erro: '+(r.error||'falha'));
+}
 async function receberRS(id){
   if(!exigeOp())return;
   var t=_db.tarefas.find(function(x){return x.id===id;});
   if(t&&!t.temFoto){alert('📷 Tira a foto do equipamento primeiro (obrigatória também na garantia)');return;}
   var mod=document.getElementById('mod-'+id);
+  if(!confirm('🔴 Finalizar como RS (garantia)? Mesma ação do botão RS da Logística.'))return;
   var r=await fetch('/api/almoxarifado?action=concluir',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({id:id,feitoPor:op(),modelo:(mod&&mod.value)||'',rs:true})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
-  if(r.ok){alert('🛡️ Registrado como GARANTIA (RS) — vai entrar no sistema de garantia');load();}
-  else alert('Erro: '+(r.error||'falha'));
+  if(r.ok){
+    await fetch('/api/logistica?action=finalizar-rs',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:t.cardId})}).catch(function(){});
+    alert('🔴 RS finalizado — registrado como garantia');load();
+  }else alert('Erro: '+(r.error||'falha'));
 }
 async function naoChegou(id){
   if(!exigeOp())return;

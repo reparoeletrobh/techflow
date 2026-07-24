@@ -96,7 +96,9 @@ export default async function handler(req, res) {
       for (const c of ((log && (log.fichas || log.cards)) || [])) {
         if (c.phase !== 'coleta_efetuada') continue;
         novoSnapCol.push(c.id);
-        // coleta efetuada SEMPRE gera tarefa de recebimento (equipamento físico na loja agora)
+        // coleta efetuada gera tarefa de recebimento (só movimentos das últimas 48h — não retro-popula paradas antigas)
+        const mvTs = new Date(c.movedAt || c.registradoEm || c.criadoEm || 0).getTime();
+        if (Date.now() - mvTs > 48 * 3600 * 1000) continue;
         if (!snapCol.has(c.id)) {
           const existe = db.tarefas.some(t => t.cardId === c.id && t.tipo === 'receber');
           if (!existe) {
@@ -172,6 +174,16 @@ export default async function handler(req, res) {
         s.f2.ceAna = novoAna; s.f2.ceComp = novoComp;
       } catch (e) {}
 
+      // fichas que SAÍRAM de coleta_efetuada (diagnóstico registrado / RS): fecha a tarefa sozinha
+      try {
+        const aindaColeta = new Set(novoSnapCol);
+        db.tarefas.forEach(t => {
+          if (t.tipo === 'receber' && t.status === 'pendente' && !aindaColeta.has(t.cardId)) {
+            t.status = 'feito'; t.feitoPor = 'Sistema'; t.feitoEm = new Date().toISOString();
+            t.autoConcluida = 'saiu de Coleta Efetuada (diagnóstico/RS registrado)';
+          }
+        });
+      } catch (e) {}
       db.snapshot = { ...db.snapshot, pipe: novoSnapPipe, logColeta: novoSnapCol };
       await dbSet(KEY, db);
     } catch (e) {}
@@ -340,6 +352,7 @@ export default async function handler(req, res) {
 
   // ── FOTO do recebimento (base64 comprimido no front) ──
   if (req.method === 'POST' && action === 'foto') {
+    try { const mm = (req.body || {}).modelo; if (mm) { const tf = db.tarefas.find(x => x.id === (req.body || {}).id); if (tf) { tf.modelo = String(mm).trim(); } } } catch (e) {}
     const { id, dataUrl } = req.body || {};
     const t = db.tarefas.find(x => x.id === id);
     if (!t) return res.status(404).json({ ok: false, error: 'tarefa não encontrada' });

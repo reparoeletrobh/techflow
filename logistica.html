@@ -1073,6 +1073,12 @@ function toast(msg, err) {
 
 // ── INIT ────────────────────────────────────────────────────
 load();
+(function(){
+  var dq=new URLSearchParams(location.search).get('diag');
+  if(dq){var tent=0;var tm=setInterval(function(){tent++;
+    if(typeof fichas!=='undefined'&&fichas.length){clearInterval(tm);try{abrirDiag(dq);}catch(e){}}
+    if(tent>40)clearInterval(tm);},250);}
+})();
 setInterval(function(){ if(!document.hidden) load(); }, 90000); // rebusca servidor
 setInterval(render, 60000); // reclassifica cores/posições a cada 1min
 
