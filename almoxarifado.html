@@ -297,27 +297,26 @@ function render(){
   if(!list.length&&!rotasAtivas.length){el.innerHTML='<div class="empty">Nenhuma tarefa pendente 🎉<br><small>Tudo nasce sozinho conforme o sistema se move — sincronização automática ligada</small></div>'+htmlFeitasHoje()+htmlRotasFinalizadas();return;}
   el.innerHTML=rotasHtml+tarefasTitulo+(list.length?'':'<div class="empty" style="padding:14px;">Nenhuma 🎉</div>')+list.map(function(t){
     var cls=t.status==='falha'?'falha-c':t.status==='feito'?'feito-c':t.tipo;
-    var heads={receber:'📥 RECEBER NA LOJA (foto + modelo)','loja-reprovado':'🔴 CLIENTE LOJA REPROVADO → Aguardando Retirada',venda:'💰 VENDA — preparar equipamento','avaliar-compra':'🧐 AVALIAR COMPRA — vale a pena?','levar-area':'📦 EQUIPAMENTO COMPRADO → levar p/ área correta'};
+    var heads={receber:'📥 COLETA CHEGOU — decidir destino','loja-reprovado':'🔴 CLIENTE LOJA REPROVADO → Aguardando Retirada',venda:'💰 VENDA — preparar equipamento','avaliar-compra':'🧐 AVALIAR COMPRA — vale a pena?','levar-area':'📦 EQUIPAMENTO COMPRADO → levar p/ área correta'};
     var head=heads[t.tipo]||(t.destino==='aprovados'?'🔧 LEVAR PARA PRODUÇÃO (confirma e move no sistema técnico)':'📦 MOVER EQUIPAMENTO');
+    var t4=String(t.tel||'').replace(/\D/g,'').slice(-4);
+    var nomeExib=esc(t.cliente)+(t4&&t.cliente.indexOf(t4)===-1?' '+t4:'');
     var html='<div class="card '+cls+'">'+
       '<div class="tt">'+head+' · '+t.id+'</div>'+
-      '<div class="nm">'+esc(t.cliente)+'</div>'+
+      '<div class="nm">'+nomeExib+'</div>'+
+      (t.tel?'<div class="eq">📞 '+esc(t.tel)+'</div>':'')+
       '<div class="eq">'+esc(t.equipamento||'—')+(t.modelo?' · '+esc(t.modelo):'')+'</div>'+
+      (t.defeito?'<div class="eq" style="color:#fbbf24;">🔧 Reclamação: '+esc(t.defeito)+'</div>':'')+
+      (t.obs?'<div class="eq" style="color:#8b93a3;white-space:pre-wrap;">📝 '+esc(String(t.obs).substring(0,300))+'</div>':'')+
       '<div class="rota-mov"><span class="de">'+lbl(t.origem)+'</span><span class="seta">→</span><span class="para">'+lbl(t.destino)+'</span></div>';
     if(t.status==='pendente'){
       if(t.tipo==='receber'){
-        html+='<div class="fld"><input id="mod-'+t.id+'" placeholder="📝 Modelo do equipamento (obrigatório)" value="'+esc(t.modelo||'')+'"></div>';
-        html+=t.temFoto?'<div class="foto-ok">✅ Foto registrada</div>':'';
-        html+='<div class="acts">'+
-          '<button class="btn b-foto" onclick="tirarFoto(\''+t.id+'\')">📷 '+(t.temFoto?'Nova foto':'Tirar foto')+'</button>'+
-          '<button class="btn" style="background:rgba(168,85,247,.2);color:#c084fc;border:1px solid rgba(168,85,247,.5);font-weight:800;" onclick="irDiagnostico(\''+t.cardId+'\')">🩺 Diagnóstico</button></div>'+
+        html+='<div class="acts" style="margin-top:8px;">'+
+          '<button class="btn" style="flex:1;background:rgba(168,85,247,.2);color:#c084fc;border:1px solid rgba(168,85,247,.5);font-weight:800;font-size:14px;padding:12px;" onclick="irDiagnostico(\''+t.cardId+'\')">🩺 Diagnóstico (foto + modelo lá dentro)</button></div>'+
         '<div class="acts" style="margin-top:6px;">'+
           '<button class="btn" style="background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.4);" onclick="receberRS(\''+t.id+'\')">🔴 RS (garantia)</button>'+
           '<button class="btn" style="background:rgba(249,115,22,.15);color:#fb923c;border:1px solid rgba(249,115,22,.4);" onclick="remarcarColeta(\''+t.cardId+'\')">📅 Remarcar</button>'+
-          '<button class="btn b-no" onclick="naoChegou(\''+t.id+'\')">🚫 Não chegou</button></div>'+
-        '<div class="acts" style="margin-top:6px;">'+
-          '<button class="btn b-ok" onclick="concluir(\''+t.id+'\')">✅ Recebido na loja (foto+modelo)</button></div>';
-        html+='<input type="file" accept="image/*" capture="environment" id="file-'+t.id+'" style="display:none" onchange="enviarFoto(\''+t.id+'\',this)">';
+          '<button class="btn b-no" onclick="naoChegou(\''+t.id+'\')">🚫 Não chegou</button></div>';
       }else if(t.tipo==='venda'){
         html+='<div class="acts">'+
           '<button class="btn '+(t.videoGravado?'b-ok':'b-foto')+'" onclick="vendaCheck(\''+t.id+'\',\'video\')">'+(t.videoGravado?'✅':'🎥')+' Vídeo gravado</button>'+
@@ -463,7 +462,6 @@ async function remarcarColeta(fichaId){
 async function receberRS(id){
   if(!exigeOp())return;
   var t=_db.tarefas.find(function(x){return x.id===id;});
-  if(t&&!t.temFoto){alert('📷 Tira a foto do equipamento primeiro (obrigatória também na garantia)');return;}
   var mod=document.getElementById('mod-'+id);
   if(!confirm('🔴 Finalizar como RS (garantia)? Mesma ação do botão RS da Logística.'))return;
   var r=await fetch('/api/almoxarifado?action=concluir',{method:'POST',headers:{'Content-Type':'application/json'},

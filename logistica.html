@@ -464,7 +464,12 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
       <!-- Seções por equipamento (renderizadas dinamicamente) -->
       <div id="diag-equips"></div>
 
-      <div id="diag-msg" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
+      <div style="margin:10px 0;">
+  <button type="button" onclick="diagTirarFoto()" style="background:rgba(96,165,250,.15);border:1px solid rgba(96,165,250,.4);color:#60a5fa;border-radius:8px;padding:9px 14px;font-weight:800;font-size:13px;cursor:pointer;">📷 Foto do equipamento</button>
+  <img id="diag-foto-prev" style="display:none;max-width:120px;border-radius:8px;margin-top:8px;border:1px solid #262b33;">
+  <input type="file" accept="image/*" capture="environment" id="diag-file" style="display:none" onchange="diagFotoSel(this)">
+</div>
+<div id="diag-msg" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
       <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:4px;">
         <button class="cbtn cbtn-outline" onclick="fecharDiag()">Cancelar</button>
         <button class="cbtn cbtn-purple" onclick="salvarDiag()">Salvar diagnóstico</button>
@@ -876,7 +881,25 @@ function abrirDiag(id) {
   document.getElementById('diag-qtd').value = qtd;
   diagEquips = Array.from({length: qtd}, ()=>({modelo:'', tipo: detectarTipo(fichaAtual), subtipo:null, servicos:[]}));
   renderEquips(qtd);
+  window._diagFotoB64=null;
+  var fp=document.getElementById('diag-foto-prev');if(fp){fp.style.display='none';fp.src='';}
   document.getElementById('ov-diag').classList.add('open');
+}
+function diagTirarFoto(){document.getElementById('diag-file').click();}
+function diagFotoSel(inp){
+  var file=inp.files&&inp.files[0];inp.value='';
+  if(!file)return;
+  var img=new Image();
+  img.onload=function(){
+    var mx=700,w=img.width,hh=img.height;
+    if(w>hh&&w>mx){hh=hh*mx/w;w=mx;}else if(hh>mx){w=w*mx/hh;hh=mx;}
+    var cv=document.createElement('canvas');cv.width=w;cv.height=hh;
+    cv.getContext('2d').drawImage(img,0,0,w,hh);
+    window._diagFotoB64=cv.toDataURL('image/jpeg',0.6);
+    var fp=document.getElementById('diag-foto-prev');
+    if(fp){fp.src=window._diagFotoB64;fp.style.display='block';}
+  };
+  img.src=URL.createObjectURL(file);
 }
 
 function fecharDiag() { document.getElementById('ov-diag').classList.remove('open'); }
@@ -1014,7 +1037,7 @@ async function salvarDiag() {
   const diagnostico = { equips: diagEquips.map(eq=>({...eq})) };
   const r1 = await fetch('/api/logistica?action=salvar-diagnostico', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ id: fichaAtual.id, diagnostico })
+    body: JSON.stringify({ id: fichaAtual.id, diagnostico, fotoB64: window._diagFotoB64||null })
   }).then(r=>r.json());
   if (!r1.ok) { mostrarMsgDiag('Erro ao salvar: '+r1.error,'err'); return; }
 

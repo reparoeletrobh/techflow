@@ -529,11 +529,12 @@ module.exports = async function handler(req, res) {
 
   // ── POST salvar-diagnostico ───────────────────────────────
   if (req.method === 'POST' && action === 'salvar-diagnostico') {
-    const { id, diagnostico } = req.body || {};
+    const { id, diagnostico, fotoB64 } = req.body || {};
     const db = await dbGet(LOG_KEY) || defaultDB();
     const ficha = db.fichas.find(f => f.id === id);
     if (!ficha) return res.status(404).json({ ok: false, error: 'nao encontrada' });
     ficha.diagnostico = diagnostico;
+    if (fotoB64) { try { await dbSet('alm_foto_' + id, { img: fotoB64, em: new Date().toISOString() }); ficha.temFotoDiag = true; } catch (e) {} }
     // Não mover para orc_registrado aqui — a fase muda em gerar-orcamento
     // (só quando o Pipefy for criado/movido com sucesso)
     await dbSet(LOG_KEY, db);

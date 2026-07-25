@@ -107,6 +107,7 @@ export default async function handler(req, res) {
             db.tarefas.unshift(novaTarefa({
               tipo: 'receber', cardId: c.id,
               cliente: c.nomeContato || c.nome || '—', tel: c.telefone || '', equipamento: c.equipamento || '',
+              defeito: c.defeito || '', obs: c.texto || '',
               origem: 'coleta_efetuada', destino: 'aguardando_aprovacao',
               modelo: '', temFoto: false,
             }));
@@ -198,10 +199,12 @@ export default async function handler(req, res) {
     const t = db.tarefas.find(x => x.id === id);
     if (!t) return res.status(404).json({ ok: false, error: 'tarefa não encontrada' });
     if (t.tipo === 'receber') {
-      if (!t.temFoto) return res.status(400).json({ ok: false, error: 'foto obrigatória no recebimento' });
-      if (modelo !== undefined) t.modelo = String(modelo || '').trim();
-      if (!t.modelo) return res.status(400).json({ ok: false, error: 'informe o modelo' });
       if ((req.body || {}).rs) { t.rs = true; t.destino = 'garantia'; }
+      else {
+        if (!t.temFoto) return res.status(400).json({ ok: false, error: 'foto obrigatória no recebimento' });
+        if (modelo !== undefined) t.modelo = String(modelo || '').trim();
+        if (!t.modelo) return res.status(400).json({ ok: false, error: 'informe o modelo' });
+      }
     }
     // ══ F2 efeitos ══
     // Aprovado → Produção: confirmar aqui MOVE o card no sistema técnico
