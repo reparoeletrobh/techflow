@@ -59,13 +59,17 @@ async function contextoCliente(tel) {
   const d8 = String(tel).replace(/\D/g, '').slice(-8);
   const ctx = { fichas: [], logistica: [], pipe: [], tecnico: [], pecas: [] };
   try {
-    const [fa, lg, pp, bd, pcs] = await Promise.all([
+    const [fa, lg, pp, bd, pcs, ftv] = await Promise.all([
       dbGet('fichas_adm'), dbGet('reparoeletro_logistica'), dbGet('reparoeletro_pipe'),
-      dbGet('reparoeletro_board'), dbGet('reparoeletro_compras_pecas'),
+      dbGet('reparoeletro_board'), dbGet('reparoeletro_compras_pecas'), dbGet('fichas_tv'),
     ]);
     const bate = (t) => String(t || '').replace(/\D/g, '').endsWith(d8);
     for (const f of ((fa && fa.fichas) || [])) if (bate(f.telefone)) {
       ctx.fichas.push({ id: f.id, nome: f.nome, status: f.status, equipamento: f.equipamento, defeito: f.defeito });
+    }
+    for (const f of (((ftv || {}).fichas) || [])) if (bate(f.telefone)) {
+      ctx.fichas.push({ id: f.id, nome: f.nome, status: f.status, equipamento: f.equipamento || 'TV', defeito: f.defeito, sistemaTV: true });
+      ctx.clienteTV = true;
     }
     for (const f of ((lg && lg.fichas) || [])) if (bate(f.telefone)) {
       ctx.logistica.push({ id: f.id, nome: f.nome, fase: f.phase, equipamento: f.equipamento,
@@ -835,9 +839,18 @@ ROTEIRO DO ATENDIMENTO:
    (a) Forma de pagamento — se o cliente disse "pode fazer" logo após você mandar o valor do Pix, confirme UMA única vez: "Só me confirma: vai ser o valor original no cartão ou o valor com desconto no Pix?" — respondeu, prossegue. Se já estiver claro (ex: "fechou no Pix"), NÃO pergunte.
    (b) Delivery ou busca na loja — só se ainda não estiver definido na conversa.
    Definidos pagamento e entrega → ação mover_aprovado com o VALOR COMBINADO e a forma no motivo (ex: "aprovado R$351 Pix balcão — F3"). A ficha vai para Aprovados e entra na fila do técnico automaticamente. Nada de re-confirmar o que o cliente já disse.
+7a-1) 📺 FLUXO TV — REGRAS PRÓPRIAS (se a ficha do contexto for de TV — sistemaTV/clienteTV — ou o equipamento for televisão, este fluxo SUBSTITUI o roteiro de agendamento):
+   a. Se não vierem na ficha, pergunte o MODELO EXATO da TV e as POLEGADAS (pode pedir foto da etiqueta traseira).
+   b. TRIAGEM DE TELA (obrigatória, uma pergunta por vez, tom leve): a TV sofreu algum impacto na tela? quebrou ou bateu algo nela? caiu no chão? antes de apagar, chegou a aparecer listra, faixa ou linha na imagem?
+   c. Se QUALQUER resposta indicar dano de tela (impacto/queda/trinca/listras/faixas/linhas): seja honesto e cordial — "esse sintoma indica problema no display, e infelizmente não trabalhamos com esse tipo de conserto — a máquina necessária é industrial e pouquíssimos laboratórios têm". Agradeça e se coloque à disposição para outros equipamentos. NÃO prossiga com coleta.
+   d. TRIAGEM LIMPA → "Perfeito! Nosso motorista vai entrar em contato com você pra combinar o melhor horário de coleta." Se o cliente adiantar a disponibilidade dele, ótimo — registre na conversa. ⚠️ TV NÃO usa as faixas de coleta nem a janela comercial do agendamento: quem agenda é o MOTORISTA, a qualquer momento. NÃO use cadastrar_logistica para TV.
+   e. PRAZO DE TV (se perguntarem): após o cliente aprovar o orçamento, o conserto leva de 1 a 7 dias — quando a peça tem pronta entrega em BH é rápido; quando precisamos pedir de São Paulo pode chegar a 7 dias. O prazo de balcão de 15min NÃO vale para TV.
+
 7a-2) RESPOSTAS PADRÃO (use quando perguntarem):
    - Condições de pagamento: "Parcelamos em até 3x sem juros no cartão (valor original) ou à vista no Pix com desconto."
-   - Prazo de entrega: "Após a aprovação pedimos de 24 a 48 horas pra fazer a entrega — nossa equipe te comunica certinho."
+   - "QUANTO CUSTA o conserto?" (qualquer equipamento, ANTES da avaliação): "Só conseguimos passar o orçamento após a avaliação — são milhares de modelos e tipos diferentes, cada orçamento é individual." Se INSISTIR no preço: "O que posso te adiantar: geralmente fica até 70% mais barato do que comprar um novo, e a maioria das pessoas que faz o orçamento com a gente aprova."
+   - PRAZOS GERAIS: na LOJA (balcão), a maioria dos equipamentos fica pronta entre 15 minutos e 1 hora (exceto TV). Via DELIVERY: entre 24 e 48 horas o equipamento chega na loja, passa pelo orçamento, é consertado e devolvido.
+   - Prazo de entrega pós-aprovação: "Após a aprovação pedimos de 24 a 48 horas pra fazer a entrega — nossa equipe te comunica certinho."
    - Pedido de LIGAÇÃO ("posso ligar?", "me liga", "prefiro por telefone", "qual o número de vocês?", ou se disser que tentou ligar): "Claro! Nosso número de ligação e suporte é (31) 97225-9819 — pode chamar por lá." (este número do WhatsApp não recebe chamadas; NUNCA prometa que ligamos deste número aqui).
 7b) JANELAS DE HORÁRIO (respeite sempre): COLETA: segunda a sexta 08h-14h, sábado 08h-11h — fora da janela, diga que a coleta será entre 08h e 14h do PRÓXIMO dia útil. LOJA/BALCÃO: segunda a sexta 08h-17h, sábado 08h-12h — ao indicar o balcão, reforce endereço e horário.
 8) REPROVOU → ação registrar_reprovacao: seja gentil, deixe a porta aberta ("vou pedir para um especialista te ligar, às vezes conseguimos uma condição"). O time humano tenta reverter por ligação.
