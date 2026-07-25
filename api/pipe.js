@@ -1839,8 +1839,8 @@ export default async function handler(req, res) {
     var db2 = (await dbGet(PIPE_KEY)) || defaultDB();
     var nowR = new Date().toISOString();
     // número da rota (reinicia por dia) calculado antes, para etiquetar as fichas
-    var ALMOX_KEY = 'reparoeletro_almoxarifado';
-    var adb = (await dbGet(ALMOX_KEY)) || { tarefas: [], inventario: {}, snapshot: {}, config: {} };
+    var ALMOX_KEY = 'reparoeletro_almox_rotas';
+    var adb = (await dbGet(ALMOX_KEY)) || { rotas: [] };
     if (!Array.isArray(adb.rotas)) adb.rotas = [];
     var hojeStr = nowR.slice(0, 10);
     var seqHoje = adb.rotas.filter(function (r) { return (r.criadaEm || '').slice(0, 10) === hojeStr; }).length + 1;

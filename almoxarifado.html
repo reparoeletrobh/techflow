@@ -168,6 +168,13 @@ function marcarVisto(id){
 }
 var _rotasAberto=localStorage.getItem('alm_rotas_aberto')!=='0';
 function toggleRotasSec(){_rotasAberto=!_rotasAberto;localStorage.setItem('alm_rotas_aberto',_rotasAberto?'1':'0');render();}
+var _rotaExp={};try{_rotaExp=JSON.parse(localStorage.getItem('alm_rota_exp')||'{}');}catch(e){}
+function toggleRota(rid){
+  _rotaExp[rid]=_rotaExp[rid]===false?true:false;
+  localStorage.setItem('alm_rota_exp',JSON.stringify(_rotaExp));
+  render();
+}
+function rotaExpandida(rid){return _rotaExp[rid]!==false;}
 function atualizaSecRotas(){
   var st=document.getElementById('sec-rotas-t');
   if(st&&!(_rotas||[]).some(function(r){return r.status!=='finalizada'&&ehNovo(r.id);}))st.classList.remove('tem-novo');
@@ -184,8 +191,10 @@ function htmlRotas(lista){
     var sep=rt.itens.filter(function(i){return i.status==='separado';}).length;
     var head='🚚 ROTA '+rt.num+' — '+rt.dia.split('-').reverse().slice(0,2).join('/')+' · '+
       (rt.status==='finalizada'?('✅ SAIU ('+(rt.tipoSaida==='parcial'?'PARCIAL':'COMPLETA')+') com '+esc(rt.motorista||'')):'📦 SEPARAÇÃO ('+sep+'/'+rt.itens.length+')');
-    var html='<div class="card '+(rt.status==='finalizada'?'feito-c':'receber')+(rotaNova?' novo':'')+'" id="c-'+rt.id+'" onclick="marcarVisto(\''+rt.id+'\')">'+
-      '<div class="tt">'+head+'</div>';
+    var aberta=rotaExpandida(rt.id);
+    var html='<div class="card '+(rt.status==='finalizada'?'feito-c':'receber')+(rotaNova?' novo':'')+'" id="c-'+rt.id+'">'+
+      '<div class="tt sec-toggle'+(aberta?' aberto':'')+'" style="cursor:pointer;" onclick="marcarVisto(\''+rt.id+'\');toggleRota(\''+rt.id+'\')"><span class="seta">▶</span> '+head+'</div>';
+    if(!aberta){return html+'</div>';}
     html+=rt.itens.map(function(i){
       var st=i.status==='separado'?'✅':i.status==='negado'?'🚫':i.status==='nao_saiu'?'↩️':'⬜';
       var linha='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);">'+

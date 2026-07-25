@@ -293,20 +293,25 @@ export default async function handler(req, res) {
 
   // ══ F2 ROTAS: listar (ativas + últimas finalizadas) ══
   if (action === 'rota-list') {
-    const rotas = Array.isArray(db.rotas) ? db.rotas : [];
-    return res.status(200).json({ ok: true, rotas: rotas.slice(0, 30) });
+    let rdb = (await dbGet('reparoeletro_almox_rotas')) || null;
+    if (!rdb) {
+      rdb = { rotas: Array.isArray(db.rotas) ? db.rotas : [] }; // migra as existentes uma única vez
+      await dbSet('reparoeletro_almox_rotas', rdb);
+    }
+    return res.status(200).json({ ok: true, rotas: (rdb.rotas || []).slice(0, 30) });
   }
 
   // ══ F2 ROTAS: marcar item separado (incrementa por unidade até a qtd) ══
   if (req.method === 'POST' && action === 'rota-separar') {
     const { rotaId, cardId, feitoPor } = req.body || {};
-    const rt = (db.rotas || []).find(r => r.id === rotaId);
+    const rdb1 = (await dbGet('reparoeletro_almox_rotas')) || { rotas: [] };
+    const rt = (rdb1.rotas || []).find(r => r.id === rotaId);
     const item = rt && rt.itens.find(i => i.cardId === cardId);
     if (!item) return res.status(404).json({ ok: false, error: 'item não encontrado' });
     item.separado = Math.min(item.qtd, (item.separado || 0) + 1);
     if (item.separado >= item.qtd) item.status = 'separado';
     item.por = String(feitoPor || '').trim();
-    await dbSet(KEY, db);
+    await dbSet('reparoeletro_almox_rotas', rdb1);
     return res.status(200).json({ ok: true, separado: item.separado, qtd: item.qtd, status: item.status });
   }
 
@@ -314,18 +319,20 @@ export default async function handler(req, res) {
   if (req.method === 'POST' && action === 'rota-negar') {
     const { rotaId, cardId, motivo, feitoPor } = req.body || {};
     if (!motivo) return res.status(400).json({ ok: false, error: 'motivo obrigatório' });
-    const rt2 = (db.rotas || []).find(r => r.id === rotaId);
+    const rdb2 = (await dbGet('reparoeletro_almox_rotas')) || { rotas: [] };
+    const rt2 = (rdb2.rotas || []).find(r => r.id === rotaId);
     const item2 = rt2 && rt2.itens.find(i => i.cardId === cardId);
     if (!item2) return res.status(404).json({ ok: false, error: 'item não encontrado' });
     item2.status = 'negado'; item2.motivo = String(motivo).trim(); item2.por = String(feitoPor || '').trim();
-    await dbSet(KEY, db);
+    await dbSet('reparoeletro_almox_rotas', rdb2);
     return res.status(200).json({ ok: true });
   }
 
   // ══ F2 ROTAS: confirmar saída (completa/parcial + foto do motorista) ══
   if (req.method === 'POST' && action === 'rota-saida') {
     const { rotaId, motorista, fotoB64, feitoPor } = req.body || {};
-    const rt3 = (db.rotas || []).find(r => r.id === rotaId);
+    const rdb3 = (await dbGet('reparoeletro_almox_rotas')) || { rotas: [] };
+    const rt3 = (rdb3.rotas || []).find(r => r.id === rotaId);
     if (!rt3) return res.status(404).json({ ok: false, error: 'rota não encontrada' });
     if (!motorista) return res.status(400).json({ ok: false, error: 'informe o motorista' });
     if (!fotoB64) return res.status(400).json({ ok: false, error: 'foto do motorista obrigatória' });
@@ -340,7 +347,7 @@ export default async function handler(req, res) {
     naoSairam.forEach(i => { if (i.status === 'pendente') { i.status = 'nao_saiu'; if (!i.motivo) i.motivo = String((req.body || {}).motivoPendentes || 'não saiu na rota').trim(); } });
     // foto separada do payload principal (Redis lean: 1 chave por rota, sobrescrevível)
     await dbSet(KEY + '_rotafoto_' + rt3.id, { b64: fotoB64, em: rt3.saidaEm });
-    await dbSet(KEY, db);
+    await dbSet('reparoeletro_almox_rotas', rdb3);
     return res.status(200).json({ ok: true, sairam: sairam.map(i => i.cardId), naoSairam: naoSairam.map(i => ({ cardId: i.cardId, motivo: i.motivo })), tipo: rt3.tipoSaida });
   }
 
@@ -357,7 +364,8 @@ export default async function handler(req, res) {
     const casa = txt => String(txt || '').toLowerCase().includes(q);
     const tarefas = (db.tarefas || []).filter(t => !q ||
       casa(t.cliente) || casa(t.tel) || casa(t.equipamento) || casa(t.modelo) || casa(t.feitoPor) || casa(t.cardId));
-    const rotas = (db.rotas || []).filter(r => !q ||
+    const rdbA = (await dbGet('reparoeletro_almox_rotas')) || { rotas: db.rotas || [] };
+    const rotas = (rdbA.rotas || []).filter(r => !q ||
       casa(r.motorista) || casa(r.id) || (r.itens || []).some(i => casa(i.cliente) || casa(i.tel) || casa(i.equipamento)));
     const ml = (db.mlEntregas || []).filter(m => !q || casa(m.descricao) || casa(m.os) || casa(m.tecnico));
     return res.status(200).json({ ok: true,
@@ -367,7 +375,8 @@ export default async function handler(req, res) {
   // ── BADGE leve p/ o hub: pendentes (tarefas + rotas em separação) ──
   if (action === 'badge') {
     const pend = (db.tarefas || []).filter(t => t.status === 'pendente' || t.status === 'falha').length;
-    const rotasSep = (db.rotas || []).filter(r => r.status !== 'finalizada').length;
+    const rdbB = (await dbGet('reparoeletro_almox_rotas')) || { rotas: db.rotas || [] };
+    const rotasSep = (rdbB.rotas || []).filter(r => r.status !== 'finalizada').length;
     return res.status(200).json({ ok: true, pendentes: pend + rotasSep });
   }
 
