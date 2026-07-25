@@ -33,7 +33,7 @@ async function dbSet(key, val) {
 }
 async function lerEvts() {
   try {
-    const r = await fetch(`${U}/lrange/${EVT_LIST}/0/-1`, { headers: { Authorization: `Bearer ${T}` } });
+    const r = await fetch(`${U}/lrange/${EVT_LIST}/-1500/-1`, { headers: { Authorization: `Bearer ${T}` } });
     const j = await r.json();
     const out = [];
     for (const s of (j.result || [])) { try { out.push(JSON.parse(s)); } catch (_) {} }
@@ -824,9 +824,7 @@ export default async function handler(req, res) {
       ? 'AGORA: DENTRO do horário comercial (seg-sex 8h-15h, sáb 8h-10h). Agendamento de coleta LIBERADO — conduza normalmente.'
       : `AGORA: FORA do horário comercial. REGRA DURA: NÃO agende nem confirme coleta agora (não use cadastrar_logistica). Converse normal, tire dúvidas, negocie e aprove orçamentos normalmente — só o AGENDAMENTO fica travado. Se o cliente quiser agendar/marcar coleta: informe \"Nosso horário de atendimento e coleta é de segunda a sexta das 8h às 15h e sábado das 8h às 10h\" e PROMETA: \"assim que abrirmos eu te chamo aqui pra deixar sua coleta agendada\". Nesse caso, inclua a tag [RETOMAR] no finalzinho da sua resposta (o sistema remove a tag e agenda a retomada automática — não explique a tag ao cliente).`;
 
-    const system = `${blocoHorario}
-
-Você é o atendente virtual da Reparo Eletro (assistência técnica de eletrodomésticos em BH: micro-ondas, purificadores, adegas, fornos e afins). Tom: cordial, direto, brasileiro, sem formalidade excessiva. Mensagens CURTAS de WhatsApp, UMA pergunta por vez.
+    const system = `Você é o atendente virtual da Reparo Eletro (assistência técnica de eletrodomésticos em BH: micro-ondas, purificadores, adegas, fornos e afins). Tom: cordial, direto, brasileiro, sem formalidade excessiva. Mensagens CURTAS de WhatsApp, UMA pergunta por vez.
 
 VOCÊ SE APRESENTA COMO: Alessandro, responsável pela logística da Reparo Eletro (é a persona oficial do atendimento — os orçamentos também saem em nome dele).
 
@@ -901,7 +899,7 @@ DISCIPLINA (CRÍTICO — leia duas vezes):
 - ⚠️ "QUERO DE VOLTA" NÃO É CONFLITO IMEDIATO: muitos clientes dirão "pode me mandar de volta", "só quero de volta" logo após o orçamento. Isso é OBJEÇÃO DE PREÇO disfarçada — NÃO abra conflito, NÃO aceite a devolução: avance para a PRÓXIMA fase do orçamento (F2 Pix → F3 balcão → F4 troca → F5 comprar), com naturalidade: "entendo! antes de devolver, deixa eu te apresentar uma condição...". Trate cada "quero de volta" como não-aprovação que avança UMA fase. SOMENTE se chegar na F5 (proposta de comprar o equipamento) e o cliente AINDA insistir que quer de volta → aí sim registrar_conflito (motivo: "recusou todas as fases, quer o equipamento de volta") para o humano ligar.
 - Nunca prometa desconto acima das políticas; nunca invente valor, prazo ou informação fora do CONTEXTO.
 
-CONTEXTO DO CLIENTE NO SISTEMA: ${JSON.stringify(ctx)}
+(o contexto do cliente e o estado do horário vêm no bloco seguinte)
 
 Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem sugerida","acao":{"tipo":"nenhuma|cadastrar_logistica|enviar_orcamento|desconto_pix|desconto_balcao|proposta_troca|mover_aprovado|registrar_reprovacao|registrar_conflito|escalar_humano","motivo":"por quê"},"confianca":"alta|media|baixa"}`;
 
@@ -917,7 +915,10 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
           model: 'claude-sonnet-4-6',
           max_tokens: 600,
           temperature: 0.2,
-          system,
+          system: [
+            { type: 'text', text: system, cache_control: { type: 'ephemeral' } },
+            { type: 'text', text: blocoHorario + '\n\nCONTEXTO DO CLIENTE NO SISTEMA: ' + JSON.stringify(ctx) },
+          ],
           messages: [{ role: 'user', content: imgB64
             ? [ { type: 'image', source: { type: 'base64', media_type: imgTipo, data: imgB64 } },
                 { type: 'text', text: 'A imagem acima é a FOTO que o cliente acabou de enviar. Analise-a conforme as regras de VISÃO do seu roteiro.\n\nHistórico da conversa:\n' + (historico || '(sem mensagens ainda)') + '\n\nGere a próxima resposta sugerida.' } ]
