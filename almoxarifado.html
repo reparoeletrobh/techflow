@@ -160,7 +160,8 @@ function hoje(iso){if(!iso)return false;var d=new Date(iso),h=new Date();return 
 var _rotas=[];
 var _vistos=[];try{_vistos=JSON.parse(localStorage.getItem('alm_vistos')||'[]');}catch(e){}
 function ehNovo(id){return _vistos.indexOf(id)===-1;}
-function marcarVisto(id){
+function marcarVisto(id,ev){
+  if(ev&&ev.target&&(ev.target.tagName==='BUTTON'||ev.target.tagName==='A'||ev.target.tagName==='INPUT'))return;
   if(_vistos.indexOf(id)===-1){_vistos.push(id);if(_vistos.length>400)_vistos=_vistos.slice(-400);
     localStorage.setItem('alm_vistos',JSON.stringify(_vistos));
     var el=document.getElementById('c-'+id);if(el)el.classList.remove('novo');
@@ -193,7 +194,7 @@ function htmlRotas(lista){
       (rt.status==='finalizada'?('✅ SAIU ('+(rt.tipoSaida==='parcial'?'PARCIAL':'COMPLETA')+') com '+esc(rt.motorista||'')):'📦 SEPARAÇÃO ('+sep+'/'+rt.itens.length+')');
     var aberta=rotaExpandida(rt.id);
     var html='<div class="card '+(rt.status==='finalizada'?'feito-c':'receber')+(rotaNova?' novo':'')+'" id="c-'+rt.id+'">'+
-      '<div class="tt sec-toggle'+(aberta?' aberto':'')+'" style="cursor:pointer;" onclick="marcarVisto(\''+rt.id+'\');toggleRota(\''+rt.id+'\')"><span class="seta">▶</span> '+head+'</div>';
+      '<div class="tt sec-toggle'+(aberta?' aberto':'')+'" style="cursor:pointer;" onclick="marcarVisto(\''+rt.id+'\',event);toggleRota(\''+rt.id+'\')"><span class="seta">▶</span> '+head+'</div>';
     if(!aberta){return html+'</div>';}
     html+=rt.itens.map(function(i){
       var st=i.status==='separado'?'✅':i.status==='negado'?'🚫':i.status==='nao_saiu'?'↩️':'⬜';
@@ -338,7 +339,7 @@ function render(){
     var t4=String(t.tel||'').replace(/\D/g,'').slice(-4);
     var nomeExib=esc(t.cliente)+(t4&&t.cliente.indexOf(t4)===-1?' '+t4:'');
     var tNovo=t.status==='pendente'&&ehNovo(t.id);
-    var html='<div class="card '+cls+(tNovo?' novo':'')+'" id="c-'+t.id+'" onclick="marcarVisto(\''+t.id+'\')">'+
+    var html='<div class="card '+cls+(tNovo?' novo':'')+'" id="c-'+t.id+'" onclick="marcarVisto(\''+t.id+'\',event)">'+
       '<div class="tt">'+head+' · '+t.id+'</div>'+
       '<div class="nm">'+nomeExib+'</div>'+
       (t.tel?'<div class="eq">📞 '+esc(t.tel)+'</div>':'')+

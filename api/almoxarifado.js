@@ -200,6 +200,22 @@ export default async function handler(req, res) {
         });
       } catch (e) {}
       db.snapshot = { ...db.snapshot, pipe: novoSnapPipe, logColeta: novoSnapCol };
+      // ══ MESCLA ANTI-CORRIDA: ações do usuário feitas durante o sync NUNCA são sobrescritas ══
+      try {
+        const fresco = (await dbGet(KEY)) || db;
+        const mapaFresco = {};
+        (fresco.tarefas || []).forEach(t => { mapaFresco[t.id] = t; });
+        const idsProcessados = new Set((db.tarefas || []).map(t => t.id));
+        db.tarefas = (db.tarefas || []).map(t => {
+          const f = mapaFresco[t.id];
+          // se o usuário mudou o status durante o sync (concluiu/falhou/reabriu), a versão dele vence
+          return (f && f.status !== t.status) ? f : (f || t);
+        });
+        // tarefas criadas por outras ações durante o sync (reconciliar etc.) entram também
+        (fresco.tarefas || []).forEach(t => { if (!idsProcessados.has(t.id)) db.tarefas.unshift(t); });
+        db.inventario = Object.assign({}, db.inventario, fresco.inventario || {});
+        if (fresco.config && fresco.config.proximoNum > (db.config.proximoNum || 0)) db.config.proximoNum = fresco.config.proximoNum;
+      } catch (e) {}
       await dbSet(KEY, db);
     } catch (e) {}
     return res.status(200).json({ ok: true, tarefas: db.tarefas.slice(0, 300), inventario: db.inventario, faseLbl: FASE_LBL });
