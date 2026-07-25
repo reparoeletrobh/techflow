@@ -91,6 +91,10 @@
   ],
   "rewrites": [
     {
+      "source": "/almoxarifado-arquivo",
+      "destination": "/almoxarifado-arquivo.html"
+    },
+    {
       "source": "/almoxarifado",
       "destination": "/almoxarifado.html"
     },

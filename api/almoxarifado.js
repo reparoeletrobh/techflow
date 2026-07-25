@@ -336,6 +336,19 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, b64: f.b64, em: f.em });
   }
 
+  // ── ARQUIVO: busca em tudo que já passou pelo almoxarifado ──
+  if (action === 'arquivo') {
+    const q = String(req.query.q || '').toLowerCase().trim();
+    const casa = txt => String(txt || '').toLowerCase().includes(q);
+    const tarefas = (db.tarefas || []).filter(t => !q ||
+      casa(t.cliente) || casa(t.tel) || casa(t.equipamento) || casa(t.modelo) || casa(t.feitoPor) || casa(t.cardId));
+    const rotas = (db.rotas || []).filter(r => !q ||
+      casa(r.motorista) || casa(r.id) || (r.itens || []).some(i => casa(i.cliente) || casa(i.tel) || casa(i.equipamento)));
+    const ml = (db.mlEntregas || []).filter(m => !q || casa(m.descricao) || casa(m.os) || casa(m.tecnico));
+    return res.status(200).json({ ok: true,
+      tarefas: tarefas.slice(0, 80), rotas: rotas.slice(0, 20), ml: ml.slice(0, 40) });
+  }
+
   // ── BADGE leve p/ o hub: pendentes (tarefas + rotas em separação) ──
   if (action === 'badge') {
     const pend = (db.tarefas || []).filter(t => t.status === 'pendente' || t.status === 'falha').length;

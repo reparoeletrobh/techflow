@@ -116,6 +116,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="kpi"><div class="v" id="k-x" style="color:#f87171;">0</div><div class="l">⚠️ Não consegui</div></div>
 </div>
 
+<div style="display:flex;gap:8px;margin-bottom:10px;">
+  <input id="rastro" placeholder="🔎 Rastrear ficha (nome, telefone, equipamento...)" oninput="render()" style="flex:1;background:#16191e;border:1px solid #262b33;border-radius:10px;padding:10px 13px;color:#f0f2f5;font-size:13.5px;outline:none;">
+  <a href="/almoxarifado-arquivo" style="display:flex;align-items:center;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);border-radius:10px;padding:0 14px;color:#f59e0b;font-weight:800;font-size:12.5px;text-decoration:none;white-space:nowrap;">📦🔎 Arquivo</a>
+</div>
 <div class="tabs">
   <div class="tab on" data-v="pend" onclick="setTab(this)">📋 Operação</div>
   <div class="tab" data-v="ml" onclick="setTab(this)">📬 Mercado Livre</div>
@@ -279,9 +283,13 @@ function render(){
 
   var el=document.getElementById('lista');
   if(_tab==='ml'){return;}
-  var rotasAtivas=(_rotas||[]).filter(function(r){return r.status!=='finalizada';});
+  var _q=((document.getElementById('rastro')||{}).value||'').toLowerCase().trim();
+  function bate(s){return String(s||'').toLowerCase().indexOf(_q)>-1;}
+  var rotasAtivas=(_rotas||[]).filter(function(r){return r.status!=='finalizada';})
+    .filter(function(r){return !_q||bate(r.motorista)||r.itens.some(function(i){return bate(i.cliente)||bate(i.tel)||bate(i.equipamento);});});
   var rotasHtml=rotasAtivas.length?('<div style="font-size:12px;font-weight:900;color:#f97316;margin:4px 0 8px;">🚚 ROTAS EM SEPARAÇÃO ('+rotasAtivas.length+')</div>'+htmlRotas(rotasAtivas)):'';
   var list=_db.tarefas.filter(function(t){
+    if(_q&&!(bate(t.cliente)||bate(t.tel)||bate(t.equipamento)||bate(t.modelo)))return false;
     if(_tab==='pend')return t.status==='pendente'||t.status==='falha';
     return t.status==='feito';
   });
