@@ -450,6 +450,46 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, modo: 'dry-run (nada foi criado)', faltam: faltam.length, lista: faltam });
   }
 
+  // ── FAXINA: identifica e resolve tarefas revertidas pela corrida / duplicadas / órfãs ──
+  // Sem &aplicar=1: só lista. Com &aplicar=1: executa.
+  if (action === 'faxina') {
+    const aplicar = req.query.aplicar === '1';
+    const relatorio = { orfas_coleta: [], orfas_pipe: [], duplicadas: [] };
+    try {
+      const [pdb, ldb] = await Promise.all([dbGet('reparoeletro_pipe'), dbGet('reparoeletro_logistica')]);
+      const emColeta = new Set(((ldb && ldb.fichas) || []).filter(f => f.phase === 'coleta_efetuada').map(f => f.id));
+      const fasePipe = {};
+      ((pdb && pdb.cards) || []).forEach(c => { fasePipe[c.id] = c.phase; });
+      const vistos = new Set();
+      const manter = [];
+      for (const t of db.tarefas) {
+        // duplicada pendente (mesmo card+tipo+destino): mantém a primeira (mais recente, lista é unshift)
+        const chave = t.cardId + '|' + t.tipo + '|' + (t.destino || '');
+        if (t.status === 'pendente' && vistos.has(chave)) {
+          relatorio.duplicadas.push({ id: t.id, cliente: t.cliente, tipo: t.tipo });
+          if (!aplicar) manter.push(t);
+          continue; // aplicar: exclui
+        }
+        vistos.add(chave);
+        // receber órfã: ficha não está mais em coleta_efetuada → conclui como Sistema
+        if (t.tipo === 'receber' && t.status === 'pendente' && !emColeta.has(t.cardId)) {
+          relatorio.orfas_coleta.push({ id: t.id, cliente: t.cliente });
+          if (aplicar) { t.status = 'feito'; t.feitoPor = 'Sistema (faxina)'; t.feitoEm = new Date().toISOString(); t.autoConcluida = 'ficha já saiu de Coleta Efetuada'; }
+        }
+        // mover órfã: card não está mais na fase destino → conclui como Sistema
+        if (t.tipo === 'mover' && t.status === 'pendente' && fasePipe[t.cardId] && fasePipe[t.cardId] !== t.destino) {
+          relatorio.orfas_pipe.push({ id: t.id, cliente: t.cliente, faseAtual: fasePipe[t.cardId] });
+          if (aplicar) { t.status = 'feito'; t.feitoPor = 'Sistema (faxina)'; t.feitoEm = new Date().toISOString(); t.autoConcluida = 'card já saiu da fase ' + t.destino; }
+        }
+        manter.push(t);
+      }
+      if (aplicar) { db.tarefas = manter; await dbSet(KEY, db); }
+    } catch (e) { return res.status(200).json({ ok: false, error: String(e).slice(0, 120) }); }
+    return res.status(200).json({ ok: true, aplicado: aplicar,
+      resumo: { orfas_coleta: relatorio.orfas_coleta.length, orfas_pipe: relatorio.orfas_pipe.length, duplicadas_excluidas: relatorio.duplicadas.length },
+      detalhes: relatorio });
+  }
+
   // ── F2: RESET — zera o almoxarifado p/ começar limpo (tarefas/inventário/snapshot) ──
   if (action === 'reset-f2') {
     await dbSet(KEY, defaultDB());
