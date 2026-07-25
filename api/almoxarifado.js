@@ -373,11 +373,9 @@ export default async function handler(req, res) {
 
   // ── LIMPAR ENXURRADA: remove tarefas 'mover' pendentes criadas nas últimas N horas (padrão 3) ──
   if (action === 'limpar-enxurrada') {
-    const horas = parseFloat(req.query.h || '3');
-    const corte = Date.now() - horas * 3600 * 1000;
     const antes = db.tarefas.length;
-    db.tarefas = db.tarefas.filter(t => !(t.tipo === 'mover' && t.status === 'pendente' &&
-      new Date(t.criadaEm || 0).getTime() > corte));
+    // remove TODAS as tarefas de movimentação pendentes (a enxurrada inteira, sem depender de data)
+    db.tarefas = db.tarefas.filter(t => !(t.tipo === 'mover' && t.status === 'pendente'));
     const removidas = antes - db.tarefas.length;
     // recriar tarefa legítima específica (?recriar=CARD_ID)
     let recriada = null;
