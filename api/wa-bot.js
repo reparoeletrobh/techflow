@@ -797,6 +797,26 @@ export default async function handler(req, res) {
     const historico = evts.filter(e => e.tel === tel && e.dir !== 'status').slice(-25)
       .map(e => (e.dir === 'in' ? 'CLIENTE: ' : 'ATENDENTE: ') + e.texto).join('\n');
 
+    // 👁️ VISÃO: se a última mensagem do cliente tem FOTO, baixa do WhatsApp e anexa para análise
+    let imgB64 = null, imgTipo = 'image/jpeg';
+    try {
+      const evtsCli = evts.filter(e => e.tel === tel && e.dir === 'in');
+      const ultCli = evtsCli[evtsCli.length - 1];
+      if (ultCli && ultCli.mediaId) {
+        const { token: tokM } = await credenciais();
+        const meta = await fetch('https://graph.facebook.com/v20.0/' + ultCli.mediaId, {
+          headers: { Authorization: 'Bearer ' + tokM } }).then(x => x.json());
+        if (meta && meta.url) {
+          const bin = await fetch(meta.url, { headers: { Authorization: 'Bearer ' + tokM } });
+          const buf = Buffer.from(await bin.arrayBuffer());
+          if (buf.length < 4.5 * 1024 * 1024) {
+            imgB64 = buf.toString('base64');
+            imgTipo = meta.mime_type || 'image/jpeg';
+          }
+        }
+      }
+    } catch (e) {}
+
     const _bras = new Date(Date.now() - 3 * 3600 * 1000);
     const _dia = _bras.getUTCDay(), _hr = _bras.getUTCHours() + _bras.getUTCMinutes() / 60;
     const _dentroHC = (_dia >= 1 && _dia <= 5) ? (_hr >= 8 && _hr < 15) : (_dia === 6 ? (_hr >= 8 && _hr < 10) : false);
@@ -846,6 +866,19 @@ ROTEIRO DO ATENDIMENTO:
    d. TRIAGEM LIMPA → "Perfeito! Nosso motorista vai entrar em contato com você pra combinar o melhor horário de coleta." Se o cliente adiantar a disponibilidade dele, ótimo — registre na conversa. ⚠️ TV NÃO usa as faixas de coleta nem a janela comercial do agendamento: quem agenda é o MOTORISTA, a qualquer momento. NÃO use cadastrar_logistica para TV.
    e. PRAZO DE TV (se perguntarem): após o cliente aprovar o orçamento, o conserto leva de 1 a 7 dias — quando a peça tem pronta entrega em BH é rápido; quando precisamos pedir de São Paulo pode chegar a 7 dias. O prazo de balcão de 15min NÃO vale para TV.
 
+7a-1b) 👁️ VISÃO — QUANDO O CLIENTE ENVIA FOTO (analise a imagem anexada):
+   A. ETIQUETA/TRASEIRA DA TV OU DO EQUIPAMENTO: extraia MODELO exato, marca e (se legível) polegadas/série. Confirme por texto: "Anotei aqui: [marca modelo, XX polegadas], certo?" — e siga o fluxo.
+   B. TELA DE TV LIGADA — TRIAGEM VISUAL DE DISPLAY/COF. Sinais de defeito de painel que NÃO consertamos (recuse com honestidade, mesmo texto do fluxo TV item c):
+      - Linhas VERTICAIS finas (coloridas ou pretas) de cima a baixo da tela
+      - Linhas/faixas HORIZONTAIS atravessando a imagem
+      - Faixa larga colorida, ou METADE/parte da tela esmaecida, com cor diferente ou sem imagem
+      - Imagem DUPLICADA/fantasma, tela branca/acinzentada ou solarizada (cores em negativo)
+      - TRINCA visível: teia de aranha, mancha preta tipo "tinta derramada", área com arco-íris (impacto físico)
+      - Blocos/mosaicos ou deformação da imagem com faixas em diagonal
+   C. Foto AMBÍGUA/escura/sem enquadramento: peça de novo com instrução: "Consegue tirar com a TV LIGADA, pegando a tela inteira de frente?"
+   D. Se a foto da tela estiver LIMPA (imagem normal, sem os sinais acima): siga o fluxo normal — a triagem visual não substitui as perguntas do 7a-1, complementa.
+   E. VÍDEO: você não consegue assistir vídeos — responda: "Não consigo abrir vídeo por aqui 😅 Me manda uma FOTO da tela ligada que eu já te ajudo!"
+
 7a-2) RESPOSTAS PADRÃO (use quando perguntarem):
    - Condições de pagamento: "Parcelamos em até 3x sem juros no cartão (valor original) ou à vista no Pix com desconto."
    - "QUANTO CUSTA o conserto?" (qualquer equipamento, ANTES da avaliação): "Só conseguimos passar o orçamento após a avaliação — são milhares de modelos e tipos diferentes, cada orçamento é individual." Se INSISTIR no preço: "O que posso te adiantar: geralmente fica até 70% mais barato do que comprar um novo, e a maioria das pessoas que faz o orçamento com a gente aprova."
@@ -884,7 +917,10 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
           max_tokens: 600,
           temperature: 0.2,
           system,
-          messages: [{ role: 'user', content: 'Histórico da conversa:\n' + (historico || '(sem mensagens ainda — cliente novo)') + '\n\nGere a próxima resposta sugerida.' }],
+          messages: [{ role: 'user', content: imgB64
+            ? [ { type: 'image', source: { type: 'base64', media_type: imgTipo, data: imgB64 } },
+                { type: 'text', text: 'A imagem acima é a FOTO que o cliente acabou de enviar. Analise-a conforme as regras de VISÃO do seu roteiro.\n\nHistórico da conversa:\n' + (historico || '(sem mensagens ainda)') + '\n\nGere a próxima resposta sugerida.' } ]
+            : 'Histórico da conversa:\n' + (historico || '(sem mensagens ainda — cliente novo)') + '\n\nGere a próxima resposta sugerida.' }],
         }),
       });
       const j = await r.json();
