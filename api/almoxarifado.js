@@ -208,8 +208,13 @@ export default async function handler(req, res) {
         const idsProcessados = new Set((db.tarefas || []).map(t => t.id));
         db.tarefas = (db.tarefas || []).map(t => {
           const f = mapaFresco[t.id];
-          // se o usuário mudou o status durante o sync (concluiu/falhou/reabriu), a versão dele vence
-          return (f && f.status !== t.status) ? f : (f || t);
+          if (!f) return t;
+          // regra: o status mais AVANÇADO vence.
+          // - sync avançou (auto-conclusão): t não-pendente e f pendente → fica t
+          // - usuário avançou durante o sync (concluiu/falhou): f não-pendente → fica f
+          if (t.status !== 'pendente' && f.status === 'pendente') return t;
+          if (f.status !== 'pendente') return f;
+          return t;
         });
         // tarefas criadas por outras ações durante o sync (reconciliar etc.) entram também
         (fresco.tarefas || []).forEach(t => { if (!idsProcessados.has(t.id)) db.tarefas.unshift(t); });
