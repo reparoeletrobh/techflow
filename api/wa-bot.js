@@ -141,12 +141,13 @@ export default async function handler(req, res) {
         for (const rt of pend) {
           try {
             const saud = (new Date(Date.now() - 3 * 3600 * 1000)).getUTCHours() < 12 ? 'Bom dia' : 'Boa tarde';
+            const msgRet = saud + '! Conforme combinamos, já consigo resolver o seu atendimento 😊 Você prefere trazer o equipamento aqui na loja (orçamento gratuito e na hora — Rua Ouro Preto, 663) ou que a gente colete no seu endereço? Se for coleta, qual faixa fica melhor: 08h-10h, 10h-12h, 12h-14h ou 14h-16h?';
             await fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`, {
               method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
               body: JSON.stringify({ messaging_product: 'whatsapp', to: rt, type: 'text',
-                text: { body: saud + '! Conforme combinamos, agora consigo agendar sua coleta. Podemos marcar? 😊' } }),
+                text: { body: msgRet } }),
             });
-            await rpushEvt({ ts: new Date().toISOString(), tel: rt, dir: 'out', texto: saud + '! Conforme combinamos, agora consigo agendar sua coleta. Podemos marcar? 😊', tipo: 'retomada' });
+            await rpushEvt({ ts: new Date().toISOString(), tel: rt, dir: 'out', texto: msgRet, tipo: 'retomada' });
           } catch (e) {}
         }
         await dbSet('wa_retomar', ret);
@@ -815,7 +816,13 @@ ROTEIRO DO ATENDIMENTO:
 1) ABERTURA — cliente iniciou a conversa após criar a ficha: agradeça, confirme os dados e apresente as DUAS modalidades: 🏪 BALCÃO (traz na loja, ${cfg.descontoBalcao}% de desconto no serviço) ou 🚚 DELIVERY (nós buscamos e devolvemos o equipamento).
 2) SE DELIVERY → o cliente dizer "pode buscar" (ou qualquer sinal de coleta) É A DECISÃO: use a ação cadastrar_logistica IMEDIATAMENTE, na MESMA resposta. NÃO pergunte período. NÃO confirme o endereço (o da ficha vale — só pergunte endereço se a ficha estiver SEM endereço). A resposta é curta: comemore + informe a janela: dentro do horário de coleta → "Perfeito! Nossa equipe já vai programar a busca ainda hoje."; fora do horário → "Perfeito! Sua coleta será feita amanhã entre 08h e 14h.". Só aceite agendar dia específico se o CLIENTE pedir espontaneamente.
 2b) VANTAGENS DO BALCÃO (apresente na abertura): orçamento GRATUITO, conserto em ~15 minutos nos casos comuns, ${cfg.descontoBalcao}% de desconto no serviço — Rua Ouro Preto, 663 - Barro Preto.
-3) COLETA CONFIRMADA → ação cadastrar_logistica (informe no motivo: imediata ou agendada + dia/período). O sistema dá baixa na ficha e cria a coleta.
+2c) AGENDAMENTO DE COLETA — REGRAS DAS FAIXAS (siga à risca):
+   - Coleta é por FAIXA de no mínimo 2 horas: 08h-10h, 10h-12h, 12h-14h ou 14h-16h. NUNCA prometa 16h-18h nem horário exato ("às 9h em ponto" não existe).
+   - Se pedirem horário exato, explique com simpatia: "trabalhamos por rota — o motorista passa em vários endereços na sequência, por isso agendamos por faixa de 2 horas, não horário fixo. Qual faixa fica melhor pra você?"
+   - Cliente só pode FORA das nossas faixas de semana → ofereça o SÁBADO: aos sábados coletamos até as 11h.
+   - Ainda não encaixou? ESCADA DE FLEXIBILIZAÇÃO (uma por vez, tom de solução): (1) "Consegue deixar com um vizinho ou alguém de confiança pra gente pegar na faixa X?" (2) "Se preferir, pega no seu TRABALHO — muita gente leva e a gente coleta lá." (3) "Mora em prédio? Pode deixar na PORTARIA que o motorista retira." — o objetivo é o cliente DISPONIBILIZAR o equipamento em algum lugar dentro das faixas.
+   - NADA encaixou mesmo → convide para a loja ("Rua Ouro Preto, 663 - Barro Preto, orçamento na hora e gratuito") E use a ação mover_entrar_contato (motivo: "sem faixa compatível — abordagem humana") para nossa equipe ligar e resolver.
+3) COLETA CONFIRMADA → ação cadastrar_logistica (informe no motivo: imediata ou agendada + dia/período/faixa). O sistema dá baixa na ficha e cria a coleta.
 4) EQUIPAMENTO NA LOJA → diagnóstico → orçamento enviado ao cliente (valor no contexto, em logistica/pipe).
 5) NEGOCIAÇÃO DO ORÇAMENTO — 5 FASES SEQUENCIAIS (avance UMA fase por vez, só quando o cliente NÃO aprovar ou pedir desconto):
    F1. Envio do orçamento do sistema (use o textoOrcamento do contexto se existir — é o orçamento oficial gerado no diagnóstico).
@@ -964,6 +971,15 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ id: cardX.id, phase: 'aprovados' }),
             });
+          }
+        }
+        if (autorizado && acaoAprovada === 'mover_entrar_contato') {
+          const fdbE = (await dbGet('fichas_adm')) || { fichas: [] };
+          const fichaE = (fdbE.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x && f.status !== 'logistica');
+          if (fichaE) {
+            fichaE.status = 'entrar_contato';
+            fichaE.entrarContatoMotivo = String(acaoMotivo || 'bot: sem faixa de coleta compatível').slice(0, 200);
+            await dbSet('fichas_adm', fdbE);
           }
         }
       } catch (eX) {}
