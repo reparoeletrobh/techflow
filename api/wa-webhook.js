@@ -80,7 +80,8 @@ export default async function handler(req, res) {
             // 🤖 AUTO-RESPOSTA (trava de teste): telefones em wa_bot_config.execTels recebem resposta automática do cérebro
             try {
               const cfgAuto = await dbGet('wa_bot_config');
-              const telsAuto = (cfgAuto && Array.isArray(cfgAuto.execTels)) ? cfgAuto.execTels : [];
+              let telsAuto = (cfgAuto && Array.isArray(cfgAuto.execTels)) ? cfgAuto.execTels : [];
+              if (cfgAuto && cfgAuto.modoAberto === true) telsAuto = [tel]; // 🔓 MODO ABERTO: todos os clientes
               const d8w = String(tel).replace(/\D/g, '').slice(-8);
               if (telsAuto.some(t => String(t).replace(/\D/g, '').slice(-8) === d8w)) {
                 const KW = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();

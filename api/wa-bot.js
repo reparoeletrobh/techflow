@@ -120,6 +120,25 @@ export default async function handler(req, res) {
 
   // ── ABORDAGEM-FICHAS (cron 5min): ficha criada há 5-60min sem conversa iniciada → template cadastro_recebido ──
   // Interruptor: wa_bot_config.abordagemAtiva (false por padrão — ligar quando o número real estiver ativo)
+  // ── 🔓 ATIVAR-GERAL: liga o bot para TODOS os clientes (abordagem + respostas + ações + orçamentos novos) ──
+  if (action === 'ativar-geral') {
+    const cfgAt = (await dbGet('wa_bot_config')) || {};
+    cfgAt.modoAberto = true;
+    cfgAt.abordagemAtiva = true;
+    cfgAt.orcMarcoTs = cfgAt.orcMarcoTs || new Date().toISOString(); // orçamentos: só os criados a partir de agora
+    cfgAt.ativadoEm = new Date().toISOString();
+    await dbSet('wa_bot_config', cfgAt);
+    return res.status(200).json({ ok: true, msg: '🤖 BOT ATIVADO PARA TODOS OS CLIENTES', abordagem: true, modoAberto: true, orcamentosAPartirDe: cfgAt.orcMarcoTs });
+  }
+  // ── 🚨 DESLIGAR-GERAL: botão de emergência — para tudo na hora ──
+  if (action === 'desligar-geral') {
+    const cfgDs = (await dbGet('wa_bot_config')) || {};
+    cfgDs.modoAberto = false;
+    cfgDs.abordagemAtiva = false;
+    await dbSet('wa_bot_config', cfgDs);
+    return res.status(200).json({ ok: true, msg: '🚨 BOT DESLIGADO (abordagem e modo aberto off; conversas de teste continuam pela trava execTels)' });
+  }
+
   // Horário comercial Reparo Eletro (Brasília UTC-3): seg-sex 8h-15h, sáb 8h-10h
   function dentroHorarioComercial() {
     const bras = new Date(Date.now() - 3 * 3600 * 1000);
@@ -165,7 +184,8 @@ export default async function handler(req, res) {
     const candidatas = ((fdb && fdb.fichas) || []).filter(f => {
       const idade = agora - new Date(f.criadoEm || 0).getTime();
       const d8 = String(f.telefone || '').replace(/\D/g, '').slice(-8);
-      return idade > 5 * 60000 && idade < 48 * 3600000 && d8.length >= 8 &&
+      const virgem = !f.status || f.status === 'ficha_criada';
+      return virgem && idade > 5 * 60000 && idade < 48 * 3600000 && d8.length >= 8 &&
         !jaFalaram.has(d8) && !abordados.tels[d8];
     }).slice(0, 10); // máx 10 por ciclo (segurança)
     const disparadas = [];
@@ -436,7 +456,9 @@ export default async function handler(req, res) {
   if (action === 'orcamentos-pendentes') {
     const cfgO = (await dbGet('wa_bot_config')) || {};
     const telsO = Array.isArray(cfgO.execTels) ? cfgO.execTels : [];
-    if (!telsO.length) return res.status(200).json({ ok: true, msg: 'nenhum telefone autorizado' });
+    const abertoO = cfgO.modoAberto === true;
+    if (!abertoO && !telsO.length) return res.status(200).json({ ok: true, msg: 'nenhum telefone autorizado' });
+    const marcoO = cfgO.orcMarcoTs ? new Date(cfgO.orcMarcoTs).getTime() : 0; // só orçamentos criados após a ativação
     const { token: tkO, phoneId: pidO } = await credenciais();
     if (!tkO || !pidO) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
     const [logO, enviadosO, evtsO] = await Promise.all([
@@ -458,8 +480,12 @@ export default async function handler(req, res) {
       if (f.phase !== 'orc_registrado') continue;
       const txtOrc = f.diagnostico && f.diagnostico.textoOrc;
       if (!txtOrc) continue;
-      if (!d8ok(f.telefone)) continue;               // trava de teste
+      if (!abertoO && !d8ok(f.telefone)) continue;    // trava de teste (modo aberto libera)
+      if (abertoO && pzO[String(f.telefone).replace(/\D/g, '').slice(-8)]) continue; // pausado (takeover)
       if (enviadosO.ids[f.id]) continue;              // dedupe
+      // marco temporal: NÃO enviar o backlog — só diagnósticos feitos após a ativação
+      const tsOrc = new Date((f.diagnostico && f.diagnostico.em) || f.movedAt || f.criadoEm || 0).getTime();
+      if (marcoO && tsOrc < marcoO) continue;
       const telO = String(f.telefone).replace(/\D/g, '');
       const to = telO.startsWith('55') ? telO : '55' + telO;
       const t8 = to.slice(-8);
@@ -971,7 +997,7 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
         const execTels = Array.isArray(cfgX.execTels) ? cfgX.execTels : [];
         const d8x = String(tel).replace(/\D/g, '').slice(-8);
         const pzE = (await dbGet('wa_bot_pausados')) || {};
-        const autorizado = !pzE[d8x] && execTels.some(t => String(t).replace(/\D/g, '').slice(-8) === d8x);
+        const autorizado = !pzE[d8x] && (cfgX.modoAberto === true || execTels.some(t => String(t).replace(/\D/g, '').slice(-8) === d8x));
         if (autorizado && acaoAprovada === 'cadastrar_logistica') {
           const fdbX = (await dbGet('fichas_adm')) || { fichas: [] };
           const fichaX = (fdbX.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x && f.status !== 'logistica');
