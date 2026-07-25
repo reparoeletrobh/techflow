@@ -116,12 +116,42 @@ export default async function handler(req, res) {
 
   // ── ABORDAGEM-FICHAS (cron 5min): ficha criada há 5-60min sem conversa iniciada → template cadastro_recebido ──
   // Interruptor: wa_bot_config.abordagemAtiva (false por padrão — ligar quando o número real estiver ativo)
+  // Horário comercial Reparo Eletro (Brasília UTC-3): seg-sex 8h-15h, sáb 8h-10h
+  function dentroHorarioComercial() {
+    const bras = new Date(Date.now() - 3 * 3600 * 1000);
+    const dia = bras.getUTCDay(), hora = bras.getUTCHours() + bras.getUTCMinutes() / 60;
+    if (dia >= 1 && dia <= 5) return hora >= 8 && hora < 15;
+    if (dia === 6) return hora >= 8 && hora < 10;
+    return false;
+  }
+
   if (action === 'abordagem-fichas') {
     const cfgA = (await dbGet('wa_bot_config')) || {};
     if (cfgA.abordagemAtiva !== true) return res.status(200).json({ ok: true, msg: 'abordagem desligada (wa_bot_config.abordagemAtiva)' });
+    if (!dentroHorarioComercial()) return res.status(200).json({ ok: true, msg: 'fora do horário comercial — fichas em standby até a próxima janela' });
     const { token, phoneId } = await credenciais();
     if (!token || !phoneId) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
     const agora = Date.now();
+    // ── RETOMADAS: clientes que pediram agendamento fora do horário — chamar na abertura da janela ──
+    try {
+      const ret = (await dbGet('wa_retomar')) || { tels: [] };
+      if (ret.tels.length) {
+        const pend = ret.tels.slice(0, 10);
+        ret.tels = ret.tels.slice(10);
+        for (const rt of pend) {
+          try {
+            const saud = (new Date(Date.now() - 3 * 3600 * 1000)).getUTCHours() < 12 ? 'Bom dia' : 'Boa tarde';
+            await fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`, {
+              method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ messaging_product: 'whatsapp', to: rt, type: 'text',
+                text: { body: saud + '! Conforme combinamos, agora consigo agendar sua coleta. Podemos marcar? 😊' } }),
+            });
+            await rpushEvt({ ts: new Date().toISOString(), tel: rt, dir: 'out', texto: saud + '! Conforme combinamos, agora consigo agendar sua coleta. Podemos marcar? 😊', tipo: 'retomada' });
+          } catch (e) {}
+        }
+        await dbSet('wa_retomar', ret);
+      }
+    } catch (e) {}
     const [fdb, evts, abordados] = await Promise.all([
       dbGet('fichas_adm'), lerEvts(), dbGet('wa_abordados').then(v => v || { tels: {} }),
     ]);
@@ -130,7 +160,7 @@ export default async function handler(req, res) {
     const candidatas = ((fdb && fdb.fichas) || []).filter(f => {
       const idade = agora - new Date(f.criadoEm || 0).getTime();
       const d8 = String(f.telefone || '').replace(/\D/g, '').slice(-8);
-      return idade > 5 * 60000 && idade < 60 * 60000 && d8.length >= 8 &&
+      return idade > 5 * 60000 && idade < 48 * 3600000 && d8.length >= 8 &&
         !jaFalaram.has(d8) && !abordados.tels[d8];
     }).slice(0, 10); // máx 10 por ciclo (segurança)
     const disparadas = [];
@@ -150,12 +180,21 @@ export default async function handler(req, res) {
         });
         const j = await r.json();
         const okA = !!(j.messages && j.messages[0]);
+        if (okA) {
+          try {
+            f.status = 'contato_feito';
+            f.contatoFeitoEm = new Date().toISOString();
+            f.abordadoPorBot = true;
+          } catch (e) {}
+        }
         abordados.tels[telA.slice(-8)] = new Date().toISOString();
         await rpushEvt({ ts: new Date().toISOString(), tel: to, dir: 'out',
           texto: '📨 [abordagem automática] cadastro_recebido — ' + (f.nome || ''), tipo: 'template' });
         disparadas.push({ nome: f.nome, ok: okA });
       } catch (e) { disparadas.push({ nome: f.nome, erro: e.message }); }
     }
+    // Persistir transições de status das fichas abordadas
+    try { if (disparadas.some(d => d.ok)) await dbSet('fichas_adm', fdb); } catch (e) {}
     // Poda do registro (30 dias)
     const corteA = agora - 30 * 86400000;
     for (const k of Object.keys(abordados.tels)) {
@@ -753,7 +792,16 @@ export default async function handler(req, res) {
     const historico = evts.filter(e => e.tel === tel && e.dir !== 'status').slice(-25)
       .map(e => (e.dir === 'in' ? 'CLIENTE: ' : 'ATENDENTE: ') + e.texto).join('\n');
 
-    const system = `Você é o atendente virtual da Reparo Eletro (assistência técnica de eletrodomésticos em BH: micro-ondas, purificadores, adegas, fornos e afins). Tom: cordial, direto, brasileiro, sem formalidade excessiva. Mensagens CURTAS de WhatsApp, UMA pergunta por vez.
+    const _bras = new Date(Date.now() - 3 * 3600 * 1000);
+    const _dia = _bras.getUTCDay(), _hr = _bras.getUTCHours() + _bras.getUTCMinutes() / 60;
+    const _dentroHC = (_dia >= 1 && _dia <= 5) ? (_hr >= 8 && _hr < 15) : (_dia === 6 ? (_hr >= 8 && _hr < 10) : false);
+    const blocoHorario = _dentroHC
+      ? 'AGORA: DENTRO do horário comercial (seg-sex 8h-15h, sáb 8h-10h). Agendamento de coleta LIBERADO — conduza normalmente.'
+      : `AGORA: FORA do horário comercial. REGRA DURA: NÃO agende nem confirme coleta agora (não use cadastrar_logistica). Converse normal, tire dúvidas, negocie e aprove orçamentos normalmente — só o AGENDAMENTO fica travado. Se o cliente quiser agendar/marcar coleta: informe \"Nosso horário de atendimento e coleta é de segunda a sexta das 8h às 15h e sábado das 8h às 10h\" e PROMETA: \"assim que abrirmos eu te chamo aqui pra deixar sua coleta agendada\". Nesse caso, inclua a tag [RETOMAR] no finalzinho da sua resposta (o sistema remove a tag e agenda a retomada automática — não explique a tag ao cliente).`;
+
+    const system = `${blocoHorario}
+
+Você é o atendente virtual da Reparo Eletro (assistência técnica de eletrodomésticos em BH: micro-ondas, purificadores, adegas, fornos e afins). Tom: cordial, direto, brasileiro, sem formalidade excessiva. Mensagens CURTAS de WhatsApp, UMA pergunta por vez.
 
 VOCÊ SE APRESENTA COMO: Alessandro, responsável pela logística da Reparo Eletro (é a persona oficial do atendimento — os orçamentos também saem em nome dele).
 
@@ -824,6 +872,16 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
       let sug;
       try { sug = JSON.parse(texto.replace(/```json|```/g, '').trim()); }
       catch { sug = { resposta: texto.slice(0, 800), acao: { tipo: 'nenhuma', motivo: 'parse' }, confianca: 'baixa' }; }
+      // Tag [RETOMAR]: cliente quis agendar fora do horário → fila de retomada na abertura da janela
+      try {
+        if (sug.resposta && sug.resposta.includes('[RETOMAR]')) {
+          sug.resposta = sug.resposta.replace(/\s*\[RETOMAR\]\s*/g, ' ').trim();
+          const telFull = String(tel).replace(/\D/g, '');
+          const toRet = telFull.startsWith('55') ? telFull : '55' + telFull;
+          const ret = (await dbGet('wa_retomar')) || { tels: [] };
+          if (!ret.tels.includes(toRet)) { ret.tels.push(toRet); await dbSet('wa_retomar', ret); }
+        }
+      } catch (e) {}
       sug.geradaEm = new Date().toISOString();
       await dbSet('wa_sug_' + tel, sug);
       return res.status(200).json({ ok: true, sugestao: sug });

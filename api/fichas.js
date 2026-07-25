@@ -199,7 +199,9 @@ export default async function handler(req, res) {
     const novosEntrar = [];
     for (const f of db.fichas) {
       if (f.status === 'contato_feito' && f.contatoFeitoEm) {
-        if (agora - new Date(f.contatoFeitoEm).getTime() > 24*60*60*1000) {
+        // Bot abordou → 1 hora para cadastrar na logística; contato manual → 24 horas
+        const limiteMs = f.abordadoPorBot ? 60*60*1000 : 24*60*60*1000;
+        if (agora - new Date(f.contatoFeitoEm).getTime() > limiteMs) {
           f.status = 'entrar_contato';
           mudou = true;
           novosEntrar.push(f);
