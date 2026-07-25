@@ -364,15 +364,14 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
       <button class="modal-close" onclick="fecharMotorista()">✕</button>
     </div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
-      <div>
-        <div class="diag-section-label" style="margin-bottom:6px;">Nome do motorista</div>
-        <input class="diag-input" id="motorista-nome" placeholder="Ex: João Moto" style="width:100%;"
-          onkeydown="if(event.key==='Enter') confirmarMotorista()">
+      <div class="diag-section-label">Escolha o motorista — a ficha vai direto para a rota dele</div>
+      <div style="display:flex;gap:10px;">
+        <button class="cbtn" style="flex:1;background:#8b5cf6;color:#fff;border:none;padding:16px;font-size:15px;font-weight:900;" onclick="confirmarMotorista('Jhonatan')">🏍️ Jhonatan</button>
+        <button class="cbtn" style="flex:1;background:#06b6d4;color:#fff;border:none;padding:16px;font-size:15px;font-weight:900;" onclick="confirmarMotorista('Wilde')">🏍️ Wilde</button>
       </div>
       <div id="motorista-msg" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
         <button class="cbtn cbtn-outline" onclick="fecharMotorista()">Cancelar</button>
-        <button class="cbtn" style="background:#8b5cf6;color:#fff;border:none;" onclick="confirmarMotorista()">Confirmar</button>
       </div>
     </div>
   </div>
@@ -1181,16 +1180,9 @@ function fecharMotorista() {
   motoristaFichaId = null;
 }
 
-async function confirmarMotorista() {
-  const nome = document.getElementById('motorista-nome').value.trim();
-  if (!nome) {
-    const msg = document.getElementById('motorista-msg');
-    msg.textContent = 'Informe o nome do motorista';
-    msg.style.display = 'block';
-    msg.style.background = 'rgba(239,68,68,.1)';
-    msg.style.color = '#ef4444';
-    return;
-  }
+async function confirmarMotorista(nomeEscolhido) {
+  const nome = String(nomeEscolhido || '').trim();
+  if (!nome) return;
   const r = await fetch('/api/tv-logistica?action=mover-motorista', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ id: motoristaFichaId, motoristaNome: nome })
