@@ -31,6 +31,12 @@ async function dbSet(key, val) {
     body: JSON.stringify(val),
   });
 }
+async function bumpStat(campo) {
+  try {
+    const dia = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+    await fetch(`${U}/hincrby/wa_stats_${dia}/${campo}/1`, { headers: { Authorization: `Bearer ${T}` } });
+  } catch (e) {}
+}
 async function lerEvts() {
   try {
     const r = await fetch(`${U}/lrange/${EVT_LIST}/-1500/-1`, { headers: { Authorization: `Bearer ${T}` } });
@@ -120,6 +126,26 @@ export default async function handler(req, res) {
 
   // ── ABORDAGEM-FICHAS (cron 5min): ficha criada há 5-60min sem conversa iniciada → template cadastro_recebido ──
   // Interruptor: wa_bot_config.abordagemAtiva (false por padrão — ligar quando o número real estiver ativo)
+  // ── 📊 BOT-STATS: contadores por dia (?dias=1..90) ──
+  if (action === 'bot-stats') {
+    const dias = Math.min(90, Math.max(1, parseInt(req.query.dias || '30', 10)));
+    const out = [];
+    for (let i = 0; i < dias; i++) {
+      const d = new Date(Date.now() - 3 * 3600 * 1000 - i * 86400000).toISOString().slice(0, 10);
+      try {
+        const r = await fetch(`${U}/hgetall/wa_stats_${d}`, { headers: { Authorization: `Bearer ${T}` } });
+        const j = await r.json();
+        const arr = j.result || [];
+        const obj = { dia: d };
+        for (let k = 0; k < arr.length; k += 2) obj[arr[k]] = parseInt(arr[k + 1], 10) || 0;
+        out.push(obj);
+      } catch (e) { out.push({ dia: d }); }
+    }
+    const tot = {};
+    for (const o of out) for (const k of Object.keys(o)) if (k !== 'dia') tot[k] = (tot[k] || 0) + o[k];
+    return res.status(200).json({ ok: true, dias: out, totais: tot });
+  }
+
   // ── 🔓 ATIVAR-GERAL: liga o bot para TODOS os clientes (abordagem + respostas + ações + orçamentos novos) ──
   if (action === 'ativar-geral') {
     const cfgAt = (await dbGet('wa_bot_config')) || {};
@@ -220,6 +246,7 @@ export default async function handler(req, res) {
         abordados.tels[telA.slice(-8)] = new Date().toISOString();
         await rpushEvt({ ts: new Date().toISOString(), tel: to, dir: 'out',
           texto: '📨 [abordagem automática] cadastro_recebido — ' + (f.nome || ''), tipo: 'template' });
+        if (okA) await bumpStat('abordagens');
         disparadas.push({ nome: f.nome, ok: okA });
       } catch (e) { disparadas.push({ nome: f.nome, erro: e.message }); }
     }
@@ -510,6 +537,7 @@ export default async function handler(req, res) {
           const okO = !!(j.messages && j.messages[0]);
           await rpushEvt({ ts: new Date().toISOString(), tel: to, dir: 'out',
             texto: String(txtOrc).slice(0, 2000), msgId: okO ? j.messages[0].id : null, tipo: 'text', via: 'bot-auto-orcamento' });
+          if (okO) await bumpStat('orcamentos');
           disparos.push({ nome: f.nome, modo: 'orcamento-direto', ok: okO });
         } else {
           // Janela fechada → template orcamento_pronto (a resposta reabre e o cérebro envia o orçamento)
@@ -525,6 +553,7 @@ export default async function handler(req, res) {
           const okO = !!(j.messages && j.messages[0]);
           await rpushEvt({ ts: new Date().toISOString(), tel: to, dir: 'out',
             texto: '📨 [template orcamento_pronto] ' + (f.nome || ''), tipo: 'template', via: 'bot-auto-orcamento' });
+          if (okO) await bumpStat('orcamentos');
           disparos.push({ nome: f.nome, modo: 'template-janela-fechada', ok: okO });
         }
         enviadosO.ids[f.id] = new Date().toISOString();
@@ -1034,6 +1063,7 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
               await dbSet('reparoeletro_logistica', logX);
               fichaX.status = 'logistica'; fichaX.logisticaEm = new Date().toISOString();
               await dbSet('fichas_adm', fdbX);
+              await bumpStat('logistica');
             }
           }
         }
@@ -1050,6 +1080,7 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
               motivo: String(acaoMotivo || 'conflito registrado pelo bot').slice(0, 300),
             }),
           });
+          await bumpStat('conflitos');
         }
         if (autorizado && acaoAprovada === 'mover_aprovado') {
           const ppX = (await dbGet('reparoeletro_pipe')) || { cards: [] };
@@ -1067,6 +1098,7 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ id: cardX.id, phase: 'aprovados' }),
             });
+            await bumpStat('aprovacoes');
           }
         }
         if (autorizado && acaoAprovada === 'mover_entrar_contato') {
@@ -1076,6 +1108,7 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
             fichaE.status = 'entrar_contato';
             fichaE.entrarContatoMotivo = String(acaoMotivo || 'bot: sem faixa de coleta compatível').slice(0, 200);
             await dbSet('fichas_adm', fdbE);
+            await bumpStat('entrar_contato');
           }
         }
       } catch (eX) {}

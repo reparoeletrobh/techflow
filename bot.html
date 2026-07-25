@@ -105,6 +105,18 @@ main{flex:1;display:flex;overflow:hidden;}
   </div>
 </header>
 
+<div id="kpis" style="padding:10px 16px 0;">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+    <span style="font-size:11px;font-weight:900;color:#8b93a3;letter-spacing:.05em;">📊 DESEMPENHO DO BOT</span>
+    <div style="display:flex;gap:4px;margin-left:auto;">
+      <button class="kpi-per btn" data-d="1" onclick="setPer(this)" style="font-size:11px;padding:4px 10px;">Hoje</button>
+      <button class="kpi-per btn" data-d="7" onclick="setPer(this)" style="font-size:11px;padding:4px 10px;">Semana</button>
+      <button class="kpi-per btn" data-d="30" onclick="setPer(this)" style="font-size:11px;padding:4px 10px;">30 dias</button>
+      <button class="kpi-per btn" data-d="90" onclick="setPer(this)" style="font-size:11px;padding:4px 10px;">90 dias</button>
+    </div>
+  </div>
+  <div id="kpi-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:10px;"></div>
+</div>
 <main>
   <div id="col-esq">
   <input id="busca-conv" placeholder="🔎 Buscar nome ou número..." oninput="window._filtroConv=this.value.toLowerCase();if(window._ultD)renderLista(window._ultD);" style="width:calc(100% - 16px);margin:8px 8px 6px;background:#12161d;border:1px solid #242b39;border-radius:9px;padding:8px 11px;color:#f0f2f5;font-size:12.5px;outline:none;box-sizing:border-box;display:block;">
@@ -246,6 +258,41 @@ async function aprovarEnviar(){
 
 carregarConversas();
 setInterval(function(){ if(!document.hidden){ carregarConversas(); if(_tel)abrirConversa(_tel); } }, 30000);
+
+var _kpiDias=parseInt(localStorage.getItem('bot_kpi_d')||'1');
+function setPer(el){
+  _kpiDias=parseInt(el.getAttribute('data-d'));
+  localStorage.setItem('bot_kpi_d',String(_kpiDias));
+  document.querySelectorAll('.kpi-per').forEach(function(b){b.style.background='';b.style.color='';});
+  el.style.background='#22c55e';el.style.color='#111';
+  loadKpis();
+}
+async function loadKpis(){
+  try{
+    var r=await fetch('/api/wa-bot?action=bot-stats&dias='+_kpiDias).then(function(x){return x.json();});
+    if(!r.ok)return;
+    var t=r.totais||{};
+    var defs=[
+      ['📨','Abordagens',t.abordagens||0,'#60a5fa'],
+      ['🚚','P/ Logística',t.logistica||0,'#22c55e'],
+      ['💰','Orçamentos',t.orcamentos||0,'#f59e0b'],
+      ['✅','Aprovações',t.aprovacoes||0,'#4ade80'],
+      ['📞','Entrar em Contato',t.entrar_contato||0,'#fb923c'],
+      ['⚡','Conflitos Bot',t.conflitos||0,'#ef4444']
+    ];
+    document.getElementById('kpi-cards').innerHTML=defs.map(function(d){
+      return '<div style="background:#12161d;border:1px solid #242b39;border-radius:10px;padding:10px 12px;">'+
+        '<div style="font-size:20px;font-weight:900;color:'+d[3]+';">'+d[2]+'</div>'+
+        '<div style="font-size:10px;color:#8b93a3;font-weight:700;">'+d[0]+' '+d[1]+'</div></div>';
+    }).join('');
+  }catch(e){}
+}
+(function(){
+  var btn=document.querySelector('.kpi-per[data-d="'+_kpiDias+'"]')||document.querySelector('.kpi-per');
+  if(btn){btn.style.background='#22c55e';btn.style.color='#111';}
+  loadKpis();
+  setInterval(function(){if(!document.hidden)loadKpis();},120000);
+})();
 </script>
 </body>
 </html>
