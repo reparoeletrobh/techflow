@@ -77,13 +77,15 @@ export default async function handler(req, res) {
       const GATILHOS = { ultima_chamada: 'aguardando_aprovacao', aprovados: 'aguardando_aprovacao', descarte: 'aguardando_aprovacao' };
       const jaTem = (cardId, destino) => db.tarefas.some(t => t.cardId === cardId && t.destino === destino && t.status === 'pendente');
 
-      // Pipe: entradas novas nas fases-gatilho
+      // Pipe: movimentos recentes (48h) para fases-gatilho — robusto a reset/página fechada
       for (const c of ((pipe && pipe.cards) || [])) {
         novoSnapPipe[c.id] = c.phase;
-        const antes = snapPipe[c.id];
-        if (antes === undefined && Object.keys(snapPipe).length === 0) continue; // primeira sync: só fotografa
-        if (c.phase !== antes && GATILHOS.hasOwnProperty(c.phase)) {
-          if (!jaTem(c.id, c.phase)) {
+        if (GATILHOS.hasOwnProperty(c.phase)) {
+          const mvPipe = new Date(c.movedAt || c.criadoEm || 0).getTime();
+          if (!mvPipe || Date.now() - mvPipe > 48 * 3600 * 1000) continue;
+          const jaTratado = db.tarefas.some(t => t.cardId === c.id && t.destino === c.phase &&
+            new Date(t.criadaEm || 0).getTime() >= mvPipe - 60000);
+          if (!jaTratado) {
             db.tarefas.unshift(novaTarefa({
               tipo: 'mover', cardId: c.id,
               cliente: c.nomeContato || '—', tel: c.telefone || '', equipamento: c.equipamento || '',
