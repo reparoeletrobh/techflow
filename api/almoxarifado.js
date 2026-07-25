@@ -396,6 +396,35 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, removidas, recriada });
   }
 
+  // ── RECONCILIAR-DIA: confere movimentos reais do pipe (movedAt) x tarefas existentes ──
+  // Sem &aplicar=1: só lista (dry-run). Com &aplicar=1: recria as que faltam.
+  if (action === 'reconciliar-dia') {
+    const horas = parseFloat(req.query.h || '18');
+    const corte = Date.now() - horas * 3600 * 1000;
+    const FASES_FISICAS = ['aprovados', 'ultima_chamada', 'descarte'];
+    const pdb = await dbGet('reparoeletro_pipe');
+    const faltam = [];
+    for (const c of ((pdb && pdb.cards) || [])) {
+      if (!FASES_FISICAS.includes(c.phase)) continue;
+      const mv = new Date(c.movedAt || 0).getTime();
+      if (!mv || mv < corte) continue;
+      const tem = db.tarefas.some(t => t.cardId === c.id && t.destino === c.phase);
+      if (!tem) faltam.push({ id: c.id, cliente: c.nomeContato || '—', tel: c.telefone || '',
+        fase: c.phase, movidoEm: c.movedAt });
+    }
+    if (req.query.aplicar === '1') {
+      for (const f of faltam) {
+        const c = (pdb.cards || []).find(x => x.id === f.id);
+        db.tarefas.unshift(novaTarefa({ tipo: 'mover', cardId: c.id,
+          cliente: c.nomeContato || '—', tel: c.telefone || '', equipamento: c.equipamento || '',
+          origem: 'aguardando_aprovacao', destino: c.phase }));
+      }
+      await dbSet(KEY, db);
+      return res.status(200).json({ ok: true, recriadas: faltam.length, lista: faltam });
+    }
+    return res.status(200).json({ ok: true, modo: 'dry-run (nada foi criado)', faltam: faltam.length, lista: faltam });
+  }
+
   // ── F2: RESET — zera o almoxarifado p/ começar limpo (tarefas/inventário/snapshot) ──
   if (action === 'reset-f2') {
     await dbSet(KEY, defaultDB());
