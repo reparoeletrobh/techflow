@@ -176,18 +176,23 @@ export default async function handler(req, res) {
         await dbSet('wa_retomar', ret);
       }
     } catch (e) {}
-    const [fdb, evts, abordados] = await Promise.all([
-      dbGet('fichas_adm'), lerEvts(), dbGet('wa_abordados').then(v => v || { tels: {} }),
+    const [fdb, fdbTv, evts, abordados] = await Promise.all([
+      dbGet('fichas_adm'), dbGet('fichas_tv'), lerEvts(), dbGet('wa_abordados').then(v => v || { tels: {} }),
     ]);
     // Telefones que JÁ iniciaram conversa (qualquer evento in)
     const jaFalaram = new Set(evts.filter(e => e.dir === 'in').map(e => String(e.tel).slice(-8)));
-    const candidatas = ((fdb && fdb.fichas) || []).filter(f => {
+    const todasFichas = [
+      ...(((fdb && fdb.fichas) || []).map(f => Object.assign(f, { _sis: 'adm' }))),
+      ...(((fdbTv && fdbTv.fichas) || []).map(f => Object.assign(f, { _sis: 'tv' }))),
+    ];
+    const candidatas = todasFichas.filter(f => {
       const idade = agora - new Date(f.criadoEm || 0).getTime();
       const d8 = String(f.telefone || '').replace(/\D/g, '').slice(-8);
       const virgem = !f.status || f.status === 'ficha_criada';
-      return virgem && idade > 5 * 60000 && idade < 48 * 3600000 && d8.length >= 8 &&
+      return virgem && idade > 5 * 60000 && d8.length >= 8 &&
         !jaFalaram.has(d8) && !abordados.tels[d8];
-    }).slice(0, 10); // máx 10 por ciclo (segurança)
+    }).sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')))
+      .slice(0, 10); // máx 10 por ciclo, mais recentes primeiro
     const disparadas = [];
     for (const f of candidatas) {
       const telA = String(f.telefone).replace(/\D/g, '');
@@ -219,7 +224,12 @@ export default async function handler(req, res) {
       } catch (e) { disparadas.push({ nome: f.nome, erro: e.message }); }
     }
     // Persistir transições de status das fichas abordadas
-    try { if (disparadas.some(d => d.ok)) await dbSet('fichas_adm', fdb); } catch (e) {}
+    try {
+      if (disparadas.some(d => d.ok)) {
+        await dbSet('fichas_adm', fdb);
+        if (fdbTv) await dbSet('fichas_tv', fdbTv);
+      }
+    } catch (e) {}
     // Poda do registro (30 dias)
     const corteA = agora - 30 * 86400000;
     for (const k of Object.keys(abordados.tels)) {
@@ -853,6 +863,8 @@ export default async function handler(req, res) {
     const system = `Você é o atendente virtual da Reparo Eletro (assistência técnica de eletrodomésticos em BH: micro-ondas, purificadores, adegas, fornos e afins). Tom: cordial, direto, brasileiro, sem formalidade excessiva. Mensagens CURTAS de WhatsApp, UMA pergunta por vez.
 
 VOCÊ SE APRESENTA COMO: Alessandro, responsável pela logística da Reparo Eletro (é a persona oficial do atendimento — os orçamentos também saem em nome dele).
+
+🎯 NICHO DE ATENDIMENTO (lista FECHADA — só consertamos): micro-ondas, forno elétrico, bebedouro de água, purificador de água, adega climatizada e televisão. QUALQUER outro equipamento (geladeira, máquina de lavar, fogão a gás, ar-condicionado, notebook, celular, som etc.): recuse com educação — "Poxa, esse a gente não atende — trabalhamos com micro-ondas, forno elétrico, bebedouro, purificador, adega e TV. Se algum dia precisar de um desses, conta com a gente!" — e NÃO crie coleta nem prossiga. TV segue o fluxo do sistema de TV (item 7a-1); os demais do nicho seguem o fluxo normal (ADM).
 
 QUEM TE PROCURA: clientes que preencheram a ficha de atendimento (formulário) e iniciaram a conversa. A ficha deles aparece no CONTEXTO abaixo (nome, equipamento, defeito, endereço).
 
