@@ -77,15 +77,25 @@ export default async function handler(req, res) {
       const GATILHOS = { ultima_chamada: 'aguardando_aprovacao', aprovados: 'aguardando_aprovacao', descarte: 'aguardando_aprovacao' };
       const jaTem = (cardId, destino) => db.tarefas.some(t => t.cardId === cardId && t.destino === destino && t.status === 'pendente');
 
-      // Pipe: movimentos recentes (48h) para fases-gatilho — robusto a reset/página fechada
+      // Pipe: diff por snapshot (estável). Primeira sync: só movimentos das últimas 12h,
+      // com FUSÍVEL: se houver mais de 15 candidatos (movimentação em massa de cron), não cria nada — só fotografa.
+      const snapVazio = Object.keys(snapPipe).length === 0;
+      let candidatos = [];
       for (const c of ((pipe && pipe.cards) || [])) {
         novoSnapPipe[c.id] = c.phase;
-        if (GATILHOS.hasOwnProperty(c.phase)) {
-          const mvPipe = new Date(c.movedAt || c.criadoEm || 0).getTime();
-          if (!mvPipe || Date.now() - mvPipe > 48 * 3600 * 1000) continue;
-          const jaTratado = db.tarefas.some(t => t.cardId === c.id && t.destino === c.phase &&
-            new Date(t.criadaEm || 0).getTime() >= mvPipe - 60000);
-          if (!jaTratado) {
+        if (!GATILHOS.hasOwnProperty(c.phase)) continue;
+        const antes = snapPipe[c.id];
+        if (snapVazio) {
+          const mvPipe = new Date(c.movedAt || 0).getTime();
+          if (mvPipe && Date.now() - mvPipe < 12 * 3600 * 1000) candidatos.push(c);
+          continue;
+        }
+        if (c.phase !== antes) candidatos.push(c);
+      }
+      if (snapVazio && candidatos.length > 15) candidatos = []; // fusível anti-enxurrada
+      for (const c of candidatos) {
+        {
+          if (!jaTem(c.id, c.phase)) {
             db.tarefas.unshift(novaTarefa({
               tipo: 'mover', cardId: c.id,
               cliente: c.nomeContato || '—', tel: c.telefone || '', equipamento: c.equipamento || '',
@@ -359,6 +369,33 @@ export default async function handler(req, res) {
     const pend = (db.tarefas || []).filter(t => t.status === 'pendente' || t.status === 'falha').length;
     const rotasSep = (db.rotas || []).filter(r => r.status !== 'finalizada').length;
     return res.status(200).json({ ok: true, pendentes: pend + rotasSep });
+  }
+
+  // ── LIMPAR ENXURRADA: remove tarefas 'mover' pendentes criadas nas últimas N horas (padrão 3) ──
+  if (action === 'limpar-enxurrada') {
+    const horas = parseFloat(req.query.h || '3');
+    const corte = Date.now() - horas * 3600 * 1000;
+    const antes = db.tarefas.length;
+    db.tarefas = db.tarefas.filter(t => !(t.tipo === 'mover' && t.status === 'pendente' &&
+      new Date(t.criadaEm || 0).getTime() > corte));
+    const removidas = antes - db.tarefas.length;
+    // recriar tarefa legítima específica (?recriar=CARD_ID)
+    let recriada = null;
+    const rid = req.query.recriar;
+    if (rid) {
+      try {
+        const pdb = await dbGet('reparoeletro_pipe');
+        const c = pdb && (pdb.cards || []).find(x => x.id === rid);
+        if (c) {
+          db.tarefas.unshift(novaTarefa({ tipo: 'mover', cardId: c.id,
+            cliente: c.nomeContato || '—', tel: c.telefone || '', equipamento: c.equipamento || '',
+            origem: 'aguardando_aprovacao', destino: c.phase }));
+          recriada = c.id + ' (' + (c.nomeContato || '') + ' → ' + c.phase + ')';
+        }
+      } catch (e) {}
+    }
+    await dbSet(KEY, db);
+    return res.status(200).json({ ok: true, removidas, recriada });
   }
 
   // ── F2: RESET — zera o almoxarifado p/ começar limpo (tarefas/inventário/snapshot) ──
