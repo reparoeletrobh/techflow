@@ -91,6 +91,22 @@
   ],
   "rewrites": [
     {
+      "source": "/Jhonatan",
+      "destination": "/tv-rota.html?m=Jhonatan"
+    },
+    {
+      "source": "/Wilde",
+      "destination": "/tv-rota.html?m=Wilde"
+    },
+    {
+      "source": "/jhonatan",
+      "destination": "/tv-rota.html?m=Jhonatan"
+    },
+    {
+      "source": "/wilde",
+      "destination": "/tv-rota.html?m=Wilde"
+    },
+    {
       "source": "/tv/wilde",
       "destination": "/tv-rota.html?m=Wilde"
     },
