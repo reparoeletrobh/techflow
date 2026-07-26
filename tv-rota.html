@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏍️ Rota TV</title>
+<script>
+/* 🔐 TF-GUARD Fase 1 */
+(function(){
+  if(location.pathname==='/login'||location.pathname==='/login.html')return;
+  var K=localStorage.getItem('tf_key');
+  if(!K){location.replace('/login?next='+encodeURIComponent(location.pathname+location.search));return;}
+  var _f=window.fetch;
+  window.fetch=function(u,o){
+    try{
+      if(typeof u==='string'&&u.indexOf('/api/')>-1&&u.indexOf('/api/auth')===-1){
+        var kk=localStorage.getItem('tf_key')||'';
+        u+=(u.indexOf('?')>-1?'&':'?')+'k='+encodeURIComponent(kk);
+      }
+    }catch(e){}
+    return _f.call(this,u,o);
+  };
+})();
+</script>
+<style>
+:root{--bg:#0e1013;--surface:#16191e;--line:#262b33;--txt:#f0f2f5;--dim:#8b93a3;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:12px;max-width:560px;margin:0 auto;padding-bottom:40px;}
+h1{font-size:17px;font-weight:900;margin-bottom:4px;}
+.sub{font-size:12px;color:var(--dim);margin-bottom:12px;}
+#copiloto{background:linear-gradient(135deg,#12161d,#1a2030);border:1px solid #2a3550;border-radius:14px;padding:14px;margin-bottom:14px;}
+#copiloto .tit{font-size:11px;font-weight:900;color:#60a5fa;letter-spacing:.05em;margin-bottom:6px;}
+#copiloto .msg{font-size:13.5px;line-height:1.55;}
+.reg-head{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;margin:14px 0 8px;cursor:pointer;user-select:none;font-weight:900;font-size:13.5px;}
+.reg-head .cnt{margin-left:auto;background:rgba(255,255,255,.15);border-radius:99px;padding:1px 9px;font-size:12px;}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px;border-left:5px solid #6b7280;}
+.card.contatado{opacity:.85;background:#131a15;border-color:rgba(34,197,94,.3);}
+.nm{font-size:15px;font-weight:800;}
+.eq{font-size:12px;color:var(--dim);margin-top:2px;line-height:1.5;}
+.aging{display:inline-block;font-size:10.5px;font-weight:900;padding:1px 8px;border-radius:8px;margin-left:6px;}
+.a-ok{background:rgba(34,197,94,.15);color:#4ade80;}
+.a-warn{background:rgba(245,158,11,.2);color:#fbbf24;}
+.a-late{background:rgba(239,68,68,.25);color:#f87171;animation:pisca .9s ease infinite;}
+@keyframes pisca{0%,100%{opacity:1;}50%{opacity:.45;}}
+.badge-ctt{display:inline-block;font-size:10.5px;font-weight:900;background:rgba(34,197,94,.2);color:#4ade80;padding:1px 8px;border-radius:8px;margin-left:6px;}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+.b{flex:1;min-width:30%;border:none;border-radius:9px;padding:10px 6px;font-size:12px;font-weight:800;cursor:pointer;text-align:center;text-decoration:none;color:#fff;display:block;}
+.b-wpp{background:#16a34a;}
+.b-tel{background:#2563eb;}
+.b-map{background:#475569;}
+.b-rel{background:#7c3aed;}
+.b-rem{background:#b45309;}
+.b-col{background:#059669;font-size:13px;min-width:100%;padding:12px;}
+.empty{text-align:center;color:var(--dim);padding:40px 16px;font-size:14px;line-height:1.6;}
+</style>
+</head>
+<body>
+<h1 id="titulo">🏍️ Rota TV</h1>
+<div class="sub" id="subtitulo">Carregando fichas…</div>
+<div id="copiloto" style="display:none;">
+  <div class="tit">🧭 COPILOTO DE ROTA</div>
+  <div class="msg" id="copi-msg"></div>
+</div>
+<div id="lista"></div>
+<script>
+var MOT=new URLSearchParams(location.search).get('m')||'';
+document.getElementById('titulo').textContent='🏍️ Rota de '+MOT;
+var _dados=null;
+var _regAberta={};
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function horasDesde(iso){return (Date.now()-new Date(iso||0).getTime())/3600000;}
+function agingHtml(iso){
+  var hh=horasDesde(iso);
+  if(hh<24)return '<span class="aging a-ok">'+Math.round(hh)+'h no sistema</span>';
+  if(hh<48)return '<span class="aging a-warn">'+Math.round(hh)+'h no sistema</span>';
+  return '<span class="aging a-late">⚠ '+Math.round(hh/24)+' dias — EM ATRASO</span>';
+}
+function distKm(a,b){
+  var R=6371,dLa=(b.lat-a.lat)*Math.PI/180,dLo=(b.lng-a.lng)*Math.PI/180;
+  var x=Math.sin(dLa/2)*Math.sin(dLa/2)+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLo/2)*Math.sin(dLo/2);
+  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+
+async function load(){
+  try{
+    var r=await fetch('/api/tv-logistica?action=rota-fichas&m='+encodeURIComponent(MOT)).then(function(x){return x.json();});
+    if(!r.ok){document.getElementById('subtitulo').textContent='Erro ao carregar';return;}
+    _dados=r;render();
+  }catch(e){document.getElementById('subtitulo').textContent='Erro de conexão';}
+}
+
+function render(){
+  var fichas=_dados.fichas,REG=_dados.regioes;
+  var el=document.getElementById('lista');
+  document.getElementById('subtitulo').textContent=fichas.length+' TV(s) para coletar';
+  if(!fichas.length){
+    el.innerHTML='<div class="empty">🎉 Nenhuma coleta pendente!<br><small>Quando a logística mandar fichas pra você, elas aparecem aqui.</small></div>';
+    document.getElementById('copiloto').style.display='none';
+    return;
+  }
+  // Agrupar por região
+  var grupos={};
+  fichas.forEach(function(f){(grupos[f.regiao]=grupos[f.regiao]||[]).push(f);});
+  // Ordenar regiões: mais fichas primeiro; dentro: atrasadas primeiro
+  var regs=Object.keys(grupos).sort(function(a,b){return grupos[b].length-grupos[a].length;});
+  // Copiloto
+  var copi='Você tem <b>'+fichas.length+' TV(s)</b> em <b>'+regs.length+' região(ões)</b>: ';
+  copi+=regs.map(function(rg){return '<span style="color:'+REG[rg].cor+';font-weight:800;">'+REG[rg].nome+' ('+grupos[rg].length+')</span>';}).join(' · ');
+  var maior=regs[0];
+  var atrasadas=fichas.filter(function(f){return horasDesde(f.movedAt)>48;}).length;
+  copi+='<br>👉 Sugestão: comece por <b style="color:'+REG[maior].cor+';">'+REG[maior].nome+'</b> ('+grupos[maior].length+' coleta'+(grupos[maior].length>1?'s':'')+' juntas'+')';
+  if(regs.length>1){
+    var prox=regs.slice(1).map(function(rg){return {rg:rg,d:distKm(REG[maior],REG[rg]),n:grupos[rg].length};})
+      .sort(function(a,b){return a.d-b.d;})[0];
+    copi+='. Terminando lá, a região com fichas mais perto é <b style="color:'+REG[prox.rg].cor+';">'+REG[prox.rg].nome+'</b> — '+prox.n+' ficha(s) a ~'+prox.d.toFixed(0)+' km.';
+  }
+  if(atrasadas)copi+='<br>⚠️ <b style="color:#f87171;">'+atrasadas+' ficha(s) EM ATRASO (2+ dias)</b> — prioriza o contato com essas!';
+  document.getElementById('copi-msg').innerHTML=copi;
+  document.getElementById('copiloto').style.display='block';
+  // Lista agrupada
+  el.innerHTML=regs.map(function(rg){
+    var R=REG[rg],lista=grupos[rg];
+    lista.sort(function(a,b){return horasDesde(b.movedAt)-horasDesde(a.movedAt);});
+    var aberta=_regAberta[rg]!==false;
+    var html='<div class="reg-head" style="background:'+R.cor+'22;border:1px solid '+R.cor+'55;color:'+R.cor+';" onclick="toggleReg(\''+rg+'\')">'+
+      (aberta?'▼':'▶')+' '+esc(R.nome)+'<span class="cnt">'+lista.length+'</span></div>';
+    if(!aberta)return html;
+    html+=lista.map(function(f){
+      var tel=String(f.telefone||'').replace(/\D/g,'');
+      var to=tel.length>=10?(tel.indexOf('55')===0?tel:'55'+tel):'';
+      var msg=encodeURIComponent('Olá '+(f.nome||'').split(' ')[0]+'! Sou o motorista da Reparo Eletro. Estou organizando a rota de coleta da sua TV ('+(f.equipamento||'TV')+'). Posso passar aí hoje?');
+      return '<div class="card'+(f.primeiroContatoEm?' contatado':'')+'" style="border-left-color:'+R.cor+';">'+
+        '<div class="nm">'+esc(f.nome||'—')+agingHtml(f.movedAt)+(f.primeiroContatoEm?'<span class="badge-ctt">✅ contato feito</span>':'')+'</div>'+
+        '<div class="eq">📍 '+esc(f.endereco||'sem endereço')+'</div>'+
+        '<div class="eq">📺 '+esc(f.equipamento||'TV')+(f.defeito?' — '+esc(f.defeito):'')+(f.telefone?' · 📞 '+esc(f.telefone):'')+'</div>'+
+        '<div class="acts">'+
+          '<a class="b b-wpp" href="https://wa.me/'+to+'?text='+msg+'" target="_blank" onclick="marcaContato(\''+f.id+'\')">💬 WhatsApp</a>'+
+          '<a class="b b-tel" href="tel:+'+to+'" onclick="marcaContato(\''+f.id+'\')">📞 Ligar</a>'+
+          '<a class="b b-map" href="https://maps.google.com/?q='+encodeURIComponent(f.endereco||'')+'" target="_blank">🗺️ Mapa</a>'+
+          '<button class="b b-rel" onclick="iniciarRelatorio(\''+f.id+'\')">📋 '+(f.relatorioIniciadoEm?'Relatório ✓':'Relatório')+'</button>'+
+          '<button class="b b-rem" onclick="remarcar(\''+f.id+'\')">📅 Remarcar</button>'+
+          '<button class="b b-col" onclick="coletado(\''+f.id+'\')">✅ EQUIPAMENTO COLETADO</button>'+
+        '</div></div>';
+    }).join('');
+    return html;
+  }).join('');
+}
+
+function toggleReg(rg){_regAberta[rg]=_regAberta[rg]===false?true:false;render();}
+async function marcaContato(id){
+  try{await fetch('/api/tv-logistica?action=rota-contato',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});}catch(e){}
+  setTimeout(load,800);
+}
+async function iniciarRelatorio(id){
+  var obs=prompt('📋 Relatório de deslocamento — alguma observação? (pode deixar vazio)');
+  if(obs===null)return;
+  await fetch('/api/tv-logistica?action=rota-relatorio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,obs:obs})}).catch(function(){});
+  load();
+}
+async function remarcar(id){
+  if(!confirm('📅 Remarcar esta coleta? A ficha volta para a logística.'))return;
+  var r=await fetch('/api/tv-logistica?action=mover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,phase:'remarcar'})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
+}
+async function coletado(id){
+  if(!confirm('✅ Confirmar: equipamento COLETADO e com você?'))return;
+  var r=await fetch('/api/tv-logistica?action=mover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,phase:'coleta_efetuada'})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
+}
+load();
+setInterval(function(){if(!document.hidden)load();},60000);
+</script>
+</body>
+</html>

@@ -520,6 +520,78 @@ module.exports = async function handler(req, res) {
   }
 
 
+  // ══════════ ROTA DO MOTORISTA (F2/F3/F4) ══════════
+  // Mapeamento bairro→região da área de coleta (normalizado: minúsculo, sem acento)
+  const REGIOES = {
+    'bh-norte':   { nome: 'BH Norte',            cor: '#3b82f6', lat: -19.85, lng: -43.96 },
+    'bh-sul':     { nome: 'BH Sul',              cor: '#22c55e', lat: -19.945, lng: -43.94 },
+    'bh-leste':   { nome: 'BH Leste',            cor: '#f59e0b', lat: -19.905, lng: -43.90 },
+    'bh-oeste':   { nome: 'BH Oeste',            cor: '#ef4444', lat: -19.95, lng: -44.00 },
+    'venda-nova': { nome: 'Venda Nova',          cor: '#8b5cf6', lat: -19.81, lng: -43.95 },
+    'contagem':   { nome: 'Contagem',            cor: '#06b6d4', lat: -19.93, lng: -44.05 },
+    'betim':      { nome: 'Betim',               cor: '#f97316', lat: -19.96, lng: -44.20 },
+    'ibirite':    { nome: 'Ibirité/Sarzedo',     cor: '#84cc16', lat: -20.02, lng: -44.06 },
+    'nova-lima':  { nome: 'Nova Lima',           cor: '#10b981', lat: -19.98, lng: -43.85 },
+    'sabara':     { nome: 'Sabará',              cor: '#eab308', lat: -19.885, lng: -43.80 },
+    'santa-luzia':{ nome: 'Santa Luzia',         cor: '#ec4899', lat: -19.77, lng: -43.85 },
+    'vespasiano': { nome: 'Vespasiano',          cor: '#a855f7', lat: -19.69, lng: -43.92 },
+    'neves':      { nome: 'Ribeirão das Neves',  cor: '#14b8a6', lat: -19.76, lng: -44.09 },
+    'sem-regiao': { nome: 'A Classificar',       cor: '#6b7280', lat: -19.92, lng: -43.94 },
+  };
+  const BAIRROS = {
+    // Venda Nova
+    'venda nova':'venda-nova','ceu azul':'venda-nova','piratininga':'venda-nova','leticia':'venda-nova','rio branco':'venda-nova','serra verde':'venda-nova','candelaria':'venda-nova','copacabana':'venda-nova','santa monica':'venda-nova','mantiqueira':'venda-nova','jardim europa':'venda-nova','sao joao batista':'venda-nova','jardim leblon':'venda-nova','maria helena':'venda-nova','lagoinha leblon':'venda-nova','minascaixa':'venda-nova','europa':'venda-nova',
+    // BH Norte (Norte + Pampulha + Nordeste)
+    'pampulha':'bh-norte','ouro preto':'bh-norte','santa amelia':'bh-norte','itapoa':'bh-norte','planalto':'bh-norte','jaragua':'bh-norte','liberdade':'bh-norte','sao luiz':'bh-norte','braunas':'bh-norte','trevo':'bh-norte','bandeirantes':'bh-norte','santa branca':'bh-norte','dona clara':'bh-norte','aeroporto':'bh-norte','universitario':'bh-norte','indaia':'bh-norte','floramar':'bh-norte','guarani':'bh-norte','tupi':'bh-norte','lajedo':'bh-norte','vila cloris':'bh-norte','jardim guanabara':'bh-norte','providencia':'bh-norte','primeiro de maio':'bh-norte','minaslandia':'bh-norte','heliopolis':'bh-norte','zilah sposito':'bh-norte','jaqueline':'bh-norte','solimoes':'bh-norte','cidade nova':'bh-norte','uniao':'bh-norte','silveira':'bh-norte','palmares':'bh-norte','ipiranga':'bh-norte','concordia':'bh-norte','cachoeirinha':'bh-norte','sao paulo':'bh-norte','renascenca':'bh-norte','fernao dias':'bh-norte','goiania':'bh-norte','maria goretti':'bh-norte','ribeiro de abreu':'bh-norte','sao gabriel':'bh-norte','sao bernardo':'bh-norte','jardim atlantico':'bh-norte','santa rosa':'bh-norte',
+    // BH Sul (Centro-Sul)
+    'centro':'bh-sul','savassi':'bh-sul','funcionarios':'bh-sul','lourdes':'bh-sul','santo agostinho':'bh-sul','boa viagem':'bh-sul','serra':'bh-sul','mangabeiras':'bh-sul','sion':'bh-sul','anchieta':'bh-sul','cruzeiro':'bh-sul','santo antonio':'bh-sul','coracao de jesus':'bh-sul','cidade jardim':'bh-sul','luxemburgo':'bh-sul','sao bento':'bh-sul','belvedere':'bh-sul','carmo':'bh-sul','barro preto':'bh-sul','vila paris':'bh-sul','santa lucia':'bh-sul','sao pedro':'bh-sul','santa efigenia':'bh-sul','comiteco':'bh-sul',
+    // BH Leste
+    'sagrada familia':'bh-leste','santa tereza':'bh-leste','floresta':'bh-leste','horto':'bh-leste','pompeia':'bh-leste','esplanada':'bh-leste','santa ines':'bh-leste','nova floresta':'bh-leste','colegio batista':'bh-leste','casa branca':'bh-leste','taquaril':'bh-leste','alto vera cruz':'bh-leste','vera cruz':'bh-leste','saudade':'bh-leste','boa vista':'bh-leste','sao geraldo':'bh-leste','granja de freitas':'bh-leste','caetano furquim':'bh-leste','paraiso':'bh-leste',
+    // BH Oeste (Oeste + Noroeste + Barreiro)
+    'gutierrez':'bh-oeste','buritis':'bh-oeste','estoril':'bh-oeste','salgado filho':'bh-oeste','nova suica':'bh-oeste','grajau':'bh-oeste','gameleira':'bh-oeste','calafate':'bh-oeste','jardim america':'bh-oeste','nova granada':'bh-oeste','prado':'bh-oeste','barroca':'bh-oeste','alto barroca':'bh-oeste','havai':'bh-oeste','betania':'bh-oeste','cabana':'bh-oeste','madre gertrudes':'bh-oeste','vista alegre':'bh-oeste','coracao eucaristico':'bh-oeste','padre eustaquio':'bh-oeste','carlos prates':'bh-oeste','caicara':'bh-oeste','monsenhor messias':'bh-oeste','dom cabral':'bh-oeste','alipio de melo':'bh-oeste','serrano':'bh-oeste','gloria':'bh-oeste','california':'bh-oeste','pindorama':'bh-oeste','barreiro':'bh-oeste','diamante':'bh-oeste','cardoso':'bh-oeste','milionarios':'bh-oeste','santa cecilia':'bh-oeste','tirol':'bh-oeste','lindeia':'bh-oeste','regina':'bh-oeste','bonsucesso':'bh-oeste','itaipu':'bh-oeste','olaria':'bh-oeste','joao pinheiro':'bh-oeste','camargos':'bh-oeste','santa maria':'bh-oeste',
+  };
+  const CIDADES = { 'contagem':'contagem','betim':'betim','ibirite':'ibirite','sarzedo':'ibirite','nova lima':'nova-lima','sabara':'sabara','santa luzia':'santa-luzia','vespasiano':'vespasiano','ribeirao das neves':'neves','justinopolis':'neves' };
+  function normTxt(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  function regiaoDoEndereco(end) {
+    const e = ' ' + normTxt(end) + ' ';
+    for (const c of Object.keys(CIDADES)) if (e.includes(c)) return CIDADES[c];
+    for (const b of Object.keys(BAIRROS)) if (e.includes(b)) return BAIRROS[b];
+    return 'sem-regiao';
+  }
+
+  // ── GET rota-fichas?m=Nome: fichas do motorista com região resolvida + catálogo ──
+  if (req.method === 'GET' && action === 'rota-fichas') {
+    const m = normTxt(req.query.m || '');
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const fichas = (db.fichas || [])
+      .filter(f => f.phase === 'motorista_parceiro' && normTxt(f.motoristaNome).includes(m))
+      .map(f => ({ id: f.id, nome: f.nome, telefone: f.telefone, endereco: f.endereco || '',
+        equipamento: f.equipamento || 'TV', defeito: f.defeito || '', movedAt: f.movedAt || f.criadoEm,
+        primeiroContatoEm: f.primeiroContatoEm || null, relatorioIniciadoEm: f.relatorioIniciadoEm || null,
+        regiao: regiaoDoEndereco(f.endereco) }));
+    return res.status(200).json({ ok: true, fichas, regioes: REGIOES });
+  }
+
+  // ── POST rota-contato: registra o 1º contato (WhatsApp/ligação) ──
+  if (req.method === 'POST' && action === 'rota-contato') {
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const f = db.fichas.find(x => x.id === (req.body || {}).id);
+    if (!f) return res.status(404).json({ ok: false });
+    if (!f.primeiroContatoEm) { f.primeiroContatoEm = new Date().toISOString(); await dbSet(LOG_KEY, db); }
+    return res.status(200).json({ ok: true });
+  }
+
+  // ── POST rota-relatorio: marca o início do relatório de deslocamento ──
+  if (req.method === 'POST' && action === 'rota-relatorio') {
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const f = db.fichas.find(x => x.id === (req.body || {}).id);
+    if (!f) return res.status(404).json({ ok: false });
+    f.relatorioIniciadoEm = new Date().toISOString();
+    if ((req.body || {}).obs) f.relatorioObs = String(req.body.obs).slice(0, 300);
+    await dbSet(LOG_KEY, db);
+    return res.status(200).json({ ok: true });
+  }
+
   // ── POST mover-motorista: move para Motorista Parceiro salvando o nome ──
   if (req.method === 'POST' && action === 'mover-motorista') {
     const { id, motoristaNome } = req.body || {};
