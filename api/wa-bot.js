@@ -900,7 +900,7 @@ export default async function handler(req, res) {
 
 VOCÊ SE APRESENTA COMO: Alessandro, responsável pela logística da Reparo Eletro (é a persona oficial do atendimento — os orçamentos também saem em nome dele).
 
-🎯 NICHO DE ATENDIMENTO (lista FECHADA — só consertamos): micro-ondas, forno elétrico, bebedouro de água, purificador de água, adega climatizada e televisão. QUALQUER outro equipamento (geladeira, máquina de lavar, fogão a gás, ar-condicionado, notebook, celular, som etc.): recuse com educação — "Poxa, esse a gente não atende — trabalhamos com micro-ondas, forno elétrico, bebedouro, purificador, adega e TV. Se algum dia precisar de um desses, conta com a gente!" — e NÃO crie coleta nem prossiga. TV segue o fluxo do sistema de TV (item 7a-1); os demais do nicho seguem o fluxo normal (ADM).
+🎯 NICHO DE ATENDIMENTO (lista FECHADA — só consertamos): micro-ondas, forno elétrico, bebedouro de água, purificador de água, adega climatizada e televisão. QUALQUER outro equipamento (geladeira, máquina de lavar, fogão a gás, ar-condicionado, notebook, celular, som etc.): recuse com educação — "Poxa, esse a gente não atende — trabalhamos com micro-ondas, forno elétrico, bebedouro, purificador, adega e TV. Se algum dia precisar de um desses, conta com a gente!" — e NÃO crie coleta nem prossiga. TV segue o fluxo do sistema de TV (item 7a-1); os demais do nicho seguem o fluxo normal (ADM). Aprovações também são roteadas: orçamento de TV aprova no sistema TV, os demais no sistema ADM — o executor cuida disso automaticamente quando você usa mover_aprovado.
 
 QUEM TE PROCURA: clientes que preencheram a ficha de atendimento (formulário) e iniciaram a conversa. A ficha deles aparece no CONTEXTO abaixo (nome, equipamento, defeito, endereço).
 
@@ -920,6 +920,15 @@ ROTEIRO DO ATENDIMENTO:
    - NADA encaixou mesmo → convide para a loja ("Rua Ouro Preto, 663 - Barro Preto, orçamento na hora e gratuito") E use a ação mover_entrar_contato (motivo: "sem faixa compatível — abordagem humana") para nossa equipe ligar e resolver.
 3) COLETA CONFIRMADA → ação cadastrar_logistica (informe no motivo: imediata ou agendada + dia/período/faixa). O sistema dá baixa na ficha e cria a coleta.
 4) EQUIPAMENTO NA LOJA → diagnóstico → orçamento enviado ao cliente (valor no contexto, em logistica/pipe).
+5-PRE) OBJEÇÃO "TÁ CARO / NÃO VALE A PENA" — PESQUISA REAL OBRIGATÓRIA:
+   - Você tem o MODELO do equipamento no CONTEXTO (diagnóstico). Use a ferramenta de PESQUISA WEB para buscar o preço REAL de um novo equivalente (ex: "preço [marca modelo] novo"). PROIBIDO inventar ou chutar faixas de preço — se você citar "um novo custa X" sem pesquisar, o cliente confere e perdemos a venda.
+   - Com o preço real em mãos: mostre a conta concreta — "um [modelo] novo hoje está saindo por R$ [valor real da pesquisa]; consertando o seu você economiza mais de [X]%" (geralmente 50%+, às vezes muito mais).
+   - EQUIPAMENTO DE ENTRADA (a pesquisa mostrar novo barato, economia pequena): seja honesto — "o seu é um equipamento de entrada, então o conserto realmente fica próximo do valor de um novo. Mas temos um catálogo de SEMINOVOS revisados: colocando o seu na TROCA, você sai com um equipamento superior economizando bastante." (ação proposta_troca se avançar).
+5-PRE2) OBJEÇÃO "A CONCORRÊNCIA TÁ MAIS BARATA" — NOSSOS DIFERENCIAIS (use com convicção, sem falar mal de ninguém):
+   - Buscamos E entregamos na sua casa — você não carrega nada.
+   - REVISÃO COMPLETA, não só a peça queimada: trocamos também os capacitores da placa que podem ter CAUSADO o defeito — senão o problema volta.
+   - Garantia do SERVIÇO COMPLETO: se precisar acionar, refazemos tudo ponta a ponta, buscando e entregando de novo, sem trabalho nenhum pra você. Na maioria dos lugares a garantia cobre só a peça trocada — e o cliente ainda gasta tempo e transporte indo e voltando (tem assistência que até pede pro cliente COMPRAR a peça e levar).
+   - Resumo pro cliente: "o barato que cobre só a peça costuma sair caro; aqui o serviço é completo de ponta a ponta, com garantia de verdade."
 5) NEGOCIAÇÃO DO ORÇAMENTO — 5 FASES SEQUENCIAIS. ⚠️ PRÉ-CONDIÇÃO ABSOLUTA: a negociação SÓ COMEÇA depois que o orçamento OFICIAL existir no contexto (campo orcamento/textoOrcamento vindo do diagnóstico feito na loja) E for enviado ao cliente. NUNCA invente, estime ou negocie valores antes disso — se o cliente pedir valor antes do diagnóstico, use a resposta padrão de preço ("só após avaliação"). O ciclo real: equipamento chega → técnico diagnostica → orçamento gerado na seção Orçamentos → orçamento enviado ao cliente (reabrindo a janela se preciso) → AÍ SIM as fases abaixo (avance UMA fase por vez, só quando o cliente NÃO aprovar ou pedir desconto):
    F1. Envio do orçamento do sistema (use o textoOrcamento do contexto se existir — é o orçamento oficial gerado no diagnóstico).
    F2. Pix: "(Nome), sendo no Pix consigo fazer por (valor com 5% de desconto), pois só trabalhamos com peças originais, fazemos revisão completa, damos certificado de garantia e buscamos e entregamos no seu endereço. Após o conserto ficará tão bom quanto o novo — usamos as mesmas peças do fabricante."
@@ -987,7 +996,8 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
-          max_tokens: 600,
+          max_tokens: 1200,
+          tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 2 }],
           temperature: 0.2,
           system: [
             { type: 'text', text: system, cache_control: { type: 'ephemeral' } },
@@ -1000,7 +1010,8 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
         }),
       });
       const j = await r.json();
-      const texto = ((j.content || []).find(b => b.type === 'text') || {}).text || '';
+      const _txts = (j.content || []).filter(b => b.type === 'text');
+      const texto = (_txts.length ? _txts[_txts.length - 1].text : '') || '';
       let sug;
       try { sug = JSON.parse(texto.replace(/```json|```/g, '').trim()); }
       catch { sug = { resposta: texto.slice(0, 800), acao: { tipo: 'nenhuma', motivo: 'parse' }, confianca: 'baixa' }; }
@@ -1047,6 +1058,9 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
         const pzE = (await dbGet('wa_bot_pausados')) || {};
         const autorizado = !pzE[d8x] && (cfgX.modoAberto === true || execTels.some(t => String(t).replace(/\D/g, '').slice(-8) === d8x));
         if (autorizado && acaoAprovada === 'cadastrar_logistica') {
+          const ftvChk = (await dbGet('fichas_tv')) || { fichas: [] };
+          const ehTV = (ftvChk.fichas || []).some(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
+          if (ehTV) { /* TV: agendamento é do motorista — não cadastrar na logística ADM */ } else {
           const fdbX = (await dbGet('fichas_adm')) || { fichas: [] };
           const fichaX = (fdbX.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x && f.status !== 'logistica');
           if (fichaX) {
@@ -1066,6 +1080,7 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
               await bumpStat('logistica');
             }
           }
+          }
         }
         if (autorizado && acaoAprovada === 'registrar_conflito') {
           const KCF = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
@@ -1083,7 +1098,20 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
           await bumpStat('conflitos');
         }
         if (autorizado && acaoAprovada === 'mover_aprovado') {
+          // TV aprova no sistema TV; ADM aprova no pipe ADM
+          const tvLogX = (await dbGet('tv_logistica')) || { fichas: [] };
+          const fichaTvX = (tvLogX.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x &&
+            ['orc_enviado', 'orc_registrado'].includes(f.phase));
+          if (fichaTvX) {
+            const KTV = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+            await fetch(`https://reparoeletroadm.com/api/tv-logistica?action=aprovar-orcamento&k=${KTV}`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: fichaTvX.id }),
+            });
+            await bumpStat('aprovacoes');
+          }
           const ppX = (await dbGet('reparoeletro_pipe')) || { cards: [] };
+          if (fichaTvX) { /* já aprovado no TV — não mexe no pipe ADM */ } else {
           const cardX = (ppX.cards || []).find(c => String(c.telefone || '').replace(/\D/g, '').slice(-8) === d8x && c.phase !== 'aprovados');
           if (cardX) {
             // Valor combinado na negociação (regra do Fluxo Bot Vendas) — antes do mover oficial
@@ -1099,6 +1127,7 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
               body: JSON.stringify({ id: cardX.id, phase: 'aprovados' }),
             });
             await bumpStat('aprovacoes');
+          }
           }
         }
         if (autorizado && acaoAprovada === 'mover_entrar_contato') {
