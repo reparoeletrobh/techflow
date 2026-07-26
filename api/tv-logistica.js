@@ -559,14 +559,26 @@ module.exports = async function handler(req, res) {
     return 'sem-regiao';
   }
 
+  // ── GET rota-debug: contagem por motoristaNome nas fichas de motorista_parceiro ──
+  if (req.method === 'GET' && action === 'rota-debug') {
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const cont = {};
+    for (const f of (db.fichas || [])) {
+      if (f.phase !== 'motorista_parceiro') continue;
+      const k = (f.motoristaNome || '(sem nome)').trim();
+      cont[k] = (cont[k] || 0) + 1;
+    }
+    return res.status(200).json({ ok: true, totalMotoristaParceiro: Object.values(cont).reduce((a, b) => a + b, 0), porNome: cont });
+  }
+
   // ── GET rota-fichas?m=Nome: fichas do motorista com região resolvida + catálogo ──
   if (req.method === 'GET' && action === 'rota-fichas') {
     const m = normTxt(req.query.m || '');
     // matching tolerante: variações de grafia digitadas à mão caem no motorista certo
     const identifica = nome => {
       const n = normTxt(nome);
-      if (/j[ho]+nat[ha]?n|jonata/.test(n)) return 'jhonatan';
-      if (/wil[d]?e?|wyld/.test(n)) return 'wilde';
+      if (/^j.{0,2}nat/.test(n) || n.includes('jonat') || n.includes('jhonat') || n.includes('jonath')) return 'jhonatan';
+      if (/^wil|wyld/.test(n) || n.includes('wild')) return 'wilde';
       return n;
     };
     const alvo = identifica(m);
