@@ -65,6 +65,12 @@ h1{font-size:17px;font-weight:900;margin-bottom:4px;}
 <div id="lista"></div>
 <script>
 var MOT=new URLSearchParams(location.search).get('m')||'';
+if(!MOT){
+  // rewrite /tv/<nome> não expõe query ao browser — pegar do caminho
+  var seg=decodeURIComponent(location.pathname.split('/').filter(Boolean).pop()||'');
+  if(seg&&seg!=='tv-rota.html')MOT=seg;
+}
+MOT=MOT.charAt(0).toUpperCase()+MOT.slice(1);
 document.getElementById('titulo').textContent='🏍️ Rota de '+MOT;
 var _dados=null;
 var _regAberta={};
