@@ -57,9 +57,10 @@ h1{font-size:17px;font-weight:900;margin-bottom:4px;}
 <body>
 <h1 id="titulo">🏍️ Rota TV</h1>
 <div class="sub" id="subtitulo">Carregando fichas…</div>
-<div id="copiloto" style="display:none;">
-  <div class="tit">🧭 COPILOTO DE ROTA</div>
-  <div class="msg" id="copi-msg"></div>
+<button id="btn-copiloto" onclick="abrirCopiloto()" style="width:100%;background:linear-gradient(135deg,#1d4ed8,#7c3aed);border:none;border-radius:12px;padding:13px;color:#fff;font-size:14px;font-weight:900;cursor:pointer;margin-bottom:12px;display:none;">🧭 COPILOTO — organizar minha rota</button>
+<div id="copiloto" style="display:none;background:linear-gradient(135deg,#12161d,#1a2030);border:1px solid #2a3550;border-radius:14px;padding:14px;margin-bottom:14px;">
+  <div class="tit" style="font-size:11px;font-weight:900;color:#60a5fa;letter-spacing:.05em;margin-bottom:8px;">🧭 COPILOTO DE ROTA</div>
+  <div class="msg" id="copi-msg" style="font-size:13.5px;line-height:1.6;"></div>
 </div>
 <div id="lista"></div>
 <script>
@@ -90,10 +91,54 @@ async function load(){
   }catch(e){document.getElementById('subtitulo').textContent='Erro de conexão';}
 }
 
+var _ordemSalva=null;
+try{_ordemSalva=JSON.parse(localStorage.getItem('rota_ordem_'+MOT)||'null');}catch(e){}
+function abrirCopiloto(){
+  var fichas=_dados.fichas,REG=_dados.regioes;
+  var grupos={};fichas.forEach(function(f){(grupos[f.regiao]=grupos[f.regiao]||[]).push(f);});
+  var regs=Object.keys(grupos).sort(function(a,b){return grupos[b].length-grupos[a].length;});
+  var html='Você tem <b>'+fichas.length+' TV(s)</b> pra coletar:<br>';
+  html+='<div style="display:flex;flex-direction:column;gap:6px;margin:10px 0;">';
+  html+=regs.map(function(rg){
+    return '<button onclick="escolherRegiao(\''+rg+'\')" style="display:flex;align-items:center;gap:8px;background:'+REG[rg].cor+'22;border:1px solid '+REG[rg].cor+'66;border-radius:10px;padding:11px 13px;color:'+REG[rg].cor+';font-weight:900;font-size:13.5px;cursor:pointer;text-align:left;">'+
+      REG[rg].nome+'<span style="margin-left:auto;background:'+REG[rg].cor+'33;border-radius:99px;padding:1px 10px;">'+grupos[rg].length+' ficha'+(grupos[rg].length>1?'s':'')+'</span></button>';
+  }).join('');
+  html+='</div><b>Por onde você gostaria de começar?</b>';
+  document.getElementById('copi-msg').innerHTML=html;
+  document.getElementById('copiloto').style.display='block';
+}
+function escolherRegiao(rgInicial){
+  var fichas=_dados.fichas,REG=_dados.regioes;
+  var grupos={};fichas.forEach(function(f){(grupos[f.regiao]=grupos[f.regiao]||[]).push(f);});
+  // rota gulosa: começa na escolhida, sempre pula pra região mais próxima com fichas
+  var restantes=Object.keys(grupos).filter(function(r){return r!==rgInicial;});
+  var ordem=[rgInicial],atual=rgInicial;
+  while(restantes.length){
+    restantes.sort(function(a,b){return distKm(REG[atual],REG[a])-distKm(REG[atual],REG[b]);});
+    atual=restantes.shift();ordem.push(atual);
+  }
+  _ordemSalva=ordem;
+  localStorage.setItem('rota_ordem_'+MOT,JSON.stringify(ordem));
+  var msg='Perfeito! Coloquei as fichas na <b>ordem otimizada</b>, começando por <b style="color:'+REG[rgInicial].cor+';">'+REG[rgInicial].nome+'</b>.';
+  if(ordem.length>1){
+    msg+='<br>Depois, na sequência de menor quilometragem: ';
+    var ant=rgInicial;
+    msg+=ordem.slice(1).map(function(rg){
+      var d=distKm(REG[ant],REG[rg]);ant=rg;
+      return '<b style="color:'+REG[rg].cor+';">'+REG[rg].nome+'</b> ('+grupos[rg].length+' · ~'+d.toFixed(0)+' km)';
+    }).join(' → ');
+  }
+  var atras=fichas.filter(function(f){return horasDesde(f.movedAt)>48;}).length;
+  if(atras)msg+='<br>⚠️ <b style="color:#f87171;">'+atras+' ficha(s) EM ATRASO</b> — chama essas primeiro em cada região.';
+  msg+='<br><a href="#" onclick="abrirCopiloto();return false;" style="color:#60a5fa;font-size:12px;">↻ escolher outra ordem</a>';
+  document.getElementById('copi-msg').innerHTML=msg;
+  render();
+}
 function render(){
   var fichas=_dados.fichas,REG=_dados.regioes;
   var el=document.getElementById('lista');
   document.getElementById('subtitulo').textContent=fichas.length+' TV(s) para coletar';
+  document.getElementById('btn-copiloto').style.display=fichas.length?'block':'none';
   if(!fichas.length){
     el.innerHTML='<div class="empty">🎉 Nenhuma coleta pendente!<br><small>Quando a logística mandar fichas pra você, elas aparecem aqui.</small></div>';
     document.getElementById('copiloto').style.display='none';
@@ -102,22 +147,16 @@ function render(){
   // Agrupar por região
   var grupos={};
   fichas.forEach(function(f){(grupos[f.regiao]=grupos[f.regiao]||[]).push(f);});
-  // Ordenar regiões: mais fichas primeiro; dentro: atrasadas primeiro
-  var regs=Object.keys(grupos).sort(function(a,b){return grupos[b].length-grupos[a].length;});
-  // Copiloto
-  var copi='Você tem <b>'+fichas.length+' TV(s)</b> em <b>'+regs.length+' região(ões)</b>: ';
-  copi+=regs.map(function(rg){return '<span style="color:'+REG[rg].cor+';font-weight:800;">'+REG[rg].nome+' ('+grupos[rg].length+')</span>';}).join(' · ');
-  var maior=regs[0];
-  var atrasadas=fichas.filter(function(f){return horasDesde(f.movedAt)>48;}).length;
-  copi+='<br>👉 Sugestão: comece por <b style="color:'+REG[maior].cor+';">'+REG[maior].nome+'</b> ('+grupos[maior].length+' coleta'+(grupos[maior].length>1?'s':'')+' juntas'+')';
-  if(regs.length>1){
-    var prox=regs.slice(1).map(function(rg){return {rg:rg,d:distKm(REG[maior],REG[rg]),n:grupos[rg].length};})
-      .sort(function(a,b){return a.d-b.d;})[0];
-    copi+='. Terminando lá, a região com fichas mais perto é <b style="color:'+REG[prox.rg].cor+';">'+REG[prox.rg].nome+'</b> — '+prox.n+' ficha(s) a ~'+prox.d.toFixed(0)+' km.';
+  // Ordem: a escolhida no copiloto (persistida); senão mais fichas primeiro
+  var regs=Object.keys(grupos);
+  if(_ordemSalva&&_ordemSalva.length){
+    regs.sort(function(a,b){
+      var ia=_ordemSalva.indexOf(a),ib=_ordemSalva.indexOf(b);
+      return (ia===-1?99:ia)-(ib===-1?99:ib);
+    });
+  }else{
+    regs.sort(function(a,b){return grupos[b].length-grupos[a].length;});
   }
-  if(atrasadas)copi+='<br>⚠️ <b style="color:#f87171;">'+atrasadas+' ficha(s) EM ATRASO (2+ dias)</b> — prioriza o contato com essas!';
-  document.getElementById('copi-msg').innerHTML=copi;
-  document.getElementById('copiloto').style.display='block';
   // Lista agrupada
   el.innerHTML=regs.map(function(rg){
     var R=REG[rg],lista=grupos[rg];

@@ -562,9 +562,17 @@ module.exports = async function handler(req, res) {
   // ── GET rota-fichas?m=Nome: fichas do motorista com região resolvida + catálogo ──
   if (req.method === 'GET' && action === 'rota-fichas') {
     const m = normTxt(req.query.m || '');
+    // matching tolerante: variações de grafia digitadas à mão caem no motorista certo
+    const identifica = nome => {
+      const n = normTxt(nome);
+      if (/j[ho]+nat[ha]?n|jonata/.test(n)) return 'jhonatan';
+      if (/wil[d]?e?|wyld/.test(n)) return 'wilde';
+      return n;
+    };
+    const alvo = identifica(m);
     const db = await dbGet(LOG_KEY) || defaultDB();
     const fichas = (db.fichas || [])
-      .filter(f => f.phase === 'motorista_parceiro' && normTxt(f.motoristaNome).includes(m))
+      .filter(f => f.phase === 'motorista_parceiro' && identifica(f.motoristaNome) === alvo)
       .map(f => ({ id: f.id, nome: f.nome, telefone: f.telefone, endereco: f.endereco || '',
         equipamento: f.equipamento || 'TV', defeito: f.defeito || '', movedAt: f.movedAt || f.criadoEm,
         primeiroContatoEm: f.primeiroContatoEm || null, relatorioIniciadoEm: f.relatorioIniciadoEm || null,
