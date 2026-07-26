@@ -100,6 +100,7 @@ async function load(){
 var _ordemSalva=null;
 try{_ordemSalva=JSON.parse(localStorage.getItem('rota_ordem_'+MOT)||'null');}catch(e){}
 function abrirCopiloto(){
+  if(!_dados||!_dados.fichas){alert('Carregando as fichas... tenta de novo em 2 segundos');load();return;}
   var fichas=_dados.fichas,REG=_dados.regioes;
   var grupos={};fichas.forEach(function(f){(grupos[f.regiao]=grupos[f.regiao]||[]).push(f);});
   var regs=Object.keys(grupos).sort(function(a,b){return grupos[b].length-grupos[a].length;});
