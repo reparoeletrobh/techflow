@@ -196,7 +196,9 @@ async function pipefyBestEffort(fn) {
 module.exports = async function handler(req, res) {
   // 🔐 TF-AUTH (Fase 1): chave obrigatória em toda chamada
   const _tfk = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
-  if (_tfk !== ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim())) {
+  const _acaoLivre = ['rota-fichas', 'rota-contato', 'rota-relatorio', 'rota-cancelar', 'rota-pref', 'rota-classificar', 'rota-mover'];
+  const _acaoAtual = (req.query && req.query.action) || '';
+  if (!_acaoLivre.includes(_acaoAtual) && _tfk !== ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim())) {
     return res.status(401).json({ ok: false, error: 'não autorizado' });
   }
 
@@ -681,6 +683,20 @@ module.exports = async function handler(req, res) {
     }
     const pref = (await dbGet(mKey)) || { ordem: [] };
     return res.status(200).json({ ok: true, ordem: pref.ordem || [] });
+  }
+
+  // ── POST rota-mover: mover restrito da página do motorista (só remarcar/coleta_efetuada) ──
+  if (req.method === 'POST' && action === 'rota-mover') {
+    const { id, phase } = req.body || {};
+    if (!['remarcar', 'coleta_efetuada'].includes(phase)) return res.status(400).json({ ok: false, error: 'fase não permitida' });
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const f = db.fichas.find(x => x.id === id);
+    if (!f || f.phase !== 'motorista_parceiro') return res.status(404).json({ ok: false, error: 'ficha não está na rota' });
+    f.phase = phase;
+    f.movedAt = new Date().toISOString();
+    await dbSet(LOG_KEY, db);
+    registrarPassagem(phase).catch(() => {});
+    return res.status(200).json({ ok: true });
   }
 
   // ── POST rota-contato: registra o 1º contato (WhatsApp/ligação) ──

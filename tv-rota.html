@@ -4,24 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🏍️ Rota TV</title>
-<script>
-/* 🔐 TF-GUARD Fase 1 */
-(function(){
-  if(location.pathname==='/login'||location.pathname==='/login.html')return;
-  var K=localStorage.getItem('tf_key');
-  if(!K){location.replace('/login?next='+encodeURIComponent(location.pathname+location.search));return;}
-  var _f=window.fetch;
-  window.fetch=function(u,o){
-    try{
-      if(typeof u==='string'&&u.indexOf('/api/')>-1&&u.indexOf('/api/auth')===-1){
-        var kk=localStorage.getItem('tf_key')||'';
-        u+=(u.indexOf('?')>-1?'&':'?')+'k='+encodeURIComponent(kk);
-      }
-    }catch(e){}
-    return _f.call(this,u,o);
-  };
-})();
-</script>
 <style>
 :root{--bg:#0e1013;--surface:#16191e;--line:#262b33;--txt:#f0f2f5;--dim:#8b93a3;}
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -262,7 +244,7 @@ async function iniciarRelatorio(id){
 }
 async function remarcar(id){
   if(!confirm('📅 Remarcar esta coleta? A ficha volta para a logística.'))return;
-  var r=await fetch('/api/tv-logistica?action=mover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,phase:'remarcar'})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  var r=await fetch('/api/tv-logistica?action=rota-mover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,phase:'remarcar'})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
   if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
 }
 async function cancelado(id){
@@ -275,7 +257,7 @@ async function cancelado(id){
 }
 async function coletado(id){
   if(!confirm('✅ Confirmar: equipamento COLETADO e com você?'))return;
-  var r=await fetch('/api/tv-logistica?action=mover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,phase:'coleta_efetuada'})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  var r=await fetch('/api/tv-logistica?action=rota-mover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,phase:'coleta_efetuada'})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
   if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
 }
 load();
