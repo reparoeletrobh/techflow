@@ -99,6 +99,43 @@ async function load(){
 
 var _ordemSalva=null;
 try{_ordemSalva=JSON.parse(localStorage.getItem('rota_ordem_'+MOT)||'null');}catch(e){}
+var _pref=[];
+(async function(){try{var r=await fetch('/api/tv-logistica?action=rota-pref&m='+encodeURIComponent(MOT)).then(function(x){return x.json();});if(r.ok)_pref=r.ordem||[];if(_pref.length&&!_ordemSalva){_ordemSalva=_pref.slice();}if(_dados)render();}catch(e){}})();
+var _prefSel=[];
+function definirPreferencia(){
+  var REG=_dados.regioes;
+  _prefSel=[];
+  var todas=Object.keys(REG).filter(function(k){return k!=='sem-regiao';});
+  var html='<b>⚙️ Minha ordem preferida</b><br><span style="font-size:12px;color:#8b93a3;">Toca nas regiões NA ORDEM que você gosta de atender (1º, 2º, 3º...). As que não tocar entram no fim, por proximidade.</span>';
+  html+='<div id="pref-grid" style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;">';
+  html+=todas.map(function(k){
+    return '<button id="pf-'+k+'" onclick="prefToque(\''+k+'\')" style="background:'+REG[k].cor+'22;border:1px solid '+REG[k].cor+'66;border-radius:9px;padding:8px 11px;color:'+REG[k].cor+';font-weight:800;font-size:12px;cursor:pointer;">'+REG[k].nome+'</button>';
+  }).join('');
+  html+='</div>';
+  html+='<div style="display:flex;gap:8px;">'+
+    '<button onclick="prefSalvar()" style="flex:1;background:#16a34a;border:none;border-radius:9px;padding:11px;color:#fff;font-weight:900;cursor:pointer;">💾 Salvar ordem</button>'+
+    '<button onclick="definirPreferencia()" style="background:#374151;border:none;border-radius:9px;padding:11px 14px;color:#fff;font-weight:800;cursor:pointer;">↻ Limpar</button></div>';
+  document.getElementById('copi-msg').innerHTML=html;
+  document.getElementById('copiloto').style.display='block';
+}
+function prefToque(k){
+  var i=_prefSel.indexOf(k);
+  if(i>-1)return;
+  _prefSel.push(k);
+  var b=document.getElementById('pf-'+k);
+  if(b){b.innerHTML='<b style="font-size:14px;">'+_prefSel.length+'º</b> '+b.textContent;b.style.opacity='.75';b.style.outline='2px solid currentColor';}
+}
+async function prefSalvar(){
+  if(!_prefSel.length){alert('Toca em pelo menos 1 região primeiro');return;}
+  var r=await fetch('/api/tv-logistica?action=rota-pref',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({m:MOT,ordem:_prefSel})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok){
+    _pref=_prefSel.slice();_ordemSalva=_pref.slice();
+    localStorage.setItem('rota_ordem_'+MOT,JSON.stringify(_ordemSalva));
+    document.getElementById('copi-msg').innerHTML='✅ <b>Ordem preferida salva!</b> Suas fichas agora sempre aparecem nessa sequência, em qualquer aparelho. <a href="#" onclick="abrirCopiloto();return false;" style="color:#60a5fa;">abrir copiloto</a>';
+    render();
+  }else alert('Erro ao salvar');
+}
 function abrirCopiloto(){
   if(!_dados||!_dados.fichas){alert('Carregando as fichas... tenta de novo em 2 segundos');load();return;}
   var fichas=_dados.fichas,REG=_dados.regioes;
@@ -111,6 +148,10 @@ function abrirCopiloto(){
       REG[rg].nome+'<span style="margin-left:auto;background:'+REG[rg].cor+'33;border-radius:99px;padding:1px 10px;">'+grupos[rg].length+' ficha'+(grupos[rg].length>1?'s':'')+'</span></button>';
   }).join('');
   html+='</div><b>Por onde você gostaria de começar?</b>';
+  if(_pref.length){
+    html+='<div style="font-size:12px;color:#8b93a3;margin-top:8px;">⭐ Sua ordem preferida: '+_pref.map(function(k){return REG[k]?REG[k].nome:k;}).join(' → ')+'</div>';
+  }
+  html+='<div style="margin-top:8px;"><a href="#" onclick="definirPreferencia();return false;" style="color:#60a5fa;font-size:12.5px;">⚙️ '+(_pref.length?'redefinir':'definir')+' minha ordem preferida de regiões</a></div>';
   document.getElementById('copi-msg').innerHTML=html;
   document.getElementById('copiloto').style.display='block';
 }
@@ -157,10 +198,15 @@ function render(){
   // Ordem: a escolhida no copiloto (persistida); senão mais fichas primeiro
   var regs=Object.keys(grupos);
   if(_ordemSalva&&_ordemSalva.length){
-    regs.sort(function(a,b){
-      var ia=_ordemSalva.indexOf(a),ib=_ordemSalva.indexOf(b);
-      return (ia===-1?99:ia)-(ib===-1?99:ib);
-    });
+    // não listadas na ordem: anexar por proximidade da última listada
+    var listadas=_ordemSalva.filter(function(r){return regs.indexOf(r)>-1;});
+    var fora=regs.filter(function(r){return _ordemSalva.indexOf(r)===-1;});
+    if(listadas.length&&fora.length){
+      var ancora=listadas[listadas.length-1];
+      fora.sort(function(a,b){return distKm(REG[ancora],REG[a])-distKm(REG[ancora],REG[b]);});
+    }
+    var ordemFinal=listadas.concat(fora);
+    regs.sort(function(a,b){return ordemFinal.indexOf(a)-ordemFinal.indexOf(b);});
   }else{
     regs.sort(function(a,b){return grupos[b].length-grupos[a].length;});
   }
@@ -190,7 +236,8 @@ function render(){
           '<a class="b b-map" href="https://maps.google.com/?q='+encodeURIComponent(f.endereco||'')+'" target="_blank">🗺️ Mapa</a>'+
           '<button class="b b-rel" onclick="iniciarRelatorio(\''+f.id+'\')">📋 '+(f.relatorioIniciadoEm?'Relatório ✓':'Relatório')+'</button>'+
           '<button class="b b-rem" onclick="remarcar(\''+f.id+'\')">📅 Remarcar</button>'+
-          '<button class="b b-col" onclick="coletado(\''+f.id+'\')">✅ EQUIPAMENTO COLETADO</button>'+
+          '<button class="b" style="background:#dc2626;min-width:44%;" onclick="cancelado(\''+f.id+'\')">❌ Cancelado</button>'+
+          '<button class="b b-col" style="min-width:52%;" onclick="coletado(\''+f.id+'\')">✅ COLETADO</button>'+
         '</div></div>';
     }).join('');
     return html;
@@ -217,6 +264,14 @@ async function remarcar(id){
   if(!confirm('📅 Remarcar esta coleta? A ficha volta para a logística.'))return;
   var r=await fetch('/api/tv-logistica?action=mover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,phase:'remarcar'})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
   if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
+}
+async function cancelado(id){
+  var motivo=prompt('❌ Coleta CANCELADA — qual o motivo? (cliente desistiu, não atendeu, mudou de ideia...)');
+  if(!motivo)return;
+  var r=await fetch('/api/tv-logistica?action=rota-cancelar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id,motivo:motivo,motorista:MOT})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok){alert('Cancelamento registrado — a ficha voltou para a logística com o motivo.');load();}
+  else alert('Erro: '+(r.error||'falha'));
 }
 async function coletado(id){
   if(!confirm('✅ Confirmar: equipamento COLETADO e com você?'))return;

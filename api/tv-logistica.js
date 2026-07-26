@@ -655,6 +655,34 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── POST rota-cancelar: coleta cancelada pelo cliente — volta p/ Liberado Coleta com o motivo ──
+  if (req.method === 'POST' && action === 'rota-cancelar') {
+    const { id, motivo, motorista } = req.body || {};
+    if (!motivo) return res.status(400).json({ ok: false, error: 'motivo obrigatório' });
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const f = db.fichas.find(x => x.id === id);
+    if (!f) return res.status(404).json({ ok: false });
+    f.phase = 'liberado_coleta';
+    f.movedAt = new Date().toISOString();
+    f.cancelamentoMotorista = { motivo: String(motivo).slice(0, 200), motorista: String(motorista || ''), em: f.movedAt };
+    f.texto = ('❌ CANCELADA pelo cliente (' + String(motorista || 'motorista') + '): ' + String(motivo).slice(0, 150) + '\n' + (f.texto || '')).slice(0, 1200);
+    await dbSet(LOG_KEY, db);
+    registrarPassagem('liberado_coleta').catch(() => {});
+    return res.status(200).json({ ok: true });
+  }
+
+  // ── GET/POST rota-pref: ordem preferida de regiões do motorista (persistida) ──
+  if (action === 'rota-pref') {
+    const mKey = 'tv_rota_pref_' + normTxt(req.query.m || (req.body || {}).m || '');
+    if (req.method === 'POST') {
+      const ordem = Array.isArray((req.body || {}).ordem) ? (req.body || {}).ordem.slice(0, 20) : [];
+      await dbSet(mKey, { ordem, em: new Date().toISOString() });
+      return res.status(200).json({ ok: true, ordem });
+    }
+    const pref = (await dbGet(mKey)) || { ordem: [] };
+    return res.status(200).json({ ok: true, ordem: pref.ordem || [] });
+  }
+
   // ── POST rota-contato: registra o 1º contato (WhatsApp/ligação) ──
   if (req.method === 'POST' && action === 'rota-contato') {
     const db = await dbGet(LOG_KEY) || defaultDB();
