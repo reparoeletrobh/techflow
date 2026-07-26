@@ -1,441 +1,83 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏍️ Motoristas — Rotas TV</title>
 <script>
 /* 🔐 TF-GUARD Fase 1 */
 (function(){
   if(location.pathname==='/login'||location.pathname==='/login.html')return;
   var K=localStorage.getItem('tf_key');
   if(!K){location.replace('/login?next='+encodeURIComponent(location.pathname));return;}
-  // Papel TV: acesso restrito às telas do sistema TV
-  if(localStorage.getItem('tf_role')==='tv'&&location.pathname.indexOf('/tv')!==0){
-    location.replace('/tv-adm');return;
-  }
   var _f=window.fetch;
   window.fetch=function(u,o){
-    var isApi=false;
     try{
       if(typeof u==='string'&&u.indexOf('/api/')>-1&&u.indexOf('/api/auth')===-1){
-        isApi=true;o=o||{};
         var kk=localStorage.getItem('tf_key')||'';
-        if(o.headers&&typeof o.headers.set==='function'){o.headers.set('x-tf-key',kk);}
-        else{o.headers=Object.assign({},o.headers||{},{'x-tf-key':kk});}
+        u+=(u.indexOf('?')>-1?'&':'?')+'k='+encodeURIComponent(kk);
       }
     }catch(e){}
-    var p=_f.call(this,u,o);
-    if(isApi){
-      p=p.then(function(r){
-        if(r&&r.status===401&&!window.__tfHealed){
-          window.__tfHealed=true;
-          localStorage.removeItem('tf_key');
-          location.replace('/login?next='+encodeURIComponent(location.pathname));
-        }
-        return r;
-      });
-    }
-    return p;
-  };
-  // Navegação/downloads para /api/ (links e window.open) também levam a chave
-  document.addEventListener('click',function(ev){
-    var a=ev.target&&ev.target.closest?ev.target.closest('a'):null;
-    if(a){
-      var hu=a.getAttribute('href')||'';
-      if(hu.indexOf('/api/')>-1&&hu.indexOf('k=')===-1){
-        a.setAttribute('href',hu+(hu.indexOf('?')>-1?'&':'?')+'k='+encodeURIComponent(localStorage.getItem('tf_key')||''));
-      }
-    }
-  },true);
-  var _wo=window.open;
-  window.open=function(u){
-    try{
-      if(typeof u==='string'&&u.indexOf('/api/')>-1&&u.indexOf('k=')===-1){
-        u+=(u.indexOf('?')>-1?'&':'?')+'k='+encodeURIComponent(localStorage.getItem('tf_key')||'');
-        arguments[0]=u;
-      }
-    }catch(e){}
-    return _wo.apply(window,arguments);
+    return _f.call(this,u,o);
   };
 })();
 </script>
-
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='18,2 8,18 15,18 14,30 24,14 17,14' fill='%233b9eff' stroke='%233b9eff' stroke-linejoin='round'/%3E%3C/svg%3E">
-<title>TV &mdash; Motorista</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#03060e;--surface:#080d18;--surface2:#0d1425;--border:#1a2540;--text:#dce8f8;--muted:#4a607a;--accent:#3b9eff;--green:#10d982;--red:#f04060;--yellow:#f5c800;--orange:#f97316;--purple:#a855f7;--fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--fb:'Inter',sans-serif;}
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh;}
-header{display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:52px;border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:100;}
-.logo{font-family:var(--fh);font-size:14px;font-weight:900;display:flex;align-items:center;gap:8px;}
-.logo-dot{width:8px;height:8px;background:var(--green);border-radius:50%;box-shadow:0 0 8px var(--green);}
-.logo span{color:var(--green);}
-.sync-btn{font-family:var(--fm);font-size:10px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;}
-.sync-btn:hover{color:var(--text);border-color:var(--accent);}
-/* TABS */
-.tabs{display:flex;gap:0;padding:12px 16px 0;border-bottom:1px solid var(--border);background:var(--bg);}
-.tab{font-family:var(--fm);font-size:11px;font-weight:700;padding:8px 20px;border-radius:8px 8px 0 0;border:1px solid transparent;border-bottom:none;cursor:pointer;color:var(--muted);background:transparent;transition:all .15s;letter-spacing:.05em;}
-.tab.active{background:var(--surface);border-color:var(--border);color:var(--text);}
-.tab.active.coleta{color:var(--accent);}
-.tab.active.entrega{color:var(--orange);}
-.tab:hover:not(.active){color:var(--text);}
-.main{padding:16px;}
-.busca-wrap{position:relative;margin-bottom:12px;}
-.busca-input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 14px 9px 36px;font-family:var(--fm);font-size:11px;color:var(--text);outline:none;box-sizing:border-box;transition:border-color .15s;}
-.busca-input:focus{border-color:var(--accent);}
-.busca-ico{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none;}
-.page-title{font-family:var(--fh);font-size:18px;font-weight:900;margin-bottom:4px;}
-.page-title span{color:var(--green);}
-.page-sub{font-family:var(--fm);font-size:10px;color:var(--muted);margin-bottom:16px;}
-/* SECAO */
-.sec-header{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;display:flex;align-items:center;gap:8px;margin:16px 0 8px;}
-.sec-header::after{content:'';flex:1;height:1px;background:var(--border);}
-.sec-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
-/* CARD */
-.m-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:12px;transition:border-color .15s;}
-.m-card.comunicou{border-color:rgba(168,85,247,.25);}
-.m-card.dimmed{opacity:.45;}
-.m-head{padding:14px 16px 10px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
-.m-info{flex:1;min-width:0;}
-.m-num{font-family:var(--fm);font-size:11px;color:var(--accent);margin-bottom:3px;}
-.m-nome{font-size:14px;font-weight:600;color:#fff;line-height:1.35;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.m-end{font-size:12px;color:var(--muted);margin-bottom:3px;}
-.m-desc{font-size:11px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-.m-badge{font-family:var(--fm);font-size:9px;padding:3px 10px;border-radius:99px;white-space:nowrap;flex-shrink:0;}
-.badge-lib{background:rgba(59,158,255,.1);color:var(--accent);border:1px solid rgba(59,158,255,.3);}
-.badge-com{background:rgba(168,85,247,.1);color:var(--purple);border:1px solid rgba(168,85,247,.3);}
-.badge-col{background:rgba(16,217,130,.1);color:var(--green);border:1px solid rgba(16,217,130,.3);}
-.badge-rem{background:rgba(249,115,22,.1);color:var(--orange);border:1px solid rgba(249,115,22,.3);}
-.badge-ent{background:rgba(245,200,0,.1);color:var(--yellow);border:1px solid rgba(245,200,0,.3);}
-/* ACOES */
-.m-actions{padding:0 12px 12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-.m-btn{font-family:var(--fb);font-size:12px;font-weight:600;padding:11px 8px;border-radius:10px;border:none;cursor:pointer;transition:all .15s;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:6px;}
-.m-btn.wpp{background:rgba(37,211,102,.12);color:#25d366;border:1px solid rgba(37,211,102,.25);}
-.m-btn.maps{background:rgba(59,158,255,.12);color:var(--accent);border:1px solid rgba(59,158,255,.25);}
-.m-btn.rel{background:rgba(245,200,0,.12);color:var(--yellow);border:1px solid rgba(245,200,0,.25);}
-.m-btn.remarcar{background:rgba(249,115,22,.12);color:var(--orange);border:1px solid rgba(249,115,22,.25);}
-.m-btn.ok{background:var(--green);color:#000;font-weight:800;grid-column:1/-1;}
-.m-btn.ok-ent{background:var(--yellow);color:#000;font-weight:800;grid-column:1/-1;}
-.m-btn:active{filter:brightness(.85);transform:scale(.98);}
-
-.empty-state{font-family:var(--fm);font-size:11px;color:var(--muted);padding:28px 16px;text-align:center;border:1px dashed var(--border);border-radius:10px;}
-/* MODAL RELATORIO */
-.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;flex-direction:column;overflow-y:auto;}
-.ov.open{display:flex;}
-.modal{background:var(--surface);margin:auto;width:100%;max-width:480px;border-radius:14px 14px 0 0;padding:20px;margin-top:auto;max-height:90vh;overflow-y:auto;}
-.modal-title{font-family:var(--fh);font-size:16px;font-weight:800;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;}
-.modal-close{background:transparent;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px;}
-.modal-section{margin-bottom:16px;}
-.modal-label{font-family:var(--fm);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;}
-.modal-textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-family:var(--fb);font-size:13px;color:var(--text);resize:none;outline:none;min-height:80px;}
-.modal-textarea:focus{border-color:var(--accent);}
-.photo-area{background:var(--surface2);border:1px dashed var(--border);border-radius:8px;padding:20px;text-align:center;cursor:pointer;font-family:var(--fm);font-size:11px;color:var(--muted);}
-.photo-preview{max-width:100%;border-radius:8px;margin-top:8px;}
-.sig-canvas{width:100%;height:160px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;cursor:crosshair;touch-action:none;}
-.modal-actions{display:flex;gap:8px;margin-top:16px;}
-.modal-btn{flex:1;font-family:var(--fm);font-size:11px;font-weight:700;padding:10px;border-radius:8px;border:none;cursor:pointer;}
-.modal-btn.cancel{background:var(--surface2);color:var(--muted);}
-.modal-btn.save{background:var(--green);color:#000;}
-.file-input{display:none;}
-/* TOAST */
-.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--green);border-radius:10px;padding:10px 20px;font-family:var(--fm);font-size:11px;opacity:0;transition:all .3s;z-index:9999;white-space:nowrap;max-width:90vw;text-align:center;}
-.toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+:root{--bg:#0e1013;--surface:#16191e;--line:#262b33;--txt:#f0f2f5;--dim:#8b93a3;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:16px;max-width:560px;margin:0 auto;}
+h1{font-size:18px;font-weight:900;margin-bottom:4px;}
+.sub{font-size:12.5px;color:var(--dim);margin-bottom:16px;}
+.mot{display:block;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:12px;text-decoration:none;color:var(--txt);transition:transform .1s;}
+.mot:active{transform:scale(.98);}
+.mot .nome{font-size:17px;font-weight:900;display:flex;align-items:center;gap:8px;}
+.mot .stats{display:flex;gap:14px;margin-top:10px;font-size:12.5px;color:var(--dim);flex-wrap:wrap;}
+.mot .stats b{font-size:16px;display:block;}
+.late{color:#f87171;}
+.regs{margin-top:10px;display:flex;flex-wrap:wrap;gap:5px;}
+.reg-pill{font-size:10.5px;font-weight:800;padding:2px 9px;border-radius:99px;}
+.carregando{color:var(--dim);font-size:12px;margin-top:8px;}
+a.volta{color:var(--dim);text-decoration:none;font-size:13px;}
 </style>
 </head>
 <body>
-<header>
-  <div class="logo"><div class="logo-dot"></div>TV <span>Motorista</span></div>
-  <button class="sync-btn" onclick="load()">&#8635; Sync</button>
-</header>
-<div class="tabs">
-  <button class="tab coleta active" id="tab-coleta" onclick="switchMode('coleta')">&#128666; Coleta</button>
-  <button class="tab entrega" id="tab-entrega" onclick="switchMode('entrega')">&#128230; Entrega</button>
-</div>
-<div class="main">
-  <div class="page-title" id="page-title">Painel do <span>Motorista</span></div>
-  <div class="page-sub" id="page-sub">// Fichas liberadas para coleta</div>
-  <div class="busca-wrap"><span class="busca-ico">&#128269;</span><input class="busca-input" id="motorista-busca" type="text" placeholder="Buscar por nome, OS, endereço..." oninput="filtrarCards(this.value)"/></div>
-  <div id="container"></div>
-</div>
-<div class="ov" id="modal-rel">
-  <div class="modal">
-    <div class="modal-title">&#128203; Relat&oacute;rio de Coleta<button class="modal-close" onclick="fecharRel()">&#10005;</button></div>
-    <div class="modal-section">
-      <div class="modal-label">Foto do equipamento</div>
-      <div class="photo-area" id="photo-area-label" onclick="document.getElementById('photo-input').click()">&#128247; Toque para tirar foto ou selecionar</div>
-      <input type="file" id="photo-input" accept="image/*" capture="environment" class="file-input" onchange="previewPhoto(this)"/>
-      <img id="photo-preview" class="photo-preview" style="display:none"/>
-    </div>
-    <div class="modal-section">
-      <div class="modal-label">Descri&ccedil;&atilde;o / Observa&ccedil;&atilde;o</div>
-      <textarea class="modal-textarea" id="rel-desc" placeholder="Descreva o estado do equipamento..."></textarea>
-    </div>
-    <div class="modal-section">
-      <div class="modal-label">Assinatura do cliente</div>
-      <canvas class="sig-canvas" id="sig-canvas"></canvas>
-      <div style="margin-top:6px;display:flex;gap:8px;">
-        <button onclick="limparAssinatura()" style="font-family:var(--fm);font-size:9px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;">Limpar</button>
-        <span style="font-family:var(--fm);font-size:9px;color:var(--muted);">Pe&ccedil;a ao cliente que assine acima</span>
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="modal-btn cancel" onclick="fecharRel()">Cancelar</button>
-      <button class="modal-btn save" id="btn-salvar-rel" onclick="salvarRel()">&#9989; Salvar Relat&oacute;rio</button>
-    </div>
-  </div>
-</div>
-<div class="toast" id="toast"></div>
+<h1>🏍️ Motoristas — Rotas de Coleta</h1>
+<div class="sub">Espelho em tempo real do que cada motorista vê no link dele. Toca no nome para abrir a rota completa. <a class="volta" href="/tv-adm">← voltar</a></div>
+<a class="mot" id="m-jhonatan" href="/tv/jhonatan" style="border-left:5px solid #8b5cf6;">
+  <div class="nome">🏍️ Jhonatan</div>
+  <div class="carregando">Carregando as fichas…</div>
+</a>
+<a class="mot" id="m-wilde" href="/tv/wilde" style="border-left:5px solid #06b6d4;">
+  <div class="nome">🏍️ Wilde</div>
+  <div class="carregando">Carregando as fichas…</div>
+</a>
 <script>
-var mode = 'coleta';
-var allCards = {};
-var filtroMotorista = '';
-var relPipefyId = null;
-var sigCtx = null, sigDrawing = false, sigLastX = 0, sigLastY = 0;
-var photoB64 = null;
-var toastTimer;
-
-function toast(msg, cor) {
-  var t = document.getElementById('toast');
-  t.textContent = msg;
-  t.style.borderTopColor = cor || 'var(--green)';
-  t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3500);
-}
-function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function osNum(c){ if(c.osCode)return c.osCode; var m=String(c.nomeContato||'').match(/\b\d{4}\b/g); return m?m[m.length-1]:String(c.pipefyId).slice(-4); }
-
-async function api(action, body) {
-  var opts = { headers: {'Content-Type':'application/json'} };
-  if (body) { opts.method = 'POST'; opts.body = JSON.stringify(body); }
-  var r = await fetch('/api/tv-coleta?action=' + action, opts);
-  return r.json();
-}
-
-function switchMode(m) {
-  mode = m;
-  document.getElementById('tab-coleta').classList.toggle('active', m==='coleta');
-  document.getElementById('tab-entrega').classList.toggle('active', m==='entrega');
-  document.getElementById('page-sub').textContent = m==='coleta' ? '// Fichas liberadas para coleta' : '// Fichas liberadas para entrega';
-  load();
-}
-
-function filtrarCards(q){filtroMotorista=q.toLowerCase().trim();render();}
-async function load() {
-  document.getElementById('container').innerHTML = '<div class="empty-state">Sincronizando com Pipefy...</div>';
-  try {
-    if (mode === 'coleta') {
-      await fetch('/api/tv-board?action=sync-coleta').catch(function(){});
-    } else {
-      await fetch('/api/tv-coleta?action=sync-entrega').catch(function(){});
-    }
-    var action = mode === 'coleta' ? 'load' : 'load-entrega';
-    var d = await api(action);
-    if (!d.ok) throw new Error(d.error || 'Erro');
-    allCards = d.byPhase || {};
-    render();
-  } catch(e) {
-    document.getElementById('container').innerHTML = '<div class="empty-state">&#10060; ' + esc(e.message) + '</div>';
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+async function carrega(nome){
+  var el=document.getElementById('m-'+nome.toLowerCase());
+  try{
+    var r=await fetch('/api/tv-logistica?action=rota-fichas&m='+encodeURIComponent(nome)).then(function(x){return x.json();});
+    if(!r.ok)throw 0;
+    var fichas=r.fichas,REG=r.regioes;
+    var atras=fichas.filter(function(f){return (Date.now()-new Date(f.movedAt||0).getTime())/3600000>48;}).length;
+    var contat=fichas.filter(function(f){return f.primeiroContatoEm;}).length;
+    var grupos={};fichas.forEach(function(f){grupos[f.regiao]=(grupos[f.regiao]||0)+1;});
+    var pills=Object.keys(grupos).sort(function(a,b){return grupos[b]-grupos[a];}).map(function(rg){
+      var R=REG[rg]||{nome:rg,cor:'#6b7280'};
+      return '<span class="reg-pill" style="background:'+R.cor+'22;color:'+R.cor+';border:1px solid '+R.cor+'55;">'+esc(R.nome)+' '+grupos[rg]+'</span>';
+    }).join('');
+    el.querySelector('.carregando').outerHTML=
+      '<div class="stats">'+
+        '<span><b>'+fichas.length+'</b>para coletar</span>'+
+        '<span><b>'+contat+'</b>já contatadas</span>'+
+        '<span class="'+(atras?'late':'')+'"><b>'+atras+'</b>em atraso (2d+)</span>'+
+      '</div>'+(pills?'<div class="regs">'+pills+'</div>':'');
+  }catch(e){
+    var c=el.querySelector('.carregando');if(c)c.textContent='Erro ao carregar';
   }
 }
-
-function render() {
-  if (mode === 'coleta') renderColeta();
-  else renderEntrega();
-}
-
-function renderColeta() {
-  var _q=filtroMotorista;var _m=function(c){if(!_q)return true;return((c.nomeContato||'')+(c.osCode||'')+(c.endereco||'')+(c.descricao||'')).toLowerCase().includes(_q);};
-  var lib=(allCards['liberado_coleta']||[]).filter(_m);
-  var com=(allCards['comunicacao_realizada']||[]).filter(_m);
-  var col=(allCards['coleta_realizada']||[]).filter(_m);
-  var rem=(allCards['remarcar']||[]).filter(_m);
-  var html = '';
-  html += sec('#3b9eff', 'A Coletar', lib.length);
-  if (!lib.length) html += '<div class="empty-state">Nenhuma ficha aguardando coleta</div>';
-  else lib.forEach(function(c){ html += buildCardColeta(c, 'liberado_coleta'); });
-  if (com.length) {
-    html += sec('#a855f7', 'Comunicac&#807;a&#771;o Realizada', com.length);
-    com.forEach(function(c){ html += buildCardColeta(c, 'comunicacao_realizada'); });
-  }
-  if (col.length) {
-    html += sec('#10d982', 'Coletados', col.length);
-    col.forEach(function(c){ html += buildSimples(c, '&#9989; Coletado', 'badge-col', 'dimmed'); });
-  }
-  if (rem.length) {
-    html += sec('#f97316', 'Remarcados', rem.length);
-    rem.forEach(function(c){ html += buildSimples(c, '&#128516; Remarcado', 'badge-rem', 'dimmed'); });
-  }
-  document.getElementById('container').innerHTML = html;
-}
-
-function renderEntrega() {
-  var _q=filtroMotorista;var _m=function(c){if(!_q)return true;return((c.nomeContato||'')+(c.osCode||'')+(c.endereco||'')+(c.descricao||'')).toLowerCase().includes(_q);};
-  var lib=(allCards['liberado_entrega']||[]).filter(_m);
-  var com=(allCards['comunicacao_entrega']||[]).filter(_m);
-  var ent=(allCards['entrega_realizada']||[]).filter(_m);
-  var html = '';
-  html += sec('#f97316', 'A Entregar', lib.length);
-  if (!lib.length) html += '<div class="empty-state">Nenhuma ficha aguardando entrega</div>';
-  else lib.forEach(function(c){ html += buildCardEntrega(c, 'liberado_entrega'); });
-  if (com.length) {
-    html += sec('#a855f7', 'Comunicac&#807;a&#771;o Realizada', com.length);
-    com.forEach(function(c){ html += buildCardEntrega(c, 'comunicacao_entrega'); });
-  }
-  if (ent.length) {
-    html += sec('#10d982', 'Entregues', ent.length);
-    ent.forEach(function(c){ html += buildSimples(c, '&#9989; Entregue', 'badge-col', 'dimmed'); });
-  }
-  document.getElementById('container').innerHTML = html;
-}
-
-function sec(color, label, count) {
-  return '<div class="sec-header"><div class="sec-dot" style="background:'+color+'"></div>'+label+' ('+count+')</div>';
-}
-
-function buildCardColeta(c, phase) {
-  var num = osNum(c);
-  var tel = (c.telefone||'').replace(/\D/g,'');
-  var msg = encodeURIComponent('Ola, bom dia! Sou o motorista da Reparo Eletro TV e estou a caminho para coletar o equipamento.');
-  var wpp = tel ? 'https://wa.me/55'+tel+'?text='+msg : 'https://api.whatsapp.com/send?text='+msg;
-  var maps = 'https://maps.google.com/?q='+encodeURIComponent(c.endereco||c.nomeContato||'');
-  var badge = phase==='comunicacao_realizada'
-    ? '<div class="m-badge badge-com">&#128172; Avisado</div>'
-    : '<div class="m-badge badge-lib">&#128309; Aguardando</div>';
-  var cls = phase==='comunicacao_realizada' ? 'm-card comunicou' : 'm-card';
-  return '<div class="'+cls+'" id="mcard-'+c.pipefyId+'">'+
-    '<div class="m-head"><div class="m-info">'+
-    '<div class="m-num">#'+esc(num)+'</div>'+
-    '<div class="m-nome">'+esc(c.nomeContato||'&mdash;')+'</div>'+
-    (c.endereco?'<div class="m-end">&#128205; '+esc(c.endereco)+'</div>':'')+
-    (c.descricao?'<div class="m-desc">'+esc(c.descricao)+'</div>':'')+
-    '</div>'+badge+'</div>'+
-    '<div class="m-actions">'+
-    '<button class="m-btn wpp" onclick="avisarCliente(\''+c.pipefyId+'\',\''+wpp+'\',\'move\',\'comunicacao_realizada\')">&#128172; Avisar Cliente</button>'+
-    '<a class="m-btn maps" href="'+maps+'" target="_blank">&#128506; Ir ao Endereco</a>'+
-    '<button class="m-btn rel" onclick="abrirRel(\''+c.pipefyId+'\')">&#128203; Iniciar Relatorio</button>'+
-    '<button class="m-btn remarcar" onclick="moverConfirmar(\''+c.pipefyId+'\',\'remarcar\',\'move\',\'Remarcar esta ficha?\')">&#128516; Remarcar</button>'+
-    '<button class="m-btn ok" onclick="moverConfirmar(\''+c.pipefyId+'\',\'coleta_realizada\',\'move\',\'Confirmar coleta?\')">&#9989; Equipamento Coletado</button>'+
-    '</div></div>';
-}
-
-function buildCardEntrega(c, phase) {
-  var num = osNum(c);
-  var tel = (c.telefone||'').replace(/\D/g,'');
-  var msg = encodeURIComponent('Ola, bom dia! Sou o motorista da Reparo Eletro TV e estou a caminho para entregar o seu equipamento.');
-  var wpp = tel ? 'https://wa.me/55'+tel+'?text='+msg : 'https://api.whatsapp.com/send?text='+msg;
-  var maps = 'https://maps.google.com/?q='+encodeURIComponent(c.endereco||c.nomeContato||'');
-  var badge = phase==='comunicacao_entrega'
-    ? '<div class="m-badge badge-com">&#128172; Avisado</div>'
-    : '<div class="m-badge badge-ent">&#128230; Aguardando</div>';
-  var cls = phase==='comunicacao_entrega' ? 'm-card comunicou' : 'm-card';
-  return '<div class="'+cls+'" id="mcard-'+c.pipefyId+'">'+
-    '<div class="m-head"><div class="m-info">'+
-    '<div class="m-num">#'+esc(num)+'</div>'+
-    '<div class="m-nome">'+esc(c.nomeContato||'&mdash;')+'</div>'+
-    (c.endereco?'<div class="m-end">&#128205; '+esc(c.endereco)+'</div>':'')+
-    (c.descricao?'<div class="m-desc">'+esc(c.descricao)+'</div>':'')+
-    '</div>'+badge+'</div>'+
-    '<div class="m-actions">'+
-    '<button class="m-btn wpp" onclick="avisarCliente(\''+c.pipefyId+'\',\''+wpp+'\',\'move-entrega\',\'comunicacao_entrega\')">&#128172; Avisar Cliente</button>'+
-    '<a class="m-btn maps" href="'+maps+'" target="_blank">&#128506; Ir ao Endereco</a>'+
-    '<button class="m-btn remarcar" onclick="moverConfirmar(\''+c.pipefyId+'\',\'remarcar\',\'move-entrega\',\'Remarcar esta ficha?\')">&#128516; Remarcar</button>'+
-    '<button class="m-btn ok-ent" onclick="moverConfirmar(\''+c.pipefyId+'\',\'entrega_realizada\',\'move-entrega\',\'Confirmar entrega realizada?\')">&#128230; Entrega Realizada</button>'+
-    '</div></div>';
-}
-
-function buildSimples(c, lbl, badgeCls, cls) {
-  var num = osNum(c);
-  return '<div class="m-card '+cls+'"><div class="m-head"><div class="m-info">'+
-    '<div class="m-num">#'+esc(num)+'</div>'+
-    '<div class="m-nome">'+esc(c.nomeContato||'&mdash;')+'</div>'+
-    (c.endereco?'<div class="m-end">&#128205; '+esc(c.endereco)+'</div>':'')+
-    '</div><div class="m-badge '+badgeCls+'">'+lbl+'</div></div></div>';
-}
-
-async function avisarCliente(pipefyId, wppLink, action, phase) {
-  window.open(wppLink, '_blank');
-  try {
-    await api(action, {pipefyId: pipefyId, phase: phase});
-    toast('&#128172; Cliente avisado &mdash; Comunicacao Realizada', 'var(--purple)');
-    await load();
-  } catch(e) { toast('&#128172; WPP aberto, falha ao registrar: '+e.message, 'var(--orange)'); }
-}
-
-async function mover(pipefyId, phase, action) {
-  if (!confirm('Mover esta ficha para '+phase+'?')) return;
-  try {
-    var d = await api(action, {pipefyId: pipefyId, phase: phase});
-    if (d.ok) { toast('&#128516; Movido para '+phase, 'var(--orange)'); await load(); }
-    else toast('&#10060; '+(d.error||'Erro'), '#ef4444');
-  } catch(e) { toast('&#10060; '+e.message, '#ef4444'); }
-}
-
-async function moverConfirmar(pipefyId, phase, action, msg) {
-  if (!confirm(msg)) return;
-  try {
-    var d = await api(action, {pipefyId: pipefyId, phase: phase});
-    if (d.ok) { toast('&#9989; Confirmado!', 'var(--green)'); await load(); }
-    else toast('&#10060; '+(d.error||'Erro'), '#ef4444');
-  } catch(e) { toast('&#10060; '+e.message, '#ef4444'); }
-}
-
-function abrirRel(pipefyId) {
-  relPipefyId = pipefyId; photoB64 = null;
-  document.getElementById('rel-desc').value = '';
-  document.getElementById('photo-input').value = '';
-  document.getElementById('photo-preview').style.display = 'none';
-  document.getElementById('photo-area-label').textContent = '\uD83D\uDCF7 Toque para tirar foto ou selecionar';
-  document.getElementById('modal-rel').classList.add('open');
-  initSigCanvas();
-}
-function fecharRel() { document.getElementById('modal-rel').classList.remove('open'); relPipefyId = null; }
-function previewPhoto(input) {
-  var file = input.files[0]; if (!file) return;
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    photoB64 = e.target.result;
-    var prev = document.getElementById('photo-preview');
-    prev.src = photoB64; prev.style.display = 'block';
-    document.getElementById('photo-area-label').textContent = '\u2705 Foto selecionada';
-  };
-  reader.readAsDataURL(file);
-}
-function initSigCanvas() {
-  var c = document.getElementById('sig-canvas');
-  c.width = c.offsetWidth || 400; c.height = 160;
-  sigCtx = c.getContext('2d');
-  sigCtx.fillStyle = '#0d1425'; sigCtx.fillRect(0,0,c.width,c.height);
-  sigCtx.strokeStyle = '#dce8f8'; sigCtx.lineWidth = 2; sigCtx.lineCap = 'round';
-  ['mousedown','mousemove','mouseup','touchstart','touchmove','touchend'].forEach(function(ev){
-    c.removeEventListener(ev, ev==='mousedown'||ev==='touchstart'?sigStart:ev==='mousemove'||ev==='touchmove'?sigMove:sigEnd);
-  });
-  c.addEventListener('mousedown',sigStart); c.addEventListener('mousemove',sigMove); c.addEventListener('mouseup',sigEnd);
-  c.addEventListener('touchstart',sigStart,{passive:false}); c.addEventListener('touchmove',sigMove,{passive:false}); c.addEventListener('touchend',sigEnd);
-}
-function sigPos(e,c){ var r=c.getBoundingClientRect(),t=e.touches?e.touches[0]:e; return{x:t.clientX-r.left,y:t.clientY-r.top}; }
-function sigStart(e){ e.preventDefault(); sigDrawing=true; var p=sigPos(e,this); sigLastX=p.x; sigLastY=p.y; }
-function sigMove(e){ if(!sigDrawing)return; e.preventDefault(); var p=sigPos(e,this); sigCtx.beginPath(); sigCtx.moveTo(sigLastX,sigLastY); sigCtx.lineTo(p.x,p.y); sigCtx.stroke(); sigLastX=p.x; sigLastY=p.y; }
-function sigEnd(){ sigDrawing=false; }
-function limparAssinatura(){ if(sigCtx){ var c=document.getElementById('sig-canvas'); sigCtx.fillStyle='#0d1425'; sigCtx.fillRect(0,0,c.width,c.height); } }
-
-async function salvarRel() {
-  var desc = document.getElementById('rel-desc').value.trim();
-  var sig  = document.getElementById('sig-canvas').toDataURL('image/png');
-  var btn  = document.getElementById('btn-salvar-rel');
-  btn.disabled = true; btn.textContent = 'Salvando...';
-  try {
-    var d = await api('salvar-relatorio', {pipefyId:relPipefyId, foto:photoB64, descricao:desc, assinatura:sig});
-    if (d.ok) { fecharRel(); toast('\uD83D\uDCCB Relatorio salvo!', 'var(--green)'); await load(); }
-    else toast('\u274C '+(d.error||'Erro ao salvar'), '#ef4444');
-  } catch(e) { toast('\u274C '+e.message, '#ef4444'); }
-  btn.disabled = false; btn.textContent = '\u2705 Salvar Relatorio';
-}
-
-
-load();
-setInterval(load, 120000);
+carrega('Jhonatan');carrega('Wilde');
+setInterval(function(){if(!document.hidden){carrega('Jhonatan');carrega('Wilde');}},90000);
 </script>
 </body>
 </html>
