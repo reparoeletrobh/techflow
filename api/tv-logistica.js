@@ -550,12 +550,64 @@ module.exports = async function handler(req, res) {
     // BH Oeste (Oeste + Noroeste + Barreiro)
     'gutierrez':'bh-oeste','buritis':'bh-oeste','estoril':'bh-oeste','salgado filho':'bh-oeste','nova suica':'bh-oeste','grajau':'bh-oeste','gameleira':'bh-oeste','calafate':'bh-oeste','jardim america':'bh-oeste','nova granada':'bh-oeste','prado':'bh-oeste','barroca':'bh-oeste','alto barroca':'bh-oeste','havai':'bh-oeste','betania':'bh-oeste','cabana':'bh-oeste','madre gertrudes':'bh-oeste','vista alegre':'bh-oeste','coracao eucaristico':'bh-oeste','padre eustaquio':'bh-oeste','carlos prates':'bh-oeste','caicara':'bh-oeste','monsenhor messias':'bh-oeste','dom cabral':'bh-oeste','alipio de melo':'bh-oeste','serrano':'bh-oeste','gloria':'bh-oeste','california':'bh-oeste','pindorama':'bh-oeste','barreiro':'bh-oeste','diamante':'bh-oeste','cardoso':'bh-oeste','milionarios':'bh-oeste','santa cecilia':'bh-oeste','tirol':'bh-oeste','lindeia':'bh-oeste','regina':'bh-oeste','bonsucesso':'bh-oeste','itaipu':'bh-oeste','olaria':'bh-oeste','joao pinheiro':'bh-oeste','camargos':'bh-oeste','santa maria':'bh-oeste',
   };
-  const CIDADES = { 'contagem':'contagem','betim':'betim','ibirite':'ibirite','sarzedo':'ibirite','nova lima':'nova-lima','sabara':'sabara','santa luzia':'santa-luzia','vespasiano':'vespasiano','ribeirao das neves':'neves','justinopolis':'neves' };
+  // Bairros de cidades vizinhas (aparecem sem o nome da cidade no endereço)
+  Object.assign(BAIRROS, {
+    // Contagem
+    'eldorado':'contagem','industrial':'contagem','ressaca':'contagem','nacional':'contagem','riacho':'contagem','riacho das pedras':'contagem','agua branca':'contagem','novo eldorado':'contagem','petrolandia':'contagem','nova contagem':'contagem','retiro':'contagem','amazonas':'contagem','inconfidentes':'contagem','tropical':'contagem','xangrila':'contagem','bernardo monteiro':'contagem','morada nova':'contagem','sapucaias':'contagem','colonial':'contagem','linda vista':'contagem','sao joaquim':'contagem','jardim laguna':'contagem','novo riacho':'contagem','campina verde':'contagem','vale das amendoeiras':'contagem','cidade industrial':'contagem','jardim industrial':'contagem','beatriz':'contagem','estancia':'contagem',
+    // Betim
+    'alterosas':'betim','imbirucu':'betim','ptb':'betim','jardim teresopolis':'betim','citrolandia':'betim','guanabara':'betim','inga':'betim','icaivera':'betim','angola':'betim','vianopolis':'betim','duque de caxias':'betim','laranjeiras':'betim',
+    // Ribeirão das Neves
+    'veneza':'neves','areias':'neves','sevilha':'neves','sao pedro neves':'neves','florenca':'neves','santinho':'neves','botafogo':'neves',
+    // Santa Luzia
+    'sao benedito':'santa-luzia','frimisa':'santa-luzia','cristina':'santa-luzia','londrina':'santa-luzia','palmital':'santa-luzia','bom destino':'santa-luzia','duquesa':'santa-luzia','ponte grande':'santa-luzia',
+    // Vespasiano
+    'morro alto':'vespasiano','celvia':'vespasiano','caieiras':'vespasiano','nova pampulha':'vespasiano',
+    // Nova Lima
+    'vila da serra':'nova-lima','vale do sereno':'nova-lima','jardim canada':'nova-lima','honorio bicalho':'nova-lima','vale dos cristais':'nova-lima',
+    // Sabará
+    'general carneiro':'sabara','roca grande':'sabara','pompeu':'sabara','nossa senhora de fatima':'sabara','adelmolandia':'sabara',
+    // Ibirité / Sarzedo
+    'durval de barros':'ibirite','jardim das rosas':'ibirite','marilandia':'ibirite','parque elizabeth':'ibirite','masterville':'ibirite',
+    // BH que faltavam
+    'lagoinha':'bh-oeste','bonfim':'bh-oeste','sao cristovao':'bh-oeste','aparecida':'bh-oeste','nova cachoeirinha':'bh-oeste','jardim montanhes':'bh-oeste','caicaras':'bh-oeste','alto caicaras':'bh-oeste','ermelinda':'bh-oeste','pedreira prado lopes':'bh-oeste','sao salvador':'bh-oeste','minas brasil':'bh-oeste','joao pinheiro':'bh-oeste','marajo':'bh-oeste','estrela dalva':'bh-oeste','palmeiras':'bh-oeste','flavio marques lisboa':'bh-oeste','vale do jatoba':'bh-oeste','independencia':'bh-oeste','solar':'bh-oeste','mangueiras':'bh-oeste','ernesto do nascimento':'bh-oeste',
+    'sao francisco':'bh-norte','santa terezinha':'bh-norte','monte azul':'bh-norte','jardim felicidade':'bh-norte','aarao reis':'bh-norte','novo aarao reis':'bh-norte','sao tomaz':'bh-norte','juliana':'bh-norte','etelvina carneiro':'bh-norte','campo alegre':'bh-norte','frei leopoldo':'bh-norte','maria virginia':'bh-norte','vila cemig':'bh-oeste',
+    'pousada santo antonio':'bh-leste','jonas veiga':'bh-leste','baleia':'bh-leste','sao lucas':'bh-sul','paraiso leste':'bh-leste','novo sao lucas':'bh-sul','conjunto taquaril':'bh-leste',
+    'santa rita':'venda-nova','sao damiao':'venda-nova','laranjeiras vn':'venda-nova','paqueta':'bh-norte','itatiaia':'bh-norte','engenho nogueira':'bh-norte',
+  });
+  const CIDADES = { 'contagem':'contagem','betim':'betim','ibirite':'ibirite','sarzedo':'ibirite','nova lima':'nova-lima','sabara':'sabara','santa luzia':'santa-luzia','vespasiano':'vespasiano','ribeirao das neves':'neves','justinopolis':'neves','r. das neves':'neves','r das neves':'neves' };
+  // Faixas de CEP da região metropolitana (fallback quando o bairro não é reconhecido)
+  function cepParaRegiao(end) {
+    const m = String(end || '').match(/\b(3\d{4})[-.\s]?\d{3}\b/);
+    if (!m) return null;
+    const p = parseInt(m[1], 10);
+    if (p >= 30100 && p <= 30199) return 'bh-sul';
+    if (p >= 30200 && p <= 30399) return 'bh-sul';
+    if (p >= 30400 && p <= 30599) return 'bh-oeste';
+    if (p >= 30600 && p <= 30698) return 'bh-oeste';
+    if (p >= 30700 && p <= 30899) return 'bh-oeste';
+    if (p >= 31000 && p <= 31149) return 'bh-leste';
+    if (p >= 31150 && p <= 31199) return 'bh-norte';
+    if (p >= 31200 && p <= 31399) return 'bh-norte';
+    if (p >= 31400 && p <= 31529) return 'bh-norte';
+    if (p >= 31530 && p <= 31699) return 'venda-nova';
+    if (p >= 31700 && p <= 31999) return 'bh-norte';
+    if (p >= 32000 && p <= 32399) return 'contagem';
+    if (p >= 32400 && p <= 32499) return 'ibirite';
+    if (p >= 32600 && p <= 32699) return 'betim';
+    if (p >= 33000 && p <= 33199) return 'santa-luzia';
+    if (p >= 33200 && p <= 33299) return 'vespasiano';
+    if (p >= 33800 && p <= 33999) return 'neves';
+    if (p >= 34000 && p <= 34399) return 'nova-lima';
+    if (p >= 34500 && p <= 34799) return 'sabara';
+    return null;
+  }
   function normTxt(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
   function regiaoDoEndereco(end) {
     const e = ' ' + normTxt(end) + ' ';
     for (const c of Object.keys(CIDADES)) if (e.includes(c)) return CIDADES[c];
     for (const b of Object.keys(BAIRROS)) if (e.includes(b)) return BAIRROS[b];
+    const porCep = cepParaRegiao(end);
+    if (porCep) return porCep;
     return 'sem-regiao';
   }
 
@@ -588,8 +640,19 @@ module.exports = async function handler(req, res) {
       .map(f => ({ id: f.id, nome: f.nome, telefone: f.telefone, endereco: f.endereco || '',
         equipamento: f.equipamento || 'TV', defeito: f.defeito || '', movedAt: f.movedAt || f.criadoEm,
         primeiroContatoEm: f.primeiroContatoEm || null, relatorioIniciadoEm: f.relatorioIniciadoEm || null,
-        regiao: regiaoDoEndereco(f.endereco) }));
+        regiao: f.regiaoManual || regiaoDoEndereco(f.endereco) }));
     return res.status(200).json({ ok: true, fichas, regioes: REGIOES });
+  }
+
+  // ── POST rota-classificar: classificação manual de ficha sem região (aprende) ──
+  if (req.method === 'POST' && action === 'rota-classificar') {
+    const { id, regiao } = req.body || {};
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const f = db.fichas.find(x => x.id === id);
+    if (!f) return res.status(404).json({ ok: false });
+    f.regiaoManual = String(regiao || '').trim();
+    await dbSet(LOG_KEY, db);
+    return res.status(200).json({ ok: true });
   }
 
   // ── POST rota-contato: registra o 1º contato (WhatsApp/ligação) ──

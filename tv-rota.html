@@ -179,6 +179,10 @@ function render(){
         '<div class="nm">'+esc(f.nome||'—')+agingHtml(f.movedAt)+(f.primeiroContatoEm?'<span class="badge-ctt">✅ contato feito</span>':'')+'</div>'+
         '<div class="eq">📍 '+esc(f.endereco||'sem endereço')+'</div>'+
         '<div class="eq">📺 '+esc(f.equipamento||'TV')+(f.defeito?' — '+esc(f.defeito):'')+(f.telefone?' · 📞 '+esc(f.telefone):'')+'</div>'+
+        (f.regiao==='sem-regiao'?('<div style="margin-top:8px;"><select onchange="classificar(\''+f.id+'\',this.value)" style="width:100%;background:#1a1e26;border:1px solid #3a4150;border-radius:8px;padding:9px;color:#f0f2f5;font-size:13px;">'+
+          '<option value="">📍 Em qual região fica este endereço?</option>'+
+          Object.keys(REG).filter(function(k){return k!=='sem-regiao';}).map(function(k){return '<option value="'+k+'">'+REG[k].nome+'</option>';}).join('')+
+        '</select></div>'):'')+
         '<div class="acts">'+
           '<a class="b b-wpp" href="https://wa.me/'+to+'?text='+msg+'" target="_blank" onclick="marcaContato(\''+f.id+'\')">💬 WhatsApp</a>'+
           '<a class="b b-tel" href="tel:+'+to+'" onclick="marcaContato(\''+f.id+'\')">📞 Ligar</a>'+
@@ -192,6 +196,11 @@ function render(){
   }).join('');
 }
 
+async function classificar(id,regiao){
+  if(!regiao)return;
+  await fetch('/api/tv-logistica?action=rota-classificar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,regiao:regiao})}).catch(function(){});
+  load();
+}
 function toggleReg(rg){_regAberta[rg]=_regAberta[rg]===false?true:false;render();}
 async function marcaContato(id){
   try{await fetch('/api/tv-logistica?action=rota-contato',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});}catch(e){}
