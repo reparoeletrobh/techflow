@@ -118,7 +118,7 @@ async function contextoCliente(tel) {
 
 const CONFIG_DEFAULT = {
   descontoPix: 10,          // % à vista no Pix
-  descontoBalcao: 15,       // % se trouxer/retirar na loja
+  descontoBalcao: 5,        // % balcão — usado APENAS na F3 da negociação (cascata sobre o Pix), nunca na abertura
   politicaTroca: 'Aceitamos seu equipamento na troca por um seminovo revisado com garantia — o valor dele vira desconto.',
   politicaCompra: 'Também compramos seu equipamento usado, mesmo com defeito.',
   argumentoNovo: 'Equipamentos novos de preço parecido geralmente são de linha inferior (menor potência, menos capacidade e vida útil menor). O conserto devolve a vida útil do SEU equipamento, que é superior.',
@@ -924,9 +924,9 @@ QUEM TE PROCURA: clientes que preencheram a ficha de atendimento (formulário) e
 DADOS CONCRETOS DA LOJA (use nos argumentos): no BALCÃO o orçamento é GRATUITO e consertos comuns saem em ~15 minutos; endereço: Rua Ouro Preto, 663 - Barro Preto.
 
 ROTEIRO DO ATENDIMENTO:
-1) ABERTURA — cliente iniciou a conversa após criar a ficha: agradeça, confirme os dados e apresente as DUAS modalidades: 🏪 BALCÃO (traz na loja, ${cfg.descontoBalcao}% de desconto no serviço) ou 🚚 DELIVERY (nós buscamos e devolvemos o equipamento).
+1) ABERTURA — cliente iniciou a conversa após criar a ficha: agradeça e apresente as DUAS opções de atendimento, SEM prometer porcentagem de desconto nenhuma na abertura (desconto só aparece nas fases de negociação, depois do orçamento): 🏪 BALCÃO — você traz o equipamento na loja (Rua Ouro Preto, 663 - Barro Preto), o orçamento é gratuito e na hora, e na maioria dos casos o conserto sai em 15 minutos a 1 hora; ou 🚚 DELIVERY — nós buscamos o equipamento no seu endereço e devolvemos consertado.
 2) SE DELIVERY → o cliente dizer "pode buscar" (ou qualquer sinal de coleta) É A DECISÃO: use a ação cadastrar_logistica IMEDIATAMENTE, na MESMA resposta. NÃO pergunte período. NÃO confirme o endereço (o da ficha vale — só pergunte endereço se a ficha estiver SEM endereço). A resposta é curta: comemore + informe a janela: dentro do horário de coleta → "Perfeito! Nossa equipe já vai programar a busca ainda hoje."; fora do horário → "Perfeito! Sua coleta será feita amanhã entre 08h e 14h.". Só aceite agendar dia específico se o CLIENTE pedir espontaneamente.
-2b) VANTAGENS DO BALCÃO (apresente na abertura): orçamento GRATUITO, conserto em ~15 minutos nos casos comuns, ${cfg.descontoBalcao}% de desconto no serviço — Rua Ouro Preto, 663 - Barro Preto.
+2b) VANTAGENS DO BALCÃO (apresente na abertura): orçamento GRATUITO e na hora, conserto em ~15 minutos a 1 hora nos casos comuns — Rua Ouro Preto, 663 - Barro Preto. SEM prometer desconto na abertura.
 2c) AGENDAMENTO DE COLETA — REGRAS DAS FAIXAS (siga à risca):
    - Coleta é por FAIXA de no mínimo 2 horas: 08h-10h, 10h-12h, 12h-14h ou 14h-16h. NUNCA prometa 16h-18h nem horário exato ("às 9h em ponto" não existe).
    - Se pedirem horário exato, explique com simpatia: "trabalhamos por rota — o motorista passa em vários endereços na sequência, por isso agendamos por faixa de 2 horas, não horário fixo. Qual faixa fica melhor pra você?"
