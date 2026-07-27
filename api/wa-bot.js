@@ -149,7 +149,7 @@ export default async function handler(req, res) {
       }
     }
     for (const f of (((tvA || {}).fichas) || [])) {
-      if (['orc_enviado', 'orc_registrado'].includes(f.phase) && envA.ids[f.id]) {
+      if (['orc_enviado', 'orc_registrado'].includes(f.phase) && (envA.ids[f.id] || envA.ids['tv:' + f.id])) {
         abertos.push({ tel: String(f.telefone || '').replace(/\D/g, ''), nome: f.nome, sis: 'tv', enviadoEm: envA.ids[f.id] });
       }
     }
@@ -574,8 +574,9 @@ export default async function handler(req, res) {
     const marcoO = cfgO.orcMarcoTs ? new Date(cfgO.orcMarcoTs).getTime() : 0; // só orçamentos criados após a ativação
     const { token: tkO, phoneId: pidO } = await credenciais();
     if (!tkO || !pidO) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
-    const [logO, enviadosO, evtsO] = await Promise.all([
-      dbGet('reparoeletro_logistica'), dbGet('wa_orc_enviados').then(v => v || { ids: {} }), lerEvts(),
+    const [logO, tvLogO, enviadosO, evtsO] = await Promise.all([
+      dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+      dbGet('wa_orc_enviados').then(v => v || { ids: {} }), lerEvts(),
     ]);
     const pzO = (await dbGet('wa_bot_pausados')) || {};
     const d8ok = t => {
@@ -589,13 +590,18 @@ export default async function handler(req, res) {
       return ult && (Date.now() - new Date(ult).getTime()) < 24 * 3600000;
     };
     const disparos = [];
-    for (const f of ((logO && logO.fichas) || [])) {
+    const filaOrc = [
+      ...(((logO || {}).fichas) || []).map(f => ({ f, sisO: 'adm' })),
+      ...(((tvLogO || {}).fichas) || []).map(f => ({ f, sisO: 'tv' })),
+    ];
+    for (const { f, sisO } of filaOrc) {
       if (f.phase !== 'orc_registrado') continue;
       const txtOrc = f.diagnostico && f.diagnostico.textoOrc;
       if (!txtOrc) continue;
       if (!abertoO && !d8ok(f.telefone)) continue;    // trava de teste (modo aberto libera)
       if (abertoO && pzO[String(f.telefone).replace(/\D/g, '').slice(-8)]) continue; // pausado (takeover)
-      if (enviadosO.ids[f.id]) continue;              // dedupe
+      const dedupeKey = sisO === 'tv' ? 'tv:' + f.id : f.id;
+      if (enviadosO.ids[dedupeKey]) continue;         // dedupe
       // marco temporal: NÃO enviar o backlog — só diagnósticos feitos após a ativação
       const tsOrc = new Date((f.diagnostico && f.diagnostico.em) || f.movedAt || f.criadoEm || 0).getTime();
       if (marcoO && tsOrc < marcoO) continue;
@@ -632,17 +638,18 @@ export default async function handler(req, res) {
           if (okO) await bumpStat('orcamentos');
           disparos.push({ nome: f.nome, modo: 'template-janela-fechada', ok: okO });
         }
-        enviadosO.ids[f.id] = new Date().toISOString();
+        enviadosO.ids[dedupeKey] = new Date().toISOString();
         // Efeito do botão "Copiar e Enviar": marca o orçamento como enviado na seção Orçamentos
         // (some de pendentes; o card já está no pipe em aguardando_aprovacao → cronômetro de 48h da última chamada segue vivo)
         try {
           const KOE = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
-          const orcDbV = (await dbGet('reparoeletro_orcamentos')) || { fichas: [] };
+          const orcDbV = (await dbGet(sisO === 'tv' ? 'tv_orcamentos' : 'reparoeletro_orcamentos')) || { fichas: [] };
           const d8f = String(f.telefone || '').replace(/\D/g, '').slice(-8);
           const orcFv = (orcDbV.fichas || []).find(x => x.status === 'pendente' &&
             String(x.tel || '').replace(/\D/g, '').slice(-8) === d8f);
           if (orcFv) {
-            await fetch(`https://reparoeletroadm.com/api/orcamento?action=orc-enviar&k=${KOE}`, {
+            const apiOrc = sisO === 'tv' ? 'tv-orcamento' : 'orcamento';
+            await fetch(`https://reparoeletroadm.com/api/${apiOrc}?action=orc-enviar&k=${KOE}`, {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ id: orcFv.id, preco: orcFv.precoSugerido || null }),
             });
