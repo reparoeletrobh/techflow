@@ -69,12 +69,13 @@ export default async function handler(req, res) {
             }
             else if (msg.type === 'image') texto = '📷 [foto]' + ((msg.image && msg.image.caption) ? ' ' + msg.image.caption : '');
             else if (msg.type === 'video') texto = '🎬 [vídeo]' + ((msg.video && msg.video.caption) ? ' ' + msg.video.caption : '');
+            else if (msg.type === 'audio') texto = '🎤 [áudio]';
             else texto = '[' + (msg.type || 'mídia') + ']';
             await rpushEvt({
               ts: new Date(parseInt(msg.timestamp || '0', 10) * 1000 || Date.now()).toISOString(),
               tel, nome: contatos[tel] || '', dir: 'in',
               texto: texto.slice(0, 2000), msgId: msg.id || null, tipo: msg.type || 'text',
-              mediaId: (msg.type === 'image' && msg.image && msg.image.id) || null,
+              mediaId: (msg.type === 'image' && msg.image && msg.image.id) || (msg.type === 'audio' && msg.audio && msg.audio.id) || null,
             });
             recebidas++;
             // 🤖 AUTO-RESPOSTA (trava de teste): telefones em wa_bot_config.execTels recebem resposta automática do cérebro

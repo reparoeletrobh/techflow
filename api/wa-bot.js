@@ -934,12 +934,47 @@ export default async function handler(req, res) {
     const historico = evts.filter(e => e.tel === tel && e.dir !== 'status').slice(-25)
       .map(e => (e.dir === 'in' ? 'CLIENTE: ' : 'ATENDENTE: ') + e.texto).join('\n');
 
+    // 🎤 AUDIÇÃO: se a última mensagem do cliente é ÁUDIO, baixa e transcreve (Groq ou OpenAI)
+    let audioTranscrito = null;
+    try {
+      const evtsCliA = evts.filter(e => e.tel === tel && e.dir === 'in');
+      const ultA = evtsCliA[evtsCliA.length - 1];
+      if (ultA && ultA.mediaId && ultA.tipo === 'audio') {
+        const sttKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY || '';
+        if (sttKey) {
+          const { token: tokA } = await credenciais();
+          const metaA = await fetch('https://graph.facebook.com/v20.0/' + ultA.mediaId, {
+            headers: { Authorization: 'Bearer ' + tokA } }).then(x => x.json());
+          if (metaA && metaA.url) {
+            const binA = await fetch(metaA.url, { headers: { Authorization: 'Bearer ' + tokA } });
+            const bufA = Buffer.from(await binA.arrayBuffer());
+            if (bufA.length < 20 * 1024 * 1024) {
+              const fd = new FormData();
+              fd.append('file', new Blob([bufA], { type: metaA.mime_type || 'audio/ogg' }), 'audio.ogg');
+              fd.append('model', process.env.GROQ_API_KEY ? 'whisper-large-v3' : 'whisper-1');
+              fd.append('language', 'pt');
+              const sttUrl = process.env.GROQ_API_KEY
+                ? 'https://api.groq.com/openai/v1/audio/transcriptions'
+                : 'https://api.openai.com/v1/audio/transcriptions';
+              const tr = await fetch(sttUrl, { method: 'POST',
+                headers: { Authorization: 'Bearer ' + sttKey }, body: fd }).then(x => x.json()).catch(() => null);
+              if (tr && tr.text) {
+                audioTranscrito = String(tr.text).slice(0, 1500);
+                await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'in',
+                  texto: '🎤 (transcrição do áudio): ' + audioTranscrito, tipo: 'audio-transcrito' });
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {}
+
     // 👁️ VISÃO: se a última mensagem do cliente tem FOTO, baixa do WhatsApp e anexa para análise
     let imgB64 = null, imgTipo = 'image/jpeg';
     try {
       const evtsCli = evts.filter(e => e.tel === tel && e.dir === 'in');
       const ultCli = evtsCli[evtsCli.length - 1];
-      if (ultCli && ultCli.mediaId) {
+      if (ultCli && ultCli.mediaId && ultCli.tipo !== 'audio') {
         const { token: tokM } = await credenciais();
         const meta = await fetch('https://graph.facebook.com/v20.0/' + ultCli.mediaId, {
           headers: { Authorization: 'Bearer ' + tokM } }).then(x => x.json());
@@ -1048,6 +1083,7 @@ Podemos prosseguir com o atendimento?"
       - Blocos/mosaicos ou deformação da imagem com faixas em diagonal
    C. Foto AMBÍGUA/escura/sem enquadramento: peça de novo com instrução: "Consegue tirar com a TV LIGADA, pegando a tela inteira de frente?"
    D. Se a foto da tela estiver LIMPA (imagem normal, sem os sinais acima): siga o fluxo normal — a triagem visual não substitui as perguntas do 7a-1, complementa.
+   D2. ÁUDIO: quando o cliente manda áudio, o sistema transcreve e a transcrição chega marcada com 🎤 — responda ao conteúdo normalmente, como se fosse texto (não precisa comentar que era um áudio). Se NÃO houver transcrição no histórico (sistema de transcrição indisponível), responda: "Não consegui ouvir seu áudio por aqui. Pode me escrever em texto, por favor?"
    E. VÍDEO: você não consegue assistir vídeos — responda: "Não consigo abrir vídeo por aqui. Me manda uma foto da tela ligada que eu te ajudo na hora."
 
 7a-2) RESPOSTAS PADRÃO (use quando perguntarem):
@@ -1095,7 +1131,7 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
           messages: [{ role: 'user', content: imgB64
             ? [ { type: 'image', source: { type: 'base64', media_type: imgTipo, data: imgB64 } },
                 { type: 'text', text: 'A imagem acima é a FOTO que o cliente acabou de enviar. Analise-a conforme as regras de VISÃO do seu roteiro.\n\nHistórico da conversa:\n' + (historico || '(sem mensagens ainda)') + '\n\nGere a próxima resposta sugerida.' } ]
-            : 'Histórico da conversa:\n' + (historico || '(sem mensagens ainda — cliente novo)') + '\n\nGere a próxima resposta sugerida.' }],
+            : 'Histórico da conversa:\n' + (historico || '(sem mensagens ainda — cliente novo)') + (audioTranscrito ? '\n\n🎤 A ÚLTIMA mensagem do cliente foi um ÁUDIO. Transcrição: "' + audioTranscrito + '" — responda a ELA.' : '') + '\n\nGere a próxima resposta sugerida.' }],
         }),
       });
       const j = await r.json();
