@@ -1585,6 +1585,20 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
               body: JSON.stringify({ id: cardX.id, phase: 'aprovados' }),
             });
             await bumpStat('aprovacoes');
+            // ESPELHOS: outros cards do MESMO telefone ainda em aguardando/última chamada são duplicatas → arquivar
+            try {
+              const ppE = (await dbGet('reparoeletro_pipe')) || { cards: [] };
+              const espelhos = (ppE.cards || []).filter(c => c.id !== cardX.id &&
+                String(c.telefone || '').replace(/\D/g, '').slice(-8) === d8x &&
+                ['aguardando_aprovacao', 'ultima_chamada'].includes(c.phaseId || c.phase));
+              if (espelhos.length) {
+                const arqE = (await dbGet('pipe_ids_arquivados')) || { ids: [] };
+                for (const e of espelhos) if (!arqE.ids.includes(e.id)) arqE.ids.push(e.id);
+                await dbSet('pipe_ids_arquivados', arqE);
+                ppE.cards = ppE.cards.filter(c => !espelhos.some(e => e.id === c.id));
+                await dbSet('reparoeletro_pipe', ppE);
+              }
+            } catch (e) {}
           }
           }
         }
