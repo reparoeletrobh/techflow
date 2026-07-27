@@ -206,7 +206,7 @@ function renderLista(d){
       if(!lst.length){el.innerHTML='<div style="padding:20px;color:#f59e0b;font-size:12px;text-align:center;">💰 Nenhuma conversa com orçamento em aberto<br><span style="color:#5a6270;">(toca no cartão Orçamentos de novo pra limpar o filtro)</span></div>';return;}}
     if(!lst.length){el.innerHTML='<div style="padding:20px;color:#5a6270;font-size:12px;text-align:center;">Nenhuma conversa encontrada</div>';return;}
     el.innerHTML=lst.map(function(c){
-      return '<div class="conv'+(c.tel===_tel?' sel':'')+'" onclick="abrirConversa(\''+c.tel+'\')">'
+      return '<div class="conv'+(c.tel===_tel?' sel':'')+(c.escalada?' conv-escalada':'')+'" onclick="abrirConversa(\''+c.tel+'\')">'
         +'<div class="conv-nome">'+esc(c.nome||fmtTel(c.tel))+(c.escalada?'<span class="conv-badge" style="background:rgba(245,158,11,.35);color:#fde047;">⚠️ precisa de humano</span>':'')+(c.pausado?'<span class="conv-badge" style="background:rgba(245,158,11,.25);color:#fbbf24;">✋ manual</span>':(c.naoRespondida?'<span class="conv-badge">responder</span>':''))+'</div>'
         +'<div style="font-size:10.5px;color:#5a8dc9;font-family:var(--fm,monospace);margin:1px 0 2px;">📞 '+fmtTel(c.tel)+'</div>'
         +'<div class="conv-ultima">'+esc(c.ultimaMsg)+'</div>'
