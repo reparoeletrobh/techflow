@@ -11,6 +11,7 @@ async function dbSet(k, v) {
 const GRAPH = 'https://graph.facebook.com/v20.0';
 
 module.exports = async function handler(req, res) {
+  try {
   res.setHeader('Access-Control-Allow-Origin', '*');
   const action = (req.query.action || '').trim();
   const _tfk = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
@@ -54,9 +55,12 @@ module.exports = async function handler(req, res) {
         ctr: i.ctr ? Number(i.ctr).toFixed(2) + '%' : '—', cpc: i.cpc ? 'R$ ' + Number(i.cpc).toFixed(2) : '—',
         conversas7d: leads };
     });
-    await dbSet('trafego_meta_cache', { em: new Date().toISOString(), campanhas: resultado });
+    try { if (U && T) await dbSet('trafego_meta_cache', { em: new Date().toISOString(), campanhas: resultado }); } catch (e) {}
     return res.status(200).json({ ok: true, conta: 'act_' + CONTA, periodo: 'últimos 7 dias', campanhas: resultado });
   }
 
   return res.status(404).json({ ok: false, error: 'ação não encontrada (meta-teste | meta-campanhas)' });
+  } catch (e) {
+    return res.status(200).json({ ok: false, error: 'erro interno: ' + e.message });
+  }
 };
