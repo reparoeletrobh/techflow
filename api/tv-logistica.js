@@ -145,6 +145,15 @@ async function dbSet(key, val) {
 function defaultDB() { return { fichas: [], nextId: 1 }; }
 
 
+async function logMov(fichaId, nome, de, para, por) {
+  try {
+    const lg = (await dbGet('tv_log_movimentos')) || { movs: [] };
+    lg.movs.unshift({ id: fichaId, nome: String(nome || '').slice(0, 40), de, para, por, ts: new Date().toISOString() });
+    lg.movs = lg.movs.slice(0, 200);
+    await dbSet('tv_log_movimentos', lg);
+  } catch (e) {}
+}
+
 async function registrarPassagem(phase) {
   try {
     const hoje = new Date().toLocaleDateString('pt-BR', {timeZone:'America/Sao_Paulo'}).split('/').reverse().join('-');
@@ -486,10 +495,12 @@ module.exports = async function handler(req, res) {
     const db = await dbGet(LOG_KEY) || defaultDB();
     const ficha = db.fichas.find(f => f.id === id);
     if (!ficha) return res.status(404).json({ ok: false, error: 'nao encontrada' });
+    const faseAnt = ficha.phase;
     ficha.phase = phase;
     ficha.movedAt = new Date().toISOString();
     await dbSet(LOG_KEY, db);
     registrarPassagem(phase).catch(() => {});
+    logMov(id, ficha.nome, faseAnt, phase, 'equipe/mover').catch(() => {});
 
     // Trigger: liberado_para_rota -> tv_board
     if (phase === 'liberado_para_rota') {
@@ -613,6 +624,12 @@ module.exports = async function handler(req, res) {
     return 'sem-regiao';
   }
 
+  // ── GET rota-audit: caixa-preta dos movimentos da logística TV ──
+  if (req.method === 'GET' && action === 'rota-audit') {
+    const lg = (await dbGet('tv_log_movimentos')) || { movs: [] };
+    return res.status(200).json({ ok: true, movimentos: lg.movs.slice(0, 60) });
+  }
+
   // ── GET rota-debug: contagem por motoristaNome nas fichas de motorista_parceiro ──
   if (req.method === 'GET' && action === 'rota-debug') {
     const db = await dbGet(LOG_KEY) || defaultDB();
@@ -664,9 +681,11 @@ module.exports = async function handler(req, res) {
     const db = await dbGet(LOG_KEY) || defaultDB();
     const f = db.fichas.find(x => x.id === id);
     if (!f) return res.status(404).json({ ok: false });
+    const faseAntC = f.phase;
     f.phase = 'liberado_coleta';
     f.movedAt = new Date().toISOString();
     f.cancelamentoMotorista = { motivo: String(motivo).slice(0, 200), motorista: String(motorista || ''), em: f.movedAt };
+    logMov(id, f.nome, faseAntC, 'liberado_coleta', 'motorista-cancelou/' + String(motorista || '?')).catch(() => {});
     f.texto = ('❌ CANCELADA pelo cliente (' + String(motorista || 'motorista') + '): ' + String(motivo).slice(0, 150) + '\n' + (f.texto || '')).slice(0, 1200);
     await dbSet(LOG_KEY, db);
     registrarPassagem('liberado_coleta').catch(() => {});
@@ -696,6 +715,7 @@ module.exports = async function handler(req, res) {
     f.movedAt = new Date().toISOString();
     await dbSet(LOG_KEY, db);
     registrarPassagem(phase).catch(() => {});
+    logMov(id, f.nome, 'motorista_parceiro', phase, 'motorista/' + String((req.body || {}).motorista || f.motoristaNome || '?')).catch(() => {});
     return res.status(200).json({ ok: true });
   }
 
