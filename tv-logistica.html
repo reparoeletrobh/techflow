@@ -1169,10 +1169,8 @@ let motoristaFichaId = null;
 
 function abrirMotorista(id) {
   motoristaFichaId = id;
-  document.getElementById('motorista-nome').value = '';
   document.getElementById('motorista-msg').style.display = 'none';
   document.getElementById('ov-motorista').style.display = 'flex';
-  setTimeout(() => document.getElementById('motorista-nome').focus(), 100);
 }
 
 function fecharMotorista() {
