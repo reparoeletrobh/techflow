@@ -224,13 +224,16 @@ export default async function handler(req, res) {
     const jaFalaramD = new Set(evtsD.filter(e => e.dir === 'in').map(e => String(e.tel || '').replace(/\D/g, '').slice(-8)));
     const [_logD, _tvLogD, _pipeD] = await Promise.all([dbGet('reparoeletro_logistica'), dbGet('tv_logistica'), dbGet('reparoeletro_pipe')]);
     const _emOpD = new Set();
+    const _FA = ['liberado_coleta', 'horario_marcado', 'em_rota', 'motorista_parceiro', 'remarcar', 'orc_enviado'];
+    const _vivo = (f, dias) => Date.now() - new Date(f.movedAt || f.criadoEm || 0).getTime() < dias * 86400000;
     for (const f of (((_logD || {}).fichas) || []).concat(((_tvLogD || {}).fichas) || [])) {
       const d = String(f.telefone || '').replace(/\D/g, '').slice(-8);
-      if (d.length >= 8) _emOpD.add(d);
+      if (d.length < 8) continue;
+      if ((_FA.includes(f.phase) || ['coleta_efetuada', 'orc_registrado'].includes(f.phase)) && _vivo(f, 30)) _emOpD.add(d);
     }
     for (const c of (((_pipeD || {}).cards) || [])) {
       const d = String(c.telefone || '').replace(/\D/g, '').slice(-8);
-      if (d.length >= 8 && !['finalizado', 'arquivado'].includes(c.phaseId || c.phase)) _emOpD.add(d);
+      if (d.length >= 8 && !['finalizado', 'arquivado'].includes(c.phaseId || c.phase) && _vivo(c, 45)) _emOpD.add(d);
     }
     const agoraD = Date.now();
     const analisa = (f, sis) => {
@@ -304,17 +307,19 @@ export default async function handler(req, res) {
     // Telefones JÁ DENTRO DA OPERAÇÃO (logística ADM/TV ou pipe): nunca abordar como coleta nova —
     // caso real: cliente com TV já coletada e orçamento pronto recebia o protocolo de coleta
     const emOperacao = new Set();
-    for (const f of (((logAb || {}).fichas) || [])) {
+    const FASES_ANDAMENTO = ['liberado_coleta', 'horario_marcado', 'em_rota', 'motorista_parceiro', 'remarcar', 'orc_enviado'];
+    const vivo = (f, dias) => Date.now() - new Date(f.movedAt || f.criadoEm || 0).getTime() < dias * 86400000;
+    // Logística ADM/TV: bloqueia só operação EM ANDAMENTO (pré-coleta sempre; equipamento conosco: últimos 30 dias)
+    for (const f of ((((logAb || {}).fichas) || []).concat(((tvLogAb || {}).fichas) || []))) {
       const d = String(f.telefone || '').replace(/\D/g, '').slice(-8);
-      if (d.length >= 8) emOperacao.add(d);
+      if (d.length < 8) continue;
+      if (FASES_ANDAMENTO.includes(f.phase) && vivo(f, 30)) emOperacao.add(d);
+      else if (['coleta_efetuada', 'orc_registrado'].includes(f.phase) && vivo(f, 30)) emOperacao.add(d);
     }
-    for (const f of (((tvLogAb || {}).fichas) || [])) {
-      const d = String(f.telefone || '').replace(/\D/g, '').slice(-8);
-      if (d.length >= 8) emOperacao.add(d);
-    }
+    // Pipe: cards ativos recentes (45 dias) — atendimento antigo concluído não bloqueia cliente recorrente
     for (const c of (((pipeAb || {}).cards) || [])) {
       const d = String(c.telefone || '').replace(/\D/g, '').slice(-8);
-      if (d.length >= 8 && !['finalizado', 'arquivado'].includes(c.phaseId || c.phase)) emOperacao.add(d);
+      if (d.length >= 8 && !['finalizado', 'arquivado'].includes(c.phaseId || c.phase) && vivo(c, 45)) emOperacao.add(d);
     }
     const todasFichas = [
       ...(((fdb && fdb.fichas) || []).map(f => Object.assign(f, { _sis: 'adm' }))),
