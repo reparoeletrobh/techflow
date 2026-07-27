@@ -195,7 +195,7 @@ export default async function handler(req, res) {
       const d8 = String(f.telefone || '').replace(/\D/g, '').slice(-8);
       const idadeMin = Math.round((agoraD - new Date(f.criadoEm || 0).getTime()) / 60000);
       return { sis, nome: f.nome, status: f.status || '(vazio)', idadeMin,
-        telOk: d8.length >= 8, virgem: !f.status || f.status === 'ficha_criada',
+        telOk: d8.length >= 8, virgem: !f.status || f.status === 'ficha_criada' || f.status === 'criada',
         idadeOk: idadeMin > 5, clienteJaEscreveu: jaFalaramD.has(d8), jaAbordado: !!abordD.tels[d8] };
     };
     const todas = [
@@ -258,7 +258,7 @@ export default async function handler(req, res) {
     const candidatas = todasFichas.filter(f => {
       const idade = agora - new Date(f.criadoEm || 0).getTime();
       const d8 = String(f.telefone || '').replace(/\D/g, '').slice(-8);
-      const virgem = !f.status || f.status === 'ficha_criada';
+      const virgem = !f.status || f.status === 'ficha_criada' || f.status === 'criada';
       return virgem && idade > 5 * 60000 && d8.length >= 8 &&
         !jaFalaram.has(d8) && !abordados.tels[d8];
     }).sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')))
