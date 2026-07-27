@@ -311,7 +311,7 @@ export default async function handler(req, res) {
             body: JSON.stringify({ nome: f.nome || 'Cliente', telefone: String(f.telefone || '').replace(/\D/g, ''),
               equipamento: f.equipamento || '',
               motivo: 'ciclo comercial esgotado — cliente não respondeu aos 4 toques do orçamento; ligar para aprovar ou definir a devolução' }),
-          });
+          }).then(x => x.json()).catch(() => null);
           await bumpStat('conflitos');
           reatR.alvos[chave] = { toques: st.toques, ultimo: agoraR, encerrado: true };
           feitos.push({ nome: f.nome, acao: 'enviado para Conflitos Bot' });
@@ -1689,7 +1689,7 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
           const acha = b => (((b || {}).fichas) || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
           const fichaC = acha(fdbC) || acha(fdbCtv);
           {
-          await fetch(`https://reparoeletroadm.com/api/prospeccao?action=criar-conflito&k=${KCF}`, {
+          const respCf = await fetch(`https://reparoeletroadm.com/api/prospeccao?action=criar-conflito&k=${KCF}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               nome: (fichaC && fichaC.nome) || 'Cliente WhatsApp',
@@ -1697,8 +1697,9 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
               equipamento: (fichaC && fichaC.equipamento) || '',
               motivo: String(acaoMotivo || 'conflito registrado pelo bot').slice(0, 300),
             }),
-          });
-          await bumpStat('conflitos');
+          }).then(x => x.json()).catch(() => null);
+          // KPI conta CONFLITO CRIADO — não tentativa nem repetição do mesmo cliente (dedupe)
+          if (respCf && respCf.criado) await bumpStat('conflitos');
           }
         }
         if (autorizado && acaoAprovada === 'mover_aprovado') {

@@ -644,6 +644,16 @@ export default async function handler(req,res){
 
   // ── EVENTOS-DIAGNOSTICO: raio-x da base de eventos ────────────────────────
   // ── CONFLITOS BOT: criação (pelo bot) e resolução (pela equipe) ──
+  async function logConflito(tipo,dados){
+    const lg=(await dbGet('prospeccao_conflitos_log'))||{movs:[]};
+    lg.movs.unshift({ts:new Date().toISOString(),tipo:tipo,
+      nome:String((dados||{}).nome||'').slice(0,40),
+      telefone:String((dados||{}).telefone||'').replace(/\D/g,'').slice(-8),
+      motivo:String((dados||{}).motivo||'').slice(0,120)});
+    lg.movs=lg.movs.slice(0,500);
+    await dbSet('prospeccao_conflitos_log',lg);
+  }
+
   if(req.method==='POST'&&action==='criar-conflito'){
     const {nome,telefone,equipamento,motivo}=req.body||{};
     if(!telefone)return res.status(400).json({ok:false,error:'telefone obrigatório'});
@@ -652,7 +662,7 @@ export default async function handler(req,res){
     const d8c=String(telefone).replace(/\D/g,'').slice(-8);
     // dedupe: conflito aberto do mesmo tel
     const jaTem=(db.fichas||[]).some(f=>f.status==='conflitos_bot'&&String(f.telefone||'').replace(/\D/g,'').slice(-8)===d8c);
-    if(jaTem)return res.status(200).json({ok:true,msg:'conflito já aberto para este telefone'});
+    if(jaTem)return res.status(200).json({ok:true,criado:false,dedupe:true,msg:'conflito já aberto para este telefone'});
     db.fichas.unshift({
       id:'conf_'+Date.now().toString(36),
       nome:String(nome||'Cliente WhatsApp'),telefone:String(telefone).replace(/\D/g,''),
@@ -661,7 +671,24 @@ export default async function handler(req,res){
       criadoEm:new Date().toISOString(),origemBot:true,
     });
     await dbSet(KEY,db);
-    return res.status(200).json({ok:true});
+    try{await logConflito('criado',{nome:nome,telefone:telefone,motivo:motivo});}catch(_){}
+    return res.status(200).json({ok:true,criado:true});
+  }
+
+  // ── 📊 CONFLITOS-STATS: reconciliação (criados × abertos × desfechos) ──
+  if(action==='conflitos-stats'){
+    const [dbS,lg]=await Promise.all([dbGet(KEY),dbGet('prospeccao_conflitos_log')]);
+    const abertos=(((dbS||{}).fichas)||[]).filter(f=>f.status==='conflitos_bot');
+    const movs=((lg||{}).movs)||[];
+    const hoje=new Date(Date.now()-3*3600*1000).toISOString().slice(0,10);
+    const doDia=movs.filter(m=>String(m.ts).slice(0,10)===hoje);
+    const cont=(arr,t)=>arr.filter(m=>m.tipo===t).length;
+    return res.status(200).json({ok:true,
+      abertosAgora:abertos.length,
+      hoje:{criados:cont(doDia,'criado'),aprovados:cont(doDia,'aprovado'),reprovados:cont(doDia,'reprovado'),resolvidos:cont(doDia,'resolvido')},
+      total:{criados:cont(movs,'criado'),aprovados:cont(movs,'aprovado'),reprovados:cont(movs,'reprovado'),resolvidos:cont(movs,'resolvido')},
+      conferencia:'criados − (aprovados + reprovados + resolvidos) deve bater com abertosAgora',
+      ultimos:movs.slice(0,30)});
   }
   // ── 📊 RETORNO DO REMARCAR: quantas coletas solicitadas voltaram (dia/semana, ADM e TV) ──
   if(action==='retorno-remarcar'){
@@ -729,6 +756,7 @@ export default async function handler(req,res){
     }catch(_){}
     db.fichas=db.fichas.filter(x=>x.id!==id);
     await dbSet(KEY,db);
+    try{await logConflito('aprovado',{nome:f.nome,telefone:f.telefone,motivo:'aprovado no Conflitos Bot'});}catch(_){}
     return res.status(200).json({ok:true,card:card.id});
   }
   if(req.method==='POST'&&action==='conflito-reprovar'){
@@ -748,6 +776,7 @@ export default async function handler(req,res){
       body:JSON.stringify({id:card.id,phase:'solicitar_entrega'})});
     db.fichas=db.fichas.filter(x=>x.id!==id);
     await dbSet(KEY,db);
+    try{await logConflito('reprovado',{nome:f.nome,telefone:f.telefone,motivo:'reprovado no Conflitos Bot'});}catch(_){}
     return res.status(200).json({ok:true,card:card.id});
   }
   if(req.method==='POST'&&action==='conflito-contatado'){
@@ -767,6 +796,7 @@ export default async function handler(req,res){
     if(!f)return res.status(404).json({ok:false,error:'não encontrado'});
     db.fichas=db.fichas.filter(x=>x.id!==id);
     await dbSet(KEY,db);
+    try{await logConflito('resolvido',{nome:f.nome,telefone:f.telefone,motivo:'resolvido/removido manualmente'});}catch(_){}
     return res.status(200).json({ok:true});
   }
 
