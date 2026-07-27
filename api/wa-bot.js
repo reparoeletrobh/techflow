@@ -1041,6 +1041,7 @@ Podemos prosseguir com o atendimento?"
    - Cliente só pode FORA das nossas faixas de semana → ofereça o SÁBADO: aos sábados coletamos até as 11h.
    - Ainda não encaixou? ESCADA DE FLEXIBILIZAÇÃO (uma por vez, tom de solução): (1) "Consegue deixar com um vizinho ou alguém de confiança pra gente pegar na faixa X?" (2) "Se preferir, pega no seu TRABALHO — muita gente leva e a gente coleta lá." (3) "Mora em prédio? Pode deixar na PORTARIA que o motorista retira." — o objetivo é o cliente DISPONIBILIZAR o equipamento em algum lugar dentro das faixas.
    - NADA encaixou mesmo → convide para a loja ("Rua Ouro Preto, 663 - Barro Preto, orçamento na hora e gratuito") E use a ação mover_entrar_contato (motivo: "sem faixa compatível — abordagem humana") para nossa equipe ligar e resolver.
+2d) CLIENTE ESCOLHEU O BALCÃO ("vou levar aí", "prefiro trazer na loja") → confirme com simpatia reforçando endereço e horário da loja E use a ação mover_cliente_loja (no motivo, anote quando o cliente disse que vai — ex: "vem hoje à tarde"). A ficha vai para a seção Cliente Loja da prospecção.
 3) COLETA CONFIRMADA → ação cadastrar_logistica (informe no motivo: imediata ou agendada + dia/período/faixa). O sistema dá baixa na ficha e cria a coleta.
 4) EQUIPAMENTO NA LOJA → diagnóstico → orçamento enviado ao cliente (valor no contexto, em logistica/pipe).
 5-PRE) OBJEÇÃO "TÁ CARO / NÃO VALE A PENA" — PESQUISA REAL OBRIGATÓRIA:
@@ -1110,7 +1111,7 @@ DISCIPLINA (CRÍTICO — leia duas vezes):
 
 (o contexto do cliente e o estado do horário vêm no bloco seguinte)
 
-Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem sugerida","acao":{"tipo":"nenhuma|cadastrar_logistica|enviar_orcamento|desconto_pix|desconto_balcao|proposta_troca|mover_aprovado|registrar_reprovacao|registrar_conflito|escalar_humano","motivo":"por quê"},"confianca":"alta|media|baixa"}`;
+Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem sugerida","acao":{"tipo":"nenhuma|cadastrar_logistica|mover_cliente_loja|enviar_orcamento|desconto_pix|desconto_balcao|proposta_troca|mover_aprovado|registrar_reprovacao|registrar_conflito|escalar_humano","motivo":"por quê"},"confianca":"alta|media|baixa"}`;
 
     try {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -1275,6 +1276,17 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
             });
             await bumpStat('aprovacoes');
           }
+          }
+        }
+        if (autorizado && acaoAprovada === 'mover_cliente_loja') {
+          const fdbL = (await dbGet('fichas_adm')) || { fichas: [] };
+          const fichaL = (fdbL.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x && f.status !== 'logistica');
+          if (fichaL) {
+            fichaL.status = 'cliente_loja';
+            fichaL.movidoEm = new Date().toISOString();
+            fichaL.clienteLojaMotivo = String(acaoMotivo || 'bot: cliente vai trazer na loja').slice(0, 200);
+            await dbSet('fichas_adm', fdbL);
+            await bumpStat('cliente_loja');
           }
         }
         if (autorizado && acaoAprovada === 'mover_entrar_contato') {
