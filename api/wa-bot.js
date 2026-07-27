@@ -292,8 +292,15 @@ export default async function handler(req, res) {
       dbGet('fichas_adm'), dbGet('fichas_tv'), lerEvts(), dbGet('wa_abordados').then(v => v || { tels: {} }),
       dbGet('reparoeletro_logistica'), dbGet('tv_logistica'), dbGet('reparoeletro_pipe'),
     ]);
-    // Telefones que JÁ iniciaram conversa (qualquer evento in)
-    const jaFalaram = new Set(evts.filter(e => e.dir === 'in').map(e => String(e.tel).slice(-8)));
+    // Última mensagem IN por telefone (para decidir template × texto direto; conversa antiga não bloqueia mais a abordagem)
+    const ultimaInPor = {};
+    for (const e of evts) if (e.dir === 'in') {
+      const d8e = String(e.tel || '').replace(/\D/g, '').slice(-8);
+      const t = new Date(e.ts || 0).getTime();
+      if (!ultimaInPor[d8e] || t > ultimaInPor[d8e]) ultimaInPor[d8e] = t;
+    }
+    // Só bloqueia abordagem quem tem conversa ATIVA agora (falou nas últimas 24h — o bot já responde no fluxo normal)
+    const jaFalaram = new Set(Object.keys(ultimaInPor).filter(d8 => Date.now() - ultimaInPor[d8] < 24 * 3600 * 1000));
     // Telefones JÁ DENTRO DA OPERAÇÃO (logística ADM/TV ou pipe): nunca abordar como coleta nova —
     // caso real: cliente com TV já coletada e orçamento pronto recebia o protocolo de coleta
     const emOperacao = new Set();
@@ -685,6 +692,44 @@ export default async function handler(req, res) {
     }
     // poda 60d
     const corteO = Date.now() - 60 * 86400000;
+    // RETRY único: template de orçamento sem resposta há 24h+ → reenvia 1x para reabrir a janela
+    try {
+      const retryDb = (await dbGet('wa_orc_retry')) || { ids: {} };
+      const ultimaIn = {};
+      for (const e of evtsO) if (e.dir === 'in') {
+        const d8e = String(e.tel || '').replace(/\D/g, '').slice(-8);
+        const t = new Date(e.ts || 0).getTime();
+        if (!ultimaIn[d8e] || t > ultimaIn[d8e]) ultimaIn[d8e] = t;
+      }
+      for (const { f, sisO } of filaOrc) {
+        if (f.phase !== 'orc_registrado') continue;
+        const dk = sisO === 'tv' ? 'tv:' + f.id : f.id;
+        const envTs = enviadosO.ids[dk] ? new Date(enviadosO.ids[dk]).getTime() : 0;
+        if (!envTs || retryDb.ids[dk]) continue;
+        const idadeEnv = Date.now() - envTs;
+        if (idadeEnv < 24 * 3600 * 1000 || idadeEnv > 72 * 3600 * 1000) continue;
+        const d8r = String(f.telefone || '').replace(/\D/g, '').slice(-8);
+        if (ultimaIn[d8r] && ultimaIn[d8r] > envTs) continue; // cliente respondeu — negociação em curso
+        const toR = String(f.telefone || '').replace(/\D/g, '');
+        const toR55 = toR.startsWith('55') ? toR : '55' + toR;
+        const rr = await fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`, {
+          method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messaging_product: 'whatsapp', to: toR55, type: 'template',
+            template: { name: 'orcamento_pronto', language: { code: 'pt_BR' },
+              components: [{ type: 'body', parameters: [
+                { type: 'text', text: (f.nome || 'cliente').split(' ')[0] },
+                { type: 'text', text: f.equipamento || 'equipamento' },
+              ] }] } }),
+        }).then(x => x.json()).catch(() => null);
+        if (rr && rr.messages && rr.messages[0]) {
+          retryDb.ids[dk] = new Date().toISOString();
+          await rpushEvt({ ts: new Date().toISOString(), tel: toR55, dir: 'out',
+            texto: '📨 [reenvio do orçamento pronto — 24h sem resposta] ' + (f.nome || ''), tipo: 'template' });
+        }
+      }
+      for (const k of Object.keys(retryDb.ids)) if (new Date(retryDb.ids[k]).getTime() < Date.now() - 7 * 86400000) delete retryDb.ids[k];
+      await dbSet('wa_orc_retry', retryDb);
+    } catch (e) {}
     for (const k of Object.keys(enviadosO.ids)) if (new Date(enviadosO.ids[k]).getTime() < corteO) delete enviadosO.ids[k];
     await dbSet('wa_orc_enviados', enviadosO);
     return res.status(200).json({ ok: true, disparos });
@@ -1066,6 +1111,8 @@ export default async function handler(req, res) {
 
     const system = `Você é o atendente virtual da Reparo Eletro (assistência técnica de eletrodomésticos em BH: micro-ondas, purificadores, adegas, fornos e afins). Tom: cordial, direto, brasileiro, sem formalidade excessiva. Mensagens CURTAS de WhatsApp, UMA pergunta por vez.
 
+📌 FICHAS DUPLICADAS — O ESTÁGIO MAIS AVANÇADO É O REAL: clientes às vezes criam uma segunda ficha só para tirar dúvida enquanto o equipamento já está conosco. Se o CONTEXTO mostrar o cliente em estágio avançado (equipamento coletado, orçamento enviado, em produção, no pipe), IGNORE fichas novas "criada" do mesmo cliente — são duplicadas. NUNCA ofereça coleta nova nem reinicie o protocolo de coleta: continue a conversa do estágio real (ex: orçamento aguardando aprovação → conduza a negociação).
+
 🚫 PAGAMENTOS — REGRA SUPREMA (violação = dano financeiro ao cliente):
 - Você NÃO TEM e NUNCA fornece: chave Pix, CNPJ, conta bancária, QR code ou link de pagamento. Esses dados NÃO EXISTEM no seu roteiro de propósito.
 - Se o cliente pedir dados para pagar QUALQUER coisa (taxa, orçamento, serviço): responda "Nossa equipe vai te enviar os dados oficiais de pagamento na sequência, tudo certinho" e use a ação registrar_conflito (motivo: "cliente aguardando dados de pagamento — enviar Pix oficial manualmente").
@@ -1115,9 +1162,10 @@ Podemos prosseguir com o atendimento?"
    - Ainda não encaixou? ESCADA DE FLEXIBILIZAÇÃO (uma por vez, tom de solução): (1) "Consegue deixar com um vizinho ou alguém de confiança pra gente pegar na faixa X?" (2) "Se preferir, pega no seu TRABALHO — muita gente leva e a gente coleta lá." (3) "Mora em prédio? Pode deixar na PORTARIA que o motorista retira." — o objetivo é o cliente DISPONIBILIZAR o equipamento em algum lugar dentro das faixas.
    - NADA encaixou mesmo → convide para a loja ("Rua Ouro Preto, 663 - Barro Preto, orçamento na hora e gratuito") E use a ação mover_entrar_contato (motivo: "sem faixa compatível — abordagem humana") para nossa equipe ligar e resolver.
 2d) CLIENTE ESCOLHEU O BALCÃO ("vou levar aí", "prefiro trazer na loja") → confirme com simpatia reforçando endereço e horário da loja E use a ação mover_cliente_loja (no motivo, anote quando o cliente disse que vai — ex: "vem hoje à tarde"). A ficha vai para a seção Cliente Loja da prospecção.
+2e) AGENDOU PARA OUTRO DIA ("pode ser amanhã", "só quinta", "semana que vem"): confirme a data e a faixa de horário com o cliente e use cadastrar_logistica com o motivo COMEÇANDO com "AGENDADO: [dia/data] [faixa]" (ex: "AGENDADO: amanhã 28/07 faixa 08-10"). O sistema coloca a ficha direto em HORÁRIO MARCADO na logística com essa informação visível.
 3) COLETA CONFIRMADA → ação cadastrar_logistica (informe no motivo: imediata ou agendada + dia/período/faixa). O sistema dá baixa na ficha e cria a coleta.
 4) EQUIPAMENTO NA LOJA → diagnóstico → orçamento enviado ao cliente (valor no contexto, em logistica/pipe).
-4-G) GARANTIA — cliente diz que JÁ FEZ serviço com a gente nesse equipamento e o defeito voltou ("tá na garantia", "vocês consertaram e parou de novo", "voltou o problema") OU envia FOTO/documento de garantia, nota ou comprovante de serviço anterior (qualquer DADO relacionado a garantia): acolha com prioridade — "Sinto muito pelo transtorno! Vou acionar nossa equipe AGORA para cuidar do seu caso com prioridade, tudo bem?" — e use OBRIGATORIAMENTE registrar_conflito (motivo: "possível GARANTIA — [equipamento/relato resumido]"). NÃO cobre nada, NÃO agende coleta normal, NÃO discuta se a garantia é válida: a equipe avalia.
+4-G) GARANTIA — cliente diz que JÁ FEZ serviço com a gente nesse equipamento e o defeito voltou ("tá na garantia", "vocês consertaram e parou de novo", "voltou o problema") OU envia FOTO/documento de garantia, nota ou comprovante de serviço anterior (qualquer DADO relacionado a garantia): acolha com prioridade — "Sinto muito pelo transtorno! Vou acionar nossa equipe AGORA para cuidar do seu caso com prioridade, tudo bem?" — e use OBRIGATORIAMENTE registrar_conflito (motivo: "possível GARANTIA — [equipamento/relato resumido]"). NÃO cobre nada, NÃO agende coleta normal, NÃO discuta se a garantia é válida: a equipe avalia. ⚠️ PROIBIDO encerrar caso de garantia só com escalar_humano ou com "já passei pro técnico": garantia SEMPRE termina com a ação registrar_conflito — sem exceção.
 4-H) DESISTIU ANTES DA COLETA (cancelou/desistiu ANTES de coletarmos — sem orçamento, sem equipamento com a gente): responda cordial deixando a porta aberta — "Sem problema! Qualquer coisa é só chamar, estamos à disposição." — e use mover_entrar_contato (motivo: "desistiu da coleta antes de acontecer — retomar por telefone"). NÃO use registrar_conflito nesse caso: conflito é para equipamento JÁ conosco, garantia ou cliente insatisfeito.
 
 5-FIM) ESGOTOU AS 5 FASES E O CLIENTE MANTEVE A RECUSA (não quer fazer o serviço / quer pagar só o orçamento): responda cordial — "Sem problema! Nossa equipe vai entrar em contato pra combinar a devolução do equipamento e os detalhes, tudo bem?" — e use OBRIGATORIAMENTE a ação registrar_conflito (motivo: "reprovou o orçamento após as 5 fases — finalizar manualmente: taxa R$30 do delivery + devolução"). NÃO cobre você mesmo, NÃO envie dados de pagamento, NÃO combine devolução por conta própria: a finalização é MANUAL da equipe.
@@ -1306,8 +1354,10 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
                 id: 'log_' + Date.now().toString(36),
                 nome: fichaX.nome, telefone: fichaX.telefone, endereco: fichaX.endereco || '',
                 equipamento: fichaX.equipamento || '', defeito: fichaX.defeito || '',
-                phase: 'liberado_coleta', criadoEm: new Date().toISOString(), movedAt: new Date().toISOString(),
-                origem: 'bot', observacao: '🤖 cadastrado pelo Bot Vendas',
+                phase: /AGENDADO:/i.test(String(acaoMotivo || '')) ? 'horario_marcado' : 'liberado_coleta',
+                criadoEm: new Date().toISOString(), movedAt: new Date().toISOString(),
+                origem: 'bot',
+                observacao: (/AGENDADO:/i.test(String(acaoMotivo || '')) ? '🤖 Bot — ' + String(acaoMotivo).slice(0, 180) : '🤖 cadastrado pelo Bot Vendas'),
               });
               await dbSet('reparoeletro_logistica', logX);
               fichaX.status = 'logistica'; fichaX.logisticaEm = new Date().toISOString();
