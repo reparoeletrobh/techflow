@@ -184,6 +184,32 @@ export default async function handler(req, res) {
     return false;
   }
 
+  // ── DEBUG da abordagem: por que cada ficha passa ou não nos filtros ──
+  if (action === 'abordagem-debug') {
+    const [fdbD, fdbTvD, evtsD, abordD] = await Promise.all([
+      dbGet('fichas_adm'), dbGet('fichas_tv'), lerEvts(), dbGet('wa_abordados').then(v => v || { tels: {} }),
+    ]);
+    const jaFalaramD = new Set(evtsD.filter(e => e.dir === 'in').map(e => String(e.tel || '').replace(/\D/g, '').slice(-8)));
+    const agoraD = Date.now();
+    const analisa = (f, sis) => {
+      const d8 = String(f.telefone || '').replace(/\D/g, '').slice(-8);
+      const idadeMin = Math.round((agoraD - new Date(f.criadoEm || 0).getTime()) / 60000);
+      return { sis, nome: f.nome, status: f.status || '(vazio)', idadeMin,
+        telOk: d8.length >= 8, virgem: !f.status || f.status === 'ficha_criada',
+        idadeOk: idadeMin > 5, clienteJaEscreveu: jaFalaramD.has(d8), jaAbordado: !!abordD.tels[d8] };
+    };
+    const todas = [
+      ...(((fdbD || {}).fichas) || []).slice(0, 60).map(f => analisa(f, 'adm')),
+      ...(((fdbTvD || {}).fichas) || []).slice(0, 40).map(f => analisa(f, 'tv')),
+    ];
+    const statusCont = {};
+    todas.forEach(t => { statusCont[t.status] = (statusCont[t.status] || 0) + 1; });
+    return res.status(200).json({ ok: true,
+      totalAdm: (((fdbD || {}).fichas) || []).length, totalTv: (((fdbTvD || {}).fichas) || []).length,
+      porStatus: statusCont,
+      amostra: todas.slice(0, 25) });
+  }
+
   if (action === 'abordagem-fichas') {
     // Importa fichas novas da planilha ANTES de tudo (roda mesmo fora do horário — elimina o ponto cego planilha→sistema)
     // e roda o motor de transições dos DOIS sistemas (regra da 1h não depende de tela aberta)
