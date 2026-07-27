@@ -1381,6 +1381,12 @@
     },
     "api/nfse.js": {
       "maxDuration": 60
+    },
+    "api/wa-bot.js": {
+      "maxDuration": 60
+    },
+    "api/wa-webhook.js": {
+      "maxDuration": 60
     }
   },
   "github": {

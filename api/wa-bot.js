@@ -186,9 +186,12 @@ export default async function handler(req, res) {
 
   if (action === 'abordagem-fichas') {
     // Importa fichas novas da planilha ANTES de tudo (roda mesmo fora do horário — elimina o ponto cego planilha→sistema)
+    // e roda o motor de transições dos DOIS sistemas (regra da 1h não depende de tela aberta)
     try {
       const KS = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
       await fetch(`https://reparoeletroadm.com/api/fichas?action=sync&k=${KS}`);
+      await fetch(`https://reparoeletroadm.com/api/fichas?action=load&k=${KS}`);
+      await fetch(`https://reparoeletroadm.com/api/fichas?action=load&sistema=tv&k=${KS}`);
     } catch (e) {}
     const cfgA = (await dbGet('wa_bot_config')) || {};
     if (cfgA.abordagemAtiva !== true) return res.status(200).json({ ok: true, msg: 'abordagem desligada (wa_bot_config.abordagemAtiva)' });
@@ -604,9 +607,25 @@ export default async function handler(req, res) {
     const KCH = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
     const BASE = 'https://reparoeletroadm.com';
     try {
-      const sg = await fetch(`${BASE}/api/wa-bot?action=sugerir&tel=${telAR}&k=${KCH}`).then(r => r.json());
+      let sg = await fetch(`${BASE}/api/wa-bot?action=sugerir&tel=${telAR}&k=${KCH}`).then(r => r.json()).catch(() => ({ ok: false }));
       if (!sg.ok || !sg.sugestao || !sg.sugestao.resposta) {
-        return res.status(200).json({ ok: false, passo: 'sugerir', meta: sg.error || 'sem sugestão' });
+        // retry único antes de desistir
+        sg = await fetch(`${BASE}/api/wa-bot?action=sugerir&tel=${telAR}&k=${KCH}`).then(r => r.json()).catch(() => ({ ok: false }));
+      }
+      if (!sg.ok || !sg.sugestao || !sg.sugestao.resposta) {
+        // ANTI-VÁCUO: nunca deixar o cliente sem resposta — mensagem neutra + registro visível no painel
+        try {
+          const { token: tkF, phoneId: phF } = await credenciais();
+          const toF = telAR.startsWith('55') ? telAR : '55' + telAR;
+          await fetch(`https://graph.facebook.com/v20.0/${phF}/messages`, {
+            method: 'POST', headers: { Authorization: `Bearer ${tkF}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messaging_product: 'whatsapp', to: toF, type: 'text',
+              text: { body: 'Recebi sua mensagem! Só um instante que já te retorno, por favor.' } }),
+          });
+          await rpushEvt({ ts: new Date().toISOString(), tel: toF, dir: 'out',
+            texto: '⚠️ [FALHA DA IA — resposta neutra enviada, precisa de atenção humana] Recebi sua mensagem! Só um instante que já te retorno, por favor.', tipo: 'falha-ia' });
+        } catch (e2) {}
+        return res.status(200).json({ ok: false, passo: 'sugerir', meta: (sg && sg.error) || 'sem sugestão', fallback: 'neutra enviada' });
       }
       const acaoT = (sg.sugestao.acao && sg.sugestao.acao.tipo) || 'nenhuma';
       const motivoT = (sg.sugestao.acao && sg.sugestao.acao.motivo) || '';
@@ -999,7 +1018,7 @@ Podemos prosseguir com o atendimento?"
    - PRAZOS GERAIS: na LOJA (balcão), a maioria dos equipamentos fica pronta entre 15 minutos e 1 hora (exceto TV). Via DELIVERY: entre 24 e 48 horas o equipamento chega na loja, passa pelo orçamento, é consertado e devolvido.
    - Prazo de entrega pós-aprovação: "Após a aprovação pedimos de 24 a 48 horas pra fazer a entrega — nossa equipe te comunica certinho."
    - Pedido de LIGAÇÃO ("posso ligar?", "me liga", "prefiro por telefone", "qual o número de vocês?", ou se disser que tentou ligar): "Claro! Nosso número de ligação e suporte é (31) 97225-9819 — pode chamar por lá." (este número do WhatsApp não recebe chamadas; NUNCA prometa que ligamos deste número aqui).
-7b) JANELAS DE HORÁRIO (respeite sempre): COLETA: segunda a sexta 08h-14h, sábado 08h-11h — fora da janela, diga que a coleta será entre 08h e 14h do PRÓXIMO dia útil. LOJA/BALCÃO: segunda a sexta 08h-17h, sábado 08h-12h — ao indicar o balcão, reforce endereço e horário.
+7b) JANELAS DE HORÁRIO (respeite sempre — coerente com as FAIXAS do item 2c): COLETA: segunda a sexta das 08h às 16h (faixas 08-10/10-12/12-14/14-16), sábado até 11h — fora da janela, ofereça as faixas do PRÓXIMO dia útil. LOJA/BALCÃO: segunda a sexta 08h-17h, sábado 08h-12h — ao indicar o balcão, reforce endereço e horário.
 8) REPROVOU → ação registrar_reprovacao: seja gentil, deixe a porta aberta ("vou pedir para um especialista te ligar, às vezes conseguimos uma condição"). O time humano tenta reverter por ligação.
 9) STATUS DO EQUIPAMENTO — use SOMENTE o campo tecnico/pecas do contexto: estágio real (bancada, aguardando peça com previsão, testado, pronto para entrega/retirada). Se aguardando peça SEM previsão no contexto, diga que confirma com o técnico e use escalar_humano se o cliente precisar de resposta imediata. NUNCA invente prazo.
 
