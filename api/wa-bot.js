@@ -395,11 +395,21 @@ export default async function handler(req, res) {
                   ] }] }) }),
         });
         const j = await r.json();
-        const okA = !!(j.messages && j.messages[0]);
+        let okA = !!(j.messages && j.messages[0]);
+        let usouFallbackAdm = false;
         if (!okA && f._sis === 'tv') {
-          // template TV ainda não aprovado na Meta → ficha fica na fila (não mandar o texto errado)
-          disparadas.push({ nome: f.nome, ok: false, aviso: 'template cadastro_recebido_tv pendente na Meta — ficha aguardando' });
-          continue;
+          // template TV ainda não aprovado → usa o template atual (decisão do dono: não parar a esteira; migra sozinho quando aprovar)
+          const r2 = await fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`, {
+            method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template',
+              template: { name: 'cadastro_recebido', language: { code: 'pt_BR' },
+                components: [{ type: 'body', parameters: [
+                  { type: 'text', text: (f.nome || 'tudo bem').split(' ')[0] },
+                  { type: 'text', text: f.equipamento || 'TV' },
+                ] }] } }),
+          }).then(x => x.json()).catch(() => null);
+          okA = !!(r2 && r2.messages && r2.messages[0]);
+          usouFallbackAdm = okA;
         }
         if (okA) {
           try {
@@ -409,7 +419,7 @@ export default async function handler(req, res) {
           } catch (e) {}
         }
         abordados.tels[telA.slice(-8)] = new Date().toISOString();
-        if (f._sis === 'tv') {
+        if (f._sis === 'tv' && !usouFallbackAdm) {
           await rpushEvt({ ts: new Date().toISOString(), tel: to, dir: 'out',
             texto: 'Olá ' + ((f.nome || 'tudo bem').split(' ')[0]) + ', tudo bem? Sou o Alessandro, responsável pela Logística da Reparo Eletro - TVs. Recebemos o seu cadastro para o conserto da sua TV.\n\nPodemos prosseguir com o atendimento?', tipo: 'template' });
         } else
