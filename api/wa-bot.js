@@ -65,11 +65,27 @@ async function contextoCliente(tel) {
   const d8 = String(tel).replace(/\D/g, '').slice(-8);
   const ctx = { fichas: [], logistica: [], pipe: [], tecnico: [], pecas: [] };
   try {
-    const [fa, lg, pp, bd, pcs, ftv] = await Promise.all([
+    const [fa, lg, pp, bd, pcs, ftv, orcA, orcT, tvlg] = await Promise.all([
       dbGet('fichas_adm'), dbGet('reparoeletro_logistica'), dbGet('reparoeletro_pipe'),
       dbGet('reparoeletro_board'), dbGet('reparoeletro_compras_pecas'), dbGet('fichas_tv'),
+      dbGet('reparoeletro_orcamentos'), dbGet('tv_orcamentos'), dbGet('tv_logistica'),
     ]);
     const bate = (t) => String(t || '').replace(/\D/g, '').endsWith(d8);
+    // 💰 ORÇAMENTO REGISTRADO no sistema (texto oficial + preço) — o bot ENVIA este texto, nunca inventa
+    try {
+      const oA = (((orcA || {}).fichas) || []).find(x => bate(x.tel) && x.textoOrc);
+      const oT = (((orcT || {}).fichas) || []).find(x => bate(x.tel) && x.textoOrc);
+      const fTvDiag = (((tvlg || {}).fichas) || []).find(x => bate(x.telefone) && x.diagnostico && x.diagnostico.textoOrc);
+      const escolhido = oT || oA || (fTvDiag ? { textoOrc: fTvDiag.diagnostico.textoOrc, precoSugerido: fTvDiag.diagnostico.precoFinal, status: fTvDiag.phase } : null);
+      if (escolhido) {
+        ctx.orcamentoRegistrado = {
+          texto: String(escolhido.textoOrc || '').slice(0, 900),
+          preco: escolhido.precoSugerido != null ? escolhido.precoSugerido : (escolhido.preco || null),
+          status: escolhido.status || '',
+          sistema: oT || fTvDiag ? 'tv' : 'adm',
+        };
+      }
+    } catch (e) {}
     let faU = fa, ftvU = ftv;
     const achou = () => (((faU && faU.fichas) || []).some(f => bate(f.telefone))) || ((((ftvU || {}).fichas) || []).some(f => bate(f.telefone)));
     if (!achou()) {
@@ -1287,6 +1303,7 @@ Podemos prosseguir com o atendimento?"
 
 5-FIM) ESGOTOU AS 5 FASES E O CLIENTE MANTEVE A RECUSA (não quer fazer o serviço / quer pagar só o orçamento): responda cordial — "Sem problema! Nossa equipe vai entrar em contato pra combinar a devolução do equipamento e os detalhes, tudo bem?" — e use OBRIGATORIAMENTE a ação registrar_conflito (motivo: "reprovou o orçamento após as 5 fases — finalizar manualmente: taxa R$30 do delivery + devolução"). NÃO cobre você mesmo, NÃO envie dados de pagamento, NÃO combine devolução por conta própria: a finalização é MANUAL da equipe.
 
+5-DESC) PEDIU DESCONTO / "ESSE É O MELHOR PREÇO?" / "TEM COMO MELHORAR?": NÃO argumente valor nem compare com equipamento novo — vá DIRETO para a F2 do script: apresente a condição no PIX (primeiro desconto, texto oficial da F2) e mencione também a condição de balcão (trazendo/buscando na loja). A escada de descontos do script é a resposta para pedido de desconto; a argumentação de valor (5-PRE) é SÓ para objeção "tá caro/não vale a pena/não compensa".
 5-PRE) OBJEÇÃO "TÁ CARO / NÃO VALE A PENA" — PESQUISA REAL OBRIGATÓRIA:
    - Você tem o MODELO do equipamento no CONTEXTO (diagnóstico). Use a ferramenta de PESQUISA WEB para buscar o preço REAL de um novo equivalente (ex: "preço [marca modelo] novo"). PROIBIDO inventar ou chutar faixas de preço — se você citar "um novo custa X" sem pesquisar, o cliente confere e perdemos a venda.
    - Com o preço real em mãos: mostre a conta concreta — "um [modelo] novo hoje está saindo por R$ [valor real da pesquisa]; consertando o seu você economiza mais de [X]%" (geralmente 50%+, às vezes muito mais).
@@ -1297,6 +1314,7 @@ Podemos prosseguir com o atendimento?"
    - Garantia do SERVIÇO COMPLETO: se precisar acionar, refazemos tudo ponta a ponta, buscando e entregando de novo, sem trabalho nenhum pra você. Na maioria dos lugares a garantia cobre só a peça trocada — e o cliente ainda gasta tempo e transporte indo e voltando (tem assistência que até pede pro cliente COMPRAR a peça e levar).
    - Resumo pro cliente: "o barato que cobre só a peça costuma sair caro; aqui o serviço é completo de ponta a ponta, com garantia de verdade."
    - PROVA SOCIAL (se precisar reforçar): convide a conferir — "você chegou a ver as avaliações dessa empresa no Google? Dá uma olhada nas nossas também: a Reparo Eletro tem centenas de comentários positivos de clientes reais." (só isso — sem inventar números exatos nem atacar o concorrente).
+4-ORC) REGRA DE OURO DO ORÇAMENTO: quando o cliente aceitar receber o orçamento ("pode sim", "manda", "quero ver") ou perguntar o valor, e o CONTEXTO tiver "orcamentoRegistrado" — ENVIE IMEDIATAMENTE o texto do orçamento registrado (campo texto, como está), sem recomeçar a conversa, sem pedir foto de novo, sem perguntar "qual orçamento você recebeu", sem perguntas de aquecimento. O orçamento do sistema É a resposta. Se o contexto NÃO tiver orcamentoRegistrado e o cliente estiver esperando um orçamento: NÃO invente valores nem descrições — use escalar_humano (motivo: "cliente aguardando orçamento — não encontrei no sistema").
 5) NEGOCIAÇÃO DO ORÇAMENTO — 5 FASES SEQUENCIAIS. Os textos das fases abaixo são MODELOS OFICIAIS: use-os como escritos (só preenchendo valores), sem reescrever com suas palavras. ⚠️ PRÉ-CONDIÇÃO ABSOLUTA: a negociação SÓ COMEÇA depois que o orçamento OFICIAL existir no contexto (campo orcamento/textoOrcamento vindo do diagnóstico feito na loja) E for enviado ao cliente. NUNCA invente, estime ou negocie valores antes disso — se o cliente pedir valor antes do diagnóstico, use a resposta padrão de preço ("só após avaliação"). O ciclo real: equipamento chega → técnico diagnostica → orçamento gerado na seção Orçamentos → orçamento enviado ao cliente (reabrindo a janela se preciso) → AÍ SIM as fases abaixo (avance UMA fase por vez, só quando o cliente NÃO aprovar ou pedir desconto):
    F1. Envio do orçamento do sistema (use o textoOrcamento do contexto se existir — é o orçamento oficial gerado no diagnóstico).
    F2. Pix: "(Nome), sendo no Pix consigo fazer por (valor com 5% de desconto), pois só trabalhamos com peças originais, fazemos revisão completa, damos certificado de garantia e buscamos e entregamos no seu endereço. Após o conserto ficará tão bom quanto o novo — usamos as mesmas peças do fabricante."
@@ -1334,6 +1352,7 @@ Podemos prosseguir com o atendimento?"
 7a-2) RESPOSTAS PADRÃO (use quando perguntarem):
    - Condições de pagamento: "Parcelamos em até 3x sem juros no cartão (valor original) ou à vista no Pix com desconto."
    - "O DELIVERY/COLETA TEM CUSTO?" — responda EXATAMENTE esta política: "Funciona assim: a gente coleta o equipamento e passa o orçamento. Se você aprovar o conserto, não paga nada pela coleta e entrega. Caso não aprove o orçamento, cobramos apenas uma taxa de R$30 pelo delivery. E trazendo aqui no balcão, o orçamento não tem custo nenhum." NUNCA diga que o delivery é simplesmente "gratuito" sem essa explicação.
+   - "A VELA FILTRANTE ESTÁ INCLUSA?" (purificador/bebedouro) — responda EXATAMENTE esta política: "A gente não vende a vela filtrante — nosso serviço é a mão de obra do conserto. A vela você encontra mais barato na internet (Mercado Livre, por exemplo), e o ideal é trocar a cada 6 meses."
    - "QUANTO CUSTA o conserto?" (qualquer equipamento, ANTES da avaliação): "Só conseguimos passar o orçamento após a avaliação — são milhares de modelos e tipos diferentes, cada orçamento é individual." Se INSISTIR no preço: "O que posso te adiantar: geralmente fica até 70% mais barato do que comprar um novo, e a maioria das pessoas que faz o orçamento com a gente aprova."
    - PRAZOS GERAIS: na LOJA (balcão), a maioria dos equipamentos fica pronta entre 15 minutos e 1 hora (exceto TV). Via DELIVERY: entre 24 e 48 horas o equipamento chega na loja, passa pelo orçamento, é consertado e devolvido.
    - Prazo de entrega pós-aprovação: "Após a aprovação pedimos de 24 a 48 horas pra fazer a entrega — nossa equipe te comunica certinho."
@@ -1377,7 +1396,7 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
           messages: [{ role: 'user', content: imgB64
             ? [ { type: 'image', source: { type: 'base64', media_type: imgTipo, data: imgB64 } },
                 { type: 'text', text: 'A imagem acima é a FOTO que o cliente acabou de enviar. Analise-a conforme as regras de VISÃO do seu roteiro.\n\nHistórico da conversa:\n' + (historico || '(sem mensagens ainda)') + '\n\nGere a próxima resposta sugerida.' } ]
-            : 'Histórico da conversa:\n' + (historico || '(sem mensagens ainda — cliente novo)') + (audioTranscrito ? '\n\n🎤 A ÚLTIMA mensagem do cliente foi um ÁUDIO. Transcrição: "' + audioTranscrito + '" — responda a ELA.' : '') + '\n\nGere a próxima resposta sugerida.' }],
+            : (ctx.orcamentoRegistrado ? '💰 ORÇAMENTO REGISTRADO NO SISTEMA (envie ESTE texto quando o cliente aceitar receber):\n"' + ctx.orcamentoRegistrado.texto + '"\n(preço: R$ ' + ctx.orcamentoRegistrado.preco + ')\n\n' : '') + 'Histórico da conversa:\n' + (historico || '(sem mensagens ainda — cliente novo)') + (audioTranscrito ? '\n\n🎤 A ÚLTIMA mensagem do cliente foi um ÁUDIO. Transcrição: "' + audioTranscrito + '" — responda a ELA.' : '') + '\n\nGere a próxima resposta sugerida.' }],
         }),
       });
       const j = await r.json();
