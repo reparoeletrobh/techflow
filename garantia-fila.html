@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🛡️ Garantia — Fila</title>
+<script>
+/* 🔐 TF-GUARD Fase 1 */
+(function(){
+  if(location.pathname==='/login'||location.pathname==='/login.html')return;
+  var K=localStorage.getItem('tf_key');
+  if(!K){location.replace('/login?next='+encodeURIComponent(location.pathname));return;}
+  var _f=window.fetch;
+  window.fetch=function(u,o){
+    try{
+      if(typeof u==='string'&&u.indexOf('/api/')>-1&&u.indexOf('/api/auth')===-1){
+        var kk=localStorage.getItem('tf_key')||'';
+        u+=(u.indexOf('?')>-1?'&':'?')+'k='+encodeURIComponent(kk);
+      }
+    }catch(e){}
+    return _f.call(this,u,o);
+  };
+})();
+</script>
+<style>
+:root{--bg:#0e1013;--surface:#16191e;--line:#262b33;--txt:#f0f2f5;--dim:#8b93a3;--azul:#2563eb;--fm:'SF Mono',ui-monospace,monospace;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:16px;max-width:760px;margin:0 auto;padding-bottom:60px;}
+h1{font-size:18px;font-weight:900;display:flex;align-items:center;gap:8px;}
+.topmenu{display:flex;gap:8px;margin:12px 0 16px;}
+.topmenu a{text-decoration:none;font-size:12.5px;font-weight:800;padding:8px 14px;border-radius:9px;border:1px solid var(--line);color:var(--dim);}
+.topmenu a.ativa{background:rgba(37,99,235,.15);border-color:#2563eb;color:#60a5fa;}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:10px 12px;}
+.kpi b{font-size:21px;display:block;}
+.kpi span{font-size:10px;color:var(--dim);font-weight:700;}
+.card{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--azul);border-radius:13px;padding:13px;margin-bottom:11px;}
+.card.resolvida{opacity:.5;border-left-color:#22c55e;}
+.nome{font-size:15px;font-weight:900;}
+.meta{font-size:11.5px;color:var(--dim);margin-top:2px;}
+.relato{font-size:12.5px;background:#101623;border-radius:8px;padding:8px 10px;margin-top:8px;color:#c9d2e0;}
+.tempo{display:inline-block;font-family:var(--fm);font-size:10.5px;font-weight:800;padding:2px 9px;border-radius:99px;margin-top:6px;}
+.t-ok{background:rgba(37,99,235,.15);color:#60a5fa;}
+.t-alerta{background:rgba(245,158,11,.15);color:#fbbf24;}
+.t-critico{background:rgba(239,68,68,.2);color:#f87171;animation:pulseT 1.1s infinite;}
+@keyframes pulseT{50%{opacity:.55;}}
+.acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.b{flex:1;min-width:44%;border:none;border-radius:9px;padding:11px;font-size:12.5px;font-weight:900;cursor:pointer;}
+.b-video{background:#7c3aed;color:#fff;}
+.b-qc{background:#16a34a;color:#fff;}
+.b-reabrir{background:#374151;color:#fff;flex:0 0 auto;min-width:auto;padding:8px 12px;font-size:11px;}
+.empty{text-align:center;color:var(--dim);padding:40px 20px;font-size:13px;}
+.origem{font-size:9.5px;font-weight:800;padding:1px 8px;border-radius:99px;background:rgba(139,147,163,.15);color:var(--dim);margin-left:6px;}
+</style>
+</head>
+<body>
+<h1>🛡️ Garantia <span style="font-size:11px;color:var(--dim);font-weight:600;">fila de tratamento</span></h1>
+<div class="topmenu">
+  <a class="ativa" href="/garantia">🔥 Fila</a>
+  <a href="/garantia-gestao">📁 Gestão de Garantias</a>
+  <a href="/adm">← Menu</a>
+</div>
+<div class="kpis">
+  <div class="kpi"><b id="k-abertos" style="color:#60a5fa;">—</b><span>ABERTAS</span></div>
+  <div class="kpi"><b id="k-hoje" style="color:#4ade80;">—</b><span>RESOLVIDAS HOJE</span></div>
+  <div class="kpi"><b id="k-total" style="color:#8b93a3;">—</b><span>RESOLVIDAS TOTAL</span></div>
+</div>
+<div id="lista"><div class="empty">Carregando…</div></div>
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function fmtTel(t){var d=String(t||'').replace(/\D/g,'');if(d.indexOf('55')===0)d=d.slice(2);
+  if(d.length===11)return '('+d.slice(0,2)+') '+d.slice(2,7)+'-'+d.slice(7);
+  if(d.length===10)return '('+d.slice(0,2)+') '+d.slice(2,6)+'-'+d.slice(6);return t||'';}
+function tempoAberto(iso){
+  var h=(Date.now()-new Date(iso).getTime())/3600000;
+  if(h<1)return {txt:Math.round(h*60)+' min aberta',cls:'t-ok'};
+  if(h<24)return {txt:h.toFixed(0)+'h aberta',cls:h>=8?'t-alerta':'t-ok'};
+  var d=Math.floor(h/24);
+  return {txt:d+'d '+Math.round(h%24)+'h aberta',cls:d>=2?'t-critico':'t-alerta'};
+}
+var _d=null;
+async function load(){
+  try{
+    var r=await fetch('/api/garantia?action=fila-load').then(function(x){return x.json();});
+    if(!r.ok)throw 0;
+    _d=r;render();
+  }catch(e){document.getElementById('lista').innerHTML='<div class="empty">Erro ao carregar</div>';}
+}
+function render(){
+  document.getElementById('k-abertos').textContent=_d.abertos;
+  document.getElementById('k-hoje').textContent=_d.resolvidosHoje;
+  document.getElementById('k-total').textContent=_d.totalResolvidos;
+  var el=document.getElementById('lista');
+  if(!_d.itens.length){el.innerHTML='<div class="empty">🎉 Nenhuma garantia na fila!</div>';return;}
+  el.innerHTML=_d.itens.map(function(g){
+    var res=g.status==='resolvido';
+    var t=tempoAberto(g.criadoEm);
+    return '<div class="card'+(res?' resolvida':'')+'">'+
+      '<div class="nome">'+esc(g.nome)+'<span class="origem">'+esc(g.origem)+'</span></div>'+
+      '<div class="meta">'+(g.telefone?'📞 '+fmtTel(g.telefone)+' · ':'')+esc(g.equipamento||'')+'</div>'+
+      (g.relato?'<div class="relato">'+esc(g.relato)+'</div>':'')+
+      (res
+        ?'<div class="tempo" style="background:rgba(34,197,94,.15);color:#4ade80;">✅ resolvida → '+(g.destino==='video'?'🎬 vídeo':'✅ controle de qualidade')+'</div>'+
+         '<div class="acts"><button class="b b-reabrir" onclick="reabrir(\''+g.id+'\')">↩ reabrir</button></div>'
+        :'<div class="tempo '+t.cls+'">⏱ '+t.txt+'</div>'+
+         '<div class="acts">'+
+           '<button class="b b-video" onclick="resolver(\''+g.id+'\',\'video\')">🎬 Liberar para Vídeo</button>'+
+           '<button class="b b-qc" onclick="resolver(\''+g.id+'\',\'qc\')">✅ Controle de Qualidade</button>'+
+         '</div>')+
+    '</div>';
+  }).join('');
+}
+async function resolver(id,destino){
+  var r=await fetch('/api/garantia?action=fila-resolver',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id,destino:destino})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok)load();else alert('Erro ao resolver');
+}
+async function reabrir(id){
+  await fetch('/api/garantia?action=fila-reabrir',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id})}).catch(function(){});
+  load();
+}
+load();
+setInterval(function(){if(!document.hidden)load();},45000);
+</script>
+</body>
+</html>

@@ -1483,6 +1483,23 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
           const KCF = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
           const fdbC = (await dbGet('fichas_adm')) || { fichas: [] };
           const fichaC = (fdbC.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
+          if (/garantia/i.test(String(acaoMotivo || ''))) {
+            // caso de GARANTIA → fila própria do novo sistema (badge azul piscante)
+            const ftvC = (await dbGet('fichas_tv')) || { fichas: [] };
+            const fichaTvC = (ftvC.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
+            const fonteG = fichaC || fichaTvC || {};
+            await fetch(`https://reparoeletroadm.com/api/garantia?action=fila-criar&k=${KCF}`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                nome: fonteG.nome || 'Cliente WhatsApp',
+                telefone: String(tel).replace(/\D/g, ''),
+                equipamento: fonteG.equipamento || '',
+                relato: String(acaoMotivo || '').slice(0, 350),
+                origem: 'bot',
+              }),
+            });
+            await bumpStat('conflitos');
+          } else {
           await fetch(`https://reparoeletroadm.com/api/prospeccao?action=criar-conflito&k=${KCF}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1493,6 +1510,7 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
             }),
           });
           await bumpStat('conflitos');
+          }
         }
         if (autorizado && acaoAprovada === 'mover_aprovado') {
           // TV aprova no sistema TV; ADM aprova no pipe ADM

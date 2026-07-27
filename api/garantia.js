@@ -102,7 +102,65 @@ module.exports = async function handler(req, res) {
   try {
 
     // ── GET load ──────────────────────────────────────────────
-    if (action === "load") {
+      // ═══ 🛡️ FILA DE GARANTIA (visão Conflitos) ═══
+  const FILA_KEY = "reparoeletro_garantia_fila";
+  if (action === "fila-load") {
+    const fdb = (await dbGet(FILA_KEY)) || { itens: [] };
+    const itens = [...(fdb.itens || [])].sort((a, b) => {
+      const sa = a.status === "resolvido" ? 1 : 0, sb = b.status === "resolvido" ? 1 : 0;
+      return sa - sb || new Date(b.criadoEm) - new Date(a.criadoEm);
+    });
+    const abertos = itens.filter(i => i.status !== "resolvido").length;
+    const hoje = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+    const resolvidosHoje = itens.filter(i => i.status === "resolvido" && String(i.resolvidoEm || "").slice(0, 10) === hoje).length;
+    return res.status(200).json({ ok: true, itens: itens.slice(0, 200), abertos, resolvidosHoje, totalResolvidos: itens.filter(i => i.status === "resolvido").length });
+  }
+  if (action === "fila-badge") {
+    const fdb = (await dbGet(FILA_KEY)) || { itens: [] };
+    return res.status(200).json({ ok: true, abertos: (fdb.itens || []).filter(i => i.status !== "resolvido").length });
+  }
+  if (req.method === "POST" && action === "fila-criar") {
+    const b = req.body || {};
+    const fdb = (await dbGet(FILA_KEY)) || { itens: [] };
+    const d8n = String(b.telefone || "").replace(/\D/g, "").slice(-8);
+    // dedupe: mesmo telefone com item aberto não duplica
+    if (d8n && (fdb.itens || []).some(i => i.status !== "resolvido" && String(i.telefone || "").replace(/\D/g, "").slice(-8) === d8n)) {
+      return res.status(200).json({ ok: true, dedupe: true });
+    }
+    fdb.itens.unshift({
+      id: "gar_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      nome: String(b.nome || "Cliente").slice(0, 80),
+      telefone: String(b.telefone || "").slice(0, 20),
+      equipamento: String(b.equipamento || "").slice(0, 80),
+      relato: String(b.relato || b.motivo || "").slice(0, 400),
+      origem: String(b.origem || "manual").slice(0, 30),
+      status: "aberto", criadoEm: new Date().toISOString(),
+    });
+    await dbSet(FILA_KEY, fdb);
+    return res.status(200).json({ ok: true });
+  }
+  if (req.method === "POST" && action === "fila-resolver") {
+    const { id, destino } = req.body || {};
+    if (!["video", "qc"].includes(destino)) return res.status(400).json({ ok: false, error: "destino: video|qc" });
+    const fdb = (await dbGet(FILA_KEY)) || { itens: [] };
+    const it = (fdb.itens || []).find(x => x.id === id);
+    if (!it) return res.status(404).json({ ok: false });
+    it.status = "resolvido";
+    it.destino = destino;
+    it.resolvidoEm = new Date().toISOString();
+    await dbSet(FILA_KEY, fdb);
+    return res.status(200).json({ ok: true });
+  }
+  if (req.method === "POST" && action === "fila-reabrir") {
+    const fdb = (await dbGet(FILA_KEY)) || { itens: [] };
+    const it = (fdb.itens || []).find(x => x.id === (req.body || {}).id);
+    if (!it) return res.status(404).json({ ok: false });
+    it.status = "aberto"; delete it.destino; delete it.resolvidoEm;
+    await dbSet(FILA_KEY, fdb);
+    return res.status(200).json({ ok: true });
+  }
+
+  if (action === "load") {
       const db = await dbGet(GARANTIA_KEY) || defaultDB();
       return res.status(200).json({ ok: true, fichas: db.fichas || [], fases: FASES });
     }

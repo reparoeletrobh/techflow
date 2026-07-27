@@ -91,6 +91,10 @@
   ],
   "rewrites": [
     {
+      "source": "/garantia-gestao",
+      "destination": "/garantia.html"
+    },
+    {
       "source": "/Jhonatan",
       "destination": "/tv-rota.html?m=Jhonatan"
     },
@@ -908,7 +912,7 @@
     },
     {
       "source": "/garantia",
-      "destination": "/garantia.html"
+      "destination": "/garantia-fila.html"
     },
     {
       "source": "/lalamove",
@@ -1373,6 +1377,15 @@
     },
     {
       "source": "/tv-logistica.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/garantia-fila.html",
       "headers": [
         {
           "key": "Cache-Control",

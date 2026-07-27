@@ -241,7 +241,18 @@ export default async function handler(req, res) {
     const t = db.tarefas.find(x => x.id === id);
     if (!t) return res.status(404).json({ ok: false, error: 'tarefa não encontrada' });
     if (t.tipo === 'receber') {
-      if ((req.body || {}).rs) { t.rs = true; t.destino = 'garantia'; }
+      if ((req.body || {}).rs) {
+        t.rs = true; t.destino = 'garantia';
+        // Entra na fila do novo sistema de Garantia (badge azul)
+        try {
+          const KG = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+          await fetch(`https://reparoeletroadm.com/api/garantia?action=fila-criar&k=${KG}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nome: t.cliente || 'Cliente', telefone: t.tel || '', equipamento: t.equipamento || '',
+              relato: 'RS aberto no almoxarifado' + (t.obs ? ' — ' + String(t.obs).slice(0, 200) : ''), origem: 'almoxarifado-rs' }),
+          });
+        } catch (e) {}
+      }
       else {
         if (!t.temFoto) return res.status(400).json({ ok: false, error: 'foto obrigatória no recebimento' });
         if (modelo !== undefined) t.modelo = String(modelo || '').trim();
