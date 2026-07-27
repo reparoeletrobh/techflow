@@ -185,6 +185,18 @@ export default async function handler(req, res) {
   }
 
   // ── DEBUG da abordagem: por que cada ficha passa ou não nos filtros ──
+  // ── HORA-DEBUG: prova do relógio que o bot usa ──
+  if (action === 'hora-debug') {
+    const bras = new Date(Date.now() - 3 * 3600 * 1000);
+    const dias = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+    const dia = bras.getUTCDay(), hora = bras.getUTCHours(), min = bras.getUTCMinutes();
+    const dentro = (dia >= 1 && dia <= 5) ? (hora + min / 60 >= 8 && hora + min / 60 < 15) : (dia === 6 ? (hora + min / 60 >= 8 && hora + min / 60 < 10) : false);
+    return res.status(200).json({ ok: true,
+      horaBrasilia: `${dias[dia]}, ${String(hora).padStart(2, '0')}:${String(min).padStart(2, '0')}`,
+      dentroHorarioComercial: dentro,
+      referencia: 'UTC-3 fixo (Brasília, sem horário de verão desde 2019)' });
+  }
+
   if (action === 'abordagem-debug') {
     const [fdbD, fdbTvD, evtsD, abordD] = await Promise.all([
       dbGet('fichas_adm'), dbGet('fichas_tv'), lerEvts(), dbGet('wa_abordados').then(v => v || { tels: {} }),
