@@ -362,7 +362,7 @@ export default async function handler(req, res) {
     const classifica = m => {
       const s = String(m || '').toLowerCase();
       if (/garantia/.test(s)) return 'garantia';
-      if (/reprov|não quer|nao quer|desistiu/.test(s)) return 'reprovação do orçamento';
+      if (/reprov|não quer|nao quer|desistiu|recusou/.test(s)) return 'reprovação do orçamento';
       if (/ciclo comercial esgotado/.test(s)) return 'reativação esgotada';
       if (/pagamento|pix|cobran/.test(s)) return 'pagamento';
       return 'outro';
@@ -462,7 +462,7 @@ export default async function handler(req, res) {
     } catch (e) {}
     const cfgA = (await dbGet('wa_bot_config')) || {};
     if (cfgA.abordagemAtiva !== true) return res.status(200).json({ ok: true, msg: 'abordagem desligada (wa_bot_config.abordagemAtiva)' });
-    if (!dentroHorarioComercial()) return res.status(200).json({ ok: true, msg: 'fora do horário comercial — fichas em standby até a próxima janela (planilha importada)' });
+    const _janelaAberta = dentroHorarioComercial();
     const { token, phoneId } = await credenciais();
     if (!token || !phoneId) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
     const agora = Date.now();
@@ -551,6 +551,7 @@ export default async function handler(req, res) {
       }
       if (curou) { await dbSet('fichas_adm', fdb); if (fdbTv) await dbSet('fichas_tv', fdbTv); }
     } catch (e) {}
+    if (!_janelaAberta) return res.status(200).json({ ok: true, autocura: 'executada', msg: 'fora do horário comercial — fichas organizadas, disparos em standby até a próxima janela' });
     const candidatas = todasFichas.filter(f => {
       const idade = agora - new Date(f.criadoEm || 0).getTime();
       const d8 = String(f.telefone || '').replace(/\D/g, '').slice(-8);
@@ -1677,8 +1678,9 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
         }
         if (autorizado && acaoAprovada === 'registrar_conflito') {
           const KCF = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
-          const fdbC = (await dbGet('fichas_adm')) || { fichas: [] };
-          const fichaC = (fdbC.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
+          const [fdbC, fdbCtv] = await Promise.all([dbGet('fichas_adm'), dbGet('fichas_tv')]);
+          const acha = b => (((b || {}).fichas) || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
+          const fichaC = acha(fdbC) || acha(fdbCtv);
           {
           await fetch(`https://reparoeletroadm.com/api/prospeccao?action=criar-conflito&k=${KCF}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },

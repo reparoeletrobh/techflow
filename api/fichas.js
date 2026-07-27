@@ -451,6 +451,7 @@ export default async function handler(req, res) {
     const PESO = { criada: 0, ficha_criada: 0, contato_feito: 2, entrar_contato: 3, cliente_loja: 4, prospeccao: 4, logistica: 5 };
     const relat = [];
     const remover = { [KEY_ADM]: [], [KEY_TV]: [] };
+    const mover = {};
     for (const key of [KEY_ADM, KEY_TV]) {
       const db = (await dbGet(key)) || { fichas: [] };
       const grupos = {};
@@ -466,31 +467,53 @@ export default async function handler(req, res) {
           (PESO[b.status] || 0) - (PESO[a.status] || 0) ||
           new Date(a.criadoEm || 0) - new Date(b.criadoEm || 0));
         const fica = ordenado[0];
+        const EM_OPERACAO = ['logistica', 'orcamento', 'aprovado'];
         for (const d of ordenado.slice(1)) {
           const ehCriada = !d.status || ['criada', 'ficha_criada'].includes(d.status);
+          let acao = 'manter (histórico — fases diferentes)';
+          if (ehCriada) {
+            acao = EM_OPERACAO.includes(fica.status)
+              ? 'entrar_contato (cliente REFEZ a ficha — equipamento já conosco, ligar)'
+              : 'eliminar (linha duplicada no mesmo cadastro)';
+          }
           relat.push({ sistema: key === KEY_ADM ? 'adm' : 'tv', nome: d.nome, telefone: d.telefone,
             equipamento: d.equipamento, statusDuplicada: d.status || 'criada', sheetRowDuplicada: d.sheetRow,
-            mantida: { id: fica.id, status: fica.status, sheetRow: fica.sheetRow },
-            removivel: ehCriada });
-          if (ehCriada) remover[key].push(d.id);
+            mantida: { id: fica.id, status: fica.status, sheetRow: fica.sheetRow }, acao,
+            removivel: acao.startsWith('eliminar') });
+          if (acao.startsWith('eliminar')) remover[key].push(d.id);
+          if (acao.startsWith('entrar_contato')) {
+            d.status = 'entrar_contato';
+            d.entrarContatoMotivo = 'cliente refez a ficha — equipamento já em atendimento; ligar para tirar dúvidas';
+            d.fichaRefeita = true;
+            (mover[key] = mover[key] || []).push(d.id);
+          }
         }
       }
     }
     if (String(req.query.limpar || '') === '1') {
-      let total = 0;
+      let total = 0, movidas = 0;
       for (const key of [KEY_ADM, KEY_TV]) {
-        if (!remover[key].length) continue;
+        const paraMover = mover[key] || [];
+        if (!remover[key].length && !paraMover.length) continue;
         const db = (await dbGet(key)) || { fichas: [] };
         const antes = db.fichas.length;
         db.fichas = db.fichas.filter(f => !remover[key].includes(f.id));
         total += antes - db.fichas.length;
+        for (const f of db.fichas) if (paraMover.includes(f.id)) {
+          f.status = 'entrar_contato';
+          f.entrarContatoMotivo = 'cliente refez a ficha — equipamento já em atendimento; ligar para tirar dúvidas';
+          f.fichaRefeita = true; movidas++;
+        }
         await dbSet(key, db);
       }
-      return res.status(200).json({ ok: true, removidas: total, relatorio: relat });
+      return res.status(200).json({ ok: true, eliminadas: total, movidasParaEntrarContato: movidas, relatorio: relat });
     }
     return res.status(200).json({ ok: true, duplicadas: relat.length,
-      removiveis: relat.filter(r => r.removivel).length, relatorio: relat.slice(0, 60),
-      dica: 'para eliminar as duplicadas em "criada": mesmo link com &limpar=1' });
+      aEliminar: relat.filter(r => r.removivel).length,
+      aLigar: relat.filter(r => String(r.acao || '').startsWith('entrar_contato')).length,
+      historicoIntacto: relat.filter(r => String(r.acao || '').startsWith('manter')).length,
+      relatorio: relat.slice(0, 60),
+      dica: 'com &limpar=1: elimina só as duplicações técnicas e manda as fichas refeitas para Entrar em Contato (o histórico não é tocado)' });
   }
 
   // ── LIMPAR-DUPLICATAS: remove fichas com sheetRow repetido ─────────────
