@@ -339,12 +339,21 @@ export default async function handler(req, res) {
     // 🩹 AUTOCURA (roda a cada ciclo): fichas presas em "criada" que já deviam ter saído
     try {
       let curou = false;
+      const AVANCADOS = ['contato_feito', 'logistica', 'entrar_contato', 'prospeccao', 'cliente_loja'];
       for (const f of todasFichas) {
         const ehCr = !f.status || f.status === 'ficha_criada' || f.status === 'criada';
         if (!ehCr) continue;
         const d8c = String(f.telefone || '').replace(/\D/g, '').slice(-8);
-        if (abordados.tels[d8c]) {
-          // já abordada → contato_feito com o horário real da abordagem (regua da 1h arma daqui)
+        // FICHA REFEITA: mesmo cliente tem OUTRA ficha em estágio avançado OU operação em andamento
+        // → vai direto para ENTRAR EM CONTATO: a equipe liga e tira as dúvidas (regra do Pedro)
+        const temOutraAvancada = todasFichas.some(o => o.id !== f.id &&
+          String(o.telefone || '').replace(/\D/g, '').slice(-8) === d8c && AVANCADOS.includes(o.status));
+        if (temOutraAvancada || emOperacao.has(d8c)) {
+          f.status = 'entrar_contato';
+          f.entrarContatoMotivo = 'cliente refez a ficha (já abordado/em atendimento) — ligar para tirar dúvidas';
+          f.fichaRefeita = true; curou = true;
+        } else if (abordados.tels[d8c]) {
+          // ficha original presa pela corrida → contato_feito com o horário real da abordagem (regua da 1h arma daqui)
           f.status = 'contato_feito';
           f.contatoFeitoEm = f.contatoFeitoEm || abordados.tels[d8c];
           f.abordadoPorBot = true; curou = true;
@@ -353,10 +362,6 @@ export default async function handler(req, res) {
           f.status = 'contato_feito';
           f.contatoFeitoEm = f.contatoFeitoEm || new Date(ultimaInPor[d8c]).toISOString();
           f.abordadoPorBot = true; curou = true;
-        } else if (emOperacao.has(d8c)) {
-          // operação em andamento → esta ficha é duplicada (estágio mais avançado é o real)
-          f.status = 'duplicada';
-          f.duplicadaEm = new Date().toISOString(); curou = true;
         }
       }
       if (curou) { await dbSet('fichas_adm', fdb); if (fdbTv) await dbSet('fichas_tv', fdbTv); }
