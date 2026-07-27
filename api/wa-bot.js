@@ -1093,8 +1093,10 @@ export default async function handler(req, res) {
     const conv = {};
     for (const e of evts) {
       if (e.dir === 'status' || !e.tel) continue;
-      if (!conv[e.tel]) conv[e.tel] = { tel: e.tel, nome: '', msgs: 0, ultimaMsg: '', ultimaTs: '', naoRespondida: false, escalada: false };
-      const c = conv[e.tel];
+      const chave = String(e.tel).replace(/\D/g, '').slice(-8) || String(e.tel);
+      if (!conv[chave]) conv[chave] = { tel: e.tel, nome: '', msgs: 0, ultimaMsg: '', ultimaTs: '', naoRespondida: false, escalada: false };
+      const c = conv[chave];
+      if (e.dir === 'in') c.tel = e.tel; // responder sempre pelo formato que o cliente usou
       c.msgs++;
       if (e.nome) c.nome = e.nome;
       if (e.dir === 'acao') {
@@ -1139,7 +1141,8 @@ export default async function handler(req, res) {
   if (action === 'historico') {
     const tel = String(req.query.tel || '');
     const evts = await lerEvts();
-    const msgs = evts.filter(e => e.tel === tel && e.dir !== 'status').slice(-60);
+    const d8Hi = String(tel).replace(/\D/g, '').slice(-8);
+    const msgs = evts.filter(e => String(e.tel || '').replace(/\D/g, '').slice(-8) === d8Hi && e.dir !== 'status').slice(-60);
     const sug = await dbGet('wa_sug_' + tel);
     return res.status(200).json({ ok: true, tel, msgs, sugestao: sug || null });
   }
@@ -1152,13 +1155,15 @@ export default async function handler(req, res) {
 
     const [evts, ctx, cfgDb] = await Promise.all([lerEvts(), contextoCliente(tel), dbGet('wa_bot_config')]);
     const cfg = Object.assign({}, CONFIG_DEFAULT, cfgDb || {});
-    const historico = evts.filter(e => e.tel === tel && e.dir !== 'status').slice(-25)
+    const d8H = String(tel).replace(/\D/g, '').slice(-8);
+    const mesmoCli = e => String(e.tel || '').replace(/\D/g, '').slice(-8) === d8H;
+    const historico = evts.filter(e => mesmoCli(e) && e.dir !== 'status').slice(-25)
       .map(e => (e.dir === 'in' ? 'CLIENTE: ' : 'ATENDENTE: ') + e.texto).join('\n');
 
     // 🎤 AUDIÇÃO: se a última mensagem do cliente é ÁUDIO, baixa e transcreve (Groq ou OpenAI)
     let audioTranscrito = null;
     try {
-      const evtsCliA = evts.filter(e => e.tel === tel && e.dir === 'in');
+      const evtsCliA = evts.filter(e => mesmoCli(e) && e.dir === 'in');
       const ultA = evtsCliA[evtsCliA.length - 1];
       if (ultA && ultA.mediaId && ultA.tipo === 'audio') {
         const sttKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY || '';
@@ -1193,7 +1198,7 @@ export default async function handler(req, res) {
     // 👁️ VISÃO: se a última mensagem do cliente tem FOTO, baixa do WhatsApp e anexa para análise
     let imgB64 = null, imgTipo = 'image/jpeg';
     try {
-      const evtsCli = evts.filter(e => e.tel === tel && e.dir === 'in');
+      const evtsCli = evts.filter(e => mesmoCli(e) && e.dir === 'in');
       const ultCli = evtsCli[evtsCli.length - 1];
       if (ultCli && ultCli.mediaId && ultCli.tipo !== 'audio') {
         const { token: tokM } = await credenciais();
