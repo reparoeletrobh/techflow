@@ -1253,6 +1253,14 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
               });
               await bumpStat('logistica');
             }
+            // Tirar a ficha TV da prospecção (Entrar em Contato / Contato Feito): agora está na logística
+            const ftvUpd = (await dbGet('fichas_tv')) || { fichas: [] };
+            const fTvU = (ftvUpd.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
+            if (fTvU && fTvU.status !== 'logistica') {
+              fTvU.status = 'logistica';
+              fTvU.logisticaEm = new Date().toISOString();
+              await dbSet('fichas_tv', ftvUpd);
+            }
           } else {
           const fdbX = (await dbGet('fichas_adm')) || { fichas: [] };
           const fichaX = (fdbX.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x && f.status !== 'logistica');
