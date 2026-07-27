@@ -255,6 +255,133 @@ export default async function handler(req, res) {
     return false;
   }
 
+  // ── 🔁 REATIVAR-CONVERSAS: nenhum orçamento morre no vácuo (espaço da loja é limitado) ──
+  // Escada: 6h → 24h → 48h → 72h; sem resposta no fim = Conflitos Bot (ligação + entrega)
+  if (action === 'reativar-conversas') {
+    const cfgR = (await dbGet('wa_bot_config')) || {};
+    if (cfgR.reativacaoAtiva === false) return res.status(200).json({ ok: true, msg: 'reativação desligada (wa_bot_config.reativacaoAtiva=false)' });
+    if (!dentroHorarioComercial()) return res.status(200).json({ ok: true, msg: 'fora do horário comercial — reativações em standby' });
+    const { token, phoneId } = await credenciais();
+    if (!token || !phoneId) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
+
+    const [logR, tvLogR, evtsR, reatR] = await Promise.all([
+      dbGet('reparoeletro_logistica'), dbGet('tv_logistica'), lerEvts(),
+      dbGet('wa_reativacao').then(v => v || { alvos: {} }),
+    ]);
+    // Última mensagem do CLIENTE e último toque nosso, por telefone
+    const ultimaIn = {}, ultimaOut = {};
+    for (const e of evtsR) {
+      const d8e = String(e.tel || '').replace(/\D/g, '').slice(-8);
+      if (!d8e) continue;
+      const t = new Date(e.ts || 0).getTime();
+      if (e.dir === 'in' && (!ultimaIn[d8e] || t > ultimaIn[d8e])) ultimaIn[d8e] = t;
+      if (e.dir === 'out' && (!ultimaOut[d8e] || t > ultimaOut[d8e])) ultimaOut[d8e] = t;
+    }
+    // Alvos: quem tem orçamento na mesa e ainda não decidiu
+    const alvos = [
+      ...(((logR || {}).fichas) || []).filter(f => ['orc_registrado', 'orc_enviado'].includes(f.phase)).map(f => ({ f, sis: 'adm' })),
+      ...(((tvLogR || {}).fichas) || []).filter(f => ['orc_registrado', 'orc_enviado'].includes(f.phase)).map(f => ({ f, sis: 'tv' })),
+    ];
+    const ESCADA = [
+      { h: 6,  txt: (n, eq) => `Oi ${n}! Conseguiu dar uma olhada no orçamento do seu ${eq}? Qualquer dúvida sobre o serviço eu te explico, é só me chamar 😊` },
+      { h: 24, txt: (n) => `${n}, uma condição que costuma ajudar: pagando no Pix a gente consegue um valor melhor pra você. Quer que eu veja isso?` },
+      { h: 48, txt: (n, eq) => `${n}, seu ${eq} já está aqui na loja aguardando só a sua decisão. Consegue me dar um retorno hoje? Se preferir, também dá pra retirar aqui no balcão sem custo de entrega.` },
+      { h: 72, txt: (n, eq) => `${n}, preciso liberar espaço na bancada e não quero deixar seu ${eq} parado. Me confirma se posso seguir com o conserto? Se não for o momento, tudo bem — só me avisa que a equipe organiza a devolução.` },
+    ];
+    const agoraR = Date.now();
+    const feitos = [];
+    for (const { f, sis } of alvos) {
+      const d8r = String(f.telefone || '').replace(/\D/g, '').slice(-8);
+      if (d8r.length < 8) continue;
+      const chave = (sis === 'tv' ? 'tv:' : '') + f.id;
+      const st = reatR.alvos[chave] || { toques: 0, ultimo: 0 };
+      // Cliente respondeu DEPOIS do nosso último toque? negociação viva — reseta o relógio, não incomoda
+      if (ultimaIn[d8r] && ultimaIn[d8r] > (st.ultimo || 0) && agoraR - ultimaIn[d8r] < 6 * 3600000) continue;
+      const base = Math.max(st.ultimo || 0, ultimaIn[d8r] || 0, ultimaOut[d8r] || 0,
+        new Date(f.orcEnviadoEm || f.movedAt || f.criadoEm || 0).getTime());
+      const horas = (agoraR - base) / 3600000;
+      const degrau = ESCADA[st.toques];
+      // Esgotou a escada → CONFLITOS BOT (ligação humana + definir entrega)
+      if (!degrau) {
+        if (horas < 24) continue;
+        try {
+          const KRC = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+          await fetch(`https://reparoeletroadm.com/api/prospeccao?action=criar-conflito&k=${KRC}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nome: f.nome || 'Cliente', telefone: String(f.telefone || '').replace(/\D/g, ''),
+              equipamento: f.equipamento || '',
+              motivo: 'ciclo comercial esgotado — cliente não respondeu aos 4 toques do orçamento; ligar para aprovar ou definir a devolução' }),
+          });
+          await bumpStat('conflitos');
+          reatR.alvos[chave] = { toques: st.toques, ultimo: agoraR, encerrado: true };
+          feitos.push({ nome: f.nome, acao: 'enviado para Conflitos Bot' });
+        } catch (e) {}
+        continue;
+      }
+      if (st.encerrado) continue;
+      if (horas < degrau.h) continue;
+      const toR = String(f.telefone || '').replace(/\D/g, '');
+      const to55 = toR.startsWith('55') ? toR : '55' + toR;
+      const nomeR = (f.nome || 'tudo bem').split(' ')[0];
+      const equipR = f.equipamento || 'equipamento';
+      const janelaAberta = ultimaIn[d8r] && (agoraR - ultimaIn[d8r]) < 24 * 3600000;
+      let enviado = false;
+      if (janelaAberta) {
+        const rr = await fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`, {
+          method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messaging_product: 'whatsapp', to: to55, type: 'text', text: { body: degrau.txt(nomeR, equipR) } }),
+        }).then(x => x.json()).catch(() => null);
+        enviado = !!(rr && rr.messages && rr.messages[0]);
+        if (enviado) await rpushEvt({ ts: new Date().toISOString(), tel: to55, dir: 'out', texto: degrau.txt(nomeR, equipR), tipo: 'reativacao' });
+      } else {
+        const rt = await fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`, {
+          method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messaging_product: 'whatsapp', to: to55, type: 'template',
+            template: { name: 'orcamento_pronto', language: { code: 'pt_BR' },
+              components: [{ type: 'body', parameters: [{ type: 'text', text: nomeR }, { type: 'text', text: equipR }] }] } }),
+        }).then(x => x.json()).catch(() => null);
+        enviado = !!(rt && rt.messages && rt.messages[0]);
+        if (enviado) await rpushEvt({ ts: new Date().toISOString(), tel: to55, dir: 'out', texto: `📨 [reativação ${st.toques + 1}/4 — janela fechada] ${f.nome || ''}`, tipo: 'template' });
+      }
+      if (enviado) {
+        reatR.alvos[chave] = { toques: st.toques + 1, ultimo: agoraR };
+        feitos.push({ nome: f.nome, sistema: sis, toque: st.toques + 1, via: janelaAberta ? 'mensagem' : 'template' });
+      }
+    }
+    for (const k of Object.keys(reatR.alvos)) {
+      if (agoraR - (reatR.alvos[k].ultimo || 0) > 20 * 86400000) delete reatR.alvos[k];
+    }
+    await dbSet('wa_reativacao', reatR);
+    return res.status(200).json({ ok: true, alvosAtivos: alvos.length, acoes: feitos.length, feitos });
+  }
+
+  // ── 🔍 CONFLITOS-AUDIT: escalar_humano × registrar_conflito (são coisas diferentes) ──
+  if (action === 'conflitos-audit') {
+    const [prosA, evtsA] = await Promise.all([dbGet('prospeccao_adm'), lerEvts()]);
+    const confs = (((prosA || {}).fichas) || []).filter(f => f.status === 'conflitos_bot');
+    const classifica = m => {
+      const s = String(m || '').toLowerCase();
+      if (/garantia/.test(s)) return 'garantia';
+      if (/reprov|não quer|nao quer|desistiu/.test(s)) return 'reprovação do orçamento';
+      if (/ciclo comercial esgotado/.test(s)) return 'reativação esgotada';
+      if (/pagamento|pix|cobran/.test(s)) return 'pagamento';
+      return 'outro';
+    };
+    const escalados = evtsA.filter(e => e.dir === 'acao' && e.texto === 'escalar_humano');
+    const conflitosAcao = evtsA.filter(e => e.dir === 'acao' && e.texto === 'registrar_conflito');
+    const porMotivo = {};
+    for (const c of confs) { const k = classifica(c.motivoConflito); porMotivo[k] = (porMotivo[k] || 0) + 1; }
+    return res.status(200).json({ ok: true,
+      veredito: 'escalar_humano NÃO cria conflito — só acende o alerta amarelo no painel. Conflito só nasce de registrar_conflito.',
+      conflitosBotAbertos: confs.length,
+      porMotivo,
+      acoesEscalarHumano: escalados.length,
+      acoesRegistrarConflito: conflitosAcao.length,
+      conflitos: confs.slice(0, 40).map(c => ({ nome: c.nome, telefone: c.telefone,
+        equipamento: c.equipamento, tipo: classifica(c.motivoConflito), motivo: c.motivoConflito, criadoEm: c.criadoEm })),
+      escalasSemConflito: escalados.slice(-20).map(e => ({ tel: e.tel, ts: e.ts })) });
+  }
+
   // ── DEBUG da abordagem: por que cada ficha passa ou não nos filtros ──
   // ── HORA-DEBUG: prova do relógio que o bot usa ──
   if (action === 'hora-debug') {
@@ -292,8 +419,9 @@ export default async function handler(req, res) {
       const idadeMin = Math.round((agoraD - new Date(f.criadoEm || 0).getTime()) / 60000);
       return { sis, nome: f.nome, status: f.status || '(vazio)', idadeMin,
         telOk: d8.length >= 8, virgem: !f.status || f.status === 'ficha_criada' || f.status === 'criada',
-        idadeOk: idadeMin > 5, clienteJaEscreveu: jaFalaramD.has(d8), jaAbordado: !!abordD.tels[d8], jaEmOperacao: _emOpD.has(d8) };
+        idadeOk: idadeMin > 5, clienteJaEscreveu: jaFalaramD.has(d8), jaAbordado: !!abordD.tels[d8], jaEmOperacao: _emOpD.has(d8), d8 };
     };
+    const _horarioOkD = dentroHorarioComercial();
     const ehCriada = f => !f.status || f.status === 'ficha_criada' || f.status === 'criada';
     const paradas = [
       ...((((fdbD || {}).fichas) || []).filter(ehCriada).map(f => analisa(f, 'adm'))),
@@ -306,11 +434,17 @@ export default async function handler(req, res) {
       if (t.clienteJaEscreveu) barreiras.push('cliente falou nas últimas 24h (bot responde na conversa)');
       if (t.jaAbordado) barreiras.push('já recebeu abordagem (dedupe)');
       if (t.jaEmOperacao) barreiras.push('operação em andamento (logística/pipe ativos)');
+      if (!_horarioOkD) barreiras.push('FORA DA JANELA COMERCIAL (seg-sex 8h-15h, sáb 8h-10h) — em standby até a próxima abertura');
+      const msgsCli = evtsD.filter(e => String(e.tel || '').replace(/\D/g, '').slice(-8) === t.d8);
+      t.mensagensTrocadas = msgsCli.length;
+      t.clienteRespondeu = msgsCli.some(e => e.dir === 'in');
+      t.ultimaMensagem = msgsCli.length ? msgsCli[msgsCli.length - 1].ts : null;
       t.veredito = barreiras.length ? 'BARRADA: ' + barreiras.join(' + ') : '✅ SERIA ABORDADA no próximo ciclo';
     }
     const resumo = {};
     paradas.forEach(t => { resumo[t.veredito.split(':')[0] === 'BARRADA' ? t.veredito : '✅ na fila'] = (resumo[t.veredito.split(':')[0] === 'BARRADA' ? t.veredito : '✅ na fila'] || 0) + 1; });
     return res.status(200).json({ ok: true,
+      janelaComercialAgora: _horarioOkD ? 'ABERTA — abordagens saindo' : 'FECHADA — fichas em standby (seg-sex 8h-15h, sáb 8h-10h)',
       criadasAdm: paradas.filter(t => t.sis === 'adm').length,
       criadasTv: paradas.filter(t => t.sis === 'tv').length,
       resumoPorMotivo: resumo,
@@ -1327,6 +1461,7 @@ Podemos prosseguir com o atendimento?"
    - NADA encaixou mesmo → convide para a loja ("Rua Ouro Preto, 663 - Barro Preto, orçamento na hora e gratuito") E use a ação mover_entrar_contato (motivo: "sem faixa compatível — abordagem humana") para nossa equipe ligar e resolver.
 2d) CLIENTE ESCOLHEU O BALCÃO ("vou levar aí", "prefiro trazer na loja") → confirme com simpatia reforçando endereço e horário da loja E use a ação mover_cliente_loja (no motivo, anote quando o cliente disse que vai — ex: "vem hoje à tarde"). A ficha vai para a seção Cliente Loja da prospecção.
 2e) AGENDOU PARA OUTRO DIA ("pode ser amanhã", "só quinta", "semana que vem"): confirme a data e a faixa de horário com o cliente e use cadastrar_logistica com o motivo COMEÇANDO com "AGENDADO: [dia/data] [faixa]" (ex: "AGENDADO: amanhã 28/07 faixa 08-10"). O sistema coloca a ficha direto em HORÁRIO MARCADO na logística com essa informação visível.
+2d-ADEGA) ADEGA / CERVEJEIRA — PERGUNTA OBRIGATÓRIA ANTES DE CADASTRAR: nunca cadastre uma adega na logística sem saber o PORTE. Pergunte: "Sua adega é pequena (daquelas de bancada, que cabem no porta-malas) ou é grande, de coluna/piso?" e PEÇA UMA FOTO do equipamento inteiro para confirmar. Motivo real: adega pequena entra na nossa rota normal de carro; adega GRANDE só pode ser coletada de caminhonete/picape, é outro tipo de agendamento. Ao cadastrar, o motivo do cadastrar_logistica DEVE começar com "ADEGA PEQUENA:" ou "ADEGA GRANDE (precisa picape):". Se o cliente não souber dizer e não mandar foto, trate como GRANDE (mais seguro) e sinalize no motivo "porte não confirmado".
 2f) PREVISÃO DE HORÁRIO DA COLETA: se o cliente perguntar quando o motorista passa / se tem previsão, responda: "Registrando a sua coleta, em até 3 horas no máximo a nossa rota já passa no seu endereço." Essa é a estimativa oficial — não invente outra.
 2g) ACESSÓRIOS — avise junto da confirmação da coleta (ou se o cliente vier trazer na loja):
    - MICRO-ONDAS: "Não precisa enviar o prato de vidro nem o trilho, pode ficar com você."
@@ -1528,7 +1663,9 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
                 phase: /AGENDADO:/i.test(String(acaoMotivo || '')) ? 'horario_marcado' : 'liberado_coleta',
                 criadoEm: new Date().toISOString(), movedAt: new Date().toISOString(),
                 origem: 'bot',
-                observacao: (/AGENDADO:/i.test(String(acaoMotivo || '')) ? '🤖 Bot — ' + String(acaoMotivo).slice(0, 180) : '🤖 cadastrado pelo Bot Vendas'),
+                observacao: (/ADEGA GRANDE/i.test(String(acaoMotivo || '')) ? '🚚 ADEGA GRANDE — precisa CAMINHONETE/PICAPE. ' : '') +
+                  (/AGENDADO:/i.test(String(acaoMotivo || '')) ? '🤖 Bot — ' + String(acaoMotivo).slice(0, 180) : '🤖 cadastrado pelo Bot Vendas'),
+                veiculoEspecial: /ADEGA GRANDE/i.test(String(acaoMotivo || '')) ? 'picape' : undefined,
               });
               await dbSet('reparoeletro_logistica', logX);
               fichaX.status = 'logistica'; fichaX.logisticaEm = new Date().toISOString();
