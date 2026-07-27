@@ -96,6 +96,11 @@ export default async function handler(req, res) {
       for (const c of candidatos) {
         {
           if (!jaTem(c.id, c.phase)) {
+            // A situação ATUAL do card substitui pendências antigas de mover do mesmo card:
+            // ex. estava pendente "mover p/ última chamada" e o cliente aprovou antes de executarem →
+            // exclui a de última chamada e fica só a de aprovado
+            db.tarefas = db.tarefas.filter(t =>
+              !(t.cardId === c.id && t.tipo === 'mover' && t.status === 'pendente' && t.destino !== c.phase));
             db.tarefas.unshift(novaTarefa({
               tipo: 'mover', cardId: c.id,
               cliente: c.nomeContato || '—', tel: c.telefone || '', equipamento: c.equipamento || '',
@@ -223,7 +228,11 @@ export default async function handler(req, res) {
       } catch (e) {}
       await dbSet(KEY, db);
     } catch (e) {}
-    return res.status(200).json({ ok: true, tarefas: db.tarefas.slice(0, 300), inventario: db.inventario, faseLbl: FASE_LBL });
+    const tarefasOrd = [...db.tarefas].sort((a, b) => {
+      const uc = t => (t.status === 'pendente' && t.tipo === 'mover' && t.destino === 'ultima_chamada') ? 1 : 0;
+      return uc(a) - uc(b); // última chamada afunda; ordem original preservada no resto (sort estável)
+    });
+    return res.status(200).json({ ok: true, tarefas: tarefasOrd.slice(0, 300), inventario: db.inventario, faseLbl: FASE_LBL });
   }
 
   // ── CONCLUIR tarefa (feito) ──
