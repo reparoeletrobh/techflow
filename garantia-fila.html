@@ -60,6 +60,16 @@ h1{font-size:18px;font-weight:900;display:flex;align-items:center;gap:8px;}
   <a href="/garantia-gestao">📁 Gestão de Garantias</a>
   <a href="/adm">← Menu</a>
 </div>
+<button onclick="abrirCadastro()" style="width:100%;background:linear-gradient(135deg,#1d4ed8,#2563eb);border:none;border-radius:12px;padding:13px;color:#fff;font-size:14px;font-weight:900;cursor:pointer;margin-bottom:14px;">➕ Cadastrar Garantia</button>
+<div id="ov-cadastro" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99;padding:16px;">
+  <div style="max-width:820px;height:92vh;margin:0 auto;background:#0e1013;border:1px solid #2563eb;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #262b33;">
+      <b style="font-size:13px;">➕ Cadastrar Garantia</b>
+      <button onclick="fecharCadastro()" style="background:#374151;border:none;border-radius:8px;padding:6px 12px;color:#fff;font-weight:800;cursor:pointer;">✕ Fechar</button>
+    </div>
+    <iframe id="frame-cadastro" style="flex:1;border:none;width:100%;background:#0e1013;"></iframe>
+  </div>
+</div>
 <div class="kpis">
   <div class="kpi"><b id="k-abertos" style="color:#60a5fa;">—</b><span>ABERTAS</span></div>
   <div class="kpi"><b id="k-hoje" style="color:#4ade80;">—</b><span>RESOLVIDAS HOJE</span></div>
@@ -118,6 +128,15 @@ async function resolver(id,destino){
 async function reabrir(id){
   await fetch('/api/garantia?action=fila-reabrir',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({id:id})}).catch(function(){});
+  load();
+}
+function abrirCadastro(){
+  document.getElementById('frame-cadastro').src='/garantia-gestao';
+  document.getElementById('ov-cadastro').style.display='block';
+}
+function fecharCadastro(){
+  document.getElementById('ov-cadastro').style.display='none';
+  document.getElementById('frame-cadastro').src='about:blank';
   load();
 }
 load();

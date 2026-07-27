@@ -327,6 +327,17 @@ export default async function handler(req, res) {
     else return res.status(400).json({ ok: false, error: 'qual: video|separado' });
     if (t.videoGravado && t.separado) {
       t.status = 'feito'; t.feitoPor = String(feitoPor || '').trim(); t.feitoEm = new Date().toISOString();
+    // Mover p/ GARANTIA concluído (equipamento fisicamente na garantia dentro da loja) → fila do novo sistema
+    if (t.tipo === 'mover' && t.destino === 'garantia') {
+      try {
+        const KG3 = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+        await fetch(`https://reparoeletroadm.com/api/garantia?action=fila-criar&k=${KG3}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nome: t.cliente || 'Cliente', telefone: t.tel || '', equipamento: t.equipamento || '',
+            relato: 'Equipamento movido para a garantia no almoxarifado', origem: 'almoxarifado-garantia' }),
+        });
+      } catch (e) {}
+    }
     }
     await dbSet(KEY, db);
     return res.status(200).json({ ok: true, videoGravado: !!t.videoGravado, separado: !!t.separado, feito: t.status === 'feito' });
