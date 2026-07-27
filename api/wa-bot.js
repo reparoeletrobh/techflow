@@ -243,16 +243,27 @@ export default async function handler(req, res) {
         telOk: d8.length >= 8, virgem: !f.status || f.status === 'ficha_criada' || f.status === 'criada',
         idadeOk: idadeMin > 5, clienteJaEscreveu: jaFalaramD.has(d8), jaAbordado: !!abordD.tels[d8], jaEmOperacao: _emOpD.has(d8) };
     };
-    const todas = [
-      ...(((fdbD || {}).fichas) || []).slice(0, 60).map(f => analisa(f, 'adm')),
-      ...(((fdbTvD || {}).fichas) || []).slice(0, 40).map(f => analisa(f, 'tv')),
+    const ehCriada = f => !f.status || f.status === 'ficha_criada' || f.status === 'criada';
+    const paradas = [
+      ...((((fdbD || {}).fichas) || []).filter(ehCriada).map(f => analisa(f, 'adm'))),
+      ...((((fdbTvD || {}).fichas) || []).filter(ehCriada).map(f => analisa(f, 'tv'))),
     ];
-    const statusCont = {};
-    todas.forEach(t => { statusCont[t.status] = (statusCont[t.status] || 0) + 1; });
+    for (const t of paradas) {
+      const barreiras = [];
+      if (!t.telOk) barreiras.push('telefone inválido/curto');
+      if (!t.idadeOk) barreiras.push('menos de 5min de vida');
+      if (t.clienteJaEscreveu) barreiras.push('cliente falou nas últimas 24h (bot responde na conversa)');
+      if (t.jaAbordado) barreiras.push('já recebeu abordagem (dedupe)');
+      if (t.jaEmOperacao) barreiras.push('operação em andamento (logística/pipe ativos)');
+      t.veredito = barreiras.length ? 'BARRADA: ' + barreiras.join(' + ') : '✅ SERIA ABORDADA no próximo ciclo';
+    }
+    const resumo = {};
+    paradas.forEach(t => { resumo[t.veredito.split(':')[0] === 'BARRADA' ? t.veredito : '✅ na fila'] = (resumo[t.veredito.split(':')[0] === 'BARRADA' ? t.veredito : '✅ na fila'] || 0) + 1; });
     return res.status(200).json({ ok: true,
-      totalAdm: (((fdbD || {}).fichas) || []).length, totalTv: (((fdbTvD || {}).fichas) || []).length,
-      porStatus: statusCont,
-      amostra: todas.slice(0, 25) });
+      criadasAdm: paradas.filter(t => t.sis === 'adm').length,
+      criadasTv: paradas.filter(t => t.sis === 'tv').length,
+      resumoPorMotivo: resumo,
+      fichas: paradas.slice(0, 40) });
   }
 
   if (action === 'abordagem-fichas') {
