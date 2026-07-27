@@ -160,6 +160,16 @@ async function carregarConversas(){
     window._ultD=d;renderLista(d);
   }catch(e){el.innerHTML='<div style="padding:20px;color:#ef4444;font-size:11px;">Erro: '+e.message+'</div>';}
 }
+window._filtroOrc=null;
+async function toggleFiltroOrc(){
+  if(window._filtroOrc){window._filtroOrc=null;loadKpis();if(window._ultD)renderLista(window._ultD);return;}
+  try{
+    var r=await fetch('/api/wa-bot?action=orcamentos-abertos').then(function(x){return x.json();});
+    if(!r.ok)return;
+    window._filtroOrc=(r.abertos||[]).map(function(a){return String(a.tel||'').slice(-8);});
+    loadKpis();if(window._ultD)renderLista(window._ultD);
+  }catch(e){}
+}
 function fmtTel(t){
   var d=String(t||'').replace(/\D/g,'');
   if(d.indexOf('55')===0)d=d.slice(2);
@@ -176,6 +186,8 @@ function renderLista(d){
     var lst=d.conversas||[];
     var q=window._filtroConv||'';
     if(q)lst=lst.filter(function(c){return (c.nome||'').toLowerCase().indexOf(q)>-1||String(c.tel||'').indexOf(q.replace(/\D/g,''))>-1;});
+    if(window._filtroOrc){lst=lst.filter(function(c){return window._filtroOrc.indexOf(String(c.tel||'').replace(/\D/g,'').slice(-8))>-1;});
+      if(!lst.length){el.innerHTML='<div style="padding:20px;color:#f59e0b;font-size:12px;text-align:center;">💰 Nenhuma conversa com orçamento em aberto<br><span style="color:#5a6270;">(toca no cartão Orçamentos de novo pra limpar o filtro)</span></div>';return;}}
     if(!lst.length){el.innerHTML='<div style="padding:20px;color:#5a6270;font-size:12px;text-align:center;">Nenhuma conversa encontrada</div>';return;}
     el.innerHTML=lst.map(function(c){
       return '<div class="conv'+(c.tel===_tel?' sel':'')+'" onclick="abrirConversa(\''+c.tel+'\')">'
@@ -302,9 +314,10 @@ async function loadKpis(){
       ['⚡','Conflitos Bot',t.conflitos||0,'#ef4444']
     ];
     document.getElementById('kpi-cards').innerHTML=defs.map(function(d){
-      return '<div style="background:#12161d;border:1px solid #242b39;border-radius:10px;padding:10px 12px;">'+
+      var clicavel=d[1]==='Orçamentos';
+      return '<div '+(clicavel?'onclick="toggleFiltroOrc()" ':'')+'style="background:#12161d;border:1px solid '+(clicavel&&window._filtroOrc?'#f59e0b':'#242b39')+';border-radius:10px;padding:10px 12px;'+(clicavel?'cursor:pointer;':'')+'">'+
         '<div style="font-size:20px;font-weight:900;color:'+d[3]+';">'+d[2]+'</div>'+
-        '<div style="font-size:10px;color:#8b93a3;font-weight:700;">'+d[0]+' '+d[1]+'</div></div>';
+        '<div style="font-size:10px;color:#8b93a3;font-weight:700;">'+d[0]+' '+d[1]+(clicavel?' <span style="color:#f59e0b;">'+(window._filtroOrc?'✕ filtro':'▸ filtrar')+'</span>':'')+'</div></div>';
     }).join('');
   }catch(e){}
 }

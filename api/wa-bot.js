@@ -136,6 +136,26 @@ export default async function handler(req, res) {
 
   // ── ABORDAGEM-FICHAS (cron 5min): ficha criada há 5-60min sem conversa iniciada → template cadastro_recebido ──
   // Interruptor: wa_bot_config.abordagemAtiva (false por padrão — ligar quando o número real estiver ativo)
+  // ── 💰 ORCAMENTOS-ABERTOS: conversas com orçamento enviado e ainda sem aprovação ──
+  if (action === 'orcamentos-abertos') {
+    const [logA, tvA, envA] = await Promise.all([
+      dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+      dbGet('wa_orc_enviados').then(v => v || { ids: {} }),
+    ]);
+    const abertos = [];
+    for (const f of (((logA || {}).fichas) || [])) {
+      if (f.phase === 'orc_registrado' && envA.ids[f.id]) {
+        abertos.push({ tel: String(f.telefone || '').replace(/\D/g, ''), nome: f.nome, sis: 'adm', enviadoEm: envA.ids[f.id] });
+      }
+    }
+    for (const f of (((tvA || {}).fichas) || [])) {
+      if (['orc_enviado', 'orc_registrado'].includes(f.phase) && envA.ids[f.id]) {
+        abertos.push({ tel: String(f.telefone || '').replace(/\D/g, ''), nome: f.nome, sis: 'tv', enviadoEm: envA.ids[f.id] });
+      }
+    }
+    return res.status(200).json({ ok: true, abertos });
+  }
+
   // ── 📊 BOT-STATS: contadores por dia (?dias=1..90) ──
   if (action === 'bot-stats') {
     const dias = Math.min(90, Math.max(1, parseInt(req.query.dias || '30', 10)));
