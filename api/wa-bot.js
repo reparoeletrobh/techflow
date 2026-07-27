@@ -222,13 +222,23 @@ export default async function handler(req, res) {
       dbGet('fichas_adm'), dbGet('fichas_tv'), lerEvts(), dbGet('wa_abordados').then(v => v || { tels: {} }),
     ]);
     const jaFalaramD = new Set(evtsD.filter(e => e.dir === 'in').map(e => String(e.tel || '').replace(/\D/g, '').slice(-8)));
+    const [_logD, _tvLogD, _pipeD] = await Promise.all([dbGet('reparoeletro_logistica'), dbGet('tv_logistica'), dbGet('reparoeletro_pipe')]);
+    const _emOpD = new Set();
+    for (const f of (((_logD || {}).fichas) || []).concat(((_tvLogD || {}).fichas) || [])) {
+      const d = String(f.telefone || '').replace(/\D/g, '').slice(-8);
+      if (d.length >= 8) _emOpD.add(d);
+    }
+    for (const c of (((_pipeD || {}).cards) || [])) {
+      const d = String(c.telefone || '').replace(/\D/g, '').slice(-8);
+      if (d.length >= 8 && !['finalizado', 'arquivado'].includes(c.phaseId || c.phase)) _emOpD.add(d);
+    }
     const agoraD = Date.now();
     const analisa = (f, sis) => {
       const d8 = String(f.telefone || '').replace(/\D/g, '').slice(-8);
       const idadeMin = Math.round((agoraD - new Date(f.criadoEm || 0).getTime()) / 60000);
       return { sis, nome: f.nome, status: f.status || '(vazio)', idadeMin,
         telOk: d8.length >= 8, virgem: !f.status || f.status === 'ficha_criada' || f.status === 'criada',
-        idadeOk: idadeMin > 5, clienteJaEscreveu: jaFalaramD.has(d8), jaAbordado: !!abordD.tels[d8] };
+        idadeOk: idadeMin > 5, clienteJaEscreveu: jaFalaramD.has(d8), jaAbordado: !!abordD.tels[d8], jaEmOperacao: _emOpD.has(d8) };
     };
     const todas = [
       ...(((fdbD || {}).fichas) || []).slice(0, 60).map(f => analisa(f, 'adm')),
@@ -278,11 +288,27 @@ export default async function handler(req, res) {
         await dbSet('wa_retomar', ret);
       }
     } catch (e) {}
-    const [fdb, fdbTv, evts, abordados] = await Promise.all([
+    const [fdb, fdbTv, evts, abordados, logAb, tvLogAb, pipeAb] = await Promise.all([
       dbGet('fichas_adm'), dbGet('fichas_tv'), lerEvts(), dbGet('wa_abordados').then(v => v || { tels: {} }),
+      dbGet('reparoeletro_logistica'), dbGet('tv_logistica'), dbGet('reparoeletro_pipe'),
     ]);
     // Telefones que JÁ iniciaram conversa (qualquer evento in)
     const jaFalaram = new Set(evts.filter(e => e.dir === 'in').map(e => String(e.tel).slice(-8)));
+    // Telefones JÁ DENTRO DA OPERAÇÃO (logística ADM/TV ou pipe): nunca abordar como coleta nova —
+    // caso real: cliente com TV já coletada e orçamento pronto recebia o protocolo de coleta
+    const emOperacao = new Set();
+    for (const f of (((logAb || {}).fichas) || [])) {
+      const d = String(f.telefone || '').replace(/\D/g, '').slice(-8);
+      if (d.length >= 8) emOperacao.add(d);
+    }
+    for (const f of (((tvLogAb || {}).fichas) || [])) {
+      const d = String(f.telefone || '').replace(/\D/g, '').slice(-8);
+      if (d.length >= 8) emOperacao.add(d);
+    }
+    for (const c of (((pipeAb || {}).cards) || [])) {
+      const d = String(c.telefone || '').replace(/\D/g, '').slice(-8);
+      if (d.length >= 8 && !['finalizado', 'arquivado'].includes(c.phaseId || c.phase)) emOperacao.add(d);
+    }
     const todasFichas = [
       ...(((fdb && fdb.fichas) || []).map(f => Object.assign(f, { _sis: 'adm' }))),
       ...(((fdbTv && fdbTv.fichas) || []).map(f => Object.assign(f, { _sis: 'tv' }))),
@@ -292,7 +318,7 @@ export default async function handler(req, res) {
       const d8 = String(f.telefone || '').replace(/\D/g, '').slice(-8);
       const virgem = !f.status || f.status === 'ficha_criada' || f.status === 'criada';
       return virgem && idade > 5 * 60000 && d8.length >= 8 &&
-        !jaFalaram.has(d8) && !abordados.tels[d8];
+        !jaFalaram.has(d8) && !abordados.tels[d8] && !emOperacao.has(d8);
     }).sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')))
       .slice(0, 10); // máx 10 por ciclo, mais recentes primeiro
     const disparadas = [];
