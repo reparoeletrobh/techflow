@@ -633,6 +633,21 @@ export default async function handler(req, res) {
           disparos.push({ nome: f.nome, modo: 'template-janela-fechada', ok: okO });
         }
         enviadosO.ids[f.id] = new Date().toISOString();
+        // Efeito do botão "Copiar e Enviar": marca o orçamento como enviado na seção Orçamentos
+        // (some de pendentes; o card já está no pipe em aguardando_aprovacao → cronômetro de 48h da última chamada segue vivo)
+        try {
+          const KOE = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+          const orcDbV = (await dbGet('reparoeletro_orcamentos')) || { fichas: [] };
+          const d8f = String(f.telefone || '').replace(/\D/g, '').slice(-8);
+          const orcFv = (orcDbV.fichas || []).find(x => x.status === 'pendente' &&
+            String(x.tel || '').replace(/\D/g, '').slice(-8) === d8f);
+          if (orcFv) {
+            await fetch(`https://reparoeletroadm.com/api/orcamento?action=orc-enviar&k=${KOE}`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: orcFv.id, preco: orcFv.precoSugerido || null }),
+            });
+          }
+        } catch (e) {}
       } catch (e) { disparos.push({ nome: f.nome, erro: e.message }); }
     }
     // poda 60d
