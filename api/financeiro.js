@@ -291,6 +291,9 @@ module.exports = async function handler(req, res) {
   if (req.method === "POST" && action === "analisar-comprovante") {
     const { id, dataB64, mime } = req.body || {};
     if (!id || !dataB64) return res.status(400).json({ ok: false, error: "informe id e dataB64" });
+    const MIMES_OK = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+    const mimeSeguro = MIMES_OK.includes(String(mime || "")) ? String(mime) : "image/jpeg";
+    if (dataB64.length > 4.2 * 1024 * 1024) return res.status(200).json({ ok: false, error: "arquivo grande demais (máx ~3MB) — tira um print/reduz e tenta de novo" });
     const AK = (process.env.ANTHROPIC_API_KEY || "").trim();
     if (!AK) return res.status(200).json({ ok: false, error: "ANTHROPIC_API_KEY não configurada" });
     const fin = await dbGet(FIN_KEY) || defaultFin();
@@ -338,12 +341,14 @@ Regra: "verde" SOMENTE se for pagamento efetivado + valor batendo + data recente
       const recF = (finF.records || []).find(r => r.id === id);
       if (!recF) return res.status(404).json({ ok: false, error: "ficha não encontrada após a análise" });
       recF.comprovanteAnalise = parecer;
-      recF.anexo = { stored: true, type: ehPdf ? "application/pdf" : (mime || "image/jpeg"), name: "comprovante" + (ehPdf ? ".pdf" : ".jpg") };
-      await dbSet(FIN_KEY, finF);
-      // Arquivo persistido em chave própria (não pesa o load do financeiro) — clicável em qualquer fase
+      // Arquivo primeiro; o anexo só é marcado se a gravação der certo (nunca 📎 mentiroso)
+      let arquivoSalvo = false;
       try {
-        await dbSet("fin_comprovante_" + id, { dataB64, mime: recF.anexo.type, em: new Date().toISOString() });
+        await dbSet("fin_comprovante_" + id, { dataB64, mime: ehPdf ? "application/pdf" : mimeSeguro, em: new Date().toISOString() });
+        arquivoSalvo = true;
       } catch (e) {}
+      if (arquivoSalvo) recF.anexo = { stored: true, type: ehPdf ? "application/pdf" : mimeSeguro, name: "comprovante" + (ehPdf ? ".pdf" : ".jpg") };
+      await dbSet(FIN_KEY, finF);
       // Marca no card do pipe (📎 visível no fluxo inteiro: solicitar entrega → entrega → ERP)
       try {
         const ppC = (await dbGet("reparoeletro_pipe")) || { cards: [] };
@@ -361,7 +366,9 @@ Regra: "verde" SOMENTE se for pagamento efetivado + valor batendo + data recente
     const idc = String(req.query.id || "");
     const arq = await dbGet("fin_comprovante_" + idc);
     if (!arq || !arq.dataB64) return res.status(404).json({ ok: false, error: "comprovante não encontrado" });
-    res.setHeader("Content-Type", arq.mime || "application/octet-stream");
+    const MIMES_SRV = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+    res.setHeader("Content-Type", MIMES_SRV.includes(arq.mime) ? arq.mime : "application/octet-stream");
+    res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Content-Disposition", "inline");
     res.setHeader("Cache-Control", "private, max-age=3600");
     return res.status(200).send(Buffer.from(arq.dataB64, "base64"));

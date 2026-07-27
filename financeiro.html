@@ -1042,14 +1042,39 @@ function pasteComprovante(ev,id){
   var its=(ev.clipboardData||{}).items||[];
   for(var i=0;i<its.length;i++){if(its[i].kind==='file'){enviarComprovante(its[i].getAsFile(),id);ev.preventDefault();return;}}
 }
+async function comprimirImagem(file){
+  return new Promise(function(res){
+    var img=new Image();var url=URL.createObjectURL(file);
+    img.onload=function(){
+      var max=1600,w=img.width,h=img.height;
+      if(w>max||h>max){var k=Math.min(max/w,max/h);w=Math.round(w*k);h=Math.round(h*k);}
+      var cv=document.createElement('canvas');cv.width=w;cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      res(cv.toDataURL('image/jpeg',0.82).split(',')[1]);
+    };
+    img.onerror=function(){URL.revokeObjectURL(url);res(null);};
+    img.src=url;
+  });
+}
 async function enviarComprovante(file,id){
   if(!file)return;
-  if(file.size>8*1024*1024){alert('Arquivo muito grande (máx 8MB)');return;}
+  var ehPdf=(file.type||'').includes('pdf');
+  if(ehPdf&&file.size>2.5*1024*1024){alert('PDF muito grande (máx 2,5MB). Dica: tira um print da tela do comprovante e cola aqui.');return;}
+  if(!ehPdf&&file.size>15*1024*1024){alert('Imagem muito grande');return;}
   var dz=document.getElementById('drop-'+id);
   if(dz)dz.innerHTML='🔍 Analisando o comprovante com a IA…';
-  var b64=await new Promise(function(res,rej){var rd=new FileReader();rd.onload=function(){res(String(rd.result).split(',')[1]);};rd.onerror=rej;rd.readAsDataURL(file);});
+  var b64,mimeEnvio;
+  if(ehPdf){
+    b64=await new Promise(function(res,rej){var rd=new FileReader();rd.onload=function(){res(String(rd.result).split(',')[1]);};rd.onerror=rej;rd.readAsDataURL(file);});
+    mimeEnvio='application/pdf';
+  }else{
+    b64=await comprimirImagem(file);
+    mimeEnvio='image/jpeg';
+    if(!b64){alert('Não consegui ler a imagem');if(dz)dz.innerHTML='📎 Tenta de novo';return;}
+  }
   var r=await fetch('/api/financeiro?action=analisar-comprovante',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({id:id,dataB64:b64,mime:file.type||'image/jpeg'})}).then(function(x){return x.json();}).catch(function(){return{ok:false,error:'falha de rede'};});
+    body:JSON.stringify({id:id,dataB64:b64,mime:mimeEnvio})}).then(function(x){return x.json();}).catch(function(){return{ok:false,error:'falha de rede'};});
   if(!r.ok){alert('Análise falhou: '+(r.error||'?'));if(dz)dz.innerHTML='📎 Tenta de novo — arrasta, cola ou toca';return;}
   await loadData();
   var vd=r.analise&&r.analise.veredito==='verde';
