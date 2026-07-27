@@ -1013,18 +1013,46 @@ export default async function handler(req, res) {
     const conv = {};
     for (const e of evts) {
       if (e.dir === 'status' || !e.tel) continue;
-      if (!conv[e.tel]) conv[e.tel] = { tel: e.tel, nome: '', msgs: 0, ultimaMsg: '', ultimaTs: '', naoRespondida: false };
+      if (!conv[e.tel]) conv[e.tel] = { tel: e.tel, nome: '', msgs: 0, ultimaMsg: '', ultimaTs: '', naoRespondida: false, escalada: false };
       const c = conv[e.tel];
       c.msgs++;
       if (e.nome) c.nome = e.nome;
+      if (e.dir === 'acao') {
+        // escalada fica acesa até alguém (humano) responder; conflito tem tratamento próprio
+        if (e.texto === 'escalar_humano') c.escalada = true;
+        if (e.texto === 'registrar_conflito') c.escalada = false;
+        continue;
+      }
+      if (e.dir === 'out' && e.tipo === 'manual') c.escalada = false;
       c.ultimaMsg = (e.dir === 'in' ? '👤 ' : '🤖 ') + String(e.texto || '').slice(0, 60);
       c.ultimaTs = e.ts;
       c.naoRespondida = (e.dir === 'in');
     }
-    const pzL = (await dbGet('wa_bot_pausados')) || {};
-    const lista = Object.values(conv).sort((a, b) => String(b.ultimaTs).localeCompare(String(a.ultimaTs)));
+    const [pzL, arqL] = await Promise.all([
+      dbGet('wa_bot_pausados').then(v => v || {}),
+      dbGet('wa_arquivadas').then(v => v || { tels: {} }),
+    ]);
+    const verArq = String(req.query.arquivadas || '') === '1';
+    let lista = Object.values(conv).sort((a, b) => String(b.ultimaTs).localeCompare(String(a.ultimaTs)));
+    lista = lista.filter(c => {
+      const d8c = String(c.tel).replace(/\D/g, '').slice(-8);
+      const arquivada = !!arqL.tels[d8c];
+      c.arquivada = arquivada;
+      return verArq ? arquivada : !arquivada;
+    });
     for (const c of lista) c.pausado = !!pzL[String(c.tel).replace(/\D/g, '').slice(-8)];
     return res.status(200).json({ ok: true, total: lista.length, conversas: lista.slice(0, 100) });
+  }
+
+  // ── Arquivar/desarquivar conversa resolvida ──
+  if (action === 'arquivar-conversa') {
+    const telAq = String(req.query.tel || '').replace(/\D/g, '').slice(-8);
+    if (!telAq) return res.status(400).json({ ok: false, error: 'informe ?tel=' });
+    const arq = (await dbGet('wa_arquivadas')) || { tels: {} };
+    if (String(req.query.undo || '') === '1') delete arq.tels[telAq];
+    else arq.tels[telAq] = new Date().toISOString();
+    await dbSet('wa_arquivadas', arq);
+    return res.status(200).json({ ok: true, arquivada: !req.query.undo });
   }
 
   // ── Histórico de uma conversa ──

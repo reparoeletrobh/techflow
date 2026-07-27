@@ -94,6 +94,8 @@ main{flex:1;display:flex;overflow:hidden;}
 .b-desc{padding:10px 14px;border-radius:8px;border:1px solid #2a2f38;background:#181b1f;color:#8b93a1;font-weight:700;font-size:12px;cursor:pointer;}
 #vazio{flex:1;display:flex;align-items:center;justify-content:center;color:#5a6270;font-size:13px;text-align:center;padding:30px;}
 @media(max-width:760px){#col-esq{width:110px;}.conv-ultima{display:none;}#busca-conv{font-size:10px;padding:6px 7px;}}
+@keyframes blinkEsc{0%,100%{background:rgba(245,158,11,.06);}50%{background:rgba(245,158,11,.28);}}
+.conv-escalada{animation:blinkEsc 1.2s ease-in-out infinite;border-left:3px solid #f59e0b!important;}
 </style>
 </head>
 <body>
@@ -119,7 +121,8 @@ main{flex:1;display:flex;overflow:hidden;}
 </div>
 <main>
   <div id="col-esq">
-  <input id="busca-conv" placeholder="🔎 Buscar nome ou número..." oninput="window._filtroConv=this.value.toLowerCase();if(window._ultD)renderLista(window._ultD);" style="width:calc(100% - 16px);margin:8px 8px 6px;background:#12161d;border:1px solid #242b39;border-radius:9px;padding:8px 11px;color:#f0f2f5;font-size:12.5px;outline:none;box-sizing:border-box;display:block;">
+  <div style="display:flex;align-items:center;gap:4px;"><button id="btn-ver-arq" onclick="toggleArquivadas()" title="Ver arquivadas" style="background:none;border:none;color:#5a6270;font-size:15px;cursor:pointer;padding:4px 2px 0 8px;">🗄</button></div>
+<input id="busca-conv" placeholder="🔎 Buscar nome ou número..." oninput="window._filtroConv=this.value.toLowerCase();if(window._ultD)renderLista(window._ultD);" style="width:calc(100% - 16px);margin:8px 8px 6px;background:#12161d;border:1px solid #242b39;border-radius:9px;padding:8px 11px;color:#f0f2f5;font-size:12.5px;outline:none;box-sizing:border-box;display:block;">
   <div id="lista-conv"><div style="padding:20px;color:#5a6270;font-size:11px;text-align:center;">⏳ Carregando...</div></div>
   </div>
   <div id="chat">
@@ -152,7 +155,7 @@ var ACAO_LBL={cadastrar_logistica:'🚚 Cadastrar em Logística',enviar_orcament
 async function carregarConversas(){
   var el=document.getElementById('lista-conv');
   try{
-    var d=await fetch('/api/wa-bot?action=conversas').then(function(r){return r.json();});
+    var d=await fetch('/api/wa-bot?action=conversas'+(window._verArq?'&arquivadas=1':'')).then(function(r){return r.json();});
     if(!d.conversas||!d.conversas.length){
       el.innerHTML='<div style="padding:20px;color:#5a6270;font-size:11px;text-align:center;">📭 Nenhuma conversa ainda.<br><br>Configure o webhook na Meta e as mensagens aparecem aqui.</div>';
       return;
@@ -169,6 +172,19 @@ async function toggleFiltroOrc(){
     window._filtroOrc=(r.abertos||[]).map(function(a){return String(a.tel||'').slice(-8);});
     loadKpis();if(window._ultD)renderLista(window._ultD);
   }catch(e){}
+}
+window._verArq=false;
+async function arquivarConv(tel){
+  var c=((window._ultD||{}).conversas||[]).find(function(x){return x.tel===tel;});
+  var undo=c&&c.arquivada?'&undo=1':'';
+  await fetch('/api/wa-bot?action=arquivar-conversa&tel='+encodeURIComponent(tel)+undo).catch(function(){});
+  loadConvs();
+  var m=document.getElementById('msgs');if(m&&!undo){m.style.display='none';document.getElementById('sugestao').style.display='none';document.getElementById('vazio').style.display='flex';}
+}
+function toggleArquivadas(){
+  window._verArq=!window._verArq;
+  document.getElementById('btn-ver-arq').style.color=window._verArq?'#fbbf24':'#5a6270';
+  loadConvs();
 }
 function fmtTel(t){
   var d=String(t||'').replace(/\D/g,'');
@@ -191,7 +207,7 @@ function renderLista(d){
     if(!lst.length){el.innerHTML='<div style="padding:20px;color:#5a6270;font-size:12px;text-align:center;">Nenhuma conversa encontrada</div>';return;}
     el.innerHTML=lst.map(function(c){
       return '<div class="conv'+(c.tel===_tel?' sel':'')+'" onclick="abrirConversa(\''+c.tel+'\')">'
-        +'<div class="conv-nome">'+esc(c.nome||fmtTel(c.tel))+(c.pausado?'<span class="conv-badge" style="background:rgba(245,158,11,.25);color:#fbbf24;">✋ manual</span>':(c.naoRespondida?'<span class="conv-badge">responder</span>':''))+'</div>'
+        +'<div class="conv-nome">'+esc(c.nome||fmtTel(c.tel))+(c.escalada?'<span class="conv-badge" style="background:rgba(245,158,11,.35);color:#fde047;">⚠️ precisa de humano</span>':'')+(c.pausado?'<span class="conv-badge" style="background:rgba(245,158,11,.25);color:#fbbf24;">✋ manual</span>':(c.naoRespondida?'<span class="conv-badge">responder</span>':''))+'</div>'
         +'<div style="font-size:10.5px;color:#5a8dc9;font-family:var(--fm,monospace);margin:1px 0 2px;">📞 '+fmtTel(c.tel)+'</div>'
         +'<div class="conv-ultima">'+esc(c.ultimaMsg)+'</div>'
       +'</div>';
@@ -235,8 +251,8 @@ async function abrirConversa(tel){
     document.getElementById('msgs').parentNode.insertBefore(hdrT,document.getElementById('msgs'));
   }
   var ccN=((window._ultD||{}).conversas||[]).find(function(x){return x.tel===tel;});
-  hdrT.innerHTML='📞 <b>'+fmtTel(tel)+'</b>'+(ccN&&ccN.nome?' — '+esc(ccN.nome):'')+' <span style="color:#3b4658;">(toca para copiar)</span>';
-  hdrT.onclick=function(){copiaTel(tel);};
+  hdrT.innerHTML='<span onclick="copiaTel(\''+tel+'\')" style="cursor:pointer;">📞 <b>'+fmtTel(tel)+'</b>'+(ccN&&ccN.nome?' — '+esc(ccN.nome):'')+'</span>'+
+    '<button onclick="arquivarConv(\''+tel+'\')" style="float:right;background:#1e293b;border:1px solid #334155;border-radius:7px;padding:3px 10px;color:#94a3b8;font-size:11px;cursor:pointer;">🗄 '+(ccN&&ccN.arquivada?'Desarquivar':'Arquivar')+'</button>';
   carregarConversas();
   var box=document.getElementById('msgs');
   box.innerHTML='<div style="color:#5a6270;font-size:11px;text-align:center;">⏳</div>';
@@ -310,6 +326,7 @@ async function loadKpis(){
       ['🚚','P/ Logística',t.logistica||0,'#22c55e'],
       ['💰','Orçamentos',t.orcamentos||0,'#f59e0b'],
       ['✅','Aprovações',t.aprovacoes||0,'#4ade80'],
+      ['🏪','Cliente Loja',t.cliente_loja||0,'#a78bfa'],
       ['📞','Entrar em Contato',t.entrar_contato||0,'#fb923c'],
       ['⚡','Conflitos Bot',t.conflitos||0,'#ef4444']
     ];

@@ -86,6 +86,12 @@ export default async function handler(req, res) {
               const d8w = String(tel).replace(/\D/g, '').slice(-8);
               if (telsAuto.some(t => String(t).replace(/\D/g, '').slice(-8) === d8w)) {
                 const KW = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+                // cliente arquivado voltou a falar → desarquiva sozinho
+                try {
+                  const arqW = (await dbGet('wa_arquivadas')) || { tels: {} };
+                  const d8aw = String(tel).replace(/\D/g, '').slice(-8);
+                  if (arqW.tels[d8aw]) { delete arqW.tels[d8aw]; await dbSet('wa_arquivadas', arqW); }
+                } catch (e) {}
                 await fetch(`https://reparoeletroadm.com/api/wa-bot?action=auto-responder&tel=${d8w ? String(tel).replace(/\D/g, '') : ''}&k=${KW}`);
               }
             } catch (eAuto) {}
