@@ -429,6 +429,7 @@ async function api(action, body) {
 }
 
 // ── LOAD ─────────────────────────────────────────────────────
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 async function load() {
   try {
     const res = await api('load');
@@ -1076,9 +1077,9 @@ async function enviarComprovante(file,id){
   var r=await fetch('/api/financeiro?action=analisar-comprovante',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({id:id,dataB64:b64,mime:mimeEnvio})}).then(function(x){return x.json();}).catch(function(){return{ok:false,error:'falha de rede'};});
   if(!r.ok){alert('Análise falhou: '+(r.error||'?'));if(dz)dz.innerHTML='📎 Tenta de novo — arrasta, cola ou toca';return;}
-  await loadData();
+  await load();
   var vd=r.analise&&r.analise.veredito==='verde';
-  showToast(vd?'🟢':'🔴', vd?'Comprovante confere!':'Comprovante NÃO bateu — conferir manualmente');
+  showToast(vd?'🟢':'🔴', vd?'Comprovante confere!':'Comprovante NÃO bateu', vd?'Análise aprovada':'Conferir manualmente antes de confirmar');
 }
 async function moverSimples(id, phaseId, icon, msg) {
   const res = await api('mover',{id,phaseId});
