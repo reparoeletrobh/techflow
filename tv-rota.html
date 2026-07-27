@@ -216,7 +216,7 @@ function render(){
           '<a class="b b-wpp" href="https://wa.me/'+to+'?text='+msg+'" target="_blank" onclick="marcaContato(\''+f.id+'\')">💬 WhatsApp</a>'+
           '<a class="b b-tel" href="tel:+'+to+'" onclick="marcaContato(\''+f.id+'\')">📞 Ligar</a>'+
           '<a class="b b-map" href="https://maps.google.com/?q='+encodeURIComponent(f.endereco||'')+'" target="_blank">🗺️ Mapa</a>'+
-          '<button class="b b-rel" onclick="iniciarRelatorio(\''+f.id+'\')">📋 '+(f.relatorioIniciadoEm?'Relatório ✓':'Relatório')+'</button>'+
+
           '<button class="b b-rem" onclick="remarcar(\''+f.id+'\')">📅 Remarcar</button>'+
           '<button class="b" style="background:#dc2626;min-width:44%;" onclick="cancelado(\''+f.id+'\')">❌ Cancelado</button>'+
           '<button class="b b-col" style="min-width:52%;" onclick="coletado(\''+f.id+'\')">✅ COLETADO</button>'+
@@ -236,14 +236,8 @@ async function marcaContato(id){
   try{await fetch('/api/tv-logistica?action=rota-contato',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});}catch(e){}
   setTimeout(load,800);
 }
-async function iniciarRelatorio(id){
-  var obs=prompt('📋 Relatório de deslocamento — alguma observação? (pode deixar vazio)');
-  if(obs===null)return;
-  await fetch('/api/tv-logistica?action=rota-relatorio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,obs:obs})}).catch(function(){});
-  load();
-}
 async function remarcar(id){
-  if(!confirm('📅 Remarcar esta coleta? A ficha volta para a logística.'))return;
+  if(!confirm('📅 REMARCAR: você não conseguiu conciliar data/horário com o cliente?\n\nA ficha SAI da sua rota e volta para a Logística, na aba Remarcar, para a equipe reagendar.'))return;
   var r=await fetch('/api/tv-logistica?action=rota-mover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,phase:'remarcar'})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
   if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
 }
