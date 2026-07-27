@@ -125,10 +125,10 @@ export default async function handler(req, res) {
       const dbTv  = (await dbGet(KEY_TV))  || { fichas:[] };
       let novas = 0, resgatadas = 0;
 
-      // Telefones já no sistema (rede de resgate compara por telefone, não por linha)
       const d8De = t => String(t || '').replace(/\D/g, '').slice(-8);
-      const telsExistentes = new Set(
-        [...dbAdm.fichas, ...dbTv.fichas].map(f => d8De(f.telefone)).filter(x => x.length >= 8));
+      // Linhas da planilha que JÁ viraram ficha (o dedupe verdadeiro é por LINHA — telefone repete p/ cliente recorrente)
+      const rowsExistentes = new Set(
+        [...dbAdm.fichas, ...dbTv.fichas].map(f => f.sheetRow).filter(x => x != null));
 
       // Linhas candidatas: (a) todas após o cursor, com ÍNDICE REAL da planilha;
       // (b) RESGATE — últimas 40 linhas com dado ANTES do cursor cujo telefone nunca virou ficha
@@ -142,7 +142,7 @@ export default async function handler(req, res) {
         const nomeB = String(rows[ri][1]||'').trim();
         if (!telB && !nomeB) continue;
         vistasAtras++;
-        if (telB && d8De(telB).length >= 8 && !telsExistentes.has(d8De(telB))) candidatas.push({ ri, resgate: true });
+        if (!rowsExistentes.has(ri + 1)) candidatas.push({ ri, resgate: true });
       }
       if (!candidatas.length) {
         return res.status(200).json({ ok:true, novas:0, total });
@@ -166,7 +166,6 @@ export default async function handler(req, res) {
         const jaExisteSync = dbAdm.fichas.some(f => f.sheetRow === rowNum) ||
                              dbTv.fichas.some(f => f.sheetRow === rowNum);
         if (jaExisteSync) continue;
-        if (tel && telsExistentes.has(d8De(tel))) continue; // telefone já virou ficha (linha renumerada/reimportada)
 
         const sistema = detectSistema(equip);
         const id = `fsh_${rowNum}_${tel.slice(-4)}_${Date.now().toString(36)}`;
@@ -186,7 +185,7 @@ export default async function handler(req, res) {
         if (resgate) ficha.resgatada = true;
         if (sistema === 'tv') dbTv.fichas.unshift(ficha);
         else                  dbAdm.fichas.unshift(ficha);
-        if (tel) telsExistentes.add(d8De(tel));
+        rowsExistentes.add(rowNum);
         novas++;
         if (resgate) resgatadas++;
       }

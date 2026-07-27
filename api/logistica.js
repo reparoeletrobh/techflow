@@ -858,6 +858,19 @@ module.exports = async function handler(req, res) {
     ficha.finalizadoEm = new Date().toISOString();
     ficha.movedAt     = ficha.finalizadoEm;
     await dbSet(LOG_KEY, db);
+    // RS/garantia → entra na fila do novo Sistema de Garantia (badge azul)
+    try {
+      const KG2 = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+      await fetch(`https://reparoeletroadm.com/api/garantia?action=fila-criar&k=${KG2}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome: ficha.nome || 'Cliente', telefone: ficha.telefone || '',
+          equipamento: ficha.equipamento || '',
+          relato: 'RS finalizado na logística' + (ficha.defeito ? ' — ' + String(ficha.defeito).slice(0, 200) : ''),
+          origem: 'logistica-rs',
+        }),
+      });
+    } catch (e) {}
     return res.status(200).json({ ok: true, ficha });
   }
 
