@@ -39,6 +39,16 @@ h1{font-size:17px;font-weight:900;margin-bottom:4px;}
 <body>
 <h1 id="titulo">🏍️ Rota TV</h1>
 <div class="sub" id="subtitulo">Carregando fichas…</div>
+<div style="display:flex;gap:8px;margin-bottom:12px;">
+<button id="btn-rota-multi" onclick="toggleSelecao()" style="flex:1;background:#0e7490;border:none;border-radius:12px;padding:13px;color:#fff;font-size:13.5px;font-weight:900;cursor:pointer;display:none;">🗺️ Mapa com vários endereços</button>
+</div>
+<div id="barra-sel" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#0f172a;border-top:2px solid #0e7490;padding:12px 16px;z-index:50;">
+  <div style="max-width:560px;margin:0 auto;display:flex;gap:10px;align-items:center;">
+    <span id="sel-cnt" style="font-weight:900;font-size:14px;">0 selecionados</span>
+    <button onclick="abrirRotaMaps()" style="flex:1;background:#16a34a;border:none;border-radius:10px;padding:12px;color:#fff;font-weight:900;font-size:14px;cursor:pointer;">🗺️ ABRIR ROTA NO MAPS</button>
+    <button onclick="toggleSelecao()" style="background:#374151;border:none;border-radius:10px;padding:12px 14px;color:#fff;font-weight:800;cursor:pointer;">✕</button>
+  </div>
+</div>
 <button id="btn-copiloto" onclick="abrirCopiloto()" style="width:100%;background:linear-gradient(135deg,#1d4ed8,#7c3aed);border:none;border-radius:12px;padding:13px;color:#fff;font-size:14px;font-weight:900;cursor:pointer;margin-bottom:12px;display:none;">🧭 COPILOTO — organizar minha rota</button>
 <div id="copiloto" style="display:none;background:linear-gradient(135deg,#12161d,#1a2030);border:1px solid #2a3550;border-radius:14px;padding:14px;margin-bottom:14px;">
   <div class="tit" style="font-size:11px;font-weight:900;color:#60a5fa;letter-spacing:.05em;margin-bottom:8px;">🧭 COPILOTO DE ROTA</div>
@@ -169,6 +179,7 @@ function render(){
   var el=document.getElementById('lista');
   document.getElementById('subtitulo').textContent=fichas.length+' TV(s) para coletar';
   document.getElementById('btn-copiloto').style.display=fichas.length?'block':'none';
+  document.getElementById('btn-rota-multi').style.display=fichas.length?'block':'none';
   if(!fichas.length){
     el.innerHTML='<div class="empty">🎉 Nenhuma coleta pendente!<br><small>Quando a logística mandar fichas pra você, elas aparecem aqui.</small></div>';
     document.getElementById('copiloto').style.display='none';
@@ -204,7 +215,9 @@ function render(){
       var tel=String(f.telefone||'').replace(/\D/g,'');
       var to=tel.length>=10?(tel.indexOf('55')===0?tel:'55'+tel):'';
       var msg=encodeURIComponent('Olá '+(f.nome||'').split(' ')[0]+'! Sou o motorista da Reparo Eletro. Estou organizando a rota de coleta da sua TV ('+(f.equipamento||'TV')+'). Posso passar aí hoje?');
-      return '<div class="card'+(f.primeiroContatoEm?' contatado':'')+'" style="border-left-color:'+R.cor+';">'+
+      var selecionada=_sel.indexOf(f.id)>-1;
+      return '<div class="card'+(f.primeiroContatoEm?' contatado':'')+'" style="border-left-color:'+R.cor+';'+(_selMode?'cursor:pointer;':'')+(selecionada?'outline:3px solid #16a34a;background:#0d1f14;':'')+'"'+(_selMode?' onclick="selToque(\''+f.id+'\')"':'')+'>'+
+        (_selMode?'<div style="font-size:13px;font-weight:900;color:'+(selecionada?'#4ade80':'#64748b')+';margin-bottom:4px;">'+(selecionada?'✔ SELECIONADA (parada '+(_sel.indexOf(f.id)+1)+')':'○ toca para selecionar')+'</div>':'')+
         '<div class="nm">'+esc(f.nome||'—')+agingHtml(f.movedAt)+(f.primeiroContatoEm?'<span class="badge-ctt">✅ contato feito</span>':'')+'</div>'+
         '<div class="eq">📍 '+esc(f.endereco||'sem endereço')+'</div>'+
         '<div class="eq">📺 '+esc(f.equipamento||'TV')+(f.defeito?' — '+esc(f.defeito):'')+(f.telefone?' · 📞 '+esc(f.telefone):'')+'</div>'+
@@ -212,7 +225,7 @@ function render(){
           '<option value="">📍 Em qual região fica este endereço?</option>'+
           Object.keys(REG).filter(function(k){return k!=='sem-regiao';}).map(function(k){return '<option value="'+k+'">'+REG[k].nome+'</option>';}).join('')+
         '</select></div>'):'')+
-        '<div class="acts">'+
+        (_selMode?'':'<div class="acts">'+
           '<a class="b b-wpp" href="https://wa.me/'+to+'?text='+msg+'" target="_blank" onclick="marcaContato(\''+f.id+'\')">💬 WhatsApp</a>'+
           '<a class="b b-tel" href="tel:+'+to+'" onclick="marcaContato(\''+f.id+'\')">📞 Ligar</a>'+
           '<a class="b b-map" href="https://maps.google.com/?q='+encodeURIComponent(f.endereco||'')+'" target="_blank">🗺️ Mapa</a>'+
@@ -220,7 +233,7 @@ function render(){
           '<button class="b b-rem" onclick="remarcar(\''+f.id+'\')">📅 Remarcar</button>'+
           '<button class="b" style="background:#dc2626;min-width:44%;" onclick="cancelado(\''+f.id+'\')">❌ Cancelado</button>'+
           '<button class="b b-col" style="min-width:52%;" onclick="coletado(\''+f.id+'\')">✅ COLETADO</button>'+
-        '</div></div>';
+        '</div>')+'</div>';
     }).join('');
     return html;
   }).join('');
@@ -230,6 +243,36 @@ async function classificar(id,regiao){
   if(!regiao)return;
   await fetch('/api/tv-logistica?action=rota-classificar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,regiao:regiao})}).catch(function(){});
   load();
+}
+var _selMode=false,_sel=[];
+function toggleSelecao(){
+  _selMode=!_selMode;_sel=[];
+  document.getElementById('barra-sel').style.display=_selMode?'block':'none';
+  document.body.style.paddingBottom=_selMode?'90px':'40px';
+  atualizaSelCnt();render();
+}
+function atualizaSelCnt(){
+  var el=document.getElementById('sel-cnt');
+  if(el)el.textContent=_sel.length+' selecionado'+(_sel.length===1?'':'s');
+}
+function selToque(id){
+  var i=_sel.indexOf(id);
+  if(i>-1)_sel.splice(i,1);else{
+    if(_sel.length>=10){alert('O Google Maps aceita no máximo 10 paradas por rota. Abre essa leva primeiro e seleciona as próximas depois.');return;}
+    _sel.push(id);
+  }
+  atualizaSelCnt();render();
+}
+function abrirRotaMaps(){
+  if(!_sel.length){alert('Toca nas fichas para selecionar os endereços primeiro');return;}
+  // manter a ordem visual (já otimizada por região/copiloto)
+  var ordenadas=[];
+  _dados.fichas.forEach(function(f){if(_sel.indexOf(f.id)>-1&&f.endereco)ordenadas.push(f.endereco);});
+  if(!ordenadas.length){alert('As fichas selecionadas estão sem endereço');return;}
+  var dest=ordenadas[ordenadas.length-1];
+  var way=ordenadas.slice(0,-1).map(encodeURIComponent).join('|');
+  var url='https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(dest)+(way?'&waypoints='+way:'')+'&travelmode=driving';
+  window.open(url,'_blank');
 }
 function toggleReg(rg){_regAberta[rg]=_regAberta[rg]===false?true:false;render();}
 async function marcaContato(id){
