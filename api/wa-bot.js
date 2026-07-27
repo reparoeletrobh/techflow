@@ -301,7 +301,7 @@ export default async function handler(req, res) {
         }
         abordados.tels[telA.slice(-8)] = new Date().toISOString();
         await rpushEvt({ ts: new Date().toISOString(), tel: to, dir: 'out',
-          texto: '📨 [abordagem automática] cadastro_recebido — ' + (f.nome || ''), tipo: 'template' });
+          texto: 'Olá ' + ((f.nome || 'tudo bem').split(' ')[0]) + ', tudo bem? Alessandro aqui, responsável pela logística da Reparo Eletro. Recebemos o seu cadastro para o conserto do seu ' + (f.equipamento || 'equipamento') + '!\n\nTEMOS 2 OPÇÕES: COLETA E ENTREGA / ATENDIMENTO NO BALCÃO\n\n*ATENÇÃO: Trazendo seu equipamento aqui na loja, o orçamento é gratuito e consertamos em 15 minutos! Estamos na Rua Ouro Preto, 663 - Barro Preto*\n\nCaso prefira a nossa coleta e entrega, podemos buscar hoje mesmo na sua casa!\n\nJá estamos prontos para te atender! Me fala qual opção você escolheu, por favor? 😊', tipo: 'template' });
         if (okA) await bumpStat('abordagens');
         disparadas.push({ nome: f.nome, ok: okA });
       } catch (e) { disparadas.push({ nome: f.nome, erro: e.message }); }
