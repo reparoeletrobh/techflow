@@ -160,6 +160,17 @@ async function carregarConversas(){
     window._ultD=d;renderLista(d);
   }catch(e){el.innerHTML='<div style="padding:20px;color:#ef4444;font-size:11px;">Erro: '+e.message+'</div>';}
 }
+function fmtTel(t){
+  var d=String(t||'').replace(/\D/g,'');
+  if(d.indexOf('55')===0)d=d.slice(2);
+  if(d.length===11)return '('+d.slice(0,2)+') '+d.slice(2,7)+'-'+d.slice(7);
+  if(d.length===10)return '('+d.slice(0,2)+') '+d.slice(2,6)+'-'+d.slice(6);
+  return t;
+}
+function copiaTel(t){
+  var d=String(t||'').replace(/\D/g,'');
+  (navigator.clipboard?navigator.clipboard.writeText(d):Promise.reject()).then(function(){alert('Número copiado: '+d);}).catch(function(){prompt('Número do cliente:',d);});
+}
 function renderLista(d){
     var el=document.getElementById('lista-conv');
     var lst=d.conversas||[];
@@ -168,7 +179,8 @@ function renderLista(d){
     if(!lst.length){el.innerHTML='<div style="padding:20px;color:#5a6270;font-size:12px;text-align:center;">Nenhuma conversa encontrada</div>';return;}
     el.innerHTML=lst.map(function(c){
       return '<div class="conv'+(c.tel===_tel?' sel':'')+'" onclick="abrirConversa(\''+c.tel+'\')">'
-        +'<div class="conv-nome">'+esc(c.nome||c.tel)+(c.pausado?'<span class="conv-badge" style="background:rgba(245,158,11,.25);color:#fbbf24;">✋ manual</span>':(c.naoRespondida?'<span class="conv-badge">responder</span>':''))+'</div>'
+        +'<div class="conv-nome">'+esc(c.nome||fmtTel(c.tel))+(c.pausado?'<span class="conv-badge" style="background:rgba(245,158,11,.25);color:#fbbf24;">✋ manual</span>':(c.naoRespondida?'<span class="conv-badge">responder</span>':''))+'</div>'
+        +'<div style="font-size:10.5px;color:#5a8dc9;font-family:var(--fm,monospace);margin:1px 0 2px;">📞 '+fmtTel(c.tel)+'</div>'
         +'<div class="conv-ultima">'+esc(c.ultimaMsg)+'</div>'
       +'</div>';
     }).join('');
@@ -204,6 +216,15 @@ async function abrirConversa(tel){
   document.getElementById('vazio').style.display='none';
   document.getElementById('msgs').style.display='flex';
   document.getElementById('sugestao').style.display='block';
+  var hdrT=document.getElementById('tel-atual');
+  if(!hdrT){
+    hdrT=document.createElement('div');hdrT.id='tel-atual';
+    hdrT.style.cssText='padding:6px 12px;background:#101623;border-bottom:1px solid #1e2530;font-size:12.5px;color:#5a8dc9;font-family:monospace;cursor:pointer;';
+    document.getElementById('msgs').parentNode.insertBefore(hdrT,document.getElementById('msgs'));
+  }
+  var ccN=((window._ultD||{}).conversas||[]).find(function(x){return x.tel===tel;});
+  hdrT.innerHTML='📞 <b>'+fmtTel(tel)+'</b>'+(ccN&&ccN.nome?' — '+esc(ccN.nome):'')+' <span style="color:#3b4658;">(toca para copiar)</span>';
+  hdrT.onclick=function(){copiaTel(tel);};
   carregarConversas();
   var box=document.getElementById('msgs');
   box.innerHTML='<div style="color:#5a6270;font-size:11px;text-align:center;">⏳</div>';

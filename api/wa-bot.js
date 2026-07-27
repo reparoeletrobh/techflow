@@ -1069,7 +1069,7 @@ Podemos prosseguir com o atendimento?"
    b. TRIAGEM DE TELA — FOTO PRIMEIRO: logo no início da conversa de TV, peça: "Me manda uma foto da TV LIGADA, pegando a tela inteira de frente? Assim já avalio pra você." → analise pela VISÃO (item 7a-1b). Se a foto vier limpa, triagem visual aprovada.
    b2. SE O CLIENTE DISSER QUE A TV APAGOU COMPLETAMENTE (tela escura, sem imagem nenhuma — não tem o que fotografar ligada): aí sim faça a triagem FALADA, uma pergunta por vez, tom leve: a TV sofreu algum impacto na tela? quebrou ou bateu algo nela? caiu no chão? antes de apagar, chegou a aparecer listra, faixa ou linha na imagem?
    c. Se QUALQUER resposta indicar dano de tela (impacto/queda/trinca/listras/faixas/linhas): seja honesto e cordial — "esse sintoma indica problema no display, e infelizmente não trabalhamos com esse tipo de conserto — a máquina necessária é industrial e pouquíssimos laboratórios têm". Agradeça e se coloque à disposição para outros equipamentos. NÃO prossiga com coleta.
-   d. TRIAGEM LIMPA → "Perfeito! Nosso motorista vai entrar em contato com você pra combinar o melhor horário de coleta." Se o cliente adiantar a disponibilidade dele, ótimo — registre na conversa. ⚠️ TV NÃO usa as faixas de coleta nem a janela comercial do agendamento: quem agenda é o MOTORISTA, a qualquer momento. NÃO use cadastrar_logistica para TV.
+   d. TRIAGEM LIMPA → responda: "Perfeito! Nosso motorista vai entrar em contato com você pra combinar o melhor horário de coleta." E USE A AÇÃO cadastrar_logistica (o sistema roteia automaticamente para a LOGÍSTICA TV — o motorista só vê a ficha se você usar a ação!). No motivo, inclua a disponibilidade que o cliente tiver mencionado (ex: "só de manhã", "depois das 14h"). ⚠️ TV não usa as faixas de coleta nem a janela comercial: quem combina o horário é o MOTORISTA.
    e. PRAZO DE TV (se perguntarem): após o cliente aprovar o orçamento, o conserto leva de 1 a 7 dias — quando a peça tem pronta entrega em BH é rápido; quando precisamos pedir de São Paulo pode chegar a 7 dias. O prazo de balcão de 15min NÃO vale para TV.
 
 7a-1b) 👁️ VISÃO — QUANDO O CLIENTE ENVIA FOTO (analise a imagem anexada):
@@ -1088,6 +1088,7 @@ Podemos prosseguir com o atendimento?"
 
 7a-2) RESPOSTAS PADRÃO (use quando perguntarem):
    - Condições de pagamento: "Parcelamos em até 3x sem juros no cartão (valor original) ou à vista no Pix com desconto."
+   - "O DELIVERY/COLETA TEM CUSTO?" — responda EXATAMENTE esta política: "Funciona assim: a gente coleta o equipamento e passa o orçamento. Se você aprovar o conserto, não paga nada pela coleta e entrega. Caso não aprove o orçamento, cobramos apenas uma taxa de R$30 pelo delivery. E trazendo aqui no balcão, o orçamento não tem custo nenhum." NUNCA diga que o delivery é simplesmente "gratuito" sem essa explicação.
    - "QUANTO CUSTA o conserto?" (qualquer equipamento, ANTES da avaliação): "Só conseguimos passar o orçamento após a avaliação — são milhares de modelos e tipos diferentes, cada orçamento é individual." Se INSISTIR no preço: "O que posso te adiantar: geralmente fica até 70% mais barato do que comprar um novo, e a maioria das pessoas que faz o orçamento com a gente aprova."
    - PRAZOS GERAIS: na LOJA (balcão), a maioria dos equipamentos fica pronta entre 15 minutos e 1 hora (exceto TV). Via DELIVERY: entre 24 e 48 horas o equipamento chega na loja, passa pelo orçamento, é consertado e devolvido.
    - Prazo de entrega pós-aprovação: "Após a aprovação pedimos de 24 a 48 horas pra fazer a entrega — nossa equipe te comunica certinho."
@@ -1184,8 +1185,29 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
         const autorizado = !pzE[d8x] && (cfgX.modoAberto === true || execTels.some(t => String(t).replace(/\D/g, '').slice(-8) === d8x));
         if (autorizado && acaoAprovada === 'cadastrar_logistica') {
           const ftvChk = (await dbGet('fichas_tv')) || { fichas: [] };
-          const ehTV = (ftvChk.fichas || []).some(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
-          if (ehTV) { /* TV: agendamento é do motorista — não cadastrar na logística ADM */ } else {
+          const fichaTvSrc = (ftvChk.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
+          const ehTV = !!fichaTvSrc;
+          if (ehTV) {
+            // TV: entra na LOGÍSTICA TV em Liberado Coleta — motorista vê e combina o horário
+            const KTV2 = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+            const jaTemTv = ((await dbGet('tv_logistica')) || { fichas: [] }).fichas
+              .some(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x &&
+                !['coleta_efetuada', 'orc_registrado'].includes(f.phase));
+            if (!jaTemTv) {
+              await fetch(`https://reparoeletroadm.com/api/tv-logistica?action=criar&k=${KTV2}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  nome: fichaTvSrc.nome || 'Cliente WhatsApp',
+                  telefone: String(tel).replace(/\D/g, ''),
+                  endereco: fichaTvSrc.endereco || '',
+                  equipamento: fichaTvSrc.equipamento || 'TV',
+                  defeito: fichaTvSrc.defeito || '',
+                  texto: '🤖 Bot: triagem OK. ' + String(acaoMotivo || '').slice(0, 250),
+                }),
+              });
+              await bumpStat('logistica');
+            }
+          } else {
           const fdbX = (await dbGet('fichas_adm')) || { fichas: [] };
           const fichaX = (fdbX.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x && f.status !== 'logistica');
           if (fichaX) {
