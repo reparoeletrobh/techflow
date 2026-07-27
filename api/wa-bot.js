@@ -336,6 +336,31 @@ export default async function handler(req, res) {
       ...(((fdb && fdb.fichas) || []).map(f => Object.assign(f, { _sis: 'adm' }))),
       ...(((fdbTv && fdbTv.fichas) || []).map(f => Object.assign(f, { _sis: 'tv' }))),
     ];
+    // 🩹 AUTOCURA (roda a cada ciclo): fichas presas em "criada" que já deviam ter saído
+    try {
+      let curou = false;
+      for (const f of todasFichas) {
+        const ehCr = !f.status || f.status === 'ficha_criada' || f.status === 'criada';
+        if (!ehCr) continue;
+        const d8c = String(f.telefone || '').replace(/\D/g, '').slice(-8);
+        if (abordados.tels[d8c]) {
+          // já abordada → contato_feito com o horário real da abordagem (regua da 1h arma daqui)
+          f.status = 'contato_feito';
+          f.contatoFeitoEm = f.contatoFeitoEm || abordados.tels[d8c];
+          f.abordadoPorBot = true; curou = true;
+        } else if (ultimaInPor[d8c]) {
+          // cliente já conversa com o bot → contato existe de fato
+          f.status = 'contato_feito';
+          f.contatoFeitoEm = f.contatoFeitoEm || new Date(ultimaInPor[d8c]).toISOString();
+          f.abordadoPorBot = true; curou = true;
+        } else if (emOperacao.has(d8c)) {
+          // operação em andamento → esta ficha é duplicada (estágio mais avançado é o real)
+          f.status = 'duplicada';
+          f.duplicadaEm = new Date().toISOString(); curou = true;
+        }
+      }
+      if (curou) { await dbSet('fichas_adm', fdb); if (fdbTv) await dbSet('fichas_tv', fdbTv); }
+    } catch (e) {}
     const candidatas = todasFichas.filter(f => {
       const idade = agora - new Date(f.criadoEm || 0).getTime();
       const d8 = String(f.telefone || '').replace(/\D/g, '').slice(-8);
@@ -375,11 +400,21 @@ export default async function handler(req, res) {
         disparadas.push({ nome: f.nome, ok: okA });
       } catch (e) { disparadas.push({ nome: f.nome, erro: e.message }); }
     }
-    // Persistir transições de status das fichas abordadas
+    // Persistir transições com RELEITURA (evita a corrida com o polling da tela de fichas)
     try {
       if (disparadas.some(d => d.ok)) {
-        await dbSet('fichas_adm', fdb);
-        if (fdbTv) await dbSet('fichas_tv', fdbTv);
+        const okIds = new Set(candidatas.filter(f => f.status === 'contato_feito').map(f => f.id));
+        const [fdbF, fdbTvF] = await Promise.all([dbGet('fichas_adm'), dbGet('fichas_tv')]);
+        for (const bank of [fdbF, fdbTvF]) {
+          if (!bank || !bank.fichas) continue;
+          for (const ff of bank.fichas) if (okIds.has(ff.id)) {
+            ff.status = 'contato_feito';
+            ff.contatoFeitoEm = ff.contatoFeitoEm || new Date().toISOString();
+            ff.abordadoPorBot = true;
+          }
+        }
+        if (fdbF) await dbSet('fichas_adm', fdbF);
+        if (fdbTvF) await dbSet('fichas_tv', fdbTvF);
       }
     } catch (e) {}
     // Poda do registro (30 dias)
