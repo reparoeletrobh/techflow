@@ -70,10 +70,20 @@ async function contextoCliente(tel) {
       dbGet('reparoeletro_board'), dbGet('reparoeletro_compras_pecas'), dbGet('fichas_tv'),
     ]);
     const bate = (t) => String(t || '').replace(/\D/g, '').endsWith(d8);
-    for (const f of ((fa && fa.fichas) || [])) if (bate(f.telefone)) {
+    let faU = fa, ftvU = ftv;
+    const achou = () => (((faU && faU.fichas) || []).some(f => bate(f.telefone))) || ((((ftvU || {}).fichas) || []).some(f => bate(f.telefone)));
+    if (!achou()) {
+      // cliente sem ficha no banco: pode estar só na planilha — importa na hora e reconsulta
+      try {
+        await fetch(`https://reparoeletroadm.com/api/fichas?action=sync&k=${(process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim()}`);
+        const [fa2, ftv2] = await Promise.all([dbGet('fichas_adm'), dbGet('fichas_tv')]);
+        faU = fa2 || faU; ftvU = ftv2 || ftvU;
+      } catch (e) {}
+    }
+    for (const f of ((faU && faU.fichas) || [])) if (bate(f.telefone)) {
       ctx.fichas.push({ id: f.id, nome: f.nome, status: f.status, equipamento: f.equipamento, defeito: f.defeito });
     }
-    for (const f of (((ftv || {}).fichas) || [])) if (bate(f.telefone)) {
+    for (const f of (((ftvU || {}).fichas) || [])) if (bate(f.telefone)) {
       ctx.fichas.push({ id: f.id, nome: f.nome, status: f.status, equipamento: f.equipamento || 'TV', defeito: f.defeito, sistemaTV: true });
       ctx.clienteTV = true;
     }
@@ -175,9 +185,14 @@ export default async function handler(req, res) {
   }
 
   if (action === 'abordagem-fichas') {
+    // Importa fichas novas da planilha ANTES de tudo (roda mesmo fora do horário — elimina o ponto cego planilha→sistema)
+    try {
+      const KS = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+      await fetch(`https://reparoeletroadm.com/api/fichas?action=sync&k=${KS}`);
+    } catch (e) {}
     const cfgA = (await dbGet('wa_bot_config')) || {};
     if (cfgA.abordagemAtiva !== true) return res.status(200).json({ ok: true, msg: 'abordagem desligada (wa_bot_config.abordagemAtiva)' });
-    if (!dentroHorarioComercial()) return res.status(200).json({ ok: true, msg: 'fora do horário comercial — fichas em standby até a próxima janela' });
+    if (!dentroHorarioComercial()) return res.status(200).json({ ok: true, msg: 'fora do horário comercial — fichas em standby até a próxima janela (planilha importada)' });
     const { token, phoneId } = await credenciais();
     if (!token || !phoneId) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
     const agora = Date.now();
