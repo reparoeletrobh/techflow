@@ -152,6 +152,41 @@ export default async function handler(req, res) {
 
   // ── ABORDAGEM-FICHAS (cron 5min): ficha criada há 5-60min sem conversa iniciada → template cadastro_recebido ──
   // Interruptor: wa_bot_config.abordagemAtiva (false por padrão — ligar quando o número real estiver ativo)
+  // ── 🔍 APROVADOS-DUPLICADOS: aprovado com espelho em aguardando aprovação (GET varre; POST ?limpar=1 arquiva os espelhos) ──
+  if (action === 'aprovados-duplicados') {
+    const pp = (await dbGet('reparoeletro_pipe')) || { cards: [] };
+    const porTel = {};
+    for (const c of (pp.cards || [])) {
+      const d = String(c.telefone || '').replace(/\D/g, '').slice(-8);
+      if (d.length < 8) continue;
+      (porTel[d] = porTel[d] || []).push(c);
+    }
+    const APROVADAS = ['aprovados', 'aprovado', 'producao', 'em_producao', 'conserto_concluido'];
+    const ESPERA = ['aguardando_aprovacao', 'ultima_chamada'];
+    const pares = [];
+    for (const d of Object.keys(porTel)) {
+      const cards = porTel[d];
+      const aprov = cards.find(c => APROVADAS.includes(c.phaseId || c.phase));
+      const espelhos = cards.filter(c => ESPERA.includes(c.phaseId || c.phase));
+      if (aprov && espelhos.length) {
+        for (const e of espelhos) pares.push({ tel: d, nome: e.nomeContato || aprov.nomeContato || '?',
+          aprovadoId: aprov.id, aprovadoFase: aprov.phaseId || aprov.phase,
+          espelhoId: e.id, espelhoFase: e.phaseId || e.phase });
+      }
+    }
+    if (String(req.query.limpar || '') === '1' && pares.length) {
+      const arqL = (await dbGet('pipe_ids_arquivados')) || { ids: [] };
+      const idsRemover = pares.map(p => p.espelhoId);
+      for (const idr of idsRemover) if (!arqL.ids.includes(idr)) arqL.ids.push(idr);
+      await dbSet('pipe_ids_arquivados', arqL);
+      pp.cards = pp.cards.filter(c => !idsRemover.includes(c.id));
+      await dbSet('reparoeletro_pipe', pp);
+      return res.status(200).json({ ok: true, limpos: pares.length, pares });
+    }
+    return res.status(200).json({ ok: true, duplicados: pares.length, pares,
+      dica: pares.length ? 'para arquivar os espelhos: mesmo link com &limpar=1' : 'nenhum espelho encontrado' });
+  }
+
   // ── 💰 ORCAMENTOS-ABERTOS: conversas com orçamento enviado e ainda sem aprovação ──
   if (action === 'orcamentos-abertos') {
     const [logA, tvA, envA] = await Promise.all([
