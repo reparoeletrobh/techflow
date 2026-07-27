@@ -383,14 +383,24 @@ export default async function handler(req, res) {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template',
-            template: { name: 'cadastro_recebido', language: { code: 'pt_BR' },
-              components: [{ type: 'body', parameters: [
-                { type: 'text', text: (f.nome || 'tudo bem').split(' ')[0] },
-                { type: 'text', text: f.equipamento || 'equipamento' },
-              ] }] } }),
+            template: (f._sis === 'tv'
+              ? { name: 'cadastro_recebido_tv', language: { code: 'pt_BR' },
+                  components: [{ type: 'body', parameters: [
+                    { type: 'text', text: (f.nome || 'tudo bem').split(' ')[0] },
+                  ] }] }
+              : { name: 'cadastro_recebido', language: { code: 'pt_BR' },
+                  components: [{ type: 'body', parameters: [
+                    { type: 'text', text: (f.nome || 'tudo bem').split(' ')[0] },
+                    { type: 'text', text: f.equipamento || 'equipamento' },
+                  ] }] }) }),
         });
         const j = await r.json();
         const okA = !!(j.messages && j.messages[0]);
+        if (!okA && f._sis === 'tv') {
+          // template TV ainda não aprovado na Meta → ficha fica na fila (não mandar o texto errado)
+          disparadas.push({ nome: f.nome, ok: false, aviso: 'template cadastro_recebido_tv pendente na Meta — ficha aguardando' });
+          continue;
+        }
         if (okA) {
           try {
             f.status = 'contato_feito';
@@ -399,6 +409,10 @@ export default async function handler(req, res) {
           } catch (e) {}
         }
         abordados.tels[telA.slice(-8)] = new Date().toISOString();
+        if (f._sis === 'tv') {
+          await rpushEvt({ ts: new Date().toISOString(), tel: to, dir: 'out',
+            texto: 'Olá ' + ((f.nome || 'tudo bem').split(' ')[0]) + ', tudo bem? Sou o Alessandro, responsável pela Logística da Reparo Eletro - TVs. Recebemos o seu cadastro para o conserto da sua TV.\n\nPodemos prosseguir com o atendimento?', tipo: 'template' });
+        } else
         await rpushEvt({ ts: new Date().toISOString(), tel: to, dir: 'out',
           texto: 'Olá ' + ((f.nome || 'tudo bem').split(' ')[0]) + ', tudo bem? Alessandro aqui, responsável pela logística da Reparo Eletro. Recebemos o seu cadastro para o conserto do seu ' + (f.equipamento || 'equipamento') + '!\n\nTEMOS 2 OPÇÕES: COLETA E ENTREGA / ATENDIMENTO NO BALCÃO\n\n*ATENÇÃO: Trazendo seu equipamento aqui na loja, o orçamento é gratuito e consertamos em 15 minutos! Estamos na Rua Ouro Preto, 663 - Barro Preto*\n\nCaso prefira a nossa coleta e entrega, podemos buscar hoje mesmo na sua casa!\n\nJá estamos prontos para te atender! Me fala qual opção você escolheu, por favor? 😊', tipo: 'template' });
         if (okA) await bumpStat('abordagens');
