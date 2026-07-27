@@ -287,6 +287,60 @@ module.exports = async function handler(req, res) {
   const { action } = req.query;
 
   // ── GET load ───────────────────────────────────────────────
+  // ── 🔍 ANALISAR COMPROVANTE: IA lê o comprovante (imagem/PDF) e dá o veredito verde/vermelho ──
+  if (req.method === "POST" && action === "analisar-comprovante") {
+    const { id, dataB64, mime } = req.body || {};
+    if (!id || !dataB64) return res.status(400).json({ ok: false, error: "informe id e dataB64" });
+    const AK = (process.env.ANTHROPIC_API_KEY || "").trim();
+    if (!AK) return res.status(200).json({ ok: false, error: "ANTHROPIC_API_KEY não configurada" });
+    const fin = await dbGet(FIN_KEY) || defaultFin();
+    const rec = (fin.records || []).find(r => r.id === id);
+    if (!rec) return res.status(404).json({ ok: false, error: "ficha não encontrada" });
+    const valorEsperado = parseFloat(rec.valor || rec.total || 0) || null;
+    const ehPdf = String(mime || "").includes("pdf");
+    const bloco = ehPdf
+      ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: dataB64 } }
+      : { type: "image", source: { type: "base64", media_type: mime || "image/jpeg", data: dataB64 } };
+    const hoje = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+    const prompt = `Você é o analista antifraude do financeiro de uma assistência técnica. Analise este comprovante de pagamento.
+DADOS DA FICHA: cliente "${rec.nome || rec.cliente || ""}", valor esperado R$ ${valorEsperado != null ? valorEsperado.toFixed(2) : "(não informado)"}. Data de hoje (Brasília): ${hoje}.
+VERIFIQUE COM RIGOR:
+1. É um comprovante de pagamento EFETIVADO? (agendamento, "em processamento", "em análise", simulação ou tela de digitação NÃO valem)
+2. O VALOR bate com o esperado da ficha? (diferença de centavos tolerada)
+3. A DATA/HORA é de hoje ou de ontem? (datas antigas = vermelho)
+4. Sinais de adulteração/fraude: fontes desalinhadas, campos apagados, screenshot recortado suspeito, comprovante genérico da internet.
+Responda APENAS o JSON: {"veredito":"verde"|"vermelho","tipoDocumento":"...","valorLido":number|null,"dataLida":"...","favorecidoLido":"...","motivos":["..."]}
+Regra: "verde" SOMENTE se for pagamento efetivado + valor batendo + data recente + sem sinais de fraude. Qualquer dúvida = "vermelho".`;
+    try {
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "x-api-key": AK, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 600,
+          messages: [{ role: "user", content: [bloco, { type: "text", text: prompt }] }] }),
+      });
+      const j = await resp.json();
+      const txts = ((j && j.content) || []).filter(b => b.type === "text");
+      const texto = (txts.length ? txts[txts.length - 1].text : "") || "";
+      let parsed = null;
+      try { parsed = JSON.parse(texto.replace(/```json|```/g, "").trim()); } catch (e) {}
+      if (!parsed || !parsed.veredito) return res.status(200).json({ ok: false, error: "análise inconclusiva", bruto: texto.slice(0, 200) });
+      rec.comprovanteAnalise = {
+        veredito: parsed.veredito === "verde" ? "verde" : "vermelho",
+        tipoDocumento: String(parsed.tipoDocumento || "").slice(0, 80),
+        valorLido: parsed.valorLido != null ? parsed.valorLido : null,
+        valorEsperado, dataLida: String(parsed.dataLida || "").slice(0, 40),
+        favorecidoLido: String(parsed.favorecidoLido || "").slice(0, 80),
+        motivos: (parsed.motivos || []).slice(0, 5).map(m => String(m).slice(0, 120)),
+        analisadoEm: new Date().toISOString(),
+      };
+      rec.anexo = true; // imagem descartada após análise (Redis enxuto) — fica o parecer completo
+      await dbSet(FIN_KEY, fin);
+      return res.status(200).json({ ok: true, analise: rec.comprovanteAnalise });
+    } catch (e) {
+      return res.status(200).json({ ok: false, error: e.message });
+    }
+  }
+
   if (action === "load") {
     const fin = await dbGet(FIN_KEY) || defaultFin();
     if (!Array.isArray(fin.syncedIds)) fin.syncedIds = [];
