@@ -1084,6 +1084,9 @@ Podemos prosseguir com o atendimento?"
 2d) CLIENTE ESCOLHEU O BALCÃO ("vou levar aí", "prefiro trazer na loja") → confirme com simpatia reforçando endereço e horário da loja E use a ação mover_cliente_loja (no motivo, anote quando o cliente disse que vai — ex: "vem hoje à tarde"). A ficha vai para a seção Cliente Loja da prospecção.
 3) COLETA CONFIRMADA → ação cadastrar_logistica (informe no motivo: imediata ou agendada + dia/período/faixa). O sistema dá baixa na ficha e cria a coleta.
 4) EQUIPAMENTO NA LOJA → diagnóstico → orçamento enviado ao cliente (valor no contexto, em logistica/pipe).
+4-G) GARANTIA — cliente diz que JÁ FEZ serviço com a gente nesse equipamento e o defeito voltou ("tá na garantia", "vocês consertaram e parou de novo", "voltou o problema"): acolha com prioridade — "Sinto muito pelo transtorno! Vou acionar nossa equipe AGORA para cuidar do seu caso com prioridade, tudo bem?" — e use OBRIGATORIAMENTE registrar_conflito (motivo: "possível GARANTIA — [equipamento/relato resumido]"). NÃO cobre nada, NÃO agende coleta normal, NÃO discuta se a garantia é válida: a equipe avalia.
+4-H) DESISTIU ANTES DA COLETA (cancelou/desistiu ANTES de coletarmos — sem orçamento, sem equipamento com a gente): responda cordial deixando a porta aberta — "Sem problema! Qualquer coisa é só chamar, estamos à disposição." — e use mover_entrar_contato (motivo: "desistiu da coleta antes de acontecer — retomar por telefone"). NÃO use registrar_conflito nesse caso: conflito é para equipamento JÁ conosco, garantia ou cliente insatisfeito.
+
 5-FIM) ESGOTOU AS 5 FASES E O CLIENTE MANTEVE A RECUSA (não quer fazer o serviço / quer pagar só o orçamento): responda cordial — "Sem problema! Nossa equipe vai entrar em contato pra combinar a devolução do equipamento e os detalhes, tudo bem?" — e use OBRIGATORIAMENTE a ação registrar_conflito (motivo: "reprovou o orçamento após as 5 fases — finalizar manualmente: taxa R$30 do delivery + devolução"). NÃO cobre você mesmo, NÃO envie dados de pagamento, NÃO combine devolução por conta própria: a finalização é MANUAL da equipe.
 
 5-PRE) OBJEÇÃO "TÁ CARO / NÃO VALE A PENA" — PESQUISA REAL OBRIGATÓRIA:
@@ -1333,12 +1336,20 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
         }
         if (autorizado && acaoAprovada === 'mover_entrar_contato') {
           const fdbE = (await dbGet('fichas_adm')) || { fichas: [] };
-          const fichaE = (fdbE.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x && f.status !== 'logistica');
+          const fichaE = (fdbE.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
           if (fichaE) {
             fichaE.status = 'entrar_contato';
-            fichaE.entrarContatoMotivo = String(acaoMotivo || 'bot: sem faixa de coleta compatível').slice(0, 200);
+            fichaE.entrarContatoMotivo = String(acaoMotivo || 'bot: retomar por telefone').slice(0, 200);
             await dbSet('fichas_adm', fdbE);
             await bumpStat('entrar_contato');
+          }
+          const ftvE = (await dbGet('fichas_tv')) || { fichas: [] };
+          const fichaTvE = (ftvE.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
+          if (fichaTvE) {
+            fichaTvE.status = 'entrar_contato';
+            fichaTvE.entrarContatoMotivo = String(acaoMotivo || 'bot: retomar por telefone').slice(0, 200);
+            await dbSet('fichas_tv', ftvE);
+            if (!fichaE) await bumpStat('entrar_contato');
           }
         }
       } catch (eX) {}
