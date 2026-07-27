@@ -121,18 +121,36 @@ export default async function handler(req, res) {
       // ── Processar apenas linhas após o cursor ──────────────────────────────
       // Pegar só linhas após cursor E com conteúdo real (ignora linhas vazias pré-alocadas)
       // Apenas linhas onde A (telefone) ou B (nome) têm conteúdo
-      const novasRows = rows.slice(cursor.row).filter(r => String(r[0]||'').trim() || String(r[1]||'').trim());
-      if (!novasRows.length) {
+      const dbAdm = (await dbGet(KEY_ADM)) || { fichas:[] };
+      const dbTv  = (await dbGet(KEY_TV))  || { fichas:[] };
+      let novas = 0, resgatadas = 0;
+
+      // Telefones já no sistema (rede de resgate compara por telefone, não por linha)
+      const d8De = t => String(t || '').replace(/\D/g, '').slice(-8);
+      const telsExistentes = new Set(
+        [...dbAdm.fichas, ...dbTv.fichas].map(f => d8De(f.telefone)).filter(x => x.length >= 8));
+
+      // Linhas candidatas: (a) todas após o cursor, com ÍNDICE REAL da planilha;
+      // (b) RESGATE — últimas 40 linhas com dado ANTES do cursor cujo telefone nunca virou ficha
+      const candidatas = [];
+      for (let ri = cursor.row; ri < rows.length; ri++) {
+        if (String(rows[ri][0]||'').trim() || String(rows[ri][1]||'').trim()) candidatas.push({ ri, resgate: false });
+      }
+      let vistasAtras = 0;
+      for (let ri = Math.min(cursor.row, rows.length) - 1; ri >= 1 && vistasAtras < 40; ri--) {
+        const telB = String(rows[ri][0]||'').replace(/\D/g,'').trim();
+        const nomeB = String(rows[ri][1]||'').trim();
+        if (!telB && !nomeB) continue;
+        vistasAtras++;
+        if (telB && d8De(telB).length >= 8 && !telsExistentes.has(d8De(telB))) candidatas.push({ ri, resgate: true });
+      }
+      if (!candidatas.length) {
         return res.status(200).json({ ok:true, novas:0, total });
       }
 
-      const dbAdm = (await dbGet(KEY_ADM)) || { fichas:[] };
-      const dbTv  = (await dbGet(KEY_TV))  || { fichas:[] };
-      let novas = 0;
-
-      for (let i = 0; i < novasRows.length; i++) {
-        const row    = novasRows[i];
-        const rowNum = cursor.row + i + 1;
+      for (const { ri, resgate } of candidatas) {
+        const row    = rows[ri];
+        const rowNum = ri + 1; // linha REAL da planilha
 
         // Estrutura: A=tel, B=nome, C=equip, D=defeito, E=endereço, F=msg, G=horário
         const tel   = String(row[0]||'').replace(/\D/g,'').trim();
@@ -148,6 +166,7 @@ export default async function handler(req, res) {
         const jaExisteSync = dbAdm.fichas.some(f => f.sheetRow === rowNum) ||
                              dbTv.fichas.some(f => f.sheetRow === rowNum);
         if (jaExisteSync) continue;
+        if (tel && telsExistentes.has(d8De(tel))) continue; // telefone já virou ficha (linha renumerada/reimportada)
 
         const sistema = detectSistema(equip);
         const id = `fsh_${rowNum}_${tel.slice(-4)}_${Date.now().toString(36)}`;
@@ -164,15 +183,19 @@ export default async function handler(req, res) {
           logisticaEm: null,
         };
 
+        if (resgate) ficha.resgatada = true;
         if (sistema === 'tv') dbTv.fichas.unshift(ficha);
         else                  dbAdm.fichas.unshift(ficha);
+        if (tel) telsExistentes.add(d8De(tel));
         novas++;
+        if (resgate) resgatadas++;
       }
 
       if (novas > 0) {
         await dbSet(KEY_ADM, dbAdm);
         await dbSet(KEY_TV,  dbTv);
       }
+      if (resgatadas > 0) console.log(`[fichas sync] ${resgatadas} ficha(s) resgatada(s) de linhas atrás do cursor`);
       // Atualizar cursor para última linha com dado (não total pré-alocado)
       let novoUltimo = cursor.row;
       for (let i = rows.length - 1; i >= 1; i--) {
