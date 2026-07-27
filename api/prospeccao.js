@@ -663,6 +663,38 @@ export default async function handler(req,res){
     await dbSet(KEY,db);
     return res.status(200).json({ok:true});
   }
+  // ── 📊 RETORNO DO REMARCAR: quantas coletas solicitadas voltaram (dia/semana, ADM e TV) ──
+  if(action==='retorno-remarcar'){
+    const cont=(await dbGet('prospeccao_retorno_remarcar'))||{dias:{}};
+    const hoje=new Date(Date.now()-3*3600*1000).toISOString().slice(0,10);
+    const d7=new Date(Date.now()-3*3600*1000-6*86400000).toISOString().slice(0,10);
+    const zero={adm:0,tv:0,total:0};
+    const soma=(de)=>{const r={adm:0,tv:0,total:0};
+      for(const d of Object.keys(cont.dias||{})){ if(d<de) continue;
+        r.adm+=(cont.dias[d].adm||0); r.tv+=(cont.dias[d].tv||0); }
+      r.total=r.adm+r.tv; return r;};
+    const hj=cont.dias[hoje]?{adm:cont.dias[hoje].adm||0,tv:cont.dias[hoje].tv||0,total:(cont.dias[hoje].adm||0)+(cont.dias[hoje].tv||0)}:zero;
+    const ultimos=Object.keys(cont.dias||{}).sort().slice(-14).map(d=>({dia:d,adm:cont.dias[d].adm||0,tv:cont.dias[d].tv||0}));
+    return res.status(200).json({ok:true,hoje:hj,semana:soma(d7),porDia:ultimos});
+  }
+
+  // ── 🏅 PONTOS: recuperações de orçamento no Conflitos Bot ──
+  if(action==='pontos'){
+    const pt=(await dbGet('reparoeletro_pontos'))||{pessoas:{}};
+    const hoje=new Date(Date.now()-3*3600*1000).toISOString().slice(0,10);
+    const d7=new Date(Date.now()-3*3600*1000-6*86400000).toISOString().slice(0,10);
+    const rank=Object.keys(pt.pessoas||{}).map(nome=>{
+      const p=pt.pessoas[nome];const h=(p.historico||[]);
+      return {nome,total:p.total||0,
+        pontosHoje:h.filter(x=>String(x.ts).slice(0,10)===hoje).reduce((a,b)=>a+(b.pontos||0),0),
+        pontosSemana:h.filter(x=>String(x.ts).slice(0,10)>=d7).reduce((a,b)=>a+(b.pontos||0),0),
+        recuperacoes:h.length,
+        valorRecuperado:h.reduce((a,b)=>a+(Number(b.valor)||0),0),
+        ultimas:h.slice(0,10)};
+    }).sort((a,b)=>b.total-a.total);
+    return res.status(200).json({ok:true,ranking:rank});
+  }
+
   if(req.method==='POST'&&action==='conflito-aprovar'){
     const {id,valor,pagamento,obs}=req.body||{};
     const db=(await dbGet(KEY))||{fichas:[]};
@@ -682,6 +714,19 @@ export default async function handler(req,res){
     await fetch('https://reparoeletroadm.com/api/pipe?action=mover&k='+KA,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({id:card.id,phase:'aprovados'})});
+    // 🏅 +2 pontos: orçamento teoricamente perdido foi recuperado no Conflitos Bot
+    try{
+      const quem=String((req.body||{}).responsavel||'André').trim().slice(0,30)||'André';
+      const pt=(await dbGet('reparoeletro_pontos'))||{pessoas:{}};
+      if(!pt.pessoas[quem]) pt.pessoas[quem]={total:0,historico:[]};
+      pt.pessoas[quem].total=(pt.pessoas[quem].total||0)+2;
+      pt.pessoas[quem].historico.unshift({ts:new Date().toISOString(),pontos:2,
+        cliente:f.nome||'',telefone:f.telefone||'',valor:v||card.valor||0,
+        eraReprovado:/reprov/i.test(String(f.motivoConflito||'')),
+        motivo:'orçamento recuperado no Conflitos Bot'});
+      pt.pessoas[quem].historico=pt.pessoas[quem].historico.slice(0,300);
+      await dbSet('reparoeletro_pontos',pt);
+    }catch(_){}
     db.fichas=db.fichas.filter(x=>x.id!==id);
     await dbSet(KEY,db);
     return res.status(200).json({ok:true,card:card.id});

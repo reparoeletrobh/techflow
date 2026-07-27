@@ -453,11 +453,21 @@ module.exports = async function handler(req, res) {
     ficha.enviadoProspeccaoEm = now;
     await dbSet(LOG_KEY, db);
 
+    // 📊 Métrica: ficha voltou do REMARCAR para a prospecção (coleta solicitada que não chegou)
+    try {
+      const hojeR = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+      const cont = (await dbGet('prospeccao_retorno_remarcar')) || { dias: {} };
+      if (!cont.dias[hojeR]) cont.dias[hojeR] = { adm: 0, tv: 0 };
+      cont.dias[hojeR].tv = (cont.dias[hojeR].tv || 0) + 1;
+      const corteR = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+      for (const d of Object.keys(cont.dias)) if (d < corteR) delete cont.dias[d];
+      await dbSet('prospeccao_retorno_remarcar', cont);
+    } catch (_) {}
     // 3. Evento para o relatório da prospecção (sistema TV)
     try {
       const U2 = (process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
       const T2 = (process.env.UPSTASH_TOKEN||'').replace(/[\n\r'"]/g,'').trim();
-      const evt = JSON.stringify({ ts: now, tipo: 'entrar_contato', de: null, sis: 'tv', id: nova.id, nome: nova.nome });
+      const evt = JSON.stringify({ ts: now, tipo: 'entrar_contato', de: null, sis: 'tv', origem: 'remarcar', id: nova.id, nome: nova.nome });
       await fetch(`${U2}/rpush/prospeccao_evt_list/${encodeURIComponent(evt)}`, { headers: { Authorization: `Bearer ${T2}` } });
     } catch(_) {}
 

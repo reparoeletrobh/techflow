@@ -129,6 +129,17 @@ export default async function handler(req, res) {
       // Linhas da planilha que JÁ viraram ficha (o dedupe verdadeiro é por LINHA — telefone repete p/ cliente recorrente)
       const rowsExistentes = new Set(
         [...dbAdm.fichas, ...dbTv.fichas].map(f => f.sheetRow).filter(x => x != null));
+      // ASSINATURA da linha (tel+nome+equip): protege contra reimportacao em massa quando os
+      // sheetRow antigos foram gravados com formula diferente (linhas vazias desalinhavam)
+      const assinar = (tel, nome, equip) =>
+        String(tel || '').replace(/\D/g, '').slice(-8) + '|' +
+        String(nome || '').trim().toLowerCase().slice(0, 20) + '|' +
+        String(equip || '').trim().toLowerCase().slice(0, 20);
+      const CORTE_SIG = Date.now() - 60 * 86400000;
+      const assinaturas = new Set(
+        [...dbAdm.fichas, ...dbTv.fichas]
+          .filter(f => new Date(f.criadoEm || 0).getTime() > CORTE_SIG)
+          .map(f => f.sheetSig || assinar(f.telefone, f.nome, f.equipamento)));
 
       // Linhas candidatas: (a) todas após o cursor, com ÍNDICE REAL da planilha;
       // (b) RESGATE — últimas 40 linhas com dado ANTES do cursor cujo telefone nunca virou ficha
@@ -142,7 +153,10 @@ export default async function handler(req, res) {
         const nomeB = String(rows[ri][1]||'').trim();
         if (!telB && !nomeB) continue;
         vistasAtras++;
-        if (!rowsExistentes.has(ri + 1)) candidatas.push({ ri, resgate: true });
+        if (!rowsExistentes.has(ri + 1) &&
+            !assinaturas.has(assinar(rows[ri][0], rows[ri][1], rows[ri][3] || rows[ri][2]))) {
+          candidatas.push({ ri, resgate: true });
+        }
       }
       if (!candidatas.length) {
         return res.status(200).json({ ok:true, novas:0, total });
@@ -171,7 +185,7 @@ export default async function handler(req, res) {
         const id = `fsh_${rowNum}_${tel.slice(-4)}_${Date.now().toString(36)}`;
 
         const ficha = {
-          id, sheetRow: rowNum,
+          id, sheetRow: rowNum, sheetSig: assinar(tel, nome, equip),
           nome, telefone: tel, endereco: end,
           equipamento: equip, defeito: def, horario: hora,
           sistema, waNum: waNum(tel),
@@ -186,6 +200,7 @@ export default async function handler(req, res) {
         if (sistema === 'tv') dbTv.fichas.unshift(ficha);
         else                  dbAdm.fichas.unshift(ficha);
         rowsExistentes.add(rowNum);
+        assinaturas.add(assinar(tel, nome, equip));
         novas++;
         if (resgate) resgatadas++;
       }
@@ -425,6 +440,57 @@ export default async function handler(req, res) {
     const db  = (await dbGet(key)) || { fichas:[] };
     const novas = (db.fichas||[]).filter(f => f.status === 'criada').length;
     return res.status(200).json({ ok:true, novas });
+  }
+
+  // ── DUPLICADAS-RELATORIO: varre "criada" duplicadas (GET lista; &limpar=1 remove) ──
+  if (action === 'duplicadas-relatorio') {
+    const assinar2 = (tel, nome, equip) =>
+      String(tel || '').replace(/\D/g, '').slice(-8) + '|' +
+      String(nome || '').trim().toLowerCase().slice(0, 20) + '|' +
+      String(equip || '').trim().toLowerCase().slice(0, 20);
+    const PESO = { criada: 0, ficha_criada: 0, contato_feito: 2, entrar_contato: 3, cliente_loja: 4, prospeccao: 4, logistica: 5 };
+    const relat = [];
+    const remover = { [KEY_ADM]: [], [KEY_TV]: [] };
+    for (const key of [KEY_ADM, KEY_TV]) {
+      const db = (await dbGet(key)) || { fichas: [] };
+      const grupos = {};
+      for (const f of (db.fichas || [])) {
+        const sig = f.sheetSig || assinar2(f.telefone, f.nome, f.equipamento);
+        (grupos[sig] = grupos[sig] || []).push(f);
+      }
+      for (const sig of Object.keys(grupos)) {
+        const g = grupos[sig];
+        if (g.length < 2) continue;
+        // mantem a de estagio mais avancado; empate -> a mais antiga
+        const ordenado = [...g].sort((a, b) =>
+          (PESO[b.status] || 0) - (PESO[a.status] || 0) ||
+          new Date(a.criadoEm || 0) - new Date(b.criadoEm || 0));
+        const fica = ordenado[0];
+        for (const d of ordenado.slice(1)) {
+          const ehCriada = !d.status || ['criada', 'ficha_criada'].includes(d.status);
+          relat.push({ sistema: key === KEY_ADM ? 'adm' : 'tv', nome: d.nome, telefone: d.telefone,
+            equipamento: d.equipamento, statusDuplicada: d.status || 'criada', sheetRowDuplicada: d.sheetRow,
+            mantida: { id: fica.id, status: fica.status, sheetRow: fica.sheetRow },
+            removivel: ehCriada });
+          if (ehCriada) remover[key].push(d.id);
+        }
+      }
+    }
+    if (String(req.query.limpar || '') === '1') {
+      let total = 0;
+      for (const key of [KEY_ADM, KEY_TV]) {
+        if (!remover[key].length) continue;
+        const db = (await dbGet(key)) || { fichas: [] };
+        const antes = db.fichas.length;
+        db.fichas = db.fichas.filter(f => !remover[key].includes(f.id));
+        total += antes - db.fichas.length;
+        await dbSet(key, db);
+      }
+      return res.status(200).json({ ok: true, removidas: total, relatorio: relat });
+    }
+    return res.status(200).json({ ok: true, duplicadas: relat.length,
+      removiveis: relat.filter(r => r.removivel).length, relatorio: relat.slice(0, 60),
+      dica: 'para eliminar as duplicadas em "criada": mesmo link com &limpar=1' });
   }
 
   // ── LIMPAR-DUPLICATAS: remove fichas com sheetRow repetido ─────────────

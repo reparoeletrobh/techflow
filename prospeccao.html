@@ -429,6 +429,14 @@ async function carregarArvore(){
     var d=await fetch('/api/prospeccao?action=relatorio-arvore&periodo='+_relPer).then(function(r){return r.json();});
     if(!d.ok)throw new Error(d.error||'falha');
     _relArv=d;
+    try{
+      var ex=await Promise.all([
+        fetch('/api/prospeccao?action=retorno-remarcar').then(function(r){return r.json();}).catch(function(){return null;}),
+        fetch('/api/prospeccao?action=pontos').then(function(r){return r.json();}).catch(function(){return null;})
+      ]);
+      window._relRetorno=ex[0]&&ex[0].ok?ex[0]:null;
+      window._relPontos=ex[1]&&ex[1].ok?ex[1]:null;
+    }catch(_){}
     renderArvore();
   }catch(e){
     corpo.innerHTML='<div style="text-align:center;color:#ef4444;font-size:12px;padding:20px;">Erro: '+e.message+'</div>';
@@ -529,7 +537,38 @@ function renderArvore(){
     +'</div>'
   +'</div>';
 
-  var temDados=MATRIZES.some(function(r){return mz[r]&&mz[r].count>0;})||(atv.logistica||0)>0||(atv.frenteloja||0)>0;
+  // ── 🔄 VOLTARAM DO REMARCAR (coleta solicitada que não chegou na loja) ──
+  var rr=window._relRetorno;
+  if(rr){
+    var rHoje=rr.hoje||{adm:0,tv:0,total:0}, rSem=rr.semana||{adm:0,tv:0,total:0};
+    kpiHtml+='<div style="background:linear-gradient(150deg,rgba(249,115,22,.12),rgba(13,16,24,.9));border:1px solid rgba(249,115,22,.5);border-radius:14px;padding:12px;margin-bottom:14px;">'
+      +'<div style="font-size:10px;font-weight:900;color:#fb923c;margin-bottom:8px;">🔄 VOLTARAM DO REMARCAR (coleta solicitada que não chegou)</div>'
+      +'<div style="display:flex;gap:8px;">'
+        +'<div style="flex:1;text-align:center;"><div style="font-size:26px;font-weight:900;color:#fb923c;line-height:1;">'+rHoje.total+'</div>'
+          +'<div style="font-size:9px;color:#c9ced6;font-weight:800;margin-top:4px;">HOJE</div>'
+          +'<div style="font-size:9px;color:#8b93a3;margin-top:2px;">ADM '+rHoje.adm+' · TV '+rHoje.tv+'</div></div>'
+        +'<div style="flex:1;text-align:center;border-left:1px solid rgba(249,115,22,.25);"><div style="font-size:26px;font-weight:900;color:#fdba74;line-height:1;">'+rSem.total+'</div>'
+          +'<div style="font-size:9px;color:#c9ced6;font-weight:800;margin-top:4px;">7 DIAS</div>'
+          +'<div style="font-size:9px;color:#8b93a3;margin-top:2px;">ADM '+rSem.adm+' · TV '+rSem.tv+'</div></div>'
+      +'</div></div>';
+  }
+
+  // ── 🏅 RECUPERAÇÕES NO CONFLITOS BOT (2 pts por orçamento salvo) ──
+  var pp=window._relPontos;
+  if(pp&&pp.ranking&&pp.ranking.length){
+    kpiHtml+='<div style="background:linear-gradient(150deg,rgba(168,85,247,.12),rgba(13,16,24,.9));border:1px solid rgba(168,85,247,.5);border-radius:14px;padding:12px;margin-bottom:14px;">'
+      +'<div style="font-size:10px;font-weight:900;color:#c084fc;margin-bottom:8px;">🏅 RECUPERAÇÕES NO CONFLITOS BOT (2 pts por orçamento salvo)</div>'
+      +pp.ranking.map(function(p){
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-top:1px solid rgba(168,85,247,.15);">'
+          +'<div style="font-size:12px;font-weight:800;color:#e9d5ff;">'+esc(p.nome)+'</div>'
+          +'<div style="text-align:right;"><span style="font-size:17px;font-weight:900;color:#c084fc;">'+p.total+' pts</span>'
+          +'<div style="font-size:9px;color:#8b93a3;">'+p.recuperacoes+' recuperações · R$ '+Number(p.valorRecuperado||0).toFixed(0)+' salvos · hoje +'+p.pontosHoje+'</div></div>'
+        +'</div>';}).join('')
+    +'</div>';
+  }
+
+  var temDados=MATRIZES.some(function(r){return mz[r]&&mz[r].count>0;})||(atv.logistica||0)>0||(atv.frenteloja||0)>0
+    ||(window._relRetorno&&(window._relRetorno.semana||{}).total>0)||(window._relPontos&&(window._relPontos.ranking||[]).length>0);
   if(!temDados){
     corpo.innerHTML=kpiHtml+'<div style="text-align:center;color:#5a6270;font-size:12px;padding:24px;">📭 Nenhuma entrada registrada no período<br><span style="font-size:10px;">(rastreamento de jornadas ativo desde 09/07/26)</span></div>';
     return;
