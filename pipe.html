@@ -366,7 +366,7 @@ function render(){
           '<span class="card-id">'+esc(c.id)+'</span>'+
           pfBadge+
         '</div>'+
-        '<div class="card-nome">'+esc(c.nomeContato)+'</div>'+
+        '<div class="card-nome">'+esc(c.nomeContato)+(c.temComprovante?' <a href="/api/financeiro?action=comprovante&id='+encodeURIComponent(c.id)+'" target="_blank" onclick="event.stopPropagation();" style="text-decoration:none;font-size:12px;" title="Ver comprovante de pagamento">📎</a>':'')+'</div>'+
         (c.telefone ? '<div style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:-2px">📞 '+telHtml(c.telefone)+'</div>' : '')+
         equipHtml+
         descHtml+

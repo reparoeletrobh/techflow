@@ -338,12 +338,33 @@ Regra: "verde" SOMENTE se for pagamento efetivado + valor batendo + data recente
       const recF = (finF.records || []).find(r => r.id === id);
       if (!recF) return res.status(404).json({ ok: false, error: "ficha não encontrada após a análise" });
       recF.comprovanteAnalise = parecer;
-      recF.anexo = true; // imagem descartada após análise (Redis enxuto) — fica o parecer completo
+      recF.anexo = { stored: true, type: ehPdf ? "application/pdf" : (mime || "image/jpeg"), name: "comprovante" + (ehPdf ? ".pdf" : ".jpg") };
       await dbSet(FIN_KEY, finF);
+      // Arquivo persistido em chave própria (não pesa o load do financeiro) — clicável em qualquer fase
+      try {
+        await dbSet("fin_comprovante_" + id, { dataB64, mime: recF.anexo.type, em: new Date().toISOString() });
+      } catch (e) {}
+      // Marca no card do pipe (📎 visível no fluxo inteiro: solicitar entrega → entrega → ERP)
+      try {
+        const ppC = (await dbGet("reparoeletro_pipe")) || { cards: [] };
+        const cardC = (ppC.cards || []).find(c => String(c.id) === String(id) || String(c.pipefyId || "") === String(id));
+        if (cardC) { cardC.temComprovante = true; await dbSet("reparoeletro_pipe", ppC); }
+      } catch (e) {}
       return res.status(200).json({ ok: true, analise: parecer });
     } catch (e) {
       return res.status(200).json({ ok: false, error: e.message });
     }
+  }
+
+  // ── 📎 GET comprovante: abre o arquivo salvo direto no navegador ──
+  if (action === "comprovante") {
+    const idc = String(req.query.id || "");
+    const arq = await dbGet("fin_comprovante_" + idc);
+    if (!arq || !arq.dataB64) return res.status(404).json({ ok: false, error: "comprovante não encontrado" });
+    res.setHeader("Content-Type", arq.mime || "application/octet-stream");
+    res.setHeader("Content-Disposition", "inline");
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    return res.status(200).send(Buffer.from(arq.dataB64, "base64"));
   }
 
   if (action === "load") {

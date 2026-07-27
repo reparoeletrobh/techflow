@@ -618,6 +618,8 @@ function buildActions(r) {
     h += `<button class="btn-primary" style="background:#22c55e;color:#000;" onclick="openMoverModal('${r.id}')">💰 Registrar Pagamento</button>`;
     h += `<button class="btn-primary" style="background:#0ea5e9;color:#fff;" onclick="moverSimples('${r.id}','analise_pagamento','🔍','Enviado para Análise!')">🔍 Analisar Pagamento</button>`;
   }
+  if (r.anexo && r.anexo.stored && r.phaseId!=='analise_pagamento')
+    h += `<button class="btn-primary" style="background:rgba(59,158,255,.12);color:#3b9eff;border:1px solid rgba(59,158,255,.3);margin-bottom:4px;" onclick="verAnexo('${r.id}')">📎 Ver Comprovante</button>`;
   if (r.phaseId==='analise_pagamento') {
     var an = r.comprovanteAnalise;
     if (an) {
@@ -633,6 +635,7 @@ function buildActions(r) {
       📎 Arrasta o comprovante aqui, cola (Ctrl+V) ou toca para escolher<br><span style="font-size:10px;">imagem ou PDF — a IA confere valor, data e sinais de fraude</span>
     </div>
     <input type="file" id="file-${r.id}" accept="image/*,.pdf" style="display:none;" onchange="fileComprovante(this,'${r.id}')">`;
+    if (r.anexo && r.anexo.stored) h += `<button class="btn-primary" style="background:rgba(59,158,255,.12);color:#3b9eff;border:1px solid rgba(59,158,255,.3);margin-bottom:4px;" onclick="verAnexo('${r.id}')">📎 Ver Comprovante</button>`;
     h += `<button class="btn-primary" style="background:#22c55e;color:#000;font-weight:bold;" onclick="moverSimples('${r.id}','pagamento_confirmado','✅','Pagamento Confirmado!')">✅ Pagamento Confirmado</button>`;
   }
   if (r.phaseId==='pagamento_confirmado')
@@ -1008,6 +1011,7 @@ async function moverAnalisePagamento(id) {
 function verAnexo(id) {
   const r = records.find(x=>x.id===id);
   if (!r?.anexo) return;
+  if (r.anexo.stored) { window.open('/api/financeiro?action=comprovante&id='+encodeURIComponent(id), '_blank'); return; }
   const { data, type, name } = r.anexo;
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
