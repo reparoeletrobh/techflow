@@ -324,7 +324,7 @@ Regra: "verde" SOMENTE se for pagamento efetivado + valor batendo + data recente
       let parsed = null;
       try { parsed = JSON.parse(texto.replace(/```json|```/g, "").trim()); } catch (e) {}
       if (!parsed || !parsed.veredito) return res.status(200).json({ ok: false, error: "análise inconclusiva", bruto: texto.slice(0, 200) });
-      rec.comprovanteAnalise = {
+      const parecer = {
         veredito: parsed.veredito === "verde" ? "verde" : "vermelho",
         tipoDocumento: String(parsed.tipoDocumento || "").slice(0, 80),
         valorLido: parsed.valorLido != null ? parsed.valorLido : null,
@@ -333,9 +333,14 @@ Regra: "verde" SOMENTE se for pagamento efetivado + valor batendo + data recente
         motivos: (parsed.motivos || []).slice(0, 5).map(m => String(m).slice(0, 120)),
         analisadoEm: new Date().toISOString(),
       };
-      rec.anexo = true; // imagem descartada após análise (Redis enxuto) — fica o parecer completo
-      await dbSet(FIN_KEY, fin);
-      return res.status(200).json({ ok: true, analise: rec.comprovanteAnalise });
+      // SAVE ATÔMICO: relê o banco AGORA (a IA demorou; o mundo pode ter mudado) e aplica só o parecer
+      const finF = (await dbGet(FIN_KEY)) || defaultFin();
+      const recF = (finF.records || []).find(r => r.id === id);
+      if (!recF) return res.status(404).json({ ok: false, error: "ficha não encontrada após a análise" });
+      recF.comprovanteAnalise = parecer;
+      recF.anexo = true; // imagem descartada após análise (Redis enxuto) — fica o parecer completo
+      await dbSet(FIN_KEY, finF);
+      return res.status(200).json({ ok: true, analise: parecer });
     } catch (e) {
       return res.status(200).json({ ok: false, error: e.message });
     }
