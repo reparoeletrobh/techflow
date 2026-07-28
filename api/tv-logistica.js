@@ -721,11 +721,17 @@ module.exports = async function handler(req, res) {
     const db = await dbGet(LOG_KEY) || defaultDB();
     const f = db.fichas.find(x => x.id === id);
     if (!f || f.phase !== 'motorista_parceiro') return res.status(404).json({ ok: false, error: 'ficha não está na rota' });
+    // guarda QUEM coletou — a coluna Coleta Efetuada perdia essa informação
+    const quemColetou = String((req.body || {}).motorista || f.motoristaNome || f.motorista || '').trim();
+    if (phase === 'coleta_efetuada' && quemColetou) {
+      f.coletadoPor = quemColetou;
+      f.coletadoEm = new Date().toISOString();
+    }
     f.phase = phase;
     f.movedAt = new Date().toISOString();
     await dbSet(LOG_KEY, db);
     registrarPassagem(phase).catch(() => {});
-    logMov(id, f.nome, 'motorista_parceiro', phase, 'motorista/' + String((req.body || {}).motorista || f.motoristaNome || '?')).catch(() => {});
+    logMov(id, f.nome, 'motorista_parceiro', phase, 'motorista/' + (quemColetou || '?')).catch(() => {});
     return res.status(200).json({ ok: true });
   }
 

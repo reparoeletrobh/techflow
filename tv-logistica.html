@@ -692,7 +692,9 @@ function cardHTML(f, phase) {
         <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>
       </div>`;
   } else if (phase === 'motorista_parceiro') {
-    const motorista = f.motoristaNome ? `<div style="font-family:var(--fm);font-size:10px;color:#8b5cf6;margin-bottom:2px;">🏍️ ${escHtml(f.motoristaNome)}</div>` : '';
+    // quem coletou fica visível também depois que a ficha sai da rota
+    const quemMoto = f.coletadoPor || f.motoristaNome;
+    const motorista = quemMoto ? `<div style="font-family:var(--fm);font-size:10px;color:#8b5cf6;margin-bottom:2px;">🏍️ ${escHtml(quemMoto)}${f.coletadoPor && f.phase === 'coleta_efetuada' ? ' · coletou' : ''}</div>` : '';
     btns = motorista + `
       <button class="cbtn-expand" id="btn-x-${f.id}" onclick="toggleExpand('${f.id}')"><em class="chev">▾</em><span> Mais ações</span></button>
       <div class="btns-hidden" id="btns-x-${f.id}">

@@ -473,6 +473,39 @@ export default async function handler(req, res) {
       resultado: saida });
   }
 
+  // ── ✅ APROVADOS-SEM-GATILHO: cliente aprovou na conversa mas o card não avançou ──
+  if (action === 'aprovados-sem-gatilho') {
+    const [evts, ppA, ppT] = await Promise.all([lerEvts(), dbGet('reparoeletro_pipe'), dbGet('tv_pipe')]);
+    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    // quem está parado aguardando decisão
+    const parados = {};
+    for (const [banco, sis] of [[ppA, 'adm'], [ppT, 'tv']]) {
+      for (const c of (((banco || {}).cards) || [])) {
+        if (!['aguardando_aprovacao', 'ultima_chamada'].includes(c.phaseId || c.phase)) continue;
+        const d = d8(c.telefone); if (d.length < 8) continue;
+        parados[d] = { id: c.id, sis, nome: c.nomeContato, equipamento: c.equipamento,
+          valor: c.valor, fase: c.phaseId || c.phase };
+      }
+    }
+    // procurou sinal de aprovação nas mensagens do cliente
+    const SIM = /\b(aprovo|aprovado|pode fazer|pode consertar|pode arrumar|autorizo|fechado|combinado|vamos fazer|manda ver|t[áa] bom pode|beleza pode|sim pode)\b/i;
+    const achados = {};
+    for (const e of evts) {
+      if (e.dir !== 'in' || !e.texto) continue;
+      const d = d8(e.tel); if (!parados[d]) continue;
+      if (!SIM.test(String(e.texto))) continue;
+      achados[d] = { ts: e.ts, texto: String(e.texto).slice(0, 80) };
+    }
+    const lista = Object.keys(achados).map(d => Object.assign({ d8: d,
+      aprovouEm: achados[d].ts, frase: achados[d].texto }, parados[d]))
+      .sort((a, b) => String(a.aprovouEm).localeCompare(String(b.aprovouEm)));
+    return res.status(200).json({ ok: true, total: lista.length,
+      explicacao: 'cliente disse que aprova mas o card segue aguardando — precisa do gatilho de aprovação',
+      lista: lista.map(x => x.nome + ' ' + String(x.id).slice(-4) + ' | ' + (x.equipamento || '') +
+        ' | R$ ' + (x.valor || '?') + ' | "' + x.frase + '" | ' + String(x.aprovouEm).slice(0, 16).replace('T', ' ')),
+      detalhe: lista });
+  }
+
   // ── 🕵️ ABORDAGENS-FANTASMA: marcadas como abordadas sem mensagem no histórico ──
   if (action === 'abordagens-fantasma') {
     const [fA, fT, evtsF, abF] = await Promise.all([
