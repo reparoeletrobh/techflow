@@ -59,6 +59,9 @@ module.exports = async function handler(req, res) {
     metas: { tv: 2, microondas: 5, forno: 5, purificador: 8, adega: 10, institucional: 8, outros: 8 },
     verba: { adm: 5000, tv: 500, aproveitamento: 0.87 },
     cicloInicio: { diaSemana: 6, hora: 13 }, // sábado 13h
+    // Encerramento sábado 11h: limite de CAPACIDADE DE ATENDIMENTO, não de mídia.
+    // As 2h de folga evitam que o lead que chega depois pense que há coleta no mesmo dia.
+    cicloFim: { diaSemana: 6, hora: 11 },
   };
   async function cfgTrafego() {
     const c = (await dbGet('trafego_config')) || {};
@@ -66,6 +69,8 @@ module.exports = async function handler(req, res) {
       metas: Object.assign({}, CFG_PADRAO.metas, c.metas || {}),
       verba: Object.assign({}, CFG_PADRAO.verba, c.verba || {}),
       cicloInicio: Object.assign({}, CFG_PADRAO.cicloInicio, c.cicloInicio || {}),
+      cicloFim: Object.assign({}, CFG_PADRAO.cicloFim, c.cicloFim || {}),
+      modelosFixados: c.modelosFixados || {},
       apelidos: c.apelidos || {},
       custoViagem: c.custoViagem != null ? c.custoViagem : 25,
     };
@@ -113,6 +118,8 @@ module.exports = async function handler(req, res) {
       if (b.metas) atual.metas = Object.assign({}, atual.metas || {}, b.metas);
       if (b.verba) atual.verba = Object.assign({}, atual.verba || {}, b.verba);
       if (b.apelidos) atual.apelidos = Object.assign({}, atual.apelidos || {}, b.apelidos);
+      if (b.modelosFixados) atual.modelosFixados = Object.assign({}, atual.modelosFixados || {}, b.modelosFixados);
+      if (b.ciclo) atual.ciclo = Object.assign({}, atual.ciclo || {}, b.ciclo);
       if (b.custoViagem != null) atual.custoViagem = Number(b.custoViagem);
       await dbSet('trafego_config', atual);
       return res.status(200).json({ ok: true, config: await cfgTrafego() });
@@ -583,6 +590,39 @@ module.exports = async function handler(req, res) {
       fechaConta: saida.every(x => x.confere) };
     try { await dbSet('trafego_inteligencia', dadosI); } catch (e) {}
     return res.status(200).json(dadosI);
+  }
+
+  // ═══ 🏆 MODELOS: o anúncio campeão de cada categoria, pronto para ser clonado ═══
+  if (action === 'modelos') {
+    const cfg = await cfgTrafego();
+    const per = ['hoje', '7d', 'ciclo'].includes(String(req.query.periodo || '')) ? String(req.query.periodo) : '7d';
+    const base = await dbGet('trafego_painel_cache_' + per) || await dbGet('trafego_painel_cache');
+    if (!base || !base.dados) return res.status(200).json({ ok: false, error: 'abra o painel primeiro para carregar os dados' });
+    const ads = (base.dados.anuncios || []).filter(a => a.ativo && a.conversas >= 3 && a.cpa != null);
+    const CATS = ['tv', 'microondas', 'purificador', 'adega', 'institucional', 'forno'];
+    const modelos = {};
+    for (const cat of CATS) {
+      const lista = ads.filter(a => a.categoria === cat)
+        .sort((a, b) => (a.razaoMeta || 9) - (b.razaoMeta || 9));   // mais abaixo da meta primeiro
+      if (!lista.length) { modelos[cat] = null; continue; }
+      const c = lista[0];
+      modelos[cat] = {
+        anuncioId: c.id, nome: c.nome,
+        conjuntoId: c.adsetId, campanhaId: c.campanhaId,
+        cpa: c.cpa, meta: c.meta, conversas: c.conversas, gasto: c.gasto,
+        verbaEm: c.verbaEm, orcamentoTotal: c.orcamentoTotal, orcamentoDiario: c.orcamentoDiario,
+        thumb: c.thumb,
+        porQue: 'melhor custo por conversa da categoria no período (' + c.conversas + ' conversas, ' +
+          Math.round((1 - (c.razaoMeta || 1)) * 100) + '% abaixo da meta)',
+        vice: lista[1] ? { nome: lista[1].nome, cpa: lista[1].cpa, anuncioId: lista[1].id } : null,
+      };
+    }
+    const cfgM = (await dbGet('trafego_config')) || {};
+    return res.status(200).json({ ok: true, periodo: per,
+      criterio: 'anúncio ATIVO com no mínimo 3 conversas e menor custo por conversa em relação à meta da categoria',
+      modelos,
+      modelosFixados: cfgM.modelosFixados || {},
+      comoFixar: 'POST em ?action=config com {"modelosFixados":{"adega":"ID_DO_ANUNCIO"}} para travar um modelo manualmente' });
   }
 
   // ── 🩺 PAINEL-DEBUG: testa cada requisição isoladamente ──
