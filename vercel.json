@@ -91,6 +91,10 @@
     {
       "path": "/api/wa-bot?action=reativar-conversas&k=tfk-re2026-Bx7mQp9zKw4Y",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/trafego?action=inteligencia&recalcular=1&k=tfk-re2026-Bx7mQp9zKw4Y",
+      "schedule": "20 8 * * *"
     }
   ],
   "rewrites": [

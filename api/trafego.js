@@ -420,6 +420,99 @@ Responda APENAS um JSON válido, sem markdown:
     }
   }
 
+  // ═══ 🧠 INTELIGÊNCIA: funil real por categoria (operação + Meta) ═══
+  // Pesado: lê os bancos da operação inteira. Roda 1x/dia por cron e serve snapshot.
+  if (action === 'inteligencia') {
+    const cacheI = await dbGet('trafego_inteligencia');
+    if (cacheI && String(req.query.recalcular || '') !== '1') {
+      return res.status(200).json(Object.assign({ ok: true, doCache: true }, cacheI));
+    }
+    const cfgI = await cfgTrafego();
+    const dias = Math.min(180, Math.max(7, parseInt(req.query.dias || '60', 10)));
+    const corte = Date.now() - dias * 86400000;
+    const dentro = (d) => { const t = new Date(d || 0).getTime(); return t > 0 && t >= corte; };
+
+    const [fAdm, fTv, logA, logT, pipe, pros] = await Promise.all([
+      dbGet('fichas_adm'), dbGet('fichas_tv'),
+      dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+      dbGet('reparoeletro_pipe'), dbGet('prospeccao_adm'),
+    ]);
+    const CATS = ['tv', 'microondas', 'purificador', 'adega', 'outros'];
+    const vazio = () => ({ fichas: 0, emAtendimento: 0, clienteLoja: 0, naLoja: 0, orcados: 0,
+      aprovados: 0, reprovados: 0, faturado: 0, tickets: [] });
+    const f = {}; for (const c of CATS) f[c] = vazio();
+
+    // 1) FICHAS criadas no período (a porta de entrada)
+    for (const fi of [...(((fAdm || {}).fichas) || []), ...(((fTv || {}).fichas) || [])]) {
+      if (!dentro(fi.criadoEm)) continue;
+      const c = categoriaDe(fi.equipamento || '');
+      f[c].fichas++;
+      if (fi.status === 'cliente_loja') { f[c].clienteLoja++; f[c].emAtendimento++; }
+      else if (['logistica', 'prospeccao'].includes(fi.status)) f[c].emAtendimento++;
+    }
+    // 2) LOGÍSTICA: equipamento que realmente chegou
+    const NA_LOJA = ['coleta_efetuada', 'orc_registrado', 'orc_enviado', 'finalizado_rs'];
+    for (const fi of [...(((logA || {}).fichas) || []), ...(((logT || {}).fichas) || [])]) {
+      if (!dentro(fi.criadoEm)) continue;
+      const c = categoriaDe(fi.equipamento || '');
+      if (NA_LOJA.includes(fi.phase)) f[c].naLoja++;
+      if (['orc_registrado', 'orc_enviado'].includes(fi.phase)) f[c].orcados++;
+    }
+    // 3) PIPE: orçados, aprovados (com valor) e reprovados
+    const APROV = ['aprovados', 'video_enviado', 'programar_entrega', 'receber', 'erp', 'finalizado'];
+    const REPROV = ['solicitar_entrega', 'entrega_solicitada', 'descarte'];
+    for (const cd of (((pipe || {}).cards) || [])) {
+      if (!dentro(cd.criadoEm || cd.createdAt || cd.movedAt)) continue;
+      const c = categoriaDe(cd.equipamento || cd.descricao || '');
+      const fase = cd.phaseId || cd.phase;
+      if (['aguardando_aprovacao', 'ultima_chamada'].includes(fase)) f[c].orcados++;
+      if (APROV.includes(fase)) {
+        f[c].aprovados++;
+        const v = parseFloat(cd.valor || 0) || 0;
+        if (v > 0) { f[c].faturado += v; f[c].tickets.push(v); }
+      }
+      if (REPROV.includes(fase)) f[c].reprovados++;
+    }
+    // 4) CONVERSAS dos anúncios (do cache do painel, sem gastar requisição da Meta)
+    const cachePainel = await dbGet('trafego_painel_cache_7d') || await dbGet('trafego_painel_cache');
+    const convPorCat = {}; const gastoPorCat = {};
+    for (const c of CATS) {
+      const pc = ((((cachePainel || {}).dados) || {}).porCategoria || {})[c] || {};
+      convPorCat[c] = pc.conversas || 0; gastoPorCat[c] = pc.gasto || 0;
+    }
+
+    const margem = 1 - 0.125; // peça consome 10-15% → margem de contribuição ~87,5%
+    const custoViagem = Number(cfgI.custoViagem || 25); // coleta + devolução do reprovado
+    const saida = CATS.map(c => {
+      const d = f[c];
+      const ticket = d.tickets.length ? d.tickets.reduce((a, b) => a + b, 0) / d.tickets.length : 0;
+      const taxaFichaLoja = d.fichas ? d.naLoja / d.fichas : null;
+      const taxaAprov = (d.aprovados + d.reprovados) ? d.aprovados / (d.aprovados + d.reprovados) : null;
+      const taxaFichaAprov = d.fichas ? d.aprovados / d.fichas : null;
+      const lucroBruto = ticket * margem;
+      const perdaFracasso = taxaAprov != null ? custoViagem * (1 - taxaAprov) : 0;
+      const lucroPorFicha = taxaFichaAprov != null ? (taxaFichaAprov * lucroBruto) - perdaFracasso : null;
+      return { categoria: c,
+        fichas: d.fichas, clienteLoja: d.clienteLoja, naLoja: d.naLoja,
+        orcados: d.orcados, aprovados: d.aprovados, reprovados: d.reprovados,
+        faturado: Number(d.faturado.toFixed(2)),
+        ticketMedio: Number(ticket.toFixed(2)),
+        taxaFichaLoja: taxaFichaLoja != null ? Number((taxaFichaLoja * 100).toFixed(1)) : null,
+        taxaAprovacao: taxaAprov != null ? Number((taxaAprov * 100).toFixed(1)) : null,
+        taxaFichaAprovacao: taxaFichaAprov != null ? Number((taxaFichaAprov * 100).toFixed(1)) : null,
+        lucroPorFicha: lucroPorFicha != null ? Number(lucroPorFicha.toFixed(2)) : null,
+        conversas7d: convPorCat[c], gasto7d: gastoPorCat[c],
+        metaAtual: cfgI.metas[c] || cfgI.metas.outros,
+        confianca: d.aprovados + d.reprovados >= 20 ? 'boa' : (d.aprovados + d.reprovados >= 8 ? 'fraca' : 'insuficiente'),
+      };
+    });
+    const dadosI = { ok: true, periodoDias: dias, margemUsada: margem, custoViagem,
+      geradoEm: new Date().toISOString(), categorias: saida,
+      nota: 'taxas por coorte de categoria — não ligam conversa individual a venda individual' };
+    try { await dbSet('trafego_inteligencia', dadosI); } catch (e) {}
+    return res.status(200).json(dadosI);
+  }
+
   // ── 🩺 PAINEL-DEBUG: testa cada requisição isoladamente ──
   if (action === 'painel-debug') {
     const tk = `&access_token=${TOKEN}`;

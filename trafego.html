@@ -103,6 +103,7 @@ a.voltar{color:var(--dim);text-decoration:none;font-size:11.5px;font-weight:700;
   <div class="aba on" id="s-anuncios" onclick="secao('anuncios')" style="border-color:#f97316;background:#f9731622;color:#fff;">📊 Anúncios ativos</div>
   <div class="aba" id="s-copiloto" onclick="secao('copiloto')">🧭 Copiloto de terça</div>
   <div class="aba" id="s-analise" onclick="secao('analise')">🔬 Análise &amp; criativos</div>
+  <div class="aba" id="s-inteligencia" onclick="secao('inteligencia')">🧠 Inteligência</div>
 </div>
 <div id="pg-anuncios">
   <div class="abas" id="abas"></div>
@@ -115,6 +116,7 @@ a.voltar{color:var(--dim);text-decoration:none;font-size:11.5px;font-weight:700;
 </div>
 <div id="pg-copiloto" style="display:none;"></div>
 <div id="pg-analise" style="display:none;"></div>
+<div id="pg-inteligencia" style="display:none;"></div>
 
 <div class="rodape">
   <a class="voltar" href="/adm">← Menu</a>
@@ -243,7 +245,7 @@ function render(){
 }
 
 function secao(s){
-  ['anuncios','copiloto','analise'].forEach(function(x){
+  ['anuncios','copiloto','analise','inteligencia'].forEach(function(x){
     document.getElementById('pg-'+x).style.display=x===s?'block':'none';
     var t=document.getElementById('s-'+x);
     if(x===s){t.classList.add('on');t.style.borderColor='#f97316';t.style.background='#f9731622';t.style.color='#fff';}
@@ -251,6 +253,55 @@ function secao(s){
   });
   if(s==='copiloto'&&!window._cop)carregarCopiloto();
   if(s==='analise'&&!window._an)carregarAnalise(false);
+  if(s==='inteligencia'&&!window._int)carregarInteligencia(false);
+}
+
+/* ── 🧠 INTELIGÊNCIA: funil real por categoria ── */
+async function carregarInteligencia(recalcular){
+  var el=document.getElementById('pg-inteligencia');
+  el.innerHTML='<div class="vazio-msg">'+(recalcular?'🧠 Recalculando o funil de toda a operação…':'🧠 Carregando…')+'</div>';
+  var r=await fetch('/api/trafego?action=inteligencia'+(recalcular?'&recalcular=1':'')).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(!r.ok){el.innerHTML='<div class="vazio-msg">Sem dados ainda.<br><br><button class="btn destaque" onclick="carregarInteligencia(true)">🧠 Calcular agora</button></div>';return;}
+  window._int=r;
+  var cats=(r.categorias||[]).filter(function(c){return c.fichas>0;})
+    .sort(function(a,b){return (b.lucroPorFicha||0)-(a.lucroPorFicha||0);});
+  var CONF={boa:['✓ dado sólido','#22c55e'],fraca:['~ amostra pequena','#f59e0b'],insuficiente:['! sem base ainda','#ef4444']};
+  var h='<div style="background:var(--painel);border:1px solid var(--linha);border-radius:12px;padding:11px 13px;margin-bottom:11px;">'
+    +'<div style="font-size:11px;color:var(--dim);line-height:1.55;">Funil real dos últimos <b style="color:#f0f2f5;">'+r.periodoDias+' dias</b>, por categoria. '
+    +'Margem usada: <b style="color:#f0f2f5;">'+Math.round(r.margemUsada*100)+'%</b> · custo de viagem perdida: <b style="color:#f0f2f5;">'+brl(r.custoViagem)+'</b></div></div>';
+
+  h+=cats.map(function(c){
+    var cor=corCat(c.categoria);
+    var cf=CONF[c.confianca]||CONF.insuficiente;
+    var etapa=function(rot,val,pct){
+      return '<div style="flex:1;min-width:70px;"><div style="font-family:var(--mono);font-size:16px;font-weight:700;">'+val+'</div>'
+        +'<div style="font-size:8.5px;color:var(--dim);font-weight:800;letter-spacing:.3px;">'+rot+'</div>'
+        +(pct!=null?'<div style="font-size:9px;color:'+cor+';font-family:var(--mono);">'+pct+'%</div>':'')+'</div>';
+    };
+    return '<div style="background:var(--painel);border:1px solid var(--linha);border-left:3px solid '+cor+';border-radius:12px;padding:12px;margin-bottom:10px;">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;">'
+        +'<b style="font-size:14px;color:'+cor+';">'+esc(CAT_NOME[c.categoria]||c.categoria)+'</b>'
+        +'<span style="font-size:9px;font-weight:800;color:'+cf[1]+';">'+cf[0]+'</span>'
+      +'</div>'
+      +'<div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap;">'
+        +etapa('FICHAS',c.fichas,null)
+        +etapa('NA LOJA',c.naLoja,c.taxaFichaLoja)
+        +etapa('ORÇADOS',c.orcados,null)
+        +etapa('APROVADOS',c.aprovados,c.taxaAprovacao)
+        +etapa('REPROVADOS',c.reprovados,null)
+      +'</div>'
+      +'<div style="display:flex;gap:14px;margin-top:10px;padding-top:9px;border-top:1px solid var(--linha);flex-wrap:wrap;">'
+        +'<div><div style="font-family:var(--mono);font-size:15px;font-weight:700;">'+brl(c.ticketMedio)+'</div><div style="font-size:8.5px;color:var(--dim);font-weight:800;">TICKET MÉDIO</div></div>'
+        +'<div><div style="font-family:var(--mono);font-size:15px;font-weight:700;color:'+((c.lucroPorFicha||0)>0?'#4ade80':'#f87171')+';">'+(c.lucroPorFicha!=null?brl(c.lucroPorFicha):'—')+'</div><div style="font-size:8.5px;color:var(--dim);font-weight:800;">LUCRO POR FICHA</div></div>'
+        +'<div><div style="font-family:var(--mono);font-size:15px;font-weight:700;">'+brl(c.faturado)+'</div><div style="font-size:8.5px;color:var(--dim);font-weight:800;">FATURADO</div></div>'
+      +'</div>'
+      +(c.conversas7d?'<div style="font-size:10px;color:var(--dim);margin-top:8px;font-family:var(--mono);">7 dias de anúncio: '+c.conversas7d+' conversas · '+brl(c.gasto7d)+' · meta atual '+brl(c.metaAtual)+'</div>':'')
+    +'</div>';
+  }).join('');
+  h+='<div style="font-size:10px;color:var(--dim);text-align:center;margin-top:8px;line-height:1.6;">'+esc(r.nota)
+    +'<br>atualizado '+(r.geradoEm?new Date(r.geradoEm).toLocaleString('pt-BR').slice(0,16):'—')
+    +' · <a href="#" onclick="carregarInteligencia(true);return false;" style="color:#60a5fa;">recalcular</a></div>';
+  el.innerHTML=h;
 }
 
 /* ── 🧭 COPILOTO DE TERÇA ── */
