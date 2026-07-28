@@ -9,6 +9,7 @@ async function dbSet(k, v) {
   await fetch(`${U}/set/${k}`, { method: 'POST', headers: { Authorization: `Bearer ${T}`, 'Content-Type': 'application/json' }, body: JSON.stringify(v) });
 }
 const GRAPH = 'https://graph.facebook.com/v20.0';
+function brlS(v) { return 'R$ ' + Number(v || 0).toFixed(2).replace('.', ','); }
 
 // Busca paginada com páginas PEQUENAS (a Meta recusa requisições grandes:
 // "Please reduce the amount of data you're asking for")
@@ -140,16 +141,19 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: false, erro: 'não consegui ler os conjuntos: ' + adsets.erro +
         (/limit reached/i.test(adsets.erro) ? ' — a Meta limitou as consultas por alguns minutos; tente de novo em instantes.' : '') });
     }
-    const ads = await pegarTudo(`${base}ads?fields=id,name,effective_status,adset_id,creative{thumbnail_url}&limit=100${filtroAtivo}${tk}`, 8);
+    const ads = await pegarTudo(`${base}ads?fields=id,name,effective_status,adset_id,campaign_id,creative{thumbnail_url}&limit=100${filtroAtivo}${tk}`, 8);
     if (ads.erro && !ads.data.length) return res.status(200).json({ ok: false, erro: ads.erro });
+    // Verba pode estar na CAMPANHA (CBO) em vez do conjunto — sem isso o Copiloto calcula zero
+    const camps2 = await pegarTudo(`${base}campaigns?fields=id,name,daily_budget,lifetime_budget,effective_status&limit=100${filtroAtivo}${tk}`, 6);
     const ins = await pegarTudo(`${base}insights?level=ad&${janela}&use_unified_attribution_setting=true&fields=ad_id,spend,clicks,ctr,actions&limit=100${tk}`, 8);
-    const camps = { data: [], erro: null };
+    const camps = camps2;
     const porAd = {};
     for (const i of (ins.data || [])) porAd[i.ad_id] = i;
     const porAdset = {};
     for (const a of (adsets.data || [])) porAdset[a.id] = a;
     const porCamp = {};
     for (const c of (camps.data || [])) porCamp[c.id] = c;
+    const cent = v => (Number(v) > 0 ? Number(v) / 100 : null);
 
 
     // Ordem de prioridade REAL: a métrica do Gerenciador é "conversas por mensagem iniciadas"
@@ -201,9 +205,12 @@ module.exports = async function handler(req, res) {
         status: ad.effective_status,
         thumb: (ad.creative || {}).thumbnail_url || null,
         adsetId: ad.adset_id, adsetNome: st.name || '',
-        orcamentoDiario: Number(st.daily_budget) > 0 ? Number(st.daily_budget) / 100 : null,
+        orcamentoDiario: cent(st.daily_budget) || cent((porCamp[ad.campaign_id] || {}).daily_budget),
+        orcamentoTotal: cent(st.lifetime_budget) || cent((porCamp[ad.campaign_id] || {}).lifetime_budget),
+        verbaEm: cent(st.daily_budget) || cent(st.lifetime_budget) ? 'conjunto'
+          : (cent((porCamp[ad.campaign_id] || {}).daily_budget) || cent((porCamp[ad.campaign_id] || {}).lifetime_budget) ? 'campanha' : 'desconhecida'),
+        campanhaId: ad.campaign_id || null,
         terminaEm: st.end_time || null,
-        orcamentoTotal: st.lifetime_budget ? Number(st.lifetime_budget) / 100 : null,
         categoria: cat, meta,
         gasto: Number(gasto.toFixed(2)), conversas, metricaConversa: cv.metrica,
         cpa: cpa != null ? Number(cpa.toFixed(2)) : null,
@@ -278,57 +285,100 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, conta: 'act_' + CONTA, periodo: 'últimos 7 dias', campanhas: resultado });
   }
 
-  // ═══ 🧭 COPILOTO: o que pausar, quanto libera e para quem vai (proporcional ao desempenho) ═══
+  // ═══ 🧭 COPILOTO: oportunidades do dia (o que pausar, o que escalar, onde sobra verba) ═══
   if (action === 'copiloto') {
     const cfg = await cfgTrafego();
-    const base = await dbGet('trafego_painel_cache');
-    if (!base || !base.dados) return res.status(200).json({ ok: false, error: 'abra o painel primeiro para carregar os dados do ciclo' });
+    const per = ['hoje', '7d', 'ciclo'].includes(String(req.query.periodo || '')) ? String(req.query.periodo) : 'ciclo';
+    const base = await dbGet('trafego_painel_cache_' + per) || await dbGet('trafego_painel_cache');
+    if (!base || !base.dados) return res.status(200).json({ ok: false, error: 'abra o painel primeiro para carregar os dados' });
     const ads = (base.dados.anuncios || []).filter(a => a.ativo);
     const diasRestantes = (function () {
       const b = new Date(Date.now() - 3 * 3600 * 1000);
       const faltam = (6 - b.getUTCDay() + 7) % 7;
       return faltam === 0 ? 7 : faltam;
     })();
-    const semanalDe = a => a.orcamentoDiario != null ? a.orcamentoDiario * 7 : (a.orcamentoTotal || 0);
-    // PAUSAR: acima de 30% da meta, ou queimando sem nenhuma conversa
+    // Verba que AINDA seria gasta por este anúncio até o fim do ciclo
+    const verbaRestante = (a) => {
+      if (a.orcamentoTotal) return Math.max(0, a.orcamentoTotal - a.gasto);       // verba total: sobra o que não gastou
+      if (a.orcamentoDiario) return a.orcamentoDiario * diasRestantes;            // verba diária: dias que faltam
+      return null;                                                                // não dá para saber
+    };
+    const semVerbaConhecida = ads.filter(a => verbaRestante(a) == null).length;
+
+    // ── OPORTUNIDADE 1: cortar quem queima acima da meta ──
     const pausar = ads.filter(a => {
-      if (a.conversas === 0 && a.gasto >= (a.meta * 2)) return true;
-      return a.razaoMeta != null && a.razaoMeta > 1.3;
-    }).map(a => ({
-      id: a.id, nome: a.nome, categoria: a.categoria, thumb: a.thumb,
-      cpa: a.cpa, meta: a.meta, gasto: a.gasto, conversas: a.conversas,
-      orcamentoDiario: a.orcamentoDiario, adsetId: a.adsetId,
-      liberaria: Number(Math.max(0, semanalDe(a) - a.gasto).toFixed(2)),
-      motivo: a.conversas === 0 ? 'queimou ' + a.gasto.toFixed(2) + ' sem nenhuma conversa'
-        : 'CPA R$ ' + a.cpa + ' — ' + Math.round((a.razaoMeta - 1) * 100) + '% acima da meta de R$ ' + a.meta,
-    })).sort((x, y) => y.liberaria - x.liberaria);
-    const liberado = Number(pausar.reduce((s, p) => s + p.liberaria, 0).toFixed(2));
-    // REFORÇAR: campeões, peso proporcional ao desempenho (quanto melhor o CPA vs meta, mais peso)
+      if (a.conversas === 0 && a.gasto >= a.meta * 2) return true;
+      return a.razaoMeta != null && a.razaoMeta > 1.3 && a.conversas > 0;
+    }).map(a => {
+      const vr = verbaRestante(a);
+      return { id: a.id, nome: a.nome, categoria: a.categoria, thumb: a.thumb, adsetId: a.adsetId,
+        cpa: a.cpa, meta: a.meta, gasto: a.gasto, conversas: a.conversas,
+        orcamentoDiario: a.orcamentoDiario, verbaEm: a.verbaEm,
+        liberaria: vr != null ? Number(vr.toFixed(2)) : null,
+        motivo: a.conversas === 0
+          ? 'queimou ' + brlS(a.gasto) + ' sem nenhuma conversa'
+          : 'CPA ' + brlS(a.cpa) + ' — ' + Math.round((a.razaoMeta - 1) * 100) + '% acima da meta de ' + brlS(a.meta),
+        desperdicioDiario: (a.cpa != null && a.orcamentoDiario)
+          ? Number((a.orcamentoDiario * (1 - 1 / a.razaoMeta)).toFixed(2)) : null,
+      };
+    }).sort((x, y) => (y.liberaria || 0) - (x.liberaria || 0));
+    const liberado = Number(pausar.reduce((s, p) => s + (p.liberaria || 0), 0).toFixed(2));
+    const liberadoIncerto = pausar.filter(p => p.liberaria == null).length;
+
+    // ── OPORTUNIDADE 2: escalar quem está bem abaixo da meta ──
     const idsPausar = new Set(pausar.map(p => p.id));
-    const campeoes = ads.filter(a => !idsPausar.has(a.id) && a.situacao === 'campeao' && a.conversas > 0);
-    const pesoDe = a => (1 / a.razaoMeta) * Math.log10(10 + a.conversas); // desempenho × consistência
+    const campeoes = ads.filter(a => !idsPausar.has(a.id) && a.situacao === 'campeao' && a.conversas >= 3);
+    const pesoDe = a => (1 / Math.max(0.15, a.razaoMeta)) * Math.log10(10 + a.conversas);
     const somaPeso = campeoes.reduce((s, a) => s + pesoDe(a), 0) || 1;
     const distribuir = campeoes.map(a => {
-      const fatia = Number((liberado * (pesoDe(a) / somaPeso)).toFixed(2));
+      const fatia = liberado > 0 ? Number((liberado * (pesoDe(a) / somaPeso)).toFixed(2)) : 0;
       const diarioExtra = diasRestantes > 0 ? fatia / diasRestantes : 0;
-      return {
-        id: a.id, nome: a.nome, categoria: a.categoria, thumb: a.thumb, adsetId: a.adsetId,
-        cpa: a.cpa, meta: a.meta, conversas: a.conversas,
+      return { id: a.id, nome: a.nome, categoria: a.categoria, thumb: a.thumb, adsetId: a.adsetId,
+        cpa: a.cpa, meta: a.meta, conversas: a.conversas, verbaEm: a.verbaEm,
         pesoPct: Number(((pesoDe(a) / somaPeso) * 100).toFixed(1)),
         receber: fatia,
         orcamentoDiarioAtual: a.orcamentoDiario,
-        orcamentoDiarioNovo: a.orcamentoDiario != null ? Number((a.orcamentoDiario + diarioExtra).toFixed(2)) : Number(diarioExtra.toFixed(2)),
-        conversasEstimadas: a.cpa ? Math.round(fatia / a.cpa) : null,
+        orcamentoDiarioNovo: a.orcamentoDiario != null ? Number((a.orcamentoDiario + diarioExtra).toFixed(2)) : null,
+        conversasEstimadas: (a.cpa && fatia > 0) ? Math.round(fatia / a.cpa) : 0,
       };
-    }).sort((x, y) => y.receber - x.receber);
+    }).sort((x, y) => y.receber - x.receber || (x.cpa || 9e9) - (y.cpa || 9e9));
     const conversasGanhas = distribuir.reduce((s, d) => s + (d.conversasEstimadas || 0), 0);
-    return res.status(200).json({ ok: true,
-      ciclo: base.dados.ciclo, diasRestantes,
-      analisados: ads.length, pausar, liberado, distribuir,
-      resumo: pausar.length
-        ? `Pausando ${pausar.length} anúncio(s) você recupera R$ ${liberado.toFixed(2)}. Redistribuindo entre os ${distribuir.length} campeões, a estimativa é de mais ${conversasGanhas} conversas com a mesma verba.`
-        : 'Nenhum anúncio ativo passou do limite de corte agora — a verba está bem alocada.',
-      conversasEstimadasGanhas: conversasGanhas });
+
+    // ── OPORTUNIDADE 3: sem entrega (ativo e parado) ──
+    const semEntrega = ads.filter(a => a.gasto === 0 && a.cliques === 0)
+      .map(a => ({ id: a.id, nome: a.nome, categoria: a.categoria, thumb: a.thumb }));
+
+    // ── OPORTUNIDADE 4: ritmo da verba do ciclo ──
+    const v = base.dados.verba || {};
+    const ritmo = ['adm', 'tv'].map(k => {
+      const d = v[k] || {};
+      const diasCorridos = Math.max(1, 7 - diasRestantes);
+      const porDia = (d.gasto || 0) / diasCorridos;
+      const projecao = (d.gasto || 0) + porDia * diasRestantes;
+      const sobra = (d.real || 0) - projecao;
+      return { frente: k.toUpperCase(), gasto: d.gasto || 0, verba: d.real || 0,
+        projecao: Number(projecao.toFixed(2)), sobra: Number(sobra.toFixed(2)),
+        alerta: sobra > (d.real || 0) * 0.15 ? 'vai sobrar verba — dinheiro parado é venda perdida'
+          : (sobra < -(d.real || 0) * 0.05 ? 'ritmo acima da verba — vai estourar antes do fim' : 'ritmo saudável') };
+    });
+
+    const oportunidades = [];
+    if (pausar.length) oportunidades.push({ tipo: 'cortar', titulo: pausar.length + ' anúncio(s) acima da meta', impacto: liberado });
+    if (semEntrega.length) oportunidades.push({ tipo: 'sem-entrega', titulo: semEntrega.length + ' ativo(s) sem entrega', impacto: 0 });
+    for (const r of ritmo) if (r.alerta !== 'ritmo saudável') oportunidades.push({ tipo: 'ritmo', titulo: r.frente + ': ' + r.alerta, impacto: Math.abs(r.sobra) });
+
+    let resumo;
+    if (!pausar.length) resumo = 'Nenhum anúncio ativo passou do limite de corte — a verba está bem alocada agora.';
+    else if (liberado > 0) resumo = 'Cortando ' + pausar.length + ' anúncio(s) você recupera ' + brlS(liberado) +
+      (distribuir.length ? '. Redistribuindo entre os ' + distribuir.length + ' campeões, a estimativa é de mais ' + conversasGanhas + ' conversas com a mesma verba.' : '.');
+    else resumo = pausar.length + ' anúncio(s) merecem corte, mas não consegui calcular a verba a recuperar: ' +
+      (semVerbaConhecida ? 'a Meta não expôs o orçamento de ' + semVerbaConhecida + ' anúncio(s) (verba pode estar em nível que o token não lê).' : 'orçamento não informado.') +
+      ' O corte segue valendo pelo desperdício: cada um está pagando acima da meta.';
+
+    return res.status(200).json({ ok: true, periodo: per,
+      ciclo: base.dados.ciclo, diasRestantes, analisados: ads.length,
+      oportunidades, pausar, liberado, liberadoIncerto, semVerbaConhecida,
+      distribuir, semEntrega, ritmo, resumo, conversasEstimadasGanhas: conversasGanhas });
   }
 
   // ── ▶️ APLICAR: executa pausa/verba na Meta (só com confirmação explícita, modo copiloto) ──

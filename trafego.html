@@ -101,7 +101,7 @@ a.voltar{color:var(--dim);text-decoration:none;font-size:11.5px;font-weight:700;
 <div class="termo" id="termo"></div>
 <div class="abas" id="secoes" style="margin-bottom:10px;">
   <div class="aba on" id="s-anuncios" onclick="secao('anuncios')" style="border-color:#f97316;background:#f9731622;color:#fff;">📊 Anúncios ativos</div>
-  <div class="aba" id="s-copiloto" onclick="secao('copiloto')">🧭 Copiloto de terça</div>
+  <div class="aba" id="s-copiloto" onclick="secao('copiloto')">🧭 Copiloto</div>
   <div class="aba" id="s-analise" onclick="secao('analise')">🔬 Análise &amp; criativos</div>
   <div class="aba" id="s-inteligencia" onclick="secao('inteligencia')">🧠 Inteligência</div>
 </div>
@@ -332,28 +332,49 @@ async function carregarCopiloto(){
     +'<div style="font-size:12.5px;line-height:1.55;">'+esc(r.resumo)+'</div>'
     +'<div style="font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:7px;">'+r.analisados+' ativos analisados · faltam '+r.diasRestantes+' dia(s) no ciclo</div>'
   +'</div>';
+  // ritmo da verba
+  (r.ritmo||[]).forEach(function(rt){
+    if(rt.alerta==='ritmo saudável')return;
+    var alta=rt.sobra>0;
+    h+='<div style="background:var(--painel);border:1px solid '+(alta?'rgba(245,158,11,.45)':'rgba(239,68,68,.45)')+';border-radius:12px;padding:10px 12px;margin-bottom:9px;">'
+      +'<div style="font-size:10px;font-weight:900;color:'+(alta?'#f59e0b':'#ef4444')+';">⏱ RITMO '+esc(rt.frente)+'</div>'
+      +'<div style="font-size:12px;margin-top:4px;line-height:1.5;">'+esc(rt.alerta)+'</div>'
+      +'<div style="font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:4px;">gasto '+brl(rt.gasto)+' de '+brl(rt.verba)+' · projeção '+brl(rt.projecao)+'</div>'
+    +'</div>';
+  });
+  if(r.semEntrega&&r.semEntrega.length){
+    h+='<div style="background:var(--painel);border:1px solid var(--linha);border-radius:12px;padding:10px 12px;margin-bottom:9px;">'
+      +'<div style="font-size:10px;font-weight:900;color:#8b93a3;">⚪ '+r.semEntrega.length+' ATIVO(S) SEM ENTREGA</div>'
+      +'<div style="font-size:11px;color:var(--dim);margin-top:4px;line-height:1.5;">'+r.semEntrega.slice(0,6).map(function(s){return esc(s.nome);}).join(' · ')+(r.semEntrega.length>6?' …':'')+'</div>'
+    +'</div>';
+  }
   if(r.pausar.length){
     h+='<div style="font-size:11px;font-weight:900;color:var(--ralo);margin:14px 0 8px;letter-spacing:.5px;">🔴 PAUSAR ('+r.pausar.length+') · libera '+brl(r.liberado)+'</div>';
     h+=r.pausar.map(function(p){
       return '<div class="ad ralo"><div class="thumb'+(p.thumb?'':' vazio')+'">'+(p.thumb?'<img src="'+esc(p.thumb)+'" style="width:100%;height:100%;object-fit:cover;border-radius:9px;">':'🎬')+'</div>'
         +'<div class="corpo"><div class="nome">'+esc(p.nome)+'</div>'
         +'<div style="font-size:11px;color:#fca5a5;margin-top:4px;font-weight:700;">'+esc(p.motivo)+'</div>'
-        +'<div class="metricas"><span>💸 <b>'+brl(p.gasto)+'</b></span><span>💬 <b>'+p.conversas+'</b></span><span style="color:var(--campeao);">↩ libera <b>'+brl(p.liberaria)+'</b></span></div>'
+        +'<div class="metricas"><span>💸 <b>'+brl(p.gasto)+'</b></span><span>💬 <b>'+p.conversas+'</b></span>'
+          +(p.liberaria!=null?'<span style="color:var(--campeao);">↩ libera <b>'+brl(p.liberaria)+'</b></span>'
+            :'<span style="color:#8b93a3;">verba não informada pela Meta</span>')
+          +(p.desperdicioDiario?'<span style="color:#f87171;">🔥 <b>'+brl(p.desperdicioDiario)+'</b>/dia desperdiçado</span>':'')+'</div>'
         +'</div></div>';
     }).join('');
   }
   if(r.distribuir.length){
-    h+='<div style="font-size:11px;font-weight:900;color:var(--campeao);margin:16px 0 8px;letter-spacing:.5px;">🟢 REFORÇAR ('+r.distribuir.length+') · proporcional ao desempenho</div>';
-    h+=r.distribuir.filter(function(d){return d.receber>0;}).map(function(d){
+    h+='<div style="font-size:11px;font-weight:900;color:var(--campeao);margin:16px 0 8px;letter-spacing:.5px;">🟢 CANDIDATOS A REFORÇO ('+r.distribuir.length+')'+(r.liberado>0?' · proporcional ao desempenho':' · sem verba liberada, mas são os que merecem mais')+'</div>';
+    h+=r.distribuir.slice(0,10).map(function(d){
       return '<div class="ad campeao"><div class="thumb'+(d.thumb?'':' vazio')+'">'+(d.thumb?'<img src="'+esc(d.thumb)+'" style="width:100%;height:100%;object-fit:cover;border-radius:9px;">':'🎬')+'</div>'
         +'<div class="corpo"><div class="nome">'+esc(d.nome)+'</div>'
-        +'<div style="display:flex;align-items:baseline;gap:6px;margin-top:5px;"><span class="cpa" style="color:var(--campeao);font-size:17px;">+'+brl(d.receber)+'</span><span class="cpa-rot">'+d.pesoPct+'% DA VERBA</span></div>'
+        +'<div style="display:flex;align-items:baseline;gap:6px;margin-top:5px;">'
+          +(d.receber>0?'<span class="cpa" style="color:var(--campeao);font-size:17px;">+'+brl(d.receber)+'</span><span class="cpa-rot">'+d.pesoPct+'% DA VERBA</span>'
+            :'<span class="cpa" style="color:var(--campeao);font-size:17px;">'+brl(d.cpa)+'</span><span class="cpa-rot">POR CONVERSA · META '+brl(d.meta)+'</span>')+'</div>'
         +'<div class="metricas"><span>CPA <b>'+brl(d.cpa)+'</b></span>'
           +(d.orcamentoDiarioAtual!=null?'<span>📅 <b>'+brl(d.orcamentoDiarioAtual)+'</b> → <b style="color:#4ade80;">'+brl(d.orcamentoDiarioNovo)+'</b>/dia</span>':'')
           +(d.conversasEstimadas?'<span style="color:#4ade80;">≈ +<b>'+d.conversasEstimadas+'</b> conversas</span>':'')+'</div>'
         +'</div></div>';
     }).join('');
-    h+='<button class="btn destaque" style="width:100%;margin-top:12px;padding:13px;font-size:13px;" onclick="aplicarCopiloto()">▶️ Aplicar na Meta (pausar '+r.pausar.length+' e realocar '+brl(r.liberado)+')</button>'
+    h+='<button class="btn destaque" style="width:100%;margin-top:12px;padding:13px;font-size:13px;" onclick="aplicarCopiloto()">▶️ Aplicar na Meta (pausar '+r.pausar.length+(r.liberado>0?' e realocar '+brl(r.liberado):'')+')</button>'
       +'<div style="font-size:10px;color:var(--dim);text-align:center;margin-top:6px;">nada é alterado sem você confirmar</div>';
   }
   el.innerHTML=h;
