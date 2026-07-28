@@ -61,6 +61,52 @@ const FASE_TECNICO_LBL = {
   entrega_realizada: 'entregue', coleta_solicitada: 'coleta a caminho', erp: 'finalizado (registro)',
 };
 
+// ═══ FONTE ÚNICA DA VERDADE: orçamento que NÓS enviamos e que não aprovou nem virou Conflitos Bot.
+// O painel de Orçamentos e o motor de reativação usam exatamente esta lista.
+async function orcamentosEmAberto() {
+  const [logA, tvA, envA, pipeA, pipeT, pros] = await Promise.all([
+    dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+    dbGet('wa_orc_enviados').then(v => v || { ids: {} }),
+    dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('prospeccao_adm'),
+  ]);
+  const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+  // SAÍDAS: aprovou (avançou no pipe) ou virou Conflitos Bot
+  const APROVOU = ['aprovados', 'video_enviado', 'analise_compra', 'equipamento_comprado',
+    'programar_entrega', 'solicitar_entrega', 'entrega_solicitada', 'rota_em_andamento',
+    'receber', 'erp', 'finalizado', 'descarte', 'garantia'];
+  const saiu = new Set();
+  for (const c of [...(((pipeA || {}).cards) || []), ...(((pipeT || {}).cards) || [])]) {
+    if (APROVOU.includes(c.phaseId || c.phase)) { const d = d8(c.telefone); if (d.length >= 8) saiu.add(d); }
+  }
+  for (const f of (((pros || {}).fichas) || [])) {
+    if (f.status === 'conflitos_bot') { const d = d8(f.telefone); if (d.length >= 8) saiu.add(d); }
+  }
+  const abertos = []; const vistos = new Set();
+  const juntar = (f, sis, quando) => {
+    const d = d8(f.telefone);
+    if (d.length < 8 || saiu.has(d) || vistos.has(d)) return;
+    vistos.add(d);
+    const ts = quando ? new Date(quando).getTime() : 0;
+    abertos.push({ fichaId: f.id, sis, tel: String(f.telefone || '').replace(/\D/g, ''), d8: d,
+      nome: f.nome || 'Cliente', equipamento: f.equipamento || '',
+      enviadoEm: quando || null,
+      horasParado: ts ? Number(((Date.now() - ts) / 3600000).toFixed(1)) : null });
+  };
+  for (const f of (((logA || {}).fichas) || [])) {
+    if (!['orc_registrado', 'orc_enviado'].includes(f.phase)) continue;
+    if (!envA.ids[f.id]) continue;                       // só o que O BOT enviou
+    juntar(f, 'adm', envA.ids[f.id]);
+  }
+  for (const f of (((tvA || {}).fichas) || [])) {
+    if (!['orc_registrado', 'orc_enviado'].includes(f.phase)) continue;
+    const q = envA.ids['tv:' + f.id] || envA.ids[f.id];
+    if (!q) continue;
+    juntar(f, 'tv', q);
+  }
+  abertos.sort((a, b) => (b.horasParado || 0) - (a.horasParado || 0));
+  return abertos;
+}
+
 async function contextoCliente(tel) {
   const d8 = String(tel).replace(/\D/g, '').slice(-8);
   const ctx = { fichas: [], logistica: [], pipe: [], tecnico: [], pecas: [] };
@@ -188,58 +234,11 @@ export default async function handler(req, res) {
   }
 
   // ── 💰 ORCAMENTOS-ABERTOS: conversas com orçamento enviado e ainda sem aprovação ──
-  // ── 💰 ORÇAMENTOS-ABERTOS: contagem VIVA — entrou em orçamento e ainda não saiu ──
-  // Sai quando: aprovou (pipe avançou) OU virou Conflitos Bot. Enquanto isso, fica aqui.
+  // ── 💰 ORÇAMENTOS-ABERTOS: o limbo da negociação (mesma lista que a reativação usa) ──
   if (action === 'orcamentos-abertos') {
-    const [logA, tvA, envA, pipeA, pipeT, pros] = await Promise.all([
-      dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
-      dbGet('wa_orc_enviados').then(v => v || { ids: {} }),
-      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('prospeccao_adm'),
-    ]);
-    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
-    // Quem JÁ SAIU: aprovou/avançou no pipe, ou está em Conflitos Bot
-    const APROVOU = ['aprovados', 'video_enviado', 'analise_compra', 'equipamento_comprado',
-      'programar_entrega', 'solicitar_entrega', 'entrega_solicitada', 'rota_em_andamento',
-      'receber', 'erp', 'finalizado', 'descarte', 'garantia'];
-    const saiu = new Set();
-    for (const c of [...(((pipeA || {}).cards) || []), ...(((pipeT || {}).cards) || [])]) {
-      const fase = c.phaseId || c.phase;
-      if (APROVOU.includes(fase)) { const d = d8(c.telefone); if (d.length >= 8) saiu.add(d); }
-    }
-    for (const f of (((pros || {}).fichas) || [])) {
-      if (f.status === 'conflitos_bot') { const d = d8(f.telefone); if (d.length >= 8) saiu.add(d); }
-    }
-    // Quem ESTÁ EM ORÇAMENTO agora
-    const abertos = [];
-    const vistos = new Set();
-    const registra = (tel, nome, sis, quando, onde, equipamento, valor) => {
-      const d = d8(tel);
-      if (d.length < 8 || saiu.has(d) || vistos.has(d)) return;
-      vistos.add(d);
-      const ts = quando ? new Date(quando).getTime() : 0;
-      abertos.push({ tel: String(tel || '').replace(/\D/g, ''), nome: nome || 'Cliente', sis, onde,
-        equipamento: equipamento || '', valor: valor || null,
-        enviadoEm: quando || null,
-        horasParado: ts ? Number(((Date.now() - ts) / 3600000).toFixed(1)) : null });
-    };
-    // SOMENTE orçamentos que O BOT enviou (registro wa_orc_enviados) e que seguem sem desfecho.
-    // Orçamento enviado por humano/outro canal NÃO entra aqui.
-    for (const f of (((logA || {}).fichas) || [])) {
-      if (!['orc_registrado', 'orc_enviado'].includes(f.phase)) continue;
-      if (!envA.ids[f.id]) continue;
-      registra(f.telefone, f.nome, 'adm', envA.ids[f.id], 'aguardando resposta', f.equipamento);
-    }
-    for (const f of (((tvA || {}).fichas) || [])) {
-      if (!['orc_registrado', 'orc_enviado'].includes(f.phase)) continue;
-      const quando = envA.ids['tv:' + f.id] || envA.ids[f.id];
-      if (!quando) continue;
-      registra(f.telefone, f.nome, 'tv', quando, 'aguardando resposta', f.equipamento);
-    }
-    abertos.sort((a, b) => (b.horasParado || 0) - (a.horasParado || 0));
-    const valorEmJogo = abertos.reduce((s, a) => s + (a.valor || 0), 0);
+    const abertos = await orcamentosEmAberto();
     return res.status(200).json({ ok: true, total: abertos.length,
-      valorEmJogo: Number(valorEmJogo.toFixed(2)),
-      porOnde: abertos.reduce((o, a) => { o[a.onde] = (o[a.onde] || 0) + 1; return o; }, {}),
+      porSistema: abertos.reduce((o, a) => { o[a.sis] = (o[a.sis] || 0) + 1; return o; }, {}),
       abertos });
   }
 
@@ -303,9 +302,8 @@ export default async function handler(req, res) {
     const { token, phoneId } = await credenciais();
     if (!token || !phoneId) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
 
-    const [logR, tvLogR, evtsR, reatR] = await Promise.all([
-      dbGet('reparoeletro_logistica'), dbGet('tv_logistica'), lerEvts(),
-      dbGet('wa_reativacao').then(v => v || { alvos: {} }),
+    const [evtsR, reatR] = await Promise.all([
+      lerEvts(), dbGet('wa_reativacao').then(v => v || { alvos: {} }),
     ]);
     // Última mensagem do CLIENTE e último toque nosso, por telefone
     const ultimaIn = {}, ultimaOut = {};
@@ -316,11 +314,9 @@ export default async function handler(req, res) {
       if (e.dir === 'in' && (!ultimaIn[d8e] || t > ultimaIn[d8e])) ultimaIn[d8e] = t;
       if (e.dir === 'out' && (!ultimaOut[d8e] || t > ultimaOut[d8e])) ultimaOut[d8e] = t;
     }
-    // Alvos: quem tem orçamento na mesa e ainda não decidiu
-    const alvos = [
-      ...(((logR || {}).fichas) || []).filter(f => ['orc_registrado', 'orc_enviado'].includes(f.phase)).map(f => ({ f, sis: 'adm' })),
-      ...(((tvLogR || {}).fichas) || []).filter(f => ['orc_registrado', 'orc_enviado'].includes(f.phase)).map(f => ({ f, sis: 'tv' })),
-    ];
+    // ALVOS = exatamente o filtro de Orçamentos: recebeu o nosso orçamento, não aprovou, não virou conflito
+    const abertosR = await orcamentosEmAberto();
+    const alvos = abertosR.map(a => ({ f: { id: a.fichaId, telefone: a.tel, nome: a.nome, equipamento: a.equipamento, orcEnviadoEm: a.enviadoEm }, sis: a.sis }));
     const ESCADA = [
       { h: 6,  txt: (n, eq) => `Oi ${n}! Conseguiu dar uma olhada no orçamento do seu ${eq}? Qualquer dúvida sobre o serviço eu te explico, é só me chamar 😊` },
       { h: 24, txt: (n) => `${n}, uma condição que costuma ajudar: pagando no Pix a gente consegue um valor melhor pra você. Quer que eu veja isso?` },
@@ -332,24 +328,11 @@ export default async function handler(req, res) {
     const TETO_CICLO = Math.min(10, Math.max(1, parseInt(cfgR.reativacaoTeto || 5, 10)));
     // TRAVA: só reativa quem O BOT atendeu (tem conversa) E para quem O BOT enviou o orçamento.
     // Sem isso o motor escrevia para clientes que nunca falaram com o bot.
-    const enviadosR = (await dbGet('wa_orc_enviados')) || { ids: {} };
-    const teveConversa = new Set();
-    for (const e of evtsR) {
-      if (e.dir !== 'in') continue;
-      const d = String(e.tel || '').replace(/\D/g, '').slice(-8);
-      if (d.length >= 8) teveConversa.add(d);
-    }
     const pulados = [];
     for (const { f, sis } of alvos) {
       const d8r = String(f.telefone || '').replace(/\D/g, '').slice(-8);
       if (d8r.length < 8) continue;
       const chave = (sis === 'tv' ? 'tv:' : '') + f.id;
-      if (!enviadosR.ids[chave] && !enviadosR.ids[f.id]) {
-        pulados.push({ nome: f.nome, motivo: 'orçamento não foi enviado pelo bot' }); continue;
-      }
-      if (!teveConversa.has(d8r)) {
-        pulados.push({ nome: f.nome, motivo: 'cliente nunca conversou com o bot' }); continue;
-      }
       const st = reatR.alvos[chave] || { toques: 0, ultimo: 0 };
       // Cliente respondeu DEPOIS do nosso último toque? negociação viva — reseta o relógio, não incomoda
       if (ultimaIn[d8r] && ultimaIn[d8r] > (st.ultimo || 0) && agoraR - ultimaIn[d8r] < 6 * 3600000) continue;
