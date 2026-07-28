@@ -486,46 +486,60 @@ Responda APENAS um JSON válido, sem markdown:
     const corte = Date.now() - dias * 86400000;
     const dentro = (d) => { const t = new Date(d || 0).getTime(); return t > 0 && t >= corte; };
 
-    const [fAdm, fTv, logA, logT, pipe, pros] = await Promise.all([
+    const [fAdm, fTv, logA, logT, pipe, pipeTv] = await Promise.all([
       dbGet('fichas_adm'), dbGet('fichas_tv'),
       dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
-      dbGet('reparoeletro_pipe'), dbGet('prospeccao_adm'),
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
     ]);
     const CATS = ['tv', 'microondas', 'purificador', 'adega', 'outros'];
-    const vazio = () => ({ fichas: 0, emAtendimento: 0, clienteLoja: 0, naLoja: 0, orcados: 0,
-      aprovados: 0, reprovados: 0, faturado: 0, tickets: [] });
+    const vazio = () => ({ entradas: 0, clienteLoja: 0, naLoja: 0,
+      orcados: 0, aprovados: 0, reprovados: 0, negociando: 0, faturado: 0, tickets: [] });
     const f = {}; for (const c of CATS) f[c] = vazio();
 
-    // 1) FICHAS criadas no período (a porta de entrada)
-    for (const fi of [...(((fAdm || {}).fichas) || []), ...(((fTv || {}).fichas) || [])]) {
-      if (!dentro(fi.criadoEm)) continue;
-      const c = categoriaDe(fi.equipamento || '');
-      f[c].fichas++;
-      if (fi.status === 'cliente_loja') { f[c].clienteLoja++; f[c].emAtendimento++; }
-      else if (['logistica', 'prospeccao'].includes(fi.status)) f[c].emAtendimento++;
-    }
-    // 2) LOGÍSTICA: equipamento que realmente chegou
+    // ═══ ENTRADA (coorte da logística): equipamentos que entraram no processo ═══
     const NA_LOJA = ['coleta_efetuada', 'orc_registrado', 'orc_enviado', 'finalizado_rs'];
     for (const fi of [...(((logA || {}).fichas) || []), ...(((logT || {}).fichas) || [])]) {
       if (!dentro(fi.criadoEm)) continue;
       const c = categoriaDe(fi.equipamento || '');
+      f[c].entradas++;
       if (NA_LOJA.includes(fi.phase)) f[c].naLoja++;
-      if (['orc_registrado', 'orc_enviado'].includes(fi.phase)) f[c].orcados++;
     }
-    // 3) PIPE: orçados, aprovados (com valor) e reprovados
-    const APROV = ['aprovados', 'video_enviado', 'programar_entrega', 'receber', 'erp', 'finalizado'];
-    const REPROV = ['solicitar_entrega', 'entrega_solicitada', 'descarte'];
-    for (const cd of (((pipe || {}).cards) || [])) {
+    // Cliente Loja: também é entrada (o cliente traz o equipamento) e também veio de conversa
+    for (const fi of [...(((fAdm || {}).fichas) || []), ...(((fTv || {}).fichas) || [])]) {
+      if (!dentro(fi.criadoEm)) continue;
+      if (fi.status !== 'cliente_loja') continue;
+      const c = categoriaDe(fi.equipamento || '');
+      f[c].entradas++; f[c].clienteLoja++; f[c].naLoja++;
+    }
+
+    // ═══ DESFECHO (coorte do pipe ADM + TV): quem recebeu orçamento e o que aconteceu ═══
+    // Regra: conta cada card UMA vez pelo ponto MAIS AVANÇADO que alcançou (usa o histórico de fases)
+    const APROV = ['aprovados', 'video_enviado', 'analise_compra', 'equipamento_comprado',
+                   'programar_entrega', 'receber', 'erp', 'finalizado', 'garantia'];
+    const REPROV = ['solicitar_entrega', 'entrega_solicitada', 'rota_em_andamento', 'descarte'];
+    const NEGOC = ['aguardando_aprovacao', 'ultima_chamada'];
+    const fasesDoCard = (cd) => {
+      const hist = (cd.history || []).map(x => x.phaseId || x.phase).filter(Boolean);
+      return new Set([...hist, cd.phaseId || cd.phase].filter(Boolean));
+    };
+    for (const cd of [...(((pipe || {}).cards) || []), ...(((pipeTv || {}).cards) || [])]) {
       if (!dentro(cd.criadoEm || cd.createdAt || cd.movedAt)) continue;
-      const c = categoriaDe(cd.equipamento || cd.descricao || '');
-      const fase = cd.phaseId || cd.phase;
-      if (['aguardando_aprovacao', 'ultima_chamada'].includes(fase)) f[c].orcados++;
-      if (APROV.includes(fase)) {
+      const fases = fasesDoCard(cd);
+      // só entra na conta quem chegou a receber orçamento
+      const recebeuOrc = [...NEGOC, ...APROV, ...REPROV].some(p => fases.has(p));
+      if (!recebeuOrc) continue;
+      const c = categoriaDe(cd.equipamento || cd.descricao || cd.nomeContato || '');
+      f[c].orcados++;
+      const aprovou = APROV.some(p => fases.has(p));
+      if (aprovou) {
         f[c].aprovados++;
         const v = parseFloat(cd.valor || 0) || 0;
         if (v > 0) { f[c].faturado += v; f[c].tickets.push(v); }
+      } else if (REPROV.some(p => fases.has(p))) {
+        f[c].reprovados++;
+      } else {
+        f[c].negociando++;
       }
-      if (REPROV.includes(fase)) f[c].reprovados++;
     }
     // 4) CONVERSAS dos anúncios (do cache do painel, sem gastar requisição da Meta)
     const cachePainel = await dbGet('trafego_painel_cache_7d') || await dbGet('trafego_painel_cache');
@@ -540,29 +554,33 @@ Responda APENAS um JSON válido, sem markdown:
     const saida = CATS.map(c => {
       const d = f[c];
       const ticket = d.tickets.length ? d.tickets.reduce((a, b) => a + b, 0) / d.tickets.length : 0;
-      const taxaFichaLoja = d.fichas ? d.naLoja / d.fichas : null;
-      const taxaAprov = (d.aprovados + d.reprovados) ? d.aprovados / (d.aprovados + d.reprovados) : null;
-      const taxaFichaAprov = d.fichas ? d.aprovados / d.fichas : null;
+      const decididos = d.aprovados + d.reprovados;             // quem já respondeu ao orçamento
+      const taxaAprov = decididos ? d.aprovados / decididos : null;
+      const taxaEntradaLoja = d.entradas ? d.naLoja / d.entradas : null;
       const lucroBruto = ticket * margem;
-      const perdaFracasso = taxaAprov != null ? custoViagem * (1 - taxaAprov) : 0;
-      const lucroPorFicha = taxaFichaAprov != null ? (taxaFichaAprov * lucroBruto) - perdaFracasso : null;
+      // lucro esperado de CADA orçamento enviado (já desconta a viagem perdida de quem reprova)
+      const lucroPorOrcamento = taxaAprov != null
+        ? (taxaAprov * lucroBruto) - (custoViagem * (1 - taxaAprov)) : null;
       return { categoria: c,
-        fichas: d.fichas, clienteLoja: d.clienteLoja, naLoja: d.naLoja,
-        orcados: d.orcados, aprovados: d.aprovados, reprovados: d.reprovados,
+        entradas: d.entradas, clienteLoja: d.clienteLoja, naLoja: d.naLoja,
+        orcados: d.orcados, aprovados: d.aprovados, reprovados: d.reprovados, negociando: d.negociando,
         faturado: Number(d.faturado.toFixed(2)),
         ticketMedio: Number(ticket.toFixed(2)),
-        taxaFichaLoja: taxaFichaLoja != null ? Number((taxaFichaLoja * 100).toFixed(1)) : null,
+        comValor: d.tickets.length,
+        taxaEntradaLoja: taxaEntradaLoja != null ? Number((taxaEntradaLoja * 100).toFixed(1)) : null,
         taxaAprovacao: taxaAprov != null ? Number((taxaAprov * 100).toFixed(1)) : null,
-        taxaFichaAprovacao: taxaFichaAprov != null ? Number((taxaFichaAprov * 100).toFixed(1)) : null,
-        lucroPorFicha: lucroPorFicha != null ? Number(lucroPorFicha.toFixed(2)) : null,
+        lucroPorOrcamento: lucroPorOrcamento != null ? Number(lucroPorOrcamento.toFixed(2)) : null,
         conversas7d: convPorCat[c], gasto7d: gastoPorCat[c],
         metaAtual: cfgI.metas[c] || cfgI.metas.outros,
-        confianca: d.aprovados + d.reprovados >= 20 ? 'boa' : (d.aprovados + d.reprovados >= 8 ? 'fraca' : 'insuficiente'),
+        confianca: decididos >= 20 ? 'boa' : (decididos >= 8 ? 'fraca' : 'insuficiente'),
+        // prova aritmética: tem que fechar sempre
+        confere: (d.aprovados + d.reprovados + d.negociando) === d.orcados,
       };
     });
     const dadosI = { ok: true, periodoDias: dias, margemUsada: margem, custoViagem,
       geradoEm: new Date().toISOString(), categorias: saida,
-      nota: 'taxas por coorte de categoria — não ligam conversa individual a venda individual' };
+      nota: 'ENTRADAS vêm da logística + cliente loja; ORÇADOS/APROVADOS vêm do pipe ADM e TV, contando cada card uma vez pelo ponto mais avançado que alcançou. São populações distintas — a taxa de aprovação é confiável; a razão entre elas é aproximada.',
+      fechaConta: saida.every(x => x.confere) };
     try { await dbSet('trafego_inteligencia', dadosI); } catch (e) {}
     return res.status(200).json(dadosI);
   }

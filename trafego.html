@@ -267,11 +267,11 @@ async function carregarInteligencia(recalcular){
     return;
   }
   window._int=r;
-  var cats=(r.categorias||[]).filter(function(c){return c.fichas>0;})
-    .sort(function(a,b){return (b.lucroPorFicha||0)-(a.lucroPorFicha||0);});
+  var cats=(r.categorias||[]).filter(function(c){return (c.entradas||0)>0||(c.orcados||0)>0;})
+    .sort(function(a,b){return (b.lucroPorOrcamento||0)-(a.lucroPorOrcamento||0);});
   var topo='<button class="btn destaque" style="width:100%;padding:11px;margin-bottom:11px;font-size:12.5px;" onclick="carregarInteligencia(true)">🔄 Recalcular agora</button>';
   if(!cats.length){
-    el.innerHTML=topo+'<div class="vazio-msg">Nenhuma ficha encontrada nos últimos '+(r.periodoDias||60)+' dias.<br>'
+    el.innerHTML=topo+'<div class="vazio-msg">Nenhum movimento encontrado nos últimos '+(r.periodoDias||60)+' dias.<br>'
       +'<span style="font-size:11px;">Se a operação teve movimento nesse período, toca em Recalcular agora — o cálculo diário ainda pode não ter rodado.</span></div>';
     return;
   }
@@ -293,16 +293,23 @@ async function carregarInteligencia(recalcular){
         +'<b style="font-size:14px;color:'+cor+';">'+esc(CAT_NOME[c.categoria]||c.categoria)+'</b>'
         +'<span style="font-size:9px;font-weight:800;color:'+cf[1]+';">'+cf[0]+'</span>'
       +'</div>'
-      +'<div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap;">'
-        +etapa('FICHAS',c.fichas,null)
-        +etapa('NA LOJA',c.naLoja,c.taxaFichaLoja)
+      +'<div style="font-size:8.5px;color:var(--dim);font-weight:800;margin-top:9px;letter-spacing:.4px;">ENTRADA (logística + cliente loja)</div>'
+      +'<div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;">'
+        +etapa('ENTRARAM',c.entradas,null)
+        +etapa('NA LOJA',c.naLoja,c.taxaEntradaLoja)
+        +etapa('BALCÃO',c.clienteLoja,null)
+      +'</div>'
+      +'<div style="font-size:8.5px;color:var(--dim);font-weight:800;margin-top:10px;letter-spacing:.4px;">DESFECHO DO ORÇAMENTO'
+        +(c.confere?'':' <span style="color:#ef4444;">⚠ não fecha</span>')+'</div>'
+      +'<div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;">'
         +etapa('ORÇADOS',c.orcados,null)
         +etapa('APROVADOS',c.aprovados,c.taxaAprovacao)
         +etapa('REPROVADOS',c.reprovados,null)
+        +etapa('NEGOCIANDO',c.negociando,null)
       +'</div>'
       +'<div style="display:flex;gap:14px;margin-top:10px;padding-top:9px;border-top:1px solid var(--linha);flex-wrap:wrap;">'
         +'<div><div style="font-family:var(--mono);font-size:15px;font-weight:700;">'+brl(c.ticketMedio)+'</div><div style="font-size:8.5px;color:var(--dim);font-weight:800;">TICKET MÉDIO</div></div>'
-        +'<div><div style="font-family:var(--mono);font-size:15px;font-weight:700;color:'+((c.lucroPorFicha||0)>0?'#4ade80':'#f87171')+';">'+(c.lucroPorFicha!=null?brl(c.lucroPorFicha):'—')+'</div><div style="font-size:8.5px;color:var(--dim);font-weight:800;">LUCRO POR FICHA</div></div>'
+        +'<div><div style="font-family:var(--mono);font-size:15px;font-weight:700;color:'+((c.lucroPorOrcamento||0)>0?'#4ade80':'#f87171')+';">'+(c.lucroPorOrcamento!=null?brl(c.lucroPorOrcamento):'—')+'</div><div style="font-size:8.5px;color:var(--dim);font-weight:800;">LUCRO POR ORÇAMENTO</div></div>'
         +'<div><div style="font-family:var(--mono);font-size:15px;font-weight:700;">'+brl(c.faturado)+'</div><div style="font-size:8.5px;color:var(--dim);font-weight:800;">FATURADO</div></div>'
       +'</div>'
       +(c.conversas7d?'<div style="font-size:10px;color:var(--dim);margin-top:8px;font-family:var(--mono);">7 dias de anúncio: '+c.conversas7d+' conversas · '+brl(c.gasto7d)+' · meta atual '+brl(c.metaAtual)+'</div>':'')
