@@ -801,6 +801,7 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
       return /\brs\b|\br\.s\b|garantia|reprovad/.test(txt);
     };
     let excluidosRsGarantia = 0;
+    let naoVendidos = 0;
     const FASES_VALEM = ['finalizado', 'erp'];
     for (const [banco, sis] of [[ppA, 'adm'], [ppT, 'tv']]) {
       for (const c of (((banco || {}).cards) || [])) {
@@ -831,8 +832,12 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
         if (!(valor > 0)) continue;
         if (ehExcluido(c)) { excluidosRsGarantia++; continue; }
         const fase = String(c.phaseId || c.phase || '');
-        // no arquivo, tudo que chegou lá já concluiu — mas ainda tiramos o que não vale
-        if (fase && ['descarte', 'reprovado', 'garantia'].includes(fase)) { excluidosRsGarantia++; continue; }
+        // 🚫 SÓ VENDA: no arquivo entram cards de todas as fases, inclusive última chamada e
+        // aguardando aprovação (orçamento sem decisão). Vale apenas finalizado/ERP ou quem passou por ERP.
+        const ehVenda = FASES_VALEM.includes(fase)
+          || ['entrega_liberada', 'entrega_agendada', 'entrega_realizada', 'equip_retirado', 'pagamento_confirmado'].includes(fase)
+          || passouPorErp(c);
+        if (!ehVenda) { naoVendidos++; continue; }
         // ⚠️ arquivadoEm NÃO serve como data do serviço: arquivamos em lote esta semana,
         // o que traria serviços antigos para dentro da janela. Vale a data real de conclusão.
         const quando = c.finalizadoEm || c.pagoEm || quandoErp(c) || c.movedAt || c.criadoEm || c.createdAt;
@@ -900,6 +905,7 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
       linhas, semCategoria,
       criterioFaturamento: 'FINALIZADO + ERP, excluindo tudo que tenha RS, garantia ou reprovado no nome/descrição (regra do dono); fontes: pipe ADM, pipe TV, board ADM, board TV e metaLog de ERP, com dedupe',
       excluidosRsGarantia,
+      descartadosSemVenda: naoVendidos,
       fontes: porFonte,
       amostraPorFonte: amostras,
       totalContado: contados.size,
