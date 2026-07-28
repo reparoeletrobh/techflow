@@ -395,12 +395,45 @@ export default async function handler(req,res){
       if(d.length>=8&&tels.has(d)){removidas.push({nome:f.nome,telefone:f.telefone,status:f.status});return false;}
       return true;
     });
-    if(String(req.query.aplicar||'')==='1'&&removidas.length){
-      db.fichas=restantes;await dbSet(KEY,db);
-      return res.status(200).json({ok:true,removidas:removidas.length,antes,depois:restantes.length,lista:removidas.slice(0,40)});
+    // 🚫 DESATIVADO: comparar por telefone marcava ficha VIVA (cliente recorrente / duplicada
+    // do mesmo numero) para exclusao — 20 das 31 estavam em logistica, com equipamento na loja.
+    if(String(req.query.aplicar||'')==='1'){
+      return res.status(400).json({ok:false,error:'execução desativada — a comparação por telefone removia fichas em atendimento'});
     }
     return res.status(200).json({ok:true,reapareceram:removidas.length,lista:removidas.slice(0,40),
       dica:'para remover: mesmo link com &aplicar=1'});
+  }
+
+  // ── 🔎 RASTREAR: onde este telefone aparece em toda a operação (investigação) ──
+  if(action==='rastrear'){
+    const alvo=String(req.query.tel||'').replace(/\D/g,'').slice(-8);
+    if(alvo.length<8)return res.status(400).json({ok:false,error:'informe ?tel= com pelo menos 8 dígitos'});
+    const bate=t=>String(t||'').replace(/\D/g,'').slice(-8)===alvo;
+    const [pros,fA,fT,lgA,lgT,ppA,exc]=await Promise.all([
+      dbGet(KEY),dbGet('fichas_adm'),dbGet('fichas_tv'),
+      dbGet('reparoeletro_logistica'),dbGet('tv_logistica'),
+      dbGet('reparoeletro_pipe'),dbGet('prospeccao_excluidos')]);
+    const achados=[];
+    const varre=(nome,arr,campos)=>{
+      for(const x of (arr||[])){
+        if(!bate(x.telefone))continue;
+        achados.push(Object.assign({onde:nome,id:x.id},campos(x)));
+      }
+    };
+    varre('prospecção',((pros||{}).fichas),x=>({nome:x.nome,equipamento:x.equipamento,status:x.status,criadoEm:x.criadoEm,sheetRow:x.sheetRow}));
+    varre('fichas ADM',((fA||{}).fichas),x=>({nome:x.nome,equipamento:x.equipamento,status:x.status,criadoEm:x.criadoEm,sheetRow:x.sheetRow}));
+    varre('fichas TV',((fT||{}).fichas),x=>({nome:x.nome,equipamento:x.equipamento,status:x.status,criadoEm:x.criadoEm,sheetRow:x.sheetRow}));
+    varre('logística ADM',((lgA||{}).fichas),x=>({nome:x.nome,equipamento:x.equipamento,fase:x.phase,criadoEm:x.criadoEm}));
+    varre('logística TV',((lgT||{}).fichas),x=>({nome:x.nome,equipamento:x.equipamento,fase:x.phase,criadoEm:x.criadoEm}));
+    for(const c of (((ppA||{}).cards)||[])){
+      if(!bate(c.telefone))continue;
+      achados.push({onde:'pipe ADM',id:c.id,nome:c.nomeContato,equipamento:c.equipamento,fase:c.phaseId||c.phase,criadoEm:c.criadoEm||c.movedAt});
+    }
+    const tomb=Object.keys(((exc||{}).tels)||{}).filter(t=>String(t).replace(/\D/g,'').slice(-8)===alvo)
+      .map(t=>({chave:t,excluidoEm:exc.tels[t]}));
+    achados.sort((a,b)=>String(a.criadoEm||'').localeCompare(String(b.criadoEm||'')));
+    return res.status(200).json({ok:true,telefone:alvo,ocorrencias:achados.length,
+      registrosDeExclusao:tomb,linhaDoTempo:achados});
   }
 
   if(req.method==='POST'&&action==='excluir'){
