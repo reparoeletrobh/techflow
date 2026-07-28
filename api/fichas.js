@@ -639,14 +639,26 @@ export default async function handler(req, res) {
         clienteRespondeu: respondeu ? new Date(recebidas[d]).toISOString() : null });
     }
     const conta = p => linhas.filter(l => l.diagnostico.startsWith(p)).length;
+    const resumo = {
+      totalPlanilha: linhas.length,
+      abordadoEResponde: conta('🟢'),
+      abordadoSemResposta: conta('🟡'),
+      avancouSemBotFalar: conta('🔵'),
+      semMensagemDoBot: linhas.filter(l => l.diagnostico.includes('SEM MENSAGEM')).length,
+      naoEntrouNoSistema: linhas.filter(l => l.diagnostico.includes('NÃO ENTROU')).length,
+    };
+    // ?curto=1 → só o essencial, uma linha por caso (cabe no chat)
+    if (String(req.query.curto || '') === '1') {
+      const compacta = l => l.nome + ' ' + l.telefone.slice(-4) + ' | ' + l.equipamento.slice(0, 22) +
+        ' | ' + l.horario.slice(-5) + ' | ' + l.diagnostico +
+        (l.ondeEsta.length ? ' | ' + l.ondeEsta[0] : '');
+      return res.status(200).json({ ok: true, dia: dias === 0 ? hojeBrt : 'últimos ' + dias + ' dias',
+        resumo,
+        problemas: linhas.filter(l => l.diagnostico.startsWith('🔴')).map(compacta),
+        avancouSemBot: linhas.filter(l => l.diagnostico.startsWith('🔵')).map(compacta) });
+    }
     return res.status(200).json({ ok: true, dia: dias === 0 ? hojeBrt : 'últimos ' + dias + ' dias',
-      totalNaPlanilha: linhas.length,
-      resumo: {
-        abordadoEResponde: conta('🟢'),
-        abordadoSemResposta: conta('🟡'),
-        avancouSemBot: conta('🔵'),
-        problema: conta('🔴'),
-      },
+      resumo,
       problemas: linhas.filter(l => l.diagnostico.startsWith('🔴')),
       todas: linhas });
   }
