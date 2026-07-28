@@ -55,7 +55,7 @@ module.exports = async function handler(req, res) {
 
   // ═══ CONFIG: metas de custo por conversa e verba semanal ═══
   const CFG_PADRAO = {
-    metas: { tv: 2, microondas: 5, purificador: 8, adega: 10, outros: 8 },
+    metas: { tv: 2, microondas: 5, forno: 5, purificador: 8, adega: 10, outros: 8 },
     verba: { adm: 5000, tv: 500, aproveitamento: 0.87 },
     cicloInicio: { diaSemana: 6, hora: 13 }, // sábado 13h
   };
@@ -77,8 +77,9 @@ module.exports = async function handler(req, res) {
     for (const termo of Object.keys(APELIDOS)) {         // o que você ensinou vem primeiro
       if (termo && s.includes(termo)) return APELIDOS[termo];
     }
-    if (/\btvs?\b|televis|barramento|tela quebrad|quebrar tv/.test(s)) return 'tv';
+    if (/tvs?\b|\btvs?\d|televis|barramento|tela quebrad|quebrar tv|polegada/.test(s)) return 'tv';
     if (/micro-?\s?ondas|reforma/.test(s)) return 'microondas';
+    if (/\bforn(o|inho)/.test(s)) return 'forno';
     if (/purificador|bebedouro|\bfiltro\b|vela|[áa]gua/.test(s)) return 'purificador';
     if (/adega|cervejeir|climatiz|vinho/.test(s)) return 'adega';
     return 'outros';
@@ -218,7 +219,7 @@ module.exports = async function handler(req, res) {
     const realAdm = cfg.verba.adm * cfg.verba.aproveitamento;
     const realTv = cfg.verba.tv * cfg.verba.aproveitamento;
     const porCategoria = {};
-    for (const c of ['tv', 'microondas', 'purificador', 'adega', 'outros']) {
+    for (const c of ['tv', 'microondas', 'forno', 'purificador', 'adega', 'outros']) {
       const lista = anuncios.filter(a => a.categoria === c && a.ativo);
       const gc = lista.reduce((s, a) => s + a.gasto, 0);
       const cc = lista.reduce((s, a) => s + a.conversas, 0);
@@ -442,17 +443,26 @@ Responda APENAS um JSON válido, sem markdown:
       if (categoriaDe(a.nome) === 'outros') contaAnuncio[a.nome] = (contaAnuncio[a.nome] || 0) + 1;
     }
     const corte90 = Date.now() - 90 * 86400000;
-    for (const fi of [...(((fA || {}).fichas) || []), ...(((fT || {}).fichas) || []),
-                      ...(((lgA || {}).fichas) || []), ...(((lgT || {}).fichas) || [])]) {
-      if (new Date(fi.criadoEm || 0).getTime() < corte90) continue;
-      const eq = String(fi.equipamento || '').trim();
-      if (!eq) { contaEquip['(equipamento em branco)'] = (contaEquip['(equipamento em branco)'] || 0) + 1; continue; }
-      if (categoriaDe(eq) === 'outros') contaEquip[eq] = (contaEquip[eq] || 0) + 1;
+    const brancosPorBanco = {};
+    const bancos = [['fichas_adm', fA], ['fichas_tv', fT], ['logistica_adm', lgA], ['logistica_tv', lgT]];
+    for (const [nomeBanco, banco] of bancos) {
+      for (const fi of (((banco || {}).fichas) || [])) {
+        if (new Date(fi.criadoEm || 0).getTime() < corte90) continue;
+        const eq = String(fi.equipamento || '').trim();
+        if (!eq) {
+          contaEquip['(equipamento em branco)'] = (contaEquip['(equipamento em branco)'] || 0) + 1;
+          brancosPorBanco[nomeBanco] = (brancosPorBanco[nomeBanco] || 0) + 1;
+          continue;
+        }
+        if (categoriaDe(eq) === 'outros') contaEquip[eq] = (contaEquip[eq] || 0) + 1;
+      }
     }
     const ordena = o => Object.keys(o).map(k => ({ nome: k, vezes: o[k] })).sort((a, b) => b.vezes - a.vezes).slice(0, 40);
     const cfgN = await cfgTrafego();
     return res.status(200).json({ ok: true,
       apelidosAtivos: cfgN.apelidos,
+      anunciosLidosDoCache: ((((cacheP || {}).dados) || {}).anuncios || []).length,
+      brancosPorBanco,
       anunciosSemCategoria: ordena(contaAnuncio),
       equipamentosSemCategoria: ordena(contaEquip),
       comoEnsinar: 'POST em ?action=config com {"apelidos":{"vitrine opa":"purificador","gabriel":"microondas"}} — o termo é procurado dentro do nome, em minúsculas' });
@@ -491,7 +501,7 @@ Responda APENAS um JSON válido, sem markdown:
       dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
       dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
     ]);
-    const CATS = ['tv', 'microondas', 'purificador', 'adega', 'outros'];
+    const CATS = ['tv', 'microondas', 'forno', 'purificador', 'adega', 'outros'];
     const vazio = () => ({ entradas: 0, clienteLoja: 0, naLoja: 0,
       orcados: 0, aprovados: 0, reprovados: 0, negociando: 0, faturado: 0, tickets: [] });
     const f = {}; for (const c of CATS) f[c] = vazio();
