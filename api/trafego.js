@@ -754,7 +754,10 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
     const faturado = {}; const detalhe = {}; let faturadoTotal = 0; let semCategoria = 0;
     const contados = new Set();
     const assinaturas = new Set();
+    const porFonte = {};
+    const amostras = {};
     const registrar = (chave, cat, valor, obj) => {
+      const fonte = String(chave).split(':')[0];
       if (contados.has(chave)) return;                 // dedupe por identificador
       // dedupe por ASSINATURA: o mesmo serviço aparece no pipe, no board e no arquivo com ids diferentes
       if (obj) {
@@ -766,6 +769,17 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
         }
       }
       contados.add(chave);
+      if (!porFonte[fonte]) porFonte[fonte] = { itens: 0, valor: 0, semTelefone: 0 };
+      porFonte[fonte].itens++;
+      porFonte[fonte].valor = Number((porFonte[fonte].valor + valor).toFixed(2));
+      if (!String((obj || {}).telefone || (obj || {}).tel || '').replace(/\D/g, '').slice(-8)) porFonte[fonte].semTelefone++;
+      if (!amostras[fonte]) amostras[fonte] = [];
+      if (amostras[fonte].length < 3) amostras[fonte].push({
+        nome: (obj || {}).nomeContato || (obj || {}).nome || (obj || {}).title || '',
+        equip: (obj || {}).equipamento || (obj || {}).descricao || '',
+        tel: (obj || {}).telefone || (obj || {}).tel || '(sem)',
+        valor, fase: (obj || {}).phaseId || (obj || {}).phase || '',
+        data: (obj || {}).finalizadoEm || (obj || {}).movedAt || (obj || {}).criadoEm || '' });
       faturado[cat] = (faturado[cat] || 0) + valor;
       detalhe[cat] = (detalhe[cat] || 0) + 1;
       faturadoTotal += valor;
@@ -886,7 +900,9 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
       linhas, semCategoria,
       criterioFaturamento: 'FINALIZADO + ERP, excluindo tudo que tenha RS, garantia ou reprovado no nome/descrição (regra do dono); fontes: pipe ADM, pipe TV, board ADM, board TV e metaLog de ERP, com dedupe',
       excluidosRsGarantia,
-      fontes: { pipeAdmTv: contados.size, vendasContadas: Object.values(detalhe).reduce((a, b) => a + b, 0) },
+      fontes: porFonte,
+      amostraPorFonte: amostras,
+      totalContado: contados.size,
       alerta: 'investimento vem da Meta por nome do anúncio; faturamento vem do financeiro por equipamento — categorias mal nomeadas nos dois lados distorcem o ROAS' };
     try { await dbSet('trafego_roas', saida); } catch (e) {}
     return res.status(200).json(Object.assign({ ok: true }, saida));
