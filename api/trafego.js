@@ -380,6 +380,11 @@ module.exports = async function handler(req, res) {
     const totalAdm = admPlanos.reduce((s, p) => s + p.verbaAlocada, 0) || 1;
     for (const p of admPlanos) p.fatiaDaVerbaAdm = Number((p.verbaAlocada / totalAdm * 100).toFixed(1));
 
+    const globalAtivos = ads.length;
+    const globalAlocado = Number(ads.reduce((s, a) => s + (verbaTotalDe(a) || 0), 0).toFixed(2));
+    const globalGasto = Number(ads.reduce((s, a) => s + a.gasto, 0).toFixed(2));
+    const globalRestante = Number(ads.reduce((s, a) => s + (restanteDe(a) || 0), 0).toFixed(2));
+    const globalConversas = ads.reduce((s, a) => s + a.conversas, 0);
     const totalCortes = planos.reduce((s, p) => s + p.cortar.length, 0);
     const totalLibera = Number(planos.reduce((s, p) => s + p.libera, 0).toFixed(2));
     const totalGanho = planos.reduce((s, p) => s + p.ganhoEstimado, 0);
@@ -389,6 +394,11 @@ module.exports = async function handler(req, res) {
       : 'Nenhum criativo ativo passou do limite de corte agora.';
 
     return res.status(200).json({ ok: true, periodo: per, diasRestantes,
+      ciclo: base.dados.ciclo,
+      global: { ativos: globalAtivos, alocado: globalAlocado, gasto: globalGasto,
+        restante: globalRestante, conversas: globalConversas,
+        cpaMedio: globalConversas > 0 ? Number((globalGasto / globalConversas).toFixed(2)) : null,
+        percentualGasto: globalAlocado > 0 ? Number((globalGasto / globalAlocado * 100).toFixed(1)) : null },
       verba: base.dados.verba, planos, totalCortes, totalLibera, totalGanho, resumo,
       regra: 'a verba de um criativo perdedor vai para os campeões da MESMA categoria; TV é frente própria e não troca verba com as demais' });
   }
