@@ -1082,10 +1082,22 @@ export default async function handler(req, res) {
     const relatorio = [];
     for (const card of achados) {
       const boardPid = card.pipefyId ? String(card.pipefyId) : ('LOCAL-' + card.id);
-      const noBoard = boardR.cards.some(c => c.pipefyId === boardPid || c.osCode === card.id);
+      const cardBoard = boardR.cards.find(c => c.pipefyId === boardPid || c.osCode === card.id);
+      const noBoard = !!cardBoard;
+      // a tela do técnico só exibe estas fases — se estiver em outra, some da lista
+      const FASES_VISIVEIS = ['aprovado', 'producao', 'cliente_loja'];
       const item = { id: card.id, nome: card.nomeContato, telefone: card.telefone,
         equipamento: card.equipamento, fase: card.phaseId || card.phase,
-        jaNoBoardTecnico: noBoard, acoes: [] };
+        jaNoBoardTecnico: noBoard,
+        faseNoBoard: cardBoard ? (cardBoard.phaseId || null) : null,
+        visivelNaTelaDoTecnico: cardBoard ? FASES_VISIVEIS.includes(cardBoard.phaseId) : false,
+        acoes: [] };
+      // corrige a fase do board se estiver numa que a tela não mostra
+      if (String(req.query.aplicar || '') === '1' && cardBoard && !FASES_VISIVEIS.includes(cardBoard.phaseId)) {
+        cardBoard.phaseId = 'producao';
+        cardBoard.movedAt = new Date().toISOString();
+        item.acoes.push('fase no Board Técnico corrigida para Produção');
+      }
       if (String(req.query.aplicar || '') === '1') {
         // a) Board Técnico
         if (!noBoard) {
