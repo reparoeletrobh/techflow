@@ -712,6 +712,89 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
     return res.status(200).json(Object.assign({ ok: true }, saida));
   }
 
+  // ═══ 💵 ROAS por categoria — faturamento REALMENTE PAGO ÷ investimento em anúncios ═══
+  if (action === 'roas') {
+    const guardado = await dbGet('trafego_roas');
+    if (guardado && String(req.query.gerar || '') !== '1') {
+      return res.status(200).json(Object.assign({ ok: true, doCache: true }, guardado));
+    }
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'META_ADS_ACCOUNT não configurado' });
+    const cfg = await cfgTrafego();
+    const dias = Math.min(120, Math.max(15, parseInt(req.query.dias || '60', 10)));
+    const ate = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+    const desde = new Date(Date.now() - 3 * 3600 * 1000 - dias * 86400000).toISOString().slice(0, 10);
+
+    // ── 1) INVESTIMENTO por categoria (todos os anúncios, ativos ou não) ──
+    const janela = 'time_range=' + encodeURIComponent(JSON.stringify({ since: desde, until: ate }));
+    const ins = await pegarTudo(`${GRAPH}/act_${CONTA}/insights?level=ad&${janela}&fields=ad_id,ad_name,spend&limit=100&access_token=${TOKEN}`, 12);
+    if (ins.erro && !ins.data.length) return res.status(200).json({ ok: false, erro: ins.erro });
+    const investido = {};
+    let investidoTotal = 0;
+    for (const i of (ins.data || [])) {
+      const cat = categoriaDe(i.ad_name || '');
+      const v = Number(i.spend || 0);
+      investido[cat] = (investido[cat] || 0) + v;
+      investidoTotal += v;
+    }
+
+    // ── 2) FATURAMENTO PAGO por categoria ──
+    // Só entra o que comprovadamente passou pelo pagamento: fase de pagamento confirmado,
+    // histórico com passagem por pagamento_confirmado, ou comprovante analisado e aprovado.
+    const [fin, ppA, ppT] = await Promise.all([
+      dbGet('reparoeletro_financeiro'), dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+    ]);
+    const PAGO_FASES = ['pagamento_confirmado', 'retirar_em_loja', 'entrega_agendada',
+      'entrega_liberada', 'rota_criada', 'item_coletado', 'erp', 'finalizado'];
+    const dentroJanela = (d) => {
+      const t = new Date(d || 0).getTime();
+      return t > 0 && t >= Date.now() - dias * 86400000;
+    };
+    const faturado = {}; const detalhe = {}; let faturadoTotal = 0; let semCategoria = 0;
+    const registrar = (cat, valor) => {
+      faturado[cat] = (faturado[cat] || 0) + valor;
+      detalhe[cat] = (detalhe[cat] || 0) + 1;
+      faturadoTotal += valor;
+    };
+    for (const r of (((fin || {}).records) || [])) {
+      const valor = parseFloat(r.valor || r.total || 0) || 0;
+      if (!(valor > 0)) continue;
+      const fases = new Set([(r.phaseId || r.phase), ...((r.history || []).map(x => x.phaseId || x.phase))].filter(Boolean));
+      const passouPagamento = PAGO_FASES.some(p => fases.has(p));
+      const comprovanteOk = r.comprovanteAnalise && r.comprovanteAnalise.veredito === 'verde';
+      if (!passouPagamento && !comprovanteOk) continue;              // 🚫 não confirmado = fora
+      const quando = r.pagoEm || r.confirmadoEm || r.movedAt || r.criadoEm || r.createdAt;
+      if (!dentroJanela(quando)) continue;
+      const cat = categoriaDe(r.equipamento || r.descricao || r.titulo || '');
+      if (cat === 'outros') semCategoria++;
+      registrar(cat, valor);
+    }
+
+    // ── 3) ROAS ──
+    const CATS = ['tv', 'microondas', 'forno', 'purificador', 'adega', 'institucional', 'outros'];
+    const linhas = CATS.map(c => {
+      const inv = Number((investido[c] || 0).toFixed(2));
+      const fat = Number((faturado[c] || 0).toFixed(2));
+      const roas = inv > 0 ? Number((fat / inv).toFixed(2)) : null;
+      const meta = cfg.metas[c] != null ? cfg.metas[c] : cfg.metas.outros;
+      return { categoria: c, investido: inv, faturado: fat, vendas: detalhe[c] || 0,
+        roas, ticketMedio: (detalhe[c] || 0) > 0 ? Number((fat / detalhe[c]).toFixed(2)) : null,
+        metaCpaAtual: meta,
+        // quanto se pode pagar por conversa mantendo o ROAS desejado
+        confianca: (detalhe[c] || 0) >= 15 ? 'boa' : ((detalhe[c] || 0) >= 5 ? 'fraca' : 'insuficiente') };
+    }).filter(l => l.investido > 0 || l.faturado > 0)
+      .sort((a, b) => (b.roas || 0) - (a.roas || 0));
+
+    const saida = { periodoDias: dias, de: desde, ate,
+      geradoEm: new Date().toISOString(),
+      totais: { investido: Number(investidoTotal.toFixed(2)), faturado: Number(faturadoTotal.toFixed(2)),
+        roas: investidoTotal > 0 ? Number((faturadoTotal / investidoTotal).toFixed(2)) : null },
+      linhas, semCategoria,
+      criterioFaturamento: 'somente registros que passaram por pagamento confirmado (fase atual ou histórico) ou com comprovante analisado e aprovado',
+      alerta: 'investimento vem da Meta por nome do anúncio; faturamento vem do financeiro por equipamento — categorias mal nomeadas nos dois lados distorcem o ROAS' };
+    try { await dbSet('trafego_roas', saida); } catch (e) {}
+    return res.status(200).json(Object.assign({ ok: true }, saida));
+  }
+
   // ── 🎯 ORIGENS: conversas com anúncio de origem capturado (base da atribuição de funil) ──
   if (action === 'origens') {
     const org = (await dbGet('wa_origem_anuncio')) || { por: {} };
