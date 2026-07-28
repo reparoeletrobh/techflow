@@ -406,9 +406,10 @@ export default async function handler(req,res){
 
   // ── 🔎 RASTREAR: onde este telefone aparece em toda a operação (investigação) ──
   if(action==='rastrear'){
-    const alvo=String(req.query.tel||'').replace(/\D/g,'').slice(-8);
-    if(alvo.length<8)return res.status(400).json({ok:false,error:'informe ?tel= com pelo menos 8 dígitos'});
-    const bate=t=>String(t||'').replace(/\D/g,'').slice(-8)===alvo;
+    const alvo=String(req.query.tel||'').replace(/\D/g,'');
+    if(alvo.length<4)return res.status(400).json({ok:false,error:'informe ?tel= com pelo menos 4 dígitos finais'});
+    // casa pelo FINAL do número: 4 dígitos já servem para investigar
+    const bate=t=>String(t||'').replace(/\D/g,'').endsWith(alvo);
     const [pros,fA,fT,lgA,lgT,ppA,exc]=await Promise.all([
       dbGet(KEY),dbGet('fichas_adm'),dbGet('fichas_tv'),
       dbGet('reparoeletro_logistica'),dbGet('tv_logistica'),
@@ -429,7 +430,7 @@ export default async function handler(req,res){
       if(!bate(c.telefone))continue;
       achados.push({onde:'pipe ADM',id:c.id,nome:c.nomeContato,equipamento:c.equipamento,fase:c.phaseId||c.phase,criadoEm:c.criadoEm||c.movedAt});
     }
-    const tomb=Object.keys(((exc||{}).tels)||{}).filter(t=>String(t).replace(/\D/g,'').slice(-8)===alvo)
+    const tomb=Object.keys(((exc||{}).tels)||{}).filter(t=>String(t).replace(/\D/g,'').endsWith(alvo))
       .map(t=>({chave:t,excluidoEm:exc.tels[t]}));
     achados.sort((a,b)=>String(a.criadoEm||'').localeCompare(String(b.criadoEm||'')));
     return res.status(200).json({ok:true,telefone:alvo,ocorrencias:achados.length,
