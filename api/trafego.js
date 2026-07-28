@@ -73,18 +73,26 @@ module.exports = async function handler(req, res) {
 
   // Apelidos ensinados pelo dono (trafego_config.apelidos): { "reforma": "microondas", ... }
   let APELIDOS = {};
-  function categoriaDe(nome) {
+  // contexto: 'anuncio' → o que não identificar vira institucional (regra do dono)
+  //           'equipamento' → tenta pelo código do modelo antes de desistir
+  function categoriaDe(nome, contexto) {
     const s = String(nome || '').toLowerCase();
     for (const termo of Object.keys(APELIDOS)) {         // o que você ensinou vem primeiro
       if (termo && s.includes(termo)) return APELIDOS[termo];
     }
     if (/tvs?\b|\btvs?\d|televis|barramento|tela quebrad|quebrar tv|polegada/.test(s)) return 'tv';
-    if (/micro-?\s?ondas|reforma|\binflu\b|\bantigo\b/.test(s)) return 'microondas';
+    // micro-ondas: nome por extenso (tolerando erros de digitação) + códigos de modelo
+    if (/mic?r?o\s?-?\s?o?nd?as|microodas|micro ?ond|reforma|\binflu\b|\bantigo\b/.test(s)) return 'microondas';
+    if (/\bme[fo]?\d{2}|\bmto\d|\bpms?\d{2}|\bpme\d|\bpm0\d|\bmtae?\d{2}|\bnn-?st?\d{2}|\bms\d{4}|\bmh\d{4}|\bbm[a-z]?\d{2}|\bcm[a-z]?\d{2}|\bmg\d{2}/.test(s)) return 'microondas';
     if (/\bforn(o|inho)/.test(s)) return 'forno';
-    if (/purificador|bebedouro|\bfiltro\b|vela|[áa]gua/.test(s)) return 'purificador';
-    if (/adega|cervejeir|climatiz|vinho/.test(s)) return 'adega';
+    // purificador/bebedouro: nome + linhas Electrolux (PE/PA/PH4/PC4) e Consul (CPB/CPC)
+    if (/purificador|bebedouro|\bfiltro\b|\bvela\b|[áa]gua/.test(s)) return 'purificador';
+    if (/\bp[ea]\d{2}[a-z]?\b|\bph4\d|\bpc4\d|\bcp[bc]\d{2}/.test(s)) return 'purificador';
+    // refrigeração de bebida: adega, cervejeira, frigobar, mini geladeira
+    if (/adega|cervejeir|climatiz|vinho|frigobar|min[ie]\s?\s?geladeira|gelad?eira|\bbz[a-z]?\d{2}/.test(s)) return 'adega';
     if (/criativo loja|reuniao externa|reunião externa|\bnovo\b|vitrine|institucional/.test(s)) return 'institucional';
-    return 'outros';
+    // sem identificação: anúncio vira institucional; equipamento fica marcado para ensinarmos
+    return contexto === 'anuncio' ? 'institucional' : 'outros';
   }
   try { const _c = await cfgTrafego(); APELIDOS = _c.apelidos || {}; } catch (e) {}
   // Início do ciclo (último sábado 13h, horário de Brasília) em data ISO
@@ -208,7 +216,7 @@ module.exports = async function handler(req, res) {
       const cv = contaConversa(i.actions);
       const conversas = cv.valor;
       const gasto = Number(i.spend || 0);
-      const cat = categoriaDe(ad.name + ' ' + (st.name || ''));
+      const cat = categoriaDe(ad.name + ' ' + (st.name || ''), 'anuncio');
       const meta = cfg.metas[cat] || cfg.metas.outros;
       const cpa = conversas > 0 ? gasto / conversas : null;
       // distância da meta: <1 abaixo (bom), >1 acima (ruim); sem conversa com gasto = pior caso
@@ -622,7 +630,7 @@ module.exports = async function handler(req, res) {
       const i = porAd[ad.id] || {};
       const gasto = Number(i.spend || 0), conv = contaConv(i.actions);
       if (gasto === 0 && conv === 0) continue;
-      const cat = categoriaDe(ad.name);
+      const cat = categoriaDe(ad.name, 'anuncio');
       const cpa = conv > 0 ? Number((gasto / conv).toFixed(2)) : null;
       doDia[ad.id] = { n: ad.name, c: cat, g: Number(gasto.toFixed(2)), v: conv, cpa };
       snapshot.push({ id: ad.id, nome: ad.name, categoria: cat, gasto: Number(gasto.toFixed(2)), conversas: conv, cpa });
@@ -732,7 +740,7 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
     const investido = {};
     let investidoTotal = 0;
     for (const i of (ins.data || [])) {
-      const cat = categoriaDe(i.ad_name || '');
+      const cat = categoriaDe(i.ad_name || '', 'anuncio');
       const v = Number(i.spend || 0);
       investido[cat] = (investido[cat] || 0) + v;
       investidoTotal += v;
@@ -919,7 +927,7 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
       duplicadosRemovidos: duplicados,
       fontes: porFonte,
       amostraPorFonte: amostras,
-      amostraOutros: amostraOutros.slice(0, 15),
+      equipamentosNaoClassificados: amostraOutros.slice(0, 25),
       totalContado: contados.size,
       alerta: 'investimento vem da Meta por nome do anúncio; faturamento vem do financeiro por equipamento — categorias mal nomeadas nos dois lados distorcem o ROAS' };
     try { await dbSet('trafego_roas', saida); } catch (e) {}
