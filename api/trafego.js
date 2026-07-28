@@ -829,6 +829,51 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
     return res.status(200).json(Object.assign({ ok: true }, saida));
   }
 
+  // ── 🩺 ROAS-DIAGNOSTICO: onde estão os serviços pagos que ainda não entram na conta ──
+  if (action === 'roas-diagnostico') {
+    const dias = Math.min(120, Math.max(15, parseInt(req.query.dias || '60', 10)));
+    const corte = Date.now() - dias * 86400000;
+    const dentro = d => { const t = new Date(d || 0).getTime(); return t > 0 && t >= corte; };
+    const [ppA, ppT, board, fin, balcao, arq, boardTv] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('reparoeletro_board'),
+      dbGet('reparoeletro_financeiro'), dbGet('reparoeletro_balcao'),
+      dbGet('pipe_ids_arquivados'), dbGet('tv_board'),
+    ]);
+    const temErp = o => [(o.phaseId || o.phase), ...((o.history || []).map(x => x.phaseId || x.phase))]
+      .filter(Boolean).some(f => String(f).startsWith('erp'));
+    const contar = (arr, filtro) => (arr || []).filter(filtro).length;
+    const somar = (arr, filtro, campo) => (arr || []).filter(filtro)
+      .reduce((s, x) => s + (parseFloat(x[campo] || x.valor || 0) || 0), 0);
+
+    const cardsA = ((ppA || {}).cards) || [];
+    const cardsT = ((ppT || {}).cards) || [];
+    const metaLog = ((board || {}).metaLog) || [];
+    const erpLog = metaLog.filter(m => String(m.phaseId || '') === 'erp_entrada');
+    const datas = erpLog.map(m => m.timestamp).filter(Boolean).sort();
+    const recs = ((fin || {}).records) || [];
+    const bal = Array.isArray(balcao) ? balcao : (((balcao || {}).itens) || []);
+
+    return res.status(200).json({ ok: true, periodoDias: dias,
+      pipeAdm: { total: cardsA.length, comErp: contar(cardsA, temErp),
+        comErpNoPeriodo: contar(cardsA, c => temErp(c) && dentro(c.movedAt || c.criadoEm)),
+        comValor: contar(cardsA, c => parseFloat(c.valor || 0) > 0) },
+      pipeTv: { total: cardsT.length, comErp: contar(cardsT, temErp),
+        comValor: contar(cardsT, c => parseFloat(c.valor || 0) > 0) },
+      boardMetaLog: { totalEntradas: metaLog.length, entradasErp: erpLog.length,
+        erpNoPeriodo: erpLog.filter(m => dentro(m.timestamp)).length,
+        comValor: erpLog.filter(m => parseFloat(m.valor || 0) > 0).length,
+        valorSomado: Number(erpLog.filter(m => dentro(m.timestamp)).reduce((s, m) => s + (parseFloat(m.valor || 0) || 0), 0).toFixed(2)),
+        maisAntiga: datas[0] || null, maisRecente: datas[datas.length - 1] || null },
+      financeiro: { registros: recs.length, comValor: contar(recs, r => parseFloat(r.valor || r.total || 0) > 0),
+        comErp: contar(recs, temErp) },
+      balcao: { registros: bal.length,
+        pagos: contar(bal, b => b.pagoEm || b.status === 'pago'),
+        pagosNoPeriodo: contar(bal, b => (b.pagoEm || b.status === 'pago') && dentro(b.pagoEm || b.entradaEm)) },
+      cardsArquivados: (((arq || {}).ids) || []).length,
+      tvBoard: { existe: !!boardTv, cards: (((boardTv || {}).cards) || []).length },
+      leitura: 'compare com ~1300 serviços pagos em 60 dias: a fonte com número próximo disso é onde mora a verdade' });
+  }
+
   // ── 🎯 ORIGENS: conversas com anúncio de origem capturado (base da atribuição de funil) ──
   if (action === 'origens') {
     const org = (await dbGet('wa_origem_anuncio')) || { por: {} };
