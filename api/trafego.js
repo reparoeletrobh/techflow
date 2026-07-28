@@ -740,33 +740,66 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
     // ── 2) FATURAMENTO PAGO por categoria ──
     // Só entra o que comprovadamente passou pelo pagamento: fase de pagamento confirmado,
     // histórico com passagem por pagamento_confirmado, ou comprovante analisado e aprovado.
-    const [fin, ppA, ppT] = await Promise.all([
-      dbGet('reparoeletro_financeiro'), dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+    // FONTE DO PAGO = passagem por ERP ("RP"), nos dois sistemas.
+    // Regra do dono: pago vai para ERP; na segunda migra para Finalizado, que é POLUÍDO
+    // (garantia e reprovado também caem lá) — por isso conta a PASSAGEM POR ERP, não a fase atual.
+    const [ppA, ppT, boardA, fin] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+      dbGet('reparoeletro_board'), dbGet('reparoeletro_financeiro'),
     ]);
-    const PAGO_FASES = ['pagamento_confirmado', 'retirar_em_loja', 'entrega_agendada',
-      'entrega_liberada', 'rota_criada', 'item_coletado', 'erp', 'finalizado'];
     const dentroJanela = (d) => {
       const t = new Date(d || 0).getTime();
       return t > 0 && t >= Date.now() - dias * 86400000;
     };
     const faturado = {}; const detalhe = {}; let faturadoTotal = 0; let semCategoria = 0;
-    const registrar = (cat, valor) => {
+    const contados = new Set();
+    const registrar = (chave, cat, valor) => {
+      if (contados.has(chave)) return;                 // dedupe entre fontes
+      contados.add(chave);
       faturado[cat] = (faturado[cat] || 0) + valor;
       detalhe[cat] = (detalhe[cat] || 0) + 1;
       faturadoTotal += valor;
     };
+    const passouPorErp = (obj) => {
+      const fases = [(obj.phaseId || obj.phase), ...((obj.history || []).map(x => x.phaseId || x.phase))]
+        .filter(Boolean).map(String);
+      return fases.some(f => f === 'erp' || f.startsWith('erp'));
+    };
+    const quandoErp = (obj) => {
+      const h = (obj.history || []).find(x => String(x.phaseId || x.phase || '').startsWith('erp'));
+      return (h && (h.ts || h.timestamp)) || obj.movedAt || obj.criadoEm || obj.createdAt;
+    };
+    // 1) cards do pipe ADM e TV que passaram por ERP
+    for (const [banco, sis] of [[ppA, 'adm'], [ppT, 'tv']]) {
+      for (const c of (((banco || {}).cards) || [])) {
+        const valor = parseFloat(c.valor || c.total || 0) || 0;
+        if (!(valor > 0) || !passouPorErp(c)) continue;
+        if (!dentroJanela(quandoErp(c))) continue;
+        const cat = categoriaDe(c.equipamento || c.descricao || c.nomeContato || '');
+        if (cat === 'outros') semCategoria++;
+        registrar(sis + ':' + c.id, cat, valor);
+      }
+    }
+    // 2) metaLog do board: entradas em ERP com valor e data reais
+    for (const m of (((boardA || {}).metaLog) || [])) {
+      if (String(m.phaseId || '') !== 'erp_entrada') continue;
+      const valor = parseFloat(m.valor || 0) || 0;
+      if (!(valor > 0) || !dentroJanela(m.timestamp)) continue;
+      const cat = categoriaDe(m.equipamento || m.descricao || m.titulo || '');
+      if (cat === 'outros') semCategoria++;
+      registrar('board:' + (m.pipefyId || m.id), cat, valor);
+    }
+    // 3) financeiro: complementa o que tiver comprovante aprovado e não veio das fontes acima
     for (const r of (((fin || {}).records) || [])) {
       const valor = parseFloat(r.valor || r.total || 0) || 0;
       if (!(valor > 0)) continue;
-      const fases = new Set([(r.phaseId || r.phase), ...((r.history || []).map(x => x.phaseId || x.phase))].filter(Boolean));
-      const passouPagamento = PAGO_FASES.some(p => fases.has(p));
-      const comprovanteOk = r.comprovanteAnalise && r.comprovanteAnalise.veredito === 'verde';
-      if (!passouPagamento && !comprovanteOk) continue;              // 🚫 não confirmado = fora
-      const quando = r.pagoEm || r.confirmadoEm || r.movedAt || r.criadoEm || r.createdAt;
+      const ok = passouPorErp(r) || (r.comprovanteAnalise && r.comprovanteAnalise.veredito === 'verde');
+      if (!ok) continue;
+      const quando = r.pagoEm || r.confirmadoEm || quandoErp(r);
       if (!dentroJanela(quando)) continue;
       const cat = categoriaDe(r.equipamento || r.descricao || r.titulo || '');
       if (cat === 'outros') semCategoria++;
-      registrar(cat, valor);
+      registrar('fin:' + r.id, cat, valor);
     }
 
     // ── 3) ROAS ──
@@ -789,7 +822,8 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
       totais: { investido: Number(investidoTotal.toFixed(2)), faturado: Number(faturadoTotal.toFixed(2)),
         roas: investidoTotal > 0 ? Number((faturadoTotal / investidoTotal).toFixed(2)) : null },
       linhas, semCategoria,
-      criterioFaturamento: 'somente registros que passaram por pagamento confirmado (fase atual ou histórico) ou com comprovante analisado e aprovado',
+      criterioFaturamento: 'passagem por ERP (o RP) no histórico — pipe ADM, pipe TV e registro de entrada em ERP do board; Finalizado NÃO é usado porque recebe garantia e reprovado',
+      fontes: { pipeAdmTv: contados.size, vendasContadas: Object.values(detalhe).reduce((a, b) => a + b, 0) },
       alerta: 'investimento vem da Meta por nome do anúncio; faturamento vem do financeiro por equipamento — categorias mal nomeadas nos dois lados distorcem o ROAS' };
     try { await dbSet('trafego_roas', saida); } catch (e) {}
     return res.status(200).json(Object.assign({ ok: true }, saida));
