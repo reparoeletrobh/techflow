@@ -134,6 +134,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
   <div class="stat-box"><span class="stat-lbl">↩ Retornar</span><span class="stat-val" style="color:#f97316;" id="st-ret">0</span></div>
   <div class="stat-box"><span class="stat-lbl">🏪 Cliente Loja</span><span class="stat-val" style="color:#3b9eff;" id="st-cli">0</span></div>
   <div class="stat-box"><span class="stat-lbl">🚚 Logística</span><span class="stat-val" style="color:#22c55e;" id="st-log">0</span></div>
+  <div class="stat-box" title="Coletas solicitadas que voltaram do Remarcar — hoje (7 dias)"><span class="stat-lbl">🔄 Voltaram</span><span class="stat-val" style="color:#fb923c;" id="st-volt">0</span></div>
+  <div class="stat-box" title="Orçamentos recuperados no Conflitos Bot — 2 pontos cada"><span class="stat-lbl">🏅 Recuperados</span><span class="stat-val" style="color:#c084fc;" id="st-recup">0</span></div>
   <div class="stat-box"><span class="stat-lbl">📋 Total</span><span class="stat-val" style="color:#5a6270;" id="st-tot">0</span></div>
   <div class="stat-box" style="border-color:rgba(59,158,255,.35);">
     <span class="stat-lbl" style="color:#3b9eff;font-weight:800;">🔧 ADM</span>
@@ -164,8 +166,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
     onblur="this.style.borderColor='#22272f'">
   <span id="rastrear-count"></span>
 </div>
-
-<div id="faixa-metricas" style="display:none;padding:0 14px 12px;gap:9px;flex-wrap:wrap;"></div>
 
 <div class="board">
   <div class="col col0">
@@ -1153,7 +1153,31 @@ async function carregarFaixaMetricas(){
       fetch('/api/prospeccao?action=pontos').then(function(x){return x.json();}).catch(function(){return null;})
     ]);
     var rr=res[0]&&res[0].ok?res[0]:null, pp=res[1]&&res[1].ok?res[1]:null;
-    var el=document.getElementById('faixa-metricas');
+    var elV=document.getElementById('st-volt');
+    if(elV&&rr){
+      var hj=(rr.hoje||{}).total||0, sem=(rr.semana||{}).total||0;
+      elV.textContent=hj;
+      elV.parentNode.title='Voltaram do Remarcar — hoje '+hj+' (ADM '+((rr.hoje||{}).adm||0)+' · TV '+((rr.hoje||{}).tv||0)+') · 7 dias '+sem;
+      if(sem>hj)elV.innerHTML=hj+'<span style="font-size:9px;color:#5a6270;font-weight:700;"> /'+sem+'</span>';
+    }
+    var elR=document.getElementById('st-recup');
+    if(elR&&pp){
+      var rank=pp.ranking||[];
+      var tot=rank.reduce(function(a,b){return a+(b.total||0);},0);
+      var qtd=rank.reduce(function(a,b){return a+(b.recuperacoes||0);},0);
+      var val=rank.reduce(function(a,b){return a+(b.valorRecuperado||0);},0);
+      elR.textContent=qtd;
+      elR.parentNode.title=qtd?(qtd+' orçamento(s) recuperado(s) · '+tot+' pontos · R$ '+val.toFixed(0)+' salvos'
+        +(rank.length?' — '+rank.map(function(p){return p.nome+' '+p.total+'pts';}).join(', '):''))
+        :'Nenhuma recuperação ainda — cada orçamento aprovado no Conflitos Bot vale 2 pontos';
+    }
+    return;
+  }catch(e){}
+}
+async function _faixaAntiga(){
+  try{
+    var rr=null, pp=null;
+    var el=null;
     if(!el)return;
     var blocos='';
 
