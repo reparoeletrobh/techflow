@@ -762,9 +762,12 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
       // dedupe por ASSINATURA: o mesmo serviço aparece no pipe, no board e no arquivo com ids diferentes
       if (obj) {
         const d8 = String(obj.telefone || obj.tel || '').replace(/\D/g, '').slice(-8);
-        const sig = d8 + '|' + valor.toFixed(2) + '|' + String(obj.osCode || obj.pipefyId || '').slice(-8);
+        // telefone + valor identificam o serviço mesmo quando o código difere entre pipe,
+        // financeiro e arquivo. Recompra do mesmo cliente com valor idêntico é rara o bastante
+        // para valer menos que a duplicação que isso evita.
+        const sig = d8 + '|' + valor.toFixed(2);
         if (d8.length >= 8) {
-          if (assinaturas.has(sig)) return;
+          if (assinaturas.has(sig)) { duplicados++; return; }
           assinaturas.add(sig);
         }
       }
@@ -802,6 +805,7 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
     };
     let excluidosRsGarantia = 0;
     let naoVendidos = 0;
+    let duplicados = 0;
     const FASES_VALEM = ['finalizado', 'erp'];
     for (const [banco, sis] of [[ppA, 'adm'], [ppT, 'tv']]) {
       for (const c of (((banco || {}).cards) || [])) {
@@ -906,6 +910,7 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
       criterioFaturamento: 'FINALIZADO + ERP, excluindo tudo que tenha RS, garantia ou reprovado no nome/descrição (regra do dono); fontes: pipe ADM, pipe TV, board ADM, board TV e metaLog de ERP, com dedupe',
       excluidosRsGarantia,
       descartadosSemVenda: naoVendidos,
+      duplicadosRemovidos: duplicados,
       fontes: porFonte,
       amostraPorFonte: amostras,
       totalContado: contados.size,
