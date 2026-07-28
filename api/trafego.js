@@ -184,7 +184,26 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, conta: 'act_' + CONTA, periodo: 'últimos 7 dias', campanhas: resultado });
   }
 
-  return res.status(404).json({ ok: false, error: 'ação não encontrada (meta-teste | meta-campanhas)' });
+  // ── 🎯 ORIGENS: conversas com anúncio de origem capturado (base da atribuição de funil) ──
+  if (action === 'origens') {
+    const org = (await dbGet('wa_origem_anuncio')) || { por: {} };
+    const tels = Object.keys(org.por || {});
+    const porAd = {};
+    for (const t of tels) {
+      const o = org.por[t];
+      const k = o.adId || 'sem-id';
+      if (!porAd[k]) porAd[k] = { adId: o.adId, titulo: o.titulo, conversas: 0, comClid: 0 };
+      porAd[k].conversas++;
+      if (o.ctwaClid) porAd[k].comClid++;
+    }
+    return res.status(200).json({ ok: true,
+      conversasComOrigem: tels.length,
+      anunciosDistintos: Object.keys(porAd).length,
+      porAnuncio: Object.values(porAd).sort((a, b) => b.conversas - a.conversas).slice(0, 50),
+      obs: 'a origem só chega na PRIMEIRA mensagem de conversas vindas de anúncio (Click-to-WhatsApp)' });
+  }
+
+  return res.status(404).json({ ok: false, error: 'ação não encontrada (meta-teste | meta-campanhas | painel | origens | config)' });
   } catch (e) {
     return res.status(200).json({ ok: false, error: 'erro interno: ' + e.message });
   }
