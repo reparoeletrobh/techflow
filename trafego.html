@@ -108,7 +108,7 @@ a.voltar{color:var(--dim);text-decoration:none;font-size:11.5px;font-weight:700;
   <div class="abas" id="abas"></div>
   <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
     <label style="font-size:10.5px;color:var(--dim);font-weight:700;display:flex;align-items:center;gap:5px;cursor:pointer;">
-      <input type="checkbox" id="ver-pausados" onchange="render()"> mostrar pausados
+      <input type="checkbox" id="ver-pausados" onchange="carregar(true)"> incluir pausados
     </label>
   </div>
   <div id="lista"><div class="vazio-msg">⏳ Puxando os anúncios da Meta…</div></div>
@@ -142,7 +142,8 @@ function corSit(s){return s==='campeao'?'#22c55e':s==='atencao'?'#f59e0b':s==='r
 
 async function carregar(forcar){
   try{
-    var r=await fetch('/api/trafego?action=painel&periodo='+_per+(forcar?'&forcar=1':'')).then(function(x){return x.json();});
+    var vp=document.getElementById('ver-pausados');
+    var r=await fetch('/api/trafego?action=painel&periodo='+_per+(forcar?'&forcar=1':'')+((vp&&vp.checked)?'&todos=1':'')).then(function(x){return x.json();});
     if(!r.ok){
       document.getElementById('lista').innerHTML='<div class="vazio-msg">Não consegui ler a conta de anúncios.<br><span style="font-size:11px;color:#fca5a5;">'+esc(r.erro||r.error||'')+'</span><br><br><button class="btn" onclick="carregar(true)">tentar de novo</button></div>';
       return;
@@ -155,7 +156,7 @@ async function carregar(forcar){
 
 function render(){
   var v=_d.verba;
-  document.getElementById('ciclo').textContent='Ciclo desde '+_d.ciclo.desde.split('-').reverse().join('/')+' · '+(_d.ativos||0)+' ativos de '+_d.totalAnuncios;
+  document.getElementById('ciclo').textContent=(_d.periodoLabel||'')+' · '+(_d.exibidos!=null?_d.exibidos:_d.totalAnuncios)+' anúncios rodando agora';
   document.getElementById('atualizado').textContent=_d.doCache?'· cache de '+new Date(_d.cacheDe).toLocaleTimeString('pt-BR').slice(0,5):'· agora';
 
   var t=_d.totais||{};
@@ -194,11 +195,7 @@ function render(){
       +esc(rot)+'<b>'+n+'</b></div>';
   }).join('');
 
-  var verPaus=document.getElementById('ver-pausados');
-  var mostrarPausados=verPaus&&verPaus.checked;
-  var lista=_d.anuncios.filter(function(a){
-    if(!mostrarPausados&&!a.ativo)return false;
-    return _cat==='todos'||a.categoria===_cat;});
+  var lista=_d.anuncios.filter(function(a){return _cat==='todos'||a.categoria===_cat;});
   var el=document.getElementById('lista');
   if(!lista.length){el.innerHTML='<div class="vazio-msg">Nenhum anúncio nesta categoria ainda.</div>';return;}
 

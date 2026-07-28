@@ -103,18 +103,18 @@ module.exports = async function handler(req, res) {
     const desde = inicioCiclo(cfg);
     const hoje = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
     const periodo = ['hoje', '7d', 'ciclo'].includes(String(req.query.periodo || '')) ? String(req.query.periodo) : 'ciclo';
+    const soAtivos = String(req.query.todos || '') !== '1';
     // Janela idêntica à do Gerenciador de Anúncios
     const janela = periodo === 'hoje' ? 'date_preset=today'
       : periodo === '7d' ? 'date_preset=last_7d'
       : 'time_range=' + encodeURIComponent(JSON.stringify({ since: desde, until: hoje }));
-    const chaveCache = 'trafego_painel_cache_' + periodo;
+    const chaveCache = 'trafego_painel_cache_' + periodo + (soAtivos ? '' : '_todos');
     const cache = await dbGet(chaveCache);
     if (cache && cache.em && (Date.now() - new Date(cache.em).getTime() < 30 * 60000)
         && String(req.query.forcar || '') !== '1' && cache.desde === desde) {
       return res.status(200).json(Object.assign({}, cache.dados, { cacheDe: cache.em, doCache: true }));
     }
     // SOMENTE ANÚNCIOS ATIVOS + campos mínimos + páginas de 25 (evita o erro de volume da Meta)
-    const soAtivos = String(req.query.todos || '') !== '1';
     const filtroAtivo = soAtivos
       ? '&filtering=' + encodeURIComponent(JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE'] }]))
       : '';
@@ -122,7 +122,7 @@ module.exports = async function handler(req, res) {
     const tk = `&access_token=${TOKEN}`;
     const [ads, adsets, ins] = await Promise.all([
       pegarTudo(`${base}ads?fields=id,name,effective_status,adset_id,creative{thumbnail_url}&limit=25${filtroAtivo}${tk}`, 8),
-      pegarTudo(`${base}adsets?fields=id,name,daily_budget,lifetime_budget&limit=25${tk}`, 8),
+      pegarTudo(`${base}adsets?fields=id,name,daily_budget,lifetime_budget,effective_status&limit=25${tk}`, 8),
       pegarTudo(`${base}insights?level=ad&${janela}&use_unified_attribution_setting=true&fields=ad_id,spend,clicks,ctr,actions&limit=25${tk}`, 12),
     ]);
     if (ads.erro && !ads.data.length) return res.status(200).json({ ok: false, erro: ads.erro });
@@ -130,6 +130,7 @@ module.exports = async function handler(req, res) {
     for (const i of (ins.data || [])) porAd[i.ad_id] = i;
     const porAdset = {};
     for (const a of (adsets.data || [])) porAdset[a.id] = a;
+
 
     // Ordem de prioridade REAL: a métrica do Gerenciador é "conversas por mensagem iniciadas"
     const CONV = ['onsite_conversion.messaging_conversation_started_7d', 'onsite_conversion.messaging_first_reply', 'onsite_conversion.total_messaging_connection', 'lead'];
@@ -140,7 +141,21 @@ module.exports = async function handler(req, res) {
       }
       return { valor: 0, metrica: null };
     };
-    const anuncios = (ads.data || []).map(ad => {
+    // Diagnóstico do que a Meta devolveu (o filtro dela nem sempre é respeitado)
+    const porStatus = {};
+    for (const ad of (ads.data || [])) {
+      const s = ad.effective_status || 'SEM_STATUS';
+      porStatus[s] = (porStatus[s] || 0) + 1;
+    }
+    // TRAVA local: anúncio ativo E conjunto ativo. Sem isso entram pausados e "ativos" de conjunto parado.
+    const brutos = (ads.data || []).filter(ad => {
+      if (!soAtivos) return true;
+      if (ad.effective_status !== 'ACTIVE') return false;
+      const st = porAdset[ad.adset_id];
+      if (st && st.effective_status && st.effective_status !== 'ACTIVE') return false;
+      return true;
+    });
+    const anuncios = brutos.map(ad => {
       const i = porAd[ad.id] || {};
       const st = porAdset[ad.adset_id] || {};
       const cv = contaConversa(i.actions);
@@ -204,6 +219,8 @@ module.exports = async function handler(req, res) {
         tv: { depositado: cfg.verba.tv, real: Number(realTv.toFixed(2)), gasto: Number(gastoTv.toFixed(2)), saldo: Number((realTv - gastoTv).toFixed(2)) },
         aproveitamento: cfg.verba.aproveitamento },
       metas: cfg.metas, porCategoria, totalAnuncios: anuncios.length, anuncios,
+      recebidosDaMeta: (ads.data || []).length, exibidos: anuncios.length,
+      statusRecebidos: porStatus,
       avisos: [ads.erro, adsets.erro, ins.erro].filter(Boolean) };
     try { await dbSet(chaveCache, { em: new Date().toISOString(), desde, dados }); } catch (e) {}
     if (periodo === 'ciclo') { try { await dbSet('trafego_painel_cache', { em: new Date().toISOString(), desde, dados }); } catch (e) {} }
