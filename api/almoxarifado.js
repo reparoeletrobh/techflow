@@ -211,8 +211,7 @@ export default async function handler(req, res) {
         const aindaColeta = new Set(novoSnapCol);
         db.tarefas.forEach(t => {
           if (t.tipo === 'receber' && t.status === 'pendente' && !aindaColeta.has(t.cardId)) {
-            await aplicarNaTarefa(KEY, id, (alvo) => { alvo.status = 'feito'; alvo.feitoPor = String(feitoPor || '').trim(); alvo.feitoEm = new Date().toISOString(); });
-    t.status = 'feito'; t.feitoPor = 'Sistema'; t.feitoEm = new Date().toISOString();
+            t.status = 'feito'; t.feitoPor = 'Sistema'; t.feitoEm = new Date().toISOString();
             t.autoConcluida = 'saiu de Coleta Efetuada (diagnóstico/RS registrado)';
           }
         });
@@ -338,11 +337,22 @@ export default async function handler(req, res) {
     t.status = 'feito';
     t.feitoPor = String(feitoPor || '').trim();
     t.feitoEm = new Date().toISOString();
-    db.inventario[t.cardId] = {
-      cliente: t.cliente, equipamento: t.equipamento, modelo: t.modelo || (db.inventario[t.cardId] || {}).modelo || '',
+    // SAVE ATÔMICO: relê o banco agora e aplica só esta tarefa (o sync roda em paralelo)
+    const dbF = (await dbGet(KEY)) || db;
+    if (!Array.isArray(dbF.tarefas)) dbF.tarefas = db.tarefas;
+    if (!dbF.inventario) dbF.inventario = {};
+    const tF = dbF.tarefas.find(x => x.id === id);
+    if (tF) {
+      tF.status = 'feito'; tF.feitoPor = t.feitoPor; tF.feitoEm = t.feitoEm;
+      if (t.modelo) tF.modelo = t.modelo;
+      if (t.rs) { tF.rs = true; tF.destino = t.destino; }
+      if (t.parecer) { tF.parecer = t.parecer; if (t.precoSugerido) tF.precoSugerido = t.precoSugerido; }
+    }
+    dbF.inventario[t.cardId] = {
+      cliente: t.cliente, equipamento: t.equipamento, modelo: t.modelo || (dbF.inventario[t.cardId] || {}).modelo || '',
       local: t.destino, atualizadoEm: t.feitoEm, por: t.feitoPor,
     };
-    await dbSet(KEY, db);
+    await dbSet(KEY, dbF);
     return res.status(200).json({ ok: true });
   }
 
