@@ -377,19 +377,9 @@ export default async function handler(req, res) {
     const dias = Math.min(30, Math.max(0, parseInt(req.query.dias || '0', 10)));   // 0 = só hoje
     const resp = await fetch(SHEET_CSV);
     const csv = await resp.text();
-    const linhas = csv.split(/\r?\n/);
-    // parser simples de CSV respeitando aspas
-    const parseLinha = (l) => {
-      const out = []; let atual = '', dentroAspas = false;
-      for (let i = 0; i < l.length; i++) {
-        const ch = l[i];
-        if (ch === '"') { if (dentroAspas && l[i + 1] === '"') { atual += '"'; i++; } else dentroAspas = !dentroAspas; }
-        else if (ch === ',' && !dentroAspas) { out.push(atual); atual = ''; }
-        else atual += ch;
-      }
-      out.push(atual); return out;
-    };
-    const rows = linhas.map(parseLinha);
+    // MESMO parser do importador — endereço e defeito têm quebra de linha dentro das aspas,
+    // e dividir por linha física quebra o alinhamento das colunas
+    const rows = parseCSV(csv);
     const [dbAdm, dbTv, cursor, tomb] = await Promise.all([
       dbGet(KEY_ADM), dbGet(KEY_TV), dbGet(KEY_CURSOR), dbGet(KEY_EXCLUIDAS),
     ]);
@@ -422,7 +412,7 @@ export default async function handler(req, res) {
       const tel = String(row[0] || '').replace(/\D/g, '').trim();
       const nome = String(row[1] || '').trim();
       const equip = String(row[2] || '').trim();
-      const hora = String(row[6] || '').trim();
+      const hora = String(row[6] || row[5] || row[7] || '').trim();
       if (!tel && !nome) continue;
       const noPeriodo = ehDoPeriodo(hora);
       if (noPeriodo === null) { if (ri > rows.length - 40) semData.push({ linha: ri + 1, nome, tel, hora }); continue; }
@@ -448,6 +438,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true,
       periodo: dias === 0 ? 'hoje (' + alvoDia + ')' : 'últimos ' + dias + ' dias',
       cursorAtual: (cursor || {}).row || null, totalLinhasPlanilha: rows.length - 1,
+      avisoAlinhamento: 'o parser descarta linhas totalmente vazias — se alguém preencher uma linha vazia no meio da planilha, os números de linha deslocam e o pareamento com as fichas antigas se perde',
       naPlanilha: naPlanilha.length, comFicha: naPlanilha.filter(x => x.temFicha).length,
       semFicha: faltando.length,
       faltando,
