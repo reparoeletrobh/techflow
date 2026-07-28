@@ -90,7 +90,7 @@ module.exports = async function handler(req, res) {
     if (/\bibbl\b|\blatina\b|colorma[qc]|coloma[qc]|esmaltec|\blibell\b|\bsoft\b|masterfrio|karina/.test(s)) return 'purificador';
     if (/\bp[ea]\d{2}[a-z]?\b|\bph4\d|\bpc4\d|\bcp[bc]\d{2}/.test(s)) return 'purificador';
     // refrigeração de bebida: adega, cervejeira, frigobar, mini geladeira
-    if (/adega|cerve[jr]|cervi|chopeir|climatiz|vinho|frigobar|min[ie]\s?\s?geladeira|gelad?eira|\bbz[a-z]?\d{2}|co ?²|co ?2/.test(s)) return 'adega';
+    if (/adega|cerve|cervi|chopeir|climatiz|vinho|frigobar|min[ie]\s?\s?geladeira|gelad?eira|\bbz[a-z]?\d{2}|co ?²|co ?2/.test(s)) return 'adega';
     if (/criativo loja|reuniao externa|reunião externa|\bnovo\b|vitrine|institucional/.test(s)) return 'institucional';
     // sem identificação: anúncio vira institucional; equipamento fica marcado para ensinarmos
     return contexto === 'anuncio' ? 'institucional' : 'outros';
