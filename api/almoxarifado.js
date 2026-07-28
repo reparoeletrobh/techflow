@@ -337,6 +337,18 @@ export default async function handler(req, res) {
     t.status = 'feito';
     t.feitoPor = String(feitoPor || '').trim();
     t.feitoEm = new Date().toISOString();
+    // Equipamento fisicamente movido para a GARANTIA dentro da loja → entra na fila do novo sistema
+    if (t.tipo === 'mover' && t.destino === 'garantia') {
+      try {
+        const KG3 = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+        await fetch(`https://reparoeletroadm.com/api/garantia?action=fila-criar&k=${KG3}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nome: t.cliente || 'Cliente', telefone: t.tel || '',
+            equipamento: t.equipamento || '', relato: 'Equipamento movido para a garantia no almoxarifado',
+            origem: 'almoxarifado-garantia' }),
+        });
+      } catch (e) {}
+    }
     // SAVE ATÔMICO: relê o banco agora e aplica só esta tarefa (o sync roda em paralelo)
     const dbF = (await dbGet(KEY)) || db;
     if (!Array.isArray(dbF.tarefas)) dbF.tarefas = db.tarefas;
@@ -387,21 +399,6 @@ export default async function handler(req, res) {
     });
     if (!tf) return res.status(404).json({ ok: false, error: 'tarefa não encontrada' });
     return res.status(200).json({ ok: true, videoGravado: !!tf.videoGravado, separado: !!tf.separado, feito: tf.status === 'feito' });
-    /* trecho antigo desativado
-    if (t.videoGravado && t.separado) {
-    // Mover p/ GARANTIA concluído (equipamento fisicamente na garantia dentro da loja) → fila do novo sistema
-    if (t.tipo === 'mover' && t.destino === 'garantia') {
-      try {
-        const KG3 = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
-        await fetch(`https://reparoeletroadm.com/api/garantia?action=fila-criar&k=${KG3}`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nome: t.cliente || 'Cliente', telefone: t.tel || '', equipamento: t.equipamento || '',
-            relato: 'Equipamento movido para a garantia no almoxarifado', origem: 'almoxarifado-garantia' }),
-        });
-      } catch (e) {}
-    }
-    }
-    */
   }
 
   // ══ F2 ROTAS: listar (ativas + últimas finalizadas) ══

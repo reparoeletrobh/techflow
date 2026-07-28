@@ -528,7 +528,7 @@ async function naoChegou(id){
 }
 async function vendaCheck(id,qual){
   if(!exigeOp())return;
-  var r=await fetch(API+'&action=venda-check',{method:'POST',headers:{'Content-Type':'application/json'},
+  var r=await fetch('/api/almoxarifado?action=venda-check',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({id:id,qual:qual,feitoPor:op()})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
   if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
 }
@@ -536,7 +536,7 @@ async function avaliarCompra(id,parecer){
   if(!exigeOp())return;
   var preco='';
   if(parecer==='sim'){preco=prompt('💰 Preço sugerido de compra (R$):');if(preco===null)return;}
-  var r=await fetch(API+'&action=concluir',{method:'POST',headers:{'Content-Type':'application/json'},
+  var r=await fetch('/api/almoxarifado?action=concluir',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({id:id,feitoPor:op(),parecer:parecer,preco:preco})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
   if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
 }
