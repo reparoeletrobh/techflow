@@ -357,13 +357,21 @@ module.exports = async function handler(req, res) {
           conversasEstimadas: (a.cpa && fatia > 0) ? Math.round(fatia / a.cpa) : 0 };
       }).sort((x, y) => y.receber - x.receber);
 
-      planos.push({ categoria: cat, meta, anuncios: lista.length,
+      const todos = lista.map(a => ({ id: a.id, nome: a.nome, thumb: a.thumb,
+        cpa: a.cpa, conversas: a.conversas, gasto: a.gasto,
+        verba: verbaTotalDe(a), restante: restanteDe(a),
+        situacao: idsCortar.has(a.id) ? 'cortar'
+          : (a.cpa != null && a.cpa <= meta && a.conversas >= 3 ? 'campeao'
+          : (a.cpa != null && a.cpa <= meta ? 'ok-pouco-volume' : 'observar')) }))
+        .sort((x, y) => (x.cpa == null ? 9e9 : x.cpa) - (y.cpa == null ? 9e9 : y.cpa));
+      planos.push({ categoria: cat, meta, anuncios: lista.length, todos,
         verbaAlocada: Number(verbaAlocada.toFixed(2)), gasto: Number(gasto.toFixed(2)),
         restante: Number(restante.toFixed(2)), conversas,
         cpa: cpaCat != null ? Number(cpaCat.toFixed(2)) : null,
         acimaDaMeta: cpaCat != null ? cpaCat > meta : null,
         cortar, libera, reforcar,
         ganhoEstimado: reforcar.reduce((s, r) => s + (r.conversasEstimadas || 0), 0),
+        aplicado: Number(reforcar.reduce((s, r) => s + (r.receber || 0), 0).toFixed(2)),
         semDestino: libera > 0 && !campeoes.length,
         frentePropria: cat === 'tv' });
     }
