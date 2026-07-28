@@ -69,8 +69,7 @@ module.exports = async function handler(req, res) {
       custoViagem: c.custoViagem != null ? c.custoViagem : 25,
     };
   }
-  // carrega os apelidos antes de qualquer classificação
-  try { const _c = await cfgTrafego(); APELIDOS = _c.apelidos || {}; } catch (e) {}
+
   // Apelidos ensinados pelo dono (trafego_config.apelidos): { "reforma": "microondas", ... }
   let APELIDOS = {};
   function categoriaDe(nome) {
@@ -84,6 +83,7 @@ module.exports = async function handler(req, res) {
     if (/adega|cervejeir|climatiz|vinho/.test(s)) return 'adega';
     return 'outros';
   }
+  try { const _c = await cfgTrafego(); APELIDOS = _c.apelidos || {}; } catch (e) {}
   // Início do ciclo (último sábado 13h, horário de Brasília) em data ISO
   function inicioCiclo(cfg) {
     const agoraBrt = new Date(Date.now() - 3 * 3600 * 1000);
