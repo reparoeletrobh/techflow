@@ -106,6 +106,7 @@ a.voltar{color:var(--dim);text-decoration:none;font-size:11.5px;font-weight:700;
   <div class="aba" id="s-inteligencia" onclick="secao('inteligencia')">🧠 Inteligência</div>
 </div>
 <div id="pg-anuncios">
+  <div id="recado-copiloto"></div>
   <div class="abas" id="abas"></div>
   <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
     <label style="font-size:10.5px;color:var(--dim);font-weight:700;display:flex;align-items:center;gap:5px;cursor:pointer;">
@@ -586,6 +587,49 @@ function copiarSug(i){
   if(navigator.clipboard)navigator.clipboard.writeText(txt);
 }
 
+/* ── 📰 RECADO DIÁRIO DO COPILOTO ── */
+async function carregarRecado(){
+  var el=document.getElementById('recado-copiloto');
+  if(!el)return;
+  var r=await fetch('/api/trafego?action=relatorio-diario').then(function(x){return x.json();}).catch(function(){return null;});
+  if(!r||!r.ok||!r.mensagem){
+    el.innerHTML='<div style="background:var(--painel);border:1px solid var(--linha);border-radius:12px;padding:11px 13px;margin-bottom:11px;font-size:11.5px;color:var(--dim);">'
+      +'🧭 O copiloto ainda não gerou o recado de hoje. <a href="#" onclick="gerarRecado();return false;" style="color:#60a5fa;">gerar agora</a></div>';
+    return;
+  }
+  var t=r.totais||{};
+  var listinha=function(tit,arr,cor,sinal){
+    if(!arr||!arr.length)return '';
+    return '<div style="margin-top:8px;"><div style="font-size:9.5px;font-weight:900;color:'+cor+';letter-spacing:.4px;">'+tit+'</div>'
+      +arr.slice(0,4).map(function(x){
+        return '<div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;margin-top:3px;">'
+          +'<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(x.nome)+'</span>'
+          +'<span style="font-family:var(--mono);color:'+cor+';flex:0 0 auto;">'+(x.cpa!=null?brl(x.cpa):'sem conversa')
+          +(x.variacaoPct!=null?' <b>'+sinal+Math.abs(x.variacaoPct)+'%</b>':'')+'</span></div>';
+      }).join('')+'</div>';
+  };
+  el.innerHTML='<div style="background:linear-gradient(150deg,rgba(59,130,246,.12),rgba(13,16,24,.95));border:1px solid rgba(59,130,246,.4);border-radius:13px;padding:13px;margin-bottom:11px;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;">'
+      +'<div style="font-size:9.5px;font-weight:900;color:#60a5fa;letter-spacing:.6px;">🧭 RECADO DO COPILOTO · '+(r.dia||'').split("-").reverse().join("/")+'</div>'
+      +'<a href="#" onclick="gerarRecado();return false;" style="font-size:10px;color:var(--dim);text-decoration:none;">↻</a>'
+    +'</div>'
+    +'<div style="font-size:12.5px;line-height:1.6;margin-top:8px;">'+esc(r.mensagem)+'</div>'
+    +'<div style="font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:8px;">'
+      +brl(t.gasto)+' · '+t.conversas+' conversas · '+(t.cpa!=null?brl(t.cpa)+'/conversa':'—')
+      +' · '+r.estaveis+' estáveis · '+r.diasDeHistorico+' dias de histórico</div>'
+    +listinha('📈 MELHORANDO',r.melhorando,'#4ade80','−')
+    +listinha('📉 PIORANDO',r.piorando,'#f87171','+')
+    +((r.semConversa||[]).length?listinha('⚠️ SEM CONVERSA ONTEM',r.semConversa,'#f59e0b',''):'')
+  +'</div>';
+}
+async function gerarRecado(){
+  var el=document.getElementById('recado-copiloto');
+  if(el)el.innerHTML='<div style="background:var(--painel);border:1px solid var(--linha);border-radius:12px;padding:11px 13px;margin-bottom:11px;font-size:11.5px;color:var(--dim);">🧭 Analisando o dia…</div>';
+  await fetch('/api/trafego?action=relatorio-diario&gerar=1').catch(function(){});
+  carregarRecado();
+}
+
+carregarRecado();
 carregar();
 setInterval(function(){if(!document.hidden)carregar();},30*60*1000);
 </script>

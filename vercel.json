@@ -99,6 +99,10 @@
     {
       "path": "/api/wa-bot?action=arquivar-inativas&aplicar=1&dias=30&k=tfk-re2026-Bx7mQp9zKw4Y",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/trafego?action=relatorio-diario&gerar=1&k=tfk-re2026-Bx7mQp9zKw4Y",
+      "schedule": "40 10 * * *"
     }
   ],
   "rewrites": [

@@ -593,6 +593,125 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, conta: 'act_' + CONTA, cicloDesde: inicioCiclo(cfgD), testes });
   }
 
+  // ═══ 📰 RELATÓRIO DIÁRIO DO COPILOTO — roda 1x/dia, compara com o histórico ═══
+  if (action === 'relatorio-diario') {
+    const guardado = await dbGet('trafego_relatorio_diario');
+    if (guardado && String(req.query.gerar || '') !== '1') {
+      return res.status(200).json(Object.assign({ ok: true, doCache: true }, guardado));
+    }
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'META_ADS_ACCOUNT não configurado' });
+    const cfg = await cfgTrafego();
+    const base = `${GRAPH}/act_${CONTA}/`;
+    const tk = `&access_token=${TOKEN}`;
+    const filtroAtivo = '&filtering=' + encodeURIComponent(JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE'] }]));
+
+    // 1) Anúncios ativos + insights de ONTEM
+    const ads = await pegarTudo(`${base}ads?fields=id,name,effective_status,adset_id,campaign_id&limit=100${filtroAtivo}${tk}`, 6);
+    if (ads.erro && !ads.data.length) return res.status(200).json({ ok: false, erro: ads.erro });
+    const ins = await pegarTudo(`${base}insights?level=ad&date_preset=yesterday&use_unified_attribution_setting=true&fields=ad_id,spend,clicks,actions&limit=100${tk}`, 6);
+    const CONV = ['onsite_conversion.messaging_conversation_started_7d', 'onsite_conversion.messaging_first_reply', 'onsite_conversion.total_messaging_connection', 'lead'];
+    const contaConv = (acoes) => { for (const t of CONV) { const a = (acoes || []).find(x => x.action_type === t); if (a) return Number(a.value || 0); } return 0; };
+    const porAd = {}; for (const i of (ins.data || [])) porAd[i.ad_id] = i;
+
+    // 2) Grava o dia de ontem no histórico
+    const ontem = new Date(Date.now() - 3 * 3600 * 1000 - 86400000).toISOString().slice(0, 10);
+    const hist = (await dbGet('trafego_historico_diario')) || { dias: {} };
+    const doDia = {};
+    const snapshot = [];
+    for (const ad of (ads.data || [])) {
+      const i = porAd[ad.id] || {};
+      const gasto = Number(i.spend || 0), conv = contaConv(i.actions);
+      if (gasto === 0 && conv === 0) continue;
+      const cat = categoriaDe(ad.name);
+      const cpa = conv > 0 ? Number((gasto / conv).toFixed(2)) : null;
+      doDia[ad.id] = { n: ad.name, c: cat, g: Number(gasto.toFixed(2)), v: conv, cpa };
+      snapshot.push({ id: ad.id, nome: ad.name, categoria: cat, gasto: Number(gasto.toFixed(2)), conversas: conv, cpa });
+    }
+    hist.dias[ontem] = doDia;
+    const corteH = new Date(Date.now() - 45 * 86400000).toISOString().slice(0, 10);
+    for (const d of Object.keys(hist.dias)) if (d < corteH) delete hist.dias[d];
+    try { await dbSet('trafego_historico_diario', hist); } catch (e) {}
+
+    // 3) Compara cada criativo com a própria média histórica (dias anteriores)
+    const diasOrd = Object.keys(hist.dias).sort();
+    const anteriores = diasOrd.filter(d => d < ontem);
+    const mediaDe = (adId) => {
+      const vals = [];
+      for (const d of anteriores) { const r = hist.dias[d][adId]; if (r && r.cpa != null) vals.push(r.cpa); }
+      return vals.length ? { media: vals.reduce((a, b) => a + b, 0) / vals.length, dias: vals.length } : null;
+    };
+    const melhorando = [], piorando = [], estaveis = [], novos = [], semConversa = [];
+    for (const s of snapshot) {
+      const meta = cfg.metas[s.categoria] != null ? cfg.metas[s.categoria] : cfg.metas.outros;
+      if (s.cpa == null) { semConversa.push(Object.assign({ meta }, s)); continue; }
+      const m = mediaDe(s.id);
+      if (!m || m.dias < 2) { novos.push(Object.assign({ meta }, s)); continue; }
+      const varia = (s.cpa - m.media) / m.media;
+      const item = Object.assign({ meta, mediaAnterior: Number(m.media.toFixed(2)),
+        variacaoPct: Number((varia * 100).toFixed(0)), diasHistorico: m.dias }, s);
+      if (varia <= -0.15) melhorando.push(item);
+      else if (varia >= 0.15) piorando.push(item);
+      else estaveis.push(item);
+    }
+    melhorando.sort((a, b) => a.variacaoPct - b.variacaoPct);
+    piorando.sort((a, b) => b.variacaoPct - a.variacaoPct);
+
+    // 4) Totais do dia + por categoria
+    const gastoOntem = snapshot.reduce((s, a) => s + a.gasto, 0);
+    const convOntem = snapshot.reduce((s, a) => s + a.conversas, 0);
+    const porCat = {};
+    for (const s of snapshot) {
+      const c = s.categoria;
+      if (!porCat[c]) porCat[c] = { gasto: 0, conversas: 0, meta: cfg.metas[c] != null ? cfg.metas[c] : cfg.metas.outros };
+      porCat[c].gasto += s.gasto; porCat[c].conversas += s.conversas;
+    }
+    for (const c of Object.keys(porCat)) {
+      porCat[c].gasto = Number(porCat[c].gasto.toFixed(2));
+      porCat[c].cpa = porCat[c].conversas > 0 ? Number((porCat[c].gasto / porCat[c].conversas).toFixed(2)) : null;
+      porCat[c].acimaDaMeta = porCat[c].cpa != null ? porCat[c].cpa > porCat[c].meta : null;
+    }
+
+    // 5) Texto do copiloto (curto e direto)
+    let mensagem = '';
+    const AK = (process.env.ANTHROPIC_API_KEY || '').trim();
+    if (AK) {
+      try {
+        const prompt = `Você é o copiloto de tráfego da Reparo Eletro. Escreva o recado do dia para o dono, em português do Brasil, tom direto de quem trabalha com ele.
+
+ONTEM (${ontem}): R$ ${gastoOntem.toFixed(2)} gastos, ${convOntem} conversas.
+POR CATEGORIA: ${JSON.stringify(porCat)}
+MELHORANDO (CPA caiu vs a média do próprio criativo): ${JSON.stringify(melhorando.slice(0, 6))}
+PIORANDO (CPA subiu): ${JSON.stringify(piorando.slice(0, 6))}
+ESTÁVEIS: ${estaveis.length} criativos
+SEM CONVERSA ONTEM: ${JSON.stringify(semConversa.slice(0, 5))}
+NOVOS (sem histórico): ${novos.length}
+
+Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criativos pelo nome quando relevante, aponte o que merece ação hoje e o que já está bom. Sem saudação, sem despedida, sem markdown. Se algo estiver com pouca amostra, diga que é cedo para concluir.`;
+        const r = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'x-api-key': AK, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }),
+        }).then(x => x.json());
+        mensagem = ((r && r.content) || []).filter(b => b.type === 'text').map(b => b.text).join(' ').trim();
+      } catch (e) {}
+    }
+    if (!mensagem) {
+      mensagem = `Ontem foram ${convOntem} conversas por R$ ${gastoOntem.toFixed(2)}` +
+        (convOntem > 0 ? ` (R$ ${(gastoOntem / convOntem).toFixed(2)} por conversa).` : '.') +
+        (piorando.length ? ` ${piorando.length} criativo(s) pioraram.` : '') +
+        (melhorando.length ? ` ${melhorando.length} melhoraram.` : '');
+    }
+
+    const saida = { dia: ontem, geradoEm: new Date().toISOString(), mensagem,
+      totais: { gasto: Number(gastoOntem.toFixed(2)), conversas: convOntem,
+        cpa: convOntem > 0 ? Number((gastoOntem / convOntem).toFixed(2)) : null },
+      porCategoria: porCat, melhorando, piorando,
+      estaveis: estaveis.length, novos: novos.length, semConversa,
+      diasDeHistorico: diasOrd.length };
+    try { await dbSet('trafego_relatorio_diario', saida); } catch (e) {}
+    return res.status(200).json(Object.assign({ ok: true }, saida));
+  }
+
   // ── 🎯 ORIGENS: conversas com anúncio de origem capturado (base da atribuição de funil) ──
   if (action === 'origens') {
     const org = (await dbGet('wa_origem_anuncio')) || { por: {} };
