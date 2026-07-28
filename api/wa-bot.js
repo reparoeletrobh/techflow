@@ -488,7 +488,7 @@ export default async function handler(req, res) {
       }
     }
     // procurou sinal de aprovação nas mensagens do cliente
-    const SIM = /\b(aprovo|aprovado|pode fazer|pode consertar|pode arrumar|autorizo|fechado|combinado|vamos fazer|manda ver|t[áa] bom pode|beleza pode|sim pode)\b/i;
+    const SIM = /\b(aprovo|aprovado|pode fazer|pode consertar|pode arrumar|pode reparar|autorizo|pode executar|manda fazer|quero (que )?conserte)\b/i;
     const achados = {};
     for (const e of evts) {
       if (e.dir !== 'in' || !e.texto) continue;
@@ -504,6 +504,38 @@ export default async function handler(req, res) {
       lista: lista.map(x => x.nome + ' ' + String(x.id).slice(-4) + ' | ' + (x.equipamento || '') +
         ' | R$ ' + (x.valor || '?') + ' | "' + x.frase + '" | ' + String(x.aprovouEm).slice(0, 16).replace('T', ' ')),
       detalhe: lista });
+  }
+
+  // ── ↩️ DESFAZER-APROVACAO: devolve o card para aguardando aprovação ──
+  if (action === 'desfazer-aprovacao') {
+    const alvo = String(req.query.id || '').trim();
+    const tel = String(req.query.tel || '').replace(/\D/g, '');
+    if (!alvo && !tel) return res.status(400).json({ ok: false, error: 'informe ?id= do card ou ?tel= (4+ dígitos finais)' });
+    const KDF = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+    const [ppA, ppT] = await Promise.all([dbGet('reparoeletro_pipe'), dbGet('tv_pipe')]);
+    const achados = [];
+    for (const [b, s, api] of [[ppA, 'adm', 'pipe'], [ppT, 'tv', 'tv-pipe']]) {
+      for (const c of (((b || {}).cards) || [])) {
+        const bate = alvo ? c.id === alvo : String(c.telefone || '').replace(/\D/g, '').endsWith(tel);
+        if (!bate) continue;
+        achados.push({ id: c.id, sis: s, api, nome: c.nomeContato, equipamento: c.equipamento,
+          faseAtual: c.phaseId || c.phase, valor: c.valor });
+      }
+    }
+    if (!achados.length) return res.status(404).json({ ok: false, error: 'card não encontrado' });
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia', achados,
+        dica: 'para desfazer: &aplicar=1 (volta para aguardando_aprovacao)' });
+    }
+    const feitos = [];
+    for (const a of achados) {
+      const r = await fetch(`https://reparoeletroadm.com/api/${a.api}?action=mover&k=${KDF}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: a.id, phase: 'aguardando_aprovacao' }),
+      }).then(x => x.json()).catch(e => ({ error: e.message }));
+      feitos.push(a.nome + ': ' + (r && !r.error ? 'devolvido para aguardando aprovação' : 'falhou — ' + (r.error || '?')));
+    }
+    return res.status(200).json({ ok: true, feitos });
   }
 
   // ── 📋 QUEM-RECEBEU-RETROATIVA: lista e conta as mensagens do disparo retroativo ──
@@ -578,7 +610,11 @@ export default async function handler(req, res) {
         parados[d] = { id: c.id, sis, nome: c.nomeContato, equipamento: c.equipamento, valor: c.valor, tel: c.telefone };
       }
     }
-    const SIM = /\b(aprovo|aprovado|pode fazer|pode consertar|pode arrumar|autorizo|fechado|combinado|vamos fazer|manda ver|pode retornar|pode seguir)\b/i;
+    // ESTRITO: precisa de verbo de ação sobre o CONSERTO. Palavras ambíguas como "combinado",
+    // "fechado" ou "beleza" sozinhas NÃO são aprovação — o cliente pode estar concordando em
+    // AGUARDAR o orçamento (erro real: Dirceu "Combinado..👍" e Jôsedna "Está combinado no aguardo").
+    const SIM = /\b(aprovo|aprovado|pode fazer|pode consertar|pode arrumar|pode reparar|pode seguir com o (conserto|reparo)|autorizo|pode executar|manda fazer|faz(er)? sim|quero (que )?conserte)\b/i;
+    const AMBIGUO = /\b(combinado|fechado|beleza|ok|t[áa] bom|certo)\b/i;
     const alvos = [];
     for (const e of evtsP) {
       if (e.dir !== 'in' || !e.texto) continue;
@@ -612,8 +648,9 @@ export default async function handler(req, res) {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: a.id, phase: 'aprovados' }) });
         }
         await bumpStat('aprovacoes');
-        // avisa o cliente (janela de 24h costuma estar aberta — ele acabou de escrever)
-        if (token && phoneId && a.tel) {
+        // avisa o cliente — UMA VEZ SÓ (5 clientes receberam em duplicidade no primeiro disparo)
+        const jaAvisou = (await dbGet('wa_aprov_retro')) || { ids: {} };
+        if (token && phoneId && a.tel && !jaAvisou.ids[a.id]) {
           const to = String(a.tel).replace(/\D/g, '');
           const to55 = to.startsWith('55') ? to : '55' + to;
           const txt = `Perfeito! Seu ${a.equipamento || 'equipamento'} já está em processo de conserto. 😊\n\nAguardo só você me confirmar se o pagamento vai ser no Pix ou no cartão, para eu já atualizar a sua ficha.`;
@@ -623,6 +660,8 @@ export default async function handler(req, res) {
           }).then(x => x.json()).catch(() => null);
           if (r && r.messages && r.messages[0]) {
             await rpushEvt({ ts: new Date().toISOString(), tel: to55, dir: 'out', texto: txt, tipo: 'aprovacao-retroativa' });
+            jaAvisou.ids[a.id] = new Date().toISOString();
+            await dbSet('wa_aprov_retro', jaAvisou);
           }
         }
         feitos.push(a.nome + ' (' + a.sis.toUpperCase() + ')');
