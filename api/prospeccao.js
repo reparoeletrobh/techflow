@@ -141,7 +141,10 @@ export default async function handler(req,res){
         const exc=(await dbGet('prospeccao_excluidos'))||{tels:{}};
         const corteExc=Date.now()-60*86400000;
         for(const t of Object.keys(exc.tels||{})){
-          if(new Date(exc.tels[t]).getTime()>corteExc)existentes.add(t);
+          if(new Date(exc.tels[t]).getTime()<=corteExc)continue;
+          existentes.add(t);
+          const d=String(t).replace(/\D/g,'').slice(-8);
+          if(d.length>=8)existentes.add(d);
         }
       }catch(_){}
 
@@ -201,8 +204,10 @@ export default async function handler(req,res){
 
         // Deduplicação por telefone
         const telNorm=tel||'';
-        if(existentes.has(telNorm))continue;
+        const telD8=String(tel||'').replace(/\D/g,'').slice(-8);
+        if(existentes.has(telNorm)||(telD8.length>=8&&existentes.has(telD8)))continue;
         existentes.add(telNorm);
+        if(telD8.length>=8)existentes.add(telD8);
 
         const novaFicha={
           id:      gerarId(tel,hora),
@@ -375,18 +380,54 @@ export default async function handler(req,res){
   }
 
   // ── EXCLUIR ─────────────────────────────────────────────────────────────
+  // ── 🧹 limpa excluídas que reapareceram (corrida do sync regravando snapshot velho) ──
+  if(action==='limpar-excluidas-reaparecidas'){
+    const [db,exc]=await Promise.all([dbGet(KEY),dbGet('prospeccao_excluidos')]);
+    const tels=new Set();
+    for(const t of Object.keys(((exc||{}).tels)||{})){
+      const d=String(t).replace(/\D/g,'').slice(-8);
+      if(d.length>=8)tels.add(d);
+    }
+    const antes=(((db||{}).fichas)||[]).length;
+    const removidas=[];
+    const restantes=(((db||{}).fichas)||[]).filter(f=>{
+      const d=String(f.telefone||'').replace(/\D/g,'').slice(-8);
+      if(d.length>=8&&tels.has(d)){removidas.push({nome:f.nome,telefone:f.telefone,status:f.status});return false;}
+      return true;
+    });
+    if(String(req.query.aplicar||'')==='1'&&removidas.length){
+      db.fichas=restantes;await dbSet(KEY,db);
+      return res.status(200).json({ok:true,removidas:removidas.length,antes,depois:restantes.length,lista:removidas.slice(0,40)});
+    }
+    return res.status(200).json({ok:true,reapareceram:removidas.length,lista:removidas.slice(0,40),
+      dica:'para remover: mesmo link com &aplicar=1'});
+  }
+
   if(req.method==='POST'&&action==='excluir'){
     const{id}=req.body||{};
     const db=(await dbGet(KEY))||{fichas:[]};
     const fx=db.fichas.find(x=>x.id===id);
-    db.fichas=db.fichas.filter(x=>x.id!==id);
-    await dbSet(KEY,db);
+    // grava o tombstone ANTES de remover (se o sync atropelar, a trava já existe)
+    if(fx&&fx.telefone){
+      try{
+        const excA=(await dbGet('prospeccao_excluidos'))||{tels:{}};
+        if(!excA.tels)excA.tels={};
+        const dA=String(fx.telefone).replace(/\D/g,'').slice(-8);
+        if(dA.length>=8)excA.tels[dA]=new Date().toISOString();
+        await dbSet('prospeccao_excluidos',excA);
+      }catch(_){}
+    }
+    const dbF=(await dbGet(KEY))||db;   // relê: o sync pode ter gravado no meio
+    dbF.fichas=(dbF.fichas||[]).filter(x=>x.id!==id);
+    await dbSet(KEY,dbF);
     // Tombstone: excluída não volta pela planilha
     if(fx&&fx.telefone){
       try{
         const exc=(await dbGet('prospeccao_excluidos'))||{tels:{}};
         if(!exc.tels)exc.tels={};
-        exc.tels[String(fx.telefone)]=new Date().toISOString();
+        const d8x=String(fx.telefone||'').replace(/\D/g,'').slice(-8);
+        if(d8x.length>=8)exc.tels[d8x]=new Date().toISOString();
+        exc.tels[String(fx.telefone)]=new Date().toISOString();   // mantém o formato antigo também
         // Poda: manter só os últimos 60 dias / máx 5000
         const corteT=Date.now()-60*86400000;
         const keys=Object.keys(exc.tels);
