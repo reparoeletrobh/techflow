@@ -82,14 +82,15 @@ module.exports = async function handler(req, res) {
     }
     if (/tvs?\b|\btvs?\d|televis|barramento|tela quebrad|quebrar tv|polegada/.test(s)) return 'tv';
     // micro-ondas: nome por extenso (tolerando erros de digitação) + códigos de modelo
-    if (/mic?r?o\s?-?\s?o?nd?as|microodas|micro ?ond|reforma|\binflu\b|\bantigo\b/.test(s)) return 'microondas';
-    if (/\bme[fo]?\d{2}|\bmto\d|\bpms?\d{2}|\bpme\d|\bpm0\d|\bmtae?\d{2}|\bnn-?st?\d{2}|\bms\d{4}|\bmh\d{4}|\bbm[a-z]?\d{2}|\bcm[a-z]?\d{2}|\bmg\d{2}/.test(s)) return 'microondas';
+    if (/mic?r?o\s?-?\s?o?nd?as|microodas|micro ?ond|\bmicro\b|reforma|\binflu\b|\bantigo\b/.test(s)) return 'microondas';
+    if (/\bme[fovs]?\d{2}|\bmto\d|\bpms?\d{2}|\bpme\d|\bpm0\d|\bmtae?\d{2}|\bnn-?st?\d{2}|\bms\d{4}|\bmh\d{4}|\bbm[a-z]?\d{2}|\bcm[a-z]?\d{2}|\bmg\d{2}/.test(s)) return 'microondas';
     if (/\bforn(o|inho)/.test(s)) return 'forno';
     // purificador/bebedouro: nome + linhas Electrolux (PE/PA/PH4/PC4) e Consul (CPB/CPC)
-    if (/purificador|bebedouro|\bfiltro\b|\bvela\b|[áa]gua/.test(s)) return 'purificador';
+    if (/purifi[a-z]*dor|purifiador|bebedouro|\bfiltro\b|\bvela\b|[áa]gua/.test(s)) return 'purificador';
+    if (/\bibbl\b|\blatina\b|colorma[qc]|coloma[qc]|esmaltec|\blibell\b|\bsoft\b|masterfrio|karina/.test(s)) return 'purificador';
     if (/\bp[ea]\d{2}[a-z]?\b|\bph4\d|\bpc4\d|\bcp[bc]\d{2}/.test(s)) return 'purificador';
     // refrigeração de bebida: adega, cervejeira, frigobar, mini geladeira
-    if (/adega|cervejeir|climatiz|vinho|frigobar|min[ie]\s?\s?geladeira|gelad?eira|\bbz[a-z]?\d{2}/.test(s)) return 'adega';
+    if (/adega|cerve[jr]|cervi|chopeir|climatiz|vinho|frigobar|min[ie]\s?\s?geladeira|gelad?eira|\bbz[a-z]?\d{2}|co ?²|co ?2/.test(s)) return 'adega';
     if (/criativo loja|reuniao externa|reunião externa|\bnovo\b|vitrine|institucional/.test(s)) return 'institucional';
     // sem identificação: anúncio vira institucional; equipamento fica marcado para ensinarmos
     return contexto === 'anuncio' ? 'institucional' : 'outros';
