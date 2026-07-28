@@ -452,12 +452,34 @@ export default async function handler(req, res) {
     const dias = Math.min(30, Math.max(1, parseInt(req.query.dias || '7', 10)));
     const resp = await fetch(SHEET_CSV, { redirect: 'follow' });
     const rows = parseCSV(await resp.text());
-    const [dbAdm, dbTv, cursor, tomb] = await Promise.all([
+    // A ficha SAI de fichas_adm/fichas_tv quando avança (logística, prospecção, pipe, arquivo).
+    // Procurar só ali fazia parecer perdida quem na verdade foi atendida.
+    const [dbAdm, dbTv, cursor, tomb, lgA, lgT, pros, ppA, ppT, arqA, arqT] = await Promise.all([
       dbGet(KEY_ADM), dbGet(KEY_TV), dbGet(KEY_CURSOR), dbGet(KEY_EXCLUIDAS),
+      dbGet('reparoeletro_logistica'), dbGet('tv_logistica'), dbGet('prospeccao_adm'),
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+      dbGet('reparoeletro_arquivo'), dbGet('tv_arquivo'),
     ]);
     const todas = [...(((dbAdm || {}).fichas) || []), ...(((dbTv || {}).fichas) || [])];
     const porRow = new Set(todas.map(f => Number(f.sheetRow)).filter(x => !isNaN(x)));
-    const porTel = new Set(todas.map(f => String(f.telefone || '').replace(/\D/g, '').slice(-8)).filter(d => d.length >= 8));
+    // ONDE o cliente aparece em toda a operação (por telefone)
+    const ondeEsta = new Map();
+    const marcar = (tel, lugar) => {
+      const d = String(tel || '').replace(/\D/g, '').slice(-8);
+      if (d.length < 8) return;
+      if (!ondeEsta.has(d)) ondeEsta.set(d, new Set());
+      ondeEsta.get(d).add(lugar);
+    };
+    for (const f of (((dbAdm || {}).fichas) || [])) marcar(f.telefone, 'ficha ADM (' + (f.status || 'criada') + ')');
+    for (const f of (((dbTv || {}).fichas) || [])) marcar(f.telefone, 'ficha TV (' + (f.status || 'criada') + ')');
+    for (const f of (((lgA || {}).fichas) || [])) marcar(f.telefone, 'logística ADM');
+    for (const f of (((lgT || {}).fichas) || [])) marcar(f.telefone, 'logística TV');
+    for (const f of (((pros || {}).fichas) || [])) marcar(f.telefone, 'prospecção (' + (f.status || '') + ')');
+    for (const c of (((ppA || {}).cards) || [])) marcar(c.telefone, 'pipe ADM (' + (c.phaseId || c.phase || '') + ')');
+    for (const c of (((ppT || {}).cards) || [])) marcar(c.telefone, 'pipe TV (' + (c.phaseId || c.phase || '') + ')');
+    for (const c of (((arqA || {}).cards) || [])) marcar(c.telefone, 'arquivo ADM');
+    for (const c of (((arqT || {}).cards) || [])) marcar(c.telefone, 'arquivo TV');
+    const porTel = new Set([...ondeEsta.keys()]);
     const bloqueadas = ((tomb || {}).linhas) || {};
     const corte = Date.now() - 3 * 3600 * 1000 - dias * 86400000;
     const parseData = (s) => {
@@ -479,16 +501,19 @@ export default async function handler(req, res) {
       const rowNum = ri + 1;
       if (porRow.has(rowNum)) continue;                       // já virou ficha
       const d8 = tel.slice(-8);
-      const jaTemCliente = d8.length >= 8 && porTel.has(d8);
+      const lugares = d8.length >= 8 && ondeEsta.has(d8) ? [...ondeEsta.get(d8)] : [];
+      const estaNaOperacao = lugares.length > 0;
+      const bloq = !!bloqueadas[String(rowNum)];
+      let acao;
+      if (estaNaOperacao) acao = 'JÁ FOI ATENDIDA — está em: ' + lugares.join(' | ');
+      else if (bloq) acao = 'desbloquear e reimportar';
+      else acao = 'forçar reimportação';
       perdidas.push({ linha: rowNum, nome, telefone: tel, equipamento: equip, horario: hora,
-        bloqueada: !!bloqueadas[String(rowNum)],
-        bloqueadaEm: bloqueadas[String(rowNum)] ? bloqueadas[String(rowNum)].em : null,
-        clienteJaTemOutraFicha: jaTemCliente,
-        acao: bloqueadas[String(rowNum)] ? 'desbloquear e reimportar'
-          : (jaTemCliente ? 'cliente já tem ficha — provável duplicata, não recuperar'
-          : 'forçar reimportação') });
+        bloqueada: bloq,
+        bloqueadaEm: bloq ? bloqueadas[String(rowNum)].em : null,
+        ondeEstaOCliente: lugares, acao });
     }
-    const recuperaveis = perdidas.filter(p => p.acao !== 'cliente já tem ficha — provável duplicata, não recuperar');
+    const recuperaveis = perdidas.filter(p => !String(p.acao).startsWith('JÁ FOI ATENDIDA'));
     if (String(req.query.aplicar || '') === '1' && recuperaveis.length) {
       // 1) desbloqueia as linhas
       const t2 = (await dbGet(KEY_EXCLUIDAS)) || { linhas: {} };
@@ -507,8 +532,11 @@ export default async function handler(req, res) {
     }
     return res.status(200).json({ ok: true, modo: 'prévia (nada foi alterado)',
       periodoDias: dias, cursorAtual: (cursor || {}).row || null,
-      perdidas: perdidas.length, recuperaveis: recuperaveis.length,
-      lista: perdidas,
+      linhasSemFichaNoBancoDeCriadas: perdidas.length,
+      jaAtendidas: perdidas.length - recuperaveis.length,
+      realmentePerdidas: recuperaveis.length,
+      lista: recuperaveis,
+      jaAtendidasDetalhe: perdidas.filter(p => String(p.acao).startsWith('JÁ FOI ATENDIDA')).slice(0, 20),
       dica: 'para recuperar: mesmo link com &aplicar=1' });
   }
 
