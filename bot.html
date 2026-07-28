@@ -155,7 +155,7 @@ var ACAO_LBL={cadastrar_logistica:'🚚 Cadastrar em Logística',enviar_orcament
 async function carregarConversas(){
   var el=document.getElementById('lista-conv');
   try{
-    var d=await fetch('/api/wa-bot?action=conversas'+(window._verArq?'&arquivadas=1':'')).then(function(r){return r.json();});
+    var d=await fetch('/api/wa-bot?action=conversas'+(window._verArq?'&arquivadas=1':'')+(window._filtroConv?'&q='+encodeURIComponent(window._filtroConv):'')).then(function(r){return r.json();});
     if(!d.conversas||!d.conversas.length){
       el.innerHTML='<div style="padding:20px;color:#5a6270;font-size:11px;text-align:center;">📭 Nenhuma conversa ainda.<br><br>Configure o webhook na Meta e as mensagens aparecem aqui.</div>';
       return;
@@ -208,6 +208,18 @@ async function arquivarConv(tel){
 }
 function toggleArquivadas(){
   window._verArq=!window._verArq;
+  var bc=document.getElementById('barra-arq');
+  if(bc)bc.remove();
+  if(window._verArq){
+    var alvo=document.getElementById('lista-conv');
+    if(alvo&&alvo.parentNode){
+      var d=document.createElement('div');
+      d.id='barra-arq';
+      d.style.cssText='background:rgba(139,147,163,.1);border:1px solid #2a2f38;border-radius:9px;padding:8px 11px;margin:0 0 6px;font-size:11px;color:#c9ced6;';
+      d.innerHTML='🗄 <b>Conversas arquivadas</b><div style="color:#5a6270;font-size:10px;margin-top:2px;">resolvidas ou sem resposta há 30+ dias · usa a busca acima para achar um cliente · se ele escrever, volta sozinha</div>';
+      alvo.parentNode.insertBefore(d,alvo);
+    }
+  }
   document.getElementById('btn-ver-arq').style.color=window._verArq?'#fbbf24':'#5a6270';
   loadConvs();
 }
@@ -248,7 +260,8 @@ function renderLista(d){
     el.innerHTML=lst.map(function(c){
       return '<div class="conv'+(c.tel===_tel?' sel':'')+(c.escalada?' conv-escalada':'')+'" onclick="abrirConversa(\''+c.tel+'\')">'
         +'<div class="conv-nome">'+esc(c.nome||fmtTel(c.tel))+(c.escalada?'<span class="conv-badge" style="background:rgba(245,158,11,.35);color:#fde047;">⚠️ precisa de humano</span>':'')+(c.pausado?'<span class="conv-badge" style="background:rgba(245,158,11,.25);color:#fbbf24;">✋ manual</span>':(c.naoRespondida?'<span class="conv-badge">responder</span>':''))+'</div>'
-        +'<div style="font-size:10.5px;color:#5a8dc9;font-family:var(--fm,monospace);margin:1px 0 2px;">📞 '+fmtTel(c.tel)+'</div>'
+        +'<div style="font-size:10.5px;color:#5a8dc9;font-family:var(--fm,monospace);margin:1px 0 2px;">📞 '+fmtTel(c.tel)
+          +(c.arquivadaEm?'<span style="color:#5a6270;"> · 🗄 '+new Date(c.arquivadaEm).toLocaleDateString('pt-BR')+'</span>':'')+'</div>'
         +(window._filtroOrc&&c.horasParado!=null
           ?'<div style="font-size:10px;color:'+(c.horasParado>24?'#fca5a5':'#8b93a3')+';margin-bottom:2px;">'
             +(c.equipamento?esc(c.equipamento)+' · ':'')

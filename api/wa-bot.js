@@ -39,7 +39,7 @@ async function bumpStat(campo) {
 }
 async function lerEvts() {
   try {
-    const r = await fetch(`${U}/lrange/${EVT_LIST}/-1500/-1`, { headers: { Authorization: `Bearer ${T}` } });
+    const r = await fetch(`${U}/lrange/${EVT_LIST}/-5000/-1`, { headers: { Authorization: `Bearer ${T}` } });
     const j = await r.json();
     const out = [];
     for (const s of (j.result || [])) { try { out.push(JSON.parse(s)); } catch (_) {} }
@@ -394,6 +394,44 @@ export default async function handler(req, res) {
     await dbSet('wa_reativacao', reatR);
     return res.status(200).json({ ok: true, alvosAtivos: alvos.length, acoes: feitos.length, feitos,
       pulados: pulados.length, motivosPulados: pulados.slice(0, 20) });
+  }
+
+  // ── 🗄 ARQUIVAR-INATIVAS: 30 dias sem o cliente responder → arquiva (nunca com orçamento aberto) ──
+  if (action === 'arquivar-inativas') {
+    const dias = Math.min(180, Math.max(7, parseInt(req.query.dias || '30', 10)));
+    const corteA = Date.now() - dias * 86400000;
+    const [evtsAI, arqAI] = await Promise.all([lerEvts(), dbGet('wa_arquivadas').then(v => v || { tels: {} })]);
+    const abertosAI = await orcamentosEmAberto();
+    const comOrcamento = new Set(abertosAI.map(a => a.d8));
+    // última mensagem DO CLIENTE por telefone
+    const ultimaIn = {}, nomes = {};
+    for (const e of evtsAI) {
+      const d = String(e.tel || '').replace(/\D/g, '').slice(-8);
+      if (d.length < 8) continue;
+      if (e.nome) nomes[d] = e.nome;
+      if (e.dir !== 'in') continue;
+      const t = new Date(e.ts || 0).getTime();
+      if (!ultimaIn[d] || t > ultimaIn[d]) ultimaIn[d] = t;
+    }
+    const candidatos = [];
+    for (const d of Object.keys(ultimaIn)) {
+      if (arqAI.tels[d]) continue;                       // já arquivada
+      if (comOrcamento.has(d)) continue;                 // 🚫 orçamento em aberto nunca arquiva
+      if (ultimaIn[d] >= corteA) continue;               // respondeu dentro do prazo
+      candidatos.push({ d8: d, nome: nomes[d] || '',
+        ultimaResposta: new Date(ultimaIn[d]).toISOString(),
+        diasParado: Math.round((Date.now() - ultimaIn[d]) / 86400000) });
+    }
+    candidatos.sort((a, b) => b.diasParado - a.diasParado);
+    if (String(req.query.aplicar || '') === '1') {
+      for (const c of candidatos) arqAI.tels[c.d8] = new Date().toISOString();
+      await dbSet('wa_arquivadas', arqAI);
+      return res.status(200).json({ ok: true, arquivadas: candidatos.length, dias, candidatos: candidatos.slice(0, 50) });
+    }
+    return res.status(200).json({ ok: true, dias, seriamArquivadas: candidatos.length,
+      protegidosPorOrcamento: comOrcamento.size,
+      candidatos: candidatos.slice(0, 50),
+      dica: 'para executar: mesmo link com &aplicar=1 (roda sozinho todo dia às 4h)' });
   }
 
   // ── 🔌 REATIVACAO-LIGAR / DESLIGAR ──
@@ -1395,15 +1433,22 @@ export default async function handler(req, res) {
       dbGet('wa_arquivadas').then(v => v || { tels: {} }),
     ]);
     const verArq = String(req.query.arquivadas || '') === '1';
+    const buscaC = String(req.query.q || '').toLowerCase().trim();
     let lista = Object.values(conv).sort((a, b) => String(b.ultimaTs).localeCompare(String(a.ultimaTs)));
     lista = lista.filter(c => {
       const d8c = String(c.tel).replace(/\D/g, '').slice(-8);
       const arquivada = !!arqL.tels[d8c];
       c.arquivada = arquivada;
-      return verArq ? arquivada : !arquivada;
+      if (arquivada) c.arquivadaEm = arqL.tels[d8c];
+      if (!(verArq ? arquivada : !arquivada)) return false;
+      if (buscaC) {
+        const alvo = ((c.nome || '') + ' ' + String(c.tel || '')).toLowerCase();
+        if (alvo.indexOf(buscaC) < 0) return false;
+      }
+      return true;
     });
     for (const c of lista) c.pausado = !!pzL[String(c.tel).replace(/\D/g, '').slice(-8)];
-    return res.status(200).json({ ok: true, total: lista.length, conversas: lista.slice(0, 100) });
+    return res.status(200).json({ ok: true, total: lista.length, conversas: lista.slice(0, 300) });
   }
 
   // ── Arquivar/desarquivar conversa resolvida ──
@@ -1422,7 +1467,7 @@ export default async function handler(req, res) {
     const tel = String(req.query.tel || '');
     const evts = await lerEvts();
     const d8Hi = String(tel).replace(/\D/g, '').slice(-8);
-    const msgs = evts.filter(e => String(e.tel || '').replace(/\D/g, '').slice(-8) === d8Hi && e.dir !== 'status').slice(-60);
+    const msgs = evts.filter(e => String(e.tel || '').replace(/\D/g, '').slice(-8) === d8Hi && e.dir !== 'status').slice(-120);
     const sug = await dbGet('wa_sug_' + tel);
     return res.status(200).json({ ok: true, tel, msgs, sugestao: sug || null });
   }
