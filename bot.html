@@ -146,7 +146,17 @@ main{flex:1;display:flex;overflow:hidden;}
 <script>
 var _tel=null,_acaoSug='nenhuma';
 function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
-function fdt(ts){if(!ts)return'';var d=new Date(new Date(ts).getTime()-3*3600000);return d.toISOString().slice(11,16);}
+function fdt(ts){
+  if(!ts)return'';
+  var d=new Date(new Date(ts).getTime()-3*3600000);
+  var hoje=new Date(Date.now()-3*3600000);
+  var dia=d.toISOString().slice(0,10), hj=hoje.toISOString().slice(0,10);
+  var ont=new Date(hoje.getTime()-86400000).toISOString().slice(0,10);
+  var hora=d.toISOString().slice(11,16);
+  if(dia===hj)return hora;
+  if(dia===ont)return 'ontem '+hora;
+  return dia.slice(8,10)+'/'+dia.slice(5,7)+' '+hora;
+}
 
 var ACAO_LBL={cadastrar_logistica:'🚚 Cadastrar em Logística',enviar_orcamento:'📄 Enviar Orçamento',
   desconto_pix:'💠 Desconto Pix',desconto_balcao:'🏪 Desconto Balcão',proposta_troca:'🔄 Proposta de Troca',
@@ -197,6 +207,19 @@ async function toggleFiltroOrc(){
     alvo.parentNode.insertBefore(d,alvo.nextSibling);
   }
   loadKpis();if(window._ultD)renderLista(window._ultD);
+}
+async function mandarConflito(tel){
+  var cc=((window._ultD||{}).conversas||[]).find(function(x){return x.tel===tel;})||{};
+  var motivo=prompt('⚡ ENVIAR PARA CONFLITOS BOT\n\nEscreva o que o atendente precisa fazer com este cliente.\nEx: "cliente quer vender a TV — avaliar compra"\n     "insatisfeito com o prazo — ligar e negociar"\n     "quer descartar o equipamento — registrar e encerrar"');
+  if(motivo===null)return;
+  if(!String(motivo).trim()){alert('Escreva o que precisa ser feito — é o que o atendente vai ler.');return;}
+  var r=await fetch('/api/prospeccao?action=criar-conflito',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({nome:cc.nome||'Cliente WhatsApp',telefone:String(tel).replace(/\D/g,''),
+      equipamento:'',motivo:'[MANUAL] '+motivo})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r&&r.ok&&r.criado)alert('✅ Enviado para Conflitos Bot');
+  else if(r&&r.dedupe)alert('Este cliente já tem um conflito aberto.');
+  else alert('Não consegui enviar. Tenta de novo.');
+  loadConvs();
 }
 window._buscaTimer=null;
 function buscarConversas(v){
@@ -318,6 +341,7 @@ async function abrirConversa(tel){
   }
   var ccN=((window._ultD||{}).conversas||[]).find(function(x){return x.tel===tel;});
   hdrT.innerHTML='<span onclick="copiaTel(\''+tel+'\')" style="cursor:pointer;">📞 <b>'+fmtTel(tel)+'</b>'+(ccN&&ccN.nome?' — '+esc(ccN.nome):'')+'</span>'+
+    '<button onclick="mandarConflito(\''+tel+'\')" style="float:right;background:#7f1d1d;border:1px solid #b91c1c;border-radius:7px;padding:3px 10px;color:#fecaca;font-size:11px;cursor:pointer;margin-right:6px;">⚡ Conflitos Bot</button>'+
     '<button onclick="arquivarConv(\''+tel+'\')" style="float:right;background:#1e293b;border:1px solid #334155;border-radius:7px;padding:3px 10px;color:#94a3b8;font-size:11px;cursor:pointer;">🗄 '+(ccN&&ccN.arquivada?'Desarquivar':'Arquivar')+'</button>';
   carregarConversas();
   var box=document.getElementById('msgs');
