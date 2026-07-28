@@ -65,12 +65,21 @@ module.exports = async function handler(req, res) {
       metas: Object.assign({}, CFG_PADRAO.metas, c.metas || {}),
       verba: Object.assign({}, CFG_PADRAO.verba, c.verba || {}),
       cicloInicio: Object.assign({}, CFG_PADRAO.cicloInicio, c.cicloInicio || {}),
+      apelidos: c.apelidos || {},
+      custoViagem: c.custoViagem != null ? c.custoViagem : 25,
     };
   }
+  // carrega os apelidos antes de qualquer classificação
+  try { const _c = await cfgTrafego(); APELIDOS = _c.apelidos || {}; } catch (e) {}
+  // Apelidos ensinados pelo dono (trafego_config.apelidos): { "reforma": "microondas", ... }
+  let APELIDOS = {};
   function categoriaDe(nome) {
     const s = String(nome || '').toLowerCase();
+    for (const termo of Object.keys(APELIDOS)) {         // o que você ensinou vem primeiro
+      if (termo && s.includes(termo)) return APELIDOS[termo];
+    }
     if (/\btvs?\b|televis|barramento|tela quebrad|quebrar tv/.test(s)) return 'tv';
-    if (/micro-?\s?ondas/.test(s)) return 'microondas';
+    if (/micro-?\s?ondas|reforma/.test(s)) return 'microondas';
     if (/purificador|bebedouro|\bfiltro\b|vela|[áa]gua/.test(s)) return 'purificador';
     if (/adega|cervejeir|climatiz|vinho/.test(s)) return 'adega';
     return 'outros';
@@ -91,6 +100,8 @@ module.exports = async function handler(req, res) {
       const b = req.body || {};
       if (b.metas) atual.metas = Object.assign({}, atual.metas || {}, b.metas);
       if (b.verba) atual.verba = Object.assign({}, atual.verba || {}, b.verba);
+      if (b.apelidos) atual.apelidos = Object.assign({}, atual.apelidos || {}, b.apelidos);
+      if (b.custoViagem != null) atual.custoViagem = Number(b.custoViagem);
       await dbSet('trafego_config', atual);
       return res.status(200).json({ ok: true, config: await cfgTrafego() });
     }
@@ -418,6 +429,33 @@ Responda APENAS um JSON válido, sem markdown:
     } catch (e) {
       return res.status(200).json({ ok: false, error: e.message });
     }
+  }
+
+  // ── 🏷️ NAO-CLASSIFICADOS: nomes que caem em "outros" (anúncios + equipamentos da operação) ──
+  if (action === 'nao-classificados') {
+    const [cacheP, fA, fT, lgA, lgT] = await Promise.all([
+      dbGet('trafego_painel_cache_7d').then(v => v || dbGet('trafego_painel_cache')),
+      dbGet('fichas_adm'), dbGet('fichas_tv'), dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+    ]);
+    const contaAnuncio = {}, contaEquip = {};
+    for (const a of ((((cacheP || {}).dados) || {}).anuncios || [])) {
+      if (categoriaDe(a.nome) === 'outros') contaAnuncio[a.nome] = (contaAnuncio[a.nome] || 0) + 1;
+    }
+    const corte90 = Date.now() - 90 * 86400000;
+    for (const fi of [...(((fA || {}).fichas) || []), ...(((fT || {}).fichas) || []),
+                      ...(((lgA || {}).fichas) || []), ...(((lgT || {}).fichas) || [])]) {
+      if (new Date(fi.criadoEm || 0).getTime() < corte90) continue;
+      const eq = String(fi.equipamento || '').trim();
+      if (!eq) { contaEquip['(equipamento em branco)'] = (contaEquip['(equipamento em branco)'] || 0) + 1; continue; }
+      if (categoriaDe(eq) === 'outros') contaEquip[eq] = (contaEquip[eq] || 0) + 1;
+    }
+    const ordena = o => Object.keys(o).map(k => ({ nome: k, vezes: o[k] })).sort((a, b) => b.vezes - a.vezes).slice(0, 40);
+    const cfgN = await cfgTrafego();
+    return res.status(200).json({ ok: true,
+      apelidosAtivos: cfgN.apelidos,
+      anunciosSemCategoria: ordena(contaAnuncio),
+      equipamentosSemCategoria: ordena(contaEquip),
+      comoEnsinar: 'POST em ?action=config com {"apelidos":{"vitrine opa":"purificador","gabriel":"microondas"}} — o termo é procurado dentro do nome, em minúsculas' });
   }
 
   // ── 🩺 REDIS-DEBUG: prova que o banco está acessível ──
