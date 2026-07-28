@@ -570,6 +570,87 @@ export default async function handler(req, res) {
       dica: 'para recuperar: mesmo link com &aplicar=1' });
   }
 
+  // ── 🔬 RAIO-X DO DIA: planilha → ficha → status → mensagem do bot → resposta ──
+  if (action === 'raio-x-dia') {
+    const dias = Math.min(7, Math.max(0, parseInt(req.query.dias || '0', 10)));
+    const rows = parseCSV(await (await fetch(SHEET_CSV, { redirect: 'follow' })).text());
+    const [dbAdm, dbTv, lgA, lgT, pros, ppA, ppT] = await Promise.all([
+      dbGet(KEY_ADM), dbGet(KEY_TV), dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+      dbGet('prospeccao_adm'), dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+    ]);
+    // eventos do WhatsApp
+    let evts = [];
+    try {
+      const r = await fetch(`${U}/lrange/wa_evt_list/-5000/-1`, { headers: { Authorization: `Bearer ${T}` } });
+      const j = await r.json();
+      evts = (j.result || []).map(x => { try { return JSON.parse(x); } catch (e) { return null; } }).filter(Boolean);
+    } catch (e) {}
+    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const enviadas = {}, recebidas = {};
+    for (const e of evts) {
+      const d = d8(e.tel); if (d.length < 8) continue;
+      const t = new Date(e.ts || 0).getTime();
+      if (e.dir === 'out') { if (!enviadas[d] || t > enviadas[d]) enviadas[d] = t; }
+      if (e.dir === 'in') { if (!recebidas[d] || t > recebidas[d]) recebidas[d] = t; }
+    }
+    // onde a ficha está
+    const onde = {};
+    const marca = (tel, lugar) => { const d = d8(tel); if (d.length < 8) return;
+      if (!onde[d]) onde[d] = []; onde[d].push(lugar); };
+    for (const f of (((dbAdm || {}).fichas) || [])) marca(f.telefone, 'ficha ADM: ' + (f.status || 'criada'));
+    for (const f of (((dbTv || {}).fichas) || [])) marca(f.telefone, 'ficha TV: ' + (f.status || 'criada'));
+    for (const f of (((lgA || {}).fichas) || [])) marca(f.telefone, 'logística ADM: ' + (f.phase || ''));
+    for (const f of (((lgT || {}).fichas) || [])) marca(f.telefone, 'logística TV: ' + (f.phase || ''));
+    for (const f of (((pros || {}).fichas) || [])) marca(f.telefone, 'prospecção: ' + (f.status || ''));
+    for (const c of (((ppA || {}).cards) || [])) marca(c.telefone, 'pipe ADM: ' + (c.phaseId || c.phase || ''));
+    for (const c of (((ppT || {}).cards) || [])) marca(c.telefone, 'pipe TV: ' + (c.phaseId || c.phase || ''));
+
+    const hojeBrt = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+    const corte = Date.now() - 3 * 3600 * 1000 - dias * 86400000;
+    const parseData = s => { const m = String(s || '').match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+      if (!m) return null; let a = m[3]; if (a.length === 2) a = '20' + a;
+      return new Date(Date.UTC(Number(a), Number(m[2]) - 1, Number(m[1]))).getTime(); };
+
+    const linhas = [];
+    for (let ri = 1; ri < rows.length; ri++) {
+      const row = rows[ri];
+      const tel = String(row[0] || '').replace(/\D/g, '').trim();
+      const nome = String(row[1] || '').trim();
+      const equip = String(row[2] || '').trim();
+      const hora = String(row[6] || row[5] || row[7] || '').trim();
+      if (!tel && !nome) continue;
+      const dt = parseData(hora);
+      if (dt == null) continue;
+      const iso = new Date(dt).toISOString().slice(0, 10);
+      if (dias === 0 ? iso !== hojeBrt : dt < corte) continue;
+      const d = tel.slice(-8);
+      const lugares = onde[d] || [];
+      const temMsg = !!enviadas[d];
+      const respondeu = !!recebidas[d];
+      let diagnostico;
+      if (!lugares.length) diagnostico = '🔴 NÃO ENTROU NO SISTEMA';
+      else if (temMsg && respondeu) diagnostico = '🟢 abordado e respondeu';
+      else if (temMsg) diagnostico = '🟡 abordado, sem resposta';
+      else if (lugares.some(l => /logística|pipe|cliente_loja/.test(l))) diagnostico = '🔵 avançou sem o bot falar (cadastro manual)';
+      else diagnostico = '🔴 NO SISTEMA MAS SEM MENSAGEM DO BOT';
+      linhas.push({ linha: ri + 1, nome, telefone: tel, equipamento: equip, horario: hora,
+        diagnostico, ondeEsta: lugares,
+        botEnviou: temMsg ? new Date(enviadas[d]).toISOString() : null,
+        clienteRespondeu: respondeu ? new Date(recebidas[d]).toISOString() : null });
+    }
+    const conta = p => linhas.filter(l => l.diagnostico.startsWith(p)).length;
+    return res.status(200).json({ ok: true, dia: dias === 0 ? hojeBrt : 'últimos ' + dias + ' dias',
+      totalNaPlanilha: linhas.length,
+      resumo: {
+        abordadoEResponde: conta('🟢'),
+        abordadoSemResposta: conta('🟡'),
+        avancouSemBot: conta('🔵'),
+        problema: conta('🔴'),
+      },
+      problemas: linhas.filter(l => l.diagnostico.startsWith('🔴')),
+      todas: linhas });
+  }
+
   // ── 🗑 LIXEIRA: fichas excluídas, com restauração ──
   if (action === 'lixeira') {
     const tomb = (await dbGet(KEY_EXCLUIDAS)) || { linhas: {} };
