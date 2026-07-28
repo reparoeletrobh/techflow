@@ -355,18 +355,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, alvosAtivos: alvos.length, acoes: feitos.length, feitos });
   }
 
-  // ── 📷 FOTO-COMPRA: serve a foto do equipamento em análise de compra ──
-  if (action === 'foto-compra') {
-    const d8f = String(req.query.tel || '').replace(/\D/g, '').slice(-8);
-    const arq = await dbGet('compra_foto_' + d8f);
-    if (!arq || !arq.dataB64) return res.status(404).json({ ok: false, error: 'sem foto guardada para este cliente' });
-    const OKM = ['image/jpeg', 'image/png', 'image/webp'];
-    res.setHeader('Content-Type', OKM.includes(arq.mime) ? arq.mime : 'application/octet-stream');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Content-Disposition', 'inline');
-    return res.status(200).send(Buffer.from(arq.dataB64, 'base64'));
-  }
-
   // ── 🔍 CONFLITOS-AUDIT: escalar_humano × registrar_conflito (são coisas diferentes) ──
   if (action === 'conflitos-audit') {
     const [prosA, evtsA] = await Promise.all([dbGet('prospeccao_adm'), lerEvts()]);
@@ -1507,7 +1495,7 @@ Podemos prosseguir com o atendimento?"
    F2. Pix: "(Nome), sendo no Pix consigo fazer por (valor com 5% de desconto), pois só trabalhamos com peças originais, fazemos revisão completa, damos certificado de garantia e buscamos e entregamos no seu endereço. Após o conserto ficará tão bom quanto o novo — usamos as mesmas peças do fabricante."
    F3. Balcão: "Buscando aqui na loja consigo a mesma condição de balcão, retirando o frete: fica por (valor da F2 com MAIS 5% de desconto) apenas. Estamos na Rua Ouro Preto, 663 - Barro Preto e deixamos pronto entre hoje e amanhã." — ATENÇÃO AO CÁLCULO: o desconto do balcão é 5% EM CIMA DO VALOR JÁ COM PIX (cascata). Ex: orçamento R$390 → Pix R$370 → balcão 5% sobre R$370 = R$351. NUNCA aplique os 5% do balcão sobre o valor original.
    F4. Troca: "Se estiver pensando em trocar por um mais em conta, temos vendas também — consigo desconto ficando com o seu na troca. Nosso catálogo: https://reparoeletroadm.com/equipamentos" (desconto padrão de R$50 na troca; se questionarem o valor, explique: temos que consertar, dar garantia, pagar imposto, taxa de maquininha, frete).
-   F5. Compra: "Tem interesse em nos VENDER o seu equipamento? Nossa equipe avalia e passa uma proposta em breve." → se o cliente ACEITAR vender, use registrar_conflito com o motivo COMEÇANDO com "ANÁLISE DE COMPRA:" seguido do equipamento e do que o cliente falou (ex: "ANÁLISE DE COMPRA: micro-ondas Electrolux, cliente aceita vender"). Se o cliente ainda não tiver mandado foto do equipamento, peça uma foto antes — a equipe precisa dela para avaliar.
+   F5. Compra: "Tem interesse em nos VENDER o seu equipamento? Nossa equipe avalia e passa uma proposta em breve." → se o cliente ACEITAR vender, use registrar_conflito com o motivo COMEÇANDO com "ANÁLISE DE COMPRA:" seguido do equipamento e do que o cliente falou (ex: "ANÁLISE DE COMPRA: micro-ondas Electrolux, cliente aceita vender"). NÃO peça foto ao cliente: o equipamento já está na nossa loja e a equipe fotografa aqui.
 6) OBJEÇÃO "caro / pelo preço compro um novo" — pesquise mentalmente o preço REAL de um equipamento novo EQUIVALENTE ao modelo dele (mesma categoria/qualidade — não o modelo de entrada) e mostre a conta da economia: "um equivalente novo sai por ~R$X; consertando você economiza R$Y". Seja honesto se não souber o modelo exato: peça o modelo ou use a faixa da categoria. O "novo barato" é categoria inferior (iPhone vs celular de entrada). ${cfg.argumentoNovo}
 7) APROVOU → FECHAMENTO ENXUTO, sem excesso de confirmação. Pergunte APENAS o que ainda não estiver claro, no máximo estas duas coisas:
    (a) Forma de pagamento — se o cliente disse "pode fazer" logo após você mandar o valor do Pix, confirme UMA única vez: "Só me confirma: vai ser o valor original no cartão ou o valor com desconto no Pix?" — respondeu, prossegue. Se já estiver claro (ex: "fechou no Pix"), NÃO pergunte.
@@ -1702,27 +1690,17 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
           const fichaC = acha(fdbC) || acha(fdbCtv);
           {
           const ehCompra = /AN[ÁA]LISE DE COMPRA/i.test(String(acaoMotivo || ''));
-          // Foto do equipamento: guarda a última imagem que o cliente mandou (a equipe avalia por ela)
-          let temFotoCompra = false;
+          // O equipamento JÁ ESTÁ NA LOJA: aproveita a foto tirada no recebimento (alm_foto_<cardId>).
+          // Se não existir, o almoxarifado pede para tirar — nunca se pede foto ao cliente.
+          let temFotoCompra = false, cardCompraId = null;
           if (ehCompra) {
             try {
-              const evtsF = await lerEvts();
-              const ultFoto = evtsF.filter(e => e.dir === 'in' && e.mediaId && e.tipo !== 'audio' &&
-                String(e.tel || '').replace(/\D/g, '').slice(-8) === d8x).pop();
-              if (ultFoto) {
-                const { token: tkF } = await credenciais();
-                const metaF = await fetch('https://graph.facebook.com/v20.0/' + ultFoto.mediaId, {
-                  headers: { Authorization: `Bearer ${tkF}` } }).then(x => x.json()).catch(() => null);
-                if (metaF && metaF.url) {
-                  const binF = await fetch(metaF.url, { headers: { Authorization: `Bearer ${tkF}` } })
-                    .then(x => x.arrayBuffer()).catch(() => null);
-                  if (binF && binF.byteLength && binF.byteLength < 4 * 1024 * 1024) {
-                    await dbSet('compra_foto_' + d8x, {
-                      dataB64: Buffer.from(binF).toString('base64'),
-                      mime: metaF.mime_type || 'image/jpeg', em: new Date().toISOString() });
-                    temFotoCompra = true;
-                  }
-                }
+              const ppF = (await dbGet('reparoeletro_pipe')) || { cards: [] };
+              const cardF = (ppF.cards || []).find(c => String(c.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
+              if (cardF) {
+                cardCompraId = cardF.id;
+                const fotoF = await dbGet('alm_foto_' + cardF.id);
+                temFotoCompra = !!(fotoF && fotoF.img);
               }
             } catch (e) {}
           }
@@ -1734,7 +1712,7 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
               equipamento: (fichaC && fichaC.equipamento) || '',
               motivo: String(acaoMotivo || 'conflito registrado pelo bot').slice(0, 300),
               tipo: ehCompra ? 'analise_compra' : 'conflito',
-              temFoto: temFotoCompra,
+              temFoto: temFotoCompra, cardId: cardCompraId,
             }),
           }).then(x => x.json()).catch(() => null);
           // Duplicata no ALMOXARIFADO para a equipe dar o parecer (recomenda ou não)
@@ -1742,7 +1720,8 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
             try {
               await fetch(`https://reparoeletroadm.com/api/almoxarifado?action=criar-analise-compra&k=${KCF}`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ conflitoId: respCf.id, cliente: (fichaC && fichaC.nome) || 'Cliente WhatsApp',
+                body: JSON.stringify({ conflitoId: respCf.id, cardId: cardCompraId,
+                  cliente: (fichaC && fichaC.nome) || 'Cliente WhatsApp',
                   tel: String(tel).replace(/\D/g, ''), equipamento: (fichaC && fichaC.equipamento) || '',
                   obs: String(acaoMotivo || '').slice(0, 200), temFoto: temFotoCompra }),
               });

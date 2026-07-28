@@ -246,7 +246,7 @@ export default async function handler(req, res) {
     const jaTem = db.tarefas.some(t => t.origemConflito === b.conflitoId && t.status === 'pendente');
     if (jaTem) return res.status(200).json({ ok: true, dedupe: true });
     db.tarefas.unshift(novaTarefa({
-      tipo: 'avaliar-compra', cardId: b.conflitoId, origemConflito: b.conflitoId,
+      tipo: 'avaliar-compra', cardId: b.cardId || b.conflitoId, origemConflito: b.conflitoId,
       cliente: String(b.cliente || 'Cliente').slice(0, 60), tel: String(b.tel || ''),
       equipamento: String(b.equipamento || '').slice(0, 60),
       obs: String(b.obs || '').slice(0, 200), temFoto: !!b.temFoto,
@@ -317,7 +317,7 @@ export default async function handler(req, res) {
           const KAC = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
           await fetch(`https://reparoeletroadm.com/api/prospeccao?action=marcar-recomendacao&k=${KAC}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: t.origemConflito, parecer, preco: preco || null, por: feitoPor || 'Almoxarifado' }),
+            body: JSON.stringify({ id: t.origemConflito, parecer, preco: preco || null, por: feitoPor || 'Almoxarifado', temFoto: !!t.temFoto }),
           });
         } catch (e) {}
       }

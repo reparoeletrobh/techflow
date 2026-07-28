@@ -1048,7 +1048,9 @@ function render(){
       +'<div class="card-nome">'+esc(f.nome||'—')
         +(ehCompra?' <span style="font-size:9px;background:rgba(37,99,235,.25);color:#60a5fa;padding:2px 6px;border-radius:8px;font-weight:900;">🔵 ANÁLISE DE COMPRA</span>':'')
         +(contatado&&!ehCompra?' <span style="font-size:9px;background:rgba(34,197,94,.2);color:#4ade80;padding:2px 6px;border-radius:8px;font-weight:900;">EM ATENDIMENTO</span>':'')+'</div>'
-      +(ehCompra&&f.temFoto?'<div style="margin-top:5px;"><a href="/api/wa-bot?action=foto-compra&tel='+encodeURIComponent(f.telefone||'')+'" target="_blank" style="color:#60a5fa;font-size:11.5px;font-weight:800;text-decoration:none;">📷 Ver foto do equipamento</a></div>':'')
+      +(ehCompra?(f.temFoto&&f.cardId
+          ?'<div style="margin-top:5px;"><a href="#" onclick="verFotoCompra(\''+f.cardId+'\');return false;" style="color:#60a5fa;font-size:11.5px;font-weight:800;text-decoration:none;">📷 Ver foto do equipamento</a></div>'
+          :'<div style="margin-top:5px;font-size:11px;color:#fb923c;font-weight:700;">📷 sem foto ainda — o almoxarifado vai tirar</div>'):'')
       +(rec?'<div style="margin-top:6px;background:'+(rec.parecer==='sim'?'rgba(34,197,94,.12)':'rgba(239,68,68,.12)')+';border:1px solid '+(rec.parecer==='sim'?'rgba(34,197,94,.4)':'rgba(239,68,68,.4)')+';border-radius:7px;padding:6px 9px;font-size:11.5px;font-weight:800;color:'+(rec.parecer==='sim'?'#4ade80':'#f87171')+';">'
         +(rec.parecer==='sim'?'👍 RECOMENDA A COMPRA':'👎 NÃO RECOMENDA A COMPRA')+(rec.preco?' · R$ '+esc(rec.preco):'')+'<div style="font-size:10px;font-weight:600;color:#8b93a3;margin-top:2px;">'+esc(rec.por||'')+'</div></div>'
         :(ehCompra?'<div style="margin-top:6px;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.3);border-radius:7px;padding:6px 9px;font-size:11px;color:#93c5fd;font-weight:700;">⏳ aguardando parecer do almoxarifado</div>':''))
@@ -1068,6 +1070,15 @@ function render(){
   }).join(''):'<div class="empty">Nenhum conflito 🎉</div>';
 }
 
+async function verFotoCompra(cardId){
+  try{
+    var r=await fetch('/api/almoxarifado?action=ver-foto&cardId='+encodeURIComponent(cardId)).then(function(x){return x.json();});
+    if(r.ok&&r.foto&&r.foto.img){
+      var w=window.open('');
+      w.document.write('<body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="'+r.foto.img+'" style="max-width:100%;max-height:100vh;"></body>');
+    }else alert('Foto ainda não registrada — o almoxarifado precisa tirar.');
+  }catch(e){alert('Não consegui abrir a foto.');}
+}
 var _confAprId=null;
 function abrirConflitoAprovar(id){
   _confAprId=id;

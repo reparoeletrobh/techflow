@@ -670,7 +670,7 @@ export default async function handler(req,res){
       nome:String(nome||'Cliente WhatsApp'),telefone:String(telefone).replace(/\D/g,''),
       equipamento:String(equipamento||''),defeito:'',endereco:'',
       status:'conflitos_bot',motivoConflito:String(motivo||'').slice(0,300),
-      analiseCompra:tipo==='analise_compra',temFoto:!!temFoto,
+      analiseCompra:tipo==='analise_compra',temFoto:!!temFoto,cardId:(req.body||{}).cardId||null,
       criadoEm:new Date().toISOString(),origemBot:true,
     });
     await dbSet(KEY,db);
@@ -788,6 +788,7 @@ export default async function handler(req,res){
     const db=(await dbGet(KEY))||{fichas:[]};
     const f=(db.fichas||[]).find(x=>x.id===id);
     if(!f)return res.status(404).json({ok:false,error:'conflito não encontrado'});
+    if((req.body||{}).temFoto)f.temFoto=true;
     f.recomendacaoCompra={parecer:parecer==='sim'?'sim':'nao',
       preco:preco?String(preco).slice(0,20):null,
       por:String(por||'Almoxarifado').slice(0,40),em:new Date().toISOString()};
