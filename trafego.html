@@ -44,7 +44,7 @@ h1{font-size:17px;font-weight:900;letter-spacing:-.4px;display:flex;align-items:
 .barra i{display:block;height:100%;border-radius:99px;transition:width .5s ease;}
 
 /* ── abas de categoria ── */
-.abas{display:flex;gap:6px;overflow-x:auto;padding-bottom:3px;margin-bottom:12px;-webkit-overflow-scrolling:touch;}
+.abas{display:flex;gap:6px;flex-wrap:wrap;padding-bottom:3px;margin-bottom:12px;}
 .aba{flex:0 0 auto;background:var(--painel);border:1px solid var(--linha);border-radius:99px;padding:7px 13px;
   font-size:11.5px;font-weight:800;color:var(--dim);cursor:pointer;white-space:nowrap;}
 .aba.on{color:#fff;}
@@ -261,12 +261,22 @@ async function carregarInteligencia(recalcular){
   var el=document.getElementById('pg-inteligencia');
   el.innerHTML='<div class="vazio-msg">'+(recalcular?'🧠 Recalculando o funil de toda a operação…':'🧠 Carregando…')+'</div>';
   var r=await fetch('/api/trafego?action=inteligencia'+(recalcular?'&recalcular=1':'')).then(function(x){return x.json();}).catch(function(){return{ok:false};});
-  if(!r.ok){el.innerHTML='<div class="vazio-msg">Sem dados ainda.<br><br><button class="btn destaque" onclick="carregarInteligencia(true)">🧠 Calcular agora</button></div>';return;}
+  if(!r.ok){
+    el.innerHTML='<button class="btn destaque" style="width:100%;padding:11px;margin-bottom:11px;font-size:12.5px;" onclick="carregarInteligencia(true)">🧠 Calcular agora</button>'
+      +'<div class="vazio-msg">Não consegui montar o funil.<br><span style="font-size:11px;color:#fca5a5;">'+esc(r.erro||r.error||'tente recalcular')+'</span></div>';
+    return;
+  }
   window._int=r;
   var cats=(r.categorias||[]).filter(function(c){return c.fichas>0;})
     .sort(function(a,b){return (b.lucroPorFicha||0)-(a.lucroPorFicha||0);});
+  var topo='<button class="btn destaque" style="width:100%;padding:11px;margin-bottom:11px;font-size:12.5px;" onclick="carregarInteligencia(true)">🔄 Recalcular agora</button>';
+  if(!cats.length){
+    el.innerHTML=topo+'<div class="vazio-msg">Nenhuma ficha encontrada nos últimos '+(r.periodoDias||60)+' dias.<br>'
+      +'<span style="font-size:11px;">Se a operação teve movimento nesse período, toca em Recalcular agora — o cálculo diário ainda pode não ter rodado.</span></div>';
+    return;
+  }
   var CONF={boa:['✓ dado sólido','#22c55e'],fraca:['~ amostra pequena','#f59e0b'],insuficiente:['! sem base ainda','#ef4444']};
-  var h='<div style="background:var(--painel);border:1px solid var(--linha);border-radius:12px;padding:11px 13px;margin-bottom:11px;">'
+  var h=topo+'<div style="background:var(--painel);border:1px solid var(--linha);border-radius:12px;padding:11px 13px;margin-bottom:11px;">'
     +'<div style="font-size:11px;color:var(--dim);line-height:1.55;">Funil real dos últimos <b style="color:#f0f2f5;">'+r.periodoDias+' dias</b>, por categoria. '
     +'Margem usada: <b style="color:#f0f2f5;">'+Math.round(r.margemUsada*100)+'%</b> · custo de viagem perdida: <b style="color:#f0f2f5;">'+brl(r.custoViagem)+'</b></div></div>';
 
