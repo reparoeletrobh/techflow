@@ -444,6 +444,35 @@ export default async function handler(req, res) {
       tetoPorCiclo: c.reativacaoTeto || 5 });
   }
 
+  // ── 🔎 BUSCAR-CONVERSAS: procura vários telefones no histórico, ignorando limites da tela ──
+  if (action === 'buscar-conversas') {
+    const alvos = String(req.query.tels || '').split(',').map(s => s.replace(/\D/g, '').trim()).filter(Boolean);
+    if (!alvos.length) return res.status(400).json({ ok: false, error: 'informe ?tels=1234,5678 (finais separados por vírgula)' });
+    const [evts, arq] = await Promise.all([lerEvts(), dbGet('wa_arquivadas').then(v => v || { tels: {} })]);
+    const saida = alvos.map(alvo => {
+      const msgs = evts.filter(e => String(e.tel || '').replace(/\D/g, '').endsWith(alvo) && e.dir !== 'status');
+      const env = msgs.filter(m => m.dir === 'out');
+      const rec = msgs.filter(m => m.dir === 'in');
+      const d8 = msgs.length ? String(msgs[0].tel || '').replace(/\D/g, '').slice(-8) : null;
+      return { busca: alvo,
+        temConversa: msgs.length > 0,
+        telefoneCompleto: msgs.length ? msgs[msgs.length - 1].tel : null,
+        nome: (msgs.find(m => m.nome) || {}).nome || null,
+        totalMensagens: msgs.length, enviadas: env.length, recebidas: rec.length,
+        primeira: msgs.length ? msgs[0].ts : null,
+        ultima: msgs.length ? msgs[msgs.length - 1].ts : null,
+        arquivada: d8 ? !!arq.tels[d8] : false,
+        ultimoTexto: msgs.length ? String(msgs[msgs.length - 1].texto || '').slice(0, 90) : null,
+        diagnostico: !msgs.length ? '❌ nenhuma mensagem no histórico'
+          : (d8 && arq.tels[d8] ? '🗄 conversa existe mas está ARQUIVADA (ative o ícone 🗄 no painel)'
+          : (env.length && !rec.length ? '🟡 bot enviou, cliente não respondeu'
+          : '🟢 conversa ativa')) };
+    });
+    return res.status(200).json({ ok: true,
+      janelaHistorico: evts.length + ' mensagens carregadas',
+      resultado: saida });
+  }
+
   // ── 🕵️ ABORDAGENS-FANTASMA: marcadas como abordadas sem mensagem no histórico ──
   if (action === 'abordagens-fantasma') {
     const [fA, fT, evtsF, abF] = await Promise.all([

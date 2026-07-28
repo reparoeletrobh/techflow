@@ -122,7 +122,7 @@ main{flex:1;display:flex;overflow:hidden;}
 <main>
   <div id="col-esq">
   <div style="display:flex;align-items:center;gap:4px;"><button id="btn-ver-arq" onclick="toggleArquivadas()" title="Ver arquivadas" style="background:none;border:none;color:#5a6270;font-size:15px;cursor:pointer;padding:4px 2px 0 8px;">🗄</button></div>
-<input id="busca-conv" placeholder="🔎 Buscar nome ou número..." oninput="window._filtroConv=this.value.toLowerCase();if(window._ultD)renderLista(window._ultD);" style="width:calc(100% - 16px);margin:8px 8px 6px;background:#12161d;border:1px solid #242b39;border-radius:9px;padding:8px 11px;color:#f0f2f5;font-size:12.5px;outline:none;box-sizing:border-box;display:block;">
+<input id="busca-conv" placeholder="🔎 Buscar nome ou número..." oninput="buscarConversas(this.value)" style="width:calc(100% - 16px);margin:8px 8px 6px;background:#12161d;border:1px solid #242b39;border-radius:9px;padding:8px 11px;color:#f0f2f5;font-size:12.5px;outline:none;box-sizing:border-box;display:block;">
   <div id="lista-conv"><div style="padding:20px;color:#5a6270;font-size:11px;text-align:center;">⏳ Carregando...</div></div>
   </div>
   <div id="chat">
@@ -197,6 +197,13 @@ async function toggleFiltroOrc(){
     alvo.parentNode.insertBefore(d,alvo.nextSibling);
   }
   loadKpis();if(window._ultD)renderLista(window._ultD);
+}
+window._buscaTimer=null;
+function buscarConversas(v){
+  window._filtroConv=String(v||'').toLowerCase();
+  if(window._ultD)renderLista(window._ultD);          // resposta imediata no que já está na tela
+  clearTimeout(window._buscaTimer);
+  window._buscaTimer=setTimeout(function(){loadConvs();},400);  // e busca no servidor
 }
 window._verArq=false;
 async function arquivarConv(tel){
