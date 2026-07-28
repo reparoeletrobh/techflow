@@ -372,6 +372,89 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok:true, linhaBloqueada: alvo ? alvo.sheetRow : null });
   }
 
+  // ── 🔎 CRUZAR-PLANILHA: compara linha a linha a planilha com as fichas do sistema ──
+  if (action === 'cruzar-planilha') {
+    const dias = Math.min(30, Math.max(0, parseInt(req.query.dias || '0', 10)));   // 0 = só hoje
+    const resp = await fetch(SHEET_CSV);
+    const csv = await resp.text();
+    const linhas = csv.split(/\r?\n/);
+    // parser simples de CSV respeitando aspas
+    const parseLinha = (l) => {
+      const out = []; let atual = '', dentroAspas = false;
+      for (let i = 0; i < l.length; i++) {
+        const ch = l[i];
+        if (ch === '"') { if (dentroAspas && l[i + 1] === '"') { atual += '"'; i++; } else dentroAspas = !dentroAspas; }
+        else if (ch === ',' && !dentroAspas) { out.push(atual); atual = ''; }
+        else atual += ch;
+      }
+      out.push(atual); return out;
+    };
+    const rows = linhas.map(parseLinha);
+    const [dbAdm, dbTv, cursor, tomb] = await Promise.all([
+      dbGet(KEY_ADM), dbGet(KEY_TV), dbGet(KEY_CURSOR), dbGet(KEY_EXCLUIDAS),
+    ]);
+    const todas = [...(((dbAdm || {}).fichas) || []), ...(((dbTv || {}).fichas) || [])];
+    const porRow = new Map(); const porTel = new Map();
+    for (const f of todas) {
+      if (f.sheetRow != null) porRow.set(Number(f.sheetRow), f);
+      const d = String(f.telefone || '').replace(/\D/g, '').slice(-8);
+      if (d.length >= 8) { if (!porTel.has(d)) porTel.set(d, []); porTel.get(d).push(f); }
+    }
+    const bloqueadas = new Set(Object.keys(((tomb || {}).linhas) || {}).map(Number));
+    // hoje em Brasília
+    const hojeBrt = new Date(Date.now() - 3 * 3600 * 1000);
+    const alvoDia = hojeBrt.toISOString().slice(0, 10);
+    const limiteDias = dias;
+    const ehDoPeriodo = (txtHora) => {
+      const s = String(txtHora || '');
+      const m = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+      if (!m) return null;
+      let [_, d1, m1, a1] = m;
+      if (a1.length === 2) a1 = '20' + a1;
+      const dt = new Date(Date.UTC(Number(a1), Number(m1) - 1, Number(d1)));
+      const iso = dt.toISOString().slice(0, 10);
+      if (limiteDias === 0) return iso === alvoDia;
+      return dt.getTime() >= Date.now() - 3 * 3600 * 1000 - limiteDias * 86400000;
+    };
+    const naPlanilha = [], faltando = [], semData = [];
+    for (let ri = 1; ri < rows.length; ri++) {
+      const row = rows[ri];
+      const tel = String(row[0] || '').replace(/\D/g, '').trim();
+      const nome = String(row[1] || '').trim();
+      const equip = String(row[2] || '').trim();
+      const hora = String(row[6] || '').trim();
+      if (!tel && !nome) continue;
+      const noPeriodo = ehDoPeriodo(hora);
+      if (noPeriodo === null) { if (ri > rows.length - 40) semData.push({ linha: ri + 1, nome, tel, hora }); continue; }
+      if (!noPeriodo) continue;
+      const rowNum = ri + 1;
+      const ficha = porRow.get(rowNum);
+      const d8 = tel.slice(-8);
+      const porTelefone = porTel.get(d8) || [];
+      const item = { linha: rowNum, nome, telefone: tel, equipamento: equip, horario: hora,
+        temFicha: !!ficha, statusFicha: ficha ? (ficha.status || 'criada') : null,
+        fichasMesmoTelefone: porTelefone.length };
+      naPlanilha.push(item);
+      if (!ficha) {
+        let motivo = 'motivo não identificado';
+        if (bloqueadas.has(rowNum)) motivo = 'linha foi EXCLUÍDA manualmente (bloqueada para não voltar)';
+        else if (porTelefone.length) motivo = 'existe ficha do mesmo telefone em outra linha (' +
+          porTelefone.map(f => f.sheetRow).join(', ') + ') — possível duplicata do cliente';
+        else if (cursor && rowNum > (cursor.row || 0) + 1) motivo = 'linha ainda não alcançada pelo cursor (sync pendente)';
+        else if (!tel || tel.length < 10) motivo = 'telefone inválido ou ausente na planilha';
+        faltando.push(Object.assign({ motivo }, item));
+      }
+    }
+    return res.status(200).json({ ok: true,
+      periodo: dias === 0 ? 'hoje (' + alvoDia + ')' : 'últimos ' + dias + ' dias',
+      cursorAtual: (cursor || {}).row || null, totalLinhasPlanilha: rows.length - 1,
+      naPlanilha: naPlanilha.length, comFicha: naPlanilha.filter(x => x.temFicha).length,
+      semFicha: faltando.length,
+      faltando,
+      linhasSemDataReconhecida: semData.slice(0, 10),
+      detalhe: naPlanilha });
+  }
+
   // ── LINHAS EXCLUÍDAS: quais linhas da planilha estão bloqueadas ──
   if (action === 'linhas-excluidas') {
     const tomb = (await dbGet(KEY_EXCLUIDAS)) || { linhas: {} };
