@@ -136,15 +136,30 @@ module.exports = async function handler(req, res) {
     const base = `${GRAPH}/act_${CONTA}/`;
     const tk = `&access_token=${TOKEN}`;
     // SEQUENCIAL e com páginas grandes: a Meta limita o NÚMERO de chamadas, não o total de itens
-    const adsets = await pegarTudo(`${base}adsets?fields=id,name,effective_status,daily_budget,lifetime_budget,end_time&limit=100${filtroAtivo}${tk}`, 8);
+    // 1º os anúncios ativos; 2º SÓ os pais deles, buscados por id (antes eu varria a conta inteira e
+    // batia no teto de paginação antes de alcançar os conjuntos/campanhas certos)
+    const ads = await pegarTudo(`${base}ads?fields=id,name,effective_status,adset_id,campaign_id,creative{thumbnail_url}&limit=100${filtroAtivo}${tk}`, 8);
+    if (ads.erro && !ads.data.length) return res.status(200).json({ ok: false, erro: ads.erro });
+    const idsAdset = [...new Set((ads.data || []).map(a => a.adset_id).filter(Boolean))];
+    const idsCamp = [...new Set((ads.data || []).map(a => a.campaign_id).filter(Boolean))];
+    const porLote = async (ids, campos) => {
+      const out = []; let erro = null;
+      for (let i = 0; i < ids.length; i += 50) {
+        const lote = ids.slice(i, i + 50).join(',');
+        const j = await fetch(`${GRAPH}/?ids=${lote}&fields=${campos}&access_token=${TOKEN}`)
+          .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+        if (j && j.error) { erro = j.error.message; break; }
+        for (const k of Object.keys(j || {})) out.push(j[k]);
+        if (i + 50 < ids.length) await new Promise(r => setTimeout(r, 120));
+      }
+      return { data: out, erro };
+    };
+    const adsets = await porLote(idsAdset, 'id,name,effective_status,daily_budget,lifetime_budget,end_time');
     if (adsets.erro && !adsets.data.length) {
       return res.status(200).json({ ok: false, erro: 'não consegui ler os conjuntos: ' + adsets.erro +
         (/limit reached/i.test(adsets.erro) ? ' — a Meta limitou as consultas por alguns minutos; tente de novo em instantes.' : '') });
     }
-    const ads = await pegarTudo(`${base}ads?fields=id,name,effective_status,adset_id,campaign_id,creative{thumbnail_url}&limit=100${filtroAtivo}${tk}`, 8);
-    if (ads.erro && !ads.data.length) return res.status(200).json({ ok: false, erro: ads.erro });
-    // Verba pode estar na CAMPANHA (CBO) em vez do conjunto — sem isso o Copiloto calcula zero
-    const camps2 = await pegarTudo(`${base}campaigns?fields=id,name,daily_budget,lifetime_budget,effective_status&limit=100${filtroAtivo}${tk}`, 6);
+    const camps2 = await porLote(idsCamp, 'id,name,effective_status,daily_budget,lifetime_budget');
     const ins = await pegarTudo(`${base}insights?level=ad&${janela}&use_unified_attribution_setting=true&fields=ad_id,spend,clicks,ctr,actions&limit=100${tk}`, 8);
     const camps = camps2;
     const porAd = {};
@@ -256,6 +271,7 @@ module.exports = async function handler(req, res) {
         aproveitamento: cfg.verba.aproveitamento },
       metas: cfg.metas, porCategoria, totalAnuncios: anuncios.length, anuncios,
       recebidosDaMeta: (ads.data || []).length, exibidos: anuncios.length,
+      verbaOrigem: anuncios.reduce((o, a) => { o[a.verbaEm] = (o[a.verbaEm] || 0) + 1; return o; }, {}),
       statusRecebidos: porStatus, motivosCorte,
       conjuntosLidos: (adsets.data || []).length, campanhasLidas: (camps.data || []).length,
       avisos: [ads.erro, adsets.erro, camps.erro, ins.erro].filter(Boolean) };
