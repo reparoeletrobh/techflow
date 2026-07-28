@@ -720,7 +720,8 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
     }
     if (!CONTA) return res.status(200).json({ ok: false, error: 'META_ADS_ACCOUNT não configurado' });
     const cfg = await cfgTrafego();
-    const dias = Math.min(120, Math.max(15, parseInt(req.query.dias || '60', 10)));
+    // 8 semanas = 56 dias (é assim que o dono mede). 60 dias inflava ~7%.
+    const dias = Math.min(120, Math.max(15, parseInt(req.query.dias || '56', 10)));
     const ate = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
     const desde = new Date(Date.now() - 3 * 3600 * 1000 - dias * 86400000).toISOString().slice(0, 10);
 
@@ -756,6 +757,7 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
     const assinaturas = new Set();
     const porFonte = {};
     const amostras = {};
+    const amostraOutros = [];
     const registrar = (chave, cat, valor, obj) => {
       const fonte = String(chave).split(':')[0];
       if (contados.has(chave)) return;                 // dedupe por identificador
@@ -776,6 +778,10 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
       porFonte[fonte].itens++;
       porFonte[fonte].valor = Number((porFonte[fonte].valor + valor).toFixed(2));
       if (!String((obj || {}).telefone || (obj || {}).tel || '').replace(/\D/g, '').slice(-8)) porFonte[fonte].semTelefone++;
+      if (cat === 'outros' && amostraOutros.length < 15) amostraOutros.push({
+        nome: (obj || {}).nomeContato || (obj || {}).nome || '',
+        equip: (obj || {}).equipamento || (obj || {}).descricao || (obj || {}).title || '(vazio)',
+        valor, fonte });
       if (!amostras[fonte]) amostras[fonte] = [];
       if (amostras[fonte].length < 3) amostras[fonte].push({
         nome: (obj || {}).nomeContato || (obj || {}).nome || (obj || {}).title || '',
@@ -801,7 +807,7 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
     const ehExcluido = (c) => {
       const txt = [c.nomeContato, c.title, c.descricao, c.equipamento, c.osCode, c.nome]
         .filter(Boolean).join(' ').toLowerCase();
-      return /\brs\b|\br\.s\b|garantia|reprovad/.test(txt);
+      return /\brs\b|\br\.?\s?s\.?\b|\brs[-–—\s]|garantia|garant|reprovad|retorno|refaz|revisit/.test(txt);
     };
     let excluidosRsGarantia = 0;
     let naoVendidos = 0;
@@ -913,6 +919,7 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
       duplicadosRemovidos: duplicados,
       fontes: porFonte,
       amostraPorFonte: amostras,
+      amostraOutros: amostraOutros.slice(0, 15),
       totalContado: contados.size,
       alerta: 'investimento vem da Meta por nome do anúncio; faturamento vem do financeiro por equipamento — categorias mal nomeadas nos dois lados distorcem o ROAS' };
     try { await dbSet('trafego_roas', saida); } catch (e) {}
