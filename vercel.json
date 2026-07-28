@@ -107,6 +107,10 @@
     {
       "path": "/api/trafego?action=roas&gerar=1&k=tfk-re2026-Bx7mQp9zKw4Y",
       "schedule": "50 10 * * *"
+    },
+    {
+      "path": "/api/almoxarifado?action=reconciliar-dia&h=6&aplicar=1&k=tfk-re2026-Bx7mQp9zKw4Y",
+      "schedule": "15 */2 * * *"
     }
   ],
   "rewrites": [
