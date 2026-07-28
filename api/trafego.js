@@ -102,8 +102,13 @@ module.exports = async function handler(req, res) {
     const cfg = await cfgTrafego();
     const desde = inicioCiclo(cfg);
     const hoje = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
-    // Cache de 30 min (a conta não muda de minuto em minuto)
-    const cache = await dbGet('trafego_painel_cache');
+    const periodo = ['hoje', '7d', 'ciclo'].includes(String(req.query.periodo || '')) ? String(req.query.periodo) : 'ciclo';
+    // Janela idêntica à do Gerenciador de Anúncios
+    const janela = periodo === 'hoje' ? 'date_preset=today'
+      : periodo === '7d' ? 'date_preset=last_7d'
+      : 'time_range=' + encodeURIComponent(JSON.stringify({ since: desde, until: hoje }));
+    const chaveCache = 'trafego_painel_cache_' + periodo;
+    const cache = await dbGet(chaveCache);
     if (cache && cache.em && (Date.now() - new Date(cache.em).getTime() < 30 * 60000)
         && String(req.query.forcar || '') !== '1' && cache.desde === desde) {
       return res.status(200).json(Object.assign({}, cache.dados, { cacheDe: cache.em, doCache: true }));
@@ -118,7 +123,7 @@ module.exports = async function handler(req, res) {
     const [ads, adsets, ins] = await Promise.all([
       pegarTudo(`${base}ads?fields=id,name,effective_status,adset_id,creative{thumbnail_url}&limit=25${filtroAtivo}${tk}`, 8),
       pegarTudo(`${base}adsets?fields=id,name,daily_budget,lifetime_budget&limit=25${tk}`, 8),
-      pegarTudo(`${base}insights?level=ad&time_range=${encodeURIComponent(JSON.stringify({ since: desde, until: hoje }))}&fields=ad_id,spend,clicks,ctr,actions&limit=25${tk}`, 12),
+      pegarTudo(`${base}insights?level=ad&${janela}&use_unified_attribution_setting=true&fields=ad_id,spend,clicks,ctr,actions&limit=25${tk}`, 12),
     ]);
     if (ads.erro && !ads.data.length) return res.status(200).json({ ok: false, erro: ads.erro });
     const porAd = {};
@@ -126,11 +131,20 @@ module.exports = async function handler(req, res) {
     const porAdset = {};
     for (const a of (adsets.data || [])) porAdset[a.id] = a;
 
-    const CONV = ['onsite_conversion.messaging_conversation_started_7d', 'lead', 'onsite_conversion.total_messaging_connection'];
+    // Ordem de prioridade REAL: a métrica do Gerenciador é "conversas por mensagem iniciadas"
+    const CONV = ['onsite_conversion.messaging_conversation_started_7d', 'onsite_conversion.messaging_first_reply', 'onsite_conversion.total_messaging_connection', 'lead'];
+    const contaConversa = (acoes) => {
+      for (const tipo of CONV) {                     // respeita a ordem: pega a primeira que existir
+        const a = (acoes || []).find(x => x.action_type === tipo);
+        if (a) return { valor: Number(a.value || 0), metrica: tipo };
+      }
+      return { valor: 0, metrica: null };
+    };
     const anuncios = (ads.data || []).map(ad => {
       const i = porAd[ad.id] || {};
       const st = porAdset[ad.adset_id] || {};
-      const conversas = Number(((i.actions || []).find(a => CONV.includes(a.action_type)) || {}).value || 0);
+      const cv = contaConversa(i.actions);
+      const conversas = cv.valor;
       const gasto = Number(i.spend || 0);
       const cat = categoriaDe(ad.name + ' ' + (st.name || ''));
       const meta = cfg.metas[cat] || cfg.metas.outros;
@@ -147,7 +161,7 @@ module.exports = async function handler(req, res) {
         orcamentoDiario: st.daily_budget ? Number(st.daily_budget) / 100 : null,
         orcamentoTotal: st.lifetime_budget ? Number(st.lifetime_budget) / 100 : null,
         categoria: cat, meta,
-        gasto: Number(gasto.toFixed(2)), conversas,
+        gasto: Number(gasto.toFixed(2)), conversas, metricaConversa: cv.metrica,
         cpa: cpa != null ? Number(cpa.toFixed(2)) : null,
         razaoMeta: razao != null ? Number(razao.toFixed(2)) : null,
         cliques: Number(i.clicks || 0),
@@ -173,7 +187,17 @@ module.exports = async function handler(req, res) {
         ralos: lista.filter(a => a.situacao === 'ralo').length };
     }
     const ativos = anuncios.filter(a => a.ativo);
+    const gastoTotal = anuncios.reduce((s, a) => s + a.gasto, 0);
+    const convTotal = anuncios.reduce((s, a) => s + a.conversas, 0);
+    const metricasVistas = [...new Set(anuncios.map(a => a.metricaConversa).filter(Boolean))];
     const dados = { ok: true, ciclo: { desde, ate: hoje },
+      periodo,
+      periodoLabel: periodo === 'hoje' ? 'Hoje' : periodo === '7d' ? 'Últimos 7 dias' : 'Ciclo (desde ' + desde.split('-').reverse().join('/') + ')',
+      totais: { gasto: Number(gastoTotal.toFixed(2)), conversas: convTotal,
+        cpa: convTotal > 0 ? Number((gastoTotal / convTotal).toFixed(2)) : null },
+      calculo: { formula: 'custo por conversa = valor gasto ÷ conversas por mensagem iniciadas',
+        metricaMeta: metricasVistas.join(', ') || 'nenhuma conversa no período',
+        atribuicao: 'configuração unificada da conta (a mesma do Gerenciador de Anúncios)' },
       ativos: ativos.length, pausados: anuncios.length - ativos.length,
       verba: {
         adm: { depositado: cfg.verba.adm, real: Number(realAdm.toFixed(2)), gasto: Number(gastoAdm.toFixed(2)), saldo: Number((realAdm - gastoAdm).toFixed(2)) },
@@ -181,7 +205,8 @@ module.exports = async function handler(req, res) {
         aproveitamento: cfg.verba.aproveitamento },
       metas: cfg.metas, porCategoria, totalAnuncios: anuncios.length, anuncios,
       avisos: [ads.erro, adsets.erro, ins.erro].filter(Boolean) };
-    try { await dbSet('trafego_painel_cache', { em: new Date().toISOString(), desde, dados }); } catch (e) {}
+    try { await dbSet(chaveCache, { em: new Date().toISOString(), desde, dados }); } catch (e) {}
+    if (periodo === 'ciclo') { try { await dbSet('trafego_painel_cache', { em: new Date().toISOString(), desde, dados }); } catch (e) {} }
     return res.status(200).json(dados);
   }
 

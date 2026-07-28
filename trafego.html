@@ -92,6 +92,12 @@ a.voltar{color:var(--dim);text-decoration:none;font-size:11.5px;font-weight:700;
 <h1>📈 Tráfego <span id="atualizado" style="font-size:10px;color:var(--dim);font-weight:600;"></span></h1>
 <div class="sub" id="ciclo">carregando o ciclo…</div>
 
+<div class="abas" id="periodos" style="margin:12px 0 10px;">
+  <div class="aba" data-p="hoje" onclick="setPeriodo('hoje')">Hoje</div>
+  <div class="aba" data-p="7d" onclick="setPeriodo('7d')">Últimos 7 dias</div>
+  <div class="aba on" data-p="ciclo" onclick="setPeriodo('ciclo')" style="border-color:#f97316;background:#f9731622;color:#fff;">Ciclo da semana</div>
+</div>
+<div id="totais"></div>
 <div class="termo" id="termo"></div>
 <div class="abas" id="secoes" style="margin-bottom:10px;">
   <div class="aba on" id="s-anuncios" onclick="secao('anuncios')" style="border-color:#f97316;background:#f9731622;color:#fff;">📊 Anúncios ativos</div>
@@ -117,7 +123,17 @@ a.voltar{color:var(--dim);text-decoration:none;font-size:11.5px;font-weight:700;
 
 <script>
 var CAT_NOME={tv:'TV',microondas:'Micro-ondas',purificador:'Purificador',adega:'Adega',outros:'Outros'};
-var _d=null,_cat='todos';
+var _d=null,_cat='todos',_per='ciclo';
+function setPeriodo(p){
+  _per=p;
+  Array.prototype.forEach.call(document.querySelectorAll('#periodos .aba'),function(t){
+    var on=t.getAttribute('data-p')===p;
+    t.classList.toggle('on',on);
+    t.style.borderColor=on?'#f97316':'';t.style.background=on?'#f9731622':'';t.style.color=on?'#fff':'';
+  });
+  document.getElementById('lista').innerHTML='<div class="vazio-msg">⏳ Carregando '+(p==='hoje'?'hoje':p==='7d'?'os últimos 7 dias':'o ciclo')+'…</div>';
+  carregar();
+}
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function brl(v){return 'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
@@ -126,7 +142,7 @@ function corSit(s){return s==='campeao'?'#22c55e':s==='atencao'?'#f59e0b':s==='r
 
 async function carregar(forcar){
   try{
-    var r=await fetch('/api/trafego?action=painel'+(forcar?'&forcar=1':'')).then(function(x){return x.json();});
+    var r=await fetch('/api/trafego?action=painel&periodo='+_per+(forcar?'&forcar=1':'')).then(function(x){return x.json();});
     if(!r.ok){
       document.getElementById('lista').innerHTML='<div class="vazio-msg">Não consegui ler a conta de anúncios.<br><span style="font-size:11px;color:#fca5a5;">'+esc(r.erro||r.error||'')+'</span><br><br><button class="btn" onclick="carregar(true)">tentar de novo</button></div>';
       return;
@@ -142,6 +158,18 @@ function render(){
   document.getElementById('ciclo').textContent='Ciclo desde '+_d.ciclo.desde.split('-').reverse().join('/')+' · '+(_d.ativos||0)+' ativos de '+_d.totalAnuncios;
   document.getElementById('atualizado').textContent=_d.doCache?'· cache de '+new Date(_d.cacheDe).toLocaleTimeString('pt-BR').slice(0,5):'· agora';
 
+  var t=_d.totais||{};
+  document.getElementById('totais').innerHTML=
+    '<div style="background:var(--painel);border:1px solid var(--linha);border-radius:13px;padding:12px;margin-bottom:10px;">'
+    +'<div style="font-size:9.5px;font-weight:900;color:var(--dim);letter-spacing:.7px;">'+esc((_d.periodoLabel||'').toUpperCase())+'</div>'
+    +'<div style="display:flex;gap:18px;margin-top:7px;align-items:baseline;flex-wrap:wrap;">'
+      +'<div><div style="font-family:var(--mono);font-size:20px;font-weight:700;">'+brl(t.gasto)+'</div><div style="font-size:9.5px;color:var(--dim);font-weight:700;">VALOR USADO</div></div>'
+      +'<div><div style="font-family:var(--mono);font-size:20px;font-weight:700;">'+(t.conversas||0)+'</div><div style="font-size:9.5px;color:var(--dim);font-weight:700;">CONVERSAS INICIADAS</div></div>'
+      +'<div><div style="font-family:var(--mono);font-size:20px;font-weight:700;color:#fb923c;">'+(t.cpa!=null?brl(t.cpa):'—')+'</div><div style="font-size:9.5px;color:var(--dim);font-weight:700;">POR CONVERSA</div></div>'
+    +'</div>'
+    +'<div style="font-size:9.5px;color:#5a6270;margin-top:8px;line-height:1.5;">'+esc((_d.calculo||{}).formula||'')
+      +'<br>métrica da Meta: <span style="font-family:var(--mono);">'+esc((_d.calculo||{}).metricaMeta||'')+'</span></div>'
+  +'</div>';
   document.getElementById('termo').innerHTML=[['ADM',v.adm,'#f97316'],['TV',v.tv,'#3b82f6']].map(function(p){
     var nome=p[0],d=p[1],cor=p[2];
     var pct=d.real>0?Math.min(100,d.gasto/d.real*100):0;
