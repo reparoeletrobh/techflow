@@ -618,6 +618,18 @@ module.exports = async function handler(req, res) {
       };
     }
     const cfgM = (await dbGet('trafego_config')) || {};
+    // ?curto=1 → uma linha por categoria (cabe no chat)
+    if (String(req.query.curto || '') === '1') {
+      const linhas = Object.keys(modelos).map(c => {
+        const m = modelos[c];
+        if (!m) return c.toUpperCase() + ': sem campeão (nenhum ativo com 3+ conversas)';
+        return c.toUpperCase() + ': ' + String(m.nome).slice(0, 32) +
+          ' | R$ ' + Number(m.cpa).toFixed(2) + '/conversa (meta ' + m.meta + ')' +
+          ' | ' + m.conversas + ' conversas' +
+          (m.vice ? ' | vice: ' + String(m.vice.nome).slice(0, 24) + ' R$ ' + Number(m.vice.cpa).toFixed(2) : '');
+      });
+      return res.status(200).json({ ok: true, periodo: per, campeoes: linhas });
+    }
     return res.status(200).json({ ok: true, periodo: per,
       criterio: 'anúncio ATIVO com no mínimo 3 conversas e menor custo por conversa em relação à meta da categoria',
       modelos,
