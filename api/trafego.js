@@ -119,6 +119,7 @@ module.exports = async function handler(req, res) {
       if (b.verba) atual.verba = Object.assign({}, atual.verba || {}, b.verba);
       if (b.apelidos) atual.apelidos = Object.assign({}, atual.apelidos || {}, b.apelidos);
       if (b.modelosFixados) atual.modelosFixados = Object.assign({}, atual.modelosFixados || {}, b.modelosFixados);
+      if (b.modelosExcluir) atual.modelosExcluir = b.modelosExcluir;
       if (b.ciclo) atual.ciclo = Object.assign({}, atual.ciclo || {}, b.ciclo);
       if (b.custoViagem != null) atual.custoViagem = Number(b.custoViagem);
       await dbSet('trafego_config', atual);
@@ -598,8 +599,14 @@ module.exports = async function handler(req, res) {
     const per = ['hoje', '7d', 'ciclo'].includes(String(req.query.periodo || '')) ? String(req.query.periodo) : '7d';
     const base = await dbGet('trafego_painel_cache_' + per) || await dbGet('trafego_painel_cache');
     if (!base || !base.dados) return res.status(200).json({ ok: false, error: 'abra o painel primeiro para carregar os dados' });
-    const ads = (base.dados.anuncios || []).filter(a => a.ativo && a.conversas >= 3 && a.cpa != null);
-    const CATS = ['tv', 'microondas', 'purificador', 'adega', 'institucional', 'forno'];
+    // Criativos que NÃO servem de modelo: reforma é outro serviço (pintura/restauração),
+    // não a base do conserto padrão. Lista ampliável pela config.
+    const cfgX = (await dbGet('trafego_config')) || {};
+    const padroesFora = (cfgX.modelosExcluir || ['reforma', 'pintura', 'restaura']).map(s => String(s).toLowerCase());
+    const foraDeModelo = (nome) => padroesFora.some(p => String(nome || '').toLowerCase().includes(p));
+    const ads = (base.dados.anuncios || []).filter(a =>
+      a.ativo && a.conversas >= 3 && a.cpa != null && !foraDeModelo(a.nome));
+    const CATS = ['tv', 'microondas', 'purificador', 'adega', 'forno'];   // institucional fora: não será clonado
     const modelos = {};
     for (const cat of CATS) {
       const lista = ads.filter(a => a.categoria === cat)
@@ -628,7 +635,8 @@ module.exports = async function handler(req, res) {
           ' | ' + m.conversas + ' conversas' +
           (m.vice ? ' | vice: ' + String(m.vice.nome).slice(0, 24) + ' R$ ' + Number(m.vice.cpa).toFixed(2) : '');
       });
-      return res.status(200).json({ ok: true, periodo: per, campeoes: linhas });
+      return res.status(200).json({ ok: true, periodo: per, campeoes: linhas,
+        excluidosDaEscolha: padroesFora.join(', ') + ' (não servem de base para clonagem)' });
     }
     return res.status(200).json({ ok: true, periodo: per,
       criterio: 'anúncio ATIVO com no mínimo 3 conversas e menor custo por conversa em relação à meta da categoria',
