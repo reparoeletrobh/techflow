@@ -446,6 +446,72 @@ export default async function handler(req, res) {
       detalhe: naPlanilha });
   }
 
+  // ── 🔁 RECUPERAR-PERDIDAS: acha e devolve as linhas da planilha que não viraram ficha ──
+  // Prévia por padrão; &aplicar=1 executa. Só mexe no período pedido (padrão 7 dias).
+  if (action === 'recuperar-perdidas') {
+    const dias = Math.min(30, Math.max(1, parseInt(req.query.dias || '7', 10)));
+    const resp = await fetch(SHEET_CSV, { redirect: 'follow' });
+    const rows = parseCSV(await resp.text());
+    const [dbAdm, dbTv, cursor, tomb] = await Promise.all([
+      dbGet(KEY_ADM), dbGet(KEY_TV), dbGet(KEY_CURSOR), dbGet(KEY_EXCLUIDAS),
+    ]);
+    const todas = [...(((dbAdm || {}).fichas) || []), ...(((dbTv || {}).fichas) || [])];
+    const porRow = new Set(todas.map(f => Number(f.sheetRow)).filter(x => !isNaN(x)));
+    const porTel = new Set(todas.map(f => String(f.telefone || '').replace(/\D/g, '').slice(-8)).filter(d => d.length >= 8));
+    const bloqueadas = ((tomb || {}).linhas) || {};
+    const corte = Date.now() - 3 * 3600 * 1000 - dias * 86400000;
+    const parseData = (s) => {
+      const m = String(s || '').match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+      if (!m) return null;
+      let a = m[3]; if (a.length === 2) a = '20' + a;
+      return new Date(Date.UTC(Number(a), Number(m[2]) - 1, Number(m[1]))).getTime();
+    };
+    const perdidas = [];
+    for (let ri = 1; ri < rows.length; ri++) {
+      const row = rows[ri];
+      const tel = String(row[0] || '').replace(/\D/g, '').trim();
+      const nome = String(row[1] || '').trim();
+      const equip = String(row[2] || '').trim();
+      const hora = String(row[6] || row[5] || row[7] || '').trim();
+      if (!tel && !nome) continue;
+      const dt = parseData(hora);
+      if (dt == null || dt < corte) continue;                 // fora do período
+      const rowNum = ri + 1;
+      if (porRow.has(rowNum)) continue;                       // já virou ficha
+      const d8 = tel.slice(-8);
+      const jaTemCliente = d8.length >= 8 && porTel.has(d8);
+      perdidas.push({ linha: rowNum, nome, telefone: tel, equipamento: equip, horario: hora,
+        bloqueada: !!bloqueadas[String(rowNum)],
+        bloqueadaEm: bloqueadas[String(rowNum)] ? bloqueadas[String(rowNum)].em : null,
+        clienteJaTemOutraFicha: jaTemCliente,
+        acao: bloqueadas[String(rowNum)] ? 'desbloquear e reimportar'
+          : (jaTemCliente ? 'cliente já tem ficha — provável duplicata, não recuperar'
+          : 'forçar reimportação') });
+    }
+    const recuperaveis = perdidas.filter(p => p.acao !== 'cliente já tem ficha — provável duplicata, não recuperar');
+    if (String(req.query.aplicar || '') === '1' && recuperaveis.length) {
+      // 1) desbloqueia as linhas
+      const t2 = (await dbGet(KEY_EXCLUIDAS)) || { linhas: {} };
+      for (const p of recuperaveis) delete (t2.linhas || {})[String(p.linha)];
+      await dbSet(KEY_EXCLUIDAS, t2);
+      // 2) volta o cursor para antes da mais antiga, para o sync alcançá-las
+      const menor = Math.min.apply(null, recuperaveis.map(p => p.linha));
+      const cur = (await dbGet(KEY_CURSOR)) || {};
+      if ((cur.row || 0) >= menor) {
+        await dbSet(KEY_CURSOR, { row: menor - 1, ajustadoEm: new Date().toISOString(), motivo: 'recuperação de fichas perdidas' });
+      }
+      return res.status(200).json({ ok: true, modo: 'APLICADO',
+        desbloqueadas: recuperaveis.length, cursorVoltouPara: menor - 1,
+        proximoPasso: 'o sync do próximo ciclo (5 min) reimporta — ou rode /api/fichas?action=sync agora',
+        recuperadas: recuperaveis, ignoradas: perdidas.filter(p => !recuperaveis.includes(p)) });
+    }
+    return res.status(200).json({ ok: true, modo: 'prévia (nada foi alterado)',
+      periodoDias: dias, cursorAtual: (cursor || {}).row || null,
+      perdidas: perdidas.length, recuperaveis: recuperaveis.length,
+      lista: perdidas,
+      dica: 'para recuperar: mesmo link com &aplicar=1' });
+  }
+
   // ── LINHAS EXCLUÍDAS: quais linhas da planilha estão bloqueadas ──
   if (action === 'linhas-excluidas') {
     const tomb = (await dbGet(KEY_EXCLUIDAS)) || { linhas: {} };
