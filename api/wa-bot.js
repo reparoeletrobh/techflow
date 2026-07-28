@@ -506,6 +506,40 @@ export default async function handler(req, res) {
       detalhe: lista });
   }
 
+  // ── 🔢 CONFERE-APROVACOES: o KPI bate com as aprovações reais do dia? ──
+  if (action === 'confere-aprovacoes') {
+    const hoje = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+    const [st, evtsC, ppA, ppT] = await Promise.all([
+      dbGet('wa_bot_stats'), lerEvts(), dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+    ]);
+    const kpi = (((st || {})[hoje]) || {}).aprovacoes || 0;
+    // ações de aprovação registradas na conversa hoje
+    const acoes = evtsC.filter(e => e.dir === 'acao' && e.texto === 'mover_aprovado' &&
+      String(e.ts || '').slice(0, 10) === hoje);
+    // mensagens da aprovação retroativa que acabamos de disparar
+    const retro = evtsC.filter(e => e.tipo === 'aprovacao-retroativa' && String(e.ts || '').slice(0, 10) === hoje);
+    // cards que entraram em aprovados hoje
+    const entraram = [];
+    for (const [b, s] of [[ppA, 'adm'], [ppT, 'tv']]) {
+      for (const c of (((b || {}).cards) || [])) {
+        const fase = c.phaseId || c.phase;
+        if (fase !== 'aprovados') continue;
+        if (String(c.movedAt || '').slice(0, 10) !== hoje) continue;
+        entraram.push(s.toUpperCase() + ' ' + (c.nomeContato || '') + ' R$ ' + (c.valor || '?'));
+      }
+    }
+    return res.status(200).json({ ok: true, dia: hoje,
+      kpiDoPainel: kpi,
+      acoesDoBotNaConversa: acoes.length,
+      aprovacoesRetroativas: retro.length,
+      cardsQueEntraramEmAprovadosHoje: entraram.length,
+      soma: acoes.length + retro.length,
+      veredito: kpi === acoes.length + retro.length
+        ? '✅ KPI bate: ' + acoes.length + ' do bot na conversa + ' + retro.length + ' retroativas'
+        : '⚠️ diferença de ' + (kpi - (acoes.length + retro.length)) + ' — contagem duplicada ou aprovação sem registro',
+      listaCards: entraram });
+  }
+
   // ── ▶️ APROVAR-PENDENTES: dispara o gatilho de quem já aprovou e avisa o cliente ──
   if (action === 'aprovar-pendentes') {
     const KTF = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
