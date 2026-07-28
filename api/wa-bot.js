@@ -660,6 +660,10 @@ export default async function handler(req, res) {
       for (const f of todasFichas) {
         const ehCr = !f.status || f.status === 'ficha_criada' || f.status === 'criada';
         if (!ehCr) continue;
+        // 🛟 FICHA RECUPERADA: foi excluída por engano e devolvida. Nas primeiras 24h ela NÃO é
+        // tratada como refeita nem como já abordada — precisa ser atendida como ficha nova.
+        const recEm = new Date(f.restauradaEm || f.recuperadaEm || 0).getTime();
+        if (recEm && Date.now() - recEm < 24 * 3600000) continue;
         const d8c = String(f.telefone || '').replace(/\D/g, '').slice(-8);
         // FICHA REFEITA: mesmo cliente tem OUTRA ficha em estágio avançado OU operação em andamento
         // → vai direto para ENTRAR EM CONTATO: a equipe liga e tira as dúvidas (regra do Pedro)

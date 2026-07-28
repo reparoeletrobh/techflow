@@ -532,6 +532,29 @@ export default async function handler(req, res) {
       if ((cur.row || 0) >= menor) {
         await dbSet(KEY_CURSOR, { row: menor - 1, ajustadoEm: new Date().toISOString(), motivo: 'recuperação de fichas perdidas' });
       }
+      // 3) limpa o registro de "já abordado" desses telefones — a ficha volta para ser atendida do zero
+      try {
+        const ab = (await dbGet('wa_abordados')) || { tels: {} };
+        let limpos = 0;
+        for (const p of recuperaveis) {
+          const d = String(p.telefone || '').replace(/\D/g, '').slice(-8);
+          if (d.length >= 8 && ab.tels && ab.tels[d]) { delete ab.tels[d]; limpos++; }
+        }
+        if (limpos) await dbSet('wa_abordados', ab);
+      } catch (e) {}
+      // 4) marca as fichas recuperadas para a autocura não reclassificá-las nas primeiras 24h
+      try {
+        const agoraR = new Date().toISOString();
+        const linhasRec = new Set(recuperaveis.map(p => Number(p.linha)));
+        for (const key of [KEY_ADM, KEY_TV]) {
+          const bd = (await dbGet(key)) || { fichas: [] };
+          let mexeu = false;
+          for (const f of (bd.fichas || [])) {
+            if (linhasRec.has(Number(f.sheetRow)) && !f.recuperadaEm) { f.recuperadaEm = agoraR; mexeu = true; }
+          }
+          if (mexeu) await dbSet(key, bd);
+        }
+      } catch (e) {}
       return res.status(200).json({ ok: true, modo: 'APLICADO',
         desbloqueadas: recuperaveis.length, cursorVoltouPara: menor - 1,
         proximoPasso: 'o sync do próximo ciclo (5 min) reimporta — ou rode /api/fichas?action=sync agora',
