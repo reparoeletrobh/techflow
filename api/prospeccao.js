@@ -680,6 +680,31 @@ export default async function handler(req,res){
   }
 
   // ── 📊 CONFLITOS-STATS: reconciliação (criados × abertos × desfechos) ──
+  // ── 🩹 CORRIGIR-NOMES: preenche nome/equipamento dos conflitos que nasceram sem ──
+  if(action==='corrigir-nomes-conflito'){
+    const [db,lgA,lgT,fA,fT,ppA,ppT]=await Promise.all([
+      dbGet(KEY),dbGet('reparoeletro_logistica'),dbGet('tv_logistica'),
+      dbGet('fichas_adm'),dbGet('fichas_tv'),dbGet('reparoeletro_pipe'),dbGet('tv_pipe')]);
+    const d8=t=>String(t||'').replace(/\D/g,'').slice(-8);
+    const mapa={};
+    const põe=(tel,nome,equip)=>{const d=d8(tel);if(d.length<8)return;
+      if(!mapa[d])mapa[d]={};
+      if(nome&&!mapa[d].nome)mapa[d].nome=nome;
+      if(equip&&!mapa[d].equipamento)mapa[d].equipamento=equip;};
+    for(const b of [lgA,lgT,fA,fT]) for(const f of (((b||{}).fichas)||[])) põe(f.telefone,f.nome,f.equipamento);
+    for(const b of [ppA,ppT]) for(const c of (((b||{}).cards)||[])) põe(c.telefone,c.nomeContato||c.nome,c.equipamento||c.descricao);
+    let corrigidos=0; const lista=[];
+    for(const f of (((db||{}).fichas)||[])){
+      if(f.status!=='conflitos_bot')continue;
+      const m=mapa[d8(f.telefone)];if(!m)continue;
+      const semNome=!f.nome||/^cliente( whatsapp)?$/i.test(String(f.nome).trim());
+      if(semNome&&m.nome){f.nome=m.nome;corrigidos++;lista.push({tel:f.telefone,nome:m.nome});}
+      if(!String(f.equipamento||'').trim()&&m.equipamento)f.equipamento=m.equipamento;
+    }
+    if(corrigidos)await dbSet(KEY,db);
+    return res.status(200).json({ok:true,corrigidos,lista:lista.slice(0,40)});
+  }
+
   if(action==='conflitos-stats'){
     const [dbS,lg]=await Promise.all([dbGet(KEY),dbGet('prospeccao_conflitos_log')]);
     const abertos=(((dbS||{}).fichas)||[]).filter(f=>f.status==='conflitos_bot');

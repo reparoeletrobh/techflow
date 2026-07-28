@@ -1824,9 +1824,24 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
         }
         if (autorizado && acaoAprovada === 'registrar_conflito') {
           const KCF = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
-          const [fdbC, fdbCtv] = await Promise.all([dbGet('fichas_adm'), dbGet('fichas_tv')]);
-          const acha = b => (((b || {}).fichas) || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
-          const fichaC = acha(fdbC) || acha(fdbCtv);
+          // Busca o cliente em TODA a operação — TV que já avançou não está mais em fichas_tv,
+          // o nome dele vive na logística TV (ou no pipe). Antes o conflito nascia sem nome.
+          const [fdbC, fdbCtv, logC, logCtv, ppC, ppCtv] = await Promise.all([
+            dbGet('fichas_adm'), dbGet('fichas_tv'),
+            dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+            dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+          ]);
+          const bateD8 = t => String(t || '').replace(/\D/g, '').slice(-8) === d8x;
+          const acha = b => (((b || {}).fichas) || []).find(f => bateD8(f.telefone));
+          const achaCard = b => {
+            const c = (((b || {}).cards) || []).find(x => bateD8(x.telefone));
+            return c ? { nome: c.nomeContato || c.nome, equipamento: c.equipamento || c.descricao || '' } : null;
+          };
+          // primeiro quem tiver NOME preenchido; a origem não importa
+          const candidatosC = [acha(fdbC), acha(fdbCtv), acha(logC), acha(logCtv), achaCard(ppC), achaCard(ppCtv)]
+            .filter(Boolean);
+          const fichaC = candidatosC.find(f => String(f.nome || '').trim()) || candidatosC[0] || null;
+          const equipC = (candidatosC.find(f => String(f.equipamento || '').trim()) || {}).equipamento || '';
           {
           const ehCompra = /AN[ÁA]LISE DE COMPRA/i.test(String(acaoMotivo || ''));
           // O equipamento JÁ ESTÁ NA LOJA: aproveita a foto tirada no recebimento (alm_foto_<cardId>).
@@ -1854,7 +1869,7 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
             body: JSON.stringify({
               nome: (fichaC && fichaC.nome) || 'Cliente WhatsApp',
               telefone: String(tel).replace(/\D/g, ''),
-              equipamento: (fichaC && fichaC.equipamento) || '',
+              equipamento: (fichaC && fichaC.equipamento) || equipC || '',
               motivo: String(acaoMotivo || 'conflito registrado pelo bot').slice(0, 300),
               tipo: ehCompra ? 'analise_compra' : 'conflito',
               temFoto: temFotoCompra, cardId: cardCompraId, sistema: ehTvCompra ? 'tv' : 'adm',
@@ -1867,7 +1882,7 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ conflitoId: respCf.id, cardId: cardCompraId,
                   cliente: (fichaC && fichaC.nome) || 'Cliente WhatsApp',
-                  tel: String(tel).replace(/\D/g, ''), equipamento: (fichaC && fichaC.equipamento) || '',
+                  tel: String(tel).replace(/\D/g, ''), equipamento: (fichaC && fichaC.equipamento) || equipC || '',
                   obs: String(acaoMotivo || '').slice(0, 200), temFoto: temFotoCompra }),
               });
             } catch (e) {}
