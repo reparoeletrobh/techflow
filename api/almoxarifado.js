@@ -13,6 +13,18 @@ async function dbGet(k) {
     return j.result ? JSON.parse(j.result) : null;
   } catch (e) { return null; }
 }
+// Aplica UMA mudança relendo o banco na hora (o sync roda em paralelo e regravava o banco
+// inteiro por cima das conclusões — tarefa concluída "voltava" para a lista)
+async function aplicarNaTarefa(KEYX, id, mudanca) {
+  const atual = (await dbGet(KEYX)) || null;
+  if (!atual || !Array.isArray(atual.tarefas)) return null;
+  const alvo = atual.tarefas.find(x => x.id === id);
+  if (!alvo) return null;
+  mudanca(alvo);
+  await dbSet(KEYX, atual);
+  return alvo;
+}
+
 async function dbSet(k, v) {
   const r = await fetch(`${U}/set/${k}`, {
     method: 'POST', headers: { Authorization: `Bearer ${T}`, 'Content-Type': 'application/json' },
@@ -199,7 +211,8 @@ export default async function handler(req, res) {
         const aindaColeta = new Set(novoSnapCol);
         db.tarefas.forEach(t => {
           if (t.tipo === 'receber' && t.status === 'pendente' && !aindaColeta.has(t.cardId)) {
-            t.status = 'feito'; t.feitoPor = 'Sistema'; t.feitoEm = new Date().toISOString();
+            await aplicarNaTarefa(KEY, id, (alvo) => { alvo.status = 'feito'; alvo.feitoPor = String(feitoPor || '').trim(); alvo.feitoEm = new Date().toISOString(); });
+    t.status = 'feito'; t.feitoPor = 'Sistema'; t.feitoEm = new Date().toISOString();
             t.autoConcluida = 'saiu de Coleta Efetuada (diagnóstico/RS registrado)';
           }
         });
@@ -352,11 +365,20 @@ export default async function handler(req, res) {
     const { id, qual, feitoPor } = req.body || {};
     const t = db.tarefas.find(x => x.id === id);
     if (!t || t.tipo !== 'venda') return res.status(404).json({ ok: false, error: 'tarefa não encontrada' });
-    if (qual === 'video') t.videoGravado = true;
-    else if (qual === 'separado') t.separado = true;
-    else return res.status(400).json({ ok: false, error: 'qual: video|separado' });
+    if (!['video', 'separado'].includes(qual)) return res.status(400).json({ ok: false, error: 'qual: video|separado' });
+    const tf = await aplicarNaTarefa(KEY, id, (alvo) => {
+      if (qual === 'video') alvo.videoGravado = true;
+      else alvo.separado = true;
+      if (alvo.videoGravado && alvo.separado) {
+        alvo.status = 'feito';
+        alvo.feitoPor = String(feitoPor || '').trim();
+        alvo.feitoEm = new Date().toISOString();
+      }
+    });
+    if (!tf) return res.status(404).json({ ok: false, error: 'tarefa não encontrada' });
+    return res.status(200).json({ ok: true, videoGravado: !!tf.videoGravado, separado: !!tf.separado, feito: tf.status === 'feito' });
+    /* trecho antigo desativado
     if (t.videoGravado && t.separado) {
-      t.status = 'feito'; t.feitoPor = String(feitoPor || '').trim(); t.feitoEm = new Date().toISOString();
     // Mover p/ GARANTIA concluído (equipamento fisicamente na garantia dentro da loja) → fila do novo sistema
     if (t.tipo === 'mover' && t.destino === 'garantia') {
       try {
@@ -369,8 +391,7 @@ export default async function handler(req, res) {
       } catch (e) {}
     }
     }
-    await dbSet(KEY, db);
-    return res.status(200).json({ ok: true, videoGravado: !!t.videoGravado, separado: !!t.separado, feito: t.status === 'feito' });
+    */
   }
 
   // ══ F2 ROTAS: listar (ativas + últimas finalizadas) ══
