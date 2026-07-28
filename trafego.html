@@ -128,7 +128,7 @@ async function carregar(forcar){
   try{
     var r=await fetch('/api/trafego?action=painel'+(forcar?'&forcar=1':'')).then(function(x){return x.json();});
     if(!r.ok){
-      document.getElementById('lista').innerHTML='<div class="vazio-msg">Não consegui ler a conta de anúncios.<br><span style="font-size:11px;">'+esc(r.erro||r.error||'')+'</span></div>';
+      document.getElementById('lista').innerHTML='<div class="vazio-msg">Não consegui ler a conta de anúncios.<br><span style="font-size:11px;color:#fca5a5;">'+esc(r.erro||r.error||'')+'</span><br><br><button class="btn" onclick="carregar(true)">tentar de novo</button></div>';
       return;
     }
     _d=r;render();

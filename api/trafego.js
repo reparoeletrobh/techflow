@@ -10,6 +10,20 @@ async function dbSet(k, v) {
 }
 const GRAPH = 'https://graph.facebook.com/v20.0';
 
+// Busca paginada com páginas PEQUENAS (a Meta recusa requisições grandes:
+// "Please reduce the amount of data you're asking for")
+async function pegarTudo(url, maxPaginas) {
+  const out = []; let prox = url, n = 0, erro = null;
+  while (prox && n < (maxPaginas || 6)) {
+    const j = await fetch(prox).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+    if (j && j.error) { erro = j.error.message; break; }
+    for (const d of ((j || {}).data || [])) out.push(d);
+    prox = ((j || {}).paging || {}).next || null;
+    n++;
+  }
+  return { data: out, erro };
+}
+
 module.exports = async function handler(req, res) {
   try {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -94,25 +108,31 @@ module.exports = async function handler(req, res) {
         && String(req.query.forcar || '') !== '1' && cache.desde === desde) {
       return res.status(200).json(Object.assign({}, cache.dados, { cacheDe: cache.em, doCache: true }));
     }
-    const g = (p) => fetch(`${GRAPH}/act_${CONTA}/${p}&access_token=${TOKEN}`).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+    // SOMENTE ANÚNCIOS ATIVOS + campos mínimos + páginas de 25 (evita o erro de volume da Meta)
+    const soAtivos = String(req.query.todos || '') !== '1';
+    const filtroAtivo = soAtivos
+      ? '&filtering=' + encodeURIComponent(JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE'] }]))
+      : '';
+    const base = `${GRAPH}/act_${CONTA}/`;
+    const tk = `&access_token=${TOKEN}`;
     const [ads, adsets, ins] = await Promise.all([
-      g('ads?fields=id,name,status,effective_status,adset_id,campaign_id,creative{id,thumbnail_url,body,title,object_story_spec{video_data{message,title},link_data{message,name,description}}}&limit=250'),
-      g('adsets?fields=id,name,status,daily_budget,lifetime_budget,campaign_id&limit=250'),
-      g(`insights?level=ad&time_range={"since":"${desde}","until":"${hoje}"}&fields=ad_id,campaign_name,spend,impressions,clicks,ctr,cpc,actions&limit=400`),
+      pegarTudo(`${base}ads?fields=id,name,effective_status,adset_id,creative{thumbnail_url}&limit=25${filtroAtivo}${tk}`, 8),
+      pegarTudo(`${base}adsets?fields=id,name,daily_budget,lifetime_budget&limit=25${tk}`, 8),
+      pegarTudo(`${base}insights?level=ad&time_range=${encodeURIComponent(JSON.stringify({ since: desde, until: hoje }))}&fields=ad_id,spend,clicks,ctr,actions&limit=25${tk}`, 12),
     ]);
-    if (ads.error) return res.status(200).json({ ok: false, erro: ads.error.message });
+    if (ads.erro && !ads.data.length) return res.status(200).json({ ok: false, erro: ads.erro });
     const porAd = {};
-    for (const i of ((ins || {}).data || [])) porAd[i.ad_id] = i;
+    for (const i of (ins.data || [])) porAd[i.ad_id] = i;
     const porAdset = {};
-    for (const a of ((adsets || {}).data || [])) porAdset[a.id] = a;
+    for (const a of (adsets.data || [])) porAdset[a.id] = a;
 
     const CONV = ['onsite_conversion.messaging_conversation_started_7d', 'lead', 'onsite_conversion.total_messaging_connection'];
-    const anuncios = ((ads || {}).data || []).map(ad => {
+    const anuncios = (ads.data || []).map(ad => {
       const i = porAd[ad.id] || {};
       const st = porAdset[ad.adset_id] || {};
       const conversas = Number(((i.actions || []).find(a => CONV.includes(a.action_type)) || {}).value || 0);
       const gasto = Number(i.spend || 0);
-      const cat = categoriaDe(ad.name + ' ' + (i.campaign_name || '') + ' ' + (st.name || ''));
+      const cat = categoriaDe(ad.name + ' ' + (st.name || ''));
       const meta = cfg.metas[cat] || cfg.metas.outros;
       const cpa = conversas > 0 ? gasto / conversas : null;
       // distância da meta: <1 abaixo (bom), >1 acima (ruim); sem conversa com gasto = pior caso
@@ -120,14 +140,9 @@ module.exports = async function handler(req, res) {
       let situacao = 'sem-dados';
       if (razao != null) situacao = razao <= 1 ? 'campeao' : (razao <= 1.3 ? 'atencao' : 'ralo');
       return {
-        id: ad.id, nome: ad.name, ativo: (ad.effective_status || ad.status) === 'ACTIVE',
-        status: ad.effective_status || ad.status,
+        id: ad.id, nome: ad.name, ativo: ad.effective_status === 'ACTIVE',
+        status: ad.effective_status,
         thumb: (ad.creative || {}).thumbnail_url || null,
-        copy: (function () {
-          const c = ad.creative || {}, os = c.object_story_spec || {};
-          const vd = os.video_data || {}, ld = os.link_data || {};
-          return String(vd.message || ld.message || c.body || vd.title || ld.name || c.title || '').slice(0, 500);
-        })(),
         adsetId: ad.adset_id, adsetNome: st.name || '',
         orcamentoDiario: st.daily_budget ? Number(st.daily_budget) / 100 : null,
         orcamentoTotal: st.lifetime_budget ? Number(st.lifetime_budget) / 100 : null,
@@ -135,9 +150,8 @@ module.exports = async function handler(req, res) {
         gasto: Number(gasto.toFixed(2)), conversas,
         cpa: cpa != null ? Number(cpa.toFixed(2)) : null,
         razaoMeta: razao != null ? Number(razao.toFixed(2)) : null,
-        impressoes: Number(i.impressions || 0), cliques: Number(i.clicks || 0),
+        cliques: Number(i.clicks || 0),
         ctr: i.ctr ? Number(Number(i.ctr).toFixed(2)) : null,
-        cpc: i.cpc ? Number(Number(i.cpc).toFixed(2)) : null,
         situacao,
       };
     }).sort((a, b) => (a.razaoMeta == null ? 9 : a.razaoMeta) - (b.razaoMeta == null ? 9 : b.razaoMeta));
@@ -165,7 +179,8 @@ module.exports = async function handler(req, res) {
         adm: { depositado: cfg.verba.adm, real: Number(realAdm.toFixed(2)), gasto: Number(gastoAdm.toFixed(2)), saldo: Number((realAdm - gastoAdm).toFixed(2)) },
         tv: { depositado: cfg.verba.tv, real: Number(realTv.toFixed(2)), gasto: Number(gastoTv.toFixed(2)), saldo: Number((realTv - gastoTv).toFixed(2)) },
         aproveitamento: cfg.verba.aproveitamento },
-      metas: cfg.metas, porCategoria, totalAnuncios: anuncios.length, anuncios };
+      metas: cfg.metas, porCategoria, totalAnuncios: anuncios.length, anuncios,
+      avisos: [ads.erro, adsets.erro, ins.erro].filter(Boolean) };
     try { await dbSet('trafego_painel_cache', { em: new Date().toISOString(), desde, dados }); } catch (e) {}
     return res.status(200).json(dados);
   }
@@ -286,10 +301,24 @@ module.exports = async function handler(req, res) {
     if (!AK) return res.status(200).json({ ok: false, error: 'ANTHROPIC_API_KEY não configurada na Vercel' });
 
     const ativos = (base.dados.anuncios || []).filter(a => a.ativo && a.conversas > 0);
-    const campeoes = ativos.filter(a => a.situacao === 'campeao').slice(0, 25)
-      .map(a => ({ nome: a.nome, categoria: a.categoria, cpa: a.cpa, meta: a.meta, conversas: a.conversas, ctr: a.ctr, copy: (a.copy || '').slice(0, 300) }));
-    const ralos = ativos.filter(a => a.situacao === 'ralo').slice(0, 15)
-      .map(a => ({ nome: a.nome, categoria: a.categoria, cpa: a.cpa, meta: a.meta, conversas: a.conversas, copy: (a.copy || '').slice(0, 200) }));
+    const topC = ativos.filter(a => a.situacao === 'campeao').slice(0, 15);
+    const topR = ativos.filter(a => a.situacao === 'ralo').slice(0, 10);
+    // Texto do criativo só para estes (lotes de 10 — requisição pequena)
+    const copys = {};
+    try {
+      const alvos = [...topC, ...topR].map(a => a.id);
+      for (let i = 0; i < alvos.length; i += 10) {
+        const lote = alvos.slice(i, i + 10).join(',');
+        const j = await fetch(`${GRAPH}/?ids=${lote}&fields=creative{body,object_story_spec{video_data{message},link_data{message}}}&access_token=${TOKEN}`)
+          .then(x => x.json()).catch(() => null);
+        for (const k of Object.keys(j || {})) {
+          const c = ((j[k] || {}).creative) || {}, os = c.object_story_spec || {};
+          copys[k] = String((os.video_data || {}).message || (os.link_data || {}).message || c.body || '').slice(0, 300);
+        }
+      }
+    } catch (e) {}
+    const campeoes = topC.map(a => ({ nome: a.nome, categoria: a.categoria, cpa: a.cpa, meta: a.meta, conversas: a.conversas, ctr: a.ctr, copy: copys[a.id] || '' }));
+    const ralos = topR.map(a => ({ nome: a.nome, categoria: a.categoria, cpa: a.cpa, meta: a.meta, conversas: a.conversas, copy: copys[a.id] || '' }));
 
     const prompt = `Você é o estrategista de tráfego pago da Reparo Eletro, assistência técnica de eletrodomésticos em Belo Horizonte. Os anúncios são Click-to-WhatsApp: o objetivo de cada criativo é fazer a pessoa abrir conversa no WhatsApp para agendar conserto.
 
@@ -330,6 +359,23 @@ Responda APENAS um JSON válido, sem markdown:
     } catch (e) {
       return res.status(200).json({ ok: false, error: e.message });
     }
+  }
+
+  // ── 🩺 PAINEL-DEBUG: testa cada requisição isoladamente ──
+  if (action === 'painel-debug') {
+    const tk = `&access_token=${TOKEN}`;
+    const base = `${GRAPH}/act_${CONTA}/`;
+    const testes = {};
+    const t1 = await fetch(`${base}ads?fields=id,name,effective_status&limit=5${tk}`).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+    testes.ads = t1.error ? '✗ ' + t1.error.message : '✓ ' + ((t1.data || []).length) + ' anúncios';
+    const t2 = await fetch(`${base}adsets?fields=id,daily_budget&limit=5${tk}`).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+    testes.adsets = t2.error ? '✗ ' + t2.error.message : '✓ ' + ((t2.data || []).length) + ' conjuntos';
+    const cfgD = await cfgTrafego();
+    const t3 = await fetch(`${base}insights?level=ad&time_range=${encodeURIComponent(JSON.stringify({ since: inicioCiclo(cfgD), until: new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10) }))}&fields=ad_id,spend&limit=5${tk}`).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+    testes.insights = t3.error ? '✗ ' + t3.error.message : '✓ ' + ((t3.data || []).length) + ' linhas';
+    const t4 = await fetch(`${base}ads?fields=id,creative{thumbnail_url}&limit=3${tk}`).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+    testes.criativos = t4.error ? '✗ ' + t4.error.message : '✓ miniaturas ok';
+    return res.status(200).json({ ok: true, conta: 'act_' + CONTA, cicloDesde: inicioCiclo(cfgD), testes });
   }
 
   // ── 🎯 ORIGENS: conversas com anúncio de origem capturado (base da atribuição de funil) ──
