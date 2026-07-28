@@ -348,6 +348,32 @@ export default async function handler(req, res) {
   }
 
   // ── EXCLUIR ───────────────────────────────────────────────────────────────
+  // ── 🔎 CONFERIR-DUPLICATA: o cliente existe em outro lugar? (chamado antes de excluir) ──
+  if (action === 'conferir-duplicata') {
+    const tel = String(req.query.tel || '').replace(/\D/g, '').slice(-8);
+    const idAtual = String(req.query.id || '');
+    if (tel.length < 8) return res.status(400).json({ ok: false, error: 'informe ?tel=' });
+    const [fA, fT, lgA, lgT, pros, ppA, ppT] = await Promise.all([
+      dbGet(KEY_ADM), dbGet(KEY_TV), dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+      dbGet('prospeccao_adm'), dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+    ]);
+    const bate = t => String(t || '').replace(/\D/g, '').slice(-8) === tel;
+    const achados = [];
+    const varre = (arr, rot, campo) => { for (const x of (arr || [])) {
+      if (!bate(x.telefone) || x.id === idAtual) continue;
+      achados.push(rot + ': ' + (x[campo] || x.status || x.phase || '')); } };
+    varre(((fA || {}).fichas), 'ficha ADM', 'status');
+    varre(((fT || {}).fichas), 'ficha TV', 'status');
+    varre(((lgA || {}).fichas), 'logística ADM', 'phase');
+    varre(((lgT || {}).fichas), 'logística TV', 'phase');
+    varre(((pros || {}).fichas), 'prospecção', 'status');
+    for (const c of (((ppA || {}).cards) || [])) if (bate(c.telefone)) achados.push('pipe ADM: ' + (c.phaseId || c.phase || ''));
+    for (const c of (((ppT || {}).cards) || [])) if (bate(c.telefone)) achados.push('pipe TV: ' + (c.phaseId || c.phase || ''));
+    return res.status(200).json({ ok: true, ehDuplicata: achados.length > 0,
+      ondeMais: achados.slice(0, 8),
+      aviso: achados.length ? null : 'este cliente NÃO aparece em nenhum outro lugar do sistema — não é duplicata' });
+  }
+
   if (req.method === 'POST' && action === 'excluir') {
     const { id, sistema } = req.body || {};
     const key = sistema === 'tv' ? KEY_TV : KEY_ADM;

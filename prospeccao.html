@@ -875,6 +875,16 @@ async function confirmarLogistica(){
 
 async function excluirEspelho(id, sistema){
   if(!confirm('⚠️ ATENÇÃO: isto APAGA a ficha do cliente do sistema inteiro,\nnão só desta tela.\n\nO cliente deixa de ser atendido. Tem certeza?'))return;
+  try{
+    var f=(typeof _fichas!=='undefined'?_fichas:[]).find(function(x){return x.id===id;})||{};
+    var tel=String(f.telefone||'').replace(/\D/g,'');
+    if(tel){
+      var chk=await fetch('/api/fichas?action=conferir-duplicata&tel='+tel+'&id='+encodeURIComponent(id)).then(function(x){return x.json();});
+      if(chk.ok&&!chk.ehDuplicata){
+        if(!confirm('⚠️ ATENÇÃO\n\nEste cliente NÃO aparece em nenhum outro lugar do sistema.\nProvavelmente NÃO é duplicata — excluir vai fazer o cliente se perder.\n\nExcluir mesmo assim?'))return;
+      }
+    }
+  }catch(e){}
   var motivo=prompt('Por que está excluindo?\n(duplicada, trote, cliente desistiu, engano...)\n\nVai para a Lixeira e pode ser restaurada.');
   if(motivo===null)return;
   await fetch('/api/fichas?action=excluir',{
