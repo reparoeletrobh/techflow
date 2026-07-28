@@ -1,6 +1,6 @@
 // ═══ 📈 TRÁFEGO — Conector Meta Ads (Fase 2, leitura) ═══
-const U = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-const T = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+const U = (process.env.UPSTASH_URL || process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || '').replace(/['"]/g, '').trim();
+const T = (process.env.UPSTASH_TOKEN || process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || '').replace(/[\n\r'"]/g, '').trim();
 async function dbGet(k) {
   const r = await fetch(`${U}/get/${k}`, { headers: { Authorization: `Bearer ${T}` } }).then(x => x.json()).catch(() => null);
   try { return r && r.result ? JSON.parse(r.result) : null; } catch (e) { return null; }
@@ -418,6 +418,22 @@ Responda APENAS um JSON válido, sem markdown:
     } catch (e) {
       return res.status(200).json({ ok: false, error: e.message });
     }
+  }
+
+  // ── 🩺 REDIS-DEBUG: prova que o banco está acessível ──
+  if (action === 'redis-debug') {
+    const testeChave = 'trafego_teste_' + Date.now();
+    let escreveu = false, leu = null;
+    try { await dbSet(testeChave, { ok: true, em: new Date().toISOString() }); escreveu = true; } catch (e) {}
+    try { leu = await dbGet(testeChave); } catch (e) {}
+    const fichas = await dbGet('fichas_adm');
+    const pipe = await dbGet('reparoeletro_pipe');
+    return res.status(200).json({ ok: true,
+      urlConfigurada: !!U, tokenConfigurado: !!T,
+      escreveu, leuDeVolta: !!(leu && leu.ok),
+      fichasAdmEncontradas: (((fichas || {}).fichas) || []).length,
+      cardsPipeEncontrados: (((pipe || {}).cards) || []).length,
+      veredito: (leu && leu.ok) ? '✅ Redis acessível' : '❌ Redis NÃO acessível — confira UPSTASH_URL/UPSTASH_TOKEN na Vercel' });
   }
 
   // ═══ 🧠 INTELIGÊNCIA: funil real por categoria (operação + Meta) ═══
