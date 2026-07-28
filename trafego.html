@@ -506,7 +506,16 @@ async function aplicarCopiloto(){
   var pausar=[],orcs=[];
   (r.planos||[]).forEach(function(p){
     p.cortar.forEach(function(c){pausar.push(c.id);});
-    p.reforcar.forEach(function(d){ if(d.receber>0&&d.adsetId&&d.diarioNovo) orcs.push({adsetId:d.adsetId,diario:d.diarioNovo}); });
+    p.reforcar.forEach(function(d){
+      if(d.receber<=0)return;
+      var alvo=d.alvoId||d.adsetId;
+      if(!alvo)return;
+      if(d.campoVerba==='lifetime_budget'&&d.verbaNova){
+        orcs.push({alvoId:alvo,campo:'lifetime_budget',valor:d.verbaNova});
+      }else if(d.diarioNovo){
+        orcs.push({alvoId:alvo,campo:'daily_budget',valor:d.diarioNovo});
+      }
+    });
   });
   var ov=document.getElementById('ov-revisao'); if(ov)ov.remove();
   var el=document.getElementById('pg-copiloto');
@@ -517,7 +526,9 @@ async function aplicarCopiloto(){
   var h='<div style="background:var(--painel);border:1px solid var(--linha);border-radius:13px;padding:14px;">'
     +'<div style="font-size:14px;font-weight:900;color:'+(resp.ok?'#4ade80':'#f59e0b')+';">'+(resp.ok?'✅ Aplicado':'⚠️ Aplicado com pendências')+'</div>'
     +'<div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:8px;">'+(resp.feitos||[]).length+' alteração(ões) confirmada(s)</div>'
-    +((resp.erros||[]).length?'<div style="margin-top:8px;font-size:11px;color:#fca5a5;">'+resp.erros.map(function(e){return esc(e.acao+': '+e.erro);}).join('<br>')+'</div>':'')
+    +((resp.erros||[]).length?'<div style="margin-top:8px;font-size:11px;color:#fca5a5;line-height:1.5;">'
+      +resp.erros.slice(0,8).map(function(e){return '• '+esc(e.acao)+': '+esc(e.erro)+(e.codigo?' (cód '+e.codigo+')':'');}).join('<br>')
+      +((resp.erros||[]).length>8?'<br>… e mais '+(resp.erros.length-8):'')+'</div>':'')
   +'</div>';
   el.innerHTML=h;
   window._cop=null;

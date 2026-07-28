@@ -352,6 +352,9 @@ module.exports = async function handler(req, res) {
           pesoPct: Number(((peso(a) / soma) * 100).toFixed(1)),
           receber: fatia,
           verbaAtual: atual, verbaNova: atual != null ? Number((atual + fatia).toFixed(2)) : null,
+          alvoId: a.verbaEm === 'campanha' ? a.campanhaId : a.adsetId,
+          campoVerba: a.orcamentoTotal ? 'lifetime_budget' : 'daily_budget',
+          valorNovo: a.orcamentoTotal ? Number((atual + fatia).toFixed(2)) : null,
           diarioNovo: atual != null && diasRestantes > 0
             ? Number(((Math.max(0, atual - a.gasto) + fatia) / diasRestantes).toFixed(2)) : null,
           conversasEstimadas: (a.cpa && fatia > 0) ? Math.round(fatia / a.cpa) : 0 };
@@ -403,158 +406,48 @@ module.exports = async function handler(req, res) {
       regra: 'a verba de um criativo perdedor vai para os campeões da MESMA categoria; TV é frente própria e não troca verba com as demais' });
   }
 
-  // ── ▶️ APLICAR: executa pausa/verba na Meta (só com confirmação explícita, modo copiloto) ──
+  // ── ▶️ APLICAR: executa na Meta (só com confirmação explícita) ──
   if (req.method === 'POST' && action === 'aplicar') {
     const { pausarIds, orcamentos, confirmar } = req.body || {};
     if (confirmar !== true) return res.status(400).json({ ok: false, error: 'confirmação explícita obrigatória' });
+    // A Meta espera form-urlencoded com o token na query — JSON no corpo dá "parâmetro inválido"
+    const postMeta = async (id, campos) => {
+      const corpo = new URLSearchParams(campos).toString();
+      return fetch(`${GRAPH}/${id}?access_token=${TOKEN}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: corpo,
+      }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+    };
     const feitos = [], erros = [];
     for (const id of (pausarIds || [])) {
-      const r = await fetch(`${GRAPH}/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'PAUSED', access_token: TOKEN }) }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
-      if (r && r.error) erros.push({ id, acao: 'pausar', erro: r.error.message });
+      const r = await postMeta(id, { status: 'PAUSED' });
+      if (r && r.error) erros.push({ id, acao: 'pausar', erro: r.error.message, codigo: r.error.code });
       else feitos.push({ id, acao: 'pausado' });
+      await new Promise(r2 => setTimeout(r2, 120));
     }
     for (const o of (orcamentos || [])) {
-      if (!o.adsetId || !o.diario) continue;
-      const centavos = Math.round(Number(o.diario) * 100);
-      const r = await fetch(`${GRAPH}/${o.adsetId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ daily_budget: centavos, access_token: TOKEN }) }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
-      if (r && r.error) erros.push({ id: o.adsetId, acao: 'orcamento', erro: r.error.message });
-      else feitos.push({ id: o.adsetId, acao: 'orçamento diário → R$ ' + Number(o.diario).toFixed(2) });
+      // o front informa ONDE está a verba e QUAL campo usar (total x diária)
+      const alvo = o.alvoId || o.adsetId;
+      const campo = o.campo || (o.diario ? 'daily_budget' : 'lifetime_budget');
+      const valor = o.valor != null ? o.valor : o.diario;
+      if (!alvo || valor == null) { erros.push({ id: alvo || '?', acao: 'orçamento', erro: 'destino ou valor ausente' }); continue; }
+      const centavos = Math.round(Number(valor) * 100);
+      if (!(centavos > 0)) { erros.push({ id: alvo, acao: 'orçamento', erro: 'valor inválido' }); continue; }
+      const r = await postMeta(alvo, { [campo]: String(centavos) });
+      if (r && r.error) erros.push({ id: alvo, acao: 'orçamento (' + campo + ')', erro: r.error.message, codigo: r.error.code });
+      else feitos.push({ id: alvo, acao: campo + ' → R$ ' + Number(valor).toFixed(2) });
+      await new Promise(r2 => setTimeout(r2, 120));
     }
     try {
       const lg = (await dbGet('trafego_log')) || { movs: [] };
       lg.movs.unshift({ ts: new Date().toISOString(), feitos, erros });
       lg.movs = lg.movs.slice(0, 200);
       await dbSet('trafego_log', lg);
+      for (const p of ['hoje', '7d', 'ciclo']) await dbSet('trafego_painel_cache_' + p, null);
       await dbSet('trafego_painel_cache', null);
     } catch (e) {}
     return res.status(200).json({ ok: erros.length === 0, feitos, erros });
-  }
-
-  // ═══ 🔬 ANÁLISE: padrões dos criativos campeões + 20 sugestões da semana ═══
-  if (action === 'analise') {
-    const AK = (process.env.ANTHROPIC_API_KEY || '').trim();
-    const cfg = await cfgTrafego();
-    const base = await dbGet('trafego_painel_cache');
-    if (!base || !base.dados) return res.status(200).json({ ok: false, error: 'abra o painel primeiro para carregar os dados do ciclo' });
-    const semana = (function () { const d = new Date(Date.now() - 3 * 3600 * 1000); const on = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-      return d.getUTCFullYear() + '-S' + Math.ceil((((d - on) / 86400000) + on.getUTCDay() + 1) / 7); })();
-    const cacheS = await dbGet('trafego_sugestoes_' + semana);
-    if (cacheS && String(req.query.gerar || '') !== '1') return res.status(200).json(Object.assign({ ok: true, semana, doCache: true }, cacheS));
-    if (!AK) return res.status(200).json({ ok: false, error: 'ANTHROPIC_API_KEY não configurada na Vercel' });
-
-    const ativos = (base.dados.anuncios || []).filter(a => a.ativo && a.conversas > 0);
-    const topC = ativos.filter(a => a.situacao === 'campeao').slice(0, 15);
-    const topR = ativos.filter(a => a.situacao === 'ralo').slice(0, 10);
-    // Texto do criativo só para estes (lotes de 10 — requisição pequena)
-    const copys = {};
-    try {
-      const alvos = [...topC, ...topR].map(a => a.id);
-      for (let i = 0; i < alvos.length; i += 10) {
-        const lote = alvos.slice(i, i + 10).join(',');
-        const j = await fetch(`${GRAPH}/?ids=${lote}&fields=creative{body,object_story_spec{video_data{message},link_data{message}}}&access_token=${TOKEN}`)
-          .then(x => x.json()).catch(() => null);
-        for (const k of Object.keys(j || {})) {
-          const c = ((j[k] || {}).creative) || {}, os = c.object_story_spec || {};
-          copys[k] = String((os.video_data || {}).message || (os.link_data || {}).message || c.body || '').slice(0, 300);
-        }
-      }
-    } catch (e) {}
-    const campeoes = topC.map(a => ({ nome: a.nome, categoria: a.categoria, cpa: a.cpa, meta: a.meta, conversas: a.conversas, ctr: a.ctr, copy: copys[a.id] || '' }));
-    const ralos = topR.map(a => ({ nome: a.nome, categoria: a.categoria, cpa: a.cpa, meta: a.meta, conversas: a.conversas, copy: copys[a.id] || '' }));
-
-    const prompt = `Você é o estrategista de tráfego pago da Reparo Eletro, assistência técnica de eletrodomésticos em Belo Horizonte. Os anúncios são Click-to-WhatsApp: o objetivo de cada criativo é fazer a pessoa abrir conversa no WhatsApp para agendar conserto.
-
-NOSSOS CRIATIVOS CAMPEÕES desta semana (CPA = custo por conversa; meta por categoria: TV R$${cfg.metas.tv}, micro-ondas R$${cfg.metas.microondas}, purificador R$${cfg.metas.purificador}, adega R$${cfg.metas.adega}):
-${JSON.stringify(campeoes)}
-
-NOSSOS PIORES desta semana (o que evitar):
-${JSON.stringify(ralos)}
-
-TAREFA — responda em duas partes:
-1) PADRÕES: analise o que os campeões têm em comum e o que os piores erram (ganchos, dor tratada, promessa, tom, formato, uso de preço/urgência/prova). Seja específico e baseado nos dados acima, não genérico.
-2) SUGESTÕES: pesquise na web o que está funcionando hoje em anúncios de conserto de eletrodomésticos e de adegas/cervejeiras no Brasil (concorrentes, ganchos comuns, formatos), e proponha EXATAMENTE 20 ideias novas de criativo em VÍDEO, assim distribuídas: 10 de ADEGA, 4 de TV, 3 de MICRO-ONDAS, 3 de PURIFICADOR.
-
-Cada sugestão precisa de: titulo (curto), categoria, gancho (a primeira frase/cena, os 3 primeiros segundos), roteiro (3 a 5 cenas descritas para gravar com celular na própria loja), legenda (texto do anúncio, até 250 caracteres, tom próximo do que funciona nos nossos campeões), cta, porque (em que padrão ou evidência essa ideia se apoia).
-
-Responda APENAS um JSON válido, sem markdown:
-{"padroes":{"campeoes":["..."],"erros":["..."],"mercado":["..."]},"sugestoes":[{"titulo":"","categoria":"adega|tv|microondas|purificador","gancho":"","roteiro":["",""],"legenda":"","cta":"","porque":""}]}`;
-
-    try {
-      const r = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'x-api-key': AK, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 8000,
-          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-          messages: [{ role: 'user', content: prompt }] }),
-      });
-      const j = await r.json();
-      const txt = ((j && j.content) || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-      let parsed = null;
-      try { parsed = JSON.parse(txt.replace(/```json|```/g, '').trim()); } catch (e) {
-        const m = txt.match(/\{[\s\S]*\}/); if (m) { try { parsed = JSON.parse(m[0]); } catch (e2) {} }
-      }
-      if (!parsed || !parsed.sugestoes) return res.status(200).json({ ok: false, error: 'não consegui montar as sugestões desta vez', bruto: txt.slice(0, 300) });
-      const saida = { padroes: parsed.padroes || {}, sugestoes: parsed.sugestoes.slice(0, 20),
-        baseadoEm: { campeoes: campeoes.length, ralos: ralos.length }, geradoEm: new Date().toISOString() };
-      await dbSet('trafego_sugestoes_' + semana, saida);
-      return res.status(200).json(Object.assign({ ok: true, semana }, saida));
-    } catch (e) {
-      return res.status(200).json({ ok: false, error: e.message });
-    }
-  }
-
-  // ── 🏷️ NAO-CLASSIFICADOS: nomes que caem em "outros" (anúncios + equipamentos da operação) ──
-  if (action === 'nao-classificados') {
-    const [cacheP, fA, fT, lgA, lgT] = await Promise.all([
-      dbGet('trafego_painel_cache_7d').then(v => v || dbGet('trafego_painel_cache')),
-      dbGet('fichas_adm'), dbGet('fichas_tv'), dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
-    ]);
-    const contaAnuncio = {}, contaEquip = {};
-    for (const a of ((((cacheP || {}).dados) || {}).anuncios || [])) {
-      if (categoriaDe(a.nome) === 'outros') contaAnuncio[a.nome] = (contaAnuncio[a.nome] || 0) + 1;
-    }
-    const corte90 = Date.now() - 90 * 86400000;
-    const brancosPorBanco = {};
-    const bancos = [['fichas_adm', fA], ['fichas_tv', fT], ['logistica_adm', lgA], ['logistica_tv', lgT]];
-    for (const [nomeBanco, banco] of bancos) {
-      for (const fi of (((banco || {}).fichas) || [])) {
-        if (new Date(fi.criadoEm || 0).getTime() < corte90) continue;
-        const eq = String(fi.equipamento || '').trim();
-        if (!eq) {
-          contaEquip['(equipamento em branco)'] = (contaEquip['(equipamento em branco)'] || 0) + 1;
-          brancosPorBanco[nomeBanco] = (brancosPorBanco[nomeBanco] || 0) + 1;
-          continue;
-        }
-        if (categoriaDe(eq) === 'outros') contaEquip[eq] = (contaEquip[eq] || 0) + 1;
-      }
-    }
-    const ordena = o => Object.keys(o).map(k => ({ nome: k, vezes: o[k] })).sort((a, b) => b.vezes - a.vezes).slice(0, 40);
-    const cfgN = await cfgTrafego();
-    return res.status(200).json({ ok: true,
-      apelidosAtivos: cfgN.apelidos,
-      anunciosLidosDoCache: ((((cacheP || {}).dados) || {}).anuncios || []).length,
-      brancosPorBanco,
-      anunciosSemCategoria: ordena(contaAnuncio),
-      equipamentosSemCategoria: ordena(contaEquip),
-      comoEnsinar: 'POST em ?action=config com {"apelidos":{"vitrine opa":"purificador","gabriel":"microondas"}} — o termo é procurado dentro do nome, em minúsculas' });
-  }
-
-  // ── 🩺 REDIS-DEBUG: prova que o banco está acessível ──
-  if (action === 'redis-debug') {
-    const testeChave = 'trafego_teste_' + Date.now();
-    let escreveu = false, leu = null;
-    try { await dbSet(testeChave, { ok: true, em: new Date().toISOString() }); escreveu = true; } catch (e) {}
-    try { leu = await dbGet(testeChave); } catch (e) {}
-    const fichas = await dbGet('fichas_adm');
-    const pipe = await dbGet('reparoeletro_pipe');
-    return res.status(200).json({ ok: true,
-      urlConfigurada: !!U, tokenConfigurado: !!T,
-      escreveu, leuDeVolta: !!(leu && leu.ok),
-      fichasAdmEncontradas: (((fichas || {}).fichas) || []).length,
-      cardsPipeEncontrados: (((pipe || {}).cards) || []).length,
-      veredito: (leu && leu.ok) ? '✅ Redis acessível' : '❌ Redis NÃO acessível — confira UPSTASH_URL/UPSTASH_TOKEN na Vercel' });
   }
 
   // ═══ 🧠 INTELIGÊNCIA: funil real por categoria (operação + Meta) ═══
