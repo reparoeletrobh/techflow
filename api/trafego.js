@@ -20,6 +20,7 @@ async function pegarTudo(url, maxPaginas) {
     for (const d of ((j || {}).data || [])) out.push(d);
     prox = ((j || {}).paging || {}).next || null;
     n++;
+    if (prox) await new Promise(r => setTimeout(r, 120)); // respiro entre páginas
   }
   return { data: out, erro };
 }
@@ -120,13 +121,16 @@ module.exports = async function handler(req, res) {
       : '';
     const base = `${GRAPH}/act_${CONTA}/`;
     const tk = `&access_token=${TOKEN}`;
-    const [ads, adsets, camps, ins] = await Promise.all([
-      pegarTudo(`${base}ads?fields=id,name,status,effective_status,adset_id,campaign_id,creative{thumbnail_url}&limit=25${filtroAtivo}${tk}`, 20),
-      pegarTudo(`${base}adsets?fields=id,name,status,effective_status,daily_budget,lifetime_budget&limit=25${tk}`, 20),
-      pegarTudo(`${base}campaigns?fields=id,status,effective_status&limit=50${tk}`, 12),
-      pegarTudo(`${base}insights?level=ad&${janela}&use_unified_attribution_setting=true&fields=ad_id,spend,clicks,ctr,actions&limit=25${tk}`, 12),
-    ]);
+    // SEQUENCIAL e com páginas grandes: a Meta limita o NÚMERO de chamadas, não o total de itens
+    const adsets = await pegarTudo(`${base}adsets?fields=id,name,effective_status,daily_budget,lifetime_budget,end_time&limit=100${filtroAtivo}${tk}`, 8);
+    if (adsets.erro && !adsets.data.length) {
+      return res.status(200).json({ ok: false, erro: 'não consegui ler os conjuntos: ' + adsets.erro +
+        (/limit reached/i.test(adsets.erro) ? ' — a Meta limitou as consultas por alguns minutos; tente de novo em instantes.' : '') });
+    }
+    const ads = await pegarTudo(`${base}ads?fields=id,name,effective_status,adset_id,creative{thumbnail_url}&limit=100${filtroAtivo}${tk}`, 8);
     if (ads.erro && !ads.data.length) return res.status(200).json({ ok: false, erro: ads.erro });
+    const ins = await pegarTudo(`${base}insights?level=ad&${janela}&use_unified_attribution_setting=true&fields=ad_id,spend,clicks,ctr,actions&limit=100${tk}`, 8);
+    const camps = { data: [], erro: null };
     const porAd = {};
     for (const i of (ins.data || [])) porAd[i.ad_id] = i;
     const porAdset = {};
@@ -155,16 +159,15 @@ module.exports = async function handler(req, res) {
     // Sem prova → fica de fora (antes eu deixava passar quando não sabia, e por isso inflava).
     const motivosCorte = {};
     const corta = (m) => { motivosCorte[m] = (motivosCorte[m] || 0) + 1; return false; };
+    const agoraMs = Date.now();
     const brutos = (ads.data || []).filter(ad => {
       if (!soAtivos) return true;
-      if (ad.status && ad.status !== 'ACTIVE') return corta('anúncio com status ' + ad.status);
       if (ad.effective_status !== 'ACTIVE') return corta('anúncio: ' + (ad.effective_status || 'sem status'));
       const st = porAdset[ad.adset_id];
       if (!st) return corta('conjunto não localizado');
-      if ((st.effective_status || st.status) !== 'ACTIVE') return corta('conjunto: ' + (st.effective_status || st.status));
-      const cp = porCamp[ad.campaign_id];
-      if (!cp) return corta('campanha não localizada');
-      if ((cp.effective_status || cp.status) !== 'ACTIVE') return corta('campanha: ' + (cp.effective_status || cp.status));
+      if (st.effective_status !== 'ACTIVE') return corta('conjunto: ' + st.effective_status);
+      // ENCERRADO: a Meta mantém status ACTIVE depois que a veiculação termina — o prazo é quem decide
+      if (st.end_time && new Date(st.end_time).getTime() < agoraMs) return corta('veiculação encerrada (prazo terminou)');
       return true;
     });
     const anuncios = brutos.map(ad => {
@@ -185,7 +188,8 @@ module.exports = async function handler(req, res) {
         status: ad.effective_status,
         thumb: (ad.creative || {}).thumbnail_url || null,
         adsetId: ad.adset_id, adsetNome: st.name || '',
-        orcamentoDiario: st.daily_budget ? Number(st.daily_budget) / 100 : null,
+        orcamentoDiario: Number(st.daily_budget) > 0 ? Number(st.daily_budget) / 100 : null,
+        terminaEm: st.end_time || null,
         orcamentoTotal: st.lifetime_budget ? Number(st.lifetime_budget) / 100 : null,
         categoria: cat, meta,
         gasto: Number(gasto.toFixed(2)), conversas, metricaConversa: cv.metrica,
