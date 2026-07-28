@@ -793,8 +793,29 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
         registrar(sis + ':' + c.id, cat, valor);
       }
     }
-    // Boards ADM e TV: mesma regra (cards finalizados vivem lá depois da migração)
-    const [bTv] = await Promise.all([dbGet('tv_board')]);
+    // ARQUIVO MORTO: cards finalizados são REMOVIDOS do pipe/board e guardados aqui —
+    // é onde mora a maior parte do faturamento histórico.
+    const [bTv, arqA, arqT, arqFin] = await Promise.all([
+      dbGet('tv_board'), dbGet('reparoeletro_arquivo'), dbGet('tv_arquivo'),
+      dbGet('reparoeletro_financeiro_arquivo'),
+    ]);
+    for (const [banco, sis] of [[arqA, 'arqAdm'], [arqT, 'arqTv'], [arqFin, 'arqFin']]) {
+      const itens = (((banco || {}).cards) || []).concat(((banco || {}).records) || [])
+        .concat(((banco || {}).fichas) || []);
+      for (const c of itens) {
+        const valor = parseFloat(c.valor || c.total || 0) || 0;
+        if (!(valor > 0)) continue;
+        if (ehExcluido(c)) { excluidosRsGarantia++; continue; }
+        const fase = String(c.phaseId || c.phase || '');
+        // no arquivo, tudo que chegou lá já concluiu — mas ainda tiramos o que não vale
+        if (fase && ['descarte', 'reprovado', 'garantia'].includes(fase)) { excluidosRsGarantia++; continue; }
+        const quando = c.arquivadoEm || c.movedAt || c.finalizadoEm || c.criadoEm || c.createdAt;
+        if (!dentroJanela(quando)) continue;
+        const cat = categoriaDe(c.equipamento || c.descricao || c.title || c.nomeContato || c.nome || '');
+        if (cat === 'outros') semCategoria++;
+        registrar(sis + ':' + (c.id || c.pipefyId || c.osCode), cat, valor);
+      }
+    }
     for (const [banco, sis] of [[boardA, 'boardAdm'], [bTv, 'boardTv']]) {
       for (const c of (((banco || {}).cards) || [])) {
         const fase = String(c.phaseId || c.phase || '');
@@ -900,6 +921,17 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
         pagos: contar(bal, b => b.pagoEm || b.status === 'pago'),
         pagosNoPeriodo: contar(bal, b => (b.pagoEm || b.status === 'pago') && dentro(b.pagoEm || b.entradaEm)) },
       cardsArquivados: (((arq || {}).ids) || []).length,
+      arquivos: await (async () => {
+        const [a1, a2, a3, a4] = await Promise.all([
+          dbGet('reparoeletro_arquivo'), dbGet('tv_arquivo'),
+          dbGet('reparoeletro_financeiro_arquivo'), dbGet('reparoeletro_logistica_arquivo')]);
+        const conta = (b) => { const it = (((b||{}).cards)||[]).concat(((b||{}).records)||[]).concat(((b||{}).fichas)||[]);
+          return { itens: it.length, comValor: it.filter(x => parseFloat(x.valor||x.total||0) > 0).length,
+            valorNoPeriodo: Number(it.filter(x => parseFloat(x.valor||x.total||0) > 0 && dentro(x.arquivadoEm||x.movedAt||x.criadoEm))
+              .reduce((s,x)=>s+(parseFloat(x.valor||x.total||0)||0),0).toFixed(2)) }; };
+        return { reparoeletro_arquivo: conta(a1), tv_arquivo: conta(a2),
+          financeiro_arquivo: conta(a3), logistica_arquivo: conta(a4) };
+      })(),
       tvBoard: { existe: !!boardTv, cards: (((boardTv || {}).cards) || []).length },
       leitura: 'compare com ~1300 serviços pagos em 60 dias: a fonte com número próximo disso é onde mora a verdade' });
   }
