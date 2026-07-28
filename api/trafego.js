@@ -55,7 +55,7 @@ module.exports = async function handler(req, res) {
 
   // ═══ CONFIG: metas de custo por conversa e verba semanal ═══
   const CFG_PADRAO = {
-    metas: { tv: 2, microondas: 5, forno: 5, purificador: 8, adega: 10, outros: 8 },
+    metas: { tv: 2, microondas: 5, forno: 5, purificador: 8, adega: 10, institucional: 8, outros: 8 },
     verba: { adm: 5000, tv: 500, aproveitamento: 0.87 },
     cicloInicio: { diaSemana: 6, hora: 13 }, // sábado 13h
   };
@@ -78,10 +78,11 @@ module.exports = async function handler(req, res) {
       if (termo && s.includes(termo)) return APELIDOS[termo];
     }
     if (/tvs?\b|\btvs?\d|televis|barramento|tela quebrad|quebrar tv|polegada/.test(s)) return 'tv';
-    if (/micro-?\s?ondas|reforma/.test(s)) return 'microondas';
+    if (/micro-?\s?ondas|reforma|\binflu\b|\bantigo\b/.test(s)) return 'microondas';
     if (/\bforn(o|inho)/.test(s)) return 'forno';
     if (/purificador|bebedouro|\bfiltro\b|vela|[áa]gua/.test(s)) return 'purificador';
     if (/adega|cervejeir|climatiz|vinho/.test(s)) return 'adega';
+    if (/criativo loja|reuniao externa|reunião externa|\bnovo\b|vitrine|institucional/.test(s)) return 'institucional';
     return 'outros';
   }
   try { const _c = await cfgTrafego(); APELIDOS = _c.apelidos || {}; } catch (e) {}
@@ -219,7 +220,7 @@ module.exports = async function handler(req, res) {
     const realAdm = cfg.verba.adm * cfg.verba.aproveitamento;
     const realTv = cfg.verba.tv * cfg.verba.aproveitamento;
     const porCategoria = {};
-    for (const c of ['tv', 'microondas', 'forno', 'purificador', 'adega', 'outros']) {
+    for (const c of ['tv', 'microondas', 'forno', 'purificador', 'adega', 'institucional', 'outros']) {
       const lista = anuncios.filter(a => a.categoria === c && a.ativo);
       const gc = lista.reduce((s, a) => s + a.gasto, 0);
       const cc = lista.reduce((s, a) => s + a.conversas, 0);
@@ -501,7 +502,7 @@ Responda APENAS um JSON válido, sem markdown:
       dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
       dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
     ]);
-    const CATS = ['tv', 'microondas', 'forno', 'purificador', 'adega', 'outros'];
+    const CATS = ['tv', 'microondas', 'forno', 'purificador', 'adega', 'institucional', 'outros'];
     const vazio = () => ({ entradas: 0, clienteLoja: 0, naLoja: 0,
       orcados: 0, aprovados: 0, reprovados: 0, negociando: 0, faturado: 0, tickets: [] });
     const f = {}; for (const c of CATS) f[c] = vazio();

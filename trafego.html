@@ -25,7 +25,7 @@
 :root{
   --bg:#07080a; --painel:#101319; --linha:#1e232c; --txt:#f0f2f5; --dim:#79828f;
   --campeao:#22c55e; --atencao:#f59e0b; --ralo:#ef4444;
-  --tv:#3b82f6; --microondas:#f97316; --purificador:#06b6d4; --adega:#a855f7; --forno:#ef4444; --outros:#64748b;
+  --tv:#3b82f6; --microondas:#f97316; --purificador:#06b6d4; --adega:#a855f7; --forno:#ef4444; --institucional:#14b8a6; --outros:#64748b;
   --mono:ui-monospace,'SF Mono',Menlo,monospace;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -124,7 +124,7 @@ a.voltar{color:var(--dim);text-decoration:none;font-size:11.5px;font-weight:700;
 </div>
 
 <script>
-var CAT_NOME={tv:'TV',microondas:'Micro-ondas',forno:'Forno elétrico',purificador:'Purificador',adega:'Adega',outros:'Outros'};
+var CAT_NOME={tv:'TV',microondas:'Micro-ondas',forno:'Forno elétrico',purificador:'Purificador',adega:'Adega',institucional:'Institucional',outros:'Outros'};
 var _d=null,_cat='todos',_per='ciclo';
 function setPeriodo(p){
   _per=p;
