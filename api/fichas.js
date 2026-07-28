@@ -4,6 +4,7 @@ const T = (process.env.UPSTASH_TOKEN ||'').replace(/[\n\r'"]/g,'').trim();
 const SHEET_ID   = '1ovSEGZ7if5-wdNZpd1cbLlyg0PZpsrT9fQwOIzfG_mw';
 const SHEET_CSV  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
 
+const KEY_EXCLUIDAS = 'fichas_linhas_excluidas';
 const KEY_ADM    = 'fichas_adm';
 const KEY_TV     = 'fichas_tv';
 const KEY_CURSOR = 'fichas_sheet_cursor';
@@ -129,6 +130,11 @@ export default async function handler(req, res) {
       // Linhas da planilha que JÁ viraram ficha (o dedupe verdadeiro é por LINHA — telefone repete p/ cliente recorrente)
       const rowsExistentes = new Set(
         [...dbAdm.fichas, ...dbTv.fichas].map(f => f.sheetRow).filter(x => x != null));
+      // Linhas excluídas manualmente NUNCA voltam (nem pelo cursor, nem pela rede de resgate)
+      try {
+        const tombI = (await dbGet(KEY_EXCLUIDAS)) || { linhas: {} };
+        for (const k of Object.keys(tombI.linhas || {})) rowsExistentes.add(Number(k));
+      } catch (e) {}
       // ASSINATURA da linha (tel+nome+equip): protege contra reimportacao em massa quando os
       // sheetRow antigos foram gravados com formula diferente (linhas vazias desalinhavam)
       const assinar = (tel, nome, equip) =>
@@ -346,9 +352,37 @@ export default async function handler(req, res) {
     const { id, sistema } = req.body || {};
     const key = sistema === 'tv' ? KEY_TV : KEY_ADM;
     const db  = (await dbGet(key)) || { fichas:[] };
-    db.fichas = db.fichas.filter(x => x.id !== id);
-    await dbSet(key, db);
-    return res.status(200).json({ ok:true });
+    const alvo = (db.fichas || []).find(x => x.id === id);
+    // TOMBSTONE DA LINHA: sem isto a rede de resgate reimportava a linha no ciclo seguinte
+    if (alvo && alvo.sheetRow != null) {
+      try {
+        const tomb = (await dbGet(KEY_EXCLUIDAS)) || { linhas: {} };
+        if (!tomb.linhas) tomb.linhas = {};
+        tomb.linhas[String(alvo.sheetRow)] = { em: new Date().toISOString(), nome: alvo.nome || '', tel: alvo.telefone || '' };
+        const corte = Date.now() - 180 * 86400000;
+        for (const k of Object.keys(tomb.linhas)) {
+          if (new Date(tomb.linhas[k].em || 0).getTime() < corte) delete tomb.linhas[k];
+        }
+        await dbSet(KEY_EXCLUIDAS, tomb);
+      } catch (e) {}
+    }
+    const dbF = (await dbGet(key)) || db;              // relê (o sync pode ter gravado no meio)
+    dbF.fichas = (dbF.fichas || []).filter(x => x.id !== id);
+    await dbSet(key, dbF);
+    return res.status(200).json({ ok:true, linhaBloqueada: alvo ? alvo.sheetRow : null });
+  }
+
+  // ── LINHAS EXCLUÍDAS: quais linhas da planilha estão bloqueadas ──
+  if (action === 'linhas-excluidas') {
+    const tomb = (await dbGet(KEY_EXCLUIDAS)) || { linhas: {} };
+    const lista = Object.keys(tomb.linhas || {}).map(k => Object.assign({ linha: Number(k) }, tomb.linhas[k]))
+      .sort((a, b) => b.linha - a.linha);
+    if (req.query.liberar) {                            // libera uma linha específica
+      const l = String(req.query.liberar);
+      if (tomb.linhas && tomb.linhas[l]) { delete tomb.linhas[l]; await dbSet(KEY_EXCLUIDAS, tomb); }
+      return res.status(200).json({ ok: true, liberada: l });
+    }
+    return res.status(200).json({ ok: true, total: lista.length, linhas: lista.slice(0, 100) });
   }
 
   // ── RESET-CURSOR: zera cursor para ser recalculado no próximo sync ────────
