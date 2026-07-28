@@ -222,26 +222,18 @@ export default async function handler(req, res) {
         enviadoEm: quando || null,
         horasParado: ts ? Number(((Date.now() - ts) / 3600000).toFixed(1)) : null });
     };
-    // 1) logística com orçamento registrado/enviado
+    // SOMENTE orçamentos que O BOT enviou (registro wa_orc_enviados) e que seguem sem desfecho.
+    // Orçamento enviado por humano/outro canal NÃO entra aqui.
     for (const f of (((logA || {}).fichas) || [])) {
-      if (['orc_registrado', 'orc_enviado'].includes(f.phase)) {
-        registra(f.telefone, f.nome, 'adm', envA.ids[f.id] || f.movedAt || f.criadoEm, 'logística', f.equipamento);
-      }
+      if (!['orc_registrado', 'orc_enviado'].includes(f.phase)) continue;
+      if (!envA.ids[f.id]) continue;
+      registra(f.telefone, f.nome, 'adm', envA.ids[f.id], 'aguardando resposta', f.equipamento);
     }
     for (const f of (((tvA || {}).fichas) || [])) {
-      if (['orc_registrado', 'orc_enviado'].includes(f.phase)) {
-        registra(f.telefone, f.nome, 'tv', envA.ids['tv:' + f.id] || envA.ids[f.id] || f.movedAt || f.criadoEm, 'logística', f.equipamento);
-      }
-    }
-    // 2) pipe aguardando decisão do cliente
-    for (const c of [...(((pipeA || {}).cards) || []), ...(((pipeT || {}).cards) || [])]) {
-      const fase = c.phaseId || c.phase;
-      if (['aguardando_aprovacao', 'ultima_chamada'].includes(fase)) {
-        registra(c.telefone, c.nomeContato, (((pipeT || {}).cards) || []).includes(c) ? 'tv' : 'adm',
-          c.aguardandoDesde || c.movedAt || c.criadoEm,
-          fase === 'ultima_chamada' ? 'última chamada' : 'aguardando aprovação',
-          c.equipamento, parseFloat(c.valor || 0) || null);
-      }
+      if (!['orc_registrado', 'orc_enviado'].includes(f.phase)) continue;
+      const quando = envA.ids['tv:' + f.id] || envA.ids[f.id];
+      if (!quando) continue;
+      registra(f.telefone, f.nome, 'tv', quando, 'aguardando resposta', f.equipamento);
     }
     abertos.sort((a, b) => (b.horasParado || 0) - (a.horasParado || 0));
     const valorEmJogo = abertos.reduce((s, a) => s + (a.valor || 0), 0);
@@ -334,10 +326,26 @@ export default async function handler(req, res) {
     ];
     const agoraR = Date.now();
     const feitos = [];
+    // TRAVA: só reativa quem O BOT atendeu (tem conversa) E para quem O BOT enviou o orçamento.
+    // Sem isso o motor escrevia para clientes que nunca falaram com o bot.
+    const enviadosR = (await dbGet('wa_orc_enviados')) || { ids: {} };
+    const teveConversa = new Set();
+    for (const e of evtsR) {
+      if (e.dir !== 'in') continue;
+      const d = String(e.tel || '').replace(/\D/g, '').slice(-8);
+      if (d.length >= 8) teveConversa.add(d);
+    }
+    const pulados = [];
     for (const { f, sis } of alvos) {
       const d8r = String(f.telefone || '').replace(/\D/g, '').slice(-8);
       if (d8r.length < 8) continue;
       const chave = (sis === 'tv' ? 'tv:' : '') + f.id;
+      if (!enviadosR.ids[chave] && !enviadosR.ids[f.id]) {
+        pulados.push({ nome: f.nome, motivo: 'orçamento não foi enviado pelo bot' }); continue;
+      }
+      if (!teveConversa.has(d8r)) {
+        pulados.push({ nome: f.nome, motivo: 'cliente nunca conversou com o bot' }); continue;
+      }
       const st = reatR.alvos[chave] || { toques: 0, ultimo: 0 };
       // Cliente respondeu DEPOIS do nosso último toque? negociação viva — reseta o relógio, não incomoda
       if (ultimaIn[d8r] && ultimaIn[d8r] > (st.ultimo || 0) && agoraR - ultimaIn[d8r] < 6 * 3600000) continue;
@@ -396,7 +404,51 @@ export default async function handler(req, res) {
       if (agoraR - (reatR.alvos[k].ultimo || 0) > 20 * 86400000) delete reatR.alvos[k];
     }
     await dbSet('wa_reativacao', reatR);
-    return res.status(200).json({ ok: true, alvosAtivos: alvos.length, acoes: feitos.length, feitos });
+    return res.status(200).json({ ok: true, alvosAtivos: alvos.length, acoes: feitos.length, feitos,
+      pulados: pulados.length, motivosPulados: pulados.slice(0, 20) });
+  }
+
+  // ── 📋 REATIVACAO-RELATORIO: tudo que o motor disparou e para quem ──
+  if (action === 'reativacao-relatorio') {
+    const [reat, evtsRR, envRR] = await Promise.all([
+      dbGet('wa_reativacao').then(v => v || { alvos: {} }), lerEvts(),
+      dbGet('wa_orc_enviados').then(v => v || { ids: {} }),
+    ]);
+    // mensagens de reativação efetivamente enviadas (ficam marcadas no histórico)
+    const enviadas = evtsRR.filter(e => e.dir === 'out' &&
+      (e.tipo === 'reativacao' || /\[reativação/i.test(String(e.texto || ''))));
+    const porTel = {};
+    for (const e of enviadas) {
+      const d = String(e.tel || '').replace(/\D/g, '').slice(-8);
+      if (!porTel[d]) porTel[d] = { tel: e.tel, toques: 0, primeiro: e.ts, ultimo: e.ts, textos: [] };
+      porTel[d].toques++;
+      porTel[d].ultimo = e.ts;
+      porTel[d].textos.push(String(e.texto || '').slice(0, 90));
+    }
+    // o cliente já tinha conversado antes do primeiro toque?
+    const lista = Object.keys(porTel).map(d => {
+      const c = porTel[d];
+      const inAntes = evtsRR.some(e => e.dir === 'in' &&
+        String(e.tel || '').replace(/\D/g, '').slice(-8) === d &&
+        new Date(e.ts || 0) < new Date(c.primeiro));
+      const respondeu = evtsRR.some(e => e.dir === 'in' &&
+        String(e.tel || '').replace(/\D/g, '').slice(-8) === d &&
+        new Date(e.ts || 0) > new Date(c.primeiro));
+      return { tel: c.tel, d8: d, toques: c.toques, primeiro: c.primeiro, ultimo: c.ultimo,
+        tinhaConversaAntes: inAntes, respondeuDepois: respondeu,
+        indevido: !inAntes, amostra: c.textos.slice(0, 2) };
+    }).sort((a, b) => (a.tinhaConversaAntes === b.tinhaConversaAntes ? 0 : (a.tinhaConversaAntes ? 1 : -1)));
+    const indevidos = lista.filter(x => x.indevido);
+    return res.status(200).json({ ok: true,
+      totalMensagens: enviadas.length,
+      clientesAtingidos: lista.length,
+      semConversaPrevia: indevidos.length,
+      responderam: lista.filter(x => x.respondeuDepois).length,
+      alvosNoRegistro: Object.keys((reat || {}).alvos || {}).length,
+      veredito: indevidos.length
+        ? '⚠️ ' + indevidos.length + ' cliente(s) receberam reativação sem nunca terem conversado com o bot'
+        : '✅ todos os atingidos já tinham conversa com o bot',
+      indevidos: indevidos.slice(0, 40), todos: lista.slice(0, 60) });
   }
 
   // ── 🔍 CONFLITOS-AUDIT: escalar_humano × registrar_conflito (são coisas diferentes) ──
