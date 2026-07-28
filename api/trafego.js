@@ -753,8 +753,18 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
     };
     const faturado = {}; const detalhe = {}; let faturadoTotal = 0; let semCategoria = 0;
     const contados = new Set();
-    const registrar = (chave, cat, valor) => {
-      if (contados.has(chave)) return;                 // dedupe entre fontes
+    const assinaturas = new Set();
+    const registrar = (chave, cat, valor, obj) => {
+      if (contados.has(chave)) return;                 // dedupe por identificador
+      // dedupe por ASSINATURA: o mesmo serviço aparece no pipe, no board e no arquivo com ids diferentes
+      if (obj) {
+        const d8 = String(obj.telefone || obj.tel || '').replace(/\D/g, '').slice(-8);
+        const sig = d8 + '|' + valor.toFixed(2) + '|' + String(obj.osCode || obj.pipefyId || '').slice(-8);
+        if (d8.length >= 8) {
+          if (assinaturas.has(sig)) return;
+          assinaturas.add(sig);
+        }
+      }
       contados.add(chave);
       faturado[cat] = (faturado[cat] || 0) + valor;
       detalhe[cat] = (detalhe[cat] || 0) + 1;
@@ -790,7 +800,7 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
         if (!dentroJanela(quando)) continue;
         const cat = categoriaDe(c.equipamento || c.descricao || c.nomeContato || '');
         if (cat === 'outros') semCategoria++;
-        registrar(sis + ':' + c.id, cat, valor);
+        registrar(sis + ':' + c.id, cat, valor, c);
       }
     }
     // ARQUIVO MORTO: cards finalizados são REMOVIDOS do pipe/board e guardados aqui —
@@ -809,11 +819,13 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
         const fase = String(c.phaseId || c.phase || '');
         // no arquivo, tudo que chegou lá já concluiu — mas ainda tiramos o que não vale
         if (fase && ['descarte', 'reprovado', 'garantia'].includes(fase)) { excluidosRsGarantia++; continue; }
-        const quando = c.arquivadoEm || c.movedAt || c.finalizadoEm || c.criadoEm || c.createdAt;
+        // ⚠️ arquivadoEm NÃO serve como data do serviço: arquivamos em lote esta semana,
+        // o que traria serviços antigos para dentro da janela. Vale a data real de conclusão.
+        const quando = c.finalizadoEm || c.pagoEm || quandoErp(c) || c.movedAt || c.criadoEm || c.createdAt;
         if (!dentroJanela(quando)) continue;
         const cat = categoriaDe(c.equipamento || c.descricao || c.title || c.nomeContato || c.nome || '');
         if (cat === 'outros') semCategoria++;
-        registrar(sis + ':' + (c.id || c.pipefyId || c.osCode), cat, valor);
+        registrar(sis + ':' + (c.id || c.pipefyId || c.osCode), cat, valor, c);
       }
     }
     for (const [banco, sis] of [[boardA, 'boardAdm'], [bTv, 'boardTv']]) {
@@ -827,7 +839,7 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
         if (!dentroJanela(quando)) continue;
         const cat = categoriaDe(c.descricao || c.equipamento || c.title || c.nomeContato || '');
         if (cat === 'outros') semCategoria++;
-        registrar(sis + ':' + (c.pipefyId || c.osCode || c.id), cat, valor);
+        registrar(sis + ':' + (c.pipefyId || c.osCode || c.id), cat, valor, c);
       }
     }
     // 2) metaLog do board: entradas em ERP com valor e data reais
@@ -837,7 +849,7 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
       if (!(valor > 0) || !dentroJanela(m.timestamp)) continue;
       const cat = categoriaDe(m.equipamento || m.descricao || m.titulo || '');
       if (cat === 'outros') semCategoria++;
-      registrar('board:' + (m.pipefyId || m.id), cat, valor);
+      registrar('board:' + (m.pipefyId || m.id), cat, valor, m);
     }
     // 3) financeiro: complementa o que tiver comprovante aprovado e não veio das fontes acima
     for (const r of (((fin || {}).records) || [])) {
@@ -849,7 +861,7 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
       if (!dentroJanela(quando)) continue;
       const cat = categoriaDe(r.equipamento || r.descricao || r.titulo || '');
       if (cat === 'outros') semCategoria++;
-      registrar('fin:' + r.id, cat, valor);
+      registrar('fin:' + r.id, cat, valor, r);
     }
 
     // ── 3) ROAS ──
