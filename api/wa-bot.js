@@ -506,6 +506,26 @@ export default async function handler(req, res) {
       detalhe: lista });
   }
 
+  // ── 📋 QUEM-RECEBEU-RETROATIVA: lista e conta as mensagens do disparo retroativo ──
+  if (action === 'quem-recebeu-retroativa') {
+    const evtsR = await lerEvts();
+    const hoje = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+    const msgs = evtsR.filter(e => e.tipo === 'aprovacao-retroativa' && String(e.ts || '').slice(0, 10) === hoje);
+    const porTel = {};
+    for (const m of msgs) {
+      const d = String(m.tel || '').replace(/\D/g, '').slice(-8);
+      if (!porTel[d]) porTel[d] = { tel: m.tel, vezes: 0, horarios: [] };
+      porTel[d].vezes++;
+      porTel[d].horarios.push(String(m.ts).slice(11, 16));
+    }
+    const lista = Object.keys(porTel).map(d => d + ' | ' + porTel[d].vezes + 'x | ' + porTel[d].horarios.join(', '));
+    return res.status(200).json({ ok: true,
+      totalMensagens: msgs.length,
+      clientesAtingidos: Object.keys(porTel).length,
+      duplicados: Object.keys(porTel).filter(d => porTel[d].vezes > 1).length,
+      lista });
+  }
+
   // ── 🔢 CONFERE-APROVACOES: o KPI bate com as aprovações reais do dia? ──
   if (action === 'confere-aprovacoes') {
     const hoje = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
