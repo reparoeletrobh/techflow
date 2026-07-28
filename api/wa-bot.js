@@ -1692,15 +1692,21 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
           const ehCompra = /AN[ÁA]LISE DE COMPRA/i.test(String(acaoMotivo || ''));
           // O equipamento JÁ ESTÁ NA LOJA: aproveita a foto tirada no recebimento (alm_foto_<cardId>).
           // Se não existir, o almoxarifado pede para tirar — nunca se pede foto ao cliente.
-          let temFotoCompra = false, cardCompraId = null;
+          let temFotoCompra = false, cardCompraId = null, ehTvCompra = false;
           if (ehCompra) {
             try {
-              const ppF = (await dbGet('reparoeletro_pipe')) || { cards: [] };
-              const cardF = (ppF.cards || []).find(c => String(c.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
-              if (cardF) {
-                cardCompraId = cardF.id;
-                const fotoF = await dbGet('alm_foto_' + cardF.id);
-                temFotoCompra = !!(fotoF && fotoF.img);
+              // Sistema do cliente: TV não passa pelo almoxarifado ADM
+              const tvLogF = (await dbGet('tv_logistica')) || { fichas: [] };
+              const naTv = (tvLogF.fichas || []).some(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
+              ehTvCompra = naTv || (!!acha(fdbCtv) && !acha(fdbC));
+              if (!ehTvCompra) {
+                const ppF = (await dbGet('reparoeletro_pipe')) || { cards: [] };
+                const cardF = (ppF.cards || []).find(c => String(c.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
+                if (cardF) {
+                  cardCompraId = cardF.id;
+                  const fotoF = await dbGet('alm_foto_' + cardF.id);
+                  temFotoCompra = !!(fotoF && fotoF.img);
+                }
               }
             } catch (e) {}
           }
@@ -1712,11 +1718,11 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
               equipamento: (fichaC && fichaC.equipamento) || '',
               motivo: String(acaoMotivo || 'conflito registrado pelo bot').slice(0, 300),
               tipo: ehCompra ? 'analise_compra' : 'conflito',
-              temFoto: temFotoCompra, cardId: cardCompraId,
+              temFoto: temFotoCompra, cardId: cardCompraId, sistema: ehTvCompra ? 'tv' : 'adm',
             }),
           }).then(x => x.json()).catch(() => null);
           // Duplicata no ALMOXARIFADO para a equipe dar o parecer (recomenda ou não)
-          if (ehCompra && respCf && respCf.criado) {
+          if (ehCompra && !ehTvCompra && respCf && respCf.criado) {
             try {
               await fetch(`https://reparoeletroadm.com/api/almoxarifado?action=criar-analise-compra&k=${KCF}`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },

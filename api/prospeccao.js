@@ -671,6 +671,7 @@ export default async function handler(req,res){
       equipamento:String(equipamento||''),defeito:'',endereco:'',
       status:'conflitos_bot',motivoConflito:String(motivo||'').slice(0,300),
       analiseCompra:tipo==='analise_compra',temFoto:!!temFoto,cardId:(req.body||{}).cardId||null,
+      sistemaCompra:String((req.body||{}).sistema||'adm'),
       criadoEm:new Date().toISOString(),origemBot:true,
     });
     await dbSet(KEY,db);

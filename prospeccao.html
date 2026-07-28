@@ -1046,9 +1046,10 @@ function render(){
     var corMotivo=contatado?'#4ade80':'#f87171';
     return '<div class="card" style="border-left:3px solid '+cor+';'+(ehCompra?'background:rgba(37,99,235,.06);':(contatado?'background:rgba(34,197,94,.04);':''))+'">'
       +'<div class="card-nome">'+esc(f.nome||'—')
-        +(ehCompra?' <span style="font-size:9px;background:rgba(37,99,235,.25);color:#60a5fa;padding:2px 6px;border-radius:8px;font-weight:900;">🔵 ANÁLISE DE COMPRA</span>':'')
+        +(ehCompra?' <span style="font-size:9px;background:rgba(37,99,235,.25);color:#60a5fa;padding:2px 6px;border-radius:8px;font-weight:900;">🔵 ANÁLISE DE COMPRA'+(f.sistemaCompra==='tv'?' · TV':'')+'</span>':'')
         +(contatado&&!ehCompra?' <span style="font-size:9px;background:rgba(34,197,94,.2);color:#4ade80;padding:2px 6px;border-radius:8px;font-weight:900;">EM ATENDIMENTO</span>':'')+'</div>'
-      +(ehCompra?(f.temFoto&&f.cardId
+      +(ehCompra&&f.sistemaCompra==='tv'?'<div style="margin-top:5px;font-size:10.5px;color:#93c5fd;font-weight:700;">📺 avaliação interna da TV — não gera tarefa no almoxarifado</div>':'')
+      +(ehCompra&&f.sistemaCompra!=='tv'?(f.temFoto&&f.cardId
           ?'<div style="margin-top:5px;"><a href="#" onclick="verFotoCompra(\''+f.cardId+'\');return false;" style="color:#60a5fa;font-size:11.5px;font-weight:800;text-decoration:none;">📷 Ver foto do equipamento</a></div>'
           :'<div style="margin-top:5px;font-size:11px;color:#fb923c;font-weight:700;">📷 sem foto ainda — o almoxarifado vai tirar</div>'):'')
       +(rec?'<div style="margin-top:6px;background:'+(rec.parecer==='sim'?'rgba(34,197,94,.12)':'rgba(239,68,68,.12)')+';border:1px solid '+(rec.parecer==='sim'?'rgba(34,197,94,.4)':'rgba(239,68,68,.4)')+';border-radius:7px;padding:6px 9px;font-size:11.5px;font-weight:800;color:'+(rec.parecer==='sim'?'#4ade80':'#f87171')+';">'
