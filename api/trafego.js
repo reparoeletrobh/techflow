@@ -420,10 +420,25 @@ module.exports = async function handler(req, res) {
       }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
     };
     const feitos = [], erros = [];
-    for (const id of (pausarIds || [])) {
-      const r = await postMeta(id, { status: 'PAUSED' });
-      if (r && r.error) erros.push({ id, acao: 'pausar', erro: r.error.message, codigo: r.error.code });
-      else feitos.push({ id, acao: 'pausado' });
+    // A verba destas campanhas é TOTAL e fica na CAMPANHA — pausar o anúncio não libera nada
+    // e a Meta recusa (código 100). Pausamos na campanha; se falhar, tentamos conjunto e anúncio.
+    for (const item of (pausarIds || [])) {
+      const alvos = typeof item === 'string'
+        ? [{ nivel: 'anúncio', id: item }]
+        : [
+            item.campanhaId ? { nivel: 'campanha', id: item.campanhaId } : null,
+            item.adsetId ? { nivel: 'conjunto', id: item.adsetId } : null,
+            item.id ? { nivel: 'anúncio', id: item.id } : null,
+          ].filter(Boolean);
+      let ok = false; const tentativas = [];
+      for (const alvo of alvos) {
+        const r = await postMeta(alvo.id, { status: 'PAUSED' });
+        if (r && r.error) { tentativas.push(alvo.nivel + ': ' + r.error.message + ' (cód ' + r.error.code + ')'); }
+        else { feitos.push({ id: alvo.id, acao: 'pausado no nível ' + alvo.nivel, nome: item.nome }); ok = true; break; }
+        await new Promise(r2 => setTimeout(r2, 120));
+      }
+      if (!ok) erros.push({ id: (item.id || item), acao: 'pausar', nome: item.nome || '',
+        erro: tentativas.join(' | ') || 'nenhum destino válido', codigo: 100 });
       await new Promise(r2 => setTimeout(r2, 120));
     }
     for (const o of (orcamentos || [])) {

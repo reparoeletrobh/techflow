@@ -505,7 +505,7 @@ async function aplicarCopiloto(){
   var r=window._cop;if(!r)return;
   var pausar=[],orcs=[];
   (r.planos||[]).forEach(function(p){
-    p.cortar.forEach(function(c){pausar.push(c.id);});
+    p.cortar.forEach(function(c){pausar.push({id:c.id,adsetId:c.adsetId,campanhaId:c.campanhaId,nome:c.nome});});
     p.reforcar.forEach(function(d){
       if(d.receber<=0)return;
       var alvo=d.alvoId||d.adsetId;
