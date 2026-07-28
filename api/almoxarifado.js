@@ -236,6 +236,26 @@ export default async function handler(req, res) {
   }
 
   // ── CONCLUIR tarefa (feito) ──
+  // ── 🔵 CRIAR-ANALISE-COMPRA: duplicata do caso de compra para a equipe dar o parecer ──
+  if (req.method === 'POST' && action === 'criar-analise-compra') {
+    const b = req.body || {};
+    if (!b.conflitoId) return res.status(400).json({ ok: false, error: 'conflitoId obrigatório' });
+    const db = (await dbGet(KEY)) || defaultDB();
+    if (!Array.isArray(db.tarefas)) db.tarefas = [];
+    if (!db.config) db.config = { proximoNum: 1 };
+    const jaTem = db.tarefas.some(t => t.origemConflito === b.conflitoId && t.status === 'pendente');
+    if (jaTem) return res.status(200).json({ ok: true, dedupe: true });
+    db.tarefas.unshift(novaTarefa({
+      tipo: 'avaliar-compra', cardId: b.conflitoId, origemConflito: b.conflitoId,
+      cliente: String(b.cliente || 'Cliente').slice(0, 60), tel: String(b.tel || ''),
+      equipamento: String(b.equipamento || '').slice(0, 60),
+      obs: String(b.obs || '').slice(0, 200), temFoto: !!b.temFoto,
+      origem: 'bot — cliente quer vender o equipamento',
+    }));
+    await dbSet(KEY, db);
+    return res.status(200).json({ ok: true });
+  }
+
   if (req.method === 'POST' && action === 'concluir') {
     const { id, feitoPor, modelo } = req.body || {};
     const t = db.tarefas.find(x => x.id === id);
@@ -291,6 +311,16 @@ export default async function handler(req, res) {
         }
       } catch (e) {}
       t.parecer = parecer; if (preco) t.precoSugerido = String(preco).trim();
+      // Parecer volta para o card de Análise de Compra no Conflitos Bot
+      if (t.origemConflito) {
+        try {
+          const KAC = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+          await fetch(`https://reparoeletroadm.com/api/prospeccao?action=marcar-recomendacao&k=${KAC}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: t.origemConflito, parecer, preco: preco || null, por: feitoPor || 'Almoxarifado' }),
+          });
+        } catch (e) {}
+      }
     }
     t.status = 'feito';
     t.feitoPor = String(feitoPor || '').trim();

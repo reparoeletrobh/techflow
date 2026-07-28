@@ -663,16 +663,19 @@ export default async function handler(req,res){
     // dedupe: conflito aberto do mesmo tel
     const jaTem=(db.fichas||[]).some(f=>f.status==='conflitos_bot'&&String(f.telefone||'').replace(/\D/g,'').slice(-8)===d8c);
     if(jaTem)return res.status(200).json({ok:true,criado:false,dedupe:true,msg:'conflito já aberto para este telefone'});
+    const novoId='conf_'+Date.now().toString(36);
+    const {tipo,temFoto}=req.body||{};
     db.fichas.unshift({
-      id:'conf_'+Date.now().toString(36),
+      id:novoId,
       nome:String(nome||'Cliente WhatsApp'),telefone:String(telefone).replace(/\D/g,''),
       equipamento:String(equipamento||''),defeito:'',endereco:'',
       status:'conflitos_bot',motivoConflito:String(motivo||'').slice(0,300),
+      analiseCompra:tipo==='analise_compra',temFoto:!!temFoto,
       criadoEm:new Date().toISOString(),origemBot:true,
     });
     await dbSet(KEY,db);
-    try{await logConflito('criado',{nome:nome,telefone:telefone,motivo:motivo});}catch(_){}
-    return res.status(200).json({ok:true,criado:true});
+    try{await logConflito(tipo==='analise_compra'?'criado-compra':'criado',{nome:nome,telefone:telefone,motivo:motivo});}catch(_){}
+    return res.status(200).json({ok:true,criado:true,id:novoId});
   }
 
   // ── 📊 CONFLITOS-STATS: reconciliação (criados × abertos × desfechos) ──
@@ -779,6 +782,19 @@ export default async function handler(req,res){
     try{await logConflito('reprovado',{nome:f.nome,telefone:f.telefone,motivo:'reprovado no Conflitos Bot'});}catch(_){}
     return res.status(200).json({ok:true,card:card.id});
   }
+  // ── 🔵 MARCAR-RECOMENDACAO: parecer do almoxarifado volta para o card de Análise de Compra ──
+  if(req.method==='POST'&&action==='marcar-recomendacao'){
+    const {id,parecer,preco,por}=req.body||{};
+    const db=(await dbGet(KEY))||{fichas:[]};
+    const f=(db.fichas||[]).find(x=>x.id===id);
+    if(!f)return res.status(404).json({ok:false,error:'conflito não encontrado'});
+    f.recomendacaoCompra={parecer:parecer==='sim'?'sim':'nao',
+      preco:preco?String(preco).slice(0,20):null,
+      por:String(por||'Almoxarifado').slice(0,40),em:new Date().toISOString()};
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true});
+  }
+
   if(req.method==='POST'&&action==='conflito-contatado'){
     const {id}=req.body||{};
     const db=(await dbGet(KEY))||{fichas:[]};
