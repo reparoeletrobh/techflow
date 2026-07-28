@@ -295,7 +295,10 @@ export default async function handler(req, res) {
   // Escada: 6h → 24h → 48h → 72h; sem resposta no fim = Conflitos Bot (ligação + entrega)
   if (action === 'reativar-conversas') {
     const cfgR = (await dbGet('wa_bot_config')) || {};
-    if (cfgR.reativacaoAtiva === false) return res.status(200).json({ ok: true, msg: 'reativação desligada (wa_bot_config.reativacaoAtiva=false)' });
+    // OPT-IN: só dispara se ligado explicitamente (era opt-out e disparou sozinho para 99 clientes)
+    if (cfgR.reativacaoAtiva !== true) {
+      return res.status(200).json({ ok: true, msg: 'reativação DESLIGADA — precisa ser ligada explicitamente em ?action=reativacao-ligar' });
+    }
     if (!dentroHorarioComercial()) return res.status(200).json({ ok: true, msg: 'fora do horário comercial — reativações em standby' });
     const { token, phoneId } = await credenciais();
     if (!token || !phoneId) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
@@ -326,6 +329,7 @@ export default async function handler(req, res) {
     ];
     const agoraR = Date.now();
     const feitos = [];
+    const TETO_CICLO = Math.min(10, Math.max(1, parseInt(cfgR.reativacaoTeto || 5, 10)));
     // TRAVA: só reativa quem O BOT atendeu (tem conversa) E para quem O BOT enviou o orçamento.
     // Sem isso o motor escrevia para clientes que nunca falaram com o bot.
     const enviadosR = (await dbGet('wa_orc_enviados')) || { ids: {} };
@@ -398,6 +402,7 @@ export default async function handler(req, res) {
       if (enviado) {
         reatR.alvos[chave] = { toques: st.toques + 1, ultimo: agoraR };
         feitos.push({ nome: f.nome, sistema: sis, toque: st.toques + 1, via: janelaAberta ? 'mensagem' : 'template' });
+        if (feitos.length >= TETO_CICLO) break;   // teto por ciclo — nada de rajada
       }
     }
     for (const k of Object.keys(reatR.alvos)) {
@@ -406,6 +411,16 @@ export default async function handler(req, res) {
     await dbSet('wa_reativacao', reatR);
     return res.status(200).json({ ok: true, alvosAtivos: alvos.length, acoes: feitos.length, feitos,
       pulados: pulados.length, motivosPulados: pulados.slice(0, 20) });
+  }
+
+  // ── 🔌 REATIVACAO-LIGAR / DESLIGAR ──
+  if (action === 'reativacao-ligar' || action === 'reativacao-desligar') {
+    const c = (await dbGet('wa_bot_config')) || {};
+    c.reativacaoAtiva = action === 'reativacao-ligar';
+    if (req.query.teto) c.reativacaoTeto = Math.min(10, Math.max(1, parseInt(req.query.teto, 10)));
+    await dbSet('wa_bot_config', c);
+    return res.status(200).json({ ok: true, reativacaoAtiva: c.reativacaoAtiva,
+      tetoPorCiclo: c.reativacaoTeto || 5 });
   }
 
   // ── 📋 REATIVACAO-RELATORIO: tudo que o motor disparou e para quem ──
