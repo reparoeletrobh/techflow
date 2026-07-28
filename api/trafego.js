@@ -593,6 +593,21 @@ module.exports = async function handler(req, res) {
     return res.status(200).json(dadosI);
   }
 
+  // ── ⛔ EXCLUIR/LIBERAR modelo pelo nome (link simples, sem POST) ──
+  if (action === 'modelo-excluir' || action === 'modelo-liberar') {
+    const termo = String(req.query.nome || '').toLowerCase().trim();
+    if (!termo) return res.status(400).json({ ok: false, error: 'informe ?nome=trecho do nome do anúncio' });
+    const c = (await dbGet('trafego_config')) || {};
+    let lista = c.modelosExcluir || ['reforma', 'pintura', 'restaura'];
+    if (action === 'modelo-excluir') { if (!lista.includes(termo)) lista.push(termo); }
+    else lista = lista.filter(x => x !== termo);
+    c.modelosExcluir = lista;
+    await dbSet('trafego_config', c);
+    return res.status(200).json({ ok: true, acao: action === 'modelo-excluir' ? 'excluído' : 'liberado',
+      termo, listaAtual: lista,
+      proximo: 'rode ?action=modelos&curto=1 para ver o novo campeão' });
+  }
+
   // ═══ 🏆 MODELOS: o anúncio campeão de cada categoria, pronto para ser clonado ═══
   if (action === 'modelos') {
     const cfg = await cfgTrafego();
