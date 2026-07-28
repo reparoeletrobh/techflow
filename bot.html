@@ -163,15 +163,37 @@ async function carregarConversas(){
     window._ultD=d;renderLista(d);
   }catch(e){el.innerHTML='<div style="padding:20px;color:#ef4444;font-size:11px;">Erro: '+e.message+'</div>';}
 }
-window._filtroOrc=null;
-async function toggleFiltroOrc(){
-  if(window._filtroOrc){window._filtroOrc=null;loadKpis();if(window._ultD)renderLista(window._ultD);return;}
+window._filtroOrc=null;window._orcVivos=null;
+async function carregarOrcVivos(){
   try{
     var r=await fetch('/api/wa-bot?action=orcamentos-abertos').then(function(x){return x.json();});
-    if(!r.ok)return;
-    window._filtroOrc=(r.abertos||[]).map(function(a){return String(a.tel||'').slice(-8);});
-    loadKpis();if(window._ultD)renderLista(window._ultD);
-  }catch(e){}
+    if(!r.ok)return null;
+    window._orcVivos=r.total||0;
+    window._orcDados=r;
+    return r;
+  }catch(e){return null;}
+}
+async function toggleFiltroOrc(){
+  if(window._filtroOrc){
+    window._filtroOrc=null;
+    var b=document.getElementById('barra-orc'); if(b)b.remove();
+    loadKpis();if(window._ultD)renderLista(window._ultD);return;
+  }
+  var r=window._orcDados||await carregarOrcVivos();
+  if(!r||!r.ok)return;
+  window._filtroOrc=(r.abertos||[]).map(function(a){return String(a.tel||'').slice(-8);});
+  var alvo=document.getElementById('kpi-cards');
+  if(alvo&&!document.getElementById('barra-orc')){
+    var d=document.createElement('div');
+    d.id='barra-orc';
+    d.style.cssText='background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);border-radius:10px;padding:8px 11px;margin:8px 0;font-size:11px;line-height:1.5;';
+    var ondes=Object.keys(r.porOnde||{}).map(function(k){return r.porOnde[k]+' '+k;}).join(' · ');
+    d.innerHTML='<b style="color:#fbbf24;">💰 '+r.total+' orçamentos abertos</b>'
+      +(r.valorEmJogo?' · <b style="color:#fbbf24;">R$ '+Number(r.valorEmJogo).toLocaleString("pt-BR",{minimumFractionDigits:2})+'</b> em jogo':'')
+      +'<div style="color:#8b93a3;font-size:10px;margin-top:2px;">'+esc(ondes)+' · toque no cartão de novo para limpar o filtro</div>';
+    alvo.parentNode.insertBefore(d,alvo.nextSibling);
+  }
+  loadKpis();if(window._ultD)renderLista(window._ultD);
 }
 window._verArq=false;
 async function arquivarConv(tel){
@@ -317,6 +339,10 @@ function setPer(el){
   loadKpis();
 }
 async function loadKpis(){
+  if(window._orcVivos==null&&!window._orcCarregando){
+    window._orcCarregando=true;
+    carregarOrcVivos().then(function(){window._orcCarregando=false;loadKpis();});
+  }
   try{
     var r=await fetch('/api/wa-bot?action=bot-stats&dias='+_kpiDias).then(function(x){return x.json();});
     if(!r.ok)return;
@@ -324,7 +350,7 @@ async function loadKpis(){
     var defs=[
       ['📨','Abordagens',t.abordagens||0,'#60a5fa'],
       ['🚚','P/ Logística',t.logistica||0,'#22c55e'],
-      ['💰','Orçamentos',t.orcamentos||0,'#f59e0b'],
+      ['💰','Orçamentos',(window._orcVivos!=null?window._orcVivos:(t.orcamentos||0)),'#f59e0b'],
       ['✅','Aprovações',t.aprovacoes||0,'#4ade80'],
       ['🏪','Cliente Loja',t.cliente_loja||0,'#a78bfa'],
       ['📞','Entrar em Contato',t.entrar_contato||0,'#fb923c'],

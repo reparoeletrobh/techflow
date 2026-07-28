@@ -188,23 +188,67 @@ export default async function handler(req, res) {
   }
 
   // ── 💰 ORCAMENTOS-ABERTOS: conversas com orçamento enviado e ainda sem aprovação ──
+  // ── 💰 ORÇAMENTOS-ABERTOS: contagem VIVA — entrou em orçamento e ainda não saiu ──
+  // Sai quando: aprovou (pipe avançou) OU virou Conflitos Bot. Enquanto isso, fica aqui.
   if (action === 'orcamentos-abertos') {
-    const [logA, tvA, envA] = await Promise.all([
+    const [logA, tvA, envA, pipeA, pipeT, pros] = await Promise.all([
       dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
       dbGet('wa_orc_enviados').then(v => v || { ids: {} }),
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('prospeccao_adm'),
     ]);
+    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    // Quem JÁ SAIU: aprovou/avançou no pipe, ou está em Conflitos Bot
+    const APROVOU = ['aprovados', 'video_enviado', 'analise_compra', 'equipamento_comprado',
+      'programar_entrega', 'solicitar_entrega', 'entrega_solicitada', 'rota_em_andamento',
+      'receber', 'erp', 'finalizado', 'descarte', 'garantia'];
+    const saiu = new Set();
+    for (const c of [...(((pipeA || {}).cards) || []), ...(((pipeT || {}).cards) || [])]) {
+      const fase = c.phaseId || c.phase;
+      if (APROVOU.includes(fase)) { const d = d8(c.telefone); if (d.length >= 8) saiu.add(d); }
+    }
+    for (const f of (((pros || {}).fichas) || [])) {
+      if (f.status === 'conflitos_bot') { const d = d8(f.telefone); if (d.length >= 8) saiu.add(d); }
+    }
+    // Quem ESTÁ EM ORÇAMENTO agora
     const abertos = [];
+    const vistos = new Set();
+    const registra = (tel, nome, sis, quando, onde, equipamento, valor) => {
+      const d = d8(tel);
+      if (d.length < 8 || saiu.has(d) || vistos.has(d)) return;
+      vistos.add(d);
+      const ts = quando ? new Date(quando).getTime() : 0;
+      abertos.push({ tel: String(tel || '').replace(/\D/g, ''), nome: nome || 'Cliente', sis, onde,
+        equipamento: equipamento || '', valor: valor || null,
+        enviadoEm: quando || null,
+        horasParado: ts ? Number(((Date.now() - ts) / 3600000).toFixed(1)) : null });
+    };
+    // 1) logística com orçamento registrado/enviado
     for (const f of (((logA || {}).fichas) || [])) {
-      if (f.phase === 'orc_registrado' && envA.ids[f.id]) {
-        abertos.push({ tel: String(f.telefone || '').replace(/\D/g, ''), nome: f.nome, sis: 'adm', enviadoEm: envA.ids[f.id] });
+      if (['orc_registrado', 'orc_enviado'].includes(f.phase)) {
+        registra(f.telefone, f.nome, 'adm', envA.ids[f.id] || f.movedAt || f.criadoEm, 'logística', f.equipamento);
       }
     }
     for (const f of (((tvA || {}).fichas) || [])) {
-      if (['orc_enviado', 'orc_registrado'].includes(f.phase) && (envA.ids[f.id] || envA.ids['tv:' + f.id])) {
-        abertos.push({ tel: String(f.telefone || '').replace(/\D/g, ''), nome: f.nome, sis: 'tv', enviadoEm: envA.ids[f.id] });
+      if (['orc_registrado', 'orc_enviado'].includes(f.phase)) {
+        registra(f.telefone, f.nome, 'tv', envA.ids['tv:' + f.id] || envA.ids[f.id] || f.movedAt || f.criadoEm, 'logística', f.equipamento);
       }
     }
-    return res.status(200).json({ ok: true, abertos });
+    // 2) pipe aguardando decisão do cliente
+    for (const c of [...(((pipeA || {}).cards) || []), ...(((pipeT || {}).cards) || [])]) {
+      const fase = c.phaseId || c.phase;
+      if (['aguardando_aprovacao', 'ultima_chamada'].includes(fase)) {
+        registra(c.telefone, c.nomeContato, (((pipeT || {}).cards) || []).includes(c) ? 'tv' : 'adm',
+          c.aguardandoDesde || c.movedAt || c.criadoEm,
+          fase === 'ultima_chamada' ? 'última chamada' : 'aguardando aprovação',
+          c.equipamento, parseFloat(c.valor || 0) || null);
+      }
+    }
+    abertos.sort((a, b) => (b.horasParado || 0) - (a.horasParado || 0));
+    const valorEmJogo = abertos.reduce((s, a) => s + (a.valor || 0), 0);
+    return res.status(200).json({ ok: true, total: abertos.length,
+      valorEmJogo: Number(valorEmJogo.toFixed(2)),
+      porOnde: abertos.reduce((o, a) => { o[a.onde] = (o[a.onde] || 0) + 1; return o; }, {}),
+      abertos });
   }
 
   // ── 📊 BOT-STATS: contadores por dia (?dias=1..90) ──
