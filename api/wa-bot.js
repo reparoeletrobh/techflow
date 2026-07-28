@@ -506,6 +506,78 @@ export default async function handler(req, res) {
       detalhe: lista });
   }
 
+  // ── ▶️ APROVAR-PENDENTES: dispara o gatilho de quem já aprovou e avisa o cliente ──
+  if (action === 'aprovar-pendentes') {
+    const KTF = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+    const so = String(req.query.ids || '').split(',').map(s => s.trim()).filter(Boolean);
+    const aplicar = String(req.query.aplicar || '') === '1';
+    // reaproveita a varredura
+    const [evtsP, ppA2, ppT2, tvLogP] = await Promise.all([
+      lerEvts(), dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('tv_logistica'),
+    ]);
+    const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const parados = {};
+    for (const [banco, sis] of [[ppA2, 'adm'], [ppT2, 'tv']]) {
+      for (const c of (((banco || {}).cards) || [])) {
+        if (!['aguardando_aprovacao', 'ultima_chamada'].includes(c.phaseId || c.phase)) continue;
+        const d = d8f(c.telefone); if (d.length < 8) continue;
+        parados[d] = { id: c.id, sis, nome: c.nomeContato, equipamento: c.equipamento, valor: c.valor, tel: c.telefone };
+      }
+    }
+    const SIM = /\b(aprovo|aprovado|pode fazer|pode consertar|pode arrumar|autorizo|fechado|combinado|vamos fazer|manda ver|pode retornar|pode seguir)\b/i;
+    const alvos = [];
+    for (const e of evtsP) {
+      if (e.dir !== 'in' || !e.texto) continue;
+      const d = d8f(e.tel); if (!parados[d]) continue;
+      if (!SIM.test(String(e.texto))) continue;
+      if (so.length && !so.includes(parados[d].id)) continue;
+      if (!alvos.some(a => a.id === parados[d].id)) alvos.push(Object.assign({ d8: d }, parados[d]));
+    }
+    if (!aplicar) {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        total: alvos.length,
+        lista: alvos.map(a => a.nome + ' | ' + a.equipamento + ' | R$ ' + a.valor + ' | ' + a.sis.toUpperCase()),
+        dica: 'para executar: &aplicar=1 (aprova no sistema e avisa o cliente)' });
+    }
+    const { token, phoneId } = await credenciais();
+    const feitos = [], erros = [];
+    for (const a of alvos) {
+      try {
+        if (a.sis === 'tv') {
+          const fTv = (((tvLogP || {}).fichas) || []).find(f => d8f(f.telefone) === a.d8 &&
+            ['orc_enviado', 'orc_registrado'].includes(f.phase));
+          if (fTv) {
+            await fetch(`https://reparoeletroadm.com/api/tv-logistica?action=aprovar-orcamento&k=${KTF}`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: fTv.id }) });
+          } else {
+            await fetch(`https://reparoeletroadm.com/api/tv-pipe?action=mover&k=${KTF}`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: a.id, phase: 'aprovados' }) });
+          }
+        } else {
+          await fetch(`https://reparoeletroadm.com/api/pipe?action=mover&k=${KTF}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: a.id, phase: 'aprovados' }) });
+        }
+        await bumpStat('aprovacoes');
+        // avisa o cliente (janela de 24h costuma estar aberta — ele acabou de escrever)
+        if (token && phoneId && a.tel) {
+          const to = String(a.tel).replace(/\D/g, '');
+          const to55 = to.startsWith('55') ? to : '55' + to;
+          const txt = `Perfeito! Seu ${a.equipamento || 'equipamento'} já está em processo de conserto. 😊\n\nAguardo só você me confirmar se o pagamento vai ser no Pix ou no cartão, para eu já atualizar a sua ficha.`;
+          const r = await fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`, {
+            method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messaging_product: 'whatsapp', to: to55, type: 'text', text: { body: txt } }),
+          }).then(x => x.json()).catch(() => null);
+          if (r && r.messages && r.messages[0]) {
+            await rpushEvt({ ts: new Date().toISOString(), tel: to55, dir: 'out', texto: txt, tipo: 'aprovacao-retroativa' });
+          }
+        }
+        feitos.push(a.nome + ' (' + a.sis.toUpperCase() + ')');
+      } catch (e) { erros.push(a.nome + ': ' + e.message); }
+      await new Promise(r => setTimeout(r, 200));
+    }
+    return res.status(200).json({ ok: erros.length === 0, aprovados: feitos.length, feitos, erros });
+  }
+
   // ── 🕵️ ABORDAGENS-FANTASMA: marcadas como abordadas sem mensagem no histórico ──
   if (action === 'abordagens-fantasma') {
     const [fA, fT, evtsF, abF] = await Promise.all([
