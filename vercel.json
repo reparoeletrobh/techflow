@@ -95,6 +95,10 @@
   ],
   "rewrites": [
     {
+      "source": "/trafego",
+      "destination": "/trafego.html"
+    },
+    {
       "source": "/garantia-gestao",
       "destination": "/garantia.html"
     },
@@ -1390,6 +1394,15 @@
     },
     {
       "source": "/garantia-fila.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/trafego.html",
       "headers": [
         {
           "key": "Cache-Control",

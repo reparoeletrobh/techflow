@@ -38,6 +38,131 @@ module.exports = async function handler(req, res) {
       contasAcessiveis: lista });
   }
 
+  // ═══ CONFIG: metas de custo por conversa e verba semanal ═══
+  const CFG_PADRAO = {
+    metas: { tv: 2, microondas: 5, purificador: 8, adega: 10, outros: 8 },
+    verba: { adm: 5000, tv: 500, aproveitamento: 0.87 },
+    cicloInicio: { diaSemana: 6, hora: 13 }, // sábado 13h
+  };
+  async function cfgTrafego() {
+    const c = (await dbGet('trafego_config')) || {};
+    return {
+      metas: Object.assign({}, CFG_PADRAO.metas, c.metas || {}),
+      verba: Object.assign({}, CFG_PADRAO.verba, c.verba || {}),
+      cicloInicio: Object.assign({}, CFG_PADRAO.cicloInicio, c.cicloInicio || {}),
+    };
+  }
+  function categoriaDe(nome) {
+    const s = String(nome || '').toLowerCase();
+    if (/\btvs?\b|televis|barramento|tela quebrad|quebrar tv/.test(s)) return 'tv';
+    if (/micro-?\s?ondas/.test(s)) return 'microondas';
+    if (/purificador|bebedouro|\bfiltro\b|vela|[áa]gua/.test(s)) return 'purificador';
+    if (/adega|cervejeir|climatiz|vinho/.test(s)) return 'adega';
+    return 'outros';
+  }
+  // Início do ciclo (último sábado 13h, horário de Brasília) em data ISO
+  function inicioCiclo(cfg) {
+    const agoraBrt = new Date(Date.now() - 3 * 3600 * 1000);
+    const d = new Date(agoraBrt);
+    const diff = (d.getUTCDay() - cfg.cicloInicio.diaSemana + 7) % 7;
+    d.setUTCDate(d.getUTCDate() - diff);
+    if (diff === 0 && agoraBrt.getUTCHours() < cfg.cicloInicio.hora) d.setUTCDate(d.getUTCDate() - 7);
+    return d.toISOString().slice(0, 10);
+  }
+
+  if (action === 'config') {
+    if (req.method === 'POST') {
+      const atual = (await dbGet('trafego_config')) || {};
+      const b = req.body || {};
+      if (b.metas) atual.metas = Object.assign({}, atual.metas || {}, b.metas);
+      if (b.verba) atual.verba = Object.assign({}, atual.verba || {}, b.verba);
+      await dbSet('trafego_config', atual);
+      return res.status(200).json({ ok: true, config: await cfgTrafego() });
+    }
+    return res.status(200).json({ ok: true, config: await cfgTrafego() });
+  }
+
+  // ═══ 📊 PAINEL: anúncios com criativo, verba e desempenho do ciclo ═══
+  if (action === 'painel') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'META_ADS_ACCOUNT não configurado' });
+    const cfg = await cfgTrafego();
+    const desde = inicioCiclo(cfg);
+    const hoje = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+    // Cache de 30 min (a conta não muda de minuto em minuto)
+    const cache = await dbGet('trafego_painel_cache');
+    if (cache && cache.em && (Date.now() - new Date(cache.em).getTime() < 30 * 60000)
+        && String(req.query.forcar || '') !== '1' && cache.desde === desde) {
+      return res.status(200).json(Object.assign({}, cache.dados, { cacheDe: cache.em, doCache: true }));
+    }
+    const g = (p) => fetch(`${GRAPH}/act_${CONTA}/${p}&access_token=${TOKEN}`).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+    const [ads, adsets, ins] = await Promise.all([
+      g('ads?fields=id,name,status,effective_status,adset_id,campaign_id,creative{id,thumbnail_url}&limit=250'),
+      g('adsets?fields=id,name,status,daily_budget,lifetime_budget,campaign_id&limit=250'),
+      g(`insights?level=ad&time_range={"since":"${desde}","until":"${hoje}"}&fields=ad_id,campaign_name,spend,impressions,clicks,ctr,cpc,actions&limit=400`),
+    ]);
+    if (ads.error) return res.status(200).json({ ok: false, erro: ads.error.message });
+    const porAd = {};
+    for (const i of ((ins || {}).data || [])) porAd[i.ad_id] = i;
+    const porAdset = {};
+    for (const a of ((adsets || {}).data || [])) porAdset[a.id] = a;
+
+    const CONV = ['onsite_conversion.messaging_conversation_started_7d', 'lead', 'onsite_conversion.total_messaging_connection'];
+    const anuncios = ((ads || {}).data || []).map(ad => {
+      const i = porAd[ad.id] || {};
+      const st = porAdset[ad.adset_id] || {};
+      const conversas = Number(((i.actions || []).find(a => CONV.includes(a.action_type)) || {}).value || 0);
+      const gasto = Number(i.spend || 0);
+      const cat = categoriaDe(ad.name + ' ' + (i.campaign_name || '') + ' ' + (st.name || ''));
+      const meta = cfg.metas[cat] || cfg.metas.outros;
+      const cpa = conversas > 0 ? gasto / conversas : null;
+      // distância da meta: <1 abaixo (bom), >1 acima (ruim); sem conversa com gasto = pior caso
+      const razao = cpa != null ? cpa / meta : (gasto > 0 ? 3 : null);
+      let situacao = 'sem-dados';
+      if (razao != null) situacao = razao <= 1 ? 'campeao' : (razao <= 1.3 ? 'atencao' : 'ralo');
+      return {
+        id: ad.id, nome: ad.name, ativo: (ad.effective_status || ad.status) === 'ACTIVE',
+        status: ad.effective_status || ad.status,
+        thumb: (ad.creative || {}).thumbnail_url || null,
+        adsetId: ad.adset_id, adsetNome: st.name || '',
+        orcamentoDiario: st.daily_budget ? Number(st.daily_budget) / 100 : null,
+        orcamentoTotal: st.lifetime_budget ? Number(st.lifetime_budget) / 100 : null,
+        categoria: cat, meta,
+        gasto: Number(gasto.toFixed(2)), conversas,
+        cpa: cpa != null ? Number(cpa.toFixed(2)) : null,
+        razaoMeta: razao != null ? Number(razao.toFixed(2)) : null,
+        impressoes: Number(i.impressions || 0), cliques: Number(i.clicks || 0),
+        ctr: i.ctr ? Number(Number(i.ctr).toFixed(2)) : null,
+        cpc: i.cpc ? Number(Number(i.cpc).toFixed(2)) : null,
+        situacao,
+      };
+    }).sort((a, b) => (a.razaoMeta == null ? 9 : a.razaoMeta) - (b.razaoMeta == null ? 9 : b.razaoMeta));
+
+    // Termômetro da semana: verba real (87%) × gasto do ciclo
+    const gastoTv = anuncios.filter(a => a.categoria === 'tv').reduce((s, a) => s + a.gasto, 0);
+    const gastoAdm = anuncios.filter(a => a.categoria !== 'tv').reduce((s, a) => s + a.gasto, 0);
+    const realAdm = cfg.verba.adm * cfg.verba.aproveitamento;
+    const realTv = cfg.verba.tv * cfg.verba.aproveitamento;
+    const porCategoria = {};
+    for (const c of ['tv', 'microondas', 'purificador', 'adega', 'outros']) {
+      const lista = anuncios.filter(a => a.categoria === c);
+      const gc = lista.reduce((s, a) => s + a.gasto, 0);
+      const cc = lista.reduce((s, a) => s + a.conversas, 0);
+      porCategoria[c] = { anuncios: lista.length, ativos: lista.filter(a => a.ativo).length,
+        gasto: Number(gc.toFixed(2)), conversas: cc,
+        cpa: cc > 0 ? Number((gc / cc).toFixed(2)) : null, meta: cfg.metas[c] || cfg.metas.outros,
+        campeoes: lista.filter(a => a.situacao === 'campeao').length,
+        ralos: lista.filter(a => a.situacao === 'ralo').length };
+    }
+    const dados = { ok: true, ciclo: { desde, ate: hoje },
+      verba: {
+        adm: { depositado: cfg.verba.adm, real: Number(realAdm.toFixed(2)), gasto: Number(gastoAdm.toFixed(2)), saldo: Number((realAdm - gastoAdm).toFixed(2)) },
+        tv: { depositado: cfg.verba.tv, real: Number(realTv.toFixed(2)), gasto: Number(gastoTv.toFixed(2)), saldo: Number((realTv - gastoTv).toFixed(2)) },
+        aproveitamento: cfg.verba.aproveitamento },
+      metas: cfg.metas, porCategoria, totalAnuncios: anuncios.length, anuncios };
+    try { await dbSet('trafego_painel_cache', { em: new Date().toISOString(), desde, dados }); } catch (e) {}
+    return res.status(200).json(dados);
+  }
+
   // ── CAMPANHAS + desempenho (últimos 7 dias) ──
   if (action === 'meta-campanhas') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'META_ADS_ACCOUNT não configurado' });

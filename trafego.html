@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📈 Tráfego — Reparo Eletro</title>
+<script>
+(function(){
+  if(location.pathname==='/login'||location.pathname==='/login.html')return;
+  var K=localStorage.getItem('tf_key');
+  if(!K){location.replace('/login?next='+encodeURIComponent(location.pathname));return;}
+  var _f=window.fetch;
+  window.fetch=function(u,o){
+    try{
+      if(typeof u==='string'&&u.indexOf('/api/')>-1&&u.indexOf('/api/auth')===-1){
+        var kk=localStorage.getItem('tf_key')||'';
+        u+=(u.indexOf('?')>-1?'&':'?')+'k='+encodeURIComponent(kk);
+      }
+    }catch(e){}
+    return _f.call(this,u,o);
+  };
+})();
+</script>
+<style>
+:root{
+  --bg:#07080a; --painel:#101319; --linha:#1e232c; --txt:#f0f2f5; --dim:#79828f;
+  --campeao:#22c55e; --atencao:#f59e0b; --ralo:#ef4444;
+  --tv:#3b82f6; --microondas:#f97316; --purificador:#06b6d4; --adega:#a855f7; --outros:#64748b;
+  --mono:ui-monospace,'SF Mono',Menlo,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  padding:14px;max-width:840px;margin:0 auto;padding-bottom:70px;-webkit-font-smoothing:antialiased;}
+h1{font-size:17px;font-weight:900;letter-spacing:-.4px;display:flex;align-items:center;gap:7px;}
+.sub{font-size:11px;color:var(--dim);font-weight:600;margin-top:2px;}
+
+/* ── termômetro da semana ── */
+.termo{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0 12px;}
+.verba{background:var(--painel);border:1px solid var(--linha);border-radius:13px;padding:12px;}
+.verba .rot{font-size:9.5px;font-weight:900;color:var(--dim);letter-spacing:.7px;}
+.verba .val{font-family:var(--mono);font-size:22px;font-weight:700;line-height:1.1;margin-top:3px;}
+.verba .det{font-size:10px;color:var(--dim);margin-top:3px;font-family:var(--mono);}
+.barra{height:5px;background:#191d25;border-radius:99px;margin-top:8px;overflow:hidden;}
+.barra i{display:block;height:100%;border-radius:99px;transition:width .5s ease;}
+
+/* ── abas de categoria ── */
+.abas{display:flex;gap:6px;overflow-x:auto;padding-bottom:3px;margin-bottom:12px;-webkit-overflow-scrolling:touch;}
+.aba{flex:0 0 auto;background:var(--painel);border:1px solid var(--linha);border-radius:99px;padding:7px 13px;
+  font-size:11.5px;font-weight:800;color:var(--dim);cursor:pointer;white-space:nowrap;}
+.aba.on{color:#fff;}
+.aba b{font-family:var(--mono);font-size:10.5px;opacity:.85;margin-left:4px;}
+
+/* ── cartão do anúncio ── */
+.ad{background:var(--painel);border:1px solid var(--linha);border-left-width:3px;border-radius:12px;
+  padding:11px;margin-bottom:9px;display:flex;gap:11px;align-items:flex-start;}
+.ad.campeao{border-left-color:var(--campeao);}
+.ad.atencao{border-left-color:var(--atencao);}
+.ad.ralo{border-left-color:var(--ralo);}
+.ad.sem-dados{border-left-color:#2c333f;}
+.ad.pausado{opacity:.45;}
+.thumb{width:54px;height:54px;border-radius:9px;object-fit:cover;background:#161a21;flex:0 0 auto;}
+.thumb.vazio{display:flex;align-items:center;justify-content:center;font-size:19px;color:#3a424f;}
+.corpo{flex:1;min-width:0;}
+.nome{font-size:12.5px;font-weight:800;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.cpa-linha{display:flex;align-items:baseline;gap:6px;margin-top:5px;}
+.cpa{font-family:var(--mono);font-size:19px;font-weight:700;line-height:1;}
+.cpa-rot{font-size:9.5px;color:var(--dim);font-weight:800;}
+
+/* ── SIGNATURE: régua de meta ── */
+/* a meta da categoria é a linha fixa no meio; o marcador cai à esquerda (lucro) ou à direita (ralo) */
+.regua{position:relative;height:16px;margin-top:8px;}
+.trilho{position:absolute;top:7px;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,rgba(34,197,94,.55) 0%,rgba(34,197,94,.55) 48%,#3b4250 48%,#3b4250 52%,rgba(239,68,68,.5) 52%,rgba(239,68,68,.5) 100%);border-radius:99px;}
+.meta-tick{position:absolute;left:50%;top:1px;width:2px;height:14px;background:#8b93a3;border-radius:2px;transform:translateX(-50%);}
+.meta-lbl{position:absolute;left:50%;top:-1px;transform:translateX(6px);font-family:var(--mono);font-size:8.5px;color:var(--dim);font-weight:700;}
+.marcador{position:absolute;top:2px;width:12px;height:12px;border-radius:50%;border:2px solid var(--bg);transform:translateX(-50%);transition:left .5s ease;}
+.metricas{display:flex;gap:11px;margin-top:7px;flex-wrap:wrap;}
+.metricas span{font-family:var(--mono);font-size:10px;color:var(--dim);}
+.metricas b{color:#aeb6c2;font-weight:700;}
+.tag{display:inline-block;font-size:8.5px;font-weight:900;padding:2px 6px;border-radius:5px;margin-left:5px;vertical-align:1px;}
+
+.vazio-msg{text-align:center;color:var(--dim);padding:34px 16px;font-size:12.5px;line-height:1.6;}
+.rodape{position:fixed;bottom:0;left:0;right:0;background:rgba(7,8,10,.93);backdrop-filter:blur(9px);
+  border-top:1px solid var(--linha);padding:9px 14px;display:flex;gap:8px;justify-content:center;align-items:center;}
+.btn{background:var(--painel);border:1px solid var(--linha);border-radius:9px;padding:8px 14px;
+  color:var(--txt);font-size:11.5px;font-weight:800;cursor:pointer;}
+.btn.destaque{background:#1d4ed8;border-color:#2563eb;}
+a.voltar{color:var(--dim);text-decoration:none;font-size:11.5px;font-weight:700;}
+</style>
+</head>
+<body>
+<h1>📈 Tráfego <span id="atualizado" style="font-size:10px;color:var(--dim);font-weight:600;"></span></h1>
+<div class="sub" id="ciclo">carregando o ciclo…</div>
+
+<div class="termo" id="termo"></div>
+<div class="abas" id="abas"></div>
+<div id="lista"><div class="vazio-msg">⏳ Puxando os anúncios da Meta…</div></div>
+
+<div class="rodape">
+  <a class="voltar" href="/adm">← Menu</a>
+  <button class="btn" onclick="carregar(true)">🔄 Atualizar agora</button>
+</div>
+
+<script>
+var CAT_NOME={tv:'TV',microondas:'Micro-ondas',purificador:'Purificador',adega:'Adega',outros:'Outros'};
+var _d=null,_cat='todos';
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function brl(v){return 'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function corCat(c){return getComputedStyle(document.documentElement).getPropertyValue('--'+c).trim()||'#64748b';}
+function corSit(s){return s==='campeao'?'#22c55e':s==='atencao'?'#f59e0b':s==='ralo'?'#ef4444':'#4b5563';}
+
+async function carregar(forcar){
+  try{
+    var r=await fetch('/api/trafego?action=painel'+(forcar?'&forcar=1':'')).then(function(x){return x.json();});
+    if(!r.ok){
+      document.getElementById('lista').innerHTML='<div class="vazio-msg">Não consegui ler a conta de anúncios.<br><span style="font-size:11px;">'+esc(r.erro||r.error||'')+'</span></div>';
+      return;
+    }
+    _d=r;render();
+  }catch(e){
+    document.getElementById('lista').innerHTML='<div class="vazio-msg">Falha de conexão com o painel.</div>';
+  }
+}
+
+function render(){
+  var v=_d.verba;
+  document.getElementById('ciclo').textContent='Ciclo desde '+_d.ciclo.desde.split('-').reverse().join('/')+' · '+_d.totalAnuncios+' anúncios';
+  document.getElementById('atualizado').textContent=_d.doCache?'· cache de '+new Date(_d.cacheDe).toLocaleTimeString('pt-BR').slice(0,5):'· agora';
+
+  document.getElementById('termo').innerHTML=[['ADM',v.adm,'#f97316'],['TV',v.tv,'#3b82f6']].map(function(p){
+    var nome=p[0],d=p[1],cor=p[2];
+    var pct=d.real>0?Math.min(100,d.gasto/d.real*100):0;
+    return '<div class="verba">'
+      +'<div class="rot" style="color:'+cor+';">VERBA '+nome+'</div>'
+      +'<div class="val">'+brl(d.saldo)+'</div>'
+      +'<div class="det">disponível de '+brl(d.real)+'</div>'
+      +'<div class="barra"><i style="width:'+pct.toFixed(1)+'%;background:'+cor+';"></i></div>'
+      +'<div class="det" style="margin-top:5px;">gasto '+brl(d.gasto)+' · '+pct.toFixed(0)+'%</div>'
+    +'</div>';
+  }).join('');
+
+  var cats=['todos','tv','microondas','purificador','adega','outros'];
+  document.getElementById('abas').innerHTML=cats.map(function(c){
+    if(c!=='todos'&&(!_d.porCategoria[c]||!_d.porCategoria[c].anuncios))return '';
+    var pc=_d.porCategoria[c];
+    var rot=c==='todos'?'Todos':CAT_NOME[c];
+    var n=c==='todos'?_d.totalAnuncios:pc.anuncios;
+    var cor=c==='todos'?'#8b93a3':corCat(c);
+    return '<div class="aba'+(_cat===c?' on':'')+'" onclick="_cat=\''+c+'\';render();" '
+      +'style="'+(_cat===c?'border-color:'+cor+';background:'+cor+'22;':'')+'">'
+      +esc(rot)+'<b>'+n+'</b></div>';
+  }).join('');
+
+  var lista=_d.anuncios.filter(function(a){return _cat==='todos'||a.categoria===_cat;});
+  var el=document.getElementById('lista');
+  if(!lista.length){el.innerHTML='<div class="vazio-msg">Nenhum anúncio nesta categoria ainda.</div>';return;}
+
+  var resumo='';
+  if(_cat!=='todos'){
+    var pc=_d.porCategoria[_cat];
+    resumo='<div style="background:var(--painel);border:1px solid var(--linha);border-radius:11px;padding:10px 12px;margin-bottom:11px;">'
+      +'<div style="font-size:10px;color:var(--dim);font-weight:800;">'+esc(CAT_NOME[_cat]).toUpperCase()+' · META '+brl(pc.meta)+' POR CONVERSA</div>'
+      +'<div style="display:flex;gap:16px;margin-top:6px;font-family:var(--mono);font-size:12px;">'
+        +'<span>CPA <b style="color:'+(pc.cpa!=null&&pc.cpa<=pc.meta?'#22c55e':'#ef4444')+';font-size:15px;">'+(pc.cpa!=null?brl(pc.cpa):'—')+'</b></span>'
+        +'<span style="color:var(--dim);">'+pc.conversas+' conversas</span>'
+        +'<span style="color:var(--dim);">'+brl(pc.gasto)+'</span>'
+      +'</div>'
+      +'<div style="font-size:10.5px;color:var(--dim);margin-top:5px;">🟢 '+pc.campeoes+' no alvo · 🔴 '+pc.ralos+' acima da meta</div>'
+    +'</div>';
+  }
+
+  el.innerHTML=resumo+lista.map(function(a){
+    // régua: meta fica em 50%. razão 0 → 4% ; razão 1 → 50% ; razão 2+ → 96%
+    var pos=a.razaoMeta==null?null:Math.max(4,Math.min(96,a.razaoMeta<=1?4+a.razaoMeta*46:50+Math.min(46,(a.razaoMeta-1)*46)));
+    var cor=corSit(a.situacao);
+    return '<div class="ad '+a.situacao+(a.ativo?'':' pausado')+'">'
+      +(a.thumb?'<img class="thumb" src="'+esc(a.thumb)+'" alt="" loading="lazy">':'<div class="thumb vazio">🎬</div>')
+      +'<div class="corpo">'
+        +'<div class="nome">'+esc(a.nome)
+          +(a.ativo?'':'<span class="tag" style="background:#242a34;color:#8b93a3;">PAUSADO</span>')
+          +'<span class="tag" style="background:'+corCat(a.categoria)+'22;color:'+corCat(a.categoria)+';">'+esc(CAT_NOME[a.categoria]||'—')+'</span>'
+        +'</div>'
+        +'<div class="cpa-linha">'
+          +'<span class="cpa" style="color:'+cor+';">'+(a.cpa!=null?brl(a.cpa):(a.gasto>0?'sem conversa':'—'))+'</span>'
+          +'<span class="cpa-rot">POR CONVERSA</span>'
+        +'</div>'
+        +(pos!=null?'<div class="regua"><div class="trilho"></div><div class="meta-tick"></div>'
+          +'<div class="meta-lbl">meta '+brl(a.meta).replace('R$ ','R$')+'</div>'
+          +'<div class="marcador" style="left:'+pos+'%;background:'+cor+';"></div></div>':'')
+        +'<div class="metricas">'
+          +'<span>💬 <b>'+a.conversas+'</b></span>'
+          +'<span>💸 <b>'+brl(a.gasto)+'</b></span>'
+          +(a.orcamentoDiario!=null?'<span>📅 <b>'+brl(a.orcamentoDiario)+'</b>/dia</span>':'')
+          +(a.ctr!=null?'<span>CTR <b>'+a.ctr+'%</b></span>':'')
+        +'</div>'
+      +'</div>'
+    +'</div>';
+  }).join('');
+}
+
+carregar();
+setInterval(function(){if(!document.hidden)carregar();},30*60*1000);
+</script>
+</body>
+</html>
