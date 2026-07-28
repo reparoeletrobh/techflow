@@ -93,8 +93,22 @@ a.voltar{color:var(--dim);text-decoration:none;font-size:11.5px;font-weight:700;
 <div class="sub" id="ciclo">carregando o ciclo…</div>
 
 <div class="termo" id="termo"></div>
-<div class="abas" id="abas"></div>
-<div id="lista"><div class="vazio-msg">⏳ Puxando os anúncios da Meta…</div></div>
+<div class="abas" id="secoes" style="margin-bottom:10px;">
+  <div class="aba on" id="s-anuncios" onclick="secao('anuncios')" style="border-color:#f97316;background:#f9731622;color:#fff;">📊 Anúncios ativos</div>
+  <div class="aba" id="s-copiloto" onclick="secao('copiloto')">🧭 Copiloto de terça</div>
+  <div class="aba" id="s-analise" onclick="secao('analise')">🔬 Análise &amp; criativos</div>
+</div>
+<div id="pg-anuncios">
+  <div class="abas" id="abas"></div>
+  <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+    <label style="font-size:10.5px;color:var(--dim);font-weight:700;display:flex;align-items:center;gap:5px;cursor:pointer;">
+      <input type="checkbox" id="ver-pausados" onchange="render()"> mostrar pausados
+    </label>
+  </div>
+  <div id="lista"><div class="vazio-msg">⏳ Puxando os anúncios da Meta…</div></div>
+</div>
+<div id="pg-copiloto" style="display:none;"></div>
+<div id="pg-analise" style="display:none;"></div>
 
 <div class="rodape">
   <a class="voltar" href="/adm">← Menu</a>
@@ -125,7 +139,7 @@ async function carregar(forcar){
 
 function render(){
   var v=_d.verba;
-  document.getElementById('ciclo').textContent='Ciclo desde '+_d.ciclo.desde.split('-').reverse().join('/')+' · '+_d.totalAnuncios+' anúncios';
+  document.getElementById('ciclo').textContent='Ciclo desde '+_d.ciclo.desde.split('-').reverse().join('/')+' · '+(_d.ativos||0)+' ativos de '+_d.totalAnuncios;
   document.getElementById('atualizado').textContent=_d.doCache?'· cache de '+new Date(_d.cacheDe).toLocaleTimeString('pt-BR').slice(0,5):'· agora';
 
   document.getElementById('termo').innerHTML=[['ADM',v.adm,'#f97316'],['TV',v.tv,'#3b82f6']].map(function(p){
@@ -145,14 +159,18 @@ function render(){
     if(c!=='todos'&&(!_d.porCategoria[c]||!_d.porCategoria[c].anuncios))return '';
     var pc=_d.porCategoria[c];
     var rot=c==='todos'?'Todos':CAT_NOME[c];
-    var n=c==='todos'?_d.totalAnuncios:pc.anuncios;
+    var n=c==='todos'?(_d.ativos||0):pc.anuncios;
     var cor=c==='todos'?'#8b93a3':corCat(c);
     return '<div class="aba'+(_cat===c?' on':'')+'" onclick="_cat=\''+c+'\';render();" '
       +'style="'+(_cat===c?'border-color:'+cor+';background:'+cor+'22;':'')+'">'
       +esc(rot)+'<b>'+n+'</b></div>';
   }).join('');
 
-  var lista=_d.anuncios.filter(function(a){return _cat==='todos'||a.categoria===_cat;});
+  var verPaus=document.getElementById('ver-pausados');
+  var mostrarPausados=verPaus&&verPaus.checked;
+  var lista=_d.anuncios.filter(function(a){
+    if(!mostrarPausados&&!a.ativo)return false;
+    return _cat==='todos'||a.categoria===_cat;});
   var el=document.getElementById('lista');
   if(!lista.length){el.innerHTML='<div class="vazio-msg">Nenhum anúncio nesta categoria ainda.</div>';return;}
 
@@ -197,6 +215,124 @@ function render(){
       +'</div>'
     +'</div>';
   }).join('');
+}
+
+function secao(s){
+  ['anuncios','copiloto','analise'].forEach(function(x){
+    document.getElementById('pg-'+x).style.display=x===s?'block':'none';
+    var t=document.getElementById('s-'+x);
+    if(x===s){t.classList.add('on');t.style.borderColor='#f97316';t.style.background='#f9731622';t.style.color='#fff';}
+    else{t.classList.remove('on');t.style.borderColor='';t.style.background='';t.style.color='';}
+  });
+  if(s==='copiloto'&&!window._cop)carregarCopiloto();
+  if(s==='analise'&&!window._an)carregarAnalise(false);
+}
+
+/* ── 🧭 COPILOTO DE TERÇA ── */
+async function carregarCopiloto(){
+  var el=document.getElementById('pg-copiloto');
+  el.innerHTML='<div class="vazio-msg">🧭 Analisando os ativos do ciclo…</div>';
+  var r=await fetch('/api/trafego?action=copiloto').then(function(x){return x.json();}).catch(function(){return{ok:false,error:'falha'};});
+  if(!r.ok){el.innerHTML='<div class="vazio-msg">'+esc(r.error||'não consegui analisar')+'</div>';return;}
+  window._cop=r;
+  var h='<div style="background:var(--painel);border:1px solid var(--linha);border-radius:13px;padding:13px;margin-bottom:12px;">'
+    +'<div style="font-size:12.5px;line-height:1.55;">'+esc(r.resumo)+'</div>'
+    +'<div style="font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:7px;">'+r.analisados+' ativos analisados · faltam '+r.diasRestantes+' dia(s) no ciclo</div>'
+  +'</div>';
+  if(r.pausar.length){
+    h+='<div style="font-size:11px;font-weight:900;color:var(--ralo);margin:14px 0 8px;letter-spacing:.5px;">🔴 PAUSAR ('+r.pausar.length+') · libera '+brl(r.liberado)+'</div>';
+    h+=r.pausar.map(function(p){
+      return '<div class="ad ralo"><div class="thumb'+(p.thumb?'':' vazio')+'">'+(p.thumb?'<img src="'+esc(p.thumb)+'" style="width:100%;height:100%;object-fit:cover;border-radius:9px;">':'🎬')+'</div>'
+        +'<div class="corpo"><div class="nome">'+esc(p.nome)+'</div>'
+        +'<div style="font-size:11px;color:#fca5a5;margin-top:4px;font-weight:700;">'+esc(p.motivo)+'</div>'
+        +'<div class="metricas"><span>💸 <b>'+brl(p.gasto)+'</b></span><span>💬 <b>'+p.conversas+'</b></span><span style="color:var(--campeao);">↩ libera <b>'+brl(p.liberaria)+'</b></span></div>'
+        +'</div></div>';
+    }).join('');
+  }
+  if(r.distribuir.length){
+    h+='<div style="font-size:11px;font-weight:900;color:var(--campeao);margin:16px 0 8px;letter-spacing:.5px;">🟢 REFORÇAR ('+r.distribuir.length+') · proporcional ao desempenho</div>';
+    h+=r.distribuir.filter(function(d){return d.receber>0;}).map(function(d){
+      return '<div class="ad campeao"><div class="thumb'+(d.thumb?'':' vazio')+'">'+(d.thumb?'<img src="'+esc(d.thumb)+'" style="width:100%;height:100%;object-fit:cover;border-radius:9px;">':'🎬')+'</div>'
+        +'<div class="corpo"><div class="nome">'+esc(d.nome)+'</div>'
+        +'<div style="display:flex;align-items:baseline;gap:6px;margin-top:5px;"><span class="cpa" style="color:var(--campeao);font-size:17px;">+'+brl(d.receber)+'</span><span class="cpa-rot">'+d.pesoPct+'% DA VERBA</span></div>'
+        +'<div class="metricas"><span>CPA <b>'+brl(d.cpa)+'</b></span>'
+          +(d.orcamentoDiarioAtual!=null?'<span>📅 <b>'+brl(d.orcamentoDiarioAtual)+'</b> → <b style="color:#4ade80;">'+brl(d.orcamentoDiarioNovo)+'</b>/dia</span>':'')
+          +(d.conversasEstimadas?'<span style="color:#4ade80;">≈ +<b>'+d.conversasEstimadas+'</b> conversas</span>':'')+'</div>'
+        +'</div></div>';
+    }).join('');
+    h+='<button class="btn destaque" style="width:100%;margin-top:12px;padding:13px;font-size:13px;" onclick="aplicarCopiloto()">▶️ Aplicar na Meta (pausar '+r.pausar.length+' e realocar '+brl(r.liberado)+')</button>'
+      +'<div style="font-size:10px;color:var(--dim);text-align:center;margin-top:6px;">nada é alterado sem você confirmar</div>';
+  }
+  el.innerHTML=h;
+}
+async function aplicarCopiloto(){
+  var r=window._cop;if(!r)return;
+  if(!confirm('Pausar '+r.pausar.length+' anúncio(s) e realocar '+brl(r.liberado)+' entre '+r.distribuir.length+' campeões?\n\nIsso altera a conta de anúncios agora.'))return;
+  var el=document.getElementById('pg-copiloto');
+  el.innerHTML='<div class="vazio-msg">▶️ Aplicando na Meta…</div>';
+  var resp=await fetch('/api/trafego?action=aplicar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({confirmar:true,pausarIds:r.pausar.map(function(p){return p.id;}),
+      orcamentos:r.distribuir.filter(function(d){return d.receber>0&&d.adsetId;}).map(function(d){return{adsetId:d.adsetId,diario:d.orcamentoDiarioNovo};})})
+  }).then(function(x){return x.json();}).catch(function(){return{ok:false,erros:[{erro:'falha de rede'}]};});
+  var h='<div style="background:var(--painel);border:1px solid var(--linha);border-radius:13px;padding:14px;">'
+    +'<div style="font-size:14px;font-weight:900;color:'+(resp.ok?'#4ade80':'#f59e0b')+';">'+(resp.ok?'✅ Aplicado':'⚠️ Aplicado com pendências')+'</div>'
+    +'<div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:8px;">'+(resp.feitos||[]).length+' alteração(ões) confirmada(s)</div>'
+    +((resp.erros||[]).length?'<div style="margin-top:8px;font-size:11px;color:#fca5a5;">'+resp.erros.map(function(e){return esc(e.acao+': '+e.erro);}).join('<br>')+'</div>':'')
+  +'</div>';
+  el.innerHTML=h;
+  window._cop=null;
+  setTimeout(function(){carregar(true);},1500);
+}
+
+/* ── 🔬 ANÁLISE & CRIATIVOS ── */
+var CATS_SUG={adega:'🍷 Adega',tv:'📺 TV',microondas:'🔥 Micro-ondas',purificador:'💧 Purificador'};
+async function carregarAnalise(gerar){
+  var el=document.getElementById('pg-analise');
+  el.innerHTML='<div class="vazio-msg">'+(gerar?'🔬 Analisando campeões e pesquisando o mercado… isso leva até 1 minuto.':'🔬 Carregando análise…')+'</div>';
+  var r=await fetch('/api/trafego?action=analise'+(gerar?'&gerar=1':'')).then(function(x){return x.json();}).catch(function(){return{ok:false,error:'falha'};});
+  if(!r.ok){
+    el.innerHTML='<div class="vazio-msg">'+esc(r.error||'sem análise ainda')+'<br><br><button class="btn destaque" onclick="carregarAnalise(true)">🔬 Gerar análise da semana</button></div>';
+    return;
+  }
+  window._an=r;
+  var p=r.padroes||{};
+  var bloco=function(t,arr,cor){
+    if(!arr||!arr.length)return '';
+    return '<div style="background:var(--painel);border:1px solid var(--linha);border-left:3px solid '+cor+';border-radius:12px;padding:12px;margin-bottom:9px;">'
+      +'<div style="font-size:10.5px;font-weight:900;color:'+cor+';letter-spacing:.5px;margin-bottom:6px;">'+t+'</div>'
+      +arr.map(function(x){return '<div style="font-size:12px;line-height:1.55;margin-bottom:5px;">• '+esc(x)+'</div>';}).join('')
+    +'</div>';
+  };
+  var h=bloco('O QUE OS CAMPEÕES TÊM EM COMUM',p.campeoes,'#22c55e')
+    +bloco('O QUE DERRUBA OS PIORES',p.erros,'#ef4444')
+    +bloco('O QUE O MERCADO ESTÁ FAZENDO',p.mercado,'#3b82f6');
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 9px;">'
+    +'<div style="font-size:11px;font-weight:900;letter-spacing:.5px;">🎬 '+(r.sugestoes||[]).length+' CRIATIVOS SUGERIDOS</div>'
+    +'<button class="btn" onclick="carregarAnalise(true)" style="padding:5px 10px;font-size:10.5px;">↻ gerar de novo</button></div>';
+  h+=(r.sugestoes||[]).map(function(s,i){
+    var cor=corCat(s.categoria||'outros');
+    return '<div style="background:var(--painel);border:1px solid var(--linha);border-left:3px solid '+cor+';border-radius:12px;padding:12px;margin-bottom:9px;">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'
+        +'<div style="font-size:13px;font-weight:900;line-height:1.3;">'+esc(s.titulo||'')+'</div>'
+        +'<span class="tag" style="background:'+cor+'22;color:'+cor+';flex:0 0 auto;">'+esc(CATS_SUG[s.categoria]||s.categoria||'')+'</span>'
+      +'</div>'
+      +'<div style="margin-top:7px;font-size:12px;line-height:1.5;color:#dbe1ea;"><b style="color:'+cor+';">Gancho:</b> '+esc(s.gancho||'')+'</div>'
+      +((s.roteiro||[]).length?'<div style="margin-top:7px;font-size:11.5px;color:var(--dim);line-height:1.6;">'+s.roteiro.map(function(c,ix){return '<div><b style="color:#aeb6c2;font-family:var(--mono);">'+(ix+1)+'.</b> '+esc(c)+'</div>';}).join('')+'</div>':'')
+      +(s.legenda?'<div style="margin-top:8px;background:#0c1016;border:1px solid var(--linha);border-radius:8px;padding:8px 10px;font-size:11.5px;line-height:1.5;">'+esc(s.legenda)+'</div>':'')
+      +'<div style="margin-top:7px;display:flex;justify-content:space-between;gap:8px;align-items:center;">'
+        +'<span style="font-size:10.5px;color:#4ade80;font-weight:800;">→ '+esc(s.cta||'')+'</span>'
+        +'<button class="btn" style="padding:4px 9px;font-size:10px;" onclick="copiarSug('+i+')">copiar</button>'
+      +'</div>'
+      +(s.porque?'<div style="margin-top:6px;font-size:10.5px;color:var(--dim);font-style:italic;">'+esc(s.porque)+'</div>':'')
+    +'</div>';
+  }).join('');
+  h+='<div style="font-size:10px;color:var(--dim);text-align:center;margin-top:10px;">gerado em '+(r.geradoEm?new Date(r.geradoEm).toLocaleString('pt-BR').slice(0,16):'—')+' · base: '+((r.baseadoEm||{}).campeoes||0)+' campeões</div>';
+  el.innerHTML=h;
+}
+function copiarSug(i){
+  var s=(window._an&&window._an.sugestoes||[])[i];if(!s)return;
+  var txt=s.titulo+'\n\nGANCHO: '+s.gancho+'\n\nROTEIRO:\n'+(s.roteiro||[]).map(function(c,ix){return (ix+1)+'. '+c;}).join('\n')+'\n\nLEGENDA:\n'+s.legenda+'\n\nCTA: '+s.cta;
+  if(navigator.clipboard)navigator.clipboard.writeText(txt);
 }
 
 carregar();

@@ -96,7 +96,7 @@ module.exports = async function handler(req, res) {
     }
     const g = (p) => fetch(`${GRAPH}/act_${CONTA}/${p}&access_token=${TOKEN}`).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
     const [ads, adsets, ins] = await Promise.all([
-      g('ads?fields=id,name,status,effective_status,adset_id,campaign_id,creative{id,thumbnail_url}&limit=250'),
+      g('ads?fields=id,name,status,effective_status,adset_id,campaign_id,creative{id,thumbnail_url,body,title,object_story_spec{video_data{message,title},link_data{message,name,description}}}&limit=250'),
       g('adsets?fields=id,name,status,daily_budget,lifetime_budget,campaign_id&limit=250'),
       g(`insights?level=ad&time_range={"since":"${desde}","until":"${hoje}"}&fields=ad_id,campaign_name,spend,impressions,clicks,ctr,cpc,actions&limit=400`),
     ]);
@@ -123,6 +123,11 @@ module.exports = async function handler(req, res) {
         id: ad.id, nome: ad.name, ativo: (ad.effective_status || ad.status) === 'ACTIVE',
         status: ad.effective_status || ad.status,
         thumb: (ad.creative || {}).thumbnail_url || null,
+        copy: (function () {
+          const c = ad.creative || {}, os = c.object_story_spec || {};
+          const vd = os.video_data || {}, ld = os.link_data || {};
+          return String(vd.message || ld.message || c.body || vd.title || ld.name || c.title || '').slice(0, 500);
+        })(),
         adsetId: ad.adset_id, adsetNome: st.name || '',
         orcamentoDiario: st.daily_budget ? Number(st.daily_budget) / 100 : null,
         orcamentoTotal: st.lifetime_budget ? Number(st.lifetime_budget) / 100 : null,
@@ -144,7 +149,7 @@ module.exports = async function handler(req, res) {
     const realTv = cfg.verba.tv * cfg.verba.aproveitamento;
     const porCategoria = {};
     for (const c of ['tv', 'microondas', 'purificador', 'adega', 'outros']) {
-      const lista = anuncios.filter(a => a.categoria === c);
+      const lista = anuncios.filter(a => a.categoria === c && a.ativo);
       const gc = lista.reduce((s, a) => s + a.gasto, 0);
       const cc = lista.reduce((s, a) => s + a.conversas, 0);
       porCategoria[c] = { anuncios: lista.length, ativos: lista.filter(a => a.ativo).length,
@@ -153,7 +158,9 @@ module.exports = async function handler(req, res) {
         campeoes: lista.filter(a => a.situacao === 'campeao').length,
         ralos: lista.filter(a => a.situacao === 'ralo').length };
     }
+    const ativos = anuncios.filter(a => a.ativo);
     const dados = { ok: true, ciclo: { desde, ate: hoje },
+      ativos: ativos.length, pausados: anuncios.length - ativos.length,
       verba: {
         adm: { depositado: cfg.verba.adm, real: Number(realAdm.toFixed(2)), gasto: Number(gastoAdm.toFixed(2)), saldo: Number((realAdm - gastoAdm).toFixed(2)) },
         tv: { depositado: cfg.verba.tv, real: Number(realTv.toFixed(2)), gasto: Number(gastoTv.toFixed(2)), saldo: Number((realTv - gastoTv).toFixed(2)) },
@@ -182,6 +189,147 @@ module.exports = async function handler(req, res) {
     });
     try { if (U && T) await dbSet('trafego_meta_cache', { em: new Date().toISOString(), campanhas: resultado }); } catch (e) {}
     return res.status(200).json({ ok: true, conta: 'act_' + CONTA, periodo: 'últimos 7 dias', campanhas: resultado });
+  }
+
+  // ═══ 🧭 COPILOTO: o que pausar, quanto libera e para quem vai (proporcional ao desempenho) ═══
+  if (action === 'copiloto') {
+    const cfg = await cfgTrafego();
+    const base = await dbGet('trafego_painel_cache');
+    if (!base || !base.dados) return res.status(200).json({ ok: false, error: 'abra o painel primeiro para carregar os dados do ciclo' });
+    const ads = (base.dados.anuncios || []).filter(a => a.ativo);
+    const diasRestantes = (function () {
+      const b = new Date(Date.now() - 3 * 3600 * 1000);
+      const faltam = (6 - b.getUTCDay() + 7) % 7;
+      return faltam === 0 ? 7 : faltam;
+    })();
+    const semanalDe = a => a.orcamentoDiario != null ? a.orcamentoDiario * 7 : (a.orcamentoTotal || 0);
+    // PAUSAR: acima de 30% da meta, ou queimando sem nenhuma conversa
+    const pausar = ads.filter(a => {
+      if (a.conversas === 0 && a.gasto >= (a.meta * 2)) return true;
+      return a.razaoMeta != null && a.razaoMeta > 1.3;
+    }).map(a => ({
+      id: a.id, nome: a.nome, categoria: a.categoria, thumb: a.thumb,
+      cpa: a.cpa, meta: a.meta, gasto: a.gasto, conversas: a.conversas,
+      orcamentoDiario: a.orcamentoDiario, adsetId: a.adsetId,
+      liberaria: Number(Math.max(0, semanalDe(a) - a.gasto).toFixed(2)),
+      motivo: a.conversas === 0 ? 'queimou ' + a.gasto.toFixed(2) + ' sem nenhuma conversa'
+        : 'CPA R$ ' + a.cpa + ' — ' + Math.round((a.razaoMeta - 1) * 100) + '% acima da meta de R$ ' + a.meta,
+    })).sort((x, y) => y.liberaria - x.liberaria);
+    const liberado = Number(pausar.reduce((s, p) => s + p.liberaria, 0).toFixed(2));
+    // REFORÇAR: campeões, peso proporcional ao desempenho (quanto melhor o CPA vs meta, mais peso)
+    const idsPausar = new Set(pausar.map(p => p.id));
+    const campeoes = ads.filter(a => !idsPausar.has(a.id) && a.situacao === 'campeao' && a.conversas > 0);
+    const pesoDe = a => (1 / a.razaoMeta) * Math.log10(10 + a.conversas); // desempenho × consistência
+    const somaPeso = campeoes.reduce((s, a) => s + pesoDe(a), 0) || 1;
+    const distribuir = campeoes.map(a => {
+      const fatia = Number((liberado * (pesoDe(a) / somaPeso)).toFixed(2));
+      const diarioExtra = diasRestantes > 0 ? fatia / diasRestantes : 0;
+      return {
+        id: a.id, nome: a.nome, categoria: a.categoria, thumb: a.thumb, adsetId: a.adsetId,
+        cpa: a.cpa, meta: a.meta, conversas: a.conversas,
+        pesoPct: Number(((pesoDe(a) / somaPeso) * 100).toFixed(1)),
+        receber: fatia,
+        orcamentoDiarioAtual: a.orcamentoDiario,
+        orcamentoDiarioNovo: a.orcamentoDiario != null ? Number((a.orcamentoDiario + diarioExtra).toFixed(2)) : Number(diarioExtra.toFixed(2)),
+        conversasEstimadas: a.cpa ? Math.round(fatia / a.cpa) : null,
+      };
+    }).sort((x, y) => y.receber - x.receber);
+    const conversasGanhas = distribuir.reduce((s, d) => s + (d.conversasEstimadas || 0), 0);
+    return res.status(200).json({ ok: true,
+      ciclo: base.dados.ciclo, diasRestantes,
+      analisados: ads.length, pausar, liberado, distribuir,
+      resumo: pausar.length
+        ? `Pausando ${pausar.length} anúncio(s) você recupera R$ ${liberado.toFixed(2)}. Redistribuindo entre os ${distribuir.length} campeões, a estimativa é de mais ${conversasGanhas} conversas com a mesma verba.`
+        : 'Nenhum anúncio ativo passou do limite de corte agora — a verba está bem alocada.',
+      conversasEstimadasGanhas: conversasGanhas });
+  }
+
+  // ── ▶️ APLICAR: executa pausa/verba na Meta (só com confirmação explícita, modo copiloto) ──
+  if (req.method === 'POST' && action === 'aplicar') {
+    const { pausarIds, orcamentos, confirmar } = req.body || {};
+    if (confirmar !== true) return res.status(400).json({ ok: false, error: 'confirmação explícita obrigatória' });
+    const feitos = [], erros = [];
+    for (const id of (pausarIds || [])) {
+      const r = await fetch(`${GRAPH}/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'PAUSED', access_token: TOKEN }) }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      if (r && r.error) erros.push({ id, acao: 'pausar', erro: r.error.message });
+      else feitos.push({ id, acao: 'pausado' });
+    }
+    for (const o of (orcamentos || [])) {
+      if (!o.adsetId || !o.diario) continue;
+      const centavos = Math.round(Number(o.diario) * 100);
+      const r = await fetch(`${GRAPH}/${o.adsetId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ daily_budget: centavos, access_token: TOKEN }) }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      if (r && r.error) erros.push({ id: o.adsetId, acao: 'orcamento', erro: r.error.message });
+      else feitos.push({ id: o.adsetId, acao: 'orçamento diário → R$ ' + Number(o.diario).toFixed(2) });
+    }
+    try {
+      const lg = (await dbGet('trafego_log')) || { movs: [] };
+      lg.movs.unshift({ ts: new Date().toISOString(), feitos, erros });
+      lg.movs = lg.movs.slice(0, 200);
+      await dbSet('trafego_log', lg);
+      await dbSet('trafego_painel_cache', null);
+    } catch (e) {}
+    return res.status(200).json({ ok: erros.length === 0, feitos, erros });
+  }
+
+  // ═══ 🔬 ANÁLISE: padrões dos criativos campeões + 20 sugestões da semana ═══
+  if (action === 'analise') {
+    const AK = (process.env.ANTHROPIC_API_KEY || '').trim();
+    const cfg = await cfgTrafego();
+    const base = await dbGet('trafego_painel_cache');
+    if (!base || !base.dados) return res.status(200).json({ ok: false, error: 'abra o painel primeiro para carregar os dados do ciclo' });
+    const semana = (function () { const d = new Date(Date.now() - 3 * 3600 * 1000); const on = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      return d.getUTCFullYear() + '-S' + Math.ceil((((d - on) / 86400000) + on.getUTCDay() + 1) / 7); })();
+    const cacheS = await dbGet('trafego_sugestoes_' + semana);
+    if (cacheS && String(req.query.gerar || '') !== '1') return res.status(200).json(Object.assign({ ok: true, semana, doCache: true }, cacheS));
+    if (!AK) return res.status(200).json({ ok: false, error: 'ANTHROPIC_API_KEY não configurada na Vercel' });
+
+    const ativos = (base.dados.anuncios || []).filter(a => a.ativo && a.conversas > 0);
+    const campeoes = ativos.filter(a => a.situacao === 'campeao').slice(0, 25)
+      .map(a => ({ nome: a.nome, categoria: a.categoria, cpa: a.cpa, meta: a.meta, conversas: a.conversas, ctr: a.ctr, copy: (a.copy || '').slice(0, 300) }));
+    const ralos = ativos.filter(a => a.situacao === 'ralo').slice(0, 15)
+      .map(a => ({ nome: a.nome, categoria: a.categoria, cpa: a.cpa, meta: a.meta, conversas: a.conversas, copy: (a.copy || '').slice(0, 200) }));
+
+    const prompt = `Você é o estrategista de tráfego pago da Reparo Eletro, assistência técnica de eletrodomésticos em Belo Horizonte. Os anúncios são Click-to-WhatsApp: o objetivo de cada criativo é fazer a pessoa abrir conversa no WhatsApp para agendar conserto.
+
+NOSSOS CRIATIVOS CAMPEÕES desta semana (CPA = custo por conversa; meta por categoria: TV R$${cfg.metas.tv}, micro-ondas R$${cfg.metas.microondas}, purificador R$${cfg.metas.purificador}, adega R$${cfg.metas.adega}):
+${JSON.stringify(campeoes)}
+
+NOSSOS PIORES desta semana (o que evitar):
+${JSON.stringify(ralos)}
+
+TAREFA — responda em duas partes:
+1) PADRÕES: analise o que os campeões têm em comum e o que os piores erram (ganchos, dor tratada, promessa, tom, formato, uso de preço/urgência/prova). Seja específico e baseado nos dados acima, não genérico.
+2) SUGESTÕES: pesquise na web o que está funcionando hoje em anúncios de conserto de eletrodomésticos e de adegas/cervejeiras no Brasil (concorrentes, ganchos comuns, formatos), e proponha EXATAMENTE 20 ideias novas de criativo em VÍDEO, assim distribuídas: 10 de ADEGA, 4 de TV, 3 de MICRO-ONDAS, 3 de PURIFICADOR.
+
+Cada sugestão precisa de: titulo (curto), categoria, gancho (a primeira frase/cena, os 3 primeiros segundos), roteiro (3 a 5 cenas descritas para gravar com celular na própria loja), legenda (texto do anúncio, até 250 caracteres, tom próximo do que funciona nos nossos campeões), cta, porque (em que padrão ou evidência essa ideia se apoia).
+
+Responda APENAS um JSON válido, sem markdown:
+{"padroes":{"campeoes":["..."],"erros":["..."],"mercado":["..."]},"sugestoes":[{"titulo":"","categoria":"adega|tv|microondas|purificador","gancho":"","roteiro":["",""],"legenda":"","cta":"","porque":""}]}`;
+
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': AK, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 8000,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+          messages: [{ role: 'user', content: prompt }] }),
+      });
+      const j = await r.json();
+      const txt = ((j && j.content) || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+      let parsed = null;
+      try { parsed = JSON.parse(txt.replace(/```json|```/g, '').trim()); } catch (e) {
+        const m = txt.match(/\{[\s\S]*\}/); if (m) { try { parsed = JSON.parse(m[0]); } catch (e2) {} }
+      }
+      if (!parsed || !parsed.sugestoes) return res.status(200).json({ ok: false, error: 'não consegui montar as sugestões desta vez', bruto: txt.slice(0, 300) });
+      const saida = { padroes: parsed.padroes || {}, sugestoes: parsed.sugestoes.slice(0, 20),
+        baseadoEm: { campeoes: campeoes.length, ralos: ralos.length }, geradoEm: new Date().toISOString() };
+      await dbSet('trafego_sugestoes_' + semana, saida);
+      return res.status(200).json(Object.assign({ ok: true, semana }, saida));
+    } catch (e) {
+      return res.status(200).json({ ok: false, error: e.message });
+    }
   }
 
   // ── 🎯 ORIGENS: conversas com anúncio de origem capturado (base da atribuição de funil) ──
