@@ -1065,6 +1065,61 @@ export default async function handler(req, res) {
     } catch(e){return res.status(500).json({ok:false,error:e.message});}
   }
 
+  // ── 🔁 REPROCESSAR-APROVADO: refaz os gatilhos que falharam (board técnico + almoxarifado) ──
+  // Uso: ?action=reprocessar-aprovado&tel=7084  (ou &id=PIPE-XXXX)  [&aplicar=1]
+  if (action === 'reprocessar-aprovado') {
+    const alvoTel = String(req.query.tel || '').replace(/\D/g, '');
+    const alvoId = String(req.query.id || '');
+    if (!alvoTel && !alvoId) return res.status(400).json({ ok: false, error: 'informe ?tel= (4+ dígitos finais) ou ?id=' });
+    const pipeR = (await dbGet(PIPE_KEY)) || defaultDB();
+    const achados = (pipeR.cards || []).filter(c =>
+      alvoId ? c.id === alvoId : String(c.telefone || '').replace(/\D/g, '').endsWith(alvoTel));
+    if (!achados.length) return res.status(404).json({ ok: false, error: 'nenhum card encontrado' });
+
+    const boardR = (await dbGet('reparoeletro_board')) || { cards: [], syncedIds: [], movesLog: [], metaLog: [] };
+    if (!Array.isArray(boardR.cards)) boardR.cards = [];
+    const KTF = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+    const relatorio = [];
+    for (const card of achados) {
+      const boardPid = card.pipefyId ? String(card.pipefyId) : ('LOCAL-' + card.id);
+      const noBoard = boardR.cards.some(c => c.pipefyId === boardPid || c.osCode === card.id);
+      const item = { id: card.id, nome: card.nomeContato, telefone: card.telefone,
+        equipamento: card.equipamento, fase: card.phaseId || card.phase,
+        jaNoBoardTecnico: noBoard, acoes: [] };
+      if (String(req.query.aplicar || '') === '1') {
+        // a) Board Técnico
+        if (!noBoard) {
+          const now = new Date().toISOString();
+          boardR.cards.unshift({ pipefyId: boardPid, phaseId: 'producao',
+            nomeContato: card.nomeContato || '', title: card.descricao || card.nomeContato || '',
+            telefone: card.telefone || '', descricao: card.equipamento || card.descricao || '',
+            osCode: card.id, valor: card.valor || 0, movedBy: 'Reprocessamento manual',
+            flFichaId: null, localOnly: !card.pipefyId, syncedAt: now, movedAt: now });
+          if (!Array.isArray(boardR.syncedIds)) boardR.syncedIds = [];
+          if (!boardR.syncedIds.includes(boardPid)) boardR.syncedIds.push(boardPid);
+          if (!Array.isArray(boardR.movesLog)) boardR.movesLog = [];
+          boardR.movesLog.push({ phaseId: 'aprovado_entrada', pipefyId: boardPid, timestamp: now, forcado: true });
+          item.acoes.push('inserido no Board Técnico');
+        } else item.acoes.push('já estava no Board Técnico');
+        // b) Almoxarifado
+        try {
+          const r = await fetch(`https://reparoeletroadm.com/api/almoxarifado?action=criar-mover&k=${KTF}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cardId: card.id, destino: card.phaseId || card.phase || 'aprovados',
+              cliente: card.nomeContato, tel: card.telefone, equipamento: card.equipamento }),
+          }).then(x => x.json());
+          item.acoes.push(r && r.dedupe ? 'almoxarifado já tinha a tarefa' : 'tarefa criada no almoxarifado');
+        } catch (e) { item.acoes.push('falha no almoxarifado: ' + e.message); }
+      }
+      relatorio.push(item);
+    }
+    if (String(req.query.aplicar || '') === '1') await dbSet('reparoeletro_board', boardR);
+    return res.status(200).json({ ok: true,
+      modo: req.query.aplicar === '1' ? 'APLICADO' : 'prévia (nada foi alterado)',
+      encontrados: relatorio.length, cards: relatorio,
+      dica: req.query.aplicar === '1' ? undefined : 'para executar: mesmo link com &aplicar=1' });
+  }
+
   // ── GET forcar-solicitar-entrega: força card do pipe para solicitar_entrega ──
   if (action === 'forcar-solicitar-entrega') {
     var fseId = req.query.id || '';

@@ -249,6 +249,26 @@ export default async function handler(req, res) {
 
   // ── CONCLUIR tarefa (feito) ──
   // ── 🔵 CRIAR-ANALISE-COMPRA: duplicata do caso de compra para a equipe dar o parecer ──
+  // ── 🔁 CRIAR-MOVER: recria a tarefa de movimentação que o gatilho perdeu ──
+  if (req.method === 'POST' && action === 'criar-mover') {
+    const b = req.body || {};
+    if (!b.cardId || !b.destino) return res.status(400).json({ ok: false, error: 'cardId e destino obrigatórios' });
+    const dbM = (await dbGet(KEY)) || defaultDB();
+    if (!Array.isArray(dbM.tarefas)) dbM.tarefas = [];
+    if (!dbM.config) dbM.config = { proximoNum: 1 };
+    const ja = dbM.tarefas.some(t => t.cardId === b.cardId && t.destino === b.destino && t.status === 'pendente');
+    if (ja) return res.status(200).json({ ok: true, dedupe: true, msg: 'tarefa já existe pendente' });
+    dbM.tarefas.unshift(novaTarefa({
+      tipo: 'mover', cardId: b.cardId,
+      cliente: String(b.cliente || 'Cliente').slice(0, 60), tel: String(b.tel || ''),
+      equipamento: String(b.equipamento || '').slice(0, 60),
+      origem: b.origem || 'aguardando_aprovacao', destino: b.destino,
+      forcada: true, forcadaEm: new Date().toISOString(),
+    }));
+    await dbSet(KEY, dbM);
+    return res.status(200).json({ ok: true, criada: true });
+  }
+
   if (req.method === 'POST' && action === 'criar-analise-compra') {
     const b = req.body || {};
     if (!b.conflitoId) return res.status(400).json({ ok: false, error: 'conflitoId obrigatório' });
