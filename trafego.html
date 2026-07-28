@@ -321,72 +321,99 @@ async function carregarInteligencia(recalcular){
   el.innerHTML=h;
 }
 
-/* ── 🧭 COPILOTO DE TERÇA ── */
+/* ── 🧭 COPILOTO: plano de verba por categoria ── */
 async function carregarCopiloto(){
   var el=document.getElementById('pg-copiloto');
-  el.innerHTML='<div class="vazio-msg">🧭 Analisando os ativos do ciclo…</div>';
-  var r=await fetch('/api/trafego?action=copiloto').then(function(x){return x.json();}).catch(function(){return{ok:false,error:'falha'};});
+  el.innerHTML='<div class="vazio-msg">🧭 Montando o plano de verba…</div>';
+  var r=await fetch('/api/trafego?action=copiloto&periodo='+_per).then(function(x){return x.json();}).catch(function(){return{ok:false,error:'falha'};});
   if(!r.ok){el.innerHTML='<div class="vazio-msg">'+esc(r.error||'não consegui analisar')+'</div>';return;}
   window._cop=r;
+
   var h='<div style="background:var(--painel);border:1px solid var(--linha);border-radius:13px;padding:13px;margin-bottom:12px;">'
     +'<div style="font-size:12.5px;line-height:1.55;">'+esc(r.resumo)+'</div>'
-    +'<div style="font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:7px;">'+r.analisados+' ativos analisados · faltam '+r.diasRestantes+' dia(s) no ciclo</div>'
+    +'<div style="font-size:10px;color:var(--dim);margin-top:7px;line-height:1.5;">'+esc(r.regra)+'</div>'
   +'</div>';
-  // ritmo da verba
-  (r.ritmo||[]).forEach(function(rt){
-    if(rt.alerta==='ritmo saudável')return;
-    var alta=rt.sobra>0;
-    h+='<div style="background:var(--painel);border:1px solid '+(alta?'rgba(245,158,11,.45)':'rgba(239,68,68,.45)')+';border-radius:12px;padding:10px 12px;margin-bottom:9px;">'
-      +'<div style="font-size:10px;font-weight:900;color:'+(alta?'#f59e0b':'#ef4444')+';">⏱ RITMO '+esc(rt.frente)+'</div>'
-      +'<div style="font-size:12px;margin-top:4px;line-height:1.5;">'+esc(rt.alerta)+'</div>'
-      +'<div style="font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:4px;">gasto '+brl(rt.gasto)+' de '+brl(rt.verba)+' · projeção '+brl(rt.projecao)+'</div>'
-    +'</div>';
-  });
-  if(r.semEntrega&&r.semEntrega.length){
-    h+='<div style="background:var(--painel);border:1px solid var(--linha);border-radius:12px;padding:10px 12px;margin-bottom:9px;">'
-      +'<div style="font-size:10px;font-weight:900;color:#8b93a3;">⚪ '+r.semEntrega.length+' ATIVO(S) SEM ENTREGA</div>'
-      +'<div style="font-size:11px;color:var(--dim);margin-top:4px;line-height:1.5;">'+r.semEntrega.slice(0,6).map(function(s){return esc(s.nome);}).join(' · ')+(r.semEntrega.length>6?' …':'')+'</div>'
-    +'</div>';
+
+  // ── barra de alocação da verba ADM por categoria ──
+  var adm=(r.planos||[]).filter(function(p){return !p.frentePropria;});
+  if(adm.length){
+    var totalAdm=adm.reduce(function(s,p){return s+p.verbaAlocada;},0)||1;
+    h+='<div style="background:var(--painel);border:1px solid var(--linha);border-radius:13px;padding:13px;margin-bottom:12px;">'
+      +'<div style="font-size:9.5px;font-weight:900;color:var(--dim);letter-spacing:.6px;margin-bottom:8px;">COMO A VERBA ADM ESTÁ DIVIDIDA HOJE</div>'
+      +'<div style="display:flex;height:9px;border-radius:99px;overflow:hidden;background:#161a21;">'
+      +adm.map(function(p){return '<div style="width:'+(p.verbaAlocada/totalAdm*100)+'%;background:'+corCat(p.categoria)+';"></div>';}).join('')
+      +'</div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:9px;">'
+      +adm.map(function(p){
+        return '<div style="font-size:10.5px;"><span style="color:'+corCat(p.categoria)+';font-weight:900;">■</span> '
+          +esc(CAT_NOME[p.categoria]||p.categoria)+' <b style="font-family:var(--mono);">'+brl(p.verbaAlocada)+'</b>'
+          +' <span style="color:var(--dim);">('+p.fatiaDaVerbaAdm+'% · '+p.anuncios+' criativos)</span></div>';
+      }).join('')
+      +'</div></div>';
   }
-  if(r.pausar.length){
-    h+='<div style="font-size:11px;font-weight:900;color:var(--ralo);margin:14px 0 8px;letter-spacing:.5px;">🔴 PAUSAR ('+r.pausar.length+') · libera '+brl(r.liberado)+'</div>';
-    h+=r.pausar.map(function(p){
-      return '<div class="ad ralo"><div class="thumb'+(p.thumb?'':' vazio')+'">'+(p.thumb?'<img src="'+esc(p.thumb)+'" style="width:100%;height:100%;object-fit:cover;border-radius:9px;">':'🎬')+'</div>'
-        +'<div class="corpo"><div class="nome">'+esc(p.nome)+'</div>'
-        +'<div style="font-size:11px;color:#fca5a5;margin-top:4px;font-weight:700;">'+esc(p.motivo)+'</div>'
-        +'<div class="metricas"><span>💸 <b>'+brl(p.gasto)+'</b></span><span>💬 <b>'+p.conversas+'</b></span>'
-          +(p.liberaria!=null?'<span style="color:var(--campeao);">↩ libera <b>'+brl(p.liberaria)+'</b></span>'
-            :'<span style="color:#8b93a3;">verba não informada pela Meta</span>')
-          +(p.desperdicioDiario?'<span style="color:#f87171;">🔥 <b>'+brl(p.desperdicioDiario)+'</b>/dia desperdiçado</span>':'')+'</div>'
-        +'</div></div>';
-    }).join('');
-  }
-  if(r.distribuir.length){
-    h+='<div style="font-size:11px;font-weight:900;color:var(--campeao);margin:16px 0 8px;letter-spacing:.5px;">🟢 CANDIDATOS A REFORÇO ('+r.distribuir.length+')'+(r.liberado>0?' · proporcional ao desempenho':' · sem verba liberada, mas são os que merecem mais')+'</div>';
-    h+=r.distribuir.slice(0,10).map(function(d){
-      return '<div class="ad campeao"><div class="thumb'+(d.thumb?'':' vazio')+'">'+(d.thumb?'<img src="'+esc(d.thumb)+'" style="width:100%;height:100%;object-fit:cover;border-radius:9px;">':'🎬')+'</div>'
-        +'<div class="corpo"><div class="nome">'+esc(d.nome)+'</div>'
-        +'<div style="display:flex;align-items:baseline;gap:6px;margin-top:5px;">'
-          +(d.receber>0?'<span class="cpa" style="color:var(--campeao);font-size:17px;">+'+brl(d.receber)+'</span><span class="cpa-rot">'+d.pesoPct+'% DA VERBA</span>'
-            :'<span class="cpa" style="color:var(--campeao);font-size:17px;">'+brl(d.cpa)+'</span><span class="cpa-rot">POR CONVERSA · META '+brl(d.meta)+'</span>')+'</div>'
-        +'<div class="metricas"><span>CPA <b>'+brl(d.cpa)+'</b></span>'
-          +(d.orcamentoDiarioAtual!=null?'<span>📅 <b>'+brl(d.orcamentoDiarioAtual)+'</b> → <b style="color:#4ade80;">'+brl(d.orcamentoDiarioNovo)+'</b>/dia</span>':'')
-          +(d.conversasEstimadas?'<span style="color:#4ade80;">≈ +<b>'+d.conversasEstimadas+'</b> conversas</span>':'')+'</div>'
-        +'</div></div>';
-    }).join('');
-    h+='<button class="btn destaque" style="width:100%;margin-top:12px;padding:13px;font-size:13px;" onclick="aplicarCopiloto()">▶️ Aplicar na Meta (pausar '+r.pausar.length+(r.liberado>0?' e realocar '+brl(r.liberado):'')+')</button>'
-      +'<div style="font-size:10px;color:var(--dim);text-align:center;margin-top:6px;">nada é alterado sem você confirmar</div>';
+
+  // ── um bloco por categoria ──
+  h+=(r.planos||[]).map(function(p){
+    var cor=corCat(p.categoria);
+    var ruim=p.acimaDaMeta;
+    return '<div style="background:var(--painel);border:1px solid var(--linha);border-left:4px solid '+cor+';border-radius:13px;padding:13px;margin-bottom:11px;">'
+      +'<div style="display:flex;justify-content:space-between;align-items:baseline;">'
+        +'<b style="font-size:15px;color:'+cor+';">'+esc(CAT_NOME[p.categoria]||p.categoria)+'</b>'
+        +'<span style="font-family:var(--mono);font-size:16px;font-weight:700;color:'+(ruim?'#ef4444':'#22c55e')+';">'
+          +(p.cpa!=null?brl(p.cpa):'—')+'<span style="font-size:9px;color:var(--dim);font-weight:700;"> /conversa · meta '+brl(p.meta)+'</span></span>'
+      +'</div>'
+      +'<div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--dim);">'
+        +'<span>🎬 <b style="color:#f0f2f5;">'+p.anuncios+'</b> criativos</span>'
+        +'<span>💼 <b style="color:#f0f2f5;">'+brl(p.verbaAlocada)+'</b> alocados</span>'
+        +'<span>💸 <b style="color:#f0f2f5;">'+brl(p.gasto)+'</b> gastos</span>'
+        +'<span>💬 <b style="color:#f0f2f5;">'+p.conversas+'</b></span>'
+      +'</div>'
+      +(p.frentePropria?'<div style="font-size:10px;color:#60a5fa;margin-top:7px;">📺 frente própria — não cede nem recebe verba das outras categorias</div>':'')
+      +(p.cortar.length?'<div style="margin-top:11px;">'
+        +'<div style="font-size:10px;font-weight:900;color:#ef4444;letter-spacing:.4px;">🔴 TIRAR VERBA DE '+p.cortar.length+' · recupera '+brl(p.libera)+'</div>'
+        +p.cortar.map(function(c){
+          return '<div style="display:flex;gap:9px;align-items:center;margin-top:7px;">'
+            +(c.thumb?'<img src="'+esc(c.thumb)+'" style="width:34px;height:34px;border-radius:7px;object-fit:cover;flex:0 0 auto;">':'<div style="width:34px;height:34px;border-radius:7px;background:#161a21;flex:0 0 auto;"></div>')
+            +'<div style="flex:1;min-width:0;"><div style="font-size:11.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(c.nome)+'</div>'
+            +'<div style="font-size:10px;color:#fca5a5;font-family:var(--mono);">'+(c.cpa!=null?brl(c.cpa):'sem conversa')+' · '+esc(c.motivo)+'</div></div>'
+            +'<div style="font-family:var(--mono);font-size:12px;color:#4ade80;font-weight:700;flex:0 0 auto;">'+(c.libera!=null?'+'+brl(c.libera):'—')+'</div>'
+          +'</div>';
+        }).join('')
+      +'</div>':'')
+      +(p.reforcar.length&&p.libera>0?'<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--linha);">'
+        +'<div style="font-size:10px;font-weight:900;color:#22c55e;letter-spacing:.4px;">🟢 COLOCAR NOS CAMPEÕES DE '+esc((CAT_NOME[p.categoria]||'').toUpperCase())+' · +'+p.ganhoEstimado+' conversas estimadas</div>'
+        +p.reforcar.filter(function(d){return d.receber>0;}).map(function(d){
+          return '<div style="display:flex;gap:9px;align-items:center;margin-top:7px;">'
+            +(d.thumb?'<img src="'+esc(d.thumb)+'" style="width:34px;height:34px;border-radius:7px;object-fit:cover;flex:0 0 auto;">':'<div style="width:34px;height:34px;border-radius:7px;background:#161a21;flex:0 0 auto;"></div>')
+            +'<div style="flex:1;min-width:0;"><div style="font-size:11.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(d.nome)+'</div>'
+            +'<div style="font-size:10px;color:var(--dim);font-family:var(--mono);">'+brl(d.cpa)+'/conversa · '+brl(d.verbaAtual||0)+' → <b style="color:#4ade80;">'+brl(d.verbaNova||0)+'</b></div></div>'
+            +'<div style="font-family:var(--mono);font-size:12px;color:#4ade80;font-weight:700;flex:0 0 auto;">+'+brl(d.receber)+'</div>'
+          +'</div>';
+        }).join('')
+      +'</div>':'')
+      +(p.semDestino?'<div style="margin-top:10px;font-size:11px;color:#f59e0b;line-height:1.5;">⚠️ Não há campeão nesta categoria para receber a verba. Cortando, os '+brl(p.libera)+' voltam para o caixa — vale subir criativo novo aqui.</div>':'')
+    +'</div>';
+  }).join('');
+
+  if(r.totalCortes){
+    h+='<button class="btn destaque" style="width:100%;padding:13px;font-size:13px;margin-top:4px;" onclick="aplicarCopiloto()">▶️ Aplicar tudo na Meta ('+r.totalCortes+' cortes · '+brl(r.totalLibera)+' realocados)</button>'
+      +'<div style="font-size:10px;color:var(--dim);text-align:center;margin-top:6px;">nada muda sem você confirmar</div>';
   }
   el.innerHTML=h;
 }
+
 async function aplicarCopiloto(){
   var r=window._cop;if(!r)return;
-  if(!confirm('Pausar '+r.pausar.length+' anúncio(s) e realocar '+brl(r.liberado)+' entre '+r.distribuir.length+' campeões?\n\nIsso altera a conta de anúncios agora.'))return;
+  var pausar=[],orcs=[];
+  (r.planos||[]).forEach(function(p){
+    p.cortar.forEach(function(c){pausar.push(c.id);});
+    p.reforcar.forEach(function(d){ if(d.receber>0&&d.adsetId&&d.diarioNovo) orcs.push({adsetId:d.adsetId,diario:d.diarioNovo}); });
+  });
+  if(!confirm('Cortar '+pausar.length+' criativo(s) e realocar '+brl(r.totalLibera)+' dentro de cada categoria?\n\nIsso altera a conta de anúncios agora.'))return;
   var el=document.getElementById('pg-copiloto');
   el.innerHTML='<div class="vazio-msg">▶️ Aplicando na Meta…</div>';
   var resp=await fetch('/api/trafego?action=aplicar',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({confirmar:true,pausarIds:r.pausar.map(function(p){return p.id;}),
-      orcamentos:r.distribuir.filter(function(d){return d.receber>0&&d.adsetId;}).map(function(d){return{adsetId:d.adsetId,diario:d.orcamentoDiarioNovo};})})
+    body:JSON.stringify({confirmar:true,pausarIds:pausar,orcamentos:orcs})
   }).then(function(x){return x.json();}).catch(function(){return{ok:false,erros:[{erro:'falha de rede'}]};});
   var h='<div style="background:var(--painel);border:1px solid var(--linha);border-radius:13px;padding:14px;">'
     +'<div style="font-size:14px;font-weight:900;color:'+(resp.ok?'#4ade80':'#f59e0b')+';">'+(resp.ok?'✅ Aplicado':'⚠️ Aplicado com pendências')+'</div>'
