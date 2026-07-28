@@ -120,9 +120,10 @@ module.exports = async function handler(req, res) {
       : '';
     const base = `${GRAPH}/act_${CONTA}/`;
     const tk = `&access_token=${TOKEN}`;
-    const [ads, adsets, ins] = await Promise.all([
-      pegarTudo(`${base}ads?fields=id,name,effective_status,adset_id,creative{thumbnail_url}&limit=25${filtroAtivo}${tk}`, 8),
-      pegarTudo(`${base}adsets?fields=id,name,daily_budget,lifetime_budget,effective_status&limit=25${tk}`, 8),
+    const [ads, adsets, camps, ins] = await Promise.all([
+      pegarTudo(`${base}ads?fields=id,name,status,effective_status,adset_id,campaign_id,creative{thumbnail_url}&limit=25${filtroAtivo}${tk}`, 20),
+      pegarTudo(`${base}adsets?fields=id,name,status,effective_status,daily_budget,lifetime_budget&limit=25${tk}`, 20),
+      pegarTudo(`${base}campaigns?fields=id,status,effective_status&limit=50${tk}`, 12),
       pegarTudo(`${base}insights?level=ad&${janela}&use_unified_attribution_setting=true&fields=ad_id,spend,clicks,ctr,actions&limit=25${tk}`, 12),
     ]);
     if (ads.erro && !ads.data.length) return res.status(200).json({ ok: false, erro: ads.erro });
@@ -130,6 +131,8 @@ module.exports = async function handler(req, res) {
     for (const i of (ins.data || [])) porAd[i.ad_id] = i;
     const porAdset = {};
     for (const a of (adsets.data || [])) porAdset[a.id] = a;
+    const porCamp = {};
+    for (const c of (camps.data || [])) porCamp[c.id] = c;
 
 
     // Ordem de prioridade REAL: a métrica do Gerenciador é "conversas por mensagem iniciadas"
@@ -148,11 +151,20 @@ module.exports = async function handler(req, res) {
       porStatus[s] = (porStatus[s] || 0) + 1;
     }
     // TRAVA local: anúncio ativo E conjunto ativo. Sem isso entram pausados e "ativos" de conjunto parado.
+    // Só entra quem PROVA que está rodando nos três níveis (anúncio, conjunto e campanha).
+    // Sem prova → fica de fora (antes eu deixava passar quando não sabia, e por isso inflava).
+    const motivosCorte = {};
+    const corta = (m) => { motivosCorte[m] = (motivosCorte[m] || 0) + 1; return false; };
     const brutos = (ads.data || []).filter(ad => {
       if (!soAtivos) return true;
-      if (ad.effective_status !== 'ACTIVE') return false;
+      if (ad.status && ad.status !== 'ACTIVE') return corta('anúncio com status ' + ad.status);
+      if (ad.effective_status !== 'ACTIVE') return corta('anúncio: ' + (ad.effective_status || 'sem status'));
       const st = porAdset[ad.adset_id];
-      if (st && st.effective_status && st.effective_status !== 'ACTIVE') return false;
+      if (!st) return corta('conjunto não localizado');
+      if ((st.effective_status || st.status) !== 'ACTIVE') return corta('conjunto: ' + (st.effective_status || st.status));
+      const cp = porCamp[ad.campaign_id];
+      if (!cp) return corta('campanha não localizada');
+      if ((cp.effective_status || cp.status) !== 'ACTIVE') return corta('campanha: ' + (cp.effective_status || cp.status));
       return true;
     });
     const anuncios = brutos.map(ad => {
@@ -220,8 +232,9 @@ module.exports = async function handler(req, res) {
         aproveitamento: cfg.verba.aproveitamento },
       metas: cfg.metas, porCategoria, totalAnuncios: anuncios.length, anuncios,
       recebidosDaMeta: (ads.data || []).length, exibidos: anuncios.length,
-      statusRecebidos: porStatus,
-      avisos: [ads.erro, adsets.erro, ins.erro].filter(Boolean) };
+      statusRecebidos: porStatus, motivosCorte,
+      conjuntosLidos: (adsets.data || []).length, campanhasLidas: (camps.data || []).length,
+      avisos: [ads.erro, adsets.erro, camps.erro, ins.erro].filter(Boolean) };
     try { await dbSet(chaveCache, { em: new Date().toISOString(), desde, dados }); } catch (e) {}
     if (periodo === 'ciclo') { try { await dbSet('trafego_painel_cache', { em: new Date().toISOString(), desde, dados }); } catch (e) {} }
     return res.status(200).json(dados);
