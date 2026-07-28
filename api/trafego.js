@@ -769,15 +769,44 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
       const h = (obj.history || []).find(x => String(x.phaseId || x.phase || '').startsWith('erp'));
       return (h && (h.ts || h.timestamp)) || obj.movedAt || obj.criadoEm || obj.createdAt;
     };
-    // 1) cards do pipe ADM e TV que passaram por ERP
+    // REGRA DO DONO: vale o que está em FINALIZADO, tirando RS, garantia e reprovado.
+    // (ERP também conta — é a antessala do finalizado, ainda não migrou na segunda.)
+    const ehExcluido = (c) => {
+      const txt = [c.nomeContato, c.title, c.descricao, c.equipamento, c.osCode, c.nome]
+        .filter(Boolean).join(' ').toLowerCase();
+      return /\brs\b|\br\.s\b|garantia|reprovad/.test(txt);
+    };
+    let excluidosRsGarantia = 0;
+    const FASES_VALEM = ['finalizado', 'erp'];
     for (const [banco, sis] of [[ppA, 'adm'], [ppT, 'tv']]) {
       for (const c of (((banco || {}).cards) || [])) {
+        const fase = String(c.phaseId || c.phase || '');
+        const valeAgora = FASES_VALEM.includes(fase);
+        if (!valeAgora && !passouPorErp(c)) continue;
         const valor = parseFloat(c.valor || c.total || 0) || 0;
-        if (!(valor > 0) || !passouPorErp(c)) continue;
-        if (!dentroJanela(quandoErp(c))) continue;
+        if (!(valor > 0)) continue;
+        if (ehExcluido(c)) { excluidosRsGarantia++; continue; }        // 🚫 RS / garantia / reprovado
+        const quando = quandoErp(c) || c.movedAt || c.criadoEm;
+        if (!dentroJanela(quando)) continue;
         const cat = categoriaDe(c.equipamento || c.descricao || c.nomeContato || '');
         if (cat === 'outros') semCategoria++;
         registrar(sis + ':' + c.id, cat, valor);
+      }
+    }
+    // Boards ADM e TV: mesma regra (cards finalizados vivem lá depois da migração)
+    const [bTv] = await Promise.all([dbGet('tv_board')]);
+    for (const [banco, sis] of [[boardA, 'boardAdm'], [bTv, 'boardTv']]) {
+      for (const c of (((banco || {}).cards) || [])) {
+        const fase = String(c.phaseId || c.phase || '');
+        if (!FASES_VALEM.includes(fase)) continue;
+        const valor = parseFloat(c.valor || c.total || 0) || 0;
+        if (!(valor > 0)) continue;
+        if (ehExcluido(c)) { excluidosRsGarantia++; continue; }
+        const quando = c.movedAt || c.syncedAt || c.criadoEm;
+        if (!dentroJanela(quando)) continue;
+        const cat = categoriaDe(c.descricao || c.equipamento || c.title || c.nomeContato || '');
+        if (cat === 'outros') semCategoria++;
+        registrar(sis + ':' + (c.pipefyId || c.osCode || c.id), cat, valor);
       }
     }
     // 2) metaLog do board: entradas em ERP com valor e data reais
@@ -822,7 +851,8 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
       totais: { investido: Number(investidoTotal.toFixed(2)), faturado: Number(faturadoTotal.toFixed(2)),
         roas: investidoTotal > 0 ? Number((faturadoTotal / investidoTotal).toFixed(2)) : null },
       linhas, semCategoria,
-      criterioFaturamento: 'passagem por ERP (o RP) no histórico — pipe ADM, pipe TV e registro de entrada em ERP do board; Finalizado NÃO é usado porque recebe garantia e reprovado',
+      criterioFaturamento: 'FINALIZADO + ERP, excluindo tudo que tenha RS, garantia ou reprovado no nome/descrição (regra do dono); fontes: pipe ADM, pipe TV, board ADM, board TV e metaLog de ERP, com dedupe',
+      excluidosRsGarantia,
       fontes: { pipeAdmTv: contados.size, vendasContadas: Object.values(detalhe).reduce((a, b) => a + b, 0) },
       alerta: 'investimento vem da Meta por nome do anúncio; faturamento vem do financeiro por equipamento — categorias mal nomeadas nos dois lados distorcem o ROAS' };
     try { await dbSet('trafego_roas', saida); } catch (e) {}
