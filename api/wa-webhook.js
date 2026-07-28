@@ -14,6 +14,17 @@ async function dbGet(k) {
   } catch (e) { return null; }
 }
 
+async function dbSet(k, v) {
+  try {
+    await fetch(`${U}/set/${k}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${T}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(v),
+    });
+    return true;
+  } catch (e) { return false; }
+}
+
 async function rpushEvt(evt) {
   try {
     await fetch(`${U}/rpush/${EVT_LIST}/${encodeURIComponent(JSON.stringify(evt))}`,
