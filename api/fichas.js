@@ -574,10 +574,11 @@ export default async function handler(req, res) {
   if (action === 'raio-x-dia') {
     const dias = Math.min(7, Math.max(0, parseInt(req.query.dias || '0', 10)));
     const rows = parseCSV(await (await fetch(SHEET_CSV, { redirect: 'follow' })).text());
-    const [dbAdm, dbTv, lgA, lgT, pros, ppA, ppT] = await Promise.all([
+    const [dbAdm, dbTv, lgA, lgT, pros, ppA, ppT, tombDb] = await Promise.all([
       dbGet(KEY_ADM), dbGet(KEY_TV), dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
-      dbGet('prospeccao_adm'), dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+      dbGet('prospeccao_adm'), dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet(KEY_EXCLUIDAS),
     ]);
+    const tombRX = ((tombDb || {}).linhas) || {};
     // eventos do WhatsApp
     let evts = [];
     try {
@@ -628,10 +629,15 @@ export default async function handler(req, res) {
       const temMsg = !!enviadas[d];
       const respondeu = !!recebidas[d];
       let diagnostico;
-      if (!lugares.length) diagnostico = '🔴 NÃO ENTROU NO SISTEMA';
+      if (!lugares.length) {
+        const bloq = tombRX[String(ri + 1)];
+        diagnostico = bloq
+          ? '🔴 EXCLUÍDA (' + (bloq.motivo || 'motivo não informado') + ')'
+          : '🔴 NÃO ENTROU NO SISTEMA';
+      }
       else if (temMsg && respondeu) diagnostico = '🟢 abordado e respondeu';
       else if (temMsg) diagnostico = '🟡 abordado, sem resposta';
-      else if (lugares.some(l => /logística|pipe|cliente_loja/.test(l))) diagnostico = '🔵 avançou sem o bot falar (cadastro manual)';
+      else if (lugares.some(l => /log[íi]stica|pipe|cliente_loja|prospeccao|prospecção/.test(l))) diagnostico = '🔵 avançou sem o bot falar (cadastro manual)';
       else diagnostico = '🔴 NO SISTEMA MAS SEM MENSAGEM DO BOT';
       linhas.push({ linha: ri + 1, nome, telefone: tel, equipamento: equip, horario: hora,
         diagnostico, ondeEsta: lugares,
@@ -646,6 +652,7 @@ export default async function handler(req, res) {
       avancouSemBotFalar: conta('🔵'),
       semMensagemDoBot: linhas.filter(l => l.diagnostico.includes('SEM MENSAGEM')).length,
       naoEntrouNoSistema: linhas.filter(l => l.diagnostico.includes('NÃO ENTROU')).length,
+      excluidasNaLixeira: linhas.filter(l => l.diagnostico.includes('EXCLUÍDA')).length,
     };
     // ?curto=1 → só o essencial, uma linha por caso (cabe no chat)
     if (String(req.query.curto || '') === '1') {
