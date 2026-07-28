@@ -358,7 +358,14 @@ export default async function handler(req, res) {
       try {
         const tomb = (await dbGet(KEY_EXCLUIDAS)) || { linhas: {} };
         if (!tomb.linhas) tomb.linhas = {};
-        tomb.linhas[String(alvo.sheetRow)] = { em: new Date().toISOString(), nome: alvo.nome || '', tel: alvo.telefone || '' };
+        // LIXEIRA: guarda a ficha INTEIRA para poder restaurar, com autor e motivo
+        tomb.linhas[String(alvo.sheetRow)] = { em: new Date().toISOString(),
+          nome: alvo.nome || '', tel: alvo.telefone || '',
+          equipamento: alvo.equipamento || '', status: alvo.status || 'criada',
+          por: String((req.body || {}).por || 'não informado').slice(0, 40),
+          motivo: String((req.body || {}).motivo || 'não informado').slice(0, 120),
+          origem: String((req.body || {}).origem || 'tela de fichas').slice(0, 30),
+          ficha: alvo };
         const corte = Date.now() - 180 * 86400000;
         for (const k of Object.keys(tomb.linhas)) {
           if (new Date(tomb.linhas[k].em || 0).getTime() < corte) delete tomb.linhas[k];
@@ -538,6 +545,76 @@ export default async function handler(req, res) {
       lista: recuperaveis,
       jaAtendidasDetalhe: perdidas.filter(p => String(p.acao).startsWith('JÁ FOI ATENDIDA')).slice(0, 20),
       dica: 'para recuperar: mesmo link com &aplicar=1' });
+  }
+
+  // ── 🗑 LIXEIRA: fichas excluídas, com restauração ──
+  if (action === 'lixeira') {
+    const tomb = (await dbGet(KEY_EXCLUIDAS)) || { linhas: {} };
+    const dias = Math.min(180, Math.max(1, parseInt(req.query.dias || '30', 10)));
+    const corte = Date.now() - dias * 86400000;
+    const itens = Object.keys(tomb.linhas || {})
+      .map(k => Object.assign({ linha: Number(k) }, tomb.linhas[k]))
+      .filter(x => new Date(x.em || 0).getTime() >= corte)
+      .sort((a, b) => String(b.em).localeCompare(String(a.em)));
+
+    // restaurar: ?restaurar=LINHA  ou  ?restaurarTodas=1
+    const alvo = String(req.query.restaurar || '');
+    const todas = String(req.query.restaurarTodas || '') === '1';
+    if (alvo || todas) {
+      const paraRestaurar = todas ? itens : itens.filter(x => String(x.linha) === alvo);
+      if (!paraRestaurar.length) return res.status(404).json({ ok: false, error: 'nada a restaurar' });
+      const dbA = (await dbGet(KEY_ADM)) || { fichas: [] };
+      const dbT = (await dbGet(KEY_TV)) || { fichas: [] };
+      let voltaram = 0;
+      for (const it of paraRestaurar) {
+        if (!it.ficha) continue;                       // exclusões antigas não guardaram a ficha
+        const ehTv = /\btv\b|televis/i.test(String(it.equipamento || ''));
+        const banco = ehTv ? dbT : dbA;
+        if (!(banco.fichas || []).some(f => f.id === it.ficha.id)) {
+          banco.fichas.unshift(Object.assign({}, it.ficha, { restauradaEm: new Date().toISOString() }));
+          voltaram++;
+        }
+        delete tomb.linhas[String(it.linha)];
+      }
+      await Promise.all([dbSet(KEY_ADM, dbA), dbSet(KEY_TV, dbT), dbSet(KEY_EXCLUIDAS, tomb)]);
+      const semDados = paraRestaurar.filter(x => !x.ficha).length;
+      return res.status(200).json({ ok: true, restauradas: voltaram,
+        semDadosParaRestaurar: semDados,
+        obs: semDados ? 'exclusões anteriores a hoje não guardaram os dados — use recuperar-perdidas para reimportar da planilha' : undefined });
+    }
+    return res.status(200).json({ ok: true, periodoDias: dias, total: itens.length,
+      podemSerRestauradas: itens.filter(x => !!x.ficha).length,
+      itens: itens.map(x => ({ linha: x.linha, nome: x.nome, telefone: x.tel,
+        equipamento: x.equipamento, statusQuandoExcluida: x.status,
+        excluidaEm: x.em, por: x.por || 'não informado', motivo: x.motivo || 'não informado',
+        origem: x.origem, temDadosParaRestaurar: !!x.ficha })),
+      comoRestaurar: '?restaurar=NUMERO_DA_LINHA ou ?restaurarTodas=1' });
+  }
+
+  // ── 🛡 AUDITORIA DIÁRIA: guarda o resultado do cruzamento e alerta se sumiu ficha ──
+  if (action === 'auditoria-diaria') {
+    const r = await fetch(`https://reparoeletroadm.com/api/fichas?action=recuperar-perdidas&dias=2&k=${(process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim()}`)
+      .then(x => x.json()).catch(() => null);
+    const perdidas = (r && r.realmentePerdidas) || 0;
+    const reg = (await dbGet('fichas_auditoria')) || { dias: {} };
+    const hoje = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+    reg.dias[hoje] = { em: new Date().toISOString(), perdidas,
+      lista: ((r && r.lista) || []).slice(0, 30).map(x => ({ linha: x.linha, nome: x.nome, tel: x.telefone })) };
+    for (const d of Object.keys(reg.dias)) {
+      if (new Date(d).getTime() < Date.now() - 30 * 86400000) delete reg.dias[d];
+    }
+    await dbSet('fichas_auditoria', reg);
+    return res.status(200).json({ ok: true, dia: hoje, perdidas,
+      alerta: perdidas > 0 ? '⚠️ ' + perdidas + ' linha(s) da planilha não viraram ficha nas últimas 48h' : '✅ nenhuma ficha perdida',
+      lista: reg.dias[hoje].lista });
+  }
+
+  // ── 📊 AUDITORIA-BADGE: número para a tela mostrar ──
+  if (action === 'auditoria-badge') {
+    const reg = (await dbGet('fichas_auditoria')) || { dias: {} };
+    const hoje = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+    const d = reg.dias[hoje] || { perdidas: 0 };
+    return res.status(200).json({ ok: true, perdidas: d.perdidas || 0, verificadoEm: d.em || null });
   }
 
   // ── LINHAS EXCLUÍDAS: quais linhas da planilha estão bloqueadas ──

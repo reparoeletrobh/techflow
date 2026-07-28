@@ -874,10 +874,12 @@ async function confirmarLogistica(){
 }
 
 async function excluirEspelho(id, sistema){
-  if(!confirm('Remover esta ficha (será removida também de Fichas)?'))return;
+  if(!confirm('⚠️ ATENÇÃO: isto APAGA a ficha do cliente do sistema inteiro,\nnão só desta tela.\n\nO cliente deixa de ser atendido. Tem certeza?'))return;
+  var motivo=prompt('Por que está excluindo?\n(duplicada, trote, cliente desistiu, engano...)\n\nVai para a Lixeira e pode ser restaurada.');
+  if(motivo===null)return;
   await fetch('/api/fichas?action=excluir',{
     method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({id:id,sistema:sistema})
+    body:JSON.stringify({id:id,sistema:sistema,motivo:motivo||'não informado',origem:'prospecção'})
   });
   await load();
 }

@@ -433,7 +433,10 @@ async function confirmarLogistica(){
 
 async function excluir(id){
   if(!confirm('Remover esta ficha da lista?')) return;
-  await fetch('/api/fichas?action=excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,sistema:SISTEMA})});
+  var motivo=prompt('Por que está excluindo esta ficha?\n(duplicada, trote, cliente desistiu, engano...)\n\nA ficha vai para a Lixeira e pode ser restaurada.');
+  if(motivo===null)return;
+  await fetch('/api/fichas?action=excluir',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id,sistema:SISTEMA,motivo:motivo||'não informado',origem:'tela de fichas'})});
   await load();
 }
 
