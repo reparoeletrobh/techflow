@@ -444,6 +444,54 @@ export default async function handler(req, res) {
       tetoPorCiclo: c.reativacaoTeto || 5 });
   }
 
+  // ── 🕵️ ABORDAGENS-FANTASMA: marcadas como abordadas sem mensagem no histórico ──
+  if (action === 'abordagens-fantasma') {
+    const [fA, fT, evtsF, abF] = await Promise.all([
+      dbGet('fichas_adm'), dbGet('fichas_tv'), lerEvts(), dbGet('wa_abordados').then(v => v || { tels: {} }),
+    ]);
+    const comMensagem = new Set();
+    for (const e of evtsF) {
+      if (e.dir !== 'out') continue;
+      const d = String(e.tel || '').replace(/\D/g, '').slice(-8);
+      if (d.length >= 8) comMensagem.add(d);
+    }
+    const fantasmas = [];
+    for (const f of [...(((fA || {}).fichas) || []), ...(((fT || {}).fichas) || [])]) {
+      if (!['contato_feito', 'entrar_contato'].includes(f.status)) continue;
+      if (!f.abordadoPorBot && !f.contatoFeitoEm) continue;
+      const d = String(f.telefone || '').replace(/\D/g, '').slice(-8);
+      if (d.length < 8 || comMensagem.has(d)) continue;
+      fantasmas.push({ nome: f.nome, telefone: f.telefone, equipamento: f.equipamento,
+        status: f.status, marcadaEm: f.contatoFeitoEm || f.movidoEm, sheetRow: f.sheetRow,
+        falha: f.falhaAbordagem || null });
+    }
+    fantasmas.sort((a, b) => String(b.marcadaEm).localeCompare(String(a.marcadaEm)));
+    if (String(req.query.devolver || '') === '1' && fantasmas.length) {
+      const tels = new Set(fantasmas.map(x => String(x.telefone || '').replace(/\D/g, '').slice(-8)));
+      for (const key of ['fichas_adm', 'fichas_tv']) {
+        const bd = (await dbGet(key)) || { fichas: [] };
+        let mexeu = false;
+        for (const f of (bd.fichas || [])) {
+          const d = String(f.telefone || '').replace(/\D/g, '').slice(-8);
+          if (!tels.has(d)) continue;
+          if (!['contato_feito', 'entrar_contato'].includes(f.status)) continue;
+          f.status = 'criada'; delete f.contatoFeitoEm; delete f.abordadoPorBot;
+          f.devolvidaEm = new Date().toISOString(); mexeu = true;
+        }
+        if (mexeu) await dbSet(key, bd);
+      }
+      const ab = (await dbGet('wa_abordados')) || { tels: {} };
+      for (const d of tels) delete (ab.tels || {})[d];
+      await dbSet('wa_abordados', ab);
+      return res.status(200).json({ ok: true, devolvidas: fantasmas.length,
+        msg: 'voltaram para "ficha criada" e o bot vai abordá-las no próximo ciclo', lista: fantasmas.slice(0, 40) });
+    }
+    return res.status(200).json({ ok: true, total: fantasmas.length,
+      explicacao: 'fichas marcadas como abordadas/contatadas cujo telefone NÃO tem nenhuma mensagem enviada no histórico — a abordagem falhou mas a ficha saiu de criada',
+      lista: fantasmas.slice(0, 60),
+      dica: 'para devolvê-las para "ficha criada": mesmo link com &devolver=1' });
+  }
+
   // ── 📋 REATIVACAO-RELATORIO: tudo que o motor disparou e para quem ──
   if (action === 'reativacao-relatorio') {
     const [reat, evtsRR, envRR] = await Promise.all([
@@ -739,6 +787,13 @@ export default async function handler(req, res) {
             f.contatoFeitoEm = new Date().toISOString();
             f.abordadoPorBot = true;
           } catch (e) {}
+        }
+        // 🚨 SÓ marca como abordado e SÓ registra no histórico se a Meta confirmou o envio.
+        // Antes marcava mesmo com falha: a ficha saía de "criada" e o cliente nunca recebia nada.
+        if (!okA) {
+          f.falhaAbordagem = { em: new Date().toISOString(), erro: (j && j.error && j.error.message) || 'envio não confirmado' };
+          disparadas.push({ nome: f.nome, ok: false, erro: f.falhaAbordagem.erro });
+          continue;
         }
         abordados.tels[telA.slice(-8)] = new Date().toISOString();
         if (f._sis === 'tv' && !usouFallbackAdm) {
