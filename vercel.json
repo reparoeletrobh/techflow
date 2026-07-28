@@ -115,6 +115,10 @@
     {
       "path": "/api/fichas?action=auditoria-diaria&k=tfk-re2026-Bx7mQp9zKw4Y",
       "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/fichas?action=auditoria-diaria&k=tfk-re2026-Bx7mQp9zKw4Y&t=meio-dia",
+      "schedule": "0 15 * * *"
     }
   ],
   "rewrites": [
