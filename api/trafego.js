@@ -723,7 +723,8 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
 
   // ═══ 💵 ROAS por categoria — faturamento REALMENTE PAGO ÷ investimento em anúncios ═══
   if (action === 'roas') {
-    const guardado = await dbGet('trafego_roas');
+    const diasCache = Math.min(120, Math.max(15, parseInt(req.query.dias || '56', 10)));
+    const guardado = await dbGet('trafego_roas_' + diasCache);
     if (guardado && String(req.query.gerar || '') !== '1') {
       return res.status(200).json(Object.assign({ ok: true, doCache: true }, guardado));
     }
@@ -917,7 +918,22 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
     }).filter(l => l.investido > 0 || l.faturado > 0)
       .sort((a, b) => (b.roas || 0) - (a.roas || 0));
 
-    const saida = { periodoDias: dias, de: desde, ate,
+    // FRENTES SEPARADAS: TV tem verba própria e não se mistura com o ADM
+    const somaFrente = (filtro) => {
+      const ls = linhas.filter(filtro);
+      const inv = ls.reduce((s, l) => s + l.investido, 0);
+      const fat = ls.reduce((s, l) => s + l.faturado, 0);
+      const vds = ls.reduce((s, l) => s + l.vendas, 0);
+      return { investido: Number(inv.toFixed(2)), faturado: Number(fat.toFixed(2)), vendas: vds,
+        roas: inv > 0 ? Number((fat / inv).toFixed(2)) : null,
+        ticketMedio: vds > 0 ? Number((fat / vds).toFixed(2)) : null,
+        categorias: ls.map(l => l.categoria) };
+    };
+    const frentes = {
+      tv: somaFrente(l => l.categoria === 'tv'),
+      adm: somaFrente(l => l.categoria !== 'tv'),
+    };
+    const saida = { periodoDias: dias, de: desde, ate, frentes,
       geradoEm: new Date().toISOString(),
       totais: { investido: Number(investidoTotal.toFixed(2)), faturado: Number(faturadoTotal.toFixed(2)),
         roas: investidoTotal > 0 ? Number((faturadoTotal / investidoTotal).toFixed(2)) : null },
@@ -931,7 +947,7 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
       equipamentosNaoClassificados: amostraOutros.slice(0, 25),
       totalContado: contados.size,
       alerta: 'investimento vem da Meta por nome do anúncio; faturamento vem do financeiro por equipamento — categorias mal nomeadas nos dois lados distorcem o ROAS' };
-    try { await dbSet('trafego_roas', saida); } catch (e) {}
+    try { await dbSet('trafego_roas_' + dias, saida); if (dias === 56) await dbSet('trafego_roas', saida); } catch (e) {}
     return res.status(200).json(Object.assign({ ok: true }, saida));
   }
 

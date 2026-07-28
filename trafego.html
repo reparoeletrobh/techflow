@@ -258,42 +258,57 @@ function secao(s){
 }
 
 /* ── 🧠 INTELIGÊNCIA: funil real por categoria ── */
+window._roasDias=56;
+async function setRoasDias(d){
+  window._roasDias=d;
+  window._roasHtml='';
+  await carregarRoas(false);
+  carregarInteligencia();
+}
 async function carregarRoas(recalcular){
-  var r=await fetch('/api/trafego?action=roas'+(recalcular?'&gerar=1':'')).then(function(x){return x.json();}).catch(function(){return null;});
+  var d=window._roasDias||56;
+  var r=await fetch('/api/trafego?action=roas&dias='+d+(recalcular?'&gerar=1':'')).then(function(x){return x.json();}).catch(function(){return null;});
   if(!r||!r.ok){window._roasHtml='';return null;}
   window._roas=r;
-  var t=r.totais||{};
+  var f=r.frentes||{};
   var linhas=(r.linhas||[]).filter(function(l){return l.investido>0||l.faturado>0;});
-  var maxRoas=Math.max.apply(null,linhas.map(function(l){return l.roas||0;}).concat([1]));
-  window._roasHtml=
-    '<div style="background:linear-gradient(150deg,rgba(34,197,94,.1),rgba(13,16,24,.95));border:1px solid rgba(34,197,94,.4);border-radius:13px;padding:13px;margin-bottom:11px;">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;">'
-      +'<div style="font-size:9.5px;font-weight:900;color:#4ade80;letter-spacing:.6px;">💵 RETORNO SOBRE O INVESTIMENTO · '+r.periodoDias+' DIAS</div>'
-      +'<a href="#" onclick="carregarRoas(true).then(carregarInteligencia);return false;" style="font-size:10px;color:var(--dim);text-decoration:none;">↻</a>'
-    +'</div>'
-    +'<div style="display:flex;gap:16px;margin-top:9px;flex-wrap:wrap;align-items:baseline;">'
-      +'<div><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:#4ade80;">'+(t.roas!=null?t.roas.toFixed(2)+'x':'—')+'</div><div style="font-size:9px;color:var(--dim);font-weight:800;">ROAS GERAL</div></div>'
-      +'<div><div style="font-family:var(--mono);font-size:15px;font-weight:700;">'+brl(t.faturado)+'</div><div style="font-size:9px;color:var(--dim);font-weight:800;">FATURADO</div></div>'
-      +'<div><div style="font-family:var(--mono);font-size:15px;font-weight:700;color:#8b93a3;">'+brl(t.investido)+'</div><div style="font-size:9px;color:var(--dim);font-weight:800;">INVESTIDO</div></div>'
-    +'</div>'
-    +'<div style="margin-top:11px;">'
-    +linhas.map(function(l){
-      var cor=corCat(l.categoria);
-      var larg=l.roas?Math.max(4,(l.roas/maxRoas)*100):0;
-      return '<div style="margin-bottom:9px;">'
-        +'<div style="display:flex;justify-content:space-between;font-size:11.5px;">'
-          +'<span style="font-weight:800;color:'+cor+';">'+esc(CAT_NOME[l.categoria]||l.categoria)+'</span>'
-          +'<span style="font-family:var(--mono);"><b style="color:'+(l.roas>=10?'#4ade80':(l.roas>=7?'#f0f2f5':'#f59e0b'))+';font-size:13px;">'
-            +(l.roas!=null?l.roas.toFixed(2)+'x':'—')+'</b></span>'
-        +'</div>'
-        +'<div style="height:6px;background:#161a21;border-radius:99px;margin-top:3px;overflow:hidden;"><div style="height:100%;width:'+larg+'%;background:'+cor+';"></div></div>'
-        +'<div style="font-family:var(--mono);font-size:9.5px;color:var(--dim);margin-top:3px;">'
-          +brl(l.investido)+' investidos → '+brl(l.faturado)+' · '+l.vendas+' vendas · ticket '+(l.ticketMedio?brl(l.ticketMedio):'—')+'</div>'
-      +'</div>';
-    }).join('')
-    +'</div>'
-    +'<div style="font-size:9.5px;color:var(--dim);line-height:1.5;margin-top:4px;">faturamento de Finalizado/ERP sem RS, garantia e reprovado · parte vem de origem orgânica (GMB, indicação, recorrente), então o número é otimista — serve para comparar categorias entre si</div>'
-  +'</div>';
+
+  var seletor='<div class="abas" style="margin-bottom:10px;">'
+    +[[30,'30 dias'],[56,'8 semanas'],[90,'90 dias']].map(function(p){
+      var on=d===p[0];
+      return '<div class="aba'+(on?' on':'')+'" onclick="setRoasDias('+p[0]+')" style="'+(on?'border-color:#22c55e;background:#22c55e22;color:#fff;':'')+'">'+p[1]+'</div>';
+    }).join('')+'</div>';
+
+  var painel=function(titulo,dados,cor,cats){
+    if(!dados||(!dados.investido&&!dados.faturado))return '';
+    var bars=linhas.filter(function(l){return (cats||[]).indexOf(l.categoria)>-1;})
+      .sort(function(a,b){return (b.roas||0)-(a.roas||0);});
+    var maxR=Math.max.apply(null,bars.map(function(l){return l.roas||0;}).concat([1]));
+    return '<div style="background:linear-gradient(150deg,'+cor+'1a,rgba(13,16,24,.95));border:1px solid '+cor+'66;border-radius:13px;padding:13px;margin-bottom:10px;">'
+      +'<div style="font-size:9.5px;font-weight:900;color:'+cor+';letter-spacing:.6px;">'+titulo+'</div>'
+      +'<div style="display:flex;gap:16px;margin-top:8px;flex-wrap:wrap;align-items:baseline;">'
+        +'<div><div style="font-family:var(--mono);font-size:24px;font-weight:700;color:'+cor+';">'+(dados.roas!=null?dados.roas.toFixed(2)+'x':'—')+'</div><div style="font-size:9px;color:var(--dim);font-weight:800;">ROAS</div></div>'
+        +'<div><div style="font-family:var(--mono);font-size:15px;font-weight:700;">'+brl(dados.faturado)+'</div><div style="font-size:9px;color:var(--dim);font-weight:800;">FATURADO</div></div>'
+        +'<div><div style="font-family:var(--mono);font-size:15px;font-weight:700;color:#8b93a3;">'+brl(dados.investido)+'</div><div style="font-size:9px;color:var(--dim);font-weight:800;">INVESTIDO</div></div>'
+        +'<div><div style="font-family:var(--mono);font-size:15px;font-weight:700;color:#8b93a3;">'+dados.vendas+'</div><div style="font-size:9px;color:var(--dim);font-weight:800;">VENDAS</div></div>'
+      +'</div>'
+      +(bars.length>1?'<div style="margin-top:11px;">'+bars.map(function(l){
+        var c2=corCat(l.categoria);
+        var larg=l.roas?Math.max(4,(l.roas/maxR)*100):0;
+        return '<div style="margin-bottom:8px;">'
+          +'<div style="display:flex;justify-content:space-between;font-size:11px;">'
+            +'<span style="font-weight:800;color:'+c2+';">'+esc(CAT_NOME[l.categoria]||l.categoria)+'</span>'
+            +'<span style="font-family:var(--mono);font-weight:700;">'+(l.roas!=null?l.roas.toFixed(2)+'x':'—')+'</span></div>'
+          +'<div style="height:5px;background:#161a21;border-radius:99px;margin-top:3px;overflow:hidden;"><div style="height:100%;width:'+larg+'%;background:'+c2+';"></div></div>'
+          +'<div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:2px;">'+brl(l.investido)+' → '+brl(l.faturado)+' · '+l.vendas+' vendas · ticket '+(l.ticketMedio?brl(l.ticketMedio):'—')+'</div>'
+        +'</div>';}).join('')+'</div>':'')
+    +'</div>';
+  };
+
+  window._roasHtml=seletor
+    +painel('🔧 RETORNO — ADM · '+r.periodoDias+' DIAS',f.adm,'#f97316',(f.adm||{}).categorias)
+    +painel('📺 RETORNO — TV · '+r.periodoDias+' DIAS',f.tv,'#3b82f6',(f.tv||{}).categorias)
+    +'<div style="font-size:9.5px;color:var(--dim);line-height:1.5;margin:-4px 0 11px;">faturamento de Finalizado/ERP sem RS, garantia e reprovado · parte da receita é orgânica (GMB, indicação, recorrente), então o número é otimista — serve para comparar entre si · <a href="#" onclick="carregarRoas(true).then(carregarInteligencia);return false;" style="color:#60a5fa;">recalcular</a></div>';
   return r;
 }
 
