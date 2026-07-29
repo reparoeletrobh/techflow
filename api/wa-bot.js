@@ -635,6 +635,7 @@ export default async function handler(req, res) {
       dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), lerEvts(), dbGet('reparoeletro_financeiro'),
     ]);
     const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
+    // fases que provam que passou pela aprovação (para saber QUEM aprovou)
     const APROV = ['aprovados', 'video_enviado', 'analise_compra', 'programar_entrega',
       'receber', 'erp', 'finalizado', 'entrega_agendada', 'entrega_liberada'];
     // última fala do cliente e do bot antes/depois da aprovação
@@ -648,10 +649,14 @@ export default async function handler(req, res) {
       for (const c of (((banco || {}).cards) || [])) {
         const fase = c.phaseId || c.phase || '';
         if (!APROV.includes(fase)) continue;
-        // momento em que entrou em aprovados
+        // ⚠️ a data da APROVAÇÃO é a entrada em 'aprovados'. Usar movedAt (último movimento)
+        // fazia card que hoje foi para ERP contar como aprovado hoje — daí o relatório inflar.
         const hist = (c.history || []).find(x => String(x.phaseId || x.phase || '') === 'aprovados');
-        const quando = (hist && (hist.ts || hist.timestamp)) || c.movedAt || c.criadoEm;
-        const t = new Date(quando || 0).getTime();
+        let quando = hist && (hist.ts || hist.timestamp);
+        let dataConfiavel = !!quando;
+        if (!quando && fase === 'aprovados') { quando = c.movedAt || c.criadoEm; dataConfiavel = true; }
+        if (!quando) continue;                       // sem como saber quando aprovou → fora
+        const t = new Date(quando).getTime();
         if (!t || t < corte) continue;
         const d = d8f(c.telefone);
         const msgs = porTel[d] || [];
@@ -665,7 +670,7 @@ export default async function handler(req, res) {
           sistema: sis, nome: c.nomeContato || '—', telefone: c.telefone || '',
           equipamento: c.equipamento || c.descricao || '',
           valor: parseFloat(c.valor || 0) || null,
-          quando, faseAtual: fase,
+          quando, dataConfiavel, faseAtual: fase,
           valorCombinadoPeloBot: !!c.valorCombinadoBot,
           falaDoCliente: falaCliente,
           registroDoBot: acao ? String(acao.texto || '').slice(0, 120) : '',

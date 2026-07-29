@@ -249,7 +249,9 @@ async function verAprovacoes(){
         +' <span style="font-size:9px;background:'+(a.sistema==='TV'?'#3b82f622;color:#60a5fa':'#f9731622;color:#fb923c')+';padding:1px 6px;border-radius:6px;font-weight:900;">'+a.sistema+'</span></b>'
         +'<span style="font-family:var(--fm,monospace);font-size:13px;color:#4ade80;font-weight:800;flex:0 0 auto;">'+(a.valor?'R$ '+Number(a.valor).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</span></div>'
       +'<div style="font-size:11px;color:#c9ced6;margin-top:2px;">'+esc(a.equipamento||'')+'</div>'
-      +'<div style="font-family:var(--fm,monospace);font-size:10px;color:#8b93a3;margin-top:2px;">🕐 '+quando+' · fase atual: '+esc(a.faseAtual)
+      +'<div style="font-family:var(--fm,monospace);font-size:11px;color:#4ade80;font-weight:700;margin-top:3px;">🕐 aprovado em '+quando
+        +(a.dataConfiavel===false?' <span style="color:#f59e0b;">(data aproximada)</span>':'')+'</div>'
+      +'<div style="font-family:var(--fm,monospace);font-size:10px;color:#8b93a3;margin-top:1px;">fase atual: '+esc(a.faseAtual)
         +(a.valorCombinadoPeloBot?' · <span style="color:#4ade80;">valor combinado na conversa</span>':'')+'</div>'
       +(a.falaDoCliente?'<div style="margin-top:5px;background:#0c1016;border-left:2px solid #4ade80;border-radius:0 7px 7px 0;padding:6px 9px;font-size:11.5px;color:#dbe1ea;">💬 "'+esc(a.falaDoCliente)+'"</div>':'')
     +'</div>';
@@ -448,13 +450,18 @@ async function loadKpis(){
   }
   try{
     var r=await fetch('/api/wa-bot?action=bot-stats&dias='+_kpiDias).then(function(x){return x.json();});
+    // Aprovações vêm da MESMA fonte do relatório, para o número do cartão bater com a lista
+    try{
+      var ra=await fetch('/api/wa-bot?action=aprovacoes-detalhe&dias='+_kpiDias).then(function(x){return x.json();});
+      if(ra&&ra.ok)window._aprovVivas=ra.total;
+    }catch(e){}
     if(!r.ok)return;
     var t=r.totais||{};
     var defs=[
       ['📨','Abordagens',t.abordagens||0,'#60a5fa'],
       ['🚚','P/ Logística',t.logistica||0,'#22c55e'],
       ['💰','Orçamentos',(window._orcVivos!=null?window._orcVivos:(t.orcamentos||0)),'#f59e0b'],
-      ['✅','Aprovações',t.aprovacoes||0,'#4ade80'],
+      ['✅','Aprovações',(window._aprovVivas!=null?window._aprovVivas:(t.aprovacoes||0)),'#4ade80'],
       ['🏪','Cliente Loja',t.cliente_loja||0,'#a78bfa'],
       ['📞','Entrar em Contato',t.entrar_contato||0,'#fb923c'],
       ['⚡','Conflitos Bot',t.conflitos||0,'#ef4444']
