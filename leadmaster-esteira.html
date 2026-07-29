@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<meta name="googlebot" content="noindex, nofollow">
+<title>Lead Master — Esteira de Produtos</title>
+<script>
+(function(){
+  if(location.pathname==='/login'||location.pathname==='/login.html')return;
+  var K=localStorage.getItem('tf_key');
+  if(!K){location.replace('/login?next='+encodeURIComponent(location.pathname));return;}
+})();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#07080a; --painel:#101319; --linha:#1e232c; --txt:#f0f2f5; --dim:#79828f;
+  --frio:#38bdf8; --morno:#fbbf24; --quente:#fb7185; --cliente:#4ade80;
+  --mono:ui-monospace,'SF Mono',Menlo,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--txt);font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  padding:16px;max-width:900px;margin:0 auto;padding-bottom:60px;-webkit-font-smoothing:antialiased;}
+h1{font-size:19px;font-weight:900;letter-spacing:-.5px;}
+.sub{font-size:12px;color:var(--dim);margin-top:3px;font-weight:600;}
+
+/* ── termômetro: a esteira inteira em uma barra ── */
+.termo{display:flex;height:8px;border-radius:99px;overflow:hidden;margin:16px 0 6px;}
+.termo i{flex:1;}
+.termo-lbl{display:flex;justify-content:space-between;font-size:9.5px;color:var(--dim);
+  font-weight:800;letter-spacing:.5px;margin-bottom:20px;}
+
+.fase{background:var(--painel);border:1px solid var(--linha);border-left:4px solid;
+  border-radius:14px;padding:15px;margin-bottom:12px;position:relative;}
+.fase-topo{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+.fase-num{font-family:var(--mono);font-size:10px;font-weight:800;opacity:.7;letter-spacing:1px;}
+.fase-nome{font-size:17px;font-weight:900;letter-spacing:-.3px;margin-top:2px;}
+.fase-oferta{font-size:13px;color:#c9ced6;margin-top:6px;line-height:1.5;}
+.preco{font-family:var(--mono);font-size:19px;font-weight:800;text-align:right;line-height:1.2;flex:0 0 auto;}
+.preco small{display:block;font-size:9.5px;color:var(--dim);font-weight:700;font-family:'Inter';letter-spacing:.3px;}
+.destino{display:inline-flex;align-items:center;gap:5px;margin-top:11px;font-family:var(--mono);
+  font-size:11px;background:#0c1016;border:1px solid var(--linha);border-radius:8px;
+  padding:6px 10px;color:#93c5fd;text-decoration:none;}
+.seta{text-align:center;color:#2c333f;font-size:15px;margin:-4px 0 8px;}
+.nota{background:var(--painel);border:1px solid var(--linha);border-radius:12px;
+  padding:12px 14px;font-size:11.5px;color:var(--dim);line-height:1.6;margin-top:18px;}
+.nota b{color:#c9ced6;}
+</style>
+</head>
+<body>
+
+<h1>🎯 Lead Master — Esteira de Produtos</h1>
+<div class="sub">Do anúncio frio ao cliente done-for-you · painel interno</div>
+
+<div class="termo">
+  <i style="background:var(--frio)"></i><i style="background:var(--morno)"></i>
+  <i style="background:var(--quente)"></i><i style="background:var(--cliente)"></i>
+</div>
+<div class="termo-lbl"><span>FRIO</span><span>MORNO</span><span>QUENTE</span><span>CLIENTE</span></div>
+
+<div class="fase" style="border-left-color:var(--frio)">
+  <div class="fase-topo">
+    <div>
+      <div class="fase-num" style="color:var(--frio)">FASE 1 · FRIO</div>
+      <div class="fase-nome">Anúncio no Instagram</div>
+      <div class="fase-oferta">Topo da esteira. Tráfego pago em teste, buscando o primeiro contato de quem ainda não conhece a solução.</div>
+    </div>
+    <div class="preco" style="color:var(--frio)">R$ 50–100<small>POR DIA · TESTE</small></div>
+  </div>
+</div>
+<div class="seta">▼</div>
+
+<div class="fase" style="border-left-color:var(--morno)">
+  <div class="fase-topo">
+    <div>
+      <div class="fase-num" style="color:var(--morno)">FASE 2 · MORNO</div>
+      <div class="fase-nome">Aula “Leads sem Google”</div>
+      <div class="fase-oferta">Produto de entrada, pagamento único. Order bump de R$ 27 no checkout.</div>
+    </div>
+    <div class="preco" style="color:var(--morno)">R$ 47<small>+ BUMP R$ 27</small></div>
+  </div>
+  <a class="destino" href="/leadmaster/">🔗 /leadmaster/</a>
+</div>
+<div class="seta">▼</div>
+
+<div class="fase" style="border-left-color:var(--quente)">
+  <div class="fase-topo">
+    <div>
+      <div class="fase-num" style="color:var(--quente)">FASE 3 · QUENTE</div>
+      <div class="fase-nome">Assinatura “Criativos da Semana”</div>
+      <div class="fase-oferta">Recorrência. Entrega contínua de criativos, mantendo o cliente ativo entre uma compra e outra.</div>
+    </div>
+    <div class="preco" style="color:var(--quente)">R$ 97<small>/MÊS · OU R$ 197/TRI</small></div>
+  </div>
+  <a class="destino" href="/leadmaster/upsell">🔗 /leadmaster/upsell</a>
+</div>
+<div class="seta">▼</div>
+
+<div class="fase" style="border-left-color:var(--cliente)">
+  <div class="fase-topo">
+    <div>
+      <div class="fase-num" style="color:var(--cliente)">FASE 4 · CLIENTE</div>
+      <div class="fase-nome">Done-for-you</div>
+      <div class="fase-oferta">Implantação completa: bot de atendimento + sistema de fichas. Setup mais mensalidade de manutenção.</div>
+    </div>
+    <div class="preco" style="color:var(--cliente)">R$ 4.997–6.997<small>SETUP + R$ 497–997/MÊS</small></div>
+  </div>
+  <a class="destino" href="/leadmaster/aplicacao">🔗 /leadmaster/aplicacao</a>
+</div>
+
+<div class="nota">
+  <b>Painel interno.</b> Protegido pelo mesmo acesso do TechFlow e marcado como <b>noindex</b> — não aparece em buscadores.
+  <br><br>
+  <b>Atenção:</b> as três páginas de destino (<span style="font-family:var(--mono)">/leadmaster/</span>,
+  <span style="font-family:var(--mono)">/leadmaster/upsell</span> e
+  <span style="font-family:var(--mono)">/leadmaster/aplicacao</span>) ainda não existem no sistema —
+  os links já apontam para os endereços certos e passam a funcionar quando as páginas forem criadas.
+</div>
+
+</body>
+</html>

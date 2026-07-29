@@ -123,6 +123,14 @@
   ],
   "rewrites": [
     {
+      "source": "/leadmaster/adm/",
+      "destination": "/leadmaster-esteira.html"
+    },
+    {
+      "source": "/leadmaster/adm",
+      "destination": "/leadmaster-esteira.html"
+    },
+    {
       "source": "/trafego",
       "destination": "/trafego.html"
     },
@@ -1432,6 +1440,19 @@
     {
       "source": "/trafego.html",
       "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/leadmaster-esteira.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
         {
           "key": "Cache-Control",
           "value": "no-cache, no-store, must-revalidate"
