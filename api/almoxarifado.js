@@ -67,8 +67,11 @@ export default async function handler(req, res) {
   function novaTarefa(t) {
     const num = db.config.proximoNum || 1;
     db.config.proximoNum = num + 1;
+    // sufixo aleatório: duas criações simultâneas liam o mesmo número e geravam IDs IGUAIS,
+    // fazendo foto e parecer irem para a tarefa errada (Lusiane x Joana com ALM-1116)
+    const suf = Math.random().toString(36).slice(2, 5).toUpperCase();
     return Object.assign({
-      id: 'ALM-' + String(num).padStart(4, '0'),
+      id: 'ALM-' + String(num).padStart(4, '0') + '-' + suf,
       criadoEm: new Date().toISOString(),
       status: 'pendente', feitoPor: '', feitoEm: null, motivoFalha: '',
     }, t);
@@ -249,6 +252,27 @@ export default async function handler(req, res) {
 
   // ── CONCLUIR tarefa (feito) ──
   // ── 🔵 CRIAR-ANALISE-COMPRA: duplicata do caso de compra para a equipe dar o parecer ──
+  // ── 🔧 REPARAR-IDS: corrige tarefas que ficaram com o mesmo identificador ──
+  if (action === 'reparar-ids') {
+    const dbR = (await dbGet(KEY)) || { tarefas: [] };
+    const vistos = new Set();
+    const trocadas = [];
+    for (const t of (dbR.tarefas || [])) {
+      if (!vistos.has(t.id)) { vistos.add(t.id); continue; }
+      const antigo = t.id;
+      const novo = t.id + '-' + Math.random().toString(36).slice(2, 5).toUpperCase();
+      t.id = novo;
+      trocadas.push({ cliente: t.cliente, equipamento: t.equipamento, de: antigo, para: novo });
+      vistos.add(novo);
+    }
+    if (String(req.query.aplicar || '') === '1' && trocadas.length) {
+      await dbSet(KEY, dbR);
+      return res.status(200).json({ ok: true, corrigidas: trocadas.length, trocadas });
+    }
+    return res.status(200).json({ ok: true, duplicadas: trocadas.length, trocadas,
+      dica: trocadas.length ? 'para corrigir: &aplicar=1' : 'nenhum identificador duplicado' });
+  }
+
   // ── 🩺 DIAGNOSTICO-COMPRA: a cadeia da análise de compra, ponta a ponta ──
   if (action === 'diagnostico-compra') {
     const [dbC, pros] = await Promise.all([dbGet(KEY), dbGet('prospeccao_adm')]);
@@ -342,6 +366,11 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST' && action === 'concluir') {
     const { id, feitoPor, modelo } = req.body || {};
+    try {
+      const iguais = (db.tarefas || []).filter(x => x.id === id);
+      if (iguais.length > 1) return res.status(409).json({ ok: false,
+        error: 'identificador duplicado no sistema — rode reparar-ids antes de continuar' });
+    } catch (e) {}
     const t = db.tarefas.find(x => x.id === id);
     if (!t) return res.status(404).json({ ok: false, error: 'tarefa não encontrada' });
     if (t.tipo === 'receber') {
@@ -679,6 +708,12 @@ export default async function handler(req, res) {
 
   // ── FOTO do recebimento (base64 comprimido no front) ──
   if (req.method === 'POST' && action === 'foto') {
+    // segurança: se o id estiver duplicado, não adivinha — avisa
+    try {
+      const iguais = (db.tarefas || []).filter(x => x.id === (req.body || {}).id);
+      if (iguais.length > 1) return res.status(409).json({ ok: false,
+        error: 'identificador duplicado no sistema — rode reparar-ids antes de continuar' });
+    } catch (e) {}
     try { const mm = (req.body || {}).modelo; if (mm) { const tf = db.tarefas.find(x => x.id === (req.body || {}).id); if (tf) { tf.modelo = String(mm).trim(); } } } catch (e) {}
     const { id, dataUrl } = req.body || {};
     const t = db.tarefas.find(x => x.id === id);
