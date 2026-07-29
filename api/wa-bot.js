@@ -178,14 +178,20 @@ async function garantirAprovacao(d8) {
     }
   } else passos.push('board técnico: ✅');
 
-  // 4) ALMOXARIFADO — cria a tarefa direto, sem depender do sync
-  const alm = (await dbGet('reparoeletro_almoxarifado')) || { tarefas: [] };
-  const temTarefa = ((alm.tarefas) || []).some(t => t.cardId === aprovado.id && t.destino === 'aprovados');
-  if (!temTarefa) {
-    const r = await post('almoxarifado', 'criar-mover', { cardId: aprovado.id, destino: 'aprovados',
-      cliente: aprovado.nomeContato || '', tel: aprovado.telefone || '', equipamento: aprovado.equipamento || '' });
-    passos.push('almoxarifado: criado ' + (r && r.ok ? '✅' : '⚠️ ' + (r.error || '')));
-  } else passos.push('almoxarifado: ✅');
+  // 4) ALMOXARIFADO — SOMENTE ADM. TV tem separação própria e não entra aqui.
+  if (ehTv) {
+    passos.push('almoxarifado: não se aplica (TV tem fluxo próprio)');
+  } else {
+    const alm = (await dbGet('reparoeletro_almoxarifado')) || { tarefas: [] };
+    // só tarefa PENDENTE conta — uma antiga já concluída não pode bloquear a nova
+    const temTarefa = ((alm.tarefas) || []).some(t => t.cardId === aprovado.id &&
+      t.destino === 'aprovados' && t.status === 'pendente');
+    if (!temTarefa) {
+      const r = await post('almoxarifado', 'criar-mover', { cardId: aprovado.id, destino: 'aprovados',
+        cliente: aprovado.nomeContato || '', tel: aprovado.telefone || '', equipamento: aprovado.equipamento || '' });
+      passos.push('almoxarifado: criado ' + (r && r.ok && !r.dedupe ? '✅' : (r && r.dedupe ? 'já existia' : '⚠️ ' + (r.error || ''))));
+    } else passos.push('almoxarifado: já pendente ✅');
+  }
 
   return { ok: true, sistema: sis, cardId: aprovado.id, passos };
 }

@@ -249,10 +249,34 @@ export default async function handler(req, res) {
 
   // ── CONCLUIR tarefa (feito) ──
   // ── 🔵 CRIAR-ANALISE-COMPRA: duplicata do caso de compra para a equipe dar o parecer ──
+  // ── 🧹 LIMPAR-TAREFAS-TV: remove do almoxarifado ADM tarefas de cards de TV ──
+  if (action === 'limpar-tarefas-tv') {
+    const [db2, ppTv2] = await Promise.all([dbGet(KEY), dbGet('tv_pipe')]);
+    const idsTv = new Set((((ppTv2 || {}).cards) || []).map(c => c.id));
+    const alvo = (((db2 || {}).tarefas) || []).filter(t => idsTv.has(t.cardId) && t.status === 'pendente');
+    if (String(req.query.aplicar || '') === '1' && alvo.length) {
+      const ids = new Set(alvo.map(t => t.id));
+      db2.tarefas = db2.tarefas.filter(t => !ids.has(t.id));
+      await dbSet(KEY, db2);
+      return res.status(200).json({ ok: true, removidas: alvo.length,
+        lista: alvo.map(t => t.cliente + ' | ' + (t.equipamento || '')) });
+    }
+    return res.status(200).json({ ok: true, encontradas: alvo.length,
+      lista: alvo.map(t => t.cliente + ' | ' + (t.equipamento || '') + ' | ' + t.destino),
+      dica: 'para remover: &aplicar=1' });
+  }
+
   // ── 🔁 CRIAR-MOVER: recria a tarefa de movimentação que o gatilho perdeu ──
   if (req.method === 'POST' && action === 'criar-mover') {
     const b = req.body || {};
     if (!b.cardId || !b.destino) return res.status(400).json({ ok: false, error: 'cardId e destino obrigatórios' });
+    // 🚫 TV não entra no almoxarifado do ADM — tem separação própria
+    try {
+      const ppTv = (await dbGet('tv_pipe')) || { cards: [] };
+      if (((ppTv.cards) || []).some(c => c.id === b.cardId)) {
+        return res.status(200).json({ ok: true, ignorado: true, motivo: 'card de TV não entra no almoxarifado ADM' });
+      }
+    } catch (e) {}
     const dbM = (await dbGet(KEY)) || defaultDB();
     if (!Array.isArray(dbM.tarefas)) dbM.tarefas = [];
     if (!dbM.config) dbM.config = { proximoNum: 1 };
