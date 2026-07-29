@@ -238,7 +238,8 @@ async function verAprovacoes(){
     +'<button onclick="document.getElementById(\'ov-aprov\').remove()" style="background:#242b39;border:none;border-radius:8px;padding:6px 12px;color:#f0f2f5;font-weight:800;cursor:pointer;">✕</button></div>'
     +'<div style="background:#0c1016;border-radius:9px;padding:10px 12px;margin-bottom:12px;font-family:var(--fm,monospace);font-size:12px;">'
       +'<b style="color:#4ade80;font-size:16px;">'+r.total+'</b> aprovações · <b style="color:#4ade80;">R$ '+Number(r.valorTotal||0).toLocaleString('pt-BR',{minimumFractionDigits:2})+'</b>'
-      +'<div style="color:#8b93a3;font-size:10.5px;margin-top:3px;">'+Object.keys(ps).map(function(k){return ps[k]+' '+k;}).join(' · ')+'</div></div>';
+      +'<div style="color:#8b93a3;font-size:10.5px;margin-top:3px;">'+Object.keys(ps).map(function(k){return ps[k]+' '+k;}).join(' · ')+'</div>'
+      +'<div style="color:#5a6270;font-size:10px;margin-top:5px;line-height:1.4;">Este relatório mostra <b>todas</b> as aprovações do período — as do bot e as feitas pela equipe direto no pipe. O número do cartão conta apenas as do bot, por isso é menor.</div></div>';
   if(!r.aprovacoes.length){corpo+='<div style="color:#8b93a3;text-align:center;padding:20px;font-size:12.5px;">Nenhuma aprovação neste período.</div>';}
   corpo+=r.aprovacoes.map(function(a){
     var dt=new Date(a.quando);
@@ -450,18 +451,14 @@ async function loadKpis(){
   }
   try{
     var r=await fetch('/api/wa-bot?action=bot-stats&dias='+_kpiDias).then(function(x){return x.json();});
-    // Aprovações vêm da MESMA fonte do relatório, para o número do cartão bater com a lista
-    try{
-      var ra=await fetch('/api/wa-bot?action=aprovacoes-detalhe&dias='+_kpiDias).then(function(x){return x.json();});
-      if(ra&&ra.ok)window._aprovVivas=ra.total;
-    }catch(e){}
+
     if(!r.ok)return;
     var t=r.totais||{};
     var defs=[
       ['📨','Abordagens',t.abordagens||0,'#60a5fa'],
       ['🚚','P/ Logística',t.logistica||0,'#22c55e'],
       ['💰','Orçamentos',(window._orcVivos!=null?window._orcVivos:(t.orcamentos||0)),'#f59e0b'],
-      ['✅','Aprovações',(window._aprovVivas!=null?window._aprovVivas:(t.aprovacoes||0)),'#4ade80'],
+      ['✅','Aprovações',t.aprovacoes||0,'#4ade80'],
       ['🏪','Cliente Loja',t.cliente_loja||0,'#a78bfa'],
       ['📞','Entrar em Contato',t.entrar_contato||0,'#fb923c'],
       ['⚡','Conflitos Bot',t.conflitos||0,'#ef4444']
