@@ -378,7 +378,7 @@ let records = [], goals = null, phaseCounts = {}, todayLabel = '', weekLabel = '
 let selId = null, curPage = 'painel';
 
 // ── API ──────────────────────────────────────────────────────
-async async function api(action, body) {
+async function api(action, body) {
   const r = await fetch(`/api/tv-financeiro?action=${action}`, body ? {
     method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
   } : {});
@@ -549,10 +549,10 @@ function cardHTML(r, color) {
 function buildActions(r) {
   let h = '';
   // Botão Editar Ficha — sempre disponível
-  h += '<button class="btn-secondary" style="font-size:10px;padding:5px 10px;" onclick="abrirEditarFin('' + r.id + '')">✏️ Editar</button>';
+  h += '<button class="btn-secondary" style="font-size:10px;padding:5px 10px;" onclick="abrirEditarFin(\' + r.id + \')">✏️ Editar</button>';
   // Botão Gerar Cobrança MP — nas fases de pagamento
   if (['faturamento','pagamento_agendado','nf_emitida'].includes(r.phaseId))
-    h += '<button class="btn-primary" style="background:#f97316;color:#fff;" onclick="abrirModalCobranca('' + r.id + '')">💳 Gerar Cobrança MP</button>';
+    h += '<button class="btn-primary" style="background:#f97316;color:#fff;" onclick="abrirModalCobranca(\' + r.id + \')">💳 Gerar Cobrança MP</button>';
   if (r.phaseId==='aguardando_dados')
     h += `<button class="btn-primary" style="background:var(--accent);color:#000;" onclick="openNfModal('${r.id}')">📋 Informar CPF / CNPJ</button>`;
   if (r.phaseId==='nf_emitida') {
@@ -1105,8 +1105,8 @@ function verAnexo(id) {
 var mpRecId = null, mpMetodo = null;
 var relTab = 'dia';
 var relDados = null;
-var goals = null;
-var phaseCounts = {};
+// goals e phaseCounts já são declarados no topo do arquivo (let) — redeclarar aqui
+// quebrava o bloco inteiro com "Identifier 'goals' has already been declared".
 
 
 function dfBRT(ts) {

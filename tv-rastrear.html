@@ -222,7 +222,7 @@ function buildCard(r) {
     ? '<div style="font-size:11px;color:#7a8ba0;margin-top:5px;line-height:1.6">' + diagParts.join('  ·  ') + '</div>'
     : '';
 
-  return '<div class="result" onclick='irPara(' + JSON.stringify(r.url) + ',' + JSON.stringify(r.tipo) + ',' + JSON.stringify(r.id) + ')'>' +
+  return '<div class="result" onclick="irPara(' + JSON.stringify(r.url) + ',' + JSON.stringify(r.tipo) + ',' + JSON.stringify(r.id) + ')">' +
     '<div class="' + iconClass + '">' + TIPO_ICON[r.tipo] + '</div>' +
     '<div class="result-body">' +
       '<div class="result-label">' + esc(r.label) + '</div>' +
