@@ -627,6 +627,59 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, feitos });
   }
 
+  // ── 📄 APROVACOES-DETALHE: relatório das fichas aprovadas no período ──
+  if (action === 'aprovacoes-detalhe') {
+    const dias = Math.min(365, Math.max(1, parseInt(req.query.dias || '1', 10)));
+    const corte = Date.now() - dias * 86400000;
+    const [ppA, ppT, evts, fin] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), lerEvts(), dbGet('reparoeletro_financeiro'),
+    ]);
+    const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const APROV = ['aprovados', 'video_enviado', 'analise_compra', 'programar_entrega',
+      'receber', 'erp', 'finalizado', 'entrega_agendada', 'entrega_liberada'];
+    // última fala do cliente e do bot antes/depois da aprovação
+    const porTel = {};
+    for (const e of evts) {
+      const d = d8f(e.tel); if (d.length < 8) continue;
+      (porTel[d] = porTel[d] || []).push(e);
+    }
+    const lista = [];
+    for (const [banco, sis] of [[ppA, 'ADM'], [ppT, 'TV']]) {
+      for (const c of (((banco || {}).cards) || [])) {
+        const fase = c.phaseId || c.phase || '';
+        if (!APROV.includes(fase)) continue;
+        // momento em que entrou em aprovados
+        const hist = (c.history || []).find(x => String(x.phaseId || x.phase || '') === 'aprovados');
+        const quando = (hist && (hist.ts || hist.timestamp)) || c.movedAt || c.criadoEm;
+        const t = new Date(quando || 0).getTime();
+        if (!t || t < corte) continue;
+        const d = d8f(c.telefone);
+        const msgs = porTel[d] || [];
+        // o que o cliente disse por último antes de aprovar
+        const antes = msgs.filter(m => m.dir === 'in' && new Date(m.ts || 0).getTime() <= t);
+        const falaCliente = antes.length ? String(antes[antes.length - 1].texto || '').slice(0, 110) : '';
+        // combinado registrado pelo bot (ação com motivo)
+        const acao = msgs.filter(m => m.dir === 'acao' && /aprovado|mover_aprovado/i.test(String(m.texto || '')))
+          .slice(-1)[0];
+        lista.push({
+          sistema: sis, nome: c.nomeContato || '—', telefone: c.telefone || '',
+          equipamento: c.equipamento || c.descricao || '',
+          valor: parseFloat(c.valor || 0) || null,
+          quando, faseAtual: fase,
+          valorCombinadoPeloBot: !!c.valorCombinadoBot,
+          falaDoCliente: falaCliente,
+          registroDoBot: acao ? String(acao.texto || '').slice(0, 120) : '',
+        });
+      }
+    }
+    lista.sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
+    const total = lista.reduce((s, x) => s + (x.valor || 0), 0);
+    return res.status(200).json({ ok: true, periodoDias: dias,
+      total: lista.length, valorTotal: Number(total.toFixed(2)),
+      porSistema: lista.reduce((o, x) => { o[x.sistema] = (o[x.sistema] || 0) + 1; return o; }, {}),
+      aprovacoes: lista.slice(0, 200) });
+  }
+
   // ── 📋 QUEM-RECEBEU-RETROATIVA: lista e conta as mensagens do disparo retroativo ──
   if (action === 'quem-recebeu-retroativa') {
     const evtsR = await lerEvts();
