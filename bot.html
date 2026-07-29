@@ -239,7 +239,18 @@ async function verAprovacoes(){
     +'<div style="background:#0c1016;border-radius:9px;padding:10px 12px;margin-bottom:12px;font-family:var(--fm,monospace);font-size:12px;">'
       +'<b style="color:#4ade80;font-size:16px;">'+r.total+'</b> aprovações · <b style="color:#4ade80;">R$ '+Number(r.valorTotal||0).toLocaleString('pt-BR',{minimumFractionDigits:2})+'</b>'
       +'<div style="color:#8b93a3;font-size:10.5px;margin-top:3px;">'+Object.keys(ps).map(function(k){return ps[k]+' '+k;}).join(' · ')+'</div>'
-      +'<div style="color:#5a6270;font-size:10px;margin-top:5px;line-height:1.4;">Este relatório mostra <b>todas</b> as aprovações do período — as do bot e as feitas pela equipe direto no pipe. O número do cartão conta apenas as do bot, por isso é menor.</div></div>';
+      +(function(){
+        var po=r.porOrigem||{};
+        var b=po.bot||0,eq=po.equipe||0,ind=po.indefinido||0;
+        var pct=r.total?Math.round(b/r.total*100):0;
+        return '<div style="margin-top:7px;padding-top:7px;border-top:1px solid #1e232c;font-size:11px;">'
+          +'<span style="color:#4ade80;font-weight:800;">🤖 '+b+' pelo bot</span>'
+          +' · <span style="color:#a78bfa;font-weight:800;">👤 '+eq+' pela equipe</span>'
+          +(ind?' · <span style="color:#8b93a3;">'+ind+' sem registro de origem</span>':'')
+          +(r.total?'<div style="color:#5a6270;font-size:10px;margin-top:3px;">o bot fechou '+pct+'% das aprovações do período</div>':'')
+        +'</div>';
+      })()
+      +'<div style="color:#5a6270;font-size:10px;margin-top:5px;line-height:1.4;">O número do cartão conta apenas as do bot. Aprovações anteriores ao registro de origem aparecem como <i>sem registro</i>.</div></div>';
   if(!r.aprovacoes.length){corpo+='<div style="color:#8b93a3;text-align:center;padding:20px;font-size:12.5px;">Nenhuma aprovação neste período.</div>';}
   corpo+=r.aprovacoes.map(function(a){
     var dt=new Date(a.quando);
@@ -247,7 +258,9 @@ async function verAprovacoes(){
     return '<div style="border-top:1px solid #1e232c;padding:9px 0;">'
       +'<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;">'
         +'<b style="font-size:13px;">'+esc(a.nome)+' <span style="font-size:10px;color:#5a8dc9;">'+String(a.telefone||'').slice(-4)+'</span>'
-        +' <span style="font-size:9px;background:'+(a.sistema==='TV'?'#3b82f622;color:#60a5fa':'#f9731622;color:#fb923c')+';padding:1px 6px;border-radius:6px;font-weight:900;">'+a.sistema+'</span></b>'
+        +' <span style="font-size:9px;background:'+(a.sistema==='TV'?'#3b82f622;color:#60a5fa':'#f9731622;color:#fb923c')+';padding:1px 6px;border-radius:6px;font-weight:900;">'+a.sistema+'</span>'
+        +(a.origem==='bot'?' <span style="font-size:9px;background:#4ade8022;color:#4ade80;padding:1px 6px;border-radius:6px;font-weight:900;">🤖 BOT</span>'
+          :(a.origem==='equipe'?' <span style="font-size:9px;background:#a78bfa22;color:#a78bfa;padding:1px 6px;border-radius:6px;font-weight:900;">👤 EQUIPE</span>':''))+'</b>'
         +'<span style="font-family:var(--fm,monospace);font-size:13px;color:#4ade80;font-weight:800;flex:0 0 auto;">'+(a.valor?'R$ '+Number(a.valor).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</span></div>'
       +'<div style="font-size:11px;color:#c9ced6;margin-top:2px;">'+esc(a.equipamento||'')+'</div>'
       +'<div style="font-family:var(--fm,monospace);font-size:11px;color:#4ade80;font-weight:700;margin-top:3px;">🕐 aprovado em '+quando

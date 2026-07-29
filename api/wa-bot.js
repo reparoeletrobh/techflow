@@ -135,7 +135,7 @@ async function garantirAprovacao(d8) {
     if (cT) { card = cT; api = 'tv-pipe'; sis = 'tv'; }
   }
   if (card) {
-    const r = await post(api, 'mover', { id: card.id, phase: 'aprovados' });
+    const r = await post(api, 'mover', { id: card.id, phase: 'aprovados', por: 'bot' });
     passos.push(api + ' mover: ' + (r && !r.error ? 'ok' : 'FALHOU ' + (r.error || '')));
   }
 
@@ -675,6 +675,12 @@ export default async function handler(req, res) {
           valor: (c.valorNaAprovacao != null ? c.valorNaAprovacao : (parseFloat(c.valor || 0) || null)),
           valorAtual: parseFloat(c.valor || 0) || null,
           aprovadoPor: c.aprovadoPor || null,
+          origem: (function () {
+            const p = String(c.aprovadoPor || '').toLowerCase();
+            if (p === 'bot' || c.valorCombinadoBot) return 'bot';
+            if (!c.aprovadoEm) return 'indefinido';        // card antigo, sem carimbo
+            return 'equipe';
+          })(),
           quando, dataConfiavel, faseAtual: fase,
           valorCombinadoPeloBot: !!c.valorCombinadoBot,
           falaDoCliente: falaCliente,
@@ -687,6 +693,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, periodoDias: dias,
       total: lista.length, valorTotal: Number(total.toFixed(2)),
       porSistema: lista.reduce((o, x) => { o[x.sistema] = (o[x.sistema] || 0) + 1; return o; }, {}),
+      porOrigem: lista.reduce((o, x) => { o[x.origem] = (o[x.origem] || 0) + 1; return o; }, {}),
       aprovacoes: lista.slice(0, 200) });
   }
 
