@@ -659,9 +659,22 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: 'foto ausente ou grande demais' });
     }
     await dbSet('alm_foto_' + t.cardId, { em: new Date().toISOString(), img: dataUrl });
-    t.temFoto = true;
-    await dbSet(KEY, db);
-    return res.status(200).json({ ok: true });
+    // SAVE ATÔMICO: relê e marca só esta tarefa (o sync roda em paralelo)
+    const dbF = (await dbGet(KEY)) || db;
+    const tF = (dbF.tarefas || []).find(x => x.id === id);
+    if (tF) { tF.temFoto = true; if ((req.body || {}).modelo) tF.modelo = String((req.body || {}).modelo).trim(); }
+    await dbSet(KEY, dbF);
+    // Se for análise de compra, avisa o card do Conflitos Bot que a foto chegou
+    if (t.tipo === 'avaliar-compra' && t.origemConflito) {
+      try {
+        const KFC = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+        await fetch(`https://reparoeletroadm.com/api/prospeccao?action=marcar-foto&k=${KFC}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: t.origemConflito, cardId: t.cardId }),
+        });
+      } catch (e) {}
+    }
+    return res.status(200).json({ ok: true, temFoto: true });
   }
 
   // ── VER-FOTO ──

@@ -884,6 +884,17 @@ export default async function handler(req,res){
     return res.status(200).json({ok:true,card:card.id});
   }
   // ── 🔵 MARCAR-RECOMENDACAO: parecer do almoxarifado volta para o card de Análise de Compra ──
+  // ── 📷 MARCAR-FOTO: a foto da análise de compra chegou pelo almoxarifado ──
+  if(req.method==='POST'&&action==='marcar-foto'){
+    const {id,cardId}=req.body||{};
+    const db=(await dbGet(KEY))||{fichas:[]};
+    const f=(db.fichas||[]).find(x=>x.id===id);
+    if(!f)return res.status(404).json({ok:false,error:'conflito não encontrado'});
+    f.temFoto=true; if(cardId)f.cardId=cardId;
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true});
+  }
+
   if(req.method==='POST'&&action==='marcar-recomendacao'){
     const {id,parecer,preco,por}=req.body||{};
     const db=(await dbGet(KEY))||{fichas:[]};

@@ -365,7 +365,8 @@ function render(){
         }else{
           html+='<div style="margin:6px 0;padding:8px 9px;background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.45);border-radius:7px;font-size:11.5px;color:#fb923c;font-weight:800;">📷 SEM FOTO — tire a foto do equipamento para a análise'
             +'<label style="display:block;margin-top:6px;background:#1f2937;border-radius:7px;padding:7px;text-align:center;color:#e5e7eb;cursor:pointer;font-weight:900;">📸 Tirar foto agora'
-            +'<input type="file" accept="image/*" capture="environment" style="display:none;" onchange="enviarFoto(\''+t.id+'\',this)"></label></div>';
+            +'<input type="file" accept="image/*" capture="environment" style="display:none;" onchange="enviarFoto(\''+t.id+'\',this)"></label>'
+            +'<div id="foto-status-'+t.id+'" style="font-size:10.5px;margin-top:5px;color:#8b93a3;"></div></div>';
         }
         if(t.obs)html+='<div class="eq" style="font-size:11px;color:#8b93a3;">📝 '+esc(t.obs)+'</div>';
         html+='<div class="acts">'+
@@ -448,24 +449,58 @@ function comprimirImg(file,mx,q){
     img.src=URL.createObjectURL(file);
   });
 }
-function enviarFoto(id,input){
+async function enviarFoto(id,input){
   var file=input.files&&input.files[0];
-  if(!file)return;
-  var img=new Image();
-  img.onload=function(){
-    var mx=640;
-    var w=img.width,h=img.height;
-    if(w>h&&w>mx){h=h*mx/w;w=mx;}else if(h>mx){w=w*mx/h;h=mx;}
-    var cv=document.createElement('canvas');cv.width=w;cv.height=h;
-    cv.getContext('2d').drawImage(img,0,0,w,h);
-    var dataUrl=cv.toDataURL('image/jpeg',0.55);
+  if(!file){alert('Nenhuma foto selecionada.');return;}
+  var aviso=document.getElementById('foto-status-'+id);
+  var diz=function(t,cor){ if(aviso){aviso.textContent=t;aviso.style.color=cor||'#8b93a3';} };
+  diz('📤 processando a foto…','#60a5fa');
+  try{
+    var dataUrl=await comprimirFoto(file);
+    if(!dataUrl){diz('❌ não consegui ler esta imagem. Tente tirar de novo pela câmera.','#f87171');return;}
+    // se ainda estiver grande, comprime mais até caber
+    var q=0.55;
+    while(dataUrl.length>230000&&q>0.25){ q-=0.1; dataUrl=await comprimirFoto(file,q); }
+    if(dataUrl.length>230000){diz('❌ foto muito pesada mesmo após compressão. Tire de mais longe.','#f87171');return;}
     var modInp=document.getElementById('mod-'+id);
-    fetch('/api/almoxarifado?action=foto',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({id:id,dataUrl:dataUrl,modelo:(modInp&&modInp.value)||''})}).then(function(x){return x.json();}).then(function(r){
-        if(r.ok){load();}else alert('Erro na foto: '+(r.error||'falha'));
-      });
-  };
-  img.src=URL.createObjectURL(file);
+    diz('📤 enviando…','#60a5fa');
+    var r=await fetch('/api/almoxarifado?action=foto',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:id,dataUrl:dataUrl,modelo:(modInp&&modInp.value)||''})}).then(function(x){return x.json();});
+    if(r&&r.ok){diz('✅ foto salva!','#4ade80');setTimeout(load,600);}
+    else diz('❌ '+((r&&r.error)||'falha ao salvar'),'#f87171');
+  }catch(e){ diz('❌ erro: '+(e.message||e),'#f87171'); }
+}
+// leitura robusta: tenta decodificar de duas formas (celulares antigos e iPhone falham na primeira)
+function comprimirFoto(file,qual){
+  var q=qual||0.55;
+  return new Promise(function(resolve){
+    var finalizado=false;
+    var pronto=function(bmpOuImg,w0,h0){
+      if(finalizado)return; finalizado=true;
+      try{
+        var mx=640,w=w0,h=h0;
+        if(w>h&&w>mx){h=h*mx/w;w=mx;}else if(h>mx){w=w*mx/h;h=mx;}
+        var cv=document.createElement('canvas');cv.width=w;cv.height=h;
+        cv.getContext('2d').drawImage(bmpOuImg,0,0,w,h);
+        resolve(cv.toDataURL('image/jpeg',q));
+      }catch(e){resolve(null);}
+    };
+    // caminho 1: createImageBitmap (funciona com HEIC em vários aparelhos)
+    if(window.createImageBitmap){
+      createImageBitmap(file).then(function(bmp){pronto(bmp,bmp.width,bmp.height);}).catch(function(){});
+    }
+    // caminho 2: FileReader + Image
+    var rd=new FileReader();
+    rd.onload=function(){
+      var img=new Image();
+      img.onload=function(){pronto(img,img.width,img.height);};
+      img.onerror=function(){ if(!finalizado){finalizado=true;resolve(null);} };
+      img.src=rd.result;
+    };
+    rd.onerror=function(){ if(!finalizado){finalizado=true;resolve(null);} };
+    rd.readAsDataURL(file);
+    setTimeout(function(){ if(!finalizado){finalizado=true;resolve(null);} },15000);
+  });
 }
 async function verFoto(cardId){
   var r=await fetch('/api/almoxarifado?action=ver-foto&cardId='+encodeURIComponent(cardId)).then(function(x){return x.json();});
