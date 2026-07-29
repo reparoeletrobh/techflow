@@ -592,6 +592,52 @@ export default async function handler(req, res) {
       listaCards: entraram });
   }
 
+  // ── ✅ APROVAR-CLIENTE: aprova pelo telefone, achando o card em qualquer sistema ──
+  if (action === 'aprovar-cliente') {
+    const tel = String(req.query.tel || '').replace(/\D/g, '');
+    if (tel.length < 4) return res.status(400).json({ ok: false, error: 'informe ?tel= com 4+ dígitos finais' });
+    const KAC = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+    const [ppA, ppT, tvLog] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('tv_logistica'),
+    ]);
+    const bate = t => String(t || '').replace(/\D/g, '').endsWith(tel);
+    const faseDe = c => c.phaseId || c.phase || '';
+    const NEGOC = ['aguardando_aprovacao', 'ultima_chamada'];
+    const candidatos = [];
+    for (const c of (((ppA || {}).cards) || [])) if (bate(c.telefone))
+      candidatos.push({ tipo: 'card', api: 'pipe', id: c.id, nome: c.nomeContato, equip: c.equipamento, fase: faseDe(c), valor: c.valor });
+    for (const c of (((ppT || {}).cards) || [])) if (bate(c.telefone))
+      candidatos.push({ tipo: 'card', api: 'tv-pipe', id: c.id, nome: c.nomeContato, equip: c.equipamento, fase: faseDe(c), valor: c.valor });
+    for (const f of (((tvLog || {}).fichas) || [])) if (bate(f.telefone))
+      candidatos.push({ tipo: 'ficha-tv', api: 'tv-logistica', id: f.id, nome: f.nome, equip: f.equipamento, fase: f.phase });
+    if (!candidatos.length) return res.status(404).json({ ok: false, error: 'nada encontrado para este telefone' });
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        encontrados: candidatos.map(c => c.tipo + ' | ' + c.api + ' | ' + (c.nome || '') + ' | ' + (c.equip || '') + ' | fase: ' + c.fase),
+        dica: 'para aprovar: &aplicar=1' });
+    }
+    const feitos = [], erros = [];
+    // prioriza a ficha de TV com orçamento (caminho oficial), senão o card em negociação
+    const fichaTv = candidatos.find(c => c.tipo === 'ficha-tv' && ['orc_enviado', 'orc_registrado'].includes(c.fase));
+    if (fichaTv) {
+      const r = await fetch(`https://reparoeletroadm.com/api/tv-logistica?action=aprovar-orcamento&k=${KAC}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: fichaTv.id }),
+      }).then(x => x.json()).catch(e => ({ error: e.message }));
+      (r && !r.error ? feitos : erros).push('TV via logística: ' + (fichaTv.nome || '') + (r && r.error ? ' — ' + r.error : ''));
+    }
+    for (const c of candidatos.filter(x => x.tipo === 'card' && NEGOC.includes(x.fase))) {
+      const r = await fetch(`https://reparoeletroadm.com/api/${c.api}?action=mover&k=${KAC}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: c.id, phase: 'aprovados' }),
+      }).then(x => x.json()).catch(e => ({ error: e.message }));
+      (r && !r.error ? feitos : erros).push(c.api + ': ' + (c.nome || '') + ' → aprovados' + (r && r.error ? ' — ' + r.error : ''));
+    }
+    if (!feitos.length && !erros.length) {
+      return res.status(200).json({ ok: false, error: 'nenhum card em negociação para aprovar',
+        situacaoAtual: candidatos.map(c => c.api + ': ' + c.fase) });
+    }
+    return res.status(200).json({ ok: erros.length === 0, feitos, erros });
+  }
+
   // ── ▶️ APROVAR-PENDENTES: dispara o gatilho de quem já aprovou e avisa o cliente ──
   if (action === 'aprovar-pendentes') {
     const KTF = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
