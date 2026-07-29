@@ -558,10 +558,10 @@ export default async function handler(req, res) {
     }
     if (req.query.aplicar === '1') {
       for (const f of faltam) {
-        const c = (pdb.cards || []).find(x => x.id === f.id);
-        db.tarefas.unshift(novaTarefa({ tipo: 'mover', cardId: c.id,
-          cliente: c.nomeContato || '—', tel: c.telefone || '', equipamento: c.equipamento || '',
-          origem: 'aguardando_aprovacao', destino: c.phase }));
+        // usa os dados já resolvidos na varredura — cobre ADM e TV, e a fase vem correta
+        db.tarefas.unshift(novaTarefa({ tipo: 'mover', cardId: f.id,
+          cliente: f.cliente || '—', tel: f.tel || '', equipamento: f.equipamento || '',
+          origem: 'aguardando_aprovacao', destino: f.fase, reconciliada: true }));
       }
       await dbSet(KEY, db);
       return res.status(200).json({ ok: true, recriadas: faltam.length, lista: faltam });
