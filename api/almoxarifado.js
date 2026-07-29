@@ -526,7 +526,7 @@ export default async function handler(req, res) {
         if (c) {
           db.tarefas.unshift(novaTarefa({ tipo: 'mover', cardId: c.id,
             cliente: c.nomeContato || '—', tel: c.telefone || '', equipamento: c.equipamento || '',
-            origem: 'aguardando_aprovacao', destino: c.phase }));
+            origem: 'aguardando_aprovacao', destino: c.fase || c.phase }));
           recriada = c.id + ' (' + (c.nomeContato || '') + ' → ' + c.phase + ')';
         }
       } catch (e) {}
