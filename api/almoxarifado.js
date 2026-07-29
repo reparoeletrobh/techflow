@@ -249,6 +249,34 @@ export default async function handler(req, res) {
 
   // ── CONCLUIR tarefa (feito) ──
   // ── 🔵 CRIAR-ANALISE-COMPRA: duplicata do caso de compra para a equipe dar o parecer ──
+  // ── 🩺 DIAGNOSTICO-COMPRA: a cadeia da análise de compra, ponta a ponta ──
+  if (action === 'diagnostico-compra') {
+    const [dbC, pros] = await Promise.all([dbGet(KEY), dbGet('prospeccao_adm')]);
+    const tarefas = (((dbC || {}).tarefas) || []).filter(t => t.tipo === 'avaliar-compra');
+    const conflitos = (((pros || {}).fichas) || []).filter(f => f.status === 'conflitos_bot' && f.analiseCompra);
+    const detalhe = [];
+    for (const t of tarefas) {
+      const foto = t.cardId ? await dbGet('alm_foto_' + t.cardId) : null;
+      detalhe.push({
+        tarefa: t.id, cliente: t.cliente, equipamento: t.equipamento,
+        status: t.status, temFotoNaTarefa: !!t.temFoto,
+        cardId: t.cardId || '(vazio)',
+        fotoGravadaNoBanco: !!(foto && foto.img),
+        tamanhoFoto: foto && foto.img ? Math.round(foto.img.length / 1024) + 'KB' : '—',
+        ligadaAoConflito: t.origemConflito || '(sem vínculo)',
+        parecer: t.parecer || '(pendente)',
+      });
+    }
+    return res.status(200).json({ ok: true,
+      tarefasAvaliarCompra: tarefas.length,
+      conflitosAnaliseCompra: conflitos.length,
+      pendentes: tarefas.filter(t => t.status === 'pendente').length,
+      cadaTarefa: detalhe,
+      conflitosNaProspeccao: conflitos.map(c => c.nome + ' | ' + (c.equipamento || '') + ' | foto:' + (c.temFoto ? 'sim' : 'não') +
+        ' | parecer:' + (c.recomendacaoCompra ? c.recomendacaoCompra.parecer : 'pendente')),
+      leitura: 'se tarefasAvaliarCompra=0 o problema é na CRIAÇÃO; se cardId estiver vazio a FOTO não tem onde ser gravada' });
+  }
+
   // ── 🧹 LIMPAR-TAREFAS-TV: remove do almoxarifado ADM tarefas de cards de TV ──
   if (action === 'limpar-tarefas-tv') {
     const [db2, ppTv2] = await Promise.all([dbGet(KEY), dbGet('tv_pipe')]);
@@ -658,11 +686,16 @@ export default async function handler(req, res) {
     if (!dataUrl || String(dataUrl).length > 250000) {
       return res.status(400).json({ ok: false, error: 'foto ausente ou grande demais' });
     }
-    await dbSet('alm_foto_' + t.cardId, { em: new Date().toISOString(), img: dataUrl });
+    // se a tarefa não tiver cardId (acontece em análise de compra sem card no pipe),
+    // grava pelo id da própria tarefa — antes a chave virava 'alm_foto_undefined'
+    const chaveFoto = 'alm_foto_' + (t.cardId || t.id);
+    if (!t.cardId) t.cardId = t.id;
+    await dbSet(chaveFoto, { em: new Date().toISOString(), img: dataUrl });
     // SAVE ATÔMICO: relê e marca só esta tarefa (o sync roda em paralelo)
     const dbF = (await dbGet(KEY)) || db;
     const tF = (dbF.tarefas || []).find(x => x.id === id);
-    if (tF) { tF.temFoto = true; if ((req.body || {}).modelo) tF.modelo = String((req.body || {}).modelo).trim(); }
+    if (tF) { tF.temFoto = true; if (!tF.cardId) tF.cardId = tF.id;
+      if ((req.body || {}).modelo) tF.modelo = String((req.body || {}).modelo).trim(); }
     await dbSet(KEY, dbF);
     // Se for análise de compra, avisa o card do Conflitos Bot que a foto chegou
     if (t.tipo === 'avaliar-compra' && t.origemConflito) {
