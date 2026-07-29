@@ -147,13 +147,35 @@ async function garantirAprovacao(d8) {
   passos.push(aprovado ? 'card em aprovados: ✅' : 'card em aprovados: ❌ NÃO CONFIRMADO');
   if (!aprovado) return { ok: false, passos };
 
-  // 3) BOARD TÉCNICO — se não entrou, força
-  const board = (await dbGet('reparoeletro_board')) || { cards: [] };
-  const noBoard = ((board.cards) || []).some(c => c.osCode === aprovado.id ||
-    String(c.telefone || '').replace(/\D/g, '').slice(-8) === d8);
-  if (!noBoard) {
-    const r = await post('pipe', 'reprocessar-aprovado&tel=' + d8 + '&aplicar=1', {});
-    passos.push('board técnico: forçado ' + (r && r.ok ? '✅' : '⚠️'));
+  // 3) BOARD TÉCNICO — cada sistema tem o seu: ADM em reparoeletro_board, TV em tv_board
+  const ehTv = sis === 'tv';
+  const chaveBoard = ehTv ? 'tv_board' : 'reparoeletro_board';
+  let board = (await dbGet(chaveBoard)) || { cards: [] };
+  const jaNoBoard = ((board.cards) || []).some(c =>
+    c.osCode === aprovado.id || String(c.telefone || '').replace(/\D/g, '').endsWith(String(d8)));
+  if (!jaNoBoard) {
+    if (!ehTv) {
+      const r = await post('pipe', 'reprocessar-aprovado&tel=' + d8 + '&aplicar=1', {});
+      passos.push('board técnico ADM: forçado ' + (r && r.ok ? '✅' : '⚠️ ' + (r.error || '')));
+    } else {
+      // insere direto no board de TV, no mesmo formato que o tv-pipe usa
+      try {
+        if (!Array.isArray(board.cards)) board.cards = [];
+        const agoraB = new Date().toISOString();
+        const pidB = aprovado.pipefyId ? String(aprovado.pipefyId) : ('LOCAL-' + aprovado.id);
+        board.cards.unshift({ pipefyId: pidB, phaseId: 'aprovado',
+          nomeContato: aprovado.nomeContato || '', title: aprovado.descricao || aprovado.nomeContato || '',
+          telefone: aprovado.telefone || '', descricao: aprovado.equipamento || aprovado.descricao || '',
+          osCode: aprovado.id, valor: aprovado.valor || 0, movedBy: 'Bot Vendas (garantia)',
+          localOnly: !aprovado.pipefyId, syncedAt: agoraB, movedAt: agoraB });
+        if (!Array.isArray(board.syncedIds)) board.syncedIds = [];
+        if (!board.syncedIds.includes(pidB)) board.syncedIds.push(pidB);
+        if (!Array.isArray(board.movesLog)) board.movesLog = [];
+        board.movesLog.push({ phaseId: 'aprovado_entrada', pipefyId: pidB, timestamp: agoraB });
+        await dbSet(chaveBoard, board);
+        passos.push('board técnico TV: inserido ✅');
+      } catch (e) { passos.push('board técnico TV: ⚠️ ' + e.message); }
+    }
   } else passos.push('board técnico: ✅');
 
   // 4) ALMOXARIFADO — cria a tarefa direto, sem depender do sync
