@@ -107,6 +107,66 @@ async function orcamentosEmAberto() {
   return abertos;
 }
 
+// ═══ GARANTIA DE APROVAÇÃO: move, CONFERE e força os gatilhos que faltarem ═══
+// Antes, mover/board/almoxarifado eram três mecanismos soltos: se um falhasse, ninguém sabia.
+async function garantirAprovacao(d8) {
+  const K = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+  const post = (api, action, body) => fetch(`https://reparoeletroadm.com/api/${api}?action=${action}&k=${K}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }).then(x => x.json()).catch(e => ({ error: e.message }));
+  const bate = t => String(t || '').replace(/\D/g, '').slice(-8) === d8;
+  const faseDe = c => c.phaseId || c.phase || '';
+  const NEGOC = ['aguardando_aprovacao', 'ultima_chamada'];
+  const passos = [];
+
+  // 1) MOVER — acha o card no sistema certo
+  let [ppA, ppT, tvLog] = await Promise.all([dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('tv_logistica')]);
+  const fTv = (((tvLog || {}).fichas) || []).find(f => bate(f.telefone) && ['orc_enviado', 'orc_registrado'].includes(f.phase));
+  let card = null, api = 'pipe', sis = 'adm';
+  if (fTv) {
+    const r = await post('tv-logistica', 'aprovar-orcamento', { id: fTv.id });
+    passos.push('TV logística: ' + (r && !r.error ? 'aprovado' : 'FALHOU ' + (r.error || '')));
+    sis = 'tv';
+  }
+  card = (((ppA || {}).cards) || []).find(c => bate(c.telefone) && NEGOC.includes(faseDe(c)));
+  if (!card) {
+    const cT = (((ppT || {}).cards) || []).find(c => bate(c.telefone) && NEGOC.includes(faseDe(c)));
+    if (cT) { card = cT; api = 'tv-pipe'; sis = 'tv'; }
+  }
+  if (card) {
+    const r = await post(api, 'mover', { id: card.id, phase: 'aprovados' });
+    passos.push(api + ' mover: ' + (r && !r.error ? 'ok' : 'FALHOU ' + (r.error || '')));
+  }
+
+  // 2) CONFERE se o card está mesmo em aprovados
+  await new Promise(r => setTimeout(r, 400));
+  const [ppA2, ppT2] = await Promise.all([dbGet('reparoeletro_pipe'), dbGet('tv_pipe')]);
+  const todos = [...(((ppA2 || {}).cards) || []), ...(((ppT2 || {}).cards) || [])];
+  const aprovado = todos.find(c => bate(c.telefone) && faseDe(c) === 'aprovados');
+  passos.push(aprovado ? 'card em aprovados: ✅' : 'card em aprovados: ❌ NÃO CONFIRMADO');
+  if (!aprovado) return { ok: false, passos };
+
+  // 3) BOARD TÉCNICO — se não entrou, força
+  const board = (await dbGet('reparoeletro_board')) || { cards: [] };
+  const noBoard = ((board.cards) || []).some(c => c.osCode === aprovado.id ||
+    String(c.telefone || '').replace(/\D/g, '').slice(-8) === d8);
+  if (!noBoard) {
+    const r = await post('pipe', 'reprocessar-aprovado&tel=' + d8 + '&aplicar=1', {});
+    passos.push('board técnico: forçado ' + (r && r.ok ? '✅' : '⚠️'));
+  } else passos.push('board técnico: ✅');
+
+  // 4) ALMOXARIFADO — cria a tarefa direto, sem depender do sync
+  const alm = (await dbGet('reparoeletro_almoxarifado')) || { tarefas: [] };
+  const temTarefa = ((alm.tarefas) || []).some(t => t.cardId === aprovado.id && t.destino === 'aprovados');
+  if (!temTarefa) {
+    const r = await post('almoxarifado', 'criar-mover', { cardId: aprovado.id, destino: 'aprovados',
+      cliente: aprovado.nomeContato || '', tel: aprovado.telefone || '', equipamento: aprovado.equipamento || '' });
+    passos.push('almoxarifado: criado ' + (r && r.ok ? '✅' : '⚠️ ' + (r.error || '')));
+  } else passos.push('almoxarifado: ✅');
+
+  return { ok: true, sistema: sis, cardId: aprovado.id, passos };
+}
+
 async function contextoCliente(tel) {
   const d8 = String(tel).replace(/\D/g, '').slice(-8);
   const ctx = { fichas: [], logistica: [], pipe: [], tecnico: [], pecas: [] };
@@ -616,8 +676,11 @@ export default async function handler(req, res) {
         encontrados: candidatos.map(c => c.tipo + ' | ' + c.api + ' | ' + (c.nome || '') + ' | ' + (c.equip || '') + ' | fase: ' + c.fase),
         dica: 'para aprovar: &aplicar=1' });
     }
+    // usa a MESMA garantia do fluxo ao vivo (move, confere, força board e almoxarifado)
+    const garM = await garantirAprovacao(String(tel).slice(-8));
+    return res.status(200).json({ ok: garM.ok, sistema: garM.sistema, passos: garM.passos });
+    /* caminho antigo desativado
     const feitos = [], erros = [];
-    // prioriza a ficha de TV com orçamento (caminho oficial), senão o card em negociação
     const fichaTv = candidatos.find(c => c.tipo === 'ficha-tv' && ['orc_enviado', 'orc_registrado'].includes(c.fase));
     if (fichaTv) {
       const r = await fetch(`https://reparoeletroadm.com/api/tv-logistica?action=aprovar-orcamento&k=${KAC}`, {
@@ -636,6 +699,7 @@ export default async function handler(req, res) {
         situacaoAtual: candidatos.map(c => c.api + ': ' + c.fase) });
     }
     return res.status(200).json({ ok: erros.length === 0, feitos, erros });
+    */
   }
 
   // ── ▶️ APROVAR-PENDENTES: dispara o gatilho de quem já aprovou e avisa o cliente ──
@@ -2247,72 +2311,51 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
           }
         }
         if (autorizado && acaoAprovada === 'mover_aprovado') {
-          // TV aprova no sistema TV; ADM aprova no pipe ADM
-          const tvLogX = (await dbGet('tv_logistica')) || { fichas: [] };
-          const fichaTvX = (tvLogX.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x &&
-            ['orc_enviado', 'orc_registrado'].includes(f.phase));
-          if (fichaTvX) {
-            const KTV = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
-            await fetch(`https://reparoeletroadm.com/api/tv-logistica?action=aprovar-orcamento&k=${KTV}`, {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: fichaTvX.id }),
-            });
-            await bumpStat('aprovacoes');
-          }
-          const ppX = (await dbGet('reparoeletro_pipe')) || { cards: [] };
-          if (fichaTvX) { /* já aprovado no TV — não mexe no pipe ADM */ } else {
-          // ⚠️ a fase do card fica em phaseId (não em phase). Ler só c.phase deixava passar
-          // card já aprovado/finalizado e escolher o alvo errado.
-          const faseDe = c => c.phaseId || c.phase || '';
-          const NEGOC = ['aguardando_aprovacao', 'ultima_chamada'];
-          const doTel = c => String(c.telefone || '').replace(/\D/g, '').slice(-8) === d8x;
-          // 1º procura no pipe ADM quem está aguardando decisão
-          let cardX = (ppX.cards || []).find(c => doTel(c) && NEGOC.includes(faseDe(c)));
-          let apiAlvo = 'pipe';
-          // 2º se não achou, procura no pipe de TV — cliente de TV sem ficha na logística TV
-          // caía aqui e NADA acontecia (caso Gabriel 6362)
-          if (!cardX) {
-            const ppTvX = (await dbGet('tv_pipe')) || { cards: [] };
-            const cTv = (ppTvX.cards || []).find(c => doTel(c) && NEGOC.includes(faseDe(c)));
-            if (cTv) { cardX = cTv; apiAlvo = 'tv-pipe'; }
-          }
-          // 3º último recurso: qualquer card do cliente que ainda não esteja aprovado
-          if (!cardX) cardX = (ppX.cards || []).find(c => doTel(c) && faseDe(c) !== 'aprovados');
-          if (cardX) {
-            // Valor combinado na negociação (regra do Fluxo Bot Vendas) — antes do mover oficial
+          // Valor combinado na negociação, se o cérebro informou
+          try {
             const mV = String(acaoMotivo || '').match(/R?\$?\s?(\d{2,5})(?:[.,](\d{2}))?/);
             if (mV) {
               const vComb = parseFloat(mV[1] + (mV[2] ? '.' + mV[2] : ''));
-              if (vComb >= 30 && vComb <= 20000) { cardX.valor = vComb; cardX.valorCombinadoBot = true; await dbSet('reparoeletro_pipe', ppX); }
+              if (vComb >= 30 && vComb <= 20000) {
+                const ppV = (await dbGet('reparoeletro_pipe')) || { cards: [] };
+                const cV = (ppV.cards || []).find(c => String(c.telefone || '').replace(/\D/g, '').slice(-8) === d8x &&
+                  ['aguardando_aprovacao', 'ultima_chamada'].includes(c.phaseId || c.phase));
+                if (cV) { cV.valor = vComb; cV.valorCombinadoBot = true; await dbSet('reparoeletro_pipe', ppV); }
+              }
             }
-            // Mover pela ACTION OFICIAL do pipe → dispara os mesmos gatilhos do mover manual (sessão técnico etc.)
-            const KMV = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
-            const rMov = await fetch(`https://reparoeletroadm.com/api/${apiAlvo}?action=mover&k=${KMV}`, {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: cardX.id, phase: 'aprovados' }),
-            }).then(x => x.json()).catch(e => ({ error: e.message }));
-            // registra o RESULTADO — antes o erro sumia e a ficha ficava parada em silêncio
-            if (!rMov || rMov.error || rMov.ok === false) {
-              await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'acao', tipo: 'falha',
-                texto: 'FALHA AO APROVAR (' + apiAlvo + '): ' + ((rMov && (rMov.error || rMov.erro)) || 'sem resposta') });
-            } else {
-              await bumpStat('aprovacoes');
-            }
-            // ESPELHOS: outros cards do MESMO telefone ainda em aguardando/última chamada são duplicatas → arquivar
+          } catch (e) {}
+          // GARANTIA: move, confere e força board técnico + almoxarifado
+          const gar = await garantirAprovacao(d8x);
+          if (gar.ok) {
+            await bumpStat('aprovacoes');
+            await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'acao', tipo: 'acao',
+              texto: 'aprovado ✅ ' + (gar.sistema || '').toUpperCase() + ' — ' + gar.passos.join(' | ') });
+            // espelhos do mesmo cliente ainda em negociação viram duplicata
             try {
               const ppE = (await dbGet('reparoeletro_pipe')) || { cards: [] };
-              const espelhos = (ppE.cards || []).filter(c => c.id !== cardX.id &&
+              const esp = (ppE.cards || []).filter(c => c.id !== gar.cardId &&
                 String(c.telefone || '').replace(/\D/g, '').slice(-8) === d8x &&
                 ['aguardando_aprovacao', 'ultima_chamada'].includes(c.phaseId || c.phase));
-              if (espelhos.length) {
+              if (esp.length) {
                 const arqE = (await dbGet('pipe_ids_arquivados')) || { ids: [] };
-                for (const e of espelhos) if (!arqE.ids.includes(e.id)) arqE.ids.push(e.id);
+                for (const e of esp) if (!arqE.ids.includes(e.id)) arqE.ids.push(e.id);
                 await dbSet('pipe_ids_arquivados', arqE);
-                ppE.cards = ppE.cards.filter(c => !espelhos.some(e => e.id === c.id));
+                ppE.cards = ppE.cards.filter(c => !esp.some(e => e.id === c.id));
                 await dbSet('reparoeletro_pipe', ppE);
               }
             } catch (e) {}
-          }
+          } else {
+            // FALHA VISÍVEL — nunca mais silenciosa
+            await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'acao', tipo: 'falha',
+              texto: '❌ APROVAÇÃO NÃO CONCLUÍDA — ' + gar.passos.join(' | ') });
+            try {
+              const KCF2 = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+              await fetch(`https://reparoeletroadm.com/api/prospeccao?action=criar-conflito&k=${KCF2}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nome: 'Cliente WhatsApp', telefone: String(tel).replace(/\D/g, ''),
+                  motivo: 'APROVAÇÃO FALHOU NO SISTEMA — cliente aprovou mas a ficha não avançou. Verificar e mover manualmente.' }),
+              });
+            } catch (e) {}
           }
         }
         if (autorizado && acaoAprovada === 'mover_cliente_loja') {
