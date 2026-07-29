@@ -541,15 +541,20 @@ export default async function handler(req, res) {
     const horas = parseFloat(req.query.h || '18');
     const corte = Date.now() - horas * 3600 * 1000;
     const FASES_FISICAS = ['aprovados', 'ultima_chamada', 'descarte'];
-    const pdb = await dbGet('reparoeletro_pipe');
+    // ⚠️ os cards guardam a fase em phaseId (e alguns em phase) — ler só c.phase fazia a
+    // reconciliação NUNCA encontrar nada, que é por que o caso Adriano passou batido.
+    const [pdb, pdbTv] = await Promise.all([dbGet('reparoeletro_pipe'), dbGet('tv_pipe')]);
     const faltam = [];
-    for (const c of ((pdb && pdb.cards) || [])) {
-      if (!FASES_FISICAS.includes(c.phase)) continue;
-      const mv = new Date(c.movedAt || 0).getTime();
-      if (!mv || mv < corte) continue;
-      const tem = db.tarefas.some(t => t.cardId === c.id && t.destino === c.phase);
-      if (!tem) faltam.push({ id: c.id, cliente: c.nomeContato || '—', tel: c.telefone || '',
-        fase: c.phase, movidoEm: c.movedAt });
+    for (const [banco, sis] of [[pdb, 'adm'], [pdbTv, 'tv']]) {
+      for (const c of ((banco && banco.cards) || [])) {
+        const fase = c.phaseId || c.phase;
+        if (!FASES_FISICAS.includes(fase)) continue;
+        const mv = new Date(c.movedAt || 0).getTime();
+        if (!mv || mv < corte) continue;
+        const tem = db.tarefas.some(t => t.cardId === c.id && t.destino === fase);
+        if (!tem) faltam.push({ id: c.id, cliente: c.nomeContato || '—', tel: c.telefone || '',
+          equipamento: c.equipamento || '', sistema: sis, fase, movidoEm: c.movedAt });
+      }
     }
     if (req.query.aplicar === '1') {
       for (const f of faltam) {
