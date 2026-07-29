@@ -114,7 +114,8 @@ async function garantirAprovacao(d8) {
   const post = (api, action, body) => fetch(`https://reparoeletroadm.com/api/${api}?action=${action}&k=${K}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }).then(x => x.json()).catch(e => ({ error: e.message }));
-  const bate = t => String(t || '').replace(/\D/g, '').slice(-8) === d8;
+  // aceita 4 ou 8 digitos finais: comparar por igualdade quebrava quando vinham 4
+  const bate = t => String(t || '').replace(/\D/g, '').endsWith(String(d8));
   const faseDe = c => c.phaseId || c.phase || '';
   const NEGOC = ['aguardando_aprovacao', 'ultima_chamada'];
   const passos = [];
