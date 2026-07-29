@@ -1977,6 +1977,14 @@ export default async function handler(req, res) {
     var faseAnterior = card.phase;
     card.history = (card.history || []).concat([{ phase: card.phase, ts: now }]);
     card.phase   = phase;
+    // 🔖 CARIMBO DA APROVAÇÃO — gravado UMA VEZ, antes de salvar, e nunca mais alterado.
+    // O relatório lê daqui; movimentos posteriores do card não mexem neste registro.
+    if (phase === 'aprovados' && !card.aprovadoEm) {
+      card.aprovadoEm = now;
+      card.valorNaAprovacao = parseFloat(card.valor || 0) || null;
+      card.aprovadoPor = String((req.body || {}).por || (req.body || {}).movedBy || 'sistema').slice(0, 40);
+      card.equipamentoNaAprovacao = card.equipamento || card.descricao || '';
+    }
     card.movedAt = now;
     if (phase === 'aguardando_aprovacao') card.aguardandoDesde = now;
     await safeWritePipe( db);

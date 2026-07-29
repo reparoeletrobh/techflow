@@ -649,13 +649,16 @@ export default async function handler(req, res) {
       for (const c of (((banco || {}).cards) || [])) {
         const fase = c.phaseId || c.phase || '';
         if (!APROV.includes(fase)) continue;
-        // ⚠️ a data da APROVAÇÃO é a entrada em 'aprovados'. Usar movedAt (último movimento)
-        // fazia card que hoje foi para ERP contar como aprovado hoje — daí o relatório inflar.
-        const hist = (c.history || []).find(x => String(x.phaseId || x.phase || '') === 'aprovados');
-        let quando = hist && (hist.ts || hist.timestamp);
+        // 🔖 lê o CARIMBO gravado no momento da aprovação. Cards antigos (antes do carimbo)
+        // usam o histórico de fases como aproximação; nunca o último movimento.
+        let quando = c.aprovadoEm;
         let dataConfiavel = !!quando;
-        if (!quando && fase === 'aprovados') { quando = c.movedAt || c.criadoEm; dataConfiavel = true; }
-        if (!quando) continue;                       // sem como saber quando aprovou → fora
+        if (!quando) {
+          const hist = (c.history || []).find(x => String(x.phaseId || x.phase || '') === 'aprovados');
+          quando = hist && (hist.ts || hist.timestamp);
+          dataConfiavel = false;
+        }
+        if (!quando) continue;                       // sem carimbo e sem histórico → fora
         const t = new Date(quando).getTime();
         if (!t || t < corte) continue;
         const d = d8f(c.telefone);
@@ -669,7 +672,9 @@ export default async function handler(req, res) {
         lista.push({
           sistema: sis, nome: c.nomeContato || '—', telefone: c.telefone || '',
           equipamento: c.equipamento || c.descricao || '',
-          valor: parseFloat(c.valor || 0) || null,
+          valor: (c.valorNaAprovacao != null ? c.valorNaAprovacao : (parseFloat(c.valor || 0) || null)),
+          valorAtual: parseFloat(c.valor || 0) || null,
+          aprovadoPor: c.aprovadoPor || null,
           quando, dataConfiavel, faseAtual: fase,
           valorCombinadoPeloBot: !!c.valorCombinadoBot,
           falaDoCliente: falaCliente,

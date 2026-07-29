@@ -1795,6 +1795,13 @@ export default async function handler(req, res) {
     var faseAnterior = card.phase;
     card.history = (card.history || []).concat([{ phase: card.phase, ts: now }]);
     card.phase   = phase;
+    // 🔖 CARIMBO DA APROVAÇÃO (congelado — ver pipe ADM)
+    if (phase === 'aprovados' && !card.aprovadoEm) {
+      card.aprovadoEm = new Date().toISOString();
+      card.valorNaAprovacao = parseFloat(card.valor || 0) || null;
+      card.aprovadoPor = String((req.body || {}).por || (req.body || {}).movedBy || 'sistema').slice(0, 40);
+      card.equipamentoNaAprovacao = card.equipamento || card.descricao || '';
+    }
     card.movedAt = now;
     if (phase === 'aguardando_aprovacao') card.aguardandoDesde = now;
     await dbSet(PIPE_KEY, db);
