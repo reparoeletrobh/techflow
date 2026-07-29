@@ -2215,7 +2215,23 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
           }
           const ppX = (await dbGet('reparoeletro_pipe')) || { cards: [] };
           if (fichaTvX) { /* já aprovado no TV — não mexe no pipe ADM */ } else {
-          const cardX = (ppX.cards || []).find(c => String(c.telefone || '').replace(/\D/g, '').slice(-8) === d8x && c.phase !== 'aprovados');
+          // ⚠️ a fase do card fica em phaseId (não em phase). Ler só c.phase deixava passar
+          // card já aprovado/finalizado e escolher o alvo errado.
+          const faseDe = c => c.phaseId || c.phase || '';
+          const NEGOC = ['aguardando_aprovacao', 'ultima_chamada'];
+          const doTel = c => String(c.telefone || '').replace(/\D/g, '').slice(-8) === d8x;
+          // 1º procura no pipe ADM quem está aguardando decisão
+          let cardX = (ppX.cards || []).find(c => doTel(c) && NEGOC.includes(faseDe(c)));
+          let apiAlvo = 'pipe';
+          // 2º se não achou, procura no pipe de TV — cliente de TV sem ficha na logística TV
+          // caía aqui e NADA acontecia (caso Gabriel 6362)
+          if (!cardX) {
+            const ppTvX = (await dbGet('tv_pipe')) || { cards: [] };
+            const cTv = (ppTvX.cards || []).find(c => doTel(c) && NEGOC.includes(faseDe(c)));
+            if (cTv) { cardX = cTv; apiAlvo = 'tv-pipe'; }
+          }
+          // 3º último recurso: qualquer card do cliente que ainda não esteja aprovado
+          if (!cardX) cardX = (ppX.cards || []).find(c => doTel(c) && faseDe(c) !== 'aprovados');
           if (cardX) {
             // Valor combinado na negociação (regra do Fluxo Bot Vendas) — antes do mover oficial
             const mV = String(acaoMotivo || '').match(/R?\$?\s?(\d{2,5})(?:[.,](\d{2}))?/);
@@ -2225,11 +2241,17 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
             }
             // Mover pela ACTION OFICIAL do pipe → dispara os mesmos gatilhos do mover manual (sessão técnico etc.)
             const KMV = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
-            await fetch(`https://reparoeletroadm.com/api/pipe?action=mover&k=${KMV}`, {
+            const rMov = await fetch(`https://reparoeletroadm.com/api/${apiAlvo}?action=mover&k=${KMV}`, {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ id: cardX.id, phase: 'aprovados' }),
-            });
-            await bumpStat('aprovacoes');
+            }).then(x => x.json()).catch(e => ({ error: e.message }));
+            // registra o RESULTADO — antes o erro sumia e a ficha ficava parada em silêncio
+            if (!rMov || rMov.error || rMov.ok === false) {
+              await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'acao', tipo: 'falha',
+                texto: 'FALHA AO APROVAR (' + apiAlvo + '): ' + ((rMov && (rMov.error || rMov.erro)) || 'sem resposta') });
+            } else {
+              await bumpStat('aprovacoes');
+            }
             // ESPELHOS: outros cards do MESMO telefone ainda em aguardando/última chamada são duplicatas → arquivar
             try {
               const ppE = (await dbGet('reparoeletro_pipe')) || { cards: [] };
