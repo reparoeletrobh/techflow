@@ -278,7 +278,11 @@ function render(){
   }
   // Populate fichas list for expand
   const fl=document.getElementById('fichas-list');
-  const esteMes=D.monthly.fichasEsteMes||[];
+  // o backend devolve fichasEsteMes como NÚMERO (contagem) e a lista em fichasEsteMesLista;
+  // aceitar os dois formatos evita o erro "filter is not a function"
+  const _em=D.monthly.fichasEsteMesLista||D.monthly.fichasEsteMes;
+  const esteMes=Array.isArray(_em)?_em:[];
+  const esteMesQtd=Array.isArray(_em)?_em.length:(Number(D.monthly.fichasEsteMes)||0);
   const esteMesPend=esteMes.filter(f=>!f.cadastrado);if(fl){fl.innerHTML=esteMesPend.length?esteMesPend.map(f=>{
     const cor=f.cadastrado?'var(--green)':'var(--red)';
     const label=f.cadastrado?'✅':'🔴';
@@ -286,7 +290,7 @@ function render(){
   }).join(''):'<div style="color:var(--muted);font-size:12px;padding:8px 0">Nenhuma ficha este mês</div>';}
   const eb2=document.getElementById('expand-btn');
   if(eb2){const v2=D.monthly?.cadastradas||0,r2=(D.monthly?.pendentes||0)+(D.monthly?.backlog||0);
-  eb2.textContent=(fl?.classList.contains('open')?'▲':'▼')+' Ver '+esteMes.length+' ficha'+(esteMes.length!==1?'s':'')+' — ✅ '+v2+' cadastrada'+(v2!==1?'s':'')+' 🔴 '+r2+' pendente'+(r2!==1?'s':'');}
+  eb2.textContent=(fl?.classList.contains('open')?'▲':'▼')+' Ver '+esteMesQtd+' ficha'+(esteMesQtd!==1?'s':'')+' — ✅ '+v2+' cadastrada'+(v2!==1?'s':'')+' 🔴 '+r2+' pendente'+(r2!==1?'s':'');}
 }
 function toast(m,t){const el=document.getElementById('toast');el.textContent=m;el.className='toast show t'+(t==='ok'?'ok':'err');clearTimeout(window._tt);window._tt=setTimeout(()=>el.classList.remove('show'),3500);}
 function fmtDate(d){try{return new Date(d).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});}catch{return '—';}}

@@ -118,6 +118,11 @@ export default async function handler(req,res){
         comprados:compMCount,cadastrados:cadM||0,
         falta:pendentes,backlog,compAnteriores,
         fichasEsteMes,fichasAnteriores,cadastradas,pendentes,
+        // lista real das fichas do mês (a tela precisa dela para detalhar pendentes)
+        fichasEsteMesLista: fichasArr.filter(f=>ficDateOf(f)>=monthUTC.getTime())
+          .map(f=>({nome:f.nome||'',telefone:f.telefone||'',equipamento:f.equipamento||'',
+            cadastrado:['logistica','prospeccao','cliente_loja','contato_feito'].includes(f.status)}))
+          .slice(0,200),
       };
 
       // ERP placeholder (TV não usa Pipefy direto)
