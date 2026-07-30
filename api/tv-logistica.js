@@ -831,7 +831,7 @@ module.exports = async function handler(req, res) {
     // POLEGADAS obrigatórias por equipamento — a tabela de preço de TV depende do tamanho
     try {
       const eqs = ((diagnostico || {}).equips) || [];
-      const semPol = eqs.filter(e => !(parseInt(String(e.polegadas || '').replace(/\D/g, ''), 10) >= 10));
+      const semPol = eqs.filter(e => String(e.tipo||'') === 'tv' && !(parseInt(String(e.polegadas || '').replace(/\D/g, ''), 10) >= 10));
       if (eqs.length && semPol.length) {
         return res.status(400).json({ ok: false,
           error: 'informe as polegadas de ' + (semPol.length === 1 ? 'todo equipamento' : 'todos os ' + eqs.length + ' equipamentos') });

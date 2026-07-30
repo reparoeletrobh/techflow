@@ -866,7 +866,7 @@ function abrirDiag(id) {
   if (cbBarr) cbBarr.checked = !!(fichaAtual.isBarramento);
   const qtd = detectarQtd(fichaAtual);
   document.getElementById('diag-qtd').value = qtd;
-  diagEquips = Array.from({length: qtd}, ()=>({modelo:'', polegadas:'', tipo: detectarTipo(fichaAtual), subtipo:null, servicos:[]}));
+  diagEquips = Array.from({length: qtd}, ()=>({modelo:'', tipo: detectarTipo(fichaAtual), subtipo:null, servicos:[]}));
   renderEquips(qtd);
   document.getElementById('ov-diag').classList.add('open');
 }
@@ -875,7 +875,7 @@ function fecharDiag() { document.getElementById('ov-diag').classList.remove('ope
 
 function renderEquips(qtd) {
   // Preservar dados já preenchidos
-  while (diagEquips.length < qtd) diagEquips.push({modelo:'', polegadas:'', tipo: detectarTipo(fichaAtual), subtipo:null, servicos:[]});
+  while (diagEquips.length < qtd) diagEquips.push({modelo:'', tipo: detectarTipo(fichaAtual), subtipo:null, servicos:[]});
   diagEquips = diagEquips.slice(0, qtd);
   const container = document.getElementById('diag-equips');
   container.innerHTML = diagEquips.map((eq, i) => equipSecHTML(eq, i, qtd)).join('');
@@ -908,12 +908,6 @@ function equipSecHTML(eq, i, total) {
         <div class="diag-section-label" style="margin-bottom:5px;">Modelo</div>
         <input class="diag-input" value="${eq.modelo||''}" placeholder="Ex: CPB34AS"
           style="width:100%;" oninput="diagEquips[${i}].modelo=this.value">
-      </div>
-      <div>
-        <div class="diag-section-label" style="margin-bottom:5px;">Polegadas <span style="color:#f04060;">*</span></div>
-        <input class="diag-input" type="number" min="10" max="120" inputmode="numeric"
-          value="${eq.polegadas||''}" placeholder="Ex: 50"
-          style="width:100%;" oninput="diagEquips[${i}].polegadas=this.value">
       </div>
       <div>
         <div class="diag-section-label" style="margin-bottom:5px;">Tipo</div>
@@ -999,12 +993,6 @@ async function salvarDiag() {
     const eq = diagEquips[i];
     const label = diagEquips.length > 1 ? `Equipamento ${i+1}` : 'equipamento';
     if (!eq.tipo)            { mostrarMsgDiag(`Selecione o tipo do ${label}`,'err'); return; }
-    // Polegadas obrigatórias em TV — a tabela de preço depende do tamanho
-    const pol = parseInt(String(eq.polegadas||'').replace(/\D/g,''), 10);
-    if (!(pol >= 10 && pol <= 120)) {
-      mostrarMsgDiag(`Informe as POLEGADAS do ${label} (a tabela de preço depende do tamanho)`,'err'); return;
-    }
-    eq.polegadas = pol;
     if (!eq.servicos.length) { mostrarMsgDiag(`Selecione ao menos um serviço para o ${label}`,'err'); return; }
     if (eq.tabela === 'dinamica') {
       const v40 = parseFloat(String(eq.valorEquip||'').replace(',','.'));
@@ -1308,6 +1296,8 @@ function renderChipSecStr(fid, idx, total) {
     (total>1?'<div class="diag-label-tv" style="color:var(--accent);margin-bottom:5px;">'+lbl+'</div>':'') +
     '<div class="diag-label-tv">Modelo</div>' +
     '<input class="diag-input-tv" type="text" id="dlm-'+fid+'-'+idx+'" placeholder="Ex: Samsung 43 Smart"/>' +
+    '<div class="diag-label-tv">Polegadas <span style="color:#f04060;">*</span></div>' +
+    '<input class="diag-input-tv" type="number" min="10" max="120" inputmode="numeric" id="dlp-'+fid+'-'+idx+'" placeholder="Ex: 50"/>' +
     '<div class="diag-label-tv">Diagnóstico</div>' +
     '<div class="diag-chips-tv">' +
       '<button class="chip-tv" id="dlc-barramento-'+fid+'-'+idx+'" onclick="toggleChipTV(\''+fid+'\','+idx+',\'barramento\')">Barramento</button>' +
@@ -1408,6 +1398,8 @@ function coletarChipsSecs(fid) {
   for (var i = 0; i < qtd; i++) {
     var modeloEl = document.getElementById('dlm-'+fid+'-'+i);
     var modelo = modeloEl ? modeloEl.value.trim() : '';
+    var polEl = document.getElementById('dlp-'+fid+'-'+i);
+    var polegadas = polEl ? parseInt(String(polEl.value||'').replace(/\D/g,''),10) : 0;
     var tuBar   = document.getElementById('dlc-tu-bar-'+fid+'-'+i);
     var tuPlaca = document.getElementById('dlc-tu-placa-'+fid+'-'+i);
     var tuSub   = tuBar&&tuBar.classList.contains('on') ? 'TU + Barramento'
@@ -1426,7 +1418,12 @@ function coletarChipsSecs(fid) {
     var dinValEl = document.getElementById('dld-'+fid+'-'+i);
     var dinVal = dinValEl ? parseFloat(String(dinValEl.value||'').replace(',','.'))||0 : 0;
     if (chips.length > 0 || hasTU) {
-      var eqTV = { modelo: modelo, tipo: 'tv', servicos: chips, tuSub: tuSub, preco: hasTU ? 1290 : (acrilicoVal||0) };
+      // POLEGADAS obrigatórias — a tabela de preço de TV depende do tamanho
+      if (!(polegadas >= 10 && polegadas <= 120)) {
+        alert('📺 Informe as POLEGADAS da TV ' + (qtd>1 ? (i+1) : '') + '\n\nA tabela de preço depende do tamanho.');
+        return null;
+      }
+      var eqTV = { modelo: modelo, polegadas: polegadas, tipo: 'tv', servicos: chips, tuSub: tuSub, preco: hasTU ? 1290 : (acrilicoVal||0) };
       if (dinOn) { eqTV.tabela = 'dinamica'; eqTV.valorEquip = dinVal; }
       equips.push(eqTV);
     }
@@ -1436,6 +1433,7 @@ function coletarChipsSecs(fid) {
 
 async function enviarDiagTV(fid) {
   var equips = coletarChipsSecs(fid);
+  if (equips === null) return;                 // polegadas faltando — já avisado
   if (!equips.length) { toast('Selecione pelo menos uma opção', 'error'); return; }
   for (var ve = 0; ve < equips.length; ve++) {
     if (equips[ve].tabela === 'dinamica' && !(equips[ve].valorEquip > 0)) {
