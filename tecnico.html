@@ -830,7 +830,7 @@ function analiseLojaCardHTML(c) {
         style="margin-top:8px;width:100%;font-family:var(--fm);font-size:10px;padding:6px;border-radius:6px;
                border:1px solid rgba(168,85,247,0.4);background:rgba(168,85,247,0.08);
                color:#a855f7;cursor:pointer;font-weight:700;">
-        🔧 ANÁLISE TÉCNICA
+        🔧 DIAGNÓSTICO
       </button>
     </div>`;
 }
@@ -848,7 +848,7 @@ function analiseLojaCardHTML(c) {
         style="margin-top:8px;width:100%;font-family:var(--fm);font-size:10px;padding:6px;border-radius:6px;
                border:1px solid rgba(168,85,247,0.4);background:rgba(168,85,247,0.08);
                color:#a855f7;cursor:pointer;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">
-        🔧 ANÁLISE TÉCNICA
+        🔧 DIAGNÓSTICO
       </button>
     </div>`;
 }
@@ -866,7 +866,7 @@ function analiseLojaCardHTML(c) {
         style="margin-top:8px;width:100%;font-family:var(--fm);font-size:10px;padding:6px;border-radius:6px;
                border:1px solid rgba(168,85,247,0.4);background:rgba(168,85,247,0.08);
                color:#a855f7;cursor:pointer;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">
-        🔧 ANÁLISE TÉCNICA
+        🔧 DIAGNÓSTICO
       </button>
     </div>`;
 }
@@ -1911,6 +1911,7 @@ let _alFlId = null;
 async function abrirAnalise(flFichaId) {
   _alFlId = flFichaId;
   document.getElementById('al-diag').value = '';
+  var _p = document.getElementById('al-preco'); if (_p) _p.value = '';
   document.getElementById('al-msg').style.display = 'none';
   document.getElementById('al-info').innerHTML = flFichaId;
   document.getElementById('al-overlay').style.display = 'flex';
@@ -1998,7 +1999,7 @@ async function enviarDiagnostico() {
               width:100%;max-width:420px;max-height:92dvh;display:flex;flex-direction:column;">
     <div style="padding:14px 18px;border-bottom:1px solid #1f2937;
                 display:flex;justify-content:space-between;align-items:center;">
-      <div style="font-family:var(--fh);font-size:15px;font-weight:700;color:#a855f7;">🔧 ANÁLISE TÉCNICA</div>
+      <div style="font-family:var(--fh);font-size:15px;font-weight:700;color:#a855f7;">🔧 DIAGNÓSTICO</div>
       <button onclick="fecharAnalise()"
         style="width:30px;height:30px;border-radius:50%;background:#1f2937;
                border:1px solid #333;color:#888;font-size:16px;cursor:pointer;">×</button>
@@ -2016,6 +2017,17 @@ async function enviarDiagnostico() {
           style="width:100%;background:#111;border:1px solid #333;border-radius:8px;
                  color:#fff;font-family:var(--fb);font-size:13px;padding:10px;
                  resize:none;box-sizing:border-box;"></textarea>
+      </div>
+      <div>
+        <label style="font-family:var(--fm);font-size:10px;color:#888;display:block;margin-bottom:6px;letter-spacing:.5px;">
+          PREÇO DO CONSERTO (R$)
+        </label>
+        <input id="al-preco" type="number" min="0" step="1" inputmode="numeric" placeholder="Ex: 350"
+          style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#fff;
+                 font-family:var(--fm);font-size:15px;padding:10px;box-sizing:border-box;">
+        <div style="font-family:var(--fm);font-size:10px;color:#4ade80;margin-top:5px;line-height:1.5;">
+          O cliente recebe com 10% de desconto automático no envio pelo WhatsApp.
+        </div>
       </div>
       <div id="al-msg"
         style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
