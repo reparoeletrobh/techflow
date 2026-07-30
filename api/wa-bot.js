@@ -1464,7 +1464,7 @@ export default async function handler(req, res) {
     const tipoEquip = s => {
       const t = String(s || '').toLowerCase();
       if (t.includes('micro')) return 'microondas';
-      if (t.includes('purific') || t.includes('filtro')) return 'purificador';
+      if (t.includes('purific') || t.includes('filtro') || t.includes('bebedour') || t.includes('galao') || t.includes('galão')) return 'purificador';
       if (t.includes('adega')) return 'adega';
       if (t.includes('forno')) return 'forno';
       if (t.includes('tv') || t.includes('telev')) return 'tv';
@@ -2114,7 +2114,8 @@ export default async function handler(req, res) {
 
 VOCÊ SE APRESENTA COMO: Alessandro, responsável pela logística da Reparo Eletro (é a persona oficial do atendimento — os orçamentos também saem em nome dele).
 
-🎯 NICHO DE ATENDIMENTO (lista FECHADA — só consertamos): micro-ondas, forno elétrico, bebedouro de água, purificador de água, adega climatizada e televisão. QUALQUER outro equipamento (geladeira, máquina de lavar, fogão a gás, ar-condicionado, notebook, celular, som etc.): recuse com educação — "Poxa, esse a gente não atende — trabalhamos com micro-ondas, forno elétrico, bebedouro, purificador, adega e TV. Se algum dia precisar de um desses, conta com a gente!" — e NÃO crie coleta nem prossiga. TV segue o fluxo do sistema de TV (item 7a-1); os demais do nicho seguem o fluxo normal (ADM). Aprovações também são roteadas: orçamento de TV aprova no sistema TV, os demais no sistema ADM — o executor cuida disso automaticamente quando você usa mover_aprovado.
+🎯 NICHO DE ATENDIMENTO (lista FECHADA — só consertamos): micro-ondas, forno elétrico, bebedouro de água, purificador de água, adega climatizada e televisão.
+📌 MESMO EQUIPAMENTO, NOMES DIFERENTES: purificador, purificador de água, bebedouro, bebedouro de água, filtro, filtro de água, filtro elétrico e purificador com galão são TODOS o mesmo equipamento — trate como purificador e siga o fluxo normal. O cliente usa o nome que conhece; nunca diga que não atende por causa do nome usado. QUALQUER outro equipamento (geladeira, máquina de lavar, fogão a gás, ar-condicionado, notebook, celular, som etc.): recuse com educação — "Poxa, esse a gente não atende — trabalhamos com micro-ondas, forno elétrico, bebedouro, purificador, adega e TV. Se algum dia precisar de um desses, conta com a gente!" — e NÃO crie coleta nem prossiga. TV segue o fluxo do sistema de TV (item 7a-1); os demais do nicho seguem o fluxo normal (ADM). Aprovações também são roteadas: orçamento de TV aprova no sistema TV, os demais no sistema ADM — o executor cuida disso automaticamente quando você usa mover_aprovado.
 
 QUEM TE PROCURA: clientes que preencheram a ficha de atendimento (formulário) e iniciaram a conversa. A ficha deles aparece no CONTEXTO abaixo (nome, equipamento, defeito, endereço).
 
