@@ -751,9 +751,10 @@ function renderBoard() {
   const VINTE_QUATRO_H = 86400000; // ms
   const agora = Date.now();
 
-  // Cards "atrasados": em aprovado/producao/cliente_loja há +24h
+  // Cards "atrasados": SOMENTE em Produção há +24h (regra do dono).
+  // Antes incluía aprovado e cliente_loja, que não devem entrar em OS em Atraso.
   const atrasadosCards = board.cards.filter(c => {
-    if (!['aprovado','producao','cliente_loja'].includes(c.phaseId)) return false;
+    if (c.phaseId !== 'producao') return false;
     const ref = c.movedAt || c.addedAt;
     if (!ref) return false;
     return (agora - new Date(ref).getTime()) > VINTE_QUATRO_H;
