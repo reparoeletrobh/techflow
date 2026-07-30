@@ -866,7 +866,7 @@ function abrirDiag(id) {
   if (cbBarr) cbBarr.checked = !!(fichaAtual.isBarramento);
   const qtd = detectarQtd(fichaAtual);
   document.getElementById('diag-qtd').value = qtd;
-  diagEquips = Array.from({length: qtd}, ()=>({modelo:'', tipo: detectarTipo(fichaAtual), subtipo:null, servicos:[]}));
+  diagEquips = Array.from({length: qtd}, ()=>({modelo:'', polegadas:'', tipo: detectarTipo(fichaAtual), subtipo:null, servicos:[]}));
   renderEquips(qtd);
   document.getElementById('ov-diag').classList.add('open');
 }
@@ -875,7 +875,7 @@ function fecharDiag() { document.getElementById('ov-diag').classList.remove('ope
 
 function renderEquips(qtd) {
   // Preservar dados já preenchidos
-  while (diagEquips.length < qtd) diagEquips.push({modelo:'', tipo: detectarTipo(fichaAtual), subtipo:null, servicos:[]});
+  while (diagEquips.length < qtd) diagEquips.push({modelo:'', polegadas:'', tipo: detectarTipo(fichaAtual), subtipo:null, servicos:[]});
   diagEquips = diagEquips.slice(0, qtd);
   const container = document.getElementById('diag-equips');
   container.innerHTML = diagEquips.map((eq, i) => equipSecHTML(eq, i, qtd)).join('');
@@ -908,6 +908,12 @@ function equipSecHTML(eq, i, total) {
         <div class="diag-section-label" style="margin-bottom:5px;">Modelo</div>
         <input class="diag-input" value="${eq.modelo||''}" placeholder="Ex: CPB34AS"
           style="width:100%;" oninput="diagEquips[${i}].modelo=this.value">
+      </div>
+      <div>
+        <div class="diag-section-label" style="margin-bottom:5px;">Polegadas <span style="color:#f04060;">*</span></div>
+        <input class="diag-input" type="number" min="10" max="120" inputmode="numeric"
+          value="${eq.polegadas||''}" placeholder="Ex: 50"
+          style="width:100%;" oninput="diagEquips[${i}].polegadas=this.value">
       </div>
       <div>
         <div class="diag-section-label" style="margin-bottom:5px;">Tipo</div>
@@ -993,6 +999,12 @@ async function salvarDiag() {
     const eq = diagEquips[i];
     const label = diagEquips.length > 1 ? `Equipamento ${i+1}` : 'equipamento';
     if (!eq.tipo)            { mostrarMsgDiag(`Selecione o tipo do ${label}`,'err'); return; }
+    // Polegadas obrigatórias em TV — a tabela de preço depende do tamanho
+    const pol = parseInt(String(eq.polegadas||'').replace(/\D/g,''), 10);
+    if (!(pol >= 10 && pol <= 120)) {
+      mostrarMsgDiag(`Informe as POLEGADAS do ${label} (a tabela de preço depende do tamanho)`,'err'); return;
+    }
+    eq.polegadas = pol;
     if (!eq.servicos.length) { mostrarMsgDiag(`Selecione ao menos um serviço para o ${label}`,'err'); return; }
     if (eq.tabela === 'dinamica') {
       const v40 = parseFloat(String(eq.valorEquip||'').replace(',','.'));

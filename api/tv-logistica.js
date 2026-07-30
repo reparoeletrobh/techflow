@@ -828,6 +828,15 @@ module.exports = async function handler(req, res) {
   // ── POST salvar-diagnostico ───────────────────────────────
   if (req.method === 'POST' && action === 'salvar-diagnostico') {
     const { id, diagnostico } = req.body || {};
+    // POLEGADAS obrigatórias por equipamento — a tabela de preço de TV depende do tamanho
+    try {
+      const eqs = ((diagnostico || {}).equips) || [];
+      const semPol = eqs.filter(e => !(parseInt(String(e.polegadas || '').replace(/\D/g, ''), 10) >= 10));
+      if (eqs.length && semPol.length) {
+        return res.status(400).json({ ok: false,
+          error: 'informe as polegadas de ' + (semPol.length === 1 ? 'todo equipamento' : 'todos os ' + eqs.length + ' equipamentos') });
+      }
+    } catch (e) {}
     const db = await dbGet(LOG_KEY) || defaultDB();
     const ficha = db.fichas.find(f => f.id === id);
     if (!ficha) return res.status(404).json({ ok: false, error: 'nao encontrada' });
