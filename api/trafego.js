@@ -1251,6 +1251,79 @@ Escreva 3 a 5 frases curtas: comece pelo que mudou de ontem para cá, cite criat
       leitura: 'compare com ~1300 serviços pagos em 60 dias: a fonte com número próximo disso é onde mora a verdade' });
   }
 
+  // ═══ 🔬 ANÁLISE: padrões dos criativos campeões + 20 sugestões da semana ═══
+  if (action === 'analise') {
+    const AK = (process.env.ANTHROPIC_API_KEY || '').trim();
+    const cfg = await cfgTrafego();
+    const base = await dbGet('trafego_painel_cache');
+    if (!base || !base.dados) return res.status(200).json({ ok: false, error: 'abra o painel primeiro para carregar os dados do ciclo' });
+    const semana = (function () { const d = new Date(Date.now() - 3 * 3600 * 1000); const on = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      return d.getUTCFullYear() + '-S' + Math.ceil((((d - on) / 86400000) + on.getUTCDay() + 1) / 7); })();
+    const cacheS = await dbGet('trafego_sugestoes_' + semana);
+    if (cacheS && String(req.query.gerar || '') !== '1') return res.status(200).json(Object.assign({ ok: true, semana, doCache: true }, cacheS));
+    if (!AK) return res.status(200).json({ ok: false, error: 'ANTHROPIC_API_KEY não configurada na Vercel' });
+
+    const ativos = (base.dados.anuncios || []).filter(a => a.ativo && a.conversas > 0);
+    const topC = ativos.filter(a => a.situacao === 'campeao').slice(0, 15);
+    const topR = ativos.filter(a => a.situacao === 'ralo').slice(0, 10);
+    // a copy não vem no payload enxuto do painel — busca só a dos selecionados, em lotes de 10
+    const copys = {};
+    try {
+      const alvos = [...topC, ...topR].map(a => a.id);
+      for (let i = 0; i < alvos.length; i += 10) {
+        const lote = alvos.slice(i, i + 10).join(',');
+        const j = await fetch(`${GRAPH}/?ids=${lote}&fields=creative{body,object_story_spec{video_data{message},link_data{message}}}&access_token=${TOKEN}`)
+          .then(x => x.json()).catch(() => null);
+        for (const k of Object.keys(j || {})) {
+          const cc = ((j[k] || {}).creative) || {}, os = cc.object_story_spec || {};
+          copys[k] = String((os.video_data || {}).message || (os.link_data || {}).message || cc.body || '').slice(0, 300);
+        }
+      }
+    } catch (e) {}
+    const campeoes = topC.map(a => ({ nome: a.nome, categoria: a.categoria, cpa: a.cpa, meta: a.meta, conversas: a.conversas, ctr: a.ctr, copy: copys[a.id] || '' }));
+    const ralos = topR.map(a => ({ nome: a.nome, categoria: a.categoria, cpa: a.cpa, meta: a.meta, conversas: a.conversas, copy: copys[a.id] || '' }));
+
+    const prompt = `Você é o estrategista de tráfego pago da Reparo Eletro, assistência técnica de eletrodomésticos em Belo Horizonte. Os anúncios são Click-to-WhatsApp: o objetivo de cada criativo é fazer a pessoa abrir conversa no WhatsApp para agendar conserto.
+
+NOSSOS CRIATIVOS CAMPEÕES desta semana (CPA = custo por conversa; meta por categoria: TV R$${cfg.metas.tv}, micro-ondas R$${cfg.metas.microondas}, purificador R$${cfg.metas.purificador}, adega R$${cfg.metas.adega}):
+${JSON.stringify(campeoes)}
+
+NOSSOS PIORES desta semana (o que evitar):
+${JSON.stringify(ralos)}
+
+TAREFA — responda em duas partes:
+1) PADRÕES: analise o que os campeões têm em comum e o que os piores erram (ganchos, dor tratada, promessa, tom, formato, uso de preço/urgência/prova). Seja específico e baseado nos dados acima, não genérico.
+2) SUGESTÕES: pesquise na web o que está funcionando hoje em anúncios de conserto de eletrodomésticos e de adegas/cervejeiras no Brasil (concorrentes, ganchos comuns, formatos), e proponha EXATAMENTE 20 ideias novas de criativo em VÍDEO, assim distribuídas: 10 de ADEGA, 4 de TV, 3 de MICRO-ONDAS, 3 de PURIFICADOR.
+
+Cada sugestão precisa de: titulo (curto), categoria, gancho (a primeira frase/cena, os 3 primeiros segundos), roteiro (3 a 5 cenas descritas para gravar com celular na própria loja), legenda (texto do anúncio, até 250 caracteres, tom próximo do que funciona nos nossos campeões), cta, porque (em que padrão ou evidência essa ideia se apoia).
+
+Responda APENAS um JSON válido, sem markdown:
+{"padroes":{"campeoes":["..."],"erros":["..."],"mercado":["..."]},"sugestoes":[{"titulo":"","categoria":"adega|tv|microondas|purificador","gancho":"","roteiro":["",""],"legenda":"","cta":"","porque":""}]}`;
+
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': AK, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 8000,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+          messages: [{ role: 'user', content: prompt }] }),
+      });
+      const j = await r.json();
+      const txt = ((j && j.content) || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+      let parsed = null;
+      try { parsed = JSON.parse(txt.replace(/```json|```/g, '').trim()); } catch (e) {
+        const m = txt.match(/\{[\s\S]*\}/); if (m) { try { parsed = JSON.parse(m[0]); } catch (e2) {} }
+      }
+      if (!parsed || !parsed.sugestoes) return res.status(200).json({ ok: false, error: 'não consegui montar as sugestões desta vez', bruto: txt.slice(0, 300) });
+      const saida = { padroes: parsed.padroes || {}, sugestoes: parsed.sugestoes.slice(0, 20),
+        baseadoEm: { campeoes: campeoes.length, ralos: ralos.length }, geradoEm: new Date().toISOString() };
+      await dbSet('trafego_sugestoes_' + semana, saida);
+      return res.status(200).json(Object.assign({ ok: true, semana }, saida));
+    } catch (e) {
+      return res.status(200).json({ ok: false, error: e.message });
+    }
+  }
+
   // ── 🎯 ORIGENS: conversas com anúncio de origem capturado (base da atribuição de funil) ──
   if (action === 'origens') {
     const org = (await dbGet('wa_origem_anuncio')) || { por: {} };
