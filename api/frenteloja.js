@@ -421,6 +421,52 @@ export default async function handler(req,res){
 
 
   // ── POST marcar-orc-whatsapp: marca orçamento como enviado pelo WhatsApp ──
+  // ── 📣 MARCAR-AVISADO: avisa o cliente pelo WhatsApp que o equipamento está pronto ──
+  if (req.method === 'POST' && action === 'marcar-avisado') {
+    const { id } = req.body || {};
+    if (!id) return res.status(400).json({ ok:false, error:'id obrigatorio' });
+    const db = await dbGet(FL_KEY) || defaultDB();
+    const ficha = db.fichas.find(f => f.id === id);
+    if (!ficha) return res.status(404).json({ ok:false, error:'ficha nao encontrada' });
+
+    // envia pelo WhatsApp: mensagem direta se a janela estiver aberta, senão o template
+    let envio = { enviado:false, via:null, erro:null };
+    const tel = String(ficha.telefone || ficha.tel || '').replace(/\D/g,'');
+    if (tel.length >= 10) {
+      const to = tel.startsWith('55') ? tel : '55' + tel;
+      const primeiro = String(ficha.nomeContato || 'tudo bem').trim().split(/\s+/)[0];
+      try {
+        const KAV = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+        const texto = `Oi ${primeiro}! Seu ${ficha.equipamento || 'equipamento'} já está pronto e pode ser retirado aqui na loja. Funcionamos de segunda a sexta das 8h às 17h e sábado das 8h às 12h. Te esperamos!`;
+        const r = await fetch(`https://reparoeletroadm.com/api/wa-bot?action=enviar&k=${KAV}`, {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ tel: to, texto, via:'frenteloja-avisado' }),
+        }).then(x=>x.json()).catch(e=>({ ok:false, error:e.message }));
+        if (r && r.ok) { envio = { enviado:true, via:'mensagem', erro:null }; }
+        else {
+          // janela fechada → template de conserto finalizado
+          const rt = await fetch(`https://reparoeletroadm.com/api/wa-bot?action=template-conserto&k=${KAV}`, {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ tel: to, nome: primeiro }),
+          }).then(x=>x.json()).catch(e=>({ ok:false, error:e.message }));
+          envio = rt && rt.ok
+            ? { enviado:true, via:'template', erro:null }
+            : { enviado:false, via:null, erro:(rt && (rt.error||rt.erro)) || (r && r.error) || 'falha no envio' };
+        }
+      } catch(e) { envio = { enviado:false, via:null, erro:e.message }; }
+    } else {
+      envio = { enviado:false, via:null, erro:'telefone inválido ou ausente na ficha' };
+    }
+
+    ficha.avisadoPronto   = envio.enviado;
+    ficha.avisadoProntoEm = new Date().toISOString();
+    ficha.avisadoVia      = envio.via;
+    if (envio.erro) ficha.avisadoErro = String(envio.erro).slice(0,140);
+    else delete ficha.avisadoErro;
+    await dbSet(FL_KEY, db);
+    return res.status(200).json({ ok:true, ficha, envio });
+  }
+
   if (req.method === 'POST' && action === 'marcar-orc-whatsapp') {
     const { id } = req.body || {};
     if (!id) return res.status(400).json({ ok:false, error:'id obrigatorio' });

@@ -668,6 +668,28 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, feitos });
   }
 
+  // ── 📨 TEMPLATE-CONSERTO: avisa que o equipamento está pronto (janela fechada) ──
+  if (req.method === 'POST' && action === 'template-conserto') {
+    const { tel, nome } = req.body || {};
+    if (!tel) return res.status(400).json({ ok: false, error: 'tel obrigatório' });
+    const { token: tkT, phoneId: pidT } = await credenciais();
+    if (!tkT || !pidT) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
+    const to = String(tel).replace(/\D/g, '');
+    const to2 = to.startsWith('55') ? to : '55' + to;
+    const r = await fetch(`https://graph.facebook.com/v20.0/${pidT}/messages`, {
+      method: 'POST', headers: { Authorization: `Bearer ${tkT}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', to: to2, type: 'template',
+        template: { name: 'conserto_finalizado', language: { code: 'pt_BR' },
+          components: [{ type: 'body', parameters: [{ type: 'text', text: String(nome || 'tudo bem').split(' ')[0] }] }] } }),
+    }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+    const ok = !!(r && r.messages && r.messages[0]);
+    if (ok) {
+      await rpushEvt({ ts: new Date().toISOString(), tel: to2, dir: 'out',
+        texto: '📨 [conserto_finalizado] ' + (nome || ''), tipo: 'template', via: 'frenteloja-avisado' });
+    }
+    return res.status(200).json({ ok, erro: ok ? undefined : ((r && r.error && r.error.message) || 'falha') });
+  }
+
   // ── 📄 APROVACOES-DETALHE: relatório das fichas aprovadas no período ──
   if (action === 'aprovacoes-detalhe') {
     const dias = Math.min(365, Math.max(1, parseInt(req.query.dias || '1', 10)));
