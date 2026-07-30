@@ -70,6 +70,9 @@ async function orcamentosEmAberto() {
     dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('prospeccao_adm'),
   ]);
   const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+  // registro de orçamento enviado: antigo era texto com a data, novo é objeto com origem
+  const dataEnvio = v => (v && typeof v === 'object') ? v.em : v;
+  const origemEnvio = v => (v && typeof v === 'object') ? v.origem : null;
   // SAÍDAS: aprovou (avançou no pipe) ou virou Conflitos Bot
   const APROVOU = ['aprovados', 'video_enviado', 'analise_compra', 'equipamento_comprado',
     'programar_entrega', 'solicitar_entrega', 'entrega_solicitada', 'rota_em_andamento',
@@ -95,13 +98,13 @@ async function orcamentosEmAberto() {
   for (const f of (((logA || {}).fichas) || [])) {
     if (!['orc_registrado', 'orc_enviado'].includes(f.phase)) continue;
     if (!envA.ids[f.id]) continue;                       // só o que O BOT enviou
-    juntar(f, 'adm', envA.ids[f.id]);
+    juntar(f, 'adm', dataEnvio(envA.ids[f.id]));
   }
   for (const f of (((tvA || {}).fichas) || [])) {
     if (!['orc_registrado', 'orc_enviado'].includes(f.phase)) continue;
     const q = envA.ids['tv:' + f.id] || envA.ids[f.id];
     if (!q) continue;
-    juntar(f, 'tv', q);
+    juntar(f, 'tv', dataEnvio(q));
   }
   abertos.sort((a, b) => (b.horasParado || 0) - (a.horasParado || 0));
   return abertos;
@@ -121,15 +124,53 @@ async function garantirAprovacao(d8) {
   const passos = [];
 
   // 1) MOVER — acha o card no sistema certo
-  let [ppA, ppT, tvLog] = await Promise.all([dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('tv_logistica')]);
-  const fTv = (((tvLog || {}).fichas) || []).find(f => bate(f.telefone) && ['orc_enviado', 'orc_registrado'].includes(f.phase));
+  let [ppA, ppT, tvLog, envG] = await Promise.all([
+    dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('tv_logistica'),
+    dbGet('wa_orc_enviados').then(v => v || { ids: {} }),
+  ]);
+
+  // ═══ 1º: ROTEAR PELA ORIGEM DO ORÇAMENTO QUE O CLIENTE RECEBEU ═══
+  // Sem isso, a busca por telefone pode casar com uma ficha ANTIGA de outro sistema
+  // (cliente recorrente) e deixar o orçamento atual parado no limbo.
+  let origemRegistrada = null;
+  try {
+    const cands = [];
+    for (const k of Object.keys(envG.ids || {})) {
+      const v = envG.ids[k];
+      if (!v || typeof v !== 'object') continue;          // registros antigos não têm origem
+      if (!v.telefone || !String(v.telefone).endsWith(String(d8))) continue;
+      cands.push({ chave: k, ...v });
+    }
+    cands.sort((a, b) => String(b.em).localeCompare(String(a.em)));
+    origemRegistrada = cands[0] || null;                   // o mais recente é o que ele respondeu
+  } catch (e) {}
+  if (origemRegistrada) passos.push('origem do orçamento: ' + origemRegistrada.origem);
+
+  // ═══ TRAVA ANTI-LIMBO: sem origem registrada e com ficha aberta em mais de um sistema ═══
+  if (!origemRegistrada) {
+    const abertosTv = (((tvLog || {}).fichas) || []).some(f => bate(f.telefone) && ['orc_enviado', 'orc_registrado'].includes(f.phase));
+    const abertosAdm = (((ppA || {}).cards) || []).some(c => bate(c.telefone) && NEGOC.includes(faseDe(c)));
+    const abertosTvPipe = (((ppT || {}).cards) || []).some(c => bate(c.telefone) && NEGOC.includes(faseDe(c)));
+    const quantos = [abertosTv || abertosTvPipe, abertosAdm].filter(Boolean).length;
+    if (quantos > 1) {
+      passos.push('❌ AMBÍGUO: cliente tem orçamento aberto em TV e em ADM — não vou adivinhar');
+      return { ok: false, ambiguo: true, passos };
+    }
+  }
+
+  // se a origem diz que é da logística TV, nem procura no ADM
+  const soTv = origemRegistrada && origemRegistrada.origem === 'logistica-tv';
+  const soAdm = origemRegistrada && origemRegistrada.origem === 'logistica-adm';
+  const fTv = soAdm ? null : (((tvLog || {}).fichas) || []).find(f =>
+    (origemRegistrada && origemRegistrada.fichaId ? f.id === origemRegistrada.fichaId : bate(f.telefone))
+    && ['orc_enviado', 'orc_registrado'].includes(f.phase));
   let card = null, api = 'pipe', sis = 'adm';
   if (fTv) {
     const r = await post('tv-logistica', 'aprovar-orcamento', { id: fTv.id });
     passos.push('TV logística: ' + (r && !r.error ? 'aprovado' : 'FALHOU ' + (r.error || '')));
     sis = 'tv';
   }
-  card = (((ppA || {}).cards) || []).find(c => bate(c.telefone) && NEGOC.includes(faseDe(c)));
+  card = soTv ? null : (((ppA || {}).cards) || []).find(c => bate(c.telefone) && NEGOC.includes(faseDe(c)));
   if (!card) {
     const cT = (((ppT || {}).cards) || []).find(c => bate(c.telefone) && NEGOC.includes(faseDe(c)));
     if (cT) { card = cT; api = 'tv-pipe'; sis = 'tv'; }
@@ -1527,7 +1568,7 @@ export default async function handler(req, res) {
       if (!abertoO && !d8ok(f.telefone)) continue;    // trava de teste (modo aberto libera)
       if (abertoO && pzO[String(f.telefone).replace(/\D/g, '').slice(-8)]) continue; // pausado (takeover)
       const dedupeKey = sisO === 'tv' ? 'tv:' + f.id : f.id;
-      if (enviadosO.ids[dedupeKey]) continue;         // dedupe
+      if (enviadosO.ids[dedupeKey]) continue;         // dedupe (aceita formato antigo em texto e o novo em objeto)
       // marco temporal: NÃO enviar o backlog — só diagnósticos feitos após a ativação
       const tsOrc = new Date((f.diagnostico && f.diagnostico.em) || f.movedAt || f.criadoEm || 0).getTime();
       if (marcoO && tsOrc < marcoO) continue;
@@ -1564,7 +1605,14 @@ export default async function handler(req, res) {
           if (okO) await bumpStat('orcamentos');
           disparos.push({ nome: f.nome, modo: 'template-janela-fechada', ok: okO });
         }
-        enviadosO.ids[dedupeKey] = new Date().toISOString();
+        // 🎯 ROTEAMENTO POR ORIGEM: guarda de ONDE veio este orçamento, para a aprovação
+        // não precisar adivinhar pelo telefone (cliente pode ter ficha em mais de um sistema).
+        enviadosO.ids[dedupeKey] = {
+          em: new Date().toISOString(),
+          origem: sisO === 'tv' ? 'logistica-tv' : 'logistica-adm',
+          fichaId: f.id,
+          telefone: String(f.telefone || '').replace(/\D/g, ''),
+        };
         // Efeito do botão "Copiar e Enviar": marca o orçamento como enviado na seção Orçamentos
         // (some de pendentes; o card já está no pipe em aguardando_aprovacao → cronômetro de 48h da última chamada segue vivo)
         try {
@@ -2446,13 +2494,15 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
           } else {
             // FALHA VISÍVEL — nunca mais silenciosa
             await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'acao', tipo: 'falha',
-              texto: '❌ APROVAÇÃO NÃO CONCLUÍDA — ' + gar.passos.join(' | ') });
+              texto: (gar.ambiguo ? '⚠️ APROVAÇÃO AMBÍGUA — ' : '❌ APROVAÇÃO NÃO CONCLUÍDA — ') + gar.passos.join(' | ') });
             try {
               const KCF2 = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
               await fetch(`https://reparoeletroadm.com/api/prospeccao?action=criar-conflito&k=${KCF2}`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ nome: 'Cliente WhatsApp', telefone: String(tel).replace(/\D/g, ''),
-                  motivo: 'APROVAÇÃO FALHOU NO SISTEMA — cliente aprovou mas a ficha não avançou. Verificar e mover manualmente.' }),
+                  motivo: gar.ambiguo
+                    ? 'APROVAÇÃO AMBÍGUA — cliente tem orçamento aberto em mais de um sistema (TV e ADM). Confirmar com ele QUAL equipamento foi aprovado e mover manualmente.'
+                    : 'APROVAÇÃO FALHOU NO SISTEMA — cliente aprovou mas a ficha não avançou. Verificar e mover manualmente.' }),
               });
             } catch (e) {}
           }
