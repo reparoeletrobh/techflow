@@ -586,6 +586,17 @@ export default async function handler(req, res) {
         proximoPasso: 'o sync do próximo ciclo (5 min) reimporta — ou rode /api/fichas?action=sync agora',
         recuperadas: recuperaveis, ignoradas: perdidas.filter(p => !recuperaveis.includes(p)) });
     }
+    // ?curto=1 → uma linha curta por ficha, para caber no chat
+    if (String(req.query.curto || '') === '1') {
+      const linha = p => (p.nome || '?').slice(0, 18) + ' ' + String(p.telefone || '').slice(-4) +
+        ' | ' + String(p.equipamento || '').slice(0, 18) +
+        ' | ' + String(p.horario || '').slice(0, 14) +
+        ' | ' + (p.bloqueada ? 'excluída' : 'não importada');
+      return res.status(200).json({ ok: true,
+        dias, perdidas: recuperaveis.length, jaAtendidas: perdidas.length - recuperaveis.length,
+        lista: recuperaveis.slice(0, 30).map(linha),
+        dica: 'para recuperar: trocar &curto=1 por &aplicar=1' });
+    }
     return res.status(200).json({ ok: true, modo: 'prévia (nada foi alterado)',
       periodoDias: dias, cursorAtual: (cursor || {}).row || null,
       linhasSemFichaNoBancoDeCriadas: perdidas.length,
