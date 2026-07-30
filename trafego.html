@@ -104,6 +104,7 @@ a.voltar{color:var(--dim);text-decoration:none;font-size:11.5px;font-weight:700;
   <div class="aba" id="s-copiloto" onclick="secao('copiloto')">🧭 Copiloto</div>
   <div class="aba" id="s-analise" onclick="secao('analise')">🔬 Análise &amp; criativos</div>
   <div class="aba" id="s-inteligencia" onclick="secao('inteligencia')">🧠 Inteligência</div>
+  <div class="aba" id="s-programacao" onclick="secao('programacao')">📅 Programação</div>
 </div>
 <div id="pg-anuncios">
   <div id="recado-copiloto"></div>
@@ -118,6 +119,7 @@ a.voltar{color:var(--dim);text-decoration:none;font-size:11.5px;font-weight:700;
 <div id="pg-copiloto" style="display:none;"></div>
 <div id="pg-analise" style="display:none;"></div>
 <div id="pg-inteligencia" style="display:none;"></div>
+<div id="pg-programacao" style="display:none;"></div>
 
 <div class="rodape">
   <a class="voltar" href="/adm">← Menu</a>
@@ -246,7 +248,7 @@ function render(){
 }
 
 function secao(s){
-  ['anuncios','copiloto','analise','inteligencia'].forEach(function(x){
+  ['anuncios','copiloto','analise','inteligencia','programacao'].forEach(function(x){
     document.getElementById('pg-'+x).style.display=x===s?'block':'none';
     var t=document.getElementById('s-'+x);
     if(x===s){t.classList.add('on');t.style.borderColor='#f97316';t.style.background='#f9731622';t.style.color='#fff';}
@@ -255,6 +257,85 @@ function secao(s){
   if(s==='copiloto'&&!window._cop)carregarCopiloto();
   if(s==='analise'&&!window._an)carregarAnalise(false);
   if(s==='inteligencia'&&!window._int)carregarInteligencia(false);
+  if(s==='programacao')carregarProgramacao();
+}
+
+/* ── 📅 PROGRAMAÇÃO DO PRÓXIMO CICLO ── */
+async function carregarProgramacao(){
+  var el=document.getElementById('pg-programacao');
+  el.innerHTML='<div class="vazio-msg">📅 Montando o plano do próximo ciclo…</div>';
+  var r=await fetch('/api/trafego?action=montar-semana',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({})}).then(function(x){return x.json();}).catch(function(){return null;});
+  if(!r||!r.ok){el.innerHTML='<div class="vazio-msg">'+esc((r&&r.error)||'não consegui montar o plano')+'</div>';return;}
+  window._prog=r;
+  var dIni=new Date(r.inicio), dFim=new Date(r.fim);
+  var fmt=function(d){return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});};
+
+  var h='<div style="background:linear-gradient(150deg,rgba(59,130,246,.12),rgba(13,16,24,.95));border:1px solid rgba(59,130,246,.45);border-radius:13px;padding:13px;margin-bottom:12px;">'
+    +'<div style="font-size:9.5px;font-weight:900;color:#60a5fa;letter-spacing:.6px;">PRÓXIMO CICLO</div>'
+    +'<div style="font-family:var(--mono);font-size:13px;font-weight:700;margin-top:5px;">'+fmt(dIni)+' → '+fmt(dFim)+'</div>'
+    +'<div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap;">'
+      +'<div><div style="font-family:var(--mono);font-size:20px;font-weight:700;">'+r.total+'</div><div style="font-size:9px;color:var(--dim);font-weight:800;">ANÚNCIOS</div></div>'
+      +'<div><div style="font-family:var(--mono);font-size:20px;font-weight:700;color:#fb923c;">'+brl(r.verbaPorAnuncio.adm)+'</div><div style="font-size:9px;color:var(--dim);font-weight:800;">CADA (ADM · '+r.adm+')</div></div>'
+      +'<div><div style="font-family:var(--mono);font-size:20px;font-weight:700;color:#60a5fa;">'+brl(r.verbaPorAnuncio.tv)+'</div><div style="font-size:9px;color:var(--dim);font-weight:800;">CADA (TV · '+r.tv+')</div></div>'
+    +'</div>'
+    +'<div style="font-size:10.5px;color:#93c5fd;margin-top:9px;line-height:1.5;">✅ '+esc(r.observacao||'')+'</div>'
+  +'</div>';
+
+  if(!r.itens.length){
+    h+='<div class="vazio-msg">Nenhum criativo registrado ainda para o próximo ciclo.<br><span style="font-size:11px;">Suba os vídeos nas pastas do Drive e peça para registrar.</span></div>';
+    el.innerHTML=h;return;
+  }
+
+  // agrupa por categoria
+  var porCat={};
+  r.itens.forEach(function(s){
+    var p=s.split(' | ');
+    var cat=(p[0]||'').toLowerCase();
+    (porCat[cat]=porCat[cat]||[]).push({tipo:(p[1]||'').trim(),nome:(p[2]||'').trim(),verba:(p[3]||'').trim(),modelo:(p[4]||'').trim()});
+  });
+  h+=Object.keys(porCat).map(function(cat){
+    var cor=corCat(cat);
+    var itens=porCat[cat];
+    return '<div style="background:var(--painel);border:1px solid var(--linha);border-left:4px solid '+cor+';border-radius:13px;padding:13px;margin-bottom:11px;">'
+      +'<div style="display:flex;justify-content:space-between;align-items:baseline;">'
+        +'<b style="font-size:15px;color:'+cor+';">'+esc(CAT_NOME[cat]||cat)+'</b>'
+        +'<span style="font-family:var(--mono);font-size:11px;color:var(--dim);">'+itens.length+' anúncios</span></div>'
+      +itens.map(function(i){
+        var ehCampeao=i.tipo==='campeao';
+        return '<div style="display:flex;justify-content:space-between;gap:9px;align-items:center;padding:7px 0;border-top:1px solid rgba(255,255,255,.05);">'
+          +'<div style="flex:1;min-width:0;">'
+            +'<span style="font-size:9px;font-weight:900;padding:1px 6px;border-radius:5px;'+(ehCampeao?'background:#22c55e22;color:#4ade80;':'background:#3b82f622;color:#60a5fa;')+'">'
+            +(ehCampeao?'🏆 PERMANECE':'🆕 ENTRA')+'</span>'
+            +'<div style="font-size:11.5px;font-weight:700;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(i.nome)+'</div>'
+          +'</div>'
+          +'<span style="font-family:var(--mono);font-size:12px;color:#4ade80;font-weight:700;flex:0 0 auto;">'+esc(i.verba)+'</span>'
+        +'</div>';
+      }).join('')
+    +'</div>';
+  }).join('');
+
+  h+='<button class="btn" style="width:100%;padding:12px;font-size:12.5px;margin-bottom:8px;background:#1e293b;" onclick="montarSemana(true)">🧪 Testar com 1 criativo primeiro</button>'
+    +'<button class="btn destaque" style="width:100%;padding:14px;font-size:13.5px;" onclick="montarSemana(false)">✅ Confirmar e agendar os '+r.total+' anúncios</button>'
+    +'<div style="font-size:10px;color:var(--dim);text-align:center;margin-top:6px;">nada é criado na Meta antes de você confirmar</div>';
+  el.innerHTML=h;
+}
+async function montarSemana(apenasUm){
+  var r=window._prog;if(!r)return;
+  var msg=apenasUm?'Criar UM anúncio de teste na Meta?':'Criar os '+r.total+' anúncios agendados para sábado?';
+  if(!confirm(msg+'\n\nIsso cria campanhas de verdade na sua conta de anúncios.'))return;
+  var el=document.getElementById('pg-programacao');
+  el.innerHTML='<div class="vazio-msg">📤 Criando na Meta… isso pode levar alguns minutos.</div>';
+  var resp=await fetch('/api/trafego?action=montar-semana',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({confirmar:true,apenasUm:!!apenasUm})}).then(function(x){return x.json();}).catch(function(){return{ok:false,erros:['falha de rede']};});
+  var h='<div style="background:var(--painel);border:1px solid var(--linha);border-radius:13px;padding:14px;">'
+    +'<b style="font-size:15px;color:'+(resp.ok?'#4ade80':'#f59e0b')+';">'+(resp.ok?'✅ Criados com sucesso':'⚠️ Criado com pendências')+'</b>'
+    +'<div style="font-family:var(--mono);font-size:12px;margin-top:8px;">'+(resp.criados||0)+' anúncio(s) criado(s)</div>'
+    +((resp.feitos||[]).length?'<div style="margin-top:8px;font-size:11px;color:#c9ced6;line-height:1.6;">'+resp.feitos.map(function(f){return '✅ '+esc(f.nome)+' · '+brl(f.verba);}).join('<br>')+'</div>':'')
+    +((resp.erros||[]).length?'<div style="margin-top:10px;font-size:11px;color:#fca5a5;line-height:1.6;">'+resp.erros.slice(0,10).map(function(e){return '❌ '+esc(e);}).join('<br>')+'</div>':'')
+    +'<button class="btn" style="width:100%;margin-top:12px;" onclick="carregarProgramacao()">↻ voltar ao plano</button>'
+  +'</div>';
+  el.innerHTML=h;
 }
 
 /* ── 🧠 INTELIGÊNCIA: funil real por categoria ── */
