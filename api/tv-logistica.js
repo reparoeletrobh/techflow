@@ -868,7 +868,7 @@ module.exports = async function handler(req, res) {
 
     function priNome(n) { return n ? n.trim().split(/\s+/)[0] : 'cliente'; }
 
-    function gerarTexto(tipo, subtipo, servicos, precoInput, templates, modelo, tuSub) {
+    function gerarTexto(tipo, subtipo, servicos, precoInput, templates, modelo, tuSub, polInformada) {
       const pn = priNome(nome);
       const s  = servicos || [];
       const tem = (lista) => s.some(x => lista.includes(x));
@@ -908,7 +908,10 @@ module.exports = async function handler(req, res) {
           }
           return null;
         }
-        const pol = extrairPol(fontesBusca);
+        // 🎯 O campo obrigatório de polegadas manda. A extração por texto vira só reserva
+        // para fichas antigas — antes o preço dependia de adivinhar o número no modelo.
+        const polCampo = parseInt(String(polInformada || '').replace(/\D/g, ''), 10);
+        const pol = (polCampo >= 30 && polCampo <= 120) ? polCampo : extrairPol(fontesBusca);
 
         // ── Tabela de preços por polegada ─────────────────────────────────
         const TAB_PRECO = [
@@ -916,6 +919,8 @@ module.exports = async function handler(req, res) {
         ];
         let precoTab = null;
         if (pol) { for (const f of TAB_PRECO) { if(pol>=f.min&&pol<=f.max){precoTab=f.p;break;} } }
+        // polegada informada mas fora da tabela (acima de 79): não inventa preço
+        if (pol && !precoTab) console.warn('[TV] ' + pol + '" fora da tabela de preços');
 
         // Fallback: se não achou por polegada mas há preço manual no eq.preco (fichas antigas)
         const precoManual = parseFloat(precoInput) > 0 ? String(Math.round(parseFloat(precoInput))) : null;
@@ -1061,7 +1066,7 @@ module.exports = async function handler(req, res) {
 
     // Gerar texto para cada equipamento
     const resultados = equips.map(eq => {
-      const r = gerarTexto(eq.tipo, eq.subtipo, eq.servicos, eq.preco, customTemplates, eq.modelo, eq.tuSub);
+      const r = gerarTexto(eq.tipo, eq.subtipo, eq.servicos, eq.preco, customTemplates, eq.modelo, eq.tuSub, eq.polegadas);
       // ⚡ Tabela Dinâmica: MESMO texto e peças — só o valor vira 40% do equipamento (arredondado)
       if (eq.tabela === 'dinamica') {
         const valorEq = parseFloat(String(eq.valorEquip || '0').replace(',', '.')) || 0;
