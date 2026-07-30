@@ -2286,8 +2286,26 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
       const _txts = (j.content || []).filter(b => b.type === 'text');
       const texto = (_txts.length ? _txts[_txts.length - 1].text : '') || '';
       let sug;
-      try { sug = JSON.parse(texto.replace(/```json|```/g, '').trim()); }
-      catch { sug = { resposta: texto.slice(0, 800), acao: { tipo: 'nenhuma', motivo: 'parse' }, confianca: 'baixa' }; }
+      const limpo = texto.replace(/```json|```/g, '').trim();
+      try { sug = JSON.parse(limpo); }
+      catch {
+        // tenta achar o JSON dentro do texto (a IA às vezes escreve algo antes ou depois)
+        let achou = null;
+        const m = limpo.match(/\{[\s\S]*\}/);
+        if (m) { try { achou = JSON.parse(m[0]); } catch (e) {} }
+        if (!achou) {
+          // último recurso: extrair só o campo resposta
+          const mr = limpo.match(/"resposta"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+          if (mr) { try { achou = { resposta: JSON.parse('"' + mr[1] + '"'), acao: { tipo: 'nenhuma', motivo: 'extraido' }, confianca: 'baixa' }; } catch (e) {} }
+        }
+        // 🚫 NUNCA usar o texto cru como resposta — era assim que o JSON chegava ao cliente
+        sug = achou || { resposta: '', acao: { tipo: 'nenhuma', motivo: 'parse-falhou' }, confianca: 'baixa', _falhaParse: true };
+      }
+      // CAMADA DE SEGURANÇA: se a resposta ainda parecer estrutura interna, descarta
+      const pareceJson = t => /"(resposta|acao|confianca|tipo|motivo)"\s*:/.test(String(t || '')) || /^\s*[{[]/.test(String(t || ''));
+      if (pareceJson(sug.resposta)) {
+        sug = { resposta: '', acao: { tipo: 'nenhuma', motivo: 'resposta-suja' }, confianca: 'baixa', _falhaParse: true };
+      }
       // Tag [RETOMAR]: cliente quis agendar fora do horário → fila de retomada na abertura da janela
       try {
         if (sug.resposta && sug.resposta.includes('[RETOMAR]')) {
@@ -2310,6 +2328,14 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
   if (req.method === 'POST' && action === 'enviar') {
     const { tel, texto, acaoAprovada, acaoMotivo, via } = req.body || {};
     if (!tel || !texto) return res.status(400).json({ ok: false, error: 'tel e texto obrigatórios' });
+    // 🛡 BARREIRA FINAL: estrutura interna do sistema NUNCA pode chegar ao cliente
+    if (/"(resposta|acao|confianca)"\s*:/.test(String(texto)) || /^\s*\{[\s\S]*"tipo"/.test(String(texto))) {
+      try {
+        await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'acao', tipo: 'falha',
+          texto: '🛡 ENVIO BLOQUEADO — a mensagem continha estrutura interna (JSON) e não foi enviada ao cliente' });
+      } catch (e) {}
+      return res.status(400).json({ ok: false, error: 'mensagem continha estrutura interna — envio bloqueado' });
+    }
     const { token: tkE, phoneId: pidE } = await credenciais();
     if (!tkE || !pidE) return res.status(200).json({ ok: false, error: 'Credenciais WhatsApp não configuradas (envs ou setup-credenciais)' });
     try {
