@@ -240,11 +240,11 @@
     },
     {
       "source": "/autorizada-:slug",
-      "destination": "/autorizada.html"
+      "destination": "/1autorizada.html"
     },
     {
       "source": "/autorizada",
-      "destination": "/autorizada.html"
+      "destination": "/1autorizada.html"
     },
     {
       "source": "/api/prospeccao",
@@ -302,7 +302,7 @@
           "value": "riorefrigeracao.com"
         }
       ],
-      "destination": "/rio-refrigeracao.html"
+      "destination": "/1rio-refrigeracao.html"
     },
     {
       "source": "/1",
@@ -312,7 +312,7 @@
           "value": "www.riorefrigeracao.com"
         }
       ],
-      "destination": "/rio-refrigeracao.html"
+      "destination": "/1rio-refrigeracao.html"
     },
     {
       "source": "/2",
@@ -322,7 +322,7 @@
           "value": "riorefrigeracao.com"
         }
       ],
-      "destination": "/rio-refrigeracao.html"
+      "destination": "/1rio-refrigeracao.html"
     },
     {
       "source": "/2",
@@ -332,7 +332,7 @@
           "value": "www.riorefrigeracao.com"
         }
       ],
-      "destination": "/rio-refrigeracao.html"
+      "destination": "/1rio-refrigeracao.html"
     },
     {
       "source": "/3",
@@ -342,7 +342,7 @@
           "value": "riorefrigeracao.com"
         }
       ],
-      "destination": "/rio-refrigeracao.html"
+      "destination": "/1rio-refrigeracao.html"
     },
     {
       "source": "/3",
@@ -352,7 +352,7 @@
           "value": "www.riorefrigeracao.com"
         }
       ],
-      "destination": "/rio-refrigeracao.html"
+      "destination": "/1rio-refrigeracao.html"
     },
     {
       "source": "/4",
@@ -362,7 +362,7 @@
           "value": "riorefrigeracao.com"
         }
       ],
-      "destination": "/rio-refrigeracao.html"
+      "destination": "/1rio-refrigeracao.html"
     },
     {
       "source": "/4",
@@ -372,7 +372,7 @@
           "value": "www.riorefrigeracao.com"
         }
       ],
-      "destination": "/rio-refrigeracao.html"
+      "destination": "/1rio-refrigeracao.html"
     },
     {
       "source": "/5",
@@ -382,7 +382,7 @@
           "value": "riorefrigeracao.com"
         }
       ],
-      "destination": "/rio-refrigeracao.html"
+      "destination": "/1rio-refrigeracao.html"
     },
     {
       "source": "/5",
@@ -392,7 +392,7 @@
           "value": "www.riorefrigeracao.com"
         }
       ],
-      "destination": "/rio-refrigeracao.html"
+      "destination": "/1rio-refrigeracao.html"
     },
     {
       "source": "/6",
@@ -402,7 +402,7 @@
           "value": "riorefrigeracao.com"
         }
       ],
-      "destination": "/rio-refrigeracao.html"
+      "destination": "/1rio-refrigeracao.html"
     },
     {
       "source": "/6",
@@ -412,7 +412,7 @@
           "value": "www.riorefrigeracao.com"
         }
       ],
-      "destination": "/rio-refrigeracao.html"
+      "destination": "/1rio-refrigeracao.html"
     },
     {
       "source": "/1",
@@ -422,7 +422,7 @@
           "value": "cabofriogeladeiras.com"
         }
       ],
-      "destination": "/cabo-frio-geladeiras.html"
+      "destination": "/1cabo-frio-geladeiras.html"
     },
     {
       "source": "/1",
@@ -432,7 +432,7 @@
           "value": "www.cabofriogeladeiras.com"
         }
       ],
-      "destination": "/cabo-frio-geladeiras.html"
+      "destination": "/1cabo-frio-geladeiras.html"
     },
     {
       "source": "/2",
@@ -442,7 +442,7 @@
           "value": "cabofriogeladeiras.com"
         }
       ],
-      "destination": "/cabo-frio-geladeiras.html"
+      "destination": "/1cabo-frio-geladeiras.html"
     },
     {
       "source": "/2",
@@ -452,7 +452,7 @@
           "value": "www.cabofriogeladeiras.com"
         }
       ],
-      "destination": "/cabo-frio-geladeiras.html"
+      "destination": "/1cabo-frio-geladeiras.html"
     },
     {
       "source": "/3",
@@ -462,7 +462,7 @@
           "value": "cabofriogeladeiras.com"
         }
       ],
-      "destination": "/cabo-frio-geladeiras.html"
+      "destination": "/1cabo-frio-geladeiras.html"
     },
     {
       "source": "/3",
@@ -472,7 +472,7 @@
           "value": "www.cabofriogeladeiras.com"
         }
       ],
-      "destination": "/cabo-frio-geladeiras.html"
+      "destination": "/1cabo-frio-geladeiras.html"
     },
     {
       "source": "/4",
@@ -482,7 +482,7 @@
           "value": "cabofriogeladeiras.com"
         }
       ],
-      "destination": "/cabo-frio-geladeiras.html"
+      "destination": "/1cabo-frio-geladeiras.html"
     },
     {
       "source": "/4",
@@ -492,7 +492,7 @@
           "value": "www.cabofriogeladeiras.com"
         }
       ],
-      "destination": "/cabo-frio-geladeiras.html"
+      "destination": "/1cabo-frio-geladeiras.html"
     },
     {
       "source": "/5",
@@ -502,7 +502,7 @@
           "value": "cabofriogeladeiras.com"
         }
       ],
-      "destination": "/cabo-frio-geladeiras.html"
+      "destination": "/1cabo-frio-geladeiras.html"
     },
     {
       "source": "/5",
@@ -512,7 +512,7 @@
           "value": "www.cabofriogeladeiras.com"
         }
       ],
-      "destination": "/cabo-frio-geladeiras.html"
+      "destination": "/1cabo-frio-geladeiras.html"
     },
     {
       "source": "/6",
@@ -522,7 +522,7 @@
           "value": "cabofriogeladeiras.com"
         }
       ],
-      "destination": "/cabo-frio-geladeiras.html"
+      "destination": "/1cabo-frio-geladeiras.html"
     },
     {
       "source": "/6",
@@ -532,7 +532,7 @@
           "value": "www.cabofriogeladeiras.com"
         }
       ],
-      "destination": "/cabo-frio-geladeiras.html"
+      "destination": "/1cabo-frio-geladeiras.html"
     },
     {
       "source": "/1",
@@ -542,7 +542,7 @@
           "value": "rjgeladeiras.com"
         }
       ],
-      "destination": "/rj-geladeiras.html"
+      "destination": "/1rj-geladeiras.html"
     },
     {
       "source": "/1",
@@ -552,7 +552,7 @@
           "value": "www.rjgeladeiras.com"
         }
       ],
-      "destination": "/rj-geladeiras.html"
+      "destination": "/1rj-geladeiras.html"
     },
     {
       "source": "/2",
@@ -562,7 +562,7 @@
           "value": "rjgeladeiras.com"
         }
       ],
-      "destination": "/rj-geladeiras.html"
+      "destination": "/1rj-geladeiras.html"
     },
     {
       "source": "/2",
@@ -572,7 +572,7 @@
           "value": "www.rjgeladeiras.com"
         }
       ],
-      "destination": "/rj-geladeiras.html"
+      "destination": "/1rj-geladeiras.html"
     },
     {
       "source": "/3",
@@ -582,7 +582,7 @@
           "value": "rjgeladeiras.com"
         }
       ],
-      "destination": "/rj-geladeiras.html"
+      "destination": "/1rj-geladeiras.html"
     },
     {
       "source": "/3",
@@ -592,7 +592,7 @@
           "value": "www.rjgeladeiras.com"
         }
       ],
-      "destination": "/rj-geladeiras.html"
+      "destination": "/1rj-geladeiras.html"
     },
     {
       "source": "/4",
@@ -602,7 +602,7 @@
           "value": "rjgeladeiras.com"
         }
       ],
-      "destination": "/rj-geladeiras.html"
+      "destination": "/1rj-geladeiras.html"
     },
     {
       "source": "/4",
@@ -612,7 +612,7 @@
           "value": "www.rjgeladeiras.com"
         }
       ],
-      "destination": "/rj-geladeiras.html"
+      "destination": "/1rj-geladeiras.html"
     },
     {
       "source": "/5",
@@ -622,7 +622,7 @@
           "value": "rjgeladeiras.com"
         }
       ],
-      "destination": "/rj-geladeiras.html"
+      "destination": "/1rj-geladeiras.html"
     },
     {
       "source": "/5",
@@ -632,7 +632,7 @@
           "value": "www.rjgeladeiras.com"
         }
       ],
-      "destination": "/rj-geladeiras.html"
+      "destination": "/1rj-geladeiras.html"
     },
     {
       "source": "/6",
@@ -642,7 +642,7 @@
           "value": "rjgeladeiras.com"
         }
       ],
-      "destination": "/rj-geladeiras.html"
+      "destination": "/1rj-geladeiras.html"
     },
     {
       "source": "/6",
@@ -652,7 +652,7 @@
           "value": "www.rjgeladeiras.com"
         }
       ],
-      "destination": "/rj-geladeiras.html"
+      "destination": "/1rj-geladeiras.html"
     },
     {
       "source": "/",
@@ -662,7 +662,7 @@
           "value": "riorefrigeracao.com"
         }
       ],
-      "destination": "/rio-refrigeracao.html"
+      "destination": "/1rio-refrigeracao.html"
     },
     {
       "source": "/",
@@ -672,7 +672,7 @@
           "value": "www.riorefrigeracao.com"
         }
       ],
-      "destination": "/rio-refrigeracao.html"
+      "destination": "/1rio-refrigeracao.html"
     },
     {
       "source": "/",
@@ -682,7 +682,7 @@
           "value": "cabofriogeladeiras.com"
         }
       ],
-      "destination": "/cabo-frio-geladeiras.html"
+      "destination": "/1cabo-frio-geladeiras.html"
     },
     {
       "source": "/",
@@ -692,7 +692,7 @@
           "value": "www.cabofriogeladeiras.com"
         }
       ],
-      "destination": "/cabo-frio-geladeiras.html"
+      "destination": "/1cabo-frio-geladeiras.html"
     },
     {
       "source": "/",
@@ -702,7 +702,7 @@
           "value": "rjgeladeiras.com"
         }
       ],
-      "destination": "/rj-geladeiras.html"
+      "destination": "/1rj-geladeiras.html"
     },
     {
       "source": "/",
@@ -712,7 +712,7 @@
           "value": "www.rjgeladeiras.com"
         }
       ],
-      "destination": "/rj-geladeiras.html"
+      "destination": "/1rj-geladeiras.html"
     },
     {
       "source": "/api/agendamento",
@@ -772,27 +772,27 @@
     },
     {
       "source": "/geladeira-6",
-      "destination": "/geladeira.html"
+      "destination": "/1geladeira.html"
     },
     {
       "source": "/geladeira-5",
-      "destination": "/geladeira.html"
+      "destination": "/1geladeira.html"
     },
     {
       "source": "/geladeira-4",
-      "destination": "/geladeira.html"
+      "destination": "/1geladeira.html"
     },
     {
       "source": "/geladeira-3",
-      "destination": "/geladeira.html"
+      "destination": "/1geladeira.html"
     },
     {
       "source": "/geladeira-2",
-      "destination": "/geladeira.html"
+      "destination": "/1geladeira.html"
     },
     {
       "source": "/geladeira-1",
-      "destination": "/geladeira.html"
+      "destination": "/1geladeira.html"
     },
     {
       "source": "/tv/barramento",
@@ -804,7 +804,7 @@
     },
     {
       "source": "/geladeira",
-      "destination": "/geladeira.html"
+      "destination": "/1geladeira.html"
     },
     {
       "source": "/api/pipe",
