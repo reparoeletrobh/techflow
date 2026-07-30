@@ -609,6 +609,78 @@ module.exports = async function handler(req, res) {
       proximo: 'rode ?action=modelos&curto=1 para ver o novo campeão' });
   }
 
+  // ── 📥 CRIATIVOS-REGISTRAR: cadastra os criativos da semana (nome, categoria, URL do vídeo) ──
+  if (req.method === 'POST' && action === 'criativos-registrar') {
+    const { semana, criativos, substituir } = req.body || {};
+    if (!Array.isArray(criativos)) return res.status(400).json({ ok: false, error: 'criativos deve ser uma lista' });
+    const chave = 'trafego_criativos_' + (semana || 'atual');
+    const atual = substituir ? { itens: [] } : ((await dbGet(chave)) || { itens: [] });
+    const CATS_OK = ['tv', 'microondas', 'purificador', 'adega'];
+    const aceitos = [], recusados = [];
+    for (const c of criativos) {
+      const cat = String(c.categoria || '').toLowerCase();
+      if (!CATS_OK.includes(cat)) { recusados.push({ nome: c.nome, motivo: 'categoria inválida: ' + cat }); continue; }
+      if (!c.url) { recusados.push({ nome: c.nome, motivo: 'sem URL do vídeo' }); continue; }
+      if (atual.itens.some(x => x.url === c.url)) { recusados.push({ nome: c.nome, motivo: 'já cadastrado' }); continue; }
+      aceitos.push({ nome: String(c.nome || 'sem nome').slice(0, 80), categoria: cat,
+        url: String(c.url), tipo: c.tipo || 'video', registradoEm: new Date().toISOString() });
+    }
+    atual.itens = atual.itens.concat(aceitos);
+    atual.atualizadoEm = new Date().toISOString();
+    await dbSet(chave, atual);
+    return res.status(200).json({ ok: true, aceitos: aceitos.length, recusados,
+      totalNaSemana: atual.itens.length,
+      porCategoria: atual.itens.reduce((o, x) => { o[x.categoria] = (o[x.categoria] || 0) + 1; return o; }, {}) });
+  }
+
+  // ── 📋 PLANO-SEMANA: campeões + novos, rateio da verba, prévia para revisão ──
+  if (action === 'plano-semana') {
+    const cfgP = await cfgTrafego();
+    const semana = String(req.query.semana || 'atual');
+    const novos = (await dbGet('trafego_criativos_' + semana)) || { itens: [] };
+    const base = await dbGet('trafego_painel_cache_7d') || await dbGet('trafego_painel_cache');
+    if (!base || !base.dados) return res.status(200).json({ ok: false, error: 'abra o painel primeiro' });
+
+    // campeões atuais por categoria (mesmo critério da action modelos)
+    const cfgX = (await dbGet('trafego_config')) || {};
+    const fora = (cfgX.modelosExcluir || ['reforma', 'pintura', 'restaura']).map(s => String(s).toLowerCase());
+    const ativos = (base.dados.anuncios || []).filter(a => a.ativo && a.conversas >= 3 && a.cpa != null
+      && !fora.some(p => String(a.nome || '').toLowerCase().includes(p)));
+    const CATS = ['tv', 'microondas', 'purificador', 'adega'];
+    const plano = [];
+    for (const cat of CATS) {
+      const daCat = ativos.filter(a => a.categoria === cat).sort((a, b) => (a.razaoMeta || 9) - (b.razaoMeta || 9));
+      const campeao = daCat[0] || null;
+      const novosCat = (novos.itens || []).filter(x => x.categoria === cat);
+      plano.push({ categoria: cat,
+        campeao: campeao ? { nome: campeao.nome, cpa: campeao.cpa, conversas: campeao.conversas,
+          anuncioId: campeao.id, adsetId: campeao.adsetId, campanhaId: campeao.campanhaId } : null,
+        novos: novosCat.map(x => ({ nome: x.nome, url: x.url })),
+        totalAnuncios: (campeao ? 1 : 0) + novosCat.length,
+        pausar: daCat.slice(1).map(a => ({ nome: a.nome, anuncioId: a.id, campanhaId: a.campanhaId, cpa: a.cpa })),
+      });
+    }
+    // rateio: TV é frente própria; as demais dividem a verba do ADM
+    const vTv = cfgP.verba.tv * cfgP.verba.aproveitamento;
+    const vAdm = cfgP.verba.adm * cfgP.verba.aproveitamento;
+    const nTv = plano.find(p => p.categoria === 'tv').totalAnuncios || 0;
+    const nAdm = plano.filter(p => p.categoria !== 'tv').reduce((s, p) => s + p.totalAnuncios, 0);
+    const porAnuncioTv = nTv ? Number((vTv / nTv).toFixed(2)) : 0;
+    const porAnuncioAdm = nAdm ? Number((vAdm / nAdm).toFixed(2)) : 0;
+    for (const p of plano) p.verbaPorAnuncio = p.categoria === 'tv' ? porAnuncioTv : porAnuncioAdm;
+
+    return res.status(200).json({ ok: true, semana,
+      ciclo: 'sábado 13h → sábado 11h',
+      verba: { adm: { total: Number(vAdm.toFixed(2)), anuncios: nAdm, porAnuncio: porAnuncioAdm },
+               tv:  { total: Number(vTv.toFixed(2)),  anuncios: nTv,  porAnuncio: porAnuncioTv } },
+      plano,
+      totalPausar: plano.reduce((s, p) => s + p.pausar.length, 0),
+      totalSubir: plano.reduce((s, p) => s + p.novos.length, 0),
+      resumo: 'Vão rodar ' + (nAdm + nTv) + ' anúncios: ' + plano.filter(p => p.campeao).length +
+        ' campeões mantidos e ' + plano.reduce((s, p) => s + p.novos.length, 0) + ' criativos novos. ' +
+        plano.reduce((s, p) => s + p.pausar.length, 0) + ' anúncios serão pausados.' });
+  }
+
   // ═══ 🏆 MODELOS: o anúncio campeão de cada categoria, pronto para ser clonado ═══
   if (action === 'modelos') {
     const cfg = await cfgTrafego();
