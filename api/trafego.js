@@ -681,6 +681,102 @@ module.exports = async function handler(req, res) {
         plano.reduce((s, p) => s + p.pausar.length, 0) + ' anúncios serão pausados.' });
   }
 
+  // ── 📅 MONTAR-SEMANA: cria os anúncios do próximo ciclo, agendados ──
+  // Não pausa nada: as campanhas atuais têm término no sábado 11h e encerram sozinhas.
+  if (req.method === 'POST' && action === 'montar-semana') {
+    const { confirmar, semana, apenasUm } = req.body || {};
+    const cfgM = await cfgTrafego();
+    const novos = (await dbGet('trafego_criativos_' + (semana || 'atual'))) || { itens: [] };
+    const base = await dbGet('trafego_painel_cache_7d') || await dbGet('trafego_painel_cache');
+    if (!base || !base.dados) return res.status(200).json({ ok: false, error: 'abra o painel primeiro' });
+
+    // datas do ciclo: próximo sábado 13h → sábado seguinte 11h (horário de Brasília = UTC-3)
+    const agoraB = new Date(Date.now() - 3 * 3600 * 1000);
+    const diasAteSab = (6 - agoraB.getUTCDay() + 7) % 7 || 7;
+    const inicio = new Date(Date.UTC(agoraB.getUTCFullYear(), agoraB.getUTCMonth(), agoraB.getUTCDate() + diasAteSab, 16, 0, 0)); // 13h BRT
+    const fim = new Date(inicio.getTime() + (6 * 86400000) + (22 * 3600000));                                                     // sáb 11h BRT
+    const iniISO = Math.floor(inicio.getTime() / 1000), fimISO = Math.floor(fim.getTime() / 1000);
+
+    // campeão (modelo) por categoria
+    const cfgX = (await dbGet('trafego_config')) || {};
+    const fora = (cfgX.modelosExcluir || ['reforma', 'pintura', 'restaura']).map(s => String(s).toLowerCase());
+    const ativos = (base.dados.anuncios || []).filter(a => a.ativo && a.conversas >= 3 && a.cpa != null
+      && !fora.some(p => String(a.nome || '').toLowerCase().includes(p)));
+    const modeloDe = cat => ativos.filter(a => a.categoria === cat)
+      .sort((a, b) => (a.razaoMeta || 9) - (b.razaoMeta || 9))[0] || null;
+
+    // lista final: campeão de cada categoria (recriado) + criativos novos
+    const CATS = ['tv', 'microondas', 'purificador', 'adega'];
+    const fila = [];
+    for (const cat of CATS) {
+      const mod = modeloDe(cat);
+      if (!mod) continue;
+      fila.push({ cat, tipo: 'campeao', nome: mod.nome + ' [C' + String(new Date().getDate()).padStart(2, '0') + ']',
+        url: null, modelo: mod });
+      for (const n of (novos.itens || []).filter(x => x.categoria === cat)) {
+        fila.push({ cat, tipo: 'novo', nome: n.nome, url: n.url, modelo: mod });
+      }
+    }
+    const nTv = fila.filter(f => f.cat === 'tv').length;
+    const nAdm = fila.length - nTv;
+    const vbTv = nTv ? (cfgM.verba.tv * cfgM.verba.aproveitamento) / nTv : 0;
+    const vbAdm = nAdm ? (cfgM.verba.adm * cfgM.verba.aproveitamento) / nAdm : 0;
+    for (const f of fila) f.verba = Number((f.cat === 'tv' ? vbTv : vbAdm).toFixed(2));
+
+    if (confirmar !== true) {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        inicio: inicio.toISOString(), fim: fim.toISOString(),
+        total: fila.length, tv: nTv, adm: nAdm,
+        verbaPorAnuncio: { tv: Number(vbTv.toFixed(2)), adm: Number(vbAdm.toFixed(2)) },
+        itens: fila.map(f => f.cat.toUpperCase() + ' | ' + f.tipo + ' | ' + String(f.nome).slice(0, 34) +
+          ' | R$ ' + f.verba + (f.modelo ? ' | modelo: ' + String(f.modelo.nome).slice(0, 22) : ' | SEM MODELO')),
+        observacao: 'nenhuma campanha atual será pausada — elas encerram sozinhas no sábado 11h' });
+    }
+
+    // ── EXECUÇÃO ──
+    const alvo = apenasUm ? fila.filter(f => f.tipo === 'novo').slice(0, 1) : fila;
+    const feitos = [], erros = [];
+    const postForm = async (path, campos) => {
+      const corpo = new URLSearchParams(campos).toString();
+      return fetch(`${GRAPH}/${path}?access_token=${TOKEN}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: corpo,
+      }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+    };
+    for (const f of alvo) {
+      try {
+        if (!f.modelo || !f.modelo.campanhaId) { erros.push(f.nome + ': sem campanha modelo'); continue; }
+        // 1) vídeo novo (a Meta baixa da URL — arquivo grande não passa pelo nosso servidor)
+        let videoId = null;
+        if (f.url) {
+          const v = await postForm('act_' + CONTA + '/advideos', { file_url: f.url, name: f.nome });
+          if (v && v.error) { erros.push(f.nome + ': vídeo — ' + v.error.message); continue; }
+          videoId = v && v.id;
+        }
+        // 2) duplica a campanha campeã (leva conjunto, segmentação e destino WhatsApp)
+        const cp = await postForm(f.modelo.campanhaId + '/copies', {
+          deep_copy: 'true', status_option: 'PAUSED', rename_options: JSON.stringify({ rename_strategy: 'NO_RENAME' }),
+        });
+        if (cp && cp.error) { erros.push(f.nome + ': cópia — ' + cp.error.message); continue; }
+        const novaCampanha = cp && (cp.copied_campaign_id || cp.id);
+        // 3) verba e janela do ciclo
+        const up = await postForm(novaCampanha, {
+          name: f.nome, lifetime_budget: String(Math.round(f.verba * 100)),
+          start_time: String(iniISO), stop_time: String(fimISO), status: 'ACTIVE',
+        });
+        if (up && up.error) { erros.push(f.nome + ': verba/agenda — ' + up.error.message); continue; }
+        feitos.push({ nome: f.nome, categoria: f.cat, campanha: novaCampanha, verba: f.verba, videoId });
+      } catch (e) { erros.push(f.nome + ': ' + e.message); }
+      await new Promise(r => setTimeout(r, 400));
+    }
+    try {
+      const lg = (await dbGet('trafego_log')) || { movs: [] };
+      lg.movs.unshift({ ts: new Date().toISOString(), acao: 'montar-semana', feitos, erros });
+      await dbSet('trafego_log', lg);
+    } catch (e) {}
+    return res.status(200).json({ ok: erros.length === 0, criados: feitos.length, feitos, erros,
+      inicio: inicio.toISOString(), fim: fim.toISOString() });
+  }
+
   // ═══ 🏆 MODELOS: o anúncio campeão de cada categoria, pronto para ser clonado ═══
   if (action === 'modelos') {
     const cfg = await cfgTrafego();
