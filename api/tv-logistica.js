@@ -684,6 +684,18 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // Aplica UMA mudança relendo o banco no momento da gravação. Sem isso, uma escrita
+  // concorrente (logística ADM ou cron) sobrescrevia a ação do motorista com o estado
+  // anterior e a ficha VOLTAVA para a rota dele.
+  async function aplicarNaFicha(fichaId, mudanca) {
+    const atual = (await dbGet(LOG_KEY)) || defaultDB();
+    const alvo = (atual.fichas || []).find(x => x.id === fichaId);
+    if (!alvo) return null;
+    mudanca(alvo);
+    await dbSet(LOG_KEY, atual);
+    return alvo;
+  }
+
   // ── POST rota-cancelar: coleta cancelada pelo cliente — volta p/ Liberado Coleta com o motivo ──
   if (req.method === 'POST' && action === 'rota-cancelar') {
     const { id, motivo, motorista } = req.body || {};
@@ -692,14 +704,25 @@ module.exports = async function handler(req, res) {
     const f = db.fichas.find(x => x.id === id);
     if (!f) return res.status(404).json({ ok: false });
     const faseAntC = f.phase;
-    f.phase = 'liberado_coleta';
-    f.movedAt = new Date().toISOString();
-    f.cancelamentoMotorista = { motivo: String(motivo).slice(0, 200), motorista: String(motorista || ''), em: f.movedAt };
+    const quando = new Date().toISOString();
+    // GRAVAÇÃO ATÔMICA + tira o motorista da ficha (senão ela continuava na lista dele)
+    const atualizada = await aplicarNaFicha(id, (alvo) => {
+      alvo.phase = 'liberado_coleta';
+      alvo.movedAt = quando;
+      alvo.cancelamentoMotorista = { motivo: String(motivo).slice(0, 200), motorista: String(motorista || ''), em: quando };
+      alvo.motoristaAnterior = alvo.motoristaNome || '';
+      alvo.motoristaNome = '';
+      alvo.texto = ('❌ CANCELADA pelo cliente (' + String(motorista || 'motorista') + '): ' + String(motivo).slice(0, 150) + '\n' + (alvo.texto || '')).slice(0, 1200);
+    });
+    if (!atualizada) return res.status(404).json({ ok: false, error: 'ficha não encontrada na gravação' });
+    // CONFERE relendo: se não saiu da rota, avisa em vez de dizer que deu certo
+    const confere = (await dbGet(LOG_KEY)) || {};
+    const dep = ((confere.fichas) || []).find(x => x.id === id);
+    const saiu = dep && dep.phase === 'liberado_coleta';
     logMov(id, f.nome, faseAntC, 'liberado_coleta', 'motorista-cancelou/' + String(motorista || '?')).catch(() => {});
-    f.texto = ('❌ CANCELADA pelo cliente (' + String(motorista || 'motorista') + '): ' + String(motivo).slice(0, 150) + '\n' + (f.texto || '')).slice(0, 1200);
-    await dbSet(LOG_KEY, db);
     registrarPassagem('liberado_coleta').catch(() => {});
-    return res.status(200).json({ ok: true });
+    return res.status(200).json({ ok: !!saiu, faseAtual: dep ? dep.phase : null,
+      erro: saiu ? undefined : 'a ficha não saiu da rota — outra tela pode ter sobrescrito' });
   }
 
   // ── GET/POST rota-pref: ordem preferida de regiões do motorista (persistida) ──

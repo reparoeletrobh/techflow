@@ -289,7 +289,8 @@ async function cancelado(id){
   if(!motivo)return;
   var r=await fetch('/api/tv-logistica?action=rota-cancelar',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({id:id,motivo:motivo,motorista:MOT})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
-  if(r.ok){alert('Cancelamento registrado — a ficha voltou para a logística com o motivo.');load();}
+  if(r.ok){alert('Cancelamento registrado — a ficha saiu da sua rota e voltou para a logística com o motivo.');load();}
+  else if(r.faseAtual){alert('⚠️ Não consegui tirar a ficha da rota (ela está em: '+r.faseAtual+').\nTenta de novo em alguns segundos.');load();}
   else alert('Erro: '+(r.error||'falha'));
 }
 async function coletado(id){
