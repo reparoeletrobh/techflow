@@ -1911,7 +1911,8 @@ let _alFlId = null;
 async function abrirAnalise(flFichaId) {
   _alFlId = flFichaId;
   document.getElementById('al-diag').value = '';
-  var _p = document.getElementById('al-preco'); if (_p) _p.value = '';
+  dljEquips = [];
+  dljSetQtd(1);
   document.getElementById('al-msg').style.display = 'none';
   document.getElementById('al-info').innerHTML = flFichaId;
   document.getElementById('al-overlay').style.display = 'flex';
@@ -1931,41 +1932,146 @@ function fecharAnalise() {
   _alFlId = null;
 }
 
-async function enviarDiagnostico() {
-  const diag = document.getElementById('al-diag').value.trim();
-  if (!diag) {
-    const m = document.getElementById('al-msg');
-    m.textContent = 'Preencha o diagnóstico técnico'; m.style.display = 'block';
-    m.style.background = 'rgba(239,68,68,0.1)'; m.style.color = '#ef4444'; return;
+/* ══════════ DIAGNÓSTICO DE LOJA — isolado, não dispara o bot ══════════ */
+const DLJ_SERVICOS = {
+  microondas: { direto: ['Capacitor','Fusível de Alta','Microchave de Acionamento','Troca de Placa',
+    'Recuperação de Placa','Motor de Rotação','Porta','Vidro','Haste','Pintura','Membrana',
+    'Display','Magnetron','Placa Micra','Reforma','Revisão'] },
+  purificador: { subtipos: {
+    'Motor': ['Gás','Bojo','Dutos e Conexões','Válvula','Kit de Partida'],
+    'Eletrônico': ['Kit Termo Elétrico','Recuperação de Placa','Dutos e Conexões','Válvula'] } },
+  adega: { subtipos: {
+    'Motor': ['Gás','Termostato','Kit de Partida do Motor','Sensor','Controlador','Porta','Recuperação de Placa','Troca de Placa'],
+    'Eletrônico': ['Kit Termo Elétrico','Sensor','Termoelétrico Duplo','Recuperação de Placa','Troca de Placa'] } },
+  forno: { direto: ['Resistência','Termostato','Recuperação de Placa','Troca de Placa','Porta','Vidro','Display','Revisão'] },
+  bblend: { subtipos: { 'Motor': ['Gás','Bojo','Dutos e Conexões','Válvula','Kit de Partida'] } },
+};
+const DLJ_COM_PRECO = ['Troca de Placa','Display','Vidro','Porta','Mola'];
+const DLJ_NOMES = { microondas:'Micro-ondas', purificador:'Purificador', adega:'Adega', forno:'Forno', bblend:'B.blend' };
+let dljEquips = [];
+
+function dljPrecisaPreco(eq){
+  if (eq.tipo === 'adega') return (eq.servicos||[]).includes('Troca de Placa');
+  if (eq.tipo === 'purificador' || eq.tipo === 'bblend') return false;
+  return (eq.servicos||[]).some(s => DLJ_COM_PRECO.includes(s));
+}
+function dljSetQtd(n){
+  while (dljEquips.length < n) dljEquips.push({ modelo:'', tipo:null, subtipo:null, servicos:[], tabela:'normal', valorEquip:'', preco:'' });
+  dljEquips = dljEquips.slice(0, n);
+  dljRender();
+}
+function dljTipo(i, t){
+  dljEquips[i].tipo = t; dljEquips[i].subtipo = null; dljEquips[i].servicos = [];
+  dljRender();
+}
+function dljSubtipo(i, s){ dljEquips[i].subtipo = s; dljEquips[i].servicos = []; dljRender(); }
+function dljServico(i, s){
+  const arr = dljEquips[i].servicos;
+  const p = arr.indexOf(s);
+  if (p >= 0) arr.splice(p, 1); else arr.push(s);
+  dljRender();
+}
+function dljTabela(i, t){ dljEquips[i].tabela = t; dljRender(); }
+function dljCampo(i, campo, v){ dljEquips[i][campo] = v; if (campo !== 'modelo') dljTotal(); }
+
+function dljTotal(){
+  let soma = 0, faltando = false;
+  for (const eq of dljEquips) {
+    if (eq.tabela === 'dinamica') {
+      const v = parseFloat(String(eq.valorEquip||'').replace(',','.'));
+      if (v > 0) soma += Math.round(v * 0.4); else faltando = true;
+    } else if (eq.tipo === 'bblend') soma += 1490;
+    else {
+      const p = parseFloat(String(eq.preco||'').replace(',','.'));
+      if (p > 0) soma += Math.round(p);
+      else if (dljPrecisaPreco(eq)) faltando = true;
+    }
   }
+  const el = document.getElementById('dlj-total');
+  if (!el) return;
+  if (!soma) { el.style.display = 'none'; return; }
+  const comDesc = Math.round(soma * 0.9);
+  el.style.display = 'block';
+  el.innerHTML = '<div style="display:flex;justify-content:space-between;"><span style="color:#888;">Total</span><span>R$ '+soma+'</span></div>'
+    + '<div style="display:flex;justify-content:space-between;margin-top:4px;"><span style="color:#4ade80;">Cliente recebe (−10%)</span>'
+    + '<b style="color:#4ade80;font-size:16px;">R$ '+comDesc+'</b></div>'
+    + (faltando ? '<div style="color:#f59e0b;font-size:11px;margin-top:6px;">falta preço em algum equipamento</div>' : '');
+}
+
+function dljRender(){
+  const q = document.getElementById('dlj-qtd');
+  if (q) q.innerHTML = [1,2,3,4].map(n =>
+    '<button onclick="dljSetQtd('+n+')" style="flex:1;padding:8px;border-radius:8px;cursor:pointer;font-family:var(--fm);font-size:13px;font-weight:700;'
+    + (dljEquips.length===n ? 'background:#a855f7;color:#fff;border:1px solid #a855f7;' : 'background:#111;color:#888;border:1px solid #333;')
+    + '">'+n+'</button>').join('');
+
+  const c = document.getElementById('dlj-equips');
+  if (!c) return;
+  c.innerHTML = dljEquips.map((eq, i) => {
+    const spec = eq.tipo ? DLJ_SERVICOS[eq.tipo] : null;
+    const lista = spec ? (spec.direto || (eq.subtipo && spec.subtipos ? spec.subtipos[eq.subtipo] : null)) : null;
+    const bt = (txt, on, acao) => '<button onclick="'+acao+'" style="padding:7px 11px;border-radius:8px;cursor:pointer;font-family:var(--fm);font-size:11.5px;font-weight:600;'
+      + (on ? 'background:#a855f7;color:#fff;border:1px solid #a855f7;' : 'background:#111;color:#9aa4b2;border:1px solid #333;') + '">'+txt+'</button>';
+    return '<div style="background:#0c1016;border:1px solid #1f2937;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;">'
+      + (dljEquips.length>1 ? '<div style="font-family:var(--fm);font-size:10px;color:#a855f7;font-weight:700;">EQUIPAMENTO '+(i+1)+'</div>' : '')
+      + '<input placeholder="Modelo (ex: MEF33)" value="'+(eq.modelo||'')+'" oninput="dljCampo('+i+',\'modelo\',this.value)"'
+        + ' style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#fff;font-family:var(--fb);font-size:13px;padding:9px;box-sizing:border-box;">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+        + Object.keys(DLJ_SERVICOS).map(t => bt(DLJ_NOMES[t], eq.tipo===t, 'dljTipo('+i+',\''+t+'\')')).join('')
+      + '</div>'
+      + (spec && spec.subtipos ? '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+          + Object.keys(spec.subtipos).map(s => bt(s, eq.subtipo===s, 'dljSubtipo('+i+',\''+s+'\')')).join('') + '</div>' : '')
+      + (lista ? '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+          + lista.map(s => bt(s, (eq.servicos||[]).includes(s), 'dljServico('+i+',\''+s.replace(/'/g,"\\'")+'\')')).join('') + '</div>' : '')
+      + (eq.tipo ? '<div style="display:flex;gap:6px;">'
+          + bt('📋 Tabela Normal', (eq.tabela||'normal')==='normal', 'dljTabela('+i+',\'normal\')')
+          + bt('⚡ Tabela Dinâmica', eq.tabela==='dinamica', 'dljTabela('+i+',\'dinamica\')') + '</div>' : '')
+      + (eq.tabela==='dinamica'
+          ? '<div><div style="font-family:var(--fm);font-size:10px;color:#888;margin-bottom:5px;">VALOR DO EQUIPAMENTO NOVO (R$)</div>'
+            + '<input type="number" min="0" inputmode="numeric" placeholder="Ex: 2000" value="'+(eq.valorEquip||'')+'" oninput="dljCampo('+i+',\'valorEquip\',this.value)"'
+            + ' style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#fff;font-family:var(--fm);font-size:15px;padding:9px;box-sizing:border-box;">'
+            + '<div style="font-family:var(--fm);font-size:11px;color:#4ade80;margin-top:4px;">Orçamento: '+(parseFloat(eq.valorEquip)>0?'R$ '+Math.round(parseFloat(eq.valorEquip)*0.4):'—')+' (40%)</div></div>'
+          : (dljPrecisaPreco(eq)
+            ? '<div><div style="font-family:var(--fm);font-size:10px;color:#888;margin-bottom:5px;">PREÇO DE CUSTO (R$)</div>'
+              + '<input type="number" min="0" inputmode="numeric" placeholder="Ex: 350" value="'+(eq.preco||'')+'" oninput="dljCampo('+i+',\'preco\',this.value)"'
+              + ' style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#fff;font-family:var(--fm);font-size:15px;padding:9px;box-sizing:border-box;"></div>'
+            : ''))
+    + '</div>';
+  }).join('');
+  dljTotal();
+}
+
+async function enviarDiagnostico() {
   const btn = document.getElementById('al-btn-enviar');
-  btn.disabled = true; btn.textContent = '⏳ Enviando...';
+  const msg = document.getElementById('al-msg');
+  const aviso = (t, cor) => { msg.style.display='block'; msg.style.background=cor+'22'; msg.style.color=cor; msg.textContent=t; };
+  if (!dljEquips.length) { aviso('Selecione ao menos um equipamento','#f59e0b'); return; }
+  for (let i=0;i<dljEquips.length;i++){
+    const eq=dljEquips[i], rot=dljEquips.length>1?('Equipamento '+(i+1)):'Equipamento';
+    if(!eq.tipo){aviso('Selecione o tipo do '+rot,'#f59e0b');return;}
+    if(!(eq.servicos||[]).length){aviso('Selecione ao menos um serviço do '+rot,'#f59e0b');return;}
+  }
+  btn.disabled = true; btn.style.opacity = '.6';
+  aviso('💾 Salvando o orçamento…','#60a5fa');
   try {
-    const r = await fetch('/api/frenteloja?action=analise', {
+    const r = await fetch('/api/frenteloja?action=diagnostico-loja', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ id: _alFlId, descricaoTecnica: diag })
-    });
-    const d = await r.json();
-    if (d.ok) {
-      // Remover card do board analise_loja
-      await fetch('/api/board?action=remove-analise-card', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ flFichaId: _alFlId })
-      }).catch(()=>{});
-      fecharAnalise();
-      loadBoard();
+      body: JSON.stringify({ id:_alFlId, equips:dljEquips,
+        observacao:(document.getElementById('al-diag')||{}).value||'' })
+    }).then(x=>x.json());
+    if (r && r.ok) {
+      aviso('✅ Orçamento salvo (R$ '+r.totalComDesconto+') — NÃO foi enviado ao cliente','#4ade80');
+      setTimeout(function(){ fecharAnalise(); if(typeof carregar==='function')carregar(); else location.reload(); }, 1400);
     } else {
-      const m = document.getElementById('al-msg');
-      m.textContent = 'Erro: '+(d.error||'falha'); m.style.display = 'block';
-      m.style.background = 'rgba(239,68,68,0.1)'; m.style.color = '#ef4444';
+      aviso('❌ '+((r&&r.error)||'falha ao salvar'),'#f87171');
+      btn.disabled=false; btn.style.opacity='1';
     }
   } catch(e) {
-    const m = document.getElementById('al-msg');
-    m.textContent = 'Erro de conexão'; m.style.display = 'block';
-    m.style.background = 'rgba(239,68,68,0.1)'; m.style.color = '#ef4444';
+    aviso('❌ '+e.message,'#f87171');
+    btn.disabled=false; btn.style.opacity='1';
   }
-  btn.disabled = false; btn.textContent = '🗒️ ENVIAR ORÇAMENTO';
 }
+
 
 </script>
 <!-- MODAL COMPRA PEÇA -->
@@ -2008,34 +2114,33 @@ async function enviarDiagnostico() {
       <div id="al-info"
         style="background:#111;border-radius:10px;padding:12px;border:1px solid #1f2937;font-size:13px;"></div>
       <div>
-        <label style="font-family:var(--fm);font-size:10px;color:#888;
-                      display:block;margin-bottom:6px;letter-spacing:.5px;">
-          DIAGNÓSTICO / PEÇAS NECESSÁRIAS
+        <label style="font-family:var(--fm);font-size:10px;color:#888;display:block;margin-bottom:6px;letter-spacing:.5px;">
+          QUANTOS EQUIPAMENTOS
         </label>
-        <textarea id="al-diag" rows="4"
-          placeholder="Descreva o diagnóstico técnico e as peças necessárias para o orçamento..."
-          style="width:100%;background:#111;border:1px solid #333;border-radius:8px;
-                 color:#fff;font-family:var(--fb);font-size:13px;padding:10px;
-                 resize:none;box-sizing:border-box;"></textarea>
+        <div style="display:flex;gap:6px;" id="dlj-qtd"></div>
       </div>
+      <div id="dlj-equips" style="display:flex;flex-direction:column;gap:14px;"></div>
       <div>
         <label style="font-family:var(--fm);font-size:10px;color:#888;display:block;margin-bottom:6px;letter-spacing:.5px;">
-          PREÇO DO CONSERTO (R$)
+          OBSERVAÇÃO (opcional)
         </label>
-        <input id="al-preco" type="number" min="0" step="1" inputmode="numeric" placeholder="Ex: 350"
-          style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#fff;
-                 font-family:var(--fm);font-size:15px;padding:10px;box-sizing:border-box;">
-        <div style="font-family:var(--fm);font-size:10px;color:#4ade80;margin-top:5px;line-height:1.5;">
-          O cliente recebe com 10% de desconto automático no envio pelo WhatsApp.
-        </div>
+        <textarea id="al-diag" rows="2" placeholder="Alguma observação para a equipe..."
+          style="width:100%;background:#111;border:1px solid #333;border-radius:8px;
+                 color:#fff;font-family:var(--fb);font-size:13px;padding:10px;resize:none;box-sizing:border-box;"></textarea>
       </div>
+      <div id="dlj-total" style="background:#0c1016;border:1px solid #1f2937;border-radius:10px;padding:11px;
+           font-family:var(--fm);font-size:13px;display:none;"></div>
       <div id="al-msg"
         style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-family:var(--fm);"></div>
       <button id="al-btn-enviar" onclick="enviarDiagnostico()"
         style="width:100%;padding:13px;border-radius:10px;border:none;background:var(--accent);
                color:#000;font-family:var(--fb);font-size:13px;font-weight:700;cursor:pointer;">
-        🗒️ ENVIAR ORÇAMENTO
+        💾 SALVAR ORÇAMENTO (sem enviar)
       </button>
+      <div style="font-family:var(--fm);font-size:10px;color:#8b93a3;text-align:center;line-height:1.5;">
+        O orçamento fica guardado com <b style="color:#4ade80;">10% de desconto</b>.<br>
+        O cliente só recebe quando você clicar em <b>Enviar Orçamento WhatsApp</b> no Frente de Loja.
+      </div>
     </div>
   </div>
 </div>
