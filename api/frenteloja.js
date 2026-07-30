@@ -405,9 +405,11 @@ export default async function handler(req,res){
     if (!ficha) return res.status(404).json({ ok:false, error:'Ficha não encontrada em produção', nome, tel4 });
     const now = new Date().toISOString();
     ficha.phase        = 'conserto_realizado';
+    ficha._avisarPronto = true;
     ficha.liberadoHoje = true;
     ficha.movedAt      = now;
     ficha.history      = (ficha.history||[]).concat([{ phase:'conserto_realizado', ts:now, via:'admin_manual' }]);
+    await processarAvisoPendente(ficha);
     await dbSet(FL_KEY, db);
     // Mover no Pipefy se tiver card
     if (ficha.pipefyCardId) {
@@ -421,6 +423,38 @@ export default async function handler(req,res){
 
 
   // ── POST marcar-orc-whatsapp: marca orçamento como enviado pelo WhatsApp ──
+  // Envia o aviso de "pronto para retirada" e devolve o resultado.
+  // Usada tanto pelo botão manual quanto pelo aviso automático ao entrar na coluna.
+  async function avisarProntoRetirada(ficha) {
+    const tel = String(ficha.telefone || ficha.tel || '').replace(/\D/g, '');
+    if (tel.length < 10) return { enviado: false, via: null, erro: 'telefone inválido ou ausente' };
+    const to = tel.startsWith('55') ? tel : '55' + tel;
+    const primeiro = String(ficha.nomeContato || 'tudo bem').trim().split(/\s+/)[0];
+    const KAV = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+    const texto = `Oi ${primeiro}! Seu ${ficha.equipamento || 'equipamento'} já está pronto e pode ser retirado aqui na loja. Funcionamos de segunda a sexta das 8h às 17h e sábado das 8h às 12h. Te esperamos!`;
+    try {
+      const r = await fetch(`https://reparoeletroadm.com/api/wa-bot?action=enviar&k=${KAV}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tel: to, texto, via: 'frenteloja-avisado' }),
+      }).then(x => x.json()).catch(e => ({ ok: false, error: e.message }));
+      if (r && r.ok) return { enviado: true, via: 'mensagem', erro: null };
+      const rt = await fetch(`https://reparoeletroadm.com/api/wa-bot?action=template-conserto&k=${KAV}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tel: to, nome: primeiro }),
+      }).then(x => x.json()).catch(e => ({ ok: false, error: e.message }));
+      return rt && rt.ok ? { enviado: true, via: 'template', erro: null }
+        : { enviado: false, via: null, erro: (rt && (rt.error || rt.erro)) || 'falha no envio' };
+    } catch (e) { return { enviado: false, via: null, erro: e.message }; }
+  }
+  // Registra o resultado do aviso na ficha (mesmo formato nos dois caminhos)
+  function gravarAviso(ficha, envio) {
+    ficha.avisadoPronto = envio.enviado;
+    ficha.avisadoProntoEm = new Date().toISOString();
+    ficha.avisadoVia = envio.via;
+    if (envio.erro) ficha.avisadoErro = String(envio.erro).slice(0, 140);
+    else delete ficha.avisadoErro;
+  }
+
   // ── 📣 MARCAR-AVISADO: avisa o cliente pelo WhatsApp que o equipamento está pronto ──
   if (req.method === 'POST' && action === 'marcar-avisado') {
     const { id } = req.body || {};
@@ -429,40 +463,8 @@ export default async function handler(req,res){
     const ficha = db.fichas.find(f => f.id === id);
     if (!ficha) return res.status(404).json({ ok:false, error:'ficha nao encontrada' });
 
-    // envia pelo WhatsApp: mensagem direta se a janela estiver aberta, senão o template
-    let envio = { enviado:false, via:null, erro:null };
-    const tel = String(ficha.telefone || ficha.tel || '').replace(/\D/g,'');
-    if (tel.length >= 10) {
-      const to = tel.startsWith('55') ? tel : '55' + tel;
-      const primeiro = String(ficha.nomeContato || 'tudo bem').trim().split(/\s+/)[0];
-      try {
-        const KAV = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
-        const texto = `Oi ${primeiro}! Seu ${ficha.equipamento || 'equipamento'} já está pronto e pode ser retirado aqui na loja. Funcionamos de segunda a sexta das 8h às 17h e sábado das 8h às 12h. Te esperamos!`;
-        const r = await fetch(`https://reparoeletroadm.com/api/wa-bot?action=enviar&k=${KAV}`, {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ tel: to, texto, via:'frenteloja-avisado' }),
-        }).then(x=>x.json()).catch(e=>({ ok:false, error:e.message }));
-        if (r && r.ok) { envio = { enviado:true, via:'mensagem', erro:null }; }
-        else {
-          // janela fechada → template de conserto finalizado
-          const rt = await fetch(`https://reparoeletroadm.com/api/wa-bot?action=template-conserto&k=${KAV}`, {
-            method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ tel: to, nome: primeiro }),
-          }).then(x=>x.json()).catch(e=>({ ok:false, error:e.message }));
-          envio = rt && rt.ok
-            ? { enviado:true, via:'template', erro:null }
-            : { enviado:false, via:null, erro:(rt && (rt.error||rt.erro)) || (r && r.error) || 'falha no envio' };
-        }
-      } catch(e) { envio = { enviado:false, via:null, erro:e.message }; }
-    } else {
-      envio = { enviado:false, via:null, erro:'telefone inválido ou ausente na ficha' };
-    }
-
-    ficha.avisadoPronto   = envio.enviado;
-    ficha.avisadoProntoEm = new Date().toISOString();
-    ficha.avisadoVia      = envio.via;
-    if (envio.erro) ficha.avisadoErro = String(envio.erro).slice(0,140);
-    else delete ficha.avisadoErro;
+    const envio = await avisarProntoRetirada(ficha);
+    gravarAviso(ficha, envio);
     await dbSet(FL_KEY, db);
     return res.status(200).json({ ok:true, ficha, envio });
   }
@@ -477,6 +479,15 @@ export default async function handler(req,res){
     ficha.orcEnviadoWppEm   = new Date().toISOString();
     await dbSet(FL_KEY, db);
     return res.status(200).json({ ok:true, id });
+  }
+
+  // Dispara o aviso pendente antes de salvar (marcado nas transições para conserto_realizado)
+  async function processarAvisoPendente(ficha) {
+    if (!ficha || !ficha._avisarPronto) return;
+    delete ficha._avisarPronto;
+    if (ficha.avisadoPronto) return;              // já avisado, não repete
+    const envio = await avisarProntoRetirada(ficha);
+    gravarAviso(ficha, envio);
   }
 
   if(req.method==='POST'&&action==='conserto-realizado'){
@@ -932,9 +943,11 @@ export default async function handler(req,res){
     const faseAnt = ficha.phase;
     const now = new Date().toISOString();
     ficha.phase = 'conserto_realizado';
+    ficha._avisarPronto = true;
     ficha.liberadoHoje = true;
     ficha.movedAt = now;
     ficha.history = (ficha.history||[]).concat([{ phase:'conserto_realizado', ts:now, via:'forcar-conserto' }]);
+    await processarAvisoPendente(ficha);
     await dbSet(FL_KEY, flDb);
     return res.status(200).json({ ok:true, id:ficha.id, nome:ficha.nomeContato, de:faseAnt, para:'conserto_realizado' });
   }
@@ -960,9 +973,11 @@ export default async function handler(req,res){
       // Ficha presa: está em loja_feito no board mas producao no FL → corrigir
       const now = new Date().toISOString();
       ficha.phase = 'conserto_realizado';
+      ficha._avisarPronto = true;
       ficha.liberadoHoje = true;
       ficha.movedAt = now;
       ficha.history = (ficha.history || []).concat([{ phase: 'conserto_realizado', ts: now, origem: 'sync-fl' }]);
+      await processarAvisoPendente(ficha);
       card.flFichaId = ficha.id; // guardar para notificações futuras
       corrigidos++;
     }
