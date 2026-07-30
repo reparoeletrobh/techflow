@@ -123,6 +123,22 @@
   ],
   "rewrites": [
     {
+      "source": "/tv/Eduardo",
+      "destination": "/tv-rota.html?m=Eduardo"
+    },
+    {
+      "source": "/tv/eduardo",
+      "destination": "/tv-rota.html?m=Eduardo"
+    },
+    {
+      "source": "/eduardo",
+      "destination": "/tv-rota.html?m=Eduardo"
+    },
+    {
+      "source": "/Eduardo",
+      "destination": "/tv-rota.html?m=Eduardo"
+    },
+    {
       "source": "/leadmaster/adm/",
       "destination": "/leadmaster-esteira.html"
     },

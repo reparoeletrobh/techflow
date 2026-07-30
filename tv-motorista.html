@@ -51,6 +51,10 @@ a.volta{color:var(--dim);text-decoration:none;font-size:13px;}
   <div class="nome">🏍️ Wilde</div>
   <div class="carregando">Carregando as fichas…</div>
 </a>
+<a class="mot" id="m-eduardo" href="/tv/eduardo" style="border-left:5px solid #f59e0b;">
+  <div class="nome">🏍️ Eduardo</div>
+  <div class="carregando">Carregando as fichas…</div>
+</a>
 <script>
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 async function carrega(nome){
@@ -76,8 +80,8 @@ async function carrega(nome){
     var c=el.querySelector('.carregando');if(c)c.textContent='Erro ao carregar';
   }
 }
-carrega('Jhonatan');carrega('Wilde');
-setInterval(function(){if(!document.hidden){carrega('Jhonatan');carrega('Wilde');}},90000);
+carrega('Jhonatan');carrega('Wilde');carrega('Eduardo');
+setInterval(function(){if(!document.hidden){carrega('Jhonatan');carrega('Wilde');carrega('Eduardo');}},90000);
 </script>
 </body>
 </html>
