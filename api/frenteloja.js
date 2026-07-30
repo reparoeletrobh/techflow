@@ -455,6 +455,72 @@ export default async function handler(req,res){
     else delete ficha.avisadoErro;
   }
 
+  // ══════════════════════════════════════════════════════════════════════
+  // 🔒 DIAGNÓSTICO DE LOJA — ISOLADO
+  // Grava SOMENTE no banco do Frente de Loja. O bot lê reparoeletro_logistica
+  // e tv_logistica; nada aqui encosta nesses bancos, então o orçamento NÃO sai
+  // sozinho — só quando alguém clicar em "Enviar Orçamento WhatsApp".
+  // ══════════════════════════════════════════════════════════════════════
+  if (req.method === 'POST' && action === 'diagnostico-loja') {
+    const { id, equips, observacao } = req.body || {};
+    if (!id) return res.status(400).json({ ok:false, error:'id obrigatorio' });
+    if (!Array.isArray(equips) || !equips.length) return res.status(400).json({ ok:false, error:'informe ao menos um equipamento' });
+    const db = await dbGet(FL_KEY) || defaultDB();
+    const ficha = db.fichas.find(f => f.id === id);
+    if (!ficha) return res.status(404).json({ ok:false, error:'ficha nao encontrada' });
+
+    // valida e calcula o preço de cada equipamento
+    const ITENS_COM_PRECO = ['Troca de Placa','Display','Vidro','Porta','Mola'];
+    const calc = [];
+    for (let i = 0; i < equips.length; i++) {
+      const e = equips[i] || {};
+      const rot = equips.length > 1 ? ('Equipamento ' + (i+1)) : 'Equipamento';
+      if (!e.tipo) return res.status(400).json({ ok:false, error:'selecione o tipo do ' + rot });
+      if (!Array.isArray(e.servicos) || !e.servicos.length) return res.status(400).json({ ok:false, error:'selecione ao menos um serviço do ' + rot });
+      let preco = null;
+      if (e.tabela === 'dinamica') {
+        const v = parseFloat(String(e.valorEquip||'').replace(',','.'));
+        if (!(v > 0)) return res.status(400).json({ ok:false, error:'informe o valor do equipamento (' + rot + ' — Tabela Dinâmica)' });
+        preco = Math.round(v * 0.4);                       // 40% do valor do equipamento
+      } else if (e.tipo === 'bblend') { preco = 1490; }
+      else {
+        const precisa = e.tipo === 'adega' ? (e.servicos||[]).includes('Troca de Placa')
+          : (e.tipo === 'purificador' ? false : (e.servicos||[]).some(x => ITENS_COM_PRECO.includes(x)));
+        const p = parseFloat(String(e.preco||'').replace(',','.'));
+        if (precisa && !(p > 0)) return res.status(400).json({ ok:false, error:'informe o preço de custo do ' + rot });
+        preco = p > 0 ? Math.round(p) : null;
+      }
+      calc.push({ modelo:String(e.modelo||'').slice(0,60), tipo:e.tipo, subtipo:e.subtipo||null,
+        servicos:e.servicos, tabela:e.tabela||'normal',
+        valorEquip: e.tabela==='dinamica' ? parseFloat(String(e.valorEquip).replace(',','.')) : null,
+        preco });
+    }
+    const total = calc.reduce((s,e) => s + (e.preco||0), 0);
+    const comDesconto = total > 0 ? Math.round(total * 0.9) : null;   // 10% do cliente de loja
+
+    // texto do orçamento, guardado SEM enviar
+    const primeiro = String(ficha.nomeContato||'cliente').trim().split(/\s+/)[0];
+    const listaTxt = calc.map(e => (e.modelo ? e.modelo + ' — ' : '') + (e.servicos||[]).join(', ')).join(' | ');
+    const texto = comDesconto
+      ? `Olá ${primeiro}, bom dia! Sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:\n\nForam feitos os testes e identificamos que será necessário: ${listaTxt}. Este conserto completo fica em ${comDesconto} reais apenas. Aprovando já iniciamos o conserto.`
+      : `Olá ${primeiro}, bom dia! Sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:\n\nForam feitos os testes e identificamos que será necessário: ${listaTxt}. Este conserto completo fica em [VALOR] apenas. Aprovando já iniciamos o conserto.`;
+
+    const now = new Date().toISOString();
+    ficha.diagnosticoLoja = { equips: calc, observacao: String(observacao||'').slice(0,600),
+      total, totalComDesconto: comDesconto, descontoAplicado: '10%', texto, em: now };
+    ficha.descricaoTecnica = listaTxt + (observacao ? ' · ' + observacao : '');
+    ficha.valorOrcamento   = comDesconto;
+    ficha.orcEnviadoWpp    = false;                 // 🔒 nasce NÃO enviado
+    ficha.phase   = 'orcamento_cadastrado';
+    ficha.movedAt = now;
+    ficha.history = (ficha.history||[]).concat([{ phase:'orcamento_cadastrado', ts:now, via:'diagnostico-loja' }]);
+    await dbSet(FL_KEY, db);
+    logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'',
+      acao:'Diagnóstico de loja', para:'orcamento_cadastrado', gatilho:'nenhum (aguarda envio manual)', status:'ok' }).catch(()=>{});
+    return res.status(200).json({ ok:true, ficha, total, totalComDesconto: comDesconto, texto,
+      aviso:'orçamento guardado — NÃO foi enviado ao cliente' });
+  }
+
   // ── 📣 MARCAR-AVISADO: avisa o cliente pelo WhatsApp que o equipamento está pronto ──
   if (req.method === 'POST' && action === 'marcar-avisado') {
     const { id } = req.body || {};
