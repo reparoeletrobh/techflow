@@ -87,6 +87,7 @@ module.exports = async function handler(req, res) {
     }
     if (/tvs?\b|\btvs?\d|televis|barramento|tela quebrad|quebrar tv|polegada/.test(s)) return 'tv';
     // micro-ondas: nome por extenso (tolerando erros de digitação) + códigos de modelo
+    if (/criativo loja 1\b/.test(s)) return 'microondas';   // confirmado pelo dono
     if (/mic?r?o\s?-?\s?o?nd?as|microodas|micro ?ond|\bmicro\b|reforma|\binflu\b|\bantigo\b/.test(s)) return 'microondas';
     if (/\bme[fovs]?\d{2}|\bmto\d|\bpms?\d{2}|\bpme\d|\bpm0\d|\bmtae?g?\d{2}|\bmi-?\d{4}|\bnn-?st?\d{2}|\bms\d{4}|\bmh\d{4}|\bbm[a-z]?\d{2}|\bcm[a-z]?\d{2}|\bmg\d{2}/.test(s)) return 'microondas';
     if (/\bforn(o|inho)/.test(s)) return 'forno';
