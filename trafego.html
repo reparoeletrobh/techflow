@@ -302,11 +302,11 @@ async function carregarProgramacao(){
         +'<b style="font-size:15px;color:'+cor+';">'+esc(CAT_NOME[cat]||cat)+'</b>'
         +'<span style="font-family:var(--mono);font-size:11px;color:var(--dim);">'+itens.length+' anúncios</span></div>'
       +itens.map(function(i){
-        var ehCampeao=i.tipo==='campeao';
+        var ehCampeao=(i.tipo==='mantido'||i.tipo==='campeao');
         return '<div style="display:flex;justify-content:space-between;gap:9px;align-items:center;padding:7px 0;border-top:1px solid rgba(255,255,255,.05);">'
           +'<div style="flex:1;min-width:0;">'
             +'<span style="font-size:9px;font-weight:900;padding:1px 6px;border-radius:5px;'+(ehCampeao?'background:#22c55e22;color:#4ade80;':'background:#3b82f622;color:#60a5fa;')+'">'
-            +(ehCampeao?'🏆 PERMANECE':'🆕 ENTRA')+'</span>'
+            +(ehCampeao?'✅ DENTRO DA META':'🆕 ENTRA')+'</span>'
             +'<div style="font-size:11.5px;font-weight:700;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(i.nome)+'</div>'
           +'</div>'
           +'<span style="font-family:var(--mono);font-size:12px;color:#4ade80;font-weight:700;flex:0 0 auto;">'+esc(i.verba)+'</span>'

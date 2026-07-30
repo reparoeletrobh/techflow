@@ -650,14 +650,20 @@ module.exports = async function handler(req, res) {
     const plano = [];
     for (const cat of CATS) {
       const daCat = ativos.filter(a => a.categoria === cat).sort((a, b) => (a.razaoMeta || 9) - (b.razaoMeta || 9));
+      // ✅ REGRA DO DONO: entra no próximo ciclo TODO anúncio dentro da meta de custo,
+      // não apenas o melhor. O campeão serve só como modelo para clonar os criativos novos.
+      const mantidos = daCat.filter(a => (a.razaoMeta || 9) <= 1);
       const campeao = daCat[0] || null;
       const novosCat = (novos.itens || []).filter(x => x.categoria === cat);
       plano.push({ categoria: cat,
+        mantidos: mantidos.map(a => ({ nome: a.nome, cpa: a.cpa, meta: a.meta, conversas: a.conversas,
+          anuncioId: a.id, campanhaId: a.campanhaId })),
         campeao: campeao ? { nome: campeao.nome, cpa: campeao.cpa, conversas: campeao.conversas,
           anuncioId: campeao.id, adsetId: campeao.adsetId, campanhaId: campeao.campanhaId } : null,
         novos: novosCat.map(x => ({ nome: x.nome, url: x.url })),
-        totalAnuncios: (campeao ? 1 : 0) + novosCat.length,
-        pausar: daCat.slice(1).map(a => ({ nome: a.nome, anuncioId: a.id, campanhaId: a.campanhaId, cpa: a.cpa })),
+        totalAnuncios: mantidos.length + novosCat.length,
+        foraDaMeta: daCat.filter(a => (a.razaoMeta || 9) > 1)
+          .map(a => ({ nome: a.nome, cpa: a.cpa, meta: a.meta })),
       });
     }
     // rateio: TV é frente própria; as demais dividem a verba do ADM
@@ -674,11 +680,13 @@ module.exports = async function handler(req, res) {
       verba: { adm: { total: Number(vAdm.toFixed(2)), anuncios: nAdm, porAnuncio: porAnuncioAdm },
                tv:  { total: Number(vTv.toFixed(2)),  anuncios: nTv,  porAnuncio: porAnuncioTv } },
       plano,
-      totalPausar: plano.reduce((s, p) => s + p.pausar.length, 0),
+      totalMantidos: plano.reduce((s, p) => s + p.mantidos.length, 0),
       totalSubir: plano.reduce((s, p) => s + p.novos.length, 0),
-      resumo: 'Vão rodar ' + (nAdm + nTv) + ' anúncios: ' + plano.filter(p => p.campeao).length +
-        ' campeões mantidos e ' + plano.reduce((s, p) => s + p.novos.length, 0) + ' criativos novos. ' +
-        plano.reduce((s, p) => s + p.pausar.length, 0) + ' anúncios serão pausados.' });
+      foraDaMeta: plano.reduce((s, p) => s + p.foraDaMeta.length, 0),
+      resumo: 'Vão rodar ' + (nAdm + nTv) + ' anúncios: ' +
+        plano.reduce((s, p) => s + p.mantidos.length, 0) + ' dentro da meta que continuam e ' +
+        plano.reduce((s, p) => s + p.novos.length, 0) + ' criativos novos. ' +
+        plano.reduce((s, p) => s + p.foraDaMeta.length, 0) + ' ficaram fora da meta e não entram.' });
   }
 
   // ── 📅 MONTAR-SEMANA: cria os anúncios do próximo ciclo, agendados ──
@@ -710,9 +718,14 @@ module.exports = async function handler(req, res) {
     const fila = [];
     for (const cat of CATS) {
       const mod = modeloDe(cat);
+      // TODOS os que estão dentro da meta continuam no próximo ciclo
+      const dentroDaMeta = ativos.filter(a => a.categoria === cat && (a.razaoMeta || 9) <= 1)
+        .sort((a, b) => (a.razaoMeta || 9) - (b.razaoMeta || 9));
+      const selo = ' [C' + String(new Date().getDate()).padStart(2, '0') + ']';
+      for (const a of dentroDaMeta) {
+        fila.push({ cat, tipo: 'mantido', nome: a.nome + selo, url: null, modelo: a });
+      }
       if (!mod) continue;
-      fila.push({ cat, tipo: 'campeao', nome: mod.nome + ' [C' + String(new Date().getDate()).padStart(2, '0') + ']',
-        url: null, modelo: mod });
       for (const n of (novos.itens || []).filter(x => x.categoria === cat)) {
         fila.push({ cat, tipo: 'novo', nome: n.nome, url: n.url, modelo: mod });
       }
