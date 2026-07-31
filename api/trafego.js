@@ -919,13 +919,44 @@ module.exports = async function handler(req, res) {
 
     // ── EXECUÇÃO ──
     const alvo = apenasUm ? fila.filter(f => f.tipo === 'novo').slice(0, 1) : fila;
+    if (String((req.body || {}).explicar || '') === '1') {
+      return res.status(200).json({ ok: true, modo: 'explicação (nada foi enviado à Meta)',
+        exemplo: alvo.map(f => ({
+          nome: f.nome, categoria: f.cat,
+          videoJaNaMeta: f.videoId || '(nenhum)',
+          campanhaModelo: f.modelo ? f.modelo.campanhaId : '(sem modelo)',
+          modeloNome: f.modelo ? f.modelo.nome : null,
+          verbaCentavos: Math.round(f.verba * 100),
+          inicioUnix: iniISO, fimUnix: fimISO,
+          inicioLegivel: inicio.toISOString(), fimLegivel: fim.toISOString(),
+        })) });
+    }
     const feitos = [], erros = [];
     const postForm = async (path, campos) => {
       const corpo = new URLSearchParams(campos).toString();
-      return fetch(`${GRAPH}/${path}?access_token=${TOKEN}`, {
+      const r = await fetch(`${GRAPH}/${path}?access_token=${TOKEN}`, {
         method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: corpo,
       }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      if (r && r.error) {
+        // guarda o detalhe completo para diagnóstico (a Meta manda 'parâmetro inválido' genérico)
+        r._detalhe = {
+          endpoint: path,
+          enviado: campos,
+          mensagem: r.error.message,
+          usuario: r.error.error_user_msg || null,
+          titulo: r.error.error_user_title || null,
+          codigo: r.error.code, subcodigo: r.error.error_subcode,
+          campo: r.error.error_data ? JSON.stringify(r.error.error_data).slice(0, 200) : null,
+        };
+      }
+      return r;
     };
+    const erroDe = (r, etapa) => etapa + ' → ' + [
+      (r._detalhe && r._detalhe.mensagem) || 'sem mensagem',
+      r._detalhe && r._detalhe.usuario ? '(' + r._detalhe.usuario + ')' : '',
+      r._detalhe ? 'cód ' + r._detalhe.codigo + (r._detalhe.subcodigo ? '/' + r._detalhe.subcodigo : '') : '',
+      r._detalhe && r._detalhe.campo ? '| ' + r._detalhe.campo : '',
+    ].filter(Boolean).join(' ');
     for (const f of alvo) {
       try {
         if (!f.modelo || !f.modelo.campanhaId) { erros.push(f.nome + ': sem campanha modelo'); continue; }
@@ -933,21 +964,21 @@ module.exports = async function handler(req, res) {
         let videoId = f.videoId || null;                 // já subido na Meta → usa direto
         if (!videoId && f.url) {
           const v = await postForm('act_' + CONTA + '/advideos', { file_url: f.url, name: f.nome });
-          if (v && v.error) { erros.push(f.nome + ': vídeo — ' + v.error.message); continue; }
+          if (v && v.error) { erros.push(f.nome + ' | ' + erroDe(v, 'upload do vídeo')); continue; }
           videoId = v && v.id;
         }
         // 2) duplica a campanha campeã (leva conjunto, segmentação e destino WhatsApp)
         const cp = await postForm(f.modelo.campanhaId + '/copies', {
           deep_copy: 'true', status_option: 'PAUSED', rename_options: JSON.stringify({ rename_strategy: 'NO_RENAME' }),
         });
-        if (cp && cp.error) { erros.push(f.nome + ': cópia — ' + cp.error.message); continue; }
+        if (cp && cp.error) { erros.push(f.nome + ' | ' + erroDe(cp, 'copiar campanha ' + f.modelo.campanhaId)); continue; }
         const novaCampanha = cp && (cp.copied_campaign_id || cp.id);
         // 3) verba e janela do ciclo
         const up = await postForm(novaCampanha, {
           name: f.nome, lifetime_budget: String(Math.round(f.verba * 100)),
           start_time: String(iniISO), stop_time: String(fimISO), status: 'ACTIVE',
         });
-        if (up && up.error) { erros.push(f.nome + ': verba/agenda — ' + up.error.message); continue; }
+        if (up && up.error) { erros.push(f.nome + ' | ' + erroDe(up, 'aplicar verba e agenda')); continue; }
         feitos.push({ nome: f.nome, categoria: f.cat, campanha: novaCampanha, verba: f.verba, videoId });
       } catch (e) { erros.push(f.nome + ': ' + e.message); }
       await new Promise(r => setTimeout(r, 400));
