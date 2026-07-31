@@ -752,7 +752,7 @@ function buildCard(f){
     btns.innerHTML=
       '<button class="fl-btn" onclick=\'abrirOrcCad('+JSON.stringify(f.id)+')\'>💬 VER ORÇAMENTO</button>'+
       '<button class="fl-btn '+wppCls+'" id="wpp-btn-'+f.id+'" onclick=\'marcarOrcWpp('+JSON.stringify(f.id)+')\'>'+ wppLbl +'</button>'+
-      (falhou ? '<div style="font-size:10.5px;color:#fca5a5;margin-top:4px;line-height:1.4;">📵 '+esc(f.orcEnvioErro)+'</div>' : '')+
+      (falhou ? '<div style="font-size:10.5px;color:#fca5a5;margin-top:4px;line-height:1.4;">📵 '+String(f.orcEnvioErro||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div>' : '')+
       (f.orcEnviadoWpp && f.orcEnviadoWppEm ? '<div style="font-size:10px;color:#4ade80;margin-top:4px;">enviado '+new Date(f.orcEnviadoWppEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</div>' : '');
   }
   if(f.phase==='producao'){
