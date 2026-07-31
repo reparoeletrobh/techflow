@@ -609,6 +609,57 @@ module.exports = async function handler(req, res) {
       proximo: 'rode ?action=modelos&curto=1 para ver o novo campeão' });
   }
 
+  // ── ✅ CHECKUP-PROGRAMACAO: confere o que foi agendado para o próximo ciclo ──
+  if (action === 'checkup-programacao') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const cfgC = await cfgTrafego();
+    // busca campanhas com agendamento futuro
+    const camps = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns?fields=id,name,status,effective_status,daily_budget,lifetime_budget,start_time,stop_time,created_time&limit=100&access_token=${TOKEN}`, 8);
+    if (camps.erro && !camps.data.length) return res.status(200).json({ ok: false, erro: camps.erro });
+    const agora = Date.now();
+    const futuras = (camps.data || []).filter(c => {
+      const ini = c.start_time ? new Date(c.start_time).getTime() : 0;
+      return ini > agora - 6 * 3600000;                      // começa agora ou no futuro
+    });
+    const brt = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') : null;
+    const linhas = futuras.map(c => {
+      const verba = c.lifetime_budget ? Number(c.lifetime_budget) / 100
+        : (c.daily_budget ? Number(c.daily_budget) / 100 : null);
+      return { nome: c.name, id: c.id, status: c.effective_status || c.status,
+        verba, tipoVerba: c.lifetime_budget ? 'total' : (c.daily_budget ? 'diária' : 'sem verba'),
+        inicio: brt(c.start_time), fim: brt(c.stop_time),
+        categoria: categoriaDe(c.name || '', 'anuncio') };
+    }).sort((a, b) => String(a.inicio).localeCompare(String(b.inicio)));
+
+    // validações
+    const alertas = [];
+    const verbas = [...new Set(linhas.map(l => l.verba))];
+    if (verbas.length > 1) alertas.push('⚠️ verbas diferentes entre campanhas: ' + verbas.map(v => 'R$ ' + v).join(', '));
+    const semVerba = linhas.filter(l => !l.verba);
+    if (semVerba.length) alertas.push('❌ ' + semVerba.length + ' campanha(s) SEM verba definida');
+    const inicios = [...new Set(linhas.map(l => l.inicio))];
+    if (inicios.length > 1) alertas.push('⚠️ horários de início diferentes: ' + inicios.join(' · '));
+    const fins = [...new Set(linhas.map(l => l.fim))];
+    if (fins.length > 1) alertas.push('⚠️ horários de término diferentes: ' + fins.join(' · '));
+    const semFim = linhas.filter(l => !l.fim);
+    if (semFim.length) alertas.push('❌ ' + semFim.length + ' campanha(s) SEM data de término — não vão encerrar sozinhas');
+    const paradas = linhas.filter(l => !['ACTIVE', 'SCHEDULED', 'PENDING_REVIEW', 'IN_PROCESS'].includes(l.status));
+    if (paradas.length) alertas.push('⚠️ ' + paradas.length + ' com status inesperado: ' + [...new Set(paradas.map(p => p.status))].join(', '));
+
+    const total = linhas.reduce((s, l) => s + (l.verba || 0), 0);
+    const porCat = linhas.reduce((o, l) => { o[l.categoria] = (o[l.categoria] || 0) + 1; return o; }, {});
+    return res.status(200).json({ ok: alertas.length === 0,
+      campanhasAgendadas: linhas.length,
+      verbaTotal: Number(total.toFixed(2)),
+      verbaPorCampanha: verbas.length === 1 ? verbas[0] : verbas,
+      inicio: inicios.length === 1 ? inicios[0] : inicios,
+      fim: fins.length === 1 ? fins[0] : fins,
+      porCategoria: porCat,
+      alertas: alertas.length ? alertas : ['✅ nenhum problema encontrado'],
+      lista: linhas.map(l => (l.categoria || '?').slice(0, 4).toUpperCase() + ' | ' + String(l.nome).slice(0, 30) +
+        ' | R$ ' + (l.verba || 0) + ' | ' + l.status) });
+  }
+
   // ── 🩺 META-SAUDE: testa a comunicação com a Meta ponta a ponta ──
   if (action === 'meta-saude') {
     const t0 = Date.now();
