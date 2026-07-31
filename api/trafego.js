@@ -622,12 +622,40 @@ module.exports = async function handler(req, res) {
       return ini > agora - 6 * 3600000;                      // começa agora ou no futuro
     });
     const brt = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') : null;
+    // ⚠️ a verba pode estar na CAMPANHA (CBO) ou no CONJUNTO. Buscar os conjuntos das
+    // campanhas que vieram sem valor — senão elas aparecem como "sem verba" sem estar.
+    const semNaCamp = futuras.filter(c => !c.lifetime_budget && !c.daily_budget).map(c => c.id);
+    const verbaConj = {}, agendaConj = {};
+    for (let i = 0; i < semNaCamp.length; i += 20) {
+      const lote = semNaCamp.slice(i, i + 20).join(',');
+      const j = await fetch(`${GRAPH}/?ids=${lote}&fields=adsets{id,daily_budget,lifetime_budget,start_time,end_time}&access_token=${TOKEN}`)
+        .then(x => x.json()).catch(() => null);
+      for (const k of Object.keys(j || {})) {
+        const sets = (((j[k] || {}).adsets) || {}).data || [];
+        let soma = 0, tipo = null, ini = null, fim = null;
+        for (const s of sets) {
+          if (s.lifetime_budget) { soma += Number(s.lifetime_budget) / 100; tipo = 'total (conjunto)'; }
+          else if (s.daily_budget) { soma += Number(s.daily_budget) / 100; tipo = 'diária (conjunto)'; }
+          if (s.start_time && !ini) ini = s.start_time;
+          if (s.end_time && !fim) fim = s.end_time;
+        }
+        if (soma > 0) verbaConj[k] = { soma: Number(soma.toFixed(2)), tipo, conjuntos: sets.length };
+        if (ini || fim) agendaConj[k] = { ini, fim };
+      }
+      await new Promise(r => setTimeout(r, 120));
+    }
     const linhas = futuras.map(c => {
-      const verba = c.lifetime_budget ? Number(c.lifetime_budget) / 100
+      let verba = c.lifetime_budget ? Number(c.lifetime_budget) / 100
         : (c.daily_budget ? Number(c.daily_budget) / 100 : null);
+      let tipoVerba = c.lifetime_budget ? 'total (campanha)' : (c.daily_budget ? 'diária (campanha)' : null);
+      let onde = 'campanha';
+      if (verba == null && verbaConj[c.id]) {
+        verba = verbaConj[c.id].soma; tipoVerba = verbaConj[c.id].tipo; onde = 'conjunto';
+      }
+      const ag = agendaConj[c.id] || {};
       return { nome: c.name, id: c.id, status: c.effective_status || c.status,
-        verba, tipoVerba: c.lifetime_budget ? 'total' : (c.daily_budget ? 'diária' : 'sem verba'),
-        inicio: brt(c.start_time), fim: brt(c.stop_time),
+        verba, tipoVerba: tipoVerba || 'sem verba', verbaEm: verba != null ? onde : null,
+        inicio: brt(c.start_time || ag.ini), fim: brt(c.stop_time || ag.fim),
         categoria: categoriaDe(c.name || '', 'anuncio') };
     }).sort((a, b) => String(a.inicio).localeCompare(String(b.inicio)));
 
@@ -656,8 +684,9 @@ module.exports = async function handler(req, res) {
       fim: fins.length === 1 ? fins[0] : fins,
       porCategoria: porCat,
       alertas: alertas.length ? alertas : ['✅ nenhum problema encontrado'],
-      lista: linhas.map(l => (l.categoria || '?').slice(0, 4).toUpperCase() + ' | ' + String(l.nome).slice(0, 30) +
-        ' | R$ ' + (l.verba || 0) + ' | ' + l.status) });
+      verbaEm: linhas.reduce((o, l) => { const k = l.verbaEm || 'sem verba'; o[k] = (o[k] || 0) + 1; return o; }, {}),
+      lista: linhas.map(l => (l.categoria || '?').slice(0, 4).toUpperCase() + ' | ' + String(l.nome).slice(0, 28) +
+        ' | R$ ' + (l.verba || 0) + ' (' + (l.verbaEm || '—') + ') | ' + l.status) });
   }
 
   // ── 🩺 META-SAUDE: testa a comunicação com a Meta ponta a ponta ──
