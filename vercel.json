@@ -123,6 +123,18 @@
   ],
   "rewrites": [
     {
+      "source": "/privacy",
+      "destination": "/privacidade.html"
+    },
+    {
+      "source": "/politica-de-privacidade",
+      "destination": "/privacidade.html"
+    },
+    {
+      "source": "/privacidade",
+      "destination": "/privacidade.html"
+    },
+    {
       "source": "/tv/Eduardo",
       "destination": "/tv-rota.html?m=Eduardo"
     },
