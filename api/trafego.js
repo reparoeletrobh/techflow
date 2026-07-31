@@ -687,6 +687,40 @@ module.exports = async function handler(req, res) {
   }
 
   // ── 📥 REGISTRAR-DA-META: usa os vídeos já subidos na Meta como criativos da semana ──
+  // ── 🔗 REGISTRAR-SEMANA: link simples, sem acentos nem espaços na URL ──
+  // Uso: ?action=registrar-semana&desde=2026-07-31&naoclassificado=adega
+  if (action === 'registrar-semana') {
+    const desde = String(req.query.desde || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(desde)) {
+      return res.status(400).json({ ok: false, error: 'informe ?desde=AAAA-MM-DD' });
+    }
+    const fallback = String(req.query.naoclassificado || '').toLowerCase().trim();
+    const CATS_OK = ['tv', 'microondas', 'purificador', 'adega'];
+    if (fallback && !CATS_OK.includes(fallback)) {
+      return res.status(400).json({ ok: false, error: 'naoclassificado deve ser: ' + CATS_OK.join(', ') });
+    }
+    const r = await pegarTudo(`${GRAPH}/act_${CONTA}/advideos?fields=id,title,created_time&limit=100&access_token=${TOKEN}`, 6);
+    const doDia = (r.data || []).filter(v => String(v.created_time || '').slice(0, 10) >= desde);
+    const chave = 'trafego_criativos_' + (req.query.semana || 'atual');
+    const atual = String(req.query.substituir || '1') === '1' ? { itens: [] } : ((await dbGet(chave)) || { itens: [] });
+    const aceitos = [], recusados = [];
+    for (const v of doDia) {
+      let cat = categoriaDe(v.title || '', 'equipamento');
+      if (!CATS_OK.includes(cat)) cat = fallback;              // não classificou → vai para o fallback
+      if (!CATS_OK.includes(cat)) { recusados.push(String(v.title || v.id).slice(0, 45)); continue; }
+      if (atual.itens.some(x => x.videoId === v.id)) continue;
+      aceitos.push({ nome: String(v.title || v.id).slice(0, 80), categoria: cat,
+        videoId: v.id, url: null, tipo: 'video-meta', registradoEm: new Date().toISOString() });
+    }
+    atual.itens = atual.itens.concat(aceitos);
+    atual.atualizadoEm = new Date().toISOString();
+    await dbSet(chave, atual);
+    return res.status(200).json({ ok: true, videosNoPeriodo: doDia.length, aceitos: aceitos.length,
+      recusados,
+      porCategoria: atual.itens.reduce((o, x) => { o[x.categoria] = (o[x.categoria] || 0) + 1; return o; }, {}),
+      lista: aceitos.map(a => a.categoria + ' | ' + a.nome.slice(0, 42)) });
+  }
+
   // ── 🔗 REGISTRAR-DA-META-LINK: mesma coisa, mas por link simples (sem POST) ──
   // Uso: ?action=registrar-da-meta-link&desde=2026-07-31&adega=titulo1|titulo2
   if (action === 'registrar-da-meta-link') {
