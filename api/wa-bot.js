@@ -64,10 +64,11 @@ const FASE_TECNICO_LBL = {
 // ═══ FONTE ÚNICA DA VERDADE: orçamento que NÓS enviamos e que não aprovou nem virou Conflitos Bot.
 // O painel de Orçamentos e o motor de reativação usam exatamente esta lista.
 async function orcamentosEmAberto() {
-  const [logA, tvA, envA, pipeA, pipeT, pros] = await Promise.all([
+  const [logA, tvA, envA, pipeA, pipeT, pros, flDb] = await Promise.all([
     dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
     dbGet('wa_orc_enviados').then(v => v || { ids: {} }),
     dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('prospeccao_adm'),
+    dbGet('reparoeletro_frenteloja'),
   ]);
   const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
   // registro de orçamento enviado: antigo era texto com a data, novo é objeto com origem
@@ -105,6 +106,13 @@ async function orcamentosEmAberto() {
     const q = envA.ids['tv:' + f.id] || envA.ids[f.id];
     if (!q) continue;
     juntar(f, 'tv', dataEnvio(q));
+  }
+  // Frente de Loja: orçamento ENVIADO e ainda sem decisão entra na régua de reativação.
+  // (isto não faz o bot enviar nada — o envio de loja é sempre manual pelo botão.)
+  for (const f of (((flDb || {}).fichas) || [])) {
+    if (f.phase !== 'orcamento_cadastrado' || !f.orcEnviadoWpp) continue;
+    juntar({ id: f.id, telefone: f.telefone, nome: f.nomeContato, equipamento: f.equipamento },
+      'loja', f.orcEnviadoWppEm);
   }
   abertos.sort((a, b) => (b.horasParado || 0) - (a.horasParado || 0));
   return abertos;

@@ -124,6 +124,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
 .fl-card-btns{display:flex;flex-direction:column;gap:4px;margin-top:8px;}
 .fl-btn{background:rgba(245,200,0,.12);border:1px solid rgba(245,200,0,.3);color:var(--yellow);border-radius:6px;padding:6px 10px;font-family:var(--fm);font-size:10px;cursor:pointer;letter-spacing:.5px;transition:all .15s;text-align:center;}
 .fl-btn:hover{background:rgba(245,200,0,.25);}
+.fl-btn.piscando{animation:flPisca 1.1s ease-in-out infinite;}
+@keyframes flPisca{0%,100%{opacity:1;}50%{opacity:.45;}}
+.fl-btn.blue{background:rgba(59,130,246,.14);border-color:rgba(59,130,246,.45);color:#93c5fd;}
 .fl-btn.green{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.3);color:var(--green);}
 .fl-btn.green:hover{background:rgba(34,197,94,.25);}
 .fl-btn.red{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.3);color:var(--red);}
@@ -743,11 +746,14 @@ function buildCard(f){
     btns.innerHTML='<button class="fl-btn" onclick=\'abrirAnalise('+JSON.stringify(f.id)+')\'>🔧 ANÁLISE TÉCNICA</button>';
   }
   if(f.phase==='orcamento_cadastrado'){
-    var wppCls = f.orcEnviadoWpp ? 'green' : 'red';
-    var wppLbl = f.orcEnviadoWpp ? '✅ ORC. ENVIADO' : '📲 ENVIAR ORC. WPP';
+    var falhou = !f.orcEnviadoWpp && f.orcEnvioErro;
+    var wppCls = f.orcEnviadoWpp ? 'green' : (falhou ? 'red piscando' : 'blue');
+    var wppLbl = f.orcEnviadoWpp ? '✅ CLIENTE RECEBEU' : (falhou ? '⚠️ FALHOU — TENTAR DE NOVO' : '📲 ENVIAR ORÇAMENTO WPP');
     btns.innerHTML=
       '<button class="fl-btn" onclick=\'abrirOrcCad('+JSON.stringify(f.id)+')\'>💬 VER ORÇAMENTO</button>'+
-      '<button class="fl-btn '+wppCls+'" id="wpp-btn-'+f.id+'" onclick=\'marcarOrcWpp('+JSON.stringify(f.id)+')\'>'+ wppLbl +'</button>';
+      '<button class="fl-btn '+wppCls+'" id="wpp-btn-'+f.id+'" onclick=\'marcarOrcWpp('+JSON.stringify(f.id)+')\'>'+ wppLbl +'</button>'+
+      (falhou ? '<div style="font-size:10.5px;color:#fca5a5;margin-top:4px;line-height:1.4;">📵 '+esc(f.orcEnvioErro)+'</div>' : '')+
+      (f.orcEnviadoWpp && f.orcEnviadoWppEm ? '<div style="font-size:10px;color:#4ade80;margin-top:4px;">enviado '+new Date(f.orcEnviadoWppEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</div>' : '');
   }
   if(f.phase==='producao'){
     btns.innerHTML='<button class="fl-btn blue" onclick=\'abrirEndereco('+JSON.stringify(f.id)+')\'>📍 CADASTRAR ENDEREÇO</button>';
@@ -778,24 +784,29 @@ function buildCard(f){
 
 async function marcarOrcWpp(id) {
   var f = fichas.find(function(x){ return x.id === id; });
-  if (!f || f.orcEnviadoWpp) return; // já marcado
+  if (!f || f.orcEnviadoWpp) return;
+  if (!confirm('📲 Enviar o orçamento para ' + (f.nomeContato||'o cliente') + ' pelo WhatsApp?\n\nO valor sai já com os 10% de desconto.')) return;
+  var btn = document.getElementById('wpp-btn-' + id);
+  if (btn) { btn.textContent = '📤 enviando…'; btn.disabled = true; }
   try {
-    var r = await fetch('/api/frenteloja?action=marcar-orc-whatsapp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    var d = await fetch('/api/frenteloja?action=enviar-orcamento-wpp', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: id })
-    });
-    var d = await r.json();
-    if (d.ok) {
+    }).then(function(r){ return r.json(); });
+    if (d && d.ok) {
       f.orcEnviadoWpp = true;
-      var btn = document.getElementById('wpp-btn-' + id);
-      if (btn) {
-        btn.className = 'fl-btn green';
-        btn.textContent = '✅ ORC. ENVIADO';
-        btn.onclick = null; // desabilitar novo clique
-      }
+      f.orcEnviadoWppEm = new Date().toISOString();
+      delete f.orcEnvioErro;
+      if (typeof toast === 'function') toast('✅ Orçamento enviado (R$ ' + (d.valor||'') + ')','g');
+    } else {
+      f.orcEnvioErro = (d && d.error) || 'falha no envio';
+      alert('⚠️ Não consegui enviar\n\n' + f.orcEnvioErro);
     }
-  } catch(e) { console.error('marcarOrcWpp:', e.message); }
+    renderKanban();
+  } catch(e) {
+    alert('⚠️ Erro: ' + e.message);
+    if (btn) { btn.disabled = false; }
+  }
 }
 
 function avisarCliente(id){

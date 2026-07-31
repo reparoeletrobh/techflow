@@ -521,6 +521,81 @@ export default async function handler(req,res){
       aviso:'orçamento guardado — NÃO foi enviado ao cliente' });
   }
 
+  // ── 📲 ENVIAR-ORCAMENTO-WPP: dispara o orçamento guardado para o cliente ──
+  // É o ÚNICO ponto em que o orçamento de loja sai. Sem clicar aqui, nada é enviado.
+  if (req.method === 'POST' && action === 'enviar-orcamento-wpp') {
+    const { id } = req.body || {};
+    if (!id) return res.status(400).json({ ok:false, error:'id obrigatorio' });
+    const db = await dbGet(FL_KEY) || defaultDB();
+    const ficha = db.fichas.find(f => f.id === id);
+    if (!ficha) return res.status(404).json({ ok:false, error:'ficha nao encontrada' });
+    if (ficha.orcEnviadoWpp) return res.status(200).json({ ok:true, jaEnviado:true, msg:'orçamento já foi enviado' });
+
+    const diag = ficha.diagnosticoLoja || {};
+    const texto = diag.texto;
+    if (!texto) return res.status(400).json({ ok:false, error:'esta ficha não tem orçamento salvo — faça o diagnóstico primeiro' });
+
+    const tel = String(ficha.telefone || ficha.tel || '').replace(/\D/g,'');
+    if (tel.length < 10) {
+      ficha.orcEnvioErro = 'telefone inválido ou ausente';
+      ficha.orcEnvioTentadoEm = new Date().toISOString();
+      await dbSet(FL_KEY, db);
+      return res.status(200).json({ ok:false, error:'telefone inválido ou ausente na ficha', ficha });
+    }
+    const to = tel.startsWith('55') ? tel : '55' + tel;
+    const KEV = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+    const primeiro = String(ficha.nomeContato||'cliente').trim().split(/\s+/)[0];
+
+    // 1) tenta mensagem direta (janela aberta)
+    let r = await fetch(`https://reparoeletroadm.com/api/wa-bot?action=enviar&k=${KEV}`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ tel: to, texto, via:'frenteloja-orcamento' }),
+    }).then(x=>x.json()).catch(e=>({ ok:false, error:e.message }));
+    let via = 'mensagem';
+
+    // 2) janela fechada → abre com template e envia o orçamento em seguida
+    if (!r || !r.ok) {
+      const rt = await fetch(`https://reparoeletroadm.com/api/wa-bot?action=template-conserto&k=${KEV}`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ tel: to, nome: primeiro }),
+      }).then(x=>x.json()).catch(e=>({ ok:false, error:e.message }));
+      if (rt && rt.ok) {
+        await new Promise(s => setTimeout(s, 1200));
+        r = await fetch(`https://reparoeletroadm.com/api/wa-bot?action=enviar&k=${KEV}`, {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ tel: to, texto, via:'frenteloja-orcamento' }),
+        }).then(x=>x.json()).catch(e=>({ ok:false, error:e.message }));
+        via = 'template + mensagem';
+      } else {
+        r = { ok:false, error:(rt && (rt.error||rt.erro)) || 'não consegui abrir a conversa' };
+      }
+    }
+
+    const agora = new Date().toISOString();
+    if (r && r.ok) {
+      ficha.orcEnviadoWpp   = true;
+      ficha.orcEnviadoWppEm = agora;
+      ficha.orcEnvioVia     = via;
+      delete ficha.orcEnvioErro;
+      // registra a ORIGEM para a aprovação rotear pela ferramenta do Frente de Loja
+      try {
+        const env = (await dbGet('wa_orc_enviados')) || { ids:{} };
+        if (!env.ids) env.ids = {};
+        env.ids['fl:' + ficha.id] = { em: agora, origem:'frenteloja', fichaId: ficha.id, telefone: to };
+        await dbSet('wa_orc_enviados', env);
+      } catch(e) {}
+    } else {
+      ficha.orcEnvioErro = String((r && r.error) || 'falha no envio').slice(0,140);
+      ficha.orcEnvioTentadoEm = agora;
+    }
+    await dbSet(FL_KEY, db);
+    logAction({ modulo:'Frente de Loja', fichaId:ficha.id, ficha:ficha.nomeContato||'',
+      acao:'Enviar orçamento WhatsApp', gatilho: via, status: (r&&r.ok)?'ok':'erro' }).catch(()=>{});
+    return res.status(200).json({ ok: !!(r && r.ok), via, ficha,
+      valor: diag.totalComDesconto,
+      error: (r && r.ok) ? undefined : ficha.orcEnvioErro });
+  }
+
   // ── 📣 MARCAR-AVISADO: avisa o cliente pelo WhatsApp que o equipamento está pronto ──
   if (req.method === 'POST' && action === 'marcar-avisado') {
     const { id } = req.body || {};
