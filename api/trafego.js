@@ -687,6 +687,25 @@ module.exports = async function handler(req, res) {
   }
 
   // ── 📥 REGISTRAR-DA-META: usa os vídeos já subidos na Meta como criativos da semana ──
+  // ── 🔗 REGISTRAR-DA-META-LINK: mesma coisa, mas por link simples (sem POST) ──
+  // Uso: ?action=registrar-da-meta-link&desde=2026-07-31&adega=titulo1|titulo2
+  if (action === 'registrar-da-meta-link') {
+    const desde = String(req.query.desde || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(desde)) {
+      return res.status(400).json({ ok: false, error: 'informe ?desde=AAAA-MM-DD (recorte obrigatório)' });
+    }
+    const cats = {};
+    for (const c of ['tv', 'microondas', 'purificador', 'adega']) {
+      const v = String(req.query[c] || '').trim();
+      if (v) for (const t of v.split('|')) if (t.trim()) cats[t.trim()] = c;
+    }
+    const r = await fetch(`https://reparoeletroadm.com/api/trafego?action=registrar-da-meta&k=${(process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim()}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ desde, substituir: String(req.query.substituir || '1') === '1', categorias: cats }),
+    }).then(x => x.json()).catch(e => ({ ok: false, error: e.message }));
+    return res.status(200).json(r);
+  }
+
   if (req.method === 'POST' && action === 'registrar-da-meta') {
     const { semana, ids, substituir, desde, categorias } = req.body || {};
     // 🚫 TRAVA: a biblioteca tem centenas de vídeos antigos. Exige recorte explícito
@@ -706,7 +725,13 @@ module.exports = async function handler(req, res) {
     const aceitos = [], semCategoria = [];
     const overrides = categorias || {};              // correção manual por título ou id
     for (const v of filtro) {
-      const cat = String(overrides[v.id] || overrides[v.title] || categoriaDe(v.title || '', 'equipamento')).toLowerCase();
+      let over = overrides[v.id] || overrides[v.title];
+      if (!over) {                                  // casa por trecho do título também
+        for (const k of Object.keys(overrides)) {
+          if (k && String(v.title || '').toLowerCase().includes(String(k).toLowerCase())) { over = overrides[k]; break; }
+        }
+      }
+      const cat = String(over || categoriaDe(v.title || '', 'equipamento')).toLowerCase();
       if (!CATS_OK.includes(cat)) { semCategoria.push({ id: v.id, titulo: v.title || '(sem título)' }); continue; }
       if (atual.itens.some(x => x.videoId === v.id)) continue;
       aceitos.push({ nome: String(v.title || v.id).slice(0, 80), categoria: cat,
