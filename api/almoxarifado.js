@@ -583,6 +583,72 @@ export default async function handler(req, res) {
       tarefas: tarefas.slice(0, 80), rotas: rotas.slice(0, 20), ml: ml.slice(0, 40) });
   }
 
+  // ── 🔎 BUSCAR-TUDO: procura em TODA a operação, inclusive rotas finalizadas e arquivo ──
+  if (action === 'buscar-tudo') {
+    const q = String(req.query.q || '').toLowerCase().trim();
+    if (q.length < 3) return res.status(200).json({ ok: false, error: 'informe ao menos 3 caracteres (nome, telefone ou OS)' });
+    const casa = t => String(t || '').toLowerCase().includes(q);
+    const [rdb, arqA, arqT, ppA, ppT, lgA, lgT, movs] = await Promise.all([
+      dbGet('reparoeletro_almox_rotas'), dbGet('reparoeletro_arquivo'), dbGet('tv_arquivo'),
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+      dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+      dbGet('reparoeletro_movimentacoes'),
+    ]);
+    const achados = { rotas: [], tarefas: [], cards: [], fichas: [], movimentos: [] };
+
+    // ROTAS — inclusive as finalizadas
+    for (const r of (((rdb || {}).rotas) || (db.rotas || []))) {
+      const itens = (r.itens || []).filter(i => casa(i.cliente) || casa(i.tel) || casa(i.equipamento) || casa(i.os) || casa(i.cardId));
+      if (itens.length || casa(r.motorista) || casa(r.id)) {
+        achados.rotas.push({ rota: r.id, motorista: r.motorista, status: r.status,
+          criadaEm: r.criadaEm || r.em, finalizadaEm: r.finalizadaEm || null,
+          totalItens: (r.itens || []).length,
+          itensQueCasam: itens.map(i => ({ cliente: i.cliente, equipamento: i.equipamento,
+            tel: i.tel, entregue: i.entregue || i.status || null, obs: i.obs || null })) });
+      }
+    }
+    // TAREFAS — todos os estados
+    for (const t of (db.tarefas || [])) {
+      if (casa(t.cliente) || casa(t.tel) || casa(t.equipamento) || casa(t.cardId) || casa(t.modelo)) {
+        achados.tarefas.push({ id: t.id, tipo: t.tipo, cliente: t.cliente, equipamento: t.equipamento,
+          status: t.status, destino: t.destino, feitoPor: t.feitoPor, feitoEm: t.feitoEm });
+      }
+    }
+    // CARDS vivos e arquivados
+    for (const [b, onde] of [[ppA, 'pipe ADM'], [ppT, 'pipe TV'], [arqA, 'arquivo ADM'], [arqT, 'arquivo TV']]) {
+      for (const c of (((b || {}).cards) || [])) {
+        if (casa(c.nomeContato) || casa(c.telefone) || casa(c.equipamento) || casa(c.id)) {
+          achados.cards.push({ onde, id: c.id, nome: c.nomeContato, equipamento: c.equipamento,
+            fase: c.phaseId || c.phase, valor: c.valor, movidoEm: c.movedAt });
+        }
+      }
+    }
+    // FICHAS da logística
+    for (const [b, onde] of [[lgA, 'logística ADM'], [lgT, 'logística TV']]) {
+      for (const f of (((b || {}).fichas) || [])) {
+        if (casa(f.nome) || casa(f.telefone) || casa(f.equipamento)) {
+          achados.fichas.push({ onde, id: f.id, nome: f.nome, equipamento: f.equipamento,
+            fase: f.phase, motorista: f.coletadoPor || f.motoristaNome || null, movidoEm: f.movedAt });
+        }
+      }
+    }
+    // MOVIMENTOS registrados
+    for (const m of (((movs || {}).movs) || []).slice(0, 3000)) {
+      if (casa(m.ficha) || casa(m.cliente) || casa(m.fichaId) || casa(m.por)) {
+        achados.movimentos.push({ quando: m.ts || m.em, modulo: m.modulo, acao: m.acao,
+          de: m.de, para: m.para, por: m.por || m.gatilho });
+      }
+    }
+    const total = Object.values(achados).reduce((s, a) => s + a.length, 0);
+    return res.status(200).json({ ok: true, busca: q, total,
+      resumo: Object.keys(achados).map(k => achados[k].length + ' ' + k).join(' · '),
+      rotas: achados.rotas.slice(0, 10),
+      tarefas: achados.tarefas.slice(0, 15),
+      cards: achados.cards.slice(0, 10),
+      fichas: achados.fichas.slice(0, 10),
+      movimentos: achados.movimentos.slice(0, 20) });
+  }
+
   // ── BADGE leve p/ o hub: pendentes (tarefas + rotas em separação) ──
   if (action === 'badge') {
     const pend = (db.tarefas || []).filter(t => t.status === 'pendente' || t.status === 'falha').length;
