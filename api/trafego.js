@@ -609,6 +609,62 @@ module.exports = async function handler(req, res) {
       proximo: 'rode ?action=modelos&curto=1 para ver o novo campeão' });
   }
 
+  // ── 🩺 META-SAUDE: testa a comunicação com a Meta ponta a ponta ──
+  if (action === 'meta-saude') {
+    const t0 = Date.now();
+    const passos = [];
+    const chamar = async (rot, url) => {
+      const ini = Date.now();
+      const r = await fetch(url).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      const ms = Date.now() - ini;
+      if (r && r.error) {
+        passos.push({ etapa: rot, ok: false, ms, erro: r.error.message, codigo: r.error.code, subcodigo: r.error.error_subcode });
+        return null;
+      }
+      passos.push({ etapa: rot, ok: true, ms });
+      return r;
+    };
+    // 1) credenciais configuradas?
+    passos.push({ etapa: 'variáveis de ambiente', ok: !!(TOKEN && CONTA),
+      detalhe: (TOKEN ? 'token presente' : 'TOKEN AUSENTE') + ' · ' + (CONTA ? 'conta act_' + CONTA : 'CONTA AUSENTE') });
+    if (!TOKEN || !CONTA) return res.status(200).json({ ok: false, passos, veredito: '❌ credenciais ausentes na Vercel' });
+    // 2) o token é válido?
+    const eu = await chamar('token válido', `${GRAPH}/me?fields=id,name&access_token=${TOKEN}`);
+    // 3) a conta responde?
+    const conta = await chamar('conta de anúncios', `${GRAPH}/act_${CONTA}?fields=name,account_status,currency,balance,spend_cap&access_token=${TOKEN}`);
+    // 4) leitura de campanhas
+    const camp = await chamar('ler campanhas', `${GRAPH}/act_${CONTA}/campaigns?fields=id&limit=1&access_token=${TOKEN}`);
+    // 5) leitura de métricas
+    const ins = await chamar('ler métricas (insights)', `${GRAPH}/act_${CONTA}/insights?date_preset=today&fields=spend&access_token=${TOKEN}`);
+    // 6) biblioteca de vídeos
+    const vid = await chamar('biblioteca de vídeos', `${GRAPH}/act_${CONTA}/advideos?fields=id&limit=1&access_token=${TOKEN}`);
+    // 7) permissão de escrita (sem alterar nada: pede o campo status de uma campanha)
+    let escrita = { etapa: 'permissão de escrita', ok: null, detalhe: 'não testada' };
+    try {
+      const c1 = (camp && camp.data && camp.data[0]) ? camp.data[0].id : null;
+      if (c1) {
+        const r = await fetch(`${GRAPH}/${c1}?fields=status,effective_status&access_token=${TOKEN}`).then(x => x.json());
+        escrita = r && !r.error
+          ? { etapa: 'permissão de escrita', ok: true, detalhe: 'acesso de gestão confirmado' }
+          : { etapa: 'permissão de escrita', ok: false, erro: (r.error || {}).message };
+      }
+    } catch (e) { escrita = { etapa: 'permissão de escrita', ok: false, erro: e.message }; }
+    passos.push(escrita);
+
+    const cont = conta || {};
+    const falhas = passos.filter(p => p.ok === false);
+    const STATUS = { 1: 'ATIVA', 2: 'DESATIVADA', 3: 'CANCELADA', 7: 'EM ANÁLISE', 9: 'PERÍODO DE GRAÇA', 101: 'FECHADA' };
+    return res.status(200).json({ ok: falhas.length === 0,
+      conta: cont.name ? { nome: cont.name, status: STATUS[cont.account_status] || cont.account_status,
+        moeda: cont.currency, saldo: cont.balance ? (cont.balance / 100).toFixed(2) : null,
+        tetoDeGasto: cont.spend_cap ? (cont.spend_cap / 100).toFixed(2) : 'sem teto' } : null,
+      usuario: eu ? eu.name : null,
+      passos, tempoTotalMs: Date.now() - t0,
+      veredito: falhas.length === 0
+        ? '✅ comunicação com a Meta saudável'
+        : '❌ ' + falhas.length + ' falha(s): ' + falhas.map(f => f.etapa).join(', ') });
+  }
+
   // ── 🎬 VIDEOS-META: lista a biblioteca de vídeos da conta de anúncios ──
   if (action === 'videos-meta') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'META_ADS_ACCOUNT não configurado' });
