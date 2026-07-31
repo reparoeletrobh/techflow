@@ -609,6 +609,53 @@ module.exports = async function handler(req, res) {
       proximo: 'rode ?action=modelos&curto=1 para ver o novo campeão' });
   }
 
+  // ── 🎬 VIDEOS-META: lista a biblioteca de vídeos da conta de anúncios ──
+  if (action === 'videos-meta') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'META_ADS_ACCOUNT não configurado' });
+    const r = await pegarTudo(`${GRAPH}/act_${CONTA}/advideos?fields=id,title,created_time,status&limit=100&access_token=${TOKEN}`, 4);
+    if (r.erro && !r.data.length) return res.status(200).json({ ok: false, erro: r.erro });
+    const vids = (r.data || []).map(v => ({
+      id: v.id, titulo: v.title || '(sem título)',
+      criadoEm: v.created_time,
+      pronto: !v.status || v.status.video_status === 'ready',
+      categoria: categoriaDe(v.title || '', 'equipamento'),
+    })).sort((a, b) => String(b.criadoEm).localeCompare(String(a.criadoEm)));
+    if (String(req.query.curto || '') === '1') {
+      return res.status(200).json({ ok: true, total: vids.length,
+        lista: vids.slice(0, 40).map(v => v.titulo.slice(0, 40) + ' | ' + v.categoria + ' | ' +
+          (v.pronto ? 'pronto' : 'processando') + ' | ' + String(v.criadoEm).slice(0, 10)) });
+    }
+    return res.status(200).json({ ok: true, total: vids.length,
+      porCategoria: vids.reduce((o, v) => { o[v.categoria] = (o[v.categoria] || 0) + 1; return o; }, {}),
+      videos: vids });
+  }
+
+  // ── 📥 REGISTRAR-DA-META: usa os vídeos já subidos na Meta como criativos da semana ──
+  if (req.method === 'POST' && action === 'registrar-da-meta') {
+    const { semana, ids, substituir } = req.body || {};
+    const chave = 'trafego_criativos_' + (semana || 'atual');
+    const atual = substituir ? { itens: [] } : ((await dbGet(chave)) || { itens: [] });
+    const r = await pegarTudo(`${GRAPH}/act_${CONTA}/advideos?fields=id,title&limit=100&access_token=${TOKEN}`, 4);
+    const todos = r.data || [];
+    const filtro = Array.isArray(ids) && ids.length ? todos.filter(v => ids.includes(v.id)) : todos;
+    const CATS_OK = ['tv', 'microondas', 'purificador', 'adega'];
+    const aceitos = [], semCategoria = [];
+    for (const v of filtro) {
+      const cat = categoriaDe(v.title || '', 'equipamento');
+      if (!CATS_OK.includes(cat)) { semCategoria.push(v.title || v.id); continue; }
+      if (atual.itens.some(x => x.videoId === v.id)) continue;
+      aceitos.push({ nome: String(v.title || v.id).slice(0, 80), categoria: cat,
+        videoId: v.id, url: null, tipo: 'video-meta', registradoEm: new Date().toISOString() });
+    }
+    atual.itens = atual.itens.concat(aceitos);
+    atual.atualizadoEm = new Date().toISOString();
+    await dbSet(chave, atual);
+    return res.status(200).json({ ok: true, aceitos: aceitos.length,
+      naoClassificados: semCategoria.slice(0, 20),
+      totalNaSemana: atual.itens.length,
+      porCategoria: atual.itens.reduce((o, x) => { o[x.categoria] = (o[x.categoria] || 0) + 1; return o; }, {}) });
+  }
+
   // ── 📥 CRIATIVOS-REGISTRAR: cadastra os criativos da semana (nome, categoria, URL do vídeo) ──
   if (req.method === 'POST' && action === 'criativos-registrar') {
     const { semana, criativos, substituir } = req.body || {};
@@ -727,7 +774,7 @@ module.exports = async function handler(req, res) {
       }
       if (!mod) continue;
       for (const n of (novos.itens || []).filter(x => x.categoria === cat)) {
-        fila.push({ cat, tipo: 'novo', nome: n.nome, url: n.url, modelo: mod });
+        fila.push({ cat, tipo: 'novo', nome: n.nome, url: n.url, videoId: n.videoId || null, modelo: mod });
       }
     }
     const nTv = fila.filter(f => f.cat === 'tv').length;
@@ -759,8 +806,8 @@ module.exports = async function handler(req, res) {
       try {
         if (!f.modelo || !f.modelo.campanhaId) { erros.push(f.nome + ': sem campanha modelo'); continue; }
         // 1) vídeo novo (a Meta baixa da URL — arquivo grande não passa pelo nosso servidor)
-        let videoId = null;
-        if (f.url) {
+        let videoId = f.videoId || null;                 // já subido na Meta → usa direto
+        if (!videoId && f.url) {
           const v = await postForm('act_' + CONTA + '/advideos', { file_url: f.url, name: f.nome });
           if (v && v.error) { erros.push(f.nome + ': vídeo — ' + v.error.message); continue; }
           videoId = v && v.id;
