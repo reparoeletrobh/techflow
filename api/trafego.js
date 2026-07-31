@@ -688,17 +688,26 @@ module.exports = async function handler(req, res) {
 
   // ── 📥 REGISTRAR-DA-META: usa os vídeos já subidos na Meta como criativos da semana ──
   if (req.method === 'POST' && action === 'registrar-da-meta') {
-    const { semana, ids, substituir } = req.body || {};
+    const { semana, ids, substituir, desde, categorias } = req.body || {};
+    // 🚫 TRAVA: a biblioteca tem centenas de vídeos antigos. Exige recorte explícito
+    // (lista de ids OU data), senão registraria o histórico inteiro como criativo da semana.
+    if (!(Array.isArray(ids) && ids.length) && !desde) {
+      return res.status(400).json({ ok: false,
+        error: 'informe "ids" (lista) ou "desde" (data AAAA-MM-DD) — sem recorte eu registraria toda a biblioteca' });
+    }
     const chave = 'trafego_criativos_' + (semana || 'atual');
     const atual = substituir ? { itens: [] } : ((await dbGet(chave)) || { itens: [] });
-    const r = await pegarTudo(`${GRAPH}/act_${CONTA}/advideos?fields=id,title&limit=100&access_token=${TOKEN}`, 4);
+    const r = await pegarTudo(`${GRAPH}/act_${CONTA}/advideos?fields=id,title,created_time&limit=100&access_token=${TOKEN}`, 6);
     const todos = r.data || [];
-    const filtro = Array.isArray(ids) && ids.length ? todos.filter(v => ids.includes(v.id)) : todos;
+    let filtro = todos;
+    if (Array.isArray(ids) && ids.length) filtro = todos.filter(v => ids.includes(v.id));
+    else if (desde) filtro = todos.filter(v => String(v.created_time || '').slice(0, 10) >= String(desde));
     const CATS_OK = ['tv', 'microondas', 'purificador', 'adega'];
     const aceitos = [], semCategoria = [];
+    const overrides = categorias || {};              // correção manual por título ou id
     for (const v of filtro) {
-      const cat = categoriaDe(v.title || '', 'equipamento');
-      if (!CATS_OK.includes(cat)) { semCategoria.push(v.title || v.id); continue; }
+      const cat = String(overrides[v.id] || overrides[v.title] || categoriaDe(v.title || '', 'equipamento')).toLowerCase();
+      if (!CATS_OK.includes(cat)) { semCategoria.push({ id: v.id, titulo: v.title || '(sem título)' }); continue; }
       if (atual.itens.some(x => x.videoId === v.id)) continue;
       aceitos.push({ nome: String(v.title || v.id).slice(0, 80), categoria: cat,
         videoId: v.id, url: null, tipo: 'video-meta', registradoEm: new Date().toISOString() });
