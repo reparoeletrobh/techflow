@@ -2060,7 +2060,8 @@ async function enviarDiagnostico() {
         observacao:(document.getElementById('al-diag')||{}).value||'' })
     }).then(x=>x.json());
     if (r && r.ok) {
-      aviso('✅ Orçamento salvo (R$ '+r.totalComDesconto+') — NÃO foi enviado ao cliente','#4ade80');
+      aviso('✅ Orçamento salvo (R$ '+r.totalComDesconto+') — NÃO foi enviado ao cliente'
+        + (r.saiuDaColunaTecnico ? ' · ficha foi para Orçamento Cadastrado' : ' · ⚠️ confira a coluna Análise Loja'), '#4ade80');
       setTimeout(function(){ fecharAnalise(); if(typeof carregar==='function')carregar(); else location.reload(); }, 1400);
     } else {
       aviso('❌ '+((r&&r.error)||'falha ao salvar'),'#f87171');

@@ -515,9 +515,23 @@ export default async function handler(req,res){
     ficha.movedAt = now;
     ficha.history = (ficha.history||[]).concat([{ phase:'orcamento_cadastrado', ts:now, via:'diagnostico-loja' }]);
     await dbSet(FL_KEY, db);
+    // 🎯 tira o card da coluna Análise Loja no Técnico — o diagnóstico já foi feito
+    let saiuDoTecnico = false;
+    try {
+      const KRB = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+      const rb = await fetch(`https://reparoeletroadm.com/api/board?action=remove-analise-card&k=${KRB}`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ flFichaId: ficha.id }),
+      }).then(x=>x.json()).catch(e=>({ ok:false, error:e.message }));
+      saiuDoTecnico = !!(rb && rb.ok);
+      if (!saiuDoTecnico) ficha.avisoTecnico = 'card pode ter ficado na coluna Análise Loja';
+    } catch(e) {}
     logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'',
-      acao:'Diagnóstico de loja', para:'orcamento_cadastrado', gatilho:'nenhum (aguarda envio manual)', status:'ok' }).catch(()=>{});
+      acao:'Diagnóstico de loja', para:'orcamento_cadastrado',
+      gatilho: saiuDoTecnico ? 'saiu do Técnico' : 'ATENÇÃO: não saiu do Técnico',
+      status: saiuDoTecnico ? 'ok' : 'alerta' }).catch(()=>{});
     return res.status(200).json({ ok:true, ficha, total, totalComDesconto: comDesconto, texto,
+      saiuDaColunaTecnico: saiuDoTecnico,
       aviso:'orçamento guardado — NÃO foi enviado ao cliente' });
   }
 
