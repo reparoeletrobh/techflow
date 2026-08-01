@@ -642,12 +642,18 @@ module.exports = async function handler(req, res) {
         conjunto: (a.adset || {}).name,
         problemas: (a.issues_info || []).map(x => x.error_summary || x.error_message) }));
 
-    return res.status(200).json({ ok: comProblema.length === 0 && adsRuins.length === 0,
+    // separa o aviso inofensivo (agendado) dos problemas de verdade
+    const ehAvisoNormal = p => /não está sendo veiculado, mas você não precisa fazer nada/i.test(String(p || ''));
+    const graves = adsRuins.filter(a => (a.problemas || []).some(p => !ehAvisoNormal(p)));
+    const soAgendados = adsRuins.length - graves.length;
+    return res.status(200).json({ ok: comProblema.length === 0 && graves.length === 0,
       conjuntosDoCiclo: recentes.length,
       conjuntosOk: ok.length, conjuntosComProblema: comProblema.length,
-      anunciosComProblema: adsRuins.length,
+      anunciosAgendadosOk: soAgendados,
+      anunciosComProblemaReal: graves.length,
+      PROBLEMAS_REAIS: graves.map(a => a.anuncio + ' | conjunto: ' + (a.conjunto || '?') +
+        ' | ' + a.problemas.filter(p => !ehAvisoNormal(p)).join(' · ')),
       detalheConjuntos: comProblema.slice(0, 15),
-      detalheAnuncios: adsRuins.slice(0, 15),
       resumoProblemas: [...new Set([
         ...comProblema.flatMap(c => c.problemas.map(p => p.resumo || p.mensagem)),
         ...adsRuins.flatMap(a => a.problemas),
