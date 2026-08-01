@@ -609,6 +609,52 @@ module.exports = async function handler(req, res) {
       proximo: 'rode ?action=modelos&curto=1 para ver o novo campeão' });
   }
 
+  // ── 🔎 CICLO-AGORA: o que está no ar neste momento, com gasto e entrega ──
+  if (action === 'ciclo-agora') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const camps = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns?fields=id,name,status,effective_status,configured_status,daily_budget,lifetime_budget,start_time,stop_time,issues_info&limit=100&access_token=${TOKEN}`, 8);
+    if (camps.erro && !camps.data.length) return res.status(200).json({ ok: false, erro: camps.erro });
+    const brt = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') : null;
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    // só as do ciclo atual (começaram hoje ou ontem)
+    const doCiclo = (camps.data || []).filter(c => {
+      const i = String(c.start_time || '').slice(0, 10);
+      return i >= new Date(Date.now() - 3 * 3600000 - 2 * 86400000).toISOString().slice(0, 10);
+    });
+    // gasto de hoje por campanha
+    const gastos = {};
+    try {
+      const ins = await pegarTudo(`${GRAPH}/act_${CONTA}/insights?level=campaign&date_preset=today&fields=campaign_id,spend,impressions&limit=100&access_token=${TOKEN}`, 4);
+      for (const i of (ins.data || [])) gastos[i.campaign_id] = { gasto: Number(i.spend || 0), impressoes: Number(i.impressions || 0) };
+    } catch (e) {}
+    const linhas = doCiclo.map(c => {
+      const g = gastos[c.id] || { gasto: 0, impressoes: 0 };
+      const problemas = (c.issues_info || []).map(x => x.error_summary || x.error_message).filter(Boolean);
+      return { nome: c.name, id: c.id,
+        situacao: c.effective_status, configurado: c.configured_status,
+        inicio: brt(c.start_time), fim: brt(c.stop_time),
+        gastoHoje: g.gasto, impressoes: g.impressoes,
+        entregando: g.impressoes > 0,
+        problemas: problemas.length ? problemas : null };
+    }).sort((a, b) => b.impressoes - a.impressoes);
+    const entregando = linhas.filter(l => l.entregando).length;
+    const comProblema = linhas.filter(l => l.problemas);
+    const naoAtivas = linhas.filter(l => l.situacao !== 'ACTIVE');
+    return res.status(200).json({ ok: true, agoraBRT: new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' '),
+      totalDoCiclo: linhas.length,
+      entregando, semEntrega: linhas.length - entregando,
+      gastoHojeTotal: Number(linhas.reduce((s, l) => s + l.gastoHoje, 0).toFixed(2)),
+      situacoes: linhas.reduce((o, l) => { o[l.situacao] = (o[l.situacao] || 0) + 1; return o; }, {}),
+      alertas: [
+        ...(naoAtivas.length ? ['⚠️ ' + naoAtivas.length + ' não estão ativas: ' + [...new Set(naoAtivas.map(n => n.situacao))].join(', ')] : []),
+        ...(comProblema.length ? ['❌ ' + comProblema.length + ' com problema informado pela Meta'] : []),
+        ...(entregando === 0 ? ['❌ NENHUMA entregando impressões'] : []),
+      ],
+      problemas: comProblema.map(c => c.nome + ' → ' + c.problemas.join(' | ')).slice(0, 10),
+      lista: linhas.map(l => String(l.nome).slice(0, 30) + ' | ' + l.situacao +
+        ' | R$ ' + l.gastoHoje.toFixed(2) + ' | ' + l.impressoes + ' impr') });
+  }
+
   // ── ✅ CHECKUP-PROGRAMACAO: confere o que foi agendado para o próximo ciclo ──
   if (action === 'checkup-programacao') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
