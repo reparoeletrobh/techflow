@@ -609,6 +609,51 @@ module.exports = async function handler(req, res) {
       proximo: 'rode ?action=modelos&curto=1 para ver o novo campeão' });
   }
 
+  // ── 🚨 ERROS-CONJUNTOS: problemas no nível do conjunto e do anúncio ──
+  if (action === 'erros-conjuntos') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const brt = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') : null;
+    // conjuntos com issues_info
+    const sets = await pegarTudo(`${GRAPH}/act_${CONTA}/adsets?fields=id,name,status,effective_status,issues_info,start_time,end_time,daily_budget,lifetime_budget,campaign{id,name},targeting,promoted_object&limit=100&access_token=${TOKEN}`, 8);
+    if (sets.erro && !sets.data.length) return res.status(200).json({ ok: false, erro: sets.erro });
+    const recentes = (sets.data || []).filter(s => {
+      const i = String(s.start_time || '').slice(0, 10);
+      return i >= new Date(Date.now() - 3 * 3600000 - 2 * 86400000).toISOString().slice(0, 10);
+    });
+    const comProblema = [], ok = [];
+    for (const s of recentes) {
+      const issues = (s.issues_info || []).map(x => ({
+        resumo: x.error_summary, mensagem: x.error_message,
+        tipo: x.level, codigo: x.error_code,
+      }));
+      const item = { conjunto: s.name, id: s.id,
+        campanha: (s.campaign || {}).name,
+        situacao: s.effective_status,
+        inicio: brt(s.start_time), fim: brt(s.end_time),
+        verba: s.lifetime_budget ? Number(s.lifetime_budget) / 100 : (s.daily_budget ? Number(s.daily_budget) / 100 : null),
+        destinoWhats: s.promoted_object ? (s.promoted_object.page_id ? 'página ' + s.promoted_object.page_id : JSON.stringify(s.promoted_object).slice(0, 60)) : '(sem destino!)',
+        problemas: issues };
+      (issues.length || s.effective_status !== 'ACTIVE' ? comProblema : ok).push(item);
+    }
+    // anúncios com problema
+    const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,effective_status,issues_info,adset{name}&limit=100&access_token=${TOKEN}`, 6);
+    const adsRuins = (ads.data || []).filter(a => (a.issues_info || []).length || ['DISAPPROVED', 'WITH_ISSUES', 'PENDING_REVIEW'].includes(a.effective_status))
+      .map(a => ({ anuncio: a.name, situacao: a.effective_status,
+        conjunto: (a.adset || {}).name,
+        problemas: (a.issues_info || []).map(x => x.error_summary || x.error_message) }));
+
+    return res.status(200).json({ ok: comProblema.length === 0 && adsRuins.length === 0,
+      conjuntosDoCiclo: recentes.length,
+      conjuntosOk: ok.length, conjuntosComProblema: comProblema.length,
+      anunciosComProblema: adsRuins.length,
+      detalheConjuntos: comProblema.slice(0, 15),
+      detalheAnuncios: adsRuins.slice(0, 15),
+      resumoProblemas: [...new Set([
+        ...comProblema.flatMap(c => c.problemas.map(p => p.resumo || p.mensagem)),
+        ...adsRuins.flatMap(a => a.problemas),
+      ].filter(Boolean))].slice(0, 10) });
+  }
+
   // ── 🔎 CICLO-AGORA: o que está no ar neste momento, com gasto e entrega ──
   if (action === 'ciclo-agora') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
