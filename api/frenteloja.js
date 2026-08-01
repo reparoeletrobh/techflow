@@ -455,6 +455,115 @@ export default async function handler(req,res){
     else delete ficha.avisadoErro;
   }
 
+  // ═══ MESMA INTELIGÊNCIA DA LOGÍSTICA (templates, tabelas e regras de preço) ═══
+  // Copiada da logística para o Frente de Loja usar o MESMO cálculo e os MESMOS textos,
+  // porém gravando apenas no banco isolado — o bot continua sem enxergar nada daqui.
+  function gerarTextoLoja(tipo, subtipo, servicos, precoInput, templates, nomeCliente) {
+      const pn = String(nomeCliente || "cliente").trim().split(/\s+/)[0];
+      const s  = servicos || [];
+      const tem = (lista) => s.some(x => lista.includes(x));
+      const pecas = (lista) => s.filter(x => lista.includes(x)).join(', ') || s.join(', ');
+      const x2 = (v) => String(Math.round(parseFloat(v||0)*2));
+      const T = templates || {};
+      // Substituir placeholders num template
+      function applyTpl(tpl, pecasStr, preco) {
+        return tpl
+          .replace(/\[NOME\]/g, pn)
+          .replace(/\[peças\]/g, pecasStr || s.join(', '))
+          .replace(/\[VALOR\]/g, preco || '');
+      }
+
+      if (tipo === 'microondas') {
+        if (tem(['Troca de Placa','Display'])) {
+          const p = pecas(['Troca de Placa','Display']);
+          const tpl = T.microondas_placa?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto conjunto da [peças], será feito a reoperação eletrica tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`;
+          return { texto: applyTpl(tpl, p, x2(precoInput)), preco:x2(precoInput) };
+        }
+        if (tem(['Vidro','Porta'])) {
+          const p = pecas(['Vidro','Porta']);
+          const tpl = T.microondas_vidro?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da [peças], montagem e regulagem consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`;
+          return { texto: applyTpl(tpl, p, x2(precoInput)), preco:x2(precoInput) };
+        }
+        if (tem(['Haste'])) { const tpl = T.microondas_haste?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da haste, montagem e regulagem consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`; return { texto: applyTpl(tpl, 'haste', '350'), preco:'350' }; }
+        if (tem(['Pintura'])) { const tpl = T.microondas_pintura?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, pintura, montagem, regulagem e revisão consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`; return { texto: applyTpl(tpl, 'pintura', '350'), preco:'350' }; }
+        if (tem(['Reforma'])) {
+          const comRevisao = tem(['Revisão']);
+          const preco = comRevisao ? '390' : '350';
+          const textoBase = `Olá, sou Alessandra, Reparo Eletro, e vou te passar seu orçamento agora. Fizemos as análises e para fazer a desmontagem do equipamento, lixar, pintar, refazer as instalações e montar novamente, fica em [VALOR] reais apenas. Aprovando, já iniciamos a reforma.`.replace('[VALOR]', preco);
+          const textoFinal = textoBase + (comRevisao ? ` Observação: foi identificado que existem componentes que estão apresentando falhas e será necessário também fazer uma revisão completa para que além da reforma o equipamento fique em perfeito funcionamento. Esta revisão não terá nenhum custo adicional.` : '');
+          return { texto: textoFinal, preco };
+        }
+        if (tem(['Magnetron'])) {
+          const tpl = T.microondas_magnetron?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do Magnetron, peca responsavel pelo aquecimento do aparelho. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`;
+          return { texto: applyTpl(tpl, 'Magnetron', '390'), preco:'390' };
+        }
+        const p = s.join(', ');
+        const tpl = T.microondas_eletrico?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do [peças], as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`;
+        return { texto: applyTpl(tpl, p, '350'), preco:'350' };
+      }
+      if (tipo === 'bblend') {
+        // Bblend — preço fixo R$ 1.490 independente das peças selecionadas
+        const p = s.join(', ') || 'conjunto do motor';
+        return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do ${p}. Este conserto completo fica em 1490 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'1490' };
+      }
+
+      if (tipo === 'tv') {
+        // TV TU — preço fixo R$ 1.290 independente da opção (TU + Barramento ou TU + Placa)
+        const opcao = s.join(', ') || subtipo || 'TU';
+        return {
+          texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do ${opcao}. Este conserto completo fica em 1290 reais apenas. Aprovando ja iniciamos o conserto.`,
+          preco:'1290'
+        };
+      }
+
+      if (tipo === 'purificador') {
+        if (subtipo === 'Motor') {
+          if (tem(['Gás'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca da valvula de gas, solda e recarga de gas refrigerante. Este conserto completo fica em 490 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'490' };
+          const p = s.join(', ');
+          return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto da ${p}. Este conserto completo fica em 490 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'490' };
+        }
+        if (subtipo === 'Eletrônico') {
+          if (tem(['Kit Termo Elétrico'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do cooler, placa de resfriamento e pasta termica, as pecas serao trocadas tambem. Este conserto completo fica em 350 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'350' };
+          if (tem(['Recuperação de Placa'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da placa principal, será feito a reoperação da placa tambem. Este conserto completo fica em 350 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'350' };
+          const p = s.join(', ');
+          return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto da ${p}. Este conserto completo fica em 350 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'350' };
+        }
+      }
+      if (tipo === 'adega') {
+        if (subtipo === 'Motor') {
+          if (tem(['Gás'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca da valvula de gas, solda e recarga de gas refrigerante. Este conserto completo fica em 490 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'490' };
+          if (tem(['Termostato'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do Termostato da sua adega. Este conserto completo fica em 490 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'490' };
+          if (tem(['Kit de Partida do Motor'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do Kit de Partida do Motor da sua adega. Este conserto completo fica em 490 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'490' };
+          if (tem(['Sensor'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do Sensor da sua adega. Este conserto completo fica em 490 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'490' };
+          if (tem(['Controlador'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do Controlador da sua adega. Este conserto completo fica em 490 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'490' };
+          if (tem(['Porta'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nPara fazer a desmontagem, instalacao da Porta, montagem e regulagem da sua adega consigo fazer para voce por ${x2(precoInput)} reais apenas. Aprovando ja iniciamos o conserto.`, preco:x2(precoInput) };
+          if (tem(['Recuperação de Placa'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da placa principal, será feito a reoperação da placa tambem. Este conserto completo fica em 490 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'490' };
+          if (tem(['Troca de Placa'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto conjunto da Placa Principal, será feito a reoperação eletrica tambem. Este conserto completo fica em ${x2(precoInput)} reais apenas. Aprovando ja iniciamos o conserto.`, preco:x2(precoInput) };
+        }
+        if (subtipo === 'Eletrônico') {
+          if (tem(['Kit Termo Elétrico'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do cooler, placa de resfriamento e pasta termica, as pecas serao trocadas tambem. Este conserto completo fica em 350 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'350' };
+          if (tem(['Sensor'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do Sensor da sua adega. Este conserto completo fica em 390 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'390' };
+          if (tem(['Termoelétrico Duplo'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do Termoeletrico Duplo da sua adega. Este conserto completo fica em 490 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'490' };
+          if (tem(['Recuperação de Placa'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da placa principal, será feito a reoperação da placa tambem. Este conserto completo fica em 350 reais apenas. Aprovando ja iniciamos o conserto.`, preco:'350' };
+          if (tem(['Troca de Placa'])) return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto conjunto da Placa Principal, será feito a reoperação eletrica tambem. Este conserto completo fica em ${x2(precoInput)} reais apenas. Aprovando ja iniciamos o conserto.`, preco:x2(precoInput) };
+        }
+      }
+      if (tipo === 'forno') {
+        const pb = subtipo === 'Grande' ? '790' : '490';
+        if (tem(['Troca de Placa','Display'])) {
+          const p = pecas(['Troca de Placa','Display']);
+          return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto conjunto do ${p}: será feito a reoperação eletrica tambem. Este conserto completo fica em ${x2(precoInput)} reais apenas. Aprovando ja iniciamos o conserto.`, preco:x2(precoInput) };
+        }
+        if (tem(['Porta','Vidro','Mola'])) {
+          const p = pecas(['Porta','Vidro','Mola']);
+          return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da ${p}, montagem e regulagem consigo fazer para você por ${x2(precoInput)} reais apenas. Aprovando ja iniciamos o conserto.`, preco:x2(precoInput) };
+        }
+        const p = s.join(', ');
+        return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto da ${p}, será feito a reoperação da placa tambem. Este conserto completo fica em ${pb} reais apenas. Aprovando ja iniciamos o conserto.`, preco:pb };
+      }
+      return { texto: null, preco: null };
+    }
+
   // ══════════════════════════════════════════════════════════════════════
   // 🔒 DIAGNÓSTICO DE LOJA — ISOLADO
   // Grava SOMENTE no banco do Frente de Loja. O bot lê reparoeletro_logistica
@@ -469,41 +578,53 @@ export default async function handler(req,res){
     const ficha = db.fichas.find(f => f.id === id);
     if (!ficha) return res.status(404).json({ ok:false, error:'ficha nao encontrada' });
 
-    // valida e calcula o preço de cada equipamento
-    const ITENS_COM_PRECO = ['Troca de Placa','Display','Vidro','Porta','Mola'];
+    // 🎯 USA A MESMA INTELIGÊNCIA DA LOGÍSTICA: templates por tipo/serviço e as regras
+    // de preço já validadas na operação (dobro do custo, tabelas fixas, TV por polegada).
+    let customTemplates = {};
+    try { const t = await dbGet('reparoeletro_orc_templates'); if (t) customTemplates = t; } catch (e) {}
+
     const calc = [];
+    const textos = [];
     for (let i = 0; i < equips.length; i++) {
       const e = equips[i] || {};
       const rot = equips.length > 1 ? ('Equipamento ' + (i+1)) : 'Equipamento';
       if (!e.tipo) return res.status(400).json({ ok:false, error:'selecione o tipo do ' + rot });
       if (!Array.isArray(e.servicos) || !e.servicos.length) return res.status(400).json({ ok:false, error:'selecione ao menos um serviço do ' + rot });
-      let preco = null;
-      if (e.tabela === 'dinamica') {
-        const v = parseFloat(String(e.valorEquip||'').replace(',','.'));
-        if (!(v > 0)) return res.status(400).json({ ok:false, error:'informe o valor do equipamento (' + rot + ' — Tabela Dinâmica)' });
-        preco = Math.round(v * 0.4);                       // 40% do valor do equipamento
-      } else if (e.tipo === 'bblend') { preco = 1490; }
-      else {
-        const precisa = e.tipo === 'adega' ? (e.servicos||[]).includes('Troca de Placa')
-          : (e.tipo === 'purificador' ? false : (e.servicos||[]).some(x => ITENS_COM_PRECO.includes(x)));
-        const p = parseFloat(String(e.preco||'').replace(',','.'));
-        if (precisa && !(p > 0)) return res.status(400).json({ ok:false, error:'informe o preço de custo do ' + rot });
-        preco = p > 0 ? Math.round(p) : null;
+      if (e.tabela === 'dinamica' && !(parseFloat(String(e.valorEquip||'').replace(',','.')) > 0)) {
+        return res.status(400).json({ ok:false, error:'informe o valor do equipamento (' + rot + ' — Tabela Dinâmica)' });
+      }
+      // preço de entrada: na tabela dinâmica o custo é 20% do valor do equipamento
+      // (a função dobra depois, chegando aos 40% praticados)
+      const entrada = e.tabela === 'dinamica'
+        ? Math.round(parseFloat(String(e.valorEquip).replace(',','.')) * 0.2)
+        : (parseFloat(String(e.preco||'').replace(',','.')) || null);
+
+      const r = gerarTextoLoja(e.tipo, e.subtipo || null, e.servicos, entrada, customTemplates, ficha.nomeContato);
+      const precoCalc = r && r.preco ? Math.round(parseFloat(String(r.preco).replace(/[^\d.,]/g,'').replace(',','.'))) : null;
+      if (!precoCalc) {
+        return res.status(400).json({ ok:false,
+          error: 'não consegui calcular o preço do ' + rot + ' — informe o preço de custo ou revise os serviços selecionados' });
       }
       calc.push({ modelo:String(e.modelo||'').slice(0,60), tipo:e.tipo, subtipo:e.subtipo||null,
         servicos:e.servicos, tabela:e.tabela||'normal',
         valorEquip: e.tabela==='dinamica' ? parseFloat(String(e.valorEquip).replace(',','.')) : null,
-        preco });
+        preco: precoCalc, textoOriginal: r.texto });
+      textos.push(r.texto);
     }
     const total = calc.reduce((s,e) => s + (e.preco||0), 0);
     const comDesconto = total > 0 ? Math.round(total * 0.9) : null;   // 10% do cliente de loja
+    if (!comDesconto) return res.status(400).json({ ok:false, error:'orçamento sem preço — revise os equipamentos' });
 
-    // texto do orçamento, guardado SEM enviar
+    // texto final: o mesmo da logística, com o valor JÁ COM DESCONTO no lugar do original
     const primeiro = String(ficha.nomeContato||'cliente').trim().split(/\s+/)[0];
-    const listaTxt = calc.map(e => (e.modelo ? e.modelo + ' — ' : '') + (e.servicos||[]).join(', ')).join(' | ');
-    const texto = comDesconto
-      ? `Olá ${primeiro}, bom dia! Sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:\n\nForam feitos os testes e identificamos que será necessário: ${listaTxt}. Este conserto completo fica em ${comDesconto} reais apenas. Aprovando já iniciamos o conserto.`
-      : `Olá ${primeiro}, bom dia! Sou o Pedro da Reparo Eletro, vou te enviar agora o orçamento:\n\nForam feitos os testes e identificamos que será necessário: ${listaTxt}. Este conserto completo fica em [VALOR] apenas. Aprovando já iniciamos o conserto.`;
+    let texto;
+    if (calc.length === 1) {
+      // troca o valor original pelo com desconto, preservando o template
+      texto = String(textos[0]).replace(new RegExp('\\b' + calc[0].preco + '\\b'), String(comDesconto));
+    } else {
+      const listaTxt = calc.map(e => (e.modelo ? e.modelo + ' — ' : '') + (e.servicos||[]).join(', ')).join(' | ');
+      texto = `Ola, ${primeiro} bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario: ${listaTxt}. Este conserto completo fica em ${comDesconto} reais apenas. Aprovando ja iniciamos o conserto.`;
+    }
 
     const now = new Date().toISOString();
     ficha.diagnosticoLoja = { equips: calc, observacao: String(observacao||'').slice(0,600),
