@@ -676,6 +676,36 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, feitos });
   }
 
+  // ── 🎤 AUDIO-TESTE: verifica se a transcrição está configurada e funcionando ──
+  if (action === 'audio-teste') {
+    const temGroq = !!process.env.GROQ_API_KEY, temOpenAi = !!process.env.OPENAI_API_KEY;
+    const passos = [{ etapa: 'chave configurada na Vercel',
+      ok: temGroq || temOpenAi,
+      detalhe: temGroq ? 'GROQ_API_KEY presente (whisper-large-v3)'
+        : (temOpenAi ? 'OPENAI_API_KEY presente (whisper-1)' : '❌ NENHUMA — é isso que falta') }];
+    // testa a chave contra o serviço
+    if (temGroq || temOpenAi) {
+      const url = temGroq ? 'https://api.groq.com/openai/v1/models' : 'https://api.openai.com/v1/models';
+      const key = temGroq ? process.env.GROQ_API_KEY : process.env.OPENAI_API_KEY;
+      const r = await fetch(url, { headers: { Authorization: 'Bearer ' + key } })
+        .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      passos.push({ etapa: 'chave válida no serviço', ok: !(r && r.error),
+        detalhe: (r && r.error) ? (r.error.message || JSON.stringify(r.error).slice(0, 120)) : 'aceita' });
+    }
+    // últimos áudios recebidos e se foram transcritos
+    const evtsA = await lerEvts();
+    const audios = evtsA.filter(e => e.tipo === 'audio' && e.dir === 'in').slice(-10);
+    const transcritos = evtsA.filter(e => e.tipo === 'audio-transcrito').slice(-10);
+    const falhas = evtsA.filter(e => e.tipo === 'falha' && /ÁUDIO|TRANSCRIÇÃO/i.test(String(e.texto || ''))).slice(-5);
+    return res.status(200).json({ ok: passos.every(p => p.ok),
+      passos,
+      audiosRecebidos: audios.length,
+      audiosTranscritos: transcritos.length,
+      ultimasFalhas: falhas.map(f => String(f.texto).slice(0, 100)),
+      comoResolver: (temGroq || temOpenAi) ? undefined
+        : 'Vercel → Settings → Environment Variables → adicionar GROQ_API_KEY (console.groq.com) ou OPENAI_API_KEY, e fazer redeploy' });
+  }
+
   // ── 📨 TEMPLATE-CONSERTO: avisa que o equipamento está pronto (janela fechada) ──
   if (req.method === 'POST' && action === 'template-conserto') {
     const { tel, nome } = req.body || {};
@@ -2080,6 +2110,11 @@ export default async function handler(req, res) {
       const ultA = evtsCliA[evtsCliA.length - 1];
       if (ultA && ultA.mediaId && ultA.tipo === 'audio') {
         const sttKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY || '';
+        if (!sttKey) {
+          // sem chave configurada o bloco inteiro era pulado em silêncio
+          await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'acao', tipo: 'falha',
+            texto: '🎤 ÁUDIO NÃO TRANSCRITO — falta configurar GROQ_API_KEY (ou OPENAI_API_KEY) na Vercel' });
+        }
         if (sttKey) {
           const { token: tokA } = await credenciais();
           const metaA = await fetch('https://graph.facebook.com/v20.0/' + ultA.mediaId, {
@@ -2101,6 +2136,9 @@ export default async function handler(req, res) {
                 audioTranscrito = String(tr.text).slice(0, 1500);
                 await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'in',
                   texto: '🎤 (transcrição do áudio): ' + audioTranscrito, tipo: 'audio-transcrito' });
+              } else {
+                await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'acao', tipo: 'falha',
+                  texto: '🎤 TRANSCRIÇÃO FALHOU: ' + ((tr && tr.error && (tr.error.message || tr.error)) || 'sem resposta do serviço') });
               }
             }
           }
