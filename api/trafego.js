@@ -609,6 +609,43 @@ module.exports = async function handler(req, res) {
       proximo: 'rode ?action=modelos&curto=1 para ver o novo campeão' });
   }
 
+  // ── 👤 QUEM-APROVA: usuários e permissões da conta (quem pode liberar) ──
+  if (action === 'quem-aprova') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const pega = async (rot, url) => {
+      const r = await fetch(url).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      return r && r.error ? { rot, erro: r.error.message } : { rot, dados: r.data || r };
+    };
+    const [conta, users, sys, eu] = await Promise.all([
+      pega('conta', `${GRAPH}/act_${CONTA}?fields=name,account_status,business,owner,disable_reason,funding_source_details&access_token=${TOKEN}`),
+      pega('usuarios', `${GRAPH}/act_${CONTA}/assigned_users?fields=id,name,tasks&limit=50&access_token=${TOKEN}`),
+      pega('meu_usuario', `${GRAPH}/me?fields=id,name&access_token=${TOKEN}`),
+      pega('permissoes', `${GRAPH}/act_${CONTA}/users?fields=id,name,role,permissions&limit=50&access_token=${TOKEN}`),
+    ]);
+    const c = (conta.dados) || {};
+    const MOTIVO = { 0:'sem restrição', 1:'ATIVIDADE INCOMUM', 2:'ANÚNCIOS RECUSADOS', 3:'POLÍTICAS DE ANÚNCIO',
+      4:'PAGAMENTO PENDENTE', 5:'CONTA FECHADA', 6:'REVISÃO DE RISCO', 7:'ATRASO NO PAGAMENTO',
+      8:'FALHA NO PAGAMENTO', 9:'IDENTIDADE NÃO CONFIRMADA', 10:'VIOLAÇÃO DE PERMISSÃO' };
+    const STATUS = { 1:'ATIVA', 2:'DESATIVADA', 3:'CANCELADA', 7:'EM ANÁLISE', 9:'PERÍODO DE GRAÇA', 101:'FECHADA' };
+    const donos = ((users.dados) || []).map(u => ({
+      nome: u.name, id: u.id,
+      papel: (u.tasks || []).includes('MANAGE') ? '👑 ADMINISTRADOR (pode liberar)'
+        : ((u.tasks || []).includes('ADVERTISE') ? 'anunciante' : (u.tasks || []).join(', ')),
+      tarefas: u.tasks }));
+    return res.status(200).json({ ok: true,
+      conta: { nome: c.name, status: STATUS[c.account_status] || c.account_status,
+        motivoRestricao: MOTIVO[c.disable_reason] != null ? MOTIVO[c.disable_reason] : c.disable_reason,
+        negocio: c.business ? c.business.name : null, negocioId: c.business ? c.business.id : null,
+        dono: c.owner || null,
+        formaPagamento: c.funding_source_details ? (c.funding_source_details.display_string || c.funding_source_details.type) : '(não informada)' },
+      tokenUsadoPeloSistema: (sys.dados || {}).name || sys.erro,
+      QUEM_PODE_LIBERAR: donos.filter(d => String(d.papel).includes('ADMIN')),
+      todosOsUsuarios: donos,
+      permissoes: permissoesErro(eu),
+      dica: 'o administrador da conta e o admin do Gerenciador de Negócios são quem recebem a notificação de confirmação' });
+  }
+  function permissoesErro(r) { return r && r.erro ? ('sem acesso: ' + r.erro) : ((r && r.dados) || []); }
+
   // ── 🚨 ERROS-CONJUNTOS: problemas no nível do conjunto e do anúncio ──
   if (action === 'erros-conjuntos') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
