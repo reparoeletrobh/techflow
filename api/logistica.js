@@ -559,6 +559,16 @@ module.exports = async function handler(req, res) {
     const ficha = db.fichas.find(f => f.id === id);
     if (!ficha) return res.status(404).json({ ok:false, error:'ficha nao encontrada' });
     if (!ficha.diagnostico) return res.status(400).json({ ok:false, error:'sem diagnostico' });
+    // MODELO OBRIGATÓRIO: o bot usa o modelo para pesquisar o preço de um equivalente
+    // novo quando o cliente objeta "com esse valor eu compro outro". Sem modelo, não há inteligência.
+    {
+      const _eqs = ficha.diagnostico.equips || [ficha.diagnostico];
+      const _semModelo = _eqs.findIndex(e => !String((e||{}).modelo || '').trim());
+      if (_semModelo >= 0) {
+        return res.status(400).json({ ok:false, semModelo:true,
+          error:'informe o MODELO do equipamento' + (_eqs.length > 1 ? ' ' + (_semModelo+1) : '') + ' antes de gerar o orçamento' });
+      }
+    }
 
     const ORC_KEY = 'reparoeletro_orcamentos';
 

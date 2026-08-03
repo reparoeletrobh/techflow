@@ -937,7 +937,7 @@ function equipSecHTML(eq, i, total) {
     <div class="diag-equip-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
       <div>
         <div class="diag-section-label" style="margin-bottom:5px;">Modelo</div>
-        <input class="diag-input" value="${eq.modelo||''}" placeholder="Ex: CPB34AS"
+        <input class="diag-input" value="${eq.modelo||''}" placeholder="Ex: CPB34AS (obrigatório)"
           style="width:100%;" oninput="diagEquips[${i}].modelo=this.value">
       </div>
       <div>
@@ -1026,6 +1026,7 @@ async function salvarDiag() {
   for (let i = 0; i < diagEquips.length; i++) {
     const eq = diagEquips[i];
     const label = diagEquips.length > 1 ? `Equipamento ${i+1}` : 'equipamento';
+    if (!String(eq.modelo||'').trim()) { mostrarMsgDiag(`Informe o MODELO do ${label} — o bot usa isso para responder a objeção de preço`,'err'); return; }
     if (!eq.tipo)            { mostrarMsgDiag(`Selecione o tipo do ${label}`,'err'); return; }
     if (!eq.servicos.length) { mostrarMsgDiag(`Selecione ao menos um serviço para o ${label}`,'err'); return; }
     if (eq.tabela === 'dinamica') {

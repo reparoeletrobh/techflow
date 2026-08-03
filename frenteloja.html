@@ -262,6 +262,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);display:flex;h
           <input id="f-equip" type="text" placeholder="Ex: Microondas, Purificador...">
         </div>
         <div>
+          <label>MODELO *</label>
+          <input id="f-modelo" type="text" placeholder="Ex: MEF41, BZC12B, PE11X">
+        </div>
+        <div>
           <label>TELEFONE</label>
           <input id="f-tel" type="text" placeholder="(31) 9 0000-0000" oninput="formatTel(this)">
         </div>
@@ -543,12 +547,14 @@ function cadastrar(){
   var desc=document.getElementById('f-desc').value.trim();
   var cpf=(document.getElementById('f-cpf')||{value:''}).value.trim();
   var email=(document.getElementById('f-email')||{value:''}).value.trim();
+  var modelo=(document.getElementById('f-modelo')||{value:''}).value.trim();
   if(!nome||!equip){toast('Nome e equipamento obrigatórios','r');return;}
+  if(!modelo){toast('Informe o MODELO do equipamento','r');return;}
   var btnCad=document.querySelector('[onclick="cadastrar()"]');
   if(btnCad){if(btnCad.disabled)return;btnCad.disabled=true;btnCad.dataset.txt=btnCad.textContent;btnCad.textContent='⏳ Salvando...';}
   function liberarBtn(){if(btnCad){btnCad.disabled=false;btnCad.textContent=btnCad.dataset.txt||'Cadastrar';}}
   fetch('/api/frenteloja?action=criar',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({nomeContato:nome,equipamento:equip,telefone:tel,descricao:desc,cpf,email})
+    body:JSON.stringify({nomeContato:nome,equipamento:equip,telefone:tel,descricao:desc,cpf,email,modelo:modelo})
   }).then(r=>r.json()).then(d=>{
     liberarBtn();
     if(!d.ok){toast('Erro: '+(d.error||''),'r');return;}
@@ -556,6 +562,7 @@ function cadastrar(){
     fichas.unshift(d.ficha);
     document.getElementById('f-nome').value='';
     document.getElementById('f-equip').value='';
+    var _fm=document.getElementById('f-modelo'); if(_fm) _fm.value='';
     document.getElementById('f-tel').value='';
     document.getElementById('f-desc').value='';
     renderKanban();renderPainel();

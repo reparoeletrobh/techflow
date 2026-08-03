@@ -1921,7 +1921,9 @@ async function abrirAnalise(flFichaId) {
     const f = (d.fichas||[]).find(f=>f.id===flFichaId);
     if (f) {
       document.getElementById('al-info').innerHTML =
-        `<strong>${f.nomeContato}</strong> — ${f.equipamento||''}<br><span style="color:#888">${f.descricao||''}</span>`;
+        `<strong>${f.nomeContato}</strong> — ${f.equipamento||''}${f.modelo?(' <span style="color:#22c55e">['+f.modelo+']</span>'):''}<br><span style="color:#888">${f.descricao||''}</span>`;
+      // herda o modelo cadastrado no Frente de Loja
+      if (f.modelo && dljEquips[0] && !dljEquips[0].modelo) { dljEquips[0].modelo = f.modelo; dljRender(); }
       if (f.descricaoTecnica) document.getElementById('al-diag').value = f.descricaoTecnica;
     }
   } catch(e) {}
@@ -2014,7 +2016,7 @@ function dljRender(){
       + (on ? 'background:#a855f7;color:#fff;border:1px solid #a855f7;' : 'background:#111;color:#9aa4b2;border:1px solid #333;') + '">'+txt+'</button>';
     return '<div style="background:#0c1016;border:1px solid #1f2937;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;">'
       + (dljEquips.length>1 ? '<div style="font-family:var(--fm);font-size:10px;color:#a855f7;font-weight:700;">EQUIPAMENTO '+(i+1)+'</div>' : '')
-      + '<input placeholder="Modelo (ex: MEF33)" value="'+(eq.modelo||'')+'" oninput="dljCampo('+i+',\'modelo\',this.value)"'
+      + '<input placeholder="Modelo (ex: MEF33) — obrigatório" value="'+(eq.modelo||'')+'" oninput="dljCampo('+i+',\'modelo\',this.value)"'
         + ' style="width:100%;background:#111;border:1px solid #333;border-radius:8px;color:#fff;font-family:var(--fb);font-size:13px;padding:9px;box-sizing:border-box;">'
       + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
         + Object.keys(DLJ_SERVICOS).map(t => bt(DLJ_NOMES[t], eq.tipo===t, 'dljTipo('+i+',\''+t+'\')')).join('')
@@ -2053,6 +2055,7 @@ async function enviarDiagnostico() {
   if (!dljEquips.length) { aviso('Selecione ao menos um equipamento','#f59e0b'); return; }
   for (let i=0;i<dljEquips.length;i++){
     const eq=dljEquips[i], rot=dljEquips.length>1?('Equipamento '+(i+1)):'Equipamento';
+    if(!String(eq.modelo||'').trim()){aviso('Informe o MODELO do '+rot+' — o bot usa isso para responder a objeção de preço','#f59e0b');return;}
     if(!eq.tipo){aviso('Selecione o tipo do '+rot,'#f59e0b');return;}
     if(!(eq.servicos||[]).length){aviso('Selecione ao menos um serviço do '+rot,'#f59e0b');return;}
   }

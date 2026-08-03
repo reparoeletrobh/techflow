@@ -219,8 +219,10 @@ export default async function handler(req,res){
   }
 
   if(req.method==='POST'&&action==='criar'){
-    const {nomeContato,equipamento,telefone,descricao,cpf,email}=req.body||{};
+    const {nomeContato,equipamento,telefone,descricao,cpf,email,modelo}=req.body||{};
     if(!nomeContato||!equipamento)return res.status(400).json({ok:false,error:'Nome e equipamento obrigatórios'});
+    // MODELO OBRIGATÓRIO — alimenta a resposta do bot à objeção "compro um novo"
+    if(!String(modelo||'').trim())return res.status(400).json({ok:false,semModelo:true,error:'informe o MODELO do equipamento'});
     const db=await dbGet(FL_KEY)||defaultDB();
     // AUDITORIA: registrar quem criou (IP + dispositivo) — investigação de criações não reconhecidas
     try {
@@ -245,6 +247,7 @@ export default async function handler(req,res){
     if(jaExiste)return res.status(200).json({ok:true,ficha:jaExiste,duplicataEvitada:true});
     const id=nextId(db);const now=new Date().toISOString();
     const ficha={id,nomeContato,equipamento,telefone:telN,
+      modelo:String(modelo||'').trim().slice(0,60),
       cpf:cpf||'',email:email||'',
       descricao:descricao||'',phase:'analise',createdAt:now,movedAt:now,
       history:[{phase:'analise',ts:now}]};
@@ -601,6 +604,12 @@ export default async function handler(req,res){
       const e = equips[i] || {};
       const rot = equips.length > 1 ? ('Equipamento ' + (i+1)) : 'Equipamento';
       if (!e.tipo) return res.status(400).json({ ok:false, error:'selecione o tipo do ' + rot });
+      // herda o modelo da ficha quando o equipamento não trouxe; segue obrigatório
+      if (!String(e.modelo||'').trim() && String(ficha.modelo||'').trim()) e.modelo = String(ficha.modelo).trim();
+      if (!String(e.modelo||'').trim()) {
+        return res.status(400).json({ ok:false, semModelo:true,
+          error:'informe o MODELO do ' + rot + ' antes de gerar o orçamento' });
+      }
       if (!Array.isArray(e.servicos) || !e.servicos.length) return res.status(400).json({ ok:false, error:'selecione ao menos um serviço do ' + rot });
       if (e.tabela === 'dinamica' && !(parseFloat(String(e.valorEquip||'').replace(',','.')) > 0)) {
         return res.status(400).json({ ok:false, error:'informe o valor do equipamento (' + rot + ' — Tabela Dinâmica)' });

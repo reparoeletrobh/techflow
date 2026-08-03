@@ -169,43 +169,43 @@ function check(nome, cond, extra) {
 
   const casos = [
     // ── MICRO-ONDAS: piso R$370 (era 350). O que já era 390 permanece 390.
-    ['micro elétrico 350 -> 370',              { tipo:'microondas', servicos:['Elétrico'] },                          '370'],
-    ['micro haste 350 -> 370',                 { tipo:'microondas', servicos:['Haste'] },                             '370'],
-    ['micro pintura 350 -> 370',               { tipo:'microondas', servicos:['Pintura'] },                           '370'],
-    ['micro reforma 350 -> 370',               { tipo:'microondas', servicos:['Reforma'] },                           '370'],
-    ['micro reforma+revisão MANTÉM 390',       { tipo:'microondas', servicos:['Reforma','Revisão'] },                 '390'],
-    ['micro magnetron MANTÉM 390',             { tipo:'microondas', servicos:['Magnetron'] },                         '390'],
-    ['micro placa custo 150: 2x=300 -> piso 370', { tipo:'microondas', servicos:['Troca de Placa'], preco:'150' },    '370'],
-    ['micro placa custo 250: 2x=500 PREVALECE',{ tipo:'microondas', servicos:['Troca de Placa'], preco:'250' },       '500'],
+    ['micro elétrico 350 -> 370',              { tipo:'microondas', servicos:['Elétrico'] , modelo:'TESTE01' },                          '370'],
+    ['micro haste 350 -> 370',                 { tipo:'microondas', servicos:['Haste'] , modelo:'TESTE01' },                             '370'],
+    ['micro pintura 350 -> 370',               { tipo:'microondas', servicos:['Pintura'] , modelo:'TESTE01' },                           '370'],
+    ['micro reforma 350 -> 370',               { tipo:'microondas', servicos:['Reforma'] , modelo:'TESTE01' },                           '370'],
+    ['micro reforma+revisão MANTÉM 390',       { tipo:'microondas', servicos:['Reforma','Revisão'] , modelo:'TESTE01' },                 '390'],
+    ['micro magnetron MANTÉM 390',             { tipo:'microondas', servicos:['Magnetron'] , modelo:'TESTE01' },                         '390'],
+    ['micro placa custo 150: 2x=300 -> piso 370', { tipo:'microondas', servicos:['Troca de Placa'], preco:'150' , modelo:'TESTE01' },    '370'],
+    ['micro placa custo 250: 2x=500 PREVALECE',{ tipo:'microondas', servicos:['Troca de Placa'], preco:'250' , modelo:'TESTE01' },       '500'],
 
     // ── FORNO: Grande 790 -> 890. Pequeno permanece 490.
-    ['forno GRANDE 790 -> 890',                { tipo:'forno', subtipo:'Grande', servicos:['Resistência'] },          '890'],
-    ['forno PEQUENO mantém 490',               { tipo:'forno', subtipo:'Pequeno', servicos:['Resistência'] },         '490'],
+    ['forno GRANDE 790 -> 890',                { tipo:'forno', subtipo:'Grande', servicos:['Resistência'] , modelo:'TESTE01' },          '890'],
+    ['forno PEQUENO mantém 490',               { tipo:'forno', subtipo:'Pequeno', servicos:['Resistência'] , modelo:'TESTE01' },         '490'],
 
     // ── PURIFICADOR: intocado.
-    ['purificador Motor Gás mantém 490',       { tipo:'purificador', subtipo:'Motor', servicos:['Gás'] },             '490'],
-    ['purificador Eletrônico Kit mantém 350',  { tipo:'purificador', subtipo:'Eletrônico', servicos:['Kit Termo Elétrico'] }, '350'],
+    ['purificador Motor Gás mantém 490',       { tipo:'purificador', subtipo:'Motor', servicos:['Gás'] , modelo:'TESTE01' },             '490'],
+    ['purificador Eletrônico Kit mantém 350',  { tipo:'purificador', subtipo:'Eletrônico', servicos:['Kit Termo Elétrico'] , modelo:'TESTE01' }, '350'],
 
     // ── ADEGA modo NORMAL: sem porte, preços atuais mantidos.
-    ['adega normal Motor Termostato = 490',    { tipo:'adega', subtipo:'Motor', servicos:['Termostato'] },            '490'],
-    ['adega normal Eletrônico Kit = 350',      { tipo:'adega', subtipo:'Eletrônico', servicos:['Kit Termo Elétrico'] }, '350'],
+    ['adega normal Motor Termostato = 490',    { tipo:'adega', subtipo:'Motor', servicos:['Termostato'] , modelo:'TESTE01' },            '490'],
+    ['adega normal Eletrônico Kit = 350',      { tipo:'adega', subtipo:'Eletrônico', servicos:['Kit Termo Elétrico'] , modelo:'TESTE01' }, '350'],
 
     // ── ADEGA 8 GARRAFAS: piso R$390. Acima disso, o maior prevalece.
-    ['adega8 Eletrônico Kit 350 -> 390',       { tipo:'adega', subtipo:'Eletrônico', servicos:['Kit Termo Elétrico'], tabela:'adega8' }, '390'],
-    ['adega8 Eletrônico Sensor 390 -> 390',    { tipo:'adega', subtipo:'Eletrônico', servicos:['Sensor'], tabela:'adega8' },            '390'],
-    ['adega8 Eletrônico TermoDuplo 490 MANTÉM',{ tipo:'adega', subtipo:'Eletrônico', servicos:['Termoelétrico Duplo'], tabela:'adega8' },'490'],
-    ['adega8 Motor Termostato 490 MANTÉM',     { tipo:'adega', subtipo:'Motor', servicos:['Termostato'], tabela:'adega8' },             '490'],
+    ['adega8 Eletrônico Kit 350 -> 390',       { tipo:'adega', subtipo:'Eletrônico', servicos:['Kit Termo Elétrico'], tabela:'adega8' , modelo:'TESTE01' }, '390'],
+    ['adega8 Eletrônico Sensor 390 -> 390',    { tipo:'adega', subtipo:'Eletrônico', servicos:['Sensor'], tabela:'adega8' , modelo:'TESTE01' },            '390'],
+    ['adega8 Eletrônico TermoDuplo 490 MANTÉM',{ tipo:'adega', subtipo:'Eletrônico', servicos:['Termoelétrico Duplo'], tabela:'adega8' , modelo:'TESTE01' },'490'],
+    ['adega8 Motor Termostato 490 MANTÉM',     { tipo:'adega', subtipo:'Motor', servicos:['Termostato'], tabela:'adega8' , modelo:'TESTE01' },             '490'],
 
     // ── ADEGA 12 GARRAFAS: piso R$450.
-    ['adega12 Eletrônico Kit 350 -> 450',      { tipo:'adega', subtipo:'Eletrônico', servicos:['Kit Termo Elétrico'], tabela:'adega12' }, '450'],
-    ['adega12 Eletrônico Sensor 390 -> 450',   { tipo:'adega', subtipo:'Eletrônico', servicos:['Sensor'], tabela:'adega12' },            '450'],
-    ['adega12 Eletrônico TermoDuplo 490 MANTÉM',{tipo:'adega', subtipo:'Eletrônico', servicos:['Termoelétrico Duplo'], tabela:'adega12' },'490'],
-    ['adega12 Motor Termostato 490 MANTÉM',    { tipo:'adega', subtipo:'Motor', servicos:['Termostato'], tabela:'adega12' },             '490'],
-    ['adega12 placa custo 180: 2x=360 -> piso 450', { tipo:'adega', subtipo:'Motor', servicos:['Troca de Placa'], preco:'180', tabela:'adega12' }, '450'],
+    ['adega12 Eletrônico Kit 350 -> 450',      { tipo:'adega', subtipo:'Eletrônico', servicos:['Kit Termo Elétrico'], tabela:'adega12' , modelo:'TESTE01' }, '450'],
+    ['adega12 Eletrônico Sensor 390 -> 450',   { tipo:'adega', subtipo:'Eletrônico', servicos:['Sensor'], tabela:'adega12' , modelo:'TESTE01' },            '450'],
+    ['adega12 Eletrônico TermoDuplo 490 MANTÉM',{tipo:'adega', subtipo:'Eletrônico', servicos:['Termoelétrico Duplo'], tabela:'adega12' , modelo:'TESTE01' },'490'],
+    ['adega12 Motor Termostato 490 MANTÉM',    { tipo:'adega', subtipo:'Motor', servicos:['Termostato'], tabela:'adega12' , modelo:'TESTE01' },             '490'],
+    ['adega12 placa custo 180: 2x=360 -> piso 450', { tipo:'adega', subtipo:'Motor', servicos:['Troca de Placa'], preco:'180', tabela:'adega12' , modelo:'TESTE01' }, '450'],
 
     // ── TABELA DINÂMICA: intocada, 40% do valor do equipamento.
-    ['dinâmica equip 1000 = 400',              { tipo:'microondas', servicos:['Elétrico'], tabela:'dinamica', valorEquip:'1000' }, '400'],
-    ['dinâmica adega equip 2000 = 800',        { tipo:'adega', subtipo:'Motor', servicos:['Gás'], tabela:'dinamica', valorEquip:'2000' }, '800'],
+    ['dinâmica equip 1000 = 400',              { tipo:'microondas', servicos:['Elétrico'], tabela:'dinamica', valorEquip:'1000' , modelo:'TESTE01' }, '400'],
+    ['dinâmica adega equip 2000 = 800',        { tipo:'adega', subtipo:'Motor', servicos:['Gás'], tabela:'dinamica', valorEquip:'2000' , modelo:'TESTE01' }, '800'],
   ];
   for (const [nome, equip, esperado] of casos) {
     const p = await precoLogistica(equip);
@@ -213,7 +213,7 @@ function check(nome, cond, extra) {
   }
 
   // multi-equipamento: 2 aparelhos = soma com 10% de desconto
-  KV['reparoeletro_logistica'] = { fichas: [{ id: 'PRC2', nome: 'Teste Multi', telefone: '5531990008888', phase: 'coleta_efetuada', diagnostico: { equips: [ { tipo:'microondas', servicos:['Elétrico'] }, { tipo:'purificador', subtipo:'Motor', servicos:['Gás'] } ] } }] };
+  KV['reparoeletro_logistica'] = { fichas: [{ id: 'PRC2', nome: 'Teste Multi', telefone: '5531990008888', phase: 'coleta_efetuada', diagnostico: { equips: [ { tipo:'microondas', servicos:['Elétrico'] , modelo:'TESTE01' }, { tipo:'purificador', subtipo:'Motor', servicos:['Gás'] , modelo:'TESTE01' } ] } }] };
   const rM = res();
   await logi(req({ action: 'gerar-orcamento', ...K }, { id: 'PRC2' }), rM);
   const pM = rM.dado && rM.dado.ficha ? rM.dado.ficha.diagnostico.preco : null;
@@ -222,19 +222,19 @@ function check(nome, cond, extra) {
   // paridade frente de loja: mesmo equipamento, total igual e −10% aplicado
   KV['reparoeletro_frenteloja'] = { fichas: [{ id: 'FL1', nomeContato: 'Teste Loja', telefone: '5531990007777', phase: 'analise' }], seq: 1 };
   const rF = res();
-  await floja(req({ action: 'diagnostico-loja', ...K }, { id: 'FL1', equips: [ { tipo:'microondas', servicos:['Magnetron'] } ] }), rF);
+  await floja(req({ action: 'diagnostico-loja', ...K }, { id: 'FL1', equips: [ { tipo:'microondas', servicos:['Magnetron'] , modelo:'TESTE01' } ] }), rF);
   check('loja: micro Magnetron total = 390 (mesma tabela da logística)', rF.dado && rF.dado.total === 390, rF.dado && (rF.dado.error || rF.dado.total));
   check('loja: desconto de 10% aplicado = 351', rF.dado && rF.dado.totalComDesconto === 351, rF.dado && (rF.dado.error || rF.dado.totalComDesconto));
   // loja usa os preços NOVOS: micro elétrico 370 -> com 10% = 333
   KV['reparoeletro_frenteloja'] = { fichas: [{ id: 'FL2', nomeContato: 'Teste Loja 2', telefone: '5531990007766', phase: 'analise' }], seq: 1 };
   const rF2 = res();
-  await floja(req({ action: 'diagnostico-loja', ...K }, { id: 'FL2', equips: [ { tipo:'microondas', servicos:['Elétrico'] } ] }), rF2);
+  await floja(req({ action: 'diagnostico-loja', ...K }, { id: 'FL2', equips: [ { tipo:'microondas', servicos:['Elétrico'] , modelo:'TESTE01' } ] }), rF2);
   check('loja: micro elétrico usa o preço novo 370', rF2.dado && rF2.dado.total === 370, rF2.dado && (rF2.dado.error || rF2.dado.total));
   check('loja: 370 −10% = 333', rF2.dado && rF2.dado.totalComDesconto === 333, rF2.dado && (rF2.dado.error || rF2.dado.totalComDesconto));
   // loja: adega 8 garrafas com piso 390 -> com 10% = 351
   KV['reparoeletro_frenteloja'] = { fichas: [{ id: 'FL3', nomeContato: 'Teste Loja 3', telefone: '5531990007755', phase: 'analise' }], seq: 1 };
   const rF3 = res();
-  await floja(req({ action: 'diagnostico-loja', ...K }, { id: 'FL3', equips: [ { tipo:'adega', subtipo:'Eletrônico', servicos:['Kit Termo Elétrico'], tabela:'adega8' } ] }), rF3);
+  await floja(req({ action: 'diagnostico-loja', ...K }, { id: 'FL3', equips: [ { tipo:'adega', subtipo:'Eletrônico', servicos:['Kit Termo Elétrico'], tabela:'adega8' , modelo:'TESTE01' } ] }), rF3);
   check('loja: adega8 aplica piso 390', rF3.dado && rF3.dado.total === 390, rF3.dado && (rF3.dado.error || rF3.dado.total));
 
   // ════ CENÁRIO 7b: orçamento NUNCA sai sem preço no texto ════
@@ -243,13 +243,13 @@ function check(nome, cond, extra) {
   KV['reparoeletro_orc_templates'] = { microondas_placa: { texto: 'Ola [NOME], vamos trocar a [peças]. Aprovando ja iniciamos.' } };
   KV['reparoeletro_frenteloja'] = { fichas: [{ id:'SP1', nomeContato:'Sem Preco', telefone:'5531990001111', phase:'analise' }], seq:1 };
   const rSP = res();
-  await floja(req({ action:'diagnostico-loja', ...K }, { id:'SP1', equips:[{ tipo:'microondas', servicos:['Troca de Placa'], preco:'150' }] }), rSP);
+  await floja(req({ action:'diagnostico-loja', ...K }, { id:'SP1', equips:[{ tipo:'microondas', servicos:['Troca de Placa'], preco:'150', modelo:'M4' }] }), rSP);
   check('loja: template sem [VALOR] é RECUSADO', rSP.dado && rSP.dado.ok === false, rSP.dado && (rSP.dado.texto || rSP.dado.total));
   const fSP = KV['reparoeletro_frenteloja'].fichas[0];
   check('loja: ficha NÃO ficou com orçamento gravado', !fSP.diagnosticoLoja && !fSP.valorOrcamento, fSP.valorOrcamento);
 
   // 7b.2 mesma coisa na logística
-  KV['reparoeletro_logistica'] = { fichas: [{ id:'SP2', nome:'Sem Preco Log', telefone:'5531990001122', phase:'coleta_efetuada', diagnostico:{ equips:[{ tipo:'microondas', servicos:['Troca de Placa'], preco:'150' }] } }] };
+  KV['reparoeletro_logistica'] = { fichas: [{ id:'SP2', nome:'Sem Preco Log', telefone:'5531990001122', phase:'coleta_efetuada', diagnostico:{ equips:[{ tipo:'microondas', servicos:['Troca de Placa'], preco:'150', modelo:'M4' }] } }] };
   const rSP2 = res();
   await logi(req({ action:'gerar-orcamento', ...K }, { id:'SP2' }), rSP2);
   check('logística: template sem [VALOR] é RECUSADO', rSP2.dado && rSP2.dado.ok === false, rSP2.dado && rSP2.dado.error);
@@ -258,10 +258,10 @@ function check(nome, cond, extra) {
   // 7b.3 peça SEM custo informado: continua sendo recusado (o piso não pode mascarar)
   KV['reparoeletro_frenteloja'] = { fichas: [{ id:'SP3', nomeContato:'Sem Custo', telefone:'5531990001133', phase:'analise' }], seq:1 };
   const rSP3 = res();
-  await floja(req({ action:'diagnostico-loja', ...K }, { id:'SP3', equips:[{ tipo:'microondas', servicos:['Troca de Placa'] }] }), rSP3);
+  await floja(req({ action:'diagnostico-loja', ...K }, { id:'SP3', equips:[{ tipo:'microondas', servicos:['Troca de Placa'], modelo:'M5' }] }), rSP3);
   check('loja: peça sem custo informado é RECUSADA (piso não mascara)', rSP3.dado && rSP3.dado.ok === false, rSP3.dado && (rSP3.dado.total || rSP3.dado.error));
 
-  KV['reparoeletro_logistica'] = { fichas: [{ id:'SP4', nome:'Sem Custo Log', telefone:'5531990001144', phase:'coleta_efetuada', diagnostico:{ equips:[{ tipo:'microondas', servicos:['Troca de Placa'] }] } }] };
+  KV['reparoeletro_logistica'] = { fichas: [{ id:'SP4', nome:'Sem Custo Log', telefone:'5531990001144', phase:'coleta_efetuada', diagnostico:{ equips:[{ tipo:'microondas', servicos:['Troca de Placa'], modelo:'M5' }] } }] };
   const rSP4 = res();
   await logi(req({ action:'gerar-orcamento', ...K }, { id:'SP4' }), rSP4);
   check('logística: peça sem custo informado é RECUSADA', rSP4.dado && rSP4.dado.ok === false, rSP4.dado && (rSP4.dado.error || 'passou'));
@@ -272,7 +272,7 @@ function check(nome, cond, extra) {
   KV['reparoeletro_log'] = [];
   global.__fetchLog.length = 0;
   KV['reparoeletro_frenteloja'] = { fichas: [{ id:'VIS1', nomeContato:'Cliente Visivel', telefone:'5531990005511', phase:'analise' }], seq:1 };
-  await floja(req({ action:'diagnostico-loja', ...K }, { id:'VIS1', equips:[{ tipo:'microondas', servicos:['Troca de Placa'], preco:'150' }] }), res());
+  await floja(req({ action:'diagnostico-loja', ...K }, { id:'VIS1', equips:[{ tipo:'microondas', servicos:['Troca de Placa'], preco:'150', modelo:'M4' }] }), res());
   const logFL = KV['reparoeletro_log'] || [];
   check('loja: recusa entrou no log de auditoria como erro',
     logFL.some(l => l.status === 'erro' && /sem o valor|SEM PREÇO|preço/i.test(String(l.detalhe) + String(l.gatilho) + String(l.acao))), logFL[0]);
@@ -281,7 +281,7 @@ function check(nome, cond, extra) {
 
   KV['reparoeletro_log'] = [];
   global.__fetchLog.length = 0;
-  KV['reparoeletro_logistica'] = { fichas: [{ id:'VIS2', nome:'Cliente Log', telefone:'5531990005522', phase:'coleta_efetuada', diagnostico:{ equips:[{ tipo:'microondas', servicos:['Troca de Placa'], preco:'150' }] } }] };
+  KV['reparoeletro_logistica'] = { fichas: [{ id:'VIS2', nome:'Cliente Log', telefone:'5531990005522', phase:'coleta_efetuada', diagnostico:{ equips:[{ tipo:'microondas', servicos:['Troca de Placa'], preco:'150', modelo:'M4' }] } }] };
   await logi(req({ action:'gerar-orcamento', ...K }, { id:'VIS2' }), res());
   const logLG = KV['reparoeletro_log'] || [];
   check('logística: recusa entrou no log de auditoria como erro',
@@ -290,13 +290,51 @@ function check(nome, cond, extra) {
     global.__fetchLog.some(u => u.includes('criar-conflito')), global.__fetchLog);
   delete KV['reparoeletro_orc_templates'];
 
+  // ════ CENÁRIO 7d: MODELO obrigatório (alimenta a objeção "compro um novo") ════
+  console.log('▶ Cenário 7d — modelo do equipamento é obrigatório');
+  // logística: sem modelo -> recusa
+  KV['reparoeletro_logistica'] = { fichas: [{ id:'MD1', nome:'Sem Modelo', telefone:'5531990006611', phase:'coleta_efetuada', diagnostico:{ equips:[{ tipo:'microondas', servicos:['Elétrico'] }] } }] };
+  const rMD1 = res();
+  await logi(req({ action:'gerar-orcamento', ...K }, { id:'MD1' }), rMD1);
+  check('logística: SEM modelo é recusado', rMD1.dado && rMD1.dado.ok === false && /modelo/i.test(String(rMD1.dado.error)), rMD1.dado && rMD1.dado.error);
+
+  // logística: com modelo -> passa
+  KV['reparoeletro_logistica'] = { fichas: [{ id:'MD2', nome:'Com Modelo', telefone:'5531990006622', phase:'coleta_efetuada', diagnostico:{ equips:[{ tipo:'microondas', servicos:['Elétrico'], modelo:'MEF41' }] } }] };
+  const rMD2 = res();
+  await logi(req({ action:'gerar-orcamento', ...K }, { id:'MD2' }), rMD2);
+  check('logística: COM modelo passa normal', rMD2.dado && rMD2.dado.ok === true, rMD2.dado && rMD2.dado.error);
+
+  // loja: sem modelo -> recusa
+  KV['reparoeletro_frenteloja'] = { fichas: [{ id:'MD3', nomeContato:'Loja Sem Modelo', telefone:'5531990006633', phase:'analise' }], seq:1 };
+  const rMD3 = res();
+  await floja(req({ action:'diagnostico-loja', ...K }, { id:'MD3', equips:[{ tipo:'microondas', servicos:['Elétrico'] }] }), rMD3);
+  check('loja: SEM modelo é recusado', rMD3.dado && rMD3.dado.ok === false && /modelo/i.test(String(rMD3.dado.error)), rMD3.dado && rMD3.dado.error);
+
+  // loja: modelo da FICHA é herdado quando o equipamento não traz
+  KV['reparoeletro_frenteloja'] = { fichas: [{ id:'MD4', nomeContato:'Loja Herda', telefone:'5531990006644', phase:'analise', modelo:'BZC12B' }], seq:1 };
+  const rMD4 = res();
+  await floja(req({ action:'diagnostico-loja', ...K }, { id:'MD4', equips:[{ tipo:'adega', subtipo:'Eletrônico', servicos:['Kit Termo Elétrico'], tabela:'adega12' }] }), rMD4);
+  check('loja: herda o modelo da ficha do Frente de Loja', rMD4.dado && rMD4.dado.ok === true, rMD4.dado && rMD4.dado.error);
+  const fMD4 = KV['reparoeletro_frenteloja'].fichas[0];
+  check('loja: modelo herdado ficou gravado no equipamento',
+    fMD4.diagnosticoLoja && fMD4.diagnosticoLoja.equips[0].modelo === 'BZC12B', fMD4.diagnosticoLoja && fMD4.diagnosticoLoja.equips[0].modelo);
+
+  // criação de ficha no Frente de Loja: modelo obrigatório e gravado
+  KV['reparoeletro_frenteloja'] = { fichas: [], seq:0 };
+  const rMD5 = res();
+  await floja(req({ action:'criar', ...K }, { nomeContato:'Novo Cliente', equipamento:'Micro-ondas', telefone:'31990006655' }), rMD5);
+  check('FL criar: SEM modelo é recusado', rMD5.dado && rMD5.dado.ok === false && /modelo/i.test(String(rMD5.dado.error)), rMD5.dado && rMD5.dado.error);
+  const rMD6 = res();
+  await floja(req({ action:'criar', ...K }, { nomeContato:'Novo Cliente', equipamento:'Micro-ondas', telefone:'31990006655', modelo:'MEF41' }), rMD6);
+  check('FL criar: COM modelo cria e grava', rMD6.dado && rMD6.dado.ok === true && rMD6.dado.ficha && rMD6.dado.ficha.modelo === 'MEF41', rMD6.dado && (rMD6.dado.error || (rMD6.dado.ficha||{}).modelo));
+
   // ════ CENÁRIO 8: isolamento do Frente de Loja ════
   // Regra inviolável: FL grava SÓ em reparoeletro_frenteloja. O bot não lê esse banco.
   console.log('▶ Cenário 8 — Frente de Loja não vaza para os bancos do bot');
   const sentinelaLog = JSON.stringify(KV['reparoeletro_logistica'] || null);
   const sentinelaTvLog = JSON.stringify(KV['tv_logistica'] || null);
   KV['reparoeletro_frenteloja'] = { fichas: [{ id: 'ISO1', nomeContato: 'Iso Teste', telefone: '5531990006666', phase: 'analise' }], seq: 1 };
-  await floja(req({ action: 'diagnostico-loja', ...K }, { id: 'ISO1', equips: [ { tipo:'purificador', subtipo:'Motor', servicos:['Gás'] } ] }), res());
+  await floja(req({ action: 'diagnostico-loja', ...K }, { id: 'ISO1', equips: [ { tipo:'purificador', subtipo:'Motor', servicos:['Gás'], modelo:'ISO-M' } ] }), res());
   check('diagnóstico de loja NÃO tocou reparoeletro_logistica', JSON.stringify(KV['reparoeletro_logistica'] || null) === sentinelaLog);
   check('diagnóstico de loja NÃO tocou tv_logistica', JSON.stringify(KV['tv_logistica'] || null) === sentinelaTvLog);
   const fIso = KV['reparoeletro_frenteloja'].fichas[0];
