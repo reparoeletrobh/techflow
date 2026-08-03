@@ -120,6 +120,40 @@ async function orcamentosEmAberto() {
 
 // ═══ GARANTIA DE APROVAÇÃO: move, CONFERE e força os gatilhos que faltarem ═══
 // Antes, mover/board/almoxarifado eram três mecanismos soltos: se um falhasse, ninguém sabia.
+// ⚠️ Abre conflito quando o bot prometeu algo ao cliente e a ação NÃO pôde ser concluída.
+// Existe para que nenhuma promessa morra em silêncio — um humano confere e resolve.
+async function promessaSemLastro(tel, d8, textoPrometido, motivo, causa) {
+  const _K = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+  const bate = t => String(t || '').replace(/\D/g, '').slice(-8) === String(d8);
+  let nome = '', equipamento = '';
+  try {
+    const [fA, fT, lA, lT] = await Promise.all([
+      dbGet('fichas_adm'), dbGet('fichas_tv'), dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+    ]);
+    const acha = b => (((b || {}).fichas) || []).find(f => bate(f.telefone));
+    const c = [acha(fA), acha(fT), acha(lA), acha(lT)].filter(Boolean);
+    const f = c.find(x => String(x.nome || '').trim()) || c[0] || null;
+    if (f) { nome = f.nome || ''; equipamento = f.equipamento || ''; }
+  } catch (e) {}
+  try {
+    await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'acao', tipo: 'falha',
+      texto: '⚠️ PROMESSA SEM LASTRO — ' + causa });
+  } catch (e) {}
+  try {
+    await fetch(`https://reparoeletroadm.com/api/prospeccao?action=criar-conflito&k=${_K}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nome: nome || 'Cliente WhatsApp', telefone: String(tel).replace(/\D/g, ''),
+        equipamento: equipamento || '',
+        motivo: '⚠️ PROMESSA NÃO CUMPRIDA — VERIFICAR COM O CLIENTE. ' + causa +
+          '. Prometido ao cliente: "' + String(textoPrometido || '').slice(0, 120) + '"' +
+          (motivo ? ' (motivo do bot: ' + String(motivo).slice(0, 80) + ')' : ''),
+      }),
+    }).then(x => x.json()).catch(() => null);
+    await bumpStat('conflitos');
+  } catch (e) {}
+}
+
 async function garantirAprovacao(d8) {
   const K = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
   const post = (api, action, body) => fetch(`https://reparoeletroadm.com/api/${api}?action=${action}&k=${K}`, {
@@ -2463,6 +2497,12 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
                 }),
               });
               await bumpStat('logistica');
+              const _chkTv = (await dbGet('tv_logistica')) || { fichas: [] };
+              const _okTv = (_chkTv.fichas || []).some(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
+              if (!_okTv) {
+                await promessaSemLastro(tel, d8x, texto, acaoMotivo,
+                  'o bot confirmou COLETA de TV e a ficha NÃO apareceu na logística TV');
+              }
             }
             // Tirar a ficha TV da prospecção (Entrar em Contato / Contato Feito): agora está na logística
             const ftvUpd = (await dbGet('fichas_tv')) || { fichas: [] };
@@ -2475,6 +2515,12 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
           } else {
           const fdbX = (await dbGet('fichas_adm')) || { fichas: [] };
           const fichaX = (fdbX.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x && f.status !== 'logistica');
+          if (!fichaX) {
+            // ⚠️ PROMESSA SEM LASTRO: o bot confirmou a coleta ao cliente, mas não há ficha
+            // de origem para cadastrar. Antes isso era pulado em SILÊNCIO e ninguém coletava.
+            await promessaSemLastro(tel, d8x, texto, acaoMotivo,
+              'o bot confirmou COLETA ao cliente, mas não existe ficha em fichas_adm para cadastrar na logística');
+          }
           if (fichaX) {
             const logX = (await dbGet('reparoeletro_logistica')) || { fichas: [] };
             const jaLog = (logX.fichas || []).some(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x && f.phase !== 'orc_registrado');
@@ -2494,6 +2540,13 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
               fichaX.status = 'logistica'; fichaX.logisticaEm = new Date().toISOString();
               await dbSet('fichas_adm', fdbX);
               await bumpStat('logistica');
+              // CONFERE O PRÓPRIO RESULTADO: relê o banco e valida que a coleta existe mesmo.
+              const _chk = (await dbGet('reparoeletro_logistica')) || { fichas: [] };
+              const _ok = (_chk.fichas || []).some(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
+              if (!_ok) {
+                await promessaSemLastro(tel, d8x, texto, acaoMotivo,
+                  'o bot confirmou COLETA e a gravação na logística NÃO foi confirmada na releitura');
+              }
             }
           }
           }

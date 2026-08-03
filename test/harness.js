@@ -402,6 +402,38 @@ function check(nome, cond, extra) {
   await prec(req({ action:'modelos', k:'chave-errada' }), r11c);
   check('chave inválida é recusada', r11c.statusCode === 401);
 
+  // ════ CENÁRIO 12: promessa não cumprida vira conflito para um humano ════
+  console.log('▶ Cenário 12 — cadastrar_logistica que falha abre conflito');
+  KV['wa_credenciais'] = { token:'mock', phoneId:'123' };
+  KV['wa_bot_config'] = { modoAberto: true, execTels: [] };
+  KV['wa_bot_pausados'] = {};
+
+  // 12a: cliente SEM ficha em fichas_adm — o cadastro não tem como acontecer
+  KV['fichas_adm'] = { fichas: [] };
+  KV['fichas_tv'] = { fichas: [] };
+  KV['reparoeletro_logistica'] = { fichas: [] };
+  global.__fetchLog.length = 0;
+  const r12a = res();
+  await wabot(req({ action:'enviar', ...K }, { tel:'5531990007001',
+    texto:'Perfeito! Sua coleta será feita amanhã entre 08h e 14h.',
+    acaoAprovada:'cadastrar_logistica', acaoMotivo:'coleta imediata' }), r12a);
+  check('sem ficha: abriu conflito para um humano',
+    global.__fetchLog.some(u => u.includes('criar-conflito')), global.__fetchLog.slice(0,4));
+  check('sem ficha: nada foi criado na logística',
+    ((KV['reparoeletro_logistica']||{}).fichas||[]).length === 0);
+
+  // 12b: cliente COM ficha — cadastra e NÃO abre conflito
+  KV['fichas_adm'] = { fichas: [{ id:'FA1', nome:'Cliente OK', telefone:'5531990007002', equipamento:'Micro-ondas', endereco:'Rua X', status:'contato_feito' }] };
+  KV['reparoeletro_logistica'] = { fichas: [] };
+  global.__fetchLog.length = 0;
+  await wabot(req({ action:'enviar', ...K }, { tel:'5531990007002',
+    texto:'Perfeito! Nossa equipe já vai programar a busca.',
+    acaoAprovada:'cadastrar_logistica', acaoMotivo:'coleta imediata' }), res());
+  check('com ficha: criou na logística', ((KV['reparoeletro_logistica']||{}).fichas||[]).length === 1,
+    (KV['reparoeletro_logistica']||{}).fichas);
+  check('com ficha: NÃO abriu conflito (nada a alertar)',
+    !global.__fetchLog.some(u => u.includes('criar-conflito')));
+
   // ════ Resultado ════
   console.log('\n═══════════════════════════════════');
   const _mj = (() => { const b = new Date(Date.now() - 3 * 3600000); const d = b.getUTCDay(), hh = b.getUTCHours(); return (d >= 1 && d <= 5) ? (hh >= 8 && hh < 15) : (d === 6 ? (hh >= 8 && hh < 10) : false); })();
