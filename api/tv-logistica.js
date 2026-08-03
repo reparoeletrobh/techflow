@@ -706,8 +706,10 @@ module.exports = async function handler(req, res) {
     const faseAntC = f.phase;
     const quando = new Date().toISOString();
     // GRAVAÇÃO ATÔMICA + tira o motorista da ficha (senão ela continuava na lista dele)
+    // 🔁 vai para REMARCAR (decisão do dono): voltar para liberado_coleta fazia a ficha
+    // reentrar na fila como se estivesse pronta, podendo virar rota de novo para o mesmo cliente.
     const atualizada = await aplicarNaFicha(id, (alvo) => {
-      alvo.phase = 'liberado_coleta';
+      alvo.phase = 'remarcar';
       alvo.movedAt = quando;
       alvo.cancelamentoMotorista = { motivo: String(motivo).slice(0, 200), motorista: String(motorista || ''), em: quando };
       alvo.motoristaAnterior = alvo.motoristaNome || '';
@@ -718,9 +720,9 @@ module.exports = async function handler(req, res) {
     // CONFERE relendo: se não saiu da rota, avisa em vez de dizer que deu certo
     const confere = (await dbGet(LOG_KEY)) || {};
     const dep = ((confere.fichas) || []).find(x => x.id === id);
-    const saiu = dep && dep.phase === 'liberado_coleta';
-    logMov(id, f.nome, faseAntC, 'liberado_coleta', 'motorista-cancelou/' + String(motorista || '?')).catch(() => {});
-    registrarPassagem('liberado_coleta').catch(() => {});
+    const saiu = dep && dep.phase === 'remarcar';
+    logMov(id, f.nome, faseAntC, 'remarcar', 'motorista-cancelou/' + String(motorista || '?')).catch(() => {});
+    registrarPassagem('remarcar').catch(() => {});
     return res.status(200).json({ ok: !!saiu, faseAtual: dep ? dep.phase : null,
       erro: saiu ? undefined : 'a ficha não saiu da rota — outra tela pode ter sobrescrito' });
   }
