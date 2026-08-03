@@ -44,7 +44,7 @@ module.exports = async function handler(req,res){
   // ── GET listar ──────────────────────────────────────────────────────────────
   if(action==='listar'){
     const lista = [...db.conflitos].sort((a,b)=>scoreOrdem(b)-scoreOrdem(a)||new Date(b.criadoEm)-new Date(a.criadoEm));
-    const abertos   = db.conflitos.filter(c=>c.status!=='resolvido');
+    const abertos   = db.conflitos.filter(c=>c.status!=='resolvido'&&c.status!=='relatar');
     const criticos  = abertos.filter(c=>c.prioridade==='critico').length;
     const semResp   = abertos.filter(c=>!c.responsavel).length;
     return res.status(200).json({ok:true,conflitos:lista,total:db.conflitos.length,criticos,semResp,abertos:abertos.length});
@@ -52,8 +52,8 @@ module.exports = async function handler(req,res){
 
   // ── GET badge — só o contador para o header ─────────────────────────────────
   if(action==='badge'){
-    const criticos = db.conflitos.filter(c=>c.status!=='resolvido'&&c.prioridade==='critico').length;
-    const abertos  = db.conflitos.filter(c=>c.status!=='resolvido').length;
+    const criticos = db.conflitos.filter(c=>c.status!=='resolvido'&&c.status!=='relatar'&&c.prioridade==='critico').length;
+    const abertos  = db.conflitos.filter(c=>c.status!=='resolvido'&&c.status!=='relatar').length;
     return res.status(200).json({ok:true,criticos,abertos});
   }
 
@@ -86,17 +86,32 @@ module.exports = async function handler(req,res){
     return res.status(200).json({ok:true,conflito:c});
   }
 
+  // ── POST relatado: cliente avisado do desfecho → vai para FINALIZADOS ──
+  if(req.method==='POST'&&action==='relatado'){
+    const{id,por}=req.body||{};
+    const c=db.conflitos.find(x=>x.id===id);
+    if(!c) return res.status(404).json({ok:false,error:'não encontrado'});
+    c.status='resolvido';
+    c.clienteRelatado=true;
+    c.relatadoEm=new Date().toISOString();
+    c.relatadoPor=String(por||'').slice(0,40);
+    c.atualizadoEm=c.relatadoEm;
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true,conflito:c});
+  }
+
   // ── POST resolver ───────────────────────────────────────────────────────────
   if(req.method==='POST'&&action==='resolver'){
     const{id,solucao,acaoPreventiva}=req.body||{};
     const c=db.conflitos.find(x=>x.id===id);
     if(!c) return res.status(404).json({ok:false,error:'não encontrado'});
-    c.status='resolvido'; c.solucao=solucao||'';
+    // 📣 etapa intermediária: resolvido vai para RELATAR CLIENTE, não direto para finalizado
+    c.status='relatar'; c.solucao=solucao||'';
     c.acaoPreventiva=acaoPreventiva||'';
     c.resolvidoEm=new Date().toISOString();
     c.atualizadoEm=new Date().toISOString();
     await dbSet(KEY,db);
-    return res.status(200).json({ok:true,conflito:c});
+    return res.status(200).json({ok:true,conflito:c,proximoPasso:'relatar ao cliente'});
   }
 
   // ── POST editar ─────────────────────────────────────────────────────────────

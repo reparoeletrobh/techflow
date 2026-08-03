@@ -274,6 +274,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
       style="background:none;border:none;border-bottom:2px solid var(--red);color:var(--red);padding:9px 18px;font-family:var(--fm);font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.06em">
       🔴 EM ABERTO <span id="badge-ab" style="background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:9px;margin-left:4px">0</span>
     </button>
+    <button id="aba-rel" onclick="trocarAba('relatar')"
+      style="background:none;border:none;border-bottom:2px solid transparent;color:var(--mu);padding:9px 18px;font-family:var(--fm);font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.06em">
+      📣 RELATAR CLIENTE <span id="badge-rel" style="background:#f59e0b;color:#000;border-radius:10px;padding:1px 7px;font-size:9px;margin-left:4px">0</span>
+    </button>
     <button id="aba-res" onclick="trocarAba('resolvido')"
       style="background:none;border:none;border-bottom:2px solid transparent;color:var(--mu);padding:9px 18px;font-family:var(--fm);font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.06em">
       ✅ FINALIZADOS <span id="badge-res" style="background:var(--gr);color:#000;border-radius:10px;padding:1px 7px;font-size:9px;margin-left:4px">0</span>
@@ -453,7 +457,9 @@ function trocarAba(aba){
   _aba=aba;
   var btnA=document.getElementById('aba-aberto');
   var btnR=document.getElementById('aba-res');
+  var btnL=document.getElementById('aba-rel');
   if(btnA){ btnA.style.borderBottomColor=aba==='aberto'?'var(--red)':'transparent'; btnA.style.color=aba==='aberto'?'var(--red)':'var(--mu)'; }
+  if(btnL){ btnL.style.borderBottomColor=aba==='relatar'?'#f59e0b':'transparent'; btnL.style.color=aba==='relatar'?'#f59e0b':'var(--mu)'; }
   if(btnR){ btnR.style.borderBottomColor=aba==='resolvido'?'var(--gr)':'transparent'; btnR.style.color=aba==='resolvido'?'var(--gr)':'var(--mu)'; }
   render();
 }
@@ -463,15 +469,19 @@ function render(){
   var todos=filtrados();
 
   // Badges
-  var nAb=todos.filter(function(c){return c.status!=='resolvido';}).length;
+  var nAb=todos.filter(function(c){return c.status!=='resolvido'&&c.status!=='relatar';}).length;
+  var nRl=todos.filter(function(c){return c.status==='relatar';}).length;
   var nRe=todos.filter(function(c){return c.status==='resolvido';}).length;
   var bA=document.getElementById('badge-ab'); if(bA)bA.textContent=nAb;
+  var bL=document.getElementById('badge-rel'); if(bL)bL.textContent=nRl;
   var bR=document.getElementById('badge-res'); if(bR)bR.textContent=nRe;
 
   // Filtrar pela aba ativa
   var lista=todos.filter(function(c){
     var res=c.status==='resolvido';
-    if(_aba==='aberto'&&res) return false;
+    var rel=c.status==='relatar';
+    if(_aba==='aberto'&&(res||rel)) return false;
+    if(_aba==='relatar'&&!rel) return false;
     if(_aba==='resolvido'&&!res) return false;
     if(busca){
       var txt=((c.titulo||'')+(c.os||'')+(c.ficha||'')+(c.equipamento||'')+(c.responsavel||'')+(c.descricao||'')+(c.id||'')).toLowerCase();
@@ -534,7 +544,11 @@ function cardHTML(c){
   var resolved=c.status==='resolvido';
 
   var btns='';
-  if(!resolved){
+  var aguardaRelato = c.status==='relatar';
+  if(aguardaRelato){
+    btns+='<button class="cc-btn" style="background:rgba(37,211,102,.14);color:#25d366;border-color:rgba(37,211,102,.45);font-weight:800;" data-id="'+c.id+'" onclick="relatarCliente(this.dataset.id)">📋 Copiar e Enviar ao cliente</button>';
+    btns+='<button class="cc-btn" data-id="'+c.id+'" onclick="abrirEditar(this.dataset.id)">✏️ Editar</button>';
+  } else if(!resolved){
     if(c.status==='aberto') btns+='<button class="cc-btn assumir" data-id="'+c.id+'" onclick="assumir(this.dataset.id)">▶ Assumir</button>';
     btns+='<button class="cc-btn resolver" data-id="'+c.id+'" onclick="abrirResolver(this.dataset.id)">✓ Resolver</button>';
     btns+='<button class="cc-btn" data-id="'+c.id+'" onclick="abrirEditar(this.dataset.id)">✏️ Editar</button>';
@@ -668,6 +682,24 @@ async function assumir(id){
   else toast('Erro','r');
 }
 
+async function relatarCliente(id){
+  var c=(_dados||[]).find(function(x){return x.id===id;});
+  if(!c)return;
+  var tel=String(c.telefone||c.tel||'').replace(/\D/g,'');
+  var primeiro=String(c.cliente||c.ficha||'').trim().split(/\s+/)[0]||'tudo bem';
+  var txt='Oi '+primeiro+'! Passando para te dar um retorno sobre o seu atendimento:\n\n'
+    +(c.solucao||'Seu caso foi resolvido.')+'\n\nQualquer dúvida é só chamar aqui. 😊';
+  try{await navigator.clipboard.writeText(txt);}catch(e){}
+  if(tel.length>=10){
+    window.open('https://wa.me/'+(tel.indexOf('55')===0?tel:'55'+tel)+'?text='+encodeURIComponent(txt),'_blank');
+  } else {
+    alert('Sem telefone no conflito — a mensagem foi copiada, envie manualmente:\n\n'+txt);
+  }
+  var r=await fetch('/api/conflitos?action=relatado',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r&&r.ok){ if(typeof toast==='function')toast('✅ Cliente avisado — conflito finalizado'); }
+  carregar();
+}
 function abrirResolver(id){
   document.getElementById('r-id').value=id;
   document.getElementById('r-solucao').value='';

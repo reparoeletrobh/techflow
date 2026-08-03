@@ -2000,7 +2000,10 @@ export default async function handler(req, res) {
       const b = new Date(Date.now() - 3 * 3600 * 1000);
       const d = b.getUTCDay(), hh = b.getUTCHours() + b.getUTCMinutes() / 60;
       const dentro = (d >= 1 && d <= 5) ? (hh >= 7 && hh < 16) : (d === 6 ? (hh >= 7 && hh < 11) : false);
-      if (!dentro) return res.status(200).json({ ok: true, foraDeHorario: true, enviados: 0 });
+      // ?forcar=1 ignora a janela — usado em teste e quando o dono precisa disparar na mão
+      if (!dentro && String(req.query.forcar || '') !== '1') {
+        return res.status(200).json({ ok: true, foraDeHorario: true, enviados: 0 });
+      }
     }
     const [cfgC, boardC, avisadosC, qcC] = await Promise.all([
       dbGet('wa_bot_config'), dbGet('reparoeletro_board'),
@@ -2095,7 +2098,10 @@ export default async function handler(req, res) {
       const b = new Date(Date.now() - 3 * 3600 * 1000);
       const d = b.getUTCDay(), hh = b.getUTCHours() + b.getUTCMinutes() / 60;
       const dentro = (d >= 1 && d <= 5) ? (hh >= 7 && hh < 16) : (d === 6 ? (hh >= 7 && hh < 11) : false);
-      if (!dentro) return res.status(200).json({ ok: true, foraDeHorario: true, enviados: 0 });
+      // ?forcar=1 ignora a janela — usado em teste e quando o dono precisa disparar na mão
+      if (!dentro && String(req.query.forcar || '') !== '1') {
+        return res.status(200).json({ ok: true, foraDeHorario: true, enviados: 0 });
+      }
     }
     const cfgO = (await dbGet('wa_bot_config')) || {};
     // 🔀 MODO MANUAL: com o envio automático desligado, os orçamentos ficam

@@ -526,7 +526,7 @@ function check(nome, cond, extra) {
   KV['reparoeletro_logistica'] = { fichas: [fichaOrc()] };
   KV['wa_orc_enviados'] = { ids: {} };
   global.__forcarErroGraph = { error: { message: 'Template name does not exist', code: 132001 } };
-  await wabot(req({ action:'orcamentos-pendentes', ...K }), res());
+  await wabot(req({ action:'orcamentos-pendentes', forcar:'1', ...K }), res());
   delete global.__forcarErroGraph;
   const reg15 = (KV['wa_orc_enviados']||{}).ids || {};
   check('template recusado: NÃO marca como enviado com sucesso',
@@ -539,7 +539,7 @@ function check(nome, cond, extra) {
   LISTS['wa_evt_list'] = [];
   KV['reparoeletro_logistica'] = { fichas: [fichaOrc()] };
   KV['wa_orc_enviados'] = { ids: {} };
-  await wabot(req({ action:'orcamentos-pendentes', ...K }), res());
+  await wabot(req({ action:'orcamentos-pendentes', forcar:'1', ...K }), res());
   const reg15b = (KV['wa_orc_enviados']||{}).ids || {};
   const evt15b = (LISTS['wa_evt_list']||[]).map(x => { try { return JSON.parse(x); } catch(e){ return {}; } });
   check('template aceito: marca enviado com ok=true', reg15b['ORC1'] && reg15b['ORC1'].ok === true, reg15b['ORC1']);
@@ -561,7 +561,7 @@ function check(nome, cond, extra) {
   KV['wa_orc_enviados'] = { ids: {} };
   global.__fetchLog.length = 0;
   global.__forcarErroGraph = { error: { message: 'Template name does not exist in the translation', code: 132001 } };
-  await wabot(req({ action:'orcamentos-pendentes', ...K }), res());
+  await wabot(req({ action:'orcamentos-pendentes', forcar:'1', ...K }), res());
   delete global.__forcarErroGraph;
   check('erro permanente: abre conflito na PRIMEIRA falha',
     global.__fetchLog.some(u => u.includes('criar-conflito')), global.__fetchLog.slice(-3));
@@ -573,14 +573,14 @@ function check(nome, cond, extra) {
   KV['wa_orc_enviados'] = { ids: {} };
   global.__fetchLog.length = 0;
   global.__forcarErroGraph = { error: { message: 'Rate limit hit', code: 130429 } };
-  await wabot(req({ action:'orcamentos-pendentes', ...K }), res());
+  await wabot(req({ action:'orcamentos-pendentes', forcar:'1', ...K }), res());
   check('erro passageiro: NÃO abre conflito na 1ª falha',
     !global.__fetchLog.some(u => u.includes('criar-conflito')));
   const r16b = ((KV['wa_orc_enviados']||{}).ids||{})['OC11'];
   check('erro passageiro: contou a falha para tentar de novo', r16b && r16b.falhas === 1, r16b);
   // 2ª e 3ª tentativa -> conflito
-  await wabot(req({ action:'orcamentos-pendentes', ...K }), res());
-  await wabot(req({ action:'orcamentos-pendentes', ...K }), res());
+  await wabot(req({ action:'orcamentos-pendentes', forcar:'1', ...K }), res());
+  await wabot(req({ action:'orcamentos-pendentes', forcar:'1', ...K }), res());
   delete global.__forcarErroGraph;
   check('erro passageiro: abre conflito após 3 tentativas',
     global.__fetchLog.some(u => u.includes('criar-conflito')), global.__fetchLog.slice(-3));
@@ -589,7 +589,7 @@ function check(nome, cond, extra) {
   KV['reparoeletro_logistica'] = { fichas: [fOrc('OC12','Denise')] };
   KV['wa_orc_enviados'] = { ids: {} };
   global.__fetchLog.length = 0;
-  await wabot(req({ action:'orcamentos-pendentes', ...K }), res());
+  await wabot(req({ action:'orcamentos-pendentes', forcar:'1', ...K }), res());
   check('sucesso: nenhum conflito aberto', !global.__fetchLog.some(u => u.includes('criar-conflito')));
 
   // ════ CENÁRIO 17: reenvio após bloqueio de pagamento da Meta ════
@@ -686,7 +686,7 @@ function check(nome, cond, extra) {
   KV['wa_orc_enviados'] = { ids: {} };
   global.__fetchLog.length = 0;
   global.__forcarErroGraph = { error: { message: 'unsettled payments', code: 131042 } };
-  await wabot(req({ action:'orcamentos-pendentes', ...K }), res());
+  await wabot(req({ action:'orcamentos-pendentes', forcar:'1', ...K }), res());
   delete global.__forcarErroGraph;
   check('recusado: NÃO chamou orc-enviar (card fica na aba Orçamento)',
     !global.__fetchLog.some(u => u.includes('orc-enviar')), global.__fetchLog.filter(u => u.includes('orc')));
@@ -696,7 +696,7 @@ function check(nome, cond, extra) {
   KV['reparoeletro_orcamentos'] = { fichas: [{ id:'ORC-19', tel:'5531990019999', nome:'Cliente 19', status:'pendente', precoSugerido:'350', textoOrc:'x' }], syncedIds: [] };
   KV['wa_orc_enviados'] = { ids: {} };
   global.__fetchLog.length = 0;
-  await wabot(req({ action:'orcamentos-pendentes', ...K }), res());
+  await wabot(req({ action:'orcamentos-pendentes', forcar:'1', ...K }), res());
   check('aceito: chamou orc-enviar (card vai para Enviado)',
     global.__fetchLog.some(u => u.includes('orc-enviar')), global.__fetchLog.filter(u => u.includes('orc')));
 

@@ -368,11 +368,17 @@ export default async function handler(req, res) {
   if (req.method === 'POST' && action === 'criar-mover') {
     const b = req.body || {};
     if (!b.cardId || !b.destino) return res.status(400).json({ ok: false, error: 'cardId e destino obrigatórios' });
-    // 🚫 TV não entra no almoxarifado do ADM — tem separação própria
+    // 🚫 TV não entra no almoxarifado do ADM — tem separação própria.
+    // Barreira final: vale para qualquer origem que tente criar a tarefa.
     try {
-      const ppTv = (await dbGet('tv_pipe')) || { cards: [] };
-      if (((ppTv.cards) || []).some(c => c.id === b.cardId)) {
-        return res.status(200).json({ ok: true, ignorado: true, motivo: 'card de TV não entra no almoxarifado ADM' });
+      const [ppTv, lgTv] = await Promise.all([dbGet('tv_pipe'), dbGet('tv_logistica')]);
+      const noTv = ((ppTv || {}).cards || []).some(c => c.id === b.cardId)
+        || ((lgTv || {}).fichas || []).some(f => f.id === b.cardId);
+      const txt = String(b.equipamento || '').toLowerCase();
+      const temTv = /\btvs?\b|televis|\bled\b|polegada|barramento/.test(txt);
+      const temAdm = /micro-?\s?ondas|microondas|purificador|bebedouro|filtro|adega|cervejeir|forno|forninho|frigobar|b\.?\s?blend/.test(txt);
+      if (noTv || (temTv && !temAdm)) {
+        return res.status(200).json({ ok: true, ignorado: true, motivo: 'TV não entra no almoxarifado ADM' });
       }
     } catch (e) {}
     const dbM = (await dbGet(KEY)) || defaultDB();
@@ -869,15 +875,25 @@ export default async function handler(req, res) {
           equipamento: c.equipamento || '', sistema: sis, fase, movidoEm: c.movedAt });
       }
     }
+    // 📺 TV tem separação própria — a reconciliação varre os dois pipes para DIAGNÓSTICO,
+    // mas só recria tarefa para o ADM. Era por aqui que a TV voltava ao almoxarifado.
+    const soTvTxt = (txt) => {
+      const t = String(txt || '').toLowerCase();
+      const temTv = /\btvs?\b|televis|\bled\b|polegada|barramento/.test(t);
+      if (!temTv) return false;
+      return !/micro-?\s?ondas|microondas|purificador|bebedouro|filtro|adega|cervejeir|forno|forninho|frigobar|b\.?\s?blend/.test(t);
+    };
+    const paraCriar = faltam.filter(f => f.sistema !== 'tv' && !soTvTxt(f.equipamento));
+    const ignoradosTv = faltam.length - paraCriar.length;
     if (req.query.aplicar === '1') {
-      for (const f of faltam) {
-        // usa os dados já resolvidos na varredura — cobre ADM e TV, e a fase vem correta
+      for (const f of paraCriar) {
         db.tarefas.unshift(novaTarefa({ tipo: 'mover', cardId: f.id,
           cliente: f.cliente || '—', tel: f.tel || '', equipamento: f.equipamento || '',
           origem: 'aguardando_aprovacao', destino: f.fase, reconciliada: true }));
       }
       await dbSet(KEY, db);
-      return res.status(200).json({ ok: true, recriadas: faltam.length, lista: faltam });
+      return res.status(200).json({ ok: true, recriadas: paraCriar.length,
+        ignoradasPorSerTv: ignoradosTv, lista: paraCriar });
     }
     return res.status(200).json({ ok: true, modo: 'dry-run (nada foi criado)', faltam: faltam.length, lista: faltam });
   }
