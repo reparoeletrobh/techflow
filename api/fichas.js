@@ -93,6 +93,42 @@ export default async function handler(req, res) {
   const action = req.query.action || (req.body && req.body.action) || '';
 
   // ── SYNC: busca novas linhas via CSV público ───────────────────────────────
+  // ── 🔎 ENTRADAS-HOJE: por que o contador não bate com a planilha (SOMENTE LEITURA) ──
+  if (action === 'entradas-hoje') {
+    const ini = new Date(); ini.setHours(0, 0, 0, 0);
+    const iniBR = new Date(ini.getTime());
+    const [aA, aT] = await Promise.all([dbGet(KEY_ADM), dbGet(KEY_TV)]);
+    const todas = [...(((aA || {}).fichas) || []).map(f => ({ ...f, _sis: 'adm' })),
+                   ...(((aT || {}).fichas) || []).map(f => ({ ...f, _sis: 'tv' }))];
+    const hoje = todas.filter(f => f.criadoEm && new Date(f.criadoEm) >= iniBR);
+    const resg = hoje.filter(f => f.resgatada);
+    const novas = hoje.filter(f => !f.resgatada);
+    // telefone repetido: mesma pessoa entrando mais de uma vez
+    const porTel = {};
+    for (const f of todas) {
+      const k = String(f.telefone || '').replace(/\D/g, '').slice(-8);
+      if (k) (porTel[k] = porTel[k] || []).push(f);
+    }
+    const dupHoje = hoje.filter(f => {
+      const k = String(f.telefone || '').replace(/\D/g, '').slice(-8);
+      return k && (porTel[k] || []).length > 1;
+    });
+    const linha = f => [f._sis, 'linha=' + (f.sheetRow != null ? f.sheetRow : '?'),
+      (f.resgatada ? 'RESGATADA' : 'nova'), f.nome || '', f.equipamento || '',
+      String(f.telefone || '').slice(-8),
+      new Date(f.criadoEm).toISOString().slice(11, 16)].join(';');
+    if (String(req.query.curto || '') === '1') {
+      return res.status(200).send(
+        'ENTRADAS HOJE=' + hoje.length + ' (novas=' + novas.length + ' resgatadas=' + resg.length +
+        ' telRepetido=' + dupHoje.length + ')\n' + hoje.map(linha).join('\n'));
+    }
+    return res.status(200).json({ ok: true, hoje: hoje.length,
+      novasDeVerdade: novas.length, resgatadas: resg.length, telefoneRepetido: dupHoje.length,
+      detalhe: hoje.map(f => ({ sistema: f._sis, sheetRow: f.sheetRow, resgatada: !!f.resgatada,
+        nome: f.nome, equipamento: f.equipamento, tel: String(f.telefone || '').slice(-8),
+        criadoEm: f.criadoEm })) });
+  }
+
   if (action === 'sync') {
     try {
       const resp = await fetch(SHEET_CSV, { redirect:'follow' });
