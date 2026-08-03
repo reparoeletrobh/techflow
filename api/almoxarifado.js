@@ -599,12 +599,18 @@ export default async function handler(req, res) {
     // ROTAS — inclusive as finalizadas
     for (const r of (((rdb || {}).rotas) || (db.rotas || []))) {
       const itens = (r.itens || []).filter(i => casa(i.cliente) || casa(i.tel) || casa(i.equipamento) || casa(i.os) || casa(i.cardId));
-      if (itens.length || casa(r.motorista) || casa(r.id)) {
+      const casouARota = casa(r.motorista) || casa(r.id);
+      if (itens.length || casouARota) {
+        // buscou pela rota ou pelo motorista → mostra TODOS os itens dela
+        const mostrar = casouARota ? (r.itens || []) : itens;
         achados.rotas.push({ rota: r.id, motorista: r.motorista, status: r.status,
           criadaEm: r.criadaEm || r.em, finalizadaEm: r.finalizadaEm || null,
+          veiculo: r.veiculo || r.placa || null, telefoneMotorista: r.telMotorista || null,
           totalItens: (r.itens || []).length,
-          itensQueCasam: itens.map(i => ({ cliente: i.cliente, equipamento: i.equipamento,
-            tel: i.tel, entregue: i.entregue || i.status || null, obs: i.obs || null })) });
+          itens: mostrar.map(i => ({ cliente: i.cliente, equipamento: i.equipamento,
+            tel: i.tel, endereco: i.endereco || null,
+            situacao: i.entregue ? 'entregue' : (i.status || 'pendente'),
+            obs: i.obs || i.motivo || null })) });
       }
     }
     // TAREFAS — todos os estados
