@@ -612,8 +612,19 @@ export default async function handler(req, res) {
       }
       return res.status(404).json({ ok: false, error: 'foto não encontrada para esta rota' });
     }
+    // ?img=1 → devolve a IMAGEM de verdade (abre no navegador em vez de mostrar o código)
+    if (String(req.query.img || '') === '1') {
+      const m = String(f.b64).match(/^data:(image\/\w+);base64,(.+)$/);
+      if (m) {
+        const buf = Buffer.from(m[2], 'base64');
+        res.setHeader('Content-Type', m[1]);
+        res.setHeader('Cache-Control', 'private, max-age=3600');
+        return res.status(200).send(buf);
+      }
+    }
     return res.status(200).json({ ok: true, b64: f.b64, em: f.em, rota,
-      tamanhoKB: Math.round(String(f.b64).length / 1024) });
+      tamanhoKB: Math.round(String(f.b64).length / 1024),
+      verNoNavegador: 'acrescente &img=1 ao link para abrir a imagem' });
   }
 
   // ── 📸 ROTAS-COM-FOTO: quais rotas têm foto guardada ──

@@ -214,7 +214,8 @@ function htmlRotas(lista){
         '<button class="btn b-ok" onclick="rotaSaida(\''+rt.id+'\')">🚛 Motorista chegou — confirmar saída</button></div>'+
         (pend?'<div style="font-size:11px;color:#f59e0b;margin-top:4px;">⚠️ '+pend+' pendente(s): confirmar agora = saída PARCIAL, eles voltam p/ Solicitar Entrega</div>':'');
     }else{
-      html+='<div class="meta">'+fmtD(rt.saidaEm)+(rt.saidaPor?' · por '+esc(rt.saidaPor):'')+' · <a href="#" onclick="verFotoRota(\''+rt.id+'\');return false;" style="color:#60a5fa;">ver foto motorista</a></div>';
+      html+='<div class="meta">'+fmtD(rt.saidaEm)+(rt.saidaPor?' · por '+esc(rt.saidaPor):'')
+        +' · <a href="#" onclick="verFotoRota(\''+rt.id+'\');return false;" style="color:#60a5fa;font-weight:700;">📸 ver foto do motorista</a></div>';
     }
     return html+'</div>';
   }).join('');
@@ -269,9 +270,28 @@ async function fotoRotaSelecionada(inp){
   _rotaSaidaId=null;
 }
 async function verFotoRota(rotaId){
-  var r=await fetch('/api/almoxarifado?action=rota-foto&rota='+rotaId).then(function(x){return x.json();}).catch(function(){return{ok:false};});
-  if(r.ok&&r.b64){var w=window.open('');w.document.write('<img src="'+r.b64+'" style="max-width:100%;">');}
-  else alert('Foto não encontrada');
+  // mostra a foto DENTRO da tela, sem abrir aba nova (bloqueada em muitos celulares)
+  var ov=document.getElementById('ov-foto-rota');
+  if(ov)ov.remove();
+  ov=document.createElement('div');
+  ov.id='ov-foto-rota';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:400;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px;';
+  ov.innerHTML='<div style="color:#8b93a3;font-size:13px;">📸 carregando a foto…</div>';
+  ov.onclick=function(e){ if(e.target===ov)ov.remove(); };
+  document.body.appendChild(ov);
+  var r=await fetch('/api/almoxarifado?action=rota-foto&rota='+encodeURIComponent(rotaId)).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r&&r.ok&&r.b64){
+    var quando=r.em?new Date(r.em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+    ov.innerHTML='<div style="color:#f0f2f5;font-size:13px;font-weight:700;margin-bottom:8px;">📸 '+rotaId+(quando?' · '+quando:'')+'</div>'
+      +'<img src="'+r.b64+'" style="max-width:100%;max-height:76vh;border-radius:10px;border:1px solid #2a2f38;">'
+      +'<div style="display:flex;gap:8px;margin-top:12px;">'
+        +'<a href="'+r.b64+'" download="rota-'+rotaId+'.jpg" style="background:#242b39;border-radius:9px;padding:9px 16px;color:#f0f2f5;font-size:12px;font-weight:800;text-decoration:none;">⬇ baixar</a>'
+        +'<button onclick="document.getElementById(\'ov-foto-rota\').remove()" style="background:#242b39;border:none;border-radius:9px;padding:9px 16px;color:#f0f2f5;font-size:12px;font-weight:800;cursor:pointer;">fechar</button>'
+      +'</div>';
+  } else {
+    ov.innerHTML='<div style="color:#fca5a5;font-size:13px;text-align:center;">Foto não encontrada para esta rota.<br>'
+      +'<button onclick="document.getElementById(\'ov-foto-rota\').remove()" style="margin-top:12px;background:#242b39;border:none;border-radius:9px;padding:9px 16px;color:#f0f2f5;font-weight:800;cursor:pointer;">fechar</button></div>';
+  }
 }
 var _ml={pendentes:[],chegadas:[]};
 async function loadML(){
