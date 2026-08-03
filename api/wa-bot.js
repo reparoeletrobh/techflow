@@ -617,6 +617,44 @@ export default async function handler(req, res) {
   }
 
   // ── 🔎 BUSCAR-CONVERSAS: procura vários telefones no histórico, ignorando limites da tela ──
+  // ── 📊 ABORDAGENS-HOJE: o que saiu, o que a Meta aceitou, quem respondeu (SOMENTE LEITURA) ──
+  if (action === 'abordagens-hoje') {
+    const ini = new Date(); ini.setHours(0, 0, 0, 0);
+    const iniMs = ini.getTime() - 3 * 3600000; // limite do dia em BRT
+    const [evts, fA, fT] = await Promise.all([lerEvts(), dbGet('fichas_adm'), dbGet('fichas_tv')]);
+    const hojeEvt = evts.filter(e => new Date(e.ts).getTime() >= iniMs);
+    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const saiu = hojeEvt.filter(e => e.dir === 'out');
+    const entrou = hojeEvt.filter(e => e.dir === 'in');
+    const respRecebida = new Set(entrou.map(e => d8(e.tel)));
+    const porTipo = {};
+    for (const e of saiu) { const k = (e.tipo || '?') + (e.via ? '/' + e.via : ''); porTipo[k] = (porTipo[k] || 0) + 1; }
+    const semMsgId = saiu.filter(e => !e.msgId && e.tipo !== 'falha');
+    const falhas = hojeEvt.filter(e => e.tipo === 'falha');
+    // fichas que o bot marcou como abordadas hoje, e se houve resposta
+    const todasF = [...(((fA || {}).fichas) || []), ...(((fT || {}).fichas) || [])];
+    const abordadasHoje = todasF.filter(f => f.contatoFeitoEm && new Date(f.contatoFeitoEm).getTime() >= iniMs);
+    const comFalha = todasF.filter(f => f.falhaAbordagem && new Date(f.falhaAbordagem.em).getTime() >= iniMs);
+    const semResposta = abordadasHoje.filter(f => !respRecebida.has(d8(f.telefone)));
+    if (String(req.query.curto || '') === '1') {
+      return res.status(200).send(
+        'ABORDAGENS HOJE\n' +
+        'fichas marcadas abordadas=' + abordadasHoje.length +
+        ' | responderam=' + (abordadasHoje.length - semResposta.length) +
+        ' | sem resposta=' + semResposta.length +
+        ' | falhaAbordagem registrada=' + comFalha.length + '\n' +
+        'mensagens OUT hoje por tipo: ' + Object.entries(porTipo).map(([k, v]) => k + '=' + v).join(' ') + '\n' +
+        'OUT sem msgId (sem prova de entrega)=' + semMsgId.length + ' | eventos de falha=' + falhas.length + '\n' +
+        (comFalha.length ? 'FALHAS:\n' + comFalha.slice(0, 15).map(f => '  ' + (f.nome || '') + ' ' + d8(f.telefone) + ' — ' + (f.falhaAbordagem.erro || '')).join('\n') + '\n' : '') +
+        (falhas.length ? 'EVENTOS FALHA:\n' + falhas.slice(-10).map(e => '  ' + String(e.ts).slice(11, 16) + ' ' + d8(e.tel) + ' ' + String(e.erro || e.texto || '').slice(0, 90)).join('\n') : ''));
+    }
+    return res.status(200).json({ ok: true,
+      abordadasHoje: abordadasHoje.length, responderam: abordadasHoje.length - semResposta.length,
+      semResposta: semResposta.length, comFalhaRegistrada: comFalha.length,
+      mensagensOutPorTipo: porTipo, outSemMsgId: semMsgId.length, eventosFalha: falhas.length,
+      falhas: comFalha.slice(0, 20).map(f => ({ nome: f.nome, tel: d8(f.telefone), erro: f.falhaAbordagem.erro, em: f.falhaAbordagem.em })) });
+  }
+
   if (action === 'buscar-conversas') {
     const alvos = String(req.query.tels || '').split(',').map(s => s.replace(/\D/g, '').trim()).filter(Boolean);
     if (!alvos.length) return res.status(400).json({ ok: false, error: 'informe ?tels=1234,5678 (finais separados por vírgula)' });
