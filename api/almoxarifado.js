@@ -541,11 +541,22 @@ export default async function handler(req, res) {
 
   // ══ F2 ROTAS: confirmar saída (completa/parcial + foto do motorista) ══
   if (req.method === 'POST' && action === 'rota-saida') {
-    const { rotaId, motorista, fotoB64, feitoPor } = req.body || {};
+    const { rotaId, motorista, placa, telMotorista, fotoB64, feitoPor } = req.body || {};
     const rdb3 = (await dbGet('reparoeletro_almox_rotas')) || { rotas: [] };
     const rt3 = (rdb3.rotas || []).find(r => r.id === rotaId);
     if (!rt3) return res.status(404).json({ ok: false, error: 'rota não encontrada' });
-    if (!motorista) return res.status(400).json({ ok: false, error: 'informe o motorista' });
+    // 🚛 os três dados do motorista são obrigatórios — sem eles a rota não fecha
+    if (!motorista || String(motorista).trim().length < 3) {
+      return res.status(400).json({ ok: false, error: 'informe o NOME do motorista' });
+    }
+    const placaLimpa = String(placa || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (placaLimpa.length < 7) {
+      return res.status(400).json({ ok: false, error: 'informe a PLACA do veículo (7 caracteres, ex: ABC1D23)' });
+    }
+    const telLimpo = String(telMotorista || '').replace(/\D/g, '');
+    if (telLimpo.length < 10) {
+      return res.status(400).json({ ok: false, error: 'informe o TELEFONE do motorista com DDD' });
+    }
     if (!fotoB64) return res.status(400).json({ ok: false, error: 'foto do motorista obrigatória' });
     const sairam = rt3.itens.filter(i => i.status === 'separado');
     if (!sairam.length) return res.status(400).json({ ok: false, error: 'nenhum item separado para sair' });
@@ -553,7 +564,10 @@ export default async function handler(req, res) {
     rt3.status = 'finalizada';
     rt3.tipoSaida = naoSairam.length ? 'parcial' : 'completa';
     rt3.motorista = String(motorista).trim();
+    rt3.placa = placaLimpa;
+    rt3.telMotorista = telLimpo;
     rt3.saidaEm = new Date().toISOString();
+    rt3.finalizadaEm = rt3.saidaEm;        // antes ficava vazio mesmo com a rota finalizada
     rt3.saidaPor = String(feitoPor || '').trim();
     naoSairam.forEach(i => { if (i.status === 'pendente') { i.status = 'nao_saiu'; if (!i.motivo) i.motivo = String((req.body || {}).motivoPendentes || 'não saiu na rota').trim(); } });
     // foto separada do payload principal (Redis lean: 1 chave por rota, sobrescrevível)

@@ -191,7 +191,8 @@ function htmlRotas(lista){
     var pend=rt.itens.filter(function(i){return i.status==='pendente';}).length;
     var sep=rt.itens.filter(function(i){return i.status==='separado';}).length;
     var head='🚚 ROTA '+rt.num+' — '+rt.dia.split('-').reverse().slice(0,2).join('/')+' · '+
-      (rt.status==='finalizada'?('✅ SAIU ('+(rt.tipoSaida==='parcial'?'PARCIAL':'COMPLETA')+') com '+esc(rt.motorista||'')):'📦 SEPARAÇÃO ('+sep+'/'+rt.itens.length+')');
+      (rt.status==='finalizada'?('✅ SAIU ('+(rt.tipoSaida==='parcial'?'PARCIAL':'COMPLETA')+') com '+esc(rt.motorista||'')
+        +(rt.placa?' · 🚗 '+esc(rt.placa):'')+(rt.telMotorista?' · 📱 '+esc(rt.telMotorista):'')):'📦 SEPARAÇÃO ('+sep+'/'+rt.itens.length+')');
     var aberta=rotaExpandida(rt.id);
     var html='<div class="card '+(rt.status==='finalizada'?'feito-c':'receber')+(rotaNova?' novo':'')+'" id="c-'+rt.id+'">'+
       '<div class="tt sec-toggle'+(aberta?' aberto':'')+'" style="cursor:pointer;" onclick="marcarVisto(\''+rt.id+'\',event);toggleRota(\''+rt.id+'\')"><span class="seta">▶</span> '+head+'</div>';
@@ -245,11 +246,17 @@ function rotaSaida(rotaId){
 async function fotoRotaSelecionada(inp){
   var file=inp.files&&inp.files[0];inp.value='';
   if(!file||!_rotaSaidaId)return;
-  var motorista=prompt('🚛 Qual MOTORISTA está levando? (Jonathan / Paulo / outro)');
-  if(!motorista){_rotaSaidaId=null;return;}
+  var motorista=prompt('🚛 NOME COMPLETO do motorista');
+  if(!motorista||motorista.trim().length<3){_rotaSaidaId=null;if(motorista!==null)alert('Nome do motorista é obrigatório');return;}
+  var placa=prompt('🚗 PLACA do veículo\n(ex: ABC1D23)');
+  if(!placa){_rotaSaidaId=null;if(placa!==null)alert('Placa é obrigatória');return;}
+  if(placa.toUpperCase().replace(/[^A-Z0-9]/g,'').length<7){alert('Placa inválida — precisa ter 7 caracteres');_rotaSaidaId=null;return;}
+  var tel=prompt('📱 TELEFONE do motorista com DDD\n(ex: 31988336530)');
+  if(!tel){_rotaSaidaId=null;if(tel!==null)alert('Telefone é obrigatório');return;}
+  if(tel.replace(/\D/g,'').length<10){alert('Telefone inválido — informe com DDD');_rotaSaidaId=null;return;}
   var b64=await comprimirImg(file,700,.62);
   var r=await fetch('/api/almoxarifado?action=rota-saida',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({rotaId:_rotaSaidaId,motorista:motorista,fotoB64:b64,feitoPor:op()})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+    body:JSON.stringify({rotaId:_rotaSaidaId,motorista:motorista.trim(),placa:placa,telMotorista:tel,fotoB64:b64,feitoPor:op()})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
   if(r.ok){
     if(r.sairam&&r.sairam.length)await fetch('/api/pipe?action=rota-saiu',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:r.sairam})}).catch(function(){});
     for(var i=0;i<(r.naoSairam||[]).length;i++){
