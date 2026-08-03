@@ -95,10 +95,22 @@ export default async function handler(req, res) {
       // Pipe: diff por snapshot (estável). Primeira sync: só movimentos das últimas 12h,
       // com FUSÍVEL: se houver mais de 15 candidatos (movimentação em massa de cron), não cria nada — só fotografa.
       const snapVazio = Object.keys(snapPipe).length === 0;
+      // 📺 TV NÃO ENTRA NO ALMOXARIFADO DO ADM — TV tem separação própria.
+      // Alguns cards de TV acabam no pipe ADM e geravam tarefa aqui.
+      const idsTvSync = new Set();
+      try {
+        const ppTvS = (await dbGet('tv_pipe')) || { cards: [] };
+        for (const c of (ppTvS.cards || [])) idsTvSync.add(String(c.id));
+        const lgTvS = (await dbGet('tv_logistica')) || { fichas: [] };
+        for (const f of (lgTvS.fichas || [])) idsTvSync.add(String(f.id));
+      } catch (e) {}
+      const ehTvPeloNome = (c) => /\btv\b|televis|\bled\b|polegada|barramento/i.test(
+        String((c.equipamento || '') + ' ' + (c.descricao || '') + ' ' + (c.nomeContato || '')));
       let candidatos = [];
       for (const c of ((pipe && pipe.cards) || [])) {
         novoSnapPipe[c.id] = c.phase;
         if (!GATILHOS.hasOwnProperty(c.phase)) continue;
+        if (idsTvSync.has(String(c.id)) || ehTvPeloNome(c)) continue;   // 📺 TV fora
         const antes = snapPipe[c.id];
         if (snapVazio) {
           const mvPipe = new Date(c.movedAt || 0).getTime();
@@ -173,10 +185,19 @@ export default async function handler(req, res) {
 
         // Vendas + Checkout → tarefa venda (2 checks)
         const vendaTarefa = (v, orig) => {
-          const cid = orig + '-' + (v.id || v.vendaId || v.createdAt || Math.random());
+          // 🚫 venda sem identificador gerava Math.random() a cada varredura, criando uma
+          // tarefa NOVA toda vez — era a venda fantasma que aparecia diariamente sem dados.
+          const idReal = v.id || v.vendaId || v.createdAt;
+          if (!idReal) return;
+          const cliente = String(v.nomeCliente || v.cliente || v.nome || '').trim();
+          const equip = String(v.equipamento || v.descricao || v.titulo || '').trim();
+          // sem cliente E sem equipamento não há o que separar — provável registro incompleto
+          if (!cliente && !equip) return;
+          const cid = orig + '-' + idReal;
           if (!jaTarefa(cid, 'venda')) db.tarefas.unshift(novaTarefa({ tipo: 'venda', cardId: cid,
-            cliente: v.nomeCliente || v.cliente || v.nome || '—', tel: v.telefone || v.tel || '',
-            equipamento: v.equipamento || v.descricao || v.titulo || '—',
+            cliente: cliente || '—', tel: v.telefone || v.tel || '',
+            equipamento: equip || '—',
+            valor: parseFloat(v.valor || v.total || 0) || null,
             origem: orig, destino: 'entrega', videoGravado: false, separado: false }));
         };
         const novoV = ((vnd && vnd.vendas) || []).map(v => String(v.id || v.createdAt));
@@ -299,6 +320,24 @@ export default async function handler(req, res) {
       conflitosNaProspeccao: conflitos.map(c => c.nome + ' | ' + (c.equipamento || '') + ' | foto:' + (c.temFoto ? 'sim' : 'não') +
         ' | parecer:' + (c.recomendacaoCompra ? c.recomendacaoCompra.parecer : 'pendente')),
       leitura: 'se tarefasAvaliarCompra=0 o problema é na CRIAÇÃO; se cardId estiver vazio a FOTO não tem onde ser gravada' });
+  }
+
+  // ── 🧹 LIMPAR-VENDAS-FANTASMA: tarefas de venda sem cliente e sem equipamento ──
+  if (action === 'limpar-vendas-fantasma') {
+    const dbV = (await dbGet(KEY)) || { tarefas: [] };
+    const vazia = t => t.tipo === 'venda' && t.status === 'pendente' &&
+      (!t.cliente || t.cliente === '—') && (!t.equipamento || t.equipamento === '—');
+    const alvo = (dbV.tarefas || []).filter(vazia);
+    if (String(req.query.aplicar || '') === '1' && alvo.length) {
+      const ids = new Set(alvo.map(t => t.id));
+      dbV.tarefas = dbV.tarefas.filter(t => !ids.has(t.id));
+      await dbSet(KEY, dbV);
+      return res.status(200).json({ ok: true, removidas: alvo.length,
+        lista: alvo.map(t => t.id + ' | ' + (t.origem || '?') + ' | ' + String(t.criadoEm || '').slice(0, 16)) });
+    }
+    return res.status(200).json({ ok: true, encontradas: alvo.length,
+      lista: alvo.map(t => t.id + ' | ' + (t.origem || '?') + ' | ' + String(t.criadoEm || '').slice(0, 16)),
+      dica: 'para remover: &aplicar=1' });
   }
 
   // ── 🧹 LIMPAR-TAREFAS-TV: remove do almoxarifado ADM tarefas de cards de TV ──
