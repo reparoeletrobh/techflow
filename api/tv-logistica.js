@@ -149,7 +149,7 @@ async function logMov(fichaId, nome, de, para, por) {
   try {
     const lg = (await dbGet('tv_log_movimentos')) || { movs: [] };
     lg.movs.unshift({ id: fichaId, nome: String(nome || '').slice(0, 40), de, para, por, ts: new Date().toISOString() });
-    lg.movs = lg.movs.slice(0, 200);
+    lg.movs = lg.movs.slice(0, 4000);      // 200 não cobria nem uma semana de operação
     await dbSet('tv_log_movimentos', lg);
   } catch (e) {}
 }
@@ -640,6 +640,82 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, movimentos: lg.movs.slice(0, 60) });
   }
 
+  // ── 📊 RELATORIO-MOTORISTAS: produtividade, tempo de coleta, cancelamentos e remarcações ──
+  if (action === 'relatorio-motoristas') {
+    const dias = Math.min(180, Math.max(1, parseInt(req.query.dias || '30', 10)));
+    const corte = Date.now() - dias * 86400000;
+    const [db, lg] = await Promise.all([dbGet(LOG_KEY), dbGet('tv_log_movimentos')]);
+    const fichas = ((db || {}).fichas) || [];
+    const movs = (((lg || {}).movs) || []).filter(m => new Date(m.ts || 0).getTime() >= corte);
+
+    const norm = n => String(n || '').trim().split(/[\r\n]/)[0].replace(/\d{10,13}/g, '').trim() || '(sem nome)';
+    const M = {};
+    const pega = n => { const k = norm(n); if (!M[k]) M[k] = { nome: k, coletas: 0, cancelou: 0,
+      remarcou: 0, naRota: 0, tempos: [], porDia: {} }; return M[k]; };
+
+    // coletas efetivadas
+    for (const f of fichas) {
+      const quando = new Date(f.coletadoEm || f.movedAt || 0).getTime();
+      if (f.coletadoPor && quando >= corte) {
+        const m = pega(f.coletadoPor);
+        m.coletas++;
+        const dia = new Date(quando - 3 * 3600000).toISOString().slice(0, 10);
+        m.porDia[dia] = (m.porDia[dia] || 0) + 1;
+        if (f.horasAteColeta > 0) m.tempos.push(f.horasAteColeta);
+      }
+      // cancelamentos registrados na ficha
+      const c = f.cancelamentoMotorista;
+      if (c && new Date(c.em || 0).getTime() >= corte) pega(c.motorista).cancelou++;
+      // quem está com ficha na rota agora
+      if (f.phase === 'motorista_parceiro' && f.motoristaNome) pega(f.motoristaNome).naRota++;
+    }
+    // remarcações e cancelamentos pelo log
+    for (const mv of movs) {
+      const quem = String(mv.por || '');
+      if (!quem.includes('motorista')) continue;
+      const nome = quem.split('/')[1] || quem;
+      if (mv.para === 'remarcar') pega(nome).remarcou++;
+    }
+
+    const media = a => a.length ? Number((a.reduce((s, x) => s + x, 0) / a.length).toFixed(1)) : null;
+    const lista = Object.values(M).map(m => {
+      const diasAtivos = Object.keys(m.porDia).length;
+      const total = m.coletas + m.cancelou;
+      return { motorista: m.nome,
+        coletas: m.coletas, cancelamentos: m.cancelou, remarcacoes: m.remarcou,
+        naRotaAgora: m.naRota,
+        diasAtivos,
+        mediaPorDiaAtivo: diasAtivos ? Number((m.coletas / diasAtivos).toFixed(1)) : 0,
+        horasMediasAteColeta: media(m.tempos),
+        taxaSucesso: total ? Math.round(m.coletas / total * 100) : null };
+    }).filter(m => m.coletas || m.cancelamentos || m.naRotaAgora)
+      .sort((a, b) => b.coletas - a.coletas);
+
+    const totColetas = lista.reduce((s, m) => s + m.coletas, 0);
+    const totCancel = lista.reduce((s, m) => s + m.cancelamentos, 0);
+    const todosTempos = Object.values(M).flatMap(m => m.tempos);
+
+    return res.status(200).json({ ok: true, periodoDias: dias,
+      resumo: {
+        motoristasAtivos: lista.length,
+        coletas: totColetas,
+        cancelamentos: totCancel,
+        remarcacoes: lista.reduce((s, m) => s + m.remarcacoes, 0),
+        taxaSucessoGeral: (totColetas + totCancel) ? Math.round(totColetas / (totColetas + totCancel) * 100) + '%' : null,
+        horasMediasAteColeta: media(todosTempos),
+        coletasPorDia: Number((totColetas / dias).toFixed(1)),
+      },
+      ranking: lista.map(m => m.motorista.slice(0, 22) + ' | ' + m.coletas + ' coletas' +
+        ' | ' + m.mediaPorDiaAtivo + '/dia' +
+        ' | ' + (m.horasMediasAteColeta != null ? m.horasMediasAteColeta + 'h' : '—') +
+        ' | ' + (m.taxaSucesso != null ? m.taxaSucesso + '%' : '—') +
+        (m.cancelamentos ? ' | ' + m.cancelamentos + ' cancel' : '') +
+        (m.naRotaAgora ? ' | ' + m.naRotaAgora + ' na rota' : '')),
+      detalhe: lista,
+      observacao: todosTempos.length ? undefined
+        : 'o tempo até a coleta passa a ser medido a partir de agora — fichas anteriores não têm o registro' });
+  }
+
   // ── GET rota-debug: contagem por motoristaNome nas fichas de motorista_parceiro ──
   if (req.method === 'GET' && action === 'rota-debug') {
     const db = await dbGet(LOG_KEY) || defaultDB();
@@ -750,6 +826,10 @@ module.exports = async function handler(req, res) {
     const quemColetou = String((req.body || {}).motorista || f.motoristaNome || f.motorista || '').trim();
     if (phase === 'coleta_efetuada' && quemColetou) {
       f.coletadoPor = quemColetou;
+      f.coletadoEm = new Date().toISOString();
+      // tempo entre a ficha entrar na logística e ser coletada
+      const nascida = new Date(f.criadoEm || f.entradaEm || 0).getTime();
+      if (nascida) f.horasAteColeta = Number(((Date.now() - nascida) / 3600000).toFixed(1));
       f.coletadoEm = new Date().toISOString();
     }
     f.phase = phase;
