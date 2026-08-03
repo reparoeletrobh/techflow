@@ -546,6 +546,52 @@ function check(nome, cond, extra) {
   check('template aceito: msgId gravado como evidência',
     evt15b.some(e => e.tipo === 'template' && e.msgId), evt15b.filter(e => e.tipo === 'template'));
 
+  // ════ CENÁRIO 16: falha de template vira conflito para um humano ════
+  console.log('▶ Cenário 16 — template não entregue abre conflito');
+  KV['wa_credenciais'] = { token:'mock', phoneId:'123' };
+  KV['wa_bot_config'] = { modoAberto:true, execTels:[] };
+  KV['wa_bot_pausados'] = {}; KV['tv_logistica'] = { fichas: [] };
+  const fOrc = (id, nome) => ({ id, nome, telefone:'55319875372' + id.slice(-2),
+    equipamento:'Purificador', phase:'orc_registrado',
+    diagnostico:{ equips:[{tipo:'purificador',modelo:'PE11X',servicos:['Gás']}],
+      textoOrc:'Orcamento: fica em 350 reais', em:new Date().toISOString() } });
+
+  // 16a: erro PERMANENTE (template não existe) -> conflito NA HORA, sem insistir
+  KV['reparoeletro_logistica'] = { fichas: [fOrc('OC10','Bruna')] };
+  KV['wa_orc_enviados'] = { ids: {} };
+  global.__fetchLog.length = 0;
+  global.__forcarErroGraph = { error: { message: 'Template name does not exist in the translation', code: 132001 } };
+  await wabot(req({ action:'orcamentos-pendentes', ...K }), res());
+  delete global.__forcarErroGraph;
+  check('erro permanente: abre conflito na PRIMEIRA falha',
+    global.__fetchLog.some(u => u.includes('criar-conflito')), global.__fetchLog.slice(-3));
+  const r16 = ((KV['wa_orc_enviados']||{}).ids||{})['OC10'];
+  check('erro permanente: marca para NÃO insistir', r16 && r16.permanente === true, r16);
+
+  // 16b: erro PASSAGEIRO -> tenta de novo, não abre conflito na primeira
+  KV['reparoeletro_logistica'] = { fichas: [fOrc('OC11','Carla')] };
+  KV['wa_orc_enviados'] = { ids: {} };
+  global.__fetchLog.length = 0;
+  global.__forcarErroGraph = { error: { message: 'Rate limit hit', code: 130429 } };
+  await wabot(req({ action:'orcamentos-pendentes', ...K }), res());
+  check('erro passageiro: NÃO abre conflito na 1ª falha',
+    !global.__fetchLog.some(u => u.includes('criar-conflito')));
+  const r16b = ((KV['wa_orc_enviados']||{}).ids||{})['OC11'];
+  check('erro passageiro: contou a falha para tentar de novo', r16b && r16b.falhas === 1, r16b);
+  // 2ª e 3ª tentativa -> conflito
+  await wabot(req({ action:'orcamentos-pendentes', ...K }), res());
+  await wabot(req({ action:'orcamentos-pendentes', ...K }), res());
+  delete global.__forcarErroGraph;
+  check('erro passageiro: abre conflito após 3 tentativas',
+    global.__fetchLog.some(u => u.includes('criar-conflito')), global.__fetchLog.slice(-3));
+
+  // 16c: sucesso não abre conflito nenhum
+  KV['reparoeletro_logistica'] = { fichas: [fOrc('OC12','Denise')] };
+  KV['wa_orc_enviados'] = { ids: {} };
+  global.__fetchLog.length = 0;
+  await wabot(req({ action:'orcamentos-pendentes', ...K }), res());
+  check('sucesso: nenhum conflito aberto', !global.__fetchLog.some(u => u.includes('criar-conflito')));
+
   // ════ Resultado ════
   console.log('\n═══════════════════════════════════');
   const _mj = (() => { const b = new Date(Date.now() - 3 * 3600000); const d = b.getUTCDay(), hh = b.getUTCHours(); return (d >= 1 && d <= 5) ? (hh >= 8 && hh < 15) : (d === 6 ? (hh >= 8 && hh < 10) : false); })();

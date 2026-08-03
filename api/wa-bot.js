@@ -1692,14 +1692,21 @@ export default async function handler(req, res) {
       if (!abertoO && !d8ok(f.telefone)) continue;    // trava de teste (modo aberto libera)
       if (abertoO && pzO[String(f.telefone).replace(/\D/g, '').slice(-8)]) continue; // pausado (takeover)
       const dedupeKey = sisO === 'tv' ? 'tv:' + f.id : f.id;
-      if (enviadosO.ids[dedupeKey]) continue;         // dedupe (aceita formato antigo em texto e o novo em objeto)
+      const regAnt = enviadosO.ids[dedupeKey];
+      if (regAnt) {
+        // já enviado com sucesso, ou falha permanente já reportada → não repete
+        if (typeof regAnt !== 'object') continue;
+        if (regAnt.ok !== false) continue;
+        if (regAnt.permanente) continue;
+        if ((regAnt.falhas || 0) >= 3) continue;
+      }
       // marco temporal: NÃO enviar o backlog — só diagnósticos feitos após a ativação
       const tsOrc = new Date((f.diagnostico && f.diagnostico.em) || f.movedAt || f.criadoEm || 0).getTime();
       if (marcoO && tsOrc < marcoO) continue;
       const telO = String(f.telefone).replace(/\D/g, '');
       const to = telO.startsWith('55') ? telO : '55' + telO;
       const t8 = to.slice(-8);
-      let okEnvio = false;
+      let okEnvio = false, erroPermanente = false, erroTxt = '';
       try {
         if (janelaAberta(t8)) {
           // Janela aberta → orçamento oficial direto
@@ -1736,6 +1743,11 @@ export default async function handler(req, res) {
           } else {
             const errMsg = (j && j.error && (j.error.message || j.error.type)) || 'sem resposta da Meta';
             const errCode = (j && j.error && j.error.code) || '';
+            // Erros que NÃO adiantam repetir: o template não existe, foi rejeitado/pausado,
+            // os parâmetros não batem, ou o número não recebe. Chamar humano imediatamente.
+            erroPermanente = [132000, 132001, 132005, 132007, 132012, 131026, 131047, 133010]
+              .includes(Number(errCode));
+            erroTxt = String(errCode) + ' ' + String(errMsg);
             await rpushEvt({ ts: new Date().toISOString(), tel: to, dir: 'out', tipo: 'falha',
               via: 'bot-auto-orcamento', erro: String(errCode) + ' ' + String(errMsg),
               texto: '❌ TEMPLATE orcamento_pronto NÃO ENVIADO para ' + (f.nome || '') + ' — ' + errCode + ' ' + errMsg });
@@ -1759,16 +1771,23 @@ export default async function handler(req, res) {
           };
         } else {
           const n = falhasAnt + 1;
+          const jaAvisou = (antes && typeof antes === 'object' && antes.conflitoAberto) || false;
           enviadosO.ids[dedupeKey] = {
             em: new Date().toISOString(), ok: false, falhas: n,
+            permanente: erroPermanente || undefined,
+            ultimoErro: erroTxt || undefined,
+            conflitoAberto: jaAvisou || erroPermanente || n >= 3,
             origem: sisO === 'tv' ? 'logistica-tv' : 'logistica-adm',
             fichaId: f.id,
             telefone: String(f.telefone || '').replace(/\D/g, ''),
           };
-          // 3 tentativas sem sucesso → para de tentar e chama um humano
-          if (n >= 3) {
-            await promessaSemLastro(to, t8, 'orçamento pronto (template)', 'envio automático',
-              'o orçamento de ' + (f.nome || 'cliente') + ' NÃO foi entregue após 3 tentativas — enviar manualmente pelo painel');
+          // ⚠️ CONFLITO: erro permanente chama humano JÁ (repetir não resolve);
+          // erro passageiro tenta 3x antes. Nunca abre o mesmo conflito duas vezes.
+          if (!jaAvisou && (erroPermanente || n >= 3)) {
+            await promessaSemLastro(to, t8, 'orçamento pronto (template orcamento_pronto)', 'envio automático do orçamento',
+              'ORÇAMENTO NÃO ENTREGUE a ' + (f.nome || 'cliente') +
+              (erroPermanente ? ' — falha permanente do template (' + erroTxt + '). Enviar manualmente pelo painel e conferir o template no Gerenciador do WhatsApp'
+                              : ' — ' + n + ' tentativas sem sucesso (' + erroTxt + '). Enviar manualmente pelo painel'));
           }
         }
         // Efeito do botão "Copiar e Enviar": marca o orçamento como enviado na seção Orçamentos
