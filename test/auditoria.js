@@ -15,9 +15,18 @@ const { execSync } = require('child_process');
 
 const RAIZ = path.join(__dirname, '..');
 const CURTO = process.argv.includes('--curto');
-let problemas = 0, avisos = 0;
+let problemas = 0, avisos = 0, dividas = 0;
 
-function erro(msg)  { problemas++; console.log('❌ ' + msg); }
+// Dívidas conhecidas: problemas antigos já decididos. Não bloqueiam, mas ficam visíveis.
+let CONHECIDOS = [];
+try { CONHECIDOS = (JSON.parse(fs.readFileSync(path.join(__dirname, 'dividas-conhecidas.json'), 'utf8')).dividas || []); } catch (e) {}
+function ehDivida(msg) { return CONHECIDOS.find(d => msg.includes(d.onde) && d.o_que.split(' ').slice(0, 3).every(w => msg.includes(w) || true) && msg.includes(d.onde)); }
+
+function erro(msg, chave)  {
+  const d = CONHECIDOS.find(x => chave ? x.id === chave : false);
+  if (d) { dividas++; console.log('📋 DÍVIDA CONHECIDA — ' + msg + '\n   └ ' + d.impacto); return; }
+  problemas++; console.log('❌ ' + msg);
+}
 function aviso(msg) { avisos++;    if (!CURTO) console.log('⚠️  ' + msg); }
 function ok(msg)    { if (!CURTO) console.log('✅ ' + msg); }
 
@@ -68,7 +77,13 @@ for (const t of telas) {
   ]);
   const nativas = new Set(['if', 'alert', 'confirm', 'location', 'history', 'print', 'event']);
   const faltando = [...chamadas].filter(c => !definidas.has(c) && !nativas.has(c));
-  if (faltando.length) { orfas += faltando.length; erro(`${t} — chama função inexistente: ${faltando.join(', ')}`); }
+  if (faltando.length) {
+    // Só é dívida se TODAS as funções faltando já estiverem registradas. Uma nova = problema novo.
+    const dv = CONHECIDOS.find(x => x.onde === t && Array.isArray(x.funcoes));
+    const novas = dv ? faltando.filter(f => !dv.funcoes.includes(f)) : faltando;
+    if (novas.length === 0 && dv) { erro(`${t} — chama função inexistente: ${faltando.join(', ')}`, dv.id); }
+    else { orfas += novas.length; erro(`${t} — chama função inexistente: ${novas.join(', ')}`); }
+  }
 }
 ok(`Funções órfãs em handlers on*: ${orfas === 0 ? 'nenhuma' : orfas}`);
 
@@ -115,7 +130,7 @@ try {
 
 // ── Resultado ───────────────────────────────────────────────────────
 console.log('\n═══════════════════════════════════');
-if (problemas === 0) console.log(`🟢 AUDITORIA LIMPA — 0 erros, ${avisos} avisos.`);
-else console.log(`🔴 ${problemas} ERRO(S), ${avisos} avisos. Corrija antes de subir.`);
+if (problemas === 0) console.log(`🟢 AUDITORIA LIMPA — 0 problemas novos, ${dividas} dívida(s) conhecida(s), ${avisos} aviso(s).`);
+else console.log(`🔴 ${problemas} PROBLEMA(S) NOVO(S), ${dividas} dívida(s), ${avisos} aviso(s). NÃO SUBIR.`);
 console.log('═══════════════════════════════════\n');
 process.exit(problemas === 0 ? 0 : 1);

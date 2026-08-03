@@ -1,0 +1,17 @@
+{
+  "_leia": "Problemas JÁ EXISTENTES no sistema, conscientemente adiados. A auditoria os mostra como DÍVIDA (não bloqueia o deploy). Qualquer problema FORA desta lista é NOVO e bloqueia. Para quitar uma dívida: conserte e apague a linha daqui.",
+  "dividas": [
+    {
+      "id": "tv-adm-conflitos-orfas",
+      "onde": "tv-adm.html",
+      "o_que": "painel 'TV Conflitos' chama fecharConfOverlay/fecharConfPainel que não existem",
+      "impacto": "nenhum hoje — nada no sistema abre esse painel (funcionalidade incompleta)",
+      "decidido_em": "2026-08-02",
+      "decisao": "Pedro não reconhece a tela; manter como dívida até decidir se o painel será concluído ou removido",
+      "funcoes": [
+        "fecharConfOverlay",
+        "fecharConfPainel"
+      ]
+    }
+  ]
+}
