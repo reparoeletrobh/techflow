@@ -655,6 +655,36 @@ export default async function handler(req, res) {
       falhas: comFalha.slice(0, 20).map(f => ({ nome: f.nome, tel: d8(f.telefone), erro: f.falhaAbordagem.erro, em: f.falhaAbordagem.em })) });
   }
 
+  // ── 📬 ENTREGA-HOJE: o que a META reportou de fato (sent/delivered/read/failed) ──
+  if (action === 'entrega-hoje') {
+    const ini = new Date(); ini.setHours(0, 0, 0, 0);
+    const iniMs = ini.getTime() - 3 * 3600000;
+    const evts = await lerEvts();
+    const hoje = evts.filter(e => new Date(e.ts).getTime() >= iniMs);
+    const st = hoje.filter(e => e.dir === 'status');
+    const cont = {};
+    const erros = [];
+    for (const e of st) {
+      const txt = String(e.texto || '');
+      const chave = txt.split(' | ')[0].trim() || '?';
+      cont[chave] = (cont[chave] || 0) + 1;
+      if (/failed|error/i.test(txt)) erros.push({ ts: e.ts, tel: String(e.tel || '').slice(-8), detalhe: txt.slice(0, 220) });
+    }
+    const out = hoje.filter(e => e.dir === 'out' && e.tipo !== 'falha' && e.tipo !== 'nota');
+    if (String(req.query.curto || '') === '1') {
+      return res.status(200).send(
+        'ENTREGA HOJE (o que a Meta reportou)\n' +
+        'mensagens enviadas=' + out.length + ' | eventos de status recebidos=' + st.length + '\n' +
+        'status: ' + (Object.entries(cont).map(([k, v]) => k + '=' + v).join(' ') || 'NENHUM') + '\n' +
+        (erros.length
+          ? 'FALHAS REPORTADAS PELA META (' + erros.length + '):\n' +
+            erros.slice(0, 12).map(e => '  ' + String(e.ts).slice(11, 16) + ' ' + e.tel + ' — ' + e.detalhe).join('\n')
+          : 'nenhuma falha reportada pela Meta') + '\n' +
+        (st.length === 0 ? '\n⚠️ ZERO eventos de status: o webhook de status pode não estar assinado no app da Meta.' : ''));
+    }
+    return res.status(200).json({ ok: true, enviadas: out.length, eventosStatus: st.length, porStatus: cont, erros: erros.slice(0, 30) });
+  }
+
   if (action === 'buscar-conversas') {
     const alvos = String(req.query.tels || '').split(',').map(s => s.replace(/\D/g, '').trim()).filter(Boolean);
     if (!alvos.length) return res.status(400).json({ ok: false, error: 'informe ?tels=1234,5678 (finais separados por vírgula)' });
