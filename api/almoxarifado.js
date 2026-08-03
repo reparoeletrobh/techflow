@@ -597,6 +597,55 @@ export default async function handler(req, res) {
       tarefas: tarefas.slice(0, 80), rotas: rotas.slice(0, 20), ml: ml.slice(0, 40) });
   }
 
+  // ── 🚛 MOTORISTAS: lista quem já fez rota, com o que foi registrado de cada um ──
+  if (action === 'motoristas') {
+    const [rdbM, lgT] = await Promise.all([dbGet('reparoeletro_almox_rotas'), dbGet('tv_logistica')]);
+    const busca = String(req.query.q || '').toLowerCase().trim();
+    const pessoas = {};
+    const guarda = (nomeBruto, extra) => {
+      const nome = String(nomeBruto || '').trim();
+      if (!nome) return;
+      // o campo era livre: nome, placa e telefone podiam vir grudados
+      const tels = (nome.match(/\d{10,13}/g) || []).map(t => t.replace(/\D/g, ''));
+      const placas = (nome.match(/\b[A-Z]{3}\d[A-Z0-9]\d{2}\b/gi) || []);
+      const limpo = nome.split(/[\r\n]/)[0].replace(/\d{10,13}/g, '').trim();
+      const chave = limpo.toLowerCase().slice(0, 30);
+      if (!pessoas[chave]) pessoas[chave] = { nome: limpo, telefones: new Set(), placas: new Set(), rotas: 0, ultima: null, origens: new Set() };
+      const p = pessoas[chave];
+      p.rotas++;
+      for (const t of tels) p.telefones.add(t);
+      for (const pl of placas) p.placas.add(String(pl).toUpperCase());
+      if (extra) {
+        if (extra.tel) p.telefones.add(String(extra.tel).replace(/\D/g, ''));
+        if (extra.placa) p.placas.add(String(extra.placa).toUpperCase());
+        if (extra.quando && (!p.ultima || extra.quando > p.ultima)) p.ultima = extra.quando;
+        if (extra.origem) p.origens.add(extra.origem);
+      }
+    };
+    for (const r of (((rdbM || {}).rotas) || [])) {
+      guarda(r.motorista, { tel: r.telMotorista, placa: r.placa, quando: r.saidaEm || r.criadaEm, origem: 'rota almoxarifado' });
+    }
+    for (const f of (((lgT || {}).fichas) || [])) {
+      if (f.motoristaNome || f.coletadoPor) guarda(f.coletadoPor || f.motoristaNome, { quando: f.movedAt, origem: 'coleta TV' });
+    }
+    let lista = Object.values(pessoas).map(p => ({
+      nome: p.nome,
+      telefones: [...p.telefones].filter(t => t.length >= 10),
+      placas: [...p.placas],
+      rotas: p.rotas,
+      ultimaAtividade: p.ultima,
+      onde: [...p.origens],
+    })).sort((a, b) => b.rotas - a.rotas);
+    if (busca) lista = lista.filter(p => p.nome.toLowerCase().includes(busca));
+    return res.status(200).json({ ok: true,
+      total: lista.length,
+      comTelefone: lista.filter(p => p.telefones.length).length,
+      semTelefone: lista.filter(p => !p.telefones.length).length,
+      motoristas: lista.map(p => p.nome + ' | ' + p.rotas + ' rota(s) | tel: ' +
+        (p.telefones.join(', ') || 'NÃO REGISTRADO') + ' | placa: ' + (p.placas.join(', ') || '—')),
+      detalhe: lista });
+  }
+
   // ── 🔎 BUSCAR-TUDO: procura em TODA a operação, inclusive rotas finalizadas e arquivo ──
   if (action === 'buscar-tudo') {
     const q = String(req.query.q || '').toLowerCase().trim();
