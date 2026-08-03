@@ -977,6 +977,11 @@ module.exports = async function handler(req, res) {
   //    voltam para a aba Orçamento, para envio manual. &aplicar=1 executa.
   if (action === "devolver-nao-entregues") {
     const CODIGOS = [131042, 133010, 131026, 131047];
+    // Início do bloqueio de pagamento: 01/08/2026 08:00 BRT (= 11:00 UTC).
+    // Ajustável por &desde=AAAA-MM-DD para reprocessar outro período.
+    const INICIO_BLOQUEIO = req.query.desde
+      ? new Date(String(req.query.desde) + 'T00:00:00-03:00').getTime()
+      : new Date('2026-08-01T11:00:00.000Z').getTime();
     // lê o histórico de eventos do bot para saber o que a Meta recusou de verdade
     let evts = [];
     try {
@@ -1004,15 +1009,23 @@ module.exports = async function handler(req, res) {
         const k = d8(f.tel);
         if (!recusa[k]) continue;                                   // nunca teve recusa
         const tEnv = new Date(f.enviadoAt || 0).getTime();
-        // a recusa tem que ser do mesmo envio (até 30 min de folga)
-        if (!(recusa[k] >= tEnv - 30 * 60000)) continue;
+        if (!tEnv) continue;
+        // 1) só orçamentos marcados como enviados A PARTIR do início do bloqueio
+        if (tEnv < INICIO_BLOQUEIO) continue;
+        // 2) a recusa tem que ser DAQUELE envio: janela apertada nos DOIS sentidos.
+        //    Sem isso, uma recusa recente casava com envio de semanas atrás e trazia
+        //    clientes já atendidos de volta para a fila (falso positivo real em produção).
+        const dt = recusa[k] - tEnv;
+        if (!(dt >= -5 * 60000 && dt <= 30 * 60000)) continue;
         if (respondeu[k] && respondeu[k] > recusa[k]) continue;      // já foi alcançado
         alvos.push({ chave, id: f.id, nome: f.nome, tel: f.tel, enviadoAt: f.enviadoAt });
       }
     }
     if (String(req.query.aplicar || "") !== "1") {
       return res.status(200).send(
-        "DEVOLVER À FILA MANUAL — devolver=" + alvos.length + "\n" +
+        "DEVOLVER À FILA MANUAL — devolver=" + alvos.length +
+        " (só marcados como enviados a partir de " +
+        new Date(INICIO_BLOQUEIO - 3 * 3600000).toISOString().slice(0, 16).replace("T", " ") + " BRT)\n" +
         (alvos.length
           ? alvos.slice(0, 60).map(a => "  " + (a.nome || "") + " · " + String(a.tel || "").slice(-8) +
               " · marcado enviado em " + String(a.enviadoAt || "").slice(0, 16).replace("T", " ")).join("\n") +

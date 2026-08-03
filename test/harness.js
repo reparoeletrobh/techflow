@@ -722,6 +722,10 @@ function check(nome, cond, extra) {
   ], syncedIds: [] };
   KV['tv_orcamentos'] = { fichas: [] };
 
+  // O3 é de 25/07 (antes do bloqueio) e recebeu recusa recente no MESMO telefone:
+  // não pode entrar — é o falso positivo que apareceu em produção.
+  LISTS['wa_evt_list'] = LISTS['wa_evt_list'].concat([
+    JSON.stringify({ ts:'2026-08-03T11:00:00.000Z', tel:'5531990020003', dir:'status', texto: fal })]);
   const s20 = res();
   await orc20(req({ action:'devolver-nao-entregues', ...K }), s20);
   const t20 = String(s20.dado || '');
@@ -733,7 +737,7 @@ function check(nome, cond, extra) {
   const fx = id => KV['reparoeletro_orcamentos'].fichas.find(f => f.id === id);
   check('aplicar: falhou 01/08 volta para pendente', fx('O1').status === 'pendente', fx('O1'));
   check('aplicar: falhou 02/08 volta para pendente', fx('O2').status === 'pendente', fx('O2'));
-  check('aplicar: enviado ANTES do bloqueio não é mexido', fx('O3').status === 'enviado', fx('O3'));
+  check('aplicar: enviado ANTES do bloqueio não é mexido, mesmo com recusa recente no mesmo telefone', fx('O3').status === 'enviado', fx('O3'));
   check('aplicar: ENTREGUE não é mexido', fx('O4').status === 'enviado', fx('O4'));
   check('aplicar: cliente que respondeu depois não é mexido', fx('O5').status === 'enviado', fx('O5'));
   check('aplicar: já pendente continua pendente', fx('O6').status === 'pendente', fx('O6'));
