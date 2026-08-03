@@ -744,14 +744,25 @@ module.exports = async function handler(req, res) {
     // Causas conhecidas: template customizado salvo sem [VALOR], ou peça sem
     // custo informado. Antes disso o texto ia ao cliente sem valor nenhum.
     const _pf = parseInt(String(precoFinal || '').replace(/\D/g, ''), 10) || 0;
+    const _equipTxt = (equips || []).map(e => (e.tipo||'') + ' ' + ((e.servicos||[]).join(', '))).join(' | ');
+    async function _recusar(msg, extra) {
+      await logAction({ modulo:'Logística', fichaId:ficha.id||'', ficha:ficha.nome||'',
+        acao:'Gerar orçamento RECUSADO', gatilho:'trava de preço', status:'erro', detalhe:msg }).catch(()=>{});
+      try {
+        const _K = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+        await fetch('https://reparoeletroadm.com/api/prospeccao?action=criar-conflito&k=' + _K, {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ nome: ficha.nome || 'Cliente', telefone: String(ficha.telefone||''),
+            equipamento: _equipTxt.slice(0,60), motivo: 'ORÇAMENTO NÃO ENVIADO: ' + msg }),
+        });
+      } catch (e) {}
+      return res.status(400).json(Object.assign({ ok:false, error:msg, conflitoAberto:true }, extra||{}));
+    }
     if (!_pf) {
-      return res.status(400).json({ ok:false,
-        error:'não consegui calcular o preço — informe o custo da peça ou revise os serviços' });
+      return await _recusar('não consegui calcular o preço — informe o custo da peça ou revise os serviços');
     }
     if (!String(textoFinal || '').includes(String(_pf))) {
-      return res.status(400).json({ ok:false,
-        error:'o texto do orçamento saiu SEM o valor (R$' + _pf + '). Verifique se o template deste serviço tem o marcador [VALOR].',
-        semPreco:true });
+      return await _recusar('o texto do orçamento saiu SEM o valor (R$' + _pf + '). Verifique se o template deste serviço tem o marcador [VALOR].', { semPreco:true });
     }
 
     // Salvar na Logística

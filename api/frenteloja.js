@@ -19,6 +19,18 @@ function fmt4dig(nome, tel) {
 }
 
 // ── Helper: gravar no log central ────────────────────────────────────────
+// Abre um conflito visível no Conflitos Bot quando um orçamento é recusado.
+async function abrirConflitoPreco(nome, telefone, equipamento, motivo) {
+  try {
+    const _K = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+    await fetch('https://reparoeletroadm.com/api/prospeccao?action=criar-conflito&k=' + _K, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ nome: nome || 'Cliente', telefone: String(telefone||''),
+        equipamento: String(equipamento||'').slice(0,60), motivo: 'ORÇAMENTO NÃO ENVIADO: ' + motivo }),
+    });
+  } catch (e) {}
+}
+
 async function logAction(entry) {
   try {
     const _U=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
@@ -639,9 +651,14 @@ export default async function handler(req,res){
     }
 
     // ── TRAVA: orçamento não sai sem preço no texto ─────────────────────
+    // Falha VISÍVEL: registra no log de auditoria e abre conflito para alguém agir.
     if (!String(texto || '').includes(String(comDesconto))) {
-      return res.status(400).json({ ok:false, semPreco:true,
-        error:'o texto do orçamento saiu SEM o valor (R$' + comDesconto + '). Verifique se o template deste serviço tem o marcador [VALOR].' });
+      const _msg = 'orçamento montado SEM o valor (R$' + comDesconto + ') — template deste serviço provavelmente está sem o marcador [VALOR]';
+      await logAction({ modulo:'Frente de Loja', fichaId:ficha.id||'', ficha:ficha.nomeContato||'',
+        acao:'Diagnóstico de loja RECUSADO', gatilho:'texto sem preço', status:'erro', detalhe:_msg }).catch(()=>{});
+      await abrirConflitoPreco(ficha.nomeContato, ficha.telefone, listaTxt, _msg).catch(()=>{});
+      return res.status(400).json({ ok:false, semPreco:true, conflitoAberto:true,
+        error:'o texto do orçamento saiu SEM o valor (R$' + comDesconto + '). Verifique se o template deste serviço tem o marcador [VALOR]. Um conflito foi aberto no Conflitos Bot.' });
     }
 
     const now = new Date().toISOString();

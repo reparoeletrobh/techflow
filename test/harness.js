@@ -266,6 +266,30 @@ function check(nome, cond, extra) {
   await logi(req({ action:'gerar-orcamento', ...K }, { id:'SP4' }), rSP4);
   check('logística: peça sem custo informado é RECUSADA', rSP4.dado && rSP4.dado.ok === false, rSP4.dado && (rSP4.dado.error || 'passou'));
 
+  // ════ CENÁRIO 7c: falha visível — nada morre em silêncio ════
+  console.log('▶ Cenário 7c — a recusa aparece no log e abre conflito');
+  KV['reparoeletro_orc_templates'] = { microondas_placa: { texto: 'Ola [NOME], vamos trocar a [peças].' } };
+  KV['reparoeletro_log'] = [];
+  global.__fetchLog.length = 0;
+  KV['reparoeletro_frenteloja'] = { fichas: [{ id:'VIS1', nomeContato:'Cliente Visivel', telefone:'5531990005511', phase:'analise' }], seq:1 };
+  await floja(req({ action:'diagnostico-loja', ...K }, { id:'VIS1', equips:[{ tipo:'microondas', servicos:['Troca de Placa'], preco:'150' }] }), res());
+  const logFL = KV['reparoeletro_log'] || [];
+  check('loja: recusa entrou no log de auditoria como erro',
+    logFL.some(l => l.status === 'erro' && /sem o valor|SEM PREÇO|preço/i.test(String(l.detalhe) + String(l.gatilho) + String(l.acao))), logFL[0]);
+  check('loja: abriu conflito visível (criar-conflito chamado)',
+    global.__fetchLog.some(u => u.includes('criar-conflito')), global.__fetchLog);
+
+  KV['reparoeletro_log'] = [];
+  global.__fetchLog.length = 0;
+  KV['reparoeletro_logistica'] = { fichas: [{ id:'VIS2', nome:'Cliente Log', telefone:'5531990005522', phase:'coleta_efetuada', diagnostico:{ equips:[{ tipo:'microondas', servicos:['Troca de Placa'], preco:'150' }] } }] };
+  await logi(req({ action:'gerar-orcamento', ...K }, { id:'VIS2' }), res());
+  const logLG = KV['reparoeletro_log'] || [];
+  check('logística: recusa entrou no log de auditoria como erro',
+    logLG.some(l => l.status === 'erro'), logLG[0]);
+  check('logística: abriu conflito visível',
+    global.__fetchLog.some(u => u.includes('criar-conflito')), global.__fetchLog);
+  delete KV['reparoeletro_orc_templates'];
+
   // ════ CENÁRIO 8: isolamento do Frente de Loja ════
   // Regra inviolável: FL grava SÓ em reparoeletro_frenteloja. O bot não lê esse banco.
   console.log('▶ Cenário 8 — Frente de Loja não vaza para os bancos do bot');
