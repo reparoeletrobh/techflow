@@ -921,6 +921,48 @@ export default async function handler(req, res) {
     return res.status(200).send(linhas.join('\n'));
   }
 
+  // ── 🔍 DESCOBRIR-WABA: tenta vários caminhos até achar o ID da conta ──
+  if (action === 'descobrir-waba') {
+    const { token: tkD } = await credenciais();
+    const tkAds = (process.env.META_ADS_TOKEN || '').trim();
+    const G = 'https://graph.facebook.com/v20.0';
+    const NEG = ['602045084706003', String(req.query.negocio || '').trim()].filter(Boolean);
+    const tent = [];
+    const tenta = async (nome, url) => {
+      if (!url) return;
+      const r = await fetch(url).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      if (r && r.error) { tent.push({ nome, erro: r.error.message.slice(0, 110) }); return null; }
+      const arr = r.data || (r.id ? [r] : []);
+      tent.push({ nome, achou: arr.length, ids: arr.map(x => x.id + (x.name ? ' (' + x.name + ')' : '')) });
+      return arr.length ? arr : null;
+    };
+    let achados = null;
+    for (const [rot, tk] of [['token do bot', tkD], ['token de anúncios', tkAds]]) {
+      if (!tk) continue;
+      for (const b of NEG) {
+        achados = achados || await tenta(`próprias · ${rot} · negócio ${b}`, `${G}/${b}/owned_whatsapp_business_accounts?fields=id,name&access_token=${tk}`);
+        achados = achados || await tenta(`de clientes · ${rot} · negócio ${b}`, `${G}/${b}/client_whatsapp_business_accounts?fields=id,name&access_token=${tk}`);
+      }
+      achados = achados || await tenta(`negócios visíveis · ${rot}`, `${G}/me/businesses?fields=id,name&access_token=${tk}`);
+    }
+    const linhas = ['TENTATIVAS DE DESCOBRIR O WABA_ID:'];
+    for (const t of tent) {
+      linhas.push('  ' + (t.erro ? '❌ ' + t.nome + ' — ' + t.erro
+        : (t.achou ? '✅ ' : '➖ ') + t.nome + ' → ' + (t.ids.length ? t.ids.join(' | ') : 'nada')));
+    }
+    if (achados && achados.length) {
+      linhas.push('');
+      linhas.push('👉 USE ESTE: ' + achados[0].id);
+      linhas.push('   /api/wa-bot?action=saude-waba&waba=' + achados[0].id + '&k=SUA_CHAVE');
+    } else {
+      linhas.push('');
+      linhas.push('Nenhum caminho automático funcionou. Jeito manual mais rápido:');
+      linhas.push('abra business.facebook.com/wa/manage/home e olhe a BARRA DE ENDEREÇO do navegador —');
+      linhas.push('o ID aparece na própria URL como waba_id=XXXXXXXXXXXXX');
+    }
+    return res.status(200).send(linhas.join('\n'));
+  }
+
   if (action === 'buscar-conversas') {
     const alvos = String(req.query.tels || '').split(',').map(s => s.replace(/\D/g, '').trim()).filter(Boolean);
     if (!alvos.length) return res.status(400).json({ ok: false, error: 'informe ?tels=1234,5678 (finais separados por vírgula)' });
