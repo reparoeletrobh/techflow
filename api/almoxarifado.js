@@ -597,6 +597,46 @@ export default async function handler(req, res) {
       tarefas: tarefas.slice(0, 80), rotas: rotas.slice(0, 20), ml: ml.slice(0, 40) });
   }
 
+  // ── 📸 ROTA-FOTO: a foto tirada na saída da rota (a tela já chamava, mas não existia) ──
+  if (action === 'rota-foto') {
+    const rota = String(req.query.rota || '').trim();
+    if (!rota) return res.status(400).json({ ok: false, error: 'informe ?rota=ID' });
+    const f = await dbGet(KEY + '_rotafoto_' + rota);
+    if (!f || !f.b64) {
+      // procura variações do identificador antes de desistir
+      const rdbF = (await dbGet('reparoeletro_almox_rotas')) || { rotas: [] };
+      const alvo = (rdbF.rotas || []).find(r => String(r.id).toLowerCase() === rota.toLowerCase());
+      if (alvo) {
+        const f2 = await dbGet(KEY + '_rotafoto_' + alvo.id);
+        if (f2 && f2.b64) return res.status(200).json({ ok: true, b64: f2.b64, em: f2.em, rota: alvo.id });
+      }
+      return res.status(404).json({ ok: false, error: 'foto não encontrada para esta rota' });
+    }
+    return res.status(200).json({ ok: true, b64: f.b64, em: f.em, rota,
+      tamanhoKB: Math.round(String(f.b64).length / 1024) });
+  }
+
+  // ── 📸 ROTAS-COM-FOTO: quais rotas têm foto guardada ──
+  if (action === 'rotas-com-foto') {
+    const rdbF = (await dbGet('reparoeletro_almox_rotas')) || { rotas: [] };
+    const dias = Math.min(60, Math.max(1, parseInt(req.query.dias || '15', 10)));
+    const corte = Date.now() - dias * 86400000;
+    const lista = [];
+    for (const r of (rdbF.rotas || [])) {
+      const q = new Date(r.saidaEm || r.criadaEm || 0).getTime();
+      if (!q || q < corte) continue;
+      const f = await dbGet(KEY + '_rotafoto_' + r.id);
+      lista.push({ rota: r.id, motorista: r.motorista, quando: r.saidaEm || r.criadaEm,
+        temFoto: !!(f && f.b64), tamanhoKB: f && f.b64 ? Math.round(String(f.b64).length / 1024) : 0 });
+    }
+    lista.sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
+    return res.status(200).json({ ok: true, periodoDias: dias,
+      total: lista.length, comFoto: lista.filter(x => x.temFoto).length,
+      lista: lista.map(x => x.rota + ' | ' + String(x.motorista || '?').slice(0, 26) +
+        ' | ' + (x.temFoto ? '📸 ' + x.tamanhoKB + 'KB' : 'sem foto') +
+        ' | ' + String(x.quando).slice(0, 10)) });
+  }
+
   // ── 🚛 MOTORISTAS: lista quem já fez rota, com o que foi registrado de cada um ──
   if (action === 'motoristas') {
     const [rdbM, lgT] = await Promise.all([dbGet('reparoeletro_almox_rotas'), dbGet('tv_logistica')]);
