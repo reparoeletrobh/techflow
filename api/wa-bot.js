@@ -1132,7 +1132,15 @@ export default async function handler(req, res) {
     if (waba && waba.account_review_status && waba.account_review_status !== 'APPROVED') {
       alertas.push('⚠️ conta de negócios em análise: ' + waba.account_review_status);
     }
-    if (faltando.length) alertas.push('❌ template(s) que o sistema usa e NÃO estão aprovados: ' + faltando.join(', '));
+    // só acusa template faltando se a leitura da lista funcionou — sem permissão
+    // a lista vem vazia e isso NÃO significa que os templates não existam
+    const leuTemplates = Array.isArray(templates);
+    if (leuTemplates && faltando.length) {
+      alertas.push('❌ template(s) que o sistema usa e NÃO estão aprovados: ' + faltando.join(', '));
+    }
+    if (!leuTemplates) {
+      alertas.push('ℹ️ não consegui ler a lista de templates (falta a permissão whatsapp_business_management no token) — isso NÃO impede o envio');
+    }
     const recusados = tpls.filter(t => t.situacao === 'REJECTED');
     if (recusados.length) alertas.push('❌ ' + recusados.length + ' template(s) RECUSADO(S)');
 
@@ -1150,7 +1158,9 @@ export default async function handler(req, res) {
         lista: tpls.map(t => t.nome + ' | ' + t.situacao + (t.qualidade ? ' | ' + t.qualidade : '') +
           (t.motivoRecusa ? ' | ' + t.motivoRecusa : '')) },
       alertas: alertas.length ? alertas : ['✅ tudo liberado para enviar'],
-      podeEnviarTemplate: alertas.filter(a => a.startsWith('❌') || a.startsWith('🔴')).length === 0,
+      // o que decide o envio é o NÚMERO, não a leitura da lista de templates
+      podeEnviarTemplate: num.quality_rating !== 'RED' && (!num.status || num.status === 'CONNECTED'),
+      leituraDeTemplates: Array.isArray(templates) ? 'ok' : 'sem permissão (não afeta o envio)',
     });
   }
 
