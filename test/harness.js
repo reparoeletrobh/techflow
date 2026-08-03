@@ -592,6 +592,52 @@ function check(nome, cond, extra) {
   await wabot(req({ action:'orcamentos-pendentes', ...K }), res());
   check('sucesso: nenhum conflito aberto', !global.__fetchLog.some(u => u.includes('criar-conflito')));
 
+  // ════ CENÁRIO 17: reenvio após bloqueio de pagamento da Meta ════
+  console.log('▶ Cenário 17 — bloqueio de pagamento: levanta e devolve para reenvio');
+  const falhaTxt = 'failed | [{"code":131042,"title":"Business eligibility payment issue"}]';
+  LISTS['wa_evt_list'] = [
+    { ts:'2026-08-03T13:01:00.000Z', tel:'5531990001111', dir:'status', texto: falhaTxt },
+    { ts:'2026-08-03T13:02:00.000Z', tel:'5531990002222', dir:'status', texto: falhaTxt },
+    { ts:'2026-08-03T13:03:00.000Z', tel:'5531990003333', dir:'status', texto: falhaTxt },
+    // 3333 respondeu DEPOIS da falha → já foi alcançado, não deve reenviar
+    { ts:'2026-08-03T14:00:00.000Z', tel:'5531990003333', dir:'in', texto:'oi' },
+    { ts:'2026-08-03T13:04:00.000Z', tel:'5531990004444', dir:'status', texto:'failed | [{"code":131047}]' },
+    { ts:'2026-08-03T13:05:00.000Z', tel:'5531990005555', dir:'status', texto:'delivered' },
+  ].map(o => JSON.stringify(o));
+  KV['fichas_adm'] = { fichas: [
+    { id:'FP1', nome:'Um',   telefone:'5531990001111', status:'contato_feito', abordadoPorBot:true, contatoFeitoEm:'2026-08-03T13:00:00.000Z' },
+    { id:'FP2', nome:'Dois', telefone:'5531990002222', status:'contato_feito', abordadoPorBot:true, contatoFeitoEm:'2026-08-03T13:00:00.000Z' },
+    { id:'FP3', nome:'Tres', telefone:'5531990003333', status:'contato_feito', abordadoPorBot:true, contatoFeitoEm:'2026-08-03T13:00:00.000Z' },
+    { id:'FP5', nome:'Cinco',telefone:'5531990005555', status:'contato_feito', abordadoPorBot:true, contatoFeitoEm:'2026-08-03T13:00:00.000Z' },
+  ] };
+  KV['fichas_tv'] = { fichas: [] };
+  KV['wa_abordados'] = { tels: { '90001111':'x', '90002222':'x', '90003333':'x', '90005555':'x' } };
+  KV['wa_orc_enviados'] = { ids: { 'O1': { telefone:'5531990001111', ok:true }, 'O9': { telefone:'5531990005555', ok:true } } };
+
+  const q17 = res();
+  await wabot(req({ action:'bloqueio-pagamento', ...K }), q17);
+  const t17 = String(q17.dado || '');
+  check('leitura: identifica as falhas de pagamento', /131042|PENDÊNCIA DE PAGAMENTO/.test(t17), t17.slice(0,80));
+  check('leitura: NÃO altera nada (fichas intactas)',
+    KV['fichas_adm'].fichas.every(f => f.status === 'contato_feito'));
+  check('leitura: quem respondeu depois fica de fora do reenvio', /para REENVIAR=3/.test(t17), t17.split('\n')[4]);
+
+  const q17b = res();
+  await wabot(req({ action:'bloqueio-pagamento', aplicar:'1', ...K }), q17b);
+  const t17b = String(q17b.dado || '');
+  const fichas17 = KV['fichas_adm'].fichas;
+  check('aplicar: ficha atingida volta para "criada"',
+    fichas17.find(f => f.id === 'FP1').status === 'criada', fichas17.find(f => f.id === 'FP1'));
+  check('aplicar: quem respondeu depois NÃO é mexido',
+    fichas17.find(f => f.id === 'FP3').status === 'contato_feito', fichas17.find(f => f.id === 'FP3'));
+  check('aplicar: quem foi ENTREGUE não é mexido',
+    fichas17.find(f => f.id === 'FP5').status === 'contato_feito', fichas17.find(f => f.id === 'FP5'));
+  check('aplicar: registro de "já abordado" limpo só dos atingidos',
+    !KV['wa_abordados'].tels['90001111'] && !!KV['wa_abordados'].tels['90005555'], KV['wa_abordados'].tels);
+  check('aplicar: orçamento do atingido liberado, o entregue mantido',
+    !KV['wa_orc_enviados'].ids['O1'] && !!KV['wa_orc_enviados'].ids['O9'], KV['wa_orc_enviados'].ids);
+  check('aplicar: relatório confirma o que foi feito', /fichas devolvidas para abordagem=2/.test(t17b), t17b);
+
   // ════ Resultado ════
   console.log('\n═══════════════════════════════════');
   const _mj = (() => { const b = new Date(Date.now() - 3 * 3600000); const d = b.getUTCDay(), hh = b.getUTCHours(); return (d >= 1 && d <= 5) ? (hh >= 8 && hh < 15) : (d === 6 ? (hh >= 8 && hh < 10) : false); })();

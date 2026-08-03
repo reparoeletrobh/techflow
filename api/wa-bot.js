@@ -685,6 +685,95 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, enviadas: out.length, eventosStatus: st.length, porStatus: cont, erros: erros.slice(0, 30) });
   }
 
+  // ── 💳 BLOQUEIO-PAGAMENTO: tudo que a Meta recusou por pendência financeira ──
+  //    modo leitura: lista e diz quando começou · &aplicar=1: devolve para reenvio
+  if (action === 'bloqueio-pagamento') {
+    const CODIGOS = [131042, 131047, 131026];   // 131042 = pendência de pagamento
+    const evts = await lerEvts();
+    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const falhas = [];
+    for (const e of evts) {
+      if (e.dir !== 'status') continue;
+      const txt = String(e.texto || '');
+      if (!/failed/i.test(txt)) continue;
+      const cod = CODIGOS.find(c => txt.includes(String(c)));
+      if (!cod) continue;
+      falhas.push({ ts: e.ts, tel: String(e.tel || ''), d8: d8(e.tel), codigo: cod });
+    }
+    if (!falhas.length) {
+      return res.status(200).send('BLOQUEIO-PAGAMENTO: nenhuma falha de pagamento no histórico (últimos 5000 eventos).');
+    }
+    falhas.sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+    const inicio = falhas[0].ts, fim = falhas[falhas.length - 1].ts;
+    // quem RESPONDEU depois da falha já foi alcançado de outra forma — não reenviar
+    const ultimoIn = {};
+    for (const e of evts) if (e.dir === 'in') {
+      const k = d8(e.tel), t = new Date(e.ts).getTime();
+      if (!ultimoIn[k] || t > ultimoIn[k]) ultimoIn[k] = t;
+    }
+    const porTel = {};
+    for (const f of falhas) {
+      if (!porTel[f.d8]) porTel[f.d8] = { tel: f.tel, d8: f.d8, qtd: 0, primeira: f.ts, ultima: f.ts, codigo: f.codigo };
+      const r = porTel[f.d8]; r.qtd++; r.ultima = f.ts;
+    }
+    const alvos = Object.values(porTel).filter(r =>
+      !(ultimoIn[r.d8] && ultimoIn[r.d8] > new Date(r.ultima).getTime()));
+    const jaFalaram = Object.values(porTel).length - alvos.length;
+
+    // ── APLICAR: devolve as fichas/orçamentos para os crons reenviarem ──
+    if (String(req.query.aplicar || '') === '1') {
+      const alvo8 = new Set(alvos.map(a => a.d8));
+      const [fA, fT, ab, orc] = await Promise.all([
+        dbGet('fichas_adm'), dbGet('fichas_tv'),
+        dbGet('wa_abordados').then(v => v || { tels: {} }),
+        dbGet('wa_orc_enviados').then(v => v || { ids: {} }),
+      ]);
+      let fichasSoltas = 0, abordLimpos = 0, orcSoltos = 0;
+      for (const banco of [fA, fT]) {
+        for (const f of (((banco || {}).fichas) || [])) {
+          if (!alvo8.has(d8(f.telefone))) continue;
+          if (f.status === 'contato_feito' && f.abordadoPorBot) {
+            f.status = 'criada'; f.contatoFeitoEm = null; f.abordadoPorBot = false;
+            f.reenvioPagamento = new Date().toISOString();
+            fichasSoltas++;
+          }
+        }
+      }
+      for (const k of Object.keys(ab.tels || {})) {
+        if (alvo8.has(k)) { delete ab.tels[k]; abordLimpos++; }
+      }
+      for (const [k, v] of Object.entries(orc.ids || {})) {
+        const t = d8((v && v.telefone) || '');
+        if (t && alvo8.has(t)) { delete orc.ids[k]; orcSoltos++; }
+      }
+      if (fA) await dbSet('fichas_adm', fA);
+      if (fT) await dbSet('fichas_tv', fT);
+      await dbSet('wa_abordados', ab);
+      await dbSet('wa_orc_enviados', orc);
+      // confere o próprio resultado
+      const chk = (await dbGet('wa_abordados')) || { tels: {} };
+      const sobrou = [...alvo8].filter(k => (chk.tels || {})[k]).length;
+      return res.status(200).send(
+        'REENVIO LIBERADO\n' +
+        'clientes atingidos=' + alvos.length + '\n' +
+        'fichas devolvidas para abordagem=' + fichasSoltas + '\n' +
+        'registros de "já abordado" limpos=' + abordLimpos + (sobrou ? ' (SOBRARAM ' + sobrou + ' — conferir)' : '') + '\n' +
+        'orçamentos liberados para reenvio=' + orcSoltos + '\n' +
+        'Os crons reenviam sozinhos: abordagem a cada 5 min, orçamento a cada 3 min, só na janela comercial.');
+    }
+
+    // ── LEITURA ──
+    return res.status(200).send(
+      'BLOQUEIO POR PENDÊNCIA DE PAGAMENTO (erro 131042)\n' +
+      'PRIMEIRA falha: ' + new Date(new Date(inicio).getTime() - 3 * 3600000).toISOString().replace('T', ' ').slice(0, 16) + ' (BRT)\n' +
+      'ÚLTIMA  falha: ' + new Date(new Date(fim).getTime() - 3 * 3600000).toISOString().replace('T', ' ').slice(0, 16) + ' (BRT)\n' +
+      'mensagens recusadas=' + falhas.length + ' | clientes distintos=' + Object.keys(porTel).length + '\n' +
+      'para REENVIAR=' + alvos.length + ' | já falaram depois (não reenviar)=' + jaFalaram + '\n\n' +
+      alvos.slice(0, 60).map(a => '  ' + a.d8 + ' · ' + a.qtd + 'x · desde ' +
+        String(a.ultima).slice(11, 16)).join('\n') +
+      '\n\nPara liberar o reenvio depois de regularizar o pagamento, acrescente &aplicar=1');
+  }
+
   if (action === 'buscar-conversas') {
     const alvos = String(req.query.tels || '').split(',').map(s => s.replace(/\D/g, '').trim()).filter(Boolean);
     if (!alvos.length) return res.status(400).json({ ok: false, error: 'informe ?tels=1234,5678 (finais separados por vírgula)' });

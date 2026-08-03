@@ -140,6 +140,28 @@ export default async function handler(req, res) {
               dir: 'status', texto: st.status + (st.errors ? ' | ' + JSON.stringify(st.errors).slice(0,300) : ''),
               msgId: st.id || null, tipo: 'status',
             });
+            // 🚨 FALHA DE CONTA (pagamento pendente, número inelegível): nenhuma mensagem
+            // será entregue até alguém resolver. Abre conflito UMA vez por hora, não a cada
+            // mensagem — senão inunda o painel. Sem isso, a operação para em silêncio.
+            try {
+              const cod = (st.errors && st.errors[0] && st.errors[0].code) || 0;
+              if (st.status === 'failed' && [131042, 131047, 131026, 133010].includes(Number(cod))) {
+                const marca = (await dbGet('wa_alerta_conta')) || {};
+                const agora = Date.now();
+                if (!marca.em || agora - new Date(marca.em).getTime() > 3600000) {
+                  await dbSet('wa_alerta_conta', { em: new Date().toISOString(), codigo: cod });
+                  const K = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+                  const det = (st.errors[0].error_data && st.errors[0].error_data.details) || st.errors[0].title || '';
+                  await fetch('https://reparoeletroadm.com/api/prospeccao?action=criar-conflito&k=' + K, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nome: '⚠️ CONTA DO WHATSAPP', telefone: '',
+                      equipamento: 'SISTEMA',
+                      motivo: '🚨 A META ESTÁ RECUSANDO AS MENSAGENS (erro ' + cod + '). NENHUM cliente está recebendo. ' +
+                        String(det).slice(0, 180) + ' — verificar cobrança/status da conta no Business Manager AGORA.' }),
+                  }).catch(() => null);
+                }
+              }
+            } catch (eAl) {}
           }
         }
       }
