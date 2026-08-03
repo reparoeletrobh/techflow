@@ -243,6 +243,35 @@ function check(nome, cond, extra) {
   const criouAlmox = global.__fetchLog.some(u => u.includes('almoxarifado') && u.includes('criar-mover'));
   check('TV: NENHUMA tarefa criada no almoxarifado ADM', !criouAlmox && !KV['reparoeletro_almoxarifado']);
 
+  // ════ CENÁRIO 11: precificação — leitura correta e ZERO escrita ════
+  console.log('▶ Cenário 11 — análise de precificação (somente leitura)');
+  const prec = carregarHandler('api/precificacao.js');
+  KV['reparoeletro_pipe'] = { cards: [
+    { id:'A1', equipamento:'Micro-ondas', modelo:'Electrolux MEF41', valor:350, phaseId:'aprovados' },
+    { id:'A2', equipamento:'Micro-ondas', modelo:'Electrolux MEF41', valor:350, phaseId:'finalizado' },
+    { id:'A3', equipamento:'Micro-ondas', modelo:'Electrolux MEF41', valor:350, phaseId:'ultima_chamada' },
+    { id:'A4', equipamento:'Adega',       modelo:'Philco PH8',       valor:490, phaseId:'aguardando_aprovacao' },
+    { id:'A5', equipamento:'Micro-ondas', modelo:'',                 valor:350, phaseId:'aprovados' },
+    { id:'A6', equipamento:'Forno',       modelo:'Fischer X',        valor:790, phaseId:'video_enviado' },
+    { id:'A7', equipamento:'Micro-ondas', modelo:'Consul CM1',       valor:0,   phaseId:'aprovados' },
+  ] };
+  KV['reparoeletro_frenteloja'] = { fichas: [] };
+  const snapAntes = JSON.stringify(KV);
+  const r11 = res();
+  await prec(req({ action:'modelos', curto:'1', ...K }), r11);
+  const txt11 = String(r11.dado || '');
+  check('agrupou por modelo e calculou taxa (MEF41: 3 casos, 67%)', /MEF41;n=3;.*aprov=67%/.test(txt11), txt11.split('\n').slice(0,4));
+  check('card sem valor foi ignorado (CM1 fora)', !txt11.includes('CM1'), txt11);
+  check('contou os sem modelo separadamente', /sem_modelo=1/.test(txt11), txt11.split('\n')[1]);
+  check('fase pós-aprovação conta como aprovada (Fischer 100%)', /FISCHER X;n=1;.*aprov=100%/.test(txt11), txt11);
+  check('LEITURA PURA: banco intacto após a análise', JSON.stringify(KV) === snapAntes);
+  const r11b = res();
+  await prec(req({ action:'faixas', curto:'1', ...K }), r11b);
+  check('faixas: agrupou por faixa de preço', /350-399/.test(String(r11b.dado||'')), String(r11b.dado||'').slice(0,120));
+  const r11c = res();
+  await prec(req({ action:'modelos', k:'chave-errada' }), r11c);
+  check('chave inválida é recusada', r11c.statusCode === 401);
+
   // ════ Resultado ════
   console.log('\n═══════════════════════════════════');
   const _mj = (() => { const b = new Date(Date.now() - 3 * 3600000); const d = b.getUTCDay(), hh = b.getUTCHours(); return (d >= 1 && d <= 5) ? (hh >= 8 && hh < 15) : (d === 6 ? (hh >= 8 && hh < 10) : false); })();
