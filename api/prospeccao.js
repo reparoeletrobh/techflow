@@ -917,6 +917,42 @@ export default async function handler(req,res){
     await dbSet(KEY,db);
     return res.status(200).json({ok:true});
   }
+  // ── 📣 CONFLITO-RELATAR: etapa entre resolvido e finalizado — retorno ao cliente ──
+  if(req.method==='POST'&&action==='conflito-relatar'){
+    const {id,resumo}=req.body||{};
+    if(!id)return res.status(400).json({ok:false,error:'id obrigatorio'});
+    if(!resumo||String(resumo).trim().length<10){
+      return res.status(400).json({ok:false,error:'escreva o resumo do que foi resolvido (mínimo 10 caracteres)'});
+    }
+    const db=(await dbGet(KEY))||{fichas:[]};
+    const f=(db.fichas||[]).find(x=>x.id===id);
+    if(!f)return res.status(404).json({ok:false,error:'conflito não encontrado'});
+    f.aguardandoRelato=true;
+    f.resumoResolucao=String(resumo).trim().slice(0,600);
+    f.resolvidoEm=new Date().toISOString();
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true,ficha:f});
+  }
+
+  // ── ✅ CONFLITO-RELATADO: cliente avisado → vai para finalizado ──
+  if(req.method==='POST'&&action==='conflito-relatado'){
+    const {id}=req.body||{};
+    if(!id)return res.status(400).json({ok:false,error:'id obrigatorio'});
+    const db=(await dbGet(KEY))||{fichas:[]};
+    const f=(db.fichas||[]).find(x=>x.id===id);
+    if(!f)return res.status(404).json({ok:false,error:'conflito não encontrado'});
+    f.clienteRelatado=true;
+    f.relatadoEm=new Date().toISOString();
+    delete f.aguardandoRelato;
+    await dbSet(KEY,db);
+    try{await logConflito('resolvido',{nome:f.nome,telefone:f.telefone,motivo:'resolvido e cliente avisado'});}catch(_){}
+    // agora sim sai da fila de conflitos
+    const dbF=(await dbGet(KEY))||db;
+    dbF.fichas=(dbF.fichas||[]).filter(x=>x.id!==id);
+    await dbSet(KEY,dbF);
+    return res.status(200).json({ok:true,finalizado:true});
+  }
+
   if(req.method==='POST'&&action==='resolver-conflito'){
     const {id}=req.body||{};
     const db=(await dbGet(KEY))||{fichas:[]};
