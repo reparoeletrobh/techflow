@@ -606,7 +606,7 @@ export default async function handler(req,res){
       const _pisoEq = e.tabela === 'dinamica' ? 0 : (_PISOS[e.tabela] || (e.tipo === 'microondas' ? 370 : 0));
       if (r && r.preco && _pisoEq) {
         const _at = parseInt(String(r.preco).replace(/\D/g,''), 10) || 0;
-        if (_at < _pisoEq) {
+        if (_at > 0 && _at < _pisoEq) {
           const _rx = new RegExp(String(r.preco).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
           r.texto = String(r.texto || '').replace(_rx, String(_pisoEq));
           r.preco = String(_pisoEq);
@@ -636,6 +636,12 @@ export default async function handler(req,res){
       texto = String(textos[0]).replace(new RegExp('\\b' + calc[0].preco + '\\b'), String(comDesconto));
     } else {
       texto = `Ola, ${primeiro} bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario: ${listaTxt}. Este conserto completo fica em ${comDesconto} reais apenas. Aprovando ja iniciamos o conserto.`;
+    }
+
+    // ── TRAVA: orçamento não sai sem preço no texto ─────────────────────
+    if (!String(texto || '').includes(String(comDesconto))) {
+      return res.status(400).json({ ok:false, semPreco:true,
+        error:'o texto do orçamento saiu SEM o valor (R$' + comDesconto + '). Verifique se o template deste serviço tem o marcador [VALOR].' });
     }
 
     const now = new Date().toISOString();

@@ -691,6 +691,7 @@ module.exports = async function handler(req, res) {
       const piso = PISOS[eq.tabela] || PISO_TIPO[eq.tipo] || 0;
       if (!piso) return r;
       const atual = parseInt(String(r.preco).replace(/\D/g, ''), 10) || 0;
+      if (atual <= 0) return r;      // preço não calculado: deixa passar para a trava abaixo
       if (atual >= piso) return r;
       const novo = String(piso);
       const rx = new RegExp(String(r.preco).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
@@ -737,6 +738,20 @@ module.exports = async function handler(req, res) {
       // Frase de desconto no final
       const fraseFinal = `Consertando os ${qtd} juntos eu consigo um desconto para voce de ${soma} para ${comDesc} reais. Aprovando ja iniciamos o conserto.`;
       textoFinal = partes + '\n\n' + fraseFinal;
+    }
+
+    // ── TRAVA: orçamento não sai sem preço ──────────────────────────────
+    // Causas conhecidas: template customizado salvo sem [VALOR], ou peça sem
+    // custo informado. Antes disso o texto ia ao cliente sem valor nenhum.
+    const _pf = parseInt(String(precoFinal || '').replace(/\D/g, ''), 10) || 0;
+    if (!_pf) {
+      return res.status(400).json({ ok:false,
+        error:'não consegui calcular o preço — informe o custo da peça ou revise os serviços' });
+    }
+    if (!String(textoFinal || '').includes(String(_pf))) {
+      return res.status(400).json({ ok:false,
+        error:'o texto do orçamento saiu SEM o valor (R$' + _pf + '). Verifique se o template deste serviço tem o marcador [VALOR].',
+        semPreco:true });
     }
 
     // Salvar na Logística

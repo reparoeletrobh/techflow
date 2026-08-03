@@ -237,6 +237,35 @@ function check(nome, cond, extra) {
   await floja(req({ action: 'diagnostico-loja', ...K }, { id: 'FL3', equips: [ { tipo:'adega', subtipo:'Eletrônico', servicos:['Kit Termo Elétrico'], tabela:'adega8' } ] }), rF3);
   check('loja: adega8 aplica piso 390', rF3.dado && rF3.dado.total === 390, rF3.dado && (rF3.dado.error || rF3.dado.total));
 
+  // ════ CENÁRIO 7b: orçamento NUNCA sai sem preço no texto ════
+  console.log('▶ Cenário 7b — trava: texto sem preço não pode ser gravado nem enviado');
+  // 7b.1 template customizado SEM [VALOR] -> tem que RECUSAR (bug do orçamento sem preço)
+  KV['reparoeletro_orc_templates'] = { microondas_placa: { texto: 'Ola [NOME], vamos trocar a [peças]. Aprovando ja iniciamos.' } };
+  KV['reparoeletro_frenteloja'] = { fichas: [{ id:'SP1', nomeContato:'Sem Preco', telefone:'5531990001111', phase:'analise' }], seq:1 };
+  const rSP = res();
+  await floja(req({ action:'diagnostico-loja', ...K }, { id:'SP1', equips:[{ tipo:'microondas', servicos:['Troca de Placa'], preco:'150' }] }), rSP);
+  check('loja: template sem [VALOR] é RECUSADO', rSP.dado && rSP.dado.ok === false, rSP.dado && (rSP.dado.texto || rSP.dado.total));
+  const fSP = KV['reparoeletro_frenteloja'].fichas[0];
+  check('loja: ficha NÃO ficou com orçamento gravado', !fSP.diagnosticoLoja && !fSP.valorOrcamento, fSP.valorOrcamento);
+
+  // 7b.2 mesma coisa na logística
+  KV['reparoeletro_logistica'] = { fichas: [{ id:'SP2', nome:'Sem Preco Log', telefone:'5531990001122', phase:'coleta_efetuada', diagnostico:{ equips:[{ tipo:'microondas', servicos:['Troca de Placa'], preco:'150' }] } }] };
+  const rSP2 = res();
+  await logi(req({ action:'gerar-orcamento', ...K }, { id:'SP2' }), rSP2);
+  check('logística: template sem [VALOR] é RECUSADO', rSP2.dado && rSP2.dado.ok === false, rSP2.dado && rSP2.dado.error);
+  delete KV['reparoeletro_orc_templates'];
+
+  // 7b.3 peça SEM custo informado: continua sendo recusado (o piso não pode mascarar)
+  KV['reparoeletro_frenteloja'] = { fichas: [{ id:'SP3', nomeContato:'Sem Custo', telefone:'5531990001133', phase:'analise' }], seq:1 };
+  const rSP3 = res();
+  await floja(req({ action:'diagnostico-loja', ...K }, { id:'SP3', equips:[{ tipo:'microondas', servicos:['Troca de Placa'] }] }), rSP3);
+  check('loja: peça sem custo informado é RECUSADA (piso não mascara)', rSP3.dado && rSP3.dado.ok === false, rSP3.dado && (rSP3.dado.total || rSP3.dado.error));
+
+  KV['reparoeletro_logistica'] = { fichas: [{ id:'SP4', nome:'Sem Custo Log', telefone:'5531990001144', phase:'coleta_efetuada', diagnostico:{ equips:[{ tipo:'microondas', servicos:['Troca de Placa'] }] } }] };
+  const rSP4 = res();
+  await logi(req({ action:'gerar-orcamento', ...K }, { id:'SP4' }), rSP4);
+  check('logística: peça sem custo informado é RECUSADA', rSP4.dado && rSP4.dado.ok === false, rSP4.dado && (rSP4.dado.error || 'passou'));
+
   // ════ CENÁRIO 8: isolamento do Frente de Loja ════
   // Regra inviolável: FL grava SÓ em reparoeletro_frenteloja. O bot não lê esse banco.
   console.log('▶ Cenário 8 — Frente de Loja não vaza para os bancos do bot');
