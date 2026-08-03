@@ -43,6 +43,9 @@ global.fetch = async function (url, opts) {
   }
   // Chamadas externas (Graph/Anthropic/produção) NUNCA saem do harness:
   (global.__fetchLog = global.__fetchLog || []).push(u);
+  if (global.__forcarErroGraph && u.includes('graph.facebook.com')) {
+    return { json: async () => global.__forcarErroGraph, ok: false, arrayBuffer: async () => new ArrayBuffer(8) };
+  }
   return { json: async () => ({ mocked: true, messages: [{ id: 'wamid.mock' }] }), ok: true, arrayBuffer: async () => new ArrayBuffer(8) };
 };
 
@@ -508,6 +511,40 @@ function check(nome, cond, extra) {
   check('relatório conta a ligação e o tempo', qF4.dado && qF4.dado.ligacoes === 1 && qF4.dado.tempoMedioSeg === 180, qF4.dado);
   check('fila: chave inválida recusada', await (async () => {
     const r = res(); await fila(req({ action:'fila', k:'errada' }), r); return r.statusCode === 401; })());
+
+  // ════ CENÁRIO 15: template de orçamento — falha não pode virar "enviado" ════
+  console.log('▶ Cenário 15 — template orcamento_pronto: evidência e reenvio');
+  KV['wa_credenciais'] = { token:'mock', phoneId:'123' };
+  KV['wa_bot_config'] = { modoAberto:true, execTels:[] };
+  KV['wa_bot_pausados'] = {};
+  KV['tv_logistica'] = { fichas: [] };
+  const fichaOrc = () => ({ id:'ORC1', nome:'Bruna Teste', telefone:'5531987537200',
+    equipamento:'Purificador', phase:'orc_registrado',
+    diagnostico:{ equips:[{tipo:'purificador',modelo:'PE11X',servicos:['Gás']}], textoOrc:'Orcamento: fica em 350 reais', em:new Date().toISOString() } });
+
+  // 15a: Meta RECUSA o template -> não pode marcar como enviado
+  KV['reparoeletro_logistica'] = { fichas: [fichaOrc()] };
+  KV['wa_orc_enviados'] = { ids: {} };
+  global.__forcarErroGraph = { error: { message: 'Template name does not exist', code: 132001 } };
+  await wabot(req({ action:'orcamentos-pendentes', ...K }), res());
+  delete global.__forcarErroGraph;
+  const reg15 = (KV['wa_orc_enviados']||{}).ids || {};
+  check('template recusado: NÃO marca como enviado com sucesso',
+    !reg15['ORC1'] || reg15['ORC1'].ok !== true, reg15['ORC1']);
+  const evt15 = (LISTS['wa_evt_list']||[]).map(x => { try { return JSON.parse(x); } catch(e){ return {}; } });
+  check('template recusado: erro da Meta fica registrado no histórico',
+    evt15.some(e => e.tipo === 'falha' && /132001|Template name/.test(String(e.texto) + String(e.erro))), evt15.slice(-2));
+
+  // 15b: Meta ACEITA -> grava msgId e marca enviado
+  LISTS['wa_evt_list'] = [];
+  KV['reparoeletro_logistica'] = { fichas: [fichaOrc()] };
+  KV['wa_orc_enviados'] = { ids: {} };
+  await wabot(req({ action:'orcamentos-pendentes', ...K }), res());
+  const reg15b = (KV['wa_orc_enviados']||{}).ids || {};
+  const evt15b = (LISTS['wa_evt_list']||[]).map(x => { try { return JSON.parse(x); } catch(e){ return {}; } });
+  check('template aceito: marca enviado com ok=true', reg15b['ORC1'] && reg15b['ORC1'].ok === true, reg15b['ORC1']);
+  check('template aceito: msgId gravado como evidência',
+    evt15b.some(e => e.tipo === 'template' && e.msgId), evt15b.filter(e => e.tipo === 'template'));
 
   // ════ Resultado ════
   console.log('\n═══════════════════════════════════');

@@ -1699,6 +1699,7 @@ export default async function handler(req, res) {
       const telO = String(f.telefone).replace(/\D/g, '');
       const to = telO.startsWith('55') ? telO : '55' + telO;
       const t8 = to.slice(-8);
+      let okEnvio = false;
       try {
         if (janelaAberta(t8)) {
           // Janela aberta → orçamento oficial direto
@@ -1712,6 +1713,7 @@ export default async function handler(req, res) {
             texto: String(txtOrc).slice(0, 2000), msgId: okO ? j.messages[0].id : null, tipo: 'text', via: 'bot-auto-orcamento' });
           if (okO) await bumpStat('orcamentos');
           disparos.push({ nome: f.nome, modo: 'orcamento-direto', ok: okO });
+          okEnvio = okO;
         } else {
           // Janela fechada → template orcamento_pronto (a resposta reabre e o cérebro envia o orçamento)
           const r = await fetch(`https://graph.facebook.com/v20.0/${pidO}/messages`, {
@@ -1724,19 +1726,51 @@ export default async function handler(req, res) {
           });
           const j = await r.json();
           const okO = !!(j.messages && j.messages[0]);
-          await rpushEvt({ ts: new Date().toISOString(), tel: to, dir: 'out',
-            texto: '📨 [template orcamento_pronto] ' + (f.nome || ''), tipo: 'template', via: 'bot-auto-orcamento' });
-          if (okO) await bumpStat('orcamentos');
-          disparos.push({ nome: f.nome, modo: 'template-janela-fechada', ok: okO });
+          // EVIDÊNCIA: grava o msgId no sucesso e o erro exato da Meta na falha.
+          // Sem isso não havia como saber se o template chegou ao cliente.
+          if (okO) {
+            await rpushEvt({ ts: new Date().toISOString(), tel: to, dir: 'out',
+              texto: '📨 [template orcamento_pronto] ' + (f.nome || ''),
+              tipo: 'template', via: 'bot-auto-orcamento', msgId: j.messages[0].id });
+            await bumpStat('orcamentos');
+          } else {
+            const errMsg = (j && j.error && (j.error.message || j.error.type)) || 'sem resposta da Meta';
+            const errCode = (j && j.error && j.error.code) || '';
+            await rpushEvt({ ts: new Date().toISOString(), tel: to, dir: 'out', tipo: 'falha',
+              via: 'bot-auto-orcamento', erro: String(errCode) + ' ' + String(errMsg),
+              texto: '❌ TEMPLATE orcamento_pronto NÃO ENVIADO para ' + (f.nome || '') + ' — ' + errCode + ' ' + errMsg });
+          }
+          disparos.push({ nome: f.nome, modo: 'template-janela-fechada', ok: okO,
+            erro: okO ? null : ((j && j.error && j.error.message) || 'falha') });
+          okEnvio = okO;
         }
         // 🎯 ROTEAMENTO POR ORIGEM: guarda de ONDE veio este orçamento, para a aprovação
         // não precisar adivinhar pelo telefone (cliente pode ter ficha em mais de um sistema).
-        enviadosO.ids[dedupeKey] = {
-          em: new Date().toISOString(),
-          origem: sisO === 'tv' ? 'logistica-tv' : 'logistica-adm',
-          fichaId: f.id,
-          telefone: String(f.telefone || '').replace(/\D/g, ''),
-        };
+        // ⚠️ Só marca como ENVIADO se a Meta confirmou. Antes marcava sempre —
+        // um envio recusado nunca era tentado de novo e o cliente nunca recebia.
+        const antes = enviadosO.ids[dedupeKey];
+        const falhasAnt = (antes && typeof antes === 'object' && antes.falhas) || 0;
+        if (okEnvio) {
+          enviadosO.ids[dedupeKey] = {
+            em: new Date().toISOString(), ok: true,
+            origem: sisO === 'tv' ? 'logistica-tv' : 'logistica-adm',
+            fichaId: f.id,
+            telefone: String(f.telefone || '').replace(/\D/g, ''),
+          };
+        } else {
+          const n = falhasAnt + 1;
+          enviadosO.ids[dedupeKey] = {
+            em: new Date().toISOString(), ok: false, falhas: n,
+            origem: sisO === 'tv' ? 'logistica-tv' : 'logistica-adm',
+            fichaId: f.id,
+            telefone: String(f.telefone || '').replace(/\D/g, ''),
+          };
+          // 3 tentativas sem sucesso → para de tentar e chama um humano
+          if (n >= 3) {
+            await promessaSemLastro(to, t8, 'orçamento pronto (template)', 'envio automático',
+              'o orçamento de ' + (f.nome || 'cliente') + ' NÃO foi entregue após 3 tentativas — enviar manualmente pelo painel');
+          }
+        }
         // Efeito do botão "Copiar e Enviar": marca o orçamento como enviado na seção Orçamentos
         // (some de pendentes; o card já está no pipe em aguardando_aprovacao → cronômetro de 48h da última chamada segue vivo)
         try {
