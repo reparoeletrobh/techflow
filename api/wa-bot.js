@@ -1092,6 +1092,68 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, feitos });
   }
 
+  // ── 📋 STATUS-TEMPLATES: situação dos modelos e do número, para saber se dá para enviar ──
+  if (action === 'status-templates') {
+    const { token: tkT, phoneId: pidT } = await credenciais();
+    if (!tkT || !pidT) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
+    const G = 'https://graph.facebook.com/v20.0';
+    const pega = async (url) => fetch(url).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+
+    // 1) o número: qualidade e limite de envio
+    const num = await pega(`${G}/${pidT}?fields=display_phone_number,verified_name,quality_rating,name_status,messaging_limit_tier,status,platform_type&access_token=${tkT}`);
+    // 2) a conta de negócios dona do número (é onde aparece restrição de pagamento)
+    let waba = null, templates = null;
+    try {
+      const dono = await pega(`${G}/${pidT}?fields=whatsapp_business_account{id,name,account_review_status,business_verification_status,message_template_namespace}&access_token=${tkT}`);
+      const w = (dono || {}).whatsapp_business_account;
+      if (w && w.id) {
+        waba = w;
+        const tpl = await pega(`${G}/${w.id}/message_templates?fields=name,status,category,language,quality_score,rejected_reason&limit=60&access_token=${tkT}`);
+        templates = (tpl && tpl.data) || null;
+      }
+    } catch (e) {}
+
+    const QUALIDADE = { GREEN: '🟢 ALTA', YELLOW: '🟡 MÉDIA', RED: '🔴 BAIXA', UNKNOWN: '⚪ sem dados' };
+    const LIMITE = { TIER_50: '50/dia', TIER_250: '250/dia', TIER_1K: '1.000/dia',
+      TIER_10K: '10.000/dia', TIER_100K: '100.000/dia', TIER_UNLIMITED: 'ilimitado' };
+    const tpls = (templates || []).map(t => ({
+      nome: t.name, situacao: t.status, categoria: t.category, idioma: t.language,
+      qualidade: t.quality_score ? t.quality_score.score : null,
+      motivoRecusa: t.rejected_reason && t.rejected_reason !== 'NONE' ? t.rejected_reason : null,
+    }));
+    const aprovados = tpls.filter(t => t.situacao === 'APPROVED');
+    const usados = ['boas_vindas_reparo', 'conserto_finalizado', 'cadastro_recebido_tv'];
+    const faltando = usados.filter(u => !aprovados.some(a => a.nome === u));
+
+    const alertas = [];
+    if (num.quality_rating === 'RED') alertas.push('🔴 qualidade BAIXA — a Meta pode limitar ou bloquear envios');
+    if (num.quality_rating === 'YELLOW') alertas.push('🟡 qualidade MÉDIA — reduza o volume por alguns dias');
+    if (num.status && num.status !== 'CONNECTED') alertas.push('⚠️ número com status ' + num.status);
+    if (waba && waba.account_review_status && waba.account_review_status !== 'APPROVED') {
+      alertas.push('⚠️ conta de negócios em análise: ' + waba.account_review_status);
+    }
+    if (faltando.length) alertas.push('❌ template(s) que o sistema usa e NÃO estão aprovados: ' + faltando.join(', '));
+    const recusados = tpls.filter(t => t.situacao === 'REJECTED');
+    if (recusados.length) alertas.push('❌ ' + recusados.length + ' template(s) RECUSADO(S)');
+
+    return res.status(200).json({
+      ok: alertas.length === 0,
+      numero: { telefone: num.display_phone_number, nome: num.verified_name,
+        qualidade: QUALIDADE[num.quality_rating] || num.quality_rating,
+        limiteDeEnvio: LIMITE[num.messaging_limit_tier] || num.messaging_limit_tier,
+        statusDoNome: num.name_status, situacao: num.status },
+      contaDeNegocios: waba ? { nome: waba.name, revisao: waba.account_review_status,
+        verificacao: waba.business_verification_status } : 'não consegui ler',
+      templates: { total: tpls.length, aprovados: aprovados.length,
+        recusados: recusados.length,
+        pendentes: tpls.filter(t => t.situacao === 'PENDING').length,
+        lista: tpls.map(t => t.nome + ' | ' + t.situacao + (t.qualidade ? ' | ' + t.qualidade : '') +
+          (t.motivoRecusa ? ' | ' + t.motivoRecusa : '')) },
+      alertas: alertas.length ? alertas : ['✅ tudo liberado para enviar'],
+      podeEnviarTemplate: alertas.filter(a => a.startsWith('❌') || a.startsWith('🔴')).length === 0,
+    });
+  }
+
   // ── 🎤 AUDIO-TESTE: verifica se a transcrição está configurada e funcionando ──
   if (action === 'audio-teste') {
     const temGroq = !!process.env.GROQ_API_KEY, temOpenAi = !!process.env.OPENAI_API_KEY;
