@@ -955,6 +955,9 @@ function equipSecHTML(eq, i, total) {
       <div class="type-grid">
         <button class="type-btn${(eq.tabela||'normal')==='normal'?' sel':''}" onclick="selTabela(${i},'normal')">📋 Tabela Normal</button>
         <button class="type-btn${eq.tabela==='dinamica'?' sel':''}" onclick="selTabela(${i},'dinamica')">⚡ Tabela Dinâmica</button>
+        ${eq.tipo==='adega' ? `
+        <button class="type-btn${eq.tabela==='adega8'?' sel':''}" onclick="selTabela(${i},'adega8')">🍷 Adega 8 garrafas</button>
+        <button class="type-btn${eq.tabela==='adega12'?' sel':''}" onclick="selTabela(${i},'adega12')">🍷 Adega 12 garrafas</button>` : ''}
       </div>
     </div>` : ''}
     ${subtiposHTML}

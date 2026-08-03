@@ -594,11 +594,11 @@ module.exports = async function handler(req, res) {
           const tpl = T.microondas_vidro?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da [peças], montagem e regulagem consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`;
           return { texto: applyTpl(tpl, p, x2(precoInput)), preco:x2(precoInput) };
         }
-        if (tem(['Haste'])) { const tpl = T.microondas_haste?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da haste, montagem e regulagem consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`; return { texto: applyTpl(tpl, 'haste', '350'), preco:'350' }; }
-        if (tem(['Pintura'])) { const tpl = T.microondas_pintura?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, pintura, montagem, regulagem e revisão consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`; return { texto: applyTpl(tpl, 'pintura', '350'), preco:'350' }; }
+        if (tem(['Haste'])) { const tpl = T.microondas_haste?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da haste, montagem e regulagem consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`; return { texto: applyTpl(tpl, 'haste', '370'), preco:'370' }; }
+        if (tem(['Pintura'])) { const tpl = T.microondas_pintura?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, pintura, montagem, regulagem e revisão consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`; return { texto: applyTpl(tpl, 'pintura', '370'), preco:'370' }; }
         if (tem(['Reforma'])) {
           const comRevisao = tem(['Revisão']);
-          const preco = comRevisao ? '390' : '350';
+          const preco = comRevisao ? '390' : '370';
           const textoBase = `Olá, sou Alessandra, Reparo Eletro, e vou te passar seu orçamento agora. Fizemos as análises e para fazer a desmontagem do equipamento, lixar, pintar, refazer as instalações e montar novamente, fica em [VALOR] reais apenas. Aprovando, já iniciamos a reforma.`.replace('[VALOR]', preco);
           const textoFinal = textoBase + (comRevisao ? ` Observação: foi identificado que existem componentes que estão apresentando falhas e será necessário também fazer uma revisão completa para que além da reforma o equipamento fique em perfeito funcionamento. Esta revisão não terá nenhum custo adicional.` : '');
           return { texto: textoFinal, preco };
@@ -609,7 +609,7 @@ module.exports = async function handler(req, res) {
         }
         const p = s.join(', ');
         const tpl = T.microondas_eletrico?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do [peças], as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`;
-        return { texto: applyTpl(tpl, p, '350'), preco:'350' };
+        return { texto: applyTpl(tpl, p, '370'), preco:'370' };
       }
       if (tipo === 'bblend') {
         // Bblend — preço fixo R$ 1.490 independente das peças selecionadas
@@ -659,7 +659,7 @@ module.exports = async function handler(req, res) {
         }
       }
       if (tipo === 'forno') {
-        const pb = subtipo === 'Grande' ? '790' : '490';
+        const pb = subtipo === 'Grande' ? '890' : '490';
         if (tem(['Troca de Placa','Display'])) {
           const p = pecas(['Troca de Placa','Display']);
           return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto conjunto do ${p}: será feito a reoperação eletrica tambem. Este conserto completo fica em ${x2(precoInput)} reais apenas. Aprovando ja iniciamos o conserto.`, preco:x2(precoInput) };
@@ -681,9 +681,25 @@ module.exports = async function handler(req, res) {
       if (tplDb) customTemplates = tplDb;
     } catch(e) { console.error('[Log] templates:', e.message); }
 
+    // ── PISO POR MODO DE TABELA ─────────────────────────────────────────
+    // adega8 = piso R$390 · adega12 = piso R$450 · micro-ondas = piso R$370
+    // Regra: valor abaixo do piso sobe para o piso; valor acima PREVALECE.
+    const PISOS = { adega8: 390, adega12: 450 };
+    const PISO_TIPO = { microondas: 370 };
+    function aplicarPiso(r, eq) {
+      if (!r || !r.preco) return r;
+      const piso = PISOS[eq.tabela] || PISO_TIPO[eq.tipo] || 0;
+      if (!piso) return r;
+      const atual = parseInt(String(r.preco).replace(/\D/g, ''), 10) || 0;
+      if (atual >= piso) return r;
+      const novo = String(piso);
+      const rx = new RegExp(String(r.preco).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+      return { texto: String(r.texto || '').replace(rx, novo), preco: novo };
+    }
+
     // Gerar texto para cada equipamento
     const resultados = equips.map(eq => {
-      const r = gerarTexto(eq.tipo, eq.subtipo, eq.servicos, eq.preco, customTemplates);
+      let r = gerarTexto(eq.tipo, eq.subtipo, eq.servicos, eq.preco, customTemplates);
       // ⚡ Tabela Dinâmica: MESMO texto e peças — só o valor vira 40% do equipamento (arredondado)
       if (eq.tabela === 'dinamica') {
         const valorEq = parseFloat(String(eq.valorEquip || '0').replace(',', '.')) || 0;
@@ -694,7 +710,7 @@ module.exports = async function handler(req, res) {
         }
         if (r && r.texto) return { texto: r.texto, preco: preco40 };
       }
-      return r;
+      return aplicarPiso(r, eq);
     });
 
     // Texto final
@@ -705,7 +721,7 @@ module.exports = async function handler(req, res) {
     } else {
       const qtd      = resultados.length;
       const soma     = resultados.reduce((acc,r)=>acc+parseInt(r.preco||0),0);
-      const descPerc = qtd === 2 ? 0.10 : qtd === 3 ? 0.15 : 0.20; // max 20%
+      const descPerc = qtd === 2 ? 0.05 : qtd === 3 ? 0.08 : 0.10; // max 10%
       const comDesc  = Math.round(soma * (1 - descPerc));
       precoFinal     = String(comDesc);
 

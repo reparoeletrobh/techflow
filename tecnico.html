@@ -2023,9 +2023,14 @@ function dljRender(){
           + Object.keys(spec.subtipos).map(s => bt(s, eq.subtipo===s, 'dljSubtipo('+i+',\''+s+'\')')).join('') + '</div>' : '')
       + (lista ? '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
           + lista.map(s => bt(s, (eq.servicos||[]).includes(s), 'dljServico('+i+',\''+s.replace(/'/g,"\\'")+'\')')).join('') + '</div>' : '')
-      + (eq.tipo ? '<div style="display:flex;gap:6px;">'
+      + (eq.tipo ? '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
           + bt('📋 Tabela Normal', (eq.tabela||'normal')==='normal', 'dljTabela('+i+',\'normal\')')
-          + bt('⚡ Tabela Dinâmica', eq.tabela==='dinamica', 'dljTabela('+i+',\'dinamica\')') + '</div>' : '')
+          + bt('⚡ Tabela Dinâmica', eq.tabela==='dinamica', 'dljTabela('+i+',\'dinamica\')')
+          + (eq.tipo==='adega'
+              ? bt('🍷 Adega 8 garrafas', eq.tabela==='adega8', 'dljTabela('+i+',\'adega8\')')
+                + bt('🍷 Adega 12 garrafas', eq.tabela==='adega12', 'dljTabela('+i+',\'adega12\')')
+              : '')
+          + '</div>' : '')
       + (eq.tabela==='dinamica'
           ? '<div><div style="font-family:var(--fm);font-size:10px;color:#888;margin-bottom:5px;">VALOR DO EQUIPAMENTO NOVO (R$)</div>'
             + '<input type="number" min="0" inputmode="numeric" placeholder="Ex: 2000" value="'+(eq.valorEquip||'')+'" oninput="dljCampo('+i+',\'valorEquip\',this.value)"'

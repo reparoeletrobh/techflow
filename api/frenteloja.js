@@ -484,11 +484,11 @@ export default async function handler(req,res){
           const tpl = T.microondas_vidro?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da [peças], montagem e regulagem consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`;
           return { texto: applyTpl(tpl, p, x2(precoInput)), preco:x2(precoInput) };
         }
-        if (tem(['Haste'])) { const tpl = T.microondas_haste?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da haste, montagem e regulagem consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`; return { texto: applyTpl(tpl, 'haste', '350'), preco:'350' }; }
-        if (tem(['Pintura'])) { const tpl = T.microondas_pintura?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, pintura, montagem, regulagem e revisão consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`; return { texto: applyTpl(tpl, 'pintura', '350'), preco:'350' }; }
+        if (tem(['Haste'])) { const tpl = T.microondas_haste?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, instalação da haste, montagem e regulagem consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`; return { texto: applyTpl(tpl, 'haste', '370'), preco:'370' }; }
+        if (tem(['Pintura'])) { const tpl = T.microondas_pintura?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orçamento:\n\nPara fazer a desmontagem, pintura, montagem, regulagem e revisão consigo fazer para você por [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`; return { texto: applyTpl(tpl, 'pintura', '370'), preco:'370' }; }
         if (tem(['Reforma'])) {
           const comRevisao = tem(['Revisão']);
-          const preco = comRevisao ? '390' : '350';
+          const preco = comRevisao ? '390' : '370';
           const textoBase = `Olá, sou Alessandra, Reparo Eletro, e vou te passar seu orçamento agora. Fizemos as análises e para fazer a desmontagem do equipamento, lixar, pintar, refazer as instalações e montar novamente, fica em [VALOR] reais apenas. Aprovando, já iniciamos a reforma.`.replace('[VALOR]', preco);
           const textoFinal = textoBase + (comRevisao ? ` Observação: foi identificado que existem componentes que estão apresentando falhas e será necessário também fazer uma revisão completa para que além da reforma o equipamento fique em perfeito funcionamento. Esta revisão não terá nenhum custo adicional.` : '');
           return { texto: textoFinal, preco };
@@ -499,7 +499,7 @@ export default async function handler(req,res){
         }
         const p = s.join(', ');
         const tpl = T.microondas_eletrico?.texto || `Ola, [NOME] bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario refazer a parte eletrica que causou danos no conjunto do [peças], as pecas serao trocadas tambem. Este conserto completo fica em [VALOR] reais apenas. Aprovando ja iniciamos o conserto.`;
-        return { texto: applyTpl(tpl, p, '350'), preco:'350' };
+        return { texto: applyTpl(tpl, p, '370'), preco:'370' };
       }
       if (tipo === 'bblend') {
         // Bblend — preço fixo R$ 1.490 independente das peças selecionadas
@@ -549,7 +549,7 @@ export default async function handler(req,res){
         }
       }
       if (tipo === 'forno') {
-        const pb = subtipo === 'Grande' ? '790' : '490';
+        const pb = subtipo === 'Grande' ? '890' : '490';
         if (tem(['Troca de Placa','Display'])) {
           const p = pecas(['Troca de Placa','Display']);
           return { texto:`Ola, ${pn} bom dia, sou o Alessandro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario fazer a troca do conjunto conjunto do ${p}: será feito a reoperação eletrica tambem. Este conserto completo fica em ${x2(precoInput)} reais apenas. Aprovando ja iniciamos o conserto.`, preco:x2(precoInput) };
@@ -600,6 +600,18 @@ export default async function handler(req,res){
         : (parseFloat(String(e.preco||'').replace(',','.')) || null);
 
       const r = gerarTextoLoja(e.tipo, e.subtipo || null, e.servicos, entrada, customTemplates, ficha.nomeContato);
+      // PISO (mesma regra da logística): adega8=390 · adega12=450 · micro-ondas=370.
+      // A tabela dinâmica não recebe piso. Acima do piso, o maior prevalece.
+      const _PISOS = { adega8: 390, adega12: 450 };
+      const _pisoEq = e.tabela === 'dinamica' ? 0 : (_PISOS[e.tabela] || (e.tipo === 'microondas' ? 370 : 0));
+      if (r && r.preco && _pisoEq) {
+        const _at = parseInt(String(r.preco).replace(/\D/g,''), 10) || 0;
+        if (_at < _pisoEq) {
+          const _rx = new RegExp(String(r.preco).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+          r.texto = String(r.texto || '').replace(_rx, String(_pisoEq));
+          r.preco = String(_pisoEq);
+        }
+      }
       const precoCalc = r && r.preco ? Math.round(parseFloat(String(r.preco).replace(/[^\d.,]/g,'').replace(',','.'))) : null;
       if (!precoCalc) {
         return res.status(400).json({ ok:false,
