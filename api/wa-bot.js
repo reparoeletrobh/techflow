@@ -866,6 +866,49 @@ export default async function handler(req, res) {
       [l.telefone, l.envio, l.template, l.recusa, l.codigo, l.casadoPor].join(';')).join('\n'));
   }
 
+  // ── 🏥 SAUDE-WABA: lê da Meta a configuração da conta do WhatsApp (só leitura) ──
+  if (action === 'saude-waba') {
+    const { token: tkW, phoneId: pidW } = await credenciais();
+    if (!tkW || !pidW) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
+    const G = 'https://graph.facebook.com/v20.0';
+    const pega = async (rot, url) => {
+      const r = await fetch(url).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      return { rot, ...(r && r.error ? { erro: r.error.message + ' (code ' + (r.error.code || '') + ')' } : { dados: r }) };
+    };
+    // 1) dados do número + a WABA dona dele
+    const num = await pega('numero', `${G}/${pidW}?fields=display_phone_number,verified_name,quality_rating,name_status,throughput,platform_type&access_token=${tkW}`);
+    const wabaId = String(req.query.waba || '').trim();
+    const passos = [num];
+    if (wabaId) {
+      passos.push(await pega('waba', `${G}/${wabaId}?fields=name,currency,timezone_id,account_review_status,business_verification_status,message_template_namespace,owner_business_info,health_status&access_token=${tkW}`));
+      passos.push(await pega('templates', `${G}/${wabaId}/message_templates?fields=name,status,category,quality_score&limit=30&access_token=${tkW}`));
+    }
+    const linhas = [];
+    for (const p of passos) {
+      if (p.erro) { linhas.push('❌ ' + p.rot + ' — ' + p.erro); continue; }
+      const d = p.dados || {};
+      if (p.rot === 'numero') {
+        linhas.push('NÚMERO: ' + (d.display_phone_number || '?') + ' · nome "' + (d.verified_name || '?') + '"');
+        linhas.push('  qualidade=' + (d.quality_rating || '?') + ' · status do nome=' + (d.name_status || '?') +
+          ' · plataforma=' + (d.platform_type || '?'));
+        if (d.throughput) linhas.push('  throughput=' + JSON.stringify(d.throughput));
+      } else if (p.rot === 'waba') {
+        linhas.push('WABA: ' + (d.name || '?'));
+        linhas.push('  MOEDA=' + (d.currency || '⚠️ VAZIA') + ' · FUSO=' + (d.timezone_id || '⚠️ VAZIO'));
+        linhas.push('  revisão da conta=' + (d.account_review_status || '?') +
+          ' · verificação do negócio=' + (d.business_verification_status || '?'));
+        if (d.health_status) linhas.push('  saúde=' + JSON.stringify(d.health_status).slice(0, 400));
+      } else if (p.rot === 'templates') {
+        const ts = (d.data || []);
+        linhas.push('TEMPLATES (' + ts.length + '):');
+        for (const t of ts) linhas.push('  ' + t.name + ' · ' + t.status + ' · ' + (t.category || '') +
+          (t.quality_score ? ' · qualidade=' + (t.quality_score.score || '?') : ''));
+      }
+    }
+    if (!wabaId) linhas.push('\n⚠️ Para ver moeda, fuso e templates, acrescente &waba=SEU_WABA_ID (está no WhatsApp Manager).');
+    return res.status(200).send(linhas.join('\n'));
+  }
+
   if (action === 'buscar-conversas') {
     const alvos = String(req.query.tels || '').split(',').map(s => s.replace(/\D/g, '').trim()).filter(Boolean);
     if (!alvos.length) return res.status(400).json({ ok: false, error: 'informe ?tels=1234,5678 (finais separados por vírgula)' });
