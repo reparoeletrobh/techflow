@@ -620,7 +620,7 @@ function check(nome, cond, extra) {
   check('leitura: identifica as falhas de pagamento', /131042|PENDÊNCIA DE PAGAMENTO/.test(t17), t17.slice(0,80));
   check('leitura: NÃO altera nada (fichas intactas)',
     KV['fichas_adm'].fichas.every(f => f.status === 'contato_feito'));
-  check('leitura: quem respondeu depois fica de fora do reenvio', /para REENVIAR=3/.test(t17), t17.split('\n')[4]);
+  check('leitura: quem respondeu depois fica de fora do reenvio', /REENVIAR \(bloqueio de conta\)=2/.test(t17) && /j[áa] falaram depois \(n[ãa]o mexer\)=1/.test(t17), t17.split('\n')[4]);
 
   const q17b = res();
   await wabot(req({ action:'bloqueio-pagamento', aplicar:'1', ...K }), q17b);
