@@ -1,0 +1,177 @@
+<!DOCTYPE html><html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<title>Fila de Ligação — TechFlow</title>
+<script>
+(function(){
+  if(location.pathname==='/login'||location.pathname==='/login.html')return;
+  var K=localStorage.getItem('tf_key');
+  if(!K){location.replace('/login?next='+encodeURIComponent(location.pathname));return;}
+})();
+</script>
+<style>
+:root{--bg:#0b0d10;--card:#12151a;--bd:#1e2228;--fg:#e8eaed;--muted:#8b93a1;
+--gr:#22c55e;--re:#ef4444;--ye:#f5c800;--bl:#3b9eff;--pu:#a855f7;--or:#f97316;
+--fm:ui-monospace,SFMono-Regular,Menlo,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.top{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--bd);position:sticky;top:0;background:var(--bg);z-index:5}
+.top h1{font-size:16px;margin:0;font-weight:800}
+.wrap{max-width:820px;margin:0 auto;padding:18px}
+.pill{display:inline-block;font-size:10px;font-weight:800;padding:3px 9px;border-radius:20px;font-family:var(--fm)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:18px;margin-bottom:14px}
+.nome{font-size:22px;font-weight:800;margin:10px 0 2px}
+.tel{font-family:var(--fm);font-size:34px;font-weight:800;letter-spacing:1px;color:var(--gr);margin:10px 0;user-select:all;cursor:pointer}
+.meta{color:var(--muted);font-size:13px;line-height:1.6}
+.nota{background:rgba(245,200,0,.1);border-left:3px solid var(--ye);padding:9px 12px;border-radius:6px;font-size:13px;margin:12px 0}
+.lbl{font-size:10px;font-weight:800;color:var(--muted);letter-spacing:.5px;margin:16px 0 7px}
+.grid{display:flex;gap:8px;flex-wrap:wrap}
+.b{background:#1a1f26;border:1px solid var(--bd);color:var(--fg);border-radius:9px;padding:11px 14px;font-size:13px;font-weight:700;cursor:pointer}
+.b:hover{border-color:#3a4250}
+.b.sel{background:var(--bl);border-color:var(--bl);color:#04121f}
+.b.ok{background:var(--gr);border-color:var(--gr);color:#04120a}
+.b.no{background:var(--re);border-color:var(--re);color:#fff}
+.b.big{width:100%;padding:15px;font-size:15px;margin-top:16px}
+.b:disabled{opacity:.4;cursor:not-allowed}
+.stat{display:flex;gap:16px;flex-wrap:wrap;font-family:var(--fm);font-size:12px;color:var(--muted)}
+.stat b{color:var(--fg)}
+input.obs{width:100%;background:#0e1116;border:1px solid var(--bd);border-radius:9px;color:var(--fg);padding:11px;font-size:14px;margin-top:8px}
+.vazio{text-align:center;padding:50px 20px;color:var(--muted)}
+.cron{font-family:var(--fm);font-size:12px;color:var(--muted)}
+</style></head><body>
+
+<div class="top">
+  <h1>📞 Fila de Ligação</h1>
+  <div class="cron"><span id="cronometro">00:00</span> · <span id="contador">—</span></div>
+</div>
+
+<div class="wrap">
+  <div id="resumo" class="card" style="padding:12px 16px;"><div class="stat" id="resumoTxt">Carregando…</div></div>
+  <div id="alvo"></div>
+  <div class="card" style="padding:12px 16px;">
+    <div class="stat" id="hoje">—</div>
+  </div>
+</div>
+
+<script>
+var K = localStorage.getItem('tf_key') || '';
+var fila = [], atual = null, t0 = null, tick = null;
+var escolha = { atendeu:null, resultado:null };
+
+function esc(s){ var d=document.createElement('div'); d.textContent = s==null?'':String(s); return d.innerHTML; }
+function api(a, m, b){
+  return fetch('/api/fila-ligacao?action='+a+'&k='+encodeURIComponent(K),
+    m==='POST' ? {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})} : {})
+    .then(function(r){ return r.json(); });
+}
+function fmtTel(t){
+  var n = String(t||'').replace(/\D/g,''); if(n.indexOf('55')===0) n = n.slice(2);
+  if(n.length===11) return '('+n.slice(0,2)+') '+n.slice(2,7)+'-'+n.slice(7);
+  if(n.length===10) return '('+n.slice(0,2)+') '+n.slice(2,6)+'-'+n.slice(6);
+  return n;
+}
+function corDe(tipo){
+  return {entrar_contato:'var(--gr)', conflito_reprovacao:'var(--re)',
+    cliente_loja_vermelho:'var(--pu)', retornar:'var(--or)', lead:'var(--bl)'}[tipo] || 'var(--muted)';
+}
+function iniciarCron(){
+  t0 = Date.now();
+  if(tick) clearInterval(tick);
+  tick = setInterval(function(){
+    var s = Math.floor((Date.now()-t0)/1000);
+    document.getElementById('cronometro').textContent =
+      String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+  }, 1000);
+}
+function render(){
+  var el = document.getElementById('alvo');
+  if(!atual){
+    el.innerHTML = '<div class="card vazio"><div style="font-size:40px;">✅</div>'+
+      '<div style="font-size:17px;font-weight:700;margin-top:10px;">Fila zerada</div>'+
+      '<div style="margin-top:6px;">Nenhuma ficha pendente de ligação agora.</div>'+
+      '<button class="b big" onclick="carregar()">Recarregar</button></div>';
+    return;
+  }
+  var a = atual;
+  el.innerHTML =
+   '<div class="card">'+
+    '<span class="pill" style="background:'+corDe(a.tipo)+'22;color:'+corDe(a.tipo)+';border:1px solid '+corDe(a.tipo)+'55;">'+esc(a.rotulo)+'</span>'+
+    (a.tentativas ? '<span class="pill" style="background:#1a1f26;color:var(--muted);margin-left:6px;">'+a.tentativas+'ª tentativa</span>' : '')+
+    '<div class="nome">'+esc(a.nome)+'</div>'+
+    '<div class="tel" onclick="copiar(\''+esc(a.telefone)+'\')" title="clique para copiar">'+fmtTel(a.telefone)+'</div>'+
+    '<div class="meta">'+
+      (a.equipamento ? '<div>🔧 '+esc(a.equipamento)+(a.defeito?' — '+esc(a.defeito):'')+'</div>' : '')+
+      (a.sistema==='tv' ? '<div>📺 Sistema TV</div>' : '')+
+    '</div>'+
+    (a.nota ? '<div class="nota">⚠️ '+esc(a.nota)+'</div>' : '')+
+    (a.motivo ? '<div class="nota" style="border-color:var(--re);background:rgba(239,68,68,.08);">💬 '+esc(a.motivo)+'</div>' : '')+
+    '<div class="lbl">ATENDEU?</div>'+
+    '<div class="grid">'+
+      ['sim|✅ Atendeu|ok','nao_atendeu|📵 Não atendeu|no','caixa_postal|📩 Caixa postal|no','ocupado|⛔ Ocupado|no','fora_area|📡 Fora de área|no','numero_errado|❌ Número errado|no']
+      .map(function(o){ var p=o.split('|');
+        return '<button class="b '+(escolha.atendeu===p[0]?p[2]:'')+'" onclick="setAtendeu(\''+p[0]+'\')">'+p[1]+'</button>'; }).join('')+
+    '</div>'+
+    '<div id="blocoRes"></div>'+
+    '<input class="obs" id="obs" placeholder="Observação (opcional)">'+
+    '<button class="b big" id="btnSalvar" onclick="salvar()" disabled>Registrar e ir para o próximo →</button>'+
+   '</div>';
+  renderResultado();
+}
+function renderResultado(){
+  var el = document.getElementById('blocoRes'); if(!el) return;
+  if(escolha.atendeu !== 'sim'){ el.innerHTML=''; return; }
+  el.innerHTML = '<div class="lbl">O QUE ACONTECEU?</div><div class="grid">'+
+    ['cadastrou_coleta|🚚 Cadastrou coleta','vai_na_loja|🏪 Vai na loja','aprovou|💰 Aprovou o serviço',
+     'ligar_depois|🔁 Ligar depois','recusou|🚫 Recusou','ja_resolvido|✔️ Já resolvido']
+    .map(function(o){ var p=o.split('|');
+      return '<button class="b '+(escolha.resultado===p[0]?'sel':'')+'" onclick="setResultado(\''+p[0]+'\')">'+p[1]+'</button>'; }).join('')+'</div>';
+}
+function setAtendeu(v){ escolha.atendeu=v; if(v!=='sim') escolha.resultado=''; else escolha.resultado=null; render(); atualizarBotao(); }
+function setResultado(v){ escolha.resultado=v; renderResultado(); atualizarBotao(); }
+function atualizarBotao(){
+  var b=document.getElementById('btnSalvar'); if(!b) return;
+  b.disabled = !(escolha.atendeu && (escolha.atendeu!=='sim' || escolha.resultado));
+}
+function copiar(t){ try{ navigator.clipboard.writeText(t); }catch(e){} }
+
+function salvar(){
+  if(!atual) return;
+  var b=document.getElementById('btnSalvar'); b.disabled=true; b.textContent='Salvando…';
+  var dur = t0 ? Math.floor((Date.now()-t0)/1000) : 0;
+  api('desfecho','POST',{ id:atual.id, sistema:atual.sistema, telefone:atual.telefone, nome:atual.nome,
+    atendeu:escolha.atendeu, resultado:escolha.resultado||'', duracaoSeg:dur,
+    obs:(document.getElementById('obs')||{value:''}).value })
+  .then(function(d){
+    if(!d || !d.ok){ b.disabled=false; b.textContent='Registrar e ir para o próximo →';
+      alert('Não consegui registrar: '+((d&&d.error)||'erro')); return; }
+    fila.shift(); proximo(); carregarHoje();
+  }).catch(function(e){ b.disabled=false; b.textContent='Registrar e ir para o próximo →'; alert('Erro: '+e.message); });
+}
+function proximo(){
+  escolha={atendeu:null,resultado:null};
+  atual = fila.length ? fila[0] : null;
+  document.getElementById('contador').textContent = fila.length ? (fila.length+' na fila') : 'fila vazia';
+  if(atual) iniciarCron();
+  render();
+}
+function carregar(){
+  api('fila').then(function(d){
+    if(!d || !d.ok){ document.getElementById('resumoTxt').textContent='Erro ao carregar a fila'; return; }
+    fila = d.fila || [];
+    var r = d.resumo || {};
+    document.getElementById('resumoTxt').innerHTML =
+      Object.keys(r).map(function(k){ return esc(k)+': <b>'+r[k]+'</b>'; }).join(' &nbsp;·&nbsp; ') || 'Nada na fila';
+    proximo();
+  });
+}
+function carregarHoje(){
+  api('relatorio&dias=1').then(function(d){
+    if(!d || !d.ok) return;
+    document.getElementById('hoje').innerHTML =
+      'Hoje: <b>'+d.ligacoes+'</b> ligações &nbsp;·&nbsp; <b>'+d.atendidas+'</b> atenderam ('+d.taxaAtendimento+'%)'+
+      ' &nbsp;·&nbsp; <b>'+d.tempoTotalMin+'</b> min ao telefone';
+  });
+}
+carregar(); carregarHoje();
+</script>
+</body></html>

@@ -459,6 +459,56 @@ function check(nome, cond, extra) {
     try { new Function(_srcBot.replace(/export default/, 'module.exports =')); return true; } catch (e) { return false; }
   })());
 
+  // ════ CENÁRIO 14: fila de ligação — prioridade e registro ════
+  console.log('▶ Cenário 14 — fila de ligação (Fase 0)');
+  const fila = carregarHandler('api/fila-ligacao.js');
+  const agoraF = Date.now();
+  const hAtras = h => new Date(agoraF - h * 3600000).toISOString();
+  KV['prospeccao_adm'] = { fichas: [
+    { id:'L1', status:'lead', nome:'Lead Frio', telefone:'5531990010001', criadoEm: hAtras(10) },
+    { id:'R1', status:'retornar', nome:'Retornar Um', telefone:'5531990010002', movidoEm: hAtras(10) },
+    { id:'E1', status:'entrar_contato', nome:'Entrar Contato', telefone:'5531990010003', equipamento:'Micro-ondas', criadoEm: hAtras(5) },
+    { id:'C1', status:'conflitos_bot', nome:'Reprovou Orc', telefone:'5531990010004', motivoConflito:'reprovou o orçamento após as 5 fases — finalizar manualmente', criadoEm: hAtras(8) },
+    { id:'C2', status:'conflitos_bot', nome:'Analise Compra', telefone:'5531990010005', motivoConflito:'ANÁLISE DE COMPRA — cliente quer vender o equipamento', criadoEm: hAtras(8) },
+    { id:'C3', status:'conflitos_bot', nome:'Promessa', telefone:'5531990010006', motivoConflito:'⚠️ PROMESSA NÃO CUMPRIDA — VERIFICAR COM O CLIENTE', criadoEm: hAtras(2) },
+    { id:'CL1', status:'cliente_loja', nome:'Loja Vermelho', telefone:'5531990010007', movidoEm: hAtras(72) },
+    { id:'CL2', status:'cliente_loja', nome:'Loja No Prazo', telefone:'5531990010008', movidoEm: hAtras(10) },
+  ] };
+  KV['fichas_adm'] = { fichas: [] }; KV['fichas_tv'] = { fichas: [] };
+  delete KV['fila_ligacao_log'];
+  const qF1 = res();
+  await fila(req({ action:'fila', ...K }), qF1);
+  const lista = (qF1.dado && qF1.dado.fila) || [];
+  const nomes = lista.map(i => i.nome);
+  check('ordem: Entrar em Contato é o 1º', nomes[0] === 'Entrar Contato', nomes);
+  check('ordem: conflito de REPROVAÇÃO é o 2º', nomes[1] === 'Reprovou Orc', nomes);
+  check('ordem: Cliente Loja VERMELHO é o 3º', nomes[2] === 'Loja Vermelho', nomes);
+  check('ordem: Retornar é o 4º', nomes[3] === 'Retornar Um', nomes);
+  check('ordem: Lead é o último', nomes[4] === 'Lead Frio', nomes);
+  check('conflito de ANÁLISE DE COMPRA fica FORA (resolve por mensagem)', !nomes.includes('Analise Compra'), nomes);
+  check('conflito de PROMESSA fica FORA da fila de ligação', !nomes.includes('Promessa'), nomes);
+  check('Cliente Loja dentro do prazo fica FORA', !nomes.includes('Loja No Prazo'), nomes);
+
+  // desfecho grava e confirma
+  const qF2 = res();
+  await fila(req({ action:'desfecho', ...K }, { id:'E1', telefone:'5531990010003', nome:'Entrar Contato',
+    atendeu:'sim', resultado:'cadastrou_coleta', duracaoSeg: 180 }), qF2);
+  check('desfecho gravado e confirmado', qF2.dado && qF2.dado.ok === true, qF2.dado);
+  check('desfecho sem "atendeu" é recusado', await (async () => {
+    const r = res(); await fila(req({ action:'desfecho', ...K }, { id:'E1' }), r); return r.dado && r.dado.ok === false; })());
+
+  // quem já foi ligado hoje sai da fila
+  const qF3 = res();
+  await fila(req({ action:'fila', ...K }), qF3);
+  check('cliente já ligado hoje sai da fila', !((qF3.dado.fila)||[]).some(i => i.id === 'E1'),
+    ((qF3.dado||{}).fila||[]).map(i => i.nome));
+
+  const qF4 = res();
+  await fila(req({ action:'relatorio', ...K }), qF4);
+  check('relatório conta a ligação e o tempo', qF4.dado && qF4.dado.ligacoes === 1 && qF4.dado.tempoMedioSeg === 180, qF4.dado);
+  check('fila: chave inválida recusada', await (async () => {
+    const r = res(); await fila(req({ action:'fila', k:'errada' }), r); return r.statusCode === 401; })());
+
   // ════ Resultado ════
   console.log('\n═══════════════════════════════════');
   const _mj = (() => { const b = new Date(Date.now() - 3 * 3600000); const d = b.getUTCDay(), hh = b.getUTCHours(); return (d >= 1 && d <= 5) ? (hh >= 8 && hh < 15) : (d === 6 ? (hh >= 8 && hh < 10) : false); })();

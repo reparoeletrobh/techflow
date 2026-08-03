@@ -275,6 +275,14 @@
       "destination": "/api/auditoria.js"
     },
     {
+      "source": "/fila-ligacao",
+      "destination": "/fila-ligacao.html"
+    },
+    {
+      "source": "/api/fila-ligacao",
+      "destination": "/api/fila-ligacao.js"
+    },
+    {
       "source": "/prospeccao",
       "destination": "/prospeccao.html"
     },
