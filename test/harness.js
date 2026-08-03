@@ -700,6 +700,45 @@ function check(nome, cond, extra) {
   check('aceito: chamou orc-enviar (card vai para Enviado)',
     global.__fetchLog.some(u => u.includes('orc-enviar')), global.__fetchLog.filter(u => u.includes('orc')));
 
+  // ════ CENÁRIO 20: devolver à fila manual os orçamentos que a Meta recusou ════
+  console.log('▶ Cenário 20 — devolver orçamentos marcados como enviados por engano');
+  const orc20 = carregarHandler('api/orcamento.js');
+  const fal = 'failed | [{"code":131042,"title":"Business eligibility payment issue"}]';
+  LISTS['wa_evt_list'] = [
+    { ts:'2026-08-01T11:00:00.000Z', tel:'5531990020001', dir:'status', texto: fal },
+    { ts:'2026-08-02T11:00:00.000Z', tel:'5531990020002', dir:'status', texto: fal },
+    { ts:'2026-08-03T11:00:00.000Z', tel:'5531990020004', dir:'status', texto:'delivered' },
+    // 0005 falhou mas o cliente respondeu depois — já foi alcançado
+    { ts:'2026-08-03T11:00:00.000Z', tel:'5531990020005', dir:'status', texto: fal },
+    { ts:'2026-08-03T12:00:00.000Z', tel:'5531990020005', dir:'in', texto:'oi' },
+  ].map(o => JSON.stringify(o));
+  KV['reparoeletro_orcamentos'] = { fichas: [
+    { id:'O1', tel:'5531990020001', nome:'Falhou Um',  status:'enviado', enviadoAt:'2026-08-01T11:00:05.000Z', preco:'350' },
+    { id:'O2', tel:'5531990020002', nome:'Falhou Dois',status:'enviado', enviadoAt:'2026-08-02T11:00:05.000Z', preco:'370' },
+    { id:'O3', tel:'5531990020003', nome:'Antes',      status:'enviado', enviadoAt:'2026-07-25T10:00:00.000Z', preco:'350' },
+    { id:'O4', tel:'5531990020004', nome:'Entregue',   status:'enviado', enviadoAt:'2026-08-03T11:00:05.000Z', preco:'350' },
+    { id:'O5', tel:'5531990020005', nome:'Respondeu',  status:'enviado', enviadoAt:'2026-08-03T11:00:05.000Z', preco:'350' },
+    { id:'O6', tel:'5531990020006', nome:'Ja pendente',status:'pendente', preco:null },
+  ], syncedIds: [] };
+  KV['tv_orcamentos'] = { fichas: [] };
+
+  const s20 = res();
+  await orc20(req({ action:'devolver-nao-entregues', ...K }), s20);
+  const t20 = String(s20.dado || '');
+  check('leitura: identifica os 2 que falharam', /devolver=2/.test(t20), t20.split('\n')[0]);
+  check('leitura: NÃO altera nada', KV['reparoeletro_orcamentos'].fichas.find(f => f.id === 'O1').status === 'enviado');
+
+  const s20b = res();
+  await orc20(req({ action:'devolver-nao-entregues', aplicar:'1', ...K }), s20b);
+  const fx = id => KV['reparoeletro_orcamentos'].fichas.find(f => f.id === id);
+  check('aplicar: falhou 01/08 volta para pendente', fx('O1').status === 'pendente', fx('O1'));
+  check('aplicar: falhou 02/08 volta para pendente', fx('O2').status === 'pendente', fx('O2'));
+  check('aplicar: enviado ANTES do bloqueio não é mexido', fx('O3').status === 'enviado', fx('O3'));
+  check('aplicar: ENTREGUE não é mexido', fx('O4').status === 'enviado', fx('O4'));
+  check('aplicar: cliente que respondeu depois não é mexido', fx('O5').status === 'enviado', fx('O5'));
+  check('aplicar: já pendente continua pendente', fx('O6').status === 'pendente', fx('O6'));
+  check('aplicar: guarda o motivo da devolução', !!fx('O1').devolvidoEm && /131042|recus/i.test(String(fx('O1').devolvidoMotivo||'')), fx('O1'));
+
   // ════ Resultado ════
   console.log('\n═══════════════════════════════════');
   const _mj = (() => { const b = new Date(Date.now() - 3 * 3600000); const d = b.getUTCDay(), hh = b.getUTCHours(); return (d >= 1 && d <= 5) ? (hh >= 8 && hh < 15) : (d === 6 ? (hh >= 8 && hh < 10) : false); })();

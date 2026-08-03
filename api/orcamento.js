@@ -973,6 +973,78 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // ── 🔁 DEVOLVER-NAO-ENTREGUES: orçamentos marcados como enviados que a Meta RECUSOU ──
+  //    voltam para a aba Orçamento, para envio manual. &aplicar=1 executa.
+  if (action === "devolver-nao-entregues") {
+    const CODIGOS = [131042, 133010, 131026, 131047];
+    // lê o histórico de eventos do bot para saber o que a Meta recusou de verdade
+    let evts = [];
+    try {
+      const r = await fetch(`${UPSTASH_URL}/lrange/wa_evt_list/-5000/-1`,
+        { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
+      const j = await r.json();
+      for (const s of (j.result || [])) { try { evts.push(JSON.parse(s)); } catch (_) {} }
+    } catch (e) {}
+    const d8 = t => String(t || "").replace(/\D/g, "").slice(-8);
+    // telefone → momento da recusa (o mais recente) e telefone → última resposta do cliente
+    const recusa = {}, respondeu = {};
+    for (const e of evts) {
+      const k = d8(e.tel); if (!k) continue;
+      const t = new Date(e.ts).getTime();
+      if (e.dir === "status" && /failed/i.test(String(e.texto || "")) &&
+          CODIGOS.some(c => String(e.texto).includes(String(c)))) {
+        if (!recusa[k] || t > recusa[k]) recusa[k] = t;
+      }
+      if (e.dir === "in") { if (!respondeu[k] || t > respondeu[k]) respondeu[k] = t; }
+    }
+    const alvos = [];
+    for (const [chave, banco] of [[ORC_KEY, await dbGet(ORC_KEY)], ["tv_orcamentos", await dbGet("tv_orcamentos")]]) {
+      for (const f of (((banco || {}).fichas) || [])) {
+        if (f.status !== "enviado") continue;
+        const k = d8(f.tel);
+        if (!recusa[k]) continue;                                   // nunca teve recusa
+        const tEnv = new Date(f.enviadoAt || 0).getTime();
+        // a recusa tem que ser do mesmo envio (até 30 min de folga)
+        if (!(recusa[k] >= tEnv - 30 * 60000)) continue;
+        if (respondeu[k] && respondeu[k] > recusa[k]) continue;      // já foi alcançado
+        alvos.push({ chave, id: f.id, nome: f.nome, tel: f.tel, enviadoAt: f.enviadoAt });
+      }
+    }
+    if (String(req.query.aplicar || "") !== "1") {
+      return res.status(200).send(
+        "DEVOLVER À FILA MANUAL — devolver=" + alvos.length + "\n" +
+        (alvos.length
+          ? alvos.slice(0, 60).map(a => "  " + (a.nome || "") + " · " + String(a.tel || "").slice(-8) +
+              " · marcado enviado em " + String(a.enviadoAt || "").slice(0, 16).replace("T", " ")).join("\n") +
+            "\n\nAcrescente &aplicar=1 para devolver ao status pendente."
+          : "Nenhum orçamento marcado como enviado bate com uma recusa da Meta."));
+    }
+    let feitos = 0;
+    for (const chave of [ORC_KEY, "tv_orcamentos"]) {
+      const dos = alvos.filter(a => a.chave === chave);
+      if (!dos.length) continue;
+      const banco = (await dbGet(chave)) || { fichas: [] };
+      const ids = new Set(dos.map(a => a.id));
+      for (const f of (banco.fichas || [])) {
+        if (!ids.has(f.id) || f.status !== "enviado") continue;
+        f.status = "pendente";
+        f.enviadoAt = null;
+        f.devolvidoEm = new Date().toISOString();
+        f.devolvidoMotivo = "recusado pela Meta (131042 / pagamento) — reenviar manualmente";
+        feitos++;
+      }
+      await dbSet(chave, banco);
+    }
+    // confere o próprio resultado
+    const chk = (await dbGet(ORC_KEY)) || { fichas: [] };
+    const sobrou = alvos.filter(a => a.chave === ORC_KEY)
+      .filter(a => ((chk.fichas || []).find(f => f.id === a.id) || {}).status === "enviado").length;
+    return res.status(200).send(
+      "DEVOLVIDOS À FILA MANUAL: " + feitos + "\n" +
+      (sobrou ? "⚠️ " + sobrou + " NÃO voltaram — conferir\n" : "") +
+      "Abra /orcamento — eles estão na aba Orçamento, com o texto e o preço prontos.");
+  }
+
   // ── POST orc-enviar ───────────────────────────────────────
   if (req.method === "POST" && action === "orc-enviar") {
     const { id, preco } = req.body || {};
