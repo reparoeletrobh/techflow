@@ -963,6 +963,27 @@ export default async function handler(req, res) {
     return res.status(200).send(linhas.join('\n'));
   }
 
+  // ── 🔀 ORCAMENTO-MANUAL: liga/desliga o envio automático de orçamento ──
+  if (action === 'orcamento-manual') {
+    const cfg = (await dbGet('wa_bot_config')) || {};
+    const v = String(req.query.ligar || '').trim();
+    if (v === '1' || v === '0') {
+      cfg.orcamentoManual = (v === '1');
+      cfg.orcamentoManualEm = new Date().toISOString();
+      await dbSet('wa_bot_config', cfg);
+      const chk = (await dbGet('wa_bot_config')) || {};
+      if (!!chk.orcamentoManual !== (v === '1')) {
+        return res.status(500).json({ ok: false, error: 'não confirmou a gravação' });
+      }
+    }
+    const c2 = (await dbGet('wa_bot_config')) || {};
+    return res.status(200).send(
+      'MODO DE ENVIO DE ORÇAMENTO: ' + (c2.orcamentoManual ? 'MANUAL (bot NÃO envia)' : 'AUTOMÁTICO (bot envia)') +
+      (c2.orcamentoManualEm ? '\nalterado em ' + c2.orcamentoManualEm : '') +
+      '\n\n&ligar=1 → manual (equipe envia por /orcamento)' +
+      '\n&ligar=0 → automático (bot envia o template)');
+  }
+
   if (action === 'buscar-conversas') {
     const alvos = String(req.query.tels || '').split(',').map(s => s.replace(/\D/g, '').trim()).filter(Boolean);
     if (!alvos.length) return res.status(400).json({ ok: false, error: 'informe ?tels=1234,5678 (finais separados por vírgula)' });
@@ -2005,6 +2026,12 @@ export default async function handler(req, res) {
       if (!dentro) return res.status(200).json({ ok: true, foraDeHorario: true, enviados: 0 });
     }
     const cfgO = (await dbGet('wa_bot_config')) || {};
+    // 🔀 MODO MANUAL: com o envio automático desligado, os orçamentos ficam
+    // acumulando na aba Orçamento (/orcamento) para envio manual pela equipe.
+    if (cfgO.orcamentoManual === true) {
+      return res.status(200).json({ ok: true, modoManual: true, enviados: 0,
+        msg: 'envio automático de orçamento DESLIGADO — a equipe envia por /orcamento' });
+    }
     const telsO = Array.isArray(cfgO.execTels) ? cfgO.execTels : [];
     const abertoO = cfgO.modoAberto === true;
     if (!abertoO && !telsO.length) return res.status(200).json({ ok: true, msg: 'nenhum telefone autorizado' });
@@ -2140,6 +2167,9 @@ export default async function handler(req, res) {
         // (some de pendentes; o card já está no pipe em aguardando_aprovacao → cronômetro de 48h da última chamada segue vivo)
         try {
           const KOE = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+          // ⚠️ Só tira o card da aba Orçamento se a Meta ENTREGOU. Se recusou, o orçamento
+          // continua disponível para envio manual — é a rede que mantém a operação de pé.
+          if (!okEnvio) throw new Error('__nao_marcar_enviado');
           const orcDbV = (await dbGet(sisO === 'tv' ? 'tv_orcamentos' : 'reparoeletro_orcamentos')) || { fichas: [] };
           const d8f = String(f.telefone || '').replace(/\D/g, '').slice(-8);
           const orcFv = (orcDbV.fichas || []).find(x => x.status === 'pendente' &&

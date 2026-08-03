@@ -670,6 +670,36 @@ function check(nome, cond, extra) {
     !!KV['wa_abordados'].tels['99451058'], KV['wa_abordados'].tels);
   check('relatório separa os dois grupos', /inv[áa]lid/i.test(t18) && /reenvio/i.test(t18), t18.slice(0, 200));
 
+  // ════ CENÁRIO 19: orçamento só sai da fila manual se a Meta entregou ════
+  console.log('▶ Cenário 19 — envio recusado mantém o orçamento na aba Orçamento');
+  KV['wa_credenciais'] = { token:'mock', phoneId:'123' };
+  KV['wa_bot_config'] = { modoAberto:true, execTels:[] };
+  KV['wa_bot_pausados'] = {}; KV['tv_logistica'] = { fichas: [] };
+  const fOrc19 = () => ({ id:'OR19', nome:'Cliente 19', telefone:'5531990019999',
+    equipamento:'Purificador', phase:'orc_registrado',
+    diagnostico:{ equips:[{tipo:'purificador',modelo:'PE11X',servicos:['Gás']}],
+      textoOrc:'Orcamento: fica em 350 reais', em:new Date().toISOString() } });
+
+  // 19a: Meta RECUSA → o card NÃO pode ser marcado como enviado
+  KV['reparoeletro_logistica'] = { fichas: [fOrc19()] };
+  KV['reparoeletro_orcamentos'] = { fichas: [{ id:'ORC-19', tel:'5531990019999', nome:'Cliente 19', status:'pendente', precoSugerido:'350', textoOrc:'x' }], syncedIds: [] };
+  KV['wa_orc_enviados'] = { ids: {} };
+  global.__fetchLog.length = 0;
+  global.__forcarErroGraph = { error: { message: 'unsettled payments', code: 131042 } };
+  await wabot(req({ action:'orcamentos-pendentes', ...K }), res());
+  delete global.__forcarErroGraph;
+  check('recusado: NÃO chamou orc-enviar (card fica na aba Orçamento)',
+    !global.__fetchLog.some(u => u.includes('orc-enviar')), global.__fetchLog.filter(u => u.includes('orc')));
+
+  // 19b: Meta ACEITA → marca como enviado normalmente
+  KV['reparoeletro_logistica'] = { fichas: [fOrc19()] };
+  KV['reparoeletro_orcamentos'] = { fichas: [{ id:'ORC-19', tel:'5531990019999', nome:'Cliente 19', status:'pendente', precoSugerido:'350', textoOrc:'x' }], syncedIds: [] };
+  KV['wa_orc_enviados'] = { ids: {} };
+  global.__fetchLog.length = 0;
+  await wabot(req({ action:'orcamentos-pendentes', ...K }), res());
+  check('aceito: chamou orc-enviar (card vai para Enviado)',
+    global.__fetchLog.some(u => u.includes('orc-enviar')), global.__fetchLog.filter(u => u.includes('orc')));
+
   // ════ Resultado ════
   console.log('\n═══════════════════════════════════');
   const _mj = (() => { const b = new Date(Date.now() - 3 * 3600000); const d = b.getUTCDay(), hh = b.getUTCHours(); return (d >= 1 && d <= 5) ? (hh >= 8 && hh < 15) : (d === 6 ? (hh >= 8 && hh < 10) : false); })();
