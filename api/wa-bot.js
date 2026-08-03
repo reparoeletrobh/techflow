@@ -774,6 +774,65 @@ export default async function handler(req, res) {
       '\n\nPara liberar o reenvio depois de regularizar o pagamento, acrescente &aplicar=1');
   }
 
+  // ── 📋 RECUSADAS-DETALHE: telefone · hora do envio · template · hora da recusa ──
+  if (action === 'recusadas-detalhe') {
+    const CODIGOS = [131042, 131047, 131026, 133010];
+    const evts = await lerEvts();
+    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const brt = ts => new Date(new Date(ts).getTime() - 3 * 3600000).toISOString().replace('T', ' ').slice(0, 16);
+    // identifica qual template pelo conteúdo/rota do evento de saída
+    const qualTemplate = e => {
+      const t = String(e.texto || '');
+      if (e.via === 'bot-auto-orcamento' || /orcamento_pronto/i.test(t)) return 'orcamento_pronto';
+      if (/Logística da Reparo Eletro - TVs|conserto da sua TV/i.test(t)) return 'cadastro_recebido_tv';
+      if (/TEMOS 2 OPÇÕES|Recebemos o seu cadastro/i.test(t)) return 'cadastro_recebido';
+      if (/equipamento (está |ta )?pronto|conserto realizado/i.test(t)) return 'equipamento_pronto';
+      if (e.tipo === 'template') return 'template (não identificado)';
+      return 'TEXTO LIVRE (não era template)';
+    };
+    // saídas por telefone, ordenadas no tempo
+    const outPorTel = {};
+    for (const e of evts) {
+      if (e.dir !== 'out' || e.tipo === 'falha' || e.tipo === 'nota') continue;
+      (outPorTel[d8(e.tel)] = outPorTel[d8(e.tel)] || []).push(e);
+    }
+    for (const k of Object.keys(outPorTel)) outPorTel[k].sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+
+    const linhas = [];
+    for (const e of evts) {
+      if (e.dir !== 'status' || !/failed/i.test(String(e.texto || ''))) continue;
+      const cod = CODIGOS.find(c => String(e.texto).includes(String(c)));
+      if (!cod) continue;
+      const k = d8(e.tel);
+      const tRec = new Date(e.ts).getTime();
+      // casa pelo msgId quando existe; senão, a última saída antes da recusa (até 15 min)
+      let orig = null;
+      if (e.msgId) orig = (outPorTel[k] || []).find(o => o.msgId && o.msgId === e.msgId) || null;
+      if (!orig) {
+        const cands = (outPorTel[k] || []).filter(o => {
+          const dt = tRec - new Date(o.ts).getTime();
+          return dt >= 0 && dt <= 15 * 60000;
+        });
+        orig = cands.length ? cands[cands.length - 1] : null;
+      }
+      linhas.push({
+        telefone: String(e.tel || ''),
+        envio: orig ? brt(orig.ts) : '(não localizado)',
+        template: orig ? qualTemplate(orig) : '(não localizado)',
+        recusa: brt(e.ts), codigo: cod,
+        casadoPor: orig ? (e.msgId && orig.msgId === e.msgId ? 'msgId' : 'horário') : '—',
+      });
+    }
+    linhas.sort((a, b) => a.recusa.localeCompare(b.recusa));
+    if (String(req.query.json || '') === '1') {
+      return res.status(200).json({ ok: true, total: linhas.length, linhas });
+    }
+    const cab = 'RECUSADAS — ' + linhas.length + ' mensagens (horários em BRT)\n' +
+      'telefone;envio;template;recusa;codigo;casado_por\n';
+    return res.status(200).send(cab + linhas.map(l =>
+      [l.telefone, l.envio, l.template, l.recusa, l.codigo, l.casadoPor].join(';')).join('\n'));
+  }
+
   if (action === 'buscar-conversas') {
     const alvos = String(req.query.tels || '').split(',').map(s => s.replace(/\D/g, '').trim()).filter(Boolean);
     if (!alvos.length) return res.status(400).json({ ok: false, error: 'informe ?tels=1234,5678 (finais separados por vírgula)' });
