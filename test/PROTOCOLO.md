@@ -12,6 +12,25 @@ NENHUMA alteração sobe direto para produção. O fluxo:
 4. **Janela de deploy**: uma vez ao dia (combinada com Pedro), merge dev→main
 5. **Smoke test pós-deploy**: conferir as telas afetadas em produção
 
+## As duas camadas de verificação
+
+**1. Harness (`node test/harness.js`)** — comportamento. Redis simulado, handlers reais.
+Cobre: almoxarifado, wa-bot e **precificação (cenário 7)** — tabela ADM completa,
+multi-equipamento com desconto, e paridade logística × frente de loja (−10%).
+O placar informa se rodou DENTRO ou FORA da janela comercial: fora dela, o
+dedupe do bot (cenário 6) NÃO é testado — o verde é mais fraco.
+
+**2. Auditoria estática (`node test/auditoria.js`)** — o repositório inteiro.
+Cobre o que o harness não vê: sintaxe das 86 APIs (CJS e ESM), blocos JS das
+90 telas, função chamada em on* que não existe no arquivo, phase×phaseId em
+quem lê o pipe, divergência de preço logística×loja, cron sem rota.
+
+**Regra da casa atualizada: os DOIS precisam estar verdes antes de qualquer push.**
+
+Ao alterar a tabela de preço: mude o cenário 7 PRIMEIRO com os valores novos,
+rode (tem que dar VERMELHO), depois altere o código nos DOIS arquivos
+(logistica.js e frenteloja.js) até dar verde. Teste que nunca falhou não protege.
+
 ## Rodar os testes
     cd repo && node test/harness.js
 

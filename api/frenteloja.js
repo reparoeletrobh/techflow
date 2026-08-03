@@ -618,11 +618,11 @@ export default async function handler(req,res){
     // texto final: o mesmo da logística, com o valor JÁ COM DESCONTO no lugar do original
     const primeiro = String(ficha.nomeContato||'cliente').trim().split(/\s+/)[0];
     let texto;
+    const listaTxt = calc.map(e => (e.modelo ? e.modelo + ' — ' : '') + (e.servicos||[]).join(', ')).join(' | ');
     if (calc.length === 1) {
       // troca o valor original pelo com desconto, preservando o template
       texto = String(textos[0]).replace(new RegExp('\\b' + calc[0].preco + '\\b'), String(comDesconto));
     } else {
-      const listaTxt = calc.map(e => (e.modelo ? e.modelo + ' — ' : '') + (e.servicos||[]).join(', ')).join(' | ');
       texto = `Ola, ${primeiro} bom dia, sou o Pedro da Reparo Eletro, vou te enviar agora o orcamento:\n\nForam feitos todos os testes e identificamos que sera necessario: ${listaTxt}. Este conserto completo fica em ${comDesconto} reais apenas. Aprovando ja iniciamos o conserto.`;
     }
 

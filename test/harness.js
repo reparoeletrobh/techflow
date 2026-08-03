@@ -19,6 +19,19 @@ global.fetch = async function (url, opts) {
   const u = String(url);
   if (u.startsWith('https://mock.upstash.local')) {
     const p = u.replace('https://mock.upstash.local/', '');
+    // Protocolo /pipeline (usado pelo frenteloja e handlers mais novos)
+    if (p === 'pipeline' || p.startsWith('pipeline')) {
+      const cmds = JSON.parse(opts.body);
+      const results = cmds.map(([cmd, key, val]) => {
+        const c = String(cmd).toUpperCase();
+        if (c === 'GET') return { result: KV[key] !== undefined ? JSON.stringify(KV[key]) : null };
+        if (c === 'SET') { KV[key] = JSON.parse(val); return { result: 'OK' }; }
+        if (c === 'RPUSH') { (LISTS[key] = LISTS[key] || []).push(val); return { result: LISTS[key].length }; }
+        if (c === 'LRANGE') return { result: LISTS[key] || [] };
+        return { result: null };
+      });
+      return { json: async () => results, ok: true };
+    }
     const [cmd, ...rest] = p.split('/');
     const key = decodeURIComponent(rest.join('/'));
     let result = null;
@@ -44,7 +57,7 @@ function carregarHandler(arquivo) {
 
 // ── Req/Res fake ──
 function req(query = {}, body = null, method) {
-  return { method: method || (body ? 'POST' : 'GET'), query, body };
+  return { method: method || (body ? 'POST' : 'GET'), query, body, headers: {} };
 }
 function res() {
   const r = { statusCode: 0, dado: null };
@@ -140,8 +153,54 @@ function check(nome, cond, extra) {
     check('fora da janela: abordagem em standby (nada disparado)', String((r6.dado || {}).msg || '').includes('standby'), r6.dado);
   }
 
+  // ════ CENÁRIO 7: tabela de preço — logística e frente de loja ════
+  console.log('▶ Cenário 7 — precificação: valores da tabela e paridade loja (−10%)');
+  const logi = carregarHandler('api/logistica.js');
+  const floja = carregarHandler('api/frenteloja.js');
+
+  // helper: gerar orçamento na logística para 1 equipamento
+  async function precoLogistica(equip) {
+    KV['reparoeletro_logistica'] = { fichas: [{ id: 'PRC1', nome: 'Teste Preco', telefone: '5531990009999', phase: 'coleta_efetuada', diagnostico: { equips: [equip] } }] };
+    const r = res();
+    await logi(req({ action: 'gerar-orcamento', ...K }, { id: 'PRC1' }), r);
+    return r.dado && r.dado.ficha ? r.dado.ficha.diagnostico.preco : (r.dado && r.dado.error);
+  }
+
+  const casos = [
+    ['micro-ondas elétrico = 350',            { tipo:'microondas', servicos:['Elétrico'] },                          '350'],
+    ['micro-ondas Magnetron = 390',           { tipo:'microondas', servicos:['Magnetron'] },                         '390'],
+    ['micro-ondas placa custo 150 = 2x = 300',{ tipo:'microondas', servicos:['Troca de Placa'], preco:'150' },       '300'],
+    ['purificador Motor Gás = 490',           { tipo:'purificador', subtipo:'Motor', servicos:['Gás'] },             '490'],
+    ['purificador Eletrônico Kit = 350',      { tipo:'purificador', subtipo:'Eletrônico', servicos:['Kit Termo Elétrico'] }, '350'],
+    ['adega Motor Termostato = 490',          { tipo:'adega', subtipo:'Motor', servicos:['Termostato'] },            '490'],
+    ['adega Eletrônico Sensor = 390',         { tipo:'adega', subtipo:'Eletrônico', servicos:['Sensor'] },           '390'],
+    ['forno Grande elétrico = 790',           { tipo:'forno', subtipo:'Grande', servicos:['Elétrico'] },             '790'],
+    ['bblend = 1490',                         { tipo:'bblend', servicos:['Motor'] },                                 '1490'],
+    ['tabela dinâmica: equip 1000 = 400',     { tipo:'microondas', servicos:['Elétrico'], tabela:'dinamica', valorEquip:'1000' }, '400'],
+  ];
+  for (const [nome, equip, esperado] of casos) {
+    const p = await precoLogistica(equip);
+    check(nome, p === esperado, { obtido: p });
+  }
+
+  // multi-equipamento: 2 aparelhos = soma com 10% de desconto
+  KV['reparoeletro_logistica'] = { fichas: [{ id: 'PRC2', nome: 'Teste Multi', telefone: '5531990008888', phase: 'coleta_efetuada', diagnostico: { equips: [ { tipo:'microondas', servicos:['Elétrico'] }, { tipo:'purificador', subtipo:'Motor', servicos:['Gás'] } ] } }] };
+  const rM = res();
+  await logi(req({ action: 'gerar-orcamento', ...K }, { id: 'PRC2' }), rM);
+  const pM = rM.dado && rM.dado.ficha ? rM.dado.ficha.diagnostico.preco : null;
+  check('2 equipamentos: (350+490) −10% = 756', pM === '756', { obtido: pM });
+
+  // paridade frente de loja: mesmo equipamento, total igual e −10% aplicado
+  KV['reparoeletro_frenteloja'] = { fichas: [{ id: 'FL1', nomeContato: 'Teste Loja', telefone: '5531990007777', phase: 'analise' }], seq: 1 };
+  const rF = res();
+  await floja(req({ action: 'diagnostico-loja', ...K }, { id: 'FL1', equips: [ { tipo:'microondas', servicos:['Magnetron'] } ] }), rF);
+  check('loja: micro Magnetron total = 390 (mesma tabela da logística)', rF.dado && rF.dado.total === 390, rF.dado && (rF.dado.error || rF.dado.total));
+  check('loja: desconto de 10% aplicado = 351', rF.dado && rF.dado.totalComDesconto === 351, rF.dado && (rF.dado.error || rF.dado.totalComDesconto));
+
   // ════ Resultado ════
   console.log('\n═══════════════════════════════════');
+  const _mj = (() => { const b = new Date(Date.now() - 3 * 3600000); const d = b.getUTCDay(), hh = b.getUTCHours(); return (d >= 1 && d <= 5) ? (hh >= 8 && hh < 15) : (d === 6 ? (hh >= 8 && hh < 10) : false); })();
+  console.log(`   Modo: ${_mj ? 'DENTRO da janela comercial (dedupe do bot TESTADO)' : 'FORA da janela comercial (dedupe do bot NÃO testado — rode tb. em horário comercial)'}`);
   console.log(falha === 0 ? `🟢 VERDE — ${passa} testes passaram. Liberado para a janela de deploy.` : `🔴 VERMELHO — ${falha} falha(s), ${passa} ok. NÃO SUBIR PARA PRODUÇÃO.`);
   console.log('═══════════════════════════════════\n');
   process.exit(falha === 0 ? 0 : 1);
