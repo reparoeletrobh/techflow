@@ -638,6 +638,38 @@ function check(nome, cond, extra) {
     !KV['wa_orc_enviados'].ids['O1'] && !!KV['wa_orc_enviados'].ids['O9'], KV['wa_orc_enviados'].ids);
   check('aplicar: relatório confirma o que foi feito', /fichas devolvidas para abordagem=2/.test(t17b), t17b);
 
+  // ════ CENÁRIO 18: reenvio separa pagamento de número inválido ════
+  console.log('▶ Cenário 18 — 131042 reenvia · 131026 vira conflito (não insiste)');
+  const fPag = 'failed | [{"code":131042,"title":"Business eligibility payment issue"}]';
+  const fInv = 'failed | [{"code":131026,"title":"Message undeliverable"}]';
+  LISTS['wa_evt_list'] = [
+    { ts:'2026-08-03T11:00:00.000Z', tel:'5531990001111', dir:'status', texto: fPag },
+    { ts:'2026-08-03T11:00:00.000Z', tel:'5531999451058', dir:'status', texto: fInv },
+    { ts:'2026-08-03T11:05:00.000Z', tel:'5531999451058', dir:'status', texto: fInv },
+  ].map(o => JSON.stringify(o));
+  KV['fichas_adm'] = { fichas: [
+    { id:'PG1', nome:'Pagamento', telefone:'5531990001111', status:'contato_feito', abordadoPorBot:true, contatoFeitoEm:'2026-08-03T10:59:00.000Z' },
+    { id:'IN1', nome:'Invalido',  telefone:'5531999451058', status:'contato_feito', abordadoPorBot:true, contatoFeitoEm:'2026-08-03T10:59:00.000Z' },
+  ] };
+  KV['fichas_tv'] = { fichas: [] };
+  KV['wa_abordados'] = { tels: { '90001111':'x', '99451058':'x' } };
+  KV['wa_orc_enviados'] = { ids: {} };
+  global.__fetchLog.length = 0;
+
+  const q18 = res();
+  await wabot(req({ action:'bloqueio-pagamento', aplicar:'1', ...K }), q18);
+  const t18 = String(q18.dado || '');
+  const f18 = KV['fichas_adm'].fichas;
+  check('131042: ficha volta para reenvio automático',
+    f18.find(f => f.id === 'PG1').status === 'criada', f18.find(f => f.id === 'PG1'));
+  check('131026: ficha NÃO volta para a esteira (reenviar não resolve)',
+    f18.find(f => f.id === 'IN1').status === 'contato_feito', f18.find(f => f.id === 'IN1'));
+  check('131026: abre conflito para alguém LIGAR',
+    global.__fetchLog.some(u => u.includes('criar-conflito')), global.__fetchLog);
+  check('131026: continua bloqueado para o bot não insistir',
+    !!KV['wa_abordados'].tels['99451058'], KV['wa_abordados'].tels);
+  check('relatório separa os dois grupos', /inv[áa]lid/i.test(t18) && /reenvio/i.test(t18), t18.slice(0, 200));
+
   // ════ Resultado ════
   console.log('\n═══════════════════════════════════');
   const _mj = (() => { const b = new Date(Date.now() - 3 * 3600000); const d = b.getUTCDay(), hh = b.getUTCHours(); return (d >= 1 && d <= 5) ? (hh >= 8 && hh < 15) : (d === 6 ? (hh >= 8 && hh < 10) : false); })();

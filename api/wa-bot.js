@@ -688,7 +688,10 @@ export default async function handler(req, res) {
   // ── 💳 BLOQUEIO-PAGAMENTO: tudo que a Meta recusou por pendência financeira ──
   //    modo leitura: lista e diz quando começou · &aplicar=1: devolve para reenvio
   if (action === 'bloqueio-pagamento') {
-    const CODIGOS = [131042, 131047, 131026];   // 131042 = pendência de pagamento
+    // Naturezas diferentes exigem tratamentos diferentes:
+    const COD_CONTA    = [131042, 133010];   // conta bloqueada → reenviar resolve
+    const COD_INVALIDO = [131026, 131047];   // número não recebe / janela fechada → reenviar NÃO resolve
+    const CODIGOS = [...COD_CONTA, ...COD_INVALIDO];
     const evts = await lerEvts();
     const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
     const falhas = [];
@@ -713,8 +716,10 @@ export default async function handler(req, res) {
     }
     const porTel = {};
     for (const f of falhas) {
-      if (!porTel[f.d8]) porTel[f.d8] = { tel: f.tel, d8: f.d8, qtd: 0, primeira: f.ts, ultima: f.ts, codigo: f.codigo };
-      const r = porTel[f.d8]; r.qtd++; r.ultima = f.ts;
+      if (!porTel[f.d8]) porTel[f.d8] = { tel: f.tel, d8: f.d8, qtd: 0, primeira: f.ts, ultima: f.ts, codigo: f.codigo, conta: false, invalido: false };
+      const r = porTel[f.d8]; r.qtd++; r.ultima = f.ts; r.codigo = f.codigo;
+      if (COD_CONTA.includes(f.codigo)) r.conta = true;
+      if (COD_INVALIDO.includes(f.codigo)) r.invalido = true;
     }
     const alvos = Object.values(porTel).filter(r =>
       !(ultimoIn[r.d8] && ultimoIn[r.d8] > new Date(r.ultima).getTime()));
@@ -722,7 +727,11 @@ export default async function handler(req, res) {
 
     // ── APLICAR: devolve as fichas/orçamentos para os crons reenviarem ──
     if (String(req.query.aplicar || '') === '1') {
-      const alvo8 = new Set(alvos.map(a => a.d8));
+      // SÓ volta para a esteira quem falhou por bloqueio de CONTA. Número que não recebe
+      // continuaria falhando — esse vai para conflito, para um humano ligar.
+      const paraReenviar = alvos.filter(a => a.conta && !a.invalido);
+      const paraLigar    = alvos.filter(a => a.invalido);
+      const alvo8 = new Set(paraReenviar.map(a => a.d8));
       const [fA, fT, ab, orc] = await Promise.all([
         dbGet('fichas_adm'), dbGet('fichas_tv'),
         dbGet('wa_abordados').then(v => v || { tels: {} }),
@@ -753,12 +762,34 @@ export default async function handler(req, res) {
       // confere o próprio resultado
       const chk = (await dbGet('wa_abordados')) || { tels: {} };
       const sobrou = [...alvo8].filter(k => (chk.tels || {})[k]).length;
+      // NÚMEROS QUE NÃO RECEBEM → conflito para contato humano (não adianta reenviar)
+      let conflitos = 0;
+      const nomePorTel = {};
+      for (const banco of [fA, fT]) for (const f of (((banco || {}).fichas) || [])) {
+        const k = d8(f.telefone); if (k && !nomePorTel[k]) nomePorTel[k] = { nome: f.nome, equip: f.equipamento };
+      }
+      for (const a of paraLigar) {
+        try {
+          const K2 = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+          const info = nomePorTel[a.d8] || {};
+          await fetch('https://reparoeletroadm.com/api/prospeccao?action=criar-conflito&k=' + K2, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nome: info.nome || 'Cliente', telefone: String(a.tel || '').replace(/\D/g, ''),
+              equipamento: info.equip || '',
+              motivo: '📵 WHATSAPP NÃO ENTREGA (erro ' + a.codigo + ', ' + a.qtd + ' tentativas) — ' +
+                'número pode estar errado ou sem WhatsApp. LIGAR para o cliente; reenviar não resolve.' }),
+          }).catch(() => null);
+          conflitos++;
+        } catch (e) {}
+      }
       return res.status(200).send(
         'REENVIO LIBERADO\n' +
-        'clientes atingidos=' + alvos.length + '\n' +
+        'clientes atingidos=' + alvos.length +
+        ' (bloqueio de conta=' + paraReenviar.length + ' · número inválido=' + paraLigar.length + ')\n' +
         'fichas devolvidas para abordagem=' + fichasSoltas + '\n' +
         'registros de "já abordado" limpos=' + abordLimpos + (sobrou ? ' (SOBRARAM ' + sobrou + ' — conferir)' : '') + '\n' +
         'orçamentos liberados para reenvio=' + orcSoltos + '\n' +
+        'conflitos abertos para LIGAR (número inválido, não reenviado)=' + conflitos + '\n' +
         'Os crons reenviam sozinhos: abordagem a cada 5 min, orçamento a cada 3 min, só na janela comercial.');
     }
 
@@ -768,7 +799,9 @@ export default async function handler(req, res) {
       'PRIMEIRA falha: ' + new Date(new Date(inicio).getTime() - 3 * 3600000).toISOString().replace('T', ' ').slice(0, 16) + ' (BRT)\n' +
       'ÚLTIMA  falha: ' + new Date(new Date(fim).getTime() - 3 * 3600000).toISOString().replace('T', ' ').slice(0, 16) + ' (BRT)\n' +
       'mensagens recusadas=' + falhas.length + ' | clientes distintos=' + Object.keys(porTel).length + '\n' +
-      'para REENVIAR=' + alvos.length + ' | já falaram depois (não reenviar)=' + jaFalaram + '\n\n' +
+      'para REENVIAR (bloqueio de conta)=' + alvos.filter(a => a.conta && !a.invalido).length +
+      ' | NÚMERO INVÁLIDO, precisa LIGAR=' + alvos.filter(a => a.invalido).length +
+      ' | já falaram depois (não mexer)=' + jaFalaram + '\n\n' +
       alvos.slice(0, 60).map(a => '  ' + a.d8 + ' · ' + a.qtd + 'x · desde ' +
         String(a.ultima).slice(11, 16)).join('\n') +
       '\n\nPara liberar o reenvio depois de regularizar o pagamento, acrescente &aplicar=1');
