@@ -434,6 +434,31 @@ function check(nome, cond, extra) {
   check('com ficha: NÃO abriu conflito (nada a alertar)',
     !global.__fetchLog.some(u => u.includes('criar-conflito')));
 
+  // ════ CENÁRIO 13: integridade do roteiro do bot ════
+  // Não julga a inteligência (nenhum teste faz isso) — garante que as âncoras
+  // críticas continuam no prompt e que o arquivo não quebrou.
+  console.log('▶ Cenário 13 — âncoras críticas do roteiro do bot');
+  const _srcBot = require('fs').readFileSync(require('path').join(__dirname, '..', 'api/wa-bot.js'), 'utf8');
+  const ancoras = [
+    ['5-DESC: pedido de desconto NÃO compara com equipamento novo', '5-DESC)'],
+    ['5-PRE: pesquisa real obrigatória continua no roteiro', '5-PRE)'],
+    ['proibido pesquisar dados da empresa (CNPJ/Pix/contas)', 'TERMINANTEMENTE PROIBIDO pesquisar na internet'],
+    ['limite de 2 pesquisas web', 'max_uses: 2'],
+    ['proibido inventar ou chutar preço', 'PROIBIDO inventar ou chutar'],
+    ['regra 6 usa PESQUISA WEB REAL (não "mentalmente")', 'PESQUISA WEB REAL'],
+    ['regra 6 compara por especificação quando não acha o modelo', 'especificaç'],
+    ['argumento de linha inferior preservado', 'cfg.argumentoNovo'],
+    ['fora da janela: regra dura de não agendar', 'REGRA DURA'],
+    ['retorno prometido gera conflito', 'registrar_conflito'],
+    ['rede de segurança da promessa sem lastro', 'promessaSemLastro'],
+  ];
+  for (const [nome, agulha] of ancoras) check(nome, _srcBot.includes(agulha), agulha);
+  check('regra 6 NÃO contém mais "pesquise mentalmente"', !_srcBot.includes('pesquise mentalmente'));
+  // o roteiro vive dentro de template literal: qualquer crase/${ solto derruba o arquivo inteiro
+  check('wa-bot.js compila (template literal íntegro)', (() => {
+    try { new Function(_srcBot.replace(/export default/, 'module.exports =')); return true; } catch (e) { return false; }
+  })());
+
   // ════ Resultado ════
   console.log('\n═══════════════════════════════════');
   const _mj = (() => { const b = new Date(Date.now() - 3 * 3600000); const d = b.getUTCDay(), hh = b.getUTCHours(); return (d >= 1 && d <= 5) ? (hh >= 8 && hh < 15) : (d === 6 ? (hh >= 8 && hh < 10) : false); })();
