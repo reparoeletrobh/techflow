@@ -876,8 +876,12 @@ export default async function handler(req, res) {
       return { rot, ...(r && r.error ? { erro: r.error.message + ' (code ' + (r.error.code || '') + ')' } : { dados: r }) };
     };
     // 1) dados do número + a WABA dona dele
-    const num = await pega('numero', `${G}/${pidW}?fields=display_phone_number,verified_name,quality_rating,name_status,throughput,platform_type&access_token=${tkW}`);
-    const wabaId = String(req.query.waba || '').trim();
+    // pergunta ao próprio número a qual WABA ele pertence (evita procurar o ID à mão)
+    const num = await pega('numero', `${G}/${pidW}?fields=display_phone_number,verified_name,quality_rating,name_status,throughput,platform_type,whatsapp_business_account&access_token=${tkW}`);
+    let wabaId = String(req.query.waba || '').trim();
+    if (!wabaId || /^SEU_/i.test(wabaId)) {
+      wabaId = (((num.dados || {}).whatsapp_business_account) || {}).id || '';
+    }
     const passos = [num];
     if (wabaId) {
       passos.push(await pega('waba', `${G}/${wabaId}?fields=name,currency,timezone_id,account_review_status,business_verification_status,message_template_namespace,owner_business_info,health_status&access_token=${tkW}`));
@@ -905,7 +909,8 @@ export default async function handler(req, res) {
           (t.quality_score ? ' · qualidade=' + (t.quality_score.score || '?') : ''));
       }
     }
-    if (!wabaId) linhas.push('\n⚠️ Para ver moeda, fuso e templates, acrescente &waba=SEU_WABA_ID (está no WhatsApp Manager).');
+    if (wabaId) linhas.unshift('WABA_ID descoberto: ' + wabaId);
+    else linhas.push('\n⚠️ Não consegui descobrir o ID da WABA pelo número — o token pode não ter escopo whatsapp_business_management.');
     return res.status(200).send(linhas.join('\n'));
   }
 
