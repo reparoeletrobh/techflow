@@ -16,7 +16,10 @@ NENHUMA alteração sobe direto para produção. O fluxo:
 
 **1. Harness (`node test/harness.js`)** — comportamento. Redis simulado, handlers reais.
 Cobre: almoxarifado, wa-bot e **precificação (cenário 7)** — tabela ADM completa,
-multi-equipamento com desconto, e paridade logística × frente de loja (−10%).
+multi-equipamento com desconto, paridade logística × frente de loja (−10%),
+e as REGRAS INVIOLÁVEIS (cenários 8-10): isolamento do Frente de Loja,
+trava anti-limbo da aprovação (ambíguo = recusa), roteamento por origem,
+e TV aprovada sem tarefa no almoxarifado ADM.
 O placar informa se rodou DENTRO ou FORA da janela comercial: fora dela, o
 dedupe do bot (cenário 6) NÃO é testado — o verde é mais fraco.
 

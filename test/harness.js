@@ -42,6 +42,7 @@ global.fetch = async function (url, opts) {
     return { json: async () => ({ result }), ok: true };
   }
   // Chamadas externas (Graph/Anthropic/produção) NUNCA saem do harness:
+  (global.__fetchLog = global.__fetchLog || []).push(u);
   return { json: async () => ({ mocked: true, messages: [{ id: 'wamid.mock' }] }), ok: true, arrayBuffer: async () => new ArrayBuffer(8) };
 };
 
@@ -196,6 +197,51 @@ function check(nome, cond, extra) {
   await floja(req({ action: 'diagnostico-loja', ...K }, { id: 'FL1', equips: [ { tipo:'microondas', servicos:['Magnetron'] } ] }), rF);
   check('loja: micro Magnetron total = 390 (mesma tabela da logística)', rF.dado && rF.dado.total === 390, rF.dado && (rF.dado.error || rF.dado.total));
   check('loja: desconto de 10% aplicado = 351', rF.dado && rF.dado.totalComDesconto === 351, rF.dado && (rF.dado.error || rF.dado.totalComDesconto));
+
+  // ════ CENÁRIO 8: isolamento do Frente de Loja ════
+  // Regra inviolável: FL grava SÓ em reparoeletro_frenteloja. O bot não lê esse banco.
+  console.log('▶ Cenário 8 — Frente de Loja não vaza para os bancos do bot');
+  const sentinelaLog = JSON.stringify(KV['reparoeletro_logistica'] || null);
+  const sentinelaTvLog = JSON.stringify(KV['tv_logistica'] || null);
+  KV['reparoeletro_frenteloja'] = { fichas: [{ id: 'ISO1', nomeContato: 'Iso Teste', telefone: '5531990006666', phase: 'analise' }], seq: 1 };
+  await floja(req({ action: 'diagnostico-loja', ...K }, { id: 'ISO1', equips: [ { tipo:'purificador', subtipo:'Motor', servicos:['Gás'] } ] }), res());
+  check('diagnóstico de loja NÃO tocou reparoeletro_logistica', JSON.stringify(KV['reparoeletro_logistica'] || null) === sentinelaLog);
+  check('diagnóstico de loja NÃO tocou tv_logistica', JSON.stringify(KV['tv_logistica'] || null) === sentinelaTvLog);
+  const fIso = KV['reparoeletro_frenteloja'].fichas[0];
+  check('orçamento de loja nasce NÃO enviado (orcEnviadoWpp=false)', fIso.orcEnviadoWpp === false, fIso.orcEnviadoWpp);
+
+  // ════ CENÁRIO 9: aprovação — trava anti-limbo e roteamento por origem ════
+  console.log('▶ Cenário 9 — aprovação: ambiguidade recusa, origem roteia');
+  // 9a: SEM origem + orçamento aberto em TV e ADM = recusa e abre conflito
+  KV['wa_orc_enviados'] = { ids: {} };
+  KV['reparoeletro_pipe'] = { cards: [{ id: 'AMB-ADM', nomeContato: 'Ambiguo', telefone: '5531990004444', phaseId: 'aguardando_aprovacao' }] };
+  KV['tv_logistica'] = { fichas: [{ id: 'AMB-TV', nome: 'Ambiguo', telefone: '5531990004444', phase: 'orc_enviado' }] };
+  KV['tv_pipe'] = { cards: [] };
+  const r9a = res();
+  await wabot(req({ action: 'aprovar-cliente', tel: '90004444', aplicar: '1', ...K }), r9a);
+  check('cliente em 2 sistemas sem origem: bot RECUSA (não adivinha)', r9a.dado && r9a.dado.ok === false, r9a.dado && r9a.dado.passos);
+
+  // 9b: origem logistica-adm registrada = NÃO toca na TV
+  global.__fetchLog.length = 0;
+  KV['wa_orc_enviados'] = { ids: { 'orc1': { telefone: '5531990004444', origem: 'logistica-adm', fichaId: 'AMB-ADM', em: new Date().toISOString() } } };
+  await wabot(req({ action: 'aprovar-cliente', tel: '90004444', aplicar: '1', ...K }), res());
+  const chamouTv = global.__fetchLog.some(u => u.includes('tv-logistica') && u.includes('aprovar-orcamento'));
+  check('origem ADM: aprovação NÃO chamou a logística de TV', !chamouTv);
+
+  // ════ CENÁRIO 10: aprovação de TV não cria tarefa no almoxarifado ADM ════
+  console.log('▶ Cenário 10 — TV aprovada: board de TV sim, almoxarifado ADM não');
+  delete KV['reparoeletro_almoxarifado'];
+  global.__fetchLog.length = 0;
+  KV['wa_orc_enviados'] = { ids: { 'orc2': { telefone: '5531990003333', origem: 'logistica-tv', fichaId: 'TVF1', em: new Date().toISOString() } } };
+  KV['tv_logistica'] = { fichas: [{ id: 'TVF1', nome: 'Cliente TV', telefone: '5531990003333', phase: 'orc_enviado' }] };
+  KV['tv_pipe'] = { cards: [{ id: 'TVC1', nomeContato: 'Cliente TV', telefone: '5531990003333', phaseId: 'aprovados', equipamento: 'TV 50' }] };
+  KV['reparoeletro_pipe'] = { cards: [] };
+  KV['tv_board'] = { cards: [] };
+  const r10 = res();
+  await wabot(req({ action: 'aprovar-cliente', tel: '90003333', aplicar: '1', ...K }), r10);
+  check('TV: card entrou no board de TV', (KV['tv_board'].cards || []).some(c => c.osCode === 'TVC1'));
+  const criouAlmox = global.__fetchLog.some(u => u.includes('almoxarifado') && u.includes('criar-mover'));
+  check('TV: NENHUMA tarefa criada no almoxarifado ADM', !criouAlmox && !KV['reparoeletro_almoxarifado']);
 
   // ════ Resultado ════
   console.log('\n═══════════════════════════════════');
