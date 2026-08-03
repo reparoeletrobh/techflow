@@ -86,7 +86,10 @@ async function buscar(){
         return '<div class="card '+(rt.status==='finalizada'?'feito':'pend')+'"><span class="tag">🚚 Rota '+rt.num+' · '+esc(rt.dia)+'</span>'+
           '<span class="nm">'+(rt.status==='finalizada'?('Saiu '+(rt.tipoSaida==='parcial'?'PARCIAL':'COMPLETA')+' com '+esc(rt.motorista||'—')):'Em separação')+'</span>'+
           '<div class="meta">'+rt.itens.map(function(i){return esc(i.cliente)+(i.qtd>1?' ×'+i.qtd:'')+' ('+esc(i.status)+(i.motivo?': '+esc(i.motivo):'')+')';}).join(' · ')+
-          '<br>'+fmtD(rt.saidaEm||rt.criadaEm)+'</div></div>';
+          (rt.placa||rt.telMotorista?'<br>'+(rt.placa?'🚗 '+esc(rt.placa):'')+(rt.telMotorista?' · 📱 '+esc(rt.telMotorista):''):'')+
+          '<br>'+fmtD(rt.saidaEm||rt.criadaEm)+
+          (rt.status==='finalizada'?'<br><button onclick="verFotoRota(\''+(rt.id||'')+'\')" style="margin-top:7px;background:#1d4ed8;border:none;border-radius:8px;padding:7px 14px;color:#fff;font-size:12px;font-weight:800;cursor:pointer;">📸 VER FOTO DO MOTORISTA</button>':'')+
+          '</div></div>';
       }).join('');
     }
     if(r.ml.length){
@@ -98,6 +101,32 @@ async function buscar(){
     }
     el.innerHTML=html||'<div class="empty">Nada encontrado para "'+esc(q)+'"</div>';
   }catch(e){el.innerHTML='<div class="empty">Erro na busca</div>';}
+}
+async function verFotoRota(rotaId){
+  if(!rotaId){alert('Rota sem identificador');return;}
+  var ov=document.getElementById('ov-foto-rota'); if(ov)ov.remove();
+  ov=document.createElement('div');
+  ov.id='ov-foto-rota';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px;';
+  ov.innerHTML='<div style="color:#8b93a3;font-size:13px;">📸 carregando…</div>';
+  ov.onclick=function(e){ if(e.target===ov)ov.remove(); };
+  document.body.appendChild(ov);
+  try{
+    var r=await fetch('/api/almoxarifado?action=rota-foto&rota='+encodeURIComponent(rotaId)).then(function(x){return x.json();});
+    if(r&&r.ok&&r.b64){
+      var q=r.em?new Date(r.em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+      ov.innerHTML='<div style="color:#fff;font-size:13px;font-weight:700;margin-bottom:8px;">📸 '+rotaId+(q?' · '+q:'')+'</div>'+
+        '<img src="'+r.b64+'" style="max-width:100%;max-height:74vh;border-radius:10px;">'+
+        '<div style="display:flex;gap:8px;margin-top:12px;">'+
+          '<a href="'+r.b64+'" download="rota-'+rotaId+'.jpg" style="background:#242b39;border-radius:9px;padding:10px 18px;color:#fff;font-size:12px;font-weight:800;text-decoration:none;">⬇ baixar</a>'+
+          '<button onclick="document.getElementById(\'ov-foto-rota\').remove()" style="background:#242b39;border:none;border-radius:9px;padding:10px 18px;color:#fff;font-size:12px;font-weight:800;cursor:pointer;">fechar</button>'+
+        '</div>';
+    } else {
+      ov.innerHTML='<div style="color:#fca5a5;font-size:13px;text-align:center;">Foto não encontrada para esta rota.<br><button onclick="document.getElementById(\'ov-foto-rota\').remove()" style="margin-top:12px;background:#242b39;border:none;border-radius:9px;padding:10px 18px;color:#fff;font-weight:800;cursor:pointer;">fechar</button></div>';
+    }
+  }catch(e){
+    ov.innerHTML='<div style="color:#fca5a5;font-size:13px;">Erro: '+e.message+'<br><button onclick="document.getElementById(\'ov-foto-rota\').remove()" style="margin-top:12px;background:#242b39;border:none;border-radius:9px;padding:10px 18px;color:#fff;font-weight:800;cursor:pointer;">fechar</button></div>';
+  }
 }
 async function verFoto(cardId){
   try{
