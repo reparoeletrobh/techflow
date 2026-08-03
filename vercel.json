@@ -267,6 +267,14 @@
       "destination": "/api/prospeccao.js"
     },
     {
+      "source": "/auditoria",
+      "destination": "/auditoria.html"
+    },
+    {
+      "source": "/api/auditoria",
+      "destination": "/api/auditoria.js"
+    },
+    {
       "source": "/prospeccao",
       "destination": "/prospeccao.html"
     },

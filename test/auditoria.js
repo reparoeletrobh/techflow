@@ -128,6 +128,19 @@ try {
   ok(`Crons: ${crons.length} configurados, ${cronsQuebrados === 0 ? 'todos com rota válida' : cronsQuebrados + ' quebrados'}`);
 } catch (e) { erro('vercel.json — ' + e.message); }
 
+// ── 7. Telas e APIs sem rota no vercel.json (o caso do /auditoria) ──
+try {
+  const vj = JSON.parse(fs.readFileSync(path.join(RAIZ, 'vercel.json'), 'utf8'));
+  const destinos = new Set((vj.rewrites || []).map(r => String(r.destination || '').replace(/^\//, '').split('?')[0]));
+  const semRota = [];
+  for (const t of telas) if (!destinos.has(t)) semRota.push(t);
+  const apisSemRota = [];
+  for (const a of apis) if (!destinos.has('api/' + a)) apisSemRota.push('api/' + a);
+  if (semRota.length) aviso(`${semRota.length} tela(s) sem rota no vercel.json: ${semRota.slice(0, 8).join(', ')}${semRota.length > 8 ? '…' : ''}`);
+  if (apisSemRota.length) aviso(`${apisSemRota.length} API(s) sem rota no vercel.json: ${apisSemRota.slice(0, 8).join(', ')}${apisSemRota.length > 8 ? '…' : ''}`);
+  if (!semRota.length && !apisSemRota.length) ok('Rotas: toda tela e API tem entrada no vercel.json');
+} catch (e) { erro('checagem de rotas — ' + e.message); }
+
 // ── Resultado ───────────────────────────────────────────────────────
 console.log('\n═══════════════════════════════════');
 if (problemas === 0) console.log(`🟢 AUDITORIA LIMPA — 0 problemas novos, ${dividas} dívida(s) conhecida(s), ${avisos} aviso(s).`);
