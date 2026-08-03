@@ -104,8 +104,15 @@ export default async function handler(req, res) {
         const lgTvS = (await dbGet('tv_logistica')) || { fichas: [] };
         for (const f of (lgTvS.fichas || [])) idsTvSync.add(String(f.id));
       } catch (e) {}
-      const ehTvPeloNome = (c) => /\btv\b|televis|\bled\b|polegada|barramento/i.test(
-        String((c.equipamento || '') + ' ' + (c.descricao || '') + ' ' + (c.nomeContato || '')));
+      // 📺 só barra quando for SÓ TV. Atendimento misto (TV + equipamento ADM) entra
+      // normalmente, porque a parte de ADM precisa de separação aqui.
+      const ehTvPeloNome = (c) => {
+        const txt = String((c.equipamento || '') + ' ' + (c.descricao || '')).toLowerCase();
+        const temTv = /\btvs?\b|televis|\bled\b|polegada|barramento/.test(txt);
+        if (!temTv) return false;
+        const temAdm = /micro-?\s?ondas|microondas|purificador|bebedouro|filtro|adega|cervejeir|forno|forninho|frigobar|b\.?\s?blend/.test(txt);
+        return !temAdm;                       // só barra se NÃO houver equipamento de ADM junto
+      };
       let candidatos = [];
       for (const c of ((pipe && pipe.cards) || [])) {
         novoSnapPipe[c.id] = c.phase;
