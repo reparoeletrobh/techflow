@@ -640,6 +640,21 @@ export default async function handler(req, res) {
           : (env.length && !rec.length ? '🟡 bot enviou, cliente não respondeu'
           : '🟢 conversa ativa')) };
     });
+    // &detalhe=1 → lista as mensagens uma a uma (para investigar caso a caso)
+    if (String(req.query.detalhe || '') === '1') {
+      const linhas = [];
+      for (const alvo of alvos) {
+        const msgs = evts.filter(e => String(e.tel || '').replace(/\D/g, '').endsWith(alvo) && e.dir !== 'status');
+        linhas.push('══ ' + alvo + ' — ' + msgs.length + ' msgs ══');
+        for (const m of msgs) {
+          const hora = new Date(new Date(m.ts).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ');
+          const seta = m.dir === 'in' ? '<<' : (m.dir === 'out' ? '>>' : '**');
+          linhas.push(hora + ' ' + seta + ' [' + (m.tipo || '?') + (m.via ? '/' + m.via : '') + ']' +
+            (m.msgId ? '' : ' SEM-MSGID') + ' ' + String(m.texto || '').replace(/\n/g, ' ').slice(0, 110));
+        }
+      }
+      return res.status(200).send(linhas.join('\n'));
+    }
     return res.status(200).json({ ok: true,
       janelaHistorico: evts.length + ' mensagens carregadas',
       resultado: saida });
