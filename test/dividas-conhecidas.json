@@ -12,6 +12,32 @@
         "fecharConfOverlay",
         "fecharConfPainel"
       ]
+    },
+    {
+      "id": "rotas-geladeira-bloqueadas",
+      "onde": "vercel.json",
+      "o_que": "51 rotas com destino prefixado por '1' (1rj-geladeiras.html etc.)",
+      "impacto": "bloqueio INTENCIONAL dos sites de geladeira — decisão pendente de reativar",
+      "decidido_em": "2026-08-02",
+      "decisao": "manter bloqueado ate Pedro decidir reativar; remover o prefixo '1' religa os sites",
+      "destinos_prefixo1": true
+    },
+    {
+      "id": "rotas-mortas-legado",
+      "onde": "vercel.json",
+      "o_que": "5 rotas para arquivos removidos: /api/admin-auth, /auth-guard.js, /admin-users, /tv/compra-equip, /nf-setup",
+      "impacto": "essas URLs dao 404; nenhuma tela do sistema as referencia",
+      "decidido_em": "2026-08-02",
+      "decisao": "reportado ao Pedro; nao removi as rotas sem confirmacao",
+      "rotas": [
+        "/api/admin-auth",
+        "/auth-guard.js",
+        "/admin-users",
+        "/tv/compra-equip",
+        "/nf-setup",
+        "/autorizada",
+        "/autorizada-:slug"
+      ]
     }
   ]
 }

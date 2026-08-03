@@ -141,6 +141,29 @@ try {
   if (!semRota.length && !apisSemRota.length) ok('Rotas: toda tela e API tem entrada no vercel.json');
 } catch (e) { erro('checagem de rotas — ' + e.message); }
 
+// ── 8. Rota apontando para arquivo que NÃO existe (rota morta) ──────
+try {
+  const vj = JSON.parse(fs.readFileSync(path.join(RAIZ, 'vercel.json'), 'utf8'));
+  let mortas = 0, bloqueadas = 0, mortasConhecidas = 0;
+  for (const r of (vj.rewrites || [])) {
+    const dest = String(r.destination || '').split('?')[0].replace(/^\//, '');
+    if (!dest || dest.startsWith('http')) continue;
+    if (!fs.existsSync(path.join(RAIZ, dest))) {
+      // bloqueio intencional dos sites de geladeira: destino prefixado com '1'
+      const dv = CONHECIDOS.find(x => x.destinos_prefixo1) ;
+      if (dv && /^1.+\.html$/.test(dest) && fs.existsSync(path.join(RAIZ, dest.slice(1)))) {
+        bloqueadas++; continue;
+      }
+      const dvR = CONHECIDOS.find(x => Array.isArray(x.rotas) && x.rotas.includes(r.source));
+      if (dvR) { mortasConhecidas++; continue; }
+      mortas++; erro(`ROTA MORTA: ${r.source} aponta para ${dest} que não existe`);
+    }
+  }
+  if (bloqueadas) { dividas++; console.log(`📋 DÍVIDA CONHECIDA — ${bloqueadas} rota(s) de site de geladeira bloqueadas de propósito (destino prefixado com '1')`); }
+  if (mortasConhecidas) { dividas++; console.log(`📋 DÍVIDA CONHECIDA — ${mortasConhecidas} rota(s) de legado apontando para arquivo removido`); }
+  if (!mortas) ok('Rotas: nenhum destino morto novo no vercel.json');
+} catch (e) { erro('checagem de rotas mortas — ' + e.message); }
+
 // ── Resultado ───────────────────────────────────────────────────────
 console.log('\n═══════════════════════════════════');
 if (problemas === 0) console.log(`🟢 AUDITORIA LIMPA — 0 problemas novos, ${dividas} dívida(s) conhecida(s), ${avisos} aviso(s).`);

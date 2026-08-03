@@ -122,6 +122,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
   <div class="h-title">🔭 Prospecção</div>
   <div class="h-btns">
     <span class="sync-info" id="sync-info">—</span>
+    <button class="btn" style="background:#f97316;color:#fff;font-weight:800;" onclick="flgAbrir()">📞 Fila de Ligação</button>
     <button class="btn" style="background:#8b5cf6;color:#fff;" onclick="abrirRelatorio()">📊 Relatório</button>
     <button class="btn" style="background:#22c55e;color:#000;" onclick="abrirNovaFicha()">➕ Nova Ficha</button>
     <button class="btn btn-sync" id="btn-sync" onclick="sincronizar()">🔄 Sincronizar</button>
@@ -1280,6 +1281,150 @@ document.addEventListener('visibilitychange',function(){
 setInterval(function(){ if(document.visibilityState==='visible')render(); },60*1000);
 // E polling leve de segurança a cada 5 min (só leitura do Redis)
 setInterval(function(){ if(document.visibilityState==='visible') load(); },5*60*1000);
+</script>
+
+<!-- ═══════════════ FILA DE LIGAÇÃO ═══════════════ -->
+<div id="flg-overlay" style="display:none;position:fixed;inset:0;z-index:950;background:rgba(0,0,0,.72);" onclick="flgFecharFora(event)">
+ <div id="flg-painel" style="position:absolute;top:0;right:0;bottom:0;width:min(560px,100%);background:#0b0d10;border-left:1px solid #1e2228;display:flex;flex-direction:column;overflow:hidden;" onclick="event.stopPropagation()">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #1e2228;flex-shrink:0;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:19px;">📞</span>
+      <span style="font-size:15px;font-weight:800;color:#e8eaed;">Fila de Ligação</span>
+      <span id="flg-cron" style="font-family:ui-monospace,monospace;font-size:12px;color:#8b93a1;">00:00</span>
+    </div>
+    <button onclick="flgFechar()" style="background:transparent;border:none;color:#5a6270;font-size:22px;cursor:pointer;">&#10005;</button>
+  </div>
+  <div id="flg-resumo" style="padding:10px 18px;border-bottom:1px solid #1e2228;font-family:ui-monospace,monospace;font-size:11px;color:#8b93a1;flex-shrink:0;">Carregando...</div>
+  <div id="flg-corpo" style="flex:1;overflow-y:auto;padding:18px;"></div>
+  <div id="flg-hoje" style="padding:10px 18px;border-top:1px solid #1e2228;font-family:ui-monospace,monospace;font-size:11px;color:#8b93a1;flex-shrink:0;">&mdash;</div>
+ </div>
+</div>
+
+<script>
+var flgFila=[], flgAtual=null, flgT0=null, flgTick=null, flgSel={atendeu:null,resultado:null};
+
+function flgApi(a,m,b){
+  var k=localStorage.getItem('tf_key')||'';
+  return fetch('/api/fila-ligacao?action='+a+'&k='+encodeURIComponent(k),
+    m==='POST'?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})}:{})
+    .then(function(r){return r.json();});
+}
+function flgH(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
+function flgTel(t){
+  var n=String(t||'').replace(/\D/g,''); if(n.indexOf('55')===0)n=n.slice(2);
+  if(n.length===11)return '('+n.slice(0,2)+') '+n.slice(2,7)+'-'+n.slice(7);
+  if(n.length===10)return '('+n.slice(0,2)+') '+n.slice(2,6)+'-'+n.slice(6);
+  return n;
+}
+function flgCor(t){return {entrar_contato:'#22c55e',conflito_reprovacao:'#ef4444',
+  cliente_loja_vermelho:'#a855f7',retornar:'#f97316',lead:'#3b9eff'}[t]||'#8b93a1';}
+function flgCron(){
+  flgT0=Date.now(); if(flgTick)clearInterval(flgTick);
+  flgTick=setInterval(function(){
+    var s=Math.floor((Date.now()-flgT0)/1000);
+    var el=document.getElementById('flg-cron');
+    if(el)el.textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+  },1000);
+}
+function flgAbrir(){
+  document.getElementById('flg-overlay').style.display='block';
+  flgCarregar(); flgCarregarHoje();
+}
+function flgFechar(){
+  document.getElementById('flg-overlay').style.display='none';
+  if(flgTick){clearInterval(flgTick);flgTick=null;}
+}
+function flgFecharFora(e){ if(e.target && e.target.id==='flg-overlay') flgFechar(); }
+function flgBtn(txt,sel,fn,cor){
+  return '<button onclick="'+fn+'" style="background:'+(sel?cor:'#1a1f26')+';border:1px solid '+(sel?cor:'#1e2228')+';color:'+(sel?'#04121f':'#e8eaed')+';border-radius:9px;padding:11px 13px;font-size:13px;font-weight:700;cursor:pointer;">'+txt+'</button>';
+}
+function flgRender(){
+  var el=document.getElementById('flg-corpo'); if(!el)return;
+  if(!flgAtual){
+    el.innerHTML='<div style="text-align:center;padding:50px 20px;color:#8b93a1;">'+
+      '<div style="font-size:40px;">&#9989;</div><div style="font-size:17px;font-weight:700;color:#e8eaed;margin-top:10px;">Fila zerada</div>'+
+      '<div style="margin-top:6px;">Nenhuma ficha pendente de ligacao agora.</div>'+
+      '<button onclick="flgCarregar()" style="margin-top:16px;background:#1a1f26;border:1px solid #1e2228;color:#e8eaed;border-radius:9px;padding:11px 18px;font-weight:700;cursor:pointer;">Recarregar</button></div>';
+    return;
+  }
+  var a=flgAtual, c=flgCor(a.tipo);
+  el.innerHTML=
+   '<span style="display:inline-block;font-size:10px;font-weight:800;padding:3px 9px;border-radius:20px;background:'+c+'22;color:'+c+';border:1px solid '+c+'55;font-family:ui-monospace,monospace;">'+flgH(a.rotulo)+'</span>'+
+   (a.tentativas?'<span style="display:inline-block;font-size:10px;font-weight:800;padding:3px 9px;border-radius:20px;background:#1a1f26;color:#8b93a1;margin-left:6px;font-family:ui-monospace,monospace;">'+a.tentativas+'a tentativa</span>':'')+
+   '<div style="font-size:22px;font-weight:800;color:#e8eaed;margin:10px 0 2px;">'+flgH(a.nome)+'</div>'+
+   '<div onclick="flgCopiar(this.getAttribute(\'data-t\'))" data-t="'+flgH(a.telefone)+'" title="clique para copiar" style="font-family:ui-monospace,monospace;font-size:32px;font-weight:800;letter-spacing:1px;color:#22c55e;margin:10px 0;user-select:all;cursor:pointer;">'+flgTel(a.telefone)+'</div>'+
+   '<div style="color:#8b93a1;font-size:13px;line-height:1.6;">'+
+     (a.equipamento?'<div>&#128295; '+flgH(a.equipamento)+(a.defeito?' &mdash; '+flgH(a.defeito):'')+'</div>':'')+
+     (a.sistema==='tv'?'<div>&#128250; Sistema TV</div>':'')+'</div>'+
+   (a.nota?'<div style="background:rgba(245,200,0,.1);border-left:3px solid #f5c800;padding:9px 12px;border-radius:6px;font-size:13px;margin:12px 0;color:#e8eaed;">&#9888; '+flgH(a.nota)+'</div>':'')+
+   (a.motivo?'<div style="background:rgba(239,68,68,.08);border-left:3px solid #ef4444;padding:9px 12px;border-radius:6px;font-size:13px;margin:12px 0;color:#e8eaed;">&#128172; '+flgH(a.motivo)+'</div>':'')+
+   '<div style="font-size:10px;font-weight:800;color:#8b93a1;letter-spacing:.5px;margin:16px 0 7px;">ATENDEU?</div>'+
+   '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
+     ['sim|&#9989; Atendeu|#22c55e','nao_atendeu|&#128244; Nao atendeu|#ef4444','caixa_postal|&#128233; Caixa postal|#ef4444','ocupado|&#9940; Ocupado|#ef4444','fora_area|&#128225; Fora de area|#ef4444','numero_errado|&#10060; Numero errado|#ef4444']
+     .map(function(o){var p=o.split('|');
+       return flgBtn(p[1], flgSel.atendeu===p[0], "flgSetAtendeu('"+p[0]+"')", p[2]);}).join('')+
+   '</div><div id="flg-res"></div>'+
+   '<input id="flg-obs" placeholder="Observacao (opcional)" style="width:100%;background:#0e1116;border:1px solid #1e2228;border-radius:9px;color:#e8eaed;padding:11px;font-size:14px;margin-top:12px;box-sizing:border-box;">'+
+   '<button id="flg-salvar" onclick="flgSalvar()" disabled style="width:100%;margin-top:14px;padding:15px;font-size:15px;font-weight:800;border-radius:9px;border:1px solid #1e2228;background:#1a1f26;color:#e8eaed;cursor:pointer;opacity:.4;">Registrar e ir para o proximo</button>';
+  flgRenderRes();
+}
+function flgRenderRes(){
+  var el=document.getElementById('flg-res'); if(!el)return;
+  if(flgSel.atendeu!=='sim'){el.innerHTML='';return;}
+  el.innerHTML='<div style="font-size:10px;font-weight:800;color:#8b93a1;letter-spacing:.5px;margin:16px 0 7px;">O QUE ACONTECEU?</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
+    ['cadastrou_coleta|&#128666; Cadastrou coleta','vai_na_loja|&#127978; Vai na loja','aprovou|&#128176; Aprovou o servico',
+     'ligar_depois|&#128257; Ligar depois','recusou|&#128683; Recusou','ja_resolvido|&#10004; Ja resolvido']
+    .map(function(o){var p=o.split('|');
+      return flgBtn(p[1], flgSel.resultado===p[0], "flgSetResultado('"+p[0]+"')", '#3b9eff');}).join('')+'</div>';
+}
+function flgSetAtendeu(v){flgSel.atendeu=v;flgSel.resultado=(v!=='sim')?'':null;flgRender();flgBotao();}
+function flgSetResultado(v){flgSel.resultado=v;flgRenderRes();flgBotao();}
+function flgBotao(){
+  var b=document.getElementById('flg-salvar'); if(!b)return;
+  var pode=!!(flgSel.atendeu&&(flgSel.atendeu!=='sim'||flgSel.resultado));
+  b.disabled=!pode; b.style.opacity=pode?'1':'.4';
+  b.style.background=pode?'#22c55e':'#1a1f26'; b.style.color=pode?'#04120a':'#e8eaed';
+}
+function flgCopiar(t){try{navigator.clipboard.writeText(t);}catch(e){}}
+function flgSalvar(){
+  if(!flgAtual)return;
+  var b=document.getElementById('flg-salvar'); b.disabled=true; b.textContent='Salvando...';
+  var dur=flgT0?Math.floor((Date.now()-flgT0)/1000):0;
+  flgApi('desfecho','POST',{id:flgAtual.id,sistema:flgAtual.sistema,telefone:flgAtual.telefone,
+    nome:flgAtual.nome,atendeu:flgSel.atendeu,resultado:flgSel.resultado||'',duracaoSeg:dur,
+    obs:(document.getElementById('flg-obs')||{value:''}).value})
+  .then(function(d){
+    if(!d||!d.ok){b.disabled=false;b.textContent='Registrar e ir para o proximo';
+      alert('Nao consegui registrar: '+((d&&d.error)||'erro'));return;}
+    flgFila.shift(); flgProximo(); flgCarregarHoje();
+  }).catch(function(e){b.disabled=false;b.textContent='Registrar e ir para o proximo';alert('Erro: '+e.message);});
+}
+function flgProximo(){
+  flgSel={atendeu:null,resultado:null};
+  flgAtual=flgFila.length?flgFila[0]:null;
+  if(flgAtual)flgCron();
+  flgRender();
+}
+function flgCarregar(){
+  flgApi('fila').then(function(d){
+    var r=document.getElementById('flg-resumo');
+    if(!d||!d.ok){if(r)r.textContent='Erro ao carregar a fila';return;}
+    flgFila=d.fila||[];
+    var res=d.resumo||{};
+    if(r)r.innerHTML=(Object.keys(res).map(function(k){return flgH(k)+': <b style="color:#e8eaed;">'+res[k]+'</b>';}).join(' &nbsp;&middot;&nbsp; ')||'Nada na fila')+
+      ' &nbsp;&middot;&nbsp; total <b style="color:#e8eaed;">'+flgFila.length+'</b>';
+    flgProximo();
+  });
+}
+function flgCarregarHoje(){
+  flgApi('relatorio&dias=1').then(function(d){
+    if(!d||!d.ok)return;
+    var el=document.getElementById('flg-hoje'); if(!el)return;
+    el.innerHTML='Hoje: <b style="color:#e8eaed;">'+d.ligacoes+'</b> ligacoes &nbsp;&middot;&nbsp; <b style="color:#e8eaed;">'+
+      d.atendidas+'</b> atenderam ('+d.taxaAtendimento+'%) &nbsp;&middot;&nbsp; <b style="color:#e8eaed;">'+d.tempoTotalMin+'</b> min ao telefone';
+  });
+}
 </script>
 </body>
 </html>
