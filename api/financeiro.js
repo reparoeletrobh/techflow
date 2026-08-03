@@ -362,9 +362,91 @@ Regra: "verde" SOMENTE se for pagamento efetivado + valor batendo + data recente
   }
 
   // ── 📎 GET comprovante: abre o arquivo salvo direto no navegador ──
+  // ── 🩺 COMPROVANTE-DIAGNOSTICO: onde a cadeia quebra ──
+  if (action === "comprovante-diagnostico") {
+    const [fin, pp] = await Promise.all([dbGet(FIN_KEY), dbGet("reparoeletro_pipe")]);
+    const recs = ((fin || {}).records) || [];
+    const cards = ((pp || {}).cards) || [];
+    const comAnexo = recs.filter(r => r.anexo && r.anexo.stored);
+    const detalhe = [];
+    for (const r of comAnexo.slice(-25)) {
+      const arq = await dbGet("fin_comprovante_" + r.id);
+      const d8 = String(r.telefone || "").replace(/\D/g, "").slice(-8);
+      const card = cards.find(c => String(c.id) === String(r.id)
+        || String(c.pipefyId || "") === String(r.id)
+        || (d8.length >= 8 && String(c.telefone || "").replace(/\D/g, "").endsWith(d8)));
+      detalhe.push({
+        registro: r.id, cliente: r.nomeContato || r.cliente || "",
+        arquivoExiste: !!(arq && arq.dataB64),
+        tamanhoKB: arq && arq.dataB64 ? Math.round(arq.dataB64.length / 1024) : 0,
+        cardEncontrado: card ? card.id : null,
+        idsIguais: card ? String(card.id) === String(r.id) : null,
+        cardMarcado: card ? !!card.temComprovante : null,
+      });
+    }
+    const semArquivo = detalhe.filter(d => !d.arquivoExiste);
+    const semCard = detalhe.filter(d => !d.cardEncontrado);
+    const naoMarcados = detalhe.filter(d => d.cardEncontrado && !d.cardMarcado);
+    const idsDiferentes = detalhe.filter(d => d.idsIguais === false);
+    return res.status(200).json({ ok: true,
+      registrosComAnexo: comAnexo.length,
+      cardsMarcados: cards.filter(c => c.temComprovante).length,
+      problemas: [
+        ...(semArquivo.length ? ["❌ " + semArquivo.length + " com anexo registrado mas ARQUIVO AUSENTE"] : []),
+        ...(semCard.length ? ["⚠️ " + semCard.length + " sem card correspondente no pipe"] : []),
+        ...(naoMarcados.length ? ["❌ " + naoMarcados.length + " com card encontrado mas SEM o marcador (📎 não aparece)"] : []),
+        ...(idsDiferentes.length ? ["ℹ️ " + idsDiferentes.length + " onde o id do card difere do id do registro"] : []),
+      ],
+      lista: detalhe.map(d => (d.cliente || "?").slice(0, 20) + " | arquivo:" + (d.arquivoExiste ? d.tamanhoKB + "KB" : "NÃO") +
+        " | card:" + (d.cardEncontrado ? (d.cardMarcado ? "marcado ✅" : "SEM MARCA ❌") : "não achado") +
+        (d.idsIguais === false ? " | ids diferentes" : "")) });
+  }
+
+  // ── 🔧 COMPROVANTE-REPARAR: marca os cards que ficaram sem o 📎 ──
+  if (action === "comprovante-reparar") {
+    const [fin, pp] = await Promise.all([dbGet(FIN_KEY), dbGet("reparoeletro_pipe")]);
+    const recs = (((fin || {}).records) || []).filter(r => r.anexo && r.anexo.stored);
+    const cards = ((pp || {}).cards) || [];
+    const corrigidos = [];
+    for (const r of recs) {
+      const arq = await dbGet("fin_comprovante_" + r.id);
+      if (!arq || !arq.dataB64) continue;
+      const d8 = String(r.telefone || "").replace(/\D/g, "").slice(-8);
+      const card = cards.find(c => String(c.id) === String(r.id)
+        || String(c.pipefyId || "") === String(r.id)
+        || (d8.length >= 8 && String(c.telefone || "").replace(/\D/g, "").endsWith(d8)));
+      if (!card || card.temComprovante) continue;
+      card.temComprovante = true;
+      card.comprovanteId = r.id;              // o link do pipe passa a apontar para o id certo
+      corrigidos.push((r.nomeContato || r.cliente || "?") + " → card " + card.id);
+    }
+    if (String(req.query.aplicar || "") === "1" && corrigidos.length) {
+      await dbSet("reparoeletro_pipe", pp);
+      return res.status(200).json({ ok: true, corrigidos: corrigidos.length, lista: corrigidos.slice(0, 30) });
+    }
+    return res.status(200).json({ ok: true, seriamCorrigidos: corrigidos.length, lista: corrigidos.slice(0, 30),
+      dica: "para aplicar: &aplicar=1" });
+  }
+
   if (action === "comprovante") {
     const idc = String(req.query.id || "");
-    const arq = await dbGet("fin_comprovante_" + idc);
+    let arq = await dbGet("fin_comprovante_" + idc);
+    // o card do pipe pode ter id diferente do registro financeiro — procura pelo cliente
+    if (!arq || !arq.dataB64) {
+      try {
+        const [ppX, finX] = await Promise.all([dbGet("reparoeletro_pipe"), dbGet(FIN_KEY)]);
+        const cardX = (((ppX || {}).cards) || []).find(c => String(c.id) === idc);
+        if (cardX) {
+          if (cardX.comprovanteId) arq = await dbGet("fin_comprovante_" + cardX.comprovanteId);
+          if (!arq || !arq.dataB64) {
+            const d8x = String(cardX.telefone || "").replace(/\D/g, "").slice(-8);
+            const recX = (((finX || {}).records) || []).find(r => r.anexo && r.anexo.stored &&
+              d8x.length >= 8 && String(r.telefone || "").replace(/\D/g, "").endsWith(d8x));
+            if (recX) arq = await dbGet("fin_comprovante_" + recX.id);
+          }
+        }
+      } catch (e) {}
+    }
     if (!arq || !arq.dataB64) return res.status(404).json({ ok: false, error: "comprovante não encontrado" });
     const MIMES_SRV = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
     res.setHeader("Content-Type", MIMES_SRV.includes(arq.mime) ? arq.mime : "application/octet-stream");
