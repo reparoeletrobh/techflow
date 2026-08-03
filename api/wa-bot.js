@@ -876,11 +876,17 @@ export default async function handler(req, res) {
       return { rot, ...(r && r.error ? { erro: r.error.message + ' (code ' + (r.error.code || '') + ')' } : { dados: r }) };
     };
     // 1) dados do número + a WABA dona dele
-    // pergunta ao próprio número a qual WABA ele pertence (evita procurar o ID à mão)
-    const num = await pega('numero', `${G}/${pidW}?fields=display_phone_number,verified_name,quality_rating,name_status,throughput,platform_type,whatsapp_business_account&access_token=${tkW}`);
+    const num = await pega('numero', `${G}/${pidW}?fields=display_phone_number,verified_name,quality_rating,name_status,throughput,platform_type&access_token=${tkW}`);
+    // Descobre o WABA_ID pelo debug_token: os escopos granulares trazem os IDs
+    // das contas às quais o token dá acesso. Também revela o que o token pode fazer.
     let wabaId = String(req.query.waba || '').trim();
-    if (!wabaId || /^SEU_/i.test(wabaId)) {
-      wabaId = (((num.dados || {}).whatsapp_business_account) || {}).id || '';
+    if (!wabaId || /^SEU_/i.test(wabaId)) wabaId = '';
+    const dbg = await pega('token', `${G}/debug_token?input_token=${tkW}&access_token=${tkW}`);
+    const gran = ((((dbg.dados || {}).data) || {}).granular_scopes) || [];
+    const escopos = gran.map(g => g.scope + (g.target_ids ? '[' + g.target_ids.join(',') + ']' : '')).join(' · ');
+    if (!wabaId) {
+      const alvo = gran.find(g => /whatsapp_business_(management|messaging)/.test(g.scope) && (g.target_ids || []).length);
+      if (alvo) wabaId = alvo.target_ids[0];
     }
     const passos = [num];
     if (wabaId) {
@@ -909,7 +915,8 @@ export default async function handler(req, res) {
           (t.quality_score ? ' · qualidade=' + (t.quality_score.score || '?') : ''));
       }
     }
-    if (wabaId) linhas.unshift('WABA_ID descoberto: ' + wabaId);
+    if (escopos) linhas.push('ESCOPOS DO TOKEN: ' + escopos);
+    if (wabaId) linhas.unshift('WABA_ID: ' + wabaId);
     else linhas.push('\n⚠️ Não consegui descobrir o ID da WABA pelo número — o token pode não ter escopo whatsapp_business_management.');
     return res.status(200).send(linhas.join('\n'));
   }
