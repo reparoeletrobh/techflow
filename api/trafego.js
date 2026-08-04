@@ -325,6 +325,22 @@ module.exports = async function handler(req, res) {
     const per = ['hoje', '7d', 'ciclo'].includes(String(req.query.periodo || '')) ? String(req.query.periodo) : 'ciclo';
     const base = await dbGet('trafego_painel_cache_' + per) || await dbGet('trafego_painel_cache');
     if (!base || !base.dados) return res.status(200).json({ ok: false, error: 'abra o painel primeiro para carregar os dados' });
+    // 📆 REGRA DO DONO: o corte não pode se basear só no dia ou no início do ciclo.
+    // Cruza com a janela de 7 dias — criativo dentro da meta na semana NÃO é cortado,
+    // mesmo que hoje esteja ruim (variação diária é normal).
+    const base7 = await dbGet('trafego_painel_cache_7d');
+    const cpaSemana = {};
+    for (const a of (((base7 || {}).dados || {}).anuncios || [])) {
+      if (a.cpa != null) cpaSemana[a.id] = { cpa: a.cpa, conversas: a.conversas, razao: a.razaoMeta };
+    }
+    let temSemana = Object.keys(cpaSemana).length > 0;
+    // se o cache de 7 dias não existir, avisa em vez de cortar com base curta
+    if (!temSemana && per !== '7d') {
+      return res.status(200).json({ ok: false,
+        error: 'preciso da média de 7 dias para decidir os cortes com segurança',
+        comoResolver: 'abra o painel no período "7 dias" uma vez (ou chame /api/trafego?action=painel&periodo=7d&forcar=1) e volte ao Copiloto',
+        motivo: 'sem a janela semanal eu cortaria olhando só o ciclo atual, que hoje tem poucos dias' });
+    }
     const ads = (base.dados.anuncios || []).filter(a => a.ativo);
     const diasRestantes = (function () {
       const b = new Date(Date.now() - 3 * 3600 * 1000);
@@ -365,13 +381,22 @@ module.exports = async function handler(req, res) {
         .map(a => ({ id: a.id, nome: a.nome, cpa: a.cpa, conversas: a.conversas,
           gasto: a.gasto, verba: verbaTotalDe(a) }))
         .sort((x, y) => (x.cpa || 9) - (y.cpa || 9));
-      const cortar = lista.filter(a => (a.conversas === 0 && a.gasto >= meta * 2)
-        || (a.razaoMeta != null && a.razaoMeta > 1.3 && a.conversas > 0))
+      const cortar = lista.filter(a => {
+        const ruimAgora = (a.conversas === 0 && a.gasto >= meta * 2)
+          || (a.razaoMeta != null && a.razaoMeta > 1.3 && a.conversas > 0);
+        if (!ruimAgora) return false;
+        // 🛡 protegido pela semana: se nos 7 dias está dentro da meta, não corta
+        const sem = cpaSemana[a.id];
+        if (sem && sem.conversas >= 3 && sem.cpa <= meta) return false;
+        return true;
+      })
         .map(a => ({ id: a.id, nome: a.nome, thumb: a.thumb, adsetId: a.adsetId, campanhaId: a.campanhaId,
           cpa: a.cpa, conversas: a.conversas, gasto: a.gasto,
           libera: restanteDe(a), verbaEm: a.verbaEm,
+          cpaSemana: (cpaSemana[a.id] || {}).cpa || null,
           motivo: a.conversas === 0 ? 'sem nenhuma conversa'
-            : Math.round((a.razaoMeta - 1) * 100) + '% acima da meta' }))
+            : Math.round((a.razaoMeta - 1) * 100) + '% acima da meta' +
+              (cpaSemana[a.id] ? ' (7 dias: ' + cpaSemana[a.id].cpa + ')' : '') }))
         .sort((x, y) => (y.libera || 0) - (x.libera || 0));
       const libera = Number(cortar.reduce((s, c) => s + (c.libera || 0), 0).toFixed(2));
 
@@ -663,6 +688,22 @@ module.exports = async function handler(req, res) {
       dica: 'o administrador da conta e o admin do Gerenciador de Negócios são quem recebem a notificação de confirmação' });
   }
   function permissoesErro(r) { return r && r.erro ? ('sem acesso: ' + r.erro) : ((r && r.dados) || []); }
+
+  // ── 🩺 LOG-BRUTO: o que está gravado no log do tráfego, sem interpretação ──
+  if (action === 'log-bruto') {
+    const lg = (await dbGet('trafego_log')) || { movs: [] };
+    const n = Math.min(20, Math.max(1, parseInt(req.query.n || '10', 10)));
+    return res.status(200).json({ ok: true,
+      totalRegistros: (lg.movs || []).length,
+      registros: (lg.movs || []).slice(0, n).map(m => ({
+        quando: m.ts,
+        acao: m.acao || '(sem rótulo)',
+        qtdFeitos: (m.feitos || []).length,
+        qtdErros: (m.erros || []).length,
+        feitos: (m.feitos || []).map(f => (f.nome || f.id) + ' → ' + f.acao),
+        erros: (m.erros || []).map(e => (e.id || '?') + ' → ' + (e.erro || '')),
+      })) });
+  }
 
   // ── 📜 HISTORICO-COPILOTO: o que o Copiloto fez no período ──
   if (action === 'historico-copiloto') {
