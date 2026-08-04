@@ -115,6 +115,39 @@ module.exports = async function handler(req,res){
       dica:'para aplicar: &aplicar=1'});
   }
 
+  // ── 📱 COMPLETAR-TELEFONES: busca o telefone do cliente em toda a operação ──
+  if(action==='completar-telefones'){
+    const [ppA,ppT,lgA,lgT,fA,fT]=await Promise.all([
+      dbGet('reparoeletro_pipe'),dbGet('tv_pipe'),
+      dbGet('reparoeletro_logistica'),dbGet('tv_logistica'),
+      dbGet('fichas_adm'),dbGet('fichas_tv')]);
+    const mapa={};
+    const guarda=(nome,tel)=>{
+      const n=String(nome||'').trim().toLowerCase();
+      const t=String(tel||'').replace(/\D/g,'');
+      if(n.length<3||t.length<10)return;
+      if(!mapa[n])mapa[n]=t;
+    };
+    for(const b of [ppA,ppT]) for(const c of (((b||{}).cards)||[])) guarda(c.nomeContato,c.telefone);
+    for(const b of [lgA,lgT,fA,fT]) for(const f of (((b||{}).fichas)||[])) guarda(f.nome,f.telefone);
+    const achados=[];
+    for(const c of (db.conflitos||[])){
+      if(c.telefone||c.tel)continue;
+      const alvo=String(c.cliente||c.ficha||'').trim().toLowerCase();
+      if(alvo.length<3)continue;
+      let tel=mapa[alvo];
+      if(!tel){ for(const k of Object.keys(mapa)){ if(k.includes(alvo)||alvo.includes(k)){tel=mapa[k];break;} } }
+      if(tel){ c.telefone=tel; achados.push((c.cliente||c.ficha)+' → '+tel); }
+    }
+    if(String(req.query.aplicar||'')==='1'&&achados.length){
+      await dbSet(KEY,db);
+      return res.status(200).json({ok:true,completados:achados.length,lista:achados.slice(0,30)});
+    }
+    return res.status(200).json({ok:true,seriamCompletados:achados.length,
+      semTelefone:(db.conflitos||[]).filter(c=>!c.telefone&&!c.tel).length,
+      lista:achados.slice(0,30),dica:'para aplicar: &aplicar=1'});
+  }
+
   // ── POST relatado: cliente avisado do desfecho → vai para FINALIZADOS ──
   if(req.method==='POST'&&action==='relatado'){
     const{id,por}=req.body||{};

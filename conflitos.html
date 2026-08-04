@@ -467,11 +467,14 @@ function trocarAba(aba){
 function render(){
   var busca=((document.getElementById('busca-c')||{value:''}).value||'').toLowerCase().trim();
   var todos=filtrados();
+  // 🔢 os badges contam a base COMPLETA — usar a lista já filtrada pela aba
+  // fazia o número de uma aba aparecer enquanto outra estava selecionada
+  var base=(_dados||[]);
 
   // Badges
-  var nAb=todos.filter(function(c){return c.status!=='resolvido'&&c.status!=='relatar';}).length;
-  var nRl=todos.filter(function(c){return c.status==='relatar';}).length;
-  var nRe=todos.filter(function(c){return c.status==='resolvido';}).length;
+  var nAb=base.filter(function(c){return c.status!=='resolvido'&&c.status!=='relatar';}).length;
+  var nRl=base.filter(function(c){return c.status==='relatar';}).length;
+  var nRe=base.filter(function(c){return c.status==='resolvido';}).length;
   var bA=document.getElementById('badge-ab'); if(bA)bA.textContent=nAb;
   var bL=document.getElementById('badge-rel'); if(bL)bL.textContent=nRl;
   var bR=document.getElementById('badge-res'); if(bR)bR.textContent=nRe;
@@ -481,7 +484,7 @@ function render(){
     var res=c.status==='resolvido';
     var rel=c.status==='relatar';
     if(_aba==='aberto'&&(res||rel)) return false;
-    if(_aba==='relatar'&&!rel) return false;
+    if(_aba==='relatar'&&!rel) return false;   // vazio até alguém resolver um conflito
     if(_aba==='resolvido'&&!res) return false;
     if(busca){
       var txt=((c.titulo||'')+(c.os||'')+(c.ficha||'')+(c.equipamento||'')+(c.responsavel||'')+(c.descricao||'')+(c.id||'')).toLowerCase();
