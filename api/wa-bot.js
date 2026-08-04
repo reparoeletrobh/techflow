@@ -1092,6 +1092,32 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, feitos });
   }
 
+  // ── 🧪 TESTE-TEMPLATE: dispara um template para um número, por link ──
+  if (action === 'teste-template') {
+    const tel = String(req.query.tel || '').replace(/\D/g, '');
+    if (tel.length < 12) return res.status(400).json({ ok: false, error: 'informe ?tel=5531XXXXXXXXX' });
+    const nome = String(req.query.nome || 'tudo bem').split(' ')[0];
+    const tpl = String(req.query.template || 'conserto_finalizado');
+    const { token: tkX, phoneId: pidX } = await credenciais();
+    if (!tkX || !pidX) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
+    const r = await fetch(`https://graph.facebook.com/v20.0/${pidX}/messages`, {
+      method: 'POST', headers: { Authorization: `Bearer ${tkX}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', to: tel, type: 'template',
+        template: { name: tpl, language: { code: 'pt_BR' },
+          components: [{ type: 'body', parameters: [{ type: 'text', text: nome }] }] } }),
+    }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+    const ok = !!(r && r.messages && r.messages[0]);
+    if (ok) {
+      await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'out',
+        texto: '🧪 [teste ' + tpl + '] ' + nome, tipo: 'template', via: 'teste-manual' });
+    }
+    return res.status(200).json({ ok, template: tpl, para: tel,
+      msgId: ok ? r.messages[0].id : null,
+      erro: ok ? undefined : ((r && r.error && (r.error.error_user_msg || r.error.message)) || 'falha'),
+      codigo: (r && r.error && r.error.code) || undefined,
+      dica: ok ? 'confira o WhatsApp do número' : 'se o erro citar o template, ele pode não estar aprovado' });
+  }
+
   // ── 💳 STATUS-COBRANCA: a conta do WhatsApp está liberada para enviar? ──
   if (action === 'status-cobranca') {
     const { token: tkC, phoneId: pidC } = await credenciais();
