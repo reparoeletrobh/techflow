@@ -542,15 +542,35 @@ module.exports = async function handler(req, res) {
       else feitos.push({ id: alvo, nome: (a.nome || a.anuncio || null), acao: campo + ' → R$ ' + Number(valor).toFixed(2) });
       await new Promise(r2 => setTimeout(r2, 120));
     }
+    // 💸 AUTOMÁTICO: depois de pausar, devolve à operação o que sobrou nas campanhas paradas.
+    // Sem isso a verba ficava presa no pausado e ninguém percebia (R$342 em 04/08).
+    let orfaDevolvida = 0; const orfaFeitos = [];
+    try {
+      if ((pausarIds || []).length) {
+        await new Promise(s => setTimeout(s, 1500));           // deixa a Meta propagar as pausas
+        const KAO = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+        const ro = await fetch(`https://reparoeletroadm.com/api/trafego?action=realocar-orfa&aplicar=1&k=${KAO}`)
+          .then(x => x.json()).catch(() => null);
+        if (ro && ro.ok && ro.feitos) {
+          for (const f of ro.feitos) {
+            orfaFeitos.push(f);
+            const m = String(f.acao || '').match(/R\$\s*([\d.,]+)/);
+            if (m) orfaDevolvida += Number(String(m[1]).replace(/\./g, '').replace(',', '.'));
+          }
+        }
+      }
+    } catch (e) {}
     try {
       const lg = (await dbGet('trafego_log')) || { movs: [] };
-      lg.movs.unshift({ ts: new Date().toISOString(), feitos, erros });
+      lg.movs.unshift({ ts: new Date().toISOString(),
+        feitos: feitos.concat(orfaFeitos.map(f => ({ ...f, acao: '[órfã] ' + f.acao }))), erros });
       lg.movs = lg.movs.slice(0, 200);
       await dbSet('trafego_log', lg);
       for (const p of ['hoje', '7d', 'ciclo']) await dbSet('trafego_painel_cache_' + p, null);
       await dbSet('trafego_painel_cache', null);
     } catch (e) {}
-    return res.status(200).json({ ok: erros.length === 0, feitos, erros });
+    return res.status(200).json({ ok: erros.length === 0, feitos, erros,
+      verbaOrfaDevolvida: orfaFeitos.length ? { anuncios: orfaFeitos.length, lista: orfaFeitos.map(f => f.nome + ' → ' + f.acao) } : 'nenhuma' });
   }
 
   // ═══ 🧠 INTELIGÊNCIA: funil real por categoria (operação + Meta) ═══
