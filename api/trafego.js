@@ -323,6 +323,17 @@ module.exports = async function handler(req, res) {
   if (action === 'copiloto') {
     const cfg = await cfgTrafego();
     const per = ['hoje', '7d', 'ciclo'].includes(String(req.query.periodo || '')) ? String(req.query.periodo) : 'ciclo';
+    // 🔄 ?recarregar=1 → busca os dados frescos na Meta antes de decidir,
+    // nos DOIS períodos (ciclo para o momento, 7 dias para a média de proteção)
+    if (String(req.query.recarregar || '') === '1') {
+      const KRC = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+      for (const p of [per, '7d']) {
+        try {
+          await fetch(`https://reparoeletroadm.com/api/trafego?action=painel&periodo=${p}&forcar=1&k=${KRC}`)
+            .then(x => x.json()).catch(() => null);
+        } catch (e) {}
+      }
+    }
     const base = await dbGet('trafego_painel_cache_' + per) || await dbGet('trafego_painel_cache');
     if (!base || !base.dados) return res.status(200).json({ ok: false, error: 'abra o painel primeiro para carregar os dados' });
     // 📆 REGRA DO DONO: o corte não pode se basear só no dia ou no início do ciclo.
@@ -504,14 +515,30 @@ module.exports = async function handler(req, res) {
     }
     for (const o of (orcamentos || [])) {
       // o front informa ONDE está a verba e QUAL campo usar (total x diária)
-      const alvo = o.alvoId || o.adsetId;
+      let alvo = o.alvoId || o.adsetId;
       const campo = o.campo || (o.diario ? 'daily_budget' : 'lifetime_budget');
       const valor = o.valor != null ? o.valor : o.diario;
       if (!alvo || valor == null) { erros.push({ id: alvo || '?', acao: 'orçamento', erro: 'destino ou valor ausente' }); continue; }
       const centavos = Math.round(Number(valor) * 100);
       if (!(centavos > 0)) { erros.push({ id: alvo, acao: 'orçamento', erro: 'valor inválido' }); continue; }
-      const r = await postMeta(alvo, { [campo]: String(centavos) });
-      if (r && r.error) erros.push({ id: alvo, acao: 'orçamento (' + campo + ')', erro: r.error.message, codigo: r.error.code });
+      let r = await postMeta(alvo, { [campo]: String(centavos) });
+      // ↩️ nível errado? tenta o outro. A conta mistura verba em campanha e em conjunto,
+      // e 20 aplicações falharam em 28/07 por isso, sem ninguém ser avisado.
+      if (r && r.error) {
+        const outro = (String(alvo) === String(o.adsetId)) ? o.campanhaId : o.adsetId;
+        if (outro && String(outro) !== String(alvo)) {
+          const r2 = await postMeta(outro, { [campo]: String(centavos) });
+          if (!(r2 && r2.error)) { r = r2; alvo = outro; }
+        }
+      }
+      // ainda falhou? tenta o outro CAMPO (total x diária)
+      if (r && r.error) {
+        const campoAlt = campo === 'lifetime_budget' ? 'daily_budget' : 'lifetime_budget';
+        const r3 = await postMeta(alvo, { [campoAlt]: String(centavos) });
+        if (!(r3 && r3.error)) r = r3;
+      }
+      if (r && r.error) erros.push({ id: alvo, nome: o.nome || null,
+        acao: 'orçamento (' + campo + ')', erro: r.error.message, codigo: r.error.code });
       else feitos.push({ id: alvo, nome: (a.nome || a.anuncio || null), acao: campo + ' → R$ ' + Number(valor).toFixed(2) });
       await new Promise(r2 => setTimeout(r2, 120));
     }
