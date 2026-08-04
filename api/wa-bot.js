@@ -1092,6 +1092,47 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, feitos });
   }
 
+  // ── 💳 STATUS-COBRANCA: a conta do WhatsApp está liberada para enviar? ──
+  if (action === 'status-cobranca') {
+    const { token: tkC, phoneId: pidC } = await credenciais();
+    if (!tkC || !pidC) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
+    const G = 'https://graph.facebook.com/v20.0';
+    const pega = async (u) => fetch(u).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+
+    // o número e a saúde dele (é aqui que a Meta reporta bloqueio por pagamento)
+    const num = await pega(`${G}/${pidC}?fields=display_phone_number,quality_rating,status,messaging_limit_tier,throughput,health_status&access_token=${tkC}`);
+    // a conta de negócios e o estado de cobrança
+    let waba = null, cobranca = null;
+    try {
+      const d = await pega(`${G}/${pidC}?fields=whatsapp_business_account{id,name,account_review_status,health_status}&access_token=${tkC}`);
+      waba = (d || {}).whatsapp_business_account || null;
+      if (waba && waba.id) {
+        cobranca = await pega(`${G}/${waba.id}?fields=account_review_status,health_status,business_verification_status,primary_funding_id&access_token=${tkC}`);
+      }
+    } catch (e) {}
+
+    // saúde: a Meta descreve aqui restrições ativas, inclusive de pagamento
+    const saude = (num && num.health_status) || (waba && waba.health_status) || null;
+    const entidades = (saude && saude.entities) || [];
+    const bloqueios = entidades.filter(e => e.can_send_message && e.can_send_message !== 'AVAILABLE')
+      .map(e => ({ tipo: e.entity_type, situacao: e.can_send_message,
+        motivos: (e.errors || []).map(x => x.error_description || x.error_code) }));
+
+    const podeEnviar = num.status === 'CONNECTED' && num.quality_rating !== 'RED' && bloqueios.length === 0;
+    return res.status(200).json({ ok: true,
+      numero: { telefone: num.display_phone_number, situacao: num.status,
+        qualidade: num.quality_rating, limite: num.messaging_limit_tier },
+      contaDeNegocios: waba ? { nome: waba.name, revisao: waba.account_review_status } : null,
+      verificacao: cobranca ? cobranca.business_verification_status : null,
+      saudeGeral: saude ? (saude.can_send_message || 'sem dados') : 'não informado',
+      bloqueiosAtivos: bloqueios.length ? bloqueios : 'nenhum',
+      PODE_ENVIAR_TEMPLATE: podeEnviar,
+      veredito: podeEnviar
+        ? '✅ liberado — pode retomar os disparos'
+        : '❌ ainda bloqueado: ' + (bloqueios.length ? bloqueios.map(b => b.motivos.join(', ')).join(' | ') : num.status),
+      observacao: 'a dívida em si aparece no Gerenciador → Configurações de pagamento; aqui vemos se a Meta já liberou o envio' });
+  }
+
   // ── 📋 STATUS-TEMPLATES: situação dos modelos e do número, para saber se dá para enviar ──
   if (action === 'status-templates') {
     const { token: tkT, phoneId: pidT } = await credenciais();
