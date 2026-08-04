@@ -127,6 +127,22 @@
   ],
   "rewrites": [
     {
+      "source": "/delete-data",
+      "destination": "/exclusao-de-dados.html"
+    },
+    {
+      "source": "/exclusao-de-dados",
+      "destination": "/exclusao-de-dados.html"
+    },
+    {
+      "source": "/termos-de-servico",
+      "destination": "/termos.html"
+    },
+    {
+      "source": "/termos",
+      "destination": "/termos.html"
+    },
+    {
       "source": "/privacy",
       "destination": "/privacidade.html"
     },
