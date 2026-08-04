@@ -469,7 +469,7 @@ module.exports = async function handler(req, res) {
       if (!(centavos > 0)) { erros.push({ id: alvo, acao: 'orçamento', erro: 'valor inválido' }); continue; }
       const r = await postMeta(alvo, { [campo]: String(centavos) });
       if (r && r.error) erros.push({ id: alvo, acao: 'orçamento (' + campo + ')', erro: r.error.message, codigo: r.error.code });
-      else feitos.push({ id: alvo, acao: campo + ' → R$ ' + Number(valor).toFixed(2) });
+      else feitos.push({ id: alvo, nome: (a.nome || a.anuncio || null), acao: campo + ' → R$ ' + Number(valor).toFixed(2) });
       await new Promise(r2 => setTimeout(r2, 120));
     }
     try {
@@ -650,8 +650,23 @@ module.exports = async function handler(req, res) {
   if (action === 'conferir-aplicacao') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
     const lg = (await dbGet('trafego_log')) || { movs: [] };
-    const ultimo = (lg.movs || []).find(m => m.acao === 'aplicar' || m.pausas || m.verbas);
-    if (!ultimo) return res.status(200).json({ ok: false, error: 'nenhuma aplicação registrada no log' });
+    // o log grava em { feitos: [{id, acao}], erros: [] } — ler nesse formato
+    const ultimo = (lg.movs || []).find(m => (m.feitos && m.feitos.length) || m.pausas || m.verbas);
+    if (!ultimo) return res.status(200).json({ ok: false,
+      error: 'nenhuma aplicação registrada no log',
+      registrosNoLog: (lg.movs || []).length,
+      ultimoRegistro: (lg.movs || [])[0] || null });
+
+    // separa pausas de realocações a partir do texto da ação
+    const feitos = ultimo.feitos || [];
+    const pausasLog = feitos.filter(f => /pausa|paused|status/i.test(String(f.acao || '')))
+      .map(f => ({ campanhaId: f.id, nome: f.nome || f.id }));
+    const verbasLog = feitos.filter(f => /budget|orçamento|orcamento|R\$/i.test(String(f.acao || '')))
+      .map(f => {
+        const m = String(f.acao || '').match(/R\$\s*([\d.,]+)/);
+        return { campanhaId: f.id, nome: f.nome || f.id,
+          nova: m ? Number(String(m[1]).replace(/\./g, '').replace(',', '.')) : null };
+      });
 
     // estado atual na Meta
     const camps = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns?fields=id,name,effective_status,daily_budget,lifetime_budget&limit=200&access_token=${TOKEN}`, 8);
@@ -699,14 +714,15 @@ module.exports = async function handler(req, res) {
         aplicou: bate };
     };
 
-    const pausas = (ultimo.pausas || ultimo.pausados || []).map(conferePausa);
-    const verbas = (ultimo.verbas || ultimo.realocacoes || []).map(confereVerba);
+    const pausas = (ultimo.pausas || ultimo.pausados || pausasLog).map(conferePausa);
+    const verbas = (ultimo.verbas || ultimo.realocacoes || verbasLog).map(confereVerba);
     const falhouPausa = pausas.filter(p => !p.pausouDeVerdade);
     const falhouVerba = verbas.filter(v => v.aplicou === false);
 
     return res.status(200).json({
       ok: falhouPausa.length === 0 && falhouVerba.length === 0,
       aplicadoEm: ultimo.ts,
+      errosNaAplicacao: (ultimo.erros || []).length ? ultimo.erros : 'nenhum',
       pausas: { total: pausas.length, confirmadas: pausas.length - falhouPausa.length, detalhe: pausas },
       verbas: { total: verbas.length, confirmadas: verbas.length - falhouVerba.length, detalhe: verbas },
       alertas: [
