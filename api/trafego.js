@@ -359,6 +359,12 @@ module.exports = async function handler(req, res) {
       const cpaCat = conversas > 0 ? gasto / conversas : null;
 
       // perdedores da categoria
+      // 📌 TODOS os ativos aparecem — inclusive os dentro da meta, marcados como tal.
+      // Antes a categoria sumia quando não havia nada a cortar.
+      const dentroDaMeta = lista.filter(a => a.cpa != null && a.cpa <= meta)
+        .map(a => ({ id: a.id, nome: a.nome, cpa: a.cpa, conversas: a.conversas,
+          gasto: a.gasto, verba: verbaTotalDe(a) }))
+        .sort((x, y) => (x.cpa || 9) - (y.cpa || 9));
       const cortar = lista.filter(a => (a.conversas === 0 && a.gasto >= meta * 2)
         || (a.razaoMeta != null && a.razaoMeta > 1.3 && a.conversas > 0))
         .map(a => ({ id: a.id, nome: a.nome, thumb: a.thumb, adsetId: a.adsetId, campanhaId: a.campanhaId,
@@ -402,7 +408,7 @@ module.exports = async function handler(req, res) {
         restante: Number(restante.toFixed(2)), conversas,
         cpa: cpaCat != null ? Number(cpaCat.toFixed(2)) : null,
         acimaDaMeta: cpaCat != null ? cpaCat > meta : null,
-        cortar, libera, reforcar,
+        dentroDaMeta, cortar, libera, reforcar,
         ganhoEstimado: reforcar.reduce((s, r) => s + (r.conversasEstimadas || 0), 0),
         aplicado: Number(reforcar.reduce((s, r) => s + (r.receber || 0), 0).toFixed(2)),
         semDestino: libera > 0 && !campeoes.length,
@@ -657,6 +663,38 @@ module.exports = async function handler(req, res) {
       dica: 'o administrador da conta e o admin do Gerenciador de Negócios são quem recebem a notificação de confirmação' });
   }
   function permissoesErro(r) { return r && r.erro ? ('sem acesso: ' + r.erro) : ((r && r.dados) || []); }
+
+  // ── 🔎 POR-QUE-FORA: quais anúncios ativos na Meta ficaram fora do painel, e por quê ──
+  if (action === 'por-que-fora') {
+    const cat = String(req.query.cat || '').toLowerCase();
+    const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,effective_status,adset{id,name,effective_status,end_time},campaign{id,name,effective_status}&limit=300&access_token=${TOKEN}`, 10);
+    const agoraMs = Date.now();
+    const linhas = [];
+    for (const a of (ads.data || [])) {
+      const c = categoriaDe(a.name || '', 'anuncio');
+      if (cat && c !== cat) continue;
+      if (a.effective_status !== 'ACTIVE') continue;          // só os que a Meta diz ATIVO
+      const st = a.adset || {};
+      let motivo = null;
+      if (st.effective_status !== 'ACTIVE') motivo = 'conjunto ' + (st.effective_status || '?');
+      else if (st.end_time && new Date(st.end_time).getTime() < agoraMs) {
+        motivo = 'veiculação encerrada em ' + new Date(new Date(st.end_time).getTime() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ');
+      }
+      linhas.push({ nome: a.name, id: a.id, categoria: c,
+        conjunto: st.name || '', fimDoConjunto: st.end_time || null,
+        campanha: (a.campaign || {}).name || '',
+        entraNoPainel: !motivo, motivoDoCorte: motivo });
+    }
+    const dentro = linhas.filter(l => l.entraNoPainel);
+    const fora = linhas.filter(l => !l.entraNoPainel);
+    const porMotivo = fora.reduce((o, l) => { const k = l.motivoDoCorte; o[k] = (o[k] || 0) + 1; return o; }, {});
+    return res.status(200).json({ ok: true, categoria: cat || 'todas',
+      ativosNaMeta: linhas.length, entramNoPainel: dentro.length, ficamDeFora: fora.length,
+      porMotivo,
+      listaFora: fora.slice(0, 30).map(l => String(l.nome).slice(0, 30) + ' | ' + l.motivoDoCorte +
+        ' | camp: ' + String(l.campanha).slice(0, 24)),
+      listaDentro: dentro.slice(0, 30).map(l => String(l.nome).slice(0, 30) + ' | camp: ' + String(l.campanha).slice(0, 24)) });
+  }
 
   // ── 🔬 DIAG-CATEGORIA: por que uma categoria some do Copiloto ──
   if (action === 'diag-categoria') {
