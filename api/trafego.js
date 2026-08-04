@@ -658,6 +658,41 @@ module.exports = async function handler(req, res) {
   }
   function permissoesErro(r) { return r && r.erro ? ('sem acesso: ' + r.erro) : ((r && r.dados) || []); }
 
+  // ── 🔬 DIAG-CATEGORIA: por que uma categoria some do Copiloto ──
+  if (action === 'diag-categoria') {
+    const cat = String(req.query.cat || 'microondas').toLowerCase();
+    const base = await dbGet('trafego_painel_cache_7d') || await dbGet('trafego_painel_cache');
+    if (!base || !base.dados) return res.status(200).json({ ok: false, error: 'abra o painel primeiro' });
+    const todos = base.dados.anuncios || [];
+    const daCat = todos.filter(a => a.categoria === cat);
+    // e o que a Meta diz AGORA (o cache pode estar velho)
+    const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,effective_status,adset{id,name,effective_status},campaign{id,name,effective_status}&limit=200&access_token=${TOKEN}`, 8);
+    const naMeta = (ads.data || []).filter(a => categoriaDe(a.name || '', 'anuncio') === cat);
+    const ativosMeta = naMeta.filter(a => a.effective_status === 'ACTIVE');
+    return res.status(200).json({ ok: true, categoria: cat,
+      cacheDoPainel: {
+        geradoEm: base.em || base.geradoEm || '(sem data)',
+        total: daCat.length,
+        ativos: daCat.filter(a => a.ativo).length,
+        inativos: daCat.filter(a => !a.ativo).length,
+        lista: daCat.map(a => (a.ativo ? '🟢 ' : '⏸️ ') + String(a.nome).slice(0, 30) +
+          ' | cpa ' + (a.cpa != null ? a.cpa : '—') + ' | conv ' + a.conversas),
+      },
+      naMetaAgora: {
+        total: naMeta.length,
+        ativos: ativosMeta.length,
+        lista: naMeta.slice(0, 30).map(a => (a.effective_status === 'ACTIVE' ? '🟢 ' : '⏸️ ') +
+          String(a.name).slice(0, 30) + ' | ' + a.effective_status +
+          ' | conj: ' + ((a.adset || {}).effective_status || '?') +
+          ' | camp: ' + ((a.campaign || {}).effective_status || '?')),
+      },
+      diagnostico: ativosMeta.length > 0 && daCat.filter(a => a.ativo).length === 0
+        ? '⚠️ o CACHE do painel está desatualizado — há ' + ativosMeta.length + ' ativo(s) na Meta. Recarregue com forcar=1'
+        : (ativosMeta.length === 0 ? 'não há nenhum anúncio ativo desta categoria na Meta'
+          : 'cache e Meta concordam'),
+      comoCorrigir: '/api/trafego?action=painel&periodo=ciclo&forcar=1' });
+  }
+
   // ── ✅ CONFERIR-APLICACAO: as últimas alterações do Copiloto valeram na Meta? ──
   if (action === 'conferir-aplicacao') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
