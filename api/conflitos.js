@@ -126,6 +126,23 @@ module.exports = async function handler(req,res){
       dica:'para aplicar: &aplicar=1'});
   }
 
+  // ── 🔗 VINCULAR-FICHA: liga um conflito já existente a uma ficha do pipe ──
+  if(req.method==='POST'&&action==='vincular-ficha'){
+    const {id,vinculo}=req.body||{};
+    if(!id||!vinculo||!vinculo.telefone){
+      return res.status(400).json({ok:false,error:'informe o conflito e a ficha'});
+    }
+    const c=db.conflitos.find(x=>x.id===id);
+    if(!c)return res.status(404).json({ok:false,error:'conflito não encontrado'});
+    c.telefone=String(vinculo.telefone).replace(/\D/g,'');
+    c.cardId=vinculo.id||'';
+    c.cardOnde=vinculo.onde||'';
+    if(vinculo.equipamento&&!c.equipamento)c.equipamento=vinculo.equipamento;
+    c.vinculadoEm=new Date().toISOString();
+    await dbSet(KEY,db);
+    return res.status(200).json({ok:true,conflito:c});
+  }
+
   // ── 🔎 BUSCAR-FICHA: procura no pipe para vincular ao conflito (nome, telefone ou OS) ──
   if(action==='buscar-ficha'){
     const q=String(req.query.q||'').toLowerCase().trim();

@@ -554,7 +554,12 @@ function cardHTML(c){
   var btns='';
   var aguardaRelato = c.status==='relatar';
   if(aguardaRelato){
-    btns+='<button class="cc-btn" style="background:rgba(37,211,102,.14);color:#25d366;border-color:rgba(37,211,102,.45);font-weight:800;" data-id="'+c.id+'" onclick="relatarCliente(this.dataset.id)">📋 Copiar e Enviar ao cliente</button>';
+    var temTel=!!(c.telefone||c.tel);
+    if(!temTel){
+      btns+='<button class="cc-btn" style="background:rgba(96,165,250,.14);color:#60a5fa;border-color:rgba(96,165,250,.45);font-weight:800;" data-id="'+c.id+'" onclick="abrirVinculo(this.dataset.id)">🔗 Vincular ficha para enviar</button>';
+    } else {
+      btns+='<button class="cc-btn" style="background:rgba(37,211,102,.14);color:#25d366;border-color:rgba(37,211,102,.45);font-weight:800;" data-id="'+c.id+'" onclick="relatarCliente(this.dataset.id)">📋 Copiar e Enviar ao cliente</button>';
+    }
     btns+='<button class="cc-btn" data-id="'+c.id+'" onclick="abrirEditar(this.dataset.id)">✏️ Editar</button>';
   } else if(!resolved){
     if(c.status==='aberto') btns+='<button class="cc-btn assumir" data-id="'+c.id+'" onclick="assumir(this.dataset.id)">▶ Assumir</button>';
@@ -692,7 +697,63 @@ async function assumir(id){
   else toast('Erro','r');
 }
 
-var _vinculoFicha=null, _buscaFichaTimer=null;
+var _vinculoFicha=null, _buscaFichaTimer=null, _vincAlvo=null;
+
+function abrirVinculo(id){
+  _vincAlvo=id;
+  var c=(_dados||[]).find(function(x){return x.id===id;});
+  var ov=document.getElementById('ov-vinc'); if(ov)ov.remove();
+  ov=document.createElement('div');
+  ov.id='ov-vinc';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:600;display:flex;align-items:flex-start;justify-content:center;padding:40px 14px;overflow-y:auto;';
+  ov.onclick=function(e){ if(e.target===ov)ov.remove(); };
+  ov.innerHTML='<div style="width:100%;max-width:520px;background:#12161d;border:1px solid #2a2f38;border-radius:14px;padding:16px;">'
+    +'<div style="font-size:15px;font-weight:900;margin-bottom:4px;">🔗 Vincular ficha</div>'
+    +'<div style="font-size:12px;color:#8b93a3;margin-bottom:12px;">'+((c&&(c.cliente||c.ficha))||'')+' — '+((c&&c.titulo)||'')+'</div>'
+    +'<input id="vinc-q" placeholder="Nome, telefone ou nº da ficha..." autocomplete="off" oninput="buscarVinc(this.value)" '
+      +'style="width:100%;background:#0c1016;border:1px solid #2a2f38;border-radius:9px;color:#f0f2f5;font-size:14px;padding:11px;box-sizing:border-box;">'
+    +'<div id="vinc-res" style="margin-top:8px;max-height:340px;overflow-y:auto;"></div>'
+    +'<button onclick="document.getElementById(\'ov-vinc\').remove()" style="width:100%;margin-top:12px;background:#242b39;border:none;border-radius:9px;padding:10px;color:#f0f2f5;font-weight:800;cursor:pointer;">fechar</button>'
+  +'</div>';
+  document.body.appendChild(ov);
+  setTimeout(function(){var i=document.getElementById('vinc-q'); if(i)i.focus();},80);
+  // já sugere pelos 4 dígitos do nome
+  var m=String((c&&(c.cliente||c.ficha))||'').match(/(\d{4})\s*$/);
+  if(m){ document.getElementById('vinc-q').value=m[1]; buscarVinc(m[1]); }
+}
+var _vincTimer=null;
+function buscarVinc(q){
+  clearTimeout(_vincTimer);
+  var box=document.getElementById('vinc-res');
+  if(!box)return;
+  if(!q||q.trim().length<3){box.innerHTML='';return;}
+  box.innerHTML='<div style="padding:10px;color:#8b93a3;font-size:12px;">buscando…</div>';
+  _vincTimer=setTimeout(async function(){
+    var r=await fetch('/api/conflitos?action=buscar-ficha&q='+encodeURIComponent(q.trim()))
+      .then(function(x){return x.json();}).catch(function(){return null;});
+    if(!r||!r.ok||!r.resultados.length){
+      box.innerHTML='<div style="padding:10px;color:#8b93a3;font-size:12px;">Nenhuma ficha com telefone encontrada</div>';return;
+    }
+    window._vincRes=r.resultados;
+    box.innerHTML=r.resultados.map(function(f,i){
+      return '<div onclick="confirmarVinculo('+i+')" style="padding:10px 12px;border:1px solid #1e232c;border-radius:9px;margin-bottom:6px;cursor:pointer;font-size:12.5px;" onmouseover="this.style.borderColor=\'#25d366\'" onmouseout="this.style.borderColor=\'#1e232c\'">'
+        +'<b>'+f.nome+'</b> <span style="color:#5a8dc9;font-family:monospace;">'+f.telefone+'</span>'
+        +'<div style="font-size:10.5px;color:#8b93a3;margin-top:2px;">'+(f.equipamento||'—')+' · '+f.onde+(f.fase?' · '+f.fase:'')+'</div></div>';
+    }).join('');
+  },300);
+}
+async function confirmarVinculo(i){
+  var f=(window._vincRes||[])[i];
+  if(!f||!_vincAlvo)return;
+  if(!confirm('Vincular a ficha de '+f.nome+' ('+f.telefone+')?\n\nO retorno será enviado para esse número.'))return;
+  var r=await fetch('/api/conflitos?action=vincular-ficha',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:_vincAlvo,vinculo:f})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  var ov=document.getElementById('ov-vinc'); if(ov)ov.remove();
+  if(r&&r.ok){ if(typeof toast==='function')toast('🔗 Ficha vinculada — já pode enviar'); }
+  else alert('Erro: '+((r&&r.error)||'falha'));
+  carregar();
+}
+
 function buscarFicha(q){
   clearTimeout(_buscaFichaTimer);
   var box=document.getElementById('f-sugestoes');
