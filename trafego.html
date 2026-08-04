@@ -592,8 +592,14 @@ async function carregarCopiloto(){
     +'</div>';
   }).join('');
 
+  // 📜 o histórico aparece SEMPRE — antes ficava dentro da condição de cortes
+  // e sumia junto com o botão de revisar quando não havia nada a aplicar
+  h+='<button class="btn" style="width:100%;padding:10px;font-size:12px;margin-top:10px;background:#1e293b;" onclick="verHistoricoCopiloto()">📜 Histórico de alterações da semana</button>';
+  if(!r.totalCortes){
+    h+='<div style="text-align:center;font-size:11.5px;color:#4ade80;margin-top:10px;padding:10px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:9px;">'
+      +'✅ Nenhum corte necessário — todos os criativos ativos estão dentro da meta.</div>';
+  }
   if(r.totalCortes){
-    h+='<button class="btn" style="width:100%;padding:10px;font-size:12px;margin-top:4px;background:#1e293b;" onclick="verHistoricoCopiloto()">📜 Histórico de alterações da semana</button>'
     h+='<button class="btn destaque" style="width:100%;padding:13px;font-size:13px;margin-top:6px;" onclick="revisarAlteracoes()">📋 Revisar alterações ('+r.totalCortes+' cortes · '+brl(r.totalLibera)+')</button>'
       +'<div style="font-size:10px;color:var(--dim);text-align:center;margin-top:6px;">você confere o resumo antes de qualquer mudança</div>';
   }
