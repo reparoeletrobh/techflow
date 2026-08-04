@@ -716,6 +716,81 @@ module.exports = async function handler(req, res) {
   }
   function permissoesErro(r) { return r && r.erro ? ('sem acesso: ' + r.erro) : ((r && r.dados) || []); }
 
+  // ── 📋 EXTRATO-VERBA: todos os anúncios do ciclo, verba e situação, somados por frente ──
+  if (action === 'extrato-verba') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const brt = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') : null;
+    const [camps, sets, ads] = await Promise.all([
+      pegarTudo(`${GRAPH}/act_${CONTA}/campaigns?fields=id,name,effective_status,daily_budget,lifetime_budget,start_time,stop_time&limit=200&access_token=${TOKEN}`, 8),
+      pegarTudo(`${GRAPH}/act_${CONTA}/adsets?fields=id,name,effective_status,daily_budget,lifetime_budget,end_time,campaign{id}&limit=200&access_token=${TOKEN}`, 8),
+      pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,effective_status,adset{id},campaign{id}&limit=300&access_token=${TOKEN}`, 10),
+    ]);
+    const porCamp = {}; for (const c of (camps.data || [])) porCamp[c.id] = c;
+    const setsDe = {};
+    for (const s of (sets.data || [])) { const cid = (s.campaign || {}).id; if (cid) (setsDe[cid] = setsDe[cid] || []).push(s); }
+
+    // gasto do ciclo por campanha
+    const desdeCiclo = (function () {
+      const b = new Date(Date.now() - 3 * 3600000);
+      const d = new Date(b); d.setUTCDate(b.getUTCDate() - ((b.getUTCDay() + 1) % 7));
+      return d.toISOString().slice(0, 10);
+    })();
+    const gastos = {};
+    try {
+      const jn = 'time_range=' + encodeURIComponent(JSON.stringify({ since: desdeCiclo, until: new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10) }));
+      const ins = await pegarTudo(`${GRAPH}/act_${CONTA}/insights?level=campaign&${jn}&fields=campaign_id,spend&limit=200&access_token=${TOKEN}`, 6);
+      for (const i of (ins.data || [])) gastos[i.campaign_id] = Number(i.spend || 0);
+    } catch (e) {}
+
+    // só campanhas deste ciclo
+    const doCiclo = (camps.data || []).filter(c => String(c.start_time || '').slice(0, 10) >= desdeCiclo);
+    const linhas = doCiclo.map(c => {
+      let verba = null, onde = null;
+      if (c.lifetime_budget) { verba = Number(c.lifetime_budget) / 100; onde = 'campanha'; }
+      else if (c.daily_budget) { verba = Number(c.daily_budget) / 100; onde = 'campanha (diária)'; }
+      else {
+        let soma = 0;
+        for (const s of (setsDe[c.id] || [])) {
+          if (s.lifetime_budget) soma += Number(s.lifetime_budget) / 100;
+          else if (s.daily_budget) soma += Number(s.daily_budget) / 100;
+        }
+        if (soma) { verba = Number(soma.toFixed(2)); onde = 'conjunto'; }
+      }
+      const ativa = ['ACTIVE'].includes(c.effective_status);
+      return { nome: c.name, id: c.id,
+        categoria: categoriaDe(c.name || '', 'anuncio'),
+        situacao: c.effective_status, ativa,
+        verba, verbaEm: onde,
+        gasto: Number((gastos[c.id] || 0).toFixed(2)),
+        inicio: brt(c.start_time), fim: brt(c.stop_time) };
+    }).sort((a, b) => (b.verba || 0) - (a.verba || 0));
+
+    const ativos = linhas.filter(l => l.ativa);
+    const pausados = linhas.filter(l => !l.ativa);
+    const somaTv = ativos.filter(l => l.categoria === 'tv');
+    const somaAdm = ativos.filter(l => l.categoria !== 'tv');
+    const soma = (arr, campo) => Number(arr.reduce((s, x) => s + (x[campo] || 0), 0).toFixed(2));
+
+    return res.status(200).json({ ok: true, cicloDesde: desdeCiclo,
+      TOTAIS: {
+        tv: { anuncios: somaTv.length, verba: soma(somaTv, 'verba'), gasto: soma(somaTv, 'gasto') },
+        adm: { anuncios: somaAdm.length, verba: soma(somaAdm, 'verba'), gasto: soma(somaAdm, 'gasto') },
+        geral: { ativos: ativos.length, pausados: pausados.length,
+          verbaAtiva: soma(ativos, 'verba'), gastoTotal: soma(linhas, 'gasto'),
+          verbaEmPausados: soma(pausados, 'verba') },
+      },
+      porCategoria: ativos.reduce((o, l) => {
+        const k = l.categoria; o[k] = o[k] || { anuncios: 0, verba: 0, gasto: 0 };
+        o[k].anuncios++; o[k].verba = Number((o[k].verba + (l.verba || 0)).toFixed(2));
+        o[k].gasto = Number((o[k].gasto + l.gasto).toFixed(2)); return o; }, {}),
+      ATIVOS: ativos.map(l => (l.categoria || '?').slice(0, 4).toUpperCase().padEnd(4) + ' | ' +
+        String(l.nome).slice(0, 30).padEnd(30) + ' | R$ ' + String(l.verba || 0).padEnd(7) +
+        ' | gasto R$ ' + l.gasto + ' (' + (l.verbaEm || '?') + ')'),
+      PAUSADOS: pausados.map(l => (l.categoria || '?').slice(0, 4).toUpperCase().padEnd(4) + ' | ' +
+        String(l.nome).slice(0, 30).padEnd(30) + ' | R$ ' + String(l.verba || 0) + ' | ' + l.situacao),
+    });
+  }
+
   // ── 🩺 LOG-BRUTO: o que está gravado no log do tráfego, sem interpretação ──
   if (action === 'log-bruto') {
     const lg = (await dbGet('trafego_log')) || { movs: [] };
