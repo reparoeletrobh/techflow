@@ -1092,6 +1092,28 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, feitos });
   }
 
+  // ── 📬 STATUS-ENVIO: o que aconteceu com as mensagens enviadas a um número ──
+  if (action === 'status-envio') {
+    const tel = String(req.query.tel || '').replace(/\D/g, '');
+    if (tel.length < 8) return res.status(400).json({ ok: false, error: 'informe ?tel=' });
+    const d8x = tel.slice(-8);
+    const evts = await lerEvts();
+    const meus = evts.filter(e => String(e.tel || '').replace(/\D/g, '').endsWith(d8x)).slice(-40);
+    const enviados = meus.filter(e => e.dir === 'out');
+    const status = meus.filter(e => e.dir === 'status' || e.tipo === 'status');
+    const falhas = status.filter(s => /fail|error|undeliver/i.test(String(s.texto || '')));
+    const entregues = status.filter(s => /delivered|read/i.test(String(s.texto || '')));
+    return res.status(200).json({ ok: true, telefone: tel,
+      enviados: enviados.length, comStatus: status.length,
+      entregues: entregues.length, falhas: falhas.length,
+      ultimoStatus: status.length ? String(status[status.length - 1].texto).slice(0, 300) : '(nenhum status recebido)',
+      linhaDoTempo: meus.slice(-15).map(e => String(e.ts || '').slice(11, 16) + ' ' + e.dir +
+        ' | ' + String(e.texto || '').slice(0, 70)),
+      leitura: status.length === 0
+        ? 'a Meta aceitou mas NÃO devolveu status — normalmente significa que o número não tem WhatsApp ativo, ou o webhook de status não está chegando'
+        : (falhas.length ? 'houve falha de entrega — ver ultimoStatus' : 'entregue') });
+  }
+
   // ── 🧪 TESTE-TEMPLATE: dispara um template para um número, por link ──
   if (action === 'teste-template') {
     const tel = String(req.query.tel || '').replace(/\D/g, '');
