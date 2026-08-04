@@ -46,6 +46,23 @@ async function lerEvts() {
     return out;
   } catch { return []; }
 }
+// 📒 índice leve msgId → template/origem, lido pelo webhook quando a entrega falha
+async function indexarEnvio(msgId, template, via, texto, telefone) {
+  if (!msgId) return;
+  try {
+    const idx = (await dbGet('wa_envio_idx')) || {};
+    idx[msgId] = { template: template || null, via: via || null,
+      texto: String(texto || '').slice(0, 120), telefone: String(telefone || ''),
+      em: new Date().toISOString() };
+    const chaves = Object.keys(idx);
+    if (chaves.length > 800) {
+      chaves.sort((a, b) => String(idx[a].em).localeCompare(String(idx[b].em)));
+      for (const k of chaves.slice(0, chaves.length - 800)) delete idx[k];
+    }
+    await dbSet('wa_envio_idx', idx);
+  } catch (e) {}
+}
+
 async function rpushEvt(evt) {
   try {
     await fetch(`${U}/rpush/${EVT_LIST}/${encodeURIComponent(JSON.stringify(evt))}`,
@@ -1092,6 +1109,56 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, feitos });
   }
 
+  // ── 📒 FILA-RECUPERACAO: tudo que a Meta recusou desde o bloqueio ──
+  if (action === 'fila-recuperacao') {
+    const desde = String(req.query.desde || '2026-08-01').slice(0, 10);
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const dias = [];
+    for (let d = new Date(desde + 'T12:00:00Z'); d.toISOString().slice(0, 10) <= hoje; d.setUTCDate(d.getUTCDate() + 1)) {
+      dias.push(d.toISOString().slice(0, 10));
+    }
+    const todos = [];
+    for (const dia of dias) {
+      const reg = await dbGet('wa_falhas_' + dia);
+      for (const i of (((reg || {}).itens) || [])) todos.push({ ...i, dia });
+    }
+    // agrupa por telefone: quantas tentativas cada cliente teve
+    const porTel = {};
+    for (const i of todos) {
+      const t = String(i.telefone || '').replace(/\D/g, '');
+      if (!porTel[t]) porTel[t] = { telefone: t, tentativas: 0, templates: new Set(),
+        origens: new Set(), primeira: i.ts, ultima: i.ts, recuperado: false };
+      const p = porTel[t];
+      p.tentativas++;
+      if (i.template) p.templates.add(i.template);
+      if (i.origem) p.origens.add(i.origem);
+      if (i.ts < p.primeira) p.primeira = i.ts;
+      if (i.ts > p.ultima) p.ultima = i.ts;
+      if (i.recuperado) p.recuperado = true;
+    }
+    const lista = Object.values(porTel).map(p => ({
+      telefone: p.telefone, tentativas: p.tentativas,
+      templates: [...p.templates], origens: [...p.origens],
+      primeiraTentativa: p.primeira, ultimaTentativa: p.ultima,
+      recuperado: p.recuperado,
+    })).sort((a, b) => b.tentativas - a.tentativas);
+
+    const porTemplate = todos.reduce((o, i) => { const k = i.template || '?'; o[k] = (o[k] || 0) + 1; return o; }, {});
+    const porOrigem = todos.reduce((o, i) => { const k = i.origem || '?'; o[k] = (o[k] || 0) + 1; return o; }, {});
+    const porMotivo = todos.reduce((o, i) => { const k = i.codigo + ' ' + (i.motivo || ''); o[k] = (o[k] || 0) + 1; return o; }, {});
+
+    if (String(req.query.curto || '') === '1') {
+      return res.status(200).json({ ok: true, desde, totalFalhas: todos.length,
+        clientesDistintos: lista.length, porTemplate, porOrigem,
+        lista: lista.slice(0, 40).map(c => c.telefone.slice(-8) + ' | ' + c.tentativas + 'x | ' +
+          (c.templates.join(',') || '?') + ' | ' + (c.origens.join(',') || '?')) });
+    }
+    return res.status(200).json({ ok: true, desde, ate: hoje,
+      totalFalhas: todos.length, clientesDistintos: lista.length,
+      porTemplate, porOrigem, porMotivo,
+      clientes: lista, bruto: todos.slice(-100) });
+  }
+
   // ── 📬 STATUS-ENVIO: o que aconteceu com as mensagens enviadas a um número ──
   if (action === 'status-envio') {
     const tel = String(req.query.tel || '').replace(/\D/g, '');
@@ -1130,6 +1197,7 @@ export default async function handler(req, res) {
     }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
     const ok = !!(r && r.messages && r.messages[0]);
     if (ok) {
+      await indexarEnvio(r.messages[0].id, tpl, 'teste-manual', nome, tel);
       await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'out',
         texto: '🧪 [teste ' + tpl + '] ' + nome, tipo: 'template', via: 'teste-manual' });
     }
@@ -1299,6 +1367,7 @@ export default async function handler(req, res) {
     }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
     const ok = !!(r && r.messages && r.messages[0]);
     if (ok) {
+      await indexarEnvio(r.messages[0].id, 'conserto_finalizado', 'frenteloja-avisado', nome || '', to2);
       await rpushEvt({ ts: new Date().toISOString(), tel: to2, dir: 'out',
         texto: '📨 [conserto_finalizado] ' + (nome || ''), tipo: 'template', via: 'frenteloja-avisado' });
     }

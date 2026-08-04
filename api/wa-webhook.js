@@ -140,6 +140,41 @@ export default async function handler(req, res) {
               dir: 'status', texto: st.status + (st.errors ? ' | ' + JSON.stringify(st.errors).slice(0,300) : ''),
               msgId: st.id || null, tipo: 'status',
             });
+            // 📒 FILA DE RECUPERAÇÃO: toda falha de entrega vai para um registro permanente,
+            // com o template tentado e a origem — para reenviar quando a conta for liberada.
+            try {
+              if (st.status === 'failed') {
+                const codF = (st.errors && st.errors[0] && st.errors[0].code) || 0;
+                const dia = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+                const chave = 'wa_falhas_' + dia;
+                const reg = (await dbGet(chave)) || { itens: [] };
+                // procura o envio correspondente para saber QUAL template e de onde veio
+                // o envio grava o par msgId → template num índice leve; ler de lá é seguro
+                let tplNome = null, viaNome = null, txtEnv = null;
+                try {
+                  const idx = (await dbGet('wa_envio_idx')) || {};
+                  const info = idx[st.id];
+                  if (info) { tplNome = info.template; viaNome = info.via; txtEnv = info.texto; }
+                } catch (e) {}
+                const jaTem = (reg.itens || []).some(x => x.msgId === st.id);
+                if (!jaTem) {
+                  reg.itens.push({
+                    ts: new Date().toISOString(),
+                    telefone: String(st.recipient_id || ''),
+                    msgId: st.id || null,
+                    template: tplNome || '(não identificado)',
+                    origem: viaNome || '(não informada)',
+                    textoTentado: String(txtEnv || '').slice(0, 160),
+                    codigo: codF,
+                    motivo: (st.errors && st.errors[0] && (st.errors[0].title || st.errors[0].message)) || 'falha',
+                    recuperado: false,
+                  });
+                  reg.atualizadoEm = new Date().toISOString();
+                  await dbSet(chave, reg);
+                }
+              }
+            } catch (e) {}
+
             // 🚨 FALHA DE CONTA (pagamento pendente, número inelegível): nenhuma mensagem
             // será entregue até alguém resolver. Abre conflito UMA vez por hora, não a cada
             // mensagem — senão inunda o painel. Sem isso, a operação para em silêncio.
