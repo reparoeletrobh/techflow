@@ -1109,6 +1109,73 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, feitos });
   }
 
+  // ── 🔄 RECONSTRUIR-FALHAS: varre o histórico e recupera as falhas anteriores ao registro ──
+  if (action === 'reconstruir-falhas') {
+    const desde = String(req.query.desde || '2026-08-01').slice(0, 10);
+    const evts = await lerEvts();
+    // 1) mapa msgId → o envio correspondente (para saber o template e a origem)
+    const envios = {};
+    for (const e of evts) {
+      if (e.dir !== 'out') continue;
+      const m = String(e.texto || '').match(/\[([a-z_0-9]+)\]/i);
+      const chave = e.msgId || null;
+      const info = { template: m ? m[1] : null, via: e.via || null,
+        texto: String(e.texto || '').slice(0, 120), tel: String(e.tel || ''), ts: e.ts };
+      if (chave) envios[chave] = info;
+      // reserva por telefone+minuto, quando o status não trouxer o msgId
+      envios['t:' + String(e.tel || '').replace(/\D/g, '').slice(-8) + ':' + String(e.ts || '').slice(0, 16)] = info;
+    }
+    // 2) percorre os status de falha
+    const porDia = {};
+    let achadas = 0;
+    for (const e of evts) {
+      const ehStatus = e.dir === 'status' || e.tipo === 'status';
+      if (!ehStatus) continue;
+      const txt = String(e.texto || '');
+      if (!/^failed/i.test(txt)) continue;
+      const dia = String(e.ts || '').slice(0, 10);
+      if (dia < desde) continue;
+      const d8e = String(e.tel || '').replace(/\D/g, '').slice(-8);
+      const info = envios[e.msgId] || envios['t:' + d8e + ':' + String(e.ts || '').slice(0, 16)] || null;
+      const mCod = txt.match(/"code":\s*(\d+)/);
+      const mTit = txt.match(/"title":\s*"([^"]+)"/);
+      if (!porDia[dia]) porDia[dia] = { itens: [] };
+      if ((porDia[dia].itens || []).some(x => x.msgId && x.msgId === e.msgId)) continue;
+      porDia[dia].itens.push({
+        ts: e.ts, telefone: String(e.tel || ''), msgId: e.msgId || null,
+        template: (info && info.template) || '(não identificado)',
+        origem: (info && info.via) || '(não informada)',
+        textoTentado: (info && info.texto) || '',
+        codigo: mCod ? Number(mCod[1]) : 0,
+        motivo: mTit ? mTit[1] : 'falha',
+        recuperado: false, reconstruido: true,
+      });
+      achadas++;
+    }
+    // 3) grava, sem apagar o que já existe
+    const gravados = {};
+    if (String(req.query.aplicar || '') === '1') {
+      for (const dia of Object.keys(porDia)) {
+        const chave = 'wa_falhas_' + dia;
+        const reg = (await dbGet(chave)) || { itens: [] };
+        const jaTem = new Set((reg.itens || []).map(x => x.msgId).filter(Boolean));
+        const novos = porDia[dia].itens.filter(x => !x.msgId || !jaTem.has(x.msgId));
+        reg.itens = (reg.itens || []).concat(novos);
+        reg.atualizadoEm = new Date().toISOString();
+        await dbSet(chave, reg);
+        gravados[dia] = novos.length;
+      }
+      return res.status(200).json({ ok: true, aplicado: true, falhasGravadas: achadas, porDia: gravados,
+        proximo: 'consulte com action=fila-recuperacao' });
+    }
+    return res.status(200).json({ ok: true, modo: 'prévia',
+      eventosVarridos: evts.length, falhasEncontradas: achadas,
+      porDia: Object.keys(porDia).reduce((o, d) => { o[d] = porDia[d].itens.length; return o; }, {}),
+      amostra: Object.values(porDia).flatMap(d => d.itens).slice(0, 15).map(i =>
+        String(i.ts).slice(5, 16) + ' | ' + String(i.telefone).slice(-8) + ' | ' + i.template + ' | ' + i.origem + ' | ' + i.motivo),
+      dica: 'para gravar: &aplicar=1' });
+  }
+
   // ── 📒 FILA-RECUPERACAO: tudo que a Meta recusou desde o bloqueio ──
   if (action === 'fila-recuperacao') {
     const desde = String(req.query.desde || '2026-08-01').slice(0, 10);
