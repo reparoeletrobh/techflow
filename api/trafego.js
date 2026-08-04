@@ -664,6 +664,72 @@ module.exports = async function handler(req, res) {
   }
   function permissoesErro(r) { return r && r.erro ? ('sem acesso: ' + r.erro) : ((r && r.dados) || []); }
 
+  // ── 📜 HISTORICO-COPILOTO: o que o Copiloto fez no período ──
+  if (action === 'historico-copiloto') {
+    const dias = Math.min(60, Math.max(1, parseInt(req.query.dias || '7', 10)));
+    const corte = Date.now() - dias * 86400000;
+    const lg = (await dbGet('trafego_log')) || { movs: [] };
+    const movs = (lg.movs || []).filter(m => new Date(m.ts || 0).getTime() >= corte);
+    // nomes atuais das campanhas, para o log não mostrar só identificadores
+    const nomes = {};
+    try {
+      const camps = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns?fields=id,name&limit=200&access_token=${TOKEN}`, 6);
+      for (const c of (camps.data || [])) nomes[c.id] = c.name;
+      const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name&limit=300&access_token=${TOKEN}`, 8);
+      for (const a of (ads.data || [])) nomes[a.id] = a.name;
+    } catch (e) {}
+
+    const eventos = [];
+    for (const m of movs) {
+      const quando = m.ts;
+      for (const f of (m.feitos || [])) {
+        const ehPausa = /pausa|paused|status/i.test(String(f.acao || ''));
+        const mv = String(f.acao || '').match(/R\$\s*([\d.,]+)/);
+        const valor = mv ? Number(String(mv[1]).replace(/\./g, '').replace(',', '.')) : null;
+        eventos.push({ quando,
+          tipo: ehPausa ? 'pausa' : 'verba',
+          nome: f.nome || nomes[f.id] || f.id,
+          id: f.id,
+          valor: !ehPausa && valor ? (valor > 5000 ? valor / 100 : valor) : null,
+          acao: f.acao });
+      }
+      for (const e of (m.erros || [])) {
+        eventos.push({ quando, tipo: 'erro', nome: nomes[e.id] || e.id, id: e.id,
+          acao: e.acao, erro: e.erro });
+      }
+    }
+    eventos.sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
+
+    const pausas = eventos.filter(e => e.tipo === 'pausa');
+    const verbas = eventos.filter(e => e.tipo === 'verba');
+    const erros = eventos.filter(e => e.tipo === 'erro');
+    // agrupa por dia
+    const porDia = {};
+    for (const e of eventos) {
+      const d = String(e.quando).slice(0, 10);
+      if (!porDia[d]) porDia[d] = { pausas: 0, verbas: 0, totalVerba: 0, erros: 0 };
+      if (e.tipo === 'pausa') porDia[d].pausas++;
+      else if (e.tipo === 'verba') { porDia[d].verbas++; porDia[d].totalVerba += (e.valor || 0); }
+      else porDia[d].erros++;
+    }
+    return res.status(200).json({ ok: true, periodoDias: dias,
+      resumo: { aplicacoes: movs.length, pausas: pausas.length, realocacoes: verbas.length,
+        verbaRealocada: Number(verbas.reduce((s, v) => s + (v.valor || 0), 0).toFixed(2)),
+        erros: erros.length },
+      porDia: Object.keys(porDia).sort().reverse().reduce((o, d) => {
+        const x = porDia[d];
+        o[d] = x.pausas + ' pausa(s) · ' + x.verbas + ' verba(s) · R$ ' + x.totalVerba.toFixed(2) +
+          (x.erros ? ' · ' + x.erros + ' erro(s)' : '');
+        return o; }, {}),
+      linhaDoTempo: eventos.slice(0, 60).map(e =>
+        String(e.quando).slice(5, 16).replace('T', ' ') + ' | ' +
+        (e.tipo === 'pausa' ? '⏸️ PAUSOU' : (e.tipo === 'verba' ? '💰 VERBA' : '❌ ERRO')) + ' | ' +
+        String(e.nome).slice(0, 30) +
+        (e.valor ? ' | R$ ' + e.valor.toFixed(2) : '') +
+        (e.erro ? ' | ' + String(e.erro).slice(0, 50) : '')),
+      eventos: eventos.slice(0, 100) });
+  }
+
   // ── 🔎 POR-QUE-FORA: quais anúncios ativos na Meta ficaram fora do painel, e por quê ──
   if (action === 'por-que-fora') {
     const cat = String(req.query.cat || '').toLowerCase();

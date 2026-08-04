@@ -593,7 +593,8 @@ async function carregarCopiloto(){
   }).join('');
 
   if(r.totalCortes){
-    h+='<button class="btn destaque" style="width:100%;padding:13px;font-size:13px;margin-top:4px;" onclick="revisarAlteracoes()">📋 Revisar alterações ('+r.totalCortes+' cortes · '+brl(r.totalLibera)+')</button>'
+    h+='<button class="btn" style="width:100%;padding:10px;font-size:12px;margin-top:4px;background:#1e293b;" onclick="verHistoricoCopiloto()">📜 Histórico de alterações da semana</button>'
+    h+='<button class="btn destaque" style="width:100%;padding:13px;font-size:13px;margin-top:6px;" onclick="revisarAlteracoes()">📋 Revisar alterações ('+r.totalCortes+' cortes · '+brl(r.totalLibera)+')</button>'
       +'<div style="font-size:10px;color:var(--dim);text-align:center;margin-top:6px;">você confere o resumo antes de qualquer mudança</div>';
   }
   el.innerHTML=h;
@@ -605,6 +606,44 @@ function toggleCat(cat){
   var abrir=el.style.display==='none';
   el.style.display=abrir?'block':'none';
   if(s)s.textContent=abrir?'▾':'▸';
+}
+async function verHistoricoCopiloto(dias){
+  dias=dias||7;
+  var ov=document.getElementById('ov-hist'); if(ov)ov.remove();
+  ov=document.createElement('div');
+  ov.id='ov-hist';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:250;overflow-y:auto;padding:14px;';
+  ov.onclick=function(e){ if(e.target===ov)ov.remove(); };
+  ov.innerHTML='<div style="max-width:720px;margin:0 auto;background:var(--painel);border:1px solid var(--linha);border-radius:14px;padding:15px;"><div class="vazio-msg">📜 carregando…</div></div>';
+  document.body.appendChild(ov);
+  var r=await fetch('/api/trafego?action=historico-copiloto&dias='+dias).then(function(x){return x.json();}).catch(function(){return null;});
+  var box=ov.querySelector('div');
+  if(!r||!r.ok){box.innerHTML='<div class="vazio-msg">Não consegui carregar o histórico.</div>';return;}
+  var s=r.resumo||{};
+  var per=[[7,'7 dias'],[15,'15 dias'],[30,'30 dias']].map(function(p){
+    return '<button onclick="verHistoricoCopiloto('+p[0]+')" style="flex:1;padding:7px;border-radius:8px;cursor:pointer;font-size:11.5px;font-weight:800;'
+      +(dias===p[0]?'background:#8b5cf6;color:#fff;border:1px solid #8b5cf6;':'background:#12161d;color:#8b93a3;border:1px solid #242b39;')+'">'+p[1]+'</button>';}).join('');
+  var h2='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
+      +'<b style="font-size:15px;">📜 Histórico do Copiloto</b>'
+      +'<button onclick="document.getElementById(\'ov-hist\').remove()" style="background:#242b39;border:none;border-radius:8px;padding:6px 12px;color:#f0f2f5;font-weight:800;cursor:pointer;">✕</button></div>'
+    +'<div style="display:flex;gap:6px;margin-bottom:12px;">'+per+'</div>'
+    +'<div style="background:#0c1016;border-radius:10px;padding:11px;display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;">'
+      +'<div><div style="font-family:var(--mono);font-size:19px;font-weight:700;color:#ef4444;">'+(s.pausas||0)+'</div><div style="font-size:9px;color:var(--dim);font-weight:800;">PAUSAS</div></div>'
+      +'<div><div style="font-family:var(--mono);font-size:19px;font-weight:700;color:#4ade80;">'+(s.realocacoes||0)+'</div><div style="font-size:9px;color:var(--dim);font-weight:800;">REALOCAÇÕES</div></div>'
+      +'<div><div style="font-family:var(--mono);font-size:19px;font-weight:700;">'+brl(s.verbaRealocada||0)+'</div><div style="font-size:9px;color:var(--dim);font-weight:800;">VERBA MOVIDA</div></div>'
+      +(s.erros?'<div><div style="font-family:var(--mono);font-size:19px;font-weight:700;color:#f59e0b;">'+s.erros+'</div><div style="font-size:9px;color:var(--dim);font-weight:800;">ERROS</div></div>':'')
+    +'</div>';
+  if(!r.linhaDoTempo.length){h2+='<div class="vazio-msg">Nenhuma alteração no período.</div>';}
+  else{
+    h2+=Object.keys(r.porDia||{}).map(function(d){
+      return '<div style="font-family:var(--mono);font-size:11px;color:#93c5fd;margin:10px 0 4px;">'+d+' — '+r.porDia[d]+'</div>';
+    }).join('');
+    h2+='<div style="border-top:1px solid var(--linha);margin-top:10px;padding-top:8px;">'
+      +r.linhaDoTempo.map(function(l){
+        return '<div style="font-family:var(--mono);font-size:10.5px;color:#c9ced6;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);">'+esc(l)+'</div>';
+      }).join('')+'</div>';
+  }
+  box.innerHTML=h2;
 }
 function revisarAlteracoes(){
   var r=window._cop;if(!r)return;
