@@ -115,6 +115,27 @@ module.exports = async function handler(req,res){
       dica:'para aplicar: &aplicar=1'});
   }
 
+  // ── 🧹 LIMPAR-TELEFONES-ERRADOS: remove os que não batem com os 4 dígitos do nome ──
+  if(action==='limpar-telefones-errados'){
+    const ruins=[];
+    for(const c of (db.conflitos||[])){
+      const tel=String(c.telefone||c.tel||'').replace(/\D/g,'');
+      if(!tel)continue;
+      const m4=String(c.cliente||c.ficha||'').match(/(\d{4})\s*$/);
+      if(!m4)continue;
+      if(!tel.endsWith(m4[1])){
+        ruins.push((c.cliente||c.ficha)+' | tinha '+tel+' | esperado terminar em '+m4[1]);
+        if(String(req.query.aplicar||'')==='1'){ delete c.telefone; delete c.tel; }
+      }
+    }
+    if(String(req.query.aplicar||'')==='1'&&ruins.length){
+      await dbSet(KEY,db);
+      return res.status(200).json({ok:true,removidos:ruins.length,lista:ruins.slice(0,40)});
+    }
+    return res.status(200).json({ok:true,errados:ruins.length,lista:ruins.slice(0,40),
+      dica:'para remover: &aplicar=1'});
+  }
+
   // ── 📱 COMPLETAR-TELEFONES: busca o telefone do cliente em toda a operação ──
   if(action==='completar-telefones'){
     const [ppA,ppT,lgA,lgT,fA,fT]=await Promise.all([
@@ -135,9 +156,23 @@ module.exports = async function handler(req,res){
       if(c.telefone||c.tel)continue;
       const alvo=String(c.cliente||c.ficha||'').trim().toLowerCase();
       if(alvo.length<3)continue;
+      // 🎯 o nome do cliente já traz os 4 dígitos finais — usar isso como VERIFICAÇÃO.
+      // Casar por nome parcial pegava outra pessoa: "Maria 8742" casava com qualquer Maria.
+      const m4=String(c.cliente||c.ficha||'').match(/(\d{4})\s*$/);
+      const d4=m4?m4[1]:null;
       let tel=mapa[alvo];
-      if(!tel){ for(const k of Object.keys(mapa)){ if(k.includes(alvo)||alvo.includes(k)){tel=mapa[k];break;} } }
-      if(tel){ c.telefone=tel; achados.push((c.cliente||c.ficha)+' → '+tel); }
+      if(tel&&d4&&!String(tel).endsWith(d4))tel=null;          // nome exato mas telefone divergente → descarta
+      if(!tel&&d4){
+        // procura quem realmente termina nesses 4 dígitos
+        for(const k of Object.keys(mapa)){
+          if(!String(mapa[k]).endsWith(d4))continue;
+          if(k===alvo||k.includes(alvo)||alvo.includes(k)){tel=mapa[k];break;}
+        }
+      }
+      if(!tel&&!d4){                                            // sem 4 dígitos no nome: só nome EXATO
+        tel=mapa[alvo]||null;
+      }
+      if(tel){ c.telefone=tel; achados.push((c.cliente||c.ficha)+' → '+tel+(d4?(String(tel).endsWith(d4)?' ✓':' ⚠️'):' (sem verificação)')); }
     }
     if(String(req.query.aplicar||'')==='1'&&achados.length){
       await dbSet(KEY,db);
