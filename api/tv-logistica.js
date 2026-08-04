@@ -221,6 +221,8 @@ module.exports = async function handler(req, res) {
   // ── GET load ──────────────────────────────────────────────
   if (action === 'load') {
     const db = await dbGet(LOG_KEY) || defaultDB();
+    // 🚚 guarda quem foi o motorista responsável ao entrar em coleta efetuada
+    // ou orçamento registrado — antes só era gravado quando o próprio motorista agia.
     return res.status(200).json({ ok: true, fichas: db.fichas || [] });
   }
 
@@ -513,6 +515,22 @@ module.exports = async function handler(req, res) {
     logMov(id, ficha.nome, faseAnt, phase, 'equipe/mover').catch(() => {});
 
     // Trigger: liberado_para_rota -> tv_board
+    // 🚚 RESPONSÁVEL PELA COLETA: ao chegar em coleta_efetuada ou orc_registrado,
+    // registra o motorista — usa quem já estava na ficha, o anterior (se a coleta o limpou)
+    // ou o informado na chamada. Sem isso a ficha perdia o vínculo com quem coletou.
+    if (['coleta_efetuada', 'orc_registrado'].includes(phase)) {
+      const f0 = (db.fichas || []).find(x => x.id === id);
+      if (f0 && !f0.coletadoPor) {
+        const quem = (req.body || {}).quemColetou || (req.body || {}).motorista
+          || f0.motoristaNome || f0.motoristaAnterior || null;
+        if (quem) {
+          f0.coletadoPor = String(quem).trim();
+          f0.coletadoEm = f0.coletadoEm || new Date().toISOString();
+          const nasc = new Date(f0.criadoEm || f0.entradaEm || 0).getTime();
+          if (nasc && !f0.horasAteColeta) f0.horasAteColeta = Number(((Date.now() - nasc) / 3600000).toFixed(1));
+        }
+      }
+    }
     if (phase === 'liberado_para_rota') {
       try {
         const _bU=(process.env.UPSTASH_URL||'').replace(/['"]/g,'').trim();
@@ -788,7 +806,7 @@ module.exports = async function handler(req, res) {
       alvo.phase = 'remarcar';
       alvo.movedAt = quando;
       alvo.cancelamentoMotorista = { motivo: String(motivo).slice(0, 200), motorista: String(motorista || ''), em: quando };
-      alvo.motoristaAnterior = alvo.motoristaNome || '';
+      alvo.motoristaAnterior = alvo.motoristaNome || '';   // preservado para o histórico
       alvo.motoristaNome = '';
       alvo.texto = ('❌ CANCELADA pelo cliente (' + String(motorista || 'motorista') + '): ' + String(motivo).slice(0, 150) + '\n' + (alvo.texto || '')).slice(0, 1200);
     });
@@ -1193,6 +1211,11 @@ module.exports = async function handler(req, res) {
     ficha.diagnostico.preco    = precoFinal;
     ficha.phase   = 'orc_registrado';
     ficha.movedAt = new Date().toISOString();
+    // 🚚 mantém o vínculo com quem coletou (o orçamento nasce depois da coleta)
+    if (!ficha.coletadoPor) {
+      const quemO = ficha.motoristaNome || ficha.motoristaAnterior || (req.body || {}).quemColetou || null;
+      if (quemO) { ficha.coletadoPor = String(quemO).trim(); ficha.coletadoEm = ficha.coletadoEm || ficha.movedAt; }
+    }
     await dbSet(LOG_KEY, db);
 
     // Salvar no Redis de orçamentos (ORC_KEY) — formato compatível com orc-sync

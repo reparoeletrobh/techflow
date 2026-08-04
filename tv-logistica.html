@@ -693,9 +693,8 @@ function cardHTML(f, phase) {
         <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>
       </div>`;
   } else if (phase === 'motorista_parceiro') {
-    // quem coletou fica visível também depois que a ficha sai da rota
     const quemMoto = f.coletadoPor || f.motoristaNome;
-    const motorista = quemMoto ? `<div style="font-family:var(--fm);font-size:10px;color:#8b5cf6;margin-bottom:2px;">🏍️ ${escHtml(quemMoto)}${f.coletadoPor && f.phase === 'coleta_efetuada' ? ' · coletou' : ''}</div>` : '';
+    const motorista = quemMoto ? `<div style="font-family:var(--fm);font-size:10px;color:#8b5cf6;margin-bottom:2px;">🏍️ ${escHtml(quemMoto)}</div>` : '';
     btns = motorista + `
       <button class="cbtn-expand" id="btn-x-${f.id}" onclick="toggleExpand('${f.id}')"><em class="chev">▾</em><span> Mais ações</span></button>
       <div class="btns-hidden" id="btns-x-${f.id}">
@@ -709,7 +708,14 @@ function cardHTML(f, phase) {
       <button class="cbtn cbtn-blue" onclick="mover('${f.id}','liberado_coleta')">Liberar Novamente</button>
       <button class="cbtn cbtn-orange" onclick="enviarProspeccao('${f.id}','${escHtml(f.nome)}')">🔭 Prospecção</button>
       <button class="cbtn cbtn-red" onclick="cancelar('${f.id}','${escHtml(f.nome)}')">Cancelar</button>`;
-  } else if (phase === 'coleta_efetuada') {
+  } else if (phase === 'coleta_efetuada' || phase === 'orc_registrado') {
+    // 🚚 responsável pela coleta fica marcado nessas duas fases
+    const resp = f.coletadoPor || f.motoristaAnterior || f.motoristaNome;
+    const selo = resp ? `<div style="font-family:var(--fm);font-size:10px;color:#8b5cf6;margin-bottom:3px;">🏍️ coletado por <b>${escHtml(resp)}</b>${f.coletadoEm ? ' · ' + new Date(f.coletadoEm).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : ''}</div>`
+      : `<div style="font-family:var(--fm);font-size:10px;color:#f59e0b;margin-bottom:3px;">⚠️ sem motorista registrado</div>`;
+    btns = selo + (btns || '');
+  }
+  if (phase === 'coleta_efetuada') {
     var diagFeito = f.diagnostico && (f.diagnostico.equips||[]).length > 0;
     btns = `
       <button class="cbtn cbtn-purple" id="dbtn-${f.id}" onclick="toggleDiagTV('${f.id}')">${diagFeito ? '✅ Rediagnosticar' : '📋 Diagnóstico'}</button>
