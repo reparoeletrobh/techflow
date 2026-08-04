@@ -823,6 +823,97 @@ module.exports = async function handler(req, res) {
         ' | R$ ' + (l.verba || 0) + ' (' + (l.verbaEm || '—') + ') | ' + l.status) });
   }
 
+  // ── 📊 CUSTO-POR-FICHA: fichas recebidas x investimento, por semana e por frente ──
+  if (action === 'custo-por-ficha') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const dias = Math.min(180, Math.max(7, parseInt(req.query.dias || '60', 10)));
+    const ate = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+    const desde = new Date(Date.now() - 3 * 3600 * 1000 - dias * 86400000).toISOString().slice(0, 10);
+    const detalhado = String(req.query.detalhado || '') === '1';
+
+    // ── investimento por dia e categoria ──
+    const janela = 'time_range=' + encodeURIComponent(JSON.stringify({ since: desde, until: ate }));
+    const ins = await pegarTudo(`${GRAPH}/act_${CONTA}/insights?level=ad&${janela}&time_increment=1&fields=ad_name,spend,date_start&limit=200&access_token=${TOKEN}`, 20);
+    if (ins.erro && !ins.data.length) return res.status(200).json({ ok: false, erro: ins.erro });
+
+    const semanaDe = (iso) => {
+      const d = new Date(iso + 'T12:00:00Z');
+      const dow = d.getUTCDay();                       // ciclo começa no sábado
+      const ini = new Date(d); ini.setUTCDate(d.getUTCDate() - ((dow + 1) % 7));
+      return ini.toISOString().slice(0, 10);
+    };
+    const sem = {};
+    const garante = (s) => { if (!sem[s]) sem[s] = {
+      semana: s, invAdm: 0, invTv: 0, fichasAdm: 0, fichasTv: 0, porCategoria: {} }; return sem[s]; };
+
+    for (const i of (ins.data || [])) {
+      const cat = categoriaDe(i.ad_name || '', 'anuncio');
+      const v = Number(i.spend || 0);
+      const s = garante(semanaDe(i.date_start));
+      if (cat === 'tv') s.invTv += v; else s.invAdm += v;
+      s.porCategoria[cat] = s.porCategoria[cat] || { investido: 0, fichas: 0 };
+      s.porCategoria[cat].investido += v;
+    }
+
+    // ── fichas recebidas por dia ──
+    const [fA, fT, lgA, lgT, arqA, arqT] = await Promise.all([
+      dbGet('fichas_adm'), dbGet('fichas_tv'),
+      dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+      dbGet('reparoeletro_arquivo'), dbGet('tv_arquivo'),
+    ]);
+    const corteMs = Date.now() - dias * 86400000;
+    const vistos = new Set();
+    const contaFicha = (f, ehTv) => {
+      const q = new Date(f.criadoEm || f.entradaEm || f.createdAt || 0).getTime();
+      if (!q || q < corteMs) return;
+      const d8 = String(f.telefone || '').replace(/\D/g, '').slice(-8);
+      const chave = d8 + '|' + new Date(q).toISOString().slice(0, 10);
+      if (d8.length >= 8 && vistos.has(chave)) return;   // dedupe: mesma pessoa no mesmo dia
+      if (d8.length >= 8) vistos.add(chave);
+      const s = garante(semanaDe(new Date(q - 3 * 3600000).toISOString().slice(0, 10)));
+      if (ehTv) s.fichasTv++; else s.fichasAdm++;
+      const cat = categoriaDe(f.equipamento || f.descricao || '', 'equipamento');
+      s.porCategoria[cat] = s.porCategoria[cat] || { investido: 0, fichas: 0 };
+      s.porCategoria[cat].fichas++;
+    };
+    for (const b of [fA, lgA, arqA]) for (const f of (((b || {}).fichas) || (((b || {}).cards) || []))) contaFicha(f, false);
+    for (const b of [fT, lgT, arqT]) for (const f of (((b || {}).fichas) || (((b || {}).cards) || []))) contaFicha(f, true);
+
+    const semanas = Object.values(sem).sort((a, b) => a.semana.localeCompare(b.semana))
+      .map(s => ({
+        semana: s.semana,
+        adm: { investido: Number(s.invAdm.toFixed(2)), fichas: s.fichasAdm,
+          custoPorFicha: s.fichasAdm ? Number((s.invAdm / s.fichasAdm).toFixed(2)) : null },
+        tv: { investido: Number(s.invTv.toFixed(2)), fichas: s.fichasTv,
+          custoPorFicha: s.fichasTv ? Number((s.invTv / s.fichasTv).toFixed(2)) : null },
+        ...(detalhado ? { categorias: Object.keys(s.porCategoria).reduce((o, c) => {
+          const x = s.porCategoria[c];
+          o[c] = { investido: Number(x.investido.toFixed(2)), fichas: x.fichas,
+            custoPorFicha: x.fichas ? Number((x.investido / x.fichas).toFixed(2)) : null };
+          return o; }, {}) } : {}),
+      }));
+
+    const tot = semanas.reduce((o, s) => ({
+      invAdm: o.invAdm + s.adm.investido, fAdm: o.fAdm + s.adm.fichas,
+      invTv: o.invTv + s.tv.investido, fTv: o.fTv + s.tv.fichas,
+    }), { invAdm: 0, fAdm: 0, invTv: 0, fTv: 0 });
+
+    return res.status(200).json({ ok: true, periodoDias: dias, de: desde, ate,
+      totais: {
+        adm: { investido: Number(tot.invAdm.toFixed(2)), fichas: tot.fAdm,
+          custoPorFicha: tot.fAdm ? Number((tot.invAdm / tot.fAdm).toFixed(2)) : null },
+        tv: { investido: Number(tot.invTv.toFixed(2)), fichas: tot.fTv,
+          custoPorFicha: tot.fTv ? Number((tot.invTv / tot.fTv).toFixed(2)) : null },
+      },
+      semanas: semanas.map(s => s.semana + ' | ADM ' + s.adm.fichas + ' fichas · ' + brlNum(s.adm.investido) +
+        ' · ' + (s.adm.custoPorFicha != null ? 'R$ ' + s.adm.custoPorFicha + '/ficha' : '—') +
+        ' || TV ' + s.tv.fichas + ' fichas · ' + brlNum(s.tv.investido) +
+        ' · ' + (s.tv.custoPorFicha != null ? 'R$ ' + s.tv.custoPorFicha + '/ficha' : '—')),
+      detalhe: semanas,
+      observacao: 'semana começa no sábado, acompanhando o ciclo de anúncios · fichas contadas sem duplicar o mesmo cliente no mesmo dia · inclui fichas orgânicas (GMB, indicação), então o custo por ficha é conservador' });
+  }
+  function brlNum(v) { return 'R$ ' + Number(v || 0).toFixed(2); }
+
   // ── 🩺 META-SAUDE: testa a comunicação com a Meta ponta a ponta ──
   if (action === 'meta-saude') {
     const t0 = Date.now();
