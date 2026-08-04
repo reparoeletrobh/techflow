@@ -705,9 +705,11 @@ module.exports = async function handler(req, res) {
       const c = porCamp[cid];
       const real = verbaReal(cid);
       const esperado = Number(v.nova || v.novaVerba || v.valor || 0);
-      const bate = real && esperado ? Math.abs(real.valor - esperado) < 1 : null;
-      return { nome: v.nome || (c && c.name) || cid, id: cid,
-        verbaEsperada: esperado || null,
+      // o log grava em CENTAVOS quando o valor vem da chamada à Meta — normalizar
+      const espReais = esperado > 5000 ? esperado / 100 : esperado;
+      const bate = real && espReais ? Math.abs(real.valor - espReais) < 1 : null;
+      return { nome: (c && c.name) || v.nome || cid, id: cid,
+        verbaEsperada: espReais || null,
         verbaNaMeta: real ? real.valor : null,
         onde: real ? real.onde : null,
         situacao: c ? c.effective_status : '(não encontrada)',
