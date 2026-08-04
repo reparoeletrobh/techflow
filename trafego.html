@@ -520,14 +520,20 @@ async function carregarCopiloto(){
         +'<span style="font-family:var(--mono);font-size:16px;font-weight:700;color:'+(ruim?'#ef4444':'#22c55e')+';">'
           +(p.cpa!=null?brl(p.cpa):'—')+'<span style="font-size:9px;color:var(--dim);font-weight:700;"> /conversa · meta '+brl(p.meta)+'</span></span>'
       +'</div>'
-      +'<div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--dim);">'
+      +(p.semAtivos?'<div style="margin-top:9px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);border-radius:9px;padding:10px 12px;">'
+        +'<div style="font-size:12px;font-weight:800;color:#fbbf24;">'+esc(p.aviso||'')+'</div>'
+        +(p.pausados&&p.pausados.length?'<div style="font-size:11px;color:#c9ced6;margin-top:6px;line-height:1.6;">'
+          +p.pausados.map(function(x){return '⏸️ '+esc(String(x.nome).slice(0,32))+(x.cpa!=null?' · '+brl(x.cpa):'');}).join('<br>')+'</div>':'')
+        +'<div style="font-size:10.5px;color:#8b93a3;margin-top:7px;">Reative um criativo ou suba um novo para a categoria voltar a rodar.</div>'
+      +'</div>':'')
+      +(p.semAtivos?'':'<div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--dim);">'
         +'<span>🎬 <b style="color:#f0f2f5;">'+p.anuncios+'</b> criativos</span>'
         +'<span>💼 <b style="color:#f0f2f5;">'+brl(p.verbaAlocada)+'</b> alocados</span>'
         +'<span>💸 <b style="color:#f0f2f5;">'+brl(p.gasto)+'</b> gastos</span>'
         +'<span>💬 <b style="color:#f0f2f5;">'+p.conversas+'</b></span>'
-      +'</div>'
+      +'</div>')
       +(p.frentePropria?'<div style="font-size:10px;color:#60a5fa;margin-top:7px;">📺 frente própria — não cede nem recebe verba das outras categorias</div>':'')
-      +(p.cortar.length?'<div style="margin-top:11px;">'
+      +((p.cortar&&p.cortar.length)?'<div style="margin-top:11px;">'
         +'<div style="font-size:10px;font-weight:900;color:#ef4444;letter-spacing:.4px;">🔴 TIRAR VERBA DE '+p.cortar.length+' CRIATIVO(S)</div>'
         +p.cortar.map(function(c){
           return '<div style="display:flex;gap:9px;align-items:center;margin-top:7px;">'

@@ -338,8 +338,20 @@ module.exports = async function handler(req, res) {
     const planos = [];
     for (const cat of CATS) {
       const lista = ads.filter(a => a.categoria === cat);
-      if (!lista.length) continue;
       const meta = (cfg.metas[cat] != null ? cfg.metas[cat] : cfg.metas.outros);
+      // 📌 categoria SEM anúncio ativo não some do painel — aparece com o aviso,
+      // senão some da tela quando todos forem pausados e ninguém percebe.
+      if (!lista.length) {
+        const pausadosCat = (base.dados.anuncios || []).filter(a => !a.ativo && a.categoria === cat);
+        if (pausadosCat.length) {
+          out.push({ categoria: cat, meta, semAtivos: true,
+            anunciosPausados: pausadosCat.length,
+            aviso: '⚠️ nenhum anúncio ATIVO nesta categoria — ' + pausadosCat.length + ' pausado(s)',
+            pausados: pausadosCat.slice(0, 10).map(a => ({ nome: a.nome, cpa: a.cpa, conversas: a.conversas })),
+            cortar: [], reforcar: [], libera: 0 });
+        }
+        continue;
+      }
       const gasto = lista.reduce((s, a) => s + a.gasto, 0);
       const conversas = lista.reduce((s, a) => s + a.conversas, 0);
       const verbaAlocada = lista.reduce((s, a) => s + (verbaTotalDe(a) || 0), 0);
