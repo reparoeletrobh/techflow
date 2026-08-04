@@ -1109,6 +1109,91 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, feitos });
   }
 
+  // ── 🔍 FALHAS-DETALHE: descobre O QUE cada disparo recusado estava tentando fazer ──
+  if (action === 'falhas-detalhe') {
+    const desde = String(req.query.desde || '2026-08-01').slice(0, 10);
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const dias = [];
+    for (let d = new Date(desde + 'T12:00:00Z'); d.toISOString().slice(0, 10) <= hoje; d.setUTCDate(d.getUTCDate() + 1)) {
+      dias.push(d.toISOString().slice(0, 10));
+    }
+    const falhas = [];
+    for (const dia of dias) {
+      const reg = await dbGet('wa_falhas_' + dia);
+      for (const i of (((reg || {}).itens) || [])) falhas.push(i);
+    }
+    if (!falhas.length) return res.status(200).json({ ok: false, error: 'nenhuma falha gravada — rode reconstruir-falhas&aplicar=1 antes' });
+
+    // onde cada cliente está agora — é isso que revela o que se tentava fazer
+    const [lgA, lgT, ppA, ppT, pros, evts] = await Promise.all([
+      dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('prospeccao_adm'), lerEvts(),
+    ]);
+    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const onde = {};
+    const marca = (tel, local, fase, nome, equip) => {
+      const k = d8(tel); if (k.length < 8) return;
+      if (!onde[k]) onde[k] = { nome, equipamento: equip, lugares: [] };
+      onde[k].lugares.push(local + (fase ? ':' + fase : ''));
+      if (!onde[k].nome && nome) onde[k].nome = nome;
+      if (!onde[k].equipamento && equip) onde[k].equipamento = equip;
+    };
+    for (const f of (((lgA || {}).fichas) || [])) marca(f.telefone, 'logística ADM', f.phase, f.nome, f.equipamento);
+    for (const f of (((lgT || {}).fichas) || [])) marca(f.telefone, 'logística TV', f.phase, f.nome, f.equipamento);
+    for (const c of (((ppA || {}).cards) || [])) marca(c.telefone, 'pipe ADM', c.phaseId || c.phase, c.nomeContato, c.equipamento);
+    for (const c of (((ppT || {}).cards) || [])) marca(c.telefone, 'pipe TV', c.phaseId || c.phase, c.nomeContato, c.equipamento);
+    for (const f of (((pros || {}).fichas) || [])) marca(f.telefone, 'prospecção', f.status, f.nome, f.equipamento);
+
+    // última mensagem que o bot tentou mandar para cada um
+    const ultMsg = {};
+    for (const e of evts) {
+      if (e.dir !== 'out') continue;
+      const k = d8(e.tel); if (k.length < 8) continue;
+      ultMsg[k] = { texto: String(e.texto || '').slice(0, 90), ts: e.ts, via: e.via || null };
+    }
+
+    // deduz a INTENÇÃO a partir da fase em que o cliente está
+    const intencao = (lugares, texto) => {
+      const L = (lugares || []).join(' ').toLowerCase();
+      const T = String(texto || '').toLowerCase();
+      if (/orc_enviado|orcamento|orc_registrado/.test(L) || /orçamento|orcamento|valor|conserto fica/.test(T)) return '💰 envio de ORÇAMENTO';
+      if (/finalizado|entrega|receber|erp/.test(L) || /pronto|retirad|finaliz/.test(T)) return '✅ aviso de EQUIPAMENTO PRONTO';
+      if (/ficha_criada|lead|prospec/.test(L) || /bom dia|boa tarde|tudo bem|sou o pedro/.test(T)) return '👋 PRIMEIRA ABORDAGEM';
+      if (/aguardando_aprovacao/.test(L)) return '🔔 REATIVAÇÃO de orçamento';
+      if (/liberado_coleta|horario_marcado|motorista/.test(L)) return '🚚 combinação de COLETA';
+      if (/conflito/.test(L)) return '⚠️ retorno de CONFLITO';
+      return '❓ não identificado';
+    };
+
+    const linhas = [];
+    const porIntencao = {};
+    for (const f of falhas) {
+      const k = d8(f.telefone);
+      const info = onde[k] || {};
+      const msg = ultMsg[k] || {};
+      const inte = intencao(info.lugares, msg.texto || f.textoTentado);
+      porIntencao[inte] = (porIntencao[inte] || 0) + 1;
+      linhas.push({
+        quando: f.ts, telefone: f.telefone,
+        cliente: info.nome || '(não encontrado)',
+        equipamento: info.equipamento || '',
+        ondeEsta: (info.lugares || []).join(' · ') || '(fora do sistema)',
+        oQueTentava: inte,
+        ultimaMensagem: msg.texto || f.textoTentado || '',
+        motivo: f.motivo,
+      });
+    }
+    linhas.sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
+
+    if (String(req.query.curto || '') === '1') {
+      return res.status(200).json({ ok: true, total: linhas.length, porIntencao,
+        lista: linhas.slice(0, 40).map(l => String(l.quando).slice(5, 16) + ' | ' +
+          String(l.cliente).slice(0, 16) + ' ' + String(l.telefone).slice(-4) + ' | ' +
+          l.oQueTentava + ' | ' + String(l.equipamento).slice(0, 18)) });
+    }
+    return res.status(200).json({ ok: true, total: linhas.length, porIntencao, detalhe: linhas.slice(0, 150) });
+  }
+
   // ── 🔄 RECONSTRUIR-FALHAS: varre o histórico e recupera as falhas anteriores ao registro ──
   if (action === 'reconstruir-falhas') {
     const desde = String(req.query.desde || '2026-08-01').slice(0, 10);
