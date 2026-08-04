@@ -716,6 +716,146 @@ module.exports = async function handler(req, res) {
   }
   function permissoesErro(r) { return r && r.erro ? ('sem acesso: ' + r.erro) : ((r && r.dados) || []); }
 
+  // ── 💸 REALOCAR-ORFA: aplica a redistribuição da verba presa nos pausados ──
+  if (action === 'realocar-orfa') {
+    const KRO = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+    const diag = await fetch(`https://reparoeletroadm.com/api/trafego?action=verba-orfa&k=${KRO}`)
+      .then(x => x.json()).catch(e => ({ ok: false, error: e.message }));
+    if (!diag || !diag.ok) return res.status(200).json({ ok: false, error: 'não consegui calcular a verba órfã' });
+    const alvos = [];
+    for (const p of (diag.propostas || [])) {
+      for (const d of (p.destinos || [])) {
+        if (d.receber > 0) alvos.push({ ...d, categoria: p.categoria });
+      }
+    }
+    if (!alvos.length) return res.status(200).json({ ok: true, nada: true, msg: 'nenhuma verba órfã para realocar' });
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia', total: alvos.length,
+        verbaRealocada: Number(alvos.reduce((s, a) => s + a.receber, 0).toFixed(2)),
+        lista: alvos.map(a => a.categoria.toUpperCase().slice(0, 4) + ' | ' + String(a.nome).slice(0, 28) +
+          ' | R$ ' + a.verbaAtual + ' → R$ ' + a.verbaNova + ' (+' + a.receber + ')'),
+        dica: 'para aplicar: &aplicar=1' });
+    }
+    const feitos = [], erros = [];
+    const postMetaO = async (id, campos) => {
+      const corpo = new URLSearchParams(campos).toString();
+      return fetch(`${GRAPH}/${id}?access_token=${TOKEN}`, { method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: corpo })
+        .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+    };
+    for (const a of alvos) {
+      const centavos = Math.round(a.verbaNova * 100);
+      let alvo = a.alvoId, r = await postMetaO(alvo, { [a.campo]: String(centavos) });
+      if (r && r.error && a.campanhaId && String(alvo) !== String(a.campanhaId)) {
+        const r2 = await postMetaO(a.campanhaId, { [a.campo]: String(centavos) });
+        if (!(r2 && r2.error)) { r = r2; alvo = a.campanhaId; }
+      }
+      if (r && r.error) erros.push({ id: alvo, nome: a.nome, erro: r.error.message });
+      else feitos.push({ id: alvo, nome: a.nome, acao: a.campo + ' → R$ ' + a.verbaNova.toFixed(2) });
+      await new Promise(s => setTimeout(s, 150));
+    }
+    try {
+      const lg = (await dbGet('trafego_log')) || { movs: [] };
+      lg.movs.unshift({ ts: new Date().toISOString(), acao: 'realocar-orfa', feitos, erros });
+      lg.movs = lg.movs.slice(0, 200);
+      await dbSet('trafego_log', lg);
+      for (const p of ['hoje', '7d', 'ciclo']) await dbSet('trafego_painel_cache_' + p, null);
+    } catch (e) {}
+    return res.status(200).json({ ok: erros.length === 0, aplicados: feitos.length, feitos, erros });
+  }
+
+  // ── 💸 VERBA-ORFA: o que foi pausado e não voltou para a operação ──
+  if (action === 'verba-orfa') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const [camps, sets] = await Promise.all([
+      pegarTudo(`${GRAPH}/act_${CONTA}/campaigns?fields=id,name,effective_status,daily_budget,lifetime_budget,start_time&limit=200&access_token=${TOKEN}`, 8),
+      pegarTudo(`${GRAPH}/act_${CONTA}/adsets?fields=id,name,effective_status,daily_budget,lifetime_budget,campaign{id}&limit=200&access_token=${TOKEN}`, 8),
+    ]);
+    const setsDe = {};
+    for (const s of (sets.data || [])) { const cid = (s.campaign || {}).id; if (cid) (setsDe[cid] = setsDe[cid] || []).push(s); }
+    const verbaDe = (c) => {
+      if (c.lifetime_budget) return { v: Number(c.lifetime_budget) / 100, onde: 'campanha', alvo: c.id, campo: 'lifetime_budget' };
+      if (c.daily_budget) return { v: Number(c.daily_budget) / 100, onde: 'campanha', alvo: c.id, campo: 'daily_budget' };
+      for (const s of (setsDe[c.id] || [])) {
+        if (s.lifetime_budget) return { v: Number(s.lifetime_budget) / 100, onde: 'conjunto', alvo: s.id, campo: 'lifetime_budget' };
+        if (s.daily_budget) return { v: Number(s.daily_budget) / 100, onde: 'conjunto', alvo: s.id, campo: 'daily_budget' };
+      }
+      return { v: 0, onde: null, alvo: null, campo: null };
+    };
+    // gasto por campanha no ciclo (a verba já consumida não pode ser realocada)
+    const desdeCiclo = (function () {
+      const b = new Date(Date.now() - 3 * 3600000);
+      const d = new Date(b); d.setUTCDate(b.getUTCDate() - ((b.getUTCDay() + 1) % 7));
+      return d.toISOString().slice(0, 10);
+    })();
+    const gastos = {};
+    try {
+      const jn = 'time_range=' + encodeURIComponent(JSON.stringify({ since: desdeCiclo, until: new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10) }));
+      const ins = await pegarTudo(`${GRAPH}/act_${CONTA}/insights?level=campaign&${jn}&fields=campaign_id,spend&limit=200&access_token=${TOKEN}`, 6);
+      for (const i of (ins.data || [])) gastos[i.campaign_id] = Number(i.spend || 0);
+    } catch (e) {}
+
+    const doCiclo = (camps.data || []).filter(c => String(c.start_time || '').slice(0, 10) >= desdeCiclo);
+    const pausadas = [], ativas = [];
+    for (const c of doCiclo) {
+      const vb = verbaDe(c);
+      const gasto = Number((gastos[c.id] || 0).toFixed(2));
+      const item = { nome: c.name, id: c.id, categoria: categoriaDe(c.name || '', 'anuncio'),
+        verba: vb.v, verbaEm: vb.onde, alvoId: vb.alvo, campo: vb.campo,
+        gasto, sobrou: Number(Math.max(0, vb.v - gasto).toFixed(2)) };
+      (c.effective_status === 'ACTIVE' ? ativas : pausadas).push(item);
+    }
+
+    // por categoria: quanto sobrou nos pausados e para quem vai
+    const cfgO = await cfgTrafego();
+    const base = await dbGet('trafego_painel_cache_ciclo') || await dbGet('trafego_painel_cache');
+    const cpaDe = {};
+    for (const a of (((base || {}).dados || {}).anuncios || [])) {
+      if (a.campanhaId && a.cpa != null) cpaDe[a.campanhaId] = { cpa: a.cpa, conversas: a.conversas, nome: a.nome };
+    }
+    const propostas = [];
+    const cats = [...new Set(pausadas.map(p => p.categoria))];
+    for (const cat of cats) {
+      const orfa = Number(pausadas.filter(p => p.categoria === cat)
+        .reduce((s, p) => s + p.sobrou, 0).toFixed(2));
+      if (orfa < 1) continue;
+      const meta = cfgO.metas[cat] != null ? cfgO.metas[cat] : cfgO.metas.outros;
+      // destinos: ativos da MESMA categoria, dentro da meta, priorizando menor CPA
+      const destinos = ativas.filter(a => a.categoria === cat)
+        .map(a => ({ ...a, cpa: (cpaDe[a.id] || {}).cpa ?? null, conversas: (cpaDe[a.id] || {}).conversas ?? 0 }))
+        .filter(a => a.cpa != null && a.cpa <= meta && a.conversas >= 3)
+        .sort((x, y) => x.cpa - y.cpa);
+      if (!destinos.length) {
+        propostas.push({ categoria: cat, verbaOrfa: orfa, destinos: [],
+          aviso: '⚠️ nenhum destino dentro da meta nesta categoria' });
+        continue;
+      }
+      const peso = a => (meta / Math.max(0.2, a.cpa)) * Math.log10(10 + a.conversas);
+      const soma = destinos.reduce((s, a) => s + peso(a), 0) || 1;
+      propostas.push({ categoria: cat, verbaOrfa: orfa, meta,
+        destinos: destinos.map(a => {
+          const fatia = Number((orfa * peso(a) / soma).toFixed(2));
+          return { nome: a.nome, alvoId: a.alvoId, campanhaId: a.id, campo: a.campo,
+            verbaEm: a.verbaEm, cpa: a.cpa, conversas: a.conversas,
+            verbaAtual: a.verba, receber: fatia,
+            verbaNova: Number((a.verba + fatia).toFixed(2)) };
+        }) });
+    }
+    const totalOrfa = Number(propostas.reduce((s, p) => s + p.verbaOrfa, 0).toFixed(2));
+    return res.status(200).json({ ok: true, cicloDesde: desdeCiclo,
+      resumo: {
+        campanhasPausadas: pausadas.length,
+        verbaAlocadaNosPausados: Number(pausadas.reduce((s, p) => s + p.verba, 0).toFixed(2)),
+        jaGastoAntesDePausar: Number(pausadas.reduce((s, p) => s + p.gasto, 0).toFixed(2)),
+        VERBA_ORFA: totalOrfa,
+      },
+      pausados: pausadas.map(p => (p.categoria || '?').toUpperCase().slice(0, 4) + ' | ' +
+        String(p.nome).slice(0, 30) + ' | alocado R$ ' + p.verba + ' · gasto R$ ' + p.gasto +
+        ' · SOBROU R$ ' + p.sobrou),
+      propostas,
+      comoAplicar: 'confira as propostas e aplique pelo Copiloto, ou pelo link realocar-orfa&aplicar=1' });
+  }
+
   // ── 📋 EXTRATO-VERBA: todos os anúncios do ciclo, verba e situação, somados por frente ──
   if (action === 'extrato-verba') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
