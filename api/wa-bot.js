@@ -385,6 +385,17 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-cache');
   const action = req.query.action || '';
 
+  // 🚦 CONTA BLOQUEADA: enquanto a Meta recusar por pagamento, não adianta insistir —
+  // cada tentativa falha, engrossa a fila e arrisca a qualidade do número quando liberar.
+  async function contaBloqueada() {
+    try {
+      const c = (await dbGet('wa_bot_config')) || {};
+      if (!c.bloqueioPagamentoEm) return false;
+      const h = (Date.now() - new Date(c.bloqueioPagamentoEm).getTime()) / 3600000;
+      return h < 2;                       // revalida a cada 2h
+    } catch (e) { return false; }
+  }
+
   // ── ABORDAGEM-FICHAS (cron 5min): ficha criada há 5-60min sem conversa iniciada → template cadastro_recebido ──
   // Interruptor: wa_bot_config.abordagemAtiva (false por padrão — ligar quando o número real estiver ativo)
   // ── 🔍 APROVADOS-DUPLICADOS: aprovado com espelho em aguardando aprovação (GET varre; POST ?limpar=1 arquiva os espelhos) ──

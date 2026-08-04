@@ -140,6 +140,26 @@ export default async function handler(req, res) {
               dir: 'status', texto: st.status + (st.errors ? ' | ' + JSON.stringify(st.errors).slice(0,300) : ''),
               msgId: st.id || null, tipo: 'status',
             });
+            // ↩️ FALHA DE PAGAMENTO: desfaz a marcação de "abordado", senão o cliente
+            // fica marcado como contactado sem nunca ter recebido nada (abordagem fantasma).
+            try {
+              const codD = Number((st.errors && st.errors[0] && st.errors[0].code) || 0);
+              if (st.status === 'failed' && [131042, 131047, 131026].includes(codD)) {
+                const telD = String(st.recipient_id || '').replace(/\D/g, '');
+                const d8d = telD.slice(-8);
+                // marca o bloqueio para o bot parar de insistir por 2h
+                try { const cfgB = (await dbGet('wa_bot_config')) || {};
+                  cfgB.bloqueioPagamentoEm = new Date().toISOString();
+                  await dbSet('wa_bot_config', cfgB); } catch (e) {}
+                const ab = (await dbGet('wa_abordados')) || { tels: {} };
+                let mexeu = false;
+                for (const k of Object.keys(ab.tels || {})) {
+                  if (String(k).replace(/\D/g, '').endsWith(d8d)) { delete ab.tels[k]; mexeu = true; }
+                }
+                if (mexeu) await dbSet('wa_abordados', ab);
+              }
+            } catch (e) {}
+
             // 📒 FILA DE RECUPERAÇÃO: toda falha de entrega vai para um registro permanente,
             // com o template tentado e a origem — para reenviar quando a conta for liberada.
             try {
