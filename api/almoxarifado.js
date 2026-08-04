@@ -64,7 +64,17 @@ export default async function handler(req, res) {
   if (!db.snapshot) db.snapshot = { pipe: {}, logColeta: [] };
   if (!db.config) db.config = { proximoNum: 1 };
 
+  // 📺 é SÓ TV? (uma ou várias, sem nenhum equipamento de ADM junto)
+  function soTv(txt) {
+    const s = String(txt || '').toLowerCase();
+    if (!/\btvs?\b|televis|\bled\b|polegada|barramento/.test(s)) return false;
+    return !/micro-?\s?ondas|microondas|purificador|bebedouro|filtro|adega|cervejeir|forno|forninho|frigobar|b\.?\s?blend/.test(s);
+  }
+  function pushTarefa(lista, t) { if (t && Array.isArray(lista)) lista.unshift(t); return t; }
   function novaTarefa(t) {
+    // 🚫 BARREIRA ÚNICA — todos os pontos que criam tarefa passam por aqui.
+    // Proteger só o sync não bastava: havia 8 caminhos, incluindo 'receber' da coleta efetuada.
+    if (soTv((t || {}).equipamento) || soTv((t || {}).descricao)) return null;
     const num = db.config.proximoNum || 1;
     db.config.proximoNum = num + 1;
     // sufixo aleatório: duas criações simultâneas liam o mesmo número e geravam IDs IGUAIS,
@@ -135,7 +145,7 @@ export default async function handler(req, res) {
             // exclui a de última chamada e fica só a de aprovado
             db.tarefas = db.tarefas.filter(t =>
               !(t.cardId === c.id && t.tipo === 'mover' && t.status === 'pendente' && t.destino !== c.phase));
-            db.tarefas.unshift(novaTarefa({
+            pushTarefa(db.tarefas, novaTarefa({
               tipo: 'mover', cardId: c.id,
               cliente: c.nomeContato || '—', tel: c.telefone || '', equipamento: c.equipamento || '',
               origem: (db.inventario[c.id] && db.inventario[c.id].local) || GATILHOS[c.phase] || '—',
@@ -155,7 +165,7 @@ export default async function handler(req, res) {
         if (!snapCol.has(c.id)) {
           const existe = db.tarefas.some(t => t.cardId === c.id && t.tipo === 'receber');
           if (!existe) {
-            db.tarefas.unshift(novaTarefa({
+            pushTarefa(db.tarefas, novaTarefa({
               tipo: 'receber', cardId: c.id,
               cliente: c.nomeContato || c.nome || '—', tel: c.telefone || '', equipamento: c.equipamento || '',
               defeito: c.defeito || '', obs: c.texto || '',
@@ -183,7 +193,7 @@ export default async function handler(req, res) {
           novoFl[f.id] = f.phase;
           if (primeira) continue;
           if (f.phase === 'reprovado' && s.f2.fl[f.id] !== 'reprovado' && !jaTarefa(f.id, 'loja-reprovado')) {
-            db.tarefas.unshift(novaTarefa({ tipo: 'loja-reprovado', cardId: f.id,
+            pushTarefa(db.tarefas, novaTarefa({ tipo: 'loja-reprovado', cardId: f.id,
               cliente: f.nomeContato || '—', tel: f.telefone || '', equipamento: f.equipamento || '',
               origem: 'Frente de Loja', destino: 'aguardando_retirada' }));
           }
@@ -201,7 +211,7 @@ export default async function handler(req, res) {
           // sem cliente E sem equipamento não há o que separar — provável registro incompleto
           if (!cliente && !equip) return;
           const cid = orig + '-' + idReal;
-          if (!jaTarefa(cid, 'venda')) db.tarefas.unshift(novaTarefa({ tipo: 'venda', cardId: cid,
+          if (!jaTarefa(cid, 'venda')) pushTarefa(db.tarefas, novaTarefa({ tipo: 'venda', cardId: cid,
             cliente: cliente || '—', tel: v.telefone || v.tel || '',
             equipamento: equip || '—',
             valor: parseFloat(v.valor || v.total || 0) || null,
@@ -220,7 +230,7 @@ export default async function handler(req, res) {
           if (f.status === 'analise') {
             novoAna.push(f.id);
             if (!primeira && !s.f2.ceAna.includes(f.id) && !jaTarefa(f.id, 'avaliar-compra')) {
-              db.tarefas.unshift(novaTarefa({ tipo: 'avaliar-compra', cardId: f.id,
+              pushTarefa(db.tarefas, novaTarefa({ tipo: 'avaliar-compra', cardId: f.id,
                 cliente: f.nomeContato || f.cliente || '—', tel: f.telefone || '', equipamento: f.equipamento || f.descricao || '—',
                 origem: 'Compra Equip', destino: 'analise' }));
             }
@@ -228,7 +238,7 @@ export default async function handler(req, res) {
           if (f.status === 'comprado') {
             novoComp.push(f.id);
             if (!primeira && !s.f2.ceComp.includes(f.id) && !jaTarefa(f.id, 'levar-area')) {
-              db.tarefas.unshift(novaTarefa({ tipo: 'levar-area', cardId: f.id,
+              pushTarefa(db.tarefas, novaTarefa({ tipo: 'levar-area', cardId: f.id,
                 cliente: f.nomeContato || f.cliente || '—', tel: f.telefone || '', equipamento: f.equipamento || f.descricao || '—',
                 origem: 'Equipamento Comprado', destino: 'area_correta' }));
             }
@@ -386,7 +396,7 @@ export default async function handler(req, res) {
     if (!dbM.config) dbM.config = { proximoNum: 1 };
     const ja = dbM.tarefas.some(t => t.cardId === b.cardId && t.destino === b.destino && t.status === 'pendente');
     if (ja) return res.status(200).json({ ok: true, dedupe: true, msg: 'tarefa já existe pendente' });
-    dbM.tarefas.unshift(novaTarefa({
+    pushTarefa(dbM.tarefas, novaTarefa({
       tipo: 'mover', cardId: b.cardId,
       cliente: String(b.cliente || 'Cliente').slice(0, 60), tel: String(b.tel || ''),
       equipamento: String(b.equipamento || '').slice(0, 60),
@@ -405,7 +415,7 @@ export default async function handler(req, res) {
     if (!db.config) db.config = { proximoNum: 1 };
     const jaTem = db.tarefas.some(t => t.origemConflito === b.conflitoId && t.status === 'pendente');
     if (jaTem) return res.status(200).json({ ok: true, dedupe: true });
-    db.tarefas.unshift(novaTarefa({
+    pushTarefa(db.tarefas, novaTarefa({
       tipo: 'avaliar-compra', cardId: b.cardId || b.conflitoId, origemConflito: b.conflitoId,
       cliente: String(b.cliente || 'Cliente').slice(0, 60), tel: String(b.tel || ''),
       equipamento: String(b.equipamento || '').slice(0, 60),
@@ -843,7 +853,7 @@ export default async function handler(req, res) {
         const pdb = await dbGet('reparoeletro_pipe');
         const c = pdb && (pdb.cards || []).find(x => x.id === rid);
         if (c) {
-          db.tarefas.unshift(novaTarefa({ tipo: 'mover', cardId: c.id,
+          pushTarefa(db.tarefas, novaTarefa({ tipo: 'mover', cardId: c.id,
             cliente: c.nomeContato || '—', tel: c.telefone || '', equipamento: c.equipamento || '',
             origem: 'aguardando_aprovacao', destino: c.fase || c.phase }));
           recriada = c.id + ' (' + (c.nomeContato || '') + ' → ' + c.phase + ')';
@@ -887,7 +897,7 @@ export default async function handler(req, res) {
     const ignoradosTv = faltam.length - paraCriar.length;
     if (req.query.aplicar === '1') {
       for (const f of paraCriar) {
-        db.tarefas.unshift(novaTarefa({ tipo: 'mover', cardId: f.id,
+        pushTarefa(db.tarefas, novaTarefa({ tipo: 'mover', cardId: f.id,
           cliente: f.cliente || '—', tel: f.tel || '', equipamento: f.equipamento || '',
           origem: 'aguardando_aprovacao', destino: f.fase, reconciliada: true }));
       }
@@ -1051,7 +1061,7 @@ export default async function handler(req, res) {
     const criadas = [];
     for (const s of seeds) {
       if (db.tarefas.some(t => t.cliente === s.cliente && t.status === 'pendente')) continue;
-      db.tarefas.unshift(novaTarefa(Object.assign({ cardId: 'TESTE-' + s.cliente.replace(/\s/g, ''), tel: '5531997856023', teste: true }, s)));
+      pushTarefa(db.tarefas, novaTarefa(Object.assign({ cardId: 'TESTE-' + s.cliente.replace(/\s/g, ''), tel: '5531997856023', teste: true }, s)));
       criadas.push(s.cliente);
     }
     await dbSet(KEY, db);

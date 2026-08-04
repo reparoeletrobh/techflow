@@ -86,6 +86,35 @@ module.exports = async function handler(req,res){
     return res.status(200).json({ok:true,conflito:c});
   }
 
+  // ── 🩺 STATUS-CONFLITOS: quantos há em cada estado (diagnóstico) ──
+  if(action==='status-conflitos'){
+    const cont={}, amostra={};
+    for(const c of (db.conflitos||[])){
+      const s=c.status||'(sem status)';
+      cont[s]=(cont[s]||0)+1;
+      if(!amostra[s])amostra[s]=[];
+      if(amostra[s].length<3)amostra[s].push({
+        id:c.id, titulo:String(c.titulo||'').slice(0,34),
+        cliente:c.cliente||c.ficha||'', temSolucao:!!c.solucao,
+        temTelefone:!!(c.telefone||c.tel), resolvidoEm:c.resolvidoEm||null });
+    }
+    return res.status(200).json({ok:true,total:(db.conflitos||[]).length,porStatus:cont,amostra});
+  }
+
+  // ── 🔧 MIGRAR-RELATAR: conflitos resolvidos sem retorno ao cliente ──
+  if(action==='migrar-relatar'){
+    const alvo=(db.conflitos||[]).filter(c=>c.status==='resolvido'&&!c.clienteRelatado);
+    if(String(req.query.aplicar||'')==='1'&&alvo.length){
+      for(const c of alvo){ c.status='relatar'; c.migradoEm=new Date().toISOString(); }
+      await dbSet(KEY,db);
+      return res.status(200).json({ok:true,migrados:alvo.length,
+        lista:alvo.slice(0,20).map(c=>String(c.titulo||c.id).slice(0,40))});
+    }
+    return res.status(200).json({ok:true,seriamMigrados:alvo.length,
+      lista:alvo.slice(0,20).map(c=>String(c.titulo||c.id).slice(0,40)),
+      dica:'para aplicar: &aplicar=1'});
+  }
+
   // ── POST relatado: cliente avisado do desfecho → vai para FINALIZADOS ──
   if(req.method==='POST'&&action==='relatado'){
     const{id,por}=req.body||{};
