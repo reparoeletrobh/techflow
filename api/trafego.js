@@ -646,6 +646,79 @@ module.exports = async function handler(req, res) {
   }
   function permissoesErro(r) { return r && r.erro ? ('sem acesso: ' + r.erro) : ((r && r.dados) || []); }
 
+  // ── ✅ CONFERIR-APLICACAO: as últimas alterações do Copiloto valeram na Meta? ──
+  if (action === 'conferir-aplicacao') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const lg = (await dbGet('trafego_log')) || { movs: [] };
+    const ultimo = (lg.movs || []).find(m => m.acao === 'aplicar' || m.pausas || m.verbas);
+    if (!ultimo) return res.status(200).json({ ok: false, error: 'nenhuma aplicação registrada no log' });
+
+    // estado atual na Meta
+    const camps = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns?fields=id,name,effective_status,daily_budget,lifetime_budget&limit=200&access_token=${TOKEN}`, 8);
+    const sets = await pegarTudo(`${GRAPH}/act_${CONTA}/adsets?fields=id,name,effective_status,daily_budget,lifetime_budget,campaign{id}&limit=200&access_token=${TOKEN}`, 8);
+    const porCamp = {}; for (const c of (camps.data || [])) porCamp[c.id] = c;
+    const setsDe = {};
+    for (const s of (sets.data || [])) {
+      const cid = (s.campaign || {}).id; if (!cid) continue;
+      (setsDe[cid] = setsDe[cid] || []).push(s);
+    }
+    const verbaReal = (cid) => {
+      const c = porCamp[cid];
+      if (!c) return null;
+      if (c.lifetime_budget) return { valor: Number(c.lifetime_budget) / 100, onde: 'campanha (total)' };
+      if (c.daily_budget) return { valor: Number(c.daily_budget) / 100, onde: 'campanha (diária)' };
+      let soma = 0, tipo = null;
+      for (const s of (setsDe[cid] || [])) {
+        if (s.lifetime_budget) { soma += Number(s.lifetime_budget) / 100; tipo = 'conjunto (total)'; }
+        else if (s.daily_budget) { soma += Number(s.daily_budget) / 100; tipo = 'conjunto (diária)'; }
+      }
+      return soma ? { valor: Number(soma.toFixed(2)), onde: tipo } : null;
+    };
+
+    const conferePausa = (p) => {
+      const cid = p.campanhaId || p.campaignId || p.id;
+      const c = porCamp[cid];
+      const pausadaNaCampanha = c && ['PAUSED', 'CAMPAIGN_PAUSED', 'ADSET_PAUSED'].includes(c.effective_status);
+      const setsPausados = (setsDe[cid] || []).every(s => ['PAUSED', 'ADSET_PAUSED', 'CAMPAIGN_PAUSED'].includes(s.effective_status));
+      const ok = pausadaNaCampanha || ((setsDe[cid] || []).length > 0 && setsPausados);
+      return { nome: p.nome || (c && c.name) || cid, id: cid,
+        situacaoAtual: c ? c.effective_status : '(não encontrada)',
+        pausouDeVerdade: !!ok };
+    };
+    const confereVerba = (v) => {
+      const cid = v.campanhaId || v.campaignId || v.id;
+      const c = porCamp[cid];
+      const real = verbaReal(cid);
+      const esperado = Number(v.nova || v.novaVerba || v.valor || 0);
+      const bate = real && esperado ? Math.abs(real.valor - esperado) < 1 : null;
+      return { nome: v.nome || (c && c.name) || cid, id: cid,
+        verbaEsperada: esperado || null,
+        verbaNaMeta: real ? real.valor : null,
+        onde: real ? real.onde : null,
+        situacao: c ? c.effective_status : '(não encontrada)',
+        aplicou: bate };
+    };
+
+    const pausas = (ultimo.pausas || ultimo.pausados || []).map(conferePausa);
+    const verbas = (ultimo.verbas || ultimo.realocacoes || []).map(confereVerba);
+    const falhouPausa = pausas.filter(p => !p.pausouDeVerdade);
+    const falhouVerba = verbas.filter(v => v.aplicou === false);
+
+    return res.status(200).json({
+      ok: falhouPausa.length === 0 && falhouVerba.length === 0,
+      aplicadoEm: ultimo.ts,
+      pausas: { total: pausas.length, confirmadas: pausas.length - falhouPausa.length, detalhe: pausas },
+      verbas: { total: verbas.length, confirmadas: verbas.length - falhouVerba.length, detalhe: verbas },
+      alertas: [
+        ...(falhouPausa.length ? ['❌ ' + falhouPausa.length + ' NÃO pausou: ' + falhouPausa.map(p => p.nome).join(', ')] : []),
+        ...(falhouVerba.length ? ['❌ ' + falhouVerba.length + ' com verba divergente'] : []),
+      ],
+      resumo: pausas.map(p => (p.pausouDeVerdade ? '⏸️ ' : '❌ ') + String(p.nome).slice(0, 30) + ' | ' + p.situacaoAtual)
+        .concat(verbas.map(v => (v.aplicou ? '💰 ' : '⚠️ ') + String(v.nome).slice(0, 30) +
+          ' | esperado R$ ' + v.verbaEsperada + ' · na Meta R$ ' + v.verbaNaMeta + ' (' + (v.onde || '?') + ')')),
+    });
+  }
+
   // ── 🚨 ERROS-CONJUNTOS: problemas no nível do conjunto e do anúncio ──
   if (action === 'erros-conjuntos') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
