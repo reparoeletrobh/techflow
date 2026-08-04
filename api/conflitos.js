@@ -59,6 +59,17 @@ module.exports = async function handler(req,res){
 
   // ── POST criar ──────────────────────────────────────────────────────────────
   if(req.method==='POST'&&action==='criar'){
+    // vínculo com o pipe: quando informado, o conflito herda telefone e equipamento
+    try{
+      const v=(req.body||{}).vinculo;
+      if(v&&v.telefone){
+        req.body.telefone=String(v.telefone).replace(/\D/g,'');
+        req.body.cardId=v.id||'';
+        req.body.cardOnde=v.onde||'';
+        if(!req.body.cliente&&v.nome)req.body.cliente=v.nome;
+        if(!req.body.equipamento&&v.equipamento)req.body.equipamento=v.equipamento;
+      }
+    }catch(e){}
     const{titulo,tipo,prioridade,setor,ficha,responsavel,descricao,registradoPor}=req.body||{};
     if(!titulo||!prioridade) return res.status(400).json({ok:false,error:'titulo e prioridade obrigatórios'});
     const novo={
@@ -113,6 +124,46 @@ module.exports = async function handler(req,res){
     return res.status(200).json({ok:true,seriamMigrados:alvo.length,
       lista:alvo.slice(0,20).map(c=>String(c.titulo||c.id).slice(0,40)),
       dica:'para aplicar: &aplicar=1'});
+  }
+
+  // ── 🔎 BUSCAR-FICHA: procura no pipe para vincular ao conflito (nome, telefone ou OS) ──
+  if(action==='buscar-ficha'){
+    const q=String(req.query.q||'').toLowerCase().trim();
+    if(q.length<3)return res.status(200).json({ok:false,error:'digite ao menos 3 caracteres'});
+    const [ppA,ppT,lgA,lgT]=await Promise.all([
+      dbGet('reparoeletro_pipe'),dbGet('tv_pipe'),
+      dbGet('reparoeletro_logistica'),dbGet('tv_logistica')]);
+    const so=t=>String(t||'').replace(/\D/g,'');
+    const qNum=so(q);
+    const casa=(nome,tel,id,equip)=>{
+      const n=String(nome||'').toLowerCase();
+      const t=so(tel);
+      if(n.includes(q))return true;
+      if(qNum.length>=4&&t.endsWith(qNum))return true;
+      if(String(id||'').toLowerCase().includes(q))return true;
+      if(String(equip||'').toLowerCase().includes(q))return true;
+      return false;
+    };
+    const achados=[];
+    for(const [b,onde,tipo] of [[ppA,'Pipe ADM','card'],[ppT,'Pipe TV','card'],
+                                 [lgA,'Logística ADM','ficha'],[lgT,'Logística TV','ficha']]){
+      const itens=tipo==='card'?(((b||{}).cards)||[]):(((b||{}).fichas)||[]);
+      for(const i of itens){
+        const nome=i.nomeContato||i.nome||'';
+        const tel=i.telefone||i.tel||'';
+        if(!casa(nome,tel,i.id,i.equipamento))continue;
+        if(!so(tel))continue;                       // sem telefone não serve para o vínculo
+        achados.push({ id:i.id, onde, nome, telefone:so(tel),
+          equipamento:i.equipamento||i.descricao||'',
+          fase:i.phaseId||i.phase||'', valor:i.valor||null,
+          movidoEm:i.movedAt||i.criadoEm||null });
+        if(achados.length>=25)break;
+      }
+      if(achados.length>=25)break;
+    }
+    return res.status(200).json({ok:true,total:achados.length,
+      resultados:achados.map(a=>({...a,
+        rotulo:a.nome+' · '+String(a.telefone).slice(-4)+' · '+String(a.equipamento).slice(0,26)+' · '+a.onde}))});
   }
 
   // ── 🧹 LIMPAR-TELEFONES-ERRADOS: remove os que não batem com os 4 dígitos do nome ──

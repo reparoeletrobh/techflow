@@ -321,7 +321,12 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
           <option>Financeiro</option><option>Compras</option><option>Técnico</option><option>Outro</option>
         </select>
       </div>
-      <div class="fld"><label>Nº DA FICHA (opcional)</label><input id="f-ficha" placeholder="Ex: FL-0303 ou 3848"></div>
+      <div class="fld ffull" style="position:relative;">
+        <label>VINCULAR À FICHA <span style="color:#8b93a3;font-weight:400;">(busque por nome, telefone ou nº)</span></label>
+        <input id="f-ficha" placeholder="Digite o nome ou os 4 dígitos do telefone..." autocomplete="off" oninput="buscarFicha(this.value)">
+        <div id="f-vinculo" style="display:none;margin-top:6px;background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.4);border-radius:8px;padding:8px 10px;font-size:12px;"></div>
+        <div id="f-sugestoes" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:60;background:#12161d;border:1px solid #2a2f38;border-radius:10px;margin-top:4px;max-height:260px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5);"></div>
+      </div>
       <div class="fld"><label>RESPONSÁVEL</label><input id="f-resp" placeholder="Quem vai resolver?"></div>
       <div class="fld ffull"><label>DESCRIÇÃO</label><textarea id="f-desc" rows="3" placeholder="Detalhes para o líder técnico..."></textarea></div>
       <div class="fld ffull"><label>REGISTRADO POR</label><input id="f-regpor" placeholder="Seu nome"></div>
@@ -649,6 +654,7 @@ function abrirModal(){
   _prioSel='';
   document.querySelectorAll('.prio-o').forEach(function(b){b.className='prio-o';});
   ['f-titulo','f-ficha','f-resp','f-desc','f-regpor'].forEach(function(id){document.getElementById(id).value='';});
+  if(typeof desvincularFicha==='function')desvincularFicha();
   abrirM('m-reg');
   setTimeout(function(){document.getElementById('f-titulo').focus();},100);
 }
@@ -667,6 +673,7 @@ async function salvarConflito(){
         tipo:document.getElementById('f-tipo').value,
         setor:document.getElementById('f-setor').value,
         ficha:document.getElementById('f-ficha').value.trim(),
+        vinculo:_vinculoFicha||undefined,
         responsavel:document.getElementById('f-resp').value.trim(),
         descricao:document.getElementById('f-desc').value.trim(),
         registradoPor:document.getElementById('f-regpor').value.trim(),
@@ -685,6 +692,44 @@ async function assumir(id){
   else toast('Erro','r');
 }
 
+var _vinculoFicha=null, _buscaFichaTimer=null;
+function buscarFicha(q){
+  clearTimeout(_buscaFichaTimer);
+  var box=document.getElementById('f-sugestoes');
+  if(!q||q.trim().length<3){ if(box)box.style.display='none'; return; }
+  _buscaFichaTimer=setTimeout(async function(){
+    var r=await fetch('/api/conflitos?action=buscar-ficha&q='+encodeURIComponent(q.trim()))
+      .then(function(x){return x.json();}).catch(function(){return null;});
+    if(!box)return;
+    if(!r||!r.ok||!r.resultados.length){
+      box.innerHTML='<div style="padding:10px 12px;color:#8b93a3;font-size:12px;">Nenhuma ficha encontrada com telefone</div>';
+      box.style.display='block'; return;
+    }
+    box.innerHTML=r.resultados.map(function(f,i){
+      return '<div onclick="vincularFicha('+i+')" data-idx="'+i+'" style="padding:9px 12px;border-bottom:1px solid #1e232c;cursor:pointer;font-size:12.5px;" onmouseover="this.style.background=\'#1a1f27\'" onmouseout="this.style.background=\'\'">'
+        +'<b>'+f.nome+'</b> <span style="color:#5a8dc9;font-family:monospace;">'+String(f.telefone).slice(-4)+'</span>'
+        +'<div style="font-size:10.5px;color:#8b93a3;margin-top:2px;">'+(f.equipamento||'—')+' · '+f.onde+(f.fase?' · '+f.fase:'')+'</div></div>';
+    }).join('');
+    box.style.display='block';
+    window._resFicha=r.resultados;
+  },300);
+}
+function vincularFicha(i){
+  var f=(window._resFicha||[])[i];
+  if(!f)return;
+  _vinculoFicha=f;
+  document.getElementById('f-ficha').value=f.id;
+  document.getElementById('f-sugestoes').style.display='none';
+  var v=document.getElementById('f-vinculo');
+  v.style.display='block';
+  v.innerHTML='✅ <b>'+f.nome+'</b> · 📱 '+f.telefone+' · '+(f.equipamento||'')+' <span style="color:#8b93a3;">('+f.onde+')</span>'
+    +' <a href="#" onclick="desvincularFicha();return false;" style="color:#fca5a5;margin-left:6px;">remover</a>';
+}
+function desvincularFicha(){
+  _vinculoFicha=null;
+  document.getElementById('f-ficha').value='';
+  var v=document.getElementById('f-vinculo'); if(v)v.style.display='none';
+}
 async function relatarCliente(id){
   var c=(_dados||[]).find(function(x){return x.id===id;});
   if(!c)return;
