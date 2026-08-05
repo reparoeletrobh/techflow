@@ -792,13 +792,79 @@ module.exports = async function handler(req, res) {
     const feitos = [], erros = [];
     for (const v of alvo) {
       try {
-        // 1) duplica a campanha modelo (leva segmentação e destino WhatsApp)
+        // 1) tenta duplicar; se o app não tiver permissão para /copies (código 10),
+        // cria do ZERO lendo a configuração do modelo — mesmo resultado, endpoints padrão
+        let nova = null;
         const cp = await postForm(modelo.campanhaId + '/copies', {
           deep_copy: 'true', status_option: 'PAUSED',
           rename_options: JSON.stringify({ rename_strategy: 'NO_RENAME' }),
         });
-        if (cp && cp.error) { erros.push(v.title + ' | cópia: ' + cp.error.message + ' (cód ' + cp.error.code + ')'); continue; }
-        const nova = cp.copied_campaign_id || cp.id;
+        if (cp && !cp.error) {
+          nova = cp.copied_campaign_id || cp.id;
+        } else {
+          // ── caminho alternativo: replicar a estrutura ──
+          const nome = String(v.title).replace(/\.(mov|mp4)$/i, '') + ' ' + new Date().getDate() + '08';
+          // lê o modelo completo
+          const mCamp = await fetch(`${GRAPH}/${modelo.campanhaId}?fields=objective,special_ad_categories,buying_type&access_token=${TOKEN}`).then(x => x.json());
+          const mSet = modelo.adsetId
+            ? await fetch(`${GRAPH}/${modelo.adsetId}?fields=targeting,optimization_goal,billing_event,destination_type,promoted_object,bid_strategy&access_token=${TOKEN}`).then(x => x.json())
+            : {};
+          if (mCamp.error || mSet.error) {
+            erros.push(v.title + ' | ler modelo: ' + ((mCamp.error || mSet.error).message));
+            continue;
+          }
+          // 1a) campanha
+          const c1 = await postForm('act_' + CONTA + '/campaigns', {
+            name: nome, objective: mCamp.objective || 'OUTCOME_ENGAGEMENT',
+            status: 'PAUSED', buying_type: mCamp.buying_type || 'AUCTION',
+            special_ad_categories: JSON.stringify(mCamp.special_ad_categories || []),
+          });
+          if (c1 && c1.error) { erros.push(v.title + ' | criar campanha: ' + c1.error.message + ' (cód ' + c1.error.code + ')'); continue; }
+          nova = c1.id;
+          // 1b) conjunto, com a mesma segmentação e destino
+          const camposSet = {
+            name: nome + ' - conjunto', campaign_id: nova,
+            targeting: JSON.stringify(mSet.targeting || {}),
+            optimization_goal: mSet.optimization_goal || 'CONVERSATIONS',
+            billing_event: mSet.billing_event || 'IMPRESSIONS',
+            bid_strategy: mSet.bid_strategy || 'LOWEST_COST_WITHOUT_CAP',
+            status: 'PAUSED',
+            lifetime_budget: String(Math.round(verba * 100)),
+            end_time: String(fimUnix),
+          };
+          if (mSet.destination_type) camposSet.destination_type = mSet.destination_type;
+          if (mSet.promoted_object) camposSet.promoted_object = JSON.stringify(mSet.promoted_object);
+          const s1 = await postForm('act_' + CONTA + '/adsets', camposSet);
+          if (s1 && s1.error) {
+            erros.push(v.title + ' | criar conjunto: ' + s1.error.message + ' (cód ' + s1.error.code + ')');
+            continue;
+          }
+          // 1c) criativo com o VÍDEO NOVO
+          const mAdC = await fetch(`${GRAPH}/${modelo.id}?fields=creative{object_story_spec,degrees_of_freedom_spec}&access_token=${TOKEN}`).then(x => x.json());
+          const oss = ((mAdC.creative || {}).object_story_spec) || {};
+          const novoOss = { page_id: oss.page_id };
+          if (oss.video_data) {
+            novoOss.video_data = { ...oss.video_data, video_id: v.id };
+            delete novoOss.video_data.image_url;
+          } else if (oss.link_data) {
+            novoOss.link_data = oss.link_data;
+          }
+          const cr = await postForm('act_' + CONTA + '/adcreatives', {
+            name: nome + ' - criativo', object_story_spec: JSON.stringify(novoOss),
+          });
+          if (cr && cr.error) { erros.push(v.title + ' | criar criativo: ' + cr.error.message + ' (cód ' + cr.error.code + ')'); continue; }
+          // 1d) anúncio
+          const a1 = await postForm('act_' + CONTA + '/ads', {
+            name: nome, adset_id: s1.id, creative: JSON.stringify({ creative_id: cr.id }), status: 'ACTIVE',
+          });
+          if (a1 && a1.error) { erros.push(v.title + ' | criar anúncio: ' + a1.error.message + ' (cód ' + a1.error.code + ')'); continue; }
+          // ativa o conjunto e a campanha
+          await postForm(s1.id, { status: 'ACTIVE' });
+          await postForm(nova, { status: 'ACTIVE' });
+          feitos.push({ video: v.title, campanha: nova, verba, videoId: v.id, via: 'criado do zero (com o vídeo novo)' });
+          await new Promise(r => setTimeout(r, 500));
+          continue;
+        }
         // 2) nome, verba e término, já ativa
         const up = await postForm(nova, {
           name: String(v.title).replace(/\.(mov|mp4)$/i, '') + ' ' + new Date().getDate() + '08',
