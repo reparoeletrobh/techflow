@@ -65,6 +65,7 @@ module.exports = async function handler(req,res){
       if(v&&v.telefone){
         req.body.telefone=String(v.telefone).replace(/\D/g,'');
         req.body.cardId=v.id||'';
+        req.body.cardOrigem=(v.onde||'')+' · '+(v.id||'');   // rastreabilidade tecnica
         req.body.cardOnde=v.onde||'';
         if(!req.body.cliente&&v.nome)req.body.cliente=v.nome;
         if(!req.body.equipamento&&v.equipamento)req.body.equipamento=v.equipamento;

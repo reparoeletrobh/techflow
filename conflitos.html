@@ -492,7 +492,7 @@ function render(){
     if(_aba==='relatar'&&!rel) return false;   // vazio até alguém resolver um conflito
     if(_aba==='resolvido'&&!res) return false;
     if(busca){
-      var txt=((c.titulo||'')+(c.os||'')+(c.ficha||'')+(c.equipamento||'')+(c.responsavel||'')+(c.descricao||'')+(c.id||'')).toLowerCase();
+      var txt=((c.titulo||'')+(c.os||'')+(c.ficha||'')+(c.equipamento||'')+(c.responsavel||'')+(c.descricao||'')+(c.id||'')+(c.telefone||'')+(c.cliente||'')+(c.cardId||'')).toLowerCase();
       return txt.includes(busca);
     }
     return true;
@@ -631,6 +631,8 @@ function cardHTML(c){
     (c.tipo?'<span class="tag">'+esc(c.tipo)+'</span>':'')+
     (c.setor?'<span class="tag">'+esc(c.setor)+'</span>':'')+
     (c.ficha?'<span class="tag ficha">📋 '+esc(c.ficha)+'</span>':'')+
+    (c.telefone?'<span class="tag" style="background:rgba(37,211,102,.12);color:#25d366;">📱 '+esc(String(c.telefone).replace(/^55/,''))+'</span>':'')+
+    (c.equipamento?'<span class="tag" style="background:rgba(139,146,163,.12);color:#aab2c0;">🔧 '+esc(String(c.equipamento).slice(0,22))+'</span>':'')+
     (c.responsavel?'<span class="tag">👤 '+esc(c.responsavel)+'</span>':'<span class="tag" style="color:var(--red);border-color:var(--red)">⚠️ Sem responsável</span>')+
     '<span class="status-b '+c.status+'">'+statusTxt+'</span>'+
     '</div>'+
@@ -779,7 +781,8 @@ function vincularFicha(i){
   var f=(window._resFicha||[])[i];
   if(!f)return;
   _vinculoFicha=f;
-  document.getElementById('f-ficha').value=f.id;
+  // grava o que é LEGÍVEL para quem lê o conflito depois; o id do card fica no vínculo
+  document.getElementById('f-ficha').value = f.nome + ' ' + String(f.telefone||'').slice(-4);
   document.getElementById('f-sugestoes').style.display='none';
   var v=document.getElementById('f-vinculo');
   v.style.display='block';
