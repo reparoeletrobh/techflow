@@ -1373,6 +1373,38 @@ export default async function handler(req, res) {
       dica: ok ? 'confira o WhatsApp do número' : 'se o erro citar o template, ele pode não estar aprovado' });
   }
 
+  // ── 📤 EXPORTAR-TEMPLATES: textos completos, prontos para recriar em outra conta ──
+  if (action === 'exportar-templates') {
+    const tkE = String(req.query.token || '').trim() || (await credenciais()).token;
+    const G = 'https://graph.facebook.com/v20.0';
+    const ids = [String(req.query.waba || '1050574074327587'), '1699351717944043'];
+    const todos = {};
+    for (const id of ids) {
+      const r = await fetch(`${G}/${id}/message_templates?fields=name,status,category,language,components&limit=60&access_token=${tkE}`)
+        .then(x => x.json()).catch(() => null);
+      for (const t of ((r && r.data) || [])) {
+        if (/jaspers_market|hello_world/.test(t.name)) continue;      // exemplos da Meta
+        if (todos[t.name]) continue;
+        todos[t.name] = t;
+      }
+    }
+    const saida = Object.values(todos).map(t => {
+      const partes = {};
+      for (const c of (t.components || [])) {
+        if (c.type === 'HEADER') partes.cabecalho = c.format === 'TEXT' ? c.text : ('[' + c.format + ']');
+        if (c.type === 'BODY') partes.corpo = c.text;
+        if (c.type === 'FOOTER') partes.rodape = c.text;
+        if (c.type === 'BUTTONS') partes.botoes = (c.buttons || []).map(b => b.type + ': ' + (b.text || ''));
+      }
+      const vars = (String(partes.corpo || '').match(/\{\{(\d+)\}\}/g) || []);
+      return { nome: t.name, categoria: t.category, idioma: t.language, status: t.status,
+        variaveis: vars.length, ...partes };
+    }).sort((a, b) => a.nome.localeCompare(b.nome));
+    return res.status(200).json({ ok: true, total: saida.length,
+      instrucao: 'copie o CORPO de cada um ao recriar na conta nova, mantendo categoria UTILITY e idioma pt_BR',
+      templates: saida });
+  }
+
   // ── 🔍 COMPARAR-TEMPLATES: confere se os templates da WABA nova servem de verdade ──
   if (action === 'comparar-templates') {
     const tkC = String(req.query.token || '').trim() || (await credenciais()).token;
