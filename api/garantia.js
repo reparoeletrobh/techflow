@@ -160,6 +160,85 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── 📊 RELATORIO: garantias por técnico, tempo de resolução e volume por período ──
+  if (action === "relatorio") {
+    const dias = Math.min(365, Math.max(1, parseInt(req.query.dias || "30", 10)));
+    const corte = Date.now() - dias * 86400000;
+    const db = await dbGet(GARANTIA_KEY) || defaultDB();
+    const todas = (db.garantias || []).concat(db.lojaImediata || []);
+    const noPeriodo = todas.filter(g => new Date(g.criadaEm || 0).getTime() >= corte);
+
+    const horas = g => {
+      if (!g.concluida) return null;
+      const ini = new Date(g.criadaEm || 0).getTime();
+      const fim = new Date(g.concluidaEm || g.movidaEm || 0).getTime();
+      return (ini && fim && fim > ini) ? Number(((fim - ini) / 3600000).toFixed(1)) : null;
+    };
+    const media = a => a.length ? Number((a.reduce((s, x) => s + x, 0) / a.length).toFixed(1)) : null;
+
+    // por TÉCNICO DE ORIGEM (quem fez o serviço que voltou em garantia)
+    const porTec = {};
+    for (const g of noPeriodo) {
+      const t = (g.tecnicoOrigem || g.tecnico || "(não informado)").trim();
+      if (!porTec[t]) porTec[t] = { tecnico: t, total: 0, abertas: 0, concluidas: 0, tempos: [], equipamentos: {} };
+      const p = porTec[t];
+      p.total++;
+      if (g.concluida) { p.concluidas++; const hh = horas(g); if (hh != null) p.tempos.push(hh); }
+      else p.abertas++;
+      const eq = String(g.equipamento || g.defeito || "").toLowerCase();
+      const cat = /micro-?\s?ondas/.test(eq) ? "micro-ondas"
+        : (/purificador|bebedouro/.test(eq) ? "purificador"
+        : (/adega|cervejeir/.test(eq) ? "adega"
+        : (/\btvs?\b|televis/.test(eq) ? "tv"
+        : (/forno/.test(eq) ? "forno" : "outros"))));
+      p.equipamentos[cat] = (p.equipamentos[cat] || 0) + 1;
+    }
+    const ranking = Object.values(porTec).map(p => ({
+      tecnico: p.tecnico, garantias: p.total, abertas: p.abertas, concluidas: p.concluidas,
+      horasMedias: media(p.tempos),
+      equipamentos: p.equipamentos,
+    })).sort((a, b) => b.garantias - a.garantias);
+
+    // por DIA
+    const porDia = {};
+    for (const g of noPeriodo) {
+      const d = new Date(new Date(g.criadaEm).getTime() - 3 * 3600000).toISOString().slice(0, 10);
+      porDia[d] = (porDia[d] || 0) + 1;
+    }
+    // por TIPO de garantia
+    const porTipo = noPeriodo.reduce((o, g) => { const t = g.tipo || "?"; o[t] = (o[t] || 0) + 1; return o; }, {});
+    const temposGerais = noPeriodo.map(horas).filter(x => x != null);
+
+    if (String(req.query.mini || "") === "1") {
+      return res.status(200).json({ dias,
+        entraram: noPeriodo.length,
+        abertas: noPeriodo.filter(g => !g.concluida).length,
+        concluidas: noPeriodo.filter(g => g.concluida).length,
+        horasMedias: media(temposGerais),
+        porTipo,
+        porTecnico: ranking.reduce((o, r) => { o[r.tecnico] = r.garantias; return o; }, {}) });
+    }
+    return res.status(200).json({ ok: true, periodoDias: dias,
+      RESUMO: {
+        entraram: noPeriodo.length,
+        abertasAgora: todas.filter(g => !g.concluida).length,
+        concluidasNoPeriodo: noPeriodo.filter(g => g.concluida).length,
+        horasMediasParaResolver: media(temposGerais),
+        porTipo,
+      },
+      POR_TECNICO: ranking.map(r => r.tecnico + " | " + r.garantias + " garantia(s) | " +
+        r.concluidas + " resolvida(s)" + (r.horasMedias != null ? " em " + r.horasMedias + "h em média" : "") +
+        (r.abertas ? " | " + r.abertas + " aberta(s)" : "")),
+      porDia,
+      detalhePorTecnico: ranking,
+      abertas: todas.filter(g => !g.concluida).map(g => ({
+        nome: g.nome, telefone: String(g.telefone || "").slice(-4),
+        equipamento: g.equipamento || g.defeito, tipo: g.tipo,
+        tecnicoOrigem: g.tecnicoOrigem || g.tecnico || null,
+        diasAberta: Number(((Date.now() - new Date(g.criadaEm || 0).getTime()) / 86400000).toFixed(1)),
+      })).sort((a, b) => b.diasAberta - a.diasAberta) });
+  }
+
   if (action === "load") {
       const db = await dbGet(GARANTIA_KEY) || defaultDB();
       return res.status(200).json({ ok: true, fichas: db.fichas || [], fases: FASES });

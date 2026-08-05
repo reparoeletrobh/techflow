@@ -44,6 +44,75 @@ export default async function handler(req, res) {
   if (!db.config) db.config = { tecnicos: [], proximoNum: 1 };
 
   // ── LOAD ──
+  // ── 📊 RELATORIO: inspeções por período, por técnico, aprovados x reprovados ──
+  if (action === 'relatorio') {
+    const dias = Math.min(365, Math.max(1, parseInt(req.query.dias || '30', 10)));
+    const corte = Date.now() - dias * 86400000;
+    const dbR = (await dbGet(KEY)) || { inspecoes: [] };
+    const todas = (dbR.inspecoes || []);
+    const noPeriodo = todas.filter(i => new Date(i.criadoEm || 0).getTime() >= corte);
+
+    const horas = i => {
+      const ini = new Date(i.criadoEm || 0).getTime();
+      const fim = new Date(i.aprovadoEm || i.reprovadoEm || 0).getTime();
+      return (ini && fim && fim > ini) ? Number(((fim - ini) / 3600000).toFixed(1)) : null;
+    };
+    const media = a => a.length ? Number((a.reduce((s, x) => s + x, 0) / a.length).toFixed(1)) : null;
+
+    // por TÉCNICO que fez o serviço
+    const porTec = {};
+    for (const i of noPeriodo) {
+      const t = (i.tecnico || '(não informado)').trim();
+      if (!porTec[t]) porTec[t] = { tecnico: t, total: 0, aprovados: 0, reprovados: 0, aguardando: 0, tempos: [] };
+      const p = porTec[t];
+      p.total++;
+      if (i.status === 'aprovado') p.aprovados++;
+      else if (i.status === 'reprovado') p.reprovados++;
+      else p.aguardando++;
+      const hh = horas(i); if (hh != null) p.tempos.push(hh);
+    }
+    const ranking = Object.values(porTec).map(p => ({
+      tecnico: p.tecnico, inspecoes: p.total,
+      aprovados: p.aprovados, reprovados: p.reprovados, aguardando: p.aguardando,
+      taxaAprovacao: (p.aprovados + p.reprovados) ? Math.round(p.aprovados / (p.aprovados + p.reprovados) * 100) : null,
+      horasMedias: media(p.tempos),
+    })).sort((a, b) => b.inspecoes - a.inspecoes);
+
+    const porDia = {};
+    for (const i of noPeriodo) {
+      const d = new Date(new Date(i.criadoEm).getTime() - 3 * 3600000).toISOString().slice(0, 10);
+      porDia[d] = (porDia[d] || 0) + 1;
+    }
+    const aprovados = noPeriodo.filter(i => i.status === 'aprovado').length;
+    const reprovados = noPeriodo.filter(i => i.status === 'reprovado').length;
+
+    if (String(req.query.mini || '') === '1') {
+      return res.status(200).json({ dias,
+        entraram: noPeriodo.length, aprovados, reprovados,
+        aguardando: noPeriodo.filter(i => i.status === 'aguardando').length,
+        taxaAprovacao: (aprovados + reprovados) ? Math.round(aprovados / (aprovados + reprovados) * 100) + '%' : null,
+        porTecnico: ranking.reduce((o, r) => { o[r.tecnico] = r.inspecoes; return o; }, {}) });
+    }
+    return res.status(200).json({ ok: true, periodoDias: dias,
+      RESUMO: {
+        entraramNoCQ: noPeriodo.length,
+        aprovados, reprovados,
+        aguardandoAgora: todas.filter(i => i.status === 'aguardando').length,
+        taxaAprovacao: (aprovados + reprovados) ? Math.round(aprovados / (aprovados + reprovados) * 100) + '%' : null,
+        horasMedias: media(noPeriodo.map(horas).filter(x => x != null)),
+      },
+      POR_TECNICO: ranking.map(r => r.tecnico + ' | ' + r.inspecoes + ' inspeção(ões) | ✅ ' +
+        r.aprovados + ' · ❌ ' + r.reprovados +
+        (r.taxaAprovacao != null ? ' | ' + r.taxaAprovacao + '% aprovação' : '') +
+        (r.aguardando ? ' | ' + r.aguardando + ' na fila' : '')),
+      porDia,
+      detalhePorTecnico: ranking,
+      reprovadosDetalhe: noPeriodo.filter(i => i.status === 'reprovado').map(i => ({
+        os: i.os, cliente: i.cliente, equipamento: i.equipamento,
+        tecnico: i.tecnico, inspetor: i.inspetor,
+        motivo: i.motivoReprovacao || null, quando: i.reprovadoEm })) });
+  }
+
   if (action === 'load') {
     return res.status(200).json({ ok: true, inspecoes: db.inspecoes, config: db.config });
   }
@@ -91,7 +160,8 @@ export default async function handler(req, res) {
 
   // ── CRIAR inspeção (entrada manual na beta; depois virá do técnico) ──
   if (req.method === 'POST' && action === 'criar') {
-    const { cliente, tel, os, equipamento, equipDesc, tecnico } = req.body || {};
+    const { cliente, tel, os, equipamento, equipDesc, tecnico,
+            diagnosticoOriginal, obsQualidade, valor } = req.body || {};
     if (!cliente || !equipamento) return res.status(400).json({ ok: false, error: 'cliente e equipamento obrigatórios' });
     const num = db.config.proximoNum || 1;
     const insp = {
@@ -103,6 +173,11 @@ export default async function handler(req, res) {
       equipamento: String(equipamento).trim(),
       equipDesc: String(equipDesc || '').trim(),
       tecnico: String(tecnico || '').trim(),
+      // 📋 contexto que o inspetor precisa: o que foi diagnosticado quando o equipamento
+      // chegou, e a observação que o técnico deixou ao mandar para o CQ (uso INTERNO)
+      diagnosticoOriginal: String(diagnosticoOriginal || '').trim().slice(0, 600),
+      obsQualidade: String(obsQualidade || '').trim().slice(0, 500),
+      valor: parseFloat(valor || 0) || null,
       inspetor: '',
       status: 'aguardando',
       checklist: {},
