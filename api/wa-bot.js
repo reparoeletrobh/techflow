@@ -3582,7 +3582,16 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
               });
               await bumpStat('logistica');
               const _chkTv = (await dbGet('tv_logistica')) || { fichas: [] };
-              const _okTv = (_chkTv.fichas || []).some(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
+              // comparação por endsWith (o slice exato falhava quando o telefone tinha
+              // formato diferente) e conferindo também o pipe de TV antes de alertar
+              const casaTv = t => String(t || '').replace(/\D/g, '').endsWith(String(d8x));
+              let _okTv = (_chkTv.fichas || []).some(f => casaTv(f.telefone));
+              if (!_okTv) {
+                try {
+                  const ppTvC = (await dbGet('tv_pipe')) || { cards: [] };
+                  _okTv = ((ppTvC.cards) || []).some(c => casaTv(c.telefone));
+                } catch (e) {}
+              }
               if (!_okTv) {
                 await promessaSemLastro(tel, d8x, texto, acaoMotivo,
                   'o bot confirmou COLETA de TV e a ficha NÃO apareceu na logística TV');
@@ -3600,10 +3609,23 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
           const fdbX = (await dbGet('fichas_adm')) || { fichas: [] };
           const fichaX = (fdbX.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x && f.status !== 'logistica');
           if (!fichaX) {
-            // ⚠️ PROMESSA SEM LASTRO: o bot confirmou a coleta ao cliente, mas não há ficha
-            // de origem para cadastrar. Antes isso era pulado em SILÊNCIO e ninguém coletava.
-            await promessaSemLastro(tel, d8x, texto, acaoMotivo,
-              'o bot confirmou COLETA ao cliente, mas não existe ficha em fichas_adm para cadastrar na logística');
+            // ✅ ANTES DE ALERTAR: confere se a ficha JÁ ESTÁ na logística ou no pipe.
+            // O alerta anterior disparava justamente no caso normal — ficha já cadastrada
+            // não aparece em fichas_adm com status diferente de logistica, e virava falso positivo.
+            let jaAtendido = false;
+            try {
+              const [logC, ppC, fadmC] = await Promise.all([
+                dbGet('reparoeletro_logistica'), dbGet('reparoeletro_pipe'), dbGet('fichas_adm'),
+              ]);
+              const casa = t => String(t || '').replace(/\D/g, '').endsWith(String(d8x));
+              jaAtendido = (((logC || {}).fichas) || []).some(f => casa(f.telefone))
+                || (((ppC || {}).cards) || []).some(c => casa(c.telefone))
+                || (((fadmC || {}).fichas) || []).some(f => casa(f.telefone) && f.status === 'logistica');
+            } catch (e) {}
+            if (!jaAtendido) {
+              await promessaSemLastro(tel, d8x, texto, acaoMotivo,
+                'o bot confirmou COLETA ao cliente, mas não existe ficha em fichas_adm para cadastrar na logística');
+            }
           }
           if (fichaX) {
             const logX = (await dbGet('reparoeletro_logistica')) || { fichas: [] };
