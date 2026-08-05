@@ -1740,6 +1740,56 @@ export default async function handler(req, res) {
         : '❌ nenhuma passou. Códigos 3 = a Meta não permite por API; 200 = falta permissão no token (gere um novo)' });
   }
 
+  // ── 🚀 INICIAR-NUMERO-NOVO: vira a chave para o número novo com corte limpo ──
+  if (req.method === 'GET' && action === 'iniciar-numero-novo') {
+    const phoneId = String(req.query.phoneId || '').trim();
+    const token = String(req.query.token || '').trim();
+    if (!phoneId || !token) {
+      return res.status(400).json({ ok: false, error: 'informe phoneId e token do número novo' });
+    }
+    // 1) valida antes de qualquer coisa
+    const teste = await fetch(`https://graph.facebook.com/v20.0/${phoneId}?fields=display_phone_number,verified_name,quality_rating,status&access_token=${token}`)
+      .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+    if (!teste || teste.error) {
+      return res.status(200).json({ ok: false, error: 'credenciais não funcionam — NADA foi alterado',
+        detalhe: (teste && teste.error && teste.error.message) || 'sem resposta' });
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia — nada foi alterado',
+        numeroNovo: { telefone: teste.display_phone_number, nome: teste.verified_name,
+          qualidade: teste.quality_rating, situacao: teste.status },
+        oQueVaiAcontecer: [
+          '1. o bot passa a enviar e receber pelo número novo',
+          '2. marco de corte gravado: fichas e orçamentos ANTERIORES a agora não serão abordados',
+          '3. só ficha nova e orçamento novo entram na régua do bot',
+          '4. o que ficou para trás continua no sistema, para tratamento manual',
+        ],
+        dica: 'para aplicar: &aplicar=1' });
+    }
+    const agora = new Date().toISOString();
+    // 2) troca as credenciais
+    const cred = (await dbGet('wa_credenciais')) || {};
+    const anterior = cred.phoneId || WA_PHONE_ID;
+    cred.token = token; cred.phoneId = phoneId; cred.ativo = true;
+    cred.apelido = String(req.query.apelido || 'numero-novo');
+    cred.trocadoEm = agora;
+    cred.historico = (cred.historico || []).concat([{ em: agora, de: anterior, para: phoneId, motivo: 'início do número novo' }]).slice(-20);
+    await dbSet('wa_credenciais', cred);
+    // 3) MARCO DE CORTE — nada anterior é abordado
+    const cfgN = (await dbGet('wa_bot_config')) || {};
+    cfgN.marcoNumeroNovo = agora;
+    cfgN.orcMarcoTs = agora;                 // orçamentos: só os criados a partir de agora
+    cfgN.abordagemMarcoTs = agora;           // fichas: idem
+    delete cfgN.bloqueioPagamentoEm;         // limpa o bloqueio do número velho
+    await dbSet('wa_bot_config', cfgN);
+    return res.status(200).json({ ok: true,
+      ativado: { telefone: teste.display_phone_number, nome: teste.verified_name, phoneId },
+      anterior,
+      marcoDeCorte: agora,
+      efeito: 'a partir de agora o bot só aborda ficha e envia orçamento criados APÓS este momento',
+      proximo: 'teste com action=teste-template e confira com action=status-envio' });
+  }
+
   // ── 🔀 TROCAR-NUMERO: ativa outro número do WhatsApp sem redeploy ──
   if (action === 'trocar-numero') {
     const phoneId = String(req.query.phoneId || '').trim();
@@ -2543,6 +2593,10 @@ export default async function handler(req, res) {
     }
     // Só bloqueia abordagem quem tem conversa ATIVA agora (falou nas últimas 24h — o bot já responde no fluxo normal)
     const jaFalaram = new Set(Object.keys(ultimaInPor).filter(d8 => Date.now() - ultimaInPor[d8] < 24 * 3600 * 1000));
+    // marco de corte gravado ao iniciar o número novo (fichas anteriores ficam de fora)
+    const marcoAbordagem = (function () {
+      try { const m = (cfg || {}).abordagemMarcoTs; return m ? new Date(m).getTime() : 0; } catch (e) { return 0; }
+    })();
     // Telefones JÁ DENTRO DA OPERAÇÃO (logística ADM/TV ou pipe): nunca abordar como coleta nova —
     // caso real: cliente com TV já coletada e orçamento pronto recebia o protocolo de coleta
     const emOperacao = new Set();
@@ -2603,7 +2657,9 @@ export default async function handler(req, res) {
       const idade = agora - new Date(f.criadoEm || 0).getTime();
       const d8 = String(f.telefone || '').replace(/\D/g, '').slice(-8);
       const virgem = !f.status || f.status === 'ficha_criada' || f.status === 'criada';
-      return virgem && idade > 5 * 60000 && d8.length >= 8 &&
+      // 🚀 MARCO DO NÚMERO NOVO: ficha anterior ao corte não é abordada pelo número novo
+      const depoisDoMarco = !marcoAbordagem || new Date(f.criadoEm || 0).getTime() >= marcoAbordagem;
+      return virgem && depoisDoMarco && idade > 5 * 60000 && d8.length >= 8 &&
         !jaFalaram.has(d8) && !abordados.tels[d8] && !emOperacao.has(d8);
     }).sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')))
       .slice(0, 10); // máx 10 por ciclo, mais recentes primeiro
