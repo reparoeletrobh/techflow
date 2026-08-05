@@ -359,18 +359,30 @@ export default async function handler(req, res) {
 
   // ── 🧹 LIMPAR-TAREFAS-TV: remove do almoxarifado ADM tarefas de cards de TV ──
   if (action === 'limpar-tarefas-tv') {
-    const [db2, ppTv2] = await Promise.all([dbGet(KEY), dbGet('tv_pipe')]);
-    const idsTv = new Set((((ppTv2 || {}).cards) || []).map(c => c.id));
-    const alvo = (((db2 || {}).tarefas) || []).filter(t => idsTv.has(t.cardId) && t.status === 'pendente');
+    // varre TODAS as origens de TV e TODOS os estados — a versão anterior só olhava
+    // o tv_pipe e só removia pendentes, então concluída de TV ficava com "reabrir tarefa"
+    const [db2, ppTv2, lgTv2, arqTv2] = await Promise.all([
+      dbGet(KEY), dbGet('tv_pipe'), dbGet('tv_logistica'), dbGet('tv_arquivo'),
+    ]);
+    const idsTv = new Set();
+    for (const c of (((ppTv2 || {}).cards) || [])) idsTv.add(String(c.id));
+    for (const f of (((lgTv2 || {}).fichas) || [])) idsTv.add(String(f.id));
+    for (const c of (((arqTv2 || {}).cards) || [])) idsTv.add(String(c.id));
+    const alvo = (((db2 || {}).tarefas) || []).filter(t => {
+      if (idsTv.has(String(t.cardId))) return true;
+      return soTv(t.equipamento) || soTv(t.descricao);   // e pelo texto do equipamento
+    });
     if (String(req.query.aplicar || '') === '1' && alvo.length) {
       const ids = new Set(alvo.map(t => t.id));
       db2.tarefas = db2.tarefas.filter(t => !ids.has(t.id));
       await dbSet(KEY, db2);
       return res.status(200).json({ ok: true, removidas: alvo.length,
-        lista: alvo.map(t => t.cliente + ' | ' + (t.equipamento || '')) });
+        lista: alvo.map(t => t.cliente + ' | ' + (t.equipamento || '') + ' | ' + (t.status || '?')) });
     }
+    const porStatus = alvo.reduce((o, t) => { const s = t.status || '?'; o[s] = (o[s] || 0) + 1; return o; }, {});
     return res.status(200).json({ ok: true, encontradas: alvo.length,
-      lista: alvo.map(t => t.cliente + ' | ' + (t.equipamento || '') + ' | ' + t.destino),
+      porStatus,
+      lista: alvo.map(t => t.cliente + ' | ' + (t.equipamento || '') + ' | ' + (t.status || '?') + ' | ' + (t.destino || '')),
       dica: 'para remover: &aplicar=1' });
   }
 
