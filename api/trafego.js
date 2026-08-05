@@ -334,7 +334,16 @@ module.exports = async function handler(req, res) {
         } catch (e) {}
       }
     }
-    const base = await dbGet('trafego_painel_cache_' + per) || await dbGet('trafego_painel_cache');
+    let base = await dbGet('trafego_painel_cache_' + per) || await dbGet('trafego_painel_cache');
+    if (!base || !base.dados) {
+      // cache apagado (acontece após criar ou alterar anúncios) → refaz sozinho
+      try {
+        const KRB = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+        await fetch(`https://reparoeletroadm.com/api/trafego?action=painel&periodo=${per}&forcar=1&k=${KRB}`)
+          .then(x => x.json()).catch(() => null);
+        base = await dbGet('trafego_painel_cache_' + per);
+      } catch (e) {}
+    }
     if (!base || !base.dados) return res.status(200).json({ ok: false, error: 'abra o painel primeiro para carregar os dados' });
     // 📆 REGRA DO DONO: o corte não pode se basear só no dia ou no início do ciclo.
     // Cruza com a janela de 7 dias — criativo dentro da meta na semana NÃO é cortado,
@@ -345,12 +354,24 @@ module.exports = async function handler(req, res) {
       if (a.cpa != null) cpaSemana[a.id] = { cpa: a.cpa, conversas: a.conversas, razao: a.razaoMeta };
     }
     let temSemana = Object.keys(cpaSemana).length > 0;
-    // se o cache de 7 dias não existir, avisa em vez de cortar com base curta
+    // 🔄 sem a média de 7 dias, RECARREGA sozinho em vez de recusar — o cache é apagado
+    // sempre que criamos ou alteramos anúncios, e a tela ficava vazia sem explicação.
     if (!temSemana && per !== '7d') {
-      return res.status(200).json({ ok: false,
-        error: 'preciso da média de 7 dias para decidir os cortes com segurança',
-        comoResolver: 'abra o painel no período "7 dias" uma vez (ou chame /api/trafego?action=painel&periodo=7d&forcar=1) e volte ao Copiloto',
-        motivo: 'sem a janela semanal eu cortaria olhando só o ciclo atual, que hoje tem poucos dias' });
+      try {
+        const KR7 = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+        await fetch(`https://reparoeletroadm.com/api/trafego?action=painel&periodo=7d&forcar=1&k=${KR7}`)
+          .then(x => x.json()).catch(() => null);
+        const b7 = await dbGet('trafego_painel_cache_7d');
+        for (const a of (((b7 || {}).dados || {}).anuncios || [])) {
+          if (a.cpa != null) cpaSemana[a.id] = { cpa: a.cpa, conversas: a.conversas, razao: a.razaoMeta };
+        }
+        temSemana = Object.keys(cpaSemana).length > 0;
+      } catch (e) {}
+      if (!temSemana) {
+        return res.status(200).json({ ok: false,
+          error: 'não consegui carregar a média de 7 dias',
+          comoResolver: 'abra o painel no período "7 dias" e volte ao Copiloto' });
+      }
     }
     const ads = (base.dados.anuncios || []).filter(a => a.ativo);
     const diasRestantes = (function () {
@@ -1022,7 +1043,11 @@ module.exports = async function handler(req, res) {
       lg.movs.unshift({ ts: new Date().toISOString(), acao: 'subir-agora',
         feitos: feitos.map(f => ({ id: f.campanha, nome: f.video, acao: 'criado com R$ ' + f.verba })), erros });
       await dbSet('trafego_log', lg);
-      for (const p of ['hoje', '7d', 'ciclo']) await dbSet('trafego_painel_cache_' + p, null);
+      // recarrega em vez de apagar — apagar deixava o Copiloto sem dados
+      const KRC = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+      for (const p of ['ciclo', '7d']) {
+        fetch(`https://reparoeletroadm.com/api/trafego?action=painel&periodo=${p}&forcar=1&k=${KRC}`).catch(() => {});
+      }
     } catch (e) {}
     // 🚦 confere se algum ficou aguardando aprovação (recurso de segurança da conta)
     let pendencias = null;

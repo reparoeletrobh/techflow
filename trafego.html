@@ -259,6 +259,7 @@ function secao(s){
   if(s==='inteligencia'&&!window._int)carregarInteligencia(false);
   if(s==='programacao'){carregarProgramacao();checarPendentes();}
   if(s==='anuncios')checarPendentes();
+  if(s==='copiloto')checarPendentes();
 }
 
 /* ── 📅 PROGRAMAÇÃO DO PRÓXIMO CICLO ── */
@@ -268,10 +269,10 @@ async function checarPendentes(){
   if(!el){
     el=document.createElement('div');
     el.id='aviso-pendentes';
-    var topo=document.querySelector('.abas')||document.body;
-    topo.parentNode.insertBefore(el, topo.nextSibling);
+    // insere no topo do conteúdo da aba ativa (o seletor .abas nem sempre existe)
+    var alvo=document.getElementById('pg-anuncios')||document.getElementById('pg-programacao')||document.body;
+    alvo.parentNode.insertBefore(el, alvo);
   }
-  if(!r||!r.ok===false&&!r.total){el.innerHTML='';return;}
   if(!r||!r.total){el.innerHTML='';return;}
   var urgente=r.aguardandoSuaAprovacao>0;
   el.innerHTML='<div style="background:'+(urgente?'rgba(239,68,68,.12)':'rgba(245,158,11,.1)')
