@@ -1373,6 +1373,58 @@ export default async function handler(req, res) {
       dica: ok ? 'confira o WhatsApp do número' : 'se o erro citar o template, ele pode não estar aprovado' });
   }
 
+  // ── 🔎 WABA-ALTERNATIVA: investiga a segunda conta do negócio ──
+  if (action === 'waba-alternativa') {
+    const tkX = String(req.query.token || '').trim() || (await credenciais()).token;
+    const G = 'https://graph.facebook.com/v20.0';
+    const alt = String(req.query.waba || '1699351717944043');
+    const atual = '1050574074327587';
+    const out = [];
+    const t = async (rot, url, metodo, corpo) => {
+      const opt = { method: metodo || 'GET' };
+      if (corpo) { opt.headers = { 'Content-Type': 'application/x-www-form-urlencoded' }; opt.body = new URLSearchParams(corpo).toString(); }
+      const r = await fetch(url, opt).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      const ok = !(r && r.error);
+      out.push({ passo: rot, ok, erro: ok ? null : (r.error.error_user_msg || r.error.message),
+        codigo: ok ? null : r.error.code, dados: ok ? r : undefined });
+      return ok ? r : null;
+    };
+
+    // 1) o que a WABA alternativa tem
+    await t('WABA alternativa: campos',
+      `${G}/${alt}?fields=id,name,currency,timezone_id,account_review_status,business_verification_status,message_template_namespace,ownership_type&access_token=${tkX}`);
+    await t('WABA alternativa: números',
+      `${G}/${alt}/phone_numbers?fields=id,display_phone_number,verified_name,status,quality_rating&access_token=${tkX}`);
+    await t('WABA alternativa: templates',
+      `${G}/${alt}/message_templates?fields=name,status,category&limit=30&access_token=${tkX}`);
+    // 2) comparar com a atual
+    await t('WABA atual: campos (comparação)',
+      `${G}/${atual}?fields=id,name,currency,timezone_id,account_review_status&access_token=${tkX}`);
+
+    // 3) tentar definir BRL na alternativa (se ainda não tem moeda, pode aceitar)
+    if (String(req.query.definirBRL || '') === '1') {
+      await t('DEFINIR moeda BRL na alternativa', `${G}/${alt}?access_token=${tkX}`, 'POST', { currency: 'BRL' });
+      await t('DEFINIR fuso na alternativa', `${G}/${alt}?access_token=${tkX}`, 'POST', { timezone_id: '25' });
+    }
+
+    const cAlt = (out.find(o => o.passo.includes('alternativa: campos')) || {}).dados || {};
+    const cAtu = (out.find(o => o.passo.includes('atual: campos')) || {}).dados || {};
+    return res.status(200).json({ ok: true,
+      COMPARACAO: {
+        alternativa: { id: alt, nome: cAlt.name, moeda: cAlt.currency || '(não definida)',
+          fuso: cAlt.timezone_id || '(não definido)', revisao: cAlt.account_review_status,
+          propriedade: cAlt.ownership_type },
+        atual: { id: atual, nome: cAtu.name, moeda: cAtu.currency, fuso: cAtu.timezone_id },
+      },
+      VEREDITO: !cAlt.currency
+        ? '🎯 a WABA alternativa NÃO tem moeda definida — vale tentar definir BRL e migrar o número para ela'
+        : (cAlt.currency === 'BRL'
+          ? '🎯 a alternativa JÁ está em BRL — migrar o número para ela resolve'
+          : '⚠️ a alternativa também está em ' + cAlt.currency),
+      resultado: out,
+      comoTentar: 'acrescente &definirBRL=1 para tentar gravar a moeda na alternativa' });
+  }
+
   // ── 💳 CONTA-PAGAMENTO: explora a payment_account descoberta na auditoria ──
   if (action === 'conta-pagamento') {
     const tkP1 = String(req.query.token || '').trim() || (await credenciais()).token;
