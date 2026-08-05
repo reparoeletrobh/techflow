@@ -1378,12 +1378,31 @@ export default async function handler(req, res) {
     const G = 'https://graph.facebook.com/v20.0';
     const pega = async (u) => fetch(u).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
 
-    // descobre a WABA dona do número
-    const dono = await pega(`${G}/${pidW}?fields=whatsapp_business_account{id,name}&access_token=${tkW}`);
-    const wid = ((dono || {}).whatsapp_business_account || {}).id;
-    if (!wid) return res.status(200).json({ ok: false, error: 'não consegui identificar a WABA',
-      detalhe: (dono && dono.error && dono.error.message) || null,
-      dica: 'o token pode não ter a permissão whatsapp_business_management' });
+    // descobre a WABA dona do número — o campo direto não existe nesta versão,
+    // então tenta pelos caminhos alternativos
+    let wid = String(req.query.waba || '').trim() || null;
+    const caminhos = [];
+    if (!wid) {
+      // 1) o próprio número às vezes expõe o id da conta
+      const p1 = await pega(`${G}/${pidW}?fields=id,display_phone_number,verified_name,account_mode,name_status&access_token=${tkW}`);
+      caminhos.push({ via: 'número', ok: !(p1 && p1.error), dados: p1 && !p1.error ? p1 : (p1.error || {}).message });
+      // 2) listar as WABAs do negócio ligado ao token
+      const me = await pega(`${G}/me?fields=id,name&access_token=${tkW}`);
+      caminhos.push({ via: 'usuário do token', ok: !(me && me.error), dados: me && !me.error ? me : (me.error || {}).message });
+      // 3) contas do WhatsApp acessíveis
+      const cw = await pega(`${G}/me/assigned_whatsapp_business_accounts?fields=id,name,currency,timezone_id&access_token=${tkW}`);
+      if (cw && cw.data && cw.data.length) {
+        wid = cw.data[0].id;
+        caminhos.push({ via: 'contas atribuídas', ok: true, encontradas: cw.data.length,
+          lista: cw.data.map(w => w.id + ' | ' + w.name + ' | moeda: ' + (w.currency || 'AUSENTE') + ' | fuso: ' + (w.timezone_id || 'AUSENTE')) });
+      } else {
+        caminhos.push({ via: 'contas atribuídas', ok: false, dados: (cw && cw.error && cw.error.message) || 'nenhuma' });
+      }
+    }
+    if (!wid) return res.status(200).json({ ok: false,
+      error: 'não consegui identificar a WABA automaticamente',
+      caminhosTentados: caminhos,
+      comoResolver: 'pegue o ID em business.facebook.com → Configurações do Negócio → Contas → Contas do WhatsApp (é um número longo) e acrescente &waba=SEU_ID ao link' });
 
     // configuração completa
     const cfgW = await pega(`${G}/${wid}?fields=id,name,currency,timezone_id,account_review_status,business_verification_status,country,ownership_type,primary_business_location,health_status,owner_business_info&access_token=${tkW}`);
