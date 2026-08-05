@@ -1373,6 +1373,75 @@ export default async function handler(req, res) {
       dica: ok ? 'confira o WhatsApp do número' : 'se o erro citar o template, ele pode não estar aprovado' });
   }
 
+  // ── 🔬 AUDITORIA-PAGAMENTO: varre TODOS os caminhos possíveis de faturamento ──
+  if (action === 'auditoria-pagamento') {
+    const tkA = String(req.query.token || '').trim() || (await credenciais()).token;
+    const G = 'https://graph.facebook.com/v20.0';
+    const wid = String(req.query.waba || '1050574074327587');
+    const neg = String(req.query.negocio || '114657968057637');
+    const conta = String(req.query.conta || '1267284360833794');
+    const testes = [];
+    const tenta = async (rot, metodo, url, corpo) => {
+      const opt = { method: metodo };
+      if (corpo) { opt.headers = { 'Content-Type': 'application/x-www-form-urlencoded' }; opt.body = new URLSearchParams(corpo).toString(); }
+      const r = await fetch(url, opt).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      const ok = !(r && r.error);
+      testes.push({ caminho: rot, metodo, ok,
+        erro: ok ? null : (r.error.error_user_msg || r.error.message),
+        codigo: ok ? null : r.error.code,
+        subcodigo: ok ? null : r.error.error_subcode,
+        dados: ok ? (JSON.stringify(r).length > 900 ? JSON.stringify(r).slice(0, 900) + '…' : r) : undefined });
+      return ok ? r : null;
+    };
+
+    // ── A) A WABA e o que ela expõe de faturamento ──
+    await tenta('WABA campos de faturamento', 'GET',
+      `${G}/${wid}?fields=id,name,currency,primary_funding_id,account_review_status,health_status,owner_business_info,is_enabled_for_insights&access_token=${tkA}`);
+    await tenta('WABA > payment_configuration', 'GET', `${G}/${wid}/payment_configuration?access_token=${tkA}`);
+    await tenta('WABA > billing', 'GET', `${G}/${wid}/billing?access_token=${tkA}`);
+    await tenta('WABA > extended_credits', 'GET', `${G}/${wid}/extended_credits?access_token=${tkA}`);
+    await tenta('WABA > conversation_analytics', 'GET', `${G}/${wid}/conversation_analytics?access_token=${tkA}`);
+
+    // ── B) O NEGÓCIO dono ──
+    await tenta('negócio > extendedcredits', 'GET',
+      `${G}/${neg}/extendedcredits?fields=id,legal_entity_name,credit_available,max_balance,balance,is_active,owner_business&access_token=${tkA}`);
+    await tenta('negócio > business_users', 'GET', `${G}/${neg}?fields=id,name,payment_account_id,verification_status,vertical&access_token=${tkA}`);
+    await tenta('negócio > owned_ad_accounts', 'GET',
+      `${G}/${neg}/owned_ad_accounts?fields=id,name,account_status,balance,currency,funding_source_details&access_token=${tkA}`);
+    await tenta('negócio > credit_cards', 'GET', `${G}/${neg}/creditcards?access_token=${tkA}`);
+
+    // ── C) A CONTA DE ANÚNCIOS (às vezes o WhatsApp fatura por ela) ──
+    await tenta('conta > saldo e método', 'GET',
+      `${G}/act_${conta}?fields=balance,currency,amount_spent,spend_cap,funding_source,funding_source_details,account_status,disable_reason,is_prepay_account,owner&access_token=${tkA}`);
+    await tenta('conta > payment_transactions', 'GET',
+      `${G}/act_${conta}/transactions?fields=id,charge_type,status,billed_amount_details,time,payment_option&limit=10&access_token=${tkA}`);
+    await tenta('conta > billing_transactions', 'GET', `${G}/act_${conta}/billing_transactions?limit=5&access_token=${tkA}`);
+    await tenta('conta > funding_source_details', 'GET', `${G}/act_${conta}/funding_source_details?access_token=${tkA}`);
+    await tenta('conta > invoices', 'GET', `${G}/act_${conta}/invoices?access_token=${tkA}`);
+    await tenta('conta > ad_account_billing', 'GET', `${G}/act_${conta}/adspaymentcycle?access_token=${tkA}`);
+
+    // ── D) TENTATIVAS DE ESCRITA (é aqui que pode estar a saída) ──
+    if (String(req.query.forcar || '') === '1') {
+      await tenta('WABA: definir método de pagamento', 'POST',
+        `${G}/${wid}?access_token=${tkA}`, { primary_funding_id: String(req.query.funding || '') });
+      await tenta('conta: alterar limite de gasto (destrava cobrança em alguns casos)', 'POST',
+        `${G}/act_${conta}?access_token=${tkA}`, { spend_cap: '100000' });
+      await tenta('conta: zerar limite de gasto', 'POST',
+        `${G}/act_${conta}?access_token=${tkA}`, { spend_cap: '0' });
+      await tenta('conta: reativar', 'POST', `${G}/act_${conta}?access_token=${tkA}`, { account_status: '1' });
+      await tenta('WABA: forçar revisão', 'POST', `${G}/${wid}?access_token=${tkA}`, { account_review_status: 'PENDING' });
+    }
+
+    const funcionam = testes.filter(t => t.ok);
+    const escrita = testes.filter(t => t.metodo === 'POST');
+    return res.status(200).json({ ok: true,
+      totalTestado: testes.length,
+      LEITURAS_QUE_FUNCIONAM: funcionam.filter(t => t.metodo === 'GET').map(t => t.caminho),
+      ESCRITAS_QUE_PASSARAM: escrita.filter(t => t.ok).map(t => t.caminho),
+      resultado: testes,
+      comoForcar: 'acrescente &forcar=1 para executar também as tentativas de ESCRITA' });
+  }
+
   // ── 🧾 LER-COBRANCA: estado real do faturamento da conta ──
   if (action === 'ler-cobranca') {
     const altC = String(req.query.token || '').trim();
