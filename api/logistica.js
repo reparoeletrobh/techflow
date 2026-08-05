@@ -349,6 +349,19 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, metricas: met });
   }
 
+  // ── 🏢 SEM-COMPLEMENTO: fichas de prédio sem apartamento/bloco ──
+  if (action === 'sem-complemento') {
+    const db = (await dbGet(KEY)) || { fichas: [] };
+    const ehPredio = e => /pr[ée]dio|condom[ií]nio|edif[ií]cio|residencial|\bcond\b|torre/i.test(String(e || ''));
+    const temCompl = e => /\bap(to|t|artamento)?\.?\s*\d|\bbloco\b|\bbl\.?\s*[a-z0-9]|\btorre\s*\d|\bcasa\s*\d|\bqd\b|\bquadra\b|\blote\b/i.test(String(e || ''));
+    const ATIVAS = ['liberado_coleta', 'horario_marcado', 'liberado_para_rota', 'motorista_parceiro', 'remarcar'];
+    const alvo = (db.fichas || []).filter(f => ATIVAS.includes(f.phase) && ehPredio(f.endereco) && !temCompl(f.endereco));
+    return res.status(200).json({ ok: true, total: alvo.length,
+      aviso: alvo.length ? '⚠️ ' + alvo.length + ' ficha(s) de prédio SEM apartamento/bloco — o motorista não vai conseguir entregar' : '✅ nenhuma',
+      lista: alvo.map(f => (f.nome || '?').slice(0, 20) + ' | ' + String(f.telefone || '').slice(-4) +
+        ' | ' + String(f.endereco || '').slice(0, 60) + ' | ' + f.phase) });
+  }
+
   // ── POST criar ────────────────────────────────────────────
   // ── ENVIAR-PROSPECCAO: coleta frustrada volta para Entrar em Contato ──────
   // ── GET arquivar-automatico — orc_registrado +7d → arquivo (cron diário) ──

@@ -3566,6 +3566,8 @@ QUEM TE PROCURA: clientes que preencheram a ficha de atendimento (formulário) e
 
 ⚠️ REGRA DE OURO DOS DADOS: os dados do cliente JÁ ESTÃO NA FICHA (contexto). NUNCA peça nem CONFIRME nome, equipamento, defeito ou endereço que estejam lá — nada de "seu endereço é X, certo?": usamos o da ficha e pronto. Só pergunte o que estiver realmente FALTANDO no contexto. Dupla confirmação atrasa a venda e irrita o cliente.
 
+🏢 ÚNICA EXCEÇÃO — COMPLEMENTO DE PRÉDIO/CONDOMÍNIO: antes de cadastrar a coleta, olhe o endereço da ficha. Se ele indicar prédio, condomínio, edifício, residencial ou similar E NÃO tiver apartamento/bloco/torre/casa, PERGUNTE numa frase curta, junto da confirmação da coleta: "Só me confirma o número do apartamento e o bloco, por favor?" (adapte: se for condomínio de casas, pergunte o número da casa/quadra). O motorista chega no portão e não consegue entregar sem isso — perdemos a corrida e o cliente espera de novo. Ao usar cadastrar_logistica, inclua o complemento no campo endereço, ao final, no formato "— Apto 302, Bloco B". Se o cliente já tiver informado o complemento em qualquer momento da conversa, NÃO pergunte de novo: use o que ele disse.
+
 DADOS CONCRETOS DA LOJA (use nos argumentos): no BALCÃO o orçamento é GRATUITO e consertos comuns saem em ~15 minutos; endereço: Rua Ouro Preto, 663 - Barro Preto.
 
 ROTEIRO DO ATENDIMENTO:
@@ -3586,7 +3588,7 @@ Já estamos prontos para te atender! Me fala qual opção escolheu por favor."
 Podemos prosseguir com o atendimento?"
 → cliente respondendo, siga o fluxo TV (7a-1: foto da TV ligada, triagem...).
 1c) Se o cliente JÁ recebeu o template de abordagem, não repita a abertura — responda direto à escolha dele.
-2) SE DELIVERY → o cliente dizer "pode buscar" (ou qualquer sinal de coleta) É A DECISÃO: use a ação cadastrar_logistica IMEDIATAMENTE, na MESMA resposta. NÃO pergunte período. NÃO confirme o endereço (o da ficha vale — só pergunte endereço se a ficha estiver SEM endereço). A resposta é curta: comemore + informe a janela: dentro do horário de coleta → "Perfeito! Nossa equipe já vai programar a busca ainda hoje."; fora do horário → "Perfeito! Sua coleta será feita amanhã entre 08h e 14h.". Só aceite agendar dia específico se o CLIENTE pedir espontaneamente.
+2) SE DELIVERY → o cliente dizer "pode buscar" (ou qualquer sinal de coleta) É A DECISÃO: use a ação cadastrar_logistica IMEDIATAMENTE, na MESMA resposta. NÃO pergunte período. NÃO confirme o endereço (o da ficha vale — só pergunte endereço se a ficha estiver SEM endereço). 🏢 EXCEÇÃO: se o endereço for de PRÉDIO/CONDOMÍNIO e não tiver apartamento/bloco, peça o complemento na mesma frase da confirmação — sem isso o motorista não entrega. A resposta é curta: comemore + informe a janela: dentro do horário de coleta → "Perfeito! Nossa equipe já vai programar a busca ainda hoje."; fora do horário → "Perfeito! Sua coleta será feita amanhã entre 08h e 14h.". Só aceite agendar dia específico se o CLIENTE pedir espontaneamente.
 2b) VANTAGENS DO BALCÃO (apresente na abertura): orçamento GRATUITO e na hora, conserto em ~15 minutos a 1 hora nos casos comuns — Rua Ouro Preto, 663 - Barro Preto. SEM prometer desconto na abertura.
 2c) AGENDAMENTO DE COLETA — REGRAS DAS FAIXAS (siga à risca):
    - Coleta é por FAIXA de no mínimo 2 horas: 08h-10h, 10h-12h, 12h-14h ou 14h-16h. NUNCA prometa 16h-18h nem horário exato ("às 9h em ponto" não existe).
@@ -3878,6 +3880,13 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
               logX.fichas.unshift({
                 id: 'log_' + Date.now().toString(36),
                 nome: fichaX.nome, telefone: fichaX.telefone, endereco: fichaX.endereco || '',
+                // 🏢 sinaliza quando o endereço parece de prédio e não tem complemento
+                faltaComplemento: (function () {
+                  const e = String(fichaX.endereco || '').toLowerCase();
+                  const ehPredio = /pr[ée]dio|condom[ií]nio|edif[ií]cio|residencial|\bcond\b|torre/.test(e);
+                  const temCompl = /\bap(to|t|artamento)?\.?\s*\d|\bbloco\b|\bbl\.?\s*[a-z0-9]|\btorre\s*\d|\bcasa\s*\d|\bqd\b|\bquadra\b|\blote\b/.test(e);
+                  return ehPredio && !temCompl;
+                })(),
                 equipamento: fichaX.equipamento || '', defeito: fichaX.defeito || '',
                 phase: /AGENDADO:/i.test(String(acaoMotivo || '')) ? 'horario_marcado' : 'liberado_coleta',
                 criadoEm: new Date().toISOString(), movedAt: new Date().toISOString(),
