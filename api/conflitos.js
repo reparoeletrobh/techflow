@@ -160,7 +160,10 @@ module.exports = async function handler(req,res){
         info=porTel[d8]||null;
       }
       if(!info){ semAchar.push(atual+' | '+String(c.titulo||'').slice(0,34)); continue; }
-      const legivel=info.nome+(info.tel?' '+info.tel.slice(-4):'');
+      // o nome no sistema já costuma terminar com os 4 dígitos — não duplicar
+      const d4=info.tel?info.tel.slice(-4):'';
+      const jaTem=d4&&new RegExp('\\b'+d4+'\\s*$').test(info.nome);
+      const legivel=info.nome+((d4&&!jaTem)?' '+d4:'');
       trocas.push({id:c.id, de:atual, para:legivel, titulo:String(c.titulo||'').slice(0,34)});
       if(String(req.query.aplicar||'')==='1'){
         c.fichaCodigo=atual;                             // guarda o código original
