@@ -1458,7 +1458,7 @@ function donutCard(label, count, goal, colorClass, isPrev) {
 }
 
 function tecnicoTableHTML(tecHoje, tecSemana) {
-  const tecnicos = ['Lucas','Diego','Kassio','Roberto','Carlos'];
+  const tecnicos = ['Lucas','Diego','Kassio','Roberto','Carlos','Arthur'];
   const maxH = Math.max(...tecnicos.map(t => (tecHoje.loja[t]||0)+(tecHoje.delivery[t]||0)), 1);
   const maxS = Math.max(...tecnicos.map(t => (tecSemana.loja[t]||0)+(tecSemana.delivery[t]||0)), 1);
   const rows = tecnicos.map(t => {

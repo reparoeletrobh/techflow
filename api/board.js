@@ -113,7 +113,7 @@ const BACKUP_KEY  = "reparoeletro_board_backup";
 const UPSTASH_URL   = (process.env.UPSTASH_URL   || "").replace(/['"]/g, "").trim();
 const UPSTASH_TOKEN = (process.env.UPSTASH_TOKEN || "").replace(/['"]/g, "").trim();
 
-const TECNICOS = ["Lucas", "Diego", "Kassio", "Roberto", "Carlos"];
+const TECNICOS = ["Lucas", "Diego", "Kassio", "Roberto", "Carlos", "Arthur"];
 const EQUIP_GRAVADO_PHASE_ID = "342818728"; // "Equipamento Gravado"
 
 // ── Upstash ────────────────────────────────────────────────────

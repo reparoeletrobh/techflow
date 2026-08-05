@@ -415,7 +415,7 @@ var tecnicoSel = null;
 
 function setTecnicoCad(name) {
   tecnicoSel = name;
-  ['Lucas','Diego','Kassio','Roberto','Carlos'].forEach(function(n) {
+  ['Lucas','Diego','Kassio','Roberto','Carlos','Arthur'].forEach(function(n) {
     var el = document.getElementById('tc-'+n);
     if (el) el.className = 'tipo-btn' + (n === name ? ' sel-loja_imediata' : '');
   });
@@ -708,7 +708,7 @@ async function cadastrar(){
     fichas.unshift(d.ficha);
     ['f-nome','f-tel','f-defeito','f-end'].forEach(function(id){document.getElementById(id).value='';});
     tipoSel=null; tecnicoSel=null;
-    ['Lucas','Diego','Kassio','Roberto','Carlos'].forEach(function(n){var el=document.getElementById('tc-'+n);if(el)el.className='tipo-btn';});
+    ['Lucas','Diego','Kassio','Roberto','Carlos','Arthur'].forEach(function(n){var el=document.getElementById('tc-'+n);if(el)el.className='tipo-btn';});
     ['li','la','del','rua'].forEach(function(k){document.getElementById('tb-'+k).className='tipo-btn';});
     updateBadges(); render();
     toast('✅ Garantia cadastrada!','var(--green)');
