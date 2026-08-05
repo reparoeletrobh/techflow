@@ -85,7 +85,7 @@ module.exports = async function handler(req, res) {
     for (const termo of Object.keys(APELIDOS)) {         // o que você ensinou vem primeiro
       if (termo && s.includes(termo)) return APELIDOS[termo];
     }
-    if (/tvs?\b|\btvs?\d|televis|barramento|tela quebrad|quebrar tv|polegada/.test(s)) return 'tv';
+    if (/tvs?\b|\btvs?\d|televis|barramento|tela quebrad|quebrar tv|polegada|\bled\b|tela lavad|tela apagad|\bt-?con\b|placa fonte|som mais? n[aã]o|sem imagem|n[aã]o d[aá] imagem/.test(s)) return 'tv';
     // micro-ondas: nome por extenso (tolerando erros de digitação) + códigos de modelo
     if (/criativo loja 1\b/.test(s)) return 'microondas';   // confirmado pelo dono
     if (/mic?r?o\s?-?\s?o?nd?as|microodas|micro ?ond|\bmicro\b|reforma|\binflu\b|\bantigo\b/.test(s)) return 'microondas';
