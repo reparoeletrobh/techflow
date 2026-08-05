@@ -1373,6 +1373,67 @@ export default async function handler(req, res) {
       dica: ok ? 'confira o WhatsApp do número' : 'se o erro citar o template, ele pode não estar aprovado' });
   }
 
+  // ── 🔍 COMPARAR-TEMPLATES: confere se os templates da WABA nova servem de verdade ──
+  if (action === 'comparar-templates') {
+    const tkC = String(req.query.token || '').trim() || (await credenciais()).token;
+    const G = 'https://graph.facebook.com/v20.0';
+    const nova = String(req.query.nova || '1699351717944043');
+    const velha = String(req.query.velha || '1050574074327587');
+    const campos = 'name,status,category,language,components,quality_score,rejected_reason';
+    const busca = async (id) => {
+      const r = await fetch(`${G}/${id}/message_templates?fields=${campos}&limit=60&access_token=${tkC}`)
+        .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      return (r && r.data) ? r.data : { erro: (r.error || {}).message };
+    };
+    const tNova = await busca(nova);
+    const tVelha = await busca(velha);
+    if (tNova.erro) return res.status(200).json({ ok: false, error: 'não li a WABA nova: ' + tNova.erro });
+
+    const corpoDe = (t) => {
+      const c = (t.components || []).find(x => x.type === 'BODY');
+      return c ? String(c.text || '') : '';
+    };
+    const varsDe = (txt) => (String(txt).match(/\{\{\d+\}\}/g) || []).length;
+
+    // os que o sistema realmente usa
+    const USADOS = ['cadastro_recebido', 'cadastro_recebido_tv', 'conserto_finalizado', 'boas_vindas_reparo', 'orcamento_pronto', 'coleta_confirmada'];
+    const mapaVelha = {};
+    if (Array.isArray(tVelha)) for (const t of tVelha) mapaVelha[t.name] = t;
+
+    const analise = USADOS.map(nome => {
+      const n = (tNova || []).find(t => t.name === nome);
+      const v = mapaVelha[nome];
+      if (!n) return { template: nome, situacao: '❌ NÃO EXISTE na WABA nova',
+        existeNaVelha: !!v, textoAtual: v ? corpoDe(v).slice(0, 120) : null };
+      const corpoN = corpoDe(n), corpoV = v ? corpoDe(v) : null;
+      const igual = corpoV != null && corpoN.trim() === corpoV.trim();
+      return { template: nome,
+        situacao: n.status === 'APPROVED' ? (igual ? '✅ existe, aprovado e IDÊNTICO' : '⚠️ existe e aprovado, mas com TEXTO DIFERENTE') : ('⚠️ status ' + n.status),
+        idioma: n.language, categoria: n.category,
+        variaveis: varsDe(corpoN),
+        variaveisNaVelha: corpoV != null ? varsDe(corpoV) : null,
+        textoNovo: corpoN.slice(0, 220),
+        textoVelho: corpoV != null ? corpoV.slice(0, 220) : '(não existe na velha)',
+      };
+    });
+
+    const faltando = analise.filter(a => a.situacao.includes('NÃO EXISTE'));
+    const diferentes = analise.filter(a => a.situacao.includes('DIFERENTE'));
+    const varsDivergentes = analise.filter(a => a.variaveisNaVelha != null && a.variaveis !== a.variaveisNaVelha);
+
+    return res.status(200).json({ ok: faltando.length === 0 && varsDivergentes.length === 0,
+      VEREDITO: faltando.length
+        ? '❌ faltam ' + faltando.length + ' template(s) que o sistema usa: ' + faltando.map(f => f.template).join(', ')
+        : (varsDivergentes.length
+          ? '⚠️ ' + varsDivergentes.length + ' com número de variáveis diferente — o envio quebraria'
+          : (diferentes.length ? '✅ todos existem e estão aprovados (textos diferem, mas o envio funciona)' : '✅ todos existem, aprovados e idênticos')),
+      atencao: varsDivergentes.length ? varsDivergentes.map(v => v.template + ': nova tem ' + v.variaveis + ' variável(is), velha tem ' + v.variaveisNaVelha) : null,
+      analise,
+      todosOsTemplatesDaNova: (tNova || []).map(t => t.name + ' | ' + t.status + ' | ' + t.category + ' | ' + (t.language || '?')),
+      totalNaNova: (tNova || []).length,
+      totalNaVelha: Array.isArray(tVelha) ? tVelha.length : 'não consegui ler' });
+  }
+
   // ── 🔎 WABA-ALTERNATIVA: investiga a segunda conta do negócio ──
   if (action === 'waba-alternativa') {
     const tkX = String(req.query.token || '').trim() || (await credenciais()).token;
