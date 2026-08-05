@@ -736,6 +736,94 @@ module.exports = async function handler(req, res) {
   }
   function permissoesErro(r) { return r && r.erro ? ('sem acesso: ' + r.erro) : ((r && r.dados) || []); }
 
+  // ── ➕ SUBIR-AGORA: cria anúncios no ciclo ATUAL, com término definido ──
+  if (action === 'subir-agora') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const cat = String(req.query.cat || 'tv').toLowerCase();
+    const verba = parseFloat(req.query.verba || '145');
+    const desde = String(req.query.desde || '').slice(0, 10);      // vídeos a partir desta data
+    const ids = String(req.query.ids || '').split(',').filter(Boolean);
+    const apenasUm = String(req.query.apenasUm || '') === '1';
+    if (!(verba > 0)) return res.status(400).json({ ok: false, error: 'verba inválida' });
+
+    // término: próximo sábado 11h BRT
+    const agoraB = new Date(Date.now() - 3 * 3600000);
+    const diasAteSab = (6 - agoraB.getUTCDay() + 7) % 7;
+    const fim = new Date(Date.UTC(agoraB.getUTCFullYear(), agoraB.getUTCMonth(),
+      agoraB.getUTCDate() + (diasAteSab === 0 && agoraB.getUTCHours() >= 14 ? 7 : diasAteSab), 14, 0, 0)); // 11h BRT
+    const fimUnix = Math.floor(fim.getTime() / 1000);
+    const horasRestantes = Math.round((fim.getTime() - Date.now()) / 3600000);
+
+    // vídeos a usar
+    const vids = await pegarTudo(`${GRAPH}/act_${CONTA}/advideos?fields=id,title,created_time&limit=100&access_token=${TOKEN}`, 6);
+    let escolhidos = (vids.data || []);
+    if (ids.length) escolhidos = escolhidos.filter(v => ids.includes(v.id));
+    else if (desde) escolhidos = escolhidos.filter(v => String(v.created_time || '').slice(0, 10) >= desde);
+    else return res.status(400).json({ ok: false, error: 'informe &desde=AAAA-MM-DD ou &ids=' });
+    if (!escolhidos.length) return res.status(200).json({ ok: false, error: 'nenhum vídeo encontrado no filtro' });
+
+    // modelo: melhor anúncio ativo da categoria
+    const base = await dbGet('trafego_painel_cache_ciclo') || await dbGet('trafego_painel_cache');
+    if (!base || !base.dados) return res.status(200).json({ ok: false, error: 'abra o painel primeiro' });
+    const modelo = (base.dados.anuncios || [])
+      .filter(a => a.ativo && a.categoria === cat && a.campanhaId)
+      .sort((x, y) => (x.razaoMeta || 9) - (y.razaoMeta || 9))[0];
+    if (!modelo) return res.status(200).json({ ok: false, error: 'nenhum anúncio ativo de ' + cat + ' para usar de modelo' });
+
+    const alvo = apenasUm ? escolhidos.slice(0, 1) : escolhidos;
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        categoria: cat, verbaPorAnuncio: verba, total: alvo.length,
+        verbaTotal: Number((verba * alvo.length).toFixed(2)),
+        terminaEm: new Date(fim.getTime() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' BRT',
+        horasDeVeiculacao: horasRestantes,
+        modelo: modelo.nome + ' (CPA R$ ' + modelo.cpa + ')',
+        videos: alvo.map(v => v.title),
+        dica: 'para criar: &aplicar=1 · para testar só o primeiro: &apenasUm=1&aplicar=1' });
+    }
+
+    const postForm = async (path, campos) => {
+      const r = await fetch(`${GRAPH}/${path}?access_token=${TOKEN}`, { method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(campos).toString() })
+        .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      return r;
+    };
+    const feitos = [], erros = [];
+    for (const v of alvo) {
+      try {
+        // 1) duplica a campanha modelo (leva segmentação e destino WhatsApp)
+        const cp = await postForm(modelo.campanhaId + '/copies', {
+          deep_copy: 'true', status_option: 'PAUSED',
+          rename_options: JSON.stringify({ rename_strategy: 'NO_RENAME' }),
+        });
+        if (cp && cp.error) { erros.push(v.title + ' | cópia: ' + cp.error.message + ' (cód ' + cp.error.code + ')'); continue; }
+        const nova = cp.copied_campaign_id || cp.id;
+        // 2) nome, verba e término, já ativa
+        const up = await postForm(nova, {
+          name: String(v.title).replace(/\.(mov|mp4)$/i, '') + ' ' + new Date().getDate() + '08',
+          lifetime_budget: String(Math.round(verba * 100)),
+          stop_time: String(fimUnix),
+          status: 'ACTIVE',
+        });
+        if (up && up.error) { erros.push(v.title + ' | verba/prazo: ' + up.error.message + ' (cód ' + up.error.code + ')'); continue; }
+        feitos.push({ video: v.title, campanha: nova, verba, videoId: v.id });
+      } catch (e) { erros.push(v.title + ' | ' + e.message); }
+      await new Promise(r => setTimeout(r, 500));
+    }
+    try {
+      const lg = (await dbGet('trafego_log')) || { movs: [] };
+      lg.movs.unshift({ ts: new Date().toISOString(), acao: 'subir-agora',
+        feitos: feitos.map(f => ({ id: f.campanha, nome: f.video, acao: 'criado com R$ ' + f.verba })), erros });
+      await dbSet('trafego_log', lg);
+      for (const p of ['hoje', '7d', 'ciclo']) await dbSet('trafego_painel_cache_' + p, null);
+    } catch (e) {}
+    return res.status(200).json({ ok: erros.length === 0, criados: feitos.length, feitos, erros,
+      terminaEm: new Date(fim.getTime() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' BRT',
+      aviso: erros.length ? 'veja os erros — o vídeo não foi trocado no criativo, apenas a campanha foi clonada' : undefined,
+      proximoPasso: 'confira em /trafego e troque o vídeo no criativo se necessário' });
+  }
+
   // ── 💸 REALOCAR-ORFA: aplica a redistribuição da verba presa nos pausados ──
   if (action === 'realocar-orfa') {
     const KRO = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
