@@ -1067,6 +1067,74 @@ export default async function handler(req, res) {
 
   // ── 🔁 REPROCESSAR-APROVADO: refaz os gatilhos que falharam (board técnico + almoxarifado) ──
   // Uso: ?action=reprocessar-aprovado&tel=7084  (ou &id=PIPE-XXXX)  [&aplicar=1]
+  // ── 📊 MOVIMENTO-DIA: o que entrou e o que saiu do pipe no período ──
+  if (action === 'movimento-dia') {
+    const dias = Math.min(30, Math.max(1, parseInt(req.query.dias || '1', 10)));
+    const corte = Date.now() - dias * 86400000;
+    const brt = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '?';
+    const [ppA, ppT, arqA, arqT] = await Promise.all([
+      dbGet(PIPE_KEY), dbGet('tv_pipe'), dbGet('reparoeletro_arquivo'), dbGet('tv_arquivo'),
+    ]);
+    const entradas = [], saidas = [], internos = [];
+    const FINAIS = ['finalizado', 'erp', 'entregue', 'reprovado', 'cancelado', 'perdido'];
+    const varre = (banco, sis, arquivado) => {
+      for (const c of (((banco || {}).cards) || [])) {
+        const nasceu = new Date(c.criadoEm || c.addedAt || 0).getTime();
+        const fase = c.phaseId || c.phase || '';
+        if (nasceu && nasceu >= corte) {
+          entradas.push({ nome: c.nomeContato || '—', tel: String(c.telefone || '').slice(-4),
+            equipamento: String(c.equipamento || c.descricao || '').slice(0, 26),
+            sistema: sis, quando: c.criadoEm || c.addedAt, faseAtual: fase,
+            valor: parseFloat(c.valor || 0) || null });
+        }
+        const hist = (c.history || []).filter(x => {
+          const t = new Date(x.ts || x.timestamp || 0).getTime();
+          return t >= corte && FINAIS.includes(String(x.phase || x.phaseId || ''));
+        });
+        const saiuAgora = arquivado
+          ? (new Date(c.arquivadoEm || c.movedAt || 0).getTime() >= corte)
+          : (FINAIS.includes(fase) && new Date(c.movedAt || 0).getTime() >= corte);
+        if (hist.length || saiuAgora) {
+          saidas.push({ nome: c.nomeContato || '—', tel: String(c.telefone || '').slice(-4),
+            equipamento: String(c.equipamento || c.descricao || '').slice(0, 26),
+            sistema: sis, quando: (hist[0] && (hist[0].ts || hist[0].timestamp)) || c.movedAt || c.arquivadoEm,
+            desfecho: (hist[0] && (hist[0].phase || hist[0].phaseId)) || fase,
+            valor: parseFloat(c.valorNaAprovacao != null ? c.valorNaAprovacao : (c.valor || 0)) || null,
+            arquivado: !!arquivado });
+        }
+        if (!arquivado && nasceu < corte && !FINAIS.includes(fase)) {
+          const m = new Date(c.movedAt || 0).getTime();
+          if (m >= corte) internos.push({ nome: c.nomeContato || '—', tel: String(c.telefone || '').slice(-4),
+            equipamento: String(c.equipamento || c.descricao || '').slice(0, 24),
+            sistema: sis, quando: c.movedAt, faseAtual: fase });
+        }
+      }
+    };
+    varre(ppA, 'ADM', false); varre(ppT, 'TV', false);
+    varre(arqA, 'ADM', true); varre(arqT, 'TV', true);
+    const ord = (a, b) => String(b.quando).localeCompare(String(a.quando));
+    entradas.sort(ord); saidas.sort(ord); internos.sort(ord);
+    const soma = arr => Number(arr.reduce((s, x) => s + (x.valor || 0), 0).toFixed(2));
+    const porDesfecho = saidas.reduce((o, s) => { o[s.desfecho] = (o[s.desfecho] || 0) + 1; return o; }, {});
+    if (String(req.query.curto || '') === '1') {
+      return res.status(200).json({ ok: true, periodoDias: dias,
+        RESUMO: { entraram: entradas.length, sairam: saidas.length,
+          saldo: entradas.length - saidas.length,
+          valorQueEntrou: soma(entradas), valorQueSaiu: soma(saidas),
+          movimentosInternos: internos.length },
+        porDesfecho,
+        ENTRARAM: entradas.slice(0, 40).map(e => brt(e.quando) + ' | ' + e.sistema + ' | ' +
+          String(e.nome).slice(0, 18) + ' ' + e.tel + ' | ' + e.equipamento + ' | ' + e.faseAtual),
+        SAIRAM: saidas.slice(0, 40).map(s => brt(s.quando) + ' | ' + s.sistema + ' | ' +
+          String(s.nome).slice(0, 18) + ' ' + s.tel + ' | ' + s.equipamento + ' | ' + s.desfecho +
+          (s.valor ? ' | R$ ' + s.valor : '')) });
+    }
+    return res.status(200).json({ ok: true, periodoDias: dias,
+      resumo: { entraram: entradas.length, sairam: saidas.length, saldo: entradas.length - saidas.length,
+        valorQueEntrou: soma(entradas), valorQueSaiu: soma(saidas) },
+      porDesfecho, entradas, saidas, movimentosInternos: internos.slice(0, 40) });
+  }
+
   if (action === 'reprocessar-aprovado') {
     const alvoTel = String(req.query.tel || '').replace(/\D/g, '');
     const alvoId = String(req.query.id || '');
