@@ -127,6 +127,62 @@ module.exports = async function handler(req,res){
       dica:'para aplicar: &aplicar=1'});
   }
 
+  // ── 🔄 CORRIGIR-FICHAS: troca o código do card pelo NOME + 4 dígitos do cliente ──
+  if(action==='corrigir-fichas'){
+    // parece código de card? (PIPE-XXXX, GARANTIA-123, LOG-0007, prosp_xxx…)
+    const ehCodigo = v => /^(PIPE-|GARANTIA-|LOG-|ALM-|prosp_|conf_|R-\d{8})/i.test(String(v||'').trim())
+      || /^[A-Z]{2,}-[A-Z0-9]{4,}/i.test(String(v||'').trim());
+    const [ppA,ppT,lgA,lgT,fA,fT,pros]=await Promise.all([
+      dbGet('reparoeletro_pipe'),dbGet('tv_pipe'),
+      dbGet('reparoeletro_logistica'),dbGet('tv_logistica'),
+      dbGet('fichas_adm'),dbGet('fichas_tv'),dbGet('prospeccao_adm')]);
+    // índice: id do card → nome e telefone
+    const porId={}, porTel={};
+    const guarda=(id,nome,tel)=>{
+      const n=String(nome||'').trim();
+      const t=String(tel||'').replace(/\D/g,'');
+      if(id&&n) porId[String(id)]={nome:n,tel:t};
+      if(t.length>=10&&n){ const d8=t.slice(-8); if(!porTel[d8])porTel[d8]={nome:n,tel:t}; }
+    };
+    for(const b of [ppA,ppT]) for(const c of (((b||{}).cards)||[])) guarda(c.id,c.nomeContato,c.telefone);
+    for(const b of [lgA,lgT,fA,fT]) for(const f of (((b||{}).fichas)||[])) guarda(f.id,f.nome,f.telefone);
+    for(const f of (((pros||{}).fichas)||[])) guarda(f.id,f.nome,f.telefone);
+
+    const trocas=[], semAchar=[];
+    for(const c of (db.conflitos||[])){
+      const atual=String(c.ficha||'').trim();
+      if(!atual||!ehCodigo(atual))continue;              // só mexe no que é código
+      let info=porId[atual]||null;
+      // se não achou pelo id, tenta pelo cardId ou pelo telefone já gravado
+      if(!info&&c.cardId)info=porId[String(c.cardId)]||null;
+      if(!info&&(c.telefone||c.tel)){
+        const d8=String(c.telefone||c.tel).replace(/\D/g,'').slice(-8);
+        info=porTel[d8]||null;
+      }
+      if(!info){ semAchar.push(atual+' | '+String(c.titulo||'').slice(0,34)); continue; }
+      const legivel=info.nome+(info.tel?' '+info.tel.slice(-4):'');
+      trocas.push({id:c.id, de:atual, para:legivel, titulo:String(c.titulo||'').slice(0,34)});
+      if(String(req.query.aplicar||'')==='1'){
+        c.fichaCodigo=atual;                             // guarda o código original
+        c.ficha=legivel;
+        if(!c.telefone&&info.tel)c.telefone=info.tel;
+        if(!c.cliente)c.cliente=info.nome;
+      }
+    }
+    if(String(req.query.aplicar||'')==='1'&&trocas.length){
+      await dbSet(KEY,db);
+      return res.status(200).json({ok:true,corrigidos:trocas.length,
+        naoIdentificados:semAchar.length,
+        lista:trocas.slice(0,40).map(t=>t.de+' → '+t.para)});
+    }
+    return res.status(200).json({ok:true,
+      seriamCorrigidos:trocas.length,
+      naoIdentificados:semAchar.length,
+      lista:trocas.slice(0,40).map(t=>t.de+' → '+t.para),
+      naoAchados:semAchar.slice(0,20),
+      dica:'para aplicar: &aplicar=1'});
+  }
+
   // ── 🔗 VINCULAR-FICHA: liga um conflito já existente a uma ficha do pipe ──
   if(req.method==='POST'&&action==='vincular-ficha'){
     const {id,vinculo}=req.body||{};
