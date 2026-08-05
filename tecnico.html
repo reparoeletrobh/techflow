@@ -1256,10 +1256,17 @@ async function submitMove() {
     compraModalOpen(selCardId, nome);
     return;
   }
+  // 🔍 CONTROLE DE QUALIDADE: pede a observação técnica (uso INTERNO, não vai ao cliente)
+  let obsQualidade = '';
+  if (selMovePhase === 'controle_qualidade') {
+    const o = prompt('🔍 CONTROLE DE QUALIDADE\n\nObservação técnica do serviço (uso interno — o cliente NÃO vê):\n\n• Trocou alguma peça a mais?\n• Usou peça diferente da prevista?\n• Algo que o CQ precisa saber?\n\n(pode deixar em branco se não houver)');
+    if (o === null) { return; }                 // cancelou: não move
+    obsQualidade = String(o || '').trim().slice(0, 500);
+  }
   const btn = document.getElementById('btn-move');
   btn.disabled = true; btn.textContent = '⏳ Movendo...';
   try {
-    const res = await api('POST', 'move', { pipefyId: selCardId, phaseId: selMovePhase, tecnico: selTecnico });
+    const res = await api('POST', 'move', { pipefyId: selCardId, phaseId: selMovePhase, tecnico: selTecnico, obsQualidade: obsQualidade || undefined });
     if (!res.ok) throw new Error(res.error);
     const ph = board.phases.find(p => p.id === selMovePhase);
     showToast('✅','OS movida!', (selTecnico ? selTecnico + ' → ' : '') + ph?.name);

@@ -669,7 +669,7 @@ module.exports = async function handler(req, res) {
 
     // ── POST move (OS principal) ───────────────────────────────
     if (req.method === "POST" && action === "move") {
-      const { pipefyId, flFichaId: movFlFichaId, phaseId, movedBy, tecnico, fotosCompra, descricaoCompra } = req.body || {};
+      const { pipefyId, flFichaId: movFlFichaId, phaseId, movedBy, tecnico, fotosCompra, descricaoCompra, obsQualidade } = req.body || {};
       if ((!pipefyId && !movFlFichaId) || !phaseId) return res.status(400).json({ ok: false, error: "pipefyId ou flFichaId e phaseId são obrigatórios" });
       const board = sanitizeBoard(await dbGet(BOARD_KEY));
       const card = pipefyId
@@ -678,6 +678,19 @@ module.exports = async function handler(req, res) {
       if (!card) return res.status(404).json({ ok: false, error: "OS não encontrada" });
       card.phaseId = phaseId; card.movedAt = new Date().toISOString();
       card.movedBy = movedBy || "—"; card.tecnico = tecnico || null;
+      // 🔍 observação técnica do Controle de Qualidade — INTERNA, nunca vai ao cliente
+      if (phaseId === 'controle_qualidade') {
+        card.tecnicoServico = tecnico || card.tecnico || null;   // quem fez o serviço
+        card.entrouCqEm = new Date().toISOString();
+        if (obsQualidade) {
+          card.obsQualidade = String(obsQualidade).slice(0, 500);
+          card.obsQualidadeHist = (card.obsQualidadeHist || []).concat([{
+            texto: String(obsQualidade).slice(0, 500),
+            tecnico: tecnico || null,
+            em: card.entrouCqEm,
+          }]).slice(-10);
+        }
+      }
       // Salva fotos e descrição quando move para comprar_peca
       if (phaseId === "comprar_peca") {
         if (fotosCompra)    card.fotosCompra    = fotosCompra;
