@@ -257,10 +257,32 @@ function secao(s){
   if(s==='copiloto'&&!window._cop)carregarCopiloto();
   if(s==='analise'&&!window._an)carregarAnalise(false);
   if(s==='inteligencia'&&!window._int)carregarInteligencia(false);
-  if(s==='programacao')carregarProgramacao();
+  if(s==='programacao'){carregarProgramacao();checarPendentes();}
+  if(s==='anuncios')checarPendentes();
 }
 
 /* ── 📅 PROGRAMAÇÃO DO PRÓXIMO CICLO ── */
+async function checarPendentes(){
+  var r=await fetch('/api/trafego?action=pendentes-aprovacao&dias=3').then(function(x){return x.json();}).catch(function(){return null;});
+  var el=document.getElementById('aviso-pendentes');
+  if(!el){
+    el=document.createElement('div');
+    el.id='aviso-pendentes';
+    var topo=document.querySelector('.abas')||document.body;
+    topo.parentNode.insertBefore(el, topo.nextSibling);
+  }
+  if(!r||!r.ok===false&&!r.total){el.innerHTML='';return;}
+  if(!r||!r.total){el.innerHTML='';return;}
+  var urgente=r.aguardandoSuaAprovacao>0;
+  el.innerHTML='<div style="background:'+(urgente?'rgba(239,68,68,.12)':'rgba(245,158,11,.1)')
+    +';border:1px solid '+(urgente?'rgba(239,68,68,.5)':'rgba(245,158,11,.4)')
+    +';border-radius:12px;padding:12px 14px;margin:10px 0;">'
+    +'<div style="font-size:13px;font-weight:900;color:'+(urgente?'#f87171':'#fbbf24')+';">'+esc(r.ACAO_NECESSARIA)+'</div>'
+    +'<div style="font-size:11px;color:#c9ced6;margin-top:7px;line-height:1.6;">'
+      +r.lista.slice(0,8).map(function(l){return esc(l);}).join('<br>')+'</div>'
+    +(urgente?'<a href="https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=1267284360833794" target="_blank" style="display:inline-block;margin-top:9px;background:#1d4ed8;color:#fff;text-decoration:none;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:800;">Abrir o Gerenciador para aprovar →</a>':'')
+  +'</div>';
+}
 async function carregarProgramacao(){
   var el=document.getElementById('pg-programacao');
   el.innerHTML='<div class="vazio-msg">📅 Montando o plano do próximo ciclo…</div>';

@@ -736,6 +736,57 @@ module.exports = async function handler(req, res) {
   }
   function permissoesErro(r) { return r && r.erro ? ('sem acesso: ' + r.erro) : ((r && r.dados) || []); }
 
+  // ── 🚦 PENDENTES-APROVACAO: anúncios criados que ainda não estão veiculando ──
+  if (action === 'pendentes-aprovacao') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const tk = String(req.query.token || '').trim() || TOKEN;
+    const dias = Math.min(30, Math.max(1, parseInt(req.query.dias || '3', 10)));
+    const corte = Date.now() - dias * 86400000;
+    const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,effective_status,created_time,issues_info,adset{id,name,effective_status},campaign{id,name,effective_status,start_time}&limit=300&access_token=${tk}`, 10);
+    if (ads.erro && !ads.data.length) return res.status(200).json({ ok: false, erro: ads.erro });
+
+    // estados que significam "não está veiculando ainda"
+    const ESPERANDO = ['PENDING_REVIEW', 'IN_PROCESS', 'PENDING_BILLING_INFO', 'PREAPPROVED', 'WITH_ISSUES'];
+    const recentes = (ads.data || []).filter(a => new Date(a.created_time || 0).getTime() >= corte);
+    const linhas = [];
+    for (const a of recentes) {
+      const st = a.effective_status;
+      const issues = (a.issues_info || []).map(x => x.error_summary || x.error_message).filter(Boolean);
+      // aviso de agendado é inofensivo; o resto merece atenção
+      const soAgendado = issues.length === 1 && /não está sendo veiculado, mas você não precisa fazer nada/i.test(issues[0]);
+      const precisaAcao = (ESPERANDO.includes(st) && !soAgendado) || st === 'DISAPPROVED';
+      if (!precisaAcao) continue;
+      const seguranca = issues.some(i => /revis|aprovad|publicar|seguran|autoriz/i.test(String(i)));
+      linhas.push({
+        anuncio: a.name, id: a.id,
+        campanha: (a.campaign || {}).name,
+        campanhaId: (a.campaign || {}).id,
+        situacao: st,
+        criadoEm: a.created_time,
+        problemas: issues.length ? issues : null,
+        tipo: st === 'DISAPPROVED' ? '❌ REPROVADO'
+          : (seguranca ? '🔒 AGUARDA SUA APROVAÇÃO (recurso de segurança)' : '⏳ em revisão da Meta'),
+        linkParaAprovar: 'https://adsmanager.facebook.com/adsmanager/manage/ads?act=' + CONTA +
+          '&selected_ad_ids=' + a.id,
+      });
+    }
+    linhas.sort((a, b) => String(b.criadoEm).localeCompare(String(a.criadoEm)));
+    const seguranca = linhas.filter(l => l.tipo.includes('SEGURANÇA'));
+    const reprovados = linhas.filter(l => l.tipo.includes('REPROVADO'));
+    return res.status(200).json({ ok: linhas.length === 0,
+      periodoDias: dias,
+      total: linhas.length,
+      aguardandoSuaAprovacao: seguranca.length,
+      emRevisaoDaMeta: linhas.length - seguranca.length - reprovados.length,
+      reprovados: reprovados.length,
+      ACAO_NECESSARIA: seguranca.length
+        ? '🔒 ' + seguranca.length + ' anúncio(s) esperando VOCÊ aprovar no Gerenciador — eles não gastam nem entregam até lá'
+        : (reprovados.length ? '❌ ' + reprovados.length + ' reprovado(s) — verifique o motivo' : '✅ nada pendente'),
+      lista: linhas.map(l => l.tipo + ' | ' + String(l.anuncio).slice(0, 30) + ' | ' + l.situacao +
+        (l.problemas ? ' | ' + String(l.problemas[0]).slice(0, 60) : '')),
+      detalhe: linhas.slice(0, 20) });
+  }
+
   // ── 🔬 AUDITORIA-CRIACAO: TUDO que é preciso para criar um anúncio, verificado de uma vez ──
   if (action === 'auditoria-criacao') {
     const tk = String(req.query.token || '').trim() || TOKEN;
@@ -973,7 +1024,19 @@ module.exports = async function handler(req, res) {
       await dbSet('trafego_log', lg);
       for (const p of ['hoje', '7d', 'ciclo']) await dbSet('trafego_painel_cache_' + p, null);
     } catch (e) {}
+    // 🚦 confere se algum ficou aguardando aprovação (recurso de segurança da conta)
+    let pendencias = null;
+    if (feitos.length) {
+      try {
+        await new Promise(s => setTimeout(s, 2500));
+        const KP = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+        const pr = await fetch(`https://reparoeletroadm.com/api/trafego?action=pendentes-aprovacao&dias=1&k=${KP}`)
+          .then(x => x.json()).catch(() => null);
+        if (pr && pr.total > 0) pendencias = { total: pr.total, aviso: pr.ACAO_NECESSARIA, lista: pr.lista };
+      } catch (e) {}
+    }
     return res.status(200).json({ ok: erros.length === 0, criados: feitos.length, feitos, erros,
+      APROVACAO_PENDENTE: pendencias || 'nenhuma',
       terminaEm: new Date(fim.getTime() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' BRT',
       aviso: erros.length ? 'veja os erros — o vídeo não foi trocado no criativo, apenas a campanha foi clonada' : undefined,
       proximoPasso: 'confira em /trafego e troque o vídeo no criativo se necessário' });
