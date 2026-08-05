@@ -817,6 +817,9 @@ module.exports = async function handler(req, res) {
           const camposCamp = {
             name: nome, objective: mCamp.objective || 'OUTCOME_ENGAGEMENT',
             status: 'PAUSED', special_ad_categories: JSON.stringify(mCamp.special_ad_categories || []),
+            // campo obrigatório quando a verba fica no CONJUNTO (é o nosso caso):
+            // false = cada conjunto usa só o próprio orçamento, sem compartilhar
+            is_adset_budget_sharing_enabled: 'false',
           };
           const c1 = await postForm('act_' + CONTA + '/campaigns', camposCamp);
           if (c1 && c1.error) {
