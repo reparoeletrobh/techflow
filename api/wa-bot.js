@@ -1408,21 +1408,34 @@ export default async function handler(req, res) {
     const cfgW = await pega(`${G}/${wid}?fields=id,name,currency,timezone_id,account_review_status,business_verification_status,country,ownership_type,primary_business_location,health_status,owner_business_info&access_token=${tkW}`);
 
     // tentativa de alteração, se pedida
-    let tentativa = null;
+    const tentativas = [];
     const novaMoeda = String(req.query.moeda || '').toUpperCase();
     const novoFuso = String(req.query.fuso || '');
-    if (novaMoeda || novoFuso) {
-      const campos = new URLSearchParams();
-      if (novaMoeda) campos.append('currency', novaMoeda);
-      if (novoFuso) campos.append('timezone_id', novoFuso);
-      const r = await fetch(`${G}/${wid}?access_token=${tkW}`, { method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: campos.toString() })
+    const cnpj = String(req.query.cnpj || '').replace(/\D/g, '');
+    // cada campo é tentado SEPARADAMENTE — se um falhar, os outros ainda passam
+    const alterar = async (rot, alvo, campos) => {
+      const body = new URLSearchParams(campos).toString();
+      const r = await fetch(`${G}/${alvo}?access_token=${tkW}`, { method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body })
         .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
-      tentativa = (r && r.error)
-        ? { ok: false, erro: r.error.message, codigo: r.error.code,
-            mensagemUsuario: r.error.error_user_msg || null }
-        : { ok: true, resultado: r };
+      tentativas.push((r && r.error)
+        ? { campo: rot, ok: false, erro: r.error.message, codigo: r.error.code,
+            subcodigo: r.error.error_subcode, mensagemUsuario: r.error.error_user_msg || null }
+        : { campo: rot, ok: true, resultado: r });
+      return !(r && r.error);
+    };
+    if (novaMoeda) await alterar('moeda', wid, { currency: novaMoeda });
+    if (novoFuso) await alterar('fuso horário', wid, { timezone_id: novoFuso });
+    if (cnpj) {
+      // dados fiscais ficam no NEGÓCIO, não na WABA
+      const negId = ((cfgW || {}).owner_business_info || {}).id;
+      if (negId) {
+        await alterar('CNPJ (negócio ' + negId + ')', negId, { vertical: 'OTHER', tax_id: cnpj });
+      } else {
+        tentativas.push({ campo: 'CNPJ', ok: false, erro: 'não identifiquei o negócio dono da WABA' });
+      }
     }
+    const tentativa = tentativas.length ? tentativas : null;
 
     const c = cfgW || {};
     const faltando = [];
@@ -1444,7 +1457,7 @@ export default async function handler(req, res) {
       negocioDono: c.owner_business_info || null,
       problemas: faltando.length ? faltando : 'configuração completa',
       tentativaDeAlteracao: tentativa,
-      comoAlterar: 'acrescente &moeda=BRL e/ou &fuso=ID ao link para tentar alterar pela API',
+      comoAlterar: 'acrescente &moeda=BRL, &fuso=America/Sao_Paulo e/ou &cnpj=00000000000000 ao link',
       erroDaMeta: (cfgW && cfgW.error) ? cfgW.error.message : undefined });
   }
 
