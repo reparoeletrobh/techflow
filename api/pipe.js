@@ -1150,6 +1150,71 @@ export default async function handler(req, res) {
       porDesfecho, entradas, saidas, movimentosInternos: internos.slice(0, 40) });
   }
 
+  // ── 📋 FASE-DIA: quem ENTROU e quem SAIU de uma fase específica no período ──
+  if (action === 'fase-dia') {
+    const fase = String(req.query.fase || 'erp').toLowerCase();
+    const sis = String(req.query.sis || 'adm').toLowerCase();
+    const dias = Math.min(30, Math.max(1, parseInt(req.query.dias || '1', 10)));
+    const corte = Date.now() - dias * 86400000;
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(11, 16) : '?';
+    const bancos = sis === 'tv'
+      ? [[await dbGet('tv_pipe'), false], [await dbGet('tv_arquivo'), true]]
+      : [[await dbGet(PIPE_KEY), false], [await dbGet('reparoeletro_arquivo'), true]];
+
+    const entraram = [], sairam = [], estao = [];
+    for (const [banco, arquivado] of bancos) {
+      for (const c of (((banco || {}).cards) || [])) {
+        const atual = String(c.phaseId || c.phase || '').toLowerCase();
+        const hist = (c.history || []).map(x => ({
+          fase: String(x.phase || x.phaseId || '').toLowerCase(),
+          t: new Date(x.ts || x.timestamp || 0).getTime(),
+        })).filter(x => x.t).sort((a, b) => a.t - b.t);
+
+        // ENTROU na fase dentro do período
+        const ent = hist.filter(x => x.fase === fase && x.t >= corte);
+        // movedAt cobre o caso de o card estar na fase agora e ter chegado hoje
+        const chegouAgora = atual === fase && new Date(c.movedAt || 0).getTime() >= corte;
+        if (ent.length || chegouAgora) {
+          entraram.push({ nome: c.nomeContato || '—', tel: String(c.telefone || '').slice(-4),
+            equip: String(c.equipamento || c.descricao || '').slice(0, 22),
+            quando: (ent[0] && new Date(ent[0].t).toISOString()) || c.movedAt,
+            valor: parseFloat(c.valor || 0) || null });
+        }
+        // SAIU da fase: houve passagem por ela e depois foi para outra
+        let saiuEm = null;
+        for (let i = 0; i < hist.length - 1; i++) {
+          if (hist[i].fase === fase && hist[i + 1].t >= corte) { saiuEm = hist[i + 1].t; break; }
+        }
+        // ou: passou por ela no histórico e hoje está em outra fase
+        const passou = hist.some(x => x.fase === fase);
+        if (saiuEm || (passou && atual !== fase && new Date(c.movedAt || 0).getTime() >= corte)) {
+          sairam.push({ nome: c.nomeContato || '—', tel: String(c.telefone || '').slice(-4),
+            equip: String(c.equipamento || c.descricao || '').slice(0, 22),
+            quando: saiuEm ? new Date(saiuEm).toISOString() : c.movedAt,
+            foiPara: arquivado ? 'arquivado' : atual,
+            valor: parseFloat(c.valor || 0) || null });
+        }
+        // ESTÃO na fase agora
+        if (!arquivado && atual === fase) {
+          estao.push({ nome: c.nomeContato || '—', tel: String(c.telefone || '').slice(-4),
+            equip: String(c.equipamento || c.descricao || '').slice(0, 22),
+            desde: c.movedAt, valor: parseFloat(c.valor || 0) || null });
+        }
+      }
+    }
+    const ord = (a, b) => String(a.quando || a.desde).localeCompare(String(b.quando || b.desde));
+    entraram.sort(ord); sairam.sort(ord);
+    const soma = a => Number(a.reduce((s, x) => s + (x.valor || 0), 0).toFixed(2));
+    return res.status(200).json({ ok: true, fase, sistema: sis.toUpperCase(), dias,
+      entraram: entraram.length, sairam: sairam.length,
+      estaoAgora: estao.length,
+      valorEntrou: soma(entraram), valorSaiu: soma(sairam),
+      ENTRARAM: entraram.map(e => hh(e.quando) + ' ' + String(e.nome).slice(0, 16) + ' ' + e.tel +
+        ' ' + e.equip + (e.valor ? ' R$' + e.valor : '')),
+      SAIRAM: sairam.map(s => hh(s.quando) + ' ' + String(s.nome).slice(0, 16) + ' ' + s.tel +
+        ' → ' + s.foiPara + (s.valor ? ' R$' + s.valor : '')) });
+  }
+
   if (action === 'reprocessar-aprovado') {
     const alvoTel = String(req.query.tel || '').replace(/\D/g, '');
     const alvoId = String(req.query.id || '');
