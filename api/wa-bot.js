@@ -1373,9 +1373,42 @@ export default async function handler(req, res) {
       dica: ok ? 'confira o WhatsApp do número' : 'se o erro citar o template, ele pode não estar aprovado' });
   }
 
+  // ── 🧾 LER-COBRANCA: estado real do faturamento da conta ──
+  if (action === 'ler-cobranca') {
+    const altC = String(req.query.token || '').trim();
+    const { token: tkD } = await credenciais();
+    const tkC = altC || tkD;
+    const G = 'https://graph.facebook.com/v20.0';
+    const wid = String(req.query.waba || '1050574074327587');
+    const neg = String(req.query.negocio || '114657968057637');
+    const pega = async (rot, u) => {
+      const r = await fetch(u).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      return { consulta: rot, ok: !(r && r.error),
+        erro: (r && r.error) ? r.error.message : null,
+        codigo: (r && r.error) ? r.error.code : null,
+        dados: !(r && r.error) ? r : undefined };
+    };
+    const out = [];
+    out.push(await pega('conta do WhatsApp',
+      `${G}/${wid}?fields=id,name,currency,timezone_id,account_review_status,business_verification_status,health_status,primary_funding_id&access_token=${tkC}`));
+    out.push(await pega('crédito da conta',
+      `${G}/${wid}/extended_credits?fields=id,legal_entity_name,credit_available,credit_type,is_active&access_token=${tkC}`));
+    out.push(await pega('negócio dono',
+      `${G}/${neg}?fields=id,name,verification_status,vertical,two_factor_type,created_time&access_token=${tkC}`));
+    out.push(await pega('assinatura de faturamento',
+      `${G}/${wid}/subscribed_apps?access_token=${tkC}`));
+    out.push(await pega('números da conta',
+      `${G}/${wid}/phone_numbers?fields=id,display_phone_number,quality_rating,status,throughput&access_token=${tkC}`));
+    return res.status(200).json({ ok: out.every(o => o.ok),
+      consultas: out,
+      leitura: 'a Meta NÃO expõe pagamento por API — estas leituras servem para achar a inconsistência e levar ao suporte' });
+  }
+
   // ── 🔑 TOKEN-PERMISSOES: o que o token atual realmente pode fazer ──
   if (action === 'token-permissoes') {
-    const { token: tkP } = await credenciais();
+    const altP = String(req.query.token || '').trim();
+    const { token: tkPd } = await credenciais();
+    const tkP = altP || tkPd;
     if (!tkP) return res.status(200).json({ ok: false, error: 'sem token' });
     const G = 'https://graph.facebook.com/v20.0';
     const dbg = await fetch(`${G}/debug_token?input_token=${tkP}&access_token=${tkP}`)
@@ -1399,7 +1432,9 @@ export default async function handler(req, res) {
 
   // ── 🔧 FORCAR-FISCAL: tenta gravar CNPJ e moeda por vários caminhos ──
   if (action === 'forcar-fiscal') {
-    const { token: tkF } = await credenciais();
+    const alt = String(req.query.token || '').trim();
+    const { token: tkPad } = await credenciais();
+    const tkF = alt || tkPad;
     const G = 'https://graph.facebook.com/v20.0';
     const wid = String(req.query.waba || '1050574074327587');
     const neg = String(req.query.negocio || '114657968057637');
