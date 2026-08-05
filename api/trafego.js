@@ -736,6 +736,84 @@ module.exports = async function handler(req, res) {
   }
   function permissoesErro(r) { return r && r.erro ? ('sem acesso: ' + r.erro) : ((r && r.dados) || []); }
 
+  // ── 🔬 AUDITORIA-CRIACAO: TUDO que é preciso para criar um anúncio, verificado de uma vez ──
+  if (action === 'auditoria-criacao') {
+    const tk = String(req.query.token || '').trim() || TOKEN;
+    const G2 = GRAPH;
+    const chk = [];
+    const pega = async (rot, url, critico) => {
+      const r = await fetch(url).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      const ok = !(r && r.error);
+      chk.push({ item: rot, ok, critico: !!critico,
+        erro: ok ? null : (r.error.error_user_msg || r.error.message),
+        codigo: ok ? null : r.error.code, dados: ok ? r : undefined });
+      return ok ? r : null;
+    };
+
+    // 1) o token e seus escopos
+    const dbg = await fetch(`${G2}/debug_token?input_token=${tk}&access_token=${tk}`).then(x => x.json()).catch(() => ({}));
+    const d = (dbg && dbg.data) || {};
+    const escopos = d.scopes || [];
+    chk.push({ item: 'token válido', ok: !!d.is_valid, critico: true,
+      erro: d.is_valid ? null : 'token inválido' });
+    chk.push({ item: 'escopo ads_management', ok: escopos.includes('ads_management'), critico: true,
+      erro: escopos.includes('ads_management') ? null : 'FALTA — sem ele não cria anúncio' });
+    chk.push({ item: 'escopo pages_manage_ads', ok: escopos.includes('pages_manage_ads'), critico: false,
+      erro: escopos.includes('pages_manage_ads') ? null : 'ausente (pode ser suprido pelo ativo Página)' });
+    chk.push({ item: 'escopos do token', ok: true, dados: escopos });
+
+    // 2) a conta de anúncios
+    await pega('conta de anúncios', `${G2}/act_${CONTA}?fields=name,account_status,capabilities&access_token=${tk}`, true);
+
+    // 3) as PÁGINAS que o token enxerga — é aqui que estava travando
+    const pgs = await pega('páginas acessíveis pelo token', `${G2}/me/accounts?fields=id,name,tasks&access_token=${tk}`);
+    const pgsConta = await pega('páginas ligadas à conta de anúncios', `${G2}/act_${CONTA}/promote_pages?fields=id,name&access_token=${tk}`);
+
+    // 4) a Página usada pelo modelo
+    let pageModelo = null;
+    try {
+      const base = await dbGet('trafego_painel_cache_ciclo') || await dbGet('trafego_painel_cache');
+      const mod = ((base || {}).dados || {}).anuncios?.filter(a => a.ativo && a.categoria === (req.query.cat || 'tv'))[0];
+      if (mod) {
+        const cr = await fetch(`${G2}/${mod.id}?fields=creative{object_story_spec{page_id}}&access_token=${tk}`).then(x => x.json());
+        pageModelo = (((cr.creative || {}).object_story_spec) || {}).page_id || null;
+        chk.push({ item: 'Página usada pelos anúncios atuais', ok: !!pageModelo,
+          critico: true, dados: pageModelo, erro: pageModelo ? null : 'não consegui ler' });
+        if (pageModelo) {
+          await pega('acesso à Página ' + pageModelo, `${G2}/${pageModelo}?fields=id,name,access_token&access_token=${tk}`, true);
+        }
+      }
+    } catch (e) {}
+
+    // 5) teste REAL de criação (cria e apaga em seguida)
+    let testeCriacao = null;
+    if (String(req.query.testar || '') === '1') {
+      const nomeT = 'TESTE-PERMISSAO-' + Date.now();
+      const c = await fetch(`${G2}/act_${CONTA}/campaigns?access_token=${tk}`, { method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ name: nomeT, objective: 'OUTCOME_ENGAGEMENT', status: 'PAUSED',
+          special_ad_categories: '[]', is_adset_budget_sharing_enabled: 'false' }).toString() })
+        .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      if (c && c.error) testeCriacao = { etapa: 'campanha', ok: false, erro: c.error.error_user_msg || c.error.message };
+      else {
+        testeCriacao = { etapa: 'campanha', ok: true, id: c.id };
+        // apaga o teste
+        await fetch(`${G2}/${c.id}?access_token=${tk}`, { method: 'DELETE' }).catch(() => {});
+      }
+    }
+
+    const criticos = chk.filter(c => c.critico && !c.ok);
+    return res.status(200).json({
+      ok: criticos.length === 0,
+      BLOQUEIOS: criticos.length ? criticos.map(c => '❌ ' + c.item + ' → ' + c.erro) : 'nenhum',
+      paginaDosAnuncios: pageModelo,
+      paginasQueOTokenVE: (pgs && pgs.data || []).map(p => p.id + ' | ' + p.name + ' | ' + (p.tasks || []).join(',')),
+      paginasDaContaDeAnuncios: (pgsConta && pgsConta.data || []).map(p => p.id + ' | ' + p.name),
+      testeCriacao,
+      verificacoes: chk,
+      comoUsar: 'acrescente &testar=1 para tentar criar uma campanha de teste (é apagada em seguida)' });
+  }
+
   // ── ➕ SUBIR-AGORA: cria anúncios no ciclo ATUAL, com término definido ──
   if (action === 'subir-agora') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
