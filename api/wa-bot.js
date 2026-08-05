@@ -5,9 +5,11 @@ const T = (process.env.UPSTASH_TOKEN || '').replace(/[\n\r'"]/g, '').trim();
 let WA_TOKEN = (process.env.WA_TOKEN || '').trim();
 let WA_PHONE_ID = (process.env.WA_PHONE_ID || '').trim();
 async function credenciais() {
-  // Envs da Vercel têm prioridade; fallback: chave wa_credenciais no Redis
-  if (WA_TOKEN && WA_PHONE_ID) return { token: WA_TOKEN, phoneId: WA_PHONE_ID };
+  // 🔀 O Redis tem PRIORIDADE quando há troca ativa — permite mudar de número em
+  // segundos, sem redeploy. Sem troca ativa, valem as variáveis da Vercel.
   const c = await dbGet('wa_credenciais');
+  if (c && c.ativo && c.token && c.phoneId) return { token: c.token, phoneId: c.phoneId };
+  if (WA_TOKEN && WA_PHONE_ID) return { token: WA_TOKEN, phoneId: WA_PHONE_ID };
   return { token: (c && c.token) || WA_TOKEN, phoneId: (c && c.phoneId) || WA_PHONE_ID };
 }
 const ANTHROPIC_KEY = (process.env.ANTHROPIC_API_KEY || '').trim();
@@ -1369,6 +1371,64 @@ export default async function handler(req, res) {
       erro: ok ? undefined : ((r && r.error && (r.error.error_user_msg || r.error.message)) || 'falha'),
       codigo: (r && r.error && r.error.code) || undefined,
       dica: ok ? 'confira o WhatsApp do número' : 'se o erro citar o template, ele pode não estar aprovado' });
+  }
+
+  // ── 🔀 TROCAR-NUMERO: ativa outro número do WhatsApp sem redeploy ──
+  if (action === 'trocar-numero') {
+    const phoneId = String(req.query.phoneId || '').trim();
+    const token = String(req.query.token || '').trim();
+    const apelido = String(req.query.apelido || 'reserva').slice(0, 30);
+
+    // ?status=1 → só mostra o que está ativo agora
+    if (String(req.query.status || '') === '1' || (!phoneId && !token)) {
+      const c = (await dbGet('wa_credenciais')) || {};
+      const atual = await credenciais();
+      let numero = null;
+      try {
+        const r = await fetch(`https://graph.facebook.com/v20.0/${atual.phoneId}?fields=display_phone_number,verified_name,quality_rating,messaging_limit_tier&access_token=${atual.token}`)
+          .then(x => x.json());
+        if (r && !r.error) numero = r;
+      } catch (e) {}
+      return res.status(200).json({ ok: true,
+        trocaAtiva: !!c.ativo,
+        apelidoAtivo: c.ativo ? c.apelido : '(padrão da Vercel)',
+        phoneIdEmUso: atual.phoneId,
+        numero: numero ? { telefone: numero.display_phone_number, nome: numero.verified_name,
+          qualidade: numero.quality_rating, limite: numero.messaging_limit_tier } : 'não consegui ler',
+        historico: c.historico || [],
+        comoTrocar: '?action=trocar-numero&phoneId=NOVO_ID&token=NOVO_TOKEN&apelido=nome',
+        comoVoltar: '?action=trocar-numero&voltar=1' });
+    }
+    // ?voltar=1 → desativa a troca e volta ao número da Vercel
+    if (String(req.query.voltar || '') === '1') {
+      const c = (await dbGet('wa_credenciais')) || {};
+      c.ativo = false;
+      c.historico = (c.historico || []).concat([{ em: new Date().toISOString(), acao: 'voltou ao número padrão' }]).slice(-20);
+      await dbSet('wa_credenciais', c);
+      return res.status(200).json({ ok: true, msg: 'voltou ao número padrão da Vercel' });
+    }
+    if (!phoneId || !token) {
+      return res.status(400).json({ ok: false, error: 'informe phoneId e token do número novo' });
+    }
+    // valida ANTES de ativar — não troca para um número que não responde
+    const teste = await fetch(`https://graph.facebook.com/v20.0/${phoneId}?fields=display_phone_number,verified_name,quality_rating&access_token=${token}`)
+      .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+    if (!teste || teste.error) {
+      return res.status(200).json({ ok: false,
+        error: 'as credenciais novas não funcionam — troca NÃO realizada',
+        detalhe: (teste && teste.error && teste.error.message) || 'sem resposta' });
+    }
+    const c = (await dbGet('wa_credenciais')) || {};
+    const anterior = c.phoneId || WA_PHONE_ID;
+    c.token = token; c.phoneId = phoneId; c.apelido = apelido; c.ativo = true;
+    c.trocadoEm = new Date().toISOString();
+    c.historico = (c.historico || []).concat([{ em: c.trocadoEm, de: anterior, para: phoneId, apelido }]).slice(-20);
+    await dbSet('wa_credenciais', c);
+    return res.status(200).json({ ok: true,
+      ativado: { telefone: teste.display_phone_number, nome: teste.verified_name,
+        qualidade: teste.quality_rating, phoneId, apelido },
+      anterior,
+      aviso: 'o bot já está enviando por este número — teste com action=teste-template' });
   }
 
   // ── 🧾 WABA-CONFIG: lê a configuração de faturamento da conta e tenta corrigir ──
