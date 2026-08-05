@@ -817,6 +817,7 @@ module.exports = async function handler(req, res) {
   // ── ➕ SUBIR-AGORA: cria anúncios no ciclo ATUAL, com término definido ──
   if (action === 'subir-agora') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const TK = String(req.query.token || '').trim() || TOKEN;   // token alternativo para teste
     const cat = String(req.query.cat || 'tv').toLowerCase();
     const verba = parseFloat(req.query.verba || '145');
     const desde = String(req.query.desde || '').slice(0, 10);      // vídeos a partir desta data
@@ -833,7 +834,7 @@ module.exports = async function handler(req, res) {
     const horasRestantes = Math.round((fim.getTime() - Date.now()) / 3600000);
 
     // vídeos a usar
-    const vids = await pegarTudo(`${GRAPH}/act_${CONTA}/advideos?fields=id,title,created_time&limit=100&access_token=${TOKEN}`, 6);
+    const vids = await pegarTudo(`${GRAPH}/act_${CONTA}/advideos?fields=id,title,created_time&limit=100&access_token=${TK}`, 6);
     let escolhidos = (vids.data || []);
     if (ids.length) escolhidos = escolhidos.filter(v => ids.includes(v.id));
     else if (desde) escolhidos = escolhidos.filter(v => String(v.created_time || '').slice(0, 10) >= desde);
@@ -861,7 +862,7 @@ module.exports = async function handler(req, res) {
     }
 
     const postForm = async (path, campos) => {
-      const r = await fetch(`${GRAPH}/${path}?access_token=${TOKEN}`, { method: 'POST',
+      const r = await fetch(`${GRAPH}/${path}?access_token=${TK}`, { method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams(campos).toString() })
         .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
@@ -883,9 +884,9 @@ module.exports = async function handler(req, res) {
           // ── caminho alternativo: replicar a estrutura ──
           const nome = String(v.title).replace(/\.(mov|mp4)$/i, '') + ' ' + new Date().getDate() + '08';
           // lê o modelo completo
-          const mCamp = await fetch(`${GRAPH}/${modelo.campanhaId}?fields=objective,special_ad_categories,buying_type&access_token=${TOKEN}`).then(x => x.json());
+          const mCamp = await fetch(`${GRAPH}/${modelo.campanhaId}?fields=objective,special_ad_categories,buying_type&access_token=${TK}`).then(x => x.json());
           const mSet = modelo.adsetId
-            ? await fetch(`${GRAPH}/${modelo.adsetId}?fields=targeting,optimization_goal,billing_event,destination_type,promoted_object,bid_strategy&access_token=${TOKEN}`).then(x => x.json())
+            ? await fetch(`${GRAPH}/${modelo.adsetId}?fields=targeting,optimization_goal,billing_event,destination_type,promoted_object,bid_strategy&access_token=${TK}`).then(x => x.json())
             : {};
           if (mCamp.error || mSet.error) {
             erros.push(v.title + ' | ler modelo: ' + ((mCamp.error || mSet.error).message));
@@ -928,7 +929,7 @@ module.exports = async function handler(req, res) {
             continue;
           }
           // 1c) criativo com o VÍDEO NOVO
-          const mAdC = await fetch(`${GRAPH}/${modelo.id}?fields=creative{object_story_spec,degrees_of_freedom_spec}&access_token=${TOKEN}`).then(x => x.json());
+          const mAdC = await fetch(`${GRAPH}/${modelo.id}?fields=creative{object_story_spec,degrees_of_freedom_spec}&access_token=${TK}`).then(x => x.json());
           const oss = ((mAdC.creative || {}).object_story_spec) || {};
           const novoOss = { page_id: oss.page_id };
           if (oss.video_data) {
