@@ -814,12 +814,19 @@ module.exports = async function handler(req, res) {
             continue;
           }
           // 1a) campanha
-          const c1 = await postForm('act_' + CONTA + '/campaigns', {
+          const camposCamp = {
             name: nome, objective: mCamp.objective || 'OUTCOME_ENGAGEMENT',
-            status: 'PAUSED', buying_type: mCamp.buying_type || 'AUCTION',
-            special_ad_categories: JSON.stringify(mCamp.special_ad_categories || []),
-          });
-          if (c1 && c1.error) { erros.push(v.title + ' | criar campanha: ' + c1.error.message + ' (cód ' + c1.error.code + ')'); continue; }
+            status: 'PAUSED', special_ad_categories: JSON.stringify(mCamp.special_ad_categories || []),
+          };
+          const c1 = await postForm('act_' + CONTA + '/campaigns', camposCamp);
+          if (c1 && c1.error) {
+            erros.push(v.title + ' | criar campanha: ' + c1.error.message + ' (cód ' + c1.error.code +
+              ')' + (c1.error.error_user_msg ? ' · ' + c1.error.error_user_msg : '') +
+              (c1.error.error_data ? ' · ' + JSON.stringify(c1.error.error_data).slice(0, 200) : '') +
+              ' | ENVIADO: ' + JSON.stringify(camposCamp).slice(0, 200) +
+              ' | MODELO: objetivo=' + (mCamp.objective || '?') + ' compra=' + (mCamp.buying_type || '?'));
+            continue;
+          }
           nova = c1.id;
           // 1b) conjunto, com a mesma segmentação e destino
           const camposSet = {
@@ -836,7 +843,7 @@ module.exports = async function handler(req, res) {
           if (mSet.promoted_object) camposSet.promoted_object = JSON.stringify(mSet.promoted_object);
           const s1 = await postForm('act_' + CONTA + '/adsets', camposSet);
           if (s1 && s1.error) {
-            erros.push(v.title + ' | criar conjunto: ' + s1.error.message + ' (cód ' + s1.error.code + ')');
+            erros.push(v.title + ' | criar conjunto: ' + s1.error.message + ' (cód ' + s1.error.code + ')' + (s1.error.error_user_msg ? ' · ' + s1.error.error_user_msg : '') + (s1.error.error_data ? ' · ' + JSON.stringify(s1.error.error_data).slice(0,150) : ''));
             continue;
           }
           // 1c) criativo com o VÍDEO NOVO
@@ -852,12 +859,12 @@ module.exports = async function handler(req, res) {
           const cr = await postForm('act_' + CONTA + '/adcreatives', {
             name: nome + ' - criativo', object_story_spec: JSON.stringify(novoOss),
           });
-          if (cr && cr.error) { erros.push(v.title + ' | criar criativo: ' + cr.error.message + ' (cód ' + cr.error.code + ')'); continue; }
+          if (cr && cr.error) { erros.push(v.title + ' | criar criativo: ' + cr.error.message + ' (cód ' + cr.error.code + ')' + (cr.error.error_user_msg ? ' · ' + cr.error.error_user_msg : '') + (cr.error.error_data ? ' · ' + JSON.stringify(cr.error.error_data).slice(0,150) : '')); continue; }
           // 1d) anúncio
           const a1 = await postForm('act_' + CONTA + '/ads', {
             name: nome, adset_id: s1.id, creative: JSON.stringify({ creative_id: cr.id }), status: 'ACTIVE',
           });
-          if (a1 && a1.error) { erros.push(v.title + ' | criar anúncio: ' + a1.error.message + ' (cód ' + a1.error.code + ')'); continue; }
+          if (a1 && a1.error) { erros.push(v.title + ' | criar anúncio: ' + a1.error.message + ' (cód ' + a1.error.code + ')' + (a1.error.error_user_msg ? ' · ' + a1.error.error_user_msg : '') + (a1.error.error_data ? ' · ' + JSON.stringify(a1.error.error_data).slice(0,150) : '')); continue; }
           // ativa o conjunto e a campanha
           await postForm(s1.id, { status: 'ACTIVE' });
           await postForm(nova, { status: 'ACTIVE' });
