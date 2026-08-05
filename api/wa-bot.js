@@ -1373,6 +1373,62 @@ export default async function handler(req, res) {
       dica: ok ? 'confira o WhatsApp do número' : 'se o erro citar o template, ele pode não estar aprovado' });
   }
 
+  // ── 🔑 TOKEN-PERMISSOES: o que o token atual realmente pode fazer ──
+  if (action === 'token-permissoes') {
+    const { token: tkP } = await credenciais();
+    if (!tkP) return res.status(200).json({ ok: false, error: 'sem token' });
+    const G = 'https://graph.facebook.com/v20.0';
+    const dbg = await fetch(`${G}/debug_token?input_token=${tkP}&access_token=${tkP}`)
+      .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+    const d = (dbg && dbg.data) || {};
+    const escopos = d.scopes || [];
+    const precisa = ['whatsapp_business_messaging', 'whatsapp_business_management', 'business_management'];
+    const faltando = precisa.filter(p => !escopos.includes(p));
+    return res.status(200).json({ ok: faltando.length === 0,
+      tipo: d.type, app: d.application, appId: d.app_id,
+      criadoEm: d.issued_at ? new Date(d.issued_at * 1000).toISOString() : null,
+      expiraEm: d.expires_at ? (d.expires_at === 0 ? 'nunca' : new Date(d.expires_at * 1000).toISOString()) : 'nunca',
+      valido: d.is_valid,
+      escopos,
+      permissoesFaltando: faltando.length ? faltando : 'nenhuma',
+      negociosGranulares: (d.granular_scopes || []).map(g => g.scope + ' → ' + (g.target_ids || []).join(', ')),
+      leitura: faltando.length
+        ? '⚠️ o token foi gerado SEM essas permissões. Atribuir o ativo depois não atualiza o token — é preciso GERAR UM NOVO.'
+        : '✅ o token tem todas as permissões necessárias' });
+  }
+
+  // ── 🔧 FORCAR-FISCAL: tenta gravar CNPJ e moeda por vários caminhos ──
+  if (action === 'forcar-fiscal') {
+    const { token: tkF } = await credenciais();
+    const G = 'https://graph.facebook.com/v20.0';
+    const wid = String(req.query.waba || '1050574074327587');
+    const neg = String(req.query.negocio || '114657968057637');
+    const cnpj = String(req.query.cnpj || '').replace(/\D/g, '');
+    const moeda = String(req.query.moeda || 'BRL').toUpperCase();
+    const tentar = async (rot, url, campos) => {
+      const r = await fetch(`${G}/${url}?access_token=${tkF}`, { method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(campos).toString() })
+        .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      return { tentativa: rot, ok: !(r && r.error),
+        erro: (r && r.error) ? r.error.message : null,
+        codigo: (r && r.error) ? r.error.code : null,
+        resposta: !(r && r.error) ? r : undefined };
+    };
+    const res1 = [];
+    if (cnpj) {
+      res1.push(await tentar('CNPJ no negócio (tax_id)', neg, { tax_id: cnpj }));
+      res1.push(await tentar('CNPJ no negócio (vertical+tax_id)', neg, { vertical: 'OTHER', tax_id: cnpj }));
+      res1.push(await tentar('CNPJ na WABA', wid, { tax_id: cnpj }));
+    }
+    res1.push(await tentar('moeda na WABA', wid, { currency: moeda }));
+    res1.push(await tentar('moeda no negócio', neg, { currency: moeda }));
+    const algumOk = res1.some(r => r.ok);
+    return res.status(200).json({ ok: algumOk, tentativas: res1,
+      conclusao: algumOk ? '✅ ao menos uma alteração passou — confira em waba-config'
+        : '❌ nenhuma passou. Códigos 3 = a Meta não permite por API; 200 = falta permissão no token (gere um novo)' });
+  }
+
   // ── 🔀 TROCAR-NUMERO: ativa outro número do WhatsApp sem redeploy ──
   if (action === 'trocar-numero') {
     const phoneId = String(req.query.phoneId || '').trim();
