@@ -1116,6 +1116,21 @@ export default async function handler(req, res) {
     entradas.sort(ord); saidas.sort(ord); internos.sort(ord);
     const soma = arr => Number(arr.reduce((s, x) => s + (x.valor || 0), 0).toFixed(2));
     const porDesfecho = saidas.reduce((o, s) => { o[s.desfecho] = (o[s.desfecho] || 0) + 1; return o; }, {});
+    // ?mini=1 → só os números, cabe em qualquer chat
+    if (String(req.query.mini || '') === '1') {
+      const porSis = (arr) => arr.reduce((o, x) => { o[x.sistema] = (o[x.sistema] || 0) + 1; return o; }, {});
+      return res.status(200).json({
+        dias,
+        entraram: entradas.length,
+        sairam: saidas.length,
+        saldo: entradas.length - saidas.length,
+        vEntrou: soma(entradas),
+        vSaiu: soma(saidas),
+        entPorSis: porSis(entradas),
+        saiPorSis: porSis(saidas),
+        desfechos: porDesfecho,
+      });
+    }
     if (String(req.query.curto || '') === '1') {
       return res.status(200).json({ ok: true, periodoDias: dias,
         RESUMO: { entraram: entradas.length, sairam: saidas.length,
@@ -1123,11 +1138,11 @@ export default async function handler(req, res) {
           valorQueEntrou: soma(entradas), valorQueSaiu: soma(saidas),
           movimentosInternos: internos.length },
         porDesfecho,
-        ENTRARAM: entradas.slice(0, 40).map(e => brt(e.quando) + ' | ' + e.sistema + ' | ' +
-          String(e.nome).slice(0, 18) + ' ' + e.tel + ' | ' + e.equipamento + ' | ' + e.faseAtual),
-        SAIRAM: saidas.slice(0, 40).map(s => brt(s.quando) + ' | ' + s.sistema + ' | ' +
-          String(s.nome).slice(0, 18) + ' ' + s.tel + ' | ' + s.equipamento + ' | ' + s.desfecho +
-          (s.valor ? ' | R$ ' + s.valor : '')) });
+        ENTRARAM: entradas.slice(0, 25).map(e => brt(e.quando).slice(6) + ' ' + e.sistema.slice(0, 3) + ' ' +
+          String(e.nome).slice(0, 14) + ' ' + e.tel + ' ' + String(e.equipamento).slice(0, 14)),
+        SAIRAM: saidas.slice(0, 25).map(s => brt(s.quando).slice(6) + ' ' + s.sistema.slice(0, 3) + ' ' +
+          String(s.nome).slice(0, 14) + ' ' + s.tel + ' ' + String(s.desfecho).slice(0, 10) +
+          (s.valor ? ' ' + s.valor : '')) });
     }
     return res.status(200).json({ ok: true, periodoDias: dias,
       resumo: { entraram: entradas.length, sairam: saidas.length, saldo: entradas.length - saidas.length,
