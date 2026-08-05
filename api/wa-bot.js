@@ -1371,6 +1371,64 @@ export default async function handler(req, res) {
       dica: ok ? 'confira o WhatsApp do número' : 'se o erro citar o template, ele pode não estar aprovado' });
   }
 
+  // ── 🧾 WABA-CONFIG: lê a configuração de faturamento da conta e tenta corrigir ──
+  if (action === 'waba-config') {
+    const { token: tkW, phoneId: pidW } = await credenciais();
+    if (!tkW || !pidW) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
+    const G = 'https://graph.facebook.com/v20.0';
+    const pega = async (u) => fetch(u).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+
+    // descobre a WABA dona do número
+    const dono = await pega(`${G}/${pidW}?fields=whatsapp_business_account{id,name}&access_token=${tkW}`);
+    const wid = ((dono || {}).whatsapp_business_account || {}).id;
+    if (!wid) return res.status(200).json({ ok: false, error: 'não consegui identificar a WABA',
+      detalhe: (dono && dono.error && dono.error.message) || null,
+      dica: 'o token pode não ter a permissão whatsapp_business_management' });
+
+    // configuração completa
+    const cfgW = await pega(`${G}/${wid}?fields=id,name,currency,timezone_id,account_review_status,business_verification_status,country,ownership_type,primary_business_location,health_status,owner_business_info&access_token=${tkW}`);
+
+    // tentativa de alteração, se pedida
+    let tentativa = null;
+    const novaMoeda = String(req.query.moeda || '').toUpperCase();
+    const novoFuso = String(req.query.fuso || '');
+    if (novaMoeda || novoFuso) {
+      const campos = new URLSearchParams();
+      if (novaMoeda) campos.append('currency', novaMoeda);
+      if (novoFuso) campos.append('timezone_id', novoFuso);
+      const r = await fetch(`${G}/${wid}?access_token=${tkW}`, { method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: campos.toString() })
+        .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      tentativa = (r && r.error)
+        ? { ok: false, erro: r.error.message, codigo: r.error.code,
+            mensagemUsuario: r.error.error_user_msg || null }
+        : { ok: true, resultado: r };
+    }
+
+    const c = cfgW || {};
+    const faltando = [];
+    if (!c.currency) faltando.push('MOEDA não definida');
+    if (!c.timezone_id) faltando.push('FUSO HORÁRIO não definido');
+    if (c.business_verification_status && c.business_verification_status !== 'verified') {
+      faltando.push('negócio não verificado: ' + c.business_verification_status);
+    }
+    if (c.account_review_status && c.account_review_status !== 'APPROVED') {
+      faltando.push('conta em revisão: ' + c.account_review_status);
+    }
+    return res.status(200).json({ ok: faltando.length === 0,
+      waba: { id: wid, nome: c.name, pais: c.country,
+        moeda: c.currency || '❌ AUSENTE',
+        fusoHorario: c.timezone_id || '❌ AUSENTE',
+        revisao: c.account_review_status,
+        verificacaoDoNegocio: c.business_verification_status,
+        tipoDePropriedade: c.ownership_type },
+      negocioDono: c.owner_business_info || null,
+      problemas: faltando.length ? faltando : 'configuração completa',
+      tentativaDeAlteracao: tentativa,
+      comoAlterar: 'acrescente &moeda=BRL e/ou &fuso=ID ao link para tentar alterar pela API',
+      erroDaMeta: (cfgW && cfgW.error) ? cfgW.error.message : undefined });
+  }
+
   // ── 💳 STATUS-COBRANCA: a conta do WhatsApp está liberada para enviar? ──
   if (action === 'status-cobranca') {
     const { token: tkC, phoneId: pidC } = await credenciais();
