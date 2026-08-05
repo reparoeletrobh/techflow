@@ -1373,6 +1373,68 @@ export default async function handler(req, res) {
       dica: ok ? 'confira o WhatsApp do número' : 'se o erro citar o template, ele pode não estar aprovado' });
   }
 
+  // ── 💳 CONTA-PAGAMENTO: explora a payment_account descoberta na auditoria ──
+  if (action === 'conta-pagamento') {
+    const tkP1 = String(req.query.token || '').trim() || (await credenciais()).token;
+    const tkAds = String(req.query.tokenAds || '').trim() || tkP1;
+    const G = 'https://graph.facebook.com/v20.0';
+    const pay = String(req.query.pay || '652349156164996');
+    const neg = String(req.query.negocio || '114657968057637');
+    const wid = String(req.query.waba || '1050574074327587');
+    const out = [];
+    const t = async (rot, url, tk, metodo, corpo) => {
+      const opt = { method: metodo || 'GET' };
+      if (corpo) { opt.headers = { 'Content-Type': 'application/x-www-form-urlencoded' }; opt.body = new URLSearchParams(corpo).toString(); }
+      const r = await fetch(url.replace('TOKEN', tk), opt).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      const ok = !(r && r.error);
+      out.push({ caminho: rot, ok, erro: ok ? null : (r.error.error_user_msg || r.error.message),
+        codigo: ok ? null : r.error.code,
+        dados: ok ? (JSON.stringify(r).length > 800 ? JSON.stringify(r).slice(0, 800) + '…' : r) : undefined });
+      return ok ? r : null;
+    };
+
+    // ── a conta de pagamento em si ──
+    await t('conta de pagamento (campos)', `${G}/${pay}?access_token=TOKEN`, tkP1);
+    await t('conta de pagamento > funding_sources', `${G}/${pay}/funding_sources?access_token=TOKEN`, tkP1);
+    await t('conta de pagamento > payment_methods', `${G}/${pay}/payment_methods?access_token=TOKEN`, tkP1);
+    await t('conta de pagamento > invoices', `${G}/${pay}/invoices?access_token=TOKEN`, tkP1);
+    await t('conta de pagamento > transactions', `${G}/${pay}/transactions?access_token=TOKEN`, tkP1);
+    await t('conta de pagamento > billing', `${G}/${pay}/billing?access_token=TOKEN`, tkP1);
+
+    // ── o negócio, com mais campos ──
+    await t('negócio: campos ampliados',
+      `${G}/${neg}?fields=id,name,payment_account_id,primary_page,timezone_id,two_factor_type,is_disabled_by_disconnect,verification_status,collaborative_ads_managed_partner_business_info&access_token=TOKEN`, tkP1);
+    await t('negócio > owned_whatsapp_business_accounts',
+      `${G}/${neg}/owned_whatsapp_business_accounts?fields=id,name,currency,account_review_status&access_token=TOKEN`, tkP1);
+    await t('negócio > client_whatsapp_business_accounts',
+      `${G}/${neg}/client_whatsapp_business_accounts?fields=id,name,currency&access_token=TOKEN`, tkP1);
+
+    // ── com o token de ANÚNCIOS (o outro tem ads_management) ──
+    await t('[ads] conta de anúncios: saldo e método',
+      `${G}/act_1267284360833794?fields=balance,currency,amount_spent,spend_cap,funding_source,funding_source_details,is_prepay_account,account_status,business&access_token=TOKEN`, tkAds);
+    await t('[ads] negócio do anúncio > extendedcredits',
+      `${G}/1267284360833794/extendedcredits?access_token=TOKEN`, tkAds);
+    await t('[ads] conta > transações recentes',
+      `${G}/act_1267284360833794/transactions?fields=id,charge_type,status,billed_amount_details,time&limit=5&access_token=TOKEN`, tkAds);
+
+    // ── a WABA vista pelo token de anúncios ──
+    await t('[ads] WABA campos', `${G}/${wid}?fields=id,name,currency,primary_funding_id&access_token=TOKEN`, tkAds);
+
+    // ── tentativas de ESCRITA na conta de pagamento ──
+    if (String(req.query.forcar || '') === '1') {
+      await t('ESCRITA: vincular funding da conta de anúncios à WABA',
+        `${G}/${wid}?access_token=TOKEN`, tkAds, 'POST', { primary_funding_id: pay });
+      await t('ESCRITA: definir payment_account no negócio',
+        `${G}/${neg}?access_token=TOKEN`, tkP1, 'POST', { payment_account_id: pay });
+    }
+
+    const ok = out.filter(x => x.ok);
+    return res.status(200).json({ ok: true, contaDePagamento: pay,
+      CAMINHOS_QUE_ABREM: ok.map(x => x.caminho),
+      resultado: out,
+      dica: 'passe &tokenAds=SEU_TOKEN_DE_ANUNCIOS para os testes marcados com [ads]' });
+  }
+
   // ── 🔬 AUDITORIA-PAGAMENTO: varre TODOS os caminhos possíveis de faturamento ──
   if (action === 'auditoria-pagamento') {
     const tkA = String(req.query.token || '').trim() || (await credenciais()).token;
