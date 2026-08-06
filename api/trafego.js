@@ -489,7 +489,40 @@ module.exports = async function handler(req, res) {
         ', realocado dentro de cada categoria — estimativa de mais ' + totalGanho + ' conversas com a mesma verba.'
       : 'Nenhum criativo ativo passou do limite de corte agora.';
 
+    // ⏸️ panorama dos PAUSADOS — o Copiloto só falava dos ativos
+    let panoramaPausados = null;
+    try {
+      const cAll = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns?fields=id,name,effective_status,daily_budget,lifetime_budget,start_time&limit=200&access_token=${TOKEN}`, 6);
+      const sAll = await pegarTudo(`${GRAPH}/act_${CONTA}/adsets?fields=id,effective_status,daily_budget,lifetime_budget,campaign{id}&limit=200&access_token=${TOKEN}`, 6);
+      const setsPor = {};
+      for (const s of (sAll.data || [])) { const ci = (s.campaign || {}).id; if (ci) (setsPor[ci] = setsPor[ci] || []).push(s); }
+      const desdeC = (function () {
+        const b = new Date(Date.now() - 3 * 3600000);
+        const d = new Date(b); d.setUTCDate(b.getUTCDate() - ((b.getUTCDay() + 1) % 7));
+        return d.toISOString().slice(0, 10);
+      })();
+      const pausadas = (cAll.data || []).filter(c => c.effective_status !== 'ACTIVE'
+        && String(c.start_time || '').slice(0, 10) >= desdeC);
+      let verbaPresa = 0;
+      const lista = pausadas.map(c => {
+        let v = 0;
+        if (c.lifetime_budget) v = Number(c.lifetime_budget) / 100;
+        else if (c.daily_budget) v = Number(c.daily_budget) / 100;
+        else for (const s of (setsPor[c.id] || [])) {
+          if (s.lifetime_budget) v += Number(s.lifetime_budget) / 100;
+          else if (s.daily_budget) v += Number(s.daily_budget) / 100;
+        }
+        verbaPresa += v;
+        return { nome: c.name, id: c.id, situacao: c.effective_status,
+          categoria: categoriaDe(c.name || '', 'anuncio'), verba: Number(v.toFixed(2)) };
+      }).sort((a, b) => b.verba - a.verba);
+      panoramaPausados = { total: pausadas.length,
+        verbaAlocadaNeles: Number(verbaPresa.toFixed(2)),
+        aviso: pausadas.length ? '⏸️ ' + pausadas.length + ' campanha(s) pausada(s) neste ciclo, com R$ ' + verbaPresa.toFixed(2) + ' alocados — rode verba-orfa para devolver o que sobrou' : null,
+        lista: lista.map(p => p.categoria.toUpperCase().slice(0, 4) + ' | ' + String(p.nome).slice(0, 30) + ' | R$ ' + p.verba + ' | ' + p.situacao) };
+    } catch (e) {}
     return res.status(200).json({ ok: true, periodo: per, diasRestantes,
+      PAUSADOS: panoramaPausados,
       ciclo: base.dados.ciclo,
       global: { ativos: globalAtivos, alocado: globalAlocado, gasto: globalGasto,
         restante: globalRestante, conversas: globalConversas,
@@ -1262,18 +1295,39 @@ module.exports = async function handler(req, res) {
     const somaAdm = ativos.filter(l => l.categoria !== 'tv');
     const soma = (arr, campo) => Number(arr.reduce((s, x) => s + (x[campo] || 0), 0).toFixed(2));
 
+    // ⏳ quanto falta até o fim do ciclo (sábado 11h BRT)
+    const agoraB = new Date(Date.now() - 3 * 3600000);
+    const diasAteSab = (6 - agoraB.getUTCDay() + 7) % 7;
+    const fimCiclo = new Date(Date.UTC(agoraB.getUTCFullYear(), agoraB.getUTCMonth(),
+      agoraB.getUTCDate() + (diasAteSab === 0 && agoraB.getUTCHours() >= 14 ? 7 : diasAteSab), 14, 0, 0));
+    const horasRestantes = Math.max(0, (fimCiclo.getTime() - Date.now()) / 3600000);
+    const horasDecorridas = Math.max(1, (Date.now() - new Date(desdeCiclo + 'T16:00:00Z').getTime()) / 3600000);
+    const projeta = (arr) => {
+      const g = soma(arr, 'gasto'), v = soma(arr, 'verba');
+      const ritmo = g / horasDecorridas;                       // por hora
+      const projetado = Number((g + ritmo * horasRestantes).toFixed(2));
+      return { gasto: g, verba: v, restante: Number((v - g).toFixed(2)),
+        porDia: Number((ritmo * 24).toFixed(2)),
+        projecaoAteOFim: projetado,
+        vaiSobrar: Number((v - projetado).toFixed(2)) };
+    };
     return res.status(200).json({ ok: true, cicloDesde: desdeCiclo,
+      fimDoCiclo: new Date(fimCiclo.getTime() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' BRT',
+      horasRestantes: Math.round(horasRestantes),
       TOTAIS: {
-        tv: { anuncios: somaTv.length, verba: soma(somaTv, 'verba'), gasto: soma(somaTv, 'gasto') },
-        adm: { anuncios: somaAdm.length, verba: soma(somaAdm, 'verba'), gasto: soma(somaAdm, 'gasto') },
+        tv: { anuncios: somaTv.length, ...projeta(somaTv) },
+        adm: { anuncios: somaAdm.length, ...projeta(somaAdm) },
         geral: { ativos: ativos.length, pausados: pausados.length,
           verbaAtiva: soma(ativos, 'verba'), gastoTotal: soma(linhas, 'gasto'),
-          verbaEmPausados: soma(pausados, 'verba') },
+          verbaEmPausados: soma(pausados, 'verba'),
+          gastoNosPausados: soma(pausados, 'gasto'),
+          presoNosPausados: Number((soma(pausados, 'verba') - soma(pausados, 'gasto')).toFixed(2)) },
       },
       porCategoria: ativos.reduce((o, l) => {
         const k = l.categoria; o[k] = o[k] || { anuncios: 0, verba: 0, gasto: 0 };
         o[k].anuncios++; o[k].verba = Number((o[k].verba + (l.verba || 0)).toFixed(2));
         o[k].gasto = Number((o[k].gasto + l.gasto).toFixed(2)); return o; }, {}),
+      ...(String(req.query.mini || '') === '1' ? {} : {}),
       ATIVOS: ativos.map(l => (l.categoria || '?').slice(0, 4).toUpperCase().padEnd(4) + ' | ' +
         String(l.nome).slice(0, 30).padEnd(30) + ' | R$ ' + String(l.verba || 0).padEnd(7) +
         ' | gasto R$ ' + l.gasto + ' (' + (l.verbaEm || '?') + ')'),
