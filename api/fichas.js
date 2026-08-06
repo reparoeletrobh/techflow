@@ -750,12 +750,14 @@ export default async function handler(req, res) {
     const alvos = [...new Set(bruto.split(/[,;\s]+/).map(x => x.replace(/\D/g, '')).filter(x => x.length >= 4))];
     if (!alvos.length) return res.status(400).json({ ok: false, error: 'informe ?d=4115,3188,0432...' });
 
-    const [fA, fT, lgA, lgT, ppA, ppT, arqA, arqT, pros, gar] = await Promise.all([
+    const [fA, fT, lgA, lgT, ppA, ppT, arqA, arqT, pros, gar, fl, balc, orcA, orcT] = await Promise.all([
       dbGet('fichas_adm'), dbGet('fichas_tv'),
       dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
       dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
       dbGet('reparoeletro_arquivo'), dbGet('tv_arquivo'),
       dbGet('prospeccao_adm'), dbGet('reparoeletro_garantia_v2'),
+      dbGet('reparoeletro_frenteloja'), dbGet('reparoeletro_balcao'),
+      dbGet('reparoeletro_orcamentos'), dbGet('tv_orcamentos'),
     ]);
     const dias = ts => { const t = new Date(ts || 0).getTime(); return t ? Number(((Date.now() - t) / 86400000).toFixed(1)) : null; };
     const so = t => String(t || '').replace(/\D/g, '');
@@ -782,6 +784,10 @@ export default async function handler(req, res) {
     for (const g of ((((gar || {}).garantias) || []).concat(((gar || {}).lojaImediata) || []))) {
       guarda(g.telefone, 'Garantia', g.faseId || (g.concluida ? 'concluída' : 'aberta'), g.nome, g.defeito, g.movidaEm || g.criadaEm);
     }
+    for (const f of (((fl || {}).fichas) || [])) guarda(f.telefone, 'Frente de Loja', f.status || f.phase, f.nome || f.nomeContato, f.equipamento, f.movedAt || f.criadoEm);
+    for (const b of (((balc || {}).fichas) || (((balc || {}).cards) || []))) guarda(b.telefone, 'Balcão', b.status || b.phase, b.nome || b.nomeContato, b.equipamento, b.movedAt || b.criadoEm);
+    for (const o of (((orcA || {}).fichas) || [])) guarda(o.telefone, 'Orçamentos ADM', o.status || o.phase, o.nome, o.equipamento, o.movedAt || o.criadoEm);
+    for (const o of (((orcT || {}).fichas) || [])) guarda(o.telefone, 'Orçamentos TV', o.status || o.phase, o.nome, o.equipamento, o.movedAt || o.criadoEm);
 
     const semNada = alvos.filter(a => !achados[a]);
     const linhas = [];
@@ -795,6 +801,27 @@ export default async function handler(req, res) {
       linhas.push(a + ' | ' + String(p.nome).slice(0, 16) + ' | ' + p.onde + ' | ' + p.fase +
         ' | ' + (p.diasNaFase != null ? p.diasNaFase + 'd' : '?') +
         (lista.length > 1 ? ' | +' + (lista.length - 1) : ''));
+    }
+    // ?todos=1 → uma linha por OCORRÊNCIA, não só a principal
+    if (String(req.query.todos || '') === '1') {
+      const todas = [];
+      for (const a of alvos) {
+        const lista = achados[a];
+        if (!lista) { todas.push(a + ' | ❌ sem registro'); continue; }
+        const ordem = ['Pipe ADM', 'Pipe TV', 'Logística ADM', 'Logística TV', 'Garantia', 'Frente de Loja',
+          'Balcão', 'Orçamentos ADM', 'Orçamentos TV', 'Fichas ADM', 'Fichas TV', 'Prospecção', 'Arquivo ADM', 'Arquivo TV'];
+        lista.sort((x, y) => ordem.indexOf(x.onde) - ordem.indexOf(y.onde));
+        for (const p of lista) {
+          todas.push(a + ' | ' + String(p.nome || '?').slice(0, 18) + ' | ' + p.onde + ' | ' + p.fase +
+            ' | ' + (p.diasNaFase != null ? p.diasNaFase + 'd' : '?') +
+            (p.equipamento ? ' | ' + p.equipamento : ''));
+        }
+      }
+      return res.status(200).json({ ok: true,
+        pedidos: alvos.length,
+        totalOcorrencias: todas.length,
+        semRegistro: semNada.length,
+        TODAS: todas });
     }
     return res.status(200).json({ ok: true,
       pedidos: alvos.length, encontrados: alvos.length - semNada.length,
