@@ -2182,7 +2182,42 @@ export default async function handler(req, res) {
     }
     card.movedAt = now;
     if (phase === 'aguardando_aprovacao') card.aguardandoDesde = now;
-    await safeWritePipe( db);
+    // ⚛️ GRAVAÇÃO ATÔMICA: relê o banco AGORA e altera só este card.
+    // Sem isso, a versão lida no início da requisição sobrescrevia alterações que
+    // outros processos (board, prospecção, bot) fizeram nesse meio-tempo — foi o que
+    // fez o contador de ERP cair de 74 para 73 em vez de subir para 75.
+    try {
+      const atual = await dbGet(PIPE_KEY);
+      if (atual && Array.isArray(atual.cards)) {
+        const alvo = atual.cards.find(c => c.id === id);
+        if (alvo) {
+          alvo.phase = phase;
+          alvo.movedAt = now;
+          alvo.history = (alvo.history || []).concat([{ phase: faseAnterior, ts: now }]);
+          if (card.aprovadoEm && !alvo.aprovadoEm) {
+            alvo.aprovadoEm = card.aprovadoEm;
+            alvo.valorNaAprovacao = card.valorNaAprovacao;
+            alvo.aprovadoPor = card.aprovadoPor;
+            alvo.equipamentoNaAprovacao = card.equipamentoNaAprovacao;
+          }
+          if (phase === 'aguardando_aprovacao') alvo.aguardandoDesde = now;
+          await safeWritePipe(atual);
+        } else {
+          await safeWritePipe(db);
+        }
+      } else {
+        await safeWritePipe(db);
+      }
+    } catch (e) {
+      await safeWritePipe(db);
+    }
+    // ✅ confere se a fase realmente ficou gravada
+    let confirmado = null;
+    try {
+      const conf = await dbGet(PIPE_KEY);
+      const c2 = ((conf || {}).cards || []).find(c => c.id === id);
+      confirmado = c2 ? (c2.phase === phase) : null;
+    } catch (e) {}
 
     // ── Gatilhos downstream ──────────────────────────────────────────────
     var pid = card.pipefyId;
@@ -2302,7 +2337,9 @@ export default async function handler(req, res) {
     if (phase === 'aguardando_aprovacao') gatilhosLog.push('Timer 48h iniciado');
     logAction({ modulo:'Pipe ADM', fichaId:card.id, ficha:card.nomeContato, acao:'Mover ficha', de:faseAnterior||'', para:phase, gatilho:gatilhosLog.join(' | '), status:'ok' }).catch(()=>{});
 
-    return res.status(200).json({ ok: true, card: card });
+    return res.status(200).json({ ok: true, card: card,
+      confirmado: confirmado,
+      aviso: confirmado === false ? '⚠️ a fase não persistiu — outro processo pode ter sobrescrito' : undefined });
   }
 
   // ── add-card ──────────────────────────────────────────────────────────────
