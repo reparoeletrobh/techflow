@@ -759,6 +759,12 @@ export default async function handler(req, res) {
       dbGet('reparoeletro_frenteloja'), dbGet('reparoeletro_balcao'),
       dbGet('reparoeletro_orcamentos'), dbGet('tv_orcamentos'),
     ]);
+    // 📦 ARQUIVOS DA LOGÍSTICA — é onde ficam última chamada, descarte e afins.
+    // Sem eles a busca não achava quase nada dessas fases.
+    const [lgArqA, lgArqT, waArq, finArq] = await Promise.all([
+      dbGet('reparoeletro_logistica_arquivo'), dbGet('tv_logistica_arquivo'),
+      dbGet('wa_arquivadas'), dbGet('reparoeletro_financeiro_arquivo'),
+    ]);
     const dias = ts => { const t = new Date(ts || 0).getTime(); return t ? Number(((Date.now() - t) / 86400000).toFixed(1)) : null; };
     const so = t => String(t || '').replace(/\D/g, '');
     const achados = {};
@@ -788,6 +794,18 @@ export default async function handler(req, res) {
     for (const b of (((balc || {}).fichas) || (((balc || {}).cards) || []))) guarda(b.telefone, 'Balcão', b.status || b.phase, b.nome || b.nomeContato, b.equipamento, b.movedAt || b.criadoEm);
     for (const o of (((orcA || {}).fichas) || [])) guarda(o.telefone, 'Orçamentos ADM', o.status || o.phase, o.nome, o.equipamento, o.movedAt || o.criadoEm);
     for (const o of (((orcT || {}).fichas) || [])) guarda(o.telefone, 'Orçamentos TV', o.status || o.phase, o.nome, o.equipamento, o.movedAt || o.criadoEm);
+    const varreArq = (banco, rot) => {
+      const b = banco || {};
+      for (const x of ((b.fichas || []).concat(b.cards || []).concat(b.itens || []).concat(Array.isArray(b) ? b : []))) {
+        guarda(x.telefone || x.tel, rot, x.phase || x.phaseId || x.status || x.faseId,
+          x.nome || x.nomeContato, x.equipamento || x.descricao,
+          x.arquivadoEm || x.movedAt || x.movidaEm || x.criadoEm);
+      }
+    };
+    varreArq(lgArqA, 'Arq. Logística ADM');
+    varreArq(lgArqT, 'Arq. Logística TV');
+    varreArq(waArq, 'Arq. WhatsApp');
+    varreArq(finArq, 'Arq. Financeiro');
 
     const semNada = alvos.filter(a => !achados[a]);
     const linhas = [];
