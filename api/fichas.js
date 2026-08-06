@@ -744,6 +744,66 @@ export default async function handler(req, res) {
   }
 
   // ── 🗑 LIXEIRA: fichas excluídas, com restauração ──
+  // ── 🔎 LOTE-FASES: recebe uma lista de 4 dígitos e devolve fase e tempo de cada um ──
+  if (action === 'lote-fases') {
+    const bruto = String(req.query.d || req.query.digitos || '');
+    const alvos = [...new Set(bruto.split(/[,;\s]+/).map(x => x.replace(/\D/g, '')).filter(x => x.length >= 4))];
+    if (!alvos.length) return res.status(400).json({ ok: false, error: 'informe ?d=4115,3188,0432...' });
+
+    const [fA, fT, lgA, lgT, ppA, ppT, arqA, arqT, pros, gar] = await Promise.all([
+      dbGet('fichas_adm'), dbGet('fichas_tv'),
+      dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+      dbGet('reparoeletro_arquivo'), dbGet('tv_arquivo'),
+      dbGet('prospeccao_adm'), dbGet('reparoeletro_garantia_v2'),
+    ]);
+    const dias = ts => { const t = new Date(ts || 0).getTime(); return t ? Number(((Date.now() - t) / 86400000).toFixed(1)) : null; };
+    const so = t => String(t || '').replace(/\D/g, '');
+    const achados = {};
+    const guarda = (tel, onde, fase, nome, equip, quando, extra) => {
+      const d = so(tel); if (d.length < 4) return;
+      for (const a of alvos) {
+        if (!d.endsWith(a)) continue;
+        achados[a] = achados[a] || [];
+        achados[a].push({ onde, fase: fase || '(sem fase)', nome: nome || '', 
+          equipamento: String(equip || '').slice(0, 24),
+          diasNaFase: dias(quando), ...(extra || {}) });
+      }
+    };
+    for (const f of (((fA || {}).fichas) || [])) guarda(f.telefone, 'Fichas ADM', f.status, f.nome, f.equipamento, f.movedAt || f.criadoEm);
+    for (const f of (((fT || {}).fichas) || [])) guarda(f.telefone, 'Fichas TV', f.status, f.nome, f.equipamento, f.movedAt || f.criadoEm);
+    for (const f of (((lgA || {}).fichas) || [])) guarda(f.telefone, 'Logística ADM', f.phase, f.nome, f.equipamento, f.movedAt || f.criadoEm);
+    for (const f of (((lgT || {}).fichas) || [])) guarda(f.telefone, 'Logística TV', f.phase, f.nome, f.equipamento, f.movedAt || f.criadoEm);
+    for (const c of (((ppA || {}).cards) || [])) guarda(c.telefone, 'Pipe ADM', c.phaseId || c.phase, c.nomeContato, c.equipamento, c.movedAt || c.criadoEm);
+    for (const c of (((ppT || {}).cards) || [])) guarda(c.telefone, 'Pipe TV', c.phaseId || c.phase, c.nomeContato, c.equipamento, c.movedAt || c.criadoEm);
+    for (const c of (((arqA || {}).cards) || [])) guarda(c.telefone, 'Arquivo ADM', c.phaseId || c.phase, c.nomeContato, c.equipamento, c.arquivadoEm || c.movedAt);
+    for (const c of (((arqT || {}).cards) || [])) guarda(c.telefone, 'Arquivo TV', c.phaseId || c.phase, c.nomeContato, c.equipamento, c.arquivadoEm || c.movedAt);
+    for (const f of (((pros || {}).fichas) || [])) guarda(f.telefone, 'Prospecção', f.status, f.nome, f.equipamento, f.movedAt || f.criadoEm);
+    for (const g of ((((gar || {}).garantias) || []).concat(((gar || {}).lojaImediata) || []))) {
+      guarda(g.telefone, 'Garantia', g.faseId || (g.concluida ? 'concluída' : 'aberta'), g.nome, g.defeito, g.movidaEm || g.criadaEm);
+    }
+
+    const semNada = alvos.filter(a => !achados[a]);
+    const linhas = [];
+    for (const a of alvos) {
+      const lista = achados[a];
+      if (!lista) { linhas.push(a + ' | ❌ NÃO ENCONTRADO'); continue; }
+      // prioriza o registro vivo mais recente
+      const ordem = ['Pipe ADM', 'Pipe TV', 'Logística ADM', 'Logística TV', 'Garantia', 'Fichas ADM', 'Fichas TV', 'Prospecção', 'Arquivo ADM', 'Arquivo TV'];
+      lista.sort((x, y) => ordem.indexOf(x.onde) - ordem.indexOf(y.onde));
+      const p = lista[0];
+      linhas.push(a + ' | ' + String(p.nome).slice(0, 16) + ' | ' + p.onde + ' | ' + p.fase +
+        ' | ' + (p.diasNaFase != null ? p.diasNaFase + 'd' : '?') +
+        (lista.length > 1 ? ' | +' + (lista.length - 1) : ''));
+    }
+    return res.status(200).json({ ok: true,
+      pedidos: alvos.length, encontrados: alvos.length - semNada.length,
+      naoEncontrados: semNada.length,
+      LISTA: linhas,
+      semRegistro: semNada,
+      detalhe: String(req.query.full || '') === '1' ? achados : undefined });
+  }
+
   if (action === 'lixeira') {
     const tomb = (await dbGet(KEY_EXCLUIDAS)) || { linhas: {} };
     const dias = Math.min(180, Math.max(1, parseInt(req.query.dias || '30', 10)));
