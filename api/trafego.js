@@ -1260,6 +1260,52 @@ module.exports = async function handler(req, res) {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: corpo })
         .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
     };
+    // ⚖️ SOMA ZERO: antes de dar a verba aos ativos, REDUZIR a dos pausados para o já gasto.
+    // Sem isso a verba total inflava — o pausado continuava com o valor cheio e os ativos
+    // recebiam a sobra por cima, criando dinheiro que não existia.
+    try {
+      const diagP = await fetch(`https://reparoeletroadm.com/api/trafego?action=verba-orfa&k=${KRO}`)
+        .then(x => x.json()).catch(() => null);
+      for (const linha of ((diagP && diagP.pausados) || [])) {
+        // recalcula pelo próprio diagnóstico: alocado e gasto vêm no texto
+        const m = String(linha).match(/alocado R\$ ([\d.]+) · gasto R\$ ([\d.]+)/);
+        if (!m) continue;
+      }
+      // usa o detalhe estruturado, mais confiável que o texto
+      const camps2 = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns?fields=id,name,effective_status,daily_budget,lifetime_budget,start_time&limit=200&access_token=${TOKEN}`, 6);
+      const sets2 = await pegarTudo(`${GRAPH}/act_${CONTA}/adsets?fields=id,effective_status,daily_budget,lifetime_budget,campaign{id}&limit=200&access_token=${TOKEN}`, 6);
+      const setsP = {};
+      for (const s of (sets2.data || [])) { const ci = (s.campaign || {}).id; if (ci) (setsP[ci] = setsP[ci] || []).push(s); }
+      const desdeP = (function () {
+        const b = new Date(Date.now() - 3 * 3600000);
+        const d = new Date(b); d.setUTCDate(b.getUTCDate() - ((b.getUTCDay() + 1) % 7));
+        return d.toISOString().slice(0, 10);
+      })();
+      const jnP = 'time_range=' + encodeURIComponent(JSON.stringify({ since: desdeP, until: new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10) }));
+      const insP = await pegarTudo(`${GRAPH}/act_${CONTA}/insights?level=campaign&${jnP}&fields=campaign_id,spend&limit=200&access_token=${TOKEN}`, 6);
+      const gastoP = {};
+      for (const i of (insP.data || [])) gastoP[i.campaign_id] = Number(i.spend || 0);
+      for (const c of (camps2.data || [])) {
+        if (c.effective_status === 'ACTIVE') continue;
+        if (String(c.start_time || '').slice(0, 10) < desdeP) continue;
+        const g = Number((gastoP[c.id] || 0).toFixed(2));
+        let alvoP = null, campoP = null, atualP = 0;
+        if (c.lifetime_budget) { alvoP = c.id; campoP = 'lifetime_budget'; atualP = Number(c.lifetime_budget) / 100; }
+        else if (c.daily_budget) { alvoP = c.id; campoP = 'daily_budget'; atualP = Number(c.daily_budget) / 100; }
+        else for (const s of (setsP[c.id] || [])) {
+          if (s.lifetime_budget) { alvoP = s.id; campoP = 'lifetime_budget'; atualP = Number(s.lifetime_budget) / 100; break; }
+          if (s.daily_budget) { alvoP = s.id; campoP = 'daily_budget'; atualP = Number(s.daily_budget) / 100; break; }
+        }
+        // reduz para o já gasto (mínimo aceito pela Meta), liberando a sobra de verdade
+        const novo = Math.max(g, 1);
+        if (alvoP && atualP > novo + 0.5) {
+          const rr = await postMetaO(alvoP, { [campoP]: String(Math.round(novo * 100)) });
+          if (rr && rr.error) erros.push('reduzir pausado ' + c.name + ': ' + rr.error.message);
+          else feitos.push({ id: alvoP, nome: c.name, acao: 'pausado reduzido para R$ ' + novo.toFixed(2) });
+          await new Promise(s => setTimeout(s, 120));
+        }
+      }
+    } catch (e) {}
     for (const a of alvos) {
       const centavos = Math.round(a.verbaNova * 100);
       let alvo = a.alvoId, r = await postMetaO(alvo, { [a.campo]: String(centavos) });
