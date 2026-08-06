@@ -818,14 +818,24 @@ export default async function handler(req, res) {
           diasNaFase: dias(quando), ...(extra || {}) });
       }
     };
-    for (const f of (((fA || {}).fichas) || [])) guarda(f.telefone, 'Fichas ADM', f.status, f.nome, f.equipamento, f.movedAt || f.criadoEm);
-    for (const f of (((fT || {}).fichas) || [])) guarda(f.telefone, 'Fichas TV', f.status, f.nome, f.equipamento, f.movedAt || f.criadoEm);
+    for (const f of (((fA || {}).fichas) || []).concat(((fA || {}).cards) || [])) guarda(f.telefone, 'Fichas ADM', f.status, f.nome, f.equipamento, f.movedAt || f.criadoEm);
+    for (const f of (((fT || {}).fichas) || []).concat(((fT || {}).cards) || [])) guarda(f.telefone, 'Fichas TV', f.status, f.nome, f.equipamento, f.movedAt || f.criadoEm);
     for (const f of (((lgA || {}).fichas) || [])) guarda(f.telefone, 'Logística ADM', f.phase, f.nome, f.equipamento, f.movedAt || f.criadoEm);
     for (const f of (((lgT || {}).fichas) || [])) guarda(f.telefone, 'Logística TV', f.phase, f.nome, f.equipamento, f.movedAt || f.criadoEm);
-    for (const c of (((ppA || {}).cards) || [])) guarda(c.telefone, 'Pipe ADM', c.phaseId || c.phase, c.nomeContato, c.equipamento, c.movedAt || c.criadoEm);
-    for (const c of (((ppT || {}).cards) || [])) guarda(c.telefone, 'Pipe TV', c.phaseId || c.phase, c.nomeContato, c.equipamento, c.movedAt || c.criadoEm);
-    for (const c of (((arqA || {}).cards) || [])) guarda(c.telefone, 'Arquivo ADM', c.phaseId || c.phase, c.nomeContato, c.equipamento, c.arquivadoEm || c.movedAt);
-    for (const c of (((arqT || {}).cards) || [])) guarda(c.telefone, 'Arquivo TV', c.phaseId || c.phase, c.nomeContato, c.equipamento, c.arquivadoEm || c.movedAt);
+    for (const c of (((ppA || {}).cards) || []).concat(((ppA || {}).fichas) || [])) guarda(c.telefone, 'Pipe ADM', c.phaseId || c.phase, c.nomeContato, c.equipamento, c.movedAt || c.criadoEm);
+    for (const c of (((ppT || {}).cards) || []).concat(((ppT || {}).fichas) || [])) guarda(c.telefone, 'Pipe TV', c.phaseId || c.phase, c.nomeContato, c.equipamento, c.movedAt || c.criadoEm);
+    // 🐛 os arquivos guardam em .fichas OU .cards — ler só .cards perdia os 806 registros
+    // de última chamada do Arquivo ADM e os 94 do Arquivo TV
+    const varreDupla = (banco, rot) => {
+      const b = banco || {};
+      for (const x of ((b.cards || []).concat(b.fichas || []))) {
+        guarda(x.telefone || x.tel, rot, x.phaseId || x.phase || x.status,
+          x.nomeContato || x.nome, x.equipamento || x.descricao,
+          x.arquivadoEm || x.movedAt || x.criadoEm);
+      }
+    };
+    varreDupla(arqA, 'Arquivo ADM');
+    varreDupla(arqT, 'Arquivo TV');
     for (const f of (((pros || {}).fichas) || [])) guarda(f.telefone, 'Prospecção', f.status, f.nome, f.equipamento, f.movedAt || f.criadoEm);
     for (const g of ((((gar || {}).garantias) || []).concat(((gar || {}).lojaImediata) || []))) {
       guarda(g.telefone, 'Garantia', g.faseId || (g.concluida ? 'concluída' : 'aberta'), g.nome, g.defeito, g.movidaEm || g.criadaEm);
