@@ -287,8 +287,18 @@ module.exports = async function handler(req, res) {
       })();
       const jnG = 'time_range=' + encodeURIComponent(JSON.stringify({ since: desdeG, until: new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10) }));
       const insG = await pegarTudo(`${GRAPH}/act_${CONTA}/insights?level=campaign&${jnG}&fields=campaign_id,campaign_name,spend&limit=200&access_token=${TOKEN}`, 6);
+      // 📅 só campanhas DESTE ciclo — as de ciclos anteriores ainda gastaram nesta janela
+      // (terminaram sábado 11h) e inflavam o total em ~R$350
+      const cicloIds = new Set();
+      try {
+        const cG = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns?fields=id,start_time&limit=200&access_token=${TOKEN}`, 6);
+        for (const c of (cG.data || [])) {
+          if (String(c.start_time || '').slice(0, 10) >= desdeG) cicloIds.add(String(c.id));
+        }
+      } catch (e) {}
       let gTv = 0, gAdm = 0, gTot = 0;
       for (const i of (insG.data || [])) {
+        if (cicloIds.size && !cicloIds.has(String(i.campaign_id))) continue;
         const v = Number(i.spend || 0);
         gTot += v;
         if (categoriaDe(i.campaign_name || '', 'anuncio') === 'tv') gTv += v; else gAdm += v;
@@ -2354,6 +2364,7 @@ module.exports = async function handler(req, res) {
 
     return res.status(200).json({ ok: true, semana,
       ciclo: 'sábado 13h → sábado 11h',
+      // ⚠️ bloco legado — mantido para compatibilidade, mas a tela usa metaVerba
       verba: { adm: { total: Number(vAdm.toFixed(2)), anuncios: nAdm, porAnuncio: porAnuncioAdm },
                tv:  { total: Number(vTv.toFixed(2)),  anuncios: nTv,  porAnuncio: porAnuncioTv } },
       plano,
