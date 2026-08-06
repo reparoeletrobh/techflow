@@ -450,9 +450,25 @@ async function confirmarRota(){
 }
 async function moverCard(id,phase){
   if(!phase)return;
-  const r=await api('mover',{id,phase});
-  if(r.ok){const c=cards.find(x=>x.id===id);if(c)c.phase=phase;render();toast('Movido → '+PHASES.find(p=>p.id===phase)?.name);}
-  else toast(r.error||'Erro',false);
+  const r=await api('mover',{id,phase}).catch(function(e){return {ok:false,error:'falha de rede: '+e.message};});
+  if(r&&r.ok){
+    const c=cards.find(x=>x.id===id);
+    if(c)c.phase=phase;
+    render();
+    toast('Movido → '+(PHASES.find(p=>p.id===phase)?.name||phase));
+    // 🔍 confere no servidor se a mudança realmente valeu
+    setTimeout(async function(){
+      try{
+        const v=await fetch('/api/pipe?action=load').then(x=>x.json());
+        const ver=((v.cards)||[]).find(x=>x.id===id);
+        if(ver && ver.phase!==phase){
+          toast('⚠️ O card voltou para '+ver.phase+' — a mudança não persistiu',false);
+          cards=v.cards; render();
+        }
+      }catch(e){}
+    },1200);
+  }
+  else toast('Não moveu: '+((r&&r.error)||'erro sem mensagem'),false);
 }
 async function toggleAC(id){
   const r=await api('toggle-analise-compra',{id});
