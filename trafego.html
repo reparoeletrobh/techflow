@@ -767,6 +767,15 @@ async function aplicarCopiloto(){
   var ov=document.getElementById('ov-revisao'); if(ov)ov.remove();
   var el=document.getElementById('pg-copiloto');
   el.innerHTML='<div class="vazio-msg">▶️ Aplicando na Meta…</div>';
+  // 🐛 guarda o que foi enviado, para diagnosticar quando nada é aplicado
+  window._ultimoEnvio={pausarIds:pausar,orcamentos:orcs};
+  if(!pausar.length&&!orcs.length){
+    el.innerHTML='<div style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.45);border-radius:12px;padding:14px;">'
+      +'<div style="font-size:14px;font-weight:900;color:#fbbf24;">⚠️ Nada para aplicar</div>'
+      +'<div style="font-size:11.5px;color:#c9ced6;margin-top:6px;">A revisão não tinha nenhum corte nem realocação marcada. '
+      +'Volte ao Copiloto, confira os itens e tente de novo.</div></div>';
+    return;
+  }
   var resp=await fetch('/api/trafego?action=aplicar',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({confirmar:true,pausarIds:pausar,orcamentos:orcs})
   }).then(function(x){return x.json();}).catch(function(){return{ok:false,erros:[{erro:'falha de rede'}]};});
@@ -774,8 +783,18 @@ async function aplicarCopiloto(){
     +'<div style="font-size:14px;font-weight:900;color:'+(resp.ok?'#4ade80':'#f59e0b')+';">'+(resp.ok?'✅ Aplicado':'⚠️ Aplicado com pendências')+'</div>'
     +'<div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:8px;">'+(resp.feitos||[]).length+' alteração(ões) confirmada(s)</div>'
     +((resp.erros||[]).length?'<div style="margin-top:8px;font-size:11px;color:#fca5a5;line-height:1.5;">'
-      +resp.erros.slice(0,8).map(function(e){return '• '+esc(e.acao)+': '+esc(e.erro)+(e.codigo?' (cód '+e.codigo+')':'');}).join('<br>')
+      +resp.erros.slice(0,8).map(function(e){
+        if(typeof e==='string')return '• '+esc(e);
+        return '• '+esc(e.nome||e.acao||e.id||'?')+': '+esc(e.erro||e.message||JSON.stringify(e))+(e.codigo?' (cód '+e.codigo+')':'');
+      }).join('<br>')
       +((resp.erros||[]).length>8?'<br>… e mais '+(resp.erros.length-8):'')+'</div>':'')
+    // 🔍 nada feito e nenhum erro? mostra o retorno cru — assim o problema não fica invisível
+    +((!(resp.feitos||[]).length&&!(resp.erros||[]).length)?
+      '<div style="margin-top:8px;font-size:10.5px;color:#fbbf24;line-height:1.5;">'
+      +'⚠️ A Meta não confirmou nem recusou nada. Retorno recebido:<br>'
+      +'<code style="font-size:9.5px;color:#c9ced6;">'+esc(JSON.stringify(resp).slice(0,400))+'</code><br>'
+      +'<span style="color:#8b93a3;">Isso costuma acontecer quando a revisão foi montada sem itens — '
+      +'confira se os criativos estavam selecionados antes de confirmar.</span></div>':'')
   +'</div>';
   el.innerHTML=h;
   window._cop=null;
