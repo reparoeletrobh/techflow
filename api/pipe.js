@@ -1108,6 +1108,12 @@ export default async function handler(req, res) {
     }
     saidas.sort((a, b) => String(b.saiuEm).localeCompare(String(a.saiuEm)));
     const porDestino = saidas.reduce((o, s) => { o[s.foiPara] = (o[s.foiPara] || 0) + 1; return o; }, {});
+    // ?mini=1 → só nome, valor, descrição e destino — cabe no chat
+    if (String(req.query.mini || '') === '1') {
+      return res.status(200).json({ de, horas, total: saidas.length, porDestino,
+        L: saidas.map(s => String(s.nome).slice(0, 18) + ' | R$' + (s.valor || 0) +
+          ' | ' + String(s.equipamento || '').slice(0, 26) + ' | →' + s.foiPara) });
+    }
     return res.status(200).json({ ok: true, faseDeOrigem: de, periodoHoras: horas,
       totalSaidas: saidas.length,
       POR_DESTINO: porDestino,
