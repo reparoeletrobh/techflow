@@ -629,8 +629,47 @@ module.exports = async function handler(req, res) {
           conjunto: st.name || null,
         });
       }
+      // 🚨 CAMPANHA ATIVA SEM NENHUM ANÚNCIO ATIVO — verba parada, ninguém percebe
+      try {
+        const cSem = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns?fields=id,name,effective_status,daily_budget,lifetime_budget,start_time&limit=300&access_token=${TOKEN}`, 8);
+        const sSem = await pegarTudo(`${GRAPH}/act_${CONTA}/adsets?fields=id,daily_budget,lifetime_budget,campaign{id}&limit=300&access_token=${TOKEN}`, 8);
+        const setsSem = {};
+        for (const s of (sSem.data || [])) { const ci = (s.campaign || {}).id; if (ci) (setsSem[ci] = setsSem[ci] || []).push(s); }
+        const adsPorCamp = {};
+        for (const a of (adsP.data || [])) {
+          const ci = (a.campaign || {}).id; if (!ci) continue;
+          adsPorCamp[ci] = adsPorCamp[ci] || { total: 0, ativos: 0 };
+          adsPorCamp[ci].total++;
+          if (a.effective_status === 'ACTIVE') adsPorCamp[ci].ativos++;
+        }
+        for (const c of (cSem.data || [])) {
+          if (c.effective_status !== 'ACTIVE') continue;
+          if (String(c.start_time || '').slice(0, 10) < desdeCicloP) continue;
+          const cont = adsPorCamp[c.id] || { total: 0, ativos: 0 };
+          if (cont.ativos > 0) continue;                    // tem anúncio rodando, tudo bem
+          let v = 0;
+          if (c.lifetime_budget) v = Number(c.lifetime_budget) / 100;
+          else if (c.daily_budget) v = Number(c.daily_budget) / 100;
+          else for (const s of (setsSem[c.id] || [])) {
+            if (s.lifetime_budget) v += Number(s.lifetime_budget) / 100;
+            else if (s.daily_budget) v += Number(s.daily_budget) / 100;
+          }
+          achados.push({
+            anuncio: c.name, id: c.id,
+            categoria: categoriaDe(c.name || '', 'anuncio'),
+            situacao: 'ACTIVE',
+            problema: '🚨 CAMPANHA ATIVA SEM ANÚNCIO RODANDO — R$ ' + v.toFixed(2) + ' de verba parada' +
+              (cont.total ? ' (' + cont.total + ' anúncio(s), nenhum ativo)' : ' (nenhum anúncio criado)'),
+            verbaParada: Number(v.toFixed(2)),
+          });
+        }
+      } catch (e) {}
+      achados.sort((a, b) => (b.verbaParada || 0) - (a.verbaParada || 0));
+      const verbaParadaTotal = Number(achados.reduce((s, x) => s + (x.verbaParada || 0), 0).toFixed(2));
       comProblema = { total: achados.length,
-        aviso: achados.length ? '⚠️ ' + achados.length + ' anúncio(s) ATIVO(S) com problema — não estão entregando' : null,
+        verbaParada: verbaParadaTotal,
+        aviso: achados.length ? '⚠️ ' + achados.length + ' campanha(s)/anúncio(s) ATIVOS com problema' +
+          (verbaParadaTotal > 0 ? ' — R$ ' + verbaParadaTotal.toFixed(2) + ' de verba parada' : ' — não estão entregando') : null,
         lista: achados.slice(0, 20).map(x => String(x.categoria || '?').toUpperCase().slice(0, 4) + ' | ' +
           String(x.anuncio).slice(0, 28) + ' | ' + x.problema),
         detalhe: achados.slice(0, 20) };
