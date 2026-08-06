@@ -125,10 +125,6 @@
       "schedule": "*/5 * * * *"
     },
     {
-      "path": "/api/trafego?action=realocar-orfa&aplicar=1&k=tfk-re2026-Bx7mQp9zKw4Y",
-      "schedule": "0 14 * * *"
-    },
-    {
       "path": "/api/trafego?action=pendentes-aprovacao&dias=2&k=tfk-re2026-Bx7mQp9zKw4Y",
       "schedule": "0 13,20 * * *"
     }

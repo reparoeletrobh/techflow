@@ -596,24 +596,11 @@ module.exports = async function handler(req, res) {
       else feitos.push({ id: alvo, nome: (a.nome || a.anuncio || null), acao: campo + ' → R$ ' + Number(valor).toFixed(2) });
       await new Promise(r2 => setTimeout(r2, 120));
     }
-    // 💸 AUTOMÁTICO: depois de pausar, devolve à operação o que sobrou nas campanhas paradas.
-    // Sem isso a verba ficava presa no pausado e ninguém percebia (R$342 em 04/08).
-    let orfaDevolvida = 0; const orfaFeitos = [];
-    try {
-      if ((pausarIds || []).length) {
-        await new Promise(s => setTimeout(s, 1500));           // deixa a Meta propagar as pausas
-        const KAO = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
-        const ro = await fetch(`https://reparoeletroadm.com/api/trafego?action=realocar-orfa&aplicar=1&k=${KAO}`)
-          .then(x => x.json()).catch(() => null);
-        if (ro && ro.ok && ro.feitos) {
-          for (const f of ro.feitos) {
-            orfaFeitos.push(f);
-            const m = String(f.acao || '').match(/R\$\s*([\d.,]+)/);
-            if (m) orfaDevolvida += Number(String(m[1]).replace(/\./g, '').replace(',', '.'));
-          }
-        }
-      }
-    } catch (e) {}
+    // ⛔ DEVOLUÇÃO AUTOMÁTICA DESLIGADA (05/08): verba de campanha PAUSADA não é gasto —
+    // é só um número na configuração e o dinheiro nunca sai. Redistribuí-la aos ativos
+    // INFLAVA o total da conta a cada ciclo com pausas. Pausou, esquece.
+    // Para reequilibrar de propósito, use ajustar-teto com o valor desejado.
+    const orfaFeitos = [];
     try {
       const lg = (await dbGet('trafego_log')) || { movs: [] };
       lg.movs.unshift({ ts: new Date().toISOString(),
