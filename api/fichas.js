@@ -820,6 +820,35 @@ export default async function handler(req, res) {
         ' | ' + (p.diasNaFase != null ? p.diasNaFase + 'd' : '?') +
         (lista.length > 1 ? ' | +' + (lista.length - 1) : ''));
     }
+    // ?fases=finalizado,erp,descarte → só as ocorrências dessas fases
+    const filtro = String(req.query.fases || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
+    if (filtro.length) {
+      const casa = f => filtro.some(x => String(f || '').toLowerCase().includes(x));
+      const porFase = {};
+      let n = 0;
+      for (const a of alvos) {
+        for (const p of (achados[a] || [])) {
+          if (!casa(p.fase)) continue;
+          const k = p.fase;
+          (porFase[k] = porFase[k] || []).push(
+            a + ' | ' + String(p.nome || '?').slice(0, 22) + ' | ' + p.onde +
+            ' | ' + (p.diasNaFase != null ? p.diasNaFase + 'd' : '?') +
+            (p.equipamento ? ' | ' + p.equipamento : ''));
+          n++;
+        }
+      }
+      for (const k of Object.keys(porFase)) {
+        porFase[k].sort((x, y) => {
+          const dx = parseFloat((x.split('|')[3] || '').replace('d', '')) || 0;
+          const dy = parseFloat((y.split('|')[3] || '').replace('d', '')) || 0;
+          return dy - dx;
+        });
+      }
+      return res.status(200).json({ ok: true,
+        filtro, codigosConsultados: alvos.length, ocorrencias: n,
+        porFase: Object.keys(porFase).reduce((o, k) => { o[k] = porFase[k].length; return o; }, {}),
+        RESULTADO: porFase });
+    }
     // ?todos=1 → uma linha por OCORRÊNCIA, não só a principal
     if (String(req.query.todos || '') === '1') {
       const todas = [];
