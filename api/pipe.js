@@ -1067,6 +1067,48 @@ export default async function handler(req, res) {
 
   // ── 🔁 REPROCESSAR-APROVADO: refaz os gatilhos que falharam (board técnico + almoxarifado) ──
   // Uso: ?action=reprocessar-aprovado&tel=7084  (ou &id=PIPE-XXXX)  [&aplicar=1]
+  // ── 🔢 CONFERE-CONTAGEM: por que a tela mostra um número e o banco outro ──
+  if (action === 'confere-contagem') {
+    const pp = (await dbGet(PIPE_KEY)) || { cards: [] };
+    const cards = pp.cards || [];
+    const porCampo = {};
+    const problemas = [];
+    for (const c of cards) {
+      const ph = c.phase || null;
+      const pid = c.phaseId || null;
+      const k = (ph || '(vazio)') + ' | phaseId=' + (pid || '(vazio)');
+      porCampo[k] = (porCampo[k] || 0) + 1;
+      if (pid && ph && pid !== ph) {
+        problemas.push({ tipo: 'divergente', id: c.id, nome: c.nomeContato,
+          phase: ph, phaseId: pid });
+      } else if (pid && !ph) {
+        problemas.push({ tipo: 'só phaseId', id: c.id, nome: c.nomeContato,
+          phaseId: pid, aviso: 'a TELA conta por phase — este card não aparece em nenhuma coluna' });
+      } else if (!pid && !ph) {
+        problemas.push({ tipo: 'sem fase', id: c.id, nome: c.nomeContato });
+      }
+    }
+    const fase = String(req.query.fase || 'erp');
+    const porPhase = cards.filter(c => c.phase === fase).length;
+    const porPhaseId = cards.filter(c => c.phaseId === fase).length;
+    const porQualquer = cards.filter(c => (c.phaseId || c.phase) === fase).length;
+    return res.status(200).json({ ok: problemas.length === 0,
+      totalCards: cards.length,
+      faseConsultada: fase,
+      contagem: {
+        'a TELA conta assim (c.phase)': porPhase,
+        'por phaseId': porPhaseId,
+        'por qualquer um dos dois': porQualquer,
+        diferenca: porQualquer - porPhase,
+      },
+      DIAGNOSTICO: porQualquer !== porPhase
+        ? '⚠️ ' + (porQualquer - porPhase) + ' card(s) com a fase gravada em phaseId e não em phase — somem da contagem da tela'
+        : '✅ contagem consistente',
+      cardsComProblema: problemas.length,
+      detalhe: problemas.slice(0, 30),
+      combinacoes: porCampo });
+  }
+
   // ── 🔍 QUEM-SAIU: cards que estavam numa fase e saíram dela no período ──
   if (action === 'quem-saiu') {
     const fase = String(req.query.fase || 'erp').toLowerCase();
