@@ -744,6 +744,46 @@ export default async function handler(req, res) {
   }
 
   // ── 🗑 LIXEIRA: fichas excluídas, com restauração ──
+  // ── 📊 CENSO-FASES: quantos registros existem em CADA fase, em TODOS os bancos ──
+  if (action === 'censo-fases') {
+    const bancos = [
+      ['fichas_adm','Fichas ADM'],['fichas_tv','Fichas TV'],
+      ['reparoeletro_logistica','Logística ADM'],['tv_logistica','Logística TV'],
+      ['reparoeletro_pipe','Pipe ADM'],['tv_pipe','Pipe TV'],
+      ['reparoeletro_arquivo','Arquivo ADM'],['tv_arquivo','Arquivo TV'],
+      ['reparoeletro_logistica_arquivo','Arq. Log. ADM'],['tv_logistica_arquivo','Arq. Log. TV'],
+      ['prospeccao_adm','Prospecção'],['reparoeletro_frenteloja','Frente de Loja'],
+      ['reparoeletro_balcao','Balcão'],['wa_arquivadas','Arq. WhatsApp'],
+    ];
+    const filtro = String(req.query.fase || '').toLowerCase();
+    const out = {}; const amostras = {};
+    for (const [chave, rot] of bancos) {
+      const b = await dbGet(chave);
+      if (!b) continue;
+      const itens = (b.fichas || []).concat(b.cards || []).concat(Array.isArray(b) ? b : []);
+      for (const x of itens) {
+        const f = String(x.phaseId || x.phase || x.status || x.faseId || '(sem fase)');
+        if (filtro && !f.toLowerCase().includes(filtro)) continue;
+        const k = rot + ' · ' + f;
+        out[k] = (out[k] || 0) + 1;
+        if (filtro) {
+          amostras[k] = amostras[k] || [];
+          if (amostras[k].length < 40) {
+            const d = new Date(x.movedAt || x.movidaEm || x.criadoEm || 0).getTime();
+            amostras[k].push((x.nome || x.nomeContato || '?').slice(0,20) + ' ' +
+              String(x.telefone || '').slice(-4) +
+              (d ? ' · ' + ((Date.now()-d)/86400000).toFixed(1) + 'd' : ''));
+          }
+        }
+      }
+    }
+    const ord = Object.keys(out).sort((a,b) => out[b]-out[a]);
+    return res.status(200).json({ ok: true, filtro: filtro || '(todas)',
+      totalRegistros: Object.values(out).reduce((s,x)=>s+x,0),
+      CONTAGEM: ord.map(k => k + ' → ' + out[k]),
+      amostras: filtro ? amostras : undefined });
+  }
+
   // ── 🔎 LOTE-FASES: recebe uma lista de 4 dígitos e devolve fase e tempo de cada um ──
   if (action === 'lote-fases') {
     const bruto = String(req.query.d || req.query.digitos || '');
