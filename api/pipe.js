@@ -1067,6 +1067,58 @@ export default async function handler(req, res) {
 
   // ── 🔁 REPROCESSAR-APROVADO: refaz os gatilhos que falharam (board técnico + almoxarifado) ──
   // Uso: ?action=reprocessar-aprovado&tel=7084  (ou &id=PIPE-XXXX)  [&aplicar=1]
+  // ── ➡️ SAIDAS-DA-FASE: quem saiu de uma fase e para onde foi, no período ──
+  if (action === 'saidas-da-fase') {
+    const de = String(req.query.de || 'entrega_solicitada').toLowerCase();
+    const horas = Math.min(720, Math.max(1, parseInt(req.query.horas || '24', 10)));
+    const corte = Date.now() - horas * 3600000;
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '?';
+    const [pp, arq, archive] = await Promise.all([
+      dbGet(PIPE_KEY), dbGet('reparoeletro_arquivo'), dbGet('reparoeletro_pipe_archive'),
+    ]);
+    const universo = ((pp || {}).cards || [])
+      .concat(((arq || {}).cards || []).map(c => ({ ...c, _arquivado: true })))
+      .concat(((archive || {}).cards || []).map(c => ({ ...c, _arquivado: true })));
+
+    const saidas = [];
+    for (const c of universo) {
+      const atual = String(c.phaseId || c.phase || '');
+      // o history guarda a fase DE ONDE saiu, com o horário da saída
+      const hist = (c.history || []).map(x => ({
+        fase: String(x.phase || x.phaseId || ''),
+        t: new Date(x.ts || x.timestamp || 0).getTime(),
+      })).filter(x => x.t).sort((a, b) => a.t - b.t);
+
+      for (let i = 0; i < hist.length; i++) {
+        if (hist[i].fase !== de) continue;
+        if (hist[i].t < corte) continue;
+        // para onde foi: a próxima entrada do histórico, ou a fase atual
+        const destino = (i + 1 < hist.length) ? hist[i + 1].fase : atual;
+        saidas.push({
+          id: c.id, nome: c.nomeContato || '?',
+          telefone: String(c.telefone || '').slice(-4),
+          equipamento: String(c.equipamento || c.descricao || '').slice(0, 24),
+          valor: parseFloat(c.valor || 0) || null,
+          saiuEm: new Date(hist[i].t).toISOString(),
+          foiPara: destino || '(desconhecida)',
+          faseAtualAgora: atual,
+          arquivado: !!c._arquivado,
+        });
+      }
+    }
+    saidas.sort((a, b) => String(b.saiuEm).localeCompare(String(a.saiuEm)));
+    const porDestino = saidas.reduce((o, s) => { o[s.foiPara] = (o[s.foiPara] || 0) + 1; return o; }, {});
+    return res.status(200).json({ ok: true, faseDeOrigem: de, periodoHoras: horas,
+      totalSaidas: saidas.length,
+      POR_DESTINO: porDestino,
+      LISTA: saidas.map(s => hh(s.saiuEm) + ' | ' + String(s.nome).slice(0, 22) + ' ' + s.telefone +
+        ' | ' + de + ' → ' + s.foiPara +
+        (s.faseAtualAgora !== s.foiPara ? ' (hoje em ' + s.faseAtualAgora + ')' : '') +
+        (s.arquivado ? ' [ARQUIVADO]' : '') +
+        (s.equipamento ? ' | ' + s.equipamento : '')),
+      detalhe: saidas });
+  }
+
   // ── 🔢 CONFERE-CONTAGEM: por que a tela mostra um número e o banco outro ──
   if (action === 'confere-contagem') {
     const pp = (await dbGet(PIPE_KEY)) || { cards: [] };
