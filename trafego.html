@@ -170,6 +170,8 @@ function render(){
     +'<div style="font-size:9.5px;font-weight:900;color:var(--dim);letter-spacing:.7px;">'+esc((_d.periodoLabel||'').toUpperCase())+'</div>'
     +'<div style="display:flex;gap:18px;margin-top:7px;align-items:baseline;flex-wrap:wrap;">'
       +'<div><div style="font-family:var(--mono);font-size:20px;font-weight:700;">'+brl(t.gasto)+'</div><div style="font-size:9.5px;color:var(--dim);font-weight:700;">VALOR USADO</div></div>'
+      +((_d.metaVerba)?'<div><div style="font-family:var(--mono);font-size:20px;font-weight:700;color:'+(_d.metaVerba.adm.pct>=90?'#f87171':'#4ade80')+';">'+brl(_d.metaVerba.adm.gasto)+'<span style="font-size:12px;color:var(--dim);">/'+brl(_d.metaVerba.adm.disponivel)+'</span></div><div style="font-size:9.5px;color:var(--dim);font-weight:700;">ADM · '+_d.metaVerba.adm.pct+'%</div></div>':'')
+      +((_d.metaVerba)?'<div><div style="font-family:var(--mono);font-size:20px;font-weight:700;color:'+(_d.metaVerba.tv.pct>=90?'#f87171':'#4ade80')+';">'+brl(_d.metaVerba.tv.gasto)+'<span style="font-size:12px;color:var(--dim);">/'+brl(_d.metaVerba.tv.disponivel)+'</span></div><div style="font-size:9.5px;color:var(--dim);font-weight:700;">TV · '+_d.metaVerba.tv.pct+'%</div></div>':'')
       +'<div><div style="font-family:var(--mono);font-size:20px;font-weight:700;">'+(t.conversas||0)+'</div><div style="font-size:9.5px;color:var(--dim);font-weight:700;">CONVERSAS INICIADAS</div></div>'
       +'<div><div style="font-family:var(--mono);font-size:20px;font-weight:700;color:#fb923c;">'+(t.cpa!=null?brl(t.cpa):'—')+'</div><div style="font-size:9.5px;color:var(--dim);font-weight:700;">POR CONVERSA</div></div>'
     +'</div>'
@@ -617,6 +619,25 @@ async function carregarCopiloto(){
 
   // 📜 o histórico aparece SEMPRE — antes ficava dentro da condição de cortes
   // e sumia junto com o botão de revisar quando não havia nada a aplicar
+  // ⚠️ ATIVOS COM PROBLEMA
+  if(r.ATIVOS_COM_PROBLEMA&&r.ATIVOS_COM_PROBLEMA.total){
+    var ap=r.ATIVOS_COM_PROBLEMA;
+    h+='<div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.45);border-radius:12px;padding:12px 14px;margin-top:14px;">'
+      +'<div style="font-size:12.5px;font-weight:900;color:#f87171;">'+esc(ap.aviso)+'</div>'
+      +'<div style="font-family:var(--mono);font-size:10.5px;color:#c9ced6;margin-top:7px;line-height:1.7;">'
+        +ap.lista.map(function(l){return esc(l);}).join('<br>')+'</div>'
+    +'</div>';
+  }
+  // ⏸️ PAUSADOS DO CICLO
+  if(r.PAUSADOS&&r.PAUSADOS.total){
+    var pz=r.PAUSADOS;
+    h+='<div style="background:rgba(139,146,163,.08);border:1px solid rgba(139,146,163,.3);border-radius:12px;padding:12px 14px;margin-top:10px;">'
+      +'<div style="font-size:12.5px;font-weight:900;color:#aab2c0;">⏸️ '+pz.total+' campanha(s) pausada(s) neste ciclo</div>'
+      +'<div style="font-size:10.5px;color:#8b93a3;margin-top:3px;">Verba alocada nelas: '+brl(pz.verbaAlocadaNeles)+' — não é gasta, o dinheiro não sai.</div>'
+      +'<div style="font-family:var(--mono);font-size:10.5px;color:#c9ced6;margin-top:7px;line-height:1.7;">'
+        +pz.lista.map(function(l){return esc(l);}).join('<br>')+'</div>'
+    +'</div>';
+  }
   h+='<button class="btn" style="width:100%;padding:10px;font-size:12px;margin-top:10px;background:#1e293b;" onclick="verHistoricoCopiloto()">📜 Histórico de alterações da semana</button>';
   if(!r.totalCortes){
     h+='<div style="text-align:center;font-size:11.5px;color:#4ade80;margin-top:10px;padding:10px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:9px;">'

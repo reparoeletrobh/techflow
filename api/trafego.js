@@ -57,7 +57,7 @@ module.exports = async function handler(req, res) {
   // ═══ CONFIG: metas de custo por conversa e verba semanal ═══
   const CFG_PADRAO = {
     metas: { tv: 2, microondas: 5, forno: 5, purificador: 8, adega: 10, institucional: 8, outros: 8 },
-    verba: { adm: 5000, tv: 500, aproveitamento: 0.87 },
+    verba: { adm: 2500, tv: 870, aproveitamento: 1 },   // valores DISPONÍVEIS (definidos 06/08)
     cicloInicio: { diaSemana: 6, hora: 13 }, // sábado 13h
     // Encerramento sábado 11h: limite de CAPACIDADE DE ATENDIMENTO, não de mídia.
     // As 2h de folga evitam que o lead que chega depois pense que há coleta no mesmo dia.
@@ -256,6 +256,9 @@ module.exports = async function handler(req, res) {
 
     // Termômetro da semana: verba real (87%) × gasto do ciclo
     const gastoTv = anuncios.filter(a => a.categoria === 'tv').reduce((s, a) => s + a.gasto, 0);
+    // 🎯 metas de verba do ciclo — o painel passa a mostrar o consumo sobre elas
+    const metaAdm = (cfg.verba && cfg.verba.adm) || 2500;
+    const metaTv = (cfg.verba && cfg.verba.tv) || 870;
     const gastoAdm = anuncios.filter(a => a.categoria !== 'tv').reduce((s, a) => s + a.gasto, 0);
     const realAdm = cfg.verba.adm * cfg.verba.aproveitamento;
     const realTv = cfg.verba.tv * cfg.verba.aproveitamento;
@@ -271,7 +274,30 @@ module.exports = async function handler(req, res) {
         ralos: lista.filter(a => a.situacao === 'ralo').length };
     }
     const ativos = anuncios.filter(a => a.ativo);
-    const gastoTotal = anuncios.reduce((s, a) => s + a.gasto, 0);
+    // 💰 o gasto real do ciclo vem das CAMPANHAS — somar só os anúncios que passam na
+    // trava de 3 níveis deixava de fora o que foi gasto por anúncio já encerrado,
+    // e o painel mostrava menos que o extrato (R$1.992 contra R$2.251 em 06/08).
+    let gastoTotal = anuncios.reduce((s, a) => s + a.gasto, 0);
+    let gastoPorFrente = null;
+    try {
+      const desdeG = (function () {
+        const b = new Date(Date.now() - 3 * 3600000);
+        const d = new Date(b); d.setUTCDate(b.getUTCDate() - ((b.getUTCDay() + 1) % 7));
+        return d.toISOString().slice(0, 10);
+      })();
+      const jnG = 'time_range=' + encodeURIComponent(JSON.stringify({ since: desdeG, until: new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10) }));
+      const insG = await pegarTudo(`${GRAPH}/act_${CONTA}/insights?level=campaign&${jnG}&fields=campaign_id,campaign_name,spend&limit=200&access_token=${TOKEN}`, 6);
+      let gTv = 0, gAdm = 0, gTot = 0;
+      for (const i of (insG.data || [])) {
+        const v = Number(i.spend || 0);
+        gTot += v;
+        if (categoriaDe(i.campaign_name || '', 'anuncio') === 'tv') gTv += v; else gAdm += v;
+      }
+      if (gTot > 0) {
+        gastoTotal = gTot;
+        gastoPorFrente = { tv: Number(gTv.toFixed(2)), adm: Number(gAdm.toFixed(2)) };
+      }
+    } catch (e) {}
     const convTotal = anuncios.reduce((s, a) => s + a.conversas, 0);
     const metricasVistas = [...new Set(anuncios.map(a => a.metricaConversa).filter(Boolean))];
     const dados = { ok: true, ciclo: { desde, ate: hoje },
@@ -279,6 +305,17 @@ module.exports = async function handler(req, res) {
       periodoLabel: periodo === 'hoje' ? 'Hoje' : periodo === '7d' ? 'Últimos 7 dias' : 'Ciclo (desde ' + desde.split('-').reverse().join('/') + ')',
       totais: { gasto: Number(gastoTotal.toFixed(2)), conversas: convTotal,
         cpa: convTotal > 0 ? Number((gastoTotal / convTotal).toFixed(2)) : null },
+      // 🎯 consumo sobre a verba DISPONÍVEL de cada frente
+      metaVerba: {
+        adm: { disponivel: metaAdm,
+          gasto: gastoPorFrente ? gastoPorFrente.adm : Number((gastoTotal - gastoTv).toFixed(2)),
+          restante: Number((metaAdm - (gastoPorFrente ? gastoPorFrente.adm : gastoTotal - gastoTv)).toFixed(2)),
+          pct: Math.round(((gastoPorFrente ? gastoPorFrente.adm : gastoTotal - gastoTv) / metaAdm) * 100) },
+        tv: { disponivel: metaTv,
+          gasto: gastoPorFrente ? gastoPorFrente.tv : Number(gastoTv.toFixed(2)),
+          restante: Number((metaTv - (gastoPorFrente ? gastoPorFrente.tv : gastoTv)).toFixed(2)),
+          pct: Math.round(((gastoPorFrente ? gastoPorFrente.tv : gastoTv) / metaTv) * 100) },
+      },
       calculo: { formula: 'custo por conversa = valor gasto ÷ conversas por mensagem iniciadas',
         metricaMeta: metricasVistas.join(', ') || 'nenhuma conversa no período',
         atribuicao: 'configuração unificada da conta (a mesma do Gerenciador de Anúncios)' },
@@ -521,7 +558,43 @@ module.exports = async function handler(req, res) {
         aviso: pausadas.length ? '⏸️ ' + pausadas.length + ' campanha(s) pausada(s) neste ciclo, com R$ ' + verbaPresa.toFixed(2) + ' alocados — rode verba-orfa para devolver o que sobrou' : null,
         lista: lista.map(p => p.categoria.toUpperCase().slice(0, 4) + ' | ' + String(p.nome).slice(0, 30) + ' | R$ ' + p.verba + ' | ' + p.situacao) };
     } catch (e) {}
+    // ⚠️ ATIVAS COM PROBLEMA — anúncios do ciclo que estão ativos mas não entregam
+    let comProblema = null;
+    try {
+      const adsP = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,effective_status,issues_info,adset{id,name,effective_status,end_time},campaign{id,name,effective_status}&limit=300&access_token=${TOKEN}`, 8);
+      const agoraMs = Date.now();
+      const ehAvisoNormal = p => /não está sendo veiculado, mas você não precisa fazer nada/i.test(String(p || ''));
+      const achados = [];
+      for (const a of (adsP.data || [])) {
+        const st = a.adset || {};
+        const issues = (a.issues_info || []).map(x => x.error_summary || x.error_message).filter(Boolean);
+        const graves = issues.filter(i => !ehAvisoNormal(i));
+        const prazoVencido = st.end_time && new Date(st.end_time).getTime() < agoraMs;
+        const conjParado = st.effective_status && st.effective_status !== 'ACTIVE';
+        const reprovado = a.effective_status === 'DISAPPROVED';
+        const emRevisao = ['PENDING_REVIEW', 'IN_PROCESS', 'WITH_ISSUES'].includes(a.effective_status) && graves.length;
+        // só interessa se a CAMPANHA está ativa (senão é pausada, já coberta acima)
+        if ((a.campaign || {}).effective_status !== 'ACTIVE') continue;
+        if (!graves.length && !prazoVencido && !conjParado && !reprovado && !emRevisao) continue;
+        achados.push({
+          anuncio: a.name, id: a.id,
+          categoria: categoriaDe(a.name || '', 'anuncio'),
+          situacao: a.effective_status,
+          problema: reprovado ? '❌ REPROVADO pela Meta'
+            : (graves.length ? '⚠️ ' + String(graves[0]).slice(0, 70)
+            : (prazoVencido ? '⏰ prazo de veiculação ENCERRADO em ' + String(st.end_time).slice(0, 10)
+            : (conjParado ? '⏸️ conjunto ' + st.effective_status : '⏳ em revisão'))),
+          conjunto: st.name || null,
+        });
+      }
+      comProblema = { total: achados.length,
+        aviso: achados.length ? '⚠️ ' + achados.length + ' anúncio(s) ATIVO(S) com problema — não estão entregando' : null,
+        lista: achados.slice(0, 20).map(x => String(x.categoria || '?').toUpperCase().slice(0, 4) + ' | ' +
+          String(x.anuncio).slice(0, 28) + ' | ' + x.problema),
+        detalhe: achados.slice(0, 20) };
+    } catch (e) {}
     return res.status(200).json({ ok: true, periodo: per, diasRestantes,
+      ATIVOS_COM_PROBLEMA: comProblema,
       PAUSADOS: panoramaPausados,
       ciclo: base.dados.ciclo,
       global: { ativos: globalAtivos, alocado: globalAlocado, gasto: globalGasto,
