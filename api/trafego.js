@@ -305,6 +305,31 @@ module.exports = async function handler(req, res) {
       periodoLabel: periodo === 'hoje' ? 'Hoje' : periodo === '7d' ? 'Últimos 7 dias' : 'Ciclo (desde ' + desde.split('-').reverse().join('/') + ')',
       totais: { gasto: Number(gastoTotal.toFixed(2)), conversas: convTotal,
         cpa: convTotal > 0 ? Number((gastoTotal / convTotal).toFixed(2)) : null },
+      // 💰 verba REALMENTE alocada nas campanhas do ciclo (mesma fonte do extrato)
+      verbaAlocadaReal: await (async function () {
+        try {
+          const desdeV = inicioCiclo(cfg);
+          const cV = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns?fields=id,name,effective_status,daily_budget,lifetime_budget,start_time&limit=200&access_token=${TOKEN}`, 6);
+          const sV = await pegarTudo(`${GRAPH}/act_${CONTA}/adsets?fields=id,daily_budget,lifetime_budget,campaign{id}&limit=200&access_token=${TOKEN}`, 6);
+          const sPor = {};
+          for (const s of (sV.data || [])) { const ci = (s.campaign || {}).id; if (ci) (sPor[ci] = sPor[ci] || []).push(s); }
+          let vTv = 0, vAdm = 0;
+          for (const c of (cV.data || [])) {
+            if (c.effective_status !== 'ACTIVE') continue;
+            if (String(c.start_time || '').slice(0, 10) < desdeV) continue;
+            let v = 0;
+            if (c.lifetime_budget) v = Number(c.lifetime_budget) / 100;
+            else if (c.daily_budget) v = Number(c.daily_budget) / 100;
+            else for (const s of (sPor[c.id] || [])) {
+              if (s.lifetime_budget) v += Number(s.lifetime_budget) / 100;
+              else if (s.daily_budget) v += Number(s.daily_budget) / 100;
+            }
+            if (categoriaDe(c.name || '', 'anuncio') === 'tv') vTv += v; else vAdm += v;
+          }
+          return { adm: Number(vAdm.toFixed(2)), tv: Number(vTv.toFixed(2)),
+            total: Number((vAdm + vTv).toFixed(2)) };
+        } catch (e) { return null; }
+      })(),
       // 🎯 consumo sobre a verba DISPONÍVEL de cada frente
       metaVerba: {
         adm: { disponivel: metaAdm,
@@ -561,8 +586,14 @@ module.exports = async function handler(req, res) {
     // ⚠️ ATIVAS COM PROBLEMA — anúncios do ciclo que estão ativos mas não entregam
     let comProblema = null;
     try {
-      const adsP = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,effective_status,issues_info,adset{id,name,effective_status,end_time},campaign{id,name,effective_status}&limit=300&access_token=${TOKEN}`, 8);
+      const adsP = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,effective_status,issues_info,adset{id,name,effective_status,end_time},campaign{id,name,effective_status,start_time}&limit=300&access_token=${TOKEN}`, 8);
       const agoraMs = Date.now();
+      // 📅 SÓ o ciclo atual — sem isso entravam anúncios de todos os ciclos anteriores (569!)
+      const desdeCicloP = (function () {
+        const b = new Date(Date.now() - 3 * 3600000);
+        const d = new Date(b); d.setUTCDate(b.getUTCDate() - ((b.getUTCDay() + 1) % 7));
+        return d.toISOString().slice(0, 10);
+      })();
       const ehAvisoNormal = p => /não está sendo veiculado, mas você não precisa fazer nada/i.test(String(p || ''));
       const achados = [];
       for (const a of (adsP.data || [])) {
@@ -573,8 +604,9 @@ module.exports = async function handler(req, res) {
         const conjParado = st.effective_status && st.effective_status !== 'ACTIVE';
         const reprovado = a.effective_status === 'DISAPPROVED';
         const emRevisao = ['PENDING_REVIEW', 'IN_PROCESS', 'WITH_ISSUES'].includes(a.effective_status) && graves.length;
-        // só interessa se a CAMPANHA está ativa (senão é pausada, já coberta acima)
+        // só interessa se a CAMPANHA está ativa E é do ciclo atual
         if ((a.campaign || {}).effective_status !== 'ACTIVE') continue;
+        if (String((a.campaign || {}).start_time || '').slice(0, 10) < desdeCicloP) continue;
         if (!graves.length && !prazoVencido && !conjParado && !reprovado && !emRevisao) continue;
         achados.push({
           anuncio: a.name, id: a.id,

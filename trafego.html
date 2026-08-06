@@ -178,15 +178,20 @@ function render(){
     +'<div style="font-size:9.5px;color:#5a6270;margin-top:8px;line-height:1.5;">'+esc((_d.calculo||{}).formula||'')
       +'<br>métrica da Meta: <span style="font-family:var(--mono);">'+esc((_d.calculo||{}).metricaMeta||'')+'</span></div>'
   +'</div>';
-  document.getElementById('termo').innerHTML=[['ADM',v.adm,'#f97316'],['TV',v.tv,'#3b82f6']].map(function(p){
-    var nome=p[0],d=p[1],cor=p[2];
-    var pct=d.real>0?Math.min(100,d.gasto/d.real*100):0;
+  // 🎯 FONTE ÚNICA: usa metaVerba (mesma do topo). Antes este bloco usava outro cálculo,
+  // com o aproveitamento antigo, e mostrava percentual diferente do cabeçalho.
+  var mv=_d.metaVerba||{adm:{disponivel:2500,gasto:0,restante:2500,pct:0},tv:{disponivel:870,gasto:0,restante:870,pct:0}};
+  var alo=_d.verbaAlocadaReal||null;
+  document.getElementById('termo').innerHTML=[['ADM',mv.adm,'#f97316','adm'],['TV',mv.tv,'#3b82f6','tv']].map(function(p){
+    var nome=p[0],d=p[1],cor=p[2],ch=p[3];
+    var pct=d.disponivel>0?Math.min(100,d.gasto/d.disponivel*100):0;
     return '<div class="verba">'
       +'<div class="rot" style="color:'+cor+';">VERBA '+nome+'</div>'
-      +'<div class="val">'+brl(d.saldo)+'</div>'
-      +'<div class="det">disponível de '+brl(d.real)+'</div>'
+      +'<div class="val">'+brl(d.restante)+'</div>'
+      +'<div class="det">a gastar · disponível '+brl(d.disponivel)+'</div>'
       +'<div class="barra"><i style="width:'+pct.toFixed(1)+'%;background:'+cor+';"></i></div>'
       +'<div class="det" style="margin-top:5px;">gasto '+brl(d.gasto)+' · '+pct.toFixed(0)+'%</div>'
+      +(alo?'<div class="det" style="margin-top:3px;color:#8b93a3;">alocado nas campanhas: '+brl(alo[ch])+'</div>':'')
     +'</div>';
   }).join('');
 
