@@ -1067,6 +1067,57 @@ export default async function handler(req, res) {
 
   // ── 🔁 REPROCESSAR-APROVADO: refaz os gatilhos que falharam (board técnico + almoxarifado) ──
   // Uso: ?action=reprocessar-aprovado&tel=7084  (ou &id=PIPE-XXXX)  [&aplicar=1]
+  // ── 🔍 QUEM-SAIU: cards que estavam numa fase e saíram dela no período ──
+  if (action === 'quem-saiu') {
+    const fase = String(req.query.fase || 'erp').toLowerCase();
+    const horas = Math.min(720, Math.max(1, parseInt(req.query.horas || '24', 10)));
+    const corte = Date.now() - horas * 3600000;
+    const brt = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '?';
+    const [pp, arq, archive] = await Promise.all([
+      dbGet(PIPE_KEY), dbGet('reparoeletro_arquivo'), dbGet('reparoeletro_pipe_archive'),
+    ]);
+    const todos = ((pp || {}).cards || []);
+    const nosArquivos = ((arq || {}).cards || []).concat(((archive || {}).cards || []));
+
+    const agora = todos.filter(c => String(c.phaseId || c.phase || '') === fase);
+    // quem PASSOU pela fase e hoje está em outra
+    const sairam = [];
+    for (const c of todos) {
+      const atual = String(c.phaseId || c.phase || '');
+      if (atual === fase) continue;
+      const hist = (c.history || []).map(x => ({
+        f: String(x.phase || x.phaseId || ''), t: new Date(x.ts || x.timestamp || 0).getTime(),
+      })).filter(x => x.t);
+      const passou = hist.some(x => x.f === fase);
+      const mexeuAgora = new Date(c.movedAt || 0).getTime() >= corte;
+      if (passou && mexeuAgora) {
+        sairam.push({ id: c.id, nome: c.nomeContato, telefone: String(c.telefone || '').slice(-4),
+          equipamento: c.equipamento || c.descricao,
+          saiuPara: atual, quando: c.movedAt, ondeEsta: 'no pipe' });
+      }
+    }
+    // quem foi ARQUIVADO vindo dessa fase
+    for (const c of nosArquivos) {
+      const q = new Date(c.arquivadoEm || c.movedAt || 0).getTime();
+      if (!q || q < corte) continue;
+      const ult = String(c.phaseId || c.phase || '');
+      const hist = (c.history || []).map(x => String(x.phase || x.phaseId || ''));
+      if (ult === fase || hist.includes(fase)) {
+        sairam.push({ id: c.id, nome: c.nomeContato, telefone: String(c.telefone || '').slice(-4),
+          equipamento: c.equipamento || c.descricao,
+          saiuPara: 'ARQUIVADO', quando: c.arquivadoEm || c.movedAt, ondeEsta: 'arquivo' });
+      }
+    }
+    sairam.sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
+    return res.status(200).json({ ok: true, fase, periodoHoras: horas,
+      naFaseAgora: agora.length,
+      sairamNoPeriodo: sairam.length,
+      LISTA: sairam.map(s => brt(s.quando) + ' | ' + String(s.nome || '?').slice(0, 22) +
+        ' ' + s.telefone + ' | → ' + s.saiuPara + ' | ' + s.ondeEsta +
+        (s.equipamento ? ' | ' + String(s.equipamento).slice(0, 20) : '')),
+      detalhe: sairam });
+  }
+
   // ── 🩺 DIAG-MOVER: por que um card não move de fase ──
   if (action === 'diag-mover') {
     const q = String(req.query.q || '').trim();
