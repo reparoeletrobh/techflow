@@ -2118,15 +2118,17 @@ async function enviarDiagnostico() {
   style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,0.85);
          backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:16px;">
   <div style="background:#0d1117;border:1px solid rgba(168,85,247,0.3);border-radius:16px;
-              width:100%;max-width:420px;max-height:92dvh;display:flex;flex-direction:column;">
-    <div style="padding:14px 18px;border-bottom:1px solid #1f2937;
+              width:100%;max-width:520px;max-height:calc(100dvh - 32px);
+              display:flex;flex-direction:column;overflow:hidden;">
+    <div style="padding:14px 18px;border-bottom:1px solid #1f2937;flex:0 0 auto;
                 display:flex;justify-content:space-between;align-items:center;">
       <div style="font-family:var(--fh);font-size:15px;font-weight:700;color:#a855f7;">🔧 DIAGNÓSTICO</div>
       <button onclick="fecharAnalise()"
         style="width:30px;height:30px;border-radius:50%;background:#1f2937;
                border:1px solid #333;color:#888;font-size:16px;cursor:pointer;">×</button>
     </div>
-    <div style="padding:16px 18px 20px;display:flex;flex-direction:column;gap:14px;">
+    <div style="padding:16px 18px 20px;display:flex;flex-direction:column;gap:14px;
+                overflow-y:auto;overflow-x:hidden;flex:1;min-height:0;-webkit-overflow-scrolling:touch;">
       <div id="al-info"
         style="background:#111;border-radius:10px;padding:12px;border:1px solid #1f2937;font-size:13px;"></div>
       <div>
@@ -2135,7 +2137,7 @@ async function enviarDiagnostico() {
         </label>
         <div style="display:flex;gap:6px;" id="dlj-qtd"></div>
       </div>
-      <div id="dlj-equips" style="display:flex;flex-direction:column;gap:14px;"></div>
+      <div id="dlj-equips" style="display:flex;flex-direction:column;gap:14px;min-width:0;max-width:100%;"></div>
       <div>
         <label style="font-family:var(--fm);font-size:10px;color:#888;display:block;margin-bottom:6px;letter-spacing:.5px;">
           OBSERVAÇÃO (opcional)
