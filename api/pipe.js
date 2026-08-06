@@ -1067,6 +1067,53 @@ export default async function handler(req, res) {
 
   // ── 🔁 REPROCESSAR-APROVADO: refaz os gatilhos que falharam (board técnico + almoxarifado) ──
   // Uso: ?action=reprocessar-aprovado&tel=7084  (ou &id=PIPE-XXXX)  [&aplicar=1]
+  // ── 🩺 DIAG-MOVER: por que um card não move de fase ──
+  if (action === 'diag-mover') {
+    const q = String(req.query.q || '').trim();
+    const destino = String(req.query.para || 'erp');
+    if (!q) return res.status(400).json({ ok: false, error: 'informe ?q=4dígitos ou nome' });
+    const so = t => String(t || '').replace(/\D/g, '');
+    const db = (await dbGet(PIPE_KEY)) || { cards: [] };
+    const dbT = (await dbGet('tv_pipe')) || { cards: [] };
+    const casa = c => {
+      const n = String(c.nomeContato || '').toLowerCase();
+      const t = so(c.telefone);
+      return n.includes(q.toLowerCase()) || (so(q).length >= 4 && t.endsWith(so(q))) ||
+        String(c.id).toLowerCase() === q.toLowerCase();
+    };
+    const achados = [];
+    for (const [banco, rot] of [[db, 'Pipe ADM'], [dbT, 'Pipe TV']]) {
+      for (const c of (banco.cards || [])) {
+        if (!casa(c)) continue;
+        const faseAtual = c.phaseId || c.phase || '';
+        const faseValida = PHASES.find(p => p.id === destino);
+        achados.push({
+          id: c.id, onde: rot, nome: c.nomeContato, telefone: c.telefone,
+          equipamento: c.equipamento || c.descricao,
+          faseAtual,
+          usaPhaseId: !!c.phaseId, usaPhase: !!c.phase,
+          divergencia: (c.phaseId && c.phase && c.phaseId !== c.phase)
+            ? '⚠️ phaseId=' + c.phaseId + ' MAS phase=' + c.phase + ' — a tela pode ler um e gravar no outro'
+            : null,
+          destinoExisteNoPipe: !!faseValida,
+          destinoNome: faseValida ? faseValida.name : '(fase não existe neste pipe)',
+          movidoEm: c.movedAt,
+          bloqueios: [
+            ...(rot === 'Pipe TV' && !faseValida ? ['a fase ' + destino + ' não existe no pipe de TV'] : []),
+            ...(!faseValida ? ['a fase de destino não existe na lista PHASES'] : []),
+            ...(c.phaseId && c.phase && c.phaseId !== c.phase ? ['card com phaseId e phase diferentes'] : []),
+          ],
+        });
+      }
+    }
+    return res.status(200).json({ ok: achados.length > 0,
+      busca: q, destino,
+      fasesDoPipeADM: PHASES.map(p => p.id),
+      encontrados: achados.length,
+      cards: achados,
+      dica: achados.length === 0 ? 'nenhum card encontrado — confira os 4 dígitos' : undefined });
+  }
+
   // ── 📊 MOVIMENTO-DIA: o que entrou e o que saiu do pipe no período ──
   if (action === 'movimento-dia') {
     const dias = Math.min(30, Math.max(1, parseInt(req.query.dias || '1', 10)));
