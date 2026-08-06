@@ -1202,6 +1202,120 @@ module.exports = async function handler(req, res) {
       proximoPasso: 'confira em /trafego e troque o vídeo no criativo se necessário' });
   }
 
+  // ── 🔬 AUDITORIA-CICLO: puxa TUDO da Meta e cruza com o que cada painel mostra ──
+  if (action === 'auditoria-ciclo') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const cfgA = await cfgTrafego();
+    const desde = inicioCiclo(cfgA);
+    const ate = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+
+    // ── 1) FONTE PRIMÁRIA: campanhas, conjuntos, anúncios e gastos ──
+    const [camps, sets, ads] = await Promise.all([
+      pegarTudo(`${GRAPH}/act_${CONTA}/campaigns?fields=id,name,effective_status,daily_budget,lifetime_budget,start_time,stop_time&limit=300&access_token=${TOKEN}`, 10),
+      pegarTudo(`${GRAPH}/act_${CONTA}/adsets?fields=id,name,effective_status,daily_budget,lifetime_budget,end_time,campaign{id}&limit=300&access_token=${TOKEN}`, 10),
+      pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,effective_status,adset{id},campaign{id}&limit=400&access_token=${TOKEN}`, 12),
+    ]);
+    const jn = 'time_range=' + encodeURIComponent(JSON.stringify({ since: desde, until: ate }));
+    const insC = await pegarTudo(`${GRAPH}/act_${CONTA}/insights?level=campaign&${jn}&fields=campaign_id,campaign_name,spend&limit=300&access_token=${TOKEN}`, 10);
+    const gastoCamp = {};
+    for (const i of (insC.data || [])) gastoCamp[i.campaign_id] = Number(i.spend || 0);
+
+    const setsDe = {};
+    for (const s of (sets.data || [])) { const ci = (s.campaign || {}).id; if (ci) (setsDe[ci] = setsDe[ci] || []).push(s); }
+    const adsDe = {};
+    for (const a of (ads.data || [])) { const ci = (a.campaign || {}).id; if (ci) (adsDe[ci] = adsDe[ci] || []).push(a); }
+
+    // ── 2) CAMPANHAS DO CICLO ──
+    const doCiclo = (camps.data || []).filter(c => String(c.start_time || '').slice(0, 10) >= desde);
+    const tabela = doCiclo.map(c => {
+      let verba = 0, onde = null;
+      if (c.lifetime_budget) { verba = Number(c.lifetime_budget) / 100; onde = 'campanha(total)'; }
+      else if (c.daily_budget) { verba = Number(c.daily_budget) / 100; onde = 'campanha(diária)'; }
+      else {
+        for (const s of (setsDe[c.id] || [])) {
+          if (s.lifetime_budget) { verba += Number(s.lifetime_budget) / 100; onde = 'conjunto(total)'; }
+          else if (s.daily_budget) { verba += Number(s.daily_budget) / 100; onde = 'conjunto(diária)'; }
+        }
+      }
+      const g = Number((gastoCamp[c.id] || 0).toFixed(2));
+      const adsAtivos = (adsDe[c.id] || []).filter(a => a.effective_status === 'ACTIVE').length;
+      return { campanha: c.name, id: c.id,
+        categoria: categoriaDe(c.name || '', 'anuncio'),
+        frente: categoriaDe(c.name || '', 'anuncio') === 'tv' ? 'TV' : 'ADM',
+        situacao: c.effective_status,
+        ativa: c.effective_status === 'ACTIVE',
+        verba: Number(verba.toFixed(2)), verbaEm: onde,
+        gasto: g, falta: Number(Math.max(0, verba - g).toFixed(2)),
+        anunciosAtivos: adsAtivos,
+        inicio: String(c.start_time || '').slice(0, 10),
+        fim: c.stop_time ? String(c.stop_time).slice(0, 16).replace('T', ' ') : null };
+    }).sort((a, b) => b.verba - a.verba);
+
+    const ativas = tabela.filter(t => t.ativa);
+    const pausadas = tabela.filter(t => !t.ativa);
+    const som = (arr, k) => Number(arr.reduce((s, x) => s + (x[k] || 0), 0).toFixed(2));
+    const porFrente = (f) => {
+      const a = ativas.filter(x => x.frente === f);
+      return { campanhas: a.length, verba: som(a, 'verba'), gasto: som(a, 'gasto'), falta: som(a, 'falta') };
+    };
+
+    // ── 3) O QUE O PAINEL/CACHE ESTÁ MOSTRANDO ──
+    const cache = await dbGet('trafego_painel_cache_ciclo');
+    const doCache = ((cache || {}).dados) || null;
+    const cacheDiz = doCache ? {
+      geradoEm: cache.em || null,
+      anunciosExibidos: doCache.exibidos ?? doCache.totalAnuncios,
+      gastoTotal: (doCache.totais || {}).gasto,
+      metaVerbaAdmGasto: ((doCache.metaVerba || {}).adm || {}).gasto,
+      metaVerbaTvGasto: ((doCache.metaVerba || {}).tv || {}).gasto,
+      verbaAlocadaReal: doCache.verbaAlocadaReal || null,
+      blocoVerbaLegado: { adm: ((doCache.verba || {}).adm || {}).gasto, tv: ((doCache.verba || {}).tv || {}).gasto },
+      motivosCorte: doCache.motivosCorte || null,
+    } : 'sem cache';
+
+    // ── 4) CRUZAMENTO ──
+    const verdade = {
+      admVerba: porFrente('ADM').verba, admGasto: porFrente('ADM').gasto,
+      tvVerba: porFrente('TV').verba, tvGasto: porFrente('TV').gasto,
+      gastoTotalCiclo: Number((porFrente('ADM').gasto + porFrente('TV').gasto).toFixed(2)),
+    };
+    const divergencias = [];
+    if (doCache) {
+      const cmp = (rot, valorPainel, valorReal) => {
+        if (valorPainel == null) { divergencias.push(rot + ': painel não informa'); return; }
+        const d = Number((valorPainel - valorReal).toFixed(2));
+        if (Math.abs(d) > 1) divergencias.push(rot + ': painel ' + valorPainel + ' × real ' + valorReal + ' → diferença ' + (d > 0 ? '+' : '') + d);
+      };
+      cmp('gasto total do ciclo', cacheDiz.gastoTotal, verdade.gastoTotalCiclo);
+      cmp('gasto ADM', cacheDiz.metaVerbaAdmGasto, verdade.admGasto);
+      cmp('gasto TV', cacheDiz.metaVerbaTvGasto, verdade.tvGasto);
+      if (cacheDiz.verbaAlocadaReal) {
+        cmp('verba alocada ADM', cacheDiz.verbaAlocadaReal.adm, verdade.admVerba);
+        cmp('verba alocada TV', cacheDiz.verbaAlocadaReal.tv, verdade.tvVerba);
+      }
+      cmp('bloco VERBA legado (ADM)', cacheDiz.blocoVerbaLegado.adm, verdade.admGasto);
+    }
+
+    return res.status(200).json({ ok: divergencias.length === 0,
+      ciclo: { desde, ate },
+      VERDADE_DA_META: {
+        ADM: porFrente('ADM'), TV: porFrente('TV'),
+        totalAtivas: ativas.length, totalPausadas: pausadas.length,
+        verbaTotalAtivas: som(ativas, 'verba'),
+        gastoTotalAtivas: som(ativas, 'gasto'),
+        faltaGastar: som(ativas, 'falta'),
+        pausadas: { verba: som(pausadas, 'verba'), gasto: som(pausadas, 'gasto') },
+      },
+      O_QUE_O_PAINEL_MOSTRA: cacheDiz,
+      DIVERGENCIAS: divergencias.length ? divergencias : '✅ nenhuma',
+      TABELA_ATIVAS: ativas.map(t => t.frente + ' | ' + String(t.campanha).slice(0, 32).padEnd(32) +
+        ' | verba ' + String(t.verba).padStart(8) + ' | gasto ' + String(t.gasto).padStart(8) +
+        ' | falta ' + String(t.falta).padStart(8) + ' | ' + t.verbaEm + ' | ' + t.anunciosAtivos + ' anúncio(s)'),
+      TABELA_PAUSADAS: pausadas.map(t => t.frente + ' | ' + String(t.campanha).slice(0, 32) +
+        ' | verba ' + t.verba + ' | gasto ' + t.gasto + ' | ' + t.situacao),
+      detalhe: tabela });
+  }
+
   // ── 🎯 AJUSTAR-TETO: redistribui a verba de uma frente para fechar num teto exato ──
   if (action === 'ajustar-teto') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
