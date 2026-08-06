@@ -1100,6 +1100,139 @@ module.exports = async function handler(req, res) {
       proximoPasso: 'confira em /trafego e troque o vídeo no criativo se necessário' });
   }
 
+  // ── 🎯 AJUSTAR-TETO: redistribui a verba de uma frente para fechar num teto exato ──
+  if (action === 'ajustar-teto') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const frente = String(req.query.frente || 'adm').toLowerCase();      // adm | tv
+    const teto = parseFloat(req.query.teto || '2500');
+    if (!(teto > 0)) return res.status(400).json({ ok: false, error: 'teto inválido' });
+
+    const [camps, sets] = await Promise.all([
+      pegarTudo(`${GRAPH}/act_${CONTA}/campaigns?fields=id,name,effective_status,daily_budget,lifetime_budget,start_time&limit=200&access_token=${TOKEN}`, 8),
+      pegarTudo(`${GRAPH}/act_${CONTA}/adsets?fields=id,name,effective_status,daily_budget,lifetime_budget,campaign{id}&limit=200&access_token=${TOKEN}`, 8),
+    ]);
+    const setsDe = {};
+    for (const s of (sets.data || [])) { const ci = (s.campaign || {}).id; if (ci) (setsDe[ci] = setsDe[ci] || []).push(s); }
+    const verbaDe = (c) => {
+      if (c.lifetime_budget) return { v: Number(c.lifetime_budget) / 100, alvo: c.id, campo: 'lifetime_budget', onde: 'campanha' };
+      if (c.daily_budget) return { v: Number(c.daily_budget) / 100, alvo: c.id, campo: 'daily_budget', onde: 'campanha' };
+      for (const s of (setsDe[c.id] || [])) {
+        if (s.lifetime_budget) return { v: Number(s.lifetime_budget) / 100, alvo: s.id, campo: 'lifetime_budget', onde: 'conjunto' };
+        if (s.daily_budget) return { v: Number(s.daily_budget) / 100, alvo: s.id, campo: 'daily_budget', onde: 'conjunto' };
+      }
+      return { v: 0, alvo: null, campo: null, onde: null };
+    };
+    const desdeCiclo = (function () {
+      const b = new Date(Date.now() - 3 * 3600000);
+      const d = new Date(b); d.setUTCDate(b.getUTCDate() - ((b.getUTCDay() + 1) % 7));
+      return d.toISOString().slice(0, 10);
+    })();
+    const gastos = {};
+    try {
+      const jn = 'time_range=' + encodeURIComponent(JSON.stringify({ since: desdeCiclo, until: new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10) }));
+      const ins = await pegarTudo(`${GRAPH}/act_${CONTA}/insights?level=campaign&${jn}&fields=campaign_id,spend&limit=200&access_token=${TOKEN}`, 6);
+      for (const i of (ins.data || [])) gastos[i.campaign_id] = Number(i.spend || 0);
+    } catch (e) {}
+
+    // desempenho por campanha (para pesar a distribuição)
+    const base = await dbGet('trafego_painel_cache_ciclo') || await dbGet('trafego_painel_cache');
+    const perf = {};
+    for (const a of (((base || {}).dados || {}).anuncios || [])) {
+      if (a.campanhaId) perf[a.campanhaId] = { cpa: a.cpa, conversas: a.conversas || 0, categoria: a.categoria };
+    }
+
+    const doCiclo = (camps.data || []).filter(c => String(c.start_time || '').slice(0, 10) >= desdeCiclo);
+    const daFrente = doCiclo.filter(c => {
+      const cat = categoriaDe(c.name || '', 'anuncio');
+      return frente === 'tv' ? cat === 'tv' : cat !== 'tv';
+    });
+    const ativos = [], pausados = [];
+    for (const c of daFrente) {
+      const vb = verbaDe(c);
+      const g = Number((gastos[c.id] || 0).toFixed(2));
+      const item = { nome: c.name, id: c.id, categoria: categoriaDe(c.name || '', 'anuncio'),
+        verbaAtual: vb.v, gasto: g, alvoId: vb.alvo, campo: vb.campo, onde: vb.onde,
+        cpa: (perf[c.id] || {}).cpa ?? null, conversas: (perf[c.id] || {}).conversas ?? 0 };
+      (c.effective_status === 'ACTIVE' ? ativos : pausados).push(item);
+    }
+    if (!ativos.length) return res.status(200).json({ ok: false, error: 'nenhuma campanha ativa em ' + frente });
+
+    // 💰 o que já foi gasto nos PAUSADOS não volta — desconta do teto
+    const gastoPausados = Number(pausados.reduce((s, p) => s + p.gasto, 0).toFixed(2));
+    const gastoAtivos = Number(ativos.reduce((s, a) => s + a.gasto, 0).toFixed(2));
+    const disponivel = Number((teto - gastoPausados).toFixed(2));   // teto para os ativos
+    if (disponivel < gastoAtivos) {
+      return res.status(200).json({ ok: false,
+        error: 'o teto é menor do que já foi gasto',
+        teto, gastoAtivos, gastoPausados,
+        explicacao: 'não dá para reduzir abaixo do que os anúncios já consumiram' });
+    }
+    // sobra a distribuir por desempenho, respeitando o já gasto como piso
+    const aDistribuir = Number((disponivel - gastoAtivos).toFixed(2));
+    const cfgT = await cfgTrafego();
+    const peso = a => {
+      const meta = cfgT.metas[a.categoria] != null ? cfgT.metas[a.categoria] : cfgT.metas.outros;
+      if (a.cpa == null || a.conversas < 1) return 0.5;           // sem dado: peso baixo
+      return (meta / Math.max(0.2, a.cpa)) * Math.log10(10 + a.conversas);
+    };
+    const somaPesos = ativos.reduce((s, a) => s + peso(a), 0) || 1;
+    const plano = ativos.map(a => {
+      const fatia = Number((aDistribuir * peso(a) / somaPesos).toFixed(2));
+      const nova = Number((a.gasto + fatia).toFixed(2));
+      return { ...a, verbaNova: nova, correcao: Number((nova - a.verbaAtual).toFixed(2)) };
+    }).sort((x, y) => y.verbaNova - x.verbaNova);
+
+    const somaNova = Number(plano.reduce((s, p) => s + p.verbaNova, 0).toFixed(2));
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia', frente: frente.toUpperCase(), teto,
+        CONFERENCIA: {
+          verbaAtualNosAtivos: Number(ativos.reduce((s, a) => s + a.verbaAtual, 0).toFixed(2)),
+          jaGastoNosAtivos: gastoAtivos,
+          jaGastoNosPausados: gastoPausados,
+          disponivelParaOsAtivos: disponivel,
+          somaDepoisDoAjuste: somaNova,
+          totalFinal: Number((somaNova + gastoPausados).toFixed(2)),
+          bate: Math.abs(somaNova + gastoPausados - teto) < 1 ? '✅ fecha no teto' : '⚠️ diferença',
+        },
+        PLANO: plano.map(p => String(p.nome).slice(0, 30).padEnd(30) +
+          ' | gasto ' + String(p.gasto).padStart(7) +
+          ' | de ' + String(p.verbaAtual).padStart(7) +
+          ' → ' + String(p.verbaNova).padStart(7) +
+          ' | ' + (p.correcao >= 0 ? '+' : '') + p.correcao +
+          (p.cpa != null ? ' | CPA ' + p.cpa : '')),
+        pausados: pausados.map(p => String(p.nome).slice(0, 30) + ' | alocado ' + p.verbaAtual + ' · gasto ' + p.gasto),
+        detalhe: plano,
+        dica: 'para aplicar: &aplicar=1' });
+    }
+    // aplica
+    const feitos = [], erros = [];
+    const postF = async (id, campos) => fetch(`${GRAPH}/${id}?access_token=${TOKEN}`, { method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(campos).toString() })
+      .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+    for (const p of plano) {
+      if (Math.abs(p.correcao) < 0.5) continue;                   // sem mudança relevante
+      const centavos = Math.round(p.verbaNova * 100);
+      let r = await postF(p.alvoId, { [p.campo]: String(centavos) });
+      if (r && r.error) {
+        const outro = p.onde === 'conjunto' ? p.id : (setsDe[p.id] || [])[0]?.id;
+        if (outro) { const r2 = await postF(outro, { [p.campo]: String(centavos) }); if (!(r2 && r2.error)) r = r2; }
+      }
+      if (r && r.error) erros.push(p.nome + ': ' + r.error.message);
+      else feitos.push({ id: p.alvoId, nome: p.nome, acao: 'verba → R$ ' + p.verbaNova.toFixed(2) });
+      await new Promise(s => setTimeout(s, 150));
+    }
+    try {
+      const lg = (await dbGet('trafego_log')) || { movs: [] };
+      lg.movs.unshift({ ts: new Date().toISOString(), acao: 'ajustar-teto ' + frente + ' R$' + teto, feitos, erros });
+      await dbSet('trafego_log', lg);
+      const KRT = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+      for (const pp of ['ciclo', '7d']) fetch(`https://reparoeletroadm.com/api/trafego?action=painel&periodo=${pp}&forcar=1&k=${KRT}`).catch(() => {});
+    } catch (e) {}
+    return res.status(200).json({ ok: erros.length === 0, frente: frente.toUpperCase(), teto,
+      aplicados: feitos.length, totalFinal: Number((somaNova + gastoPausados).toFixed(2)),
+      feitos: feitos.map(f => f.nome + ' → ' + f.acao), erros });
+  }
+
   // ── 💸 REALOCAR-ORFA: aplica a redistribuição da verba presa nos pausados ──
   if (action === 'realocar-orfa') {
     const KRO = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
