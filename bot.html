@@ -96,6 +96,8 @@ main{flex:1;display:flex;overflow:hidden;}
 @media(max-width:760px){#col-esq{width:110px;}.conv-ultima{display:none;}#busca-conv{font-size:10px;padding:6px 7px;}}
 @keyframes blinkEsc{0%,100%{background:rgba(245,158,11,.06);}50%{background:rgba(245,158,11,.28);}}
 .conv-escalada{animation:blinkEsc 1.2s ease-in-out infinite;border-left:3px solid #f59e0b!important;}
+.alerta-pisca{animation:alPulse 1.6s ease-in-out infinite;}
+@keyframes alPulse{0%,100%{opacity:1;}50%{opacity:.6;}}
 </style>
 </head>
 <body>
@@ -117,6 +119,7 @@ main{flex:1;display:flex;overflow:hidden;}
       <button class="kpi-per btn" data-d="90" onclick="setPer(this)" style="font-size:11px;padding:4px 10px;">90 dias</button>
     </div>
   </div>
+  <div id="alerta-entrega" style="display:none;margin-bottom:10px;"></div>
   <div id="kpi-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:10px;"></div>
   <div style="display:flex;align-items:center;gap:8px;margin:2px 0 10px;">
     <button class="btn" onclick="abrirLogOrc()" style="font-size:11.5px;padding:6px 12px;background:#1d4ed8;color:#fff;font-weight:800;">📒 Log de orçamentos</button>
@@ -461,9 +464,46 @@ async function aprovarEnviar(){
 }
 
 carregarConversas();
+checarEntrega();
 setInterval(function(){ if(!document.hidden){ carregarConversas(); if(_tel)abrirConversa(_tel); } }, 30000);
+// 🚨 vigilância de entrega — a cada 5 minutos
+setInterval(function(){ if(!document.hidden) checarEntrega(); }, 300000);
 
 var _kpiDias=parseInt(localStorage.getItem('bot_kpi_d')||'1');
+// ── 🚨 ALERTA DE ENTREGA ──────────────────────────────────────────────
+let _logFalhasAberto=false;
+async function checarEntrega(){
+  var el=document.getElementById('alerta-entrega');
+  if(!el)return;
+  var r=await fetch('/api/wa-bot?action=alerta-entrega&horas=24').then(function(x){return x.json();}).catch(function(){return null;});
+  if(!r||r.NIVEL==='OK'){el.style.display='none';return;}
+  window._ultAlerta=r;
+  var crit=r.NIVEL==='CRITICO';
+  var cor=crit?'#ef4444':(r.NIVEL==='ATENCAO'?'#f59e0b':'#8b93a3');
+  el.style.display='block';
+  el.innerHTML='<div class="'+(crit?'alerta-pisca':'')+'" style="background:'+cor+'1f;border:1px solid '+cor+'77;border-radius:11px;padding:11px 13px;">'
+    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      +'<span style="font-size:12.5px;font-weight:900;color:'+cor+';">'+esc(r.ALERTA)+'</span>'
+      +'<button class="btn" onclick="verLogFalhas()" style="margin-left:auto;font-size:10.5px;padding:4px 10px;background:'+cor+';color:#0b0d10;font-weight:800;">📋 Ver quais</button>'
+    +'</div>'
+    +(r.porCodigo&&r.porCodigo.length?'<div style="font-size:10.5px;color:#c9ced6;margin-top:6px;line-height:1.6;">'
+      +r.porCodigo.map(function(c){return '• '+esc(c);}).join('<br>')+'</div>':'')
+    +'<div id="log-falhas" style="display:none;margin-top:9px;"></div>'
+  +'</div>';
+}
+function verLogFalhas(){
+  var el=document.getElementById('log-falhas'); if(!el)return;
+  var r=window._ultAlerta; if(!r)return;
+  _logFalhasAberto=!_logFalhasAberto;
+  el.style.display=_logFalhasAberto?'block':'none';
+  if(!_logFalhasAberto)return;
+  el.innerHTML='<div style="background:#0b0e13;border:1px solid #1e2228;border-radius:8px;padding:9px 11px;'
+    +'max-height:260px;overflow-y:auto;font-family:ui-monospace,monospace;font-size:10.5px;color:#c9ced6;line-height:1.8;">'
+    +(r.LISTA||[]).map(function(l){return esc(l);}).join('<br>')
+    +((r.totalFalhas>40)?'<br><span style="color:#5a6270;">… e mais '+(r.totalFalhas-40):'')
+  +'</div>';
+}
+
 // ── 📒 LOG DE ORÇAMENTOS ──────────────────────────────────────────────
 let _logOrcAberto=false, _logOrcDias=7;
 async function abrirLogOrc(dias){

@@ -2176,6 +2176,59 @@ export default async function handler(req, res) {
         : 'nenhum orçamento sai sozinho — só pelo envio manual na tela' });
   }
 
+  // ── 🚨 ALERTA-ENTREGA: templates que a Meta recusou nas últimas horas ──
+  if (action === 'alerta-entrega') {
+    const horas = Math.min(168, Math.max(1, parseInt(req.query.horas || '24', 10)));
+    const corte = Date.now() - horas * 3600000;
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '?';
+    // varre os registros diários de falha
+    const falhas = [];
+    for (let i = 0; i <= Math.ceil(horas / 24); i++) {
+      const dia = new Date(Date.now() - 3 * 3600000 - i * 86400000).toISOString().slice(0, 10);
+      const r = await dbGet('wa_falhas_' + dia);
+      for (const f of ((r && (r.itens || r.falhas || (Array.isArray(r) ? r : []))) || [])) {
+        const t = new Date(f.ts || f.quando || 0).getTime();
+        if (!t || t < corte) continue;
+        falhas.push({ quando: f.ts || f.quando, tel: String(f.tel || f.telefone || '').slice(-4),
+          template: f.template || f.tipo || '?', codigo: f.codigo || f.code || null,
+          motivo: String(f.erro || f.motivo || '').slice(0, 90), origem: f.origem || f.via || '?' });
+      }
+    }
+    falhas.sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
+    // agrupa por código — é o que diz se é problema sistêmico ou pontual
+    const porCodigo = {}, porTemplate = {};
+    for (const f of falhas) {
+      const k = String(f.codigo || 'sem código');
+      porCodigo[k] = (porCodigo[k] || 0) + 1;
+      porTemplate[f.template] = (porTemplate[f.template] || 0) + 1;
+    }
+    // ⚠️ códigos que indicam BLOQUEIO da conta, não erro do destinatário
+    const GRAVES = { 131042: 'problema de pagamento/elegibilidade da conta',
+      131047: 'janela de 24h expirada — precisa de template',
+      131026: 'número não pode receber mensagens',
+      133010: 'número não registrado',
+      132000: 'número de parâmetros do template não confere',
+      132001: 'template não existe ou não foi aprovado',
+      132015: 'template pausado por qualidade',
+      132012: 'formato do parâmetro inválido' };
+    const sistemicos = falhas.filter(f => [131042, 132001, 132015].includes(Number(f.codigo)));
+    const nivel = sistemicos.length >= 3 ? 'CRITICO'
+      : (falhas.length >= 10 ? 'ATENCAO' : (falhas.length ? 'LEVE' : 'OK'));
+    return res.status(200).json({ ok: nivel === 'OK',
+      NIVEL: nivel, periodoHoras: horas,
+      totalFalhas: falhas.length,
+      falhasSistemicas: sistemicos.length,
+      ALERTA: nivel === 'CRITICO'
+        ? '🚨 ' + sistemicos.length + ' template(s) recusados por problema DA CONTA — os disparos podem estar parando em silêncio'
+        : (nivel === 'ATENCAO' ? '⚠️ ' + falhas.length + ' falhas de entrega nas últimas ' + horas + 'h'
+        : (nivel === 'LEVE' ? falhas.length + ' falha(s) pontual(is)' : '✅ nenhuma falha de entrega')),
+      porCodigo: Object.entries(porCodigo).map(([c, n]) =>
+        c + ' (' + (GRAVES[c] || 'outro') + '): ' + n),
+      porTemplate,
+      LISTA: falhas.slice(0, 40).map(f => hh(f.quando) + ' | ' + f.tel + ' | ' + f.template +
+        ' | cód ' + (f.codigo || '?') + ' | ' + (GRAVES[f.codigo] || f.motivo)) });
+  }
+
   // ── 🧹 LIMPAR-BLOQUEIO: remove a marca de bloqueio de pagamento ──
   if (action === 'limpar-bloqueio') {
     const c = (await dbGet('wa_bot_config')) || {};
