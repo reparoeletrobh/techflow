@@ -2176,6 +2176,56 @@ export default async function handler(req, res) {
         : 'nenhum orçamento sai sozinho — só pelo envio manual na tela' });
   }
 
+  // ── 🚪 CONFERE-JANELA: quem está fora da janela e receberia texto recusado ──
+  if (action === 'confere-janela') {
+    const evs = await lerEvts();
+    const ultimaIn = {};
+    for (const e of (evs || [])) {
+      if (e.dir !== 'in') continue;
+      const d = String(e.tel || '').replace(/\D/g, '').slice(-8);
+      const t = new Date(e.ts || 0).getTime();
+      if (d.length >= 8 && t > (ultimaIn[d] || 0)) ultimaIn[d] = t;
+    }
+    // quem o bot tentou responder nas últimas horas
+    const tentativas = {};
+    for (const e of (evs || [])) {
+      if (e.dir !== 'out') continue;
+      if (e.tipo === 'template') continue;
+      const t = new Date(e.ts || 0).getTime();
+      if (Date.now() - t > 24 * 3600000) continue;
+      const d = String(e.tel || '').replace(/\D/g, '').slice(-8);
+      if (d.length < 8) continue;
+      const aberta = ultimaIn[d] && (t - ultimaIn[d]) < 24 * 3600000;
+      if (!aberta) tentativas[d] = (tentativas[d] || 0) + 1;
+    }
+    const lista = Object.entries(tentativas).sort((a, b) => b[1] - a[1]);
+    return res.status(200).json({ ok: lista.length === 0,
+      telefonesForaDaJanela: lista.length,
+      mensagensPerdidas: lista.reduce((s, x) => s + x[1], 0),
+      explicacao: 'texto livre enviado sem o cliente ter falado nas últimas 24h — a Meta recusa com 131047',
+      LISTA: lista.slice(0, 40).map(([d, n]) => d.slice(-4) + ': ' + n + ' mensagem(ns) perdida(s)' +
+        (ultimaIn[d] ? ' · última resposta dele há ' +
+          ((Date.now() - ultimaIn[d]) / 86400000).toFixed(1) + 'd' : ' · nunca respondeu')) });
+  }
+
+  // ── 🚪 JANELA DE 24H: o cliente só recebe TEXTO LIVRE se falou nas últimas 24h.
+  // Fora disso a Meta recusa com 131047 e a mensagem some sem aviso — foram 61 num dia.
+  // Esta função responde se a janela está aberta para um telefone.
+  async function janelaAbertaPara(tel) {
+    try {
+      const d8j = String(tel || '').replace(/\D/g, '').slice(-8);
+      if (d8j.length < 8) return false;
+      const evs = await lerEvts();
+      for (let i = (evs || []).length - 1; i >= 0; i--) {
+        const e = evs[i];
+        if (e.dir !== 'in') continue;
+        if (String(e.tel || '').replace(/\D/g, '').slice(-8) !== d8j) continue;
+        return (Date.now() - new Date(e.ts || 0).getTime()) < 24 * 3600000;
+      }
+      return false;
+    } catch (e) { return true; }        // na dúvida, tenta enviar
+  }
+
   // ── 🚨 ALERTA-ENTREGA: templates que a Meta recusou nas últimas horas ──
   if (action === 'alerta-entrega') {
     const horas = Math.min(168, Math.max(1, parseInt(req.query.horas || '24', 10)));
