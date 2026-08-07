@@ -2176,6 +2176,51 @@ export default async function handler(req, res) {
         : 'nenhum orçamento sai sozinho — só pelo envio manual na tela' });
   }
 
+  // ── 🔬 CASO-FALHA: reconstitui a conversa de quem teve mensagem recusada ──
+  if (action === 'caso-falha') {
+    const q = String(req.query.tel || '').replace(/\D/g, '').slice(-8);
+    if (!q) return res.status(400).json({ ok: false, error: 'informe ?tel=8dígitos' });
+    const evs = await lerEvts();
+    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '?';
+    const meus = (evs || []).filter(e => d8(e.tel) === q)
+      .sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+    // acha as falhas desse telefone
+    const falhas = [];
+    for (let i = 0; i <= 2; i++) {
+      const dia = new Date(Date.now() - 3 * 3600000 - i * 86400000).toISOString().slice(0, 10);
+      const r = await dbGet('wa_falhas_' + dia);
+      for (const f of ((r && (r.itens || [])) || [])) {
+        if (d8(f.telefone || f.tel) !== q) continue;
+        falhas.push({ quando: f.ts, codigo: f.codigo, texto: f.textoTentado || '', origem: f.origem });
+      }
+    }
+    // última entrada do cliente antes de cada falha
+    const entradas = meus.filter(e => e.dir === 'in');
+    const linha = meus.slice(-30).map(e => {
+      const t = new Date(e.ts || 0).getTime();
+      const falhou = falhas.some(f => Math.abs(new Date(f.quando).getTime() - t) < 90000);
+      return hh(e.ts) + ' ' + (e.dir === 'in' ? '👤 CLIENTE' : (e.tipo === 'template' ? '📋 TEMPLATE' : '🤖 BOT')) +
+        (falhou ? ' ❌ RECUSADA' : '') + ' | ' + String(e.texto || '').replace(/\n/g, ' ').slice(0, 90);
+    });
+    const analise = falhas.map(f => {
+      const tf = new Date(f.quando).getTime();
+      const ultimaIn = entradas.filter(e => new Date(e.ts).getTime() < tf).slice(-1)[0];
+      const horas = ultimaIn ? ((tf - new Date(ultimaIn.ts).getTime()) / 3600000).toFixed(1) : null;
+      return { quando: hh(f.quando), codigo: f.codigo, origem: f.origem,
+        ultimaMensagemDoCliente: ultimaIn ? hh(ultimaIn.ts) : '❌ NUNCA ESCREVEU',
+        horasDesdeQueOClienteFalou: horas,
+        veredito: !ultimaIn ? 'o cliente nunca escreveu — só template funcionaria'
+          : (Number(horas) > 24 ? 'passaram ' + horas + 'h desde a última mensagem dele — janela fechada'
+          : 'janela deveria estar aberta (' + horas + 'h) — investigar'),
+        textoTentado: String(f.texto || '').slice(0, 120) };
+    });
+    return res.status(200).json({ ok: true, telefone: q,
+      totalMensagens: meus.length, doCliente: entradas.length, falhas: falhas.length,
+      ANALISE: analise,
+      CONVERSA: linha });
+  }
+
   // ── 🆘 NAO-RECEBERAM: quem ficou sem resposta hoje, com nome e situação ──
   if (action === 'nao-receberam') {
     const horas = Math.min(72, Math.max(1, parseInt(req.query.horas || '24', 10)));
