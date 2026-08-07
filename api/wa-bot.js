@@ -2206,6 +2206,85 @@ export default async function handler(req, res) {
         : 'nenhum orçamento sai sozinho — só pelo envio manual na tela' });
   }
 
+  // ── ♻️ REENVIAR-PERDIDAS: reenvia pelo número CERTO o que foi recusado hoje ──
+  if (action === 'reenviar-perdidas') {
+    const horas = Math.min(48, Math.max(1, parseInt(req.query.horas || '24', 10)));
+    const corte = Date.now() - horas * 3600000;
+    const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '?';
+    const evs = await lerEvts();
+
+    // 1) última mensagem RECUSADA de cada telefone, com o texto que o bot queria mandar
+    const perdidas = {};
+    for (const e of (evs || [])) {
+      if (e.dir !== 'out') continue;
+      const t = new Date(e.ts || 0).getTime();
+      if (!t || t < corte) continue;
+      const txt = String(e.texto || '');
+      if (!txt || /^(sent|read|delivered|failed)/i.test(txt)) continue;
+      if (e.tipo === 'template') continue;
+      const d = d8f(e.tel);
+      if (d.length < 8) continue;
+      // só interessa quem teve falha registrada
+      perdidas[d] = { tel: e.tel, texto: txt, quando: e.ts };
+    }
+    // 2) cruza com as falhas para confirmar que não chegou
+    const comFalha = new Set();
+    for (let i = 0; i <= 2; i++) {
+      const dia = new Date(Date.now() - 3 * 3600000 - i * 86400000).toISOString().slice(0, 10);
+      const r = await dbGet('wa_falhas_' + dia);
+      for (const f of ((r && (r.itens || [])) || [])) {
+        const t = new Date(f.ts || 0).getTime();
+        if (t >= corte) comFalha.add(d8f(f.telefone || f.tel));
+      }
+    }
+    // 3) e confirma que a janela do cliente ainda está aberta
+    const ultimaIn = {};
+    for (const e of (evs || [])) {
+      if (e.dir !== 'in') continue;
+      const d = d8f(e.tel), t = new Date(e.ts || 0).getTime();
+      if (d.length >= 8 && t > (ultimaIn[d] || 0)) ultimaIn[d] = t;
+    }
+    const alvos = Object.entries(perdidas)
+      .filter(([d]) => comFalha.has(d))
+      .map(([d, v]) => {
+        const jan = ultimaIn[d] ? (Date.now() - ultimaIn[d]) / 3600000 : 999;
+        return { ...v, d8: d, horasDaJanela: Number(jan.toFixed(1)), janelaAberta: jan < 24 };
+      })
+      .filter(x => x.janelaAberta)
+      .sort((a, b) => a.horasDaJanela - b.horasDaJanela);
+
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia — nada enviado',
+        comFalhaNoPeriodo: comFalha.size,
+        podemSerRecuperados: alvos.length,
+        janelaJaFechou: comFalha.size - alvos.length,
+        LISTA: alvos.map(a => a.d8.slice(-4) + ' | janela fecha em ' +
+          (24 - a.horasDaJanela).toFixed(1) + 'h | ' + String(a.texto).slice(0, 60)),
+        dica: 'para reenviar: &aplicar=1' });
+    }
+    const feitos = [], erros = [];
+    for (const a of alvos) {
+      const cr = await credenciaisResposta(a.tel);
+      const r = await fetch(`https://graph.facebook.com/v20.0/${cr.phoneId}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${cr.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messaging_product: 'whatsapp', to: a.tel,
+          type: 'text', text: { body: a.texto } }),
+      }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      if (r && r.messages && r.messages[0]) {
+        feitos.push(a.d8.slice(-4) + ' → enviado por ' + (cr.viaAntigo ? 'número ANTIGO' : 'número novo'));
+        await rpushEvt({ ts: new Date().toISOString(), tel: a.tel, dir: 'out',
+          texto: a.texto, tipo: 'texto', via: 'reenvio-perdida', msgId: r.messages[0].id });
+      } else {
+        erros.push(a.d8.slice(-4) + ': ' + ((r.error && (r.error.error_user_msg || r.error.message)) || 'falha'));
+      }
+      await new Promise(s => setTimeout(s, 400));
+    }
+    return res.status(200).json({ ok: erros.length === 0,
+      reenviados: feitos.length, feitos, erros });
+  }
+
   // ── 🔐 NUMERO-SECUNDARIO: cadastra credencial de um número que só RESPONDE ──
   // Guardado em chave separada. NUNCA afeta o número ativo.
   if (action === 'numero-secundario') {
