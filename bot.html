@@ -406,7 +406,16 @@ async function abrirConversa(tel){
     var d=await fetch('/api/wa-bot?action=historico&tel='+encodeURIComponent(tel)).then(function(r){return r.json();});
     box.innerHTML=(d.msgs||[]).map(function(m){
       if(m.dir==='acao')return '<div class="msg acao">⚡ '+esc(ACAO_LBL[m.texto]||m.texto)+' · '+fdt(m.ts)+'</div>';
-      return '<div class="msg '+(m.dir==='in'?'in':'out')+'">'+esc(m.texto)
+      // 📋 selo de TEMPLATE — deixa claro que a mensagem saiu como modelo aprovado,
+      // e não como texto livre (que só sairia dentro da janela de 24h)
+      var selo='';
+      if(m.tipo==='template'){
+        selo='<div style="font-size:9px;font-weight:800;color:#25d366;background:rgba(37,211,102,.14);'
+          +'border:1px solid rgba(37,211,102,.3);border-radius:5px;padding:1px 6px;display:inline-block;'
+          +'margin-bottom:5px;letter-spacing:.03em;">📋 TEMPLATE'
+          +(m.template?' · '+esc(m.template):'')+(m.via?' · '+esc(m.via):'')+'</div><br>';
+      }
+      return '<div class="msg '+(m.dir==='in'?'in':'out')+'">'+selo+esc(m.texto)
         +'<div class="msg-ts">'+fdt(m.ts)+(m.via==='copiloto'?' · ✅ aprovada':'')+'</div></div>';
     }).join('')||'<div style="color:#5a6270;font-size:11px;text-align:center;">Sem mensagens</div>';
     box.scrollTop=box.scrollHeight;
