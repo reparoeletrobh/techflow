@@ -2157,6 +2157,21 @@ export default async function handler(req, res) {
       teto: c.recuperacao7dTeto || 10 });
   }
 
+  // ── 🔘 ORCAMENTO-AUTO: liga ou desliga o envio automático de orçamento ──
+  if (action === 'orcamento-auto-ligar' || action === 'orcamento-auto-desligar') {
+    const c = (await dbGet('wa_bot_config')) || {};
+    const ligar = action === 'orcamento-auto-ligar';
+    c.orcamentoManual = !ligar;
+    c.orcamentoManualEm = new Date().toISOString();
+    await dbSet('wa_bot_config', c);
+    return res.status(200).json({ ok: true,
+      envioAutomaticoDeOrcamento: ligar ? 'LIGADO' : 'DESLIGADO (manual)',
+      desde: c.orcamentoManualEm,
+      efeito: ligar
+        ? 'o cron passa a disparar orcamento_pronto para ficha nova em aguardando aprovação'
+        : 'nenhum orçamento sai sozinho — só pelo envio manual na tela' });
+  }
+
   // ── 🧹 LIMPAR-BLOQUEIO: remove a marca de bloqueio de pagamento ──
   if (action === 'limpar-bloqueio') {
     const c = (await dbGet('wa_bot_config')) || {};
@@ -2233,9 +2248,15 @@ export default async function handler(req, res) {
       if (e.dir !== 'out') continue;
       const t = new Date(e.ts || 0).getTime();
       if (!t || t < desde || t >= ate) continue;
-      const txt = String(e.texto || '');
-      if (!/orcamento_pronto|orçamento/i.test(txt)) continue;
-      enviados.push({ quando: e.ts, tel: d8f(e.tel), via: e.via || 'bot', texto: txt.slice(0, 60) });
+      // 🎯 só TEMPLATE de orçamento — antes contava qualquer mensagem que citasse a
+      // palavra "orçamento", inflando o número com conversas normais do bot (101 → real)
+      const ehTemplateOrc = e.tipo === 'template' &&
+        (String(e.template || '') === 'orcamento_pronto' ||
+         /\[orcamento_pronto\]/i.test(String(e.texto || '')));
+      const viaOrc = ['orcamentos-pendentes', 'recuperacao-7d'].includes(String(e.via || ''));
+      if (!ehTemplateOrc && !viaOrc) continue;
+      enviados.push({ quando: e.ts, tel: d8f(e.tel), via: e.via || 'bot',
+        template: e.template || 'orcamento_pronto' });
     }
 
     // 2) APROVADOS — pela data REAL de aprovação, não pela fase atual
@@ -2288,8 +2309,9 @@ export default async function handler(req, res) {
         ' | ' + x.tentativas + '/7' + (x.ultimo ? ' · último ' + x.ultimo : '') +
         ' | ' + x.faseAgora + (x.saiuDaFila ? ' ✅ saiu' : '') +
         (x.conflitoAberto ? ' | 🚨 conflito ' + x.conflitoAberto : '')),
-      ENVIADOS: enviados.slice(0, 60).map(e => dBR(e.quando) + ' ' + String(e.quando).slice(11, 16) +
-        ' | ' + e.tel.slice(-4) + ' | ' + e.via) });
+      ENVIADOS: enviados.slice(0, 80).map(e => dBR(e.quando) + ' ' + String(e.quando).slice(11, 16) +
+        ' | ' + e.tel.slice(-4) + ' | ' + e.via + ' | ' + e.template),
+      nota: 'só conta TEMPLATE de orçamento (orcamento_pronto) — conversa do bot que menciona orçamento não entra' });
   }
 
   // ── 💵 IA-CONSUMO: quanto a IA custou por dia e onde o token está indo ──
