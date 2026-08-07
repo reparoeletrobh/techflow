@@ -34,6 +34,8 @@ h1{font-size:17px;font-weight:900;margin-bottom:4px;}
 .b-rem{background:#b45309;}
 .b-col{background:#059669;font-size:13px;min-width:100%;padding:12px;}
 .empty{text-align:center;color:var(--dim);padding:40px 16px;font-size:14px;line-height:1.6;}
+.ag-pisca{animation:agPulse 1.4s ease-in-out infinite;}
+@keyframes agPulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.55;transform:scale(1.015);}}
 </style>
 </head>
 <body>
@@ -221,6 +223,7 @@ function render(){
         '<div class="nm">'+esc(f.nome||'—')+agingHtml(f.movedAt)+(f.primeiroContatoEm?'<span class="badge-ctt">✅ contato feito</span>':'')+'</div>'+
         '<div class="eq">📍 '+esc(f.endereco||'sem endereço')+'</div>'+
         '<div class="eq">📺 '+esc(f.equipamento||'TV')+(f.defeito?' — '+esc(f.defeito):'')+(f.telefone?' · 📞 '+esc(f.telefone):'')+'</div>'+
+        agendaHtml(f)+
         (f.regiao==='sem-regiao'?('<div style="margin-top:8px;"><select onchange="classificar(\''+f.id+'\',this.value)" style="width:100%;background:#1a1e26;border:1px solid #3a4150;border-radius:8px;padding:9px;color:#f0f2f5;font-size:13px;">'+
           '<option value="">📍 Em qual região fica este endereço?</option>'+
           Object.keys(REG).filter(function(k){return k!=='sem-regiao';}).map(function(k){return '<option value="'+k+'">'+REG[k].nome+'</option>';}).join('')+
@@ -230,6 +233,7 @@ function render(){
           '<a class="b b-tel" href="tel:+'+to+'" onclick="marcaContato(\''+f.id+'\')">📞 Ligar</a>'+
           '<a class="b b-map" href="https://maps.google.com/?q='+encodeURIComponent(f.endereco||'')+'" target="_blank">🗺️ Mapa</a>'+
 
+          '<button class="b" style="background:#7c3aed;" onclick="agendar(\''+f.id+'\')">🕐 '+(f.agendadoPara?'Reagendar':'Combinar horário')+'</button>'+
           '<button class="b b-rem" onclick="remarcar(\''+f.id+'\')">📅 Remarcar</button>'+
           '<button class="b" style="background:#dc2626;min-width:44%;" onclick="cancelado(\''+f.id+'\')">❌ Cancelado</button>'+
           '<button class="b b-col" style="min-width:52%;" onclick="coletado(\''+f.id+'\')">✅ COLETADO</button>'+
@@ -238,6 +242,58 @@ function render(){
     return html;
   }).join('');
 }
+
+// ── 🕐 HORÁRIO COMBINADO COM O CLIENTE ────────────────────────────────
+function agendaHtml(f){
+  if(!f.agendadoPara)return '';
+  var d=new Date(f.agendadoPara), ag=Date.now();
+  var falta=(d.getTime()-ag)/60000;                 // minutos
+  var passou=falta<0;
+  var perto=falta>=0&&falta<=60;                    // pisca na última hora
+  var dia=d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+  var hora=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  var hoje=new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})===dia;
+  var cor=passou?'#ef4444':(perto?'#f59e0b':'#a78bfa');
+  var rot=passou?'⚠️ PASSOU DO HORÁRIO':(perto?'🔔 É AGORA':(hoje?'🕐 HOJE':'🕐 AGENDADO'));
+  var quando=(hoje?'hoje':dia)+' às '+hora;
+  return '<div class="ag-box'+(perto||passou?' ag-pisca':'')+'" style="background:'+cor+'1f;border:1px solid '+cor+'66;'
+    +'border-radius:9px;padding:7px 10px;margin-top:7px;">'
+    +'<div style="font-size:12px;font-weight:900;color:'+cor+';">'+rot+' · '+quando+'</div>'
+    +(f.agendadoObs?'<div style="font-size:11px;color:#c9ced6;margin-top:2px;">'+esc(f.agendadoObs)+'</div>':'')
+    +'</div>';
+}
+async function agendar(id){
+  var f=null;
+  var _lst=(_dados&&_dados.fichas)||[];
+  for(var i=0;i<_lst.length;i++){if(_lst[i].id===id){f=_lst[i];break;}}
+  var atual=f&&f.agendadoPara?new Date(f.agendadoPara):null;
+  var hj=new Date();
+  var dPad=atual?atual.toLocaleDateString('pt-BR'):hj.toLocaleDateString('pt-BR');
+  var data=prompt('📅 Que DIA o cliente combinou?\n\nFormato: DD/MM  (ex: '+hj.getDate()+'/'+(hj.getMonth()+1)+')\n\nDeixe vazio e clique OK para REMOVER o agendamento.',dPad.slice(0,5));
+  if(data===null)return;
+  if(!data.trim()){
+    await fetch('/api/tv-logistica?action=rota-agendar',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:id,limpar:true})}).catch(function(){});
+    load();return;
+  }
+  var hora=prompt('🕐 Que HORA?\n\nFormato: HH:MM  (ex: 10:00)',atual?atual.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'10:00');
+  if(hora===null)return;
+  var obs=prompt('📝 Alguma observação? (opcional)\n\nEx: "cliente sai às 12h", "tocar interfone 302"',(f&&f.agendadoObs)||'');
+  if(obs===null)obs='';
+  var pd=data.trim().split('/'), ph=(hora||'10:00').trim().split(':');
+  if(pd.length<2||ph.length<2){alert('Formato inválido. Use DD/MM e HH:MM');return;}
+  var ano=pd[2]?(pd[2].length===2?'20'+pd[2]:pd[2]):String(hj.getFullYear());
+  var iso=ano+'-'+String(pd[1]).padStart(2,'0')+'-'+String(pd[0]).padStart(2,'0')
+    +'T'+String(ph[0]).padStart(2,'0')+':'+String(ph[1]).padStart(2,'0')+':00-03:00';
+  if(isNaN(new Date(iso).getTime())){alert('Data ou hora inválida');return;}
+  var r=await fetch('/api/tv-logistica?action=rota-agendar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id,quando:iso,obs:obs})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
+}
+// mantém o piscar vivo mesmo sem recarregar
+setInterval(function(){
+  try{ if(_dados&&_dados.fichas&&_dados.fichas.length&&typeof render==='function') render(); }catch(e){}
+}, 60000);
 
 async function classificar(id,regiao){
   if(!regiao)return;

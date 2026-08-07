@@ -658,6 +658,28 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, movimentos: lg.movs.slice(0, 60) });
   }
 
+  // ── 📅 ROTA-AGENDAR: o motorista combina data/hora sem tirar a ficha da rota ──
+  if (req.method === 'POST' && action === 'rota-agendar') {
+    const { id, quando, obs, limpar } = req.body || {};
+    if (!id) return res.status(400).json({ ok: false, error: 'id obrigatório' });
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const f = (db.fichas || []).find(x => x.id === id);
+    if (!f) return res.status(404).json({ ok: false, error: 'ficha não encontrada' });
+    if (limpar) {
+      delete f.agendadoPara; delete f.agendadoObs; delete f.agendadoEm;
+    } else {
+      if (!quando) return res.status(400).json({ ok: false, error: 'informe quando (ISO)' });
+      f.agendadoPara = quando;
+      f.agendadoObs = String(obs || '').slice(0, 140);
+      f.agendadoEm = new Date().toISOString();
+      f.historicoAgenda = (f.historicoAgenda || []).concat([{
+        para: quando, obs: f.agendadoObs, em: f.agendadoEm,
+      }]).slice(-10);
+    }
+    await dbSet(LOG_KEY, db);
+    return res.status(200).json({ ok: true, id, agendadoPara: f.agendadoPara || null });
+  }
+
   // ── 🚚 QUEM-COLETOU: motorista responsável por cada ficha de uma fase ──
   if (action === 'quem-coletou') {
     const fase = String(req.query.fase || 'coleta_efetuada');
