@@ -2149,6 +2149,50 @@ export default async function handler(req, res) {
       teto: c.recuperacao7dTeto || 10 });
   }
 
+  // ── 🩺 POR-QUE-NAO-ENVIOU: diagnóstico de um orçamento que não saiu ──
+  if (action === 'por-que-nao-enviou') {
+    const q = String(req.query.q || '').replace(/\D/g, '');
+    if (!q) return res.status(400).json({ ok: false, error: 'informe ?q=4dígitos' });
+    const cfgD = (await dbGet('wa_bot_config')) || {};
+    const marcoD = cfgD.orcMarcoTs ? new Date(cfgD.orcMarcoTs).getTime() : 0;
+    const [pp, orcE, evts, pz] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('wa_orc_enviados').then(v => v || { ids: {} }),
+      lerEvts(), dbGet('wa_bot_pausados').then(v => v || {}),
+    ]);
+    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const achados = (((pp || {}).cards) || []).filter(c =>
+      String(c.telefone || '').replace(/\D/g, '').endsWith(q) ||
+      String(c.nomeContato || '').toLowerCase().includes(String(req.query.q || '').toLowerCase()));
+    if (!achados.length) return res.status(200).json({ ok: false, error: 'nenhum card encontrado com ' + q });
+
+    const telsCfg = Array.isArray(cfgD.execTels) ? cfgD.execTels.map(x => d8(x)) : [];
+    const out = achados.map(c => {
+      const fase = String(c.phaseId || c.phase || '');
+      const criado = new Date(c.criadoEm || 0).getTime();
+      const movido = new Date(c.movedAt || 0).getTime();
+      const dd8 = d8(c.telefone);
+      const bloqueios = [];
+      if (fase !== 'aguardando_aprovacao') bloqueios.push('fase é "' + fase + '" — o envio automático só ocorre em aguardando_aprovacao');
+      if (marcoD && movido < marcoD) bloqueios.push('⏳ entrou na fase ANTES do marco do número novo (' +
+        new Date(marcoD - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ') — bloqueado de propósito');
+      if (orcE.ids && orcE.ids[c.id]) bloqueios.push('já consta como ENVIADO em ' + (orcE.ids[c.id].em || '?'));
+      if (pz[dd8]) bloqueios.push('conversa PAUSADA — assumida por humano');
+      if (telsCfg.length && !telsCfg.includes(dd8)) bloqueios.push('telefone não está na lista de destinatários liberados (execTels)');
+      if (!c.valor || parseFloat(c.valor) <= 0) bloqueios.push('card SEM VALOR — o orçamento precisa de valor para ser enviado');
+      if (!c.textoOrcamento && !c.orcamentoTexto) bloqueios.push('sem texto de orçamento gerado no diagnóstico');
+      const ultimoEnvio = (evts || []).filter(e => e.dir === 'out' && d8(e.tel) === dd8).slice(-1)[0];
+      return { id: c.id, nome: c.nomeContato, telefone: c.telefone,
+        equipamento: c.equipamento || c.descricao, valor: c.valor || null,
+        fase, criadoEm: c.criadoEm, entrouNaFaseEm: c.movedAt,
+        temTextoOrcamento: !!(c.textoOrcamento || c.orcamentoTexto),
+        MOTIVOS: bloqueios.length ? bloqueios : ['✅ nenhum bloqueio — deveria ter enviado; verifique o log do cron'],
+        ultimaMensagemEnviada: ultimoEnvio ? { quando: ultimoEnvio.ts, via: ultimoEnvio.via } : 'nenhuma' };
+    });
+    return res.status(200).json({ ok: true, busca: q,
+      marcoDoNumeroNovo: cfgD.orcMarcoTs || null,
+      encontrados: out.length, cards: out });
+  }
+
   // ── 📒 LOG-ORCAMENTOS: enviados, aprovados e a janela de recuperação, com data real ──
   if (action === 'log-orcamentos') {
     const dia = String(req.query.dia || '').trim();                  // AAAA-MM-DD
