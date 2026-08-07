@@ -1969,6 +1969,7 @@ export default async function handler(req, res) {
     }
 
     const candidatos = [];
+    const esgotados = [];
     for (const c of (((pp7 || {}).cards) || [])) {
       const fase = String(c.phaseId || c.phase || '');
       if (fase !== 'aguardando_aprovacao') continue;          // ← o cruzamento pedido
@@ -1976,7 +1977,38 @@ export default async function handler(req, res) {
       if (d8.length < 8) continue;
       if (respondeu.has(d8)) continue;
       const ctrl = controle.clientes[d8] || { tentativas: 0, ultimo: null };
-      if (ctrl.tentativas >= 7) continue;                     // esgotou as 7
+      // 🚨 esgotou as 7 sem resposta → abre CONFLITO BOT uma vez e para de tentar
+      if (ctrl.tentativas >= 7) {
+        if (!ctrl.conflitoAberto) {
+          try {
+            // grava direto na prospecção com status conflitos_bot (mesmo caminho do cérebro)
+            const pdb7 = (await dbGet('prospeccao_adm')) || { fichas: [] };
+            const jaTem = (pdb7.fichas || []).some(f => f.status === 'conflitos_bot' &&
+              String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8);
+            if (!jaTem) {
+              pdb7.fichas = pdb7.fichas || [];
+              pdb7.fichas.unshift({
+                id: 'conf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+                nome: c.nomeContato || '?', telefone: c.telefone,
+                equipamento: c.equipamento || c.descricao || '',
+                status: 'conflitos_bot',
+                motivo: '🔁 7 tentativas de recuperação sem resposta — orçamento de R$ ' +
+                  (c.valor || '?') + ' parado em aguardando aprovação desde ' +
+                  String(c.movedAt || c.criadoEm || '').slice(0, 10) + '. Retomar por TELEFONE.',
+                origem: 'recuperacao-7d',
+                cardId: c.id,
+                criadoEm: new Date().toISOString(),
+                movedAt: new Date().toISOString(),
+              });
+              await dbSet('prospeccao_adm', pdb7);
+            }
+            ctrl.conflitoAberto = new Date().toISOString();
+            controle.clientes[d8] = ctrl;
+            esgotados.push((c.nomeContato || '?') + ' ' + d8.slice(-4));
+          } catch (e) {}
+        }
+        continue;
+      }
       if (ctrl.ultimo === hoje) continue;                     // já recebeu hoje
       candidatos.push({ card: c, d8, tentativa: ctrl.tentativas + 1 });
     }
@@ -1985,6 +2017,7 @@ export default async function handler(req, res) {
 
     if (String(req.query.simular || '') === '1') {
       return res.status(200).json({ ok: true, modo: 'simulação — nada enviado',
+        esgotaramAs7: esgotados.length,
         emAguardandoAprovacao: candidatos.length + lote.length ? candidatos.length : 0,
         elegiveisAgora: candidatos.length, seriamEnviados: lote.length, teto,
         lista: lote.map(x => (x.card.nomeContato || '?') + ' ' + x.d8.slice(-4) +
@@ -2025,7 +2058,9 @@ export default async function handler(req, res) {
     await dbSet('wa_recuperacao_7d', controle);
     return res.status(200).json({ ok: falhas.length === 0,
       elegiveis: candidatos.length, enviados: enviados.length,
-      lista: enviados, falhas });
+      lista: enviados, falhas,
+      esgotaramAs7: esgotados.length ? { total: esgotados.length, lista: esgotados,
+        acao: 'conflito aberto para retomada por telefone' } : 'nenhum' });
   }
 
   // ── 🔘 RECUPERACAO7D-LIGAR / DESLIGAR ──
