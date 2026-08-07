@@ -2024,8 +2024,32 @@ export default async function handler(req, res) {
           ' | tentativa ' + x.tentativa + '/7 | ' + String(x.card.equipamento || '').slice(0, 24)) });
     }
 
-    const enviados = [], falhas = [];
+    const enviados = [], falhas = [], mudaramDeFase = [];
     for (const x of lote) {
+      // 🔒 RECONFERÊNCIA IMEDIATA: entre montar a lista e chegar aqui o cliente pode ter
+      // aprovado, reprovado ou avançado. Relê o pipe e confirma a fase ANTES de cada envio.
+      try {
+        const ppAgora = await dbGet('reparoeletro_pipe');
+        const cardAgora = (((ppAgora || {}).cards) || []).find(k => k.id === x.card.id);
+        const faseAgora = cardAgora ? String(cardAgora.phaseId || cardAgora.phase || '') : null;
+        if (!cardAgora) {
+          mudaramDeFase.push((x.card.nomeContato || '?') + ': card não existe mais');
+          continue;
+        }
+        if (faseAgora !== 'aguardando_aprovacao') {
+          mudaramDeFase.push((x.card.nomeContato || '?') + ': saiu para ' + faseAgora);
+          continue;
+        }
+        // e se respondeu nos últimos minutos, também não dispara
+        const evAgora = await lerEvts();
+        const falouAgora = (evAgora || []).some(e => e.dir === 'in' &&
+          String(e.tel || '').replace(/\D/g, '').slice(-8) === x.d8 &&
+          Date.now() - new Date(e.ts || 0).getTime() < 24 * 3600000);
+        if (falouAgora) {
+          mudaramDeFase.push((x.card.nomeContato || '?') + ': respondeu — conversa ativa');
+          continue;
+        }
+      } catch (e) {}
       const nome = String(x.card.nomeContato || '').trim().split(/\s+/)[0] || 'tudo bem';
       const tel = String(x.card.telefone || '').replace(/\D/g, '');
       const to = tel.startsWith('55') ? tel : '55' + tel;
@@ -2060,7 +2084,8 @@ export default async function handler(req, res) {
       elegiveis: candidatos.length, enviados: enviados.length,
       lista: enviados, falhas,
       esgotaramAs7: esgotados.length ? { total: esgotados.length, lista: esgotados,
-        acao: 'conflito aberto para retomada por telefone' } : 'nenhum' });
+        acao: 'conflito aberto para retomada por telefone' } : 'nenhum',
+      naoEnviadosPorMudanca: mudaramDeFase.length ? mudaramDeFase : 'nenhum' });
   }
 
   // ── 🔘 RECUPERACAO7D-LIGAR / DESLIGAR ──
