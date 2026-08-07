@@ -1270,6 +1270,90 @@ module.exports = async function handler(req, res) {
       proximoPasso: 'confira em /trafego e troque o vídeo no criativo se necessário' });
   }
 
+  // ── ✍️ TEXTOS-CRIATIVOS: compara e replica os textos dos campeões nos novos ──
+  if (action === 'textos-criativos') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const tkT = String(req.query.token || '').trim() || TOKEN;
+    const cat = String(req.query.cat || 'tv').toLowerCase();
+    const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,effective_status,creative{id,object_story_spec,title,body,call_to_action_type},campaign{id,name,start_time}&limit=300&access_token=${tkT}`, 8);
+    const desdeC = (function () {
+      const b = new Date(Date.now() - 3 * 3600000);
+      const d = new Date(b); d.setUTCDate(b.getUTCDate() - ((b.getUTCDay() + 1) % 7));
+      return d.toISOString().slice(0, 10);
+    })();
+    const doCiclo = (ads.data || []).filter(a => {
+      const c = a.campaign || {};
+      if (String(c.start_time || '').slice(0, 10) < desdeC) return false;
+      return categoriaDe(a.name || c.name || '', 'anuncio') === cat;
+    });
+    const lidos = doCiclo.map(a => {
+      const cr = a.creative || {};
+      const oss = cr.object_story_spec || {};
+      const vd = oss.video_data || {};
+      const ld = oss.link_data || {};
+      const cta = vd.call_to_action || ld.call_to_action || {};
+      return {
+        anuncio: a.name, id: a.id, criativoId: cr.id,
+        situacao: a.effective_status,
+        titulo: vd.title || ld.name || cr.title || null,
+        corpo: vd.message || ld.message || cr.body || null,
+        descricao: vd.link_description || ld.description || null,
+        botao: cta.type || cr.call_to_action_type || null,
+        destino: (cta.value && (cta.value.link || cta.value.whatsapp_number)) || null,
+        pageId: oss.page_id || null,
+      };
+    });
+    const completos = lidos.filter(x => x.corpo && x.titulo);
+    const vazios = lidos.filter(x => !x.corpo || !x.titulo);
+    const modelo = completos.sort((a, b) => (b.corpo || '').length - (a.corpo || '').length)[0] || null;
+
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, categoria: cat,
+        totalNoCiclo: lidos.length,
+        comTexto: completos.length, semTexto: vazios.length,
+        MODELO: modelo ? { anuncio: modelo.anuncio, titulo: modelo.titulo,
+          corpo: modelo.corpo, descricao: modelo.descricao, botao: modelo.botao } : null,
+        SEM_TEXTO: vazios.map(v => v.anuncio + ' | título: ' + (v.titulo || '❌') +
+          ' | corpo: ' + (v.corpo ? '✅' : '❌') + ' | botão: ' + (v.botao || '❌')),
+        detalhe: lidos,
+        dica: modelo && vazios.length
+          ? 'para replicar o texto do modelo nos vazios: &aplicar=1'
+          : (vazios.length ? 'nenhum criativo completo para servir de modelo' : 'todos já têm texto') });
+    }
+    if (!modelo) return res.status(200).json({ ok: false, error: 'nenhum criativo com texto para servir de modelo' });
+
+    const feitos = [], erros = [];
+    for (const v of vazios) {
+      // lê o criativo atual para preservar o vídeo
+      const at = await fetch(`${GRAPH}/${v.criativoId}?fields=object_story_spec&access_token=${tkT}`)
+        .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      if (at && at.error) { erros.push(v.anuncio + ': ' + at.error.message); continue; }
+      const oss = (at.object_story_spec) || {};
+      if (!oss.video_data) { erros.push(v.anuncio + ': criativo sem vídeo — não mexi'); continue; }
+      const novoOss = { page_id: oss.page_id, video_data: { ...oss.video_data } };
+      novoOss.video_data.title = modelo.titulo;
+      novoOss.video_data.message = modelo.corpo;
+      if (modelo.descricao) novoOss.video_data.link_description = modelo.descricao;
+      delete novoOss.video_data.image_url;
+      // cria um criativo novo com o mesmo vídeo e o texto do modelo
+      const cr = await fetch(`${GRAPH}/act_${CONTA}/adcreatives?access_token=${tkT}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ name: v.anuncio + ' - criativo com texto',
+          object_story_spec: JSON.stringify(novoOss) }).toString(),
+      }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      if (cr && cr.error) { erros.push(v.anuncio + ' (criar criativo): ' + cr.error.message); continue; }
+      const up = await fetch(`${GRAPH}/${v.id}?access_token=${tkT}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ creative: JSON.stringify({ creative_id: cr.id }) }).toString(),
+      }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      if (up && up.error) erros.push(v.anuncio + ' (aplicar): ' + up.error.message);
+      else feitos.push(v.anuncio + ' → texto do modelo aplicado');
+      await new Promise(s => setTimeout(s, 400));
+    }
+    return res.status(200).json({ ok: erros.length === 0,
+      modeloUsado: modelo.anuncio, aplicados: feitos.length, feitos, erros });
+  }
+
   // ── 🔬 AUDITORIA-CICLO: puxa TUDO da Meta e cruza com o que cada painel mostra ──
   if (action === 'auditoria-ciclo') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
