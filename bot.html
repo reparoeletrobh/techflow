@@ -118,6 +118,11 @@ main{flex:1;display:flex;overflow:hidden;}
     </div>
   </div>
   <div id="kpi-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:10px;"></div>
+  <div style="display:flex;align-items:center;gap:8px;margin:2px 0 10px;">
+    <button class="btn" onclick="abrirLogOrc()" style="font-size:11.5px;padding:6px 12px;background:#1d4ed8;color:#fff;font-weight:800;">📒 Log de orçamentos</button>
+    <span style="font-size:10.5px;color:#5a6270;">enviados · aprovados · janela de 7 dias</span>
+  </div>
+  <div id="log-orc" style="display:none;margin-bottom:12px;"></div>
 </div>
 <main>
   <div id="col-esq">
