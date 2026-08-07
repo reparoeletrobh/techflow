@@ -69,49 +69,22 @@ export default async function handler(req, res) {
           for (const c of (value.contacts || [])) {
             contatos[c.wa_id] = (c.profile && c.profile.name) || '';
           }
-          // 🌉 PONTE DE MIGRAÇÃO: o cliente escreveu para o número ANTIGO.
-          // O bot responde pelo número NOVO, mas para a Meta esse cliente nunca falou
-          // com o número novo — a janela de 24h está fechada e o texto é recusado (131047).
-          // Solução: mandar um TEMPLATE pelo número novo, que funciona sem janela.
+          // 📱 CADA NÚMERO RESPONDE O SEU: guarda por qual número a mensagem chegou.
+          // Quem escreveu para o número antigo abriu a janela DELE — a resposta sai por
+          // lá, normalmente. Só as conversas INICIADAS pelo sistema usam o número novo.
           const phoneIdRecebido = String((value.metadata && value.metadata.phone_number_id) || '');
-          let precisaPonte = false;
-          try {
-            const credA = (await dbGet('wa_credenciais')) || {};
-            const phoneAtivoW = credA.phoneId || (process.env.WA_PHONE_ID || '').trim();
-            if (phoneIdRecebido && phoneAtivoW && phoneIdRecebido !== phoneAtivoW) {
-              precisaPonte = true;
-            }
-          } catch (e) {}
 
           for (const msg of (value.messages || [])) {
             const tel = String(msg.from || '');
-            // 🌉 dispara a ponte uma única vez por cliente
-            if (precisaPonte) {
-              try {
-                const d8p = tel.replace(/\D/g, '').slice(-8);
-                const pontes = (await dbGet('wa_ponte_migracao')) || { feitos: {} };
-                if (!pontes.feitos[d8p]) {
-                  const credP = (await dbGet('wa_credenciais')) || {};
-                  const tkP = credP.token || (process.env.WA_TOKEN || '').trim();
-                  const pidP = credP.phoneId || (process.env.WA_PHONE_ID || '').trim();
-                  const nomeP = (contatos[tel] || '').split(' ')[0] || 'tudo bem';
-                  if (tkP && pidP) {
-                    const rp = await fetch('https://graph.facebook.com/v20.0/' + pidP + '/messages', {
-                      method: 'POST',
-                      headers: { Authorization: 'Bearer ' + tkP, 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ messaging_product: 'whatsapp', to: tel, type: 'template',
-                        template: { name: 'boas_vindas_reparo', language: { code: 'pt_BR' },
-                          components: [{ type: 'body', parameters: [{ type: 'text', text: nomeP }] }] } }),
-                    }).then(x => x.json()).catch(() => null);
-                    const okP = !!(rp && rp.messages && rp.messages[0]);
-                    pontes.feitos[d8p] = { em: new Date().toISOString(), ok: okP,
-                      erro: okP ? null : ((rp && rp.error && rp.error.message) || 'falha') };
-                    await dbSet('wa_ponte_migracao', pontes);
-                    console.log('[ponte-migracao]', tel, okP ? 'template enviado' : 'falhou');
-                  }
-                }
-              } catch (e) { console.error('[ponte-migracao]', e.message); }
-            }
+            // 📱 registra por qual número este cliente falou — a resposta sai pelo mesmo
+            try {
+              if (phoneIdRecebido) {
+                const d8o = tel.replace(/\D/g, '').slice(-8);
+                const orig = (await dbGet('wa_origem_conversa')) || { por: {} };
+                orig.por[d8o] = { phoneId: phoneIdRecebido, em: new Date().toISOString() };
+                await dbSet('wa_origem_conversa', orig);
+              }
+            } catch (e) {}
             let texto = '';
             if (msg.type === 'text') texto = (msg.text && msg.text.body) || '';
             else if (msg.type === 'button') texto = (msg.button && msg.button.text) || '[botão]';

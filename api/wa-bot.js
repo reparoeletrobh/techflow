@@ -4,6 +4,25 @@ const U = (process.env.UPSTASH_URL || '').replace(/['"]/g, '').trim();
 const T = (process.env.UPSTASH_TOKEN || '').replace(/[\n\r'"]/g, '').trim();
 let WA_TOKEN = (process.env.WA_TOKEN || '').trim();
 let WA_PHONE_ID = (process.env.WA_PHONE_ID || '').trim();
+// 📱 CREDENCIAIS PARA RESPONDER: usa o número por onde o cliente falou.
+// Quem escreveu para o número antigo abriu a janela DELE — responder por lá funciona
+// normalmente. Só as conversas INICIADAS pelo sistema usam sempre o número novo.
+async function credenciaisResposta(tel) {
+  const padrao = await credenciais();
+  try {
+    const d8 = String(tel || '').replace(/\D/g, '').slice(-8);
+    if (d8.length < 8) return padrao;
+    const orig = await dbGet('wa_origem_conversa');
+    const reg = orig && orig.por && orig.por[d8];
+    if (!reg || !reg.phoneId) return padrao;
+    if (String(reg.phoneId) === String(padrao.phoneId)) return padrao;
+    // o cliente falou pelo número ANTIGO — responde por ele, com o token da Vercel
+    const tkAntigo = (process.env.WA_TOKEN || '').trim();
+    if (!tkAntigo) return padrao;
+    return { token: tkAntigo, phoneId: String(reg.phoneId), viaAntigo: true };
+  } catch (e) { return padrao; }
+}
+
 async function credenciais() {
   // 🔀 O Redis tem PRIORIDADE quando há troca ativa — permite mudar de número em
   // segundos, sem redeploy. Sem troca ativa, valem as variáveis da Vercel.
@@ -3987,7 +4006,7 @@ export default async function handler(req, res) {
       if (!sg.ok || !sg.sugestao || !sg.sugestao.resposta) {
         // ANTI-VÁCUO: nunca deixar o cliente sem resposta — mensagem neutra + registro visível no painel
         try {
-          const { token: tkF, phoneId: phF } = await credenciais();
+          const { token: tkF, phoneId: phF } = await credenciaisResposta(tel);
           const toF = telAR.startsWith('55') ? telAR : '55' + telAR;
           await fetch(`https://graph.facebook.com/v20.0/${phF}/messages`, {
             method: 'POST', headers: { Authorization: `Bearer ${tkF}`, 'Content-Type': 'application/json' },
@@ -4651,7 +4670,8 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
       } catch (e) {}
       return res.status(400).json({ ok: false, error: 'mensagem continha estrutura interna — envio bloqueado' });
     }
-    const { token: tkE, phoneId: pidE } = await credenciais();
+    // 📱 responde pelo número por onde o cliente falou
+    const { token: tkE, phoneId: pidE, viaAntigo: _vaE } = await credenciaisResposta(tel);
     if (!tkE || !pidE) return res.status(200).json({ ok: false, error: 'Credenciais WhatsApp não configuradas (envs ou setup-credenciais)' });
     try {
       const r = await fetch(`https://graph.facebook.com/v20.0/${pidE}/messages`, {
