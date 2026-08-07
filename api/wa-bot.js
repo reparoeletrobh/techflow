@@ -1938,6 +1938,107 @@ export default async function handler(req, res) {
       erroDaMeta: (cfgW && cfgW.error) ? cfgW.error.message : undefined });
   }
 
+  // ── 🔁 RECUPERACAO-7D: retoma a negociação de quem está em AGUARDANDO APROVAÇÃO ──
+  // 1 disparo por dia, no máximo 7 por cliente. Objetivo: fazer a negociação chegar à F5.
+  if (action === 'recuperacao-7d') {
+    const cfgR7 = (await dbGet('wa_bot_config')) || {};
+    if (cfgR7.recuperacao7dAtiva !== true && String(req.query.forcar || '') !== '1') {
+      return res.status(200).json({ ok: true,
+        msg: 'recuperação de 7 dias DESLIGADA — ligue em ?action=recuperacao7d-ligar' });
+    }
+    if (!dentroHorarioComercial() && String(req.query.forcar || '') !== '1') {
+      return res.status(200).json({ ok: true, msg: 'fora do horário comercial' });
+    }
+    const { token: tk7, phoneId: pid7 } = await credenciais();
+    if (!tk7 || !pid7) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
+
+    // 🎯 CRUZAMENTO: só quem está em aguardando_aprovacao no pipe AGORA
+    const [pp7, evts7, reg7] = await Promise.all([
+      dbGet('reparoeletro_pipe'), lerEvts(), dbGet('wa_recuperacao_7d'),
+    ]);
+    const controle = reg7 || { clientes: {} };
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const d8de = t => String(t || '').replace(/\D/g, '').slice(-8);
+
+    // quem respondeu nas últimas 24h não recebe (está em conversa ativa)
+    const respondeu = new Set();
+    for (const e of evts7) {
+      if (e.dir !== 'in') continue;
+      if (Date.now() - new Date(e.ts || 0).getTime() > 24 * 3600000) continue;
+      respondeu.add(d8de(e.tel));
+    }
+
+    const candidatos = [];
+    for (const c of (((pp7 || {}).cards) || [])) {
+      const fase = String(c.phaseId || c.phase || '');
+      if (fase !== 'aguardando_aprovacao') continue;          // ← o cruzamento pedido
+      const d8 = d8de(c.telefone);
+      if (d8.length < 8) continue;
+      if (respondeu.has(d8)) continue;
+      const ctrl = controle.clientes[d8] || { tentativas: 0, ultimo: null };
+      if (ctrl.tentativas >= 7) continue;                     // esgotou as 7
+      if (ctrl.ultimo === hoje) continue;                     // já recebeu hoje
+      candidatos.push({ card: c, d8, tentativa: ctrl.tentativas + 1 });
+    }
+    const teto = Math.min(30, Math.max(1, parseInt(req.query.teto || cfgR7.recuperacao7dTeto || '10', 10)));
+    const lote = candidatos.slice(0, teto);
+
+    if (String(req.query.simular || '') === '1') {
+      return res.status(200).json({ ok: true, modo: 'simulação — nada enviado',
+        emAguardandoAprovacao: candidatos.length + lote.length ? candidatos.length : 0,
+        elegiveisAgora: candidatos.length, seriamEnviados: lote.length, teto,
+        lista: lote.map(x => (x.card.nomeContato || '?') + ' ' + x.d8.slice(-4) +
+          ' | tentativa ' + x.tentativa + '/7 | ' + String(x.card.equipamento || '').slice(0, 24)) });
+    }
+
+    const enviados = [], falhas = [];
+    for (const x of lote) {
+      const nome = String(x.card.nomeContato || '').trim().split(/\s+/)[0] || 'tudo bem';
+      const tel = String(x.card.telefone || '').replace(/\D/g, '');
+      const to = tel.startsWith('55') ? tel : '55' + tel;
+      // usa o template de orçamento pronto — a conversa segue pelo cérebro nas 5 fases
+      const r = await fetch(`https://graph.facebook.com/v20.0/${pid7}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tk7}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template',
+          template: { name: 'orcamento_pronto', language: { code: 'pt_BR' },
+            components: [{ type: 'body', parameters: [
+              { type: 'text', text: nome },
+              { type: 'text', text: String(x.card.equipamento || 'equipamento').slice(0, 40) },
+            ] }] } }),
+      }).then(z => z.json()).catch(e => ({ error: { message: e.message } }));
+
+      const ok = !!(r && r.messages && r.messages[0]);
+      if (ok) {
+        controle.clientes[x.d8] = { tentativas: x.tentativa, ultimo: hoje,
+          nome: x.card.nomeContato, cardId: x.card.id };
+        enviados.push((x.card.nomeContato || '?') + ' (tentativa ' + x.tentativa + '/7)');
+        await indexarEnvio(r.messages[0].id, 'orcamento_pronto', 'recuperacao-7d', nome, to);
+        await rpushEvt({ ts: new Date().toISOString(), tel: to, dir: 'out',
+          texto: '🔁 [orcamento_pronto] recuperação ' + x.tentativa + '/7 — ' + nome,
+          tipo: 'template', via: 'recuperacao-7d', msgId: r.messages[0].id });
+      } else {
+        falhas.push((x.card.nomeContato || '?') + ': ' + ((r.error && (r.error.error_user_msg || r.error.message)) || 'falha'));
+      }
+      await new Promise(s => setTimeout(s, 900));             // ritmo suave
+    }
+    await dbSet('wa_recuperacao_7d', controle);
+    return res.status(200).json({ ok: falhas.length === 0,
+      elegiveis: candidatos.length, enviados: enviados.length,
+      lista: enviados, falhas });
+  }
+
+  // ── 🔘 RECUPERACAO7D-LIGAR / DESLIGAR ──
+  if (action === 'recuperacao7d-ligar' || action === 'recuperacao7d-desligar') {
+    const c = (await dbGet('wa_bot_config')) || {};
+    c.recuperacao7dAtiva = action === 'recuperacao7d-ligar';
+    if (req.query.teto) c.recuperacao7dTeto = Math.min(30, Math.max(1, parseInt(req.query.teto, 10)));
+    await dbSet('wa_bot_config', c);
+    return res.status(200).json({ ok: true,
+      recuperacao7d: c.recuperacao7dAtiva ? 'LIGADA' : 'DESLIGADA',
+      teto: c.recuperacao7dTeto || 10 });
+  }
+
   // ── 💵 IA-CONSUMO: quanto a IA custou por dia e onde o token está indo ──
   if (action === 'ia-consumo') {
     const dias = Math.min(60, Math.max(1, parseInt(req.query.dias || '7', 10)));
@@ -2942,6 +3043,9 @@ export default async function handler(req, res) {
   // ── CONSERTO-FINALIZADO-PENDENTES (cron 3min): card em loja_feito/delivery_feito/controle_qualidade →
   //    template conserto_finalizado (trava execTels) + fase controle_qualidade cria inspeção no QC (geral)
   if (action === 'conserto-finalizado-pendentes') {
+    // 🚀 marco do número novo: não avisar equipamento que ficou pronto ANTES da virada
+    const _cfgM = (await dbGet('wa_bot_config')) || {};
+    const _marcoC = _cfgM.marcoNumeroNovo ? new Date(_cfgM.marcoNumeroNovo).getTime() : 0;
     // mesma guarda de horário (ver orcamentos-pendentes)
     {
       const b = new Date(Date.now() - 3 * 3600 * 1000);
@@ -2979,6 +3083,8 @@ export default async function handler(req, res) {
     const resultados = [];
     for (const c of ((boardC && boardC.cards) || [])) {
       if (!FASES_FEITO.includes(c.phaseId)) continue;
+      // 🚀 marco: só o que ficou pronto DEPOIS da virada do número
+      if (_marcoC && new Date(c.movedAt || c.criadoEm || 0).getTime() < _marcoC) continue;
       const cid = String(c.id || c.os || '');
       if (!cid) continue;
       const marca = avisadosC.ids[cid] || {};

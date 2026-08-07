@@ -127,6 +127,10 @@
     {
       "path": "/api/trafego?action=pendentes-aprovacao&dias=2&k=tfk-re2026-Bx7mQp9zKw4Y",
       "schedule": "0 13,20 * * *"
+    },
+    {
+      "path": "/api/wa-bot?action=recuperacao-7d&k=tfk-re2026-Bx7mQp9zKw4Y",
+      "schedule": "0 13 * * 1-6"
     }
   ],
   "rewrites": [
