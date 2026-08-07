@@ -1969,8 +1969,26 @@ export default async function handler(req, res) {
           ? Math.round(tot.cacheLido / (tot.cacheCriado + tot.cacheLido) * 100) + '%' : '0%',
         custoTotalUSD: Number(tot.custo.toFixed(2)),
         custoPorChamadaUSD: tot.chamadas ? Number((tot.custo / tot.chamadas).toFixed(4)) : 0 },
+      POR_ORIGEM: await (async function () {
+        const agg = {};
+        for (let i = 0; i < dias; i++) {
+          const d = new Date(Date.now() - 3 * 3600000 - i * 86400000).toISOString().slice(0, 10);
+          const r = await dbGet('ia_uso_' + d);
+          for (const [o, v] of Object.entries((r || {}).porOrigem || {})) {
+            const a = agg[o] || { n: 0, ent: 0, sai: 0, cw: 0, cr: 0 };
+            a.n += v.n; a.ent += v.ent; a.sai += v.sai; a.cw += v.cw; a.cr += v.cr;
+            agg[o] = a;
+          }
+        }
+        return Object.entries(agg).map(([o, v]) => {
+          const c = (v.ent / 1e6) * P_IN + (v.sai / 1e6) * P_OUT
+            + (v.cw / 1e6) * P_CACHE_W + (v.cr / 1e6) * P_CACHE_R;
+          return { origem: o, chamadas: v.n, custoUSD: Number(c.toFixed(3)),
+            tokensPorChamada: v.n ? Math.round((v.ent + v.cw + v.cr) / v.n) : 0 };
+        }).sort((a, b) => b.custoUSD - a.custoUSD);
+      })(),
       porDia: linhas,
-      observacao: 'o registro começa agora — dias anteriores não têm dados' });
+      observacao: 'o registro começa agora — dias anteriores não têm dados. O bot aparece como origem implícita; as demais chamadas do sistema vêm nomeadas.' });
   }
 
   // ── 💳 STATUS-COBRANCA: a conta do WhatsApp está liberada para enviar? ──
@@ -3867,6 +3885,11 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
         reg.cacheCriado += (u.cache_creation_input_tokens || 0);
         reg.cacheLido += (u.cache_read_input_tokens || 0);
         reg.ms += (Date.now() - _iaT0);
+        reg.porOrigem = reg.porOrigem || {};
+        const _o = reg.porOrigem['wa-bot'] || { n: 0, ent: 0, sai: 0, cw: 0, cr: 0 };
+        _o.n++; _o.ent += (u.input_tokens || 0); _o.sai += (u.output_tokens || 0);
+        _o.cw += (u.cache_creation_input_tokens || 0); _o.cr += (u.cache_read_input_tokens || 0);
+        reg.porOrigem['wa-bot'] = _o;
         await dbSet(kU, reg);
       } catch (e) {}
       const _txts = (j.content || []).filter(b => b.type === 'text');

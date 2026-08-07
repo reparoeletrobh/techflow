@@ -105,6 +105,35 @@ async function createPipefyCard() {
   return { ok: false, error: 'Pipefy desconectado' };
 }
 
+
+// ── 📊 medidor de consumo da IA (chave única da Anthropic) ──
+async function _regIA(origem, j) {
+  try {
+    const U2 = (process.env.UPSTASH_URL || '').replace(/['"]/g, '').trim();
+    const T2 = (process.env.UPSTASH_TOKEN || '').replace(/[\n\r'"]/g, '').trim();
+    if (!U2 || !T2 || !j) return;
+    const u = j.usage || {};
+    const dia = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const k = 'ia_uso_' + dia;
+    const rr = await fetch(`${U2}/get/${k}`, { headers: { Authorization: `Bearer ${T2}` } })
+      .then(x => x.json()).catch(() => null);
+    let reg = { chamadas: 0, entrada: 0, saida: 0, cacheCriado: 0, cacheLido: 0, ms: 0, porOrigem: {} };
+    try { if (rr && rr.result) reg = Object.assign(reg, JSON.parse(rr.result)); } catch (e) {}
+    reg.chamadas++;
+    reg.entrada += (u.input_tokens || 0);
+    reg.saida += (u.output_tokens || 0);
+    reg.cacheCriado += (u.cache_creation_input_tokens || 0);
+    reg.cacheLido += (u.cache_read_input_tokens || 0);
+    reg.porOrigem = reg.porOrigem || {};
+    const o = reg.porOrigem[origem] || { n: 0, ent: 0, sai: 0, cw: 0, cr: 0 };
+    o.n++; o.ent += (u.input_tokens || 0); o.sai += (u.output_tokens || 0);
+    o.cw += (u.cache_creation_input_tokens || 0); o.cr += (u.cache_read_input_tokens || 0);
+    reg.porOrigem[origem] = o;
+    await fetch(`${U2}/set/${k}/${encodeURIComponent(JSON.stringify(reg))}`,
+      { headers: { Authorization: `Bearer ${T2}` } });
+  } catch (e) {}
+}
+
 module.exports = async function handler(req, res) {
   // 🔐 TF-AUTH (Fase 1): chave obrigatória em toda chamada
   const _tfk = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
