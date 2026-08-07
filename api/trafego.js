@@ -1210,6 +1210,14 @@ module.exports = async function handler(req, res) {
           if (oss.video_data) {
             novoOss.video_data = { ...oss.video_data, video_id: v.id };
             delete novoOss.video_data.image_url;
+            // ✍️ TEXTO: o criativo nascia SEM título e SEM corpo (os 3 de TV de 05/08).
+            // Gera a partir do nome do vídeo, que descreve o defeito, e mantém o
+            // botão e o destino herdados do modelo.
+            const txt = textoPorDefeito(String(v.title || ''), cat);
+            if (txt) {
+              novoOss.video_data.title = txt.titulo;
+              novoOss.video_data.message = txt.corpo;
+            }
           } else if (oss.link_data) {
             novoOss.link_data = oss.link_data;
           }
@@ -1270,6 +1278,48 @@ module.exports = async function handler(req, res) {
       proximoPasso: 'confira em /trafego e troque o vídeo no criativo se necessário' });
   }
 
+  // ── ✍️ textos por DEFEITO: cada criativo fala do problema que mostra ──
+  function textoPorDefeito(nomeArquivo, categoria) {
+    const s = String(nomeArquivo || '').toLowerCase().replace(/\.(mov|mp4|avi)$/i, '');
+    const TV = [
+      { re: /som.*(n[aã]o|sem).*(imagem|v[ií]deo)|sem imagem|n[aã]o d[aá] imagem/,
+        titulo: 'Sua TV tem som mas não tem imagem?',
+        corpo: 'A tela fica preta mas o som continua funcionando? Na maioria das vezes é a placa ou os LEDs — conserto rápido e com garantia. Chama no WhatsApp!' },
+      { re: /led queimad|led/,
+        titulo: 'LED queimado na sua TV?',
+        corpo: 'Tela escura, manchada ou com faixas? Os LEDs queimam com o tempo. Fazemos a troca completa com peças originais e garantia. Fala com a gente!' },
+      { re: /tela lavad|lavada|desbotad|apagad/,
+        titulo: 'A imagem da sua TV ficou lavada?',
+        corpo: 'Cores desbotadas, imagem clara demais ou esbranquiçada? Tem conserto — e sai bem mais em conta que uma TV nova. Chama no WhatsApp!' },
+      { re: /tela azul|azulad/,
+        titulo: 'Sua TV está com a tela azulada?',
+        corpo: 'Sua TV perdeu o brilho? Você consegue ver a imagem lá no fundo, ou ela fica toda azul? Podemos fazer a troca dos LEDs rapidamente!' },
+      { re: /n[aã]o liga|nao liga|morta/,
+        titulo: 'Sua TV não liga?',
+        corpo: 'Não acende nem a luzinha? Costuma ser a fonte — um dos consertos mais simples que fazemos. Orçamento após avaliação, sem compromisso.' },
+      { re: /listra|risco|linha/,
+        titulo: 'TV com listras ou linhas na tela?',
+        corpo: 'Faixas coloridas, linhas verticais ou horizontais? É defeito conhecido e tem solução. Coletamos na sua casa e devolvemos consertada!' },
+      { re: /quebrad|trincad|rachad/,
+        titulo: 'Quebrou a tela da sua TV?',
+        corpo: 'Antes de comprar outra, faça um orçamento com a gente. Avaliamos sem compromisso e você decide. Chama no WhatsApp!' },
+      { re: /t-?con|barrament/,
+        titulo: 'Imagem falhando na sua TV?',
+        corpo: 'Imagem tremendo, piscando ou com defeito na placa? Consertamos com peças originais e garantia. Fala com a gente pelo WhatsApp!' },
+    ];
+    const GENERICO = {
+      tv: { titulo: 'Consertamos sua TV', corpo: 'Conserto de TV rápido em BH, com peças originais e garantia. Coletamos na sua casa e devolvemos funcionando. Chama no WhatsApp!' },
+      microondas: { titulo: 'Seu micro-ondas parou?', corpo: 'Não esquenta, não liga ou está fazendo barulho? Consertamos com peças originais e garantia. Chama no WhatsApp!' },
+      purificador: { titulo: 'Purificador com problema?', corpo: 'Não gela, vaza ou parou de sair água? Consertamos rápido, com garantia. Fala com a gente!' },
+      adega: { titulo: 'Sua adega parou de gelar?', corpo: 'Adega ou cervejeira com defeito? Consertamos com peças originais e garantia. Chama no WhatsApp!' },
+    };
+    if ((categoria || '') === 'tv' || /\btv\b|televis/.test(s)) {
+      for (const t of TV) if (t.re.test(s)) return { titulo: t.titulo, corpo: t.corpo };
+      return GENERICO.tv;
+    }
+    return GENERICO[categoria] || GENERICO.tv;
+  }
+
   // ── ✍️ TEXTOS-CRIATIVOS: compara e replica os textos dos campeões nos novos ──
   if (action === 'textos-criativos') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
@@ -1313,8 +1363,12 @@ module.exports = async function handler(req, res) {
         comTexto: completos.length, semTexto: vazios.length,
         MODELO: modelo ? { anuncio: modelo.anuncio, titulo: modelo.titulo,
           corpo: modelo.corpo, descricao: modelo.descricao, botao: modelo.botao } : null,
-        SEM_TEXTO: vazios.map(v => v.anuncio + ' | título: ' + (v.titulo || '❌') +
-          ' | corpo: ' + (v.corpo ? '✅' : '❌') + ' | botão: ' + (v.botao || '❌')),
+        SEM_TEXTO: vazios.map(v => {
+          const t = textoPorDefeito(v.anuncio, cat);
+          return v.anuncio + '\n     ↳ título: "' + (t ? t.titulo : '?') + '"\n     ↳ corpo: "' +
+            (t ? t.corpo : '?') + '"';
+        }),
+        observacao: 'cada criativo recebe o texto do DEFEITO que ele mostra, não uma cópia do campeão',
         detalhe: lidos,
         dica: modelo && vazios.length
           ? 'para replicar o texto do modelo nos vazios: &aplicar=1'
@@ -1331,8 +1385,11 @@ module.exports = async function handler(req, res) {
       const oss = (at.object_story_spec) || {};
       if (!oss.video_data) { erros.push(v.anuncio + ': criativo sem vídeo — não mexi'); continue; }
       const novoOss = { page_id: oss.page_id, video_data: { ...oss.video_data } };
-      novoOss.video_data.title = modelo.titulo;
-      novoOss.video_data.message = modelo.corpo;
+      // usa o texto do DEFEITO que o vídeo mostra — copiar o texto do campeão
+      // colocaria "tela azulada" num anúncio de "sai som", derrubando o desempenho
+      const txtD = textoPorDefeito(v.anuncio, cat);
+      novoOss.video_data.title = (txtD && txtD.titulo) || modelo.titulo;
+      novoOss.video_data.message = (txtD && txtD.corpo) || modelo.corpo;
       if (modelo.descricao) novoOss.video_data.link_description = modelo.descricao;
       delete novoOss.video_data.image_url;
       // cria um criativo novo com o mesmo vídeo e o texto do modelo
