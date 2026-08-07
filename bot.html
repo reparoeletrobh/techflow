@@ -455,6 +455,53 @@ carregarConversas();
 setInterval(function(){ if(!document.hidden){ carregarConversas(); if(_tel)abrirConversa(_tel); } }, 30000);
 
 var _kpiDias=parseInt(localStorage.getItem('bot_kpi_d')||'1');
+// ── 📒 LOG DE ORÇAMENTOS ──────────────────────────────────────────────
+let _logOrcAberto=false, _logOrcDias=7;
+async function abrirLogOrc(dias){
+  var el=document.getElementById('log-orc');
+  if(_logOrcAberto&&dias===undefined){el.style.display='none';_logOrcAberto=false;return;}
+  if(dias!==undefined)_logOrcDias=dias;
+  _logOrcAberto=true; el.style.display='block';
+  el.innerHTML='<div style="padding:14px;color:#5a6270;font-size:11.5px;">⏳ carregando…</div>';
+  var r=await fetch('/api/wa-bot?action=log-orcamentos&dias='+_logOrcDias).then(function(x){return x.json();}).catch(function(){return null;});
+  if(!r||!r.ok){el.innerHTML='<div style="padding:14px;color:#f87171;font-size:11.5px;">não consegui carregar</div>';return;}
+  var R=r.RESUMO||{};
+  function card(rot,val,cor){
+    return '<div style="background:#12161d;border:1px solid #242b39;border-radius:10px;padding:9px 11px;">'
+      +'<div style="font-family:ui-monospace,monospace;font-size:17px;font-weight:700;color:'+(cor||'#f0f2f5')+';">'+val+'</div>'
+      +'<div style="font-size:9.5px;color:#5a6270;font-weight:700;margin-top:2px;">'+rot+'</div></div>';
+  }
+  function bloco(titulo,itens,cor,vazio){
+    if(!itens||!itens.length)return '<div style="margin-top:10px;"><div style="font-size:11px;font-weight:900;color:'+cor+';margin-bottom:5px;">'+titulo+'</div>'
+      +'<div style="font-size:11px;color:#5a6270;padding:6px 0;">'+(vazio||'nenhum')+'</div></div>';
+    return '<div style="margin-top:10px;">'
+      +'<div style="font-size:11px;font-weight:900;color:'+cor+';margin-bottom:5px;">'+titulo+' <span style="color:#5a6270;font-weight:400;">('+itens.length+')</span></div>'
+      +'<div style="background:#0f1319;border:1px solid #1e2228;border-radius:9px;padding:9px 11px;max-height:220px;overflow-y:auto;'
+      +'font-family:ui-monospace,monospace;font-size:10.5px;color:#c9ced6;line-height:1.75;">'
+      +itens.map(function(x){return String(x).replace(/&/g,'&amp;').replace(/</g,'&lt;');}).join('<br>')+'</div></div>';
+  }
+  el.innerHTML='<div style="background:#0d1117;border:1px solid #242b39;border-radius:12px;padding:13px 14px;">'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">'
+      +'<span style="font-size:12px;font-weight:900;color:#25d366;">📒 LOG DE ORÇAMENTOS</span>'
+      +'<span style="font-size:10.5px;color:#5a6270;">'+(r.periodo||'')+'</span>'
+      +'<div style="margin-left:auto;display:flex;gap:4px;">'
+        +[1,7,30].map(function(d){return '<button class="btn" onclick="abrirLogOrc('+d+')" style="font-size:10px;padding:3px 9px;'+(_logOrcDias===d?'background:#1d4ed8;color:#fff;':'')+'">'+(d===1?'Hoje':d+'d')+'</button>';}).join('')
+      +'</div></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:7px;">'
+      +card('ENVIADOS',R.orcamentosEnviados||0)
+      +card('APROVADOS',R.aprovadosNoPeriodo||0,'#4ade80')
+      +card('VALOR','R$ '+(R.valorAprovado||0),'#4ade80')
+      +card('TAXA',R.taxaAprovacao||'—','#fbbf24')
+      +card('NA JANELA 7D',R.naJanelaDe7Dias||0,'#60a5fa')
+      +card('CONVERTERAM',R.converteramAposRecuperacao||0,'#4ade80')
+      +card('ESGOTARAM 7',R.esgotaramAs7||0,(R.esgotaramAs7?'#f87171':'#5a6270'))
+    +'</div>'
+    +bloco('✅ APROVADOS NO PERÍODO',r.APROVADOS,'#4ade80','nenhuma aprovação registrada')
+    +bloco('🔁 JANELA DE 7 DIAS',r.JANELA_7D,'#60a5fa','ninguém no ciclo de recuperação')
+    +bloco('📤 ORÇAMENTOS ENVIADOS',r.ENVIADOS,'#8b93a3','nenhum envio no período')
+  +'</div>';
+}
+
 function setPer(el){
   _kpiDias=parseInt(el.getAttribute('data-d'));
   localStorage.setItem('bot_kpi_d',String(_kpiDias));
