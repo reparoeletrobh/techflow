@@ -16,10 +16,21 @@ async function credenciaisResposta(tel) {
     const reg = orig && orig.por && orig.por[d8];
     if (!reg || !reg.phoneId) return padrao;
     if (String(reg.phoneId) === String(padrao.phoneId)) return padrao;
-    // o cliente falou pelo número ANTIGO — responde por ele, com o token da Vercel
+    // 🔐 o cliente falou por OUTRO número — busca a credencial dele numa chave
+    // SEPARADA (wa_credenciais_secundarias). Essa chave NUNCA é lida por credenciais(),
+    // então não há como afetar o número ativo.
+    const sec = await dbGet('wa_credenciais_secundarias');
+    const ent = sec && sec.numeros && sec.numeros[String(reg.phoneId)];
+    if (ent && ent.token) {
+      return { token: ent.token, phoneId: String(reg.phoneId), viaAntigo: true };
+    }
+    // sem credencial daquele número: cai no padrão (número ativo)
     const tkAntigo = (process.env.WA_TOKEN || '').trim();
-    if (!tkAntigo) return padrao;
-    return { token: tkAntigo, phoneId: String(reg.phoneId), viaAntigo: true };
+    const pidAntigo = (process.env.WA_PHONE_ID || '').trim();
+    if (tkAntigo && pidAntigo === String(reg.phoneId)) {
+      return { token: tkAntigo, phoneId: String(reg.phoneId), viaAntigo: true };
+    }
+    return padrao;
   } catch (e) { return padrao; }
 }
 
@@ -2193,6 +2204,60 @@ export default async function handler(req, res) {
       efeito: ligar
         ? 'o cron passa a disparar orcamento_pronto para ficha nova em aguardando aprovação'
         : 'nenhum orçamento sai sozinho — só pelo envio manual na tela' });
+  }
+
+  // ── 🔐 NUMERO-SECUNDARIO: cadastra credencial de um número que só RESPONDE ──
+  // Guardado em chave separada. NUNCA afeta o número ativo.
+  if (action === 'numero-secundario') {
+    const pid = String(req.query.phoneId || '').trim();
+    const tk = String(req.query.token || '').trim();
+    const cred = await credenciais();
+
+    if (String(req.query.listar || '') === '1') {
+      const s = (await dbGet('wa_credenciais_secundarias')) || { numeros: {} };
+      return res.status(200).json({ ok: true,
+        numeroAtivo: cred.phoneId,
+        secundarios: Object.entries(s.numeros || {}).map(([p, v]) =>
+          p + ' | ' + (v.apelido || 'sem apelido') + ' | cadastrado ' + String(v.em || '').slice(0, 10)),
+        observacao: 'estes números apenas RESPONDEM quem escrever para eles; nunca iniciam conversa' });
+    }
+    if (String(req.query.remover || '') === '1' && pid) {
+      const s = (await dbGet('wa_credenciais_secundarias')) || { numeros: {} };
+      delete s.numeros[pid];
+      await dbSet('wa_credenciais_secundarias', s);
+      return res.status(200).json({ ok: true, removido: pid });
+    }
+    if (!pid || !tk) return res.status(400).json({ ok: false,
+      error: 'informe ?phoneId=X&token=Y — ou &listar=1 para ver os cadastrados' });
+
+    // 🛡 TRAVA 1: nunca aceitar o número ATIVO como secundário
+    if (String(pid) === String(cred.phoneId)) {
+      return res.status(400).json({ ok: false,
+        error: '🛡 BLOQUEADO: este é o número ATIVO. Cadastrá-lo como secundário poderia confundir o roteamento.',
+        numeroAtivo: cred.phoneId });
+    }
+    // 🛡 TRAVA 2: validar na Meta antes de guardar
+    const teste = await fetch(`https://graph.facebook.com/v20.0/${pid}?fields=display_phone_number,verified_name,quality_rating,status&access_token=${tk}`)
+      .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+    if (!teste || teste.error) {
+      return res.status(200).json({ ok: false,
+        error: 'credenciais não funcionam — NADA foi salvo',
+        detalhe: (teste && teste.error && (teste.error.error_user_msg || teste.error.message)) || '?' });
+    }
+    const s = (await dbGet('wa_credenciais_secundarias')) || { numeros: {} };
+    s.numeros = s.numeros || {};
+    s.numeros[pid] = { token: tk, apelido: String(req.query.apelido || teste.display_phone_number || ''),
+      em: new Date().toISOString() };
+    await dbSet('wa_credenciais_secundarias', s);
+    // conferência final: o número ativo continua o mesmo?
+    const depois = await credenciais();
+    return res.status(200).json({ ok: true,
+      cadastrado: { phoneId: pid, telefone: teste.display_phone_number,
+        nome: teste.verified_name, qualidade: teste.quality_rating, situacao: teste.status },
+      papel: 'apenas RESPONDE quem escrever para ele — nunca inicia conversa',
+      CONFERENCIA: {
+        numeroAtivoAntes: cred.phoneId, numeroAtivoDepois: depois.phoneId,
+        intacto: cred.phoneId === depois.phoneId ? '✅ o número ativo não foi alterado' : '🚨 ALTEROU — reverter' } });
   }
 
   // ── 🩺 DIAG-ROTEAMENTO: por que a resposta não saiu pelo número de origem ──
