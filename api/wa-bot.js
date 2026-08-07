@@ -1961,8 +1961,8 @@ export default async function handler(req, res) {
     if (!tk7 || !pid7) return res.status(200).json({ ok: false, error: 'credenciais ausentes' });
 
     // 🎯 CRUZAMENTO: só quem está em aguardando_aprovacao no pipe AGORA
-    const [pp7, evts7, reg7] = await Promise.all([
-      dbGet('reparoeletro_pipe'), lerEvts(), dbGet('wa_recuperacao_7d'),
+    const [pp7, ppTv7, evts7, reg7] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), lerEvts(), dbGet('wa_recuperacao_7d'),
     ]);
     const controle = reg7 || { clientes: {} };
     const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
@@ -1978,7 +1978,10 @@ export default async function handler(req, res) {
 
     const candidatos = [];
     const esgotados = [];
-    for (const c of (((pp7 || {}).cards) || [])) {
+    // 📺 cobre ADM e TV — a recuperação olhava só o pipe ADM
+    const universo7 = (((pp7 || {}).cards) || []).map(c => ({ ...c, _sis: 'adm' }))
+      .concat((((ppTv7 || {}).cards) || []).map(c => ({ ...c, _sis: 'tv' })));
+    for (const c of universo7) {
       const fase = String(c.phaseId || c.phase || '');
       if (fase !== 'aguardando_aprovacao') continue;          // ← o cruzamento pedido
       const d8 = d8de(c.telefone);
@@ -1990,7 +1993,8 @@ export default async function handler(req, res) {
         if (!ctrl.conflitoAberto) {
           try {
             // grava direto na prospecção com status conflitos_bot (mesmo caminho do cérebro)
-            const pdb7 = (await dbGet('prospeccao_adm')) || { fichas: [] };
+            const chaveProsp = c._sis === 'tv' ? 'prospeccao_tv' : 'prospeccao_adm';
+            const pdb7 = (await dbGet(chaveProsp)) || { fichas: [] };
             const jaTem = (pdb7.fichas || []).some(f => f.status === 'conflitos_bot' &&
               String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8);
             if (!jaTem) {
@@ -2008,7 +2012,7 @@ export default async function handler(req, res) {
                 criadoEm: new Date().toISOString(),
                 movedAt: new Date().toISOString(),
               });
-              await dbSet('prospeccao_adm', pdb7);
+              await dbSet(chaveProsp, pdb7);
             }
             ctrl.conflitoAberto = new Date().toISOString();
             controle.clientes[d8] = ctrl;
@@ -2071,9 +2075,9 @@ export default async function handler(req, res) {
       // suficiente para pegar mudança de fase e leve o bastante para não dar timeout.
       try {
         if (!_faseCache || Date.now() - _faseCacheEm > 15000) {
-          const ppAgora = await dbGet('reparoeletro_pipe');
+          const [ppA2, ppT2] = await Promise.all([dbGet('reparoeletro_pipe'), dbGet('tv_pipe')]);
           _faseCache = {};
-          for (const k of (((ppAgora || {}).cards) || [])) {
+          for (const k of ((((ppA2 || {}).cards) || []).concat((((ppT2 || {}).cards) || [])))) {
             _faseCache[k.id] = String(k.phaseId || k.phase || '');
           }
           _faseCacheEm = Date.now();
