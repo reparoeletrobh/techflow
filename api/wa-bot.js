@@ -2206,6 +2206,18 @@ export default async function handler(req, res) {
         : 'nenhum orçamento sai sozinho — só pelo envio manual na tela' });
   }
 
+  // ── 🕐 MARCO-MONITORAMENTO: zera o histórico de falhas e começa a contar de agora ──
+  if (action === 'marco-monitoramento') {
+    const c = (await dbGet('wa_bot_config')) || {};
+    const antes = c.marcoMonitoramento || null;
+    c.marcoMonitoramento = new Date().toISOString();
+    await dbSet('wa_bot_config', c);
+    return res.status(200).json({ ok: true,
+      marcoAnterior: antes,
+      novoMarco: c.marcoMonitoramento,
+      efeito: 'o alerta e os relatórios de falha só contam o que acontecer a partir deste momento' });
+  }
+
   // ── ♻️ REENVIAR-PERDIDAS: reenvia pelo número CERTO o que foi recusado hoje ──
   if (action === 'reenviar-perdidas') {
     const horas = Math.min(48, Math.max(1, parseInt(req.query.horas || '24', 10)));
@@ -2632,7 +2644,9 @@ export default async function handler(req, res) {
     // 🚀 NUNCA olhar antes da virada do número — as falhas do número antigo (bloqueio
     // de pagamento de 01/08) não são problema atual e poluíam o alerta com 24 casos.
     const cfgAl = (await dbGet('wa_bot_config')) || {};
-    const marcoAl = cfgAl.marcoNumeroNovo ? new Date(cfgAl.marcoNumeroNovo).getTime() : 0;
+    const marcoAl = Math.max(
+      cfgAl.marcoNumeroNovo ? new Date(cfgAl.marcoNumeroNovo).getTime() : 0,
+      cfgAl.marcoMonitoramento ? new Date(cfgAl.marcoMonitoramento).getTime() : 0);
     const phoneAtivo = (await credenciais()).phoneId || null;
     const corteBase = Date.now() - horas * 3600000;
     const corte = marcoAl ? Math.max(corteBase, marcoAl) : corteBase;
@@ -2688,7 +2702,9 @@ export default async function handler(req, res) {
         c + ' (' + (GRAVES[c] || 'outro') + '): ' + n),
       porTemplate,
       LISTA: falhas.slice(0, 40).map(f => hh(f.quando) + ' | ' + f.tel + ' | ' + f.template +
-        ' | cód ' + (f.codigo || '?') + ' | ' + (GRAVES[f.codigo] || f.motivo)) });
+        ' | cód ' + (f.codigo || '?') + ' | ' + (GRAVES[f.codigo] || f.motivo) +
+        (f.origem && f.origem !== '?' ? ' | ' + f.origem : '')),
+      contandoDesde: new Date(corte - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' BRT' });
   }
 
   // ── 🧹 LIMPAR-BLOQUEIO: remove a marca de bloqueio de pagamento ──
@@ -4655,6 +4671,8 @@ Podemos prosseguir com o atendimento?"
 4-H) DESISTIU ANTES DA COLETA (cancelou/desistiu ANTES de coletarmos — sem orçamento, sem equipamento com a gente): responda cordial deixando a porta aberta — "Sem problema! Qualquer coisa é só chamar, estamos à disposição." — e use mover_entrar_contato (motivo: "desistiu da coleta antes de acontecer — retomar por telefone"). NÃO use registrar_conflito nesse caso: conflito é para equipamento JÁ conosco, garantia ou cliente insatisfeito.
 
 5-FIM) ESGOTOU AS 5 FASES E O CLIENTE MANTEVE A RECUSA (não quer fazer o serviço / quer pagar só o orçamento): responda cordial — "Sem problema! Nossa equipe vai entrar em contato pra combinar a devolução do equipamento e os detalhes, tudo bem?" — e use OBRIGATORIAMENTE a ação registrar_conflito (motivo: "reprovou o orçamento após as 5 fases — finalizar manualmente: taxa R$30 do delivery + devolução"). NÃO cobre você mesmo, NÃO envie dados de pagamento, NÃO combine devolução por conta própria: a finalização é MANUAL da equipe.
+
+5-NUM) DOIS NÚMEROS EM OPERAÇÃO — REGRA ABSOLUTA: a empresa tem dois números de WhatsApp ativos. O NOVO (31) 9637-3843 é o oficial e inicia todas as conversas; o ANTIGO (31) 9608-7963 apenas RESPONDE quem escrever para ele. Você NUNCA menciona isso ao cliente, NUNCA pede para ele trocar de número, NUNCA diz "esse número mudou" ou "fale no outro número". Para o cliente existe UMA empresa e UMA conversa — a que ele já está tendo. Se ele perguntar sobre número, responda apenas com o telefone de LIGAÇÃO (item 5-TEL) e siga o atendimento normalmente. Também NUNCA inicie assunto novo numa conversa que o cliente reabriu: responda o que ele trouxe, no ponto em que a esteira parou.
 
 5-TEL) CLIENTE QUER FALAR POR TELEFONE / DIZ QUE TENTOU LIGAR E NÃO CONSEGUE: informe de imediato o número de atendimento por ligação — **(31) 97225-9819**, dentro do horário comercial. Vale para qualquer sinal disso: "tentei ligar e não atende", "esse número não completa a chamada", "tem telefone pra falar?", "prefiro falar por voz", "me liga", "qual o número de vocês", "liguei e caiu". Responda curto e resolutivo: "Claro! Nosso número de atendimento por ligação é (31) 97225-9819, no horário comercial. E por aqui também consigo te ajudar, viu?" — e CONTINUE a conversa normalmente pelo WhatsApp, sem encerrar nem abandonar a esteira das 5 fases. O número deste WhatsApp é só para mensagens; ligação é no (31) 97225-9819.
 
