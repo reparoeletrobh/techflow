@@ -1938,6 +1938,41 @@ export default async function handler(req, res) {
       erroDaMeta: (cfgW && cfgW.error) ? cfgW.error.message : undefined });
   }
 
+  // ── 💵 IA-CONSUMO: quanto a IA custou por dia e onde o token está indo ──
+  if (action === 'ia-consumo') {
+    const dias = Math.min(60, Math.max(1, parseInt(req.query.dias || '7', 10)));
+    const P_IN = 3.0, P_OUT = 15.0, P_CACHE_W = 3.75, P_CACHE_R = 0.30;
+    const linhas = [];
+    let tot = { chamadas: 0, entrada: 0, saida: 0, cacheCriado: 0, cacheLido: 0, custo: 0 };
+    for (let i = 0; i < dias; i++) {
+      const d = new Date(Date.now() - 3 * 3600000 - i * 86400000).toISOString().slice(0, 10);
+      const r = await dbGet('ia_uso_' + d);
+      if (!r) continue;
+      const custo = (r.entrada / 1e6) * P_IN + (r.saida / 1e6) * P_OUT
+        + (r.cacheCriado / 1e6) * P_CACHE_W + (r.cacheLido / 1e6) * P_CACHE_R;
+      tot.chamadas += r.chamadas; tot.entrada += r.entrada; tot.saida += r.saida;
+      tot.cacheCriado += r.cacheCriado; tot.cacheLido += r.cacheLido; tot.custo += custo;
+      linhas.push({ dia: d, chamadas: r.chamadas,
+        entrada: r.entrada, saida: r.saida,
+        cacheCriado: r.cacheCriado, cacheLido: r.cacheLido,
+        aproveitamentoCache: (r.cacheCriado + r.cacheLido) > 0
+          ? Math.round(r.cacheLido / (r.cacheCriado + r.cacheLido) * 100) + '%' : '0%',
+        tokensPorChamada: r.chamadas ? Math.round((r.entrada + r.cacheCriado + r.cacheLido) / r.chamadas) : 0,
+        custoUSD: Number(custo.toFixed(2)),
+        msMedio: r.chamadas ? Math.round(r.ms / r.chamadas) : 0 });
+    }
+    return res.status(200).json({ ok: true, periodoDias: dias,
+      TOTAIS: { chamadas: tot.chamadas,
+        tokensEntrada: tot.entrada, tokensSaida: tot.saida,
+        cacheCriado: tot.cacheCriado, cacheLido: tot.cacheLido,
+        aproveitamentoCache: (tot.cacheCriado + tot.cacheLido) > 0
+          ? Math.round(tot.cacheLido / (tot.cacheCriado + tot.cacheLido) * 100) + '%' : '0%',
+        custoTotalUSD: Number(tot.custo.toFixed(2)),
+        custoPorChamadaUSD: tot.chamadas ? Number((tot.custo / tot.chamadas).toFixed(4)) : 0 },
+      porDia: linhas,
+      observacao: 'o registro começa agora — dias anteriores não têm dados' });
+  }
+
   // ── 💳 STATUS-COBRANCA: a conta do WhatsApp está liberada para enviar? ──
   if (action === 'status-cobranca') {
     const { token: tkC, phoneId: pidC } = await credenciais();
@@ -3793,6 +3828,7 @@ DISCIPLINA (CRÍTICO — leia duas vezes):
 Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem sugerida","acao":{"tipo":"nenhuma|cadastrar_logistica|mover_cliente_loja|enviar_orcamento|desconto_pix|desconto_balcao|proposta_troca|mover_aprovado|registrar_reprovacao|registrar_conflito|escalar_humano","motivo":"por quê"},"confianca":"alta|media|baixa"}`;
 
     try {
+      const _iaT0 = Date.now();
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -3819,6 +3855,20 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
         }),
       });
       const j = await r.json();
+      // 📊 registra o consumo real de cada chamada, para saber onde o crédito vai
+      try {
+        const u = j.usage || {};
+        const dia = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+        const kU = 'ia_uso_' + dia;
+        const reg = (await dbGet(kU)) || { chamadas: 0, entrada: 0, saida: 0, cacheCriado: 0, cacheLido: 0, ms: 0 };
+        reg.chamadas++;
+        reg.entrada += (u.input_tokens || 0);
+        reg.saida += (u.output_tokens || 0);
+        reg.cacheCriado += (u.cache_creation_input_tokens || 0);
+        reg.cacheLido += (u.cache_read_input_tokens || 0);
+        reg.ms += (Date.now() - _iaT0);
+        await dbSet(kU, reg);
+      } catch (e) {}
       const _txts = (j.content || []).filter(b => b.type === 'text');
       const texto = (_txts.length ? _txts[_txts.length - 1].text : '') || '';
       let sug;
