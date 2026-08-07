@@ -2012,6 +2012,18 @@ export default async function handler(req, res) {
       if (ctrl.ultimo === hoje) continue;                     // já recebeu hoje
       candidatos.push({ card: c, d8, tentativa: ctrl.tentativas + 1 });
     }
+    // 🔒 UM POR TELEFONE: cliente com dois cards em aguardando aprovação (Julimar 4147,
+    // purificador + micro-ondas) recebia duas mensagens na mesma leva. Mantém só um card
+    // por telefone — o de maior valor, que é o que mais importa recuperar.
+    const porTel = {};
+    for (const x of candidatos) {
+      const atual = porTel[x.d8];
+      const vNovo = parseFloat(x.card.valor || 0) || 0;
+      const vAtual = atual ? (parseFloat(atual.card.valor || 0) || 0) : -1;
+      if (!atual || vNovo > vAtual) porTel[x.d8] = x;
+    }
+    candidatos.length = 0;
+    for (const x of Object.values(porTel)) candidatos.push(x);
     const teto = Math.min(30, Math.max(1, parseInt(req.query.teto || cfgR7.recuperacao7dTeto || '10', 10)));
     const lote = candidatos.slice(0, teto);
 
