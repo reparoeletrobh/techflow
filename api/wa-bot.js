@@ -2195,6 +2195,41 @@ export default async function handler(req, res) {
         : 'nenhum orçamento sai sozinho — só pelo envio manual na tela' });
   }
 
+  // ── 🩺 DIAG-ROTEAMENTO: por que a resposta não saiu pelo número de origem ──
+  if (action === 'diag-roteamento') {
+    const tel = String(req.query.tel || '').replace(/\D/g, '');
+    const d8 = tel.slice(-8);
+    const cred = await credenciais();
+    const orig = (await dbGet('wa_origem_conversa')) || { por: {} };
+    const reg = d8 ? orig.por[d8] : null;
+    const tkVercel = (process.env.WA_TOKEN || '').trim();
+    const pidVercel = (process.env.WA_PHONE_ID || '').trim();
+    const resp = d8 ? await credenciaisResposta(tel) : null;
+    return res.status(200).json({ ok: true,
+      telefone: d8 || '(não informado)',
+      '1_NUMERO_ATIVO': { phoneId: cred.phoneId },
+      '2_VARIAVEIS_DA_VERCEL': {
+        WA_PHONE_ID: pidVercel || '(vazio)',
+        temToken: !!tkVercel,
+        ehONumeroNovo: pidVercel === cred.phoneId,
+        alerta: pidVercel === cred.phoneId
+          ? '🚨 a variável da Vercel foi trocada para o número NOVO — não existe mais credencial do antigo, então é IMPOSSÍVEL responder por ele'
+          : (tkVercel ? '✅ credencial do número antigo disponível' : '🚨 sem token do antigo na Vercel'),
+      },
+      '3_ORIGEM_REGISTRADA': reg
+        ? { phoneId: reg.phoneId, em: reg.em,
+            veio_do_antigo: String(reg.phoneId) !== String(cred.phoneId) }
+        : '❌ nenhum registro — o webhook não gravou a origem desta conversa',
+      '4_CREDENCIAL_QUE_SERIA_USADA': resp
+        ? { phoneId: resp.phoneId, viaAntigo: !!resp.viaAntigo,
+            resultado: resp.phoneId === cred.phoneId
+              ? '⚠️ responderia pelo número NOVO' : '✅ responderia pelo ANTIGO' }
+        : null,
+      totalConversasRegistradas: Object.keys(orig.por || {}).length,
+      amostraRegistros: Object.entries(orig.por || {}).slice(0, 5).map(([d, v]) =>
+        d.slice(-4) + ' → ' + v.phoneId + ' (' + String(v.em).slice(5, 16) + ')') });
+  }
+
   // ── 🔍 TESTA-ANTIGO: o número antigo ainda consegue enviar? ──
   if (action === 'testa-antigo') {
     const tkV = (process.env.WA_TOKEN || '').trim();
