@@ -658,6 +658,45 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, movimentos: lg.movs.slice(0, 60) });
   }
 
+  // ── 🚚 QUEM-COLETOU: motorista responsável por cada ficha de uma fase ──
+  if (action === 'quem-coletou') {
+    const fase = String(req.query.fase || 'coleta_efetuada');
+    const db = await dbGet(LOG_KEY) || defaultDB();
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const alvo = ((db.fichas) || []).filter(f => f.phase === fase);
+    const lg = (await dbGet('tv_log_movimentos')) || { movs: [] };
+
+    const linhas = alvo.map(f => {
+      // quem consta na ficha
+      const naFicha = f.coletadoPor || f.motoristaNome || f.motoristaAnterior || null;
+      // e o que o log de movimentações registrou na entrada desta fase
+      const mov = (lg.movs || []).find(m => m.id === f.id && m.para === fase);
+      const noLog = mov ? String(mov.por || '') : null;
+      const doLog = noLog && noLog.includes('/') ? noLog.split('/')[1] : noLog;
+      return {
+        nome: f.nome, telefone: String(f.telefone || '').slice(-4),
+        equipamento: String(f.equipamento || '').slice(0, 22),
+        motorista: naFicha || doLog || '❌ SEM REGISTRO',
+        fonte: naFicha ? 'ficha' : (doLog ? 'log' : null),
+        coletadoEm: f.coletadoEm || null,
+        entrouNaFase: f.movedAt || null,
+        horasAteColeta: f.horasAteColeta || null,
+        divergencia: (naFicha && doLog && naFicha !== doLog)
+          ? '⚠️ ficha diz ' + naFicha + ' mas o log diz ' + doLog : null,
+      };
+    }).sort((a, b) => String(a.entrouNaFase).localeCompare(String(b.entrouNaFase)));
+
+    const porMotorista = linhas.reduce((o, l) => { o[l.motorista] = (o[l.motorista] || 0) + 1; return o; }, {});
+    const semRegistro = linhas.filter(l => l.motorista === '❌ SEM REGISTRO').length;
+    return res.status(200).json({ ok: true, fase, total: linhas.length,
+      POR_MOTORISTA: porMotorista,
+      semRegistro,
+      LISTA: linhas.map(l => hh(l.entrouNaFase) + ' | ' + String(l.nome || '?').slice(0, 20) +
+        ' ' + l.telefone + ' | ' + l.equipamento + ' | 🚚 ' + l.motorista +
+        (l.divergencia ? ' | ' + l.divergencia : '')),
+      detalhe: linhas });
+  }
+
   // ── 📊 RELATORIO-MOTORISTAS: produtividade, tempo de coleta, cancelamentos e remarcações ──
   if (action === 'relatorio-motoristas') {
     const dias = Math.min(180, Math.max(1, parseInt(req.query.dias || '30', 10)));
