@@ -2176,6 +2176,101 @@ export default async function handler(req, res) {
         : 'nenhum orçamento sai sozinho — só pelo envio manual na tela' });
   }
 
+  // ── 🆘 NAO-RECEBERAM: quem ficou sem resposta hoje, com nome e situação ──
+  if (action === 'nao-receberam') {
+    const horas = Math.min(72, Math.max(1, parseInt(req.query.horas || '24', 10)));
+    const cfgN = (await dbGet('wa_bot_config')) || {};
+    const marcoN = cfgN.marcoNumeroNovo ? new Date(cfgN.marcoNumeroNovo).getTime() : 0;
+    const corte = Math.max(Date.now() - horas * 3600000, marcoN || 0);
+    const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
+
+    // 1) telefones que tiveram falha de entrega
+    const afetados = {};
+    for (let i = 0; i <= Math.ceil(horas / 24); i++) {
+      const dia = new Date(Date.now() - 3 * 3600000 - i * 86400000).toISOString().slice(0, 10);
+      const r = await dbGet('wa_falhas_' + dia);
+      for (const f of ((r && (r.itens || [])) || [])) {
+        const t = new Date(f.ts || 0).getTime();
+        if (!t || t < corte) continue;
+        const d = d8f(f.telefone || f.tel);
+        if (d.length < 8) continue;
+        afetados[d] = afetados[d] || { tentativas: 0, primeiro: f.ts, ultimo: f.ts, codigos: {} };
+        afetados[d].tentativas++;
+        afetados[d].ultimo = f.ts;
+        afetados[d].codigos[f.codigo] = (afetados[d].codigos[f.codigo] || 0) + 1;
+      }
+    }
+    // 2) cruza com o sistema para dar nome e situação
+    const [ppA, ppT, lgA, lgT, fA, fT, pros] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+      dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+      dbGet('fichas_adm'), dbGet('fichas_tv'), dbGet('prospeccao_adm'),
+    ]);
+    const acha = (d) => {
+      const fontes = [
+        [((ppA || {}).cards) || [], 'Pipe ADM', 'nomeContato', 'phaseId'],
+        [((ppT || {}).cards) || [], 'Pipe TV', 'nomeContato', 'phaseId'],
+        [((lgA || {}).fichas) || [], 'Logística ADM', 'nome', 'phase'],
+        [((lgT || {}).fichas) || [], 'Logística TV', 'nome', 'phase'],
+        [((fA || {}).fichas) || [], 'Fichas ADM', 'nome', 'status'],
+        [((fT || {}).fichas) || [], 'Fichas TV', 'nome', 'status'],
+        [((pros || {}).fichas) || [], 'Prospecção', 'nome', 'status'],
+      ];
+      for (const [lista, onde, cn, cf] of fontes) {
+        const x = lista.find(y => d8f(y.telefone) === d);
+        if (x) return { nome: x[cn] || '?', onde,
+          fase: x[cf] || x.phase || x.phaseId || '?',
+          equipamento: x.equipamento || x.descricao || '',
+          valor: x.valor || null, id: x.id };
+      }
+      return null;
+    };
+    const linhas = Object.entries(afetados).map(([d, v]) => {
+      const info = acha(d);
+      return { tel: d, ultimos4: d.slice(-4), tentativas: v.tentativas,
+        quando: v.ultimo, codigos: Object.keys(v.codigos).join(','),
+        nome: info ? info.nome : '(não encontrado no sistema)',
+        onde: info ? info.onde : null, fase: info ? info.fase : null,
+        equipamento: info ? info.equipamento : null,
+        valor: info ? info.valor : null, cardId: info ? info.id : null };
+    }).sort((a, b) => b.tentativas - a.tentativas);
+
+    // 3) opcionalmente abre conflito para cada um
+    if (String(req.query.abrirConflito || '') === '1') {
+      const pdb = (await dbGet('prospeccao_adm')) || { fichas: [] };
+      const criados = [];
+      for (const l of linhas) {
+        const jaTem = (pdb.fichas || []).some(f => f.status === 'conflitos_bot' &&
+          d8f(f.telefone) === l.tel);
+        if (jaTem) continue;
+        pdb.fichas = pdb.fichas || [];
+        pdb.fichas.unshift({
+          id: 'conf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+          nome: l.nome, telefone: l.tel,
+          equipamento: l.equipamento || '',
+          status: 'conflitos_bot',
+          motivo: '📵 MENSAGEM NÃO ENTREGUE — o bot tentou responder ' + l.tentativas +
+            ' vez(es) e a Meta recusou (janela de 24h fechada). O cliente pode estar sem resposta. ' +
+            (l.fase ? 'Situação: ' + l.onde + ' · ' + l.fase + '. ' : '') + 'CONFERIR se já foi resolvido.',
+          origem: 'falha-entrega',
+          criadoEm: new Date().toISOString(), movedAt: new Date().toISOString(),
+        });
+        criados.push(l.nome + ' ' + l.ultimos4);
+      }
+      if (criados.length) await dbSet('prospeccao_adm', pdb);
+      return res.status(200).json({ ok: true, conflitosAbertos: criados.length,
+        lista: criados, jaExistiam: linhas.length - criados.length });
+    }
+    return res.status(200).json({ ok: true, periodoHoras: horas,
+      clientesAfetados: linhas.length,
+      totalTentativas: linhas.reduce((s, l) => s + l.tentativas, 0),
+      LISTA: linhas.map(l => l.ultimos4 + ' | ' + String(l.nome).slice(0, 22) +
+        ' | ' + l.tentativas + 'x | ' + (l.onde ? l.onde + ' · ' + l.fase : '❌ sem ficha') +
+        (l.equipamento ? ' | ' + String(l.equipamento).slice(0, 20) : '')),
+      detalhe: linhas,
+      dica: 'para abrir conflito de todos: &abrirConflito=1' });
+  }
+
   // ── 🚪 CONFERE-JANELA: quem está fora da janela e receberia texto recusado ──
   if (action === 'confere-janela') {
     const evs = await lerEvts();
