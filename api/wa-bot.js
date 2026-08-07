@@ -2133,6 +2133,87 @@ export default async function handler(req, res) {
       teto: c.recuperacao7dTeto || 10 });
   }
 
+  // ── 📒 LOG-ORCAMENTOS: enviados, aprovados e a janela de recuperação, com data real ──
+  if (action === 'log-orcamentos') {
+    const dia = String(req.query.dia || '').trim();                  // AAAA-MM-DD
+    const dias = Math.min(90, Math.max(1, parseInt(req.query.dias || '7', 10)));
+    const desde = dia ? new Date(dia + 'T00:00:00-03:00').getTime()
+      : Date.now() - dias * 86400000;
+    const ate = dia ? desde + 86400000 : Date.now();
+    const dBR = t => t ? new Date(new Date(t).getTime() - 3 * 3600000).toISOString().slice(0, 10) : null;
+    const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
+
+    const [pp, arq, evts, ctrl7] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('reparoeletro_arquivo'),
+      lerEvts(), dbGet('wa_recuperacao_7d'),
+    ]);
+    const universo = (((pp || {}).cards) || []).concat(((arq || {}).cards) || []);
+
+    // 1) ORÇAMENTOS ENVIADOS — pelos eventos de saída com template de orçamento
+    const enviados = [];
+    for (const e of (evts || [])) {
+      if (e.dir !== 'out') continue;
+      const t = new Date(e.ts || 0).getTime();
+      if (!t || t < desde || t >= ate) continue;
+      const txt = String(e.texto || '');
+      if (!/orcamento_pronto|orçamento/i.test(txt)) continue;
+      enviados.push({ quando: e.ts, tel: d8f(e.tel), via: e.via || 'bot', texto: txt.slice(0, 60) });
+    }
+
+    // 2) APROVADOS — pela data REAL de aprovação, não pela fase atual
+    const aprovados = [];
+    for (const c of universo) {
+      const q = c.aprovadoEm || null;
+      if (!q) continue;
+      const t = new Date(q).getTime();
+      if (!t || t < desde || t >= ate) continue;
+      aprovados.push({ quando: q, nome: c.nomeContato, tel: d8f(c.telefone),
+        equipamento: String(c.equipamento || c.descricao || '').slice(0, 26),
+        valor: parseFloat(c.valorNaAprovacao != null ? c.valorNaAprovacao : (c.valor || 0)) || 0,
+        por: c.aprovadoPor || null, faseAgora: c.phaseId || c.phase });
+    }
+    aprovados.sort((a, b) => String(a.quando).localeCompare(String(b.quando)));
+
+    // 3) JANELA DE 7 DIAS — quem está no ciclo de recuperação
+    const clientes = ((ctrl7 || {}).clientes) || {};
+    const naJanela = [];
+    for (const [d8, v] of Object.entries(clientes)) {
+      const card = universo.find(c => d8f(c.telefone) === d8);
+      const faseAgora = card ? String(card.phaseId || card.phase || '') : '(sem card)';
+      naJanela.push({ tel: d8, nome: v.nome || (card && card.nomeContato) || '?',
+        tentativas: v.tentativas, ultimo: v.ultimo,
+        conflitoAberto: v.conflitoAberto ? dBR(v.conflitoAberto) : null,
+        faseAgora,
+        saiuDaFila: faseAgora !== 'aguardando_aprovacao',
+        valor: card ? (parseFloat(card.valor || 0) || 0) : 0 });
+    }
+    naJanela.sort((a, b) => b.tentativas - a.tentativas);
+
+    const somaAprov = Number(aprovados.reduce((s, a) => s + a.valor, 0).toFixed(2));
+    const converteram = naJanela.filter(x => x.faseAgora === 'aprovados' || x.faseAgora === 'producao');
+    return res.status(200).json({ ok: true,
+      periodo: dia ? ('dia ' + dia) : ('últimos ' + dias + ' dias'),
+      RESUMO: {
+        orcamentosEnviados: enviados.length,
+        aprovadosNoPeriodo: aprovados.length,
+        valorAprovado: somaAprov,
+        taxaAprovacao: enviados.length ? Math.round(aprovados.length / enviados.length * 100) + '%' : null,
+        naJanelaDe7Dias: naJanela.length,
+        jaSairamDaFila: naJanela.filter(x => x.saiuDaFila).length,
+        converteramAposRecuperacao: converteram.length,
+        esgotaramAs7: naJanela.filter(x => x.tentativas >= 7).length,
+      },
+      APROVADOS: aprovados.map(a => dBR(a.quando) + ' ' + String(a.quando).slice(11, 16) +
+        ' | ' + String(a.nome || '?').slice(0, 20) + ' ' + a.tel.slice(-4) +
+        ' | R$ ' + a.valor + ' | ' + a.equipamento + (a.por ? ' | ' + a.por : '')),
+      JANELA_7D: naJanela.map(x => String(x.nome).slice(0, 20) + ' ' + x.tel.slice(-4) +
+        ' | ' + x.tentativas + '/7' + (x.ultimo ? ' · último ' + x.ultimo : '') +
+        ' | ' + x.faseAgora + (x.saiuDaFila ? ' ✅ saiu' : '') +
+        (x.conflitoAberto ? ' | 🚨 conflito ' + x.conflitoAberto : '')),
+      ENVIADOS: enviados.slice(0, 60).map(e => dBR(e.quando) + ' ' + String(e.quando).slice(11, 16) +
+        ' | ' + e.tel.slice(-4) + ' | ' + e.via) });
+  }
+
   // ── 💵 IA-CONSUMO: quanto a IA custou por dia e onde o token está indo ──
   if (action === 'ia-consumo') {
     const dias = Math.min(60, Math.max(1, parseInt(req.query.dias || '7', 10)));
