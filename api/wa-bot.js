@@ -2176,6 +2176,26 @@ export default async function handler(req, res) {
         : 'nenhum orçamento sai sozinho — só pelo envio manual na tela' });
   }
 
+  // ── 📋 PONTE-STATUS: quem já recebeu o convite de migração ──
+  if (action === 'ponte-status') {
+    const p = (await dbGet('wa_ponte_migracao')) || { feitos: {} };
+    const itens = Object.entries(p.feitos || {}).map(([d, v]) => ({
+      tel: d.slice(-4), em: v.em, ok: v.ok, erro: v.erro || null }))
+      .sort((a, b) => String(b.em).localeCompare(String(a.em)));
+    if (String(req.query.limpar || '') === '1') {
+      await dbSet('wa_ponte_migracao', { feitos: {} });
+      return res.status(200).json({ ok: true, limpou: itens.length,
+        efeito: 'todos podem receber o convite de novo' });
+    }
+    return res.status(200).json({ ok: true,
+      total: itens.length,
+      enviados: itens.filter(i => i.ok).length,
+      falharam: itens.filter(i => !i.ok).length,
+      LISTA: itens.slice(0, 60).map(i => i.tel + ' | ' +
+        String(i.em).slice(5, 16).replace('T', ' ') + ' | ' +
+        (i.ok ? '✅ convite enviado' : '❌ ' + (i.erro || 'falha'))) });
+  }
+
   // ── 🔬 CASO-FALHA: reconstitui a conversa de quem teve mensagem recusada ──
   if (action === 'caso-falha') {
     const q = String(req.query.tel || '').replace(/\D/g, '').slice(-8);
