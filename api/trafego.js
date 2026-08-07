@@ -1278,6 +1278,78 @@ module.exports = async function handler(req, res) {
       proximoPasso: 'confira em /trafego e troque o vídeo no criativo se necessário' });
   }
 
+  // ── 📁 DA-PASTA: pega vídeos de uma pasta pública do Drive e cria os anúncios ──
+  // A Meta baixa o vídeo sozinha pelo file_url — não precisa passar o arquivo por aqui.
+  if (action === 'da-pasta') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const tkP = String(req.query.token || '').trim() || TOKEN;
+    const pasta = String(req.query.pasta || '').trim();      // ID da pasta do Drive
+    const cat = String(req.query.cat || 'tv').toLowerCase();
+    const verba = parseFloat(req.query.verba || '145');
+    if (!pasta) {
+      return res.status(400).json({ ok: false,
+        error: 'informe ?pasta=ID_DA_PASTA_DO_DRIVE',
+        comoObter: 'abra a pasta no Drive; o ID é o trecho depois de /folders/ na barra de endereço',
+        importante: 'a pasta precisa estar compartilhada como "qualquer pessoa com o link"' });
+    }
+    // 1) lista os vídeos da pasta pública
+    const chaveG = (process.env.GOOGLE_API_KEY || '').trim();
+    let arquivos = [];
+    if (chaveG) {
+      const lst = await fetch('https://www.googleapis.com/drive/v3/files?q=' +
+        encodeURIComponent("'" + pasta + "' in parents and mimeType contains 'video/'") +
+        '&fields=files(id,name,mimeType,size)&key=' + chaveG)
+        .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      if (lst && lst.error) {
+        return res.status(200).json({ ok: false,
+          error: 'não consegui ler a pasta: ' + (lst.error.message || ''),
+          verifique: 'a pasta está compartilhada como "qualquer pessoa com o link"?' });
+      }
+      arquivos = (lst.files || []);
+    } else {
+      return res.status(200).json({ ok: false,
+        error: 'GOOGLE_API_KEY não configurada na Vercel',
+        comoResolver: 'crie uma chave de API em console.cloud.google.com (Drive API habilitada) e adicione como GOOGLE_API_KEY' });
+    }
+    if (!arquivos.length) {
+      return res.status(200).json({ ok: false, error: 'nenhum vídeo encontrado na pasta' });
+    }
+    // 2) prévia: mostra o que será criado, com o texto de cada um
+    const plano = arquivos.map(a => {
+      const t = textoPorDefeito(a.name, cat);
+      return { arquivo: a.name, driveId: a.id,
+        titulo: t.titulo, corpo: t.corpo,
+        verba, tamanhoMB: a.size ? Math.round(Number(a.size) / 1048576) : null };
+    });
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia — nada foi criado',
+        pasta, categoria: cat, videos: plano.length,
+        verbaTotal: Number((verba * plano.length).toFixed(2)),
+        PLANO: plano.map(p => p.arquivo + (p.tamanhoMB ? ' (' + p.tamanhoMB + 'MB)' : '') +
+          '\n   ↳ "' + p.titulo + '"\n   ↳ ' + p.corpo),
+        dica: 'para criar tudo: &aplicar=1' });
+    }
+    // 3) sobe cada vídeo para a Meta pelo link direto do Drive
+    const subidos = [], falhas = [];
+    for (const p of plano) {
+      const urlDireta = 'https://drive.google.com/uc?export=download&id=' + p.driveId;
+      const up = await fetch(`${GRAPH}/act_${CONTA}/advideos?access_token=${tkP}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ file_url: urlDireta, title: p.arquivo }).toString(),
+      }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      if (up && up.error) { falhas.push(p.arquivo + ': ' + (up.error.error_user_msg || up.error.message)); continue; }
+      subidos.push({ arquivo: p.arquivo, videoId: up.id, titulo: p.titulo, corpo: p.corpo });
+      await new Promise(s => setTimeout(s, 800));
+    }
+    return res.status(200).json({ ok: falhas.length === 0,
+      subidosParaMeta: subidos.length,
+      videos: subidos.map(s => s.arquivo + ' → id ' + s.videoId),
+      falhas,
+      proximoPasso: subidos.length
+        ? 'agora rode: action=subir-agora&cat=' + cat + '&verba=' + verba + '&aplicar=1 — os vídeos já estão na biblioteca da Meta e vão entrar com o texto certo'
+        : 'nenhum vídeo subiu' });
+  }
+
   // ── ✍️ textos por DEFEITO: cada criativo fala do problema que mostra ──
   function textoPorDefeito(nomeArquivo, categoria) {
     const s = String(nomeArquivo || '').toLowerCase().replace(/\.(mov|mp4|avi)$/i, '');
