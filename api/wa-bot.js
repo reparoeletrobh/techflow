@@ -2024,6 +2024,14 @@ export default async function handler(req, res) {
     }
     candidatos.length = 0;
     for (const x of Object.values(porTel)) candidatos.push(x);
+    // ⏳ ORDEM: do MAIS ANTIGO em aguardando aprovação para o mais recente.
+    // Quem está parado há mais tempo é quem mais esfriou e mais precisa da retomada;
+    // ficha de ontem ainda está quente e pode responder sozinha.
+    candidatos.sort((a, b) => {
+      const ta = new Date(a.card.movedAt || a.card.aguardandoDesde || a.card.criadoEm || 0).getTime();
+      const tb = new Date(b.card.movedAt || b.card.aguardandoDesde || b.card.criadoEm || 0).getTime();
+      return ta - tb;                                        // mais antigo primeiro
+    });
     const teto = Math.min(30, Math.max(1, parseInt(req.query.teto || cfgR7.recuperacao7dTeto || '10', 10)));
     const lote = candidatos.slice(0, teto);
 
@@ -2032,8 +2040,13 @@ export default async function handler(req, res) {
         esgotaramAs7: esgotados.length,
         emAguardandoAprovacao: candidatos.length + lote.length ? candidatos.length : 0,
         elegiveisAgora: candidatos.length, seriamEnviados: lote.length, teto,
-        lista: lote.map(x => (x.card.nomeContato || '?') + ' ' + x.d8.slice(-4) +
-          ' | tentativa ' + x.tentativa + '/7 | ' + String(x.card.equipamento || '').slice(0, 24)) });
+        lista: lote.map(x => {
+          const t = new Date(x.card.movedAt || x.card.aguardandoDesde || x.card.criadoEm || 0).getTime();
+          const d = t ? ((Date.now() - t) / 86400000).toFixed(1) + 'd parado' : '?';
+          return (x.card.nomeContato || '?') + ' ' + x.d8.slice(-4) +
+            ' | ' + d + ' | tentativa ' + x.tentativa + '/7 | ' +
+            String(x.card.equipamento || '').slice(0, 22);
+        }) });
     }
 
     const enviados = [], falhas = [], mudaramDeFase = [];
@@ -2103,7 +2116,10 @@ export default async function handler(req, res) {
         // 💾 GRAVA IMEDIATAMENTE: salvar só no fim fazia o registro se perder quando a
         // função dava timeout, e a execução seguinte reenviava para todo mundo.
         await dbSet('wa_recuperacao_7d', controle);
-        enviados.push((x.card.nomeContato || '?') + ' (tentativa ' + x.tentativa + '/7)');
+        const _tp = new Date(x.card.movedAt || x.card.aguardandoDesde || x.card.criadoEm || 0).getTime();
+        enviados.push((x.card.nomeContato || '?') +
+          (_tp ? ' [' + ((Date.now() - _tp) / 86400000).toFixed(0) + 'd parado]' : '') +
+          ' (tentativa ' + x.tentativa + '/7)');
         await indexarEnvio(r.messages[0].id, 'orcamento_pronto', 'recuperacao-7d', nome, to);
         await rpushEvt({ ts: new Date().toISOString(), tel: to, dir: 'out',
           texto: '🔁 [orcamento_pronto] recuperação ' + x.tentativa + '/7 — ' + nome,
