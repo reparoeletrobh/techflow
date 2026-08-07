@@ -186,6 +186,8 @@ export default async function handler(req, res) {
                     origem: viaNome || '(não informada)',
                     textoTentado: String(txtEnv || '').slice(0, 160),
                     codigo: codF,
+                    // 📱 de qual número saiu — permite separar falhas do número antigo
+                    phoneId: String((value && value.metadata && value.metadata.phone_number_id) || ''),
                     motivo: (st.errors && st.errors[0] && (st.errors[0].title || st.errors[0].message)) || 'falha',
                     recuperado: false,
                   });

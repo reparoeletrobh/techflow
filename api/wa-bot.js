@@ -2179,7 +2179,13 @@ export default async function handler(req, res) {
   // ── 🚨 ALERTA-ENTREGA: templates que a Meta recusou nas últimas horas ──
   if (action === 'alerta-entrega') {
     const horas = Math.min(168, Math.max(1, parseInt(req.query.horas || '24', 10)));
-    const corte = Date.now() - horas * 3600000;
+    // 🚀 NUNCA olhar antes da virada do número — as falhas do número antigo (bloqueio
+    // de pagamento de 01/08) não são problema atual e poluíam o alerta com 24 casos.
+    const cfgAl = (await dbGet('wa_bot_config')) || {};
+    const marcoAl = cfgAl.marcoNumeroNovo ? new Date(cfgAl.marcoNumeroNovo).getTime() : 0;
+    const phoneAtivo = (await credenciais()).phoneId || null;
+    const corteBase = Date.now() - horas * 3600000;
+    const corte = marcoAl ? Math.max(corteBase, marcoAl) : corteBase;
     const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '?';
     // varre os registros diários de falha
     const falhas = [];
@@ -2189,6 +2195,8 @@ export default async function handler(req, res) {
       for (const f of ((r && (r.itens || r.falhas || (Array.isArray(r) ? r : []))) || [])) {
         const t = new Date(f.ts || f.quando || 0).getTime();
         if (!t || t < corte) continue;
+        // 📱 se a falha tem o número de origem gravado e NÃO é o número ativo, ignora
+        if (f.phoneId && phoneAtivo && String(f.phoneId) !== String(phoneAtivo)) continue;
         falhas.push({ quando: f.ts || f.quando, tel: String(f.tel || f.telefone || '').slice(-4),
           template: f.template || f.tipo || '?', codigo: f.codigo || f.code || null,
           motivo: String(f.erro || f.motivo || '').slice(0, 90), origem: f.origem || f.via || '?' });
@@ -2216,6 +2224,10 @@ export default async function handler(req, res) {
       : (falhas.length >= 10 ? 'ATENCAO' : (falhas.length ? 'LEVE' : 'OK'));
     return res.status(200).json({ ok: nivel === 'OK',
       NIVEL: nivel, periodoHoras: horas,
+      contandoDesde: new Date(corte - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' BRT',
+      observacao: marcoAl && corte === marcoAl
+        ? 'só falhas do número NOVO — as anteriores à virada foram ignoradas'
+        : undefined,
       totalFalhas: falhas.length,
       falhasSistemicas: sistemicos.length,
       ALERTA: nivel === 'CRITICO'
