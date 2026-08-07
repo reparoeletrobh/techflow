@@ -2071,6 +2071,16 @@ export default async function handler(req, res) {
           continue;
         }
       } catch (e) {}
+      // 🔒 trava final contra duplicidade: relê o controle e confirma que não saiu hoje
+      try {
+        const ctrlAgora = (await dbGet('wa_recuperacao_7d')) || { clientes: {} };
+        const cAtual = ctrlAgora.clientes[x.d8];
+        if (cAtual && cAtual.ultimo === hoje) {
+          mudaramDeFase.push((x.card.nomeContato || '?') + ': já recebeu hoje');
+          continue;
+        }
+        controle.clientes = Object.assign({}, ctrlAgora.clientes, controle.clientes);
+      } catch (e) {}
       const nome = String(x.card.nomeContato || '').trim().split(/\s+/)[0] || 'tudo bem';
       const tel = String(x.card.telefone || '').replace(/\D/g, '');
       const to = tel.startsWith('55') ? tel : '55' + tel;
@@ -2090,6 +2100,9 @@ export default async function handler(req, res) {
       if (ok) {
         controle.clientes[x.d8] = { tentativas: x.tentativa, ultimo: hoje,
           nome: x.card.nomeContato, cardId: x.card.id };
+        // 💾 GRAVA IMEDIATAMENTE: salvar só no fim fazia o registro se perder quando a
+        // função dava timeout, e a execução seguinte reenviava para todo mundo.
+        await dbSet('wa_recuperacao_7d', controle);
         enviados.push((x.card.nomeContato || '?') + ' (tentativa ' + x.tentativa + '/7)');
         await indexarEnvio(r.messages[0].id, 'orcamento_pronto', 'recuperacao-7d', nome, to);
         await rpushEvt({ ts: new Date().toISOString(), tel: to, dir: 'out',
