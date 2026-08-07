@@ -2684,7 +2684,7 @@ export default async function handler(req, res) {
         if (token && phoneId && a.tel && !jaAvisou.ids[a.id]) {
           const to = String(a.tel).replace(/\D/g, '');
           const to55 = to.startsWith('55') ? to : '55' + to;
-          const txt = `Perfeito! Seu ${a.equipamento || 'equipamento'} já está em processo de conserto. 😊\n\nAguardo só você me confirmar se o pagamento vai ser no Pix ou no cartão, para eu já atualizar a sua ficha.`;
+          const txt = `Perfeito! Seu ${a.equipamento || 'equipamento'} já está em processo de conserto. 😊\n\nAssim que ficar pronto, nossa equipe entra em contato para combinar a entrega e alinhar os detalhes do faturamento.`;
           const r = await fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`, {
             method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ messaging_product: 'whatsapp', to: to55, type: 'text', text: { body: txt } }),
@@ -4070,10 +4070,11 @@ Podemos prosseguir com o atendimento?"
 5-APROVOU) O QUE FAZER QUANDO O CLIENTE APROVA — ORDEM OBRIGATÓRIA (erro recorrente hoje):
    PASSO 1: confirme e tranquilize — "Combinado! Já vou colocar o seu [equipamento] na fila de produção. Assim que ficar pronto a equipe entra em contato para combinar a entrega."
    PASSO 2: EXECUTE A AÇÃO DE APROVAÇÃO NO MESMO INSTANTE (mover_aprovado). NÃO espere forma de pagamento, NÃO espere mais nada. O equipamento precisa entrar em produção agora.
-   PASSO 3: SÓ DEPOIS pergunte a forma de pagamento — "Só me confirma se vai ser no Pix ou no cartão, para eu já atualizar a sua ficha?"
-   PASSO 4: com a resposta, apenas ajuste o valor conforme a condição (Pix tem o desconto combinado). O conserto já está andando enquanto o cliente decide.
-   ⛔ PROIBIDO: perguntar Pix ou cartão ANTES de aprovar, ou deixar a aprovação "aguardando" a resposta do cliente sobre pagamento. Isso trava o equipamento na bancada sem necessidade.
-   Se o cliente já aprovou antes e você ainda não perguntou o pagamento, mande: "Seu [equipamento] já está em processo de conserto! Aguardo só você me atualizar se vai ser Pix ou cartão para eu alterar na sua ficha."
+   PASSO 3: NÃO trate de pagamento. Encerre encaminhando para a equipe — "Nossa equipe entra em contato para alinhar os detalhes do faturamento, tudo bem?"
+   ⛔ PROIBIDO FALAR DE PAGAMENTO NA ENTREGA: nunca diga que o cliente paga quando o equipamento chegar, nem "paga na entrega", "acerta com o entregador", "paga ao receber" ou equivalente. NUNCA combine forma, prazo ou condição de pagamento por conta própria. NUNCA envie chave Pix, dados bancários ou link de cobrança — a única exceção é a taxa de R$30 do delivery (item 5-TAXA), quando o cliente pede explicitamente.
+   ⛔ PROIBIDO também: perguntar "Pix ou cartão?", pedir comprovante, ou deixar a aprovação "aguardando" resposta sobre pagamento. Isso trava o equipamento na bancada sem necessidade.
+   ✅ A REGRA É SIMPLES: aprovação você registra na hora; faturamento é assunto da EQUIPE. Se o cliente insistir em falar de pagamento, responda "Nossa equipe vai te passar todos os detalhes do faturamento, viu? Qualquer coisa é só chamar" e siga adiante.
+   Se o cliente já aprovou antes, mande: "Seu [equipamento] já está em processo de conserto! Assim que ficar pronto nossa equipe entra em contato para combinar a entrega e alinhar o faturamento."
 
 5-FECH) COMO PEDIR A APROVAÇÃO — TOM SOLÍCITO, NUNCA COBRANÇA: é PROIBIDO fechar com pressão do tipo "então vai fechar?", "vai aprovar?", "e aí, fechou?", "posso considerar aprovado?". O fechamento correto é se colocar à disposição e mostrar o benefício da rapidez. Fórmula: [fala do script/condição] + "Fico no aguardo da sua aprovação para prosseguir com o conserto." + previsão de entrega conforme a JANELA COMERCIAL informada no contexto:
    - JANELA ABERTA (horário comercial agora): "Aprovando hoje, acredito que entre hoje e amanhã mesmo a gente já consegue te entregar."
