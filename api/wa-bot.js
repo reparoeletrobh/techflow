@@ -2176,6 +2176,48 @@ export default async function handler(req, res) {
         : 'nenhum orçamento sai sozinho — só pelo envio manual na tela' });
   }
 
+  // ── 🔍 TESTA-ANTIGO: o número antigo ainda consegue enviar? ──
+  if (action === 'testa-antigo') {
+    const tkV = (process.env.WA_TOKEN || '').trim();
+    const pidV = (process.env.WA_PHONE_ID || '').trim();
+    if (!tkV || !pidV) return res.status(200).json({ ok: false,
+      error: 'credenciais do número antigo não estão nas variáveis da Vercel' });
+    const cred = await credenciais();
+    if (pidV === cred.phoneId) return res.status(200).json({ ok: false,
+      error: 'a variável da Vercel já é o número NOVO — não há antigo para testar' });
+    // 1) o número responde?
+    const info = await fetch(`https://graph.facebook.com/v20.0/${pidV}?fields=display_phone_number,quality_rating,status,throughput&access_token=${tkV}`)
+      .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+    // 2) consegue enviar de verdade?
+    let envio = null;
+    const alvo = String(req.query.tel || '').replace(/\D/g, '');
+    if (alvo) {
+      const to = alvo.startsWith('55') ? alvo : '55' + alvo;
+      const r = await fetch(`https://graph.facebook.com/v20.0/${pidV}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tkV}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template',
+          template: { name: 'cadastro_recebido', language: { code: 'pt_BR' },
+            components: [{ type: 'body', parameters: [
+              { type: 'text', text: 'Teste' }, { type: 'text', text: 'equipamento' }] }] } }),
+      }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      envio = (r && r.messages && r.messages[0])
+        ? { ok: true, msgId: r.messages[0].id }
+        : { ok: false, erro: (r.error && (r.error.error_user_msg || r.error.message)) || 'falha',
+            codigo: (r.error && r.error.code) || null };
+    }
+    return res.status(200).json({ ok: !(info && info.error),
+      numeroAntigo: info && !info.error ? {
+        telefone: info.display_phone_number, qualidade: info.quality_rating,
+        situacao: info.status } : null,
+      erroLeitura: info && info.error ? (info.error.error_user_msg || info.error.message) : null,
+      testeDeEnvio: envio,
+      VEREDITO: envio
+        ? (envio.ok ? '✅ o número antigo AINDA ENVIA — dá para cada número responder o seu'
+          : '❌ o número antigo NÃO envia: ' + envio.erro + ' — a ponte é o único caminho')
+        : 'passe &tel=SEUNUMERO para testar o envio de verdade' });
+  }
+
   // ── 📋 PONTE-STATUS: quem já recebeu o convite de migração ──
   if (action === 'ponte-status') {
     const p = (await dbGet('wa_ponte_migracao')) || { feitos: {} };
