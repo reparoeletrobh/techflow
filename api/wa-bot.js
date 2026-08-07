@@ -2025,14 +2025,28 @@ export default async function handler(req, res) {
     }
 
     const enviados = [], falhas = [], mudaramDeFase = [];
+    let _faseCache = null, _faseCacheEm = 0;
+    const _tInicio = Date.now();
     for (const x of lote) {
-      // 🔒 RECONFERÊNCIA IMEDIATA: entre montar a lista e chegar aqui o cliente pode ter
-      // aprovado, reprovado ou avançado. Relê o pipe e confirma a fase ANTES de cada envio.
+      // ⏱️ trava de tempo: a função da Vercel tem limite; para antes de estourar
+      if (Date.now() - _tInicio > 40000) {
+        mudaramDeFase.push('⏱️ parou em ' + enviados.length + ' por limite de tempo — o resto vai no próximo ciclo');
+        break;
+      }
+      // 🔒 RECONFERÊNCIA com cache curto: reler o pipe inteiro (689 cards) a cada envio
+      // estourava o tempo da função. Agora relê no máximo a cada 15s, que é curto o
+      // suficiente para pegar mudança de fase e leve o bastante para não dar timeout.
       try {
-        const ppAgora = await dbGet('reparoeletro_pipe');
-        const cardAgora = (((ppAgora || {}).cards) || []).find(k => k.id === x.card.id);
-        const faseAgora = cardAgora ? String(cardAgora.phaseId || cardAgora.phase || '') : null;
-        if (!cardAgora) {
+        if (!_faseCache || Date.now() - _faseCacheEm > 15000) {
+          const ppAgora = await dbGet('reparoeletro_pipe');
+          _faseCache = {};
+          for (const k of (((ppAgora || {}).cards) || [])) {
+            _faseCache[k.id] = String(k.phaseId || k.phase || '');
+          }
+          _faseCacheEm = Date.now();
+        }
+        const faseAgora = _faseCache[x.card.id];
+        if (faseAgora === undefined) {
           mudaramDeFase.push((x.card.nomeContato || '?') + ': card não existe mais');
           continue;
         }
@@ -2040,12 +2054,7 @@ export default async function handler(req, res) {
           mudaramDeFase.push((x.card.nomeContato || '?') + ': saiu para ' + faseAgora);
           continue;
         }
-        // e se respondeu nos últimos minutos, também não dispara
-        const evAgora = await lerEvts();
-        const falouAgora = (evAgora || []).some(e => e.dir === 'in' &&
-          String(e.tel || '').replace(/\D/g, '').slice(-8) === x.d8 &&
-          Date.now() - new Date(e.ts || 0).getTime() < 24 * 3600000);
-        if (falouAgora) {
+        if (respondeu.has(x.d8)) {
           mudaramDeFase.push((x.card.nomeContato || '?') + ': respondeu — conversa ativa');
           continue;
         }
@@ -2077,7 +2086,7 @@ export default async function handler(req, res) {
       } else {
         falhas.push((x.card.nomeContato || '?') + ': ' + ((r.error && (r.error.error_user_msg || r.error.message)) || 'falha'));
       }
-      await new Promise(s => setTimeout(s, 900));             // ritmo suave
+      await new Promise(s => setTimeout(s, 250));             // ritmo suave, sem estourar o tempo
     }
     await dbSet('wa_recuperacao_7d', controle);
     return res.status(200).json({ ok: falhas.length === 0,
