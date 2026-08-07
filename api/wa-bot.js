@@ -393,6 +393,14 @@ export default async function handler(req, res) {
     try {
       const c = (await dbGet('wa_bot_config')) || {};
       if (!c.bloqueioPagamentoEm) return false;
+      // 🚀 status de erro de mensagens ANTIGAS chega atrasado e marcava bloqueio
+      // indevidamente no número novo, travando os disparos por 2h sem motivo.
+      // Só vale se o bloqueio for posterior à virada do número.
+      if (c.marcoNumeroNovo) {
+        const marco = new Date(c.marcoNumeroNovo).getTime();
+        const bloq = new Date(c.bloqueioPagamentoEm).getTime();
+        if (bloq - marco < 30 * 60000) return false;   // até 30min após a virada = resíduo
+      }
       const h = (Date.now() - new Date(c.bloqueioPagamentoEm).getTime()) / 3600000;
       return h < 2;                       // revalida a cada 2h
     } catch (e) { return false; }
@@ -2147,6 +2155,16 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true,
       recuperacao7d: c.recuperacao7dAtiva ? 'LIGADA' : 'DESLIGADA',
       teto: c.recuperacao7dTeto || 10 });
+  }
+
+  // ── 🧹 LIMPAR-BLOQUEIO: remove a marca de bloqueio de pagamento ──
+  if (action === 'limpar-bloqueio') {
+    const c = (await dbGet('wa_bot_config')) || {};
+    const antes = c.bloqueioPagamentoEm || null;
+    delete c.bloqueioPagamentoEm;
+    await dbSet('wa_bot_config', c);
+    return res.status(200).json({ ok: true, removido: antes,
+      efeito: 'os disparos voltam imediatamente' });
   }
 
   // ── 🩺 POR-QUE-NAO-ENVIOU: diagnóstico de um orçamento que não saiu ──
