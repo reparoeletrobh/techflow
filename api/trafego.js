@@ -729,6 +729,54 @@ module.exports = async function handler(req, res) {
       }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
     };
     const feitos = [], erros = [];
+    // 🛡 nomes já usados no ciclo, para não duplicar
+    const nomesExistentes = new Set();
+    let verbaJaAlocada = 0;
+    try {
+      const cAll = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns?fields=id,name,effective_status,daily_budget,lifetime_budget,start_time&limit=300&access_token=${TK}`, 8);
+      const sAll = await pegarTudo(`${GRAPH}/act_${CONTA}/adsets?fields=id,daily_budget,lifetime_budget,campaign{id}&limit=300&access_token=${TK}`, 8);
+      const setsPor = {};
+      for (const s of (sAll.data || [])) { const ci = (s.campaign || {}).id; if (ci) (setsPor[ci] = setsPor[ci] || []).push(s); }
+      for (const c of (cAll.data || [])) {
+        if (String(c.start_time || '').slice(0, 10) < desdeCiclo) continue;
+        nomesExistentes.add(String(c.name || '').toLowerCase());
+        if (c.effective_status !== 'ACTIVE') continue;
+        if (categoriaDe(c.name || '', 'anuncio') !== (cat === 'tv' ? 'tv' : categoriaDe(c.name || '', 'anuncio'))) {
+          if (cat === 'tv') continue;
+        }
+        const mesmaFrente = cat === 'tv'
+          ? categoriaDe(c.name || '', 'anuncio') === 'tv'
+          : categoriaDe(c.name || '', 'anuncio') !== 'tv';
+        if (!mesmaFrente) continue;
+        let vv = 0;
+        if (c.lifetime_budget) vv = Number(c.lifetime_budget) / 100;
+        else if (c.daily_budget) vv = Number(c.daily_budget) / 100;
+        else for (const s of (setsPor[c.id] || [])) {
+          if (s.lifetime_budget) vv += Number(s.lifetime_budget) / 100;
+          else if (s.daily_budget) vv += Number(s.daily_budget) / 100;
+        }
+        verbaJaAlocada += vv;
+      }
+    } catch (e) {}
+    // 🚧 TETO DA FRENTE: ADM 2.500 · TV 870 (configurável)
+    const cfgT2 = await cfgTrafego();
+    const tetoFrente = cat === 'tv' ? ((cfgT2.verba && cfgT2.verba.tv) || 870)
+      : ((cfgT2.verba && cfgT2.verba.adm) || 2500);
+    const vaiAlocar = verba * videos.length;
+    if (verbaJaAlocada + vaiAlocar > tetoFrente + 1 && String(req.query.ignorarTeto || '') !== '1') {
+      return res.status(200).json({ ok: false,
+        error: '🚧 estouraria o teto da frente ' + cat.toUpperCase(),
+        tetoDaFrente: tetoFrente,
+        jaAlocado: Number(verbaJaAlocada.toFixed(2)),
+        tentandoAlocar: Number(vaiAlocar.toFixed(2)),
+        totalFicaria: Number((verbaJaAlocada + vaiAlocar).toFixed(2)),
+        excedente: Number((verbaJaAlocada + vaiAlocar - tetoFrente).toFixed(2)),
+        opcoes: [
+          'reduza a verba por anúncio: &verba=' + Math.max(1, Math.floor((tetoFrente - verbaJaAlocada) / Math.max(1, videos.length))),
+          'ou libere espaço com ajustar-teto antes',
+          'ou force com &ignorarTeto=1 (não recomendado)',
+        ] });
+    }
     // A verba destas campanhas é TOTAL e fica na CAMPANHA — pausar o anúncio não libera nada
     // e a Meta recusa (código 100). Pausamos na campanha; se falhar, tentamos conjunto e anúncio.
     for (const item of (pausarIds || [])) {
@@ -1146,6 +1194,13 @@ module.exports = async function handler(req, res) {
     const feitos = [], erros = [];
     for (const v of alvo) {
       try {
+        // 🛡 DUPLICATA: não recriar campanha que já existe com o mesmo nome no ciclo.
+        // O subir-agora rodado duas vezes criava a mesma campanha de novo (05/08).
+        const nomePrev = nomeComData(v.title);
+        if (nomesExistentes.has(nomePrev.toLowerCase())) {
+          erros.push(v.title + ': já existe a campanha "' + nomePrev + '" — pulei para não duplicar');
+          continue;
+        }
         // 1) tenta duplicar; se o app não tiver permissão para /copies (código 10),
         // cria do ZERO lendo a configuração do modelo — mesmo resultado, endpoints padrão
         let nova = null;
@@ -1220,6 +1275,21 @@ module.exports = async function handler(req, res) {
             }
           } else if (oss.link_data) {
             novoOss.link_data = oss.link_data;
+          }
+          // ⏳ vídeo recém-subido leva alguns segundos para processar; criar o criativo
+          // antes disso faz a Meta recusar. Espera até ficar pronto (máx 40s).
+          try {
+            for (let tent = 0; tent < 8; tent++) {
+              const st = await fetch(`${GRAPH}/${v.id}?fields=status&access_token=${TK}`)
+                .then(x => x.json()).catch(() => null);
+              const fase = st && st.status && (st.status.video_status || st.status);
+              if (!fase || fase === 'ready') break;
+              if (fase === 'error') { throw new Error('vídeo com erro de processamento'); }
+              await new Promise(s => setTimeout(s, 5000));
+            }
+          } catch (e) {
+            erros.push(v.title + ': ' + e.message);
+            continue;
           }
           const cr = await postForm('act_' + CONTA + '/adcreatives', {
             name: nome + ' - criativo', object_story_spec: JSON.stringify(novoOss),
