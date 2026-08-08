@@ -1195,7 +1195,7 @@ module.exports = async function handler(req, res) {
       error: 'nenhum anúncio de ' + cat + ' encontrado para usar de modelo',
       dica: 'recarregue o painel: /api/trafego?action=painel&periodo=ciclo&forcar=1' });
 
-    const alvo = apenasUm ? escolhidos.slice(0, 1) : escolhidos;
+    let alvo = apenasUm ? escolhidos.slice(0, 1) : escolhidos;
     if (String(req.query.aplicar || '') !== '1') {
       return res.status(200).json({ ok: true, modo: 'prévia',
         categoria: cat, verbaPorAnuncio: verba, total: alvo.length,
