@@ -1348,6 +1348,57 @@ module.exports = async function handler(req, res) {
       proximoPasso: 'confira em /trafego e troque o vídeo no criativo se necessário' });
   }
 
+  // ── 🎯 VER-SEGMENTACAO: mostra em português o que o modelo tem configurado ──
+  if (action === 'ver-segmentacao') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const tkS = String(req.query.token || '').trim() || TOKEN;
+    const cat = String(req.query.cat || 'tv').toLowerCase();
+    const base = await dbGet('trafego_painel_cache_ciclo') || await dbGet('trafego_painel_cache');
+    const mod = ((base || {}).dados || {}).anuncios
+      ?.filter(a => a.ativo && a.categoria === cat && a.adsetId)
+      .sort((x, y) => (x.razaoMeta || 9) - (y.razaoMeta || 9))[0];
+    if (!mod) return res.status(200).json({ ok: false, error: 'nenhum modelo ativo em ' + cat });
+
+    const [camp, set] = await Promise.all([
+      fetch(`${GRAPH}/${mod.campanhaId}?fields=name,objective,special_ad_categories&access_token=${tkS}`).then(x => x.json()),
+      fetch(`${GRAPH}/${mod.adsetId}?fields=name,targeting,optimization_goal,billing_event,destination_type&access_token=${tkS}`).then(x => x.json()),
+    ]);
+    if (camp.error || set.error) return res.status(200).json({ ok: false,
+      error: (camp.error || set.error).message });
+    const t = set.targeting || {};
+    const g = t.geo_locations || {};
+    const traduzGen = { 1: 'homens', 2: 'mulheres' };
+    const cidades = (g.cities || []).map(c => c.name + (c.radius ? ' + ' + c.radius + (c.distance_unit || 'km') : ''));
+    const regioes = (g.regions || []).map(r => r.name);
+    const paises = g.countries || [];
+    return res.status(200).json({ ok: true,
+      modeloUsado: mod.nome + ' (CPA R$ ' + (mod.cpa ?? '?') + ')',
+      CAMPANHA: {
+        objetivo: camp.objective,
+        oQueSignifica: camp.objective === 'OUTCOME_ENGAGEMENT'
+          ? 'otimizar para ENGAJAMENTO — no seu caso, conversas iniciadas no WhatsApp' : camp.objective,
+        categoriasEspeciais: (camp.special_ad_categories || []).length
+          ? camp.special_ad_categories
+          : 'NENHUMA — anúncio comum, sem restrição de segmentação',
+        oQueSaoCategoriasEspeciais: 'a Meta obriga a declarar quando o anúncio é de CRÉDITO, EMPREGO, MORADIA, política ou questões sociais. Nesses casos ela PROÍBE segmentar por idade, gênero e CEP, para evitar discriminação. Conserto de eletrodoméstico não se encaixa em nenhuma — por isso a lista vem vazia, e é o correto.',
+      },
+      SEGMENTACAO: {
+        idade: (t.age_min || '?') + ' a ' + (t.age_max || '?') + ' anos',
+        genero: (t.genders || []).length ? (t.genders || []).map(x => traduzGen[x] || x).join(', ') : 'todos',
+        paises, regioes, cidades,
+        idiomas: t.locales || 'não restrito',
+        interesses: ((t.flexible_spec || []).flatMap(f => (f.interests || []).map(i => i.name))) || [],
+        publicoPersonalizado: (t.custom_audiences || []).map(a => a.name || a.id),
+        excluidos: (t.excluded_custom_audiences || []).map(a => a.name || a.id),
+        posicionamentos: t.publisher_platforms || 'automático (todos)',
+        dispositivos: t.device_platforms || 'todos',
+        otimizacao: set.optimization_goal,
+        cobranca: set.billing_event,
+        destino: set.destination_type,
+      },
+      observacao: 'tudo isso é copiado IGUAL para cada anúncio novo — só mudam vídeo, texto, verba e nome' });
+  }
+
   // ── 📁 DA-PASTA: pega vídeos de uma pasta pública do Drive e cria os anúncios ──
   // A Meta baixa o vídeo sozinha pelo file_url — não precisa passar o arquivo por aqui.
   if (action === 'da-pasta') {
