@@ -1426,6 +1426,38 @@ module.exports = async function handler(req, res) {
       observacao: 'tudo isso é copiado IGUAL para cada anúncio novo — só mudam vídeo, texto, verba e nome' });
   }
 
+  // ── 🔑 assinatura AWS SigV4 — necessária para listar o bucket do R2 ──
+  async function assinarR2(metodo, caminho, query) {
+    const AK = (process.env.R2_ACCESS_KEY || '31a48286ed15896e6201edadfa35aa87').trim();
+    const SK = (process.env.R2_SECRET_KEY || 'c3abe45aec10e95cdf1b65209b11122b1b5fcf3ca92c2947d216c508b823042c').trim();
+    const host = (process.env.R2_HOST || '1cef61647aff00cef531b60af8dbdf2b.r2.cloudflarestorage.com').trim();
+    const cr = await import('node:crypto');
+    const sha256 = (x) => cr.createHash('sha256').update(x).digest('hex');
+    const hmac = (k, x) => cr.createHmac('sha256', k).update(x).digest();
+    const agora = new Date();
+    const amz = agora.toISOString().replace(/[:-]|\.\d{3}/g, '');
+    const dia = amz.slice(0, 8);
+    const vazio = sha256('');
+    const canonQ = Object.keys(query || {}).sort()
+      .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(query[k])).join('&');
+    const canon = [metodo, caminho, canonQ,
+      'host:' + host, 'x-amz-content-sha256:' + vazio, 'x-amz-date:' + amz, '',
+      'host;x-amz-content-sha256;x-amz-date', vazio].join('\n');
+    const escopo = dia + '/auto/s3/aws4_request';
+    const paraAssinar = ['AWS4-HMAC-SHA256', amz, escopo, sha256(canon)].join('\n');
+    let k = hmac('AWS4' + SK, dia);
+    k = hmac(k, 'auto'); k = hmac(k, 's3'); k = hmac(k, 'aws4_request');
+    const assinatura = cr.createHmac('sha256', k).update(paraAssinar).digest('hex');
+    return {
+      url: 'https://' + host + caminho + (canonQ ? '?' + canonQ : ''),
+      headers: {
+        Authorization: 'AWS4-HMAC-SHA256 Credential=' + AK + '/' + escopo +
+          ', SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=' + assinatura,
+        'x-amz-content-sha256': vazio, 'x-amz-date': amz,
+      },
+    };
+  }
+
   // ── 📁 DA-PASTA: pega vídeos de uma pasta pública do Drive e cria os anúncios ──
   // A Meta baixa o vídeo sozinha pelo file_url — não precisa passar o arquivo por aqui.
   if (action === 'da-pasta') {
@@ -1440,7 +1472,11 @@ module.exports = async function handler(req, res) {
     let arquivos = [];
     const prefixo = pasta ? (pasta.replace(/^\/|\/$/g, '') + '/') : '';
     try {
-      const xml = await fetch(R2_PUB + '/?list-type=2' + (prefixo ? '&prefix=' + encodeURIComponent(prefixo) : ''))
+      const bucket = (process.env.R2_BUCKET || 'reparo-criativos').trim();
+      const q = { 'list-type': '2', 'max-keys': '100' };
+      if (prefixo) q.prefix = prefixo;
+      const ass = await assinarR2('GET', '/' + bucket, q);
+      const xml = await fetch(ass.url, { headers: ass.headers })
         .then(x => x.text()).catch(() => '');
       const chaves = [...String(xml).matchAll(/<Key>([^<]+)<\/Key>/g)].map(m => m[1]);
       const tams = [...String(xml).matchAll(/<Size>(\d+)<\/Size>/g)].map(m => Number(m[1]));
