@@ -1375,10 +1375,19 @@ module.exports = async function handler(req, res) {
     const t = set.targeting || {};
     const g = t.geo_locations || {};
     const traduzGen = { 1: 'homens', 2: 'mulheres' };
+    // 📍 a Meta pode usar cities OU custom_locations (ponto no mapa + raio) — ler os dois
     const cidades = (g.cities || []).map(c => c.name + (c.radius ? ' + ' + c.radius + (c.distance_unit || 'km') : ''));
+    const pontos = (g.custom_locations || []).map(p =>
+      'ponto ' + p.latitude + ', ' + p.longitude + ' + raio de ' + p.radius + ' ' +
+      (p.distance_unit === 'kilometer' ? 'km' : (p.distance_unit || '')) +
+      (p.country ? ' (' + p.country + ')' : '') +
+      ' · mapa: https://maps.google.com/?q=' + p.latitude + ',' + p.longitude);
+    const tiposLocal = (g.location_types || []).map(x =>
+      x === 'home' ? 'quem mora na área' : (x === 'recent' ? 'quem esteve na área recentemente' : x));
     const regioes = (g.regions || []).map(r => r.name);
     const paises = g.countries || [];
-    const semGeo = !(g.cities || []).length && !(g.regions || []).length && !(g.countries || []).length;
+    const semGeo = !(g.cities || []).length && !(g.regions || []).length &&
+      !(g.countries || []).length && !(g.custom_locations || []).length;
     return res.status(200).json({ ok: true,
       modeloUsado: mod.nome + ' (CPA R$ ' + (mod.cpa ?? '?') + ')',
       conjunto: set.name || mod.adsetNome || '?',
@@ -1398,6 +1407,11 @@ module.exports = async function handler(req, res) {
         idade: (t.age_min || '?') + ' a ' + (t.age_max || '?') + ' anos',
         genero: (t.genders || []).length ? (t.genders || []).map(x => traduzGen[x] || x).join(', ') : 'todos',
         paises, regioes, cidades,
+        pontosNoMapa: pontos,
+        quemVe: tiposLocal.length ? tiposLocal : 'não especificado',
+        publicoAmpliado: (t.targeting_automation && t.targeting_automation.advantage_audience === 1)
+          ? '⚡ Advantage+ LIGADO — a Meta amplia o público além do definido quando acha que converte melhor'
+          : 'desligado',
         idiomas: t.locales || 'não restrito',
         interesses: ((t.flexible_spec || []).flatMap(f => (f.interests || []).map(i => i.name))) || [],
         publicoPersonalizado: (t.custom_audiences || []).map(a => a.name || a.id),
