@@ -1157,7 +1157,7 @@ module.exports = async function handler(req, res) {
           nova = cp.copied_campaign_id || cp.id;
         } else {
           // ── caminho alternativo: replicar a estrutura ──
-          const nome = String(v.title).replace(/\.(mov|mp4)$/i, '') + ' ' + new Date().getDate() + '08';
+          const nome = nomeComData(v.title);
           // lê o modelo completo
           const mCamp = await fetch(`${GRAPH}/${modelo.campanhaId}?fields=objective,special_ad_categories,buying_type&access_token=${TK}`).then(x => x.json());
           const mSet = modelo.adsetId
@@ -1239,7 +1239,7 @@ module.exports = async function handler(req, res) {
         }
         // 2) nome, verba e término, já ativa
         const up = await postForm(nova, {
-          name: String(v.title).replace(/\.(mov|mp4)$/i, '') + ' ' + new Date().getDate() + '08',
+          name: nomeComData(v.title),
           lifetime_budget: String(Math.round(verba * 100)),
           stop_time: String(fimUnix),
           status: 'ACTIVE',
@@ -1347,6 +1347,22 @@ module.exports = async function handler(req, res) {
       proximoPasso: subidos.length
         ? 'agora rode: action=subir-agora&cat=' + cat + '&verba=' + verba + '&aplicar=1 — os vídeos já estão na biblioteca da Meta e vão entrar com o texto certo'
         : 'nenhum vídeo subiu' });
+  }
+
+  // ── 📅 selo de data no nome da campanha: DDMMAAAA, para rastreabilidade ──
+  // Antes o código usava '08' fixo como mês, o que funcionaria só em agosto.
+  function seloData() {
+    const b = new Date(Date.now() - 3 * 3600000);          // horário de Brasília
+    const dd = String(b.getUTCDate()).padStart(2, '0');
+    const mm = String(b.getUTCMonth() + 1).padStart(2, '0');
+    return dd + mm + b.getUTCFullYear();
+  }
+  function nomeComData(base) {
+    const limpo = String(base || '').replace(/\.(mov|mp4|avi|mkv|webm)$/i, '').trim();
+    const selo = seloData();
+    // não duplica se já terminar com um selo de 8 dígitos
+    if (new RegExp('\\b' + selo + '$').test(limpo)) return limpo;
+    return limpo.replace(/\s+\d{4,8}$/, '') + ' ' + selo;
   }
 
   // ── ✍️ textos por DEFEITO: cada criativo fala do problema que mostra ──
