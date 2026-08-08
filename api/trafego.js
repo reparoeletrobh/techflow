@@ -1368,7 +1368,7 @@ module.exports = async function handler(req, res) {
 
     const [camp, set] = await Promise.all([
       fetch(`${GRAPH}/${mod.campanhaId}?fields=name,objective,special_ad_categories&access_token=${tkS}`).then(x => x.json()),
-      fetch(`${GRAPH}/${mod.adsetId}?fields=name,targeting,optimization_goal,billing_event,destination_type&access_token=${tkS}`).then(x => x.json()),
+      fetch(`${GRAPH}/${mod.adsetId}?fields=name,optimization_goal,billing_event,destination_type,targeting{geo_locations,age_min,age_max,genders,locales,flexible_spec,custom_audiences,excluded_custom_audiences,publisher_platforms,device_platforms,targeting_automation}&access_token=${tkS}`).then(x => x.json()),
     ]);
     if (camp.error || set.error) return res.status(200).json({ ok: false,
       error: (camp.error || set.error).message });
@@ -1408,6 +1408,7 @@ module.exports = async function handler(req, res) {
         cobranca: set.billing_event,
         destino: set.destination_type,
       },
+      TARGETING_CRU: t,
       observacao: 'tudo isso é copiado IGUAL para cada anúncio novo — só mudam vídeo, texto, verba e nome' });
   }
 
