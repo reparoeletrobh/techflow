@@ -1500,15 +1500,22 @@ module.exports = async function handler(req, res) {
     // 2) prévia: mostra o que será criado, com o texto de cada um
     const plano = arquivos.map(a => {
       const t = textoPorDefeito(a.name, cat);
+      const catReal = categoriaDe(a.name, 'anuncio');
       return { arquivo: a.name, url: R2_PUB + '/' + a.chave.split('/').map(encodeURIComponent).join('/'),
+        categoria: catReal,
+        frente: catReal === 'tv' ? 'TV' : 'ADM',
         titulo: t.titulo, corpo: t.corpo,
         verba, tamanhoMB: a.size ? Math.round(Number(a.size) / 1048576) : null };
     });
+    const porCat = plano.reduce((o, p) => { o[p.categoria] = (o[p.categoria] || 0) + 1; return o; }, {});
+    const porFrente = plano.reduce((o, p) => { o[p.frente] = (o[p.frente] || 0) + 1; return o; }, {});
     if (String(req.query.aplicar || '') !== '1') {
       return res.status(200).json({ ok: true, modo: 'prévia — nada foi criado',
-        bucket: R2_PUB, pasta: prefixo || '(raiz)', categoria: cat, videos: plano.length,
+        bucket: R2_PUB, pasta: prefixo || '(raiz)', videos: plano.length,
+        POR_CATEGORIA: porCat, POR_FRENTE: porFrente,
         verbaTotal: Number((verba * plano.length).toFixed(2)),
-        PLANO: plano.map(p => p.arquivo + (p.tamanhoMB ? ' (' + p.tamanhoMB + 'MB)' : '') +
+        PLANO: plano.map(p => '[' + p.categoria.toUpperCase() + '] ' + p.arquivo +
+          (p.tamanhoMB ? ' (' + p.tamanhoMB + 'MB)' : '') +
           '\n   ↳ "' + p.titulo + '"\n   ↳ ' + p.corpo),
         dica: 'para criar tudo: &aplicar=1' });
     }
@@ -1578,17 +1585,70 @@ module.exports = async function handler(req, res) {
         titulo: 'Imagem falhando na sua TV?',
         corpo: 'Imagem tremendo, piscando ou com defeito na placa? Consertamos com peças originais e garantia. Fala com a gente pelo WhatsApp!' },
     ];
+    const MICRO = [
+      { re: /n[aã]o liga.*n[aã]o esquenta|n[aã]o esquenta/,
+        titulo: 'Seu micro-ondas não esquenta?',
+        corpo: 'Liga, gira o prato, mas a comida sai fria? Costuma ser a válvula magnetron — trocamos com peça original e garantia. Chama no WhatsApp!' },
+      { re: /enferrujad|ferrugem/,
+        titulo: 'Micro-ondas enferrujado por dentro?',
+        corpo: 'Ferrugem na cavidade é comum e tem conserto — fazemos o reparo e a pintura própria para micro-ondas. Bem mais barato que comprar outro!' },
+      { re: /qualquer marca|todas as marcas/,
+        titulo: 'Consertamos micro-ondas de qualquer marca',
+        corpo: 'Brastemp, Electrolux, Consul, Philco, LG, Panasonic e outras. Orçamento após avaliação, sem compromisso. Chama no WhatsApp!' },
+      { re: /hor[aá]rio de almo[cç]o|almo[cç]o/,
+        titulo: 'Sem micro-ondas na hora do almoço?',
+        corpo: 'A gente busca, conserta e devolve funcionando. Peças originais e garantia. Fala com a gente pelo WhatsApp!' },
+      { re: /90 por cento|90%|maioria dos casos/,
+        titulo: 'Vale a pena consertar seu micro-ondas?',
+        corpo: 'Na maioria dos casos o conserto sai por uma fração do preço de um novo — e o seu é de linha superior. Avaliamos sem compromisso!' },
+      { re: /fa[ií]sca|estala|barulho/,
+        titulo: 'Micro-ondas fazendo barulho ou faísca?',
+        corpo: 'Estalos e faíscas costumam ser a mica ou o prato — conserto rápido e seguro, com garantia. Chama no WhatsApp!' },
+    ];
+    const ADEGA = [
+      { re: /volume de adega|quantas garrafa|tamanho/,
+        titulo: 'Sua adega parou de gelar?',
+        corpo: 'Seja de 8, 12 ou 30 garrafas, consertamos com peças originais e garantia. Coletamos na sua casa. Chama no WhatsApp!' },
+      { re: /15 minutos|quinze minutos/,
+        titulo: 'Conserto de adega em BH',
+        corpo: 'Adega ou cervejeira que não gela, faz barulho ou não liga? Avaliamos sem compromisso e consertamos com garantia. Fala com a gente!' },
+      { re: /interessante|segredo|olha (que|s[oó])/,
+        titulo: 'Adega com defeito? Tem conserto',
+        corpo: 'Antes de comprar outra, faça um orçamento com a gente. Peças originais, garantia e coleta na sua casa. Chama no WhatsApp!' },
+      { re: /n[aã]o gela|esquentou/,
+        titulo: 'Adega não está gelando?',
+        corpo: 'Costuma ser o compressor ou o termostato — os dois têm conserto. Avaliamos sem compromisso e você decide. Chama no WhatsApp!' },
+    ];
+    const PURI = [
+      { re: /beber [aá]gua|[aá]gua quente|calor/,
+        titulo: 'Purificador parou de gelar?',
+        corpo: 'Água saindo quente ou sem sair? Consertamos com peças originais e garantia, e ainda trocamos o filtro. Chama no WhatsApp!' },
+      { re: /fecha registro|vazand|vazament|pingand/,
+        titulo: 'Purificador vazando?',
+        corpo: 'Vazamento costuma ser mangueira, válvula ou vedação — conserto rápido e com garantia. Coletamos na sua casa. Fala com a gente!' },
+      { re: /bebedouro torre|torre|empresa/,
+        titulo: 'Bebedouro da sua empresa parou?',
+        corpo: 'Atendemos empresas com conserto de bebedouro torre e de coluna. Coleta, conserto e entrega, com nota fiscal. Chama no WhatsApp!' },
+      { re: /tipos de bebedouro|bebedouro/,
+        titulo: 'Consertamos bebedouros e purificadores',
+        corpo: 'De coluna, de torre ou de bancada, qualquer marca. Peças originais e garantia. Fala com a gente pelo WhatsApp!' },
+    ];
     const GENERICO = {
       tv: { titulo: 'Consertamos sua TV', corpo: 'Conserto de TV rápido em BH, com peças originais e garantia. Coletamos na sua casa e devolvemos funcionando. Chama no WhatsApp!' },
-      microondas: { titulo: 'Seu micro-ondas parou?', corpo: 'Não esquenta, não liga ou está fazendo barulho? Consertamos com peças originais e garantia. Chama no WhatsApp!' },
-      purificador: { titulo: 'Purificador com problema?', corpo: 'Não gela, vaza ou parou de sair água? Consertamos rápido, com garantia. Fala com a gente!' },
+      microondas: { titulo: 'Seu micro-ondas parou?', corpo: 'Não esquenta, não liga ou faz barulho? Consertamos com peças originais e garantia. Coletamos na sua casa. Chama no WhatsApp!' },
+      purificador: { titulo: 'Purificador com problema?', corpo: 'Não gela, vaza ou parou de sair água? Consertamos rápido, com garantia e coleta na sua casa. Fala com a gente!' },
       adega: { titulo: 'Sua adega parou de gelar?', corpo: 'Adega ou cervejeira com defeito? Consertamos com peças originais e garantia. Chama no WhatsApp!' },
+      forno: { titulo: 'Forno elétrico com defeito?', corpo: 'Não esquenta, não liga ou o timer parou? Consertamos com peças originais e garantia. Chama no WhatsApp!' },
     };
-    if ((categoria || '') === 'tv' || /\btv\b|televis/.test(s)) {
-      for (const t of TV) if (t.re.test(s)) return { titulo: t.titulo, corpo: t.corpo };
-      return GENERICO.tv;
-    }
-    return GENERICO[categoria] || GENERICO.tv;
+    // 🎯 a CATEGORIA vem do nome do arquivo, não do parâmetro — os 16 vídeos de 08/08
+    // eram de micro-ondas, adega e purificador, e recebiam texto de TV
+    const cat2 = categoriaDe(s, 'anuncio');
+    if (cat2 === 'tv') { for (const t of TV) if (t.re.test(s)) return { titulo: t.titulo, corpo: t.corpo }; return GENERICO.tv; }
+    if (cat2 === 'microondas') { for (const t of MICRO) if (t.re.test(s)) return { titulo: t.titulo, corpo: t.corpo }; return GENERICO.microondas; }
+    if (cat2 === 'adega') { for (const t of ADEGA) if (t.re.test(s)) return { titulo: t.titulo, corpo: t.corpo }; return GENERICO.adega; }
+    if (cat2 === 'purificador') { for (const t of PURI) if (t.re.test(s)) return { titulo: t.titulo, corpo: t.corpo }; return GENERICO.purificador; }
+    if (cat2 === 'forno') return GENERICO.forno;
+    return GENERICO[categoria] || GENERICO.microondas;
   }
 
   // ── ✍️ TEXTOS-CRIATIVOS: compara e replica os textos dos campeões nos novos ──
