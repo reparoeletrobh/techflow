@@ -1648,6 +1648,154 @@ module.exports = async function handler(req, res) {
       observacao: 'tudo isso é copiado IGUAL para cada anúncio novo — só mudam vídeo, texto, verba e nome' });
   }
 
+  // ── 🤖 CICLO-AUTOMATICO: monta o ciclo inteiro num comando ──
+  // R2 → Meta → renova campeões → cria os novos → devolve o relatório do que foi feito
+  if (action === 'ciclo-automatico') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const TKA = String(req.query.token || '').trim() || TOKEN;
+    const KA = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+    const pasta = String(req.query.pasta || 'Criativos Reparo Eletro');
+    const tetoAdm = parseFloat(req.query.tetoAdm || '2500');
+    const tetoTv = parseFloat(req.query.tetoTv || '870');
+    const desde = String(req.query.desde || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
+    const base = 'https://reparoeletroadm.com/api/trafego';
+    const chamar = async (qs) => fetch(base + '?' + qs + '&k=' + KA).then(x => x.json()).catch(e => ({ ok: false, error: e.message }));
+    const etapas = [];
+    const reg = (nome, r, resumo) => etapas.push({ etapa: nome, ok: !!(r && r.ok), resumo, detalhe: r });
+
+    // ── 1) o que existe no R2 ──
+    const noR2 = await chamar('action=da-pasta&pasta=' + encodeURIComponent(pasta) + '&verba=1');
+    const videos = ((noR2 || {}).PLANO || []);
+    const porCat = ((noR2 || {}).POR_CATEGORIA) || {};
+    reg('1. Ler o R2', noR2, videos.length + ' vídeo(s) encontrado(s)');
+
+    // ── 2) quantos campeões renovam ──
+    const prevAdm = await chamar('action=renovar-ciclo&frente=adm&verba=1&desde=' + desde);
+    const prevTv = await chamar('action=renovar-ciclo&frente=tv&verba=1&desde=' + desde);
+    const nAdmCamp = (prevAdm || {}).campeoesQueSeraoRenovados || 0;
+    const nTvCamp = (prevTv || {}).campeoesQueSeraoRenovados || 0;
+    // vídeos novos por frente
+    const novosTv = Object.entries(porCat).filter(([c]) => c === 'tv').reduce((s, [, n]) => s + n, 0);
+    const novosAdm = videos.length - novosTv;
+    const totalAdm = nAdmCamp + novosAdm;
+    const totalTv = nTvCamp + novosTv;
+    const verbaAdm = totalAdm ? Math.floor((tetoAdm / totalAdm) * 100) / 100 : 0;
+    const verbaTv = totalTv ? Math.floor((tetoTv / totalTv) * 100) / 100 : 0;
+    reg('2. Calcular a verba', { ok: true },
+      'ADM: ' + totalAdm + ' anúncios × R$ ' + verbaAdm + ' · TV: ' + totalTv + ' × R$ ' + verbaTv);
+
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'PRÉVIA — nada foi criado',
+        cicloComeca: desde + ' 13:00 BRT',
+        PLANO: {
+          videosNoR2: videos.length, porCategoria: porCat,
+          campeoesAdm: nAdmCamp, novosAdm, totalAdm, verbaPorAnuncioAdm: verbaAdm,
+          campeoesTv: nTvCamp, novosTv, totalTv, verbaPorAnuncioTv: verbaTv,
+          verbaTotalAdm: Number((verbaAdm * totalAdm).toFixed(2)),
+          verbaTotalTv: Number((verbaTv * totalTv).toFixed(2)),
+        },
+        VIDEOS: videos,
+        etapas,
+        dica: 'para executar tudo: &aplicar=1' });
+    }
+
+    // ── 3) sobe os vídeos do R2 para a Meta ──
+    const subiu = await chamar('action=da-pasta&pasta=' + encodeURIComponent(pasta) + '&verba=1&aplicar=1');
+    reg('3. Subir vídeos para a Meta', subiu, ((subiu || {}).subidosParaMeta || 0) + ' vídeo(s)');
+
+    // ── 4) renova os campeões ──
+    if (nAdmCamp) {
+      const r = await chamar('action=renovar-ciclo&frente=adm&verba=' + verbaAdm + '&desde=' + desde + '&aplicar=1');
+      reg('4. Renovar campeões ADM', r, (r.renovados || 0) + ' renovado(s)');
+    }
+    if (nTvCamp) {
+      const r = await chamar('action=renovar-ciclo&frente=tv&verba=' + verbaTv + '&desde=' + desde + '&aplicar=1');
+      reg('5. Renovar campeões TV', r, (r.renovados || 0) + ' renovado(s)');
+    }
+
+    // ── 5) cria os novos, categoria por categoria ──
+    for (const [cat, qtd] of Object.entries(porCat)) {
+      if (!qtd) continue;
+      const v = cat === 'tv' ? verbaTv : verbaAdm;
+      const r = await chamar('action=subir-agora&cat=' + cat + '&verba=' + v + '&desde=' + desde + '&aplicar=1');
+      reg('6. Criar novos de ' + cat, r, (r.criados || 0) + ' criado(s)' +
+        ((r.erros || []).length ? ' · ' + r.erros.length + ' erro(s)' : ''));
+      await new Promise(s => setTimeout(s, 800));
+    }
+
+    // ── 6) confere o resultado ──
+    const extrato = await chamar('action=extrato-verba');
+    const pend = await chamar('action=pendentes-aprovacao&dias=1');
+    reg('7. Conferir', extrato, ((extrato.TOTAIS || {}).geral || {}).ativos + ' anúncio(s) ativo(s)');
+
+    const criados = etapas.filter(e => e.etapa.startsWith('6.')).reduce((s, e) => s + ((e.detalhe || {}).criados || 0), 0);
+    const renovados = etapas.filter(e => e.etapa.startsWith('4.') || e.etapa.startsWith('5.'))
+      .reduce((s, e) => s + ((e.detalhe || {}).renovados || 0), 0);
+    const errosTotais = etapas.flatMap(e => ((e.detalhe || {}).erros || []));
+    return res.status(200).json({ ok: errosTotais.length === 0,
+      RESUMO: {
+        videosSubidos: (subiu || {}).subidosParaMeta || 0,
+        campeoesRenovados: renovados, criativosNovos: criados,
+        totalNoAr: ((extrato.TOTAIS || {}).geral || {}).ativos || 0,
+        verbaAdm: ((extrato.TOTAIS || {}).adm || {}).verba || 0,
+        verbaTv: ((extrato.TOTAIS || {}).tv || {}).verba || 0,
+        aprovacaoPendente: (pend || {}).aguardandoSuaAprovacao || 0,
+        erros: errosTotais.length,
+      },
+      DISTRIBUICAO: (extrato || {}).porCategoria || {},
+      ETAPAS: etapas.map(e => (e.ok ? '✅ ' : '⚠️ ') + e.etapa + ' — ' + e.resumo),
+      ERROS: errosTotais.length ? errosTotais : 'nenhum',
+      ANUNCIOS: (extrato || {}).ATIVOS || [] });
+  }
+
+  // ── 🧽 LIMPAR-R2: apaga do bucket os vídeos que já viraram anúncio ──
+  if (action === 'limpar-r2') {
+    const TKL = String(req.query.token || '').trim() || TOKEN;
+    const pasta = String(req.query.pasta || 'Criativos Reparo Eletro');
+    const prefixo = pasta ? (pasta.replace(/^\/|\/$/g, '') + '/') : '';
+    const bucket = (process.env.R2_BUCKET || 'reparo-criativos').trim();
+    // 1) o que está no bucket
+    const q = { 'list-type': '2', 'max-keys': '200' };
+    if (prefixo) q.prefix = prefixo;
+    const ass = await assinarR2('GET', '/' + bucket, q);
+    const xml = await fetch(ass.url, { headers: ass.headers }).then(x => x.text()).catch(() => '');
+    const chaves = [...String(xml).matchAll(/<Key>([^<]+)<\/Key>/g)].map(m => m[1])
+      .filter(k => /\.(mp4|mov|avi|mkv|webm)$/i.test(k));
+    if (!chaves.length) return res.status(200).json({ ok: true, msg: 'bucket já está vazio' });
+    // 2) quais desses viraram anúncio na Meta
+    const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,effective_status&limit=400&access_token=${TKL}`, 10);
+    const nomesNaMeta = new Set((ads.data || []).map(a => String(a.name || '').toLowerCase()));
+    const semExt = s => String(s).replace(/\.(mp4|mov|avi|mkv|webm)$/i, '').toLowerCase();
+    const analise = chaves.map(k => {
+      const nome = k.split('/').pop();
+      const baseNome = semExt(nome);
+      const virouAnuncio = [...nomesNaMeta].some(n => n.includes(baseNome.slice(0, 24)));
+      return { chave: k, arquivo: nome, virouAnuncio };
+    });
+    const podeApagar = analise.filter(a => a.virouAnuncio);
+    const naoApagar = analise.filter(a => !a.virouAnuncio);
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        noBucket: analise.length,
+        podeApagar: podeApagar.length, naoApagar: naoApagar.length,
+        SEGUROS_PARA_APAGAR: podeApagar.map(a => a.arquivo),
+        NAO_VIRARAM_ANUNCIO: naoApagar.map(a => '⚠️ ' + a.arquivo),
+        dica: 'para apagar os que já viraram anúncio: &aplicar=1' });
+    }
+    const feitos = [], erros = [];
+    for (const a of podeApagar) {
+      const del = await assinarR2('DELETE', '/' + bucket + '/' + a.chave.split('/').map(encodeURIComponent).join('/'), {});
+      const r = await fetch(del.url, { method: 'DELETE', headers: del.headers })
+        .then(x => ({ ok: x.status === 204 || x.status === 200, st: x.status })).catch(e => ({ ok: false, st: e.message }));
+      if (r.ok) feitos.push(a.arquivo); else erros.push(a.arquivo + ' (HTTP ' + r.st + ')');
+      await new Promise(s => setTimeout(s, 200));
+    }
+    return res.status(200).json({ ok: erros.length === 0,
+      apagados: feitos.length, feitos, erros,
+      mantidos: naoApagar.map(a => a.arquivo),
+      observacao: 'só foram apagados os vídeos que já existem como anúncio na Meta' });
+  }
+
   // ── 🔑 assinatura AWS SigV4 — necessária para listar o bucket do R2 ──
   async function assinarR2(metodo, caminho, query) {
     const AK = (process.env.R2_ACCESS_KEY || '31a48286ed15896e6201edadfa35aa87').trim();
