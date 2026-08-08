@@ -121,7 +121,7 @@ module.exports = async function handler(req, res) {
     if (/\bme[fovs]?\d{2}|\bmto\d|\bpms?\d{2}|\bpme\d|\bpm0\d|\bmtae?g?\d{2}|\bmi-?\d{4}|\bnn-?st?\d{2}|\bms\d{4}|\bmh\d{4}|\bbm[a-z]?\d{2}|\bcm[a-z]?\d{2}|\bmg\d{2}/.test(s)) return 'microondas';
     if (/\bforn(o|inho)/.test(s)) return 'forno';
     // purificador/bebedouro: nome + linhas Electrolux (PE/PA/PH4/PC4) e Consul (CPB/CPC)
-    if (/purifi[a-z]*dor|purifiador|bebedouro|\bfiltro\b|\bvela\b|[áa]gua/.test(s)) return 'purificador';
+    if (/purifi[a-z]*dor|purifiador|bebe[a-z]*douro|bebedor|\bfiltro\b|\bvela\b|[áa]gua/.test(s)) return 'purificador';
     if (/\bibbl\b|\blatina\b|colorma[qc]|coloma[qc]|esmaltec|\blibell\b|\bsoft\b|masterfrio|karina/.test(s)) return 'purificador';
     if (/\bp[ea]\d{2}[a-z]?\b|\bph4\d|\bpc4\d|\bcp[bc]\d{2}/.test(s)) return 'purificador';
     // refrigeração de bebida: adega, cervejeira, frigobar, mini geladeira
