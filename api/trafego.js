@@ -1354,10 +1354,17 @@ module.exports = async function handler(req, res) {
     const tkS = String(req.query.token || '').trim() || TOKEN;
     const cat = String(req.query.cat || 'tv').toLowerCase();
     const base = await dbGet('trafego_painel_cache_ciclo') || await dbGet('trafego_painel_cache');
-    const mod = ((base || {}).dados || {}).anuncios
-      ?.filter(a => a.ativo && a.categoria === cat && a.adsetId)
-      .sort((x, y) => (x.razaoMeta || 9) - (y.razaoMeta || 9))[0];
-    if (!mod) return res.status(200).json({ ok: false, error: 'nenhum modelo ativo em ' + cat });
+    const alvoNome = String(req.query.anuncio || '').toLowerCase();
+    const cands = ((base || {}).dados || {}).anuncios
+      ?.filter(a => a.ativo && a.adsetId && (alvoNome
+        ? String(a.nome || '').toLowerCase().includes(alvoNome)
+        : a.categoria === cat)) || [];
+    const mod = alvoNome ? cands[0]
+      : cands.sort((x, y) => (x.razaoMeta || 9) - (y.razaoMeta || 9))[0];
+    if (!mod) return res.status(200).json({ ok: false,
+      error: 'nenhum modelo encontrado',
+      disponiveis: (((base || {}).dados || {}).anuncios || [])
+        .filter(a => a.ativo).map(a => a.nome + ' | ' + a.categoria + ' | conjunto: ' + (a.adsetNome || '?')) });
 
     const [camp, set] = await Promise.all([
       fetch(`${GRAPH}/${mod.campanhaId}?fields=name,objective,special_ad_categories&access_token=${tkS}`).then(x => x.json()),
@@ -1371,8 +1378,13 @@ module.exports = async function handler(req, res) {
     const cidades = (g.cities || []).map(c => c.name + (c.radius ? ' + ' + c.radius + (c.distance_unit || 'km') : ''));
     const regioes = (g.regions || []).map(r => r.name);
     const paises = g.countries || [];
+    const semGeo = !(g.cities || []).length && !(g.regions || []).length && !(g.countries || []).length;
     return res.status(200).json({ ok: true,
       modeloUsado: mod.nome + ' (CPA R$ ' + (mod.cpa ?? '?') + ')',
+      conjunto: set.name || mod.adsetNome || '?',
+      ALERTA: semGeo
+        ? '🚨 SEM GEOLOCALIZAÇÃO — este conjunto não tem país, região nem cidade definidos. Confira no Gerenciador; se estiver mesmo aberto, o anúncio pode estar sendo mostrado fora da sua área de atendimento.'
+        : null,
       CAMPANHA: {
         objetivo: camp.objective,
         oQueSignifica: camp.objective === 'OUTCOME_ENGAGEMENT'
