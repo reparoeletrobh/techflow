@@ -1648,6 +1648,55 @@ module.exports = async function handler(req, res) {
       observacao: 'tudo isso é copiado IGUAL para cada anúncio novo — só mudam vídeo, texto, verba e nome' });
   }
 
+  // ── 🔎 STATUS-CICLO: situação real de cada anúncio do ciclo novo ──
+  if (action === 'status-ciclo') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const TKS = String(req.query.token || '').trim() || TOKEN;
+    const desde = String(req.query.desde || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
+    const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,status,effective_status,issues_info,adset{id,status,effective_status,start_time,end_time},campaign{id,name,status,effective_status,start_time}&limit=400&access_token=${TKS}`, 10);
+    const doCiclo = (ads.data || []).filter(a =>
+      String((a.campaign || {}).start_time || '').slice(0, 10) >= desde);
+    const porStatus = {};
+    const linhas = doCiclo.map(a => {
+      const st = a.effective_status;
+      porStatus[st] = (porStatus[st] || 0) + 1;
+      const iss = (a.issues_info || []).map(x => x.error_summary || x.error_message).filter(Boolean);
+      return { anuncio: a.name, situacao: st, statusProprio: a.status,
+        conjunto: (a.adset || {}).effective_status,
+        campanha: (a.campaign || {}).effective_status,
+        comeca: (a.adset || {}).start_time,
+        avisos: iss.length ? iss : null };
+    });
+    const TRADUZ = {
+      ACTIVE: '✅ rodando',
+      PENDING_REVIEW: '⏳ em revisão da Meta',
+      IN_PROCESS: '⏳ processando',
+      CAMPAIGN_PAUSED: '⏸️ campanha pausada',
+      ADSET_PAUSED: '⏸️ conjunto pausado',
+      PAUSED: '⏸️ pausado',
+      DISAPPROVED: '❌ reprovado',
+      WITH_ISSUES: '⚠️ com problema',
+      PENDING_BILLING_INFO: '💳 falta pagamento',
+    };
+    const agendados = doCiclo.filter(a => {
+      const s = (a.adset || {}).start_time;
+      return s && new Date(s).getTime() > Date.now();
+    }).length;
+    return res.status(200).json({ ok: true, cicloDesde: desde,
+      totalAnuncios: doCiclo.length,
+      agendadosParaComecar: agendados,
+      POR_SITUACAO: Object.entries(porStatus).map(([s, n]) =>
+        (TRADUZ[s] || s) + ': ' + n),
+      DIAGNOSTICO: agendados === doCiclo.length
+        ? '✅ todos AGENDADOS — vão ativar automaticamente no horário de início'
+        : (porStatus.ACTIVE === doCiclo.length ? '✅ todos rodando'
+        : '⚠️ situações mistas — veja a lista'),
+      LISTA: linhas.slice(0, 50).map(l => (TRADUZ[l.situacao] || l.situacao) + ' | ' +
+        String(l.anuncio).slice(0, 34) +
+        (l.comeca ? ' | começa ' + String(l.comeca).slice(5, 16).replace('T', ' ') : '') +
+        (l.avisos ? ' | ' + String(l.avisos[0]).slice(0, 50) : '')) });
+  }
+
   // ── 🤖 CICLO-AUTOMATICO: monta o ciclo inteiro num comando ──
   // R2 → Meta → renova campeões → cria os novos → devolve o relatório do que foi feito
   if (action === 'ciclo-automatico') {
