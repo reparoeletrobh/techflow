@@ -737,8 +737,12 @@ module.exports = async function handler(req, res) {
       const sAll = await pegarTudo(`${GRAPH}/act_${CONTA}/adsets?fields=id,daily_budget,lifetime_budget,campaign{id}&limit=300&access_token=${TK}`, 8);
       const setsPor = {};
       for (const s of (sAll.data || [])) { const ci = (s.campaign || {}).id; if (ci) (setsPor[ci] = setsPor[ci] || []).push(s); }
+      // 📅 o teto vale para o ciclo de DESTINO (parâmetro desde), não para o anterior.
+      // Cada ciclo tem verba própria: o que foi gasto na semana passada não ocupa
+      // espaço na programação da semana nova.
+      const cicloDestino = String(req.query.desde || desdeCiclo).slice(0, 10);
       for (const c of (cAll.data || [])) {
-        if (String(c.start_time || '').slice(0, 10) < desdeCiclo) continue;
+        if (String(c.start_time || '').slice(0, 10) < cicloDestino) continue;
         nomesExistentes.add(String(c.name || '').toLowerCase());
         if (c.effective_status !== 'ACTIVE') continue;
         if (categoriaDe(c.name || '', 'anuncio') !== (cat === 'tv' ? 'tv' : categoriaDe(c.name || '', 'anuncio'))) {
@@ -766,6 +770,7 @@ module.exports = async function handler(req, res) {
     if (verbaJaAlocada + vaiAlocar > tetoFrente + 1 && String(req.query.ignorarTeto || '') !== '1') {
       return res.status(200).json({ ok: false,
         error: '🚧 estouraria o teto da frente ' + cat.toUpperCase(),
+        cicloDeDestino: String(req.query.desde || desdeCiclo).slice(0, 10),
         tetoDaFrente: tetoFrente,
         jaAlocado: Number(verbaJaAlocada.toFixed(2)),
         tentandoAlocar: Number(vaiAlocar.toFixed(2)),
@@ -1346,6 +1351,101 @@ module.exports = async function handler(req, res) {
       terminaEm: new Date(fim.getTime() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' BRT',
       aviso: erros.length ? 'veja os erros — o vídeo não foi trocado no criativo, apenas a campanha foi clonada' : undefined,
       proximoPasso: 'confira em /trafego e troque o vídeo no criativo se necessário' });
+  }
+
+  // ── ♻️ RENOVAR-CICLO: duplica os campeões para o ciclo novo, com verba e data novas ──
+  if (action === 'renovar-ciclo') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const TKR = String(req.query.token || '').trim() || TOKEN;
+    const frente = String(req.query.frente || 'adm').toLowerCase();
+    const verba = parseFloat(req.query.verba || '0');
+    const desde = String(req.query.desde || '').slice(0, 10);
+    if (!verba || !desde) return res.status(400).json({ ok: false,
+      error: 'informe &verba=X&desde=AAAA-MM-DD' });
+
+    // término: sábado 11h BRT da semana do início
+    const ini = new Date(desde + 'T00:00:00-03:00');
+    const fim = new Date(ini);
+    fim.setUTCDate(ini.getUTCDate() + ((6 - ini.getUTCDay() + 7) % 7 || 7));
+    fim.setUTCHours(14, 0, 0, 0);
+    const fimUnix = Math.floor(fim.getTime() / 1000);
+
+    // campeões do ciclo ANTERIOR = ativos que não estão marcados para corte
+    const base = await dbGet('trafego_painel_cache_7d') || await dbGet('trafego_painel_cache_ciclo');
+    const todos = (((base || {}).dados || {}).anuncios || [])
+      .filter(a => a.ativo && a.campanhaId && a.adsetId);
+    const daFrente = todos.filter(a => frente === 'tv' ? a.categoria === 'tv' : a.categoria !== 'tv');
+    const cfgR = await cfgTrafego();
+    const campeoes = daFrente.filter(a => {
+      const meta = cfgR.metas[a.categoria] != null ? cfgR.metas[a.categoria] : cfgR.metas.outros;
+      if (a.cpa == null) return true;                       // sem dado: mantém
+      return a.cpa <= meta * 1.3;                           // até 30% acima da meta continua
+    });
+    const cortados = daFrente.filter(a => !campeoes.includes(a));
+
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia — nada criado',
+        frente: frente.toUpperCase(), cicloNovo: desde,
+        terminaEm: new Date(fim.getTime() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' BRT',
+        campeoesQueSeraoRenovados: campeoes.length,
+        naoRenovados: cortados.length,
+        verbaPorAnuncio: verba,
+        verbaTotal: Number((verba * campeoes.length).toFixed(2)),
+        RENOVAR: campeoes.map(a => a.nome + ' | CPA ' + (a.cpa ?? '?') + ' | ' + a.categoria),
+        NAO_RENOVAR: cortados.map(a => a.nome + ' | CPA ' + (a.cpa ?? '?') + ' — acima de 30% da meta'),
+        dica: 'para criar: &aplicar=1' });
+    }
+
+    const postF = async (id, campos) => fetch(`${GRAPH}/${id}?access_token=${TKR}`, { method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(campos).toString() })
+      .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+    const postNovo = async (caminho, campos) => fetch(`${GRAPH}/${caminho}?access_token=${TKR}`, { method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(campos).toString() })
+      .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+
+    const feitos = [], erros = [];
+    for (const a of campeoes) {
+      try {
+        const nome = nomeComData(a.nome);
+        const [mC, mS, mA] = await Promise.all([
+          fetch(`${GRAPH}/${a.campanhaId}?fields=objective,special_ad_categories&access_token=${TKR}`).then(x => x.json()),
+          fetch(`${GRAPH}/${a.adsetId}?fields=optimization_goal,billing_event,destination_type,promoted_object,bid_strategy,targeting{geo_locations,age_min,age_max,genders,locales,flexible_spec,custom_audiences,excluded_custom_audiences,publisher_platforms,device_platforms,targeting_automation}&access_token=${TKR}`).then(x => x.json()),
+          fetch(`${GRAPH}/${a.id}?fields=creative{object_story_spec}&access_token=${TKR}`).then(x => x.json()),
+        ]);
+        if (mC.error || mS.error || mA.error) { erros.push(a.nome + ': ' + ((mC.error || mS.error || mA.error).message)); continue; }
+        const c1 = await postNovo('act_' + CONTA + '/campaigns', {
+          name: nome, objective: mC.objective || 'OUTCOME_ENGAGEMENT', status: 'PAUSED',
+          special_ad_categories: JSON.stringify(mC.special_ad_categories || []),
+          is_adset_budget_sharing_enabled: 'false',
+        });
+        if (c1.error) { erros.push(a.nome + ' (campanha): ' + c1.error.message); continue; }
+        const camposS = { name: nome + ' - conjunto', campaign_id: c1.id, status: 'PAUSED',
+          targeting: JSON.stringify(mS.targeting || {}),
+          optimization_goal: mS.optimization_goal || 'CONVERSATIONS',
+          billing_event: mS.billing_event || 'IMPRESSIONS',
+          bid_strategy: mS.bid_strategy || 'LOWEST_COST_WITHOUT_CAP',
+          lifetime_budget: String(Math.round(verba * 100)), end_time: String(fimUnix) };
+        if (mS.destination_type) camposS.destination_type = mS.destination_type;
+        if (mS.promoted_object) camposS.promoted_object = JSON.stringify(mS.promoted_object);
+        const s1 = await postNovo('act_' + CONTA + '/adsets', camposS);
+        if (s1.error) { erros.push(a.nome + ' (conjunto): ' + s1.error.message); continue; }
+        const oss = ((mA.creative || {}).object_story_spec) || {};
+        const cr = await postNovo('act_' + CONTA + '/adcreatives', {
+          name: nome + ' - criativo', object_story_spec: JSON.stringify(oss) });
+        if (cr.error) { erros.push(a.nome + ' (criativo): ' + cr.error.message); continue; }
+        const a1 = await postNovo('act_' + CONTA + '/ads', {
+          name: nome, adset_id: s1.id, creative: JSON.stringify({ creative_id: cr.id }), status: 'ACTIVE' });
+        if (a1.error) { erros.push(a.nome + ' (anúncio): ' + a1.error.message); continue; }
+        await postF(s1.id, { status: 'ACTIVE' });
+        await postF(c1.id, { status: 'ACTIVE' });
+        feitos.push(nome + ' → R$ ' + verba);
+        await new Promise(s => setTimeout(s, 500));
+      } catch (e) { erros.push(a.nome + ': ' + e.message); }
+    }
+    return res.status(200).json({ ok: erros.length === 0,
+      renovados: feitos.length, feitos, erros,
+      naoRenovados: cortados.map(a => a.nome),
+      terminaEm: new Date(fim.getTime() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' BRT' });
   }
 
   // ── 🎯 VER-SEGMENTACAO: mostra em português o que o modelo tem configurado ──
