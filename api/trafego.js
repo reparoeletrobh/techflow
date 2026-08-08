@@ -1173,8 +1173,14 @@ module.exports = async function handler(req, res) {
     const base = await dbGet('trafego_painel_cache_ciclo') || await dbGet('trafego_painel_cache');
     if (!base || !base.dados) return res.status(200).json({ ok: false, error: 'abra o painel primeiro' });
     const modelo = (base.dados.anuncios || [])
-      .filter(a => a.ativo && a.categoria === cat && a.campanhaId)
-      .sort((x, y) => (x.razaoMeta || 9) - (y.razaoMeta || 9))[0];
+      .filter(a => a.categoria === cat && a.campanhaId && a.adsetId)
+      .sort((x, y) => {
+        // prefere ATIVO; entre iguais, o de melhor CPA. O ciclo anterior termina
+        // sábado 11h e os anúncios deixam de ser ativos — sem isso o sistema
+        // ficava sem modelo justamente na hora de montar o ciclo novo.
+        if (!!x.ativo !== !!y.ativo) return x.ativo ? -1 : 1;
+        return (x.razaoMeta || 9) - (y.razaoMeta || 9);
+      })[0];
     if (!modelo) return res.status(200).json({ ok: false, error: 'nenhum anúncio ativo de ' + cat + ' para usar de modelo' });
 
     const alvo = apenasUm ? escolhidos.slice(0, 1) : escolhidos;
