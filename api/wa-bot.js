@@ -2761,6 +2761,144 @@ export default async function handler(req, res) {
       encontrados: out.length, cards: out });
   }
 
+  // ── 📊 DIAGNOSTICO-COMERCIAL: cada orçamento enviado pelo bot e onde ele parou ──
+  if (action === 'diagnostico-comercial') {
+    const cfgD = (await dbGet('wa_bot_config')) || {};
+    const marco = cfgD.marcoNumeroNovo ? new Date(cfgD.marcoNumeroNovo).getTime() : (Date.now() - 7 * 86400000);
+    const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '?';
+    const dias = d => d ? Number(((Date.now() - new Date(d).getTime()) / 86400000).toFixed(1)) : null;
+
+    const [evts, ppA, ppT, arqA, arqT, ctrl7] = await Promise.all([
+      lerEvts(), dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+      dbGet('reparoeletro_arquivo'), dbGet('tv_arquivo'), dbGet('wa_recuperacao_7d'),
+    ]);
+    const universo = (((ppA || {}).cards) || []).map(c => ({ ...c, _sis: 'ADM' }))
+      .concat((((ppT || {}).cards) || []).map(c => ({ ...c, _sis: 'TV' })))
+      .concat((((arqA || {}).cards) || []).map(c => ({ ...c, _sis: 'ADM', _arq: true })))
+      .concat((((arqT || {}).cards) || []).map(c => ({ ...c, _sis: 'TV', _arq: true })));
+
+    // 1) ORÇAMENTOS QUE O BOT ENVIOU desde o marco
+    const enviados = {};
+    for (const e of (evts || [])) {
+      if (e.dir !== 'out') continue;
+      const t = new Date(e.ts || 0).getTime();
+      if (!t || t < marco) continue;
+      const ehOrc = (e.tipo === 'template' && /orcamento_pronto/i.test(String(e.template || e.texto || '')))
+        || ['orcamentos-pendentes', 'recuperacao-7d'].includes(String(e.via || ''));
+      if (!ehOrc) continue;
+      const d = d8f(e.tel);
+      if (d.length < 8) continue;
+      if (!enviados[d]) enviados[d] = { primeiro: e.ts, ultimo: e.ts, vezes: 0, vias: {} };
+      enviados[d].vezes++;
+      enviados[d].ultimo = e.ts;
+      enviados[d].vias[e.via || 'bot'] = (enviados[d].vias[e.via || 'bot'] || 0) + 1;
+    }
+
+    // 2) o cliente respondeu depois do envio?
+    const respostaApos = {};
+    for (const e of (evts || [])) {
+      if (e.dir !== 'in') continue;
+      const d = d8f(e.tel);
+      const env = enviados[d];
+      if (!env) continue;
+      const t = new Date(e.ts || 0).getTime();
+      if (t > new Date(env.primeiro).getTime()) {
+        if (!respostaApos[d] || t > new Date(respostaApos[d]).getTime()) respostaApos[d] = e.ts;
+      }
+    }
+
+    // 3) quantas trocas de mensagem houve (proxy da fase da negociação)
+    const trocas = {};
+    for (const e of (evts || [])) {
+      const d = d8f(e.tel);
+      if (!enviados[d]) continue;
+      const t = new Date(e.ts || 0).getTime();
+      if (t < new Date(enviados[d].primeiro).getTime()) continue;
+      trocas[d] = trocas[d] || { doCliente: 0, doBot: 0 };
+      if (e.dir === 'in') trocas[d].doCliente++;
+      else if (e.dir === 'out' && e.tipo !== 'template') trocas[d].doBot++;
+    }
+
+    const clientes7 = ((ctrl7 || {}).clientes) || {};
+    const FASES_OK = ['aprovados', 'producao', 'video_enviado', 'analise_compra',
+      'equipamento_comprado', 'programar_entrega', 'solicitar_entrega', 'entrega_solicitada',
+      'receber', 'erp', 'garantia', 'finalizado'];
+
+    const linhas = Object.entries(enviados).map(([d, env]) => {
+      const card = universo.find(c => d8f(c.telefone) === d);
+      const fase = card ? String(card.phaseId || card.phase || '') : null;
+      const respondeu = !!respostaApos[d];
+      const tr = trocas[d] || { doCliente: 0, doBot: 0 };
+      const rec = clientes7[d];
+      // situação comercial
+      let situacao, etapa;
+      if (fase && FASES_OK.includes(fase) && fase !== 'aguardando_aprovacao') {
+        situacao = '✅ APROVOU';
+        etapa = fase;
+      } else if (fase === 'descarte' || fase === 'ultima_chamada') {
+        situacao = '❌ ENCERRADO';
+        etapa = fase;
+      } else if (respondeu) {
+        situacao = '💬 NEGOCIANDO';
+        // estima a fase pela quantidade de trocas depois do orçamento
+        etapa = tr.doCliente >= 5 ? 'F4/F5 — troca ou compra'
+          : (tr.doCliente >= 3 ? 'F3 — balcão'
+          : (tr.doCliente >= 2 ? 'F2 — Pix' : 'F1 — orçamento'));
+      } else {
+        situacao = '🔇 SEM RESPOSTA';
+        etapa = rec ? 'recuperação ' + rec.tentativas + '/7' : 'aguardando 1ª resposta';
+      }
+      return { tel: d.slice(-4), nome: card ? (card.nomeContato || '?') : '(sem ficha)',
+        sistema: card ? card._sis : '?', equipamento: card ? String(card.equipamento || card.descricao || '').slice(0, 22) : '',
+        valor: card ? (parseFloat(card.valor || 0) || 0) : 0,
+        situacao, etapa, fase,
+        enviosDeOrcamento: env.vezes, primeiroEnvio: env.primeiro, ultimoEnvio: env.ultimo,
+        respondeu, trocasDoCliente: tr.doCliente,
+        diasDesdeOPrimeiro: dias(env.primeiro),
+        tentativasRecuperacao: rec ? rec.tentativas : 0,
+        conflitoAberto: rec && rec.conflitoAberto ? true : false };
+    }).sort((a, b) => {
+      const ord = { '✅ APROVOU': 0, '💬 NEGOCIANDO': 1, '🔇 SEM RESPOSTA': 2, '❌ ENCERRADO': 3 };
+      return (ord[a.situacao] - ord[b.situacao]) || (b.valor - a.valor);
+    });
+
+    const aprovou = linhas.filter(l => l.situacao === '✅ APROVOU');
+    const negoc = linhas.filter(l => l.situacao === '💬 NEGOCIANDO');
+    const semResp = linhas.filter(l => l.situacao === '🔇 SEM RESPOSTA');
+    const encerr = linhas.filter(l => l.situacao === '❌ ENCERRADO');
+    const soma = a => Number(a.reduce((s, x) => s + (x.valor || 0), 0).toFixed(2));
+    const porEtapa = negoc.reduce((o, l) => { o[l.etapa] = (o[l.etapa] || 0) + 1; return o; }, {});
+    const porTentativa = semResp.reduce((o, l) => {
+      const k = l.tentativasRecuperacao + '/7'; o[k] = (o[k] || 0) + 1; return o; }, {});
+
+    return res.status(200).json({ ok: true,
+      desde: new Date(marco - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' BRT',
+      FUNIL: {
+        orcamentosEnviados: linhas.length,
+        aprovaram: aprovou.length,
+        emNegociacao: negoc.length,
+        semResposta: semResp.length,
+        encerrados: encerr.length,
+        taxaDeAprovacao: linhas.length ? Math.round(aprovou.length / linhas.length * 100) + '%' : null,
+        taxaDeResposta: linhas.length ? Math.round((aprovou.length + negoc.length) / linhas.length * 100) + '%' : null,
+        valorAprovado: soma(aprovou),
+        valorEmNegociacao: soma(negoc),
+        valorParado: soma(semResp),
+      },
+      NEGOCIACAO_POR_FASE: porEtapa,
+      RECUPERACAO_POR_TENTATIVA: porTentativa,
+      APROVARAM: aprovou.map(l => l.nome.slice(0, 20) + ' ' + l.tel + ' | R$ ' + l.valor +
+        ' | ' + l.etapa + ' | ' + l.trocasDoCliente + ' resposta(s)'),
+      NEGOCIANDO: negoc.map(l => l.nome.slice(0, 20) + ' ' + l.tel + ' | R$ ' + l.valor +
+        ' | ' + l.etapa + ' | ' + l.diasDesdeOPrimeiro + 'd | ' + l.equipamento),
+      SEM_RESPOSTA: semResp.map(l => l.nome.slice(0, 20) + ' ' + l.tel + ' | R$ ' + l.valor +
+        ' | ' + l.etapa + ' | ' + l.diasDesdeOPrimeiro + 'd desde o 1º envio' +
+        (l.conflitoAberto ? ' | 🚨 conflito aberto' : '')),
+      ENCERRADOS: encerr.map(l => l.nome.slice(0, 20) + ' ' + l.tel + ' | ' + l.etapa),
+      detalhe: linhas });
+  }
+
   // ── 📒 LOG-ORCAMENTOS: enviados, aprovados e a janela de recuperação, com data real ──
   if (action === 'log-orcamentos') {
     const dia = String(req.query.dia || '').trim();                  // AAAA-MM-DD
