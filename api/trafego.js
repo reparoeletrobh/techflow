@@ -1156,11 +1156,18 @@ module.exports = async function handler(req, res) {
     // 📅 término: sábado 11h BRT — SEMPRE no futuro. Rodando num sábado depois das 11h
     // o cálculo antigo apontava para hoje, e as campanhas nasciam já encerradas.
     const agoraB = new Date(Date.now() - 3 * 3600000);
-    const diasAteSab = (6 - agoraB.getUTCDay() + 7) % 7;
-    const fim = new Date(Date.UTC(agoraB.getUTCFullYear(), agoraB.getUTCMonth(),
-      agoraB.getUTCDate() + diasAteSab, 14, 0, 0));
-    while (fim.getTime() <= Date.now() + 2 * 3600000) fim.setUTCDate(fim.getUTCDate() + 7);
+    // 🕐 INÍCIO: 13h BRT do dia informado em ?desde (ou hoje). 16h UTC.
+    const inicioCic = desde
+      ? new Date(desde + 'T16:00:00Z')
+      : new Date(Date.UTC(agoraB.getUTCFullYear(), agoraB.getUTCMonth(), agoraB.getUTCDate(), 16, 0, 0));
+    // 🏁 FIM: sábado 11h BRT (14h UTC) da semana SEGUINTE ao início
+    const fim = new Date(inicioCic);
+    const diasAteSab = (6 - inicioCic.getUTCDay() + 7) % 7;
+    fim.setUTCDate(inicioCic.getUTCDate() + (diasAteSab === 0 ? 7 : diasAteSab));
+    fim.setUTCHours(14, 0, 0, 0);
+    while (fim.getTime() <= inicioCic.getTime()) fim.setUTCDate(fim.getUTCDate() + 7);
     const fimUnix = Math.floor(fim.getTime() / 1000);
+    const inicioUnix = Math.floor(Math.max(inicioCic.getTime(), Date.now() + 300000) / 1000);
     const horasRestantes = Math.round((fim.getTime() - Date.now()) / 3600000);
 
     // vídeos a usar
@@ -1280,6 +1287,7 @@ module.exports = async function handler(req, res) {
             bid_strategy: mSet.bid_strategy || 'LOWEST_COST_WITHOUT_CAP',
             status: 'PAUSED',
             lifetime_budget: String(Math.round(verba * 100)),
+            start_time: String(inicioUnix),
             end_time: String(fimUnix),
           };
           if (mSet.destination_type) camposSet.destination_type = mSet.destination_type;
@@ -1438,11 +1446,15 @@ module.exports = async function handler(req, res) {
       error: 'informe &verba=X&desde=AAAA-MM-DD' });
 
     // término: sábado 11h BRT da semana do início
-    const ini = new Date(desde + 'T00:00:00-03:00');
+    // 🕐 início 13h BRT do dia informado · 🏁 fim sábado 11h BRT da semana seguinte
+    const ini = new Date(desde + 'T16:00:00Z');
     const fim = new Date(ini);
-    fim.setUTCDate(ini.getUTCDate() + ((6 - ini.getUTCDay() + 7) % 7 || 7));
+    const dSab = (6 - ini.getUTCDay() + 7) % 7;
+    fim.setUTCDate(ini.getUTCDate() + (dSab === 0 ? 7 : dSab));
     fim.setUTCHours(14, 0, 0, 0);
+    while (fim.getTime() <= ini.getTime()) fim.setUTCDate(fim.getUTCDate() + 7);
     const fimUnix = Math.floor(fim.getTime() / 1000);
+    const iniUnix = Math.floor(Math.max(ini.getTime(), Date.now() + 300000) / 1000);
 
     // campeões do ciclo ANTERIOR = ativos que não estão marcados para corte
     const base = await dbGet('trafego_painel_cache_7d') || await dbGet('trafego_painel_cache_ciclo');
@@ -1494,6 +1506,7 @@ module.exports = async function handler(req, res) {
     if (String(req.query.aplicar || '') !== '1') {
       return res.status(200).json({ ok: true, modo: 'prévia — nada criado',
         frente: frente.toUpperCase(), cicloNovo: desde,
+        comecaEm: new Date(iniUnix * 1000 - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' BRT',
         terminaEm: new Date(fim.getTime() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' BRT',
         campeoesQueSeraoRenovados: campeoes.length,
         naoRenovados: cortados.length,
@@ -1532,7 +1545,8 @@ module.exports = async function handler(req, res) {
           optimization_goal: mS.optimization_goal || 'CONVERSATIONS',
           billing_event: mS.billing_event || 'IMPRESSIONS',
           bid_strategy: mS.bid_strategy || 'LOWEST_COST_WITHOUT_CAP',
-          lifetime_budget: String(Math.round(verba * 100)), end_time: String(fimUnix) };
+          lifetime_budget: String(Math.round(verba * 100)),
+          start_time: String(iniUnix), end_time: String(fimUnix) };
         if (mS.destination_type) camposS.destination_type = mS.destination_type;
         if (mS.promoted_object) camposS.promoted_object = JSON.stringify(mS.promoted_object);
         const s1 = await postNovo('act_' + CONTA + '/adsets', camposS);
