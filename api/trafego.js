@@ -1200,9 +1200,8 @@ module.exports = async function handler(req, res) {
     for (const v of alvo) {
       try {
         // 🛡 DUPLICATA: não recriar campanha que já existe com o mesmo nome no ciclo.
-        // O subir-agora rodado duas vezes criava a mesma campanha de novo (05/08).
         const nomePrev = nomeComData(v.title);
-        if (nomesExistentes.has(nomePrev.toLowerCase())) {
+        if (nomesExistentes && nomesExistentes.has && nomesExistentes.has(nomePrev.toLowerCase())) {
           erros.push(v.title + ': já existe a campanha "' + nomePrev + '" — pulei para não duplicar');
           continue;
         }
@@ -1353,6 +1352,39 @@ module.exports = async function handler(req, res) {
       proximoPasso: 'confira em /trafego e troque o vídeo no criativo se necessário' });
   }
 
+  // ── 🧹 LIMPAR-ORFAS: remove campanhas criadas sem anúncio dentro ──
+  if (action === 'limpar-orfas') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const TKO = String(req.query.token || '').trim() || TOKEN;
+    const desde = String(req.query.desde || '').slice(0, 10);
+    const [camps, ads] = await Promise.all([
+      pegarTudo(`${GRAPH}/act_${CONTA}/campaigns?fields=id,name,effective_status,daily_budget,lifetime_budget,start_time&limit=300&access_token=${TKO}`, 8),
+      pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,campaign{id}&limit=400&access_token=${TKO}`, 10),
+    ]);
+    const comAnuncio = new Set();
+    for (const a of (ads.data || [])) { const ci = (a.campaign || {}).id; if (ci) comAnuncio.add(String(ci)); }
+    const orfas = (camps.data || []).filter(c => {
+      if (desde && String(c.start_time || '').slice(0, 10) < desde) return false;
+      return !comAnuncio.has(String(c.id));
+    });
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        campanhasSemAnuncio: orfas.length,
+        lista: orfas.map(c => c.name + ' | ' + c.effective_status +
+          ' | R$ ' + ((Number(c.lifetime_budget || c.daily_budget || 0) / 100).toFixed(2))),
+        dica: 'para excluir: &aplicar=1' });
+    }
+    const feitos = [], erros = [];
+    for (const c of orfas) {
+      const r = await fetch(`${GRAPH}/${c.id}?access_token=${TKO}`, { method: 'DELETE' })
+        .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      if (r && r.error) erros.push(c.name + ': ' + r.error.message);
+      else feitos.push(c.name);
+      await new Promise(s => setTimeout(s, 250));
+    }
+    return res.status(200).json({ ok: erros.length === 0, excluidas: feitos.length, feitos, erros });
+  }
+
   // ── ♻️ RENOVAR-CICLO: duplica os campeões para o ciclo novo, com verba e data novas ──
   if (action === 'renovar-ciclo') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
@@ -1410,7 +1442,7 @@ module.exports = async function handler(req, res) {
         const [mC, mS, mA] = await Promise.all([
           fetch(`${GRAPH}/${a.campanhaId}?fields=objective,special_ad_categories&access_token=${TKR}`).then(x => x.json()),
           fetch(`${GRAPH}/${a.adsetId}?fields=optimization_goal,billing_event,destination_type,promoted_object,bid_strategy,targeting{geo_locations,age_min,age_max,genders,locales,flexible_spec,custom_audiences,excluded_custom_audiences,publisher_platforms,device_platforms,targeting_automation}&access_token=${TKR}`).then(x => x.json()),
-          fetch(`${GRAPH}/${a.id}?fields=creative{object_story_spec}&access_token=${TKR}`).then(x => x.json()),
+          fetch(`${GRAPH}/${a.id}?fields=creative{id,object_story_spec}&access_token=${TKR}`).then(x => x.json()),
         ]);
         if (mC.error || mS.error || mA.error) { erros.push(a.nome + ': ' + ((mC.error || mS.error || mA.error).message)); continue; }
         const c1 = await postNovo('act_' + CONTA + '/campaigns', {
@@ -1429,12 +1461,12 @@ module.exports = async function handler(req, res) {
         if (mS.promoted_object) camposS.promoted_object = JSON.stringify(mS.promoted_object);
         const s1 = await postNovo('act_' + CONTA + '/adsets', camposS);
         if (s1.error) { erros.push(a.nome + ' (conjunto): ' + s1.error.message); continue; }
-        const oss = ((mA.creative || {}).object_story_spec) || {};
-        const cr = await postNovo('act_' + CONTA + '/adcreatives', {
-          name: nome + ' - criativo', object_story_spec: JSON.stringify(oss) });
-        if (cr.error) { erros.push(a.nome + ' (criativo): ' + cr.error.message); continue; }
+        // ♻️ REUTILIZA o criativo original: recriar a partir do object_story_spec falhava
+        // com "Invalid parameter" porque a Meta devolve campos que não aceita de volta.
+        const cid = (mA.creative || {}).id;
+        if (!cid) { erros.push(a.nome + ': não consegui ler o criativo original'); continue; }
         const a1 = await postNovo('act_' + CONTA + '/ads', {
-          name: nome, adset_id: s1.id, creative: JSON.stringify({ creative_id: cr.id }), status: 'ACTIVE' });
+          name: nome, adset_id: s1.id, creative: JSON.stringify({ creative_id: cid }), status: 'ACTIVE' });
         if (a1.error) { erros.push(a.nome + ' (anúncio): ' + a1.error.message); continue; }
         await postF(s1.id, { status: 'ACTIVE' });
         await postF(c1.id, { status: 'ACTIVE' });
