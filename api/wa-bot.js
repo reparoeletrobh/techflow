@@ -2761,6 +2761,70 @@ export default async function handler(req, res) {
       encontrados: out.length, cards: out });
   }
 
+  // ── 📈 TAXA-HISTORICA: aprovação por semana, com tempo de maturação ──
+  if (action === 'taxa-historica') {
+    const semanas = Math.min(12, Math.max(1, parseInt(req.query.semanas || '8', 10)));
+    const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const [ppA, ppT, arqA, arqT] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+      dbGet('reparoeletro_arquivo'), dbGet('tv_arquivo'),
+    ]);
+    const universo = (((ppA || {}).cards) || []).concat(((ppT || {}).cards) || [])
+      .concat(((arqA || {}).cards) || []).concat(((arqT || {}).cards) || []);
+
+    // agrupa por semana da data em que o card entrou em aguardando_aprovacao
+    const APROVADAS = ['aprovados', 'producao', 'video_enviado', 'analise_compra',
+      'equipamento_comprado', 'programar_entrega', 'solicitar_entrega', 'entrega_solicitada',
+      'receber', 'erp', 'garantia', 'finalizado'];
+    const baldes = {};
+    for (const c of universo) {
+      // quando recebeu o orçamento: primeira entrada em aguardando_aprovacao
+      const hist = (c.history || []).map(x => ({
+        f: String(x.phase || x.phaseId || ''), t: new Date(x.ts || x.timestamp || 0).getTime(),
+      })).filter(x => x.t).sort((a, b) => a.t - b.t);
+      const entrou = hist.find(x => x.f === 'aguardando_aprovacao');
+      const quando = entrou ? entrou.t : (c.aguardandoDesde ? new Date(c.aguardandoDesde).getTime() : null);
+      if (!quando) continue;
+      const idadeDias = (Date.now() - quando) / 86400000;
+      if (idadeDias > semanas * 7) continue;
+      const sem = Math.floor(idadeDias / 7);           // 0 = esta semana
+      baldes[sem] = baldes[sem] || { total: 0, aprovou: 0, aberto: 0, perdeu: 0, valor: 0, valorAprov: 0 };
+      const b = baldes[sem];
+      b.total++;
+      b.valor += parseFloat(c.valor || 0) || 0;
+      const faseAtual = String(c.phaseId || c.phase || '');
+      if (APROVADAS.includes(faseAtual)) {
+        b.aprovou++;
+        b.valorAprov += parseFloat(c.valorNaAprovacao != null ? c.valorNaAprovacao : (c.valor || 0)) || 0;
+      } else if (faseAtual === 'aguardando_aprovacao') b.aberto++;
+      else b.perdeu++;
+    }
+    const linhas = Object.entries(baldes).map(([s, b]) => {
+      const n = Number(s);
+      const fechados = b.aprovou + b.perdeu;
+      return { semanasAtras: n,
+        rotulo: n === 0 ? 'esta semana' : (n === 1 ? 'semana passada' : n + ' semanas atrás'),
+        orcamentos: b.total, aprovaram: b.aprovou, aindaAbertos: b.aberto, perderam: b.perdeu,
+        taxaSobreTudo: b.total ? Math.round(b.aprovou / b.total * 100) + '%' : null,
+        taxaSobreFechados: fechados ? Math.round(b.aprovou / fechados * 100) + '%' : null,
+        maturado: b.total ? Math.round(fechados / b.total * 100) + '%' : null,
+        valorAprovado: Number(b.valorAprov.toFixed(2)) };
+    }).sort((a, b) => a.semanasAtras - b.semanasAtras);
+
+    const maduras = linhas.filter(l => l.semanasAtras >= 2);
+    const mediaMadura = maduras.length
+      ? Math.round(maduras.reduce((s, l) => s + parseInt(l.taxaSobreFechados || '0'), 0) / maduras.length)
+      : null;
+    return res.status(200).json({ ok: true,
+      explicacao: 'taxaSobreTudo conta os ainda em aberto como não-aprovados; taxaSobreFechados só considera quem já teve desfecho; maturado indica quanto daquela semana já fechou',
+      LINHA_DO_TEMPO: linhas.map(l => l.rotulo.padEnd(18) + ' | ' + String(l.orcamentos).padStart(3) + ' orç. | ' +
+        String(l.aprovaram).padStart(3) + ' aprov. | ' + String(l.aindaAbertos).padStart(3) + ' abertos | ' +
+        'bruta ' + String(l.taxaSobreTudo).padStart(4) + ' | fechados ' + String(l.taxaSobreFechados).padStart(4) +
+        ' | maturado ' + String(l.maturado).padStart(4)),
+      mediaHistoricaSobreFechados: mediaMadura ? mediaMadura + '%' : null,
+      detalhe: linhas });
+  }
+
   // ── 📊 DIAGNOSTICO-COMERCIAL: cada orçamento enviado pelo bot e onde ele parou ──
   if (action === 'diagnostico-comercial') {
     const cfgD = (await dbGet('wa_bot_config')) || {};
