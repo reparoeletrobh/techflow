@@ -1283,47 +1283,46 @@ module.exports = async function handler(req, res) {
   if (action === 'da-pasta') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
     const tkP = String(req.query.token || '').trim() || TOKEN;
-    const pasta = String(req.query.pasta || '').trim();      // ID da pasta do Drive
+    const pasta = String(req.query.pasta || '').trim();      // subpasta no R2 (opcional)
+    const R2_PUB = (process.env.R2_PUBLIC_URL || 'https://pub-2e45a0631d27491ea1b38cdd5520b4ea.r2.dev').replace(/\/$/, '');
+    const R2_S3 = (process.env.R2_S3_ENDPOINT || 'https://1cef61647aff00cef531b60af8dbdf2b.r2.cloudflarestorage.com/reparo-criativos').replace(/\/$/, '');
     const cat = String(req.query.cat || 'tv').toLowerCase();
     const verba = parseFloat(req.query.verba || '145');
-    if (!pasta) {
-      return res.status(400).json({ ok: false,
-        error: 'informe ?pasta=ID_DA_PASTA_DO_DRIVE',
-        comoObter: 'abra a pasta no Drive; o ID é o trecho depois de /folders/ na barra de endereço',
-        importante: 'a pasta precisa estar compartilhada como "qualquer pessoa com o link"' });
-    }
-    // 1) lista os vídeos da pasta pública
-    const chaveG = (process.env.GOOGLE_API_KEY || '').trim();
+    // 1) LISTA os vídeos: o bucket público do R2 responde a ?list-type=2 em XML
     let arquivos = [];
-    if (chaveG) {
-      const lst = await fetch('https://www.googleapis.com/drive/v3/files?q=' +
-        encodeURIComponent("'" + pasta + "' in parents and mimeType contains 'video/'") +
-        '&fields=files(id,name,mimeType,size)&key=' + chaveG)
-        .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
-      if (lst && lst.error) {
-        return res.status(200).json({ ok: false,
-          error: 'não consegui ler a pasta: ' + (lst.error.message || ''),
-          verifique: 'a pasta está compartilhada como "qualquer pessoa com o link"?' });
+    const prefixo = pasta ? (pasta.replace(/^\/|\/$/g, '') + '/') : '';
+    try {
+      const xml = await fetch(R2_PUB + '/?list-type=2' + (prefixo ? '&prefix=' + encodeURIComponent(prefixo) : ''))
+        .then(x => x.text()).catch(() => '');
+      const chaves = [...String(xml).matchAll(/<Key>([^<]+)<\/Key>/g)].map(m => m[1]);
+      const tams = [...String(xml).matchAll(/<Size>(\d+)<\/Size>/g)].map(m => Number(m[1]));
+      arquivos = chaves.map((k, i) => ({ chave: k, name: k.split('/').pop(), size: tams[i] || null }))
+        .filter(a => /\.(mp4|mov|avi|mkv|webm)$/i.test(a.name));
+    } catch (e) {}
+    // se a listagem não vier (bucket sem permissão de list), aceita os nomes por parâmetro
+    if (!arquivos.length) {
+      const nomes = String(req.query.arquivos || '').split(',').map(x => x.trim()).filter(Boolean);
+      if (nomes.length) {
+        arquivos = nomes.map(n => ({ chave: prefixo + n, name: n.split('/').pop(), size: null }));
       }
-      arquivos = (lst.files || []);
-    } else {
-      return res.status(200).json({ ok: false,
-        error: 'GOOGLE_API_KEY não configurada na Vercel',
-        comoResolver: 'crie uma chave de API em console.cloud.google.com (Drive API habilitada) e adicione como GOOGLE_API_KEY' });
     }
     if (!arquivos.length) {
-      return res.status(200).json({ ok: false, error: 'nenhum vídeo encontrado na pasta' });
+      return res.status(200).json({ ok: false,
+        error: 'nenhum vídeo encontrado no bucket',
+        bucket: R2_PUB, prefixoUsado: prefixo || '(raiz)',
+        alternativa: 'se o bucket não permite listagem, passe os nomes: &arquivos=Led queimado.mov,Tela lavada.mov',
+        dica: 'confira também se o "URL de desenvolvimento público" está ativado no R2' });
     }
     // 2) prévia: mostra o que será criado, com o texto de cada um
     const plano = arquivos.map(a => {
       const t = textoPorDefeito(a.name, cat);
-      return { arquivo: a.name, driveId: a.id,
+      return { arquivo: a.name, url: R2_PUB + '/' + a.chave.split('/').map(encodeURIComponent).join('/'),
         titulo: t.titulo, corpo: t.corpo,
         verba, tamanhoMB: a.size ? Math.round(Number(a.size) / 1048576) : null };
     });
     if (String(req.query.aplicar || '') !== '1') {
       return res.status(200).json({ ok: true, modo: 'prévia — nada foi criado',
-        pasta, categoria: cat, videos: plano.length,
+        bucket: R2_PUB, pasta: prefixo || '(raiz)', categoria: cat, videos: plano.length,
         verbaTotal: Number((verba * plano.length).toFixed(2)),
         PLANO: plano.map(p => p.arquivo + (p.tamanhoMB ? ' (' + p.tamanhoMB + 'MB)' : '') +
           '\n   ↳ "' + p.titulo + '"\n   ↳ ' + p.corpo),
@@ -1332,7 +1331,7 @@ module.exports = async function handler(req, res) {
     // 3) sobe cada vídeo para a Meta pelo link direto do Drive
     const subidos = [], falhas = [];
     for (const p of plano) {
-      const urlDireta = 'https://drive.google.com/uc?export=download&id=' + p.driveId;
+      const urlDireta = p.url;                              // link público direto do R2
       const up = await fetch(`${GRAPH}/act_${CONTA}/advideos?access_token=${tkP}`, {
         method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ file_url: urlDireta, title: p.arquivo }).toString(),
