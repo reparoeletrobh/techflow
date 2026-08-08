@@ -1153,11 +1153,13 @@ module.exports = async function handler(req, res) {
     const apenasUm = String(req.query.apenasUm || '') === '1';
     if (!(verba > 0)) return res.status(400).json({ ok: false, error: 'verba inválida' });
 
-    // término: próximo sábado 11h BRT
+    // 📅 término: sábado 11h BRT — SEMPRE no futuro. Rodando num sábado depois das 11h
+    // o cálculo antigo apontava para hoje, e as campanhas nasciam já encerradas.
     const agoraB = new Date(Date.now() - 3 * 3600000);
     const diasAteSab = (6 - agoraB.getUTCDay() + 7) % 7;
     const fim = new Date(Date.UTC(agoraB.getUTCFullYear(), agoraB.getUTCMonth(),
-      agoraB.getUTCDate() + (diasAteSab === 0 && agoraB.getUTCHours() >= 14 ? 7 : diasAteSab), 14, 0, 0)); // 11h BRT
+      agoraB.getUTCDate() + diasAteSab, 14, 0, 0));
+    while (fim.getTime() <= Date.now() + 2 * 3600000) fim.setUTCDate(fim.getUTCDate() + 7);
     const fimUnix = Math.floor(fim.getTime() / 1000);
     const horasRestantes = Math.round((fim.getTime() - Date.now()) / 3600000);
 
@@ -1205,6 +1207,12 @@ module.exports = async function handler(req, res) {
         .then(x => x.json()).catch(e => ({ error: { message: e.message } }));
       return r;
     };
+    // 🎯 só os vídeos da CATEGORIA pedida — sem isso os 16 da pasta entravam todos
+    // em cada rodada, criando anúncio de adega com texto de micro-ondas
+    alvo = alvo.filter(v => categoriaDe(String(v.title || ''), 'anuncio') === cat);
+    if (!alvo.length) return res.status(200).json({ ok: false,
+      error: 'nenhum vídeo de ' + cat + ' entre os recentes',
+      dica: 'os vídeos são classificados pelo NOME do arquivo' });
     const feitos = [], erros = [];
     // 🛡 nomes já usados no ciclo de destino, para não duplicar campanha
     const nomesNoCiclo = new Set();
@@ -1447,13 +1455,17 @@ module.exports = async function handler(req, res) {
         // inteiro da conta, incluindo campanhas de outros negócios de anos atrás.
         const ini = new Date(desde + 'T00:00:00-03:00');
         const inicioAnterior = new Date(ini.getTime() - 7 * 86400000).toISOString().slice(0, 10);
-        const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,adset{id},campaign{id,name,start_time}&limit=400&access_token=${TKR}`, 10);
+        const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,effective_status,adset{id},campaign{id,name,start_time,effective_status}&limit=400&access_token=${TKR}`, 10);
         const vistos = new Set();
         todos = (ads.data || [])
           .filter(a => (a.adset || {}).id && (a.campaign || {}).id)
           .filter(a => {
             const dt = String((a.campaign || {}).start_time || '').slice(0, 10);
-            return dt >= inicioAnterior && dt < desde;      // apenas o ciclo que acabou
+            if (!(dt >= inicioAnterior && dt < desde)) return false;   // só o ciclo que acabou
+            // ⛔ não renovar quem foi PAUSADO no ciclo — foram cortes por desempenho
+            const stC = String((a.campaign || {}).effective_status || '');
+            if (stC === 'PAUSED' || stC === 'DELETED' || stC === 'ARCHIVED') return false;
+            return true;
           })
           .filter(a => { const n = String(a.name || '').toLowerCase(); if (vistos.has(n)) return false; vistos.add(n); return true; })
           .map(a => ({ id: a.id, nome: a.name, adsetId: a.adset.id, campanhaId: a.campaign.id,
