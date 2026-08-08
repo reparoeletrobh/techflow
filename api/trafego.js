@@ -1172,7 +1172,7 @@ module.exports = async function handler(req, res) {
     // modelo: melhor anúncio ativo da categoria
     const base = await dbGet('trafego_painel_cache_ciclo') || await dbGet('trafego_painel_cache');
     if (!base || !base.dados) return res.status(200).json({ ok: false, error: 'abra o painel primeiro' });
-    const modelo = (base.dados.anuncios || [])
+    let modelo = (base.dados.anuncios || [])
       .filter(a => a.categoria === cat && a.campanhaId && a.adsetId)
       .sort((x, y) => {
         // prefere ATIVO; entre iguais, o de melhor CPA. O ciclo anterior termina
@@ -1181,7 +1181,10 @@ module.exports = async function handler(req, res) {
         if (!!x.ativo !== !!y.ativo) return x.ativo ? -1 : 1;
         return (x.razaoMeta || 9) - (y.razaoMeta || 9);
       })[0];
-    if (!modelo) return res.status(200).json({ ok: false, error: 'nenhum anúncio ativo de ' + cat + ' para usar de modelo' });
+    if (!modelo) modelo = await modeloDaMeta(cat, TK);
+    if (!modelo) return res.status(200).json({ ok: false,
+      error: 'nenhum anúncio de ' + cat + ' encontrado para usar de modelo',
+      dica: 'recarregue o painel: /api/trafego?action=painel&periodo=ciclo&forcar=1' });
 
     const alvo = apenasUm ? escolhidos.slice(0, 1) : escolhidos;
     if (String(req.query.aplicar || '') !== '1') {
@@ -1358,6 +1361,21 @@ module.exports = async function handler(req, res) {
       proximoPasso: 'confira em /trafego e troque o vídeo no criativo se necessário' });
   }
 
+  // ── 🔎 modelo direto da Meta: o cache do painel esvazia na virada do ciclo ──
+  async function modeloDaMeta(cat, tk) {
+    try {
+      const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,effective_status,adset{id},campaign{id,name,start_time}&limit=400&access_token=${tk}`, 10);
+      const cands = (ads.data || [])
+        .filter(a => (a.adset || {}).id && (a.campaign || {}).id)
+        .filter(a => categoriaDe(a.name || (a.campaign || {}).name || '', 'anuncio') === cat)
+        .sort((x, y) => String((y.campaign || {}).start_time || '').localeCompare(String((x.campaign || {}).start_time || '')));
+      const m = cands[0];
+      if (!m) return null;
+      return { id: m.id, nome: m.name, adsetId: m.adset.id, campanhaId: m.campaign.id,
+        categoria: cat, viaMeta: true };
+    } catch (e) { return null; }
+  }
+
   // ── 🧹 LIMPAR-ORFAS: remove campanhas criadas sem anúncio dentro ──
   if (action === 'limpar-orfas') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
@@ -1410,8 +1428,22 @@ module.exports = async function handler(req, res) {
 
     // campeões do ciclo ANTERIOR = ativos que não estão marcados para corte
     const base = await dbGet('trafego_painel_cache_7d') || await dbGet('trafego_painel_cache_ciclo');
-    const todos = (((base || {}).dados || {}).anuncios || [])
-      .filter(a => a.ativo && a.campanhaId && a.adsetId);
+    let todos = (((base || {}).dados || {}).anuncios || [])
+      .filter(a => a.campanhaId && a.adsetId);
+    // o cache esvazia na virada do ciclo — busca direto na Meta nesse caso
+    if (!todos.length) {
+      try {
+        const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,adset{id},campaign{id,name,start_time}&limit=400&access_token=${TKR}`, 10);
+        const vistos = new Set();
+        todos = (ads.data || [])
+          .filter(a => (a.adset || {}).id && (a.campaign || {}).id)
+          .filter(a => { const n = String(a.name || '').toLowerCase(); if (vistos.has(n)) return false; vistos.add(n); return true; })
+          .map(a => ({ id: a.id, nome: a.name, adsetId: a.adset.id, campanhaId: a.campaign.id,
+            categoria: categoriaDe(a.name || '', 'anuncio'), cpa: null,
+            inicio: (a.campaign || {}).start_time }))
+          .sort((x, y) => String(y.inicio || '').localeCompare(String(x.inicio || '')));
+      } catch (e) {}
+    }
     const daFrente = todos.filter(a => frente === 'tv' ? a.categoria === 'tv' : a.categoria !== 'tv');
     const cfgR = await cfgTrafego();
     const campeoes = daFrente.filter(a => {
