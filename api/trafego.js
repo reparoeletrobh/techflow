@@ -1206,11 +1206,21 @@ module.exports = async function handler(req, res) {
       return r;
     };
     const feitos = [], erros = [];
+    // 🛡 nomes já usados no ciclo de destino, para não duplicar campanha
+    const nomesNoCiclo = new Set();
+    try {
+      const cicloDest = String(req.query.desde || '').slice(0, 10);
+      const cJa = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns?fields=id,name,start_time&limit=300&access_token=${TK}`, 8);
+      for (const c of (cJa.data || [])) {
+        if (cicloDest && String(c.start_time || '').slice(0, 10) < cicloDest) continue;
+        nomesNoCiclo.add(String(c.name || '').toLowerCase());
+      }
+    } catch (e) {}
     for (const v of alvo) {
       try {
         // 🛡 DUPLICATA: não recriar campanha que já existe com o mesmo nome no ciclo.
         const nomePrev = nomeComData(v.title);
-        if (nomesExistentes && nomesExistentes.has && nomesExistentes.has(nomePrev.toLowerCase())) {
+        if (nomesNoCiclo.has(nomePrev.toLowerCase())) {
           erros.push(v.title + ': já existe a campanha "' + nomePrev + '" — pulei para não duplicar');
           continue;
         }
@@ -1433,10 +1443,18 @@ module.exports = async function handler(req, res) {
     // o cache esvazia na virada do ciclo — busca direto na Meta nesse caso
     if (!todos.length) {
       try {
+        // 🎯 SÓ O CICLO ANTERIOR: sem esse recorte vinham os 394 anúncios do histórico
+        // inteiro da conta, incluindo campanhas de outros negócios de anos atrás.
+        const ini = new Date(desde + 'T00:00:00-03:00');
+        const inicioAnterior = new Date(ini.getTime() - 7 * 86400000).toISOString().slice(0, 10);
         const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,adset{id},campaign{id,name,start_time}&limit=400&access_token=${TKR}`, 10);
         const vistos = new Set();
         todos = (ads.data || [])
           .filter(a => (a.adset || {}).id && (a.campaign || {}).id)
+          .filter(a => {
+            const dt = String((a.campaign || {}).start_time || '').slice(0, 10);
+            return dt >= inicioAnterior && dt < desde;      // apenas o ciclo que acabou
+          })
           .filter(a => { const n = String(a.name || '').toLowerCase(); if (vistos.has(n)) return false; vistos.add(n); return true; })
           .map(a => ({ id: a.id, nome: a.name, adsetId: a.adset.id, campanhaId: a.campaign.id,
             categoria: categoriaDe(a.name || '', 'anuncio'), cpa: null,
@@ -1453,6 +1471,14 @@ module.exports = async function handler(req, res) {
     });
     const cortados = daFrente.filter(a => !campeoes.includes(a));
 
+    // 🛡 trava: número absurdo indica que o filtro falhou
+    if (campeoes.length > 40 && String(req.query.forcar || '') !== '1') {
+      return res.status(200).json({ ok: false,
+        error: '🛡 ' + campeoes.length + ' anúncios seriam renovados — isso indica que o filtro de ciclo falhou',
+        verbaQueSeriaAlocada: Number((verba * campeoes.length).toFixed(2)),
+        oQueFazer: 'confira o painel; se estiver certo mesmo, use &forcar=1',
+        amostra: campeoes.slice(0, 10).map(a => a.nome + ' | ' + a.categoria) });
+    }
     if (String(req.query.aplicar || '') !== '1') {
       return res.status(200).json({ ok: true, modo: 'prévia — nada criado',
         frente: frente.toUpperCase(), cicloNovo: desde,
