@@ -1648,6 +1648,133 @@ module.exports = async function handler(req, res) {
       observacao: 'tudo isso é copiado IGUAL para cada anúncio novo — só mudam vídeo, texto, verba e nome' });
   }
 
+  // ── 🧠 INTELIGENCIA-SEMANAS: investimento × fichas × leads, por semana e categoria ──
+  if (action === 'inteligencia-semanas') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const TKI = String(req.query.token || '').trim() || TOKEN;
+    const semanas = Math.min(12, Math.max(1, parseInt(req.query.semanas || '8', 10)));
+    const ini = new Date(Date.now() - 3 * 3600000 - semanas * 7 * 86400000).toISOString().slice(0, 10);
+    const fim = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+
+    // 1) GASTO por dia e por anúncio
+    const ins = await pegarTudo(`${GRAPH}/act_${CONTA}/insights?level=ad&fields=ad_id,ad_name,spend,actions&time_range=${encodeURIComponent(JSON.stringify({ since: ini, until: fim }))}&time_increment=1&limit=500&access_token=${TKI}`, 20);
+    const semanaDe = (d) => {
+      const dias = Math.floor((new Date(fim + 'T12:00:00Z') - new Date(d + 'T12:00:00Z')) / 86400000);
+      return Math.floor(dias / 7);
+    };
+    const gasto = {};      // [semana][categoria] = valor
+    const conversas = {};
+    for (const r of (ins.data || [])) {
+      const s = semanaDe(String(r.date_start || '').slice(0, 10));
+      if (s < 0 || s >= semanas) continue;
+      const cat = categoriaDe(r.ad_name || '', 'anuncio');
+      gasto[s] = gasto[s] || {}; conversas[s] = conversas[s] || {};
+      gasto[s][cat] = (gasto[s][cat] || 0) + (parseFloat(r.spend || 0) || 0);
+      const conv = ((r.actions || []).find(a =>
+        /onsite_conversion.messaging_conversation_started|messaging_conversation_started/.test(a.action_type)) || {}).value;
+      conversas[s][cat] = (conversas[s][cat] || 0) + (parseInt(conv || 0, 10) || 0);
+    }
+
+    // 2) FICHAS e LEADS por semana e categoria
+    const U2 = (process.env.UPSTASH_URL || '').replace(/['"]/g, '').trim();
+    const T2 = (process.env.UPSTASH_TOKEN || '').replace(/[\n\r'"]/g, '').trim();
+    const ler = async (k) => {
+      try {
+        const r = await fetch(`${U2}/get/${k}`, { headers: { Authorization: `Bearer ${T2}` } }).then(x => x.json());
+        return r && r.result ? JSON.parse(r.result) : null;
+      } catch (e) { return null; }
+    };
+    const [fA, fT, prosA, prosT] = await Promise.all([
+      ler('fichas_adm'), ler('fichas_tv'), ler('prospeccao_adm'), ler('prospeccao_tv'),
+    ]);
+    const catDoEquip = (txt) => categoriaDe(String(txt || ''), 'anuncio');
+    const fichas = {}, leads = {};
+    const contar = (lista, alvo) => {
+      for (const f of (lista || [])) {
+        const d = String(f.criadoEm || f.data || '').slice(0, 10);
+        if (!d || d < ini) continue;
+        const s = semanaDe(d);
+        if (s < 0 || s >= semanas) continue;
+        const cat = catDoEquip(f.equipamento || f.descricao || '');
+        alvo[s] = alvo[s] || {};
+        alvo[s][cat] = (alvo[s][cat] || 0) + 1;
+      }
+    };
+    contar(((fA || {}).fichas) || [], fichas);
+    contar(((fT || {}).fichas) || [], fichas);
+    // leads = quem está em prospecção e NÃO virou ficha
+    contar((((prosA || {}).fichas) || []).filter(f => !['ficha', 'convertido'].includes(String(f.status || ''))), leads);
+    contar((((prosT || {}).fichas) || []).filter(f => !['ficha', 'convertido'].includes(String(f.status || ''))), leads);
+
+    // 3) monta a tabela
+    const cats = [...new Set([...Object.values(gasto), ...Object.values(fichas), ...Object.values(leads)]
+      .flatMap(o => Object.keys(o || {})))];
+    const linhas = [];
+    for (let s = 0; s < semanas; s++) {
+      const rot = s === 0 ? 'esta semana' : (s === 1 ? 'semana passada' : s + ' semanas atrás');
+      const g = gasto[s] || {}, fi = fichas[s] || {}, le = leads[s] || {}, co = conversas[s] || {};
+      const totG = Object.values(g).reduce((a, b) => a + b, 0);
+      const totF = Object.values(fi).reduce((a, b) => a + b, 0);
+      const totL = Object.values(le).reduce((a, b) => a + b, 0);
+      const totC = Object.values(co).reduce((a, b) => a + b, 0);
+      linhas.push({ semana: s, rotulo: rot,
+        gasto: Number(totG.toFixed(2)), conversas: totC, fichas: totF, leads: totL,
+        custoPorConversa: totC ? Number((totG / totC).toFixed(2)) : null,
+        custoPorFicha: totF ? Number((totG / totF).toFixed(2)) : null,
+        custoPorLead: totL ? Number((totG / totL).toFixed(2)) : null,
+        taxaFichaSobreConversa: totC ? Math.round(totF / totC * 100) + '%' : null,
+        porCategoria: cats.map(c => ({ categoria: c,
+          gasto: Number((g[c] || 0).toFixed(2)), conversas: co[c] || 0,
+          fichas: fi[c] || 0, leads: le[c] || 0,
+          custoPorFicha: fi[c] ? Number(((g[c] || 0) / fi[c]).toFixed(2)) : null,
+          custoPorLead: le[c] ? Number(((g[c] || 0) / le[c]).toFixed(2)) : null })).filter(x => x.gasto || x.fichas || x.leads),
+      });
+    }
+    return res.status(200).json({ ok: true, periodo: ini + ' a ' + fim,
+      TABELA: linhas.map(l => l.rotulo.padEnd(17) + ' | R$ ' + String(l.gasto).padStart(8) +
+        ' | ' + String(l.conversas).padStart(4) + ' conv | ' + String(l.fichas).padStart(3) + ' fichas | ' +
+        String(l.leads).padStart(3) + ' leads | ficha R$ ' + String(l.custoPorFicha || '—').padStart(7) +
+        ' | lead R$ ' + String(l.custoPorLead || '—').padStart(7)),
+      detalhe: linhas });
+  }
+
+  // ── 📞 DESTINO-ANUNCIOS: para qual WhatsApp cada anúncio manda o cliente ──
+  if (action === 'destino-anuncios') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const TKD = String(req.query.token || '').trim() || TOKEN;
+    const desde = String(req.query.desde || '').slice(0, 10);
+    const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,effective_status,campaign{id,name,start_time},creative{id,object_story_spec}&limit=400&access_token=${TKD}`, 10);
+    const lista = (ads.data || [])
+      .filter(a => !desde || String((a.campaign || {}).start_time || '').slice(0, 10) >= desde)
+      .map(a => {
+        const oss = ((a.creative || {}).object_story_spec) || {};
+        const vd = oss.video_data || oss.link_data || {};
+        const cta = vd.call_to_action || {};
+        const val = cta.value || {};
+        const num = val.whatsapp_number || val.app_destination || null;
+        const link = val.link || null;
+        return { anuncio: a.name, situacao: a.effective_status,
+          pagina: oss.page_id || null,
+          botao: cta.type || null,
+          numeroWhatsApp: num, link,
+          inicio: String((a.campaign || {}).start_time || '').slice(0, 10) };
+      });
+    const porNumero = {}, porPagina = {}, porBotao = {};
+    for (const l of lista) {
+      const k = l.numeroWhatsApp || (l.link ? 'via link: ' + String(l.link).slice(0, 40) : '(não definido)');
+      porNumero[k] = (porNumero[k] || 0) + 1;
+      porPagina[l.pagina || '?'] = (porPagina[l.pagina || '?'] || 0) + 1;
+      porBotao[l.botao || '?'] = (porBotao[l.botao || '?'] || 0) + 1;
+    }
+    return res.status(200).json({ ok: true, totalAnuncios: lista.length,
+      POR_NUMERO_DE_DESTINO: porNumero,
+      POR_PAGINA: porPagina,
+      POR_BOTAO: porBotao,
+      observacao: 'quando o destino é a Página (sem número explícito), a Meta usa o WhatsApp vinculado à Página — confira em Configurações da Página',
+      LISTA: lista.slice(0, 60).map(l => l.inicio + ' | ' + String(l.anuncio).slice(0, 30) +
+        ' | ' + (l.botao || '?') + ' | ' + (l.numeroWhatsApp || l.link || 'destino pela Página')) });
+  }
+
   // ── 🔎 STATUS-CICLO: situação real de cada anúncio do ciclo novo ──
   if (action === 'status-ciclo') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
