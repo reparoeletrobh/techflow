@@ -1648,6 +1648,42 @@ module.exports = async function handler(req, res) {
       observacao: 'tudo isso é copiado IGUAL para cada anúncio novo — só mudam vídeo, texto, verba e nome' });
   }
 
+  // ── ✅ CHECAR-COPILOTO: confirma que o Copiloto vai ler o ciclo certo ──
+  if (action === 'checar-copiloto') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const TKC = String(req.query.token || '').trim() || TOKEN;
+    const b = new Date(Date.now() - 3 * 3600000);
+    const d = new Date(b); d.setUTCDate(b.getUTCDate() - ((b.getUTCDay() + 1) % 7));
+    const inicioCiclo = d.toISOString().slice(0, 10);
+    const camps = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns?fields=id,name,effective_status,start_time,stop_time&limit=300&access_token=${TKC}`, 8);
+    const doCiclo = (camps.data || []).filter(c =>
+      String(c.start_time || '').slice(0, 10) >= inicioCiclo);
+    const anteriores = (camps.data || []).filter(c =>
+      String(c.start_time || '').slice(0, 10) < inicioCiclo &&
+      c.effective_status === 'ACTIVE');
+    // já há gasto no ciclo?
+    const ins = await fetch(`${GRAPH}/act_${CONTA}/insights?level=account&fields=spend,actions&time_range=${encodeURIComponent(JSON.stringify({ since: inicioCiclo, until: new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10) }))}&access_token=${TKC}`)
+      .then(x => x.json()).catch(() => null);
+    const g = ((ins || {}).data || [])[0] || {};
+    const conv = ((g.actions || []).find(a => /messaging_conversation_started/.test(a.action_type)) || {}).value;
+    const horasRodando = Math.max(0, (Date.now() - new Date(inicioCiclo + 'T16:00:00Z').getTime()) / 3600000);
+    return res.status(200).json({ ok: true,
+      cicloComecaEm: inicioCiclo + ' (sábado)',
+      horasJaRodadas: Number(horasRodando.toFixed(1)),
+      campanhasDoCiclo: doCiclo.length,
+      campanhasDeCiclosAnterioresAindaAtivas: anteriores.length,
+      avisoAnteriores: anteriores.length
+        ? '⚠️ ' + anteriores.length + ' campanha(s) antiga(s) ainda ACTIVE — o Copiloto as descarta por prazo vencido, mas confira se alguma deveria ter parado'
+        : '✅ nenhuma campanha antiga ativa',
+      gastoNoCiclo: Number((parseFloat(g.spend || 0) || 0).toFixed(2)),
+      conversasNoCiclo: parseInt(conv || 0, 10) || 0,
+      PRONTO_PARA_DECIDIR: horasRodando >= 36 && (parseInt(conv || 0, 10) || 0) >= 30
+        ? '✅ sim — dados suficientes para o Copiloto sugerir cortes'
+        : '⏳ ainda cedo — o Copiloto precisa de ~36h e 30+ conversas para uma decisão confiável',
+      listaDoCiclo: doCiclo.slice(0, 45).map(c => c.name + ' | ' + c.effective_status),
+      listaAnteriores: anteriores.slice(0, 20).map(c => c.name + ' | ' + c.effective_status) });
+  }
+
   // ── ⏱️ ULTIMAS-24H: o ciclo novo comparado com a média das semanas anteriores ──
   if (action === 'ultimas-24h') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
