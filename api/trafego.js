@@ -1648,6 +1648,86 @@ module.exports = async function handler(req, res) {
       observacao: 'tudo isso é copiado IGUAL para cada anúncio novo — só mudam vídeo, texto, verba e nome' });
   }
 
+  // ── ⏱️ ULTIMAS-24H: o ciclo novo comparado com a média das semanas anteriores ──
+  if (action === 'ultimas-24h') {
+    if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
+    const TKH = String(req.query.token || '').trim() || TOKEN;
+    const horas = Math.min(72, Math.max(1, parseInt(req.query.horas || '24', 10)));
+    const corte = Date.now() - horas * 3600000;
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const ontem = new Date(Date.now() - 3 * 3600000 - 86400000).toISOString().slice(0, 10);
+
+    // gasto e conversas de ontem e hoje, por anúncio
+    const ins = await pegarTudo(`${GRAPH}/act_${CONTA}/insights?level=ad&fields=ad_id,ad_name,spend,actions&time_range=${encodeURIComponent(JSON.stringify({ since: ontem, until: hoje }))}&time_increment=1&limit=500&access_token=${TKH}`, 12);
+    const novos = {}, antigos = {};
+    for (const r of (ins.data || [])) {
+      const nome = String(r.ad_name || '');
+      const ehNovo = /08082026$/.test(nome.trim());
+      const alvo = ehNovo ? novos : antigos;
+      const cat = categoriaDe(nome, 'anuncio');
+      alvo[cat] = alvo[cat] || { gasto: 0, conversas: 0, anuncios: new Set() };
+      alvo[cat].gasto += parseFloat(r.spend || 0) || 0;
+      alvo[cat].anuncios.add(r.ad_id);
+      const conv = ((r.actions || []).find(a =>
+        /messaging_conversation_started/.test(a.action_type)) || {}).value;
+      alvo[cat].conversas += parseInt(conv || 0, 10) || 0;
+    }
+    // fichas e leads criados nas últimas N horas
+    const U3 = (process.env.UPSTASH_URL || '').replace(/['"]/g, '').trim();
+    const T3 = (process.env.UPSTASH_TOKEN || '').replace(/[\n\r'"]/g, '').trim();
+    const ler = async (k) => { try {
+      const r = await fetch(`${U3}/get/${k}`, { headers: { Authorization: `Bearer ${T3}` } }).then(x => x.json());
+      return r && r.result ? JSON.parse(r.result) : null; } catch (e) { return null; } };
+    const [fA, fT, pA, pT] = await Promise.all([ler('fichas_adm'), ler('fichas_tv'), ler('prospeccao_adm'), ler('prospeccao_tv')]);
+    const contar = (lista, filtro) => {
+      const o = {};
+      for (const f of (lista || [])) {
+        if (filtro && !filtro(f)) continue;
+        const t = new Date(f.criadoEm || f.data || 0).getTime();
+        if (!t || t < corte) continue;
+        const c = categoriaDe(String(f.equipamento || f.descricao || ''), 'anuncio');
+        o[c] = (o[c] || 0) + 1;
+      }
+      return o;
+    };
+    const fichas = contar((((fA || {}).fichas) || []).concat(((fT || {}).fichas) || []));
+    const leads = contar((((pA || {}).fichas) || []).concat(((pT || {}).fichas) || []),
+      f => !['ficha', 'convertido'].includes(String(f.status || '')));
+
+    const cats = [...new Set([...Object.keys(novos), ...Object.keys(antigos), ...Object.keys(fichas), ...Object.keys(leads)])];
+    const linhas = cats.map(c => {
+      const n = novos[c] || { gasto: 0, conversas: 0, anuncios: new Set() };
+      const a = antigos[c] || { gasto: 0, conversas: 0, anuncios: new Set() };
+      const gTot = n.gasto + a.gasto, cTot = n.conversas + a.conversas;
+      return { categoria: c,
+        criativosNovos: n.anuncios.size, gastoNovos: Number(n.gasto.toFixed(2)), conversasNovos: n.conversas,
+        cpaNovos: n.conversas ? Number((n.gasto / n.conversas).toFixed(2)) : null,
+        criativosAntigos: a.anuncios.size, gastoAntigos: Number(a.gasto.toFixed(2)), conversasAntigos: a.conversas,
+        cpaAntigos: a.conversas ? Number((a.gasto / a.conversas).toFixed(2)) : null,
+        fichas: fichas[c] || 0, leads: leads[c] || 0,
+        custoPorFicha: fichas[c] ? Number((gTot / fichas[c]).toFixed(2)) : null,
+        custoPorLead: leads[c] ? Number((gTot / leads[c]).toFixed(2)) : null };
+    }).sort((x, y) => y.gastoNovos - x.gastoNovos);
+
+    const somaN = linhas.reduce((s, l) => s + l.gastoNovos, 0);
+    const somaA = linhas.reduce((s, l) => s + l.gastoAntigos, 0);
+    const convN = linhas.reduce((s, l) => s + l.conversasNovos, 0);
+    const convA = linhas.reduce((s, l) => s + l.conversasAntigos, 0);
+    return res.status(200).json({ ok: true, periodo: 'últimas ' + horas + 'h',
+      CICLO_NOVO_08082026: { gasto: Number(somaN.toFixed(2)), conversas: convN,
+        cpa: convN ? Number((somaN / convN).toFixed(2)) : null },
+      CICLO_ANTERIOR: { gasto: Number(somaA.toFixed(2)), conversas: convA,
+        cpa: convA ? Number((somaA / convA).toFixed(2)) : null },
+      totalFichas: Object.values(fichas).reduce((a, b) => a + b, 0),
+      totalLeads: Object.values(leads).reduce((a, b) => a + b, 0),
+      TABELA: linhas.map(l => l.categoria.padEnd(14) +
+        ' | NOVO: ' + String(l.criativosNovos).padStart(2) + ' anún R$ ' + String(l.gastoNovos).padStart(7) +
+        ' ' + String(l.conversasNovos).padStart(3) + ' conv CPA ' + String(l.cpaNovos || '—').padStart(6) +
+        ' | ANTIGO: ' + String(l.conversasAntigos).padStart(3) + ' conv CPA ' + String(l.cpaAntigos || '—').padStart(6) +
+        ' | ' + String(l.fichas).padStart(2) + ' fichas ' + String(l.leads).padStart(3) + ' leads'),
+      detalhe: linhas });
+  }
+
   // ── 🧠 INTELIGENCIA-SEMANAS: investimento × fichas × leads, por semana e categoria ──
   if (action === 'inteligencia-semanas') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
@@ -1743,11 +1823,23 @@ module.exports = async function handler(req, res) {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
     const TKD = String(req.query.token || '').trim() || TOKEN;
     const desde = String(req.query.desde || '').slice(0, 10);
-    const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,effective_status,campaign{id,name,start_time},creative{id,object_story_spec}&limit=400&access_token=${TKD}`, 10);
-    const lista = (ads.data || [])
+    const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,effective_status,creative,campaign{id,name,start_time}&limit=400&access_token=${TKD}`, 10);
+    const filtrados = (ads.data || [])
       .filter(a => !desde || String((a.campaign || {}).start_time || '').slice(0, 10) >= desde)
+      .slice(0, 60);
+    // o object_story_spec não vem na listagem — busca criativo a criativo
+    const specs = {};
+    for (const a of filtrados) {
+      const cid = (a.creative || {}).id;
+      if (!cid || specs[cid]) continue;
+      const cr = await fetch(`${GRAPH}/${cid}?fields=object_story_spec&access_token=${TKD}`)
+        .then(x => x.json()).catch(() => null);
+      specs[cid] = (cr && cr.object_story_spec) || {};
+      await new Promise(s => setTimeout(s, 120));
+    }
+    const lista = filtrados
       .map(a => {
-        const oss = ((a.creative || {}).object_story_spec) || {};
+        const oss = specs[(a.creative || {}).id] || {};
         const vd = oss.video_data || oss.link_data || {};
         const cta = vd.call_to_action || {};
         const val = cta.value || {};
@@ -1766,7 +1858,15 @@ module.exports = async function handler(req, res) {
       porPagina[l.pagina || '?'] = (porPagina[l.pagina || '?'] || 0) + 1;
       porBotao[l.botao || '?'] = (porBotao[l.botao || '?'] || 0) + 1;
     }
-    return res.status(200).json({ ok: true, totalAnuncios: lista.length,
+    const esperado = String(req.query.esperado || '3099').replace(/\D/g, '');
+    const errados = lista.filter(l => l.numeroWhatsApp &&
+      !String(l.numeroWhatsApp).replace(/\D/g, '').endsWith(esperado));
+    return res.status(200).json({ ok: errados.length === 0, totalAnuncios: lista.length,
+      numeroEsperado: '...' + esperado,
+      ALERTA: errados.length
+        ? '🚨 ' + errados.length + ' anúncio(s) apontando para número DIFERENTE do esperado'
+        : '✅ nenhum anúncio com número divergente',
+      DIVERGENTES: errados.map(l => l.anuncio + ' → ' + l.numeroWhatsApp),
       POR_NUMERO_DE_DESTINO: porNumero,
       POR_PAGINA: porPagina,
       POR_BOTAO: porBotao,
