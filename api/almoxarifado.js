@@ -413,7 +413,8 @@ export default async function handler(req, res) {
     for (const f of semTarefa) {
       const r = await fetch('https://reparoeletroadm.com/api/almoxarifado?action=criar-mover&k=' + KTF, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: f.id, cliente: f.nome, telefone: f.telefone,
+        body: JSON.stringify({ cardId: f.id, destino: 'orcamento',
+          cliente: f.nome, tel: f.telefone,
           equipamento: f.equipamento, origem: 'recriar-faltantes' }),
       }).then(x => x.json()).catch(e => ({ error: e.message }));
       if (r && r.ok) feitos.push(f.nome); else erros.push(f.nome + ': ' + ((r && r.error) || '?'));

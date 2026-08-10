@@ -495,7 +495,10 @@ module.exports = async function handler(req, res) {
         const KTF = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
         const r = await fetch('https://reparoeletroadm.com/api/almoxarifado?action=criar-mover&k=' + KTF, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: ficha.id, cliente: ficha.nome, telefone: ficha.telefone,
+          // ⚠️ o endpoint exige cardId e destino — enviar id/telefone fazia a chamada
+          // ser recusada com "cardId e destino obrigatórios", e a tarefa nunca nascia
+          body: JSON.stringify({ cardId: ficha.id, destino: 'orcamento',
+            cliente: ficha.nome, tel: ficha.telefone,
             equipamento: ficha.equipamento, origem: 'coleta_efetuada (quadro)' }),
         }).then(x => x.json()).catch(e => ({ error: e.message }));
         ficha.almoxarifadoTarefa = (r && r.ok) ? 'criada' : ('falhou: ' + ((r && r.error) || '?'));
