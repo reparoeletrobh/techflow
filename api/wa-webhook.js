@@ -143,7 +143,29 @@ export default async function handler(req, res) {
                   const d8aw = String(tel).replace(/\D/g, '').slice(-8);
                   if (arqW.tels[d8aw]) { delete arqW.tels[d8aw]; await dbSet('wa_arquivadas', arqW); }
                 } catch (e) {}
-                await fetch(`https://reparoeletroadm.com/api/wa-bot?action=auto-responder&tel=${d8w ? String(tel).replace(/\D/g, '') : ''}&k=${KW}`);
+                // 🎯 UMA RESPOSTA POR LOTE: o cliente que manda 7 fotos gerava 7 chamadas
+                // ao cérebro e 7 respostas iguais. Agora a chamada é adiada alguns
+                // segundos e só a última do lote executa — as anteriores se cancelam.
+                try {
+                  const telLimpo = String(tel).replace(/\D/g, '');
+                  const d8lote = telLimpo.slice(-8);
+                  const agoraLote = Date.now();
+                  const lote = (await dbGet('wa_lote_resposta')) || { tels: {} };
+                  lote.tels[d8lote] = { em: agoraLote, tel: telLimpo };
+                  await dbSet('wa_lote_resposta', lote);
+                  // espera para ver se vem mais mensagem do mesmo cliente
+                  await new Promise(r => setTimeout(r, 4000));
+                  const conf = (await dbGet('wa_lote_resposta')) || { tels: {} };
+                  const ultimo = conf.tels[d8lote];
+                  // se chegou mensagem depois desta, deixa a última responder
+                  if (ultimo && ultimo.em > agoraLote) {
+                    console.log('[lote] mensagem mais recente chegou — esta não responde');
+                  } else {
+                    await fetch(`https://reparoeletroadm.com/api/wa-bot?action=auto-responder&tel=${d8w ? telLimpo : ''}&k=${KW}`);
+                  }
+                } catch (e) {
+                  await fetch(`https://reparoeletroadm.com/api/wa-bot?action=auto-responder&tel=${d8w ? String(tel).replace(/\D/g, '') : ''}&k=${KW}`);
+                }
               }
             } catch (eAuto) {}
           }

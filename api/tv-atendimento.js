@@ -65,9 +65,19 @@ export default async function handler(req,res){
       // Aprovados = cards que passaram por 'aprovado'
       const aprvCards=cards.filter(c=>(c.phaseId==='aprovado')||(c.history||[]).some(h=>h.phaseId==='aprovado'));
       const aprvTotal=aprvCards.length;
-      const aprvTs   =aprvCards.map(c=>c.criadoEm||c.movedAt).filter(Boolean);
-      const aprvHoje =aprvCards.filter(c=>cardTs(c)>=todayUTC.getTime()).length||null;
-      const aprvSem  =aprvCards.filter(c=>cardTs(c)>=weekUTC.getTime()).length||null;
+      // 📅 a data que vale é a da APROVAÇÃO, não a da última movimentação.
+      // Antes um card aprovado ontem que alguém movesse hoje contava como aprovado hoje.
+      const dataAprovacao=c=>{
+        if(c.aprovadoEm) return new Date(c.aprovadoEm).getTime();
+        const h=(c.history||[]).map(x=>({f:String(x.phaseId||x.phase||''),t:new Date(x.ts||x.timestamp||0).getTime()}))
+          .filter(x=>x.t).sort((a,b)=>a.t-b.t);
+        const entrou=h.find(x=>x.f==='aprovado');
+        if(entrou) return entrou.t;
+        return c.phaseId==='aprovado' ? cardTs(c) : 0;   // sem histórico: usa o que há
+      };
+      const aprvTs   =aprvCards.map(c=>c.aprovadoEm||c.criadoEm||c.movedAt).filter(Boolean);
+      const aprvHoje =aprvCards.filter(c=>dataAprovacao(c)>=todayUTC.getTime()).length||null;
+      const aprvSem  =aprvCards.filter(c=>dataAprovacao(c)>=weekUTC.getTime()).length||null;
 
       // Cadastrados = todos os cards já no board
       const cadTotal=cards.length;
