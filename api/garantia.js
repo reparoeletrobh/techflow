@@ -105,6 +105,37 @@ module.exports = async function handler(req, res) {
       // ═══ 🛡️ FILA DE GARANTIA (visão Conflitos) ═══
   const FILA_KEY = "reparoeletro_garantia_fila";
 
+  // ── 📊 RELATORIO: o que está na garantia agora e de onde veio ──
+  if (action === 'relatorio') {
+    const LISTA14 = ['1991','2582','9757','2908','1427','0942','4404','3292',
+      '5978','0611','7270','3878','8937','8011'];
+    const d4 = t => String(t || '').replace(/\D/g, '').slice(-4);
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
+    const lista = db.fichas || db.cards || [];
+    const daLista = [], deHoje = [], outras = [];
+    for (const f of lista) {
+      const c = d4(f.telefone);
+      if (LISTA14.includes(c)) { daLista.push(f); continue; }
+      const q = String(f.criadoEm || f.em || '').slice(0, 10);
+      (q === hoje ? deHoje : outras).push(f);
+    }
+    const linha = f => String(f.nome || f.cliente || '?').slice(0, 20).padEnd(20) +
+      ' ' + d4(f.telefone) + ' | ' +
+      (f.equipamento || f.descricao ? String(f.equipamento || f.descricao).slice(0, 34) : '⚠️ COMPLETAR') +
+      ' | ' + String(f.status || f.phase || '?');
+    return res.status(200).json({ ok: true,
+      totalNaGarantia: lista.length,
+      dos14ConferidosNaLoja: daLista.length,
+      abertasHojeForaDaLista: deHoje.length,
+      outras: outras.length,
+      precisamCompletar: daLista.filter(f => !(f.equipamento || f.descricao))
+        .map(f => String(f.nome || '?') + ' ' + d4(f.telefone)),
+      OS_14: daLista.map(linha),
+      ABERTAS_HOJE: deHoje.length ? deHoje.map(linha) : 'nenhuma além dos 14',
+      OUTRAS: outras.length ? outras.map(linha) : 'nenhuma' });
+  }
+
   // ── 🎯 REDEFINIR-LISTA: deixa exatamente os 14 da loja + as criadas hoje ──
   if (action === 'redefinir-lista') {
     const LISTA = [

@@ -73,9 +73,12 @@ export default async function handler(req,res){
           .filter(x=>x.t).sort((a,b)=>a.t-b.t);
         const entrou=h.find(x=>x.f==='aprovado');
         if(entrou) return entrou.t;
-        return c.phaseId==='aprovado' ? cardTs(c) : 0;   // sem histórico: usa o que há
+        // 🚫 sem carimbo e sem histórico: NÃO conta como aprovação de hoje.
+        // Usar a última movimentação aqui era justamente o que inflava o número.
+        return 0;
       };
-      const aprvTs   =aprvCards.map(c=>c.aprovadoEm||c.criadoEm||c.movedAt).filter(Boolean);
+      // 📅 os timestamps também precisam ser da aprovação — a tela usa isso no filtro por data
+      const aprvTs   =aprvCards.map(c=>{const t=dataAprovacao(c); return t?new Date(t).toISOString():null;}).filter(Boolean);
       const aprvHoje =aprvCards.filter(c=>dataAprovacao(c)>=todayUTC.getTime()).length||null;
       const aprvSem  =aprvCards.filter(c=>dataAprovacao(c)>=weekUTC.getTime()).length||null;
 
@@ -147,7 +150,8 @@ export default async function handler(req,res){
         erp,
         orcamento: {hoje:orcHoje,semana:orcSem,timestamps:orcTs},
         pagamento: {hoje:pgHoje,semana:pgSem,timestamps:pgTs},
-        aprovados: {hoje:aprvHoje,semana:aprvSem,total:aprvTotal,timestamps:aprvTs},
+        aprovados: {hoje:aprvHoje,semana:aprvSem,total:aprvTotal,timestamps:aprvTs,
+          semCarimboDeAprovacao:aprvCards.filter(c=>!dataAprovacao(c)).length},
         monthly,
         fichasHojeList,
         updatedAt:new Date().toISOString(),
