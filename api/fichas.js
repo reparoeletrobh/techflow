@@ -380,6 +380,24 @@ export default async function handler(req, res) {
       } catch(_) {}
     }
     await dbSet(key, db);
+    // 🏅 LEAD CONVERTIDO: também pelo caminho do espelho (/api/fichas), que é o
+    // usado quando a ficha vem de Entrar em Contato — sem isso o KPI ficava zerado
+    try {
+      const origemCol = String(stAnt || ficha.status || '');
+      if (origemCol === 'lead') {
+        const diaC = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+        const kC = 'prosp_convertidos_' + diaC;
+        const regC = (await dbGet(kC)) || { total: 0, itens: [] };
+        if (!regC.itens.some(x => x.id === ficha.id)) {
+          regC.total++;
+          regC.itens.push({ id: ficha.id, nome: ficha.nome,
+            telefone: String(ficha.telefone || '').slice(-4),
+            equipamento: ficha.equipamento || '', sistema,
+            tipoColeta, via: 'espelho', em: new Date().toISOString() });
+          await dbSet(kC, regC);
+        }
+      }
+    } catch (e) {}
     return res.status(200).json({ ok:true });
   }
 
