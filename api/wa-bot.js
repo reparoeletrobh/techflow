@@ -2761,6 +2761,55 @@ export default async function handler(req, res) {
       encontrados: out.length, cards: out });
   }
 
+  // ── 🔎 ORIGEM-APROVACOES: quem aprovou cada orçamento — bot ou equipe ──
+  if (action === 'origem-aprovacoes') {
+    const dia = String(req.query.dia || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
+    const ini = new Date(dia + 'T00:00:00-03:00').getTime();
+    const fim = ini + 86400000;
+    const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const [evts, ppA, ppT, arqA, arqT] = await Promise.all([
+      lerEvts(), dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+      dbGet('reparoeletro_arquivo'), dbGet('tv_arquivo'),
+    ]);
+    const universo = (((ppA || {}).cards) || []).map(c => ({ ...c, _s: 'ADM' }))
+      .concat((((ppT || {}).cards) || []).map(c => ({ ...c, _s: 'TV' })))
+      .concat((((arqA || {}).cards) || []).map(c => ({ ...c, _s: 'ADM' })))
+      .concat((((arqT || {}).cards) || []).map(c => ({ ...c, _s: 'TV' })));
+    // aprovadas no dia
+    const aprov = universo.filter(c => {
+      const t = new Date(c.aprovadoEm || 0).getTime();
+      return t >= ini && t < fim;
+    });
+    // o bot registrou ação de aprovação para este telefone?
+    const acoesBot = new Set();
+    for (const e of (evts || [])) {
+      const t = new Date(e.ts || 0).getTime();
+      if (t < ini || t >= fim) continue;
+      const txt = String(e.texto || '') + ' ' + String(e.acaoAprovada || '');
+      if (e.dir === 'acao' && /aprovad/i.test(txt)) acoesBot.add(d8f(e.tel));
+      if (String(e.acaoAprovada || '') === 'aprovado') acoesBot.add(d8f(e.tel));
+    }
+    const linhas = aprov.map(c => {
+      const d8 = d8f(c.telefone);
+      const porBot = acoesBot.has(d8) || String(c.aprovadoPor || '').toLowerCase().includes('bot');
+      return { nome: c.nomeContato || '?', tel: d8.slice(-4), sistema: c._s,
+        valor: parseFloat(c.valorNaAprovacao != null ? c.valorNaAprovacao : (c.valor || 0)) || 0,
+        quando: c.aprovadoEm, aprovadoPor: c.aprovadoPor || '(não registrado)',
+        origem: porBot ? '🤖 BOT' : '👤 EQUIPE' };
+    }).sort((a, b) => String(a.quando).localeCompare(String(b.quando)));
+    const porOrigem = linhas.reduce((o, l) => { o[l.origem] = (o[l.origem] || 0) + 1; return o; }, {});
+    const porQuem = linhas.reduce((o, l) => { o[l.aprovadoPor] = (o[l.aprovadoPor] || 0) + 1; return o; }, {});
+    return res.status(200).json({ ok: true, dia,
+      totalAprovacoes: linhas.length,
+      POR_ORIGEM: porOrigem,
+      POR_QUEM_REGISTROU: porQuem,
+      valorTotal: Number(linhas.reduce((s, l) => s + l.valor, 0).toFixed(2)),
+      explicacao: 'o painel do bot conta apenas as que ELE processou; a equipe também aprova direto no sistema, movendo o card ou clicando em aprovar',
+      L: linhas.map(l => String(l.quando).slice(11, 16) + ' | ' + l.origem + ' | ' +
+        String(l.nome).slice(0, 18).padEnd(18) + ' ' + l.tel + ' | R$ ' + l.valor +
+        ' | ' + l.sistema + ' | por: ' + String(l.aprovadoPor).slice(0, 14)) });
+  }
+
   // ── 📅 FILA-RECUPERACAO: quem ainda não entrou e quando entra ──
   if (action === 'fila-recuperacao-programada') {
     const cfgF = (await dbGet('wa_bot_config')) || {};

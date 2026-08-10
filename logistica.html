@@ -754,11 +754,23 @@ function cardHTML(f, phase) {
 
 // ── AÇÕES ─────────────────────────────────────────────────────
 async function mover(id, phase) {
+  // 📝 REMARCAR exige o motivo — por que o equipamento não chegou
+  var _motivo = null;
+  if (phase === 'remarcar') {
+    _motivo = prompt('📅 REMARCAR\n\nPor que o equipamento NÃO chegou?\n\n(cliente não estava, endereço errado, cliente desmarcou, fora da região...)');
+    if (_motivo === null) return;
+    if (!String(_motivo).trim()) { alert('O motivo é obrigatório.'); return; }
+  }
   const r = await fetch('/api/logistica?action=mover', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({id, phase})
+    body: JSON.stringify({id, phase, motivo: _motivo, quem: (localStorage.getItem('tf_user')||'')})
   }).then(r=>r.json());
-  if (r.ok) { await load(); toast('Movido com sucesso'); }
+  if (r.ok) {
+    await load();
+    toast(phase === 'remarcar' && r.prospeccao
+      ? 'Remarcado — ficha devolvida ao atendimento ativo'
+      : 'Movido com sucesso');
+  }
   else toast('Erro: '+r.error, true);
 }
 

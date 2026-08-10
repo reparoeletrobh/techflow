@@ -336,8 +336,10 @@ async function marcaContato(id){
   setTimeout(load,800);
 }
 async function remarcar(id){
-  if(!confirm('📅 REMARCAR: você não conseguiu conciliar data/horário com o cliente?\n\nA ficha SAI da sua rota e volta para a Logística, na aba Remarcar, para a equipe reagendar.'))return;
-  var r=await fetch('/api/tv-logistica?action=rota-mover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,phase:'remarcar'})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
+  var mot=prompt('📅 REMARCAR\n\nPor que não deu para coletar?\n\n(cliente não estava, endereço errado, fora da minha região, fora do meu horário, cliente desmarcou...)');
+  if(mot===null)return;
+  if(!String(mot).trim()){alert('O motivo é obrigatório.');return;}
+  var r=await fetch('/api/tv-logistica?action=rota-mover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,phase:'remarcar',motivo:mot,quem:(typeof _motorista!=='undefined'?_motorista:'')})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
   if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
 }
 async function cancelado(id){
