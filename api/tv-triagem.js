@@ -45,9 +45,45 @@ const MARCAS_TELA_LAVADA = ['lg', 'tcl'];
 function normaliza(s) {
   return String(s || '').toUpperCase().replace(/[\s\-_.]/g, '');
 }
+// ── como o CLIENTE descreve tela lavada (backlight aceso, sem imagem) ──
+// Cuidado com dois defeitos que parecem iguais e NÃO são:
+//  • LED/backlight queimado → tela ESCURA, mas dá para ver a imagem com lanterna. É reparável.
+//  • Luz VERMELHA acesa e não liga → é o LED de standby, problema de fonte. Não é tela lavada.
 function ehTelaLavada(txt) {
-  const s = String(txt || '').toLowerCase();
-  return /tela\s*lavada|lavada|backlight\s*(aceso|ligado).*(sem imagem)|luz de fundo.*sem imagem|acende.*n[ãa]o (d[áa]|aparece) imagem|sem imagem.*(luz|backlight)/.test(s);
+  const s = String(txt || '').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');   // tira acentos
+
+  // 🚫 exclusões: descrições que parecem mas são outro defeito
+  const ehLedQueimado = /lanterna|celular.{0,20}(ver|enxerg)|no escuro.{0,15}(ver|da pra)|imagem fraca|imagem escura mas|so ve.{0,12}(perto|escuro)|sombra da imagem|da pra ver a imagem/.test(s);
+  if (ehLedQueimado) return false;
+  const ehStandby = /luz vermelha|led vermelho|luzinha vermelha/.test(s) && !/tela (branca|clara|lavada|acesa)/.test(s);
+  if (ehStandby) return false;
+
+  // ✅ o jeito técnico
+  if (/tela\s*lavada|backlight\s*(aceso|ligado|funcionando)|luz de fundo\s*(acesa|ligada|funcionando)|t-?con/.test(s)) return true;
+
+  // ✅ como o cliente leigo descreve
+  const PADROES = [
+    // tela clara/branca/acesa sem imagem
+    /tela\s*(fica\s*)?(branca|clara|esbranquicada|leitosa|acinzentada|cinza)/,
+    /tela\s*(acesa|iluminada|clareia|clara).{0,25}sem imagem/,
+    // acende / liga mas não mostra nada
+    /(acende|liga|ligar|ligou).{0,30}(mas|porem|so que|;)?.{0,20}(nao|sem)\s*(da|de|aparece|mostra|tem|vem|forma|surge)?\s*(imagem|nada|figura|video|desenho|tela)/,
+    /(acende|liga).{0,25}(imagem|tela).{0,15}nao (aparece|vem|forma)/,
+    /lig(a|ou|ando).{0,40}tela\s*(fica\s*)?(preta|escura|apagada|em branco|branca|apagad)/,
+    /tela\s*(fica|ficou)\s*(em branco|preta|apagada)/,
+    // som sem imagem
+    /(tem|sai|ouve|escuta|funciona).{0,15}(som|audio|barulho|voz).{0,30}(mas|porem)?.{0,20}(nao|sem)\s*(tem|da|aparece|vem)?\s*(imagem|video|figura)/,
+    /som (normal|ok|funcionando).{0,25}(sem|nao).{0,10}imagem/,
+    // formulações diretas
+    /(nao|sem)\s*(da|de|aparece|mostra|tem|forma)\s*imagem/,
+    /imagem\s*(nao|nunca)\s*(aparece|vem|forma|surge)/,
+    /so\s*(a\s*)?(luz|claridade|iluminacao)/,
+    /(fica|ficou)\s*(so\s*)?(a\s*)?(luz|clarinha|claro|iluminada)/,
+    /apagou a imagem|sumiu a imagem|perdeu a imagem|imagem sumiu/,
+    /aparece (a )?(marca|logo|logotipo).{0,20}(depois|e (ai|entao))?.{0,15}(some|apaga|escurece)/,
+  ];
+  return PADROES.some(re => re.test(s));
 }
 function marcaDe(txt) {
   const s = String(txt || '').toLowerCase();
