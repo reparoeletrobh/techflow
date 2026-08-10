@@ -433,6 +433,41 @@ export default async function handler(req, res) {
       observacao: 'card de diagnóstico criado — com foto, modelo, RS, remarcar e não chegou' });
   }
 
+  // ── 💾 PROCURAR-BACKUP: há cópia do banco com os comprados? ──
+  if (action === 'procurar-backup') {
+    const CANDIDATAS = [
+      'reparoeletro_compra_equip_backup', 'reparoeletro_compra_equip_bak',
+      'reparoeletro_compra_equip_old', 'reparoeletro_compra_equip_snapshot',
+      'compra_equip_backup', 'almox_snapshot', 'reparoeletro_almoxarifado_snapshot',
+      'reparoeletro_almoxarifado',
+    ];
+    const achados = [];
+    for (const k of CANDIDATAS) {
+      try {
+        const d = await dbGet(k);
+        if (!d) { achados.push(k + ' → não existe'); continue; }
+        let info = k + ' → existe';
+        for (const L of ['fichas', 'cards', 'tarefas', 'itens']) {
+          if (Array.isArray(d[L])) {
+            const comp = d[L].filter(f => String(f.status || '') === 'comprado').length;
+            info += ' | ' + L + ': ' + d[L].length + (comp ? ' (COMPRADOS: ' + comp + ')' : '');
+          }
+        }
+        if (d.f2) info += ' | tem snapshot f2';
+        achados.push(info);
+      } catch (e) { achados.push(k + ' → erro'); }
+    }
+    // o snapshot do almoxarifado guarda os ids que já foram vistos como comprados
+    const almox = await dbGet('reparoeletro_almoxarifado');
+    const snap = almox && almox.snapshot && almox.snapshot.f2;
+    return res.status(200).json({ ok: true, BANCOS: achados,
+      SNAPSHOT_ALMOXARIFADO: snap
+        ? { idsEmAnalise: (snap.ceAna || []).length, idsComprados: (snap.ceComp || []).length,
+            amostraComprados: (snap.ceComp || []).slice(0, 10) }
+        : 'sem snapshot',
+      observacao: 'ceComp guarda os ids que o almoxarifado viu como COMPRADOS — pode servir para restaurar o status' });
+  }
+
   // ── 🕐 QUANDO-MUDOU: quando cada ficha da Compra Equip foi criada/alterada ──
   if (action === 'quando-mudou') {
     const ceq = (await dbGet('reparoeletro_compra_equip')) || { fichas: [] };
@@ -440,12 +475,12 @@ export default async function handler(req, res) {
     const fichas = ceq.fichas || [];
     const porCriacao = {};
     for (const f of fichas) {
-      const k = String(f.criadoEm || '').slice(0, 10) || '(sem data)';
+      const k = String(f.criadoEm || f.createdAt || '').slice(0, 10) || '(sem data)';
       porCriacao[k] = (porCriacao[k] || 0) + 1;
     }
     // rajada por minuto
     const porMin = {};
-    for (const f of fichas) { const m = hh(f.criadoEm); porMin[m] = (porMin[m] || 0) + 1; }
+    for (const f of fichas) { const m = hh(f.criadoEm || f.createdAt); porMin[m] = (porMin[m] || 0) + 1; }
     const rajadas = Object.entries(porMin).filter(([, n]) => n >= 5).sort((a, b) => b[1] - a[1]);
     // campos que indicam alteração de status
     const comHistorico = fichas.filter(f => f.compradoEm || f.statusEm || f.atualizadoEm).length;
@@ -455,7 +490,7 @@ export default async function handler(req, res) {
       RAJADAS_POR_MINUTO: rajadas.length ? rajadas.map(([m, n]) => m + ' → ' + n) : 'nenhuma',
       comCarimboDeStatus: comHistorico,
       camposDeUmaFicha: fichas[0] ? Object.keys(fichas[0]) : [],
-      amostra: fichas.slice(0, 8).map(f => hh(f.criadoEm) + ' | ' +
+      amostra: fichas.slice(0, 8).map(f => hh(f.criadoEm || f.createdAt) + ' | ' +
         String(f.nomeContato || '?').slice(0, 18) + ' | ' + f.status) });
   }
 
