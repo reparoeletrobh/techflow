@@ -357,6 +357,53 @@ export default async function handler(req, res) {
       dica: 'para remover: &aplicar=1' });
   }
 
+  // ── 🩺 POR-QUE-NAO-ENTROU: por que uma ficha coletada não chegou ao almoxarifado ──
+  if (action === 'por-que-nao-entrou') {
+    const q = String(req.query.q || '').replace(/\D/g, '');
+    if (!q) return res.status(400).json({ ok: false, error: 'informe ?q=4dígitos' });
+    const d8 = t => String(t || '').replace(/\D/g, '');
+    const [db, logA, logT, pipeA, pipeT] = await Promise.all([
+      dbGet(KEY), dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+    ]);
+    const acha = (lista, onde) => (lista || [])
+      .filter(f => d8(f.telefone).endsWith(q) || String(f.nome || f.nomeContato || '').toLowerCase().includes(String(req.query.q || '').toLowerCase()))
+      .map(f => ({ onde, id: f.id, nome: f.nome || f.nomeContato,
+        telefone: f.telefone, fase: f.phase || f.phaseId || f.status,
+        equipamento: f.equipamento || f.descricao,
+        coletadoEm: f.coletadoEm, movedAt: f.movedAt, sistema: f._sis }));
+    const achados = [
+      ...acha(((logA || {}).fichas), 'Logística ADM'),
+      ...acha(((logT || {}).fichas), 'Logística TV'),
+      ...acha(((pipeA || {}).cards), 'Pipe ADM'),
+      ...acha(((pipeT || {}).cards), 'Pipe TV'),
+    ];
+    const tarefas = ((db || {}).tarefas || []).filter(t =>
+      d8(t.telefone).endsWith(q) ||
+      String(t.cliente || t.nome || '').toLowerCase().includes(String(req.query.q || '').toLowerCase()));
+    const FASES_QUE_GERAM = ['coleta_efetuada', 'recebido', 'na_oficina'];
+    const analise = achados.map(a => {
+      const bloqueios = [];
+      if (tarefas.length) bloqueios.push('✅ JÁ EXISTE tarefa no almoxarifado (' + tarefas.length + ')');
+      else {
+        if (!FASES_QUE_GERAM.includes(String(a.fase)))
+          bloqueios.push('a fase "' + a.fase + '" não é uma das que geram tarefa (' + FASES_QUE_GERAM.join(', ') + ')');
+        if (a.onde === 'Logística TV')
+          bloqueios.push('ficha de TV — o almoxarifado ADM não recebe tarefas de TV');
+        if (!a.coletadoEm)
+          bloqueios.push('sem carimbo de coleta — pode ter sido movida pelo quadro, sem passar pela rota do motorista');
+      }
+      return { ...a, situacao: bloqueios.length ? bloqueios : ['nenhum bloqueio óbvio — o gatilho pode ter falhado'] };
+    });
+    return res.status(200).json({ ok: true, busca: q,
+      encontrados: achados.length,
+      tarefasNoAlmoxarifado: tarefas.length,
+      ANALISE: analise,
+      tarefas: tarefas.map(t => (t.tipo || '?') + ' | ' + (t.cliente || t.nome || '?') + ' | ' + (t.origem || '?')),
+      comoCorrigir: tarefas.length ? undefined
+        : 'para criar a tarefa manualmente: action=criar-mover com o id da ficha' });
+  }
+
   // ── 🕵️ ORIGEM-TAREFAS: de onde vieram as tarefas do almoxarifado ──
   if (action === 'origem-tarefas') {
     const horas = Math.min(720, Math.max(1, parseInt(req.query.horas || '48', 10)));
