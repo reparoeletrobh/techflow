@@ -202,6 +202,27 @@ export default async function handler(req, res) {
   }
 
   // ── APROVAR ──
+  // ── 🧹 ZERAR: limpa as inspeções (fichas de teste) ──
+  if (action === 'zerar') {
+    const antes = (db.inspecoes || []).length;
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        inspecoes: antes,
+        porStatus: (db.inspecoes || []).reduce((o, i) => {
+          const s = String(i.status || '?'); o[s] = (o[s] || 0) + 1; return o; }, {}),
+        amostra: (db.inspecoes || []).slice(0, 10).map(i =>
+          (i.os || i.id) + ' | ' + String(i.cliente || i.nome || '?').slice(0, 18) + ' | ' + i.status),
+        dica: 'para apagar: &aplicar=1' });
+    }
+    // guarda cópia antes de apagar
+    try { await dbSet('qualidade_lixeira', { em: new Date().toISOString(), inspecoes: db.inspecoes || [] }); } catch (e) {}
+    db.inspecoes = [];
+    if (db.config) db.config.proximoNum = 1;
+    await dbSet(KEY, db);
+    return res.status(200).json({ ok: true, apagadas: antes,
+      backup: 'cópia guardada em qualidade_lixeira' });
+  }
+
   if (req.method === 'POST' && action === 'aprovar') {
     const { id, checklist, inspetor } = req.body || {};
     const insp = db.inspecoes.find(i => i.id === id);
