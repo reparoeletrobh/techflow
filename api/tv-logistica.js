@@ -818,7 +818,27 @@ module.exports = async function handler(req, res) {
       if (r.ok) feitos.push(p.f.nome || '?'); else erros.push((p.f.nome || '?') + ': ' + r.erro);
       await new Promise(s => setTimeout(s, 120));
     }
-    return res.status(200).json({ ok: erros.length === 0, devolvidas: feitos.length, feitos, erros });
+    // 🚪 LIBERA A COLUNA: quem já tem ficha em Entrar em Contato vindo do remarcar
+    // não precisa ser devolvido de novo, mas também não pode continuar ocupando a coluna
+    const liberadas = [];
+    for (const [banco, chave, sis] of [[logTv, LOG_KEY, 'tv'], [logAdm, 'reparoeletro_logistica', 'adm']]) {
+      if (!banco || !Array.isArray(banco.fichas)) continue;
+      let mudou = 0;
+      for (const f of banco.fichas) {
+        if (String(f.phase || '') !== 'remarcar') continue;
+        if (!naProspeccao.has(d8(f.telefone))) continue;   // esse foi devolvido agora
+        f.phase = 'prospeccao';
+        f.enviadoProspeccaoEm = f.enviadoProspeccaoEm || new Date().toISOString();
+        f.saiuDoRemarcarPor = 'já estava no atendimento ativo';
+        liberadas.push(sis.toUpperCase() + ' | ' + (f.nome || '?'));
+        mudou++;
+      }
+      if (mudou) await dbSet(chave, banco);
+    }
+    return res.status(200).json({ ok: erros.length === 0,
+      devolvidas: feitos.length, feitos, erros,
+      liberadasDaColuna: liberadas.length, liberadas,
+      observacao: 'liberadas são as que já tinham ficha no atendimento e só estavam ocupando a coluna' });
   }
 
   // ── 📋 LOG-REMARCAR + auditoria: os que voltaram chegaram mesmo na prospecção? ──
