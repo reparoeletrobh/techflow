@@ -389,6 +389,39 @@ export default async function handler(req, res) {
       dica: faltando.length ? 'para criar todas: &aplicar=1' : undefined });
   }
 
+  // ── 🔁 RECRIAR-FALTANTES: cria tarefa para quem está em coleta efetuada sem ela ──
+  if (action === 'recriar-faltantes') {
+    const db = (await dbGet(KEY)) || { tarefas: [] };
+    const log = (await dbGet('reparoeletro_logistica')) || { fichas: [] };
+    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const temTarefa = new Set((db.tarefas || []).map(t => String(t.fichaId || t.id || '')));
+    const temTel = new Set((db.tarefas || []).map(t => d8(t.telefone)).filter(x => x.length >= 8));
+    const semTarefa = (log.fichas || []).filter(f =>
+      String(f.phase || '') === 'coleta_efetuada' &&
+      !temTarefa.has(String(f.id)) && !temTel.has(d8(f.telefone)));
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        emColetaEfetuada: (log.fichas || []).filter(f => String(f.phase || '') === 'coleta_efetuada').length,
+        semTarefa: semTarefa.length,
+        L: semTarefa.slice(0, 30).map(f => String(f.nome || '?').slice(0, 18) + ' ' +
+          String(f.telefone || '').slice(-4) + ' | ' + String(f.equipamento || '').slice(0, 18) +
+          ' | ' + (f.almoxarifadoTarefa || 'gatilho nunca rodou')),
+        dica: 'para criar: &aplicar=1' });
+    }
+    const KTF = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+    const feitos = [], erros = [];
+    for (const f of semTarefa) {
+      const r = await fetch('https://reparoeletroadm.com/api/almoxarifado?action=criar-mover&k=' + KTF, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: f.id, cliente: f.nome, telefone: f.telefone,
+          equipamento: f.equipamento, origem: 'recriar-faltantes' }),
+      }).then(x => x.json()).catch(e => ({ error: e.message }));
+      if (r && r.ok) feitos.push(f.nome); else erros.push(f.nome + ': ' + ((r && r.error) || '?'));
+      await new Promise(s => setTimeout(s, 150));
+    }
+    return res.status(200).json({ ok: erros.length === 0, criadas: feitos.length, feitos, erros });
+  }
+
   // ── 🩺 POR-QUE-NAO-ENTROU: por que uma ficha coletada não chegou ao almoxarifado ──
   if (action === 'por-que-nao-entrou') {
     const q = String(req.query.q || '').replace(/\D/g, '');
@@ -403,6 +436,7 @@ export default async function handler(req, res) {
       .map(f => ({ onde, id: f.id, nome: f.nome || f.nomeContato,
         telefone: f.telefone, fase: f.phase || f.phaseId || f.status,
         equipamento: f.equipamento || f.descricao,
+        almoxTarefa: f.almoxarifadoTarefa || null,
         coletadoEm: f.coletadoEm, movedAt: f.movedAt, sistema: f._sis }));
     const achados = [
       ...acha(((logA || {}).fichas), 'Logística ADM'),
@@ -431,8 +465,9 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, q,
       temTarefa: tarefas.length,
       L: analise.map(a => a.onde + ' | ' + String(a.nome || '?').slice(0, 16) +
-        ' | fase: ' + a.fase + ' | ' + (a.coletadoEm ? 'coletado' : 'sem carimbo') +
-        ' | ' + a.situacao[0].slice(0, 60)) });
+        ' | fase: ' + a.fase +
+        ' | gatilho: ' + (a.almoxTarefa || 'NUNCA RODOU') +
+        ' | ' + a.situacao[0].slice(0, 40)) });
   }
 
   // ── 🕵️ ORIGEM-TAREFAS: de onde vieram as tarefas do almoxarifado ──
