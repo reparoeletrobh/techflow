@@ -712,6 +712,182 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, id, agendadoPara: f.agendadoPara || null });
   }
 
+  // ── 📋 LOG-REMARCAR + auditoria: os que voltaram chegaram mesmo na prospecção? ──
+  if (action === 'log-remarcar') {
+    const dias = Math.min(60, Math.max(1, parseInt(req.query.dias || '7', 10)));
+    const corte = Date.now() - dias * 86400000;
+    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '?';
+    const [logTv, logAdm, prosA, prosT] = await Promise.all([
+      dbGet(LOG_KEY), dbGet('reparoeletro_logistica'),
+      dbGet('prospeccao_adm'), dbGet('prospeccao_tv'),
+    ]);
+    const naProspeccao = new Set();
+    for (const p of [prosA, prosT]) {
+      for (const f of (((p || {}).fichas) || [])) {
+        if (['lead', 'entrar_contato', 'retornar'].includes(String(f.status || ''))) naProspeccao.add(d8(f.telefone));
+      }
+    }
+    const linhas = [];
+    for (const [banco, sis] of [[logTv, 'TV'], [logAdm, 'ADM']]) {
+      for (const f of (((banco || {}).fichas) || [])) {
+        const q = new Date(f.remarcadoEm || f.movedAt || 0).getTime();
+        const foiRemarcada = String(f.phase || '') === 'remarcar' || f.motivoRemarcar;
+        if (!foiRemarcada || !q || q < corte) continue;
+        linhas.push({ sis, nome: f.nome || '?', tel: d8(f.telefone).slice(-4),
+          equipamento: String(f.equipamento || '').slice(0, 20),
+          quando: f.remarcadoEm || f.movedAt,
+          motivo: String(f.motivoRemarcar || '(sem motivo — anterior à regra)').slice(0, 50),
+          por: f.remarcadoPor || '?',
+          chegouNaProspeccao: naProspeccao.has(d8(f.telefone)) });
+      }
+    }
+    linhas.sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
+    const perdidas = linhas.filter(l => !l.chegouNaProspeccao);
+    return res.status(200).json({ ok: perdidas.length === 0,
+      periodoDias: dias, total: linhas.length,
+      chegaramNaProspeccao: linhas.length - perdidas.length,
+      NAO_CHEGARAM: perdidas.length,
+      ALERTA: perdidas.length
+        ? '🚨 ' + perdidas.length + ' ficha(s) remarcada(s) que NÃO aparecem em Entrar em Contato — podem ter se perdido'
+        : '✅ todas as remarcadas estão no atendimento ativo',
+      PERDIDAS: perdidas.map(l => hh(l.quando) + ' | ' + l.sis + ' | ' + String(l.nome).slice(0, 18) +
+        ' ' + l.tel + ' | ' + l.motivo),
+      L: linhas.slice(0, 60).map(l => hh(l.quando) + ' | ' + l.sis + ' | ' +
+        String(l.nome).slice(0, 16).padEnd(16) + ' ' + l.tel +
+        ' | ' + (l.chegouNaProspeccao ? '✅' : '🚨') + ' | ' + l.motivo) });
+  }
+
+  // ── 🤖 DISTRIBUIR: manda cada ficha liberada para o motorista certo ──
+  if (action === 'distribuir') {
+    const db = (await dbGet(LOG_KEY)) || defaultDB();
+    const recusas = (await dbGet('tv_recusas_motorista')) || { por: {} };
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+
+    // regiões de cada motorista
+    const WILDE = ['bh-norte', 'venda-nova', 'santa-luzia', 'vespasiano', 'sabara', 'bh-leste', 'neves'];
+    const EDUARDO = ['bh-oeste', 'bh-sul', 'contagem', 'betim', 'ibirite'];
+    const SEMPRE_JONATHAN = ['nova-lima'];
+
+    // polegadas a partir da descrição
+    function polegadas(txt) {
+      const s = String(txt || '');
+      const m = s.match(/(\d{2})\s*(?:"|”|''|pol|polegada)/i) || s.match(/\b(\d{2})\b(?=\s*(?:pol|"|”))/i);
+      if (m) return parseInt(m[1], 10);
+      // número solto entre 14 e 90 costuma ser polegada em ficha de TV
+      const m2 = s.match(/\b(1[4-9]|[2-8]\d|90)\b/);
+      return m2 ? parseInt(m2[1], 10) : null;
+    }
+    const regiaoDe = f => f.regiaoManual || regiaoDoEndereco(f.endereco);
+
+    const liberadas = (db.fichas || []).filter(f => String(f.phase || '') === 'liberado_coleta');
+    const decisoes = [], vermelhos = [];
+    // quem o Jonathan já vai atender hoje, por região — para o encaixe
+    const regioesJonathan = new Set((db.fichas || [])
+      .filter(f => String(f.motoristaNome || '') === 'Jonathan' && String(f.phase || '') === 'motorista_parceiro')
+      .map(f => regiaoDe(f)));
+
+    for (const f of liberadas) {
+      const pol = polegadas(f.equipamento || f.descricao);
+      const reg = regiaoDe(f);
+      const recusou = (recusas.por[String(f.id)] || []);
+      const motivo = [];
+      if (!pol) motivo.push('sem polegada na descrição');
+      if (reg === 'sem-regiao') motivo.push('região não identificada pelo endereço');
+      if (motivo.length) {
+        vermelhos.push({ id: f.id, nome: f.nome, equipamento: f.equipamento, motivo });
+        continue;
+      }
+      // decide o motorista
+      let escolhido = null, porque = '';
+      if (SEMPRE_JONATHAN.includes(reg)) { escolhido = 'Jonathan'; porque = 'Nova Lima é sempre dele'; }
+      else if (pol > 55) { escolhido = 'Jonathan'; porque = pol + '" — acima de 55'; }
+      else if (regioesJonathan.has(reg)) { escolhido = 'Jonathan'; porque = 'encaixe: já vai a ' + reg; }
+      else if (WILDE.includes(reg)) { escolhido = 'Wilde'; porque = reg; }
+      else if (EDUARDO.includes(reg)) { escolhido = 'Eduardo'; porque = reg; }
+      // nunca para quem recusou
+      if (escolhido && recusou.includes(escolhido)) {
+        const alt = ['Jonathan', 'Wilde', 'Eduardo'].filter(m => m !== escolhido && !recusou.includes(m));
+        if (!alt.length) {
+          vermelhos.push({ id: f.id, nome: f.nome, equipamento: f.equipamento,
+            motivo: ['todos os motoristas já recusaram esta ficha'] });
+          continue;
+        }
+        porque = escolhido + ' já recusou → ' + alt[0];
+        escolhido = alt[0];
+      }
+      if (!escolhido) {
+        vermelhos.push({ id: f.id, nome: f.nome, equipamento: f.equipamento,
+          motivo: ['região ' + reg + ' não está mapeada para nenhum motorista'] });
+        continue;
+      }
+      decisoes.push({ id: f.id, nome: f.nome, tel: String(f.telefone || '').slice(-4),
+        equipamento: String(f.equipamento || '').slice(0, 24), pol, regiao: reg,
+        motorista: escolhido, porque });
+    }
+
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        emLiberadoColeta: liberadas.length,
+        vaoSerDistribuidas: decisoes.length,
+        ficamVermelhas: vermelhos.length,
+        porMotorista: decisoes.reduce((o, d) => { o[d.motorista] = (o[d.motorista] || 0) + 1; return o; }, {}),
+        DISTRIBUIR: decisoes.map(d => d.motorista.padEnd(9) + ' | ' + String(d.nome || '?').slice(0, 18) +
+          ' ' + d.tel + ' | ' + d.pol + '" | ' + d.regiao + ' | ' + d.porque),
+        VERMELHAS: vermelhos.map(v => String(v.nome || '?').slice(0, 18) + ' | ' +
+          String(v.equipamento || '').slice(0, 22) + ' | ' + v.motivo.join(' · ')),
+        dica: 'para aplicar: &aplicar=1' });
+    }
+
+    // aplica
+    const log = (await dbGet('tv_log_distribuicao')) || { dias: {} };
+    log.dias[hoje] = log.dias[hoje] || [];
+    for (const d of decisoes) {
+      const f = (db.fichas || []).find(x => x.id === d.id);
+      if (!f) continue;
+      f.phase = 'motorista_parceiro';
+      f.motoristaNome = d.motorista;
+      f.distribuidoEm = new Date().toISOString();
+      f.distribuidoPor = 'automático';
+      f.motivoDistribuicao = d.porque;
+      log.dias[hoje].push({ ts: new Date().toISOString(), id: d.id, nome: d.nome,
+        tel: d.tel, motorista: d.motorista, pol: d.pol, regiao: d.regiao, porque: d.porque });
+    }
+    // marca as vermelhas
+    for (const v of vermelhos) {
+      const f = (db.fichas || []).find(x => x.id === v.id);
+      if (f) { f.alertaDistribuicao = v.motivo.join(' · '); f.alertaEm = new Date().toISOString(); }
+    }
+    await dbSet(LOG_KEY, db);
+    await dbSet('tv_log_distribuicao', log);
+    return res.status(200).json({ ok: true,
+      distribuidas: decisoes.length, vermelhas: vermelhos.length,
+      porMotorista: decisoes.reduce((o, d) => { o[d.motorista] = (o[d.motorista] || 0) + 1; return o; }, {}),
+      feitos: decisoes.map(d => d.nome + ' → ' + d.motorista + ' (' + d.porque + ')') });
+  }
+
+  // ── 📊 LOG-DISTRIBUICAO: quantas fichas foram para cada motorista, por dia ──
+  if (action === 'log-distribuicao') {
+    const dias = Math.min(60, Math.max(1, parseInt(req.query.dias || '7', 10)));
+    const log = (await dbGet('tv_log_distribuicao')) || { dias: {} };
+    const linhas = [], porMotorista = {};
+    for (let i = 0; i < dias; i++) {
+      const d = new Date(Date.now() - 3 * 3600000 - i * 86400000).toISOString().slice(0, 10);
+      const itens = log.dias[d] || [];
+      if (!itens.length) continue;
+      const porM = itens.reduce((o, x) => { o[x.motorista] = (o[x.motorista] || 0) + 1; return o; }, {});
+      for (const [m, n] of Object.entries(porM)) porMotorista[m] = (porMotorista[m] || 0) + n;
+      linhas.push({ dia: d, total: itens.length, porMotorista: porM, itens });
+    }
+    return res.status(200).json({ ok: true, periodoDias: dias,
+      TOTAL_POR_MOTORISTA: porMotorista,
+      POR_DIA: linhas.map(l => l.dia + ' | ' + String(l.total).padStart(2) + ' ficha(s) | ' +
+        Object.entries(l.porMotorista).map(([m, n]) => m + ' ' + n).join(' · ')),
+      DETALHE: linhas.flatMap(l => l.itens.map(x =>
+        l.dia + ' ' + String(x.ts).slice(11, 16) + ' | ' + x.motorista.padEnd(9) + ' | ' +
+        String(x.nome || '?').slice(0, 18) + ' ' + x.tel + ' | ' + x.pol + '" | ' + x.regiao)).slice(0, 80) });
+  }
+
   // ── 🚚 QUEM-COLETOU: motorista responsável por cada ficha de uma fase ──
   if (action === 'quem-coletou') {
     const fase = String(req.query.fase || 'coleta_efetuada');
