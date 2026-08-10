@@ -870,7 +870,19 @@ module.exports = async function handler(req, res) {
     // um motorista pode "invadir" a região do outro se estiver com pelo menos 4 a menos
     const DIFERENCA_PARA_INVADIR = 4;
 
-    const liberadas = (db.fichas || []).filter(f => String(f.phase || '') === 'liberado_coleta');
+    // 🕐 além de liberado_coleta, entram as de HORÁRIO MARCADO que estão perto do
+    // compromisso — sem motorista definido elas chegariam à hora marcada sem ninguém
+    const HORAS_ANTES = Number(req.query.horasAntes || 6);
+    const perto = (db.fichas || []).filter(f => {
+      if (String(f.phase || '') !== 'horario_marcado') return false;
+      if (f.motoristaNome) return false;                    // já tem dono
+      const t = new Date(f.horarioColeta || f.agendadoPara || 0).getTime();
+      if (!t) return false;
+      const faltam = (t - Date.now()) / 3600000;
+      return faltam <= HORAS_ANTES;                          // inclui as vencidas
+    });
+    const liberadas = (db.fichas || []).filter(f => String(f.phase || '') === 'liberado_coleta')
+      .concat(perto.map(f => Object.assign({}, f, { _porHorario: true })));
     const decisoes = [], vermelhos = [];
     // quem o Jonathan já vai atender hoje, por região — para o encaixe
     const regioesJonathan = new Set((db.fichas || [])
@@ -923,15 +935,22 @@ module.exports = async function handler(req, res) {
         continue;
       }
       carga[escolhido] = (carga[escolhido] || 0) + 1;   // conta na hora, para o próximo já ver
+      if (f._porHorario) {
+        const t = new Date(f.horarioColeta || f.agendadoPara || 0).getTime();
+        const faltam = ((t - Date.now()) / 3600000).toFixed(1);
+        porque += ' · ⏰ horário marcado ' + (Number(faltam) < 0 ? 'VENCIDO há ' + Math.abs(faltam) + 'h' : 'em ' + faltam + 'h');
+      }
       decisoes.push({ id: f.id, nome: f.nome, tel: String(f.telefone || '').slice(-4),
         equipamento: String(f.equipamento || '').slice(0, 24), pol, regiao: reg,
-        motorista: escolhido, porque });
+        motorista: escolhido, porque, porHorario: !!f._porHorario });
     }
 
     if (String(req.query.aplicar || '') !== '1') {
       return res.status(200).json({ ok: true, modo: 'prévia',
         CARGA_ATUAL: carga,
-        emLiberadoColeta: liberadas.length,
+        emLiberadoColeta: liberadas.filter(f => !f._porHorario).length,
+        deHorarioMarcadoPertoDoPrazo: perto.length,
+        janelaEmHoras: HORAS_ANTES,
         vaoSerDistribuidas: decisoes.length,
         ficamVermelhas: vermelhos.length,
         porMotorista: decisoes.reduce((o, d) => { o[d.motorista] = (o[d.motorista] || 0) + 1; return o; }, {}),
@@ -948,7 +967,8 @@ module.exports = async function handler(req, res) {
     for (const d of decisoes) {
       const f = (db.fichas || []).find(x => x.id === d.id);
       if (!f) continue;
-      f.phase = 'motorista_parceiro';
+      // ficha com horário combinado mantém a fase — só ganha o motorista responsável
+      if (!d.porHorario) f.phase = 'motorista_parceiro';
       f.motoristaNome = nomeReal[d.motorista] || d.motorista;
       f.distribuidoEm = new Date().toISOString();
       f.distribuidoPor = 'automático';
