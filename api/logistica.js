@@ -184,6 +184,38 @@ async function pipefyBestEffort(fn) {
   try { return await fn(); } catch(e) { console.warn('[Pipefy]', e.message); return null; }
 }
 
+
+// ── ♻️ REMARCAR → PROSPECÇÃO: toda ficha que cai em remarcar volta para o
+// atendimento ativo automaticamente, levando o motivo. Antes alguém precisava
+// clicar em "Prospecção" a cada uma, e ficha ficava esquecida na coluna.
+async function remarcarParaProspeccao(ficha, motivo, sistema, quem) {
+  try {
+    const KEYP = sistema === 'tv' ? 'prospeccao_tv' : 'prospeccao_adm';
+    const pdb = (await dbGet(KEYP)) || { fichas: [] };
+    pdb.fichas = pdb.fichas || [];
+    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const jaTem = pdb.fichas.some(f => d8(f.telefone) === d8(ficha.telefone) &&
+      ['lead', 'entrar_contato', 'retornar'].includes(String(f.status || '')));
+    if (jaTem) return { ok: true, info: 'já estava na prospecção' };
+    pdb.fichas.unshift({
+      id: 'rem_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6),
+      nome: ficha.nome || ficha.nomeContato || '?',
+      telefone: ficha.telefone || '',
+      equipamento: ficha.equipamento || ficha.descricao || '',
+      defeito: ficha.defeito || '',
+      endereco: ficha.endereco || '',
+      status: 'entrar_contato',
+      origem: 'remarcar',
+      motivoRemarcar: String(motivo || 'não informado').slice(0, 200),
+      remarcadoPor: quem || 'não identificado',
+      fichaOrigemId: ficha.id,
+      criadoEm: new Date().toISOString(),
+    });
+    await dbSet(KEYP, pdb);
+    return { ok: true };
+  } catch (e) { return { ok: false, erro: e.message }; }
+}
+
 module.exports = async function handler(req, res) {
   // 🔐 TF-AUTH (Fase 1): chave obrigatória em toda chamada
   const _tfk = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
@@ -482,6 +514,15 @@ module.exports = async function handler(req, res) {
     const db = await dbGet(LOG_KEY) || defaultDB();
     const ficha = db.fichas.find(f => f.id === id);
     if (!ficha) return res.status(404).json({ ok: false, error: 'nao encontrada' });
+    // ♻️ REMARCAR: motivo obrigatório e volta automática para o atendimento ativo
+    if (phase === 'remarcar') {
+      const mot = String((req.body || {}).motivo || '').trim();
+      if (!mot) return res.status(400).json({ ok: false,
+        error: 'informe o motivo do remarcar — por que o equipamento não chegou?' });
+      ficha.motivoRemarcar = mot.slice(0, 200);
+      ficha.remarcadoEm = new Date().toISOString();
+      ficha.remarcadoPor = String((req.body || {}).quem || 'não identificado');
+    }
     ficha.phase = phase;
     ficha.movedAt = new Date().toISOString();
     await dbSet(LOG_KEY, db);
@@ -508,7 +549,14 @@ module.exports = async function handler(req, res) {
         await dbSet(LOG_KEY, db);
       } catch (e) { }
     }
-    return res.status(200).json({ ok: true, ficha, almoxarifado: ficha.almoxarifadoTarefa || undefined });
+    // ♻️ remarcar → volta para o atendimento ativo, com o motivo
+    if (phase === 'remarcar') {
+      const r = await remarcarParaProspeccao(ficha, ficha.motivoRemarcar, 'adm', ficha.remarcadoPor);
+      ficha.voltouProspeccao = r.ok ? new Date().toISOString() : null;
+      await dbSet(LOG_KEY, db);
+    }
+    return res.status(200).json({ ok: true, ficha, almoxarifado: ficha.almoxarifadoTarefa || undefined,
+      prospeccao: phase === 'remarcar' ? (ficha.voltouProspeccao ? 'ficha devolvida ao atendimento ativo' : 'falhou') : undefined });
   }
 
 

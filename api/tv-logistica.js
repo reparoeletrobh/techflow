@@ -202,6 +202,38 @@ async function pipefyBestEffort(fn) {
   try { return await fn(); } catch(e) { console.warn('[Pipefy]', e.message); return null; }
 }
 
+
+// ── ♻️ REMARCAR → PROSPECÇÃO: toda ficha que cai em remarcar volta para o
+// atendimento ativo automaticamente, levando o motivo. Antes alguém precisava
+// clicar em "Prospecção" a cada uma, e ficha ficava esquecida na coluna.
+async function remarcarParaProspeccao(ficha, motivo, sistema, quem) {
+  try {
+    const KEYP = sistema === 'tv' ? 'prospeccao_tv' : 'prospeccao_adm';
+    const pdb = (await dbGet(KEYP)) || { fichas: [] };
+    pdb.fichas = pdb.fichas || [];
+    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const jaTem = pdb.fichas.some(f => d8(f.telefone) === d8(ficha.telefone) &&
+      ['lead', 'entrar_contato', 'retornar'].includes(String(f.status || '')));
+    if (jaTem) return { ok: true, info: 'já estava na prospecção' };
+    pdb.fichas.unshift({
+      id: 'rem_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6),
+      nome: ficha.nome || ficha.nomeContato || '?',
+      telefone: ficha.telefone || '',
+      equipamento: ficha.equipamento || ficha.descricao || '',
+      defeito: ficha.defeito || '',
+      endereco: ficha.endereco || '',
+      status: 'entrar_contato',
+      origem: 'remarcar',
+      motivoRemarcar: String(motivo || 'não informado').slice(0, 200),
+      remarcadoPor: quem || 'não identificado',
+      fichaOrigemId: ficha.id,
+      criadoEm: new Date().toISOString(),
+    });
+    await dbSet(KEYP, pdb);
+    return { ok: true };
+  } catch (e) { return { ok: false, erro: e.message }; }
+}
+
 module.exports = async function handler(req, res) {
   // 🔐 TF-AUTH (Fase 1): chave obrigatória em toda chamada
   const _tfk = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
@@ -865,6 +897,8 @@ module.exports = async function handler(req, res) {
     // reentrar na fila como se estivesse pronta, podendo virar rota de novo para o mesmo cliente.
     const atualizada = await aplicarNaFicha(id, (alvo) => {
       alvo.phase = 'remarcar';
+      alvo.motivoRemarcar = String((req.body || {}).motivo || alvo.motivoRemarcar || '').slice(0, 200);
+      remarcarParaProspeccao(alvo, alvo.motivoRemarcar, 'tv', (req.body || {}).quem).catch(() => {});
       alvo.movedAt = quando;
       alvo.cancelamentoMotorista = { motivo: String(motivo).slice(0, 200), motorista: String(motorista || ''), em: quando };
       alvo.motoristaAnterior = alvo.motoristaNome || '';   // preservado para o histórico
@@ -878,6 +912,16 @@ module.exports = async function handler(req, res) {
     const saiu = dep && dep.phase === 'remarcar';
     logMov(id, f.nome, faseAntC, 'remarcar', 'motorista-cancelou/' + String(motorista || '?')).catch(() => {});
     registrarPassagem('remarcar').catch(() => {});
+    // 🧠 memória de recusa: este motorista não recebe esta ficha de novo
+    try {
+      const rec = (await dbGet('tv_recusas_motorista')) || { por: {} };
+      rec.por[String(id)] = rec.por[String(id)] || [];
+      const nomeM = String(motorista || '?');
+      if (!rec.por[String(id)].includes(nomeM)) rec.por[String(id)].push(nomeM);
+      await dbSet('tv_recusas_motorista', rec);
+    } catch (e) {}
+    // ♻️ volta para o atendimento ativo com o motivo
+    remarcarParaProspeccao(f, motivo || 'motorista cancelou', 'tv', motorista).catch(() => {});
     return res.status(200).json({ ok: !!saiu, faseAtual: dep ? dep.phase : null,
       erro: saiu ? undefined : 'a ficha não saiu da rota — outra tela pode ter sobrescrito' });
   }
