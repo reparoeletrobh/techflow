@@ -433,6 +433,56 @@ export default async function handler(req, res) {
       observacao: 'card de diagnóstico criado — com foto, modelo, RS, remarcar e não chegou' });
   }
 
+  // ── 🔬 AUDITORIA-COMPRA: procura os equipamentos comprados em TODOS os bancos ──
+  if (action === 'auditoria-compra') {
+    const CHAVES = ['reparoeletro_compra_equip', 'compra_equipamentos', 'reparoeletro_equipamentos',
+      'equipamentos_comprados', 'reparoeletro_compra_equip_bkp', 'reparoeletro_compra_equip_archive',
+      'compra_equip', 'reparoeletro_arquivo', 'reparoeletro_pipe'];
+    const achados = [];
+    for (const k of CHAVES) {
+      try {
+        const d = await dbGet(k);
+        if (!d) { achados.push({ chave: k, existe: false }); continue; }
+        const listas = ['fichas', 'cards', 'itens', 'equipamentos'];
+        for (const L of listas) {
+          if (!Array.isArray(d[L])) continue;
+          const porStatus = d[L].reduce((o, f) => {
+            const s = String(f.status || f.phase || f.phaseId || '(sem)'); o[s] = (o[s] || 0) + 1; return o; }, {});
+          achados.push({ chave: k, lista: L, total: d[L].length,
+            porStatus: Object.fromEntries(Object.entries(porStatus).sort((a, b) => b[1] - a[1]).slice(0, 8)),
+            campos: Object.keys(d) });
+        }
+      } catch (e) { achados.push({ chave: k, erro: e.message }); }
+    }
+    // procura nomes específicos da lista de comprados que o Pedro enviou
+    const PROCURAR = ['9469', '9422', '8144', '6556', '6108', '1115', '3881', '3457', '0217', '7004'];
+    const ondeEstao = {};
+    for (const k of CHAVES) {
+      try {
+        const d = await dbGet(k);
+        if (!d) continue;
+        for (const L of ['fichas', 'cards']) {
+          if (!Array.isArray(d[L])) continue;
+          for (const f of d[L]) {
+            const tel = String(f.telefone || '').replace(/\D/g, '');
+            for (const p of PROCURAR) {
+              if (tel.endsWith(p)) {
+                ondeEstao[p] = ondeEstao[p] || [];
+                ondeEstao[p].push(k + '.' + L + ' | ' + String(f.status || f.phase || f.phaseId || '?'));
+              }
+            }
+          }
+        }
+      } catch (e) {}
+    }
+    return res.status(200).json({ ok: true,
+      BANCOS: achados.filter(a => a.total !== undefined || a.existe === false)
+        .map(a => a.existe === false ? a.chave + ' → NÃO EXISTE'
+          : a.chave + '.' + a.lista + ' → ' + a.total + ' | ' + JSON.stringify(a.porStatus)),
+      AMOSTRA_DA_SUA_LISTA: Object.entries(ondeEstao).map(([p, v]) => p + ': ' + v.join(' · ')),
+      naoEncontrados: PROCURAR.filter(p => !ondeEstao[p]) });
+  }
+
   // ── 🔍 ESTADO-COMPRA-EQUIP: fotografia do banco, sem alterar nada ──
   if (action === 'estado-compra-equip') {
     const ceq = (await dbGet('reparoeletro_compra_equip')) || null;
