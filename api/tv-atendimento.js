@@ -63,7 +63,17 @@ export default async function handler(req,res){
       const cardTs=c=>new Date(c.criadoEm||c.movedAt||0).getTime();
 
       // Aprovados = cards que passaram por 'aprovado'
-      const aprvCards=cards.filter(c=>(c.phaseId==='aprovado')||(c.history||[]).some(h=>h.phaseId==='aprovado'));
+      // 🎯 o carimbo de aprovação vive no tv_pipe, não no board — a tela lia o banco errado
+      const pipeTv = await dbGet('tv_pipe').catch(()=>null);
+      const cardsPipe = ((pipeTv||{}).cards)||[];
+      const FASES_APROV = ['aprovados','aprovado','producao','video_enviado','analise_compra',
+        'equipamento_comprado','programar_entrega','solicitar_entrega','entrega_solicitada',
+        'receber','erp','garantia','finalizado'];
+      const aprvPipe = cardsPipe.filter(c=>
+        c.aprovadoEm || FASES_APROV.includes(String(c.phaseId||c.phase||'')) ||
+        (c.history||[]).some(h=>String(h.phaseId||h.phase||'')==='aprovados'));
+      const aprvCards = aprvPipe.length ? aprvPipe
+        : cards.filter(c=>(c.phaseId==='aprovado')||(c.history||[]).some(h=>h.phaseId==='aprovado'));
       const aprvTotal=aprvCards.length;
       // 📅 a data que vale é a da APROVAÇÃO, não a da última movimentação.
       // Antes um card aprovado ontem que alguém movesse hoje contava como aprovado hoje.
@@ -71,7 +81,7 @@ export default async function handler(req,res){
         if(c.aprovadoEm) return new Date(c.aprovadoEm).getTime();
         const h=(c.history||[]).map(x=>({f:String(x.phaseId||x.phase||''),t:new Date(x.ts||x.timestamp||0).getTime()}))
           .filter(x=>x.t).sort((a,b)=>a.t-b.t);
-        const entrou=h.find(x=>x.f==='aprovado');
+        const entrou=h.find(x=>x.f==='aprovados'||x.f==='aprovado');
         if(entrou) return entrou.t;
         // 🚫 sem carimbo e sem histórico: NÃO conta como aprovação de hoje.
         // Usar a última movimentação aqui era justamente o que inflava o número.
