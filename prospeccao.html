@@ -1178,13 +1178,14 @@ async function carregarFaixaMetricas(){
     }
     // 🎯 leads convertidos — cadastros de logística feitos a partir da coluna Lead
     try{
-      var cv=await fetch('/api/prospeccao?action=convertidos&dias=7').then(function(x){return x.json();});
+      var cv=await fetch('/api/prospeccao?action=convertidos').then(function(x){return x.json();});
       var elC=document.getElementById('st-conv');
       if(elC&&cv&&cv.ok){
         elC.textContent=cv.hoje||0;
         if((cv.total||0)>(cv.hoje||0))
           elC.innerHTML=(cv.hoje||0)+'<span style="font-size:9px;color:#5a6270;font-weight:700;"> /'+cv.total+'</span>';
-        elC.parentNode.title='Leads que viraram cadastro de logística — hoje '+(cv.hoje||0)+' · 7 dias '+(cv.total||0);
+        elC.parentNode.title='Leads que viraram cadastro de logística — hoje '+(cv.hoje||0)+
+          ' · semana '+(cv.total||0)+' (desde segunda '+(cv.semanaComecaEm||'')+')';
       }
     }catch(e){}
     var elR=document.getElementById('st-recup');

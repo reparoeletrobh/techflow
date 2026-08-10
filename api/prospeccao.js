@@ -325,7 +325,11 @@ export default async function handler(req,res){
   // ── CADASTRAR-LOGISTICA ─────────────────────────────────────────────────
   // ── 🏅 CONVERTIDOS: leads que viraram cadastro de logística ──
   if(action==='convertidos'){
-    const dias=Math.min(60,Math.max(1,parseInt(req.query.dias||'7',10)));
+    // 📅 por padrão conta a SEMANA COMERCIAL (segunda a domingo)
+    const bras=new Date(Date.now()-3*3600*1000);
+    const diaSem=bras.getUTCDay();
+    const desdeSegunda=(diaSem===0)?7:diaSem;            // dias já corridos desta semana
+    const dias=req.query.dias?Math.min(60,Math.max(1,parseInt(req.query.dias,10))):desdeSegunda;
     let total=0; const itens=[];
     for(let i=0;i<dias;i++){
       const d=new Date(Date.now()-3*3600000-i*86400000).toISOString().slice(0,10);
@@ -336,7 +340,9 @@ export default async function handler(req,res){
     }
     const hojeD=new Date(Date.now()-3*3600000).toISOString().slice(0,10);
     const rHoje=await dbGet('prosp_convertidos_'+hojeD);
+    const seg=new Date(bras); seg.setUTCDate(bras.getUTCDate()-((diaSem===0)?6:(diaSem-1)));
     return res.status(200).json({ok:true,periodoDias:dias,
+      semanaComecaEm:seg.toISOString().slice(0,10),
       hoje:(rHoje&&rHoje.total)||0,total,
       lista:itens.slice(0,60).map(x=>x.dia+' | '+String(x.nome||'?').slice(0,20)+' '+x.telefone+
         ' | '+String(x.equipamento||'').slice(0,20)+' | '+(x.sistema||'').toUpperCase()+' · '+(x.tipoColeta||''))});
@@ -849,17 +855,28 @@ export default async function handler(req,res){
   if(action==='pontos'){
     const pt=(await dbGet('reparoeletro_pontos'))||{pessoas:{}};
     const hoje=new Date(Date.now()-3*3600*1000).toISOString().slice(0,10);
-    const d7=new Date(Date.now()-3*3600*1000-6*86400000).toISOString().slice(0,10);
+    // 📅 SEMANA COMERCIAL: começa na SEGUNDA e zera domingo 23h59.
+    // Antes o placar somava desde sempre e nunca reiniciava.
+    const bras=new Date(Date.now()-3*3600*1000);
+    const diaSem=bras.getUTCDay();                       // 0=dom 1=seg
+    const voltar=(diaSem===0)?6:(diaSem-1);              // domingo pertence à semana que começou na segunda
+    const segunda=new Date(bras); segunda.setUTCDate(bras.getUTCDate()-voltar);
+    const iniSemana=segunda.toISOString().slice(0,10);
+    const naSemana=x=>String(x.ts).slice(0,10)>=iniSemana;
     const rank=Object.keys(pt.pessoas||{}).map(nome=>{
       const p=pt.pessoas[nome];const h=(p.historico||[]);
-      return {nome,total:p.total||0,
+      const hSem=h.filter(naSemana);
+      return {nome,
+        total:hSem.reduce((a,b)=>a+(b.pontos||0),0),      // placar da SEMANA
+        totalHistorico:p.total||0,
         pontosHoje:h.filter(x=>String(x.ts).slice(0,10)===hoje).reduce((a,b)=>a+(b.pontos||0),0),
-        pontosSemana:h.filter(x=>String(x.ts).slice(0,10)>=d7).reduce((a,b)=>a+(b.pontos||0),0),
-        recuperacoes:h.length,
-        valorRecuperado:h.reduce((a,b)=>a+(Number(b.valor)||0),0),
+        pontosSemana:hSem.reduce((a,b)=>a+(b.pontos||0),0),
+        recuperacoes:hSem.length,
+        recuperacoesHistorico:h.length,
+        valorRecuperado:hSem.reduce((a,b)=>a+(Number(b.valor)||0),0),
         ultimas:h.slice(0,10)};
     }).sort((a,b)=>b.total-a.total);
-    return res.status(200).json({ok:true,ranking:rank});
+    return res.status(200).json({ok:true,semanaComecaEm:iniSemana,ranking:rank});
   }
 
   if(req.method==='POST'&&action==='conflito-aprovar'){
