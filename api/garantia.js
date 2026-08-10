@@ -119,16 +119,34 @@ module.exports = async function handler(req, res) {
     const lista = db.fichas || db.cards || [];
     const campo = db.fichas ? 'fichas' : 'cards';
     const ficam = [], saem = [];
+    // 🎯 casa APENAS pelos 4 dígitos do telefone — casar por nome puxava homônimos
+    // (Emerson 5705, Davidson 8927, Marcio 2804 não são os da lista)
     for (const f of lista) {
-      const cod = d4(f.telefone);
-      const bate = cods.has(cod) ||
-        LISTA.some(([n]) => String(f.nome || f.cliente || '').toLowerCase().includes(n.toLowerCase()));
-      (bate ? ficam : saem).push(f);
+      (cods.has(d4(f.telefone)) ? ficam : saem).push(f);
     }
-    const naLista = LISTA.filter(([n, c]) =>
-      !ficam.some(f => d4(f.telefone) === c || String(f.nome || f.cliente || '').toLowerCase().includes(n.toLowerCase())));
+    const naLista = LISTA.filter(([, c]) => !ficam.some(f => d4(f.telefone) === c));
+    // 🔎 os que não estão na garantia — onde eles estão?
+    const ondeEstao = {};
+    if (naLista.length) {
+      for (const chave of ['reparoeletro_pipe', 'reparoeletro_arquivo', 'reparoeletro_logistica',
+        'fichas_adm', 'reparoeletro_garantia_fila']) {
+        try {
+          const b = await dbGet(chave);
+          for (const L of ['cards', 'fichas']) {
+            for (const x of ((b || {})[L] || [])) {
+              const c4 = d4(x.telefone);
+              if (!naLista.some(([, c]) => c === c4)) continue;
+              ondeEstao[c4] = ondeEstao[c4] || [];
+              ondeEstao[c4].push(chave + ' · ' + String(x.phaseId || x.phase || x.status || '?'));
+            }
+          }
+        } catch (e) {}
+      }
+    }
     if (String(req.query.aplicar || '') !== '1') {
       return res.status(200).json({ ok: true, modo: 'prévia',
+        ONDE_ESTAO_OS_QUE_FALTAM: Object.entries(ondeEstao).map(([c, v]) =>
+          c + ': ' + [...new Set(v)].slice(0, 3).join(' | ')),
         totalHoje: lista.length,
         vaoFicar: ficam.length, vaoSair: saem.length,
         naListaMasNaoEncontrados: naLista.map(x => x[0] + ' ' + x[1]),
