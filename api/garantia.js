@@ -104,6 +104,47 @@ module.exports = async function handler(req, res) {
     // ── GET load ──────────────────────────────────────────────
       // ═══ 🛡️ FILA DE GARANTIA (visão Conflitos) ═══
   const FILA_KEY = "reparoeletro_garantia_fila";
+
+  // ── 🧹 MANTER-APENAS: deixa na garantia só os equipamentos conferidos na loja ──
+  if (action === 'manter-apenas') {
+    const LISTA = [
+      ['Alexandre','1991'],['Augusto','2582'],['Vera','9757'],['Marcio','2908'],
+      ['Vilmar','1427'],['Isabel','0942'],['Elton','4404'],['Lucas','3292'],
+      ['Emerson','5978'],['Emília','0611'],['Gilda','7270'],['Daianne','3878'],
+      ['Davidson','8937'],['Paulo','8011'],
+    ];
+    const cods = new Set(LISTA.map(x => x[1]));
+    const d4 = t => String(t || '').replace(/\D/g, '').slice(-4);
+    const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
+    const lista = db.fichas || db.cards || [];
+    const campo = db.fichas ? 'fichas' : 'cards';
+    const ficam = [], saem = [];
+    for (const f of lista) {
+      const cod = d4(f.telefone);
+      const bate = cods.has(cod) ||
+        LISTA.some(([n]) => String(f.nome || f.cliente || '').toLowerCase().includes(n.toLowerCase()));
+      (bate ? ficam : saem).push(f);
+    }
+    const naLista = LISTA.filter(([n, c]) =>
+      !ficam.some(f => d4(f.telefone) === c || String(f.nome || f.cliente || '').toLowerCase().includes(n.toLowerCase())));
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        totalHoje: lista.length,
+        vaoFicar: ficam.length, vaoSair: saem.length,
+        naListaMasNaoEncontrados: naLista.map(x => x[0] + ' ' + x[1]),
+        FICAM: ficam.map(f => String(f.nome || f.cliente || '?').slice(0, 20) + ' ' + d4(f.telefone) +
+          ' | ' + String(f.equipamento || f.descricao || '').slice(0, 20)),
+        SAEM: saem.slice(0, 50).map(f => String(f.nome || f.cliente || '?').slice(0, 20) + ' ' + d4(f.telefone)),
+        dica: 'para aplicar: &aplicar=1' });
+    }
+    try { await dbSet('reparoeletro_garantia_lixeira', { em: new Date().toISOString(), fichas: saem }); } catch (e) {}
+    db[campo] = ficam;
+    await dbSet(GARANTIA_KEY, db);
+    return res.status(200).json({ ok: true,
+      ficaram: ficam.length, removidos: saem.length,
+      naListaMasNaoEncontrados: naLista.map(x => x[0] + ' ' + x[1]),
+      backup: 'cópia em reparoeletro_garantia_lixeira' });
+  }
   if (action === "fila-load") {
     const fdb = (await dbGet(FILA_KEY)) || { itens: [] };
     const itens = [...(fdb.itens || [])].sort((a, b) => {
