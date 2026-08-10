@@ -239,7 +239,40 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const action = req.query.action;
+  const action = req.query.action
+
+  // ── 🔎 RASTREAR: onde está uma ficha específica, em todos os bancos ──
+  if (action === 'rastrear') {
+    const q = String(req.query.q || '').replace(/\D/g, '');
+    if (!q) return res.status(400).json({ ok: false, error: 'informe ?q=4dígitos' });
+    const BANCOS = ['reparoeletro_logistica', 'tv_logistica', 'prospeccao_adm', 'prospeccao_tv',
+      'fichas_adm', 'fichas_tv', 'reparoeletro_pipe', 'tv_pipe', 'reparoeletro_arquivo'];
+    const dg = t => String(t || '').replace(/\D/g, '');
+    const achados = [];
+    for (const k of BANCOS) {
+      try {
+        const b = await dbGet(k);
+        if (!b) continue;
+        for (const L of ['fichas', 'cards']) {
+          for (const f of ((b[L]) || [])) {
+            if (!dg(f.telefone).endsWith(q)) continue;
+            achados.push({ banco: k + '.' + L,
+              nome: f.nome || f.nomeContato || '?',
+              fase: f.phase || f.phaseId || f.status || '?',
+              origem: f.origem || null,
+              motivoRemarcar: f.motivoRemarcar || null,
+              enviadoProspeccaoEm: f.enviadoProspeccaoEm || null });
+          }
+        }
+      } catch (e) {}
+    }
+    return res.status(200).json({ ok: achados.length > 0, busca: q,
+      encontrados: achados.length,
+      L: achados.map(a => a.banco + ' | ' + String(a.nome).slice(0, 18) +
+        ' | fase: ' + a.fase + (a.origem ? ' | origem: ' + a.origem : '') +
+        (a.enviadoProspeccaoEm ? ' | devolvida ' + String(a.enviadoProspeccaoEm).slice(5, 16).replace('T', ' ') : '')) });
+  }
+;
 
   // ── GET load ──────────────────────────────────────────────
   if (action === 'load') {
