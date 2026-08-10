@@ -742,10 +742,25 @@ module.exports = async function handler(req, res) {
         naProsp[d].push(String(f.status || '?') + (f.origem === 'remarcar' ? ' (do remarcar)' : ''));
       }
     }
+    // 🔍 índice por telefone COM o status de cada ficha, para não confundir
+    // "existe na prospecção" com "está em Entrar em Contato"
+    const detalhe = {};
+    for (const [p, nome] of [[prosA, 'ADM'], [prosT, 'TV']]) {
+      for (const f of (((p || {}).fichas) || [])) {
+        const d = d8(f.telefone);
+        if (!d) continue;
+        detalhe[d] = detalhe[d] || [];
+        detalhe[d].push({ sis: nome, status: String(f.status || '?'), origem: f.origem || null,
+          criadoEm: f.criadoEm });
+      }
+    }
     const linhas = ((logTv || {}).fichas || [])
       .filter(f => String(f.phase || '') === 'remarcar')
       .map(f => ({
         nome: f.nome || '?', tel: d8(f.telefone).slice(-4),
+        telCompleto: d8(f.telefone),
+        emEntrarContato: (detalhe[d8(f.telefone)] || []).some(x => x.status === 'entrar_contato'),
+        todosOsStatus: (detalhe[d8(f.telefone)] || []).map(x => x.sis + ':' + x.status).join(', ') || 'NENHUMA FICHA',
         equipamento: String(f.equipamento || '').slice(0, 20),
         entrouEm: f.remarcadoEm || f.movedAt,
         motivo: f.motivoRemarcar || '(sem motivo)',
@@ -759,10 +774,12 @@ module.exports = async function handler(req, res) {
       comMotivoRegistrado: linhas.filter(l => l.temMotivo).length,
       jaForamDevolvidas: linhas.filter(l => l.jaFoiDevolvida).length,
       temFichaNaProspeccao: linhas.filter(l => l.ondeEstaNaProspeccao).length,
+      emEntrarContato: linhas.filter(l => l.emEntrarContato).length,
+      SEM_FICHA_NO_ATENDIMENTO: linhas.filter(l => !l.emEntrarContato)
+        .map(l => String(l.nome).slice(0, 18) + ' ' + l.tel + ' | ' + l.todosOsStatus),
       L: linhas.map(l => hh(l.entrouEm) + ' | ' + String(l.nome).slice(0, 16).padEnd(16) + ' ' + l.tel +
-        ' | motivo: ' + (l.temMotivo ? 'sim' : 'NÃO') +
-        ' | devolvida: ' + (l.jaFoiDevolvida ? 'sim' : 'NÃO') +
-        ' | prospecção: ' + (l.ondeEstaNaProspeccao ? l.ondeEstaNaProspeccao.join(', ') : 'não está')) });
+        ' | ' + (l.emEntrarContato ? '✅ em Entrar em Contato' : '🚨 NÃO está') +
+        ' | ' + l.todosOsStatus) });
   }
 
   // ── ♻️ REPROCESSAR-REMARCAR: devolve ao atendimento as que ficaram para trás ──
@@ -772,10 +789,12 @@ module.exports = async function handler(req, res) {
       dbGet(LOG_KEY), dbGet('reparoeletro_logistica'),
       dbGet('prospeccao_adm'), dbGet('prospeccao_tv'),
     ]);
+    // ✅ só conta como resolvida quem está em ENTRAR EM CONTATO — estar em lead ou
+    // retornar não serve, porque a fila lá é lenta e quem volta do remarcar tem pressa
     const naProspeccao = new Set();
     for (const p of [prosA, prosT]) {
       for (const f of (((p || {}).fichas) || [])) {
-        if (['lead', 'entrar_contato', 'retornar'].includes(String(f.status || ''))) naProspeccao.add(d8(f.telefone));
+        if (String(f.status || '') === 'entrar_contato') naProspeccao.add(d8(f.telefone));
       }
     }
     const pendentes = [];
