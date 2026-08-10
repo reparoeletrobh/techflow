@@ -312,6 +312,9 @@ module.exports = async function handler(req, res) {
       for (const f of src.fichas) {
         // só as que EU criei a partir do remarcar
         if (String(f.origem || '') !== 'remarcar') { restam.push(f); continue; }
+        // 🎯 filtro opcional por telefone: ?tels=7373,0161 migra só essas
+        const filtro = String(req.query.tels || '').split(',').map(x => x.trim()).filter(Boolean);
+        if (filtro.length && !filtro.some(t => dg(f.telefone).endsWith(t))) { restam.push(f); continue; }
         const jaLa = dst.fichas.some(x => dg(x.telefone) === dg(f.telefone) &&
           String(x.status || '') === 'entrar_contato');
         if (!jaLa) {
