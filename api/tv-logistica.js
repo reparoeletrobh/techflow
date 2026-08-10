@@ -726,6 +726,23 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, id, agendadoPara: f.agendadoPara || null });
   }
 
+  // ── 📜 HISTORICO-REMARCAR: tudo que saiu da coluna, com data e como saiu ──
+  if (action === 'historico-remarcar') {
+    const dias = Math.min(60, Math.max(1, parseInt(req.query.dias || '30', 10)));
+    const reg = (await dbGet('tv_log_saida_remarcar')) || { dias: {} };
+    const linhas = [];
+    for (let i = 0; i < dias; i++) {
+      const d = new Date(Date.now() - 3 * 3600000 - i * 86400000).toISOString().slice(0, 10);
+      for (const x of (reg.dias[d] || [])) {
+        linhas.push(d + ' ' + String(x.ts).slice(11, 16) + ' | ' + x.nome + ' | ' + x.como);
+      }
+    }
+    return res.status(200).json({ ok: true, total: linhas.length,
+      L: linhas,
+      observacao: linhas.length ? undefined
+        : 'o registro começa agora — saídas anteriores não ficaram gravadas' });
+  }
+
   // ── 🔍 DIAG-REMARCAR: o que aconteceu com cada ficha da coluna ──
   if (action === 'diag-remarcar') {
     const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
@@ -854,6 +871,15 @@ module.exports = async function handler(req, res) {
       }
       if (mudou) await dbSet(chave, banco);
     }
+    // 📜 registra permanentemente o que saiu, para consulta depois
+    try {
+      const diaR = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+      const reg = (await dbGet('tv_log_saida_remarcar')) || { dias: {} };
+      reg.dias[diaR] = reg.dias[diaR] || [];
+      for (const n of feitos) reg.dias[diaR].push({ ts: new Date().toISOString(), nome: n, como: 'devolvida ao atendimento' });
+      for (const n of liberadas) reg.dias[diaR].push({ ts: new Date().toISOString(), nome: n, como: 'liberada — já estava no atendimento' });
+      await dbSet('tv_log_saida_remarcar', reg);
+    } catch (e) {}
     return res.status(200).json({ ok: erros.length === 0,
       devolvidas: feitos.length, feitos, erros,
       liberadasDaColuna: liberadas.length, liberadas,
