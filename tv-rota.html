@@ -292,26 +292,50 @@ async function agendar(id){
   var atual=f&&f.agendadoPara?new Date(f.agendadoPara):null;
   var hj=new Date();
   var dPad=atual?atual.toLocaleDateString('pt-BR'):hj.toLocaleDateString('pt-BR');
-  var data=prompt('📅 Que DIA o cliente combinou?\n\nFormato: DD/MM  (ex: '+hj.getDate()+'/'+(hj.getMonth()+1)+')\n\nDeixe vazio e clique OK para REMOVER o agendamento.',dPad.slice(0,5));
+  var data=prompt('📅 Que DIA o cliente combinou?\n\nPode escrever: 11/08 · 11-08 · hoje · amanhã\n\nDeixe vazio e clique OK para REMOVER o agendamento.',dPad.slice(0,5));
   if(data===null)return;
   if(!data.trim()){
     await fetch('/api/tv-logistica?action=rota-agendar',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({id:id,limpar:true})}).catch(function(){});
     load();return;
   }
-  var hora=prompt('🕐 Que HORA?\n\nFormato: HH:MM  (ex: 10:00)',atual?atual.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'10:00');
+  var hora=prompt('🕐 Que HORA?\n\nPode escrever: 10:00 · 10 · 10h · 10h30',atual?atual.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'10:00');
   if(hora===null)return;
   var obs=prompt('📝 Alguma observação? (opcional)\n\nEx: "cliente sai às 12h", "tocar interfone 302"',(f&&f.agendadoObs)||'');
   if(obs===null)obs='';
-  var pd=data.trim().split('/'), ph=(hora||'10:00').trim().split(':');
-  if(pd.length<2||ph.length<2){alert('Formato inválido. Use DD/MM e HH:MM');return;}
-  var ano=pd[2]?(pd[2].length===2?'20'+pd[2]:pd[2]):String(hj.getFullYear());
-  var iso=ano+'-'+String(pd[1]).padStart(2,'0')+'-'+String(pd[0]).padStart(2,'0')
-    +'T'+String(ph[0]).padStart(2,'0')+':'+String(ph[1]).padStart(2,'0')+':00-03:00';
-  if(isNaN(new Date(iso).getTime())){alert('Data ou hora inválida');return;}
+  // 📅 aceita o jeito que o motorista escreve: 11/08, 11-08, 11.08, "amanhã", "hoje"
+  var d0 = String(data).trim().toLowerCase();
+  var dia, mes, ano;
+  if(/^(hoje)$/.test(d0)){ dia=hj.getDate(); mes=hj.getMonth()+1; ano=hj.getFullYear(); }
+  else if(/^(amanh[ãa]|amanha)$/.test(d0)){
+    var am=new Date(hj.getTime()+86400000); dia=am.getDate(); mes=am.getMonth()+1; ano=am.getFullYear();
+  } else {
+    var pd = d0.split(/[\/\-\.\s]+/).filter(Boolean);
+    if(pd.length<2){ alert('Não entendi a data. Escreva assim: 11/08 — ou "hoje" / "amanhã".'); return; }
+    dia = parseInt(pd[0],10); mes = parseInt(pd[1],10);
+    ano = pd[2] ? (String(pd[2]).length===2 ? 2000+parseInt(pd[2],10) : parseInt(pd[2],10)) : hj.getFullYear();
+  }
+  // 🕐 aceita 10:00, 10, 10h, 10h30, 1030
+  var h0 = String(hora||'').trim().toLowerCase().replace(/\s/g,'');
+  var hh, mm;
+  var mH = h0.match(/^(\d{1,2})[:h.]?(\d{2})?/);
+  if(!mH){ alert('Não entendi a hora. Escreva assim: 10:00 — ou só 10.'); return; }
+  hh = parseInt(mH[1],10); mm = mH[2] ? parseInt(mH[2],10) : 0;
+  if(!(dia>=1&&dia<=31)||!(mes>=1&&mes<=12)||!(hh>=0&&hh<=23)||!(mm>=0&&mm<=59)){
+    alert('Data ou hora fora do comum. Confira: dia '+dia+', mês '+mes+', hora '+hh+':'+mm); return;
+  }
+  var iso = ano+'-'+String(mes).padStart(2,'0')+'-'+String(dia).padStart(2,'0')
+    +'T'+String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0')+':00-03:00';
+  if(isNaN(new Date(iso).getTime())){ alert('Essa data não existe. Confira o dia e o mês.'); return; }
   var r=await fetch('/api/tv-logistica?action=rota-agendar',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({id:id,quando:iso,obs:obs})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
-  if(r.ok)load();else alert('Erro: '+(r.error||'falha'));
+    body:JSON.stringify({id:id,quando:iso,obs:obs})}).then(function(x){return x.json();})
+    .catch(function(e){return{ok:false,error:'sem conexão — tente de novo'};});
+  if(r&&r.ok){
+    var d=new Date(iso);
+    alert('✅ Combinado para '+d.toLocaleDateString('pt-BR')+' às '+
+      d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
+    load();
+  } else alert('Não consegui salvar: '+((r&&r.error)||'erro desconhecido'));
 }
 // mantém o piscar vivo mesmo sem recarregar
 setInterval(function(){
