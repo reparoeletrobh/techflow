@@ -444,14 +444,26 @@ export default async function handler(req, res) {
     const ficam = todas.filter(t => !alvo.includes(t));
     const porTipo = alvo.reduce((o, t) => { o[t.tipo] = (o[t.tipo] || 0) + 1; return o; }, {});
     const porStatus = alvo.reduce((o, t) => { o[t.status || '?'] = (o[t.status || '?'] || 0) + 1; return o; }, {});
+    // 🔍 CRUZAMENTO: em que status cada uma está na seção Compra de Equipamentos
+    const ceq = (await dbGet('reparoeletro_compra_equip')) || { fichas: [] };
+    const porId = {};
+    for (const f of (ceq.fichas || [])) porId[String(f.id)] = String(f.status || '?');
+    const cruzado = alvo.reduce((o, t) => {
+      const st = porId[String(t.cardId)] || '(não encontrada na Compra Equip)';
+      o[st] = (o[st] || 0) + 1; return o;
+    }, {});
     if (String(req.query.aplicar || '') !== '1') {
       return res.status(200).json({ ok: true, modo: 'PRÉVIA — nada removido',
         totalNoAlmoxarifado: todas.length,
         VAI_EXCLUIR: alvo.length, porTipo, porStatus,
+        STATUS_NA_COMPRA_EQUIP: cruzado,
+        ATENCAO: cruzado['analise']
+          ? '⚠️ ' + cruzado['analise'] + ' estão EM ANÁLISE na Compra Equip, não em Comprados'
+          : undefined,
         VAI_MANTER: ficam.length,
         mantidosPorOrigem: ficam.reduce((o, t) => { const k = String(t.origem || '?'); o[k] = (o[k] || 0) + 1; return o; }, {}),
-        LISTA_EXCLUIR: alvo.slice(0, 60).map(t => String(t.cliente || '?').slice(0, 22) + ' | ' +
-          String(t.equipamento || '').slice(0, 20) + ' | ' + t.tipo),
+        LISTA_EXCLUIR: alvo.slice(0, 60).map(t => String(t.cliente || '?').slice(0, 20) + ' | ' +
+          (porId[String(t.cardId)] || 'sem ficha') + ' | ' + String(t.equipamento || '').slice(0, 16)),
         dica: 'para excluir: &aplicar=1' });
     }
     db.tarefas = ficam;
