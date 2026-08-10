@@ -233,6 +233,17 @@ async function remarcarParaProspeccao(ficha, motivo, sistema, quem) {
       criadoEm: new Date().toISOString(),
     });
     await dbSet(KEYP, pdb);
+    // 🚪 a ficha SAI da coluna Remarcar — ela vive agora na prospecção.
+    // Sem isso ela voltava ao atendimento mas continuava ocupando a coluna.
+    try {
+      const lg = (await dbGet(LOG_KEY)) || {};
+      const alvo = ((lg.fichas) || []).find(x => x.id === ficha.id);
+      if (alvo && String(alvo.phase || '') === 'remarcar') {
+        alvo.phase = 'prospeccao';
+        alvo.enviadoProspeccaoEm = new Date().toISOString();
+        await dbSet(LOG_KEY, lg);
+      }
+    } catch (e) {}
     return { ok: true };
   } catch (e) { return { ok: false, erro: e.message }; }
 }
