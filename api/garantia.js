@@ -105,6 +105,75 @@ module.exports = async function handler(req, res) {
       // ═══ 🛡️ FILA DE GARANTIA (visão Conflitos) ═══
   const FILA_KEY = "reparoeletro_garantia_fila";
 
+  // ── ➕ GARANTIR-14: coloca na garantia os equipamentos conferidos na loja ──
+  if (action === 'garantir-lista') {
+    const LISTA = [
+      ['Alexandre','1991'],['Augusto','2582'],['Vera','9757'],['Marcio','2908'],
+      ['Vilmar','1427'],['Isabel','0942'],['Elton','4404'],['Lucas','3292'],
+      ['Emerson','5978'],['Emília','0611'],['Gilda','7270'],['Daianne','3878'],
+      ['Davidson','8937'],['Paulo','8011'],
+    ];
+    const d4 = t => String(t || '').replace(/\D/g, '').slice(-4);
+    const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
+    const campo = db.fichas ? 'fichas' : (db.cards ? 'cards' : 'fichas');
+    db[campo] = db[campo] || [];
+    const jaTem = new Set(db[campo].map(f => d4(f.telefone)));
+
+    // procura os dados de cada um nos outros bancos
+    const FONTES = ['reparoeletro_pipe', 'reparoeletro_logistica', 'fichas_adm', 'reparoeletro_arquivo'];
+    const dados = {};
+    for (const k of FONTES) {
+      try {
+        const b = await dbGet(k);
+        for (const L of ['cards', 'fichas']) {
+          for (const x of ((b || {})[L] || [])) {
+            const c = d4(x.telefone);
+            if (!LISTA.some(([, cod]) => cod === c)) continue;
+            if (dados[c] && dados[c].equipamento) continue;   // já tem um bom
+            dados[c] = { nome: x.nomeContato || x.nome, telefone: x.telefone,
+              equipamento: x.equipamento || x.descricao || '', valor: x.valor || 0,
+              endereco: x.endereco || '', origemBanco: k };
+          }
+        }
+      } catch (e) {}
+    }
+    const criados = [], jaEstavam = [], semDados = [];
+    for (const [nome, cod] of LISTA) {
+      if (jaTem.has(cod)) { jaEstavam.push(nome + ' ' + cod); continue; }
+      const d = dados[cod];
+      criados.push({
+        id: 'gar_' + cod + '_' + Date.now().toString(36),
+        nome: d ? (d.nome || nome) : nome,
+        cliente: d ? (d.nome || nome) : nome,
+        telefone: d ? d.telefone : cod,
+        equipamento: d ? d.equipamento : '',
+        endereco: d ? d.endereco : '',
+        valor: 0,
+        status: 'garantia_solicitada',
+        phase: 'garantia_solicitada',
+        origem: 'conferência física na loja 10/08',
+        obs: d ? ('dados recuperados de ' + d.origemBanco) : 'CADASTRAR EQUIPAMENTO — não encontrado no sistema',
+        criadoEm: new Date().toISOString(),
+      });
+      if (!d) semDados.push(nome + ' ' + cod);
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        jaEstavamNaGarantia: jaEstavam.length, jaEstavam,
+        vaoSerCriados: criados.length,
+        semDadosNoSistema: semDados.length, semDados,
+        DETALHE: criados.map(c => c.nome + ' ' + String(c.telefone).slice(-4) +
+          ' | ' + (c.equipamento || '⚠️ sem equipamento') + ' | ' + c.obs),
+        dica: 'para criar: &aplicar=1' });
+    }
+    db[campo] = criados.concat(db[campo]);
+    await dbSet(GARANTIA_KEY, db);
+    return res.status(200).json({ ok: true,
+      criados: criados.length, jaEstavam: jaEstavam.length,
+      semDadosNoSistema: semDados,
+      totalAgora: db[campo].length });
+  }
+
   // ── 🧹 MANTER-APENAS: deixa na garantia só os equipamentos conferidos na loja ──
   if (action === 'manter-apenas') {
     const LISTA = [
