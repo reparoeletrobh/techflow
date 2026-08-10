@@ -408,17 +408,17 @@ function check(nome, cond, extra) {
   // ════ CENÁRIO 12: promessa não cumprida vira conflito para um humano ════
   // ── trava de horário: cadastro de coleta fora da janela é recusado ──
   console.log('▶ Cenário 12b — coleta fora da janela é bloqueada');
-  const r12h = resp();
+  const r12h = res();
   await wabot(req({ action:'enviar', ...K }, { tel:'5531990007099',
     texto:'Perfeito! Vou programar sua coleta.',
     acaoAprovada:'cadastrar_logistica', acaoMotivo:'coleta imediata' }), r12h);
   {
-    const j = r12h._json || {};
+    const j = r12h.dado || {};
     const bras = new Date(Date.now() - 3*3600000);
     const dia = bras.getUTCDay(), hora = bras.getUTCHours() + bras.getUTCMinutes()/60;
     const dentro = (dia>=1&&dia<=5) ? (hora>=8&&hora<15) : (dia===6 ? (hora>=8&&hora<10) : false);
-    if (dentro) ok('dentro da janela: cadastro permitido', j.ok !== false || !/fora da janela/.test(String(j.error||'')));
-    else ok('fora da janela: cadastro recusado', /fora da janela/.test(String(j.error||'')));
+    if (dentro) check('dentro da janela: cadastro permitido', j.ok !== false || !/fora da janela/.test(String(j.error||'')));
+    else check('fora da janela: cadastro recusado', /fora da janela/.test(String(j.error||'')));
   }
 
   console.log('▶ Cenário 12 — cadastrar_logistica que falha abre conflito');
