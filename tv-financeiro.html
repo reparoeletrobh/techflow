@@ -775,7 +775,7 @@ async function openMoverModal(id) {
 }
 
 async function moverAgendada(id) {
-  const dateVal = document.getElementById('agendada-date').value;
+  const dateVal = (document.getElementById('agendada-date')||{}).value;
   if (!dateVal) { showToast('⚠️','Informe a data',''); return; }
   // Format for display: DD/MM/YYYY
   const [y,m,d] = dateVal.split('-');
@@ -1026,6 +1026,7 @@ function renderMover() {
 
   // Build list
   var lista = document.getElementById('mover-lista');
+  if (!lista) return;   // 🛡 elemento pode não existir nesta tela
   lista.innerHTML = '';
   var cores = {aguardando_dados:'#f97316',nf_emitida:'#3b9eff',faturamento:'#a855f7',
     pagamento_agendado:'#22c55e',entrega_agendada:'#f5c800',entrega_liberada:'#22c55e',

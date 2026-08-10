@@ -866,7 +866,7 @@ function openMoverModal(id) {
 }
 
 async function moverAgendada(id) {
-  const dateVal = document.getElementById('agendada-date').value;
+  const dateVal = (document.getElementById('agendada-date')||{}).value;
   if (!dateVal) { showToast('⚠️','Informe a data',''); return; }
   // Format for display: DD/MM/YYYY
   const [y,m,d] = dateVal.split('-');

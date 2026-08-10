@@ -1579,7 +1579,7 @@ async function carregarRelatorio(preset) {
   var ate = document.getElementById('tv-rel-ate').value;
   if (!de || !ate) return;
 
-  document.getElementById('rel-tabela').innerHTML = '<div style="font-family:var(--fm);font-size:11px;color:var(--muted);padding:8px;">Carregando...</div>';
+  (document.getElementById('rel-tabela')||{}).innerHTML = '<div style="font-family:var(--fm);font-size:11px;color:var(--muted);padding:8px;">Carregando...</div>';
 
   try {
     var r = await fetch('/api/tv-logistica?action=metricas').then(r=>r.json());
@@ -1631,9 +1631,9 @@ async function carregarRelatorio(preset) {
     html += '<td style="text-align:center;padding:7px 10px;font-weight:700;color:var(--accent);">'+(grand||'—')+'</td>';
     html += '</tr></table>';
 
-    document.getElementById('rel-tabela').innerHTML = html;
+    (document.getElementById('rel-tabela')||{}).innerHTML = html;
   } catch(e) {
-    document.getElementById('rel-tabela').innerHTML = '<div style="color:var(--red);font-family:var(--fm);font-size:11px;padding:8px;">Erro ao carregar: '+e.message+'</div>';
+    (document.getElementById('rel-tabela')||{}).innerHTML = '<div style="color:var(--red);font-family:var(--fm);font-size:11px;padding:8px;">Erro ao carregar: '+e.message+'</div>';
   }
 }
 
