@@ -114,6 +114,17 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 .mx-card:nth-child(2){animation-delay:.06s;}
 .mx-card:nth-child(3){animation-delay:.12s;}
 .mx-card:nth-child(4){animation-delay:.18s;}
+
+/* ── selos de triagem de TV ── */
+.selo-prio{background:rgba(34,197,94,.18);border:1px solid rgba(34,197,94,.55);color:#4ade80;
+  font-size:9.5px;font-weight:900;padding:2px 8px;border-radius:6px;letter-spacing:.04em;
+  display:inline-block;animation:prioPulse 1.5s ease-in-out infinite;}
+@keyframes prioPulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(34,197,94,.5);}
+  50%{opacity:.75;box-shadow:0 0 0 4px rgba(34,197,94,0);}}
+.selo-nao{background:rgba(239,68,68,.16);border:1px solid rgba(239,68,68,.5);color:#f87171;
+  font-size:9.5px;font-weight:900;padding:2px 8px;border-radius:6px;letter-spacing:.04em;display:inline-block;}
+.selo-aten{background:rgba(245,158,11,.16);border:1px solid rgba(245,158,11,.5);color:#fbbf24;
+  font-size:9.5px;font-weight:900;padding:2px 8px;border-radius:6px;display:inline-block;}
 </style>
 </head>
 <body>
@@ -401,6 +412,17 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 </div>
 
 <script>
+// ── 🏷️ selo de triagem de TV: PRIORIDADE (verde piscando) ou NÃO COLETAR ──
+function seloTriagem(f){
+  var s = f && f.seloTriagem;
+  if(!s) return '';
+  var t = (f.motivoTriagem||'').replace(/"/g,'&quot;');
+  if(s==='PRIORIDADE') return '<span class="selo-prio" title="'+t+'">⭐ PRIORIDADE</span> ';
+  if(s==='NAO_COLETAR') return '<span class="selo-nao" title="'+t+'">🚫 NÃO COLETAR</span> ';
+  if(s==='ATENCAO') return '<span class="selo-aten" title="'+t+'">⚠️ CONFIRMAR</span> ';
+  return '';
+}
+
 var _fichas=[], _espelho=[], _busca='';
 
 // ── Relatório ────────────────────────────────────────────────────────────
@@ -1031,6 +1053,7 @@ function render(){
       :'border-color:rgba(239,68,68,.4);';
     return '<div class="card" style="'+estiloEsp+'">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><div class="card-nome" style="margin:0;">'+esc(f.nome||'—')+'</div>'+sisBadge+'</div>'
+      +(seloTriagem(f)?'<div style="margin:2px 0 5px;">'+seloTriagem(f)+'</div>':'')
       +'<div class="card-equip">'+esc(f.equipamento||'—')+'</div>'
       +'<div class="card-info">'+esc(f.defeito||'—')+'</div>'
       +(f.endereco?'<div class="card-info">'+esc(f.endereco)+'</div>':'')

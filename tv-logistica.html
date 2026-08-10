@@ -263,6 +263,17 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 @keyframes distPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0);}50%{box-shadow:0 0 0 3px rgba(239,68,68,.12);}}
 .log-box{background:#0f1319;border:1px solid #1e2228;border-radius:9px;padding:9px 11px;
   max-height:230px;overflow-y:auto;font-family:ui-monospace,monospace;font-size:10.5px;color:#c9ced6;line-height:1.75;}
+
+/* ── selos de triagem de TV ── */
+.selo-prio{background:rgba(34,197,94,.18);border:1px solid rgba(34,197,94,.55);color:#4ade80;
+  font-size:9.5px;font-weight:900;padding:2px 8px;border-radius:6px;letter-spacing:.04em;
+  display:inline-block;animation:prioPulse 1.5s ease-in-out infinite;}
+@keyframes prioPulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(34,197,94,.5);}
+  50%{opacity:.75;box-shadow:0 0 0 4px rgba(34,197,94,0);}}
+.selo-nao{background:rgba(239,68,68,.16);border:1px solid rgba(239,68,68,.5);color:#f87171;
+  font-size:9.5px;font-weight:900;padding:2px 8px;border-radius:6px;letter-spacing:.04em;display:inline-block;}
+.selo-aten{background:rgba(245,158,11,.16);border:1px solid rgba(245,158,11,.5);color:#fbbf24;
+  font-size:9.5px;font-weight:900;padding:2px 8px;border-radius:6px;display:inline-block;}
 </style>
 </head>
 <body>
@@ -512,6 +523,17 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 <div class="toast" id="toast"></div>
 
 <script>
+// ── 🏷️ selo de triagem de TV: PRIORIDADE (verde piscando) ou NÃO COLETAR ──
+function seloTriagem(f){
+  var s = f && f.seloTriagem;
+  if(!s) return '';
+  var t = (f.motivoTriagem||'').replace(/"/g,'&quot;');
+  if(s==='PRIORIDADE') return '<span class="selo-prio" title="'+t+'">⭐ PRIORIDADE</span> ';
+  if(s==='NAO_COLETAR') return '<span class="selo-nao" title="'+t+'">🚫 NÃO COLETAR</span> ';
+  if(s==='ATENCAO') return '<span class="selo-aten" title="'+t+'">⚠️ CONFIRMAR</span> ';
+  return '';
+}
+
 // ── ESTRUTURA DE SERVIÇOS ────────────────────────────────────
 const SERVICOS = {
   microondas: {
@@ -795,6 +817,7 @@ function cardHTML(f, phase) {
   return `
   <div class="card${emRotaAlerta ? ' alerta-rota' : ''}${_alertaDist ? ' alerta-dist' : ''}">
     ${_alertaDist ? `<div class="faixa-dist">⚠️ NÃO DISTRIBUÍDA — ${escHtml(_alertaDist)}</div>` : ''}
+    ${seloTriagem(f) ? `<div style="margin:0 0 7px;">${seloTriagem(f)}</div>` : ''}
     <div class="card-left-bar" style="background:${barCor};"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;">
       <div class="card-id">${f.id}</div>

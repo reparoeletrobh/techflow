@@ -36,6 +36,17 @@ h1{font-size:17px;font-weight:900;margin-bottom:4px;}
 .empty{text-align:center;color:var(--dim);padding:40px 16px;font-size:14px;line-height:1.6;}
 .ag-pisca{animation:agPulse 1.4s ease-in-out infinite;}
 @keyframes agPulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.55;transform:scale(1.015);}}
+
+/* ── selos de triagem de TV ── */
+.selo-prio{background:rgba(34,197,94,.18);border:1px solid rgba(34,197,94,.55);color:#4ade80;
+  font-size:9.5px;font-weight:900;padding:2px 8px;border-radius:6px;letter-spacing:.04em;
+  display:inline-block;animation:prioPulse 1.5s ease-in-out infinite;}
+@keyframes prioPulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(34,197,94,.5);}
+  50%{opacity:.75;box-shadow:0 0 0 4px rgba(34,197,94,0);}}
+.selo-nao{background:rgba(239,68,68,.16);border:1px solid rgba(239,68,68,.5);color:#f87171;
+  font-size:9.5px;font-weight:900;padding:2px 8px;border-radius:6px;letter-spacing:.04em;display:inline-block;}
+.selo-aten{background:rgba(245,158,11,.16);border:1px solid rgba(245,158,11,.5);color:#fbbf24;
+  font-size:9.5px;font-weight:900;padding:2px 8px;border-radius:6px;display:inline-block;}
 </style>
 </head>
 <body>
@@ -58,6 +69,17 @@ h1{font-size:17px;font-weight:900;margin-bottom:4px;}
 </div>
 <div id="lista"></div>
 <script>
+// ── 🏷️ selo de triagem de TV: PRIORIDADE (verde piscando) ou NÃO COLETAR ──
+function seloTriagem(f){
+  var s = f && f.seloTriagem;
+  if(!s) return '';
+  var t = (f.motivoTriagem||'').replace(/"/g,'&quot;');
+  if(s==='PRIORIDADE') return '<span class="selo-prio" title="'+t+'">⭐ PRIORIDADE</span> ';
+  if(s==='NAO_COLETAR') return '<span class="selo-nao" title="'+t+'">🚫 NÃO COLETAR</span> ';
+  if(s==='ATENCAO') return '<span class="selo-aten" title="'+t+'">⚠️ CONFIRMAR</span> ';
+  return '';
+}
+
 var MOT=new URLSearchParams(location.search).get('m')||'';
 if(!MOT){
   // rewrite /tv/<nome> não expõe query ao browser — pegar do caminho
@@ -222,6 +244,7 @@ function render(){
         (_selMode?'<div style="font-size:13px;font-weight:900;color:'+(selecionada?'#4ade80':'#64748b')+';margin-bottom:4px;">'+(selecionada?'✔ SELECIONADA (parada '+(_sel.indexOf(f.id)+1)+')':'○ toca para selecionar')+'</div>':'')+
         '<div class="nm">'+esc(f.nome||'—')+agingHtml(f.movedAt)+(f.primeiroContatoEm?'<span class="badge-ctt">✅ contato feito</span>':'')+'</div>'+
         '<div class="eq">📍 '+esc(f.endereco||'sem endereço')+'</div>'+
+        (seloTriagem(f)?'<div style="margin-bottom:6px;">'+seloTriagem(f)+'</div>':'')+
         '<div class="eq">📺 '+esc(f.equipamento||'TV')+(f.defeito?' — '+esc(f.defeito):'')+(f.telefone?' · 📞 '+esc(f.telefone):'')+'</div>'+
         agendaHtml(f)+
         (f.regiao==='sem-regiao'?('<div style="margin-top:8px;"><select onchange="classificar(\''+f.id+'\',this.value)" style="width:100%;background:#1a1e26;border:1px solid #3a4150;border-radius:8px;padding:9px;color:#f0f2f5;font-size:13px;">'+
