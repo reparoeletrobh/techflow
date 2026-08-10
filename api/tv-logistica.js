@@ -212,12 +212,9 @@ async function remarcarParaProspeccao(ficha, motivo, sistema, quem) {
     const pdb = (await dbGet(KEYP)) || { fichas: [] };
     pdb.fichas = pdb.fichas || [];
     const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
-    // 🔁 SEMPRE devolve, mesmo que já exista ficha em outra coluna: quem volta do
-    // remarcar precisa de contato rápido, e em lead ou retornar a fila é mais lenta.
-    // Se houver duplicata, a equipe percebe no atendimento e exclui a antiga.
-    const jaEmContato = pdb.fichas.some(f => d8(f.telefone) === d8(ficha.telefone) &&
-      String(f.status || '') === 'entrar_contato' && String(f.origem || '') === 'remarcar');
-    if (jaEmContato) return { ok: true, info: 'já voltou do remarcar e está em Entrar em Contato' };
+    // 🔁 SEM EXCEÇÃO: toda ficha que cai em remarcar vai para Entrar em Contato.
+    // Duplicata não é problema — a equipe percebe no atendimento e exclui a antiga.
+    // Ficha presa na coluna é problema, e era o que acontecia com os filtros.
     pdb.fichas.unshift({
       id: 'rem_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6),
       nome: ficha.nome || ficha.nomeContato || '?',
@@ -814,11 +811,11 @@ module.exports = async function handler(req, res) {
         if (String(f.status || '') === 'entrar_contato') naProspeccao.add(d8(f.telefone));
       }
     }
+    // 🎯 TODAS as que estão na coluna, sem exceção
     const pendentes = [];
     for (const [banco, sis] of [[logTv, 'tv'], [logAdm, 'adm']]) {
       for (const f of (((banco || {}).fichas) || [])) {
         if (String(f.phase || '') !== 'remarcar') continue;
-        if (naProspeccao.has(d8(f.telefone))) continue;
         pendentes.push({ f, sis });
       }
     }
@@ -854,19 +851,17 @@ module.exports = async function handler(req, res) {
       if (r.ok) feitos.push(p.f.nome || '?'); else erros.push((p.f.nome || '?') + ': ' + r.erro);
       await new Promise(s => setTimeout(s, 120));
     }
-    // 🚪 LIBERA A COLUNA: quem já tem ficha em Entrar em Contato vindo do remarcar
-    // não precisa ser devolvido de novo, mas também não pode continuar ocupando a coluna
+    // 🚪 GARANTIA FINAL: relê os bancos e tira da coluna tudo que sobrou
     const liberadas = [];
-    for (const [banco, chave, sis] of [[logTv, LOG_KEY, 'tv'], [logAdm, 'reparoeletro_logistica', 'adm']]) {
+    for (const chave of [LOG_KEY, 'reparoeletro_logistica']) {
+      const banco = await dbGet(chave);
       if (!banco || !Array.isArray(banco.fichas)) continue;
       let mudou = 0;
       for (const f of banco.fichas) {
         if (String(f.phase || '') !== 'remarcar') continue;
-        if (!naProspeccao.has(d8(f.telefone))) continue;   // esse foi devolvido agora
         f.phase = 'prospeccao';
         f.enviadoProspeccaoEm = f.enviadoProspeccaoEm || new Date().toISOString();
-        f.saiuDoRemarcarPor = 'já estava no atendimento ativo';
-        liberadas.push(sis.toUpperCase() + ' | ' + (f.nome || '?'));
+        liberadas.push((f.nome || '?') + ' ' + String(f.telefone || '').slice(-4));
         mudou++;
       }
       if (mudou) await dbSet(chave, banco);
