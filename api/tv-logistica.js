@@ -726,6 +726,45 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, id, agendadoPara: f.agendadoPara || null });
   }
 
+  // ── 🔍 DIAG-REMARCAR: o que aconteceu com cada ficha da coluna ──
+  if (action === 'diag-remarcar') {
+    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const [logTv, prosA, prosT] = await Promise.all([
+      dbGet(LOG_KEY), dbGet('prospeccao_adm'), dbGet('prospeccao_tv'),
+    ]);
+    const naProsp = {};
+    for (const p of [prosA, prosT]) {
+      for (const f of (((p || {}).fichas) || [])) {
+        const d = d8(f.telefone);
+        if (!d) continue;
+        naProsp[d] = naProsp[d] || [];
+        naProsp[d].push(String(f.status || '?') + (f.origem === 'remarcar' ? ' (do remarcar)' : ''));
+      }
+    }
+    const linhas = ((logTv || {}).fichas || [])
+      .filter(f => String(f.phase || '') === 'remarcar')
+      .map(f => ({
+        nome: f.nome || '?', tel: d8(f.telefone).slice(-4),
+        equipamento: String(f.equipamento || '').slice(0, 20),
+        entrouEm: f.remarcadoEm || f.movedAt,
+        motivo: f.motivoRemarcar || '(sem motivo)',
+        temMotivo: !!f.motivoRemarcar,
+        jaFoiDevolvida: !!f.enviadoProspeccaoEm,
+        ondeEstaNaProspeccao: naProsp[d8(f.telefone)] || null,
+      }))
+      .sort((a, b) => String(b.entrouEm).localeCompare(String(a.entrouEm)));
+    return res.status(200).json({ ok: true,
+      totalNaColuna: linhas.length,
+      comMotivoRegistrado: linhas.filter(l => l.temMotivo).length,
+      jaForamDevolvidas: linhas.filter(l => l.jaFoiDevolvida).length,
+      temFichaNaProspeccao: linhas.filter(l => l.ondeEstaNaProspeccao).length,
+      L: linhas.map(l => hh(l.entrouEm) + ' | ' + String(l.nome).slice(0, 16).padEnd(16) + ' ' + l.tel +
+        ' | motivo: ' + (l.temMotivo ? 'sim' : 'NÃO') +
+        ' | devolvida: ' + (l.jaFoiDevolvida ? 'sim' : 'NÃO') +
+        ' | prospecção: ' + (l.ondeEstaNaProspeccao ? l.ondeEstaNaProspeccao.join(', ') : 'não está')) });
+  }
+
   // ── ♻️ REPROCESSAR-REMARCAR: devolve ao atendimento as que ficaram para trás ──
   if (action === 'reprocessar-remarcar') {
     const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
