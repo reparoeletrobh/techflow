@@ -209,6 +209,14 @@ module.exports = async function handler(req, res) {
 
   // ── POST limpar-concluidos
   if (req.method === "POST" && action === "limpar-concluidos") {
+    // 🚫 DESATIVADO: este botão apagou 59 equipamentos comprados em 10/08.
+    // Foi removido da tela e o endpoint só responde com liberar=1, para uso técnico.
+    if (String(req.query.liberar || '') !== '1') {
+      return res.status(200).json({ ok: false,
+        error: '🚫 função desativada — ela apagava os equipamentos já comprados',
+        motivo: 'em 10/08 removeu 59 fichas sem possibilidade de desfazer',
+        seRealmentePrecisar: 'acrescente &liberar=1&confirmar=1' });
+    }
     const db = await dbGet(COMPRA_KEY) || defaultDB();
     const before = db.fichas.length;
     const removidas = db.fichas.filter(f => f.status !== "analise");
