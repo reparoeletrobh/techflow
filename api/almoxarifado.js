@@ -224,16 +224,13 @@ export default async function handler(req, res) {
         if (!primeira) ((ckv && ckv.vendas) || []).forEach(v => { if (!s.f2.ck.includes(String(v.id || v.createdAt))) vendaTarefa(v, 'Checkout'); });
         s.f2.ck = novoCk;
 
-        // Compra Equip: nova ficha em análise → avaliar; status comprado → levar p/ área
+        // 🚫 DESLIGADO: a criação automática de tarefa a partir do Compra Equip gerou
+        // 50 tarefas de uma vez em 10/08 quando o snapshot se perdeu. A ficha de análise
+        // de compra já é criada pelo bot ao chegar na F5 da negociação — não precisa daqui.
         const novoAna = [], novoComp = [];
         for (const f of ((ceq && ceq.fichas) || [])) {
           if (f.status === 'analise') {
-            novoAna.push(f.id);
-            if (!primeira && !s.f2.ceAna.includes(f.id) && !jaTarefa(f.id, 'avaliar-compra')) {
-              pushTarefa(db.tarefas, novaTarefa({ tipo: 'avaliar-compra', cardId: f.id,
-                cliente: f.nomeContato || f.cliente || '—', tel: f.telefone || '', equipamento: f.equipamento || f.descricao || '—',
-                origem: 'Compra Equip', destino: 'analise' }));
-            }
+            novoAna.push(f.id);      // segue registrando no snapshot, mas NÃO cria tarefa
           }
           if (f.status === 'comprado') {
             novoComp.push(f.id);

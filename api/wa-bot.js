@@ -2761,6 +2761,71 @@ export default async function handler(req, res) {
       encontrados: out.length, cards: out });
   }
 
+  // ── 📋 PENDENTES-NEGOCIACAO: todo orçamento enviado e ainda não aprovado ──
+  if (action === 'pendentes-negociacao') {
+    const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const [evts, ppA, ppT, ctrl7] = await Promise.all([
+      lerEvts(), dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('wa_recuperacao_7d'),
+    ]);
+    const universo = (((ppA || {}).cards) || []).map(c => ({ ...c, _s: 'ADM' }))
+      .concat((((ppT || {}).cards) || []).map(c => ({ ...c, _s: 'TV' })));
+    // só quem está em aguardando_aprovacao = recebeu orçamento e não aprovou
+    const abertos = universo.filter(c => String(c.phaseId || c.phase || '') === 'aguardando_aprovacao');
+
+    // marcadores de cada fase nas mensagens que o bot enviou
+    const MARCAS = [
+      { f: 'F5 — comprar o equipamento', re: /interesse em nos vender|comprar (o )?seu equipamento|vender o seu/i },
+      { f: 'F4 — troca por seminovo', re: /na troca|seminovo|trade|equipamento na troca/i },
+      { f: 'F3 — desconto balcão', re: /aqui na loja|trazendo (o|seu)|retirar o frete|balc[ãa]o/i },
+      { f: 'F2 — desconto Pix', re: /no pix|pelo pix|sendo no pix/i },
+      { f: 'F1 — orçamento enviado', re: /or[çc]amento|ficou pronto|valor do conserto/i },
+    ];
+    const clientes7 = ((ctrl7 || {}).clientes) || {};
+    const linhas = [];
+    for (const c of abertos) {
+      const d8 = d8f(c.telefone);
+      if (d8.length < 8) continue;
+      const meus = (evts || []).filter(e => d8f(e.tel) === d8)
+        .sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+      const saidas = meus.filter(e => e.dir === 'out' && e.tipo !== 'template');
+      if (!saidas.length && !clientes7[d8]) continue;      // nunca falamos com ele
+      // fase mais avançada que o bot já ofereceu
+      let fase = 'F1 — orçamento enviado';
+      for (const m of MARCAS) {
+        if (saidas.some(e => m.re.test(String(e.texto || '')))) { fase = m.f; break; }
+      }
+      const ultimaIn = meus.filter(e => e.dir === 'in').slice(-1)[0];
+      const ultimaOut = saidas.slice(-1)[0];
+      const rec = clientes7[d8];
+      const hDesde = ultimaIn ? ((Date.now() - new Date(ultimaIn.ts).getTime()) / 3600000) : null;
+      linhas.push({
+        nome: c.nomeContato || '?', tel: d8.slice(-4), sistema: c._s,
+        equipamento: String(c.equipamento || c.descricao || '').slice(0, 22),
+        valor: parseFloat(c.valor || 0) || 0,
+        faseNegociacao: fase,
+        respostasDoCliente: meus.filter(e => e.dir === 'in').length,
+        horasSemResponder: hDesde != null ? Number(hDesde.toFixed(1)) : null,
+        recuperacao: rec ? rec.tentativas + '/7' : 'não entrou',
+        ultimoContato: ultimaOut ? ultimaOut.ts : null,
+        conflitoAberto: !!(rec && rec.conflitoAberto),
+      });
+    }
+    linhas.sort((a, b) => b.valor - a.valor);
+    const porFase = linhas.reduce((o, l) => { o[l.faseNegociacao] = (o[l.faseNegociacao] || 0) + 1; return o; }, {});
+    const porRec = linhas.reduce((o, l) => { o[l.recuperacao] = (o[l.recuperacao] || 0) + 1; return o; }, {});
+    return res.status(200).json({ ok: true,
+      totalAguardandoAprovacao: abertos.length,
+      comHistoricoDeConversa: linhas.length,
+      valorEmAberto: Number(linhas.reduce((s, l) => s + l.valor, 0).toFixed(2)),
+      POR_FASE: porFase, POR_RECUPERACAO: porRec,
+      L: linhas.map(l => String(l.nome).slice(0, 18).padEnd(18) + ' ' + l.tel +
+        ' | R$ ' + String(l.valor).padStart(5) +
+        ' | ' + l.faseNegociacao.padEnd(26) +
+        ' | rec ' + l.recuperacao.padEnd(9) +
+        ' | ' + (l.horasSemResponder != null ? l.horasSemResponder + 'h' : 'nunca respondeu') +
+        (l.conflitoAberto ? ' | 🚨' : '')) });
+  }
+
   // ── 📈 TAXA-HISTORICA: aprovação por semana, com tempo de maturação ──
   if (action === 'taxa-historica') {
     const semanas = Math.min(12, Math.max(1, parseInt(req.query.semanas || '8', 10)));
