@@ -403,7 +403,9 @@ export default async function handler(req,res){
     await dbSet(KEY,db);
     // 🏅 LEAD CONVERTIDO: cadastro de logística feito a partir da coluna LEAD conta ponto
     try {
-      if (String(ficha.status || '') === 'lead' || String(ficha._faseOrigem || '') === 'lead') {
+      // ⚠️ ficha.status já virou 'logistica' algumas linhas acima — quem guarda a
+      // coluna de ORIGEM é stAntLog. Conferir ficha.status aqui nunca dava 'lead'.
+      if (String(stAntLog || '') === 'lead') {
         const dia = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
         const kC = 'prosp_convertidos_' + dia;
         const reg = (await dbGet(kC)) || { total: 0, itens: [] };
