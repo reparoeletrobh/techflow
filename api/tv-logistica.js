@@ -733,8 +733,24 @@ module.exports = async function handler(req, res) {
         pendentes.push({ f, sis });
       }
     }
+    // 🔍 mostra também as que foram excluídas do reprocessamento e por quê
+    const todasEmRemarcar = [];
+    for (const [banco, sis] of [[logTv, 'tv'], [logAdm, 'adm']]) {
+      for (const f of (((banco || {}).fichas) || [])) {
+        if (String(f.phase || '') !== 'remarcar') continue;
+        const ja = naProspeccao.has(d8(f.telefone));
+        todasEmRemarcar.push({ sis, nome: f.nome, tel: String(f.telefone || '').slice(-4),
+          equipamento: String(f.equipamento || '').slice(0, 22),
+          jaEstaNaProspeccao: ja, semTelefone: d8(f.telefone).length < 8 });
+      }
+    }
     if (String(req.query.aplicar || '') !== '1') {
       return res.status(200).json({ ok: true, modo: 'prévia',
+        totalEmRemarcar: todasEmRemarcar.length,
+        jaEstavamNaProspeccao: todasEmRemarcar.filter(x => x.jaEstaNaProspeccao).length,
+        TODAS: todasEmRemarcar.map(x => x.sis.toUpperCase() + ' | ' + String(x.nome || '?').slice(0, 20) +
+          ' ' + x.tel + ' | ' + x.equipamento + ' | ' +
+          (x.jaEstaNaProspeccao ? '✅ já está no atendimento' : '⏳ será devolvida')),
         emRemarcarSemVoltar: pendentes.length,
         L: pendentes.map(p => p.sis.toUpperCase() + ' | ' + String(p.f.nome || '?').slice(0, 20) +
           ' ' + String(p.f.telefone || '').slice(-4) + ' | ' +
