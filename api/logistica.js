@@ -266,6 +266,10 @@ module.exports = async function handler(req, res) {
         const q = new Date(f.remarcadoEm || f.enviadoProspeccaoEm || 0).getTime();
         if (!q || q < corte) continue;
         if (!f.motivoRemarcar && !f.enviadoProspeccaoEm) continue;
+        // 🕐 remarcada de dias atrás já foi tratada pela equipe e saiu de Entrar em
+        // Contato naturalmente — só cobra as das últimas 24h, que ainda deveriam estar lá
+        const recente = (Date.now() - q) < 24 * 3600000;
+        if (!recente && !String(f.phase || '').includes('remarcar')) continue;
         const chegou = emContato.has(dg(f.telefone));
         linhas.push({ sis, nome: f.nome || '?', tel: dg(f.telefone).slice(-4),
           equipamento: String(f.equipamento || '').slice(0, 20),
@@ -293,6 +297,39 @@ module.exports = async function handler(req, res) {
       L: linhas.slice(0, 60).map(l => (l.chegou ? '✅' : '🚨') + ' ' + hh(l.quando) + ' | ' +
         l.sis.padEnd(3) + ' | ' + String(l.nome).slice(0, 16).padEnd(16) + ' ' + l.tel +
         ' | ' + l.motivo) });
+  }
+
+  // ── 🔧 MIGRAR-REMARCAR: leva ao banco certo as fichas gravadas no lugar errado ──
+  if (action === 'migrar-remarcar') {
+    const dg = t => String(t || '').replace(/\D/g, '').slice(-8);
+    let movidas = 0; const lista = [];
+    for (const [errado, certo] of [['prospeccao_adm', 'fichas_adm'], ['prospeccao_tv', 'fichas_tv']]) {
+      const src = await dbGet(errado);
+      if (!src || !Array.isArray(src.fichas)) continue;
+      const dst = (await dbGet(certo)) || { fichas: [] };
+      dst.fichas = dst.fichas || [];
+      const restam = [];
+      for (const f of src.fichas) {
+        // só as que EU criei a partir do remarcar
+        if (String(f.origem || '') !== 'remarcar') { restam.push(f); continue; }
+        const jaLa = dst.fichas.some(x => dg(x.telefone) === dg(f.telefone) &&
+          String(x.status || '') === 'entrar_contato');
+        if (!jaLa) {
+          dst.fichas.unshift({ ...f, status: 'entrar_contato' });
+          lista.push((f.nome || '?') + ' ' + dg(f.telefone).slice(-4) + ' → ' + certo);
+          movidas++;
+        }
+        // sai do banco errado de qualquer forma
+      }
+      if (String(req.query.aplicar || '') === '1') {
+        src.fichas = restam;
+        await dbSet(errado, src);
+        await dbSet(certo, dst);
+      }
+    }
+    return res.status(200).json({ ok: true,
+      modo: String(req.query.aplicar || '') === '1' ? 'aplicado' : 'prévia',
+      movidas, lista });
   }
 
   // ── 🔎 RASTREAR: onde está uma ficha específica, em todos os bancos ──

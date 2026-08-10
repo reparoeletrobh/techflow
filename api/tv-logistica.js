@@ -907,6 +907,8 @@ module.exports = async function handler(req, res) {
         const q = new Date(f.remarcadoEm || f.enviadoProspeccaoEm || 0).getTime();
         if (!q || q < corte) continue;
         if (!f.motivoRemarcar && !f.enviadoProspeccaoEm) continue;
+        const recente = (Date.now() - q) < 24 * 3600000;
+        if (!recente && !String(f.phase || '').includes('remarcar')) continue;
         const chegou = emContato.has(dg(f.telefone));
         linhas.push({ sis, nome: f.nome || '?', tel: dg(f.telefone).slice(-4),
           equipamento: String(f.equipamento || '').slice(0, 20),
