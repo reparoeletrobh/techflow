@@ -105,6 +105,7 @@ a.voltar{color:var(--dim);text-decoration:none;font-size:11.5px;font-weight:700;
   <div class="aba" id="s-analise" onclick="secao('analise')">🔬 Análise &amp; criativos</div>
   <div class="aba" id="s-inteligencia" onclick="secao('inteligencia')">🧠 Inteligência</div>
   <div class="aba" id="s-programacao" onclick="secao('programacao')">📅 Programação</div>
+  <div class="aba" id="s-r2" onclick="secao('r2')">🎬 Criativos</div>
 </div>
 <div id="pg-anuncios">
   <div id="recado-copiloto"></div>
@@ -120,6 +121,7 @@ a.voltar{color:var(--dim);text-decoration:none;font-size:11.5px;font-weight:700;
 <div id="pg-analise" style="display:none;"></div>
 <div id="pg-inteligencia" style="display:none;"></div>
 <div id="pg-programacao" style="display:none;"></div>
+<div class="pg" id="pg-r2" style="display:none;"></div>
 
 <div class="rodape">
   <a class="voltar" href="/adm">← Menu</a>
@@ -255,7 +257,7 @@ function render(){
 }
 
 function secao(s){
-  ['anuncios','copiloto','analise','inteligencia','programacao'].forEach(function(x){
+  ['anuncios','copiloto','analise','inteligencia','programacao','r2'].forEach(function(x){
     document.getElementById('pg-'+x).style.display=x===s?'block':'none';
     var t=document.getElementById('s-'+x);
     if(x===s){t.classList.add('on');t.style.borderColor='#f97316';t.style.background='#f9731622';t.style.color='#fff';}
@@ -265,6 +267,7 @@ function secao(s){
   if(s==='analise'&&!window._an)carregarAnalise(false);
   if(s==='inteligencia'&&!window._int)carregarInteligencia(false);
   if(s==='programacao'){carregarProgramacao();checarPendentes();}
+  if(s==='r2'){carregarR2();}
   if(s==='anuncios')checarPendentes();
   if(s==='copiloto')checarPendentes();
 }
@@ -291,6 +294,77 @@ async function checarPendentes(){
     +(urgente?'<a href="https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=1267284360833794" target="_blank" style="display:inline-block;margin-top:9px;background:#1d4ed8;color:#fff;text-decoration:none;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:800;">Abrir o Gerenciador para aprovar →</a>':'')
   +'</div>';
 }
+// ── 🎬 CRIATIVOS NO R2 ────────────────────────────────────────────────
+var _r2Pasta='Criativos Reparo Eletro';
+async function carregarR2(){
+  var el=document.getElementById('pg-r2');
+  el.innerHTML='<div class="vazio-msg">🎬 Carregando os criativos…</div>';
+  var r=await fetch('/api/trafego?action=r2-listar&pasta='+encodeURIComponent(_r2Pasta))
+    .then(function(x){return x.json();}).catch(function(){return null;});
+  if(!r||!r.ok){el.innerHTML='<div class="vazio-msg">não consegui ler o bucket</div>';return;}
+  var CORES={microondas:'#f97316',purificador:'#3b82f6',adega:'#a855f7',tv:'#22c55e',forno:'#eab308',institucional:'#8b93a3'};
+  var cards=(r.arquivos||[]).map(function(a){
+    var cor=CORES[a.categoria]||'#8b93a3';
+    return '<div style="background:#12161d;border:1px solid #242b39;border-left:3px solid '+cor+';border-radius:11px;padding:11px 13px;margin-bottom:8px;">'
+      +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+        +'<span style="font-size:9.5px;font-weight:900;color:'+cor+';background:'+cor+'22;padding:2px 7px;border-radius:5px;">'+esc(a.categoria.toUpperCase())+'</span>'
+        +'<span style="font-size:12.5px;font-weight:700;color:#f0f2f5;">'+esc(a.nome)+'</span>'
+        +'<span style="font-size:10.5px;color:#5a6270;">'+(a.mb||'?')+'MB</span>'
+        +'<button class="btn" style="margin-left:auto;font-size:10px;padding:3px 9px;color:#f87171;" '
+        +'onclick="apagarR2(\''+esc(a.chave)+'\',\''+esc(a.nome)+'\')">✕ apagar</button>'
+      +'</div>'
+      +(a.texto?'<div style="font-size:11px;color:#c9ced6;margin-top:6px;line-height:1.5;">'
+        +'<b style="color:#e8eaed;">'+esc(a.texto.titulo)+'</b><br>'+esc(a.texto.corpo)+'</div>':'')
+    +'</div>';
+  }).join('');
+  el.innerHTML='<div style="background:var(--painel);border:1px solid var(--linha);border-radius:14px;padding:15px 17px;">'
+    +'<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:12px;">'
+      +'<span style="font-size:15px;font-weight:900;color:#a78bfa;">🎬 Criativos prontos para subir</span>'
+      +'<span style="font-size:11px;color:#5a6270;">'+(r.total||0)+' vídeo(s) · '+(r.totalMB||0)+'MB</span>'
+      +'<button class="btn" style="margin-left:auto;font-size:11px;padding:5px 11px;" onclick="carregarR2()">↻</button>'
+    +'</div>'
+    +'<div style="border:2px dashed #2a3140;border-radius:12px;padding:18px;text-align:center;margin-bottom:14px;" '
+      +'ondragover="event.preventDefault();this.style.borderColor=\'#a78bfa\';" '
+      +'ondragleave="this.style.borderColor=\'#2a3140\';" '
+      +'ondrop="event.preventDefault();this.style.borderColor=\'#2a3140\';enviarR2(event.dataTransfer.files);">'
+      +'<div style="font-size:13px;font-weight:800;color:#c9ced6;">Arraste os vídeos aqui</div>'
+      +'<div style="font-size:10.5px;color:#5a6270;margin:5px 0 9px;">o nome do arquivo define a categoria e o texto do anúncio</div>'
+      +'<input type="file" id="r2-file" multiple accept="video/*" style="display:none;" onchange="enviarR2(this.files)">'
+      +'<button class="btn" style="background:#7c3aed;color:#fff;font-weight:800;padding:8px 18px;" '
+      +'onclick="document.getElementById(\'r2-file\').click()">📁 escolher arquivos</button>'
+      +'<div id="r2-progresso" style="margin-top:10px;"></div>'
+    +'</div>'
+    +(cards||'<div style="font-size:11.5px;color:#5a6270;text-align:center;padding:12px;">nenhum vídeo no bucket</div>')
+    +((r.total||0)?'<button class="btn" style="width:100%;margin-top:10px;padding:12px;background:#16a34a;color:#fff;font-weight:900;" '
+      +'onclick="secao(\'programacao\');setTimeout(function(){cicloAuto(0);},300);">🚀 usar no próximo ciclo</button>':'')
+  +'</div>';
+}
+async function enviarR2(files){
+  if(!files||!files.length)return;
+  var pr=document.getElementById('r2-progresso');
+  var total=files.length, feitos=0, erros=[];
+  for(var i=0;i<files.length;i++){
+    var f=files[i];
+    pr.innerHTML='<div style="font-size:11.5px;color:#a78bfa;font-weight:700;">⏳ enviando '+(i+1)+'/'+total+' — '+esc(f.name)+'…</div>';
+    try{
+      var a=await fetch('/api/trafego?action=r2-url-upload&nome='+encodeURIComponent(f.name)+'&pasta='+encodeURIComponent(_r2Pasta))
+        .then(function(x){return x.json();});
+      if(!a||!a.ok){erros.push(f.name+': não consegui a permissão');continue;}
+      var up=await fetch(a.url,{method:'PUT',headers:a.headers,body:f});
+      if(up.ok)feitos++; else erros.push(f.name+': HTTP '+up.status);
+    }catch(e){erros.push(f.name+': '+e.message);}
+  }
+  pr.innerHTML='<div style="font-size:11.5px;font-weight:700;color:'+(erros.length?'#fbbf24':'#4ade80')+';">'
+    +(erros.length?'⚠️ ':'✅ ')+feitos+' de '+total+' enviado(s)'
+    +(erros.length?'<br><span style="font-size:10.5px;color:#f87171;">'+erros.map(esc).join('<br>')+'</span>':'')+'</div>';
+  setTimeout(carregarR2,1200);
+}
+async function apagarR2(chave,nome){
+  if(!confirm('Apagar "'+nome+'" do bucket?'))return;
+  await fetch('/api/trafego?action=r2-apagar&chave='+encodeURIComponent(chave)).catch(function(){});
+  carregarR2();
+}
+
 // ── 🤖 CICLO AUTOMÁTICO ───────────────────────────────────────────────
 async function cicloAuto(aplicar){
   var el=document.getElementById('pg-programacao');

@@ -2060,6 +2060,56 @@ module.exports = async function handler(req, res) {
       ANUNCIOS: (extrato || {}).ATIVOS || [] });
   }
 
+  // ── 📤 R2-LISTAR / R2-UPLOAD: gerenciar os vídeos do bucket pela tela ──
+  if (action === 'r2-listar') {
+    const pasta = String(req.query.pasta || 'Criativos Reparo Eletro');
+    const prefixo = pasta ? (pasta.replace(/^\/|\/$/g, '') + '/') : '';
+    const bucket = (process.env.R2_BUCKET || 'reparo-criativos').trim();
+    const R2_PUB = (process.env.R2_PUBLIC_URL || 'https://pub-2e45a0631d27491ea1b38cdd5520b4ea.r2.dev').replace(/\/$/, '');
+    const q = { 'list-type': '2', 'max-keys': '200' };
+    if (prefixo) q.prefix = prefixo;
+    const ass = await assinarR2('GET', '/' + bucket, q);
+    const xml = await fetch(ass.url, { headers: ass.headers }).then(x => x.text()).catch(() => '');
+    const chaves = [...String(xml).matchAll(/<Key>([^<]+)<\/Key>/g)].map(m => m[1]);
+    const tams = [...String(xml).matchAll(/<Size>(\d+)<\/Size>/g)].map(m => Number(m[1]));
+    const datas = [...String(xml).matchAll(/<LastModified>([^<]+)<\/LastModified>/g)].map(m => m[1]);
+    const arqs = chaves.map((k, i) => ({ chave: k, nome: k.split('/').pop(),
+      mb: tams[i] ? Math.round(tams[i] / 1048576) : null,
+      quando: datas[i] || null,
+      url: R2_PUB + '/' + k.split('/').map(encodeURIComponent).join('/'),
+      categoria: categoriaDe(k.split('/').pop(), 'anuncio'),
+      texto: textoPorDefeito(k.split('/').pop(), '') }))
+      .filter(a => /\.(mp4|mov|avi|mkv|webm)$/i.test(a.nome));
+    return res.status(200).json({ ok: true, pasta: prefixo || '(raiz)',
+      total: arqs.length,
+      totalMB: arqs.reduce((s, a) => s + (a.mb || 0), 0),
+      porCategoria: arqs.reduce((o, a) => { o[a.categoria] = (o[a.categoria] || 0) + 1; return o; }, {}),
+      arquivos: arqs });
+  }
+  // gera a URL assinada para o navegador enviar o arquivo direto ao R2
+  if (action === 'r2-url-upload') {
+    const nome = String(req.query.nome || '').trim();
+    const pasta = String(req.query.pasta || 'Criativos Reparo Eletro');
+    if (!nome) return res.status(400).json({ ok: false, error: 'informe ?nome=arquivo.mov' });
+    const bucket = (process.env.R2_BUCKET || 'reparo-criativos').trim();
+    const chave = (pasta ? pasta.replace(/^\/|\/$/g, '') + '/' : '') + nome;
+    const caminho = '/' + bucket + '/' + chave.split('/').map(encodeURIComponent).join('/');
+    const ass = await assinarR2('PUT', caminho, {});
+    return res.status(200).json({ ok: true, url: ass.url, headers: ass.headers, chave });
+  }
+  // apaga um arquivo específico
+  if (action === 'r2-apagar') {
+    const chave = String(req.query.chave || '').trim();
+    if (!chave) return res.status(400).json({ ok: false, error: 'informe ?chave=' });
+    const bucket = (process.env.R2_BUCKET || 'reparo-criativos').trim();
+    const caminho = '/' + bucket + '/' + chave.split('/').map(encodeURIComponent).join('/');
+    const ass = await assinarR2('DELETE', caminho, {});
+    const r = await fetch(ass.url, { method: 'DELETE', headers: ass.headers })
+      .then(x => ({ ok: x.status === 204 || x.status === 200, st: x.status }))
+      .catch(e => ({ ok: false, st: e.message }));
+    return res.status(200).json({ ok: r.ok, chave, http: r.st });
+  }
+
   // ── 🧽 LIMPAR-R2: apaga do bucket os vídeos que já viraram anúncio ──
   if (action === 'limpar-r2') {
     const TKL = String(req.query.token || '').trim() || TOKEN;
