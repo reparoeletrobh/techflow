@@ -211,10 +211,26 @@ module.exports = async function handler(req, res) {
   if (req.method === "POST" && action === "limpar-concluidos") {
     const db = await dbGet(COMPRA_KEY) || defaultDB();
     const before = db.fichas.length;
+    const removidas = db.fichas.filter(f => f.status !== "analise");
+    // 💾 BACKUP antes de apagar — em 10/08 este botão apagou 59 comprados sem volta
+    if (removidas.length) {
+      try {
+        await dbSet('reparoeletro_compra_equip_lixeira', {
+          em: new Date().toISOString(), quantidade: removidas.length, fichas: removidas });
+      } catch (e) {}
+    }
+    // 🚧 trava: apagar muita coisa de uma vez exige confirmação explícita
+    if (removidas.length > 15 && String(req.query.confirmar || '') !== '1') {
+      return res.status(200).json({ ok: false,
+        error: '🚧 isto apagaria ' + removidas.length + ' fichas (comprados e não comprados)',
+        detalhe: removidas.slice(0, 10).map(f => (f.nomeContato || '?') + ' | ' + f.status),
+        oQueFazer: 'confirme na tela se é isso mesmo — as fichas foram copiadas para a lixeira' });
+    }
     db.fichas    = db.fichas.filter(f => f.status === "analise");
     db.syncedIds = db.fichas.map(f => f.pipefyId);
     await dbSet(COMPRA_KEY, db);
-    return res.status(200).json({ ok: true, removed: before - db.fichas.length });
+    return res.status(200).json({ ok: true, removed: before - db.fichas.length,
+      backup: removidas.length ? 'cópia guardada em reparoeletro_compra_equip_lixeira' : undefined });
   }
 
   if (req.method === "POST" && action === "desmarcar-cadastrado-vendas") {

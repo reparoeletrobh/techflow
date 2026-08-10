@@ -433,6 +433,70 @@ export default async function handler(req, res) {
       observacao: 'card de diagnóstico criado — com foto, modelo, RS, remarcar e não chegou' });
   }
 
+  // ── ♻️ RESTAURAR-COMPRADOS: recria as fichas apagadas pelo Limpar Concluídos ──
+  if (action === 'restaurar-comprados') {
+    const LISTA = [
+      ['Elias','2500'],['Erika','0898'],['Lidiane','9469'],['Angélica','9422'],['Kathelyn','8144'],
+      ['Luiz','6556'],['Emilene','6337'],['Flávia','6108'],['Fernando','1115'],['Pedro','3881'],
+      ['Cynthia','3457'],['Verlane','0217'],['Thiago','6868'],['Marília','7004'],['Regina','7290'],
+      ['Tatiane','4565'],['José Luiz','0119'],['Eduarda','3832'],['Marlúcia','0328'],['Lauro','5221'],
+      ['Marcus','0282'],['Claudia','4826'],['Lilian','9773'],['Deisiane','5279'],['Cristina','2119'],
+      ['Thalita','8962'],['Eva','7774'],['Aline','1464'],['Sofia','6574'],['Jaqueline','3289'],
+      ['Stephany','0927'],['Vanessa','2769'],['Luiz','9930'],['Sonia','1971'],['Tamiles','7788'],
+      ['Ronan','5553'],['Pedro Henrique','2711'],['Gabriel','8586'],['Ana','3068'],
+      ['Maria de Lourdes','0824'],['Cleide Nunes','2723'],['Wesley','7813'],['Francisco',''],
+      ['Guilherme','4892'],['Ivete Aparecida','0236'],['Kassiane','2333'],['Eliane','7428'],
+      ['Rodrigo','4830'],['Jonathas','4316'],['Falcon','1122'],['Carvalho','1206'],['Lincoln','8308'],
+    ];
+    const ceq = (await dbGet('reparoeletro_compra_equip')) || { fichas: [], syncedIds: [] };
+    ceq.fichas = ceq.fichas || [];
+    const pp = (await dbGet('reparoeletro_pipe')) || { cards: [] };
+    const arq = (await dbGet('reparoeletro_arquivo')) || { fichas: [] };
+    const universo = (pp.cards || []).concat(arq.fichas || []);
+    const d4 = t => String(t || '').replace(/\D/g, '').slice(-4);
+    const jaTem = new Set(ceq.fichas.map(f => d4(f.telefone)).filter(x => x.length === 4));
+
+    const novas = [], semDado = [], jaExistiam = [];
+    for (const [nome, cod] of LISTA) {
+      if (cod && jaTem.has(cod)) { jaExistiam.push(nome + ' ' + cod); continue; }
+      // procura o card no pipe/arquivo para trazer telefone e equipamento
+      const card = cod ? universo.find(c => d4(c.telefone) === cod) : null;
+      if (!card && !cod) { semDado.push(nome + ' (sem código)'); }
+      novas.push({
+        id: 'rec_' + (cod || Math.random().toString(36).slice(2, 7)) + '_' + Date.now().toString(36),
+        pipefyId: card ? String(card.pipefyId || card.id || '') : '',
+        title: nome + (cod ? ' ' + cod : ''),
+        nomeContato: card ? (card.nomeContato || nome) : nome,
+        telefone: card ? String(card.telefone || '') : '',
+        descricao: card ? String(card.equipamento || card.descricao || '') : '',
+        valor: 0,
+        fotos: [], recomendacao: 'sim',
+        status: 'comprado',
+        restauradoEm: new Date().toISOString(),
+        obs: 'restaurado após exclusão acidental pelo Limpar Concluídos em 10/08 10:21 — VALOR A CONFERIR',
+        createdAt: card ? (card.criadoEm || card.movedAt || null) : null,
+      });
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'PRÉVIA — nada gravado',
+        naListaParaRestaurar: LISTA.length,
+        vaiCriar: novas.length, jaExistiam: jaExistiam.length,
+        semTelefoneEncontrado: novas.filter(n => !n.telefone).length,
+        emAnaliseHoje: ceq.fichas.filter(f => f.status === 'analise').length,
+        ficariaTotal: ceq.fichas.length + novas.length,
+        amostra: novas.slice(0, 12).map(n => n.title + ' | ' + (n.telefone ? 'tel ok' : 'sem tel') +
+          ' | ' + (n.descricao || 'sem equipamento').slice(0, 24)),
+        dica: 'para restaurar: &aplicar=1' });
+    }
+    ceq.fichas = novas.concat(ceq.fichas);          // os em análise permanecem
+    await dbSet('reparoeletro_compra_equip', ceq);
+    return res.status(200).json({ ok: true,
+      restaurados: novas.length,
+      emAnaliseMantidos: ceq.fichas.filter(f => f.status === 'analise').length,
+      totalAgora: ceq.fichas.length,
+      observacao: 'restaurados com status comprado e valor zerado — a equipe precisa conferir os valores' });
+  }
+
   // ── 💾 PROCURAR-BACKUP: há cópia do banco com os comprados? ──
   if (action === 'procurar-backup') {
     const CANDIDATAS = [

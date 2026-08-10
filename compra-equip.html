@@ -284,7 +284,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
   </div>
   <div class="tbright">
     <button class="tbtn" onclick="sync()">↻ Sync Pipefy</button>
-    <button class="tbtn" onclick="limparConcluidos()">🗑 Limpar Concluídos</button>
+    <button class="tbtn" style="color:#f87171;border-color:rgba(248,113,113,.3);" title="APAGA os comprados e não comprados" onclick="limparConcluidos()">🗑 Limpar Concluídos</button>
     <button class="tbtn accent" onclick="load()">⟳ Atualizar</button>
   </div>
 </div>
@@ -453,8 +453,13 @@ async function sync(silent) {
 }
 
 async function limparConcluidos() {
-  if (!confirm('Remover fichas com status Comprado ou Não Comprado?')) return;
+  if (!confirm('⚠️ ATENÇÃO: isto APAGA todas as fichas marcadas como COMPRADO e NÃO COMPRADO.\n\nElas somem da aba Equipamentos Comprados.\n\nTem certeza?')) return;
+  if (!confirm('Confirmando de novo: os equipamentos JÁ COMPRADOS serão apagados desta tela. Continuar?')) return;
   var d = await api('limpar-concluidos', {});
+  if (d && d.ok === false && d.error) {
+    if (!confirm(d.error + '\n\nUma cópia foi guardada. Apagar mesmo assim?')) return;
+    d = await api('limpar-concluidos', { confirmar: '1' });
+  }
   if (d.ok) { showToast('🗑', d.removed + ' ficha(s) removida(s)', ''); await load(); }
 }
 
