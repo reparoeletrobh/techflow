@@ -151,6 +151,10 @@
     {
       "path": "/api/tv-triagem?action=aplicar-em-massa&aplicar=1&k=tfk-re2026-Bx7mQp9zKw4Y",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/tv-logistica?action=reprocessar-remarcar&aplicar=1&k=tfk-re2026-Bx7mQp9zKw4Y",
+      "schedule": "*/20 * * * *"
     }
   ],
   "rewrites": [

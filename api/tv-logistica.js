@@ -841,16 +841,31 @@ module.exports = async function handler(req, res) {
 
     // ⚖️ BALANCEAMENTO: quantas coletas cada um já tem em aberto hoje
     const EM_ABERTO = ['motorista_parceiro', 'horario_marcado', 'liberado_para_rota'];
-    const carga = { Jonathan: 0, Wilde: 0, Eduardo: 0 };
-    for (const f of (db.fichas || [])) {
-      const m = String(f.motoristaNome || '');
-      if (carga[m] === undefined) continue;
-      if (EM_ABERTO.includes(String(f.phase || ''))) carga[m]++;
+    // 🔤 os nomes vêm do próprio banco — grafias variam (Jhonatan, Jonathan…)
+    function quemE(nome) {
+      const s = String(nome || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      if (/jh?on|jonat|jhonat/.test(s)) return 'JONATHAN';
+      if (/wild|will|wil\b/.test(s)) return 'WILDE';
+      if (/eduard|edu\b/.test(s)) return 'EDUARDO';
+      return null;
     }
+    // nome exato que o sistema usa para cada um, lido das fichas
+    const nomeReal = { JONATHAN: null, WILDE: null, EDUARDO: null };
+    const carga = { JONATHAN: 0, WILDE: 0, EDUARDO: 0 };
+    for (const f of (db.fichas || [])) {
+      const chave = quemE(f.motoristaNome);
+      if (!chave) continue;
+      if (!nomeReal[chave]) nomeReal[chave] = String(f.motoristaNome);
+      if (EM_ABERTO.includes(String(f.phase || ''))) carga[chave]++;
+    }
+    // se algum não apareceu nas fichas, usa o nome padrão
+    nomeReal.JONATHAN = nomeReal.JONATHAN || 'Jhonatan';
+    nomeReal.WILDE = nomeReal.WILDE || 'Wilde';
+    nomeReal.EDUARDO = nomeReal.EDUARDO || 'Eduardo';
     // regiões vizinhas — quando um está sobrecarregado, o outro avança pela fronteira
     const VIZINHAS = {
-      Wilde:   ['bh-leste', 'bh-norte', 'venda-nova'],     // fronteira com o Eduardo
-      Eduardo: ['bh-oeste', 'bh-sul', 'contagem'],          // fronteira com o Wilde
+      WILDE:   ['bh-leste', 'bh-norte', 'venda-nova'],     // fronteira com o Eduardo
+      EDUARDO: ['bh-oeste', 'bh-sul', 'contagem'],          // fronteira com o Wilde
     };
     // um motorista pode "invadir" a região do outro se estiver com pelo menos 4 a menos
     const DIFERENCA_PARA_INVADIR = 4;
@@ -859,7 +874,7 @@ module.exports = async function handler(req, res) {
     const decisoes = [], vermelhos = [];
     // quem o Jonathan já vai atender hoje, por região — para o encaixe
     const regioesJonathan = new Set((db.fichas || [])
-      .filter(f => String(f.motoristaNome || '') === 'Jonathan' && String(f.phase || '') === 'motorista_parceiro')
+      .filter(f => quemE(f.motoristaNome) === 'JONATHAN' && String(f.phase || '') === 'motorista_parceiro')
       .map(f => regiaoDe(f)));
 
     for (const f of liberadas) {
@@ -875,15 +890,15 @@ module.exports = async function handler(req, res) {
       }
       // decide o motorista
       let escolhido = null, porque = '';
-      if (SEMPRE_JONATHAN.includes(reg)) { escolhido = 'Jonathan'; porque = 'Nova Lima é sempre dele'; }
-      else if (pol > 55) { escolhido = 'Jonathan'; porque = pol + '" — acima de 55'; }
-      else if (regioesJonathan.has(reg)) { escolhido = 'Jonathan'; porque = 'encaixe: já vai a ' + reg; }
-      else if (WILDE.includes(reg)) { escolhido = 'Wilde'; porque = reg; }
-      else if (EDUARDO.includes(reg)) { escolhido = 'Eduardo'; porque = reg; }
+      if (SEMPRE_JONATHAN.includes(reg)) { escolhido = 'JONATHAN'; porque = 'Nova Lima é sempre dele'; }
+      else if (pol > 55) { escolhido = 'JONATHAN'; porque = pol + '" — acima de 55'; }
+      else if (regioesJonathan.has(reg)) { escolhido = 'JONATHAN'; porque = 'encaixe: já vai a ' + reg; }
+      else if (WILDE.includes(reg)) { escolhido = 'WILDE'; porque = reg; }
+      else if (EDUARDO.includes(reg)) { escolhido = 'EDUARDO'; porque = reg; }
       // ⚖️ equilíbrio: se o dono da região está muito mais carregado e a região faz
       // fronteira com o outro, passa para quem tem menos — evita 11 contra 1
-      if (escolhido === 'Wilde' || escolhido === 'Eduardo') {
-        const outro = escolhido === 'Wilde' ? 'Eduardo' : 'Wilde';
+      if (escolhido === 'WILDE' || escolhido === 'EDUARDO') {
+        const outro = escolhido === 'WILDE' ? 'EDUARDO' : 'WILDE';
         const diff = carga[escolhido] - carga[outro];
         if (diff >= DIFERENCA_PARA_INVADIR && (VIZINHAS[outro] || []).includes(reg)) {
           porque = reg + ' · equilíbrio: ' + escolhido + ' tem ' + carga[escolhido] +
@@ -893,7 +908,7 @@ module.exports = async function handler(req, res) {
       }
       // nunca para quem recusou
       if (escolhido && recusou.includes(escolhido)) {
-        const alt = ['Jonathan', 'Wilde', 'Eduardo'].filter(m => m !== escolhido && !recusou.includes(m));
+        const alt = ['JONATHAN', 'WILDE', 'EDUARDO'].filter(m => m !== escolhido && !recusou.includes(nomeReal[m]));
         if (!alt.length) {
           vermelhos.push({ id: f.id, nome: f.nome, equipamento: f.equipamento,
             motivo: ['todos os motoristas já recusaram esta ficha'] });
@@ -934,7 +949,7 @@ module.exports = async function handler(req, res) {
       const f = (db.fichas || []).find(x => x.id === d.id);
       if (!f) continue;
       f.phase = 'motorista_parceiro';
-      f.motoristaNome = d.motorista;
+      f.motoristaNome = nomeReal[d.motorista] || d.motorista;
       f.distribuidoEm = new Date().toISOString();
       f.distribuidoPor = 'automático';
       f.motivoDistribuicao = d.porque;
