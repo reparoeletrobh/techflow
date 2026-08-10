@@ -1001,11 +1001,13 @@ function render(){
   document.getElementById('b1').textContent=leads.length;
   document.getElementById('b2').textContent=rets.length;
   document.getElementById('b3').textContent=clis.length;
-  document.getElementById('st-lead').textContent=leads.length;
-  document.getElementById('st-ret').textContent=rets.length;
-  document.getElementById('st-cli').textContent=clis.length;
-  document.getElementById('st-log').textContent=logs.length;
-  document.getElementById('st-tot').textContent=_fichas.length;
+  // 🛡 escrever num elemento que não existe mais quebrava o render inteiro e
+  // as colunas ficavam vazias — o st-log foi removido dos KPIs
+  function _kpi(id, v){ var e=document.getElementById(id); if(e)e.textContent=v; }
+  _kpi('st-lead', leads.length);
+  _kpi('st-ret', rets.length);
+  _kpi('st-cli', clis.length);
+  _kpi('st-tot', _fichas.length);
 
   var cnt=document.getElementById('rastrear-count');
   if(cnt)cnt.textContent=_busca?(leads.length+rets.length+clis.length)+' resultado(s)':'';
