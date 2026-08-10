@@ -433,6 +433,28 @@ export default async function handler(req, res) {
       observacao: 'card de diagnóstico criado — com foto, modelo, RS, remarcar e não chegou' });
   }
 
+  // ── 🔍 ESTADO-COMPRA-EQUIP: fotografia do banco, sem alterar nada ──
+  if (action === 'estado-compra-equip') {
+    const ceq = (await dbGet('reparoeletro_compra_equip')) || null;
+    if (!ceq) return res.status(200).json({ ok: false,
+      error: '🚨 a chave reparoeletro_compra_equip NÃO EXISTE no banco' });
+    const fichas = ceq.fichas || [];
+    const porStatus = fichas.reduce((o, f) => {
+      const s = String(f.status || '(sem status)'); o[s] = (o[s] || 0) + 1; return o; }, {});
+    const maisNova = fichas.map(f => f.criadoEm || f.em).filter(Boolean).sort().slice(-1)[0];
+    const maisAntiga = fichas.map(f => f.criadoEm || f.em).filter(Boolean).sort()[0];
+    return res.status(200).json({ ok: true,
+      totalFichas: fichas.length,
+      POR_STATUS: porStatus,
+      camposDoBanco: Object.keys(ceq),
+      maisAntiga, maisNova,
+      amostraComprados: fichas.filter(f => String(f.status) === 'comprado')
+        .slice(0, 15).map(f => String(f.nomeContato || f.cliente || '?').slice(0, 20) +
+          ' | ' + String(f.equipamento || '').slice(0, 20)),
+      amostraOutros: fichas.filter(f => String(f.status) !== 'comprado')
+        .slice(0, 5).map(f => String(f.nomeContato || f.cliente || '?').slice(0, 18) + ' | ' + f.status) });
+  }
+
   // ── 🧹 LIMPAR-COMPRA-EQUIP: remove tarefas que duplicam a seção Compra de Equipamentos ──
   if (action === 'limpar-compra-equip') {
     const db = (await dbGet(KEY)) || { tarefas: [] };
