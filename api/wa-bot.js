@@ -2825,6 +2825,24 @@ export default async function handler(req, res) {
       detalhe: linhas });
   }
 
+  // ── 🕐 COLETAS-PENDENTES: quem pediu coleta fora da janela ──
+  if (action === 'coletas-pendentes') {
+    const p = (await dbGet('wa_coleta_pendente')) || { itens: {} };
+    const itens = Object.entries(p.itens || {}).map(([d, v]) => ({
+      tel: d.slice(-4), quando: v.em, motivo: String(v.motivo || '').slice(0, 60) }))
+      .sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
+    if (String(req.query.limpar || '') === '1') {
+      await dbSet('wa_coleta_pendente', { itens: {} });
+      return res.status(200).json({ ok: true, limpou: itens.length });
+    }
+    return res.status(200).json({ ok: true, total: itens.length,
+      dentroDaJanelaAgora: dentroHorarioComercial(),
+      LISTA: itens.map(i => i.tel + ' | ' +
+        new Date(new Date(i.quando).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') +
+        (i.motivo ? ' | ' + i.motivo : '')),
+      observacao: 'são clientes que pediram coleta fora do horário — o bot prometeu retomar quando abrir' });
+  }
+
   // ── 📊 DIAGNOSTICO-COMERCIAL: cada orçamento enviado pelo bot e onde ele parou ──
   if (action === 'diagnostico-comercial') {
     const cfgD = (await dbGet('wa_bot_config')) || {};
@@ -5090,6 +5108,29 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
         const d8x = String(tel).replace(/\D/g, '').slice(-8);
         const pzE = (await dbGet('wa_bot_pausados')) || {};
         const autorizado = !pzE[d8x] && (cfgX.modoAberto === true || execTels.some(t => String(t).replace(/\D/g, '').slice(-8) === d8x));
+        // 🚧 TRAVA DE HORÁRIO: a regra existia apenas como texto no cérebro, e o modelo
+        // a ignorava quando o cliente reabria a conversa fora da janela. Agora o CÓDIGO
+        // recusa o cadastro fora do horário de coleta (seg-sex 8h-15h · sáb 8h-10h).
+        if (acaoAprovada === 'cadastrar_logistica' && !dentroHorarioComercial()
+            && String(via || '') !== 'humano' && String(req.query.forcar || '') !== '1') {
+          const agoraBr = new Date(Date.now() - 3 * 3600000);
+          await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'acao', tipo: 'bloqueio',
+            texto: '🚧 cadastro de logística BLOQUEADO — fora da janela de coleta (' +
+              String(agoraBr.getUTCHours()).padStart(2, '0') + ':' +
+              String(agoraBr.getUTCMinutes()).padStart(2, '0') + ' BRT)' });
+          // grava para retomada quando abrir
+          try {
+            const pend = (await dbGet('wa_coleta_pendente')) || { itens: {} };
+            const d8p = String(tel).replace(/\D/g, '').slice(-8);
+            pend.itens[d8p] = { tel, motivo: acaoMotivo || '', em: new Date().toISOString() };
+            await dbSet('wa_coleta_pendente', pend);
+          } catch (e) {}
+          return res.status(200).json({ ok: false,
+            error: '🚧 fora da janela de coleta — cadastro não realizado',
+            horarioDeColeta: 'segunda a sexta 8h-15h · sábado 8h-10h',
+            oQueFoiFeito: 'a mensagem NÃO foi enviada e o cliente ficou registrado para retomada quando abrir',
+            comoForcar: 'acrescente &forcar=1 se precisar cadastrar mesmo assim' });
+        }
         if (autorizado && acaoAprovada === 'cadastrar_logistica') {
           const ftvChk = (await dbGet('fichas_tv')) || { fichas: [] };
           const fichaTvSrc = (ftvChk.fichas || []).find(f => String(f.telefone || '').replace(/\D/g, '').slice(-8) === d8x);
