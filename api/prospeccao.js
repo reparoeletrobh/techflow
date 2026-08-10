@@ -323,6 +323,25 @@ export default async function handler(req,res){
   }
 
   // ── CADASTRAR-LOGISTICA ─────────────────────────────────────────────────
+  // ── 🏅 CONVERTIDOS: leads que viraram cadastro de logística ──
+  if(action==='convertidos'){
+    const dias=Math.min(60,Math.max(1,parseInt(req.query.dias||'7',10)));
+    let total=0; const itens=[];
+    for(let i=0;i<dias;i++){
+      const d=new Date(Date.now()-3*3600000-i*86400000).toISOString().slice(0,10);
+      const r=await dbGet('prosp_convertidos_'+d);
+      if(!r)continue;
+      total+=r.total||0;
+      for(const x of (r.itens||[]))itens.push({...x,dia:d});
+    }
+    const hojeD=new Date(Date.now()-3*3600000).toISOString().slice(0,10);
+    const rHoje=await dbGet('prosp_convertidos_'+hojeD);
+    return res.status(200).json({ok:true,periodoDias:dias,
+      hoje:(rHoje&&rHoje.total)||0,total,
+      lista:itens.slice(0,60).map(x=>x.dia+' | '+String(x.nome||'?').slice(0,20)+' '+x.telefone+
+        ' | '+String(x.equipamento||'').slice(0,20)+' | '+(x.sistema||'').toUpperCase()+' · '+(x.tipoColeta||''))});
+  }
+
   if(req.method==='POST'&&action==='cadastrar-logistica'){
     const{id,sistema,tipoColeta,dataAgendada,faixaHorario,dados}=req.body||{};
     const db=(await dbGet(KEY))||{fichas:[]};
@@ -376,6 +395,23 @@ export default async function handler(req,res){
     ficha.logisticaSistema=sistema==='tv'?'tv':'adm';
     await logEventos([{tipo:'logistica',de:stAntLog||null,sis:sistema,id:idEvt(ficha),nome:ficha.nome}]);
     await dbSet(KEY,db);
+    // 🏅 LEAD CONVERTIDO: cadastro de logística feito a partir da coluna LEAD conta ponto
+    try {
+      if (String(ficha.status || '') === 'lead' || String(ficha._faseOrigem || '') === 'lead') {
+        const dia = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+        const kC = 'prosp_convertidos_' + dia;
+        const reg = (await dbGet(kC)) || { total: 0, itens: [] };
+        if (!reg.itens.some(x => x.id === ficha.id)) {
+          reg.total++;
+          reg.itens.push({ id: ficha.id, nome: ficha.nome,
+            telefone: String(ficha.telefone || '').slice(-4),
+            equipamento: ficha.equipamento || '', sistema,
+            tipoColeta, em: new Date().toISOString() });
+          await dbSet(kC, reg);
+        }
+        ficha.leadConvertidoEm = new Date().toISOString();
+      }
+    } catch (e) {}
     return res.status(200).json({ok:true});
   }
 
