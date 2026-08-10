@@ -357,6 +357,38 @@ export default async function handler(req, res) {
       dica: 'para remover: &aplicar=1' });
   }
 
+  // ── 🔎 COLETADOS-SEM-TAREFA: fichas coletadas que nunca chegaram ao almoxarifado ──
+  if (action === 'coletados-sem-tarefa') {
+    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const [db, logA] = await Promise.all([dbGet(KEY), dbGet('reparoeletro_logistica')]);
+    const tarefas = ((db || {}).tarefas || []);
+    const comTarefa = new Set(tarefas.map(t => d8(t.telefone)).filter(x => x.length >= 8));
+    const alvo = (((logA || {}).fichas) || []).filter(f =>
+      ['coleta_efetuada', 'orc_registrado'].includes(String(f.phase || '')));
+    const faltando = alvo.filter(f => !comTarefa.has(d8(f.telefone)));
+    if (String(req.query.aplicar || '') === '1') {
+      const KTF = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+      const feitos = [], erros = [];
+      for (const f of faltando) {
+        const r = await fetch('https://reparoeletroadm.com/api/almoxarifado?action=criar-mover&k=' + KTF, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: f.id, cliente: f.nome, telefone: f.telefone,
+            equipamento: f.equipamento, origem: 'recuperação — coletada sem tarefa' }),
+        }).then(x => x.json()).catch(e => ({ error: e.message }));
+        if (r && r.ok) feitos.push(f.nome); else erros.push(f.nome + ': ' + ((r && r.error) || '?'));
+        await new Promise(s => setTimeout(s, 200));
+      }
+      return res.status(200).json({ ok: erros.length === 0, criadas: feitos.length, feitos, erros });
+    }
+    return res.status(200).json({ ok: faltando.length === 0,
+      coletadasNaLogistica: alvo.length,
+      semTarefaNoAlmoxarifado: faltando.length,
+      LISTA: faltando.map(f => String(f.nome || '?').slice(0, 24) + ' | ' +
+        String(f.equipamento || '').slice(0, 22) + ' | ' + f.phase +
+        ' | desde ' + String(f.movedAt || '').slice(5, 10)),
+      dica: faltando.length ? 'para criar todas: &aplicar=1' : undefined });
+  }
+
   // ── 🩺 POR-QUE-NAO-ENTROU: por que uma ficha coletada não chegou ao almoxarifado ──
   if (action === 'por-que-nao-entrou') {
     const q = String(req.query.q || '').replace(/\D/g, '');

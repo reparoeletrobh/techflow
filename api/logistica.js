@@ -487,7 +487,22 @@ module.exports = async function handler(req, res) {
     await dbSet(LOG_KEY, db);
     registrarPassagem(phase, ficha).catch(() => {});
     if (phase === 'liberado_coleta') registrarFichaAtendimento(ficha).catch(() => {});
-    return res.status(200).json({ ok: true, ficha });
+    // 📦 GATILHO DO ALMOXARIFADO: mover a ficha pelo QUADRO não criava a tarefa,
+    // porque o gatilho vivia só no fluxo da rota do motorista — a Cláudia 5696 ficou
+    // em coleta efetuada desde 07/08 sem nunca aparecer para orçamento.
+    if (phase === 'coleta_efetuada') {
+      try {
+        const KTF = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+        const r = await fetch('https://reparoeletroadm.com/api/almoxarifado?action=criar-mover&k=' + KTF, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: ficha.id, cliente: ficha.nome, telefone: ficha.telefone,
+            equipamento: ficha.equipamento, origem: 'coleta_efetuada (quadro)' }),
+        }).then(x => x.json()).catch(e => ({ error: e.message }));
+        ficha.almoxarifadoTarefa = (r && r.ok) ? 'criada' : ('falhou: ' + ((r && r.error) || '?'));
+        await dbSet(LOG_KEY, db);
+      } catch (e) { }
+    }
+    return res.status(200).json({ ok: true, ficha, almoxarifado: ficha.almoxarifadoTarefa || undefined });
   }
 
 
