@@ -427,13 +427,12 @@ export default async function handler(req, res) {
       }
       return { ...a, situacao: bloqueios.length ? bloqueios : ['nenhum bloqueio óbvio — o gatilho pode ter falhado'] };
     });
-    return res.status(200).json({ ok: true, busca: q,
-      encontrados: achados.length,
-      tarefasNoAlmoxarifado: tarefas.length,
-      ANALISE: analise,
-      tarefas: tarefas.map(t => (t.tipo || '?') + ' | ' + (t.cliente || t.nome || '?') + ' | ' + (t.origem || '?')),
-      comoCorrigir: tarefas.length ? undefined
-        : 'para criar a tarefa manualmente: action=criar-mover com o id da ficha' });
+    // resposta enxuta, para caber no chat
+    return res.status(200).json({ ok: true, q,
+      temTarefa: tarefas.length,
+      L: analise.map(a => a.onde + ' | ' + String(a.nome || '?').slice(0, 16) +
+        ' | fase: ' + a.fase + ' | ' + (a.coletadoEm ? 'coletado' : 'sem carimbo') +
+        ' | ' + a.situacao[0].slice(0, 60)) });
   }
 
   // ── 🕵️ ORIGEM-TAREFAS: de onde vieram as tarefas do almoxarifado ──
