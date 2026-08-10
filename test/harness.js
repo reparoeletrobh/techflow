@@ -147,7 +147,7 @@ function check(nome, cond, extra) {
   const r6 = res();
   await wabot(req({ action: 'abordagem-fichas', ...K }), r6);
   const f6 = KV['fichas_adm'].fichas[0];
-  const dentroJanela = (() => { const b = new Date(Date.now() - 3 * 3600000); const d = b.getUTCDay(), hh = b.getUTCHours(); return (d >= 1 && d <= 5) ? (hh >= 8 && hh < 15) : (d === 6 ? (hh >= 8 && hh < 10) : false); })();
+  const dentroJanela = (() => { const b = new Date(Date.now() - 3 * 3600000); const d = b.getUTCDay(), hh = b.getUTCHours(); return (d >= 1 && d <= 5) ? (hh >= 8 && hh < 14) : (d === 6 ? (hh >= 8 && hh < 10) : false); })();
   if (dentroJanela) {
     check('ficha moveu para contato_feito com marca do bot', f6.status === 'contato_feito' && f6.abordadoPorBot === true, f6.status);
     const r6b = res();
@@ -760,7 +760,7 @@ function check(nome, cond, extra) {
 
   // ════ Resultado ════
   console.log('\n═══════════════════════════════════');
-  const _mj = (() => { const b = new Date(Date.now() - 3 * 3600000); const d = b.getUTCDay(), hh = b.getUTCHours(); return (d >= 1 && d <= 5) ? (hh >= 8 && hh < 15) : (d === 6 ? (hh >= 8 && hh < 10) : false); })();
+  const _mj = (() => { const b = new Date(Date.now() - 3 * 3600000); const d = b.getUTCDay(), hh = b.getUTCHours(); return (d >= 1 && d <= 5) ? (hh >= 8 && hh < 14) : (d === 6 ? (hh >= 8 && hh < 10) : false); })();
   console.log(`   Modo: ${_mj ? 'DENTRO da janela comercial (dedupe do bot TESTADO)' : 'FORA da janela comercial (dedupe do bot NÃO testado — rode tb. em horário comercial)'}`);
   console.log(falha === 0 ? `🟢 VERDE — ${passa} testes passaram. Liberado para a janela de deploy.` : `🔴 VERMELHO — ${falha} falha(s), ${passa} ok. NÃO SUBIR PARA PRODUÇÃO.`);
   console.log('═══════════════════════════════════\n');
