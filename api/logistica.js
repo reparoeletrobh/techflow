@@ -194,9 +194,12 @@ async function remarcarParaProspeccao(ficha, motivo, sistema, quem) {
     const pdb = (await dbGet(KEYP)) || { fichas: [] };
     pdb.fichas = pdb.fichas || [];
     const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
-    const jaTem = pdb.fichas.some(f => d8(f.telefone) === d8(ficha.telefone) &&
-      ['lead', 'entrar_contato', 'retornar'].includes(String(f.status || '')));
-    if (jaTem) return { ok: true, info: 'já estava na prospecção' };
+    // 🔁 SEMPRE devolve, mesmo que já exista ficha em outra coluna: quem volta do
+    // remarcar precisa de contato rápido, e em lead ou retornar a fila é mais lenta.
+    // Se houver duplicata, a equipe percebe no atendimento e exclui a antiga.
+    const jaEmContato = pdb.fichas.some(f => d8(f.telefone) === d8(ficha.telefone) &&
+      String(f.status || '') === 'entrar_contato' && String(f.origem || '') === 'remarcar');
+    if (jaEmContato) return { ok: true, info: 'já voltou do remarcar e está em Entrar em Contato' };
     pdb.fichas.unshift({
       id: 'rem_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6),
       nome: ficha.nome || ficha.nomeContato || '?',

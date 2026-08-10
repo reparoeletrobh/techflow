@@ -212,9 +212,12 @@ async function remarcarParaProspeccao(ficha, motivo, sistema, quem) {
     const pdb = (await dbGet(KEYP)) || { fichas: [] };
     pdb.fichas = pdb.fichas || [];
     const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
-    const jaTem = pdb.fichas.some(f => d8(f.telefone) === d8(ficha.telefone) &&
-      ['lead', 'entrar_contato', 'retornar'].includes(String(f.status || '')));
-    if (jaTem) return { ok: true, info: 'já estava na prospecção' };
+    // 🔁 SEMPRE devolve, mesmo que já exista ficha em outra coluna: quem volta do
+    // remarcar precisa de contato rápido, e em lead ou retornar a fila é mais lenta.
+    // Se houver duplicata, a equipe percebe no atendimento e exclui a antiga.
+    const jaEmContato = pdb.fichas.some(f => d8(f.telefone) === d8(ficha.telefone) &&
+      String(f.status || '') === 'entrar_contato' && String(f.origem || '') === 'remarcar');
+    if (jaEmContato) return { ok: true, info: 'já voltou do remarcar e está em Entrar em Contato' };
     pdb.fichas.unshift({
       id: 'rem_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6),
       nome: ficha.nome || ficha.nomeContato || '?',
@@ -836,6 +839,22 @@ module.exports = async function handler(req, res) {
     }
     const regiaoDe = f => f.regiaoManual || regiaoDoEndereco(f.endereco);
 
+    // ⚖️ BALANCEAMENTO: quantas coletas cada um já tem em aberto hoje
+    const EM_ABERTO = ['motorista_parceiro', 'horario_marcado', 'liberado_para_rota'];
+    const carga = { Jonathan: 0, Wilde: 0, Eduardo: 0 };
+    for (const f of (db.fichas || [])) {
+      const m = String(f.motoristaNome || '');
+      if (carga[m] === undefined) continue;
+      if (EM_ABERTO.includes(String(f.phase || ''))) carga[m]++;
+    }
+    // regiões vizinhas — quando um está sobrecarregado, o outro avança pela fronteira
+    const VIZINHAS = {
+      Wilde:   ['bh-leste', 'bh-norte', 'venda-nova'],     // fronteira com o Eduardo
+      Eduardo: ['bh-oeste', 'bh-sul', 'contagem'],          // fronteira com o Wilde
+    };
+    // um motorista pode "invadir" a região do outro se estiver com pelo menos 4 a menos
+    const DIFERENCA_PARA_INVADIR = 4;
+
     const liberadas = (db.fichas || []).filter(f => String(f.phase || '') === 'liberado_coleta');
     const decisoes = [], vermelhos = [];
     // quem o Jonathan já vai atender hoje, por região — para o encaixe
@@ -861,6 +880,17 @@ module.exports = async function handler(req, res) {
       else if (regioesJonathan.has(reg)) { escolhido = 'Jonathan'; porque = 'encaixe: já vai a ' + reg; }
       else if (WILDE.includes(reg)) { escolhido = 'Wilde'; porque = reg; }
       else if (EDUARDO.includes(reg)) { escolhido = 'Eduardo'; porque = reg; }
+      // ⚖️ equilíbrio: se o dono da região está muito mais carregado e a região faz
+      // fronteira com o outro, passa para quem tem menos — evita 11 contra 1
+      if (escolhido === 'Wilde' || escolhido === 'Eduardo') {
+        const outro = escolhido === 'Wilde' ? 'Eduardo' : 'Wilde';
+        const diff = carga[escolhido] - carga[outro];
+        if (diff >= DIFERENCA_PARA_INVADIR && (VIZINHAS[outro] || []).includes(reg)) {
+          porque = reg + ' · equilíbrio: ' + escolhido + ' tem ' + carga[escolhido] +
+            ' e ' + outro + ' tem ' + carga[outro];
+          escolhido = outro;
+        }
+      }
       // nunca para quem recusou
       if (escolhido && recusou.includes(escolhido)) {
         const alt = ['Jonathan', 'Wilde', 'Eduardo'].filter(m => m !== escolhido && !recusou.includes(m));
@@ -877,6 +907,7 @@ module.exports = async function handler(req, res) {
           motivo: ['região ' + reg + ' não está mapeada para nenhum motorista'] });
         continue;
       }
+      carga[escolhido] = (carga[escolhido] || 0) + 1;   // conta na hora, para o próximo já ver
       decisoes.push({ id: f.id, nome: f.nome, tel: String(f.telefone || '').slice(-4),
         equipamento: String(f.equipamento || '').slice(0, 24), pol, regiao: reg,
         motorista: escolhido, porque });
@@ -884,6 +915,7 @@ module.exports = async function handler(req, res) {
 
     if (String(req.query.aplicar || '') !== '1') {
       return res.status(200).json({ ok: true, modo: 'prévia',
+        CARGA_ATUAL: carga,
         emLiberadoColeta: liberadas.length,
         vaoSerDistribuidas: decisoes.length,
         ficamVermelhas: vermelhos.length,
@@ -917,6 +949,7 @@ module.exports = async function handler(req, res) {
     await dbSet(LOG_KEY, db);
     await dbSet('tv_log_distribuicao', log);
     return res.status(200).json({ ok: true,
+      CARGA_DEPOIS: carga,
       distribuidas: decisoes.length, vermelhas: vermelhos.length,
       porMotorista: decisoes.reduce((o, d) => { o[d.motorista] = (o[d.motorista] || 0) + 1; return o; }, {}),
       feitos: decisoes.map(d => d.nome + ' → ' + d.motorista + ' (' + d.porque + ')') });
