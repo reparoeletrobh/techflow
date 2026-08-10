@@ -396,9 +396,12 @@ export default async function handler(req, res) {
     const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
     const temTarefa = new Set((db.tarefas || []).map(t => String(t.fichaId || t.id || '')));
     const temTel = new Set((db.tarefas || []).map(t => d8(t.telefone)).filter(x => x.length >= 8));
+    // ?so=4dig,4dig — restringe a fichas específicas, para não recriar as demais
+    const so = String(req.query.so || '').split(',').map(x => x.trim().replace(/\D/g, '')).filter(Boolean);
     const semTarefa = (log.fichas || []).filter(f =>
       String(f.phase || '') === 'coleta_efetuada' &&
-      !temTarefa.has(String(f.id)) && !temTel.has(d8(f.telefone)));
+      !temTarefa.has(String(f.id)) && !temTel.has(d8(f.telefone)) &&
+      (!so.length || so.some(s => String(f.telefone || '').replace(/\D/g, '').endsWith(s))));
     if (String(req.query.aplicar || '') !== '1') {
       return res.status(200).json({ ok: true, modo: 'prévia',
         emColetaEfetuada: (log.fichas || []).filter(f => String(f.phase || '') === 'coleta_efetuada').length,
