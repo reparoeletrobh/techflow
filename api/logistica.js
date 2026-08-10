@@ -190,7 +190,9 @@ async function pipefyBestEffort(fn) {
 // clicar em "Prospecção" a cada uma, e ficha ficava esquecida na coluna.
 async function remarcarParaProspeccao(ficha, motivo, sistema, quem) {
   try {
-    const KEYP = sistema === 'tv' ? 'prospeccao_tv' : 'prospeccao_adm';
+    // 🎯 a coluna "Entrar em Contato" da prospecção lê fichas_adm / fichas_tv,
+    // NÃO prospeccao_adm — gravar no lugar errado fazia a ficha sumir das duas telas
+    const KEYP = sistema === 'tv' ? 'fichas_tv' : 'fichas_adm';
     const pdb = (await dbGet(KEYP)) || { fichas: [] };
     pdb.fichas = pdb.fichas || [];
     const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
@@ -240,6 +242,58 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const action = req.query.action
+
+  // ── 📋 LOG-REMARCAR: quantas voltaram e se chegaram em Entrar em Contato ──
+  if (action === 'log-remarcar') {
+    const dias = Math.min(60, Math.max(1, parseInt(req.query.dias || '7', 10)));
+    const corte = Date.now() - dias * 86400000;
+    const dg = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '?';
+    const [lgA, lgT, fA, fT] = await Promise.all([
+      dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+      dbGet('fichas_adm'), dbGet('fichas_tv'),
+    ]);
+    // quem está de fato em Entrar em Contato
+    const emContato = new Set();
+    for (const b of [fA, fT]) {
+      for (const f of (((b || {}).fichas) || [])) {
+        if (String(f.status || '') === 'entrar_contato') emContato.add(dg(f.telefone));
+      }
+    }
+    const linhas = [];
+    for (const [banco, sis] of [[lgA, 'ADM'], [lgT, 'TV']]) {
+      for (const f of (((banco || {}).fichas) || [])) {
+        const q = new Date(f.remarcadoEm || f.enviadoProspeccaoEm || 0).getTime();
+        if (!q || q < corte) continue;
+        if (!f.motivoRemarcar && !f.enviadoProspeccaoEm) continue;
+        const chegou = emContato.has(dg(f.telefone));
+        linhas.push({ sis, nome: f.nome || '?', tel: dg(f.telefone).slice(-4),
+          equipamento: String(f.equipamento || '').slice(0, 20),
+          quando: f.remarcadoEm || f.enviadoProspeccaoEm,
+          motivo: String(f.motivoRemarcar || '(sem motivo)').slice(0, 44),
+          chegou, aindaNaColuna: String(f.phase || '') === 'remarcar' });
+      }
+    }
+    linhas.sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
+    const naoChegaram = linhas.filter(l => !l.chegou);
+    const porDia = linhas.reduce((o, l) => {
+      const d = String(l.quando).slice(0, 10); o[d] = (o[d] || 0) + 1; return o; }, {});
+    return res.status(200).json({ ok: naoChegaram.length === 0,
+      periodoDias: dias,
+      totalRemarcadas: linhas.length,
+      chegaramEmEntrarContato: linhas.length - naoChegaram.length,
+      NAO_CHEGARAM: naoChegaram.length,
+      aindaPresasNaColuna: linhas.filter(l => l.aindaNaColuna).length,
+      POR_DIA: porDia,
+      ALERTA: naoChegaram.length
+        ? '🚨 ' + naoChegaram.length + ' remarcada(s) que NÃO estão em Entrar em Contato'
+        : '✅ todas as remarcadas chegaram ao atendimento',
+      PENDENTES: naoChegaram.map(l => hh(l.quando) + ' | ' + l.sis + ' | ' +
+        String(l.nome).slice(0, 18) + ' ' + l.tel + ' | ' + l.motivo),
+      L: linhas.slice(0, 60).map(l => (l.chegou ? '✅' : '🚨') + ' ' + hh(l.quando) + ' | ' +
+        l.sis.padEnd(3) + ' | ' + String(l.nome).slice(0, 16).padEnd(16) + ' ' + l.tel +
+        ' | ' + l.motivo) });
+  }
 
   // ── 🔎 RASTREAR: onde está uma ficha específica, em todos os bancos ──
   if (action === 'rastrear') {

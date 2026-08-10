@@ -208,7 +208,9 @@ async function pipefyBestEffort(fn) {
 // clicar em "Prospecção" a cada uma, e ficha ficava esquecida na coluna.
 async function remarcarParaProspeccao(ficha, motivo, sistema, quem) {
   try {
-    const KEYP = sistema === 'tv' ? 'prospeccao_tv' : 'prospeccao_adm';
+    // 🎯 a coluna "Entrar em Contato" da prospecção lê fichas_adm / fichas_tv,
+    // NÃO prospeccao_adm — gravar no lugar errado fazia a ficha sumir das duas telas
+    const KEYP = sistema === 'tv' ? 'fichas_tv' : 'fichas_adm';
     const pdb = (await dbGet(KEYP)) || { fichas: [] };
     pdb.fichas = pdb.fichas || [];
     const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
@@ -881,50 +883,57 @@ module.exports = async function handler(req, res) {
       observacao: 'liberadas são as que já tinham ficha no atendimento e só estavam ocupando a coluna' });
   }
 
-  // ── 📋 LOG-REMARCAR + auditoria: os que voltaram chegaram mesmo na prospecção? ──
+
+  // ── 📋 LOG-REMARCAR: quantas voltaram e se chegaram em Entrar em Contato ──
   if (action === 'log-remarcar') {
     const dias = Math.min(60, Math.max(1, parseInt(req.query.dias || '7', 10)));
     const corte = Date.now() - dias * 86400000;
-    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const dg = t => String(t || '').replace(/\D/g, '').slice(-8);
     const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '?';
-    const [logTv, logAdm, prosA, prosT] = await Promise.all([
-      dbGet(LOG_KEY), dbGet('reparoeletro_logistica'),
-      dbGet('prospeccao_adm'), dbGet('prospeccao_tv'),
+    const [lgA, lgT, fA, fT] = await Promise.all([
+      dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+      dbGet('fichas_adm'), dbGet('fichas_tv'),
     ]);
-    const naProspeccao = new Set();
-    for (const p of [prosA, prosT]) {
-      for (const f of (((p || {}).fichas) || [])) {
-        if (['lead', 'entrar_contato', 'retornar'].includes(String(f.status || ''))) naProspeccao.add(d8(f.telefone));
+    // quem está de fato em Entrar em Contato
+    const emContato = new Set();
+    for (const b of [fA, fT]) {
+      for (const f of (((b || {}).fichas) || [])) {
+        if (String(f.status || '') === 'entrar_contato') emContato.add(dg(f.telefone));
       }
     }
     const linhas = [];
-    for (const [banco, sis] of [[logTv, 'TV'], [logAdm, 'ADM']]) {
+    for (const [banco, sis] of [[lgA, 'ADM'], [lgT, 'TV']]) {
       for (const f of (((banco || {}).fichas) || [])) {
-        const q = new Date(f.remarcadoEm || f.movedAt || 0).getTime();
-        const foiRemarcada = String(f.phase || '') === 'remarcar' || f.motivoRemarcar;
-        if (!foiRemarcada || !q || q < corte) continue;
-        linhas.push({ sis, nome: f.nome || '?', tel: d8(f.telefone).slice(-4),
+        const q = new Date(f.remarcadoEm || f.enviadoProspeccaoEm || 0).getTime();
+        if (!q || q < corte) continue;
+        if (!f.motivoRemarcar && !f.enviadoProspeccaoEm) continue;
+        const chegou = emContato.has(dg(f.telefone));
+        linhas.push({ sis, nome: f.nome || '?', tel: dg(f.telefone).slice(-4),
           equipamento: String(f.equipamento || '').slice(0, 20),
-          quando: f.remarcadoEm || f.movedAt,
-          motivo: String(f.motivoRemarcar || '(sem motivo — anterior à regra)').slice(0, 50),
-          por: f.remarcadoPor || '?',
-          chegouNaProspeccao: naProspeccao.has(d8(f.telefone)) });
+          quando: f.remarcadoEm || f.enviadoProspeccaoEm,
+          motivo: String(f.motivoRemarcar || '(sem motivo)').slice(0, 44),
+          chegou, aindaNaColuna: String(f.phase || '') === 'remarcar' });
       }
     }
     linhas.sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
-    const perdidas = linhas.filter(l => !l.chegouNaProspeccao);
-    return res.status(200).json({ ok: perdidas.length === 0,
-      periodoDias: dias, total: linhas.length,
-      chegaramNaProspeccao: linhas.length - perdidas.length,
-      NAO_CHEGARAM: perdidas.length,
-      ALERTA: perdidas.length
-        ? '🚨 ' + perdidas.length + ' ficha(s) remarcada(s) que NÃO aparecem em Entrar em Contato — podem ter se perdido'
-        : '✅ todas as remarcadas estão no atendimento ativo',
-      PERDIDAS: perdidas.map(l => hh(l.quando) + ' | ' + l.sis + ' | ' + String(l.nome).slice(0, 18) +
-        ' ' + l.tel + ' | ' + l.motivo),
-      L: linhas.slice(0, 60).map(l => hh(l.quando) + ' | ' + l.sis + ' | ' +
-        String(l.nome).slice(0, 16).padEnd(16) + ' ' + l.tel +
-        ' | ' + (l.chegouNaProspeccao ? '✅' : '🚨') + ' | ' + l.motivo) });
+    const naoChegaram = linhas.filter(l => !l.chegou);
+    const porDia = linhas.reduce((o, l) => {
+      const d = String(l.quando).slice(0, 10); o[d] = (o[d] || 0) + 1; return o; }, {});
+    return res.status(200).json({ ok: naoChegaram.length === 0,
+      periodoDias: dias,
+      totalRemarcadas: linhas.length,
+      chegaramEmEntrarContato: linhas.length - naoChegaram.length,
+      NAO_CHEGARAM: naoChegaram.length,
+      aindaPresasNaColuna: linhas.filter(l => l.aindaNaColuna).length,
+      POR_DIA: porDia,
+      ALERTA: naoChegaram.length
+        ? '🚨 ' + naoChegaram.length + ' remarcada(s) que NÃO estão em Entrar em Contato'
+        : '✅ todas as remarcadas chegaram ao atendimento',
+      PENDENTES: naoChegaram.map(l => hh(l.quando) + ' | ' + l.sis + ' | ' +
+        String(l.nome).slice(0, 18) + ' ' + l.tel + ' | ' + l.motivo),
+      L: linhas.slice(0, 60).map(l => (l.chegou ? '✅' : '🚨') + ' ' + hh(l.quando) + ' | ' +
+        l.sis.padEnd(3) + ' | ' + String(l.nome).slice(0, 16).padEnd(16) + ' ' + l.tel +
+        ' | ' + l.motivo) });
   }
 
   // ── 🤖 DISTRIBUIR: manda cada ficha liberada para o motorista certo ──
