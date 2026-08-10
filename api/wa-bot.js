@@ -2074,7 +2074,7 @@ export default async function handler(req, res) {
       const tb = new Date(b.card.movedAt || b.card.aguardandoDesde || b.card.criadoEm || 0).getTime();
       return ta - tb;                                        // mais antigo primeiro
     });
-    const teto = Math.min(30, Math.max(1, parseInt(req.query.teto || cfgR7.recuperacao7dTeto || '10', 10)));
+    const teto = Math.min(80, Math.max(1, parseInt(req.query.teto || cfgR7.recuperacao7dTeto || '10', 10)));
     const lote = candidatos.slice(0, teto);
 
     if (String(req.query.simular || '') === '1') {
@@ -2184,7 +2184,7 @@ export default async function handler(req, res) {
   if (action === 'recuperacao7d-ligar' || action === 'recuperacao7d-desligar') {
     const c = (await dbGet('wa_bot_config')) || {};
     c.recuperacao7dAtiva = action === 'recuperacao7d-ligar';
-    if (req.query.teto) c.recuperacao7dTeto = Math.min(30, Math.max(1, parseInt(req.query.teto, 10)));
+    if (req.query.teto) c.recuperacao7dTeto = Math.min(80, Math.max(1, parseInt(req.query.teto, 10)));
     await dbSet('wa_bot_config', c);
     return res.status(200).json({ ok: true,
       recuperacao7d: c.recuperacao7dAtiva ? 'LIGADA' : 'DESLIGADA',
