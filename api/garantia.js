@@ -105,6 +105,44 @@ module.exports = async function handler(req, res) {
       // ═══ 🛡️ FILA DE GARANTIA (visão Conflitos) ═══
   const FILA_KEY = "reparoeletro_garantia_fila";
 
+  // ── 🧹 REMOVER-DUPLICADOS: mesma pessoa com mais de uma ficha na garantia ──
+  if (action === 'remover-duplicados') {
+    const d4 = t => String(t || '').replace(/\D/g, '').slice(-4);
+    const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
+    const campo = db.fichas ? 'fichas' : (db.cards ? 'cards' : 'fichas');
+    const lista = db[campo] || [];
+    const porTel = {};
+    for (const f of lista) {
+      const k = d4(f.telefone) + '|' + String(f.equipamento || f.descricao || '').toLowerCase().trim();
+      porTel[k] = porTel[k] || [];
+      porTel[k].push(f);
+    }
+    const ficam = [], removidos = [];
+    for (const [k, grupo] of Object.entries(porTel)) {
+      if (grupo.length === 1) { ficam.push(grupo[0]); continue; }
+      // mantém a mais completa: com equipamento e mais recente
+      grupo.sort((a, b) => {
+        const ea = (a.equipamento || a.descricao || '').length;
+        const eb = (b.equipamento || b.descricao || '').length;
+        if (ea !== eb) return eb - ea;
+        return String(b.criadoEm || '').localeCompare(String(a.criadoEm || ''));
+      });
+      ficam.push(grupo[0]);
+      for (const x of grupo.slice(1)) removidos.push(String(x.nome || x.cliente || '?') + ' ' + d4(x.telefone) +
+        ' | ' + String(x.equipamento || x.descricao || 'sem equipamento').slice(0, 20));
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        total: lista.length, ficam: ficam.length,
+        duplicados: removidos.length, REMOVER: removidos,
+        criterio: 'mesma pessoa e mesmo equipamento — mantém a ficha mais completa',
+        dica: 'para remover: &aplicar=1' });
+    }
+    db[campo] = ficam;
+    await dbSet(GARANTIA_KEY, db);
+    return res.status(200).json({ ok: true, removidos: removidos.length, restaram: ficam.length });
+  }
+
   // ── ➕ GARANTIR-14: coloca na garantia os equipamentos conferidos na loja ──
   if (action === 'garantir-lista') {
     const LISTA = [
