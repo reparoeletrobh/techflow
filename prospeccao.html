@@ -1174,6 +1174,17 @@ async function carregarFaixaMetricas(){
       elV.parentNode.title='Voltaram do Remarcar — hoje '+hj+' (ADM '+((rr.hoje||{}).adm||0)+' · TV '+((rr.hoje||{}).tv||0)+') · 7 dias '+sem;
       if(sem>hj)elV.innerHTML=hj+'<span style="font-size:9px;color:#5a6270;font-weight:700;"> /'+sem+'</span>';
     }
+    // 🎯 leads convertidos — cadastros de logística feitos a partir da coluna Lead
+    try{
+      var cv=await fetch('/api/prospeccao?action=convertidos&dias=7').then(function(x){return x.json();});
+      var elC=document.getElementById('st-conv');
+      if(elC&&cv&&cv.ok){
+        elC.textContent=cv.hoje||0;
+        if((cv.total||0)>(cv.hoje||0))
+          elC.innerHTML=(cv.hoje||0)+'<span style="font-size:9px;color:#5a6270;font-weight:700;"> /'+cv.total+'</span>';
+        elC.parentNode.title='Leads que viraram cadastro de logística — hoje '+(cv.hoje||0)+' · 7 dias '+(cv.total||0);
+      }
+    }catch(e){}
     var elR=document.getElementById('st-recup');
     if(elR&&pp){
       var rank=pp.ranking||[];
