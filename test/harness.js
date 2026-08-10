@@ -416,7 +416,7 @@ function check(nome, cond, extra) {
     const j = r12h.dado || {};
     const bras = new Date(Date.now() - 3*3600000);
     const dia = bras.getUTCDay(), hora = bras.getUTCHours() + bras.getUTCMinutes()/60;
-    const dentro = (dia>=1&&dia<=5) ? (hora>=8&&hora<15) : (dia===6 ? (hora>=8&&hora<10) : false);
+    const dentro = (dia>=1&&dia<=5) ? (hora>=8&&hora<14) : (dia===6 ? (hora>=8&&hora<10) : false);
     if (dentro) check('dentro da janela: cadastro permitido', j.ok !== false || !/fora da janela/.test(String(j.error||'')));
     else check('fora da janela: cadastro recusado', /fora da janela/.test(String(j.error||'')));
   }

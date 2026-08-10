@@ -521,11 +521,11 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, msg: '🚨 BOT DESLIGADO (abordagem e modo aberto off; conversas de teste continuam pela trava execTels)' });
   }
 
-  // Horário comercial Reparo Eletro (Brasília UTC-3): seg-sex 8h-15h, sáb 8h-10h
+  // Horário de coleta Reparo Eletro (Brasília UTC-3): seg-sex 8h-14h, sáb 8h-10h
   function dentroHorarioComercial() {
     const bras = new Date(Date.now() - 3 * 3600 * 1000);
     const dia = bras.getUTCDay(), hora = bras.getUTCHours() + bras.getUTCMinutes() / 60;
-    if (dia >= 1 && dia <= 5) return hora >= 8 && hora < 15;
+    if (dia >= 1 && dia <= 5) return hora >= 8 && hora < 14;
     if (dia === 6) return hora >= 8 && hora < 10;
     return false;
   }
@@ -3711,7 +3711,7 @@ export default async function handler(req, res) {
       if (t.clienteJaEscreveu) barreiras.push('cliente falou nas últimas 24h (bot responde na conversa)');
       if (t.jaAbordado) barreiras.push('já recebeu abordagem (dedupe)');
       if (t.jaEmOperacao) barreiras.push('operação em andamento (logística/pipe ativos)');
-      if (!_horarioOkD) barreiras.push('FORA DA JANELA COMERCIAL (seg-sex 8h-15h, sáb 8h-10h) — em standby até a próxima abertura');
+      if (!_horarioOkD) barreiras.push('FORA DA JANELA COMERCIAL (seg-sex 8h-14h, sáb 8h-10h) — em standby até a próxima abertura');
       const msgsCli = evtsD.filter(e => String(e.tel || '').replace(/\D/g, '').slice(-8) === t.d8);
       t.mensagensTrocadas = msgsCli.length;
       t.clienteRespondeu = msgsCli.some(e => e.dir === 'in');
@@ -3721,7 +3721,7 @@ export default async function handler(req, res) {
     const resumo = {};
     paradas.forEach(t => { resumo[t.veredito.split(':')[0] === 'BARRADA' ? t.veredito : '✅ na fila'] = (resumo[t.veredito.split(':')[0] === 'BARRADA' ? t.veredito : '✅ na fila'] || 0) + 1; });
     return res.status(200).json({ ok: true,
-      janelaComercialAgora: _horarioOkD ? 'ABERTA — abordagens saindo' : 'FECHADA — fichas em standby (seg-sex 8h-15h, sáb 8h-10h)',
+      janelaComercialAgora: _horarioOkD ? 'ABERTA — abordagens saindo' : 'FECHADA — fichas em standby (seg-sex 8h-14h, sáb 8h-10h)',
       criadasAdm: paradas.filter(t => t.sis === 'adm').length,
       criadasTv: paradas.filter(t => t.sis === 'tv').length,
       resumoPorMotivo: resumo,
@@ -4809,8 +4809,8 @@ export default async function handler(req, res) {
     const _dia = _bras.getUTCDay(), _hr = _bras.getUTCHours() + _bras.getUTCMinutes() / 60;
     const _dentroHC = (_dia >= 1 && _dia <= 5) ? (_hr >= 8 && _hr < 15) : (_dia === 6 ? (_hr >= 8 && _hr < 10) : false);
     const blocoHorario = _dentroHC
-      ? 'AGORA: DENTRO do horário comercial (seg-sex 8h-15h, sáb 8h-10h). Agendamento de coleta LIBERADO — conduza normalmente.'
-      : `AGORA: FORA do horário comercial. REGRA DURA: NÃO agende nem confirme coleta agora (não use cadastrar_logistica). Converse normal, tire dúvidas, negocie e aprove orçamentos normalmente — só o AGENDAMENTO fica travado. Se o cliente quiser agendar/marcar coleta: informe \"Nosso horário de atendimento e coleta é de segunda a sexta das 8h às 15h e sábado das 8h às 10h\" e PROMETA: \"assim que abrirmos eu te chamo aqui pra deixar sua coleta agendada\". Nesse caso, inclua a tag [RETOMAR] no finalzinho da sua resposta (o sistema remove a tag e agenda a retomada automática — não explique a tag ao cliente).`;
+      ? 'AGORA: DENTRO do horário comercial (seg-sex 8h-14h, sáb 8h-10h). Agendamento de coleta LIBERADO — conduza normalmente.'
+      : `AGORA: FORA do horário comercial. REGRA DURA: NÃO agende nem confirme coleta agora (não use cadastrar_logistica). Converse normal, tire dúvidas, negocie e aprove orçamentos normalmente — só o AGENDAMENTO fica travado. Se o cliente quiser agendar/marcar coleta: informe \"Nosso horário de atendimento e coleta é de segunda a sexta das 8h às 14h e sábado das 8h às 10h\" e PROMETA: \"assim que abrirmos eu te chamo aqui pra deixar sua coleta agendada\". Nesse caso, inclua a tag [RETOMAR] no finalzinho da sua resposta (o sistema remove a tag e agenda a retomada automática — não explique a tag ao cliente).`;
 
     const system = `Você é o atendente virtual da Reparo Eletro (assistência técnica de eletrodomésticos em BH: micro-ondas, purificadores, adegas, fornos e afins). Tom: cordial, direto, brasileiro, sem formalidade excessiva. Mensagens CURTAS de WhatsApp, UMA pergunta por vez.
 
@@ -5110,7 +5110,7 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
         const autorizado = !pzE[d8x] && (cfgX.modoAberto === true || execTels.some(t => String(t).replace(/\D/g, '').slice(-8) === d8x));
         // 🚧 TRAVA DE HORÁRIO: a regra existia apenas como texto no cérebro, e o modelo
         // a ignorava quando o cliente reabria a conversa fora da janela. Agora o CÓDIGO
-        // recusa o cadastro fora do horário de coleta (seg-sex 8h-15h · sáb 8h-10h).
+        // recusa o cadastro fora do horário de coleta (seg-sex 8h-14h · sáb 8h-10h).
         if (acaoAprovada === 'cadastrar_logistica' && !dentroHorarioComercial()
             && String(via || '') !== 'humano' && String(req.query.forcar || '') !== '1') {
           const agoraBr = new Date(Date.now() - 3 * 3600000);
@@ -5127,7 +5127,7 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
           } catch (e) {}
           return res.status(200).json({ ok: false,
             error: '🚧 fora da janela de coleta — cadastro não realizado',
-            horarioDeColeta: 'segunda a sexta 8h-15h · sábado 8h-10h',
+            horarioDeColeta: 'segunda a sexta 8h-14h · sábado 8h-10h',
             oQueFoiFeito: 'a mensagem NÃO foi enviada e o cliente ficou registrado para retomada quando abrir',
             comoForcar: 'acrescente &forcar=1 se precisar cadastrar mesmo assim' });
         }
