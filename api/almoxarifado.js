@@ -389,6 +389,50 @@ export default async function handler(req, res) {
       dica: faltando.length ? 'para criar todas: &aplicar=1' : undefined });
   }
 
+  // ── 🧯 CORRIGIR-TAREFA: troca tarefa do tipo errado pelo card de diagnóstico ──
+  if (action === 'corrigir-tarefa') {
+    const so = String(req.query.so || '').split(',').map(x => x.trim().replace(/\D/g, '')).filter(Boolean);
+    if (!so.length) return res.status(400).json({ ok: false, error: 'informe ?so=4dig,4dig' });
+    const db = (await dbGet(KEY)) || { tarefas: [] };
+    const log = (await dbGet('reparoeletro_logistica')) || { fichas: [] };
+    const d8 = t => String(t || '').replace(/\D/g, '');
+    const alvos = (log.fichas || []).filter(f =>
+      so.some(s => d8(f.telefone).endsWith(s)));
+    // o que existe hoje para esses telefones
+    const erradas = (db.tarefas || []).filter(t =>
+      so.some(s => d8(t.tel).endsWith(s)) && t.tipo !== 'receber');
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        fichas: alvos.length,
+        tarefasDoTipoErrado: erradas.length,
+        L: erradas.map(t => (t.cliente || '?') + ' | tipo atual: ' + t.tipo + ' → vai virar: receber'),
+        criara: alvos.filter(f => !(db.tarefas || []).some(t => t.cardId === f.id && t.tipo === 'receber'))
+          .map(f => String(f.nome || '?').slice(0, 18) + ' | ' + String(f.equipamento || '').slice(0, 20)),
+        dica: 'para aplicar: &aplicar=1' });
+    }
+    // remove as erradas
+    const antes = (db.tarefas || []).length;
+    db.tarefas = (db.tarefas || []).filter(t =>
+      !(so.some(s => d8(t.tel).endsWith(s)) && t.tipo !== 'receber'));
+    const removidas = antes - db.tarefas.length;
+    // cria o card de diagnóstico, no mesmo molde do fluxo normal
+    const criadas = [];
+    for (const f of alvos) {
+      if (db.tarefas.some(t => t.cardId === f.id && t.tipo === 'receber')) continue;
+      pushTarefa(db.tarefas, novaTarefa({
+        tipo: 'receber', cardId: f.id,
+        cliente: f.nome || '—', tel: f.telefone || '', equipamento: f.equipamento || '',
+        defeito: f.defeito || '', obs: f.obs || '',
+        origem: 'coleta_efetuada', destino: 'aguardando_aprovacao',
+        modelo: '', temFoto: false,
+      }));
+      criadas.push(f.nome);
+    }
+    await dbSet(KEY, db);
+    return res.status(200).json({ ok: true, removidas, criadas: criadas.length, lista: criadas,
+      observacao: 'card de diagnóstico criado — com foto, modelo, RS, remarcar e não chegou' });
+  }
+
   // ── 🔁 RECRIAR-FALTANTES: cria tarefa para quem está em coleta efetuada sem ela ──
   if (action === 'recriar-faltantes') {
     const db = (await dbGet(KEY)) || { tarefas: [] };
@@ -416,9 +460,10 @@ export default async function handler(req, res) {
     for (const f of semTarefa) {
       const r = await fetch('https://reparoeletroadm.com/api/almoxarifado?action=criar-mover&k=' + KTF, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardId: f.id, destino: 'orcamento',
-          cliente: f.nome, tel: f.telefone,
-          equipamento: f.equipamento, origem: 'recriar-faltantes' }),
+        body: JSON.stringify({ cardId: f.id, destino: 'aguardando_aprovacao',
+          tipo: 'receber', cliente: f.nome, tel: f.telefone,
+          equipamento: f.equipamento, defeito: f.defeito || '',
+          origem: 'coleta_efetuada' }),
       }).then(x => x.json()).catch(e => ({ error: e.message }));
       if (r && r.ok) feitos.push(f.nome); else erros.push(f.nome + ': ' + ((r && r.error) || '?'));
       await new Promise(s => setTimeout(s, 150));
@@ -567,7 +612,7 @@ export default async function handler(req, res) {
     const ja = dbM.tarefas.some(t => t.cardId === b.cardId && t.destino === b.destino && t.status === 'pendente');
     if (ja) return res.status(200).json({ ok: true, dedupe: true, msg: 'tarefa já existe pendente' });
     pushTarefa(dbM.tarefas, novaTarefa({
-      tipo: 'mover', cardId: b.cardId,
+      tipo: b.tipo === 'receber' ? 'receber' : 'mover', cardId: b.cardId,
       cliente: String(b.cliente || 'Cliente').slice(0, 60), tel: String(b.tel || ''),
       equipamento: String(b.equipamento || '').slice(0, 60),
       origem: b.origem || 'aguardando_aprovacao', destino: b.destino,

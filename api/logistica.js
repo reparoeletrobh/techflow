@@ -497,9 +497,12 @@ module.exports = async function handler(req, res) {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           // ⚠️ o endpoint exige cardId e destino — enviar id/telefone fazia a chamada
           // ser recusada com "cardId e destino obrigatórios", e a tarefa nunca nascia
-          body: JSON.stringify({ cardId: ficha.id, destino: 'orcamento',
-            cliente: ficha.nome, tel: ficha.telefone,
-            equipamento: ficha.equipamento, origem: 'coleta_efetuada (quadro)' }),
+          // tipo 'receber' e destino 'aguardando_aprovacao' — é o card com
+          // diagnóstico, foto, modelo, RS, remarcar e não chegou
+          body: JSON.stringify({ cardId: ficha.id, destino: 'aguardando_aprovacao',
+            tipo: 'receber', cliente: ficha.nome, tel: ficha.telefone,
+            equipamento: ficha.equipamento, defeito: ficha.defeito || '',
+            origem: 'coleta_efetuada' }),
         }).then(x => x.json()).catch(e => ({ error: e.message }));
         ficha.almoxarifadoTarefa = (r && r.ok) ? 'criada' : ('falhou: ' + ((r && r.error) || '?'));
         await dbSet(LOG_KEY, db);
