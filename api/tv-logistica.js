@@ -712,6 +712,46 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, id, agendadoPara: f.agendadoPara || null });
   }
 
+  // ── ♻️ REPROCESSAR-REMARCAR: devolve ao atendimento as que ficaram para trás ──
+  if (action === 'reprocessar-remarcar') {
+    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const [logTv, logAdm, prosA, prosT] = await Promise.all([
+      dbGet(LOG_KEY), dbGet('reparoeletro_logistica'),
+      dbGet('prospeccao_adm'), dbGet('prospeccao_tv'),
+    ]);
+    const naProspeccao = new Set();
+    for (const p of [prosA, prosT]) {
+      for (const f of (((p || {}).fichas) || [])) {
+        if (['lead', 'entrar_contato', 'retornar'].includes(String(f.status || ''))) naProspeccao.add(d8(f.telefone));
+      }
+    }
+    const pendentes = [];
+    for (const [banco, sis] of [[logTv, 'tv'], [logAdm, 'adm']]) {
+      for (const f of (((banco || {}).fichas) || [])) {
+        if (String(f.phase || '') !== 'remarcar') continue;
+        if (naProspeccao.has(d8(f.telefone))) continue;
+        pendentes.push({ f, sis });
+      }
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        emRemarcarSemVoltar: pendentes.length,
+        L: pendentes.map(p => p.sis.toUpperCase() + ' | ' + String(p.f.nome || '?').slice(0, 20) +
+          ' ' + String(p.f.telefone || '').slice(-4) + ' | ' +
+          String(p.f.equipamento || '').slice(0, 20) + ' | ' +
+          (p.f.motivoRemarcar || '(sem motivo registrado)')),
+        dica: 'para devolver ao atendimento: &aplicar=1' });
+    }
+    const feitos = [], erros = [];
+    for (const p of pendentes) {
+      const r = await remarcarParaProspeccao(p.f,
+        p.f.motivoRemarcar || 'remarcada antes da regra automática', p.sis, 'reprocessamento');
+      if (r.ok) feitos.push(p.f.nome || '?'); else erros.push((p.f.nome || '?') + ': ' + r.erro);
+      await new Promise(s => setTimeout(s, 120));
+    }
+    return res.status(200).json({ ok: erros.length === 0, devolvidas: feitos.length, feitos, erros });
+  }
+
   // ── 📋 LOG-REMARCAR + auditoria: os que voltaram chegaram mesmo na prospecção? ──
   if (action === 'log-remarcar') {
     const dias = Math.min(60, Math.max(1, parseInt(req.query.dias || '7', 10)));
@@ -2260,7 +2300,11 @@ Devido ao superaquecimento dos barramentos o acrílico pode ressecar e ter peque
     f.orcValor    = '';
     f.orcReprovadoEm = new Date().toISOString();
     f.movedAt     = new Date().toISOString();
+    f.motivoRemarcar = String((req.body || {}).motivo || 'orçamento reprovado pelo cliente').slice(0, 200);
+    f.remarcadoEm = new Date().toISOString();
     await dbSet(LOG_KEY, db);
+    // ♻️ este caminho não devolvia a ficha ao atendimento ativo
+    remarcarParaProspeccao(f, f.motivoRemarcar, 'tv', (req.body || {}).quem).catch(() => {});
     return res.status(200).json({ ok: true });
   }
 
