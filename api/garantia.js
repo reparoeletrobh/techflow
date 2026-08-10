@@ -105,6 +105,102 @@ module.exports = async function handler(req, res) {
       // ═══ 🛡️ FILA DE GARANTIA (visão Conflitos) ═══
   const FILA_KEY = "reparoeletro_garantia_fila";
 
+  // ── 🎯 REDEFINIR-LISTA: deixa exatamente os 14 da loja + as criadas hoje ──
+  if (action === 'redefinir-lista') {
+    const LISTA = [
+      ['Alexandre','1991'],['Augusto','2582'],['Vera','9757'],['Marcio','2908'],
+      ['Vilmar','1427'],['Isabel','0942'],['Elton','4404'],['Lucas','3292'],
+      ['Emerson','5978'],['Emília','0611'],['Gilda','7270'],['Daianne','3878'],
+      ['Davidson','8937'],['Paulo','8011'],
+    ];
+    const d4 = t => String(t || '').replace(/\D/g, '').slice(-4);
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
+    const campo = db.fichas ? 'fichas' : (db.cards ? 'cards' : 'fichas');
+    const atual = db[campo] || [];
+    const cods = new Set(LISTA.map(x => x[1]));
+
+    // 1) as criadas HOJE que não estão na lista permanecem
+    const criadasHoje = atual.filter(f => {
+      const c = d4(f.telefone);
+      if (cods.has(c)) return false;
+      const q = String(f.criadoEm || f.em || '');
+      return q.slice(0, 10) === hoje && !String(f.origem || '').includes('conferência física');
+    });
+
+    // 2) monta uma ficha por item da lista, com o NOME QUE VOCÊ PASSOU
+    const FONTES = ['reparoeletro_pipe', 'reparoeletro_logistica', 'fichas_adm', 'reparoeletro_arquivo'];
+    const dados = {};
+    for (const k of FONTES) {
+      try {
+        const b = await dbGet(k);
+        for (const L of ['cards', 'fichas']) {
+          for (const x of ((b || {})[L] || [])) {
+            const c = d4(x.telefone);
+            if (!cods.has(c)) continue;
+            const eq = x.equipamento || x.descricao || '';
+            if (dados[c] && dados[c].equipamento) continue;
+            dados[c] = { telefone: x.telefone, equipamento: eq, endereco: x.endereco || '',
+              nomeNoSistema: x.nomeContato || x.nome || null, origemBanco: k };
+          }
+        }
+      } catch (e) {}
+    }
+    // aproveita o que já existe na garantia
+    for (const f of atual) {
+      const c = d4(f.telefone);
+      if (!cods.has(c)) continue;
+      const eq = f.equipamento || f.descricao || '';
+      if (eq && (!dados[c] || !dados[c].equipamento)) {
+        dados[c] = { ...(dados[c] || {}), telefone: f.telefone, equipamento: eq,
+          endereco: f.endereco || '', origemBanco: 'garantia' };
+      }
+    }
+    const novos = LISTA.map(([nome, cod]) => {
+      const d = dados[cod] || {};
+      const falta = !d.equipamento;
+      return {
+        id: 'gar_' + cod,
+        nome, cliente: nome,                         // 👤 o nome que veio da conferência física
+        nomeNoSistema: d.nomeNoSistema || null,      // guarda a divergência, se houver
+        telefone: d.telefone || cod,
+        equipamento: d.equipamento || '',
+        endereco: d.endereco || '',
+        valor: 0,
+        status: 'garantia_solicitada', phase: 'garantia_solicitada',
+        origem: 'conferência física na loja',
+        cadastroIncompleto: falta,
+        obs: falta ? '⚠️ COMPLETAR: falta o equipamento' : null,
+        criadoEm: new Date().toISOString(),
+      };
+    });
+    const divergentes = novos.filter(n => n.nomeNoSistema &&
+      !String(n.nomeNoSistema).toLowerCase().includes(String(n.nome).toLowerCase()));
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        totalHoje: atual.length,
+        ficaraoDaLista: novos.length,
+        maisCriadasHoje: criadasHoje.length,
+        totalFinal: novos.length + criadasHoje.length,
+        precisamCompletar: novos.filter(n => n.cadastroIncompleto).map(n => n.nome + ' ' + String(n.telefone).slice(-4)),
+        NOME_DIVERGENTE: divergentes.map(n => n.nome + ' ' + String(n.telefone).slice(-4) +
+          ' → no sistema consta "' + n.nomeNoSistema + '"'),
+        LISTA_FINAL: novos.map(n => n.nome + ' ' + String(n.telefone).slice(-4) +
+          ' | ' + (n.equipamento || '⚠️ completar')),
+        MANTIDAS_DE_HOJE: criadasHoje.map(f => String(f.nome || f.cliente || '?').slice(0, 20) +
+          ' ' + d4(f.telefone)),
+        dica: 'para aplicar: &aplicar=1' });
+    }
+    try { await dbSet('reparoeletro_garantia_lixeira_2', { em: new Date().toISOString(), fichas: atual }); } catch (e) {}
+    db[campo] = novos.concat(criadasHoje);
+    await dbSet(GARANTIA_KEY, db);
+    return res.status(200).json({ ok: true,
+      daLista: novos.length, mantidasDeHoje: criadasHoje.length,
+      total: db[campo].length,
+      precisamCompletar: novos.filter(n => n.cadastroIncompleto).map(n => n.nome),
+      backup: 'estado anterior em reparoeletro_garantia_lixeira_2' });
+  }
+
   // ── 🧹 REMOVER-DUPLICADOS: mesma pessoa com mais de uma ficha na garantia ──
   if (action === 'remover-duplicados') {
     const d4 = t => String(t || '').replace(/\D/g, '').slice(-4);
