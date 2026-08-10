@@ -4288,7 +4288,8 @@ export default async function handler(req, res) {
       return telsC.some(x => String(x).replace(/\D/g, '').slice(-8) === d8v);
     };
     const { token: tkC, phoneId: pidC } = await credenciais();
-    const FASES_FEITO = ['loja_feito', 'delivery_feito', 'controle_qualidade'];
+    const FASES_FEITO = ['loja_feito', 'delivery_feito']   // 🚫 controle_qualidade saiu:
+    // o aviso agora é disparado pelo próprio CQ, DEPOIS da aprovação, com o resultado;
     const tipoEquip = s => {
       const t = String(s || '').toLowerCase();
       if (t.includes('micro')) return 'microondas';

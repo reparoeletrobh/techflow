@@ -232,7 +232,38 @@ export default async function handler(req, res) {
     insp.status = 'aprovado';
     insp.aprovadoEm = new Date().toISOString();
     await dbSet(KEY, db);
-    return res.status(200).json({ ok: true, inspecao: insp });
+
+    // ── 📲 AVISA O CLIENTE com o resultado do controle de qualidade ──
+    let avisoCliente = null;
+    try {
+      const tel = String(insp.telefone || '').replace(/\D/g, '');
+      if (tel.length >= 10) {
+        const EQ = { microondas: 'micro-ondas', purificador: 'purificador',
+          adega: 'adega', forno: 'forno', tv: 'TV', bblend: 'BBlend', outro: 'equipamento' };
+        const aprovados = Object.entries(insp.checklist || {})
+          .filter(([, v]) => v && v.v === 'ok').length;
+        const primeiro = String(insp.cliente || '').trim().split(/\s+/)[0] || 'tudo bem';
+        const equip = EQ[insp.equipamento] || 'equipamento';
+        const texto =
+          'Olá ' + primeiro + '! ✅ Seu ' + equip + ' passou pelo nosso Controle de Qualidade e foi APROVADO.\n\n' +
+          (aprovados ? aprovados + ' verificação(ões) conferida(s) e aprovada(s).\n\n' : '') +
+          'Agora ele segue para a etapa de *instalação e teste prático*, onde montamos e ligamos o equipamento para certificar que está pronto de verdade.\n\n' +
+          'Assim que essa etapa terminar, nossa equipe do financeiro entra em contato pelo número *(31) 97225-9819* para emitir a nota fiscal, registrar a garantia e combinar a entrega.\n\n' +
+          'Qualquer dúvida é só chamar! 😊';
+        const KTF = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+        const r = await fetch('https://reparoeletroadm.com/api/wa-bot?action=enviar&k=' + KTF, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tel, texto, via: 'controle-qualidade' }),
+        }).then(x => x.json()).catch(e => ({ ok: false, error: e.message }));
+        avisoCliente = r && r.ok ? 'enviado' : ('não enviado: ' + ((r && r.error) || '?'));
+        insp.avisoClienteEm = new Date().toISOString();
+        insp.avisoClienteStatus = avisoCliente;
+        insp.textoEnviado = texto;
+        await dbSet(KEY, db);
+      } else { avisoCliente = 'inspeção sem telefone — cliente não avisado'; }
+    } catch (e) { avisoCliente = 'falhou: ' + e.message; }
+
+    return res.status(200).json({ ok: true, inspecao: insp, avisoCliente });
   }
 
   // ── REPROVAR (registra retrabalho) ──
