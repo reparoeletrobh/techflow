@@ -312,7 +312,6 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
 .conf-notif-x{position:absolute;top:8px;right:10px;background:none;border:none;color:#5a5a7a;font-size:14px;cursor:pointer;padding:2px 6px;}
 .conf-notif-x:hover{color:#fff;}
 
-
 .conf-notif{position:fixed;bottom:24px;right:24px;z-index:9999;background:#0d0d14;border:2px solid #f04060;border-radius:14px;padding:16px 20px 14px;max-width:300px;box-shadow:0 8px 40px rgba(240,64,96,.45);display:flex;align-items:flex-start;gap:12px;animation:conf-in .4s cubic-bezier(.16,1,.3,1) forwards;cursor:pointer;}
 .conf-notif.out{animation:conf-out .3s ease forwards;}
 .conf-notif-ic{font-size:26px;animation:conf-blink 1s ease infinite;flex-shrink:0;}
@@ -320,7 +319,6 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
 .conf-notif-msg{font-family:'DM Mono',monospace;font-size:10px;color:#8080a0;line-height:1.5;}
 .conf-notif-x{position:absolute;top:8px;right:10px;background:none;border:none;color:#5a5a7a;font-size:14px;cursor:pointer;padding:2px 6px;}
 .conf-notif-x:hover{color:#fff;}
-
 
 </style>
 </head>
@@ -406,7 +404,6 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
         <span class="nav-label">Orçamento</span>
       </div>
 
-
       <div class="nav-item" data-url="/tv/logistica" data-label="Logística"
            style="--item-color:#10d982" onclick="openPage(this)">
         <span class="nav-icon">🔧</span>
@@ -436,12 +433,6 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
         <span class="nav-label">Catálogo Peças</span>
       </div>
 
-      <div class="nav-item" data-label="Notas"
-           style="--item-color:#f59e0b" onclick="abrirPainelNotas()">
-        <span class="nav-icon" style="background:rgba(245,158,11,.15);">📝</span>
-        <span class="nav-label">Notas</span>
-      </div>
-
       <div class="nav-item" data-url="/tv/compras-pecas" data-label="Compra de Peças"
            style="--item-color:#f97316" onclick="openPage(this)">
         <span class="nav-icon">🔩</span>
@@ -454,39 +445,9 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
         <span class="nav-label">Compras</span>
       </div>
 
-
-      <div class="nav-item" data-url="/tv/garantia" data-label="Garantia"
-           style="--item-color:#a855f7" onclick="openPage(this)">
-        <span class="nav-icon">🛡️</span>
-        <span class="nav-label">Garantia</span>
-      </div>
-
       <div class="nav-item" data-url="/api/tv-pipe?action=erp-report" data-label="Análise ERP" style="--item-color:#22c55e" onclick="openPage(this)">
         <div class="nav-icon">📊</div>
         <div class="nav-label">Análise ERP</div>
-      </div>
-      <div class="nav-item" data-url="/tv/metricas" data-label="Métricas"
-           style="--item-color:#a855f7" onclick="openPage(this)">
-        <span class="nav-icon">📊</span>
-        <span class="nav-label">Métricas</span>
-      </div>
-
-      <div class="nav-item" data-url="/tv/checkout" data-label="Checkout"
-           style="--item-color:#f0b429" onclick="openPage(this)">
-        <span class="nav-icon">🛒</span>
-        <span class="nav-label">Checkout</span>
-      </div>
-
-      <div class="nav-item" data-url="/tv/monitoramento" data-label="Monitoramento"
-           style="--item-color:#f97316" onclick="openPage(this)">
-        <span class="nav-icon">🔭</span>
-        <span class="nav-label">Monitoramento</span>
-      </div>
-
-      <div class="nav-item" data-url="/tv/aguardando-retirada" data-label="Ag. Retirada"
-           style="--item-color:#f97316" onclick="openPage(this)">
-        <span class="nav-icon">📦</span>
-        <span class="nav-label">Ag. Retirada</span>
       </div>
 
       <div class="nav-item" data-url="/tv/coleta" data-label="Coleta"
@@ -505,7 +466,6 @@ html, body { height: 100vh; overflow: hidden; background: var(--bg); color: var(
         <span class="nav-icon" style="background:rgba(249,115,22,.15);">📊</span>
         <span class="nav-label">Gestão KM</span>
       </div>
-
 
     </div>
 
@@ -668,7 +628,6 @@ async function executarRastrear(q) {
   }
 }
 </script>
-
 
 <!-- PAINEL CATÁLOGO INLINE -->
 <div id="catalogo-overlay" onclick="fecharPainelCatalogo(event)"
@@ -917,7 +876,6 @@ function catEsc(s){var d=document.createElement('div');d.textContent=s||'';retur
 function catFmtDt(s){if(!s)return'—';try{var d=new Date(s);return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}catch(e){return s;}}
 </script>
 
-
 <!-- ═══════════════════════════════════════════════════ -->
 <!-- PAINEL NOTAS — INLINE (sem iframe)                  -->
 <!-- ═══════════════════════════════════════════════════ -->
@@ -1127,7 +1085,6 @@ function toggleNotasConcluidas(){
 }
 function notaEsc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
 </script>
-
 
 <!-- ═══════════════════════════════════ TV CONFLITOS ═════════════════════════ -->
 <div id="conf-overlay" onclick="fecharConfOverlay(event)"
