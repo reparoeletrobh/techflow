@@ -2761,6 +2761,73 @@ export default async function handler(req, res) {
       encontrados: out.length, cards: out });
   }
 
+  // ── 📅 FILA-RECUPERACAO: quem ainda não entrou e quando entra ──
+  if (action === 'fila-recuperacao-programada') {
+    const cfgF = (await dbGet('wa_bot_config')) || {};
+    const teto = cfgF.recuperacao7dTeto || 20;
+    const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const [ppA, ppT, evts, ctrl7] = await Promise.all([
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), lerEvts(), dbGet('wa_recuperacao_7d'),
+    ]);
+    const universo = (((ppA || {}).cards) || []).map(c => ({ ...c, _s: 'ADM' }))
+      .concat((((ppT || {}).cards) || []).map(c => ({ ...c, _s: 'TV' })));
+    const abertos = universo.filter(c => String(c.phaseId || c.phase || '') === 'aguardando_aprovacao');
+    const clientes = ((ctrl7 || {}).clientes) || {};
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+
+    // quem respondeu nas últimas 24h fica de fora da fila
+    const respondeu = new Set();
+    for (const e of (evts || [])) {
+      if (e.dir !== 'in') continue;
+      if (Date.now() - new Date(e.ts || 0).getTime() > 24 * 3600000) continue;
+      respondeu.add(d8f(e.tel));
+    }
+    // 🔒 um por telefone, o de maior valor — a Julimar tem 3 cards e receberia 3 vezes
+    const porTel = {};
+    for (const c of abertos) {
+      const d8 = d8f(c.telefone);
+      if (d8.length < 8) continue;
+      const v = parseFloat(c.valor || 0) || 0;
+      if (!porTel[d8] || v > (parseFloat(porTel[d8].valor || 0) || 0)) porTel[d8] = c;
+    }
+    const unicos = Object.entries(porTel);
+
+    const jaNaFila = [], vaoEntrar = [], foraDaFila = [];
+    for (const [d8, c] of unicos) {
+      const ctrl = clientes[d8];
+      const item = { nome: c.nomeContato || '?', tel: d8.slice(-4), sistema: c._s,
+        valor: parseFloat(c.valor || 0) || 0,
+        equipamento: String(c.equipamento || c.descricao || '').slice(0, 20),
+        paradoDesde: c.movedAt || c.aguardandoDesde,
+        diasParado: c.movedAt ? Number(((Date.now() - new Date(c.movedAt).getTime()) / 86400000).toFixed(1)) : null };
+      if (ctrl) { jaNaFila.push({ ...item, tentativa: ctrl.tentativas + '/7', ultimo: ctrl.ultimo }); continue; }
+      if (respondeu.has(d8)) { foraDaFila.push({ ...item, motivo: 'respondeu nas últimas 24h — conversa ativa' }); continue; }
+      vaoEntrar.push(item);
+    }
+    // ordena como a recuperação ordena: mais antigo primeiro
+    vaoEntrar.sort((a, b) => String(a.paradoDesde || '').localeCompare(String(b.paradoDesde || '')));
+    // quantos já vão receber amanhã (os que estão em 1/7 e não receberam hoje)
+    const renovamAmanha = jaNaFila.filter(x => x.ultimo !== hoje && parseInt(x.tentativa) < 7).length;
+    const vagasAmanha = Math.max(0, teto - renovamAmanha);
+    const programacao = vaoEntrar.map((x, i) => {
+      const diasAte = Math.floor(i / Math.max(1, vagasAmanha || teto));
+      const d = new Date(Date.now() - 3 * 3600000 + (diasAte + 1) * 86400000);
+      return { ...x, entraEm: d.toISOString().slice(0, 10), posicao: i + 1 };
+    });
+    return res.status(200).json({ ok: true,
+      tetoPorDia: teto,
+      jaNaRecuperacao: jaNaFila.length,
+      aindaNaoEntraram: vaoEntrar.length,
+      foraPorConversaAtiva: foraDaFila.length,
+      renovamAmanha, vagasParaNovosAmanha: vagasAmanha,
+      PROGRAMACAO: programacao.slice(0, 40).map(x => x.entraEm + ' | #' + String(x.posicao).padStart(2) +
+        ' | ' + String(x.nome).slice(0, 18).padEnd(18) + ' ' + x.tel +
+        ' | R$ ' + String(x.valor).padStart(5) +
+        ' | parado ' + (x.diasParado != null ? x.diasParado + 'd' : '?')),
+      FORA_POR_CONVERSA_ATIVA: foraDaFila.map(x => String(x.nome).slice(0, 18) + ' ' + x.tel +
+        ' | R$ ' + x.valor + ' — ' + x.motivo) });
+  }
+
   // ── 📋 PENDENTES-NEGOCIACAO: todo orçamento enviado e ainda não aprovado ──
   if (action === 'pendentes-negociacao') {
     const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
@@ -2781,7 +2848,7 @@ export default async function handler(req, res) {
       { f: 'F1 — orçamento enviado', re: /or[çc]amento|ficou pronto|valor do conserto/i },
     ];
     const clientes7 = ((ctrl7 || {}).clientes) || {};
-    const linhas = [];
+    let linhas = [];
     for (const c of abertos) {
       const d8 = d8f(c.telefone);
       if (d8.length < 8) continue;
@@ -2810,7 +2877,15 @@ export default async function handler(req, res) {
         conflitoAberto: !!(rec && rec.conflitoAberto),
       });
     }
-    linhas.sort((a, b) => b.valor - a.valor);
+    // 🔒 UM POR TELEFONE quando ?porTelefone=1 — a Julimar tem 3 cards e aparecia 3 vezes
+    let saida = linhas;
+    if (String(req.query.porTelefone || '') === '1') {
+      const m = {};
+      for (const l of linhas) { if (!m[l.tel] || l.valor > m[l.tel].valor) m[l.tel] = l; }
+      saida = Object.values(m);
+    }
+    saida.sort((a, b) => b.valor - a.valor);
+    linhas = saida;
     const porFase = linhas.reduce((o, l) => { o[l.faseNegociacao] = (o[l.faseNegociacao] || 0) + 1; return o; }, {});
     const porRec = linhas.reduce((o, l) => { o[l.recuperacao] = (o[l.recuperacao] || 0) + 1; return o; }, {});
     return res.status(200).json({ ok: true,
