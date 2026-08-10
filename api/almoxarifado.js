@@ -357,6 +357,47 @@ export default async function handler(req, res) {
       dica: 'para remover: &aplicar=1' });
   }
 
+  // ── 🕵️ ORIGEM-TAREFAS: de onde vieram as tarefas do almoxarifado ──
+  if (action === 'origem-tarefas') {
+    const horas = Math.min(720, Math.max(1, parseInt(req.query.horas || '48', 10)));
+    const corte = Date.now() - horas * 3600000;
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '?';
+    const db = (await dbGet(KEY)) || { tarefas: [] };
+    const todas = db.tarefas || [];
+    const recentes = todas.filter(t => {
+      const q = new Date(t.criadaEm || t.criadoEm || t.em || 0).getTime();
+      return q && q >= corte;
+    });
+    // agrupa por origem, tipo e minuto de criação (rajada = criação automática)
+    const porOrigem = {}, porTipo = {}, porMinuto = {};
+    for (const t of recentes) {
+      const o = String(t.origem || t.via || '(não informada)');
+      porOrigem[o] = (porOrigem[o] || 0) + 1;
+      const tp = String(t.tipo || t.acao || '?');
+      porTipo[tp] = (porTipo[tp] || 0) + 1;
+      const min = hh(t.criadaEm || t.criadoEm || t.em);
+      porMinuto[min] = (porMinuto[min] || 0) + 1;
+    }
+    // rajadas: minutos com 5+ tarefas indicam criação em lote
+    const rajadas = Object.entries(porMinuto).filter(([, n]) => n >= 5)
+      .sort((a, b) => b[1] - a[1]);
+    return res.status(200).json({ ok: true, periodoHoras: horas,
+      totalNoAlmoxarifado: todas.length,
+      criadasNoPeriodo: recentes.length,
+      POR_ORIGEM: porOrigem,
+      POR_TIPO: porTipo,
+      RAJADAS: rajadas.length
+        ? rajadas.map(([m, n]) => m + ' → ' + n + ' tarefa(s) no mesmo minuto')
+        : 'nenhuma — criadas de forma espaçada',
+      DIAGNOSTICO: rajadas.length
+        ? '⚠️ há criação em LOTE — ' + rajadas[0][1] + ' tarefas num único minuto (' + rajadas[0][0] + '), típico de rotina automática ou importação'
+        : '✅ criação espaçada, compatível com uso manual',
+      AMOSTRA: recentes.slice(0, 40).map(t => hh(t.criadaEm || t.criadoEm || t.em) + ' | ' +
+        String(t.tipo || t.acao || '?').padEnd(18) + ' | ' + String(t.cliente || t.nome || '?').slice(0, 20) +
+        ' | ' + String(t.equipamento || '').slice(0, 20) +
+        ' | origem: ' + String(t.origem || t.via || '(não informada)')) });
+  }
+
   // ── 🧹 LIMPAR-TAREFAS-TV: remove do almoxarifado ADM tarefas de cards de TV ──
   if (action === 'limpar-tarefas-tv') {
     // varre TODAS as origens de TV e TODOS os estados — a versão anterior só olhava
