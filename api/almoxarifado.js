@@ -433,6 +433,38 @@ export default async function handler(req, res) {
       observacao: 'card de diagnóstico criado — com foto, modelo, RS, remarcar e não chegou' });
   }
 
+  // ── ⏪ QUEM-VOLTOU: cards que saíram de equipamento_comprado para trás ──
+  if (action === 'quem-voltou') {
+    const pp = (await dbGet('reparoeletro_pipe')) || { cards: [] };
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '?';
+    const voltaram = [];
+    for (const c of (pp.cards || [])) {
+      const atual = String(c.phaseId || c.phase || '');
+      if (atual === 'equipamento_comprado') continue;
+      const hist = (c.history || []).map(x => ({
+        f: String(x.phase || x.phaseId || ''), t: new Date(x.ts || x.timestamp || 0).getTime(),
+      })).filter(x => x.t).sort((a, b) => a.t - b.t);
+      const passou = hist.some(x => x.f === 'equipamento_comprado');
+      if (!passou) continue;
+      voltaram.push({ id: c.id, nome: c.nomeContato,
+        tel: String(c.telefone || '').slice(-4),
+        equipamento: String(c.equipamento || c.descricao || '').slice(0, 20),
+        faseAgora: atual, movidoEm: c.movedAt,
+        ultimaEtapa: hist.slice(-1)[0] ? hist.slice(-1)[0].f : '?' });
+    }
+    voltaram.sort((a, b) => String(b.movidoEm).localeCompare(String(a.movidoEm)));
+    // agrupa por minuto para achar movimentação em lote
+    const porMin = voltaram.reduce((o, v) => { const m = hh(v.movidoEm); o[m] = (o[m] || 0) + 1; return o; }, {});
+    const rajadas = Object.entries(porMin).filter(([, n]) => n >= 5).sort((a, b) => b[1] - a[1]);
+    return res.status(200).json({ ok: true,
+      aindaEmComprado: (pp.cards || []).filter(c => String(c.phaseId || c.phase) === 'equipamento_comprado').length,
+      voltaramParaTras: voltaram.length,
+      porFaseAtual: voltaram.reduce((o, v) => { o[v.faseAgora] = (o[v.faseAgora] || 0) + 1; return o; }, {}),
+      RAJADAS: rajadas.length ? rajadas.map(([m, n]) => m + ' → ' + n + ' card(s)') : 'nenhuma',
+      L: voltaram.slice(0, 60).map(v => hh(v.movidoEm) + ' | ' + String(v.nome || '?').slice(0, 18) +
+        ' ' + v.tel + ' | → ' + v.faseAgora) });
+  }
+
   // ── 🔬 AUDITORIA-COMPRA: procura os equipamentos comprados em TODOS os bancos ──
   if (action === 'auditoria-compra') {
     const CHAVES = ['reparoeletro_compra_equip', 'compra_equipamentos', 'reparoeletro_equipamentos',
