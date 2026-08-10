@@ -433,6 +433,32 @@ export default async function handler(req, res) {
       observacao: 'card de diagnóstico criado — com foto, modelo, RS, remarcar e não chegou' });
   }
 
+  // ── 🕐 QUANDO-MUDOU: quando cada ficha da Compra Equip foi criada/alterada ──
+  if (action === 'quando-mudou') {
+    const ceq = (await dbGet('reparoeletro_compra_equip')) || { fichas: [] };
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '(sem data)';
+    const fichas = ceq.fichas || [];
+    const porCriacao = {};
+    for (const f of fichas) {
+      const k = String(f.criadoEm || '').slice(0, 10) || '(sem data)';
+      porCriacao[k] = (porCriacao[k] || 0) + 1;
+    }
+    // rajada por minuto
+    const porMin = {};
+    for (const f of fichas) { const m = hh(f.criadoEm); porMin[m] = (porMin[m] || 0) + 1; }
+    const rajadas = Object.entries(porMin).filter(([, n]) => n >= 5).sort((a, b) => b[1] - a[1]);
+    // campos que indicam alteração de status
+    const comHistorico = fichas.filter(f => f.compradoEm || f.statusEm || f.atualizadoEm).length;
+    return res.status(200).json({ ok: true,
+      total: fichas.length,
+      POR_DIA_DE_CRIACAO: Object.fromEntries(Object.entries(porCriacao).sort()),
+      RAJADAS_POR_MINUTO: rajadas.length ? rajadas.map(([m, n]) => m + ' → ' + n) : 'nenhuma',
+      comCarimboDeStatus: comHistorico,
+      camposDeUmaFicha: fichas[0] ? Object.keys(fichas[0]) : [],
+      amostra: fichas.slice(0, 8).map(f => hh(f.criadoEm) + ' | ' +
+        String(f.nomeContato || '?').slice(0, 18) + ' | ' + f.status) });
+  }
+
   // ── ⏪ QUEM-VOLTOU: cards que saíram de equipamento_comprado para trás ──
   if (action === 'quem-voltou') {
     const pp = (await dbGet('reparoeletro_pipe')) || { cards: [] };
