@@ -433,6 +433,37 @@ export default async function handler(req, res) {
       observacao: 'card de diagnóstico criado — com foto, modelo, RS, remarcar e não chegou' });
   }
 
+  // ── 🔌 AUDITORIA-PIPEFY: toda conexão viva com o sistema externo ──
+  if (action === 'auditoria-pipefy') {
+    const temToken = !!(process.env.PIPEFY_TOKEN || '').trim();
+    // testa se o token ainda funciona
+    let tokenAtivo = null;
+    if (temToken) {
+      try {
+        const r = await fetch('https://api.pipefy.com/graphql', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + (process.env.PIPEFY_TOKEN || '').trim(),
+            'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: '{ me { name } }' }),
+        }).then(x => x.json()).catch(e => ({ erro: e.message }));
+        tokenAtivo = !!(r && r.data && r.data.me);
+      } catch (e) { tokenAtivo = false; }
+    }
+    return res.status(200).json({ ok: !temToken,
+      PIPEFY_TOKEN_configurado: temToken,
+      tokenAindaFunciona: tokenAtivo,
+      SITUACAO: !temToken
+        ? '✅ sem token — nenhuma chamada ao Pipefy consegue funcionar, mesmo com o código presente'
+        : (tokenAtivo
+          ? '🚨 o token está ATIVO — as rotinas que chamam o Pipefy conseguem enviar e receber dados'
+          : '⚠️ token configurado mas já não funciona — as chamadas falham em silêncio'),
+      arquivosQueChamam: ['aguardando-retirada', 'atendimento', 'compra-equip', 'cron.erp', 'fin',
+        'lalamove', 'pipe', 'relatorio-logistica-pipefy', 'tv-aguardando-retirada', 'tv-coleta',
+        'tv-compra-equip', 'tv-metricas', 'tv-pipe', 'tv-rotas', 'webhook-mp', 'fix-clarice-0273'],
+      nenhumCronChamaPipefy: true,
+      comoDesligarDeVez: 'remover a variável PIPEFY_TOKEN na Vercel — sem ela nenhuma chamada funciona' });
+  }
+
   // ── ♻️ RESTAURAR-COMPRADOS: recria as fichas apagadas pelo Limpar Concluídos ──
   if (action === 'restaurar-comprados') {
     const LISTA = [
