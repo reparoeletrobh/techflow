@@ -190,8 +190,28 @@ module.exports = async function handler(req, res) {
     const tamAntes = JSON.stringify(db).length;
     const tamDepois = JSON.stringify({ ...db, fichas: ficam }).length;
     if (String(req.query.aplicar || '') !== '1') {
+      // 🔍 distribuição real: por status, por mês e quantas sem data
+      const porStatus = db.fichas.reduce((o, f) => {
+        const s = String(f.status || '(sem status)'); o[s] = (o[s] || 0) + 1; return o; }, {});
+      const porMes = db.fichas.reduce((o, f) => {
+        const d = String(f.criadoEm || f.registradoEm || '');
+        const k = d ? d.slice(0, 7) : '(SEM DATA)'; o[k] = (o[k] || 0) + 1; return o; }, {});
+      // qual campo ocupa mais espaço?
+      const amostra = db.fichas.slice(0, 50);
+      const porCampo = {};
+      for (const f of amostra) {
+        for (const [k, v] of Object.entries(f)) {
+          porCampo[k] = (porCampo[k] || 0) + JSON.stringify(v || '').length;
+        }
+      }
+      const pesados = Object.entries(porCampo).sort((a, b) => b[1] - a[1]).slice(0, 8)
+        .map(([k, v]) => k + ': ~' + Math.round(v / amostra.length) + ' bytes/ficha');
       return res.status(200).json({ ok: true, modo: 'prévia',
         banco, registrosHoje: db.fichas.length,
+        POR_STATUS: porStatus,
+        POR_MES: Object.fromEntries(Object.entries(porMes).sort()),
+        CAMPOS_MAIS_PESADOS: pesados,
+        bytesPorFicha: Math.round(JSON.stringify(db).length / db.fichas.length),
         vaoParaOArquivo: vao.length, permanecem: ficam.length,
         tamanhoAtualMB: (tamAntes / 1048576).toFixed(2),
         tamanhoDepoisMB: (tamDepois / 1048576).toFixed(2),
