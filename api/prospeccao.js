@@ -887,14 +887,23 @@ export default async function handler(req,res){
     const f=(db.fichas||[]).find(x=>x.id===id);
     if(!f)return res.status(404).json({ok:false,error:'não encontrado'});
     const d8a=String(f.telefone||'').replace(/\D/g,'').slice(-8);
-    const pp=(await dbGet('reparoeletro_pipe'))||{cards:[]};
-    const card=(pp.cards||[]).find(c=>String(c.telefone||'').replace(/\D/g,'').slice(-8)===d8a&&c.phase!=='aprovados');
-    if(!card)return res.status(404).json({ok:false,error:'card do cliente não encontrado no pipe'});
+    // 📺 o cliente pode ser de TV — procurar nos DOIS pipes, senão a aprovação falha
+    let pp=(await dbGet('reparoeletro_pipe'))||{cards:[]};
+    let chavePipe='reparoeletro_pipe';
+    let card=(pp.cards||[]).find(c=>String(c.telefone||'').replace(/\D/g,'').slice(-8)===d8a&&c.phase!=='aprovados');
+    if(!card){
+      const ppTv=(await dbGet('tv_pipe'))||{cards:[]};
+      const cTv=(ppTv.cards||[]).find(c=>String(c.telefone||'').replace(/\D/g,'').slice(-8)===d8a&&c.phase!=='aprovados');
+      if(cTv){ card=cTv; pp=ppTv; chavePipe='tv_pipe'; }
+    }
+    if(!card)return res.status(404).json({ok:false,
+      error:'card do cliente não encontrado em nenhum pipe (ADM ou TV)',
+      telefoneProcurado:d8a.slice(-4)});
     const v=parseFloat(valor)||0;
     if(v>0)card.valor=v;
     const nota='✔ Aprovado via Conflitos Bot: R$'+(v||card.valor)+' ('+String(pagamento||'—')+')'+(obs?' — '+String(obs).slice(0,150):'');
     card.descricao=(card.descricao?card.descricao+'\n':'')+nota;
-    await dbSet('reparoeletro_pipe',pp);
+    await dbSet(chavePipe,pp);
     // Mover pela action oficial → dispara o gatilho do técnico
     const KA=(process.env.TECHFLOW_KEY||'tfk-re2026-Bx7mQp9zKw4Y').trim();
     await fetch('https://reparoeletroadm.com/api/pipe?action=mover&k='+KA,{
@@ -924,11 +933,19 @@ export default async function handler(req,res){
     const f=(db.fichas||[]).find(x=>x.id===id);
     if(!f)return res.status(404).json({ok:false,error:'não encontrado'});
     const d8r=String(f.telefone||'').replace(/\D/g,'').slice(-8);
-    const pp=(await dbGet('reparoeletro_pipe'))||{cards:[]};
-    const card=(pp.cards||[]).find(c=>String(c.telefone||'').replace(/\D/g,'').slice(-8)===d8r&&c.phase!=='solicitar_entrega');
-    if(!card)return res.status(404).json({ok:false,error:'card do cliente não encontrado no pipe'});
+    let pp=(await dbGet('reparoeletro_pipe'))||{cards:[]};
+    let chavePipeR='reparoeletro_pipe';
+    let card=(pp.cards||[]).find(c=>String(c.telefone||'').replace(/\D/g,'').slice(-8)===d8r&&c.phase!=='solicitar_entrega');
+    if(!card){
+      const ppTvR=(await dbGet('tv_pipe'))||{cards:[]};
+      const cTvR=(ppTvR.cards||[]).find(c=>String(c.telefone||'').replace(/\D/g,'').slice(-8)===d8r&&c.phase!=='solicitar_entrega');
+      if(cTvR){ card=cTvR; pp=ppTvR; chavePipeR='tv_pipe'; }
+    }
+    if(!card)return res.status(404).json({ok:false,
+      error:'card do cliente não encontrado em nenhum pipe (ADM ou TV)',
+      telefoneProcurado:d8r.slice(-4)});
     card.descricao='REPROVADO - '+String(card.descricao||'');
-    await dbSet('reparoeletro_pipe',pp);
+    await dbSet(chavePipeR,pp);
     const KR=(process.env.TECHFLOW_KEY||'tfk-re2026-Bx7mQp9zKw4Y').trim();
     await fetch('https://reparoeletroadm.com/api/pipe?action=mover&k='+KR,{
       method:'POST',headers:{'Content-Type':'application/json'},
