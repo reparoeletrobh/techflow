@@ -216,8 +216,35 @@ export default async function handler(req, res) {
       SO_NO_SISTEMA: soNoSistema.map(({ f, s }) => s + ' | ' + String(f.nome || '?').slice(0, 20) +
         ' ' + d4(f.telefone) + ' | origem: ' + (f.origem || '(sem)') +
         ' | ' + String(f.equipamento || '').slice(0, 18)),
-      SO_NA_PLANILHA: soNaPlanilha.map(x => String(x.nome || '?').slice(0, 20) + ' ' +
-        d4(x.telCompleto || x.tel) + (x.ehTv ? ' | TV' : ' | ADM')),
+      SO_NA_PLANILHA: await (async () => {
+        // 🔍 onde cada uma está? pode ter entrado em outro dia, estar na logística,
+        // no pipe, no arquivo — ou não existir mesmo em lugar nenhum
+        const BANCOS = ['fichas_adm', 'fichas_tv', 'reparoeletro_logistica', 'tv_logistica',
+          'prospeccao_adm', 'reparoeletro_pipe', 'tv_pipe', 'reparoeletro_arquivo'];
+        const onde = {};
+        for (const k of BANCOS) {
+          try {
+            const b = await dbGet(k);
+            for (const L of ['fichas', 'cards']) {
+              for (const x of ((b || {})[L] || [])) {
+                const t = d8(x.telefone);
+                if (!soNaPlanilha.some(p => d8(p.telCompleto || p.tel) === t)) continue;
+                onde[t] = onde[t] || [];
+                const q = String(x.criadoEm || x.registradoEm || x.movedAt || '').slice(0, 10);
+                onde[t].push(k + (q ? ' (' + q + ')' : '') + ' · ' +
+                  String(x.status || x.phase || x.phaseId || '?'));
+              }
+            }
+          } catch (e) {}
+        }
+        return soNaPlanilha.map(x => {
+          const t = d8(x.telCompleto || x.tel);
+          const achado = onde[t];
+          return String(x.nome || '?').slice(0, 18) + ' ' + d4(x.telCompleto || x.tel) +
+            (x.ehTv ? ' | TV' : ' | ADM') + ' → ' +
+            (achado ? [...new Set(achado)].slice(0, 2).join(' | ') : '🚨 NÃO EXISTE EM NENHUM BANCO');
+        });
+      })(),
       DUPLICADOS_NO_SISTEMA: duplicadasSis,
       PLANILHA: { total: linhas.length,
         tv: linhas.filter(x => x.ehTv).length,
