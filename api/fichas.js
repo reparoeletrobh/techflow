@@ -142,7 +142,9 @@ export default async function handler(req, res) {
           dt.startsWith(d + '/' + m2 + '/' + a.slice(2));
         if (!bate) continue;
         const txt = String(c[iSis] || '') + ' ' + String(c[iNome] || '');
-        linhas.push({ nome: c[iNome] || '?', tel: String(c[iTel] || '').replace(/\D/g, '').slice(-4),
+        linhas.push({ nome: c[iNome] || '?',
+          tel: String(c[iTel] || '').replace(/\D/g, '').slice(-4),
+          telCompleto: String(c[iTel] || '').replace(/\D/g, ''),
           ehTv: /\btv\b|televis|polegada/i.test(txt) });
       }
     } catch (e) { return res.status(200).json({ ok: false, error: 'não consegui ler a planilha: ' + e.message }); }
@@ -173,11 +175,50 @@ export default async function handler(req, res) {
       String(f.id || '').startsWith('rem_') || String(f.id || '').startsWith('fic_reag_');
     const porOrigem = (arr) => arr.reduce((o, f) => {
       const k = String(f.origem || '(sem origem)'); o[k] = (o[k] || 0) + 1; return o; }, {});
+    // 🔍 cruzamento pelos 8 dígitos, dos DOIS lados, sem depender do formato
+    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
     const d4 = t => String(t || '').replace(/\D/g, '').slice(-4);
-    const naPlanilha = new Set(linhas.map(x => x.tel).filter(x => x.length === 4));
-    const foraDaPlanilha = [...admTodas, ...tvTodas].filter(f => !naPlanilha.has(d4(f.telefone)));
+    const telsPlanilha = new Map();
+    for (const x of linhas) {
+      const k = d8(x.telCompleto || x.tel);
+      if (k.length < 8) continue;
+      telsPlanilha.set(k, (telsPlanilha.get(k) || 0) + 1);
+    }
+    const todasSis = [...admTodas.map(f => ({ f, s: 'ADM' })), ...tvTodas.map(f => ({ f, s: 'TV' }))];
+    const telsSistema = new Map();
+    for (const { f } of todasSis) {
+      const k = d8(f.telefone);
+      if (k.length < 8) continue;
+      telsSistema.set(k, (telsSistema.get(k) || 0) + 1);
+    }
+    // no sistema e não na planilha
+    const soNoSistema = todasSis.filter(({ f }) => !telsPlanilha.has(d8(f.telefone)));
+    // na planilha e não no sistema
+    const soNaPlanilha = linhas.filter(x => !telsSistema.has(d8(x.telCompleto || x.tel)));
+    // duplicadas dentro do próprio sistema
+    const duplicadasSis = [];
+    for (const [k, n] of telsSistema) {
+      if (n < 2) continue;
+      const quais = todasSis.filter(({ f }) => d8(f.telefone) === k);
+      duplicadasSis.push(k.slice(-4) + ' ×' + n + ' → ' +
+        quais.map(({ f, s }) => s + ':' + String(f.nome || '?').slice(0, 12) +
+          '(' + (f.origem || 'sem') + ')').join(' | '));
+    }
+    const foraDaPlanilha = soNoSistema.map(x => x.f);
 
     return res.status(200).json({ ok: true, dia,
+      CRUZAMENTO: {
+        soNoSistema: soNoSistema.length,
+        soNaPlanilha: soNaPlanilha.length,
+        telefonesDuplicadosNoSistema: duplicadasSis.length,
+        contaFecha: (linhas.length + soNoSistema.length - soNaPlanilha.length) === todasSis.length,
+      },
+      SO_NO_SISTEMA: soNoSistema.map(({ f, s }) => s + ' | ' + String(f.nome || '?').slice(0, 20) +
+        ' ' + d4(f.telefone) + ' | origem: ' + (f.origem || '(sem)') +
+        ' | ' + String(f.equipamento || '').slice(0, 18)),
+      SO_NA_PLANILHA: soNaPlanilha.map(x => String(x.nome || '?').slice(0, 20) + ' ' +
+        d4(x.telCompleto || x.tel) + (x.ehTv ? ' | TV' : ' | ADM')),
+      DUPLICADOS_NO_SISTEMA: duplicadasSis,
       PLANILHA: { total: linhas.length,
         tv: linhas.filter(x => x.ehTv).length,
         adm: linhas.filter(x => !x.ehTv).length },
