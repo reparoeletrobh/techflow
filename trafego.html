@@ -106,6 +106,7 @@ a.voltar{color:var(--dim);text-decoration:none;font-size:11.5px;font-weight:700;
   <div class="aba" id="s-inteligencia" onclick="secao('inteligencia')">🧠 Inteligência</div>
   <div class="aba" id="s-programacao" onclick="secao('programacao')">📅 Programação</div>
   <div class="aba" id="s-r2" onclick="secao('r2')">🎬 Criativos</div>
+  <div class="aba" id="s-historico" onclick="secao('historico')">📚 Histórico</div>
 </div>
 <div id="pg-anuncios">
   <div id="recado-copiloto"></div>
@@ -122,6 +123,7 @@ a.voltar{color:var(--dim);text-decoration:none;font-size:11.5px;font-weight:700;
 <div id="pg-inteligencia" style="display:none;"></div>
 <div id="pg-programacao" style="display:none;"></div>
 <div class="pg" id="pg-r2" style="display:none;"></div>
+<div class="pg" id="pg-historico" style="display:none;"></div>
 
 <div class="rodape">
   <a class="voltar" href="/adm">← Menu</a>
@@ -257,7 +259,7 @@ function render(){
 }
 
 function secao(s){
-  ['anuncios','copiloto','analise','inteligencia','programacao','r2'].forEach(function(x){
+  ['anuncios','copiloto','analise','inteligencia','programacao','r2','historico'].forEach(function(x){
     document.getElementById('pg-'+x).style.display=x===s?'block':'none';
     var t=document.getElementById('s-'+x);
     if(x===s){t.classList.add('on');t.style.borderColor='#f97316';t.style.background='#f9731622';t.style.color='#fff';}
@@ -268,6 +270,7 @@ function secao(s){
   if(s==='inteligencia'&&!window._int)carregarInteligencia(false);
   if(s==='programacao'){carregarProgramacao();checarPendentes();}
   if(s==='r2'){carregarR2();}
+  if(s==='historico'){carregarHistorico();}
   if(s==='anuncios')checarPendentes();
   if(s==='copiloto')checarPendentes();
 }
@@ -294,6 +297,54 @@ async function checarPendentes(){
     +(urgente?'<a href="https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=1267284360833794" target="_blank" style="display:inline-block;margin-top:9px;background:#1d4ed8;color:#fff;text-decoration:none;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:800;">Abrir o Gerenciador para aprovar →</a>':'')
   +'</div>';
 }
+
+// ── 📚 HISTÓRICO: cada execução com o detalhe do que foi feito ──
+var _histDados = null;
+async function carregarHistorico(){
+  var el=document.getElementById('pg-historico');
+  el.innerHTML='<div class="vazio-msg">📚 Carregando o histórico…</div>';
+  var r=await fetch('/api/trafego?action=historico&dias=30').then(function(x){return x.json();}).catch(function(){return null;});
+  if(!r||!r.ok){el.innerHTML='<div class="vazio-msg">não consegui carregar</div>';return;}
+  _histDados = r.DETALHE || [];
+  el.innerHTML='<div style="background:var(--painel);border:1px solid var(--linha);border-radius:14px;padding:15px 17px;">'
+    +'<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">'
+      +'<span style="font-size:15px;font-weight:900;color:#a78bfa;">📚 Histórico de alterações</span>'
+      +'<span style="font-size:11px;color:#5a6270;">'+(r.execucoes||0)+' execução(ões) · 30 dias</span>'
+      +'<button class="btn" style="margin-left:auto;font-size:11px;padding:5px 11px;" onclick="carregarHistorico()">↻</button>'
+    +'</div>'
+    +'<div style="font-size:11px;color:#5a6270;margin-top:9px;">clique numa linha para ver os anúncios</div>'
+    +'<div style="background:#0f1319;border:1px solid #1e2228;border-radius:9px;padding:9px 11px;margin-top:8px;max-height:330px;overflow-y:auto;">'
+    +(_histDados.length?_histDados.map(function(d,i){
+        var cor = d.ERROS.length ? '#f87171' : (d.PAUSADOS.length ? '#fbbf24' : '#4ade80');
+        return '<div style="cursor:pointer;padding:4px 0;border-bottom:1px solid #171b22;font-family:var(--mono);font-size:10.5px;color:#c9ced6;" '
+          +'onclick="verExecucao('+i+')" onmouseover="this.style.color=\'#60a5fa\'" onmouseout="this.style.color=\'#c9ced6\'">'
+          +'▸ <span style="color:'+cor+'">#'+d.n+'</span> · '+esc(d.quando)+' · '+esc(d.resumo)+'</div>';
+      }).join(''):'<div style="font-size:11px;color:#5a6270;">nenhuma execução no período</div>')
+    +'</div>'
+    +'<div id="hist-detalhe"></div>'
+  +'</div>';
+}
+function verExecucao(i){
+  var d=(_histDados||[])[i]; if(!d)return;
+  var alvo=document.getElementById('hist-detalhe');
+  if(alvo.dataset.aberto===String(i)){alvo.innerHTML='';alvo.dataset.aberto='';return;}
+  alvo.dataset.aberto=String(i);
+  function bloco(tit,arr,cor){
+    if(!arr||!arr.length)return '';
+    return '<div style="margin-top:10px;"><div style="font-size:11px;font-weight:900;color:'+cor+';">'+tit+' ('+arr.length+')</div>'
+      +'<div style="background:#0f1319;border:1px solid #1e2228;border-radius:8px;padding:9px 11px;margin-top:5px;'
+      +'font-family:var(--mono);font-size:10.5px;color:#c9ced6;line-height:1.85;max-height:240px;overflow-y:auto;">'
+      +arr.map(function(x){return esc(String(x));}).join('<br>')+'</div></div>';
+  }
+  alvo.innerHTML='<div style="background:#12161d;border:1px solid #2a3140;border-radius:11px;padding:12px 14px;margin-top:11px;">'
+    +'<div style="font-size:12.5px;font-weight:900;color:#60a5fa;">#'+d.n+' · '+esc(d.quando)+'</div>'
+    +bloco('⏸️ PAUSADOS',d.PAUSADOS,'#fbbf24')
+    +bloco('💰 VERBAS AJUSTADAS',d.VERBAS,'#4ade80')
+    +bloco('✨ CRIADOS',d.CRIADOS,'#a78bfa')
+    +bloco('🚨 ERROS',d.ERROS,'#f87171')
+  +'</div>';
+}
+
 // ── 🎬 CRIATIVOS NO R2 ────────────────────────────────────────────────
 var _r2Pasta='Criativos Reparo Eletro';
 async function carregarR2(){

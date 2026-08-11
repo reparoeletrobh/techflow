@@ -217,6 +217,15 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   </div>
 </header>
 
+<div style="margin:14px 16px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+  <input id="busca-gar" placeholder="🔍 rastrear cliente por nome ou telefone…"
+    style="flex:1;min-width:240px;background:#12161d;border:1px solid #2a3140;border-radius:9px;
+    padding:9px 12px;color:#f0f2f5;font-size:12.5px;outline:none;"
+    onkeydown="if(event.key==='Enter')rastrearGarantia()">
+  <button class="hbtn" onclick="rastrearGarantia()">Rastrear</button>
+</div>
+<div id="res-busca" style="margin:0 16px;"></div>
+
 <div id="painel-kpis" style="margin:14px 16px 0;"></div>
 
 <div class="main-tabs">
@@ -364,6 +373,31 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   </div>
 </div>
 <script>
+// ── 🔍 RASTREAR cliente na fila e na gestão ──
+async function rastrearGarantia(){
+  const q = (document.getElementById('busca-gar')||{}).value || '';
+  const alvo = document.getElementById('res-busca');
+  if(!alvo) return;
+  if(!q.trim()){ alvo.innerHTML=''; return; }
+  alvo.innerHTML = '<div style="font-size:12px;color:#8b93a3;padding:9px 0;">⏳ procurando…</div>';
+  let r = null;
+  try { r = await fetch('/api/garantia?action=rastrear&q='+encodeURIComponent(q)).then(x=>x.json()); } catch(e){}
+  if(!r){ alvo.innerHTML='<div style="font-size:12px;color:#f87171;padding:9px 0;">erro na busca</div>'; return; }
+  const esc2 = s => String(s||'').replace(/</g,'&lt;');
+  alvo.innerHTML = '<div style="background:#0d1117;border:1px solid #242b39;border-radius:12px;padding:12px 14px;margin-top:9px;">'
+    + '<div style="display:flex;align-items:center;gap:9px;">'
+      + '<span style="font-size:12.5px;font-weight:900;color:'+(r.encontrados?'#4ade80':'#fbbf24')+';">'
+      + (r.encontrados ? '🔍 '+r.encontrados+' resultado(s) — fila: '+r.naFila+' · gestão: '+r.naGestao
+                       : '🔍 nada encontrado para "'+esc2(q)+'"')+'</span>'
+      + '<button class="hbtn" style="margin-left:auto;font-size:11px;padding:3px 9px;" onclick="document.getElementById(\'res-busca\').innerHTML=\'\'">✕</button>'
+    + '</div>'
+    + ((r.L&&r.L.length)
+      ? '<div style="background:#0f1319;border:1px solid #1e2228;border-radius:9px;padding:9px 11px;margin-top:8px;'
+        + 'font-family:ui-monospace,monospace;font-size:10.5px;color:#c9ced6;line-height:1.9;">'
+        + r.L.map(esc2).join('<br>')+'</div>' : '')
+  + '</div>';
+}
+
 // ── 📊 KPIs da garantia: dia, semana, resolvidas, enviadas ao CQ e por técnico ──
 async function carregarKpisGarantia(){
   const el = document.getElementById('painel-kpis');
