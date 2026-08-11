@@ -254,9 +254,13 @@ module.exports = async function handler(req, res) {
       dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
       dbGet('fichas_adm'), dbGet('fichas_tv'),
     ]);
+    // ✅ a ficha CHEGOU se existe registro com origem remarcar — mesmo que já tenha
+    // avançado de coluna. Exigir status entrar_contato agora marcava como perdida
+    // toda ficha que a equipe já atendeu, que é justamente o desfecho desejado.
     const emContato = new Set();
     for (const b of [fA, fT]) for (const f of (((b || {}).fichas) || [])) {
-      if (String(f.status || '') === 'entrar_contato') emContato.add(dg(f.telefone));
+      if (String(f.origem || '') === 'remarcar' || String(f.id || '').startsWith('rem_')
+          || String(f.status || '') === 'entrar_contato') emContato.add(dg(f.telefone));
     }
     const linhas = [];
     for (const [banco, sis] of [[lgA, 'ADM'], [lgT, 'TV']]) {
@@ -326,10 +330,12 @@ module.exports = async function handler(req, res) {
       dbGet('fichas_adm'), dbGet('fichas_tv'),
     ]);
     // quem está de fato em Entrar em Contato
+    // ✅ chegou = existe ficha vinda do remarcar, mesmo que já tenha avançado
     const emContato = new Set();
     for (const b of [fA, fT]) {
       for (const f of (((b || {}).fichas) || [])) {
-        if (String(f.status || '') === 'entrar_contato') emContato.add(dg(f.telefone));
+        if (String(f.origem || '') === 'remarcar' || String(f.id || '').startsWith('rem_')
+            || String(f.status || '') === 'entrar_contato') emContato.add(dg(f.telefone));
       }
     }
     const linhas = [];

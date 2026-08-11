@@ -895,10 +895,12 @@ module.exports = async function handler(req, res) {
       dbGet('fichas_adm'), dbGet('fichas_tv'),
     ]);
     // quem está de fato em Entrar em Contato
+    // ✅ chegou = existe ficha vinda do remarcar, mesmo que já tenha avançado
     const emContato = new Set();
     for (const b of [fA, fT]) {
       for (const f of (((b || {}).fichas) || [])) {
-        if (String(f.status || '') === 'entrar_contato') emContato.add(dg(f.telefone));
+        if (String(f.origem || '') === 'remarcar' || String(f.id || '').startsWith('rem_')
+            || String(f.status || '') === 'entrar_contato') emContato.add(dg(f.telefone));
       }
     }
     const linhas = [];
