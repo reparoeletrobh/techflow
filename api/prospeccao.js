@@ -917,11 +917,29 @@ export default async function handler(req,res){
     const nota='✔ Aprovado via Conflitos Bot: R$'+(v||card.valor)+' ('+String(pagamento||'—')+')'+(obs?' — '+String(obs).slice(0,150):'');
     card.descricao=(card.descricao?card.descricao+'\n':'')+nota;
     await dbSet(chavePipe,pp);
-    // Mover pela action oficial → dispara o gatilho do técnico
+    // Mover pela action oficial → dispara o gatilho do técnico.
+    // 📺 cliente de TV precisa do endpoint de TV, senão o card não se move,
+    // não sai do Conflitos e o valor não é aplicado.
     const KA=(process.env.TECHFLOW_KEY||'tfk-re2026-Bx7mQp9zKw4Y').trim();
-    await fetch('https://reparoeletroadm.com/api/pipe?action=mover&k='+KA,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({id:card.id,phase:'aprovados'})});
+    const apiMover = chavePipe==='tv_pipe' ? 'tv-pipe' : 'pipe';
+    let moveuOk=false, moveuErro=null;
+    try{
+      const rm=await fetch('https://reparoeletroadm.com/api/'+apiMover+'?action=mover&k='+KA,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:card.id,phase:'aprovados'})}).then(x=>x.json());
+      moveuOk=!!(rm&&rm.ok); if(!moveuOk) moveuErro=(rm&&rm.error)||'sem detalhe';
+    }catch(e){ moveuErro=e.message; }
+    // se o endpoint falhou, move direto no banco para não deixar o card parado
+    if(!moveuOk){
+      try{
+        const pp2=(await dbGet(chavePipe))||{cards:[]};
+        const c2=(pp2.cards||[]).find(x=>x.id===card.id);
+        if(c2){ c2.phase='aprovados'; c2.phaseId='aprovados';
+          c2.aprovadoEm=new Date().toISOString();
+          if(v>0)c2.valor=v;
+          await dbSet(chavePipe,pp2); moveuOk=true; }
+      }catch(e){}
+    }
     // 🏅 +2 pontos: orçamento teoricamente perdido foi recuperado no Conflitos Bot
     try{
       const quem=String((req.body||{}).responsavel||'André').trim().slice(0,30)||'André';
