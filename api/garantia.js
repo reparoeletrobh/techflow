@@ -198,20 +198,23 @@ module.exports = async function handler(req, res) {
     const seg = new Date(bras); seg.setUTCDate(bras.getUTCDate() - ((diaSem === 0) ? 6 : (diaSem - 1)));
     const iniSemana = seg.toISOString().slice(0, 10);
     const dia = d => String(d || '').slice(0, 10);
-    const RESOLVIDAS = ['resolvida', 'finalizado', 'entregue', 'concluida'];
+    // a ficha marca conclusão no booleano concluida, além da fase
+    const RESOLVIDAS = ['resolvida', 'finalizado', 'entregue', 'concluida', 'concluido'];
+    const ehResolvida = f => f.concluida === true ||
+      RESOLVIDAS.includes(String(f.faseId || f.status || f.phase || '').toLowerCase());
 
-    const entrouHoje = lista.filter(f => dia(f.criadoEm || f.em) === hoje);
-    const entrouSemana = lista.filter(f => dia(f.criadoEm || f.em) >= iniSemana);
-    const resolvidas = lista.filter(f => RESOLVIDAS.includes(String(f.status || f.phase || '')));
+    const entrouHoje = lista.filter(f => dia(f.criadaEm || f.criadoEm || f.em) === hoje);
+    const entrouSemana = lista.filter(f => dia(f.criadaEm || f.criadoEm || f.em) >= iniSemana);
+    const resolvidas = lista.filter(f => ehResolvida(f));
     const noCq = lista.filter(f => f.enviadoCqEm);
     const porTecnico = {};
     for (const f of lista) {
-      const t = String(f.tecnicoOrigem || f.tecnico || '(sem técnico)');
+      const t = String(f.tecnico || f.tecnicoOrigem || '(sem técnico)');
       porTecnico[t] = porTecnico[t] || { hoje: 0, semana: 0, total: 0, resolvidas: 0 };
       porTecnico[t].total++;
-      if (dia(f.criadoEm || f.em) === hoje) porTecnico[t].hoje++;
-      if (dia(f.criadoEm || f.em) >= iniSemana) porTecnico[t].semana++;
-      if (RESOLVIDAS.includes(String(f.status || f.phase || ''))) porTecnico[t].resolvidas++;
+      if (dia(f.criadaEm || f.criadoEm || f.em) === hoje) porTecnico[t].hoje++;
+      if (dia(f.criadaEm || f.criadoEm || f.em) >= iniSemana) porTecnico[t].semana++;
+      if (ehResolvida(f)) porTecnico[t].resolvidas++;
     }
     return res.status(200).json({ ok: true,
       hoje, semanaComecaEm: iniSemana,
@@ -231,8 +234,8 @@ module.exports = async function handler(req, res) {
           ' | total ' + v.total),
       // 📋 as garantias de cada técnico, nominalmente
       GARANTIAS_POR_TECNICO: Object.fromEntries(Object.keys(porTecnico).map(t => [t,
-        lista.filter(f => String(f.tecnicoOrigem || f.tecnico || '(sem técnico)') === t &&
-            dia(f.criadoEm || f.em) >= iniSemana)
+        lista.filter(f => String(f.tecnico || f.tecnicoOrigem || '(sem técnico)') === t &&
+            dia(f.criadaEm || f.criadoEm || f.em) >= iniSemana)
           .sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')))
           .map(f => String(f.nome || f.cliente || '?').slice(0, 20) +
             ' ' + String(f.telefone || '').slice(-4) +
@@ -254,7 +257,7 @@ module.exports = async function handler(req, res) {
     for (const f of lista) {
       const c = d4(f.telefone);
       if (LISTA14.includes(c)) { daLista.push(f); continue; }
-      const q = String(f.criadoEm || f.em || '').slice(0, 10);
+      const q = String(f.criadaEm || f.criadoEm || f.em || '').slice(0, 10);
       (q === hoje ? deHoje : outras).push(f);
     }
     const linha = f => String(f.nome || f.cliente || '?').slice(0, 20).padEnd(20) +
@@ -292,7 +295,7 @@ module.exports = async function handler(req, res) {
     const criadasHoje = atual.filter(f => {
       const c = d4(f.telefone);
       if (cods.has(c)) return false;
-      const q = String(f.criadoEm || f.em || '');
+      const q = String(f.criadaEm || f.criadoEm || f.em || '');
       return q.slice(0, 10) === hoje && !String(f.origem || '').includes('conferência física');
     });
 
