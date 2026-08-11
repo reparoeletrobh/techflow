@@ -59,6 +59,25 @@
 </script>
 
 <script>
+// ── 🏷️ badge do menu Qualidade: entraram hoje / concluídas hoje ──
+async function atualizarBadgeQualidade(){
+  var el = document.getElementById('nav-cq-badge');
+  if(!el) return;
+  try{
+    var c = await fetch('/api/qualidade?action=contadores').then(function(r){return r.json();});
+    if(!c || !c.ok){ el.textContent=''; return; }
+    var ent = (c.ENTRARAM && c.ENTRARAM.hojeSemGarantia != null)
+      ? c.ENTRARAM.hojeSemGarantia : ((c.ENTRARAM && c.ENTRARAM.hoje) || 0);
+    var con = (c.CONCLUIDAS && c.CONCLUIDAS.hoje) || 0;
+    if(!ent && !con){ el.textContent=''; el.style.background='transparent'; return; }
+    el.textContent = ent + '/' + con;
+    el.title = ent + ' entraram hoje · ' + con + ' concluída(s)';
+    var ok = con >= ent && ent > 0;
+    el.style.background = ok ? 'rgba(74,222,128,.25)' : 'rgba(245,158,11,.25)';
+    el.style.color = ok ? '#4ade80' : '#fbbf24';
+  }catch(e){ el.textContent=''; }
+}
+
 (function(){
   var d = JSON.parse(localStorage.getItem('adm_auth')||'{}');
   if(!d.token || !d.expiry || Date.now() > d.expiry){
@@ -326,7 +345,7 @@ html,body{height:100vh;overflow:hidden;background:var(--bg);color:var(--text);fo
       </div>
       <div class="nav-item" data-url="/qualidade" data-label="Controle de Qualidade" style="--item-color:#a855f7" onclick="openPage(this)">
         <span class="nav-icon" style="background:rgba(168,85,247,.15);">🔬</span>
-        <span class="nav-label">Qualidade <span style="font-size:9px;background:rgba(168,85,247,.25);padding:1px 5px;border-radius:8px;font-weight:900;">BETA</span></span>
+        <span class="nav-label">Qualidade <span id="nav-cq-badge" style="font-size:9px;background:rgba(168,85,247,.25);padding:1px 5px;border-radius:8px;font-weight:900;"></span></span>
       </div>
       <!-- 🛡️ GARANTIA — entre Conflitos e Fichas -->
       <div class="nav-item" data-url="/garantia" data-label="Garantia" style="--item-color:#2563eb" onclick="openPage(this)" id="nav-garantia">
