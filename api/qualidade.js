@@ -54,8 +54,12 @@ export default async function handler(req, res) {
     const iniSemana = seg.toISOString().slice(0, 10);
     const dia = d => String(d || '').slice(0, 10);
 
+    // 🎯 a meta de 25/dia NÃO conta as que vieram de garantia
+    const deGarantia = i => /garantia/i.test(String(i.origem || '') + ' ' + String(i.tipo || ''));
     const entrouHoje = insp.filter(i => dia(i.criadoEm) === hoje);
     const entrouSemana = insp.filter(i => dia(i.criadoEm) >= iniSemana);
+    const hojeSemGarantia = entrouHoje.filter(i => !deGarantia(i));
+    const semanaSemGarantia = entrouSemana.filter(i => !deGarantia(i));
     const concluiHoje = insp.filter(i => i.aprovadoEm && dia(i.aprovadoEm) === hoje);
     const concluiSemana = insp.filter(i => i.aprovadoEm && dia(i.aprovadoEm) >= iniSemana);
     const reprovHoje = insp.filter(i => i.reprovadoEm && dia(i.reprovadoEm) === hoje);
@@ -72,7 +76,14 @@ export default async function handler(req, res) {
     }
     return res.status(200).json({ ok: true,
       hoje, semanaComecaEm: iniSemana,
-      ENTRARAM: { hoje: entrouHoje.length, semana: entrouSemana.length, total: insp.length },
+      META_DIA: 25,
+      ENTRARAM: { hoje: entrouHoje.length, semana: entrouSemana.length, total: insp.length,
+        hojeSemGarantia: hojeSemGarantia.length,
+        semanaSemGarantia: semanaSemGarantia.length,
+        deGarantiaHoje: entrouHoje.length - hojeSemGarantia.length },
+      META: { alvo: 25, feito: hojeSemGarantia.length,
+        falta: Math.max(0, 25 - hojeSemGarantia.length),
+        percentual: Math.round(hojeSemGarantia.length / 25 * 100) + '%' },
       CONCLUIDAS: { hoje: concluiHoje.length, semana: concluiSemana.length,
         total: insp.filter(i => i.status === 'aprovado').length },
       AGUARDANDO: insp.filter(i => i.status === 'aguardando').length,

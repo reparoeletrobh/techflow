@@ -198,6 +198,14 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .sr-empty{font-family:var(--fm);font-size:10px;color:var(--muted);text-align:center;padding:12px 0;}
 .toast{position:fixed;bottom:20px;right:20px;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--purple);border-radius:10px;padding:10px 16px;font-family:var(--fm);font-size:11px;transform:translateY(60px);opacity:0;transition:all .3s;z-index:9999;}
 .toast.show{transform:translateY(0);opacity:1;}
+
+.gk-box{background:#0d1117;border:1px solid #242b39;border-radius:14px;padding:15px 17px;}
+.gk-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:8px;margin-top:11px;}
+.gk-card{background:#12161d;border:1px solid #242b39;border-radius:11px;padding:10px 12px;}
+.gk-v{font-family:ui-monospace,monospace;font-size:21px;font-weight:700;line-height:1;}
+.gk-l{font-size:9.5px;color:#5a6270;font-weight:700;margin-top:3px;}
+.gk-tec{background:#0f1319;border:1px solid #1e2228;border-radius:9px;padding:9px 11px;margin-top:10px;
+  font-family:ui-monospace,monospace;font-size:10.5px;color:#c9ced6;line-height:1.8;max-height:190px;overflow-y:auto;}
 </style>
 </head>
 <body>
@@ -208,6 +216,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
     <a class="hbtn" href="/adm">Home</a>
   </div>
 </header>
+
+<div id="painel-kpis" style="margin:14px 16px 0;"></div>
 
 <div class="main-tabs">
   <button class="mtab active" id="mtab-geral"            onclick="setView('geral')">📋 Geral<span class="badge" id="b-geral">0</span></button>
@@ -354,6 +364,35 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   </div>
 </div>
 <script>
+// ── 📊 KPIs da garantia: dia, semana, resolvidas, enviadas ao CQ e por técnico ──
+async function carregarKpisGarantia(){
+  const el = document.getElementById('painel-kpis');
+  if(!el) return;
+  let c = null;
+  try { c = await fetch('/api/garantia?action=contadores&k=' + (localStorage.getItem('tf_key')||''))
+    .then(r=>r.json()); } catch(e){}
+  if(!c || !c.ok){ el.innerHTML=''; return; }
+  const kpi = (v,l,cr) => '<div class="gk-card"><div class="gk-v" style="color:'+(cr||'#f0f2f5')+'">'+v+'</div><div class="gk-l">'+l+'</div></div>';
+  el.innerHTML = '<div class="gk-box">'
+    + '<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">'
+      + '<span style="font-size:14px;font-weight:900;color:#f59e0b;">🛡️ Garantias</span>'
+      + '<span style="font-size:11px;color:#5a6270;">semana desde '+(c.semanaComecaEm||'')+'</span>'
+    + '</div>'
+    + '<div class="gk-grid">'
+      + kpi((c.ENTRARAM&&c.ENTRARAM.hoje)||0, 'ENTRARAM HOJE', '#f87171')
+      + kpi((c.ENTRARAM&&c.ENTRARAM.semana)||0, 'NA SEMANA', '#fbbf24')
+      + kpi((c.RESOLVIDAS&&c.RESOLVIDAS.hoje)||0, 'RESOLVIDAS HOJE', '#4ade80')
+      + kpi((c.RESOLVIDAS&&c.RESOLVIDAS.semana)||0, 'RESOLVIDAS SEMANA', '#4ade80')
+      + kpi((c.ENVIADAS_AO_CQ&&c.ENVIADAS_AO_CQ.semana)||0, 'ENVIADAS AO CQ', '#60a5fa')
+      + kpi(c.EM_ABERTO||0, 'EM ABERTO', '#f59e0b')
+    + '</div>'
+    + ((c.POR_TECNICO&&c.POR_TECNICO.length)
+      ? '<div style="font-size:11px;font-weight:900;color:#8b93a3;margin-top:12px;">👨‍🔧 POR TÉCNICO</div>'
+        + '<div class="gk-tec">'+c.POR_TECNICO.map(t=>String(t).replace(/</g,'&lt;')).join('<br>')+'</div>'
+      : '')
+  + '</div>';
+}
+
 var fichas = [], fases = {}, tipoSel = null, curView = 'geral', relTipoFiltro = '';
 
 var TIPO_COLORS = {
@@ -848,6 +887,8 @@ async function concluirDaBusca(id) {
 
 // init
 load();
+carregarKpisGarantia();
+setInterval(function(){carregarKpisGarantia();},120000);
 setInterval(load, 60000);
 setInterval(pipefySync, 300000); // sync Pipefy a cada 5 min
 </script>

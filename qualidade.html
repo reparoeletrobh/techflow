@@ -129,6 +129,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .chip{background:#171c25;border:1px solid #2a3242;border-radius:20px;padding:6px 12px;font-size:13px;font-weight:700;display:flex;gap:8px;align-items:center;}
 .chip b{cursor:pointer;color:#f87171;}
 @media(max-width:600px){.row2{grid-template-columns:1fr;}}
+
+.mt-box{background:var(--painel,#0d1117);border:1px solid var(--linha,#242b39);border-radius:14px;padding:15px 17px;}
+.mt-titulo{font-size:14px;font-weight:900;color:#60a5fa;}
+.mt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:8px;margin-top:11px;}
+.mt-card{background:#12161d;border:1px solid #242b39;border-radius:11px;padding:10px 12px;}
+.mt-v{font-family:ui-monospace,monospace;font-size:21px;font-weight:700;line-height:1;}
+.mt-l{font-size:9.5px;color:#5a6270;font-weight:700;margin-top:3px;letter-spacing:.03em;}
+.mt-barra{height:9px;background:#1a1f28;border-radius:5px;overflow:hidden;margin-top:9px;}
+.mt-fill{height:100%;border-radius:5px;transition:width .5s;}
+.mt-tec{background:#0f1319;border:1px solid #1e2228;border-radius:9px;padding:9px 11px;margin-top:10px;
+  font-family:ui-monospace,monospace;font-size:10.5px;color:#c9ced6;line-height:1.8;max-height:190px;overflow-y:auto;}
 </style>
 </head>
 <body>
@@ -137,6 +148,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <span class="beta">BETA</span>
   <button class="btn btn-add" onclick="abrirNova()">+ Nova Inspeção</button>
 </div>
+
+<div id="painel-meta" style="margin:0 0 14px;"></div>
 
 <div class="kpis">
   <div class="kpi"><div class="v" id="k-ag" style="color:#fbbf24;">0</div><div class="l">🔍 Aguardando inspeção</div></div>
@@ -212,6 +225,42 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 
 <script>
+// ── 🎯 PAINEL DE META: 25 fichas por dia no controle de qualidade ──
+const META_DIA = 25;
+async function carregarPainelMeta(){
+  const el = document.getElementById('painel-meta');
+  if(!el) return;
+  let c = null;
+  try { c = await fetch('/api/qualidade?action=contadores&k=' + (localStorage.getItem('tf_key')||''))
+    .then(r=>r.json()); } catch(e){}
+  if(!c || !c.ok){ el.innerHTML=''; return; }
+  const hoje = (c.ENTRARAM && c.ENTRARAM.hojeSemGarantia != null)
+    ? c.ENTRARAM.hojeSemGarantia : ((c.ENTRARAM && c.ENTRARAM.hoje) || 0);
+  const pct = Math.min(100, Math.round(hoje / META_DIA * 100));
+  const cor = pct >= 100 ? '#4ade80' : pct >= 60 ? '#fbbf24' : '#f87171';
+  const kpi = (v,l,cr) => '<div class="mt-card"><div class="mt-v" style="color:'+(cr||'#f0f2f5')+'">'+v+'</div><div class="mt-l">'+l+'</div></div>';
+  el.innerHTML = '<div class="mt-box">'
+    + '<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">'
+      + '<span class="mt-titulo">🎯 Meta do dia — '+META_DIA+' fichas</span>'
+      + '<span style="font-size:11px;color:#5a6270;">semana desde '+(c.semanaComecaEm||'')+'</span>'
+      + '<span style="margin-left:auto;font-size:12.5px;font-weight:900;color:'+cor+'">'+hoje+' / '+META_DIA+' · '+pct+'%</span>'
+    + '</div>'
+    + '<div class="mt-barra"><div class="mt-fill" style="width:'+pct+'%;background:'+cor+'"></div></div>'
+    + '<div class="mt-grid">'
+      + kpi(hoje, 'ENTRARAM HOJE', cor)
+      + kpi((c.ENTRARAM&&c.ENTRARAM.semana)||0, 'NA SEMANA', '#60a5fa')
+      + kpi((c.CONCLUIDAS&&c.CONCLUIDAS.hoje)||0, 'CONCLUÍDAS HOJE', '#4ade80')
+      + kpi((c.CONCLUIDAS&&c.CONCLUIDAS.semana)||0, 'CONCLUÍDAS SEMANA', '#4ade80')
+      + kpi(c.AGUARDANDO||0, 'AGUARDANDO', '#fbbf24')
+      + ((c.ENTRARAM&&c.ENTRARAM.deGarantiaHoje) ? kpi(c.ENTRARAM.deGarantiaHoje, 'DE GARANTIA (fora da meta)', '#a78bfa') : '')
+    + '</div>'
+    + ((c.POR_TECNICO&&c.POR_TECNICO.length)
+      ? '<div style="font-size:11px;font-weight:900;color:#8b93a3;margin-top:12px;">👨‍🔧 POR TÉCNICO</div>'
+        + '<div class="mt-tec">'+c.POR_TECNICO.map(t=>String(t).replace(/</g,'&lt;')).join('<br>')+'</div>'
+      : '')
+  + '</div>';
+}
+
 // ═══ CHECKLISTS ═══
 var CK_UNIVERSAL=[
   {id:'u1',t:'Liga e opera todas as funções'},
@@ -513,6 +562,8 @@ function esc(s){return String(s||'').replace(/</g,'&lt;');}
 function fmtD(iso){if(!iso)return '—';var d=new Date(iso);return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}
 
 load();
+carregarPainelMeta();
+setInterval(function(){carregarPainelMeta();},120000);
 setInterval(function(){if(!document.hidden)load();},120000);
 document.addEventListener('visibilitychange',function(){if(!document.hidden)load();});
 </script>
