@@ -92,6 +92,67 @@ export default async function handler(req, res) {
 
   const action = req.query.action || (req.body && req.body.action) || '';
 
+  // ── 📊 CONFERIR-CONTAGEM: planilha × sistema, honestamente ──
+  if (action === 'conferir-contagem') {
+    const dia = String(req.query.dia || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
+    const [d, m2, a] = [dia.slice(8, 10), dia.slice(5, 7), dia.slice(0, 4)];
+    // 1) a planilha
+    let linhas = [];
+    try {
+      const csv = await fetch(SHEET_CSV).then(x => x.text());
+      const todas = csv.split(/\r?\n/).filter(Boolean);
+      const cab = todas[0].split(',').map(x => x.replace(/"/g, '').trim().toLowerCase());
+      const iData = cab.findIndex(x => /data|carimbo|timestamp/.test(x));
+      const iSis = cab.findIndex(x => /sistema|tipo|frente|equipamento/.test(x));
+      const iNome = cab.findIndex(x => /nome/.test(x));
+      const iTel = cab.findIndex(x => /telefone|whats|contato/.test(x));
+      for (const l of todas.slice(1)) {
+        const c = l.split(',').map(x => x.replace(/^"|"$/g, ''));
+        const dt = String(c[iData] || '');
+        // aceita DD/MM/AAAA e AAAA-MM-DD
+        const bate = dt.startsWith(d + '/' + m2 + '/' + a) || dt.startsWith(dia) ||
+          dt.startsWith(d + '/' + m2 + '/' + a.slice(2));
+        if (!bate) continue;
+        const txt = String(c[iSis] || '') + ' ' + String(c[iNome] || '');
+        linhas.push({ nome: c[iNome] || '?', tel: String(c[iTel] || '').replace(/\D/g, '').slice(-4),
+          ehTv: /\btv\b|televis|polegada/i.test(txt) });
+      }
+    } catch (e) { return res.status(200).json({ ok: false, error: 'não consegui ler a planilha: ' + e.message }); }
+
+    // 2) o sistema
+    const [fa, ft] = await Promise.all([dbGet('fichas_adm'), dbGet('fichas_tv')]);
+    const ini = new Date(dia + 'T00:00:00-03:00').getTime();
+    const fim = ini + 86400000;
+    const noDia = (b) => ((b || {}).fichas || []).filter(f => {
+      const t = new Date(f.criadoEm || f.registradoEm || 0).getTime();
+      return t >= ini && t < fim;
+    });
+    const admTodas = noDia(fa), tvTodas = noDia(ft);
+    const ehRetorno = f => ['remarcar', 'reagendamento'].includes(String(f.origem || '')) ||
+      String(f.id || '').startsWith('rem_') || String(f.id || '').startsWith('fic_reag_');
+    const porOrigem = (arr) => arr.reduce((o, f) => {
+      const k = String(f.origem || '(sem origem)'); o[k] = (o[k] || 0) + 1; return o; }, {});
+    const d4 = t => String(t || '').replace(/\D/g, '').slice(-4);
+    const naPlanilha = new Set(linhas.map(x => x.tel).filter(x => x.length === 4));
+    const foraDaPlanilha = [...admTodas, ...tvTodas].filter(f => !naPlanilha.has(d4(f.telefone)));
+
+    return res.status(200).json({ ok: true, dia,
+      PLANILHA: { total: linhas.length,
+        tv: linhas.filter(x => x.ehTv).length,
+        adm: linhas.filter(x => !x.ehTv).length },
+      SISTEMA: { total: admTodas.length + tvTodas.length,
+        adm: admTodas.length, tv: tvTodas.length,
+        admSemRetornos: admTodas.filter(f => !ehRetorno(f)).length,
+        tvSemRetornos: tvTodas.filter(f => !ehRetorno(f)).length },
+      DIFERENCA: (admTodas.length + tvTodas.length) - linhas.length,
+      ORIGENS_ADM: porOrigem(admTodas),
+      ORIGENS_TV: porOrigem(tvTodas),
+      NAO_ESTAO_NA_PLANILHA: foraDaPlanilha.map(f =>
+        String(f.nome || '?').slice(0, 20) + ' ' + d4(f.telefone) +
+        ' | origem: ' + (f.origem || '(sem)') + ' | id: ' + String(f.id || '').slice(0, 14)) });
+  }
+
+
   // ── SYNC: busca novas linhas via CSV público ───────────────────────────────
   // ── 🔎 ENTRADAS-HOJE: por que o contador não bate com a planilha (SOMENTE LEITURA) ──
   if (action === 'entradas-hoje') {
