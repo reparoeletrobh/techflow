@@ -2877,6 +2877,71 @@ export default async function handler(req, res) {
         ' | R$ ' + x.valor + ' — ' + x.motivo) });
   }
 
+  // ── 🕰️ HISTORICO-DAS-DESTRAVADAS: elas já passaram por contato feito antes? ──
+  if (action === 'historico-destravadas') {
+    const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const [fa, ft, exc, evts] = await Promise.all([
+      dbGet('fichas_adm'), dbGet('fichas_tv'),
+      dbGet('prospeccao_excluidos'), lerEvts(),
+    ]);
+    const alvo = ((fa || {}).fichas || []).map(f => ({ ...f, _s: 'ADM' }))
+      .concat(((ft || {}).fichas || []).map(f => ({ ...f, _s: 'TV' })))
+      .filter(f => f.destravadaEm);
+    // outras fichas do mesmo telefone, em qualquer banco
+    const BANCOS = [['fichas_adm', 'fichas'], ['fichas_tv', 'fichas'],
+      ['reparoeletro_logistica', 'fichas'], ['tv_logistica', 'fichas'],
+      ['prospeccao_adm', 'fichas'], ['reparoeletro_pipe', 'cards'], ['tv_pipe', 'cards'],
+      ['reparoeletro_arquivo', 'fichas']];
+    const outras = {};
+    for (const [k, L] of BANCOS) {
+      try {
+        const b = await dbGet(k);
+        for (const x of ((b || {})[L] || [])) {
+          const t = d8f(x.telefone);
+          if (!alvo.some(a => d8f(a.telefone) === t)) continue;
+          (outras[t] = outras[t] || []).push({ banco: k, id: x.id,
+            status: String(x.status || x.phase || x.phaseId || '?'),
+            criadoEm: x.criadoEm || x.registradoEm || null });
+        }
+      } catch (e) {}
+    }
+    // excluídos registrados
+    const excl = {};
+    for (const [tel, quando] of Object.entries(((exc || {}).tels) || {})) {
+      excl[String(tel).slice(-8)] = quando;
+    }
+    // conversas anteriores
+    const primeiraMsg = {};
+    for (const e of (evts || [])) {
+      const d = d8f(e.tel);
+      if (!primeiraMsg[d] || String(e.ts) < String(primeiraMsg[d])) primeiraMsg[d] = e.ts;
+    }
+    const linhas = alvo.map(f => {
+      const t = d8f(f.telefone);
+      const irmas = (outras[t] || []).filter(o => String(o.id) !== String(f.id));
+      const jaPassou = irmas.some(o => ['contato_feito', 'entrar_contato', 'logistica', 'prospeccao'].includes(o.status));
+      return {
+        sis: f._s, nome: f.nome, tel: t.slice(-4),
+        criadaEm: f.criadoEm, destravadaEm: f.destravadaEm,
+        foiExcluida: !!excl[t], excluidaEm: excl[t] || null,
+        jaTemOutraAvancada: jaPassou,
+        outrasFichas: irmas.map(o => o.banco + ':' + o.status),
+        conversaDesde: primeiraMsg[t] || null,
+      };
+    });
+    return res.status(200).json({ ok: true,
+      destravadas: linhas.length,
+      comHistoricoDeExclusao: linhas.filter(l => l.foiExcluida).length,
+      jaTemOutraFichaAvancada: linhas.filter(l => l.jaTemOutraAvancada).length,
+      L: linhas.map(l => l.sis + ' | ' + String(l.nome || '?').slice(0, 18).padEnd(18) + ' ' + l.tel +
+        ' | criada ' + String(l.criadaEm || '').slice(0, 10) +
+        (l.foiExcluida ? ' | 🗑️ EXCLUÍDA em ' + hh(l.excluidaEm) : '') +
+        (l.jaTemOutraAvancada ? ' | ⚠️ tem outra ficha adiante' : '') +
+        (l.conversaDesde ? ' | conversa desde ' + hh(l.conversaDesde) : ' | sem conversa') +
+        (l.outrasFichas.length ? ' | ' + l.outrasFichas.slice(0, 3).join(', ') : '')) });
+  }
+
   // ── 🔓 DESTRAVAR-CRIADAS: ficha abordada que ficou presa em "criada" ──
   // O bot marca o telefone como abordado num banco pequeno e muda o status da ficha
   // num banco grande. Quando a segunda gravação é sobrescrita, a ficha fica travada:
