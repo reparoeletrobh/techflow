@@ -899,6 +899,15 @@ export default async function handler(req,res){
       const cTv=(ppTv.cards||[]).find(c=>mesmoTel(c)&&faseDe(c)!=='aprovados');
       if(cTv){ card=cTv; pp=ppTv; chavePipe='tv_pipe'; }
     }
+    // ✅ card JÁ em aprovados: a aprovação segue mesmo assim, para aplicar o valor,
+    // registrar a nota e tirar a ficha do Conflitos — antes travava e nada acontecia
+    let jaEstavaAprovado=false;
+    if(!card){
+      const cA=(pp.cards||[]).find(mesmoTel);
+      const cT=(ppTv.cards||[]).find(mesmoTel);
+      if(cA){ card=cA; jaEstavaAprovado=true; }
+      else if(cT){ card=cT; pp=ppTv; chavePipe='tv_pipe'; jaEstavaAprovado=true; }
+    }
     if(!card){
       // 🔍 diagnóstico: o cliente existe em algum pipe? em que fase?
       const achadosAdm=(pp.cards||[]).filter(mesmoTel).map(c=>'ADM:'+faseDe(c));
@@ -945,13 +954,20 @@ export default async function handler(req,res){
       const quem=String((req.body||{}).responsavel||'André').trim().slice(0,30)||'André';
       const pt=(await dbGet('reparoeletro_pontos'))||{pessoas:{}};
       if(!pt.pessoas[quem]) pt.pessoas[quem]={total:0,historico:[]};
-      pt.pessoas[quem].total=(pt.pessoas[quem].total||0)+2;
-      pt.pessoas[quem].historico.unshift({ts:new Date().toISOString(),pontos:2,
-        cliente:f.nome||'',telefone:f.telefone||'',valor:v||card.valor||0,
-        eraReprovado:/reprov/i.test(String(f.motivoConflito||'')),
-        motivo:'orçamento recuperado no Conflitos Bot'});
-      pt.pessoas[quem].historico=pt.pessoas[quem].historico.slice(0,300);
-      await dbSet('reparoeletro_pontos',pt);
+      // 🏅 1 ponto por recuperação, e nunca duas vezes o mesmo cliente:
+      // aprovar de novo alguém que já contou inflava o placar
+      const d8p=String(f.telefone||'').replace(/\D/g,'').slice(-8);
+      const jaContou=Object.values(pt.pessoas).some(p=>(p.historico||[]).some(x=>
+        String(x.telefone||'').replace(/\D/g,'').slice(-8)===d8p));
+      if(!jaContou){
+        pt.pessoas[quem].total=(pt.pessoas[quem].total||0)+1;
+        pt.pessoas[quem].historico.unshift({ts:new Date().toISOString(),pontos:1,
+          cliente:f.nome||'',telefone:f.telefone||'',valor:v||card.valor||0,
+          eraReprovado:/reprov/i.test(String(f.motivoConflito||'')),
+          motivo:'orçamento recuperado no Conflitos Bot'});
+        pt.pessoas[quem].historico=pt.pessoas[quem].historico.slice(0,300);
+        await dbSet('reparoeletro_pontos',pt);
+      }
     }catch(_){}
     db.fichas=db.fichas.filter(x=>x.id!==id);
     await dbSet(KEY,db);
