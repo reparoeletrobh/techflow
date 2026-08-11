@@ -176,15 +176,6 @@ header{display:flex;align-items:center;padding:0 24px;height:52px;border-bottom:
     Reparo<span>Eletro</span> — Orçamento
   </div>
 </header>
-<div style="margin:12px 16px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-  <input id="busca-orc" placeholder="🔍 rastrear cliente por nome ou telefone…"
-    style="flex:1;min-width:230px;background:#12161d;border:1px solid #2a3140;border-radius:9px;
-    padding:9px 12px;color:#f0f2f5;font-size:12.5px;outline:none;"
-    onkeydown="if(event.key==='Enter')rastrearOrcamento()">
-  <button onclick="rastrearOrcamento()" style="background:#1d4ed8;border:none;border-radius:9px;
-    padding:9px 15px;color:#fff;font-weight:800;cursor:pointer;font-size:12.5px;">Rastrear</button>
-</div>
-<div id="res-orc" style="margin:0 16px;"></div>
 
 
 <div class="tabs">
@@ -250,7 +241,16 @@ header{display:flex;align-items:center;padding:0 24px;height:52px;border-bottom:
 
 <!-- ENVIADOS -->
 <div class="page" id="page-enviado">
-  <div class="orc-toolbar">
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 10px;">
+  <input id="filtro-enviados" placeholder="🔍 filtrar por nome, telefone ou equipamento…"
+    style="flex:1;min-width:220px;background:#12161d;border:1px solid #2a3140;border-radius:9px;
+    padding:8px 12px;color:#f0f2f5;font-size:12.5px;outline:none;"
+    oninput="orcRender()">
+  <button onclick="document.getElementById('filtro-enviados').value='';orcRender();"
+    style="background:#374151;border:none;border-radius:9px;padding:8px 13px;color:#fff;
+    font-weight:700;cursor:pointer;font-size:12px;">✕ limpar</button>
+</div>
+<div class="orc-toolbar">
     <span id="env-count" style="font-family:var(--fm);font-size:11px;color:var(--muted);">— fichas enviadas</span>
   </div>
   <div class="orc-list" id="env-list">
@@ -264,31 +264,6 @@ header{display:flex;align-items:center;padding:0 24px;height:52px;border-bottom:
 </div>
 
 <script>
-// ── 🔍 RASTREAR orçamento em todas as fases ──
-async function rastrearOrcamento(){
-  const q = (document.getElementById('busca-orc')||{}).value || '';
-  const alvo = document.getElementById('res-orc');
-  if(!alvo) return;
-  if(!q.trim()){ alvo.innerHTML=''; return; }
-  alvo.innerHTML = '<div style="font-size:12px;color:#8b93a3;padding:8px 0;">⏳ procurando…</div>';
-  let r = null;
-  try { r = await fetch('/api/orcamento?action=rastrear&q='+encodeURIComponent(q)).then(x=>x.json()); } catch(e){}
-  if(!r){ alvo.innerHTML='<div style="font-size:12px;color:#f87171;">erro na busca</div>'; return; }
-  const e2 = s => String(s||'').replace(/</g,'&lt;');
-  alvo.innerHTML = '<div style="background:#0d1117;border:1px solid #242b39;border-radius:12px;padding:12px 14px;margin-top:9px;">'
-    + '<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">'
-      + '<span style="font-size:12.5px;font-weight:900;color:'+(r.encontrados?'#4ade80':'#fbbf24')+';">'
-      + (r.encontrados ? '🔍 '+r.encontrados+' registro(s) encontrado(s)' : '🔍 nada encontrado para "'+e2(q)+'"')+'</span>'
-      + '<button style="margin-left:auto;background:#374151;border:none;border-radius:7px;padding:4px 10px;'
-      + 'color:#fff;font-weight:700;cursor:pointer;font-size:11px;" '
-      + 'onclick="document.getElementById(\'res-orc\').innerHTML=\'\'">✕</button>'
-    + '</div>'
-    + ((r.L&&r.L.length)
-      ? '<div style="background:#0f1319;border:1px solid #1e2228;border-radius:9px;padding:9px 11px;margin-top:8px;'
-        + 'font-family:ui-monospace,monospace;font-size:10.5px;color:#c9ced6;line-height:1.9;max-height:300px;overflow-y:auto;">'
-        + r.L.map(e2).join('<br>')+'</div>' : '')
-  + '</div>';
-}
 
 // ── CADASTRO ──────────────────────────────────────────────────
 var phases = [], solicitarColetaId = null;
@@ -565,11 +540,23 @@ async function orcSync() {
 function orcRender() {
   var pendentes = orcFichas.filter(function(f) { return f.status !== "enviado"; });
   var enviados  = orcFichas.filter(function(f) { return f.status === "enviado"; });
+  // 🔍 filtro individual da aba Enviados — por nome, telefone ou equipamento
+  var _bq = ((document.getElementById("filtro-enviados") || {}).value || "").trim().toLowerCase();
+  var _bqd = _bq.replace(/\D/g, "");
+  if (_bq) {
+    enviados = enviados.filter(function(f) {
+      var tel = String(f.tel || f.telefone || "").replace(/\D/g, "");
+      return String(f.nome || "").toLowerCase().indexOf(_bq) >= 0
+        || (_bqd.length >= 3 && tel.indexOf(_bqd) >= 0)
+        || String(f.desc || f.equipamento || "").toLowerCase().indexOf(_bq) >= 0;
+    });
+  }
 
   var countEl = document.getElementById("orc-count");
   if (countEl) countEl.textContent = pendentes.length + " ficha" + (pendentes.length !== 1 ? "s" : "");
   var envCount = document.getElementById("env-count");
-  if (envCount) envCount.textContent = enviados.length + " ficha" + (enviados.length !== 1 ? "s enviadas" : " enviada");
+  if (envCount) envCount.textContent = enviados.length + " ficha" + (enviados.length !== 1 ? "s enviadas" : " enviada")
+    + (_bq ? ' · filtrando por "' + _bq + '"' : "");
   var badgeEnv = document.getElementById("badge-env");
   if (badgeEnv) badgeEnv.textContent = enviados.length;
 
