@@ -92,6 +92,29 @@ export default async function handler(req, res) {
 
   const action = req.query.action || (req.body && req.body.action) || '';
 
+  // ── 🔧 CORRIGIR-STATUS: fichas criadas com status inexistente não aparecem na tela ──
+  if (action === 'corrigir-status-recuperadas') {
+    let mudadas = 0; const lista = [];
+    for (const chave of [KEY_ADM, KEY_TV]) {
+      const db = await dbGet(chave);
+      if (!db || !Array.isArray(db.fichas)) continue;
+      let mudou = 0;
+      for (const f of db.fichas) {
+        if (String(f.status || '') !== 'ficha_criada') continue;
+        f.status = 'criada';
+        // devolve a data da planilha, se o id indicar recuperação
+        if (f.recuperadaEm && f.criadoEm === f.recuperadaEm) { /* já correto */ }
+        lista.push(String(f.nome || '?').slice(0, 18) + ' ' + String(f.telefone || '').slice(-4));
+        mudou++; mudadas++;
+      }
+      if (mudou && String(req.query.aplicar || '') === '1') await dbSet(chave, db);
+    }
+    return res.status(200).json({ ok: true,
+      modo: String(req.query.aplicar || '') === '1' ? 'aplicado' : 'prévia',
+      comStatusErrado: mudadas, lista: lista.slice(0, 70),
+      dica: 'para corrigir: &aplicar=1' });
+  }
+
   // ── 🔬 AUDITORIA-FICHAS: dado por dado, sem suposição ──
   if (action === 'auditoria-fichas') {
     const dias = Math.min(30, Math.max(1, parseInt(req.query.dias || '7', 10)));
@@ -232,7 +255,8 @@ export default async function handler(req, res) {
       const eq = String(r[ix.eq] || '');
       const item = { telefone: tel, nome: String(r[ix.nome] || '?').trim(), equipamento: eq,
         defeito: String(r[ix.def] || ''), endereco: String(r[ix.end] || ''),
-        ehTv: /\btv\b|televis/i.test(eq), quandoTexto: dt };
+        ehTv: /\btv\b|televis/i.test(eq), quandoTexto: dt,
+        dataPlanilha: quando ? new Date(quando).toISOString() : null };
       if (!ult) { criar.push(item); continue; }
       const diasDesde = (Date.now() - ult) / 86400000;
       if (diasDesde > REENTRADA_DIAS) {                // 🔁 voltou depois de 30 dias
@@ -260,9 +284,12 @@ export default async function handler(req, res) {
         id: 'sc_' + x.telefone.slice(-4) + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
         nome: x.nome, telefone: x.telefone, equipamento: x.equipamento,
         defeito: x.defeito, endereco: x.endereco,
-        status: 'ficha_criada', origemPlanilha: true,
+        status: 'criada', origemPlanilha: true,
         reentrada: x.reentrada || null,
-        criadoEm: new Date().toISOString(), registradoEm: new Date().toISOString(),
+        // 📅 a data é a da PLANILHA — usar a data da recuperação inflava o contador do dia
+        criadoEm: x.dataPlanilha || new Date().toISOString(),
+        registradoEm: new Date().toISOString(),
+        recuperadaEm: new Date().toISOString(),
       });
       await dbSet(chave, db);
       criadas[x.ehTv ? 'tv' : 'adm']++;
@@ -342,7 +369,7 @@ export default async function handler(req, res) {
         id: 'rec_' + x.telefone.slice(-4) + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
         nome: x.nome, telefone: x.telefone, equipamento: x.equipamento,
         defeito: x.defeito, endereco: x.endereco,
-        status: 'ficha_criada',
+        status: 'criada',
         origemPlanilha: true,
         obs: 'recuperada — a planilha tinha a ficha mas o sync não a criou',
         criadoEm: new Date().toISOString(), registradoEm: new Date().toISOString(),
