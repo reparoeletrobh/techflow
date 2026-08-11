@@ -1864,6 +1864,61 @@ module.exports = async function handler(req, res) {
         ' | ' + (l.botao || '?') + ' | ' + (l.numeroWhatsApp || l.link || 'destino pela Página')) });
   }
 
+  // ── 📜 ULTIMA-APLICACAO: o que a última execução do Copiloto fez ──
+  if (action === 'ultima-aplicacao') {
+    const lg = (await dbGet('trafego_log')) || { movs: [] };
+    const n = Math.min(5, Math.max(1, parseInt(req.query.n || '1', 10)));
+    return res.status(200).json({ ok: true,
+      execucoes: (lg.movs || []).slice(0, n).map(m => ({
+        quando: new Date(new Date(m.ts).getTime() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' '),
+        totalFeitos: (m.feitos || []).length,
+        totalErros: (m.erros || []).length,
+        PAUSAS: (m.feitos || []).filter(f => /pausado/i.test(String(f.acao || '')))
+          .map(f => (f.nome || f.id) + ' → ' + f.acao),
+        VERBAS: (m.feitos || []).filter(f => /budget/i.test(String(f.acao || '')))
+          .map(f => (f.nome || f.id) + ' → ' + f.acao),
+        ERROS: (m.erros || []).map(e => (e.nome || e.id) + ' | ' + e.acao + ' | ' + e.erro),
+      })) });
+  }
+
+  // ── 🔧 REATIVAR-ANUNCIOS: liga os anúncios de campanhas ativas que ficaram sem ──
+  if (action === 'reativar-anuncios') {
+    const TKR2 = String(req.query.token || '').trim() || TOKEN;
+    const desde = String(req.query.desde || '2026-08-08').slice(0, 10);
+    const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,status,effective_status,adset{id,status},campaign{id,name,status,effective_status,start_time}&limit=400&access_token=${TKR2}`, 10);
+    const alvo = (ads.data || []).filter(a => {
+      const c = a.campaign || {};
+      if (String(c.start_time || '').slice(0, 10) < desde) return false;
+      if (String(c.effective_status || '') !== 'ACTIVE') return false;   // campanha ativa
+      return String(a.status || '') === 'PAUSED';                        // anúncio pausado
+    });
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        anunciosPausadosEmCampanhaAtiva: alvo.length,
+        L: alvo.map(a => String((a.campaign || {}).name || '?').slice(0, 34) +
+          ' | anúncio ' + String(a.name || '').slice(0, 24) + ' | ' + a.effective_status),
+        dica: 'para religar: &aplicar=1' });
+    }
+    const feitos = [], erros = [];
+    for (const a of alvo) {
+      const corpo = new URLSearchParams({ status: 'ACTIVE' }).toString();
+      const r = await fetch(`${GRAPH}/${a.id}?access_token=${TKR2}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: corpo,
+      }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+      if (r && r.error) erros.push(String(a.name || a.id).slice(0, 30) + ': ' + r.error.message);
+      else feitos.push(String((a.campaign || {}).name || a.name).slice(0, 34));
+      // o conjunto também pode estar pausado
+      const ads2 = (a.adset || {});
+      if (ads2.id && String(ads2.status || '') === 'PAUSED') {
+        await fetch(`${GRAPH}/${ads2.id}?access_token=${TKR2}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ status: 'ACTIVE' }).toString() }).catch(() => {});
+      }
+      await new Promise(s => setTimeout(s, 150));
+    }
+    return res.status(200).json({ ok: erros.length === 0, religados: feitos.length, feitos, erros });
+  }
+
   // ── 🔎 STATUS-CICLO: situação real de cada anúncio do ciclo novo ──
   if (action === 'status-ciclo') {
     if (!CONTA) return res.status(200).json({ ok: false, error: 'conta não configurada' });
