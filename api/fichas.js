@@ -120,7 +120,7 @@ export default async function handler(req, res) {
       const iData = cab.findIndex(x => /data|carimbo|timestamp|hora/.test(x));
       const iSis = cab.findIndex(x => /^equipamento$|sistema|tipo|frente/.test(x));
       const iNome = cab.findIndex(x => /nome/.test(x));
-      const iTel = cab.findIndex(x => /telefone|whats|contato/.test(x));
+      const iTel = cab.findIndex(x => /telefone|whats|contato|numero/.test(x));
       // divide cada registro em colunas, também respeitando as aspas
       const colunas = (linha) => {
         const out = []; let campo = '', asp = false;
@@ -148,13 +148,14 @@ export default async function handler(req, res) {
     if (!linhas.length) {
       // diagnóstico: mostra o cabeçalho e as primeiras datas, para ajustar o filtro
       try {
-        const csv2 = await fetch(SHEET_CSV).then(x => x.text());
-        const t2 = csv2.split(/\r?\n/).filter(Boolean);
         return res.status(200).json({ ok: false,
           error: 'nenhuma linha da planilha bateu com a data ' + dia,
-          CABECALHO: t2[0].split(',').map(x => x.replace(/"/g, '').trim()),
-          PRIMEIRAS_LINHAS: t2.slice(1, 4),
-          ULTIMAS_LINHAS: t2.slice(-3) });
+          CABECALHO: cab,
+          colunaDeData: iData >= 0 ? cab[iData] : 'NÃO ENCONTRADA',
+          registrosLidos: todas.length - 1,
+          EXEMPLOS_DE_DATA: todas.slice(1, 6).map(l => {
+            const c = colunas(l); return iData >= 0 ? c[iData] : '?'; }),
+          procurando: [d + '/' + m2 + '/' + a, dia, d + '/' + m2 + '/' + a.slice(2)] });
       } catch (e) {}
     }
 
