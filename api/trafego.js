@@ -1885,7 +1885,7 @@ module.exports = async function handler(req, res) {
   if (action === 'reativar-anuncios') {
     const TKR2 = String(req.query.token || '').trim() || TOKEN;
     const desde = String(req.query.desde || '2026-08-08').slice(0, 10);
-    const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,status,effective_status,adset{id,status},campaign{id,name,status,effective_status,start_time}&limit=400&access_token=${TKR2}`, 10);
+    const ads = await pegarTudo(`${GRAPH}/act_${CONTA}/ads?fields=id,name,status,effective_status,issues_info,adset{id,status,effective_status},campaign{id,name,status,effective_status,start_time}&limit=400&access_token=${TKR2}`, 10);
     const alvo = (ads.data || []).filter(a => {
       const c = a.campaign || {};
       if (String(c.start_time || '').slice(0, 10) < desde) return false;
@@ -1893,10 +1893,18 @@ module.exports = async function handler(req, res) {
       return String(a.status || '') === 'PAUSED';                        // anúncio pausado
     });
     if (String(req.query.aplicar || '') !== '1') {
+      // 🔍 o MOTIVO real: alteração de verba coloca o anúncio em revisão, e isso
+      // aparece como WITH_ISSUES sem que ninguém o tenha pausado de fato
       return res.status(200).json({ ok: true, modo: 'prévia',
         anunciosPausadosEmCampanhaAtiva: alvo.length,
-        L: alvo.map(a => String((a.campaign || {}).name || '?').slice(0, 34) +
-          ' | anúncio ' + String(a.name || '').slice(0, 24) + ' | ' + a.effective_status),
+        L: alvo.map(a => String((a.campaign || {}).name || '?').slice(0, 30) +
+          ' | status próprio: ' + a.status +
+          ' | efetivo: ' + a.effective_status +
+          ' | conjunto: ' + ((a.adset || {}).status || '?') +
+          ' | motivo: ' + ((a.issues_info || []).map(x => x.error_summary || x.error_message)
+            .filter(Boolean).join(' · ').slice(0, 90) || '(nenhum informado)')),
+        LEITURA: 'se o motivo for "não está sendo veiculado, mas você não precisa fazer nada", ' +
+          'é o aviso benigno de revisão — NÃO religue, a Meta reativa sozinha',
         dica: 'para religar: &aplicar=1' });
     }
     const feitos = [], erros = [];
