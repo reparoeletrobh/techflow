@@ -92,6 +92,104 @@ export default async function handler(req, res) {
 
   const action = req.query.action || (req.body && req.body.action) || '';
 
+  // ── 🛡️ SYNC-COMPLETO: varre a planilha inteira, sem depender de cursor ──
+  // O sync normal guarda a posição da última linha lida. Se a planilha for ordenada,
+  // receber linha no meio, ou o cursor avançar sem gravar, as linhas puladas se
+  // perdem para sempre. Esta rotina compara por TELEFONE e não pula nada.
+  if (action === 'sync-completo') {
+    const JANELA_DIAS = Math.min(90, Math.max(1, parseInt(req.query.dias || '3', 10)));
+    const REENTRADA_DIAS = 30;   // mesma ficha pode voltar depois de 30 dias
+    const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
+    let rows;
+    try { rows = parseCSV(await fetch(SHEET_CSV, { redirect: 'follow' }).then(x => x.text())); }
+    catch (e) { return res.status(200).json({ ok: false, error: 'planilha: ' + e.message }); }
+    const cab = (rows[0] || []).map(x => String(x || '').normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '').toLowerCase().trim());
+    const ix = {
+      tel: cab.findIndex(x => /numero|telefone|whats/.test(x)),
+      nome: cab.findIndex(x => /nome/.test(x)),
+      eq: cab.findIndex(x => /^equipamento$/.test(x)),
+      def: cab.findIndex(x => /defeito/.test(x)),
+      end: cab.findIndex(x => /endereco/.test(x)),
+      hora: cab.findIndex(x => /hora|data/.test(x)),
+    };
+    if (ix.tel < 0) return res.status(200).json({ ok: false, error: 'coluna de telefone não encontrada', cab });
+
+    // quando cada telefone entrou pela última vez, em qualquer banco
+    const BANCOS = ['fichas_adm', 'fichas_tv', 'reparoeletro_logistica', 'tv_logistica',
+      'prospeccao_adm', 'reparoeletro_pipe', 'tv_pipe', 'reparoeletro_arquivo'];
+    const ultimaEntrada = {};
+    for (const k of BANCOS) {
+      try {
+        const b = await dbGet(k);
+        for (const L of ['fichas', 'cards']) {
+          for (const x of ((b || {})[L] || [])) {
+            const t = d8f(x.telefone);
+            if (t.length < 8) continue;
+            const q = new Date(x.criadoEm || x.registradoEm || x.movedAt || 0).getTime();
+            if (!ultimaEntrada[t] || q > ultimaEntrada[t]) ultimaEntrada[t] = q;
+          }
+        }
+      } catch (e) {}
+    }
+    const corte = Date.now() - JANELA_DIAS * 86400000;
+    const criar = [], jaExistem = [], reentradas = [];
+    for (const r of rows.slice(1)) {
+      const tel = String(r[ix.tel] || '').replace(/\D/g, '');
+      if (tel.length < 10) continue;
+      const dt = String(r[ix.hora] || '');
+      const mm = dt.match(/^(\d{2})\/(\d{2})\/(\d{2,4})/);
+      let quando = null;
+      if (mm) {
+        const ano = mm[3].length === 2 ? '20' + mm[3] : mm[3];
+        quando = new Date(ano + '-' + mm[2] + '-' + mm[1] + 'T12:00:00-03:00').getTime();
+      }
+      if (quando && quando < corte) continue;          // fora da janela pedida
+      const t8 = d8f(tel);
+      const ult = ultimaEntrada[t8];
+      const eq = String(r[ix.eq] || '');
+      const item = { telefone: tel, nome: String(r[ix.nome] || '?').trim(), equipamento: eq,
+        defeito: String(r[ix.def] || ''), endereco: String(r[ix.end] || ''),
+        ehTv: /\btv\b|televis/i.test(eq), quandoTexto: dt };
+      if (!ult) { criar.push(item); continue; }
+      const diasDesde = (Date.now() - ult) / 86400000;
+      if (diasDesde > REENTRADA_DIAS) {                // 🔁 voltou depois de 30 dias
+        item.reentrada = Math.round(diasDesde);
+        criar.push(item); reentradas.push(item); continue;
+      }
+      jaExistem.push(item);
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        janelaDias: JANELA_DIAS, linhasNaPlanilha: rows.length - 1,
+        vaoSerCriadas: criar.length, jaExistem: jaExistem.length,
+        reentradasApos30Dias: reentradas.length,
+        CRIAR: criar.map(x => x.quandoTexto + ' | ' + (x.ehTv ? 'TV ' : 'ADM') + ' | ' +
+          String(x.nome).slice(0, 18) + ' ' + x.telefone.slice(-4) +
+          (x.reentrada ? ' | 🔁 voltou após ' + x.reentrada + 'd' : '')),
+        dica: 'para criar: &aplicar=1' });
+    }
+    const criadas = { adm: 0, tv: 0 };
+    for (const x of criar) {
+      const chave = x.ehTv ? KEY_TV : KEY_ADM;
+      const db = (await dbGet(chave)) || { fichas: [] };
+      db.fichas = db.fichas || [];
+      db.fichas.unshift({
+        id: 'sc_' + x.telefone.slice(-4) + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+        nome: x.nome, telefone: x.telefone, equipamento: x.equipamento,
+        defeito: x.defeito, endereco: x.endereco,
+        status: 'ficha_criada', origemPlanilha: true,
+        reentrada: x.reentrada || null,
+        criadoEm: new Date().toISOString(), registradoEm: new Date().toISOString(),
+      });
+      await dbSet(chave, db);
+      criadas[x.ehTv ? 'tv' : 'adm']++;
+      await new Promise(s => setTimeout(s, 60));
+    }
+    return res.status(200).json({ ok: true, criadas, total: criadas.adm + criadas.tv,
+      reentradas: reentradas.length });
+  }
+
   // ── 🔁 RECUPERAR-PULADAS: cria as fichas da planilha que o cursor pulou ──
   if (action === 'recuperar-puladas') {
     const dias = Math.min(30, Math.max(1, parseInt(req.query.dias || '1', 10)));
