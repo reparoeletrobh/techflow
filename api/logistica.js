@@ -268,28 +268,42 @@ module.exports = async function handler(req, res) {
     const [lgA, lgT, fA, fT] = await Promise.all([
       dbGet('reparoeletro_logistica'), dbGet('tv_logistica'), dbGet('fichas_adm'), dbGet('fichas_tv'),
     ]);
+    // ✅ reconhece TODAS as formas de ficha devolvida, inclusive as migradas manualmente
     const temRemarcar = new Set();
     for (const b of [fA, fT]) for (const f of (((b || {}).fichas) || [])) {
-      if (String(f.origem || '') === 'remarcar' || String(f.id || '').startsWith('rem_')) {
+      const id = String(f.id || '');
+      if (String(f.origem || '') === 'remarcar' || id.startsWith('rem_') ||
+          id.startsWith('fic_reag_') || id.startsWith('rec_') || f.fichaOrigemId) {
         temRemarcar.add(dg(f.telefone));
       }
     }
-    const dias = Math.min(30, Math.max(1, parseInt(req.query.dias || '3', 10)));
-    const corte = Date.now() - dias * 86400000;
+    // 📅 recorte por DIA específico, em horário de Brasília
+    const diaAlvo = String(req.query.dia || '').slice(0, 10);
+    let ini, fim;
+    if (diaAlvo) {
+      ini = new Date(diaAlvo + 'T00:00:00-03:00').getTime();
+      fim = ini + 86400000;
+    } else {
+      const dias = Math.min(30, Math.max(1, parseInt(req.query.dias || '3', 10)));
+      ini = Date.now() - dias * 86400000; fim = Date.now() + 86400000;
+    }
     const perdidas = [];
     for (const [banco, sis] of [[lgA, 'adm'], [lgT, 'tv']]) {
       for (const f of (((banco || {}).fichas) || [])) {
         if (!f.enviadoProspeccaoEm && !f.remarcadoEm) continue;
         const q = new Date(f.enviadoProspeccaoEm || f.remarcadoEm).getTime();
-        if (!q || q < corte) continue;
+        if (!q || q < ini || q >= fim) continue;
         if (temRemarcar.has(dg(f.telefone))) continue;
-        perdidas.push({ f, sis });
+        perdidas.push({ f, sis, quando: f.enviadoProspeccaoEm || f.remarcadoEm });
       }
     }
+    perdidas.sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
     if (String(req.query.aplicar || '') !== '1') {
       return res.status(200).json({ ok: true, modo: 'prévia',
         marcadasComoDevolvidas: perdidas.length,
-        L: perdidas.map(p => p.sis.toUpperCase() + ' | ' + String(p.f.nome || '?').slice(0, 20) +
+        periodo: diaAlvo || 'últimos dias',
+        L: perdidas.map(p => new Date(new Date(p.quando).getTime() - 3*3600000).toISOString().slice(11,16) +
+          ' | ' + p.sis.toUpperCase() + ' | ' + String(p.f.nome || '?').slice(0, 20) +
           ' ' + dg(p.f.telefone).slice(-4) + ' | ' + String(p.f.equipamento || '').slice(0, 22) +
           ' | ' + (p.f.motivoRemarcar || '(sem motivo)')),
         dica: 'para recriar no atendimento: &aplicar=1' });
