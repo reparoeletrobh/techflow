@@ -79,6 +79,10 @@ module.exports = async function handler(req, res) {
         if (!chegou) alertas.push({ tipo: 'REMARCAR_SEM_DESTINO', sis: L,
           nome: f.nome, tel: d8(f.telefone).slice(-4), quando: hh(f.enviadoProspeccaoEm || f.remarcadoEm),
           detalhe: 'saiu da coluna Remarcar e não há ficha no atendimento',
+          // 🔍 mostra onde o telefone aparece, para saber se é perda real ou falha de leitura
+          ondeAparece: onde.map(o => o.banco + ':' + o.fase +
+            (o.origem ? '(' + o.origem + ')' : '') + '[' + String(o.id || '').slice(0, 10) + ']'),
+          telefoneNaLogistica: String(f.telefone || ''),
           motivo: f.motivoRemarcar || '(sem motivo)' });
       }
     }
@@ -139,7 +143,9 @@ module.exports = async function handler(req, res) {
         : '🚨 ' + alertas.length + ' ficha(s) em estado inconsistente',
       ALERTAS: alertas.map(a => a.tipo + ' | ' + a.sis + ' | ' +
         String(a.nome || '?').slice(0, 20) + ' ' + a.tel + ' | ' + a.quando +
-        ' | ' + a.detalhe),
+        ' | ' + a.detalhe +
+        (a.ondeAparece ? ' → ONDE: ' + (a.ondeAparece.join(' | ') || 'em lugar nenhum') : '') +
+        (a.telefoneNaLogistica ? ' | tel: ' + a.telefoneNaLogistica : '')),
       comoCorrigir: {
         REMARCAR_SEM_DESTINO: '/api/logistica?action=recriar-perdidas&dia=HOJE&aplicar=1',
         GARANTIA_SEM_TIPO: 'atribuir o tipo na tela de garantia',
