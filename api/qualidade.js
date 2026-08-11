@@ -174,7 +174,7 @@ export default async function handler(req, res) {
       { cliente: 'Pedro 9',  equipamento: 'tv',          equipDesc: 'TV 50" — TU + barramento (recuperação da placa)', tecnico: 'Técnico A', os: 'TV-TESTE-09' },
       { cliente: 'Pedro 10', equipamento: 'bblend',      equipDesc: 'B.blend — reparo do circuito hidráulico + higienização do sistema', tecnico: 'Técnico B', os: 'PIPE-TESTE-10' },
     ];
-    const EQUIPE = ['Lucas', 'Diego', 'Cássio', 'Roberto', 'Carlos', 'Arthur'];
+    const EQUIPE = ['Lucas', 'Diego', 'Kassio', 'Roberto', 'Carlos', 'Arthur'];  // Kassio é a grafia usada no sistema
     if (!db.config.tecnicos || !db.config.tecnicos.length) db.config.tecnicos = EQUIPE.slice();
     // garante que todos da equipe estejam na lista, sem apagar nomes já cadastrados
     for (const t of EQUIPE) if (!db.config.tecnicos.includes(t)) db.config.tecnicos.push(t);
