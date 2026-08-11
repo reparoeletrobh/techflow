@@ -160,15 +160,32 @@ module.exports = async function handler(req, res) {
         vaoVoltar: voltar.length,
         porTipoNasLixeiras: candidatas.reduce((o, f) => {
           const k = String(f.tipo || '(sem tipo)'); o[k] = (o[k] || 0) + 1; return o; }, {}),
+        // 🔍 as fases que as fichas de RS Rua tinham guardadas
+        FASES_DAS_DE_RUA: soRua.reduce((o, f) => {
+          const k = String(f.fase || f.phase || f.status || f.faseId || f.coluna || '(sem fase)');
+          o[k] = (o[k] || 0) + 1; return o; }, {}),
+        camposDeUmaDeRua: soRua[0] ? Object.keys(soRua[0]) : [],
+        exemploDeRua: soRua[0] || null,
         AMOSTRA: voltar.slice(0, 40).map(f => String(f.nome || f.cliente || '?').slice(0, 20) +
           ' ' + d4(f.telefone) + ' | ' + String(f.equipamento || f.descricao || '').slice(0, 22) +
           ' | tipo: ' + (f.tipo || '?') + ' | ' + String(f.status || f.phase || '?')),
         dica: soRua.length ? 'para restaurar: &aplicar=1'
           : 'nenhuma identificada como RS Rua — use &tudo=1 para ver todas as da lixeira' });
     }
-    db[campo] = voltar.map(f => { const g = { ...f }; delete g._de; return g; }).concat(db[campo]);
+    // 🔒 preserva a fase original de cada ficha — a maioria já estava concluída
+    db[campo] = voltar.map(f => {
+      const g = { ...f }; delete g._de;
+      // se algum campo de fase existir, mantém; nunca sobrescreve
+      if (!g.fase && !g.phase && !g.status) { g.status = 'garantia_solicitada'; g.faseRestauradaPadrao = true; }
+      return g;
+    }).concat(db[campo]);
     await dbSet(GARANTIA_KEY, db);
-    return res.status(200).json({ ok: true, restauradas: voltar.length, totalAgora: db[campo].length });
+    const porFase = voltar.reduce((o, f) => {
+      const k = String(f.fase || f.phase || f.status || '(sem fase)'); o[k] = (o[k] || 0) + 1; return o; }, {});
+    return res.status(200).json({ ok: true, restauradas: voltar.length,
+      totalAgora: db[campo].length,
+      POR_FASE: porFase,
+      semFaseOriginal: voltar.filter(f => !f.fase && !f.phase && !f.status).length });
   }
 
   // ── 📊 CONTADORES: garantias por dia, semana e por técnico ──
