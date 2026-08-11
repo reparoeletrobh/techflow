@@ -306,23 +306,54 @@ async function carregarHistorico(){
   var r=await fetch('/api/trafego?action=historico&dias=30').then(function(x){return x.json();}).catch(function(){return null;});
   if(!r||!r.ok){el.innerHTML='<div class="vazio-msg">não consegui carregar</div>';return;}
   _histDados = r.DETALHE || [];
+  _histPorDia = r.POR_DIA || [];
   el.innerHTML='<div style="background:var(--painel);border:1px solid var(--linha);border-radius:14px;padding:15px 17px;">'
     +'<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">'
       +'<span style="font-size:15px;font-weight:900;color:#a78bfa;">📚 Histórico de alterações</span>'
       +'<span style="font-size:11px;color:#5a6270;">'+(r.execucoes||0)+' execução(ões) · 30 dias</span>'
       +'<button class="btn" style="margin-left:auto;font-size:11px;padding:5px 11px;" onclick="carregarHistorico()">↻</button>'
     +'</div>'
-    +'<div style="font-size:11px;color:#5a6270;margin-top:9px;">clique numa linha para ver os anúncios</div>'
-    +'<div style="background:#0f1319;border:1px solid #1e2228;border-radius:9px;padding:9px 11px;margin-top:8px;max-height:330px;overflow-y:auto;">'
-    +(_histDados.length?_histDados.map(function(d,i){
-        var cor = d.ERROS.length ? '#f87171' : (d.PAUSADOS.length ? '#fbbf24' : '#4ade80');
-        return '<div style="cursor:pointer;padding:4px 0;border-bottom:1px solid #171b22;font-family:var(--mono);font-size:10.5px;color:#c9ced6;" '
-          +'onclick="verExecucao('+i+')" onmouseover="this.style.color=\'#60a5fa\'" onmouseout="this.style.color=\'#c9ced6\'">'
-          +'▸ <span style="color:'+cor+'">#'+d.n+'</span> · '+esc(d.quando)+' · '+esc(d.resumo)+'</div>';
+    +'<div style="font-size:11px;color:#5a6270;margin-top:9px;">clique num dia para abrir · clique na execução para ver os criativos</div>'
+    +'<div style="margin-top:9px;">'
+    +(_histPorDia.length?_histPorDia.map(function(g,i){
+        var cor = g.erros ? '#f87171' : (g.pausados ? '#fbbf24' : '#4ade80');
+        return '<div style="background:#12161d;border:1px solid #242b39;border-radius:10px;margin-bottom:7px;overflow:hidden;">'
+          +'<div style="cursor:pointer;padding:10px 12px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;" '
+            +'onclick="toggleDia('+i+')">'
+            +'<span id="seta-dia-'+i+'" style="color:#5a6270;font-size:11px;">▸</span>'
+            +'<span style="font-family:var(--mono);font-size:12.5px;font-weight:700;color:#f0f2f5;">'+esc(g.dia)+'</span>'
+            +'<span style="font-size:11px;color:#5a6270;">'+g.execucoes+' execução(ões)</span>'
+            +'<span style="margin-left:auto;font-size:11.5px;font-weight:700;color:'+cor+';">'+esc(g.resumo)+'</span>'
+          +'</div>'
+          +'<div id="dia-'+i+'" style="display:none;padding:0 12px 11px;"></div>'
+        +'</div>';
       }).join(''):'<div style="font-size:11px;color:#5a6270;">nenhuma execução no período</div>')
     +'</div>'
-    +'<div id="hist-detalhe"></div>'
   +'</div>';
+}
+var _histPorDia = [];
+function toggleDia(i){
+  var g=(_histPorDia||[])[i]; if(!g)return;
+  var cx=document.getElementById('dia-'+i), seta=document.getElementById('seta-dia-'+i);
+  if(cx.style.display!=='none'){cx.style.display='none';seta.textContent='▸';return;}
+  seta.textContent='▾';
+  cx.style.display='block';
+  cx.innerHTML=(g.execucoesDoDia||[]).map(function(d){
+    function bloco(tit,arr,cor){
+      if(!arr||!arr.length)return '';
+      return '<div style="margin-top:8px;"><div style="font-size:10.5px;font-weight:900;color:'+cor+';">'+tit+' ('+arr.length+')</div>'
+        +'<div style="background:#0b0e13;border:1px solid #1e2228;border-radius:7px;padding:8px 10px;margin-top:4px;'
+        +'font-family:var(--mono);font-size:10px;color:#c9ced6;line-height:1.9;max-height:220px;overflow-y:auto;">'
+        +arr.map(function(x){return '• '+esc(String(x));}).join('<br>')+'</div></div>';
+    }
+    return '<div style="background:#0f1319;border:1px solid #1e2228;border-radius:9px;padding:10px 12px;margin-top:8px;">'
+      +'<div style="font-size:11.5px;font-weight:900;color:#60a5fa;">🕐 '+esc(d.quando)+' — '+esc(d.resumo)+'</div>'
+      +bloco('⏸️ PAUSADOS',d.PAUSADOS,'#fbbf24')
+      +bloco('💰 VERBAS AJUSTADAS',d.VERBAS,'#4ade80')
+      +bloco('✨ CRIADOS',d.CRIADOS,'#a78bfa')
+      +bloco('🚨 ERROS',d.ERROS,'#f87171')
+    +'</div>';
+  }).join('');
 }
 function verExecucao(i){
   var d=(_histDados||[])[i]; if(!d)return;

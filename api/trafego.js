@@ -1891,8 +1891,28 @@ module.exports = async function handler(req, res) {
              ' | ' + (e.erro || e.error || e.message || JSON.stringify(e).slice(0, 80)))),
       };
     });
+    // 📅 agrupa por dia, para o painel abrir por data
+    const porDia = {};
+    for (const d of detalhado) {
+      const dia = d.quando.slice(0, 5);   // MM-DD
+      porDia[dia] = porDia[dia] || { execucoes: 0, pausados: 0, verbas: 0, criados: 0, erros: 0, itens: [] };
+      porDia[dia].execucoes++;
+      porDia[dia].pausados += d.PAUSADOS.length;
+      porDia[dia].verbas += d.VERBAS.length;
+      porDia[dia].criados += d.CRIADOS.length;
+      porDia[dia].erros += d.ERROS.length;
+      porDia[dia].itens.push(d);
+    }
     return res.status(200).json({ ok: true, periodoDias: dias,
       execucoes: detalhado.length,
+      POR_DIA: Object.entries(porDia).map(([dia, v]) => ({
+        dia, execucoes: v.execucoes,
+        resumo: [v.pausados ? v.pausados + ' pausado(s)' : null,
+          v.verbas ? v.verbas + ' verba(s)' : null,
+          v.criados ? v.criados + ' criado(s)' : null,
+          v.erros ? v.erros + ' erro(s)' : null].filter(Boolean).join(' · ') || 'sem alterações',
+        pausados: v.pausados, verbas: v.verbas, criados: v.criados, erros: v.erros,
+        execucoesDoDia: v.itens })),
       LINHA_DO_TEMPO: detalhado.map(d => '#' + d.n + ' · ' + d.quando + ' · ' + d.resumo),
       DETALHE: detalhado });
   }

@@ -1163,9 +1163,13 @@ module.exports = async function handler(req, res) {
     // aplica
     const log = (await dbGet('tv_log_distribuicao')) || { dias: {} };
     log.dias[hoje] = log.dias[hoje] || [];
+    // 📜 registra TODAS as decisões, inclusive as que não alteram a ficha,
+    // para o log refletir o que realmente foi analisado e distribuído
     for (const d of decisoes) {
       const f = (db.fichas || []).find(x => x.id === d.id);
-      if (!f) continue;
+      if (!f) { log.dias[hoje].push({ ts: new Date().toISOString(), id: d.id, nome: d.nome,
+        tel: d.tel, motorista: d.motorista, pol: d.pol, regiao: d.regiao,
+        porque: d.porque, obs: 'ficha não encontrada no momento de aplicar' }); continue; }
       // ficha com horário combinado mantém a fase — só ganha o motorista responsável
       if (!d.porHorario) f.phase = 'motorista_parceiro';
       f.motoristaNome = nomeReal[d.motorista] || d.motorista;
@@ -1202,7 +1206,22 @@ module.exports = async function handler(req, res) {
       for (const [m, n] of Object.entries(porM)) porMotorista[m] = (porMotorista[m] || 0) + n;
       linhas.push({ dia: d, total: itens.length, porMotorista: porM, itens });
     }
+    // 🚚 confronto com a realidade: quantas cada motorista tem de fato agora
+    const dbAtual = (await dbGet(LOG_KEY)) || { fichas: [] };
+    const EM_ABERTO = ['motorista_parceiro', 'horario_marcado', 'liberado_para_rota'];
+    const cargaReal = {};
+    for (const f of (dbAtual.fichas || [])) {
+      const m = String(f.motoristaNome || '');
+      if (!m) continue;
+      cargaReal[m] = cargaReal[m] || { emAberto: 0, hoje: 0 };
+      if (EM_ABERTO.includes(String(f.phase || ''))) cargaReal[m].emAberto++;
+      if (String(f.distribuidoEm || '').slice(0, 10) === new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10)) {
+        cargaReal[m].hoje++;
+      }
+    }
     return res.status(200).json({ ok: true, periodoDias: dias,
+      CARGA_REAL_AGORA: cargaReal,
+      observacao: 'o log conta o que a distribuição automática fez; a carga real inclui fichas atribuídas manualmente',
       TOTAL_POR_MOTORISTA: porMotorista,
       POR_DIA: linhas.map(l => l.dia + ' | ' + String(l.total).padStart(2) + ' ficha(s) | ' +
         Object.entries(l.porMotorista).map(([m, n]) => m + ' ' + n).join(' · ')),
