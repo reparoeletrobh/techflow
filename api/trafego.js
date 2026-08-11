@@ -719,6 +719,9 @@ module.exports = async function handler(req, res) {
   if (req.method === 'POST' && action === 'aplicar') {
     const { pausarIds, orcamentos, confirmar } = req.body || {};
     if (confirmar !== true) return res.status(400).json({ ok: false, error: 'confirmação explícita obrigatória' });
+    // 🐛 'cat' era usado adiante sem nunca ser declarado, e a aplicação inteira
+    // falhava com "cat is not defined" — nenhum corte era executado.
+    const cat = String((req.body && req.body.frente) || req.query.frente || req.query.cat || 'adm').toLowerCase();
     // A Meta espera form-urlencoded com o token na query — JSON no corpo dá "parâmetro inválido"
     const postMeta = async (id, campos) => {
       const corpo = new URLSearchParams(campos).toString();
