@@ -443,9 +443,22 @@ function check(nome, cond, extra) {
       JSON.stringify(c.GARANTIAS_POR_TECNICO || {}).includes('Teste Harness'));
   }
 
+  // ── 🚪 janela de 24h: texto livre para quem não escreve há mais de 24h é bloqueado ──
+  console.log('▶ Cenário J1 — texto livre fora da janela de 24h é bloqueado');
+  {
+    const rJ = res();
+    global.__fetchLog.length = 0;
+    await wabot(req({ action:'enviar', ...K }, { tel:'5531900001111',
+      texto:'Olá, tudo bem?' }), rJ);
+    const j = rJ.dado || {};
+    check('janela fechada: envio recusado', /janela de 24h/.test(String(j.error||'')), j.error);
+    check('janela fechada: nada foi enviado à Meta',
+      !(global.__fetchLog||[]).some(u => String(u).includes('/messages')));
+  }
+
   console.log('▶ Cenário 12b — coleta fora da janela é bloqueada');
   const r12h = res();
-  await wabot(req({ action:'enviar', ...K }, { tel:'5531990007099',
+  await wabot(req({ action:'enviar', forcarJanela:'1', ...K }, { tel:'5531990007099',
     texto:'Perfeito! Vou programar sua coleta.',
     acaoAprovada:'cadastrar_logistica', acaoMotivo:'coleta imediata' }), r12h);
   {
@@ -468,7 +481,7 @@ function check(nome, cond, extra) {
   KV['reparoeletro_logistica'] = { fichas: [] };
   global.__fetchLog.length = 0;
   const r12a = res();
-  await wabot(req({ action:'enviar', forcar:'1', ...K }, { tel:'5531990007001',
+  await wabot(req({ action:'enviar', forcar:'1', forcarJanela:'1', ...K }, { tel:'5531990007001',
     texto:'Perfeito! Sua coleta será feita amanhã entre 08h e 14h.',
     acaoAprovada:'cadastrar_logistica', acaoMotivo:'coleta imediata' }), r12a);
   check('sem ficha: abriu conflito para um humano',
@@ -480,7 +493,7 @@ function check(nome, cond, extra) {
   KV['fichas_adm'] = { fichas: [{ id:'FA1', nome:'Cliente OK', telefone:'5531990007002', equipamento:'Micro-ondas', endereco:'Rua X', status:'contato_feito' }] };
   KV['reparoeletro_logistica'] = { fichas: [] };
   global.__fetchLog.length = 0;
-  await wabot(req({ action:'enviar', forcar:'1', ...K }, { tel:'5531990007002',
+  await wabot(req({ action:'enviar', forcar:'1', forcarJanela:'1', ...K }, { tel:'5531990007002',
     texto:'Perfeito! Nossa equipe já vai programar a busca.',
     acaoAprovada:'cadastrar_logistica', acaoMotivo:'coleta imediata' }), res());
   check('com ficha: criou na logística', ((KV['reparoeletro_logistica']||{}).fichas||[]).length === 1,

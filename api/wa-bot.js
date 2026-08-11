@@ -5506,6 +5506,34 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
       } catch (e) {}
       return res.status(400).json({ ok: false, error: 'mensagem continha estrutura interna — envio bloqueado' });
     }
+    // 🚪 JANELA DE 24H: a Meta só aceita texto livre se o cliente escreveu nas últimas
+    // 24 horas. Fora disso a mensagem é recusada (131047) e o cliente não recebe nada —
+    // é preciso template. Antes o envio era tentado às cegas e falhava em silêncio.
+    let janelaAberta = null, ultimaEntrada = null;
+    try {
+      const d8j = String(tel).replace(/\D/g, '').slice(-8);
+      const evtsJ = await lerEvts();
+      for (const e of (evtsJ || [])) {
+        if (e.dir !== 'in') continue;
+        if (String(e.tel || '').replace(/\D/g, '').slice(-8) !== d8j) continue;
+        const t = new Date(e.ts || 0).getTime();
+        if (t && (!ultimaEntrada || t > ultimaEntrada)) ultimaEntrada = t;
+      }
+      janelaAberta = !!(ultimaEntrada && (Date.now() - ultimaEntrada) < 24 * 3600000);
+    } catch (e) { janelaAberta = null; }
+    if (janelaAberta === false && String(req.query.forcarJanela || '') !== '1') {
+      const horas = ultimaEntrada ? ((Date.now() - ultimaEntrada) / 3600000).toFixed(1) : '?';
+      try {
+        await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'acao', tipo: 'bloqueio',
+          texto: '🚪 ENVIO BLOQUEADO — janela de 24h fechada (última mensagem do cliente há ' +
+            horas + 'h). Use um template.' });
+      } catch (e) {}
+      return res.status(200).json({ ok: false,
+        error: '🚪 janela de 24h fechada — o cliente não escreve há ' + horas + 'h',
+        oQueFazer: 'para reabrir a conversa é preciso enviar um TEMPLATE aprovado, não texto livre',
+        ultimaMensagemDoCliente: ultimaEntrada ? new Date(ultimaEntrada).toISOString() : null,
+        comoForcar: 'acrescente &forcarJanela=1 se tiver certeza de que a janela está aberta' });
+    }
     // 📱 responde pelo número por onde o cliente falou
     const { token: tkE, phoneId: pidE, viaAntigo: _vaE } = await credenciaisResposta(tel);
     if (!tkE || !pidE) return res.status(200).json({ ok: false, error: 'Credenciais WhatsApp não configuradas (envs ou setup-credenciais)' });
