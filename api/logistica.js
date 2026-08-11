@@ -214,6 +214,25 @@ async function remarcarParaProspeccao(ficha, motivo, sistema, quem) {
       criadoEm: new Date().toISOString(),
     });
     await dbSet(KEYP, pdb);
+    // 🔒 CONFERE se a gravação persistiu. Duas rotinas gravando o mesmo banco ao
+    // mesmo tempo fazem uma sobrescrever a outra, e a ficha desaparece em silêncio
+    // enquanto a coluna já foi liberada. Aconteceu com a Maria 1499 em 11/08.
+    try {
+      const conf = (await dbGet(KEYP)) || { fichas: [] };
+      const achou = (conf.fichas || []).some(x => d8(x.telefone) === d8(ficha.telefone) &&
+        String(x.origem || '') === 'remarcar');
+      if (!achou) {
+        // segunda tentativa, relendo o estado mais recente
+        const novo = (await dbGet(KEYP)) || { fichas: [] };
+        novo.fichas = novo.fichas || [];
+        novo.fichas.unshift(pdb.fichas[0]);
+        await dbSet(KEYP, novo);
+        const conf2 = (await dbGet(KEYP)) || { fichas: [] };
+        const ok2 = (conf2.fichas || []).some(x => d8(x.telefone) === d8(ficha.telefone) &&
+          String(x.origem || '') === 'remarcar');
+        if (!ok2) return { ok: false, erro: 'gravação não persistiu — ficha NÃO devolvida' };
+      }
+    } catch (e) { return { ok: false, erro: 'falha ao confirmar: ' + e.message }; }
     // 🚪 a ficha SAI da coluna Remarcar — ela vive agora na prospecção.
     // Sem isso ela voltava ao atendimento mas continuava ocupando a coluna.
     try {
@@ -242,6 +261,47 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const action = req.query.action
+
+  // ── 🔧 RECRIAR-PERDIDAS: fichas marcadas como devolvidas que não existem no atendimento ──
+  if (action === 'recriar-perdidas') {
+    const dg = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const [lgA, lgT, fA, fT] = await Promise.all([
+      dbGet('reparoeletro_logistica'), dbGet('tv_logistica'), dbGet('fichas_adm'), dbGet('fichas_tv'),
+    ]);
+    const temRemarcar = new Set();
+    for (const b of [fA, fT]) for (const f of (((b || {}).fichas) || [])) {
+      if (String(f.origem || '') === 'remarcar' || String(f.id || '').startsWith('rem_')) {
+        temRemarcar.add(dg(f.telefone));
+      }
+    }
+    const dias = Math.min(30, Math.max(1, parseInt(req.query.dias || '3', 10)));
+    const corte = Date.now() - dias * 86400000;
+    const perdidas = [];
+    for (const [banco, sis] of [[lgA, 'adm'], [lgT, 'tv']]) {
+      for (const f of (((banco || {}).fichas) || [])) {
+        if (!f.enviadoProspeccaoEm && !f.remarcadoEm) continue;
+        const q = new Date(f.enviadoProspeccaoEm || f.remarcadoEm).getTime();
+        if (!q || q < corte) continue;
+        if (temRemarcar.has(dg(f.telefone))) continue;
+        perdidas.push({ f, sis });
+      }
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        marcadasComoDevolvidas: perdidas.length,
+        L: perdidas.map(p => p.sis.toUpperCase() + ' | ' + String(p.f.nome || '?').slice(0, 20) +
+          ' ' + dg(p.f.telefone).slice(-4) + ' | ' + String(p.f.equipamento || '').slice(0, 22) +
+          ' | ' + (p.f.motivoRemarcar || '(sem motivo)')),
+        dica: 'para recriar no atendimento: &aplicar=1' });
+    }
+    const feitos = [], erros = [];
+    for (const p of perdidas) {
+      const r = await remarcarParaProspeccao(p.f, p.f.motivoRemarcar || 'recriada após falha', p.sis, 'recriar-perdidas');
+      if (r.ok) feitos.push(String(p.f.nome || '?').slice(0, 20)); else erros.push((p.f.nome || '?') + ': ' + r.erro);
+      await new Promise(s => setTimeout(s, 150));
+    }
+    return res.status(200).json({ ok: erros.length === 0, recriadas: feitos.length, feitos, erros });
+  }
 
   // ── 📋 REMARCADAS-HOJE: tudo que passou pela coluna hoje, ADM e TV ──
   if (action === 'remarcadas-hoje') {
@@ -769,6 +829,9 @@ module.exports = async function handler(req, res) {
     if (phase === 'remarcar') {
       const r = await remarcarParaProspeccao(ficha, ficha.motivoRemarcar, 'adm', ficha.remarcadoPor);
       ficha.voltouProspeccao = r.ok ? new Date().toISOString() : null;
+      // 🚧 se a devolução falhou, a ficha FICA na coluna — melhor visível e pendente
+      // do que fora da coluna e invisível no atendimento
+      if (!r.ok) { ficha.phase = 'remarcar'; ficha.erroDevolucao = r.erro || 'falhou'; }
       await dbSet(LOG_KEY, db);
     }
     return res.status(200).json({ ok: true, ficha, almoxarifado: ficha.almoxarifadoTarefa || undefined,
