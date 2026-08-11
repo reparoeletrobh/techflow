@@ -84,6 +84,37 @@ function isConcluida(ficha) {
   return ficha.faseId === ultimas[ficha.tipo];
 }
 
+
+// ── 🔥 ENVIA PARA A FILA DE TRATAMENTO ──
+// Regras: garantia de LOJA entra ao ser cadastrada; RS RUA entra apenas quando o
+// equipamento é RECOLHIDO; almoxarifado já entra pelo seu próprio caminho.
+async function enviarParaFila(ficha, origem) {
+  try {
+    const FK = "reparoeletro_garantia_fila";
+    const fdb = (await dbGet(FK)) || { itens: [] };
+    fdb.itens = fdb.itens || [];
+    const d8 = String(ficha.telefone || "").replace(/\D/g, "").slice(-8);
+    if (d8 && fdb.itens.some(i => i.status !== "resolvido" &&
+        String(i.telefone || "").replace(/\D/g, "").slice(-8) === d8)) {
+      return { ok: true, dedupe: true };
+    }
+    fdb.itens.unshift({
+      id: "gar_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      nome: String(ficha.nome || "Cliente").slice(0, 80),
+      telefone: String(ficha.telefone || "").slice(0, 20),
+      equipamento: String(ficha.equipamento || ficha.defeito || "").slice(0, 80),
+      relato: String(ficha.defeito || "").slice(0, 400),
+      origem: origem || ficha.tipo || "garantia",
+      tecnico: ficha.tecnico || null,
+      fichaGarantiaId: ficha.id || null,
+      status: "aberto",
+      criadoEm: new Date().toISOString(),
+    });
+    await dbSet(FK, fdb);
+    return { ok: true };
+  } catch (e) { return { ok: false, erro: e.message }; }
+}
+
 module.exports = async function handler(req, res) {
   // 🔐 TF-AUTH (Fase 1): chave obrigatória em toda chamada
   const _tfk = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
@@ -210,6 +241,40 @@ module.exports = async function handler(req, res) {
   }
 
   // ── 🔬 RAIO-X: o que existe no banco, por tipo, fase e situação ──
+  // ── 🔁 SINCRONIZAR-FILA: leva à fila quem já deveria estar nela ──
+  if (action === 'sincronizar-fila') {
+    const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
+    const fdb = (await dbGet('reparoeletro_garantia_fila')) || { itens: [] };
+    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const naFila = new Set((fdb.itens || []).filter(i => i.status !== 'resolvido').map(i => d8(i.telefone)));
+    const devem = (db.fichas || []).filter(f => {
+      if (f.concluida) return false;
+      if (naFila.has(d8(f.telefone))) return false;
+      if (f.tipo === 'loja_imediata' || f.tipo === 'loja_acompanhamento') return true;
+      if (f.tipo === 'rua' && f.faseId === 'equip_recolhido') return true;
+      return false;
+    });
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        naFilaAgora: (fdb.itens || []).filter(i => i.status !== 'resolvido').length,
+        vaoEntrar: devem.length,
+        L: devem.map(f => String(f.nome || '?').slice(0, 20) + ' | ' + f.tipo +
+          ' | ' + (f.faseId || '?') + ' | ' + String(f.defeito || '').slice(0, 30)),
+        regras: ['loja_imediata e loja_acompanhamento: entram ao cadastrar',
+          'rua: entra apenas quando marcada como equip_recolhido',
+          'almoxarifado: entra pelo caminho próprio'],
+        dica: 'para enviar: &aplicar=1' });
+    }
+    const feitos = [];
+    for (const f of devem) {
+      const r = await enviarParaFila({ ...f, equipamento: f.defeito },
+        f.tipo === 'rua' ? 'rs-rua-recolhido' : 'loja-' + f.tipo);
+      if (r.ok && !r.dedupe) feitos.push(String(f.nome || '?').slice(0, 20));
+      await new Promise(s => setTimeout(s, 80));
+    }
+    return res.status(200).json({ ok: true, enviadas: feitos.length, feitos });
+  }
+
   if (action === 'raio-x') {
     const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
     const lista = db.fichas || [];
@@ -758,6 +823,12 @@ module.exports = async function handler(req, res) {
         pipefyErro: null,
       };
 
+      // 🔥 LOJA vai para a fila de tratamento assim que é cadastrada
+      if (tipo === "loja_imediata" || tipo === "loja_acompanhamento") {
+        const rf = await enviarParaFila({ ...ficha, equipamento: ficha.defeito }, "loja-" + tipo);
+        ficha.naFila = rf.ok && !rf.dedupe;
+      }
+
       // Delivery → cria card no Pipefy imediatamente
       if (tipo === "delivery") {
         // Criar card na coluna Garantia do Pipe ADM
@@ -847,8 +918,15 @@ module.exports = async function handler(req, res) {
       if (!fases.find(function(f) { return f.id === faseId; }))
         return res.status(400).json({ ok: false, error: "Fase inválida para este tipo" });
 
+      const faseAnterior = ficha.faseId;
       ficha.faseId   = faseId;
       ficha.movidaEm = new Date().toISOString();
+      // 🔥 RS RUA só entra na fila quando o equipamento é RECOLHIDO
+      if (ficha.tipo === "rua" && faseId === "equip_recolhido" && faseAnterior !== "equip_recolhido") {
+        const rf = await enviarParaFila({ ...ficha, equipamento: ficha.defeito }, "rs-rua-recolhido");
+        ficha.naFila = rf.ok && !rf.dedupe;
+        ficha.entrouNaFilaEm = new Date().toISOString();
+      }
       // Ao mover via Técnico, auto-conclui (sai da coluna)
       ficha.concluida = false;
 
