@@ -243,6 +243,52 @@ module.exports = async function handler(req, res) {
 
   const action = req.query.action
 
+  // ── 📋 REMARCADAS-HOJE: tudo que passou pela coluna hoje, ADM e TV ──
+  if (action === 'remarcadas-hoje') {
+    const dia = String(req.query.dia || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
+    const ini = new Date(dia + 'T00:00:00-03:00').getTime();
+    const fim = ini + 86400000;
+    const dg = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(11, 16) : '--:--';
+    const [lgA, lgT, fA, fT] = await Promise.all([
+      dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+      dbGet('fichas_adm'), dbGet('fichas_tv'),
+    ]);
+    const emContato = new Set();
+    for (const b of [fA, fT]) for (const f of (((b || {}).fichas) || [])) {
+      if (String(f.status || '') === 'entrar_contato') emContato.add(dg(f.telefone));
+    }
+    const linhas = [];
+    for (const [banco, sis] of [[lgA, 'ADM'], [lgT, 'TV']]) {
+      for (const f of (((banco || {}).fichas) || [])) {
+        const q = new Date(f.remarcadoEm || f.enviadoProspeccaoEm || 0).getTime();
+        const naColuna = String(f.phase || '') === 'remarcar';
+        if (!q && !naColuna) continue;
+        if (q && (q < ini || q >= fim)) continue;
+        linhas.push({ sis, hora: hh(f.remarcadoEm || f.enviadoProspeccaoEm),
+          nome: f.nome || '?', tel: dg(f.telefone).slice(-4),
+          equipamento: String(f.equipamento || '').slice(0, 22),
+          motivo: String(f.motivoRemarcar || '(sem motivo)').slice(0, 60),
+          por: f.remarcadoPor || '—',
+          aindaNaColuna: naColuna,
+          noAtendimento: emContato.has(dg(f.telefone)),
+          ts: q });
+      }
+    }
+    linhas.sort((a, b) => b.ts - a.ts);
+    const porMotivo = linhas.reduce((o, l) => { o[l.motivo] = (o[l.motivo] || 0) + 1; return o; }, {});
+    return res.status(200).json({ ok: true, dia,
+      total: linhas.length,
+      adm: linhas.filter(l => l.sis === 'ADM').length,
+      tv: linhas.filter(l => l.sis === 'TV').length,
+      aindaNaColuna: linhas.filter(l => l.aindaNaColuna).length,
+      naoChegaramAoAtendimento: linhas.filter(l => !l.noAtendimento).length,
+      POR_MOTIVO: porMotivo,
+      L: linhas.map(l => l.hora + ' | ' + l.sis.padEnd(3) + ' | ' +
+        String(l.nome).slice(0, 18).padEnd(18) + ' ' + l.tel + ' | ' +
+        l.equipamento.padEnd(22) + ' | ' + (l.noAtendimento ? '✅' : '🚨') + ' | ' + l.motivo) });
+  }
+
   // ── 📋 LOG-REMARCAR: quantas voltaram e se chegaram em Entrar em Contato ──
   if (action === 'log-remarcar') {
     const dias = Math.min(60, Math.max(1, parseInt(req.query.dias || '7', 10)));
