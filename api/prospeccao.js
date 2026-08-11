@@ -890,15 +890,28 @@ export default async function handler(req,res){
     // 📺 o cliente pode ser de TV — procurar nos DOIS pipes, senão a aprovação falha
     let pp=(await dbGet('reparoeletro_pipe'))||{cards:[]};
     let chavePipe='reparoeletro_pipe';
-    let card=(pp.cards||[]).find(c=>String(c.telefone||'').replace(/\D/g,'').slice(-8)===d8a&&c.phase!=='aprovados');
+    // o card guarda a fase em phase OU phaseId conforme a origem — aceitar os dois
+    const faseDe=c=>String(c.phaseId||c.phase||'');
+    const mesmoTel=c=>String(c.telefone||'').replace(/\D/g,'').slice(-8)===d8a;
+    let card=(pp.cards||[]).find(c=>mesmoTel(c)&&faseDe(c)!=='aprovados');
+    const ppTv=(await dbGet('tv_pipe'))||{cards:[]};
     if(!card){
-      const ppTv=(await dbGet('tv_pipe'))||{cards:[]};
-      const cTv=(ppTv.cards||[]).find(c=>String(c.telefone||'').replace(/\D/g,'').slice(-8)===d8a&&c.phase!=='aprovados');
+      const cTv=(ppTv.cards||[]).find(c=>mesmoTel(c)&&faseDe(c)!=='aprovados');
       if(cTv){ card=cTv; pp=ppTv; chavePipe='tv_pipe'; }
     }
-    if(!card)return res.status(404).json({ok:false,
-      error:'card do cliente não encontrado em nenhum pipe (ADM ou TV)',
-      telefoneProcurado:d8a.slice(-4)});
+    if(!card){
+      // 🔍 diagnóstico: o cliente existe em algum pipe? em que fase?
+      const achadosAdm=(pp.cards||[]).filter(mesmoTel).map(c=>'ADM:'+faseDe(c));
+      const achadosTv=(ppTv.cards||[]).filter(mesmoTel).map(c=>'TV:'+faseDe(c));
+      const todos=achadosAdm.concat(achadosTv);
+      return res.status(404).json({ok:false,
+        error: todos.length
+          ? 'o cliente existe no pipe, mas já está em fase que não permite aprovar: '+todos.join(', ')
+          : 'card do cliente não encontrado em nenhum pipe (ADM ou TV)',
+        telefoneProcurado:d8a.slice(-4),
+        ondeEstaNoPipe: todos.length?todos:'em lugar nenhum',
+        nomeNaProspeccao: f.nome||null});
+    }
     const v=parseFloat(valor)||0;
     if(v>0)card.valor=v;
     const nota='✔ Aprovado via Conflitos Bot: R$'+(v||card.valor)+' ('+String(pagamento||'—')+')'+(obs?' — '+String(obs).slice(0,150):'');
@@ -935,15 +948,23 @@ export default async function handler(req,res){
     const d8r=String(f.telefone||'').replace(/\D/g,'').slice(-8);
     let pp=(await dbGet('reparoeletro_pipe'))||{cards:[]};
     let chavePipeR='reparoeletro_pipe';
-    let card=(pp.cards||[]).find(c=>String(c.telefone||'').replace(/\D/g,'').slice(-8)===d8r&&c.phase!=='solicitar_entrega');
+    const faseDeR=c=>String(c.phaseId||c.phase||'');
+    const mesmoTelR=c=>String(c.telefone||'').replace(/\D/g,'').slice(-8)===d8r;
+    let card=(pp.cards||[]).find(c=>mesmoTelR(c)&&faseDeR(c)!=='solicitar_entrega');
+    const ppTvR=(await dbGet('tv_pipe'))||{cards:[]};
     if(!card){
-      const ppTvR=(await dbGet('tv_pipe'))||{cards:[]};
-      const cTvR=(ppTvR.cards||[]).find(c=>String(c.telefone||'').replace(/\D/g,'').slice(-8)===d8r&&c.phase!=='solicitar_entrega');
+      const cTvR=(ppTvR.cards||[]).find(c=>mesmoTelR(c)&&faseDeR(c)!=='solicitar_entrega');
       if(cTvR){ card=cTvR; pp=ppTvR; chavePipeR='tv_pipe'; }
     }
-    if(!card)return res.status(404).json({ok:false,
-      error:'card do cliente não encontrado em nenhum pipe (ADM ou TV)',
-      telefoneProcurado:d8r.slice(-4)});
+    if(!card){
+      const todosR=(pp.cards||[]).filter(mesmoTelR).map(c=>'ADM:'+faseDeR(c))
+        .concat((ppTvR.cards||[]).filter(mesmoTelR).map(c=>'TV:'+faseDeR(c)));
+      return res.status(404).json({ok:false,
+        error: todosR.length
+          ? 'o cliente existe no pipe, mas em fase que não permite reprovar: '+todosR.join(', ')
+          : 'card do cliente não encontrado em nenhum pipe (ADM ou TV)',
+        telefoneProcurado:d8r.slice(-4), ondeEstaNoPipe: todosR.length?todosR:'em lugar nenhum'});
+    }
     card.descricao='REPROVADO - '+String(card.descricao||'');
     await dbSet(chavePipeR,pp);
     const KR=(process.env.TECHFLOW_KEY||'tfk-re2026-Bx7mQp9zKw4Y').trim();
