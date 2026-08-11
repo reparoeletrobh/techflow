@@ -145,7 +145,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <body>
 <div class="top">
   <h1>🔬 Controle de Qualidade</h1>
-  <span class="beta">BETA</span>
+  <span class="beta" id="badge-cq" title="entraram hoje / concluídas hoje">—</span>
   <button class="btn btn-add" onclick="abrirNova()">+ Nova Inspeção</button>
 </div>
 
@@ -246,6 +246,16 @@ async function carregarPainelMeta(){
   }
   const hoje = (c.ENTRARAM && c.ENTRARAM.hojeSemGarantia != null)
     ? c.ENTRARAM.hojeSemGarantia : ((c.ENTRARAM && c.ENTRARAM.hoje) || 0);
+  // 🏷️ badge do título: entraram hoje / concluídas hoje
+  const bd = document.getElementById('badge-cq');
+  if(bd){
+    const conc = (c.CONCLUIDAS && c.CONCLUIDAS.hoje) || 0;
+    bd.textContent = hoje + '/' + conc;
+    bd.title = hoje + ' entraram hoje · ' + conc + ' concluída(s) hoje';
+    bd.style.background = conc >= hoje && hoje > 0 ? 'rgba(74,222,128,.16)'
+      : (hoje ? 'rgba(245,158,11,.16)' : '');
+    bd.style.color = conc >= hoje && hoje > 0 ? '#4ade80' : (hoje ? '#fbbf24' : '');
+  }
   const pct = Math.min(100, Math.round(hoje / META_DIA * 100));
   const cor = pct >= 100 ? '#4ade80' : pct >= 60 ? '#fbbf24' : '#f87171';
   const kpi = (v,l,cr) => '<div class="mt-card"><div class="mt-v" style="color:'+(cr||'#f0f2f5')+'">'+v+'</div><div class="mt-l">'+l+'</div></div>';
