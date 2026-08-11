@@ -466,6 +466,31 @@ function itensDe(i){
   // 🎯 só o checklist ESPECÍFICO do equipamento — o geral foi retirado
   return (CK_ESP[i.equipamento] || CK_ESP.outro || []);
 }
+
+function abrirInsp(id){
+  _atual=_db.inspecoes.find(function(x){return x.id===id;});
+  if(!_atual)return;
+  document.getElementById('i-titulo').textContent='🔍 '+_atual.id+' — '+_atual.cliente+' ('+(EQUIP_LBL[_atual.equipamento]||'')+')';
+  fillTecSelect('i-inspetor','— quem está inspecionando? —');
+  if(_atual.inspetor)document.getElementById('i-inspetor').value=_atual.inspetor;
+  var itens=itensDe(_atual);
+  var espT=EQUIP_LBL[_atual.equipamento]||'Específico';
+  var html='<div class="sec-t">✔️ Verificações gerais</div>';
+  itens.forEach(function(it,ix){
+    if(ix===CK_UNIVERSAL.length)html+='<div class="sec-t">🎯 Específico — '+espT+'</div>';
+    var st=(_atual.checklist||{})[it.id]||{};
+    html+='<div class="ck'+(st.v==='falha'?' falha':'')+'" id="ck-'+it.id+'">'+
+      '<div class="q"><div class="t">'+it.t+'</div><div class="ops">'+
+      '<button class="op ok'+(st.v==='ok'?' sel':'')+'" onclick="mark(\''+it.id+'\',\'ok\')">✓</button>'+
+      '<button class="op fl'+(st.v==='falha'?' sel':'')+'" onclick="mark(\''+it.id+'\',\'falha\')">✗</button>'+
+      '<button class="op na'+(st.v==='na'?' sel':'')+'" onclick="mark(\''+it.id+'\',\'na\')">N/A</button>'+
+      '</div></div>'+
+      '<textarea id="obs-'+it.id+'" placeholder="O que foi encontrado? (obrigatório na falha)">'+esc(st.obs||'')+'</textarea></div>';
+  });
+  document.getElementById('i-checks').innerHTML=html;
+  prog();
+  document.getElementById('ov-insp').classList.add('on');
+}
 function mark(id,v){
   _atual.checklist=_atual.checklist||{};
   var cur=_atual.checklist[id]||{};
