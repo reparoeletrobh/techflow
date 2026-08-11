@@ -125,6 +125,20 @@ module.exports = async function handler(req, res) {
       }
     } catch (e) {}
 
+    // 5) 🚨 banco perto do limite de 1 MB — gravações começam a falhar em silêncio
+    const tamanhos = {};
+    for (const [k] of BANCOS) {
+      try {
+        const b = await dbGet(k);
+        if (!b) continue;
+        const t = JSON.stringify(b).length;
+        tamanhos[k] = (t / 1048576).toFixed(2) + ' MB';
+        if (t > 900000) alertas.push({ tipo: 'BANCO_NO_LIMITE', sis: k, nome: k,
+          tel: '', quando: 'agora',
+          detalhe: 'banco com ' + (t / 1048576).toFixed(2) + ' MB — perto do limite de 1 MB, ' +
+            'gravações podem falhar em silêncio e fichas se perdem' });
+      } catch (e) {}
+    }
     const porTipo = alertas.reduce((o, a) => { o[a.tipo] = (o[a.tipo] || 0) + 1; return o; }, {});
     // guarda o histórico para acompanhar a evolução
     try {
@@ -138,6 +152,7 @@ module.exports = async function handler(req, res) {
       janelaHoras: horas,
       totalDeProblemas: alertas.length,
       POR_TIPO: porTipo,
+      TAMANHO_DOS_BANCOS: tamanhos,
       SITUACAO: alertas.length === 0
         ? '✅ nenhuma ficha perdida — todas as saídas têm destino'
         : '🚨 ' + alertas.length + ' ficha(s) em estado inconsistente',
@@ -151,6 +166,56 @@ module.exports = async function handler(req, res) {
         GARANTIA_SEM_TIPO: 'atribuir o tipo na tela de garantia',
         SEM_TELEFONE: 'corrigir o telefone na ficha',
       } });
+  }
+
+  // ── 📦 ARQUIVAR-ANTIGAS: tira do banco quente o que já foi resolvido ──
+  // fichas_adm chegou a 0,97 MB com 1089 registros. O limite do Upstash é 1 MB por
+  // chave, e perto dele as gravações concorrentes falham em silêncio — foi assim que
+  // fichas devolvidas do remarcar sumiram sem deixar rastro.
+  if (action === 'arquivar-antigas') {
+    const banco = String(req.query.banco || 'fichas_adm');
+    const arquivo = banco + '_arquivo';
+    const diasManter = Math.min(365, Math.max(7, parseInt(req.query.dias || '45', 10)));
+    const corte = Date.now() - diasManter * 86400000;
+    const FINAIS = ['logistica', 'finalizado', 'descarte', 'cliente_loja', 'concluido'];
+    const db = await dbGet(banco);
+    if (!db || !Array.isArray(db.fichas)) return res.status(200).json({ ok: false, error: 'banco sem lista fichas' });
+    const ficam = [], vao = [];
+    for (const f of db.fichas) {
+      const q = new Date(f.criadoEm || f.registradoEm || 0).getTime();
+      const antiga = q && q < corte;
+      const encerrada = FINAIS.includes(String(f.status || ''));
+      (antiga && encerrada ? vao : ficam).push(f);
+    }
+    const tamAntes = JSON.stringify(db).length;
+    const tamDepois = JSON.stringify({ ...db, fichas: ficam }).length;
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        banco, registrosHoje: db.fichas.length,
+        vaoParaOArquivo: vao.length, permanecem: ficam.length,
+        tamanhoAtualMB: (tamAntes / 1048576).toFixed(2),
+        tamanhoDepoisMB: (tamDepois / 1048576).toFixed(2),
+        criterio: 'criada há mais de ' + diasManter + ' dias E já encerrada (' + FINAIS.join(', ') + ')',
+        amostra: vao.slice(0, 10).map(f => String(f.nome || '?').slice(0, 20) + ' | ' +
+          f.status + ' | ' + String(f.criadoEm || '').slice(0, 10)),
+        dica: 'para arquivar: &aplicar=1' });
+    }
+    // guarda no arquivo, somando ao que já houver
+    const arq = (await dbGet(arquivo)) || { fichas: [] };
+    arq.fichas = (arq.fichas || []).concat(vao);
+    await dbSet(arquivo, arq);
+    // confere que o arquivo persistiu ANTES de tirar do banco quente
+    const conf = await dbGet(arquivo);
+    const salvou = ((conf || {}).fichas || []).length >= arq.fichas.length - 2;
+    if (!salvou) return res.status(200).json({ ok: false,
+      error: '🚨 o arquivo não persistiu — NADA foi removido do banco quente' });
+    db.fichas = ficam;
+    await dbSet(banco, db);
+    return res.status(200).json({ ok: true,
+      arquivadas: vao.length, permanecem: ficam.length,
+      tamanhoAntesMB: (tamAntes / 1048576).toFixed(2),
+      tamanhoDepoisMB: (tamDepois / 1048576).toFixed(2),
+      arquivo });
   }
 
   // ── 🧪 TESTE-GRAVACAO: o banco aceita escrita? qual o tamanho? ──
