@@ -100,15 +100,41 @@ export default async function handler(req, res) {
     let linhas = [];
     try {
       const csv = await fetch(SHEET_CSV).then(x => x.text());
-      const todas = csv.split(/\r?\n/).filter(Boolean);
+      // 📄 as mensagens têm quebras de linha DENTRO das aspas — dividir por \n
+      // partia um registro em vários. Este leitor respeita as aspas.
+      const registros = [];
+      let atual = '', dentroDeAspas = false;
+      for (let i = 0; i < csv.length; i++) {
+        const ch = csv[i];
+        if (ch === '"') { dentroDeAspas = !dentroDeAspas; atual += ch; continue; }
+        if ((ch === '\n' || ch === '\r') && !dentroDeAspas) {
+          if (atual.trim()) registros.push(atual);
+          atual = ''; continue;
+        }
+        atual += ch;
+      }
+      if (atual.trim()) registros.push(atual);
+      const todas = registros;
       const cab = todas[0].split(',').map(x => x.replace(/"/g, '').trim().toLowerCase());
       // a planilha pode ter cabeçalho diferente — mostra o que encontrou
       const iData = cab.findIndex(x => /data|carimbo|timestamp|hora/.test(x));
-      const iSis = cab.findIndex(x => /sistema|tipo|frente|equipamento/.test(x));
+      const iSis = cab.findIndex(x => /^equipamento$|sistema|tipo|frente/.test(x));
       const iNome = cab.findIndex(x => /nome/.test(x));
       const iTel = cab.findIndex(x => /telefone|whats|contato/.test(x));
+      // divide cada registro em colunas, também respeitando as aspas
+      const colunas = (linha) => {
+        const out = []; let campo = '', asp = false;
+        for (let i = 0; i < linha.length; i++) {
+          const ch = linha[i];
+          if (ch === '"') { asp = !asp; continue; }
+          if (ch === ',' && !asp) { out.push(campo); campo = ''; continue; }
+          campo += ch;
+        }
+        out.push(campo);
+        return out;
+      };
       for (const l of todas.slice(1)) {
-        const c = l.split(',').map(x => x.replace(/^"|"$/g, ''));
+        const c = colunas(l);
         const dt = String(c[iData] || '');
         // aceita DD/MM/AAAA e AAAA-MM-DD
         const bate = dt.startsWith(d + '/' + m2 + '/' + a) || dt.startsWith(dia) ||
