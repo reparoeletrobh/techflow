@@ -2877,6 +2877,85 @@ export default async function handler(req, res) {
         ' | R$ ' + x.valor + ' — ' + x.motivo) });
   }
 
+  // ── 🔮 O-QUE-O-BOT-FARA: ação prevista para cada ficha, uma a uma ──
+  if (action === 'o-que-o-bot-fara') {
+    const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const cfgB = (await dbGet('wa_bot_config')) || {};
+    const [fa, ft, evts, abordados, logA, logT, pipeA, pipeT, pausados] = await Promise.all([
+      dbGet('fichas_adm'), dbGet('fichas_tv'), lerEvts(),
+      dbGet('wa_abordados').then(v => v || { tels: {} }),
+      dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+      dbGet('wa_bot_pausados').then(v => v || {}),
+    ]);
+    // quem já está em operação (logística ou pipe) — o bot não aborda
+    const emOperacao = new Set();
+    for (const b of [logA, logT]) for (const f of (((b || {}).fichas) || [])) emOperacao.add(d8f(f.telefone));
+    for (const b of [pipeA, pipeT]) for (const c of (((b || {}).cards) || [])) emOperacao.add(d8f(c.telefone));
+    // quem já tem conversa iniciada
+    const conversa = {};
+    for (const e of (evts || [])) {
+      const d = d8f(e.tel);
+      if (!d || d.length < 8) continue;
+      conversa[d] = conversa[d] || { in: 0, out: 0, ultimo: null };
+      if (e.dir === 'in') conversa[d].in++;
+      else if (e.dir === 'out') conversa[d].out++;
+      const t = e.ts;
+      if (!conversa[d].ultimo || String(t) > String(conversa[d].ultimo)) conversa[d].ultimo = t;
+    }
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const linhas = [];
+    for (const [sis, db] of [['ADM', fa], ['TV', ft]]) {
+      for (const f of (((db || {}).fichas) || [])) {
+        const st = String(f.status || '');
+        if (!['criada', 'contato_feito', 'entrar_contato'].includes(st)) continue;
+        const d8 = d8f(f.telefone);
+        const c = conversa[d8];
+        const jaAbordado = !!abordados.tels[d8];
+        const pausado = !!pausados[d8];
+        const noSistema = emOperacao.has(d8);
+        let acao, motivo = '';
+        if (pausado) { acao = '⏸️ NADA — bot pausado para este cliente'; }
+        else if (d8.length < 8) { acao = '🚨 NADA — telefone inválido'; }
+        else if (st === 'criada') {
+          if (noSistema) { acao = '⏭️ PULA — cliente já tem ficha em operação'; }
+          else if (jaAbordado) { acao = '⏭️ PULA — já foi abordado antes'; motivo = 'abordado em ' + hh(abordados.tels[d8]); }
+          else if (c && c.in) { acao = '💬 RESPONDE — cliente já escreveu, o cérebro assume'; motivo = c.in + ' msg(s) dele'; }
+          else { acao = '📤 ABORDA às 8h — pergunta loja ou coleta'; }
+        }
+        else if (st === 'contato_feito') {
+          if (c && c.in) { acao = '💬 CONTINUA a conversa — cliente respondeu'; motivo = c.in + ' resposta(s)'; }
+          else { acao = '⏳ AGUARDA — abordado, sem resposta; vira Entrar em Contato após 1h de expediente'; }
+        }
+        else { // entrar_contato
+          acao = '📞 EQUIPE LIGA — o bot não age nesta coluna';
+        }
+        linhas.push({ sis, st, nome: f.nome || '?', tel: d8.slice(-4),
+          equipamento: String(f.equipamento || '').slice(0, 20),
+          acao, motivo,
+          conversaIniciada: !!(c && (c.in || c.out)),
+          msgsDoCliente: c ? c.in : 0,
+          ultimaMsg: c ? hh(c.ultimo) : null });
+      }
+    }
+    const resumo = linhas.reduce((o, l) => { const k = l.acao.split('—')[0].trim(); o[k] = (o[k] || 0) + 1; return o; }, {});
+    const vaoSerAbordadas = linhas.filter(l => l.acao.startsWith('📤'));
+    return res.status(200).json({ ok: true,
+      abordagemLigada: cfgB.abordagemAtiva === true,
+      totalAnalisado: linhas.length,
+      RESUMO_DAS_ACOES: resumo,
+      quantasSeraoAbordadasAmanha: vaoSerAbordadas.length,
+      tempoEstimado: Math.ceil(vaoSerAbordadas.length / 10) * 5 + ' minutos (10 a cada 5 min)',
+      COM_CONVERSA_JA_INICIADA: linhas.filter(l => l.conversaIniciada)
+        .map(l => l.sis + ' | ' + String(l.nome).slice(0, 16) + ' ' + l.tel + ' | ' + l.st +
+          ' | ' + l.msgsDoCliente + ' msg(s) | última ' + l.ultimaMsg + ' | ' + l.acao),
+      SERAO_ABORDADAS: vaoSerAbordadas.map(l => l.sis + ' | ' + String(l.nome).slice(0, 18) +
+        ' ' + l.tel + ' | ' + l.equipamento),
+      TODAS: linhas.map(l => l.sis + ' | ' + l.st.padEnd(14) + ' | ' +
+        String(l.nome).slice(0, 16).padEnd(16) + ' ' + l.tel + ' | ' + l.acao +
+        (l.motivo ? ' (' + l.motivo + ')' : '')) });
+  }
+
   // ── 📋 PENDENTES-NEGOCIACAO: todo orçamento enviado e ainda não aprovado ──
   if (action === 'pendentes-negociacao') {
     const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
