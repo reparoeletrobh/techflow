@@ -105,6 +105,53 @@ module.exports = async function handler(req, res) {
       // ═══ 🛡️ FILA DE GARANTIA (visão Conflitos) ═══
   const FILA_KEY = "reparoeletro_garantia_fila";
 
+  // ── ♻️ RESTAURAR-RSRUA: devolve as garantias de RS Rua que a redefinição removeu ──
+  if (action === 'restaurar-rsrua') {
+    const lix2 = await dbGet('reparoeletro_garantia_lixeira_2');   // estado antes da redefinição
+    const lix1 = await dbGet('reparoeletro_garantia_lixeira');     // antes do manter-apenas
+    const d4 = t => String(t || '').replace(/\D/g, '').slice(-4);
+    const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
+    const campo = db.fichas ? 'fichas' : (db.cards ? 'cards' : 'fichas');
+    db[campo] = db[campo] || [];
+    const agora = new Set(db[campo].map(f => d4(f.telefone)));
+
+    // tudo que havia nas duas lixeiras
+    const candidatas = [];
+    for (const [nome, lx] of [['lixeira_2', lix2], ['lixeira_1', lix1]]) {
+      for (const f of (((lx || {}).fichas) || [])) candidatas.push({ ...f, _de: nome });
+    }
+    // as de RS RUA: identificadas pelo tipo/origem/fase
+    const ehRua = f => {
+      const t = (String(f.tipo || '') + ' ' + String(f.origem || '') + ' ' +
+        String(f.fase || f.phase || f.status || '') + ' ' + String(f.board || '')).toLowerCase();
+      return /rua|rsrua|rs_rua/.test(t) || f.rsRua === true || f.ehRua === true;
+    };
+    const soRua = String(req.query.tudo || '') === '1' ? candidatas : candidatas.filter(ehRua);
+    // sem duplicar o que já está lá
+    const vistos = new Set();
+    const voltar = soRua.filter(f => {
+      const k = d4(f.telefone) + '|' + String(f.equipamento || f.descricao || '').slice(0, 18);
+      if (agora.has(d4(f.telefone)) || vistos.has(k)) return false;
+      vistos.add(k); return true;
+    });
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        naGarantiaAgora: db[campo].length,
+        naLixeira2: (((lix2 || {}).fichas) || []).length,
+        naLixeira1: (((lix1 || {}).fichas) || []).length,
+        identificadasComoRSRua: soRua.length,
+        vaoVoltar: voltar.length,
+        AMOSTRA: voltar.slice(0, 40).map(f => String(f.nome || f.cliente || '?').slice(0, 20) +
+          ' ' + d4(f.telefone) + ' | ' + String(f.equipamento || f.descricao || '').slice(0, 22) +
+          ' | ' + String(f.status || f.phase || '?') + ' | de ' + f._de),
+        dica: soRua.length ? 'para restaurar: &aplicar=1'
+          : 'nenhuma identificada como RS Rua — use &tudo=1 para ver todas as da lixeira' });
+    }
+    db[campo] = voltar.map(f => { const g = { ...f }; delete g._de; return g; }).concat(db[campo]);
+    await dbSet(GARANTIA_KEY, db);
+    return res.status(200).json({ ok: true, restauradas: voltar.length, totalAgora: db[campo].length });
+  }
+
   // ── 📊 CONTADORES: garantias por dia, semana e por técnico ──
   if (action === 'contadores') {
     const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
