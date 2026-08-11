@@ -92,6 +92,88 @@ export default async function handler(req, res) {
 
   const action = req.query.action || (req.body && req.body.action) || '';
 
+  // ── 🔬 AUDITORIA-FICHAS: dado por dado, sem suposição ──
+  if (action === 'auditoria-fichas') {
+    const dias = Math.min(30, Math.max(1, parseInt(req.query.dias || '7', 10)));
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const iniHoje = new Date(hoje + 'T00:00:00-03:00').getTime();
+    const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const [fa, ft] = await Promise.all([dbGet(KEY_ADM), dbGet(KEY_TV)]);
+    const relatorio = {};
+    for (const [sis, db] of [['ADM', fa], ['TV', ft]]) {
+      const fichas = (db || {}).fichas || [];
+      const dt = f => new Date(f.criadoEm || f.registradoEm || 0).getTime();
+      const doDia = fichas.filter(f => dt(f) >= iniHoje);
+      const daJanela = fichas.filter(f => dt(f) >= Date.now() - dias * 86400000);
+      const porStatus = fichas.reduce((o, f) => {
+        const s = String(f.status || '(sem status)'); o[s] = (o[s] || 0) + 1; return o; }, {});
+      const doDiaPorStatus = doDia.reduce((o, f) => {
+        const s = String(f.status || '(sem status)'); o[s] = (o[s] || 0) + 1; return o; }, {});
+      const ehRetorno = f => ['remarcar', 'reagendamento'].includes(String(f.origem || '')) ||
+        String(f.id || '').startsWith('rem_') || String(f.id || '').startsWith('fic_reag_');
+      const porOrigemDoDia = doDia.reduce((o, f) => {
+        const k = ehRetorno(f) ? 'retorno do remarcar'
+          : (String(f.id || '').startsWith('sc_') ? 'sync-completo (recuperada)'
+          : (String(f.id || '').startsWith('rec_') ? 'recuperada'
+          : (f.origemPlanilha ? 'planilha' : 'outra')));
+        o[k] = (o[k] || 0) + 1; return o; }, {});
+      // sem telefone, sem nome, sem equipamento
+      const semTel = fichas.filter(f => d8f(f.telefone).length < 8);
+      const semNome = fichas.filter(f => !String(f.nome || '').trim());
+      const semEquip = fichas.filter(f => !String(f.equipamento || '').trim());
+      // duplicatas por telefone
+      const porTel = {};
+      for (const f of fichas) { const t = d8f(f.telefone); if (t.length >= 8) (porTel[t] = porTel[t] || []).push(f); }
+      const dups = Object.entries(porTel).filter(([, v]) => v.length > 1);
+      // fichas que o bot pode abordar agora
+      const abordaveis = fichas.filter(f => String(f.status || '') === 'ficha_criada');
+      relatorio[sis] = {
+        totalNoBanco: fichas.length,
+        criadasHoje: doDia.length,
+        criadasNaJanela: daJanela.length,
+        POR_STATUS_TOTAL: porStatus,
+        POR_STATUS_HOJE: doDiaPorStatus,
+        ORIGEM_DAS_DE_HOJE: porOrigemDoDia,
+        prontasParaOBotAbordar: abordaveis.length,
+        PROBLEMAS: {
+          semTelefone: semTel.length,
+          semNome: semNome.length,
+          semEquipamento: semEquip.length,
+          telefonesDuplicados: dups.length,
+        },
+        AMOSTRA_SEM_TELEFONE: semTel.slice(0, 8).map(f => String(f.nome || '?').slice(0, 20) + ' | ' + f.status),
+        AMOSTRA_DUPLICADOS: dups.slice(0, 8).map(([t, v]) => t.slice(-4) + ' ×' + v.length + ' → ' +
+          v.map(f => String(f.status || '?')).join(', ')),
+      };
+    }
+    // conferência: quantas na planilha hoje
+    let naPlanilhaHoje = null;
+    try {
+      const rows = parseCSV(await fetch(SHEET_CSV, { redirect: 'follow' }).then(x => x.text()));
+      const cab = (rows[0] || []).map(x => String(x || '').normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '').toLowerCase().trim());
+      const iH = cab.findIndex(x => /hora|data/.test(x));
+      const iT = cab.findIndex(x => /numero|telefone/.test(x));
+      const [dd, mm2, aa] = [hoje.slice(8, 10), hoje.slice(5, 7), hoje.slice(2, 4)];
+      const doDiaP = rows.slice(1).filter(r => String(r[iH] || '').startsWith(dd + '/' + mm2 + '/' + aa));
+      naPlanilhaHoje = { total: doDiaP.length,
+        telefonesUnicos: new Set(doDiaP.map(r => d8f(r[iT]))).size };
+    } catch (e) { naPlanilhaHoje = { erro: e.message }; }
+
+    const somaHoje = relatorio.ADM.criadasHoje + relatorio.TV.criadasHoje;
+    const retornosHoje = (relatorio.ADM.ORIGEM_DAS_DE_HOJE['retorno do remarcar'] || 0) +
+      (relatorio.TV.ORIGEM_DAS_DE_HOJE['retorno do remarcar'] || 0);
+    return res.status(200).json({ ok: true, dia: hoje, janelaDias: dias,
+      RESUMO: {
+        criadasHojeADM: relatorio.ADM.criadasHoje,
+        criadasHojeTV: relatorio.TV.criadasHoje,
+        somaHoje, retornosHoje,
+        fichasNovasReais: somaHoje - retornosHoje,
+        naPlanilhaHoje,
+      },
+      ADM: relatorio.ADM, TV: relatorio.TV });
+  }
+
   // ── 🛡️ SYNC-COMPLETO: varre a planilha inteira, sem depender de cursor ──
   // O sync normal guarda a posição da última linha lida. Se a planilha for ordenada,
   // receber linha no meio, ou o cursor avançar sem gravar, as linhas puladas se
