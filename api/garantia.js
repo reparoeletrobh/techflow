@@ -140,13 +140,9 @@ module.exports = async function handler(req, res) {
         VALORES_ENCONTRADOS: Object.entries(valoresTipo).sort((a, b) => b[1] - a[1]).slice(0, 30),
         UMA_FICHA_COMPLETA: candidatas[0] || null });
     }
-    const ehRua = f => {
-      // só campos de classificação — NUNCA o endereço
-      const t = [f.tipo, f.origem, f.fase, f.phase, f.status, f.board, f.lista, f.grupo]
-        .map(x => String(x || '')).join(' ').toLowerCase();
-      return /\brs\s*rua\b|rsrua|rs_rua|garantia_rua|\brua\b/.test(t) ||
-        f.rsRua === true || f.ehRua === true;
-    };
+    // 🎯 o campo tipo classifica a garantia: rua, delivery, loja_acompanhamento,
+    // loja_imediata. RS Rua é exatamente tipo === 'rua'.
+    const ehRua = f => String(f.tipo || '').toLowerCase().trim() === 'rua';
     const soRua = String(req.query.tudo || '') === '1' ? candidatas : candidatas.filter(ehRua);
     // sem duplicar o que já está lá
     const vistos = new Set();
@@ -162,9 +158,11 @@ module.exports = async function handler(req, res) {
         naLixeira1: (((lix1 || {}).fichas) || []).length,
         identificadasComoRSRua: soRua.length,
         vaoVoltar: voltar.length,
+        porTipoNasLixeiras: candidatas.reduce((o, f) => {
+          const k = String(f.tipo || '(sem tipo)'); o[k] = (o[k] || 0) + 1; return o; }, {}),
         AMOSTRA: voltar.slice(0, 40).map(f => String(f.nome || f.cliente || '?').slice(0, 20) +
           ' ' + d4(f.telefone) + ' | ' + String(f.equipamento || f.descricao || '').slice(0, 22) +
-          ' | ' + String(f.status || f.phase || '?') + ' | de ' + f._de),
+          ' | tipo: ' + (f.tipo || '?') + ' | ' + String(f.status || f.phase || '?')),
         dica: soRua.length ? 'para restaurar: &aplicar=1'
           : 'nenhuma identificada como RS Rua — use &tudo=1 para ver todas as da lixeira' });
     }
