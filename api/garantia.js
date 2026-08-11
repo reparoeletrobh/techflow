@@ -209,6 +209,41 @@ module.exports = async function handler(req, res) {
       FICHAS: achados.slice(0, 3) });
   }
 
+  // ── 🔬 RAIO-X: o que existe no banco, por tipo, fase e situação ──
+  if (action === 'raio-x') {
+    const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
+    const lista = db.fichas || [];
+    const porTipo = {}, semTipo = [], faseInvalida = [];
+    const FASES_VALIDAS = {};
+    for (const [t, arr] of Object.entries(FASES || {})) FASES_VALIDAS[t] = (arr || []).map(x => x.id);
+    for (const f of lista) {
+      const t = String(f.tipo || '(SEM TIPO)');
+      porTipo[t] = porTipo[t] || { total: 0, ativas: 0, concluidas: 0, porFase: {} };
+      porTipo[t].total++;
+      if (f.concluida) porTipo[t].concluidas++; else porTipo[t].ativas++;
+      const fase = String(f.faseId || '(SEM FASE)');
+      porTipo[t].porFase[fase] = (porTipo[t].porFase[fase] || 0) + 1;
+      if (!f.tipo) semTipo.push(String(f.nome || '?').slice(0, 20));
+      else if (FASES_VALIDAS[f.tipo] && !FASES_VALIDAS[f.tipo].includes(String(f.faseId || ''))) {
+        faseInvalida.push(String(f.nome || '?').slice(0, 18) + ' | tipo ' + f.tipo +
+          ' | faseId "' + (f.faseId || '(vazio)') + '" não existe neste tipo');
+      }
+    }
+    const ativasTotal = lista.filter(f => !f.concluida).length;
+    return res.status(200).json({ ok: true,
+      totalNoBanco: lista.length,
+      ativas: ativasTotal, concluidas: lista.length - ativasTotal,
+      FASES_VALIDAS_POR_TIPO: FASES_VALIDAS,
+      POR_TIPO: porTipo,
+      SEM_TIPO: { quantas: semTipo.length, exemplos: semTipo.slice(0, 20) },
+      FASE_INVALIDA: { quantas: faseInvalida.length, exemplos: faseInvalida.slice(0, 20),
+        obs: 'ficha com faseId que não pertence ao seu tipo pode não renderizar na tela' },
+      ATIVAS_LOJA_ACOMPANHAMENTO: lista
+        .filter(f => f.tipo === 'loja_acompanhamento' && !f.concluida)
+        .map(f => String(f.nome || '?').slice(0, 20) + ' | fase: ' + (f.faseId || '?') +
+          ' | ' + String(f.criadaEm || '').slice(0, 10)) });
+  }
+
   if (action === 'contadores') {
     const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
     const lista = db.fichas || db.cards || [];
