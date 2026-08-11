@@ -284,6 +284,32 @@ module.exports = async function handler(req, res) {
       aindaNaColuna: linhas.filter(l => l.aindaNaColuna).length,
       naoChegaramAoAtendimento: linhas.filter(l => !l.noAtendimento).length,
       POR_MOTIVO: porMotivo,
+      // 🔍 onde cada uma foi parar, em todos os bancos
+      ONDE_ESTAO: await (async () => {
+        const BANCOS = ['fichas_adm', 'fichas_tv', 'prospeccao_adm', 'prospeccao_tv',
+          'reparoeletro_logistica', 'tv_logistica', 'reparoeletro_pipe', 'tv_pipe'];
+        const mapa = {};
+        for (const k of BANCOS) {
+          try {
+            const b = await dbGet(k);
+            for (const L of ['fichas', 'cards']) {
+              for (const x of ((b || {})[L] || [])) {
+                const t = dg(x.telefone);
+                if (!linhas.some(l => dg(l.tel.padStart(8, '0')) === t || String(x.telefone || '').includes(l.tel))) continue;
+                mapa[t] = mapa[t] || [];
+                mapa[t].push(k + ' · ' + String(x.status || x.phase || x.phaseId || '?') +
+                  (x.origem === 'remarcar' ? ' (do remarcar)' : ''));
+              }
+            }
+          } catch (e) {}
+        }
+        return linhas.map(l => {
+          const chaves = Object.keys(mapa).filter(t => t.endsWith(l.tel));
+          const achados = chaves.flatMap(t => mapa[t]);
+          return l.nome.slice(0, 16) + ' ' + l.tel + ' → ' +
+            (achados.length ? [...new Set(achados)].join(' | ') : '🚨 NÃO EXISTE EM NENHUM BANCO');
+        });
+      })(),
       L: linhas.map(l => l.hora + ' | ' + l.sis.padEnd(3) + ' | ' +
         String(l.nome).slice(0, 18).padEnd(18) + ' ' + l.tel + ' | ' +
         l.equipamento.padEnd(22) + ' | ' + (l.noAtendimento ? '✅' : '🚨') + ' | ' + l.motivo) });
