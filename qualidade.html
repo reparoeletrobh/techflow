@@ -513,10 +513,18 @@ function mark(id,v){
 }
 function coletaChecklist(){
   var ck={};
-  itensDe(_atual).forEach(function(it){
-    var cur=(_atual.checklist||{})[it.id]||{};
+  if(!_atual) return ck;
+  // parte do que JÁ está marcado na ficha, para não perder item cuja categoria mudou
+  var jaMarcado=_atual.checklist||{};
+  Object.keys(jaMarcado).forEach(function(id){
+    var obs=document.getElementById('obs-'+id);
+    ck[id]={v:(jaMarcado[id]||{}).v||'',obs:obs?obs.value.trim():((jaMarcado[id]||{}).obs||'')};
+  });
+  // e acrescenta os itens da categoria atual
+  (itensDe(_atual)||[]).forEach(function(it){
+    var cur=jaMarcado[it.id]||{};
     var obs=document.getElementById('obs-'+it.id);
-    ck[it.id]={v:cur.v||'',obs:obs?obs.value.trim():''};
+    ck[it.id]={v:cur.v||'',obs:obs?obs.value.trim():(cur.obs||'')};
   });
   return ck;
 }
@@ -546,6 +554,12 @@ async function aprovar(){
   else alert('Erro: '+(r.error||'falha'));
 }
 async function reprovar(){
+  // 🔊 nada de botão mudo: qualquer falha aqui vira mensagem na tela
+  try{ await _reprovar(); }
+  catch(e){ alert('Erro ao reprovar: '+(e&&e.message||e)+'\n\nRecarregue a página e tente de novo.'); }
+}
+async function _reprovar(){
+  if(!_atual){alert('Nenhuma inspeção aberta. Feche e abra a ficha de novo.');return;}
   var ck=coletaChecklist();
   var falhas=[];
   // 🔍 lê as falhas do PRÓPRIO checklist marcado, não da lista teórica de itens.
@@ -563,13 +577,14 @@ async function reprovar(){
       + semObs.map(function(f){return '• '+f.item;}).join('\n'));
     return;
   }
-  var insp=document.getElementById('i-inspetor').value;
-  if(!insp){alert('Informe o inspetor.');return;}
+  var elIn=document.getElementById('i-inspetor');
+  var insp=elIn?elIn.value:'';
+  if(!insp){alert('Selecione quem está inspecionando (campo Inspetor no topo).');return;}
   if(!confirm('Reprovar e enviar para retrabalho?\n\n'+falhas.map(function(f){return '✗ '+f.item;}).join('\n')))return;
-  var b=document.getElementById('btn-rep');b.disabled=true;
+  var b=document.getElementById('btn-rep'); if(b)b.disabled=true;
   var r=await fetch('/api/qualidade?action=reprovar',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({id:_atual.id,checklist:ck,inspetor:insp,itensFalhos:falhas})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
-  b.disabled=false;
+  if(b)b.disabled=false;
   if(r.ok){fechar('ov-insp');load();carregarPainelMeta();}
   else alert('Não consegui reprovar: '+(r.error||'o servidor não respondeu')
     +'\n\nSe persistir, recarregue a página e tente de novo.');
