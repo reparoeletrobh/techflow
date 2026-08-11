@@ -92,6 +92,89 @@ export default async function handler(req, res) {
 
   const action = req.query.action || (req.body && req.body.action) || '';
 
+  // ── 🔁 RECUPERAR-PULADAS: cria as fichas da planilha que o cursor pulou ──
+  if (action === 'recuperar-puladas') {
+    const dias = Math.min(30, Math.max(1, parseInt(req.query.dias || '1', 10)));
+    const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
+    let rows;
+    try { rows = parseCSV(await fetch(SHEET_CSV, { redirect: 'follow' }).then(x => x.text())); }
+    catch (e) { return res.status(200).json({ ok: false, error: 'planilha: ' + e.message }); }
+    const cab = (rows[0] || []).map(x => String(x || '').normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '').toLowerCase().trim());
+    const iTel = cab.findIndex(x => /numero|telefone|whats/.test(x));
+    const iNome = cab.findIndex(x => /nome/.test(x));
+    const iEq = cab.findIndex(x => /^equipamento$/.test(x));
+    const iDef = cab.findIndex(x => /defeito/.test(x));
+    const iEnd = cab.findIndex(x => /endereco/.test(x));
+    const iHora = cab.findIndex(x => /hora|data/.test(x));
+
+    // o que já existe em qualquer banco
+    const BANCOS = ['fichas_adm', 'fichas_tv', 'reparoeletro_logistica', 'tv_logistica',
+      'prospeccao_adm', 'reparoeletro_pipe', 'tv_pipe', 'reparoeletro_arquivo'];
+    const existentes = new Set();
+    for (const k of BANCOS) {
+      try {
+        const b = await dbGet(k);
+        for (const L of ['fichas', 'cards']) {
+          for (const x of ((b || {})[L] || [])) {
+            const t = d8f(x.telefone);
+            if (t.length >= 8) existentes.add(t);
+          }
+        }
+      } catch (e) {}
+    }
+    // linhas recentes da planilha que não existem em lugar nenhum
+    const corte = Date.now() - dias * 86400000;
+    const faltando = [];
+    for (const r of rows.slice(1)) {
+      const tel = String(r[iTel] || '').replace(/\D/g, '');
+      if (tel.length < 10) continue;
+      if (existentes.has(d8f(tel))) continue;
+      // data: DD/MM/AA HH:MM
+      const dt = String(r[iHora] || '');
+      const mm = dt.match(/^(\d{2})\/(\d{2})\/(\d{2,4})/);
+      let quando = null;
+      if (mm) {
+        const ano = mm[3].length === 2 ? '20' + mm[3] : mm[3];
+        quando = new Date(ano + '-' + mm[2] + '-' + mm[1] + 'T12:00:00-03:00').getTime();
+      }
+      if (quando && quando < corte) continue;
+      const eq = String(r[iEq] || '');
+      faltando.push({ telefone: tel, nome: String(r[iNome] || '?').trim(),
+        equipamento: eq, defeito: String(r[iDef] || ''), endereco: String(r[iEnd] || ''),
+        ehTv: /\btv\b|televis/i.test(eq), quandoTexto: dt });
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        naPlanilhaSemFicha: faltando.length,
+        tv: faltando.filter(x => x.ehTv).length,
+        adm: faltando.filter(x => !x.ehTv).length,
+        L: faltando.map(x => x.quandoTexto + ' | ' + (x.ehTv ? 'TV ' : 'ADM') + ' | ' +
+          String(x.nome).slice(0, 18) + ' ' + x.telefone.slice(-4) + ' | ' + String(x.equipamento).slice(0, 22)),
+        dica: 'para criar: &aplicar=1' });
+    }
+    const criadas = { adm: 0, tv: 0 }, nomes = [];
+    for (const x of faltando) {
+      const chave = x.ehTv ? KEY_TV : KEY_ADM;
+      const db = (await dbGet(chave)) || { fichas: [] };
+      db.fichas = db.fichas || [];
+      db.fichas.unshift({
+        id: 'rec_' + x.telefone.slice(-4) + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+        nome: x.nome, telefone: x.telefone, equipamento: x.equipamento,
+        defeito: x.defeito, endereco: x.endereco,
+        status: 'ficha_criada',
+        origemPlanilha: true,
+        obs: 'recuperada — a planilha tinha a ficha mas o sync não a criou',
+        criadoEm: new Date().toISOString(), registradoEm: new Date().toISOString(),
+      });
+      await dbSet(chave, db);
+      criadas[x.ehTv ? 'tv' : 'adm']++;
+      nomes.push(x.nome + ' ' + x.telefone.slice(-4));
+      await new Promise(s => setTimeout(s, 80));
+    }
+    return res.status(200).json({ ok: true, criadas, total: criadas.adm + criadas.tv, nomes });
+  }
+
   // ── 📊 CONFERIR-CONTAGEM: planilha × sistema, honestamente ──
   if (action === 'conferir-contagem') {
     const dia = String(req.query.dia || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
