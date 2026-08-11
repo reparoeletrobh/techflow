@@ -682,6 +682,44 @@ module.exports = async function handler(req, res) {
       if (phaseId === 'controle_qualidade') {
         card.tecnicoServico = tecnico || card.tecnico || null;   // quem fez o serviço
         card.entrouCqEm = new Date().toISOString();
+        // 🔬 cria a inspeção no Controle de Qualidade — antes o card entrava na fase
+        // mas nada aparecia na tela de qualidade, e o inspetor não sabia o que conferir
+        try {
+          const KQ = 'reparoeletro_qualidade';
+          const q = (await dbGet(KQ)) || { inspecoes: [], config: { tecnicos: [], proximoNum: 1 } };
+          q.inspecoes = q.inspecoes || [];
+          q.config = q.config || { tecnicos: [], proximoNum: 1 };
+          const jaTem = q.inspecoes.some(i => String(i.cardId || '') === String(card.id) &&
+            i.status !== 'aprovado');
+          if (!jaTem) {
+            const num = q.config.proximoNum || (q.inspecoes.length + 1);
+            const txt = String(card.equipamento || card.descricao || '').toLowerCase();
+            const tipo = /micro-?ondas/.test(txt) ? 'microondas'
+              : /purificador|bebedouro/.test(txt) ? 'purificador'
+              : /adega/.test(txt) ? 'adega'
+              : /forno/.test(txt) ? 'forno'
+              : /\btv\b|televis/.test(txt) ? 'tv'
+              : /bblend|b-?blend/.test(txt) ? 'bblend' : 'outro';
+            q.inspecoes.unshift({
+              id: 'insp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+              os: 'CQ-' + String(num).padStart(4, '0'),
+              cardId: card.id,
+              cliente: card.nomeContato || card.nome || '—',
+              telefone: card.telefone || '',
+              equipamento: tipo,
+              equipamentoTexto: card.equipamento || card.descricao || '',
+              tecnico: card.tecnicoServico || null,      // 👨‍🔧 quem fez o serviço
+              obsTecnica: card.obsQualidade || null,
+              valor: card.valor || 0,
+              status: 'aguardando',
+              checklist: {},
+              criadoEm: new Date().toISOString(),
+            });
+            q.config.proximoNum = num + 1;
+            await dbSet(KQ, q);
+            card.inspecaoCriada = 'CQ-' + String(num).padStart(4, '0');
+          }
+        } catch (e) { card.inspecaoErro = String(e.message).slice(0, 80); }
         if (obsQualidade) {
           card.obsQualidade = String(obsQualidade).slice(0, 500);
           card.obsQualidadeHist = (card.obsQualidadeHist || []).concat([{

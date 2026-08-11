@@ -44,6 +44,48 @@ export default async function handler(req, res) {
   if (!db.config) db.config = { tecnicos: [], proximoNum: 1 };
 
   // ── LOAD ──
+  // ── 📊 CONTADORES: por dia, semana e por técnico ──
+  if (action === 'contadores') {
+    const insp = db.inspecoes || [];
+    const bras = new Date(Date.now() - 3 * 3600000);
+    const hoje = bras.toISOString().slice(0, 10);
+    const diaSem = bras.getUTCDay();
+    const seg = new Date(bras); seg.setUTCDate(bras.getUTCDate() - ((diaSem === 0) ? 6 : (diaSem - 1)));
+    const iniSemana = seg.toISOString().slice(0, 10);
+    const dia = d => String(d || '').slice(0, 10);
+
+    const entrouHoje = insp.filter(i => dia(i.criadoEm) === hoje);
+    const entrouSemana = insp.filter(i => dia(i.criadoEm) >= iniSemana);
+    const concluiHoje = insp.filter(i => i.aprovadoEm && dia(i.aprovadoEm) === hoje);
+    const concluiSemana = insp.filter(i => i.aprovadoEm && dia(i.aprovadoEm) >= iniSemana);
+    const reprovHoje = insp.filter(i => i.reprovadoEm && dia(i.reprovadoEm) === hoje);
+
+    const porTecnico = {};
+    for (const i of insp) {
+      const t = String(i.tecnico || '(sem técnico)');
+      porTecnico[t] = porTecnico[t] || { hoje: 0, semana: 0, total: 0, aprovadas: 0, reprovadas: 0 };
+      porTecnico[t].total++;
+      if (dia(i.criadoEm) === hoje) porTecnico[t].hoje++;
+      if (dia(i.criadoEm) >= iniSemana) porTecnico[t].semana++;
+      if (i.status === 'aprovado') porTecnico[t].aprovadas++;
+      if (i.reprovadoEm) porTecnico[t].reprovadas++;
+    }
+    return res.status(200).json({ ok: true,
+      hoje, semanaComecaEm: iniSemana,
+      ENTRARAM: { hoje: entrouHoje.length, semana: entrouSemana.length, total: insp.length },
+      CONCLUIDAS: { hoje: concluiHoje.length, semana: concluiSemana.length,
+        total: insp.filter(i => i.status === 'aprovado').length },
+      AGUARDANDO: insp.filter(i => i.status === 'aguardando').length,
+      REPROVADAS_HOJE: reprovHoje.length,
+      POR_TECNICO: Object.entries(porTecnico)
+        .sort((a, b) => b[1].semana - a[1].semana)
+        .map(([t, v]) => t.padEnd(12) + ' | hoje ' + String(v.hoje).padStart(2) +
+          ' | semana ' + String(v.semana).padStart(2) +
+          ' | aprovadas ' + String(v.aprovadas).padStart(2) +
+          (v.reprovadas ? ' | reprovadas ' + v.reprovadas : '')),
+      detalhePorTecnico: porTecnico });
+  }
+
   // ── 📊 RELATORIO: inspeções por período, por técnico, aprovados x reprovados ──
   if (action === 'relatorio') {
     const dias = Math.min(365, Math.max(1, parseInt(req.query.dias || '30', 10)));

@@ -105,6 +105,50 @@ module.exports = async function handler(req, res) {
       // ═══ 🛡️ FILA DE GARANTIA (visão Conflitos) ═══
   const FILA_KEY = "reparoeletro_garantia_fila";
 
+  // ── 📊 CONTADORES: garantias por dia, semana e por técnico ──
+  if (action === 'contadores') {
+    const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
+    const lista = db.fichas || db.cards || [];
+    const bras = new Date(Date.now() - 3 * 3600000);
+    const hoje = bras.toISOString().slice(0, 10);
+    const diaSem = bras.getUTCDay();
+    const seg = new Date(bras); seg.setUTCDate(bras.getUTCDate() - ((diaSem === 0) ? 6 : (diaSem - 1)));
+    const iniSemana = seg.toISOString().slice(0, 10);
+    const dia = d => String(d || '').slice(0, 10);
+    const RESOLVIDAS = ['resolvida', 'finalizado', 'entregue', 'concluida'];
+
+    const entrouHoje = lista.filter(f => dia(f.criadoEm || f.em) === hoje);
+    const entrouSemana = lista.filter(f => dia(f.criadoEm || f.em) >= iniSemana);
+    const resolvidas = lista.filter(f => RESOLVIDAS.includes(String(f.status || f.phase || '')));
+    const noCq = lista.filter(f => f.enviadoCqEm);
+    const porTecnico = {};
+    for (const f of lista) {
+      const t = String(f.tecnicoOrigem || f.tecnico || '(sem técnico)');
+      porTecnico[t] = porTecnico[t] || { hoje: 0, semana: 0, total: 0, resolvidas: 0 };
+      porTecnico[t].total++;
+      if (dia(f.criadoEm || f.em) === hoje) porTecnico[t].hoje++;
+      if (dia(f.criadoEm || f.em) >= iniSemana) porTecnico[t].semana++;
+      if (RESOLVIDAS.includes(String(f.status || f.phase || ''))) porTecnico[t].resolvidas++;
+    }
+    return res.status(200).json({ ok: true,
+      hoje, semanaComecaEm: iniSemana,
+      ENTRARAM: { hoje: entrouHoje.length, semana: entrouSemana.length, total: lista.length },
+      RESOLVIDAS: { total: resolvidas.length,
+        hoje: resolvidas.filter(f => dia(f.resolvidoEm) === hoje).length,
+        semana: resolvidas.filter(f => dia(f.resolvidoEm) >= iniSemana).length },
+      ENVIADAS_AO_CQ: { total: noCq.length,
+        hoje: noCq.filter(f => dia(f.enviadoCqEm) === hoje).length,
+        semana: noCq.filter(f => dia(f.enviadoCqEm) >= iniSemana).length },
+      EM_ABERTO: lista.length - resolvidas.length,
+      POR_TECNICO: Object.entries(porTecnico)
+        .sort((a, b) => b[1].semana - a[1].semana)
+        .map(([t, v]) => t.padEnd(12) + ' | hoje ' + String(v.hoje).padStart(2) +
+          ' | semana ' + String(v.semana).padStart(2) +
+          ' | resolvidas ' + String(v.resolvidas).padStart(2) +
+          ' | total ' + v.total),
+      observacao: 'o técnico da garantia vem de tecnicoOrigem — garantias antigas podem não ter esse campo' });
+  }
+
   // ── 📊 RELATORIO: o que está na garantia agora e de onde veio ──
   if (action === 'relatorio') {
     const LISTA14 = ['1991','2582','9757','2908','1427','0942','4404','3292',
