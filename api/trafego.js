@@ -732,59 +732,9 @@ module.exports = async function handler(req, res) {
       }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
     };
     const feitos = [], erros = [];
-    // 🛡 nomes já usados no ciclo, para não duplicar
-    const nomesExistentes = new Set();
-    let verbaJaAlocada = 0;
-    try {
-      const cAll = await pegarTudo(`${GRAPH}/act_${CONTA}/campaigns?fields=id,name,effective_status,daily_budget,lifetime_budget,start_time&limit=300&access_token=${TK}`, 8);
-      const sAll = await pegarTudo(`${GRAPH}/act_${CONTA}/adsets?fields=id,daily_budget,lifetime_budget,campaign{id}&limit=300&access_token=${TK}`, 8);
-      const setsPor = {};
-      for (const s of (sAll.data || [])) { const ci = (s.campaign || {}).id; if (ci) (setsPor[ci] = setsPor[ci] || []).push(s); }
-      // 📅 o teto vale para o ciclo de DESTINO (parâmetro desde), não para o anterior.
-      // Cada ciclo tem verba própria: o que foi gasto na semana passada não ocupa
-      // espaço na programação da semana nova.
-      const cicloDestino = String(req.query.desde || desdeCiclo).slice(0, 10);
-      for (const c of (cAll.data || [])) {
-        if (String(c.start_time || '').slice(0, 10) < cicloDestino) continue;
-        nomesExistentes.add(String(c.name || '').toLowerCase());
-        if (c.effective_status !== 'ACTIVE') continue;
-        if (categoriaDe(c.name || '', 'anuncio') !== (cat === 'tv' ? 'tv' : categoriaDe(c.name || '', 'anuncio'))) {
-          if (cat === 'tv') continue;
-        }
-        const mesmaFrente = cat === 'tv'
-          ? categoriaDe(c.name || '', 'anuncio') === 'tv'
-          : categoriaDe(c.name || '', 'anuncio') !== 'tv';
-        if (!mesmaFrente) continue;
-        let vv = 0;
-        if (c.lifetime_budget) vv = Number(c.lifetime_budget) / 100;
-        else if (c.daily_budget) vv = Number(c.daily_budget) / 100;
-        else for (const s of (setsPor[c.id] || [])) {
-          if (s.lifetime_budget) vv += Number(s.lifetime_budget) / 100;
-          else if (s.daily_budget) vv += Number(s.daily_budget) / 100;
-        }
-        verbaJaAlocada += vv;
-      }
-    } catch (e) {}
-    // 🚧 TETO DA FRENTE: ADM 2.500 · TV 870 (configurável)
-    const cfgT2 = await cfgTrafego();
-    const tetoFrente = cat === 'tv' ? ((cfgT2.verba && cfgT2.verba.tv) || 870)
-      : ((cfgT2.verba && cfgT2.verba.adm) || 2500);
-    const vaiAlocar = verba * videos.length;
-    if (verbaJaAlocada + vaiAlocar > tetoFrente + 1 && String(req.query.ignorarTeto || '') !== '1') {
-      return res.status(200).json({ ok: false,
-        error: '🚧 estouraria o teto da frente ' + cat.toUpperCase(),
-        cicloDeDestino: String(req.query.desde || desdeCiclo).slice(0, 10),
-        tetoDaFrente: tetoFrente,
-        jaAlocado: Number(verbaJaAlocada.toFixed(2)),
-        tentandoAlocar: Number(vaiAlocar.toFixed(2)),
-        totalFicaria: Number((verbaJaAlocada + vaiAlocar).toFixed(2)),
-        excedente: Number((verbaJaAlocada + vaiAlocar - tetoFrente).toFixed(2)),
-        opcoes: [
-          'reduza a verba por anúncio: &verba=' + Math.max(1, Math.floor((tetoFrente - verbaJaAlocada) / Math.max(1, videos.length))),
-          'ou libere espaço com ajustar-teto antes',
-          'ou force com &ignorarTeto=1 (não recomendado)',
-        ] });
-    }
+    // 🚫 aqui havia um bloco inteiro de verificação de teto copiado do subir-agora,
+    // usando verba, videos, desdeCiclo e TK — variáveis que só existem lá. A aplicação
+    // morria antes de tocar na Meta. O aplicar pausa e ajusta; não cria anúncio.
     // A verba destas campanhas é TOTAL e fica na CAMPANHA — pausar o anúncio não libera nada
     // e a Meta recusa (código 100). Pausamos na campanha; se falhar, tentamos conjunto e anúncio.
     for (const item of (pausarIds || [])) {
@@ -832,7 +782,7 @@ module.exports = async function handler(req, res) {
       }
       if (r && r.error) erros.push({ id: alvo, nome: o.nome || null,
         acao: 'orçamento (' + campo + ')', erro: r.error.message, codigo: r.error.code });
-      else feitos.push({ id: alvo, nome: (a.nome || a.anuncio || null), acao: campo + ' → R$ ' + Number(valor).toFixed(2) });
+      else feitos.push({ id: alvo, nome: (o.nome || o.anuncio || null), acao: campo + ' → R$ ' + Number(valor).toFixed(2) });
       await new Promise(r2 => setTimeout(r2, 120));
     }
     // ⛔ DEVOLUÇÃO AUTOMÁTICA DESLIGADA (05/08): verba de campanha PAUSADA não é gasto —
