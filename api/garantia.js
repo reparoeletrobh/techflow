@@ -121,10 +121,31 @@ module.exports = async function handler(req, res) {
       for (const f of (((lx || {}).fichas) || [])) candidatas.push({ ...f, _de: nome });
     }
     // as de RS RUA: identificadas pelo tipo/origem/fase
+    // 🔍 diagnóstico: mostra os campos reais antes de filtrar. O filtro anterior
+    // procurava "rua" em vários campos e batia no ENDEREÇO ("Rua tal, 123"),
+    // trazendo 136 fichas que não têm relação com RS Rua.
+    if (String(req.query.campos || '') === '1') {
+      const ex = candidatas.slice(0, 3).map(f => ({ campos: Object.keys(f), amostra: f }));
+      const valoresTipo = {};
+      for (const f of candidatas) {
+        for (const c of ['tipo', 'origem', 'fase', 'phase', 'status', 'board', 'lista', 'grupo']) {
+          if (f[c] === undefined) continue;
+          const k = c + '=' + String(f[c]).slice(0, 24);
+          valoresTipo[k] = (valoresTipo[k] || 0) + 1;
+        }
+      }
+      return res.status(200).json({ ok: true,
+        totalNasLixeiras: candidatas.length,
+        CAMPOS_DE_EXEMPLO: ex.map(e => e.campos),
+        VALORES_ENCONTRADOS: Object.entries(valoresTipo).sort((a, b) => b[1] - a[1]).slice(0, 30),
+        UMA_FICHA_COMPLETA: candidatas[0] || null });
+    }
     const ehRua = f => {
-      const t = (String(f.tipo || '') + ' ' + String(f.origem || '') + ' ' +
-        String(f.fase || f.phase || f.status || '') + ' ' + String(f.board || '')).toLowerCase();
-      return /rua|rsrua|rs_rua/.test(t) || f.rsRua === true || f.ehRua === true;
+      // só campos de classificação — NUNCA o endereço
+      const t = [f.tipo, f.origem, f.fase, f.phase, f.status, f.board, f.lista, f.grupo]
+        .map(x => String(x || '')).join(' ').toLowerCase();
+      return /\brs\s*rua\b|rsrua|rs_rua|garantia_rua|\brua\b/.test(t) ||
+        f.rsRua === true || f.ehRua === true;
     };
     const soRua = String(req.query.tudo || '') === '1' ? candidatas : candidatas.filter(ehRua);
     // sem duplicar o que já está lá
