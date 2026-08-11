@@ -168,6 +168,43 @@ module.exports = async function handler(req, res) {
       } });
   }
 
+  // ── 🧹 ENXUGAR: remove campos redundantes que incham o banco ──
+  // textoCopiar ocupa ~241 bytes por ficha (26% de fichas_adm) e é apenas texto
+  // pronto para colar — pode ser montado na hora a partir dos próprios campos.
+  if (action === 'enxugar') {
+    const banco = String(req.query.banco || 'fichas_adm');
+    const CAMPOS = String(req.query.campos || 'textoCopiar').split(',').map(x => x.trim()).filter(Boolean);
+    const db = await dbGet(banco);
+    if (!db || !Array.isArray(db.fichas)) return res.status(200).json({ ok: false, error: 'banco sem lista fichas' });
+    const antes = JSON.stringify(db).length;
+    let afetadas = 0;
+    const copia = JSON.parse(JSON.stringify(db));
+    for (const f of copia.fichas) {
+      let mexeu = false;
+      for (const c of CAMPOS) if (f[c] !== undefined) { delete f[c]; mexeu = true; }
+      if (mexeu) afetadas++;
+    }
+    const depois = JSON.stringify(copia).length;
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        banco, campos: CAMPOS, fichasAfetadas: afetadas,
+        tamanhoAtualMB: (antes / 1048576).toFixed(2),
+        tamanhoDepoisMB: (depois / 1048576).toFixed(2),
+        economiaMB: ((antes - depois) / 1048576).toFixed(2),
+        economiaPct: Math.round((antes - depois) / antes * 100) + '%',
+        dica: 'para aplicar: &aplicar=1' });
+    }
+    await dbSet(banco, copia);
+    const conf = await dbGet(banco);
+    const persistiu = ((conf || {}).fichas || []).length === copia.fichas.length;
+    return res.status(200).json({ ok: persistiu,
+      fichasAfetadas: afetadas,
+      tamanhoAntesMB: (antes / 1048576).toFixed(2),
+      tamanhoDepoisMB: (depois / 1048576).toFixed(2),
+      persistiu,
+      alerta: persistiu ? undefined : '🚨 a gravação não persistiu — banco ainda no limite' });
+  }
+
   // ── 📦 ARQUIVAR-ANTIGAS: tira do banco quente o que já foi resolvido ──
   // fichas_adm chegou a 0,97 MB com 1089 registros. O limite do Upstash é 1 MB por
   // chave, e perto dele as gravações concorrentes falham em silêncio — foi assim que
@@ -175,7 +212,7 @@ module.exports = async function handler(req, res) {
   if (action === 'arquivar-antigas') {
     const banco = String(req.query.banco || 'fichas_adm');
     const arquivo = banco + '_arquivo';
-    const diasManter = Math.min(365, Math.max(7, parseInt(req.query.dias || '45', 10)));
+    const diasManter = Math.min(365, Math.max(7, parseInt(req.query.dias || '30', 10)));
     const corte = Date.now() - diasManter * 86400000;
     const FINAIS = ['logistica', 'finalizado', 'descarte', 'cliente_loja', 'concluido'];
     const db = await dbGet(banco);
