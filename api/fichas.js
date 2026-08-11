@@ -115,9 +115,10 @@ export default async function handler(req, res) {
       }
       if (atual.trim()) registros.push(atual);
       const todas = registros;
-      const cab = todas[0].split(',').map(x => x.replace(/"/g, '').trim().toLowerCase());
-      // a planilha pode ter cabeçalho diferente — mostra o que encontrou
-      const iData = cab.findIndex(x => /data|carimbo|timestamp|hora/.test(x));
+      // 🔤 sem acento: a coluna chama-se "Horário" e o filtro por "hora" não batia
+      const semAcento = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      const cab = todas[0].split(',').map(x => semAcento(x.replace(/"/g, '').trim()));
+      const iData = cab.findIndex(x => /hora|data|carimbo|timestamp/.test(x));
       const iSis = cab.findIndex(x => /^equipamento$|sistema|tipo|frente/.test(x));
       const iNome = cab.findIndex(x => /nome/.test(x));
       const iTel = cab.findIndex(x => /telefone|whats|contato|numero/.test(x));
