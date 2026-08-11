@@ -672,9 +672,10 @@ async function abrirLogs(){
   if(_logsAberto){ el.style.display='none'; _logsAberto=false; return; }
   _logsAberto = true; el.style.display='block';
   el.innerHTML = '<div style="background:#0d1117;border:1px solid #242b39;border-radius:12px;padding:14px;color:#8b93a3;font-size:12px;">⏳ carregando os logs…</div>';
-  const [d, r] = await Promise.all([
+  const [d, r, dev] = await Promise.all([
     fetch('/api/tv-logistica?action=log-distribuicao&dias=7').then(x=>x.json()).catch(()=>null),
     fetch('/api/tv-logistica?action=log-remarcar&dias=7').then(x=>x.json()).catch(()=>null),
+    fetch('/api/tv-logistica?action=log-devolucoes&dias=7').then(x=>x.json()).catch(()=>null),
   ]);
   function bloco(tit, itens, cor, vazio){
     if(!itens || !itens.length) return '<div style="font-size:11px;color:#5a6270;margin-top:6px;">'+(vazio||'nada no período')+'</div>';
@@ -702,6 +703,13 @@ async function abrirLogs(){
     + bloco('', (d&&d.DETALHE)||[], '#60a5fa')
     + '<div style="font-size:11.5px;font-weight:900;color:#f59e0b;margin-top:12px;">📅 REMARCADAS · ✅ chegou na prospecção · 🚨 não chegou</div>'
     + bloco('', (r&&r.L)||[], '#f59e0b', 'nenhuma remarcada no período')
+    + '<div style="font-size:11.5px;font-weight:900;color:#a78bfa;margin-top:12px;">📜 DEVOLUÇÕES CONFIRMADAS'
+      + (dev ? ' — '+(dev.confirmadas||0)+' ok · '+(dev.comErro||0)+' com erro' : '')+'</div>'
+    + bloco('', (dev&&dev.L)||[], '#a78bfa', 'nenhuma devolução registrada ainda')
+    + ((dev&&dev.ERROS&&dev.ERROS.length)
+      ? '<div style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);border-radius:9px;padding:9px 11px;margin-top:9px;">'
+        + '<div style="font-size:11px;font-weight:900;color:#f87171;">🚨 DEVOLUÇÕES COM ERRO</div>'
+        + bloco('', dev.ERROS, '#f87171') + '</div>' : '')
   + '</div>';
 }
 

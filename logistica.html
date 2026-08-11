@@ -233,6 +233,17 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .toast.show{opacity:1;transform:translateY(0);}
 .checado-rota{border-color:#22c55e!important;box-shadow:0 0 0 2px rgba(34,197,94,.25)!important;}
 .checado-badge{font-family:var(--fm);font-size:9px;font-weight:700;color:#22c55e;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:2px 7px;margin-bottom:4px;display:inline-block;}
+
+.lg-box{background:#0d1117;border:1px solid #242b39;border-radius:13px;padding:14px 16px;margin:12px 0;}
+.lg-tit{font-size:13.5px;font-weight:900;}
+.lg-lin{background:#0f1319;border:1px solid #1e2228;border-radius:8px;padding:9px 11px;margin-top:8px;
+  font-family:ui-monospace,monospace;font-size:10.5px;color:#c9ced6;line-height:1.85;max-height:330px;overflow-y:auto;}
+.lg-item{cursor:pointer;padding:3px 0;border-bottom:1px solid #171b22;}
+.lg-item:hover{color:#60a5fa;}
+.lg-kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:7px;margin-top:10px;}
+.lg-card{background:#12161d;border:1px solid #242b39;border-radius:10px;padding:9px 11px;}
+.lg-v{font-family:ui-monospace,monospace;font-size:19px;font-weight:700;line-height:1;}
+.lg-l{font-size:9px;color:#5a6270;font-weight:700;margin-top:3px;}
 </style>
 </head>
 <body>
@@ -242,6 +253,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
   <div class="header-right">
 <button class="hbtn cbtn-green" onclick="abrirCadastro()" style="background:rgba(34,197,94,.15);color:#22c55e;border-color:#22c55e;">+ Cadastrar</button>
 <button class="hbtn" onclick="load()">↻ Atualizar</button>
+<button class="btn" onclick="abrirLogRemarcar()">📜 Log Remarcar</button>
     <a href="/adm" class="hbtn">← ADM</a>
   </div>
 </header>
@@ -481,6 +493,52 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 <div class="toast" id="toast"></div>
 
 <script>
+// ── 📜 LOG DE DEVOLUÇÕES DO REMARCAR ──
+let _logAberto = false;
+async function abrirLogRemarcar(){
+  let el = document.getElementById('painel-log-remarcar');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'painel-log-remarcar';
+    el.style.cssText = 'margin:0 14px;';
+    const alvo = document.querySelector('.board') || document.querySelector('main') || document.body;
+    alvo.parentNode.insertBefore(el, alvo);
+  }
+  if(_logAberto){ el.innerHTML=''; _logAberto=false; return; }
+  _logAberto = true;
+  el.innerHTML = '<div class="lg-box"><div style="font-size:12px;color:#8b93a3;">⏳ carregando o log…</div></div>';
+  let d = null, p = null;
+  try {
+    d = await fetch('/api/logistica?action=log-devolucoes&dias=7').then(r=>r.json());
+    p = await fetch('/api/logistica?action=processar-pendentes').then(r=>r.json());
+  } catch(e){}
+  if(!d || !d.ok && d.error){
+    el.innerHTML = '<div class="lg-box" style="border-color:rgba(245,158,11,.4)"><div style="color:#fbbf24;font-size:12px;">⚠️ '+(d&&d.error||'não consegui carregar')+'</div></div>';
+    return;
+  }
+  const kpi=(v,l,c)=>'<div class="lg-card"><div class="lg-v" style="color:'+(c||'#f0f2f5')+'">'+v+'</div><div class="lg-l">'+l+'</div></div>';
+  const esc2=s=>String(s||'').replace(/</g,'&lt;');
+  el.innerHTML = '<div class="lg-box">'
+    + '<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">'
+      + '<span class="lg-tit" style="color:#60a5fa;">📜 Devoluções do Remarcar</span>'
+      + '<span style="font-size:11px;color:#5a6270;">últimos 7 dias</span>'
+      + '<button class="btn" style="margin-left:auto;font-size:11px;padding:4px 10px;" onclick="abrirLogRemarcar()">✕ fechar</button>'
+    + '</div>'
+    + '<div class="lg-kpi">'
+      + kpi(d.total||0,'DEVOLUÇÕES','#60a5fa')
+      + kpi(d.confirmadas||0,'CONFIRMADAS','#4ade80')
+      + kpi(d.comErro||0,'COM ERRO',(d.comErro?'#f87171':'#5a6270'))
+      + kpi((p&&p.pendentes)||0,'NA FILA',((p&&p.pendentes)?'#fbbf24':'#5a6270'))
+    + '</div>'
+    + ((d.ERROS&&d.ERROS.length)
+      ? '<div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);border-radius:9px;padding:9px 11px;margin-top:10px;">'
+        + '<div style="font-size:11px;font-weight:900;color:#f87171;">🚨 ERROS</div>'
+        + '<div class="lg-lin" style="margin-top:5px;">'+d.ERROS.map(esc2).join('<br>')+'</div></div>' : '')
+    + '<div style="font-size:11px;font-weight:900;color:#8b93a3;margin-top:11px;">HISTÓRICO</div>'
+    + '<div class="lg-lin">'+((d.L&&d.L.length)?d.L.map(esc2).join('<br>'):'nenhuma devolução no período')+'</div>'
+  + '</div>';
+}
+
 // ── ESTRUTURA DE SERVIÇOS ────────────────────────────────────
 const SERVICOS = {
   microondas: {

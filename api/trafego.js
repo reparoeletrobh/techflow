@@ -1874,8 +1874,9 @@ module.exports = async function handler(req, res) {
     const detalhado = execs.map((m, idx) => {
       const feitos = m.feitos || [], erros = m.erros || [];
       const pausas = feitos.filter(f => /pausad/i.test(String(f.acao || '')));
-      const verbas = feitos.filter(f => /budget|R\$/i.test(String(f.acao || '')));
       const criados = feitos.filter(f => /criad|novo/i.test(String(f.acao || '')));
+      // verbas: exclui os criados, que também mencionam valor e apareciam duas vezes
+      const verbas = feitos.filter(f => /budget/i.test(String(f.acao || '')) && !criados.includes(f));
       return {
         n: idx + 1, quando: hh(m.ts),
         resumo: [pausas.length ? pausas.length + ' pausado(s)' : null,
@@ -1885,7 +1886,9 @@ module.exports = async function handler(req, res) {
         PAUSADOS: pausas.map(f => (f.nome || f.id) + (f.acao ? ' — ' + f.acao : '')),
         VERBAS: verbas.map(f => (f.nome || f.id) + ' → ' + f.acao),
         CRIADOS: criados.map(f => (f.nome || f.id) + ' — ' + f.acao),
-        ERROS: erros.map(e => (e.nome || e.id) + ' | ' + (e.acao || '') + ' | ' + (e.erro || '')),
+        ERROS: erros.map(e => typeof e === 'string' ? e
+          : ((e.nome || e.id || e.video || '?') + (e.acao ? ' | ' + e.acao : '') +
+             ' | ' + (e.erro || e.error || e.message || JSON.stringify(e).slice(0, 80)))),
       };
     });
     return res.status(200).json({ ok: true, periodoDias: dias,
