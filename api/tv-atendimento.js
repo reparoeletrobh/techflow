@@ -48,7 +48,12 @@ export default async function handler(req,res){
       ]);
 
       // ── FICHAS TV (planilha) ──────────────────────────────────────────────
-      const fichasArr=(fichasDb?.fichas||[]);
+      // 🎯 ficha que VOLTOU do remarcar não é ficha nova — ela já foi contada quando
+      // entrou pela primeira vez. Contá-la de novo inflava o total do dia.
+      const ehRetorno=f=>['remarcar','reagendamento'].includes(String(f.origem||''))
+        || String(f.id||'').startsWith('rem_') || String(f.id||'').startsWith('fic_reag_');
+      const fichasArr=(fichasDb?.fichas||[]).filter(f=>!ehRetorno(f));
+      const retornosHoje=(fichasDb?.fichas||[]).filter(ehRetorno);
       const ficDateOf=f=>new Date(f.criadoEm||0).getTime();
       const fichasTotal=fichasArr.length;
       const ficHoje   =fichasArr.filter(f=>ficDateOf(f)>=todayUTC.getTime()).length||null;
@@ -152,7 +157,8 @@ export default async function handler(req,res){
       const erp={total:0,semValor:0,hoje:null,semana:null};
 
       const m={
-        fichas:    {total:fichasTotal,hoje:ficHoje,semana:ficSem,mes:ficMes},
+        fichas:    {total:fichasTotal,hoje:ficHoje,semana:ficSem,mes:ficMes,
+          retornosDeRemarcarHoje:retornosHoje.filter(f=>ficDateOf(f)>=todayUTC.getTime()).length},
         comprados: {total:compTotal,hoje:compH,semana:compS,mes:compMCount},
         cadastrados:{total:cadTotal,hoje:cadH,semana:cadS,mes:cadM},
         vendidos:  {total:vendTotal,hoje:vendH,semana:vendS},

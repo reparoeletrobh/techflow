@@ -42,7 +42,9 @@ export default async function handler(req,res){
       ]);
       // FICHAS — logistica (reparoeletro_atend_logistica)
       const atendLogDb=await dbG('reparoeletro_atend_logistica').catch(()=>null);
-      const atendFichas=atendLogDb?.fichas||[];
+      const atendFichas=atendLogDb?.fichas||[].filter(f=>!(['remarcar','reagendamento'].includes(String(f.origem||''))
+    || String(f.id||'').startsWith('rem_') || String(f.id||'').startsWith('fic_reag_')));
+  // 🎯 ficha que voltou do remarcar não é ficha nova — já foi contada na primeira entrada
       const fichasTotal=atendFichas.length;
       const ficDateOf=f=>new Date(f.registradoEm||0).getTime();
       const ficHoje=atendFichas.filter(f=>ficDateOf(f)>=todayUTC.getTime()).length||null;
