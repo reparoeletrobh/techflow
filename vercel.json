@@ -167,6 +167,10 @@
     {
       "path": "/api/logistica?action=processar-pendentes&aplicar=1&k=tfk-re2026-Bx7mQp9zKw4Y",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/wa-bot?action=despachar-pendentes&aplicar=1&k=tfk-re2026-Bx7mQp9zKw4Y",
+      "schedule": "*/3 * * * *"
     }
   ],
   "rewrites": [

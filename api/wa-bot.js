@@ -2942,6 +2942,60 @@ export default async function handler(req, res) {
         (l.outrasFichas.length ? ' | ' + l.outrasFichas.slice(0, 3).join(', ') : '')) });
   }
 
+  // ── 📨 DESPACHAR-PENDENTES: manda as mensagens que ficaram esperando a janela ──
+  if (action === 'despachar-pendentes') {
+    const fila = (await dbGet('wa_pendentes_janela')) || { itens: [] };
+    const itens = fila.itens || [];
+    if (!itens.length) return res.status(200).json({ ok: true, pendentes: 0, msg: 'nada na fila' });
+    const evts = await lerEvts();
+    const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
+    // quem escreveu nas últimas 24h tem a janela aberta
+    const ultimaIn = {};
+    for (const e of (evts || [])) {
+      if (e.dir !== 'in') continue;
+      const d = d8f(e.tel);
+      const t = new Date(e.ts || 0).getTime();
+      if (t && (!ultimaIn[d] || t > ultimaIn[d])) ultimaIn[d] = t;
+    }
+    const prontos = [], restam = [];
+    for (const it of itens) {
+      const u = ultimaIn[d8f(it.tel)];
+      const aberta = u && (Date.now() - u) < 24 * 3600000;
+      // descarta o que ficou mais de 7 dias esperando
+      const velho = (Date.now() - new Date(it.criadoEm || 0).getTime()) > 7 * 86400000;
+      if (aberta && !velho) prontos.push(it);
+      else if (!velho) restam.push(it);
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        naFila: itens.length, prontosParaEnviar: prontos.length, aguardandoResposta: restam.length,
+        L: prontos.map(p => String(p.tel).slice(-4) + ' | ' + String(p.texto || '').slice(0, 50)),
+        dica: 'para enviar: &aplicar=1' });
+    }
+    const enviados = [], erros = [];
+    for (const it of prontos) {
+      try {
+        const { token: tk, phoneId: pid } = await credenciaisResposta(it.tel);
+        if (!tk || !pid) { erros.push(String(it.tel).slice(-4) + ': sem credencial'); restam.push(it); continue; }
+        const r = await fetch(`https://graph.facebook.com/v20.0/${pid}/messages`, {
+          method: 'POST', headers: { Authorization: `Bearer ${tk}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messaging_product: 'whatsapp', to: String(it.tel).replace(/\D/g, ''),
+            type: 'text', text: { body: String(it.texto || '') } }),
+        }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+        if (r && r.messages && r.messages[0]) {
+          enviados.push(String(it.tel).slice(-4));
+          await rpushEvt({ ts: new Date().toISOString(), tel: it.tel, dir: 'out',
+            tipo: 'pendente-despachada',
+            texto: it.texto + '\n\n[mensagem que aguardava a reabertura da janela]' });
+        } else { erros.push(String(it.tel).slice(-4) + ': ' + ((r && r.error && r.error.message) || '?')); restam.push(it); }
+      } catch (e) { erros.push(String(it.tel).slice(-4) + ': ' + e.message); restam.push(it); }
+      await new Promise(s => setTimeout(s, 250));
+    }
+    await dbSet('wa_pendentes_janela', { itens: restam });
+    return res.status(200).json({ ok: erros.length === 0,
+      enviadas: enviados.length, enviados, erros, aindaAguardando: restam.length });
+  }
+
   // ── 🔓 DESTRAVAR-CRIADAS: ficha abordada que ficou presa em "criada" ──
   // O bot marca o telefone como abordado num banco pequeno e muda o status da ficha
   // num banco grande. Quando a segunda gravação é sobrescrita, a ficha fica travada:
@@ -5523,16 +5577,75 @@ Responda APENAS um JSON válido, sem markdown: {"resposta":"texto da mensagem su
     } catch (e) { janelaAberta = null; }
     if (janelaAberta === false && String(req.query.forcarJanela || '') !== '1') {
       const horas = ultimaEntrada ? ((Date.now() - ultimaEntrada) / 3600000).toFixed(1) : '?';
+      // 📨 RESOLVER, não só avisar: dispara o template de reengajamento e GUARDA a
+      // mensagem original, que sai sozinha assim que o cliente responder e a janela reabrir.
+      const { token: tkT, phoneId: pidT } = await credenciaisResposta(tel);
+      let templateEnviado = false, erroTemplate = null;
+      if (tkT && pidT) {
+        // nome e equipamento para preencher o template
+        let nomeT = '', equipT = '';
+        try {
+          const d8t = String(tel).replace(/\D/g, '').slice(-8);
+          for (const k of ['fichas_adm', 'fichas_tv', 'reparoeletro_pipe', 'tv_pipe',
+                           'reparoeletro_logistica', 'tv_logistica']) {
+            const b = await dbGet(k);
+            for (const L of ['fichas', 'cards']) {
+              const x = ((b || {})[L] || []).find(y =>
+                String(y.telefone || '').replace(/\D/g, '').slice(-8) === d8t);
+              if (x) { nomeT = nomeT || x.nome || x.nomeContato || '';
+                equipT = equipT || x.equipamento || x.descricao || ''; }
+            }
+            if (nomeT && equipT) break;
+          }
+        } catch (e) {}
+        const primeiroNome = String(nomeT || 'Cliente').trim().split(/\s+/)[0];
+        const eq = String(equipT || 'seu equipamento').slice(0, 40);
+        try {
+          const rt = await fetch(`https://graph.facebook.com/v20.0/${pidT}/messages`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${tkT}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messaging_product: 'whatsapp', to: String(tel).replace(/\D/g, ''),
+              type: 'template',
+              template: { name: 'orcamento_pronto', language: { code: 'pt_BR' },
+                components: [{ type: 'body', parameters: [
+                  { type: 'text', text: primeiroNome }, { type: 'text', text: eq }] }] } }),
+          }).then(x => x.json()).catch(e => ({ error: { message: e.message } }));
+          templateEnviado = !!(rt && rt.messages && rt.messages[0]);
+          if (!templateEnviado) erroTemplate = (rt && rt.error && rt.error.message) || 'sem detalhe';
+          if (templateEnviado) {
+            await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'out', tipo: 'template',
+              texto: '[template orcamento_pronto] reabrindo a janela para ' + primeiroNome });
+          }
+        } catch (e) { erroTemplate = e.message; }
+      }
+      // guarda a mensagem para sair quando o cliente responder
+      try {
+        const fila = (await dbGet('wa_pendentes_janela')) || { itens: [] };
+        const d8p = String(tel).replace(/\D/g, '').slice(-8);
+        fila.itens = (fila.itens || []).filter(x =>
+          String(x.tel || '').replace(/\D/g, '').slice(-8) !== d8p);
+        fila.itens.unshift({ tel, texto: String((req.body || {}).texto || '').slice(0, 900),
+          acaoAprovada: (req.body || {}).acaoAprovada || null,
+          templateEnviadoEm: templateEnviado ? new Date().toISOString() : null,
+          criadoEm: new Date().toISOString() });
+        fila.itens = fila.itens.slice(0, 300);
+        await dbSet('wa_pendentes_janela', fila);
+      } catch (e) {}
       try {
         await rpushEvt({ ts: new Date().toISOString(), tel, dir: 'acao', tipo: 'bloqueio',
-          texto: '🚪 ENVIO BLOQUEADO — janela de 24h fechada (última mensagem do cliente há ' +
-            horas + 'h). Use um template.' });
+          texto: '🚪 janela de 24h fechada (cliente não escreve há ' + horas + 'h) — ' +
+            (templateEnviado ? 'template enviado para reabrir; a mensagem sai quando ele responder'
+                             : 'NÃO consegui enviar o template: ' + (erroTemplate || '?')) });
       } catch (e) {}
-      return res.status(200).json({ ok: false,
-        error: '🚪 janela de 24h fechada — o cliente não escreve há ' + horas + 'h',
-        oQueFazer: 'para reabrir a conversa é preciso enviar um TEMPLATE aprovado, não texto livre',
-        ultimaMensagemDoCliente: ultimaEntrada ? new Date(ultimaEntrada).toISOString() : null,
-        comoForcar: 'acrescente &forcarJanela=1 se tiver certeza de que a janela está aberta' });
+      return res.status(200).json({ ok: templateEnviado,
+        janelaFechada: true, horasSemContato: horas,
+        templateEnviado,
+        erroTemplate,
+        mensagemGuardada: true,
+        oQueAconteceu: templateEnviado
+          ? '📨 template enviado para reabrir a conversa — sua mensagem sai automaticamente assim que o cliente responder'
+          : '🚨 janela fechada e o template também falhou: ' + (erroTemplate || 'motivo desconhecido'),
+        ultimaMensagemDoCliente: ultimaEntrada ? new Date(ultimaEntrada).toISOString() : null });
     }
     // 📱 responde pelo número por onde o cliente falou
     const { token: tkE, phoneId: pidE, viaAntigo: _vaE } = await credenciaisResposta(tel);
