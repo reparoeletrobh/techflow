@@ -153,6 +153,50 @@ module.exports = async function handler(req, res) {
       } });
   }
 
+  // ── 🧪 TESTE-GRAVACAO: o banco aceita escrita? qual o tamanho? ──
+  if (action === 'teste-gravacao') {
+    const alvo = String(req.query.banco || 'fichas_adm');
+    const antes = await dbGet(alvo);
+    const tamanho = JSON.stringify(antes || {}).length;
+    const quantas = ((antes || {}).fichas || (antes || {}).cards || []).length;
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'só leitura',
+        banco: alvo,
+        registros: quantas,
+        tamanhoBytes: tamanho,
+        tamanhoMB: (tamanho / 1048576).toFixed(2),
+        limiteUpstash: '1 MB por chave no plano gratuito · 100 MB no pago',
+        alerta: tamanho > 900000 ? '🚨 PERTO DO LIMITE — gravações podem falhar em silêncio' :
+                tamanho > 500000 ? '⚠️ banco grande, vale acompanhar' : '✅ tamanho tranquilo',
+        dica: 'para testar uma gravação real: &aplicar=1' });
+    }
+    // grava um marcador e confere se persistiu
+    const db = antes || { fichas: [] };
+    const lista = db.fichas ? 'fichas' : (db.cards ? 'cards' : 'fichas');
+    db[lista] = db[lista] || [];
+    const marca = 'teste_vigia_' + Date.now().toString(36);
+    db[lista].unshift({ id: marca, nome: 'TESTE DO VIGIA', telefone: '00000000000',
+      status: 'teste', criadoEm: new Date().toISOString() });
+    const gravou = await dbSet(alvo, db);
+    await new Promise(s => setTimeout(s, 400));
+    const depois = await dbGet(alvo);
+    const achou = ((depois || {})[lista] || []).some(x => x.id === marca);
+    // limpa o marcador
+    if (achou) {
+      const limpo = await dbGet(alvo);
+      limpo[lista] = (limpo[lista] || []).filter(x => x.id !== marca);
+      await dbSet(alvo, limpo);
+    }
+    return res.status(200).json({ ok: achou,
+      banco: alvo, registros: quantas,
+      tamanhoMB: (tamanho / 1048576).toFixed(2),
+      dbSetRetornou: gravou,
+      persistiu: achou,
+      VEREDITO: achou
+        ? '✅ o banco aceita gravação normalmente'
+        : '🚨 A GRAVAÇÃO NÃO PERSISTIU — é aqui que as fichas se perdem' });
+  }
+
   // ── 📈 HISTORICO: evolução dos problemas ao longo dos dias ──
   if (action === 'historico') {
     const h = (await dbGet('vigia_historico')) || { dias: {} };
