@@ -102,7 +102,8 @@ export default async function handler(req, res) {
       const csv = await fetch(SHEET_CSV).then(x => x.text());
       const todas = csv.split(/\r?\n/).filter(Boolean);
       const cab = todas[0].split(',').map(x => x.replace(/"/g, '').trim().toLowerCase());
-      const iData = cab.findIndex(x => /data|carimbo|timestamp/.test(x));
+      // a planilha pode ter cabeçalho diferente — mostra o que encontrou
+      const iData = cab.findIndex(x => /data|carimbo|timestamp|hora/.test(x));
       const iSis = cab.findIndex(x => /sistema|tipo|frente|equipamento/.test(x));
       const iNome = cab.findIndex(x => /nome/.test(x));
       const iTel = cab.findIndex(x => /telefone|whats|contato/.test(x));
@@ -118,6 +119,18 @@ export default async function handler(req, res) {
           ehTv: /\btv\b|televis|polegada/i.test(txt) });
       }
     } catch (e) { return res.status(200).json({ ok: false, error: 'não consegui ler a planilha: ' + e.message }); }
+    if (!linhas.length) {
+      // diagnóstico: mostra o cabeçalho e as primeiras datas, para ajustar o filtro
+      try {
+        const csv2 = await fetch(SHEET_CSV).then(x => x.text());
+        const t2 = csv2.split(/\r?\n/).filter(Boolean);
+        return res.status(200).json({ ok: false,
+          error: 'nenhuma linha da planilha bateu com a data ' + dia,
+          CABECALHO: t2[0].split(',').map(x => x.replace(/"/g, '').trim()),
+          PRIMEIRAS_LINHAS: t2.slice(1, 4),
+          ULTIMAS_LINHAS: t2.slice(-3) });
+      } catch (e) {}
+    }
 
     // 2) o sistema
     const [fa, ft] = await Promise.all([dbGet('fichas_adm'), dbGet('fichas_tv')]);
@@ -339,6 +352,14 @@ export default async function handler(req, res) {
     const novosEntrar = [];
     for (const f of db.fichas) {
       if (f.status === 'contato_feito' && f.contatoFeitoEm) {
+        // 🕐 a contagem só corre DENTRO do horário de trabalho. Uma ficha abordada
+        // às 19h virava "entrar em contato" às 20h, quando ninguém pode agendar
+        // coleta — e chegava de manhã já fora da fila normal.
+        const bras = new Date(Date.now() - 3 * 3600000);
+        const diaS = bras.getUTCDay(), horaS = bras.getUTCHours() + bras.getUTCMinutes() / 60;
+        const dentroDoExpediente = (diaS >= 1 && diaS <= 5) ? (horaS >= 8 && horaS < 14)
+          : (diaS === 6 ? (horaS >= 8 && horaS < 10) : false);
+        if (!dentroDoExpediente) continue;   // fora do horário, ninguém envelhece
         // Bot abordou → 1 hora para cadastrar na logística; contato manual → 24 horas
         const limiteMs = f.abordadoPorBot ? 60*60*1000 : 24*60*60*1000;
         if (agora - new Date(f.contatoFeitoEm).getTime() > limiteMs) {
