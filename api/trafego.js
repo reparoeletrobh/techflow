@@ -1864,6 +1864,36 @@ module.exports = async function handler(req, res) {
         ' | ' + (l.botao || '?') + ' | ' + (l.numeroWhatsApp || l.link || 'destino pela Página')) });
   }
 
+  // ── 📚 HISTORICO: todas as execuções, com o detalhe de cada anúncio ──
+  if (action === 'historico') {
+    const dias = Math.min(60, Math.max(1, parseInt(req.query.dias || '14', 10)));
+    const corte = Date.now() - dias * 86400000;
+    const lg = (await dbGet('trafego_log')) || { movs: [] };
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '?';
+    const execs = (lg.movs || []).filter(m => new Date(m.ts || 0).getTime() >= corte);
+    const detalhado = execs.map((m, idx) => {
+      const feitos = m.feitos || [], erros = m.erros || [];
+      const pausas = feitos.filter(f => /pausad/i.test(String(f.acao || '')));
+      const verbas = feitos.filter(f => /budget|R\$/i.test(String(f.acao || '')));
+      const criados = feitos.filter(f => /criad|novo/i.test(String(f.acao || '')));
+      return {
+        n: idx + 1, quando: hh(m.ts),
+        resumo: [pausas.length ? pausas.length + ' pausado(s)' : null,
+          verbas.length ? verbas.length + ' verba(s) ajustada(s)' : null,
+          criados.length ? criados.length + ' criado(s)' : null,
+          erros.length ? erros.length + ' erro(s)' : null].filter(Boolean).join(' · ') || 'sem alterações',
+        PAUSADOS: pausas.map(f => (f.nome || f.id) + (f.acao ? ' — ' + f.acao : '')),
+        VERBAS: verbas.map(f => (f.nome || f.id) + ' → ' + f.acao),
+        CRIADOS: criados.map(f => (f.nome || f.id) + ' — ' + f.acao),
+        ERROS: erros.map(e => (e.nome || e.id) + ' | ' + (e.acao || '') + ' | ' + (e.erro || '')),
+      };
+    });
+    return res.status(200).json({ ok: true, periodoDias: dias,
+      execucoes: detalhado.length,
+      LINHA_DO_TEMPO: detalhado.map(d => '#' + d.n + ' · ' + d.quando + ' · ' + d.resumo),
+      DETALHE: detalhado });
+  }
+
   // ── 📜 ULTIMA-APLICACAO: o que a última execução do Copiloto fez ──
   if (action === 'ultima-aplicacao') {
     const lg = (await dbGet('trafego_log')) || { movs: [] };
@@ -2056,6 +2086,21 @@ module.exports = async function handler(req, res) {
     const pend = await chamar('action=pendentes-aprovacao&dias=1');
     reg('7. Conferir', extrato, ((extrato.TOTAIS || {}).geral || {}).ativos + ' anúncio(s) ativo(s)');
 
+    // 📜 registra a montagem do ciclo no histórico do tráfego
+    try {
+      const lgC = (await dbGet('trafego_log')) || { movs: [] };
+      const feitosC = [];
+      for (const e of etapas) {
+        for (const f of (((e.detalhe || {}).feitos) || [])) {
+          feitosC.push({ nome: typeof f === 'string' ? f : (f.video || f.campanha || '?'),
+            acao: e.etapa.replace(/^\d+\.\s*/, '') });
+        }
+      }
+      lgC.movs.unshift({ ts: new Date().toISOString(), origem: 'ciclo-automatico',
+        feitos: feitosC, erros: etapas.flatMap(e => ((e.detalhe || {}).erros || [])) });
+      lgC.movs = lgC.movs.slice(0, 200);
+      await dbSet('trafego_log', lgC);
+    } catch (e) {}
     const criados = etapas.filter(e => e.etapa.startsWith('6.')).reduce((s, e) => s + ((e.detalhe || {}).criados || 0), 0);
     const renovados = etapas.filter(e => e.etapa.startsWith('4.') || e.etapa.startsWith('5.'))
       .reduce((s, e) => s + ((e.detalhe || {}).renovados || 0), 0);

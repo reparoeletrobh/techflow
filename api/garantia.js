@@ -220,6 +220,43 @@ module.exports = async function handler(req, res) {
   }
 
   // ── 📊 CONTADORES: garantias por dia, semana e por técnico ──
+  // ── 🔍 RASTREAR: procura um cliente na fila e na gestão de garantias ──
+  if (action === 'rastrear') {
+    const q = String(req.query.q || '').trim();
+    const qd = q.replace(/\D/g, '');
+    if (!q) return res.status(400).json({ ok: false, error: 'informe ?q=nome ou telefone' });
+    const bate = (x) => {
+      const tel = String(x.telefone || '').replace(/\D/g, '');
+      const nome = String(x.nome || x.cliente || '').toLowerCase();
+      return (qd.length >= 3 && tel.endsWith(qd)) || (q.length >= 3 && nome.includes(q.toLowerCase()));
+    };
+    const [fila, gest] = await Promise.all([
+      dbGet('reparoeletro_garantia_fila'), dbGet(GARANTIA_KEY),
+    ]);
+    const naFila = ((fila || {}).itens || []).filter(bate).map(i => ({
+      onde: '🔥 Fila de tratamento', nome: i.nome, telefone: i.telefone,
+      equipamento: i.equipamento, origem: i.origem, status: i.status,
+      tecnico: i.tecnico || null, quando: i.criadoEm }));
+    const naGestao = ((gest || {}).fichas || []).filter(bate).map(f => ({
+      onde: '📁 Gestão de Garantias', nome: f.nome || f.cliente, telefone: f.telefone,
+      equipamento: f.equipamento || f.defeito, tipo: f.tipo || '(sem tipo)',
+      fase: f.faseId || f.status || '?', tecnico: f.tecnico || null,
+      concluida: !!f.concluida, quando: f.criadaEm || f.criadoEm }));
+    const tudo = naFila.concat(naGestao);
+    return res.status(200).json({ ok: tudo.length > 0, busca: q,
+      encontrados: tudo.length,
+      naFila: naFila.length, naGestao: naGestao.length,
+      L: tudo.map(x => x.onde + ' | ' + String(x.nome || '?').slice(0, 22) +
+        ' ' + String(x.telefone || '').slice(-4) +
+        ' | ' + String(x.equipamento || '').slice(0, 26) +
+        (x.tipo ? ' | tipo: ' + x.tipo : '') +
+        ' | ' + (x.fase || x.status || '?') +
+        (x.tecnico ? ' | téc: ' + x.tecnico : '') +
+        (x.concluida ? ' | ✅ concluída' : '') +
+        ' | ' + String(x.quando || '').slice(0, 10)),
+      detalhe: tudo });
+  }
+
   // ── 🔎 VER-FICHA: mostra a ficha crua, sem interpretação ──
   if (action === 'ver-ficha') {
     const q = String(req.query.q || '').replace(/\D/g, '');
