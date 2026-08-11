@@ -2904,6 +2904,8 @@ export default async function handler(req, res) {
       if (!conversa[d].ultimo || String(t) > String(conversa[d].ultimo)) conversa[d].ultimo = t;
     }
     const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '—';
+    // 🚧 marco de corte: ficha criada ANTES dele não é abordada pelo bot
+    const marco = cfgB.abordagemMarcoTs ? new Date(cfgB.abordagemMarcoTs).getTime() : 0;
     const linhas = [];
     for (const [sis, db] of [['ADM', fa], ['TV', ft]]) {
       for (const f of (((db || {}).fichas) || [])) {
@@ -2921,6 +2923,9 @@ export default async function handler(req, res) {
           if (noSistema) { acao = '⏭️ PULA — cliente já tem ficha em operação'; }
           else if (jaAbordado) { acao = '⏭️ PULA — já foi abordado antes'; motivo = 'abordado em ' + hh(abordados.tels[d8]); }
           else if (c && c.in) { acao = '💬 RESPONDE — cliente já escreveu, o cérebro assume'; motivo = c.in + ' msg(s) dele'; }
+          else if (marco && new Date(f.criadoEm || 0).getTime() < marco) {
+            acao = '🚧 BARRADA pelo marco de corte'; motivo = 'criada em ' + hh(f.criadoEm) + ', marco em ' + hh(cfgB.abordagemMarcoTs);
+          }
           else { acao = '📤 ABORDA às 8h — pergunta loja ou coleta'; }
         }
         else if (st === 'contato_feito') {
@@ -2940,8 +2945,12 @@ export default async function handler(req, res) {
     }
     const resumo = linhas.reduce((o, l) => { const k = l.acao.split('—')[0].trim(); o[k] = (o[k] || 0) + 1; return o; }, {});
     const vaoSerAbordadas = linhas.filter(l => l.acao.startsWith('📤'));
-    return res.status(200).json({ ok: true,
+    const barradas = linhas.filter(l => l.acao.startsWith('🚧'));
+    return res.status(200).json({ ok: barradas.length === 0,
       abordagemLigada: cfgB.abordagemAtiva === true,
+      marcoDeCorte: cfgB.abordagemMarcoTs ? hh(cfgB.abordagemMarcoTs) : 'sem marco',
+      BARRADAS_PELO_MARCO: barradas.length,
+      LISTA_BARRADAS: barradas.map(l => l.sis + ' | ' + String(l.nome).slice(0, 18) + ' ' + l.tel + ' | ' + l.motivo),
       totalAnalisado: linhas.length,
       RESUMO_DAS_ACOES: resumo,
       quantasSeraoAbordadasAmanha: vaoSerAbordadas.length,
