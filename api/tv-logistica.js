@@ -217,19 +217,24 @@ async function remarcarParaProspeccao(ficha, motivo, sistema, quem) {
     // 🔁 SEM EXCEÇÃO: toda ficha que cai em remarcar vai para Entrar em Contato.
     // Duplicata não é problema — a equipe percebe no atendimento e exclui a antiga.
     // Ficha presa na coluna é problema, e era o que acontecia com os filtros.
+    // 🏷️ mesmos campos do envio manual, para a ficha receber a badge de reagendamento
     pdb.fichas.unshift({
-      id: 'rem_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6),
+      id: 'fic_reag_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4),
       nome: ficha.nome || ficha.nomeContato || '?',
-      telefone: ficha.telefone || '',
+      telefone: String(ficha.telefone || '').replace(/\D/g, ''),
+      waNum: String(ficha.telefone || '').replace(/\D/g, ''),
       equipamento: ficha.equipamento || ficha.descricao || '',
       defeito: ficha.defeito || '',
       endereco: ficha.endereco || '',
       status: 'entrar_contato',
+      reagendarColeta: true,               // 🏷️ é o que acende a badge na prospecção
+      origemLogistica: true,
+      logisticaFichaId: ficha.id,
       origem: 'remarcar',
       motivoRemarcar: String(motivo || 'não informado').slice(0, 200),
       remarcadoPor: quem || 'não identificado',
       fichaOrigemId: ficha.id,
-      criadoEm: new Date().toISOString(),
+      criadoEm: new Date().toISOString(), contatoFeitoEm: null,
     });
     await dbSet(KEYP, pdb);
     // 🚪 a ficha SAI da coluna Remarcar — ela vive agora na prospecção.
