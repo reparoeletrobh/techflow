@@ -407,6 +407,42 @@ function check(nome, cond, extra) {
 
   // ════ CENÁRIO 12: promessa não cumprida vira conflito para um humano ════
   // ── trava de horário: cadastro de coleta fora da janela é recusado ──
+  // ── 🛡️ GARANTIA: cadastrar uma ficha e ver se ela aparece nos contadores ──
+  console.log('▶ Cenário G1 — garantia cadastrada aparece nos contadores');
+  {
+    const garantia = carregarHandler('api/garantia.js');
+    KV['reparoeletro_garantia_v2'] = { fichas: [] };
+    const hojeISO = new Date(Date.now() - 3*3600000).toISOString();
+    // 1) cadastra
+    const rC = res();
+    await garantia(req({ action: 'cadastrar', ...K }, {
+      nome: 'Teste Harness', telefone: '31999990000',
+      defeito: 'teste automatizado', tipo: 'loja_acompanhamento', tecnico: 'Lucas',
+    }, 'POST'), rC);
+    const criou = rC.dado && rC.dado.ok;
+    check('garantia: cadastro aceito', criou, rC.dado && rC.dado.error);
+    // 2) confere no banco
+    const noBanco = ((KV['reparoeletro_garantia_v2']||{}).fichas || [])
+      .filter(f => String(f.telefone||'').includes('99999'));
+    check('garantia: gravou no banco', noBanco.length === 1, noBanco.length);
+    if (noBanco[0]) {
+      check('garantia: tem criadaEm', !!noBanco[0].criadaEm);
+      check('garantia: tem tipo', noBanco[0].tipo === 'loja_acompanhamento');
+      check('garantia: tem tecnico', noBanco[0].tecnico === 'Lucas');
+    }
+    // 3) os contadores enxergam?
+    const rK = res();
+    await garantia(req({ action: 'contadores', ...K }), rK);
+    const c = rK.dado || {};
+    check('garantia: contadores respondem', c.ok === true, c.error);
+    check('garantia: conta ENTRARAM hoje', (c.ENTRARAM && c.ENTRARAM.hoje) >= 1,
+      JSON.stringify(c.ENTRARAM));
+    check('garantia: técnico aparece', JSON.stringify(c.POR_TECNICO || []).includes('Lucas'),
+      JSON.stringify(c.POR_TECNICO));
+    check('garantia: lista por técnico traz a ficha',
+      JSON.stringify(c.GARANTIAS_POR_TECNICO || {}).includes('Teste Harness'));
+  }
+
   console.log('▶ Cenário 12b — coleta fora da janela é bloqueada');
   const r12h = res();
   await wabot(req({ action:'enviar', ...K }, { tel:'5531990007099',

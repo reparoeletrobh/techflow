@@ -230,9 +230,20 @@ const META_DIA = 25;
 async function carregarPainelMeta(){
   const el = document.getElementById('painel-meta');
   if(!el) return;
-  let c = null;
-  try { c = await fetch('/api/qualidade?action=contadores').then(r=>r.json()); } catch(e){}
-  if(!c || !c.ok){ el.innerHTML=''; return; }
+  let c = null, falha = null;
+  try {
+    const resp = await fetch('/api/qualidade?action=contadores');
+    if(!resp.ok) falha = 'HTTP ' + resp.status;
+    c = await resp.json();
+    if(c && c.ok === false) falha = c.error || 'retorno sem ok';
+  } catch(e){ falha = e.message; }
+  // 🔊 em vez de sumir em silêncio, mostra o motivo — painel mudo esconde o problema
+  if(!c || !c.ok){
+    el.innerHTML = '<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);'
+      + 'border-radius:11px;padding:11px 14px;font-size:11.5px;color:#fbbf24;">'
+      + '⚠️ não consegui carregar os indicadores — ' + (falha||'motivo desconhecido') + '</div>';
+    return;
+  }
   const hoje = (c.ENTRARAM && c.ENTRARAM.hojeSemGarantia != null)
     ? c.ENTRARAM.hojeSemGarantia : ((c.ENTRARAM && c.ENTRARAM.hoje) || 0);
   const pct = Math.min(100, Math.round(hoje / META_DIA * 100));
