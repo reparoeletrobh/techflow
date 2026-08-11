@@ -369,8 +369,9 @@ async function carregarKpisGarantia(){
   const el = document.getElementById('painel-kpis');
   if(!el) return;
   let c = null;
-  try { c = await fetch('/api/garantia?action=contadores&k=' + (localStorage.getItem('tf_key')||''))
-    .then(r=>r.json()); } catch(e){}
+  // as demais chamadas desta tela não passam chave — o proxy já autentica.
+  // Acrescentar &k= vazio derrubava a chamada com 401 e o painel ficava em branco.
+  try { c = await fetch('/api/garantia?action=contadores').then(r=>r.json()); } catch(e){}
   if(!c || !c.ok){ el.innerHTML=''; return; }
   const kpi = (v,l,cr) => '<div class="gk-card"><div class="gk-v" style="color:'+(cr||'#f0f2f5')+'">'+v+'</div><div class="gk-l">'+l+'</div></div>';
   el.innerHTML = '<div class="gk-box">'

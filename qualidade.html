@@ -231,8 +231,7 @@ async function carregarPainelMeta(){
   const el = document.getElementById('painel-meta');
   if(!el) return;
   let c = null;
-  try { c = await fetch('/api/qualidade?action=contadores&k=' + (localStorage.getItem('tf_key')||''))
-    .then(r=>r.json()); } catch(e){}
+  try { c = await fetch('/api/qualidade?action=contadores').then(r=>r.json()); } catch(e){}
   if(!c || !c.ok){ el.innerHTML=''; return; }
   const hoje = (c.ENTRARAM && c.ENTRARAM.hojeSemGarantia != null)
     ? c.ENTRARAM.hojeSemGarantia : ((c.ENTRARAM && c.ENTRARAM.hoje) || 0);
