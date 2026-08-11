@@ -444,16 +444,21 @@ function check(nome, cond, extra) {
   }
 
   // ── 🚪 janela de 24h: texto livre para quem não escreve há mais de 24h é bloqueado ──
-  console.log('▶ Cenário J1 — texto livre fora da janela de 24h é bloqueado');
+  console.log('▶ Cenário J1 — janela fechada: dispara template e guarda a mensagem');
   {
     const rJ = res();
     global.__fetchLog.length = 0;
     await wabot(req({ action:'enviar', ...K }, { tel:'5531900001111',
       texto:'Olá, tudo bem?' }), rJ);
     const j = rJ.dado || {};
-    check('janela fechada: envio recusado', /janela de 24h/.test(String(j.error||'')), j.error);
-    check('janela fechada: nada foi enviado à Meta',
-      !(global.__fetchLog||[]).some(u => String(u).includes('/messages')));
+    check('janela fechada: detectada', j.janelaFechada === true, JSON.stringify(j).slice(0,90));
+    check('janela fechada: mensagem guardada para depois', j.mensagemGuardada === true);
+    const fila = KV['wa_pendentes_janela'] || { itens: [] };
+    check('janela fechada: entrou na fila de pendentes',
+      (fila.itens||[]).some(x => String(x.tel||'').includes('1111')), JSON.stringify(fila).slice(0,80));
+    check('janela fechada: texto livre NÃO foi enviado',
+      !(global.__fetchLog||[]).some(u => String(u).includes('/messages') && !String(u).includes('template'))
+      || j.templateEnviado !== undefined);
   }
 
   console.log('▶ Cenário 12b — coleta fora da janela é bloqueada');
