@@ -188,6 +188,27 @@ async function pipefyBestEffort(fn) {
 // ── ♻️ REMARCAR → PROSPECÇÃO: toda ficha que cai em remarcar volta para o
 // atendimento ativo automaticamente, levando o motivo. Antes alguém precisava
 // clicar em "Prospecção" a cada uma, e ficha ficava esquecida na coluna.
+
+// 📜 registra cada tentativa de devolução do remarcar, com o desfecho
+async function registrarDevolucao(ficha, sistema, motivo, resultado, detalhe) {
+  try {
+    const dia = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const k = 'log_remarcar_' + dia;
+    const lg = (await dbGet(k)) || { itens: [] };
+    lg.itens.unshift({
+      ts: new Date().toISOString(),
+      sistema, nome: ficha.nome || ficha.nomeContato || '?',
+      telefone: String(ficha.telefone || ''),
+      equipamento: String(ficha.equipamento || ficha.descricao || '').slice(0, 40),
+      motivo: String(motivo || '').slice(0, 120),
+      resultado,                      // 'confirmada' | 'erro' | 'retentativa'
+      detalhe: String(detalhe || '').slice(0, 160),
+    });
+    lg.itens = lg.itens.slice(0, 400);
+    await dbSet(k, lg);
+  } catch (e) {}
+}
+
 async function remarcarParaProspeccao(ficha, motivo, sistema, quem) {
   try {
     // 🎯 a coluna "Entrar em Contato" da prospecção lê fichas_adm / fichas_tv,
@@ -254,10 +275,14 @@ async function remarcarParaProspeccao(ficha, motivo, sistema, quem) {
             pend.itens = pend.itens.slice(0, 200);
             await dbSet('remarcar_pendentes', pend);
           } catch (e) {}
+          await registrarDevolucao(ficha, sistema, motivo, 'erro',
+            'gravação não persistiu após 3 tentativas — ficha mantida na coluna');
           return { ok: false, erro: 'gravação não persistiu após 3 tentativas — ficha mantida na coluna e registrada em remarcar_pendentes' };
         }
       }
     } catch (e) { return { ok: false, erro: 'falha ao confirmar: ' + e.message }; }
+    await registrarDevolucao(ficha, sistema, motivo, 'confirmada',
+      'ficha criada em ' + KEYP + ' e visível em Entrar em Contato');
     // 🚪 a ficha SAI da coluna Remarcar — ela vive agora na prospecção.
     // Sem isso ela voltava ao atendimento mas continuava ocupando a coluna.
     try {
@@ -286,6 +311,54 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const action = req.query.action
+
+  // ── 📜 LOG-DEVOLUCOES: histórico com desfecho de cada devolução ──
+  if (action === 'log-devolucoes') {
+    const dias = Math.min(30, Math.max(1, parseInt(req.query.dias || '7', 10)));
+    const dg = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const [fA, fT] = await Promise.all([dbGet('fichas_adm'), dbGet('fichas_tv')]);
+    const noAtendimento = new Map();
+    for (const b of [fA, fT]) for (const f of (((b || {}).fichas) || [])) {
+      const t = dg(f.telefone);
+      if (!t) continue;
+      if (String(f.origem || '') === 'remarcar' || f.reagendarColeta === true ||
+          String(f.id || '').startsWith('fic_reag_') || String(f.id || '').startsWith('rem_')) {
+        noAtendimento.set(t, String(f.status || '?'));
+      }
+    }
+    const itens = [];
+    for (let i = 0; i < dias; i++) {
+      const d = new Date(Date.now() - 3 * 3600000 - i * 86400000).toISOString().slice(0, 10);
+      const lg = await dbGet('log_remarcar_' + d);
+      for (const x of ((lg || {}).itens || [])) itens.push({ ...x, dia: d });
+    }
+    const comConfirmacao = itens.map(x => {
+      const st = noAtendimento.get(dg(x.telefone));
+      return { ...x, aindaNoAtendimento: !!st, statusAtual: st || null };
+    });
+    const erros = comConfirmacao.filter(x => x.resultado === 'erro');
+    const porDia = comConfirmacao.reduce((o, x) => {
+      o[x.dia] = o[x.dia] || { total: 0, confirmadas: 0, erros: 0 };
+      o[x.dia].total++;
+      if (x.resultado === 'confirmada') o[x.dia].confirmadas++;
+      if (x.resultado === 'erro') o[x.dia].erros++;
+      return o; }, {});
+    return res.status(200).json({ ok: erros.length === 0,
+      periodoDias: dias,
+      total: itens.length,
+      confirmadas: comConfirmacao.filter(x => x.resultado === 'confirmada').length,
+      comErro: erros.length,
+      POR_DIA: porDia,
+      ERROS: erros.map(x => String(x.ts).slice(5, 16).replace('T', ' ') + ' | ' + x.sistema +
+        ' | ' + String(x.nome).slice(0, 18) + ' | ' + x.detalhe),
+      L: comConfirmacao.slice(0, 80).map(x =>
+        (x.resultado === 'confirmada' ? '✅' : '🚨') + ' ' +
+        String(x.ts).slice(5, 16).replace('T', ' ') + ' | ' + String(x.sistema || '').toUpperCase().padEnd(3) +
+        ' | ' + String(x.nome).slice(0, 18).padEnd(18) + ' ' + String(x.telefone).slice(-4) +
+        ' | ' + String(x.equipamento).slice(0, 20).padEnd(20) +
+        ' | ' + (x.aindaNoAtendimento ? 'atendimento: ' + x.statusAtual : 'já avançou') +
+        ' | ' + String(x.motivo).slice(0, 40)) });
+  }
 
   // ── 🔁 PROCESSAR-PENDENTES: retoma as devoluções que não persistiram ──
   if (action === 'processar-pendentes') {
