@@ -227,15 +227,35 @@ async function remarcarParaProspeccao(ficha, motivo, sistema, quem) {
       const achou = (conf.fichas || []).some(x => d8(x.telefone) === d8(ficha.telefone) &&
         (String(x.origem || '') === 'remarcar' || x.reagendarColeta === true));
       if (!achou) {
-        // segunda tentativa, relendo o estado mais recente
-        const novo = (await dbGet(KEYP)) || { fichas: [] };
-        novo.fichas = novo.fichas || [];
-        novo.fichas.unshift(pdb.fichas[0]);
-        await dbSet(KEYP, novo);
-        const conf2 = (await dbGet(KEYP)) || { fichas: [] };
-        const ok2 = (conf2.fichas || []).some(x => d8(x.telefone) === d8(ficha.telefone) &&
-          (String(x.origem || '') === 'remarcar' || x.reagendarColeta === true));
-        if (!ok2) return { ok: false, erro: 'gravação não persistiu — ficha NÃO devolvida' };
+        // 🔁 até 3 tentativas, relendo o estado mais recente a cada vez.
+        // O banco perto do limite de 1 MB recusa gravações de forma intermitente.
+        let ok2 = false;
+        for (let tent = 1; tent <= 3 && !ok2; tent++) {
+          await new Promise(s => setTimeout(s, 250 * tent));
+          const novo = (await dbGet(KEYP)) || { fichas: [] };
+          novo.fichas = novo.fichas || [];
+          novo.fichas.unshift(pdb.fichas[0]);
+          await dbSet(KEYP, novo);
+          const conf2 = (await dbGet(KEYP)) || { fichas: [] };
+          ok2 = (conf2.fichas || []).some(x => d8(x.telefone) === d8(ficha.telefone) &&
+            (String(x.origem || '') === 'remarcar' || x.reagendarColeta === true));
+        }
+        if (!ok2) {
+          // 📌 falhou 3 vezes: registra na fila de pendências para o vigia retomar,
+          // e devolve erro para a ficha PERMANECER na coluna Remarcar
+          try {
+            const pend = (await dbGet('remarcar_pendentes')) || { itens: [] };
+            pend.itens = (pend.itens || []).filter(x => x.telefone !== ficha.telefone);
+            pend.itens.unshift({ telefone: ficha.telefone, nome: ficha.nome,
+              equipamento: ficha.equipamento || ficha.descricao || '',
+              defeito: ficha.defeito || '', endereco: ficha.endereco || '',
+              motivo: String(motivo || ''), sistema, fichaId: ficha.id,
+              tentativas: 3, em: new Date().toISOString() });
+            pend.itens = pend.itens.slice(0, 200);
+            await dbSet('remarcar_pendentes', pend);
+          } catch (e) {}
+          return { ok: false, erro: 'gravação não persistiu após 3 tentativas — ficha mantida na coluna e registrada em remarcar_pendentes' };
+        }
       }
     } catch (e) { return { ok: false, erro: 'falha ao confirmar: ' + e.message }; }
     // 🚪 a ficha SAI da coluna Remarcar — ela vive agora na prospecção.
@@ -266,6 +286,34 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const action = req.query.action
+
+  // ── 🔁 PROCESSAR-PENDENTES: retoma as devoluções que não persistiram ──
+  if (action === 'processar-pendentes') {
+    const pend = (await dbGet('remarcar_pendentes')) || { itens: [] };
+    const itens = pend.itens || [];
+    if (!itens.length) return res.status(200).json({ ok: true, pendentes: 0, msg: 'nada pendente' });
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia', pendentes: itens.length,
+        L: itens.map(i => String(i.nome || '?').slice(0, 20) + ' ' +
+          String(i.telefone || '').slice(-4) + ' | ' + i.sistema + ' | ' +
+          String(i.em || '').slice(5, 16).replace('T', ' ') + ' | ' + (i.motivo || '')),
+        dica: 'para retomar: &aplicar=1' });
+    }
+    const feitos = [], restam = [];
+    for (const i of itens) {
+      const r = await remarcarParaProspeccao(
+        { id: i.fichaId, nome: i.nome, telefone: i.telefone, equipamento: i.equipamento,
+          defeito: i.defeito, endereco: i.endereco },
+        i.motivo, i.sistema, 'retomada-automatica');
+      if (r.ok) feitos.push(String(i.nome || '?').slice(0, 20)); else restam.push(i);
+      await new Promise(s => setTimeout(s, 200));
+    }
+    await dbSet('remarcar_pendentes', { itens: restam });
+    return res.status(200).json({ ok: restam.length === 0,
+      resolvidas: feitos.length, feitos,
+      aindaPendentes: restam.length,
+      alerta: restam.length ? '🚨 ' + restam.length + ' ainda não persistiram — banco pode estar no limite' : undefined });
+  }
 
   // ── 🔧 RECRIAR-PERDIDAS: fichas marcadas como devolvidas que não existem no atendimento ──
   if (action === 'recriar-perdidas') {
