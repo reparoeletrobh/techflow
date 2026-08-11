@@ -454,10 +454,10 @@ export default async function handler(req,res){
     if(alvo.length<4)return res.status(400).json({ok:false,error:'informe ?tel= com pelo menos 4 dígitos finais'});
     // casa pelo FINAL do número: 4 dígitos já servem para investigar
     const bate=t=>String(t||'').replace(/\D/g,'').endsWith(alvo);
-    const [pros,fA,fT,lgA,lgT,ppA,exc]=await Promise.all([
+    const [pros,fA,fT,lgA,lgT,ppA,exc,ppT]=await Promise.all([
       dbGet(KEY),dbGet('fichas_adm'),dbGet('fichas_tv'),
       dbGet('reparoeletro_logistica'),dbGet('tv_logistica'),
-      dbGet('reparoeletro_pipe'),dbGet('prospeccao_excluidos')]);
+      dbGet('reparoeletro_pipe'),dbGet('prospeccao_excluidos'),dbGet('tv_pipe')]);
     const achados=[];
     const varre=(nome,arr,campos)=>{
       for(const x of (arr||[])){

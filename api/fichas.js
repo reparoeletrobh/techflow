@@ -92,6 +92,62 @@ export default async function handler(req, res) {
 
   const action = req.query.action || (req.body && req.body.action) || '';
 
+  // ── 🔬 AUDITAR-CRIADAS: o que há na coluna Ficha Criada, dado por dado ──
+  if (action === 'auditar-criadas') {
+    const sis = String(req.query.sistema || 'adm').toLowerCase();
+    const chave = sis === 'tv' ? KEY_TV : KEY_ADM;
+    const db = (await dbGet(chave)) || { fichas: [] };
+    const lista = db.fichas || [];
+    const criadas = lista.filter(f => String(f.status || '') === 'criada');
+    const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+
+    // duplicatas por telefone dentro das criadas
+    const porTel = {};
+    for (const f of criadas) { const t = d8(f.telefone); if (t) (porTel[t] = porTel[t] || []).push(f); }
+    const dups = Object.entries(porTel).filter(([, v]) => v.length > 1);
+
+    // o mesmo cliente já está em operação em outro lugar?
+    const emOperacao = new Set();
+    for (const k of ['reparoeletro_logistica', 'tv_logistica', 'reparoeletro_pipe', 'tv_pipe']) {
+      try {
+        const b = await dbGet(k);
+        for (const L of ['fichas', 'cards']) for (const x of ((b || {})[L] || [])) emOperacao.add(d8(x.telefone));
+      } catch (e) {}
+    }
+    const jaEmOperacao = criadas.filter(f => emOperacao.has(d8(f.telefone)));
+
+    return res.status(200).json({ ok: true, sistema: sis,
+      totalNoBanco: lista.length,
+      naColunaFichaCriada: criadas.length,
+      PROBLEMAS: {
+        semTelefone: criadas.filter(f => d8(f.telefone).length < 8).length,
+        semNome: criadas.filter(f => !String(f.nome || '').trim()).length,
+        semEquipamento: criadas.filter(f => !String(f.equipamento || '').trim()).length,
+        semData: criadas.filter(f => !f.criadoEm && !f.registradoEm).length,
+        telefonesDuplicados: dups.length,
+        jaEstaoEmOperacao: jaEmOperacao.length,
+      },
+      POR_DIA: criadas.reduce((o, f) => {
+        const d = String(f.criadoEm || f.registradoEm || '').slice(0, 10) || '(sem data)';
+        o[d] = (o[d] || 0) + 1; return o; }, {}),
+      POR_ORIGEM: criadas.reduce((o, f) => {
+        const k = String(f.id || '').startsWith('sc_') ? 'sync-completo'
+          : String(f.id || '').startsWith('rec_') ? 'recuperada'
+          : String(f.id || '').startsWith('fic_reag_') ? 'retorno do remarcar'
+          : String(f.id || '').startsWith('fsh_') ? 'planilha' : 'outra';
+        o[k] = (o[k] || 0) + 1; return o; }, {}),
+      DUPLICADAS: dups.slice(0, 20).map(([t, v]) => t.slice(-4) + ' ×' + v.length + ' → ' +
+        v.map(f => String(f.nome || '?').slice(0, 14) + '[' + String(f.id || '').slice(0, 12) + ']').join(' | ')),
+      JA_EM_OPERACAO: jaEmOperacao.slice(0, 20).map(f => String(f.nome || '?').slice(0, 20) +
+        ' ' + d8(f.telefone).slice(-4) + ' | criada ' + String(f.criadoEm || '').slice(0, 10) +
+        ' — cliente já tem ficha na logística ou no pipe'),
+      AMOSTRA: criadas.slice(0, 25).map(f => String(f.nome || '?').slice(0, 20).padEnd(20) +
+        ' ' + d8(f.telefone).slice(-4) + ' | ' + String(f.equipamento || '(sem equipamento)').slice(0, 24) +
+        ' | ' + String(f.criadoEm || '(sem data)').slice(0, 10) +
+        ' | ' + String(f.id || '').slice(0, 14)) });
+  }
+
   // ── 🔧 CORRIGIR-STATUS: fichas criadas com status inexistente não aparecem na tela ──
   if (action === 'corrigir-status-recuperadas') {
     let mudadas = 0; const lista = [];
