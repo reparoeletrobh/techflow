@@ -94,6 +94,16 @@ export default async function handler(req, res) {
           ' | semana ' + String(v.semana).padStart(2) +
           ' | aprovadas ' + String(v.aprovadas).padStart(2) +
           (v.reprovadas ? ' | reprovadas ' + v.reprovadas : '')),
+      // 📋 as OSs de cada técnico, para ver quais são e não só quantas
+      OSS_POR_TECNICO: Object.fromEntries(Object.keys(porTecnico).map(t => [t,
+        insp.filter(i => String(i.tecnico || '(sem técnico)') === t &&
+            dia(i.criadoEm) >= iniSemana)
+          .sort((a, b) => String(b.criadoEm).localeCompare(String(a.criadoEm)))
+          .map(i => (i.os || i.id) + ' | ' + String(i.cliente || '?').slice(0, 20) +
+            ' | ' + String(i.equipamentoTexto || i.equipamento || '').slice(0, 24) +
+            ' | ' + (i.status === 'aprovado' ? '✅ aprovada'
+              : i.reprovadoEm ? '🔧 retrabalho' : '⏳ aguardando') +
+            ' | ' + String(i.criadoEm || '').slice(5, 10).split('-').reverse().join('/'))])),
       detalhePorTecnico: porTecnico });
   }
 

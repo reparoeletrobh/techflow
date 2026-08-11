@@ -229,6 +229,16 @@ module.exports = async function handler(req, res) {
           ' | semana ' + String(v.semana).padStart(2) +
           ' | resolvidas ' + String(v.resolvidas).padStart(2) +
           ' | total ' + v.total),
+      // 📋 as garantias de cada técnico, nominalmente
+      GARANTIAS_POR_TECNICO: Object.fromEntries(Object.keys(porTecnico).map(t => [t,
+        lista.filter(f => String(f.tecnicoOrigem || f.tecnico || '(sem técnico)') === t &&
+            dia(f.criadoEm || f.em) >= iniSemana)
+          .sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')))
+          .map(f => String(f.nome || f.cliente || '?').slice(0, 20) +
+            ' ' + String(f.telefone || '').slice(-4) +
+            ' | ' + String(f.equipamento || f.descricao || '').slice(0, 22) +
+            ' | ' + String(f.faseId || f.status || f.phase || '?') +
+            ' | ' + (f.tipo || '?'))])),
       observacao: 'o técnico da garantia vem de tecnicoOrigem — garantias antigas podem não ter esse campo' });
   }
 

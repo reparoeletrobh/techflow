@@ -255,9 +255,30 @@ async function carregarPainelMeta(){
       + ((c.ENTRARAM&&c.ENTRARAM.deGarantiaHoje) ? kpi(c.ENTRARAM.deGarantiaHoje, 'DE GARANTIA (fora da meta)', '#a78bfa') : '')
     + '</div>'
     + ((c.POR_TECNICO&&c.POR_TECNICO.length)
-      ? '<div style="font-size:11px;font-weight:900;color:#8b93a3;margin-top:12px;">👨‍🔧 POR TÉCNICO</div>'
-        + '<div class="mt-tec">'+c.POR_TECNICO.map(t=>String(t).replace(/</g,'&lt;')).join('<br>')+'</div>'
+      ? '<div style="font-size:11px;font-weight:900;color:#8b93a3;margin-top:12px;">👨‍🔧 POR TÉCNICO <span style="font-weight:400;color:#5a6270;">— clique para ver as OSs</span></div>'
+        + '<div class="mt-tec">'+c.POR_TECNICO.map(function(t){
+            var nome = String(t).split('|')[0].trim();
+            return '<div style="cursor:pointer;padding:2px 0;" onclick="verOssTecnico(\''+nome.replace(/'/g,"")+'\')" '
+              + 'onmouseover="this.style.color=\'#60a5fa\'" onmouseout="this.style.color=\'\'">'
+              + '▸ '+String(t).replace(/</g,'&lt;')+'</div>';
+          }).join('')+'</div>'
+        + '<div id="oss-tecnico"></div>'
       : '')
+  + '</div>';
+  window._ossPorTecnico = c.OSS_POR_TECNICO || {};
+}
+function verOssTecnico(nome){
+  const alvo = document.getElementById('oss-tecnico');
+  if(!alvo) return;
+  const lista = (window._ossPorTecnico||{})[nome] || [];
+  if(alvo.dataset.aberto === nome){ alvo.innerHTML=''; alvo.dataset.aberto=''; return; }
+  alvo.dataset.aberto = nome;
+  alvo.innerHTML = '<div style="background:#0f1319;border:1px solid #2a3140;border-radius:9px;padding:10px 12px;margin-top:9px;">'
+    + '<div style="font-size:11.5px;font-weight:900;color:#60a5fa;margin-bottom:7px;">📋 '+nome+' — '+lista.length+' OS(s) nesta semana</div>'
+    + (lista.length
+      ? '<div style="font-family:ui-monospace,monospace;font-size:10.5px;color:#c9ced6;line-height:1.9;max-height:260px;overflow-y:auto;">'
+        + lista.map(function(x){return String(x).replace(/</g,'&lt;');}).join('<br>')+'</div>'
+      : '<div style="font-size:11px;color:#5a6270;">nenhuma OS nesta semana</div>')
   + '</div>';
 }
 
