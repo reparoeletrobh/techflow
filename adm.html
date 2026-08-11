@@ -59,6 +59,45 @@
 </script>
 
 <script>
+// ── 🩺 EXAME DO SISTEMA: mostra problemas reais no topo do menu ──
+async function exameDoSistema(){
+  var el = document.getElementById('painel-exame');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'painel-exame';
+    el.style.cssText = 'margin:0 0 12px;';
+    var nav = document.querySelector('.nav-grid') || document.querySelector('main') || document.body;
+    nav.parentNode.insertBefore(el, nav);
+  }
+  var r = null;
+  try { r = await fetch('/api/vigia?action=exame-completo&horas=48').then(function(x){return x.json();}); } catch(e){}
+  if(!r){ el.innerHTML=''; return; }
+  if(r.ok){
+    el.innerHTML = '<div style="background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.3);'
+      + 'border-radius:11px;padding:9px 13px;font-size:12px;color:#4ade80;font-weight:700;">'
+      + '✅ Sistema sem pendências — nenhuma ficha perdida</div>';
+    return;
+  }
+  var e2 = function(s){ return String(s||'').replace(/</g,'&lt;'); };
+  var bloco = function(tit,arr,cor){
+    if(!arr||!arr.length) return '';
+    return '<div style="margin-top:9px;"><div style="font-size:11px;font-weight:900;color:'+cor+';">'+tit+' ('+arr.length+')</div>'
+      + '<div style="background:#0f1319;border:1px solid #1e2228;border-radius:8px;padding:8px 10px;margin-top:4px;'
+      + 'font-family:ui-monospace,monospace;font-size:10.5px;color:#c9ced6;line-height:1.85;max-height:200px;overflow-y:auto;">'
+      + arr.map(function(x){return '• '+e2(x);}).join('<br>')+'</div></div>';
+  };
+  el.innerHTML = '<div style="background:#0d1117;border:1px solid rgba(239,68,68,.35);border-radius:13px;padding:13px 15px;">'
+    + '<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">'
+      + '<span style="font-size:13.5px;font-weight:900;color:#f87171;">🩺 '+e2(r.VEREDITO)+'</span>'
+      + '<button onclick="exameDoSistema()" style="margin-left:auto;background:#374151;border:none;'
+      + 'border-radius:7px;padding:4px 10px;color:#fff;font-weight:700;cursor:pointer;font-size:11px;">↻</button>'
+    + '</div>'
+    + bloco('🔴 GRAVES — resolver hoje', r.GRAVES, '#f87171')
+    + bloco('🟠 MÉDIOS', r.MEDIOS, '#fbbf24')
+    + bloco('🟡 LEVES', r.LEVES, '#a78bfa')
+  + '</div>';
+}
+
 // ── 🏷️ badge do menu Qualidade: entraram hoje / concluídas hoje ──
 async function atualizarBadgeQualidade(){
   var el = document.getElementById('nav-cq-badge');
@@ -1083,7 +1122,8 @@ async function checarAlmox(){
 checarConflitos(true);
 checarAlmox();
 atualizarBadgeQualidade();
-setInterval(function(){ if(!document.hidden){ checarConflitos(false); checarAlmox(); atualizarBadgeQualidade(); } }, 120000);
+exameDoSistema();
+setInterval(function(){ if(!document.hidden){ checarConflitos(false); checarAlmox(); atualizarBadgeQualidade(); exameDoSistema(); } }, 300000);
 </script>
 
 </body>

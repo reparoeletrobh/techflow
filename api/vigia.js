@@ -319,6 +319,159 @@ module.exports = async function handler(req, res) {
         : '🚨 A GRAVAÇÃO NÃO PERSISTIU — é aqui que as fichas se perdem' });
   }
 
+  // ── 🩺 EXAME-COMPLETO: tudo que pode estar quebrado, num só lugar ──
+  if (action === 'exame-completo') {
+    const horas = Math.min(168, Math.max(1, parseInt(req.query.horas || '48', 10)));
+    const corte = Date.now() - horas * 3600000;
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const P = [];   // problemas
+    const add = (grav, area, o, quem, oque, comoResolver) =>
+      P.push({ gravidade: grav, area, objeto: o, quem, problema: oque, resolver: comoResolver });
+
+    const [fA, fT, lgA, lgT, ppA, ppT, gar, fila, qual, abordados] = await Promise.all([
+      dbGet('fichas_adm'), dbGet('fichas_tv'),
+      dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+      dbGet('reparoeletro_garantia_v2'), dbGet('reparoeletro_garantia_fila'),
+      dbGet('reparoeletro_qualidade'), dbGet('wa_abordados').then(v => v || { tels: {} }),
+    ]);
+
+    // 1️⃣ ficha saiu do remarcar e não chegou ao atendimento
+    const chegou = new Set();
+    for (const b of [fA, fT]) for (const f of (((b || {}).fichas) || [])) {
+      const id = String(f.id || '');
+      if (String(f.origem || '') === 'remarcar' || f.reagendarColeta === true ||
+          id.startsWith('rem_') || id.startsWith('fic_reag_') || id.startsWith('rec_')) {
+        chegou.add(d8(f.telefone));
+      }
+    }
+    for (const [b, sis] of [[lgA, 'ADM'], [lgT, 'TV']]) {
+      for (const f of (((b || {}).fichas) || [])) {
+        const q = new Date(f.enviadoProspeccaoEm || f.remarcadoEm || 0).getTime();
+        if (!q || q < corte) continue;
+        if (chegou.has(d8(f.telefone))) continue;
+        add('🔴 GRAVE', 'Remarcar', sis, (f.nome || '?') + ' ' + d8(f.telefone).slice(-4),
+          'saiu da coluna e não há ficha no atendimento',
+          '/api/logistica?action=recriar-perdidas&dia=' + hoje + '&aplicar=1');
+      }
+    }
+
+    // 2️⃣ ficha abordada travada em "criada"
+    for (const [b, sis] of [[fA, 'ADM'], [fT, 'TV']]) {
+      for (const f of (((b || {}).fichas) || [])) {
+        if (String(f.status || '') !== 'criada') continue;
+        if (!abordados.tels[d8(f.telefone)]) continue;
+        add('🟠 MÉDIO', 'Fichas', sis, (f.nome || '?') + ' ' + d8(f.telefone).slice(-4),
+          'foi abordada pelo bot mas continua em Ficha Criada',
+          '/api/wa-bot?action=destravar-criadas&aplicar=1');
+      }
+    }
+
+    // 3️⃣ garantia sem tipo — invisível
+    for (const f of (((gar || {}).fichas) || [])) {
+      if (f.tipo) continue;
+      add('🟠 MÉDIO', 'Garantia', '', (f.nome || '?') + ' ' + d8(f.telefone).slice(-4),
+        'sem tipo — não aparece em nenhuma coluna', 'atribuir o tipo na tela de garantia');
+    }
+
+    // 4️⃣ garantia de loja que não está na fila
+    const naFila = new Set((((fila || {}).itens) || [])
+      .filter(i => i.status !== 'resolvido').map(i => d8(i.telefone)));
+    for (const f of (((gar || {}).fichas) || [])) {
+      if (f.concluida) continue;
+      const t = String(f.tipo || '');
+      const deveEstar = (t === 'loja_imediata' || t === 'loja_acompanhamento') ||
+        (t === 'rua' && f.faseId === 'equip_recolhido');
+      if (!deveEstar || naFila.has(d8(f.telefone))) continue;
+      add('🟡 LEVE', 'Garantia', t, (f.nome || '?') + ' ' + d8(f.telefone).slice(-4),
+        'deveria estar na fila de tratamento e não está',
+        '/api/garantia?action=sincronizar-fila&aplicar=1');
+    }
+
+    // 5️⃣ inspeção de qualidade sem técnico
+    for (const i of (((qual || {}).inspecoes) || [])) {
+      if (i.tecnico || i.status === 'aprovado') continue;
+      const q = new Date(i.criadoEm || 0).getTime();
+      if (!q || q < corte) continue;
+      add('🟡 LEVE', 'Qualidade', i.os || '', i.cliente || '?',
+        'inspeção sem técnico responsável', 'informar o técnico na tela de qualidade');
+    }
+
+    // 6️⃣ card no pipe sem valor em fase que exige
+    const EXIGE_VALOR = ['aprovados', 'producao', 'solicitar_entrega', 'erp'];
+    for (const [b, sis] of [[ppA, 'ADM'], [ppT, 'TV']]) {
+      for (const c of (((b || {}).cards) || [])) {
+        const fase = String(c.phaseId || c.phase || '');
+        if (!EXIGE_VALOR.includes(fase)) continue;
+        if (Number(c.valor || 0) > 0) continue;
+        add('🟠 MÉDIO', 'Pipe', sis, (c.nomeContato || c.nome || '?') + ' ' + d8(c.telefone).slice(-4),
+          'card em ' + fase + ' sem valor definido', 'informar o valor no card');
+      }
+    }
+
+    // 7️⃣ mensagens presas esperando a janela reabrir
+    try {
+      const pend = await dbGet('wa_pendentes_janela');
+      for (const it of (((pend || {}).itens) || [])) {
+        const dias = (Date.now() - new Date(it.criadoEm || 0).getTime()) / 86400000;
+        if (dias < 2) continue;
+        add('🟡 LEVE', 'WhatsApp', '', String(it.tel || '').slice(-4),
+          'mensagem aguarda há ' + dias.toFixed(0) + ' dias o cliente responder ao template',
+          'ligar para o cliente — ele não respondeu ao WhatsApp');
+      }
+    } catch (e) {}
+
+    // 8️⃣ devoluções do remarcar que falharam
+    try {
+      const lg = await dbGet('log_remarcar_' + hoje);
+      for (const x of (((lg || {}).itens) || [])) {
+        if (x.resultado !== 'erro') continue;
+        add('🔴 GRAVE', 'Remarcar', x.sistema, (x.nome || '?') + ' ' + String(x.telefone).slice(-4),
+          'a devolução falhou: ' + (x.detalhe || ''),
+          '/api/logistica?action=processar-pendentes&aplicar=1');
+      }
+    } catch (e) {}
+
+    // 9️⃣ tamanho dos bancos
+    const tam = {};
+    for (const [k] of BANCOS) {
+      try {
+        const b = await dbGet(k);
+        if (!b) continue;
+        const t = JSON.stringify(b).length;
+        tam[k] = (t / 1048576).toFixed(2) + ' MB';
+        if (t > 900000) add('🟠 MÉDIO', 'Banco', k, '',
+          'com ' + (t / 1048576).toFixed(2) + ' MB — perto do limite, gravações podem falhar',
+          'arquivar registros antigos');
+      } catch (e) {}
+    }
+
+    const porGravidade = P.reduce((o, x) => { o[x.gravidade] = (o[x.gravidade] || 0) + 1; return o; }, {});
+    const porArea = P.reduce((o, x) => { o[x.area] = (o[x.area] || 0) + 1; return o; }, {});
+    // histórico
+    try {
+      const hst = (await dbGet('vigia_exame')) || { dias: {} };
+      hst.dias[hoje] = { em: new Date().toISOString(), total: P.length, porArea };
+      await dbSet('vigia_exame', hst);
+    } catch (e) {}
+
+    return res.status(200).json({ ok: P.length === 0,
+      janelaHoras: horas,
+      VEREDITO: P.length === 0 ? '✅ nenhum problema encontrado'
+        : '🚨 ' + P.length + ' problema(s): ' + Object.entries(porGravidade)
+            .map(([g, n]) => n + ' ' + g).join(' · '),
+      POR_GRAVIDADE: porGravidade,
+      POR_AREA: porArea,
+      TAMANHO_DOS_BANCOS: tam,
+      GRAVES: P.filter(x => x.gravidade.includes('GRAVE'))
+        .map(x => x.area + ' | ' + x.quem + ' | ' + x.problema + ' → ' + x.resolver),
+      MEDIOS: P.filter(x => x.gravidade.includes('MÉDIO'))
+        .map(x => x.area + ' | ' + x.quem + ' | ' + x.problema),
+      LEVES: P.filter(x => x.gravidade.includes('LEVE'))
+        .map(x => x.area + ' | ' + x.quem + ' | ' + x.problema),
+      COMO_RESOLVER: [...new Set(P.map(x => x.resolver).filter(r => r.startsWith('/api')))] });
+  }
+
   // ── 📈 HISTORICO: evolução dos problemas ao longo dos dias ──
   if (action === 'historico') {
     const h = (await dbGet('vigia_historico')) || { dias: {} };
