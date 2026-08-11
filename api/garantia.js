@@ -189,6 +189,26 @@ module.exports = async function handler(req, res) {
   }
 
   // ── 📊 CONTADORES: garantias por dia, semana e por técnico ──
+  // ── 🔎 VER-FICHA: mostra a ficha crua, sem interpretação ──
+  if (action === 'ver-ficha') {
+    const q = String(req.query.q || '').replace(/\D/g, '');
+    const db = (await dbGet(GARANTIA_KEY)) || {};
+    const CH = Object.keys(db);
+    const achados = [];
+    for (const L of ['fichas', 'cards', 'itens']) {
+      for (const f of ((db[L]) || [])) {
+        if (q && !String(f.telefone || '').replace(/\D/g, '').endsWith(q)) continue;
+        achados.push({ _lista: L, ...f });
+      }
+    }
+    return res.status(200).json({ ok: true,
+      chaveLida: 'reparoeletro_garantia_v2',
+      listasNoBanco: CH,
+      tamanhoDeCadaLista: Object.fromEntries(CH.map(k => [k, Array.isArray(db[k]) ? db[k].length : typeof db[k]])),
+      encontradas: achados.length,
+      FICHAS: achados.slice(0, 3) });
+  }
+
   if (action === 'contadores') {
     const db = (await dbGet(GARANTIA_KEY)) || { fichas: [] };
     const lista = db.fichas || db.cards || [];
