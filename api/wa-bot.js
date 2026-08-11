@@ -2877,6 +2877,76 @@ export default async function handler(req, res) {
         ' | R$ ' + x.valor + ' — ' + x.motivo) });
   }
 
+  // ── 🔓 DESTRAVAR-CRIADAS: ficha abordada que ficou presa em "criada" ──
+  // O bot marca o telefone como abordado num banco pequeno e muda o status da ficha
+  // num banco grande. Quando a segunda gravação é sobrescrita, a ficha fica travada:
+  // não é abordada de novo (já consta abordada) e não avança (o status não mudou).
+  if (action === 'destravar-criadas') {
+    const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const [fa, ft, abordados, evts] = await Promise.all([
+      dbGet('fichas_adm'), dbGet('fichas_tv'),
+      dbGet('wa_abordados').then(v => v || { tels: {} }), lerEvts(),
+    ]);
+    // última mensagem recebida de cada telefone
+    const ultimaIn = {};
+    for (const e of (evts || [])) {
+      if (e.dir !== 'in') continue;
+      const d = d8f(e.tel);
+      if (!ultimaIn[d] || String(e.ts) > String(ultimaIn[d])) ultimaIn[d] = e.ts;
+    }
+    const presas = [];
+    for (const [chave, db, sis] of [['fichas_adm', fa, 'ADM'], ['fichas_tv', ft, 'TV']]) {
+      for (const f of (((db || {}).fichas) || [])) {
+        if (String(f.status || '') !== 'criada') continue;
+        const d8 = d8f(f.telefone);
+        const quandoAbordado = abordados.tels[d8];
+        const respondeu = ultimaIn[d8];
+        if (!quandoAbordado && !respondeu) continue;    // nunca abordada: fica como está
+        presas.push({ chave, sis, f, quandoAbordado, respondeu });
+      }
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        presas: presas.length,
+        L: presas.map(p => p.sis + ' | ' + String(p.f.nome || '?').slice(0, 20) +
+          ' ' + d8f(p.f.telefone).slice(-4) +
+          ' | abordada ' + (p.quandoAbordado ? String(p.quandoAbordado).slice(5, 16).replace('T', ' ') : 'não') +
+          ' | cliente respondeu ' + (p.respondeu ? 'sim' : 'não') +
+          ' → vai para ' + (p.respondeu ? 'contato_feito (conversa ativa)' : 'contato_feito')),
+        dica: 'para destravar: &aplicar=1' });
+    }
+    const feitos = [];
+    for (const chave of ['fichas_adm', 'fichas_tv']) {
+      const db = await dbGet(chave);
+      if (!db || !Array.isArray(db.fichas)) continue;
+      let mudou = 0;
+      for (const f of db.fichas) {
+        if (String(f.status || '') !== 'criada') continue;
+        const d8 = d8f(f.telefone);
+        const q = abordados.tels[d8];
+        const r = ultimaIn[d8];
+        if (!q && !r) continue;
+        f.status = 'contato_feito';
+        f.contatoFeitoEm = f.contatoFeitoEm || q || r || new Date().toISOString();
+        f.abordadoPorBot = true;
+        f.destravadaEm = new Date().toISOString();
+        feitos.push(String(f.nome || '?').slice(0, 20) + ' ' + d8.slice(-4));
+        mudou++;
+      }
+      if (mudou) {
+        await dbSet(chave, db);
+        // confirma que persistiu
+        const conf = await dbGet(chave);
+        const ainda = ((conf || {}).fichas || []).filter(x => String(x.status || '') === 'criada' &&
+          (abordados.tels[d8f(x.telefone)] || ultimaIn[d8f(x.telefone)])).length;
+        if (ainda) return res.status(200).json({ ok: false,
+          error: '🚨 gravação não persistiu — ' + ainda + ' ainda presas em ' + chave,
+          destravadas: feitos.length });
+      }
+    }
+    return res.status(200).json({ ok: true, destravadas: feitos.length, feitos });
+  }
+
   // ── 🔮 O-QUE-O-BOT-FARA: ação prevista para cada ficha, uma a uma ──
   if (action === 'o-que-o-bot-fara') {
     const d8f = t => String(t || '').replace(/\D/g, '').slice(-8);
