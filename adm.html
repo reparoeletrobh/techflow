@@ -1082,7 +1082,8 @@ async function checarAlmox(){
 }
 checarConflitos(true);
 checarAlmox();
-setInterval(function(){ if(!document.hidden){ checarConflitos(false); checarAlmox(); } }, 120000);
+atualizarBadgeQualidade();
+setInterval(function(){ if(!document.hidden){ checarConflitos(false); checarAlmox(); atualizarBadgeQualidade(); } }, 120000);
 </script>
 
 </body>
