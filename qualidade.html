@@ -548,12 +548,21 @@ async function aprovar(){
 async function reprovar(){
   var ck=coletaChecklist();
   var falhas=[];
-  itensDe(_atual).forEach(function(it){
-    if((ck[it.id]||{}).v==='falha')falhas.push({item:it.t,obs:(ck[it.id]||{}).obs||''});
+  // 🔍 lê as falhas do PRÓPRIO checklist marcado, não da lista teórica de itens.
+  // Quando o equipamento da ficha não bate com nenhuma categoria conhecida, a lista
+  // vinha vazia e o botão recusava dizendo que nada foi marcado.
+  var mapa={};
+  (itensDe(_atual)||[]).forEach(function(it){ mapa[it.id]=it.t; });
+  Object.keys(ck||{}).forEach(function(id){
+    if((ck[id]||{}).v==='falha') falhas.push({item:mapa[id]||id,obs:(ck[id]||{}).obs||''});
   });
   if(!falhas.length){alert('Marque com ✗ os itens que falharam antes de reprovar.');return;}
-  var semObs=falhas.filter(function(f){return !f.obs;});
-  if(semObs.length){alert('Descreva o que foi encontrado nos itens com ✗ (é o que volta para o técnico).');return;}
+  var semObs=falhas.filter(function(f){return !String(f.obs||'').trim();});
+  if(semObs.length){
+    alert('Descreva o que foi encontrado nestes itens marcados com ✗:\n\n'
+      + semObs.map(function(f){return '• '+f.item;}).join('\n'));
+    return;
+  }
   var insp=document.getElementById('i-inspetor').value;
   if(!insp){alert('Informe o inspetor.');return;}
   if(!confirm('Reprovar e enviar para retrabalho?\n\n'+falhas.map(function(f){return '✗ '+f.item;}).join('\n')))return;
@@ -561,8 +570,9 @@ async function reprovar(){
   var r=await fetch('/api/qualidade?action=reprovar',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({id:_atual.id,checklist:ck,inspetor:insp,itensFalhos:falhas})}).then(function(x){return x.json();}).catch(function(){return{ok:false};});
   b.disabled=false;
-  if(r.ok){fechar('ov-insp');load();}
-  else alert('Erro: '+(r.error||'falha'));
+  if(r.ok){fechar('ov-insp');load();carregarPainelMeta();}
+  else alert('Não consegui reprovar: '+(r.error||'o servidor não respondeu')
+    +'\n\nSe persistir, recarregue a página e tente de novo.');
 }
 async function reinspecionar(id){
   if(!confirm('O equipamento voltou do retrabalho? O checklist será reiniciado para nova inspeção.'))return;
