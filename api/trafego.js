@@ -782,7 +782,16 @@ module.exports = async function handler(req, res) {
       }
       if (r && r.error) erros.push({ id: alvo, nome: o.nome || null,
         acao: 'orçamento (' + campo + ')', erro: r.error.message, codigo: r.error.code });
-      else feitos.push({ id: alvo, nome: (o.nome || o.anuncio || null), acao: campo + ' → R$ ' + Number(valor).toFixed(2) });
+      else {
+        // 📝 log legível: nome, quanto recebeu e o saldo final
+        const antes = o.verbaAntes != null ? Number(o.verbaAntes) : null;
+        const recebeu = o.recebeu != null ? Number(o.recebeu)
+          : (antes != null ? Number(valor) - antes : null);
+        feitos.push({ id: alvo, nome: (o.nome || o.anuncio || null),
+          acao: (antes != null ? 'R$ ' + antes.toFixed(2) + ' + R$ ' + (recebeu || 0).toFixed(2) + ' = ' : '') +
+            'R$ ' + Number(valor).toFixed(2) + ' (' + (campo === 'daily_budget' ? 'diária' : 'total') + ')',
+          verbaAntes: antes, recebeu, verbaFinal: Number(valor) });
+      }
       await new Promise(r2 => setTimeout(r2, 120));
     }
     // ⛔ DEVOLUÇÃO AUTOMÁTICA DESLIGADA (05/08): verba de campanha PAUSADA não é gasto —
@@ -1884,7 +1893,7 @@ module.exports = async function handler(req, res) {
           criados.length ? criados.length + ' criado(s)' : null,
           erros.length ? erros.length + ' erro(s)' : null].filter(Boolean).join(' · ') || 'sem alterações',
         PAUSADOS: pausas.map(f => (f.nome || f.id) + (f.acao ? ' — ' + f.acao : '')),
-        VERBAS: verbas.map(f => (f.nome || f.id) + ' → ' + f.acao),
+        VERBAS: verbas.map(f => (f.nome ? f.nome : 'campanha ' + String(f.id || '').slice(-6)) + ' → ' + f.acao),
         CRIADOS: criados.map(f => (f.nome || f.id) + ' — ' + f.acao),
         ERROS: erros.map(e => typeof e === 'string' ? e
           : ((e.nome || e.id || e.video || '?') + (e.acao ? ' | ' + e.acao : '') +

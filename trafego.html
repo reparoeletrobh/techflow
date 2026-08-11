@@ -983,10 +983,14 @@ async function aplicarCopiloto(){
       if(d.receber<=0)return;
       var alvo=d.alvoId||d.adsetId;
       if(!alvo)return;
+      // 📝 leva nome e valores para o log registrar de forma legível
+      var extra={nome:d.nome||d.anuncio||d.campanha||null,
+        verbaAntes:(d.verba!=null?d.verba:d.verbaAtual),
+        recebeu:d.receber,campanhaId:d.campanhaId,adsetId:d.adsetId};
       if(d.campoVerba==='lifetime_budget'&&d.verbaNova){
-        orcs.push({alvoId:alvo,campo:'lifetime_budget',valor:d.verbaNova});
+        orcs.push(Object.assign({alvoId:alvo,campo:'lifetime_budget',valor:d.verbaNova},extra));
       }else if(d.diarioNovo){
-        orcs.push({alvoId:alvo,campo:'daily_budget',valor:d.diarioNovo});
+        orcs.push(Object.assign({alvoId:alvo,campo:'daily_budget',valor:d.diarioNovo},extra));
       }
     });
   });
