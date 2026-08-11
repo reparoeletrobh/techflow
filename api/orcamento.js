@@ -148,6 +148,53 @@ module.exports = async function handler(req, res) {
 
   const { action } = req.query;
 
+  // ── 🔍 RASTREAR: onde está um orçamento, em qualquer fase ──
+  if (action === 'rastrear') {
+    const q = String(req.query.q || '').trim();
+    const qd = q.replace(/\D/g, '');
+    if (!q) return res.status(400).json({ ok: false, error: 'informe ?q=nome ou telefone' });
+    const bate = x => {
+      const tel = String(x.telefone || '').replace(/\D/g, '');
+      const nome = String(x.nome || x.nomeContato || x.cliente || '').toLowerCase();
+      return (qd.length >= 3 && tel.endsWith(qd)) || (q.length >= 3 && nome.includes(q.toLowerCase()));
+    };
+    const BANCOS = [
+      ['reparoeletro_orcamentos', 'fichas', '📄 Orçamentos'],
+      ['reparoeletro_pipe', 'cards', '📋 Pipe ADM'],
+      ['tv_pipe', 'cards', '📺 Pipe TV'],
+      ['reparoeletro_logistica', 'fichas', '🚚 Logística ADM'],
+      ['tv_logistica', 'fichas', '🚚 Logística TV'],
+      ['fichas_adm', 'fichas', '📝 Fichas ADM'],
+      ['fichas_tv', 'fichas', '📝 Fichas TV'],
+      ['reparoeletro_arquivo', 'fichas', '📦 Arquivo'],
+    ];
+    const achados = [];
+    for (const [k, L, rotulo] of BANCOS) {
+      try {
+        const b = await dbGet(k);
+        for (const x of ((b || {})[L] || [])) {
+          if (!bate(x)) continue;
+          achados.push({ onde: rotulo,
+            nome: x.nome || x.nomeContato || x.cliente || '?',
+            telefone: x.telefone,
+            equipamento: String(x.equipamento || x.descricao || '').slice(0, 30),
+            fase: String(x.phaseId || x.phase || x.status || '?'),
+            valor: x.valor || 0,
+            quando: x.criadoEm || x.registradoEm || x.movedAt || null });
+        }
+      } catch (e) {}
+    }
+    return res.status(200).json({ ok: achados.length > 0, busca: q,
+      encontrados: achados.length,
+      L: achados.map(a => a.onde + ' | ' + String(a.nome).slice(0, 20) +
+        ' ' + String(a.telefone || '').slice(-4) +
+        ' | ' + a.equipamento + ' | ' + a.fase +
+        (a.valor ? ' | R$ ' + a.valor : '') +
+        (a.quando ? ' | ' + String(a.quando).slice(0, 10) : '')),
+      detalhe: achados });
+  }
+
+
   if (action === "estrutura") {
     try {
       const estrutura = await fetchPipeStructure();

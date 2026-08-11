@@ -70,6 +70,16 @@ h1{font-size:18px;font-weight:900;display:flex;align-items:center;gap:8px;}
     <iframe id="frame-cadastro" style="flex:1;border:none;width:100%;background:#0e1013;"></iframe>
   </div>
 </div>
+<div style="margin:0 0 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+  <input id="busca-fila" placeholder="🔍 rastrear cliente por nome ou telefone…"
+    style="flex:1;min-width:230px;background:#12161d;border:1px solid #2a3140;border-radius:9px;
+    padding:9px 12px;color:#f0f2f5;font-size:12.5px;outline:none;"
+    onkeydown="if(event.key==='Enter')rastrearNaFila()">
+  <button onclick="rastrearNaFila()" style="background:#1d4ed8;border:none;border-radius:9px;
+    padding:9px 15px;color:#fff;font-weight:800;cursor:pointer;font-size:12.5px;">Rastrear</button>
+</div>
+<div id="res-fila"></div>
+
 <div class="kpis">
   <div class="kpi"><b id="k-abertos" style="color:#60a5fa;">—</b><span>ABERTAS</span></div>
   <div class="kpi"><b id="k-hoje" style="color:#4ade80;">—</b><span>RESOLVIDAS HOJE</span></div>
@@ -77,6 +87,33 @@ h1{font-size:18px;font-weight:900;display:flex;align-items:center;gap:8px;}
 </div>
 <div id="lista"><div class="empty">Carregando…</div></div>
 <script>
+// ── 🔍 RASTREAR: procura o cliente na fila e na gestão de garantias ──
+async function rastrearNaFila(){
+  const q = (document.getElementById('busca-fila')||{}).value || '';
+  const alvo = document.getElementById('res-fila');
+  if(!alvo) return;
+  if(!q.trim()){ alvo.innerHTML=''; return; }
+  alvo.innerHTML = '<div style="font-size:12px;color:#8b93a3;padding:8px 0;">⏳ procurando…</div>';
+  let r = null;
+  try { r = await fetch('/api/garantia?action=rastrear&q='+encodeURIComponent(q)).then(x=>x.json()); } catch(e){}
+  if(!r){ alvo.innerHTML='<div style="font-size:12px;color:#f87171;padding:8px 0;">erro na busca</div>'; return; }
+  const e2 = s => String(s||'').replace(/</g,'&lt;');
+  alvo.innerHTML = '<div style="background:#0d1117;border:1px solid #242b39;border-radius:12px;padding:12px 14px;margin-bottom:10px;">'
+    + '<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">'
+      + '<span style="font-size:12.5px;font-weight:900;color:'+(r.encontrados?'#4ade80':'#fbbf24')+';">'
+      + (r.encontrados ? '🔍 '+r.encontrados+' resultado(s) — fila: '+r.naFila+' · gestão: '+r.naGestao
+                       : '🔍 nada encontrado para "'+e2(q)+'"')+'</span>'
+      + '<button style="margin-left:auto;background:#374151;border:none;border-radius:7px;padding:4px 10px;'
+      + 'color:#fff;font-weight:700;cursor:pointer;font-size:11px;" '
+      + 'onclick="document.getElementById(\'res-fila\').innerHTML=\'\';document.getElementById(\'busca-fila\').value=\'\'">✕</button>'
+    + '</div>'
+    + ((r.L&&r.L.length)
+      ? '<div style="background:#0f1319;border:1px solid #1e2228;border-radius:9px;padding:9px 11px;margin-top:8px;'
+        + 'font-family:ui-monospace,monospace;font-size:10.5px;color:#c9ced6;line-height:1.9;max-height:280px;overflow-y:auto;">'
+        + r.L.map(e2).join('<br>')+'</div>' : '')
+  + '</div>';
+}
+
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function fmtTel(t){var d=String(t||'').replace(/\D/g,'');if(d.indexOf('55')===0)d=d.slice(2);
   if(d.length===11)return '('+d.slice(0,2)+') '+d.slice(2,7)+'-'+d.slice(7);
