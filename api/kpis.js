@@ -132,12 +132,28 @@ module.exports = async function handler(req, res) {
   const J = janela(req.query || {});
   const dentro = d => { const t = new Date(d || 0).getTime(); return t >= J.ini && t <= J.fim; };
 
-  const [fA, fT, lgA, lgT, ppA, ppT, inv] = await Promise.all([
+  // 📦 cards e fichas antigas migram para o arquivo — sem incluí-lo, qualquer
+  // período passado aparece com aprovados, orçamentos e logística muito abaixo do real
+  const [fA, fT, lgA, lgT, ppA, ppT, arqA, arqT, inv] = await Promise.all([
     dbGet('fichas_adm'), dbGet('fichas_tv'),
     dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
     dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
+    dbGet('reparoeletro_arquivo'), dbGet('tv_arquivo'),
     investimento(J.de, J.ate),
   ]);
+  // o arquivo guarda tanto cards quanto fichas — separa cada tipo
+  const desmembrar = (arq) => {
+    const cards = [], fichas = [];
+    for (const L of ['cards', 'fichas']) {
+      for (const x of (((arq || {})[L]) || [])) {
+        if (x.phaseId || x.phase || x.aprovadoEm) cards.push(x); else fichas.push(x);
+      }
+    }
+    return { cards, fichas };
+  };
+  const arqAdm = desmembrar(arqA), arqTv = desmembrar(arqT);
+  const juntarCards = (pipe, extra) => ({ cards: (((pipe || {}).cards) || []).concat(extra.cards) });
+  const juntarFichas = (b, extra) => ({ fichas: (((b || {}).fichas) || []).concat(extra.fichas) });
 
   // 📨 conversas vêm SOMENTE da Meta. O histórico deste sistema não serve:
   // quem atende a conversa vinda do anúncio é outro número, e o bot daqui só
@@ -147,8 +163,13 @@ module.exports = async function handler(req, res) {
       f.reagendarColeta === true ||
       String(f.id || '').startsWith('rem_') || String(f.id || '').startsWith('fic_reag_');
     // fichas
+    const vistos = new Set();
+    const unico = x => {
+      const k = String(x.id || '') || (d8(x.telefone) + '|' + String(x.criadoEm || ''));
+      if (vistos.has(k)) return false; vistos.add(k); return true;
+    };
     const fichas = (((fichasDb || {}).fichas) || [])
-      .filter(f => dentro(f.criadoEm || f.registradoEm) && !ehRetorno(f));
+      .filter(f => dentro(f.criadoEm || f.registradoEm) && !ehRetorno(f) && unico(f));
     // logística
     const logs = (((logDb || {}).fichas) || []).filter(f => dentro(f.criadoEm));
     const porBot = logs.filter(f => /bot/i.test(String(f.origem || '') + ' ' + String(f.criadoPor || '')));
@@ -185,8 +206,8 @@ module.exports = async function handler(req, res) {
     };
   }
 
-  const adm = montar(fA, lgA, ppA);
-  const tv = montar(fT, lgT, ppT);
+  const adm = montar(juntarFichas(fA, arqAdm), juntarFichas(lgA, arqAdm), juntarCards(ppA, arqAdm));
+  const tv = montar(juntarFichas(fT, arqTv), juntarFichas(lgT, arqTv), juntarCards(ppT, arqTv));
   const temMeta = inv.convTotal > 0 || !!TOKEN;
   const convAdmFinal = inv.convAdm;
   const convTvFinal = inv.convTv;
@@ -230,12 +251,13 @@ module.exports = async function handler(req, res) {
       investimento: 'Meta Ads · gasto real das datas escolhidas, incluindo campanhas já pausadas ou encerradas depois · campanha com TV, televisão, tela, LED ou barramento no nome conta como TV; o resto como ADM',
       conversas: 'Meta Ads · conversas iniciadas pelo anúncio no período, atribuídas à campanha que as gerou. O histórico de mensagens deste sistema NÃO é usado: quem recebe a conversa vinda do anúncio é outro número, e o bot daqui só entra depois que o contato virou ficha',
       conversasPorFrente: 'pela campanha que gerou a conversa',
-      fichas: 'fichas_adm e fichas_tv · pela data de criação · não conta retorno do remarcar, que já foi contado na primeira entrada',
-      logistica: 'reparoeletro_logistica e tv_logistica · pela data de criação · é do bot quando a origem ou quem cadastrou menciona bot',
-      orcamentos: 'cards do pipe com data de orçamento ou valor preenchido, dentro do período',
+      fichas: 'fichas_adm e fichas_tv, mais o arquivo · pela data de criação · não conta retorno do remarcar, que já foi contado na primeira entrada',
+      logistica: 'logística das duas frentes, mais o arquivo · pela data de criação · é do bot quando a origem ou quem cadastrou menciona bot',
+      orcamentos: 'cards do pipe e do arquivo com data de orçamento ou valor preenchido, dentro do período',
       aprovados: 'cards que PASSARAM pela fase de aprovação dentro do período, pelo carimbo ou pelo histórico — inclui os que já avançaram para produção, entrega ou finalizado',
       faturamento: 'soma do valor desses mesmos cards, na data em que passaram pela aprovação',
       custoPorAprovado: 'investimento ÷ aprovados',
+      arquivo: 'períodos passados só ficam corretos porque o arquivo também é lido — cards e fichas antigas saem dos bancos ativos com o tempo',
       atencao: 'as etapas medem coisas que acontecem em momentos diferentes: uma ficha criada hoje pode ser aprovada semana que vem, então as taxas entre etapas não são de um mesmo grupo de clientes',
     },
     origemDasConversas: 'Meta Ads — conversas iniciadas pelo anúncio, atribuídas à campanha',

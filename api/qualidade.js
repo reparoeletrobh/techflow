@@ -335,8 +335,11 @@ export default async function handler(req, res) {
     const ehAvulsaC = i => i.avulsa === true;
     const entrouHoje = insp.filter(i => dia(i.criadoEm) === hoje);
     const entrouSemana = insp.filter(i => dia(i.criadoEm) >= iniSemana);
-    const hojeSemGarantia = entrouHoje.filter(i => !deGarantia(i));
-    const semanaSemGarantia = entrouSemana.filter(i => !deGarantia(i));
+    // 🎯 a meta de 25/dia mede a produção que veio da esteira do técnico:
+    // não conta garantia nem ficha avulsa, que é registro manual de outra origem
+    const contaNaMeta = i => !deGarantia(i) && i.avulsa !== true;
+    const hojeSemGarantia = entrouHoje.filter(contaNaMeta);
+    const semanaSemGarantia = entrouSemana.filter(contaNaMeta);
     const concluiHoje = insp.filter(i => i.aprovadoEm && dia(i.aprovadoEm) === hoje);
     const concluiSemana = insp.filter(i => i.aprovadoEm && dia(i.aprovadoEm) >= iniSemana);
     const reprovHoje = insp.filter(i => i.reprovadoEm && dia(i.reprovadoEm) === hoje);
@@ -360,7 +363,7 @@ export default async function handler(req, res) {
         deGarantiaHoje: entrouHoje.length - hojeSemGarantia.length },
       AVULSAS: { hoje: entrouHoje.filter(ehAvulsaC).length,
         semana: entrouSemana.filter(ehAvulsaC).length,
-        obs: 'produção interna: venda, reforma — conta para o técnico e para a meta' },
+        obs: 'produção interna: venda, reforma — conta para o técnico, mas fica FORA da meta de 25' },
       META: { alvo: 25, feito: hojeSemGarantia.length,
         falta: Math.max(0, 25 - hojeSemGarantia.length),
         percentual: Math.round(hojeSemGarantia.length / 25 * 100) + '%' },
