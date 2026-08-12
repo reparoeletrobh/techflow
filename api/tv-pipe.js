@@ -1795,6 +1795,10 @@ export default async function handler(req, res) {
     var faseAnterior = card.phase;
     card.history = (card.history || []).concat([{ phase: card.phase, ts: now }]);
     card.phase   = phase;
+    // 🔄 a tela do técnico lê phaseId — atualizar só phase deixava o card parado
+    // na coluna antiga exibindo a fase nova
+    card.phaseId = phase;
+    card.movedAt = now;
     // 🔖 CARIMBO DA APROVAÇÃO (congelado — ver pipe ADM)
     if (phase === 'aprovados' && !card.aprovadoEm) {
       card.aprovadoEm = new Date().toISOString();

@@ -840,6 +840,36 @@ module.exports = async function handler(req, res) {
       LIMPAS: limpas.map(v => v.nome.slice(0, 20) + ' ' + v.tel.slice(-4) + ' | ' + v.via + ' em ' + v.quando) });
   }
 
+  // ── 🔧 SINCRONIZAR-FASES: card com phase e phaseId diferentes ──
+  // A tela lê phaseId e o backend gravava só phase: o card mudava de fase mas
+  // continuava aparecendo na coluna antiga.
+  if (action === 'sincronizar-fases') {
+    const achados = [], corrigidos = [];
+    for (const k of ['reparoeletro_pipe', 'tv_pipe', 'reparoeletro_board']) {
+      const db = await dbGet(k);
+      if (!db || !Array.isArray(db.cards)) continue;
+      let mexeu = 0;
+      for (const c of db.cards) {
+        const p = String(c.phase || ''), pid = String(c.phaseId || '');
+        if (!p || !pid || p === pid) continue;
+        achados.push(k + ' | ' + String(c.nomeContato || c.nome || '?').slice(0, 20) +
+          ' ' + String(c.telefone || '').slice(-4) + ' | phase="' + p + '" phaseId="' + pid + '"');
+        if (String(req.query.aplicar || '') === '1') {
+          // phase é o que a movimentação grava — vale como verdade
+          c.phaseId = p; mexeu++;
+          corrigidos.push(String(c.nomeContato || c.nome || '?').slice(0, 20) + ' → ' + p);
+        }
+      }
+      if (mexeu) await dbSet(k, db);
+    }
+    return res.status(200).json({ ok: achados.length === 0 || corrigidos.length > 0,
+      modo: String(req.query.aplicar || '') === '1' ? 'aplicado' : 'prévia',
+      divergentes: achados.length,
+      corrigidos: corrigidos.length,
+      L: achados.slice(0, 60),
+      dica: achados.length && !corrigidos.length ? 'para corrigir: &aplicar=1' : undefined });
+  }
+
   // ── 📈 HISTORICO: evolução dos problemas ao longo dos dias ──
   if (action === 'historico') {
     const h = (await dbGet('vigia_historico')) || { dias: {} };

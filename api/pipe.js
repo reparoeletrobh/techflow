@@ -2323,6 +2323,9 @@ export default async function handler(req, res) {
     var faseAnterior = card.phase;
     card.history = (card.history || []).concat([{ phase: card.phase, ts: now }]);
     card.phase   = phase;
+    // 🔄 a tela lê phaseId — sem isto o card fica na coluna antiga
+    card.phaseId = phase;
+    card.movedAt = new Date().toISOString();
     // 🔖 CARIMBO DA APROVAÇÃO — gravado UMA VEZ, antes de salvar, e nunca mais alterado.
     // O relatório lê daqui; movimentos posteriores do card não mexem neste registro.
     if (phase === 'aprovados' && !card.aprovadoEm) {
