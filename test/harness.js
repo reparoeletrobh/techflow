@@ -54,8 +54,23 @@ function carregarHandler(arquivo) {
   let src = fs.readFileSync(path.join(__dirname, '..', arquivo), 'utf8');
   src = src.replace(/export default/, 'module.exports =');
   const mod = { exports: {} };
-  const fn = new Function('module', 'exports', 'require', 'process', 'fetch', 'Buffer', src);
-  fn(mod, mod.exports, require, process, global.fetch, Buffer);
+  // 🔌 módulos auxiliares (_gravar, _funil) são resolvidos a partir da pasta api,
+  // e recebem o mesmo fetch simulado — sem isso eles falavam com o banco de verdade
+  const requireLocal = (nome) => {
+    if (String(nome).startsWith('./_') || String(nome).includes('/_')) {
+      const alvo = path.join(__dirname, '..', 'api', String(nome).replace(/^\.\//, '') + '.js');
+      if (fs.existsSync(alvo)) {
+        let s2 = fs.readFileSync(alvo, 'utf8');
+        const m2 = { exports: {} };
+        new Function('module', 'exports', 'require', 'process', 'fetch', 'Buffer', s2)
+          (m2, m2.exports, requireLocal, process, global.fetch, Buffer);
+        return m2.exports;
+      }
+    }
+    return require(nome);
+  };
+  const fn = new Function('module', 'exports', 'require', 'process', 'fetch', 'Buffer', '__dirname', src);
+  fn(mod, mod.exports, requireLocal, process, global.fetch, Buffer, path.join(__dirname, '..', 'api'));
   return mod.exports;
 }
 
@@ -554,6 +569,36 @@ function check(nome, cond, extra) {
   // ── 📅 cada etapa do funil precisa gravar a própria data na origem ──
   // ── 📒 cada etapa do funil precisa registrar no livro-razão ──
   // ── 🔒 a camada de gravação segura precisa resistir à sobreposição ──
+  // ── 🔁 devolução do remarcar com a camada segura ──
+  console.log('▶ Cenário RM — ficha remarcada chega em Entrar em Contato');
+  {
+    const logi = carregarHandler('api/logistica.js');
+    KV['reparoeletro_logistica'] = { fichas: [{
+      id: 'LOG-TESTE', nome: 'Cliente Remarcado', telefone: '5531988887777',
+      equipamento: 'Micro-ondas', phase: 'liberado_coleta', criadoEm: new Date().toISOString(),
+    }] };
+    KV['fichas_adm'] = { fichas: [] };
+    const rR = res();
+    await logi(req({ action: 'mover', ...K }, {
+      id: 'LOG-TESTE', phase: 'remarcar', motivo: 'cliente não estava', quem: 'teste' }, 'POST'), rR);
+    const criadas = (KV['fichas_adm'].fichas || []).filter(f =>
+      String(f.telefone || '').includes('8888'));
+    check('remarcar: ficha chegou em fichas_adm', criadas.length === 1,
+      'criadas: ' + criadas.length + ' | ' + JSON.stringify(rR.dado).slice(0, 90));
+    if (criadas[0]) {
+      check('remarcar: status entrar_contato', criadas[0].status === 'entrar_contato', criadas[0].status);
+      check('remarcar: tem a badge de reagendamento', criadas[0].reagendarColeta === true);
+      check('remarcar: guarda o motivo', /não estava/.test(String(criadas[0].motivoRemarcar || '')));
+    }
+    // repetir a mesma devolução NÃO pode criar uma segunda ficha
+    const rR2 = res();
+    await logi(req({ action: 'mover', ...K }, {
+      id: 'LOG-TESTE', phase: 'remarcar', motivo: 'cliente não estava', quem: 'teste' }, 'POST'), rR2);
+    const depois = (KV['fichas_adm'].fichas || []).filter(f =>
+      String(f.telefone || '').includes('8888'));
+    check('remarcar: não duplica ao repetir', depois.length === 1, 'agora: ' + depois.length);
+  }
+
   console.log('▶ Cenário GR — gravação segura não perde nem duplica');
   {
     const G = require('../api/_gravar.js');

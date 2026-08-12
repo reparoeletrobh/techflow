@@ -12,17 +12,19 @@
 // tenta de novo lendo o estado atualizado. Nunca insere duas vezes, porque
 // quem decide o que mudar é sempre a função, sobre o dado recém-lido.
 // ═══════════════════════════════════════════════════════════════════
-const U = (process.env.UPSTASH_URL || '').replace(/['"]/g, '').trim();
-const T = (process.env.UPSTASH_TOKEN || '').replace(/[\n\r'"]/g, '').trim();
+// 🔌 lidos a cada chamada, não no carregamento: em teste as variáveis são
+// definidas depois que o módulo já foi importado
+const url = () => (process.env.UPSTASH_URL || '').replace(/['"]/g, '').trim();
+const tok = () => (process.env.UPSTASH_TOKEN || '').replace(/[\n\r'"]/g, '').trim();
 
 async function ler(chave) {
-  const r = await fetch(`${U}/get/${chave}`, { headers: { Authorization: `Bearer ${T}` } })
+  const r = await fetch(`${url()}/get/${chave}`, { headers: { Authorization: `Bearer ${tok()}` } })
     .then(x => x.json());
-  return r && r.result ? JSON.parse(r.result) : null;
+  return r && r.result ? (typeof r.result === 'string' ? JSON.parse(r.result) : r.result) : null;
 }
 async function escrever(chave, valor) {
-  const r = await fetch(`${U}/set/${chave}`, { method: 'POST',
-    headers: { Authorization: `Bearer ${T}`, 'Content-Type': 'application/json' },
+  const r = await fetch(`${url()}/set/${chave}`, { method: 'POST',
+    headers: { Authorization: `Bearer ${tok()}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(valor) }).then(x => x.json());
   return r && r.result === 'OK';
 }

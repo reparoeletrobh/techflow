@@ -1,3 +1,8 @@
+let _gravar = { alterar: async () => ({ ok: false, motivo: 'módulo indisponível' }),
+  acrescentar: async () => ({ ok: false, motivo: 'módulo indisponível' }) };
+try { _gravar = require('./_gravar'); } catch (e) {
+  try { _gravar = require(require('path').join(__dirname, '_gravar.js')); } catch (e2) {}
+}
 // carregado de forma tolerante: o harness executa os arquivos fora da pasta api
 let _funil = { registrar: async () => false, ler: async () => [], jaRegistrado: async () => false };
 try { _funil = require('./_funil'); } catch (e) {
@@ -226,7 +231,8 @@ async function remarcarParaProspeccao(ficha, motivo, sistema, quem) {
     // Duplicata não é problema — a equipe percebe no atendimento e exclui a antiga.
     // Ficha presa na coluna é problema, e era o que acontecia com os filtros.
     // 🏷️ mesmos campos do envio manual, para a ficha receber a badge de reagendamento
-    pdb.fichas.unshift({
+    // 📄 a ficha que vai para o atendimento
+    const nova = {
       id: 'fic_reag_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4),
       nome: ficha.nome || ficha.nomeContato || '?',
       telefone: String(ficha.telefone || '').replace(/\D/g, ''),
@@ -243,51 +249,37 @@ async function remarcarParaProspeccao(ficha, motivo, sistema, quem) {
       remarcadoPor: quem || 'não identificado',
       fichaOrigemId: ficha.id,
       criadoEm: new Date().toISOString(), contatoFeitoEm: null,
-    });
-    await dbSet(KEYP, pdb);
-    // 🔒 CONFERE se a gravação persistiu. Duas rotinas gravando o mesmo banco ao
-    // mesmo tempo fazem uma sobrescrever a outra, e a ficha desaparece em silêncio
-    // enquanto a coluna já foi liberada. Aconteceu com a Maria 1499 em 11/08.
-    try {
-      const conf = (await dbGet(KEYP)) || { fichas: [] };
-      const achou = (conf.fichas || []).some(x => d8(x.telefone) === d8(ficha.telefone) &&
-        (String(x.origem || '') === 'remarcar' || x.reagendarColeta === true));
-      if (!achou) {
-        // 🔁 até 3 tentativas, relendo o estado mais recente a cada vez.
-        // O banco perto do limite de 1 MB recusa gravações de forma intermitente.
-        let ok2 = false;
-        for (let tent = 1; tent <= 3 && !ok2; tent++) {
-          await new Promise(s => setTimeout(s, 250 * tent));
-          const novo = (await dbGet(KEYP)) || { fichas: [] };
-          novo.fichas = novo.fichas || [];
-          novo.fichas.unshift(pdb.fichas[0]);
-          await dbSet(KEYP, novo);
-          const conf2 = (await dbGet(KEYP)) || { fichas: [] };
-          ok2 = (conf2.fichas || []).some(x => d8(x.telefone) === d8(ficha.telefone) &&
-            (String(x.origem || '') === 'remarcar' || x.reagendarColeta === true));
-        }
-        if (!ok2) {
-          // 📌 falhou 3 vezes: registra na fila de pendências para o vigia retomar,
-          // e devolve erro para a ficha PERMANECER na coluna Remarcar
-          try {
-            const pend = (await dbGet('remarcar_pendentes')) || { itens: [] };
-            pend.itens = (pend.itens || []).filter(x => x.telefone !== ficha.telefone);
-            pend.itens.unshift({ telefone: ficha.telefone, nome: ficha.nome,
-              equipamento: ficha.equipamento || ficha.descricao || '',
-              defeito: ficha.defeito || '', endereco: ficha.endereco || '',
-              motivo: String(motivo || ''), sistema, fichaId: ficha.id,
-              tentativas: 3, em: new Date().toISOString() });
-            pend.itens = pend.itens.slice(0, 200);
-            await dbSet('remarcar_pendentes', pend);
-          } catch (e) {}
-          await registrarDevolucao(ficha, sistema, motivo, 'erro',
-            'gravação não persistiu após 3 tentativas — ficha mantida na coluna');
-          return { ok: false, erro: 'gravação não persistiu após 3 tentativas — ficha mantida na coluna e registrada em remarcar_pendentes' };
-        }
-      }
-    } catch (e) { return { ok: false, erro: 'falha ao confirmar: ' + e.message }; }
+    };
+    // 🔒 gravação segura: insere lendo o estado mais recente e confirma que
+    // persistiu, tentando de novo se outra rotina gravar por cima. Substitui
+    // quarenta linhas de retentativa manual que ainda podiam duplicar.
+    const jaEsta = (db) => ((db || {}).fichas || []).some(x =>
+      d8(x.telefone) === d8(ficha.telefone) &&
+      (String(x.origem || '') === 'remarcar' || x.reagendarColeta === true));
+    const rG = await _gravar.acrescentar(KEYP, 'fichas', nova,
+      (a, b2) => d8(a.telefone) === d8(b2.telefone) &&
+        (String(a.origem || '') === 'remarcar' || a.reagendarColeta === true),
+      { tentativas: 3 });
+    if (!rG.ok) {
+      // 📌 não persistiu: registra a pendência e mantém a ficha na coluna
+      try {
+        const pend = (await dbGet('remarcar_pendentes')) || { itens: [] };
+        pend.itens = (pend.itens || []).filter(x => x.telefone !== ficha.telefone);
+        pend.itens.unshift({ telefone: ficha.telefone, nome: ficha.nome,
+          equipamento: ficha.equipamento || ficha.descricao || '',
+          defeito: ficha.defeito || '', endereco: ficha.endereco || '',
+          motivo: String(motivo || ''), sistema, fichaId: ficha.id,
+          tentativas: rG.tentativas, em: new Date().toISOString() });
+        pend.itens = pend.itens.slice(0, 200);
+        await dbSet('remarcar_pendentes', pend);
+      } catch (e) {}
+      await registrarDevolucao(ficha, sistema, motivo, 'erro',
+        rG.motivo + ' — ficha mantida na coluna');
+      return { ok: false, erro: rG.motivo + ' — ficha mantida na coluna e registrada em remarcar_pendentes' };
+    }
     await registrarDevolucao(ficha, sistema, motivo, 'confirmada',
       'ficha criada em ' + KEYP + ' e visível em Entrar em Contato');
+    void jaEsta;
     // 🚪 a ficha SAI da coluna Remarcar — ela vive agora na prospecção.
     // Sem isso ela voltava ao atendimento mas continuava ocupando a coluna.
     try {
