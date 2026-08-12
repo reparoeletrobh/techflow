@@ -44,6 +44,65 @@ export default async function handler(req, res) {
   if (!db.config) db.config = { tecnicos: [], proximoNum: 1 };
 
   // ── LOAD ──
+  // ── 🔍 FALTANDO: cards no Controle de Qualidade sem inspeção criada ──
+  if (action === 'faltando') {
+    const dias = Math.min(30, Math.max(1, parseInt(req.query.dias || '3', 10)));
+    const corte = Date.now() - dias * 86400000;
+    const insp = db.inspecoes || [];
+    const comInsp = new Set(insp.map(i => String(i.cardId || '')).filter(Boolean));
+    const faltando = [];
+    for (const k of ['reparoeletro_board', 'reparoeletro_pipe', 'tv_pipe']) {
+      try {
+        const b = await dbGet(k);
+        for (const c of (((b || {}).cards) || [])) {
+          const fase = String(c.phaseId || c.phase || '');
+          if (fase !== 'controle_qualidade') continue;
+          const q = new Date(c.entrouCqEm || c.movedAt || 0).getTime();
+          if (!q || q < corte) continue;
+          if (comInsp.has(String(c.id))) continue;
+          faltando.push({ banco: k, id: c.id,
+            cliente: c.nomeContato || c.nome || '?',
+            telefone: c.telefone || '',
+            equipamento: c.equipamento || c.descricao || '',
+            tecnico: c.tecnicoServico || c.tecnico || null,
+            entrouEm: c.entrouCqEm || c.movedAt });
+        }
+      } catch (e) {}
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: faltando.length === 0,
+        cardsSemInspecao: faltando.length,
+        L: faltando.map(f => String(f.cliente).slice(0, 22) + ' ' +
+          String(f.telefone).slice(-4) + ' | ' + String(f.equipamento).slice(0, 26) +
+          ' | téc: ' + (f.tecnico || '(sem técnico)') +
+          ' | entrou ' + String(f.entrouEm || '').slice(5, 16).replace('T', ' ')),
+        dica: faltando.length ? 'para criar as inspeções: &aplicar=1' : undefined });
+    }
+    const criadas = [];
+    for (const f of faltando) {
+      const num = (db.config.proximoNum || (db.inspecoes.length + 1));
+      const txt = String(f.equipamento).toLowerCase();
+      const tipo = /micro-?ondas|magnetron/.test(txt) ? 'microondas'
+        : /purificador|bebedouro/.test(txt) ? 'purificador'
+        : /adega/.test(txt) ? 'adega' : /forno/.test(txt) ? 'forno'
+        : /\btv\b|televis/.test(txt) ? 'tv' : 'outro';
+      db.inspecoes.unshift({
+        id: 'insp_rec_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+        os: 'CQ-' + String(num).padStart(4, '0'),
+        cardId: f.id, cliente: f.cliente, telefone: f.telefone,
+        equipamento: tipo, equipamentoTexto: f.equipamento,
+        tecnico: f.tecnico, valor: 0, status: 'aguardando', checklist: {},
+        criadoEm: f.entrouEm || new Date().toISOString(),
+        recuperada: true,
+      });
+      db.config.proximoNum = num + 1;
+      criadas.push(String(f.cliente).slice(0, 22) + ' — ' + String(f.equipamento).slice(0, 24));
+      await new Promise(s => setTimeout(s, 60));
+    }
+    if (criadas.length) await dbSet(KEY, db);
+    return res.status(200).json({ ok: true, criadas: criadas.length, L: criadas });
+  }
+
   // ── 👨‍🔧 EQUIPE: a lista oficial de técnicos, igual à do Mover OS ──
   if (action === 'equipe') {
     const EQUIPE_OFICIAL = ['Lucas', 'Diego', 'Kassio', 'Roberto', 'Carlos', 'Arthur'];

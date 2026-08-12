@@ -717,7 +717,26 @@ module.exports = async function handler(req, res) {
             });
             q.config.proximoNum = num + 1;
             await dbSet(KQ, q);
+            // 🔒 dois técnicos movendo ao mesmo tempo: cada um lê a lista sem a
+            // inspeção do outro e o último a gravar apaga a primeira. Confere e
+            // reinsere lendo o estado mais recente, até três vezes.
+            let confirmou = false;
+            for (let tent = 1; tent <= 3 && !confirmou; tent++) {
+              const conf = (await dbGet(KQ)) || { inspecoes: [] };
+              confirmou = (conf.inspecoes || []).some(i => String(i.cardId || '') === String(card.id));
+              if (confirmou) break;
+              await new Promise(s => setTimeout(s, 200 * tent));
+              const novo = (await dbGet(KQ)) || { inspecoes: [], config: { proximoNum: 1 } };
+              novo.inspecoes = novo.inspecoes || [];
+              novo.config = novo.config || { proximoNum: 1 };
+              if (!novo.inspecoes.some(i => String(i.cardId || '') === String(card.id))) {
+                novo.inspecoes.unshift(q.inspecoes[0]);
+                novo.config.proximoNum = Math.max(novo.config.proximoNum || 1, num + 1);
+                await dbSet(KQ, novo);
+              }
+            }
             card.inspecaoCriada = 'CQ-' + String(num).padStart(4, '0');
+            card.inspecaoConfirmada = confirmou;
           }
         } catch (e) { card.inspecaoErro = String(e.message).slice(0, 80); }
         if (obsQualidade) {
