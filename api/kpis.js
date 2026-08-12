@@ -635,10 +635,42 @@ module.exports = async function handler(req, res) {
     ...f, origem: 'frenteloja',
     valor: (f.orcamento && f.orcamento.valor) || f.valor || 0,
   }));
-  const adm = montar(juntarFichas(fA, arqAdm), juntarFichas(lgA, arqAdm),
+  // 📒 o livro-razão é a fonte quando há registro no período. Ele guarda o fato
+  // no instante em que acontece, então não muda quando o card avança ou é
+  // arquivado — que era a origem das divergências. Sem registro, cai para os cards.
+  const evsLivro = await _funil.ler(J.ini, J.fim);
+  const usaLivro = evsLivro.length > 0;
+  const doLivro = (frente) => {
+    const c = (etapa, f2) => evsLivro.filter(e => e.etapa === etapa && e.frente === frente &&
+      (!f2 || f2(e))).length;
+    const s = (etapa) => evsLivro.filter(e => e.etapa === etapa && e.frente === frente)
+      .reduce((t, e) => t + (Number(e.valor) || 0), 0);
+    const totOrc = c('orcamento'), totApr = c('aprovado'), totLog = c('logistica');
+    const orcBal = c('orcamento', e => e.canal === 'balcao');
+    const aprBal = c('aprovado', e => e.canal === 'balcao');
+    const logBot = c('logistica', e => e.canal === 'bot');
+    const fatBal = evsLivro.filter(e => e.etapa === 'aprovado' && e.frente === frente &&
+      e.canal === 'balcao').reduce((t, e) => t + (Number(e.valor) || 0), 0);
+    return {
+      fichas: c('ficha'),
+      logistica: { total: totLog, bot: logBot, manual: totLog - logBot,
+        pctBot: totLog ? Math.round(logBot / totLog * 100) : 0 },
+      orcamentos: { total: totOrc, balcao: orcBal, online: totOrc - orcBal,
+        pctBalcao: totOrc ? Math.round(orcBal / totOrc * 100) : 0 },
+      aprovados: { total: totApr, balcao: aprBal, online: totApr - aprBal,
+        bot: 0, manual: totApr,
+        pctBalcao: totApr ? Math.round(aprBal / totApr * 100) : 0, pctBot: 0 },
+      faturamento: +s('aprovado').toFixed(2),
+      faturamentoBalcao: +fatBal.toFixed(2),
+      faturamentoOnline: +(s('aprovado') - fatBal).toFixed(2),
+      ticketMedio: totApr ? +(s('aprovado') / totApr).toFixed(2) : 0,
+    };
+  };
+  const adm = usaLivro ? doLivro('adm') : montar(juntarFichas(fA, arqAdm), juntarFichas(lgA, arqAdm),
     { cards: (((ppA || {}).cards) || []).concat(arqAdm.cards).concat(fichasFL) },
     { telsBalcao, totalBalcao: doBalcao.length });
-  const tv = montar(juntarFichas(fT, arqTv), juntarFichas(lgT, arqTv), juntarCards(ppT, arqTv));
+  const tv = usaLivro ? doLivro('tv')
+    : montar(juntarFichas(fT, arqTv), juntarFichas(lgT, arqTv), juntarCards(ppT, arqTv));
   const temMeta = inv.convTotal > 0 || !!TOKEN;
   const convAdmFinal = inv.convAdm;
   const convTvFinal = inv.convTv;
@@ -673,6 +705,10 @@ module.exports = async function handler(req, res) {
       fimExato: new Date(J.fim - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' BRT' },
     geradoEm: new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' BRT',
     fonteInvestimento: inv.fonte,
+    fonteDoFunil: usaLivro
+      ? '📒 livro-razão — ' + evsLivro.length + ' evento(s) registrados no instante do fato'
+      : '📇 estado atual dos cards — período sem registro no livro',
+    livroAtivo: usaLivro,
     DIAGNOSTICO: {
       tokenDaMetaConfigurado: !!TOKEN,
       contaDeAnuncios: CONTA ? 'act_' + CONTA : '(não configurada)',

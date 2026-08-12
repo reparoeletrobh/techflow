@@ -378,7 +378,10 @@ async function carregar(){
     return;
   }
   window._kpi = r;
-  document.getElementById('carimbo').textContent = (r.periodo.rotulo||'') + ' · atualizado ' + (r.geradoEm||'');
+  document.getElementById('carimbo').innerHTML = esc(r.periodo.rotulo||'')
+    + ' · atualizado ' + esc(r.geradoEm||'')
+    + (r.fonteDoFunil ? '<br><span style="color:'+(r.livroAtivo?'var(--verde)':'var(--ambar)')+'">'
+        + esc(r.fonteDoFunil)+'</span>' : '');
   var t = r.TOTAL||{};
   var roiCor = t.retorno>=3?'var(--verde)':t.retorno>=1?'var(--ambar)':'var(--vermelho)';
   var dg = r.DIAGNOSTICO || {};
