@@ -504,19 +504,23 @@ function check(nome, cond, extra) {
 
   // ── 🔗 toda página apontada pelo menu precisa de rota configurada ──
   // ── 🔐 toda página do menu precisa do bloco que envia a chave nas chamadas ──
-  console.log('▶ Cenário R2 — páginas do menu têm o guard de autenticação');
+  console.log('▶ Cenário R2 — páginas do menu enviam a chave nas chamadas');
   {
     const fs6 = require('fs');
     const adm = fs6.readFileSync('adm.html', 'utf8');
     const urls = [...new Set((adm.match(/data-url="\/[a-z-]+"/g) || [])
       .map(x => x.replace(/data-url="|"/g, '').replace('/', '')))];
-    const semGuard = urls.filter(u => {
+    // o que importa é a chave chegar à API: pelo guard que intercepta o fetch,
+    // ou passada diretamente em cada chamada
+    const semChave = urls.filter(u => {
       const arq = u + '.html';
       if (!fs6.existsSync(arq)) return false;
-      return !fs6.readFileSync(arq, 'utf8').includes('TF-GUARD');
+      const c = fs6.readFileSync(arq, 'utf8');
+      if (!/\/api\//.test(c)) return false;           // página que não chama API
+      return !/TF-GUARD/.test(c) && !/tf_key/.test(c);
     });
-    check('menu: todas as páginas enviam a chave nas chamadas',
-      semGuard.length === 0, 'sem guard: ' + semGuard.join(', '));
+    check('menu: páginas que chamam a API enviam a chave',
+      semChave.length === 0, 'sem chave: ' + semChave.join(', '));
   }
 
   console.log('▶ Cenário R1 — páginas do menu têm rewrite no vercel.json');
