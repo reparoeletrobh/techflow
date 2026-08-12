@@ -461,6 +461,21 @@ function check(nome, cond, extra) {
       || j.templateEnviado !== undefined);
   }
 
+  // ── 🚚 toda ação chamada pela tela do motorista precisa estar liberada ──
+  console.log('▶ Cenário M1 — tela do motorista não esbarra em autorização');
+  {
+    const fs2 = require('fs');
+    const tela = fs2.readFileSync('tv-rota.html', 'utf8');
+    const api = fs2.readFileSync('api/tv-logistica.js', 'utf8');
+    const chamadas = [...new Set((tela.match(/action=rota-[a-z-]+/g) || [])
+      .map(x => x.replace('action=', '')))];
+    const mL = api.match(/_acaoLivre\s*=\s*\[([^\]]+)\]/);
+    const livres = mL ? mL[1].split(',').map(x => x.trim().replace(/['"]/g, '')) : [];
+    const faltando = chamadas.filter(c => !livres.includes(c));
+    check('motorista: todas as ações da tela estão liberadas',
+      faltando.length === 0, 'faltam: ' + faltando.join(', '));
+  }
+
   console.log('▶ Cenário 12b — coleta fora da janela é bloqueada');
   const r12h = res();
   await wabot(req({ action:'enviar', forcarJanela:'1', ...K }, { tel:'5531990007099',

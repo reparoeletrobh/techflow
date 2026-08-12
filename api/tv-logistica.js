@@ -278,7 +278,11 @@ async function remarcarParaProspeccao(ficha, motivo, sistema, quem) {
 module.exports = async function handler(req, res) {
   // 🔐 TF-AUTH (Fase 1): chave obrigatória em toda chamada
   const _tfk = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
-  const _acaoLivre = ['rota-fichas', 'rota-contato', 'rota-relatorio', 'rota-cancelar', 'rota-pref', 'rota-classificar', 'rota-mover'];
+  // 🚚 ações da tela do motorista: ele acessa por link, sem login, então elas
+  // precisam constar aqui. 'rota-agendar' faltava e combinar horário respondia
+  // "não autorizado" mesmo com a data correta.
+  const _acaoLivre = ['rota-fichas', 'rota-contato', 'rota-relatorio', 'rota-cancelar',
+    'rota-pref', 'rota-classificar', 'rota-mover', 'rota-agendar'];
   const _acaoAtual = (req.query && req.query.action) || '';
   if (!_acaoLivre.includes(_acaoAtual) && _tfk !== ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim())) {
     return res.status(401).json({ ok: false, error: 'não autorizado' });
