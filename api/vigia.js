@@ -772,6 +772,74 @@ module.exports = async function handler(req, res) {
           String(a.quem).slice(0, 24).padEnd(24) + ' | ' + a.oQue) });
   }
 
+  // ── 🗑️ CONFERIR-EXCLUIDAS: as fichas devolvidas já tinham sido descartadas? ──
+  if (action === 'conferir-excluidas') {
+    const min = Math.min(1440, Math.max(5, parseInt(req.query.minutos || '120', 10)));
+    const desde = Date.now() - min * 60000;
+    const hh2 = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '?';
+    // 1) as fichas que voltaram nesta janela
+    const voltaram = [];
+    for (const k of ['fichas_adm', 'fichas_tv']) {
+      const b = await dbGet(k);
+      for (const f of (((b || {}).fichas) || [])) {
+        const q = new Date(f.criadoEm || 0).getTime();
+        const qd = new Date(f.destravadaEm || 0).getTime();
+        const recente = (q && q >= desde) || (qd && qd >= desde);
+        if (!recente) continue;
+        const id = String(f.id || '');
+        const devolvida = id.startsWith('fic_reag_') || id.startsWith('rem_') ||
+          String(f.origem || '') === 'remarcar' || !!f.destravadaEm;
+        if (!devolvida) continue;
+        voltaram.push({ banco: k, nome: f.nome || '?', tel: d8(f.telefone),
+          via: f.destravadaEm ? 'destravada' : 'devolvida do remarcar',
+          quando: hh2(f.destravadaEm || f.criadoEm) });
+      }
+    }
+    // 2) registros de exclusão
+    const excluidos = {};
+    try {
+      const ex = await dbGet('prospeccao_excluidos');
+      const tels = (ex || {}).tels || ex || {};
+      for (const [t, v] of Object.entries(tels)) {
+        const t8 = String(t).replace(/\D/g, '').slice(-8);
+        if (t8.length >= 8) excluidos[t8] = { quando: v, fonte: 'prospeccao_excluidos' };
+      }
+    } catch (e) {}
+    // 3) fichas marcadas como duplicadas ou canceladas em qualquer banco
+    const marcadas = {};
+    for (const k of ['fichas_adm', 'fichas_tv', 'reparoeletro_logistica', 'tv_logistica',
+                     'reparoeletro_arquivo']) {
+      try {
+        const b = await dbGet(k);
+        for (const L of ['fichas', 'cards']) {
+          for (const x of ((b || {})[L] || [])) {
+            const st = String(x.status || x.phase || '').toLowerCase();
+            if (!/duplicad|cancelad|descarte|excluid|desistiu/.test(st)) continue;
+            const t = d8(x.telefone);
+            if (t) marcadas[t] = { banco: k, status: st,
+              quando: x.movedAt || x.criadoEm || null, motivo: x.motivoCancelamento || x.obs || null };
+          }
+        }
+      } catch (e) {}
+    }
+    const suspeitas = voltaram.filter(v => excluidos[v.tel] || marcadas[v.tel]);
+    const limpas = voltaram.filter(v => !excluidos[v.tel] && !marcadas[v.tel]);
+    return res.status(200).json({ ok: suspeitas.length === 0,
+      janelaMinutos: min,
+      totalQueVoltaram: voltaram.length,
+      semHistoricoDeExclusao: limpas.length,
+      comHistoricoDeExclusao: suspeitas.length,
+      VEREDITO: suspeitas.length === 0
+        ? '✅ nenhuma das fichas devolvidas tinha sido excluída ou cancelada antes'
+        : '⚠️ ' + suspeitas.length + ' ficha(s) já tinham registro de exclusão ou cancelamento — conferir',
+      SUSPEITAS: suspeitas.map(v => v.nome.slice(0, 20) + ' ' + v.tel.slice(-4) +
+        ' | ' + v.via + ' em ' + v.quando +
+        (excluidos[v.tel] ? ' | 🗑️ excluída em ' + hh2(excluidos[v.tel].quando) : '') +
+        (marcadas[v.tel] ? ' | ⚠️ está como "' + marcadas[v.tel].status + '" em ' + marcadas[v.tel].banco +
+          (marcadas[v.tel].motivo ? ' (' + String(marcadas[v.tel].motivo).slice(0, 50) + ')' : '') : '')),
+      LIMPAS: limpas.map(v => v.nome.slice(0, 20) + ' ' + v.tel.slice(-4) + ' | ' + v.via + ' em ' + v.quando) });
+  }
+
   // ── 📈 HISTORICO: evolução dos problemas ao longo dos dias ──
   if (action === 'historico') {
     const h = (await dbGet('vigia_historico')) || { dias: {} };
