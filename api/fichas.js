@@ -97,6 +97,101 @@ export default async function handler(req, res) {
 
   const action = req.query.action || (req.body && req.body.action) || '';
 
+  // ── 🔎 DESTINO-PLANILHA: o que aconteceu com CADA linha do dia ──
+  if (action === 'destino-planilha') {
+    const dia = String(req.query.dia || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
+    const d8p = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '—';
+    // 1) a planilha
+    let linhas = [];
+    try {
+      const rows = parseCSV(await fetch(SHEET_CSV, { redirect: 'follow' }).then(x => x.text()));
+      const cab = (rows[0] || []).map(x => String(x || '').normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '').toLowerCase().trim());
+      const iH = cab.findIndex(x => /hora|data/.test(x));
+      const iT = cab.findIndex(x => /numero|telefone|whats/.test(x));
+      const iN = cab.findIndex(x => /nome/.test(x));
+      const iE = cab.findIndex(x => /^equipamento$/.test(x));
+      const [dd, mm, aa] = [dia.slice(8, 10), dia.slice(5, 7), dia.slice(2, 4)];
+      for (const r of rows.slice(1)) {
+        const dt = String(r[iH] || '');
+        if (!dt.startsWith(dd + '/' + mm + '/' + aa)) continue;
+        linhas.push({ tel: String(r[iT] || '').replace(/\D/g, ''), nome: String(r[iN] || '?').trim(),
+          equipamento: String(r[iE] || ''), hora: dt.slice(9, 14) });
+      }
+    } catch (e) { return res.status(200).json({ ok: false, error: 'planilha: ' + e.message }); }
+    // 2) onde cada telefone aparece
+    const BANCOS = [['fichas_adm', 'fichas'], ['fichas_tv', 'fichas'],
+      ['reparoeletro_logistica', 'fichas'], ['tv_logistica', 'fichas'],
+      ['prospeccao_adm', 'fichas'], ['reparoeletro_pipe', 'cards'], ['tv_pipe', 'cards'],
+      ['reparoeletro_arquivo', 'fichas'], ['reparoeletro_frenteloja', 'fichas']];
+    const onde = {};
+    for (const [k, L] of BANCOS) {
+      try {
+        const b = await dbGet(k);
+        for (const x of ((b || {})[L] || [])) {
+          const t = d8p(x.telefone);
+          if (t.length < 8) continue;
+          (onde[t] = onde[t] || []).push({ banco: k,
+            status: String(x.status || x.phase || x.phaseId || '?'),
+            quando: x.criadoEm || x.registradoEm || x.movedAt || null });
+        }
+      } catch (e) {}
+    }
+    // 3) contato do bot
+    const falouComBot = {};
+    try {
+      const r = await fetch(`${process.env.UPSTASH_URL}/lrange/wa_evt_list/-8000/-1`,
+        { headers: { Authorization: `Bearer ${process.env.UPSTASH_TOKEN}` } }).then(x => x.json());
+      for (const s of (r.result || [])) {
+        try {
+          const e = JSON.parse(s);
+          const t = d8p(e.tel); if (!t) continue;
+          falouComBot[t] = falouComBot[t] || { in: 0, out: 0, ultima: null };
+          if (e.dir === 'in') falouComBot[t].in++; else if (e.dir === 'out') falouComBot[t].out++;
+          const q = String(e.ts || '');
+          if (!falouComBot[t].ultima || q > falouComBot[t].ultima) falouComBot[t].ultima = q;
+        } catch (x) {}
+      }
+    } catch (e) {}
+    const abordados = (await dbGet('wa_abordados')) || { tels: {} };
+    // 4) classifica cada linha
+    const grupos = { comFicha: [], soEmOutroBanco: [], soConversa: [], semNada: [] };
+    for (const l of linhas) {
+      const t = d8p(l.tel);
+      const locais = onde[t] || [];
+      const temFicha = locais.some(x => x.banco === 'fichas_adm' || x.banco === 'fichas_tv');
+      const conversa = falouComBot[t];
+      const info = { ...l, t,
+        locais: locais.map(x => x.banco.replace('reparoeletro_', '') + ':' + x.status),
+        msgs: conversa ? conversa.in + '↓/' + conversa.out + '↑' : 'nenhuma',
+        abordado: !!abordados.tels[t] };
+      if (temFicha) grupos.comFicha.push(info);
+      else if (locais.length) grupos.soEmOutroBanco.push(info);
+      else if (conversa) grupos.soConversa.push(info);
+      else grupos.semNada.push(info);
+    }
+    const fmt = i => i.hora + ' | ' + String(i.nome).slice(0, 20) + ' ' + i.t.slice(-4) +
+      ' | ' + String(i.equipamento).slice(0, 20) +
+      ' | msgs: ' + i.msgs + (i.abordado ? ' | abordado' : '') +
+      (i.locais.length ? ' | ' + i.locais.join(', ') : '');
+    return res.status(200).json({ ok: grupos.semNada.length === 0,
+      dia, naPlanilha: linhas.length,
+      RESUMO: {
+        comFichaCriada: grupos.comFicha.length,
+        semFichaMasEmOutroBanco: grupos.soEmOutroBanco.length,
+        semFichaMasComConversa: grupos.soConversa.length,
+        semNenhumRegistro: grupos.semNada.length,
+      },
+      VEREDITO: grupos.semNada.length
+        ? '🚨 ' + grupos.semNada.length + ' linha(s) da planilha sem NENHUM registro no sistema'
+        : '✅ toda linha da planilha tem algum registro — nenhuma perdida',
+      SEM_NENHUM_REGISTRO: grupos.semNada.map(fmt),
+      SEM_FICHA_MAS_EM_OUTRO_BANCO: grupos.soEmOutroBanco.map(fmt),
+      SEM_FICHA_MAS_COM_CONVERSA: grupos.soConversa.map(fmt),
+      COM_FICHA: grupos.comFicha.map(fmt) });
+  }
+
   // ── 🧹 LIMPAR-TRAVADAS: trata as fichas criadas indevidamente pelo sync ──
   // Três destinos, conforme a situação de cada uma. Nada é removido sem confirmação.
   if (action === 'limpar-travadas') {
