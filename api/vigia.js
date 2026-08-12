@@ -725,16 +725,23 @@ module.exports = async function handler(req, res) {
     }
     if (enviadas.length > 20) alertas.push('🚨 ' + enviadas.length +
       ' mensagens enviadas de uma vez — volume alto, conferir se foi intencional');
-    // ficha devolvida cujo cliente já está em operação
-    const emOperacao = new Set();
-    for (const k of ['reparoeletro_logistica', 'tv_logistica', 'reparoeletro_pipe', 'tv_pipe']) {
+    // ⚠️ contato duplicado de verdade: o cliente tem COLETA ATIVA em paralelo.
+    // A ficha de origem continua na logística em fase prospeccao/remarcar — é dela
+    // que veio a devolução, então contá-la gerava alarme falso em todos os casos.
+    const FASES_ATIVAS = ['em_rota', 'horario_marcado', 'motorista_parceiro',
+      'liberado_para_rota', 'coleta_solicitada', 'aguardando_coleta'];
+    const comColetaAtiva = new Set();
+    for (const k of ['reparoeletro_logistica', 'tv_logistica']) {
       const b = await dbGet(k);
-      for (const L of ['fichas', 'cards']) for (const x of ((b || {})[L] || [])) emOperacao.add(d8(x.telefone));
+      for (const x of (((b || {}).fichas) || [])) {
+        if (!FASES_ATIVAS.includes(String(x.phase || ''))) continue;
+        comColetaAtiva.add(d8(x.telefone));
+      }
     }
     for (const a of achados.filter(x => x.etapa === 'remarcar')) {
-      const t = String(a.quem).slice(-4);
-      if ([...emOperacao].some(e => e.endsWith(t))) {
-        alertas.push('⚠️ ' + a.quem + ' foi devolvido ao atendimento mas já tem ficha em operação — pode gerar contato duplicado');
+      const t = String(a.quem).replace(/\D/g, '').slice(-4);
+      if ([...comColetaAtiva].some(e => e.endsWith(t))) {
+        alertas.push('⚠️ ' + a.quem + ' foi devolvido ao atendimento mas já tem COLETA ATIVA marcada — conferir para não ligar em duplicidade');
       }
     }
 
