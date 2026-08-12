@@ -75,16 +75,17 @@ a{color:inherit;text-decoration:none;}
 .froi span{font-size:9.5px;color:var(--fraco);font-weight:700;letter-spacing:.08em;text-transform:uppercase;}
 
 /* ▶️ FUNIL HORIZONTAL: colunas lado a lado, altura decrescente da esquerda para a direita */
-/* colunas alinhadas pelo topo: a silhueta desce da esquerda para a direita */
-.funil{display:flex;align-items:flex-start;gap:5px;overflow-x:auto;padding-bottom:6px;
+/* 🪜 bases alinhadas e alturas decrescentes: o TOPO de cada coluna fica mais
+   baixo que o da anterior, formando a escada que desce para a direita */
+.funil{display:flex;align-items:flex-end;gap:5px;overflow-x:auto;padding-bottom:6px;
   scrollbar-width:thin;}
 .funil::-webkit-scrollbar{height:5px;}
 .funil::-webkit-scrollbar-thumb{background:var(--linha);border-radius:3px;}
 .passo{flex:1 1 0;min-width:126px;position:relative;display:flex;flex-direction:column;
-  justify-content:flex-start;overflow:visible;
+  justify-content:flex-end;overflow:hidden;
   background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.014));
-  border:1px solid var(--linha);border-top:2.5px solid var(--c);
-  border-radius:13px 13px 11px 11px;padding:15px 14px 14px;
+  border:1px solid var(--linha);border-top:3px solid var(--c);
+  border-radius:13px 13px 11px 11px;padding:34px 14px 15px;
   transition:transform .22s cubic-bezier(.2,.8,.3,1),box-shadow .22s,border-color .22s;
   box-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 -18px 34px -26px var(--c) inset;}
 /* ✨ brilho suave que sobe do topo, na cor da etapa */
@@ -98,17 +99,17 @@ a{color:inherit;text-decoration:none;}
   width:0;height:0;border-left:5px solid var(--linha);
   border-top:4px solid transparent;border-bottom:4px solid transparent;z-index:2;}
 .pn{font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--fraco);letter-spacing:.06em;
-  height:13px;}
+  position:absolute;top:12px;left:14px;}
 /* 📏 rótulo e número ocupam alturas fixas, então TODOS os números do funil
    ficam na mesma linha de visão, independentemente da altura da coluna */
 .plbl{font-size:10px;font-weight:750;color:var(--dim);letter-spacing:.045em;text-transform:uppercase;
-  line-height:1.3;margin-top:8px;height:26px;display:flex;align-items:flex-start;}
+  line-height:1.3;height:26px;display:flex;align-items:flex-end;}
 .pval{font-family:var(--mono);font-size:27px;font-weight:680;letter-spacing:-1.5px;line-height:1;
   height:30px;display:flex;align-items:center;margin-top:2px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   text-shadow:0 0 26px currentColor;filter:saturate(1.15);}
 .pinfo{display:contents;}
-.pdet{font-size:10px;color:var(--fraco);margin-top:auto;padding-top:8px;line-height:1.45;}
+.pdet{font-size:10px;color:var(--fraco);margin-top:7px;line-height:1.45;min-height:28px;}
 /* o que sobra da altura vai para o rodapé da coluna, dando a forma do funil */
 .pfundo{margin-top:auto;}
 
@@ -286,7 +287,7 @@ function passo(n, lbl, val, cor, det, taxa, taxaLbl, altura){
     + '<div class="plbl">'+lbl+'</div>'
     + '<div class="pval" style="color:'+cor+'">'+val+'</div>'
     + (taxa!=null ? '<span class="ptaxa '+cls+'">'+taxa+'% ▸</span>' : '')
-    + (det ? '<div class="pdet">'+det+'</div>' : '')
+    + '<div class="pdet">'+(det||'&nbsp;')+'</div>'
   + '</div>';
 }
 
