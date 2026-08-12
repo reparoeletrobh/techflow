@@ -80,7 +80,7 @@ a{color:inherit;text-decoration:none;}
 .funil::-webkit-scrollbar{height:5px;}
 .funil::-webkit-scrollbar-thumb{background:var(--linha);border-radius:3px;}
 .passo{flex:1 1 0;min-width:126px;position:relative;display:flex;flex-direction:column;
-  justify-content:flex-start;overflow:hidden;
+  justify-content:flex-start;overflow:visible;
   background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.014));
   border:1px solid var(--linha);border-top:2.5px solid var(--c);
   border-radius:13px 13px 11px 11px;padding:15px 14px 14px;
@@ -110,6 +110,16 @@ a{color:inherit;text-decoration:none;}
 .pdet{font-size:10px;color:var(--fraco);margin-top:7px;line-height:1.45;}
 /* o que sobra da altura vai para o rodapé da coluna, dando a forma do funil */
 .pfundo{margin-top:auto;}
+/* 🔻 barra que desce da esquerda para a direita, ancorada na mesma base */
+.barras{display:flex;align-items:flex-end;gap:5px;margin-top:9px;height:96px;}
+.barra-col{flex:1 1 0;min-width:126px;position:relative;border-radius:9px 9px 0 0;
+  background:linear-gradient(180deg,var(--c),transparent 130%);
+  border:1px solid var(--c);border-bottom:none;opacity:.55;transition:.22s;
+  box-shadow:0 -10px 30px -14px var(--c);}
+.barra-col:hover{opacity:.9;box-shadow:0 -12px 34px -10px var(--c);}
+.barra-col span{position:absolute;top:-17px;left:0;right:0;text-align:center;
+  font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--dim);}
+.base-funil{height:2px;background:linear-gradient(90deg,var(--linha),transparent);border-radius:2px;}
 .ptaxa{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;
   padding:2px 7px;border-radius:5px;margin-top:8px;align-self:flex-start;}
 .t-bom{background:rgba(52,211,153,.13);color:var(--verde);}
@@ -279,7 +289,7 @@ function esc(s){ return String(s==null?'':s).replace(/</g,'&lt;'); }
 // ▶️ cada coluna é mais baixa que a anterior — o funil corre da esquerda para a direita
 function passo(n, lbl, val, cor, det, taxa, taxaLbl, altura){
   var cls = taxa==null ? '' : (taxa>=60?'t-bom':taxa>=30?'t-medio':'t-ruim');
-  return '<div class="passo" style="height:'+altura+'px;--c:'+cor+'">'
+  return '<div class="passo" style="--c:'+cor+'">'
     + '<span class="pn">'+n+'</span>'
     + '<div class="plbl">'+lbl+'</div>'
     + '<div class="pval" style="color:'+cor+'">'+val+'</div>'
@@ -328,6 +338,17 @@ function blocoFrente(nome, d, cor, etiqueta){
             ? ((d.custoPorAprovado/d.ticketMedio*100).toFixed(0))+'% do ticket médio' : '',
           null, null, L[7])
     + '</div>'
+    + '<div class="barras">'
+      + [d.investimento, d.conversas, d.fichas, d.logistica.total,
+         d.orcamentos, d.aprovados.total, d.faturamento, d.custoPorAprovado]
+        .map(function(v, ix){
+          var cores = ['var(--a1)','var(--a2)','var(--a3)','var(--a4)',
+                       'var(--a5)','var(--a6)','var(--verde)','var(--ambar)'];
+          var alt = [96, 85, 74, 64, 54, 44, 35, 26][ix];
+          return '<div class="barra-col" style="height:'+alt+'px;--c:'+cores[ix]+'"></div>';
+        }).join('')
+    + '</div>'
+    + '<div class="base-funil"></div>'
   + '</div>';
 }
 
