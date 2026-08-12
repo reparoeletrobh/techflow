@@ -553,6 +553,35 @@ function check(nome, cond, extra) {
 
   // ── 📅 cada etapa do funil precisa gravar a própria data na origem ──
   // ── 📒 cada etapa do funil precisa registrar no livro-razão ──
+  // ── 🔒 a camada de gravação segura precisa resistir à sobreposição ──
+  console.log('▶ Cenário GR — gravação segura não perde nem duplica');
+  {
+    const G = require('../api/_gravar.js');
+    // 1) acrescenta um item novo
+    KV['teste_grav'] = { fichas: [] };
+    const igual = (a, b) => String(a.id) === String(b.id);
+    const r1 = await G.acrescentar('teste_grav', 'fichas', { id: 'A', nome: 'Ana' }, igual);
+    check('gravação: item novo entrou', r1.ok && (KV['teste_grav'].fichas || []).length === 1,
+      JSON.stringify(r1));
+    // 2) o mesmo item de novo NÃO duplica
+    const r2 = await G.acrescentar('teste_grav', 'fichas', { id: 'A', nome: 'Ana' }, igual);
+    check('gravação: não duplica item existente',
+      r2.ok && KV['teste_grav'].fichas.length === 1, KV['teste_grav'].fichas.length);
+    // 3) item diferente entra
+    await G.acrescentar('teste_grav', 'fichas', { id: 'B', nome: 'Bruno' }, igual);
+    check('gravação: segundo item entrou', KV['teste_grav'].fichas.length === 2);
+    // 4) alteração que muda um campo, com conferência
+    const r4 = await G.alterar('teste_grav',
+      (db) => { const f = db.fichas.find(x => x.id === 'A'); if (f) f.status = 'ok'; return db; },
+      (db) => (db.fichas || []).some(x => x.id === 'A' && x.status === 'ok'));
+    check('gravação: alteração confirmada', r4.ok, r4.motivo);
+    // 5) desistir devolve ok sem alterar
+    const antes = JSON.stringify(KV['teste_grav']);
+    const r5 = await G.alterar('teste_grav', () => null, null);
+    check('gravação: desistir não altera nada',
+      r5.ok && JSON.stringify(KV['teste_grav']) === antes);
+  }
+
   console.log('▶ Cenário K2 — etapas registram no livro-razão do funil');
   {
     const fs8 = require('fs');
