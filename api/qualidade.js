@@ -44,6 +44,52 @@ export default async function handler(req, res) {
   if (!db.config) db.config = { tecnicos: [], proximoNum: 1 };
 
   // ── LOAD ──
+  // ── 🩻 POR-QUE-NAO-CRIOU: o card registra o que houve ao tentar criar a inspeção ──
+  if (action === 'por-que-nao-criou') {
+    const dias = Math.min(7, Math.max(1, parseInt(req.query.dias || '2', 10)));
+    const corte = Date.now() - dias * 86400000;
+    const L = [];
+    for (const k of ['reparoeletro_board', 'reparoeletro_pipe', 'tv_pipe']) {
+      try {
+        const b = await dbGet(k);
+        for (const c of (((b || {}).cards) || [])) {
+          if (String(c.phaseId || c.phase || '') !== 'controle_qualidade') continue;
+          const t = new Date(c.entrouCqEm || c.movedAt || 0).getTime();
+          if (!t || t < corte) continue;
+          L.push({ banco: k,
+            cliente: c.nomeContato || c.nome || c.title || '?',
+            temId: !!c.id, id: c.id || '(sem id)',
+            telefone: c.telefone || '(sem telefone)',
+            tecnicoServico: c.tecnicoServico || null,
+            inspecaoCriada: c.inspecaoCriada || null,
+            inspecaoConfirmada: c.inspecaoConfirmada,
+            inspecaoErro: c.inspecaoErro || null,
+            entrouCqEm: c.entrouCqEm || null,
+            movedAt: c.movedAt });
+        }
+      } catch (e) {}
+    }
+    const semTentativa = L.filter(x => !x.inspecaoCriada && !x.inspecaoErro);
+    const comErro = L.filter(x => x.inspecaoErro);
+    const semId = L.filter(x => !x.temId);
+    return res.status(200).json({ ok: comErro.length === 0 && semTentativa.length === 0,
+      cardsNoCQ: L.length,
+      semNenhumaTentativa: semTentativa.length,
+      comErroRegistrado: comErro.length,
+      semIdentificador: semId.length,
+      DIAGNOSTICO: semId.length ? '🚨 há card sem identificador — a inspeção não consegue se vincular'
+        : comErro.length ? '🚨 a criação falhou com erro registrado'
+        : semTentativa.length ? '⚠️ o gatilho não chegou a rodar para estes cards'
+        : '✅ todos registraram criação de inspeção',
+      L: L.map(x => String(x.cliente).slice(0, 22) + ' | ' + x.banco +
+        ' | id: ' + String(x.id).slice(0, 14) +
+        ' | tel: ' + String(x.telefone).slice(-4) +
+        ' | téc: ' + (x.tecnicoServico || '—') +
+        ' | inspeção: ' + (x.inspecaoCriada || '❌ nenhuma') +
+        (x.inspecaoConfirmada === false ? ' (não confirmada)' : '') +
+        (x.inspecaoErro ? ' | 🚨 ' + x.inspecaoErro : '')) });
+  }
+
   // ── 🔎 CONFERIR-HOJE: o que existe e o que sumiu do controle de qualidade ──
   if (action === 'conferir-hoje') {
     const dia = String(req.query.dia || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
