@@ -294,7 +294,8 @@ export default async function handler(req, res) {
       id: 'insp_avl_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
       os: 'AVL-' + String(num).padStart(4, '0'),
       cardId: null,
-      cliente: String(b.cliente || '').trim() || '— produção interna —',
+      // 🏷️ sem cliente, o cabeçalho mostra o que foi feito, não um traço vazio
+      cliente: String(b.cliente || '').trim() || descricao.slice(0, 40),
       telefone: '',
       equipamento: tipo,
       equipamentoTexto: descricao.slice(0, 120),

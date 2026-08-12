@@ -523,14 +523,19 @@ function render(){
     acts+='<button class="btn b-x" onclick="excluir(\''+i.id+'\')">🗑</button>';
     return '<div class="card">'+
       '<div class="hd"><div><div class="nm">'+esc(i.cliente)+'</div>'+
-      '<div class="eq">'+(EQUIP_LBL[i.equipamento]||i.equipamento)+(i.equipDesc?' · '+esc(i.equipDesc):'')+'</div></div>'+pill+'</div>'+
-      '<div class="meta">'+i.id+(i.os?' · OS '+esc(i.os):'')+
+      '<div class="eq">'+(EQUIP_LBL[i.equipamento]||i.equipamento)
+        +((i.equipamentoTexto||i.equipDesc)?' · '+esc(i.equipamentoTexto||i.equipDesc):'')+'</div></div>'+pill+'</div>'+
+      '<div class="meta">'+(i.os?'<b>'+esc(i.os)+'</b>':esc(i.id))+
+      (i.avulsa?' <span style="background:rgba(168,85,247,.2);color:#c084fc;padding:1px 6px;'
+        +'border-radius:8px;font-size:9.5px;font-weight:800;">AVULSA'
+        +(i.categoria?' · '+esc(String(i.categoria).replace('_',' ')):'')+'</span>':'')+
       // 📅 quando entrou no controle de qualidade, e há quanto tempo espera
       (i.criadoEm?'<br>📥 Entrou: <b>'+fmtDH(i.criadoEm)+'</b>'+esperaHTML(i):'')+
       (i.tecnico?'<br>🔧 Técnico: <b>'+esc(i.tecnico)+'</b>':'')+
       (i.inspetor?' · 🔍 Inspetor: <b>'+esc(i.inspetor)+'</b>':'')+
       (rep?'<br>⚠️ '+rep+' reprovação(ões) anteriores':'')+
       (i.aprovadoEm?'<br>✅ Aprovado: <b>'+fmtDH(i.aprovadoEm)+'</b>'+duracaoHTML(i):'')+
+      (i.obsTecnica?'<br>🗒 '+esc(String(i.obsTecnica).slice(0,120)):'')+
       (i.reprovadoEm?'<br>🔧 Reprovado: '+fmtDH(i.reprovadoEm):'')+'</div>'+
       '<div class="acts">'+acts+'</div></div>';
   }).join('');
