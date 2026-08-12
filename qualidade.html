@@ -451,6 +451,15 @@ var CK_ESP={
     {id:'a2',t:'Barulho'},
     {id:'a3',t:'Parafuso'},
   ],
+  // 🧰 equipamento sem categoria própria: verificações que valem para qualquer
+  // conserto. Sem isto a tela abria vazia e não dava para inspecionar.
+  outro:[
+    {id:'o1',t:'Liga e funciona'},
+    {id:'o2',t:'Defeito relatado resolvido'},
+    {id:'o3',t:'Barulho anormal'},
+    {id:'o4',t:'Parafusos e fixação'},
+    {id:'o5',t:'Limpeza e acabamento'},
+  ],
   forno:[
     {id:'f1',t:'Resistências aquecendo (superior e inferior)'},
     {id:'f2',t:'Termostato desarma na temperatura certa'},
@@ -599,8 +608,10 @@ async function criar(){
 
 // ═══ INSPEÇÃO ═══
 function itensDe(i){
-  // 🎯 só o checklist ESPECÍFICO do equipamento — o geral foi retirado
-  return (CK_ESP[i.equipamento] || CK_ESP.outro || []);
+  // 🎯 checklist do equipamento; sem categoria conhecida, usa o genérico
+  var l = CK_ESP[i.equipamento];
+  if(l && l.length) return l;
+  return CK_ESP.outro || [];
 }
 
 function abrirInsp(id){
@@ -611,6 +622,15 @@ function abrirInsp(id){
   if(_atual.inspetor)document.getElementById('i-inspetor').value=_atual.inspetor;
   var itens=itensDe(_atual);
   var espT=EQUIP_LBL[_atual.equipamento]||'Específico';
+  if(!itens.length){
+    document.getElementById('i-itens').innerHTML =
+      '<div style="padding:20px;text-align:center;color:#fbbf24;font-size:13px;">'
+      + '⚠️ não há checklist para este equipamento<br>'
+      + '<span style="font-size:11.5px;color:#8b93a3;">'
+      + esc(_atual.equipamentoTexto||_atual.equipamento||'') + '</span></div>';
+    document.getElementById('ov-insp').classList.add('on');
+    return;
+  }
   var html='<div class="sec-t">✔️ Verificações gerais</div>';
   itens.forEach(function(it,ix){
     if(ix===CK_UNIVERSAL.length)html+='<div class="sec-t">🎯 Específico — '+espT+'</div>';

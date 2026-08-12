@@ -1,3 +1,8 @@
+let _gravar = { alterar: async () => ({ ok: false, motivo: 'módulo indisponível' }),
+  acrescentar: async () => ({ ok: false, motivo: 'módulo indisponível' }) };
+try { _gravar = require('./_gravar'); } catch (e) {
+  try { _gravar = require(require('path').join(__dirname, '_gravar.js')); } catch (e2) {}
+}
 // ═══ CONTROLE DE QUALIDADE — API (beta) ═══
 // Fila de inspeção + checklists + aprovação/reprovação + técnicos + certificado
 
@@ -588,36 +593,40 @@ export default async function handler(req, res) {
     // Agora ela passa pelo Controle de Qualidade, então quem move é a aprovação daqui.
     let frenteLoja = null;
     try {
-      const FL = await dbGet('reparoeletro_frenteloja');
       const d8q = String(insp.telefone || '').replace(/\D/g, '').slice(-8);
       const nomeQ = String(insp.cliente || '').toLowerCase().trim();
-      if (FL && Array.isArray(FL.fichas) && (d8q.length >= 8 || nomeQ)) {
-        const f = FL.fichas.find(x => {
-          const t = String(x.telefone || '').replace(/\D/g, '').slice(-8);
-          const n = String(x.nomeContato || x.nome || '').toLowerCase().trim();
-          const jaFeito = ['conserto_realizado', 'entregue', 'finalizado'].includes(String(x.phase || ''));
-          if (jaFeito) return false;
-          return (d8q.length >= 8 && t === d8q) || (nomeQ && n === nomeQ);
-        });
-        if (f) {
+      const ABERTAS = ['producao', 'analise', 'orcamento_cadastrado', 'aprovados', 'receber'];
+      // 🏪 aprovado no CQ → conserto realizado no Frente de Loja, liberando o pagamento
+      const rFL = await _gravar.alterar('reparoeletro_frenteloja',
+        (FL) => {
+          const lista = (FL && FL.fichas) || [];
+          const f = lista.find(x => {
+            if (String(x.id || '') === String(insp.flFichaId || '')) return true;
+            const t = String(x.telefone || '').replace(/\D/g, '').slice(-8);
+            const n = String(x.nomeContato || x.nome || '').toLowerCase().trim();
+            if (!ABERTAS.includes(String(x.phase || ''))) return false;
+            return (d8q.length >= 8 && t === d8q) || (nomeQ && n === nomeQ);
+          });
+          if (!f) return null;                       // nada a fazer
           const agora = new Date().toISOString();
           f.phase = 'conserto_realizado';
           f.movedAt = agora;
           f.consertoRealizadoEm = agora;
           f.viaControleQualidade = true;
+          f.inspecaoOs = insp.os || insp.id;
           f.history = (f.history || []).concat([{ phase: 'conserto_realizado', ts: agora,
             via: 'controle_qualidade', inspecao: insp.os || insp.id }]);
-          await dbSet('reparoeletro_frenteloja', FL);
-          // confirma que persistiu
-          const conf = await dbGet('reparoeletro_frenteloja');
-          const ok2 = ((conf || {}).fichas || []).some(x => x.id === f.id &&
-            String(x.phase || '') === 'conserto_realizado');
-          frenteLoja = ok2 ? { movido: true, ficha: f.nomeContato || f.nome, id: f.id }
-                           : { movido: false, erro: 'a gravação não persistiu' };
-        } else {
-          frenteLoja = { movido: false, motivo: 'cliente não encontrado no Frente de Loja em fase aberta' };
-        }
-      }
+          return FL;
+        },
+        (FL) => ((FL || {}).fichas || []).some(x =>
+          String(x.inspecaoOs || '') === String(insp.os || insp.id) &&
+          String(x.phase || '') === 'conserto_realizado'),
+        { tentativas: 3, padrao: { fichas: [] } });
+      frenteLoja = rFL.ok
+        ? (rFL.motivo === 'nada a alterar'
+            ? { movido: false, motivo: 'cliente não encontrado em fase aberta no Frente de Loja' }
+            : { movido: true, para: 'conserto_realizado', detalhe: rFL.motivo })
+        : { movido: false, erro: rFL.motivo };
     } catch (e) { frenteLoja = { movido: false, erro: e.message }; }
 
     // ── 📲 AVISA O CLIENTE com o resultado do controle de qualidade ──

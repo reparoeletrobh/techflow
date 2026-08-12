@@ -707,16 +707,18 @@ module.exports = async function handler(req, res) {
           if (!jaTem) {
             const num = q.config.proximoNum || (q.inspecoes.length + 1);
             const txt = String(card.equipamento || card.descricao || '').toLowerCase();
-            const tipo = /micro-?ondas/.test(txt) ? 'microondas'
-              : /purificador|bebedouro/.test(txt) ? 'purificador'
-              : /adega/.test(txt) ? 'adega'
-              : /forno/.test(txt) ? 'forno'
+            // 🔍 reconhece também abreviações e grafias soltas do balcão
+            const tipo = /micro-?ondas|microondas|micro ondas|\bmo\b|magnetron/.test(txt) ? 'microondas'
+              : /purificador|bebedouro|filtro|agua|água/.test(txt) ? 'purificador'
+              : /adega|climatizada|vinho/.test(txt) ? 'adega'
+              : /forno|fogao|fogão|cooktop/.test(txt) ? 'forno'
               : /\btv\b|televis/.test(txt) ? 'tv'
-              : /bblend|b-?blend/.test(txt) ? 'bblend' : 'outro';
+              : /bblend|b-?blend|liquidificador/.test(txt) ? 'bblend' : 'outro';
             q.inspecoes.unshift({
               id: 'insp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
               os: 'CQ-' + String(num).padStart(4, '0'),
               cardId: card.id,
+              flFichaId: card.flFichaId || null,   // 🏪 vínculo direto com a ficha do balcão
               cliente: card.nomeContato || card.nome || '—',
               telefone: card.telefone || '',
               equipamento: tipo,
