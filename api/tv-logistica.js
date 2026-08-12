@@ -801,11 +801,7 @@ module.exports = async function handler(req, res) {
     if (limpar) {
       delete f.agendadoPara; delete f.agendadoObs; delete f.agendadoEm;
       delete f.horarioColeta;
-      // desmarcar devolve a ficha ao motorista, sem horário
-      if (String(f.phase || '') === 'horario_marcado') {
-        f.phase = 'motorista_parceiro';
-        f.movedAt = new Date().toISOString();
-      }
+      // desmarcar apenas remove o horário — a ficha permanece onde está
     } else {
       if (!quando) return res.status(400).json({ ok: false, error: 'informe quando (ISO)' });
       f.agendadoPara = quando;
@@ -817,16 +813,10 @@ module.exports = async function handler(req, res) {
       f.historicoAgenda = (f.historicoAgenda || []).concat([{
         para: quando, obs: f.agendadoObs, em: f.agendadoEm,
       }]).slice(-10);
-      // 🕐 combinar horário move a ficha para Horário Marcado — antes ela ficava
-      // em Motorista Parceiro e nada mudava na tela da equipe
-      const faseAntes = String(f.phase || '');
-      if (faseAntes !== 'horario_marcado') {
-        f.phase = 'horario_marcado';
-        f.horarioMarcadoEm = f.agendadoEm;
-        f.movedAt = f.agendadoEm;
-        f.history = (f.history || []).concat([{ phase: 'horario_marcado', ts: f.agendadoEm,
-          via: 'motorista', para: quando }]);
-      }
+      // 🕐 a ficha NÃO muda de coluna: continua com o mesmo motorista, apenas
+      // ganha o relógio. Mover para Horário Marcado a tirava da lista dele.
+      f.history = (f.history || []).concat([{ phase: String(f.phase || ''), ts: f.agendadoEm,
+        via: 'motorista', acao: 'horário combinado', para: quando }]);
     }
     await dbSet(LOG_KEY, db);
     return res.status(200).json({ ok: true, id, agendadoPara: f.agendadoPara || null });
