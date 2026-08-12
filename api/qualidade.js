@@ -44,12 +44,35 @@ export default async function handler(req, res) {
   if (!db.config) db.config = { tecnicos: [], proximoNum: 1 };
 
   // ── LOAD ──
+  // ── ↩️ DESFAZER-RECUPERADAS: remove as inspeções criadas em massa por engano ──
+  if (action === 'desfazer-recuperadas') {
+    const alvo = (db.inspecoes || []).filter(i => i.recuperada === true &&
+      i.status !== 'aprovado' && i.status !== 'reprovado');
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        vaoSerRemovidas: alvo.length,
+        L: alvo.map(i => (i.os || i.id) + ' | ' + String(i.cliente || '?').slice(0, 22) +
+          ' | ' + String(i.equipamentoTexto || i.equipamento || '').slice(0, 26) +
+          ' | téc: ' + (i.tecnico || '—')),
+        observacao: 'só remove as recuperadas que ainda não foram inspecionadas',
+        dica: 'para remover: &aplicar=1' });
+    }
+    const ids = new Set(alvo.map(i => i.id));
+    db.inspecoes = (db.inspecoes || []).filter(i => !ids.has(i.id));
+    await dbSet(KEY, db);
+    return res.status(200).json({ ok: true, removidas: ids.size, restam: db.inspecoes.length });
+  }
+
   // ── 🔍 FALTANDO: cards no Controle de Qualidade sem inspeção criada ──
   if (action === 'faltando') {
     const dias = Math.min(30, Math.max(1, parseInt(req.query.dias || '3', 10)));
     const corte = Date.now() - dias * 86400000;
     const insp = db.inspecoes || [];
     const comInsp = new Set(insp.map(i => String(i.cardId || '')).filter(Boolean));
+    // 🔍 inspeções antigas podem não ter cardId — casar também por telefone evita
+    // considerar como faltante um card que já foi inspecionado
+    const d8q = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const telComInsp = new Set(insp.map(i => d8q(i.telefone)).filter(t => t.length >= 8));
     const faltando = [];
     for (const k of ['reparoeletro_board', 'reparoeletro_pipe', 'tv_pipe']) {
       try {
@@ -60,6 +83,7 @@ export default async function handler(req, res) {
           const q = new Date(c.entrouCqEm || c.movedAt || 0).getTime();
           if (!q || q < corte) continue;
           if (comInsp.has(String(c.id))) continue;
+          if (telComInsp.has(d8q(c.telefone))) continue;   // já tem inspeção deste cliente
           faltando.push({ banco: k, id: c.id,
             cliente: c.nomeContato || c.nome || '?',
             telefone: c.telefone || '',
