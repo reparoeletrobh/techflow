@@ -615,15 +615,22 @@ function itensDe(i){
 }
 
 function abrirInsp(id){
+  try { _abrirInsp(id); }
+  catch(e){ alert('Não consegui abrir a inspeção: '+(e&&e.message||e)
+    +'\n\nRecarregue a página (Ctrl+F5) e tente de novo.'); }
+}
+function _abrirInsp(id){
   _atual=_db.inspecoes.find(function(x){return x.id===id;});
-  if(!_atual)return;
+  if(!_atual){ alert('Inspeção não encontrada. Atualize a lista.'); return; }
   document.getElementById('i-titulo').textContent='🔍 '+_atual.id+' — '+_atual.cliente+' ('+(EQUIP_LBL[_atual.equipamento]||'')+')';
   fillTecSelect('i-inspetor','— quem está inspecionando? —');
   if(_atual.inspetor)document.getElementById('i-inspetor').value=_atual.inspetor;
   var itens=itensDe(_atual);
   var espT=EQUIP_LBL[_atual.equipamento]||'Específico';
   if(!itens.length){
-    document.getElementById('i-itens').innerHTML =
+    // o container do checklist é i-checks — usar outro id fazia a função quebrar
+    // antes de abrir o modal, e o botão Inspecionar ficava sem reação
+    document.getElementById('i-checks').innerHTML =
       '<div style="padding:20px;text-align:center;color:#fbbf24;font-size:13px;">'
       + '⚠️ não há checklist para este equipamento<br>'
       + '<span style="font-size:11.5px;color:#8b93a3;">'

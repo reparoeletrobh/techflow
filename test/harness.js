@@ -571,6 +571,28 @@ function check(nome, cond, extra) {
   // ── 🔒 a camada de gravação segura precisa resistir à sobreposição ──
   // ── 🔁 devolução do remarcar com a camada segura ──
   // ── 🔁 ficha já devolvida e atendida NÃO pode ser recriada ──
+  // ── 🖥️ elemento citado no script precisa existir no HTML ──
+  console.log('▶ Cenário EL — telas não chamam elementos inexistentes');
+  {
+    const fs9 = require('fs');
+    const telas = ['qualidade.html', 'garantia.html', 'fichas.html', 'kpis.html', 'tecnico.html'];
+    const problemas = [];
+    for (const t of telas) {
+      if (!fs9.existsSync(t)) continue;
+      const c = fs9.readFileSync(t, 'utf8');
+      const usados = [...new Set((c.match(/getElementById\('([a-zA-Z0-9_-]+)'\)/g) || [])
+        .map(x => x.replace(/getElementById\('|'\)/g, '')))];
+      for (const id of usados) {
+        // ignora os criados dinamicamente pelo próprio script
+        if (new RegExp("id\\s*=\\s*['\"]" + id + "['\"]").test(c)) continue;
+        if (new RegExp("id=\\\\?['\"]?" + id).test(c)) continue;
+        problemas.push(t + ':' + id);
+      }
+    }
+    check('telas: nenhum elemento citado está ausente',
+      problemas.length === 0, problemas.slice(0, 6).join(', '));
+  }
+
   console.log('▶ Cenário RC — recriar-perdidas respeita devolução já feita');
   {
     const logi2 = carregarHandler('api/logistica.js');
