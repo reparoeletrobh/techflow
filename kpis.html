@@ -169,11 +169,22 @@ a{color:inherit;text-decoration:none;}
   <button class="fbtn" onclick="carregar()" style="margin-left:auto;">↻</button>
 </div>
 
+<div id="erro-geral" style="display:none;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4);
+  border-radius:12px;padding:14px 16px;margin-bottom:16px;font-size:12.5px;color:#f87171;
+  font-family:var(--mono);white-space:pre-wrap;"></div>
+
 <div id="conteudo"><div class="carregando">⏳ montando o funil…</div></div>
 
 <div class="rodape" id="rodape"></div>
 
 <script>
+// 🔊 qualquer falha de script aparece na tela, em vez de deixar a página vazia
+window.onerror = function(msg, arq, lin, col){
+  var el = document.getElementById('erro-geral');
+  if(el){ el.style.display='block';
+    el.textContent = '🚨 erro na página: ' + msg + '\n' + (arq||'') + ' linha ' + lin + ':' + col; }
+  return false;
+};
 var _per = 'dia';
 function periodo(p){
   _per = p;
@@ -250,11 +261,21 @@ async function carregar(){
     if(!de||!ate){ alert('Escolha as duas datas.'); return; }
     qs += '&de='+de+'&ate='+ate;
   }
-  var r = null;
-  try { r = await fetch('/api/kpis?'+qs).then(function(x){return x.json();}); } catch(e){}
+  var r = null, diag = '';
+  try {
+    var resp = await fetch('/api/kpis?'+qs);
+    diag = 'HTTP ' + resp.status;
+    var txt = await resp.text();
+    try { r = JSON.parse(txt); }
+    catch(e){ diag += ' · resposta não é JSON: ' + txt.slice(0,180); }
+  } catch(e){ diag = 'falha na conexão: ' + e.message; }
   if(!r || !r.ok){
-    cx.innerHTML = '<div class="carregando" style="color:var(--vermelho)">não consegui carregar os indicadores'
-      + (r&&r.error?'<br><span style="font-size:12px">'+esc(r.error)+'</span>':'')+'</div>';
+    cx.innerHTML = '<div class="carregando" style="color:var(--vermelho)">'
+      + 'não consegui carregar os indicadores<br>'
+      + '<span style="font-size:12px;font-family:var(--mono);color:var(--dim)">'
+      + esc(diag) + (r&&r.error?' · '+esc(r.error):'') + '</span><br>'
+      + '<button class="fbtn" style="margin-top:14px" onclick="carregar()">↻ tentar de novo</button>'
+      + '</div>';
     return;
   }
   document.getElementById('carimbo').textContent = (r.periodo.rotulo||'') + ' · atualizado ' + (r.geradoEm||'');
