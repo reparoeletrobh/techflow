@@ -128,6 +128,10 @@ async function registrarNoPipe(dados) {
       descricao:       dados.descricao || '',
       valor:           parseFloat(dados.valor || 0) || 0,
       origem:          'frenteloja',
+      // 🕐 o card nasce já aprovado: leva a data em que o cliente aprovou no balcão
+      aprovadoEm:      dados.aprovadoEm || now,
+      aprovadoPor:     dados.aprovadoPor || 'balcão',
+      aprovadoNoBalcao: true,
       criadoEm:        now, movedAt: now,
       aguardandoDesde: null,
       history: [], analiseCompra: false
@@ -304,7 +308,13 @@ export default async function handler(req,res){
 
     if(decisao==='aprovado'){
       ficha.phase='producao';ficha.movedAt=now;
-      ficha.history=(ficha.history||[]).concat([{phase:'producao',ts:now}]);
+      // ✅ este é o momento real da aprovação no balcão — sem este carimbo,
+      // a venda presencial não podia ser datada em nenhum relatório
+      ficha.aprovadoEm=now;
+      ficha.aprovadoPor=String(req.body?.usuario||req.body?.atendente||'balcão').slice(0,30);
+      ficha.history=(ficha.history||[]).concat([
+        {phase:'aprovados',ts:now,via:'passar orçamento'},
+        {phase:'producao',ts:now}]);
 
       const titleCompleto=(ficha.nomeContato+' (Loja) - '+ficha.equipamento+
         ' | '+(ficha.descricao||'')+' | Diag: '+(ficha.descricaoTecnica||'')+
