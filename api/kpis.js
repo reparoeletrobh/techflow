@@ -123,12 +123,83 @@ async function desdeQuando() {
 }
 let lg;
 
+// 🔎 desde quando existe carimbo de aprovação — e quanto se perde antes disso
+async function coberturaAprovacoes() {
+  const R = { porMes: {}, primeiroCarimbo: null, primeiroHistorico: null,
+    totalCards: 0, comCarimbo: 0, comHistorico: 0, semNada: 0 };
+  const fases = ['aprovados', 'producao', 'video_enviado', 'analise_compra',
+    'equipamento_comprado', 'programar_entrega', 'solicitar_entrega',
+    'entrega_solicitada', 'receber', 'erp', 'garantia', 'finalizado'];
+  for (const k of ['reparoeletro_pipe', 'tv_pipe', 'reparoeletro_arquivo', 'tv_arquivo']) {
+    let b = null;
+    try { b = await dbGet(k); } catch (e) { continue; }
+    for (const L of ['cards', 'fichas']) {
+      for (const c of (((b || {})[L]) || [])) {
+        const fase = String(c.phaseId || c.phase || '');
+        const passou = fases.includes(fase) || !!c.aprovadoEm ||
+          (c.history || []).some(x => String(x.phase || x.phaseId || '') === 'aprovados');
+        if (!passou) continue;
+        R.totalCards++;
+        const carimbo = c.aprovadoEm ? String(c.aprovadoEm).slice(0, 10) : null;
+        const hist = (c.history || [])
+          .filter(x => String(x.phase || x.phaseId || '') === 'aprovados')
+          .map(x => String(x.ts || x.timestamp || '').slice(0, 10)).filter(Boolean).sort()[0] || null;
+        // o mês de referência é o do card, para saber quando cada situação ocorre
+        const mesRef = String(carimbo || hist || c.criadoEm || '').slice(0, 7) || '(sem data)';
+        R.porMes[mesRef] = R.porMes[mesRef] || { total: 0, carimbo: 0, historico: 0, semNada: 0 };
+        R.porMes[mesRef].total++;
+        if (carimbo) {
+          R.comCarimbo++; R.porMes[mesRef].carimbo++;
+          if (!R.primeiroCarimbo || carimbo < R.primeiroCarimbo) R.primeiroCarimbo = carimbo;
+        } else if (hist) {
+          R.comHistorico++; R.porMes[mesRef].historico++;
+          if (!R.primeiroHistorico || hist < R.primeiroHistorico) R.primeiroHistorico = hist;
+        } else {
+          R.semNada++; R.porMes[mesRef].semNada++;
+        }
+      }
+    }
+  }
+  return R;
+}
+
 module.exports = async function handler(req, res) {
   const _k = (req.query && req.query.k) || req.headers['x-tf-key'] || '';
   if (_k !== ((process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim())) {
     return res.status(401).json({ ok: false, error: 'não autorizado' });
   }
   res.setHeader('Access-Control-Allow-Origin', 'https://reparoeletroadm.com');
+  // 📏 medição da cobertura das aprovações
+  if ((req.query || {}).action === 'cobertura') {
+    const C = await coberturaAprovacoes();
+    const meses = Object.entries(C.porMes).sort();
+    const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+    // a partir de qual mês a medição é confiável (90% ou mais identificados)
+    let confiavelDesde = null;
+    for (const [m, v] of meses) {
+      const ident = v.carimbo + v.historico;
+      if (pct(ident, v.total) >= 90) { confiavelDesde = m; break; }
+    }
+    return res.status(200).json({ ok: true,
+      RESUMO: {
+        cardsQuePassaramPorAprovacao: C.totalCards,
+        comCarimboDeData: C.comCarimbo,
+        semCarimboMasComHistorico: C.comHistorico,
+        semNenhumaDataDeAprovacao: C.semNada,
+        percentualIdentificavel: pct(C.comCarimbo + C.comHistorico, C.totalCards) + '%',
+      },
+      primeiroCarimboRegistrado: C.primeiroCarimbo,
+      primeiroHistoricoRegistrado: C.primeiroHistorico,
+      VEREDITO: confiavelDesde
+        ? 'a medição de aprovados é confiável a partir de ' + confiavelDesde
+        : 'nenhum mês atinge 90% de aprovações identificáveis',
+      confiavelDesde,
+      POR_MES: meses.map(([m, v]) => m + ' | ' + String(v.total).padStart(3) + ' aprovação(ões) | ' +
+        'com data: ' + pct(v.carimbo + v.historico, v.total) + '% ' +
+        '(carimbo ' + v.carimbo + ' · histórico ' + v.historico + ' · sem data ' + v.semNada + ')'),
+      observacao: 'card sem carimbo e sem histórico não entra em nenhum período — ele existe, mas não se sabe quando foi aprovado' });
+  }
+
   const J = janela(req.query || {});
   const dentro = d => { const t = new Date(d || 0).getTime(); return t >= J.ini && t <= J.fim; };
 
