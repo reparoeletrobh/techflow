@@ -404,10 +404,23 @@ export default async function handler(req, res) {
       } catch (e) {}
     }
     const corte = Date.now() - JANELA_DIAS * 86400000;
-    const criar = [], jaExistem = [], reentradas = [];
+    const criar = [], jaExistem = [], reentradas = [], descartadas = [];
     for (const r of rows.slice(1)) {
-      const tel = String(r[ix.tel] || '').replace(/\D/g, '');
-      if (tel.length < 10) continue;
+      const telBruto = String(r[ix.tel] || '');
+      let tel = telBruto.replace(/\D/g, '');
+      // 📞 normaliza o que a planilha traz em formatos diferentes, em vez de descartar:
+      // 8 ou 9 dígitos (sem DDD) não dá para recuperar, mas 10/11 sem o 55 sim
+      if (tel.length === 12 && tel.startsWith('55')) tel = tel;            // 55 + DDD + 8
+      else if (tel.length === 13 && tel.startsWith('55')) tel = tel;       // 55 + DDD + 9
+      else if (tel.length === 10 || tel.length === 11) tel = '55' + tel;   // DDD + número
+      if (tel.length < 12) {
+        // 🔊 antes isto sumia em silêncio e a ficha nunca entrava
+        const dtD = String(r[ix.hora] || '');
+        descartadas.push({ nome: String(r[ix.nome] || '?').trim(),
+          telefoneNaPlanilha: telBruto, digitos: telBruto.replace(/\D/g, '').length,
+          quando: dtD, motivo: 'telefone incompleto — precisa de DDD + número' });
+        continue;
+      }
       const dt = String(r[ix.hora] || '');
       const mm = dt.match(/^(\d{2})\/(\d{2})\/(\d{2,4})/);
       let quando = null;
@@ -436,6 +449,10 @@ export default async function handler(req, res) {
         janelaDias: JANELA_DIAS, linhasNaPlanilha: rows.length - 1,
         vaoSerCriadas: criar.length, jaExistem: jaExistem.length,
         reentradasApos30Dias: reentradas.length,
+        DESCARTADAS: { quantas: descartadas.length,
+          motivo: 'linhas que não puderam virar ficha — confira o telefone na planilha',
+          L: descartadas.map(d => (d.quando || '?') + ' | ' + String(d.nome).slice(0, 20) +
+            ' | "' + d.telefoneNaPlanilha + '" (' + d.digitos + ' dígitos) — ' + d.motivo) },
         CRIAR: criar.map(x => x.quandoTexto + ' | ' + (x.ehTv ? 'TV ' : 'ADM') + ' | ' +
           String(x.nome).slice(0, 18) + ' ' + x.telefone.slice(-4) +
           (x.reentrada ? ' | 🔁 voltou após ' + x.reentrada + 'd' : '')),
@@ -461,8 +478,14 @@ export default async function handler(req, res) {
       criadas[x.ehTv ? 'tv' : 'adm']++;
       await new Promise(s => setTimeout(s, 60));
     }
-    return res.status(200).json({ ok: true, criadas, total: criadas.adm + criadas.tv,
-      reentradas: reentradas.length });
+    return res.status(200).json({ ok: descartadas.length === 0,
+      criadas, total: criadas.adm + criadas.tv,
+      reentradas: reentradas.length,
+      descartadas: descartadas.length,
+      DESCARTADAS: descartadas.map(d => String(d.nome).slice(0, 20) +
+        ' | "' + d.telefoneNaPlanilha + '" — ' + d.motivo),
+      alerta: descartadas.length
+        ? '🚨 ' + descartadas.length + ' linha(s) da planilha com telefone incompleto — corrija na planilha' : undefined });
   }
 
   // ── 🔁 RECUPERAR-PULADAS: cria as fichas da planilha que o cursor pulou ──
