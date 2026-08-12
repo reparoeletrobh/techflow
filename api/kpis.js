@@ -351,14 +351,18 @@ module.exports = async function handler(req, res) {
 
   // 📦 cards e fichas antigas migram para o arquivo — sem incluí-lo, qualquer
   // período passado aparece com aprovados, orçamentos e logística muito abaixo do real
-  const [fA, fT, lgA, lgT, ppA, ppT, arqA, arqT, fl, inv] = await Promise.all([
+  const [fA, fT, lgA, lgT, ppA, ppT, arqA, arqT, fl, balcao, inv] = await Promise.all([
     dbGet('fichas_adm'), dbGet('fichas_tv'),
     dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
     dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
     dbGet('reparoeletro_arquivo'), dbGet('tv_arquivo'),
-    dbGet('reparoeletro_frenteloja'),
+    dbGet('reparoeletro_frenteloja'), dbGet('reparoeletro_balcao'),
     investimento(J.de, J.ate),
   ]);
+  // 🏪 toda aprovação no balcão gera uma entrada aqui — é a fonte oficial do presencial
+  const doBalcao = (Array.isArray(balcao) ? balcao : ((balcao || {}).itens || []))
+    .filter(b => dentro(b.entradaEm));
+  const telsBalcao = new Set(doBalcao.map(b => d8(b.telefone)).filter(t => t.length >= 8));
   // o arquivo guarda tanto cards quanto fichas — separa cada tipo
   const desmembrar = (arq) => {
     const cards = [], fichas = [];
@@ -376,7 +380,7 @@ module.exports = async function handler(req, res) {
   // 📨 conversas vêm SOMENTE da Meta. O histórico deste sistema não serve:
   // quem atende a conversa vinda do anúncio é outro número, e o bot daqui só
   // entra depois que o contato já virou ficha — seria uma etapa bem posterior.
-  function montar(fichasDb, logDb, pipeDb, telsTv) {
+  function montar(fichasDb, logDb, pipeDb, extraBalcao) {
     const ehRetorno = f => ['remarcar', 'reagendamento'].includes(String(f.origem || '')) ||
       f.reagendarColeta === true ||
       String(f.id || '').startsWith('rem_') || String(f.id || '').startsWith('fic_reag_');
@@ -393,8 +397,12 @@ module.exports = async function handler(req, res) {
     const porBot = logs.filter(f => /bot/i.test(String(f.origem || '') + ' ' + String(f.criadoPor || '')));
     // pipe: orçamentos e aprovados
     const cards = ((pipeDb || {}).cards) || [];
+    // 🏪 é do balcão se a origem diz, se o carimbo diz, ou se o cliente consta
+    // na seção Balcão — que é criada exatamente quando se aprova na loja
+    const tb = (extraBalcao && extraBalcao.telsBalcao) || new Set();
     const ehBalcao = c => String(c.origem || '') === 'frenteloja' ||
-      c.aprovadoNoBalcao === true || String(c.id || '').includes('-loja');
+      c.aprovadoNoBalcao === true || String(c.id || '').includes('-loja') ||
+      tb.has(d8(c.telefone));
     const orcs = cards.filter(c => dentro(c.orcamentoEm || c.criadoEm) &&
       (Number(c.valor || 0) > 0 || c.orcamentoEm));
     // ✅ contam os que PASSARAM pela aprovação no período, mesmo que já tenham
@@ -415,7 +423,10 @@ module.exports = async function handler(req, res) {
     const aprovBot = aprov.filter(c => /bot/i.test(String(c.aprovadoPor || '')));
     const faturamento = aprov.reduce((s, c) => s + (Number(c.valor || 0) || 0), 0);
     const orcBalcao = orcs.filter(ehBalcao).length;
-    const aprovBalcao = aprov.filter(ehBalcao);
+    let aprovBalcao = aprov.filter(ehBalcao);
+    // a seção Balcão registra toda aprovação presencial: se ela tem mais do que
+    // encontramos nos cards, o número dela prevalece
+    const pisoBalcao = (extraBalcao && extraBalcao.totalBalcao) || 0;
     const fatBalcao = aprovBalcao.reduce((s, c) => s + (Number(c.valor || 0) || 0), 0);
     return {
       fichas: fichas.length,
@@ -423,8 +434,11 @@ module.exports = async function handler(req, res) {
         pctBot: logs.length ? Math.round(porBot.length / logs.length * 100) : 0 },
       orcamentos: { total: orcs.length, balcao: orcBalcao, online: orcs.length - orcBalcao,
         pctBalcao: orcs.length ? Math.round(orcBalcao / orcs.length * 100) : 0 },
-      aprovados: { total: aprov.length, bot: aprovBot.length, manual: aprov.length - aprovBot.length,
-        balcao: aprovBalcao.length, online: aprov.length - aprovBalcao.length,
+      aprovados: { total: Math.max(aprov.length, pisoBalcao + (aprov.length - aprovBalcao.length)),
+        bot: aprovBot.length, manual: aprov.length - aprovBot.length,
+        balcao: Math.max(aprovBalcao.length, pisoBalcao),
+        online: aprov.length - aprovBalcao.length,
+        balcaoPelaSecao: pisoBalcao, balcaoPelosCards: aprovBalcao.length,
         pctBalcao: aprov.length ? Math.round(aprovBalcao.length / aprov.length * 100) : 0,
         pctBot: aprov.length ? Math.round(aprovBot.length / aprov.length * 100) : 0 },
       faturamento: +faturamento.toFixed(2),
@@ -441,7 +455,8 @@ module.exports = async function handler(req, res) {
     valor: (f.orcamento && f.orcamento.valor) || f.valor || 0,
   }));
   const adm = montar(juntarFichas(fA, arqAdm), juntarFichas(lgA, arqAdm),
-    { cards: (((ppA || {}).cards) || []).concat(arqAdm.cards).concat(fichasFL) });
+    { cards: (((ppA || {}).cards) || []).concat(arqAdm.cards).concat(fichasFL) },
+    { telsBalcao, totalBalcao: doBalcao.length });
   const tv = montar(juntarFichas(fT, arqTv), juntarFichas(lgT, arqTv), juntarCards(ppT, arqTv));
   const temMeta = inv.convTotal > 0 || !!TOKEN;
   const convAdmFinal = inv.convAdm;
@@ -491,7 +506,7 @@ module.exports = async function handler(req, res) {
       fichas: 'fichas_adm e fichas_tv, mais o arquivo · pela data de criação · não conta retorno do remarcar, que já foi contado na primeira entrada',
       logistica: 'logística das duas frentes, mais o arquivo · pela data de criação · é do bot quando a origem ou quem cadastrou menciona bot',
       orcamentos: 'cards do pipe e do arquivo com data de orçamento ou valor preenchido, dentro do período',
-      aprovados: 'cards que PASSARAM pela fase de aprovação dentro do período, pelo carimbo ou pelo histórico — inclui os que já avançaram para produção, entrega ou finalizado',
+      aprovados: 'online: cards que passaram pela fase de aprovação no período, pelo carimbo ou pelo histórico. Balcão: a seção Balcão, que recebe uma entrada a cada aprovação presencial — é a fonte oficial do atendimento na loja',
       faturamento: 'soma do valor desses mesmos cards, na data em que passaram pela aprovação',
       custoPorAprovado: 'investimento ÷ aprovados',
       arquivo: 'períodos passados só ficam corretos porque o arquivo também é lido — cards e fichas antigas saem dos bancos ativos com o tempo',
