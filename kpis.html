@@ -400,6 +400,35 @@ async function carregar(){
   + '</div>'
   + blocoFrente('ADM', r.ADM, 'var(--a1)', 'linha branca')
   + blocoFrente('TV', r.TV, 'var(--a6)', 'televisores');
+  var dq = r.DESDE_QUANDO || {};
+  var fmtD2 = function(d){ return d ? String(d).split('-').reverse().join('/') : '—'; };
+  var alerta = '';
+  if(dq.conversas && r.periodo && r.periodo.de < dq.conversas){
+    alerta = '<div style="background:rgba(251,191,36,.09);border:1px solid rgba(251,191,36,.32);'
+      + 'border-radius:11px;padding:11px 14px;margin-top:16px;font-size:11.5px;color:var(--ambar);line-height:1.7;">'
+      + '⚠️ o período escolhido começa antes de ' + fmtD2(dq.conversas)
+      + ', quando o histórico de conversas começa — os números anteriores a essa data ficam incompletos</div>';
+  }
+  document.getElementById('conteudo').insertAdjacentHTML('beforeend', alerta
+    + '<div style="background:rgba(255,255,255,.02);border:1px solid var(--linha);border-radius:14px;'
+    + 'padding:15px 18px;margin-top:18px;">'
+    + '<div style="font-size:11px;font-weight:750;color:var(--dim);letter-spacing:.08em;'
+      + 'text-transform:uppercase;">📆 desde quando há registro</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin-top:11px;">'
+      + [['Fichas', dq.fichas],['Logística', dq.logistica],['Cards do pipe', dq.cards],
+         ['Aprovações', dq.aprovacoes],['Conversas', dq.conversas]]
+        .map(function(p){
+          return '<div><div style="font-family:var(--mono);font-size:14px;font-weight:650;color:var(--txt);">'
+            + fmtD2(p[1]) + '</div><div style="font-size:9.5px;color:var(--fraco);font-weight:700;'
+            + 'letter-spacing:.05em;text-transform:uppercase;margin-top:2px;">'+p[0]+'</div></div>';
+        }).join('')
+    + '</div>'
+    + '<div style="font-size:10.5px;color:var(--fraco);margin-top:12px;line-height:1.65;">'
+      + 'o funil é confiável a partir de <b style="color:var(--verde)">'
+      + fmtD2(dq.conversas || dq.aprovacoes || dq.fichas)
+      + '</b> — antes disso alguma etapa não tem registro completo'
+      + (dq.mensagensGuardadas ? '<br>' + dq.mensagensGuardadas + ' mensagens guardadas no histórico do WhatsApp' : '')
+    + '</div></div>');
   document.getElementById('rodape').innerHTML =
     'conversas: ' + esc(r.origemDasConversas || '—') + '<br>'
     + 'aprovados: quem passou pela fase no período, mesmo que já tenha avançado depois<br>'
