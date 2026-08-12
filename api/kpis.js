@@ -34,18 +34,34 @@ function janela(q) {
   const hoje = new Date(Date.now() - 3 * 3600000);
   const hojeStr = hoje.toISOString().slice(0, 10);
   const p = String(q.periodo || 'dia');
-  let de, ate = hojeStr, rotulo = '';
+  let de, ate = hojeStr, rotulo = '', cicloSabado = null;
   if (p === 'personalizado' && q.de && q.ate) {
     de = String(q.de).slice(0, 10); ate = String(q.ate).slice(0, 10);
     rotulo = 'de ' + de.split('-').reverse().join('/') + ' a ' + ate.split('-').reverse().join('/');
   } else if (p === 'semana') {
-    const ds = hoje.getUTCDay();
-    const seg = new Date(hoje); seg.setUTCDate(hoje.getUTCDate() - ((ds === 0) ? 6 : (ds - 1)));
-    de = seg.toISOString().slice(0, 10); rotulo = 'esta semana (desde segunda)';
+    // 📅 o ciclo comercial vai de sábado 13h ao sábado seguinte 13h — é o intervalo
+    // em que a verba é montada e consumida, então investimento e faturamento
+    // precisam ser medidos nessa mesma janela
+    const agoraBR = hoje;                       // já está em horário de Brasília
+    const dia = agoraBR.getUTCDay();            // 6 = sábado
+    const hora = agoraBR.getUTCHours() + agoraBR.getUTCMinutes() / 60;
+    let diasDesdeSabado = (dia - 6 + 7) % 7;    // quantos dias desde o último sábado
+    if (dia === 6 && hora < 13) diasDesdeSabado = 7;   // sábado antes das 13h ainda é o ciclo anterior
+    const inicio = new Date(agoraBR);
+    inicio.setUTCDate(agoraBR.getUTCDate() - diasDesdeSabado);
+    de = inicio.toISOString().slice(0, 10);
+    cicloSabado = { de, hIni: 13, hFim: 13 };
+    rotulo = 'ciclo de ' + de.slice(8) + '/' + de.slice(5, 7) + ' 13h até sábado 13h';
   } else if (p === 'mes') {
     de = hojeStr.slice(0, 8) + '01'; rotulo = 'este mês';
   } else { de = hojeStr; rotulo = 'hoje'; }
-  return { de, ate, rotulo, periodo: p,
+  // no ciclo de sábado a hora importa: começa às 13h e termina 7 dias depois às 13h
+  if (cicloSabado) {
+    const ini = new Date(cicloSabado.de + 'T13:00:00-03:00').getTime();
+    return { de, ate, rotulo, periodo: p, cicloSabado: true,
+      ini, fim: Math.min(Date.now(), ini + 7 * 86400000) };
+  }
+  return { de, ate, rotulo, periodo: p, cicloSabado: false,
     ini: new Date(de + 'T00:00:00-03:00').getTime(),
     fim: new Date(ate + 'T23:59:59-03:00').getTime() };
 }
@@ -203,7 +219,10 @@ module.exports = async function handler(req, res) {
   });
 
   return res.status(200).json({ ok: true,
-    periodo: { de: J.de, ate: J.ate, rotulo: J.rotulo, tipo: J.periodo },
+    periodo: { de: J.de, ate: J.ate, rotulo: J.rotulo, tipo: J.periodo,
+      cicloFechado: !!J.cicloSabado,
+      inicioExato: new Date(J.ini - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' BRT',
+      fimExato: new Date(J.fim - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' BRT' },
     geradoEm: new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' BRT',
     fonteInvestimento: inv.fonte,
     DIAGNOSTICO: {

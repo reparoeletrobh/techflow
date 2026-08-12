@@ -92,6 +92,100 @@ export default async function handler(req, res) {
 
   const action = req.query.action || (req.body && req.body.action) || '';
 
+  // ── 🔬 AUDITORIA-TRAVADAS: a história completa de cada ficha parada ──
+  if (action === 'auditoria-travadas') {
+    const d8a = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const hh = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(5, 16).replace('T', ' ') : '—';
+    const agora = Date.now();
+    const [fa, ft, abordados, exc, lgA, lgT, ppA, ppT, prA] = await Promise.all([
+      dbGet(KEY_ADM), dbGet(KEY_TV), dbGet('wa_abordados').then(v => v || { tels: {} }),
+      dbGet('prospeccao_excluidos'), dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
+      dbGet('reparoeletro_pipe'), dbGet('tv_pipe'), dbGet('prospeccao_adm'),
+    ]);
+    // mensagens trocadas
+    let evts = [];
+    try {
+      const r = await fetch(`${process.env.UPSTASH_URL}/lrange/wa_evt_list/-8000/-1`,
+        { headers: { Authorization: `Bearer ${process.env.UPSTASH_TOKEN}` } }).then(x => x.json());
+      for (const s of (r.result || [])) { try { evts.push(JSON.parse(s)); } catch (e) {} }
+    } catch (e) {}
+    const conversa = {};
+    for (const e of evts) {
+      const d = d8a(e.tel); if (!d) continue;
+      conversa[d] = conversa[d] || { in: 0, out: 0, primeira: null, ultima: null };
+      if (e.dir === 'in') conversa[d].in++; else if (e.dir === 'out') conversa[d].out++;
+      const t = String(e.ts || '');
+      if (!conversa[d].primeira || t < conversa[d].primeira) conversa[d].primeira = t;
+      if (!conversa[d].ultima || t > conversa[d].ultima) conversa[d].ultima = t;
+    }
+    // excluídos
+    const excl = {};
+    try {
+      const tels = (exc || {}).tels || exc || {};
+      for (const [t, v] of Object.entries(tels)) excl[String(t).replace(/\D/g, '').slice(-8)] = v;
+    } catch (e) {}
+    // outras passagens do cliente pelo sistema
+    const passagens = {};
+    for (const [k, L] of [['reparoeletro_logistica', 'fichas'], ['tv_logistica', 'fichas'],
+                          ['reparoeletro_pipe', 'cards'], ['tv_pipe', 'cards'],
+                          ['prospeccao_adm', 'fichas']]) {
+      const b = { reparoeletro_logistica: lgA, tv_logistica: lgT,
+        reparoeletro_pipe: ppA, tv_pipe: ppT, prospeccao_adm: prA }[k];
+      for (const x of (((b || {})[L]) || [])) {
+        const t = d8a(x.telefone); if (!t) continue;
+        (passagens[t] = passagens[t] || []).push(k + ':' + String(x.status || x.phase || x.phaseId || '?'));
+      }
+    }
+    const linhas = [];
+    for (const [db, sis] of [[fa, 'ADM'], [ft, 'TV']]) {
+      for (const f of (((db || {}).fichas) || [])) {
+        if (String(f.status || '') !== 'criada') continue;
+        const t = d8a(f.telefone);
+        const nasceu = new Date(f.criadoEm || f.registradoEm || 0).getTime();
+        const horas = nasceu ? (agora - nasceu) / 3600000 : null;
+        const c = conversa[t] || null;
+        const abordado = abordados.tels[t] || null;
+        const id = String(f.id || '');
+        const origem = id.startsWith('sc_') ? 'recuperada pelo sync'
+          : id.startsWith('rec_') ? 'recuperada'
+          : id.startsWith('fic_reag_') || id.startsWith('rem_') ? 'retorno do remarcar'
+          : id.startsWith('fsh_') ? 'planilha' : 'outra';
+        // 🧠 por que está parada?
+        let porque;
+        if (abordado && !c) porque = '🔴 marcada como abordada mas não há mensagem no histórico — o envio falhou';
+        else if (abordado && c && !c.in) porque = '🟡 abordada e o cliente não respondeu — deveria ter virado Contato Feito';
+        else if (abordado && c && c.in) porque = '🔴 abordada e o cliente RESPONDEU — travou sem avançar';
+        else if (!abordado && c && c.in) porque = '🟠 cliente escreveu por conta própria e a ficha não acompanhou';
+        else if (!abordado && horas != null && horas < 1) porque = '🟢 recém-criada — o bot ainda vai abordar';
+        else if (!abordado && horas != null && horas >= 1) porque = '🔴 nunca foi abordada, apesar do tempo';
+        else porque = '⚪ sem informação suficiente';
+        linhas.push({ sis, nome: f.nome || '?', tel: t.slice(-4),
+          equipamento: String(f.equipamento || '').slice(0, 22),
+          origem, criadoEm: f.criadoEm, horas: horas != null ? +horas.toFixed(1) : null,
+          abordadoEm: abordado, msgsDele: c ? c.in : 0, msgsNossas: c ? c.out : 0,
+          primeiraMsg: c ? c.primeira : null,
+          jaFoiExcluida: !!excl[t], excluidaEm: excl[t] || null,
+          outrasPassagens: [...new Set(passagens[t] || [])],
+          porque });
+      }
+    }
+    linhas.sort((a, b) => (b.horas || 0) - (a.horas || 0));
+    const porMotivo = linhas.reduce((o, l) => { o[l.porque] = (o[l.porque] || 0) + 1; return o; }, {});
+    return res.status(200).json({ ok: true,
+      travadas: linhas.length,
+      POR_MOTIVO: porMotivo,
+      jaPassaramPorOutraFase: linhas.filter(l => l.outrasPassagens.length).length,
+      jaForamExcluidas: linhas.filter(l => l.jaFoiExcluida).length,
+      DETALHE: linhas.map(l => l.porque + '\n     ' + l.sis + ' | ' + String(l.nome).slice(0, 20) +
+        ' ' + l.tel + ' | ' + l.equipamento +
+        ' | criada ' + hh(l.criadoEm) + (l.horas != null ? ' (há ' + l.horas + 'h)' : '') +
+        ' | origem: ' + l.origem +
+        (l.abordadoEm ? ' | abordada ' + hh(l.abordadoEm) : ' | nunca abordada') +
+        ' | msgs: ' + l.msgsDele + ' dele / ' + l.msgsNossas + ' nossas' +
+        (l.jaFoiExcluida ? ' | 🗑️ JÁ FOI EXCLUÍDA em ' + hh(l.excluidaEm) : '') +
+        (l.outrasPassagens.length ? ' | também está em: ' + l.outrasPassagens.join(', ') : '')) });
+  }
+
   // ── ✅ CONFERE-PLANILHA: contagem oficial, planilha × sistema, com carimbo ──
   if (action === 'confere-planilha') {
     const dia = String(req.query.dia || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
