@@ -59,7 +59,8 @@
 </script>
 
 <script>
-// ── 🩺 EXAME DO SISTEMA: mostra problemas reais no topo do menu ──
+// ── 🩺 EXAME DO SISTEMA: compacto, expansível, com botão de resolver ──
+var _exame = null;
 async function exameDoSistema(){
   var el = document.getElementById('painel-exame');
   if(!el){
@@ -72,6 +73,7 @@ async function exameDoSistema(){
   var r = null;
   try { r = await fetch('/api/vigia?action=exame-completo&horas=48').then(function(x){return x.json();}); } catch(e){}
   if(!r){ el.innerHTML=''; return; }
+  _exame = r;
   if(r.ok){
     el.innerHTML = '<div style="background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.3);'
       + 'border-radius:11px;padding:9px 13px;font-size:12px;color:#4ade80;font-weight:700;">'
@@ -79,23 +81,104 @@ async function exameDoSistema(){
     return;
   }
   var e2 = function(s){ return String(s||'').replace(/</g,'&lt;'); };
-  var bloco = function(tit,arr,cor){
-    if(!arr||!arr.length) return '';
-    return '<div style="margin-top:9px;"><div style="font-size:11px;font-weight:900;color:'+cor+';">'+tit+' ('+arr.length+')</div>'
-      + '<div style="background:#0f1319;border:1px solid #1e2228;border-radius:8px;padding:8px 10px;margin-top:4px;'
-      + 'font-family:ui-monospace,monospace;font-size:10.5px;color:#c9ced6;line-height:1.85;max-height:200px;overflow-y:auto;">'
-      + arr.map(function(x){return '• '+e2(x);}).join('<br>')+'</div></div>';
-  };
-  el.innerHTML = '<div style="background:#0d1117;border:1px solid rgba(239,68,68,.35);border-radius:13px;padding:13px 15px;">'
-    + '<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">'
-      + '<span style="font-size:13.5px;font-weight:900;color:#f87171;">🩺 '+e2(r.VEREDITO)+'</span>'
-      + '<button onclick="exameDoSistema()" style="margin-left:auto;background:#374151;border:none;'
-      + 'border-radius:7px;padding:4px 10px;color:#fff;font-weight:700;cursor:pointer;font-size:11px;">↻</button>'
+  var podeResolver = (r.RESOLVIVEIS_AUTOMATICAMENTE||[]).length > 0;
+  // ── cabeçalho compacto: só o resumo, tudo fechado ──
+  el.innerHTML = '<div style="background:#0d1117;border:1px solid rgba(239,68,68,.3);border-radius:12px;overflow:hidden;">'
+    + '<div style="padding:10px 14px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;cursor:pointer;" onclick="toggleExame()">'
+      + '<span id="exame-seta" style="color:#5a6270;font-size:11px;">▸</span>'
+      + '<span style="font-size:12.5px;font-weight:900;color:#f87171;">🩺 '+e2(r.VEREDITO)+'</span>'
+      + (podeResolver
+        ? '<button onclick="event.stopPropagation();abrirResolver()" style="margin-left:auto;background:#15803d;'
+          + 'border:none;border-radius:8px;padding:5px 13px;color:#fff;font-weight:800;cursor:pointer;font-size:11.5px;">🛠️ Resolver</button>'
+        : '<span style="margin-left:auto;font-size:10.5px;color:#5a6270;">precisa de ação manual</span>')
+      + '<button onclick="event.stopPropagation();exameDoSistema()" style="background:#374151;border:none;'
+        + 'border-radius:7px;padding:5px 10px;color:#fff;font-weight:700;cursor:pointer;font-size:11px;">↻</button>'
     + '</div>'
-    + bloco('🔴 GRAVES — resolver hoje', r.GRAVES, '#f87171')
-    + bloco('🟠 MÉDIOS', r.MEDIOS, '#fbbf24')
-    + bloco('🟡 LEVES', r.LEVES, '#a78bfa')
+    + '<div id="exame-corpo" style="display:none;padding:0 14px 12px;"></div>'
   + '</div>';
+}
+function toggleExame(){
+  var cx = document.getElementById('exame-corpo'), st = document.getElementById('exame-seta');
+  if(!cx || !_exame) return;
+  if(cx.style.display !== 'none'){ cx.style.display='none'; st.textContent='▸'; return; }
+  st.textContent='▾'; cx.style.display='block';
+  var e2 = function(s){ return String(s||'').replace(/</g,'&lt;'); };
+  cx.innerHTML = (_exame.GRUPOS||[]).map(function(g,i){
+    var cor = g.gravidade.indexOf('GRAVE')>=0 ? '#f87171'
+            : g.gravidade.indexOf('MÉDIO')>=0 ? '#fbbf24' : '#a78bfa';
+    return '<div style="background:#12161d;border:1px solid #242b39;border-radius:9px;margin-top:7px;overflow:hidden;">'
+      + '<div style="padding:8px 11px;cursor:pointer;display:flex;align-items:center;gap:8px;" onclick="toggleGrupo('+i+')">'
+        + '<span id="gs-'+i+'" style="color:#5a6270;font-size:10px;">▸</span>'
+        + '<span style="font-size:11.5px;font-weight:800;color:'+cor+';">'+e2(g.gravidade)+'</span>'
+        + '<span style="font-size:11.5px;color:#c9ced6;">'+e2(g.area)+' — '+e2(g.problema)+'</span>'
+        + '<span style="margin-left:auto;font-family:ui-monospace,monospace;font-size:12px;font-weight:700;color:'+cor+';">'+g.quantos+'</span>'
+      + '</div>'
+      + '<div id="gc-'+i+'" style="display:none;padding:0 11px 9px;font-family:ui-monospace,monospace;'
+      + 'font-size:10.5px;color:#8b93a3;line-height:1.85;max-height:190px;overflow-y:auto;"></div>'
+    + '</div>';
+  }).join('');
+}
+function toggleGrupo(i){
+  var g = (_exame.GRUPOS||[])[i]; if(!g) return;
+  var cx = document.getElementById('gc-'+i), st = document.getElementById('gs-'+i);
+  if(cx.style.display !== 'none'){ cx.style.display='none'; st.textContent='▸'; return; }
+  st.textContent='▾'; cx.style.display='block';
+  cx.innerHTML = g.quem.map(function(q){ return '• '+String(q||'').replace(/</g,'&lt;'); }).join('<br>')
+    + (g.quantos > g.quem.length ? '<br><i>… e mais '+(g.quantos-g.quem.length)+'</i>' : '');
+}
+async function abrirResolver(){
+  var prev = null;
+  try { prev = await fetch('/api/vigia?action=resolver').then(function(x){return x.json();}); } catch(e){}
+  if(!prev){ alert('não consegui carregar o que será resolvido'); return; }
+  var e2 = function(s){ return String(s||'').replace(/</g,'&lt;'); };
+  var ov = document.createElement('div');
+  ov.id = 'ov-resolver';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9999;display:flex;'
+    + 'align-items:center;justify-content:center;padding:18px;';
+  ov.innerHTML = '<div style="background:#0d1117;border:1px solid #2a3140;border-radius:15px;padding:20px 22px;'
+    + 'max-width:560px;width:100%;max-height:82vh;overflow-y:auto;">'
+    + '<div style="font-size:16px;font-weight:900;color:#4ade80;">🛠️ Resolver pendências</div>'
+    + '<div style="font-size:12.5px;color:#8b93a3;margin-top:10px;">O sistema vai executar automaticamente:</div>'
+    + '<div style="background:#0f1319;border:1px solid #1e2228;border-radius:9px;padding:11px 13px;margin-top:7px;'
+      + 'font-size:12px;color:#c9ced6;line-height:1.9;">'
+      + ((prev.oQueSeraFeito||[]).map(function(x){return '• '+e2(x);}).join('<br>') || 'nada automático a fazer')
+    + '</div>'
+    + '<div style="font-size:12.5px;color:#fbbf24;margin-top:13px;">⚠️ NÃO será feito automaticamente:</div>'
+    + '<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:9px;'
+      + 'padding:11px 13px;margin-top:7px;font-size:11.5px;color:#c9ced6;line-height:1.9;">'
+      + (prev.naoSeraFeito||[]).map(function(x){return '• '+e2(x);}).join('<br>')
+    + '</div>'
+    + '<div id="resolver-saida" style="margin-top:12px;"></div>'
+    + '<div style="display:flex;gap:9px;margin-top:16px;">'
+      + '<button id="btn-conf-resolver" onclick="confirmarResolver()" style="flex:1;background:#15803d;border:none;'
+        + 'border-radius:9px;padding:11px;color:#fff;font-weight:800;cursor:pointer;font-size:13px;">✅ Executar</button>'
+      + '<button onclick="document.getElementById(\'ov-resolver\').remove()" style="background:#374151;border:none;'
+        + 'border-radius:9px;padding:11px 18px;color:#fff;font-weight:800;cursor:pointer;font-size:13px;">Cancelar</button>'
+    + '</div>'
+  + '</div>';
+  document.body.appendChild(ov);
+}
+async function confirmarResolver(){
+  var b = document.getElementById('btn-conf-resolver');
+  var saida = document.getElementById('resolver-saida');
+  if(b){ b.disabled = true; b.textContent = '⏳ resolvendo…'; }
+  var r = null;
+  try { r = await fetch('/api/vigia?action=resolver&aplicar=1').then(function(x){return x.json();}); } catch(e){}
+  if(!r){ if(saida) saida.innerHTML = '<div style="color:#f87171;font-size:12px;">erro ao executar</div>';
+    if(b){ b.disabled=false; b.textContent='✅ Executar'; } return; }
+  var e2 = function(s){ return String(s||'').replace(/</g,'&lt;'); };
+  if(saida) saida.innerHTML = '<div style="background:#0f1319;border:1px solid '
+    + (r.ok?'rgba(74,222,128,.4)':'rgba(245,158,11,.4)') + ';border-radius:9px;padding:11px 13px;'
+    + 'font-family:ui-monospace,monospace;font-size:10.5px;color:#c9ced6;line-height:1.8;max-height:220px;overflow-y:auto;">'
+    + '<b style="color:'+(r.ok?'#4ade80':'#fbbf24')+';">'+(r.ok?'✅ concluído':'⚠️ concluído com avisos')+'</b><br>'
+    + (r.feitos||[]).map(function(x){return '• '+e2(x);}).join('<br>')
+    + ((r.erros||[]).length ? '<br><b style="color:#f87171;">erros:</b><br>'+r.erros.map(function(x){return '• '+e2(x);}).join('<br>') : '')
+  + '</div>';
+  if(b){ b.textContent = '✔ feito — atualizando…'; }
+  setTimeout(function(){
+    var ov=document.getElementById('ov-resolver'); if(ov)ov.remove();
+    exameDoSistema();
+  }, 2600);
 }
 
 // ── 🏷️ badge do menu Qualidade: entraram hoje / concluídas hoje ──

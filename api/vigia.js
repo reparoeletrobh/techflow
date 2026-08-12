@@ -463,13 +463,71 @@ module.exports = async function handler(req, res) {
       POR_GRAVIDADE: porGravidade,
       POR_AREA: porArea,
       TAMANHO_DOS_BANCOS: tam,
+      // 📦 agrupado por tipo de problema, para a tela mostrar resumido e expandir
+      GRUPOS: Object.values(P.reduce((o, x) => {
+        const k = x.gravidade + '|' + x.area + '|' + x.problema.split(' — ')[0].split(':')[0].slice(0, 60);
+        o[k] = o[k] || { gravidade: x.gravidade, area: x.area, problema: x.problema.split(':')[0],
+          quantos: 0, quem: [], resolver: x.resolver };
+        o[k].quantos++;
+        if (o[k].quem.length < 60) o[k].quem.push(x.quem);
+        return o; }, {})).sort((a, b) => {
+          const peso = g => g.includes('GRAVE') ? 0 : g.includes('MÉDIO') ? 1 : 2;
+          return peso(a.gravidade) - peso(b.gravidade) || b.quantos - a.quantos;
+        }),
       GRAVES: P.filter(x => x.gravidade.includes('GRAVE'))
         .map(x => x.area + ' | ' + x.quem + ' | ' + x.problema + ' → ' + x.resolver),
       MEDIOS: P.filter(x => x.gravidade.includes('MÉDIO'))
         .map(x => x.area + ' | ' + x.quem + ' | ' + x.problema),
       LEVES: P.filter(x => x.gravidade.includes('LEVE'))
         .map(x => x.area + ' | ' + x.quem + ' | ' + x.problema),
+      RESOLVIVEIS_AUTOMATICAMENTE:
+        (P.some(x => x.area === 'Remarcar') ? ['remarcar'] : [])
+        .concat(P.some(x => /Ficha Criada/.test(x.problema)) ? ['criadas'] : [])
+        .concat(P.some(x => /fila de tratamento/.test(x.problema)) ? ['garantia'] : []),
       COMO_RESOLVER: [...new Set(P.map(x => x.resolver).filter(r => r.startsWith('/api')))] });
+  }
+
+  // ── 🛠️ RESOLVER: aplica as correções conhecidas, uma por tipo de problema ──
+  if (action === 'resolver') {
+    const quais = String(req.query.o || 'tudo').split(',').map(x => x.trim()).filter(Boolean);
+    const quer = t => quais.includes('tudo') || quais.includes(t);
+    const K = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+    const base = 'https://reparoeletroadm.com/api/';
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const feitos = [], erros = [];
+    const chamar = async (rotulo, url) => {
+      try {
+        const r = await fetch(base + url + '&k=' + K).then(x => x.json());
+        if (r && r.ok !== false) feitos.push(rotulo + ': ' + JSON.stringify(r).slice(0, 110));
+        else erros.push(rotulo + ': ' + (r.error || 'falhou'));
+      } catch (e) { erros.push(rotulo + ': ' + e.message); }
+    };
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: true, modo: 'prévia',
+        oQueSeraFeito: [
+          quer('remarcar') ? '🔴 devolver ao atendimento as fichas que saíram do Remarcar sem destino (últimos 7 dias)' : null,
+          quer('criadas') ? '🟠 mover para Contato Feito as fichas já abordadas presas em Ficha Criada' : null,
+          quer('garantia') ? '🟡 enviar à fila de tratamento as garantias de loja que estão fora' : null,
+          quer('pendentes') ? '🔴 reprocessar as devoluções que ficaram na fila de pendências' : null,
+        ].filter(Boolean),
+        naoSeraFeito: [
+          'garantia sem tipo — precisa da sua decisão sobre qual tipo atribuir',
+          'card sem valor — o valor tem de ser informado por uma pessoa',
+          'banco perto do limite — arquivar exige sua autorização',
+        ],
+        dica: 'para executar: &aplicar=1' });
+    }
+    if (quer('remarcar')) {
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(Date.now() - 3 * 3600000 - i * 86400000).toISOString().slice(0, 10);
+        await chamar('remarcar ' + d, 'logistica?action=recriar-perdidas&dia=' + d + '&aplicar=1');
+      }
+    }
+    if (quer('pendentes')) await chamar('pendências', 'logistica?action=processar-pendentes&aplicar=1');
+    if (quer('criadas')) await chamar('fichas travadas', 'wa-bot?action=destravar-criadas&aplicar=1');
+    if (quer('garantia')) await chamar('fila de garantia', 'garantia?action=sincronizar-fila&aplicar=1');
+    return res.status(200).json({ ok: erros.length === 0, feitos, erros,
+      proximoPasso: 'rode o exame-completo de novo para confirmar' });
   }
 
   // ── 📈 HISTORICO: evolução dos problemas ao longo dos dias ──
