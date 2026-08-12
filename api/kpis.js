@@ -16,16 +16,6 @@ async function dbGet(k) {
     return r && r.result ? JSON.parse(r.result) : null;
   } catch (e) { return null; }
 }
-// 📨 os eventos do WhatsApp ficam numa LISTA do Redis, não numa chave comum
-async function lerEventos() {
-  try {
-    const r = await fetch(`${U}/lrange/wa_evt_list/-8000/-1`,
-      { headers: { Authorization: `Bearer ${T}` } }).then(x => x.json());
-    const out = [];
-    for (const s of (r.result || [])) { try { out.push(JSON.parse(s)); } catch (e) {} }
-    return out;
-  } catch (e) { return []; }
-}
 const d8 = t => String(t || '').replace(/\D/g, '').slice(-8);
 const soDia = d => String(d || '').slice(0, 10);
 
@@ -127,15 +117,8 @@ async function desdeQuando() {
     r.aprovacoes = menor(cards.map(c => String(c.aprovadoEm || '').slice(0, 10)));
     r.cards = menor(cards.map(c => String(c.criadoEm || '').slice(0, 10)));
   } catch (e) {}
-  try {
-    const ev = await fetch(`${U}/lrange/wa_evt_list/0/0`,
-      { headers: { Authorization: `Bearer ${T}` } }).then(x => x.json());
-    const primeiro = (ev.result || [])[0];
-    if (primeiro) { const e = JSON.parse(primeiro); r.conversas = String(e.ts || '').slice(0, 10); }
-    const tam = await fetch(`${U}/llen/wa_evt_list`,
-      { headers: { Authorization: `Bearer ${T}` } }).then(x => x.json());
-    r.mensagensGuardadas = (tam && tam.result) || 0;
-  } catch (e) {}
+  // as conversas vêm da Meta, que guarda 37 meses — não dependem deste banco
+  r.conversas = 'Meta Ads · 37 meses';
   return r;
 }
 let lg;
@@ -149,27 +132,16 @@ module.exports = async function handler(req, res) {
   const J = janela(req.query || {});
   const dentro = d => { const t = new Date(d || 0).getTime(); return t >= J.ini && t <= J.fim; };
 
-  const [fA, fT, lgA, lgT, ppA, ppT, evts, inv] = await Promise.all([
+  const [fA, fT, lgA, lgT, ppA, ppT, inv] = await Promise.all([
     dbGet('fichas_adm'), dbGet('fichas_tv'),
     dbGet('reparoeletro_logistica'), dbGet('tv_logistica'),
     dbGet('reparoeletro_pipe'), dbGet('tv_pipe'),
-    lerEventos(), investimento(J.de, J.ate),
+    investimento(J.de, J.ate),
   ]);
 
-  // conversas iniciadas: telefones cujo PRIMEIRO contato caiu no período
-  const primeiraMsg = {};
-  const listaEv = Array.isArray(evts) ? evts : [];
-  for (const e of listaEv) {
-    if (e.dir !== 'in') continue;
-    const t = d8(e.tel); if (!t) continue;
-    const q = new Date(e.ts || 0).getTime();
-    if (!q) continue;
-    if (!primeiraMsg[t] || q < primeiraMsg[t]) primeiraMsg[t] = q;
-  }
-  const conversasNoPeriodo = Object.entries(primeiraMsg)
-    .filter(([, q]) => q >= J.ini && q <= J.fim).map(([t]) => t);
-  const setConversas = new Set(conversasNoPeriodo);
-
+  // 📨 conversas vêm SOMENTE da Meta. O histórico deste sistema não serve:
+  // quem atende a conversa vinda do anúncio é outro número, e o bot daqui só
+  // entra depois que o contato já virou ficha — seria uma etapa bem posterior.
   function montar(fichasDb, logDb, pipeDb, telsTv) {
     const ehRetorno = f => ['remarcar', 'reagendamento'].includes(String(f.origem || '')) ||
       f.reagendarColeta === true ||
@@ -213,18 +185,11 @@ module.exports = async function handler(req, res) {
     };
   }
 
-  // conversas por frente: pelo telefone da ficha correspondente
-  const telFichasTv = new Set((((fT || {}).fichas) || []).map(f => d8(f.telefone)));
-  const convTv = conversasNoPeriodo.filter(t => telFichasTv.has(t)).length;
-  const convAdm = conversasNoPeriodo.length - convTv;
-
   const adm = montar(fA, lgA, ppA);
   const tv = montar(fT, lgT, ppT);
-  // 📨 a contagem da Meta é a oficial de conversas iniciadas pelo tráfego;
-  // o histórico do WhatsApp serve de reserva quando a Meta não responde
-  const usarMeta = inv.convTotal > 0;
-  const convAdmFinal = usarMeta ? inv.convAdm : convAdm;
-  const convTvFinal = usarMeta ? inv.convTv : convTv;
+  const temMeta = inv.convTotal > 0 || !!TOKEN;
+  const convAdmFinal = inv.convAdm;
+  const convTvFinal = inv.convTv;
   const taxa = (a, b) => b ? Math.round(a / b * 100) : 0;
   const custo = (v, n) => n ? +(v / n).toFixed(2) : 0;
 
@@ -257,18 +222,14 @@ module.exports = async function handler(req, res) {
     DIAGNOSTICO: {
       tokenDaMetaConfigurado: !!TOKEN,
       contaDeAnuncios: CONTA ? 'act_' + CONTA : '(não configurada)',
-      eventosLidos: listaEv.length,
-      conversasNoPeriodo: conversasNoPeriodo.length,
+      conversasNoPeriodo: inv.convTotal,
     },
     // 📖 de onde sai cada número, para conferência
     DESDE_QUANDO: await desdeQuando(),
     FONTES: {
       investimento: 'Meta Ads · gasto real das datas escolhidas, incluindo campanhas já pausadas ou encerradas depois · campanha com TV, televisão, tela, LED ou barramento no nome conta como TV; o resto como ADM',
-      conversas: usarMeta
-        ? 'Meta Ads · conversas iniciadas pelo anúncio no período, atribuídas à campanha que as gerou'
-        : 'histórico do WhatsApp · primeiro contato de cada telefone no período (a Meta não retornou dados)',
-      conversasPorFrente: usarMeta ? 'pela campanha que gerou a conversa'
-        : 'a conversa é de TV se o telefone tiver ficha em fichas_tv',
+      conversas: 'Meta Ads · conversas iniciadas pelo anúncio no período, atribuídas à campanha que as gerou. O histórico de mensagens deste sistema NÃO é usado: quem recebe a conversa vinda do anúncio é outro número, e o bot daqui só entra depois que o contato virou ficha',
+      conversasPorFrente: 'pela campanha que gerou a conversa',
       fichas: 'fichas_adm e fichas_tv · pela data de criação · não conta retorno do remarcar, que já foi contado na primeira entrada',
       logistica: 'reparoeletro_logistica e tv_logistica · pela data de criação · é do bot quando a origem ou quem cadastrou menciona bot',
       orcamentos: 'cards do pipe com data de orçamento ou valor preenchido, dentro do período',
@@ -277,8 +238,7 @@ module.exports = async function handler(req, res) {
       custoPorAprovado: 'investimento ÷ aprovados',
       atencao: 'as etapas medem coisas que acontecem em momentos diferentes: uma ficha criada hoje pode ser aprovada semana que vem, então as taxas entre etapas não são de um mesmo grupo de clientes',
     },
-    origemDasConversas: usarMeta ? 'Meta Ads (conversas iniciadas pelo anúncio)'
-      : 'histórico do WhatsApp (primeiro contato de cada cliente)',
+    origemDasConversas: 'Meta Ads — conversas iniciadas pelo anúncio, atribuídas à campanha',
     ADM: enriquecer(adm, inv.adm, convAdmFinal),
     TV: enriquecer(tv, inv.tv, convTvFinal),
     TOTAL: {
