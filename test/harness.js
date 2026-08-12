@@ -503,6 +503,22 @@ function check(nome, cond, extra) {
   }
 
   // ── 🔗 toda página apontada pelo menu precisa de rota configurada ──
+  // ── 🔐 toda página do menu precisa do bloco que envia a chave nas chamadas ──
+  console.log('▶ Cenário R2 — páginas do menu têm o guard de autenticação');
+  {
+    const fs6 = require('fs');
+    const adm = fs6.readFileSync('adm.html', 'utf8');
+    const urls = [...new Set((adm.match(/data-url="\/[a-z-]+"/g) || [])
+      .map(x => x.replace(/data-url="|"/g, '').replace('/', '')))];
+    const semGuard = urls.filter(u => {
+      const arq = u + '.html';
+      if (!fs6.existsSync(arq)) return false;
+      return !fs6.readFileSync(arq, 'utf8').includes('TF-GUARD');
+    });
+    check('menu: todas as páginas enviam a chave nas chamadas',
+      semGuard.length === 0, 'sem guard: ' + semGuard.join(', '));
+  }
+
   console.log('▶ Cenário R1 — páginas do menu têm rewrite no vercel.json');
   {
     const fs4 = require('fs');
