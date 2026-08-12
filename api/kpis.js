@@ -169,6 +169,19 @@ module.exports = async function handler(req, res) {
       eventosLidos: listaEv.length,
       conversasNoPeriodo: conversasNoPeriodo.length,
     },
+    // 📖 de onde sai cada número, para conferência
+    FONTES: {
+      investimento: 'Meta Ads · insights por campanha no período · campanha com TV, televisão, tela, LED ou barramento no nome conta como TV; o resto como ADM',
+      conversas: 'histórico do WhatsApp (wa_evt_list) · conta o PRIMEIRO contato de cada telefone dentro do período; quem já falou antes não conta de novo',
+      conversasPorFrente: 'a conversa é de TV se o telefone tiver ficha em fichas_tv; caso contrário conta como ADM',
+      fichas: 'fichas_adm e fichas_tv · pela data de criação · não conta retorno do remarcar, que já foi contado na primeira entrada',
+      logistica: 'reparoeletro_logistica e tv_logistica · pela data de criação · é do bot quando a origem ou quem cadastrou menciona bot',
+      orcamentos: 'cards do pipe com data de orçamento ou valor preenchido, dentro do período',
+      aprovados: 'cards do pipe com carimbo de aprovação no período · é do bot quando aprovadoPor menciona bot',
+      faturamento: 'soma do valor dos cards aprovados no período',
+      custoPorAprovado: 'investimento ÷ aprovados',
+      atencao: 'as etapas medem coisas que acontecem em momentos diferentes: uma ficha criada hoje pode ser aprovada semana que vem, então as taxas entre etapas não são de um mesmo grupo de clientes',
+    },
     ADM: enriquecer(adm, inv.adm, convAdm),
     TV: enriquecer(tv, inv.tv, convTv),
     TOTAL: {

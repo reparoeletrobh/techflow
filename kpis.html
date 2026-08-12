@@ -44,23 +44,34 @@ a{color:inherit;text-decoration:none;}
 
 /* resumo */
 .resumo{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:13px;margin-bottom:26px;}
-.rcard{background:linear-gradient(165deg,rgba(255,255,255,.035),rgba(255,255,255,.008));
-  border:1px solid var(--linha);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;
-  backdrop-filter:blur(8px);}
-.rcard::after{content:'';position:absolute;inset:0 auto auto 0;width:100%;height:1px;
-  background:linear-gradient(90deg,var(--c,var(--a1)),transparent 70%);}
+.rcard{background:linear-gradient(165deg,rgba(255,255,255,.04),rgba(255,255,255,.008));
+  border:1px solid var(--linha);border-radius:17px;padding:19px 21px;position:relative;overflow:hidden;
+  backdrop-filter:blur(10px);transition:.22s;
+  box-shadow:0 1px 0 rgba(255,255,255,.05) inset;}
+.rcard:hover{border-color:rgba(255,255,255,.16);transform:translateY(-2px);
+  box-shadow:0 16px 38px -22px var(--c,var(--a1));}
+.rcard::after{content:'';position:absolute;inset:0 auto auto 0;width:100%;height:2px;
+  background:linear-gradient(90deg,var(--c,var(--a1)),transparent 72%);
+  box-shadow:0 0 18px var(--c,var(--a1));}
+/* halo difuso no canto */
+.rcard::before{content:'';position:absolute;top:-46px;right:-46px;width:120px;height:120px;
+  border-radius:50%;background:var(--c,var(--a1));opacity:.09;filter:blur(28px);pointer-events:none;}
+.rval{filter:saturate(1.1);}
 .rlbl{font-size:9.5px;font-weight:750;color:var(--fraco);letter-spacing:.11em;text-transform:uppercase;}
-.rval{font-family:var(--mono);font-size:30px;font-weight:640;line-height:1;margin-top:9px;letter-spacing:-1.5px;}
+.rval{font-family:var(--mono);font-size:32px;font-weight:680;line-height:1;margin-top:10px;
+  letter-spacing:-1.8px;text-shadow:0 0 30px currentColor;}
 .rsub{font-size:10.5px;color:var(--fraco);margin-top:6px;}
 
 /* frente */
-.frente{background:var(--painel);border:1px solid var(--linha);border-radius:19px;
-  padding:22px 24px;margin-bottom:18px;}
+.frente{background:linear-gradient(180deg,rgba(255,255,255,.022),transparent 40%),var(--painel);
+  border:1px solid var(--linha);border-radius:20px;padding:23px 25px;margin-bottom:18px;
+  box-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 24px 60px -40px rgba(0,0,0,.9);}
 .fhead{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;}
 .fnome{font-size:20px;font-weight:800;letter-spacing:-.5px;}
 .ftag{font-size:9.5px;font-weight:750;padding:4px 10px;border-radius:20px;letter-spacing:.07em;text-transform:uppercase;}
 .froi{margin-left:auto;text-align:right;}
-.froi b{display:block;font-family:var(--mono);font-size:22px;font-weight:640;line-height:1;letter-spacing:-1px;}
+.froi b{display:block;font-family:var(--mono);font-size:24px;font-weight:680;line-height:1;
+  letter-spacing:-1.2px;text-shadow:0 0 24px currentColor;}
 .froi span{font-size:9.5px;color:var(--fraco);font-weight:700;letter-spacing:.08em;text-transform:uppercase;}
 
 /* ▶️ FUNIL HORIZONTAL: colunas lado a lado, altura decrescente da esquerda para a direita */
@@ -68,13 +79,19 @@ a{color:inherit;text-decoration:none;}
   scrollbar-width:thin;}
 .funil::-webkit-scrollbar{height:5px;}
 .funil::-webkit-scrollbar-thumb{background:var(--linha);border-radius:3px;}
-.passo{flex:1 1 0;min-width:118px;position:relative;display:flex;flex-direction:column;
-  justify-content:flex-end;
-  background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.012));
-  border:1px solid var(--linha);border-top:2px solid var(--c);
-  border-radius:12px 12px 10px 10px;padding:14px 13px 13px;transition:.2s;}
-.passo:hover{border-color:rgba(255,255,255,.18);transform:translateY(-3px);
-  box-shadow:0 8px 24px -12px var(--c);}
+.passo{flex:1 1 0;min-width:126px;position:relative;display:flex;flex-direction:column;
+  justify-content:flex-end;overflow:hidden;
+  background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.014));
+  border:1px solid var(--linha);border-top:2.5px solid var(--c);
+  border-radius:13px 13px 11px 11px;padding:15px 14px 14px;
+  transition:transform .22s cubic-bezier(.2,.8,.3,1),box-shadow .22s,border-color .22s;
+  box-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 -18px 34px -26px var(--c) inset;}
+/* ✨ brilho suave que sobe do topo, na cor da etapa */
+.passo::before{content:'';position:absolute;inset:-1px -1px auto -1px;height:62%;pointer-events:none;
+  background:linear-gradient(180deg,var(--c),transparent);opacity:.13;}
+.passo:hover{border-color:rgba(255,255,255,.22);transform:translateY(-5px);
+  box-shadow:0 1px 0 rgba(255,255,255,.08) inset, 0 18px 40px -20px var(--c), 0 0 0 1px var(--c);}
+.passo:hover::before{opacity:.2;}
 /* seta entre as etapas */
 .passo:not(:last-child)::after{content:'';position:absolute;right:-8px;top:50%;
   width:0;height:0;border-left:5px solid var(--linha);
@@ -84,8 +101,9 @@ a{color:inherit;text-decoration:none;}
 .plbl{font-size:10px;font-weight:750;color:var(--dim);letter-spacing:.045em;text-transform:uppercase;
   line-height:1.35;margin-top:9px;min-height:26px;}
 .pdet{font-size:10px;color:var(--fraco);margin-top:5px;line-height:1.45;min-height:26px;}
-.pval{font-family:var(--mono);font-size:25px;font-weight:640;letter-spacing:-1.3px;line-height:1;
-  margin-top:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pval{font-family:var(--mono);font-size:27px;font-weight:680;letter-spacing:-1.5px;line-height:1;
+  margin-top:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  text-shadow:0 0 26px currentColor;filter:saturate(1.15);}
 .ptaxa{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;
   padding:2px 7px;border-radius:5px;margin-top:9px;}
 .t-bom{background:rgba(52,211,153,.13);color:var(--verde);}
@@ -182,6 +200,7 @@ a{color:inherit;text-decoration:none;}
   <input type="date" id="dt-de"  class="data-in">
   <input type="date" id="dt-ate" class="data-in">
   <button class="fbtn" onclick="periodo('personalizado')">Aplicar</button>
+  <button class="fbtn" onclick="verFontes()">📖 De onde vêm os números</button>
   <button class="fbtn" onclick="carregar()" style="margin-left:auto;">↻</button>
 </div>
 
@@ -208,6 +227,40 @@ function periodo(p){
     var b=document.getElementById('f-'+x); if(b) b.classList.toggle('on', x===p);
   });
   carregar();
+}
+
+function verFontes(){
+  var r = window._kpi; if(!r || !r.FONTES){ alert('carregue o painel primeiro'); return; }
+  var F = r.FONTES, dg = r.DIAGNOSTICO || {};
+  var linha = function(t,v){ return '<div style="margin-top:13px;">'
+    + '<div style="font-size:11px;font-weight:750;color:var(--a1);letter-spacing:.05em;text-transform:uppercase;">'+t+'</div>'
+    + '<div style="font-size:12px;color:var(--dim);margin-top:4px;line-height:1.65;">'+esc(v)+'</div></div>'; };
+  var ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;'
+    + 'align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(4px);';
+  ov.innerHTML = '<div style="background:var(--painel);border:1px solid var(--linha);border-radius:18px;'
+    + 'padding:24px 26px;max-width:600px;width:100%;max-height:86vh;overflow-y:auto;">'
+    + '<div style="font-size:19px;font-weight:800;letter-spacing:-.6px;">📖 De onde vêm os números</div>'
+    + '<div style="background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.25);border-radius:11px;'
+      + 'padding:12px 14px;margin-top:14px;font-size:11.5px;color:var(--dim);line-height:1.7;">'
+      + 'conta de anúncios: <b>'+esc(dg.contaDeAnuncios||'—')+'</b><br>'
+      + 'mensagens lidas no histórico: <b>'+(dg.eventosLidos||0)+'</b><br>'
+      + 'conversas novas no período: <b>'+(dg.conversasNoPeriodo||0)+'</b></div>'
+    + linha('Investimento', F.investimento)
+    + linha('Conversas iniciadas', F.conversas)
+    + linha('ADM ou TV', F.conversasPorFrente)
+    + linha('Fichas criadas', F.fichas)
+    + linha('Logística', F.logistica)
+    + linha('Orçamentos', F.orcamentos)
+    + linha('Aprovados', F.aprovados)
+    + linha('Faturamento', F.faturamento)
+    + '<div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.28);border-radius:11px;'
+      + 'padding:12px 14px;margin-top:16px;font-size:11.5px;color:var(--ambar);line-height:1.7;">⚠️ '+esc(F.atencao)+'</div>'
+    + '<button onclick="this.closest(\'div[style*=fixed]\').remove()" style="width:100%;margin-top:18px;'
+      + 'background:rgba(255,255,255,.06);border:1px solid var(--linha);border-radius:10px;padding:11px;'
+      + 'color:var(--txt);font-weight:700;cursor:pointer;font-size:13px;">Fechar</button>'
+  + '</div>';
+  document.body.appendChild(ov);
 }
 function moeda(v){
   return 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -245,10 +298,11 @@ function blocoFrente(nome, d, cor, etiqueta){
     + '</div>'
     + '<div class="funil">'
       + passo('01','Investimento', moeda(d.investimento), 'var(--a1)',
-          d.custoPorConversa ? moeda(d.custoPorConversa)+' por conversa iniciada' : 'sem gasto no período',
+          d.investimento ? 'verba gasta na Meta no período' : 'sem gasto no período',
           null, null, L[0])
       + passo('02','Conversas iniciadas', d.conversas, 'var(--a2)',
-          d.conversas ? 'primeiro contato de cada cliente' : 'nenhuma conversa nova',
+          d.custoPorConversa ? '<b style="color:var(--a2)">'+moeda(d.custoPorConversa)+'</b> por conversa'
+            : (d.conversas ? 'primeiro contato de cada cliente' : 'nenhuma conversa nova'),
           null, null, L[1])
       + passo('03','Fichas criadas', d.fichas, 'var(--a3)',
           d.custoPorFicha ? moeda(d.custoPorFicha)+' por ficha' : '',
@@ -299,6 +353,7 @@ async function carregar(){
       + '</div>';
     return;
   }
+  window._kpi = r;
   document.getElementById('carimbo').textContent = (r.periodo.rotulo||'') + ' · atualizado ' + (r.geradoEm||'');
   var t = r.TOTAL||{};
   var roiCor = t.retorno>=3?'var(--verde)':t.retorno>=1?'var(--ambar)':'var(--vermelho)';
