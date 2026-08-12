@@ -731,17 +731,29 @@ module.exports = async function handler(req, res) {
     const FASES_ATIVAS = ['em_rota', 'horario_marcado', 'motorista_parceiro',
       'liberado_para_rota', 'coleta_solicitada', 'aguardando_coleta'];
     const comColetaAtiva = new Set();
+    const detalheColeta = {};
     for (const k of ['reparoeletro_logistica', 'tv_logistica']) {
       const b = await dbGet(k);
       for (const x of (((b || {}).fichas) || [])) {
         if (!FASES_ATIVAS.includes(String(x.phase || ''))) continue;
-        comColetaAtiva.add(d8(x.telefone));
+        const t = d8(x.telefone);
+        comColetaAtiva.add(t);
+        detalheColeta[t] = { fase: x.phase, motorista: x.motoristaNome || null,
+          quando: x.movedAt || x.distribuidoEm || x.horarioMarcadoEm || null };
       }
     }
     for (const a of achados.filter(x => x.etapa === 'remarcar')) {
       const t = String(a.quem).replace(/\D/g, '').slice(-4);
       if ([...comColetaAtiva].some(e => e.endsWith(t))) {
-        alertas.push('⚠️ ' + a.quem + ' foi devolvido ao atendimento mas já tem COLETA ATIVA marcada — conferir para não ligar em duplicidade');
+        const det = detalheColeta[[...comColetaAtiva].find(e => e.endsWith(t))] || {};
+        // a coleta foi marcada DEPOIS da devolução? então a equipe já resolveu
+        const depois = det.quando && a.quando &&
+          new Date(det.quando).getTime() > (Date.now() - min * 60000);
+        alertas.push('⚠️ ' + a.quem + ' | coleta ' + (det.fase || '?') +
+          (det.motorista ? ' com ' + det.motorista : '') +
+          (det.quando ? ' marcada em ' + hh(det.quando) : '') +
+          (depois ? ' — marcada APÓS a devolução, provavelmente já tratada'
+                  : ' — conferir para não ligar em duplicidade'));
       }
     }
 
