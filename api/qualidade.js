@@ -140,6 +140,48 @@ export default async function handler(req, res) {
         ' | téc: ' + (c.tecnico || '—')) });
   }
 
+  // ── 🧹 LIMPAR-DUPLICADAS: mesma inspeção gravada mais de uma vez ──
+  if (action === 'limpar-duplicadas') {
+    const lista = db.inspecoes || [];
+    const porId = {}, porConteudo = {};
+    const ficam = [], removidas = [];
+    for (const i of lista) {
+      const chaveId = String(i.id || '');
+      const chaveC = String(i.os || '') + '|' + String(i.cardId || '') + '|' +
+        String(i.cliente || '') + '|' + String(i.equipamentoTexto || i.equipamento || '') + '|' +
+        String(i.tecnico || '');
+      // mantém a primeira; se alguma já foi inspecionada, ela tem preferência
+      const jaTemId = porId[chaveId], jaTemC = porConteudo[chaveC];
+      if (!jaTemId && !jaTemC) {
+        porId[chaveId] = i; porConteudo[chaveC] = i; ficam.push(i); continue;
+      }
+      const guardada = jaTemId || jaTemC;
+      const estaTratada = i.status === 'aprovado' || i.status === 'reprovado';
+      const guardadaTratada = guardada.status === 'aprovado' || guardada.status === 'reprovado';
+      if (estaTratada && !guardadaTratada) {
+        // troca: a tratada vale mais
+        const ix = ficam.indexOf(guardada);
+        if (ix >= 0) ficam[ix] = i;
+        porId[chaveId] = i; porConteudo[chaveC] = i;
+        removidas.push((guardada.os || guardada.id) + ' | ' + String(guardada.cliente || '?').slice(0, 20));
+      } else {
+        removidas.push((i.os || i.id) + ' | ' + String(i.cliente || '?').slice(0, 20) +
+          ' | ' + String(i.equipamentoTexto || i.equipamento || '').slice(0, 22));
+      }
+    }
+    if (String(req.query.aplicar || '') !== '1') {
+      return res.status(200).json({ ok: removidas.length === 0,
+        modo: 'prévia', total: lista.length,
+        duplicadas: removidas.length, ficam: ficam.length,
+        L: removidas.slice(0, 50),
+        criterio: 'mesma OS, mesmo card, mesmo cliente, equipamento e técnico · inspeção já tratada tem preferência',
+        dica: removidas.length ? 'para limpar: &aplicar=1' : undefined });
+    }
+    db.inspecoes = ficam;
+    await dbSet(KEY, db);
+    return res.status(200).json({ ok: true, removidas: removidas.length, restam: ficam.length });
+  }
+
   // ── ↩️ DESFAZER-RECUPERADAS: remove as inspeções criadas em massa por engano ──
   if (action === 'desfazer-recuperadas') {
     const alvo = (db.inspecoes || []).filter(i => i.recuperada === true &&

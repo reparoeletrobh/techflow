@@ -733,20 +733,32 @@ module.exports = async function handler(req, res) {
             // 🔒 dois técnicos movendo ao mesmo tempo: cada um lê a lista sem a
             // inspeção do outro e o último a gravar apaga a primeira. Confere e
             // reinsere lendo o estado mais recente, até três vezes.
+            // 🔒 confere pelo identificador ÚNICO da inspeção, não pela assinatura,
+            // e limpa qualquer repetição antes de gravar. A versão anterior reinseria
+            // quando a leitura vinha atrasada e chegou a criar quatro cópias iguais.
+            const idNovo = q.inspecoes[0].id;
             let confirmou = false;
-            for (let tent = 1; tent <= 3 && !confirmou; tent++) {
-              const conf = (await dbGet(KQ)) || { inspecoes: [] };
-              confirmou = (conf.inspecoes || []).some(i => assinatura(i) === assinatura(minha));
-              if (confirmou) break;
-              await new Promise(s => setTimeout(s, 200 * tent));
+            for (let tent = 1; tent <= 2 && !confirmou; tent++) {
+              await new Promise(s => setTimeout(s, 300 * tent));
               const novo = (await dbGet(KQ)) || { inspecoes: [], config: { proximoNum: 1 } };
               novo.inspecoes = novo.inspecoes || [];
               novo.config = novo.config || { proximoNum: 1 };
-              if (!novo.inspecoes.some(i => assinatura(i) === assinatura(minha))) {
-                novo.inspecoes.unshift(q.inspecoes[0]);
-                novo.config.proximoNum = Math.max(novo.config.proximoNum || 1, num + 1);
+              const quantas = novo.inspecoes.filter(i => i.id === idNovo).length;
+              if (quantas === 1) { confirmou = true; break; }
+              if (quantas > 1) {
+                // já duplicou: mantém uma só
+                let vista = false;
+                novo.inspecoes = novo.inspecoes.filter(i => {
+                  if (i.id !== idNovo) return true;
+                  if (vista) return false; vista = true; return true;
+                });
                 await dbSet(KQ, novo);
+                confirmou = true; break;
               }
+              // não está lá: insere uma única vez
+              novo.inspecoes.unshift(q.inspecoes[0]);
+              novo.config.proximoNum = Math.max(novo.config.proximoNum || 1, num + 1);
+              await dbSet(KQ, novo);
             }
             card.inspecaoCriada = 'CQ-' + String(num).padStart(4, '0');
             card.inspecaoConfirmada = confirmou;
