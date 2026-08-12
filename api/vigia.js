@@ -213,17 +213,36 @@ module.exports = async function handler(req, res) {
     const banco = String(req.query.banco || 'fichas_adm');
     const arquivo = banco + '_arquivo';
     const diasManter = Math.min(365, Math.max(7, parseInt(req.query.dias || '30', 10)));
+    const manterN = parseInt(req.query.manter || '0', 10);   // manter as N mais recentes
     const corte = Date.now() - diasManter * 86400000;
-    const FINAIS = ['logistica', 'finalizado', 'descarte', 'cliente_loja', 'concluido'];
+    // fases em que a ficha já cumpriu seu papel no banco quente
+    const FINAIS = ['logistica', 'finalizado', 'descarte', 'cliente_loja', 'concluido',
+      'prospeccao', 'duplicada', 'arquivada', 'entregue'];
+    const ATIVAS = ['criada', 'contato_feito', 'entrar_contato'];
     const db = await dbGet(banco);
-    if (!db || !Array.isArray(db.fichas)) return res.status(200).json({ ok: false, error: 'banco sem lista fichas' });
+    const LISTA = Array.isArray((db || {}).fichas) ? 'fichas'
+      : Array.isArray((db || {}).cards) ? 'cards' : null;
+    if (!db || !LISTA) return res.status(200).json({ ok: false, error: 'banco sem lista reconhecida' });
+    const dtDe = f => new Date(f.criadoEm || f.registradoEm || f.movedAt || 0).getTime();
     const ficam = [], vao = [];
-    for (const f of db.fichas) {
-      const q = new Date(f.criadoEm || f.registradoEm || 0).getTime();
-      const antiga = q && q < corte;
-      const encerrada = FINAIS.includes(String(f.status || ''));
-      (antiga && encerrada ? vao : ficam).push(f);
+    if (manterN > 0) {
+      // 📌 critério simples e seguro: guarda as N mais recentes e tudo que ainda está
+      // ativo; o resto, já encerrado, vai para o arquivo
+      const ordenadas = [...db[LISTA]].sort((a, b) => dtDe(b) - dtDe(a));
+      ordenadas.forEach((f, i) => {
+        const ativa = ATIVAS.includes(String(f.status || ''));
+        const encerrada = FINAIS.includes(String(f.status || ''));
+        if (i < manterN || ativa || !encerrada) ficam.push(f); else vao.push(f);
+      });
+    } else {
+      for (const f of db[LISTA]) {
+        const q = dtDe(f);
+        const antiga = q && q < corte;
+        const encerrada = FINAIS.includes(String(f.status || ''));
+        (antiga && encerrada ? vao : ficam).push(f);
+      }
     }
+    db.fichas = db[LISTA];
     const tamAntes = JSON.stringify(db).length;
     const tamDepois = JSON.stringify({ ...db, fichas: ficam }).length;
     if (String(req.query.aplicar || '') !== '1') {
@@ -266,8 +285,14 @@ module.exports = async function handler(req, res) {
     const salvou = ((conf || {}).fichas || []).length >= arq.fichas.length - 2;
     if (!salvou) return res.status(200).json({ ok: false,
       error: '🚨 o arquivo não persistiu — NADA foi removido do banco quente' });
-    db.fichas = ficam;
+    db[LISTA] = ficam;
     await dbSet(banco, db);
+    // confere que o banco quente realmente encolheu
+    const conf2 = await dbGet(banco);
+    const agora = ((conf2 || {})[LISTA] || []).length;
+    if (agora !== ficam.length) return res.status(200).json({ ok: false,
+      error: '🚨 a gravação não persistiu — o arquivo foi salvo, mas o banco quente continua com ' + agora,
+      arquivadas: vao.length });
     return res.status(200).json({ ok: true,
       arquivadas: vao.length, permanecem: ficam.length,
       tamanhoAntesMB: (tamAntes / 1048576).toFixed(2),
@@ -440,9 +465,9 @@ module.exports = async function handler(req, res) {
         if (!b) continue;
         const t = JSON.stringify(b).length;
         tam[k] = (t / 1048576).toFixed(2) + ' MB';
-        if (t > 900000) add('🟠 MÉDIO', 'Banco', k, '',
-          'com ' + (t / 1048576).toFixed(2) + ' MB — perto do limite, gravações podem falhar',
-          'arquivar registros antigos');
+        if (t > 900000) add('🟠 MÉDIO', 'Banco', k, k,
+          'banco grande (' + (t / 1048576).toFixed(2) + ' MB) — quanto maior, maior a chance de duas gravações se sobreporem e uma ficha se perder',
+          '/api/vigia?action=arquivar-antigas&banco=' + k + '&manter=400&aplicar=1');
       } catch (e) {}
     }
 
@@ -485,6 +510,79 @@ module.exports = async function handler(req, res) {
         .concat(P.some(x => /Ficha Criada/.test(x.problema)) ? ['criadas'] : [])
         .concat(P.some(x => /fila de tratamento/.test(x.problema)) ? ['garantia'] : []),
       COMO_RESOLVER: [...new Set(P.map(x => x.resolver).filter(r => r.startsWith('/api')))] });
+  }
+
+  // ── 📋 PLANO: as etapas que o Resolver vai executar, uma a uma ──
+  if (action === 'plano') {
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const etapas = [];
+    // 1) devoluções do remarcar, dia a dia
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(Date.now() - 3 * 3600000 - i * 86400000).toISOString().slice(0, 10);
+      etapas.push({ id: 'remarcar-' + d,
+        titulo: 'Devolver ao atendimento as fichas do Remarcar de ' + d.slice(8) + '/' + d.slice(5, 7),
+        oQueFaz: 'procura fichas que saíram da coluna Remarcar naquele dia e não chegaram em Entrar em Contato, e as recria',
+        url: 'logistica?action=recriar-perdidas&dia=' + d + '&aplicar=1' });
+    }
+    etapas.push({ id: 'pendentes',
+      titulo: 'Reprocessar a fila de pendências do Remarcar',
+      oQueFaz: 'tenta de novo as devoluções cuja gravação não persistiu',
+      url: 'logistica?action=processar-pendentes&aplicar=1' });
+    etapas.push({ id: 'criadas',
+      titulo: 'Destravar fichas abordadas presas em Ficha Criada',
+      oQueFaz: 'move para Contato Feito quem o bot já abordou, usando o horário real da abordagem',
+      url: 'wa-bot?action=destravar-criadas&aplicar=1' });
+    etapas.push({ id: 'garantia',
+      titulo: 'Enviar à fila de tratamento as garantias de loja',
+      oQueFaz: 'garantia de loja entra na fila ao ser cadastrada; esta etapa recupera as que ficaram fora',
+      url: 'garantia?action=sincronizar-fila&aplicar=1' });
+    etapas.push({ id: 'despachar',
+      titulo: 'Enviar mensagens que aguardavam a janela do WhatsApp reabrir',
+      oQueFaz: 'quem respondeu ao template recebe agora a mensagem que ficou guardada',
+      url: 'wa-bot?action=despachar-pendentes&aplicar=1' });
+    return res.status(200).json({ ok: true, etapas,
+      naoAutomatico: [
+        'garantia sem tipo — precisa da sua decisão sobre qual tipo atribuir',
+        'card sem valor — o valor tem de ser informado por uma pessoa',
+        'banco grande — o arquivamento tem etapa própria, com prévia',
+      ] });
+  }
+
+  // ── ▶️ EXECUTAR-ETAPA: roda uma etapa e devolve o que aconteceu ──
+  if (action === 'executar-etapa') {
+    const url = String(req.query.url || '');
+    if (!url || !/^[a-z-]+\?action=/.test(url)) {
+      return res.status(400).json({ ok: false, error: 'etapa inválida' });
+    }
+    const K = (process.env.TECHFLOW_KEY || 'tfk-re2026-Bx7mQp9zKw4Y').trim();
+    const inicio = Date.now();
+    try {
+      const resp = await fetch('https://reparoeletroadm.com/api/' + url + '&k=' + K);
+      const txt = await resp.text();
+      let r = null;
+      try { r = JSON.parse(txt); } catch (e) {
+        return res.status(200).json({ ok: false, httpStatus: resp.status,
+          erro: 'a resposta não veio em formato JSON',
+          respostaCrua: txt.slice(0, 400), duracaoMs: Date.now() - inicio });
+      }
+      // resume o que mudou, em linguagem de operação
+      const n = r.recriadas || r.destravadas || r.enviadas || r.resolvidas || r.restauradas ||
+        r.arquivadas || r.criadas || r.movidas || 0;
+      const nada = (r.pendentes === 0) || (r.msg && /nada/i.test(r.msg));
+      return res.status(200).json({ ok: r.ok !== false,
+        httpStatus: resp.status,
+        quantidade: n,
+        semNadaAFazer: !!nada,
+        resumo: nada ? 'nada a fazer nesta etapa'
+          : (n ? n + ' registro(s) tratado(s)' : 'executada'),
+        detalhe: r.feitos || r.L || r.nomes || r.lista || null,
+        erro: r.ok === false ? (r.error || 'falhou') : null,
+        retornoCompleto: r,
+        duracaoMs: Date.now() - inicio });
+    } catch (e) {
+      return res.status(200).json({ ok: false, erro: e.message, tipo: 'exceção',
+        duracaoMs: Date.now() - inicio });
+    }
   }
 
   // ── 🛠️ RESOLVER: aplica as correções conhecidas, uma por tipo de problema ──

@@ -127,80 +127,109 @@ function toggleGrupo(i){
     + (g.quantos > g.quem.length ? '<br><i>… e mais '+(g.quantos-g.quem.length)+'</i>' : '');
 }
 async function abrirResolver(){
-  var prev = null;
-  try { prev = await fetch('/api/vigia?action=resolver').then(function(x){return x.json();}); } catch(e){}
-  if(!prev){ alert('não consegui carregar o que será resolvido'); return; }
+  var plano = null;
+  try { plano = await fetch('/api/vigia?action=plano').then(function(x){return x.json();}); } catch(e){}
+  if(!plano || !plano.ok){ alert('não consegui montar o plano de correção'); return; }
+  window._plano = plano;
   var e2 = function(s){ return String(s||'').replace(/</g,'&lt;'); };
   var ov = document.createElement('div');
   ov.id = 'ov-resolver';
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9999;display:flex;'
-    + 'align-items:center;justify-content:center;padding:18px;';
-  ov.innerHTML = '<div style="background:#0d1117;border:1px solid #2a3140;border-radius:15px;padding:20px 22px;'
-    + 'max-width:560px;width:100%;max-height:82vh;overflow-y:auto;">'
-    + '<div style="font-size:16px;font-weight:900;color:#4ade80;">🛠️ Resolver pendências</div>'
-    + '<div style="font-size:12.5px;color:#8b93a3;margin-top:10px;">O sistema vai executar automaticamente:</div>'
-    + '<div style="background:#0f1319;border:1px solid #1e2228;border-radius:9px;padding:11px 13px;margin-top:7px;'
-      + 'font-size:12px;color:#c9ced6;line-height:1.9;">'
-      + ((prev.oQueSeraFeito||[]).map(function(x){return '• '+e2(x);}).join('<br>') || 'nada automático a fazer')
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9999;display:flex;'
+    + 'align-items:center;justify-content:center;padding:16px;';
+  ov.innerHTML = '<div style="background:#0d1117;border:1px solid #2a3140;border-radius:15px;'
+    + 'max-width:640px;width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">'
+    + '<div style="padding:16px 20px;border-bottom:1px solid #1e2228;">'
+      + '<div style="font-size:16px;font-weight:900;color:#4ade80;">🛠️ Resolver pendências</div>'
+      + '<div style="font-size:12px;color:#8b93a3;margin-top:5px;">'
+        + plano.etapas.length + ' etapas · cada uma é registrada abaixo com o resultado</div>'
     + '</div>'
-    + '<div style="font-size:12.5px;color:#fbbf24;margin-top:13px;">⚠️ NÃO será feito automaticamente:</div>'
-    + '<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:9px;'
-      + 'padding:11px 13px;margin-top:7px;font-size:11.5px;color:#c9ced6;line-height:1.9;">'
-      + (prev.naoSeraFeito||[]).map(function(x){return '• '+e2(x);}).join('<br>')
-    + '</div>'
-    + '<div id="resolver-saida" style="margin-top:12px;"></div>'
-    + '<div style="display:flex;gap:9px;margin-top:16px;">'
-      + '<button id="btn-conf-resolver" onclick="confirmarResolver()" style="flex:1;background:#15803d;border:none;'
-        + 'border-radius:9px;padding:11px;color:#fff;font-weight:800;cursor:pointer;font-size:13px;">✅ Executar</button>'
-      + '<button onclick="document.getElementById(\'ov-resolver\').remove()" style="background:#374151;border:none;'
-        + 'border-radius:9px;padding:11px 18px;color:#fff;font-weight:800;cursor:pointer;font-size:13px;">Cancelar</button>'
+    + '<div id="chat-resolver" style="flex:1;overflow-y:auto;padding:14px 18px;background:#0b0e13;'
+      + 'font-size:12.5px;line-height:1.65;min-height:220px;"></div>'
+    + '<div style="padding:13px 18px;border-top:1px solid #1e2228;display:flex;gap:9px;align-items:center;">'
+      + '<button id="btn-exec" onclick="executarPlano()" style="flex:1;background:#15803d;border:none;'
+        + 'border-radius:9px;padding:11px;color:#fff;font-weight:800;cursor:pointer;font-size:13px;">▶️ Começar</button>'
+      + '<button id="btn-copiar-log" onclick="copiarLogResolver()" style="display:none;background:#1d4ed8;'
+        + 'border:none;border-radius:9px;padding:11px 15px;color:#fff;font-weight:800;cursor:pointer;font-size:12.5px;">📋 Copiar</button>'
+      + '<button onclick="document.getElementById(\'ov-resolver\').remove();exameDoSistema();" '
+        + 'style="background:#374151;border:none;border-radius:9px;padding:11px 16px;color:#fff;'
+        + 'font-weight:800;cursor:pointer;font-size:12.5px;">Fechar</button>'
     + '</div>'
   + '</div>';
   document.body.appendChild(ov);
+  window._logResolver = [];
+  falaResolver('sistema', 'Vou executar ' + plano.etapas.length + ' etapas. Nada é feito sem você clicar em Começar.');
+  (plano.naoAutomatico||[]).forEach(function(x){ falaResolver('aviso', 'Não será feito: ' + x); });
 }
-
-function copiarErroResolver(){
-  var t = document.getElementById('txt-erro');
-  if(!t) return;
-  t.select(); t.setSelectionRange(0, 999999);
-  try { document.execCommand('copy'); alert('✅ copiado — cole na conversa com o suporte'); }
-  catch(e){ alert('selecione o texto e copie manualmente'); }
-}
-async function confirmarResolver(){
-  var b = document.getElementById('btn-conf-resolver');
-  var saida = document.getElementById('resolver-saida');
-  if(b){ b.disabled = true; b.textContent = '⏳ resolvendo…'; }
-  var r = null;
-  try { r = await fetch('/api/vigia?action=resolver&aplicar=1').then(function(x){return x.json();}); } catch(e){}
-  if(!r){ if(saida) saida.innerHTML = '<div style="color:#f87171;font-size:12px;">erro ao executar</div>';
-    if(b){ b.disabled=false; b.textContent='✅ Executar'; } return; }
+function falaResolver(tipo, texto, extra){
+  var cx = document.getElementById('chat-resolver');
+  if(!cx) return;
+  var hora = new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  var cores = { sistema:'#60a5fa', acao:'#c9ced6', ok:'#4ade80', erro:'#f87171',
+                aviso:'#fbbf24', neutro:'#8b93a3' };
+  var icones = { sistema:'🤖', acao:'▶️', ok:'✅', erro:'🚨', aviso:'⚠️', neutro:'·' };
+  window._logResolver = window._logResolver || [];
+  window._logResolver.push('[' + hora + '] ' + (icones[tipo]||'') + ' ' + texto + (extra?'\n     '+extra:''));
   var e2 = function(s){ return String(s||'').replace(/</g,'&lt;'); };
-  window._erroResolver = (r.DIAGNOSTICO && r.DIAGNOSTICO.textoParaCopiar) || '';
-  if(saida) saida.innerHTML = '<div style="background:#0f1319;border:1px solid '
-    + (r.ok?'rgba(74,222,128,.4)':'rgba(239,68,68,.45)') + ';border-radius:9px;padding:11px 13px;'
-    + 'font-family:ui-monospace,monospace;font-size:10.5px;color:#c9ced6;line-height:1.8;max-height:220px;overflow-y:auto;">'
-    + '<b style="color:'+(r.ok?'#4ade80':'#f87171')+';">'+(r.ok?'✅ concluído':'🚨 houve falha')+'</b><br>'
-    + (r.feitos||[]).map(function(x){return '• '+e2(x);}).join('<br>')
-    + ((r.erros||[]).length ? '<br><b style="color:#f87171;">erros:</b><br>'+r.erros.map(function(x){return '• '+e2(x);}).join('<br>') : '')
-  + '</div>'
-  + (window._erroResolver
-    ? '<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.35);border-radius:9px;'
-      + 'padding:11px 13px;margin-top:9px;">'
-      + '<div style="font-size:11.5px;font-weight:900;color:#f87171;">📋 Detalhes do erro — envie para o suporte</div>'
-      + '<textarea id="txt-erro" readonly style="width:100%;height:120px;margin-top:7px;background:#0b0e13;'
-      + 'border:1px solid #242b39;border-radius:7px;padding:8px;color:#c9ced6;font-family:ui-monospace,monospace;'
-      + 'font-size:10px;resize:vertical;">'+e2(window._erroResolver)+'</textarea>'
-      + '<button onclick="copiarErroResolver()" style="margin-top:7px;background:#1d4ed8;border:none;'
-      + 'border-radius:8px;padding:7px 14px;color:#fff;font-weight:800;cursor:pointer;font-size:11.5px;">'
-      + '📋 Copiar tudo</button>'
-    + '</div>'
-    : '');
-  if(b){ b.disabled=false; b.textContent = r.ok ? '✔ feito' : '↻ tentar de novo'; }
-  // só fecha sozinho quando deu tudo certo — com erro, fica aberto para você copiar
-  if(r.ok) setTimeout(function(){
-    var ov=document.getElementById('ov-resolver'); if(ov)ov.remove();
-    exameDoSistema();
-  }, 2600);
+  var div = document.createElement('div');
+  div.style.cssText = 'margin-bottom:7px;';
+  div.innerHTML = '<span style="font-family:ui-monospace,monospace;font-size:10px;color:#404855;">'+hora+'</span> '
+    + '<span style="color:'+(cores[tipo]||'#c9ced6')+';">'+(icones[tipo]||'')+' '+e2(texto)+'</span>'
+    + (extra ? '<div style="margin:3px 0 0 46px;font-family:ui-monospace,monospace;font-size:10.5px;'
+      + 'color:#6b7280;line-height:1.75;white-space:pre-wrap;">'+e2(extra)+'</div>' : '');
+  cx.appendChild(div);
+  cx.scrollTop = cx.scrollHeight;
+}
+async function executarPlano(){
+  var b = document.getElementById('btn-exec');
+  if(b){ b.disabled = true; b.textContent = '⏳ executando…'; }
+  var etapas = (window._plano||{}).etapas || [];
+  var totalTratados = 0, falhas = 0;
+  falaResolver('sistema', 'Iniciando. Vou avisar o resultado de cada etapa.');
+  for (var i=0; i<etapas.length; i++){
+    var et = etapas[i];
+    falaResolver('acao', '('+(i+1)+'/'+etapas.length+') ' + et.titulo, et.oQueFaz);
+    var r = null;
+    try {
+      r = await fetch('/api/vigia?action=executar-etapa&url='+encodeURIComponent(et.url))
+        .then(function(x){return x.json();});
+    } catch(e){ r = { ok:false, erro:e.message }; }
+    if(!r){ falaResolver('erro','sem resposta do servidor'); falhas++; continue; }
+    if(r.ok){
+      if(r.semNadaAFazer){ falaResolver('neutro', 'nada a fazer aqui'); }
+      else {
+        totalTratados += (r.quantidade||0);
+        var det = null;
+        if(Array.isArray(r.detalhe) && r.detalhe.length){
+          det = r.detalhe.slice(0,12).map(function(x){return '• '+String(x).slice(0,90);}).join('\n')
+            + (r.detalhe.length>12 ? '\n… e mais '+(r.detalhe.length-12) : '');
+        }
+        falaResolver('ok', r.resumo + ' · ' + (r.duracaoMs||0) + 'ms', det);
+      }
+    } else {
+      falhas++;
+      falaResolver('erro', et.titulo + ' — ' + (r.erro||'falhou'),
+        'http: ' + (r.httpStatus||'?')
+        + (r.respostaCrua ? '\nresposta: ' + String(r.respostaCrua).slice(0,220) : '')
+        + (r.retornoCompleto ? '\nretorno: ' + JSON.stringify(r.retornoCompleto).slice(0,320) : ''));
+    }
+  }
+  falaResolver('sistema', falhas
+    ? 'Terminei com ' + falhas + ' falha(s) e ' + totalTratados + ' registro(s) tratado(s). Copie o log e envie para o suporte.'
+    : 'Terminei sem falhas. ' + totalTratados + ' registro(s) tratado(s).');
+  if(b){ b.disabled=false; b.textContent = falhas ? '↻ tentar de novo' : '✔ concluído'; }
+  var bc = document.getElementById('btn-copiar-log');
+  if(bc) bc.style.display = 'inline-block';
+  if(!falhas) setTimeout(exameDoSistema, 1500);
+}
+function copiarLogResolver(){
+  var txt = '=== RESOLVER — ' + new Date().toLocaleString('pt-BR') + ' ===\n'
+    + (window._logResolver||[]).join('\n');
+  var ta = document.createElement('textarea');
+  ta.value = txt; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); alert('✅ log copiado — cole na conversa com o suporte'); }
+  catch(e){ alert('não consegui copiar automaticamente'); }
+  ta.remove();
 }
 
 // ── 🏷️ badge do menu Qualidade: entraram hoje / concluídas hoje ──
