@@ -81,7 +81,7 @@ a{color:inherit;text-decoration:none;}
   scrollbar-width:thin;}
 .funil{position:relative;}
 /* linha-guia sutil na altura dos números-chave */
-.funil::before{content:'';position:absolute;left:0;right:0;bottom:70px;height:1px;
+.funil::before{content:'';position:absolute;left:0;right:0;bottom:84px;height:1px;
   background:linear-gradient(90deg,transparent,rgba(255,255,255,.09) 12%,rgba(255,255,255,.09) 88%,transparent);
   pointer-events:none;z-index:1;}
 .funil::-webkit-scrollbar{height:5px;}
@@ -107,10 +107,12 @@ a{color:inherit;text-decoration:none;}
   position:absolute;top:12px;left:14px;}
 /* 📏 tudo abaixo do rótulo é posicionado a partir da BASE comum, em alturas fixas,
    então os números-chave de todas as etapas ficam exatamente na mesma linha */
-.passo .plbl{position:absolute;left:14px;right:14px;bottom:94px;}
-.passo .pval{position:absolute;left:14px;right:14px;bottom:56px;}
-.passo .ptaxa{position:absolute;left:14px;bottom:33px;}
-.passo .pdet{position:absolute;left:14px;right:14px;bottom:12px;}
+.passo .plbl{position:absolute;left:14px;right:14px;bottom:108px;}
+.passo .pval{position:absolute;left:14px;right:14px;bottom:70px;}
+.passo .ptaxa{position:absolute;left:14px;bottom:46px;}
+/* 🏪💻 a divisão loja/online fica logo abaixo do número, com espaço próprio */
+.passo .pdet{position:absolute;left:14px;right:14px;bottom:10px;min-height:34px;}
+.passo .split{margin-top:0;}
 /* 📏 rótulo e número ocupam alturas fixas, então TODOS os números do funil
    ficam na mesma linha de visão, independentemente da altura da coluna */
 .plbl{font-size:10px;font-weight:750;color:var(--dim);letter-spacing:.045em;text-transform:uppercase;
@@ -120,7 +122,7 @@ a{color:inherit;text-decoration:none;}
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   text-shadow:0 0 26px currentColor;filter:saturate(1.15);}
 .pinfo{display:contents;}
-.pdet{font-size:10px;color:var(--fraco);line-height:1.4;height:29px;overflow:hidden;}
+.pdet{font-size:10px;color:var(--fraco);line-height:1.4;}
 /* o que sobra da altura vai para o rodapé da coluna, dando a forma do funil */
 .pfundo{margin-top:auto;}
 
@@ -130,8 +132,9 @@ a{color:inherit;text-decoration:none;}
 .t-medio{background:rgba(251,191,36,.13);color:var(--ambar);}
 .t-ruim{background:rgba(251,113,133,.13);color:var(--vermelho);}
 .split{display:flex;gap:4px;margin-top:7px;flex-wrap:wrap;}
-.chip{background:rgba(0,0,0,.32);border:1px solid var(--linha);border-radius:5px;padding:2px 6px;
-  font-size:9px;font-weight:700;color:var(--dim);white-space:nowrap;}
+.chip{background:rgba(0,0,0,.34);border:1px solid var(--linha);border-radius:5px;padding:3px 7px;
+  font-size:9.5px;font-weight:700;color:var(--dim);white-space:nowrap;line-height:1.25;}
+.chip b{font-family:var(--mono);font-size:11px;}
 .chip b{font-family:var(--mono);}
 
 .carregando{text-align:center;padding:80px 20px;color:var(--fraco);font-size:14px;}
@@ -304,7 +307,7 @@ function passo(n, lbl, val, cor, det, taxa, taxaLbl, altura){
 function blocoFrente(nome, d, cor, etiqueta){
   var roiCor = d.retorno>=3?'var(--verde)':d.retorno>=1?'var(--ambar)':'var(--vermelho)';
   // altura decrescente — a menor ainda comporta a faixa fixa de conteúdo (132px)
-  var L = [272, 252, 232, 213, 194, 176, 158, 140];
+  var L = [300, 282, 264, 246, 228, 210, 192, 174];
   var chip = function(v,t,c){ return '<span class="chip"><b style="color:'+c+'">'+v+'</b> '+t+'</span>'; };
   return '<div class="frente">'
     + '<div class="fhead">'
