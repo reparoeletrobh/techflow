@@ -44,6 +44,56 @@ export default async function handler(req, res) {
   if (!db.config) db.config = { tecnicos: [], proximoNum: 1 };
 
   // ── LOAD ──
+  // ── 🔎 CONFERIR-HOJE: o que existe e o que sumiu do controle de qualidade ──
+  if (action === 'conferir-hoje') {
+    const dia = String(req.query.dia || new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10));
+    const ini = new Date(dia + 'T00:00:00-03:00').getTime();
+    const fim = ini + 86400000;
+    const insp = db.inspecoes || [];
+    const doDia = insp.filter(i => {
+      const t = new Date(i.criadoEm || 0).getTime();
+      return t >= ini && t < fim;
+    });
+    // cards que entraram na fase hoje — a referência do que DEVERIA existir
+    const d8q = t => String(t || '').replace(/\D/g, '').slice(-8);
+    const comInsp = new Set(insp.map(i => String(i.cardId || '')).filter(Boolean));
+    const telComInsp = new Set(insp.map(i => d8q(i.telefone)).filter(t => t.length >= 8));
+    const cardsHoje = [], semInspecao = [];
+    for (const k of ['reparoeletro_board', 'reparoeletro_pipe', 'tv_pipe']) {
+      try {
+        const b = await dbGet(k);
+        for (const c of (((b || {}).cards) || [])) {
+          if (String(c.phaseId || c.phase || '') !== 'controle_qualidade') continue;
+          const t = new Date(c.entrouCqEm || c.movedAt || 0).getTime();
+          if (!t || t < ini || t >= fim) continue;
+          const item = { banco: k, id: c.id, cliente: c.nomeContato || c.nome || '?',
+            tel: d8q(c.telefone), equipamento: c.equipamento || c.descricao || '',
+            tecnico: c.tecnicoServico || c.tecnico || null,
+            entrou: c.entrouCqEm || c.movedAt };
+          cardsHoje.push(item);
+          if (!comInsp.has(String(c.id)) && !telComInsp.has(item.tel)) semInspecao.push(item);
+        }
+      } catch (e) {}
+    }
+    const hh3 = d => d ? new Date(new Date(d).getTime() - 3 * 3600000).toISOString().slice(11, 16) : '?';
+    return res.status(200).json({ ok: semInspecao.length === 0,
+      dia,
+      inspecoesDoDia: doDia.length,
+      cardsQueEntraramHoje: cardsHoje.length,
+      semInspecao: semInspecao.length,
+      VEREDITO: semInspecao.length === 0
+        ? '✅ todo card que entrou hoje tem inspeção — nada foi removido indevidamente'
+        : '🚨 ' + semInspecao.length + ' card(s) de hoje sem inspeção',
+      INSPECOES_DE_HOJE: doDia.map(i => hh3(i.criadoEm) + ' | ' + (i.os || '') +
+        ' | ' + String(i.cliente || '?').slice(0, 22) +
+        ' | ' + String(i.equipamentoTexto || i.equipamento || '').slice(0, 24) +
+        ' | téc: ' + (i.tecnico || '—') + ' | ' + i.status +
+        (i.recuperada ? ' | ⚠️ recuperada' : '') + (i.avulsa ? ' | avulsa' : '')),
+      SEM_INSPECAO: semInspecao.map(c => hh3(c.entrou) + ' | ' + String(c.cliente).slice(0, 22) +
+        ' ' + c.tel.slice(-4) + ' | ' + String(c.equipamento).slice(0, 24) +
+        ' | téc: ' + (c.tecnico || '—')) });
+  }
+
   // ── ↩️ DESFAZER-RECUPERADAS: remove as inspeções criadas em massa por engano ──
   if (action === 'desfazer-recuperadas') {
     const alvo = (db.inspecoes || []).filter(i => i.recuperada === true &&
