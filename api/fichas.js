@@ -141,11 +141,37 @@ export default async function handler(req, res) {
     // 3) cruzamento
     const telSis = new Set(doSistema.map(x => d8c(x.tel)).filter(x => x.length >= 8));
     const telPla = new Set(daPlanilha.map(x => d8c(x.tel)).filter(x => x.length >= 8));
-    const faltamNoSistema = daPlanilha.filter(x => !telSis.has(d8c(x.tel)));
+    // 🔍 quem não tem ficha DO DIA pode já existir no sistema de antes — o sync não
+    // duplica cliente que voltou em menos de 30 dias, e isso é o comportamento certo.
+    // Sem separar os dois casos, cliente conhecido aparecia como ficha perdida.
+    const OUTROS = ['fichas_adm', 'fichas_tv', 'reparoeletro_logistica', 'tv_logistica',
+      'reparoeletro_pipe', 'tv_pipe', 'prospeccao_adm', 'reparoeletro_arquivo'];
+    const ondeJaExiste = {};
+    for (const k of OUTROS) {
+      try {
+        const b = await dbGet(k);
+        for (const L of ['fichas', 'cards']) {
+          for (const x of ((b || {})[L] || [])) {
+            const t = d8c(x.telefone);
+            if (t.length < 8 || telSis.has(t)) continue;
+            if (!telPla.has(t)) continue;
+            const q = String(x.criadoEm || x.registradoEm || x.movedAt || '').slice(0, 10);
+            if (!ondeJaExiste[t] || q > ondeJaExiste[t].quando) {
+              ondeJaExiste[t] = { banco: k, quando: q || '?',
+                fase: String(x.status || x.phase || x.phaseId || '?') };
+            }
+          }
+        }
+      } catch (e) {}
+    }
+    const semFichaHoje = daPlanilha.filter(x => !telSis.has(d8c(x.tel)));
+    const jaConhecidos = semFichaHoje.filter(x => ondeJaExiste[d8c(x.tel)]);
+    const faltamNoSistema = semFichaHoje.filter(x => !ondeJaExiste[d8c(x.tel)]);
     const sobramNoSistema = doSistema.filter(x => !telPla.has(d8c(x.tel)));
     const bate = faltamNoSistema.length === 0 && sobramNoSistema.length === 0;
+    void bate;
 
-    return res.status(200).json({ ok: bate,
+    return res.status(200).json({ ok: faltamNoSistema.length === 0 && !erroPlanilha,
       dia, conferidoEm: carimbo + ' BRT',
       PLANILHA: { total: daPlanilha.length,
         tv: daPlanilha.filter(x => x.ehTv).length,
@@ -156,9 +182,16 @@ export default async function handler(req, res) {
         tv: doSistema.filter(x => x.sis === 'TV').length },
       diferenca: doSistema.length - daPlanilha.length,
       VEREDITO: erroPlanilha ? '🚨 não consegui ler a planilha: ' + erroPlanilha
+        : faltamNoSistema.length ? '🚨 ' + faltamNoSistema.length + ' ficha(s) da planilha não entraram — o sync automático traz em até 1h'
+        : jaConhecidos.length ? '✅ conferido — ' + jaConhecidos.length + ' cliente(s) já existiam no sistema, por isso não geraram ficha nova'
         : bate ? '✅ conferido — planilha e sistema batem'
-        : '⚠️ ' + faltamNoSistema.length + ' na planilha sem ficha · ' +
-          sobramNoSistema.length + ' no sistema sem linha na planilha',
+        : '⚠️ ' + sobramNoSistema.length + ' no sistema sem linha na planilha',
+      JA_CONHECIDOS: jaConhecidos.map(x => x.hora + ' | ' + String(x.nome).slice(0, 18) +
+        ' ' + d8c(x.tel).slice(-4) + ' → já está em ' +
+        (ondeJaExiste[d8c(x.tel)] || {}).banco + ' desde ' + (ondeJaExiste[d8c(x.tel)] || {}).quando +
+        ' (' + (ondeJaExiste[d8c(x.tel)] || {}).fase + ')'),
+      explicacao: 'cliente que voltou em menos de 30 dias não gera ficha nova — a original continua valendo',
+      syncAutomatico: 'roda aos 25 minutos de cada hora e traz sozinho o que faltar',
       FALTAM_NO_SISTEMA: faltamNoSistema.map(x => x.hora + ' | ' +
         String(x.nome).slice(0, 20) + ' ' + d8c(x.tel).slice(-4) + ' | ' +
         String(x.equipamento).slice(0, 24)),

@@ -215,10 +215,14 @@ async function conferirPlanilha(){
   try { r = await fetch('/api/fichas?action=confere-planilha').then(function(x){return x.json();}); } catch(e){}
   if(!r){ el.innerHTML = '<span style="color:#5a6270;">não consegui conferir</span>'; return; }
   var e2 = function(s){ return String(s||'').replace(/</g,'&lt;'); };
-  var cor = r.ok ? '#4ade80' : '#fbbf24';
+  var faltam = (r.FALTAM_NO_SISTEMA||[]).length;
+  var conhecidos = (r.JA_CONHECIDOS||[]).length;
+  var cor = faltam ? '#f87171' : '#4ade80';
   el.innerHTML = '<span style="color:'+cor+';cursor:pointer;font-weight:700;" onclick="detalheConferencia()">'
-    + (r.ok ? '✅' : '⚠️') + ' planilha ' + ((r.PLANILHA||{}).total||0)
+    + (faltam ? '🚨 '+faltam+' ficha(s) não entraram' : '✅ conferido')
+    + ' · planilha ' + ((r.PLANILHA||{}).total||0)
     + ' · sistema ' + ((r.SISTEMA||{}).total||0)
+    + (conhecidos ? ' · '+conhecidos+' já conhecido'+(conhecidos>1?'s':'') : '')
     + '</span> <span style="color:#5a6270;">· ' + e2(r.conferidoEm) + '</span>';
   window._conf = r;
 }
@@ -247,8 +251,11 @@ function detalheConferencia(){
         + '<div style="font-family:ui-monospace,monospace;font-size:20px;font-weight:700;color:#4ade80;">'+((r.SISTEMA||{}).total||0)+'</div>'
         + '<div style="font-size:9.5px;color:#5a6270;font-weight:700;">NO SISTEMA</div></div>'
     + '</div>'
-    + bloco('🚨 Na planilha e sem ficha no sistema', r.FALTAM_NO_SISTEMA, '#f87171')
+    + bloco('🚨 Na planilha e sem ficha — precisam entrar', r.FALTAM_NO_SISTEMA, '#f87171')
+    + bloco('✅ Já existiam no sistema — não geram ficha nova', r.JA_CONHECIDOS, '#4ade80')
     + bloco('⚠️ No sistema e sem linha na planilha', r.SOBRAM_NO_SISTEMA, '#fbbf24')
+    + (r.explicacao ? '<div style="font-size:11px;color:#8b93a3;margin-top:11px;line-height:1.6;">'
+        + 'ℹ️ ' + e2(r.explicacao) + '<br>🔄 ' + e2(r.syncAutomatico||'') + '</div>' : '')
     + '<div style="display:flex;gap:9px;margin-top:15px;">'
       + (r.comoCorrigir ? '<button onclick="recuperarFaltantes()" style="flex:1;background:#15803d;border:none;'
         + 'border-radius:9px;padding:10px;color:#fff;font-weight:800;cursor:pointer;font-size:12.5px;">🔄 Trazer as que faltam</button>' : '')
